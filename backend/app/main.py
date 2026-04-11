@@ -33,6 +33,14 @@ from app.routers.working_paper import router as working_paper_router
 from app.routers.qc import router as qc_router
 from app.routers.wp_review import router as wp_review_router
 from app.routers.sampling import router as sampling_router
+from app.routers.consolidation import router as consolidation_router
+from app.routers.consol_scope import router as consol_scope_router
+from app.routers.consol_trial import router as consol_trial_router
+from app.routers.internal_trade import router as internal_trade_router
+from app.routers.component_auditor import router as component_auditor_router
+from app.routers.goodwill import router as goodwill_router
+from app.routers.forex import router as forex_router
+from app.routers.minority_interest import router as minority_interest_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -105,3 +113,11 @@ app.include_router(working_paper_router)
 app.include_router(qc_router)
 app.include_router(wp_review_router)
 app.include_router(sampling_router)
+app.include_router(consolidation_router)
+app.include_router(consol_scope_router)
+app.include_router(consol_trial_router)
+app.include_router(internal_trade_router)
+app.include_router(component_auditor_router)
+app.include_router(goodwill_router)
+app.include_router(forex_router)
+app.include_router(minority_interest_router)
