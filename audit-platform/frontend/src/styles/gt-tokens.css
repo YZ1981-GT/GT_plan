@@ -1,0 +1,38 @@
+/**
+ * GT 品牌视觉 Token 系统
+ * 定义致同品牌色、间距、字体、圆角、阴影等 CSS 自定义属性
+ */
+:root {
+  /* 品牌色 */
+  --gt-color-primary: #4b2d77;
+  --gt-color-primary-light: #A06DFF;
+  --gt-color-primary-dark: #2B1D4D;
+  --gt-color-teal: #0094B3;
+  --gt-color-coral: #FF5149;
+  --gt-color-wheat: #FFC23D;
+  --gt-color-success: #28A745;
+
+  /* 间距（4px 网格） */
+  --gt-space-1: 4px;
+  --gt-space-2: 8px;
+  --gt-space-3: 12px;
+  --gt-space-4: 16px;
+  --gt-space-6: 24px;
+  --gt-space-8: 32px;
+
+  /* 圆角 */
+  --gt-radius-sm: 4px;
+  --gt-radius-md: 8px;
+  --gt-radius-lg: 12px;
+
+  /* 字体 */
+  --gt-font-family-zh: 'FZYueHei', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --gt-font-family-en: 'GT Walsheim', 'Helvetica Neue', Arial, sans-serif;
+  --gt-font-size-base: 16px;
+  --gt-line-height-base: 1.6;
+
+  /* 阴影（GT 紫色调） */
+  --gt-shadow-sm: 0 1px 3px rgba(75, 45, 119, 0.075);
+  --gt-shadow-md: 0 4px 12px rgba(75, 45, 119, 0.15);
+  --gt-shadow-lg: 0 8px 24px rgba(75, 45, 119, 0.175);
+}

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>审计侧边栏</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fafafa;
+      padding: 12px;
+    }
+
+    .gt-sidebar-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #4b2d77;
+      margin-bottom: 16px;
+    }
+
+    .gt-sidebar-header .gt-logo {
+      width: 24px;
+      height: 24px;
+      background: #4b2d77;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .gt-sidebar-header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #4b2d77;
+    }
+
+    .gt-section {
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(75, 45, 119, 0.075);
+    }
+
+    .gt-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #4b2d77;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gt-section-title .gt-icon {
+      font-size: 14px;
+    }
+
+    .gt-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .gt-info-label {
+      color: #666;
+    }
+
+    .gt-info-value {
+      color: #333;
+      font-weight: 500;
+    }
+
+    .gt-status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .gt-status-badge.gt-status-review {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .gt-status-badge.gt-status-done {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .gt-log-item {
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 12px;
+    }
+
+    .gt-log-item:last-child {
+      border-bottom: none;
+    }
+
+    .gt-log-time {
+      color: #999;
+      font-size: 11px;
+    }
+
+    .gt-log-action {
+      color: #333;
+      margin-top: 2px;
+    }
+
+    .gt-footer {
+      text-align: center;
+      color: #999;
+      font-size: 11px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #eee;
+    }
+  </style>
+</head>
+<body>
+  <!-- 头部 -->
+  <div class="gt-sidebar-header">
+    <div class="gt-logo">GT</div>
+    <h1>审计信息面板</h1>
+  </div>
+
+  <!-- 底稿信息 -->
+  <div class="gt-section">
+    <div class="gt-section-title">
+      <span class="gt-icon">📋</span> 底稿信息
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">底稿编号</span>
+      <span class="gt-info-value" id="wp-code">D1-1</span>
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">底稿名称</span>
+      <span class="gt-info-value" id="wp-name">应收账款明细表</span>
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">所属循环</span>
+      <span class="gt-info-value" id="wp-cycle">销售与收款循环</span>
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">编制人</span>
+      <span class="gt-info-value" id="wp-author">张三</span>
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">编制日期</span>
+      <span class="gt-info-value" id="wp-date">2025-03-15</span>
+    </div>
+  </div>
+
+  <!-- 复核状态 -->
+  <div class="gt-section">
+    <div class="gt-section-title">
+      <span class="gt-icon">✅</span> 复核状态
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">当前状态</span>
+      <span class="gt-info-value">
+        <span class="gt-status-badge gt-status-review" id="wp-status">待复核</span>
+      </span>
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">复核人</span>
+      <span class="gt-info-value" id="wp-reviewer">李四（项目经理）</span>
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">复核意见数</span>
+      <span class="gt-info-value" id="wp-comments">3 条</span>
+    </div>
+    <div class="gt-info-row">
+      <span class="gt-info-label">未解决问题</span>
+      <span class="gt-info-value" id="wp-issues">1 条</span>
+    </div>
+  </div>
+
+  <!-- 操作日志 -->
+  <div class="gt-section">
+    <div class="gt-section-title">
+      <span class="gt-icon">📝</span> 最近操作
+    </div>
+    <div id="log-list">
+      <div class="gt-log-item">
+        <div class="gt-log-time">2025-03-15 14:30</div>
+        <div class="gt-log-action">张三 编辑了单元格 B5:B20</div>
+      </div>
+      <div class="gt-log-item">
+        <div class="gt-log-time">2025-03-15 14:15</div>
+        <div class="gt-log-action">李四 添加了复核意见</div>
+      </div>
+      <div class="gt-log-item">
+        <div class="gt-log-time">2025-03-15 10:00</div>
+        <div class="gt-log-action">张三 创建了底稿</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="gt-footer">
+    致同审计作业平台 v0.1.0 (POC)
+  </div>
+
+  <!-- 插件 JS -->
+  <script src="index.js"></script>
+</body>
+</html>

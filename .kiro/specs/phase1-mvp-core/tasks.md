@@ -1,0 +1,371 @@
+# 实现计划：第一阶段MVP核心 — 数据导入+科目映射+四表联动+试算表+调整分录+重要性水平
+
+## 概述
+
+本实现计划将设计文档中的架构和组件拆解为可执行的编码任务，按照数据库→后端服务→前端页面→测试的顺序递进实现。每个任务构建在前序任务之上，确保无孤立代码。技术栈：Python（FastAPI + SQLAlchemy + Celery + Hypothesis）+ TypeScript（Vue 3 + Pinia + fast-check）。
+
+## 任务
+
+- [x] 1. 数据库迁移：创建10张核心表及索引
+  - [x] 1.1 创建 Alembic 迁移脚本，定义 `account_chart` 表（UUID PK、project_id FK、account_code、account_name、direction enum、level、category enum、parent_code、source enum、is_deleted、created_at、updated_at）及复合唯一索引 (project_id, account_code, source)
+    - _需求: 9.1_
+  - [x] 1.2 创建 `account_mapping` 表（UUID PK、project_id FK、original_account_code、original_account_name、standard_account_code、mapping_type enum、is_deleted、created_by FK、created_at、updated_at）及复合唯一索引 (project_id, original_account_code)
+    - _需求: 9.2_
+  - [x] 1.3 创建 `tb_balance` 表（UUID PK、project_id FK、year、company_code、account_code、account_name、opening_balance numeric(20,2)、debit_amount、credit_amount、closing_balance、currency_code、import_batch_id、is_deleted、created_at、updated_at）及复合索引 (project_id, year, account_code)
+    - _需求: 9.3_
+  - [x] 1.4 创建 `tb_ledger` 表（UUID PK、project_id FK、year、company_code、voucher_date、voucher_no、account_code、account_name、debit_amount、credit_amount、counterpart_account、summary、preparer、currency_code、import_batch_id、is_deleted、created_at、updated_at）及复合索引 (project_id, year, voucher_date, voucher_no) 和 (project_id, year, account_code)
+    - _需求: 9.4_
+  - [x] 1.5 创建 `tb_aux_balance` 表（UUID PK、project_id FK、year、company_code、account_code、aux_type、aux_code、aux_name、opening_balance、debit_amount、credit_amount、closing_balance、currency_code、import_batch_id、is_deleted、created_at、updated_at）及复合索引 (project_id, year, account_code, aux_type)
+    - _需求: 9.5_
+  - [x] 1.6 创建 `tb_aux_ledger` 表（UUID PK、project_id FK、year、company_code、voucher_date、voucher_no、account_code、aux_type、aux_code、aux_name、debit_amount、credit_amount、summary、preparer、currency_code、import_batch_id、is_deleted、created_at、updated_at）及复合索引 (project_id, year, account_code, aux_type)
+    - _需求: 9.6_
+  - [x] 1.7 创建 `adjustments` 表（UUID PK、project_id FK、year、company_code、adjustment_no、adjustment_type enum、description、account_code、account_name、debit_amount、credit_amount、entry_group_id、review_status enum、reviewer_id FK、reviewed_at、rejection_reason、is_deleted、created_by FK、updated_by FK、created_at、updated_at）及复合索引 (project_id, year, adjustment_type) 和 (project_id, entry_group_id)
+    - _需求: 9.7_
+  - [x] 1.8 创建 `trial_balance` 表（UUID PK、project_id FK、year、company_code、standard_account_code、account_name、account_category enum、unadjusted_amount、rje_adjustment、aje_adjustment、audited_amount、opening_balance、is_deleted、created_at、updated_at）及复合唯一索引 (project_id, year, company_code, standard_account_code)
+    - _需求: 9.8_
+  - [x] 1.9 创建 `materiality` 表（UUID PK、project_id FK、year、benchmark_type、benchmark_amount、overall_percentage、overall_materiality、performance_ratio、performance_materiality、trivial_ratio、trivial_threshold、is_override、override_reason、notes、calculated_by FK、calculated_at、is_deleted、created_at、updated_at）及复合唯一索引 (project_id, year)
+    - _需求: 9.9_
+  - [x] 1.10 创建 `import_batches` 表（UUID PK、project_id FK、year、source_type、file_name、data_type、record_count、status enum、validation_summary jsonb、started_at、completed_at、created_by FK、created_at）及索引 (project_id, year)
+    - _需求: 9.10_
+
+- [x] 2. 定义 SQLAlchemy ORM 模型与 Pydantic Schema
+  - [x] 2.1 在 `backend/app/models/` 下创建 `audit_platform_models.py`，定义10张表对应的 SQLAlchemy ORM 模型（AccountChart、AccountMapping、TbBalance、TbLedger、TbAuxBalance、TbAuxLedger、Adjustment、TrialBalance、Materiality、ImportBatch），包含所有字段、枚举类型、外键关系
+    - _需求: 9.1-9.10_
+  - [x] 2.2 在 `backend/app/models/` 下创建 `audit_platform_schemas.py`，定义所有 API 请求/响应的 Pydantic Schema（BasicInfoSchema、WizardState、MappingInput、MappingSuggestion、ImportProgress、AdjustmentCreate、AdjustmentUpdate、MaterialityInput、MaterialityResult、BalanceFilter、LedgerFilter 等）
+    - _需求: 1.1-1.8, 3.1-3.8, 4.1-4.24, 5.1-5.9, 6.1-6.12, 7.1-7.13, 8.1-8.9_
+
+- [x] 3. 检查点 — 确保数据库迁移和模型定义正确
+  - 运行 `alembic upgrade head` 确认迁移成功，确保所有测试通过，如有问题请询问用户。
+
+- [x] 4. 项目初始化向导（后端服务 + API）
+  - [x] 4.1 实现 `ProjectWizardService`，包含 `create_project`（创建项目记录 status=created）、`get_wizard_state`（获取向导当前状态）、`update_step`（更新步骤数据并持久化到 projects.wizard_state jsonb）、`validate_step`（校验必填字段和步骤依赖）、`confirm_project`（状态 created→planning）
+    - 步骤依赖：basic_info → account_import → account_mapping → materiality → template_set → confirmation
+    - 支持断点续做：退出后重新进入恢复已保存步骤数据
+    - _需求: 1.1, 1.2, 1.3, 1.4, 1.5, 1.7, 1.8_
+  - [x] 4.2 实现项目向导 API 路由（`backend/app/routers/project_wizard.py`）：POST `/api/projects` 创建项目、GET `/api/projects/{id}/wizard` 获取状态、PUT `/api/projects/{id}/wizard/{step}` 更新步骤、POST `/api/projects/{id}/wizard/validate/{step}` 校验、POST `/api/projects/{id}/wizard/confirm` 确认
+    - _需求: 1.1-1.8_
+  - [ ]* 4.3 编写属性测试：向导状态持久化与恢复
+    - **Property 25: 向导状态持久化与恢复**
+    - 使用 Hypothesis 生成随机步骤数据，验证退出后重新进入恢复所有已保存步骤
+    - **验证: 需求 1.4, 1.5**
+
+- [x] 5. 项目初始化向导（前端页面）
+  - [x] 5.1 实现向导页面容器组件 `ProjectWizard.vue`，包含顶部步骤条（6步）、中间内容区、底部导航按钮（上一步/下一步/确认），使用 Pinia store 管理向导状态
+    - _需求: 1.1, 1.4, 1.6_
+  - [x] 5.2 实现步骤1-基本信息表单（客户名称、审计年度、项目类型下拉、会计准则下拉、签字合伙人、项目经理），步骤6-确认汇总页面
+    - _需求: 1.2, 1.6, 1.7_
+
+- [x] 6. 标准科目表管理与科目导入
+  - [x] 6.1 实现标准科目表数据初始化：创建企业会计准则标准科目模板 JSON/CSV 种子数据（一级+二级科目，含编码、名称、借贷方向、级次、类别），实现 `AccountChartService.load_standard_template` 方法将标准科目加载到 `account_chart` 表（source=standard）
+    - _需求: 2.1, 2.2_
+  - [x] 6.2 实现客户科目表导入：`AccountChartService.import_client_chart` 解析 Excel/CSV 文件提取科目编码、名称、借贷方向、父科目编码，校验必填列（编码+名称），写入 `account_chart` 表（source=client）
+    - _需求: 2.3, 2.4, 2.5_
+  - [x] 6.3 实现科目表 API 路由：GET `/api/projects/{id}/account-chart/standard`、POST `/api/projects/{id}/account-chart/import`、GET `/api/projects/{id}/account-chart/client`（树形结构按类别分组）
+    - _需求: 2.2, 2.5, 2.6_
+  - [x] 6.4 实现前端步骤2-科目导入页面：文件上传区 + 导入结果树形展示（按科目类别折叠，显示导入总数）
+    - _需求: 2.6_
+
+- [x] 7. 科目映射引擎（自动匹配 + 手动调整）
+  - [x] 7.1 实现 `MappingService.auto_suggest`：按优先级执行自动匹配算法（编码前缀精确匹配 → 名称精确匹配 → 名称模糊匹配 Levenshtein/Jaccard 相似度>0.7 → 未匹配标记待人工映射）
+    - _需求: 3.1_
+  - [x] 7.2 实现 `MappingService` 的 `save_mapping`（保存单条映射）、`batch_confirm`（批量确认）、`get_completion_rate`（完成率计算）、`update_mapping`（修改映射，触发事件）方法，支持多对一映射
+    - _需求: 3.3, 3.4, 3.5, 3.7_
+  - [x] 7.3 实现映射完成率校验：有余额的未映射科目阻止向导前进
+    - _需求: 3.6_
+  - [x] 7.4 实现科目映射 API 路由：POST auto-suggest、GET 映射列表、POST 保存、PUT 修改、POST batch-confirm、GET completion-rate
+    - _需求: 3.1-3.8_
+  - [x] 7.5 实现前端步骤3-科目映射页面：三栏布局（左-客户科目、中-映射状态、右-标准科目），未匹配项黄色高亮，支持手动选择映射，显示完成率
+    - _需求: 3.2, 3.5_
+  - [ ]* 7.6 编写属性测试：科目映射往返一致性
+    - **Property 3: 科目映射往返一致性**
+    - 使用 Hypothesis 生成随机科目编码+名称对，验证映射查找返回正确的标准科目编码
+    - **验证: 需求 3.8**
+  - [ ]* 7.7 编写属性测试：映射完成率计算
+    - **Property 24: 映射完成率计算**
+    - 使用 Hypothesis 生成随机映射状态，验证完成率 = 已映射数/总数×100%
+    - **验证: 需求 3.5, 3.6**
+  - [ ]* 7.8 编写属性测试：自动映射建议正确性
+    - **Property 27: 自动映射建议正确性**
+    - 使用 Hypothesis 生成随机科目编码+名称，验证编码前缀匹配或名称相似度>阈值时建议包含对应标准科目
+    - **验证: 需求 3.1**
+
+- [x] 7a. 报表行次映射（AI匹配+集团参照）
+  - [x] 7a.1 创建 Alembic 迁移脚本，定义 `report_line_mapping` 表（UUID PK、project_id FK、standard_account_code varchar、report_type enum balance_sheet/income_statement/cash_flow、report_line_code varchar、report_line_name varchar、report_line_level int、parent_line_code varchar nullable、mapping_type enum ai_suggested/manual/reference_copied、is_confirmed boolean default false、is_deleted boolean default false、created_at、updated_at、created_by FK）及复合索引 (project_id, report_type, standard_account_code)
+    - _需求: 3.9_
+  - [x] 7a.2 实现 `ReportLineMappingService.ai_suggest_mappings`：加载标准科目列表+标准报表行次模板→调用LLM分析科目编码前缀+名称语义→生成映射建议（含置信度分数）→保存到 report_line_mapping（mapping_type=ai_suggested, is_confirmed=false）
+    - _需求: 3.10_
+  - [x] 7a.3 实现映射确认：`confirm_mapping`（单条确认）、`batch_confirm`（批量确认），确认后 is_confirmed=true
+    - _需求: 3.11_
+  - [x] 7a.4 实现集团内企业一键参照：`reference_copy`（查找同集团源企业已确认映射→筛选目标企业也存在的科目→复制映射 mapping_type=reference_copied, is_confirmed=false→返回复制数量和未匹配科目列表）
+    - _需求: 3.12, 3.13_
+  - [x] 7a.5 实现跨年度继承：`inherit_from_prior_year`（复制上年已确认映射到本年项目）
+    - _需求: 3.14_
+  - [x] 7a.6 实现报表行次映射 API 路由：POST ai-suggest、GET 列表、PUT confirm、POST batch-confirm、POST reference-copy、GET report-lines
+    - _需求: 3.9-3.14_
+  - [x] 7a.7 实现前端报表行次映射确认页面：AI建议列表（标准科目→建议报表行次+置信度分数+确认/拒绝/重新分配操作）、一键参照按钮（选择源企业）、未匹配科目高亮
+    - _需求: 3.10, 3.11, 3.12_
+
+- [x] 8. 检查点 — 确保向导、科目表、映射功能正常
+  - 确保所有测试通过，如有问题请询问用户。
+
+- [x] 9. 数据导入引擎（解析器工厂 + 校验规则链 + Celery异步任务）
+  - [x] 9.1 实现解析器工厂 `ParserFactory` 和基类 `BaseParser`，实现 `GenericParser`（通用标准模板解析器）解析 Excel/CSV 四表数据（余额表、序时账、辅助余额表、辅助明细账）
+    - _需求: 4.1, 4.2_
+  - [x] 9.2 实现 `YonyouParser`（用友U8/T+）、`KingdeeParser`（金蝶K3/KIS）、`SAPParser` 解析器，继承 BaseParser，处理各财务软件特有的列名和格式差异
+    - _需求: 4.1_
+  - [x] 9.3 实现校验引擎 `ValidationEngine`，采用责任链模式，实现以下校验规则：
+    - `YearConsistencyRule`（年度一致性，reject级别）
+    - `DebitCreditBalanceRule`（凭证借贷平衡，reject级别）
+    - `DuplicateDetectionRule`（重复记录检测，需用户选择skip/overwrite）
+    - `OpeningClosingRule`（期初期末勾稽，warning级别）
+    - `AccountCompletenessRule`（科目完整性，warning级别）
+    - 每条规则实现 `applies_to` 和 `execute` 方法
+    - _需求: 4.7-4.16_
+  - [x] 9.4 实现跨表校验规则：
+    - `LedgerBalanceReconcileRule`（序时账-余额表勾稽，warning级别）
+    - `AuxMainReconcileRule`（辅助-主表勾稽，warning级别）
+    - _需求: 4.17-4.20_
+  - [x] 9.5 实现 `ImportService.start_import`（创建 import_batch 记录，提交 Celery 任务）和 Celery 异步任务 `import_data_task`（解析→校验→批量写入 chunk_size=5000→应用已有映射→触发试算表重算→更新 Redis 进度）
+    - _需求: 4.3, 4.4, 4.5, 4.6_
+  - [x] 9.6 实现导入后处理：自动应用已有科目映射（`ImportService.apply_mappings`）、未映射科目加入待映射队列（`ImportService.queue_unmapped`）、导入回滚（`ImportService.rollback_import` 按 batch_id 删除所有记录，状态→rolled_back）
+    - _需求: 4.21, 4.22, 4.23_
+  - [x] 9.7 实现数据导入 API 路由：POST 上传启动导入、GET SSE进度推送、GET 批次列表、POST 回滚、POST 重复记录处理
+    - _需求: 4.3, 4.4, 4.23_
+  - [x] 9.8 实现前端数据导入面板：文件上传区（选择数据源类型+数据类型）、实时进度条（SSE）、导入日志展示、回滚按钮
+    - _需求: 4.3, 4.4, 4.6_
+  - [ ]* 9.9 编写属性测试：凭证借贷平衡校验
+    - **Property 7: 凭证借贷平衡校验**
+    - 使用 Hypothesis 生成随机凭证数据（含平衡和不平衡），验证不平衡凭证被拒绝
+    - **验证: 需求 4.7, 4.8**
+  - [ ]* 9.10 编写属性测试：期初期末勾稽校验
+    - **Property 8: 期初期末勾稽校验**
+    - 使用 Hypothesis 生成随机余额数据，验证借方/贷方科目勾稽公式
+    - **验证: 需求 4.9, 4.10**
+  - [ ]* 9.11 编写属性测试：导入数据年度一致性
+    - **Property 9: 导入数据年度一致性**
+    - 使用 Hypothesis 生成随机年度对，验证不匹配时拒绝导入
+    - **验证: 需求 4.13, 4.14**
+  - [ ]* 9.12 编写属性测试：重复记录检测
+    - **Property 10: 重复记录检测**
+    - 使用 Hypothesis 生成随机凭证号+日期组合，验证重复检测
+    - **验证: 需求 4.15**
+  - [ ]* 9.13 编写属性测试：账表勾稽校验
+    - **Property 11: 账表勾稽校验**
+    - 使用 Hypothesis 生成随机序时账+余额表数据，验证按科目汇总的发生额一致性
+    - **验证: 需求 4.17, 4.18**
+  - [ ]* 9.14 编写属性测试：辅助-主表勾稽校验
+    - **Property 12: 辅助-主表勾稽校验**
+    - 使用 Hypothesis 生成随机辅助余额+主余额数据，验证按科目汇总一致性
+    - **验证: 需求 4.19, 4.20**
+  - [ ]* 9.15 编写属性测试：导入回滚完整性
+    - **Property 13: 导入回滚完整性**
+    - 使用 Hypothesis 生成随机导入数据，验证回滚后所有记录移除且状态为 rolled_back
+    - **验证: 需求 4.23**
+  - [ ]* 9.16 编写属性测试：科目完整性校验
+    - **Property 28: 科目完整性校验**
+    - 使用 Hypothesis 生成随机科目编码集，验证不存在的科目被加入待映射队列
+    - **验证: 需求 4.11, 4.12**
+
+- [x] 10. 检查点 — 确保数据导入引擎和校验规则正常
+  - 确保所有测试通过，如有问题请询问用户。
+
+- [x] 11. 四表联动穿透查询（后端服务 + 前端页面）
+  - [x] 11.1 实现 `DrilldownService`：`get_balance_list`（科目余额表分页+筛选：科目类别、层级、关键词）、`drill_to_ledger`（穿透到序时账：按科目+日期范围+金额范围+凭证号+摘要关键词筛选）、`drill_to_aux_balance`（穿透到辅助余额表：按辅助维度分组）、`drill_to_aux_ledger`（穿透到辅助明细账）
+    - 使用 keyset pagination 避免大偏移量性能问题
+    - _需求: 5.1, 5.2, 5.3, 5.4, 5.6, 5.7, 5.8_
+  - [x] 11.2 实现四表穿透 API 路由：GET balance（分页+筛选）、GET ledger/{account_code}、GET aux-balance/{account_code}、GET aux-ledger/{account_code}
+    - _需求: 5.1-5.9_
+  - [x] 11.3 实现前端四表穿透页面：主从布局（左侧余额表主表+右侧穿透详情面板），面包屑导航（余额表>序时账>辅助余额>辅助明细），返回时保持父视图滚动位置和筛选状态（Pinia store 持久化）
+    - _需求: 5.1, 5.2, 5.3, 5.4, 5.9_
+  - [x] 11.4 实现序时账筛选功能：日期范围、金额范围、凭证号、摘要关键词搜索、对方科目筛选
+    - _需求: 5.7_
+  - [ ]* 11.5 编写属性测试：穿透查询数据过滤正确性
+    - **Property 15: 穿透查询数据过滤正确性**
+    - 使用 Hypothesis 生成随机科目编码和筛选条件，验证返回记录全部满足条件且无遗漏
+    - **验证: 需求 5.2, 5.7**
+  - [ ]* 11.6 编写属性测试：辅助维度穿透正确性
+    - **Property 16: 辅助维度穿透正确性**
+    - 使用 Hypothesis 生成随机辅助维度数据，验证穿透返回匹配科目+维度值的所有记录
+    - **验证: 需求 5.3, 5.4**
+
+- [x] 12. 试算表计算引擎（增量更新 + 全量重算 + 缓存）
+  - [x] 12.1 实现 `TrialBalanceService.recalc_unadjusted`：通过 SQL JOIN account_mapping 汇总 tb_balance.closing_balance 到标准科目，支持增量（指定科目列表）和全量模式
+    - _需求: 6.2_
+  - [x] 12.2 实现 `TrialBalanceService.recalc_adjustments`：按 adjustment_type 分组汇总 adjustments 表的 SUM(debit_amount)-SUM(credit_amount) 到 rje_adjustment 和 aje_adjustment 列
+    - _需求: 6.3, 6.4_
+  - [x] 12.3 实现 `TrialBalanceService.recalc_audited`：在数据库层面 UPDATE audited_amount = unadjusted_amount + rje_adjustment + aje_adjustment
+    - _需求: 6.5_
+  - [x] 12.4 实现 `TrialBalanceService.full_recalc`：全量重算（未审数→调整列→审定数），作为兜底方法
+    - _需求: 6.12_
+  - [x] 12.5 实现 Redis 缓存策略：缓存试算表查询结果 key=`tb:{project_id}:{year}`，TTL=10min，写操作触发缓存失效
+    - _需求: 6.6_
+  - [x] 12.6 实现试算表 API 路由：GET trial-balance（四列结构，按类别分组+小计+合计+借贷平衡指示器）、POST recalc（手动全量重算）、GET consistency-check、POST export（导出Excel）
+    - _需求: 6.1, 6.7, 6.8, 6.11_
+  - [x] 12.7 实现 `TrialBalanceService.check_consistency`：数据一致性校验（未审数=映射汇总、调整列=分录汇总、审定数公式正确），返回差异报告含期望值和实际值
+    - _需求: 10.8, 10.9_
+  - [ ]* 12.8 编写属性测试：试算表审定数公式不变量
+    - **Property 1: 试算表审定数公式不变量**
+    - 使用 Hypothesis 生成随机科目+随机调整分录，验证 audited = unadjusted + rje + aje
+    - **验证: 需求 6.5, 10.6**
+  - [ ]* 12.9 编写属性测试：未审数等于映射汇总
+    - **Property 4: 未审数等于映射汇总**
+    - 使用 Hypothesis 生成随机余额数据+映射关系，验证未审数 = 映射后 closing_balance 之和
+    - **验证: 需求 6.2**
+  - [ ]* 12.10 编写属性测试：调整列等于分录汇总
+    - **Property 5: 调整列等于分录汇总**
+    - 使用 Hypothesis 生成随机 AJE/RJE 分录集，验证调整列 = 对应类型分录汇总
+    - **验证: 需求 6.3, 6.4**
+  - [ ]* 12.11 编写属性测试：分类小计正确性
+    - **Property 17: 试算表分类小计正确性**
+    - 使用 Hypothesis 生成随机科目分类+金额，验证每类小计 = 该类所有科目金额之和
+    - **验证: 需求 6.7**
+  - [ ]* 12.12 编写属性测试：借贷平衡校验
+    - **Property 18: 试算表借贷平衡校验**
+    - 使用 Hypothesis 生成随机试算表数据，验证各列借方合计 = 贷方合计
+    - **验证: 需求 6.8**
+
+- [x] 13. 审计调整分录管理（CRUD + 复核状态机 + 事件发布）
+  - [x] 13.1 实现 `AdjustmentService.create_entry`：校验借贷平衡、自动生成编号（AJE-001/RJE-001）、写入 adjustments 表（同一 entry_group_id）、发布 AdjustmentChanged 事件
+    - _需求: 7.1, 7.2, 7.3, 7.4_
+  - [x] 13.2 实现 `AdjustmentService.update_entry`（仅 draft/rejected 状态可改）和 `delete_entry`（软删除，仅 draft/rejected 状态可删，触发试算表重算）
+    - _需求: 7.9, 7.10, 7.11_
+  - [x] 13.3 实现复核状态机 `AdjustmentService.change_review_status`：draft→pending_review、pending_review→approved（记录 reviewer_id+reviewed_at）、pending_review→rejected（需填 rejection_reason）、rejected→draft；禁止非法转换
+    - _需求: 7.6, 7.7, 7.8_
+  - [x] 13.4 实现 `AdjustmentService.get_summary`：汇总统计（AJE/RJE 数量、金额、各状态计数）
+    - _需求: 7.12_
+  - [x] 13.5 实现调整分录 API 路由：GET 列表（支持 type/status 筛选）、POST 创建、PUT 修改、DELETE 软删除、POST review 变更状态、GET summary
+    - _需求: 7.1-7.13_
+  - [x] 13.6 创建 `adjustment_entries` 明细行表（UUID PK、adjustment_id FK、entry_group_id UUID、line_no int、standard_account_code varchar、account_name varchar、report_line_code varchar nullable、debit_amount numeric(20,2)、credit_amount numeric(20,2)、is_deleted boolean、created_at、updated_at）及索引 (adjustment_id) 和 (entry_group_id)
+    - _需求: 7.17_
+  - [x] 13.7 实现科目下拉选择：`get_account_dropdown`（report_line_code=None→返回报表一级行次列表；report_line_code=指定值→返回该行次下的标准科目列表），数据来源 report_line_mapping + account_chart
+    - _需求: 7.14, 7.15_
+  - [x] 13.8 实现科目标准化校验：创建/修改分录时校验每行 standard_account_code 存在于 account_chart（source=standard），不存在则拒绝并返回错误
+    - _需求: 7.16_
+  - [x] 13.9 实现底稿审定表数据：`get_wp_adjustment_summary`（通过 wp_code→audit_cycle→standard_account_codes→汇总所有 AJE/RJE 明细→返回未审数+各笔调整明细+审定数）
+    - _需求: 7.18, 7.19_
+  - [x] 13.10 实现分录→底稿双向穿透 API：GET `/api/projects/{id}/adjustments/account-dropdown`、GET `/api/projects/{id}/adjustments/wp-summary/{wp_code}`
+    - _需求: 7.20_
+  - [ ]* 13.11 编写属性测试：调整分录借贷平衡不变量
+    - **Property 2: 调整分录借贷平衡不变量**
+    - 使用 Hypothesis 生成随机金额的借贷行项，验证 SUM(debit) = SUM(credit)
+    - **验证: 需求 7.2, 7.3, 7.13**
+  - [ ]* 13.12 编写属性测试：复核状态机合法转换
+    - **Property 19: 复核状态机合法转换**
+    - 使用 Hypothesis 生成随机状态转换序列，验证只允许合法路径，approved 不可编辑/删除
+    - **验证: 需求 7.6, 7.9, 7.10**
+  - [ ]* 13.13 编写属性测试：复核元数据完整性
+    - **Property 20: 复核元数据完整性**
+    - 使用 Hypothesis 生成随机复核操作，验证 approved 时 reviewer_id/reviewed_at 非空，rejected 时 rejection_reason 非空
+    - **验证: 需求 7.7, 7.8**
+
+- [x] 14. 检查点 — 确保试算表、调整分录、穿透查询功能正常
+  - 确保所有测试通过，如有问题请询问用户。
+
+- [x] 15. 重要性水平计算
+  - [x] 15.1 实现 `MaterialityService.calculate`：计算三级重要性水平（整体=基准×百分比、执行=整体×执行比例、微小=整体×微小比例）
+    - _需求: 8.3_
+  - [x] 15.2 实现 `MaterialityService.auto_populate_benchmark`：从试算表自动取基准金额（利润总额/营业收入/总资产/净资产），基于 BENCHMARK_MAPPING 配置
+    - _需求: 8.2_
+  - [x] 15.3 实现 `MaterialityService.override`：手动覆盖任意计算值，记录覆盖原因；实现 `get_change_history`：获取变更历史（修改前值、修改后值、变更原因、操作人、时间戳）
+    - _需求: 8.6, 8.9_
+  - [x] 15.4 实现重要性水平 API 路由：GET 获取当前值、POST calculate 计算、PUT override 覆盖、GET history 变更历史
+    - _需求: 8.1-8.9_
+  - [x] 15.5 实现前端步骤4-重要性水平页面：基准类型选择、参数输入、实时计算结果展示、手动覆盖输入框+原因说明
+    - _需求: 8.1, 8.5_
+  - [x] 15.6 实现重要性水平与其他模块联动：试算表高亮超过重要性水平的科目、调整分录标记低于微小错报临界值的分录
+    - _需求: 8.7_
+  - [ ]* 15.7 编写属性测试：重要性水平计算公式
+    - **Property 21: 重要性水平计算公式**
+    - 使用 Hypothesis 生成随机基准金额+百分比，验证三级指标计算公式正确
+    - **验证: 需求 8.3, 8.5**
+  - [ ]* 15.8 编写属性测试：重要性水平变更历史
+    - **Property 22: 重要性水平变更历史**
+    - 使用 Hypothesis 生成随机参数变更序列，验证每次变更都记录完整历史
+    - **验证: 需求 8.9**
+
+- [x] 16. 事件总线与联动逻辑
+  - [x] 16.1 实现进程内事件总线 `EventBus`（基于 asyncio）：`publish` 发布事件、`subscribe` 注册处理器，定义 EventType 枚举（ADJUSTMENT_CREATED/UPDATED/DELETED、MAPPING_CHANGED、DATA_IMPORTED、IMPORT_ROLLED_BACK、MATERIALITY_CHANGED）
+    - _需求: 10.1-10.6_
+  - [x] 16.2 实现事件处理器注册与联动逻辑：
+    - 调整分录 CRUD → `trial_balance_service.on_adjustment_changed`（增量重算受影响科目的调整列+审定数）
+    - 科目映射变更 → `trial_balance_service.on_mapping_changed`（重算旧+新标准科目的未审数）
+    - 数据导入完成 → `trial_balance_service.on_data_imported`（全量重算未审数）
+    - 导入回滚 → `trial_balance_service.on_import_rolled_back`（全量重算）
+    - _需求: 10.1, 10.2, 10.3, 10.4, 10.5_
+  - [x] 16.3 实现 SSE 推送机制：试算表更新完成后通过 SSE 通知前端刷新
+    - _需求: 10.1_
+  - [ ]* 16.4 编写属性测试：调整分录CRUD触发试算表增量更新
+    - **Property 6: 调整分录CRUD触发试算表增量更新**
+    - 使用 Hypothesis 生成随机 CRUD 操作序列，验证受影响科目立即更新且未受影响科目不变
+    - **验证: 需求 10.1, 10.2, 10.3, 7.4, 7.11**
+  - [ ]* 16.5 编写属性测试：科目映射变更触发双向重算
+    - **Property 23: 科目映射变更触发双向重算**
+    - 使用 Hypothesis 生成随机映射变更，验证旧+新标准科目的未审数都被重算
+    - **验证: 需求 10.4, 3.7**
+  - [ ]* 16.6 编写属性测试：数据一致性校验覆盖性
+    - **Property 26: 数据一致性校验覆盖性**
+    - 使用 Hypothesis 生成随机数据+人为注入不一致，验证三项校验全部覆盖且报告差异
+    - **验证: 需求 10.8, 10.9**
+
+- [x] 17. 检查点 — 确保事件总线和联动逻辑正常
+  - 确保所有测试通过，如有问题请询问用户。
+
+- [x] 18. 前端页面（试算表 + 调整分录 + 重要性水平）
+  - [x] 18.1 实现试算表页面 `TrialBalance.vue`：全屏表格（科目编码|科目名称|未审数|RJE调整|AJE调整|审定数），按科目类别分组+小计行，底部合计行+借贷平衡指示器（✓/✗），超过重要性水平的科目高亮
+    - _需求: 6.1, 6.7, 6.8_
+  - [x] 18.2 实现试算表穿透交互：未审数可点击→跳转四表穿透、RJE/AJE金额可点击→弹出调整分录明细列表；右上角导出Excel按钮、全量重算按钮、一致性校验按钮
+    - _需求: 6.9, 6.10, 6.11, 10.7_
+  - [x] 18.3 实现调整分录页面 `Adjustments.vue`：Tab切换（AJE/RJE/全部）、分录列表（编号、类型、摘要、金额、创建人、日期、复核状态彩色标签）、汇总面板（数量、金额、状态饼图）
+    - _需求: 7.5, 7.12_
+  - [x] 18.4 实现新建/编辑分录弹窗：动态行（借方/贷方行项，科目下拉选择标准科目，名称自动填充），实时显示借贷差额，提交时校验平衡
+    - _需求: 7.1, 7.2, 7.3_
+  - [x] 18.5 实现复核操作：经理可批量审批/驳回，驳回时弹出原因输入框
+    - _需求: 7.6, 7.7, 7.8_
+  - [x] 18.6 实现重要性水平独立页面 `Materiality.vue`（项目仪表盘中的汇总卡片 + 独立配置页面），显示基准类型、基准金额、三级指标
+    - _需求: 8.1, 8.8_
+
+- [x] 19. 前端集成与路由注册
+  - [x] 19.1 在 Vue Router 中注册所有新页面路由（项目向导、四表穿透、试算表、调整分录、重要性水平），在 `main.py` 中注册所有新 API 路由模块
+    - _需求: 1.1, 5.1, 6.1, 7.1, 8.1_
+  - [x] 19.2 实现前端 API 服务层 `auditPlatformApi.ts`：封装所有后端 API 调用（项目向导、科目表、映射、导入、穿透、试算表、调整分录、重要性水平）
+    - _需求: 1.1-10.9_
+
+- [x] 20. 检查点 — 确保前端页面和集成正常
+  - 确保所有测试通过，如有问题请询问用户。
+
+- [x] 21. 未更正错报汇总管理
+  - [x] 21.1 创建 Alembic 迁移脚本，定义 `unadjusted_misstatements` 表（UUID PK、project_id FK、year int、source_adjustment_id FK nullable、misstatement_description text、affected_account_code varchar、affected_account_name varchar、misstatement_amount numeric(20,2)、misstatement_type enum factual/judgmental/projected、management_reason text nullable、auditor_evaluation text nullable、is_carried_forward boolean default false、prior_year_id FK nullable、is_deleted boolean default false、created_at、updated_at、created_by FK）及复合索引 (project_id, year) 和索引 (source_adjustment_id)
+    - _需求: 12.1_
+  - [x] 21.2 在 `audit_platform_models.py` 中新增 `UnadjustedMisstatement` ORM 模型，在 `audit_platform_schemas.py` 中新增 `MisstatementCreate`、`MisstatementUpdate`、`MisstatementSummary`、`ThresholdResult` Pydantic Schema
+    - _需求: 11.1-11.8, 12.1_
+  - [x] 21.3 实现 `UnadjustedMisstatementService`：`create_misstatement`（创建记录）、`create_from_rejected_aje`（从被拒绝AJE预填充创建）、`get_summary`（按类型分组汇总+与重要性水平对比）、`get_cumulative_amount`（累计金额计算）、`check_materiality_threshold`（超限预警）、`carry_forward`（上年结转）、`check_evaluation_completeness`（评价完整性检查）
+    - _需求: 11.1-11.7_
+  - [x] 21.4 实现未更正错报 API 路由（`backend/app/routers/unadjusted_misstatements.py`）：GET 列表、POST 创建、POST from-aje/{group_id} 从AJE创建、PUT 更新、DELETE 软删除、GET summary 汇总视图
+    - _需求: 11.1-11.8_
+  - [x] 21.5 实现前端未更正错报汇总页面：错报列表（按类型分组+小计+总计）、与重要性水平对比卡片、超限预警横幅、管理层原因和审计师评价编辑
+    - _需求: 11.3, 11.4, 11.6, 11.7_
+  - [ ]* 21.6 编写属性测试：未更正错报累计金额一致性
+    - **Property 33: 未更正错报累计金额一致性**
+    - 使用 Hypothesis 生成随机错报记录集，验证汇总总额 = SUM(misstatement_amount)
+    - **验证: 需求 11.3, 11.8**
+  - [ ]* 21.7 编写属性测试：未更正错报超限预警
+    - **Property 34: 未更正错报超限预警**
+    - 使用 Hypothesis 生成随机错报金额+重要性水平，验证累计≥重要性时触发预警
+    - **验证: 需求 11.4**
+
+- [ ] 22. 导入-导出往返一致性测试
+  - [ ]* 22.1 编写属性测试：导入-导出往返一致性
+    - **Property 14: 导入-导出往返一致性**
+    - 使用 Hypothesis 生成随机完整数据集，验证导出试算表后重新导入产生等价余额
+    - **验证: 需求 4.24**
+
+- [x] 23. 最终检查点 — 全量测试通过
+  - 运行全部单元测试和属性测试，确保所有测试通过。如有问题请询问用户。
+
+## 备注
+
+- 标记 `*` 的子任务为可选测试任务，可跳过以加速 MVP 交付
+- 每个任务引用了具体的需求编号，确保需求全覆盖
+- 检查点任务确保增量验证，及时发现问题
+- 属性测试验证通用正确性属性，单元测试验证具体示例和边界条件
+- 所有35个正确性属性均已分配到对应的属性测试任务中（Property 1-32 + 33-35）
