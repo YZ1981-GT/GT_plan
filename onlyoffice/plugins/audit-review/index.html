@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>审计复核面板</title>
+  <style>
+    /* ========== 基础重置 ========== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fafafa;
+      padding: 12px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ========== GT 品牌头部 ========== */
+    .gt-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #4b2d77;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .gt-header .gt-logo {
+      width: 24px;
+      height: 24px;
+      background: #4b2d77;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    .gt-header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #4b2d77;
+    }
+
+    .gt-header .gt-refresh-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid #4b2d77;
+      color: #4b2d77;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .gt-header .gt-refresh-btn:hover {
+      background: #4b2d77;
+      color: #fff;
+    }
+
+    /* ========== 状态筛选栏 ========== */
+    .gt-filter-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .gt-filter-btn {
+      flex: 1;
+      padding: 4px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      font-size: 11px;
+      color: #666;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .gt-filter-btn.active {
+      border-color: #4b2d77;
+      color: #4b2d77;
+      font-weight: 600;
+      background: #f3eef9;
+    }
+
+    /* ========== 评论列表区域 ========== */
+    .gt-review-list {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 12px;
+    }
+
+    .gt-empty-tip {
+      text-align: center;
+      color: #999;
+      padding: 40px 0;
+      font-size: 12px;
+    }
+
+    /* ========== 评论卡片 ========== */
+    .gt-comment-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(75, 45, 119, 0.075);
+      border-left: 3px solid #ccc;
+    }
+
+    /* 状态左边框颜色 */
+    .gt-comment-card.status-open {
+      border-left-color: #FF5149;
+    }
+
+    .gt-comment-card.status-replied {
+      border-left-color: #0094B3;
+    }
+
+    .gt-comment-card.status-resolved {
+      border-left-color: #28a745;
+    }
+
+    /* 卡片头部：评论人 + 时间 + 状态 */
+    .gt-comment-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .gt-commenter {
+      font-weight: 600;
+      font-size: 12px;
+      color: #333;
+    }
+
+    .gt-comment-time {
+      font-size: 11px;
+      color: #999;
+      margin-left: auto;
+    }
+
+    .gt-status-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .gt-status-badge.badge-open {
+      background: #fff0ef;
+      color: #FF5149;
+    }
+
+    .gt-status-badge.badge-replied {
+      background: #e6f7fb;
+      color: #0094B3;
+    }
+
+    .gt-status-badge.badge-resolved {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    /* 评论正文 */
+    .gt-comment-text {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #333;
+      margin-bottom: 4px;
+    }
+
+    .gt-cell-ref {
+      display: inline-block;
+      background: #f3eef9;
+      color: #4b2d77;
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+    }
+
+    /* 回复内容 */
+    .gt-reply-block {
+      background: #f8f9fa;
+      border-radius: 4px;
+      padding: 6px 8px;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    .gt-reply-label {
+      font-size: 11px;
+      color: #0094B3;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .gt-reply-text {
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .gt-reply-time {
+      font-size: 10px;
+      color: #aaa;
+      margin-top: 2px;
+    }
+
+    /* 操作按钮区 */
+    .gt-comment-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .gt-action-btn {
+      padding: 3px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      font-size: 11px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .gt-action-btn:hover {
+      border-color: #4b2d77;
+      color: #4b2d77;
+    }
+
+    .gt-action-btn.btn-resolve {
+      border-color: #28a745;
+      color: #28a745;
+    }
+
+    .gt-action-btn.btn-resolve:hover {
+      background: #28a745;
+      color: #fff;
+    }
+
+    /* 内联回复表单 */
+    .gt-reply-form {
+      margin-top: 8px;
+      display: none;
+    }
+
+    .gt-reply-form.visible {
+      display: block;
+    }
+
+    .gt-reply-form textarea {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 48px;
+      margin-bottom: 4px;
+    }
+
+    .gt-reply-form textarea:focus {
+      outline: none;
+      border-color: #4b2d77;
+    }
+
+    .gt-reply-form .gt-reply-submit {
+      padding: 3px 12px;
+      background: #0094B3;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .gt-reply-form .gt-reply-submit:hover {
+      background: #007a96;
+    }
+
+    /* ========== 底部添加表单 ========== */
+    .gt-add-form {
+      flex-shrink: 0;
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: 0 1px 3px rgba(75, 45, 119, 0.075);
+    }
+
+    .gt-form-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #4b2d77;
+      margin-bottom: 8px;
+    }
+
+    .gt-add-form textarea {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 56px;
+      margin-bottom: 6px;
+    }
+
+    .gt-add-form textarea:focus {
+      outline: none;
+      border-color: #4b2d77;
+    }
+
+    .gt-add-form input[type="text"] {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      margin-bottom: 8px;
+    }
+
+    .gt-add-form input[type="text"]:focus {
+      outline: none;
+      border-color: #4b2d77;
+    }
+
+    .gt-submit-btn {
+      width: 100%;
+      padding: 6px 0;
+      background: #4b2d77;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .gt-submit-btn:hover {
+      background: #3a2260;
+    }
+
+    .gt-submit-btn:disabled {
+      background: #b8a5d0;
+      cursor: not-allowed;
+    }
+
+    /* ========== 页脚 ========== */
+    .gt-footer {
+      text-align: center;
+      color: #999;
+      font-size: 11px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+      flex-shrink: 0;
+    }
+</style>
+</head>
+<body>
+  <!-- 头部 -->
+  <div class="gt-header">
+    <div class="gt-logo">GT</div>
+    <h1>复核批注</h1>
+    <button class="gt-refresh-btn" id="btn-refresh" title="刷新">🔄 刷新</button>
+  </div>
+
+  <!-- 状态筛选 -->
+  <div class="gt-filter-bar">
+    <button class="gt-filter-btn active" data-status="">全部</button>
+    <button class="gt-filter-btn" data-status="open">待处理</button>
+    <button class="gt-filter-btn" data-status="replied">已回复</button>
+    <button class="gt-filter-btn" data-status="resolved">已解决</button>
+  </div>
+
+  <!-- 评论列表 -->
+  <div class="gt-review-list" id="review-list">
+    <div class="gt-empty-tip">加载中...</div>
+  </div>
+
+  <!-- 添加评论表单 -->
+  <div class="gt-add-form" id="add-form">
+    <div class="gt-form-title">📝 添加复核意见</div>
+    <textarea id="input-comment" placeholder="输入复核意见..." rows="3"></textarea>
+    <input type="text" id="input-cell-ref" placeholder="单元格引用（可选，如 B5）" />
+    <button class="gt-submit-btn" id="btn-add-comment">提交意见</button>
+  </div>
+
+  <!-- 页脚 -->
+  <div class="gt-footer">
+    致同审计作业平台 v0.1.0 (POC)
+  </div>
+
+  <!-- 插件 JS -->
+  <script src="index.js"></script>
+</body>
+</html>

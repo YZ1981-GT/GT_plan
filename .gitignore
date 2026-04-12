@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+.hypothesis/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+.nuxt/
+.output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+*.env.local
+
+# Storage & data
+storage/
+backend/data/sessions/
+
+# Build artifacts
+*.exe
+*.dll
+*.pyd
+
+# Large data files
+Excel财务数据采集*.xlsx

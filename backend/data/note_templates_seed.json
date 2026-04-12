@@ -1,0 +1,114 @@
+{
+  "description": "附注模版种子数据 — 最小集合，覆盖6个关键科目",
+  "account_mapping_template": [
+    {
+      "account_name": "货币资金",
+      "report_row_code": "BS-002",
+      "note_section": "五、1",
+      "section_title": "货币资金",
+      "content_type": "table",
+      "sort_order": 1,
+      "check_roles": ["余额", "其中项"],
+      "table_template": {
+        "headers": ["项目", "期末余额", "期初余额"],
+        "rows": [
+          {"label": "库存现金", "account_codes": ["1001"], "is_total": false},
+          {"label": "银行存款", "account_codes": ["1002"], "is_total": false},
+          {"label": "其他货币资金", "account_codes": ["1012"], "is_total": false},
+          {"label": "合计", "account_codes": [], "is_total": true}
+        ]
+      }
+    },
+    {
+      "account_name": "应收账款",
+      "report_row_code": "BS-005",
+      "note_section": "五、2",
+      "section_title": "应收账款",
+      "content_type": "table",
+      "sort_order": 2,
+      "check_roles": ["余额", "其中项"],
+      "table_template": {
+        "headers": ["项目", "期末余额", "期初余额"],
+        "rows": [
+          {"label": "应收账款", "account_codes": ["1122"], "is_total": false},
+          {"label": "减：坏账准备", "account_codes": [], "is_total": false},
+          {"label": "合计", "account_codes": [], "is_total": true}
+        ]
+      }
+    },
+    {
+      "account_name": "存货",
+      "report_row_code": "BS-008",
+      "note_section": "五、3",
+      "section_title": "存货",
+      "content_type": "table",
+      "sort_order": 3,
+      "check_roles": ["余额", "其中项"],
+      "table_template": {
+        "headers": ["项目", "期末余额", "期初余额"],
+        "rows": [
+          {"label": "原材料", "account_codes": ["1401"], "is_total": false},
+          {"label": "合计", "account_codes": [], "is_total": true}
+        ]
+      }
+    },
+    {
+      "account_name": "固定资产",
+      "report_row_code": "BS-014",
+      "note_section": "五、4",
+      "section_title": "固定资产",
+      "content_type": "table",
+      "sort_order": 4,
+      "check_roles": ["余额"],
+      "table_template": {
+        "headers": ["项目", "期末余额", "期初余额"],
+        "rows": [
+          {"label": "固定资产原值", "account_codes": ["1601"], "is_total": false},
+          {"label": "减：累计折旧", "account_codes": ["1602"], "is_total": false},
+          {"label": "固定资产净值", "account_codes": [], "is_total": true}
+        ]
+      }
+    },
+    {
+      "account_name": "短期借款",
+      "report_row_code": "BS-023",
+      "note_section": "五、5",
+      "section_title": "短期借款",
+      "content_type": "table",
+      "sort_order": 5,
+      "check_roles": ["余额"],
+      "table_template": {
+        "headers": ["项目", "期末余额", "期初余额"],
+        "rows": [
+          {"label": "短期借款", "account_codes": ["2001"], "is_total": false},
+          {"label": "合计", "account_codes": [], "is_total": true}
+        ]
+      }
+    },
+    {
+      "account_name": "营业收入",
+      "report_row_code": "IS-001",
+      "note_section": "五、6",
+      "section_title": "营业收入",
+      "content_type": "table",
+      "sort_order": 6,
+      "check_roles": ["余额"],
+      "table_template": {
+        "headers": ["项目", "本期金额", "上期金额"],
+        "rows": [
+          {"label": "主营业务收入", "account_codes": ["6001"], "is_total": false},
+          {"label": "合计", "account_codes": [], "is_total": true}
+        ]
+      }
+    }
+  ],
+  "check_presets": {
+    "货币资金": ["balance", "sub_item"],
+    "应收账款": ["balance", "sub_item"],
+    "存货": ["balance", "sub_item"],
+    "固定资产": ["balance"],
+    "短期借款": ["balance"],
+    "营业收入": ["balance"]
+  },
+  "wide_table_presets": {}
+}

@@ -1,0 +1,108 @@
+/**
+ * 全局样式
+ * 引入 GT 品牌 Token，覆盖 Element Plus 主题，定义 gt- 前缀工具类
+ */
+@import './gt-tokens.css';
+
+/* Element Plus 主题覆盖 — 使用 GT 紫色 */
+:root {
+  --el-color-primary: var(--gt-color-primary);
+  --el-color-primary-light-3: var(--gt-color-primary-light);
+  --el-color-primary-light-5: #c4a3e8;
+  --el-color-primary-light-7: #dbc8f0;
+  --el-color-primary-light-9: #f0e8f7;
+  --el-color-primary-dark-2: var(--gt-color-primary-dark);
+  --el-color-success: var(--gt-color-success);
+  --el-border-radius-base: var(--gt-radius-sm);
+  --el-font-size-base: var(--gt-font-size-base);
+}
+
+/* 基础重置 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: var(--gt-font-size-base);
+  line-height: var(--gt-line-height-base);
+}
+
+body {
+  font-family: var(--gt-font-family-zh);
+  color: #333;
+  background-color: #f5f5f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* gt- 前缀工具类 */
+.gt-card {
+  background: #fff;
+  border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm);
+  padding: var(--gt-space-4);
+}
+
+.gt-card:hover {
+  box-shadow: var(--gt-shadow-md);
+}
+
+.gt-button {
+  border-radius: var(--gt-radius-sm);
+  font-family: var(--gt-font-family-zh);
+  transition: all 0.2s ease;
+}
+
+.gt-button--primary {
+  background-color: var(--gt-color-primary);
+  color: #fff;
+  border: none;
+}
+
+.gt-button--primary:hover {
+  background-color: var(--gt-color-primary-light);
+}
+
+.gt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.gt-table th {
+  background-color: var(--gt-color-primary);
+  color: #fff;
+  padding: var(--gt-space-2) var(--gt-space-3);
+  text-align: left;
+}
+
+.gt-table td {
+  padding: var(--gt-space-2) var(--gt-space-3);
+  border-bottom: 1px solid #eee;
+}
+
+.gt-table tr:hover td {
+  background-color: var(--el-color-primary-light-9, #f0e8f7);
+}
+
+.gt-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--gt-space-4);
+}
+
+.gt-text-primary {
+  color: var(--gt-color-primary);
+}
+
+.gt-text-teal {
+  color: var(--gt-color-teal);
+}
+
+.gt-text-coral {
+  color: var(--gt-color-coral);
+}
