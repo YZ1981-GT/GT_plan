@@ -1,6 +1,6 @@
 # ============================================================
 # 审计作业平台 — Docker Compose 开发环境
-# 启动顺序：PostgreSQL → Redis → Ollama/ChromaDB → Backend → ONLYOFFICE
+# 启动顺序：PostgreSQL → Redis → Backend → ONLYOFFICE
 # ============================================================
 
 services:
@@ -45,53 +45,6 @@ services:
       start_period: 5s
 
   # ----------------------------------------------------------
-  # Ollama 本地LLM推理引擎
-  # ----------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: audit-ollama
-    restart: unless-stopped
-    ports:
-      - "${OLLAMA_PORT:-11434}:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    # GPU透传（可选，注释掉以支持CPU模式）
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  # ----------------------------------------------------------
-  # ChromaDB 向量数据库
-  # ----------------------------------------------------------
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: audit-chromadb
-    restart: unless-stopped
-    ports:
-      - "${CHROMADB_PORT:-8000}:8000"
-    volumes:
-      - chromadb_data:/chroma/chroma
-    environment:
-      IS_PERSISTENT: "TRUE"
-      ANONYMIZED_TELEMETRY: "FALSE"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
-  # ----------------------------------------------------------
   # FastAPI Backend（本地构建）
   # ----------------------------------------------------------
   backend:
@@ -113,20 +66,12 @@ services:
       ONLYOFFICE_URL: ${ONLYOFFICE_URL:-http://onlyoffice:80}
       WOPI_BASE_URL: ${WOPI_BASE_URL:-http://backend:8000/wopi}
       STORAGE_ROOT: ${STORAGE_ROOT:-./storage}
-      # AI 服务配置
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
-      CHROMADB_URL: ${CHROMADB_URL:-http://chromadb:8000}
-      PADDLEOCR_ENABLED: ${PADDLEOCR_ENABLED:-true}
     volumes:
       - ./storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-      chromadb:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
@@ -162,6 +107,4 @@ services:
 volumes:
   pg_data:
   redis_data:
-  ollama_data:
-  chromadb_data:
   office_data:

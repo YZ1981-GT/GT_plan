@@ -16,7 +16,5 @@ openpyxl
 # 测试依赖
 pytest
 pytest-asyncio
-pytest-cov
-hypothesis
 fakeredis
 aiosqlite

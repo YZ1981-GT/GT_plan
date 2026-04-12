@@ -158,18 +158,14 @@ class Notification(Base):
     recipient_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id"), nullable=False
     )
-    notification_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    message_type: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     related_object_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     related_object_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     is_read: Mapped[bool] = mapped_column(default=False)
-    is_deleted: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
-    )
 
     __table_args__ = (
-        Index("idx_notifications_recipient_read", "recipient_id", "is_read", "created_at"),
+        Index("idx_notifications_recipient_read", "recipient_id", "is_read"),
     )

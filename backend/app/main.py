@@ -11,9 +11,6 @@ from app.api.health import router as health_router
 from app.api.users import router as users_router
 from app.api.wopi import router as wopi_router
 from app.routers.account_chart import router as account_chart_router
-from app.routers.companies import router as companies_router
-from app.routers.consol_scope import router as consol_scope_router
-from app.routers.consol_scope import router as consol_scope_router_v2
 from app.routers.mapping import router as mapping_router
 from app.routers.project_wizard import router as project_wizard_router
 from app.routers.data_import import router as data_import_router
@@ -41,41 +38,9 @@ from app.routers.consol_scope import router as consol_scope_router
 from app.routers.consol_trial import router as consol_trial_router
 from app.routers.internal_trade import router as internal_trade_router
 from app.routers.component_auditor import router as component_auditor_router
-from app.routers.component_auditors import (
-    router as component_auditors_router,
-    instruction_router,
-    result_router,
-)
 from app.routers.goodwill import router as goodwill_router
 from app.routers.forex import router as forex_router
 from app.routers.minority_interest import router as minority_interest_router
-from app.routers.consol_report import router as consol_report_router
-from app.routers.consol_notes import router as consol_notes_router
-from app.routers.notifications import router as notifications_router
-from app.routers.sync import router as sync_router
-from app.routers.audit_logs import router as audit_logs_router
-from app.routers.project_mgmt import router as project_mgmt_router
-from app.routers.review import router as review_router
-from app.routers.subsequent_events import router as subsequent_events_router
-from app.routers.pbc import router as pbc_router
-from app.routers.confirmations import router as confirmations_router
-from app.routers.going_concern import router as going_concern_router
-from app.routers.archive import router as archive_router
-from app.routers.sync_conflict import router as sync_conflict_router
-from app.routers.audit_plan import router as audit_plan_router
-from app.routers.audit_findings import router as audit_findings_router
-from app.routers.ai_admin import router as ai_admin_router
-from app.routers.ai_risk_assessment import router as ai_risk_assessment_router
-from app.routers.ai_workpaper import router as ai_workpaper_router
-from app.routers.ai_ocr import router as ai_ocr_router, document_router as ai_document_router
-from app.routers.ai_pdf_export import router as ai_pdf_export_router
-from app.routers.ai_contract import router as ai_contract_router
-from app.routers.ai_evidence_chain import router as ai_evidence_chain_router, project_router as ai_evidence_chain_project_router
-from app.routers.ai_chat import router as ai_chat_router, project_router as ai_chat_project_router
-from app.routers.ai_confirmation import router as ai_confirmation_router
-from app.routers.ai_report import project_router as ai_report_router
-from app.routers.ai_knowledge import router as ai_knowledge_router
-from app.routers.nl_command import router as nl_command_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -89,21 +54,8 @@ from app.services.event_handlers import register_event_handlers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时注册事件处理器 + 预置AI模型"""
-    from app.core.seed_ai_models import seed_ai_models, ensure_active_chat_model
-    from app.core.database import async_session_maker
-
+    """应用生命周期：启动时注册事件处理器"""
     register_event_handlers()
-
-    # 预置 AI 模型初始数据
-    try:
-        async with async_session_maker() as db:
-            await seed_ai_models(db)
-            await ensure_active_chat_model(db)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"AI模型预置失败（非致命）: {e}")
-
     yield
 
 
@@ -163,44 +115,9 @@ app.include_router(wp_review_router)
 app.include_router(sampling_router)
 app.include_router(consolidation_router)
 app.include_router(consol_scope_router)
-app.include_router(consol_scope_router_v2)
-app.include_router(companies_router)
 app.include_router(consol_trial_router)
 app.include_router(internal_trade_router)
 app.include_router(component_auditor_router)
-app.include_router(component_auditors_router)
-app.include_router(instruction_router)
-app.include_router(result_router)
 app.include_router(goodwill_router)
 app.include_router(forex_router)
 app.include_router(minority_interest_router)
-app.include_router(consol_report_router)
-app.include_router(consol_notes_router)
-app.include_router(notifications_router, prefix="/api/v1")
-app.include_router(sync_router)
-app.include_router(audit_logs_router)
-app.include_router(project_mgmt_router)
-app.include_router(review_router)
-app.include_router(subsequent_events_router)
-app.include_router(pbc_router)
-app.include_router(confirmations_router)
-app.include_router(going_concern_router)
-app.include_router(archive_router)
-app.include_router(sync_conflict_router)
-app.include_router(audit_plan_router)
-app.include_router(audit_findings_router)
-app.include_router(ai_admin_router)
-app.include_router(ai_risk_assessment_router)
-app.include_router(ai_workpaper_router)
-app.include_router(ai_ocr_router)
-app.include_router(ai_document_router)
-app.include_router(ai_pdf_export_router)
-app.include_router(ai_contract_router)
-app.include_router(ai_evidence_chain_router)
-app.include_router(ai_evidence_chain_project_router)
-app.include_router(ai_chat_router)
-app.include_router(ai_chat_project_router)
-app.include_router(ai_confirmation_router)
-app.include_router(ai_report_router)
-app.include_router(ai_knowledge_router)
-app.include_router(nl_command_router)

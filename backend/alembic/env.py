@@ -16,9 +16,9 @@ from app.models import Base  # noqa: F401
 # Alembic Config 对象
 config = context.config
 
-# 配置日志（强制 UTF-8 编码解决 Windows GBK 问题）
+# 配置日志
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name, encoding="utf-8")
+    fileConfig(config.config_file_name)
 
 # 设置 target_metadata 供 autogenerate 使用
 target_metadata = Base.metadata

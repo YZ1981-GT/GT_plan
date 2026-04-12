@@ -90,20 +90,14 @@ def create_or_update_forex(
 def translate_amount(
     amount: Decimal, rate: Decimal | None, method: str = "bs"
 ) -> Decimal:
-    """按汇率折算金额（外币 → 人民币）
-
-    外币报表折算：外币金额 / 汇率 = 列报货币金额
-    例如：100 USD / 7.2 = 13.89 CNY
-
-    - bs: 资产负债表项目，用期末汇率
-    - pl: 利润表项目，用平均汇率
-    - equity: 所有者权益，用历史汇率（返回原值）
-    """
+    """按汇率折算金额"""
     if rate is None or rate == 0:
         return amount
-    if method in ("bs", "pl"):
-        return (amount / rate).quantize(Decimal("0.01"))
-    return amount  # equity uses historical rate, return as-is
+    if method == "bs":
+        return amount * rate
+    elif method == "pl":
+        return amount * rate
+    return amount  # equity uses historical, return as-is
 
 
 def delete_forex(db, forex_id: UUID, project_id: UUID) -> bool:

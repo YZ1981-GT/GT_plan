@@ -696,27 +696,6 @@ class EventType(str, enum.Enum):
     MATERIALITY_CHANGED = "materiality.changed"
     TRIAL_BALANCE_UPDATED = "trial_balance.updated"
     REPORTS_UPDATED = "reports.updated"
-    # Phase 2 合并抵消事件
-    ELIMINATION_CREATED = "elimination.created"
-    ELIMINATION_UPDATED = "elimination.updated"
-    ELIMINATION_DELETED = "elimination.deleted"
-    CONSOL_SCOPE_CHANGED = "consol.scope_changed"
-    FOREX_TRANSLATED = "forex.translated"
-    COMPONENT_RESULT_ACCEPTED = "component.result_accepted"
-    INTERNAL_TRADE_CHANGED = "internal_trade.changed"
-    INTERNAL_ARAP_CHANGED = "internal_arap.changed"
-    # Phase 2 商誉事件
-    GOODWILL_IMPAIRED = "goodwill.impaired"
-    # Phase 3 协作与质控事件
-    REVIEW_SUBMITTED = "review.submitted"
-    REVIEW_COMPLETED = "review.completed"
-    REVIEW_RESPONDED = "review.responded"
-    PROJECT_PHASE_CHANGED = "project.phase_changed"
-    ARCHIVE_COMPLETED = "archive.completed"
-    SYNC_CONFLICT = "sync.conflict"
-    CONFIRMATION_OVERDUE = "confirmation.overdue"
-    MISSTATEMENT_THRESHOLD = "misstatement.threshold_reached"
-    GOING_CONCERN_ALERT = "going_concern.alert"
 
 
 class EventPayload(BaseModel):

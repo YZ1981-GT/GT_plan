@@ -1,10 +1,10 @@
 {
   "enabled": true,
   "name": "自动保存记忆",
-  "description": "用户主动触发时，回顾本次对话，将有价值的用户偏好、技术决策、项目上下文、待办事项等更新到 .kiro/steering/memory.md 文件中",
-  "version": "2",
+  "description": "对话结束时，自动回顾本次对话，将有价值的用户偏好、技术决策、项目上下文、待办事项等更新到 .kiro/steering/memory.md 文件中",
+  "version": "1",
   "when": {
-    "type": "userTriggered"
+    "type": "agentStop"
   },
   "then": {
     "type": "askAgent",

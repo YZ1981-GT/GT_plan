@@ -18,9 +18,6 @@
         <el-menu-item index="/projects">
           <span>项目列表</span>
         </el-menu-item>
-        <el-menu-item index="/projects">
-          <span>合并报表</span>
-        </el-menu-item>
       </el-menu>
     </el-aside>
 

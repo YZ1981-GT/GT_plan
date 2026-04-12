@@ -3,10 +3,9 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
-from app.deps import get_current_user
-from app.core.database import get_db
+from app.api.deps import db, get_current_user
 from app.models.consolidation_schemas import (
     InternalTradeCreate,
     InternalTradeResponse,
@@ -38,7 +37,7 @@ router = APIRouter(prefix="/api/consolidation/internal-trade", tags=["内部交�
 def list_trades(
     project_id: UUID,
     year: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     return get_trades(db, project_id, year)
@@ -48,7 +47,7 @@ def list_trades(
 def create_trade_route(
     project_id: UUID,
     data: InternalTradeCreate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     return create_trade(db, project_id, data)
@@ -59,7 +58,7 @@ def update_trade_route(
     trade_id: UUID,
     project_id: UUID,
     data: InternalTradeUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     trade = update_trade(db, trade_id, project_id, data)
@@ -72,7 +71,7 @@ def update_trade_route(
 def delete_trade_route(
     trade_id: UUID,
     project_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     if not delete_trade(db, trade_id, project_id):
@@ -84,30 +83,17 @@ def delete_trade_route(
 def list_arap(
     project_id: UUID,
     year: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     return get_arap_list(db, project_id, year)
-
-
-@router.get("/arap/{arap_id}", response_model=InternalArApResponse)
-def get_arap_route(
-    arap_id: UUID,
-    project_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    arap = get_arap(db, arap_id, project_id)
-    if not arap:
-        raise HTTPException(status_code=404, detail="内部往来不存在")
-    return arap
 
 
 @router.post("/arap", response_model=InternalArApResponse, status_code=201)
 def create_arap_route(
     project_id: UUID,
     data: InternalArApCreate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     return create_arap(db, project_id, data)
@@ -118,7 +104,7 @@ def update_arap_route(
     arap_id: UUID,
     project_id: UUID,
     data: InternalArApUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     arap = update_arap(db, arap_id, project_id, data)
@@ -131,7 +117,7 @@ def update_arap_route(
 def delete_arap_route(
     arap_id: UUID,
     project_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     if not delete_arap(db, arap_id, project_id):
@@ -143,7 +129,7 @@ def delete_arap_route(
 def get_matrix(
     project_id: UUID,
     year: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(db),
     user=Depends(get_current_user),
 ):
     return get_transaction_matrix(db, project_id, year)
