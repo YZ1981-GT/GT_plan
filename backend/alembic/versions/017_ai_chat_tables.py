@@ -1,7 +1,7 @@
 """017 - AI chat session tables
 
 Revision ID: 017_ai_chat
-Revises: 016_ai_tables
+Revises: 016
 Create Date: 2024-12-01
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 revision = "017_ai_chat"
-down_revision = "016_ai_tables"
+down_revision = "016"
 branch_labels = None
 depends_on = None
 

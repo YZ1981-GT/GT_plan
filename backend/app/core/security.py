@@ -2,13 +2,10 @@
 
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
-
-# 密码哈希上下文 — bcrypt, cost factor ≥ 12
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
 
 def create_access_token(data: dict) -> str:
@@ -56,10 +53,16 @@ def decode_token(token: str) -> dict:
 
 
 def hash_password(password: str) -> str:
-    """使用 bcrypt 哈希密码（cost factor ≥ 12）。"""
-    return pwd_context.hash(password)
+    """使用 bcrypt 哈希密码（cost factor = 12）。"""
+    # bcrypt 限制密码长度为 72 字节
+    password_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt(rounds=12)
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """验证明文密码与哈希值是否匹配。"""
-    return pwd_context.verify(plain, hashed)
+    plain_bytes = plain.encode('utf-8')[:72]
+    hashed_bytes = hashed.encode('utf-8')
+    return bcrypt.checkpw(plain_bytes, hashed_bytes)

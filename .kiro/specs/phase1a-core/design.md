@@ -1311,7 +1311,7 @@ class ImportWarning:
 - **前端（TypeScript）**：使用 `fast-check` 库
 - 每个属性测试最少运行 **100次迭代**
 - 每个属性测试必须用注释引用设计文档中的属性编号
-- 标签格式：**Feature: phase1-mvp-core, Property {number}: {property_text}**
+- 标签格式：**Feature: phase1a-core, Property {number}: {property_text}**
 
 ### 属性测试覆盖矩阵
 
@@ -1359,7 +1359,7 @@ class ImportWarning:
 ### 每个属性测试必须包含的注释
 
 ```python
-# Feature: phase1-mvp-core, Property 1: 试算表审定数公式不变量
+# Feature: phase1a-core, Property 1: 试算表审定数公式不变量
 @given(
     accounts=st.lists(st.builds(AccountFactory), min_size=1, max_size=50),
     adjustments=st.lists(st.builds(AdjustmentFactory), min_size=0, max_size=20),

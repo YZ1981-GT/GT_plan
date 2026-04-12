@@ -34,7 +34,7 @@ from app.models.consolidation_models import (
 from app.models.consolidation_schemas import ConsolDisclosureSection
 from app.models.report_models import DisclosureNote, ContentType, SourceTemplate, NoteStatus
 from app.services.goodwill_service import get_goodwill_list
-from app.services.minority_interest_service import get_minority_interest_list
+from app.services.minority_interest_service import get_mi_list
 
 logger = logging.getLogger(__name__)
 
@@ -361,7 +361,7 @@ class ConsolDisclosureService:
         year: int,
     ) -> ConsolDisclosureSection:
         """生成少数股东权益披露"""
-        mi_records = get_minority_interest_list(self.db, project_id, year)
+        mi_records = get_mi_list(self.db, project_id, year)
 
         rows = []
         total_mi = Decimal("0")

@@ -27,13 +27,21 @@ class RefreshRequest(BaseModel):
 
 
 class UserCreate(BaseModel):
-    """创建用户请求"""
+    """创建用户请求（管理员使用）"""
 
     username: str
     email: EmailStr
     password: str
     role: UserRole
     office_code: str | None = None
+
+
+class UserRegister(BaseModel):
+    """用户注册请求（公开接口）"""
+
+    username: str
+    email: EmailStr
+    password: str
 
 
 # ---------------------------------------------------------------------------

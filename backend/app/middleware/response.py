@@ -72,9 +72,12 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
         }
         wrapped_bytes = json.dumps(wrapped, ensure_ascii=False).encode("utf-8")
 
+        # 去掉原始 Content-Length，Response 会自动根据新 body 计算
+        headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
+
         return Response(
             content=wrapped_bytes,
             status_code=response.status_code,
-            headers=dict(response.headers),
+            headers=headers,
             media_type="application/json",
         )

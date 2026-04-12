@@ -1,7 +1,7 @@
 """创建风险评估相关表
 
-Revision ID: 010
-Revises: 009
+Revision ID: 010a
+Revises: 010
 Create Date: 2024-06-15
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
-revision = '010'
-down_revision = '009'
+revision = '010a'
+down_revision = '010'
 branch_labels = None
 depends_on = None
 

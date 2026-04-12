@@ -7,13 +7,13 @@
 ## 任务
 
 - [ ] 1. 数据库迁移：创建21张协作相关表及索引
-  - [ ] 1.1 创建 Alembic 迁移脚本，定义 `users` 表（UUID PK、username varchar unique not null、password_hash varchar not null、display_name varchar、role enum admin/partner/manager/auditor/qc_reviewer/readonly、office_code varchar nullable、email varchar nullable、is_active boolean default true、is_deleted boolean default false、created_at、updated_at）及唯一索引 (username) 和索引 (role, is_active)
+  - [ ] 1.1 扩展 `users` 表（Phase 0 已创建基础版本），无需新增字段（role 枚举已包含 qc_reviewer），仅验证索引完整性
     - _需求: 10.1_
-  - [ ] 1.2 创建 `project_users` 表（UUID PK、project_id UUID FK、user_id UUID FK、project_role enum partner/manager/auditor/qc_reviewer/readonly、assigned_cycles jsonb、assigned_account_ranges jsonb、valid_from date、valid_to date nullable、is_deleted boolean default false、created_at、updated_at）及复合唯一索引 (project_id, user_id) 和索引 (project_id, project_role)
+  - [ ] 1.2 扩展 `project_users` 表（Phase 0 已创建基础版本），新增字段：assigned_cycles jsonb、assigned_account_ranges jsonb；更新 role 枚举为 project_role（与 phase0 的 role 字段区分）；及复合唯一索引 (project_id, user_id) 和索引 (project_id, project_role)
     - _需求: 10.2_
-  - [ ] 1.3 创建 `logs` 表（UUID PK、project_id UUID FK nullable、user_id UUID FK、operation_type enum create/update/delete/review/archive/login/logout、object_type varchar、object_id varchar、old_value jsonb nullable、new_value jsonb nullable、ip_address varchar、created_at）及复合索引 (project_id, created_at) 和索引 (user_id, created_at)
+  - [ ] 1.3 扩展 `logs` 表（Phase 0 已创建基础版本），新增字段：operation_type 扩展枚举值（增加 review/archive）、object_type 扩展枚举值；及复合索引 (project_id, created_at) 和索引 (user_id, created_at)
     - _需求: 10.3_
-  - [ ] 1.4 扩展 `review_records` 表，新增字段：review_level enum level_1/level_2、object_type enum working_paper/adjustment/report/subsequent_event/confirmation、review_opinion text not null、review_result enum approved/rejected/needs_revision、response_content text nullable、response_by UUID FK nullable、response_at timestamp nullable、is_resolved boolean default false；及复合索引 (project_id, object_type, object_id) 和索引 (reviewer_id, created_at)
+  - [ ] 1.4 扩展 `review_records` 表（Phase 1b 已创建基础版本），新增字段：review_level enum level_1/level_2、object_type enum working_paper/adjustment/report/subsequent_event/confirmation、review_opinion text not null、review_result enum approved/rejected/needs_revision、response_content text nullable、response_by UUID FK nullable、response_at timestamp nullable、is_resolved boolean default false、project_id UUID FK、reviewer_id UUID FK；及复合索引 (project_id, object_type, object_id) 和索引 (reviewer_id, created_at)
     - _需求: 10.4_
   - [ ] 1.5 创建 `subsequent_events` 表（UUID PK、project_id UUID FK、event_type enum adjusting/non_adjusting、discovery_date date not null、event_description text not null、affected_accounts jsonb、impact_amount numeric(20,2) nullable、treatment enum adjusted/disclosed/no_action_needed、related_adjustment_id UUID FK nullable、related_note_section varchar nullable、identified_by UUID FK、review_status enum draft/pending_review/approved/rejected default draft、is_deleted boolean default false、created_at、updated_at）及复合索引 (project_id, event_type)
     - _需求: 10.5_
@@ -31,7 +31,7 @@
     - _需求: 10.11_
   - [ ] 1.12 创建 `pbc_checklist` 表（UUID PK、project_id UUID FK、item_name varchar not null、audit_cycle varchar、requested_from varchar、due_date date、received_status enum not_received/received/overdue、received_date date nullable、notes text nullable、is_deleted boolean default false、created_at、updated_at）及复合索引 (project_id, audit_cycle)
     - _需求: 10.12_
-  - [ ] 1.13 创建 `notifications` 表（UUID PK、recipient_id UUID FK、notification_type enum review_pending/review_response/overdue_warning/misstatement_alert/sync_conflict/ai_complete/import_complete/confirmation_overdue、title varchar not null、content text not null、related_object_type varchar nullable、related_object_id UUID nullable、is_read boolean default false、created_at）及复合索引 (recipient_id, is_read, created_at)
+  - [ ] 1.13 扩展 `notifications` 表（Phase 0 已创建基础版本），扩展 notification_type 枚举值（增加 ai_complete/import_complete/confirmation_overdue/sync_conflict）；及复合索引 (recipient_id, is_read, created_at)
     - _需求: 10.13_
   - [ ] 1.14 创建 `confirmation_list` 表（UUID PK、project_id UUID FK、confirmation_no varchar、confirmation_type enum bank/receivable/payable/lawyer/other、counterparty_name varchar not null、account_code varchar、book_amount numeric(20,2)、cutoff_date date、approval_status enum draft/approved/submitted_to_center、approved_by UUID FK nullable、submitted_at timestamp nullable、is_deleted boolean default false、created_at、updated_at）及复合索引 (project_id, confirmation_type)
     - _需求: 10.14_

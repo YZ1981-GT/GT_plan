@@ -192,6 +192,7 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
     debit_amount: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
     credit_amount: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    lines: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     entry_group_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     related_company_codes: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     is_continuous: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)

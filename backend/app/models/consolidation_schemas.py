@@ -129,6 +129,16 @@ class ConsolTrialRow(BaseModel):
     consol_amount: Decimal = Field(default=Decimal("0"))
 
 
+class ConsolTrialUpdate(BaseModel):
+    """Update schema for consolidation trial balance row"""
+    account_name: str | None = None
+    account_category: str | None = None
+    individual_sum: Decimal | None = None
+    consol_adjustment: Decimal | None = None
+    consol_elimination: Decimal | None = None
+    consol_amount: Decimal | None = None
+
+
 class ConsolTrialResponse(ConsolTrialRow):
     id: UUID
     project_id: UUID
@@ -176,6 +186,8 @@ class EliminationEntryResponse(EliminationEntryBase):
     project_id: UUID
     entry_no: str
     entry_group_id: UUID
+    debit_amount: Decimal = Field(default=Decimal("0"))
+    credit_amount: Decimal = Field(default=Decimal("0"))
     is_continuous: bool
     prior_year_entry_id: UUID | None = None
     review_status: ReviewStatusEnum
@@ -533,6 +545,85 @@ class ResultResponse(BaseModel):
         from_attributes = True
 
 
+# ========== 合并附注 ==========
+
+
+class ConsolDisclosureRow(BaseModel):
+    """合并附注行"""
+    row_index: int | None = None
+    col1: str | None = Field(None, alias="col_1")
+    col2: str | None = Field(None, alias="col_2")
+    col3: str | None = Field(None, alias="col_3")
+    col4: str | None = Field(None, alias="col_4")
+    col5: str | None = Field(None, alias="col_5")
+    col6: str | None = Field(None, alias="col_6")
+
+    class Config:
+        populate_by_name = True
+
+
+class ConsolDisclosureSection(BaseModel):
+    """合并附注章节"""
+    section_code: str
+    section_title: str
+    content: str | None = None
+    rows: list[ConsolDisclosureRow] = Field(default_factory=list)
+    is_editable: bool = True
+    is_group_header: bool = False
+
+
+# ========== 合并报表 ==========
+
+
+class ConsolReportRow(BaseModel):
+    """合并报表行"""
+    row_code: str
+    row_name: str
+    row_index: int = 0
+    is_bold: bool = False
+    is_total: bool = False
+    current_period_amount: Decimal = Decimal("0")
+    prior_period_amount: Decimal = Decimal("0")
+    formula_used: str | None = None
+    source_accounts: list[str] = Field(default_factory=list)
+
+
+class ConsolWorkpaperResult(BaseModel):
+    """合并底稿生成结果"""
+    file_name: str
+    file_data: bytes | None = None
+
+
+class BalanceCheckResult(BaseModel):
+    """资产负债表平衡校验结果"""
+    is_balanced: bool
+    total_assets: Decimal = Decimal("0")
+    total_liabilities: Decimal = Decimal("0")
+    total_equity: Decimal = Decimal("0")
+    difference: Decimal = Decimal("0")
+    minority_interest: Decimal | None = None
+    goodwill: Decimal | None = None
+    issues: list[str] = Field(default_factory=list)
+
+
+class ConsolReportGenerateRequest(BaseModel):
+    """合并报表生成请求"""
+    project_id: UUID
+    year: int
+    applicable_standard: Literal["CAS", "IFRS"] = "CAS"
+
+
+class ConsolNotesGenerateRequest(BaseModel):
+    """合并附注生成请求"""
+    project_id: UUID
+    year: int
+    include_subsidiaries: bool = True
+    include_goodwill: bool = True
+    include_mi: bool = True
+    include_internal_trade: bool = True
+    include_forex: bool = True
+
+
 # ========== 看板与汇总 ==========
 
 
@@ -554,6 +645,16 @@ class ConsolScopeSummary(BaseModel):
 
 
 # ========== 集团结构校验 ==========
+
+
+class ConsistencyCheckResult(BaseModel):
+    """一致性校验结果"""
+    is_balanced: bool
+    total_debit: Decimal
+    total_credit: Decimal
+    difference: Decimal
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class StructureValidationResult(BaseModel):

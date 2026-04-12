@@ -41,6 +41,8 @@ from app.routers.component_auditor import router as component_auditor_router
 from app.routers.goodwill import router as goodwill_router
 from app.routers.forex import router as forex_router
 from app.routers.minority_interest import router as minority_interest_router
+from app.routers.consol_notes import router as consol_notes_router
+from app.routers.consol_report import router as consol_report_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -121,3 +123,5 @@ app.include_router(component_auditor_router)
 app.include_router(goodwill_router)
 app.include_router(forex_router)
 app.include_router(minority_interest_router)
+app.include_router(consol_notes_router)
+app.include_router(consol_report_router)

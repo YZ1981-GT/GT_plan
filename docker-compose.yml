@@ -57,12 +57,12 @@ services:
       - "${API_PORT:-8000}:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://${PG_USER:-postgres}:${PG_PASSWORD:-postgres}@postgres:5432/${PG_DB:-audit_platform}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-120}
       JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3030"]'
       ONLYOFFICE_URL: ${ONLYOFFICE_URL:-http://onlyoffice:80}
       WOPI_BASE_URL: ${WOPI_BASE_URL:-http://backend:8000/wopi}
       STORAGE_ROOT: ${STORAGE_ROOT:-./storage}

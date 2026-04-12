@@ -21,14 +21,11 @@ from app.models.consolidation_schemas import (
 def _generate_entry_no(db: Session, project_id: UUID, year: int, entry_type: EliminationEntryType) -> str:
     """生成抵消分录编号 CE-001 格式"""
     prefix_map = {
-        EliminationEntryType.INVESTMENT_ELIMINATION: "IE",
-        EliminationEntryType.INTERCOMPANY_ELIMINATION: "IC",
-        EliminationEntryType.UNREALIZED_PROFIT: "UP",
-        EliminationEntryType.AR_AP_ELIMINATION: "AA",
-        EliminationEntryType.FOREX_ELIMINATION: "FE",
-        EliminationEntryType.GOODWILL: "GW",
-        EliminationEntryType.MINORITY_INTEREST: "MI",
-        EliminationEntryType.OTHER: "OT",
+        EliminationEntryType.equity: "EQ",
+        EliminationEntryType.internal_trade: "IT",
+        EliminationEntryType.internal_ar_ap: "IA",
+        EliminationEntryType.unrealized_profit: "UP",
+        EliminationEntryType.other: "OT",
     }
     prefix = prefix_map.get(entry_type, "CE")
     suffix = f"{year}"
@@ -73,9 +70,10 @@ def create_entry(db: Session, project_id: UUID, data: EliminationCreate) -> Elim
         year=data.year,
         entry_type=data.entry_type,
         description=data.description,
-        lines=[l.model_dump() for l in data.lines],
         related_company_codes=data.related_company_codes,
         review_status=ReviewStatusEnum.DRAFT,
+        debit_amount=total_debit,
+        credit_amount=total_credit,
     )
     db.add(entry)
     db.commit()
@@ -131,11 +129,11 @@ def update_entry(
         total_credit = sum(l.credit_amount or Decimal("0") for l in data.lines)
         if total_debit != total_credit:
             raise ValueError("借贷不平衡")
+        entry.debit_amount = total_debit
+        entry.credit_amount = total_credit
 
     for key, value in data.model_dump(exclude_unset=True).items():
-        if key == "lines":
-            setattr(entry, key, [l.model_dump() for l in value])
-        else:
+        if key != "lines":
             setattr(entry, key, value)
 
     db.commit()
