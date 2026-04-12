@@ -70,8 +70,8 @@ const form = reactive<BasicInfo>({
   audit_year: null,
   project_type: '',
   accounting_standard: '',
-  signing_partner_id: '',
-  manager_id: '',
+  signing_partner_id: null,
+  manager_id: null,
 })
 
 const rules: FormRules = {
@@ -79,8 +79,8 @@ const rules: FormRules = {
   audit_year: [{ required: true, message: '请选择审计年度', trigger: 'change' }],
   project_type: [{ required: true, message: '请选择项目类型', trigger: 'change' }],
   accounting_standard: [{ required: true, message: '请选择会计准则', trigger: 'change' }],
-  signing_partner_id: [{ required: true, message: '请输入签字合伙人', trigger: 'blur' }],
-  manager_id: [{ required: true, message: '请输入项目经理', trigger: 'blur' }],
+  signing_partner_id: [],
+  manager_id: [],
 }
 
 function onYearChange(val: string) {

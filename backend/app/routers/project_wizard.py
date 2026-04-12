@@ -23,6 +23,30 @@ from app.services import project_wizard_service
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
+@router.get("", response_model=list[ProjectCreateResponse])
+async def list_projects(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ProjectCreateResponse]:
+    """获取项目列表"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Project).where(Project.is_deleted == False)  # noqa: E712
+    )
+    projects = result.scalars().all()
+    return [
+        ProjectCreateResponse(
+            id=p.id,
+            client_name=p.client_name,
+            audit_year=None,  # Will be extracted from wizard_state if needed
+            project_type=p.project_type.value if p.project_type else None,
+            status=p.status.value,
+            created_at=p.created_at,
+        )
+        for p in projects
+    ]
+
+
 @router.post("", response_model=ProjectCreateResponse)
 async def create_project(
     data: BasicInfoSchema,

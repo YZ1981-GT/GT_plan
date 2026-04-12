@@ -1,108 +1,304 @@
 /**
- * 全局样式
- * 引入 GT 品牌 Token，覆盖 Element Plus 主题，定义 gt- 前缀工具类
+ * 全局样式 — GT 审计平台
+ * 引入品牌 Token → 覆盖 Element Plus → 定义 gt- 工具类 → 动画
  */
 @import './gt-tokens.css';
 
-/* Element Plus 主题覆盖 — 使用 GT 紫色 */
+/* ═══════════════════════════════════════════════════════════════
+   Element Plus 主题覆盖
+   ═══════════════════════════════════════════════════════════════ */
 :root {
   --el-color-primary: var(--gt-color-primary);
   --el-color-primary-light-3: var(--gt-color-primary-light);
-  --el-color-primary-light-5: #c4a3e8;
-  --el-color-primary-light-7: #dbc8f0;
-  --el-color-primary-light-9: #f0e8f7;
+  --el-color-primary-light-5: var(--gt-color-primary-lighter);
+  --el-color-primary-light-7: #d4c4e8;
+  --el-color-primary-light-9: var(--gt-color-primary-bg);
   --el-color-primary-dark-2: var(--gt-color-primary-dark);
   --el-color-success: var(--gt-color-success);
+  --el-color-warning: var(--gt-color-wheat);
+  --el-color-danger: var(--gt-color-coral);
+  --el-color-info: var(--gt-color-teal);
   --el-border-radius-base: var(--gt-radius-sm);
   --el-font-size-base: var(--gt-font-size-base);
+  --el-font-family: var(--gt-font-family);
+  --el-border-color: var(--gt-color-border);
+  --el-border-color-light: var(--gt-color-border-light);
+  --el-bg-color-page: var(--gt-color-bg);
+  --el-fill-color-light: var(--gt-color-primary-bg);
 }
 
-/* 基础重置 */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* ═══════════════════════════════════════════════════════════════
+   基础重置
+   ═══════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
   font-size: var(--gt-font-size-base);
   line-height: var(--gt-line-height-base);
+  scroll-behavior: smooth;
 }
 
 body {
-  font-family: var(--gt-font-family-zh);
-  color: #333;
-  background-color: #f5f5f5;
+  font-family: var(--gt-font-family);
+  color: var(--gt-color-text);
+  background-color: var(--gt-color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* gt- 前缀工具类 */
-.gt-card {
-  background: #fff;
+/* ═══════════════════════════════════════════════════════════════
+   Element Plus 组件精调
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 表格 — 去掉默认粗边框，表头用浅紫渐变 */
+.el-table {
+  --el-table-border-color: var(--gt-color-border-light);
+  --el-table-header-bg-color: var(--gt-color-primary-bg);
+  --el-table-header-text-color: var(--gt-color-primary-dark);
+  --el-table-row-hover-bg-color: #f0ecf7;
+  border-radius: var(--gt-radius-md);
+  overflow: hidden;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+  font-size: var(--gt-font-size-sm);
+  letter-spacing: 0.3px;
+  text-transform: none;
+  border-bottom: 2px solid var(--gt-color-primary-lighter) !important;
+  background: linear-gradient(180deg, #f8f5fd 0%, var(--gt-color-primary-bg) 100%) !important;
+  color: var(--gt-color-primary-dark) !important;
+}
+
+.el-table td.el-table__cell {
+  font-size: var(--gt-font-size-base);
+  transition: background-color var(--gt-transition-fast);
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #faf9fc;
+}
+
+.el-table .el-table__empty-text {
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-base);
+  padding: var(--gt-space-10) 0;
+}
+
+/* 按钮 — 圆角更柔和，hover 微上浮 */
+.el-button {
+  border-radius: var(--gt-radius-sm);
+  font-weight: 500;
+  transition: all var(--gt-transition-base);
+  letter-spacing: 0.2px;
+}
+
+.el-button:hover {
+  transform: translateY(-1px);
+}
+
+.el-button:active {
+  transform: translateY(0);
+}
+
+.el-button--primary {
+  background: linear-gradient(135deg, var(--gt-color-primary) 0%, var(--gt-color-primary-light) 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(75, 45, 119, 0.25);
+}
+
+.el-button--primary:hover {
+  background: linear-gradient(135deg, var(--gt-color-primary-light) 0%, var(--gt-color-primary) 100%);
+  box-shadow: 0 4px 16px rgba(75, 45, 119, 0.35);
+}
+
+/* 卡片 */
+.el-card {
+  border: none;
   border-radius: var(--gt-radius-md);
   box-shadow: var(--gt-shadow-sm);
-  padding: var(--gt-space-4);
+  transition: box-shadow var(--gt-transition-base), transform var(--gt-transition-base);
+}
+
+.el-card:hover {
+  box-shadow: var(--gt-shadow-md);
+}
+
+/* 标签 */
+.el-tag {
+  border-radius: var(--gt-radius-xs);
+  font-weight: 500;
+  border: none;
+}
+
+/* 菜单 */
+.el-menu {
+  border-right: none !important;
+}
+
+/* 对话框 */
+.el-dialog {
+  border-radius: var(--gt-radius-lg) !important;
+  overflow: hidden;
+}
+
+.el-dialog__header {
+  border-bottom: 1px solid var(--gt-color-border-light);
+  padding: var(--gt-space-4) var(--gt-space-6) !important;
+}
+
+/* Tabs */
+.el-tabs__item {
+  font-weight: 500;
+  transition: color var(--gt-transition-fast);
+}
+
+.el-tabs__active-bar {
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* 输入框 */
+.el-input__wrapper {
+  border-radius: var(--gt-radius-sm);
+  transition: box-shadow var(--gt-transition-fast);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   gt- 工具类
+   ═══════════════════════════════════════════════════════════════ */
+.gt-card {
+  background: var(--gt-color-bg-white);
+  border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm);
+  padding: var(--gt-space-5);
+  transition: all var(--gt-transition-base);
 }
 
 .gt-card:hover {
   box-shadow: var(--gt-shadow-md);
 }
 
-.gt-button {
-  border-radius: var(--gt-radius-sm);
-  font-family: var(--gt-font-family-zh);
-  transition: all 0.2s ease;
+.gt-page-title {
+  font-size: var(--gt-font-size-2xl);
+  font-weight: 700;
+  color: var(--gt-color-primary-dark);
+  display: flex;
+  align-items: center;
+  gap: var(--gt-space-3);
 }
 
-.gt-button--primary {
-  background-color: var(--gt-color-primary);
-  color: #fff;
-  border: none;
+.gt-page-title .el-icon {
+  color: var(--gt-color-primary);
 }
 
-.gt-button--primary:hover {
-  background-color: var(--gt-color-primary-light);
+.gt-section-title {
+  font-size: var(--gt-font-size-lg);
+  font-weight: 600;
+  color: var(--gt-color-text);
+  margin-bottom: var(--gt-space-4);
 }
 
-.gt-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.gt-table th {
-  background-color: var(--gt-color-primary);
-  color: #fff;
-  padding: var(--gt-space-2) var(--gt-space-3);
-  text-align: left;
-}
-
-.gt-table td {
-  padding: var(--gt-space-2) var(--gt-space-3);
-  border-bottom: 1px solid #eee;
-}
-
-.gt-table tr:hover td {
-  background-color: var(--el-color-primary-light-9, #f0e8f7);
-}
+.gt-text-primary { color: var(--gt-color-primary); }
+.gt-text-teal { color: var(--gt-color-teal); }
+.gt-text-coral { color: var(--gt-color-coral); }
+.gt-text-secondary { color: var(--gt-color-text-secondary); }
 
 .gt-container {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 var(--gt-space-4);
 }
 
-.gt-text-primary {
-  color: var(--gt-color-primary);
+/* ═══════════════════════════════════════════════════════════════
+   动画
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 页面路由过渡 */
+.gt-page-enter-active {
+  animation: gtPageIn var(--gt-transition-slow) both;
+}
+.gt-page-leave-active {
+  animation: gtPageOut 0.2s both;
 }
 
-.gt-text-teal {
-  color: var(--gt-color-teal);
+@keyframes gtPageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes gtPageOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
-.gt-text-coral {
-  color: var(--gt-color-coral);
+/* 淡入上浮 */
+.gt-fade-in {
+  animation: gtFadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes gtFadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 缩放弹入 */
+.gt-scale-in {
+  animation: gtScaleIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes gtScaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 左侧滑入 */
+.gt-slide-in {
+  animation: gtSlideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes gtSlideIn {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* 列表项交错动画 */
+.gt-stagger > * {
+  animation: gtFadeUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.gt-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.gt-stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.gt-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.gt-stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.gt-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+
+/* 数字跳动 */
+@keyframes gtCountUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.gt-count-up {
+  animation: gtCountUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 脉冲指示器 */
+@keyframes gtPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.gt-pulse {
+  animation: gtPulse 2s ease-in-out infinite;
+}
+
+/* 骨架屏闪烁 */
+@keyframes gtShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.gt-shimmer {
+  background: linear-gradient(90deg, #f0f0f5 25%, #e8e8ed 50%, #f0f0f5 75%);
+  background-size: 200% 100%;
+  animation: gtShimmer 1.5s infinite;
 }

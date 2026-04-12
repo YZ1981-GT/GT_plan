@@ -10,6 +10,11 @@ const router = createRouter({
       component: () => import('@/views/Login.vue'),
     },
     {
+      path: '/register',
+      name: 'Register',
+      component: () => import('@/views/Register.vue'),
+    },
+    {
       path: '/',
       component: () => import('@/layouts/DefaultLayout.vue'),
       meta: { requireAuth: true },
@@ -98,6 +103,11 @@ const router = createRouter({
           path: 'projects/:projectId/templates',
           name: 'TemplateManager',
           component: () => import('@/views/TemplateManager.vue'),
+        },
+        {
+          path: 'projects/:projectId/consolidation',
+          name: 'Consolidation',
+          component: () => import('@/views/ConsolidationIndex.vue'),
         },
       ],
     },

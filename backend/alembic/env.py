@@ -1,12 +1,23 @@
 """Alembic 环境配置 — 支持异步迁移 (asyncpg)"""
 
 import asyncio
+import sys
 from logging.config import fileConfig
+import io
 
-from alembic import context
+# Fix encoding issue on Windows
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
+
+from alembic import context
+from pathlib import Path
+
+# 确保项目根目录在 sys.path 中（Docker 容器内 WORKDIR=/app）
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 

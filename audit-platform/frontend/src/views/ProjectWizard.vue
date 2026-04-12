@@ -28,6 +28,13 @@
       <el-button v-if="!wizardStore.isFirstStep" @click="handlePrev">
         上一步
       </el-button>
+      <el-button
+        v-if="wizardStore.projectId"
+        :loading="wizardStore.loading"
+        @click="handleSave"
+      >
+        保存
+      </el-button>
       <div class="footer-spacer" />
       <el-button
         v-if="!wizardStore.isLastStep"
@@ -95,10 +102,8 @@ function getStepStatus(idx: number): string | undefined {
 }
 
 function onStepClick(idx: number) {
-  // Allow navigating back to completed steps
-  if (idx <= wizardStore.currentStepIndex) {
-    wizardStore.goToStep(idx)
-  }
+  // Allow navigating to any step
+  wizardStore.goToStep(idx)
 }
 
 async function handleNext() {
@@ -119,6 +124,34 @@ async function handleNext() {
   }
 
   wizardStore.goNext()
+}
+
+async function handleSave() {
+  const currentStep = wizardStore.currentStepKey
+
+  if (!wizardStore.projectId) {
+    ElMessage.warning('请先创建项目')
+    return
+  }
+
+  // Step-specific validation and save
+  if (currentStep === 'basic_info') {
+    if (!basicInfoRef.value) return
+    const data = await basicInfoRef.value.validate()
+    if (!data) return
+
+    await wizardStore.saveStep('basic_info', data as unknown as Record<string, unknown>)
+    ElMessage.success('保存成功')
+  } else {
+    // For other steps, save current step data from store
+    const stepData = wizardStore.stepData[currentStep]
+    if (stepData) {
+      await wizardStore.saveStep(currentStep, stepData)
+      ElMessage.success('保存成功')
+    } else {
+      ElMessage.warning('当前步骤无数据可保存')
+    }
+  }
 }
 
 function handlePrev() {

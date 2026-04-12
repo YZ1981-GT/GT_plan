@@ -1,38 +1,70 @@
 /**
  * GT 品牌视觉 Token 系统
- * 定义致同品牌色、间距、字体、圆角、阴影等 CSS 自定义属性
+ * 致同品牌色、间距、字体、圆角、阴影等 CSS 自定义属性
  */
 :root {
-  /* 品牌色 */
+  /* ── 品牌色 ── */
   --gt-color-primary: #4b2d77;
-  --gt-color-primary-light: #A06DFF;
+  --gt-color-primary-light: #7c5baa;
+  --gt-color-primary-lighter: #a68fd0;
+  --gt-color-primary-bg: #f4f0fa;
   --gt-color-primary-dark: #2B1D4D;
   --gt-color-teal: #0094B3;
+  --gt-color-teal-light: #e6f7fa;
   --gt-color-coral: #FF5149;
+  --gt-color-coral-light: #fff0ef;
   --gt-color-wheat: #FFC23D;
+  --gt-color-wheat-light: #fff8e6;
   --gt-color-success: #28A745;
+  --gt-color-success-light: #edf7ef;
 
-  /* 间距（4px 网格） */
+  /* ── 中性色 ── */
+  --gt-color-text: #1d1d1f;
+  --gt-color-text-secondary: #6e6e73;
+  --gt-color-text-tertiary: #999;
+  --gt-color-border: #e5e5ea;
+  --gt-color-border-light: #f0f0f5;
+  --gt-color-bg: #f7f7fa;
+  --gt-color-bg-white: #ffffff;
+
+  /* ── 间距（4px 网格） ── */
   --gt-space-1: 4px;
   --gt-space-2: 8px;
   --gt-space-3: 12px;
   --gt-space-4: 16px;
+  --gt-space-5: 20px;
   --gt-space-6: 24px;
   --gt-space-8: 32px;
+  --gt-space-10: 40px;
 
-  /* 圆角 */
-  --gt-radius-sm: 4px;
-  --gt-radius-md: 8px;
-  --gt-radius-lg: 12px;
+  /* ── 圆角 ── */
+  --gt-radius-xs: 4px;
+  --gt-radius-sm: 6px;
+  --gt-radius-md: 10px;
+  --gt-radius-lg: 14px;
+  --gt-radius-xl: 20px;
 
-  /* 字体 */
-  --gt-font-family-zh: 'FZYueHei', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  --gt-font-family-en: 'GT Walsheim', 'Helvetica Neue', Arial, sans-serif;
-  --gt-font-size-base: 16px;
+  /* ── 字体 ── */
+  --gt-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  --gt-font-size-xs: 12px;
+  --gt-font-size-sm: 13px;
+  --gt-font-size-base: 14px;
+  --gt-font-size-md: 15px;
+  --gt-font-size-lg: 16px;
+  --gt-font-size-xl: 18px;
+  --gt-font-size-2xl: 22px;
+  --gt-font-size-3xl: 28px;
   --gt-line-height-base: 1.6;
 
-  /* 阴影（GT 紫色调） */
-  --gt-shadow-sm: 0 1px 3px rgba(75, 45, 119, 0.075);
-  --gt-shadow-md: 0 4px 12px rgba(75, 45, 119, 0.15);
-  --gt-shadow-lg: 0 8px 24px rgba(75, 45, 119, 0.175);
+  /* ── 阴影 ── */
+  --gt-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --gt-shadow-sm: 0 1px 4px rgba(75, 45, 119, 0.06);
+  --gt-shadow-md: 0 4px 16px rgba(75, 45, 119, 0.1);
+  --gt-shadow-lg: 0 8px 32px rgba(75, 45, 119, 0.12);
+  --gt-shadow-xl: 0 16px 48px rgba(75, 45, 119, 0.16);
+
+  /* ── 过渡 ── */
+  --gt-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --gt-transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --gt-transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }

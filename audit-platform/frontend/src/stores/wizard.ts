@@ -6,8 +6,8 @@ export interface BasicInfo {
   audit_year: number | null
   project_type: string
   accounting_standard: string
-  signing_partner_id: string
-  manager_id: string
+  signing_partner_id: string | null
+  manager_id: string | null
 }
 
 export interface WizardStepData {
@@ -74,7 +74,21 @@ export const useWizardStore = defineStore('wizard', {
     async createProject(basicInfo: BasicInfo) {
       this.loading = true
       try {
-        const { data } = await http.post('/api/projects', basicInfo)
+        // Filter out null values for optional fields
+        const payload: Record<string, unknown> = {
+          client_name: basicInfo.client_name,
+          audit_year: basicInfo.audit_year,
+          project_type: basicInfo.project_type,
+          accounting_standard: basicInfo.accounting_standard,
+        }
+        if (basicInfo.signing_partner_id) {
+          payload.signing_partner_id = basicInfo.signing_partner_id
+        }
+        if (basicInfo.manager_id) {
+          payload.manager_id = basicInfo.manager_id
+        }
+        
+        const { data } = await http.post('/api/projects', payload)
         const project = data.data ?? data
         this.projectId = project.id
         this.stepData.basic_info = { ...basicInfo }

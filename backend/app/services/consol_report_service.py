@@ -32,7 +32,8 @@ from app.models.consolidation_models import (
     MinorityInterest,
     AccountCategory,
 )
-from app.models.audit_platform_models import TrialBalance, FinancialReport
+from app.models.audit_platform_models import TrialBalance
+from app.models.report_models import FinancialReport
 from app.models.report_models import FinancialReportType
 from app.models.consolidation_schemas import (
     ConsolTrialRow,
@@ -42,7 +43,7 @@ from app.models.consolidation_schemas import (
     ConsolDisclosureSection,
 )
 from app.services.goodwill_service import get_goodwill_list
-from app.services.minority_interest_service import get_minority_interest_list
+from app.services.minority_interest_service import get_mi_list
 
 logger = logging.getLogger(__name__)
 
@@ -461,7 +462,7 @@ class ConsolReportService:
                 total_equity += amount
 
         # 获取少数股东权益
-        mi_records = get_minority_interest_list(self.db, project_id, year)
+        mi_records = get_mi_list(self.db, project_id, year)
         mi_total = sum(
             (r.minority_equity or Decimal("0")) for r in mi_records
         )
@@ -999,7 +1000,7 @@ class ConsolReportService:
         year: int,
     ) -> ConsolDisclosureSection:
         """生成少数股东权益披露"""
-        mi_records = get_minority_interest_list(self.db, project_id, year)
+        mi_records = get_mi_list(self.db, project_id, year)
 
         rows = []
         total_mi = Decimal("0")

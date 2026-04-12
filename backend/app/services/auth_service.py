@@ -152,6 +152,20 @@ async def logout(refresh_token: str, redis: Redis) -> None:
 async def create_user(user_data: UserCreate, db: AsyncSession) -> UserResponse:
     """创建用户，密码 bcrypt 哈希存储。"""
 
+    # 检查用户名是否已存在
+    existing_username = await db.execute(
+        select(User).where(User.username == user_data.username, User.is_deleted == False)  # noqa: E712
+    )
+    if existing_username.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="用户名已存在")
+
+    # 检查邮箱是否已存在
+    existing_email = await db.execute(
+        select(User).where(User.email == user_data.email, User.is_deleted == False)  # noqa: E712
+    )
+    if existing_email.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="邮箱已被注册")
+
     user = User(
         username=user_data.username,
         email=user_data.email,
