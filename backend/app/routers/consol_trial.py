@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.api.deps import db, get_current_user
+from app.deps import db, get_current_user
 from app.models.consolidation_schemas import ConsolTrialResponse, ConsolTrialUpdate, ConsistencyCheckResult
 from app.services.consol_trial_service import (
     check_trial_consistency,

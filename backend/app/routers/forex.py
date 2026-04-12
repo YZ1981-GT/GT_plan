@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import db, get_current_user
+from app.deps import db, get_current_user
 from app.models.consolidation_schemas import ForexRates, TranslationWorksheet
 from app.services.forex_service import create_or_update_forex, delete_forex, get_forex, get_forex_list
 

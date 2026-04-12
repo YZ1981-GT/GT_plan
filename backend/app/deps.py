@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
+
+# Alias for routers that use "db" as the Depends name
+db = get_db
 from app.models.core import ProjectUser, User
 
 security = HTTPBearer()

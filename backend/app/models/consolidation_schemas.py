@@ -565,3 +565,6 @@ class StructureValidationResult(BaseModel):
 
 # 修复前向引用
 CompanyTreeNode.model_rebuild()
+
+# Alias for existing code that uses EliminationCreate
+EliminationCreate = EliminationEntryCreate

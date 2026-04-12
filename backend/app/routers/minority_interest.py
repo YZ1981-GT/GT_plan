@@ -5,7 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.deps import db, get_current_user
+from app.deps import get_db, get_current_user
+db = get_db
 from app.models.consolidation_schemas import MinorityInterestResult
 from app.services.minority_interest_service import (
     calculate_mi,

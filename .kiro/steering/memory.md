@@ -10,6 +10,8 @@ inclusion: always
 - 语言偏好：中文
 - 部署偏好：倾向本地部署、轻量方案，避免重依赖
 - 打包偏好：优先用 build_exe.py 打包为 EXE（PyInstaller），不要 .bat 脚本方式；打包前先 npm run build + 复制到 backend/static/，再 python build_exe.py --skip-frontend
+- 启动偏好：删掉了 .bat 启动文件，希望我直接用 Start-Process 自动启动后端(9980)+前端(3030)；用 `uvicorn app.main:app --host 0.0.0.0 --port 9980 --reload` 启动后端，`npm run dev` 启动前端
+- pydantic-settings Node.js 路径问题：pydantic-settings 初始化时调用 `npm config get prefix`，.venv 里没有 node.exe 会报 `Could not determine Node.js install directory`；临时解决：在 .env 中设置 NPM_CONFIG_PREFIX 环境变量或确保系统 node 在 PATH 中
 - TTS 声音偏好：默认声音觉得难听，需要能自选男女声/角色，且支持自录音频替代 TTS
 - PPT 生成偏好：必须用 ppt-generator skill 工作流（ppt_helpers.py 命令）生成，不要手写 JSON/HTML
 - PPT 内容密度偏好：每页内容不要太少，要充实
@@ -24,7 +26,7 @@ inclusion: always
 ## 项目上下文
 
 ### 基础环境
-- Git 远程仓库：https://github.com/YZ1981-GT/GT_digao.git，全局 HTTP/HTTPS 代理 127.0.0.1:7897
+- Git 远程仓库：https://github.com/YZ1981-GT/GT_plan.git（master分支），本地新初始化时需先 `git init` → `git remote add origin` → 用 `git config --global --unset http.proxy` 清代理后 pull/push；代理端口 127.0.0.1:7897 不通时会报 "Failed to connect to 127.0.0.1 port 7897"
 - Python 3.12 虚拟环境 (.venv)，本地已安装 Docker 28.3.3、Ollama 0.11.10
 - 使用 Kiro steering + hooks 机制管理工作流
 - 四大模块统一架构：四/五步工作流 + SSE 流式通信 + LLM 驱动 + Word 导出
@@ -466,3 +468,7 @@ inclusion: always
 - `onlyoffice/plugins/audit-sidebar/` — 审计侧边栏插件（config.json + index.html + index.js，静态底稿信息/复核状态/操作日志）
 - `onlyoffice/plugins/audit-formula/` — 审计取数函数插件（config.json + index.html + code.js，注册TB/WP/AUX/PREV/SUM_TB五个自定义函数，同步XHR调用后端Formula API，中文列名映射，#REF!错误处理）
 - `onlyoffice/plugins/audit-review/` — 审计复核批注侧边栏插件（config.json + index.html + index.js，复核意见列表+添加/回复/解决操作，珊瑚橙#FF5149未解决+水鸭蓝#0094B3已回复+绿色#28a745已解决左边框，30秒自动刷新）
+
+
+## 技术决策（2026-04-12）
+- deps.py 别名导出：`db = get_db`，供 consolidation 相关路由（使用 `db: Session = Depends(db)`）使用
