@@ -1,5 +1,5 @@
 <template>
-  <div class="sync-management">
+  <div class="gt-sync-management">
     <div class="sync-header">
       <h3>同步管理</h3>
       <el-button type="primary" @click="syncNow">立即同步</el-button>
@@ -55,6 +55,6 @@ async function syncNow() {
 </script>
 
 <style scoped>
-.sync-management {}
+.gt-sync-management {}
 .sync-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="knowledge-base-panel">
+  <div class="gt-knowledge-base-panel">
     <div class="panel-header">
       <h3>📚 知识库管理</h3>
     </div>
@@ -393,7 +393,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.knowledge-base-panel { padding: 16px; }
+.gt-knowledge-base-panel { padding: 16px; }
 
 .panel-header { margin-bottom: 16px; }
 .panel-header h3 { margin: 0; font-size: 16px; }

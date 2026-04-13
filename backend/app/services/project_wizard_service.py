@@ -113,6 +113,13 @@ async def create_project(data: BasicInfoSchema, db: AsyncSession) -> Project:
         status=ProjectStatus.created,
         manager_id=data.manager_id,
         partner_id=data.signing_partner_id,
+        company_code=data.company_code,
+        template_type=data.template_type,
+        report_scope=data.report_scope,
+        parent_company_name=data.parent_company_name,
+        parent_company_code=data.parent_company_code,
+        ultimate_company_name=data.ultimate_company_name,
+        ultimate_company_code=data.ultimate_company_code,
     )
     db.add(project)
     await db.flush()  # 获取 project.id

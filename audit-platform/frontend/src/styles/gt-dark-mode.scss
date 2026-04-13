@@ -1,0 +1,23 @@
+/**
+ * GT 暗色模式 CSS 变量映射 SCSS 包装
+ * 暗色模式变量已在 gt-tokens.css 中通过 @media (prefers-color-scheme: dark) 定义
+ * 此文件提供 SCSS 级别的暗色模式工具
+ */
+
+// 暗色模式混入
+@mixin gt-dark-mode {
+  @media (prefers-color-scheme: dark) {
+    :root.gt-dark & {
+      @content;
+    }
+  }
+}
+
+// 暗色模式 SCSS 变量
+$gt-dark-primary: #A06DFF;
+$gt-dark-primary-bg: #1a1035;
+$gt-dark-text: #e5e5ea;
+$gt-dark-text-secondary: #a1a1a6;
+$gt-dark-border: #38383a;
+$gt-dark-bg: #1c1c1e;
+$gt-dark-bg-white: #2c2c2e;

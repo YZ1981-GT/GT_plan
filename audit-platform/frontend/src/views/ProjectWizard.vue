@@ -1,7 +1,7 @@
 <template>
-  <div class="project-wizard">
+  <div class="gt-project-wizard gt-fade-in">
     <!-- Step Bar -->
-    <div class="wizard-header">
+    <div class="gt-wizard-header">
       <el-steps :active="wizardStore.currentStepIndex" finish-status="success" align-center>
         <el-step
           v-for="(key, idx) in stepKeys"
@@ -14,7 +14,7 @@
     </div>
 
     <!-- Content Area -->
-    <div v-loading="wizardStore.loading" class="wizard-content">
+    <div v-loading="wizardStore.loading" class="gt-wizard-content">
       <BasicInfoStep v-if="wizardStore.currentStepKey === 'basic_info'" ref="basicInfoRef" />
       <AccountImportStep v-else-if="wizardStore.currentStepKey === 'account_import'" />
       <AccountMappingStep v-else-if="wizardStore.currentStepKey === 'account_mapping'" />
@@ -24,7 +24,7 @@
     </div>
 
     <!-- Navigation Buttons -->
-    <div class="wizard-footer">
+    <div class="gt-wizard-footer">
       <el-button v-if="!wizardStore.isFirstStep" @click="handlePrev">
         上一步
       </el-button>
@@ -35,7 +35,7 @@
       >
         保存
       </el-button>
-      <div class="footer-spacer" />
+      <div class="gt-wizard-footer-spacer" />
       <el-button
         v-if="!wizardStore.isLastStep"
         type="primary"
@@ -181,35 +181,35 @@ async function handleConfirm() {
 </script>
 
 <style scoped>
-.project-wizard {
+.gt-project-wizard {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: calc(100vh - 120px);
-  background: #fff;
+  background: var(--gt-color-bg-white);
   border-radius: var(--gt-radius-md);
   box-shadow: var(--gt-shadow-sm);
 }
 
-.wizard-header {
+.gt-wizard-header {
   padding: var(--gt-space-6) var(--gt-space-8);
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--gt-color-border-light);
 }
 
-.wizard-content {
+.gt-wizard-content {
   flex: 1;
   padding: var(--gt-space-6) var(--gt-space-8);
   overflow-y: auto;
 }
 
-.wizard-footer {
+.gt-wizard-footer {
   display: flex;
   align-items: center;
   padding: var(--gt-space-4) var(--gt-space-8);
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--gt-color-border-light);
 }
 
-.footer-spacer {
+.gt-wizard-footer-spacer {
   flex: 1;
 }
 </style>

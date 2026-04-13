@@ -1,5 +1,5 @@
 <template>
-  <div class="audit-procedure-panel">
+  <div class="gt-audit-procedure-panel">
     <div class="panel-header">
       <span class="panel-title">审计程序清单</span>
       <div class="header-actions">
@@ -368,7 +368,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.audit-procedure-panel {
+.gt-audit-procedure-panel {
   padding: 16px;
 }
 

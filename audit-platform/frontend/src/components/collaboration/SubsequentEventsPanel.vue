@@ -1,5 +1,5 @@
 <template>
-  <div class="subsequent-events-panel">
+  <div class="gt-subsequent-events-panel">
     <el-tabs v-model="activeTab" class="events-tabs">
       <!-- Tab 1: 期后事项记录 -->
       <el-tab-pane label="期后事项记录" name="events">
@@ -186,7 +186,7 @@ async function completeItem(row: any) {
 </script>
 
 <style scoped>
-.subsequent-events-panel {
+.gt-subsequent-events-panel {
   padding: 16px;
 }
 

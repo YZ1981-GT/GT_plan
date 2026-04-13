@@ -17,7 +17,7 @@ from app.models.audit_platform_schemas import (
     WizardState,
     WizardStep,
 )
-from app.models.core import User
+from app.models.core import Project, User
 from app.services import project_wizard_service
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -37,10 +37,14 @@ async def list_projects(
     return [
         ProjectCreateResponse(
             id=p.id,
+            name=p.name,
             client_name=p.client_name,
-            audit_year=None,  # Will be extracted from wizard_state if needed
+            audit_year=None,
             project_type=p.project_type.value if p.project_type else None,
             status=p.status.value,
+            report_scope=p.report_scope,
+            parent_project_id=p.parent_project_id,
+            consol_level=p.consol_level or 1,
             created_at=p.created_at,
         )
         for p in projects
@@ -138,3 +142,54 @@ async def confirm_project(
         status=project.status.value,
         created_at=project.created_at,
     )
+
+
+# ── 删除项目 ──
+
+
+from pydantic import BaseModel as _BaseModel
+
+
+class BatchDeleteRequest(_BaseModel):
+    project_ids: list[UUID]
+
+
+@router.delete("/{project_id}")
+async def delete_project(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """软删除单个项目（需二次确认由前端处理）"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="项目不存在")
+    project.is_deleted = True
+    await db.commit()
+    return {"id": str(project_id), "deleted": True}
+
+
+@router.post("/batch-delete")
+async def batch_delete_projects(
+    body: BatchDeleteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """批量软删除项目（需二次确认由前端处理）"""
+    from sqlalchemy import select, update
+    count = 0
+    for pid in body.project_ids:
+        result = await db.execute(
+            select(Project).where(Project.id == pid, Project.is_deleted == False)  # noqa: E712
+        )
+        p = result.scalar_one_or_none()
+        if p:
+            p.is_deleted = True
+            count += 1
+    await db.commit()
+    return {"deleted_count": count, "requested": len(body.project_ids)}

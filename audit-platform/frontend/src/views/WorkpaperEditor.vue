@@ -1,17 +1,17 @@
 <template>
-  <div class="wp-editor-page">
+  <div class="gt-wp-editor gt-fade-in">
     <!-- 顶部工具栏 -->
-    <div class="editor-toolbar">
-      <div class="toolbar-left">
+    <div class="gt-wp-editor-toolbar">
+      <div class="gt-wp-editor-toolbar-left">
         <el-button text @click="goBack">← 返回</el-button>
-        <span class="wp-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
-        <span class="wp-name" v-if="wpDetail">{{ wpDetail.wp_name }}</span>
+        <span class="gt-wp-editor-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
+        <span class="gt-wp-editor-name" v-if="wpDetail">{{ wpDetail.wp_name }}</span>
         <el-tag v-if="wpDetail" :type="statusTagType(wpDetail.status)" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
       </div>
-      <div class="toolbar-right">
-        <span class="save-indicator" v-if="wpDetail">
+      <div class="gt-wp-editor-toolbar-right">
+        <span class="gt-wp-editor-save-indicator" v-if="wpDetail">
           <el-icon color="var(--gt-color-success)"><i class="el-icon-check" /></el-icon>
           已保存
         </span>
@@ -19,20 +19,20 @@
     </div>
 
     <!-- 主编辑区 -->
-    <div class="editor-main">
+    <div class="gt-wp-editor-main">
       <!-- ONLYOFFICE 可用 -->
       <template v-if="editorAvailable">
         <iframe
           ref="editorFrame"
           :src="editorUrl"
-          class="editor-iframe"
+          class="gt-wp-editor-iframe"
           allow="fullscreen"
         />
       </template>
 
       <!-- ONLYOFFICE 不可用：降级模式 -->
       <template v-else>
-        <div class="fallback-panel">
+        <div class="gt-wp-editor-fallback-panel">
           <el-alert
             title="ONLYOFFICE 编辑器不可用"
             description="在线编辑服务暂时无法连接，请使用离线编辑模式：下载底稿到本地编辑后再上传。"
@@ -41,7 +41,7 @@
             :closable="false"
             style="margin-bottom: 20px"
           />
-          <div class="fallback-actions">
+          <div class="gt-wp-editor-fallback-actions">
             <el-button type="primary" size="large" @click="onDownloadEdit">
               下载编辑
             </el-button>
@@ -52,7 +52,7 @@
     </div>
 
     <!-- 底部状态栏 -->
-    <div class="editor-statusbar" v-if="wpDetail">
+    <div class="gt-wp-editor-statusbar" v-if="wpDetail">
       <span>编制人: {{ wpDetail.assigned_to || '未分配' }}</span>
       <span>复核人: {{ wpDetail.reviewer || '未分配' }}</span>
       <span>版本: v{{ wpDetail.file_version || 1 }}</span>
@@ -138,29 +138,29 @@ onMounted(loadEditor)
 </script>
 
 <style scoped>
-.wp-editor-page {
+.gt-wp-editor {
   display: flex; flex-direction: column; height: 100vh;
-  background: #f5f5f5;
+  background: var(--gt-color-bg);
 }
-.editor-toolbar {
+.gt-wp-editor-toolbar {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 16px; background: #fff; box-shadow: var(--gt-shadow-sm);
+  padding: var(--gt-space-2) var(--gt-space-4); background: var(--gt-color-bg-white); box-shadow: var(--gt-shadow-sm);
   z-index: 10;
 }
-.toolbar-left { display: flex; align-items: center; gap: 10px; }
-.toolbar-right { display: flex; align-items: center; gap: 8px; }
-.wp-code { font-weight: 600; color: var(--gt-color-primary); font-size: 15px; }
-.wp-name { color: #333; font-size: 15px; }
-.save-indicator { font-size: 13px; color: var(--gt-color-success); }
-.editor-main { flex: 1; min-height: 0; }
-.editor-iframe { width: 100%; height: 100%; border: none; }
-.fallback-panel {
+.gt-wp-editor-toolbar-left { display: flex; align-items: center; gap: 10px; }
+.gt-wp-editor-toolbar-right { display: flex; align-items: center; gap: var(--gt-space-2); }
+.gt-wp-editor-code { font-weight: 600; color: var(--gt-color-primary); font-size: var(--gt-font-size-md); }
+.gt-wp-editor-name { color: var(--gt-color-text); font-size: var(--gt-font-size-md); }
+.gt-wp-editor-save-indicator { font-size: var(--gt-font-size-sm); color: var(--gt-color-success); }
+.gt-wp-editor-main { flex: 1; min-height: 0; }
+.gt-wp-editor-iframe { width: 100%; height: 100%; border: none; }
+.gt-wp-editor-fallback-panel {
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 100%; padding: 40px;
+  justify-content: center; height: 100%; padding: var(--gt-space-10);
 }
-.fallback-actions { display: flex; gap: 12px; }
-.editor-statusbar {
-  display: flex; gap: 20px; padding: 6px 16px;
-  background: var(--gt-color-primary-dark); color: #ccc; font-size: 12px;
+.gt-wp-editor-fallback-actions { display: flex; gap: var(--gt-space-3); }
+.gt-wp-editor-statusbar {
+  display: flex; gap: var(--gt-space-5); padding: 6px var(--gt-space-4);
+  background: var(--gt-color-primary-dark); color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs);
 }
 </style>

@@ -1,0 +1,29 @@
+/**
+ * GT 底稿视觉标记样式 SCSS 包装
+ * 导入已有的 CSS 标记样式
+ */
+@import './gt-markers.css';
+
+// SCSS 扩展混入
+@mixin gt-marker-ai {
+  background: var(--gt-marker-ai-bg);
+  border-left: 3px solid var(--gt-marker-ai-border);
+  padding: 4px 8px;
+}
+
+@mixin gt-marker-review {
+  background: var(--gt-marker-review-bg);
+  border-left: 3px solid var(--gt-marker-review-border);
+  padding: 4px 8px;
+}
+
+@mixin gt-marker-audited {
+  background: var(--gt-marker-audited-bg);
+  border-left: 3px solid var(--gt-marker-audited-border);
+  padding: 4px 8px;
+}
+
+@mixin gt-marker-formula {
+  background: var(--gt-marker-formula-bg);
+  padding: 4px 8px;
+}

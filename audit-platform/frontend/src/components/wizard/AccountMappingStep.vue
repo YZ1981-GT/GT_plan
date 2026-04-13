@@ -1,5 +1,5 @@
 <template>
-  <div class="account-mapping-step">
+  <div class="gt-account-mapping-step">
     <h2 class="step-title">科目映射</h2>
     <p class="step-desc">将客户科目映射到标准审计科目，支持自动匹配和手动调整</p>
 
@@ -459,7 +459,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.account-mapping-step {
+.gt-account-mapping-step {
   max-width: 1200px;
   margin: 0 auto;
 }

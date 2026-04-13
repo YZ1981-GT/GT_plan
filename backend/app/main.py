@@ -33,6 +33,12 @@ from app.routers.working_paper import router as working_paper_router
 from app.routers.qc import router as qc_router
 from app.routers.wp_review import router as wp_review_router
 from app.routers.sampling import router as sampling_router
+from app.routers.gt_coding import router as gt_coding_router
+from app.routers.t_accounts import router as t_accounts_router
+from app.routers.ledger_penetration import router as ledger_penetration_router
+from app.routers.metabase import router as metabase_router
+from app.routers.attachments import router as attachments_router
+from app.routers.custom_templates import router as custom_templates_router
 from app.routers.consolidation import router as consolidation_router
 from app.routers.consol_scope import router as consol_scope_router
 from app.routers.consol_trial import router as consol_trial_router
@@ -43,6 +49,13 @@ from app.routers.forex import router as forex_router
 from app.routers.minority_interest import router as minority_interest_router
 from app.routers.consol_notes import router as consol_notes_router
 from app.routers.consol_report import router as consol_report_router
+from app.routers.accounting_standards import router as accounting_standards_router
+from app.routers.i18n import router as i18n_router
+from app.routers.audit_types import router as audit_types_router
+from app.routers.signatures import router as signatures_router
+from app.routers.ai_plugins import router as ai_plugins_router
+from app.routers.regulatory import router as regulatory_router
+from app.routers.note_templates import router as note_templates_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -81,7 +94,7 @@ app.add_middleware(ResponseWrapperMiddleware)
 # 3) CORS 中间件（最外层 — 最先处理跨域）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -115,6 +128,12 @@ app.include_router(working_paper_router)
 app.include_router(qc_router)
 app.include_router(wp_review_router)
 app.include_router(sampling_router)
+app.include_router(gt_coding_router)
+app.include_router(t_accounts_router)
+app.include_router(ledger_penetration_router)
+app.include_router(metabase_router)
+app.include_router(attachments_router)
+app.include_router(custom_templates_router)
 app.include_router(consolidation_router)
 app.include_router(consol_scope_router)
 app.include_router(consol_trial_router)
@@ -125,3 +144,10 @@ app.include_router(forex_router)
 app.include_router(minority_interest_router)
 app.include_router(consol_notes_router)
 app.include_router(consol_report_router)
+app.include_router(accounting_standards_router)
+app.include_router(i18n_router)
+app.include_router(audit_types_router)
+app.include_router(signatures_router)
+app.include_router(ai_plugins_router)
+app.include_router(regulatory_router)
+app.include_router(note_templates_router)

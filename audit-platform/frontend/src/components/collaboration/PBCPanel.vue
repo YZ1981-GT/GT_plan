@@ -1,5 +1,5 @@
 <template>
-  <div class="pbc-panel">
+  <div class="gt-pbc-panel">
     <div class="panel-header">
       <h3>PBC清单管理</h3>
       <el-button size="small" @click="fetchItems">刷新</el-button>
@@ -192,7 +192,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.pbc-panel {}
+.gt-pbc-panel {}
 
 .panel-header {
   display: flex;

@@ -37,6 +37,7 @@ class User(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     role: Mapped[UserRole] = mapped_column(nullable=False)
     office_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    language: Mapped[str] = mapped_column(String(10), server_default=text("'zh-CN'"), nullable=False)
 
     __table_args__ = (
         Index("idx_users_active", "is_active", postgresql_where=text("is_deleted = false")),
@@ -69,6 +70,20 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     )
     version: Mapped[int] = mapped_column(default=1)
     wizard_state: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    accounting_standard_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("accounting_standards.id"), nullable=True
+    )
+    company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    template_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    report_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    parent_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    parent_company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    ultimate_company_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ultimate_company_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    parent_project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
+    consol_level: Mapped[int] = mapped_column(default=1)
 
     __table_args__ = (
         Index(

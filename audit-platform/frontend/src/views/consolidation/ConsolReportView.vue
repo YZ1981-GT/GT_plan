@@ -1,5 +1,5 @@
 <template>
-  <div class="consol-report-view">
+  <div class="gt-consol-report-view">
     <!-- 顶部工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
@@ -474,7 +474,7 @@ watch(() => props.period, (val) => {
 </script>
 
 <style scoped>
-.consol-report-view {
+.gt-consol-report-view {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-4, 12px);

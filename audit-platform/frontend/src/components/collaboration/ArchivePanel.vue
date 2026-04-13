@@ -1,5 +1,5 @@
 <template>
-  <div class="archive-panel">
+  <div class="gt-archive-panel">
     <div class="panel-header">
       <h3>归档管理</h3>
       <div class="header-right">
@@ -150,7 +150,7 @@ async function handleExportPdf() {
 </script>
 
 <style scoped>
-.archive-panel {}
+.gt-archive-panel {}
 .panel-header {
   display: flex;
   justify-content: space-between;

@@ -1,0 +1,33 @@
+/**
+ * GT 打印样式 SCSS 包装
+ * 导入已有的 CSS 打印样式
+ */
+@import './gt-print.css';
+
+// SCSS 打印混入
+@mixin gt-print-page {
+  @media print {
+    @page {
+      size: A4;
+      margin: 2.54cm 3.18cm 2.54cm 3cm;
+    }
+  }
+}
+
+@mixin gt-print-hide {
+  @media print {
+    display: none !important;
+  }
+}
+
+@mixin gt-print-break-before {
+  @media print {
+    page-break-before: always;
+  }
+}
+
+@mixin gt-print-avoid-break {
+  @media print {
+    page-break-inside: avoid;
+  }
+}

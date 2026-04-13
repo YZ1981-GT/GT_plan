@@ -1,5 +1,5 @@
 <template>
-  <div class="consol-scope-table">
+  <div class="gt-consol-scope-table">
     <!-- Toolbar -->
     <div class="table-toolbar">
       <div class="toolbar-left">
@@ -331,7 +331,7 @@ onMounted(() => refresh())
 </script>
 
 <style scoped>
-.consol-scope-table {
+.gt-consol-scope-table {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

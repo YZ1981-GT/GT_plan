@@ -1,5 +1,5 @@
 <template>
-  <div class="notification-center">
+  <div class="gt-notification-center">
     <el-popover
       :visible="popoverVisible"
       placement="bottom-end"
@@ -148,7 +148,7 @@ function formatTime(iso: string) {
 </script>
 
 <style scoped>
-.notification-center { display: inline-flex; align-items: center; }
+.gt-notification-center { display: inline-flex; align-items: center; }
 .bell-icon {
   cursor: pointer;
   color: #606266;

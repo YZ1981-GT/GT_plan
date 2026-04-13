@@ -11,7 +11,7 @@
       :model="formData"
       :rules="formRules"
       label-width="110px"
-      class="instruction-form"
+      class="gt-instruction-form"
     >
       <!-- Instruction Number (auto-generated, read-only) -->
       <el-form-item label="指令编号">
@@ -367,7 +367,7 @@ async function handleSubmit() {
 </script>
 
 <style scoped>
-.instruction-form {
+.gt-instruction-form {
   padding: var(--gt-space-2) 0;
 }
 

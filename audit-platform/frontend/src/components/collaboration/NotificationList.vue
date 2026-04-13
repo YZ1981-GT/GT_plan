@@ -1,5 +1,5 @@
 <template>
-  <div class="notification-list">
+  <div class="gt-notification-list">
     <div class="notif-actions">
       <el-button size="small" @click="markAllRead">全部标为已读</el-button>
     </div>

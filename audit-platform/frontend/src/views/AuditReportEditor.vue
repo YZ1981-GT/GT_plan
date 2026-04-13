@@ -1,8 +1,8 @@
 <template>
-  <div class="audit-report-page">
-    <div class="ar-header">
-      <h2 class="ar-title">审计报告</h2>
-      <div class="ar-actions">
+  <div class="gt-audit-report gt-fade-in">
+    <div class="gt-ar-header">
+      <h2 class="gt-page-title">审计报告</h2>
+      <div class="gt-ar-actions">
         <el-button @click="showGenerateDialog = true" type="primary">生成报告</el-button>
         <el-button v-if="report" @click="onStatusChange('review')"
           :disabled="report.status === 'final'">提交复核</el-button>
@@ -11,22 +11,22 @@
       </div>
     </div>
 
-    <div v-if="!report && !loading" class="empty-state">
+    <div v-if="!report && !loading" class="gt-ar-empty-state">
       <p>暂无审计报告，请先生成</p>
       <el-button type="primary" @click="showGenerateDialog = true">生成报告</el-button>
     </div>
 
-    <el-row v-if="report" :gutter="12" class="ar-body">
+    <el-row v-if="report" :gutter="12" class="gt-ar-body">
       <!-- 左侧：段落导航 -->
       <el-col :span="5">
-        <div class="panel nav-panel">
-          <h4 class="panel-title">段落导航</h4>
-          <div class="nav-info">
+        <div class="gt-ar-panel gt-ar-nav-panel">
+          <h4 class="gt-ar-panel-title">段落导航</h4>
+          <div class="gt-ar-nav-info">
             <el-tag size="small">{{ opinionLabel(report.opinion_type) }}</el-tag>
             <el-tag size="small" type="info">{{ report.company_type === 'listed' ? '上市公司' : '非上市' }}</el-tag>
             <el-tag size="small" :type="statusTagType(report.status)">{{ statusLabel(report.status) }}</el-tag>
           </div>
-          <el-menu :default-active="activeSection" @select="onSectionSelect" class="section-menu">
+          <el-menu :default-active="activeSection" @select="onSectionSelect" class="gt-ar-section-menu">
             <el-menu-item v-for="s in sectionNames" :key="s" :index="s">
               {{ s }}
             </el-menu-item>
@@ -36,13 +36,13 @@
 
       <!-- 中间：编辑器 -->
       <el-col :span="12">
-        <div class="panel editor-panel">
-          <div class="editor-header">
+        <div class="gt-ar-panel gt-ar-editor-panel">
+          <div class="gt-ar-editor-header">
             <h4>{{ activeSection }}</h4>
           </div>
           <el-input v-model="sectionContent" type="textarea" :rows="16"
             :disabled="report.status === 'final'" placeholder="段落内容" />
-          <div class="editor-footer">
+          <div class="gt-ar-editor-footer">
             <el-button type="primary" @click="onSaveParagraph" :loading="saveLoading"
               :disabled="report.status === 'final'">保存段落</el-button>
           </div>
@@ -51,16 +51,16 @@
 
       <!-- 右侧：财务数据面板 -->
       <el-col :span="7">
-        <div class="panel data-panel">
-          <h4 class="panel-title">财务数据引用</h4>
-          <div v-if="report.financial_data" class="fin-data-list">
-            <div v-for="(val, key) in report.financial_data" :key="key" class="fin-data-item">
-              <span class="fin-key">{{ key }}</span>
-              <span class="fin-val">{{ fmtAmt(val) }}</span>
+        <div class="gt-ar-panel gt-ar-data-panel">
+          <h4 class="gt-ar-panel-title">财务数据引用</h4>
+          <div v-if="report.financial_data" class="gt-ar-fin-data-list">
+            <div v-for="(val, key) in report.financial_data" :key="key" class="gt-ar-fin-data-item">
+              <span class="gt-ar-fin-key">{{ key }}</span>
+              <span class="gt-ar-fin-val">{{ fmtAmt(val) }}</span>
             </div>
           </div>
-          <div v-else class="empty-hint">暂无财务数据</div>
-          <div class="data-meta" v-if="report">
+          <div v-else class="gt-ar-empty-hint">暂无财务数据</div>
+          <div class="gt-ar-data-meta" v-if="report">
             <div v-if="report.report_date">报告日期: {{ report.report_date }}</div>
             <div v-if="report.signing_partner">签字合伙人: {{ report.signing_partner }}</div>
           </div>
@@ -83,6 +83,12 @@
           <el-select v-model="genForm.company_type" style="width: 100%">
             <el-option label="非上市公司" value="non_listed" />
             <el-option label="上市公司" value="listed" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="报告语言">
+          <el-select v-model="genForm.language" style="width: 100%">
+            <el-option label="中文" value="zh-CN" />
+            <el-option label="English" value="en-US" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -114,7 +120,7 @@ const report = ref<AuditReportData | null>(null)
 const activeSection = ref('')
 const sectionContent = ref('')
 const showGenerateDialog = ref(false)
-const genForm = ref({ opinion_type: 'unqualified', company_type: 'non_listed' })
+const genForm = ref({ opinion_type: 'unqualified', company_type: 'non_listed', language: 'zh-CN' })
 
 const sectionNames = computed(() => {
   if (!report.value?.paragraphs) return []
@@ -195,23 +201,22 @@ onMounted(fetchReport)
 </script>
 
 <style scoped>
-.audit-report-page { padding: 16px; }
-.ar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.ar-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.ar-actions { display: flex; gap: 8px; }
-.ar-body { height: calc(100vh - 180px); }
-.panel { background: #fff; border-radius: var(--gt-radius-sm); padding: 12px; box-shadow: var(--gt-shadow-sm); height: 100%; overflow-y: auto; }
-.panel-title { margin: 0 0 8px; font-size: 14px; color: var(--gt-color-primary); }
-.nav-info { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
-.section-menu { border-right: none; }
-.editor-header { margin-bottom: 8px; }
-.editor-header h4 { margin: 0; font-size: 15px; }
-.editor-footer { margin-top: 12px; text-align: right; }
-.fin-data-list { margin-bottom: 12px; }
-.fin-data-item { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
-.fin-key { color: #666; }
-.fin-val { font-weight: 600; color: var(--gt-color-primary); }
-.data-meta { font-size: 12px; color: #999; margin-top: 8px; }
-.empty-state { text-align: center; padding: 60px 0; color: #999; }
-.empty-hint { color: #999; font-size: 13px; text-align: center; padding: 20px 0; }
+.gt-audit-report { padding: var(--gt-space-4); }
+.gt-ar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
+.gt-ar-actions { display: flex; gap: var(--gt-space-2); }
+.gt-ar-body { height: calc(100vh - 180px); }
+.gt-ar-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-3); box-shadow: var(--gt-shadow-sm); height: 100%; overflow-y: auto; }
+.gt-ar-panel-title { margin: 0 0 var(--gt-space-2); font-size: var(--gt-font-size-base); color: var(--gt-color-primary); }
+.gt-ar-nav-info { display: flex; gap: var(--gt-space-1); flex-wrap: wrap; margin-bottom: var(--gt-space-2); }
+.gt-ar-section-menu { border-right: none; }
+.gt-ar-editor-header { margin-bottom: var(--gt-space-2); }
+.gt-ar-editor-header h4 { margin: 0; font-size: var(--gt-font-size-md); }
+.gt-ar-editor-footer { margin-top: var(--gt-space-3); text-align: right; }
+.gt-ar-fin-data-list { margin-bottom: var(--gt-space-3); }
+.gt-ar-fin-data-item { display: flex; justify-content: space-between; padding: var(--gt-space-1) 0; border-bottom: 1px solid var(--gt-color-border-light); font-size: var(--gt-font-size-sm); }
+.gt-ar-fin-key { color: var(--gt-color-text-secondary); }
+.gt-ar-fin-val { font-weight: 600; color: var(--gt-color-primary); }
+.gt-ar-data-meta { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: var(--gt-space-2); }
+.gt-ar-empty-state { text-align: center; padding: 60px 0; color: var(--gt-color-text-tertiary); }
+.gt-ar-empty-hint { color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-sm); text-align: center; padding: var(--gt-space-5) 0; }
 </style>

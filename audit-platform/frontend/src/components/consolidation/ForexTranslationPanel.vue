@@ -1,5 +1,5 @@
 <template>
-  <div class="forex-translation-panel">
+  <div class="gt-forex-translation-panel">
     <!-- 顶部工具栏 -->
     <div class="panel-toolbar">
       <div class="toolbar-left">
@@ -456,7 +456,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.forex-translation-panel {
+.gt-forex-translation-panel {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

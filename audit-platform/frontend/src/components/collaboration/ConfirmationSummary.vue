@@ -1,5 +1,5 @@
 <template>
-  <div class="confirmation-summary">
+  <div class="gt-confirmation-summary">
     <h3>函证统计汇总</h3>
 
     <!-- 汇总卡片 -->
@@ -201,7 +201,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.confirmation-summary {}
+.gt-confirmation-summary {}
 .summary-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));

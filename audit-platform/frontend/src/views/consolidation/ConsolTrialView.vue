@@ -1,5 +1,5 @@
 <template>
-  <div class="consol-trial-view">
+  <div class="gt-consol-trial-view">
     <div class="section-header">
       <el-button @click="onCheck" :loading="checkLoading">一致性校验</el-button>
       <el-button @click="onRecalc" :loading="recalcLoading">全量重算</el-button>
@@ -115,7 +115,7 @@ onMounted(() => store.fetchConsolTrial(props.projectId, props.year))
 </script>
 
 <style scoped>
-.consol-trial-view {
+.gt-consol-trial-view {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

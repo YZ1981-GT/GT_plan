@@ -1,5 +1,5 @@
 <template>
-  <div class="evidence-chain-panel">
+  <div class="gt-evidence-chain-panel">
     <el-card class="panel-card">
       <template #header>
         <div class="panel-header">
@@ -319,7 +319,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.evidence-chain-panel {
+.gt-evidence-chain-panel {
   padding: 16px;
 }
 

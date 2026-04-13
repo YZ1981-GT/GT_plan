@@ -1,5 +1,5 @@
 <template>
-  <div class="materiality-step">
+  <div class="gt-materiality-step">
     <h2 class="step-title">重要性水平</h2>
     <p class="step-desc">选择基准类型、设置参数，系统自动计算三级重要性水平</p>
 
@@ -365,7 +365,7 @@ defineExpose({ validate })
 </script>
 
 <style scoped>
-.materiality-step {
+.gt-materiality-step {
   max-width: 700px;
   margin: 0 auto;
 }

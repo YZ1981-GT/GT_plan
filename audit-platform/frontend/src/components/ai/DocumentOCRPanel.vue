@@ -1,5 +1,5 @@
 <template>
-  <div class="document-ocr-panel">
+  <div class="gt-document-ocr-panel">
     <div class="panel-header">
       <h3>📄 单据智能识别</h3>
       <div class="tab-nav">
@@ -276,7 +276,7 @@ function formatCurrency(val) {
 </script>
 
 <style scoped>
-.document-ocr-panel { padding: 16px; }
+.gt-document-ocr-panel { padding: 16px; }
 
 .panel-header { margin-bottom: 16px; }
 .panel-header h3 { margin: 0 0 12px; font-size: 16px; }

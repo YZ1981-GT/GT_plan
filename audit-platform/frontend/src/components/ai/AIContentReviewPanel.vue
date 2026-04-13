@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-content-review-panel">
+  <div class="gt-ai-content-review-panel">
     <div class="panel-header">
       <h3>🤖 AI内容审核确认</h3>
       <div class="filter-bar">
@@ -510,7 +510,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.ai-content-review-panel {
+.gt-ai-content-review-panel {
   display: flex;
   flex-direction: column;
   height: 100%;

@@ -1,5 +1,5 @@
 <template>
-  <div class="archive-modification-form">
+  <div class="gt-archive-modification-form">
     <div class="form-header">
       <h3>归档后修改申请</h3>
     </div>
@@ -158,7 +158,7 @@ async function submitRequest() {
 </script>
 
 <style scoped>
-.archive-modification-form {}
+.gt-archive-modification-form {}
 .form-header { margin-bottom: 16px; }
 .history-section { margin-top: 24px; }
 .history-section h4 { margin-bottom: 12px; }

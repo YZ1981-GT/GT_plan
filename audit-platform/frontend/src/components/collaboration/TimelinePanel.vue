@@ -1,5 +1,5 @@
 <template>
-  <div class="timeline-panel">
+  <div class="gt-timeline-panel">
     <div class="panel-header">
       <h3>里程碑管理</h3>
       <el-button type="primary" size="small" @click="openAddDialog">+ 添加里程碑</el-button>
@@ -195,7 +195,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.timeline-panel {}
+.gt-timeline-panel {}
 
 .panel-header {
   display: flex;

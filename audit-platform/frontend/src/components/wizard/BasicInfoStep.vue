@@ -1,18 +1,24 @@
 <template>
-  <div class="basic-info-step">
-    <h2 class="step-title">基本信息</h2>
-    <p class="step-desc">请填写审计项目的基本信息</p>
+  <div class="gt-basic-info-step">
+    <h2 class="gt-step-title">基本信息</h2>
+    <p class="gt-step-desc">请填写审计项目的基本信息</p>
 
     <el-form
       ref="formRef"
       :model="form"
       :rules="rules"
-      label-width="120px"
+      label-width="140px"
       label-position="right"
-      class="basic-info-form"
+      class="gt-basic-form"
     >
+      <el-divider content-position="left">项目信息</el-divider>
+
       <el-form-item label="客户名称" prop="client_name">
         <el-input v-model="form.client_name" placeholder="请输入客户名称" />
+      </el-form-item>
+
+      <el-form-item label="企业代码" prop="company_code">
+        <el-input v-model="form.company_code" placeholder="统一社会信用代码" maxlength="18" />
       </el-form-item>
 
       <el-form-item label="审计年度" prop="audit_year">
@@ -33,6 +39,8 @@
           <el-option label="专项审计" value="special" />
           <el-option label="IPO审计" value="ipo" />
           <el-option label="内控审计" value="internal_control" />
+          <el-option label="验资" value="capital_verification" />
+          <el-option label="税审" value="tax_audit" />
         </el-select>
       </el-form-item>
 
@@ -42,14 +50,62 @@
           <el-option label="小企业会计准则" value="small_enterprise" />
           <el-option label="金融企业会计准则" value="financial" />
           <el-option label="政府会计准则" value="government" />
+          <el-option label="国际准则 IFRS" value="ifrs" />
         </el-select>
       </el-form-item>
 
-      <el-form-item label="签字合伙人" prop="signing_partner_id">
+      <el-divider content-position="left">模板与报表</el-divider>
+
+      <el-form-item label="附注模板类型" prop="template_type">
+        <el-radio-group v-model="form.template_type">
+          <el-radio-button value="soe">国企版</el-radio-button>
+          <el-radio-button value="listed">上市版</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+
+      <el-form-item label="报表类型" prop="report_scope">
+        <el-radio-group v-model="form.report_scope" @change="onReportScopeChange">
+          <el-radio-button value="standalone">单户报表</el-radio-button>
+          <el-radio-button value="consolidated">合并报表</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+
+      <el-alert
+        v-if="form.report_scope === 'consolidated'"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      >
+        合并报表项目将自动创建一张差额表，用于填充合并抵消及其他调整分录。
+        子公司清单和持股比例请在「合并项目」模块中配置。
+      </el-alert>
+
+      <!-- 合并报表：集团架构折叠面板 -->
+      <el-collapse v-if="form.report_scope === 'consolidated'" v-model="groupPanelOpen" class="gt-group-collapse">
+        <el-collapse-item title="集团架构信息（三码体系）" name="group">
+          <el-form-item label="上级企业名称" prop="parent_company_name">
+            <el-input v-model="form.parent_company_name" placeholder="直接控股的上级企业名称" />
+          </el-form-item>
+          <el-form-item label="上级企业代码" prop="parent_company_code">
+            <el-input v-model="form.parent_company_code" placeholder="上级企业统一社会信用代码" maxlength="18" />
+          </el-form-item>
+          <el-form-item label="最终控制方名称" prop="ultimate_company_name">
+            <el-input v-model="form.ultimate_company_name" placeholder="最终控制方企业名称" />
+          </el-form-item>
+          <el-form-item label="最终控制方代码" prop="ultimate_company_code">
+            <el-input v-model="form.ultimate_company_code" placeholder="最终控制方统一社会信用代码" maxlength="18" />
+          </el-form-item>
+        </el-collapse-item>
+      </el-collapse>
+
+      <el-divider content-position="left">项目团队</el-divider>
+
+      <el-form-item label="签字合伙人">
         <el-input v-model="form.signing_partner_id" placeholder="请输入签字合伙人" />
       </el-form-item>
 
-      <el-form-item label="项目经理" prop="manager_id">
+      <el-form-item label="项目经理">
         <el-input v-model="form.manager_id" placeholder="请输入项目经理" />
       </el-form-item>
     </el-form>
@@ -64,12 +120,20 @@ import { useWizardStore, type BasicInfo } from '@/stores/wizard'
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
 const auditYearDate = ref<string>('')
+const groupPanelOpen = ref<string[]>(['group'])
 
 const form = reactive<BasicInfo>({
   client_name: '',
   audit_year: null,
   project_type: '',
   accounting_standard: '',
+  company_code: '',
+  template_type: 'soe',
+  report_scope: 'standalone',
+  parent_company_name: '',
+  parent_company_code: '',
+  ultimate_company_name: '',
+  ultimate_company_code: '',
   signing_partner_id: null,
   manager_id: null,
 })
@@ -79,15 +143,20 @@ const rules: FormRules = {
   audit_year: [{ required: true, message: '请选择审计年度', trigger: 'change' }],
   project_type: [{ required: true, message: '请选择项目类型', trigger: 'change' }],
   accounting_standard: [{ required: true, message: '请选择会计准则', trigger: 'change' }],
-  signing_partner_id: [],
-  manager_id: [],
+  template_type: [{ required: true, message: '请选择附注模板类型', trigger: 'change' }],
+  report_scope: [{ required: true, message: '请选择报表类型', trigger: 'change' }],
 }
 
 function onYearChange(val: string) {
   form.audit_year = val ? parseInt(val, 10) : null
 }
 
-/** Restore form from store if data exists */
+function onReportScopeChange(val: string) {
+  if (val === 'consolidated') {
+    groupPanelOpen.value = ['group']
+  }
+}
+
 onMounted(() => {
   const saved = wizardStore.stepData.basic_info as unknown as BasicInfo | undefined
   if (saved) {
@@ -98,7 +167,6 @@ onMounted(() => {
   }
 })
 
-/** Validate and return form data */
 async function validate(): Promise<BasicInfo | null> {
   if (!formRef.value) return null
   try {
@@ -113,24 +181,11 @@ defineExpose({ validate })
 </script>
 
 <style scoped>
-.basic-info-step {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.step-title {
-  color: var(--gt-color-primary);
-  margin-bottom: var(--gt-space-1);
-  font-size: 20px;
-}
-
-.step-desc {
-  color: #999;
-  margin-bottom: var(--gt-space-6);
-  font-size: 14px;
-}
-
-.basic-info-form {
-  padding: var(--gt-space-4) 0;
-}
+.gt-basic-info-step { max-width: 650px; margin: 0 auto; }
+.gt-step-title { color: var(--gt-color-primary); margin-bottom: var(--gt-space-1); font-size: 20px; }
+.gt-step-desc { color: var(--gt-color-text-tertiary); margin-bottom: var(--gt-space-4); font-size: 14px; }
+.gt-basic-form { padding: var(--gt-space-2) 0; }
+.gt-group-collapse { margin-bottom: var(--gt-space-4); border: 1px solid var(--gt-color-primary-lighter); border-radius: var(--gt-radius-md); }
+.gt-group-collapse :deep(.el-collapse-item__header) { color: var(--gt-color-primary); font-weight: 600; padding-left: var(--gt-space-3); }
+.gt-group-collapse :deep(.el-collapse-item__content) { padding: var(--gt-space-2) var(--gt-space-3); }
 </style>

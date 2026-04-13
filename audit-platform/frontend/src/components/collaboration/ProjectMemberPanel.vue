@@ -1,5 +1,5 @@
 <template>
-  <div class="project-member-panel">
+  <div class="gt-project-member-panel">
     <div class="toolbar">
       <span class="title">项目成员</span>
       <el-button v-if="canManage" type="primary" size="small" @click="openAddDialog">添加成员</el-button>
@@ -147,7 +147,7 @@ onMounted(loadMembers)
 </script>
 
 <style scoped>
-.project-member-panel { padding: 8px 0; }
+.gt-project-member-panel { padding: 8px 0; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .title { font-weight: 600; font-size: 14px; }
 </style>

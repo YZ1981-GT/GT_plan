@@ -1,0 +1,41 @@
+/**
+ * GT 样式混入（间距、圆角、阴影）
+ */
+
+// 间距
+@mixin gt-spacing($size: 2) {
+  padding: calc(#{$size} * 4px);
+}
+
+@mixin gt-margin($size: 2) {
+  margin: calc(#{$size} * 4px);
+}
+
+// 圆角
+@mixin gt-radius-sm { border-radius: 4px; }
+@mixin gt-radius-md { border-radius: 8px; }
+@mixin gt-radius-lg { border-radius: 12px; }
+
+// 阴影
+@mixin gt-shadow-sm { box-shadow: 0 1px 4px rgba(75, 45, 119, 0.075); }
+@mixin gt-shadow-md { box-shadow: 0 4px 12px rgba(75, 45, 119, 0.15); }
+@mixin gt-shadow-lg { box-shadow: 0 8px 24px rgba(75, 45, 119, 0.175); }
+
+// 卡片
+@mixin gt-card {
+  background: #ffffff;
+  border: 1px solid #e5e5ea;
+  border-radius: 8px;
+  @include gt-shadow-sm;
+}
+
+// 焦点样式
+@mixin gt-focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(160, 109, 255, 0.5);
+}
+
+// 过渡
+@mixin gt-transition($property: all) {
+  transition: $property 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}

@@ -1,5 +1,5 @@
 <template>
-  <div class="elimination-list">
+  <div class="gt-elimination-list">
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
@@ -566,7 +566,7 @@ onMounted(() => loadData())
 </script>
 
 <style scoped>
-.elimination-list {
+.gt-elimination-list {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

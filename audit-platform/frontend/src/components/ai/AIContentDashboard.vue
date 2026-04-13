@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-content-dashboard">
+  <div class="gt-ai-content-dashboard">
     <div class="panel-header">
       <h3>🤖 AI内容管理看板</h3>
       <div class="filter-bar">
@@ -376,7 +376,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.ai-content-dashboard { padding: 16px; }
+.gt-ai-content-dashboard { padding: 16px; }
 
 .panel-header {
   display: flex;

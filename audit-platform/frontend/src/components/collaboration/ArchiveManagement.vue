@@ -1,5 +1,5 @@
 <template>
-  <div class="archive-management">
+  <div class="gt-archive-management">
     <div class="archive-header">
       <h3>归档管理</h3>
       <el-button type="primary" @click="initChecklist">初始化归档清单</el-button>
@@ -72,6 +72,6 @@ async function completeItem(row: any) {
 </script>
 
 <style scoped>
-.archive-management {}
+.gt-archive-management {}
 .archive-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 </style>

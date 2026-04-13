@@ -13,6 +13,10 @@ from app.core.database import get_db  # noqa: E402
 from app.core.redis import get_redis  # noqa: E402
 from app.models.base import Base  # noqa: E402
 import app.models.core  # noqa: E402, F401
+import app.models.extension_models  # noqa: E402, F401
+import app.models.gt_coding_models  # noqa: E402, F401
+import app.models.t_account_models  # noqa: E402, F401
+import app.models.attachment_models  # noqa: E402, F401
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)

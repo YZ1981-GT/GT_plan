@@ -1,8 +1,8 @@
 <template>
-  <div class="user-management">
+  <div class="gt-user-management gt-fade-in">
     <el-card>
       <template #header>
-        <div class="header">
+        <div class="gt-um-header">
           <span>用户管理</span>
           <el-button v-if="isAdmin" type="primary" @click="openCreateDialog">创建用户</el-button>
         </div>
@@ -60,7 +60,7 @@
         </el-form-item>
         <el-form-item v-if="!isEditing" label="密码" prop="password">
           <el-input v-model="form.password" type="password" show-password placeholder="初始密码" />
-          <div class="password-strength">
+          <div class="gt-um-password-strength">
             <el-progress :percentage="passwordStrength" :color="strengthColor" />
           </div>
         </el-form-item>
@@ -185,7 +185,7 @@ onMounted(loadUsers)
 </script>
 
 <style scoped>
-.user-management { padding: 16px; }
-.header { display: flex; justify-content: space-between; align-items: center; }
-.password-strength { margin-top: 6px; }
+.gt-user-management { padding: var(--gt-space-4); }
+.gt-um-header { display: flex; justify-content: space-between; align-items: center; }
+.gt-um-password-strength { margin-top: 6px; }
 </style>

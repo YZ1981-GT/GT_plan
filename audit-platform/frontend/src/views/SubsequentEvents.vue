@@ -1,7 +1,7 @@
 <template>
-  <div class="subsequent-events-view">
-    <div class="page-header">
-      <h2>期后事项管理</h2>
+  <div class="gt-subsequent-events gt-fade-in">
+    <div class="gt-se-header">
+      <h2 class="gt-page-title">期后事项管理</h2>
       <el-select v-model="currentProjectId" placeholder="选择项目" filterable style="width: 300px" @change="loadEvents">
         <el-option v-for="p in projects" :key="p.id" :label="p.project_name" :value="p.id" />
       </el-select>
@@ -44,7 +44,6 @@ onMounted(loadProjects)
 </script>
 
 <style scoped>
-.subsequent-events-view { padding: 16px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.page-header h2 { margin: 0; }
+.gt-subsequent-events { padding: var(--gt-space-4); }
+.gt-se-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
 </style>

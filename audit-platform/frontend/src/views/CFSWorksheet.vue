@@ -1,8 +1,8 @@
 <template>
-  <div class="cfs-worksheet-page">
-    <div class="cfs-header">
-      <h2 class="cfs-title">现金流量表工作底稿</h2>
-      <div class="cfs-actions">
+  <div class="gt-cfs-worksheet gt-fade-in">
+    <div class="gt-cfs-header">
+      <h2 class="gt-page-title">现金流量表工作底稿</h2>
+      <div class="gt-cfs-actions">
         <el-button @click="onGenerate" :loading="genLoading">生成工作底稿</el-button>
         <el-button @click="onAutoGenerate" :loading="autoLoading">自动生成调整项</el-button>
         <el-button @click="showAdjForm = true" type="primary">新建调整分录</el-button>
@@ -15,7 +15,7 @@
       show-icon style="margin-bottom: 12px" />
 
     <!-- 工作底稿表格 -->
-    <h3 class="section-title">工作底稿</h3>
+    <h3 class="gt-section-title">工作底稿</h3>
     <el-table :data="worksheetRows" v-loading="loading" border stripe size="small" style="width: 100%; margin-bottom: 20px">
       <el-table-column prop="account_code" label="科目编码" width="110" />
       <el-table-column prop="account_name" label="科目名称" min-width="160" />
@@ -33,7 +33,7 @@
       </el-table-column>
       <el-table-column label="未分配" width="130" align="right">
         <template #default="{ row }">
-          <span :class="{ 'unallocated': parseFloat(row.unallocated_amount) !== 0 }">
+          <span :class="{ 'gt-cfs-unallocated': parseFloat(row.unallocated_amount) !== 0 }">
             {{ fmtAmt(row.unallocated_amount) }}
           </span>
         </template>
@@ -41,7 +41,7 @@
     </el-table>
 
     <!-- CFS调整分录列表 -->
-    <h3 class="section-title">调整分录</h3>
+    <h3 class="gt-section-title">调整分录</h3>
     <el-table :data="adjustments" border stripe size="small" style="width: 100%; margin-bottom: 20px">
       <el-table-column prop="adjustment_no" label="编号" width="100" />
       <el-table-column prop="description" label="描述" min-width="180" show-overflow-tooltip />
@@ -73,7 +73,7 @@
     <!-- 现金流量表预览 + 勾稽校验 -->
     <el-row :gutter="16">
       <el-col :span="12">
-        <h3 class="section-title">间接法补充资料</h3>
+        <h3 class="gt-section-title">间接法补充资料</h3>
         <el-table v-if="indirectMethod" :data="indirectMethod.items" border size="small"
           :row-class-name="({ row }) => row.is_total ? 'total-row' : ''">
           <el-table-column prop="label" label="项目" min-width="250" />
@@ -81,17 +81,17 @@
             <template #default="{ row }">{{ fmtAmt(row.amount) }}</template>
           </el-table-column>
         </el-table>
-        <div v-if="indirectMethod" class="reconciliation-badge" :class="indirectMethod.reconciliation_passed ? 'pass' : 'fail'">
+        <div v-if="indirectMethod" class="gt-cfs-reconciliation-badge" :class="indirectMethod.reconciliation_passed ? 'gt-cfs-pass' : 'gt-cfs-fail'">
           {{ indirectMethod.reconciliation_passed ? '✓ 间接法勾稽通过' : '✗ 间接法勾稽不通过' }}
         </div>
       </el-col>
       <el-col :span="12">
-        <h3 class="section-title">现金勾稽校验</h3>
-        <div v-if="verifyResult" class="verify-panel">
-          <div v-for="(item, idx) in verifyResult.checks || []" :key="idx" class="verify-item"
-            :class="item.passed ? 'pass' : 'fail'">
+        <h3 class="gt-section-title">现金勾稽校验</h3>
+        <div v-if="verifyResult" class="gt-cfs-verify-panel">
+          <div v-for="(item, idx) in verifyResult.checks || []" :key="idx" class="gt-cfs-verify-item"
+            :class="item.passed ? 'gt-cfs-pass' : 'gt-cfs-fail'">
             {{ item.passed ? '✓' : '✗' }} {{ item.name }}
-            <span v-if="!item.passed" class="verify-diff">差额: {{ item.diff }}</span>
+            <span v-if="!item.passed" class="gt-cfs-verify-diff">差额: {{ item.diff }}</span>
           </div>
         </div>
         <el-button @click="onVerify" :loading="verifyLoading" style="margin-top: 8px">执行勾稽校验</el-button>
@@ -269,19 +269,17 @@ onMounted(fetchAll)
 </script>
 
 <style scoped>
-.cfs-worksheet-page { padding: 16px; }
-.cfs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.cfs-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.cfs-actions { display: flex; gap: 8px; }
-.section-title { font-size: 15px; color: var(--gt-color-primary); margin: 12px 0 8px; }
-.unallocated { color: var(--gt-color-coral, #e74c3c); font-weight: 600; }
-.reconciliation-badge { margin-top: 8px; font-size: 14px; font-weight: 600; }
-.reconciliation-badge.pass { color: var(--gt-color-success, #27ae60); }
-.reconciliation-badge.fail { color: var(--gt-color-coral, #e74c3c); }
-.verify-panel { background: #fff; padding: 12px; border-radius: var(--gt-radius-sm); box-shadow: var(--gt-shadow-sm); }
-.verify-item { padding: 6px 0; font-size: 14px; }
-.verify-item.pass { color: var(--gt-color-success, #27ae60); }
-.verify-item.fail { color: var(--gt-color-coral, #e74c3c); }
-.verify-diff { margin-left: 8px; font-weight: 600; }
+.gt-cfs-worksheet { padding: var(--gt-space-4); }
+.gt-cfs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.gt-cfs-actions { display: flex; gap: var(--gt-space-2); }
+.gt-cfs-unallocated { color: var(--gt-color-coral); font-weight: 600; }
+.gt-cfs-reconciliation-badge { margin-top: var(--gt-space-2); font-size: var(--gt-font-size-base); font-weight: 600; }
+.gt-cfs-reconciliation-badge.gt-cfs-pass { color: var(--gt-color-success); }
+.gt-cfs-reconciliation-badge.gt-cfs-fail { color: var(--gt-color-coral); }
+.gt-cfs-verify-panel { background: var(--gt-color-bg-white); padding: var(--gt-space-3); border-radius: var(--gt-radius-sm); box-shadow: var(--gt-shadow-sm); }
+.gt-cfs-verify-item { padding: 6px 0; font-size: var(--gt-font-size-base); }
+.gt-cfs-verify-item.gt-cfs-pass { color: var(--gt-color-success); }
+.gt-cfs-verify-item.gt-cfs-fail { color: var(--gt-color-coral); }
+.gt-cfs-verify-diff { margin-left: var(--gt-space-2); font-weight: 600; }
 :deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
 </style>

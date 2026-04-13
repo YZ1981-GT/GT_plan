@@ -1,5 +1,5 @@
 <template>
-  <div class="workpaper-ai-fill">
+  <div class="gt-workpaper-ai-fill">
     <div class="panel-header">
       <h3>🤖 AI 底稿填充</h3>
       <div class="fill-controls">
@@ -205,7 +205,7 @@ function confidenceClass(c) {
 </script>
 
 <style scoped>
-.workpaper-ai-fill { padding: 16px; }
+.gt-workpaper-ai-fill { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .panel-header h3 { margin: 0; font-size: 16px; }
 .fill-controls { display: flex; gap: 8px; align-items: center; }

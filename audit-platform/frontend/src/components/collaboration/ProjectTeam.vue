@@ -1,5 +1,5 @@
 <template>
-  <div class="project-team">
+  <div class="gt-project-team">
     <div class="team-header">
       <h3>项目团队</h3>
       <el-button type="primary" @click="showInvite = true">邀请成员</el-button>
@@ -86,6 +86,6 @@ function editRole(row: any) {
 </script>
 
 <style scoped>
-.project-team {}
+.gt-project-team {}
 .team-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 </style>

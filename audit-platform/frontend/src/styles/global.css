@@ -3,6 +3,9 @@
  * 引入品牌 Token → 覆盖 Element Plus → 定义 gt- 工具类 → 动画
  */
 @import './gt-tokens.css';
+@import './gt-markers.css';
+@import './gt-a11y.css';
+@import './gt-print.css';
 
 /* ═══════════════════════════════════════════════════════════════
    Element Plus 主题覆盖
@@ -165,7 +168,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   gt- 工具类
+   gt- 工具类（Task 10.2：命名规范 gt-{component}-{modifier}）
    ═══════════════════════════════════════════════════════════════ */
 .gt-card {
   background: var(--gt-color-bg-white);

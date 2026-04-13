@@ -22,6 +22,62 @@ router = APIRouter(
 )
 
 
+# ── 自定义函数管理（Task 6.4） ──
+
+from pydantic import BaseModel
+
+
+class RegisterFunctionRequest(BaseModel):
+    name: str
+    expression: str
+    description: str = ""
+    param_names: list[str] = []
+
+
+@router.get("/functions")
+async def list_all_functions(redis=Depends(get_redis)):
+    """列出所有可用函数（内置 + 自定义）"""
+    engine = FormulaEngine(redis_client=redis)
+    return engine.list_all_functions()
+
+
+@router.get("/custom-functions")
+async def list_custom_functions(redis=Depends(get_redis)):
+    """列出所有自定义函数"""
+    engine = FormulaEngine(redis_client=redis)
+    return engine.list_custom_functions()
+
+
+@router.post("/custom-functions")
+async def register_custom_function(
+    body: RegisterFunctionRequest,
+    redis=Depends(get_redis),
+):
+    """注册自定义公式函数"""
+    engine = FormulaEngine(redis_client=redis)
+    try:
+        return engine.register_custom_function(
+            name=body.name,
+            expression=body.expression,
+            description=body.description,
+            param_names=body.param_names,
+        )
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/custom-functions/{name}")
+async def unregister_custom_function(name: str, redis=Depends(get_redis)):
+    """注销自定义函数"""
+    engine = FormulaEngine(redis_client=redis)
+    removed = engine.unregister_custom_function(name)
+    if not removed:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"自定义函数 '{name}' 不存在")
+    return {"name": name, "removed": True}
+
+
 @router.post("/execute", response_model=FormulaResult)
 async def execute_formula(
     data: FormulaRequest,

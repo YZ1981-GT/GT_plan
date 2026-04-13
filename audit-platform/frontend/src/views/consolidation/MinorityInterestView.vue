@@ -1,5 +1,5 @@
 <template>
-  <div class="minority-interest-view">
+  <div class="gt-minority-interest-view">
     <div class="section-header">
       <h3>少数股东权益</h3>
       <el-button type="primary" size="small" @click="showDialog()">新增记录</el-button>
@@ -105,7 +105,7 @@ onMounted(() => store.fetchMinorityInterestRows(props.projectId, props.year))
 </script>
 
 <style scoped>
-.minority-interest-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
+.gt-minority-interest-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header h3 { margin: 0; font-size: 16px; color: var(--gt-color-primary-dark); }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="confirmation-step">
+  <div class="gt-confirmation-step">
     <h2 class="step-title">确认项目配置</h2>
     <p class="step-desc">请确认以下项目配置信息，确认后项目将进入计划阶段</p>
 
@@ -134,7 +134,7 @@ function isStepCompleted(step: string): boolean {
 </script>
 
 <style scoped>
-.confirmation-step {
+.gt-confirmation-step {
   max-width: 800px;
   margin: 0 auto;
 }

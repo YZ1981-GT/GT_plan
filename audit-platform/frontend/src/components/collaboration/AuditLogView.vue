@@ -1,5 +1,5 @@
 <template>
-  <div class="audit-log-view">
+  <div class="gt-audit-log-view">
     <div class="log-header">
       <h3>审计日志</h3>
     </div>
@@ -51,6 +51,6 @@ function viewDetail(row: any) {
 </script>
 
 <style scoped>
-.audit-log-view {}
+.gt-audit-log-view {}
 .log-header { margin-bottom: 16px; }
 </style>

@@ -116,7 +116,7 @@ async function handleRegister() {
 
   loading.value = true
   try {
-    await axios.post('http://localhost:8000/api/auth/register', {
+    await axios.post('/api/auth/register', {
       username: form.username,
       email: form.email,
       password: form.password,

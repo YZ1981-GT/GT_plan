@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-chat-panel" :class="{ collapsed: isCollapsed }">
+  <div class="gt-ai-chat-panel" :class="{ collapsed: isCollapsed }">
     <div class="panel-header" @click="isCollapsed = !isCollapsed">
       <span class="panel-title">💬 AI 助手</span>
       <span class="collapse-icon">{{ isCollapsed ? '◀' : '▶' }}</span>
@@ -327,7 +327,7 @@ watch(() => props.projectId, (val) => {
 </script>
 
 <style scoped>
-.ai-chat-panel {
+.gt-ai-chat-panel {
   position: fixed;
   right: 0;
   top: 0;
@@ -342,7 +342,7 @@ watch(() => props.projectId, (val) => {
   box-shadow: -2px 0 8px rgba(0,0,0,0.08);
 }
 
-.ai-chat-panel.collapsed {
+.gt-ai-chat-panel.collapsed {
   width: 40px;
 }
 

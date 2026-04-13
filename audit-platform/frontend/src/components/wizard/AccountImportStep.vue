@@ -1,5 +1,5 @@
 <template>
-  <div class="account-import-step">
+  <div class="gt-account-import-step">
     <h2 class="step-title">科目导入</h2>
     <p class="step-desc">上传客户科目表文件（Excel/CSV），系统将自动解析并导入</p>
 
@@ -256,7 +256,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.account-import-step {
+.gt-account-import-step {
   max-width: 800px;
   margin: 0 auto;
 }

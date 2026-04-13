@@ -1,0 +1,106 @@
+/**
+ * GT 打印样式（Task 10.8）
+ * A4纸张、黑白配色、避免分页断裂
+ */
+
+@media print {
+  /* ── 页面设置 ── */
+  @page {
+    size: A4;
+    margin: 20mm 15mm 20mm 15mm;
+  }
+
+  /* ── 隐藏非打印元素 ── */
+  .gt-topbar,
+  .gt-sidebar,
+  .gt-resizer,
+  .gt-sidebar-bottom,
+  .el-button,
+  .el-dialog,
+  .el-message,
+  .el-notification,
+  .gt-topbar-btn,
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  /* ── 主内容区全宽 ── */
+  .gt-body,
+  .gt-detail,
+  .gt-middle {
+    width: 100% !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  .gt-three-col {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* ── 黑白配色 ── */
+  body {
+    color: #000 !important;
+    background: #fff !important;
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+  }
+
+  * {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* ── 表格打印 ── */
+  .el-table {
+    border: 1px solid #000 !important;
+  }
+
+  .el-table th,
+  .el-table td {
+    border: 1px solid #666 !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+  }
+
+  .el-table th {
+    font-weight: 700 !important;
+    background: #f0f0f0 !important;
+  }
+
+  /* ── 避免分页断裂 ── */
+  .gt-card,
+  .el-card,
+  .el-table,
+  .el-descriptions,
+  .gt-detail-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3, h4 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* ── 链接显示URL ── */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 10px;
+    color: #666 !important;
+  }
+
+  a[href^="#"]::after,
+  a[href^="javascript"]::after {
+    content: "";
+  }
+
+  /* ── 标签打印 ── */
+  .el-tag {
+    border: 1px solid #666 !important;
+    padding: 1px 4px !important;
+    font-size: 10px !important;
+  }
+}

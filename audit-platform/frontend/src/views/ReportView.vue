@@ -1,8 +1,8 @@
 <template>
-  <div class="report-view-page">
-    <div class="rv-header">
-      <h2 class="rv-title">财务报表</h2>
-      <div class="rv-actions">
+  <div class="gt-report-view gt-fade-in">
+    <div class="gt-rv-header">
+      <h2 class="gt-page-title">财务报表</h2>
+      <div class="gt-rv-actions">
         <el-button @click="onGenerate" :loading="genLoading">重新生成</el-button>
         <el-button @click="onConsistencyCheck" :loading="checkLoading">一致性校验</el-button>
         <el-button @click="onExportExcel">导出 Excel</el-button>
@@ -16,7 +16,7 @@
       <template #title>
         跨报表一致性校验未通过
       </template>
-      <div v-for="c in consistencyResult.checks.filter(x => !x.passed)" :key="c.name" class="check-item">
+      <div v-for="c in consistencyResult.checks.filter(x => !x.passed)" :key="c.name" class="gt-rv-check-item">
         {{ c.name }}：期望 {{ c.expected }}，实际 {{ c.actual }}，差额 {{ c.diff }}
       </div>
     </el-alert>
@@ -44,7 +44,7 @@
       </el-table-column>
       <el-table-column label="本期金额" width="160" align="right">
         <template #default="{ row }">
-          <span class="amount-cell" @click="onDrilldown(row)">
+          <span class="gt-rv-amount-cell" @click="onDrilldown(row)">
             {{ fmtAmt(row.current_period_amount) }}
           </span>
         </template>
@@ -56,9 +56,9 @@
 
     <!-- 穿透弹窗 -->
     <el-dialog v-model="drilldownVisible" :title="`穿透查询 — ${drilldownData?.row_name || ''}`" width="700px">
-      <div v-if="drilldownData" class="drilldown-content">
-        <div class="dd-section">
-          <span class="dd-label">公式：</span>
+      <div v-if="drilldownData" class="gt-rv-drilldown-content">
+        <div class="gt-rv-dd-section">
+          <span class="gt-rv-dd-label">公式：</span>
           <code>{{ drilldownData.formula }}</code>
         </div>
         <el-table :data="drilldownData.accounts" border size="small" style="margin-top: 12px">
@@ -167,15 +167,14 @@ onMounted(fetchReport)
 </script>
 
 <style scoped>
-.report-view-page { padding: 16px; }
-.rv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.rv-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.rv-actions { display: flex; gap: 8px; }
-.amount-cell { cursor: pointer; color: var(--el-color-primary); }
-.amount-cell:hover { text-decoration: underline; }
-.check-item { font-size: 13px; margin-top: 4px; }
-.drilldown-content .dd-section { margin-bottom: 8px; }
-.dd-label { font-weight: 600; color: #666; }
-.dd-section code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+.gt-report-view { padding: var(--gt-space-4); }
+.gt-rv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.gt-rv-actions { display: flex; gap: var(--gt-space-2); }
+.gt-rv-amount-cell { cursor: pointer; color: var(--el-color-primary); }
+.gt-rv-amount-cell:hover { text-decoration: underline; }
+.gt-rv-check-item { font-size: var(--gt-font-size-sm); margin-top: var(--gt-space-1); }
+.gt-rv-drilldown-content .gt-rv-dd-section { margin-bottom: var(--gt-space-2); }
+.gt-rv-dd-label { font-weight: 600; color: var(--gt-color-text-secondary); }
+.gt-rv-dd-section code { background: var(--gt-color-bg); padding: 2px 6px; border-radius: var(--gt-radius-sm); font-size: var(--gt-font-size-sm); }
 :deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
 </style>

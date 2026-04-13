@@ -1,5 +1,5 @@
 <template>
-  <div class="consol-trial-balance">
+  <div class="gt-consol-trial-balance">
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
@@ -428,7 +428,7 @@ onMounted(() => loadData())
 </script>
 
 <style scoped>
-.consol-trial-balance {
+.gt-consol-trial-balance {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

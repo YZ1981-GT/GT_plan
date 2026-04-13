@@ -1,5 +1,5 @@
 <template>
-  <div class="group-structure-tree">
+  <div class="gt-group-structure-tree">
     <div class="tree-toolbar">
       <el-button size="small" @click="handleAddRoot" plain>
         <span class="toolbar-icon">+</span> 添加集团
@@ -191,7 +191,7 @@ defineExpose({ refresh })
 </script>
 
 <style scoped>
-.group-structure-tree {
+.gt-group-structure-tree {
   position: relative;
 }
 

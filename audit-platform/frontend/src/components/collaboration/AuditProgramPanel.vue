@@ -1,5 +1,5 @@
 <template>
-  <div class="audit-program-panel">
+  <div class="gt-audit-program-panel">
     <div class="panel-header">
       <h3>审计程序</h3>
       <el-button type="primary" size="small" @click="showAddDialog = true">
@@ -360,7 +360,7 @@ loadProcedures()
 </script>
 
 <style scoped>
-.audit-program-panel {
+.gt-audit-program-panel {
   padding: 16px;
 }
 .panel-header {

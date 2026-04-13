@@ -1,5 +1,5 @@
 <template>
-  <div class="workhour-form">
+  <div class="gt-workhour-form">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" @submit.prevent="handleSubmit">
       <el-form-item label="审计年度" prop="auditCycle">
         <el-select v-model="form.auditCycle" placeholder="请选择审计年度" style="width: 100%">
@@ -136,7 +136,7 @@ function handleReset() {
 </script>
 
 <style scoped>
-.workhour-form {
+.gt-workhour-form {
   max-width: 560px;
 }
 </style>

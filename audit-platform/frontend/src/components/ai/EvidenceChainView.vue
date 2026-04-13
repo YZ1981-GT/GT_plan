@@ -1,5 +1,5 @@
 <template>
-  <div class="evidence-chain-view">
+  <div class="gt-evidence-chain-view">
     <div class="panel-header">
       <h3>🔗 证据链分析</h3>
       <div class="header-actions">
@@ -139,7 +139,7 @@ loadChains()
 </script>
 
 <style scoped>
-.evidence-chain-view { padding: 16px; }
+.gt-evidence-chain-view { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .panel-header h3 { margin: 0; font-size: 16px; }
 .header-actions { display: flex; gap: 8px; align-items: center; }

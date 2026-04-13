@@ -1,5 +1,5 @@
 <template>
-  <div class="command-confirm-card">
+  <div class="gt-command-confirm-card">
     <div class="card-header">
       <span class="card-icon">⚡</span>
       <span class="card-title">{{ displayTitle }}</span>
@@ -104,7 +104,7 @@ async function handleConfirm() {
 </script>
 
 <style scoped>
-.command-confirm-card {
+.gt-command-confirm-card {
   border: 1.5px solid #faad14;
   border-radius: 8px;
   background: #fffbe6;

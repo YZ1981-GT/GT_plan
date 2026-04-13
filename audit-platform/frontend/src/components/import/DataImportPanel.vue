@@ -1,5 +1,5 @@
 <template>
-  <div class="data-import-panel">
+  <div class="gt-data-import-panel">
     <h3>数据导入</h3>
 
     <!-- Upload Section -->
@@ -304,8 +304,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.data-import-panel {
-  padding: 16px;
+.gt-data-import-panel {
+  padding: var(--gt-space-4);
 }
 .error-msg {
   margin-top: 12px;

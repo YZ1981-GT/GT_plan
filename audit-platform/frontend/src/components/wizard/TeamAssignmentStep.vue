@@ -1,5 +1,5 @@
 <template>
-  <div class="placeholder-step">
+  <div class="gt-placeholder-step">
     <h2 class="step-title">团队分工</h2>
     <p class="placeholder-text">待实现</p>
   </div>
@@ -9,7 +9,7 @@
 </script>
 
 <style scoped>
-.placeholder-step {
+.gt-placeholder-step {
   text-align: center;
   padding: 80px 0;
 }

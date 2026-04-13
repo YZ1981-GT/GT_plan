@@ -1,5 +1,5 @@
 <template>
-  <div class="nl-command-input">
+  <div class="gt-nl-command-input">
     <div class="input-wrapper">
       <span class="nl-icon">💬</span>
       <input
@@ -78,7 +78,7 @@ function fillExample(text) {
 </script>
 
 <style scoped>
-.nl-command-input { width: 100%; }
+.gt-nl-command-input { width: 100%; }
 .input-wrapper { display: flex; align-items: center; gap: 8px; background: #fff; border: 1.5px solid #ddd; border-radius: 24px; padding: 8px 12px; transition: border-color 0.2s; }
 .input-wrapper:focus-within { border-color: #4b2d77; }
 .nl-icon { font-size: 18px; }

@@ -1,5 +1,5 @@
 <template>
-  <div class="consol-notes-view">
+  <div class="gt-consol-notes-view">
     <!-- 顶部工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
@@ -554,7 +554,7 @@ watch(() => props.period, (val) => {
 </script>
 
 <style scoped>
-.consol-notes-view {
+.gt-consol-notes-view {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-4, 12px);

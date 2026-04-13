@@ -1,5 +1,5 @@
 <template>
-  <div class="consol-calculation-view">
+  <div class="gt-consol-calculation-view">
     <div class="view-header">
       <h3 class="view-title">合并计算工作表</h3>
       <div class="header-actions">
@@ -69,7 +69,7 @@ export default { name: 'ConsolCalculationView' }
 </script>
 
 <style scoped>
-.consol-calculation-view {
+.gt-consol-calculation-view {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-4);

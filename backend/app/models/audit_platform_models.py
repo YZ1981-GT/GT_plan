@@ -282,7 +282,7 @@ class TbBalance(Base):
 
 
 class TbLedger(Base):
-    """序时账（总账明细）"""
+    """序时账（总账明细）— 按 year 分区"""
 
     __tablename__ = "tb_ledger"
 
@@ -292,7 +292,7 @@ class TbLedger(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
     )
-    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    year: Mapped[int] = mapped_column(sa.Integer, primary_key=True, nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     voucher_date: Mapped[date] = mapped_column(sa.Date, nullable=False)
     voucher_no: Mapped[str] = mapped_column(String, nullable=False)
@@ -391,7 +391,7 @@ class TbAuxBalance(Base):
 
 
 class TbAuxLedger(Base):
-    """辅助明细账"""
+    """辅助明细账 — 按 year 分区"""
 
     __tablename__ = "tb_aux_ledger"
 
@@ -401,7 +401,7 @@ class TbAuxLedger(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
     )
-    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    year: Mapped[int] = mapped_column(sa.Integer, primary_key=True, nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     voucher_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
     voucher_no: Mapped[str | None] = mapped_column(String, nullable=True)

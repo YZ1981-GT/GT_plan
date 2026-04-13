@@ -1,5 +1,5 @@
 <template>
-  <div class="review-management">
+  <div class="gt-review-management">
     <div class="review-header">
       <h3>复核管理</h3>
     </div>
@@ -138,6 +138,6 @@ async function confirmReject() {
 </script>
 
 <style scoped>
-.review-management {}
+.gt-review-management {}
 .review-header { margin-bottom: 16px; }
 </style>

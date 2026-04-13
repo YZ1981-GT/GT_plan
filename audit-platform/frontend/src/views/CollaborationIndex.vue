@@ -1,15 +1,15 @@
 <template>
-  <div class="collab-index">
-    <div class="collab-header">
-      <h1>协作与质控</h1>
-      <div class="header-actions">
+  <div class="gt-collaboration gt-fade-in">
+    <div class="gt-collab-header">
+      <h1 class="gt-page-title">协作与质控</h1>
+      <div class="gt-collab-actions">
         <el-badge :value="unreadCount" :hidden="unreadCount === 0">
           <el-button @click="showNotifications = true">通知</el-button>
         </el-badge>
       </div>
     </div>
 
-    <el-tabs v-model="activeTab" class="collab-tabs">
+    <el-tabs v-model="activeTab" class="gt-collab-tabs">
       <el-tab-pane label="项目团队" name="team">
         <ProjectTeam />
       </el-tab-pane>
@@ -58,7 +58,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.collab-index { padding: 24px; }
-.collab-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.collab-tabs :deep(.el-tabs__content) { padding-top: 16px; }
+.gt-collaboration { padding: var(--gt-space-6); }
+.gt-collab-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-6); }
+.gt-collab-tabs :deep(.el-tabs__content) { padding-top: var(--gt-space-4); }
 </style>

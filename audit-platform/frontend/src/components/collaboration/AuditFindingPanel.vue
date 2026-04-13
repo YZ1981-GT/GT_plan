@@ -1,5 +1,5 @@
 <template>
-  <div class="audit-finding-panel">
+  <div class="gt-audit-finding-panel">
     <div class="panel-header">
       <h3>审计发现</h3>
       <el-button type="primary" size="small" @click="showAddDialog = true">
@@ -280,7 +280,7 @@ loadFindings()
 </script>
 
 <style scoped>
-.audit-finding-panel {
+.gt-audit-finding-panel {
   padding: 16px;
 }
 .panel-header {

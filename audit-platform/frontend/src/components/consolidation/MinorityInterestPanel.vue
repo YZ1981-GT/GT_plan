@@ -1,5 +1,5 @@
 <template>
-  <div class="minority-interest-panel">
+  <div class="gt-minority-interest-panel">
     <!-- 顶部工具栏 -->
     <div class="panel-toolbar">
       <div class="toolbar-left">
@@ -560,7 +560,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.minority-interest-panel {
+.gt-minority-interest-panel {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

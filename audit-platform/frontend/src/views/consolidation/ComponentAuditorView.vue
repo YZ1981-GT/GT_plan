@@ -1,5 +1,5 @@
 <template>
-  <div class="component-auditor-view">
+  <div class="gt-component-auditor-view">
     <!-- View Mode Toggle -->
     <div class="view-toggle">
       <el-radio-group v-model="viewMode" size="small">
@@ -290,7 +290,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.component-auditor-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
+.gt-component-auditor-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 
 .view-toggle {
   display: flex;
@@ -303,5 +303,5 @@ onMounted(async () => {
 .dashboard-cards { margin-bottom: var(--gt-space-4); }
 .dash-card { text-align: center; }
 .dash-value { font-size: 28px; font-weight: bold; color: var(--gt-color-primary); }
-.dash-label { font-size: 13px; color: #666; margin-top: 4px; }
+.dash-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: var(--gt-space-1); }
 </style>

@@ -1,0 +1,199 @@
+<template>
+  <div class="gt-tree-node">
+    <!-- 当前节点 -->
+    <div
+      class="gt-node-row"
+      :class="{
+        'gt-node-row--active': selectedId === node.id,
+        'gt-node-row--consolidated': node.report_scope === 'consolidated',
+      }"
+      :style="{ paddingLeft: depth * 20 + 8 + 'px' }"
+    >
+      <!-- 展开/收起按钮 -->
+      <span
+        v-if="hasChildren"
+        class="gt-node-toggle"
+        @click.stop="expanded = !expanded"
+      >{{ expanded ? '−' : '+' }}</span>
+      <span v-else class="gt-node-toggle gt-node-toggle--leaf" />
+
+      <!-- checkbox -->
+      <el-checkbox
+        :model-value="checkedIds.includes(node.id)"
+        size="small"
+        class="gt-node-check"
+        @change="(val: boolean) => $emit('toggle-check', node.id, val)"
+        @click.stop
+      />
+
+      <!-- 状态色条 -->
+      <div class="gt-node-status" :class="'gt-status--' + (node.status || 'created')" />
+
+      <!-- 内容区 -->
+      <div class="gt-node-body" @click="$emit('select', node)">
+        <div class="gt-node-title">
+          <el-icon v-if="node.report_scope === 'consolidated'" :size="13" style="color: var(--gt-color-primary); margin-right: 4px"><FolderOpened /></el-icon>
+          {{ node.name || node.client_name || '未命名项目' }}
+        </div>
+        <div class="gt-node-meta">
+          <span>{{ node.client_name || '-' }}</span>
+          <el-tag :type="statusTagType(node.status)" size="small" round>
+            {{ statusLabel(node.status) }}
+          </el-tag>
+        </div>
+      </div>
+
+      <!-- 删除按钮 -->
+      <el-button
+        class="gt-node-delete"
+        type="danger"
+        :icon="Delete"
+        size="small"
+        text
+        @click.stop="$emit('delete', node)"
+      />
+    </div>
+
+    <!-- 子节点（递归） -->
+    <div v-if="hasChildren && expanded" class="gt-node-children">
+      <ProjectTreeNode
+        v-for="child in node.children"
+        :key="child.id"
+        :node="child"
+        :depth="depth + 1"
+        :selected-id="selectedId"
+        :checked-ids="checkedIds"
+        @select="(p: any) => $emit('select', p)"
+        @toggle-check="(id: string, v: boolean) => $emit('toggle-check', id, v)"
+        @delete="(p: any) => $emit('delete', p)"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { FolderOpened, Delete } from '@element-plus/icons-vue'
+
+interface ProjectNode {
+  id: string
+  name: string | null
+  client_name: string
+  status: string
+  report_scope: string | null
+  children?: ProjectNode[]
+}
+
+const props = defineProps<{
+  node: ProjectNode
+  depth: number
+  selectedId: string | null
+  checkedIds: string[]
+}>()
+
+defineEmits<{
+  (e: 'select', project: any): void
+  (e: 'toggle-check', id: string, checked: boolean): void
+  (e: 'delete', project: any): void
+}>()
+
+const expanded = ref(true)
+const hasChildren = computed(() => (props.node.children?.length ?? 0) > 0)
+
+function statusTagType(s: string) {
+  const m: Record<string, string> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
+  return m[s] || 'info'
+}
+
+function statusLabel(s: string) {
+  const m: Record<string, string> = { created: '已创建', planning: '计划中', execution: '执行中', completion: '已完成', archived: '已归档' }
+  return m[s] || s || '-'
+}
+</script>
+
+<style scoped>
+.gt-tree-node { user-select: none; }
+
+.gt-node-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+  border-radius: var(--gt-radius-sm);
+  background: var(--gt-color-bg-white);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--gt-transition-fast);
+  min-height: 44px;
+}
+.gt-node-row:hover {
+  border-color: var(--gt-color-primary-lighter);
+  background: #faf8fd;
+}
+.gt-node-row:hover .gt-node-delete { opacity: 1; }
+.gt-node-row--active {
+  border-color: var(--gt-color-primary) !important;
+  background: var(--gt-color-primary-bg) !important;
+  box-shadow: 0 0 0 1px var(--gt-color-primary);
+}
+.gt-node-row--consolidated {
+  border-left: 2px solid var(--gt-color-primary-lighter);
+}
+
+.gt-node-toggle {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gt-color-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 3px;
+  transition: background var(--gt-transition-fast);
+}
+.gt-node-toggle:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
+.gt-node-toggle--leaf { visibility: hidden; }
+
+.gt-node-check { flex-shrink: 0; margin: 0 4px; }
+
+.gt-node-status { width: 2px; flex-shrink: 0; align-self: stretch; border-radius: 1px; margin: 4px 2px; }
+.gt-status--created { background: var(--gt-color-text-tertiary); }
+.gt-status--planning { background: var(--gt-color-wheat); }
+.gt-status--execution { background: var(--gt-color-primary); }
+.gt-status--completion { background: var(--gt-color-success); }
+.gt-status--archived { background: var(--gt-color-border); }
+
+.gt-node-body { padding: 4px 8px; flex: 1; min-width: 0; }
+.gt-node-title {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+.gt-node-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2px;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+}
+
+.gt-node-delete {
+  opacity: 0;
+  transition: opacity var(--gt-transition-fast);
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.gt-node-children {
+  border-left: 1px dashed var(--gt-color-border);
+  margin-left: 18px;
+}
+</style>

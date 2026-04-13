@@ -1,5 +1,5 @@
 <template>
-  <div class="goodwill-panel">
+  <div class="gt-goodwill-panel">
     <!-- 顶部工具栏 -->
     <div class="panel-toolbar">
       <div class="toolbar-left">
@@ -383,7 +383,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.goodwill-panel {
+.gt-goodwill-panel {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

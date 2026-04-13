@@ -1,9 +1,9 @@
 <template>
-  <div class="trial-balance-page">
+  <div class="gt-trial-balance gt-fade-in">
     <!-- 顶部操作栏 -->
-    <div class="tb-header">
-      <h2 class="tb-title">试算表</h2>
-      <div class="tb-actions">
+    <div class="gt-tb-header">
+      <h2 class="gt-page-title">试算表</h2>
+      <div class="gt-tb-actions">
         <el-button @click="onConsistencyCheck" :loading="checkLoading">一致性校验</el-button>
         <el-button @click="onRecalc" :loading="recalcLoading">全量重算</el-button>
         <el-button type="primary" @click="onExport">导出 Excel</el-button>
@@ -72,8 +72,8 @@
     </el-table>
 
     <!-- 借贷平衡指示器 -->
-    <div class="balance-indicator" v-if="!loading">
-      <span :class="isBalanced ? 'balanced' : 'unbalanced'">
+    <div class="gt-tb-balance-indicator" v-if="!loading">
+      <span :class="isBalanced ? 'gt-tb-balanced' : 'gt-tb-unbalanced'">
         {{ isBalanced ? '✓ 借贷平衡' : '✗ 借贷不平衡' }}
       </span>
     </div>
@@ -293,18 +293,17 @@ onMounted(fetchData)
 </script>
 
 <style scoped>
-.trial-balance-page { padding: 16px; }
-.tb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.tb-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.tb-actions { display: flex; gap: 8px; }
+.gt-trial-balance { padding: var(--gt-space-4); }
+.gt-tb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.gt-tb-actions { display: flex; gap: var(--gt-space-2); }
 .clickable { cursor: pointer; color: var(--el-color-primary); }
 .clickable:hover { text-decoration: underline; }
 .subtotal-val { font-weight: 600; }
-.balance-indicator { margin-top: 12px; text-align: right; font-size: 14px; }
-.balanced { color: var(--gt-color-success); font-weight: 600; }
-.unbalanced { color: var(--gt-color-coral); font-weight: 600; }
+.gt-tb-balance-indicator { margin-top: var(--gt-space-3); text-align: right; font-size: var(--gt-font-size-base); }
+.gt-tb-balanced { color: var(--gt-color-success); font-weight: 600; }
+.gt-tb-unbalanced { color: var(--gt-color-coral); font-weight: 600; }
 
-:deep(.subtotal-row) { background-color: #f0ecf5 !important; font-weight: 600; }
+:deep(.subtotal-row) { background-color: var(--gt-color-primary-bg) !important; font-weight: 600; }
 :deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
-:deep(.highlight-row) { background-color: #fff3cd !important; }
+:deep(.highlight-row) { background-color: var(--gt-color-wheat-light) !important; }
 </style>

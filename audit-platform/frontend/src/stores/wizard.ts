@@ -6,6 +6,13 @@ export interface BasicInfo {
   audit_year: number | null
   project_type: string
   accounting_standard: string
+  company_code: string
+  template_type: string
+  report_scope: string
+  parent_company_name: string
+  parent_company_code: string
+  ultimate_company_name: string
+  ultimate_company_code: string
   signing_partner_id: string | null
   manager_id: string | null
 }
@@ -80,6 +87,21 @@ export const useWizardStore = defineStore('wizard', {
           audit_year: basicInfo.audit_year,
           project_type: basicInfo.project_type,
           accounting_standard: basicInfo.accounting_standard,
+        }
+        if (basicInfo.company_code) {
+          payload.company_code = basicInfo.company_code
+        }
+        if (basicInfo.template_type) {
+          payload.template_type = basicInfo.template_type
+        }
+        if (basicInfo.report_scope) {
+          payload.report_scope = basicInfo.report_scope
+        }
+        if (basicInfo.report_scope === 'consolidated') {
+          if (basicInfo.parent_company_name) payload.parent_company_name = basicInfo.parent_company_name
+          if (basicInfo.parent_company_code) payload.parent_company_code = basicInfo.parent_company_code
+          if (basicInfo.ultimate_company_name) payload.ultimate_company_name = basicInfo.ultimate_company_name
+          if (basicInfo.ultimate_company_code) payload.ultimate_company_code = basicInfo.ultimate_company_code
         }
         if (basicInfo.signing_partner_id) {
           payload.signing_partner_id = basicInfo.signing_partner_id

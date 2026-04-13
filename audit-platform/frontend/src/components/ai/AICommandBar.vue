@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-command-bar">
+  <div class="gt-ai-command-bar">
     <!-- 命令输入区 -->
     <div class="command-input-area">
       <div class="input-wrapper">
@@ -301,7 +301,7 @@ function showResult(message, type) {
 </script>
 
 <style scoped>
-.ai-command-bar {
+.gt-ai-command-bar {
   position: relative;
   width: 100%;
 }

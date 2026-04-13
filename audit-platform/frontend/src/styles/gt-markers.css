@@ -1,0 +1,86 @@
+/**
+ * GT 底稿视觉标记样式（Task 10.7）
+ * 用于底稿编辑器中标识不同类型的内容区域
+ */
+
+/* ── AI 生成内容标记 ── */
+.gt-marker-ai {
+  background-color: var(--gt-marker-ai-bg);
+  border-left: 3px solid var(--gt-marker-ai-border);
+  position: relative;
+}
+
+.gt-marker-ai::before {
+  content: 'AI';
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gt-marker-ai-border);
+  background: rgba(160, 109, 255, 0.15);
+  padding: 1px 4px;
+  border-radius: var(--gt-radius-sm);
+  line-height: 1;
+}
+
+.gt-marker-ai-pending {
+  background-color: var(--gt-marker-ai-bg);
+  border-left: 3px dashed var(--gt-marker-ai-border);
+}
+
+.gt-marker-ai-confirmed {
+  background-color: transparent;
+  border-left: 3px solid var(--gt-color-success);
+}
+
+/* ── 复核意见标记 ── */
+.gt-marker-review {
+  background-color: var(--gt-marker-review-bg);
+  border-left: 3px solid var(--gt-marker-review-border);
+}
+
+.gt-marker-review-replied {
+  background-color: #e6f7fb;
+  border-left: 3px solid var(--gt-marker-review-replied);
+}
+
+.gt-marker-review-resolved {
+  background-color: var(--gt-marker-audited-bg);
+  border-left: 3px solid var(--gt-color-success);
+}
+
+/* ── 审定数标记 ── */
+.gt-marker-audited {
+  background-color: var(--gt-marker-audited-bg);
+  border-left: 3px solid var(--gt-marker-audited-border);
+  font-weight: 600;
+}
+
+/* ── 取数公式区标记 ── */
+.gt-marker-formula {
+  background-color: var(--gt-marker-formula-bg);
+  border-left: 3px solid var(--gt-color-teal);
+}
+
+/* ── 人工填写区标记 ── */
+.gt-marker-manual {
+  background-color: var(--gt-marker-manual-bg);
+  border: 1px dashed var(--gt-color-border);
+}
+
+/* ── 交叉索引标记 ── */
+.gt-marker-xref {
+  color: var(--gt-color-teal);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gt-marker-xref:hover {
+  color: var(--gt-color-primary);
+}
+
+/* ── 风险等级标记 ── */
+.gt-risk-high { color: var(--gt-color-coral); font-weight: 600; }
+.gt-risk-medium { color: var(--gt-color-wheat); font-weight: 500; }
+.gt-risk-low { color: var(--gt-color-success); }

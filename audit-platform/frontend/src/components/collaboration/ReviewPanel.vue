@@ -1,5 +1,5 @@
 <template>
-  <div class="review-panel">
+  <div class="gt-review-panel">
     <!-- 复核意见列表 -->
     <div class="panel-header">
       <span class="panel-title">复核意见</span>
@@ -288,7 +288,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.review-panel {
+.gt-review-panel {
   padding: 12px;
 }
 

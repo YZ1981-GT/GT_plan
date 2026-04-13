@@ -1,5 +1,5 @@
 <template>
-  <div class="management-letter-panel">
+  <div class="gt-management-letter-panel">
     <div class="panel-header">
       <h3>管理建议书</h3>
       <div class="header-actions">
@@ -364,7 +364,7 @@ loadItems()
 </script>
 
 <style scoped>
-.management-letter-panel {
+.gt-management-letter-panel {
   padding: 16px;
 }
 .panel-header {

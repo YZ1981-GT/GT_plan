@@ -1,10 +1,10 @@
 <template>
-  <div class="materiality-page">
-    <h2 class="page-title">重要性水平</h2>
+  <div class="gt-materiality gt-fade-in">
+    <h2 class="gt-page-title">重要性水平</h2>
 
-    <div class="mat-layout">
+    <div class="gt-mat-layout">
       <!-- 左侧：配置表单 -->
-      <div class="mat-form-section">
+      <div class="gt-mat-form-section">
         <el-form :model="form" label-width="130px" label-position="right">
           <el-form-item label="基准类型">
             <el-select v-model="form.benchmark_type" placeholder="请选择" style="width: 100%"
@@ -39,22 +39,22 @@
       </div>
 
       <!-- 右侧：结果卡片 -->
-      <div class="mat-result-section">
-        <div v-if="result" class="result-cards">
-          <div class="result-card primary">
-            <span class="result-label">整体重要性</span>
-            <span class="result-value">{{ formatAmt(result.overall_materiality) }}</span>
+      <div class="gt-mat-result-section">
+        <div v-if="result" class="gt-mat-result-cards">
+          <div class="gt-mat-result-card gt-mat-result-card--primary">
+            <span class="gt-mat-result-label">整体重要性</span>
+            <span class="gt-mat-result-value">{{ formatAmt(result.overall_materiality) }}</span>
           </div>
-          <div class="result-card">
-            <span class="result-label">实际执行重要性</span>
-            <span class="result-value">{{ formatAmt(result.performance_materiality) }}</span>
+          <div class="gt-mat-result-card">
+            <span class="gt-mat-result-label">实际执行重要性</span>
+            <span class="gt-mat-result-value">{{ formatAmt(result.performance_materiality) }}</span>
           </div>
-          <div class="result-card">
-            <span class="result-label">明显微小错报</span>
-            <span class="result-value">{{ formatAmt(result.trivial_threshold) }}</span>
+          <div class="gt-mat-result-card">
+            <span class="gt-mat-result-label">明显微小错报</span>
+            <span class="gt-mat-result-value">{{ formatAmt(result.trivial_threshold) }}</span>
           </div>
         </div>
-        <div v-else class="no-result">请配置参数后计算</div>
+        <div v-else class="gt-mat-no-result">请配置参数后计算</div>
 
         <!-- 手动覆盖 -->
         <el-collapse v-if="result" style="margin-top: 16px">
@@ -86,8 +86,8 @@
     </div>
 
     <!-- 变更历史 -->
-    <div class="history-section" v-if="history.length">
-      <h3>变更历史</h3>
+    <div class="gt-mat-history-section" v-if="history.length">
+      <h3 class="gt-section-title">变更历史</h3>
       <el-table :data="history" border stripe size="small">
         <el-table-column prop="changed_at" label="时间" width="170">
           <template #default="{ row }">{{ row.changed_at || row.calculated_at }}</template>
@@ -221,21 +221,19 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.materiality-page { padding: 16px; }
-.page-title { color: var(--gt-color-primary); margin-bottom: 20px; font-size: 20px; }
-.mat-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.mat-form-section { background: #fff; padding: 20px; border-radius: var(--gt-radius-md); box-shadow: var(--gt-shadow-sm); }
-.mat-result-section { }
-.result-cards { display: flex; flex-direction: column; gap: 12px; }
-.result-card {
-  background: #fff; border-radius: var(--gt-radius-sm); padding: 16px;
+.gt-materiality { padding: var(--gt-space-4); }
+.gt-mat-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gt-space-6); }
+.gt-mat-form-section { background: var(--gt-color-bg-white); padding: var(--gt-space-5); border-radius: var(--gt-radius-md); box-shadow: var(--gt-shadow-sm); }
+.gt-mat-result-section { }
+.gt-mat-result-cards { display: flex; flex-direction: column; gap: var(--gt-space-3); }
+.gt-mat-result-card {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-4);
   text-align: center; box-shadow: var(--gt-shadow-sm);
 }
-.result-card.primary { border-left: 4px solid var(--gt-color-primary); }
-.result-label { display: block; font-size: 13px; color: #999; margin-bottom: 4px; }
-.result-value { display: block; font-size: 22px; font-weight: 600; color: #333; }
-.result-card.primary .result-value { color: var(--gt-color-primary); }
-.no-result { text-align: center; color: #ccc; padding: 40px; }
-.history-section { margin-top: 32px; }
-.history-section h3 { color: var(--gt-color-primary); margin-bottom: 12px; }
+.gt-mat-result-card.gt-mat-result-card--primary { border-left: 4px solid var(--gt-color-primary); }
+.gt-mat-result-label { display: block; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); margin-bottom: var(--gt-space-1); }
+.gt-mat-result-value { display: block; font-size: var(--gt-font-size-2xl); font-weight: 600; color: var(--gt-color-text); }
+.gt-mat-result-card.gt-mat-result-card--primary .gt-mat-result-value { color: var(--gt-color-primary); }
+.gt-mat-no-result { text-align: center; color: var(--gt-color-text-tertiary); padding: var(--gt-space-10); }
+.gt-mat-history-section { margin-top: var(--gt-space-8); }
 </style>

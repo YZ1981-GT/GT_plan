@@ -1,5 +1,5 @@
 <template>
-  <div class="qc-summary-card" v-loading="loading">
+  <div class="gt-qc-summary-card" v-loading="loading">
     <h3 class="card-title">质量自检概览</h3>
     <div class="metrics-grid" v-if="summary">
       <div class="metric-item" @click="$emit('drill', 'all')">
@@ -59,9 +59,9 @@ onMounted(fetchSummary)
 </script>
 
 <style scoped>
-.qc-summary-card {
-  background: #fff; border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm); padding: 16px;
+.gt-qc-summary-card {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); padding: var(--gt-space-4);
 }
 .card-title { margin: 0 0 12px; color: var(--gt-color-primary); font-size: 16px; }
 .metrics-grid { display: flex; gap: 12px; flex-wrap: wrap; }

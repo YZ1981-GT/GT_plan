@@ -1,5 +1,5 @@
 <template>
-  <div class="elimination-view">
+  <div class="gt-elimination-view">
     <el-tabs v-model="activeSubTab" class="gt-tabs">
       <!-- 抵消分录列表 -->
       <el-tab-pane label="分录列表" name="list">
@@ -133,7 +133,7 @@ function onCreateElimination() {
 </script>
 
 <style scoped>
-.elimination-view {
+.gt-elimination-view {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);
@@ -154,11 +154,11 @@ function onCreateElimination() {
 
 .detail-label {
   font-weight: 600;
-  color: #555;
+  color: var(--gt-color-text-secondary);
 }
 
 .detail-value {
-  color: #333;
+  color: var(--gt-color-text);
 }
 
 .elimination-amount {
@@ -168,8 +168,8 @@ function onCreateElimination() {
 }
 
 .no-detail {
-  color: #999;
-  font-size: 14px;
+  color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-base);
   padding: var(--gt-space-6);
   text-align: center;
   background: #f8f7fc;
@@ -178,7 +178,7 @@ function onCreateElimination() {
 
 .debit { color: var(--gt-color-coral, #FF5149); }
 .credit { color: var(--gt-color-teal, #0094B3); }
-.zero { color: #999; }
+.zero { color: var(--gt-color-text-tertiary); }
 
 .gt-tabs :deep(.el-tabs__item) {
   font-weight: 500;

@@ -1,5 +1,5 @@
 <template>
-  <div class="internal-trade-view">
+  <div class="gt-internal-trade-view">
     <el-tabs v-model="activePanel" class="gt-internal-trade-tabs">
       <el-tab-pane label="内部交易管理" name="trade">
         <InternalTradePanel
@@ -41,7 +41,7 @@ export default { name: 'InternalTradeView' }
 </script>
 
 <style scoped>
-.internal-trade-view {
+.gt-internal-trade-view {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

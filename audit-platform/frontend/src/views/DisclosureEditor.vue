@@ -1,8 +1,8 @@
 <template>
-  <div class="disclosure-editor-page">
-    <div class="de-header">
-      <h2 class="de-title">附注编辑</h2>
-      <div class="de-actions">
+  <div class="gt-disclosure-editor gt-fade-in">
+    <div class="gt-de-header">
+      <h2 class="gt-page-title">附注编辑</h2>
+      <div class="gt-de-actions">
         <el-select v-model="templateType" style="width: 120px" @change="onGenerate">
           <el-option label="国企版" value="soe" />
           <el-option label="上市版" value="listed" />
@@ -12,15 +12,15 @@
       </div>
     </div>
 
-    <el-row :gutter="12" class="de-body">
+    <el-row :gutter="12" class="gt-de-body">
       <!-- 左侧：目录树 -->
       <el-col :span="5">
-        <div class="panel tree-panel">
-          <h4 class="panel-title">附注目录</h4>
+        <div class="gt-de-panel gt-de-tree-panel">
+          <h4 class="gt-de-panel-title">附注目录</h4>
           <el-tree :data="treeData" :props="{ label: 'label', children: 'children' }"
             highlight-current node-key="id" @node-click="onNodeClick"
             default-expand-all />
-          <div v-if="!treeData.length && !treeLoading" class="empty-hint">
+          <div v-if="!treeData.length && !treeLoading" class="gt-de-empty-hint">
             暂无附注，请先生成
           </div>
         </div>
@@ -28,9 +28,9 @@
 
       <!-- 中间：编辑区 -->
       <el-col :span="12">
-        <div class="panel editor-panel" v-loading="detailLoading">
+        <div class="gt-de-panel gt-de-editor-panel" v-loading="detailLoading">
           <template v-if="currentNote">
-            <div class="editor-header">
+            <div class="gt-de-editor-header">
               <h4>{{ currentNote.note_section }} {{ currentNote.section_title }}</h4>
               <el-tag :type="currentNote.status === 'confirmed' ? 'success' : 'info'" size="small">
                 {{ currentNote.status === 'confirmed' ? '已确认' : '草稿' }}
@@ -66,7 +66,7 @@
                 placeholder="请输入附注文字内容" />
             </div>
 
-            <div class="editor-footer">
+            <div class="gt-de-editor-footer">
               <el-button v-if="!editMode" @click="editMode = true">编辑</el-button>
               <template v-else>
                 <el-button @click="editMode = false">取消</el-button>
@@ -74,24 +74,24 @@
               </template>
             </div>
           </template>
-          <div v-else class="empty-hint">请从左侧目录选择章节</div>
+          <div v-else class="gt-de-empty-hint">请从左侧目录选择章节</div>
         </div>
       </el-col>
 
       <!-- 右侧：校验面板 -->
       <el-col :span="7">
-        <div class="panel validation-panel">
-          <h4 class="panel-title">校验结果</h4>
-          <div v-if="validationFindings.length === 0" class="empty-hint">暂无校验结果</div>
-          <div v-for="(f, fi) in validationFindings" :key="fi" class="finding-item"
-            :class="'severity-' + f.severity">
-            <div class="finding-header">
+        <div class="gt-de-panel gt-de-validation-panel">
+          <h4 class="gt-de-panel-title">校验结果</h4>
+          <div v-if="validationFindings.length === 0" class="gt-de-empty-hint">暂无校验结果</div>
+          <div v-for="(f, fi) in validationFindings" :key="fi" class="gt-de-finding-item"
+            :class="'gt-de-severity-' + f.severity">
+            <div class="gt-de-finding-header">
               <el-tag :type="severityTagType(f.severity)" size="small">{{ f.severity }}</el-tag>
-              <span class="finding-type">{{ f.check_type }}</span>
+              <span class="gt-de-finding-type">{{ f.check_type }}</span>
             </div>
-            <div class="finding-section">{{ f.note_section }} {{ f.table_name }}</div>
-            <div class="finding-msg">{{ f.message }}</div>
-            <div v-if="f.expected_value || f.actual_value" class="finding-values">
+            <div class="gt-de-finding-section">{{ f.note_section }} {{ f.table_name }}</div>
+            <div class="gt-de-finding-msg">{{ f.message }}</div>
+            <div v-if="f.expected_value || f.actual_value" class="gt-de-finding-values">
               期望: {{ f.expected_value ?? '-' }} | 实际: {{ f.actual_value ?? '-' }}
             </div>
           </div>
@@ -207,26 +207,25 @@ onMounted(fetchTree)
 </script>
 
 <style scoped>
-.disclosure-editor-page { padding: 16px; }
-.de-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.de-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.de-actions { display: flex; gap: 8px; align-items: center; }
-.de-body { height: calc(100vh - 180px); }
-.panel { background: #fff; border-radius: var(--gt-radius-sm); padding: 12px; box-shadow: var(--gt-shadow-sm); height: 100%; overflow-y: auto; }
-.panel-title { margin: 0 0 8px; font-size: 14px; color: var(--gt-color-primary); }
-.empty-hint { color: #999; font-size: 13px; text-align: center; padding: 20px 0; }
-.editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.editor-header h4 { margin: 0; font-size: 15px; }
-.editor-footer { margin-top: 12px; text-align: right; }
-.total-label { font-weight: 700; }
-.total-val { font-weight: 700; }
-.finding-item { padding: 8px; border-bottom: 1px solid #eee; }
-.finding-item.severity-error { border-left: 3px solid #e74c3c; }
-.finding-item.severity-warning { border-left: 3px solid #f39c12; }
-.finding-item.severity-info { border-left: 3px solid #999; }
-.finding-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.finding-type { font-size: 12px; color: #666; }
-.finding-section { font-size: 12px; color: #999; }
-.finding-msg { font-size: 13px; margin-top: 2px; }
-.finding-values { font-size: 12px; color: #888; margin-top: 2px; }
+.gt-disclosure-editor { padding: var(--gt-space-4); }
+.gt-de-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
+.gt-de-actions { display: flex; gap: var(--gt-space-2); align-items: center; }
+.gt-de-body { height: calc(100vh - 180px); }
+.gt-de-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-3); box-shadow: var(--gt-shadow-sm); height: 100%; overflow-y: auto; }
+.gt-de-panel-title { margin: 0 0 var(--gt-space-2); font-size: var(--gt-font-size-base); color: var(--gt-color-primary); }
+.gt-de-empty-hint { color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-sm); text-align: center; padding: var(--gt-space-5) 0; }
+.gt-de-editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
+.gt-de-editor-header h4 { margin: 0; font-size: var(--gt-font-size-md); }
+.gt-de-editor-footer { margin-top: var(--gt-space-3); text-align: right; }
+.gt-de-total-label { font-weight: 700; }
+.gt-de-total-val { font-weight: 700; }
+.gt-de-finding-item { padding: var(--gt-space-2); border-bottom: 1px solid var(--gt-color-border-light); }
+.gt-de-finding-item.gt-de-severity-error { border-left: 3px solid var(--gt-color-coral); }
+.gt-de-finding-item.gt-de-severity-warning { border-left: 3px solid var(--gt-color-wheat); }
+.gt-de-finding-item.gt-de-severity-info { border-left: 3px solid var(--gt-color-text-tertiary); }
+.gt-de-finding-header { display: flex; align-items: center; gap: 6px; margin-bottom: var(--gt-space-1); }
+.gt-de-finding-type { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); }
+.gt-de-finding-section { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-de-finding-msg { font-size: var(--gt-font-size-sm); margin-top: 2px; }
+.gt-de-finding-values { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-top: 2px; }
 </style>

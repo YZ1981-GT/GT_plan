@@ -1,5 +1,5 @@
 <template>
-  <div class="internal-trade-panel">
+  <div class="gt-internal-trade-panel">
     <!-- Toolbar -->
     <div class="panel-toolbar">
       <div class="toolbar-left">
@@ -563,7 +563,7 @@ export default { name: 'InternalTradePanel' }
 </script>
 
 <style scoped>
-.internal-trade-panel {
+.gt-internal-trade-panel {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-3);

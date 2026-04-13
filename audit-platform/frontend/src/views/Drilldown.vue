@@ -1,13 +1,13 @@
 <template>
-  <div class="drilldown-page">
+  <div class="gt-drilldown gt-fade-in">
     <!-- 面包屑导航 -->
-    <el-breadcrumb separator=">" class="drilldown-breadcrumb">
+    <el-breadcrumb separator=">" class="gt-drilldown-breadcrumb">
       <el-breadcrumb-item
         v-for="(crumb, idx) in store.breadcrumbs"
         :key="crumb.level"
       >
         <span
-          :class="{ 'crumb-link': idx < store.breadcrumbs.length - 1 }"
+          :class="{ 'gt-drilldown-crumb-link': idx < store.breadcrumbs.length - 1 }"
           @click="idx < store.breadcrumbs.length - 1 && store.navigateTo(crumb.level)"
         >
           {{ crumb.label }}
@@ -16,8 +16,8 @@
     </el-breadcrumb>
 
     <!-- 余额表视图 -->
-    <div v-if="store.currentLevel === 'balance'" class="balance-view">
-      <div class="filter-bar">
+    <div v-if="store.currentLevel === 'balance'" class="gt-drilldown-balance-view">
+      <div class="gt-drilldown-filter-bar">
         <el-select
           v-model="store.balanceFilter.category"
           placeholder="科目类别"
@@ -54,7 +54,7 @@
         <el-table-column prop="account_name" label="科目名称" min-width="180">
           <template #default="{ row }">
             <span
-              class="account-link"
+              class="gt-drilldown-account-link"
               @click="onAccountClick(row)"
             >
               {{ row.account_name }}
@@ -88,8 +88,8 @@
     </div>
 
     <!-- 序时账视图 -->
-    <div v-if="store.currentLevel === 'ledger'" class="ledger-view">
-      <div class="filter-bar">
+    <div v-if="store.currentLevel === 'ledger'" class="gt-drilldown-ledger-view">
+      <div class="gt-drilldown-filter-bar">
         <el-date-picker
           v-model="ledgerDateRange"
           type="daterange"
@@ -166,7 +166,7 @@
     </div>
 
     <!-- 辅助余额表视图 -->
-    <div v-if="store.currentLevel === 'aux_balance'" class="aux-balance-view">
+    <div v-if="store.currentLevel === 'aux_balance'" class="gt-drilldown-aux-balance-view">
       <el-table
         :data="store.auxBalanceData"
         v-loading="store.loading"
@@ -178,7 +178,7 @@
         <el-table-column prop="aux_code" label="辅助编码" width="120" />
         <el-table-column prop="aux_name" label="辅助名称" min-width="180">
           <template #default="{ row }">
-            <span class="account-link" @click="onAuxBalanceClick(row)">
+            <span class="gt-drilldown-account-link" @click="onAuxBalanceClick(row)">
               {{ row.aux_name }}
             </span>
           </template>
@@ -199,7 +199,7 @@
     </div>
 
     <!-- 辅助明细账视图 -->
-    <div v-if="store.currentLevel === 'aux_ledger'" class="aux-ledger-view">
+    <div v-if="store.currentLevel === 'aux_ledger'" class="gt-drilldown-aux-ledger-view">
       <el-table
         :data="store.auxLedgerData"
         v-loading="store.loading"
@@ -316,31 +316,31 @@ function onAuxLedgerPageChange(page: number) {
 </script>
 
 <style scoped>
-.drilldown-page {
-  padding: 16px;
+.gt-drilldown {
+  padding: var(--gt-space-4);
 }
-.drilldown-breadcrumb {
-  margin-bottom: 16px;
+.gt-drilldown-breadcrumb {
+  margin-bottom: var(--gt-space-4);
 }
-.crumb-link {
+.gt-drilldown-crumb-link {
   cursor: pointer;
   color: var(--el-color-primary);
 }
-.crumb-link:hover {
+.gt-drilldown-crumb-link:hover {
   text-decoration: underline;
 }
-.filter-bar {
+.gt-drilldown-filter-bar {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--gt-space-2);
+  margin-bottom: var(--gt-space-3);
   flex-wrap: wrap;
   align-items: center;
 }
-.account-link {
+.gt-drilldown-account-link {
   cursor: pointer;
   color: var(--el-color-primary);
 }
-.account-link:hover {
+.gt-drilldown-account-link:hover {
   text-decoration: underline;
 }
 </style>

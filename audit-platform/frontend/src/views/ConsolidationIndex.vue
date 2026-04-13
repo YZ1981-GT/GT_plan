@@ -1,8 +1,8 @@
 <template>
-  <div class="consolidation-page">
-    <div class="page-header">
-      <h2 class="page-title">合并报表</h2>
-      <div class="header-actions">
+  <div class="gt-consolidation gt-fade-in">
+    <div class="gt-consol-header">
+      <h2 class="gt-page-title">合并报表</h2>
+      <div class="gt-consol-actions">
         <el-button @click="onRefresh" :loading="store.loading" plain>刷新</el-button>
       </div>
     </div>
@@ -85,22 +85,16 @@ export default { name: 'ConsolidationIndex' }
 </script>
 
 <style scoped>
-.consolidation-page {
+.gt-consolidation {
   display: flex;
   flex-direction: column;
   gap: var(--gt-space-4);
 }
 
-.page-header {
+.gt-consol-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.page-title {
-  margin: 0;
-  font-size: 20px;
-  color: var(--gt-color-primary-dark);
 }
 
 .gt-tabs :deep(.el-tabs__item) {

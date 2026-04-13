@@ -1,15 +1,15 @@
 <template>
-  <div class="pdf-export-page">
-    <div class="pe-header">
-      <h2 class="pe-title">PDF 导出</h2>
+  <div class="gt-pdf-export gt-fade-in">
+    <div class="gt-pe-header">
+      <h2 class="gt-page-title">PDF 导出</h2>
     </div>
 
     <el-row :gutter="16">
       <!-- 左侧：导出配置 -->
       <el-col :span="10">
-        <div class="panel">
-          <h4 class="panel-title">文档选择</h4>
-          <el-checkbox-group v-model="selectedDocs" class="doc-checkboxes">
+        <div class="gt-pe-panel">
+          <h4 class="gt-pe-panel-title">文档选择</h4>
+          <el-checkbox-group v-model="selectedDocs" class="gt-pe-doc-checkboxes">
             <el-checkbox value="audit_report" label="审计报告" />
             <el-checkbox value="balance_sheet" label="资产负债表" />
             <el-checkbox value="income_statement" label="利润表" />
@@ -20,13 +20,19 @@
 
           <el-divider />
 
-          <h4 class="panel-title">导出选项</h4>
+          <h4 class="gt-pe-panel-title">导出选项</h4>
           <el-form label-width="100px">
             <el-form-item label="密码保护">
               <el-switch v-model="passwordProtected" />
             </el-form-item>
             <el-form-item v-if="passwordProtected" label="密码">
               <el-input v-model="password" type="password" show-password placeholder="设置PDF打开密码" />
+            </el-form-item>
+            <el-form-item label="报表语言">
+              <el-select v-model="exportLanguage" style="width: 100%" placeholder="选择导出语言">
+                <el-option label="中文" value="zh-CN" />
+                <el-option label="English" value="en-US" />
+              </el-select>
             </el-form-item>
           </el-form>
 
@@ -36,21 +42,21 @@
           </el-button>
 
           <!-- 进度条 -->
-          <div v-if="currentTask" class="progress-section">
+          <div v-if="currentTask" class="gt-pe-progress-section">
             <el-divider />
-            <div class="progress-info">
+            <div class="gt-pe-progress-info">
               <span>状态: {{ taskStatusLabel(currentTask.status) }}</span>
               <span>{{ currentTask.progress_percentage }}%</span>
             </div>
             <el-progress :percentage="currentTask.progress_percentage"
               :status="progressStatus(currentTask.status)" :stroke-width="12" />
-            <div v-if="currentTask.status === 'completed'" class="download-link">
+            <div v-if="currentTask.status === 'completed'" class="gt-pe-download-link">
               <el-button type="success" @click="onDownload(currentTask.id)">下载 PDF</el-button>
-              <span v-if="currentTask.file_size" class="file-size">
+              <span v-if="currentTask.file_size" class="gt-pe-file-size">
                 {{ formatFileSize(currentTask.file_size) }}
               </span>
             </div>
-            <div v-if="currentTask.status === 'failed'" class="error-msg">
+            <div v-if="currentTask.status === 'failed'" class="gt-pe-error-msg">
               {{ currentTask.error_message || '导出失败' }}
             </div>
           </div>
@@ -59,8 +65,8 @@
 
       <!-- 右侧：历史记录 -->
       <el-col :span="14">
-        <div class="panel">
-          <h4 class="panel-title">导出历史</h4>
+        <div class="gt-pe-panel">
+          <h4 class="gt-pe-panel-title">导出历史</h4>
           <el-table :data="history" v-loading="historyLoading" border stripe size="small">
             <el-table-column label="时间" width="160">
               <template #default="{ row }">{{ row.created_at?.slice(0, 19).replace('T', ' ') }}</template>
@@ -109,6 +115,7 @@ const projectId = computed(() => route.params.projectId as string)
 const selectedDocs = ref<string[]>([])
 const passwordProtected = ref(false)
 const password = ref('')
+const exportLanguage = ref('zh-CN')
 const exportLoading = ref(false)
 const historyLoading = ref(false)
 const currentTask = ref<ExportTaskData | null>(null)
@@ -185,15 +192,14 @@ onUnmounted(stopPolling)
 </script>
 
 <style scoped>
-.pdf-export-page { padding: 16px; }
-.pe-header { margin-bottom: 16px; }
-.pe-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.panel { background: #fff; border-radius: var(--gt-radius-sm); padding: 16px; box-shadow: var(--gt-shadow-sm); }
-.panel-title { margin: 0 0 12px; font-size: 14px; color: var(--gt-color-primary); }
-.doc-checkboxes { display: flex; flex-direction: column; gap: 8px; }
-.progress-section { margin-top: 8px; }
-.progress-info { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; color: #666; }
-.download-link { margin-top: 8px; display: flex; align-items: center; gap: 8px; }
-.file-size { font-size: 12px; color: #999; }
-.error-msg { margin-top: 8px; color: var(--gt-color-coral, #e74c3c); font-size: 13px; }
+.gt-pdf-export { padding: var(--gt-space-4); }
+.gt-pe-header { margin-bottom: var(--gt-space-4); }
+.gt-pe-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-4); box-shadow: var(--gt-shadow-sm); }
+.gt-pe-panel-title { margin: 0 0 var(--gt-space-3); font-size: var(--gt-font-size-base); color: var(--gt-color-primary); }
+.gt-pe-doc-checkboxes { display: flex; flex-direction: column; gap: var(--gt-space-2); }
+.gt-pe-progress-section { margin-top: var(--gt-space-2); }
+.gt-pe-progress-info { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
+.gt-pe-download-link { margin-top: var(--gt-space-2); display: flex; align-items: center; gap: var(--gt-space-2); }
+.gt-pe-file-size { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-pe-error-msg { margin-top: var(--gt-space-2); color: var(--gt-color-coral); font-size: var(--gt-font-size-sm); }
 </style>

@@ -1,0 +1,71 @@
+{
+  "description": "多准则附注模版配置 — 每种准则的关键附注章节",
+  "standards": {
+    "CAS": {
+      "sections": [
+        {"section_number": "五、1", "section_title": "货币资金", "content_type": "table", "check_roles": ["余额", "其中项"]},
+        {"section_number": "五、2", "section_title": "应收账款", "content_type": "table", "check_roles": ["余额", "其中项", "账龄"]},
+        {"section_number": "五、3", "section_title": "存货", "content_type": "table", "check_roles": ["余额", "其中项"]},
+        {"section_number": "五、4", "section_title": "固定资产", "content_type": "table", "check_roles": ["余额", "变动"]},
+        {"section_number": "五、5", "section_title": "无形资产", "content_type": "table", "check_roles": ["余额", "变动"]},
+        {"section_number": "五、6", "section_title": "营业收入", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、7", "section_title": "营业成本", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、8", "section_title": "期间费用", "content_type": "table", "check_roles": ["余额", "其中项"]},
+        {"section_number": "五、9", "section_title": "所得税费用", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、10", "section_title": "其他重要事项", "content_type": "text", "check_roles": []}
+      ]
+    },
+    "CAS_SMALL": {
+      "sections": [
+        {"section_number": "五、1", "section_title": "货币资金", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、2", "section_title": "应收账款", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、3", "section_title": "固定资产", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、4", "section_title": "营业收入", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、5", "section_title": "费用", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、6", "section_title": "其他事项", "content_type": "text", "check_roles": []}
+      ]
+    },
+    "GOV": {
+      "sections": [
+        {"section_number": "五、1", "section_title": "财政拨款收入", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、2", "section_title": "事业收入", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、3", "section_title": "业务活动费用", "content_type": "table", "check_roles": ["余额", "其中项"]},
+        {"section_number": "五、4", "section_title": "单位管理费用", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、5", "section_title": "固定资产", "content_type": "table", "check_roles": ["余额", "变动"]},
+        {"section_number": "五、6", "section_title": "累计盈余", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、7", "section_title": "净资产变动", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、8", "section_title": "预算收入", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、9", "section_title": "预算支出", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、10", "section_title": "预算结余", "content_type": "table", "check_roles": ["余额"]}
+      ]
+    },
+    "FIN": {
+      "sections": [
+        {"section_number": "五、1", "section_title": "存放同业款项", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、2", "section_title": "拆出资金", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、3", "section_title": "发放贷款和垫款", "content_type": "table", "check_roles": ["余额", "其中项"]},
+        {"section_number": "五、4", "section_title": "吸收存款", "content_type": "table", "check_roles": ["余额", "其中项"]},
+        {"section_number": "五、5", "section_title": "拆入资金", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、6", "section_title": "利息净收入", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、7", "section_title": "手续费及佣金净收入", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、8", "section_title": "信用减值损失", "content_type": "table", "check_roles": ["余额"]},
+        {"section_number": "五、9", "section_title": "资本充足率", "content_type": "text", "check_roles": []},
+        {"section_number": "五、10", "section_title": "风险管理", "content_type": "text", "check_roles": []}
+      ]
+    },
+    "IFRS": {
+      "sections": [
+        {"section_number": "5.1", "section_title": "Cash and Cash Equivalents", "content_type": "table", "check_roles": ["balance"]},
+        {"section_number": "5.2", "section_title": "Trade Receivables", "content_type": "table", "check_roles": ["balance", "aging"]},
+        {"section_number": "5.3", "section_title": "Inventories", "content_type": "table", "check_roles": ["balance"]},
+        {"section_number": "5.4", "section_title": "Property, Plant and Equipment", "content_type": "table", "check_roles": ["balance", "movement"]},
+        {"section_number": "5.5", "section_title": "Revenue", "content_type": "table", "check_roles": ["balance"]},
+        {"section_number": "5.6", "section_title": "Income Tax", "content_type": "table", "check_roles": ["balance"]},
+        {"section_number": "5.7", "section_title": "Leases", "content_type": "table", "check_roles": ["balance"]},
+        {"section_number": "5.8", "section_title": "Financial Instruments", "content_type": "table", "check_roles": ["balance"]},
+        {"section_number": "5.9", "section_title": "Related Party Transactions", "content_type": "text", "check_roles": []},
+        {"section_number": "5.10", "section_title": "Subsequent Events", "content_type": "text", "check_roles": []}
+      ]
+    }
+  }
+}

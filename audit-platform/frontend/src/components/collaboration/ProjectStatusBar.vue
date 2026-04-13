@@ -1,5 +1,5 @@
 <template>
-  <div class="project-status-bar">
+  <div class="gt-project-status-bar">
     <div class="status-header">
       <span class="status-title">项目状态</span>
       <el-button
@@ -167,7 +167,7 @@ function onStepClick(step: typeof steps[0], index: number) {
 </script>
 
 <style scoped>
-.project-status-bar {
+.gt-project-status-bar {
   padding: 16px;
   background: #fff;
   border-radius: 4px;

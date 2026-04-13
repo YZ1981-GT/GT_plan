@@ -1,5 +1,5 @@
 <template>
-  <div class="forex-view">
+  <div class="gt-forex-view">
     <div class="section-header">
       <h3>外币报表折算</h3>
       <el-button type="primary" size="small" @click="showDialog()">新增记录</el-button>
@@ -100,7 +100,7 @@ onMounted(() => store.fetchForexRows(props.projectId, props.year))
 </script>
 
 <style scoped>
-.forex-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
+.gt-forex-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header h3 { margin: 0; font-size: 16px; color: var(--gt-color-primary-dark); }
 </style>

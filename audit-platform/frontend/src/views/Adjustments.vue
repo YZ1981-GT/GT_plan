@@ -1,25 +1,25 @@
 <template>
-  <div class="adjustments-page">
-    <div class="adj-header">
-      <h2 class="adj-title">调整分录</h2>
+  <div class="gt-adjustments gt-fade-in">
+    <div class="gt-adj-header">
+      <h2 class="gt-page-title">调整分录</h2>
       <el-button type="primary" @click="openCreateDialog">新建分录</el-button>
     </div>
 
     <!-- 汇总面板 -->
-    <div class="summary-panel" v-if="summary">
-      <div class="summary-card">
-        <span class="summary-label">AJE</span>
-        <span class="summary-value">{{ summary.aje_count }} 笔</span>
-        <span class="summary-sub">借 {{ fmtAmt(summary.aje_total_debit) }} / 贷 {{ fmtAmt(summary.aje_total_credit) }}</span>
+    <div class="gt-summary-panel" v-if="summary">
+      <div class="gt-summary-card">
+        <span class="gt-summary-label">AJE</span>
+        <span class="gt-summary-value">{{ summary.aje_count }} 笔</span>
+        <span class="gt-summary-sub">借 {{ fmtAmt(summary.aje_total_debit) }} / 贷 {{ fmtAmt(summary.aje_total_credit) }}</span>
       </div>
-      <div class="summary-card">
-        <span class="summary-label">RJE</span>
-        <span class="summary-value">{{ summary.rje_count }} 笔</span>
-        <span class="summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
+      <div class="gt-summary-card">
+        <span class="gt-summary-label">RJE</span>
+        <span class="gt-summary-value">{{ summary.rje_count }} 笔</span>
+        <span class="gt-summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
       </div>
-      <div class="summary-card" v-for="(cnt, st) in summary.status_counts" :key="st">
-        <span class="summary-label">{{ statusLabel(st) }}</span>
-        <span class="summary-value">{{ cnt }}</span>
+      <div class="gt-summary-card" v-for="(cnt, st) in summary.status_counts" :key="st">
+        <span class="gt-summary-label">{{ statusLabel(st) }}</span>
+        <span class="gt-summary-value">{{ cnt }}</span>
       </div>
     </div>
 
@@ -74,7 +74,7 @@
     </el-table>
 
     <!-- 批量复核操作 -->
-    <div class="batch-actions" v-if="selectedRows.length > 0">
+    <div class="gt-adj-batch-actions" v-if="selectedRows.length > 0">
       <span>已选 {{ selectedRows.length }} 条</span>
       <el-button type="success" size="small" @click="batchReview('approved')">批量批准</el-button>
       <el-button type="warning" size="small" @click="showRejectDialog = true">批量驳回</el-button>
@@ -103,7 +103,7 @@
         </el-form-item>
 
         <!-- 动态行项 -->
-        <div class="line-items-header">
+        <div class="gt-adj-line-items-header">
           <span>行项明细</span>
           <el-button size="small" @click="addLine">+ 添加行</el-button>
         </div>
@@ -138,7 +138,7 @@
         </el-table>
 
         <!-- 借贷差额 -->
-        <div class="balance-diff" :class="{ unbalanced: balanceDiff !== 0 }">
+        <div class="gt-adj-balance-diff" :class="{ 'gt-adj-unbalanced': balanceDiff !== 0 }">
           借方合计: {{ totalDebit.toFixed(2) }} | 贷方合计: {{ totalCredit.toFixed(2) }}
           | 差额: {{ balanceDiff.toFixed(2) }}
         </div>
@@ -343,19 +343,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.adjustments-page { padding: 16px; }
-.adj-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.adj-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.summary-panel { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.summary-card {
-  background: #fff; border-radius: var(--gt-radius-sm); padding: 12px 16px;
+.gt-adjustments { padding: var(--gt-space-4); }
+.gt-adj-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.gt-summary-panel { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-4); flex-wrap: wrap; }
+.gt-summary-card {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-3) var(--gt-space-4);
   box-shadow: var(--gt-shadow-sm); min-width: 120px; text-align: center;
 }
-.summary-label { display: block; font-size: 12px; color: #999; }
-.summary-value { display: block; font-size: 18px; font-weight: 600; color: var(--gt-color-primary); }
-.summary-sub { display: block; font-size: 11px; color: #aaa; margin-top: 2px; }
-.batch-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-.line-items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
-.balance-diff { text-align: right; font-size: 13px; color: var(--gt-color-success); }
-.balance-diff.unbalanced { color: var(--gt-color-coral); font-weight: 600; }
+.gt-summary-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-summary-value { display: block; font-size: var(--gt-font-size-xl); font-weight: 600; color: var(--gt-color-primary); }
+.gt-summary-sub { display: block; font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 2px; }
+.gt-adj-batch-actions { display: flex; align-items: center; gap: var(--gt-space-2); margin-top: var(--gt-space-3); }
+.gt-adj-line-items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-2); font-weight: 600; }
+.gt-adj-balance-diff { text-align: right; font-size: var(--gt-font-size-sm); color: var(--gt-color-success); }
+.gt-adj-balance-diff.gt-adj-unbalanced { color: var(--gt-color-coral); font-weight: 600; }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="sampling-panel">
+  <div class="gt-sampling-panel">
     <el-tabs v-model="activeTab">
       <!-- 抽样配置 Tab -->
       <el-tab-pane label="抽样配置" name="configs">
@@ -338,7 +338,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.sampling-panel { padding: 8px; }
+.gt-sampling-panel { padding: var(--gt-space-2); }
 .toolbar { margin-bottom: 12px; }
 .mus-result { margin-top: 16px; }
 </style>

@@ -276,6 +276,8 @@ inclusion: always
 - 聊天框特殊字符交互模式：`/` 触发快捷指令跳转工作模块，`@` 触发知识库引用（弹出候选列表，支持模糊过滤，选中显示为标签），不带 `@` 的消息不走知识库检索
 - 聊天 Markdown 渲染依赖：前端需新增 react-markdown + remark-gfm + rehype-highlight + unified + remark-parse + remark-rehype + rehype-stringify（后四个用于富文本复制时 Markdown→HTML 转换）；@ranui/preview 已弃用，改用 iframe + markdownToHtml 方案做在线预览
 - 富文本复制内联样式：markdownToHtml.ts 中自定义 rehypeInlineStyles 插件，给 table/th/td/blockquote/pre/code/h1-h3/hr 注入内联 style 属性，确保剪贴板 HTML 不依赖外部 CSS，粘贴到 Word/邮件/飞书等任何富文本环境都能正确显示格式
+- 项目删除偏好：删除和批量删除操作必须有 ElMessageBox 二次确认弹窗，不能直接删除
+- 文档同步偏好：每次功能变更后需同步更新需求文档（需求文档.md），保持文档与代码一致
 
 ## 待办 / 进行中
 - 项目文件清理（2026-04）：已删除根目录 `__pycache__/`、`frontend/README.md`；`GT_底稿/审计实务操作手册-框架.md` 和 `致同GT审计手册设计规范.md` 待用户确认是否删除
@@ -283,10 +285,15 @@ inclusion: always
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程
 - 审计作业平台需求文档（2026-04）：`需求文档.md` 已迭代至 v6（约2200行+7个附录），涵盖23个能力模块、40+数据表、完整业务链路、技术架构、开发优先级。关键技术决策：底稿编辑器选定 ONLYOFFICE Document Server（AGPL，私有化Docker部署，WOPI协议集成，自定义函数实现取数公式，插件实现复核批注/AI标记/交叉索引）；底稿文件（.xlsx/.docx）为第一公民，支持在线编辑（ONLYOFFICE）和离线编辑（下载→本地Excel→上传）双模式；技术栈 FastAPI + PostgreSQL + Redis + Vue 3 + ONLYOFFICE + Ollama；配套 `致同GT审计手册设计规范.md` 定义品牌视觉规范；附录G已整合致同2025年修订版实际底稿编码体系（B/C/D-N/A/S/Q约600+底稿）、三测联动结构、附注模版体系（国企版/上市版各含科目对照+校验公式+宽表公式+正文模版4个配置文件）、6个内置模板集定义；工作区新增 `附注模版/` 和 `致同通用审计程序及底稿模板（2025年修订）/` 两个资源文件夹
-- 审计作业平台spec拆分方案（2026-04）：全部7个阶段三件套已完成，3个遗漏+2个新需求已全部修复，7阶段一致性分析已完成并修复5个中等问题。v7增量：①报表行次映射（余额表→报表科目AI自动匹配+人工确认+集团内企业一键参照+跨年继承），新增 `report_line_mapping` 表和 `ReportLineMappingService`；②调整分录独立编辑表（`adjustment_entries` 明细行表+报表一级/二级科目级联下拉+手动输入+科目标准化校验+底稿审定表自动汇总AJE/RJE明细+分录↔底稿双向穿透）；③TSJ审计复核提示词库应用（~70个按报表科目组织的Markdown提示词→三大应用场景：底稿AI智能复核system prompt驱动+AI分析性复核维度参考+B60审计方案自动生成）。需求文档已同步更新5.2节、5.4节和6.2.1节+6.2.1a节。Phase 4 spec已同步更新需求3.7-3.9+design WorkpaperFillService+tasks 7.2a/7.4
+- 审计作业平台spec拆分方案（2026-04）：全部8个阶段三件套已完成（Phase 0-4 + Phase 8 Extension），3个遗漏+2个新需求已全部修复，7阶段一致性分析已完成并修复5个中等问题。v7增量：①报表行次映射（余额表→报表科目AI自动匹配+人工确认+集团内企业一键参照+跨年继承），新增 `report_line_mapping` 表和 `ReportLineMappingService`；②调整分录独立编辑表（`adjustment_entries` 明细行表+报表一级/二级科目级联下拉+手动输入+科目标准化校验+底稿审定表自动汇总AJE/RJE明细+分录↔底稿双向穿透）；③TSJ审计复核提示词库应用（~70个按报表科目组织的Markdown提示词→三大应用场景：底稿AI智能复核system prompt驱动+AI分析性复核维度参考+B60审计方案自动生成）。需求文档已同步更新5.2节、5.4节和6.2.1节+6.2.1a节。Phase 4 spec已同步更新需求3.7-3.9+design WorkpaperFillService+tasks 7.2a/7.4。Phase 8 Extension spec新增（2026-04）：15个需求+29个任务组，涵盖多准则适配/多语言/审计类型扩展/自定义模板/电子签名/监管对接/致同编码体系/品牌视觉/附注模版/T型账户/AI插件/Metabase集成/Paperless-ngx集成/大数据优化，design.md含7个冲突解决方案（Metabase vs Phase 4 AI、Paperless-ngx vs Phase 3附件、分区表vs现有DB等）
 - 审计作业平台代码实现（2026-04开始）：Phase 0 全部必需任务已完成，Phase 1 MVP Core 全部必需任务已完成（Task 1-23，可选属性测试任务跳过）。后端326个测试全部通过。已完成：Task 1 数据库迁移10张表、Task 2 ORM模型+Pydantic Schema（60+个Schema类覆盖10个模块）、Task 3 检查点、Task 4 项目向导后端（ProjectWizardService 5个方法+5个API端点+16个测试）、Task 5 项目向导前端（ProjectWizard.vue 6步向导+Pinia store+BasicInfoStep+ConfirmationStep+4个占位步骤）、Task 6 科目表管理（标准科目种子数据120个企业会计准则科目+客户科目CSV/Excel导入+3个API端点+AccountImportStep.vue+15个测试）、Task 7 科目映射引擎（auto_suggest 4级优先匹配+save/batch_confirm/update/get_completion_rate+6个API端点+AccountMappingStep.vue三栏布局+21个测试）、Task 7a 报表行次映射（report_line_mapping表+003迁移+规则匹配占位+confirm/batch_confirm/reference_copy/inherit+6个API端点+19个测试）、Task 8 检查点、Task 9 数据导入引擎（ParserFactory+GenericParser+7条校验规则责任链+ImportService同步导入+回滚+4个API端点+DataImportPanel.vue+37个测试）、Task 10 检查点、Task 11 四表穿透查询（DrilldownService 4个方法+4个API端点+Drilldown.vue面包屑导航+Pinia store+13个测试）、Task 12 试算表计算引擎（TrialBalanceService 增量/全量重算+一致性校验+3个API端点+8个测试）、Task 13 调整分录管理（AdjustmentService CRUD+复核状态机+科目下拉+底稿审定表+AdjustmentEntry明细行表+004迁移+8个API端点+28个测试）、Task 14 检查点、Task 15 重要性水平（MaterialityService 三级计算+自动取基准+手动覆盖+变更历史+5个API端点+MaterialityStep.vue+23个测试）、Task 16 事件总线（EventBus asyncio+事件处理器注册+SSE推送+14个测试）、Task 17 检查点、Task 18 前端页面（TrialBalance.vue分组小计+穿透交互+Adjustments.vue Tab切换+CRUD弹窗+批量复核+Materiality.vue独立页面）、Task 19 前端集成（Vue Router注册4个新路由+auditPlatformApi.ts API服务层）、Task 20 检查点、Task 21 未更正错报（UnadjustedMisstatement模型+005迁移+MisstatementService 7个方法+6个API端点+Misstatements.vue+18个测试）、Task 22-23 检查点
 - 审计作业平台 Phase 1 MVP Report 全部必需任务已完成（Task 1-24，可选属性测试跳过）。后端466个测试全部通过。已完成：Task 1-3 数据库迁移8张报表表+ORM模型+Schema、Task 4-5 报表配置种子数据（四张报表121行含公式）+ReportConfigService+API、Task 6-7 报表生成引擎（ReportFormulaParser+ReportEngine公式驱动取数+增量更新+平衡校验+穿透查询+EventBus监听）、Task 8-9 现金流量表工作底稿引擎（CFSWorksheetEngine工作底稿法+自动调整项+CRUD+平衡状态+主表生成+间接法+勾稽校验+11个API端点+26个测试）、Task 10-12 附注生成与校验引擎（DisclosureEngine附注生成+NoteValidationEngine 8种校验器+种子数据+API+EventBus监听+17个测试）、Task 13-14 审计报告模板管理（AuditReportService模板加载+占位符填充+段落编辑+KAM校验+财务数据刷新+EventBus监听+25个测试）、Task 15-18 PDF导出引擎（PDFExportEngine HTML渲染+WeasyPrint可选+同步导出+API+15个测试）+报表联动（已通过EventBus实现）、Task 19-24 前端5个Vue页面（ReportView.vue四张报表Tab+穿透弹窗、CFSWorksheet.vue工作底稿+调整分录+间接法+勾稽、DisclosureEditor.vue三栏布局目录树+编辑+校验、AuditReportEditor.vue段落导航+编辑+财务数据、PDFExportPanel.vue文档选择+进度+历史）+Vue Router 5条新路由+auditPlatformApi.ts 25个新API函数
 - 审计作业平台 Phase 1 MVP Workpaper 全部必需任务已完成（Task 1-24，可选属性测试跳过）。后端661个测试全部通过。已完成：Task 1-3 数据库迁移8张底稿表+ORM模型+Schema+16个测试、Task 4-5 取数公式引擎（FormulaEngine 5种Executor+Redis缓存+35个测试）、Task 6-8 底稿模板引擎（TemplateEngine+6个内置模板集+11个API端点+28个测试）+预填充/解析服务（10个测试）、Task 9 WOPI Host服务（WOPIHostService check_file_info/get_file/put_file+内存锁管理lock/unlock/refresh_lock+JWT访问令牌+WOPI API支持UUID和旧版POC双模式+Lock/Unlock/RefreshLock via X-WOPI-Override）、Task 10-11 底稿管理服务（WorkingPaperService list/get/download/upload冲突检测/update_status/assign+10个API端点）、Task 12-13 QC引擎（QCEngine 12条规则框架3阻断+8警告+1提示stub+get_project_summary+3个API端点）、Task 14 复核批注服务（WpReviewService add/reply/resolve状态机+4个API端点）、Task 15 事件联动（FormulaEngine.invalidate_cache注册到adjustment/import/mapping事件）、Task 16-17 ONLYOFFICE插件（audit-formula取数函数插件5个自定义函数TB/WP/AUX/PREV/SUM_TB+audit-review复核批注侧边栏插件）、Task 18-22 前端页面（WorkpaperList.vue索引树+筛选+详情面板、WorkpaperEditor.vue ONLYOFFICE iframe+降级模式、QCResultPanel.vue三级分组+阻断禁用提交、QCSummaryCard.vue五指标卡片、TemplateManager.vue模板+模板集Tab、Vue Router 3条新路由+workpaperApi.ts 25+个API函数）、Task 23 抽样记录管理（008迁移2张表+SamplingService样本量计算属性/MUS/随机+MUS评价+完整性检查+8个API端点+SamplingPanel.vue+46个测试）、Task 24 最终检查点
+- 审计作业平台代码已推送到 GT_plan 仓库（2026-04）：git init → git remote add origin https://github.com/YZ1981-GT/GT_plan.git → git push -u origin master，1207个文件，.gitignore排除node_modules/__pycache__/.venv/storage/sessions/大Excel文件
+- 审计作业平台 Phase 8 Extension 后端+前端全部必需任务已完成（2026-04）：Task 1-2 数据库迁移+ORM+Schemas全部完成、Task 3 多准则适配(3.1/3.5/3.6)、Task 4 多语言(4.2/4.7后端+19.1-19.5前端)、Task 5 审计类型(5.4)、Task 6 自定义模板(6.1-6.3/6.5-6.7后端+20.1-20.5前端)、Task 7 电子签名(7.1-7.7后端+21.1-21.5前端)、Task 8 监管对接(8.1-8.7后端+22.1-22.5前端)、Task 9 致同编码(9.1/9.2/9.5/9.6后端+23.1-23.4前端)、Task 10 品牌视觉(全部+27.1-27.6 SCSS)、Task 12 T型账户(12.1-12.8后端+24.1-24.4前端)、Task 13 AI插件(13.1-13.14后端含8个Executor stub+25.1-25.5前端)、Task 14 Metabase(14.1-14.4/14.6/14.7)、Task 15 Paperless-ngx(全部)、Task 16 大数据优化(全部)、Task 18 后端测试(18.1-18.10全部)、Task 19-27 前端42个Vue组件全部完成、Task 30 三栏布局(全部)、Task 31 vue-office(全部)；后端857个测试通过；extensionApi.ts API服务层+9条新路由；剩余未完成：5.1-5.3/5.5(审计类型模板)、28(集成测试)、29(文档)、32(Teable/Grist评估)
+- Phase 8 三件套与需求文档一致性审查（2026-04）：8个问题已全部修复——requirements.md新增需求16(三栏布局)+17(vue-office)+18(Teable/Grist评估)，需求7补充模板集关联(附录G.6)，需求12移除与需求15冗余的分区表/索引定义，需求13补充Metabase与右侧栏功能边界说明；tasks.md新增任务组30(三栏布局,4/6已完成)+31(vue-office)+32(Teable/Grist)；design.md确认完整(1053行)；README.md更新为18个需求32个任务组
+- 前端三栏布局（需求文档12.2.2）已完成初版：ThreeColumnLayout.vue核心组件（顶部导航+左侧9项功能导航可折叠220px+中间栏340px+右侧栏自适应+拖拽分隔线+localStorage偏好保存+响应式）、MiddleProjectList.vue中间栏项目列表（搜索/筛选/状态色条/选中高亮）、DetailProjectPanel.vue右侧详情面板（5个Tab概览/指标/底稿/试算表/报表+6个快捷操作）、DefaultLayout.vue重写为三栏容器（首页/项目列表三栏模式，具体项目子页面隐藏中间栏右侧全宽）
+- 四表联查是用户强调的重中之重：Task 16已全部完成——012迁移将tb_ledger+tb_aux_ledger重建为PARTITION BY RANGE(year)分区表（复合主键id+year，预建2023-2027共5个年度分区，无生产数据直接重建）+011迁移3个补充索引+LedgerPenetrationService 6个查询方法+Redis缓存TTL=5min+7个API端点+VirtualScrollTable虚拟滚动组件+LedgerPenetration.vue穿透查询页面（面包屑5级导航：余额→序时账→凭证→辅助余额→辅助明细）+19个测试通过；实际数据量参考：凭证表26万行、核算项目明细表23万行
 
 ### 审计作业平台新增代码结构 (audit-platform/)
 
@@ -469,6 +476,60 @@ inclusion: always
 - `onlyoffice/plugins/audit-formula/` — 审计取数函数插件（config.json + index.html + code.js，注册TB/WP/AUX/PREV/SUM_TB五个自定义函数，同步XHR调用后端Formula API，中文列名映射，#REF!错误处理）
 - `onlyoffice/plugins/audit-review/` — 审计复核批注侧边栏插件（config.json + index.html + index.js，复核意见列表+添加/回复/解决操作，珊瑚橙#FF5149未解决+水鸭蓝#0094B3已回复+绿色#28a745已解决左边框，30秒自动刷新）
 
+#### Phase 8 Extension 新增后端文件
+- `backend/app/schemas/extension.py` — 扩展模型Pydantic Schemas（AccountingStandard/SignatureRecord/CustomTemplate/RegulatoryFiling/GTWPCoding/AIPlugin 各含Create/Update/Response）
+- `backend/app/schemas/core.py` — 核心模型扩展Schemas（UserCreateExtended/UserResponseExtended含language、ProjectCreateExtended/ProjectUpdateExtended含accounting_standard_id、ExtendedAuditType枚举）
+- `backend/app/services/regulatory_service.py` — 监管对接服务（submit_cicpa_report/submit_archival_standard/check_filing_status/handle_filing_response/retry_filing/list_filings，状态机submitted→pending→approved/rejected，最大重试3次）
+- `backend/app/routers/regulatory.py` — 监管对接API（6个端点：POST cicpa-report/archival-standard、GET filings/{id}/status、POST filings/{id}/retry/response、GET filings列表）
+- `backend/app/services/i18n_service.py` — 多语言服务（TRANSLATIONS中英翻译字典+AUDIT_TERMS审计术语+set_user_language）
+- `backend/app/routers/i18n.py` — 多语言API（GET languages/translations/{lang}/audit-terms/{lang}、PUT users/{id}/language）
+- `backend/app/services/audit_type_service.py` — 审计类型服务（6种审计类型+推荐配置含模板集/程序/报告模板）
+- `backend/app/routers/audit_types.py` — 审计类型API（GET audit-types、GET audit-types/{type}/recommendation）
+- `backend/app/services/sign_service.py` — 电子签名服务（sign_document三级签名+verify_signature+get_signatures+revoke_signature）
+- `backend/app/routers/signatures.py` — 电子签名API（POST sign、GET {type}/{id}、POST verify/revoke）
+- `backend/app/services/ai_plugin_service.py` — AI插件服务（8个PluginExecutor stub+PLUGIN_EXECUTORS映射+execute_plugin方法+load_preset_plugins幂等加载）
+- `backend/app/routers/ai_plugins.py` — AI插件API（GET列表、POST enable/disable、PUT config、GET presets、POST seed）
+- `backend/tests/test_extension_services.py` — 77个测试（5个服务+5个API测试类）
+- `backend/tests/test_regulatory_service.py` — 44个测试（备案提交/状态跟踪/重试/列表/API端点+AI插件Executor stub）
+- `backend/data/multi_standard_charts.json` — 5种会计准则标准科目表（CAS引用/CAS_SMALL~60/GOV~49/FIN~61/IFRS~45）
+- `backend/data/multi_standard_report_formats.json` — 5种准则×4张报表格式配置（BS/IS/CFS/EQ行次+公式）
+- `backend/data/multi_standard_note_templates.json` — 5种准则附注模版配置（每种~10节）
+- `backend/data/gt_template_library.json` — 致同底稿模板目录（70+条，覆盖B/C/D-N/Q/A/S/T/Z全类型）
+- `backend/data/note_template_soe.json` — 国企版附注模版（40节，含科目对照/校验公式/宽表公式/正文模版）
+- `backend/data/note_template_listed.json` — 上市版附注模版（45节，更详细披露要求）
+- `backend/app/services/note_formula_engine.py` — 附注校验公式引擎（8种校验器：BalanceCheck/WideTableHorizontal/VerticalReconcile/CrossCheck/SubItemCheck/AgingTransition/CompletenessCheck/LLMReview stub + validate_note双层架构）
+- `backend/app/services/note_template_service.py` — 附注模版自定义服务（CRUD+版本管理+回滚+SOE/Listed加载，文件存储~/.gt_audit_helper/note_templates/custom/）
+- `backend/app/routers/note_templates.py` — 附注模版API（9个端点：POST validate/GET soe/GET listed/自定义CRUD/versions/rollback）
+- `audit-platform/frontend/src/i18n/index.ts` — 轻量级i18n框架（useI18n composable，无vue-i18n依赖，t()翻译+setLocale切换+localStorage持久化+zh-CN回退）
+- `backend/tests/test_multi_standard_notes.py` — 65个测试（多准则科目表/报表格式/附注模版+GT模板目录+SOE/Listed模版+8种校验器+自定义模版CRUD+API端点）
+- `backend/tests/test_custom_dsl_coding.py` — 32个测试（公式DSL扩展+自定义编码CRUD+API端点）
+
+#### Phase 8 Extension 新增前端文件
+- `audit-platform/frontend/src/services/extensionApi.ts` — 扩展模块API服务层（会计准则/多语言/审计类型/自定义模板/电子签名/监管备案/致同编码/T型账户/AI插件全部API封装）
+- `audit-platform/frontend/src/i18n/zh-CN.json` + `en-US.json` — 前端多语言翻译文件
+- `audit-platform/frontend/src/components/extension/` — 30+个Vue组件（LanguageSwitcher/StandardSelector/AuditTypeSelector/TemplateUpload/TemplateValidator/SignatureLevel1-3/SignatureHistory/FilingStatus/FilingError/CICPAReportForm/ArchivalStandardForm/GTWPCodingTree/WPIndexGenerator/CustomCodingEditor/TAccountEditor/TAccountEntryForm/TAccountResult/PluginList/PluginConfig/ExternalAPIConfig/ModelSwitcher/DrillDownNavigator）
+- `audit-platform/frontend/src/views/extension/` — 8个页面（CustomTemplateList/CustomTemplateEditor/TemplateMarket/SignatureManagement/RegulatoryFiling/GTCodingSystem/TAccountManagement/AIPluginManagement）
+- `audit-platform/frontend/src/styles/` — 6个SCSS文件（gt-variables/gt-mixins/gt-typography/gt-markers/gt-print/gt-dark-mode）
+- `audit-platform/frontend/src/router/index.ts` — 新增9条扩展路由（t-accounts/custom-templates/template-market/signatures/regulatory/gt-coding/ai-plugins）
+
 
 ## 技术决策（2026-04-12）
 - deps.py 别名导出：`db = get_db`，供 consolidation 相关路由（使用 `db: Session = Depends(db)`）使用
+
+## 技术决策（2026-04-13）
+- config.py .env 路径修复：pydantic-settings 的 env_file 改为自动查找 backend/.env 和项目根目录 .env（向上回溯），解决从 backend/ 目录启动时找不到根目录 .env 的问题
+- JWT_SECRET_KEY 默认值：从必填无默认改为 `dev-secret-key-change-in-production`，避免本地开发启动失败
+- CORS_ORIGINS 类型修复：从 `list[str]` 改为 `str`（逗号分隔），main.py 中 split(",") 转列表；pydantic-settings 解析 .env 中的纯字符串 `http://localhost:5173` 会报 JSON 解析错误
+- vite.config.ts 代理端口修复：proxy target 从 localhost:8001 改为 localhost:9980（匹配用户实际后端端口）
+- CORS 默认源增加 localhost:3030 和 localhost:5173（前端开发端口）
+- vite.config.ts 开发端口从 5173 改为 3030（与用户启动偏好一致），strictPort: false 允许自动递增
+- .env REDIS_URL 修复：从 `redis://redis:6379/0`（Docker服务名）改为 `redis://localhost:6379/0`（本地开发）
+- Alembic 多 head 冲突：迁移脚本 009-014 各有两个同名文件导致 `Multiple head revisions` 错误，暂用 `ALTER TABLE ADD COLUMN IF NOT EXISTS` 和 `CREATE TABLE IF NOT EXISTS` 直接补齐 Phase 8 变更，待后续合并迁移链
+- Phase 8 手动创建的表（本地PG）：gt_wp_coding、t_accounts、t_account_entries、accounting_standards、signature_records、wp_template_custom、regulatory_filing、ai_plugins、attachments、attachment_working_paper；手动加的列：users.language、projects.accounting_standard_id/company_code/template_type/report_scope/parent_company_name/parent_company_code/ultimate_company_name/ultimate_company_code/parent_project_id/consol_level
+- 测试用户：admin/admin123（role=admin）已创建，yangzhi/123456 密码已重置
+- DefaultLayout 三栏路由判断：`/projects/new` 和 `/extension/*` 路径需特殊处理为全宽模式（hideMiddle=true, isBrowseMode=false），否则会被当成浏览模式显示 DetailProjectPanel 而非 router-view
+- 合并报表集团架构信息放置方案：选择方案A（基本信息中展开折叠面板），不新增向导步骤；选择"合并报表"时自动展开"集团架构信息（三码体系）"折叠面板，填写上级企业名称/代码、最终控制方名称/代码；子公司清单和持股比例在后续"合并项目"模块中配置
+- projects 表新增4列：parent_company_name/parent_company_code/ultimate_company_name/ultimate_company_code（合并报表三码体系），用 ALTER TABLE ADD COLUMN IF NOT EXISTS 直接加列
+- 合并与单户联动架构：一个合并项目 = 一组单户项目 + 合并层；projects 表新增 parent_project_id（UUID FK→projects.id）和 consol_level（int 1-15）；前端用递归 ProjectTreeNode 组件构建树形列表，合并项目为父节点（紫色左边框+📁图标），单户项目为子节点
+- 项目列表树形展示偏好：用 +/− 文字按钮展开/收起（非箭头图标），每级缩进20px，子节点区域左侧虚线连接线，最多15级嵌套
+- UI 精致度偏好：状态色条不能太粗（2px+上下4px间距），合并项目左边框用浅紫色（primary-lighter）而非深紫色，整体要符合致同品牌规范的精致感

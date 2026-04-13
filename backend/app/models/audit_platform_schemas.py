@@ -90,6 +90,13 @@ class BasicInfoSchema(BaseModel):
     audit_year: int
     project_type: str  # annual / special / ipo / internal_control
     accounting_standard: str  # enterprise / small_enterprise / financial / government
+    company_code: str | None = None  # 企业代码（统一社会信用代码）
+    template_type: str | None = None  # 附注模板类型：soe（国企版）/ listed（上市版）
+    report_scope: str | None = None  # 报表类型：standalone（单户）/ consolidated（合并）
+    parent_company_name: str | None = None  # 上级企业名称（合并报表时填写）
+    parent_company_code: str | None = None  # 上级企业代码
+    ultimate_company_name: str | None = None  # 最终控制方名称
+    ultimate_company_code: str | None = None  # 最终控制方代码
     signing_partner_id: UUID | None = None
     manager_id: UUID | None = None
 
@@ -134,10 +141,14 @@ class ProjectCreateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    name: str | None = None
     client_name: str
     audit_year: int | None = None
     project_type: str | None = None
     status: str
+    report_scope: str | None = None
+    parent_project_id: UUID | None = None
+    consol_level: int = 1
     created_at: datetime
 
 

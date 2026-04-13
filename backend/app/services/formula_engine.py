@@ -258,9 +258,9 @@ class SumTBExecutor:
 # ---------------------------------------------------------------------------
 
 class FormulaEngine:
-    """取数公式引擎 — 公式类型注册 + Redis缓存 + 批量执行
+    """取数公式引擎 — 公式类型注册 + Redis缓存 + 批量执行 + 自定义函数扩展
 
-    Validates: Requirements 2.8, 2.9, 2.10
+    Validates: Requirements 2.8, 2.9, 2.10, 4.3
     """
 
     FORMULA_TYPES: dict[str, Any] = {
@@ -276,6 +276,85 @@ class FormulaEngine:
         self._executors: dict[str, Any] = {
             k: v() for k, v in self.FORMULA_TYPES.items()
         }
+        # 用户自定义函数注册表 {name: CustomFunctionDef}
+        self._custom_functions: dict[str, "CustomFunctionDef"] = {}
+
+    # ------------------------------------------------------------------
+    # 自定义函数 DSL 扩展（Task 6.4）
+    # ------------------------------------------------------------------
+
+    def register_custom_function(
+        self,
+        name: str,
+        expression: str,
+        description: str = "",
+        param_names: list[str] | None = None,
+    ) -> dict:
+        """注册用户自定义公式函数
+
+        Args:
+            name: 函数名（大写，如 "NET_ASSET"）
+            expression: 公式表达式，引用内置函数，如 "TB(account_code, '期末余额') - TB(account_code, '年初余额')"
+            description: 函数说明
+            param_names: 参数名列表，如 ["account_code"]
+
+        Returns:
+            注册结果 dict
+        """
+        name = name.upper().strip()
+        if not name:
+            raise ValueError("函数名不能为空")
+        if name in self.FORMULA_TYPES:
+            raise ValueError(f"'{name}' 是内置函数，不能覆盖")
+        if not _validate_custom_expression(expression):
+            raise ValueError(f"表达式语法不合法: {expression}")
+
+        func_def = CustomFunctionDef(
+            name=name,
+            expression=expression,
+            description=description,
+            param_names=param_names or [],
+        )
+        self._custom_functions[name] = func_def
+        logger.info("注册自定义函数: %s = %s", name, expression)
+        return {
+            "name": name,
+            "expression": expression,
+            "description": description,
+            "param_names": func_def.param_names,
+        }
+
+    def unregister_custom_function(self, name: str) -> bool:
+        """注销自定义函数"""
+        name = name.upper().strip()
+        if name in self._custom_functions:
+            del self._custom_functions[name]
+            return True
+        return False
+
+    def list_custom_functions(self) -> list[dict]:
+        """列出所有已注册的自定义函数"""
+        return [
+            {
+                "name": f.name,
+                "expression": f.expression,
+                "description": f.description,
+                "param_names": f.param_names,
+            }
+            for f in self._custom_functions.values()
+        ]
+
+    def list_all_functions(self) -> list[dict]:
+        """列出所有可用函数（内置 + 自定义）"""
+        built_in = [
+            {"name": k, "type": "built_in", "description": v.__doc__ or ""}
+            for k, v in self.FORMULA_TYPES.items()
+        ]
+        custom = [
+            {"name": f.name, "type": "custom", "description": f.description, "expression": f.expression}
+            for f in self._custom_functions.values()
+        ]
+        return built_in + custom
 
     @staticmethod
     def _cache_key(project_id: UUID, year: int, formula_type: str, params: dict) -> str:
@@ -299,10 +378,15 @@ class FormulaEngine:
         """
         # Validate formula type
         if formula_type not in self._executors:
+            # Check custom functions
+            if formula_type in self._custom_functions:
+                return await self._execute_custom(
+                    db, project_id, year, formula_type, params
+                )
             return {
                 "value": None,
                 "cached": False,
-                "error": f"未知公式类型'{formula_type}'，支持: {', '.join(self.FORMULA_TYPES.keys())}",
+                "error": f"未知公式类型'{formula_type}'，支持: {', '.join(list(self.FORMULA_TYPES.keys()) + list(self._custom_functions.keys()))}",
             }
 
         cache_key = self._cache_key(project_id, year, formula_type, params)
@@ -405,3 +489,131 @@ class FormulaEngine:
         except Exception:
             logger.warning("Redis cache invalidation failed")
             return 0
+
+    # ------------------------------------------------------------------
+    # 自定义函数执行（Task 6.4）
+    # ------------------------------------------------------------------
+
+    async def _execute_custom(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        year: int,
+        func_name: str,
+        params: dict,
+    ) -> dict:
+        """执行自定义函数：解析表达式中的内置函数调用并求值"""
+        func_def = self._custom_functions.get(func_name)
+        if not func_def:
+            return {"value": None, "cached": False, "error": f"自定义函数 '{func_name}' 不存在"}
+
+        try:
+            # 将参数替换到表达式中
+            expr = func_def.expression
+            for pname in func_def.param_names:
+                if pname in params:
+                    expr = expr.replace(pname, repr(params[pname]))
+
+            # 解析并执行表达式中的内置函数调用
+            value = await _eval_custom_expression(self, db, project_id, year, expr)
+            return {"value": value, "cached": False, "error": None}
+        except Exception as e:
+            logger.warning("自定义函数 %s 执行失败: %s", func_name, e)
+            return {"value": None, "cached": False, "error": f"自定义函数执行失败: {e}"}
+
+
+# ---------------------------------------------------------------------------
+# 自定义函数定义
+# ---------------------------------------------------------------------------
+
+class CustomFunctionDef:
+    """自定义函数定义"""
+
+    def __init__(
+        self,
+        name: str,
+        expression: str,
+        description: str = "",
+        param_names: list[str] | None = None,
+    ):
+        self.name = name
+        self.expression = expression
+        self.description = description
+        self.param_names = param_names or []
+
+
+# ---------------------------------------------------------------------------
+# 自定义函数表达式验证与求值
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+_FUNC_CALL_RE = _re.compile(
+    r"(TB|WP|AUX|PREV|SUM_TB)\s*\(([^)]*)\)"
+)
+
+_ALLOWED_EXPR_RE = _re.compile(
+    r"^[\d\s\+\-\*/\(\)\.,\'\"a-zA-Z_\u4e00-\u9fff]+$"
+)
+
+
+def _validate_custom_expression(expression: str) -> bool:
+    """验证自定义函数表达式语法安全性
+
+    允许：内置函数调用、四则运算、数字、字符串参数
+    禁止：import、exec、eval、__等危险操作
+    """
+    if not expression or not expression.strip():
+        return False
+    dangerous = ["import", "exec", "eval", "__", "open", "os.", "sys."]
+    lower = expression.lower()
+    for d in dangerous:
+        if d in lower:
+            return False
+    # 必须包含至少一个内置函数调用或纯数字表达式
+    if not _FUNC_CALL_RE.search(expression) and not expression.strip().replace(".", "").replace("-", "").isdigit():
+        return False
+    return True
+
+
+async def _eval_custom_expression(
+    engine: FormulaEngine,
+    db: "AsyncSession",
+    project_id: "UUID",
+    year: int,
+    expression: str,
+) -> float | None:
+    """安全求值自定义表达式：提取内置函数调用→逐个执行→替换为结果→算术求值"""
+    expr = expression
+
+    # 逐个替换内置函数调用为数值
+    for match in _FUNC_CALL_RE.finditer(expression):
+        func_type = match.group(1)
+        args_str = match.group(2)
+        # 解析参数
+        args = [a.strip().strip("'\"") for a in args_str.split(",")]
+        params: dict = {}
+        if func_type == "TB" and len(args) >= 2:
+            params = {"account_code": args[0], "column_name": args[1]}
+        elif func_type == "SUM_TB" and len(args) >= 2:
+            params = {"account_range": args[0], "column_name": args[1]}
+        elif func_type == "AUX" and len(args) >= 4:
+            params = {"account_code": args[0], "aux_type": args[1], "aux_name": args[2], "column_name": args[3]}
+        elif func_type == "WP" and len(args) >= 2:
+            params = {"wp_code": args[0], "cell_ref": args[1]}
+
+        result = await engine.execute(db, project_id, year, func_type, params)
+        val = result.get("value")
+        if val is None:
+            val = 0
+        expr = expr.replace(match.group(0), str(float(val)), 1)
+
+    # 安全算术求值（仅允许数字和四则运算）
+    expr = expr.strip()
+    if not _re.match(r"^[\d\s\+\-\*/\(\)\.]+$", expr):
+        raise ValueError(f"表达式包含不安全字符: {expr}")
+
+    try:
+        return float(eval(expr))  # noqa: S307 — 已验证仅含数字和运算符
+    except Exception as e:
+        raise ValueError(f"表达式求值失败: {expr} → {e}") from e

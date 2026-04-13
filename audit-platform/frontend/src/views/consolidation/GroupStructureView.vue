@@ -1,5 +1,5 @@
 <template>
-  <div class="group-structure-view">
+  <div class="gt-group-structure-view">
     <!-- Layout: Left tree panel + Right scope table -->
     <div class="view-layout">
       <!-- Left: Group Structure Tree -->
@@ -95,7 +95,7 @@ async function onFormSaved() {
 </script>
 
 <style scoped>
-.group-structure-view {
+.gt-group-structure-view {
   display: flex;
   flex-direction: column;
 }
@@ -129,6 +129,6 @@ async function onFormSaved() {
 
 .panel-hint {
   font-size: 11px;
-  color: #999;
+  color: var(--gt-color-text-tertiary);
 }
 </style>

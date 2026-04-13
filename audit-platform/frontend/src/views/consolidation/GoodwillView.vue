@@ -1,5 +1,5 @@
 <template>
-  <div class="goodwill-view">
+  <div class="gt-goodwill-view">
     <div class="section-header">
       <h3>商誉减值测试</h3>
       <el-button type="primary" size="small" @click="showDialog()">新增记录</el-button>
@@ -102,7 +102,7 @@ onMounted(() => store.fetchGoodwillRows(props.projectId, props.year))
 </script>
 
 <style scoped>
-.goodwill-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
+.gt-goodwill-view { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header h3 { margin: 0; font-size: 16px; color: var(--gt-color-primary-dark); }
 </style>

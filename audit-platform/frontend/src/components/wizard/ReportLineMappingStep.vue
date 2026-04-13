@@ -1,5 +1,5 @@
 <template>
-  <div class="report-line-mapping-page">
+  <div class="gt-report-line-mapping">
     <h2 class="page-title">报表行次映射</h2>
     <p class="page-desc">将标准科目映射到报表行次，支持AI建议、手动调整和集团参照复制</p>
 
@@ -306,7 +306,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.report-line-mapping-page {
+.gt-report-line-mapping {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;

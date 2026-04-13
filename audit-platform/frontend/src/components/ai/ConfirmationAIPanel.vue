@@ -1,5 +1,5 @@
 <template>
-  <div class="confirmation-ai-panel">
+  <div class="gt-confirmation-ai-panel">
     <el-card class="panel-card">
       <template #header>
         <div class="panel-header">
@@ -467,7 +467,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.confirmation-ai-panel {
+.gt-confirmation-ai-panel {
   padding: 16px;
 }
 
@@ -546,7 +546,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.confirmation-ai-panel {
+.gt-confirmation-ai-panel {
   padding: 16px;
 }
 

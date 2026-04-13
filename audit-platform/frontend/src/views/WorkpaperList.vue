@@ -1,9 +1,9 @@
 <template>
-  <div class="wp-list-page">
+  <div class="gt-wp-list gt-fade-in">
     <!-- 顶部筛选栏 -->
-    <div class="wp-filter-bar">
-      <h2 class="wp-title">底稿管理</h2>
-      <div class="wp-filters">
+    <div class="gt-wp-filter-bar">
+      <h2 class="gt-page-title">底稿管理</h2>
+      <div class="gt-wp-filters">
         <el-select v-model="filterCycle" placeholder="审计循环" clearable size="default" style="width: 160px">
           <el-option v-for="c in cycleOptions" :key="c.value" :label="c.label" :value="c.value" />
         </el-select>
@@ -18,9 +18,9 @@
     </div>
 
     <!-- 主体：左树 + 右详情 -->
-    <div class="wp-body">
+    <div class="gt-wp-body">
       <!-- 左侧索引树 -->
-      <div class="wp-tree-panel">
+      <div class="gt-wp-tree-panel">
         <el-tree
           :data="treeData"
           :props="{ label: 'label', children: 'children' }"
@@ -30,9 +30,9 @@
           @node-click="onNodeClick"
         >
           <template #default="{ data }">
-            <div class="tree-node">
-              <span class="tree-node-label">{{ data.label }}</span>
-              <el-tag v-if="data.status" :type="statusTagType(data.status)" size="small" class="tree-node-tag">
+            <div class="gt-wp-tree-node">
+              <span class="gt-wp-tree-node-label">{{ data.label }}</span>
+              <el-tag v-if="data.status" :type="statusTagType(data.status)" size="small" class="gt-wp-tree-node-tag">
                 {{ statusLabel(data.status) }}
               </el-tag>
             </div>
@@ -42,10 +42,10 @@
       </div>
 
       <!-- 右侧详情面板 -->
-      <div class="wp-detail-panel">
+      <div class="gt-wp-detail-panel">
         <template v-if="selectedWp">
-          <div class="detail-card">
-            <h3 class="detail-title">{{ selectedWp.wp_code }} {{ selectedWp.wp_name }}</h3>
+          <div class="gt-wp-detail-card">
+            <h3 class="gt-wp-detail-title">{{ selectedWp.wp_code }} {{ selectedWp.wp_name }}</h3>
             <el-descriptions :column="2" border size="default">
               <el-descriptions-item label="底稿编号">{{ selectedWp.wp_code }}</el-descriptions-item>
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
@@ -62,7 +62,7 @@
             </el-descriptions>
 
             <!-- 操作按钮 -->
-            <div class="detail-actions">
+            <div class="gt-wp-detail-actions">
               <el-button type="primary" @click="onOnlineEdit">在线编辑</el-button>
               <el-button @click="onDownload">下载</el-button>
               <el-button @click="onUpload">上传</el-button>
@@ -71,11 +71,11 @@
             </div>
 
             <!-- QC 结果摘要 -->
-            <div v-if="qcResult" class="qc-summary-inline">
+            <div v-if="qcResult" class="gt-wp-qc-summary-inline">
               <el-tag :type="qcResult.passed ? 'success' : 'danger'" size="small">
                 {{ qcResult.passed ? '自检通过' : '存在问题' }}
               </el-tag>
-              <span class="qc-counts">
+              <span class="gt-wp-qc-counts">
                 阻断 {{ qcResult.blocking_count }} / 警告 {{ qcResult.warning_count }} / 提示 {{ qcResult.info_count }}
               </span>
             </div>
@@ -293,25 +293,24 @@ onMounted(fetchData)
 </script>
 
 <style scoped>
-.wp-list-page { padding: 16px; height: 100%; display: flex; flex-direction: column; }
-.wp-filter-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.wp-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.wp-filters { display: flex; gap: 8px; align-items: center; }
-.wp-body { display: flex; gap: 16px; flex: 1; min-height: 0; }
-.wp-tree-panel {
-  width: 320px; min-width: 320px; background: #fff; border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm); padding: 12px; overflow-y: auto;
+.gt-wp-list { padding: var(--gt-space-4); height: 100%; display: flex; flex-direction: column; }
+.gt-wp-filter-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
+.gt-wp-filters { display: flex; gap: var(--gt-space-2); align-items: center; }
+.gt-wp-body { display: flex; gap: var(--gt-space-4); flex: 1; min-height: 0; }
+.gt-wp-tree-panel {
+  width: 320px; min-width: 320px; background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); padding: var(--gt-space-3); overflow-y: auto;
 }
-.wp-detail-panel {
-  flex: 1; background: #fff; border-radius: var(--gt-radius-md);
-  box-shadow: var(--gt-shadow-sm); padding: 20px; overflow-y: auto;
+.gt-wp-detail-panel {
+  flex: 1; background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); padding: var(--gt-space-5); overflow-y: auto;
 }
-.tree-node { display: flex; align-items: center; gap: 6px; width: 100%; }
-.tree-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-node-tag { flex-shrink: 0; }
-.detail-card { }
-.detail-title { margin: 0 0 16px; color: var(--gt-color-primary); font-size: 18px; }
-.detail-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
-.qc-summary-inline { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
-.qc-counts { font-size: 13px; color: #666; }
+.gt-wp-tree-node { display: flex; align-items: center; gap: 6px; width: 100%; }
+.gt-wp-tree-node-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-wp-tree-node-tag { flex-shrink: 0; }
+.gt-wp-detail-card { }
+.gt-wp-detail-title { margin: 0 0 var(--gt-space-4); color: var(--gt-color-primary); font-size: var(--gt-font-size-xl); }
+.gt-wp-detail-actions { display: flex; gap: var(--gt-space-2); margin-top: var(--gt-space-4); flex-wrap: wrap; }
+.gt-wp-qc-summary-inline { margin-top: var(--gt-space-3); display: flex; align-items: center; gap: var(--gt-space-2); }
+.gt-wp-qc-counts { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
 </style>

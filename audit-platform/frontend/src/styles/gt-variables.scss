@@ -1,0 +1,24 @@
+/**
+ * GT品牌色系 SCSS 变量
+ * 导入已有的 CSS Token 系统，并提供 SCSS 变量别名
+ */
+@import './gt-tokens.css';
+
+// SCSS 变量映射（供 SCSS 文件中使用）
+$gt-color-primary: #4b2d77;
+$gt-color-primary-light: #A06DFF;
+$gt-color-primary-lighter: #c4a8e8;
+$gt-color-primary-bg: #f4f0fa;
+$gt-color-primary-dark: #2B1D4D;
+$gt-color-teal: #0094B3;
+$gt-color-coral: #FF5149;
+$gt-color-wheat: #FFC23D;
+$gt-color-success: #28A745;
+
+$gt-color-text: #1d1d1f;
+$gt-color-text-secondary: #6e6e73;
+$gt-color-text-tertiary: #999;
+$gt-color-border: #e5e5ea;
+$gt-color-border-light: #f0f0f5;
+$gt-color-bg: #f7f7fa;
+$gt-color-bg-white: #ffffff;

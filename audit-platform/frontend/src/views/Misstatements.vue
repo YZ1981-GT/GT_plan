@@ -1,33 +1,33 @@
 <template>
-  <div class="misstatements-page">
-    <div class="ms-header">
-      <h2 class="ms-title">未更正错报汇总</h2>
+  <div class="gt-misstatements gt-fade-in">
+    <div class="gt-ms-header">
+      <h2 class="gt-page-title">未更正错报汇总</h2>
       <el-button type="primary" @click="openCreateDialog">新增错报</el-button>
     </div>
 
     <!-- 重要性水平对比卡片 -->
-    <div class="materiality-cards" v-if="summary">
-      <div class="mat-card">
-        <span class="mat-label">累计错报金额</span>
-        <span class="mat-value" :class="{ exceeded: summary.exceeds_materiality }">
+    <div class="gt-ms-materiality-cards" v-if="summary">
+      <div class="gt-ms-mat-card">
+        <span class="gt-ms-mat-label">累计错报金额</span>
+        <span class="gt-ms-mat-value" :class="{ 'gt-ms-exceeded': summary.exceeds_materiality }">
           {{ fmtAmt(summary.cumulative_amount) }}
         </span>
       </div>
-      <div class="mat-card">
-        <span class="mat-label">整体重要性</span>
-        <span class="mat-value">{{ fmtAmt(summary.overall_materiality) }}</span>
+      <div class="gt-ms-mat-card">
+        <span class="gt-ms-mat-label">整体重要性</span>
+        <span class="gt-ms-mat-value">{{ fmtAmt(summary.overall_materiality) }}</span>
       </div>
-      <div class="mat-card">
-        <span class="mat-label">实际执行重要性</span>
-        <span class="mat-value">{{ fmtAmt(summary.performance_materiality) }}</span>
+      <div class="gt-ms-mat-card">
+        <span class="gt-ms-mat-label">实际执行重要性</span>
+        <span class="gt-ms-mat-value">{{ fmtAmt(summary.performance_materiality) }}</span>
       </div>
-      <div class="mat-card">
-        <span class="mat-label">微小错报临界值</span>
-        <span class="mat-value">{{ fmtAmt(summary.trivial_threshold) }}</span>
+      <div class="gt-ms-mat-card">
+        <span class="gt-ms-mat-label">微小错报临界值</span>
+        <span class="gt-ms-mat-value">{{ fmtAmt(summary.trivial_threshold) }}</span>
       </div>
-      <div class="mat-card">
-        <span class="mat-label">评价完整性</span>
-        <span class="mat-value" :class="summary.evaluation_complete ? 'complete' : 'incomplete'">
+      <div class="gt-ms-mat-card">
+        <span class="gt-ms-mat-label">评价完整性</span>
+        <span class="gt-ms-mat-value" :class="summary.evaluation_complete ? 'gt-ms-complete' : 'gt-ms-incomplete'">
           {{ summary.evaluation_complete ? '✓ 完整' : '✗ 不完整' }}
         </span>
       </div>
@@ -35,12 +35,12 @@
 
     <!-- 超限预警横幅 -->
     <el-alert v-if="summary?.exceeds_materiality" type="error" :closable="false"
-      class="threshold-warning" show-icon>
+      class="gt-ms-threshold-warning" show-icon>
       未更正错报累计金额({{ fmtAmt(summary.cumulative_amount) }})已达到或超过整体重要性水平({{ fmtAmt(summary.overall_materiality) }})，可能需要出具保留意见或否定意见
     </el-alert>
 
     <!-- 按类型分组小计 -->
-    <div class="type-summary" v-if="summary?.by_type?.length">
+    <div class="gt-ms-type-summary" v-if="summary?.by_type?.length">
       <el-table :data="summary.by_type" border size="small" style="margin-bottom: 16px">
         <el-table-column label="错报类型" width="150">
           <template #default="{ row }">
@@ -257,19 +257,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.misstatements-page { padding: 16px; }
-.ms-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.ms-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
-.materiality-cards { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.mat-card {
-  background: #fff; border-radius: var(--gt-radius-sm); padding: 12px 16px;
+.gt-misstatements { padding: var(--gt-space-4); }
+.gt-ms-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.gt-ms-materiality-cards { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-4); flex-wrap: wrap; }
+.gt-ms-mat-card {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-3) var(--gt-space-4);
   box-shadow: var(--gt-shadow-sm); min-width: 130px; text-align: center;
 }
-.mat-label { display: block; font-size: 12px; color: #999; }
-.mat-value { display: block; font-size: 18px; font-weight: 600; color: var(--gt-color-primary); }
-.mat-value.exceeded { color: var(--gt-color-coral, #e74c3c); }
-.mat-value.complete { color: var(--gt-color-success, #27ae60); }
-.mat-value.incomplete { color: var(--gt-color-coral, #e74c3c); }
-.threshold-warning { margin-bottom: 16px; }
-.type-summary { margin-bottom: 8px; }
+.gt-ms-mat-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
+.gt-ms-mat-value { display: block; font-size: var(--gt-font-size-xl); font-weight: 600; color: var(--gt-color-primary); }
+.gt-ms-mat-value.gt-ms-exceeded { color: var(--gt-color-coral); }
+.gt-ms-mat-value.gt-ms-complete { color: var(--gt-color-success); }
+.gt-ms-mat-value.gt-ms-incomplete { color: var(--gt-color-coral); }
+.gt-ms-threshold-warning { margin-bottom: var(--gt-space-4); }
+.gt-ms-type-summary { margin-bottom: var(--gt-space-2); }
 </style>

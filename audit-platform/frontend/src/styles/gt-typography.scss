@@ -1,0 +1,43 @@
+/**
+ * GT 字体规范 SCSS
+ * 中文：方正悦黑 → 微软雅黑 → 苹方
+ * 英文：GT Walsheim → Helvetica Neue → Arial
+ */
+
+$gt-font-family: 'GT Walsheim', 'FZYueHei', 'Microsoft YaHei', 'PingFang SC',
+                  'Helvetica Neue', Arial, sans-serif;
+
+$gt-font-size-xs: 12px;
+$gt-font-size-sm: 13px;
+$gt-font-size-base: 14px;
+$gt-font-size-md: 15px;
+$gt-font-size-lg: 16px;
+$gt-font-size-xl: 18px;
+$gt-font-size-2xl: 22px;
+$gt-font-size-3xl: 28px;
+
+$gt-line-height-base: 1.6;
+$gt-line-height-tight: 1.3;
+$gt-line-height-loose: 1.8;
+
+@mixin gt-heading($size: $gt-font-size-xl) {
+  font-family: $gt-font-family;
+  font-size: $size;
+  font-weight: 600;
+  line-height: $gt-line-height-tight;
+  color: var(--gt-color-text);
+}
+
+@mixin gt-body($size: $gt-font-size-base) {
+  font-family: $gt-font-family;
+  font-size: $size;
+  line-height: $gt-line-height-base;
+  color: var(--gt-color-text);
+}
+
+@mixin gt-caption {
+  font-family: $gt-font-family;
+  font-size: $gt-font-size-xs;
+  line-height: $gt-line-height-base;
+  color: var(--gt-color-text-tertiary);
+}

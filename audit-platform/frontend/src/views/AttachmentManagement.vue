@@ -1,0 +1,234 @@
+<template>
+  <div class="gt-attachment-page">
+    <div class="gt-att-header">
+      <h2 class="gt-page-title">附件管理</h2>
+      <div class="gt-att-actions">
+        <el-input v-model="searchQuery" placeholder="搜索附件..." size="small" clearable
+          :prefix-icon="Search" style="width: 200px" @keyup.enter="onSearch" />
+        <el-select v-model="filterType" placeholder="文件类型" size="small" clearable style="width: 120px" @change="loadAttachments">
+          <el-option label="PDF" value="pdf" />
+          <el-option label="Word" value="docx" />
+          <el-option label="Excel" value="xlsx" />
+          <el-option label="图片" value="image" />
+        </el-select>
+        <el-upload
+          :action="`/api/projects/${projectId}/attachments`"
+          :show-file-list="false"
+          :before-upload="beforeUpload"
+          :on-success="onUploadSuccess"
+        >
+          <el-button type="primary" size="small"><el-icon><Upload /></el-icon> 上传附件</el-button>
+        </el-upload>
+      </div>
+    </div>
+
+    <!-- 附件列表 -->
+    <el-table :data="attachments" v-loading="loading" stripe size="small" style="width: 100%">
+      <el-table-column prop="file_name" label="文件名" min-width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span class="gt-file-name" @click="preview(row)">
+            <el-icon :size="16" class="gt-file-icon"><Document /></el-icon>
+            {{ row.file_name }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="file_type" label="类型" width="80" align="center">
+        <template #default="{ row }">
+          <el-tag size="small" :type="typeTagType(row.file_type)">{{ row.file_type }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="大小" width="100" align="right">
+        <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
+      </el-table-column>
+      <el-table-column prop="ocr_status" label="OCR" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag size="small" :type="ocrTagType(row.ocr_status)">{{ ocrLabel(row.ocr_status) }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="created_at" label="上传时间" width="140">
+        <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="180" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" size="small" @click="preview(row)">预览</el-button>
+          <el-button link type="primary" size="small" @click="associateDialog(row)">关联底稿</el-button>
+          <el-button link size="small" @click="download(row)">下载</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 附件预览弹窗 -->
+    <AttachmentPreview
+      v-model="previewVisible"
+      :file-url="previewUrl"
+      :file-name="previewName"
+      :file-type="previewType"
+      @close="previewVisible = false"
+    />
+
+    <!-- 关联底稿弹窗 -->
+    <el-dialog v-model="associateVisible" title="关联到底稿" width="400px">
+      <el-form label-width="80px" size="small">
+        <el-form-item label="底稿ID">
+          <el-input v-model="associateWpId" placeholder="输入底稿ID" />
+        </el-form-item>
+        <el-form-item label="关联类型">
+          <el-select v-model="associateType" style="width: 100%">
+            <el-option label="审计证据" value="evidence" />
+            <el-option label="支持文件" value="support" />
+            <el-option label="函证回函" value="confirmation" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="associateNotes" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button size="small" @click="associateVisible = false">取消</el-button>
+        <el-button type="primary" size="small" @click="submitAssociate">确认关联</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Search, Upload, Document } from '@element-plus/icons-vue'
+import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
+import http from '@/utils/http'
+
+const route = useRoute()
+const projectId = computed(() => route.params.projectId as string)
+
+const loading = ref(false)
+const attachments = ref<any[]>([])
+const searchQuery = ref('')
+const filterType = ref('')
+
+// 预览
+const previewVisible = ref(false)
+const previewUrl = ref('')
+const previewName = ref('')
+const previewType = ref('')
+
+// 关联
+const associateVisible = ref(false)
+const associateAttachmentId = ref('')
+const associateWpId = ref('')
+const associateType = ref('evidence')
+const associateNotes = ref('')
+
+async function loadAttachments() {
+  loading.value = true
+  try {
+    const params: any = {}
+    if (filterType.value) params.file_type = filterType.value
+    const { data } = await http.get(`/api/projects/${projectId.value}/attachments`, { params })
+    attachments.value = data.data ?? data ?? []
+  } catch { attachments.value = [] }
+  finally { loading.value = false }
+}
+
+async function onSearch() {
+  if (!searchQuery.value) { loadAttachments(); return }
+  loading.value = true
+  try {
+    const { data } = await http.get('/api/attachments/search', {
+      params: { project_id: projectId.value, q: searchQuery.value },
+    })
+    attachments.value = data.data ?? data ?? []
+  } catch { attachments.value = [] }
+  finally { loading.value = false }
+}
+
+function preview(row: any) {
+  previewUrl.value = row.file_path
+  previewName.value = row.file_name
+  previewType.value = row.file_type
+  previewVisible.value = true
+}
+
+function download(row: any) {
+  window.open(row.file_path, '_blank')
+}
+
+function associateDialog(row: any) {
+  associateAttachmentId.value = row.id
+  associateWpId.value = ''
+  associateNotes.value = ''
+  associateVisible.value = true
+}
+
+async function submitAssociate() {
+  if (!associateWpId.value) { ElMessage.warning('请输入底稿ID'); return }
+  try {
+    await http.post(`/api/attachments/${associateAttachmentId.value}/associate`, {
+      wp_id: associateWpId.value,
+      association_type: associateType.value,
+      notes: associateNotes.value || undefined,
+    })
+    ElMessage.success('关联成功')
+    associateVisible.value = false
+  } catch { ElMessage.error('关联失败') }
+}
+
+function beforeUpload(file: File) {
+  const maxSize = 50 * 1024 * 1024 // 50MB
+  if (file.size > maxSize) {
+    ElMessage.error('文件大小不能超过 50MB')
+    return false
+  }
+  return true
+}
+
+function onUploadSuccess() {
+  ElMessage.success('上传成功')
+  loadAttachments()
+}
+
+function formatSize(bytes: number): string {
+  if (!bytes) return '-'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
+function formatDate(d: string): string {
+  if (!d) return '-'
+  return new Date(d).toLocaleDateString('zh-CN')
+}
+
+function typeTagType(t: string): string {
+  const m: Record<string, string> = { pdf: 'danger', docx: '', xlsx: 'success', image: 'warning' }
+  return m[t] || 'info'
+}
+
+function ocrTagType(s: string): string {
+  const m: Record<string, string> = { pending: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
+  return m[s] || 'info'
+}
+
+function ocrLabel(s: string): string {
+  const m: Record<string, string> = { pending: '待识别', processing: '识别中', completed: '已完成', failed: '失败' }
+  return m[s] || s
+}
+
+onMounted(loadAttachments)
+</script>
+
+<style scoped>
+.gt-attachment-page { padding: var(--gt-space-4); }
+.gt-att-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--gt-space-4);
+}
+.gt-att-actions { display: flex; gap: var(--gt-space-2); align-items: center; }
+.gt-file-name {
+  display: flex; align-items: center; gap: 4px;
+  cursor: pointer; color: var(--gt-color-primary);
+}
+.gt-file-name:hover { text-decoration: underline; }
+.gt-file-icon { color: var(--gt-color-text-secondary); }
+</style>

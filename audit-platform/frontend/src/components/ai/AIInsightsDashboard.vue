@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-insights-dashboard">
+  <div class="gt-ai-insights-dashboard">
     <div class="panel-header">
       <h3>📊 AI 洞察中心</h3>
       <button class="btn-refresh" @click="loadInsights">🔄</button>
@@ -44,7 +44,7 @@ onMounted(loadInsights)
 </script>
 
 <style scoped>
-.ai-insights-dashboard { padding: 16px; }
+.gt-ai-insights-dashboard { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .panel-header h3 { margin: 0; font-size: 16px; }
 .btn-refresh { background: none; border: none; cursor: pointer; font-size: 16px; }

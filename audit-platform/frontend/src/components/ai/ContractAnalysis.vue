@@ -1,5 +1,5 @@
 <template>
-  <div class="contract-analysis">
+  <div class="gt-contract-analysis">
     <div class="panel-header">
       <h3>📑 合同智能分析</h3>
       <div class="header-actions">
@@ -292,7 +292,7 @@ loadContracts()
 </script>
 
 <style scoped>
-.contract-analysis { padding: 16px; }
+.gt-contract-analysis { padding: 16px; }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .panel-header h3 { margin: 0; font-size: 16px; }
 

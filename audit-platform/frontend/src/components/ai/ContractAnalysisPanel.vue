@@ -1,5 +1,5 @@
 <template>
-  <div class="contract-analysis-panel">
+  <div class="gt-contract-analysis-panel">
     <div class="panel-header">
       <h3>📑 合同智能分析</h3>
       <div class="header-actions">
@@ -484,7 +484,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.contract-analysis-panel { padding: 16px; height: 100%; display: flex; flex-direction: column; }
+.gt-contract-analysis-panel { padding: 16px; height: 100%; display: flex; flex-direction: column; }
 
 .panel-header {
   display: flex;

@@ -1,5 +1,5 @@
 <template>
-  <div class="going-concern-panel">
+  <div class="gt-going-concern-panel">
     <h3>持续经营评估</h3>
 
     <el-tabs v-model="activeTab">
@@ -221,7 +221,7 @@ async function handleCreateEval() {
 </script>
 
 <style scoped>
-.going-concern-panel {}
+.gt-going-concern-panel {}
 .indicator-header {
   display: flex;
   align-items: center;

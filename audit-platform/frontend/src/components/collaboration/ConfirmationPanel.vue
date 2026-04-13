@@ -1,5 +1,5 @@
 <template>
-  <div class="confirmation-panel">
+  <div class="gt-confirmation-panel">
     <div class="panel-header">
       <h3>函证管理</h3>
       <el-button type="primary" @click="showCreateDialog = true">新建函证</el-button>
@@ -194,7 +194,7 @@ async function generateLetter(row: any) {
 </script>
 
 <style scoped>
-.confirmation-panel {}
+.gt-confirmation-panel {}
 .panel-header {
   display: flex;
   justify-content: space-between;

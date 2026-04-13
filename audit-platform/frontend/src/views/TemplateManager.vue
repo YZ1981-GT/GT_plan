@@ -1,7 +1,7 @@
 <template>
-  <div class="tpl-manager-page">
-    <div class="tpl-header">
-      <h2 class="tpl-title">模板管理</h2>
+  <div class="gt-tpl-manager gt-fade-in">
+    <div class="gt-tpl-header">
+      <h2 class="gt-page-title">模板管理</h2>
       <el-button type="primary" @click="showUploadDialog = true">上传模板</el-button>
     </div>
 
@@ -182,7 +182,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.tpl-manager-page { padding: 16px; }
-.tpl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.tpl-title { margin: 0; color: var(--gt-color-primary); font-size: 20px; }
+.gt-tpl-manager { padding: var(--gt-space-4); }
+.gt-tpl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
 </style>

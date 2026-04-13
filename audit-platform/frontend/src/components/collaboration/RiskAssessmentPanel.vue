@@ -1,5 +1,5 @@
 <template>
-  <div class="risk-assessment-panel">
+  <div class="gt-risk-assessment-panel">
     <div class="panel-header">
       <h3>风险评估</h3>
       <el-button type="primary" size="small" @click="showAddDialog = true">
@@ -276,7 +276,7 @@ loadRisks()
 </script>
 
 <style scoped>
-.risk-assessment-panel {
+.gt-risk-assessment-panel {
   padding: 16px;
 }
 .panel-header {

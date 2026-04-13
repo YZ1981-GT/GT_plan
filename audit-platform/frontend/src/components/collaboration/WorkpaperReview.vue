@@ -1,5 +1,5 @@
 <template>
-  <div class="workpaper-review">
+  <div class="gt-workpaper-review">
     <div class="wp-header">
       <h3>工作底稿复核状态</h3>
     </div>
@@ -57,7 +57,7 @@ async function viewReviews(row: any) {
 </script>
 
 <style scoped>
-.workpaper-review {}
+.gt-workpaper-review {}
 .wp-header { margin-bottom: 16px; }
 .review-levels { display: flex; gap: 4px; }
 </style>
