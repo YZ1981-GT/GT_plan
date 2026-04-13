@@ -37,15 +37,25 @@
         </div>
         <div class="gt-node-meta">
           <span>{{ node.client_name || '-' }}</span>
-          <el-tag :type="statusTagType(node.status)" size="small" round>
+          <el-tag v-if="node.status !== 'created'" :type="statusTagType(node.status)" size="small" round>
             {{ statusLabel(node.status) }}
           </el-tag>
         </div>
       </div>
 
+      <!-- 编辑按钮 -->
+      <el-button
+        class="gt-node-action"
+        type="primary"
+        :icon="Edit"
+        size="small"
+        text
+        @click.stop="$emit('edit', node)"
+      />
+
       <!-- 删除按钮 -->
       <el-button
-        class="gt-node-delete"
+        class="gt-node-action gt-node-action--danger"
         type="danger"
         :icon="Delete"
         size="small"
@@ -66,6 +76,7 @@
         @select="(p: any) => $emit('select', p)"
         @toggle-check="(id: string, v: boolean) => $emit('toggle-check', id, v)"
         @delete="(p: any) => $emit('delete', p)"
+        @edit="(p: any) => $emit('edit', p)"
       />
     </div>
   </div>
@@ -73,7 +84,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { FolderOpened, Delete } from '@element-plus/icons-vue'
+import { FolderOpened, Delete, Edit } from '@element-plus/icons-vue'
 
 interface ProjectNode {
   id: string
@@ -95,6 +106,7 @@ defineEmits<{
   (e: 'select', project: any): void
   (e: 'toggle-check', id: string, checked: boolean): void
   (e: 'delete', project: any): void
+  (e: 'edit', project: any): void
 }>()
 
 const expanded = ref(true)
@@ -117,19 +129,20 @@ function statusLabel(s: string) {
 .gt-node-row {
   display: flex;
   align-items: center;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   border-radius: var(--gt-radius-sm);
   background: var(--gt-color-bg-white);
   border: 1px solid transparent;
   cursor: pointer;
   transition: all var(--gt-transition-fast);
-  min-height: 44px;
+  min-height: 36px;
+  padding-right: 4px;
 }
 .gt-node-row:hover {
   border-color: var(--gt-color-primary-lighter);
   background: #faf8fd;
 }
-.gt-node-row:hover .gt-node-delete { opacity: 1; }
+.gt-node-row:hover .gt-node-action { opacity: 1; }
 .gt-node-row--active {
   border-color: var(--gt-color-primary) !important;
   background: var(--gt-color-primary-bg) !important;
@@ -140,60 +153,60 @@ function statusLabel(s: string) {
 }
 
 .gt-node-toggle {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--gt-color-text-secondary);
   cursor: pointer;
   flex-shrink: 0;
-  border-radius: 3px;
+  border-radius: 2px;
   transition: background var(--gt-transition-fast);
 }
 .gt-node-toggle:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
 .gt-node-toggle--leaf { visibility: hidden; }
 
-.gt-node-check { flex-shrink: 0; margin: 0 4px; }
+.gt-node-check { flex-shrink: 0; margin: 0 2px; }
 
-.gt-node-status { width: 2px; flex-shrink: 0; align-self: stretch; border-radius: 1px; margin: 4px 2px; }
+.gt-node-status { width: 2px; flex-shrink: 0; align-self: stretch; border-radius: 1px; margin: 3px 1px; }
 .gt-status--created { background: var(--gt-color-text-tertiary); }
 .gt-status--planning { background: var(--gt-color-wheat); }
 .gt-status--execution { background: var(--gt-color-primary); }
 .gt-status--completion { background: var(--gt-color-success); }
 .gt-status--archived { background: var(--gt-color-border); }
 
-.gt-node-body { padding: 4px 8px; flex: 1; min-width: 0; }
+.gt-node-body { padding: 3px 6px; flex: 1; min-width: 0; }
 .gt-node-title {
   font-size: var(--gt-font-size-sm);
   font-weight: 600;
   color: var(--gt-color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-all;
+  line-height: 1.3;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 .gt-node-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 2px;
-  font-size: var(--gt-font-size-xs);
+  margin-top: 1px;
+  font-size: 11px;
   color: var(--gt-color-text-secondary);
+  word-break: break-all;
 }
 
-.gt-node-delete {
+.gt-node-action {
   opacity: 0;
   transition: opacity var(--gt-transition-fast);
-  margin-right: 4px;
   flex-shrink: 0;
 }
+.gt-node-action--danger { margin-right: 4px; }
 
 .gt-node-children {
   border-left: 1px dashed var(--gt-color-border);
-  margin-left: 18px;
+  margin-left: 14px;
 }
 </style>

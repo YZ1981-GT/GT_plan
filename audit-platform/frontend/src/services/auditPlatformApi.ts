@@ -529,3 +529,27 @@ export async function getExportHistory(projectId: string): Promise<ExportTaskDat
   const { data } = await http.get(`/api/export/${projectId}/history`)
   return data.data ?? data
 }
+
+
+// ─── Workpaper Summary (底稿跨企业汇总) ───
+
+export async function getChildCompanies(projectId: string) {
+  const { data } = await http.get(`/api/projects/${projectId}/child-companies`)
+  return data.data ?? data
+}
+
+export async function generateWorkpaperSummary(projectId: string, params: {
+  year: number; account_codes: string[]; company_codes: string[]
+}) {
+  const { data } = await http.post(`/api/projects/${projectId}/workpaper-summary`, params)
+  return data.data ?? data
+}
+
+export async function exportWorkpaperSummary(projectId: string, params: {
+  year: number; account_codes: string[]; company_codes: string[]
+}): Promise<Blob> {
+  const { data } = await http.post(`/api/projects/${projectId}/workpaper-summary/export`, params, {
+    responseType: 'blob',
+  })
+  return data
+}

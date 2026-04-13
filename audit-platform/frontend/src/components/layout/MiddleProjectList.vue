@@ -57,6 +57,7 @@
           @select="selectProject"
           @toggle-check="toggleCheck"
           @delete="confirmDeleteOne"
+          @edit="editProject"
         />
       </div>
       <el-empty v-if="!loading && filteredTree.length === 0" description="暂无项目" :image-size="60" />
@@ -163,6 +164,10 @@ function toggleCheck(id: string, checked: boolean) {
 function selectProject(project: any) {
   selectedId.value = project.id
   emit('select', project)
+}
+
+function editProject(project: any) {
+  router.push(`/projects/new?projectId=${project.id}`)
 }
 
 async function confirmDeleteOne(project: any) {

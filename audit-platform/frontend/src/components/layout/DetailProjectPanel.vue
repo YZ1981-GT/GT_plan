@@ -58,6 +58,14 @@
                 <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
                 <span>查账</span>
               </div>
+              <div
+                v-if="project.report_scope === 'consolidated'"
+                class="gt-quick-btn"
+                @click="goTo('workpaper-summary')"
+              >
+                <el-icon :size="20" color="var(--gt-color-teal)"><Grid /></el-icon>
+                <span>底稿汇总</span>
+              </div>
             </div>
           </div>
         </el-tab-pane>
@@ -168,7 +176,7 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid,
 } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 

@@ -56,6 +56,7 @@ from app.routers.signatures import router as signatures_router
 from app.routers.ai_plugins import router as ai_plugins_router
 from app.routers.regulatory import router as regulatory_router
 from app.routers.note_templates import router as note_templates_router
+from app.routers.workpaper_summary import router as workpaper_summary_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -151,3 +152,4 @@ app.include_router(signatures_router)
 app.include_router(ai_plugins_router)
 app.include_router(regulatory_router)
 app.include_router(note_templates_router)
+app.include_router(workpaper_summary_router)

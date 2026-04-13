@@ -294,6 +294,7 @@ inclusion: always
 - Phase 8 三件套与需求文档一致性审查（2026-04）：8个问题已全部修复——requirements.md新增需求16(三栏布局)+17(vue-office)+18(Teable/Grist评估)，需求7补充模板集关联(附录G.6)，需求12移除与需求15冗余的分区表/索引定义，需求13补充Metabase与右侧栏功能边界说明；tasks.md新增任务组30(三栏布局,4/6已完成)+31(vue-office)+32(Teable/Grist)；design.md确认完整(1053行)；README.md更新为18个需求32个任务组
 - 前端三栏布局（需求文档12.2.2）已完成初版：ThreeColumnLayout.vue核心组件（顶部导航+左侧9项功能导航可折叠220px+中间栏340px+右侧栏自适应+拖拽分隔线+localStorage偏好保存+响应式）、MiddleProjectList.vue中间栏项目列表（搜索/筛选/状态色条/选中高亮）、DetailProjectPanel.vue右侧详情面板（5个Tab概览/指标/底稿/试算表/报表+6个快捷操作）、DefaultLayout.vue重写为三栏容器（首页/项目列表三栏模式，具体项目子页面隐藏中间栏右侧全宽）
 - 四表联查是用户强调的重中之重：Task 16已全部完成——012迁移将tb_ledger+tb_aux_ledger重建为PARTITION BY RANGE(year)分区表（复合主键id+year，预建2023-2027共5个年度分区，无生产数据直接重建）+011迁移3个补充索引+LedgerPenetrationService 6个查询方法+Redis缓存TTL=5min+7个API端点+VirtualScrollTable虚拟滚动组件+LedgerPenetration.vue穿透查询页面（面包屑5级导航：余额→序时账→凭证→辅助余额→辅助明细）+19个测试通过；实际数据量参考：凭证表26万行、核算项目明细表23万行
+- 底稿跨企业汇总功能（已完成）：WorkpaperSummaryService（trial_balance按科目×企业透视+Excel导出）+ workpaper_summary router 3个端点 + WorkpaperSummary.vue（左侧科目树+企业树checkbox，右侧动态列el-table+合计行+导出Excel）+ 路由 /projects/:id/workpaper-summary + 详情面板快捷按钮（仅合并项目显示）
 
 ### 审计作业平台新增代码结构 (audit-platform/)
 
@@ -533,3 +534,5 @@ inclusion: always
 - 合并与单户联动架构：一个合并项目 = 一组单户项目 + 合并层；projects 表新增 parent_project_id（UUID FK→projects.id）和 consol_level（int 1-15）；前端用递归 ProjectTreeNode 组件构建树形列表，合并项目为父节点（紫色左边框+📁图标），单户项目为子节点
 - 项目列表树形展示偏好：用 +/− 文字按钮展开/收起（非箭头图标），每级缩进20px，子节点区域左侧虚线连接线，最多15级嵌套
 - UI 精致度偏好：状态色条不能太粗（2px+上下4px间距），合并项目左边框用浅紫色（primary-lighter）而非深紫色，整体要符合致同品牌规范的精致感
+- 数据导入三阶段流程：上传→预览前20行+自动列映射→确认导入；后端 preview_file() API 返回 headers/rows/column_mapping/file_type_guess；前端每列上方 el-select 下拉按4组分类（科目/金额/凭证/辅助），已匹配绿✓未匹配橙⚠；_COLUMN_MAP 扩展到30+个中英文列名映射，支持自动识别科目表/序时账/余额表/辅助账4种文件类型
+- 数据导入预览偏好：Excel 多 sheet 时每个 sheet 独立预览20行（el-tabs 卡片切换），默认跳过前2行（第3行作为表头，skip_rows=2）；_parse_excel 重构为 _parse_sheet + _parse_excel_multi_sheet

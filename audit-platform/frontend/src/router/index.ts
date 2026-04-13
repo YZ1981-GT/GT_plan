@@ -119,6 +119,11 @@ const router = createRouter({
           name: 'Consolidation',
           component: () => import('@/views/ConsolidationIndex.vue'),
         },
+        {
+          path: 'projects/:projectId/workpaper-summary',
+          name: 'WorkpaperSummary',
+          component: () => import('@/views/WorkpaperSummary.vue'),
+        },
         // ── Phase 8 Extension Routes ──
         {
           path: 'projects/:projectId/t-accounts',

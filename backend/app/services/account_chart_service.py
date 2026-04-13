@@ -176,12 +176,17 @@ async def import_client_chart(
     project_id: UUID,
     file: UploadFile,
     db: AsyncSession,
+    column_mapping: dict[str, str | None] | None = None,
 ) -> AccountImportResult:
     """Import client account chart from Excel/CSV file.
 
     Parses account_code, account_name, direction, parent_code.
     Validates required columns (account_code + account_name).
     Writes to account_chart with source=client.
+
+    Args:
+        column_mapping: Optional user-confirmed mapping {original_header: standard_field}.
+                        If provided, overrides the default _COLUMN_MAP normalization.
 
     Validates: Requirements 2.3, 2.4, 2.5
     """
@@ -206,22 +211,38 @@ async def import_client_chart(
     if not rows:
         raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
 
-    # Validate required columns
-    first_row = rows[0]
-    missing_cols = []
-    if "account_code" not in first_row and "科目编码" not in first_row:
-        missing_cols.append("account_code/科目编码")
-    if "account_name" not in first_row and "科目名称" not in first_row:
-        missing_cols.append("account_name/科目名称")
+    # Apply user-provided column mapping or default normalization
+    if column_mapping:
+        normalized_rows = _apply_custom_mapping(rows, column_mapping)
+    else:
+        # Validate required columns (legacy path)
+        first_row = rows[0]
+        missing_cols = []
+        if "account_code" not in first_row and "科目编码" not in first_row:
+            missing_cols.append("account_code/科目编码")
+        if "account_name" not in first_row and "科目名称" not in first_row:
+            missing_cols.append("account_name/科目名称")
 
-    if missing_cols:
-        raise HTTPException(
-            status_code=400,
-            detail=f"缺少必填列: {', '.join(missing_cols)}",
-        )
+        if missing_cols:
+            raise HTTPException(
+                status_code=400,
+                detail=f"缺少必填列: {', '.join(missing_cols)}",
+            )
+        normalized_rows = _normalize_columns(rows)
 
-    # Normalize column names
-    normalized_rows = _normalize_columns(rows)
+    # Validate required fields after normalization
+    if normalized_rows:
+        sample = normalized_rows[0]
+        missing = []
+        if "account_code" not in sample:
+            missing.append("account_code/科目编码")
+        if "account_name" not in sample:
+            missing.append("account_name/科目名称")
+        if missing and column_mapping:
+            raise HTTPException(
+                status_code=400,
+                detail=f"列映射中缺少必填字段: {', '.join(missing)}",
+            )
 
     # Build records
     records: list[AccountChart] = []
@@ -368,8 +389,9 @@ def _build_tree(accounts: list[AccountChart]) -> list[AccountTreeNode]:
 # File parsing helpers
 # ---------------------------------------------------------------------------
 
-# Column name mapping: Chinese → English
+# Column name mapping: Chinese → English (extended for all file types)
 _COLUMN_MAP = {
+    # 科目信息
     "科目编码": "account_code",
     "科目代码": "account_code",
     "编码": "account_code",
@@ -385,7 +407,144 @@ _COLUMN_MAP = {
     "account_code": "account_code",
     "account_name": "account_name",
     "direction": "direction",
+    # 凭证信息
+    "凭证日期": "voucher_date",
+    "日期": "voucher_date",
+    "voucher_date": "voucher_date",
+    "凭证号": "voucher_no",
+    "凭证编号": "voucher_no",
+    "voucher_no": "voucher_no",
+    "摘要": "summary",
+    "summary": "summary",
+    "对方科目": "counterpart_account",
+    "counterpart_account": "counterpart_account",
+    "制单人": "preparer",
+    "preparer": "preparer",
+    # 金额信息
+    "借方金额": "debit_amount",
+    "借方": "debit_amount",
+    "debit": "debit_amount",
+    "debit_amount": "debit_amount",
+    "贷方金额": "credit_amount",
+    "贷方": "credit_amount",
+    "credit": "credit_amount",
+    "credit_amount": "credit_amount",
+    "期初余额": "opening_balance",
+    "年初余额": "opening_balance",
+    "opening": "opening_balance",
+    "opening_balance": "opening_balance",
+    "期末余额": "closing_balance",
+    "closing": "closing_balance",
+    "closing_balance": "closing_balance",
+    # 辅助核算
+    "辅助类型": "aux_type",
+    "aux_type": "aux_type",
+    "辅助编码": "aux_code",
+    "aux_code": "aux_code",
+    "辅助名称": "aux_name",
+    "aux_name": "aux_name",
 }
+
+
+# ---------------------------------------------------------------------------
+# preview_file — file preview + auto column mapping
+# ---------------------------------------------------------------------------
+
+
+def _guess_file_type(mapped_cols: set[str]) -> str:
+    """Guess file type based on which standard columns are present."""
+    has_account_code = "account_code" in mapped_cols
+    has_account_name = "account_name" in mapped_cols
+    has_voucher_date = "voucher_date" in mapped_cols
+    has_voucher_no = "voucher_no" in mapped_cols
+    has_debit = "debit_amount" in mapped_cols
+    has_credit = "credit_amount" in mapped_cols
+    has_opening = "opening_balance" in mapped_cols
+    has_closing = "closing_balance" in mapped_cols
+    has_aux_type = "aux_type" in mapped_cols
+    has_aux_code = "aux_code" in mapped_cols
+
+    if has_aux_type and has_aux_code:
+        return "aux_balance"
+    if has_voucher_date and has_voucher_no and (has_debit or has_credit):
+        return "ledger"
+    if has_account_code and (has_opening or has_closing):
+        return "balance"
+    if has_account_code and has_account_name and not has_debit and not has_credit:
+        return "account_chart"
+    return "unknown"
+
+
+async def preview_file(file: UploadFile, skip_rows: int = 2) -> dict:
+    """Parse file, return first 20 rows per sheet + auto-matched column mapping.
+
+    Args:
+        skip_rows: 跳过前N行（默认2行，第3行作为表头）
+
+    Returns:
+        {
+            "sheets": [
+                {
+                    "sheet_name": "Sheet1",
+                    "headers": ["col1", "col2", ...],
+                    "rows": [...],  # first 20 rows (after skipping)
+                    "total_rows": 150,
+                    "column_mapping": {"col1": "account_code", ...},
+                    "file_type_guess": "ledger"
+                },
+                ...
+            ],
+            "active_sheet": 0
+        }
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="未提供文件")
+
+    filename_lower = file.filename.lower()
+    content = await file.read()
+
+    if filename_lower.endswith(".csv"):
+        rows = _parse_csv(content, skip_rows=skip_rows)
+        if not rows:
+            raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
+        headers = list(rows[0].keys())
+        column_mapping = {h: _COLUMN_MAP.get(str(h).strip()) for h in headers}
+        mapped_cols = {v for v in column_mapping.values() if v}
+        return {
+            "sheets": [{
+                "sheet_name": "CSV",
+                "headers": headers,
+                "rows": rows[:20],
+                "total_rows": len(rows),
+                "column_mapping": column_mapping,
+                "file_type_guess": _guess_file_type(mapped_cols),
+            }],
+            "active_sheet": 0,
+        }
+    elif filename_lower.endswith((".xlsx", ".xls")):
+        sheets_data = _parse_excel_multi_sheet(content, skip_rows=skip_rows)
+        if not sheets_data:
+            raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
+        sheets = []
+        for sheet_name, rows in sheets_data.items():
+            if not rows:
+                continue
+            headers = list(rows[0].keys())
+            column_mapping = {h: _COLUMN_MAP.get(str(h).strip()) for h in headers}
+            mapped_cols = {v for v in column_mapping.values() if v}
+            sheets.append({
+                "sheet_name": sheet_name,
+                "headers": headers,
+                "rows": rows[:20],
+                "total_rows": len(rows),
+                "column_mapping": column_mapping,
+                "file_type_guess": _guess_file_type(mapped_cols),
+            })
+        if not sheets:
+            raise HTTPException(status_code=400, detail="所有工作表均无有效数据")
+        return {"sheets": sheets, "active_sheet": 0}
+    else:
+        raise HTTPException(status_code=400, detail="不支持的文件格式")
 
 
 def _normalize_columns(rows: list[dict]) -> list[dict]:
@@ -403,9 +562,24 @@ def _normalize_columns(rows: list[dict]) -> list[dict]:
     return normalized
 
 
-def _parse_csv(content: bytes) -> list[dict]:
+def _apply_custom_mapping(rows: list[dict], mapping: dict[str, str | None]) -> list[dict]:
+    """Apply user-confirmed column mapping to rows."""
+    normalized = []
+    for row in rows:
+        new_row = {}
+        for key, value in row.items():
+            if key is None:
+                continue
+            key_str = str(key).strip()
+            target = mapping.get(key_str)
+            if target:  # skip None / "(忽略)"
+                new_row[target] = value
+        normalized.append(new_row)
+    return normalized
+
+
+def _parse_csv(content: bytes, skip_rows: int = 0) -> list[dict]:
     """Parse CSV file content into list of dicts."""
-    # Try utf-8-sig first, then gbk
     for encoding in ("utf-8-sig", "gbk", "utf-8"):
         try:
             text = content.decode(encoding)
@@ -415,26 +589,59 @@ def _parse_csv(content: bytes) -> list[dict]:
     else:
         raise HTTPException(status_code=400, detail="无法识别文件编码，请使用 UTF-8 或 GBK 编码")
 
-    reader = csv.DictReader(io.StringIO(text))
+    lines = text.strip().splitlines()
+    if skip_rows > 0 and len(lines) > skip_rows:
+        lines = lines[skip_rows:]
+    reader = csv.DictReader(io.StringIO("\n".join(lines)))
     return list(reader)
 
 
-def _parse_excel(content: bytes) -> list[dict]:
-    """Parse Excel file content into list of dicts."""
+def _parse_excel(content: bytes, skip_rows: int = 0) -> list[dict]:
+    """Parse Excel active sheet into list of dicts (backward compatible)."""
     try:
         import openpyxl
     except ImportError:
-        raise HTTPException(
-            status_code=500,
-            detail="服务器未安装 openpyxl 库，无法解析 Excel 文件",
-        )
+        raise HTTPException(status_code=500, detail="服务器未安装 openpyxl 库")
 
     wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     ws = wb.active
     if ws is None:
         raise HTTPException(status_code=400, detail="Excel 文件中没有工作表")
 
+    result = _parse_sheet(ws, skip_rows=skip_rows)
+    wb.close()
+    return result
+
+
+def _parse_excel_multi_sheet(content: bytes, skip_rows: int = 0) -> dict[str, list[dict]]:
+    """Parse ALL sheets in an Excel file, each returning list of dicts."""
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(status_code=500, detail="服务器未安装 openpyxl 库")
+
+    wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    sheets: dict[str, list[dict]] = {}
+    for ws_name in wb.sheetnames:
+        ws = wb[ws_name]
+        rows = _parse_sheet(ws, skip_rows=skip_rows)
+        sheets[ws_name] = rows
+    wb.close()
+    return sheets
+
+
+def _parse_sheet(ws, skip_rows: int = 0) -> list[dict]:
+    """Parse a single worksheet into list of dicts, skipping first N rows."""
     rows_iter = ws.iter_rows(values_only=True)
+
+    # Skip rows
+    for _ in range(skip_rows):
+        try:
+            next(rows_iter)
+        except StopIteration:
+            return []
+
+    # Header row (the row after skipped rows)
     try:
         header = next(rows_iter)
     except StopIteration:
@@ -451,6 +658,4 @@ def _parse_excel(content: bytes) -> list[dict]:
             if i < len(headers):
                 row_dict[headers[i]] = str(cell) if cell is not None else ""
         result.append(row_dict)
-
-    wb.close()
     return result
