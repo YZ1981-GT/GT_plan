@@ -1,9 +1,9 @@
 # ============================================================
 # 审计作业平台 — FastAPI 后端
-# 基础镜像: python:3.12-slim
+# 基础镜像: python:3.12-slim-bookworm (稳定版本)
 # ============================================================
 
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 # 禁用代理
 ARG http_proxy
@@ -16,8 +16,7 @@ ENV HTTP_PROXY=
 ENV HTTPS_PROXY=
 
 # 系统依赖（curl 用于健康检查）
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 

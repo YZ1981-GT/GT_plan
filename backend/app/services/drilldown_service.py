@@ -128,10 +128,89 @@ class DrilldownService:
     async def drill_to_ledger(
         self, project_id: UUID, year: int, account_code: str, filters: LedgerFilter
     ) -> PageResult:
-        """穿透到序时账：按科目+日期范围+金额范围+凭证号+摘要关键词筛选"""
-        tbl = TbLedger.__table__
+        """穿透到序时账：按科目+日期范围+金额范围+凭证号+摘要关键词筛选。
 
-        base_q = (
+        包含累计余额（running_balance）：期初余额 + 累计借方 - 累计贷方。
+        使用 SQL 窗口函数在数据库层面计算，支持百万行数据。
+        """
+        tbl = TbLedger.__table__
+        bal = TbBalance.__table__
+
+        # 获取该科目的期初余额（用于计算 running balance）
+        opening_q = (
+            sa.select(
+                sa.func.coalesce(sa.func.sum(bal.c.opening_balance), 0).label("opening")
+            )
+            .where(
+                bal.c.project_id == project_id,
+                bal.c.year == year,
+                bal.c.account_code == account_code,
+                bal.c.is_deleted == sa.false(),
+            )
+        )
+        opening_result = await self.db.execute(opening_q)
+        opening_balance = opening_result.scalar() or Decimal("0")
+
+        # 基础筛选条件
+        where_clauses = [
+            tbl.c.project_id == project_id,
+            tbl.c.year == year,
+            tbl.c.account_code == account_code,
+            tbl.c.is_deleted == sa.false(),
+        ]
+        if filters.date_from is not None:
+            where_clauses.append(tbl.c.voucher_date >= filters.date_from)
+        if filters.date_to is not None:
+            where_clauses.append(tbl.c.voucher_date <= filters.date_to)
+        if filters.amount_min is not None:
+            where_clauses.append(sa.or_(
+                tbl.c.debit_amount >= filters.amount_min,
+                tbl.c.credit_amount >= filters.amount_min,
+            ))
+        if filters.amount_max is not None:
+            where_clauses.append(sa.or_(
+                sa.and_(tbl.c.debit_amount <= filters.amount_max, tbl.c.debit_amount > 0),
+                sa.and_(tbl.c.credit_amount <= filters.amount_max, tbl.c.credit_amount > 0),
+            ))
+        if filters.voucher_no:
+            where_clauses.append(tbl.c.voucher_no == filters.voucher_no)
+        if filters.summary_keyword:
+            where_clauses.append(tbl.c.summary.ilike(f"%{filters.summary_keyword}%"))
+        if filters.counterpart_account:
+            where_clauses.append(tbl.c.counterpart_account == filters.counterpart_account)
+
+        base_q = sa.select(
+            tbl.c.id,
+            tbl.c.voucher_date,
+            tbl.c.voucher_no,
+            tbl.c.account_code,
+            tbl.c.account_name,
+            tbl.c.debit_amount,
+            tbl.c.credit_amount,
+            tbl.c.counterpart_account,
+            tbl.c.summary,
+            tbl.c.preparer,
+        ).where(*where_clauses)
+
+        # 总数
+        count_q = sa.select(sa.func.count()).select_from(base_q.subquery())
+        total = (await self.db.execute(count_q)).scalar() or 0
+
+        # 使用窗口函数计算累计余额（在数据库层面完成，支持大数据量）
+        order_cols = (tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.id)
+        running_balance_expr = (
+            sa.literal(opening_balance)
+            + sa.func.coalesce(
+                sa.func.sum(sa.func.coalesce(tbl.c.debit_amount, 0)).over(order_by=order_cols),
+                0,
+            )
+            - sa.func.coalesce(
+                sa.func.sum(sa.func.coalesce(tbl.c.credit_amount, 0)).over(order_by=order_cols),
+                0,
+            )
+        ).label("running_balance")
+
+        data_q = (
             sa.select(
                 tbl.c.id,
                 tbl.c.voucher_date,
@@ -143,51 +222,11 @@ class DrilldownService:
                 tbl.c.counterpart_account,
                 tbl.c.summary,
                 tbl.c.preparer,
+                running_balance_expr,
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.account_code == account_code,
-                tbl.c.is_deleted == sa.false(),
-            )
-        )
-
-        # 筛选条件
-        if filters.date_from is not None:
-            base_q = base_q.where(tbl.c.voucher_date >= filters.date_from)
-        if filters.date_to is not None:
-            base_q = base_q.where(tbl.c.voucher_date <= filters.date_to)
-        if filters.amount_min is not None:
-            base_q = base_q.where(
-                sa.or_(
-                    tbl.c.debit_amount >= filters.amount_min,
-                    tbl.c.credit_amount >= filters.amount_min,
-                )
-            )
-        if filters.amount_max is not None:
-            base_q = base_q.where(
-                sa.or_(
-                    sa.and_(tbl.c.debit_amount <= filters.amount_max, tbl.c.debit_amount > 0),
-                    sa.and_(tbl.c.credit_amount <= filters.amount_max, tbl.c.credit_amount > 0),
-                )
-            )
-        if filters.voucher_no:
-            base_q = base_q.where(tbl.c.voucher_no == filters.voucher_no)
-        if filters.summary_keyword:
-            base_q = base_q.where(tbl.c.summary.ilike(f"%{filters.summary_keyword}%"))
-        if filters.counterpart_account:
-            base_q = base_q.where(tbl.c.counterpart_account == filters.counterpart_account)
-
-        # 总数
-        count_q = sa.select(sa.func.count()).select_from(base_q.subquery())
-        total = (await self.db.execute(count_q)).scalar() or 0
-
-        # 分页 + 排序（按凭证日期+凭证号）
-        offset = (filters.page - 1) * filters.page_size
-        data_q = (
-            base_q
-            .order_by(tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.id)
-            .offset(offset)
+            .where(*where_clauses)
+            .order_by(*order_cols)
+            .offset((filters.page - 1) * filters.page_size)
             .limit(filters.page_size)
         )
         result = await self.db.execute(data_q)
@@ -203,6 +242,7 @@ class DrilldownService:
                 counterpart_account=r.counterpart_account,
                 summary=r.summary,
                 preparer=r.preparer,
+                running_balance=r.running_balance,
             )
             for r in result.fetchall()
         ]
@@ -328,3 +368,269 @@ class DrilldownService:
             page=page,
             page_size=page_size,
         )
+
+    # ------------------------------------------------------------------
+    # 凭证分录查询（按凭证号穿透，显示完整借贷分录）
+    # ------------------------------------------------------------------
+
+    async def get_voucher_detail(
+        self, project_id: UUID, year: int, voucher_no: str
+    ) -> dict:
+        """按凭证号查询完整分录，包含借贷合计和平衡状态。
+
+        返回该凭证的所有分录行 + 借方合计 + 贷方合计 + 是否平衡。
+        """
+        tbl = TbLedger.__table__
+
+        stmt = (
+            sa.select(
+                tbl.c.id,
+                tbl.c.voucher_date,
+                tbl.c.voucher_no,
+                tbl.c.account_code,
+                tbl.c.account_name,
+                tbl.c.debit_amount,
+                tbl.c.credit_amount,
+                tbl.c.counterpart_account,
+                tbl.c.summary,
+                tbl.c.preparer,
+            )
+            .where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.voucher_no == voucher_no,
+                tbl.c.is_deleted == sa.false(),
+            )
+            .order_by(tbl.c.account_code)
+        )
+        result = await self.db.execute(stmt)
+        rows = result.fetchall()
+
+        entries = []
+        total_debit = Decimal("0")
+        total_credit = Decimal("0")
+        voucher_date = None
+
+        for r in rows:
+            d = r.debit_amount or Decimal("0")
+            c = r.credit_amount or Decimal("0")
+            total_debit += d
+            total_credit += c
+            if voucher_date is None:
+                voucher_date = r.voucher_date
+            entries.append({
+                "id": r.id,
+                "account_code": r.account_code,
+                "account_name": r.account_name,
+                "debit_amount": d,
+                "credit_amount": c,
+                "summary": r.summary,
+            })
+
+        return {
+            "voucher_no": voucher_no,
+            "voucher_date": voucher_date,
+            "preparer": rows[0].preparer if rows else None,
+            "entries": entries,
+            "total_debit": total_debit,
+            "total_credit": total_credit,
+            "is_balanced": total_debit == total_credit,
+            "difference": total_debit - total_credit,
+        }
+
+    # ------------------------------------------------------------------
+    # 凭证列表（按日期范围分页，支持大数据量）
+    # ------------------------------------------------------------------
+
+    async def list_vouchers(
+        self, project_id: UUID, year: int,
+        date_from=None, date_to=None,
+        keyword: str | None = None,
+        page: int = 1, page_size: int = 50,
+    ) -> PageResult:
+        """凭证列表：按凭证号分组，显示日期、摘要、借贷合计。
+
+        使用 GROUP BY 在数据库层面聚合，支持百万行序时账。
+        """
+        tbl = TbLedger.__table__
+
+        # 按凭证号分组聚合
+        group_q = (
+            sa.select(
+                tbl.c.voucher_no,
+                sa.func.min(tbl.c.voucher_date).label("voucher_date"),
+                sa.func.min(tbl.c.preparer).label("preparer"),
+                sa.func.string_agg(
+                    sa.func.distinct(tbl.c.summary),
+                    sa.literal_column("'; '"),
+                ).label("summaries"),
+                sa.func.coalesce(sa.func.sum(tbl.c.debit_amount), 0).label("total_debit"),
+                sa.func.coalesce(sa.func.sum(tbl.c.credit_amount), 0).label("total_credit"),
+                sa.func.count().label("entry_count"),
+            )
+            .where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.is_deleted == sa.false(),
+            )
+            .group_by(tbl.c.voucher_no)
+        )
+
+        if date_from:
+            group_q = group_q.having(sa.func.min(tbl.c.voucher_date) >= date_from)
+        if date_to:
+            group_q = group_q.having(sa.func.min(tbl.c.voucher_date) <= date_to)
+        if keyword:
+            # 筛选包含关键词的凭证（摘要或凭证号）
+            group_q = group_q.having(
+                sa.or_(
+                    tbl.c.voucher_no.ilike(f"%{keyword}%"),
+                    sa.func.string_agg(tbl.c.summary, sa.literal_column("' '")).ilike(f"%{keyword}%"),
+                )
+            )
+
+        # 总数
+        count_sub = group_q.subquery()
+        total = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(count_sub)
+        )).scalar() or 0
+
+        # 分页
+        data_q = (
+            group_q
+            .order_by(sa.text("voucher_date"), sa.text("voucher_no"))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        result = await self.db.execute(data_q)
+        items = [
+            {
+                "voucher_no": r.voucher_no,
+                "voucher_date": r.voucher_date,
+                "preparer": r.preparer,
+                "summaries": r.summaries,
+                "total_debit": r.total_debit,
+                "total_credit": r.total_credit,
+                "entry_count": r.entry_count,
+                "is_balanced": r.total_debit == r.total_credit,
+            }
+            for r in result.fetchall()
+        ]
+
+        return PageResult(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    # ------------------------------------------------------------------
+    # 余额表↔序时账联动校验
+    # ------------------------------------------------------------------
+
+    async def verify_balance_ledger_consistency(
+        self, project_id: UUID, year: int
+    ) -> list[dict]:
+        """校验余额表与序时账的一致性。
+
+        对每个科目检查：
+        - 余额表的 debit_amount 是否等于序时账借方合计
+        - 余额表的 credit_amount 是否等于序时账贷方合计
+        - 余额表的 closing_balance 是否等于 opening_balance + debit - credit
+
+        使用 SQL 聚合在数据库层面完成，支持大数据量。
+        """
+        bal = TbBalance.__table__
+        led = TbLedger.__table__
+
+        # 序时账按科目汇总
+        ledger_agg = (
+            sa.select(
+                led.c.account_code,
+                sa.func.coalesce(sa.func.sum(led.c.debit_amount), 0).label("ledger_debit"),
+                sa.func.coalesce(sa.func.sum(led.c.credit_amount), 0).label("ledger_credit"),
+                sa.func.count().label("voucher_count"),
+            )
+            .where(
+                led.c.project_id == project_id,
+                led.c.year == year,
+                led.c.is_deleted == sa.false(),
+            )
+            .group_by(led.c.account_code)
+        ).subquery("ledger_agg")
+
+        # LEFT JOIN 余额表
+        stmt = (
+            sa.select(
+                bal.c.account_code,
+                bal.c.account_name,
+                bal.c.opening_balance,
+                bal.c.debit_amount.label("bal_debit"),
+                bal.c.credit_amount.label("bal_credit"),
+                bal.c.closing_balance,
+                ledger_agg.c.ledger_debit,
+                ledger_agg.c.ledger_credit,
+                ledger_agg.c.voucher_count,
+            )
+            .select_from(
+                bal.outerjoin(
+                    ledger_agg,
+                    bal.c.account_code == ledger_agg.c.account_code,
+                )
+            )
+            .where(
+                bal.c.project_id == project_id,
+                bal.c.year == year,
+                bal.c.is_deleted == sa.false(),
+            )
+            .order_by(bal.c.account_code)
+        )
+
+        result = await self.db.execute(stmt)
+        issues = []
+
+        for r in result.fetchall():
+            opening = r.opening_balance or Decimal("0")
+            bal_debit = r.bal_debit or Decimal("0")
+            bal_credit = r.bal_credit or Decimal("0")
+            closing = r.closing_balance or Decimal("0")
+            led_debit = r.ledger_debit or Decimal("0")
+            led_credit = r.ledger_credit or Decimal("0")
+
+            # 检查1：余额表发生额 vs 序时账合计
+            if bal_debit != led_debit:
+                issues.append({
+                    "account_code": r.account_code,
+                    "account_name": r.account_name,
+                    "type": "debit_mismatch",
+                    "message": f"借方发生额不一致：余额表={bal_debit}，序时账合计={led_debit}",
+                    "balance_value": str(bal_debit),
+                    "ledger_value": str(led_debit),
+                    "difference": str(bal_debit - led_debit),
+                })
+
+            if bal_credit != led_credit:
+                issues.append({
+                    "account_code": r.account_code,
+                    "account_name": r.account_name,
+                    "type": "credit_mismatch",
+                    "message": f"贷方发生额不一致：余额表={bal_credit}，序时账合计={led_credit}",
+                    "balance_value": str(bal_credit),
+                    "ledger_value": str(led_credit),
+                    "difference": str(bal_credit - led_credit),
+                })
+
+            # 检查2：期初+借方-贷方=期末
+            expected_closing = opening + bal_debit - bal_credit
+            if closing != expected_closing:
+                issues.append({
+                    "account_code": r.account_code,
+                    "account_name": r.account_name,
+                    "type": "closing_formula",
+                    "message": f"期末余额公式不平：期初({opening})+借方({bal_debit})-贷方({bal_credit})={expected_closing}，实际={closing}",
+                    "expected": str(expected_closing),
+                    "actual": str(closing),
+                    "difference": str(closing - expected_closing),
+                })
+
+        return issues

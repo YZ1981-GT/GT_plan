@@ -42,7 +42,7 @@ from app.models.collaboration_models import (  # noqa: E402
     ProjectTimeline, WorkHours, BudgetHours, PBCChecklist,
     ConfirmationList, ConfirmationLetter, ConfirmationResult,
     ConfirmationSummary, ConfirmationAttachment,
-    GoingConcern, GoingConcernIndicator, ArchiveChecklist,
+    GoingConcernEvaluation, GoingConcernIndicator, ArchiveChecklist,
     ArchiveModification, WorkpaperReviewRecord,
 )
 from app.models.core import Project  # noqa: F401

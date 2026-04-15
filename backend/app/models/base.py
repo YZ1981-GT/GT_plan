@@ -1,7 +1,7 @@
 """SQLAlchemy 声明式基类、Mixin 和 PostgreSQL 枚举类型定义"""
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, func
@@ -79,10 +79,18 @@ class Base(DeclarativeBase):
 
 
 class SoftDeleteMixin:
-    """软删除 Mixin — 所有业务表必须包含"""
+    """软删除 Mixin — 所有业务表必须包含。
+
+    设置 is_deleted=True 时会通过 @event.listens_for 自动填充 deleted_at。
+    """
 
     is_deleted: Mapped[bool] = mapped_column(default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    def soft_delete(self) -> None:
+        """标记为软删除，自动设置 deleted_at 时间戳。"""
+        self.is_deleted = True
+        self.deleted_at = datetime.now(timezone.utc)
 
 
 class TimestampMixin:

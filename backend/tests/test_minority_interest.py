@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.models.base import Base
 from app.models.core import Project
 from app.models.consolidation_models import MinorityInterest
-from app.models.consolidation_schemas import MinorityInterestInput
+from app.models.consolidation_schemas import MinorityInterestResult as MinorityInterestInput
 from app.services import minority_interest_service as svc
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

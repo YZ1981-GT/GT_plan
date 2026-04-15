@@ -137,6 +137,6 @@ def delete_trial(db: Session, trial_id: UUID, project_id: UUID) -> bool:
     trial = get_trial_row(db, trial_id, project_id)
     if not trial:
         return False
-    trial.is_deleted = True
+    trial.soft_delete()
     db.commit()
     return True

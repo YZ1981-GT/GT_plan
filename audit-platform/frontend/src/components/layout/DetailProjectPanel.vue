@@ -8,7 +8,7 @@
           <div class="gt-detail-section">
             <div class="gt-title-row">
               <h3 class="gt-detail-title">{{ project.name }}</h3>
-              <el-button size="small" type="primary" plain @click="editProject">
+              <el-button size="small" type="primary" @click="editProject">
                 <el-icon><Edit /></el-icon> 编辑
               </el-button>
             </div>
@@ -162,6 +162,33 @@
             </el-button>
           </div>
         </el-tab-pane>
+
+        <!-- 附件管理 -->
+        <el-tab-pane label="附件" name="attachments" lazy>
+          <div class="gt-attachment-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
+              <h4 style="margin: 0; color: var(--gt-color-text)">项目附件</h4>
+              <el-button type="primary" size="small" @click="goTo('attachments')">
+                <el-icon><Paperclip /></el-icon> 管理附件
+              </el-button>
+            </div>
+            <el-table v-if="attachmentList.length" :data="attachmentList" size="small" stripe max-height="300">
+              <el-table-column prop="file_name" label="文件名" min-width="180" show-overflow-tooltip />
+              <el-table-column prop="file_type" label="类型" width="80" />
+              <el-table-column prop="attachment_type" label="分类" width="80">
+                <template #default="{ row }">
+                  <el-tag size="small">{{ attachTypeLabel(row.attachment_type) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="大小" width="80">
+                <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="暂无附件" :image-size="50">
+              <el-button size="small" type="primary" @click="goTo('attachments')">上传附件</el-button>
+            </el-empty>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </template>
 
@@ -176,7 +203,7 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip,
 } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 
@@ -188,6 +215,8 @@ const activeTab = ref('overview')
 const wpTree = ref<any[]>([])
 // 试算表预览
 const trialBalanceRows = ref<any[]>([])
+// 附件列表
+const attachmentList = ref<any[]>([])
 
 // 选中项目变化时加载数据
 watch(() => props.project?.id, async (newId) => {
@@ -210,6 +239,19 @@ watch(() => props.project?.id, async (newId) => {
     const rows = data.data ?? data ?? []
     trialBalanceRows.value = rows.slice(0, 20)
   } catch { trialBalanceRows.value = [] }
+  // 加载附件列表（前10条，静默失败）
+  try {
+    const { data } = await http.get(`/api/projects/${newId}/attachments`, {
+      params: { page_size: 10 },
+      validateStatus: (s: number) => s < 600,
+    })
+    if (data && !data.code || (data.code && data.code < 400)) {
+      const d = data.data ?? data
+      attachmentList.value = Array.isArray(d) ? d.slice(0, 10) : (d?.items ?? []).slice(0, 10)
+    } else {
+      attachmentList.value = []
+    }
+  } catch { attachmentList.value = [] }
 }, { immediate: true })
 
 function goTo(page: string) {
@@ -243,6 +285,21 @@ function statusLabel(s: string) {
 function formatDate(d: string) {
   if (!d) return '-'
   return new Date(d).toLocaleDateString('zh-CN')
+}
+
+function attachTypeLabel(t: string) {
+  const m: Record<string, string> = {
+    general: '通用', workpaper: '底稿', confirmation: '函证',
+    contract: '合同', evidence: '证据', report: '报告',
+  }
+  return m[t] || t || '通用'
+}
+
+function formatSize(bytes: number) {
+  if (!bytes) return '-'
+  if (bytes < 1024) return bytes + 'B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB'
+  return (bytes / 1024 / 1024).toFixed(1) + 'MB'
 }
 </script>
 

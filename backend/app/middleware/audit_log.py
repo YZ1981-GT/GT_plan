@@ -31,6 +31,8 @@ _SKIP_PATHS = (
     "/api/auth/login",
     "/api/auth/refresh",
     "/api/health",
+    "/api/events/",
+    "/api/message/stream",
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -178,6 +180,11 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
 
         # 仅对成功响应记录日志（2xx）
         if not (200 <= response.status_code < 300):
+            return response
+
+        # 跳过 SSE 流式响应（不消费 body_iterator）
+        content_type = response.headers.get("content-type", "")
+        if "text/event-stream" in content_type:
             return response
 
         # 读取响应体，尝试解析为 new_value

@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.deps import db, get_current_user
+from app.deps import sync_db, get_current_user
 from app.models.consolidation_schemas import ConsolTrialResponse, ConsolTrialUpdate, ConsistencyCheckResult
 from app.services.consol_trial_service import (
     check_trial_consistency,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/consolidation/trial", tags=["合并试算表"])
 def get_trial_balance_list(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_trial_balance(db, project_id, year)
@@ -34,7 +34,7 @@ def update_trial_row(
     trial_id: UUID,
     project_id: UUID,
     data: ConsolTrialUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     trial = get_trial_row(db, trial_id, project_id)
@@ -53,7 +53,7 @@ def update_trial_row(
 def trigger_recalculate(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     """触发全量重算"""
@@ -64,7 +64,7 @@ def trigger_recalculate(
 def check_consistency(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     """一致性校验"""
@@ -75,7 +75,7 @@ def check_consistency(
 def delete_trial_row(
     trial_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_trial(db, trial_id, project_id):

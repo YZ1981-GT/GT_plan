@@ -15,21 +15,37 @@ from app.models.consolidation_models import (
     Company,
     ConsolScope,
     ConsolMethod,
-    OwnershipType,
+    ScopeCompanyType,
     ScopeChangeType,
 )
 from app.models.consolidation_schemas import (
     CompanyCreate,
     CompanyResponse,
     CompanyTreeNode,
-    CompanyTreeResponse,
     CompanyUpdate,
     ConsolScopeCreate,
     ConsolScopeResponse,
     ConsolScopeUpdate,
-    ConsolidationPeriod,
     StructureValidationResult,
 )
+from pydantic import BaseModel, Field
+
+
+# ---------------------------------------------------------------------------
+# 本地补充 Schema（consolidation_schemas 中未定义）
+# ---------------------------------------------------------------------------
+
+class CompanyTreeResponse(BaseModel):
+    """集团结构树响应"""
+    nodes: list[CompanyTreeNode] = Field(default_factory=list)
+
+
+class ConsolidationPeriod(BaseModel):
+    """合并期间"""
+    include_pl: bool = True
+    include_bs: bool = True
+    start_date: date | None = None
+    end_date: date | None = None
 
 
 # ===================================================================
@@ -410,7 +426,7 @@ class GroupStructureService:
             # 递归软删除所有后代
             self._soft_delete_descendants(company.project_id, company.company_code)
 
-        company.is_deleted = True
+        company.soft_delete()
         self.db.commit()
 
     def _soft_delete_descendants(self, project_id: UUID, parent_code: str) -> None:
@@ -426,7 +442,7 @@ class GroupStructureService:
         )
         for child in children:
             self._soft_delete_descendants(project_id, child.company_code)
-            child.is_deleted = True
+            child.soft_delete()
 
     # -----------------------------------------------------------------
     # 4.2 树结构 & 校验

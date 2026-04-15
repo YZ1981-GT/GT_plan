@@ -1,20 +1,21 @@
 <template>
   <div class="gt-account-mapping-step">
     <h2 class="step-title">科目映射</h2>
-    <p class="step-desc">将客户科目映射到标准审计科目，支持自动匹配和手动调整</p>
+    <p class="step-desc">将客户科目映射到标准审计科目，点击自动匹配后确认结果</p>
 
     <!-- Toolbar -->
     <div class="toolbar">
-      <el-button type="primary" :loading="autoSuggesting" @click="handleAutoSuggest">
+      <el-button type="primary" :loading="autoMatching" @click="handleAutoMatch">
+        <el-icon style="margin-right: 4px"><Connection /></el-icon>
         自动匹配
       </el-button>
       <el-button
-        type="success"
-        :loading="batchConfirming"
-        :disabled="suggestions.length === 0 && pendingMappings.length === 0"
-        @click="handleBatchConfirm"
+        v-if="unmatchedCount > 0"
+        type="warning"
+        plain
+        @click="showUnmatched = !showUnmatched"
       >
-        批量确认
+        未匹配 ({{ unmatchedCount }})
       </el-button>
       <div class="toolbar-spacer" />
       <div class="completion-info">
@@ -23,20 +24,31 @@
           :percentage="completionRate"
           :stroke-width="18"
           :text-inside="true"
-          style="width: 200px"
+          style="width: 180px"
         />
         <span class="rate-text">{{ mappedCount }}/{{ totalCount }}</span>
       </div>
     </div>
 
+    <!-- Auto-match result summary -->
+    <el-alert
+      v-if="matchResultMsg"
+      :title="matchResultMsg"
+      type="success"
+      :closable="true"
+      show-icon
+      style="margin-bottom: 12px"
+      @close="matchResultMsg = ''"
+    />
+
     <!-- Warning for unmapped accounts with balance -->
     <el-alert
       v-if="unmappedWithBalance.length > 0"
-      title="以下未映射科目存在余额，需完成映射后才能进入下一步"
+      title="以下未映射科目存在余额，建议完成映射"
       type="warning"
       :closable="false"
       show-icon
-      style="margin-bottom: 16px"
+      style="margin-bottom: 12px"
     >
       <template #default>
         <div class="unmapped-list">
@@ -47,116 +59,100 @@
       </template>
     </el-alert>
 
-    <!-- Three-column layout -->
-    <div class="mapping-layout">
-      <!-- Left: Client accounts -->
-      <div class="column column-left">
-        <div class="column-header">客户科目</div>
-        <div class="account-list">
-          <div
-            v-for="account in clientAccounts"
-            :key="account.account_code"
-            class="account-item"
-            :class="{
-              selected: selectedClientCode === account.account_code,
-              mapped: isMapped(account.account_code),
-              unmatched: !isMapped(account.account_code) && !hasSuggestion(account.account_code),
-            }"
-            @click="selectClient(account)"
+    <!-- Mapping result table -->
+    <el-table
+      :data="tableRows"
+      border
+      stripe
+      size="small"
+      max-height="520"
+      style="width: 100%"
+      :row-style="rowStyle"
+    >
+      <el-table-column label="客户科目编码" prop="account_code" width="130" sortable>
+        <template #default="{ row }">
+          <span class="code-cell">{{ row.account_code }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="客户科目名称" prop="account_name" min-width="160" show-overflow-tooltip />
+      <el-table-column label="" width="50" align="center">
+        <template #default>
+          <el-icon style="color: #999"><Right /></el-icon>
+        </template>
+      </el-table-column>
+      <el-table-column label="标准科目" min-width="220">
+        <template #default="{ row }">
+          <el-select
+            :model-value="row.standard_account_code"
+            filterable
+            placeholder="选择标准科目"
+            size="small"
+            style="width: 100%"
+            @change="(val: string) => handleMappingChange(row, val)"
           >
-            <span class="item-code">{{ account.account_code }}</span>
-            <span class="item-name">{{ account.account_name }}</span>
-            <el-tag v-if="isMapped(account.account_code)" size="small" type="success">已映射</el-tag>
-            <el-tag v-else-if="hasSuggestion(account.account_code)" size="small" type="warning">建议</el-tag>
-          </div>
-          <div v-if="clientAccounts.length === 0" class="empty-hint">
-            请先在上一步导入客户科目表
-          </div>
-        </div>
-      </div>
-
-      <!-- Center: Mapping status -->
-      <div class="column column-center">
-        <div class="column-header">映射状态</div>
-        <div class="mapping-detail" v-if="selectedClientCode">
-          <div class="detail-label">当前选中</div>
-          <div class="detail-value">{{ selectedClientCode }} {{ selectedClientName }}</div>
-
-          <template v-if="currentMappingStdCode">
-            <div class="detail-label" style="margin-top: 12px">已映射到</div>
-            <div class="detail-value mapped-target">
-              {{ currentMappingStdCode }}
-              <el-icon><Right /></el-icon>
-            </div>
-          </template>
-
-          <template v-else-if="currentSuggestion">
-            <div class="detail-label" style="margin-top: 12px">建议映射</div>
-            <div class="detail-value suggestion-target">
-              {{ currentSuggestion.suggested_standard_code }}
-              {{ currentSuggestion.suggested_standard_name }}
-            </div>
-            <div class="detail-meta">
-              匹配方式: {{ matchMethodLabel(currentSuggestion.match_method) }}
-              · 置信度: {{ (currentSuggestion.confidence * 100).toFixed(0) }}%
-            </div>
-          </template>
-
-          <template v-else>
-            <div class="detail-label" style="margin-top: 12px">状态</div>
-            <div class="detail-value unmatched-hint">未匹配，请从右侧选择标准科目</div>
-          </template>
-
-          <!-- Manual mapping dropdown -->
-          <div class="manual-mapping" style="margin-top: 16px">
-            <div class="detail-label">手动选择标准科目</div>
-            <el-select
-              v-model="manualStdCode"
-              filterable
-              placeholder="搜索标准科目编码或名称"
-              style="width: 100%"
-              @change="handleManualMapping"
-            >
-              <el-option
-                v-for="std in standardAccounts"
-                :key="std.account_code"
-                :label="`${std.account_code} ${std.account_name}`"
-                :value="std.account_code"
-              />
-            </el-select>
-          </div>
-        </div>
-        <div v-else class="empty-hint">
-          点击左侧客户科目查看映射详情
-        </div>
-      </div>
-
-      <!-- Right: Standard accounts -->
-      <div class="column column-right">
-        <div class="column-header">标准科目</div>
-        <div class="account-list">
-          <div
-            v-for="account in standardAccounts"
-            :key="account.account_code"
-            class="account-item"
-            :class="{ highlighted: account.account_code === currentMappingStdCode }"
-            @click="handleStdClick(account)"
+            <el-option
+              v-for="std in standardAccounts"
+              :key="std.account_code"
+              :label="`${std.account_code} ${std.account_name}`"
+              :value="std.account_code"
+            />
+          </el-select>
+        </template>
+      </el-table-column>
+      <el-table-column label="匹配方式" width="120" align="center">
+        <template #default="{ row }">
+          <el-tag
+            v-if="row.match_method"
+            :type="matchTagType(row.match_method)"
+            size="small"
           >
-            <span class="item-code">{{ account.account_code }}</span>
-            <span class="item-name">{{ account.account_name }}</span>
-          </div>
-          <div v-if="standardAccounts.length === 0" class="empty-hint">
-            标准科目表未加载
-          </div>
-        </div>
+            {{ matchMethodLabel(row.match_method) }}
+          </el-tag>
+          <el-tag v-else-if="row.standard_account_code" type="info" size="small">手动</el-tag>
+          <el-tag v-else type="danger" size="small">未匹配</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="置信度" width="80" align="center">
+        <template #default="{ row }">
+          <span v-if="row.confidence" :style="{ color: confidenceColor(row.confidence) }">
+            {{ (row.confidence * 100).toFixed(0) }}%
+          </span>
+          <span v-else style="color: #ccc">—</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- Unmatched accounts drawer -->
+    <el-drawer v-model="showUnmatched" title="未匹配科目" size="420px" direction="rtl">
+      <div v-for="row in unmatchedRows" :key="row.account_code" class="unmatched-row">
+        <span class="code-cell">{{ row.account_code }}</span>
+        <span class="unmatched-name">{{ row.account_name }}</span>
+        <el-select
+          :model-value="row.standard_account_code"
+          filterable
+          placeholder="手动选择"
+          size="small"
+          style="width: 200px; margin-left: auto"
+          @change="(val: string) => handleMappingChange(row, val)"
+        >
+          <el-option
+            v-for="std in standardAccounts"
+            :key="std.account_code"
+            :label="`${std.account_code} ${std.account_name}`"
+            :value="std.account_code"
+          />
+        </el-select>
       </div>
-    </div>
+      <div v-if="unmatchedRows.length === 0" class="empty-hint">
+        所有科目均已匹配
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Right } from '@element-plus/icons-vue'
+import { Right, Connection } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useWizardStore } from '@/stores/wizard'
@@ -196,20 +192,24 @@ interface UnmappedItem {
   closing_balance: string
 }
 
+interface TableRow {
+  account_code: string
+  account_name: string
+  standard_account_code: string
+  match_method: string
+  confidence: number | null
+  mapping_id: string | null
+}
+
 // --- State ---
 
 const clientAccounts = ref<AccountItem[]>([])
 const standardAccounts = ref<AccountItem[]>([])
-const suggestions = ref<MappingSuggestion[]>([])
-const mappings = ref<MappingRecord[]>([])
-const pendingMappings = ref<MappingSuggestion[]>([])
+const tableRows = ref<TableRow[]>([])
 
-const selectedClientCode = ref<string | null>(null)
-const selectedClientName = ref<string>('')
-const manualStdCode = ref<string>('')
-
-const autoSuggesting = ref(false)
-const batchConfirming = ref(false)
+const autoMatching = ref(false)
+const showUnmatched = ref(false)
+const matchResultMsg = ref('')
 
 const mappedCount = ref(0)
 const totalCount = ref(0)
@@ -218,150 +218,87 @@ const unmappedWithBalance = ref<UnmappedItem[]>([])
 
 // --- Computed ---
 
-const mappedCodes = computed(() => new Set(mappings.value.map((m) => m.original_account_code)))
-const suggestionMap = computed(() => {
-  const map = new Map<string, MappingSuggestion>()
-  for (const s of suggestions.value) {
-    map.set(s.original_account_code, s)
-  }
-  return map
-})
+const unmatchedRows = computed(() =>
+  tableRows.value.filter((r) => !r.standard_account_code),
+)
 
-const currentMappingStdCode = computed(() => {
-  if (!selectedClientCode.value) return null
-  const m = mappings.value.find((m) => m.original_account_code === selectedClientCode.value)
-  return m?.standard_account_code ?? null
-})
-
-const currentSuggestion = computed(() => {
-  if (!selectedClientCode.value) return null
-  return suggestionMap.value.get(selectedClientCode.value) ?? null
-})
+const unmatchedCount = computed(() => unmatchedRows.value.length)
 
 // --- Methods ---
 
-function isMapped(code: string): boolean {
-  return mappedCodes.value.has(code)
-}
-
-function hasSuggestion(code: string): boolean {
-  return suggestionMap.value.has(code)
-}
-
 function matchMethodLabel(method: string): string {
   const labels: Record<string, string> = {
-    prefix: '编码前缀匹配',
-    exact_name: '名称精确匹配',
-    fuzzy_name: '名称模糊匹配',
+    exact_code: '编码精确',
+    prefix: '编码前缀',
+    level1_prefix: '一级前缀',
+    exact_name: '名称精确',
+    base_name: '名称基础',
+    fuzzy_name: '模糊匹配',
   }
   return labels[method] || method
 }
 
-function selectClient(account: AccountItem) {
-  selectedClientCode.value = account.account_code
-  selectedClientName.value = account.account_name
-  // Pre-fill manual dropdown with current mapping or suggestion
-  const existing = mappings.value.find((m) => m.original_account_code === account.account_code)
-  if (existing) {
-    manualStdCode.value = existing.standard_account_code
-  } else {
-    const sug = suggestionMap.value.get(account.account_code)
-    manualStdCode.value = sug?.suggested_standard_code ?? ''
-  }
+function matchTagType(method: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+  if (method === 'exact_code' || method === 'prefix' || method === 'level1_prefix') return 'success'
+  if (method === 'exact_name' || method === 'base_name') return ''
+  if (method === 'fuzzy_name') return 'warning'
+  return 'info'
 }
 
-function handleStdClick(account: AccountItem) {
-  if (!selectedClientCode.value) {
-    ElMessage.info('请先选择左侧的客户科目')
-    return
-  }
-  manualStdCode.value = account.account_code
-  handleManualMapping(account.account_code)
+function confidenceColor(c: number): string {
+  if (c >= 0.95) return '#52c41a'
+  if (c >= 0.85) return '#fa8c16'
+  return '#f5222d'
 }
 
-async function handleManualMapping(stdCode: string) {
-  if (!wizardStore.projectId || !selectedClientCode.value || !stdCode) return
+function rowStyle({ row }: { row: TableRow }) {
+  if (!row.standard_account_code) return { background: '#fffbe6' }
+  return {}
+}
 
-  try {
-    const { data } = await http.post(
-      `/api/projects/${wizardStore.projectId}/mapping`,
-      {
-        original_account_code: selectedClientCode.value,
-        original_account_name: selectedClientName.value,
-        standard_account_code: stdCode,
-        mapping_type: 'manual',
-      },
-    )
-    const record = data.data ?? data
-    // Update local mappings
-    const idx = mappings.value.findIndex(
-      (m) => m.original_account_code === selectedClientCode.value,
-    )
-    if (idx >= 0) {
-      mappings.value[idx] = record
-    } else {
-      mappings.value.push(record)
+/** Rebuild tableRows from clientAccounts + mappings + matchDetails */
+function rebuildTable(
+  clients: AccountItem[],
+  mappings: MappingRecord[],
+  details: MappingSuggestion[],
+) {
+  const mappingMap = new Map<string, MappingRecord>()
+  for (const m of mappings) mappingMap.set(m.original_account_code, m)
+
+  const detailMap = new Map<string, MappingSuggestion>()
+  for (const d of details) detailMap.set(d.original_account_code, d)
+
+  tableRows.value = clients.map((c) => {
+    const mapping = mappingMap.get(c.account_code)
+    const detail = detailMap.get(c.account_code)
+    return {
+      account_code: c.account_code,
+      account_name: c.account_name,
+      standard_account_code: mapping?.standard_account_code ?? '',
+      match_method: detail?.match_method ?? (mapping ? mapping.mapping_type : ''),
+      confidence: detail?.confidence ?? null,
+      mapping_id: mapping?.id ?? null,
     }
-    ElMessage.success('映射已保存')
-    await loadCompletionRate()
-  } catch {
-    // Error handled by interceptor
-  }
+  })
 }
 
-async function handleAutoSuggest() {
+async function handleAutoMatch() {
   if (!wizardStore.projectId) return
-  autoSuggesting.value = true
+  autoMatching.value = true
   try {
     const { data } = await http.post(
-      `/api/projects/${wizardStore.projectId}/mapping/auto-suggest`,
-    )
-    suggestions.value = data.data ?? data
-    // Build pending mappings from suggestions that aren't already mapped
-    pendingMappings.value = suggestions.value.filter(
-      (s) => !isMapped(s.original_account_code),
-    )
-    ElMessage.success(`自动匹配完成，找到 ${suggestions.value.length} 个建议`)
-  } catch {
-    // Error handled by interceptor
-  } finally {
-    autoSuggesting.value = false
-  }
-}
-
-async function handleBatchConfirm() {
-  if (!wizardStore.projectId) return
-
-  // Combine suggestions and pending into batch
-  const toConfirm = suggestions.value
-    .filter((s) => !isMapped(s.original_account_code))
-    .map((s) => ({
-      original_account_code: s.original_account_code,
-      original_account_name: s.original_account_name,
-      standard_account_code: s.suggested_standard_code,
-      mapping_type: s.confidence >= 0.95 ? 'auto_exact' : 'auto_fuzzy',
-    }))
-
-  if (toConfirm.length === 0) {
-    ElMessage.info('没有待确认的映射建议')
-    return
-  }
-
-  batchConfirming.value = true
-  try {
-    const { data } = await http.post(
-      `/api/projects/${wizardStore.projectId}/mapping/batch-confirm`,
-      toConfirm,
+      `/api/projects/${wizardStore.projectId}/mapping/auto-match`,
     )
     const result = data.data ?? data
-    ElMessage.success(`已确认 ${result.confirmed_count} 条映射，完成率 ${result.completion_rate}%`)
+    const details: MappingSuggestion[] = result.details || []
+    matchResultMsg.value = `自动匹配完成：新增 ${result.saved_count} 条，跳过已映射 ${result.skipped_count} 条，未匹配 ${result.unmatched_count} 条，完成率 ${result.completion_rate}%`
 
-    // Reload data
-    await loadMappings()
+    // Reload mappings, then rebuild table with details
+    const mappings = await fetchMappings()
+    rebuildTable(clientAccounts.value, mappings, details)
     await loadCompletionRate()
-    pendingMappings.value = []
 
-    // Save step data
+    // Save step
     await wizardStore.saveStep('account_mapping', {
       mapped_count: mappedCount.value,
       total_count: totalCount.value,
@@ -370,11 +307,55 @@ async function handleBatchConfirm() {
   } catch {
     // Error handled by interceptor
   } finally {
-    batchConfirming.value = false
+    autoMatching.value = false
+  }
+}
+
+async function handleMappingChange(row: TableRow, stdCode: string) {
+  if (!wizardStore.projectId || !stdCode) return
+  try {
+    let record: MappingRecord
+    if (row.mapping_id) {
+      // Update existing
+      const { data } = await http.put(
+        `/api/projects/${wizardStore.projectId}/mapping/${row.mapping_id}`,
+        { standard_account_code: stdCode },
+      )
+      record = data.data ?? data
+    } else {
+      // Create new
+      const { data } = await http.post(
+        `/api/projects/${wizardStore.projectId}/mapping`,
+        {
+          original_account_code: row.account_code,
+          original_account_name: row.account_name,
+          standard_account_code: stdCode,
+          mapping_type: 'manual',
+        },
+      )
+      record = data.data ?? data
+    }
+    // Update row in-place (no full reload, no flicker)
+    row.standard_account_code = record.standard_account_code
+    row.mapping_id = record.id
+    row.match_method = ''
+    row.confidence = null
+    ElMessage.success(`${row.account_code} 映射已更新`)
+    await loadCompletionRate()
+  } catch {
+    // Error handled by interceptor
   }
 }
 
 // --- Data loading ---
+
+async function fetchMappings(): Promise<MappingRecord[]> {
+  if (!wizardStore.projectId) return []
+  const { data } = await http.get(
+    `/api/projects/${wizardStore.projectId}/mapping`,
+  )
+  return data.data ?? data
+}
 
 async function loadClientAccounts() {
   if (!wizardStore.projectId) return
@@ -383,7 +364,6 @@ async function loadClientAccounts() {
       `/api/projects/${wizardStore.projectId}/account-chart/client`,
     )
     const tree = data.data ?? data
-    // Flatten tree into list
     const flat: AccountItem[] = []
     for (const nodes of Object.values(tree) as AccountItem[][]) {
       flattenTree(nodes, flat)
@@ -413,20 +393,7 @@ async function loadStandardAccounts() {
     const { data } = await http.get(
       `/api/projects/${wizardStore.projectId}/account-chart/standard`,
     )
-    const accounts = data.data ?? data
-    standardAccounts.value = accounts
-  } catch {
-    // Silently fail
-  }
-}
-
-async function loadMappings() {
-  if (!wizardStore.projectId) return
-  try {
-    const { data } = await http.get(
-      `/api/projects/${wizardStore.projectId}/mapping`,
-    )
-    mappings.value = data.data ?? data
+    standardAccounts.value = data.data ?? data
   } catch {
     // Silently fail
   }
@@ -452,15 +419,17 @@ onMounted(async () => {
   await Promise.all([
     loadClientAccounts(),
     loadStandardAccounts(),
-    loadMappings(),
-    loadCompletionRate(),
   ])
+  // Load mappings and build table after clients are ready
+  const mappings = await fetchMappings()
+  rebuildTable(clientAccounts.value, mappings, [])
+  await loadCompletionRate()
 })
 </script>
 
 <style scoped>
 .gt-account-mapping-step {
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -480,7 +449,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: var(--gt-space-4);
+  margin-bottom: 16px;
   padding: 12px 16px;
   background: #fafafa;
   border-radius: var(--gt-radius-md);
@@ -522,129 +491,26 @@ onMounted(async () => {
   border-radius: 4px;
 }
 
-/* Three-column layout */
-.mapping-layout {
-  display: grid;
-  grid-template-columns: 1fr 300px 1fr;
-  gap: 16px;
-  min-height: 500px;
-}
-
-.column {
-  border: 1px solid #e8e8e8;
-  border-radius: var(--gt-radius-md);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.column-header {
-  padding: 10px 16px;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--gt-color-primary);
-  background: #f5f0fa;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.column-center .column-header {
-  background: #f0f5ff;
-}
-
-.account-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.account-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: background 0.15s;
-}
-
-.account-item:hover {
-  background: #f5f5f5;
-}
-
-.account-item.selected {
-  background: #e8e0f0;
-}
-
-.account-item.mapped {
-  background: #f0faf0;
-}
-
-.account-item.unmatched {
-  background: #fffbe6;
-}
-
-.account-item.highlighted {
-  background: #e6f7ff;
-  border: 1px solid #91d5ff;
-}
-
-.item-code {
+.code-cell {
   font-family: monospace;
   color: var(--gt-color-primary);
-  min-width: 50px;
 }
 
-.item-name {
+.unmatched-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+}
+
+.unmatched-name {
   flex: 1;
-  color: #333;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Center column detail */
-.mapping-detail {
-  padding: 16px;
-}
-
-.detail-label {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 4px;
-}
-
-.detail-value {
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
-}
-
-.mapped-target {
-  color: #52c41a;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.suggestion-target {
-  color: #fa8c16;
-}
-
-.unmatched-hint {
-  color: #faad14;
-  font-weight: normal;
-}
-
-.detail-meta {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
-}
-
-.manual-mapping {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 12px;
+  min-width: 0;
 }
 
 .empty-hint {

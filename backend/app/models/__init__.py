@@ -73,6 +73,8 @@ from app.models.workpaper_models import (
     WpTemplateSet,
     WpTemplateStatus,
 )
+from app.models.attachment_models import Attachment, AttachmentWorkingPaper
+from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
 
 __all__ = [
     # --- base ---
@@ -130,6 +132,13 @@ __all__ = [
     "AuditReportTemplate",
     "ExportTask",
     "NoteValidationResult",
+    # --- attachment models ---
+    "Attachment",
+    "AttachmentWorkingPaper",
+    # --- ai enums/models ---
+    "AIModelType",
+    "AIProvider",
+    "AIModelConfig",
     # --- workpaper enums ---
     "WpTemplateStatus",
     "RegionType",

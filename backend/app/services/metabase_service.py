@@ -27,10 +27,12 @@ class MetabaseService:
         metabase_url: str = "http://localhost:3000",
         embedding_secret: str = "audit-metabase-secret-key",
         redis: Any = None,
+        cache_manager: Any = None,
     ):
         self.metabase_url = metabase_url.rstrip("/")
         self.embedding_secret = embedding_secret
         self.redis = redis
+        self._cache = cache_manager  # CacheManager instance (preferred)
 
     # ------------------------------------------------------------------
     # 嵌入 URL 生成（JWT signed embedding）
@@ -167,8 +169,15 @@ ORDER BY aux_type, aux_code;
     async def get_cached_or_fetch(
         self, cache_key: str, fetch_fn, ttl: int = 300,
     ) -> Any:
-        """从缓存获取或执行查询"""
-        if self.redis:
+        """从缓存获取或执行查询（优先 CacheManager，降级 raw Redis）"""
+        if self._cache:
+            try:
+                cached = await self._cache.get("metabase", cache_key)
+                if cached is not None:
+                    return cached
+            except Exception:
+                pass
+        elif self.redis:
             try:
                 cached = await self.redis.get(cache_key)
                 if cached:
@@ -178,7 +187,12 @@ ORDER BY aux_type, aux_code;
 
         result = await fetch_fn()
 
-        if self.redis:
+        if self._cache:
+            try:
+                await self._cache.set("metabase", cache_key, result, ttl=ttl)
+            except Exception:
+                pass
+        elif self.redis:
             try:
                 await self.redis.setex(cache_key, ttl, json.dumps(result, default=str))
             except Exception:
@@ -188,6 +202,9 @@ ORDER BY aux_type, aux_code;
 
     async def invalidate_dashboard_cache(self, project_id: UUID) -> int:
         """清除项目相关的仪表板缓存"""
+        if self._cache:
+            return await self._cache.invalidate_namespace("metabase")
+
         if not self.redis:
             return 0
         pattern = f"metabase:dashboard:*:{project_id}:*"

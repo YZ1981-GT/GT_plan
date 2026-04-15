@@ -104,6 +104,6 @@ def delete_forex(db, forex_id: UUID, project_id: UUID) -> bool:
     forex = get_forex(db, forex_id, project_id)
     if not forex:
         return False
-    forex.is_deleted = True
+    forex.soft_delete()
     db.commit()
     return True

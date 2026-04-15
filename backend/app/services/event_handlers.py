@@ -19,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 
 def _make_handler(service_class, method_name: str):
-    """创建一个带独立数据库会话的事件处理器"""
+    """创建一个带独立数据库会话的事件处理器，异常时自动回滚"""
 
     async def handler(payload: EventPayload) -> None:
         async with async_session_factory() as session:
-            svc = service_class(session)
-            method = getattr(svc, method_name)
-            await method(payload)
-            await session.commit()
+            try:
+                svc = service_class(session)
+                method = getattr(svc, method_name)
+                await method(payload)
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     handler.__qualname__ = f"{service_class.__name__}.{method_name}"
     return handler

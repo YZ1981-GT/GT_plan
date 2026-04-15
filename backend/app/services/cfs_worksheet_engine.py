@@ -317,7 +317,7 @@ class CFSWorksheetEngine:
         adj = result.scalar_one_or_none()
         if adj is None:
             return False
-        adj.is_deleted = True
+        adj.soft_delete()
         await self.db.flush()
         return True
 

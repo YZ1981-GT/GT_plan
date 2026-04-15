@@ -189,6 +189,8 @@ class AccountImportResult(BaseModel):
     total_imported: int
     by_category: dict[str, int] = {}
     errors: list[str] = []
+    data_sheets_imported: dict[str, int] = {}  # {data_type: record_count}
+    sheet_diagnostics: list[dict] = []  # [{sheet_name, guessed_type, matched_cols, missing_cols, row_count}]
 
 
 # ===================================================================
@@ -232,6 +234,16 @@ class MappingResult(BaseModel):
     confirmed_count: int
     total_count: int
     completion_rate: float
+
+
+class AutoMatchResult(BaseModel):
+    """自动匹配并保存的结果"""
+    saved_count: int
+    skipped_count: int
+    unmatched_count: int
+    total_client: int
+    completion_rate: float
+    details: list[MappingSuggestion] = []
 
 
 class MappingCompletionRate(BaseModel):
@@ -431,6 +443,7 @@ class LedgerRow(BaseModel):
     counterpart_account: str | None = None
     summary: str | None = None
     preparer: str | None = None
+    running_balance: Decimal | None = None
 
 
 class AuxBalanceRow(BaseModel):

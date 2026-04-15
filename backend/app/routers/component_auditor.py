@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.deps import db, get_current_user
+from app.deps import sync_db, get_current_user
 from app.models.consolidation_schemas import (
     ComponentAuditorCreate,
     ComponentAuditorUpdate,
@@ -44,7 +44,7 @@ router = APIRouter(prefix="/api/consolidation/component-auditor", tags=["组成�
 @router.get("/auditors", response_model=list[ComponentAuditorResponse])
 def list_auditors(
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_auditors(db, project_id)
@@ -54,7 +54,7 @@ def list_auditors(
 def create_auditor_route(
     project_id: UUID,
     data: ComponentAuditorCreate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return create_auditor(db, project_id, data)
@@ -65,7 +65,7 @@ def update_auditor_route(
     auditor_id: UUID,
     project_id: UUID,
     data: ComponentAuditorUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     auditor = update_auditor(db, auditor_id, project_id, data)
@@ -78,7 +78,7 @@ def update_auditor_route(
 def delete_auditor_route(
     auditor_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_auditor(db, auditor_id, project_id):
@@ -90,7 +90,7 @@ def delete_auditor_route(
 def list_instructions(
     project_id: UUID,
     auditor_id: UUID | None = None,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_instructions(db, project_id, auditor_id)
@@ -100,7 +100,7 @@ def list_instructions(
 def create_instruction_route(
     project_id: UUID,
     data: InstructionCreate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return create_instruction(db, project_id, data)
@@ -111,7 +111,7 @@ def update_instruction_route(
     instruction_id: UUID,
     project_id: UUID,
     data: InstructionUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     instruction = update_instruction(db, instruction_id, project_id, data)
@@ -124,7 +124,7 @@ def update_instruction_route(
 def delete_instruction_route(
     instruction_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_instruction(db, instruction_id, project_id):
@@ -136,7 +136,7 @@ def delete_instruction_route(
 def list_results(
     project_id: UUID,
     auditor_id: UUID | None = None,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_results(db, project_id, auditor_id)
@@ -146,7 +146,7 @@ def list_results(
 def create_result_route(
     project_id: UUID,
     data: ResultCreate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return create_result(db, project_id, data)
@@ -157,7 +157,7 @@ def update_result_route(
     result_id: UUID,
     project_id: UUID,
     data: ResultUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     result = update_result(db, result_id, project_id, data)
@@ -170,7 +170,7 @@ def update_result_route(
 def delete_result_route(
     result_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_result(db, result_id, project_id):
@@ -181,7 +181,7 @@ def delete_result_route(
 @router.get("/dashboard", response_model=ComponentDashboard)
 def get_dashboard_route(
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_dashboard(db, project_id)

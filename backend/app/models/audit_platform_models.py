@@ -179,6 +179,7 @@ class AccountChart(Base):
             "uq_account_chart_project_code_source",
             "project_id", "account_code", "source",
             unique=True,
+            postgresql_where=text("is_deleted = false"),
         ),
     )
 
@@ -244,9 +245,12 @@ class TbBalance(Base):
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     account_code: Mapped[str] = mapped_column(String, nullable=False)
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    level: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # 科目级次
     opening_balance: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
+    opening_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 期初数量
+    opening_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 期初外币
     debit_amount: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
@@ -298,12 +302,19 @@ class TbLedger(Base):
     voucher_no: Mapped[str] = mapped_column(String, nullable=False)
     account_code: Mapped[str] = mapped_column(String, nullable=False)
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    accounting_period: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # 会计月份
+    voucher_type: Mapped[str | None] = mapped_column(String(20), nullable=True)  # 凭证类型（记/收/付/转）
+    entry_seq: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # 分录序号
     debit_amount: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
     credit_amount: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
+    debit_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 借方数量
+    credit_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 贷方数量
+    debit_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 借方外币
+    credit_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 贷方外币
     counterpart_account: Mapped[str | None] = mapped_column(String, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     preparer: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -350,12 +361,16 @@ class TbAuxBalance(Base):
     year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     account_code: Mapped[str] = mapped_column(String, nullable=False)
+    account_name: Mapped[str | None] = mapped_column(String, nullable=True)
     aux_type: Mapped[str] = mapped_column(String, nullable=False)
+    aux_type_name: Mapped[str | None] = mapped_column(String, nullable=True)  # 核算项目类型名称
     aux_code: Mapped[str | None] = mapped_column(String, nullable=True)
     aux_name: Mapped[str | None] = mapped_column(String, nullable=True)
     opening_balance: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
+    opening_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 期初数量
+    opening_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 期初外币
     debit_amount: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
@@ -406,15 +421,23 @@ class TbAuxLedger(Base):
     voucher_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
     voucher_no: Mapped[str | None] = mapped_column(String, nullable=True)
     account_code: Mapped[str] = mapped_column(String, nullable=False)
+    account_name: Mapped[str | None] = mapped_column(String, nullable=True)
     aux_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    aux_type_name: Mapped[str | None] = mapped_column(String, nullable=True)  # 核算项目类型名称
     aux_code: Mapped[str | None] = mapped_column(String, nullable=True)
     aux_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    accounting_period: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # 会计月份
+    voucher_type: Mapped[str | None] = mapped_column(String(20), nullable=True)  # 凭证类型
     debit_amount: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
     credit_amount: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
+    debit_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 借方数量
+    credit_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 贷方数量
+    debit_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 借方外币
+    credit_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 贷方外币
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     preparer: Mapped[str | None] = mapped_column(String, nullable=True)
     currency_code: Mapped[str] = mapped_column(

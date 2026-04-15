@@ -59,7 +59,7 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance } from 'element-plus'
-import axios from 'axios'
+import http from '@/utils/http'
 
 const router = useRouter()
 const formRef = ref<FormInstance>()
@@ -116,7 +116,7 @@ async function handleRegister() {
 
   loading.value = true
   try {
-    await axios.post('/api/auth/register', {
+    await http.post('/api/auth/register', {
       username: form.username,
       email: form.email,
       password: form.password,

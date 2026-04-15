@@ -206,11 +206,11 @@ class AdjustmentService:
 
             # 软删除旧行
             for row in adj_rows:
-                row.is_deleted = True
+                row.soft_delete()
             # 软删除旧 entry 行
             old_entries = await self._get_entry_rows(entry_group_id)
             for e in old_entries:
-                e.is_deleted = True
+                e.soft_delete()
 
             # 写入新行
             adj_no = adj_rows[0].adjustment_no
@@ -294,12 +294,12 @@ class AdjustmentService:
             raise ValueError(f"当前状态 {status.value} 不允许删除")
 
         for row in adj_rows:
-            row.is_deleted = True
+            row.soft_delete()
 
         # 软删除 entry 行
         entry_rows = await self._get_entry_rows(entry_group_id)
         for e in entry_rows:
-            e.is_deleted = True
+            e.soft_delete()
 
         await self.db.flush()
 

@@ -18,7 +18,7 @@ from app.models.consolidation_models import (
     ComponentInstruction,
     ComponentResult,
     InstructionStatus,
-    EvaluationStatus,
+    EvaluationStatusEnum,
     CompetenceRating,
     OpinionTypeEnum,
 )
@@ -28,7 +28,7 @@ from app.models.consolidation_schemas import (
     ComponentAuditorUpdate,
     InstructionCreate,
     InstructionUpdate,
-    ComponentResultCreate,
+    ResultCreate as ComponentResultCreate,
     InstructionStatus as SchemaInstructionStatus,
 )
 from app.services.group_structure_service import (
@@ -36,7 +36,7 @@ from app.services.group_structure_service import (
     _build_tree,
     _detect_circular_reference,
 )
-from app.services.component_auditor_service import ComponentAuditorService
+from app.services import component_auditor_service as ComponentAuditorService
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -632,7 +632,7 @@ class TestInstructionLockLogic:
                 auditor_code="A001",
                 email="auditor@test.com",
                 competence=CompetenceRating.good,
-                evaluation_status=EvaluationStatus.qualified,
+                evaluation_status=EvaluationStatusEnum.accepted,
                 evaluation_date=date(2024, 1, 1),
                 evaluation_expiry=date(2025, 1, 1),
             ),
@@ -670,7 +670,7 @@ class TestInstructionLockLogic:
                 auditor_code="B001",
                 email="auditor2@test.com",
                 competence=CompetenceRating.good,
-                evaluation_status=EvaluationStatus.qualified,
+                evaluation_status=EvaluationStatusEnum.accepted,
                 evaluation_date=date(2024, 1, 1),
                 evaluation_expiry=date(2025, 1, 1),
             ),
@@ -708,7 +708,7 @@ class TestInstructionLockLogic:
                 auditor_code="C001",
                 email="auditor3@test.com",
                 competence=CompetenceRating.good,
-                evaluation_status=EvaluationStatus.qualified,
+                evaluation_status=EvaluationStatusEnum.accepted,
                 evaluation_date=date(2024, 1, 1),
                 evaluation_expiry=date(2025, 1, 1),
             ),
@@ -749,7 +749,7 @@ class TestInstructionLockLogic:
                 auditor_code="D001",
                 email="auditor4@test.com",
                 competence=CompetenceRating.good,
-                evaluation_status=EvaluationStatus.qualified,
+                evaluation_status=EvaluationStatusEnum.accepted,
                 evaluation_date=date(2024, 1, 1),
                 evaluation_expiry=date(2025, 1, 1),
             ),
@@ -800,7 +800,7 @@ class TestInstructionLockLogic:
                 auditor_code="E001",
                 email="auditor5@test.com",
                 competence=CompetenceRating.good,
-                evaluation_status=EvaluationStatus.qualified,
+                evaluation_status=EvaluationStatusEnum.accepted,
                 evaluation_date=date(2024, 1, 1),
                 evaluation_expiry=date(2025, 1, 1),
             ),

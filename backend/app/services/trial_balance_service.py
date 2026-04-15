@@ -46,12 +46,15 @@ class TrialBalanceService:
         """
         通过 JOIN account_mapping 汇总 tb_balance.closing_balance 到标准科目。
         account_codes=None → 全量; 指定列表 → 增量。
+
+        全量模式下，不在汇总结果中的已有试算表行会被清零（解决回滚后残留问题）。
+        使用批量操作减少数据库往返。
         """
         bal = TbBalance.__table__
         mp = AccountMapping.__table__
         ac = AccountChart.__table__
 
-        # 汇总查询：客户余额 → 映射 → 标准科目
+        # 1. 汇总查询：客户余额 → 映射 → 标准科目
         agg_q = (
             sa.select(
                 mp.c.standard_account_code,
@@ -82,7 +85,7 @@ class TrialBalanceService:
         result = await self.db.execute(agg_q)
         agg_rows = {r.standard_account_code: r for r in result.fetchall()}
 
-        # 获取标准科目信息（名称、类别）
+        # 2. 获取标准科目信息（名称、类别）
         std_q = (
             sa.select(ac.c.account_code, ac.c.account_name, ac.c.category)
             .where(
@@ -97,11 +100,25 @@ class TrialBalanceService:
         std_result = await self.db.execute(std_q)
         std_map = {r.account_code: r for r in std_result.fetchall()}
 
-        # 合并所有需要处理的科目
-        all_codes = set(agg_rows.keys()) | set(std_map.keys())
+        # 3. 获取已有试算表行（批量加载）
+        tb_q = sa.select(TrialBalance).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.company_code == company_code,
+            TrialBalance.is_deleted == sa.false(),
+        )
+        if account_codes:
+            tb_q = tb_q.where(TrialBalance.standard_account_code.in_(account_codes))
+
+        tb_result = await self.db.execute(tb_q)
+        existing_rows = {r.standard_account_code: r for r in tb_result.scalars().all()}
+
+        # 4. 合并所有需要处理的科目（含已有但不在汇总中的——需清零）
+        all_codes = set(agg_rows.keys()) | set(std_map.keys()) | set(existing_rows.keys())
         if account_codes:
             all_codes = all_codes & set(account_codes)
 
+        new_rows = []
         for code in all_codes:
             agg = agg_rows.get(code)
             std = std_map.get(code)
@@ -110,24 +127,15 @@ class TrialBalanceService:
             name = std.account_name if std else None
             cat = std.category if std else AccountCategory.asset.value
 
-            # UPSERT: 更新或插入
-            existing = await self.db.execute(
-                sa.select(TrialBalance).where(
-                    TrialBalance.project_id == project_id,
-                    TrialBalance.year == year,
-                    TrialBalance.company_code == company_code,
-                    TrialBalance.standard_account_code == code,
-                    TrialBalance.is_deleted == sa.false(),
-                )
-            )
-            row = existing.scalar_one_or_none()
+            row = existing_rows.get(code)
             if row:
                 row.unadjusted_amount = closing
                 row.opening_balance = opening
-                row.account_name = name or row.account_name
+                if name:
+                    row.account_name = name
                 row.audited_amount = closing + row.rje_adjustment + row.aje_adjustment
             else:
-                new_row = TrialBalance(
+                new_rows.append(TrialBalance(
                     project_id=project_id,
                     year=year,
                     company_code=company_code,
@@ -139,8 +147,10 @@ class TrialBalanceService:
                     rje_adjustment=Decimal("0"),
                     aje_adjustment=Decimal("0"),
                     audited_amount=closing,
-                )
-                self.db.add(new_row)
+                ))
+
+        if new_rows:
+            self.db.add_all(new_rows)
 
         await self.db.flush()
 
@@ -154,7 +164,7 @@ class TrialBalanceService:
         company_code: str = "001",
         account_codes: list[str] | None = None,
     ) -> None:
-        """按 adjustment_type 分组汇总 adjustments 表到 rje/aje 列"""
+        """按 adjustment_type 分组汇总 adjustments 表到 rje/aje 列（批量操作）"""
         adj = Adjustment.__table__
 
         agg_q = (
@@ -185,23 +195,27 @@ class TrialBalanceService:
                 adj_map[code] = {"rje": Decimal("0"), "aje": Decimal("0")}
             adj_map[code][r.adjustment_type] = Decimal(str(r.net))
 
-        # 如果指定了科目列表但没有调整分录，也需要清零
+        # 批量加载需要更新的试算表行
         codes_to_update = set(adj_map.keys())
         if account_codes:
             codes_to_update = codes_to_update | set(account_codes)
 
+        if not codes_to_update:
+            return
+
+        tb_q = sa.select(TrialBalance).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.company_code == company_code,
+            TrialBalance.standard_account_code.in_(codes_to_update),
+            TrialBalance.is_deleted == sa.false(),
+        )
+        tb_result = await self.db.execute(tb_q)
+        existing_rows = {r.standard_account_code: r for r in tb_result.scalars().all()}
+
         for code in codes_to_update:
             vals = adj_map.get(code, {"rje": Decimal("0"), "aje": Decimal("0")})
-            existing = await self.db.execute(
-                sa.select(TrialBalance).where(
-                    TrialBalance.project_id == project_id,
-                    TrialBalance.year == year,
-                    TrialBalance.company_code == company_code,
-                    TrialBalance.standard_account_code == code,
-                    TrialBalance.is_deleted == sa.false(),
-                )
-            )
-            row = existing.scalar_one_or_none()
+            row = existing_rows.get(code)
             if row:
                 row.rje_adjustment = vals["rje"]
                 row.aje_adjustment = vals["aje"]

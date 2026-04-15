@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.deps import db, get_current_user
+from app.deps import sync_db, get_current_user
 from app.models.consolidation_schemas import (
     ConsolScopeBatchUpdate,
     ConsolScopeCreate,
@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/consolidation/scope", tags=["合并范围"])
 def list_scope(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_scope_list(db, project_id, year)
@@ -40,7 +40,7 @@ def list_scope(
 def create_scope(
     project_id: UUID,
     data: ConsolScopeCreate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     try:
@@ -54,7 +54,7 @@ def update_scope(
     scope_id: UUID,
     project_id: UUID,
     data: ConsolScopeUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     scope = update_scope_item(db, scope_id, project_id, data)
@@ -67,7 +67,7 @@ def update_scope(
 def delete_scope(
     scope_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_scope_item(db, scope_id, project_id):
@@ -78,7 +78,7 @@ def delete_scope(
 def batch_update(
     project_id: UUID,
     data: ConsolScopeBatchUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return batch_update_scope(db, project_id, data)
@@ -88,7 +88,7 @@ def batch_update(
 def scope_summary(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_scope_summary(db, project_id, year)

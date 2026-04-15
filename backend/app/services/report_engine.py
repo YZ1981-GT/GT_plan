@@ -12,7 +12,9 @@ Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 2.9, 8.2, 8.5
 
 from __future__ import annotations
 
+import ast
 import logging
+import operator
 import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -42,6 +44,57 @@ _COLUMN_MAP = {
     "年初余额": "opening_balance",
     "本期发生额": "_period_amount",  # special: needs debit-credit calc
 }
+
+# ---------------------------------------------------------------------------
+# 安全算术表达式求值（替代 eval）
+# ---------------------------------------------------------------------------
+
+_SAFE_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+
+def _safe_eval_expr(expr: str) -> Decimal:
+    """安全求值纯算术表达式（仅支持 +−×÷ 和括号），不使用 eval。
+
+    基于 ast.parse 解析表达式树，递归求值。
+    """
+    try:
+        tree = ast.parse(expr.strip(), mode="eval")
+    except SyntaxError:
+        return Decimal("0")
+
+    def _eval_node(node: ast.expr) -> Decimal:
+        if isinstance(node, ast.Expression):
+            return _eval_node(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return Decimal(str(node.value))
+        if isinstance(node, ast.BinOp):
+            left = _eval_node(node.left)
+            right = _eval_node(node.right)
+            op_func = _SAFE_OPS.get(type(node.op))
+            if op_func is None:
+                raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
+            if isinstance(node.op, ast.Div) and right == 0:
+                return Decimal("0")
+            return Decimal(str(op_func(float(left), float(right))))
+        if isinstance(node, ast.UnaryOp):
+            operand = _eval_node(node.operand)
+            op_func = _SAFE_OPS.get(type(node.op))
+            if op_func is None:
+                raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
+            return Decimal(str(op_func(float(operand))))
+        raise ValueError(f"Unsupported AST node: {type(node).__name__}")
+
+    try:
+        return _eval_node(tree)
+    except (ValueError, InvalidOperation, ZeroDivisionError, TypeError):
+        return Decimal("0")
 
 
 class ReportFormulaParser:
@@ -166,18 +219,11 @@ class ReportFormulaParser:
             val = row_cache.get(row_code, Decimal("0"))
             expression = expression.replace(match.group(0), str(val), 1)
 
-        # Step 4: Evaluate arithmetic expression safely
+        # Step 4: Evaluate arithmetic expression safely (no eval)
         try:
-            # Only allow digits, decimal points, +, -, *, /, (, ), whitespace
-            safe_expr = expression.strip()
-            if not re.match(r'^[\d\.\+\-\*\/\(\)\s]+$', safe_expr):
-                logger.warning("Unsafe expression: %s (from formula: %s)", safe_expr, formula)
-                return Decimal("0")
-            result = eval(safe_expr, {"__builtins__": {}}, {})
-            return Decimal(str(result))
-        except (SyntaxError, ZeroDivisionError, InvalidOperation, TypeError) as e:
+            return _safe_eval_expr(expression)
+        except Exception as e:
             logger.warning("Formula eval error: %s (expr: %s, formula: %s)", e, expression, formula)
-            return Decimal("0")
 
     def extract_account_codes(self, formula: str | None) -> list[str]:
         """从公式中提取所有引用的科目代码"""

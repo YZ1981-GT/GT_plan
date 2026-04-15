@@ -186,7 +186,7 @@ class SubsequentEventService:
         ).first()
         if not e:
             return False
-        e.is_deleted = True
+        e.soft_delete()
         e.updated_at = datetime.now(timezone.utc)
         db.commit()
         return True
@@ -277,7 +277,7 @@ class SubsequentEventService:
         ).first()
         if not item:
             return False
-        item.is_deleted = True
+        item.soft_delete()
         item.updated_at = datetime.now(timezone.utc)
         db.commit()
         return True

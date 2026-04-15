@@ -5,7 +5,7 @@ Validates: Requirements 2.2, 2.5, 2.6
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -36,12 +36,7 @@ async def get_standard_chart(
 
     Validates: Requirements 2.2
     """
-    # Try to get existing standard chart
-    accounts = await account_chart_service.get_standard_chart(project_id, db)
-    if accounts:
-        return accounts
-
-    # Auto-load standard template based on project's accounting standard
+    # Always try incremental load (adds missing standard accounts)
     from app.services.project_wizard_service import get_wizard_state
     state = await get_wizard_state(project_id, db)
     accounting_standard = "enterprise"  # default
@@ -58,12 +53,12 @@ async def get_standard_chart(
 async def preview_file(
     project_id: UUID,
     file: UploadFile = File(...),
-    skip_rows: int = 2,
+    skip_rows: int | None = Query(default=None, description="跳过前N行，None=自动检测表头"),
     current_user: User = Depends(get_current_user),
 ):
     """Preview uploaded file: return first 20 rows per sheet + auto-matched column mapping.
-    
-    skip_rows: 跳过前N行（默认2行，第3行作为表头）
+
+    skip_rows: None=自动检测表头行位置（推荐），传数字则固定跳过。
     """
     return await account_chart_service.preview_file(file, skip_rows=skip_rows)
 
@@ -114,3 +109,217 @@ async def get_client_chart(
     Validates: Requirements 2.6
     """
     return await account_chart_service.get_client_chart_tree(project_id, db)
+
+
+# ── 列映射保存/加载（持久化到 wizard_state） ──
+
+from pydantic import BaseModel as _BaseModel
+
+
+class SaveColumnMappingRequest(_BaseModel):
+    """保存列映射"""
+    file_type: str  # account_chart / ledger / balance / aux_balance
+    sheet_name: str | None = None
+    mapping: dict[str, str]  # {原列名: 标准字段名}
+
+
+class ReferenceMatchRequest(_BaseModel):
+    """参照匹配请求"""
+    source_project_id: str
+    source_year: int | None = None
+
+
+@router.post("/{project_id}/column-mappings")
+async def save_column_mapping(
+    project_id: UUID,
+    body: SaveColumnMappingRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """保存用户确认的列映射（持久化到项目 wizard_state）"""
+    from sqlalchemy import select
+    from app.models.core import Project
+
+    result = await db.execute(
+        select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    # 保存到 wizard_state.column_mappings
+    state = project.wizard_state or {}
+    if "column_mappings" not in state:
+        state["column_mappings"] = {}
+
+    key = f"{body.file_type}"
+    if body.sheet_name:
+        key = f"{body.file_type}:{body.sheet_name}"
+    state["column_mappings"][key] = body.mapping
+    project.wizard_state = state
+
+    await db.commit()
+    return {"saved": True, "key": key, "field_count": len(body.mapping)}
+
+
+@router.get("/{project_id}/column-mappings")
+async def get_column_mappings(
+    project_id: UUID,
+    file_type: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取已保存的列映射"""
+    from sqlalchemy import select
+    from app.models.core import Project
+
+    result = await db.execute(
+        select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    state = project.wizard_state or {}
+    mappings = state.get("column_mappings", {})
+
+    if file_type:
+        # 过滤指定文件类型
+        filtered = {k: v for k, v in mappings.items() if k.startswith(file_type)}
+        return filtered
+    return mappings
+
+
+@router.get("/{project_id}/column-mappings/reference-projects")
+async def get_reference_projects(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取可参照的项目列表（有已保存列映射的其他项目）"""
+    from sqlalchemy import select, func, cast, String
+    from app.models.core import Project
+
+    # 查找所有有 column_mappings 的项目（排除当前项目）
+    result = await db.execute(
+        select(Project.id, Project.name, Project.client_name, Project.wizard_state)
+        .where(
+            Project.id != project_id,
+            Project.is_deleted == False,  # noqa: E712
+            Project.wizard_state.isnot(None),
+        )
+        .order_by(Project.created_at.desc())
+        .limit(20)
+    )
+    projects = []
+    for row in result.all():
+        ws = row.wizard_state or {}
+        mappings = ws.get("column_mappings", {})
+        if mappings:
+            projects.append({
+                "id": str(row.id),
+                "name": row.name,
+                "client_name": row.client_name,
+                "mapping_count": len(mappings),
+                "file_types": list(set(k.split(":")[0] for k in mappings.keys())),
+            })
+    return projects
+
+
+@router.post("/{project_id}/column-mappings/reference-copy")
+async def reference_copy_mappings(
+    project_id: UUID,
+    body: ReferenceMatchRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """从其他项目参照复制列映射"""
+    from sqlalchemy import select
+    from app.models.core import Project
+
+    # 获取源项目的映射
+    source = await db.execute(
+        select(Project).where(Project.id == UUID(body.source_project_id))
+    )
+    source_project = source.scalar_one_or_none()
+    if not source_project or not source_project.wizard_state:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="源项目不存在或无映射数据")
+
+    source_mappings = (source_project.wizard_state or {}).get("column_mappings", {})
+    if not source_mappings:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="源项目无已保存的列映射")
+
+    # 复制到目标项目
+    target = await db.execute(
+        select(Project).where(Project.id == project_id, Project.is_deleted == False)  # noqa: E712
+    )
+    target_project = target.scalar_one_or_none()
+    if not target_project:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="目标项目不存在")
+
+    state = target_project.wizard_state or {}
+    if "column_mappings" not in state:
+        state["column_mappings"] = {}
+    state["column_mappings"].update(source_mappings)
+    target_project.wizard_state = state
+
+    await db.commit()
+    return {
+        "copied": True,
+        "source_project": body.source_project_id,
+        "mapping_count": len(source_mappings),
+    }
+
+
+class AccountUpdateItem(_BaseModel):
+    """单个科目更新"""
+    account_code: str
+    account_name: str | None = None
+    direction: str | None = None
+
+
+class BatchUpdateRequest(_BaseModel):
+    """批量更新科目"""
+    updates: list[AccountUpdateItem]
+
+
+@router.put("/{project_id}/account-chart/batch-update")
+async def batch_update_accounts(
+    project_id: UUID,
+    body: BatchUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """批量更新客户科目（名称、借贷方向）"""
+    from app.models.audit_platform_models import AccountChart, AccountSource, AccountDirection
+
+    updated = 0
+    for item in body.updates:
+        result = await db.execute(
+            select(AccountChart).where(
+                AccountChart.project_id == project_id,
+                AccountChart.account_code == item.account_code,
+                AccountChart.source == AccountSource.client,
+                AccountChart.is_deleted == False,  # noqa: E712
+            )
+        )
+        row = result.scalar_one_or_none()
+        if not row:
+            continue
+
+        if item.account_name is not None:
+            row.account_name = item.account_name
+        if item.direction is not None:
+            try:
+                row.direction = AccountDirection(item.direction)
+            except ValueError:
+                pass
+        updated += 1
+
+    await db.commit()
+    return {"updated": updated, "total": len(body.updates)}

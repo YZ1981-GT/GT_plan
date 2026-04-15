@@ -60,7 +60,7 @@ def delete_company(db: Session, company_id: UUID, project_id: UUID) -> bool:
     company = get_company(db, company_id, project_id)
     if not company:
         return False
-    company.is_deleted = True
+    company.soft_delete()
     db.commit()
     return True
 

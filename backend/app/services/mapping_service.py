@@ -21,6 +21,7 @@ from app.models.audit_platform_models import (
     TbBalance,
 )
 from app.models.audit_platform_schemas import (
+    AutoMatchResult,
     MappingCompletionRate,
     MappingInput,
     MappingResponse,
@@ -117,6 +118,94 @@ async def auto_suggest(
     return suggestions
 
 
+# ---------------------------------------------------------------------------
+# auto_match — auto-suggest + auto-save in one step
+# ---------------------------------------------------------------------------
+
+
+async def auto_match(
+    project_id: UUID,
+    db: AsyncSession,
+) -> AutoMatchResult:
+    """Auto-match and directly save all mappings.
+
+    Runs auto_suggest, then saves all suggestions as mappings.
+    Already-mapped accounts are skipped (not overwritten).
+    Returns the full result with details for user review.
+    """
+    suggestions = await auto_suggest(project_id, db)
+
+    # Get existing mappings to skip
+    existing_result = await db.execute(
+        select(AccountMapping.original_account_code).where(
+            AccountMapping.project_id == project_id,
+            AccountMapping.is_deleted == False,  # noqa: E712
+        )
+    )
+    existing_codes = {row[0] for row in existing_result.all()}
+
+    saved = 0
+    skipped = 0
+    details: list[MappingSuggestion] = []
+
+    for s in suggestions:
+        if s.original_account_code in existing_codes:
+            skipped += 1
+            # Still include in details for display
+            details.append(s)
+            continue
+
+        # Save mapping
+        mapping_type = MappingType.auto_exact if s.confidence >= 0.92 else MappingType.auto_fuzzy
+        record = AccountMapping(
+            project_id=project_id,
+            original_account_code=s.original_account_code,
+            original_account_name=s.original_account_name,
+            standard_account_code=s.suggested_standard_code,
+            mapping_type=mapping_type,
+        )
+        db.add(record)
+        saved += 1
+        details.append(s)
+
+    if saved > 0:
+        await db.flush()
+        await db.commit()
+
+    total_client = await _count_client_accounts(project_id, db)
+    mapped_count = await _count_mapped_accounts(project_id, db)
+    rate = (mapped_count / total_client * 100) if total_client > 0 else 0.0
+    unmatched = total_client - mapped_count
+
+    return AutoMatchResult(
+        saved_count=saved,
+        skipped_count=skipped,
+        unmatched_count=unmatched,
+        total_client=total_client,
+        completion_rate=round(rate, 2),
+        details=details,
+    )
+
+
+def _extract_level1_code(code: str) -> str:
+    """Extract level-1 account code from a client code.
+
+    Handles multiple formats:
+    - "6401.01" → "6401"  (dot-separated)
+    - "6401-01" → "6401"  (dash-separated)
+    - "640101"  → "6401"  (concatenated, first 4 digits)
+    - "6401"    → "6401"  (already level-1)
+    """
+    # Strip leading/trailing whitespace
+    code = code.strip()
+    # If contains dot or dash, take the part before first separator
+    for sep in (".", "-"):
+        if sep in code:
+            return code.split(sep)[0]
+    # Pure digits: take first 4 chars as level-1 code
+    return code[:4] if len(code) >= 4 else code
+
+
 def _match_single(
     client: AccountChart,
     std_by_code: dict[str, AccountChart],
@@ -126,9 +215,23 @@ def _match_single(
     """Try to match a single client account against standard accounts."""
     code = client.account_code
     name = client.account_name
-    prefix = code[:4] if len(code) >= 4 else code
+    # Normalize: strip dots/dashes for lookup (e.g. "6401.01" → "640101")
+    normalized = code.replace(".", "").replace("-", "").strip()
 
-    # Priority 1: Code prefix exact match
+    # Priority 0: Full code exact match (e.g. "221101" → "221101 工资")
+    if normalized in std_by_code:
+        std = std_by_code[normalized]
+        return MappingSuggestion(
+            original_account_code=code,
+            original_account_name=name,
+            suggested_standard_code=std.account_code,
+            suggested_standard_name=std.account_name,
+            confidence=1.0,
+            match_method="exact_code",
+        )
+
+    # Priority 1a: First-4-digit prefix match (e.g. "640101" → "6401")
+    prefix = normalized[:4] if len(normalized) >= 4 else normalized
     if prefix in std_by_code:
         std = std_by_code[prefix]
         return MappingSuggestion(
@@ -136,8 +239,21 @@ def _match_single(
             original_account_name=name,
             suggested_standard_code=std.account_code,
             suggested_standard_name=std.account_name,
-            confidence=1.0,
+            confidence=0.98,
             match_method="prefix",
+        )
+
+    # Priority 1b: Level-1 code from separator (e.g. "6401.01" → "6401")
+    level1 = _extract_level1_code(code)
+    if level1 != prefix and level1 in std_by_code:
+        std = std_by_code[level1]
+        return MappingSuggestion(
+            original_account_code=code,
+            original_account_name=name,
+            suggested_standard_code=std.account_code,
+            suggested_standard_name=std.account_name,
+            confidence=0.96,
+            match_method="level1_prefix",
         )
 
     # Priority 2: Name exact match
@@ -150,6 +266,20 @@ def _match_single(
             suggested_standard_name=std.account_name,
             confidence=0.95,
             match_method="exact_name",
+        )
+
+    # Priority 2b: Name contains match — client name like "主营业务成本-累计折旧费"
+    # should match standard "主营业务成本" (strip suffix after dash/hyphen)
+    base_name = name.split("-")[0].split("—")[0].split("－")[0].strip()
+    if base_name != name and base_name in std_by_name:
+        std = std_by_name[base_name]
+        return MappingSuggestion(
+            original_account_code=code,
+            original_account_name=name,
+            suggested_standard_code=std.account_code,
+            suggested_standard_name=std.account_name,
+            confidence=0.92,
+            match_method="base_name",
         )
 
     # Priority 3: Name fuzzy match

@@ -13,7 +13,7 @@ from app.services.notification_service import (
     NOTIF_TYPE_WORKPAPER_ASSIGNED,
     NOTIF_TYPE_REVIEW_APPROVED,
     NOTIF_TYPE_REVIEW_REJECTED,
-    NOTIF_TYPE_MISSTATEMENT,
+    NOTIF_TYPE_MISSTATEMENT_ALERT,
     NOTIF_TYPE_SYNC_CONFLICT,
     NOTIF_TYPE_GENERAL,
 )
@@ -133,12 +133,12 @@ class TestEventMapping:
         notif = NotificationService.create_notification(
             db,
             recipient_id=recipient_id,
-            notification_type=NOTIF_TYPE_MISSTATEMENT,
+            notification_type=NOTIF_TYPE_MISSTATEMENT_ALERT,
             title="错报超限预警",
             content="未更正错报金额超过重要性水平，请关注",
             related_object_type="misstatement",
         )
-        assert notif.notification_type == NOTIF_TYPE_MISSTATEMENT
+        assert notif.notification_type == NOTIF_TYPE_MISSTATEMENT_ALERT
 
     def test_sync_conflict_creates_notification(self):
         """Sync conflict notification per Requirement 6.4."""
@@ -169,6 +169,6 @@ class TestNotificationTypeConstants:
         assert NOTIF_TYPE_WORKPAPER_ASSIGNED is not None
         assert NOTIF_TYPE_REVIEW_APPROVED is not None
         assert NOTIF_TYPE_REVIEW_REJECTED is not None
-        assert NOTIF_TYPE_MISSTATEMENT is not None
+        assert NOTIF_TYPE_MISSTATEMENT_ALERT is not None
         assert NOTIF_TYPE_SYNC_CONFLICT is not None
         assert NOTIF_TYPE_GENERAL is not None

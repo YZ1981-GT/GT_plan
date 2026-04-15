@@ -5,7 +5,7 @@ Validates: Requirements 3.1, 3.2, 3.3
 
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from app.models.collaboration_models import WorkpaperReviewRecord, ReviewStatusEnum
+from app.models.collaboration_models import WorkpaperReviewRecord, ReviewStatus as ReviewStatusEnum
 from app.models.core import User
 from datetime import datetime, timezone
 import uuid

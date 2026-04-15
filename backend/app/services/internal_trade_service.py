@@ -78,7 +78,7 @@ def delete_trade(db, trade_id: UUID, project_id: UUID) -> bool:
     trade = get_trade(db, trade_id, project_id)
     if not trade:
         return False
-    trade.is_deleted = True
+    trade.soft_delete()
     db.commit()
     return True
 
@@ -140,7 +140,7 @@ def delete_arap(db, arap_id: UUID, project_id: UUID) -> bool:
     arap = get_arap(db, arap_id, project_id)
     if not arap:
         return False
-    arap.is_deleted = True
+    arap.soft_delete()
     db.commit()
     return True
 

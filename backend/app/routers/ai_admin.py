@@ -28,6 +28,7 @@ from app.models.ai_schemas import (
     AIModelCreate,
 )
 from app.services.ai_service import AIService
+from app.services.unified_ai_service import UnifiedAIService
 
 router = APIRouter(
     prefix="/api/ai",

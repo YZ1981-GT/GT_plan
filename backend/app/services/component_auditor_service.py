@@ -76,7 +76,7 @@ def delete_auditor(db: Session, auditor_id: UUID, project_id: UUID) -> bool:
     auditor = get_auditor(db, auditor_id, project_id)
     if not auditor:
         return False
-    auditor.is_deleted = True
+    auditor.soft_delete()
     db.commit()
     return True
 
@@ -134,7 +134,7 @@ def delete_instruction(db: Session, instruction_id: UUID, project_id: UUID) -> b
     instruction = get_instruction(db, instruction_id, project_id)
     if not instruction:
         return False
-    instruction.is_deleted = True
+    instruction.soft_delete()
     db.commit()
     return True
 
@@ -192,7 +192,7 @@ def delete_result(db: Session, result_id: UUID, project_id: UUID) -> bool:
     result = get_result(db, result_id, project_id)
     if not result:
         return False
-    result.is_deleted = True
+    result.soft_delete()
     db.commit()
     return True
 

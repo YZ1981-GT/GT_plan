@@ -37,31 +37,28 @@
         </div>
         <div class="gt-node-meta">
           <span>{{ node.client_name || '-' }}</span>
-          <el-tag v-if="node.status !== 'created'" :type="statusTagType(node.status)" size="small" round>
-            {{ statusLabel(node.status) }}
-          </el-tag>
+          <span class="gt-node-meta-right">
+            <el-tag v-if="node.status !== 'created'" :type="statusTagType(node.status)" size="small" round>
+              {{ statusLabel(node.status) }}
+            </el-tag>
+            <el-button
+              class="gt-node-action-inline"
+              :icon="EditPen"
+              size="small"
+              text
+              @click.stop="$emit('edit', node)"
+            />
+            <el-button
+              class="gt-node-action-inline gt-node-action--danger"
+              type="danger"
+              :icon="Delete"
+              size="small"
+              text
+              @click.stop="$emit('delete', node)"
+            />
+          </span>
         </div>
       </div>
-
-      <!-- 编辑按钮 -->
-      <el-button
-        class="gt-node-action"
-        type="primary"
-        :icon="Edit"
-        size="small"
-        text
-        @click.stop="$emit('edit', node)"
-      />
-
-      <!-- 删除按钮 -->
-      <el-button
-        class="gt-node-action gt-node-action--danger"
-        type="danger"
-        :icon="Delete"
-        size="small"
-        text
-        @click.stop="$emit('delete', node)"
-      />
     </div>
 
     <!-- 子节点（递归） -->
@@ -84,7 +81,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { FolderOpened, Delete, Edit } from '@element-plus/icons-vue'
+import { FolderOpened, Delete, EditPen } from '@element-plus/icons-vue'
 
 interface ProjectNode {
   id: string
@@ -142,7 +139,6 @@ function statusLabel(s: string) {
   border-color: var(--gt-color-primary-lighter);
   background: #faf8fd;
 }
-.gt-node-row:hover .gt-node-action { opacity: 1; }
 .gt-node-row--active {
   border-color: var(--gt-color-primary) !important;
   background: var(--gt-color-primary-bg) !important;
@@ -197,13 +193,23 @@ function statusLabel(s: string) {
   color: var(--gt-color-text-secondary);
   word-break: break-all;
 }
+.gt-node-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
 
-.gt-node-action {
+.gt-node-action-inline {
   opacity: 0;
   transition: opacity var(--gt-transition-fast);
   flex-shrink: 0;
+  padding: 2px !important;
+  height: 18px !important;
+  width: 18px !important;
 }
-.gt-node-action--danger { margin-right: 4px; }
+.gt-node-row:hover .gt-node-action-inline { opacity: 1; }
+.gt-node-action--danger { margin-right: 2px; }
 
 .gt-node-children {
   border-left: 1px dashed var(--gt-color-border);

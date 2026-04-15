@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.audit_platform_schemas import (
+    AutoMatchResult,
     MappingCompletionRate,
     MappingInput,
     MappingResponse,
@@ -37,6 +38,22 @@ async def auto_suggest(
     Validates: Requirements 3.1
     """
     return await mapping_service.auto_suggest(project_id, db)
+
+
+@router.post(
+    "/{project_id}/mapping/auto-match",
+    response_model=AutoMatchResult,
+)
+async def auto_match(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AutoMatchResult:
+    """自动匹配并直接保存映射结果。
+
+    已映射的科目不会被覆盖，返回完整匹配详情供用户确认。
+    """
+    return await mapping_service.auto_match(project_id, db)
 
 
 @router.get(

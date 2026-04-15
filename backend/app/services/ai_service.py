@@ -76,10 +76,19 @@ class ModelValidationError(Exception):
 
 
 async def _get_ollama_client() -> httpx.AsyncClient:
-    """获取 Ollama HTTP 客户端"""
+    """获取 Ollama HTTP 客户端（备用）"""
     return httpx.AsyncClient(
         base_url=settings.OLLAMA_BASE_URL,
         timeout=httpx.Timeout(60.0, connect=10.0),
+    )
+
+
+async def _get_llm_client() -> httpx.AsyncClient:
+    """获取 LLM HTTP 客户端（默认 vLLM OpenAI 兼容 API）"""
+    return httpx.AsyncClient(
+        base_url=settings.LLM_BASE_URL,
+        headers={"Authorization": f"Bearer {settings.LLM_API_KEY}"},
+        timeout=httpx.Timeout(120.0, connect=10.0),
     )
 
 
@@ -199,20 +208,20 @@ class AIService:
                 return False
 
         elif model.provider == AIProvider.openai_compatible:
-            # OpenAI 兼容验证
+            # OpenAI 兼容验证（vLLM 等）
             try:
-                async with await _get_ollama_client() as client:
-                    endpoint = model.endpoint_url or "/v1/chat/completions"
+                async with await _get_llm_client() as client:
                     response = await asyncio.wait_for(
                         client.post(
-                            endpoint,
+                            "/chat/completions",
                             json={
                                 "model": model.model_name,
                                 "messages": [{"role": "user", "content": "hi"}],
                                 "max_tokens": 5,
+                                "chat_template_kwargs": {"enable_thinking": False},
                             },
                         ),
-                        timeout=10.0,
+                        timeout=30.0,
                     )
                     return response.status_code == 200
             except (asyncio.TimeoutError, httpx.HTTPError) as e:
@@ -267,27 +276,30 @@ class AIService:
         temperature: float,
         max_tokens: int | None,
     ) -> str:
-        """同步对话"""
-        async with await _get_ollama_client() as client:
+        """同步对话（OpenAI 兼容 API，默认 vLLM）"""
+        async with await _get_llm_client() as client:
             payload: dict[str, Any] = {
                 "model": model,
                 "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
                 "stream": False,
-                "options": {
-                    "temperature": temperature,
-                },
             }
-            if max_tokens:
-                payload["options"]["num_predict"] = max_tokens
+            # Qwen3.5 thinking 模式控制
+            if not settings.LLM_ENABLE_THINKING:
+                payload["chat_template_kwargs"] = {"enable_thinking": False}
 
-            response = await client.post("/api/chat", json=payload)
+            response = await client.post("/chat/completions", json=payload)
             if response.status_code != 200:
                 raise AIServiceUnavailableError(
-                    f"Ollama returned {response.status_code}"
+                    f"LLM returned {response.status_code}: {response.text[:200]}"
                 )
 
             data = response.json()
-            return data.get("message", {}).get("content", "")
+            msg = data.get("choices", [{}])[0].get("message", {})
+            # Qwen3.5 thinking 模式下 content 可能为 None，实际内容在 reasoning_content
+            content = msg.get("content") or msg.get("reasoning_content", "")
+            return content
 
     async def _chat_stream(
         self,
@@ -296,34 +308,39 @@ class AIService:
         temperature: float,
         max_tokens: int | None,
     ) -> AsyncGenerator[str, None]:
-        """流式对话"""
-        async with await _get_ollama_client() as client:
+        """流式对话（OpenAI 兼容 SSE，默认 vLLM）"""
+        async with await _get_llm_client() as client:
             payload: dict[str, Any] = {
                 "model": model,
                 "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
                 "stream": True,
-                "options": {
-                    "temperature": temperature,
-                },
             }
-            if max_tokens:
-                payload["options"]["num_predict"] = max_tokens
+            if not settings.LLM_ENABLE_THINKING:
+                payload["chat_template_kwargs"] = {"enable_thinking": False}
 
-            async with client.stream("POST", "/api/chat", json=payload) as response:
+            async with client.stream("POST", "/chat/completions", json=payload) as response:
                 if response.status_code != 200:
                     raise AIServiceUnavailableError(
-                        f"Ollama returned {response.status_code}"
+                        f"LLM returned {response.status_code}"
                     )
 
                 async for line in response.aiter_lines():
-                    if line.strip():
-                        try:
-                            data = json.loads(line)
-                            content = data.get("message", {}).get("content", "")
-                            if content:
-                                yield content
-                        except json.JSONDecodeError:
-                            continue
+                    line = line.strip()
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]  # 去掉 "data: " 前缀
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        data = json.loads(data_str)
+                        delta = data.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            yield content
+                    except json.JSONDecodeError:
+                        continue
 
     # -------------------------------------------------------------------------
     # Embedding 向量化
@@ -335,7 +352,7 @@ class AIService:
         model: str | None = None,
     ) -> list[float]:
         """
-        文本向量化
+        文本向量化（OpenAI 兼容 API）
 
         Args:
             text: 待向量化的文本
@@ -351,21 +368,25 @@ class AIService:
             else:
                 model = settings.DEFAULT_EMBEDDING_MODEL
 
-        async with await _get_ollama_client() as client:
+        async with await _get_llm_client() as client:
             response = await client.post(
-                "/api/embeddings",
+                "/embeddings",
                 json={
                     "model": model,
-                    "prompt": text,
+                    "input": text,
                 },
             )
             if response.status_code != 200:
                 raise AIServiceUnavailableError(
-                    f"Ollama embedding returned {response.status_code}"
+                    f"Embedding returned {response.status_code}: {response.text[:200]}"
                 )
 
             data = response.json()
-            return data.get("embedding", [])
+            # OpenAI 格式：data[0].embedding
+            embeddings = data.get("data", [])
+            if embeddings:
+                return embeddings[0].get("embedding", [])
+            return []
 
     # -------------------------------------------------------------------------
     # OCR 识别
@@ -373,7 +394,7 @@ class AIService:
 
     async def ocr_recognize(self, image_path: str) -> dict[str, Any]:
         """
-        OCR文字识别
+        OCR文字识别 — 代理到 UnifiedOCRService（带双引擎兜底）
 
         Args:
             image_path: 图片文件路径
@@ -391,33 +412,22 @@ class AIService:
             }
         """
         try:
-            import cv2
-            import numpy as np
+            from app.services.unified_ocr_service import OCREngine, UnifiedOCRService
 
-            ocr = _get_paddle_ocr()
+            ocr_svc = UnifiedOCRService()
+            result = await ocr_svc.recognize(image_path, mode=OCREngine.AUTO)
 
-            # PaddleOCR 返回格式: [[box, text, score], ...]
-            result = ocr.ocr(image_path, cls=True)
-
-            regions = []
-            full_text_parts = []
-
-            if result and result[0]:
-                for line in result[0]:
-                    box = line[0]  # [[x1,y1], [x2,y2], [x3,y3], [x4,y4]]
-                    text = line[1][0]
-                    score = line[1][1]
-
-                    regions.append({
-                        "text": text,
-                        "bbox": box,
-                        "confidence": float(score),
-                    })
-                    full_text_parts.append(text)
-
+            # 统一返回格式（UnifiedOCRService 用 "box"，AIService 约定用 "bbox"）
             return {
-                "text": "\n".join(full_text_parts),
-                "regions": regions,
+                "text": result["text"],
+                "regions": [
+                    {
+                        "text": r["text"],
+                        "bbox": r.get("box", []),
+                        "confidence": r.get("confidence", 0.0),
+                    }
+                    for r in result.get("regions", [])
+                ],
             }
 
         except Exception as e:
@@ -429,40 +439,38 @@ class AIService:
     # -------------------------------------------------------------------------
 
     async def health_check(self) -> dict[str, Any]:
-        """
-        检查所有AI引擎健康状态
-
-        Returns:
-            健康状态字典
-        """
+        """检查所有AI引擎健康状态"""
+        vllm_status = "unavailable"
         ollama_status = "unavailable"
         paddleocr_status = "unavailable"
         chromadb_status = "unavailable"
         active_chat_model = None
         active_embedding_model = None
 
-        # 检查 Ollama
+        # 检查 vLLM（主要 LLM 服务）
+        try:
+            async with await _get_llm_client() as client:
+                response = await asyncio.wait_for(
+                    client.get("/models"), timeout=5.0,
+                )
+                if response.status_code == 200:
+                    vllm_status = "healthy"
+                    models = response.json().get("data", [])
+                    if models:
+                        active_chat_model = models[0].get("id", settings.DEFAULT_CHAT_MODEL)
+        except Exception as e:
+            logger.warning(f"vLLM health check failed: {e}")
+
+        # 检查 Ollama（备用）
         try:
             async with await _get_ollama_client() as client:
-                response = await client.get("/api/tags")
+                response = await asyncio.wait_for(
+                    client.get("/api/tags"), timeout=5.0,
+                )
                 if response.status_code == 200:
                     ollama_status = "healthy"
-                    # 获取已安装模型列表
-                    models = response.json().get("models", [])
-                    if models:
-                        # 尝试获取激活的模型
-                        chat_model = await self.get_active_model(AIModelType.chat)
-                        if chat_model:
-                            active_chat_model = chat_model.model_name
-                        else:
-                            # 使用第一个模型
-                            active_chat_model = models[0].get("name", "qwen2.5:7b")
-
-                        embed_model = await self.get_active_model(AIModelType.embedding)
-                        if embed_model:
-                            active_embedding_model = embed_model.model_name
         except Exception as e:
-            logger.warning(f"Ollama health check failed: {e}")
+            logger.debug(f"Ollama health check failed (backup): {e}")
 
         # 检查 PaddleOCR
         try:
@@ -480,12 +488,28 @@ class AIService:
         except Exception as e:
             logger.warning(f"ChromaDB health check failed: {e}")
 
+        # 从数据库获取激活模型
+        if not active_chat_model:
+            chat_model = await self.get_active_model(AIModelType.chat)
+            if chat_model:
+                active_chat_model = chat_model.model_name
+            else:
+                active_chat_model = settings.DEFAULT_CHAT_MODEL
+
+        embed_model = await self.get_active_model(AIModelType.embedding)
+        if embed_model:
+            active_embedding_model = embed_model.model_name
+        else:
+            active_embedding_model = settings.DEFAULT_EMBEDDING_MODEL
+
         return {
+            "vllm_status": vllm_status,
             "ollama_status": ollama_status,
             "paddleocr_status": paddleocr_status,
             "chromadb_status": chromadb_status,
             "active_chat_model": active_chat_model,
             "active_embedding_model": active_embedding_model,
+            "llm_base_url": settings.LLM_BASE_URL,
             "timestamp": datetime.now().isoformat(),
         }
 
@@ -542,22 +566,22 @@ class AIService:
         """初始化默认模型配置（如果不存在）"""
         default_models = [
             {
-                "model_name": "qwen2.5:7b",
+                "model_name": "Kbenkhaled/Qwen3.5-27B-NVFP4",
                 "model_type": AIModelType.chat,
-                "provider": AIProvider.ollama,
-                "endpoint_url": None,
+                "provider": AIProvider.openai_compatible,
+                "endpoint_url": "http://localhost:8100/v1",
                 "is_active": True,
-                "context_window": 8192,
-                "performance_notes": "通义千问2.5，7B参数，适合审计对话",
+                "context_window": 32768,
+                "performance_notes": "Qwen3.5-27B NVFP4量化，本地vLLM推理，128K上下文",
             },
             {
-                "model_name": "nomic-embed-text",
+                "model_name": "Kbenkhaled/Qwen3.5-27B-NVFP4",
                 "model_type": AIModelType.embedding,
-                "provider": AIProvider.ollama,
-                "endpoint_url": None,
-                "is_active": False,
-                "context_window": 8192,
-                "performance_notes": "Nomic文本嵌入模型，适合知识库检索",
+                "provider": AIProvider.openai_compatible,
+                "endpoint_url": "http://localhost:8100/v1",
+                "is_active": True,
+                "context_window": 32768,
+                "performance_notes": "Qwen3.5-27B 文本嵌入（复用对话模型）",
             },
             {
                 "model_name": "paddleocr",

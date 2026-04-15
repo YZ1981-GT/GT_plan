@@ -8,16 +8,13 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 
-from app.services.auth_service import (
+from app.core.security import (
     hash_password,
     verify_password,
     create_access_token,
     create_refresh_token,
-    create_tokens,
-    TokenPair,
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    REFRESH_TOKEN_EXPIRE_DAYS,
 )
+from app.core.config import settings
 from app.services.permission_service import (
     Permission,
     ROLE_PERMISSION_MATRIX,
@@ -30,14 +27,10 @@ from app.services.permission_service import (
 # ---------------------------------------------------------------------------
 
 class TestPasswordHashing:
-    def test_hash_password_returns_salted_hash(self):
+    def test_hash_password_returns_bcrypt_hash(self):
         pw = "MySecret123"
         result = hash_password(pw)
-        assert "$" in result
-        parts = result.split("$")
-        assert len(parts) == 2
-        assert len(parts[0]) == 32
-        assert len(parts[1]) == 64
+        assert result.startswith("$2b$")
 
     def test_verify_password_correct(self):
         pw = "CorrectPassword"
@@ -65,62 +58,35 @@ class TestPasswordHashing:
 # ---------------------------------------------------------------------------
 
 class TestJWTTokens:
-    @patch("app.services.auth_service.settings")
-    def test_create_access_token(self, mock_settings):
-        mock_settings.JWT_SECRET_KEY = "test-secret-key"
-        mock_settings.JWT_ALGORITHM = "HS256"
-        token = create_access_token("user-123", "testuser", "auditor")
+    def test_create_access_token(self):
+        token = create_access_token({"sub": "user-123"})
         assert isinstance(token, str)
         assert len(token) > 0
 
-    @patch("app.services.auth_service.settings")
-    def test_create_refresh_token(self, mock_settings):
-        mock_settings.JWT_SECRET_KEY = "test-secret-key"
-        mock_settings.JWT_ALGORITHM = "HS256"
-        token = create_refresh_token("user-123")
+    def test_create_refresh_token(self):
+        token = create_refresh_token({"sub": "user-123"})
         assert isinstance(token, str)
         assert len(token) > 0
 
-    @patch("app.services.auth_service.settings")
-    def test_create_tokens(self, mock_settings):
-        mock_settings.JWT_SECRET_KEY = "test-secret-key"
-        mock_settings.JWT_ALGORITHM = "HS256"
-        tokens = create_tokens("user-123", "testuser", "auditor")
-        assert isinstance(tokens, TokenPair)
-        assert tokens.access_token
-        assert tokens.refresh_token
-        assert tokens.token_type == "bearer"
-
-    @patch("app.services.auth_service.settings")
-    def test_access_token_contains_user_info(self, mock_settings):
-        mock_settings.JWT_SECRET_KEY = "test-secret-key"
-        mock_settings.JWT_ALGORITHM = "HS256"
-        token = create_access_token("user-abc", "alice", "manager")
-        payload = jwt.decode(token, "test-secret-key", algorithms=["HS256"])
+    def test_access_token_contains_user_info(self):
+        token = create_access_token({"sub": "user-abc"})
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         assert payload["sub"] == "user-abc"
-        assert payload["username"] == "alice"
-        assert payload["role"] == "manager"
         assert payload["type"] == "access"
 
-    @patch("app.services.auth_service.settings")
-    def test_access_token_expiration(self, mock_settings):
-        mock_settings.JWT_SECRET_KEY = "test-secret-key"
-        mock_settings.JWT_ALGORITHM = "HS256"
-        token = create_access_token("user-123", "testuser", "auditor")
-        payload = jwt.decode(token, "test-secret-key", algorithms=["HS256"])
+    def test_access_token_expiration(self):
+        token = create_access_token({"sub": "user-123"})
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         exp = payload["exp"]
         now = datetime.now(timezone.utc).timestamp()
-        assert ACCESS_TOKEN_EXPIRE_MINUTES - 1 <= (exp - now) / 60 <= ACCESS_TOKEN_EXPIRE_MINUTES + 1
+        minutes_diff = (exp - now) / 60
+        assert settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES - 1 <= minutes_diff <= settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES + 1
 
-    @patch("app.services.auth_service.settings")
-    def test_refresh_token_no_user_info(self, mock_settings):
-        mock_settings.JWT_SECRET_KEY = "test-secret-key"
-        mock_settings.JWT_ALGORITHM = "HS256"
-        token = create_refresh_token("user-123")
-        payload = jwt.decode(token, "test-secret-key", algorithms=["HS256"])
+    def test_refresh_token_type(self):
+        token = create_refresh_token({"sub": "user-123"})
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         assert payload["sub"] == "user-123"
         assert payload["type"] == "refresh"
-        assert "username" not in payload
 
 
 # ---------------------------------------------------------------------------

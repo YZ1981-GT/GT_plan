@@ -13,6 +13,12 @@ from app.core.database import get_db  # noqa: E402
 from app.core.redis import get_redis  # noqa: E402
 from app.models.base import Base  # noqa: E402
 import app.models.core  # noqa: E402, F401
+import app.models.audit_platform_models  # noqa: E402, F401
+import app.models.report_models  # noqa: E402, F401
+import app.models.workpaper_models  # noqa: E402, F401
+import app.models.consolidation_models  # noqa: E402, F401
+import app.models.collaboration_models  # noqa: E402, F401
+import app.models.ai_models  # noqa: E402, F401
 import app.models.extension_models  # noqa: E402, F401
 import app.models.gt_coding_models  # noqa: E402, F401
 import app.models.t_account_models  # noqa: E402, F401

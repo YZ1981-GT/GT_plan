@@ -103,3 +103,62 @@ async def drill_to_aux_ledger(
         aux_type=aux_type, aux_code=aux_code,
         page=page, page_size=page_size,
     )
+
+
+# ------------------------------------------------------------------
+# 凭证查询
+# ------------------------------------------------------------------
+
+
+@router.get("/voucher/{voucher_no}")
+async def get_voucher_detail(
+    project_id: UUID,
+    voucher_no: str,
+    year: int = Query(..., description="审计年度"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """按凭证号查询完整分录（借贷明细+合计+平衡状态）"""
+    svc = DrilldownService(db)
+    return await svc.get_voucher_detail(project_id, year, voucher_no)
+
+
+@router.get("/vouchers")
+async def list_vouchers(
+    project_id: UUID,
+    year: int = Query(..., description="审计年度"),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    keyword: str | None = Query(None, description="凭证号或摘要关键词"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+) -> PageResult:
+    """凭证列表（按凭证号分组聚合，支持大数据量分页）"""
+    svc = DrilldownService(db)
+    return await svc.list_vouchers(
+        project_id, year,
+        date_from=date_from, date_to=date_to,
+        keyword=keyword,
+        page=page, page_size=page_size,
+    )
+
+
+# ------------------------------------------------------------------
+# 余额表↔序时账联动校验
+# ------------------------------------------------------------------
+
+
+@router.get("/verify-consistency")
+async def verify_balance_ledger_consistency(
+    project_id: UUID,
+    year: int = Query(..., description="审计年度"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """校验余额表与序时账的一致性（发生额核对+期末公式校验）"""
+    svc = DrilldownService(db)
+    issues = await svc.verify_balance_ledger_consistency(project_id, year)
+    return {
+        "total_issues": len(issues),
+        "is_consistent": len(issues) == 0,
+        "issues": issues,
+    }

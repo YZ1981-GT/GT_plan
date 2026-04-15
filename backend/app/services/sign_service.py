@@ -111,7 +111,7 @@ class SignService:
         if not record:
             raise ValueError("签名记录不存在")
 
-        record.is_deleted = True
+        record.soft_delete()
         await db.flush()
         return {"signature_id": str(signature_id), "revoked": True}
 

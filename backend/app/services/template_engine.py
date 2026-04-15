@@ -231,7 +231,7 @@ class TemplateEngine:
                 f"模板 {template.template_code} 已被 {ref_count} 个项目底稿引用，无法删除"
             )
 
-        template.is_deleted = True
+        template.soft_delete()
         await db.flush()
 
     # ------------------------------------------------------------------

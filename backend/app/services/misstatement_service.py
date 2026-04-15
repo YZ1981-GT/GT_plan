@@ -193,9 +193,8 @@ class UnadjustedMisstatementService:
         row = await self._get_by_id(project_id, misstatement_id)
         if not row:
             raise ValueError("未更正错报记录不存在")
-        row.is_deleted = True
+        row.soft_delete()
         await self.db.flush()
-
     # ------------------------------------------------------------------
     # get_summary
     # ------------------------------------------------------------------

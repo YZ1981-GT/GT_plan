@@ -35,6 +35,16 @@ def _blacklist_key(token: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# is_token_blacklisted（公开函数，供 deps.py 使用）
+# ---------------------------------------------------------------------------
+
+async def is_token_blacklisted(token: str, redis: Redis) -> bool:
+    """检查 access/refresh token 是否在黑名单中。"""
+    bl_key = _blacklist_key(token)
+    return bool(await redis.exists(bl_key))
+
+
+# ---------------------------------------------------------------------------
 # login
 # ---------------------------------------------------------------------------
 

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
@@ -57,6 +58,9 @@ from app.routers.ai_plugins import router as ai_plugins_router
 from app.routers.regulatory import router as regulatory_router
 from app.routers.note_templates import router as note_templates_router
 from app.routers.workpaper_summary import router as workpaper_summary_router
+from app.routers.ai_unified import router as ai_unified_router
+from app.routers.ai_models import router as ai_models_router
+from app.routers.recycle_bin import router as recycle_bin_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -92,7 +96,9 @@ app.add_exception_handler(Exception, generic_exception_handler)
 app.add_middleware(AuditLogMiddleware)
 # 2) ResponseWrapperMiddleware（包装在审计日志之外）
 app.add_middleware(ResponseWrapperMiddleware)
-# 3) CORS 中间件（最外层 — 最先处理跨域）
+# 3) GZip 压缩（大 JSON 响应自动压缩）
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+# 4) CORS 中间件（最外层 — 最先处理跨域）
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()],
@@ -153,3 +159,6 @@ app.include_router(ai_plugins_router)
 app.include_router(regulatory_router)
 app.include_router(note_templates_router)
 app.include_router(workpaper_summary_router)
+app.include_router(ai_unified_router)
+app.include_router(ai_models_router)
+app.include_router(recycle_bin_router)

@@ -72,7 +72,7 @@ class CustomTemplateService:
         tpl = await self._get_owned(db, template_id, user_id)
         if not tpl:
             raise ValueError("模板不存在或无权限")
-        tpl.is_deleted = True
+        tpl.soft_delete()
         await db.flush()
         return True
 

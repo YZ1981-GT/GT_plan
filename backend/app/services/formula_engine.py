@@ -271,8 +271,9 @@ class FormulaEngine:
         "SUM_TB": SumTBExecutor,
     }
 
-    def __init__(self, redis_client=None):
+    def __init__(self, redis_client=None, cache_manager=None):
         self._redis = redis_client
+        self._cache = cache_manager  # CacheManager instance (preferred)
         self._executors: dict[str, Any] = {
             k: v() for k, v in self.FORMULA_TYPES.items()
         }
@@ -362,7 +363,31 @@ class FormulaEngine:
         params_hash = hashlib.md5(
             json.dumps(params, sort_keys=True, default=str).encode()
         ).hexdigest()
-        return f"formula:{project_id}:{year}:{formula_type}:{params_hash}"
+        return f"{project_id}:{year}:{formula_type}:{params_hash}"
+
+    async def _cache_get(self, key: str):
+        """Read from cache: prefer CacheManager, fallback to raw Redis."""
+        if self._cache:
+            return await self._cache.get("formula", key)
+        if self._redis:
+            raw = await self._redis.get(f"formula:{key}")
+            if raw is not None:
+                try:
+                    return json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    return raw
+        return None
+
+    async def _cache_set(self, key: str, value):
+        """Write to cache: prefer CacheManager, fallback to raw Redis."""
+        if self._cache:
+            await self._cache.set("formula", key, value)
+        elif self._redis:
+            await self._redis.set(
+                f"formula:{key}",
+                json.dumps(value, default=str),
+                ex=300,
+            )
 
     async def execute(
         self,
@@ -391,14 +416,13 @@ class FormulaEngine:
 
         cache_key = self._cache_key(project_id, year, formula_type, params)
 
-        # Check Redis cache
-        if self._redis:
-            try:
-                cached = await self._redis.get(cache_key)
-                if cached is not None:
-                    return {"value": json.loads(cached), "cached": True, "error": None}
-            except Exception:
-                logger.warning("Redis cache read failed, proceeding without cache")
+        # Check cache
+        try:
+            cached = await self._cache_get(cache_key)
+            if cached is not None:
+                return {"value": cached, "cached": True, "error": None}
+        except Exception:
+            logger.warning("Cache read failed, proceeding without cache")
 
         # Execute formula
         executor = self._executors[formula_type]
@@ -407,15 +431,11 @@ class FormulaEngine:
             # PREV returns a dict from recursive call
             if isinstance(result, dict):
                 # Cache the result
-                if self._redis and result.get("error") is None:
+                if result.get("error") is None:
                     try:
-                        await self._redis.set(
-                            cache_key,
-                            json.dumps(result["value"], default=str),
-                            ex=300,  # TTL 5 min
-                        )
+                        await self._cache_set(cache_key, result["value"])
                     except Exception:
-                        logger.warning("Redis cache write failed")
+                        logger.warning("Cache write failed")
                 return result
         else:
             result = await executor.execute(db, project_id, year, params)
@@ -428,15 +448,10 @@ class FormulaEngine:
         value = float(result) if isinstance(result, Decimal) else result
 
         # Write to cache
-        if self._redis:
-            try:
-                await self._redis.set(
-                    cache_key,
-                    json.dumps(value, default=str),
-                    ex=300,  # TTL 5 min
-                )
-            except Exception:
-                logger.warning("Redis cache write failed")
+        try:
+            await self._cache_set(cache_key, value)
+        except Exception:
+            logger.warning("Cache write failed")
 
         return {"value": value, "cached": False, "error": None}
 
@@ -476,6 +491,11 @@ class FormulaEngine:
 
         Returns count of deleted keys.
         """
+        if self._cache:
+            # CacheManager: invalidate entire formula namespace
+            # (fine-grained invalidation would need pattern support)
+            return await self._cache.invalidate_namespace("formula")
+
         if not self._redis:
             return 0
 

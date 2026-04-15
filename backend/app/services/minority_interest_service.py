@@ -119,6 +119,6 @@ def delete_mi(db, mi_id: UUID, project_id: UUID) -> bool:
     mi = get_mi(db, mi_id, project_id)
     if not mi:
         return False
-    mi.is_deleted = True
+    mi.soft_delete()
     db.commit()
     return True

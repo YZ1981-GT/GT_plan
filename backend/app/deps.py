@@ -3,6 +3,7 @@
 Validates: Requirements 3.7, 3.8, 3.9, 3.10
 """
 
+import logging
 from collections.abc import Callable
 from uuid import UUID
 
@@ -13,11 +14,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.redis import get_redis
 from app.core.security import decode_token
 
 # Alias for routers that use "db" as the Depends name
 db = get_db
+
+# Alias for sync routers (consolidation module etc.) that use synchronous ORM
+from app.core.database import get_sync_db  # noqa: E402
+sync_db = get_sync_db
+
 from app.models.core import ProjectUser, User
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
@@ -39,9 +48,22 @@ async def get_current_user(
 ) -> User:
     """从 Authorization header 解析 JWT，查询用户，验证 is_active 和 is_deleted。
 
+    包含 access token 黑名单检查（Redis 不可用时降级跳过）。
     未认证或 token 无效时返回 401。
     """
     token = credentials.credentials
+
+    # 黑名单检查（Redis 不可用时降级跳过，不阻断请求）
+    try:
+        from app.core.redis import redis_client
+        from app.services.auth_service import is_token_blacklisted
+        if await is_token_blacklisted(token, redis_client):
+            raise HTTPException(status_code=401, detail="Token 已被吊销")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.debug("Redis unavailable for blacklist check, skipping")
+
     try:
         payload = decode_token(token)
     except JWTError:

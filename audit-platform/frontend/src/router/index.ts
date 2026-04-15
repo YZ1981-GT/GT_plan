@@ -170,6 +170,16 @@ const router = createRouter({
           name: 'AIPluginManagement',
           component: () => import('@/views/extension/AIPluginManagement.vue'),
         },
+        {
+          path: 'settings/ai-models',
+          name: 'AIModelConfig',
+          component: () => import('@/views/AIModelConfig.vue'),
+        },
+        {
+          path: 'recycle-bin',
+          name: 'RecycleBin',
+          component: () => import('@/views/RecycleBin.vue'),
+        },
       ],
     },
     {

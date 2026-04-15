@@ -97,9 +97,18 @@ _INCOME_STATEMENT_LINES: dict[str, tuple[str, str, int, str | None]] = {
 
 
 def _determine_report_type_from_code(account_code: str) -> ReportType | None:
-    """根据科目编码前缀判断报表类型。"""
+    """根据科目编码前缀判断报表类型。
+
+    企业会计准则科目编码规则：
+    - 1xxx: 资产类 → 资产负债表
+    - 2xxx: 负债类 → 资产负债表
+    - 3xxx: 共同类 → 资产负债表
+    - 4xxx: 所有者权益类 → 资产负债表（权益侧）
+    - 5xxx: 成本类 → 利润表
+    - 6xxx: 损益类 → 利润表
+    """
     prefix = account_code[:1] if account_code else ""
-    if prefix in ("1", "2", "3"):
+    if prefix in ("1", "2", "3", "4"):
         return ReportType.balance_sheet
     if prefix in ("5", "6"):
         return ReportType.income_statement

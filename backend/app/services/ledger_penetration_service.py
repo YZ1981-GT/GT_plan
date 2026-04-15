@@ -45,9 +45,10 @@ class DecimalEncoder(json.JSONEncoder):
 class LedgerPenetrationService:
     """穿透查询服务"""
 
-    def __init__(self, db: AsyncSession, redis: Any = None):
+    def __init__(self, db: AsyncSession, redis: Any = None, cache_manager: Any = None):
         self.db = db
         self.redis = redis
+        self._cache = cache_manager  # CacheManager instance (preferred)
 
     # ------------------------------------------------------------------
     # 核心穿透查询（无缓存版）
@@ -63,6 +64,7 @@ class LedgerPenetrationService:
             sa.select(
                 tbl.c.account_code,
                 tbl.c.account_name,
+                tbl.c.level,
                 tbl.c.opening_balance,
                 tbl.c.debit_amount,
                 tbl.c.credit_amount,
@@ -86,8 +88,19 @@ class LedgerPenetrationService:
         date_from: str | None = None, date_to: str | None = None,
         page: int = 1, page_size: int = 100,
     ) -> dict:
-        """第二层：序时账明细（按科目穿透）"""
+        """第二层：序时账明细（按科目穿透）
+
+        account_code 支持前缀匹配：传 "1002*" 查询所有 1002 开头的末级科目明细
+        """
         tbl = TbLedger.__table__
+
+        # 判断是否前缀查询
+        if account_code.endswith('*'):
+            prefix = account_code[:-1]
+            code_filter = tbl.c.account_code.like(prefix + '%')
+        else:
+            code_filter = (tbl.c.account_code == account_code)
+
         base = (
             sa.select(
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
@@ -98,7 +111,7 @@ class LedgerPenetrationService:
             .where(
                 tbl.c.project_id == project_id,
                 tbl.c.year == year,
-                tbl.c.account_code == account_code,
+                code_filter,
                 tbl.c.is_deleted == sa.false(),
             )
         )
@@ -141,6 +154,28 @@ class LedgerPenetrationService:
                 tbl.c.is_deleted == sa.false(),
             )
             .order_by(tbl.c.account_code)
+        )
+        result = await self.db.execute(stmt)
+        return [dict(r._mapping) for r in result.fetchall()]
+
+    async def get_all_aux_balance(
+        self, project_id: UUID, year: int,
+    ) -> list[dict]:
+        """全量辅助余额（所有科目）"""
+        tbl = TbAuxBalance.__table__
+        stmt = (
+            sa.select(
+                tbl.c.account_code, tbl.c.account_name,
+                tbl.c.aux_type, tbl.c.aux_code, tbl.c.aux_name,
+                tbl.c.opening_balance, tbl.c.debit_amount,
+                tbl.c.credit_amount, tbl.c.closing_balance,
+            )
+            .where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.is_deleted == sa.false(),
+            )
+            .order_by(tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code)
         )
         result = await self.db.execute(stmt)
         return [dict(r._mapping) for r in result.fetchall()]
@@ -252,13 +287,13 @@ class LedgerPenetrationService:
     # ------------------------------------------------------------------
 
     def _cache_key(self, project_id: UUID, year: int, **kwargs: Any) -> str:
-        """生成缓存键"""
+        """生成缓存键（不含 namespace 前缀，CacheManager 自动加）"""
         params = json.dumps(
             {"project_id": str(project_id), "year": year, **kwargs},
             sort_keys=True,
         )
         h = hashlib.md5(params.encode()).hexdigest()[:12]
-        return f"penetrate:{project_id}:{year}:{h}"
+        return f"{project_id}:{year}:{h}"
 
     async def penetrate_cached(
         self, project_id: UUID, year: int,
@@ -268,7 +303,7 @@ class LedgerPenetrationService:
         date_to: str | None = None,
         page: int = 1, page_size: int = 100,
     ) -> dict:
-        """带 Redis 缓存的穿透查询"""
+        """带缓存的穿透查询（优先 CacheManager，降级 raw Redis）"""
         cache_key = self._cache_key(
             project_id, year,
             account_code=account_code, drill_level=drill_level,
@@ -276,10 +311,17 @@ class LedgerPenetrationService:
             page=page, page_size=page_size,
         )
 
-        # 尝试缓存
-        if self.redis:
+        # 尝试缓存读取
+        if self._cache:
             try:
-                cached = await self.redis.get(cache_key)
+                cached = await self._cache.get("ledger", cache_key)
+                if cached is not None:
+                    return cached
+            except Exception:
+                pass
+        elif self.redis:
+            try:
+                cached = await self.redis.get(f"penetrate:{cache_key}")
                 if cached:
                     return json.loads(cached)
             except Exception:
@@ -291,11 +333,16 @@ class LedgerPenetrationService:
             date_from, date_to, page, page_size,
         )
 
-        # 写入缓存 TTL=5min
-        if self.redis:
+        # 写入缓存
+        if self._cache:
+            try:
+                await self._cache.set("ledger", cache_key, result)
+            except Exception:
+                pass
+        elif self.redis:
             try:
                 await self.redis.setex(
-                    cache_key, 300,
+                    f"penetrate:{cache_key}", 300,
                     json.dumps(result, cls=DecimalEncoder),
                 )
             except Exception:
@@ -305,6 +352,9 @@ class LedgerPenetrationService:
 
     async def invalidate_cache(self, project_id: UUID, year: int) -> int:
         """失效指定项目年度的所有穿透缓存"""
+        if self._cache:
+            return await self._cache.invalidate_namespace("ledger")
+
         if not self.redis:
             return 0
         pattern = f"penetrate:{project_id}:{year}:*"

@@ -112,6 +112,6 @@ def delete_goodwill(db, goodwill_id: UUID, project_id: UUID) -> bool:
     goodwill = get_goodwill(db, goodwill_id, project_id)
     if not goodwill:
         return False
-    goodwill.is_deleted = True
+    goodwill.soft_delete()
     db.commit()
     return True

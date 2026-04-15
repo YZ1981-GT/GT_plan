@@ -72,7 +72,7 @@ def delete_scope_item(db, scope_id: UUID, project_id: UUID) -> bool:
     scope = get_scope_item(db, scope_id, project_id)
     if not scope:
         return False
-    scope.is_deleted = True
+    scope.soft_delete()
     db.commit()
     return True
 

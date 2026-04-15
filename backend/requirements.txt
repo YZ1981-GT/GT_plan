@@ -7,10 +7,19 @@ pydantic-settings
 email-validator
 redis
 python-jose[cryptography]
+PyJWT
 passlib[bcrypt]
 httpx
 python-multipart
 openpyxl
+
+# OCR dependencies (optional, install as needed)
+# paddleocr
+# pytesseract
+# Pillow
+
+# MinerU (for advanced document parsing)
+mineru[core]>=2.7.0
 
 pytest
 pytest-asyncio

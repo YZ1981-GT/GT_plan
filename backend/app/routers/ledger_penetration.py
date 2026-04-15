@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -94,6 +94,17 @@ async def get_voucher_entries(
     return await svc.get_voucher_entries(project_id, year, voucher_no)
 
 
+@router.get("/aux-balance-all")
+async def get_all_aux_balance(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """全量辅助余额（所有科目的辅助核算维度）"""
+    svc = _svc(db, None)
+    return await svc.get_all_aux_balance(project_id, year)
+
+
 @router.get("/aux-balance/{account_code}")
 async def get_aux_balance(
     project_id: UUID,
@@ -136,3 +147,48 @@ async def clear_cache(
     svc = _svc(db, redis)
     count = await svc.invalidate_cache(project_id, year)
     return {"cleared": count, "message": f"已清除 {count} 条缓存"}
+
+
+@router.post("/upload")
+async def upload_data(
+    project_id: UUID,
+    year: int = Query(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传四表数据文件（支持历史年度）。
+
+    自动识别 Excel 中的余额表/序时账/辅助账 sheet 并导入。
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="未提供文件")
+
+    content = await file.read()
+    from app.services.account_chart_service import _auto_import_data_sheets
+    result, diagnostics = await _auto_import_data_sheets(
+        project_id, content, year=year, db=db,
+    )
+    return {
+        "imported": result,
+        "diagnostics": diagnostics,
+        "year": year,
+        "file_name": file.filename,
+    }
+
+
+@router.get("/years")
+async def get_available_years(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取该项目有数据的年度列表"""
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import TbBalance
+    tbl = TbBalance.__table__
+    result = await db.execute(
+        sa.select(sa.distinct(tbl.c.year))
+        .where(tbl.c.project_id == project_id, tbl.c.is_deleted == sa.false())
+        .order_by(tbl.c.year.desc())
+    )
+    years = [row[0] for row in result.fetchall()]
+    return {"years": years}

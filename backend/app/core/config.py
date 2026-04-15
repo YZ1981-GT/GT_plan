@@ -31,8 +31,57 @@ class Settings(BaseSettings):
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
     # 文件存储
     STORAGE_ROOT: str = "./storage"
+    ATTACHMENT_PRIMARY_STORAGE: str = "paperless"
+    ATTACHMENT_FALLBACK_TO_LOCAL: bool = True
+    ATTACHMENT_LOCAL_STORAGE_ROOT: str = "./storage/attachments"
+    PAPERLESS_URL: str = ""
+    PAPERLESS_TOKEN: str = ""
+    PAPERLESS_TIMEOUT: int = 30
+    # OCR 配置
+    OCR_DEFAULT_ENGINE: str = "auto"  # auto, paddle, tesseract
+    OCR_PADDLE_ENABLED: bool = True
+    OCR_TESSERACT_ENABLED: bool = True
+    OCR_TESSERACT_LANG: str = "chi_sim+eng"
+    OCR_CONFIDENCE_THRESHOLD: float = 0.8
+    # MinerU 配置
+    MINERU_ENABLED: bool = False
+    MINERU_API_URL: str = "http://localhost:8000"
+    MINERU_USE_CLI: bool = True  # 使用 CLI 模式（直接调用本地 mineru 命令）
+    # 文件上传限制
+    MAX_UPLOAD_SIZE_MB: int = 100  # 最大上传文件大小（MB）
+    # LLM 服务配置（默认使用本地 vLLM）
+    LLM_BASE_URL: str = "http://localhost:8100/v1"  # vLLM OpenAI 兼容 API
+    LLM_API_KEY: str = "not-needed"  # vLLM 本地不需要 API Key
+    DEFAULT_CHAT_MODEL: str = "Kbenkhaled/Qwen3.5-27B-NVFP4"
+    DEFAULT_EMBEDDING_MODEL: str = "Kbenkhaled/Qwen3.5-27B-NVFP4"
+    LLM_TEMPERATURE: float = 0.3
+    LLM_MAX_TOKENS: int = 4096
+    LLM_ENABLE_THINKING: bool = False  # Qwen3.5 thinking 模式，审计场景默认关闭
+    # Ollama 配置（备用，当 vLLM 不可用时降级）
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    # ChromaDB 向量数据库
+    CHROMADB_URL: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
+    @property
+    def is_jwt_key_secure(self) -> bool:
+        """检查 JWT 密钥是否为安全值（非默认弱密钥）"""
+        _WEAK_KEYS = {
+            "dev-secret-key-change-in-production",
+            "change-me-to-a-random-secret",
+            "secret",
+            "test",
+        }
+        return self.JWT_SECRET_KEY not in _WEAK_KEYS and len(self.JWT_SECRET_KEY) >= 16
+
 
 settings = Settings()
+
+# 启动时警告弱 JWT 密钥
+import logging as _logging
+_logger = _logging.getLogger("audit_platform.config")
+if not settings.is_jwt_key_secure:
+    _logger.warning(
+        "⚠️  JWT_SECRET_KEY 使用了默认弱密钥，生产环境请设置强随机密钥（至少16字符）"
+    )

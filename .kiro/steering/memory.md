@@ -30,6 +30,12 @@ inclusion: always
 - Python 3.12 虚拟环境 (.venv)，本地已安装 Docker 28.3.3、Ollama 0.11.10
 - 使用 Kiro steering + hooks 机制管理工作流
 - 四大模块统一架构：四/五步工作流 + SSE 流式通信 + LLM 驱动 + Word 导出
+- 本地 vLLM 模型：`Kbenkhaled/Qwen3.5-27B-NVFP4`（NVFP4 量化，FP8 KV cache，128K 上下文），模型缓存在 `D:\vllm\hf-cache\hub\models--Kbenkhaled--Qwen3.5-27B-NVFP4`（已下载完成）
+- vLLM Docker 配置：镜像 `vllm/vllm-openai:cu130-nightly`，端口 8100，`HF_HUB_OFFLINE=1` 离线模式，NVFP4_BACKEND=marlin，max-model-len=32768，gpu-memory-utilization=0.89，启动命令 `docker compose --profile gpu up vllm`
+- vLLM 已验证可用（2026-04-14）：API `http://localhost:8100/v1`，Qwen3.5 默认开启 thinking 模式（reasoning_content），审计平台调用时需加 `chat_template_kwargs: {enable_thinking: false}` 获取直接回复
+- vLLM 已有独立部署配置在 `D:\vllm\vllm-qwen3.5-nvfp4-sm120\docker-compose.yml`（经过验证的参数），审计平台 docker-compose 已复用该配置
+- 文件上传限制：MAX_UPLOAD_SIZE_MB=100（config.py）
+- Docker Compose 统一管理：GPU 服务（vLLM/MinerU）用 `profiles: [gpu]` 按需启动，`docker-compose.mineru.yml` 已删除并整合到主 `docker-compose.yml`；MinerU 端口改为 8002（Router）+7860（WebUI）；启动命令 `docker compose --profile gpu up vllm mineru`
 
 ### 项目根目录文件
 - `start.bat` — 开发模式一键启动（前后端分离，后端9980+前端3030）
@@ -277,7 +283,9 @@ inclusion: always
 - 聊天 Markdown 渲染依赖：前端需新增 react-markdown + remark-gfm + rehype-highlight + unified + remark-parse + remark-rehype + rehype-stringify（后四个用于富文本复制时 Markdown→HTML 转换）；@ranui/preview 已弃用，改用 iframe + markdownToHtml 方案做在线预览
 - 富文本复制内联样式：markdownToHtml.ts 中自定义 rehypeInlineStyles 插件，给 table/th/td/blockquote/pre/code/h1-h3/hr 注入内联 style 属性，确保剪贴板 HTML 不依赖外部 CSS，粘贴到 Word/邮件/飞书等任何富文本环境都能正确显示格式
 - 项目删除偏好：删除和批量删除操作必须有 ElMessageBox 二次确认弹窗，不能直接删除
+- 回收站偏好：所有删除操作先进回收站（软删除），回收站上限 500 条超限提示清理；左侧栏底部显示回收站入口；支持按类型筛选、恢复、永久删除、清空
 - 文档同步偏好：每次功能变更后需同步更新需求文档（需求文档.md），保持文档与代码一致
+- 科目导入后预览偏好：按大类（资产/负债/权益/损益）Tab 分组，树形展开默认只展开1级科目（不全展开），每个节点显示科目编码+名称+借贷+级次，支持行内编辑（名称+借贷方向）和批量保存
 
 ## 待办 / 进行中
 - 项目文件清理（2026-04）：已删除根目录 `__pycache__/`、`frontend/README.md`；`GT_底稿/审计实务操作手册-框架.md` 和 `致同GT审计手册设计规范.md` 待用户确认是否删除
@@ -293,8 +301,12 @@ inclusion: always
 - 审计作业平台 Phase 8 Extension 后端+前端全部必需任务已完成（2026-04）：Task 1-2 数据库迁移+ORM+Schemas全部完成、Task 3 多准则适配(3.1/3.5/3.6)、Task 4 多语言(4.2/4.7后端+19.1-19.5前端)、Task 5 审计类型(5.4)、Task 6 自定义模板(6.1-6.3/6.5-6.7后端+20.1-20.5前端)、Task 7 电子签名(7.1-7.7后端+21.1-21.5前端)、Task 8 监管对接(8.1-8.7后端+22.1-22.5前端)、Task 9 致同编码(9.1/9.2/9.5/9.6后端+23.1-23.4前端)、Task 10 品牌视觉(全部+27.1-27.6 SCSS)、Task 12 T型账户(12.1-12.8后端+24.1-24.4前端)、Task 13 AI插件(13.1-13.14后端含8个Executor stub+25.1-25.5前端)、Task 14 Metabase(14.1-14.4/14.6/14.7)、Task 15 Paperless-ngx(全部)、Task 16 大数据优化(全部)、Task 18 后端测试(18.1-18.10全部)、Task 19-27 前端42个Vue组件全部完成、Task 30 三栏布局(全部)、Task 31 vue-office(全部)；后端857个测试通过；extensionApi.ts API服务层+9条新路由；剩余未完成：5.1-5.3/5.5(审计类型模板)、28(集成测试)、29(文档)、32(Teable/Grist评估)
 - Phase 8 三件套与需求文档一致性审查（2026-04）：8个问题已全部修复——requirements.md新增需求16(三栏布局)+17(vue-office)+18(Teable/Grist评估)，需求7补充模板集关联(附录G.6)，需求12移除与需求15冗余的分区表/索引定义，需求13补充Metabase与右侧栏功能边界说明；tasks.md新增任务组30(三栏布局,4/6已完成)+31(vue-office)+32(Teable/Grist)；design.md确认完整(1053行)；README.md更新为18个需求32个任务组
 - 前端三栏布局（需求文档12.2.2）已完成初版：ThreeColumnLayout.vue核心组件（顶部导航+左侧9项功能导航可折叠220px+中间栏340px+右侧栏自适应+拖拽分隔线+localStorage偏好保存+响应式）、MiddleProjectList.vue中间栏项目列表（搜索/筛选/状态色条/选中高亮）、DetailProjectPanel.vue右侧详情面板（5个Tab概览/指标/底稿/试算表/报表+6个快捷操作）、DefaultLayout.vue重写为三栏容器（首页/项目列表三栏模式，具体项目子页面隐藏中间栏右侧全宽）
+- 四栏视图需求（2026-04-14）：默认三栏，用户手动切换才出现四栏；但合并模块直接默认四栏。四栏模式下：第1栏=导航、第2栏=项目列表、第3栏=功能目录（折叠展开列表）、第4栏=选中项的具体内容。前3栏各自支持独立隐藏/展开（点击按钮收起为窄条），最大化第4栏内容区。9个四栏场景：①报表→按年度+报表类型/选中年度报表数据+多年对比 ②附注→按科目章节树/选中章节表格+文字 ③底稿→按审计循环B/C/D-N分组/选中底稿详情+在线编辑 ④试算表→按科目类别分组/选中科目未审数+调整+审定数 ⑤调整分录→AJE/RJE分组/选中分录借贷明细行 ⑥合并范围→子公司树形列表/选中子公司抵消分录+少数股东 ⑦函证→按类型+状态分组/选中函证详情+回函对比 ⑧风险评估→按业务循环+认定/选中风险评估详情+应对程序 ⑨归档检查→检查清单分组/选中项完成状态+附件
+- 四栏视图已实现初版（2026-04-14）：ThreeColumnLayout.vue 新增 catalog slot + 顶部栏 Grid/Menu 视图切换按钮 + catalog 栏独立折叠（20px窄条）+ 拖拽宽度调整；新增 FourColumnCatalog.vue（4个Tab：报表按年度/附注按章节/底稿按循环/试算表按类别，折叠展开）+ FourColumnContent.vue（报表表格/附注内容/底稿跳转/试算表明细）；DefaultLayout.vue 四栏模式下第3栏=FourColumnCatalog 第4栏=FourColumnContent，三栏模式保持原有 DetailProjectPanel
+- 查账页面偏好：查账必须跳转到独立页面（/projects/:id/ledger），不混在首页四栏视图中；查账页面自身最多3栏（科目列表+序时账+凭证详情），通过折叠功能切换；年度默认值改为 getFullYear()-1（审计通常审计上一年度数据），不再用当前年
 - 四表联查是用户强调的重中之重：Task 16已全部完成——012迁移将tb_ledger+tb_aux_ledger重建为PARTITION BY RANGE(year)分区表（复合主键id+year，预建2023-2027共5个年度分区，无生产数据直接重建）+011迁移3个补充索引+LedgerPenetrationService 6个查询方法+Redis缓存TTL=5min+7个API端点+VirtualScrollTable虚拟滚动组件+LedgerPenetration.vue穿透查询页面（面包屑5级导航：余额→序时账→凭证→辅助余额→辅助明细）+19个测试通过；实际数据量参考：凭证表26万行、核算项目明细表23万行
 - 底稿跨企业汇总功能（已完成）：WorkpaperSummaryService（trial_balance按科目×企业透视+Excel导出）+ workpaper_summary router 3个端点 + WorkpaperSummary.vue（左侧科目树+企业树checkbox，右侧动态列el-table+合计行+导出Excel）+ 路由 /projects/:id/workpaper-summary + 详情面板快捷按钮（仅合并项目显示）
+- 账表联动字段缺失（待修复）：①tb_aux_balance和tb_aux_ledger缺少account_name字段（穿透查询需额外JOIN显示科目名称）②trial_balance缺少currency_code字段（多币种项目无法区分）
 
 ### 审计作业平台新增代码结构 (audit-platform/)
 
@@ -535,4 +547,152 @@ inclusion: always
 - 项目列表树形展示偏好：用 +/− 文字按钮展开/收起（非箭头图标），每级缩进20px，子节点区域左侧虚线连接线，最多15级嵌套
 - UI 精致度偏好：状态色条不能太粗（2px+上下4px间距），合并项目左边框用浅紫色（primary-lighter）而非深紫色，整体要符合致同品牌规范的精致感
 - 数据导入三阶段流程：上传→预览前20行+自动列映射→确认导入；后端 preview_file() API 返回 headers/rows/column_mapping/file_type_guess；前端每列上方 el-select 下拉按4组分类（科目/金额/凭证/辅助），已匹配绿✓未匹配橙⚠；_COLUMN_MAP 扩展到30+个中英文列名映射，支持自动识别科目表/序时账/余额表/辅助账4种文件类型
-- 数据导入预览偏好：Excel 多 sheet 时每个 sheet 独立预览20行（el-tabs 卡片切换），默认跳过前2行（第3行作为表头，skip_rows=2）；_parse_excel 重构为 _parse_sheet + _parse_excel_multi_sheet
+- 列映射下拉框偏好：只显示中文标签（不要英文字段名），分组用 el-option-group，加 filterable 支持搜索过滤；列名匹配用模糊匹配（_match_column 去掉方括号/圆括号/空格等特殊字符后再匹配，不穷举变体）
+- 数据导入预览偏好：Excel 多 sheet 时每个 sheet 独立预览20行（el-tabs 卡片切换+匹配计数徽标），表头行自动检测（_detect_header_row 扫描前5行，识别说明行vs表头行，不再固定 skip_rows=2）；首汽股份格式前2行说明→skip=2，丰桔出行格式第1行表头→skip=0
+- 列映射持久化：改为后端持久化（wizard_state.column_mappings），localStorage作为降级方案；每个sheet独立保存（key={file_type}:{sheet_name}）；_COLUMN_MAP扩展到90+个同义词（科目编号/期初金额/凭证字号/借方发生额/核算维度等）；新增4个API：POST/GET column-mappings + GET reference-projects + POST reference-copy（跨项目参照复制映射）
+- 用户需求：列映射+科目映射都需要跨项目参照复制——企业A配好后企业B可弹窗选择参照，自动带出以往映射规则，新增科目仍需用户手动对应
+- 架构优化三问题已完成（architecture-optimization.md 全部7个问题已解决）：①UnifiedAIService 统一入口包装 AIService+AIPluginService+UnifiedOCRService ②UnifiedOCRService 自动选择 PaddleOCR(精度)/Tesseract(速度)+延迟初始化+引擎回退 ③CacheManager 命名空间化Redis缓存(formula/metabase/ledger/auth/notification)+预定义TTL+批量失效+统计监控；新增 /api/ai/health + /api/cache/stats 端点；35个测试通过；所有改动为 additive 不破坏现有代码
+- 架构优化遗留问题修复（2026-04-14）：①AIService.ocr_recognize()已改为代理到UnifiedOCRService（自动获得三引擎兜底）②config.py已补齐OCR_DEFAULT_ENGINE/OCR_PADDLE_ENABLED/OCR_TESSERACT_ENABLED/OCR_TESSERACT_LANG/OCR_CONFIDENCE_THRESHOLD五个配置项 ③UnifiedOCRService.__init__已读取config控制引擎启用 ④asyncio.get_event_loop()已改为get_running_loop() ⑤CacheManager已迁移到FormulaEngine/LedgerPenetrationService/MetabaseService（三个服务新增cache_manager参数，优先CacheManager降级raw Redis，向后兼容）⑥ai_plugins.py路由已改用UnifiedAIService（list_plugins/enable/disable通过统一入口），ai_admin.py保留AIService用于typed AIHealthResponse兼容 ⑦全部遗留问题已修复，仅剩architecture-optimization.md文档重复内容待清理
+- AI模型配置管理（2026-04-14）：新增 /api/ai-models CRUD+激活+健康检查+种子数据 API（ai_models.py路由），前端新增 AIModelConfig.vue 页面（三Tab对话/嵌入/OCR+健康状态卡片+CRUD弹窗）+ ModelTable.vue 组件 + aiModelApi.ts 服务层；左侧栏新增「AI 模型」导航项（Cpu图标），路由 /settings/ai-models，DefaultLayout 已处理 /settings/ 前缀为全宽模式
+- LLM 调用全面切换到本地 vLLM（2026-04-14）：ai_service.py 从 Ollama 原生 API 改为 OpenAI 兼容 API，新增 `_get_llm_client()` 指向 `http://localhost:8100/v1`；`_chat_sync`/`_chat_stream`/`embedding` 全部改用 OpenAI 格式；config.py 新增 LLM_BASE_URL/LLM_API_KEY/DEFAULT_CHAT_MODEL/DEFAULT_EMBEDDING_MODEL/LLM_TEMPERATURE/LLM_MAX_TOKENS/LLM_ENABLE_THINKING/OLLAMA_BASE_URL/CHROMADB_URL 共9个配置项；默认模型 `Kbenkhaled/Qwen3.5-27B-NVFP4`；Qwen3.5 thinking 模式默认关闭（`chat_template_kwargs: {enable_thinking: false}`）；init_default_models 种子数据改为 openai_compatible provider；Ollama 保留为备用
+- 回收站架构（2026-04-14）：`SoftDeleteMixin` 新增 `soft_delete()` 方法（设 is_deleted=True + deleted_at=now()），全部 24 处服务层软删除操作统一改为调用 `soft_delete()`；新增 recycle_bin.py 路由（5个端点：列表/恢复/永久删除/清空/统计），支持 12 种数据类型；上限 500 条超限提示；ai_chat 物理删除和 import_service rollback 物理删除保持不变（不进回收站）；前端 RecycleBin.vue + 左侧栏导航 + 路由 /recycle-bin
+- 项目向导确认步骤依赖放宽（2026-04-14）：confirmation 步骤只要求 basic_info + account_import + account_mapping 三个核心步骤完成即可创建项目，materiality 和 template_set 改为可选（项目创建后再补充）
+
+## 代码审查与修复（2026-04-14）
+
+### 已修复：8个测试文件 ImportError（全部修复，所有文件可被 pytest 收集）
+- `test_auth_permission.py`：导入改为 `app.core.security`，JWT 测试适配 `create_access_token(data: dict)` 签名，密码哈希测试适配 bcrypt 格式
+- `test_collaboration.py`/`test_going_concern.py`：`GoingConcern` → `GoingConcernEvaluation`
+- `test_consolidation.py`：`EvaluationStatus` → `EvaluationStatusEnum`，`ComponentResultCreate` → `ResultCreate`（别名导入），`ComponentAuditorService` 改为模块导入
+- `test_notification_service.py`：`NOTIF_TYPE_MISSTATEMENT` → `NOTIF_TYPE_MISSTATEMENT_ALERT`
+- `test_ocr_service.py`：`DocumentExtracted`/`DocumentMatch`/`DocumentScan`/`DocumentType`/`RecognitionStatus`/`MatchResult` 已导出到 `app.models.__init__`
+- `test_review_service.py`：`review_service.py` 改为 `from app.models.collaboration_models import ReviewStatus as ReviewStatusEnum`
+- `test_minority_interest.py`：`MinorityInterestInput` → `MinorityInterestResult`（别名导入）
+
+### 已修复：架构问题
+- `auth_middleware.py` 重写为代理到 `deps.py` 的统一 `get_current_user`（消除双重定义+同步ORM问题），保留 `require_permission`/`require_any_permission`
+- `auth_service.py` 新增公开 `is_token_blacklisted(token, redis)` 函数
+- `deps.py` 加入 access token Redis 黑名单检查（Redis 不可用时降级跳过，不阻断请求）
+- `deps.py` 新增 `sync_db = get_sync_db` 别名，供同步路由使用
+- `database.py` 已添加 `pool_size=10, max_overflow=20` 连接池配置
+- `response.py` + `audit_log.py` 的 `_SKIP_PATHS` 加入 `/api/events/` + `/api/message/stream`，并跳过 `text/event-stream` content-type
+- `going_concern_service.py`：`GoingConcern` → `GoingConcernEvaluation` 全局替换
+- `group_structure_service.py`：`OwnershipType` → `ScopeCompanyType`，补充 `CompanyTreeResponse`/`ConsolidationPeriod` 本地定义
+- `consolidation_schemas.py`：`class Config:` 已全部替换为 `model_config = ConfigDict(...)`
+- 10个合并路由（consolidation/consol_scope/consol_trial/internal_trade/component_auditor/goodwill/forex/minority_interest/consol_notes/consol_report）从 `Depends(db)`（异步）改为 `Depends(sync_db)`（同步），修复 sync/async 混用
+- `event_bus.py` SSE 队列加 `maxsize=100` 限制，防止无限内存增长
+- `event_handlers.py` `_make_handler` 添加 try/except/rollback，异常时自动回滚数据库会话
+- `notification_service.py`：修复 `SessionLocal`→`SyncSession` 导入错误；新增 `_notify()` 包装方法自动关闭数据库会话防止连接泄漏
+- `main.py` 添加 `GZipMiddleware`（minimum_size=1000），大 JSON 响应自动压缩
+- `config.py` 添加 `is_jwt_key_secure` 属性和启动时弱密钥警告
+
+### 已修复：安全问题
+- `deps.py` 的 `get_current_user` 现在检查 access token 黑名单（通过 `is_token_blacklisted`）
+- `docker-compose.yml` CORS_ORIGINS 从 JSON 数组格式改为逗号分隔字符串（与 config.py `split(",")` 一致）
+- `.env` 补齐附件存储（`ATTACHMENT_*`/`PAPERLESS_*`）和 MinerU 配置项
+- `config.py` 启动时检测弱 JWT 密钥并输出警告日志
+
+### 已修复：前端问题
+- `package.json` 添加 `@element-plus/icons-vue` 依赖
+- `auth.ts` 认证请求改用独立 `authHttp`（避免循环依赖），`fetchUserProfile` 改用带拦截器的 `http` 实例
+- `vite.config.ts` alias `'@': '/src'` 改为 `fileURLToPath(new URL('./src', import.meta.url))`，修复 Windows 路径解析
+- `Register.vue` 全局 `axios` 改为 `http` 实例，保持一致性
+
+### 已修复：测试基础设施
+- `conftest.py` 补齐 6 个缺失的模型导入（audit_platform_models/report_models/workpaper_models/consolidation_models/collaboration_models/ai_models），确保 `Base.metadata.create_all` 能创建所有表
+
+### 已确认：32个同步路由+10个AI路由为死代码（未注册到 main.py）
+- 同步路由：dashboard/project_mgmt/going_concern/archive/audit_logs/audit_plan/audit_program/audit_findings/management_letter/confirmations/pbc/reviews/review/sync/sync_conflict/notifications/risk/companies/component_auditors 等，使用同步 `Session` + `db.query()`
+- AI路由：ai_chat/ai_contract/ai_evidence_chain/ai_confirmation/ai_knowledge/ai_ocr/ai_pdf_export/ai_report/ai_risk_assessment/ai_workpaper/nl_command 等
+- `dashboard.py` 有导入路径错误（`app.services.collaboration_schemas` 应为 `app.models.collaboration_schemas`）
+- 以上均不影响当前运行，启用前需修复
+
+### 仍待修复
+- Alembic 迁移链 009-014 多 head 冲突仍未解决（需 `alembic merge heads` 或手动合并）
+- main.py 60+ 个路由注册可优化为分组嵌套 APIRouter
+- `routers/auth.py`（旧版，未注册到 main.py）有同步调用异步函数、导入不存在函数等问题，建议删除
+- 32个未注册的同步路由文件启用前需转为异步 ORM 风格
+- dashboard_service 等同步服务存在 N+1 查询、缺少分页限制、统计计算应下推到 SQL 层
+
+### 查账链路分析发现（2026-04-14）
+
+数据流：Excel/CSV → GenericParser → 四表(tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger) → account_mapping(科目映射) → report_line_mapping(行次映射) → trial_balance(试算表) → financial_report(报表) → drilldown/ledger_penetration(穿透查询)
+
+已修复（2026-04-14，面向百万行数据优化）：
+1. recalc_unadjusted 批量化：1次查询加载所有已有试算表行（代替逐行SELECT），回滚后不在汇总结果中的科目自动清零
+2. recalc_adjustments 批量化：同上模式，1次查询加载所有需更新行
+3. GenericParser._try_parse_excel 遍历所有 worksheets 合并数据（不再只读第一个 sheet）
+4. import_service 写入优化：CHUNK_SIZE 5000→10000，改用 execute(table.insert(), dicts) 批量INSERT（比 add_all ORM 快5-10倍），每50000行flush
+5. TbAuxBalance + TbAuxLedger 添加 account_name 字段（ORM模型已加，需 ALTER TABLE ADD COLUMN 到本地PG）
+6. drill_to_ledger 使用 SQL 窗口函数 SUM() OVER(ORDER BY ...) 计算累计余额（running_balance），LedgerRow schema 新增 running_balance 字段
+7. _determine_report_type_from_code 补全 4xxx 所有者权益类 → 资产负债表映射
+8. ReportFormulaParser.execute 用 ast.parse + 递归求值替代 eval()，_safe_eval_expr 函数支持 +−×÷ 和括号
+9. _backfill_account_names 新增：导入完成后从 account_chart 表批量回填缺失的 account_name（单条 UPDATE FROM）
+
+仍待修复：
+- LedgerBalanceReconcileRule 和 AuxMainReconcileRule 校验依赖导入顺序（需先导入余额表），应在 UI 层引导或校验时明确提示
+- trial_balance 缺少 currency_code 字段，多币种项目同科目不同币种余额会被合并
+- 科目映射 auto_suggest 模糊匹配可优化为预计算索引（当前 500×120=6万次字符串比较，内存操作不涉及DB，优先级低）
+- 现金流量表和权益变动表的报表行次映射逻辑尚未实现（当前只有 BS 和 IS）
+
+### 四表字段扩展（2026-04-14，基于实际序时账 Excel 表头）
+- 实际数据量：凭证表 26 万行、核算项目明细表 23 万行、科目余额表 830 行、核算项目余额表 1142 行
+- TbBalance 新增：opening_qty（期初数量）、opening_fc（期初外币）
+- TbLedger 新增：accounting_period（会计月份）、voucher_type（凭证类型）、entry_seq（分录序号）、debit_qty/credit_qty（借贷数量）、debit_fc/credit_fc（借贷外币）
+- TbAuxBalance 新增：aux_type_name（核算项目类型名称）、opening_qty、opening_fc
+- TbAuxLedger 新增：aux_type_name、accounting_period、voucher_type、debit_qty/credit_qty、debit_fc/credit_fc
+- 解析器列名映射新增：科目编号/期初金额/会计月份/凭证类型/分录序号/借方数量/贷方数量/借方外币发生额/贷方外币发生额/核算项目类型编号/核算项目类型名称/核算项目编号/核算项目名称
+- 前端 FIELD_GROUPS 同步扩展，列映射变化时自动防抖保存到后端（watch + 800ms debounce）
+- 以上新增字段已在本地 PG 执行 ALTER TABLE ADD COLUMN（2026-04-15 完成，共补齐 20 列：tb_ledger 7列 + tb_balance 2列 + tb_aux_balance 4列 + tb_aux_ledger 7列）
+- attachments 表缺少列（迁移019未执行）：需执行 `ALTER TABLE attachments ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(50) DEFAULT 'general'; ADD COLUMN IF NOT EXISTS reference_id UUID; ADD COLUMN IF NOT EXISTS reference_type VARCHAR(50); ADD COLUMN IF NOT EXISTS storage_type VARCHAR(20) DEFAULT 'local';`
+- 数据导入流程偏好（2026-04-14）：上传预览后所有 sheet 自动做列名匹配（不等用户切换），用户确认映射后点"确认导入"才入库；入库前检测重复数据（同 project+year+account_code+voucher_no），重复时提示用户选择覆盖或跳过
+- 科目导入一键联动四表（2026-04-14）：步骤2"确认导入"按钮同时做两件事——①科目表sheet→account_chart ②其他sheet按识别类型自动导入四表（凭证表→tb_ledger，辅助余额表→tb_aux_balance，辅助明细表→tb_aux_ledger，余额表→tb_balance），导入完成后查账页面即可看到数据
+- account_chart_service._COLUMN_MAP 扩展 40+ 个新列名映射（会计月份/凭证类型/分录序号/借贷数量/借贷外币/核算项目类型编号名称/科目级次类别/期初数量外币）
+- _guess_file_type 增强：区分辅助明细账（有凭证日期+凭证号→aux_ledger）和辅助余额表（无凭证信息→aux_balance）
+
+## 技术决策（2026-04-15）
+- 标准科目表扩充（120→166个）：新增新准则科目（使用权资产1641/1642/1643、租赁负债2601、合同资产1141/1142、合同负债2205、债权投资1504-1507、其他综合收益3102、其他权益工具3003等）+ 6xxx系列损益科目（6001主营业务收入、6401主营业务成本、6601-6604费用、6701/6702减值损失、6115资产处置收益、6117其他收益等），兼容企业实际使用的两套编码体系
+- 科目映射自动匹配增强：匹配优先级扩展为7级：⓪完整编码精确匹配（去掉点号/横杠后全码匹配，解决221101误匹配到2211的bug） ①前4位前缀匹配 ②一级科目前缀匹配（`_extract_level1_code`处理6401.01→6401） ③科目名称精确匹配 ④基础名称匹配（去掉横杠后缀，如"主营业务成本-累计折旧费"→"主营业务成本"） ⑤模糊匹配 ⑥未匹配
+- 标准科目加载改为增量更新：`load_standard_template` 不再拒绝重复加载，而是只插入缺失的科目（已有的跳过），`get_standard_chart` 路由每次请求都尝试增量补充，确保已有项目也能获取到新增的标准科目
+- 科目映射交互偏好：自动匹配应直接保存结果（不要只返回"建议"让用户逐条确认），匹配后展示映射结果表格让用户确认/调整即可
+- 科目映射 auto_match API（`POST /mapping/auto-match`）：自动匹配并直接保存，已映射科目不覆盖，返回 AutoMatchResult（saved_count/skipped_count/unmatched_count/details）；前端 AccountMappingStep.vue 从三栏布局改为 el-table 表格视图（客户编码→标准科目下拉→匹配方式标签→置信度），未匹配行黄色高亮+侧边抽屉手动选择
+- 四表数据导入链路问题（2026-04-15）：科目导入步骤（AccountImportStep）的 `importOtherSheets` 依赖 `previewSheets` 中 `file_type_guess` 正确识别余额表/序时账等类型，如果用户上传的 Excel 只有科目表 sheet 或其他 sheet 未被识别，四表（tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger）会为空，导致查账页面无数据；已在 LedgerPenetration.vue 添加空状态导入入口作为兜底
+- confirm_project 状态校验放宽：允许 `created` 和 `planning` 状态都能确认（planning 状态下相当于重新确认/更新配置）
+- 四表导入架构改造（2026-04-15）：从前端 `importOtherSheets` 逐 sheet 调用改为后端 `import_client_chart` 一次性自动处理——新增 `_auto_import_data_sheets` 函数，在科目表导入后自动用 `_parse_excel_multi_sheet` 解析所有 sheet、`_guess_file_type` 识别类型、`GenericParser` 解析并批量写入四表；`AccountImportResult` 新增 `data_sheets_imported` 字段返回各表导入条数；前端不再单独调用 `importOtherSheets`，改为展示后端返回的四表导入结果
+- import_batches 表列缺失修复（2026-04-15）：`import_batches` 表缺少 `is_deleted`/`created_by`/`updated_at`/`deleted_at` 四列（Alembic 迁移不完整），导致 `_auto_import_data_sheets` 创建 ImportBatch 时报 UndefinedColumnError 被 try/except 静默吞掉；已手动 ALTER TABLE ADD COLUMN 修复
+- 数据导入校验偏好：四表关键列缺失时必须阻止进入下一步并明确提示用户，不能静默跳过
+- 四表导入诊断机制（2026-04-15）：`_auto_import_data_sheets` 新增 `sheet_diagnostics` 返回每个 sheet 的识别结果（类型/匹配列/缺失列/行数），缺少必需列的 sheet 跳过导入并记录警告；`AccountImportResult` 新增 `sheet_diagnostics` 字段；前端导入结果页余额表缺失时显示红色警告+诊断详情，`AccountImportStep.validate()` 阻止进入科目映射步骤
+- 两套列名映射不一致修复（2026-04-15）：`account_chart_service._COLUMN_MAP`（识别阶段）和 `parsers.py._COLUMN_MAPS`（解析阶段）存在严重不一致，识别阶段判断为余额表但解析阶段关键列映射不到导致0条写入；已将 parsers.py 四个映射表（_BALANCE/_LEDGER/_AUX_BALANCE/_AUX_LEDGER_COLUMN_MAP）与 _COLUMN_MAP 完全同步，新增 50+ 个列名映射（借方累计/贷方累计/期末数/年初数/凭证字号/核算维度等），清理重复条目
+- 列映射保存偏好：点"保存映射"应一次保存所有 sheet 的映射（不仅当前 sheet），保存后自动进入参照映射库供其他项目引用；防抖自动保存只存当前 sheet，手动保存和确认导入时才全量保存
+- attachments 表列缺失已修复（2026-04-15）：手动 ALTER TABLE 补齐 attachment_type/reference_id/reference_type/storage_type 四列（迁移019未执行的遗留问题，memory.md 中已有记录但未实际执行）
+- 科目分类推断改造（2026-04-15）：`_infer_category` 从纯编码首位硬编码改为名称关键词优先+编码兜底——新增 `_NAME_CATEGORY_KEYWORDS`（40+个关键词覆盖权益/收入/费用），6xxx 损益类细分（6001-6399=收入，6400+=费用），4xxx 区分标准成本类（4001/4101）和权益类；解决用户编码体系中 4001=实收资本被误归为资产类的问题
+- 新建项目 wizard reset 修复（2026-04-15）：`ProjectWizard.vue` onMounted 在无 projectId 参数时调用 `wizardStore.reset()`，解决新建项目弹出已有项目数据的问题
+- 修改推断逻辑后需同步修复已有数据：改 `_infer_category` 代码不会自动修复数据库中已有的错误分类，需要跑批量 UPDATE 脚本；已修复两个项目共 730 个科目的分类（4xxx 权益归位、6xxx 收入/费用归位），修复后分布：资产 728/负债 184/权益 30/收入 92/费用 620
+- 项目数据现状（2026-04-15）：两个项目（df5b8403 + fae4b0e7），每个 827 客户科目 + 166 标准科目；四表（tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger）仍为空，待用户重新上传文件触发 `_auto_import_data_sheets`
+- 四表必需列两级校验（2026-04-15）：硬性必需（红色，缺了丢弃行）= 余额表(account_code)、凭证表(account_code+voucher_date+voucher_no)、辅助余额(account_code+aux_type)、辅助明细(account_code)；建议列（橙色，缺了能入库但数据不完整）= 余额表(opening/debit/credit/closing_balance)、凭证表(debit/credit_amount+summary)、辅助余额(opening/closing_balance+aux_code/name)、辅助明细(aux_type+voucher_date+debit/credit_amount)
+- import_batches 时区类型不匹配修复（2026-04-15）：`started_at`/`completed_at` 列类型是 `TIMESTAMP WITHOUT TIME ZONE`（naive），代码用 `datetime.now(timezone.utc)`（aware）导致 asyncpg DataError；已改为 `datetime.utcnow()`；同时 except 块加 `await db.rollback()` 防止 session PendingRollbackError 污染后续循环
+- 11张表补齐 deleted_at 列（2026-04-15）：tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger/account_chart/account_mapping/trial_balance/adjustments/adjustment_entries/materiality/unadjusted_misstatements 均缺少 `deleted_at` 列（ORM 模型有但数据库没有），`_soft_delete_existing` 设置 deleted_at 时报 `Unconsumed column names`；已全部 ALTER TABLE ADD COLUMN 修复
+- import_service.py 时区统一（2026-04-15）：8处 `datetime.now(timezone.utc)` 全部改为 `datetime.utcnow()`，与数据库 TIMESTAMP WITHOUT TIME ZONE 类型一致
+- _soft_delete_existing ORM/Core 风格冲突修复（2026-04-15）：`sa_update(table_model)` ORM 风格 update 在 `.values(deleted_at=...)` 时报 `Unconsumed column names: deleted_at`（ORM 元数据缓存与实际表结构不一致）；改为 Core 风格 `sa.update(tbl.__table__)` 只设 `is_deleted=True`，彻底绕过 ORM 列校验
+- 查账页面筛选偏好：余额表需支持多种筛选（期末有数/期初有数/期初+期末都有数/本期有变动/借方有发生额/贷方有发生额/仅一级科目），一级科目行加粗，显示筛选计数
+- 查账页面穿透交互：余额表从 VirtualScrollTable 改为 el-table（支持排序+双击+行样式），科目编号和期末余额单击可穿透，双击行也可穿透；序时账→凭证同理
+- 四表数据导入现状（2026-04-15）：tb_balance 827行、tb_ledger 15162行已成功导入；tb_aux_balance/tb_aux_ledger 仍为0行（可能有其他列缺失问题待排查）
+- 科目级次字段（2026-04-15）：`tb_balance` 新增 `level` 列（INTEGER），解析器从 Excel"科目级次"列提取（无则从编码推断 `_infer_level_from_code`），`get_balance_summary` API 返回 level，前端 `getLevel(row)` 优先用后端 level 字段；已回填 827 行（111 个一级 + 716 个二级）
+- 折叠级次偏好：科目余额表的树形折叠必须支持 3 级、4 级、5 级及以上的多级嵌套，不能只处理 1-2 级
+- 筛选后折叠偏好：筛选后仍需保持树形折叠展开（自动补充缺失的祖先节点，祖先用灰色斜体区分），筛选模式下默认全部展开让用户直接看到匹配结果
+- 查账页面账套切换（2026-04-15）：顶部新增账套信息栏（单位名称+项目标签+切换单位下拉+切换年度下拉），切换时 router.push 更新 URL 触发 watch 重新加载；单位名称从 wizard_state.basic_info.client_name 取，年度从 audit_year 取
+- 多年度数据管理（2026-04-15）：查账页面新增"导入数据"按钮+弹窗（年度选择+多文件拖拽上传+逐文件进度），后端新增 `POST /ledger/upload?year=` 直接调用 `_auto_import_data_sheets` 只导四表不动科目表 + `GET /ledger/years` 返回有数据的年度列表；年度下拉标记"有数据"；支持首次承接上传以往年度数据
+- 多年度自动识别（待实现）：用户提出通过"上年期末=当年期初"规则自动识别年度，目前需用户手动选择年度后上传
+- 余额表树形视图改为可选（2026-04-15）：默认扁平视图（filteredBalance，保证数据一定能显示），用户点"树形视图"按钮才切换到 treeBalance；treeBalance 曾导致数据不显示（树构建 bug），改为可选后不影响基础功能
+- 合计行穿透偏好：双击非末级科目（合计行）的发生额时，需查出所有末级子科目的明细账合并展示；后端 `get_ledger_entries` 支持 `account_code` 以 `*` 结尾时用 `LIKE` 前缀查询，前端自动检测是否有子科目决定传 `1002*` 还是 `1002.011`
+- 序时账显示偏好：需显示期初余额行（紫色斜体）+ 每笔发生后的 running balance 余额列 + 月份变化时插入月小计行（橙色加粗，本月借贷累计）；按 Enter 键返回上一级余额表
+- 辅助表sheet名称匹配修复（2026-04-15）：`_SHEET_PATTERNS` 中 `tb_aux_ledger` 的"辅助账"关键词太宽泛，把"辅助账月余额表"也匹配走了导致辅助余额表0行；修复：`tb_aux_balance` 加"月余额"/"辅助账月余额"，`tb_aux_ledger` 改为"辅助账明细"，优先级调整为 aux_balance > aux_ledger
+- 穿透链路完整（2026-04-15）：余额表 → 序时账（含期初行+余额列+月小计） → 凭证分录 / 辅助余额（序时账页面新增"辅助余额"按钮） → 辅助明细；面包屑支持所有层级回退+Enter返回
+- 辅助余额表Tab偏好（2026-04-15）：辅助余额表应与科目余额表同级展示（Tab切换，不是穿透下级），位于"科目余额表"标题旁；新增 `GET /ledger/aux-balance-all` 全量辅助余额API + `get_all_aux_balance` 服务方法；双击辅助余额行直接进入辅助明细账
+- tb_aux_balance/tb_aux_ledger 补齐 account_name 列（2026-04-15）：ORM 模型有但数据库缺失，`get_all_aux_balance` 查询时报 UndefinedColumnError；已 ALTER TABLE ADD COLUMN 修复
+- 辅助余额表树形视图（待实现）：用户要求辅助余额表也支持树形视图（按科目编号分组折叠），逻辑同科目余额表
+- tb_aux_balance/tb_aux_ledger 已成功导入（2026-04-15）：tb_aux_balance 3497行、tb_aux_ledger 13637行；辅助余额表加前端分页（每页100行）解决3497行渲染卡顿
+- 辅助余额表借贷发生额为空（非bug）：用友等财务软件导出的"辅助账月余额表"只有期初/期末余额，无借贷发生额；发生额在"辅助账明细表"中；可从 tb_aux_ledger 按科目+辅助维度汇总回填
+- 查账导入表头匹配（待实现）：用户要求导入数据时弹出表头字段匹配确认，改造为三步流程：上传→预览+列映射确认→导入；复用科目导入步骤的 preview API
+- 查账页面命名：大标题和面包屑用"账簿查询"，Tab 标签保留"科目余额表"/"辅助余额表"
+- 导入数据按钮改为跳转回科目导入步骤（复用已有的预览+列映射功能），去掉查账页面的独立上传弹窗

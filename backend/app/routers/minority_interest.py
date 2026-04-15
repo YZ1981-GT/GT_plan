@@ -5,8 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.deps import get_db, get_current_user
-db = get_db
+from app.deps import sync_db, get_current_user
 from app.models.consolidation_schemas import MinorityInterestResult
 from app.services.minority_interest_service import (
     calculate_mi,
@@ -23,7 +22,7 @@ router = APIRouter(prefix="/api/consolidation/minority-interest", tags=["少数�
 def list_mi(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_mi_list(db, project_id, year)
@@ -46,7 +45,7 @@ def create_or_update_mi_route(
     year: int,
     company_code: str,
     data: MinorityInterestResult,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return create_or_update_mi(db, project_id, year, company_code, data)
@@ -56,7 +55,7 @@ def create_or_update_mi_route(
 def delete_mi_route(
     mi_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_mi(db, mi_id, project_id):

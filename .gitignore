@@ -37,6 +37,7 @@ desktop.ini
 # Storage & data
 storage/
 backend/data/sessions/
+backend/*.db
 
 # Build artifacts
 *.exe
@@ -45,3 +46,11 @@ backend/data/sessions/
 
 # Large data files
 Excel财务数据采集*.xlsx
+序时账.xlsx
+test_collab.db
+
+# Temporary files
+*.log
+
+# Test databases
+*.db

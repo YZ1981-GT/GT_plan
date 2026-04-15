@@ -16,7 +16,7 @@
     <!-- Content Area -->
     <div v-loading="wizardStore.loading" class="gt-wizard-content">
       <BasicInfoStep v-if="wizardStore.currentStepKey === 'basic_info'" ref="basicInfoRef" />
-      <AccountImportStep v-else-if="wizardStore.currentStepKey === 'account_import'" />
+      <AccountImportStep v-else-if="wizardStore.currentStepKey === 'account_import'" ref="accountImportRef" />
       <AccountMappingStep v-else-if="wizardStore.currentStepKey === 'account_mapping'" />
       <MaterialityStep v-else-if="wizardStore.currentStepKey === 'materiality'" />
       <TeamAssignmentStep v-else-if="wizardStore.currentStepKey === 'team_assignment'" />
@@ -73,6 +73,7 @@ const router = useRouter()
 const wizardStore = useWizardStore()
 
 const basicInfoRef = ref<InstanceType<typeof BasicInfoStep> | null>(null)
+const accountImportRef = ref<InstanceType<typeof AccountImportStep> | null>(null)
 
 const stepKeys: StepKey[] = [
   'basic_info',
@@ -88,6 +89,9 @@ onMounted(async () => {
   const projectId = route.query.projectId as string | undefined
   if (projectId) {
     await wizardStore.loadWizardState(projectId)
+  } else {
+    // New project — reset wizard state
+    wizardStore.reset()
   }
 })
 
@@ -121,6 +125,10 @@ async function handleNext() {
     } else {
       await wizardStore.saveStep('basic_info', data as unknown as Record<string, unknown>)
     }
+  }
+
+  if (currentStep === 'account_import') {
+    if (accountImportRef.value && !accountImportRef.value.validate()) return
   }
 
   wizardStore.goNext()

@@ -330,7 +330,7 @@ async def delete_forex(
     if not forex:
         return False
 
-    forex.is_deleted = True
+    forex.soft_delete()
     await db.flush()
     return True
 

@@ -30,6 +30,7 @@ from app.models.ai_models import (
     ConfirmationCheckType,
     ConfirmationRiskLevel,
 )
+from app.models.attachment_models import Attachment
 from app.models.collaboration_models import (
     ConfirmationList,
     ConfirmationResult,
@@ -38,6 +39,7 @@ from app.models.collaboration_models import (
     ConfirmationListStatus,
     ConfirmationResultStatus,
 )
+from app.services.attachment_service import AttachmentService
 from app.services.ai_service import AIService
 
 logger = logging.getLogger(__name__)
@@ -619,23 +621,56 @@ class ConfirmationAIService:
 
         # 如果没有OCR记录，尝试从附件获取
         if not ocr_record:
-            attachment_result = await self.db.execute(
-                select(ConfirmationAttachment).where(
-                    ConfirmationAttachment.confirmation_list_id == confirmation_id,
-                    ConfirmationAttachment.is_deleted == False,  # noqa: E712
-                ).order_by(ConfirmationAttachment.created_at.desc())
+            unified_attachment_result = await self.db.execute(
+                select(Attachment).where(
+                    Attachment.reference_id == confirmation_id,
+                    Attachment.reference_type == "confirmation_list",
+                    Attachment.attachment_type == "confirmation",
+                    Attachment.is_deleted == False,  # noqa: E712
+                ).order_by(Attachment.created_at.desc())
             )
-            attachment = attachment_result.scalars().first()
+            attachment = unified_attachment_result.scalars().first()
 
             if attachment:
                 try:
-                    ocr_result = await self.ai.ocr_recognize(attachment.file_path)
-                    ocr_text = ocr_result.get("text", "")
-                    extracted = await self._extract_reply_fields(ocr_text, confirmation.counterparty_name)
-                    has_seal = extracted.get("seal_detected", False)
-                    seal_text = extracted.get("seal_name")
+                    if attachment.ocr_text:
+                        ocr_text = attachment.ocr_text
+                    elif attachment.paperless_document_id:
+                        attachment_service = AttachmentService(self.db)
+                        ocr_text = await attachment_service.get_paperless_ocr(attachment.paperless_document_id) or ""
+                        if ocr_text:
+                            attachment.ocr_text = ocr_text
+                            attachment.ocr_status = "completed"
+                            await self.db.flush()
+                    elif attachment.file_path and not str(attachment.file_path).startswith("paperless://"):
+                        ocr_result = await self.ai.ocr_recognize(attachment.file_path)
+                        ocr_text = ocr_result.get("text", "")
+
+                    if ocr_text:
+                        extracted = await self._extract_reply_fields(ocr_text, confirmation.counterparty_name)
+                        has_seal = extracted.get("seal_detected", False)
+                        seal_text = extracted.get("seal_name")
                 except Exception as e:
-                    logger.warning(f"OCR failed for attachment: {e}")
+                    logger.warning(f"OCR failed for unified attachment: {e}")
+
+            if not ocr_text:
+                attachment_result = await self.db.execute(
+                    select(ConfirmationAttachment).where(
+                        ConfirmationAttachment.confirmation_list_id == confirmation_id,
+                        ConfirmationAttachment.is_deleted == False,  # noqa: E712
+                    ).order_by(ConfirmationAttachment.created_at.desc())
+                )
+                attachment = attachment_result.scalars().first()
+
+                if attachment:
+                    try:
+                        ocr_result = await self.ai.ocr_recognize(attachment.file_path)
+                        ocr_text = ocr_result.get("text", "")
+                        extracted = await self._extract_reply_fields(ocr_text, confirmation.counterparty_name)
+                        has_seal = extracted.get("seal_detected", False)
+                        seal_text = extracted.get("seal_name")
+                    except Exception as e:
+                        logger.warning(f"OCR failed for legacy attachment: {e}")
 
         # 3. 比对印章名称与银行/对方单位
         is_bank_confirmation = confirmation.confirmation_type == ConfirmationType.bank

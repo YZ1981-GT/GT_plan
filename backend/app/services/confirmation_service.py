@@ -1,12 +1,19 @@
-from typing import Optional, List
+from datetime import datetime, timezone
+import os
+from pathlib import Path
+import tempfile
+from typing import List, Optional
+import uuid
+
 from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.models.attachment_models import Attachment
 from app.models.collaboration_models import (
     ConfirmationList, ConfirmationLetter, ConfirmationResult,
-    ConfirmationSummary, ConfirmationAttachment,
+    ConfirmationSummary,
     ConfirmationType, ConfirmationStatusEnum, LetterFormat, ReplyStatus,
 )
-from datetime import datetime, timezone
-import uuid
 
 
 class ConfirmationService:
@@ -280,31 +287,92 @@ class ConfirmationService:
         uploaded_by: Optional[str] = None,
     ) -> dict:
         """上传回函附件"""
-        # 简化：仅记录元数据，实际文件存储由文件系统处理
-        import os
-        upload_dir = os.path.join("uploads", "confirmations", str(result_id))
-        os.makedirs(upload_dir, exist_ok=True)
-        file_path = os.path.join(upload_dir, filename)
-        with open(file_path, "wb") as f:
-            f.write(file_data)
+        confirmation = db.query(ConfirmationList).filter(
+            ConfirmationList.id == result_id,
+            ConfirmationList.is_deleted == False,
+        ).first()
+        if not confirmation:
+            raise ValueError("函证清单不存在")
 
-        attachment = ConfirmationAttachment(
-            id=uuid.uuid4(),
-            confirmation_list_id=result_id,
-            file_name=filename,
-            file_path=file_path,
-            file_type=filename.rsplit(".", 1)[-1] if "." in filename else None,
-            file_size=len(file_data),
-            uploaded_by=uploaded_by,
-            is_deleted=False,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(attachment)
-        db.commit()
-        db.refresh(attachment)
+        safe_name = Path(filename).name or "attachment.bin"
+        suffix = Path(safe_name).suffix or ".bin"
+        file_type = suffix.lstrip(".") or "unknown"
+        paperless_document_id = None
+        storage_type = "local"
+        file_path = ""
+        ocr_status = "pending"
+        temp_path = None
 
-        return {
-            "id": str(attachment.id),
-            "file_name": attachment.file_name,
-            "file_path": attachment.file_path,
-        }
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(file_data)
+                temp_path = tmp.name
+
+            use_paperless = (
+                settings.ATTACHMENT_PRIMARY_STORAGE.lower() == "paperless"
+                and bool(settings.PAPERLESS_URL and settings.PAPERLESS_TOKEN)
+            )
+            if use_paperless:
+                try:
+                    import httpx
+
+                    with httpx.Client(timeout=settings.PAPERLESS_TIMEOUT) as client:
+                        with open(temp_path, "rb") as f:
+                            resp = client.post(
+                                f"{settings.PAPERLESS_URL}/api/documents/post_document/",
+                                files={"document": (safe_name, f)},
+                                data={"title": safe_name, "document_type": "confirmation"},
+                                headers={"Authorization": f"Token {settings.PAPERLESS_TOKEN}"},
+                            )
+                            if resp.status_code in (200, 201):
+                                paperless_document_id = resp.json().get("id")
+                except Exception:
+                    paperless_document_id = None
+
+            if paperless_document_id is not None:
+                storage_type = "paperless"
+                file_path = f"paperless://documents/{paperless_document_id}"
+                ocr_status = "processing"
+            else:
+                if use_paperless and not settings.ATTACHMENT_FALLBACK_TO_LOCAL:
+                    raise RuntimeError("Paperless-ngx 上传失败，且未启用本地回退存储")
+
+                target_dir = Path(settings.ATTACHMENT_LOCAL_STORAGE_ROOT) / str(confirmation.project_id) / "confirmation"
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_path = target_dir / safe_name
+                counter = 1
+                while target_path.exists():
+                    target_path = target_dir / f"{Path(safe_name).stem}_{counter}{suffix}"
+                    counter += 1
+                target_path.write_bytes(file_data)
+                file_path = target_path.as_posix()
+
+            attachment = Attachment(
+                id=uuid.uuid4(),
+                project_id=confirmation.project_id,
+                file_name=safe_name,
+                file_path=file_path,
+                file_type=file_type,
+                file_size=len(file_data),
+                attachment_type="confirmation",
+                reference_id=confirmation.id,
+                reference_type="confirmation_list",
+                storage_type=storage_type,
+                paperless_document_id=paperless_document_id,
+                ocr_status=ocr_status,
+                created_by=uploaded_by,
+            )
+            db.add(attachment)
+            db.commit()
+            db.refresh(attachment)
+
+            return {
+                "id": str(attachment.id),
+                "file_name": attachment.file_name,
+                "file_path": attachment.file_path,
+                "storage_type": attachment.storage_type,
+                "paperless_document_id": attachment.paperless_document_id,
+            }
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.unlink(temp_path)

@@ -279,7 +279,7 @@ class GTCodingService:
         if not coding:
             raise ValueError("编码不存在")
 
-        coding.is_deleted = True
+        coding.soft_delete()
         await db.flush()
         return {"id": str(coding_id), "deleted": True}
 

@@ -13,7 +13,7 @@ from starlette.responses import Response
 
 
 # 跳过包装的路径前缀
-_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/")
+_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/")
 
 
 class ResponseWrapperMiddleware(BaseHTTPMiddleware):
@@ -33,6 +33,10 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
         # 仅处理 JSON 响应
         content_type = response.headers.get("content-type", "")
         if "application/json" not in content_type:
+            return response
+
+        # 跳过 SSE 流式响应
+        if "text/event-stream" in content_type:
             return response
 
         # 读取原始响应体

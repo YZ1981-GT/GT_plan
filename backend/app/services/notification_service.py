@@ -293,8 +293,7 @@ class NotificationService:
             logger.warning("on_review_submitted: no reviewer_id in payload")
             return
 
-        self.create_notification(
-            db=self._get_sync_db(),
+        self._notify(
             recipient_id=reviewer_id,
             notification_type=NOTIF_TYPE_REVIEW_PENDING,
             title="工作底稿待复核",
@@ -344,8 +343,7 @@ class NotificationService:
                 + (f"\n意见：{opinion}" if opinion else "")
             )
 
-        self.create_notification(
-            db=self._get_sync_db(),
+        self._notify(
             recipient_id=submitter_id,
             notification_type=notif_type,
             title=title,
@@ -371,8 +369,7 @@ class NotificationService:
             logger.warning("on_review_responded: no reviewer_id in payload")
             return
 
-        self.create_notification(
-            db=self._get_sync_db(),
+        self._notify(
             recipient_id=reviewer_id,
             notification_type=NOTIF_TYPE_REVIEW_RESPONSE,
             title="复核意见已回复",
@@ -399,20 +396,22 @@ class NotificationService:
         project_id = str(payload.project_id)
 
         # 查询项目成员：manager 和 partner
-        project_users = (
-            self._get_sync_db()
-            .query(ProjectUser)
-            .filter(
-                ProjectUser.project_id == project_id,
-                ProjectUser.is_deleted == False,  # noqa: E712
-                ProjectUser.role.in_(["manager", "partner"]),
+        db = self._get_sync_db()
+        try:
+            project_users = (
+                db.query(ProjectUser)
+                .filter(
+                    ProjectUser.project_id == project_id,
+                    ProjectUser.is_deleted == False,  # noqa: E712
+                    ProjectUser.role.in_(["manager", "partner"]),
+                )
+                .all()
             )
-            .all()
-        )
+        finally:
+            db.close()
 
         for pu in project_users:
-            self.create_notification(
-                db=self._get_sync_db(),
+            self._notify(
                 recipient_id=str(pu.user_id),
                 notification_type=NOTIF_TYPE_MISSTATEMENT_ALERT,
                 title="错报超限预警",
@@ -443,8 +442,7 @@ class NotificationService:
             logger.warning("on_confirmation_overdue: no manager_id in payload")
             return
 
-        self.create_notification(
-            db=self._get_sync_db(),
+        self._notify(
             recipient_id=manager_id,
             notification_type=NOTIF_TYPE_CONFIRMATION_OVERDUE,
             title="函证超期未回函",
@@ -473,8 +471,7 @@ class NotificationService:
             logger.warning("on_sync_conflict: no user_id in payload")
             return
 
-        self.create_notification(
-            db=self._get_sync_db(),
+        self._notify(
             recipient_id=user_id,
             notification_type=NOTIF_TYPE_SYNC_CONFLICT,
             title="同步冲突",
@@ -509,8 +506,7 @@ class NotificationService:
         elif conclusion == "going_concern_inappropriate":
             conclusion_msg = "建议考虑出具否定意见。"
 
-        self.create_notification(
-            db=self._get_sync_db(),
+        self._notify(
             recipient_id=partner_id,
             notification_type=NOTIF_TYPE_GOING_CONCERN_ALERT,
             title="持续经营预警",
@@ -532,13 +528,18 @@ class NotificationService:
     def _get_sync_db() -> Session:
         """
         获取同步数据库会话（用于事件处理器）。
-
-        事件总线使用异步上下文，但通知服务内部使用同步 SQLAlchemy。
-        通过 scoped session 获得当前同步会话。
         """
-        from app.core.database import SessionLocal
+        from app.core.database import SyncSession
 
-        return SessionLocal()
+        return SyncSession()
+
+    def _notify(self, **kwargs) -> None:
+        """创建通知并自动关闭数据库会话，防止连接泄漏。"""
+        db = self._get_sync_db()
+        try:
+            self.create_notification(db=db, **kwargs)
+        finally:
+            db.close()
 
 
 # ---------------------------------------------------------------------------

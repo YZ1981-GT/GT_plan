@@ -11,7 +11,7 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.base import Base
-from app.models.core import Project, ProjectStatus, ProjectType
+from app.models.core import Project, ProjectStatus, ProjectType, User
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.workpaper_models import WpIndex, WpStatus, WpSourceType, WpFileStatus, WorkingPaper
 
@@ -27,8 +27,16 @@ FAKE_PROJECT_ID = uuid.uuid4()
 @pytest_asyncio.fixture
 async def db_session() -> AsyncSession:
     async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        tables = [
+            User.__table__,
+            Project.__table__,
+            WpIndex.__table__,
+            WorkingPaper.__table__,
+            Attachment.__table__,
+            AttachmentWorkingPaper.__table__,
+        ]
+        await conn.run_sync(lambda sync_conn: Base.metadata.drop_all(sync_conn, tables=tables))
+        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, tables=tables))
     factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
         yield session
@@ -97,6 +105,29 @@ class TestAttachmentService:
         await db_session.commit()
         assert result["file_name"] == "合同.pdf"
         assert result["ocr_status"] == "pending"
+        assert result["attachment_type"] == "general"
+        assert result["storage_type"] == "local"
+
+    @pytest.mark.asyncio
+    async def test_create_attachment_infers_paperless_storage(self, db_session, seeded_db):
+        from app.services.attachment_service import AttachmentService
+        svc = AttachmentService(db_session)
+        ref_id = uuid.uuid4()
+        result = await svc.create_attachment(FAKE_PROJECT_ID, {
+            "file_name": "函证回函.pdf",
+            "file_path": "/staging/reply.pdf",
+            "file_type": "pdf",
+            "file_size": 256,
+            "paperless_document_id": 101,
+            "attachment_type": "confirmation",
+            "reference_id": ref_id,
+            "reference_type": "confirmation_list",
+        })
+        await db_session.commit()
+        assert result["storage_type"] == "paperless"
+        assert result["file_path"] == "paperless://documents/101"
+        assert result["reference_id"] == str(ref_id)
+        assert result["reference_type"] == "confirmation_list"
 
     @pytest.mark.asyncio
     async def test_list_attachments(self, db_session, seeded_db):
@@ -201,6 +232,32 @@ class TestAttachmentService:
         assert len(results) == 1
         assert "银行" in results[0]["file_name"]
 
+    @pytest.mark.asyncio
+    async def test_upload_attachment_file_fallback_local(self, db_session, seeded_db, tmp_path):
+        from app.services.attachment_service import AttachmentService
+        svc = AttachmentService(
+            db_session,
+            primary_storage="paperless",
+            fallback_to_local=True,
+            local_storage_root=tmp_path.as_posix(),
+        )
+        ref_id = uuid.uuid4()
+        result = await svc.upload_attachment_file(
+            project_id=FAKE_PROJECT_ID,
+            file_name="evidence.pdf",
+            content=b"pdf-binary",
+            metadata={
+                "attachment_type": "confirmation",
+                "reference_id": ref_id,
+                "reference_type": "confirmation_list",
+            },
+        )
+        await db_session.commit()
+        assert result["storage_type"] == "local"
+        assert result["attachment_type"] == "confirmation"
+        assert result["reference_id"] == str(ref_id)
+        assert (tmp_path / str(FAKE_PROJECT_ID) / "confirmation").exists()
+
 
 # ── API Tests ──
 
@@ -261,6 +318,29 @@ class TestAttachmentAPI:
             "file_name": "test.pdf", "file_path": "/test", "file_type": "pdf", "file_size": 100,
         })
         assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_upload_api_fallback_local(self, client, tmp_path, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "ATTACHMENT_LOCAL_STORAGE_ROOT", tmp_path.as_posix())
+        monkeypatch.setattr(settings, "PAPERLESS_URL", "")
+        monkeypatch.setattr(settings, "PAPERLESS_TOKEN", "")
+
+        ref_id = uuid.uuid4()
+        resp = await client.post(
+            f"/api/projects/{FAKE_PROJECT_ID}/attachments/upload",
+            files={"file": ("reply.pdf", b"reply-content", "application/pdf")},
+            data={
+                "attachment_type": "confirmation",
+                "reference_id": str(ref_id),
+                "reference_type": "confirmation_list",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json().get("data", resp.json())
+        assert data["storage_type"] == "local"
+        assert data["attachment_type"] == "confirmation"
 
     @pytest.mark.asyncio
     async def test_list_api(self, client):

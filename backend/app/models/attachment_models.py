@@ -25,6 +25,10 @@ class Attachment(Base):
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     file_type: Mapped[str] = mapped_column(String(50), nullable=False)
     file_size: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    attachment_type: Mapped[str] = mapped_column(String(50), server_default=text("'general'"), nullable=False)
+    reference_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    storage_type: Mapped[str] = mapped_column(String(20), server_default=text("'paperless'"), nullable=False)
     paperless_document_id: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     ocr_status: Mapped[str] = mapped_column(String(20), server_default=text("'pending'"), nullable=False)
     ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -37,6 +41,8 @@ class Attachment(Base):
         Index("idx_attachments_project", "project_id"),
         Index("idx_attachments_ocr_status", "project_id", "ocr_status"),
         Index("idx_attachments_paperless", "paperless_document_id"),
+        Index("idx_attachments_type_ref", "attachment_type", "reference_type", "reference_id"),
+        Index("idx_attachments_storage_type", "storage_type"),
     )
 
 

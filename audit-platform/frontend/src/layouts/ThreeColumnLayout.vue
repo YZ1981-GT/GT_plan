@@ -17,6 +17,12 @@
         </el-breadcrumb>
       </div>
       <div class="gt-topbar-right">
+        <!-- 视图切换按钮（三栏/四栏） -->
+        <el-tooltip :content="fourColumnMode ? '切换三栏视图' : '切换四栏视图'" placement="bottom">
+          <div class="gt-topbar-btn" @click="fourColumnMode = !fourColumnMode">
+            <el-icon :size="18"><Grid v-if="!fourColumnMode" /><Menu v-else /></el-icon>
+          </div>
+        </el-tooltip>
         <el-tooltip content="通知" placement="bottom">
           <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
             <el-icon :size="18"><Bell /></el-icon>
@@ -78,14 +84,60 @@
       />
 
       <!-- 中间栏：2级内容 -->
-      <section v-if="!props.hideMiddle" class="gt-middle" :style="{ width: middleWidth + 'px' }" role="main">
-        <slot name="middle">
-          <router-view name="middle" />
-        </slot>
+      <section v-if="!props.hideMiddle && !middleCollapsed" class="gt-middle" :style="{ width: middleWidth + 'px' }" role="main">
+        <div class="gt-middle-content">
+          <slot name="middle">
+            <router-view name="middle" />
+          </slot>
+        </div>
+        <div class="gt-middle-bottom">
+          <div class="gt-nav-item" @click="middleCollapsed = true" title="收起列表">
+            <el-icon :size="18"><DArrowLeft /></el-icon>
+            <span class="gt-nav-label">收起</span>
+          </div>
+        </div>
       </section>
+      <!-- 中间栏收起态 -->
+      <div
+        v-if="!props.hideMiddle && middleCollapsed"
+        class="gt-middle-collapsed"
+        @click="middleCollapsed = false"
+        title="展开项目列表"
+      >
+        <div class="gt-middle-collapsed-icon">
+          <el-icon :size="18"><DArrowRight /></el-icon>
+        </div>
+      </div>
 
       <!-- 右侧拖拽分隔线 -->
-      <div v-if="!props.hideMiddle" class="gt-resizer" @mousedown="startResize('right', $event)" />
+      <div v-if="!props.hideMiddle && !middleCollapsed" class="gt-resizer" @mousedown="startResize('right', $event)" />
+
+      <!-- 第3栏：功能目录（四栏模式下显示） -->
+      <section
+        v-if="fourColumnMode && !catalogCollapsed"
+        class="gt-catalog"
+        :style="{ width: catalogWidth + 'px' }"
+      >
+        <div class="gt-catalog-header">
+          <span class="gt-catalog-title">{{ catalogTitle }}</span>
+          <el-icon class="gt-catalog-collapse" @click="catalogCollapsed = true" :size="14" title="收起"><DArrowLeft /></el-icon>
+        </div>
+        <slot name="catalog" />
+      </section>
+      <!-- 第3栏收起态 -->
+      <div
+        v-if="fourColumnMode && catalogCollapsed"
+        class="gt-catalog-collapsed"
+        @click="catalogCollapsed = false"
+        title="展开功能目录"
+      >
+        <div class="gt-catalog-collapsed-icon">
+          <el-icon :size="18"><DArrowRight /></el-icon>
+        </div>
+      </div>
+
+      <!-- 第3/4栏分隔线 -->
+      <div v-if="fourColumnMode && !catalogCollapsed" class="gt-resizer" @mousedown="startResize('catalog', $event)" />
 
       <!-- 右侧栏：项目详情 / 主内容区 -->
       <section class="gt-detail" :role="props.hideMiddle ? 'main' : 'complementary'">
@@ -104,7 +156,7 @@ import { useAuthStore } from '@/stores/auth'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
-  DArrowLeft, DArrowRight,
+  DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -112,7 +164,11 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 // ── Props ──
-const props = defineProps<{ hideMiddle?: boolean }>()
+const props = defineProps<{
+  hideMiddle?: boolean
+  fourColumn?: boolean
+  catalogTitle?: string
+}>()
 
 // ── 导航项 ──
 const navItems = [
@@ -124,7 +180,10 @@ const navItems = [
   { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation' },
   { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation' },
   { key: 'archive', label: '归档管理', icon: Box, path: '/archive' },
+  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments' },
+  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models' },
   { key: 'settings', label: '系统设置', icon: Setting, path: '/settings' },
+  { key: 'recycle-bin', label: '回收站', icon: DeleteFilled, path: '/recycle-bin' },
 ]
 
 const activeNav = computed(() => {
@@ -142,7 +201,10 @@ const currentModule = computed(() => {
   return item?.label || ''
 })
 
-const emit = defineEmits<{ (e: 'nav-change', key: string): void }>()
+const emit = defineEmits<{
+  (e: 'nav-change', key: string): void
+  (e: 'view-change', mode: 'three' | 'four'): void
+}>()
 
 function onNavClick(item: typeof navItems[0]) {
   emit('nav-change', item.key)
@@ -154,10 +216,24 @@ const STORAGE_KEY = 'gt-layout-prefs'
 const sidebarCollapsed = ref(false)
 const sidebarWidth = ref(220)
 const middleWidth = ref(340)
+const middleCollapsed = ref(false)
+const catalogWidth = ref(280)
+const catalogCollapsed = ref(false)
+const fourColumnMode = ref(false)
 const fullscreen = ref(false)
 
+// 四栏模式由 props 或用户切换控制
+watch(() => props.fourColumn, (v) => {
+  if (v !== undefined) fourColumnMode.value = v
+}, { immediate: true })
+
+// 视图模式变化时通知父组件
+watch(fourColumnMode, (v) => {
+  emit('view-change', v ? 'four' : 'three')
+})
+
 // 监听折叠状态变化自动保存
-watch(sidebarCollapsed, () => savePrefs())
+watch([sidebarCollapsed, middleCollapsed, catalogCollapsed], () => savePrefs())
 
 function loadPrefs() {
   try {
@@ -167,6 +243,9 @@ function loadPrefs() {
       sidebarCollapsed.value = prefs.collapsed ?? false
       sidebarWidth.value = prefs.sidebarWidth ?? 220
       middleWidth.value = prefs.middleWidth ?? 340
+      middleCollapsed.value = prefs.middleCollapsed ?? false
+      catalogWidth.value = prefs.catalogWidth ?? 280
+      catalogCollapsed.value = prefs.catalogCollapsed ?? false
     }
   } catch { /* ignore */ }
 }
@@ -176,18 +255,21 @@ function savePrefs() {
     collapsed: sidebarCollapsed.value,
     sidebarWidth: sidebarWidth.value,
     middleWidth: middleWidth.value,
+    middleCollapsed: middleCollapsed.value,
+    catalogWidth: catalogWidth.value,
+    catalogCollapsed: catalogCollapsed.value,
   }))
 }
 
 // ── 拖拽调整宽度 ──
-let resizing: 'left' | 'right' | null = null
+let resizing: 'left' | 'right' | 'catalog' | null = null
 let startX = 0
 let startW = 0
 
-function startResize(side: 'left' | 'right', e: MouseEvent) {
+function startResize(side: 'left' | 'right' | 'catalog', e: MouseEvent) {
   resizing = side
   startX = e.clientX
-  startW = side === 'left' ? sidebarWidth.value : middleWidth.value
+  startW = side === 'left' ? sidebarWidth.value : side === 'right' ? middleWidth.value : catalogWidth.value
   document.body.style.cursor = 'col-resize'
   document.body.style.userSelect = 'none'
   document.addEventListener('mousemove', onResize)
@@ -199,8 +281,10 @@ function onResize(e: MouseEvent) {
   const dx = e.clientX - startX
   if (resizing === 'left') {
     sidebarWidth.value = Math.max(180, Math.min(300, startW + dx))
-  } else {
+  } else if (resizing === 'right') {
     middleWidth.value = Math.max(250, Math.min(500, startW + dx))
+  } else if (resizing === 'catalog') {
+    catalogWidth.value = Math.max(200, Math.min(450, startW + dx))
   }
 }
 
@@ -400,8 +484,41 @@ onUnmounted(() => {
   flex-shrink: 0;
   background: var(--gt-color-bg-white);
   border-right: 1px solid var(--gt-color-border-light);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.gt-middle-content {
+  flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+}
+.gt-middle-bottom {
+  border-top: 1px solid var(--gt-color-border-light);
+  padding: var(--gt-space-1);
+  flex-shrink: 0;
+}
+.gt-middle-collapsed {
+  width: 24px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: #f5f7fa;
+  border-right: 1px solid var(--gt-color-border-light);
+  cursor: pointer;
+  color: var(--gt-color-text-tertiary);
+  transition: all var(--gt-transition-fast);
+}
+.gt-middle-collapsed:hover {
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
+}
+.gt-middle-collapsed-icon {
+  padding: 12px 0;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--gt-color-border-light);
 }
 
 /* ── 右侧栏 ── */
@@ -410,6 +527,59 @@ onUnmounted(() => {
   min-width: 0;
   background: var(--gt-color-bg-white);
   overflow-y: auto;
+}
+
+/* ── 第3栏：功能目录（四栏模式） ── */
+.gt-catalog {
+  flex-shrink: 0;
+  background: var(--gt-color-bg-white);
+  border-right: 1px solid var(--gt-color-border-light);
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.gt-catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--gt-space-3) var(--gt-space-3);
+  border-bottom: 1px solid var(--gt-color-border-light);
+  flex-shrink: 0;
+}
+.gt-catalog-title {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-text);
+}
+.gt-catalog-collapse {
+  cursor: pointer;
+  color: var(--gt-color-text-tertiary);
+  transition: color var(--gt-transition-fast);
+}
+.gt-catalog-collapse:hover { color: var(--gt-color-primary); }
+
+.gt-catalog-collapsed {
+  width: 24px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: #f5f7fa;
+  border-right: 1px solid var(--gt-color-border-light);
+  cursor: pointer;
+  color: var(--gt-color-text-tertiary);
+  transition: all var(--gt-transition-fast);
+}
+.gt-catalog-collapsed:hover {
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
+}
+.gt-catalog-collapsed-icon {
+  padding: 12px 0;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid var(--gt-color-border-light);
 }
 
 /* ── 全屏模式 ── */

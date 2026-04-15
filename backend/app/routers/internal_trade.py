@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.deps import db, get_current_user
+from app.deps import sync_db, get_current_user
 from app.models.consolidation_schemas import (
     InternalTradeCreate,
     InternalTradeResponse,
@@ -37,7 +37,7 @@ router = APIRouter(prefix="/api/consolidation/internal-trade", tags=["内部交�
 def list_trades(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_trades(db, project_id, year)
@@ -47,7 +47,7 @@ def list_trades(
 def create_trade_route(
     project_id: UUID,
     data: InternalTradeCreate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return create_trade(db, project_id, data)
@@ -58,7 +58,7 @@ def update_trade_route(
     trade_id: UUID,
     project_id: UUID,
     data: InternalTradeUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     trade = update_trade(db, trade_id, project_id, data)
@@ -71,7 +71,7 @@ def update_trade_route(
 def delete_trade_route(
     trade_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_trade(db, trade_id, project_id):
@@ -83,7 +83,7 @@ def delete_trade_route(
 def list_arap(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_arap_list(db, project_id, year)
@@ -93,7 +93,7 @@ def list_arap(
 def create_arap_route(
     project_id: UUID,
     data: InternalArApCreate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return create_arap(db, project_id, data)
@@ -104,7 +104,7 @@ def update_arap_route(
     arap_id: UUID,
     project_id: UUID,
     data: InternalArApUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     arap = update_arap(db, arap_id, project_id, data)
@@ -117,7 +117,7 @@ def update_arap_route(
 def delete_arap_route(
     arap_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     if not delete_arap(db, arap_id, project_id):
@@ -129,7 +129,7 @@ def delete_arap_route(
 def get_matrix(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_transaction_matrix(db, project_id, year)

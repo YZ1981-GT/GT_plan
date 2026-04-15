@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.deps import db, get_current_user
+from app.deps import sync_db, get_current_user
 from app.models.consolidation_models import EliminationEntryType, ReviewStatusEnum
 from app.models.consolidation_schemas import (
     EliminationCreate,
@@ -33,7 +33,7 @@ def list_eliminations(
     year: int | None = None,
     entry_type: EliminationEntryType | None = None,
     review_status: ReviewStatusEnum | None = None,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_entries(db, project_id, year, entry_type, review_status)
@@ -43,7 +43,7 @@ def list_eliminations(
 def create_elimination(
     project_id: UUID,
     data: EliminationCreate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     try:
@@ -56,7 +56,7 @@ def create_elimination(
 def get_elimination(
     entry_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     entry = get_entry(db, entry_id, project_id)
@@ -70,7 +70,7 @@ def update_elimination(
     entry_id: UUID,
     project_id: UUID,
     data: EliminationEntryUpdate,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     try:
@@ -86,7 +86,7 @@ def update_elimination(
 def delete_elimination(
     entry_id: UUID,
     project_id: UUID,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     try:
@@ -101,7 +101,7 @@ def review_elimination(
     entry_id: UUID,
     project_id: UUID,
     action: EliminationReviewAction,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     try:
@@ -117,7 +117,7 @@ def review_elimination(
 def elimination_summary(
     project_id: UUID,
     year: int,
-    db: Session = Depends(db),
+    db: Session = Depends(sync_db),
     user=Depends(get_current_user),
 ):
     return get_summary(db, project_id, year)

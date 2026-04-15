@@ -1,5 +1,12 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import http from '@/utils/http'
+
+/**
+ * 认证专用 axios 实例（不带 auth 拦截器，避免循环依赖）。
+ * 仅用于 login / refresh / logout 这三个不需要 token 自动附加的请求。
+ */
+const authHttp = axios.create({ baseURL: '/', timeout: 30000 })
 
 export interface UserProfile {
   id: string
@@ -31,7 +38,7 @@ export const useAuthStore = defineStore('auth', {
 
   actions: {
     async login(username: string, password: string) {
-      const { data } = await axios.post('/api/auth/login', { username, password })
+      const { data } = await authHttp.post('/api/auth/login', { username, password })
       const payload = data.data ?? data
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token
@@ -42,7 +49,9 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       try {
-        await axios.post('/api/auth/logout', null, {
+        await authHttp.post('/api/auth/logout', {
+          refresh_token: this.refreshToken,
+        }, {
           headers: { Authorization: `Bearer ${this.token}` },
         })
       } catch {
@@ -56,7 +65,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async refreshAccessToken() {
-      const { data } = await axios.post('/api/auth/refresh', {
+      const { data } = await authHttp.post('/api/auth/refresh', {
         refresh_token: this.refreshToken,
       })
       const payload = data.data ?? data
@@ -65,9 +74,8 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async fetchUserProfile() {
-      const { data } = await axios.get('/api/users/me', {
-        headers: { Authorization: `Bearer ${this.token}` },
-      })
+      // 使用带拦截器的 http 实例，自动附加 token + 401 刷新
+      const { data } = await http.get('/api/users/me')
       this.user = data.data ?? data
     },
   },

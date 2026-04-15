@@ -186,6 +186,50 @@ function handleFileRemove() {
 async function startImport() {
   if (!selectedFile.value || !form.dataType) return
 
+  // 1. 先检查是否有重复数据
+  try {
+    const { data: dupCheck } = await http.get(
+      `/api/projects/${props.projectId}/import/check-duplicates`,
+      { params: { data_type: form.dataType, year: form.year } }
+    )
+    const dup = dupCheck.data ?? dupCheck
+
+    if (dup.has_duplicates) {
+      // 弹窗让用户选择
+      try {
+        const action = await ElMessageBox.confirm(
+          `${dup.message}。\n\n选择"覆盖"将删除旧数据后重新导入，选择"跳过"将只导入新增记录。`,
+          '检测到重复数据',
+          {
+            confirmButtonText: '覆盖旧数据',
+            cancelButtonText: '跳过重复',
+            distinguishCancelAndClose: true,
+            type: 'warning',
+          }
+        )
+        // 用户点了"覆盖旧数据"
+        await doImport('overwrite')
+      } catch (action) {
+        if (action === 'cancel') {
+          // 用户点了"跳过重复"
+          await doImport('skip')
+        }
+        // 用户点了关闭（X），不导入
+        return
+      }
+      return
+    }
+  } catch {
+    // 检查失败，继续正常导入
+  }
+
+  // 2. 无重复，直接导入
+  await doImport('skip')
+}
+
+async function doImport(onDuplicate: string) {
+  if (!selectedFile.value) return
+
   importing.value = true
   currentProgress.value = null
 
@@ -195,6 +239,7 @@ async function startImport() {
     formData.append('source_type', form.sourceType)
     formData.append('data_type', form.dataType)
     formData.append('year', String(form.year))
+    formData.append('on_duplicate', onDuplicate)
 
     const res = await http.post(
       `/api/projects/${props.projectId}/import`,
@@ -203,6 +248,12 @@ async function startImport() {
     )
 
     const batch = res.data?.data || res.data
+
+    if (batch.status === 'failed' && batch.validation_summary?.duplicate_action_required) {
+      ElMessage.warning(batch.validation_summary.error)
+      return
+    }
+
     ElMessage.success(`导入完成，共 ${batch.record_count} 条记录`)
 
     // Load progress

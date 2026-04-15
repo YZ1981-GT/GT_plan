@@ -1,7 +1,7 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.models.collaboration_models import (
-    GoingConcern, GoingConcernIndicator, GcRiskLevel, IndicatorSeverity,
+    GoingConcernEvaluation, GoingConcernIndicator, GcRiskLevel, IndicatorSeverity,
 )
 from datetime import datetime, timezone
 import uuid
@@ -11,7 +11,7 @@ class GoingConcernService:
     @staticmethod
     def init_indicators(db: Session, project_id: str, created_by: str) -> List[GoingConcernIndicator]:
         """项目创建时预填充标准风险指标"""
-        gc = GoingConcern(
+        gc = GoingConcernEvaluation(
             id=uuid.uuid4(),
             project_id=project_id,
             assessment_date=datetime.now(timezone.utc).date(),
@@ -68,8 +68,8 @@ class GoingConcernService:
         project_id: str,
         assessment_date=None,
         created_by: str = None,
-    ) -> GoingConcern:
-        gc = GoingConcern(
+    ) -> GoingConcernEvaluation:
+        gc = GoingConcernEvaluation(
             id=uuid.uuid4(),
             project_id=project_id,
             assessment_date=assessment_date or datetime.now(timezone.utc).date(),
@@ -95,8 +95,8 @@ class GoingConcernService:
         assessment_basis: Optional[str] = None,
         management_plans: Optional[str] = None,
         auditor_conclusion: Optional[str] = None,
-    ) -> Optional[GoingConcern]:
-        gc = db.query(GoingConcern).filter(GoingConcern.id == gc_id).first()
+    ) -> Optional[GoingConcernEvaluation]:
+        gc = db.query(GoingConcernEvaluation).filter(GoingConcernEvaluation.id == gc_id).first()
         if not gc:
             return None
         gc.has_gc_indicator = has_gc_indicator
@@ -113,11 +113,11 @@ class GoingConcernService:
         return gc
 
     @staticmethod
-    def get_evaluation(db: Session, project_id: str) -> Optional[GoingConcern]:
-        return db.query(GoingConcern).filter(
-            GoingConcern.project_id == project_id,
-            GoingConcern.is_deleted == False,  # noqa: E712
-        ).order_by(GoingConcern.created_at.desc()).first()
+    def get_evaluation(db: Session, project_id: str) -> Optional[GoingConcernEvaluation]:
+        return db.query(GoingConcernEvaluation).filter(
+            GoingConcernEvaluation.project_id == project_id,
+            GoingConcernEvaluation.is_deleted == False,  # noqa: E712
+        ).order_by(GoingConcernEvaluation.created_at.desc()).first()
 
     @staticmethod
     def update_indicator(

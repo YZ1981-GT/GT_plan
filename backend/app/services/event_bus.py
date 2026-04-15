@@ -69,7 +69,7 @@ class EventBus:
     # ------------------------------------------------------------------
     def create_sse_queue(self) -> asyncio.Queue[EventPayload | None]:
         """创建一个 SSE 订阅队列，供 SSE endpoint 使用"""
-        queue: asyncio.Queue[EventPayload | None] = asyncio.Queue()
+        queue: asyncio.Queue[EventPayload | None] = asyncio.Queue(maxsize=100)
         self._sse_queues.append(queue)
         logger.info("EventBus: SSE queue created, total=%d", len(self._sse_queues))
         return queue

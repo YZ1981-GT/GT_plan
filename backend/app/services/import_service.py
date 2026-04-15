@@ -4,12 +4,12 @@ Validates: Requirements 4.3, 4.4, 4.5, 4.6, 4.21, 4.22, 4.23
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import (
@@ -45,7 +45,7 @@ _TABLE_MAP = {
     "tb_aux_ledger": TbAuxLedger,
 }
 
-CHUNK_SIZE = 5000
+CHUNK_SIZE = 10000
 
 
 # ---------------------------------------------------------------------------
@@ -60,8 +60,14 @@ async def start_import(
     data_type: str,
     year: int,
     db: AsyncSession,
+    on_duplicate: str = "skip",  # skip / overwrite / error
 ) -> ImportBatch:
     """Create import_batch, parse file, validate, bulk insert, return batch.
+
+    on_duplicate:
+      - "skip": 跳过重复记录（默认）
+      - "overwrite": 软删除旧数据后重新导入
+      - "error": 发现重复时报错中止
 
     Validates: Requirements 4.3, 4.4, 4.5, 4.6
     """
@@ -78,7 +84,7 @@ async def start_import(
         file_name=file.filename,
         data_type=data_type,
         status=ImportStatus.processing,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.utcnow(),
     )
     db.add(batch)
     await db.flush()
@@ -92,7 +98,7 @@ async def start_import(
         if not parsed_data:
             batch.status = ImportStatus.failed
             batch.validation_summary = {"error": "文件中未解析到有效数据"}
-            batch.completed_at = datetime.now(timezone.utc)
+            batch.completed_at = datetime.utcnow()
             await db.commit()
             raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
 
@@ -121,43 +127,71 @@ async def start_import(
 
         if not validation_result.passed:
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.now(timezone.utc)
+            batch.completed_at = datetime.utcnow()
             await db.commit()
             # Return the batch with failure info rather than raising
             return batch
 
-        # 5. Bulk insert in chunks
+        # 5. Check for duplicates and handle according to on_duplicate strategy
         table_model = _TABLE_MAP[data_type]
+        existing_count = await _count_existing_records(project_id, year, data_type, db)
+
+        if existing_count > 0:
+            if on_duplicate == "error":
+                batch.status = ImportStatus.failed
+                batch.validation_summary = {
+                    "error": f"已存在 {existing_count} 条{data_type}数据（{year}年度），请选择覆盖或跳过",
+                    "existing_count": existing_count,
+                    "duplicate_action_required": True,
+                }
+                batch.completed_at = datetime.utcnow()
+                await db.commit()
+                return batch
+            elif on_duplicate == "overwrite":
+                # 软删除旧数据（保留到回收站）
+                old_count = await _soft_delete_existing(project_id, year, data_type, db)
+                logger.info("Overwrite mode: soft-deleted %d existing records", old_count)
+
+        # 6. Bulk insert in chunks (use execute for raw INSERT performance)
         record_count = 0
 
         for i in range(0, len(parsed_data), CHUNK_SIZE):
             chunk = parsed_data[i : i + CHUNK_SIZE]
             records = []
             for row in chunk:
-                record = _build_record(
-                    table_model, row, project_id, year, batch.id
+                record = _build_record_dict(
+                    data_type, row, project_id, year, batch.id
                 )
                 if record:
                     records.append(record)
 
             if records:
-                db.add_all(records)
-                await db.flush()
+                await db.execute(
+                    table_model.__table__.insert(),
+                    records,
+                )
                 record_count += len(records)
 
-        # 6. Update batch status
+            # Periodic flush to avoid holding too much in memory
+            if record_count % 50000 == 0 and record_count > 0:
+                await db.flush()
+
+        # 7. Update batch status
         batch.record_count = record_count
         batch.status = ImportStatus.completed
-        batch.completed_at = datetime.now(timezone.utc)
+        batch.completed_at = datetime.utcnow()
         await db.commit()
 
-        # 7. Publish data imported event
+        # 8. Publish data imported event
         await event_bus.publish(EventPayload(
             event_type=EventType.DATA_IMPORTED,
             project_id=project_id,
             year=year,
             batch_id=batch.id,
         ))
+
+        # 9. Backfill account_name from account_chart for records missing it
+        await _backfill_account_names(project_id, batch.id, data_type, db)
 
         return batch
 
@@ -167,7 +201,7 @@ async def start_import(
         logger.exception("Import failed: %s", e)
         batch.status = ImportStatus.failed
         batch.validation_summary = {"error": str(e)}
-        batch.completed_at = datetime.now(timezone.utc)
+        batch.completed_at = datetime.utcnow()
         await db.commit()
         raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
 
@@ -194,7 +228,7 @@ async def get_import_progress(
 
     elapsed = 0.0
     if batch.started_at:
-        end = batch.completed_at or datetime.now(timezone.utc)
+        end = batch.completed_at or datetime.utcnow()
         elapsed = (end - batch.started_at).total_seconds()
 
     # Extract warnings from validation summary
@@ -340,7 +374,7 @@ async def rollback_import(batch_id: UUID, db: AsyncSession) -> ImportBatch:
 
     batch.status = ImportStatus.rolled_back
     batch.record_count = 0
-    batch.completed_at = datetime.now(timezone.utc)
+    batch.completed_at = datetime.utcnow()
     await db.commit()
 
     # Publish import rolled back event
@@ -396,62 +430,218 @@ async def _load_balance_data(
 
 
 def _build_record(table_model, row: dict, project_id: UUID, year: int, batch_id: UUID):
-    """Build an ORM record from a parsed row dict."""
-    base_kwargs = {
+    """Build an ORM record from a parsed row dict. (Legacy, kept for compatibility)"""
+    d = _build_record_dict(table_model.__tablename__, row, project_id, year, batch_id)
+    if d is None:
+        return None
+    return table_model(**d)
+
+
+def _parse_int(value) -> int | None:
+    """Parse a value to int, return None for empty/invalid."""
+    if value is None:
+        return None
+    try:
+        return int(float(str(value).strip()))
+    except (ValueError, TypeError):
+        return None
+
+
+def _build_record_dict(data_type: str, row: dict, project_id: UUID, year: int, batch_id: UUID) -> dict | None:
+    """Build a plain dict for bulk INSERT (much faster than ORM objects for large datasets).
+
+    Returns None if the row is invalid (missing required fields).
+    """
+    import uuid as _uuid
+
+    base = {
+        "id": _uuid.uuid4(),
         "project_id": project_id,
         "year": year,
         "import_batch_id": batch_id,
         "company_code": row.get("company_code", "default"),
         "account_code": row["account_code"],
+        "currency_code": row.get("currency_code", "CNY"),
+        "is_deleted": False,
     }
 
-    if table_model is TbBalance:
-        return TbBalance(
-            **base_kwargs,
-            account_name=row.get("account_name"),
-            opening_balance=row.get("opening_balance"),
-            debit_amount=row.get("debit_amount"),
-            credit_amount=row.get("credit_amount"),
-            closing_balance=row.get("closing_balance"),
-            currency_code=row.get("currency_code", "CNY"),
+    if data_type == "tb_balance":
+        base.update({
+            "account_name": row.get("account_name"),
+            "level": row.get("level"),
+            "opening_balance": row.get("opening_balance"),
+            "opening_qty": row.get("opening_qty"),
+            "opening_fc": row.get("opening_fc"),
+            "debit_amount": row.get("debit_amount"),
+            "credit_amount": row.get("credit_amount"),
+            "closing_balance": row.get("closing_balance"),
+        })
+    elif data_type == "tb_ledger":
+        if not row.get("voucher_date") or not row.get("voucher_no"):
+            return None
+        base.update({
+            "voucher_date": row["voucher_date"],
+            "voucher_no": row["voucher_no"],
+            "account_name": row.get("account_name"),
+            "accounting_period": _parse_int(row.get("accounting_period")),
+            "voucher_type": row.get("voucher_type"),
+            "entry_seq": _parse_int(row.get("entry_seq")),
+            "debit_amount": row.get("debit_amount"),
+            "credit_amount": row.get("credit_amount"),
+            "debit_qty": row.get("debit_qty"),
+            "credit_qty": row.get("credit_qty"),
+            "debit_fc": row.get("debit_fc"),
+            "credit_fc": row.get("credit_fc"),
+            "counterpart_account": row.get("counterpart_account"),
+            "summary": row.get("summary"),
+            "preparer": row.get("preparer"),
+        })
+    elif data_type == "tb_aux_balance":
+        if not row.get("aux_type"):
+            return None
+        base.update({
+            "aux_type": row["aux_type"],
+            "aux_type_name": row.get("aux_type_name"),
+            "aux_code": row.get("aux_code"),
+            "aux_name": row.get("aux_name"),
+            "account_name": row.get("account_name"),
+            "opening_balance": row.get("opening_balance"),
+            "opening_qty": row.get("opening_qty"),
+            "opening_fc": row.get("opening_fc"),
+            "debit_amount": row.get("debit_amount"),
+            "credit_amount": row.get("credit_amount"),
+            "closing_balance": row.get("closing_balance"),
+        })
+    elif data_type == "tb_aux_ledger":
+        base.update({
+            "aux_type": row.get("aux_type"),
+            "aux_type_name": row.get("aux_type_name"),
+            "aux_code": row.get("aux_code"),
+            "aux_name": row.get("aux_name"),
+            "account_name": row.get("account_name"),
+            "accounting_period": _parse_int(row.get("accounting_period")),
+            "voucher_type": row.get("voucher_type"),
+            "voucher_date": row.get("voucher_date"),
+            "voucher_no": row.get("voucher_no"),
+            "debit_amount": row.get("debit_amount"),
+            "credit_amount": row.get("credit_amount"),
+            "debit_qty": row.get("debit_qty"),
+            "credit_qty": row.get("credit_qty"),
+            "debit_fc": row.get("debit_fc"),
+            "credit_fc": row.get("credit_fc"),
+            "summary": row.get("summary"),
+            "preparer": row.get("preparer"),
+        })
+    else:
+        return None
+
+    return base
+
+
+async def _backfill_account_names(
+    project_id: UUID, batch_id: UUID, data_type: str, db: AsyncSession
+) -> None:
+    """从 account_chart 表回填缺失的 account_name（导入文件中可能没有科目名称列）。
+
+    使用单条 UPDATE ... FROM 语句批量更新，支持百万行数据。
+    """
+    table_model = _TABLE_MAP.get(data_type)
+    if table_model is None:
+        return
+
+    tbl = table_model.__table__
+    ac = AccountChart.__table__
+
+    # UPDATE table SET account_name = ac.account_name
+    # FROM account_chart ac
+    # WHERE table.account_code = ac.account_code
+    #   AND table.project_id = ac.project_id
+    #   AND table.import_batch_id = :batch_id
+    #   AND table.account_name IS NULL
+    #   AND ac.is_deleted = false
+    stmt = (
+        tbl.update()
+        .values(account_name=ac.c.account_name)
+        .where(
+            tbl.c.account_code == ac.c.account_code,
+            tbl.c.project_id == ac.c.project_id,
+            tbl.c.import_batch_id == batch_id,
+            tbl.c.account_name.is_(None),
+            ac.c.is_deleted == False,  # noqa: E712
         )
-    elif table_model is TbLedger:
-        return TbLedger(
-            **base_kwargs,
-            voucher_date=row["voucher_date"],
-            voucher_no=row["voucher_no"],
-            account_name=row.get("account_name"),
-            debit_amount=row.get("debit_amount"),
-            credit_amount=row.get("credit_amount"),
-            counterpart_account=row.get("counterpart_account"),
-            summary=row.get("summary"),
-            preparer=row.get("preparer"),
-            currency_code=row.get("currency_code", "CNY"),
+    )
+    await db.execute(stmt)
+    await db.flush()
+
+
+async def _count_existing_records(
+    project_id: UUID, year: int, data_type: str, db: AsyncSession
+) -> int:
+    """统计指定项目+年度+数据类型的已有记录数。"""
+    table_model = _TABLE_MAP.get(data_type)
+    if not table_model:
+        return 0
+    result = await db.execute(
+        select(func.count()).select_from(table_model).where(
+            table_model.project_id == project_id,
+            table_model.year == year,
+            table_model.is_deleted == False,  # noqa: E712
         )
-    elif table_model is TbAuxBalance:
-        return TbAuxBalance(
-            **base_kwargs,
-            aux_type=row["aux_type"],
-            aux_code=row.get("aux_code"),
-            aux_name=row.get("aux_name"),
-            opening_balance=row.get("opening_balance"),
-            debit_amount=row.get("debit_amount"),
-            credit_amount=row.get("credit_amount"),
-            closing_balance=row.get("closing_balance"),
-            currency_code=row.get("currency_code", "CNY"),
+    )
+    return result.scalar() or 0
+
+
+async def _soft_delete_existing(
+    project_id: UUID, year: int, data_type: str, db: AsyncSession
+) -> int:
+    """软删除指定项目+年度+数据类型的所有已有记录（覆盖导入前清理）。"""
+    import sqlalchemy as sa
+    table_model = _TABLE_MAP.get(data_type)
+    if not table_model:
+        return 0
+    tbl = table_model.__table__
+    result = await db.execute(
+        sa.update(tbl)
+        .where(
+            tbl.c.project_id == project_id,
+            tbl.c.year == year,
+            tbl.c.is_deleted == sa.false(),
         )
-    elif table_model is TbAuxLedger:
-        return TbAuxLedger(
-            **base_kwargs,
-            voucher_date=row.get("voucher_date"),
-            voucher_no=row.get("voucher_no"),
-            aux_type=row.get("aux_type"),
-            aux_code=row.get("aux_code"),
-            aux_name=row.get("aux_name"),
-            debit_amount=row.get("debit_amount"),
-            credit_amount=row.get("credit_amount"),
-            summary=row.get("summary"),
-            preparer=row.get("preparer"),
-            currency_code=row.get("currency_code", "CNY"),
-        )
-    return None
+        .values(is_deleted=True)
+    )
+    await db.flush()
+    return result.rowcount
+
+
+async def check_duplicates(
+    project_id: UUID, year: int, data_type: str, db: AsyncSession
+) -> dict:
+    """检查是否存在重复数据（供前端导入前调用）。
+
+    Returns:
+        {
+            "has_duplicates": bool,
+            "existing_count": int,
+            "data_type": str,
+            "year": int,
+            "message": str,
+        }
+    """
+    data_type = normalize_data_type(data_type)
+    count = await _count_existing_records(project_id, year, data_type, db)
+
+    type_labels = {
+        "tb_balance": "科目余额表",
+        "tb_ledger": "序时账",
+        "tb_aux_balance": "辅助余额表",
+        "tb_aux_ledger": "辅助明细账",
+    }
+    label = type_labels.get(data_type, data_type)
+
+    return {
+        "has_duplicates": count > 0,
+        "existing_count": count,
+        "data_type": data_type,
+        "year": year,
+        "message": f"已存在 {count} 条{label}数据（{year}年度）" if count > 0 else "无重复数据",
+    }

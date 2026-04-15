@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,10 @@ class AttachmentCreate(BaseModel):
     file_type: str = "unknown"
     file_size: int = 0
     paperless_document_id: int | None = None
+    attachment_type: str = "general"
+    reference_id: UUID | None = None
+    reference_type: str | None = None
+    storage_type: str | None = None
 
 
 class AssociateRequest(BaseModel):
@@ -52,15 +56,58 @@ async def create_attachment(
     return result
 
 
+@router.post("/api/projects/{project_id}/attachments/upload")
+async def upload_attachment(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    attachment_type: str = Form("general"),
+    reference_id: UUID | None = Form(None),
+    reference_type: str | None = Form(None),
+    file_type: str | None = Form(None),
+    title: str | None = Form(None),
+    correspondent: str | None = Form(None),
+    document_type: str | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = _svc(db)
+    content = await file.read()
+    result = await svc.upload_attachment_file(
+        project_id=project_id,
+        file_name=file.filename or "attachment.bin",
+        content=content,
+        metadata={
+            "attachment_type": attachment_type,
+            "reference_id": reference_id,
+            "reference_type": reference_type,
+            "file_type": file_type,
+            "title": title,
+            "correspondent": correspondent,
+            "document_type": document_type,
+        },
+    )
+    await db.commit()
+    return result
+
+
 @router.get("/api/projects/{project_id}/attachments")
 async def list_attachments(
     project_id: UUID,
     file_type: str | None = None,
     ocr_status: str | None = None,
+    attachment_type: str | None = None,
+    reference_type: str | None = None,
+    reference_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     svc = _svc(db)
-    return await svc.list_attachments(project_id, file_type, ocr_status)
+    return await svc.list_attachments(
+        project_id,
+        file_type,
+        ocr_status,
+        attachment_type,
+        reference_type,
+        reference_id,
+    )
 
 
 @router.get("/api/attachments/search")

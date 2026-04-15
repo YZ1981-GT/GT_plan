@@ -147,7 +147,7 @@ def delete_entry(db: Session, entry_id: UUID, project_id: UUID) -> bool:
         return False
     if entry.review_status == ReviewStatusEnum.APPROVED:
         raise ValueError("已审批的分录不能删除")
-    entry.is_deleted = True
+    entry.soft_delete()
     db.commit()
     return True
 

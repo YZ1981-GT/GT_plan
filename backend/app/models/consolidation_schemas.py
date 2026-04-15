@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .consolidation_models import (
     CompetenceRating,
@@ -64,8 +64,7 @@ class CompanyResponse(CompanyBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CompanyTreeNode(CompanyResponse):
@@ -112,8 +111,7 @@ class ConsolScopeResponse(ConsolScopeBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 3. 合并试算表 ==========
@@ -147,8 +145,7 @@ class ConsolTrialResponse(ConsolTrialRow):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 4. 抵消分录 ==========
@@ -197,8 +194,7 @@ class EliminationEntryResponse(EliminationEntryBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EliminationReviewAction(BaseModel):
@@ -255,8 +251,7 @@ class InternalTradeResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 6. 内部往来 ==========
@@ -296,8 +291,7 @@ class InternalArApResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionMatrix(BaseModel):
@@ -337,8 +331,7 @@ class GoodwillCalcResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 8. 少数股东权益 ==========
@@ -365,8 +358,7 @@ class MinorityInterestResponse(MinorityInterestResult):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 9. 外币折算 ==========
@@ -407,8 +399,7 @@ class ForexTranslationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 10. 组成部分审计师 ==========
@@ -450,8 +441,7 @@ class ComponentAuditorResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 11. 组成部分指令 ==========
@@ -496,8 +486,7 @@ class InstructionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 12. 组成部分结果 ==========
@@ -541,8 +530,7 @@ class ResultResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 合并附注 ==========
@@ -558,8 +546,7 @@ class ConsolDisclosureRow(BaseModel):
     col5: str | None = Field(None, alias="col_5")
     col6: str | None = Field(None, alias="col_6")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ConsolDisclosureSection(BaseModel):

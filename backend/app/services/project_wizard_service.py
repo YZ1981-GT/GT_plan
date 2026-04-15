@@ -50,8 +50,7 @@ STEP_DEPENDENCIES: dict[WizardStep, list[WizardStep]] = {
         WizardStep.basic_info,
         WizardStep.account_import,
         WizardStep.account_mapping,
-        WizardStep.materiality,
-        WizardStep.template_set,
+        # materiality 和 template_set 为可选步骤，不阻断项目创建
     ],
 }
 
@@ -264,17 +263,8 @@ async def validate_step(
                     )
 
     elif step == WizardStep.confirmation:
-        # 确认步骤要求所有前置步骤已完成
-        for dep_step_name in STEP_DEPENDENCIES[WizardStep.confirmation]:
-            dep_data = state.steps.get(dep_step_name.value)
-            if dep_data is None or not dep_data.completed:
-                messages.append(
-                    ValidationMessage(
-                        field=dep_step_name.value,
-                        message=f"步骤「{dep_step_name.value}」尚未完成",
-                        severity="error",
-                    )
-                )
+        # 确认步骤的依赖已在上面通用逻辑中检查，这里不重复
+        pass
 
     return ValidationResult(valid=len(messages) == 0, messages=messages)
 
@@ -291,10 +281,10 @@ async def confirm_project(project_id: UUID, db: AsyncSession) -> Project:
     """
     project = await _get_project_or_404(db, project_id)
 
-    if project.status != ProjectStatus.created:
+    if project.status not in (ProjectStatus.created, ProjectStatus.planning):
         raise HTTPException(
             status_code=400,
-            detail=f"项目状态为 {project.status.value}，无法确认（仅 created 状态可确认）",
+            detail=f"项目状态为 {project.status.value}，无法确认（仅 created/planning 状态可确认）",
         )
 
     # 校验确认步骤
