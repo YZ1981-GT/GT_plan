@@ -88,6 +88,12 @@
               <el-tag v-else type="info" size="small">待完成</el-tag>
             </span>
           </div>
+          <template v-if="teamMembers.length">
+            <div v-for="m in teamMembers" :key="m.staff_id" class="info-row">
+              <span class="info-label">{{ m.staff_name }}</span>
+              <span class="info-value">{{ roleLabel(m.role) }} · {{ (m.assigned_cycles || []).join('/') || '全部' }}</span>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -127,6 +133,16 @@ const basicInfo = computed<BasicInfo>(() => {
 
 const projectTypeLabel = computed(() => PROJECT_TYPE_MAP[basicInfo.value.project_type] ?? '—')
 const standardLabel = computed(() => STANDARD_MAP[basicInfo.value.accounting_standard] ?? '—')
+
+const teamMembers = computed(() => {
+  const ta = wizardStore.stepData.team_assignment as any
+  return ta?.members || []
+})
+
+const ROLE_LABEL_MAP: Record<string, string> = {
+  signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员',
+}
+function roleLabel(role: string) { return ROLE_LABEL_MAP[role] || role }
 
 function isStepCompleted(step: string): boolean {
   return wizardStore.isStepCompleted(step)

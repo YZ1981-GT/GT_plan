@@ -157,6 +157,7 @@ import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
+  DataAnalysis, UserFilled,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -174,13 +175,15 @@ const props = defineProps<{
 const navItems = [
   { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/' },
   { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects' },
-  { key: 'team', label: '人员委派', icon: User, path: '/team' },
+  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff' },
   { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge' },
-  { key: 'workhours', label: '工时管理', icon: Timer, path: '/workhours' },
+  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours' },
+  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management' },
   { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation' },
   { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation' },
   { key: 'archive', label: '归档管理', icon: Box, path: '/archive' },
   { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments' },
+  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users' },
   { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models' },
   { key: 'settings', label: '系统设置', icon: Setting, path: '/settings' },
   { key: 'recycle-bin', label: '回收站', icon: DeleteFilled, path: '/recycle-bin' },

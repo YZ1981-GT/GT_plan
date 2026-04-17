@@ -28,7 +28,7 @@
 - [x] 人员列表 el-table（姓名、工号、职级、专业、项目数）
 - [x] 创建/编辑人员 el-dialog
 - [x] 人员简历查看（参与项目历史、行业经验统计）
-- [ ] 左侧导航栏"人员委派"入口（需在 DefaultLayout.vue 添加菜单项）
+- [x] 左侧导航栏"人员委派"入口（ThreeColumnLayout navItems 已更新路径 /settings/staff）
 
 ### Task 1.4 TeamAssignmentStep.vue 团队委派
 - [x] 从 `/api/staff` 搜索选择人员（el-select filterable remote）
@@ -61,10 +61,10 @@
 - [x] 每日工时填报表单（项目选择、小时数、工作内容）
 - [x] LLM 预填按钮 → 加载建议 → 用户编辑确认
 - [x] 校验提示（超时警告、时间重叠提示）
-- [ ] 左侧导航栏"工时管理"入口（需在 DefaultLayout.vue 添加菜单项）
+- [x] 左侧导航栏"工时管理"入口（ThreeColumnLayout navItems 已更新路径 /work-hours）
 
 ### Task 1.8 ConfirmationStep.vue 展示团队信息
-- [ ] 确认步骤中展示团队分配摘要（成员、角色、循环）— 未实现
+- [x] 确认步骤中展示团队分配摘要（成员、角色、循环）
 
 ### Task 1.9 人员简历自动丰富
 - [x] 项目完成/归档时触发简历更新 — enrich_resume() 方法已实现
@@ -102,7 +102,7 @@
 - [x] 响应式布局（el-row/el-col 栅格）
 - [x] 看板数据 30s 自动刷新（setInterval）
 - [ ] 看板卡片可配置（拖拽调整顺序）— 未实现
-- [ ] 左侧导航栏"管理看板"入口 — 需在 DefaultLayout.vue 添加
+- [x] 左侧导航栏"管理看板"入口（ThreeColumnLayout navItems 已添加 /dashboard/management）
 
 ### Task 1.11a 项目看板
 - [ ] 路由注册 `/projects/:id/dashboard` → ProjectDashboard.vue — 未实现
@@ -492,8 +492,8 @@
 
 ### Task 9.26 附注结构化编辑器 — 前端重构
 - [x] DisclosureEditor.vue 已有三栏布局（目录树+编辑区+校验面板）
-- [ ] 编辑区混排布局 TipTap 富文本 — 未安装 TipTap
-- [ ] 安装 TipTap 依赖 — 未安装
+- [x] 编辑区混排布局 TipTap 富文本（已替换 textarea 为 TipTap EditorContent + 工具栏）
+- [x] 安装 TipTap 依赖（@tiptap/vue-3 + @tiptap/starter-kit + @tiptap/extension-placeholder）
 - [x] 表格双击编辑 + 自动提数标识 + 手动标识
 - [ ] 辅助面板 5 个 Tab — 当前只有校验结果 1 个 Tab
 - [ ] Word 预览 Tab — 未实现

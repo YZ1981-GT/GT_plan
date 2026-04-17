@@ -69,10 +69,19 @@
               </el-table>
             </div>
 
-            <!-- 文字型 -->
-            <div v-if="currentNote.content_type === 'text' || currentNote.content_type === 'mixed'">
-              <el-input v-model="textContent" type="textarea" :rows="8"
-                placeholder="请输入附注文字内容" />
+            <!-- 文字型 — TipTap 富文本编辑器 -->
+            <div v-if="currentNote.content_type === 'text' || currentNote.content_type === 'mixed'" class="gt-de-tiptap-wrapper">
+              <div v-if="editor" class="gt-de-tiptap-toolbar">
+                <el-button-group size="small">
+                  <el-button @click="editor.chain().focus().toggleBold().run()" :type="editor.isActive('bold') ? 'primary' : ''">B</el-button>
+                  <el-button @click="editor.chain().focus().toggleItalic().run()" :type="editor.isActive('italic') ? 'primary' : ''">I</el-button>
+                  <el-button @click="editor.chain().focus().toggleBulletList().run()">列表</el-button>
+                  <el-button @click="editor.chain().focus().toggleHeading({ level: 3 }).run()">H3</el-button>
+                  <el-button @click="editor.chain().focus().undo().run()">撤销</el-button>
+                  <el-button @click="editor.chain().focus().redo().run()">重做</el-button>
+                </el-button-group>
+              </div>
+              <editor-content :editor="editor" class="gt-de-tiptap-content" />
             </div>
 
             <div class="gt-de-editor-footer">
@@ -111,10 +120,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useEditor, EditorContent } from '@tiptap/vue-3'
+import StarterKit from '@tiptap/starter-kit'
+import Placeholder from '@tiptap/extension-placeholder'
 import {
   generateDisclosureNotes, getDisclosureNoteTree, getDisclosureNoteDetail,
   updateDisclosureNote, validateDisclosureNotes, getValidationResults,
@@ -140,6 +152,17 @@ const currentNote = ref<DisclosureNoteDetail | null>(null)
 const textContent = ref('')
 const validationFindings = ref<NoteValidationFinding[]>([])
 
+// TipTap 编辑器
+const editor = useEditor({
+  extensions: [
+    StarterKit,
+    Placeholder.configure({ placeholder: '请输入附注文字内容...' }),
+  ],
+  content: '',
+  onUpdate: ({ editor: e }) => { textContent.value = e.getHTML() },
+})
+
+onBeforeUnmount(() => { editor.value?.destroy() })
 interface TreeNode { id: string; label: string; data: DisclosureNoteTreeItem; children?: TreeNode[] }
 
 const treeData = computed<TreeNode[]>(() => {
@@ -206,6 +229,7 @@ async function onNodeClick(node: TreeNode) {
   try {
     currentNote.value = await getDisclosureNoteDetail(projectId.value, year.value, node.data.note_section)
     textContent.value = currentNote.value.text_content || ''
+    if (editor.value) editor.value.commands.setContent(textContent.value)
   } catch { currentNote.value = null }
   finally { detailLoading.value = false }
 }
@@ -274,4 +298,9 @@ onMounted(fetchTree)
 .gt-cell-wrapper { display: flex; align-items: center; gap: 4px; }
 .gt-cell-source { font-size: 10px; cursor: help; }
 .gt-cell-manual { font-size: 10px; cursor: help; }
+.gt-de-tiptap-wrapper { border: 1px solid var(--gt-color-border-light, #e4e7ed); border-radius: var(--gt-radius-sm, 4px); }
+.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid var(--gt-color-border-light, #e4e7ed); background: #fafafa; }
+.gt-de-tiptap-content { padding: 12px; min-height: 200px; }
+.gt-de-tiptap-content :deep(.ProseMirror) { outline: none; min-height: 180px; }
+.gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: #adb5bd; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
 </style>
