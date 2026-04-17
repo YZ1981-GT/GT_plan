@@ -209,3 +209,172 @@ GET /api/projects/{id}/ledger/aux-summary
       ]
     }]
 ```
+
+
+## 10. 过程记录与人机协同标注（补充设计，对应需求 4）
+
+### 底稿编辑记录
+```
+WOPI PutFile 触发时：
+  → 记录到 logs 表：
+    action_type: "workpaper_edit"
+    object_type: "working_paper"
+    object_id: wp_id
+    new_value: { file_version, edited_by, edited_at, change_summary }
+  → change_summary 由 ParseService 对比前后 parsed_data 生成
+```
+
+### 人机协同标注
+```
+AI 生成内容时：
+  → 写入 ai_content 表（Phase 4 已定义）
+  → content_type: data_fill / analytical_review / note_draft
+  → confirmation_status: pending → accepted / modified / rejected
+  → 前端显示 AI 标签（紫色背景 + "AI 辅助-待确认"）
+  → 人工确认后标签变为"已确认"
+```
+
+## 11. 抽样程序增强（补充设计，对应需求 6）
+
+### 截止性测试
+```
+POST /api/projects/{id}/sampling/cutoff-test
+  body: { account_codes: ["6001"], days_before: 5, days_after: 5, amount_threshold: 10000 }
+  → 查询 tb_ledger WHERE voucher_date BETWEEN (period_end - days_before) AND (period_end + days_after)
+    AND account_code IN account_codes AND (debit_amount > threshold OR credit_amount > threshold)
+  → 返回交易列表 + 自动填入截止性测试底稿模板
+```
+
+### 账龄分析
+```
+POST /api/projects/{id}/sampling/aging-analysis
+  body: { account_code: "1122", aging_brackets: ["0-180", "181-365", "366-730", "731+"] }
+  → 查询 tb_aux_balance WHERE account_code LIKE '1122%'
+  → 按辅助维度（客户）分组，计算每个客户的账龄区间分布
+  → 返回账龄分析表 + 自动填入底稿
+```
+
+### 月度明细
+```
+POST /api/projects/{id}/sampling/monthly-detail
+  body: { account_code: "6001", year: 2025 }
+  → 查询 tb_ledger GROUP BY accounting_period
+  → 按月汇总借方/贷方/余额
+  → 返回 12 个月的明细数据 + 自动填入底稿
+```
+
+## 12. 合并报表增强（补充设计，对应需求 7）
+
+### 7a 合并锁定同步
+```
+projects 表新增字段：
+  consol_lock: BOOLEAN DEFAULT false
+  consol_lock_by: UUID FK → projects.id（锁定发起的合并项目）
+  consol_lock_at: TIMESTAMPTZ
+
+锁定流程：
+  合并项目开始汇总 → PUT /api/consolidation/{parent_id}/lock
+    → 遍历所有子公司项目，设置 consol_lock=true, consol_lock_by=parent_id
+    → 锁定期间子公司的 trial_balance/adjustments API 返回 423 Locked
+  合并完成 → PUT /api/consolidation/{parent_id}/unlock
+    → 遍历所有子公司项目，设置 consol_lock=false
+```
+
+### 7b 外部单位报表导入
+```
+POST /api/consolidation/{project_id}/import-external
+  body: multipart/form-data（Excel 报表 + Word 附注）
+  → Excel 解析：提取四张报表行次数据，写入 consol_trial 的独立列
+  → Word 附注：调用 history_note_parser 解析章节结构
+  → LLM 辅助映射到合并附注模版
+```
+
+### 7c 独立模块入口
+```
+前端路由：
+  /standalone/consolidation → 仅合并模块（导入各单位报表 → 合并）
+  /standalone/report-review → 仅报告复核（上传报告+报表+附注 → 复核）
+  /standalone/report-format → 仅报告排版（上传内容 → 排版导出）
+
+后端：复用现有 API，不需要 project_id 时用临时项目
+```
+
+## 13. LLM 底稿复核提示词（补充设计，对应需求 8a）
+
+```
+复核流程：
+  POST /api/workpapers/{wp_id}/ai/review
+    → 加载底稿 parsed_data
+    → 根据 audit_cycle 从 TSJ/ 加载对应提示词（如 E 循环 → 货币资金提示词.md）
+    → 构建 system prompt：提示词内容 + 底稿数据 + 试算表数据
+    → 调用 llm_client.chat_completion()
+    → 解析 LLM 回复为结构化 findings：
+      [{
+        finding_type: "data_discrepancy" | "logic_contradiction" | "completeness_gap",
+        severity: "high" | "medium" | "low",
+        description: "...",
+        cell_reference: "E9-1!B15",
+        suggestion: "..."
+      }]
+    → 写入 wp_qc_result 表
+```
+
+## 14. 私人库 RAG 对话（补充设计，对应需求 12b）
+
+```
+上传文档 → 向量化索引：
+  POST /api/users/{id}/private-storage/upload
+    → 保存文件到 storage/users/{id}/private/
+    → 调用 UnifiedOCRService 提取文本（Word/PDF/图片）
+    → 文本分块（chunk_size=500, overlap=50）
+    → 调用 embedding API 生成向量
+    → 存入 ChromaDB collection: private_{user_id}
+
+RAG 对话：
+  POST /api/users/{id}/private-storage/chat
+    body: { message }
+    → ChromaDB 检索 top-5 相关文档片段
+    → 构建 prompt：用户消息 + 检索到的文档片段
+    → 调用 llm_client.chat_completion(stream=True)
+    → SSE 流式返回，回复中标注引用来源
+```
+
+## 15. 权限精细化（补充设计，对应需求 14）
+
+```
+删除权限检查中间件：
+  在 DELETE 请求处理前检查：
+    1. 获取目标对象的 created_by
+    2. 当前用户 == created_by → 允许
+    3. 当前用户角色 == manager 且 目标在同一项目 → 允许
+    4. 当前用户角色 == partner 或 admin → 允许
+    5. 否则 → 403 Forbidden
+
+  实现方式：在各路由的 DELETE 端点中添加权限检查
+  或：创建通用 check_delete_permission(user, object) 函数
+```
+
+## 16. 存储统计看板（补充设计，对应需求 3a.5）
+
+```
+GET /api/admin/storage-stats
+  → 遍历 storage/ 目录，按项目/用户/年度统计占用
+  → 返回：
+    {
+      total_size: 52GB,
+      by_project: [{ project_id, name, size, wp_count }],
+      by_user: [{ user_id, name, private_size }],
+      by_year: [{ year, size }],
+    }
+  → 前端 ECharts 饼图/柱状图展示
+```
+
+## 跨 Phase 兼容性说明
+
+| 冲突点 | 涉及 Phase | 解决方案 |
+|--------|-----------|---------|
+| 底稿导入 vs WOPI PutFile | 1b vs 10 | 共存：WOPI 用于在线编辑，Phase 10 用于离线回传 |
+| 连续审计 vs 项目向导 | 9 vs 10 | 新增 create-next-year API，不修改现有向导 |
+| 合并锁定 vs 合并试算表 | 9 vs 10 | 新增 consol_lock 字段，锁定期间返回 423 |
+| 复核对话 vs 三级复核 | 3 vs 10 | 共存：review_records 正式复核，review_conversations 实时对话 |
+| 私人库 vs 知识库 | 9 vs 10 | 不同存储路径（users/ vs knowledge/），可互相共享 |

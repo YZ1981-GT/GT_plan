@@ -6,7 +6,8 @@
 - [ ] `POST /api/projects/{id}/workpapers/download-pack` 打包下载 API
 - [ ] 下载前自动预填（调用 PrefillService）
 - [ ] ZIP 打包（zipfile 模块，目录结构：循环/编号_名称.xlsx）
-- [ ] 前端 WorkpaperList.vue 添加勾选+下载按钮
+- [ ] 单个底稿下载（`GET /api/projects/{id}/workpapers/{wp_id}/download`）
+- [ ] 前端 WorkpaperList.vue 添加勾选+下载按钮+单个下载按钮
 
 ### Task 1.2 底稿导入（离线编辑回传）
 - [ ] `POST /api/projects/{id}/workpapers/{wp_id}/upload` 上传 API
@@ -29,6 +30,10 @@
 - [ ] 上年 unadjusted_misstatements carry_forward
 - [ ] 前端项目详情面板"创建下年项目"按钮
 
+### Task 2.2 跨年数据对比
+- [ ] 当年底稿中查看上年同科目数据（PREV 函数已支持，前端展示待实现）
+- [ ] 附注变动分析自动对比上年数据生成变动说明（复用 note_ai generate-analysis）
+
 ---
 
 ## 任务组 3：服务器存储与分区
@@ -47,6 +52,11 @@
 - [ ] 触发 enrich_resume 更新人员简历
 - [ ] 前端归档确认弹窗
 
+### Task 3.3 存储统计看板
+- [ ] `GET /api/admin/storage-stats` 存储统计 API
+- [ ] 按项目/用户/年度统计存储占用
+- [ ] 前端 ECharts 饼图/柱状图展示
+
 ---
 
 ## 任务组 4：过程记录与附件关联
@@ -59,6 +69,12 @@
 - [ ] 底稿详情面板显示关联附件列表
 - [ ] 附件详情显示关联底稿列表
 - [ ] 上传附件时可选择关联底稿
+
+### Task 4.3 人机协同标注
+- [ ] AI 生成内容写入 ai_content 表（复用 Phase 4 定义）
+- [ ] 前端 AI 标签（紫色背景 + "AI 辅助-待确认"）
+- [ ] 人工确认后标签变为"已确认"
+- [ ] 关键底稿提交复核前检查未确认的 AI 内容
 
 ---
 
@@ -87,18 +103,25 @@
 ## 任务组 6：抽样程序增强
 
 ### Task 6.1 截止性测试
+- [ ] `POST /api/projects/{id}/sampling/cutoff-test` API
 - [ ] 自动从 tb_ledger 提取期末前后 N 天交易
 - [ ] 填入截止性测试底稿模板
 - [ ] 前端截止性测试配置（天数/科目/金额阈值）
 
 ### Task 6.2 账龄分析
+- [ ] `POST /api/projects/{id}/sampling/aging-analysis` API
 - [ ] 自动从 tb_aux_balance 生成账龄分析表
 - [ ] 按账龄区间（1年内/1-2年/2-3年/3年以上）分组
 - [ ] 填入账龄分析底稿
 
 ### Task 6.3 月度明细填充
+- [ ] `POST /api/projects/{id}/sampling/monthly-detail` API
 - [ ] 按月汇总 tb_ledger 数据
 - [ ] 自动填入月度明细分析底稿
+
+### Task 6.4 抽样结果与底稿关联
+- [ ] 抽样选中的样本自动填入对应底稿
+- [ ] MUS 评价结果自动生成审计结论
 
 ---
 
@@ -141,12 +164,19 @@
 - [ ] 结束对话按钮（仅发起人可见）
 - [ ] 导出对话记录按钮
 - [ ] 看板集成（进行中对话数）
+- [ ] 质量控制复核人员对话通道预留
 
 ### Task 8.3 LLM 底稿复核
+- [ ] `POST /api/workpapers/{wp_id}/ai/review` 复核 API
 - [ ] 复核时加载 TSJ/ 对应提示词
 - [ ] LLM 自动检查底稿（数据完整性/逻辑一致性/格式规范）
-- [ ] 生成结构化 findings
+- [ ] 生成结构化 findings（类型/严重度/位置/建议）
 - [ ] 前端复核结果面板
+
+### Task 8.4 导出功能增强
+- [ ] 复核记录导出为 Word/PDF
+- [ ] 对话记录导出为 Word/PDF
+- [ ] 底稿复核报告导出（含所有 findings + 处理状态）
 
 ---
 
