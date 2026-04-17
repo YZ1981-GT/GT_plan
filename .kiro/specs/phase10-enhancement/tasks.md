@@ -222,6 +222,7 @@
 - [ ] 上传后自动向量化索引
 - [ ] 容量管理（1GB 上限 + 90% 提示）
 - [ ] 前端 PrivateStorage.vue
+- [ ] ThreeColumnLayout navItems 添加"私人库"入口（最左侧第一栏，与项目/知识库同级）
 
 ### Task 12.2 私人库 LLM 对话
 - [ ] 基于私人库的 RAG 对话
