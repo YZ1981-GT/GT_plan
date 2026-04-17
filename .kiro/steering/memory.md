@@ -797,6 +797,9 @@ inclusion: always
 - 新增数据表：review_conversations+review_messages+check_ins+forum_posts+forum_comments
 - 关键技术决策：复核对话系统（双向实时对话+SSE推送+导出Word）、私人库容量管理（1GB上限+90%提示）、合并锁定同步（consol_lock字段）、连续审计（prior_year_project_id+一键创建当年项目）
 - Phase 10 一致性审查完成（2026-04-17）：补充6个缺失设计（过程记录/抽样增强/合并锁定/LLM复核提示词/私人库RAG/权限精细化/存储统计看板）+8个缺失任务子项+5个跨Phase兼容性说明；commit dca4fe9
+- Phase 10 全面复盘通过（2026-04-17）：35+个用户需求全部覆盖、14个需求→14个设计→14个任务组完全对齐、8个跨Phase冲突均为低/中严重度有解决方案；commit c9de520
+- Phase 10 扩展（2026-04-17）：新增7个需求（15单元格级复核批注+16合并数据快照+17底稿智能推荐+18知识库上下文感知+19年度差异分析报告+20附件智能分类+21报告排版模板），总计21个需求21个任务组；新增3张表（cell_annotations+consol_snapshots+report_format_templates）；执行顺序调整为21步
+- 私人库导航偏好：私人库入口必须放在最左侧第一栏导航中（ThreeColumnLayout navItems），与项目/知识库同级，方便用户随时调用
 - Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 9 的 WorkHour 使用 "work_hours"
 - conftest.py 修复：新增 _WorkpaperStub（__tablename__="workpapers"）解决 ai_models FK 引用缺失表的问题；新增 staff_models 导入（在 collaboration_models 之前）
 - 已有测试预存问题（非 Phase 9 引入）：test_event_bus 中 Adjustment.soft_delete() AttributeError（Adjustment 模型缺少 SoftDeleteMixin）

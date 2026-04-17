@@ -251,12 +251,97 @@
 
 ---
 
+## 任务组 15：单元格级复核批注
+
+### Task 15.1 批注系统
+- [ ] cell_annotations 表（Alembic 迁移）
+- [ ] ORM 模型 + Pydantic Schema
+- [ ] `POST /api/projects/{id}/annotations` 创建批注
+- [ ] `GET /api/projects/{id}/annotations` 批注列表（按对象/状态/优先级筛选）
+- [ ] `PUT /api/annotations/{id}` 更新状态（pending→replied→resolved）
+- [ ] 穿透关联：附注批注→底稿批注自动创建 linked_annotation
+- [ ] 批注升级为对话（关联 review_conversations）
+- [ ] 前端：单元格右键菜单"添加批注"+批注气泡+批注汇总面板
+
+---
+
+## 任务组 16：合并数据快照
+
+### Task 16.1 快照管理
+- [ ] consol_snapshots 表（Alembic 迁移）
+- [ ] 合并报表生成时自动保存快照
+- [ ] `GET /api/consolidation/{id}/snapshots` 快照列表
+- [ ] `GET /api/consolidation/{id}/snapshots/{snapshot_id}/diff` 快照差异对比
+- [ ] 基于历史快照重新生成合并报表
+- [ ] 前端快照列表+差异对比面板
+
+---
+
+## 任务组 17：底稿智能推荐
+
+### Task 17.1 LLM 推荐
+- [ ] `POST /api/projects/{id}/ai/recommend-workpapers` 推荐 API
+- [ ] 输入：materiality + industry + prior_year_findings
+- [ ] LLM 分析风险等级，推荐底稿优先级
+- [ ] 与 procedure_instances 联动（高风险→execute）
+- [ ] 前端推荐结果面板（在 ProcedureTrimming.vue 中集成）
+
+---
+
+## 任务组 18：知识库上下文感知
+
+### Task 18.1 上下文注入
+- [ ] LLM 对话时自动注入底稿上下文（科目/循环/类型/试算表数据）
+- [ ] 知识库检索按相关度排序（同行业/同科目优先）
+- [ ] 引用标注来源文档和页码
+- [ ] 前端"@知识库"触发精准检索
+
+---
+
+## 任务组 19：年度差异分析报告
+
+### Task 19.1 差异报告生成
+- [ ] `POST /api/projects/{id}/ai/annual-diff-report` 生成 API
+- [ ] 全科目变动额/变动率计算
+- [ ] 重大变动筛选（>20% 或 >materiality）
+- [ ] LLM 逐科目生成分析说明
+- [ ] 保存为底稿 + 导出 Word
+
+---
+
+## 任务组 20：附件智能分类
+
+### Task 20.1 智能分类
+- [ ] 上传附件时 OCR 提取文本
+- [ ] LLM 自动分类（合同/发票/对账单/函证/会议纪要）
+- [ ] 自动建议关联底稿
+- [ ] 前端分类确认/修改界面
+
+---
+
+## 任务组 21：报告排版模板
+
+### Task 21.1 模板管理
+- [ ] report_format_templates 表（Alembic 迁移）
+- [ ] 模板 CRUD API
+- [ ] 4 个内置模板（标准版/简化版/国企版/上市版）
+- [ ] 模板自定义（字体/页边距/页眉页脚/水印）
+- [ ] 排版实时预览（python-docx → HTML → iframe）
+- [ ] 模板版本管理+回滚
+- [ ] 前端 ReportFormatManager.vue
+
+---
+
 ## 执行顺序
 
-1. **Task 1.1-1.2**（底稿下载导入）→ 2. **Task 2.1**（连续审计）
-3. **Task 3.1-3.2**（存储分区+归档）→ 4. **Task 4.1-4.2**（过程记录+附件关联）
-5. **Task 5.1-5.3**（LLM 底稿填充）→ 6. **Task 6.1-6.3**（抽样+截止性+账龄）
-7. **Task 7.1-7.3**（合并增强）→ 8. **Task 8.1-8.3**（复核对话+LLM复核）
+1. **Task 1.1-1.2**（底稿下载导入）→ 2. **Task 2.1-2.2**（连续审计）
+3. **Task 3.1-3.3**（存储分区+归档+统计）→ 4. **Task 4.1-4.3**（过程记录+附件+人机协同）
+5. **Task 5.1-5.3**（LLM 底稿填充）→ 6. **Task 6.1-6.4**（抽样+截止性+账龄+月度）
+7. **Task 7.1-7.3**（合并增强）→ 8. **Task 8.1-8.4**（复核对话+LLM复核+导出）
 9. **Task 9.1**（报告溯源）→ 10. **Task 13.1**（辅助余额汇总）
-11. **Task 14.1**（权限精细化）→ 12. **Task 10.1-10.2**（打卡足迹）
-13. **Task 11.1**（吐槽专栏）→ 14. **Task 12.1-12.2**（私人库+LLM对话）
+11. **Task 14.1**（权限精细化）→ 12. **Task 15.1**（单元格级复核批注）
+13. **Task 16.1**（合并数据快照）→ 14. **Task 17.1**（底稿智能推荐）
+15. **Task 18.1**（知识库上下文感知）→ 16. **Task 19.1**（年度差异分析报告）
+17. **Task 20.1**（附件智能分类）→ 18. **Task 21.1**（报告排版模板）
+19. **Task 10.1-10.2**（打卡足迹）→ 20. **Task 11.1**（吐槽专栏）
+21. **Task 12.1-12.2**（私人库+LLM对话）

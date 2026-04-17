@@ -378,3 +378,95 @@ GET /api/admin/storage-stats
 | 合并锁定 vs 合并试算表 | 9 vs 10 | 新增 consol_lock 字段，锁定期间返回 423 |
 | 复核对话 vs 三级复核 | 3 vs 10 | 共存：review_records 正式复核，review_conversations 实时对话 |
 | 私人库 vs 知识库 | 9 vs 10 | 不同存储路径（users/ vs knowledge/），可互相共享 |
+
+
+## 17. 单元格级复核批注（需求 15）
+
+### 数据模型
+```
+cell_annotations 表（新增）
+├── id: UUID PK
+├── project_id: UUID FK
+├── object_type: VARCHAR（workpaper/disclosure_note/financial_report）
+├── object_id: UUID
+├── cell_ref: VARCHAR（如 "E9-1!B15" 或 "五、9.row3.col2"）
+├── content: TEXT
+├── priority: VARCHAR（high/medium/low）
+├── status: VARCHAR（pending/replied/resolved）
+├── author_id: UUID FK → users.id
+├── mentioned_user_ids: JSONB（@提及的人员）
+├── linked_annotation_id: UUID FK → cell_annotations.id（穿透关联的批注）
+├── conversation_id: UUID FK → review_conversations.id（升级为对话时关联）
+├── is_deleted, created_at, updated_at
+```
+
+### 穿透关联逻辑
+```
+附注单元格批注 → 通过 note_wp_mapping 找到关联底稿 → 自动创建 linked_annotation
+底稿单元格批注 → 通过 note_wp_mapping 反向找到附注 → 自动创建 linked_annotation
+```
+
+## 18. 合并数据快照（需求 16）
+
+### 数据模型
+```
+consol_snapshots 表（新增）
+├── id: UUID PK
+├── project_id: UUID FK（合并项目）
+├── year: INT
+├── snapshot_data: JSONB（各单体 trial_balance + 抵消分录 + 合并调整的完整快照）
+├── trigger_reason: VARCHAR（manual/auto_on_generate/auto_on_lock）
+├── diff_summary: JSONB（与上一次快照的差异摘要）
+├── created_by: UUID FK
+├── created_at
+```
+
+## 19. 底稿智能推荐（需求 17）
+
+```
+POST /api/projects/{id}/ai/recommend-workpapers
+  → 输入：项目的 materiality + industry + prior_year_findings
+  → LLM 分析风险等级，推荐底稿优先级
+  → 返回：[{ wp_code, wp_name, risk_level, recommendation, reason }]
+  → 与 procedure_instances 联动：高风险自动标记 status=execute
+```
+
+## 20. 年度差异分析报告（需求 19）
+
+```
+POST /api/projects/{id}/ai/annual-diff-report
+  → 查询当年 trial_balance vs 上年（prior_year_project_id）
+  → 计算全科目变动额/变动率
+  → 筛选重大变动（>20% 或 >materiality）
+  → LLM 逐科目生成分析说明
+  → 保存为底稿（wp_index + working_paper）
+  → 返回 Word 下载链接
+```
+
+## 21. 附件智能分类（需求 20）
+
+```
+POST /api/projects/{id}/attachments/upload
+  → 保存文件
+  → OCR 提取文本（UnifiedOCRService）
+  → LLM 分类：{ type: "invoice", confidence: 0.95, suggested_wp_code: "D1-5" }
+  → 自动创建 attachment_working_paper 关联
+  → 返回分类结果供用户确认/修改
+```
+
+## 22. 报告排版模板（需求 21）
+
+```
+report_format_templates 表（新增）
+├── id: UUID PK
+├── template_name: VARCHAR（致同标准版/简化版/国企版/上市版）
+├── template_type: VARCHAR（audit_report/management_letter/confirmation）
+├── config: JSONB（字体/页边距/页眉页脚/水印/Logo路径）
+├── version: INT
+├── is_default: BOOLEAN
+├── is_deleted, created_at, updated_at
+
+排版预览：
+  GET /api/report-format/preview?template_id=xxx&content=...
+  → 后端用 python-docx 按模板配置渲染 → 转 HTML → 返回给前端 iframe
+```
