@@ -25,7 +25,17 @@ class DashboardService:
         self.db = db
 
     async def get_overview(self) -> dict:
-        """关键指标聚合"""
+        """关键指标聚合（带 Redis 缓存）"""
+        # 尝试 Redis 缓存
+        try:
+            from app.core.redis import redis_client
+            cached = await redis_client.get("dashboard:global:overview")
+            if cached:
+                import json
+                return json.loads(cached)
+        except Exception:
+            pass
+
         # 在审项目数
         active_q = sa.select(sa.func.count()).select_from(Project).where(
             Project.is_deleted == False,  # noqa
@@ -47,13 +57,23 @@ class DashboardService:
         staff_q = sa.select(sa.func.count()).select_from(StaffMember).where(StaffMember.is_deleted == False)  # noqa
         staff_count = (await self.db.execute(staff_q)).scalar() or 0
 
-        return {
+        result = {
             "active_projects": active_count,
             "week_hours": week_hours,
             "staff_count": staff_count,
             "overdue_projects": 0,  # TODO: 需要 project_timelines 表
             "pending_review_workpapers": 0,  # TODO: 需要 working_paper 状态统计
         }
+
+        # 写入 Redis 缓存
+        try:
+            from app.core.redis import redis_client
+            import json
+            await redis_client.set("dashboard:global:overview", json.dumps(result), ex=30)
+        except Exception:
+            pass
+
+        return result
 
     async def get_project_progress(self) -> list[dict]:
         """项目进度列表"""

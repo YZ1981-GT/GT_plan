@@ -46,6 +46,12 @@
         <el-form-item>
           <el-button link type="primary" @click="showQuickCreate = true">搜不到？快速创建人员</el-button>
         </el-form-item>
+        <!-- 候选人负荷预览 -->
+        <el-form-item v-if="selectedStaffId && selectedStaffWorkload" label="当前负荷">
+          <div style="font-size: 13px; color: #666">
+            参与 {{ selectedStaffWorkload.project_count }} 个项目，本周 {{ selectedStaffWorkload.week_hours }}h
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAddDialog = false">取消</el-button>
@@ -80,10 +86,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listStaff, createStaff, listAssignments, saveAssignments, type StaffMember, type Assignment } from '@/services/staffApi'
 import { useWizardStore } from '@/stores/wizard'
+import http from '@/utils/http'
 
 const props = defineProps<{ projectId?: string }>()
 const wizardStore = useWizardStore()
@@ -104,10 +111,21 @@ const members = ref<MemberRow[]>([])
 const showAddDialog = ref(false)
 const showQuickCreate = ref(false)
 const selectedStaffId = ref('')
+const selectedStaffWorkload = ref<any>(null)
 const searchResults = ref<StaffMember[]>([])
 const searching = ref(false)
 const creating = ref(false)
 const newStaff = ref({ name: '', title: '', department: '', phone: '' })
+
+// 选中人员时加载负荷数据
+watch(selectedStaffId, async (id) => {
+  if (!id) { selectedStaffWorkload.value = null; return }
+  try {
+    const { data } = await http.get('/api/dashboard/staff-workload')
+    const all = data.data ?? data
+    selectedStaffWorkload.value = (Array.isArray(all) ? all : []).find((s: any) => s.staff_id === id) || null
+  } catch { selectedStaffWorkload.value = null }
+})
 
 async function searchStaff(query: string) {
   if (!query || query.length < 1) { searchResults.value = []; return }

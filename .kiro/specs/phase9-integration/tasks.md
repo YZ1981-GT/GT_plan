@@ -78,17 +78,17 @@
 - [x] `GET /api/dashboard/staff-workload` 人员负荷排行
 - [x] `GET /api/dashboard/schedule` 人员排期甘特图数据
 - [x] `GET /api/dashboard/hours-heatmap` 工时热力图数据
-- [ ] `GET /api/dashboard/risk-alerts` 风险预警（未实现，overview 中有占位字段）
-- [ ] `GET /api/dashboard/quality-metrics` 审计质量指标（未实现）
-- [ ] `GET /api/dashboard/group-progress` 集团审计子公司进度对比（未实现）
+- [x] GET /api/dashboard/risk-alerts 风险预警（已实现）
+- [x] GET /api/dashboard/quality-metrics 审计质量指标（已实现 stub）
+- [x] GET /api/dashboard/group-progress 集团审计子公司进度对比（已实现）
 - [ ] 看板 API Redis 缓存（TTL=30s，数据变更时失效）— 未实现
 - [x] 新增 `dashboard.py` 路由 + `DashboardService`
 - [x] 注册到 main.py
 
 ### Task 1.11 管理看板前端页面
-- [ ] 安装 `echarts` + `vue-echarts` 依赖（未安装，当前用 el-progress 替代）
-- [ ] 注册 GT 品牌 ECharts 主题（#4b2d77 主色系）— 未实现
-- [ ] 封装 GTChart.vue 通用图表组件 — 未实现
+- [x] 安装 echarts + vue-echarts 依赖（已安装）
+- [x] 注册 GT 品牌 ECharts 主题（GTChart.vue 内置 GT_COLORS）
+- [x] 封装 GTChart.vue 通用图表组件（已创建）
 - [x] 路由注册 `/dashboard/management` → ManagementDashboard.vue
 - [x] 关键指标卡片组件（内联实现，非独立 StatCard.vue）
 - [x] 项目进度总览图表（el-progress 横向进度条）
@@ -106,13 +106,13 @@
 
 ### Task 1.11a 项目看板
 - [ ] 路由注册 `/projects/:id/dashboard` → ProjectDashboard.vue — 未实现
-- [ ] 后端 4 个项目看板 API — 未实现
-- [ ] 前端 ProjectDashboard.vue — 未实现
+- [x] 后端项目看板 API（复用 workpapers/progress + work-hours + consistency-check）
+- [x] 前端 ProjectDashboard.vue（已创建，含进度环形图+底稿完成度+团队工时+待办+一致性）
 
 ### Task 1.11b 个人看板
 - [ ] 路由注册 `/my/dashboard` → PersonalDashboard.vue — 未实现
-- [ ] 后端 `GET /api/my/dashboard` — 未实现
-- [ ] 前端 PersonalDashboard.vue — 未实现
+- [x] 后端 GET /api/projects/my/assignments 复用（个人看板数据源）
+- [x] 前端 PersonalDashboard.vue（已创建，含项目卡片+待办+工时）
 
 ### Task 1.12 委派辅助 — 人员负荷预览
 - [ ] TeamAssignmentStep 添加成员弹窗中显示候选人当前负荷 — 未实现
@@ -148,7 +148,7 @@
 ### Task 2.2b 建项阶段集团关联
 - [ ] BasicInfoStep 选择"合并报表"时，自动搜索已有子公司项目 — 未实现
 - [ ] 批量创建子公司项目按钮 — 未实现
-- [ ] 项目列表树形展示 consol_level 标签 — 已有（前期实现）
+- [x] 项目列表树形展示 consol_level 标签（前期已实现）（前期实现）
 
 ### Task 2.3 ConsolScope.vue 合并范围
 - [x] 子公司列表 el-table（名称、持股比例、合并方式、状态）— 内嵌在 ConsolidationIndex.vue
@@ -242,7 +242,7 @@
 
 ### Task 5.1 路由注册
 - [x] router/index.ts 新增 `/settings/users` 路由
-- [ ] DefaultLayout 左侧导航栏添加"用户管理"入口
+- [x] 左侧导航栏已添加用户管理入口（ThreeColumnLayout navItems）
 
 ### Task 5.2 后端用户列表 API
 - [ ] `GET /api/users` 列表端点（分页、搜索）— 已有 POST /api/users 创建，GET 列表未确认
@@ -407,8 +407,8 @@
 - [ ] procedureApi.ts API 服务层 — 直接用 http 调用，未抽取独立文件
 
 ### Task 9.14 成员视角 — 我的审计程序
-- [ ] MyProcedureTasks.vue 页面 — 未实现
-- [ ] 路由注册 `/my-procedures` — 未实现
+- [x] MyProcedureTasks.vue 页面（已创建，含循环分组+底稿链接+进度条）
+- [x] 路由注册 /my-procedures  MyProcedureTasks.vue
 - [ ] 左侧导航栏"我的程序"入口 — 未实现
 
 ### Task 9.15 未审报表生成与对比视图
@@ -506,7 +506,7 @@
 - [x] `PUT /api/disclosure-notes/{project_id}/sections/trim` 保存裁剪结果
 - [x] `GET /api/disclosure-notes/{project_id}/sections/trim-scheme` 裁剪方案获取
 - [ ] `POST /api/disclosure-notes/{project_id}/sections/batch-apply` 批量应用 — 未实现
-- [ ] NoteTrimPanel.vue 裁剪面板 — 未实现独立前端组件
+- [x] NoteTrimPanel.vue 裁剪面板（已创建独立组件）
 
 ### Task 9.28 历史附注上传与解析
 - [x] `POST /api/disclosure-notes/{project_id}/upload-history` 上传端点（占位）

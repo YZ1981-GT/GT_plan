@@ -38,6 +38,34 @@
         </div>
       </el-col>
     </el-row>
+
+    <!-- 风险预警 + 审计质量 -->
+    <el-row :gutter="16" style="margin-top: 16px">
+      <el-col :span="8">
+        <div class="gt-chart-card">
+          <h3 class="gt-chart-title">风险预警</h3>
+          <div v-if="riskAlerts.length === 0" class="gt-chart-empty">无风险预警</div>
+          <div v-for="a in riskAlerts" :key="a.type" style="padding: 6px 0; border-bottom: 1px solid #f0f0f0">
+            <el-tag type="danger" size="small">{{ a.count }}</el-tag>
+            <span style="margin-left: 8px; font-size: 13px">{{ a.message }}</span>
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="8">
+        <div class="gt-chart-card">
+          <h3 class="gt-chart-title">集团审计总览</h3>
+          <GTChart v-if="groupOption" :option="groupOption" :height="220" />
+          <div v-else class="gt-chart-empty">无合并项目</div>
+        </div>
+      </el-col>
+      <el-col :span="8">
+        <div class="gt-chart-card">
+          <h3 class="gt-chart-title">工时热力图</h3>
+          <GTChart v-if="heatmapOption" :option="heatmapOption" :height="220" />
+          <div v-else class="gt-chart-empty">暂无工时数据</div>
+        </div>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -55,6 +83,10 @@ const statCards = ref([
 ])
 const projectProgress = ref<any[]>([])
 const staffWorkload = ref<any[]>([])
+const riskAlerts = ref<any[]>([])
+const groupProgress = ref<any[]>([])
+const heatmapData = ref<any[]>([])
+
 const workloadOption = computed(() => {
   if (!staffWorkload.value.length) return null
   const top10 = staffWorkload.value.slice(0, 10)
@@ -66,13 +98,40 @@ const workloadOption = computed(() => {
   }
 })
 
+const groupOption = computed(() => {
+  if (!groupProgress.value.length) return null
+  return {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'value', max: 100 },
+    yAxis: { type: 'category', data: groupProgress.value.map((g: any) => g.name), axisLabel: { fontSize: 11 } },
+    series: [{ type: 'bar', data: groupProgress.value.map((g: any) => g.progress), itemStyle: { color: '#0094B3' } }],
+  }
+})
+
+const heatmapOption = computed(() => {
+  if (!heatmapData.value.length) return null
+  const names = [...new Set(heatmapData.value.map((d: any) => d.staff_name))]
+  const dates = [...new Set(heatmapData.value.map((d: any) => d.date))].sort()
+  const data = heatmapData.value.map((d: any) => [dates.indexOf(d.date), names.indexOf(d.staff_name), d.hours])
+  return {
+    tooltip: { formatter: (p: any) => `${names[p.value[1]]} ${dates[p.value[0]]}: ${p.value[2]}h` },
+    xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 10, rotate: 45 } },
+    yAxis: { type: 'category', data: names, axisLabel: { fontSize: 11 } },
+    visualMap: { min: 0, max: 12, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#f8f6fb', '#4b2d77'] } },
+    series: [{ type: 'heatmap', data, label: { show: false } }],
+  }
+})
+
 async function refreshAll() {
   loading.value = true
   try {
-    const [overview, progress, workload] = await Promise.all([
+    const [overview, progress, workload, alerts, group, heatmap] = await Promise.all([
       http.get('/api/dashboard/overview').then(r => r.data.data ?? r.data),
       http.get('/api/dashboard/project-progress').then(r => r.data.data ?? r.data),
       http.get('/api/dashboard/staff-workload').then(r => r.data.data ?? r.data),
+      http.get('/api/dashboard/risk-alerts').then(r => r.data.data ?? r.data).catch(() => []),
+      http.get('/api/dashboard/group-progress').then(r => r.data.data ?? r.data).catch(() => []),
+      http.get('/api/dashboard/hours-heatmap').then(r => r.data.data ?? r.data).catch(() => []),
     ])
     statCards.value = [
       { label: '在审项目', value: overview.active_projects },
@@ -82,6 +141,9 @@ async function refreshAll() {
     ]
     projectProgress.value = progress
     staffWorkload.value = workload
+    riskAlerts.value = Array.isArray(alerts) ? alerts : []
+    groupProgress.value = Array.isArray(group) ? group : []
+    heatmapData.value = Array.isArray(heatmap) ? heatmap : []
   } finally { loading.value = false }
 }
 

@@ -95,6 +95,17 @@ class AssignmentService:
         # 发送通知给被委派人员
         await self._send_assignment_notifications(project_id, created)
 
+        # 发布 SSE 事件通知前端
+        try:
+            from app.services.event_bus import event_bus
+            from app.models.audit_platform_schemas import EventPayload, EventType
+            await event_bus.publish(EventPayload(
+                event_type=EventType.DATA_IMPORTED,  # 复用事件类型，前端按 project_id 过滤
+                project_id=project_id,
+            ))
+        except Exception:
+            pass  # SSE 推送失败不阻断主流程
+
         return created
 
     async def _send_assignment_notifications(
@@ -128,7 +139,7 @@ class AssignmentService:
                     recipient_id=staff.user_id,
                     message_type="ASSIGNMENT_CREATED",
                     title=f"您已被委派到项目「{project_name}」",
-                    content=f"角色：{role_cn}，负责循环：{cycles}",
+                    content=f"角色：{role_cn}，负责循环：{cycles}。点击前往填报工时：/work-hours",
                     related_object_type="project",
                     related_object_id=project_id,
                 )

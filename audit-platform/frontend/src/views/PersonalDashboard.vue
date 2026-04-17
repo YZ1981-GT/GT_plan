@@ -7,8 +7,14 @@
           <h4>我参与的项目</h4>
           <div v-for="p in myProjects" :key="p.project_id" class="gt-p-project-item"
             @click="$router.push(`/projects/${p.project_id}/ledger`)">
-            <span class="gt-p-proj-name">{{ p.project_name }}</span>
-            <el-tag size="small" type="info">{{ p.role }}</el-tag>
+            <div>
+              <span class="gt-p-proj-name">{{ p.project_name }}</span>
+              <el-tag v-if="isNewAssignment(p.assigned_at)" type="danger" size="small" style="margin-left: 4px">新</el-tag>
+            </div>
+            <div style="display: flex; gap: 4px; align-items: center">
+              <el-tag size="small" type="info">{{ roleLabel(p.role) }}</el-tag>
+              <span v-if="p.assigned_cycles?.length" style="font-size: 11px; color: #999">{{ p.assigned_cycles.join('/') }}</span>
+            </div>
           </div>
           <el-empty v-if="!myProjects.length" :image-size="50" description="暂无委派项目" />
         </div>
@@ -44,6 +50,14 @@ import { getMyAssignments } from '@/services/staffApi'
 const myProjects = ref<any[]>([])
 const todos = ref<any[]>([])
 const weekHours = ref<any[]>([])
+
+const ROLE_MAP: Record<string, string> = { signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员' }
+function roleLabel(role: string) { return ROLE_MAP[role] || role }
+function isNewAssignment(assignedAt: string | null) {
+  if (!assignedAt) return false
+  const diff = Date.now() - new Date(assignedAt).getTime()
+  return diff < 7 * 24 * 60 * 60 * 1000 // 7天内
+}
 onMounted(async () => {
   try { myProjects.value = await getMyAssignments() } catch { myProjects.value = [] }
 })

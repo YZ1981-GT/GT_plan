@@ -22,7 +22,7 @@ class WpAIService:
         self.db = db
 
     async def analytical_review(self, project_id: UUID, account_code: str, year: int) -> dict:
-        """分析性复核：变动分析"""
+        """分析性复核：变动分析 + LLM 生成分析文本"""
         from app.models.audit_platform_models import TrialBalance
 
         q = sa.select(TrialBalance).where(
@@ -39,6 +39,18 @@ class WpAIService:
         prior = float(tb.unadjusted_debit or 0) - float(tb.unadjusted_credit or 0)
         change = current - prior
         rate = round(change / prior * 100, 2) if prior != 0 else None
+        is_significant = abs(rate or 0) > 20 if rate is not None else abs(change) > 0
+
+        # 调用 LLM 生成分析文本
+        from app.services.llm_client import chat_completion
+        prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请用一句话分析变动原因。"
+        try:
+            ai_text = await chat_completion([
+                {"role": "system", "content": "你是审计分析师，请简洁分析科目余额变动原因。"},
+                {"role": "user", "content": prompt},
+            ])
+        except Exception:
+            ai_text = f"该科目余额变动 {change:,.2f}，变动率 {rate}%。"
 
         return {
             "account_code": account_code,
@@ -46,8 +58,8 @@ class WpAIService:
             "prior_balance": prior,
             "change_amount": change,
             "change_rate": rate,
-            "is_significant": abs(rate or 0) > 20 if rate is not None else abs(change) > 0,
-            "ai_analysis": f"该科目余额变动 {change:,.2f}，变动率 {rate}%。" if rate else f"该科目余额变动 {change:,.2f}。",
+            "is_significant": is_significant,
+            "ai_analysis": ai_text,
             "recommended_procedures": [],
         }
 
