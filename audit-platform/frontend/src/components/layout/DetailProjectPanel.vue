@@ -58,6 +58,10 @@
                 <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
                 <span>查账</span>
               </div>
+              <div class="gt-quick-btn" @click="onCreateNextYear" title="一键创建当年项目（继承上年配置）">
+                <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
+                <span>创建下年</span>
+              </div>
               <div
                 v-if="project.report_scope === 'consolidated'"
                 class="gt-quick-btn"
@@ -203,8 +207,9 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument,
 } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
 const props = defineProps<{ project: any | null }>()
@@ -262,6 +267,25 @@ function goTo(page: string) {
 function editProject() {
   if (!props.project) return
   router.push(`/projects/new?projectId=${props.project.id}`)
+}
+
+async function onCreateNextYear() {
+  if (!props.project) return
+  try {
+    await ElMessageBox.confirm(
+      `确定要基于「${props.project.name}」创建下年项目吗？将继承科目映射、团队委派、试算表审定数等配置。`,
+      '创建下年项目',
+      { confirmButtonText: '确定创建', cancelButtonText: '取消', type: 'info' },
+    )
+    const { data } = await http.post(`/api/projects/${props.project.id}/create-next-year`)
+    const result = data.data ?? data
+    ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)
+    router.push(`/projects/new?projectId=${result.new_project_id}`)
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err?.response?.data?.detail || '创建失败')
+    }
+  }
 }
 
 function fmtAmt(v: any): string {

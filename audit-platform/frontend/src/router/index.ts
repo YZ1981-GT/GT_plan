@@ -236,6 +236,12 @@ const router = createRouter({
           name: 'MyProcedureTasks',
           component: () => import('@/views/MyProcedureTasks.vue'),
         },
+        // ── Phase 10 Routes ──
+        {
+          path: 'private-storage',
+          name: 'PrivateStorage',
+          component: () => import('@/views/PrivateStorage.vue'),
+        },
       ],
     },
     {

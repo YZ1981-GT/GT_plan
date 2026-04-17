@@ -806,3 +806,11 @@ inclusion: always
 - Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 9 的 WorkHour 使用 "work_hours"
 - conftest.py 修复：新增 _WorkpaperStub（__tablename__="workpapers"）解决 ai_models FK 引用缺失表的问题；新增 staff_models 导入（在 collaboration_models 之前）
 - 已有测试预存问题（非 Phase 9 引入）：test_event_bus 中 Adjustment.soft_delete() AttributeError（Adjustment 模型缺少 SoftDeleteMixin）
+
+## Phase 10 代码实现进度（2026-04-17 开始）
+- Phase 10 三件套最终版：21个需求+25个设计章节（含§25a-25o联动链路）+21个任务组+193个子任务；两轮联动论证发现并修复9个断点（底稿→试算表自动同步/调整分录反向联动/合并锁定中间件/连续审计底稿结转/复核deep link/note_wp_mapping自动初始化/抽样底稿映射/附件匹配规则/统一findings视图）
+- Phase 10 hook 已启用（phase10-auto-continue.kiro.hook enabled=true version=3）
+- 账龄分析技术决策：用户自定义区间段+FIFO先进先出核销算法（借方按日期正序形成，贷方按日期正序核销最早借方），从tb_aux_ledger计算，兜底支持上传已有账龄Excel
+- Step 0 完成（2026-04-17）：3个Alembic迁移脚本（023_review_and_forum 4表 + 024_annotations_and_snapshots 3表 + 025_report_templates_and_fields 1表+5字段）
+- Step 0.5 完成（2026-04-17）：wp_parse_rules.json（10个核心审定表E1-E10）+ wp_parse_rules_extended.json（20个扩展E11-G3+D1-D5）+ note_wp_mapping_rules.json（30个附注↔底稿映射）
+- Step 1 Task 1.1-1.2 完成（2026-04-17）：WpDownloadService（批量ZIP+单个下载）+ WpUploadService（版本冲突检测+上传覆盖）+ wp_download.py路由4端点 + phase10_models.py（8个ORM）+ phase10_schemas.py（15+Schema）+ WorkpaperList.vue增强（checkbox勾选+批量下载+上传弹窗+版本冲突）+ 12个测试通过；commit d47ffdb

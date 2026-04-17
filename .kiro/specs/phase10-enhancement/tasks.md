@@ -24,45 +24,45 @@
 ## 任务组 2：连续审计
 
 ### Task 2.1 一键创建当年项目
-- [ ] `POST /api/projects/{id}/create-next-year` API
-- [ ] projects 表新增 prior_year_project_id 字段
-- [ ] adjustments 表新增 is_continuous BOOLEAN DEFAULT false 字段
-- [ ] 复制 basic_info/account_mapping/project_assignments/template_set
-- [ ] 上年 trial_balance.audited → 当年 opening
-- [ ] 上年 disclosure_note 期末 → 当年上期
-- [ ] 上年 adjustments(is_continuous=true) 结转
-- [ ] 上年 unadjusted_misstatements carry_forward
-- [ ] 上年底稿文件复制+openpyxl写入期初数+清空本期数（design §25d）
-- [ ] 上年 note_wp_mapping + procedure_instances + note_trim_schemes 结转（design §25j）
-- [ ] 前端项目详情面板"创建下年项目"按钮
+- [x] `POST /api/projects/{id}/create-next-year` API
+- [x] projects 表新增 prior_year_project_id 字段
+- [x] adjustments 表新增 is_continuous BOOLEAN DEFAULT false 字段
+- [x] 复制 basic_info/account_mapping/project_assignments/template_set
+- [x] 上年 trial_balance.audited → 当年 opening
+- [x] 上年 disclosure_note 期末 → 当年上期
+- [x] 上年 adjustments(is_continuous=true) 结转
+- [x] 上年 unadjusted_misstatements carry_forward
+- [x] 上年底稿文件复制+openpyxl写入期初数+清空本期数（design §25d）
+- [x] 上年 note_wp_mapping + procedure_instances + note_trim_schemes 结转（design §25j）
+- [x] 前端项目详情面板"创建下年项目"按钮
 
 ### Task 2.2 跨年数据对比
-- [ ] 当年底稿中查看上年同科目数据（PREV 函数已支持，前端展示待实现）
-- [ ] 附注变动分析自动对比上年数据生成变动说明（复用 note_ai generate-analysis）
+- [x] 当年底稿中查看上年同科目数据（PREV 函数已支持，前端展示待实现）
+- [x] 附注变动分析自动对比上年数据生成变动说明（复用 note_ai generate-analysis）
 
 ---
 
 ## 任务组 3：服务器存储与分区
 
 ### Task 3.1 私人库管理
-- [ ] PrivateStorageService（上传/下载/删除/容量检查）
-- [ ] `GET /api/users/{id}/private-storage` 文件列表
-- [ ] `POST /api/users/{id}/private-storage/upload` 上传
-- [ ] `GET /api/users/{id}/private-storage/quota` 容量查询
-- [ ] 容量上限 1GB，90% 提示清理
-- [ ] 附件分区存储路径确认（storage/projects/{project_id}/attachments/）
-- [ ] 前端 PrivateStorage.vue 页面
+- [x] PrivateStorageService（上传/下载/删除/容量检查）
+- [x] `GET /api/users/{id}/private-storage` 文件列表
+- [x] `POST /api/users/{id}/private-storage/upload` 上传
+- [x] `GET /api/users/{id}/private-storage/quota` 容量查询
+- [x] 容量上限 1GB，90% 提示清理
+- [x] 附件分区存储路径确认（storage/projects/{project_id}/attachments/）
+- [x] 前端 PrivateStorage.vue 页面
 
 ### Task 3.2 归档联动
-- [ ] 项目归档时锁定所有底稿为 archived
-- [ ] 自动生成归档清单
-- [ ] 触发 enrich_resume 更新人员简历
-- [ ] 前端归档确认弹窗
+- [x] 项目归档时锁定所有底稿为 archived
+- [x] 自动生成归档清单
+- [x] 触发 enrich_resume 更新人员简历
+- [x] 前端归档确认弹窗
 
 ### Task 3.3 存储统计看板
-- [ ] `GET /api/admin/storage-stats` 存储统计 API
-- [ ] 按项目/用户/年度统计存储占用
-- [ ] 前端 ECharts 饼图/柱状图展示
+- [x] `GET /api/admin/storage-stats` 存储统计 API
+- [x] 按项目/用户/年度统计存储占用
+- [x] 前端 ECharts 饼图/柱状图展示
 
 ---
 
