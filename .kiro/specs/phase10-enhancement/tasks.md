@@ -23,10 +23,11 @@
 ### Task 2.1 一键创建当年项目
 - [ ] `POST /api/projects/{id}/create-next-year` API
 - [ ] projects 表新增 prior_year_project_id 字段
+- [ ] adjustments 表新增 is_continuous BOOLEAN DEFAULT false 字段
 - [ ] 复制 basic_info/account_mapping/project_assignments/template_set
 - [ ] 上年 trial_balance.audited → 当年 opening
 - [ ] 上年 disclosure_note 期末 → 当年上期
-- [ ] 上年 adjustments(is_continuous) 结转
+- [ ] 上年 adjustments(is_continuous=true) 结转
 - [ ] 上年 unadjusted_misstatements carry_forward
 - [ ] 前端项目详情面板"创建下年项目"按钮
 
@@ -111,7 +112,7 @@
 
 ### Task 6.2 账龄分析
 - [ ] `POST /api/projects/{id}/sampling/aging-analysis` API
-- [ ] 自动从 tb_aux_balance 生成账龄分析表
+- [ ] 从 tb_aux_ledger 按辅助维度计算最早未清交易日期（或从用户上传账龄表导入）
 - [ ] 按账龄区间（1年内/1-2年/2-3年/3年以上）分组
 - [ ] 填入账龄分析底稿
 
@@ -143,6 +144,7 @@
 - [ ] 仅合并模块入口（无需单体项目）
 - [ ] 仅报告复核模块入口
 - [ ] 仅报告排版模块入口
+- [ ] 临时项目机制（auto_created=true，30天无操作自动清理）
 - [ ] 前端模块选择页面
 
 ---
@@ -337,6 +339,7 @@
 
 ## 执行顺序
 
+0. **迁移脚本**（统一创建 023/024/025 三个 Alembic 迁移脚本，所有新表+新字段一次性就绪）
 1. **Task 1.1-1.2**（底稿下载导入）→ 2. **Task 2.1-2.2**（连续审计）
 3. **Task 3.1-3.3**（存储分区+归档+统计）→ 4. **Task 4.1-4.3**（过程记录+附件+人机协同）
 5. **Task 18.1 + Task 5.1-5.3**（知识库上下文感知 → LLM 底稿填充，合并执行）
@@ -358,4 +361,4 @@ Phase 10 新增 8 张表，合并为 3 个迁移脚本：
 |---------|--------|--------|
 | 023_review_and_forum.py | review_conversations + review_messages + forum_posts + forum_comments | 协作与社区 |
 | 024_annotations_and_snapshots.py | cell_annotations + consol_snapshots + check_ins | 复核批注+合并快照+打卡 |
-| 025_report_templates.py | report_format_templates + projects.prior_year_project_id + projects.consol_lock + projects.consol_lock_by + projects.consol_lock_at 字段 | 排版模板+连续审计+合并锁定 |
+| 025_report_templates.py | report_format_templates + projects.prior_year_project_id + projects.consol_lock + projects.consol_lock_by + projects.consol_lock_at + adjustments.is_continuous 字段 | 排版模板+连续审计+合并锁定 |

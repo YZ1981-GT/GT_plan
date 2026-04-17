@@ -29,6 +29,9 @@
 projects 表已有 parent_project_id（合并层级），连续审计用新字段：
   prior_year_project_id: UUID FK → projects.id（上年项目）
 
+adjustments 表新增字段：
+  is_continuous: BOOLEAN DEFAULT false（标记为连续审计结转分录）
+
 连续审计创建流程：
   POST /api/projects/{id}/create-next-year
     → 复制 basic_info（client_name/company_code/template_type 等）
@@ -249,8 +252,9 @@ POST /api/projects/{id}/sampling/cutoff-test
 ```
 POST /api/projects/{id}/sampling/aging-analysis
   body: { account_code: "1122", aging_brackets: ["0-180", "181-365", "366-730", "731+"] }
-  → 查询 tb_aux_balance WHERE account_code LIKE '1122%'
-  → 按辅助维度（客户）分组，计算每个客户的账龄区间分布
+  → 从 tb_aux_ledger 按辅助维度分组，找每个客户最早未清交易日期
+  → 或：从用户上传的账龄分析 Excel 直接导入（兜底方案）
+  → 按账龄区间分布计算
   → 返回账龄分析表 + 自动填入底稿
 ```
 
@@ -297,6 +301,9 @@ POST /api/consolidation/{project_id}/import-external
   /standalone/report-format → 仅报告排版（上传内容 → 排版导出）
 
 后端：复用现有 API，不需要 project_id 时用临时项目
+  → 临时项目：auto_created=true，project_type="standalone"
+  → 生命周期：30天无操作自动清理（定时任务扫描 updated_at < now()-30d AND auto_created=true）
+  → 用户可将临时项目转为正式项目（PUT /api/projects/{id}/promote）
 ```
 
 ## 13. LLM 底稿复核提示词（补充设计，对应需求 8a）

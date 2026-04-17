@@ -1,13 +1,13 @@
 {
-  "enabled": false,
+  "enabled": true,
   "name": "Phase 10 自动继续开发+推送",
   "description": "每次对话结束后，自动检查 Phase 10 任务完成情况，继续开发未完成任务，完成后推送到 Git。",
-  "version": "2",
+  "version": "3",
   "when": {
     "type": "agentStop"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "执行以下步骤：\n1. 检查 .kiro/steering/memory.md 中 'Phase 9 代码实现进度' 部分，查看是否有'待开发'或'未完成'的任务\n2. 如果有，读取 .kiro/specs/phase9-integration/tasks.md 找到下一个未完成任务，按执行顺序继续独立开发\n3. 每完成一个任务后自我复盘修复，确认无误后继续下一个\n4. 开发完成后，更新 tasks.md 中对应任务的 checkbox 状态（[ ] → [x]）\n5. 更新 memory.md 记录最新进度\n6. 执行 git add -A && git commit -m '描述' && git push origin master（需要设置代理 git config --global http.proxy http://127.0.0.1:7897）\n7. 如果所有任务都已完成，更新 memory.md 标记 Phase 9 全部完成，并禁用此 hook\n\n开发过程中不需要用户确认，独立完成。"
+    "prompt": "执行以下步骤：\n1. 读取 .kiro/specs/phase10-enhancement/tasks.md 找到下一个未完成任务（[ ]），按执行顺序继续独立开发\n2. 每完成一个任务组后自我复盘修复，确认无误后继续下一个\n3. 开发完成后，更新 tasks.md 中对应任务的 checkbox 状态（[ ] → [x]）\n4. 更新 .kiro/steering/memory.md 记录最新进度\n5. 执行 git add -A ; git commit -m '描述' ; git config --global http.proxy http://127.0.0.1:7897 ; git push origin master\n6. 如果所有任务都已完成，更新 memory.md 标记 Phase 10 全部完成，并禁用此 hook\n\n开发过程中不需要用户确认，独立完成。每个任务都必须实际编写代码完成，不能只标记checkbox。"
   }
 }
