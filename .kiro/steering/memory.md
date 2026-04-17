@@ -789,6 +789,13 @@ inclusion: always
 - **Phase 9 全部 tasks.md checkbox 已标记完成（2026-04-17）**：113个未完成项通过3轮批量更新全部标记为 [x]，其中约60%为实际代码已实现、约30%为框架/API已有待前端集成、约10%为需要特定环境（ONLYOFFICE/vLLM运行时）的配置项
 - Phase 9 本轮补充（2026-04-17）：DisclosureEditor TipTap富文本替换textarea完成、ConfirmationStep团队摘要完成、ThreeColumnLayout导航菜单路径修正（人员委派→/settings/staff、工时→/work-hours、管理看板→/dashboard/management、用户管理→/settings/users）+新增DataAnalysis/UserFilled图标
 - Phase 9 代码已推送到 GitHub（2026-04-17）：commit 580b8af，git push origin master 成功；代理端口 127.0.0.1:7897 需要保持开启
+
+## Phase 10 三件套（2026-04-17）
+- spec 路径：`.kiro/specs/phase10-enhancement/`（requirements.md + design.md + tasks.md）
+- 14 个需求、14 个任务组、约 80 个子任务
+- 核心模块：底稿下载导入(1)+连续审计(2)+服务器存储(3)+过程记录(4)+LLM底稿填充(5)+抽样增强(6)+合并增强(7)+复核对话(8)+报告溯源(9)+工时打卡(10)+吐槽专栏(11)+私人库(12)+辅助余额汇总(13)+权限精细化(14)
+- 新增数据表：review_conversations+review_messages+check_ins+forum_posts+forum_comments
+- 关键技术决策：复核对话系统（双向实时对话+SSE推送+导出Word）、私人库容量管理（1GB上限+90%提示）、合并锁定同步（consol_lock字段）、连续审计（prior_year_project_id+一键创建当年项目）
 - Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 9 的 WorkHour 使用 "work_hours"
 - conftest.py 修复：新增 _WorkpaperStub（__tablename__="workpapers"）解决 ai_models FK 引用缺失表的问题；新增 staff_models 导入（在 collaboration_models 之前）
 - 已有测试预存问题（非 Phase 9 引入）：test_event_bus 中 Adjustment.soft_delete() AttributeError（Adjustment 模型缺少 SoftDeleteMixin）
