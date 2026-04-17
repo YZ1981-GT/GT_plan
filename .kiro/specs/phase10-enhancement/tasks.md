@@ -14,6 +14,7 @@
 - [ ] 版本冲突检测（file_version 比对）
 - [ ] 冲突处理（409 + diff 摘要 / 覆盖 / 保留）
 - [ ] 导入后触发 ParseService + WORKPAPER_SAVED 事件
+- [ ] WORKPAPER_SAVED 事件处理器：解析审定数 → 与 trial_balance 比对 → 差异时自动同步（design §25a）
 - [ ] 前端上传弹窗（版本冲突提示+选择操作）
 
 ---
@@ -29,6 +30,7 @@
 - [ ] 上年 disclosure_note 期末 → 当年上期
 - [ ] 上年 adjustments(is_continuous=true) 结转
 - [ ] 上年 unadjusted_misstatements carry_forward
+- [ ] 上年底稿文件复制+openpyxl写入期初数+清空本期数（design §25d）
 - [ ] 前端项目详情面板"创建下年项目"按钮
 
 ### Task 2.2 跨年数据对比
@@ -112,9 +114,12 @@
 
 ### Task 6.2 账龄分析
 - [ ] `POST /api/projects/{id}/sampling/aging-analysis` API
-- [ ] 从 tb_aux_ledger 按辅助维度计算最早未清交易日期（或从用户上传账龄表导入）
-- [ ] 按账龄区间（1年内/1-2年/2-3年/3年以上）分组
-- [ ] 填入账龄分析底稿
+- [ ] 用户自定义账龄区间段配置（前端 el-form 动态行：标签+起始天数+结束天数）
+- [ ] FIFO 先进先出核销算法（借方按日期正序形成，贷方按日期正序核销最早借方）
+- [ ] 从 tb_aux_ledger 按辅助维度分组计算未核销余额的账龄天数
+- [ ] 兜底：支持用户直接上传已有账龄分析 Excel
+- [ ] 按自定义区间分组汇总，填入账龄分析底稿
+- [ ] 前端账龄分析配置面板（科目选择+基准日+区间编辑+结果预览表格）
 
 ### Task 6.3 月度明细填充
 - [ ] `POST /api/projects/{id}/sampling/monthly-detail` API
@@ -122,7 +127,8 @@
 - [ ] 自动填入月度明细分析底稿
 
 ### Task 6.4 抽样结果与底稿关联
-- [ ] 抽样选中的样本自动填入对应底稿
+- [ ] sampling_config 新增 target_wp_id + target_cell_range 字段（design §25g）
+- [ ] 抽样选中的样本用 openpyxl 自动填入对应底稿
 - [ ] MUS 评价结果自动生成审计结论
 
 ---
@@ -131,9 +137,10 @@
 
 ### Task 7.1 合并锁定同步
 - [ ] 合并项目开始时锁定单体试算表（consol_lock + consol_lock_by + consol_lock_at 字段）
-- [ ] 锁定期间单体禁止修改试算表/调整分录（返回 423 Locked）
+- [ ] consol_lock_check 依赖注入函数（Depends），拦截锁定期间的写操作返回 423（design §25c）
+- [ ] 锁定期间单体禁止修改试算表/调整分录/未更正错报（返回 423 Locked）
 - [ ] 合并完成后自动解锁
-- [ ] 前端锁定状态提示
+- [ ] 前端锁定状态提示（el-alert 横幅 + 写操作按钮禁用）
 
 ### Task 7.2 外部单位报表导入
 - [ ] 导入其他审计师审计的单位报表（Excel）
@@ -153,6 +160,7 @@
 
 ### Task 8.1 数据模型与后端
 - [ ] review_conversations + review_messages 表（Alembic 迁移）
+- [ ] review_conversations 新增 cell_ref VARCHAR 字段（精确到单元格的 deep link）
 - [ ] ORM 模型 + Pydantic Schema
 - [ ] `POST /api/review-conversations` 创建对话
 - [ ] `POST /api/review-conversations/{id}/messages` 发送消息
@@ -166,6 +174,7 @@
 - [ ] 发送消息输入框
 - [ ] 结束对话按钮（仅发起人可见）
 - [ ] 导出对话记录按钮
+- [ ] 通知点击 deep link 跳转到底稿/附注具体位置（design §25e）
 - [ ] 看板集成（进行中对话数）
 - [ ] 质量控制复核人员对话通道预留
 
@@ -188,6 +197,8 @@
 ### Task 9.1 溯源 API
 - [ ] `GET /api/report-review/{project_id}/trace/{section_number}` 溯源查询
 - [ ] 返回：附注数据 + 底稿审定数 + 审计说明 + 大额交易明细
+- [ ] note_wp_mapping 自动初始化（项目底稿生成时根据模板规则自动创建映射，design §25f）
+- [ ] data/note_wp_mapping_rules.json 映射规则配置文件
 - [ ] 前端溯源面板（在报告复核页面中）
 
 ---
@@ -319,7 +330,7 @@
 ### Task 20.1 智能分类
 - [ ] 上传附件时 OCR 提取文本
 - [ ] LLM 自动分类（合同/发票/对账单/函证/会议纪要）
-- [ ] 自动建议关联底稿
+- [ ] 自动建议关联底稿（按科目关键词匹配 wp_index，design §25h）
 - [ ] 前端分类确认/修改界面
 
 ---

@@ -86,6 +86,7 @@ review_conversations 表（新增）
 ├── target_id: UUID FK → users.id（被指定人）
 ├── related_object_type: VARCHAR（workpaper/disclosure_note/audit_report）
 ├── related_object_id: UUID
+├── cell_ref: VARCHAR（可选，精确到单元格，如 "E9-1!B15"）
 ├── status: VARCHAR（open/in_progress/closed）
 ├── title: VARCHAR
 ├── created_at, closed_at
@@ -251,11 +252,36 @@ POST /api/projects/{id}/sampling/cutoff-test
 ### 账龄分析
 ```
 POST /api/projects/{id}/sampling/aging-analysis
-  body: { account_code: "1122", aging_brackets: ["0-180", "181-365", "366-730", "731+"] }
-  → 从 tb_aux_ledger 按辅助维度分组，找每个客户最早未清交易日期
-  → 或：从用户上传的账龄分析 Excel 直接导入（兜底方案）
-  → 按账龄区间分布计算
-  → 返回账龄分析表 + 自动填入底稿
+  body: {
+    account_code: "1122",
+    aging_brackets: [
+      { label: "1年以内", min_days: 0, max_days: 365 },
+      { label: "1-2年", min_days: 366, max_days: 730 },
+      { label: "2-3年", min_days: 731, max_days: 1095 },
+      { label: "3年以上", min_days: 1096, max_days: null }
+    ],
+    base_date: "2025-12-31"  // 账龄计算基准日（默认审计期末）
+  }
+  → 先进先出（FIFO）账龄计算逻辑：
+    1. 从 tb_aux_ledger 按辅助维度（客户/供应商）分组
+    2. 每个辅助维度内，按 voucher_date 正序排列所有借方发生（形成应收）
+    3. 按 voucher_date 正序排列所有贷方发生（回款核销）
+    4. 贷方金额按先进先出原则依次核销最早的借方余额
+    5. 未核销的借方余额按其原始 voucher_date 计算账龄天数 = base_date - voucher_date
+    6. 按用户自定义的 aging_brackets 区间分组汇总
+  → 兜底方案：用户可直接上传已有账龄分析 Excel（跳过 FIFO 计算）
+  → 返回：
+    [{
+      aux_name: "客户A",
+      total_balance: 500000,
+      brackets: [
+        { label: "1年以内", amount: 300000 },
+        { label: "1-2年", amount: 150000 },
+        { label: "2-3年", amount: 50000 },
+        { label: "3年以上", amount: 0 }
+      ]
+    }]
+  → 自动填入账龄分析底稿
 ```
 
 ### 月度明细
@@ -532,3 +558,100 @@ PUT /api/review-conversations/{id}/close
 | 年度差异报告 vs 未审/已审对比 | 9 vs 10 | 不同维度：Phase 9 单张报表对比，Phase 10 全科目跨年差异 |
 | 附件分类 vs 单据OCR | 4 vs 10 | 互补：Phase 4 结构化提取，Phase 10 类型分类+底稿关联 |
 | 排版模板 vs PDF导出 | 1c vs 10 | Phase 10 新增模板管理层，导出引擎复用 Phase 1c |
+
+## 25. 联动链路完整性设计（关键）
+
+### 25a 底稿导入 → 试算表自动同步
+```
+底稿导入（Task 1.2）→ ParseService 解析审定数 → WORKPAPER_SAVED 事件
+  → 事件处理器：
+    1. 从 parsed_data 提取审定数（account_code → audited_amount）
+    2. 与 trial_balance 当前审定数比对
+    3. 差异时自动调用 tb_sync（POST /api/trial-balance/{project_id}/{year}/sync-from-workpaper）
+    4. 触发 TRIAL_BALANCE_UPDATED → 报表重算 → 附注刷新
+  → 全自动，无需人工干预
+```
+
+### 25b 调整分录 → 底稿审定表反向联动
+```
+调整分录变更 → ADJUSTMENT_CREATED/UPDATED/DELETED 事件
+  → 事件处理器：
+    1. 标记关联科目底稿 prefill_stale=true（已有）
+    2. 新增：自动汇总该科目所有 AJE/RJE 金额
+    3. 通过 note_wp_mapping 找到对应底稿的审定表
+    4. 用 openpyxl 更新底稿中"调整数"列的值
+    5. 触发 WORKPAPER_SAVED → 级联更新
+  → 或：底稿中用 AJE() 公式实时取数（ONLYOFFICE 自定义函数已支持）
+```
+
+### 25c 合并锁定中间件
+```
+新增 consol_lock_middleware.py：
+  在 trial_balance/adjustments/misstatements 路由的 POST/PUT/DELETE 前检查：
+    1. 从 request 获取 project_id
+    2. 查询 projects.consol_lock
+    3. consol_lock=true → 返回 423 Locked + { locked_by, locked_at, message }
+    4. consol_lock=false → 放行
+  → 实现为 FastAPI Depends 依赖注入，不用中间件（更精确控制哪些路由需要）
+```
+
+### 25d 连续审计底稿期初数结转
+```
+create-next-year API 中：
+  → 遍历上年 working_paper 记录
+  → 对每个底稿：
+    1. 复制文件到当年目录
+    2. 用 openpyxl 打开新底稿
+    3. 从上年 parsed_data 提取审定数
+    4. 写入新底稿的"期初数"列（根据模板映射规则）
+    5. 清空"本期数"/"调整数"列
+    6. 保存并创建新 working_paper 记录
+```
+
+### 25e 复核对话 deep link
+```
+review_conversations 表已有 related_object_type + related_object_id
+新增字段：cell_ref VARCHAR（可选，精确到单元格）
+
+前端通知点击：
+  → router.push 到对应页面：
+    workpaper → /projects/{id}/workpapers/{wp_id}/edit?highlight=cell_ref
+    disclosure_note → /projects/{id}/disclosure-notes?section=note_id&cell=cell_ref
+    audit_report → /projects/{id}/audit-report?paragraph=section_number
+```
+
+### 25f note_wp_mapping 自动初始化
+```
+项目底稿生成时（workpaper_generator.py）：
+  → 根据模板集中的底稿编号规则，自动生成 note_wp_mapping：
+    E9-1 固定资产审定表 → 附注"五、9 固定资产"
+    E10-1 无形资产审定表 → 附注"五、10 无形资产"
+    ...
+  → 映射规则存储在 data/note_wp_mapping_rules.json
+  → 用户可在前端手动调整映射关系
+```
+
+### 25g 抽样结果 → 底稿填充映射
+```
+sampling_config 表新增字段：
+  target_wp_id: UUID FK → working_paper.id（目标底稿）
+  target_cell_range: VARCHAR（如 "B5:F50"，填入区域）
+
+抽样完成后：
+  → 从 sampling_records 提取选中样本
+  → 用 openpyxl 写入 target_wp_id 的 target_cell_range
+  → 触发 WORKPAPER_SAVED 事件
+```
+
+### 25h 附件分类 → 底稿匹配规则
+```
+LLM 分类后匹配底稿：
+  1. 从附件 OCR 文本提取关键词（科目名称/编号/客户名称）
+  2. 在 wp_index 中按 audit_cycle + account_code 模糊匹配
+  3. 匹配到多个底稿时返回候选列表供用户选择
+  4. 匹配规则：
+     - 发票/合同 → 匹配收入/成本循环底稿（D 循环）
+     - 银行对账单 → 匹配货币资金底稿（E1）
+     - 函证回函 → 匹配对应科目的函证底稿
+     - 会议纪要 → 匹配审计总结底稿（A 循环）
+```
