@@ -337,6 +337,13 @@ RAG 对话：
     → 构建 prompt：用户消息 + 检索到的文档片段
     → 调用 llm_client.chat_completion(stream=True)
     → SSE 流式返回，回复中标注引用来源
+
+私人库→知识库共享：
+  POST /api/users/{id}/private-storage/share
+    body: { file_ids: [uuid], target_library: "notes" }
+    → 复制文件到 knowledge_service 对应分类目录
+    → 创建知识库文档记录
+    → 返回共享结果
 ```
 
 ## 15. 权限精细化（补充设计，对应需求 14）
@@ -435,11 +442,13 @@ POST /api/projects/{id}/ai/recommend-workpapers
 
 ```
 POST /api/projects/{id}/ai/annual-diff-report
+  body: { save_to: "project" | "private" }  // 保存位置选项
   → 查询当年 trial_balance vs 上年（prior_year_project_id）
   → 计算全科目变动额/变动率
   → 筛选重大变动（>20% 或 >materiality）
   → LLM 逐科目生成分析说明
-  → 保存为底稿（wp_index + working_paper）
+  → save_to == "project" → 保存为底稿（wp_index + working_paper）
+  → save_to == "private" → 保存到私人库（PrivateStorageService）
   → 返回 Word 下载链接
 ```
 

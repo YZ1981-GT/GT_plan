@@ -44,6 +44,7 @@
 - [ ] `POST /api/users/{id}/private-storage/upload` 上传
 - [ ] `GET /api/users/{id}/private-storage/quota` 容量查询
 - [ ] 容量上限 1GB，90% 提示清理
+- [ ] 附件分区存储路径确认（storage/projects/{project_id}/attachments/）
 - [ ] 前端 PrivateStorage.vue 页面
 
 ### Task 3.2 归档联动
@@ -128,8 +129,8 @@
 ## 任务组 7：合并报表增强
 
 ### Task 7.1 合并锁定同步
-- [ ] 合并项目开始时锁定单体试算表（consol_lock 字段）
-- [ ] 锁定期间单体禁止修改试算表/调整分录
+- [ ] 合并项目开始时锁定单体试算表（consol_lock + consol_lock_by + consol_lock_at 字段）
+- [ ] 锁定期间单体禁止修改试算表/调整分录（返回 423 Locked）
 - [ ] 合并完成后自动解锁
 - [ ] 前端锁定状态提示
 
@@ -153,7 +154,7 @@
 - [ ] ORM 模型 + Pydantic Schema
 - [ ] `POST /api/review-conversations` 创建对话
 - [ ] `POST /api/review-conversations/{id}/messages` 发送消息
-- [ ] `PUT /api/review-conversations/{id}/close` 关闭对话
+- [ ] `PUT /api/review-conversations/{id}/close` 关闭对话（权限校验：仅发起人可关闭）
 - [ ] `POST /api/review-conversations/{id}/export` 导出 Word
 - [ ] SSE 推送新消息通知
 
@@ -218,11 +219,13 @@
 ## 任务组 12：私人库与 LLM 对话
 
 ### Task 12.1 私人库
-- [ ] PrivateStorageService + API
+- [ ] 复用 Task 3.1 的 PrivateStorageService（不重复创建）
 - [ ] 上传后自动向量化索引
-- [ ] 容量管理（1GB 上限 + 90% 提示）
-- [ ] 前端 PrivateStorage.vue
+- [ ] 容量管理（1GB 上限 + 90% 提示，复用 Task 3.1）
+- [ ] 前端 PrivateStorage.vue 增强（向量化状态+RAG 入口）
 - [ ] ThreeColumnLayout navItems 添加"私人库"入口（最左侧第一栏，与项目/知识库同级）
+- [ ] 新生成底稿/分析报告可指定保存到私人库（Task 5.2/19.1 联动）
+- [ ] 私人库文档共享到项目知识库 API（`POST /api/users/{id}/private-storage/share`）
 
 ### Task 12.2 私人库 LLM 对话
 - [ ] 基于私人库的 RAG 对话
@@ -355,4 +358,4 @@ Phase 10 新增 8 张表，合并为 3 个迁移脚本：
 |---------|--------|--------|
 | 023_review_and_forum.py | review_conversations + review_messages + forum_posts + forum_comments | 协作与社区 |
 | 024_annotations_and_snapshots.py | cell_annotations + consol_snapshots + check_ins | 复核批注+合并快照+打卡 |
-| 025_report_templates.py | report_format_templates + projects.prior_year_project_id + projects.consol_lock 字段 | 排版模板+连续审计+合并锁定 |
+| 025_report_templates.py | report_format_templates + projects.prior_year_project_id + projects.consol_lock + projects.consol_lock_by + projects.consol_lock_at 字段 | 排版模板+连续审计+合并锁定 |
