@@ -470,3 +470,49 @@ report_format_templates 表（新增）
   GET /api/report-format/preview?template_id=xxx&content=...
   → 后端用 python-docx 按模板配置渲染 → 转 HTML → 返回给前端 iframe
 ```
+
+
+## 23. 知识库上下文感知（补充设计，对应需求 18）
+
+```
+LLM 对话上下文自动注入：
+  POST /api/workpapers/{wp_id}/ai/chat
+    → 后端自动构建上下文：
+      1. 从 wp_index 获取 audit_cycle + wp_code
+      2. 从 trial_balance 获取该科目的未审/调整/审定数
+      3. 从 knowledge_retriever 按科目关键词检索知识库 top-5 文档片段
+      4. 从 TSJ/ 加载对应审计循环的提示词
+      5. 组装 system prompt = 提示词 + 科目数据 + 知识库片段
+    → 用户消息作为 user prompt
+    → llm_client.chat_completion(stream=True)
+
+知识库检索排序：
+  1. 同科目同行业的历史底稿（最高优先）
+  2. 同科目不同行业的底稿
+  3. 审计准则/法规文档
+  4. 通用审计经验文档
+
+"@知识库"触发：
+  前端检测用户输入 "@知识库" 或 "@kb" 前缀
+    → 弹出知识库搜索面板（复用 KnowledgeSearchPanel）
+    → 选中文档后自动注入对话上下文
+```
+
+## 24. 复核对话权限补充
+
+```
+PUT /api/review-conversations/{id}/close
+  → 权限校验：只有 initiator_id == current_user.id 才能关闭
+  → 其他人调用返回 403 "只有发起人可以结束对话"
+```
+
+## 跨 Phase 兼容性说明（补充）
+
+| 冲突点 | 涉及 Phase | 解决方案 |
+|--------|-----------|---------|
+| 单元格批注 vs ONLYOFFICE 批注插件 | 1b vs 10 | 共存：ONLYOFFICE 内部批注用于编辑时标注，系统级批注用于跨模块穿透 |
+| 合并快照 vs consol_trial | 2 vs 10 | 快照存入独立 consol_snapshots 表，不修改 consol_trial |
+| 底稿推荐 vs 程序裁剪 | 9 vs 10 | 推荐结果写入 procedure_instances.status，与裁剪共用 |
+| 年度差异报告 vs 未审/已审对比 | 9 vs 10 | 不同维度：Phase 9 单张报表对比，Phase 10 全科目跨年差异 |
+| 附件分类 vs 单据OCR | 4 vs 10 | 互补：Phase 4 结构化提取，Phase 10 类型分类+底稿关联 |
+| 排版模板 vs PDF导出 | 1c vs 10 | Phase 10 新增模板管理层，导出引擎复用 Phase 1c |
