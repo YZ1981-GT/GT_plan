@@ -6,6 +6,7 @@
         <el-radio-group v-model="reportMode" size="small" style="margin-right: 12px" @change="fetchReport">
           <el-radio-button value="audited">已审报表</el-radio-button>
           <el-radio-button value="unadjusted">未审报表</el-radio-button>
+          <el-radio-button value="compare">对比视图</el-radio-button>
         </el-radio-group>
         <el-button @click="onGenerate" :loading="genLoading">重新生成</el-button>
         <el-button @click="onConsistencyCheck" :loading="checkLoading">一致性校验</el-button>
@@ -35,8 +36,8 @@
       <el-tab-pane label="所有者权益变动表" name="equity_statement" />
     </el-tabs>
 
-    <!-- 报表表格 -->
-    <el-table :data="rows" v-loading="loading" border stripe style="width: 100%"
+    <!-- 报表表格 — 普通模式 -->
+    <el-table v-if="reportMode !== 'compare'" :data="rows" v-loading="loading" border stripe style="width: 100%"
       :row-class-name="rowClassName">
       <el-table-column prop="row_code" label="行次" width="100" />
       <el-table-column label="项目" min-width="250">
@@ -55,6 +56,28 @@
       </el-table-column>
       <el-table-column label="上期金额" width="160" align="right">
         <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 报表表格 — 对比视图 -->
+    <el-table v-if="reportMode === 'compare'" :data="compareRows" v-loading="loading" border stripe style="width: 100%"
+      :row-class-name="compareRowClassName">
+      <el-table-column prop="row_code" label="行次" width="80" />
+      <el-table-column label="项目" min-width="200">
+        <template #default="{ row }">
+          <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">{{ row.row_name }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="未审金额" width="140" align="right">
+        <template #default="{ row }">{{ fmtAmt(row.unadjusted_amount) }}</template>
+      </el-table-column>
+      <el-table-column label="调整影响" width="140" align="right">
+        <template #default="{ row }">
+          <span :style="{ color: row.adjustment !== 0 ? '#FF5149' : '#999' }">{{ fmtAmt(row.adjustment) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="已审金额" width="140" align="right">
+        <template #default="{ row }">{{ fmtAmt(row.audited_amount) }}</template>
       </el-table-column>
     </el-table>
 
@@ -108,6 +131,7 @@ const checkLoading = ref(false)
 const activeTab = ref('balance_sheet')
 const reportMode = ref('audited')
 const rows = ref<ReportRow[]>([])
+const compareRows = ref<any[]>([])
 const consistencyResult = ref<ReportConsistencyCheck | null>(null)
 
 // Drilldown
@@ -130,12 +154,42 @@ function rowClassName({ row }: { row: ReportRow }) {
 async function fetchReport() {
   loading.value = true
   try {
-    rows.value = await getReport(projectId.value, year.value, activeTab.value, reportMode.value === 'unadjusted')
+    if (reportMode.value === 'compare') {
+      // 对比视图：同时加载未审+已审
+      const [audited, unadjusted] = await Promise.all([
+        getReport(projectId.value, year.value, activeTab.value, false),
+        getReport(projectId.value, year.value, activeTab.value, true),
+      ])
+      // 合并为对比行
+      const uMap = new Map(unadjusted.map((r: any) => [r.row_code, r]))
+      compareRows.value = audited.map((r: any) => {
+        const u = uMap.get(r.row_code)
+        const uAmt = parseFloat(u?.current_period_amount || '0')
+        const aAmt = parseFloat(r.current_period_amount || '0')
+        return {
+          ...r,
+          unadjusted_amount: uAmt,
+          audited_amount: aAmt,
+          adjustment: Math.round((aAmt - uAmt) * 100) / 100,
+        }
+      })
+      rows.value = audited
+    } else {
+      rows.value = await getReport(projectId.value, year.value, activeTab.value, reportMode.value === 'unadjusted')
+      compareRows.value = []
+    }
   } catch {
     rows.value = []
+    compareRows.value = []
   } finally {
     loading.value = false
   }
+}
+
+function compareRowClassName({ row }: { row: any }) {
+  if (row.is_total_row) return 'total-row'
+  if (row.adjustment && row.adjustment !== 0) return 'diff-row'
+  return ''
 }
 
 function onTabChange() { fetchReport() }
@@ -196,4 +250,5 @@ onMounted(fetchReport)
 .gt-rv-dd-label { font-weight: 600; color: var(--gt-color-text-secondary); }
 .gt-rv-dd-section code { background: var(--gt-color-bg); padding: 2px 6px; border-radius: var(--gt-radius-sm); font-size: var(--gt-font-size-sm); }
 :deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
+:deep(.diff-row) { background-color: #fff3e0 !important; }
 </style>

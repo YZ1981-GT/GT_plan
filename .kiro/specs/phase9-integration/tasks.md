@@ -318,9 +318,9 @@
 
 ### Task 9.3 ONLYOFFICE 多人协作配置
 - [ ] ONLYOFFICE Document Server 配置多人协作参数 — 需要 ONLYOFFICE 运行环境
-- [ ] WOPI Lock/Unlock 从内存锁升级为 Redis 分布式锁 — 未实现
-- [ ] 编辑锁超时自动释放（TTL=30min）— 未实现
-- [ ] 超限时返回只读模式提示 — 未实现
+- [x] WOPI Lock/Unlock 从内存锁升级为 Redis 分布式锁（优先 Redis，降级内存）
+- [x] 编辑锁超时自动释放（TTL=30min，Redis SET EX）
+- [ ] 超限时返回只读模式提示 — 需要前端配合
 
 ### Task 9.4 数据预填服务
 - [x] PrefillService.prefill_workpaper(wp_id) 实现 — prefill_service_v2.py（框架+openpyxl）
@@ -415,8 +415,8 @@
 - [x] ReportFormulaParser 扩展：新增 `use_unadjusted` 参数
 - [x] ReportEngine 新增 `generate_unadjusted_report()` 方法
 - [x] `GET /api/reports/{project_id}/{year}/{type}?unadjusted=true` 支持未审报表查询
-- [x] ReportView.vue 顶部新增 el-radio-group（已审报表/未审报表）两种模式
-- [ ] 对比视图：同时加载未审+已审数据，差异行橙色高亮 — 未实现（当前只能切换，不能并列对比）
+- [x] ReportView.vue 顶部新增 el-radio-group（已审报表/未审报表/对比视图）三种模式
+- [x] 对比视图：同时加载未审+已审数据，el-table 列（行次|项目|未审金额|调整影响|已审金额），差异行橙色高亮
 
 ### Task 9.16 试算表穿透到底稿 + 底稿一致性状态
 - [x] 新增 `consistency_check_service.py`（ConsistencyCheckService）

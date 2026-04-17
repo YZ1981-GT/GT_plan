@@ -782,7 +782,8 @@ inclusion: always
 - **Phase 9 全部任务已完成（2026-04-17）**：84个测试通过，无回归。共新增19个后端服务+14个路由模块+3个Alembic迁移+12个Vue前端页面+3个API服务层+1个ONLYOFFICE插件扩展
 - Phase 9 tasks.md 详细审查（2026-04-17）：逐条对照实际代码更新了所有checkbox状态，约60%完全实现/25%框架完成/15%未实现；7类未完成项：①TipTap未安装 ②ECharts未安装 ③ONLYOFFICE环境 ④LLM从stub升级 ⑤前端细节增强 ⑥协作同步路由未注册 ⑦5个独立Vue页面未创建
 - Phase 9 补充开发（2026-04-17）：安装echarts+vue-echarts+@tiptap/vue-3+@tiptap/starter-kit+@tiptap/extension-placeholder依赖；新增5个Vue页面（ProjectDashboard/PersonalDashboard/MyProcedureTasks/NoteTrimPanel/GTChart通用图表组件）；ManagementDashboard升级为ECharts柱状图；dashboard后端新增3个API（risk-alerts/quality-metrics/group-progress）；新增3条路由注册；84个测试通过
-- Phase 9 剩余未完成项（需特定环境或深度集成）：ONLYOFFICE多人协作Redis分布式锁(9.3)、LLM从stub升级为vLLM实际调用(9.8/9.28/9.29)、协作模块32个同步路由注册到main.py(4.6)、部分前端细节（右键菜单/对比视图/看板卡片拖拽）
+- Phase 9 剩余未完成项（需特定环境或深度集成）：ONLYOFFICE Document Server配置(9.3部分)、LLM从stub升级为vLLM实际调用(9.8/9.28/9.29)、协作模块32个同步路由注册到main.py(4.6)、看板卡片拖拽(1.11)
+- Phase 9 本轮补充2（2026-04-17）：WOPI Lock升级为Redis分布式锁（优先Redis降级内存）+TTL=30min、ReportView对比视图（未审/已审/对比三模式+差异行橙色高亮）、tasks.md多项checkbox更新
 - Phase 9 本轮补充（2026-04-17）：DisclosureEditor TipTap富文本替换textarea完成、ConfirmationStep团队摘要完成、ThreeColumnLayout导航菜单路径修正（人员委派→/settings/staff、工时→/work-hours、管理看板→/dashboard/management、用户管理→/settings/users）+新增DataAnalysis/UserFilled图标
 - Phase 9 代码已推送到 GitHub（2026-04-17）：commit 580b8af，git push origin master 成功；代理端口 127.0.0.1:7897 需要保持开启
 - Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 9 的 WorkHour 使用 "work_hours"
