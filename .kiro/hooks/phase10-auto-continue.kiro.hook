@@ -1,7 +1,7 @@
 {
   "enabled": false,
-  "name": "Phase 9 自动继续开发+推送",
-  "description": "每次对话结束后，自动检查 Phase 9 任务完成情况，继续开发未完成任务，完成后推送到 Git。",
+  "name": "Phase 10 自动继续开发+推送",
+  "description": "每次对话结束后，自动检查 Phase 10 任务完成情况，继续开发未完成任务，完成后推送到 Git。",
   "version": "2",
   "when": {
     "type": "agentStop"

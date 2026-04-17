@@ -799,6 +799,9 @@ inclusion: always
 - Phase 10 一致性审查完成（2026-04-17）：补充6个缺失设计（过程记录/抽样增强/合并锁定/LLM复核提示词/私人库RAG/权限精细化/存储统计看板）+8个缺失任务子项+5个跨Phase兼容性说明；commit dca4fe9
 - Phase 10 全面复盘通过（2026-04-17）：35+个用户需求全部覆盖、14个需求→14个设计→14个任务组完全对齐、8个跨Phase冲突均为低/中严重度有解决方案；commit c9de520
 - Phase 10 扩展（2026-04-17）：新增7个需求（15单元格级复核批注+16合并数据快照+17底稿智能推荐+18知识库上下文感知+19年度差异分析报告+20附件智能分类+21报告排版模板），总计21个需求21个任务组；新增3张表（cell_annotations+consol_snapshots+report_format_templates）；执行顺序调整为21步
+- Phase 10 最终复盘通过（2026-04-17）：补充知识库上下文感知设计(§23)+复核对话权限校验(§24)+6个新增跨Phase兼容性说明；21个需求全部有design+tasks对应；commit 55d6077
+- Phase 10 开发建议：①Task 18(知识库感知)应提前到Task 5(LLM底稿)之前或合并执行 ②8张新表合并为2-3个迁移脚本 ③design.md编号与需求编号不对应但不改（开发时按需求编号组织代码）
+- Phase 10 执行顺序已优化（2026-04-17）：Task 18合并到Task 5作为前置步骤（步骤5变为"Task 18.1+Task 5.1-5.3"）；Task 15(批注)提前到Task 9(溯源)之前；8张新表合并为3个迁移脚本（023协作社区+024批注快照打卡+025排版模板连续审计锁定）
 - 私人库导航偏好：私人库入口必须放在最左侧第一栏导航中（ThreeColumnLayout navItems），与项目/知识库同级，方便用户随时调用
 - Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 9 的 WorkHour 使用 "work_hours"
 - conftest.py 修复：新增 _WorkpaperStub（__tablename__="workpapers"）解决 ai_models FK 引用缺失表的问题；新增 staff_models 导入（在 collaboration_models 之前）
