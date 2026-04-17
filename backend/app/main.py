@@ -61,6 +61,20 @@ from app.routers.workpaper_summary import router as workpaper_summary_router
 from app.routers.ai_unified import router as ai_unified_router
 from app.routers.ai_models import router as ai_models_router
 from app.routers.recycle_bin import router as recycle_bin_router
+from app.routers.staff import router as staff_router
+from app.routers.assignments import router as assignments_router_v2
+from app.routers.workhours import router as workhours_router
+from app.routers.dashboard import router as dashboard_router
+from app.routers.consistency import router as consistency_router
+from app.routers.procedures import router as procedures_router
+from app.routers.wp_progress import router as wp_progress_router
+from app.routers.wp_ai import router as wp_ai_router
+from app.routers.tb_sync import router as tb_sync_router
+from app.routers.note_wp_mapping import router as note_wp_mapping_router
+from app.routers.note_trim import router as note_trim_router
+from app.routers.subsequent_events import router as subsequent_events_router
+from app.routers.note_ai import router as note_ai_router
+from app.routers.wp_storage import router as wp_storage_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -162,3 +176,17 @@ app.include_router(workpaper_summary_router)
 app.include_router(ai_unified_router)
 app.include_router(ai_models_router)
 app.include_router(recycle_bin_router)
+app.include_router(staff_router)
+app.include_router(assignments_router_v2)
+app.include_router(workhours_router)
+app.include_router(dashboard_router)
+app.include_router(consistency_router)
+app.include_router(procedures_router)
+app.include_router(wp_progress_router)
+app.include_router(wp_ai_router)
+app.include_router(tb_sync_router)
+app.include_router(note_wp_mapping_router)
+app.include_router(note_trim_router)
+app.include_router(subsequent_events_router)
+app.include_router(note_ai_router)
+app.include_router(wp_storage_router)

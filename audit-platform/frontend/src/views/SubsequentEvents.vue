@@ -1,49 +1,80 @@
 <template>
-  <div class="gt-subsequent-events gt-fade-in">
-    <div class="gt-se-header">
-      <h2 class="gt-page-title">期后事项管理</h2>
-      <el-select v-model="currentProjectId" placeholder="选择项目" filterable style="width: 300px" @change="loadEvents">
-        <el-option v-for="p in projects" :key="p.id" :label="p.project_name" :value="p.id" />
-      </el-select>
+  <div class="gt-events gt-fade-in">
+    <div class="gt-events-header">
+      <h2 class="gt-page-title">后续事项</h2>
+      <el-button type="primary" @click="showCreate = true">新增事项</el-button>
     </div>
-
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="期后事项记录" name="events">
-        <SubsequentEventsPanel :project-id="currentProjectId" />
-      </el-tab-pane>
-      <el-tab-pane label="审阅程序清单" name="checklist">
-        <SEChecklistPanel :project-id="currentProjectId" />
-      </el-tab-pane>
-    </el-tabs>
+    <el-table :data="events" border stripe v-loading="loading">
+      <el-table-column prop="event_type" label="类型" width="120">
+        <template #default="{ row }">
+          <el-tag :type="row.event_type === 'adjusting' ? 'warning' : 'info'" size="small">
+            {{ row.event_type === 'adjusting' ? '调整事项' : '非调整事项' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="event_description" label="描述" min-width="300" />
+      <el-table-column prop="impact_amount" label="影响金额" width="140" align="right" />
+      <el-table-column prop="treatment" label="处理方式" width="120" />
+      <el-table-column prop="review_status" label="状态" width="100" />
+    </el-table>
+    <el-dialog v-model="showCreate" title="新增后续事项" width="550px">
+      <el-form :model="form" label-width="90px">
+        <el-form-item label="事项类型">
+          <el-radio-group v-model="form.event_type">
+            <el-radio value="adjusting">调整事项</el-radio>
+            <el-radio value="non_adjusting">非调整事项</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="事项描述"><el-input v-model="form.event_description" type="textarea" :rows="3" /></el-form-item>
+        <el-form-item label="影响金额"><el-input-number v-model="form.impact_amount" :precision="2" style="width: 100%" /></el-form-item>
+        <el-form-item label="处理方式">
+          <el-select v-model="form.treatment" style="width: 100%">
+            <el-option label="已调整" value="adjusted" />
+            <el-option label="已披露" value="disclosed" />
+            <el-option label="无需处理" value="no_action_needed" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCreate = false">取消</el-button>
+        <el-button type="primary" @click="saveEvent" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
-
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import SubsequentEventsPanel from '@/components/collaboration/SubsequentEventsPanel.vue'
-import SEChecklistPanel from '@/components/collaboration/SEChecklistPanel.vue'
-import { auditPlatformApi } from '@/services/auditPlatformApi'
-
-const activeTab = ref('events')
-const currentProjectId = ref('')
-const projects = ref<any[]>([])
-
-const loadProjects = async () => {
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
+const route = useRoute()
+const projectId = computed(() => route.params.projectId as string)
+const events = ref<any[]>([])
+const loading = ref(false)
+const showCreate = ref(false)
+const saving = ref(false)
+const form = ref({ event_type: 'adjusting', event_description: '', impact_amount: 0, treatment: 'adjusted' })
+async function loadEvents() {
+  loading.value = true
   try {
-    const res = await auditPlatformApi.getProjects()
-    projects.value = res.data
-    if (projects.value.length && !currentProjectId.value) {
-      currentProjectId.value = projects.value[0].id
-    }
-  } catch {}
+    const { data } = await http.get(`/api/projects/${projectId.value}/subsequent-events`)
+    events.value = data.data ?? data
+    if (!Array.isArray(events.value)) events.value = []
+  } catch { events.value = [] }
+  finally { loading.value = false }
 }
-
-const loadEvents = () => {}
-
-onMounted(loadProjects)
+async function saveEvent() {
+  saving.value = true
+  try {
+    await http.post(`/api/projects/${projectId.value}/subsequent-events`, form.value)
+    ElMessage.success('保存成功')
+    showCreate.value = false
+    await loadEvents()
+  } finally { saving.value = false }
+}
+onMounted(loadEvents)
 </script>
-
 <style scoped>
-.gt-subsequent-events { padding: var(--gt-space-4); }
-.gt-se-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.gt-events { padding: var(--gt-space-4); }
+.gt-events-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
 </style>

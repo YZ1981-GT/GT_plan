@@ -3,6 +3,10 @@
     <div class="gt-rv-header">
       <h2 class="gt-page-title">财务报表</h2>
       <div class="gt-rv-actions">
+        <el-radio-group v-model="reportMode" size="small" style="margin-right: 12px" @change="fetchReport">
+          <el-radio-button value="audited">已审报表</el-radio-button>
+          <el-radio-button value="unadjusted">未审报表</el-radio-button>
+        </el-radio-group>
         <el-button @click="onGenerate" :loading="genLoading">重新生成</el-button>
         <el-button @click="onConsistencyCheck" :loading="checkLoading">一致性校验</el-button>
         <el-button @click="onExportExcel">导出 Excel</el-button>
@@ -67,6 +71,13 @@
           <el-table-column label="金额" width="150" align="right">
             <template #default="{ row }">{{ fmtAmt(row.amount) }}</template>
           </el-table-column>
+          <el-table-column label="底稿" width="100" align="center">
+            <template #default="{ row }">
+              <el-button v-if="row.wp_id" link type="primary" size="small"
+                @click="openWorkpaper(row.wp_id)">打开底稿</el-button>
+              <span v-else style="color: #ccc">—</span>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
       <div v-else v-loading="drilldownLoading" style="min-height: 100px" />
@@ -76,13 +87,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck,
   getReportExcelUrl,
   type ReportRow, type ReportDrilldownData, type ReportConsistencyCheck,
 } from '@/services/auditPlatformApi'
+
+const route = useRoute()
+const router = useRouter()
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -92,6 +106,7 @@ const loading = ref(false)
 const genLoading = ref(false)
 const checkLoading = ref(false)
 const activeTab = ref('balance_sheet')
+const reportMode = ref('audited')
 const rows = ref<ReportRow[]>([])
 const consistencyResult = ref<ReportConsistencyCheck | null>(null)
 
@@ -115,7 +130,7 @@ function rowClassName({ row }: { row: ReportRow }) {
 async function fetchReport() {
   loading.value = true
   try {
-    rows.value = await getReport(projectId.value, year.value, activeTab.value)
+    rows.value = await getReport(projectId.value, year.value, activeTab.value, reportMode.value === 'unadjusted')
   } catch {
     rows.value = []
   } finally {
@@ -161,6 +176,10 @@ async function onDrilldown(row: ReportRow) {
   } finally {
     drilldownLoading.value = false
   }
+}
+
+function openWorkpaper(wpId: string) {
+  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
 }
 
 onMounted(fetchReport)

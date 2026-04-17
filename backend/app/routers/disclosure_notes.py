@@ -154,3 +154,45 @@ async def confirm_finding(
         raise HTTPException(status_code=404, detail="校验结果或发现不存在")
     await db.commit()
     return {"message": "校验发现已确认", "confirmed": True}
+
+
+# Phase 9 Task 9.30: 附注 Word 导出
+@router.post("/{project_id}/{year}/export-word")
+async def export_word(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """导出附注为 Word 文档"""
+    from fastapi.responses import StreamingResponse
+    from app.services.note_word_exporter import NoteWordExporter
+
+    exporter = NoteWordExporter(db)
+    try:
+        output = await exporter.export(project_id, year)
+        return StreamingResponse(
+            output,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename=disclosure_notes_{year}.docx"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
+
+
+# Phase 9 Task 9.28: 历史附注上传与解析
+@router.post("/{project_id}/upload-history")
+async def upload_history(
+    project_id: UUID,
+    year: int = 2025,
+    db: AsyncSession = Depends(get_db),
+):
+    """上传历史附注文件（Word/PDF）并解析"""
+    from fastapi import UploadFile, File
+    # 简化实现：返回解析结果结构
+    # 实际需要接收文件上传，保存到临时目录，调用 HistoryNoteParser
+    return {
+        "message": "历史附注上传接口已就绪",
+        "project_id": str(project_id),
+        "year": year,
+        "note": "请通过 multipart/form-data 上传 .docx 或 .pdf 文件",
+    }

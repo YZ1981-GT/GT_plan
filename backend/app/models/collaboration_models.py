@@ -701,9 +701,8 @@ class ProjectTimeline(Base):
 
 
 class WorkHours(Base):
-    """工时记录"""
-    __tablename__ = "work_hours"
-    __table_args__ = (Index("ix_work_hours_project", "project_id"),)
+    """工时记录 — Phase 3 遗留表，已被 Phase 9 staff_models.WorkHour 替代"""
+    __tablename__ = "work_hours_legacy"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)

@@ -69,6 +69,17 @@
           </span>
         </template>
       </el-table-column>
+      <el-table-column label="底稿状态" width="100" align="center">
+        <template #default="{ row }">
+          <el-tooltip v-if="row.wp_consistency?.status === 'consistent'" content="底稿审定数一致" placement="top">
+            <span style="color: #28a745; cursor: pointer" @dblclick="openWorkpaper(row)">✅</span>
+          </el-tooltip>
+          <el-tooltip v-else-if="row.wp_consistency?.status === 'inconsistent'" :content="`差异 ${row.wp_consistency.diff_amount}`" placement="top">
+            <span style="color: #FF5149; cursor: pointer" @dblclick="openWorkpaper(row)">⚠️</span>
+          </el-tooltip>
+          <span v-else style="color: #ccc">—</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- 借贷平衡指示器 -->
@@ -261,6 +272,15 @@ async function onConsistencyCheck() {
 function onExport() {
   // 简单实现：打开导出URL
   window.open(`/api/projects/${projectId.value}/trial-balance/export?year=${year.value}`, '_blank')
+}
+
+function openWorkpaper(row: TrialBalanceRow) {
+  const wpId = (row as any).wp_consistency?.wp_id
+  if (wpId) {
+    router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
+  } else {
+    ElMessage.info('该科目未关联底稿')
+  }
 }
 
 function onUnadjustedClick(_row: TrialBalanceRow) {

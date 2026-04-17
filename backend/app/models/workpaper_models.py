@@ -259,6 +259,10 @@ class WorkingPaper(Base):
         sa.Integer, server_default=text("1"), nullable=False
     )
     last_parsed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    parsed_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    prefill_stale: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

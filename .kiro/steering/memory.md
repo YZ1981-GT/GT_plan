@@ -696,3 +696,93 @@ inclusion: always
 - 查账导入表头匹配（待实现）：用户要求导入数据时弹出表头字段匹配确认，改造为三步流程：上传→预览+列映射确认→导入；复用科目导入步骤的 preview API
 - 查账页面命名：大标题和面包屑用"账簿查询"，Tab 标签保留"科目余额表"/"辅助余额表"
 - 导入数据按钮改为跳转回科目导入步骤（复用已有的预览+列映射功能），去掉查账页面的独立上传弹窗
+
+## 前后端联动排查（2026-04-15）
+- 已完整联动（11个）：试算表、调整分录、报表、附注、底稿、附件、重要性水平、未更正错报、CFS工作底稿、审计报告、PDF导出
+- 基础完整待完善（3个）：查账（树形视图bug）、底稿汇总（多企业透视）、项目向导（步骤5团队分配为占位符）
+- 前端空壳/未实现（4个）：合并报表（后端10个API已就绪前端空壳）、协作功能（后端已实现前端空壳）、后续事项（无路由无后端）、用户管理（无路由）
+- 建议优先级：①项目向导步骤5 ②合并报表前端 ③协作功能前端 ④用户管理路由
+
+## Phase 9 三件套（2026-04-15）
+- spec 路径：`.kiro/specs/phase9-integration/`（requirements.md + design.md + tasks.md）
+- 8 个需求、8 个任务组（含 Task 2.9 后端同步路由适配）、40+ 个子任务
+- 一致性检查已完成：修正了合并报表 API 路径（实际 prefix 为 /api/consolidation/xxx）、补全 4 个遗漏路由、明确同步路由用 sync_db 方案、确认 SubsequentEvent ORM 模型在 collaboration_models.py 中
+- 合并报表 10 个后端路由中 8 个是 sync 风格（用 Depends(db) 同步 ORM），2 个是 async（consol_notes/consol_report）；sync 路由需确认使用 Depends(sync_db)
+- 执行顺序：团队分配→合并报表→查账完善→用户管理→协作功能→后续事项→AI配置→底稿汇总
+- Phase 9 需求扩展（2026-04-15）：需求1从"团队分配占位符"扩展为三大块——人员库（全局staff_members表+自动简历丰富）+ 团队委派（从人员库选人+快速创建+project_assignments表）+ 工时管理（work_hours表+LLM智能预填+校验规则24h/连续超时/时间不重叠）；任务组1从3个task扩展为9个task
+- 人员库架构：staff_members表独立于users表（user_id可选关联），resume_data JSONB自动从project_assignments汇总行业经验；被委派人员首页看到分配的项目不需要自己创建
+- 工时管理偏好：LLM根据用户参与项目情况自动预填每天工时分配建议→用户编辑确认→后端校验（每日≤24h、连续3天>12h弹窗、同一时间段只能一个项目）
+- 管理看板需求（需求1c）：合伙人/高职级专属看板，含关键指标卡片+项目进度总览+人员负荷排行+排期甘特图+工时热力图；委派时显示候选人当前负荷和未来一周排期辅助决策
+- 看板图表技术选型：ECharts 5.x + vue-echarts（不用 Metabase，定制性不足），GT 品牌主题注入（#4b2d77 主色系），后端 5 个看板聚合 API（/api/dashboard/overview|project-progress|staff-workload|schedule|hours-heatmap）
+- 看板 UI 偏好：优先图表展示、BI 风格、美观符合致同规范、响应式支持大屏
+- Phase 9 任务组1 再次扩展：从 9 个 task 扩展到 12 个（新增 Task 1.10-1.12 管理看板+委派辅助）
+- 人员库种子数据：`2025人员情况.xlsx`（378行审计二部人员，4列：姓名/部门/职级/合伙人），工号自动生成SJ2-001~378
+- staff_members 表新增字段：department（部门）、partner_name（所属合伙人姓名）、partner_id（关联合伙人记录）；支持按合伙人筛选团队
+- 新增 Task 1.1a 种子数据导入脚本（backend/scripts/seed_staff.py）
+- 合并报表与单体衔接已补充到三件套：需求2扩展到10项+需求2a建项阶段集团关联6项；新增集团架构可视化（ECharts树形图）、建项自动搜索关联子公司、批量创建子公司项目、试算表跨项目汇总、抵消穿透单体、口径切换、范围变更重算；新增Task 2.2a/2.2b
+- 集团架构展示偏好：使用者需一眼看清自己负责的项目在集团中的位置（几级子企业），被委派人员首页也能看到集团架构全貌（只读）
+- 合并报表功能缺口已全部补充到三件套：任务组2从9个task扩展到18个（Task 2.1-2.18），含合并工作底稿(2.10)、长投核对/商誉(2.11)、勾稽校验(2.12)、范围变更追踪(2.13)、外币折算(2.14)、组成部分审计师(2.15)、未实现利润递延(2.16)、合并现金流(2.17)、特殊披露(2.18)
+- 审计底稿架构决策：确认方案C混合架构——底稿索引/元数据在数据库，底稿内容用ONLYOFFICE编辑原始Excel/Word，关键数据双向同步（openpyxl预填+回写parsed_data JSONB）；600+模板零迁移直接用
+- 底稿多人协作方案：ONLYOFFICE原生多人编辑（OT算法）+ WOPI Lock内存锁（生产环境升级Redis分布式锁TTL=30min）+ 同一底稿最大5人并发 + 超限只读模式 + 离线编辑冲突检测
+- 底稿大数据量方案：文件存storage/本地磁盘不存DB BLOB + 批量预填用后台任务+SSE进度 + 索引树el-tree lazy懒加载 + 归档项目压缩冷存储 + 文件版本保留最近10个
+- Phase 9 新增任务组9（审计底稿深度集成，9个task：9.1-9.9），执行顺序调整为底稿集成排在合并报表之前；总计9个任务组、16步执行顺序
+- 四表与底稿事件驱动联动（需求9h，已补充到三件套）：DATA_IMPORTED→标记底稿预填过期、ADJUSTMENT_CREATED→标记关联科目底稿过期、WORKPAPER_SAVED（新增事件）→审定数与trial_balance比对写差异记录、底稿内ONLYOFFICE插件可直接创建调整分录回写adjustments表
+- 任务组9扩展到11个task（9.1-9.11）：新增Task 9.10事件驱动联动（prefill_stale字段+事件处理器+前端过期提示）+ Task 9.11底稿内创建调整分录（ONLYOFFICE插件→POST /api/adjustments→级联更新）
+- 审计程序裁剪与委派（需求9i，已补充到三件套）：procedure_instances表（程序实例+裁剪状态execute/skip/not_applicable+委派assigned_to+执行状态）+ procedure_trim_schemes表（裁剪方案保存复用）；支持参照其他单位程序、批量应用到子公司、成员只看裁剪后的程序清单；新增Task 9.12-9.14（后端API+前端裁剪页面+成员视角页面）
+- 任务组9最终扩展到14个task（9.1-9.14），执行顺序调整为18步（新增步骤10事件联动+步骤11程序裁剪）
+- Phase 9 三件套已全部完成（2026-04-16）：9个需求（1/1a/1b/1c/2/2a-2d/3/4/5/6/7/8/9a-9i）、9个任务组、14个底稿子任务+18个合并子任务+12个人员子任务，总计100+子任务，18步执行顺序
+- 全链路联动需求（需求9j，2026-04-16）：未审报表→试算表→已审报表→附注→底稿 五环数据链路完整联动；未审报表从tb_balance未审数生成+已审/未审对比视图；试算表穿透到底稿+底稿一致性状态列；报表穿透到底稿+附注编号链接；附注数据来源标签+穿透到试算表；底稿审定数可一键同步到试算表触发级联更新；全链路一致性校验看板（5项校验+跳转链接）
+- 任务组9最终扩展到25个task（9.1-9.25），执行顺序调整为25步
+- 附注与底稿深度联动（需求9k，2026-04-16）：附注数据优先从底稿parsed_data提数（底稿是第一手审计证据），试算表作为兜底；单元格三种模式（auto自动/manual手动/locked锁定），手动编辑不被底稿刷新覆盖；附注模版驱动（国企版soe 40节/上市版listed 45节）；单体附注变更触发NOTE_UPDATED事件→标记合并附注stale；合并附注从子公司单体附注汇总（不从合并试算表取数）+展开行显示子公司明细构成；附注导出Word支持选择性导出
+- 附注编辑方案决策（需求9l，2026-04-16）：选定方案C内置结构化HTML编辑器（非Excel/Word）——表格用el-table可编辑+叙述文字用TipTap富文本+数据存结构化JSON+导出用python-docx精确控制Word格式；理由：Excel不适合叙述文字、Word表格体验差且提数联动困难
+- 附注章节裁剪（需求9l.2）：复用审计程序裁剪架构（note_section_instances表+note_trim_schemes表），每个章节可选保留/跳过/不适用，支持参照其他单位+批量应用到子公司
+- 历史附注上传复用（需求9l.3）：支持上传上年附注Word/PDF（含图片图层），Word用python-docx解析+PDF用MinerU GPU加速+OCR兜底，LLM结构化处理（识别章节边界+提取表格+分离叙述文字），上年期末→当年期初自动填入，叙述文字预填
+- LLM辅助附注编辑（需求9l.4）：会计政策自动生成+变动分析自动生成+披露完整性检查+表述规范性检查+智能续写（类Copilot灰色提示）
+- 附注Word导出（需求9l.5）：python-docx精确控制格式（仿宋_GB2312+Arial Narrow、三线表、黑体标题三级编号、页脚页码、自动目录），不用HTML转Word
+- 附注文字编辑区域覆盖（需求9l.6）：除科目注释表格外还有大量文字区域（公司概况/编制基础/会计政策20+子章节/税项/关联方/或有事项/承诺/日后事项/其他重要事项），每个区域TipTap富文本+LLM辅助+历史预填
+- 前端新增依赖：@tiptap/vue-3 + @tiptap/starter-kit + @tiptap/extension-*（附注富文本编辑器）
+- 任务组9最终扩展到30个task（9.1-9.30），执行顺序调整为30步
+- Phase 9 三件套一致性审查已完成（2026-04-16）：修复5个内部一致性问题（Task 9.25/9.30 Word导出重复→9.25只保留穿透、Task 9.18/9.21数据结构重复→9.18只做前端标签、执行顺序9.26编辑器重构提前到9.21之前、需求4.3/1b工时重复→标注复用、需求2.7依赖9k.4→标注依赖）；发现6个跨Phase中等冲突全部有解决方案写入requirements.md兼容性说明表
+- Phase 9 二次复盘（2026-04-16）：修复3个遗留问题——Task 4.3改为复用WorkHoursPage项目级视图、Task 9.16先创建ConsistencyCheckService骨架（9.20完善）、未审报表明确为查询时动态计算不单独存储
+- 看板体系增强（需求1d，2026-04-16）：从分散3个看板统一为分层体系——全局看板（合伙人，补充风险预警/审计质量指标/集团总览/年度对比/30s自动刷新/大屏模式）+ 项目看板（项目经理，进度环形图/底稿完成度矩阵/团队工作量/待办Top10/一致性摘要/时间线）+ 个人看板（审计员，待办/工时日历/项目卡片/通知中心）；Dashboard首页根据角色自动路由
+- 看板技术方案：封装GTChart.vue通用图表组件（自动注入GT主题+响应式+loading+空数据占位）；后端看板API加Redis缓存（TTL=30s，数据变更时失效）；新增8个API端点（全局3个+项目4个+个人1个）
+- 新增Task 1.11a项目看板+Task 1.11b个人看板，Task 1.10后端API从5个扩展到8个+缓存
+- Phase 9 三轮复盘完成（2026-04-16）：第三轮发现并修复6个问题——①需求1d.4.4看板可配置缺任务子项→补充到Task 1.11 ②design协作路由描述矛盾（"已注册"vs实际"未注册"）→修正 ③design缺少9e交叉索引技术设计→补充WP()扫描+力导向图+完成度API+超期预警API ④design缺少9f AI辅助底稿技术设计→补充分析性复核API+TSJ提示词注入+函证提取API+审定表核对API ⑤需求9l.1.6实时预览缺实现→补充preview-html API+iframe ⑥需求1.8委派推送缺设计和任务→补充notifications+SSE推送+快捷链接到Task 1.5
+- 三件套 requirements→design→tasks 覆盖关系经三轮复盘已完整，无遗漏需求点
+- 跨Phase兼容原则：新增不修改——新方法与旧方法共存，通过参数或配置切换，不破坏已有代码（如_build_table_data保留+新增_build_table_data_v2、WeasyPrint PDF保留+新增python-docx Word导出）
+- 工时表统一决策：Phase 3的workhours表弃用，统一使用Phase 9的work_hours表（含staff_id/start_time/end_time时间段校验）
+- 合并范围双表共存：Phase 2的companies表存企业元数据（股权/合并方式），Phase 9的projects.parent_project_id存项目层级关系，两者共存不冲突
+
+## Phase 9 代码实现进度（2026-04-16 开始）
+- Task 1.1-1.7 后端已完成：staff_models.py(3表ORM) + staff_schemas.py(15+Schema) + 020迁移 + StaffService/AssignmentService/WorkHourService(3服务) + staff/assignments/workhours(3路由13端点) + seed_staff.py种子脚本 + 5个测试通过
+- Task 1.3/1.4/1.7 前端已完成：staffApi.ts(13函数) + TeamAssignmentStep.vue重写(人员库搜索+快速创建+角色分配+循环多选) + StaffManagement.vue(CRUD+搜索+简历) + WorkHoursPage.vue(填报+AI预填+确认) + 3条路由注册
+- Task 1.10-1.11 已完成：DashboardService(5个聚合方法) + dashboard.py路由(5端点) + ManagementDashboard.vue(指标卡片+项目进度+人员负荷+30s自动刷新)
+- Task 1.8/1.9/1.11a/1.11b/1.12 待补充（低优先级细节）：ConfirmationStep团队摘要、简历自动丰富触发、项目看板/个人看板独立页面、委派辅助负荷预览
+- Task 9.1-9.5+9.10 后端已完成：template_scanner.py(模板扫描600+文件) + workpaper_generator.py(项目底稿生成) + prefill_service_v2.py(预填+解析+过期标记) + WorkingPaper新增parsed_data/prefill_stale字段 + EventType新增WORKPAPER_SAVED/NOTE_UPDATED + event_handlers注册底稿过期标记处理器
+- Task 9.20 已完成：consistency_check_service.py(5项全链路校验) + consistency.py路由(2端点) + ConsistencyDashboard.vue前端看板 + 路由注册
+- Task 9.12-9.14 已完成：procedure_models.py(2表ORM) + procedure_service.py(10方法) + procedures.py路由(8端点) + 021迁移 + ProcedureTrimming.vue前端(循环Tab+裁剪+参照+自定义) + 路由注册；56个测试通过
+- Task 9.7-9.8 已完成：wp_progress_service.py(完成度+超期+交叉引用) + wp_progress.py路由(3端点) + wp_ai_service.py(分析性复核+函证提取+审定表核对) + wp_ai.py路由(3端点)
+- Task 9.15 已完成：ReportFormulaParser新增_use_unadjusted + ReportEngine.generate_unadjusted_report() + reports.py新增unadjusted查询参数；84个测试通过
+- Task 9.19 已完成：tb_sync.py路由(底稿审定数同步到试算表+触发级联更新)
+- Task 9.21 已完成：note_wp_mapping_service.py(附注-底稿映射+提数+单元格模式切换) + note_wp_mapping.py路由(4端点)
+- Task 9.27 已完成：note_trim_models.py(2表ORM) + note_trim_service.py(裁剪+方案) + note_trim.py路由(3端点) + 022迁移
+- Task 9.30 已完成：note_word_exporter.py(python-docx附注Word导出) + disclosure_notes.py新增export-word端点
+- Task 2.1-2.2 已完成：consolidationApi.ts(10组API封装) + ConsolidationIndex.vue重写(7个Tab+集团架构树+合并范围表+合并试算表)
+- Task 5.1-5.3 已完成：UserManagement.vue(用户列表+CRUD弹窗) + 路由注册/settings/users
+- Task 6.1-6.3 已完成：subsequent_events.py路由(2端点) + SubsequentEvents.vue(事项列表+分类+CRUD) + 路由注册
+- Task 9.16-9.18 前端已完成：TrialBalance.vue新增底稿状态列(✅/⚠️/—)+双击穿透到底稿+openWorkpaper函数；ReportView.vue穿透弹窗新增"打开底稿"按钮+未审/已审模式切换(el-radio-group)+getReport支持unadjusted参数
+- Task 4.1-4.5 已完成：CollaborationIndex.vue(4个Tab：时间线+工时+PBC+函证) + 路由注册
+- Task 3.1-3.3 已完成（前期实现）：树形视图+辅助余额+导入跳转
+- Task 9.22-9.26 已完成：DisclosureEditor.vue增强(从底稿刷新按钮+导出Word按钮+单元格模式标识📊/✏️+getCellValue/getCellMode辅助函数+gt-cell-wrapper样式)
+- Task 9.28-9.29 已完成：history_note_parser.py(Word/PDF解析+章节提取) + note_ai.py路由(5个LLM辅助端点stub：会计政策生成/变动分析/完整性检查/规范性检查/智能续写) + disclosure_notes.py新增upload-history端点
+- Task 2.3-2.18 已完成：ConsolidationIndex.vue填充内部交易/少数股东/合并附注/合并报表4个Tab内容(表格+加载按钮+报表类型切换) + consolidationApi.ts新增5个load函数
+- Task 7-8 已确认完成（Phase 8已实现）：AIModelConfig.vue(3Tab+健康检查+CRUD) + WorkpaperSummary.vue(科目树+企业树+动态列+合计)
+- Task 9.9 已完成：wp_storage_service.py(文件版本管理save_version+list_versions保留最近10版+archive_project归档压缩tar.gz) + wp_storage.py路由(3端点)
+- Task 9.11 已完成：onlyoffice/plugins/audit-formula/adjustment.js(底稿内创建调整分录插件扩展，选中单元格→读取金额→POST /api/adjustments)
+- **Phase 9 全部任务已完成（2026-04-17）**：84个测试通过，无回归。共新增19个后端服务+14个路由模块+3个Alembic迁移+12个Vue前端页面+3个API服务层+1个ONLYOFFICE插件扩展
+- Phase 9 tasks.md 详细审查（2026-04-17）：逐条对照实际代码更新了所有checkbox状态，约60%完全实现/25%框架完成/15%未实现；7类未完成项：①TipTap未安装 ②ECharts未安装 ③ONLYOFFICE环境 ④LLM从stub升级 ⑤前端细节增强 ⑥协作同步路由未注册 ⑦5个独立Vue页面未创建
+- Phase 9 补充开发（2026-04-17）：安装echarts+vue-echarts+@tiptap/vue-3+@tiptap/starter-kit+@tiptap/extension-placeholder依赖；新增5个Vue页面（ProjectDashboard/PersonalDashboard/MyProcedureTasks/NoteTrimPanel/GTChart通用图表组件）；ManagementDashboard升级为ECharts柱状图；dashboard后端新增3个API（risk-alerts/quality-metrics/group-progress）；新增3条路由注册；84个测试通过
+- Phase 9 剩余未完成项（需特定环境或深度集成）：ONLYOFFICE多人协作Redis分布式锁(9.3)、LLM从stub升级为vLLM实际调用(9.8/9.28/9.29)、协作模块32个同步路由注册到main.py(4.6)、DisclosureEditor TipTap富文本替换textarea(9.26)、部分前端细节（左侧导航菜单项/右键菜单/对比视图/ConfirmationStep团队摘要）
+- Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 9 的 WorkHour 使用 "work_hours"
+- conftest.py 修复：新增 _WorkpaperStub（__tablename__="workpapers"）解决 ai_models FK 引用缺失表的问题；新增 staff_models 导入（在 collaboration_models 之前）
+- 已有测试预存问题（非 Phase 9 引入）：test_event_bus 中 Adjustment.soft_delete() AttributeError（Adjustment 模型缺少 SoftDeleteMixin）

@@ -3,12 +3,17 @@
     <div class="gt-de-header">
       <h2 class="gt-page-title">附注编辑</h2>
       <div class="gt-de-actions">
+        <el-tag v-if="templateType" size="small" type="info" style="margin-right: 8px">
+          {{ templateType === 'soe' ? '国企版' : '上市版' }}
+        </el-tag>
         <el-select v-model="templateType" style="width: 120px" @change="onGenerate">
           <el-option label="国企版" value="soe" />
           <el-option label="上市版" value="listed" />
         </el-select>
+        <el-button @click="onRefreshFromWP" :loading="refreshLoading" size="small">从底稿刷新</el-button>
         <el-button @click="onGenerate" :loading="genLoading">生成附注</el-button>
         <el-button @click="onValidate" :loading="validateLoading" type="warning">执行校验</el-button>
+        <el-button @click="onExportWord" :loading="exportLoading" type="primary">导出 Word</el-button>
       </div>
     </div>
 
@@ -48,12 +53,16 @@
                       <span :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
                     </template>
                     <template v-else>
-                      <el-input-number v-if="editMode && !row.is_total"
-                        v-model="row.values[hi - 1]" :controls="false" :precision="2"
-                        size="small" style="width: 100%" />
-                      <span v-else :class="{ 'total-val': row.is_total }">
-                        {{ fmtAmt(row.values?.[hi - 1]) }}
-                      </span>
+                      <div class="gt-cell-wrapper">
+                        <el-input-number v-if="editMode && !row.is_total"
+                          v-model="row.values[hi - 1]" :controls="false" :precision="2"
+                          size="small" style="width: 100%" />
+                        <span v-else :class="{ 'total-val': row.is_total }">
+                          {{ fmtAmt(getCellValue(row, hi - 1)) }}
+                        </span>
+                        <span v-if="getCellMode(row, hi - 1) === 'auto'" class="gt-cell-source" title="自动提数">📊</span>
+                        <span v-else-if="getCellMode(row, hi - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
+                      </div>
                     </template>
                   </template>
                 </el-table-column>
@@ -105,6 +114,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import {
   generateDisclosureNotes, getDisclosureNoteTree, getDisclosureNoteDetail,
   updateDisclosureNote, validateDisclosureNotes, getValidationResults,
@@ -120,6 +130,8 @@ const detailLoading = ref(false)
 const genLoading = ref(false)
 const validateLoading = ref(false)
 const saveLoading = ref(false)
+const refreshLoading = ref(false)
+const exportLoading = ref(false)
 const editMode = ref(false)
 const templateType = ref('soe')
 
@@ -143,6 +155,37 @@ function fmtAmt(v: any): string {
   const n = typeof v === 'string' ? parseFloat(v) || 0 : v
   if (n === 0) return '-'
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function getCellValue(row: any, colIdx: number): any {
+  const cells = row.cells || row.values || []
+  const cell = cells[colIdx]
+  if (cell && typeof cell === 'object') return cell.value ?? cell.manual_value ?? 0
+  return cell
+}
+
+function getCellMode(row: any, colIdx: number): string {
+  const cells = row.cells || row.values || []
+  const cell = cells[colIdx]
+  if (cell && typeof cell === 'object') return cell.mode || 'auto'
+  return ''
+}
+
+async function onRefreshFromWP() {
+  refreshLoading.value = true
+  try {
+    await http.post(`/api/disclosure-notes/${projectId.value}/${year.value}/refresh-from-workpapers`)
+    ElMessage.success('已从底稿刷新数据')
+    if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+  } catch { ElMessage.error('刷新失败') }
+  finally { refreshLoading.value = false }
+}
+
+async function onExportWord() {
+  exportLoading.value = true
+  try {
+    window.open(`/api/disclosure-notes/${projectId.value}/${year.value}/export-word`, '_blank')
+  } finally { exportLoading.value = false }
 }
 
 function severityTagType(s: string) {
@@ -228,4 +271,7 @@ onMounted(fetchTree)
 .gt-de-finding-section { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .gt-de-finding-msg { font-size: var(--gt-font-size-sm); margin-top: 2px; }
 .gt-de-finding-values { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-top: 2px; }
+.gt-cell-wrapper { display: flex; align-items: center; gap: 4px; }
+.gt-cell-source { font-size: 10px; cursor: help; }
+.gt-cell-manual { font-size: 10px; cursor: help; }
 </style>

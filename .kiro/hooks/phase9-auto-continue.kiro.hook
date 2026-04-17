@@ -1,0 +1,13 @@
+{
+  "enabled": false,
+  "name": "Phase 9 自动继续开发",
+  "description": "每次对话结束后，自动检查 Phase 9 任务清单中是否有未完成的任务，如果有则继续开发下一个任务。",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "检查 .kiro/steering/memory.md 中 \"Phase 9 代码实现进度\" 部分，如果还有\"待开发\"的任务，读取 .kiro/specs/phase9-integration/tasks.md 找到下一个待开发任务，按任务清单的执行顺序继续独立开发。每完成一个大任务后自我复盘修复，确认无误后继续下一个。全部完成后整体复盘，无问题则更新 memory.md 标记 Phase 9 全部完成。开发过程中不需要用户确认，独立完成。"
+  }
+}

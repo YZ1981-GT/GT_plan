@@ -180,6 +180,62 @@ const router = createRouter({
           name: 'RecycleBin',
           component: () => import('@/views/RecycleBin.vue'),
         },
+        // ── Phase 9 Routes ──
+        {
+          path: 'settings/staff',
+          name: 'StaffManagement',
+          component: () => import('@/views/StaffManagement.vue'),
+        },
+        {
+          path: 'work-hours',
+          name: 'WorkHours',
+          component: () => import('@/views/WorkHoursPage.vue'),
+        },
+        {
+          path: 'dashboard/management',
+          name: 'ManagementDashboard',
+          component: () => import('@/views/ManagementDashboard.vue'),
+        },
+        {
+          path: 'projects/:projectId/consistency',
+          name: 'ConsistencyDashboard',
+          component: () => import('@/views/ConsistencyDashboard.vue'),
+        },
+        {
+          path: 'projects/:projectId/procedures',
+          name: 'ProcedureTrimming',
+          component: () => import('@/views/ProcedureTrimming.vue'),
+        },
+        {
+          path: 'settings/users',
+          name: 'UserManagement',
+          component: () => import('@/views/UserManagement.vue'),
+        },
+        {
+          path: 'projects/:projectId/subsequent-events',
+          name: 'SubsequentEvents',
+          component: () => import('@/views/SubsequentEvents.vue'),
+        },
+        {
+          path: 'projects/:projectId/collaboration',
+          name: 'Collaboration',
+          component: () => import('@/views/CollaborationIndex.vue'),
+        },
+        {
+          path: 'projects/:projectId/project-dashboard',
+          name: 'ProjectDashboard',
+          component: () => import('@/views/ProjectDashboard.vue'),
+        },
+        {
+          path: 'my/dashboard',
+          name: 'PersonalDashboard',
+          component: () => import('@/views/PersonalDashboard.vue'),
+        },
+        {
+          path: 'my-procedures',
+          name: 'MyProcedureTasks',
+          component: () => import('@/views/MyProcedureTasks.vue'),
+        },
       ],
     },
     {

@@ -148,3 +148,37 @@ def register_event_handlers() -> None:
     )
 
     logger.info("All event handlers registered successfully (including formula cache invalidation)")
+
+    # ------------------------------------------------------------------
+    # Phase 9: 底稿预填过期标记
+    # ------------------------------------------------------------------
+    async def _mark_workpapers_stale_all(payload: EventPayload) -> None:
+        """数据导入 → 标记所有底稿预填数据为过期"""
+        try:
+            async with async_session_factory() as session:
+                from app.services.prefill_service_v2 import PrefillServiceV2
+                svc = PrefillServiceV2(session)
+                count = await svc.mark_stale(payload.project_id)
+                await session.commit()
+                logger.info(f"Marked {count} workpapers as stale for project {payload.project_id}")
+        except Exception:
+            logger.warning("Failed to mark workpapers stale")
+
+    async def _mark_workpapers_stale_by_account(payload: EventPayload) -> None:
+        """调整分录变更 → 标记关联科目底稿预填数据为过期"""
+        try:
+            async with async_session_factory() as session:
+                from app.services.prefill_service_v2 import PrefillServiceV2
+                svc = PrefillServiceV2(session)
+                count = await svc.mark_stale(payload.project_id, payload.account_codes)
+                await session.commit()
+                logger.info(f"Marked {count} workpapers as stale (account change)")
+        except Exception:
+            logger.warning("Failed to mark workpapers stale on adjustment change")
+
+    event_bus.subscribe(EventType.DATA_IMPORTED, _mark_workpapers_stale_all)
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_workpapers_stale_by_account)
+
+    logger.info("Phase 9 workpaper event handlers registered")

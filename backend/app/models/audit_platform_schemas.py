@@ -720,6 +720,8 @@ class EventType(str, enum.Enum):
     MATERIALITY_CHANGED = "materiality.changed"
     TRIAL_BALANCE_UPDATED = "trial_balance.updated"
     REPORTS_UPDATED = "reports.updated"
+    WORKPAPER_SAVED = "workpaper.saved"
+    NOTE_UPDATED = "note.updated"
 
 
 class EventPayload(BaseModel):

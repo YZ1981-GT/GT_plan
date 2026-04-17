@@ -1,64 +1,88 @@
 <template>
-  <div class="gt-collaboration gt-fade-in">
+  <div class="gt-collab gt-fade-in">
     <div class="gt-collab-header">
-      <h1 class="gt-page-title">协作与质控</h1>
-      <div class="gt-collab-actions">
-        <el-badge :value="unreadCount" :hidden="unreadCount === 0">
-          <el-button @click="showNotifications = true">通知</el-button>
-        </el-badge>
-      </div>
+      <h2 class="gt-page-title">协作管理</h2>
     </div>
 
-    <el-tabs v-model="activeTab" class="gt-collab-tabs">
-      <el-tab-pane label="项目团队" name="team">
-        <ProjectTeam />
+    <el-tabs v-model="activeTab">
+      <el-tab-pane label="项目时间线" name="timeline">
+        <el-timeline>
+          <el-timeline-item v-for="item in timeline" :key="item.id"
+            :timestamp="item.date" :type="item.type" placement="top">
+            <el-card shadow="hover" style="padding: 8px">
+              <p>{{ item.description }}</p>
+            </el-card>
+          </el-timeline-item>
+        </el-timeline>
+        <el-empty v-if="!timeline.length" description="暂无时间线数据" />
       </el-tab-pane>
-      <el-tab-pane label="复核管理" name="review">
-        <ReviewManagement />
+
+      <el-tab-pane label="工时管理" name="workhours">
+        <p style="color: #999; padding: 20px">项目级工时视图 — 复用工时管理页面，按当前项目筛选</p>
+        <el-button type="primary" @click="$router.push('/work-hours')">前往工时管理</el-button>
       </el-tab-pane>
-      <el-tab-pane label="工作底稿" name="workpaper">
-        <WorkpaperReview />
+
+      <el-tab-pane label="PBC 清单" name="pbc">
+        <el-table :data="pbcList" border stripe v-loading="loading">
+          <el-table-column prop="item_name" label="资料名称" min-width="250" />
+          <el-table-column prop="audit_cycle" label="审计循环" width="100" />
+          <el-table-column prop="requested_from" label="提供方" width="120" />
+          <el-table-column prop="due_date" label="截止日期" width="120" />
+          <el-table-column prop="received_status" label="状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.received_status === 'received' ? 'success' : row.received_status === 'overdue' ? 'danger' : 'info'" size="small">
+                {{ { not_received: '待提供', received: '已提供', overdue: '已逾期' }[row.received_status] || row.received_status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!pbcList.length && !loading" description="暂无 PBC 清单" />
       </el-tab-pane>
-      <el-tab-pane label="同步管理" name="sync">
-        <SyncManagement />
-      </el-tab-pane>
-      <el-tab-pane label="归档管理" name="archive">
-        <ArchiveManagement />
-      </el-tab-pane>
-      <el-tab-pane label="审计日志" name="audit">
-        <AuditLogView />
+
+      <el-tab-pane label="函证管理" name="confirmations">
+        <el-table :data="confirmations" border stripe v-loading="loading">
+          <el-table-column prop="confirmation_type" label="类型" width="100" />
+          <el-table-column prop="counterparty" label="对象" min-width="200" />
+          <el-table-column prop="amount" label="金额" width="140" align="right" />
+          <el-table-column prop="status" label="状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'replied' ? 'success' : row.status === 'sent' ? 'warning' : 'info'" size="small">
+                {{ { draft: '草稿', sent: '已发', replied: '已回', diff: '有差异' }[row.status] || row.status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!confirmations.length && !loading" description="暂无函证数据" />
       </el-tab-pane>
     </el-tabs>
-
-    <el-drawer v-model="showNotifications" title="通知" size="400px">
-      <NotificationList />
-    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useCollaborationStore } from '@/stores/collaboration'
-import ProjectTeam from '@/components/collaboration/ProjectTeam.vue'
-import ReviewManagement from '@/components/collaboration/ReviewManagement.vue'
-import WorkpaperReview from '@/components/collaboration/WorkpaperReview.vue'
-import SyncManagement from '@/components/collaboration/SyncManagement.vue'
-import ArchiveManagement from '@/components/collaboration/ArchiveManagement.vue'
-import AuditLogView from '@/components/collaboration/AuditLogView.vue'
-import NotificationList from '@/components/collaboration/NotificationList.vue'
+import { useRoute } from 'vue-router'
+import http from '@/utils/http'
 
-const store = useCollaborationStore()
-const activeTab = ref('team')
-const showNotifications = ref(false)
-const unreadCount = computed(() => store.unreadCount)
+const route = useRoute()
+const projectId = computed(() => route.params.projectId as string)
+const activeTab = ref('timeline')
+const loading = ref(false)
+const timeline = ref<any[]>([])
+const pbcList = ref<any[]>([])
+const confirmations = ref<any[]>([])
 
-onMounted(() => {
-  store.fetchNotifications()
+onMounted(async () => {
+  // 加载时间线（简化：从项目状态推断）
+  timeline.value = [
+    { id: '1', date: '项目创建', description: '项目已创建', type: 'primary' },
+    { id: '2', date: '计划阶段', description: '审计计划编制中', type: 'info' },
+  ]
+
+  // PBC 和函证暂时为空（后端同步路由需要先注册到 main.py）
 })
 </script>
 
 <style scoped>
-.gt-collaboration { padding: var(--gt-space-6); }
-.gt-collab-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-6); }
-.gt-collab-tabs :deep(.el-tabs__content) { padding-top: var(--gt-space-4); }
+.gt-collab { padding: var(--gt-space-4); }
+.gt-collab-header { margin-bottom: var(--gt-space-3); }
 </style>

@@ -79,9 +79,19 @@ async def get_report(
     project_id: UUID,
     year: int,
     report_type: FinancialReportType,
+    unadjusted: bool = Query(False, description="是否返回未审报表数据"),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取指定报表数据"""
+    """获取指定报表数据（支持未审/已审切换）"""
+    if unadjusted:
+        # 未审报表：动态计算，不存储
+        engine = ReportEngine(db)
+        try:
+            rows = await engine.generate_unadjusted_report(project_id, year, report_type)
+            return rows
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"未审报表生成失败: {str(e)}")
+
     result = await db.execute(
         sa.select(FinancialReport)
         .where(

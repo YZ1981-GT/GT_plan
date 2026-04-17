@@ -107,6 +107,7 @@ class ReportFormulaParser:
         self.db = db
         self.project_id = project_id
         self.year = year
+        self._use_unadjusted = False  # Phase 9: 未审模式标志
         # Cache: standard_account_code -> TrialBalance row
         self._tb_cache: dict[str, TrialBalance | None] = {}
 
@@ -132,14 +133,18 @@ class ReportFormulaParser:
         if row is None:
             return Decimal("0")
 
+        # Phase 9: 未审模式下，审定数列替换为未审数列
+        if self._use_unadjusted and column_name in ("期末余额", "审定数"):
+            unadj = row.unadjusted_debit or Decimal("0")
+            unadj_cr = row.unadjusted_credit or Decimal("0")
+            return unadj - unadj_cr
+
         field = _COLUMN_MAP.get(column_name)
         if field is None:
             logger.warning("Unknown column name: %s", column_name)
             return Decimal("0")
 
         if field == "_period_amount":
-            # 本期发生额 = debit_amount - credit_amount (from tb_balance)
-            # In trial_balance, we use audited_amount - opening_balance as proxy
             audited = row.audited_amount or Decimal("0")
             opening = row.opening_balance or Decimal("0")
             return audited - opening
@@ -694,3 +699,43 @@ class ReportEngine:
             payload.project_id, year, payload.account_codes,
         )
         await self.db.flush()
+
+    async def generate_unadjusted_report(
+        self,
+        project_id: UUID,
+        year: int,
+        report_type,
+    ) -> list[dict]:
+        """生成未审报表 — 只用试算表未审数列，不含调整分录影响。
+
+        Phase 9 Task 9.15: 动态计算，不存储到数据库。
+        """
+        configs = await self._load_report_configs(project_id, year, report_type)
+        if not configs:
+            return []
+
+        parser = ReportFormulaParser(self.db, project_id, year)
+        # 临时切换为未审模式
+        parser._use_unadjusted = True
+
+        rows = []
+        row_values: dict[str, Decimal] = {}
+
+        for cfg in configs:
+            try:
+                value = await parser.execute(cfg.formula, row_values)
+            except Exception:
+                value = Decimal("0")
+
+            row_values[cfg.row_code] = value
+
+            rows.append({
+                "row_code": cfg.row_code,
+                "row_name": cfg.row_name,
+                "current_period_amount": str(value),
+                "prior_period_amount": "0",
+                "indent_level": cfg.indent_level,
+                "is_total_row": cfg.is_total_row,
+            })
+
+        return rows

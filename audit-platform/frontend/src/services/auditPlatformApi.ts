@@ -280,8 +280,10 @@ export async function generateReports(projectId: string, year: number) {
   return data.data ?? data
 }
 
-export async function getReport(projectId: string, year: number, reportType: string): Promise<ReportRow[]> {
-  const { data } = await http.get(`/api/reports/${projectId}/${year}/${reportType}`)
+export async function getReport(projectId: string, year: number, reportType: string, unadjusted: boolean = false): Promise<ReportRow[]> {
+  const params: any = {}
+  if (unadjusted) params.unadjusted = true
+  const { data } = await http.get(`/api/reports/${projectId}/${year}/${reportType}`, { params })
   return data.data ?? data
 }
 
