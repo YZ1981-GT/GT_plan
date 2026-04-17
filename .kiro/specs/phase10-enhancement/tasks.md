@@ -7,6 +7,7 @@
 - [ ] 下载前自动预填（调用 PrefillService）
 - [ ] ZIP 打包（zipfile 模块，目录结构：循环/编号_名称.xlsx）
 - [ ] 单个底稿下载（`GET /api/projects/{id}/workpapers/{wp_id}/download`）
+- [ ] 批量下载性能优化：>10个底稿时异步模式+进度轮询（design §25m）
 - [ ] 前端 WorkpaperList.vue 添加勾选+下载按钮+单个下载按钮
 
 ### Task 1.2 底稿导入（离线编辑回传）
@@ -15,6 +16,7 @@
 - [ ] 冲突处理（409 + diff 摘要 / 覆盖 / 保留）
 - [ ] 导入后触发 ParseService + WORKPAPER_SAVED 事件
 - [ ] WORKPAPER_SAVED 事件处理器：解析审定数 → 与 trial_balance 比对 → 差异时自动同步（design §25a）
+- [ ] data/wp_parse_rules.json 底稿模板解析规则配置（先覆盖核心30个审定表）
 - [ ] 前端上传弹窗（版本冲突提示+选择操作）
 
 ---
@@ -31,6 +33,7 @@
 - [ ] 上年 adjustments(is_continuous=true) 结转
 - [ ] 上年 unadjusted_misstatements carry_forward
 - [ ] 上年底稿文件复制+openpyxl写入期初数+清空本期数（design §25d）
+- [ ] 上年 note_wp_mapping + procedure_instances + note_trim_schemes 结转（design §25j）
 - [ ] 前端项目详情面板"创建下年项目"按钮
 
 ### Task 2.2 跨年数据对比
@@ -109,7 +112,7 @@
 ### Task 6.1 截止性测试
 - [ ] `POST /api/projects/{id}/sampling/cutoff-test` API
 - [ ] 自动从 tb_ledger 提取期末前后 N 天交易
-- [ ] 填入截止性测试底稿模板
+- [ ] 填入截止性测试底稿模板（复用 §25g target_wp_id 机制，design §25l）
 - [ ] 前端截止性测试配置（天数/科目/金额阈值）
 
 ### Task 6.2 账龄分析
@@ -124,7 +127,7 @@
 ### Task 6.3 月度明细填充
 - [ ] `POST /api/projects/{id}/sampling/monthly-detail` API
 - [ ] 按月汇总 tb_ledger 数据
-- [ ] 自动填入月度明细分析底稿
+- [ ] 自动填入月度明细分析底稿（复用 §25g target_wp_id 机制，design §25l）
 
 ### Task 6.4 抽样结果与底稿关联
 - [ ] sampling_config 新增 target_wp_id + target_cell_range 字段（design §25g）
@@ -140,6 +143,7 @@
 - [ ] consol_lock_check 依赖注入函数（Depends），拦截锁定期间的写操作返回 423（design §25c）
 - [ ] 锁定期间单体禁止修改试算表/调整分录/未更正错报（返回 423 Locked）
 - [ ] 合并完成后自动解锁
+- [ ] 解锁后自动刷新合并试算表+与快照对比差异（design §25i）
 - [ ] 前端锁定状态提示（el-alert 横幅 + 写操作按钮禁用）
 
 ### Task 7.2 外部单位报表导入
@@ -199,6 +203,8 @@
 - [ ] 返回：附注数据 + 底稿审定数 + 审计说明 + 大额交易明细
 - [ ] note_wp_mapping 自动初始化（项目底稿生成时根据模板规则自动创建映射，design §25f）
 - [ ] data/note_wp_mapping_rules.json 映射规则配置文件
+- [ ] 溯源页面复核意见统一写入 cell_annotations（design §25n）
+- [ ] `GET /api/projects/{id}/findings-summary` 统一 findings 视图（LLM+人工合并，design §25o）
 - [ ] 前端溯源面板（在报告复核页面中）
 
 ---
@@ -308,7 +314,8 @@
 
 ### Task 18.1 上下文注入
 - [ ] LLM 对话时自动注入底稿上下文（科目/循环/类型/试算表数据）
-- [ ] 知识库检索按相关度排序（同行业/同科目优先）
+- [ ] 知识库文档上传时 LLM 自动打标签（行业/科目/文档类型，design §25k）
+- [ ] 知识库检索按相关度排序（同行业/同科目优先，基于标签匹配）
 - [ ] 引用标注来源文档和页码
 - [ ] 前端"@知识库"触发精准检索
 

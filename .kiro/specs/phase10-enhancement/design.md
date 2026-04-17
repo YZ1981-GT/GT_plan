@@ -570,6 +570,19 @@ PUT /api/review-conversations/{id}/close
     3. 差异时自动调用 tb_sync（POST /api/trial-balance/{project_id}/{year}/sync-from-workpaper）
     4. 触发 TRIAL_BALANCE_UPDATED → 报表重算 → 附注刷新
   → 全自动，无需人工干预
+
+  前提：data/wp_parse_rules.json 定义每种底稿模板的解析规则：
+    {
+      "E9-1": {  // 固定资产审定表
+        "account_code": "1601",
+        "audited_cell": "F25",      // 审定数单元格
+        "adjustment_cell": "E25",   // 调整数单元格
+        "opening_cell": "C25",      // 期初数单元格
+        "unadjusted_cell": "D25"    // 未审数单元格
+      },
+      ...
+    }
+  → 先覆盖核心 30 个审定表（E 循环），其余用 LLM 辅助识别单元格位置
 ```
 
 ### 25b 调整分录 → 底稿审定表反向联动
@@ -628,6 +641,7 @@ review_conversations 表已有 related_object_type + related_object_id
     E10-1 无形资产审定表 → 附注"五、10 无形资产"
     ...
   → 映射规则存储在 data/note_wp_mapping_rules.json
+  → 先覆盖核心 30 个审定表，其余用 LLM 辅助匹配（根据底稿名称+科目编码推断）
   → 用户可在前端手动调整映射关系
 ```
 
@@ -654,4 +668,79 @@ LLM 分类后匹配底稿：
      - 银行对账单 → 匹配货币资金底稿（E1）
      - 函证回函 → 匹配对应科目的函证底稿
      - 会议纪要 → 匹配审计总结底稿（A 循环）
+```
+
+### 25i 合并解锁后自动刷新
+```
+PUT /api/consolidation/{parent_id}/unlock
+  → 遍历所有子公司项目，设置 consol_lock=false
+  → 自动触发合并试算表重算（调用 consol_trial 汇总 API）
+  → 与上次快照对比，生成差异摘要
+  → 前端显示"解锁完成，N 个科目有变动"提示
+```
+
+### 25j 连续审计额外结转项
+```
+create-next-year API 中额外结转：
+  → 复制 note_wp_mapping（附注-底稿映射关系）
+  → 复制 procedure_instances + procedure_trim_schemes（程序裁剪方案）
+  → 复制 note_section_instances + note_trim_schemes（附注章节裁剪方案）
+  → 复制 sampling_config（抽样配置，清空抽样记录）
+  → 以上均设置 project_id = 新项目 ID
+```
+
+### 25k 知识库文档自动打标签
+```
+知识库上传时：
+  POST /api/knowledge/{library}/upload
+    → 保存文件 + OCR 提取文本
+    → LLM 自动打标签：
+      { industry: "制造业", account_codes: ["1601","1602"], doc_type: "审计底稿" }
+    → 标签存入知识库文档元数据（knowledge_service 的 metadata JSONB）
+    → 检索时按标签匹配排序
+```
+
+### 25l 截止性测试/月度明细统一底稿填充
+```
+截止性测试和月度明细复用 §25g 的 target_wp_id + target_cell_range 机制：
+  → cutoff-test API 新增 target_wp_id 参数（可选）
+  → monthly-detail API 新增 target_wp_id 参数（可选）
+  → 有 target_wp_id 时自动用 openpyxl 填入底稿
+  → 无 target_wp_id 时只返回数据（前端展示）
+```
+
+### 25m 批量下载预填性能优化
+```
+POST /api/projects/{id}/workpapers/download-pack
+  → 底稿数量 > 10 时改为异步模式：
+    1. 创建下载任务（download_tasks 表或内存队列）
+    2. 返回 task_id，前端轮询进度
+    3. 后端用 asyncio.gather 并发预填（最大并发 5）
+    4. 全部完成后打包 ZIP，返回下载链接
+  → 底稿数量 ≤ 10 时同步模式（直接 StreamingResponse）
+```
+
+### 25n 溯源复核意见统一写入
+```
+溯源页面添加复核意见时：
+  → 写入 cell_annotations 表（与批注系统统一）
+  → object_type = "disclosure_note"
+  → object_id = note_id
+  → cell_ref = section_number（如 "五、9"）
+  → 自动通过 note_wp_mapping 创建 linked_annotation 到底稿
+  → 复核意见同时可升级为 review_conversation（点击"发起对话"）
+```
+
+### 25o LLM 复核 findings 与人工复核统一视图
+```
+review_messages 表新增字段：
+  finding_id: UUID FK → wp_qc_result.id（可选，关联 LLM 复核发现）
+
+统一 findings 查询：
+  GET /api/projects/{id}/findings-summary
+    → 合并两个来源：
+      1. wp_qc_result（LLM 自动复核发现）
+      2. cell_annotations WHERE priority='high'（人工复核批注）
+    → 按科目/底稿/严重度分组
+    → 前端统一 findings 看板
 ```
