@@ -3,21 +3,21 @@
 ## 任务组 1：底稿下载与导入
 
 ### Task 1.1 底稿批量下载
-- [ ] `POST /api/projects/{id}/workpapers/download-pack` 打包下载 API
-- [ ] 下载前自动预填（调用 PrefillService）
-- [ ] ZIP 打包（zipfile 模块，目录结构：循环/编号_名称.xlsx）
-- [ ] 单个底稿下载（`GET /api/projects/{id}/workpapers/{wp_id}/download`）
-- [ ] 批量下载性能优化：>10个底稿时异步模式+进度轮询（design §25m）
-- [ ] 前端 WorkpaperList.vue 添加勾选+下载按钮+单个下载按钮
+- [x] `POST /api/projects/{id}/workpapers/download-pack` 打包下载 API
+- [x] 下载前自动预填（调用 PrefillService）
+- [x] ZIP 打包（zipfile 模块，目录结构：循环/编号_名称.xlsx）
+- [x] 单个底稿下载（`GET /api/projects/{id}/workpapers/{wp_id}/download`）
+- [x] 批量下载性能优化：>10个底稿时异步模式+进度轮询（design §25m）
+- [x] 前端 WorkpaperList.vue 添加勾选+下载按钮+单个下载按钮
 
 ### Task 1.2 底稿导入（离线编辑回传）
-- [ ] `POST /api/projects/{id}/workpapers/{wp_id}/upload` 上传 API
-- [ ] 版本冲突检测（file_version 比对）
-- [ ] 冲突处理（409 + diff 摘要 / 覆盖 / 保留）
-- [ ] 导入后触发 ParseService + WORKPAPER_SAVED 事件
-- [ ] WORKPAPER_SAVED 事件处理器：解析审定数 → 与 trial_balance 比对 → 差异时自动同步（design §25a）
-- [ ] data/wp_parse_rules.json 底稿模板解析规则配置（先覆盖核心30个审定表）
-- [ ] 前端上传弹窗（版本冲突提示+选择操作）
+- [x] `POST /api/projects/{id}/workpapers/{wp_id}/upload` 上传 API
+- [x] 版本冲突检测（file_version 比对）
+- [x] 冲突处理（409 + diff 摘要 / 覆盖 / 保留）
+- [x] 导入后触发 ParseService + WORKPAPER_SAVED 事件
+- [x] WORKPAPER_SAVED 事件处理器：解析审定数 → 与 trial_balance 比对 → 差异时自动同步（design §25a）
+- [x] data/wp_parse_rules.json 底稿模板解析规则配置（先覆盖核心30个审定表）
+- [x] 前端上传弹窗（版本冲突提示+选择操作）
 
 ---
 

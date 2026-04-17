@@ -75,6 +75,7 @@ from app.routers.note_trim import router as note_trim_router
 from app.routers.subsequent_events import router as subsequent_events_router
 from app.routers.note_ai import router as note_ai_router
 from app.routers.wp_storage import router as wp_storage_router
+from app.routers.wp_download import router as wp_download_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -190,3 +191,4 @@ app.include_router(note_trim_router)
 app.include_router(subsequent_events_router)
 app.include_router(note_ai_router)
 app.include_router(wp_storage_router)
+app.include_router(wp_download_router)

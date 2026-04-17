@@ -14,6 +14,9 @@
           <el-option label="全部" value="" />
         </el-select>
         <el-button @click="fetchData" :loading="loading">刷新</el-button>
+        <el-button type="primary" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
+          批量下载 ({{ selectedWpIds.length }})
+        </el-button>
       </div>
     </div>
 
@@ -27,7 +30,10 @@
           node-key="id"
           highlight-current
           default-expand-all
+          show-checkbox
+          @check-change="onCheckChange"
           @node-click="onNodeClick"
+          ref="treeRef"
         >
           <template #default="{ data }">
             <div class="gt-wp-tree-node">
@@ -84,6 +90,33 @@
         <el-empty v-else description="请从左侧选择底稿" :image-size="120" />
       </div>
     </div>
+
+    <!-- 上传弹窗 -->
+    <el-dialog v-model="uploadDialogVisible" title="上传底稿" width="500px">
+      <el-alert v-if="uploadConflict" type="warning" :closable="false" show-icon style="margin-bottom: 16px">
+        版本冲突：服务器版本 v{{ uploadConflict.server_version }}，您的版本 v{{ uploadConflict.uploaded_version }}
+      </el-alert>
+      <el-upload
+        ref="uploadRef"
+        drag
+        :auto-upload="false"
+        :limit="1"
+        accept=".xlsx,.xls"
+        :on-change="onUploadFileChange"
+      >
+        <el-icon style="font-size: 40px; color: var(--gt-color-primary)"><Upload /></el-icon>
+        <div>拖拽文件到此处，或点击选择</div>
+      </el-upload>
+      <template #footer>
+        <el-button @click="uploadDialogVisible = false">取消</el-button>
+        <el-button v-if="uploadConflict" type="warning" @click="doUpload(true)" :loading="uploadLoading">
+          强制覆盖
+        </el-button>
+        <el-button type="primary" @click="doUpload(false)" :loading="uploadLoading" :disabled="!uploadFile">
+          上传
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -91,6 +124,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Upload } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 import {
   listWorkpapers, runQCCheck, getQCResults,
   updateWorkpaperStatus, getWpIndex,
@@ -103,10 +138,20 @@ const projectId = computed(() => route.params.projectId as string)
 
 const loading = ref(false)
 const qcLoading = ref(false)
+const downloadLoading = ref(false)
+const uploadLoading = ref(false)
 const wpList = ref<WorkpaperDetail[]>([])
 const wpIndex = ref<WpIndexItem[]>([])
 const selectedWp = ref<WorkpaperDetail | null>(null)
+const selectedWpIds = ref<string[]>([])
 const qcResult = ref<QCResult | null>(null)
+const treeRef = ref<any>(null)
+
+// Upload dialog
+const uploadDialogVisible = ref(false)
+const uploadFile = ref<File | null>(null)
+const uploadConflict = ref<{ server_version: number; uploaded_version: number } | null>(null)
+const uploadRef = ref<any>(null)
 
 // Filters
 const filterCycle = ref('')
@@ -257,11 +302,74 @@ function onOnlineEdit() {
 
 function onDownload() {
   if (!selectedWp.value) return
-  window.open(`/api/projects/${projectId.value}/working-papers/${selectedWp.value.id}/download`, '_blank')
+  window.open(`/api/projects/${projectId.value}/workpapers/${selectedWp.value.id}/download-file`, '_blank')
 }
 
 function onUpload() {
-  ElMessage.info('上传功能开发中')
+  if (!selectedWp.value) return
+  uploadFile.value = null
+  uploadConflict.value = null
+  uploadDialogVisible.value = true
+}
+
+function onUploadFileChange(file: any) {
+  uploadFile.value = file.raw
+}
+
+async function doUpload(forceOverwrite: boolean) {
+  if (!selectedWp.value || !uploadFile.value) return
+  uploadLoading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', uploadFile.value)
+    const version = selectedWp.value.file_version || 1
+    const resp = await http.post(
+      `/api/projects/${projectId.value}/workpapers/${selectedWp.value.id}/upload-file?uploaded_version=${version}&force_overwrite=${forceOverwrite}`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    ElMessage.success(`上传成功，新版本 v${resp.data?.new_version || version + 1}`)
+    uploadDialogVisible.value = false
+    await fetchData()
+  } catch (err: any) {
+    if (err.response?.status === 409) {
+      uploadConflict.value = err.response.data?.detail || err.response.data
+      ElMessage.warning('版本冲突，请选择操作')
+    } else {
+      ElMessage.error('上传失败')
+    }
+  } finally {
+    uploadLoading.value = false
+  }
+}
+
+async function onBatchDownload() {
+  if (selectedWpIds.value.length === 0) return
+  downloadLoading.value = true
+  try {
+    const resp = await http.post(
+      `/api/projects/${projectId.value}/workpapers/download-pack`,
+      { wp_ids: selectedWpIds.value, include_prefill: true },
+      { responseType: 'blob' }
+    )
+    const url = window.URL.createObjectURL(new Blob([resp.data]))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'workpapers.zip'
+    a.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success(`已下载 ${selectedWpIds.value.length} 个底稿`)
+  } catch {
+    ElMessage.error('批量下载失败')
+  } finally {
+    downloadLoading.value = false
+  }
+}
+
+function onCheckChange() {
+  if (!treeRef.value) return
+  const checked = treeRef.value.getCheckedNodes(true) // leaf only
+  selectedWpIds.value = checked.filter((n: any) => n.wpId).map((n: any) => n.wpId)
 }
 
 async function onQCCheck() {

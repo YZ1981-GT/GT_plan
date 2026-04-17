@@ -1,0 +1,185 @@
+{
+  "_comment": "底稿模板解析规则（扩展部分）— 负债/权益/损益循环",
+  "rules": {
+    "E11-1": {
+      "name": "在建工程审定表",
+      "account_codes": ["1604"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "E12-1": {
+      "name": "使用权资产审定表",
+      "account_codes": ["1641"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "E13-1": {
+      "name": "长期待摊费用审定表",
+      "account_codes": ["1801"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "E14-1": {
+      "name": "递延所得税资产审定表",
+      "account_codes": ["1811"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "F1-1": {
+      "name": "短期借款审定表",
+      "account_codes": ["2001"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "F2-1": {
+      "name": "应付账款审定表",
+      "account_codes": ["2202"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "F3-1": {
+      "name": "预收账款/合同负债审定表",
+      "account_codes": ["2203", "2205"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "F4-1": {
+      "name": "应付职工薪酬审定表",
+      "account_codes": ["2211"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "F5-1": {
+      "name": "应交税费审定表",
+      "account_codes": ["2221"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "F6-1": {
+      "name": "其他应付款审定表",
+      "account_codes": ["2241"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "F7-1": {
+      "name": "长期借款审定表",
+      "account_codes": ["2501"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "F8-1": {
+      "name": "租赁负债审定表",
+      "account_codes": ["2601"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "G1-1": {
+      "name": "实收资本审定表",
+      "account_codes": ["4001"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "G2-1": {
+      "name": "资本公积审定表",
+      "account_codes": ["4002"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "G3-1": {
+      "name": "盈余公积审定表",
+      "account_codes": ["4101"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    },
+    "D1-1": {
+      "name": "营业收入审定表",
+      "account_codes": ["6001", "6051"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "D2-1": {
+      "name": "营业成本审定表",
+      "account_codes": ["6401", "6402"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "D3-1": {
+      "name": "管理费用审定表",
+      "account_codes": ["6602"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "D4-1": {
+      "name": "销售费用审定表",
+      "account_codes": ["6601"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "D5-1": {
+      "name": "财务费用审定表",
+      "account_codes": ["6603"],
+      "sheet": "审定表",
+      "audited_cell": "F15",
+      "adjustment_cell": "E15",
+      "opening_cell": "C15",
+      "unadjusted_cell": "D15"
+    }
+  }
+}

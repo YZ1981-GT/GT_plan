@@ -1,0 +1,97 @@
+{
+  "_comment": "底稿模板解析规则 — 定义每种底稿的关键单元格位置",
+  "_usage": "ParseService 根据 wp_code 前缀匹配规则，用 openpyxl 读写指定单元格",
+  "rules": {
+    "E1-1": {
+      "name": "货币资金审定表",
+      "account_codes": ["1001", "1002", "1012"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25",
+      "conclusion_cell": "B30"
+    },
+    "E2-1": {
+      "name": "交易性金融资产审定表",
+      "account_codes": ["1101"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "E3-1": {
+      "name": "应收票据审定表",
+      "account_codes": ["1121"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "E4-1": {
+      "name": "应收账款审定表",
+      "account_codes": ["1122"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "E5-1": {
+      "name": "预付账款审定表",
+      "account_codes": ["1123"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    },
+    "E6-1": {
+      "name": "其他应收款审定表",
+      "account_codes": ["1221"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "E7-1": {
+      "name": "存货审定表",
+      "account_codes": ["1401", "1402", "1403", "1405"],
+      "sheet": "审定表",
+      "audited_cell": "F30",
+      "adjustment_cell": "E30",
+      "opening_cell": "C30",
+      "unadjusted_cell": "D30"
+    },
+    "E8-1": {
+      "name": "长期股权投资审定表",
+      "account_codes": ["1511"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "E9-1": {
+      "name": "固定资产审定表",
+      "account_codes": ["1601", "1602"],
+      "sheet": "审定表",
+      "audited_cell": "F25",
+      "adjustment_cell": "E25",
+      "opening_cell": "C25",
+      "unadjusted_cell": "D25"
+    },
+    "E10-1": {
+      "name": "无形资产审定表",
+      "account_codes": ["1701", "1702"],
+      "sheet": "审定表",
+      "audited_cell": "F20",
+      "adjustment_cell": "E20",
+      "opening_cell": "C20",
+      "unadjusted_cell": "D20"
+    }
+  }
+}
