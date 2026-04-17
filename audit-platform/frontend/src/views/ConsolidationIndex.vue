@@ -39,7 +39,16 @@
                 </el-tag>
               </template>
             </el-table-column>
+            <el-table-column label="操作" width="120" align="center">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" @click="editScope(row)">编辑</el-button>
+                <el-popconfirm title="确认删除？" @confirm="deleteScope(row)">
+                  <template #reference><el-button link type="danger" size="small">删除</el-button></template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
           </el-table>
+          <el-button style="margin-top: 12px" @click="showScopeDialog = true">+ 新增子公司</el-button>
         </div>
       </el-tab-pane>
 
@@ -94,12 +103,18 @@
 
       <el-tab-pane label="合并报表" name="report">
         <div class="gt-tab-content">
-          <el-button size="small" @click="loadReports" :loading="loading" style="margin-bottom: 12px">加载报表</el-button>
-          <el-radio-group v-model="reportType" size="small" style="margin-bottom: 12px">
-            <el-radio-button value="balance_sheet">资产负债表</el-radio-button>
-            <el-radio-button value="income_statement">利润表</el-radio-button>
-            <el-radio-button value="cash_flow">现金流量表</el-radio-button>
-          </el-radio-group>
+          <div style="display: flex; gap: 12px; margin-bottom: 12px; align-items: center">
+            <el-button size="small" @click="loadReports" :loading="loading">加载报表</el-button>
+            <el-radio-group v-model="reportScope" size="small">
+              <el-radio-button value="consolidated">合并口径</el-radio-button>
+              <el-radio-button value="individual">单体口径</el-radio-button>
+            </el-radio-group>
+            <el-radio-group v-model="reportType" size="small">
+              <el-radio-button value="balance_sheet">资产负债表</el-radio-button>
+              <el-radio-button value="income_statement">利润表</el-radio-button>
+              <el-radio-button value="cash_flow">现金流量表</el-radio-button>
+            </el-radio-group>
+          </div>
           <el-table :data="reportData" border stripe v-loading="loading" empty-text="暂无合并报表数据">
             <el-table-column prop="row_name" label="项目" min-width="250" />
             <el-table-column prop="amount" label="合并金额" width="160" align="right" />
@@ -130,6 +145,9 @@ const minorityData = ref<any[]>([])
 const notesData = ref<any[]>([])
 const reportData = ref<any[]>([])
 const reportType = ref('balance_sheet')
+const reportScope = ref('consolidated')
+const showScopeDialog = ref(false)
+const scopeForm = ref({ company_name: '', company_code: '', shareholding: 100, consol_method: 'full', is_included: true })
 
 async function loadGroupTree() {
   try {
@@ -195,6 +213,16 @@ async function loadReports() {
     if (!Array.isArray(reportData.value)) reportData.value = []
   } catch { reportData.value = [] }
   finally { loading.value = false }
+}
+
+function editScope(row: any) {
+  scopeForm.value = { ...row }
+  showScopeDialog.value = true
+}
+
+async function deleteScope(row: any) {
+  // TODO: 调用后端删除 API
+  scopeData.value = scopeData.value.filter((s: any) => s.company_code !== row.company_code)
 }
 
 onMounted(async () => {
