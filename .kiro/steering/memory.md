@@ -959,3 +959,10 @@ inclusion: always
 - WOPI check_file_info 改为读取真实文件大小（不再返回0）
 - WorkpaperEditor.vue 双模式UI：在线可用时显示iframe+下载副本按钮，不可用时自动降级+重试在线按钮+上传回传按钮
 - WorkpaperList.vue 双模式按钮组：在线编辑+下载编辑并列显示（el-button-group）
+
+## 工作包落地（2026-04-18 第六轮）
+- WP-P0-03 完成：AttachmentPreview下载按钮改用/download代理URL；附件列表OCR失败显示重试按钮（PUT /ocr-status status=pending）
+- WP-P0-04 完成：http.ts错误提示中显示request_id（从X-Request-ID响应头提取，格式"错误信息（ID: xxx）"）
+- WP-P0-01 完成：11个QC阻断规则测试（4类场景×通过/阻断+3个集成测试），全部通过
+- WP-P1-03 完成：SMOKE_TEST_CHECKLIST.md发版前冒烟清单（后端测试+6条主链路手动检查+4个API验证+验收签字表）
+- 62个测试通过（51+11新增）；commit fbc1148

@@ -116,7 +116,7 @@ class WOPIHostService:
             if fp.exists():
                 file_size = fp.stat().st_size
 
-        return {
+        info = {
             "BaseFileName": wp.file_path.split("/")[-1] if wp.file_path else str(file_id),
             "Size": file_size,
             "OwnerId": str(wp.created_by) if wp.created_by else "",
@@ -126,6 +126,23 @@ class WOPIHostService:
             "SupportsLocks": True,
             "UserFriendlyName": str(user_id) if user_id else "",
         }
+
+        # 记录编辑会话打开事件
+        try:
+            from app.models.core import Log
+            log = Log(
+                user_id=user_id,
+                action_type="workpaper_online_open",
+                object_type="working_paper",
+                object_id=file_id,
+                new_value={"file_version": wp.file_version, "file_size": file_size},
+            )
+            db.add(log)
+            await db.flush()
+        except Exception:
+            pass  # 不阻断主流程
+
+        return info
 
     async def get_file(self, db: AsyncSession, file_id: UUID) -> bytes:
         """WOPI GetFile: 返回文件真实二进制内容。"""
@@ -203,12 +220,25 @@ class WOPIHostService:
             shutil.copy2(fp, snapshot_dir / snapshot_name)
             logger.info("version snapshot: %s → %s", fp.name, snapshot_name)
 
-        # 3. 写入文件
+        # 3. 幂等检查（如果内容与当前文件完全相同，跳过写入）
+        content_hash = hashlib.sha256(content).hexdigest()
+        if fp.exists():
+            existing_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
+            if existing_hash == content_hash:
+                logger.info("put_file IDEMPOTENT: wp=%s hash=%s (skip write)", file_id, content_hash[:12])
+                return {
+                    "version": wp.file_version,
+                    "content_hash": content_hash,
+                    "file_size": len(content),
+                    "message": "文件内容未变化，跳过写入",
+                    "idempotent": True,
+                }
+
+        # 4. 写入文件
         fp.write_bytes(content)
 
-        # 4. 哈希校验（写入后验证完整性）
+        # 5. 哈希校验（写入后验证完整性）
         written_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
-        content_hash = hashlib.sha256(content).hexdigest()
         if written_hash != content_hash:
             logger.error("CRITICAL: hash mismatch after write! file=%s expected=%s actual=%s",
                          fp, content_hash, written_hash)
@@ -391,7 +421,7 @@ class WOPIHostService:
         user_id: UUID,
         project_id: UUID,
         file_id: UUID,
-        expires_minutes: int = 120,
+        expires_minutes: int = 15,  # 短 TTL：15 分钟（WOPI 专用，前端需定时刷新）
     ) -> str:
         """生成 WOPI 访问令牌 (JWT)。
 

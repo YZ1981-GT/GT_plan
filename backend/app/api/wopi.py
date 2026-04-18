@@ -193,3 +193,116 @@ async def wopi_lock_operations(
     else:
         status = result.get("status", 409)
         return JSONResponse(status_code=status, content=result)
+
+
+# ---------------------------------------------------------------------------
+# 管理员强制解锁 + 编辑会话监控
+# ---------------------------------------------------------------------------
+
+@router.delete("/files/{file_id}/lock")
+async def force_unlock(
+    file_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """管理员强制解锁（不需要 lock_id）"""
+    if not _is_uuid(file_id):
+        return JSONResponse(status_code=400, content={"message": "仅支持 UUID file_id"})
+
+    file_key = file_id
+    from app.services.wopi_service import _locks, _get_redis
+
+    # 清除 Redis 锁
+    r = _get_redis()
+    if r:
+        try:
+            await r.delete(f"wopi:lock:{file_key}")
+        except Exception:
+            pass
+
+    # 清除内存锁
+    if file_key in _locks:
+        del _locks[file_key]
+
+    return JSONResponse(content={"success": True, "message": "锁已强制释放"})
+
+
+@router.get("/files/{file_id}/lock-status")
+async def get_lock_status(
+    file_id: str,
+):
+    """查询文件锁状态（运维监控用）"""
+    if not _is_uuid(file_id):
+        return JSONResponse(status_code=400, content={"message": "仅支持 UUID file_id"})
+
+    from app.services.wopi_service import _locks, _get_redis
+    import time
+
+    file_key = file_id
+    result = {"file_id": file_id, "locked": False}
+
+    # 检查 Redis
+    r = _get_redis()
+    if r:
+        try:
+            redis_lock = await r.get(f"wopi:lock:{file_key}")
+            if redis_lock:
+                ttl = await r.ttl(f"wopi:lock:{file_key}")
+                result["locked"] = True
+                result["lock_source"] = "redis"
+                result["lock_id"] = redis_lock.decode() if isinstance(redis_lock, bytes) else redis_lock
+                result["ttl_seconds"] = ttl
+                return JSONResponse(content=result)
+        except Exception:
+            pass
+
+    # 检查内存锁
+    if file_key in _locks:
+        lock_info = _locks[file_key]
+        remaining = lock_info["expires_at"] - time.time()
+        if remaining > 0:
+            result["locked"] = True
+            result["lock_source"] = "memory"
+            result["lock_id"] = lock_info["lock_id"]
+            result["ttl_seconds"] = int(remaining)
+        else:
+            del _locks[file_key]
+
+    return JSONResponse(content=result)
+
+
+@router.get("/stats")
+async def wopi_stats():
+    """WOPI 运维统计（锁数量、活跃编辑会话）"""
+    import time
+    from app.services.wopi_service import _locks, _get_redis
+
+    # 内存锁统计
+    now = time.time()
+    active_memory = {k: v for k, v in _locks.items() if v["expires_at"] > now}
+    expired_memory = len(_locks) - len(active_memory)
+
+    # 清理过期内存锁
+    for k in list(_locks.keys()):
+        if _locks[k]["expires_at"] <= now:
+            del _locks[k]
+
+    stats = {
+        "active_locks_memory": len(active_memory),
+        "expired_cleaned": expired_memory,
+    }
+
+    # Redis 锁统计
+    r = _get_redis()
+    if r:
+        try:
+            keys = []
+            async for key in r.scan_iter(match="wopi:lock:*"):
+                keys.append(key)
+            stats["active_locks_redis"] = len(keys)
+            stats["redis_available"] = True
+        except Exception:
+            stats["redis_available"] = False
+    else:
+        stats["redis_available"] = False
+
+    return JSONResponse(content=stats)

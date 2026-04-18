@@ -171,8 +171,39 @@ async function loadEditor() {
     // Build WOPI editor URL with access token
     const token = localStorage.getItem('token') || ''
     editorUrl.value = getWopiEditorUrl(wpId.value, token)
+
+    // 启动锁租约续期定时器（每 10 分钟刷新一次，TTL=30 分钟）
+    startLockRefresh()
   }
 }
+
+let lockRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+function startLockRefresh() {
+  if (lockRefreshTimer) clearInterval(lockRefreshTimer)
+  lockRefreshTimer = setInterval(async () => {
+    if (!editorAvailable.value || !wpDetail.value) return
+    try {
+      await http.post(`/wopi/files/${wpId.value}`, null, {
+        headers: { 'X-WOPI-Override': 'REFRESH_LOCK', 'X-WOPI-Lock': `lock-${wpId.value}` },
+        timeout: 5000,
+      })
+    } catch (err: any) {
+      if (err?.response?.status === 409) {
+        ElMessage.error('编辑锁已被其他用户获取，请保存后刷新页面')
+        editorAvailable.value = false  // 降级到离线模式
+      }
+    }
+  }, 10 * 60 * 1000) // 10 分钟
+}
+
+import { onUnmounted } from 'vue'
+onUnmounted(() => {
+  if (lockRefreshTimer) {
+    clearInterval(lockRefreshTimer)
+    lockRefreshTimer = null
+  }
+})
 
 onMounted(loadEditor)
 </script>
