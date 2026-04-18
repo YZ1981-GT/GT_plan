@@ -798,3 +798,65 @@ Phase 10 新增 Vue 页面（10个）：
   9. ReportFormatManager.vue — 排版模板管理
   10. CheckInsPage.vue — 打卡签到
 ```
+
+## 27. 全阶段审查报告
+
+### 27a 后端路由审计
+```
+已注册路由：74 个（main.py include_router）
+未注册路由：32 个（Phase 3/4 同步风格，已确认为死代码）
+  - AI 路由（11个）：ai_chat/ai_contract/ai_evidence_chain/ai_confirmation/
+    ai_knowledge/ai_ocr/ai_pdf_export/ai_report/ai_risk_assessment/ai_workpaper/nl_command
+  - 协作路由（10个）：archive/audit_findings/audit_logs/audit_plan/audit_program/
+    confirmations/going_concern/management_letter/pbc/notifications
+  - 其他（11个）：auth(旧版)/companies/component_auditors/project_mgmt/
+    review/reviews/risk/sync/sync_conflict/users(旧版)
+  → 状态：不影响运行，启用前需转为异步 ORM 风格
+```
+
+### 27b 路由前缀冲突
+```
+已发现冲突（不影响运行，均未注册）：
+  - review.py 和 reviews.py 都用 prefix="/reviews"
+  → 解决方案：两者均未注册到 main.py，Phase 10 使用独立的 /api/review-conversations
+
+无冲突的共享前缀（正常，通过不同端点路径区分）：
+  - /api/projects：account_chart/mapping/assignments/procedures/consistency/
+    sampling_enhanced/annotations/report_line_mapping/ai_confirmation/ai_knowledge/ai_risk_assessment
+  - /api/disclosure-notes：note_wp_mapping/note_trim/note_ai
+  - /api/consolidation/*：eliminations/scope/trial/internal_trade/component_auditor/
+    goodwill/forex/minority_interest
+```
+
+### 27c 前端联动完整性
+```
+Vue 页面：47 个（全部有路由注册）
+API 服务层：10 个 .ts 文件
+  - auditPlatformApi.ts（Phase 1a/1c 核心）
+  - workpaperApi.ts（Phase 1b 底稿）
+  - consolidationApi.ts（Phase 2 合并）
+  - collaborationApi.ts（Phase 3 协作）
+  - aiApi.ts + aiModelApi.ts（Phase 4 AI）
+  - extensionApi.ts（Phase 8 扩展）
+  - staffApi.ts（Phase 9 人员）
+  - phase10Api.ts（Phase 10 增强）
+  - types.ts（共享类型）
+
+Phase 10 前端覆盖：
+  - 10 个 Vue 页面全部实现
+  - 10 条路由全部注册
+  - 40+ API 函数全部封装
+  - 3 个导航项已添加到 ThreeColumnLayout
+```
+
+### 27d 跨阶段冲突总结
+```
+| 冲突类型 | 详情 | 严重度 | 状态 |
+|---------|------|--------|------|
+| 表名冲突 | work_hours vs work_hours_legacy | 低 | 已解决（Phase 3 改名） |
+| 路由冲突 | review.py vs reviews.py 同前缀 | 低 | 不影响（均未注册） |
+| 功能重叠 | Phase 4 AI + Phase 10 LLM | 低 | 互补（Phase 4 结构化提取，Phase 10 对话填充） |
+| 功能重叠 | Phase 9 底稿进度 + Phase 10 底稿推荐 | 低 | 互补（进度跟踪 vs 风险推荐） |
+| 功能重叠 | Phase 1b QC + Phase 10 LLM复核 | 低 | 互补（规则检查 vs LLM智能复核） |
+| 模型冲突 | Log 表无 project_id | 中 | 已解决（通过 new_value JSONB 存储） |
+```

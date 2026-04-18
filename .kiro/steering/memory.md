@@ -820,3 +820,5 @@ inclusion: always
 - Phase 10 前后端联动审查完成（2026-04-18）：补齐7个缺失Vue页面（AnnotationsPanel/ReportTracePanel/SamplingEnhanced/AuxSummaryPanel/ConsolSnapshots/ReportFormatManager/CheckInsPage）+ 10条路由注册到router/index.ts + ThreeColumnLayout新增3个导航项（私人库/吐槽求助/排版模板）+ DefaultLayout排除/forum和/private-storage为全宽模式 + design.md新增§26前端集成设计 + tasks.md新增任务组22前端集成
 - Phase 10 三件套一致性审查通过：21个需求→25个设计章节→21+1个任务组全部对齐；跨Phase冲突6项均有解决方案（批注vs ONLYOFFICE共存/快照独立表/推荐写入procedure_instances/差异报告不同维度/附件分类互补/排版模板复用导出引擎）
 - Phase 10 hook 改为全阶段审查模式（version=4），完成后已禁用
+- 全阶段审查完成（2026-04-18）：74个已注册路由+32个未注册死代码路由（Phase 3/4同步风格）；47个Vue页面全部有路由；10个API服务层文件覆盖所有阶段；review.py和reviews.py同前缀冲突不影响运行（均未注册）；Phase 10 design.md新增§27全阶段审查报告
+- 用户偏好：讲究前后端联动，不能只开发后端不管前端；要求三件套一致性和跨阶段冲突检查
