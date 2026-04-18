@@ -13,7 +13,7 @@ from starlette.responses import Response
 
 
 # 跳过包装的路径前缀
-_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/")
+_SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream")
 
 
 class ResponseWrapperMiddleware(BaseHTTPMiddleware):

@@ -225,22 +225,22 @@
 - [x] 25. 检查点 — 确保前端页面和API集成正确
   - 手动测试完整流程：登录→创建用户→分配项目成员→编制底稿→提交复核→一级复核→二级复核→记录期后事项→编制函证清单→登记回函→归档检查→执行归档→PDF导出。
 
-- [ ] 26. 后端单元测试
-  - [ ] 26.1 编写 `backend/tests/test_auth_permission.py`：测试JWT认证（登录/刷新/登出/过期/锁定）、权限矩阵校验（六种角色×各操作）、审计循环分工范围校验
+- [x] 26. 后端单元测试
+  - [x] 26.1 编写 `backend/tests/test_auth_permission.py`：测试JWT认证（登录/刷新/登出/过期/锁定）、权限矩阵校验（六种角色×各操作）、审计循环分工范围校验
     - _需求: 1.3, 1.4, 1.6_
-  - [ ] 26.2 编写 `backend/tests/test_review_service.py`：测试复核状态机（合法/非法转换）、复核退回必须附带意见、项目状态门控条件、关键底稿二级复核强制、复核及时性统计
+  - [x] 26.2 编写 `backend/tests/test_review_service.py`：测试复核状态机（合法/非法转换）、复核退回必须附带意见、项目状态门控条件、关键底稿二级复核强制、复核及时性统计
     - _需求: 2.2-2.8_
-  - [ ] 26.3 编写 `backend/tests/test_subsequent_events.py`：测试期后事项关联完整性（调整事项→调整分录、非调整事项→附注）、审阅程序清单完成性门控、上年事项结转
+  - [x] 26.3 编写 `backend/tests/test_subsequent_events.py`：测试期后事项关联完整性（调整事项→调整分录、非调整事项→附注）、审阅程序清单完成性门控、上年事项结转
     - _需求: 3.2, 3.3, 3.6, 3.7_
-  - [ ] 26.4 编写 `backend/tests/test_sync_service.py`：测试同步版本号逻辑（上传/下载/冲突检测）、已审核数据不可覆盖、离线包导入校验
+  - [x] 26.4 编写 `backend/tests/test_sync_service.py`：测试同步版本号逻辑（上传/下载/冲突检测）、已审核数据不可覆盖、离线包导入校验
     - _需求: 4.2, 4.4, 4.5_
-  - [ ] 26.5 编写 `backend/tests/test_confirmation_service.py`：测试函证差异金额计算、未回函替代程序强制、统计表自动计算一致性、超期检测
+  - [x] 26.5 编写 `backend/tests/test_confirmation_service.py`：测试函证差异金额计算、未回函替代程序强制、统计表自动计算一致性、超期检测
     - _需求: 7.5, 7.6_
-  - [ ] 26.6 编写 `backend/tests/test_archive_service.py`：测试归档检查清单门控、归档后数据锁定、归档保存期不可违反、归档后修改审批流程
+  - [x] 26.6 编写 `backend/tests/test_archive_service.py`：测试归档检查清单门控、归档后数据锁定、归档保存期不可违反、归档后修改审批流程
     - _需求: 8.2, 8.4, 8.5_
-  - [ ] 26.7 编写 `backend/tests/test_going_concern.py`：测试持续经营结论与报告联动（material_uncertainty→通知、going_concern_inappropriate→通知）、风险指标预填充
+  - [x] 26.7 编写 `backend/tests/test_going_concern.py`：测试持续经营结论与报告联动（material_uncertainty→通知、going_concern_inappropriate→通知）、风险指标预填充
     - _需求: 9.3, 9.4, 9.5_
-  - [ ] 26.8 编写 `backend/tests/test_notification_service.py`：测试事件→通知映射（复核提交/超期/错报超限/函证超期/同步冲突）、未读数缓存
+  - [x] 26.8 编写 `backend/tests/test_notification_service.py`：测试事件→通知映射（复核提交/超期/错报超限/函证超期/同步冲突）、未读数缓存
     - _需求: 6.2-6.4_
 
 - [x] 27. 审计程序与风险管理
@@ -286,11 +286,11 @@
     - _需求: 11.6, 11.7, 11.10_
   - [x] 29.2 编写 `backend/tests/test_management_letter.py`：测试管理建议书跨年结转（未解决事项结转+prior_year_item_id+follow_up_status）
     - _需求: 11.9_
-  - [ ]* 29.3 编写属性测试：风险评估组合风险自动计算
+  - [x]* 29.3 编写属性测试：风险评估组合风险自动计算
     - **Property 19: 风险评估组合风险自动计算**
     - 使用 Hypothesis 生成随机 inherent_risk+control_risk 组合，验证 combined_risk 符合风险矩阵
     - **验证: 需求 11.7**
-  - [ ]* 29.4 编写属性测试：特别风险必须有应对策略
+  - [x]* 29.4 编写属性测试：特别风险必须有应对策略
     - **Property 20: 特别风险必须有应对策略**
     - 使用 Hypothesis 生成随机风险评估记录，验证 is_significant_risk=true 时 response_strategy 非空
     - **验证: 需求 11.6**

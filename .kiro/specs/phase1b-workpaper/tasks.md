@@ -51,27 +51,27 @@
     - _需求: 2.7_
   - [x] 4.8 实现取数公式 API 路由（`backend/app/routers/formula.py`）：POST `/api/formula/execute` 执行单个公式、POST `/api/formula/batch-execute` 批量执行
     - _需求: 2.9_
-  - [ ]* 4.9 编写属性测试：取数公式确定性执行
+  - [x]* 4.9 编写属性测试：取数公式确定性执行
     - **Property 1: 取数公式确定性执行**
     - 使用 Hypothesis 生成随机公式类型+参数，验证连续两次执行返回相同结果
     - **验证: 需求 2.10**
-  - [ ]* 4.10 编写属性测试：TB函数取数一致性
+  - [x]* 4.10 编写属性测试：TB函数取数一致性
     - **Property 2: TB函数取数一致性**
     - 使用 Hypothesis 生成随机科目+列名，验证TB()返回值等于trial_balance表对应值
     - **验证: 需求 2.2**
-  - [ ]* 4.11 编写属性测试：SUM_TB范围汇总正确性
+  - [x]* 4.11 编写属性测试：SUM_TB范围汇总正确性
     - **Property 3: SUM_TB范围汇总正确性**
     - 使用 Hypothesis 生成随机科目范围，验证SUM_TB()等于范围内所有科目值之和
     - **验证: 需求 2.6**
-  - [ ]* 4.12 编写属性测试：PREV函数年度偏移正确性
+  - [x]* 4.12 编写属性测试：PREV函数年度偏移正确性
     - **Property 4: PREV函数年度偏移正确性**
     - 使用 Hypothesis 生成随机公式+年度，验证PREV()等于year-1执行结果
     - **验证: 需求 2.5**
-  - [ ]* 4.13 编写属性测试：公式缓存一致性
+  - [x]* 4.13 编写属性测试：公式缓存一致性
     - **Property 5: 公式缓存一致性**
     - 使用 Hypothesis 生成随机公式+数据变更，验证缓存命中值等于直接计算值
     - **验证: 需求 2.8**
-  - [ ]* 4.14 编写属性测试：公式错误处理正确性
+  - [x]* 4.14 编写属性测试：公式错误处理正确性
     - **Property 18: 公式错误处理正确性**
     - 使用 Hypothesis 生成随机无效公式参数，验证返回FORMULA_ERROR而非异常
     - **验证: 需求 2.7**
@@ -92,11 +92,11 @@
     - _需求: 1.8, 6.2, 6.3_
   - [x] 6.6 实现模板 API 路由（`backend/app/routers/wp_template.py`）：POST 上传、GET 列表、GET 详情、POST 新版本、DELETE 删除、GET 模板集列表、GET 模板集详情
     - _需求: 1.1-1.8_
-  - [ ]* 6.7 编写属性测试：模板版本不可删除性
+  - [x]* 6.7 编写属性测试：模板版本不可删除性
     - **Property 14: 模板版本不可删除性**
     - 使用 Hypothesis 生成随机模板+引用关系，验证已引用模板删除被拒绝
     - **验证: 需求 1.4**
-  - [ ]* 6.8 编写属性测试：底稿生成完整性
+  - [x]* 6.8 编写属性测试：底稿生成完整性
     - **Property 15: 底稿生成完整性**
     - 使用 Hypothesis 生成随机模板集，验证生成的wp_index数=模板数且每个都有working_paper记录
     - **验证: 需求 1.8, 6.2, 6.3**
@@ -110,7 +110,7 @@
     - _需求: 6.6, 6.7_
   - [x] 7.4 实现 `ParseService.detect_conflicts`：比对上传文件版本号 vs 数据库版本号，版本不匹配时逐单元格比对差异，返回冲突报告
     - _需求: 7.2, 7.3, 7.4_
-  - [ ]* 7.5 编写属性测试：预填充-解析往返一致性
+  - [x]* 7.5 编写属性测试：预填充-解析往返一致性
     - **Property 8: 预填充-解析往返一致性**
     - 使用 Hypothesis 生成随机底稿+人工填写值，验证预填充后解析回写不影响人工填写区
     - **验证: 需求 7.5**
@@ -127,11 +127,11 @@
     - _需求: 3.2_
   - [x] 9.4 实现 WOPI API 路由（`backend/app/routers/wopi.py`）：GET `/wopi/files/{file_id}` CheckFileInfo、GET `/wopi/files/{file_id}/contents` GetFile、POST `/wopi/files/{file_id}/contents` PutFile、POST `/wopi/files/{file_id}` Lock/Unlock/RefreshLock（通过 X-WOPI-Override 头区分）
     - _需求: 3.1_
-  - [ ]* 9.5 编写属性测试：WOPI文件版本单调递增
+  - [x]* 9.5 编写属性测试：WOPI文件版本单调递增
     - **Property 6: WOPI文件版本单调递增**
     - 使用 Hypothesis 生成随机PutFile序列，验证file_version严格单调递增
     - **验证: 需求 3.7**
-  - [ ]* 9.6 编写属性测试：WOPI锁互斥性
+  - [x]* 9.6 编写属性测试：WOPI锁互斥性
     - **Property 7: WOPI锁互斥性**
     - 使用 Hypothesis 生成随机Lock/Unlock序列，验证同一时刻最多一个有效锁
     - **验证: 需求 3.3**
@@ -147,7 +147,7 @@
     - _需求: 6.1_
   - [x] 10.5 实现底稿管理 API 路由（`backend/app/routers/working_paper.py`）：GET 列表、GET 详情、POST generate（从模板集生成）、GET download、POST upload、PUT status、PUT assign、POST prefill、POST parse、GET wp-index、GET wp-cross-refs
     - _需求: 6.1-7.5_
-  - [ ]* 10.6 编写属性测试：离线编辑版本冲突检测
+  - [x]* 10.6 编写属性测试：离线编辑版本冲突检测
     - **Property 9: 离线编辑版本冲突检测**
     - 使用 Hypothesis 生成随机版本号对，验证版本不匹配时检测到冲突
     - **验证: 需求 7.2, 7.3, 7.4**
@@ -180,23 +180,23 @@
     - _需求: 9.1_
   - [x] 12.6 实现质量自检 API 路由（`backend/app/routers/qc.py`）：POST qc-check 执行自检、GET qc-results 获取结果、GET qc-summary 项目级汇总
     - _需求: 8.1-9.3_
-  - [ ]* 12.7 编写属性测试：QC阻断规则阻止提交
+  - [x]* 12.7 编写属性测试：QC阻断规则阻止提交
     - **Property 10: QC阻断规则阻止提交**
     - 使用 Hypothesis 生成随机底稿+QC结果，验证有阻断finding时不允许提交复核
     - **验证: 需求 8.3**
-  - [ ]* 12.8 编写属性测试：QC结论区检查正确性
+  - [x]* 12.8 编写属性测试：QC结论区检查正确性
     - **Property 11: QC结论区检查正确性**
     - 使用 Hypothesis 生成随机结论区内容（含空/空白/有内容），验证Rule 1判断正确
     - **验证: 需求 8.1 Rule 1**
-  - [ ]* 12.9 编写属性测试：QC公式一致性检查正确性
+  - [x]* 12.9 编写属性测试：QC公式一致性检查正确性
     - **Property 12: QC公式一致性检查正确性**
     - 使用 Hypothesis 生成随机公式值+偏差，验证差异>0.01时报告阻断finding
     - **验证: 需求 8.1 Rule 3**
-  - [ ]* 12.10 编写属性测试：QC交叉索引检查正确性
+  - [x]* 12.10 编写属性测试：QC交叉索引检查正确性
     - **Property 13: QC交叉索引检查正确性**
     - 使用 Hypothesis 生成随机WP引用+索引，验证引用不存在时报告警告finding
     - **验证: 需求 8.1 Rule 8**
-  - [ ]* 12.11 编写属性测试：项目级QC汇总一致性
+  - [x]* 12.11 编写属性测试：项目级QC汇总一致性
     - **Property 16: 项目级QC汇总一致性**
     - 使用 Hypothesis 生成随机项目底稿集，验证汇总数据计算正确
     - **验证: 需求 9.1**
@@ -209,7 +209,7 @@
     - _需求: 5.2, 5.3, 5.4_
   - [x] 14.2 实现复核批注 API 路由（`backend/app/routers/wp_review.py`）：GET 列表、POST 添加、PUT reply、PUT resolve
     - _需求: 5.1-5.5_
-  - [ ]* 14.3 编写属性测试：复核意见状态机合法转换
+  - [x]* 14.3 编写属性测试：复核意见状态机合法转换
     - **Property 17: 复核意见状态机合法转换**
     - 使用 Hypothesis 生成随机状态转换序列，验证只允许合法路径
     - **验证: 需求 5.2, 5.3, 5.4**
@@ -275,15 +275,15 @@
     - _需求: 11.1-11.6_
   - [x] 23.6 实现前端抽样管理面板：抽样配置表单（方法选择+参数输入+自动计算样本量）、抽样记录列表（关联底稿+总体描述+样本量+结果+结论）、MUS评价结果展示
     - _需求: 11.1-11.4_
-  - [ ]* 23.7 编写属性测试：抽样样本量计算正确性
+  - [x]* 23.7 编写属性测试：抽样样本量计算正确性
     - **Property 19: 抽样样本量计算正确性**
     - 使用 Hypothesis 生成随机抽样参数，验证样本量计算符合标准公式
     - **验证: 需求 11.2**
-  - [ ]* 23.8 编写属性测试：抽样记录完整性校验
+  - [x]* 23.8 编写属性测试：抽样记录完整性校验
     - **Property 20: 抽样记录完整性校验**
     - 使用 Hypothesis 生成随机抽样记录（含完整/不完整），验证QC Rule 10判断正确
     - **验证: 需求 11.5**
-  - [ ]* 23.9 编写属性测试：MUS错报推断计算正确性
+  - [x]* 23.9 编写属性测试：MUS错报推断计算正确性
     - **Property 21: MUS错报推断计算正确性**
     - 使用 Hypothesis 生成随机MUS抽样结果（含错报金额和污染因子），验证projected_misstatement和upper_misstatement_limit按MUS评价公式正确计算
     - **验证: 需求 11.4**
