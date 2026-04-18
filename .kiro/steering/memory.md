@@ -872,3 +872,22 @@ inclusion: always
 - 文件存储权威来源推荐本地磁盘为主：底稿存storage/projects/{id}/workpapers/（频繁读写不走Paperless中转），附件走Paperless-ngx（OCR+分类+检索），两者通过attachment_working_paper关联
 - 灾备推荐RPO=1天/RTO=4小时：每日pg_dump全量+storage/ rsync备份，底稿保留最近10版本
 - 待修复16项：试点前6项（token统一/权限/真实用户/附件代理/在线编辑降级/request_id）→ 扩大试点前6项（复核闭环/硬门槛/QC规则/附件关联/任务中心/功能标识）→ 全所推广项（代码收敛/灾备脚本）
+
+## 复盘报告 16 项修复完成（2026-04-18）
+- A.1 token键名统一：collaboration.ts 从 access_token 改为 token（与 auth.ts 一致）
+- A.2 项目级权限：deps.py 新增 check_consol_lock（合并锁定423）+ get_visible_project_ids（项目可见性过滤）
+- A.3 真实用户：6个路由文件（annotations/forum/process_record/report_trace/review_conversations）全部消除占位UUID，改用 Depends(get_current_user)
+- A.5 功能开关：feature_flags.py（is_enabled/set_project_flag/get_feature_maturity）+ feature_flags.py 路由3端点 + 功能成熟度分级（production/pilot/experimental）
+- A.6 链路追踪：request_id.py 中间件（X-Request-ID 自动生成+响应头回传+日志 filter 注入）
+- B.1 复核批注闭环：WorkpaperList.vue 新增复核意见面板（列表+新增+解决+未解决计数徽标）
+- B.2 提交复核硬门槛：4项门禁（reviewer分配+QC阻断+未解决批注+AI确认），不满足时按钮禁用+tooltip显示原因
+- B.3 QC规则做实：5条阻断级规则（结论非空+AI确认+审定数公式+复核人分配+未解决批注），从 parsed_data 和数据库实际检查
+- B.5 异步任务中心：task_center.py（create/update/get/list/stats）+ task_center.py 路由3端点，支持 pending/processing/success/failed/retrying 状态
+- B.6 功能成熟度：get_feature_maturity() 返回17个功能的分级（production/pilot/experimental）
+- C.4 灾备脚本：backup.py（pg_dump+storage复制+30天清理+manifest.json），RPO=1天/RTO=4小时
+- 路径口径不统一（working-papers vs workpapers）已记录但不改（breaking change），新代码统一用 working-papers
+- commit 1f8e768，git push 待代理恢复后执行
+
+## 文件存储架构决策（2026-04-18 用户确认）
+- 三阶段存储架构：①项目进行中→底稿在本地磁盘（快速读写/预填充/解析/版本管理）②日常使用中→Paperless-ngx负责OCR/分类/检索/元数据（不存文件本身，只存识别后的文本+元数据，供LLM引用和信息交互）③项目归档时→底稿推送云端存储（S3/MinIO/阿里云OSS），本地可选清理
+- 待开发：CloudStorageService（S3/MinIO/OSS配置切换）+ 归档流程增加云端推送步骤 + Paperless元数据同步（底稿保存时自动同步OCR文本，不传文件）+ 云端归档后本地文件标记storage_type=cloud

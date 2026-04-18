@@ -59,9 +59,19 @@ async def get_quota(user_id: UUID):
 # ── 归档 ──────────────────────────────────────────────────
 
 @router.post("/api/projects/{project_id}/archive")
-async def archive_project(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def archive_project(
+    project_id: UUID,
+    push_to_cloud: bool = True,
+    cleanup_local: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """项目归档：锁定底稿 → 推送云端 → 可选清理本地"""
     svc = ProjectArchiveService()
-    result = await svc.archive_project(db, project_id)
+    result = await svc.archive_project(
+        db, project_id,
+        push_to_cloud=push_to_cloud,
+        cleanup_local=cleanup_local,
+    )
     await db.commit()
     return result
 
