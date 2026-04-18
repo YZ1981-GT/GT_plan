@@ -472,13 +472,20 @@ async function onQCCheck() {
 }
 
 async function onSubmitReview() {
-  if (!selectedWp.value || hasBlocking.value) return
+  if (!selectedWp.value) return
   try {
-    await updateWorkpaperStatus(projectId.value, selectedWp.value.id, 'review_level1_passed')
+    // 使用专用提交复核端点（后端统一校验 4 项门禁）
+    const { data } = await http.post(
+      `/api/projects/${projectId.value}/working-papers/${selectedWp.value.id}/submit-review`
+    )
+    if (data?.status === 'blocked') {
+      ElMessage.warning(`无法提交复核：${(data.blocking_reasons || []).join('；')}`)
+      return
+    }
     ElMessage.success('已提交复核')
     await fetchData()
-  } catch {
-    ElMessage.error('提交失败')
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || '提交失败')
   }
 }
 

@@ -131,11 +131,16 @@ class ProjectArchiveService:
         cloud_result = None
         if push_to_cloud:
             from app.services.cloud_storage_service import CloudStorageService
+            from app.services.task_center import create_task, update_task, TaskType, TaskStatus
+            cloud_task_id = create_task(TaskType.sync_upload, project_id=str(project_id), params={"action": "archive_push"})
+            update_task(cloud_task_id, TaskStatus.processing)
             cloud_svc = CloudStorageService()
             try:
                 cloud_result = await cloud_svc.upload_project_archive(project_id, project_name, year)
+                update_task(cloud_task_id, TaskStatus.success, result=cloud_result)
                 logger.info("cloud_push: project=%s result=%s", project_id, cloud_result.get("status"))
             except Exception as e:
+                update_task(cloud_task_id, TaskStatus.failed, error=str(e))
                 logger.error("cloud_push failed: %s", e)
                 cloud_result = {"status": "failed", "error": str(e)}
 

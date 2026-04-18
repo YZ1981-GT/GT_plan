@@ -937,3 +937,11 @@ inclusion: always
 - 批量修复工具：fix_auth_coverage.py（自动正则匹配+注入认证依赖）+ check_auth_coverage.py（验证覆盖率）
 - 修复的文件：working_paper/wp_download/wp_template/wp_review/wp_chat/qc/attachments/trial_balance/misstatements/sampling/sampling_enhanced/review_conversations/annotations/process_record/report_trace/adjustments（16个路由文件）
 - adjustments.py 缩进修复：get_summary 的 current_user 参数缩进错误已修正
+
+## 复盘校正缺陷修复（2026-04-18 第四轮）
+- QCFindingItem 参数修复：5处 description= 改为 message=（之前会导致 TypeError 被吞掉，规则假通过）
+- 在线编辑入口功能开关：WorkpaperList.vue "在线编辑"按钮改为 v-if="onlineEditEnabled"，onMounted 时从 /api/feature-flags/check/online_editing 加载，关闭时按钮不显示
+- http.ts 请求监控接入：request 拦截器记录 _startTime，response/error 拦截器调用 logRequest() 记录 url/method/status/duration
+- WorkpaperEditor.vue token 修复：localStorage.getItem('access_token') 改为 localStorage.getItem('token')
+- 复核后端门禁补齐 AI 确认：update_status 新增第4项门禁检查 parsed_data.ai_content 中 status=pending 的项
+- commit ae99a75 待push

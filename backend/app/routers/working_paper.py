@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.working_paper_service import WorkingPaperService
 from app.services.prefill_service import PrefillService, ParseService
@@ -113,7 +113,7 @@ async def upload_workpaper(
     wp_id: UUID,
     data: UploadRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """上传离线编辑的底稿"""
     svc = WorkingPaperService()
@@ -213,9 +213,9 @@ async def assign_workpaper(
     wp_id: UUID,
     data: AssignRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("review")),
 ):
-    """分配编制人/复核人"""
+    """分配编制人/复核人（需 review 权限）"""
     svc = WorkingPaperService()
     try:
         result = await svc.assign_workpaper(
@@ -225,6 +225,89 @@ async def assign_workpaper(
         )
         await db.commit()
         return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/working-papers/{wp_id}/submit-review")
+async def submit_review(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """专用提交复核端点 — 统一校验 4 项门禁后流转状态
+
+    门禁：1.复核人已分配 2.QC阻断=0 3.未解决批注=0 4.AI未确认=0
+    全部通过后自动将状态从 edit_complete → review_level1_passed
+    """
+    # 加载底稿
+    wp_result = await db.execute(sa.select(WorkingPaper).where(WorkingPaper.id == wp_id))
+    wp = wp_result.scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    blocking_reasons = []
+
+    # 门禁 1：复核人已分配
+    if not wp.reviewer:
+        blocking_reasons.append("复核人未分配")
+
+    # 门禁 2：阻断级 QC 通过
+    from app.models.workpaper_models import WpQcResult
+    qc_result = await db.execute(
+        sa.select(WpQcResult).where(WpQcResult.working_paper_id == wp_id)
+        .order_by(WpQcResult.check_timestamp.desc()).limit(1)
+    )
+    qc = qc_result.scalar_one_or_none()
+    if qc is None:
+        blocking_reasons.append("未执行质量自检")
+    elif qc.blocking_count > 0:
+        blocking_reasons.append(f"存在 {qc.blocking_count} 个阻断级 QC 问题")
+
+    # 门禁 3：无未解决复核意见
+    try:
+        from app.models.phase10_models import CellAnnotation
+        ann_result = await db.execute(
+            sa.select(sa.func.count()).select_from(CellAnnotation).where(
+                CellAnnotation.project_id == project_id,
+                CellAnnotation.object_type == "workpaper",
+                CellAnnotation.object_id == wp_id,
+                CellAnnotation.status != "resolved",
+                CellAnnotation.is_deleted == sa.false(),
+            )
+        )
+        unresolved = ann_result.scalar() or 0
+        if unresolved > 0:
+            blocking_reasons.append(f"{unresolved} 条未解决复核意见")
+    except Exception:
+        pass
+
+    # 门禁 4：无未确认 AI 内容
+    pd = wp.parsed_data or {}
+    ai_items = pd.get("ai_content", [])
+    unconfirmed_ai = [a for a in ai_items if a.get("status") == "pending"]
+    if unconfirmed_ai:
+        blocking_reasons.append(f"{len(unconfirmed_ai)} 项未确认的 AI 生成内容")
+
+    if blocking_reasons:
+        return {
+            "status": "blocked",
+            "blocking_reasons": blocking_reasons,
+            "can_submit": False,
+        }
+
+    # 全部通过 → 流转状态
+    svc = WorkingPaperService()
+    try:
+        result = await svc.update_status(db=db, wp_id=wp_id, new_status="review_level1_passed")
+        await db.commit()
+        return {
+            "status": "submitted",
+            "can_submit": True,
+            "blocking_reasons": [],
+            "wp_status": result.get("status"),
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
