@@ -67,12 +67,16 @@
               <el-descriptions-item label="最后解析">{{ selectedWp.last_parsed_at?.slice(0, 19) || '-' }}</el-descriptions-item>
             </el-descriptions>
 
-            <!-- 操作按钮 -->
+            <!-- 操作按钮：在线优先+离线兜底双模式 -->
             <div class="gt-wp-detail-actions">
-              <el-button v-if="onlineEditEnabled" type="primary" @click="onOnlineEdit">
-                在线编辑 <el-tag size="small" type="warning" style="margin-left:4px">实验</el-tag>
-              </el-button>
-              <el-button @click="onDownload">下载</el-button>
+              <el-button-group>
+                <el-button type="primary" @click="onOnlineEdit">
+                  <el-icon style="margin-right:4px"><Monitor /></el-icon>在线编辑
+                </el-button>
+                <el-button @click="onDownload">
+                  <el-icon style="margin-right:4px"><Download /></el-icon>下载编辑
+                </el-button>
+              </el-button-group>
               <el-button @click="onUpload">上传</el-button>
               <el-button type="warning" @click="onQCCheck" :loading="qcLoading">自检</el-button>
               <el-tooltip :disabled="!hasBlocking" :content="blockingReasons.join('；')" placement="top">

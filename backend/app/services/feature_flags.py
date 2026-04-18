@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # 功能开关默认值（全局）
 _DEFAULT_FLAGS: dict[str, bool] = {
-    "online_editing": False,       # 在线编辑（默认关闭，实验功能）
+    "online_editing": True,        # 在线编辑（默认开启，不可用时自动降级到离线）
     "ai_workpaper_fill": True,     # AI 底稿填充
     "ai_review": True,             # AI 底稿复核
     "ai_recommendation": False,    # AI 底稿推荐（实验功能）
@@ -62,7 +62,7 @@ def get_all_flags(project_id: str | UUID | None = None) -> dict[str, bool]:
 def get_feature_maturity() -> dict[str, str]:
     """获取功能成熟度分级"""
     return {
-        "online_editing": "experimental",
+        "online_editing": "pilot",  # 在线优先+离线兜底双模式
         "ai_workpaper_fill": "pilot",
         "ai_review": "pilot",
         "ai_recommendation": "experimental",

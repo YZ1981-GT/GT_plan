@@ -945,3 +945,8 @@ inclusion: always
 - WorkpaperEditor.vue token 修复：localStorage.getItem('access_token') 改为 localStorage.getItem('token')
 - 复核后端门禁补齐 AI 确认：update_status 新增第4项门禁检查 parsed_data.ai_content 中 status=pending 的项
 - commit ae99a75 待push
+
+## 工作包落地（2026-04-18 第五轮）
+- WP-P0-01 完成：新增 POST /working-papers/{wp_id}/submit-review 专用端点（4项门禁统一校验后流转状态，返回 blocking_reasons 列表），前端 onSubmitReview 改用此端点（不再直接调 updateWorkpaperStatus）
+- WP-P0-04 完成：working_paper.py 的 upload/assign/submit-review 三个写端点改用 require_project_access("edit"/"review") 替代 get_current_user，实现项目级权限校验
+- WP-P1-01 进展：task_center 已接入 3 类真实任务（OCR上传/底稿解析/归档云推送），/api/tasks 可查到完整状态

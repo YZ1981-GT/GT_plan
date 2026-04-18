@@ -9,21 +9,20 @@
         <el-tag v-if="wpDetail" :type="statusTagType(wpDetail.status)" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
-        <el-tag type="warning" size="small" effect="dark" style="margin-left: 8px">
-          ⚠ 实验功能
-        </el-tag>
+        <el-tag v-if="editorAvailable" type="success" size="small" style="margin-left: 8px">在线模式</el-tag>
+        <el-tag v-else type="info" size="small" style="margin-left: 8px">离线模式</el-tag>
       </div>
       <div class="gt-wp-editor-toolbar-right">
-        <span class="gt-wp-editor-save-indicator" v-if="wpDetail">
-          <el-icon color="var(--gt-color-success)"><i class="el-icon-check" /></el-icon>
-          已保存
-        </span>
+        <!-- 双模式切换：在线时也能下载，离线时也能重试在线 -->
+        <el-button v-if="editorAvailable" size="small" @click="onDownloadEdit">下载副本</el-button>
+        <el-button v-else size="small" type="primary" @click="retryOnline" :loading="retrying">重试在线</el-button>
+        <el-button size="small" @click="onUploadEdit">上传回传</el-button>
       </div>
     </div>
 
     <!-- 主编辑区 -->
     <div class="gt-wp-editor-main">
-      <!-- ONLYOFFICE 可用 -->
+      <!-- ONLYOFFICE 可用：在线编辑 -->
       <template v-if="editorAvailable">
         <iframe
           ref="editorFrame"
@@ -33,21 +32,22 @@
         />
       </template>
 
-      <!-- ONLYOFFICE 不可用：降级模式 -->
+      <!-- ONLYOFFICE 不可用：自动降级到离线模式 -->
       <template v-else>
         <div class="gt-wp-editor-fallback-panel">
           <el-alert
-            title="ONLYOFFICE 编辑器不可用"
-            description="在线编辑服务暂时无法连接，请使用离线编辑模式：下载底稿到本地编辑后再上传。"
-            type="warning"
+            title="在线编辑暂不可用，已自动切换到离线模式"
+            description="您可以下载底稿到本地 Excel 编辑，完成后点击「上传回传」。在线服务恢复后可点击「重试在线」切换回来。"
+            type="info"
             show-icon
             :closable="false"
             style="margin-bottom: 20px"
           />
           <div class="gt-wp-editor-fallback-actions">
             <el-button type="primary" size="large" @click="onDownloadEdit">
-              下载编辑
+              下载底稿到本地编辑
             </el-button>
+            <el-button size="large" @click="onUploadEdit">上传编辑后的底稿</el-button>
             <el-button size="large" @click="goBack">返回底稿列表</el-button>
           </div>
         </div>
@@ -105,6 +105,33 @@ function goBack() {
 
 function onDownloadEdit() {
   window.open(`/api/projects/${projectId.value}/working-papers/${wpId.value}/download`, '_blank')
+}
+
+function onUploadEdit() {
+  // 跳转到底稿列表页的上传弹窗
+  router.push({
+    name: 'WorkpaperList',
+    params: { projectId: projectId.value },
+    query: { upload: wpId.value },
+  })
+}
+
+const retrying = ref(false)
+async function retryOnline() {
+  retrying.value = true
+  try {
+    const available = await checkOnlyoffice()
+    editorAvailable.value = available
+    if (available) {
+      const token = localStorage.getItem('token') || ''
+      editorUrl.value = getWopiEditorUrl(wpId.value, token)
+      ElMessage.success('在线编辑已恢复')
+    } else {
+      ElMessage.warning('在线编辑服务仍不可用，继续使用离线模式')
+    }
+  } finally {
+    retrying.value = false
+  }
 }
 
 async function checkOnlyoffice(): Promise<boolean> {
