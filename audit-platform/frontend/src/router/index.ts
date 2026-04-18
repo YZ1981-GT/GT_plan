@@ -22,7 +22,7 @@ const router = createRouter({
         {
           path: '',
           name: 'Dashboard',
-          component: () => import('@/views/Dashboard.vue'),
+          component: () => import(/* webpackPrefetch: true */ '@/views/Dashboard.vue'),
         },
         {
           path: 'projects',
@@ -47,7 +47,7 @@ const router = createRouter({
         {
           path: 'projects/:projectId/trial-balance',
           name: 'TrialBalance',
-          component: () => import('@/views/TrialBalance.vue'),
+          component: () => import(/* webpackPrefetch: true */ '@/views/TrialBalance.vue'),
         },
         {
           path: 'projects/:projectId/adjustments',
@@ -67,7 +67,7 @@ const router = createRouter({
         {
           path: 'projects/:projectId/reports',
           name: 'Reports',
-          component: () => import('@/views/ReportView.vue'),
+          component: () => import(/* webpackPrefetch: true */ '@/views/ReportView.vue'),
         },
         {
           path: 'projects/:projectId/cfs-worksheet',
@@ -92,7 +92,7 @@ const router = createRouter({
         {
           path: 'projects/:projectId/workpapers',
           name: 'WorkpaperList',
-          component: () => import('@/views/WorkpaperList.vue'),
+          component: () => import(/* webpackPrefetch: true */ '@/views/WorkpaperList.vue'),
         },
         {
           path: 'projects/:projectId/workpapers/:wpId/edit',

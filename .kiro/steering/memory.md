@@ -848,3 +848,13 @@ inclusion: always
 - 部署前修：①前端console.log未清理（LedgerPenetration/WorkpaperReview/AuditLogView）用ESLint no-console ②后端日志不统一（部分服务无logger，缺结构化JSON日志）③API版本控制缺失（建议加/api/v1/前缀） ④数据库连接池加pool_pre_ping=True
 - 后续优化：①TypeScript类型自动生成（openapi-typescript） ②SSE统一封装 ③请求取消/重试/缓存（@tanstack/vue-query） ④路由预加载高频页面 ⑤Web Vitals+Sentry性能监控
 - 不认可WebSocket需求：SSE满足单向推送，复核对话用SSE+轮询足够，WebSocket增加部署复杂度
+
+## 问题修复（2026-04-18）
+- Alembic迁移重编号完成：32个迁移文件从001-032线性化，消除009-014编号冲突（fix_migrations.py脚本自动重命名+更新revision/down_revision链）
+- 前端硬编码修复：vite.config.ts改用loadEnv读取VITE_API_BASE_URL/VITE_DEV_PORT；WopiPoc.vue改用import.meta.env；新增.env和.env.example
+- 前端全局错误处理：main.ts新增app.config.errorHandler（防白屏）+ window.unhandledrejection + router.onError
+- console.log清理：LedgerPenetration.vue/WorkpaperReview.vue/AuditLogView.vue 3处console.log已移除
+- 后端连接池优化：database.py新增pool_pre_ping=True（自动检测断连）+ pool_recycle=3600（1小时回收）
+- 后端统一日志：新增logging_config.py（JSONFormatter结构化日志+setup_logging函数），main.py lifespan中初始化
+- http.ts升级：响应拦截器统一解包ApiResponse（消除data.data??data）+ 分级错误处理（400/403/404/409/413/422/423/500）
+- 143个测试全部通过；commit e6a0279

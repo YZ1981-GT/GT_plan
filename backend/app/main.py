@@ -108,9 +108,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="审计作业平台",
     description="面向会计师事务所的审计全流程作业系统",
-    version="0.1.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
+
+# API 版本信息端点
+@app.get("/api/version")
+async def api_version():
+    return {"version": "1.0.0", "api_prefix": "/api", "note": "当前为 v1，未来升级将使用 /api/v2/"}
 
 # --- 异常处理器注册 ---
 app.add_exception_handler(HTTPException, http_exception_handler)

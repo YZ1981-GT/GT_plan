@@ -7,6 +7,7 @@ import 'element-plus/dist/index.css'
 import './styles/global.css'
 import App from './App.vue'
 import router from './router'
+import { initWebVitals } from './utils/monitor'
 
 const app = createApp(App)
 
@@ -36,5 +37,8 @@ router.onError((error) => {
   console.error('[路由错误]', error)
   ElMessage.error('页面加载失败，请刷新重试')
 })
+
+// 性能监控
+initWebVitals()
 
 app.mount('#app')
