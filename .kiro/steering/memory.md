@@ -902,3 +902,6 @@ inclusion: always
 - Paperless-ngx 已部署（2026-04-18）：Docker容器 audit-paperless 端口8010，首次启动CPU 100%（数据库迁移+OCR引擎初始化，需2-5分钟），内存78MB正常；与gt_workplan主进程同时占满CPU导致启动慢，建议加deploy.resources.limits限制CPU=2核/内存=512M
 - Paperless-ngx 启动成功（2026-04-18）：API http://localhost:8010 可访问，管理员 admin/admin；首次启动失败原因是 chi_sim 中文OCR语言包未安装（容器内apt走代理连不上），改为 PAPERLESS_OCR_LANGUAGE=eng + PAPERLESS_OCR_MODE=skip_noarchive，中文OCR由后端UnifiedOCRService（Tesseract/MinerU）处理，结果通过元数据同步到Paperless
 - Paperless OCR 分工决策：Paperless 只做英文OCR和文档管理/检索/分类，中文OCR由后端处理后同步元数据，避免在容器内安装中文语言包的网络问题
+- 最后3项"部分完成"已全部修复（2026-04-18）：①附件预览/下载统一代理（/api/attachments/{id}/preview + /download，屏蔽paperless://和本地路径差异）②附件关联改为搜索下拉（el-select remote filterable，按底稿编号/名称模糊搜索，替代手输ID）③Paperless中文OCR（从GitHub下载chi_sim.traineddata 44MB复制进容器，docker-compose恢复chi_sim+eng）
+- 新增 MIGRATION_LEDGER.md 迁移台账（路径口径不统一记录+32个死代码路由清单+两套前端定位）
+- 问题文档所有30+项整改全部完成（27项✅→30项✅），commit aa431fd已push

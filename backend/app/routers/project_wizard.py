@@ -28,11 +28,36 @@ async def list_projects(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[ProjectCreateResponse]:
-    """获取项目列表"""
+    """获取项目列表（按用户可见性过滤）
+
+    admin/partner 可见所有项目，其他角色只能看到自己参与的项目。
+    """
     from sqlalchemy import select
-    result = await db.execute(
-        select(Project).where(Project.is_deleted == False)  # noqa: E712
-    )
+    from app.models.core import ProjectUser
+
+    if current_user.role.value in ("admin", "partner"):
+        # 管理员和合伙人可见所有项目
+        result = await db.execute(
+            select(Project).where(Project.is_deleted == False)  # noqa: E712
+        )
+    else:
+        # 其他角色只能看到自己参与的项目
+        my_project_ids = await db.execute(
+            select(ProjectUser.project_id).where(
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
+        )
+        pids = [r[0] for r in my_project_ids.all()]
+        if not pids:
+            return []
+        result = await db.execute(
+            select(Project).where(
+                Project.id.in_(pids),
+                Project.is_deleted == False,  # noqa: E712
+            )
+        )
+
     projects = result.scalars().all()
     return [
         ProjectCreateResponse(

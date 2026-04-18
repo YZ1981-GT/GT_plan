@@ -914,8 +914,265 @@
 | `audit-platform/frontend/vite.config.ts` | 环境变量配置 |
 | `.env.example` | 云端存储配置项 |
 
-## 测试验证
+ ## 测试验证
+ 
+ - 当前仓库中确实存在较多后端测试资产，但本轮未执行测试，也未复核“143个后端测试全部通过”的运行证据。
+ - 如需将“全部通过、无回归”作为管理层结论，建议补充 `pytest` / CI 结果输出、测试报告或提交记录作为正式佐证。
+ - 因此本轮更适合表述为：测试资产已具备一定基础，是否全部通过及是否无回归，需以后续实际执行结果为准。
 
-- 当前仓库中确实存在较多后端测试资产，但本轮未执行测试，也未复核“143个后端测试全部通过”的运行证据。
-- 如需将“全部通过、无回归”作为管理层结论，建议补充 `pytest` / CI 结果输出、测试报告或提交记录作为正式佐证。
-- 因此本轮更适合表述为：测试资产已具备一定基础，是否全部通过及是否无回归，需以后续实际执行结果为准。
+## 落地开发建议（供排期、分工与验收）
+
+### 1. 使用方式
+
+- **排期依据**  
+  实际安排研发任务时，建议以“复盘校正结论 + 本节”作为落地依据，而不是以“整改总览”中的“已完成”字样直接销项。
+
+- **任务定义口径**  
+  本文中“开发完成”不等于“问题关闭”。只有在完成代码提交、联调验证、测试通过、业务验收四个动作后，相关问题才可正式销项。
+
+- **组织要求**  
+  在线编辑、复核门禁、附件证据链、权限留痕、可观测性这五类任务，均不建议拆成纯前端或纯后端任务单独推进，必须按端到端工作包推进。
+
+### 2. 实施原则
+
+- **后端门禁优先于前端按钮**  
+  所有“提交复核、归档、在线编辑开放、敏感下载”类能力，必须以后端校验为准。前端禁用按钮只能改善体验，不能承担最终控制责任。
+
+- **先补主梁，再扩能力**  
+  当前阶段应优先修复底稿、复核、附件、权限、留痕、运行基线，不应再并行推进大量高级 AI、复杂协同、监管报送等展示性能力。
+
+- **联调、演练、压测也要算工作量**  
+  Paperless 联调、归档恢复演练、OnlyOffice 灰度验证、请求链路追踪验证，都必须进入排期，不能只把“代码写完”算作完成。
+
+- **正式能力与灰度能力必须分栏管理**  
+  离线底稿、项目管理、报表附注应视为正式能力；在线编辑、部分 AI、部分协同功能只能纳入灰度或试点能力管理。
+
+### 3. 建议开发工作包总表
+
+| 工作包 | 优先级 | 目标 | 主要负责人 | 关键代码落点 | 完成定义 |
+|------|------|------|------|------|------|
+| WP-P0-01 | P0 | 修复 QC 与提交复核后端门禁 | 后端负责人 + 前端负责人 | `backend/app/services/qc_engine.py`、`backend/app/routers/working_paper.py`、`backend/app/services/working_paper_service.py`、`backend/app/routers/process_record.py`、`audit-platform/frontend/src/views/WorkpaperList.vue` | 复核状态不能再靠前端直接改状态绕过 |
+| WP-P0-02 | P0 | 把在线编辑真正降级为灰度能力 | 前端负责人 + 后端负责人 | `backend/app/services/feature_flags.py`、`backend/app/routers/feature_flags.py`、`backend/app/api/wopi.py`、`audit-platform/frontend/src/views/WorkpaperList.vue` | 默认项目看不到正式在线编辑入口，灰度项目才可见 |
+| WP-P0-03 | P0 | 做实附件预览/下载/Paperless 联调闭环 | 后端负责人 + 前端负责人 + 运维 | `backend/app/routers/attachments.py`、`audit-platform/frontend/src/views/AttachmentManagement.vue`、`audit-platform/frontend/src/components/extension/AttachmentPreview.vue` | Paperless 与本地回退两条链路均能在真实环境跑通 |
+| WP-P0-04 | P0 | 权限、留痕、request_id、请求监控打通 | 后端负责人 + 前端负责人 | `backend/app/deps.py`、`backend/app/middleware/request_id.py`、`backend/app/core/logging_config.py`、`audit-platform/frontend/src/utils/http.ts`、`audit-platform/frontend/src/utils/monitor.ts` | 主链路具备项目级权限校验、request_id 与基础请求监控 |
+| WP-P1-01 | P1 | 把任务中心接入真实 OCR/AI/上传/解析链路 | 后端负责人 | `backend/app/services/task_center.py`、相关 OCR/AI/上传服务、`backend/app/routers/task_center.py` | `/api/tasks` 能反映真实业务任务，而非仅空壳能力 |
+| WP-P1-02 | P1 | 做实归档、云推送、恢复演练 | 后端负责人 + 运维 | `backend/app/services/cloud_storage_service.py`、`backend/app/services/private_storage_service.py`、`backend/scripts/backup.py` | 至少完成一次“备份-恢复-抽样核对”演练 |
+| WP-P1-03 | P1 | 建立最小回归测试与验收基线 | QA 负责人 + 后端负责人 + 前端负责人 | `backend/tests/*`、关键前端页面冒烟清单、CI/执行记录 | 关键主链路有可复用回归用例和执行证据 |
+
+### 4. 各工作包详细要求
+
+#### 4.1 WP-P0-01：QC 与提交复核后端门禁
+
+- **目标**  
+  把“提交复核”从前端点击动作，改成后端统一校验通过后才允许流转的正式业务动作。
+
+- **必须完成的开发动作**  
+  - 修复 `qc_engine.py` 中 `QCFindingItem` 参数错误，确保阻断规则真实生效
+  - 将 reviewer 已分配、QC blocking=0、未解决批注=0、AI 待确认=0 统一纳入后端校验
+  - 不建议继续让前端直接调用状态更新接口把底稿改成 `review_level1_passed`
+  - 建议新增明确的“提交复核”服务方法或专用端点，由后端统一返回阻断原因列表
+  - 对例外放行场景单独设计，不得通过绕过接口实现
+
+- **建议代码落点**  
+  - `backend/app/services/qc_engine.py`
+  - `backend/app/routers/working_paper.py`
+  - `backend/app/services/working_paper_service.py`
+  - `backend/app/routers/process_record.py`
+  - `backend/app/services/process_record_service.py`
+  - `audit-platform/frontend/src/views/WorkpaperList.vue`
+
+- **验收标准**  
+  - 任一门禁未满足时，后端返回明确阻断信息，前端无法绕过
+  - 补做至少 4 类阻断用例：无 reviewer、有未解决批注、QC blocking>0、AI 未确认
+  - 形成一条可复测的“编制完成 → 提交复核 → 一级复核”标准链路
+
+#### 4.2 WP-P0-02：在线编辑正式降级与灰度治理
+
+- **目标**  
+  既然当前已决定采用“离线为正式主链路、在线编辑仅灰度验证”，就必须把该策略真正体现在页面入口、路由控制和服务端校验上。
+
+- **必须完成的开发动作**  
+  - 默认项目组隐藏或禁用正式在线编辑入口
+  - 只有灰度项目/模板/用户组在功能开关开启时才可进入在线编辑页面
+  - 在线编辑关闭时，前端应明确提示“正式场景请走下载-编辑-上传闭环”
+  - 补充实验功能标识，避免项目组误判为正式生产能力
+  - 若 ONLYOFFICE/WOPI 服务异常，应自动提示降级，不得继续假装可编辑
+
+- **建议代码落点**  
+  - `backend/app/services/feature_flags.py`
+  - `backend/app/routers/feature_flags.py`
+  - `backend/app/api/wopi.py`
+  - `audit-platform/frontend/src/views/WorkpaperList.vue`
+  - 在线编辑对应页面与路由守卫
+
+- **验收标准**  
+  - 默认项目中不再出现“可直接在线编辑”的正式入口
+  - 灰度项目打开/关闭开关后，入口、页面、接口行为一致
+  - ONLYOFFICE 不可用时页面能稳定降级，不误导用户
+
+#### 4.3 WP-P0-03：附件预览、下载与 Paperless 联调闭环
+
+- **目标**  
+  让附件能力从“有代码骨架”升级到“真实项目可联调使用”。
+
+- **必须完成的开发动作**  
+  - 在真实 Paperless 环境下跑通上传、列表、下载、预览、失败回退路径
+  - 校验 `paperless://` 路径代理、本地路径代理、异常超时提示三类场景
+  - 做实附件关联到底稿的交互，确保搜索、选择、关联、回显完整闭环
+  - 对不可预览文件，统一回落为 OCR 文本 + 下载入口
+
+- **建议代码落点**  
+  - `backend/app/routers/attachments.py`
+  - `audit-platform/frontend/src/views/AttachmentManagement.vue`
+  - `audit-platform/frontend/src/components/extension/AttachmentPreview.vue`
+
+- **验收标准**  
+  - 至少完成 1 次真实 Paperless 联调记录
+  - PDF/图片可预览，Office 文件可下载，失败时有可理解提示
+  - 附件与底稿关联后，能在附件侧和底稿侧双向查询到关系
+
+#### 4.4 WP-P0-04：权限、留痕与可观测性打通
+
+- **目标**  
+  把现有新增的权限函数、request_id、日志、监控从“存在”变成“主链路真实使用”。
+
+- **必须完成的开发动作**  
+  - 在底稿、附件、过程记录、归档等关键路由上补接项目级权限依赖
+  - 将 `RequestIDFilter` 真正接入日志配置，或在 JSON 日志中直接输出 request_id
+  - 在 `http.ts` 中接入 `logRequest()`，形成前端请求耗时和错误统计
+  - 对关键动作（提交复核、归档、敏感下载）补充统一日志字段和 request_id 透传
+
+- **建议代码落点**  
+  - `backend/app/deps.py`
+  - `backend/app/middleware/request_id.py`
+  - `backend/app/core/logging_config.py`
+  - `backend/app/main.py`
+  - `audit-platform/frontend/src/utils/http.ts`
+  - `audit-platform/frontend/src/utils/monitor.ts`
+
+- **验收标准**  
+  - 抽查关键请求时，前后端均可定位到 request_id
+  - 无项目权限的用户无法读写关键项目数据
+  - 能导出一份最小链路追踪样例，证明日志可定位问题
+
+#### 4.5 WP-P1-01：任务中心接入真实业务任务
+
+- **目标**  
+  把 `/api/tasks` 从静态能力变成真实任务中台最小版本。
+
+- **必须完成的开发动作**  
+  - 接入 OCR 任务
+  - 接入 AI 内容生成/确认相关任务
+  - 接入底稿解析、上传回传、归档推送等耗时动作
+  - 统一 pending / processing / success / failed / retrying 状态流转
+
+- **验收标准**  
+  - 至少 3 类真实任务可在 `/api/tasks` 查到完整状态
+  - 失败任务能返回错误摘要
+  - 前端或运维可基于 task_id 做问题定位
+
+#### 4.6 WP-P1-02：归档、云推送与恢复演练
+
+- **目标**  
+  把归档和灾备从“有脚本/有服务”推进到“至少做过一次演练”。
+
+- **必须完成的开发动作**  
+  - 选定一个测试项目，完成项目归档、云端推送、清单生成
+  - 执行一次备份恢复演练，验证数据库与存储恢复后底稿、附件、清单一致
+  - 形成一份恢复操作说明，明确 RPO/RTO 假设和实际结果
+
+- **建议代码落点**  
+  - `backend/app/services/cloud_storage_service.py`
+  - `backend/app/services/private_storage_service.py`
+  - `backend/app/routers/private_storage.py`
+  - `backend/scripts/backup.py`
+
+- **验收标准**  
+  - 形成书面恢复记录和抽样核对记录
+  - 至少能证明底稿文件、附件元数据、归档清单三者一致
+
+#### 4.7 WP-P1-03：测试与验收基线
+
+- **目标**  
+  让“修好了”有证据，而不是靠口头判断。
+
+- **必须完成的开发动作**  
+  - 为 QC 引擎、提交复核门禁、功能开关、附件预览代理补最小单元/集成测试
+  - 输出一份前端冒烟清单：底稿列表、下载上传、提交复核、附件预览、附件关联
+  - 固化一份每次发版前必须执行的验收清单
+
+- **验收标准**  
+  - 至少有一份可复用测试报告或 CI 结果
+  - 文档中不再出现“全部通过”但无执行证据的表述
+
+### 5. 建议排期
+
+- **第 0 周：热修与任务收口**  
+  - 修 QC 参数错误
+  - 暂时关闭默认在线编辑正式入口
+  - 明确复核门禁规则与例外放行口径
+
+- **第 1-2 周：P0 主梁补硬**  
+  - 完成 `WP-P0-01`、`WP-P0-02`、`WP-P0-03`、`WP-P0-04`
+  - 这两周的目标不是扩功能，而是把试点主链补硬
+
+- **第 3 周：P1 任务中心与归档演练**  
+  - 完成 `WP-P1-01`、`WP-P1-02`
+  - 输出真实任务链路和归档恢复记录
+
+- **第 4 周：回归测试与业务验收**  
+  - 完成 `WP-P1-03`
+  - 组织业务方、测试、研发共同验收
+
+- **排期判断**  
+  若配置为 `2 名后端 + 1 名前端 + 1 名 QA + 1 名兼职运维/实施`，上述 P0 + P1 工作包具备在一个月左右完成第一轮收口的可能；若资源更少，则必须进一步砍掉并行事项。
+
+### 6. 建议角色分工
+
+- **产品/业务负责人**  
+  负责明确复核门槛、例外放行规则、试点范围和是否允许回退到线下。
+
+- **后端负责人 A**  
+  负责 QC、复核门禁、状态机、权限与审计相关开发。
+
+- **后端负责人 B**  
+  负责附件/Paperless、任务中心、归档与云推送、灾备脚本联动。
+
+- **前端负责人**  
+  负责 `WorkpaperList.vue`、`AttachmentManagement.vue`、功能开关展示、错误提示与降级交互。
+
+- **QA/测试负责人**  
+  负责门禁用例、附件联调用例、归档恢复核对、回归清单与验收记录。
+
+- **运维/实施**  
+  负责 ONLYOFFICE、Paperless、备份环境、恢复演练环境、日志采集与部署支持。
+
+### 7. 当前明确建议暂缓的事项
+
+- **暂缓把在线编辑做成正式主链路**  
+  当前阶段只建议灰度验证，不建议作为正式生产入口全面开放。
+
+- **暂缓大范围路径口径重构**  
+  `working-papers` / `workpapers` 的完全统一会引入 breaking change，不宜与主梁补硬并行推进。
+
+- **暂缓高级 AI 与复杂协同扩展**  
+  这些能力可以保留灰度验证，但不应占用当前主链修复资源。
+
+### 8. 阶段性验收门槛
+
+- **试点前必须满足**  
+  - QC 规则真实生效
+  - 提交复核后端门禁生效
+  - 在线编辑正式入口完成降级
+  - 附件预览/下载在真实环境可联调
+  - request_id 与项目级权限至少在主链路打通
+
+- **扩大试点前必须满足**  
+  - 任务中心接入至少 3 类真实业务任务
+  - Paperless 与附件关联闭环稳定
+  - 关键回归清单可复用执行
+
+- **更大范围推广前必须满足**  
+  - 归档、云推送、恢复演练完成
+  - 可观测性指标与日志定位能力可被运维使用
+  - 在线编辑若仍要推进，必须先通过灰度质量评审

@@ -179,6 +179,29 @@ class WpUploadService:
         except Exception as e:
             logger.warning("cloud sync on upload failed (non-blocking): %s", e)
 
+        # 触发 ParseService 解析关键单元格 → 回写 parsed_data
+        try:
+            from app.services.prefill_service import ParseService
+            parse_svc = ParseService()
+            parse_result = await parse_svc.parse_workpaper(db=db, project_id=project_id, wp_id=wp_id)
+            logger.info("parse after upload: wp=%s result=%s", wp_id, parse_result.get("status"))
+        except Exception as e:
+            logger.warning("parse after upload failed (non-blocking): %s", e)
+
+        # 发布 WORKPAPER_SAVED 事件 → 级联更新试算表和报表
+        try:
+            from app.models.audit_platform_schemas import EventType, EventPayload
+            from app.services.event_bus import event_bus
+            payload = EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=project_id,
+                extra={"wp_id": str(wp_id), "file_version": wp.file_version, "trigger": "upload"},
+            )
+            await event_bus.publish(payload)
+            logger.info("event WORKPAPER_SAVED published: wp=%s", wp_id)
+        except Exception as e:
+            logger.warning("event publish failed (non-blocking): %s", e)
+
         logger.info(
             "upload_file: wp=%s, new_version=%d, size=%d bytes",
             wp_id, wp.file_version, len(file_content),

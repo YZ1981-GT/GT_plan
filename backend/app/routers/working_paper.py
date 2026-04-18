@@ -26,7 +26,7 @@ import sqlalchemy as sa
 from app.core.database import get_db
 from app.services.working_paper_service import WorkingPaperService
 from app.services.prefill_service import PrefillService, ParseService
-from app.models.workpaper_models import WpIndex, WpCrossRef
+from app.models.workpaper_models import WpIndex, WpCrossRef, WorkingPaper
 
 router = APIRouter(
     prefix="/api/projects/{project_id}",
@@ -128,10 +128,65 @@ async def update_status(
     data: StatusUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """更新底稿状态"""
+    """更新底稿状态（含复核提交硬门槛）"""
+    new_status = data.status
+
+    # 提交复核时强制检查 4 项门禁
+    if new_status in ("review_level1_passed", "review_level2_passed", "review_passed"):
+        wp_result = await db.execute(
+            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        )
+        wp = wp_result.scalar_one_or_none()
+        if not wp:
+            raise HTTPException(status_code=404, detail="底稿不存在")
+
+        blocking_reasons = []
+
+        # 门禁 1：复核人已分配
+        if not wp.reviewer:
+            blocking_reasons.append("复核人未分配")
+
+        # 门禁 2：阻断级 QC 通过
+        from app.models.workpaper_models import WpQcResult
+        qc_result = await db.execute(
+            sa.select(WpQcResult)
+            .where(WpQcResult.working_paper_id == wp_id)
+            .order_by(WpQcResult.check_timestamp.desc())
+            .limit(1)
+        )
+        qc = qc_result.scalar_one_or_none()
+        if qc is None:
+            blocking_reasons.append("未执行质量自检")
+        elif qc.blocking_count > 0:
+            blocking_reasons.append(f"存在 {qc.blocking_count} 个阻断级 QC 问题")
+
+        # 门禁 3：无未解决复核意见
+        try:
+            from app.models.phase10_models import CellAnnotation
+            ann_result = await db.execute(
+                sa.select(sa.func.count()).select_from(CellAnnotation).where(
+                    CellAnnotation.project_id == project_id,
+                    CellAnnotation.object_type == "workpaper",
+                    CellAnnotation.object_id == wp_id,
+                    CellAnnotation.status != "resolved",
+                    CellAnnotation.is_deleted == sa.false(),
+                )
+            )
+            unresolved = ann_result.scalar() or 0
+            if unresolved > 0:
+                blocking_reasons.append(f"{unresolved} 条未解决复核意见")
+        except Exception:
+            pass  # cell_annotations 表可能不存在
+
+        if blocking_reasons:
+            raise HTTPException(
+                status_code=400,
+                detail=f"无法提交复核：{'；'.join(blocking_reasons)}",
+            )
+
     svc = WorkingPaperService()
     try:
-        result = await svc.update_status(db=db, wp_id=wp_id, new_status=data.status)
+        result = await svc.update_status(db=db, wp_id=wp_id, new_status=new_status)
         await db.commit()
         return result
     except ValueError as e:
