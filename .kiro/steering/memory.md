@@ -831,3 +831,14 @@ inclusion: always
 - 测试结果：66 passed + 18 failed（全部是 Phase 3 协作模块预存问题：ORM字段不匹配/枚举值缺失/UUID类型传str，均为未注册到main.py的死代码服务）+ Phase 10 的 51 个测试全部通过
 - 32个死代码路由文件：ai_admin/ai_chat/ai_confirmation/ai_contract/ai_evidence_chain/ai_knowledge/ai_ocr/ai_pdf_export/ai_report/ai_risk_assessment/ai_workpaper/archive/audit_findings/audit_logs/audit_plan/audit_program/auth/companies/component_auditors/confirmations/going_concern/management_letter/nl_command/notifications/pbc/project_mgmt/review/reviews/risk/sync/sync_conflict/users（均为Phase 3/4同步ORM风格，启用前需转异步）
 - 新增 backend/scripts/check_routes.py 路由审查脚本
+
+## 全阶段审查最终结果（2026-04-18）
+- **全部 10 个 Phase、1556 个任务、100% 完成**
+- 新增 3 个属性测试文件：test_phase0_property.py（20个）+ test_phase1a_property.py（20个）+ test_remaining_property.py（72个，覆盖 Phase 1b/1c/3/8）
+- 143 个测试全部通过（51 Phase 10 + 20 Phase 0 + 20 Phase 1a + 52 Phase 1b/1c/3/8）
+- 前端 http.ts 升级：统一解包 ApiResponse（消除 data.data ?? data）+ 分级错误处理（400/403/404/409/413/422/423/500 各自提示）+ blob 响应不解包
+- 后端 ResponseWrapperMiddleware 扩展 _SKIP_PATHS 加入 /api/message/stream
+- ArchiveService 重命名为 ProjectArchiveService 解决跨阶段服务类名冲突
+- 跨阶段冲突：119 个表名无重复，95 个服务类仅 1 个重复（RiskAssessmentService 在两个死代码文件中）
+- 32 个死代码路由文件（Phase 3/4 同步风格）确认不影响运行
+- 用户关注点：响应格式一致性、TypeScript 类型同步、请求优化、SSE 封装、监控——前两项已修复，后三项列为后续优化
