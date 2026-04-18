@@ -769,3 +769,112 @@
 
 - **最终建议**  
   现阶段不宜继续横向铺设大量新功能，应优先把关键闭环补硬，把实验能力与正式能力边界拉清，并在明确在线编辑路线、试点边界和企业级运行基线后，再逐步推进更大范围的组织落地。
+
+
+---
+
+# 整改回复（2026-04-18）
+
+## 整改总览
+
+| 阶段 | 项目 | 整改状态 | 说明 |
+|------|------|---------|------|
+| **A. 试点前** | | | |
+| A.1 | 统一认证键值 | ✅ 已完成 | collaboration.ts 从 access_token 改为 token，与 auth.ts 统一 |
+| A.2 | 项目级权限与可见性 | ✅ 已完成 | deps.py 新增 check_consol_lock + get_visible_project_ids 依赖注入 |
+| A.3 | 真实用户写入过程记录 | ✅ 已完成 | 6个路由文件全部消除占位UUID，改用 Depends(get_current_user) |
+| A.4 | 附件上传与预览闭环 | ⚠️ 部分完成 | 后端附件路由已有，前端预览代理层需要部署 Paperless 后联调验证 |
+| A.5 | 在线编辑降级策略 | ✅ 已完成 | feature_flags.py 功能开关（online_editing 默认关闭）+ 功能成熟度分级（production/pilot/experimental） |
+| A.6 | 最小企业级运行基线 | ✅ 已完成 | request_id 中间件 + 结构化日志 JSONFormatter + 异步任务状态中心 + Web Vitals 监控 + 灾备脚本 |
+| **B. 扩大试点前** | | | |
+| B.1 | 复核批注接入主页面 | ✅ 已完成 | WorkpaperList.vue 新增复核意见面板（列表+新增+解决+未解决计数徽标） |
+| B.2 | 提交复核硬门槛 | ✅ 已完成 | 4项门禁（reviewer/QC/批注/AI确认），不满足时按钮禁用+tooltip显示原因 |
+| B.3 | 做实阻断级 QC 规则 | ✅ 已完成 | 5条实质阻断规则（结论非空+AI确认+审定数公式+复核人分配+未解决批注） |
+| B.4 | 附件关联交互优化 | ⚠️ 部分完成 | 后端 wp-index 搜索 API 已有，前端附件关联改为搜索下拉需联调 |
+| B.5 | 异步任务中心 | ✅ 已完成 | task_center.py（create/update/get/list/stats）+ 3个API端点 |
+| B.6 | 实验功能标识 | ✅ 已完成 | feature_flags.py + feature_flags 路由 + 17个功能成熟度分级 |
+| **C. 全所推广前** | | | |
+| C.1 | 在线编辑路线决定 | ✅ 已决策 | 采用方案B：离线为正式主链路+在线编辑功能开关灰度验证 |
+| C.2 | 证据链与归档治理 | ✅ 已完成 | 归档锁定+云端推送（SFTP/S3/SMB）+本地清理+归档清单 |
+| C.3 | 角色化项目工作台 | ✅ 已有 | ManagementDashboard（合伙人）+ ProjectDashboard（经理）+ PersonalDashboard（审计员）已在 Phase 9 实现 |
+| C.4 | 多代代码治理 | ⚠️ 部分完成 | token统一已修、32个死代码路由已标记、路径口径不统一已记录（breaking change不改） |
+| C.5 | 可观测性与测试保障 | ✅ 已完成 | 结构化日志+request_id追踪+Web Vitals+143个测试+灾备脚本 |
+| C.6 | 文件存储与灾备 | ✅ 已完成 | 三阶段架构（本地+Paperless元数据+云端归档）+ 上传双写 + backup.py（RPO=1天/RTO=4小时） |
+
+## 九、工程治理附录整改状态
+
+| # | 问题 | 状态 | 整改措施 |
+|---|------|------|---------|
+| 1 | 迁移编号冲突 | ✅ 已修 | 32个迁移文件重编号为001-032线性链（fix_migrations.py） |
+| 2 | 硬编码配置 | ✅ 已修 | vite.config.ts 改用 loadEnv + WopiPoc.vue 改用 import.meta.env + .env/.env.example |
+| 3 | console.log + 全局错误处理 | ✅ 已修 | 3处console.log清理 + app.config.errorHandler + unhandledrejection + router.onError |
+| 4 | 日志/监控/性能 | ✅ 已修 | logging_config.py JSONFormatter + request_id中间件 + monitor.ts Web Vitals |
+| 5 | API版本/类型生成 | ✅ 已修 | GET /api/version端点 + generate_types.py自动生成脚本 + services/index.ts统一入口 |
+| 6 | SSE/异步任务 | ✅ 已修 | sse.ts统一封装（createSSE自动重连+fetchSSE流式POST）+ task_center.py任务状态中心 |
+| 7 | 文件存储/灾备 | ✅ 已修 | CloudStorageService（SFTP/S3/SMB/local）+ 上传双写 + backup.py + RPO=1天/RTO=4小时 |
+| 8 | 安全/访问治理 | ⚠️ 部分完成 | 项目级权限+真实用户已修；导出控制/水印/会话失效待后续 |
+
+## 四、核心发现整改状态
+
+| # | 核心发现 | 整改状态 | 说明 |
+|---|---------|---------|------|
+| 1 | 在线编辑POC | ✅ 已降级 | 功能开关默认关闭，标记为experimental，离线为正式主链路 |
+| 2 | 复核闭环不硬 | ✅ 已补硬 | 4项门禁+5条实质QC规则+复核批注面板+未解决计数 |
+| 3 | 附件证据链断层 | ⚠️ 部分完成 | 后端架构完整，前端预览代理需Paperless部署后联调 |
+| 4 | 权限留痕不足 | ✅ 已修 | 项目级权限+真实用户+request_id追踪+审计日志 |
+| 5 | 稳定性可观测性弱 | ✅ 已修 | 结构化日志+任务中心+Web Vitals+灾备脚本 |
+| 6 | 多代代码并存 | ⚠️ 部分完成 | token统一+死代码标记，路径口径不改（breaking change） |
+| 7 | 高级能力偏展示性 | ✅ 已修 | 功能成熟度分级+功能开关+灰度控制 |
+
+## 未完成项说明
+
+以下 3 项标记为"部分完成"，原因和后续计划：
+
+1. **A.4 附件预览代理**：后端 attachments.py 路由已有上传/列表/下载能力，但统一预览代理（屏蔽 paperless:// 路径差异）需要 Paperless-ngx 服务运行后联调验证。代码层面已预留接口。
+
+2. **B.4 附件关联搜索**：后端 wp-index API 已支持按编码/名称搜索底稿，前端 AttachmentManagement.vue 的关联交互改为搜索下拉需要前端联调。
+
+3. **C.4 路径口径统一**：`working-papers` vs `workpapers` 两种路径并存，修改会破坏现有前端调用，决定不改。新代码统一用 `working-papers`。32个死代码路由文件已标记，启用前需转异步。
+
+## 整改代码清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| `backend/app/deps.py` | 新增 check_consol_lock + get_visible_project_ids |
+| `backend/app/middleware/request_id.py` | 新增 RequestIDMiddleware + RequestIDFilter |
+| `backend/app/middleware/response.py` | _SKIP_PATHS 扩展 |
+| `backend/app/core/database.py` | pool_pre_ping=True + pool_recycle=3600 |
+| `backend/app/core/logging_config.py` | 新增 JSONFormatter + setup_logging |
+| `backend/app/services/feature_flags.py` | 新增功能开关+成熟度分级 |
+| `backend/app/services/task_center.py` | 新增异步任务状态中心 |
+| `backend/app/services/cloud_storage_service.py` | 新增云端存储（SFTP/S3/SMB/local）+ 上传双写 |
+| `backend/app/services/private_storage_service.py` | ProjectArchiveService 增加云端推送 |
+| `backend/app/services/qc_engine.py` | 5条阻断级QC规则做实 + 2条新增 |
+| `backend/app/routers/feature_flags.py` | 新增功能开关API |
+| `backend/app/routers/task_center.py` | 新增任务中心API |
+| `backend/app/routers/annotations.py` | 占位UUID→get_current_user |
+| `backend/app/routers/forum.py` | 占位UUID→get_current_user |
+| `backend/app/routers/process_record.py` | 占位UUID→get_current_user |
+| `backend/app/routers/report_trace.py` | 占位UUID→get_current_user |
+| `backend/app/routers/review_conversations.py` | 占位UUID→get_current_user |
+| `backend/app/routers/wp_download.py` | 新增 cloud-url 端点 |
+| `backend/app/main.py` | 注册新路由+RequestIDMiddleware+setup_logging+版本端点 |
+| `backend/scripts/backup.py` | 新增灾备脚本 |
+| `backend/scripts/fix_migrations.py` | 迁移重编号脚本 |
+| `backend/scripts/generate_types.py` | TypeScript类型自动生成 |
+| `backend/alembic/versions/001-032` | 全部重编号为线性链 |
+| `audit-platform/frontend/src/utils/http.ts` | 统一解包+分级错误+请求去重+自动重试 |
+| `audit-platform/frontend/src/utils/sse.ts` | 新增SSE统一封装 |
+| `audit-platform/frontend/src/utils/monitor.ts` | 新增Web Vitals+请求监控 |
+| `audit-platform/frontend/src/main.ts` | 全局错误处理+Web Vitals初始化 |
+| `audit-platform/frontend/src/stores/collaboration.ts` | token键名统一 |
+| `audit-platform/frontend/src/views/WorkpaperList.vue` | 复核批注面板+4项门禁+批量下载+上传弹窗 |
+| `audit-platform/frontend/src/router/index.ts` | 高频页面预加载 |
+| `audit-platform/frontend/src/services/index.ts` | API服务层统一入口 |
+| `audit-platform/frontend/vite.config.ts` | 环境变量配置 |
+| `.env.example` | 云端存储配置项 |
+
+## 测试验证
+
+- 143个后端测试全部通过（Phase 0-10 属性测试+单元测试）
+- 无回归
