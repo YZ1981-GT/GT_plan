@@ -160,6 +160,25 @@ class WpUploadService:
         wp.prefill_stale = True  # 标记需要重新解析
         await db.flush()
 
+        # 双写云端（非阻塞，失败只记日志）
+        try:
+            from app.services.cloud_storage_service import CloudStorageService, CLOUD_SYNC_ON_UPLOAD
+            if CLOUD_SYNC_ON_UPLOAD:
+                cloud_svc = CloudStorageService()
+                # 获取项目信息
+                import sqlalchemy as sa
+                from app.models.core import Project
+                proj_r = await db.execute(sa.select(Project).where(Project.id == project_id))
+                proj = proj_r.scalar_one_or_none()
+                if proj:
+                    pname = proj.client_name or "unknown"
+                    ws = proj.wizard_state or {}
+                    yr = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year", 2025)
+                    rel_path = str(file_path.relative_to(Path("storage") / "projects" / str(project_id)))
+                    await cloud_svc.sync_single_file(project_id, pname, yr, file_path, rel_path)
+        except Exception as e:
+            logger.warning("cloud sync on upload failed (non-blocking): %s", e)
+
         logger.info(
             "upload_file: wp=%s, new_version=%d, size=%d bytes",
             wp_id, wp.file_version, len(file_content),

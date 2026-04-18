@@ -891,3 +891,9 @@ inclusion: always
 ## 文件存储架构决策（2026-04-18 用户确认）
 - 三阶段存储架构：①项目进行中→底稿在本地磁盘（快速读写/预填充/解析/版本管理）②日常使用中→Paperless-ngx负责OCR/分类/检索/元数据（不存文件本身，只存识别后的文本+元数据，供LLM引用和信息交互）③项目归档时→底稿推送云端存储（S3/MinIO/阿里云OSS），本地可选清理
 - 待开发：CloudStorageService（S3/MinIO/OSS配置切换）+ 归档流程增加云端推送步骤 + Paperless元数据同步（底稿保存时自动同步OCR文本，不传文件）+ 云端归档后本地文件标记storage_type=cloud
+- CloudStorageService 已实现（2026-04-18）：支持 sftp/s3/smb/local 四种传输方式，通过 CLOUD_STORAGE_TYPE 环境变量切换；预留内部服务器地址 192.168.1.100；归档流程已集成云端推送（ProjectArchiveService.archive_project 新增 push_to_cloud/cleanup_local 参数）；.env.example 已补齐云端配置项
+
+## 文件存储架构升级（2026-04-18 用户新需求）
+- 上传时双写：底稿上传时同时写入本地磁盘+云端服务器（不等归档再同步），日常交互只用识别后的信息（parsed_data/OCR文本），需要查看原始文档时从云端直接打开
+- 好处：①归档不用再批量上传 ②云端始终有最新版（天然备份）③其他用户可从云端查看原始文档（不依赖上传者本地）
+- CloudStorageService 需新增 sync_on_upload() 方法，在底稿上传/WOPI保存时自动同步到云端

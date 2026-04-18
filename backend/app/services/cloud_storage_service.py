@@ -53,9 +53,107 @@ CLOUD_LOCAL_PATH = os.environ.get("CLOUD_LOCAL_PATH", "archive_cloud")
 
 STORAGE_ROOT = Path(os.environ.get("STORAGE_ROOT", "storage"))
 
+# 是否启用上传时双写（默认开启，有云端服务器时自动同步）
+CLOUD_SYNC_ON_UPLOAD = os.environ.get("CLOUD_SYNC_ON_UPLOAD", "true").lower() == "true"
+
 
 class CloudStorageService:
     """云端存储服务"""
+
+    async def sync_single_file(
+        self,
+        project_id: UUID,
+        project_name: str,
+        year: int,
+        local_file: Path,
+        relative_path: str,
+    ) -> dict[str, Any]:
+        """上传时同步单个文件到云端（双写模式）
+
+        在底稿上传/WOPI保存时调用，不阻塞主流程（失败只记日志不报错）。
+        """
+        if not CLOUD_SYNC_ON_UPLOAD:
+            return {"status": "disabled"}
+
+        remote_prefix = f"{year}/{project_name}_{str(project_id)[:8]}"
+        remote_key = f"{remote_prefix}/{relative_path}"
+
+        try:
+            if CLOUD_STORAGE_TYPE == "sftp":
+                return await self._sync_file_sftp(local_file, remote_key)
+            elif CLOUD_STORAGE_TYPE == "s3":
+                return await self._sync_file_s3(local_file, remote_key)
+            elif CLOUD_STORAGE_TYPE == "smb":
+                return await self._sync_file_smb(local_file, remote_key)
+            else:
+                return await self._sync_file_local(local_file, remote_key)
+        except Exception as e:
+            logger.warning("cloud sync failed (non-blocking): %s", e)
+            return {"status": "failed", "error": str(e)}
+
+    async def _sync_file_local(self, local_file: Path, remote_key: str) -> dict:
+        dest = Path(CLOUD_LOCAL_PATH) / remote_key
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(local_file, dest)
+        return {"status": "success", "method": "local", "remote_key": remote_key}
+
+    async def _sync_file_sftp(self, local_file: Path, remote_key: str) -> dict:
+        try:
+            import paramiko
+        except ImportError:
+            return await self._sync_file_local(local_file, remote_key)
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            kw: dict[str, Any] = {"hostname": CLOUD_SFTP_HOST, "port": CLOUD_SFTP_PORT, "username": CLOUD_SFTP_USER}
+            if CLOUD_SFTP_KEY_PATH:
+                kw["key_filename"] = CLOUD_SFTP_KEY_PATH
+            elif CLOUD_SFTP_PASSWORD:
+                kw["password"] = CLOUD_SFTP_PASSWORD
+            ssh.connect(**kw)
+            sftp = ssh.open_sftp()
+            remote_path = f"{CLOUD_SFTP_BASE_PATH}/{remote_key}"
+            remote_dir = "/".join(remote_path.split("/")[:-1])
+            self._sftp_makedirs(sftp, remote_dir)
+            sftp.put(str(local_file), remote_path)
+            sftp.close()
+            return {"status": "success", "method": "sftp", "remote_key": remote_key}
+        finally:
+            ssh.close()
+
+    async def _sync_file_s3(self, local_file: Path, remote_key: str) -> dict:
+        try:
+            import boto3
+            from botocore.config import Config as BotoConfig
+        except ImportError:
+            return await self._sync_file_local(local_file, remote_key)
+        s3 = boto3.client("s3", endpoint_url=CLOUD_S3_ENDPOINT,
+                          aws_access_key_id=CLOUD_S3_ACCESS_KEY,
+                          aws_secret_access_key=CLOUD_S3_SECRET_KEY,
+                          region_name=CLOUD_S3_REGION or None,
+                          config=BotoConfig(signature_version="s3v4"))
+        s3.upload_file(str(local_file), CLOUD_S3_BUCKET, remote_key)
+        return {"status": "success", "method": "s3", "remote_key": remote_key}
+
+    async def _sync_file_smb(self, local_file: Path, remote_key: str) -> dict:
+        dest = Path(CLOUD_SMB_SERVER) / remote_key
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(local_file, dest)
+        return {"status": "success", "method": "smb", "remote_key": remote_key}
+
+    def get_cloud_url(self, project_id: UUID, project_name: str, year: int, relative_path: str) -> str | None:
+        """获取云端文件的访问 URL（供其他用户直接打开原始文档）"""
+        remote_prefix = f"{year}/{project_name}_{str(project_id)[:8]}"
+        remote_key = f"{remote_prefix}/{relative_path}"
+
+        if CLOUD_STORAGE_TYPE == "s3":
+            return f"{CLOUD_S3_ENDPOINT}/{CLOUD_S3_BUCKET}/{remote_key}"
+        elif CLOUD_STORAGE_TYPE == "smb":
+            return f"{CLOUD_SMB_SERVER}/{remote_key}"
+        elif CLOUD_STORAGE_TYPE == "sftp":
+            return f"sftp://{CLOUD_SFTP_HOST}{CLOUD_SFTP_BASE_PATH}/{remote_key}"
+        else:
+            return f"file:///{CLOUD_LOCAL_PATH}/{remote_key}"
 
     async def upload_project_archive(
         self,

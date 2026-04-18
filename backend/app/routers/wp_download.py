@@ -111,3 +111,51 @@ async def upload_file(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/workpapers/{wp_id}/cloud-url")
+async def get_cloud_url(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取底稿的云端访问 URL（供其他用户直接打开原始文档）"""
+    import sqlalchemy as sa
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+    from app.models.core import Project
+    from app.services.cloud_storage_service import CloudStorageService
+    from pathlib import Path
+
+    result = await db.execute(
+        sa.select(WorkingPaper, WpIndex)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WorkingPaper.id == wp_id, WorkingPaper.project_id == project_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+    wp, idx = row
+
+    proj_r = await db.execute(sa.select(Project).where(Project.id == project_id))
+    proj = proj_r.scalar_one_or_none()
+    if not proj:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    pname = proj.client_name or "unknown"
+    ws = proj.wizard_state or {}
+    yr = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year", 2025)
+
+    file_path = Path(wp.file_path)
+    try:
+        rel_path = str(file_path.relative_to(Path("storage") / "projects" / str(project_id)))
+    except ValueError:
+        rel_path = file_path.name
+
+    svc = CloudStorageService()
+    url = svc.get_cloud_url(project_id, pname, yr, rel_path)
+    return {
+        "wp_id": str(wp_id),
+        "wp_code": idx.wp_code,
+        "cloud_url": url,
+        "file_version": wp.file_version,
+    }
