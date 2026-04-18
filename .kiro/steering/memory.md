@@ -824,3 +824,10 @@ inclusion: always
 - Phase 10 hook 改为全阶段审查模式（version=4），完成后已禁用
 - 全阶段审查完成（2026-04-18）：74个已注册路由+32个未注册死代码路由（Phase 3/4同步风格）；47个Vue页面全部有路由；10个API服务层文件覆盖所有阶段；review.py和reviews.py同前缀冲突不影响运行（均未注册）；Phase 10 design.md新增§27全阶段审查报告
 - 用户偏好：讲究前后端联动，不能只开发后端不管前端；要求三件套一致性和跨阶段冲突检查
+
+## 全阶段审查（2026-04-18 第二轮）
+- 审查结果：74个已注册路由+32个未注册死代码路由（Phase 3/4同步风格）；56个Vue文件全部有路由无缺失；5个前缀级别共用（非真正冲突，子路径不同）；10个API服务层文件覆盖所有阶段
+- 修复：test_collaboration.py WorkpaperStub 添加 extend_existing=True，解决全量测试收集阶段崩溃
+- 测试结果：66 passed + 18 failed（全部是 Phase 3 协作模块预存问题：ORM字段不匹配/枚举值缺失/UUID类型传str，均为未注册到main.py的死代码服务）+ Phase 10 的 51 个测试全部通过
+- 32个死代码路由文件：ai_admin/ai_chat/ai_confirmation/ai_contract/ai_evidence_chain/ai_knowledge/ai_ocr/ai_pdf_export/ai_report/ai_risk_assessment/ai_workpaper/archive/audit_findings/audit_logs/audit_plan/audit_program/auth/companies/component_auditors/confirmations/going_concern/management_letter/nl_command/notifications/pbc/project_mgmt/review/reviews/risk/sync/sync_conflict/users（均为Phase 3/4同步ORM风格，启用前需转异步）
+- 新增 backend/scripts/check_routes.py 路由审查脚本
