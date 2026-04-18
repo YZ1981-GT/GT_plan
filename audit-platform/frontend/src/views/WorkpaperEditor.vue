@@ -109,9 +109,19 @@ function onDownloadEdit() {
 
 async function checkOnlyoffice(): Promise<boolean> {
   try {
-    const resp = await http.get('/api/health', { timeout: 5000 })
-    // Check if ONLYOFFICE is configured and reachable
-    return resp.status === 200
+    // 检查后端健康
+    const healthResp = await http.get('/api/health', { timeout: 5000 })
+    if (healthResp.status !== 200) return false
+
+    // 检查 ONLYOFFICE Document Server 是否可达
+    const onlyofficeUrl = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
+    try {
+      const officeResp = await fetch(`${onlyofficeUrl}/healthcheck`, { signal: AbortSignal.timeout(3000) })
+      return officeResp.ok
+    } catch {
+      // ONLYOFFICE 不可达，降级到离线模式
+      return false
+    }
   } catch {
     return false
   }

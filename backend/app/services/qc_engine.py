@@ -210,25 +210,7 @@ class UnresolvedAnnotationsRule(QCRule):
 # ---------------------------------------------------------------------------
 
 class ManualInputCompleteRule(QCRule):
-    """Rule 4: 人工填写区完整。"""
-    severity = "warning"
-    rule_id = "QC-04"
-
-    async def check(self, context: QCContext) -> list[QCFindingItem]:
-        return []
-
-
-class SubtotalAccuracyRule(QCRule):
-    """Rule 5: 内部合计数正确。"""
-    severity = "warning"
-    rule_id = "QC-05"
-
-    async def check(self, context: QCContext) -> list[QCFindingItem]:
-        return []
-
-
-class CrossRefConsistencyRule(QCRule):
-    """Rule 6: 交叉索引一致性。"""
+    """Rule 6: 人工填写区完整。"""
     severity = "warning"
     rule_id = "QC-06"
 
@@ -236,8 +218,8 @@ class CrossRefConsistencyRule(QCRule):
         return []
 
 
-class IndexRegistrationRule(QCRule):
-    """Rule 7: 索引表登记。"""
+class SubtotalAccuracyRule(QCRule):
+    """Rule 7: 内部合计数正确。"""
     severity = "warning"
     rule_id = "QC-07"
 
@@ -245,8 +227,8 @@ class IndexRegistrationRule(QCRule):
         return []
 
 
-class CrossRefExistsRule(QCRule):
-    """Rule 8: 引用底稿存在。"""
+class CrossRefConsistencyRule(QCRule):
+    """Rule 8: 交叉索引一致性。"""
     severity = "warning"
     rule_id = "QC-08"
 
@@ -254,8 +236,8 @@ class CrossRefExistsRule(QCRule):
         return []
 
 
-class AuditProcedureStatusRule(QCRule):
-    """Rule 9: 审计程序执行状态。"""
+class IndexRegistrationRule(QCRule):
+    """Rule 9: 索引表登记。"""
     severity = "warning"
     rule_id = "QC-09"
 
@@ -263,8 +245,8 @@ class AuditProcedureStatusRule(QCRule):
         return []
 
 
-class SamplingCompletenessRule(QCRule):
-    """Rule 10: 抽样记录完整。"""
+class CrossRefExistsRule(QCRule):
+    """Rule 10: 引用底稿存在。"""
     severity = "warning"
     rule_id = "QC-10"
 
@@ -272,10 +254,28 @@ class SamplingCompletenessRule(QCRule):
         return []
 
 
-class AdjustmentRecordedRule(QCRule):
-    """Rule 11: 调整事项已录入。"""
+class AuditProcedureStatusRule(QCRule):
+    """Rule 11: 审计程序执行状态。"""
     severity = "warning"
     rule_id = "QC-11"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        return []
+
+
+class SamplingCompletenessRule(QCRule):
+    """Rule 12: 抽样记录完整。"""
+    severity = "warning"
+    rule_id = "QC-12"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        return []
+
+
+class AdjustmentRecordedRule(QCRule):
+    """Rule 13: 调整事项已录入。"""
+    severity = "warning"
+    rule_id = "QC-13"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
         return []
@@ -286,9 +286,9 @@ class AdjustmentRecordedRule(QCRule):
 # ---------------------------------------------------------------------------
 
 class PreparationDateRule(QCRule):
-    """Rule 12: 编制日期合理。"""
+    """Rule 14: 编制日期合理。"""
     severity = "info"
-    rule_id = "QC-12"
+    rule_id = "QC-14"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
         return []

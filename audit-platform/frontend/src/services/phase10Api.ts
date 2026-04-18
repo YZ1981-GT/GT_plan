@@ -1,6 +1,12 @@
 /**
  * Phase 10 API 服务层
  * 过程记录/LLM底稿对话/抽样增强/复核对话/批注/论坛/溯源/打卡/辅助汇总/合并增强/快照/推荐/差异/分类/排版
+ *
+ * 路径约定：
+ *   - process_record 路由前缀: /api/process-record/projects/{id}/workpapers/...
+ *   - wp_chat 路由前缀: /api/workpapers/{wp_id}/ai/...
+ *   - 主底稿管理（workpaperApi.ts）: /api/projects/{id}/working-papers/...
+ *   注意：workpapers 和 working-papers 两种路径并存，新代码统一用 working-papers
  */
 import http from '@/utils/http'
 

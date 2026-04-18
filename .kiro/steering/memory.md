@@ -913,3 +913,12 @@ inclusion: always
 - 复核提交后端门禁：working_paper.py update_status 在状态为 review_* 时强制检查4项（reviewer分配/QC阻断/未解决批注/未执行QC），不满足返回400+具体原因列表
 - EventPayload 修复：event_bus.publish 接受 EventPayload 对象（不是两个参数），wp_download_service 已修正
 - commit 99286db 已push
+
+## 框架→落地修复（2026-04-18 第二轮）
+- 发现5个"定义了但没接入"的问题并全部修实：
+  ①check_consol_lock 接入 trial_balance.py(recalc) + adjustments.py(create/update/delete) 3个写端点
+  ②RequestIDFilter 接入 logging_config.py（日志格式加 %(request_id)s，JSON格式加 request_id 字段）
+  ③task_center 接入 attachment_service.upload_attachment_file（OCR任务跟踪）+ wp_download_service.upload_file（parse任务跟踪）
+  ④feature_flags.is_enabled("online_editing") 接入 wopi.py check_file_info（关闭时强制 ReadOnly=True）
+  ⑤WorkpaperEditor.vue 顶部工具栏加"⚠ 实验功能"标签
+- commit d08594c，待push

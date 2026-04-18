@@ -223,10 +223,19 @@ class WorkingPaperService:
         wp_id: UUID,
         new_status: str,
     ) -> dict:
-        """更新底稿状态。
+        """更新底稿状态（含严格状态机校验）。
 
-        Validates: Requirements 6.1
+        状态流转：draft → edit_complete → review_level1_passed → review_level2_passed → archived
         """
+        # 严格状态转换规则
+        VALID_TRANSITIONS: dict[str, list[str]] = {
+            "draft": ["edit_complete"],
+            "edit_complete": ["draft", "review_level1_passed"],  # 可退回编制
+            "review_level1_passed": ["edit_complete", "review_level2_passed"],  # 可退回
+            "review_level2_passed": ["review_level1_passed", "archived"],
+            "archived": [],  # 归档后不可变更
+        }
+
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
         )
@@ -235,9 +244,18 @@ class WorkingPaperService:
             raise ValueError("底稿不存在")
 
         try:
-            wp.status = WpFileStatus(new_status)
+            new_enum = WpFileStatus(new_status)
         except ValueError:
             raise ValueError(f"无效状态: {new_status}")
+
+        current = wp.status.value if wp.status else "draft"
+        allowed = VALID_TRANSITIONS.get(current, [])
+        if new_status not in allowed:
+            raise ValueError(
+                f"状态转换不允许: {current} → {new_status}（允许: {', '.join(allowed) or '无'}）"
+            )
+
+        wp.status = new_enum
 
         wp.updated_at = datetime.now(timezone.utc)
         await db.flush()

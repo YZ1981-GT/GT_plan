@@ -145,6 +145,24 @@ async def get_wp_attachments(wp_id: UUID, db: AsyncSession = Depends(get_db)):
     return await svc.get_wp_attachments(wp_id)
 
 
+class OCRStatusUpdate(BaseModel):
+    status: str  # pending / processing / completed / failed
+    ocr_text: str | None = None
+
+
+@router.put("/api/attachments/{attachment_id}/ocr-status")
+async def update_ocr_status(
+    attachment_id: UUID, body: OCRStatusUpdate, db: AsyncSession = Depends(get_db),
+):
+    """更新附件 OCR 状态和文本（由 OCR 服务回调）"""
+    svc = _svc(db)
+    result = await svc.update_ocr_status(attachment_id, body.status, body.ocr_text)
+    if not result:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await db.commit()
+    return result
+
+
 @router.post("/api/attachments/{attachment_id}/classify")
 async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
     """自动分类文档"""
