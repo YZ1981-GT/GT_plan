@@ -99,10 +99,9 @@ class WOPIHostService:
         file_id: UUID,
         user_id: UUID | None = None,
     ) -> dict:
-        """WOPI CheckFileInfo: 返回文件元数据。
+        """WOPI CheckFileInfo: 返回文件元数据（含真实文件大小）。"""
+        from pathlib import Path
 
-        Validates: Requirements 3.1
-        """
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == file_id)
         )
@@ -110,9 +109,16 @@ class WOPIHostService:
         if wp is None:
             raise FileNotFoundError(f"底稿不存在: {file_id}")
 
+        # 真实文件大小
+        file_size = 0
+        if wp.file_path:
+            fp = Path(wp.file_path)
+            if fp.exists():
+                file_size = fp.stat().st_size
+
         return {
             "BaseFileName": wp.file_path.split("/")[-1] if wp.file_path else str(file_id),
-            "Size": 0,  # stub — 实际文件大小需读取文件系统
+            "Size": file_size,
             "OwnerId": str(wp.created_by) if wp.created_by else "",
             "Version": str(wp.file_version),
             "UserCanWrite": True,
@@ -122,10 +128,9 @@ class WOPIHostService:
         }
 
     async def get_file(self, db: AsyncSession, file_id: UUID) -> bytes:
-        """WOPI GetFile: 返回文件二进制内容 (stub)。
+        """WOPI GetFile: 返回文件真实二进制内容。"""
+        from pathlib import Path
 
-        Validates: Requirements 3.1
-        """
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == file_id)
         )
@@ -133,8 +138,14 @@ class WOPIHostService:
         if wp is None:
             raise FileNotFoundError(f"底稿不存在: {file_id}")
 
-        # MVP stub: return empty bytes
-        return b""
+        if not wp.file_path:
+            raise FileNotFoundError(f"底稿文件路径为空: {file_id}")
+
+        fp = Path(wp.file_path)
+        if not fp.exists():
+            raise FileNotFoundError(f"底稿文件不存在: {wp.file_path}")
+
+        return fp.read_bytes()
 
     async def put_file(
         self,
@@ -143,10 +154,11 @@ class WOPIHostService:
         content: bytes,
         lock_id: str | None = None,
     ) -> dict:
-        """WOPI PutFile: 写入文件 + 递增版本号。
+        """WOPI PutFile: 企业级保存 — 锁校验+版本快照+写入+哈希校验+审计留痕+事件发布。"""
+        import hashlib
+        import shutil
+        from pathlib import Path
 
-        Validates: Requirements 3.7
-        """
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == file_id)
         )
@@ -154,21 +166,132 @@ class WOPIHostService:
         if wp is None:
             raise FileNotFoundError(f"底稿不存在: {file_id}")
 
-        # Check lock if provided
+        # 1. 锁校验（Redis 优先，内存降级）
+        file_key = str(file_id)
         if lock_id:
-            file_key = str(file_id)
+            # 检查 Redis 锁
+            r = _get_redis()
+            if r:
+                try:
+                    redis_key = f"wopi:lock:{file_key}"
+                    existing = await r.get(redis_key)
+                    if existing:
+                        existing_id = existing.decode() if isinstance(existing, bytes) else existing
+                        if existing_id != lock_id:
+                            raise PermissionError(f"锁冲突: 期望 {lock_id}，实际 {existing_id}")
+                except PermissionError:
+                    raise
+                except Exception:
+                    pass  # Redis 不可用，降级到内存锁
+            # 内存锁检查
             if file_key in _locks:
                 lock_info = _locks[file_key]
                 if lock_info["lock_id"] != lock_id:
                     raise PermissionError("锁冲突: lock_id 不匹配")
 
-        # Increment version (stub — no actual file write)
+        if not wp.file_path:
+            raise FileNotFoundError(f"底稿文件路径为空: {file_id}")
+
+        fp = Path(wp.file_path)
+        fp.parent.mkdir(parents=True, exist_ok=True)
+
+        # 2. 版本快照（保存前备份当前版本）
+        if fp.exists():
+            snapshot_dir = fp.parent / ".versions"
+            snapshot_dir.mkdir(exist_ok=True)
+            snapshot_name = f"{fp.stem}_v{wp.file_version}{fp.suffix}"
+            shutil.copy2(fp, snapshot_dir / snapshot_name)
+            logger.info("version snapshot: %s → %s", fp.name, snapshot_name)
+
+        # 3. 写入文件
+        fp.write_bytes(content)
+
+        # 4. 哈希校验（写入后验证完整性）
+        written_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
+        content_hash = hashlib.sha256(content).hexdigest()
+        if written_hash != content_hash:
+            logger.error("CRITICAL: hash mismatch after write! file=%s expected=%s actual=%s",
+                         fp, content_hash, written_hash)
+            # 尝试从快照恢复
+            snapshot_dir = fp.parent / ".versions"
+            snapshot_name = f"{fp.stem}_v{wp.file_version}{fp.suffix}"
+            snapshot_path = snapshot_dir / snapshot_name
+            if snapshot_path.exists():
+                shutil.copy2(snapshot_path, fp)
+                logger.info("restored from snapshot after hash mismatch")
+            raise RuntimeError("文件写入完整性校验失败，已从快照恢复")
+
+        # 5. 更新数据库
+        old_version = wp.file_version
         wp.file_version += 1
         wp.updated_at = datetime.now(timezone.utc)
+        wp.prefill_stale = True
         await db.flush()
 
+        # 6. 审计留痕
+        try:
+            from app.models.core import Log
+            log = Log(
+                action_type="workpaper_online_save",
+                object_type="working_paper",
+                object_id=file_id,
+                new_value={
+                    "old_version": old_version,
+                    "new_version": wp.file_version,
+                    "file_size": len(content),
+                    "content_hash": content_hash,
+                    "lock_id": lock_id,
+                    "save_method": "wopi_put_file",
+                },
+            )
+            db.add(log)
+            await db.flush()
+        except Exception as e:
+            logger.warning("audit log for online save failed: %s", e)
+
+        # 7. 发布 WORKPAPER_SAVED 事件
+        try:
+            from app.models.audit_platform_schemas import EventType, EventPayload
+            from app.services.event_bus import event_bus
+            payload = EventPayload(
+                event_type=EventType.WORKPAPER_SAVED,
+                project_id=wp.project_id,
+                extra={
+                    "wp_id": str(file_id),
+                    "file_version": wp.file_version,
+                    "trigger": "wopi_online_save",
+                    "content_hash": content_hash,
+                },
+            )
+            await event_bus.publish(payload)
+        except Exception as e:
+            logger.warning("event publish after online save failed: %s", e)
+
+        # 8. 云端双写（非阻塞）
+        try:
+            from app.services.cloud_storage_service import CloudStorageService, CLOUD_SYNC_ON_UPLOAD
+            if CLOUD_SYNC_ON_UPLOAD:
+                from app.models.core import Project
+                proj_r = await db.execute(sa.select(Project).where(Project.id == wp.project_id))
+                proj = proj_r.scalar_one_or_none()
+                if proj:
+                    cloud_svc = CloudStorageService()
+                    pname = proj.client_name or "unknown"
+                    ws = proj.wizard_state or {}
+                    yr = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year", 2025)
+                    rel_path = str(fp.relative_to(Path("storage") / "projects" / str(wp.project_id)))
+                    await cloud_svc.sync_single_file(wp.project_id, pname, yr, fp, rel_path)
+        except Exception as e:
+            logger.warning("cloud sync after online save failed: %s", e)
+
+        logger.info(
+            "put_file SUCCESS: wp=%s v%d→v%d size=%d hash=%s",
+            file_id, old_version, wp.file_version, len(content), content_hash[:12],
+        )
         return {
             "version": wp.file_version,
+            "content_hash": content_hash,
+            "file_size": len(content),
             "message": "文件保存成功",
         }
 
