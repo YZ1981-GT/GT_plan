@@ -930,3 +930,10 @@ inclusion: always
 - QC rule_id 重编号：14条规则从 QC-01 到 QC-14 无冲突（之前 QC-04/05 阻断级和警告级重复）
 - 路径约定文档：phase10Api.ts 头部加注释说明 workpapers vs working-papers 两种路径的来源和约定
 - commit 4631f01 待push
+
+## 五根主梁认证硬化（2026-04-18 关键修复）
+- 修复前：124个主梁端点中只有35个有JWT认证（28%），底稿/附件/复核大量端点全裸
+- 修复后：124个端点全部加上 Depends(get_current_user)（100%覆盖）
+- 批量修复工具：fix_auth_coverage.py（自动正则匹配+注入认证依赖）+ check_auth_coverage.py（验证覆盖率）
+- 修复的文件：working_paper/wp_download/wp_template/wp_review/wp_chat/qc/attachments/trial_balance/misstatements/sampling/sampling_enhanced/review_conversations/annotations/process_record/report_trace/adjustments（16个路由文件）
+- adjustments.py 缩进修复：get_summary 的 current_user 参数缩进错误已修正
