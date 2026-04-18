@@ -43,6 +43,8 @@ http.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
   addPending(config)
+  // 记录请求开始时间
+  ;(config as any)._startTime = Date.now()
   return config
 })
 
@@ -54,6 +56,19 @@ let refreshQueue: Array<(token: string) => void> = []
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     removePending(response.config as InternalAxiosRequestConfig)
+    // 记录请求日志
+    const startTime = (response.config as any)._startTime
+    if (startTime) {
+      import('./monitor').then(({ logRequest }) => {
+        logRequest({
+          url: response.config.url || '',
+          method: (response.config.method || 'get').toUpperCase(),
+          status: response.status,
+          duration: Date.now() - startTime,
+          timestamp: Date.now(),
+        })
+      }).catch(() => {})
+    }
     // blob/arraybuffer 不解包
     if (response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer') {
       return response
@@ -67,6 +82,22 @@ http.interceptors.response.use(
   },
   async (error: AxiosError) => {
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
+
+    // 记录错误请求日志
+    if (error.config) {
+      const startTime = (error.config as any)._startTime
+      if (startTime) {
+        import('./monitor').then(({ logRequest }) => {
+          logRequest({
+            url: error.config?.url || '',
+            method: (error.config?.method || 'get').toUpperCase(),
+            status: error.response?.status || 0,
+            duration: Date.now() - startTime,
+            timestamp: Date.now(),
+          })
+        }).catch(() => {})
+      }
+    }
 
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)

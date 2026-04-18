@@ -142,7 +142,7 @@ async function loadEditor() {
 
   if (available) {
     // Build WOPI editor URL with access token
-    const token = localStorage.getItem('access_token') || ''
+    const token = localStorage.getItem('token') || ''
     editorUrl.value = getWopiEditorUrl(wpId.value, token)
   }
 }

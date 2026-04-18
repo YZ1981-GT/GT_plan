@@ -114,7 +114,7 @@ class ConclusionNotEmptyRule(QCRule):
         if not conclusion.strip():
             return [QCFindingItem(
                 rule_id=self.rule_id, severity=self.severity,
-                description="底稿结论区为空，请填写审计结论",
+                message="底稿结论区为空，请填写审计结论",
                 cell_reference="结论区",
             )]
         return []
@@ -133,7 +133,7 @@ class AIFillConfirmedRule(QCRule):
         if unconfirmed:
             return [QCFindingItem(
                 rule_id=self.rule_id, severity=self.severity,
-                description=f"存在 {len(unconfirmed)} 项未确认的 AI 生成内容",
+                message=f"存在 {len(unconfirmed)} 项未确认的 AI 生成内容",
                 cell_reference=unconfirmed[0].get("cell_ref", ""),
             )]
         return []
@@ -157,7 +157,7 @@ class FormulaConsistencyRule(QCRule):
             if abs(float(audited) - expected) > 0.01:
                 findings.append(QCFindingItem(
                     rule_id=self.rule_id, severity=self.severity,
-                    description=f"审定数({audited})≠未审数({unadj})+AJE({aje})+RJE({rje})={expected:.2f}",
+                    message=f"审定数({audited})≠未审数({unadj})+AJE({aje})+RJE({rje})={expected:.2f}",
                     cell_reference="审定数",
                     expected_value=str(round(expected, 2)),
                     actual_value=str(audited),
@@ -175,7 +175,7 @@ class ReviewerAssignedRule(QCRule):
         if not wp.reviewer:
             return [QCFindingItem(
                 rule_id=self.rule_id, severity=self.severity,
-                description="复核人未分配，请先分配复核人再提交复核",
+                message="复核人未分配，请先分配复核人再提交复核",
             )]
         return []
 
@@ -200,7 +200,7 @@ class UnresolvedAnnotationsRule(QCRule):
         if count > 0:
             return [QCFindingItem(
                 rule_id=self.rule_id, severity=self.severity,
-                description=f"存在 {count} 条未解决的复核意见",
+                message=f"存在 {count} 条未解决的复核意见",
             )]
         return []
 

@@ -69,7 +69,9 @@
 
             <!-- 操作按钮 -->
             <div class="gt-wp-detail-actions">
-              <el-button type="primary" @click="onOnlineEdit">在线编辑</el-button>
+              <el-button v-if="onlineEditEnabled" type="primary" @click="onOnlineEdit">
+                在线编辑 <el-tag size="small" type="warning" style="margin-left:4px">实验</el-tag>
+              </el-button>
               <el-button @click="onDownload">下载</el-button>
               <el-button @click="onUpload">上传</el-button>
               <el-button type="warning" @click="onQCCheck" :loading="qcLoading">自检</el-button>
@@ -208,6 +210,9 @@ const uploadDialogVisible = ref(false)
 const uploadFile = ref<File | null>(null)
 const uploadConflict = ref<{ server_version: number; uploaded_version: number } | null>(null)
 const uploadRef = ref<any>(null)
+
+// Feature flags
+const onlineEditEnabled = ref(false)
 
 // Review annotations
 const annotations = ref<any[]>([])
@@ -512,7 +517,16 @@ async function resolveAnnotation(id: string) {
 }
 
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
-onMounted(fetchData)
+onMounted(async () => {
+  await fetchData()
+  // 加载功能开关
+  try {
+    const { data } = await http.get(`/api/feature-flags/check/online_editing`, {
+      params: { project_id: projectId.value },
+    })
+    onlineEditEnabled.value = data?.enabled ?? false
+  } catch { onlineEditEnabled.value = false }
+})
 </script>
 
 <style scoped>

@@ -185,6 +185,13 @@ async def update_status(
         except Exception:
             pass  # cell_annotations 表可能不存在
 
+        # 门禁 4：无未确认 AI 内容
+        pd = wp.parsed_data or {}
+        ai_items = pd.get("ai_content", [])
+        unconfirmed_ai = [a for a in ai_items if a.get("status") == "pending"]
+        if unconfirmed_ai:
+            blocking_reasons.append(f"{len(unconfirmed_ai)} 项未确认的 AI 生成内容")
+
         if blocking_reasons:
             raise HTTPException(
                 status_code=400,
