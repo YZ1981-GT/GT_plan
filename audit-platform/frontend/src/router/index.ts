@@ -242,6 +242,51 @@ const router = createRouter({
           name: 'PrivateStorage',
           component: () => import('@/views/PrivateStorage.vue'),
         },
+        {
+          path: 'forum',
+          name: 'Forum',
+          component: () => import('@/views/ForumPage.vue'),
+        },
+        {
+          path: 'projects/:projectId/review-conversations',
+          name: 'ReviewConversations',
+          component: () => import('@/views/ReviewConversations.vue'),
+        },
+        {
+          path: 'projects/:projectId/annotations',
+          name: 'Annotations',
+          component: () => import('@/views/AnnotationsPanel.vue'),
+        },
+        {
+          path: 'projects/:projectId/report-trace',
+          name: 'ReportTrace',
+          component: () => import('@/views/ReportTracePanel.vue'),
+        },
+        {
+          path: 'projects/:projectId/sampling-enhanced',
+          name: 'SamplingEnhanced',
+          component: () => import('@/views/SamplingEnhanced.vue'),
+        },
+        {
+          path: 'projects/:projectId/aux-summary',
+          name: 'AuxSummary',
+          component: () => import('@/views/AuxSummaryPanel.vue'),
+        },
+        {
+          path: 'projects/:projectId/consol-snapshots',
+          name: 'ConsolSnapshots',
+          component: () => import('@/views/ConsolSnapshots.vue'),
+        },
+        {
+          path: 'settings/report-format',
+          name: 'ReportFormatManager',
+          component: () => import('@/views/ReportFormatManager.vue'),
+        },
+        {
+          path: 'staff/:staffId/check-ins',
+          name: 'CheckIns',
+          component: () => import('@/views/CheckInsPage.vue'),
+        },
       ],
     },
     {

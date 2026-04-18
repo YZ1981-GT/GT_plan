@@ -157,7 +157,7 @@ import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
-  DataAnalysis, UserFilled,
+  DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -185,6 +185,9 @@ const navItems = [
   { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments' },
   { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users' },
   { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models' },
+  { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage' },
+  { key: 'forum', label: '吐槽求助', icon: ChatDotSquare, path: '/forum' },
+  { key: 'report-format', label: '排版模板', icon: Document, path: '/settings/report-format' },
   { key: 'settings', label: '系统设置', icon: Setting, path: '/settings' },
   { key: 'recycle-bin', label: '回收站', icon: DeleteFilled, path: '/recycle-bin' },
 ]

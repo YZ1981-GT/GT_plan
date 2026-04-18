@@ -380,3 +380,31 @@ Phase 10 新增 8 张表，合并为 3 个迁移脚本：
 | 023_review_and_forum.py | review_conversations + review_messages + forum_posts + forum_comments | 协作与社区 |
 | 024_annotations_and_snapshots.py | cell_annotations + consol_snapshots + check_ins | 复核批注+合并快照+打卡 |
 | 025_report_templates.py | report_format_templates + projects.prior_year_project_id + projects.consol_lock + projects.consol_lock_by + projects.consol_lock_at + adjustments.is_continuous 字段 | 排版模板+连续审计+合并锁定 |
+
+---
+
+## 任务组 22：前端集成（补充）
+
+### Task 22.1 前端 API 服务层
+- [x] phase10Api.ts 统一封装所有 Phase 10 后端 API（40+ 函数）
+- [x] TypeScript 类型定义（ConversationItem/AnnotationItem/ForumPostItem/AgingBracket）
+
+### Task 22.2 前端路由注册
+- [x] router/index.ts 注册 10 条 Phase 10 路由
+- [x] DefaultLayout.vue 排除 /forum 和 /private-storage 为全宽模式
+
+### Task 22.3 前端页面实现
+- [x] AnnotationsPanel.vue — 批注管理（表格+筛选+创建弹窗+状态流转）
+- [x] ReportTracePanel.vue — 报告溯源（章节号查询+附注/底稿/试算表/序时账四层展示+findings汇总）
+- [x] SamplingEnhanced.vue — 抽样增强（截止性测试/账龄分析/月度明细三Tab+表单+结果表格）
+- [x] AuxSummaryPanel.vue — 辅助余额汇总匹配（科目余额vs辅助汇总+差异高亮+统计）
+- [x] ConsolSnapshots.vue — 合并数据快照（列表+创建）
+- [x] ReportFormatManager.vue — 排版模板管理（列表+创建弹窗+字体/字号配置）
+- [x] CheckInsPage.vue — 打卡签到（打卡按钮+记录列表+上下班标签）
+- [x] ReviewConversations.vue — 复核对话（已有，双栏布局+消息列表+发送+关闭+导出）
+- [x] ForumPage.vue — 论坛（已有，分类筛选+发帖+评论+点赞+匿名）
+- [x] PrivateStorage.vue — 私人库（已有）
+
+### Task 22.4 导航集成
+- [x] ThreeColumnLayout navItems 新增：私人库/吐槽求助/排版模板
+- [x] 新增图标导入：ChatDotSquare/Suitcase/Document

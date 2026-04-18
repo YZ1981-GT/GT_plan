@@ -744,3 +744,57 @@ review_messages 表新增字段：
     → 按科目/底稿/严重度分组
     → 前端统一 findings 看板
 ```
+
+## 26. 前端集成设计
+
+### 26a 前端 API 服务层
+```
+audit-platform/frontend/src/services/phase10Api.ts
+  → 统一封装 Phase 10 所有后端 API 调用
+  → 包含：过程记录(7函数) + LLM底稿(2函数) + 抽样增强(3函数)
+         + 复核对话(6函数) + 批注(3函数) + 论坛(5函数)
+         + 溯源(2函数) + 打卡(2函数) + 辅助汇总(1函数)
+         + 合并锁定(3函数) + 快照(2函数) + 推荐(1函数)
+         + 差异报告(1函数) + 附件分类(1函数) + 排版模板(2函数)
+```
+
+### 26b 前端路由注册
+```
+router/index.ts Phase 10 新增路由：
+  /private-storage          → PrivateStorage.vue（私人库）
+  /forum                    → ForumPage.vue（论坛）
+  /projects/:id/review-conversations → ReviewConversations.vue（复核对话）
+  /projects/:id/annotations → AnnotationsPanel.vue（批注）
+  /projects/:id/report-trace → ReportTracePanel.vue（溯源）
+  /projects/:id/sampling-enhanced → SamplingEnhanced.vue（抽样增强）
+  /projects/:id/aux-summary → AuxSummaryPanel.vue（辅助汇总）
+  /projects/:id/consol-snapshots → ConsolSnapshots.vue（快照）
+  /settings/report-format   → ReportFormatManager.vue（排版模板）
+  /staff/:id/check-ins      → CheckInsPage.vue（打卡）
+```
+
+### 26c 导航集成
+```
+ThreeColumnLayout.vue navItems 新增：
+  - 私人库（Suitcase 图标，/private-storage）
+  - 吐槽求助（ChatDotSquare 图标，/forum）
+  - 排版模板（Document 图标，/settings/report-format）
+
+DefaultLayout.vue isBrowseMode/hideMiddle 排除：
+  - /forum 和 /private-storage 使用全宽模式
+```
+
+### 26d 前端页面清单
+```
+Phase 10 新增 Vue 页面（10个）：
+  1. PrivateStorage.vue — 私人库（已有）
+  2. ForumPage.vue — 论坛（已有）
+  3. ReviewConversations.vue — 复核对话（已有）
+  4. AnnotationsPanel.vue — 批注管理
+  5. ReportTracePanel.vue — 报告溯源
+  6. SamplingEnhanced.vue — 抽样增强（截止性/账龄/月度三Tab）
+  7. AuxSummaryPanel.vue — 辅助余额汇总匹配
+  8. ConsolSnapshots.vue — 合并数据快照
+  9. ReportFormatManager.vue — 排版模板管理
+  10. CheckInsPage.vue — 打卡签到
+```

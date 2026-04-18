@@ -69,14 +69,14 @@ const catalogTitle = computed(() => {
 // 浏览模式：首页/项目列表/其他一级模块（非具体项目子页面和新建向导）
 const isBrowseMode = computed(() => {
   const p = route.path
-  if (p === '/projects/new' || p.startsWith('/extension/') || p.startsWith('/settings/') || p === '/recycle-bin') return false
+  if (p === '/projects/new' || p.startsWith('/extension/') || p.startsWith('/settings/') || p === '/recycle-bin' || p === '/forum' || p === '/private-storage') return false
   return p === '/' || p === '/projects' || !p.match(/^\/projects\/[^/]+\//)
 })
 
-// 隐藏中间栏：在具体项目子页面、新建向导、扩展页面、设置页面、回收站时
+// 隐藏中间栏：在具体项目子页面、新建向导、扩展页面、设置页面、回收站、论坛、私人库时
 const hideMiddle = computed(() => {
   const p = route.path
-  if (p === '/projects/new' || p.startsWith('/extension/') || p.startsWith('/settings/') || p === '/recycle-bin') return true
+  if (p === '/projects/new' || p.startsWith('/extension/') || p.startsWith('/settings/') || p === '/recycle-bin' || p === '/forum' || p === '/private-storage') return true
   return !!p.match(/^\/projects\/[^/]+\//)
 })
 
