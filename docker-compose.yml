@@ -67,7 +67,7 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-120}
       JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      CORS_ORIGINS: "http://localhost:5173,http://localhost:3030"
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3030
       ONLYOFFICE_URL: ${ONLYOFFICE_URL:-http://onlyoffice:80}
       WOPI_BASE_URL: ${WOPI_BASE_URL:-http://backend:8000/wopi}
       STORAGE_ROOT: ${STORAGE_ROOT:-./storage}

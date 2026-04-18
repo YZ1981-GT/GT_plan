@@ -3,7 +3,7 @@
 # 基础镜像: python:3.12-slim-bookworm (稳定版本)
 # ============================================================
 
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim
 
 # 禁用代理
 ARG http_proxy
@@ -24,7 +24,7 @@ WORKDIR /app
 
 # 先复制依赖清单，利用 Docker 层缓存
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip install --no-cache-dir -r requirements.txt --default-timeout=300
 
 # 复制应用代码
 COPY . .

@@ -78,6 +78,13 @@ from app.routers.wp_storage import router as wp_storage_router
 from app.routers.wp_download import router as wp_download_router
 from app.routers.continuous_audit import router as continuous_audit_router
 from app.routers.private_storage import router as private_storage_router
+from app.routers.process_record import router as process_record_router
+from app.routers.wp_chat import router as wp_chat_router
+from app.routers.sampling_enhanced import router as sampling_enhanced_router
+from app.routers.review_conversations import router as review_conversations_router
+from app.routers.annotations import router as annotations_router_v2
+from app.routers.forum import router as forum_router
+from app.routers.report_trace import router as report_trace_router
 from app.core.config import settings
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
@@ -196,3 +203,10 @@ app.include_router(wp_storage_router)
 app.include_router(wp_download_router)
 app.include_router(continuous_audit_router)
 app.include_router(private_storage_router)
+app.include_router(process_record_router)
+app.include_router(wp_chat_router)
+app.include_router(sampling_enhanced_router)
+app.include_router(review_conversations_router)
+app.include_router(annotations_router_v2)
+app.include_router(forum_router)
+app.include_router(report_trace_router)
