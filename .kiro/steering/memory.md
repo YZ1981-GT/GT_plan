@@ -897,3 +897,6 @@ inclusion: always
 - 上传时双写：底稿上传时同时写入本地磁盘+云端服务器（不等归档再同步），日常交互只用识别后的信息（parsed_data/OCR文本），需要查看原始文档时从云端直接打开
 - 好处：①归档不用再批量上传 ②云端始终有最新版（天然备份）③其他用户可从云端查看原始文档（不依赖上传者本地）
 - CloudStorageService 需新增 sync_on_upload() 方法，在底稿上传/WOPI保存时自动同步到云端
+- 问题文档整改回复已写入（2026-04-18）：30+项中27项✅已完成、3项⚠️部分完成（A.4附件预览代理/B.4附件关联搜索/C.4路径口径——均需Paperless部署或属breaking change）；问题文件末尾追加了完整整改状态表+代码清单
+- 待push的commit：1f8e768(16项修复) + cloud archive + dual-write + 问题文档更新，共4个commit等代理恢复后统一push
+- Paperless-ngx 已部署（2026-04-18）：Docker容器 audit-paperless 端口8010，首次启动CPU 100%（数据库迁移+OCR引擎初始化，需2-5分钟），内存78MB正常；与gt_workplan主进程同时占满CPU导致启动慢，建议加deploy.resources.limits限制CPU=2核/内存=512M
