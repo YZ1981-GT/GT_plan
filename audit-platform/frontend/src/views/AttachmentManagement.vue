@@ -12,7 +12,7 @@
           <el-option label="图片" value="image" />
         </el-select>
         <el-upload
-          :action="`/api/projects/${projectId}/attachments`"
+          :action="`/api/projects/${projectId}/attachments/upload`"
           :show-file-list="false"
           :before-upload="beforeUpload"
           :on-success="onUploadSuccess"
@@ -67,16 +67,37 @@
     />
 
     <!-- 关联底稿弹窗 -->
-    <el-dialog v-model="associateVisible" title="关联到底稿" width="400px">
+    <el-dialog v-model="associateVisible" title="关联到底稿" width="480px">
       <el-form label-width="80px" size="small">
-        <el-form-item label="底稿ID">
-          <el-input v-model="associateWpId" placeholder="输入底稿ID" />
+        <el-form-item label="搜索底稿">
+          <el-select
+            v-model="associateWpId"
+            filterable
+            remote
+            :remote-method="searchWorkpapers"
+            :loading="wpSearchLoading"
+            placeholder="输入底稿编号或名称搜索"
+            style="width: 100%"
+            value-key="id"
+          >
+            <el-option
+              v-for="wp in wpSearchResults"
+              :key="wp.id"
+              :label="`${wp.wp_code} ${wp.wp_name}`"
+              :value="wp.id"
+            >
+              <span style="float: left">{{ wp.wp_code }}</span>
+              <span style="float: right; color: var(--gt-color-text-secondary); font-size: 12px">{{ wp.wp_name }}</span>
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="关联类型">
           <el-select v-model="associateType" style="width: 100%">
             <el-option label="审计证据" value="evidence" />
             <el-option label="支持文件" value="support" />
             <el-option label="函证回函" value="confirmation" />
+            <el-option label="合同" value="contract" />
+            <el-option label="银行对账单" value="bank_statement" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注">
@@ -85,7 +106,7 @@
       </el-form>
       <template #footer>
         <el-button size="small" @click="associateVisible = false">取消</el-button>
-        <el-button type="primary" size="small" @click="submitAssociate">确认关联</el-button>
+        <el-button type="primary" size="small" @click="submitAssociate" :disabled="!associateWpId">确认关联</el-button>
       </template>
     </el-dialog>
   </div>
@@ -119,6 +140,24 @@ const associateAttachmentId = ref('')
 const associateWpId = ref('')
 const associateType = ref('evidence')
 const associateNotes = ref('')
+const wpSearchLoading = ref(false)
+const wpSearchResults = ref<any[]>([])
+
+async function searchWorkpapers(query: string) {
+  if (!query || query.length < 1) { wpSearchResults.value = []; return }
+  wpSearchLoading.value = true
+  try {
+    const { data } = await http.get(`/api/projects/${projectId.value}/wp-index`)
+    const items = Array.isArray(data) ? data : data?.data ?? []
+    // 按编号或名称模糊过滤
+    const q = query.toLowerCase()
+    wpSearchResults.value = items.filter((w: any) =>
+      (w.wp_code || '').toLowerCase().includes(q) ||
+      (w.wp_name || '').toLowerCase().includes(q)
+    ).slice(0, 20)
+  } catch { wpSearchResults.value = [] }
+  finally { wpSearchLoading.value = false }
+}
 
 async function loadAttachments() {
   loading.value = true
@@ -144,14 +183,16 @@ async function onSearch() {
 }
 
 function preview(row: any) {
-  previewUrl.value = row.file_path
+  // 使用统一预览代理端点
+  previewUrl.value = `/api/attachments/${row.id}/preview`
   previewName.value = row.file_name
   previewType.value = row.file_type
   previewVisible.value = true
 }
 
 function download(row: any) {
-  window.open(row.file_path, '_blank')
+  // 使用统一下载代理端点
+  window.open(`/api/attachments/${row.id}/download`, '_blank')
 }
 
 function associateDialog(row: any) {
@@ -162,7 +203,7 @@ function associateDialog(row: any) {
 }
 
 async function submitAssociate() {
-  if (!associateWpId.value) { ElMessage.warning('请输入底稿ID'); return }
+  if (!associateWpId.value) { ElMessage.warning('请选择底稿'); return }
   try {
     await http.post(`/api/attachments/${associateAttachmentId.value}/associate`, {
       wp_id: associateWpId.value,

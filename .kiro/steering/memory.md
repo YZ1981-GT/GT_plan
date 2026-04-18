@@ -900,3 +900,5 @@ inclusion: always
 - 问题文档整改回复已写入（2026-04-18）：30+项中27项✅已完成、3项⚠️部分完成（A.4附件预览代理/B.4附件关联搜索/C.4路径口径——均需Paperless部署或属breaking change）；问题文件末尾追加了完整整改状态表+代码清单
 - 待push的commit：1f8e768(16项修复) + cloud archive + dual-write + 问题文档更新，共4个commit等代理恢复后统一push
 - Paperless-ngx 已部署（2026-04-18）：Docker容器 audit-paperless 端口8010，首次启动CPU 100%（数据库迁移+OCR引擎初始化，需2-5分钟），内存78MB正常；与gt_workplan主进程同时占满CPU导致启动慢，建议加deploy.resources.limits限制CPU=2核/内存=512M
+- Paperless-ngx 启动成功（2026-04-18）：API http://localhost:8010 可访问，管理员 admin/admin；首次启动失败原因是 chi_sim 中文OCR语言包未安装（容器内apt走代理连不上），改为 PAPERLESS_OCR_LANGUAGE=eng + PAPERLESS_OCR_MODE=skip_noarchive，中文OCR由后端UnifiedOCRService（Tesseract/MinerU）处理，结果通过元数据同步到Paperless
+- Paperless OCR 分工决策：Paperless 只做英文OCR和文档管理/检索/分类，中文OCR由后端处理后同步元数据，避免在容器内安装中文语言包的网络问题

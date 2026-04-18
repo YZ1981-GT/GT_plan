@@ -163,3 +163,124 @@ async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Dep
         return await svc.extract_confirmation_reply(attachment_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ── 统一预览/下载代理（屏蔽 paperless:// 和本地路径差异）──
+
+@router.get("/api/attachments/{attachment_id}/download")
+async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
+    """统一下载代理 — 屏蔽底层存储差异"""
+    from fastapi.responses import StreamingResponse, Response
+    from pathlib import Path
+    import httpx
+
+    svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+
+    file_path = att.get("file_path", "")
+    file_name = att.get("file_name", "attachment")
+
+    # Paperless 存储：通过 Paperless API 代理下载
+    if file_path.startswith("paperless://"):
+        doc_id = file_path.replace("paperless://", "")
+        import os
+        paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
+        paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(
+                    f"{paperless_url}/api/documents/{doc_id}/download/",
+                    headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
+                )
+                if resp.status_code == 200:
+                    return Response(
+                        content=resp.content,
+                        media_type=resp.headers.get("content-type", "application/octet-stream"),
+                        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+                    )
+                raise HTTPException(status_code=resp.status_code, detail="Paperless 下载失败")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"Paperless 连接失败: {e}")
+
+    # 本地存储：直接读取文件
+    local_path = Path(file_path)
+    if not local_path.exists():
+        # 尝试在 storage 目录下查找
+        from pathlib import Path as P
+        storage_path = P("storage") / file_path.lstrip("/")
+        if storage_path.exists():
+            local_path = storage_path
+        else:
+            raise HTTPException(status_code=404, detail="文件不存在")
+
+    return StreamingResponse(
+        open(local_path, "rb"),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+
+@router.get("/api/attachments/{attachment_id}/preview")
+async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
+    """统一预览代理 — 返回可预览的内容（PDF/图片直接返回，其他返回元数据）"""
+    from fastapi.responses import StreamingResponse, Response
+    from pathlib import Path
+    import httpx
+
+    svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+
+    file_path = att.get("file_path", "")
+    file_name = att.get("file_name", "")
+    file_type = att.get("file_type", "")
+
+    # 判断是否可直接预览
+    previewable_types = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+    ext = Path(file_name).suffix.lower() if file_name else ""
+    can_preview = ext in previewable_types
+
+    if not can_preview:
+        # 不可预览的文件返回元数据 + OCR 文本
+        return {
+            "previewable": False,
+            "file_name": file_name,
+            "file_type": file_type,
+            "ocr_text": att.get("ocr_text", ""),
+            "download_url": f"/api/attachments/{attachment_id}/download",
+        }
+
+    # Paperless 存储
+    if file_path.startswith("paperless://"):
+        doc_id = file_path.replace("paperless://", "")
+        import os
+        paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
+        paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(
+                    f"{paperless_url}/api/documents/{doc_id}/preview/",
+                    headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
+                )
+                if resp.status_code == 200:
+                    return Response(
+                        content=resp.content,
+                        media_type=resp.headers.get("content-type", "application/pdf"),
+                    )
+        except httpx.RequestError:
+            pass
+
+    # 本地存储
+    local_path = Path(file_path)
+    if not local_path.exists():
+        local_path = Path("storage") / file_path.lstrip("/")
+    if local_path.exists():
+        mime_map = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg", ".gif": "image/gif", ".svg": "image/svg+xml"}
+        mime = mime_map.get(ext, "application/octet-stream")
+        return StreamingResponse(open(local_path, "rb"), media_type=mime)
+
+    return {"previewable": False, "file_name": file_name, "download_url": f"/api/attachments/{attachment_id}/download"}

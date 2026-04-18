@@ -161,8 +161,7 @@ services:
       PAPERLESS_DBUSER: ${PG_USER:-postgres}
       PAPERLESS_DBPASS: ${PG_PASSWORD:-postgres}
       PAPERLESS_REDIS: redis://redis:6379/1
-      PAPERLESS_OCR_LANGUAGE: eng
-      PAPERLESS_OCR_MODE: skip_noarchive
+      PAPERLESS_OCR_LANGUAGE: chi_sim+eng
       PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET:-audit-paperless-secret-key}
       PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-admin}
       PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:-admin}
