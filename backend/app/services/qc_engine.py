@@ -103,30 +103,105 @@ class QCRule(ABC):
 # ---------------------------------------------------------------------------
 
 class ConclusionNotEmptyRule(QCRule):
-    """Rule 1: 结论区已填写。"""
+    """Rule 1: 结论区已填写（从 parsed_data 检查）。"""
     severity = "blocking"
     rule_id = "QC-01"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
-        # MVP stub: 无法读取实际文件，返回空
+        wp = context.working_paper
+        pd = wp.parsed_data or {}
+        conclusion = pd.get("conclusion") or pd.get("conclusion_text") or ""
+        if not conclusion.strip():
+            return [QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                description="底稿结论区为空，请填写审计结论",
+                cell_reference="结论区",
+            )]
         return []
 
 
 class AIFillConfirmedRule(QCRule):
-    """Rule 2: AI填充区全部确认。"""
+    """Rule 2: AI 填充内容全部已确认。"""
     severity = "blocking"
     rule_id = "QC-02"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        wp = context.working_paper
+        pd = wp.parsed_data or {}
+        ai_items = pd.get("ai_content", [])
+        unconfirmed = [a for a in ai_items if a.get("status") == "pending"]
+        if unconfirmed:
+            return [QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                description=f"存在 {len(unconfirmed)} 项未确认的 AI 生成内容",
+                cell_reference=unconfirmed[0].get("cell_ref", ""),
+            )]
         return []
 
 
 class FormulaConsistencyRule(QCRule):
-    """Rule 3: 取数公式一致性。"""
+    """Rule 3: 审定数 = 未审数 + AJE + RJE（从 parsed_data 检查）。"""
     severity = "blocking"
     rule_id = "QC-03"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        wp = context.working_paper
+        pd = wp.parsed_data or {}
+        findings = []
+        unadj = pd.get("unadjusted_amount")
+        aje = pd.get("aje_adjustment", 0)
+        rje = pd.get("rje_adjustment", 0)
+        audited = pd.get("audited_amount")
+        if unadj is not None and audited is not None:
+            expected = float(unadj) + float(aje) + float(rje)
+            if abs(float(audited) - expected) > 0.01:
+                findings.append(QCFindingItem(
+                    rule_id=self.rule_id, severity=self.severity,
+                    description=f"审定数({audited})≠未审数({unadj})+AJE({aje})+RJE({rje})={expected:.2f}",
+                    cell_reference="审定数",
+                    expected_value=str(round(expected, 2)),
+                    actual_value=str(audited),
+                ))
+        return findings
+
+
+class ReviewerAssignedRule(QCRule):
+    """Rule 4: 复核人已分配。"""
+    severity = "blocking"
+    rule_id = "QC-04"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        wp = context.working_paper
+        if not wp.reviewer:
+            return [QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                description="复核人未分配，请先分配复核人再提交复核",
+            )]
+        return []
+
+
+class UnresolvedAnnotationsRule(QCRule):
+    """Rule 5: 无未解决的复核意见。"""
+    severity = "blocking"
+    rule_id = "QC-05"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        from app.models.phase10_models import CellAnnotation
+        result = await context.db.execute(
+            sa.select(sa.func.count()).select_from(CellAnnotation).where(
+                CellAnnotation.project_id == context.project_id,
+                CellAnnotation.object_type == "workpaper",
+                CellAnnotation.object_id == context.working_paper.id,
+                CellAnnotation.status != "resolved",
+                CellAnnotation.is_deleted == sa.false(),
+            )
+        )
+        count = result.scalar() or 0
+        if count > 0:
+            return [QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                description=f"存在 {count} 条未解决的复核意见",
+            )]
         return []
 
 
@@ -235,6 +310,8 @@ class QCEngine:
             ConclusionNotEmptyRule(),
             AIFillConfirmedRule(),
             FormulaConsistencyRule(),
+            ReviewerAssignedRule(),
+            UnresolvedAnnotationsRule(),
             # 警告级
             ManualInputCompleteRule(),
             SubtotalAccuracyRule(),

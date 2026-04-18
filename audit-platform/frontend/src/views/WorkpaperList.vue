@@ -73,7 +73,9 @@
               <el-button @click="onDownload">下载</el-button>
               <el-button @click="onUpload">上传</el-button>
               <el-button type="warning" @click="onQCCheck" :loading="qcLoading">自检</el-button>
-              <el-button type="success" @click="onSubmitReview" :disabled="hasBlocking">提交复核</el-button>
+              <el-tooltip :disabled="!hasBlocking" :content="blockingReasons.join('；')" placement="top">
+                <el-button type="success" @click="onSubmitReview" :disabled="hasBlocking">提交复核</el-button>
+              </el-tooltip>
             </div>
 
             <!-- QC 结果摘要 -->
@@ -85,6 +87,60 @@
                 阻断 {{ qcResult.blocking_count }} / 警告 {{ qcResult.warning_count }} / 提示 {{ qcResult.info_count }}
               </span>
             </div>
+
+            <!-- 复核批注面板 -->
+            <div class="gt-wp-review-section" style="margin-top: 16px">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+                <h4 style="margin: 0; font-size: 14px; color: var(--gt-color-text)">
+                  复核意见
+                  <el-badge v-if="unresolvedCount > 0" :value="unresolvedCount" type="danger" style="margin-left: 8px" />
+                </h4>
+                <el-button size="small" type="primary" @click="showAddAnnotation = true">新增意见</el-button>
+              </div>
+              <el-table v-if="annotations.length" :data="annotations" size="small" stripe max-height="200">
+                <el-table-column prop="content" label="内容" min-width="200" show-overflow-tooltip />
+                <el-table-column prop="priority" label="优先级" width="80">
+                  <template #default="{ row }">
+                    <el-tag :type="row.priority === 'high' ? 'danger' : row.priority === 'medium' ? 'warning' : 'info'" size="small">
+                      {{ row.priority === 'high' ? '高' : row.priority === 'medium' ? '中' : '低' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="status" label="状态" width="80">
+                  <template #default="{ row }">
+                    <el-tag :type="row.status === 'resolved' ? 'success' : row.status === 'replied' ? 'warning' : 'danger'" size="small">
+                      {{ row.status === 'resolved' ? '已解决' : row.status === 'replied' ? '已回复' : '待处理' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="100">
+                  <template #default="{ row }">
+                    <el-button v-if="row.status !== 'resolved'" size="small" text type="success" @click="resolveAnnotation(row.id)">解决</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-empty v-else description="暂无复核意见" :image-size="40" />
+            </div>
+
+            <!-- 新增意见弹窗 -->
+            <el-dialog v-model="showAddAnnotation" title="新增复核意见" width="400px">
+              <el-form label-width="60px">
+                <el-form-item label="内容">
+                  <el-input v-model="newAnnotation.content" type="textarea" :rows="3" placeholder="输入复核意见" />
+                </el-form-item>
+                <el-form-item label="优先级">
+                  <el-radio-group v-model="newAnnotation.priority">
+                    <el-radio value="high">高</el-radio>
+                    <el-radio value="medium">中</el-radio>
+                    <el-radio value="low">低</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+              </el-form>
+              <template #footer>
+                <el-button @click="showAddAnnotation = false">取消</el-button>
+                <el-button type="primary" @click="submitAnnotation" :disabled="!newAnnotation.content">提交</el-button>
+              </template>
+            </el-dialog>
           </div>
         </template>
         <el-empty v-else description="请从左侧选择底稿" :image-size="120" />
@@ -153,6 +209,12 @@ const uploadFile = ref<File | null>(null)
 const uploadConflict = ref<{ server_version: number; uploaded_version: number } | null>(null)
 const uploadRef = ref<any>(null)
 
+// Review annotations
+const annotations = ref<any[]>([])
+const unresolvedCount = computed(() => annotations.value.filter(a => a.status !== 'resolved').length)
+const showAddAnnotation = ref(false)
+const newAnnotation = ref({ content: '', priority: 'medium' })
+
 // Filters
 const filterCycle = ref('')
 const filterStatus = ref('')
@@ -182,7 +244,26 @@ const statusOptions = [
   { value: 'archived', label: '已归档' },
 ]
 
-const hasBlocking = computed(() => (qcResult.value?.blocking_count ?? 0) > 0)
+const hasBlocking = computed(() => {
+  // 4 项硬门槛：任一不满足则禁止提交复核
+  if (!selectedWp.value) return true
+  // 1. reviewer 未分配
+  if (!selectedWp.value.reviewer) return true
+  // 2. 阻断级 QC 未通过
+  if (qcResult.value && (qcResult.value.blocking_count ?? 0) > 0) return true
+  // 3. 存在未解决复核意见
+  if (unresolvedCount.value > 0) return true
+  return false
+})
+
+const blockingReasons = computed(() => {
+  const reasons: string[] = []
+  if (!selectedWp.value) return reasons
+  if (!selectedWp.value.reviewer) reasons.push('复核人未分配')
+  if (qcResult.value && (qcResult.value.blocking_count ?? 0) > 0) reasons.push('存在阻断级 QC 问题')
+  if (unresolvedCount.value > 0) reasons.push(`${unresolvedCount.value} 条未解决复核意见`)
+  return reasons
+})
 
 interface TreeNode {
   id: string
@@ -284,11 +365,11 @@ async function onNodeClick(data: TreeNode) {
     }
   }
   qcResult.value = null
-  // Try to load QC results
+  annotations.value = []
+  // Try to load QC results and annotations
   if (selectedWp.value) {
-    try {
-      qcResult.value = await getQCResults(projectId.value, selectedWp.value.id)
-    } catch { /* no QC yet */ }
+    try { qcResult.value = await getQCResults(projectId.value, selectedWp.value.id) } catch { /* no QC yet */ }
+    await loadAnnotations()
   }
 }
 
@@ -394,6 +475,40 @@ async function onSubmitReview() {
   } catch {
     ElMessage.error('提交失败')
   }
+}
+
+async function loadAnnotations() {
+  if (!selectedWp.value) { annotations.value = []; return }
+  try {
+    const { data } = await http.get(`/api/projects/${projectId.value}/annotations`, {
+      params: { object_type: 'workpaper', object_id: selectedWp.value.id },
+    })
+    annotations.value = Array.isArray(data) ? data : data?.items ?? []
+  } catch { annotations.value = [] }
+}
+
+async function submitAnnotation() {
+  if (!selectedWp.value || !newAnnotation.value.content) return
+  try {
+    await http.post(`/api/projects/${projectId.value}/annotations`, {
+      object_type: 'workpaper',
+      object_id: selectedWp.value.id,
+      content: newAnnotation.value.content,
+      priority: newAnnotation.value.priority,
+    })
+    ElMessage.success('复核意见已提交')
+    showAddAnnotation.value = false
+    newAnnotation.value = { content: '', priority: 'medium' }
+    await loadAnnotations()
+  } catch { ElMessage.error('提交失败') }
+}
+
+async function resolveAnnotation(id: string) {
+  try {
+    await http.put(`/api/annotations/${id}`, { status: 'resolved' })
+    ElMessage.success('已标记为解决')
+    await loadAnnotations()
+  } catch { ElMessage.error('操作失败') }
 }
 
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
