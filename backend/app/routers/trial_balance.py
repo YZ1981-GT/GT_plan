@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import check_consol_lock
 from app.services.materiality_service import MaterialityService
 from app.services.trial_balance_service import TrialBalanceService
 
@@ -60,8 +61,9 @@ async def recalc_trial_balance(
     year: int = Query(...),
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """手动触发全量重算"""
+    """手动触发全量重算（合并锁定期间禁止）"""
     svc = TrialBalanceService(db)
     await svc.full_recalc(project_id, year, company_code)
     await db.commit()

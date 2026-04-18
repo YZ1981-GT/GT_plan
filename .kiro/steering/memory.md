@@ -905,3 +905,11 @@ inclusion: always
 - 最后3项"部分完成"已全部修复（2026-04-18）：①附件预览/下载统一代理（/api/attachments/{id}/preview + /download，屏蔽paperless://和本地路径差异）②附件关联改为搜索下拉（el-select remote filterable，按底稿编号/名称模糊搜索，替代手输ID）③Paperless中文OCR（从GitHub下载chi_sim.traineddata 44MB复制进容器，docker-compose恢复chi_sim+eng）
 - 新增 MIGRATION_LEDGER.md 迁移台账（路径口径不统一记录+32个死代码路由清单+两套前端定位）
 - 问题文档所有30+项整改全部完成（27项✅→30项✅），commit aa431fd已push
+
+## 主链路硬化修复（2026-04-18）
+- 用户强调：主链路可靠可用是第一优先级，不能只搭框架不落地
+- 项目列表可见性：list_projects 从返回全部改为按角色过滤（admin/partner全部，其他只看自己参与的项目，查 project_users 表）
+- 底稿上传级联：upload_file 写文件后真正调用 ParseService.parse_workpaper() + 发布 EventPayload(WORKPAPER_SAVED) 事件，非阻塞（失败只记日志）
+- 复核提交后端门禁：working_paper.py update_status 在状态为 review_* 时强制检查4项（reviewer分配/QC阻断/未解决批注/未执行QC），不满足返回400+具体原因列表
+- EventPayload 修复：event_bus.publish 接受 EventPayload 对象（不是两个参数），wp_download_service 已修正
+- commit 99286db 已push

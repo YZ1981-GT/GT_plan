@@ -1,4 +1,4 @@
-"""统一日志配置 — 结构化 JSON 日志格式"""
+"""统一日志配置 — 结构化 JSON 日志格式 + request_id 链路追踪"""
 
 import logging
 import sys
@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 class JSONFormatter(logging.Formatter):
-    """结构化 JSON 日志格式"""
+    """结构化 JSON 日志格式（含 request_id）"""
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
@@ -18,6 +18,7 @@ class JSONFormatter(logging.Formatter):
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
+            "request_id": getattr(record, "request_id", "-"),
         }
         if record.exc_info and record.exc_info[1]:
             log_entry["exception"] = self.formatException(record.exc_info)
@@ -31,6 +32,8 @@ def setup_logging(level: str = "INFO", json_format: bool = False):
         level: 日志级别 (DEBUG/INFO/WARNING/ERROR)
         json_format: 是否使用 JSON 格式（生产环境推荐）
     """
+    from app.middleware.request_id import RequestIDFilter
+
     root = logging.getLogger()
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
@@ -38,11 +41,15 @@ def setup_logging(level: str = "INFO", json_format: bool = False):
     root.handlers.clear()
 
     handler = logging.StreamHandler(sys.stdout)
+
+    # 注入 request_id filter
+    handler.addFilter(RequestIDFilter())
+
     if json_format:
         handler.setFormatter(JSONFormatter())
     else:
         handler.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+            "%(asctime)s %(levelname)-8s [%(name)s] [%(request_id)s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         ))
     root.addHandler(handler)

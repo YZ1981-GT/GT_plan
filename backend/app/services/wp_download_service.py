@@ -182,10 +182,18 @@ class WpUploadService:
         # 触发 ParseService 解析关键单元格 → 回写 parsed_data
         try:
             from app.services.prefill_service import ParseService
+            from app.services.task_center import create_task, update_task, TaskType, TaskStatus
+            parse_task_id = create_task(TaskType.parse_workpaper, project_id=str(project_id), object_id=str(wp_id))
+            update_task(parse_task_id, TaskStatus.processing)
             parse_svc = ParseService()
             parse_result = await parse_svc.parse_workpaper(db=db, project_id=project_id, wp_id=wp_id)
+            update_task(parse_task_id, TaskStatus.success, result=parse_result)
             logger.info("parse after upload: wp=%s result=%s", wp_id, parse_result.get("status"))
         except Exception as e:
+            try:
+                update_task(parse_task_id, TaskStatus.failed, error=str(e))
+            except Exception:
+                pass
             logger.warning("parse after upload failed (non-blocking): %s", e)
 
         # 发布 WORKPAPER_SAVED 事件 → 级联更新试算表和报表

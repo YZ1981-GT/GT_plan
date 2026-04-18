@@ -9,6 +9,9 @@
         <el-tag v-if="wpDetail" :type="statusTagType(wpDetail.status)" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
+        <el-tag type="warning" size="small" effect="dark" style="margin-left: 8px">
+          ⚠ 实验功能
+        </el-tag>
       </div>
       <div class="gt-wp-editor-toolbar-right">
         <span class="gt-wp-editor-save-indicator" v-if="wpDetail">

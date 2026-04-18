@@ -54,6 +54,22 @@ async def wopi_check_file_info(
                 except ValueError:
                     return JSONResponse(status_code=401, content={"message": "令牌无效"})
             info = await svc.check_file_info(db, UUID(file_id), user_id)
+
+            # 功能开关：online_editing 关闭时强制只读
+            from app.services.feature_flags import is_enabled
+            # 从底稿获取 project_id
+            from app.models.workpaper_models import WorkingPaper
+            import sqlalchemy as sa
+            wp_result = await db.execute(
+                sa.select(WorkingPaper.project_id).where(WorkingPaper.id == UUID(file_id))
+            )
+            wp_row = wp_result.first()
+            project_id = str(wp_row[0]) if wp_row else None
+            if not is_enabled("online_editing", project_id):
+                info["ReadOnly"] = True
+                info["UserCanWrite"] = False
+                info["UserCanNotWriteRelative"] = True
+
             return JSONResponse(content=info)
         except FileNotFoundError:
             return JSONResponse(status_code=404, content={"message": f"底稿不存在: {file_id}"})

@@ -100,11 +100,22 @@ class AttachmentService:
         metadata = metadata or {}
         temp_path = self._write_temp_file(file_name, content)
 
+        # 创建异步任务跟踪
+        from app.services.task_center import create_task, update_task, TaskType, TaskStatus
+        task_id = create_task(
+            TaskType.ocr,
+            project_id=str(project_id),
+            object_id=file_name,
+            params={"file_size": len(content), "storage": self.primary_storage},
+        )
+
         try:
             use_paperless = self.primary_storage == "paperless" and self.paperless_enabled()
             if use_paperless:
+                update_task(task_id, TaskStatus.processing)
                 paperless_document_id = await self.upload_to_paperless(temp_path.as_posix(), metadata)
                 if paperless_document_id is not None:
+                    update_task(task_id, TaskStatus.success, result={"paperless_id": paperless_document_id})
                     return await self.create_attachment(
                         project_id,
                         {
@@ -130,6 +141,7 @@ class AttachmentService:
                 content=content,
                 attachment_type=metadata.get("attachment_type", "general"),
             )
+            update_task(task_id, TaskStatus.success, result={"storage": "local", "path": local_path})
             return await self.create_attachment(
                 project_id,
                 {

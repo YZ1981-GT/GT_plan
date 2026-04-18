@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, check_consol_lock
 from app.models.audit_platform_models import AdjustmentType, ReviewStatus
 from app.models.audit_platform_schemas import (
     AccountOption,
@@ -63,8 +63,9 @@ async def create_adjustment(
     data: AdjustmentCreate,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """创建调整分录"""
+    """创建调整分录（合并锁定期间禁止）"""
     svc = AdjustmentService(db)
     try:
         result = await svc.create_entry(project_id, data, user.id)
@@ -81,8 +82,9 @@ async def update_adjustment(
     data: AdjustmentUpdate,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """修改调整分录"""
+    """修改调整分录（合并锁定期间禁止）"""
     svc = AdjustmentService(db)
     try:
         result = await svc.update_entry(project_id, entry_group_id, data, user.id)
@@ -97,8 +99,9 @@ async def delete_adjustment(
     project_id: UUID,
     entry_group_id: UUID,
     db: AsyncSession = Depends(get_db),
+    _lock_check=Depends(check_consol_lock),
 ):
-    """软删除调整分录"""
+    """软删除调整分录（合并锁定期间禁止）"""
     svc = AdjustmentService(db)
     try:
         await svc.delete_entry(project_id, entry_group_id)
