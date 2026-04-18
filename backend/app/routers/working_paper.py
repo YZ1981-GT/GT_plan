@@ -18,16 +18,23 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import require_project_access
+from app.models.ai_models import AIConfirmationStatus, AIContent
 from app.models.core import User
+from app.models.phase10_schemas import DownloadPackRequest
+from app.services.feature_flags import get_feature_maturity, is_enabled
+from app.services.wopi_service import WOPIHostService
 from app.services.working_paper_service import WorkingPaperService
 from app.services.prefill_service import PrefillService, ParseService
+from app.services.wp_download_service import WpDownloadService, WpUploadService
 from app.models.workpaper_models import WpIndex, WpCrossRef, WorkingPaper, WpFileStatus
 
 router = APIRouter(
@@ -81,6 +88,30 @@ async def list_workpapers(
     )
 
 
+@router.post("/working-papers/download-pack")
+async def download_workpaper_pack(
+    project_id: UUID,
+    body: DownloadPackRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    svc = WpDownloadService()
+    try:
+        buf = await svc.download_pack(
+            db=db,
+            project_id=project_id,
+            wp_ids=body.wp_ids,
+            include_prefill=body.include_prefill,
+        )
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=workpapers.zip"},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.get("/working-papers/{wp_id}")
 async def get_workpaper(
     project_id: UUID,
@@ -90,10 +121,61 @@ async def get_workpaper(
 ):
     """底稿详情（需项目成员权限）"""
     svc = WorkingPaperService()
-    detail = await svc.get_workpaper(db=db, wp_id=wp_id)
+    detail = await svc.get_workpaper(db=db, wp_id=wp_id, project_id=project_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
     return detail
+
+
+@router.get("/working-papers/{wp_id}/online-session")
+async def get_online_edit_session(
+    project_id: UUID,
+    wp_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """获取在线编辑会话配置。
+
+    在线编辑是优先方案；当功能开关关闭或服务未部署时，前端再降级到离线模式。
+    """
+    wp_result = await db.execute(
+        sa.select(WorkingPaper.id).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    if wp_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    maturity = get_feature_maturity().get("online_editing", "pilot")
+    enabled = is_enabled("online_editing", project_id)
+    if not enabled:
+        return {
+            "enabled": False,
+            "maturity": maturity,
+            "preferred_mode": "offline",
+            "wopi_src": None,
+            "access_token": None,
+            "editor_base_url": None,
+        }
+
+    access_token = WOPIHostService.generate_access_token(
+        user_id=current_user.id,
+        project_id=project_id,
+        file_id=wp_id,
+    )
+    wopi_base_url = settings.WOPI_BASE_URL.rstrip("/")
+
+    return {
+        "enabled": True,
+        "maturity": maturity,
+        "preferred_mode": "online",
+        "wopi_src": f"{wopi_base_url}/files/{wp_id}?access_token={access_token}",
+        "access_token": access_token,
+        "editor_base_url": str(request.base_url).rstrip("/"),
+    }
 
 
 @router.get("/working-papers/{wp_id}/download")
@@ -104,9 +186,20 @@ async def download_workpaper(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """下载底稿（需项目成员权限）"""
-    svc = WorkingPaperService()
+    svc = WpDownloadService()
     try:
-        return await svc.download_for_offline(db=db, wp_id=wp_id)
+        info = await svc.download_single(db=db, project_id=project_id, wp_id=wp_id)
+        from pathlib import Path
+
+        file_path = Path(info["file_path"])
+        return StreamingResponse(
+            open(file_path, "rb"),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{info["file_name"]}"',
+                "X-WP-Version": str(info["file_version"]),
+            },
+        )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -123,8 +216,38 @@ async def upload_workpaper(
     svc = WorkingPaperService()
     try:
         result = await svc.upload_offline_edit(
-            db=db, wp_id=wp_id, recorded_version=data.recorded_version,
+            db=db, wp_id=wp_id, recorded_version=data.recorded_version, project_id=project_id,
         )
+        await db.commit()
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/working-papers/{wp_id}/upload-file")
+async def upload_workpaper_file(
+    project_id: UUID,
+    wp_id: UUID,
+    file: UploadFile = File(...),
+    uploaded_version: int = Query(...),
+    force_overwrite: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """上传离线编辑后的底稿文件（正式主链路）。"""
+    svc = WpUploadService()
+    content = await file.read()
+    try:
+        result = await svc.upload_file(
+            db=db,
+            project_id=project_id,
+            wp_id=wp_id,
+            file_content=content,
+            uploaded_version=uploaded_version,
+            force_overwrite=force_overwrite,
+        )
+        if result.get("status") == "conflict":
+            raise HTTPException(status_code=409, detail=result)
         await db.commit()
         return result
     except ValueError as e:
@@ -146,7 +269,7 @@ async def update_status(
     """
     svc = WorkingPaperService()
     try:
-        result = await svc.update_status(db=db, wp_id=wp_id, new_status=data.status)
+        result = await svc.update_status(db=db, wp_id=wp_id, new_status=data.status, project_id=project_id)
         await db.commit()
         return result
     except ValueError as e:
@@ -165,7 +288,7 @@ async def assign_workpaper(
     svc = WorkingPaperService()
     try:
         result = await svc.assign_workpaper(
-            db=db, wp_id=wp_id,
+            db=db, wp_id=wp_id, project_id=project_id,
             assigned_to=data.assigned_to,
             reviewer=data.reviewer,
         )
@@ -189,13 +312,19 @@ async def submit_review(
       - 编制状态 → under_review
       - 复核状态 → pending_level1
     """
-    wp_result = await db.execute(sa.select(WorkingPaper).where(WorkingPaper.id == wp_id))
+    wp_result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
     wp = wp_result.scalar_one_or_none()
     if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
     # 只有 edit_complete 或 revision_required→edit_complete 后才能提交
-    if wp.status not in (WpFileStatus.edit_complete, WpFileStatus.draft):
+    if wp.status != WpFileStatus.edit_complete:
         current_s = wp.status.value if wp.status else "unknown"
         raise HTTPException(
             status_code=400,
@@ -239,11 +368,17 @@ async def submit_review(
         pass
 
     # 门禁 4：无未确认 AI 内容
-    pd = wp.parsed_data or {}
-    ai_items = pd.get("ai_content", [])
-    unconfirmed_ai = [a for a in ai_items if a.get("status") == "pending"]
-    if unconfirmed_ai:
-        blocking_reasons.append(f"{len(unconfirmed_ai)} 项未确认的 AI 生成内容")
+    ai_pending_result = await db.execute(
+        sa.select(sa.func.count()).select_from(AIContent).where(
+            AIContent.project_id == project_id,
+            AIContent.workpaper_id == wp_id,
+            AIContent.confirmation_status == AIConfirmationStatus.pending,
+            AIContent.is_deleted == sa.false(),
+        )
+    )
+    unconfirmed_ai_count = ai_pending_result.scalar() or 0
+    if unconfirmed_ai_count > 0:
+        blocking_reasons.append(f"{unconfirmed_ai_count} 项未确认的 AI 生成内容")
 
     if blocking_reasons:
         return {
@@ -256,7 +391,7 @@ async def submit_review(
     svc = WorkingPaperService()
     try:
         result = await svc.update_review_status(
-            db=db, wp_id=wp_id, new_review_status="pending_level1"
+            db=db, wp_id=wp_id, new_review_status="pending_level1", project_id=project_id,
         )
         await db.commit()
         return {
@@ -287,7 +422,7 @@ async def update_review_status(
     svc = WorkingPaperService()
     try:
         result = await svc.update_review_status(
-            db=db, wp_id=wp_id, new_review_status=data.review_status
+            db=db, wp_id=wp_id, new_review_status=data.review_status, project_id=project_id
         )
         await db.commit()
         return result

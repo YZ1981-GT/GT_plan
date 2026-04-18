@@ -36,9 +36,33 @@ function removePending(config: InternalAxiosRequestConfig) {
   pendingMap.delete(key)
 }
 
+async function extractErrorDetail(responseData: unknown): Promise<string> {
+  if (responseData instanceof Blob) {
+    try {
+      const text = await responseData.text()
+      if (!text) return ''
+      try {
+        const parsed = JSON.parse(text)
+        return parsed?.detail ?? parsed?.message ?? text
+      } catch {
+        return text
+      }
+    } catch {
+      return ''
+    }
+  }
+
+  if (responseData && typeof responseData === 'object') {
+    return (responseData as any)?.detail ?? (responseData as any)?.message ?? ''
+  }
+
+  return typeof responseData === 'string' ? responseData : ''
+}
+
 // ── 请求拦截器 ──────────────────────────────────────────
-http.interceptors.request.use((config) => {
+http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const authStore = useAuthStore()
+  config.headers = config.headers ?? {}
   if (authStore.token) {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
@@ -50,7 +74,10 @@ http.interceptors.request.use((config) => {
 
 // ── 401 刷新队列 ────────────────────────────────────────
 let isRefreshing = false
-let refreshQueue: Array<(token: string) => void> = []
+let refreshQueue: Array<{
+  resolve: (token: string) => void
+  reject: (error: unknown) => void
+}> = []
 
 // ── 响应拦截器 ──────────────────────────────────────────
 http.interceptors.response.use(
@@ -114,10 +141,14 @@ http.interceptors.response.use(
         return Promise.reject(error)
       }
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          refreshQueue.push((token: string) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`
-            resolve(http(originalRequest))
+        return new Promise((resolve, reject) => {
+          refreshQueue.push({
+            resolve: (token: string) => {
+              originalRequest.headers = originalRequest.headers ?? {}
+              originalRequest.headers.Authorization = `Bearer ${token}`
+              resolve(http(originalRequest))
+            },
+            reject,
           })
         })
       }
@@ -126,11 +157,14 @@ http.interceptors.response.use(
       try {
         await authStore.refreshAccessToken()
         const newToken = authStore.token!
-        refreshQueue.forEach((cb) => cb(newToken))
+        refreshQueue.forEach(({ resolve }) => resolve(newToken))
         refreshQueue = []
+        originalRequest.headers = originalRequest.headers ?? {}
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return http(originalRequest)
-      } catch {
+      } catch (refreshError) {
+        refreshQueue.forEach(({ reject }) => reject(refreshError))
+        refreshQueue = []
         authStore.logout()
         window.location.href = '/login'
         return Promise.reject(error)
@@ -147,7 +181,7 @@ http.interceptors.response.use(
     }
 
     // 分级错误提示
-    const detail = (error.response?.data as any)?.detail ?? (error.response?.data as any)?.message ?? ''
+    const detail = await extractErrorDetail(error.response?.data)
     const fallback = error.message ?? '请求失败'
     const requestId = error.response?.headers?.['x-request-id'] || ''
     const msgMap: Record<number, string> = {
@@ -176,6 +210,55 @@ http.interceptors.response.use(
 )
 
 // ── 导出辅助函数 ────────────────────────────────────────
+
+function extractFileNameFromDisposition(contentDisposition?: string, fallback: string = 'download') {
+  if (!contentDisposition) return fallback
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1])
+    } catch {
+      return utf8Match[1]
+    }
+  }
+
+  const fileNameMatch = contentDisposition.match(/filename="?([^";]+)"?/i)
+  if (fileNameMatch?.[1]) {
+    return fileNameMatch[1]
+  }
+
+  return fallback
+}
+
+export function saveBlobAsFile(blob: Blob, fileName: string) {
+  const objectUrl = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = fileName
+  a.click()
+  window.URL.revokeObjectURL(objectUrl)
+}
+
+export async function downloadFile(
+  url: string,
+  options?: {
+    method?: 'get' | 'post'
+    data?: any
+    params?: Record<string, any>
+    fileName?: string
+  },
+) {
+  const method = options?.method ?? 'get'
+  const response = method === 'post'
+    ? await http.post(url, options?.data ?? null, { params: options?.params, responseType: 'blob' })
+    : await http.get(url, { params: options?.params, responseType: 'blob' })
+
+  const contentDisposition = response.headers?.['content-disposition'] as string | undefined
+  const resolvedFileName = extractFileNameFromDisposition(contentDisposition, options?.fileName || 'download')
+  saveBlobAsFile(response.data as Blob, resolvedFileName)
+  return response
+}
 
 /** 创建可取消的请求（用于组件卸载时取消） */
 export function createCancelToken() {

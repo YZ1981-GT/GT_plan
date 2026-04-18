@@ -186,7 +186,16 @@ class AttachmentService:
             .order_by(Attachment.created_at.desc())
         )
         if file_type:
-            stmt = stmt.where(Attachment.file_type == file_type)
+            normalized_file_type = file_type.lower()
+            file_type_aliases = {
+                "word": ["word", "doc", "docx"],
+                "excel": ["excel", "xls", "xlsx", "csv"],
+                "image": ["image", "jpg", "jpeg", "png", "gif", "bmp", "webp"],
+            }
+            if normalized_file_type in file_type_aliases:
+                stmt = stmt.where(Attachment.file_type.in_(file_type_aliases[normalized_file_type]))
+            else:
+                stmt = stmt.where(Attachment.file_type == normalized_file_type)
         if ocr_status:
             stmt = stmt.where(Attachment.ocr_status == ocr_status)
         if attachment_type:

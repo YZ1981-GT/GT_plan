@@ -25,7 +25,6 @@
       <!-- ONLYOFFICE 可用：在线编辑 -->
       <template v-if="editorAvailable">
         <iframe
-          ref="editorFrame"
           :src="editorUrl"
           class="gt-wp-editor-iframe"
           allow="fullscreen"
@@ -65,10 +64,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getWorkpaper, getWopiEditorUrl, type WorkpaperDetail } from '@/services/workpaperApi'
+import {
+  checkOnlineEditingAvailability,
+  downloadWorkpaper,
+  getOnlineEditSession,
+  getWorkpaper,
+  getWopiEditorUrl,
+  type WorkpaperDetail,
+} from '@/services/workpaperApi'
 import http from '@/utils/http'
 
 const route = useRoute()
@@ -79,7 +85,8 @@ const wpId = computed(() => route.params.wpId as string)
 const wpDetail = ref<WorkpaperDetail | null>(null)
 const editorAvailable = ref(false)
 const editorUrl = ref('')
-const editorFrame = ref<HTMLIFrameElement | null>(null)
+const onlineEditEnabled = ref(true)
+const onlineAccessToken = ref('')
 
 function statusTagType(s: string) {
   const m: Record<string, string> = {
@@ -103,8 +110,12 @@ function goBack() {
   router.push({ name: 'WorkpaperList', params: { projectId: projectId.value } })
 }
 
-function onDownloadEdit() {
-  window.open(`/api/projects/${projectId.value}/working-papers/${wpId.value}/download`, '_blank')
+async function onDownloadEdit() {
+  try {
+    await downloadWorkpaper(projectId.value, wpId.value)
+  } catch {
+    ElMessage.error('底稿下载失败')
+  }
 }
 
 function onUploadEdit() {
@@ -117,40 +128,59 @@ function onUploadEdit() {
 }
 
 const retrying = ref(false)
-async function retryOnline() {
-  retrying.value = true
-  try {
-    const available = await checkOnlyoffice()
-    editorAvailable.value = available
-    if (available) {
-      const token = localStorage.getItem('token') || ''
-      editorUrl.value = getWopiEditorUrl(wpId.value, token)
-      ElMessage.success('在线编辑已恢复')
-    } else {
-      ElMessage.warning('在线编辑服务仍不可用，继续使用离线模式')
-    }
-  } finally {
-    retrying.value = false
+let lockRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+function stopLockRefresh() {
+  if (lockRefreshTimer) {
+    clearInterval(lockRefreshTimer)
+    lockRefreshTimer = null
   }
 }
 
-async function checkOnlyoffice(): Promise<boolean> {
-  try {
-    // 检查后端健康
-    const healthResp = await http.get('/api/health', { timeout: 5000 })
-    if (healthResp.status !== 200) return false
+async function applyOnlineMode(notify: boolean = false) {
+  stopLockRefresh()
+  editorAvailable.value = false
+  editorUrl.value = ''
+  onlineAccessToken.value = ''
 
-    // 检查 ONLYOFFICE Document Server 是否可达
-    const onlyofficeUrl = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
-    try {
-      const officeResp = await fetch(`${onlyofficeUrl}/healthcheck`, { signal: AbortSignal.timeout(3000) })
-      return officeResp.ok
-    } catch {
-      // ONLYOFFICE 不可达，降级到离线模式
-      return false
+  try {
+    const session = await getOnlineEditSession(projectId.value, wpId.value)
+    onlineEditEnabled.value = session.enabled
+    if (!session.enabled || !session.wopi_src) {
+      if (notify) {
+        ElMessage.warning('在线编辑当前未启用，继续使用离线模式')
+      }
+      return
+    }
+
+    const available = await checkOnlineEditingAvailability()
+    if (!available) {
+      if (notify) {
+        ElMessage.warning('在线编辑服务仍不可用，继续使用离线模式')
+      }
+      return
+    }
+
+    onlineAccessToken.value = session.access_token || ''
+    editorUrl.value = getWopiEditorUrl(session.wopi_src)
+    editorAvailable.value = true
+    startLockRefresh()
+    if (notify) {
+      ElMessage.success('在线编辑已恢复')
     }
   } catch {
-    return false
+    if (notify) {
+      ElMessage.warning(onlineEditEnabled.value ? '在线编辑暂不可用，继续使用离线模式' : '在线编辑当前未启用，继续使用离线模式')
+    }
+  }
+}
+
+async function retryOnline() {
+  retrying.value = true
+  try {
+    await applyOnlineMode(true)
+  } finally {
+    retrying.value = false
   }
 }
 
@@ -163,46 +193,31 @@ async function loadEditor() {
     return
   }
 
-  // Check ONLYOFFICE availability
-  const available = await checkOnlyoffice()
-  editorAvailable.value = available
-
-  if (available) {
-    // Build WOPI editor URL with access token
-    const token = localStorage.getItem('token') || ''
-    editorUrl.value = getWopiEditorUrl(wpId.value, token)
-
-    // 启动锁租约续期定时器（每 10 分钟刷新一次，TTL=30 分钟）
-    startLockRefresh()
-  }
+  await applyOnlineMode()
 }
 
-let lockRefreshTimer: ReturnType<typeof setInterval> | null = null
-
 function startLockRefresh() {
-  if (lockRefreshTimer) clearInterval(lockRefreshTimer)
+  stopLockRefresh()
   lockRefreshTimer = setInterval(async () => {
-    if (!editorAvailable.value || !wpDetail.value) return
+    if (!editorAvailable.value || !wpDetail.value || !onlineAccessToken.value) return
     try {
-      await http.post(`/wopi/files/${wpId.value}`, null, {
+      await http.post(`/wopi/files/${wpId.value}?access_token=${encodeURIComponent(onlineAccessToken.value)}`, null, {
         headers: { 'X-WOPI-Override': 'REFRESH_LOCK', 'X-WOPI-Lock': `lock-${wpId.value}` },
         timeout: 5000,
       })
     } catch (err: any) {
       if (err?.response?.status === 409) {
         ElMessage.error('编辑锁已被其他用户获取，请保存后刷新页面')
-        editorAvailable.value = false  // 降级到离线模式
+        editorAvailable.value = false
+        editorUrl.value = ''
+        stopLockRefresh()
       }
     }
   }, 10 * 60 * 1000) // 10 分钟
 }
 
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
-  if (lockRefreshTimer) {
-    clearInterval(lockRefreshTimer)
-    lockRefreshTimer = null
-  }
+  stopLockRefresh()
 })
 
 onMounted(loadEditor)

@@ -77,7 +77,7 @@
               <el-button-group>
                 <el-button type="primary" @click="onOnlineEdit">
                   <el-icon style="margin-right:4px"><Monitor /></el-icon>
-                  {{ onlineEditAvailable ? '在线编辑' : '在线编辑（不可用）' }}
+                  {{ onlineEditReady ? '在线编辑' : '在线编辑（离线兜底）' }}
                   <el-tag v-if="onlineEditMaturity !== 'production'" size="small" type="warning" style="margin-left:6px">
                     {{ onlineEditMaturity === 'experimental' ? '实验' : '试点' }}
                   </el-tag>
@@ -92,8 +92,8 @@
                 <el-button type="success" @click="onSubmitReview" :disabled="hasBlocking">提交复核</el-button>
               </el-tooltip>
             </div>
-            <el-alert v-if="!onlineEditAvailable" type="info" :closable="false" style="margin-top:8px" show-icon>
-              ONLYOFFICE 服务暂不可用，点击"在线编辑"将自动降级为下载编辑模式
+            <el-alert v-if="!onlineEditReady" type="info" :closable="false" style="margin-top:8px" show-icon>
+              {{ onlineEditNotice }}
             </el-alert>
 
             <!-- QC 结果摘要 -->
@@ -198,13 +198,18 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Upload } from '@element-plus/icons-vue'
+import { Download, Monitor, Upload } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import {
+  checkOnlineEditingAvailability,
+  downloadWorkpaper,
+  downloadWorkpaperPack,
+  uploadWorkpaperFile,
   listWorkpapers, runQCCheck, getQCResults,
-  updateWorkpaperStatus, getWpIndex,
+  getWpIndex,
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
+import { checkUnconfirmedAI } from '@/services/phase10Api'
 
 const route = useRoute()
 const router = useRouter()
@@ -229,11 +234,18 @@ const uploadRef = ref<any>(null)
 
 // Feature flags & ONLYOFFICE 可用性
 const onlineEditAvailable = ref(true)  // ONLYOFFICE 是否可用（探测结果）
+const onlineEditEnabled = ref(true)
 const onlineEditMaturity = ref('pilot')  // 功能成熟度
+const onlineEditReady = computed(() => onlineEditEnabled.value && onlineEditAvailable.value)
+const onlineEditNotice = computed(() => {
+  if (!onlineEditEnabled.value) return '在线编辑当前未启用，点击“在线编辑”将自动降级为下载编辑模式'
+  return 'ONLYOFFICE 尚未部署或服务暂不可用，点击“在线编辑”将自动降级为下载编辑模式'
+})
 
 // Review annotations
 const annotations = ref<any[]>([])
-const unresolvedCount = computed(() => annotations.value.filter(a => a.status !== 'resolved').length)
+const unresolvedCount = computed(() => annotations.value.filter((a: any) => a.status !== 'resolved').length)
+const unconfirmedAiCount = ref(0)
 const showAddAnnotation = ref(false)
 const newAnnotation = ref({ content: '', priority: 'medium' })
 
@@ -269,21 +281,29 @@ const statusOptions = [
 const hasBlocking = computed(() => {
   // 4 项硬门槛：任一不满足则禁止提交复核
   if (!selectedWp.value) return true
+  // 0. 编制状态必须为 edit_complete
+  if (selectedWp.value.status !== 'edit_complete') return true
   // 1. reviewer 未分配
   if (!selectedWp.value.reviewer) return true
   // 2. 阻断级 QC 未通过
+  if (!qcResult.value) return true
   if (qcResult.value && (qcResult.value.blocking_count ?? 0) > 0) return true
   // 3. 存在未解决复核意见
   if (unresolvedCount.value > 0) return true
+  // 4. 存在未确认 AI 内容
+  if (unconfirmedAiCount.value > 0) return true
   return false
 })
 
 const blockingReasons = computed(() => {
   const reasons: string[] = []
   if (!selectedWp.value) return reasons
+  if (selectedWp.value.status !== 'edit_complete') reasons.push('底稿尚未完成编制')
   if (!selectedWp.value.reviewer) reasons.push('复核人未分配')
+  if (!qcResult.value) reasons.push('未执行质量自检')
   if (qcResult.value && (qcResult.value.blocking_count ?? 0) > 0) reasons.push('存在阻断级 QC 问题')
   if (unresolvedCount.value > 0) reasons.push(`${unresolvedCount.value} 条未解决复核意见`)
+  if (unconfirmedAiCount.value > 0) reasons.push(`${unconfirmedAiCount.value} 项未确认的 AI 生成内容`)
   return reasons
 })
 
@@ -302,7 +322,7 @@ const treeData = computed<TreeNode[]>(() => {
     B: 'B类 穿行测试', C: 'C类 控制测试',
   }
 
-  const items = wpIndex.value.filter(w => {
+  const items = wpIndex.value.filter((w: WpIndexItem) => {
     if (filterCycle.value && !w.wp_code?.startsWith(filterCycle.value)) return false
     if (filterStatus.value && w.status !== filterStatus.value) return false
     if (filterAssignee.value && w.assigned_to !== filterAssignee.value) return false
@@ -313,16 +333,17 @@ const treeData = computed<TreeNode[]>(() => {
     const prefix = wp.wp_code?.charAt(0) || '?'
     const groupKey = prefix
     const groupLabel = CYCLE_GROUPS[prefix] || `${prefix}类 实质性程序`
+    const matchedWorkpaper = wpList.value.find((item: WorkpaperDetail) => item.wp_index_id === wp.id)
 
     if (!groups[groupKey]) {
       groups[groupKey] = { id: `group-${groupKey}`, label: groupLabel, children: [] }
     }
     groups[groupKey].children!.push({
-      id: wp.id,
+      id: matchedWorkpaper?.id || wp.id,
       label: `${wp.wp_code} ${wp.wp_name}`,
-      status: wp.status || undefined,
-      assigned_to: wp.assigned_to,
-      wpId: wp.id,
+      status: matchedWorkpaper?.status || wp.status || undefined,
+      assigned_to: matchedWorkpaper?.assigned_to ?? wp.assigned_to,
+      wpId: matchedWorkpaper?.id || wp.id,
     })
   }
 
@@ -387,21 +408,38 @@ async function fetchData() {
       getWpIndex(projectId.value),
     ])
     wpList.value = wps
-    wpIndex.value = idx
+    wpIndex.value = idx.map((item) => {
+      const matchedWorkpaper = wps.find((wp) => wp.wp_index_id === item.id)
+      return {
+        ...item,
+        assigned_to: matchedWorkpaper?.assigned_to ?? item.assigned_to,
+        reviewer: matchedWorkpaper?.reviewer ?? item.reviewer,
+      }
+    })
   } finally {
     loading.value = false
   }
 }
 
-async function onNodeClick(data: TreeNode) {
-  if (!data.wpId) return
-  // Find matching working paper detail
-  const wp = wpList.value.find(w => w.wp_index_id === data.wpId || w.id === data.wpId)
+async function loadUnconfirmedAi() {
+  if (!selectedWp.value) {
+    unconfirmedAiCount.value = 0
+    return
+  }
+  try {
+    const result = await checkUnconfirmedAI(projectId.value, selectedWp.value.id)
+    unconfirmedAiCount.value = Number(result?.unconfirmed_count || 0)
+  } catch {
+    unconfirmedAiCount.value = 0
+  }
+}
+
+async function selectWorkpaperById(wpId: string) {
+  const wp = wpList.value.find((w: WorkpaperDetail) => w.wp_index_id === wpId || w.id === wpId)
   if (wp) {
     selectedWp.value = wp
   } else {
-    // Fetch from index info
-    const idx = wpIndex.value.find(i => i.id === data.wpId)
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === wpId)
     if (idx) {
       selectedWp.value = {
         id: idx.id, project_id: projectId.value, wp_index_id: idx.id,
@@ -414,18 +452,23 @@ async function onNodeClick(data: TreeNode) {
   }
   qcResult.value = null
   annotations.value = []
-  // Try to load QC results and annotations
+  unconfirmedAiCount.value = 0
   if (selectedWp.value) {
     try { qcResult.value = await getQCResults(projectId.value, selectedWp.value.id) } catch { /* no QC yet */ }
     await loadAnnotations()
+    await loadUnconfirmedAi()
   }
+}
+
+async function onNodeClick(data: TreeNode) {
+  if (!data.wpId) return
+  await selectWorkpaperById(data.wpId)
 }
 
 function onOnlineEdit() {
   if (!selectedWp.value) return
-  if (!onlineEditAvailable.value) {
-    // ONLYOFFICE 不可用 → 自动降级为下载编辑
-    ElMessage.info('在线编辑暂不可用，已自动切换为下载编辑')
+  if (!onlineEditReady.value) {
+    ElMessage.info(onlineEditNotice.value)
     onDownload()
     return
   }
@@ -435,9 +478,13 @@ function onOnlineEdit() {
   })
 }
 
-function onDownload() {
+async function onDownload() {
   if (!selectedWp.value) return
-  window.open(`/api/projects/${projectId.value}/workpapers/${selectedWp.value.id}/download-file`, '_blank')
+  try {
+    await downloadWorkpaper(projectId.value, selectedWp.value.id)
+  } catch {
+    ElMessage.error('下载失败')
+  }
 }
 
 function onUpload() {
@@ -455,17 +502,20 @@ async function doUpload(forceOverwrite: boolean) {
   if (!selectedWp.value || !uploadFile.value) return
   uploadLoading.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', uploadFile.value)
     const version = selectedWp.value.file_version || 1
-    const resp = await http.post(
-      `/api/projects/${projectId.value}/workpapers/${selectedWp.value.id}/upload-file?uploaded_version=${version}&force_overwrite=${forceOverwrite}`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+    const result = await uploadWorkpaperFile(
+      projectId.value,
+      selectedWp.value.id,
+      uploadFile.value,
+      version,
+      forceOverwrite,
     )
-    ElMessage.success(`上传成功，新版本 v${resp.data?.new_version || version + 1}`)
+    ElMessage.success(`上传成功，新版本 v${result?.new_version || version + 1}`)
     uploadDialogVisible.value = false
+    uploadConflict.value = null
+    uploadRef.value?.clearFiles?.()
     await fetchData()
+    await selectWorkpaperById(selectedWp.value.id)
   } catch (err: any) {
     if (err.response?.status === 409) {
       uploadConflict.value = err.response.data?.detail || err.response.data
@@ -482,17 +532,7 @@ async function onBatchDownload() {
   if (selectedWpIds.value.length === 0) return
   downloadLoading.value = true
   try {
-    const resp = await http.post(
-      `/api/projects/${projectId.value}/workpapers/download-pack`,
-      { wp_ids: selectedWpIds.value, include_prefill: true },
-      { responseType: 'blob' }
-    )
-    const url = window.URL.createObjectURL(new Blob([resp.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'workpapers.zip'
-    a.click()
-    window.URL.revokeObjectURL(url)
+    await downloadWorkpaperPack(projectId.value, selectedWpIds.value, true)
     ElMessage.success(`已下载 ${selectedWpIds.value.length} 个底稿`)
   } catch {
     ElMessage.error('批量下载失败')
@@ -523,6 +563,7 @@ async function onQCCheck() {
 async function onSubmitReview() {
   if (!selectedWp.value) return
   try {
+    const currentWpId = selectedWp.value.id
     // 使用专用提交复核端点（后端统一校验 4 项门禁）
     const { data } = await http.post(
       `/api/projects/${projectId.value}/working-papers/${selectedWp.value.id}/submit-review`
@@ -533,6 +574,7 @@ async function onSubmitReview() {
     }
     ElMessage.success('已提交复核')
     await fetchData()
+    await selectWorkpaperById(currentWpId)
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.detail || '提交失败')
   }
@@ -569,30 +611,50 @@ async function resolveAnnotation(id: string) {
     await http.put(`/api/annotations/${id}`, { status: 'resolved' })
     ElMessage.success('已标记为解决')
     await loadAnnotations()
+    await loadUnconfirmedAi()
   } catch { ElMessage.error('操作失败') }
+}
+
+async function refreshOnlineEditState() {
+  try {
+    const { data } = await http.get('/api/feature-flags/check/online_editing', {
+      params: { project_id: projectId.value },
+    })
+    const result = data?.data ?? data
+    onlineEditEnabled.value = result?.enabled ?? true
+  } catch {
+    onlineEditEnabled.value = true
+  }
+
+  if (!onlineEditEnabled.value) {
+    onlineEditAvailable.value = false
+    return
+  }
+
+  onlineEditAvailable.value = await checkOnlineEditingAvailability()
+}
+
+async function handleUploadRedirect() {
+  const uploadWpId = typeof route.query.upload === 'string' ? route.query.upload : ''
+  if (!uploadWpId) return
+  await selectWorkpaperById(uploadWpId)
+  if (selectedWp.value?.id === uploadWpId) {
+    onUpload()
+  }
+  const nextQuery = { ...route.query }
+  delete nextQuery.upload
+  await router.replace({ query: nextQuery })
 }
 
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
   await fetchData()
-  // 探测 ONLYOFFICE 可用性（在线优先，不可用时自动降级）
-  try {
-    const { data } = await http.get('/api/health')
-    // 同时检查 ONLYOFFICE 端点
-    try {
-      await http.get('/wopi/health', { timeout: 3000 })
-      onlineEditAvailable.value = true
-    } catch {
-      onlineEditAvailable.value = false
-    }
-  } catch {
-    onlineEditAvailable.value = false
-  }
-  // 加载功能成熟度
   try {
     const { data } = await http.get('/api/feature-flags/maturity')
     onlineEditMaturity.value = data?.online_editing || 'pilot'
   } catch { /* 默认 pilot */ }
+  await refreshOnlineEditState()
+  await handleUploadRedirect()
 })
 </script>
 

@@ -7,15 +7,14 @@
           :prefix-icon="Search" style="width: 200px" @keyup.enter="onSearch" />
         <el-select v-model="filterType" placeholder="文件类型" size="small" clearable style="width: 120px" @change="loadAttachments">
           <el-option label="PDF" value="pdf" />
-          <el-option label="Word" value="docx" />
-          <el-option label="Excel" value="xlsx" />
+          <el-option label="Word" value="word" />
+          <el-option label="Excel" value="excel" />
           <el-option label="图片" value="image" />
         </el-select>
         <el-upload
-          :action="`/api/projects/${projectId}/attachments/upload`"
           :show-file-list="false"
           :before-upload="beforeUpload"
-          :on-success="onUploadSuccess"
+          :http-request="uploadAttachment"
         >
           <el-button type="primary" size="small"><el-icon><Upload /></el-icon> 上传附件</el-button>
         </el-upload>
@@ -119,7 +118,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Upload, Document } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
-import http from '@/utils/http'
+import http, { downloadFile } from '@/utils/http'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -191,9 +190,12 @@ function preview(row: any) {
   previewVisible.value = true
 }
 
-function download(row: any) {
-  // 使用统一下载代理端点
-  window.open(`/api/attachments/${row.id}/download`, '_blank')
+async function download(row: any) {
+  try {
+    await downloadFile(`/api/attachments/${row.id}/download`)
+  } catch {
+    ElMessage.error('下载失败')
+  }
 }
 
 function associateDialog(row: any) {
@@ -223,6 +225,22 @@ function beforeUpload(file: File) {
     return false
   }
   return true
+}
+
+async function uploadAttachment(options: any) {
+  const formData = new FormData()
+  formData.append('file', options.file)
+  try {
+    const response = await http.post(
+      `/api/projects/${projectId.value}/attachments/upload`,
+      formData,
+    )
+    options.onSuccess?.(response.data)
+    onUploadSuccess()
+  } catch (error) {
+    options.onError?.(error)
+    ElMessage.error('上传失败')
+  }
 }
 
 function onUploadSuccess() {

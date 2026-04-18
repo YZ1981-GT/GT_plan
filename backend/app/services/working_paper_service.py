@@ -86,6 +86,7 @@ class WorkingPaperService:
                 "audit_cycle": idx.audit_cycle,
                 "index_status": idx.status.value if idx.status else None,
                 "file_status": wp.status.value if wp.status else None,
+                "status": wp.status.value if wp.status else (idx.status.value if idx.status else None),
                 "review_status": wp.review_status.value if wp.review_status else "not_submitted",
                 "assigned_to": str(wp.assigned_to) if wp.assigned_to else None,
                 "reviewer": str(wp.reviewer) if wp.reviewer else None,
@@ -101,13 +102,21 @@ class WorkingPaperService:
         self,
         db: AsyncSession,
         wp_id: UUID,
+        project_id: UUID | None = None,
     ) -> dict | None:
         """获取底稿详情（含索引信息、文件信息、最新QC状态）。"""
-        result = await db.execute(
+        query = (
             sa.select(WorkingPaper, WpIndex)
             .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
-            .where(WorkingPaper.id == wp_id)
+            .where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == sa.false(),
+                WpIndex.is_deleted == sa.false(),
+            )
         )
+        if project_id is not None:
+            query = query.where(WorkingPaper.project_id == project_id)
+        result = await db.execute(query)
         row = result.one_or_none()
         if row is None:
             return None
@@ -132,6 +141,7 @@ class WorkingPaperService:
             "audit_cycle": idx.audit_cycle,
             "index_status": idx.status.value if idx.status else None,
             "file_status": wp.status.value if wp.status else None,
+            "status": wp.status.value if wp.status else (idx.status.value if idx.status else None),
             "review_status": wp.review_status.value if wp.review_status else "not_submitted",
             "assigned_to": str(wp.assigned_to) if wp.assigned_to else None,
             "reviewer": str(wp.reviewer) if wp.reviewer else None,
@@ -153,14 +163,19 @@ class WorkingPaperService:
         self,
         db: AsyncSession,
         wp_id: UUID,
+        project_id: UUID | None = None,
     ) -> dict:
         """下载底稿（离线编辑）：执行预填充 → 返回文件信息。
 
         Validates: Requirements 7.1
         """
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        query = sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.is_deleted == sa.false(),
         )
+        if project_id is not None:
+            query = query.where(WorkingPaper.project_id == project_id)
+        result = await db.execute(query)
         wp = result.scalar_one_or_none()
         if wp is None:
             raise ValueError("底稿不存在")
@@ -182,14 +197,19 @@ class WorkingPaperService:
         db: AsyncSession,
         wp_id: UUID,
         recorded_version: int,
+        project_id: UUID | None = None,
     ) -> dict:
         """上传离线编辑的底稿：冲突检测 → 版本递增。
 
         Validates: Requirements 7.2, 7.3, 7.4, 7.5
         """
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        query = sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.is_deleted == sa.false(),
         )
+        if project_id is not None:
+            query = query.where(WorkingPaper.project_id == project_id)
+        result = await db.execute(query)
         wp = result.scalar_one_or_none()
         if wp is None:
             raise ValueError("底稿不存在")
@@ -233,6 +253,7 @@ class WorkingPaperService:
         db: AsyncSession,
         wp_id: UUID,
         new_status: str,
+        project_id: UUID | None = None,
     ) -> dict:
         """更新底稿编制生命周期状态（与复核状态分开管理）。
 
@@ -252,9 +273,13 @@ class WorkingPaperService:
             "review_level2_passed": ["review_level1_passed", "archived"],
         }
 
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        query = sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.is_deleted == sa.false(),
         )
+        if project_id is not None:
+            query = query.where(WorkingPaper.project_id == project_id)
+        result = await db.execute(query)
         wp = result.scalar_one_or_none()
         if wp is None:
             raise ValueError("底稿不存在")
@@ -308,6 +333,7 @@ class WorkingPaperService:
         db: AsyncSession,
         wp_id: UUID,
         new_review_status: str,
+        project_id: UUID | None = None,
     ) -> dict:
         """更新底稿复核任务状态（独立于编制状态）。
 
@@ -328,9 +354,13 @@ class WorkingPaperService:
             "level2_rejected": ["not_submitted", "pending_level1"],
         }
 
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        query = sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.is_deleted == sa.false(),
         )
+        if project_id is not None:
+            query = query.where(WorkingPaper.project_id == project_id)
+        result = await db.execute(query)
         wp = result.scalar_one_or_none()
         if wp is None:
             raise ValueError("底稿不存在")
@@ -373,14 +403,19 @@ class WorkingPaperService:
         wp_id: UUID,
         assigned_to: UUID | None = None,
         reviewer: UUID | None = None,
+        project_id: UUID | None = None,
     ) -> dict:
         """分配编制人和复核人。
 
         Validates: Requirements 6.1
         """
-        result = await db.execute(
-            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        query = sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.is_deleted == sa.false(),
         )
+        if project_id is not None:
+            query = query.where(WorkingPaper.project_id == project_id)
+        result = await db.execute(query)
         wp = result.scalar_one_or_none()
         if wp is None:
             raise ValueError("底稿不存在")

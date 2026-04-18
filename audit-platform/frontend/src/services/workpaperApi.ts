@@ -2,7 +2,7 @@
  * 底稿模块 API 服务层
  * 封装模板管理、取数公式、WOPI、底稿管理、质量自检、复核批注全部 API
  */
-import http from '@/utils/http'
+import http, { downloadFile } from '@/utils/http'
 
 // ─── Types ───
 
@@ -69,6 +69,15 @@ export interface WorkpaperDetail {
   wp_name?: string
   audit_cycle?: string
   qc_passed?: boolean | null
+}
+
+export interface OnlineEditSession {
+  enabled: boolean
+  maturity: string
+  preferred_mode: 'online' | 'offline'
+  wopi_src: string | null
+  access_token: string | null
+  editor_base_url: string | null
 }
 
 export interface QCFinding {
@@ -187,28 +196,64 @@ export async function batchExecuteFormulas(reqs: FormulaRequest[]): Promise<Form
 
 // ─── Working Papers ───
 
+function normalizeWorkpaper(item: any): WorkpaperDetail {
+  return {
+    ...item,
+    status: item?.status ?? item?.file_status ?? item?.index_status ?? 'not_started',
+  }
+}
+
 export async function listWorkpapers(
   projectId: string,
   opts?: { audit_cycle?: string; status?: string; assigned_to?: string }
 ): Promise<WorkpaperDetail[]> {
   const { data } = await http.get(`/api/projects/${projectId}/working-papers`, { params: opts })
-  return data.data ?? data
+  const items = data.data ?? data ?? []
+  return Array.isArray(items) ? items.map(normalizeWorkpaper) : []
 }
 
 export async function getWorkpaper(projectId: string, wpId: string): Promise<WorkpaperDetail> {
   const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}`)
-  return data.data ?? data
+  return normalizeWorkpaper(data.data ?? data)
 }
 
 export async function downloadWorkpaper(projectId: string, wpId: string) {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/download`)
-  return data.data ?? data
+  return downloadFile(`/api/projects/${projectId}/working-papers/${wpId}/download`)
+}
+
+export async function downloadWorkpaperPack(projectId: string, wpIds: string[], includePrefill: boolean = true) {
+  return downloadFile(`/api/projects/${projectId}/working-papers/download-pack`, {
+    method: 'post',
+    data: { wp_ids: wpIds, include_prefill: includePrefill },
+    fileName: 'workpapers.zip',
+  })
 }
 
 export async function uploadWorkpaper(projectId: string, wpId: string, recordedVersion: number) {
   const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/upload`, {
     recorded_version: recordedVersion,
   })
+  return data.data ?? data
+}
+
+export async function uploadWorkpaperFile(
+  projectId: string,
+  wpId: string,
+  file: File,
+  uploadedVersion: number,
+  forceOverwrite: boolean = false,
+) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await http.post(
+    `/api/projects/${projectId}/working-papers/${wpId}/upload-file?uploaded_version=${uploadedVersion}&force_overwrite=${forceOverwrite}`,
+    formData,
+  )
+  return data.data ?? data
+}
+
+export async function getOnlineEditSession(projectId: string, wpId: string): Promise<OnlineEditSession> {
+  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/online-session`)
   return data.data ?? data
 }
 
@@ -302,9 +347,21 @@ export async function resolveReview(wpId: string, reviewId: string, body: {
 
 // ─── WOPI ───
 
-export function getWopiEditorUrl(wpId: string, accessToken: string): string {
-  const baseUrl = window.location.origin
-  return `${baseUrl}/wopi/files/${wpId}?access_token=${encodeURIComponent(accessToken)}`
+export function getWopiEditorUrl(
+  wopiSrc: string,
+  onlyofficeUrl: string = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080',
+): string {
+  const normalizedBaseUrl = onlyofficeUrl.replace(/\/$/, '')
+  return `${normalizedBaseUrl}/hosting/wopi/cell?WOPISrc=${encodeURIComponent(wopiSrc)}`
+}
+
+export async function checkOnlineEditingAvailability(): Promise<boolean> {
+  try {
+    const healthResp = await http.get('/wopi/health', { timeout: 5000, validateStatus: () => true })
+    return healthResp.status === 200
+  } catch {
+    return false
+  }
 }
 
 

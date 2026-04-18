@@ -47,7 +47,7 @@
         <div class="model-actions">
           <button class="btn-sm" @click="testModel(model.model_id)">测试</button>
           <button class="btn-sm" @click="editModel(model)">编辑</button>
-          <button class="btn-sm btn-danger" @click="deleteModel(model.model_id)">删除</button>
+          <button class="btn-sm btn-danger" @click="handleDeleteModel(model.model_id)">删除</button>
         </div>
       </div>
     </div>
@@ -182,7 +182,7 @@ async function testModel(modelId) {
   }
 }
 
-async function deleteModel(modelId) {
+async function handleDeleteModel(modelId) {
   if (!confirm('确定要删除此模型配置吗？')) return
   await deleteModel(modelId)
 }

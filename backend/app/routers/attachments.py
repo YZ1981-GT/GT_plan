@@ -12,6 +12,7 @@ Validates: Requirements 14.2, 14.5, 14.8
 
 from __future__ import annotations
 
+import sqlalchemy as sa
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -19,8 +20,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
-from app.models.core import User
+from app.deps import PERMISSION_HIERARCHY, get_current_user, require_project_access
+from app.models.core import ProjectUser, User
 from app.services.attachment_service import AttachmentService
 
 router = APIRouter(tags=["attachments"])
@@ -48,10 +49,43 @@ def _svc(db: AsyncSession) -> AttachmentService:
     return AttachmentService(db)
 
 
+async def _ensure_project_access(
+    db: AsyncSession,
+    current_user: User,
+    project_id: UUID,
+    min_permission: str = "readonly",
+):
+    if current_user.role.value == "admin":
+        return
+
+    result = await db.execute(
+        sa.select(ProjectUser).where(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == sa.false(),
+        )
+    )
+    project_user = result.scalar_one_or_none()
+    if project_user is None:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    user_level = PERMISSION_HIERARCHY.get(project_user.permission_level.value, 0)
+    required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
+    if user_level < required_level:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+
+def _paperless_document_id_from_path(file_path: str) -> str:
+    doc_id = file_path.replace("paperless://", "", 1).lstrip("/")
+    if doc_id.startswith("documents/"):
+        doc_id = doc_id[len("documents/"):]
+    return doc_id
+
+
 @router.post("/api/projects/{project_id}/attachments")
 async def create_attachment(
     project_id: UUID, body: AttachmentCreate, db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     svc = _svc(db)
     result = await svc.create_attachment(project_id, body.model_dump())
@@ -71,7 +105,7 @@ async def upload_attachment(
     correspondent: str | None = Form(None),
     document_type: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     svc = _svc(db)
     content = await file.read()
@@ -102,7 +136,7 @@ async def list_attachments(
     reference_type: str | None = None,
     reference_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     svc = _svc(db)
     return await svc.list_attachments(
@@ -122,6 +156,7 @@ async def search_attachments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    await _ensure_project_access(db, current_user, project_id, "readonly")
     svc = _svc(db)
     return await svc.search(project_id, q)
 
@@ -132,6 +167,7 @@ async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)
     result = await svc.get_attachment(attachment_id)
     if not result:
         raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(result["project_id"]), "readonly")
     return result
 
 
@@ -141,6 +177,10 @@ async def associate_with_wp(
     current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
     result = await svc.associate_with_wp(attachment_id, body.wp_id, body.association_type, body.notes)
     await db.commit()
     return result
@@ -148,7 +188,19 @@ async def associate_with_wp(
 
 @router.get("/api/working-papers/{wp_id}/attachments")
 async def get_wp_attachments(wp_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from app.models.workpaper_models import WorkingPaper
+
     svc = _svc(db)
+    wp_result = await db.execute(
+        sa.select(WorkingPaper.project_id).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    project_id = wp_result.scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+    await _ensure_project_access(db, current_user, project_id, "readonly")
     return await svc.get_wp_attachments(wp_id)
 
 
@@ -162,8 +214,11 @@ async def update_ocr_status(
     attachment_id: UUID, body: OCRStatusUpdate, db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """更新附件 OCR 状态和文本（由 OCR 服务回调）"""
     svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
     result = await svc.update_ocr_status(attachment_id, body.status, body.ocr_text)
     if not result:
         raise HTTPException(status_code=404, detail="附件不存在")
@@ -173,8 +228,11 @@ async def update_ocr_status(
 
 @router.post("/api/attachments/{attachment_id}/classify")
 async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """自动分类文档"""
     svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
     try:
         return await svc.classify_document(attachment_id)
     except ValueError as e:
@@ -183,8 +241,11 @@ async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_
 
 @router.post("/api/attachments/{attachment_id}/extract-confirmation")
 async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """函证回函 OCR 识别"""
     svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
     try:
         return await svc.extract_confirmation_reply(attachment_id)
     except ValueError as e:
@@ -195,7 +256,6 @@ async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Dep
 
 @router.get("/api/attachments/{attachment_id}/download")
 async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """统一下载代理 — 屏蔽底层存储差异，记录下载审计日志"""
     from fastapi.responses import StreamingResponse, Response
     from pathlib import Path
     import httpx
@@ -207,6 +267,7 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
     att = await svc.get_attachment(attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
 
     file_path = att.get("file_path", "")
     file_name = att.get("file_name", "attachment")
@@ -219,7 +280,7 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
 
     # Paperless 存储：通过 Paperless API 代理下载
     if file_path.startswith("paperless://"):
-        doc_id = file_path.replace("paperless://", "")
+        doc_id = _paperless_document_id_from_path(file_path)
         import os
         paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
         paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
@@ -235,31 +296,25 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
                         media_type=resp.headers.get("content-type", "application/octet-stream"),
                         headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
                     )
-                raise HTTPException(status_code=resp.status_code, detail="Paperless 下载失败")
-        except httpx.RequestError as e:
-            raise HTTPException(status_code=502, detail=f"Paperless 连接失败: {e}")
+        except httpx.RequestError:
+            pass
 
-    # 本地存储：直接读取文件
+    # 本地存储
     local_path = Path(file_path)
     if not local_path.exists():
-        # 尝试在 storage 目录下查找
-        from pathlib import Path as P
-        storage_path = P("storage") / file_path.lstrip("/")
-        if storage_path.exists():
-            local_path = storage_path
-        else:
-            raise HTTPException(status_code=404, detail="文件不存在")
+        local_path = Path("storage") / file_path.lstrip("/")
+    if local_path.exists():
+        return StreamingResponse(
+            open(local_path, "rb"),
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+        )
 
-    return StreamingResponse(
-        open(local_path, "rb"),
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
-    )
+    raise HTTPException(status_code=404, detail="文件不存在")
 
 
 @router.get("/api/attachments/{attachment_id}/preview")
 async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """统一预览代理 — 返回可预览的内容（PDF/图片直接返回，其他返回元数据）"""
     from fastapi.responses import StreamingResponse, Response
     from pathlib import Path
     import httpx
@@ -268,18 +323,18 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
     att = await svc.get_attachment(attachment_id)
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
 
     file_path = att.get("file_path", "")
     file_name = att.get("file_name", "")
     file_type = att.get("file_type", "")
 
     # 判断是否可直接预览
-    previewable_types = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+    previewable_types = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".csv"}
     ext = Path(file_name).suffix.lower() if file_name else ""
     can_preview = ext in previewable_types
 
     if not can_preview:
-        # 不可预览的文件返回元数据 + OCR 文本
         return {
             "previewable": False,
             "file_name": file_name,
@@ -290,20 +345,21 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
 
     # Paperless 存储
     if file_path.startswith("paperless://"):
-        doc_id = file_path.replace("paperless://", "")
+        doc_id = _paperless_document_id_from_path(file_path)
         import os
         paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
         paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
+        endpoint = "download" if ext in {".doc", ".docx", ".xls", ".xlsx", ".csv"} else "preview"
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 resp = await client.get(
-                    f"{paperless_url}/api/documents/{doc_id}/preview/",
+                    f"{paperless_url}/api/documents/{doc_id}/{endpoint}/",
                     headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
                 )
                 if resp.status_code == 200:
                     return Response(
                         content=resp.content,
-                        media_type=resp.headers.get("content-type", "application/pdf"),
+                        media_type=resp.headers.get("content-type", "application/octet-stream"),
                     )
         except httpx.RequestError:
             pass
@@ -314,7 +370,10 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
         local_path = Path("storage") / file_path.lstrip("/")
     if local_path.exists():
         mime_map = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg",
-                    ".jpeg": "image/jpeg", ".gif": "image/gif", ".svg": "image/svg+xml"}
+                    ".jpeg": "image/jpeg", ".gif": "image/gif", ".svg": "image/svg+xml",
+                    ".doc": "application/msword", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ".xls": "application/vnd.ms-excel", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    ".csv": "text/csv"}
         mime = mime_map.get(ext, "application/octet-stream")
         return StreamingResponse(open(local_path, "rb"), media_type=mime)
 
