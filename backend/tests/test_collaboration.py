@@ -33,6 +33,7 @@ class WorkpaperStub(Base):
     uses __tablename__ = "working_papers".  This stub satisfies FK resolution.
     """
     __tablename__ = "workpapers"
+    __table_args__ = {"extend_existing": True}
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 
