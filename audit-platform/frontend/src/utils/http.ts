@@ -149,6 +149,7 @@ http.interceptors.response.use(
     // 分级错误提示
     const detail = (error.response?.data as any)?.detail ?? (error.response?.data as any)?.message ?? ''
     const fallback = error.message ?? '请求失败'
+    const requestId = error.response?.headers?.['x-request-id'] || ''
     const msgMap: Record<number, string> = {
       400: detail || '请求参数错误',
       403: '权限不足，无法执行此操作',
@@ -162,12 +163,13 @@ http.interceptors.response.use(
       503: '服务暂时不可用',
     }
     const msg = (status && msgMap[status]) || detail || fallback
+    const displayMsg = requestId ? `${msg}（ID: ${requestId}）` : msg
     if (status && status >= 500) {
-      ElMessage.error(msg)
+      ElMessage.error(displayMsg)
     } else if (status === 403) {
-      ElMessage.error(msg)
+      ElMessage.error(displayMsg)
     } else {
-      ElMessage.warning(msg)
+      ElMessage.warning(displayMsg)
     }
     return Promise.reject(error)
   },

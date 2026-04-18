@@ -40,9 +40,10 @@
       <el-table-column label="大小" width="100" align="right">
         <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
       </el-table-column>
-      <el-table-column prop="ocr_status" label="OCR" width="90" align="center">
+      <el-table-column prop="ocr_status" label="OCR" width="120" align="center">
         <template #default="{ row }">
           <el-tag size="small" :type="ocrTagType(row.ocr_status)">{{ ocrLabel(row.ocr_status) }}</el-tag>
+          <el-button v-if="row.ocr_status === 'failed'" link type="warning" size="small" @click="retryOCR(row)" style="margin-left:4px">重试</el-button>
         </template>
       </el-table-column>
       <el-table-column prop="created_at" label="上传时间" width="140">
@@ -227,6 +228,14 @@ function beforeUpload(file: File) {
 function onUploadSuccess() {
   ElMessage.success('上传成功')
   loadAttachments()
+}
+
+async function retryOCR(row: any) {
+  try {
+    await http.put(`/api/attachments/${row.id}/ocr-status`, { status: 'pending' })
+    ElMessage.success('已重新提交 OCR 识别')
+    await loadAttachments()
+  } catch { ElMessage.error('重试失败') }
 }
 
 function formatSize(bytes: number): string {

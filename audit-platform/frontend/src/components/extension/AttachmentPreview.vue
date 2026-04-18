@@ -102,7 +102,9 @@ function onRendered() { loading.value = false }
 function onError() { loading.value = false }
 
 function download() {
-  window.open(props.fileUrl, '_blank')
+  // 使用下载代理端点（preview URL 替换为 download URL）
+  const downloadUrl = props.fileUrl.replace('/preview', '/download')
+  window.open(downloadUrl, '_blank')
 }
 </script>
 

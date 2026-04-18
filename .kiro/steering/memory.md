@@ -950,3 +950,12 @@ inclusion: always
 - WP-P0-01 完成：新增 POST /working-papers/{wp_id}/submit-review 专用端点（4项门禁统一校验后流转状态，返回 blocking_reasons 列表），前端 onSubmitReview 改用此端点（不再直接调 updateWorkpaperStatus）
 - WP-P0-04 完成：working_paper.py 的 upload/assign/submit-review 三个写端点改用 require_project_access("edit"/"review") 替代 get_current_user，实现项目级权限校验
 - WP-P1-01 进展：task_center 已接入 3 类真实任务（OCR上传/底稿解析/归档云推送），/api/tasks 可查到完整状态
+
+## 在线编辑企业级升级（2026-04-18）
+- 用户决策：在线编辑默认开启，采用"在线优先+离线兜底"双模式并存（不是二选一）
+- feature_flags online_editing 改为默认 True，成熟度从 experimental 升级为 pilot
+- WOPI get_file 从 stub(返回空字节) 改为真实读取本地磁盘文件
+- WOPI put_file 企业级重写8项能力：①锁校验(Redis+内存) ②版本快照(.versions/目录) ③真实写入文件 ④SHA256哈希校验(不匹配自动从快照恢复) ⑤数据库版本递增 ⑥审计留痕(logs表workpaper_online_save) ⑦WORKPAPER_SAVED事件发布 ⑧云端双写
+- WOPI check_file_info 改为读取真实文件大小（不再返回0）
+- WorkpaperEditor.vue 双模式UI：在线可用时显示iframe+下载副本按钮，不可用时自动降级+重试在线按钮+上传回传按钮
+- WorkpaperList.vue 双模式按钮组：在线编辑+下载编辑并列显示（el-button-group）
