@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.workpaper_models import (
     WpFileStatus,
     WpIndex,
+    WpReviewStatus,
     WpStatus,
     WorkingPaper,
     WpQcResult,
@@ -85,6 +86,7 @@ class WorkingPaperService:
                 "audit_cycle": idx.audit_cycle,
                 "index_status": idx.status.value if idx.status else None,
                 "file_status": wp.status.value if wp.status else None,
+                "review_status": wp.review_status.value if wp.review_status else "not_submitted",
                 "assigned_to": str(wp.assigned_to) if wp.assigned_to else None,
                 "reviewer": str(wp.reviewer) if wp.reviewer else None,
                 "file_version": wp.file_version,
@@ -130,6 +132,7 @@ class WorkingPaperService:
             "audit_cycle": idx.audit_cycle,
             "index_status": idx.status.value if idx.status else None,
             "file_status": wp.status.value if wp.status else None,
+            "review_status": wp.review_status.value if wp.review_status else "not_submitted",
             "assigned_to": str(wp.assigned_to) if wp.assigned_to else None,
             "reviewer": str(wp.reviewer) if wp.reviewer else None,
             "file_version": wp.file_version,
@@ -191,6 +194,14 @@ class WorkingPaperService:
         if wp is None:
             raise ValueError("底稿不存在")
 
+        # 归档后只读，禁止上传
+        if wp.status == WpFileStatus.archived:
+            return {
+                "success": False,
+                "has_conflict": False,
+                "message": "底稿已归档，不允许修改。如需修改请先解除归档。",
+            }
+
         # Conflict detection
         if recorded_version < wp.file_version:
             return {
@@ -223,17 +234,22 @@ class WorkingPaperService:
         wp_id: UUID,
         new_status: str,
     ) -> dict:
-        """更新底稿状态（含严格状态机校验）。
+        """更新底稿编制生命周期状态（与复核状态分开管理）。
 
-        状态流转：draft → edit_complete → review_level1_passed → review_level2_passed → archived
+        编制状态流转：
+          draft → edit_complete → under_review → review_passed → archived
+          under_review → revision_required → edit_complete（退回修改）
         """
-        # 严格状态转换规则
         VALID_TRANSITIONS: dict[str, list[str]] = {
             "draft": ["edit_complete"],
-            "edit_complete": ["draft", "review_level1_passed"],  # 可退回编制
-            "review_level1_passed": ["edit_complete", "review_level2_passed"],  # 可退回
+            "edit_complete": ["draft", "under_review"],
+            "under_review": ["revision_required", "review_passed"],
+            "revision_required": ["edit_complete"],
+            "review_passed": ["archived"],
+            "archived": [],
+            # 兼容旧值
+            "review_level1_passed": ["review_level2_passed", "edit_complete", "archived"],
             "review_level2_passed": ["review_level1_passed", "archived"],
-            "archived": [],  # 归档后不可变更
         }
 
         result = await db.execute(
@@ -256,23 +272,24 @@ class WorkingPaperService:
             )
 
         wp.status = new_enum
-
         wp.updated_at = datetime.now(timezone.utc)
         await db.flush()
 
-        # Also update wp_index status
+        # 同步更新 wp_index 状态
         idx_result = await db.execute(
             sa.select(WpIndex).where(WpIndex.id == wp.wp_index_id)
         )
         idx = idx_result.scalar_one_or_none()
         if idx:
-            # Map file status to index status
             status_map = {
                 WpFileStatus.draft: WpStatus.in_progress,
                 WpFileStatus.edit_complete: WpStatus.draft_complete,
+                WpFileStatus.under_review: WpStatus.draft_complete,
+                WpFileStatus.revision_required: WpStatus.in_progress,
+                WpFileStatus.review_passed: WpStatus.review_passed,
+                WpFileStatus.archived: WpStatus.archived,
                 WpFileStatus.review_level1_passed: WpStatus.review_passed,
                 WpFileStatus.review_level2_passed: WpStatus.review_passed,
-                WpFileStatus.archived: WpStatus.archived,
             }
             mapped = status_map.get(wp.status)
             if mapped:
@@ -282,7 +299,72 @@ class WorkingPaperService:
         return {
             "wp_id": str(wp.id),
             "status": wp.status.value,
+            "review_status": wp.review_status.value if wp.review_status else "not_submitted",
             "message": "状态已更新",
+        }
+
+    async def update_review_status(
+        self,
+        db: AsyncSession,
+        wp_id: UUID,
+        new_review_status: str,
+    ) -> dict:
+        """更新底稿复核任务状态（独立于编制状态）。
+
+        复核状态流转：
+          not_submitted → pending_level1 → level1_in_progress → level1_passed/level1_rejected
+          level1_passed → pending_level2 → level2_in_progress → level2_passed/level2_rejected
+          level1_rejected/level2_rejected → not_submitted（退回后重新提交）
+        """
+        REVIEW_TRANSITIONS: dict[str, list[str]] = {
+            "not_submitted": ["pending_level1"],
+            "pending_level1": ["level1_in_progress", "not_submitted"],
+            "level1_in_progress": ["level1_passed", "level1_rejected"],
+            "level1_passed": ["pending_level2"],
+            "level1_rejected": ["not_submitted"],
+            "pending_level2": ["level2_in_progress", "level1_passed"],
+            "level2_in_progress": ["level2_passed", "level2_rejected"],
+            "level2_passed": [],
+            "level2_rejected": ["not_submitted", "pending_level1"],
+        }
+
+        result = await db.execute(
+            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        )
+        wp = result.scalar_one_or_none()
+        if wp is None:
+            raise ValueError("底稿不存在")
+
+        try:
+            new_enum = WpReviewStatus(new_review_status)
+        except ValueError:
+            raise ValueError(f"无效复核状态: {new_review_status}")
+
+        current = wp.review_status.value if wp.review_status else "not_submitted"
+        allowed = REVIEW_TRANSITIONS.get(current, [])
+        if new_review_status not in allowed:
+            raise ValueError(
+                f"复核状态转换不允许: {current} → {new_review_status}（允许: {', '.join(allowed) or '无'}）"
+            )
+
+        wp.review_status = new_enum
+        wp.updated_at = datetime.now(timezone.utc)
+
+        # 复核状态变化联动编制状态
+        if new_review_status == "pending_level1":
+            wp.status = WpFileStatus.under_review
+        elif new_review_status in ("level1_rejected", "level2_rejected"):
+            wp.status = WpFileStatus.revision_required
+        elif new_review_status == "level2_passed":
+            wp.status = WpFileStatus.review_passed
+
+        await db.flush()
+
+        return {
+            "wp_id": str(wp.id),
+            "status": wp.status.value,
+            "review_status": wp.review_status.value,
+            "message": "复核状态已更新",
         }
 
     async def assign_workpaper(

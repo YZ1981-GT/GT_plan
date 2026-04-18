@@ -270,6 +270,12 @@ async def get_lock_status(
     return JSONResponse(content=result)
 
 
+@router.get("/health")
+async def wopi_health():
+    """WOPI 服务健康检查 — 前端用于探测在线编辑可用性"""
+    return JSONResponse(content={"status": "ok", "service": "wopi"})
+
+
 @router.get("/stats")
 async def wopi_stats():
     """WOPI 运维统计（锁数量、活跃编辑会话）"""

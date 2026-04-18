@@ -23,6 +23,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.custom_template_service import CustomTemplateService
 
 router = APIRouter(prefix="/api/custom-templates", tags=["custom-templates"])
@@ -70,6 +72,7 @@ async def create_template(body: TemplateCreate, db: AsyncSession = Depends(get_d
 @router.get("")
 async def list_my_templates(
     category: str | None = None, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc()
     return await svc.list_my_templates(db, TEMP_USER_ID, category)
@@ -78,6 +81,7 @@ async def list_my_templates(
 @router.get("/market")
 async def list_market(
     category: str | None = None, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc()
     return await svc.list_market(db, category)
@@ -95,6 +99,7 @@ async def get_template(template_id: UUID, db: AsyncSession = Depends(get_db)):
 @router.put("/{template_id}")
 async def update_template(
     template_id: UUID, body: TemplateUpdate, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc()
     try:
@@ -141,6 +146,7 @@ async def unpublish_template(template_id: UUID, db: AsyncSession = Depends(get_d
 @router.post("/{template_id}/version")
 async def create_version(
     template_id: UUID, body: VersionCreate, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc()
     try:

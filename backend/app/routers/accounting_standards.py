@@ -20,6 +20,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.accounting_standard_service import AccountingStandardService
 
 router = APIRouter(tags=["accounting-standards"])
@@ -60,6 +62,7 @@ async def switch_project_standard(
     project_id: UUID,
     body: SwitchStandardRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """切换项目会计准则"""
     svc = AccountingStandardService()

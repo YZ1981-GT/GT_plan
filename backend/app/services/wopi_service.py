@@ -183,6 +183,11 @@ class WOPIHostService:
         if wp is None:
             raise FileNotFoundError(f"底稿不存在: {file_id}")
 
+        # 归档后只读，禁止在线保存
+        from app.models.workpaper_models import WpFileStatus as _WpFileStatus
+        if wp.status == _WpFileStatus.archived:
+            raise PermissionError("底稿已归档，不允许修改")
+
         # 1. 锁校验（Redis 优先，内存降级）
         file_key = str(file_id)
         if lock_id:

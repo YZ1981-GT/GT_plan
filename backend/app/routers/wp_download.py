@@ -31,6 +31,12 @@ async def download_pack(
     current_user: User = Depends(get_current_user),
 ):
     """批量打包下载底稿为 ZIP"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "workpaper_batch_download: user=%s project=%s count=%d",
+        str(current_user.id), str(project_id), len(body.wp_ids),
+    )
     svc = WpDownloadService()
     try:
         buf = await svc.download_pack(
@@ -56,6 +62,12 @@ async def download_single(
     current_user: User = Depends(get_current_user),
 ):
     """单个底稿下载"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "workpaper_download: user=%s project=%s wp_id=%s",
+        str(current_user.id), str(project_id), str(wp_id),
+    )
     svc = WpDownloadService()
     try:
         info = await svc.download_single(db=db, project_id=project_id, wp_id=wp_id)

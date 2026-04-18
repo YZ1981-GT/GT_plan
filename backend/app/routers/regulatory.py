@@ -18,6 +18,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.regulatory_service import RegulatoryService
 
 router = APIRouter(tags=["regulatory"])
@@ -53,6 +55,7 @@ class FilingResponseRequest(BaseModel):
 async def submit_cicpa_report(
     body: CICPAReportRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """提交中注协审计报告备案"""
     svc = RegulatoryService()
@@ -72,6 +75,7 @@ async def submit_cicpa_report(
 async def submit_archival_standard(
     body: ArchivalStandardRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """提交电子底稿归档标准"""
     svc = RegulatoryService()
@@ -91,6 +95,7 @@ async def submit_archival_standard(
 async def get_filing_status(
     filing_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """查询备案状态"""
     svc = RegulatoryService()
@@ -104,6 +109,7 @@ async def get_filing_status(
 async def retry_filing(
     filing_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """重试失败的备案"""
     svc = RegulatoryService()
@@ -121,6 +127,7 @@ async def list_filings(
     filing_type: str | None = Query(None),
     filing_status: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """列出所有备案记录"""
     svc = RegulatoryService()
@@ -137,6 +144,7 @@ async def handle_filing_response(
     filing_id: UUID,
     body: FilingResponseRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """处理备案响应（状态更新）"""
     svc = RegulatoryService()

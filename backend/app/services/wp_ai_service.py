@@ -24,44 +24,59 @@ class WpAIService:
     async def analytical_review(self, project_id: UUID, account_code: str, year: int) -> dict:
         """分析性复核：变动分析 + LLM 生成分析文本"""
         from app.models.audit_platform_models import TrialBalance
+        from app.services.task_center import create_task, update_task, TaskType, TaskStatus
 
-        q = sa.select(TrialBalance).where(
-            TrialBalance.project_id == project_id,
-            TrialBalance.standard_account_code == account_code,
-            TrialBalance.year == year,
-            TrialBalance.is_deleted == False,  # noqa
+        task_id = create_task(
+            TaskType.ai_analysis,
+            project_id=str(project_id),
+            params={"account_code": account_code, "year": year, "action": "analytical_review"},
         )
-        tb = (await self.db.execute(q)).scalar_one_or_none()
-        if not tb:
-            return {"error": f"科目 {account_code} 未找到"}
+        update_task(task_id, TaskStatus.processing)
 
-        current = float(tb.audited_debit or 0) - float(tb.audited_credit or 0)
-        prior = float(tb.unadjusted_debit or 0) - float(tb.unadjusted_credit or 0)
-        change = current - prior
-        rate = round(change / prior * 100, 2) if prior != 0 else None
-        is_significant = abs(rate or 0) > 20 if rate is not None else abs(change) > 0
-
-        # 调用 LLM 生成分析文本
-        from app.services.llm_client import chat_completion
-        prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请用一句话分析变动原因。"
         try:
-            ai_text = await chat_completion([
-                {"role": "system", "content": "你是审计分析师，请简洁分析科目余额变动原因。"},
-                {"role": "user", "content": prompt},
-            ])
-        except Exception:
-            ai_text = f"该科目余额变动 {change:,.2f}，变动率 {rate}%。"
+            q = sa.select(TrialBalance).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.standard_account_code == account_code,
+                TrialBalance.year == year,
+                TrialBalance.is_deleted == False,  # noqa
+            )
+            tb = (await self.db.execute(q)).scalar_one_or_none()
+            if not tb:
+                update_task(task_id, TaskStatus.failed, error="科目未找到")
+                return {"error": f"科目 {account_code} 未找到"}
 
-        return {
-            "account_code": account_code,
-            "current_balance": current,
-            "prior_balance": prior,
-            "change_amount": change,
-            "change_rate": rate,
-            "is_significant": is_significant,
-            "ai_analysis": ai_text,
-            "recommended_procedures": [],
-        }
+            current = float(tb.audited_debit or 0) - float(tb.audited_credit or 0)
+            prior = float(tb.unadjusted_debit or 0) - float(tb.unadjusted_credit or 0)
+            change = current - prior
+            rate = round(change / prior * 100, 2) if prior != 0 else None
+            is_significant = abs(rate or 0) > 20 if rate is not None else abs(change) > 0
+
+            # 调用 LLM 生成分析文本
+            from app.services.llm_client import chat_completion
+            prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请用一句话分析变动原因。"
+            try:
+                ai_text = await chat_completion([
+                    {"role": "system", "content": "你是审计分析师，请简洁分析科目余额变动原因。"},
+                    {"role": "user", "content": prompt},
+                ])
+            except Exception:
+                ai_text = f"该科目余额变动 {change:,.2f}，变动率 {rate}%。"
+
+            update_task(task_id, TaskStatus.success)
+            return {
+                "account_code": account_code,
+                "current_balance": current,
+                "prior_balance": prior,
+                "change_amount": change,
+                "change_rate": rate,
+                "is_significant": is_significant,
+                "ai_analysis": ai_text,
+                "recommended_procedures": [],
+                "task_id": task_id,
+            }
+        except Exception as e:
+            update_task(task_id, TaskStatus.failed, error=str(e))
+            raise
 
     async def extract_confirmations(self, project_id: UUID, account_code: str, year: int) -> list[dict]:
         """函证对象提取：从辅助余额表提取"""

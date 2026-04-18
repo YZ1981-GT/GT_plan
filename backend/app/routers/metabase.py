@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from app.deps import get_current_user
+from app.models.core import User
 from fastapi import APIRouter, Depends, Query
 
 from app.core.config import settings

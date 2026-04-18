@@ -34,6 +34,7 @@ async def get_materiality(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取当前重要性水平"""
     svc = MaterialityService(db)
@@ -81,6 +82,7 @@ async def get_history(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """变更历史"""
     svc = MaterialityService(db)
@@ -95,6 +97,7 @@ async def get_benchmark(
     benchmark_type: str = Query(...),
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """从试算表自动取基准金额"""
     svc = MaterialityService(db)

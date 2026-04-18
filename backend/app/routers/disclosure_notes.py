@@ -20,6 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user, require_project_access
+from app.models.core import User
 from app.models.report_schemas import (
     DisclosureNoteDetail,
     DisclosureNoteGenerateRequest,
@@ -40,6 +42,7 @@ router = APIRouter(
 async def generate_notes(
     data: DisclosureNoteGenerateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """生成附注初稿"""
     engine = DisclosureEngine(db)
@@ -63,6 +66,7 @@ async def get_notes_tree(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取附注目录树"""
     engine = DisclosureEngine(db)
@@ -77,6 +81,7 @@ async def get_validation_results(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取最新校验结果"""
     engine = NoteValidationEngine(db)
@@ -92,6 +97,7 @@ async def get_note_detail(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取指定附注章节详情"""
     engine = DisclosureEngine(db)
@@ -106,6 +112,7 @@ async def update_note(
     note_id: UUID,
     data: DisclosureNoteUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """更新附注章节内容"""
     engine = DisclosureEngine(db)
@@ -126,6 +133,7 @@ async def validate_notes(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """执行附注校验"""
     engine = NoteValidationEngine(db)
@@ -144,6 +152,7 @@ async def confirm_finding(
     finding_index: int,
     data: NoteValidationFindingConfirm,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """确认校验发现为"已确认-无需修改" """
     engine = NoteValidationEngine(db)
@@ -162,6 +171,7 @@ async def export_word(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """导出附注为 Word 文档"""
     from fastapi.responses import StreamingResponse
@@ -185,6 +195,7 @@ async def upload_history(
     project_id: UUID,
     year: int = 2025,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """上传历史附注文件（Word/PDF）并解析"""
     from fastapi import UploadFile, File

@@ -19,7 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, check_consol_lock
+from app.deps import get_current_user, check_consol_lock, require_project_access
+from app.models.core import User
 from app.models.audit_platform_models import AdjustmentType, ReviewStatus
 from app.models.audit_platform_schemas import (
     AccountOption,
@@ -46,9 +47,9 @@ async def list_adjustments(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
-    """分录列表（支持 type/status 筛选）"""
+    """分录列表（支持 type/status 筛选，需项目成员权限）"""
     svc = AdjustmentService(db)
     return await svc.list_entries(
         project_id, year,
@@ -63,10 +64,10 @@ async def create_adjustment(
     project_id: UUID,
     data: AdjustmentCreate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """创建调整分录（合并锁定期间禁止）"""
+    """创建调整分录（合并锁定期间禁止，需编辑权限）"""
     svc = AdjustmentService(db)
     try:
         result = await svc.create_entry(project_id, data, user.id)
@@ -82,10 +83,10 @@ async def update_adjustment(
     entry_group_id: UUID,
     data: AdjustmentUpdate,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
 ):
-    """修改调整分录（合并锁定期间禁止）"""
+    """修改调整分录（合并锁定期间禁止，需编辑权限）"""
     svc = AdjustmentService(db)
     try:
         result = await svc.update_entry(project_id, entry_group_id, data, user.id)
@@ -101,8 +102,9 @@ async def delete_adjustment(
     entry_group_id: UUID,
     db: AsyncSession = Depends(get_db),
     _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(require_project_access("edit")),
 ):
-    """软删除调整分录（合并锁定期间禁止）"""
+    """软删除调整分录（合并锁定期间禁止，需编辑权限）"""
     svc = AdjustmentService(db)
     try:
         await svc.delete_entry(project_id, entry_group_id)
@@ -118,9 +120,9 @@ async def review_adjustment(
     entry_group_id: UUID,
     change: ReviewStatusChange,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("review")),
 ):
-    """变更复核状态"""
+    """变更复核状态（需复核权限）"""
     svc = AdjustmentService(db)
     try:
         await svc.change_review_status(
@@ -137,7 +139,7 @@ async def get_summary(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """汇总统计"""
     svc = AdjustmentService(db)
@@ -150,7 +152,7 @@ async def get_account_dropdown(
     project_id: UUID,
     report_line_code: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """科目下拉选项"""
     svc = AdjustmentService(db)
@@ -164,7 +166,7 @@ async def get_wp_summary(
     wp_code: str,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """底稿审定表数据"""
     svc = AdjustmentService(db)

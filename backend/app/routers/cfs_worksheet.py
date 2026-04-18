@@ -24,6 +24,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user, require_project_access
+from app.models.core import User
 from app.models.report_schemas import (
     CFSAdjustmentCreate,
     CFSAdjustmentResponse,
@@ -42,6 +44,7 @@ router = APIRouter(
 async def generate_worksheet(
     data: ReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """生成工作底稿"""
     engine = CFSWorksheetEngine(db)
@@ -57,6 +60,7 @@ async def get_worksheet(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取工作底稿数据"""
     engine = CFSWorksheetEngine(db)
@@ -68,6 +72,7 @@ async def create_adjustment(
     project_id: UUID,
     data: CFSAdjustmentCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """创建CFS调整分录"""
     engine = CFSWorksheetEngine(db)
@@ -96,6 +101,7 @@ async def update_adjustment(
     adjustment_id: UUID,
     data: CFSAdjustmentUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """修改CFS调整分录"""
     engine = CFSWorksheetEngine(db)
@@ -115,6 +121,7 @@ async def update_adjustment(
 async def delete_adjustment(
     adjustment_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """删除CFS调整分录"""
     engine = CFSWorksheetEngine(db)
@@ -130,6 +137,7 @@ async def list_adjustments(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """列出所有CFS调整分录"""
     engine = CFSWorksheetEngine(db)
@@ -142,6 +150,7 @@ async def get_reconciliation(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取工作底稿平衡状态"""
     engine = CFSWorksheetEngine(db)
@@ -152,6 +161,7 @@ async def get_reconciliation(
 async def auto_generate_adjustments(
     data: ReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """自动生成常见调整项"""
     engine = CFSWorksheetEngine(db)
@@ -172,6 +182,7 @@ async def get_indirect_method(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取间接法补充资料"""
     engine = CFSWorksheetEngine(db)
@@ -183,6 +194,7 @@ async def verify_reconciliation(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """勾稽校验"""
     engine = CFSWorksheetEngine(db)
@@ -194,6 +206,7 @@ async def get_main_table(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取现金流量表主表数据"""
     engine = CFSWorksheetEngine(db)

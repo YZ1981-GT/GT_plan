@@ -56,12 +56,29 @@ class WpSourceType(str, enum.Enum):
 
 
 class WpFileStatus(str, enum.Enum):
-    """底稿文件状态"""
-    draft = "draft"
-    edit_complete = "edit_complete"
+    """底稿编制生命周期状态（与复核状态分开管理）"""
+    draft = "draft"                          # 编制中
+    edit_complete = "edit_complete"           # 编制完成，待提交复核
+    under_review = "under_review"            # 复核中（已提交，等待复核人处理）
+    revision_required = "revision_required"  # 退回修改
+    review_passed = "review_passed"          # 复核通过（所有级别）
+    archived = "archived"                    # 已归档（只读）
+    # 保留旧值兼容
     review_level1_passed = "review_level1_passed"
     review_level2_passed = "review_level2_passed"
-    archived = "archived"
+
+
+class WpReviewStatus(str, enum.Enum):
+    """底稿复核任务状态（独立于编制状态）"""
+    not_submitted = "not_submitted"          # 未提交复核
+    pending_level1 = "pending_level1"        # 待一级复核
+    level1_in_progress = "level1_in_progress"  # 一级复核处理中
+    level1_passed = "level1_passed"          # 一级复核通过
+    level1_rejected = "level1_rejected"      # 一级复核退回
+    pending_level2 = "pending_level2"        # 待二级复核
+    level2_in_progress = "level2_in_progress"  # 二级复核处理中
+    level2_passed = "level2_passed"          # 二级复核通过
+    level2_rejected = "level2_rejected"      # 二级复核退回
 
 
 class ReviewCommentStatus(str, enum.Enum):
@@ -247,6 +264,11 @@ class WorkingPaper(Base):
     status: Mapped[WpFileStatus] = mapped_column(
         sa.Enum(WpFileStatus, name="wp_file_status", create_type=False),
         server_default=text("'draft'"),
+        nullable=False,
+    )
+    review_status: Mapped[WpReviewStatus] = mapped_column(
+        sa.Enum(WpReviewStatus, name="wp_review_status", create_type=False),
+        server_default=text("'not_submitted'"),
         nullable=False,
     )
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(

@@ -21,6 +21,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user, require_project_access
+from app.models.core import User
 from app.models.report_models import FinancialReport, FinancialReportType
 from app.models.report_schemas import (
     ReportGenerateRequest,
@@ -38,6 +40,7 @@ router = APIRouter(
 async def generate_reports(
     data: ReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """生成/重新生成四张报表"""
     engine = ReportEngine(db)
@@ -63,6 +66,7 @@ async def consistency_check(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """跨报表一致性校验"""
     engine = ReportEngine(db)
@@ -81,6 +85,7 @@ async def get_report(
     report_type: FinancialReportType,
     unadjusted: bool = Query(False, description="是否返回未审报表数据"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取指定报表数据（支持未审/已审切换）"""
     if unadjusted:
@@ -115,6 +120,7 @@ async def drilldown_report_row(
     report_type: FinancialReportType,
     row_code: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """报表行穿透查询"""
     engine = ReportEngine(db)
@@ -130,8 +136,15 @@ async def export_report_excel(
     year: int,
     report_type: FinancialReportType,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """导出单张报表为 Excel"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "report_export: user=%s project=%s year=%s type=%s",
+        str(current_user.id), str(project_id), year, report_type.value,
+    )
     result = await db.execute(
         sa.select(FinancialReport)
         .where(

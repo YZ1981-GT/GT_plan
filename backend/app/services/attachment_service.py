@@ -12,7 +12,10 @@ Validates: Requirements 14.1-14.8
 
 from __future__ import annotations
 
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -113,7 +116,14 @@ class AttachmentService:
             use_paperless = self.primary_storage == "paperless" and self.paperless_enabled()
             if use_paperless:
                 update_task(task_id, TaskStatus.processing)
+                # 自动重试：Paperless 上传失败时重试 1 次
                 paperless_document_id = await self.upload_to_paperless(temp_path.as_posix(), metadata)
+                if paperless_document_id is None:
+                    import asyncio
+                    logger.warning("Paperless upload failed, retrying in 2s...")
+                    update_task(task_id, TaskStatus.retrying)
+                    await asyncio.sleep(2)
+                    paperless_document_id = await self.upload_to_paperless(temp_path.as_posix(), metadata)
                 if paperless_document_id is not None:
                     update_task(task_id, TaskStatus.success, result={"paperless_id": paperless_document_id})
                     return await self.create_attachment(

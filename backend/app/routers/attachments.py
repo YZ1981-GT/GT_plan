@@ -51,7 +51,7 @@ def _svc(db: AsyncSession) -> AttachmentService:
 @router.post("/api/projects/{project_id}/attachments")
 async def create_attachment(
     project_id: UUID, body: AttachmentCreate, db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
     result = await svc.create_attachment(project_id, body.model_dump())
@@ -138,7 +138,7 @@ async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)
 @router.post("/api/attachments/{attachment_id}/associate")
 async def associate_with_wp(
     attachment_id: UUID, body: AssociateRequest, db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
     result = await svc.associate_with_wp(attachment_id, body.wp_id, body.association_type, body.notes)
@@ -160,7 +160,7 @@ class OCRStatusUpdate(BaseModel):
 @router.put("/api/attachments/{attachment_id}/ocr-status")
 async def update_ocr_status(
     attachment_id: UUID, body: OCRStatusUpdate, db: AsyncSession = Depends(get_db),
-current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """更新附件 OCR 状态和文本（由 OCR 服务回调）"""
     svc = _svc(db)
@@ -195,10 +195,13 @@ async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Dep
 
 @router.get("/api/attachments/{attachment_id}/download")
 async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """统一下载代理 — 屏蔽底层存储差异"""
+    """统一下载代理 — 屏蔽底层存储差异，记录下载审计日志"""
     from fastapi.responses import StreamingResponse, Response
     from pathlib import Path
     import httpx
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     svc = _svc(db)
     att = await svc.get_attachment(attachment_id)
@@ -207,6 +210,12 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
 
     file_path = att.get("file_path", "")
     file_name = att.get("file_name", "attachment")
+
+    # 审计日志：记录敏感下载操作
+    logger.info(
+        "attachment_download: user=%s attachment_id=%s file_name=%s",
+        str(current_user.id), str(attachment_id), file_name,
+    )
 
     # Paperless 存储：通过 Paperless API 代理下载
     if file_path.startswith("paperless://"):
@@ -309,4 +318,4 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
         mime = mime_map.get(ext, "application/octet-stream")
         return StreamingResponse(open(local_path, "rb"), media_type=mime)
 
-    return {"previewable": False, "file_name": file_name, "download_url": f"/api/attachments/{attachment_id}/download"}
+    return {"previewable": False, "file_name": file_name, "ocr_text": att.get("ocr_text", ""), "download_url": f"/api/attachments/{attachment_id}/download", "message": "文件暂不可预览，请下载查看"}

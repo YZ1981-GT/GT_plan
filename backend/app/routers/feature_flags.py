@@ -30,6 +30,12 @@ async def check_flag(flag: str, project_id: UUID | None = None):
     return {"flag": flag, "enabled": is_enabled(flag, project_id)}
 
 
+@router.get("/maturity")
+async def get_maturity():
+    """获取所有功能成熟度分级"""
+    return get_feature_maturity()
+
+
 @router.put("/projects/{project_id}")
 async def set_flag(
     project_id: UUID,

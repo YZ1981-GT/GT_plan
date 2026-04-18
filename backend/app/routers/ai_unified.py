@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from app.deps import get_current_user
+from app.models.core import User
 from fastapi import APIRouter, Depends
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession

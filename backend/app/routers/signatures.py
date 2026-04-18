@@ -17,6 +17,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.sign_service import SignService
 
 router = APIRouter(tags=["signatures"])
@@ -55,7 +57,8 @@ async def sign_document(body: SignRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/api/signatures/{object_type}/{object_id}")
 async def get_signatures(
-    object_type: str, object_id: UUID, db: AsyncSession = Depends(get_db)
+    object_type: str, object_id: UUID, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取签名记录"""
     svc = SignService()
@@ -64,7 +67,8 @@ async def get_signatures(
 
 @router.post("/api/signatures/{signature_id}/verify")
 async def verify_signature(
-    signature_id: UUID, db: AsyncSession = Depends(get_db)
+    signature_id: UUID, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """验证签名"""
     svc = SignService()
@@ -78,7 +82,8 @@ async def verify_signature(
 
 @router.post("/api/signatures/{signature_id}/revoke")
 async def revoke_signature(
-    signature_id: UUID, db: AsyncSession = Depends(get_db)
+    signature_id: UUID, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """撤销签名"""
     svc = SignService()

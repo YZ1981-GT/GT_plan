@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.deps import check_consol_lock
 from app.services.materiality_service import MaterialityService
@@ -26,7 +26,7 @@ async def get_trial_balance(
     year: int = Query(...),
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取试算表（四列结构），含重要性水平高亮标记"""
     svc = TrialBalanceService(db)
@@ -65,9 +65,9 @@ async def recalc_trial_balance(
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
     _lock_check=Depends(check_consol_lock),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
-    """手动触发全量重算（合并锁定期间禁止）"""
+    """手动触发全量重算（合并锁定期间禁止，需编辑权限）"""
     svc = TrialBalanceService(db)
     await svc.full_recalc(project_id, year, company_code)
     await db.commit()
@@ -80,7 +80,7 @@ async def consistency_check(
     year: int = Query(...),
     company_code: str = Query("001"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """数据一致性校验"""
     svc = TrialBalanceService(db)

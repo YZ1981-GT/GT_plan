@@ -12,6 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.phase10_schemas import CreateNextYearRequest, CreateNextYearResponse
 from app.services.continuous_audit_service import ContinuousAuditService
 
@@ -23,6 +25,7 @@ async def create_next_year(
     project_id: UUID,
     body: CreateNextYearRequest | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """一键创建当年项目（继承上年配置和数据）"""
     svc = ContinuousAuditService()
@@ -46,6 +49,7 @@ async def get_prior_year_data(
     project_id: UUID,
     account_code: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取上年同科目数据（跨年对比）"""
     import sqlalchemy as sa

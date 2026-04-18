@@ -16,6 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.report_models import FinancialReportType
 from app.models.report_schemas import ReportConfigCloneRequest, ReportConfigRow
 from app.services.report_config_service import ReportConfigService
@@ -31,6 +33,7 @@ async def list_report_configs(
     report_type: FinancialReportType | None = Query(None),
     applicable_standard: str = Query("enterprise"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """查询报表配置列表"""
     svc = ReportConfigService(db)
@@ -45,6 +48,7 @@ async def list_report_configs(
 async def get_report_config(
     config_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """查询单行配置详情"""
     svc = ReportConfigService(db)
@@ -58,6 +62,7 @@ async def get_report_config(
 async def clone_report_config(
     data: ReportConfigCloneRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """克隆标准配置到项目"""
     svc = ReportConfigService(db)
@@ -77,6 +82,7 @@ async def update_report_config(
     config_id: UUID,
     updates: dict,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """修改配置行"""
     svc = ReportConfigService(db)
@@ -91,6 +97,7 @@ async def update_report_config(
 @router.post("/seed")
 async def load_seed_data(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """加载种子数据"""
     svc = ReportConfigService(db)

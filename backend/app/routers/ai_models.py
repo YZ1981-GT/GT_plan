@@ -19,6 +19,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider
 from app.services.ai_service import AIService, ModelNotFoundError
 
@@ -57,6 +59,7 @@ class ActivateRequest(BaseModel):
 async def list_models(
     model_type: AIModelType | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """模型列表（可按类型筛选）"""
     svc = AIService(db)
@@ -92,6 +95,7 @@ async def update_model(
     model_id: UUID,
     body: ModelUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新模型配置"""
     model = await _get_model(db, model_id)

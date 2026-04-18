@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.gt_coding_service import GTCodingService
 
 router = APIRouter(tags=["gt-coding"])
@@ -58,6 +60,7 @@ async def list_codings(
     wp_type: str | None = None,
     code_prefix: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """编码体系列表"""
     svc = GTCodingService()
@@ -113,6 +116,7 @@ async def load_seed_data(db: AsyncSession = Depends(get_db)):
 async def create_custom_coding(
     body: CreateCodingRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """创建自定义编码条目"""
     svc = GTCodingService()
@@ -138,6 +142,7 @@ async def update_custom_coding(
     coding_id: UUID,
     body: UpdateCodingRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新自定义编码条目"""
     svc = GTCodingService()
@@ -155,6 +160,7 @@ async def update_custom_coding(
 async def delete_custom_coding(
     coding_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """删除自定义编码条目"""
     svc = GTCodingService()
@@ -171,6 +177,7 @@ async def clone_coding_for_project(
     project_id: UUID,
     body: CloneCodingRequest = CloneCodingRequest(),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """克隆标准编码体系到项目级自定义"""
     svc = GTCodingService()
@@ -191,6 +198,7 @@ async def generate_project_index(
     project_id: UUID,
     body: GenerateIndexRequest = GenerateIndexRequest(),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """根据致同编码体系为项目自动生成底稿索引"""
     svc = GTCodingService()

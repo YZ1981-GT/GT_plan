@@ -56,9 +56,14 @@
               <el-descriptions-item label="底稿编号">{{ selectedWp.wp_code }}</el-descriptions-item>
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
               <el-descriptions-item label="审计循环">{{ selectedWp.audit_cycle || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="状态">
+              <el-descriptions-item label="编制状态">
                 <el-tag :type="statusTagType(selectedWp.status)" size="small">
                   {{ statusLabel(selectedWp.status) }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="复核状态">
+                <el-tag :type="reviewStatusTagType(selectedWp.review_status)" size="small">
+                  {{ reviewStatusLabel(selectedWp.review_status) }}
                 </el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="编制人">{{ selectedWp.assigned_to || '未分配' }}</el-descriptions-item>
@@ -71,7 +76,11 @@
             <div class="gt-wp-detail-actions">
               <el-button-group>
                 <el-button type="primary" @click="onOnlineEdit">
-                  <el-icon style="margin-right:4px"><Monitor /></el-icon>在线编辑
+                  <el-icon style="margin-right:4px"><Monitor /></el-icon>
+                  {{ onlineEditAvailable ? '在线编辑' : '在线编辑（不可用）' }}
+                  <el-tag v-if="onlineEditMaturity !== 'production'" size="small" type="warning" style="margin-left:6px">
+                    {{ onlineEditMaturity === 'experimental' ? '实验' : '试点' }}
+                  </el-tag>
                 </el-button>
                 <el-button @click="onDownload">
                   <el-icon style="margin-right:4px"><Download /></el-icon>下载编辑
@@ -83,6 +92,9 @@
                 <el-button type="success" @click="onSubmitReview" :disabled="hasBlocking">提交复核</el-button>
               </el-tooltip>
             </div>
+            <el-alert v-if="!onlineEditAvailable" type="info" :closable="false" style="margin-top:8px" show-icon>
+              ONLYOFFICE 服务暂不可用，点击"在线编辑"将自动降级为下载编辑模式
+            </el-alert>
 
             <!-- QC 结果摘要 -->
             <div v-if="qcResult" class="gt-wp-qc-summary-inline">
@@ -215,8 +227,9 @@ const uploadFile = ref<File | null>(null)
 const uploadConflict = ref<{ server_version: number; uploaded_version: number } | null>(null)
 const uploadRef = ref<any>(null)
 
-// Feature flags
-const onlineEditEnabled = ref(false)
+// Feature flags & ONLYOFFICE 可用性
+const onlineEditAvailable = ref(true)  // ONLYOFFICE 是否可用（探测结果）
+const onlineEditMaturity = ref('pilot')  // 功能成熟度
 
 // Review annotations
 const annotations = ref<any[]>([])
@@ -319,7 +332,8 @@ const treeData = computed<TreeNode[]>(() => {
 function statusTagType(s: string) {
   const m: Record<string, string> = {
     not_started: 'info', in_progress: 'warning', draft: 'warning',
-    draft_complete: '', edit_complete: '', review_passed: 'success',
+    draft_complete: '', edit_complete: '', under_review: '',
+    revision_required: 'danger', review_passed: 'success',
     review_level1_passed: 'success', review_level2_passed: 'success',
     archived: 'info',
   }
@@ -329,9 +343,34 @@ function statusTagType(s: string) {
 function statusLabel(s: string) {
   const m: Record<string, string> = {
     not_started: '未开始', in_progress: '编制中', draft: '草稿',
-    draft_complete: '初稿完成', edit_complete: '编辑完成',
+    draft_complete: '初稿完成', edit_complete: '编制完成',
+    under_review: '复核中', revision_required: '退回修改',
     review_passed: '复核通过', review_level1_passed: '一级复核通过',
     review_level2_passed: '二级复核通过', archived: '已归档',
+  }
+  return m[s] || s
+}
+
+function reviewStatusTagType(s: string | undefined) {
+  if (!s) return 'info'
+  const m: Record<string, string> = {
+    not_submitted: 'info',
+    pending_level1: 'warning', level1_in_progress: 'warning',
+    level1_passed: 'success', level1_rejected: 'danger',
+    pending_level2: 'warning', level2_in_progress: 'warning',
+    level2_passed: 'success', level2_rejected: 'danger',
+  }
+  return m[s] || 'info'
+}
+
+function reviewStatusLabel(s: string | undefined) {
+  if (!s) return '未提交'
+  const m: Record<string, string> = {
+    not_submitted: '未提交',
+    pending_level1: '待一级复核', level1_in_progress: '一级复核中',
+    level1_passed: '一级通过', level1_rejected: '一级退回',
+    pending_level2: '待二级复核', level2_in_progress: '二级复核中',
+    level2_passed: '二级通过', level2_rejected: '二级退回',
   }
   return m[s] || s
 }
@@ -384,6 +423,12 @@ async function onNodeClick(data: TreeNode) {
 
 function onOnlineEdit() {
   if (!selectedWp.value) return
+  if (!onlineEditAvailable.value) {
+    // ONLYOFFICE 不可用 → 自动降级为下载编辑
+    ElMessage.info('在线编辑暂不可用，已自动切换为下载编辑')
+    onDownload()
+    return
+  }
   router.push({
     name: 'WorkpaperEditor',
     params: { projectId: projectId.value, wpId: selectedWp.value.id },
@@ -530,13 +575,24 @@ async function resolveAnnotation(id: string) {
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
   await fetchData()
-  // 加载功能开关
+  // 探测 ONLYOFFICE 可用性（在线优先，不可用时自动降级）
   try {
-    const { data } = await http.get(`/api/feature-flags/check/online_editing`, {
-      params: { project_id: projectId.value },
-    })
-    onlineEditEnabled.value = data?.enabled ?? false
-  } catch { onlineEditEnabled.value = false }
+    const { data } = await http.get('/api/health')
+    // 同时检查 ONLYOFFICE 端点
+    try {
+      await http.get('/wopi/health', { timeout: 3000 })
+      onlineEditAvailable.value = true
+    } catch {
+      onlineEditAvailable.value = false
+    }
+  } catch {
+    onlineEditAvailable.value = false
+  }
+  // 加载功能成熟度
+  try {
+    const { data } = await http.get('/api/feature-flags/maturity')
+    onlineEditMaturity.value = data?.online_editing || 'pilot'
+  } catch { /* 默认 pilot */ }
 })
 </script>
 

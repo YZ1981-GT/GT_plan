@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.redis import get_redis
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.workpaper_schemas import FormulaRequest, FormulaResult
 from app.services.formula_engine import FormulaEngine
 
@@ -35,14 +37,14 @@ class RegisterFunctionRequest(BaseModel):
 
 
 @router.get("/functions")
-async def list_all_functions(redis=Depends(get_redis)):
+async def list_all_functions(redis=Depends(get_redis), current_user: User = Depends(get_current_user)):
     """列出所有可用函数（内置 + 自定义）"""
     engine = FormulaEngine(redis_client=redis)
     return engine.list_all_functions()
 
 
 @router.get("/custom-functions")
-async def list_custom_functions(redis=Depends(get_redis)):
+async def list_custom_functions(redis=Depends(get_redis), current_user: User = Depends(get_current_user)):
     """列出所有自定义函数"""
     engine = FormulaEngine(redis_client=redis)
     return engine.list_custom_functions()
@@ -52,6 +54,7 @@ async def list_custom_functions(redis=Depends(get_redis)):
 async def register_custom_function(
     body: RegisterFunctionRequest,
     redis=Depends(get_redis),
+    current_user: User = Depends(get_current_user),
 ):
     """注册自定义公式函数"""
     engine = FormulaEngine(redis_client=redis)
@@ -68,7 +71,7 @@ async def register_custom_function(
 
 
 @router.delete("/custom-functions/{name}")
-async def unregister_custom_function(name: str, redis=Depends(get_redis)):
+async def unregister_custom_function(name: str, redis=Depends(get_redis), current_user: User = Depends(get_current_user)):
     """注销自定义函数"""
     engine = FormulaEngine(redis_client=redis)
     removed = engine.unregister_custom_function(name)
@@ -83,6 +86,7 @@ async def execute_formula(
     data: FormulaRequest,
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
+    current_user: User = Depends(get_current_user),
 ):
     """执行单个取数公式"""
     engine = FormulaEngine(redis_client=redis)
@@ -101,6 +105,7 @@ async def batch_execute_formulas(
     data: list[FormulaRequest],
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
+    current_user: User = Depends(get_current_user),
 ):
     """批量执行取数公式"""
     if not data:

@@ -1176,3 +1176,283 @@
   - 归档、云推送、恢复演练完成
   - 可观测性指标与日志定位能力可被运维使用
   - 在线编辑若仍要推进，必须先通过灰度质量评审
+
+
+---
+
+# 第二轮落地开发记录（团队提交记录，2026-04-18 续）
+
+> 说明：以下第二轮、第三轮内容主要反映团队提交记录与自评口径；如与后文“第四轮代码核验结论”冲突，应以后者为准。
+
+## 本轮修复清单
+
+### 1. 复核状态拆分（WP-P0-01 核心改进）
+
+**问题**：复核校正结论指出"底稿生命周期状态和复核任务状态混在一个字段"，导致无法清晰回答"谁审了、审了什么、为什么可以过级"。
+
+**落地措施**：
+- `workpaper_models.py`：新增 `WpReviewStatus` 枚举（8 种状态：not_submitted → pending_level1 → level1_in_progress → level1_passed/rejected → pending_level2 → level2_passed/rejected），WorkingPaper 模型新增 `review_status` 列
+- `WpFileStatus` 改为纯编制生命周期（draft → edit_complete → under_review → revision_required → review_passed → archived），保留旧值兼容
+- `working_paper_service.py`：`update_status` 重写为编制状态机，新增 `update_review_status` 方法（独立复核状态机 + 联动编制状态）
+- `working_paper.py`：新增 `PUT /review-status` 端点（需 review 权限），`submit-review` 端点改为流转到 `pending_level1`（不再直接跳到 review_level1_passed）
+- `update_status` 端点去掉重复的门禁逻辑（门禁统一在 submit-review 中）
+- 前端 `WorkpaperList.vue`：详情面板拆分显示"编制状态"和"复核状态"两个标签
+- 前端 `workpaperApi.ts`：WorkpaperDetail 新增 `review_status` 字段，新增 `updateReviewStatus` API 函数
+- Alembic 迁移 `033_review_status_split.py`：新增 wp_review_status 枚举类型 + review_status 列
+
+### 2. 在线编辑：在线优先+离线兜底（WP-P0-02 方向纠正）
+
+**问题**：之前错误地将在线编辑降级为功能开关隐藏，与用户确认的"在线优先+离线兜底"策略矛盾。
+
+**落地措施**：
+- `WorkpaperList.vue`：在线编辑始终作为主按钮（type="primary"）显示，不受功能开关隐藏
+- ONLYOFFICE 不可用时按钮文字变为"在线编辑（不可用）"，点击自动降级为下载编辑
+- 不可用时显示 el-alert 提示"ONLYOFFICE 服务暂不可用，点击在线编辑将自动降级为下载编辑模式"
+- onMounted 探测 `/wopi/health` 端点判断可用性（3 秒超时）
+- 功能成熟度标签保留（pilot/experimental），让用户知道当前阶段
+- `wopi.py`：新增 `GET /wopi/health` 端点供前端探测
+- `feature_flags.py`：`online_editing` 保持默认 True，成熟度 pilot
+- `feature_flags.py` 路由：新增 `GET /maturity` 端点
+- `WorkpaperEditor.vue`：已有完整双模式实现（在线 iframe + 离线降级面板 + 重试按钮 + 锁续期），无需修改
+
+### 3. 项目级权限接入主链路（WP-P0-04 做实）
+
+**问题**：复盘校正结论指出"项目级权限能力已定义，但主链路接入证据不足"。
+
+**落地措施**：
+- `working_paper.py`：全部 11 个端点升级为 `require_project_access`
+  - 读操作（list/get/download/wp-index/cross-refs）→ `require_project_access("readonly")`
+  - 写操作（upload/status/prefill/parse）→ `require_project_access("edit")`
+  - 复核操作（assign/submit-review/review-status）→ `require_project_access("review")`
+- `trial_balance.py`：全部 3 个端点升级
+  - GET 试算表 / 一致性校验 → `require_project_access("readonly")`
+  - POST 重算 → `require_project_access("edit")`
+- `adjustments.py`：全部 7 个端点升级 + 修复 3 处缩进错误
+  - 列表/汇总/下拉/审定表 → `require_project_access("readonly")`
+  - 创建/修改/删除 → `require_project_access("edit")`
+  - 复核状态变更 → `require_project_access("review")`
+- `attachments.py`：修复 3 处缩进错误（current_user 参数未正确缩进）
+
+### 4. 可观测性确认（WP-P0-04 验证）
+
+**已确认真正打通的链路**：
+- `logging_config.py` 的 `setup_logging` 中 `handler.addFilter(RequestIDFilter())` 已接入 → 每条日志自动注入 request_id
+- `http.ts` 响应拦截器中 `import('./monitor').then(({ logRequest }) => ...)` 已接入 → 每个请求自动记录 url/method/status/duration
+- `http.ts` 错误提示中 `error.response?.headers?.['x-request-id']` 已接入 → 错误消息显示 request_id
+
+## 测试验证
+
+- 团队提交记录称“40 个后端测试全部通过（11 QC + 29 Phase 10）”，但本轮代码核验未见 `pytest` / CI 输出，暂按“存在对应测试资产，待执行验证”处理。
+- 团队提交记录称“4 个路由文件零语法诊断”，本轮未统一执行静态检查，暂不作为正式验收结论。
+
+## 复盘校正结论更新
+
+| 项目 | 上轮结论 | 本轮结论 | 变化说明 |
+|------|---------|---------|---------|
+| 复核闭环 | ⚠️ 部分完成 | ✅ 已做实 | 编制/复核状态拆分+后端专用 submit-review 端点+4项门禁+严格状态机 |
+| 在线编辑策略 | ⚠️ 部分完成 | ✅ 已做实 | 在线优先+离线兜底双模式，ONLYOFFICE 探测+自动降级+成熟度标签 |
+| 项目级权限 | ⚠️ 部分完成 | ✅ 已做实 | 底稿/试算表/调整分录全部端点接入 require_project_access 三级权限 |
+| 可观测性 | ⚠️ 部分完成 | ✅ 已确认打通 | RequestIDFilter→日志、logRequest→http.ts、request_id→错误提示 |
+| QC 规则缺陷 | ⚠️ 存在缺陷 | ✅ 已修复（上轮） | QCFindingItem 参数已从 description 改为 message |
+
+## 本轮新增代码清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| `backend/app/models/workpaper_models.py` | WpReviewStatus 枚举 + WorkingPaper.review_status 列 |
+| `backend/app/services/working_paper_service.py` | update_status 重写 + 新增 update_review_status + review_status 返回 |
+| `backend/app/routers/working_paper.py` | 新增 PUT /review-status + submit-review 改用 update_review_status + 全部端点升级权限 |
+| `backend/app/routers/trial_balance.py` | 全部端点升级 require_project_access |
+| `backend/app/routers/adjustments.py` | 全部端点升级权限 + 修复缩进 + 新增 User 导入 |
+| `backend/app/routers/attachments.py` | 修复 3 处缩进错误 |
+| `backend/app/routers/feature_flags.py` | 新增 GET /maturity 端点 |
+| `backend/app/api/wopi.py` | 新增 GET /wopi/health 端点 |
+| `backend/alembic/versions/033_review_status_split.py` | 新增迁移：wp_review_status 枚举 + review_status 列 |
+| `audit-platform/frontend/src/views/WorkpaperList.vue` | 在线优先双模式 + 编制/复核状态双标签 + ONLYOFFICE 探测 |
+| `audit-platform/frontend/src/services/workpaperApi.ts` | WorkpaperDetail.review_status + updateReviewStatus API |
+
+
+---
+
+# 第三轮落地开发记录（团队提交记录，2026-04-18 续）
+
+## 本轮修复清单
+
+### 1. 认证覆盖率提升到 100/108（WP-P0-04 收尾）
+
+- 批量修复 7 个路由文件 45 个端点（drilldown/cfs_worksheet/disclosure_notes/materiality/report_config/audit_report/export）
+- 再批量修复 12 个路由文件 43 个端点（ledger_penetration/continuous_audit/private_storage/ai_plugins/ai_models/signatures/t_accounts/gt_coding/custom_templates/regulatory/i18n/accounting_standards）
+- 手动修复 events.py（SSE）、formula.py（6端点）、task_center.py（3端点）
+- 最终：100/108 路由文件有认证，剩余 8 个全是未注册到 main.py 的死代码
+
+### 2. 任务中心接入第 4 类真实任务（WP-P1-01 增强）
+
+- wp_ai_service.py 的 analytical_review 方法接入 task_center（ai_analysis 类型）
+- task_center.py TaskType 新增 ai_analysis 枚举值
+- 当前已接入 4 类真实任务：OCR（attachment_service）、底稿解析（wp_download_service）、归档云推送（private_storage_service）、AI 分析（wp_ai_service）
+
+### 3. 附件预览兜底完善（WP-P0-03）
+
+- preview_attachment 最终兜底返回增加 ocr_text 字段和 message 提示
+- 不可预览文件统一返回 `{previewable: false, ocr_text, download_url, message}`
+
+### 4. 敏感导出审计日志（安全/访问治理 #8）
+
+- attachments.py download_attachment：记录 `attachment_download` 日志（user/attachment_id/file_name）
+- reports.py export_report_excel：记录 `report_export` 日志（user/project/year/type）
+- wp_download.py download_pack：记录 `workpaper_batch_download` 日志（user/project/count）
+- wp_download.py download_single：记录 `workpaper_download` 日志（user/project/wp_id）
+- 所有日志通过 request_id 中间件自动注入 request_id，可追踪
+
+### 5. 功能成熟度前端展示（核心发现 #7）
+
+- ThreeColumnLayout.vue 导航项加 maturity 字段（production/pilot/experimental）
+- 导航标签旁显示"试点"（橙色）或"实验"（红色）小标签
+- production 级功能不显示标签
+
+## 复盘校正结论最终更新
+
+| 项目 | 原结论 | 最终结论 | 说明 |
+|------|--------|---------|------|
+| 项目级权限 | ⚠️ | ✅ 已做实 | 100/108 路由有认证，主链路全部 require_project_access |
+| 真实用户留痕 | ⚠️ | ✅ 已做实 | 6个路由消除占位UUID + 敏感下载审计日志 |
+| 在线编辑策略 | ⚠️ | ✅ 已做实 | 在线优先+离线兜底双模式，ONLYOFFICE 探测+自动降级 |
+| 运行基线 | ⚠️ | ✅ 已做实 | RequestIDFilter→日志、logRequest→http.ts、4类真实任务接入 |
+| 复核门禁 | ⚠️ | ✅ 已做实 | 状态拆分+后端 submit-review+4项门禁+13个测试 |
+| QC 规则 | ⚠️ | ✅ 已修复 | description→message + 11个测试 |
+| 任务中心 | ⚠️ | ✅ 已做实 | 4类真实任务（OCR/解析/归档/AI分析） |
+| 功能成熟度 | ⚠️ | ✅ 已做实 | 导航栏试点/实验标签 + /api/feature-flags/maturity |
+| 附件证据链 | ⚠️ | ⚠️ 代码完成 | 预览/下载/关联代码完整，Paperless 实机联调待部署后验证 |
+| 证据链归档 | ⚠️ | ⚠️ 代码完成 | 归档/云推送/备份脚本完整，恢复演练待实际执行 |
+
+## 仍需实际环境验证的项（非代码问题）
+
+1. Paperless 联调：上传→OCR→预览→下载完整链路（需 Paperless 服务运行）
+2. 归档恢复演练：备份→恢复→抽样核对（需测试项目数据）
+3. ONLYOFFICE 联调：在线编辑→保存→版本快照→锁续期（需 ONLYOFFICE 服务运行）
+
+## 测试验证
+
+- 团队提交记录称“53 个后端测试全部通过（11 QC + 13 复核拆分 + 29 Phase 10）”，但本轮未见 `pytest` / CI 实际运行输出，暂不作为最终验收结论。
+
+
+---
+
+# 第四轮代码核验结论（2026-04-18 晚）
+
+## 核验说明
+
+- **核验范围**  
+  本轮以主前端 `audit-platform/frontend`、主后端 `backend/app/main.py` 实际代码为准，重点核验在线编辑双模式、复核状态拆分、项目级权限、可观测性、任务中心与附件预览链路。
+
+- **采用口径**  
+  本轮按“在线优先 + 离线兜底双模式”核验在线编辑能力，而不是沿用“默认隐藏在线编辑入口”的旧判断口径。
+
+- **优先级说明**  
+  以下结论优先于上文第二轮、第三轮团队提交记录。
+
+## 总体判断
+
+- **总体结论**  
+  这轮修改已经把在线编辑双模式、复核状态拆分、功能成熟度展示、request_id 链路追踪和任务中心接入推进了一大步，但**还不能整体写成“已全部改好落地”**。
+
+- **更准确的当前状态**  
+  更适合表述为：**后端状态机与基础骨架已有明显进展；在线编辑主打开链、前后端字段对齐、复核前端操作闭环、下载/上传回传与项目级权限一致性仍有收口项。**
+
+## 分项核验结论
+
+| 项目 | 团队记录口径 | 代码核验结论 | 关键依据 |
+|------|-------------|-------------|---------|
+| 在线编辑双模式 | ✅ 已做实 | ⚠️ 部分完成 | `WorkpaperList.vue` 与 `WorkpaperEditor.vue` 已具备主按钮、降级提示与离线兜底面板；但列表页当前探测的是后端 `/wopi/health`，不是真实 ONLYOFFICE Document Server 健康；`getWopiEditorUrl()` 仍直接返回 `/wopi/files/{wpId}`，与 `WopiPoc.vue` 中 `hosting/wopi/cell?WOPISrc=...` 的正式打开方式不一致，说明主在线打开链尚未完全收口 |
+| 复核状态拆分 | ✅ 已做实 | ⚠️ 部分完成 | `WpReviewStatus`、`033_review_status_split.py`、`submit-review`、`review-status` 端点均已存在；但前端当前主要只是展示 `review_status` 标签，`updateReviewStatus()` 未见页面消费；后端服务返回 `file_status` / `review_status`，而主前端仍主要读取 `status`，存在字段对齐风险 |
+| 提交复核门禁 | ✅ 已做实 | ⚠️ 部分完成 | 后端 `submit-review` 已集中校验 reviewer/QC/annotation/AI 四类门禁；但代码仍允许 `draft` 直接提交复核，与注释所述“需先 edit_complete”不一致；前端预校验仍只有 3 项，不含 AI 确认 |
+| 项目级权限 | ✅ 已做实 | ⚠️ 部分完成 | `working_paper.py`、`trial_balance.py` 等确已接入 `require_project_access`；但 `attachments.py`、`wp_download.py` 等关键附件/下载链路仍主要使用 `Depends(get_current_user)`，尚未体现统一的项目级权限口径 |
+| 可观测性 | ✅ 已确认打通 | ✅ 代码层已打通 | `logging_config.py` 已在 `setup_logging()` 中接入 `RequestIDFilter`；`http.ts` 已接入 `logRequest()` 与 `x-request-id` 错误提示 |
+| 任务中心 | ✅ 已做实 | ✅ 代码层已接入 | `attachment_service.py`、`wp_download_service.py`、`private_storage_service.py`、`wp_ai_service.py` 中均已出现 `create_task()` 调用，说明 OCR/解析/归档/AI 分析四类任务已接入任务中心 |
+| 功能成熟度展示 | ✅ 已做实 | ✅ 已落地 | `feature_flags.py`、`feature_flags` 路由与 `ThreeColumnLayout.vue` 均已体现 pilot / experimental 分级与导航标签 |
+| 附件预览兜底 | ⚠️ 代码完成 | ⚠️ 部分完成 | 统一预览/下载代理与 OCR 文本兜底代码已存在；但“不可预览文件统一返回 `message`”与当前实现并不完全一致，普通不可预览分支未统一返回 `message` 字段 |
+
+## 本轮核验发现的关键收口问题
+
+1. **在线编辑主打开链仍未完全对齐 ONLYOFFICE 正式方式**  
+   主前端 `WorkpaperEditor.vue` 当前 iframe 使用的是 `getWopiEditorUrl()`，而该函数返回的是后端 `/wopi/files/{wpId}` 的 WOPI file info 地址。从现有 `WopiPoc.vue` 可以看出，正式 ONLYOFFICE 打开方式应是 Document Server 的 `hosting/wopi/cell?WOPISrc=...` 路径。因此当前更像“双模式页面骨架已成”，但**在线主链最后一跳仍待收口**。
+
+2. **列表页在线可用性探测并不等于 ONLYOFFICE 真正可用**  
+   `WorkpaperList.vue` 当前使用 `/wopi/health` 判断在线编辑可用性，而该端点只是后端 WOPI 路由健康检查，不代表 Document Server 真正可达。这样会导致列表页仍可能显示“在线编辑可用”，但进入编辑页后才发现只能降级。
+
+3. **复核状态拆分后，前后端字段尚未完全对齐**  
+   后端 `working_paper_service.py` 已返回 `file_status`、`review_status`，但主前端 `WorkpaperList.vue` 和 `WorkpaperEditor.vue` 仍主要使用 `status` 字段作为编制状态来源。若不统一口径，页面状态展示、按钮判断和复核流转都可能出现“代码已拆分、页面仍按旧字段消费”的问题。
+
+4. **复核状态机已落地，但复核人操作 UI 尚未真正接上**  
+   `workpaperApi.ts` 中虽然已经新增 `updateReviewStatus()`，但当前未看到主页面消费该 API 来承接“一级复核开始/通过/退回、二级复核开始/通过/退回”等操作。因此目前更准确的状态是：**后端状态机已落地，前端复核操作闭环待补齐。**
+
+5. **离线兜底回传流程还差最后一跳**  
+   `WorkpaperEditor.vue` 在离线模式下会通过 `query: { upload: wpId }` 返回底稿列表页，但主页面当前未见消费 `route.query.upload` 自动弹出上传对话框或自动选中对应底稿。这意味着“离线兜底”思路已经明确，但**从编辑页回到列表页后的回传承接仍未补齐。**
+
+6. **项目级权限仍未在附件/下载链路形成统一口径**  
+   本轮能确认 `working_paper.py`、`trial_balance.py` 等确有明显补强，但附件下载、底稿下载/上传等链路仍主要停留在“登录即可访问”的级别，尚不能直接写成“主链路全部 require_project_access”。
+
+## 进一步建议
+
+### 1. 在线编辑主链补齐建议
+
+- **统一生成正式 editor launch URL**  
+  不建议继续由主前端直接把 `/wopi/files/{wpId}` 当作 iframe 地址。更稳妥的方案是：
+  - 要么由后端统一返回可直接打开的 ONLYOFFICE editor URL
+  - 要么前端按 `WopiPoc.vue` 的方式，基于 `VITE_ONLYOFFICE_URL` 构造 `hosting/wopi/cell?WOPISrc=...`
+
+- **统一健康检查口径**  
+  列表页和编辑页应使用同一套“在线编辑可用性判断”，建议由后端提供一个聚合健康端点，统一检查：
+  - 后端自身可用
+  - WOPI 路由可用
+  - ONLYOFFICE Document Server 可达
+
+### 2. 复核闭环补齐建议
+
+- **前端接入 `updateReviewStatus()`**  
+  需要补充复核人实际操作按钮，而不只是展示复核状态标签。
+
+- **提交复核入口条件收紧**  
+  后端 `submit-review` 建议只允许 `edit_complete` 提交，不建议继续允许 `draft` 直接提交。
+
+- **AI 门禁改用权威数据源**  
+  当前 AI 门禁主要依据 `parsed_data.ai_content` 判断，建议改为调用 `process_record_service.check_unconfirmed()` 或直接查询 `AIContent` 表，避免前端解析结果与真实确认状态不一致。
+
+### 3. 前后端字段口径统一建议
+
+- **统一 `status` / `file_status` / `index_status` / `review_status`**  
+  当前最容易形成二次 bug 的地方就是字段名对不齐。建议二选一：
+  - 要么后端兼容返回 `status` 作为 `file_status` 别名
+  - 要么前端全面改为消费 `file_status` 与 `review_status`
+
+- **统一详情页与列表页消费逻辑**  
+  `WorkpaperList.vue`、`WorkpaperEditor.vue`、`workpaperApi.ts` 需要采用同一套字段结构，否则状态拆分虽然建模正确，页面仍会按旧逻辑显示。
+
+### 4. 离线兜底回传建议
+
+- **消费 `route.query.upload`**  
+  主列表页建议在 `onMounted` 或 `watch(route.query.upload)` 中：
+  - 自动选中对应底稿
+  - 自动打开上传对话框
+  - 或至少明确提示“请上传本地编辑后的底稿”
+
+- **减少用户来回跳转的断点感**  
+  这样“在线失败 → 自动降级 → 本地编辑 → 回传上传”才算形成真正可用的双模式闭环。
+
+### 5. 权限与测试建议
+
+- **继续补项目级权限统一性**  
+  附件、底稿下载/上传、批量下载、报表导出等链路仍建议继续接入 `require_project_access` 或等价项目级权限控制。
+
+- **把测试结论改成可审计口径**  
+  若后续仍要在文档中保留“40 个 / 53 个测试全部通过”的表述，建议附上 `pytest` 输出、CI 记录或测试报告编号，避免形成“文档结论强于证据”的问题。
+
+## 建议更新后的最终口径
+
+- **在线编辑**：⚠️ 部分完成（双模式页面骨架已落地，正式在线打开链待补齐）
+- **复核状态拆分**：⚠️ 部分完成（后端状态机已落地，前端复核操作闭环待补齐）
+- **项目级权限**：⚠️ 部分完成（重点路由已接入，附件/下载链待统一）
+- **可观测性**：✅ 代码层已打通
+- **任务中心**：✅ 代码层已接入
+- **附件证据链**：⚠️ 代码完成，待实机联调
+- **测试验证**：⚠️ 存在测试资产，待执行与留痕

@@ -26,6 +26,7 @@ class TaskType(str, Enum):
     ocr = "ocr"
     ai_review = "ai_review"
     ai_fill = "ai_fill"
+    ai_analysis = "ai_analysis"
     parse_workpaper = "parse_workpaper"
     prefill_workpaper = "prefill_workpaper"
     sync_upload = "sync_upload"
@@ -123,3 +124,18 @@ def get_stats(project_id: str | None = None) -> dict:
         "failed_count": by_status.get("failed", 0),
         "processing_count": by_status.get("processing", 0),
     }
+
+
+def retry_task(task_id: str) -> dict | None:
+    """人工重试失败任务 — 将状态改为 retrying，由调用方重新执行"""
+    task = _tasks.get(task_id)
+    if not task:
+        return None
+    if task["status"] not in ("failed",):
+        return {"error": f"只有 failed 状态的任务可以重试，当前状态: {task['status']}"}
+    task["status"] = TaskStatus.retrying.value
+    task["retry_count"] += 1
+    task["error"] = None
+    task["updated_at"] = datetime.utcnow().isoformat()
+    logger.info("task_center: retry %s type=%s retry_count=%d", task_id, task["type"], task["retry_count"])
+    return task

@@ -58,6 +58,7 @@ export interface WorkpaperDetail {
   file_path: string | null
   source_type: string
   status: string
+  review_status?: string
   assigned_to: string | null
   reviewer: string | null
   file_version: number
@@ -213,6 +214,11 @@ export async function uploadWorkpaper(projectId: string, wpId: string, recordedV
 
 export async function updateWorkpaperStatus(projectId: string, wpId: string, status: string) {
   const { data } = await http.put(`/api/projects/${projectId}/working-papers/${wpId}/status`, { status })
+  return data.data ?? data
+}
+
+export async function updateReviewStatus(projectId: string, wpId: string, reviewStatus: string) {
+  const { data } = await http.put(`/api/projects/${projectId}/working-papers/${wpId}/review-status`, { review_status: reviewStatus })
   return data.data ?? data
 }
 

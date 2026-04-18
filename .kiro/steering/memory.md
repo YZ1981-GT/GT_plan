@@ -966,3 +966,39 @@ inclusion: always
 - WP-P0-01 完成：11个QC阻断规则测试（4类场景×通过/阻断+3个集成测试），全部通过
 - WP-P1-03 完成：SMOKE_TEST_CHECKLIST.md发版前冒烟清单（后端测试+6条主链路手动检查+4个API验证+验收签字表）
 - 62个测试通过（51+11新增）；commit fbc1148
+
+## WOPI 企业级完善 + 复核状态拆分（2026-04-18 第七轮）
+- WOPI 令牌 TTL 从 120 分钟改为 15 分钟（短 TTL 专用令牌）
+- 新增 DELETE /wopi/files/{id}/lock 管理员强制解锁端点
+- 新增 GET /wopi/files/{id}/lock-status 锁状态查询（含 TTL）
+- 新增 GET /wopi/stats 运维统计（活跃锁数量/Redis 可用性）
+- 前端 WorkpaperEditor 新增 10 分钟定时 REFRESH_LOCK + 锁冲突自动降级
+- put_file 新增幂等处理（content_hash 相同跳过写入）
+- check_file_info 新增编辑会话打开日志（workpaper_online_open）
+- 复核状态拆分已完成：WpFileStatus 改为编制生命周期（draft→edit_complete→under_review→revision_required→review_passed→archived），新增 WpReviewStatus 枚举（not_submitted→pending_level1→level1_in_progress→level1_passed/rejected→pending_level2→level2_passed/rejected），WorkingPaper 新增 review_status 列，working_paper_service 新增 update_review_status 方法（独立复核状态机+联动编制状态），working_paper.py 新增 PUT /review-status 端点，submit-review 改为流转到 pending_level1，前端拆分显示编制状态+复核状态双标签
+- commit 5aacb28（WOPI完善）+ 复核拆分开发中
+
+## 问题文档第二轮落地（2026-04-18 续）
+- 复核状态拆分完成：033迁移+WpReviewStatus枚举+review_status列+update_review_status方法+PUT /review-status端点+submit-review改为pending_level1+前端双标签
+- 在线编辑方向纠正：从"功能开关隐藏"改回"在线优先+离线兜底"——在线编辑始终为主按钮，ONLYOFFICE不可用时自动降级为下载编辑，新增/wopi/health探测端点+/api/feature-flags/maturity端点
+- 项目级权限做实：working_paper.py全部11个端点+trial_balance.py全部3个端点+adjustments.py全部7个端点升级为require_project_access三级权限（readonly/edit/review）
+- adjustments.py修复3处缩进错误+新增User/require_project_access导入
+- attachments.py修复3处缩进错误
+- 可观测性确认打通：RequestIDFilter→日志已接入、logRequest→http.ts已接入、request_id→错误提示已接入
+- 40个测试通过（11 QC + 29 Phase 10），无回归
+
+## 问题文档第三轮落地（2026-04-18 续）
+- 认证覆盖率从 81/108 提升到 100/108（剩余 8 个全是未注册到 main.py 的死代码）
+- 批量修复 7 个路由文件共 45 个端点（drilldown/cfs_worksheet/disclosure_notes/materiality/report_config/audit_report/export）→ require_project_access 或 get_current_user
+- 再批量修复 12 个路由文件共 43 个端点（ledger_penetration/continuous_audit/private_storage/ai_plugins/ai_models/signatures/t_accounts/gt_coding/custom_templates/regulatory/i18n/accounting_standards）
+- 手动修复 events.py（SSE）、formula.py（6个端点）、task_center.py（3个端点）、reports.py（5个端点）
+- adjustments.py 修复 3 处缩进错误 + 新增 User/require_project_access 导入
+- 附件关联搜索下拉确认已完成（AttachmentManagement.vue el-select remote filterable + 关联类型 + 备注）
+- 功能成熟度前端展示：ThreeColumnLayout.vue 导航项加 maturity 字段 + 试点/实验标签（橙色/红色小标签）
+- 新增 13 个复核状态拆分测试（test_review_status_split.py：枚举完整性+编制状态机+复核状态机+联动逻辑+功能成熟度）
+- 53 个测试全部通过（11 QC + 13 复核拆分 + 29 Phase 10）
+- 在线编辑方向确认：在线优先+离线兜底双模式（不是功能开关隐藏），ONLYOFFICE 不可用时自动降级
+- 敏感导出审计日志：attachments download_attachment + reports export_report_excel + wp_download download_pack/download_single 四处关键下载操作记录审计日志（user/project/file_name），通过 request_id 可追踪
+- task_center 接入第4类真实任务：wp_ai_service.analytical_review → ai_analysis 类型
+- 附件预览兜底：不可预览文件返回 ocr_text + download_url + message
+- 问题文档复盘校正结论：12项中10项升级为✅已做实，仅剩2项⚠️代码完成待实际环境验证（Paperless联调+归档演练）

@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user, require_project_access
+from app.models.core import User
 from app.models.audit_platform_models import AccountCategory
 from app.models.audit_platform_schemas import (
     AuxBalanceRow,
@@ -35,6 +37,7 @@ async def get_balance_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> PageResult:
     """科目余额表（分页+筛选）"""
     svc = DrilldownService(db)
@@ -60,6 +63,7 @@ async def drill_to_ledger(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> PageResult:
     """穿透到序时账"""
     svc = DrilldownService(db)
@@ -79,6 +83,7 @@ async def drill_to_aux_balance(
     account_code: str,
     year: int = Query(..., description="审计年度"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> list[AuxBalanceRow]:
     """穿透到辅助余额表"""
     svc = DrilldownService(db)
@@ -95,6 +100,7 @@ async def drill_to_aux_ledger(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> PageResult:
     """穿透到辅助明细账"""
     svc = DrilldownService(db)
@@ -116,6 +122,7 @@ async def get_voucher_detail(
     voucher_no: str,
     year: int = Query(..., description="审计年度"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
     """按凭证号查询完整分录（借贷明细+合计+平衡状态）"""
     svc = DrilldownService(db)
@@ -132,6 +139,7 @@ async def list_vouchers(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> PageResult:
     """凭证列表（按凭证号分组聚合，支持大数据量分页）"""
     svc = DrilldownService(db)
@@ -153,6 +161,7 @@ async def verify_balance_ledger_consistency(
     project_id: UUID,
     year: int = Query(..., description="审计年度"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> dict:
     """校验余额表与序时账的一致性（发生额核对+期末公式校验）"""
     svc = DrilldownService(db)

@@ -22,6 +22,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.t_account_service import TAccountService
 
 router = APIRouter(tags=["t-accounts"])
@@ -50,6 +52,7 @@ class ReconcileRequest(BaseModel):
 @router.post("/api/projects/{project_id}/t-accounts")
 async def create_t_account(
     project_id: UUID, body: TAccountCreate, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = TAccountService()
     result = await svc.create_t_account(db, project_id, body.model_dump())
@@ -66,6 +69,7 @@ async def list_t_accounts(project_id: UUID, db: AsyncSession = Depends(get_db)):
 @router.get("/api/projects/{project_id}/t-accounts/{t_account_id}")
 async def get_t_account(
     project_id: UUID, t_account_id: UUID, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = TAccountService()
     result = await svc.get_t_account(db, t_account_id)
@@ -78,6 +82,7 @@ async def get_t_account(
 async def add_entry(
     project_id: UUID, t_account_id: UUID, body: TAccountEntryCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = TAccountService()
     try:
@@ -91,6 +96,7 @@ async def add_entry(
 @router.post("/api/projects/{project_id}/t-accounts/{t_account_id}/calculate")
 async def calculate_net_change(
     project_id: UUID, t_account_id: UUID, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = TAccountService()
     try:
@@ -103,6 +109,7 @@ async def calculate_net_change(
 async def reconcile(
     project_id: UUID, t_account_id: UUID, body: ReconcileRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = TAccountService()
     try:
@@ -117,6 +124,7 @@ async def reconcile(
 @router.post("/api/projects/{project_id}/t-accounts/{t_account_id}/integrate")
 async def integrate_to_cfs(
     project_id: UUID, t_account_id: UUID, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = TAccountService()
     try:

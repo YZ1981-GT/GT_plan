@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.ai_plugin_service import AIPluginService
 from app.services.unified_ai_service import UnifiedAIService
 
@@ -66,7 +68,8 @@ async def get_plugin(plugin_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/api/ai-plugins")
 async def register_plugin(
-    body: RegisterPluginRequest, db: AsyncSession = Depends(get_db)
+    body: RegisterPluginRequest, db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """注册插件"""
     svc = AIPluginService()
@@ -117,6 +120,7 @@ async def update_config(
     plugin_id: str,
     body: UpdateConfigRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新插件配置"""
     svc = AIPluginService()

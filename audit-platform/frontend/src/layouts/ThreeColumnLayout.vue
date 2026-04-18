@@ -62,7 +62,11 @@
           >
             <el-icon :size="20"><component :is="item.icon" /></el-icon>
             <transition name="gt-fade">
-              <span v-if="!sidebarCollapsed" class="gt-nav-label">{{ item.label }}</span>
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">
+                {{ item.label }}
+                <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
+                <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
+              </span>
             </transition>
           </div>
         </nav>
@@ -173,23 +177,23 @@ const props = defineProps<{
 
 // ── 导航项 ──
 const navItems = [
-  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/' },
-  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects' },
-  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff' },
-  { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge' },
-  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours' },
-  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management' },
-  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation' },
-  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation' },
-  { key: 'archive', label: '归档管理', icon: Box, path: '/archive' },
-  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments' },
-  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users' },
-  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models' },
-  { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage' },
-  { key: 'forum', label: '吐槽求助', icon: ChatDotSquare, path: '/forum' },
-  { key: 'report-format', label: '排版模板', icon: Document, path: '/settings/report-format' },
-  { key: 'settings', label: '系统设置', icon: Setting, path: '/settings' },
-  { key: 'recycle-bin', label: '回收站', icon: DeleteFilled, path: '/recycle-bin' },
+  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
+  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production' },
+  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff', maturity: 'production' },
+  { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production' },
+  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production' },
+  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'pilot' },
+  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'pilot' },
+  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
+  { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production' },
+  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
+  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production' },
+  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'pilot' },
+  { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production' },
+  { key: 'forum', label: '吐槽求助', icon: ChatDotSquare, path: '/forum', maturity: 'production' },
+  { key: 'report-format', label: '排版模板', icon: Document, path: '/settings/report-format', maturity: 'pilot' },
+  { key: 'settings', label: '系统设置', icon: Setting, path: '/settings', maturity: 'production' },
+  { key: 'recycle-bin', label: '回收站', icon: DeleteFilled, path: '/recycle-bin', maturity: 'production' },
 ]
 
 const activeNav = computed(() => {
@@ -452,6 +456,12 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.3);
 }
 .gt-nav-label { font-weight: 500; }
+.gt-maturity-badge {
+  font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 3px;
+  margin-left: 4px; vertical-align: middle; line-height: 1;
+}
+.gt-maturity-pilot { background: #fef0e6; color: #e6a23c; }
+.gt-maturity-exp { background: #fde2e2; color: #f56c6c; }
 
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);

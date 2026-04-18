@@ -8,6 +8,8 @@ Validates: Requirements 5.1-5.2
 
 from __future__ import annotations
 
+from app.deps import get_current_user
+from app.models.core import User
 from fastapi import APIRouter, HTTPException
 
 from app.services.audit_type_service import AuditTypeService

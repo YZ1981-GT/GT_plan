@@ -21,6 +21,8 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.core.redis import get_redis
 from app.services.ledger_penetration_service import LedgerPenetrationService
 
@@ -58,6 +60,7 @@ async def get_balance(
     year: int = Query(...),
     account_code: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """科目余额汇总"""
     svc = _svc(db, None)
@@ -74,6 +77,7 @@ async def get_ledger_entries(
     page: int = 1,
     page_size: int = 100,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """序时账明细（按科目穿透）"""
     svc = _svc(db, None)
@@ -88,6 +92,7 @@ async def get_voucher_entries(
     voucher_no: str,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """凭证分录明细（按凭证号穿透）"""
     svc = _svc(db, None)
@@ -99,6 +104,7 @@ async def get_all_aux_balance(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """全量辅助余额（所有科目的辅助核算维度）"""
     svc = _svc(db, None)
@@ -112,6 +118,7 @@ async def get_aux_balance(
     year: int = Query(...),
     aux_type: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """辅助余额（按科目穿透到辅助维度）"""
     svc = _svc(db, None)
@@ -128,6 +135,7 @@ async def get_aux_ledger_entries(
     page: int = 1,
     page_size: int = 100,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """辅助明细账（按辅助维度穿透）"""
     svc = _svc(db, None)
@@ -142,6 +150,7 @@ async def clear_cache(
     year: int = Query(...),
     redis=Depends(get_redis),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """清除穿透查询缓存"""
     svc = _svc(db, redis)
@@ -155,6 +164,7 @@ async def upload_data(
     year: int = Query(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """上传四表数据文件（支持历史年度）。
 
@@ -180,6 +190,7 @@ async def upload_data(
 async def get_available_years(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取该项目有数据的年度列表"""
     import sqlalchemy as sa

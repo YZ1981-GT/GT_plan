@@ -12,9 +12,11 @@ import json
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.event_bus import event_bus
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ router = APIRouter(
 async def sse_stream(
     project_id: UUID,
     year: int = Query(default=None),
+    current_user: User = Depends(get_current_user),
 ):
     """SSE 事件流：客户端订阅后接收试算表更新等事件通知
 

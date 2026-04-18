@@ -16,6 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.private_storage_service import (
     PrivateStorageService, ProjectArchiveService, StorageStatsService,
 )
@@ -64,6 +66,7 @@ async def archive_project(
     push_to_cloud: bool = True,
     cleanup_local: bool = False,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """项目归档：锁定底稿 → 推送云端 → 可选清理本地"""
     svc = ProjectArchiveService()

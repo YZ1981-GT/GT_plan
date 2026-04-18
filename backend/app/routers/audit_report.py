@@ -19,6 +19,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.report_models import CompanyType, OpinionType
 from app.models.report_schemas import (
     AuditReportGenerateRequest,
@@ -38,6 +40,7 @@ router = APIRouter(
 @router.post("/templates/load-seed")
 async def load_seed_templates(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """加载审计报告模板种子数据"""
     svc = AuditReportService(db)
@@ -55,6 +58,7 @@ async def get_templates(
     opinion_type: OpinionType | None = Query(None),
     company_type: CompanyType | None = Query(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取审计报告模板列表"""
     svc = AuditReportService(db)
@@ -66,6 +70,7 @@ async def get_templates(
 async def generate_report(
     data: AuditReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """从模板生成审计报告"""
     svc = AuditReportService(db)
@@ -90,6 +95,7 @@ async def get_report(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取审计报告"""
     svc = AuditReportService(db)
@@ -105,6 +111,7 @@ async def update_paragraph(
     section: str,
     data: AuditReportParagraph,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新审计报告指定段落内容"""
     svc = AuditReportService(db)
@@ -120,6 +127,7 @@ async def update_status(
     report_id: UUID,
     data: AuditReportStatusUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新审计报告状态（draft→review→final）"""
     svc = AuditReportService(db)

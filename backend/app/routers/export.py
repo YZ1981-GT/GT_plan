@@ -19,6 +19,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.report_models import ExportTaskStatus
 from app.models.report_schemas import (
     ExportTaskCreate,
@@ -37,6 +39,7 @@ router = APIRouter(
 async def create_export_task(
     data: ExportTaskCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """创建导出任务并同步执行（MVP 无 Celery）"""
     engine = PDFExportEngine(db)
@@ -59,6 +62,7 @@ async def create_export_task(
 async def get_task_status(
     task_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """查询导出任务状态"""
     engine = PDFExportEngine(db)
@@ -72,6 +76,7 @@ async def get_task_status(
 async def download_export(
     task_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """下载导出文件"""
     engine = PDFExportEngine(db)
@@ -98,6 +103,7 @@ async def download_export(
 async def get_export_history(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取项目导出历史"""
     engine = PDFExportEngine(db)
