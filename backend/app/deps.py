@@ -159,3 +159,52 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         return current_user
 
     return dependency
+
+
+# ---------------------------------------------------------------------------
+# check_consol_lock — 合并锁定检查
+# ---------------------------------------------------------------------------
+
+
+async def check_consol_lock(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """检查项目是否被合并锁定，锁定时返回 423。"""
+    from sqlalchemy import text as sa_text
+    result = await db.execute(
+        sa_text("SELECT consol_lock FROM projects WHERE id = :pid"),
+        {"pid": str(project_id)},
+    )
+    row = result.first()
+    if row and row[0]:
+        raise HTTPException(status_code=423, detail="项目已被合并锁定，请等待合并完成后再操作")
+
+
+# ---------------------------------------------------------------------------
+# get_visible_projects — 项目可见性过滤
+# ---------------------------------------------------------------------------
+
+
+async def get_visible_project_ids(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[UUID]:
+    """返回当前用户可见的项目 ID 列表。
+
+    admin/partner 可见所有项目，其他角色只能看到自己参与的项目。
+    """
+    if current_user.role.value in ("admin", "partner"):
+        from app.models.core import Project
+        result = await db.execute(
+            select(Project.id).where(Project.is_deleted == False)  # noqa: E712
+        )
+        return [r[0] for r in result.all()]
+
+    result = await db.execute(
+        select(ProjectUser.project_id).where(
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )
+    return [r[0] for r in result.all()]

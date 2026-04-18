@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.phase10_schemas import CreatePostRequest, CreateCommentRequest
 from app.services.forum_service import ForumService
 
@@ -17,8 +19,8 @@ _svc = ForumService()
 
 
 @router.post("/posts")
-async def create_post(req: CreatePostRequest, db: AsyncSession = Depends(get_db)):
-    author_id = UUID("00000000-0000-0000-0000-000000000000")
+async def create_post(req: CreatePostRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    author_id = current_user.id
     result = await _svc.create_post(
         db, author_id, req.title, req.content, req.category, req.is_anonymous,
     )
@@ -41,9 +43,9 @@ async def get_comments(post_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @router.post("/posts/{post_id}/comments")
 async def create_comment(
-    post_id: UUID, req: CreateCommentRequest, db: AsyncSession = Depends(get_db),
+    post_id: UUID, req: CreateCommentRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    author_id = UUID("00000000-0000-0000-0000-000000000000")
+    author_id = current_user.id
     result = await _svc.create_comment(db, post_id, author_id, req.content)
     await db.commit()
     return result

@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.phase10_schemas import (
     CreateConversationRequest,
     SendMessageRequest,
@@ -26,10 +28,10 @@ async def create_conversation(
     project_id: UUID,
     req: CreateConversationRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """创建复核对话"""
-    # 占位 user_id（实际从 JWT 获取）
-    initiator_id = UUID("00000000-0000-0000-0000-000000000000")
+    initiator_id = current_user.id
     result = await _svc.create_conversation(
         db, project_id, initiator_id, req.target_id,
         req.related_object_type, req.related_object_id,
@@ -65,9 +67,10 @@ async def send_message(
     conversation_id: UUID,
     req: SendMessageRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """发送消息"""
-    sender_id = UUID("00000000-0000-0000-0000-000000000000")
+    sender_id = current_user.id
     result = await _svc.send_message(
         db, conversation_id, sender_id,
         req.content, req.message_type, req.attachment_path, req.finding_id,
@@ -80,9 +83,10 @@ async def send_message(
 async def close_conversation(
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """关闭对话（仅发起人可关闭）"""
-    user_id = UUID("00000000-0000-0000-0000-000000000000")
+    user_id = current_user.id
     try:
         result = await _svc.close_conversation(db, conversation_id, user_id)
         await db.commit()

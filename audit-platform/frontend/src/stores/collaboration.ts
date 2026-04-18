@@ -3,9 +3,9 @@ import { ref, computed } from 'vue'
 import { authApi, notificationApi } from '@/services/collaborationApi'
 
 export const useCollaborationStore = defineStore('collaboration', () => {
-  // Auth state
+  // Auth state — 统一使用 'token' 键名（与 auth.ts 一致）
   const user = ref<any>(null)
-  const accessToken = ref<string | null>(localStorage.getItem('access_token'))
+  const accessToken = ref<string | null>(localStorage.getItem('token'))
   const isAuthenticated = computed(() => !!accessToken.value)
 
   // Notifications
@@ -15,8 +15,8 @@ export const useCollaborationStore = defineStore('collaboration', () => {
   async function login(username: string, password: string) {
     const { data } = await authApi.login(username, password)
     accessToken.value = data.access_token
-    localStorage.setItem('access_token', data.access_token)
-    localStorage.setItem('refresh_token', data.refresh_token)
+    localStorage.setItem('token', data.access_token)
+    localStorage.setItem('refreshToken', data.refresh_token)
     await fetchMe()
     return data
   }
@@ -25,21 +25,15 @@ export const useCollaborationStore = defineStore('collaboration', () => {
     try {
       const { data } = await authApi.me()
       user.value = data
-    } catch (e) {
-      console.error(e)
-    }
+    } catch { /* silent */ }
   }
 
   async function logout() {
-    try {
-      await authApi.logout()
-    } catch (e) {
-      console.error(e)
-    }
+    try { await authApi.logout() } catch { /* silent */ }
     accessToken.value = null
     user.value = null
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
   }
 
   async function fetchNotifications() {
@@ -48,18 +42,14 @@ export const useCollaborationStore = defineStore('collaboration', () => {
       notifications.value = data
       const count = await notificationApi.unreadCount()
       unreadCount.value = count.data?.count ?? 0
-    } catch (e) {
-      console.error(e)
-    }
+    } catch { /* silent */ }
   }
 
   async function markNotificationRead(id: string) {
     try {
       await notificationApi.markRead(id)
       await fetchNotifications()
-    } catch (e) {
-      console.error(e)
-    }
+    } catch { /* silent */ }
   }
 
   return {

@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.phase10_schemas import (
     CreateAnnotationRequest,
     UpdateAnnotationRequest,
@@ -24,8 +26,9 @@ async def create_annotation(
     project_id: UUID,
     req: CreateAnnotationRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    author_id = UUID("00000000-0000-0000-0000-000000000000")
+    author_id = current_user.id
     result = await _svc.create_annotation(
         db, project_id, author_id,
         req.object_type, req.object_id, req.content,

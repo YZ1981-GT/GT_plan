@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.process_record_service import (
     AttachmentLinkService,
     AIContentTagService,
@@ -55,11 +57,11 @@ async def record_edit(
     wp_id: UUID,
     req: RecordEditRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """记录底稿编辑"""
     svc = ProcessRecordService()
-    # 使用一个占位 user_id（实际应从 JWT 获取）
-    user_id = UUID("00000000-0000-0000-0000-000000000000")
+    user_id = current_user.id
     result = await svc.record_workpaper_edit(
         db, project_id, wp_id, user_id, req.file_version, req.change_summary
     )
@@ -122,10 +124,11 @@ async def confirm_ai_content(
     content_id: UUID,
     req: ConfirmAIContentRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """确认/拒绝 AI 内容"""
     svc = AIContentTagService()
-    user_id = UUID("00000000-0000-0000-0000-000000000000")
+    user_id = current_user.id
     try:
         result = await svc.confirm_ai_content(db, content_id, req.status, user_id)
         await db.commit()

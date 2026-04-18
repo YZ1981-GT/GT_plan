@@ -85,6 +85,7 @@ from app.routers.review_conversations import router as review_conversations_rout
 from app.routers.annotations import router as annotations_router_v2
 from app.routers.forum import router as forum_router
 from app.routers.report_trace import router as report_trace_router
+from app.routers.feature_flags import router as feature_flags_router
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.audit_log import AuditLogMiddleware
@@ -94,6 +95,7 @@ from app.middleware.error_handler import (
     validation_exception_handler,
 )
 from app.middleware.response import ResponseWrapperMiddleware
+from app.middleware.request_id import RequestIDMiddleware
 from app.services.event_handlers import register_event_handlers
 
 
@@ -125,7 +127,9 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # --- 中间件注册（Starlette LIFO：最后添加的最先执行） ---
 # 1) AuditLogMiddleware（最内层 — 最接近路由处理器）
 app.add_middleware(AuditLogMiddleware)
-# 2) ResponseWrapperMiddleware（包装在审计日志之外）
+# 2) RequestIDMiddleware（链路追踪）
+app.add_middleware(RequestIDMiddleware)
+# 3) ResponseWrapperMiddleware（包装在审计日志之外）
 app.add_middleware(ResponseWrapperMiddleware)
 # 3) GZip 压缩（大 JSON 响应自动压缩）
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -217,3 +221,4 @@ app.include_router(review_conversations_router)
 app.include_router(annotations_router_v2)
 app.include_router(forum_router)
 app.include_router(report_trace_router)
+app.include_router(feature_flags_router)

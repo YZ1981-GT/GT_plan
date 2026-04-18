@@ -858,3 +858,17 @@ inclusion: always
 - 后端统一日志：新增logging_config.py（JSONFormatter结构化日志+setup_logging函数），main.py lifespan中初始化
 - http.ts升级：响应拦截器统一解包ApiResponse（消除data.data??data）+ 分级错误处理（400/403/404/409/413/422/423/500）
 - 143个测试全部通过；commit e6a0279
+- 问题清单全部修复完成（2026-04-18）：①http.ts增强（请求去重pendingMap+AbortController取消+500自动重试2次+指数退避）②SSE统一封装（sse.ts：createSSE自动重连+fetchSSE流式POST）③Web Vitals监控（monitor.ts：LCP/FID/CLS采集+请求日志+慢请求告警）④API服务层统一入口（services/index.ts）⑤API版本端点（GET /api/version）⑥路由预加载（Dashboard/TrialBalance/WorkpaperList/ReportView加webpackPrefetch）⑦TypeScript类型自动生成脚本（generate_types.py从OpenAPI schema生成）；commit fd36df4
+
+## 系统复盘报告（2026-04-18 外部评审）
+- 收到完整系统复盘报告（问题文件），定位为"准生产试点平台"，建议方案A保守推进（离线底稿为主+在线灰度）
+- 五项核心短板：①在线编辑POC未打实 ②复核QC闭环不够硬 ③附件Paperless前端断点 ④权限审计留痕不足 ⑤生产稳定性可观测性弱
+- 待修复（代码层面）：①项目级权限统一依赖注入+真实用户写入过程记录 ②复核硬门槛（reviewer/QC/AI确认/批注4项门禁） ③附件预览代理（屏蔽paperless://和本地路径） ④实验功能标识+功能开关 ⑤异步任务状态中心（pending/processing/success/failed） ⑥token键名统一 ⑦request_id链路追踪
+- 架构决策待定：在线编辑路线（方案A离线为主 vs 方案B灰度验证）、文件存储权威来源（Paperless vs 本地）、功能成熟度分级体系
+- 报告建议的上线门槛分三阶段：试点前6项→扩大试点前6项→全所推广前6项
+
+## 架构决策建议（2026-04-18 待用户确认）
+- 在线编辑路线推荐方案B：离线为正式主链路+在线编辑加功能开关（默认关，项目经理可对单个项目开启，页面显示"实验功能"标签）
+- 文件存储权威来源推荐本地磁盘为主：底稿存storage/projects/{id}/workpapers/（频繁读写不走Paperless中转），附件走Paperless-ngx（OCR+分类+检索），两者通过attachment_working_paper关联
+- 灾备推荐RPO=1天/RTO=4小时：每日pg_dump全量+storage/ rsync备份，底稿保留最近10版本
+- 待修复16项：试点前6项（token统一/权限/真实用户/附件代理/在线编辑降级/request_id）→ 扩大试点前6项（复核闭环/硬门槛/QC规则/附件关联/任务中心/功能标识）→ 全所推广项（代码收敛/灾备脚本）
