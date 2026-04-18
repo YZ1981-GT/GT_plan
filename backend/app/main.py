@@ -86,6 +86,7 @@ from app.routers.annotations import router as annotations_router_v2
 from app.routers.forum import router as forum_router
 from app.routers.report_trace import router as report_trace_router
 from app.core.config import settings
+from app.core.logging_config import setup_logging
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
     generic_exception_handler,
@@ -99,6 +100,7 @@ from app.services.event_handlers import register_event_handlers
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期：启动时注册事件处理器"""
+    setup_logging(level="INFO", json_format=False)  # 开发模式用文本格式，生产改 True
     register_event_handlers()
     yield
 

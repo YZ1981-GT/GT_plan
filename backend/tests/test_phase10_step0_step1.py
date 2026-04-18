@@ -155,9 +155,9 @@ class TestMigrationFiles:
     """验证 3 个迁移脚本存在且结构正确"""
 
     @pytest.mark.parametrize("filename,tables", [
-        ("023_review_and_forum.py", ["review_conversations", "review_messages", "forum_posts", "forum_comments"]),
-        ("024_annotations_and_snapshots.py", ["cell_annotations", "consol_snapshots", "check_ins"]),
-        ("025_report_templates_and_fields.py", ["report_format_templates"]),
+        ("030_review_and_forum.py", ["review_conversations", "review_messages", "forum_posts", "forum_comments"]),
+        ("031_annotations_and_snapshots.py", ["cell_annotations", "consol_snapshots", "check_ins"]),
+        ("032_report_templates_and_fields.py", ["report_format_templates"]),
     ])
     def test_migration_exists_and_contains_tables(self, filename, tables):
         path = MIGRATION_DIR / filename

@@ -90,8 +90,8 @@ import { ElMessage } from 'element-plus'
  */
 
 const fileId = ref('test.xlsx')
-const onlyofficeUrl = ref('http://localhost:8080')
-const wopiBaseUrl = ref('http://localhost:8000/wopi')
+const onlyofficeUrl = ref(import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080')
+const wopiBaseUrl = ref(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:9980'}/wopi`)
 const editorSrc = ref('')
 const loading = ref(false)
 

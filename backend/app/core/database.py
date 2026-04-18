@@ -11,6 +11,8 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     pool_size=10,
     max_overflow=20,
+    pool_pre_ping=True,  # 自动检测断开的连接
+    pool_recycle=3600,    # 1小时回收连接（防止数据库端超时断开）
 )
 
 async_session = async_sessionmaker(

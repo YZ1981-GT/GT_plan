@@ -49,7 +49,7 @@ function getReviewTagType(row: any, level: number) {
 async function viewReviews(row: any) {
   try {
     const { data } = await reviewApi.list(row.id)
-    console.log('reviews', data)
+    // reviews loaded
   } catch (e) {
     console.error(e)
   }

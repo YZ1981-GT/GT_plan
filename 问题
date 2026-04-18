@@ -25,3 +25,68 @@
 2. 自动化 TypeScript 类型生成
 问题：前后端类型定义手动维护，易不同步。
 解决方案是自动化生成，让后端成为唯一数据源
+
+数据库迁移文件命名冲突
+问题：Alembic 迁移文件存在版本号重复
+
+009 有两个文件：009_gt_wp_coding.py 和 009_consolidation_tables.py
+010 有三个文件：010_t_accounts.py、010_collaboration_tables.py、010_risk_assessment_tables.py
+011 有两个文件：011_penetration_indexes.py、011_audit_plan_tables.py
+012 有两个文件：012_partition_tables.py、012_audit_procedure_tables.py
+013 有两个文件：013_attachments.py、013_audit_findings_tables.py
+这会导致 Alembic 无法正确识别迁移顺序，可能引发数据库迁移失败。
+
+前端硬编码配置问题
+问题：配置硬编码，缺乏环境变量支持
+
+vite.config.ts 中硬编码 http://localhost:9980
+WopiPoc.vue 中硬编码 http://localhost:8080 和 http://localhost:8000/wopi
+应该使用环境变量配置这些地址
+
+前端调试代码未清理
+问题：生产环境中存在 console.log
+
+LedgerPenetration.vue:818 有 console.log
+WorkpaperReview.vue:52 有 console.log
+AuditLogView.vue:49 有 console.log
+前端缺少全局错误处理
+问题：无 ErrorBoundary 或全局错误处理器
+
+main.ts 中未注册错误处理
+路由守卫只有认证检查，无错误捕获
+组件级错误可能直接导致白屏
+后端日志不统一
+问题：日志记录不规范
+
+部分服务有 logger，部分没有
+缺少统一的日志格式和级别控制
+没有结构化日志（JSON格式）
+API 版本控制缺失
+问题：无 API 版本管理
+
+所有路由都在 /api/ 下，无版本号（如 /api/v1/）
+未来升级可能破坏兼容性
+前端 API 调用分散
+问题：缺少统一的 API 客户端封装
+
+组件中直接使用 http.get() 调用
+错误处理不一致（有些用 .catch(() => null)，有些用 try/catch）
+没有统一的请求/响应拦截器
+数据库连接池配置未优化
+问题：连接池参数可能不适合生产环境
+
+pool_size=10, max_overflow=20 可能不足以应对高并发
+缺少连接池监控和调优
+前端路由懒加载性能问题
+问题：所有路由都使用懒加载，但无预加载策略
+
+首屏加载后，用户点击路由时才加载组件
+对于常用页面应该考虑预加载
+缺少性能监控
+问题：无前端性能监控
+
+没有集成性能监控工具（如 Web Vitals）
+无法追踪实际用户体验指标
+
+
+

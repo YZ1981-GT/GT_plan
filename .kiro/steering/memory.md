@@ -842,3 +842,9 @@ inclusion: always
 - 跨阶段冲突：119 个表名无重复，95 个服务类仅 1 个重复（RiskAssessmentService 在两个死代码文件中）
 - 32 个死代码路由文件（Phase 3/4 同步风格）确认不影响运行
 - 用户关注点：响应格式一致性、TypeScript 类型同步、请求优化、SSE 封装、监控——前两项已修复，后三项列为后续优化
+
+## 待修复问题清单（2026-04-18 用户提出）
+- 立即修（影响正确性）：①Alembic迁移009-013编号冲突需合并迁移链 ②前端硬编码配置（vite.config.ts localhost:9980、WopiPoc.vue localhost:8080/8000）改用.env环境变量 ③前端缺少全局错误处理（Vue app.config.errorHandler未注册）
+- 部署前修：①前端console.log未清理（LedgerPenetration/WorkpaperReview/AuditLogView）用ESLint no-console ②后端日志不统一（部分服务无logger，缺结构化JSON日志）③API版本控制缺失（建议加/api/v1/前缀） ④数据库连接池加pool_pre_ping=True
+- 后续优化：①TypeScript类型自动生成（openapi-typescript） ②SSE统一封装 ③请求取消/重试/缓存（@tanstack/vue-query） ④路由预加载高频页面 ⑤Web Vitals+Sentry性能监控
+- 不认可WebSocket需求：SSE满足单向推送，复核对话用SSE+轮询足够，WebSocket增加部署复杂度

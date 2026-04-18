@@ -46,7 +46,7 @@ async function fetchLogs() {
 }
 
 function viewDetail(row: any) {
-  console.log('detail', row)
+  // TODO: open detail dialog
 }
 </script>
 

@@ -815,7 +815,7 @@ async function loadBalance() {
       params: { year: year.value },
     })
     balanceData.value = data.data ?? data ?? []
-    console.log(`[Ledger] loaded ${balanceData.value.length} balance rows for project=${projectId.value} year=${year.value}`)
+    // debug log removed for production
   } catch (e) {
     console.error('[Ledger] loadBalance failed:', e)
     balanceData.value = []
