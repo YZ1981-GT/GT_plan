@@ -80,8 +80,8 @@ class PrivateStorageService:
         return False
 
 
-class ArchiveService:
-    """归档联动服务"""
+class ProjectArchiveService:
+    """归档联动服务（Phase 10）"""
 
     async def archive_project(self, db: Any, project_id: UUID) -> dict[str, Any]:
         """项目归档：锁定底稿+生成清单+压缩"""

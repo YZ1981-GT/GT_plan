@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.services.private_storage_service import (
-    PrivateStorageService, ArchiveService, StorageStatsService,
+    PrivateStorageService, ProjectArchiveService, StorageStatsService,
 )
 
 router = APIRouter(tags=["private-storage"])
@@ -60,7 +60,7 @@ async def get_quota(user_id: UUID):
 
 @router.post("/api/projects/{project_id}/archive")
 async def archive_project(project_id: UUID, db: AsyncSession = Depends(get_db)):
-    svc = ArchiveService()
+    svc = ProjectArchiveService()
     result = await svc.archive_project(db, project_id)
     await db.commit()
     return result
