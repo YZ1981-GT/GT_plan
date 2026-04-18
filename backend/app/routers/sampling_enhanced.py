@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.sampling_enhanced_service import (
     AgingAnalysisService,
     CutoffTestService,
@@ -54,6 +56,7 @@ async def cutoff_test(
     project_id: UUID,
     req: CutoffTestRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """截止性测试 — 提取期末前后 N 天交易"""
     svc = CutoffTestService()
@@ -70,6 +73,7 @@ async def aging_analysis(
     project_id: UUID,
     req: AgingAnalysisRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """账龄分析 — FIFO 先进先出核销"""
     svc = AgingAnalysisService()
@@ -86,6 +90,7 @@ async def monthly_detail(
     project_id: UUID,
     req: MonthlyDetailRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """月度明细填充 — 按月汇总序时账"""
     svc = MonthlyDetailService()

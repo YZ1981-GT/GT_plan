@@ -29,13 +29,14 @@ router = APIRouter(tags=["phase10-misc"])
 async def trace_section(
     project_id: UUID, section_number: str,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     svc = ReportTraceService()
     return await svc.trace_section(db, project_id, section_number)
 
 
 @router.get("/api/projects/{project_id}/findings-summary")
-async def findings_summary(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def findings_summary(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = ReportTraceService()
     return await svc.get_findings_summary(db, project_id)
 
@@ -52,7 +53,7 @@ async def lock_project(project_id: UUID, db: AsyncSession = Depends(get_db), cur
 
 
 @router.post("/api/consolidation/{project_id}/unlock")
-async def unlock_project(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def unlock_project(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = ConsolLockService()
     result = await svc.unlock_project(db, project_id)
     await db.commit()
@@ -60,7 +61,7 @@ async def unlock_project(project_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/api/consolidation/{project_id}/lock-status")
-async def check_lock(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def check_lock(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = ConsolLockService()
     return await svc.check_lock(db, project_id)
 
@@ -93,7 +94,7 @@ class CheckInRequest(BaseModel):
 
 
 @router.post("/api/staff/{staff_id}/check-in")
-async def check_in(staff_id: UUID, req: CheckInRequest, db: AsyncSession = Depends(get_db)):
+async def check_in(staff_id: UUID, req: CheckInRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     from app.models.phase10_models import CheckIn
     ci = CheckIn(
         staff_id=staff_id,
@@ -111,6 +112,7 @@ async def check_in(staff_id: UUID, req: CheckInRequest, db: AsyncSession = Depen
 @router.get("/api/staff/{staff_id}/check-ins")
 async def list_check_ins(
     staff_id: UUID, limit: int = 30, db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     import sqlalchemy as sa
     from app.models.phase10_models import CheckIn
@@ -131,7 +133,7 @@ async def list_check_ins(
 # ── 辅助余额汇总 (Task 13.1) ─────────────────────────────
 
 @router.get("/api/projects/{project_id}/ledger/aux-summary")
-async def aux_summary(project_id: UUID, year: int | None = None, db: AsyncSession = Depends(get_db)):
+async def aux_summary(project_id: UUID, year: int | None = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     import sqlalchemy as sa
     from app.models.audit_platform_models import TbAuxBalance, TbBalance
 
@@ -182,6 +184,7 @@ async def aux_summary(project_id: UUID, year: int | None = None, db: AsyncSessio
 async def check_delete_permission(
     project_id: UUID, object_type: str, object_id: UUID,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """检查删除权限（stub — 实际需从 JWT 获取用户角色）"""
     return {"allowed": True, "reason": "管理员权限"}
@@ -190,7 +193,7 @@ async def check_delete_permission(
 # ── 合并快照 (Task 16.1) ─────────────────────────────────
 
 @router.get("/api/consolidation/{project_id}/snapshots")
-async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     import sqlalchemy as sa
     from app.models.phase10_models import ConsolSnapshot
     stmt = (
@@ -211,6 +214,7 @@ async def list_snapshots(project_id: UUID, db: AsyncSession = Depends(get_db)):
 async def create_snapshot(
     project_id: UUID, year: int = 2025, reason: str = "manual",
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     from app.models.phase10_models import ConsolSnapshot
     snap = ConsolSnapshot(
@@ -226,7 +230,7 @@ async def create_snapshot(
 # ── 底稿推荐 (Task 17.1) ─────────────────────────────────
 
 @router.post("/api/projects/{project_id}/ai/recommend-workpapers")
-async def recommend_workpapers(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def recommend_workpapers(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """LLM 推荐底稿优先级（stub）"""
     return {
         "recommendations": [
@@ -240,7 +244,7 @@ async def recommend_workpapers(project_id: UUID, db: AsyncSession = Depends(get_
 # ── 年度差异报告 (Task 19.1) ──────────────────────────────
 
 @router.post("/api/projects/{project_id}/ai/annual-diff-report")
-async def annual_diff_report(project_id: UUID, db: AsyncSession = Depends(get_db)):
+async def annual_diff_report(project_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """年度差异分析报告（stub）"""
     return {
         "project_id": str(project_id),
@@ -260,6 +264,7 @@ class ClassifyAttachmentRequest(BaseModel):
 async def classify_attachment(
     project_id: UUID, req: ClassifyAttachmentRequest,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """附件智能分类（stub）"""
     # 简单规则分类
@@ -280,7 +285,7 @@ async def classify_attachment(
 # ── 排版模板 (Task 21.1) ─────────────────────────────────
 
 @router.get("/api/report-format-templates")
-async def list_format_templates(db: AsyncSession = Depends(get_db)):
+async def list_format_templates(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     import sqlalchemy as sa
     from app.models.phase10_models import ReportFormatTemplate
     stmt = (
@@ -302,6 +307,7 @@ async def list_format_templates(db: AsyncSession = Depends(get_db)):
 @router.post("/api/report-format-templates")
 async def create_format_template(
     req: dict[str, Any], db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     from app.models.phase10_models import ReportFormatTemplate
     tpl = ReportFormatTemplate(

@@ -17,6 +17,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.wp_review_service import WpReviewService
 
 router = APIRouter(
@@ -53,6 +55,7 @@ async def list_reviews(
     wp_id: UUID,
     status: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取复核意见列表"""
     svc = WpReviewService()
@@ -64,6 +67,7 @@ async def add_comment(
     wp_id: UUID,
     data: AddCommentRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """添加复核意见"""
     svc = WpReviewService()
@@ -84,6 +88,7 @@ async def reply_review(
     review_id: UUID,
     data: ReplyRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """回复复核意见"""
     svc = WpReviewService()
@@ -106,6 +111,7 @@ async def resolve_review(
     review_id: UUID,
     data: ResolveRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """标记为已解决"""
     svc = WpReviewService()

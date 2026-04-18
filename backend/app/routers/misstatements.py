@@ -37,6 +37,7 @@ async def list_misstatements(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """未更正错报列表"""
     svc = UnadjustedMisstatementService(db)
@@ -84,6 +85,7 @@ async def update_misstatement(
     misstatement_id: UUID,
     data: MisstatementUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新未更正错报"""
     svc = UnadjustedMisstatementService(db)
@@ -100,6 +102,7 @@ async def delete_misstatement(
     project_id: UUID,
     misstatement_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """软删除未更正错报"""
     svc = UnadjustedMisstatementService(db)
@@ -116,6 +119,7 @@ async def get_summary(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """汇总视图：按类型分组 + 与重要性水平对比"""
     svc = UnadjustedMisstatementService(db)

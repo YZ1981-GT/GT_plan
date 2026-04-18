@@ -45,6 +45,7 @@ async def get_edit_history(
     wp_id: UUID,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """获取底稿编辑历史"""
     svc = ProcessRecordService()
@@ -76,6 +77,7 @@ async def get_workpaper_attachments(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """获取底稿关联的附件"""
     svc = AttachmentLinkService()
@@ -86,6 +88,7 @@ async def get_workpaper_attachments(
 async def get_attachment_workpapers(
     attachment_id: UUID,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """获取附件关联的底稿"""
     svc = AttachmentLinkService()
@@ -96,6 +99,7 @@ async def get_attachment_workpapers(
 async def link_attachment(
     req: LinkAttachmentRequest,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """将附件关联到底稿"""
     svc = AttachmentLinkService()
@@ -113,6 +117,7 @@ async def get_pending_ai_content(
     project_id: UUID,
     workpaper_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """获取待确认的 AI 内容"""
     svc = AIContentTagService()
@@ -142,6 +147,7 @@ async def check_unconfirmed_ai(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """检查底稿是否有未确认的 AI 内容（提交复核前检查）"""
     svc = AIContentTagService()

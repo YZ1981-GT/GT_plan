@@ -24,6 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.working_paper_service import WorkingPaperService
 from app.services.prefill_service import PrefillService, ParseService
 from app.models.workpaper_models import WpIndex, WpCrossRef, WorkingPaper
@@ -62,6 +64,7 @@ async def list_workpapers(
     status: str | None = None,
     assigned_to: UUID | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """底稿列表（支持筛选）"""
     svc = WorkingPaperService()
@@ -79,6 +82,7 @@ async def get_workpaper(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """底稿详情"""
     svc = WorkingPaperService()
@@ -93,6 +97,7 @@ async def download_workpaper(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """下载底稿（含预填充）"""
     svc = WorkingPaperService()
@@ -108,6 +113,7 @@ async def upload_workpaper(
     wp_id: UUID,
     data: UploadRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """上传离线编辑的底稿"""
     svc = WorkingPaperService()
@@ -127,6 +133,7 @@ async def update_status(
     wp_id: UUID,
     data: StatusUpdateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新底稿状态（含复核提交硬门槛）"""
     new_status = data.status
@@ -199,6 +206,7 @@ async def assign_workpaper(
     wp_id: UUID,
     data: AssignRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """分配编制人/复核人"""
     svc = WorkingPaperService()
@@ -220,6 +228,7 @@ async def prefill_workpaper(
     wp_id: UUID,
     year: int = 2025,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """手动触发预填充"""
     svc = PrefillService()
@@ -232,6 +241,7 @@ async def parse_workpaper(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """手动触发解析回写"""
     svc = ParseService()
@@ -248,6 +258,7 @@ async def parse_workpaper(
 async def list_wp_index(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """底稿索引列表"""
     result = await db.execute(
@@ -274,6 +285,7 @@ async def list_wp_index(
 async def list_wp_cross_refs(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """交叉索引关系"""
     result = await db.execute(

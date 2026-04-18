@@ -15,6 +15,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.phase10_schemas import DownloadPackRequest, UploadWorkpaperRequest
 from app.services.wp_download_service import WpDownloadService, WpUploadService
 
@@ -26,6 +28,7 @@ async def download_pack(
     project_id: UUID,
     body: DownloadPackRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """批量打包下载底稿为 ZIP"""
     svc = WpDownloadService()
@@ -50,6 +53,7 @@ async def download_single(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """单个底稿下载"""
     svc = WpDownloadService()
@@ -75,6 +79,7 @@ async def check_version(
     wp_id: UUID,
     uploaded_version: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """检查版本冲突"""
     svc = WpUploadService()
@@ -92,6 +97,7 @@ async def upload_file(
     uploaded_version: int = Query(...),
     force_overwrite: bool = Query(False),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """上传离线编辑的底稿文件"""
     svc = WpUploadService()
@@ -118,6 +124,7 @@ async def get_cloud_url(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取底稿的云端访问 URL（供其他用户直接打开原始文档）"""
     import sqlalchemy as sa

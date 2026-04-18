@@ -46,6 +46,7 @@ async def list_adjustments(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """分录列表（支持 type/status 筛选）"""
     svc = AdjustmentService(db)
@@ -136,6 +137,7 @@ async def get_summary(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """汇总统计"""
     svc = AdjustmentService(db)
@@ -148,6 +150,7 @@ async def get_account_dropdown(
     project_id: UUID,
     report_line_code: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """科目下拉选项"""
     svc = AdjustmentService(db)
@@ -161,6 +164,7 @@ async def get_wp_summary(
     wp_code: str,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """底稿审定表数据"""
     svc = AdjustmentService(db)

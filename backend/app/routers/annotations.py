@@ -47,6 +47,7 @@ async def list_annotations(
     priority: str | None = None,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     return await _svc.list_annotations(
         db, project_id, object_type, object_id, status, priority, limit,
@@ -58,6 +59,7 @@ async def update_annotation(
     annotation_id: UUID,
     req: UpdateAnnotationRequest,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     try:
         result = await _svc.update_annotation(db, annotation_id, req.status, req.content)
@@ -72,6 +74,7 @@ async def link_to_conversation(
     annotation_id: UUID,
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     try:
         result = await _svc.link_to_conversation(db, annotation_id, conversation_id)

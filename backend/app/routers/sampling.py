@@ -21,6 +21,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.sampling_service import SamplingService
 
 router = APIRouter(
@@ -114,6 +116,7 @@ class MUSEvaluateRequest(BaseModel):
 async def list_sampling_configs(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """抽样配置列表"""
     svc = SamplingService()
@@ -125,6 +128,7 @@ async def create_sampling_config(
     project_id: UUID,
     data: SamplingConfigCreateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """创建抽样配置"""
     svc = SamplingService()
@@ -146,6 +150,7 @@ async def update_sampling_config(
     config_id: UUID,
     data: SamplingConfigUpdateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新抽样配置"""
     svc = SamplingService()
@@ -166,6 +171,7 @@ async def calculate_sample_size(
     project_id: UUID,
     data: CalculateSampleSizeRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """计算样本量"""
     svc = SamplingService()
@@ -187,6 +193,7 @@ async def list_sampling_records(
     project_id: UUID,
     working_paper_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """抽样记录列表"""
     svc = SamplingService()
@@ -202,6 +209,7 @@ async def create_sampling_record(
     project_id: UUID,
     data: SamplingRecordCreateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """创建抽样记录"""
     svc = SamplingService()
@@ -223,6 +231,7 @@ async def update_sampling_record(
     record_id: UUID,
     data: SamplingRecordUpdateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新抽样记录"""
     svc = SamplingService()
@@ -244,6 +253,7 @@ async def mus_evaluate(
     record_id: UUID,
     data: MUSEvaluateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """MUS评价计算"""
     svc = SamplingService()

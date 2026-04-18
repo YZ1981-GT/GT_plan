@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.workpaper_models import WpQcResult
 from app.services.qc_engine import QCEngine
 
@@ -30,6 +32,7 @@ async def qc_check(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """执行质量自检"""
     engine = QCEngine()
@@ -46,6 +49,7 @@ async def get_qc_results(
     project_id: UUID,
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取自检结果（最新一次）"""
     result = await db.execute(
@@ -74,6 +78,7 @@ async def get_qc_results(
 async def get_qc_summary(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """项目级QC汇总"""
     engine = QCEngine()

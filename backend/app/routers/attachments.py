@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.services.attachment_service import AttachmentService
 
 router = APIRouter(tags=["attachments"])
@@ -49,6 +51,7 @@ def _svc(db: AsyncSession) -> AttachmentService:
 @router.post("/api/projects/{project_id}/attachments")
 async def create_attachment(
     project_id: UUID, body: AttachmentCreate, db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
     result = await svc.create_attachment(project_id, body.model_dump())
@@ -68,6 +71,7 @@ async def upload_attachment(
     correspondent: str | None = Form(None),
     document_type: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
     content = await file.read()
@@ -98,6 +102,7 @@ async def list_attachments(
     reference_type: str | None = None,
     reference_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
     return await svc.list_attachments(
@@ -115,13 +120,14 @@ async def search_attachments(
     project_id: UUID = Query(...),
     q: str = Query(..., min_length=1),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
     return await svc.search(project_id, q)
 
 
 @router.get("/api/attachments/{attachment_id}")
-async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = _svc(db)
     result = await svc.get_attachment(attachment_id)
     if not result:
@@ -132,6 +138,7 @@ async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)
 @router.post("/api/attachments/{attachment_id}/associate")
 async def associate_with_wp(
     attachment_id: UUID, body: AssociateRequest, db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
     result = await svc.associate_with_wp(attachment_id, body.wp_id, body.association_type, body.notes)
@@ -140,7 +147,7 @@ async def associate_with_wp(
 
 
 @router.get("/api/working-papers/{wp_id}/attachments")
-async def get_wp_attachments(wp_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_wp_attachments(wp_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     svc = _svc(db)
     return await svc.get_wp_attachments(wp_id)
 
@@ -153,6 +160,7 @@ class OCRStatusUpdate(BaseModel):
 @router.put("/api/attachments/{attachment_id}/ocr-status")
 async def update_ocr_status(
     attachment_id: UUID, body: OCRStatusUpdate, db: AsyncSession = Depends(get_db),
+current_user: User = Depends(get_current_user),
 ):
     """更新附件 OCR 状态和文本（由 OCR 服务回调）"""
     svc = _svc(db)
@@ -164,7 +172,7 @@ async def update_ocr_status(
 
 
 @router.post("/api/attachments/{attachment_id}/classify")
-async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
+async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """自动分类文档"""
     svc = _svc(db)
     try:
@@ -174,7 +182,7 @@ async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_
 
 
 @router.post("/api/attachments/{attachment_id}/extract-confirmation")
-async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
+async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """函证回函 OCR 识别"""
     svc = _svc(db)
     try:
@@ -186,7 +194,7 @@ async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Dep
 # ── 统一预览/下载代理（屏蔽 paperless:// 和本地路径差异）──
 
 @router.get("/api/attachments/{attachment_id}/download")
-async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
+async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """统一下载代理 — 屏蔽底层存储差异"""
     from fastapi.responses import StreamingResponse, Response
     from pathlib import Path
@@ -241,7 +249,7 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
 
 
 @router.get("/api/attachments/{attachment_id}/preview")
-async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)):
+async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """统一预览代理 — 返回可预览的内容（PDF/图片直接返回，其他返回元数据）"""
     from fastapi.responses import StreamingResponse, Response
     from pathlib import Path

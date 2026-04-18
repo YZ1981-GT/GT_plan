@@ -47,6 +47,7 @@ async def list_conversations(
     status: str | None = None,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """列出项目的复核对话"""
     return await _svc.list_conversations(db, project_id, status, limit)
@@ -57,6 +58,7 @@ async def get_messages(
     conversation_id: UUID,
     limit: int = 200,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取对话消息"""
     return await _svc.get_messages(db, conversation_id, limit)
@@ -101,6 +103,7 @@ async def close_conversation(
 async def export_conversation(
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """导出对话记录"""
     try:

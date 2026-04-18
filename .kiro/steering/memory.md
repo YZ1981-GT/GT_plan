@@ -922,3 +922,11 @@ inclusion: always
   ④feature_flags.is_enabled("online_editing") 接入 wopi.py check_file_info（关闭时强制 ReadOnly=True）
   ⑤WorkpaperEditor.vue 顶部工具栏加"⚠ 实验功能"标签
 - commit d08594c，待push
+
+## 问题文档细致落地（2026-04-18 第三轮）
+- ONLYOFFICE 健康检查：WorkpaperEditor.vue checkOnlyoffice() 从只检查 /api/health 改为同时检查 ONLYOFFICE /healthcheck 端点，不可达时自动降级
+- 底稿状态机：WorkingPaperService.update_status 加入 VALID_TRANSITIONS 严格校验（draft→edit_complete→review_level1→review_level2→archived，支持退回），非法转换返回 ValueError
+- OCR 状态回写：attachments.py 新增 PUT /api/attachments/{id}/ocr-status 端点（status + ocr_text），供 OCR 服务回调
+- QC rule_id 重编号：14条规则从 QC-01 到 QC-14 无冲突（之前 QC-04/05 阻断级和警告级重复）
+- 路径约定文档：phase10Api.ts 头部加注释说明 workpapers vs working-papers 两种路径的来源和约定
+- commit 4631f01 待push

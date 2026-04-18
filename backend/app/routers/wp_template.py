@@ -23,6 +23,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 from app.models.workpaper_schemas import TemplateResponse, TemplateSetResponse
 from app.services.template_engine import TemplateEngine
 
@@ -77,6 +79,7 @@ class GenerateWorkpapersRequest(BaseModel):
 async def upload_template(
     data: TemplateUploadRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """上传模板文件（MVP: 仅保存元数据）"""
     engine = TemplateEngine()
@@ -98,6 +101,7 @@ async def list_templates(
     audit_cycle: str | None = None,
     applicable_standard: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """模板列表（支持按循环、准则筛选）"""
     engine = TemplateEngine()
@@ -113,6 +117,7 @@ async def get_template(
     code: str,
     version: str | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取模板详情（默认最新版本）"""
     engine = TemplateEngine()
@@ -127,6 +132,7 @@ async def create_version(
     code: str,
     data: VersionCreateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """创建新版本"""
     engine = TemplateEngine()
@@ -146,6 +152,7 @@ async def create_version(
 async def delete_template(
     template_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """删除模板（校验无引用）"""
     engine = TemplateEngine()
@@ -165,6 +172,7 @@ async def delete_template(
 @router.get("/api/template-sets", response_model=list[TemplateSetResponse])
 async def list_template_sets(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """模板集列表"""
     engine = TemplateEngine()
@@ -175,6 +183,7 @@ async def list_template_sets(
 async def get_template_set(
     set_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """模板集详情"""
     engine = TemplateEngine()
@@ -188,6 +197,7 @@ async def get_template_set(
 async def create_template_set(
     data: TemplateSetCreateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """创建模板集"""
     engine = TemplateEngine()
@@ -208,6 +218,7 @@ async def update_template_set(
     set_id: UUID,
     data: TemplateSetUpdateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """更新模板集"""
     engine = TemplateEngine()
@@ -230,6 +241,7 @@ async def update_template_set(
 @router.post("/api/template-sets/seed")
 async def seed_template_sets(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """初始化6个内置模板集（幂等）"""
     engine = TemplateEngine()
@@ -248,6 +260,7 @@ async def generate_project_workpapers(
     project_id: UUID,
     data: GenerateWorkpapersRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """从模板集生成项目底稿"""
     engine = TemplateEngine()
