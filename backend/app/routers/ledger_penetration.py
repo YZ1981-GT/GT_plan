@@ -582,6 +582,232 @@ async def get_data_stats(
     }
 
 
+@router.get("/export-ledger/{account_code}")
+async def export_ledger_excel(
+    project_id: UUID,
+    account_code: str,
+    year: int = Query(...),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """导出序时账为 Excel（含期初余额行+月小计+累计余额）"""
+    from fastapi.responses import StreamingResponse
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from app.models.audit_platform_models import TbLedger, TbBalance
+    import sqlalchemy as sa
+    from decimal import Decimal
+
+    # 获取期初余额
+    tbl_b = TbBalance.__table__
+    if account_code.endswith('*'):
+        prefix = account_code[:-1]
+        code_filter_b = tbl_b.c.account_code.like(prefix + '%')
+    else:
+        code_filter_b = (tbl_b.c.account_code == account_code)
+    ob_r = await db.execute(
+        sa.select(sa.func.coalesce(sa.func.sum(tbl_b.c.opening_balance), 0))
+        .where(tbl_b.c.project_id == project_id, tbl_b.c.year == year, code_filter_b, tbl_b.c.is_deleted == sa.false())
+    )
+    opening = float(ob_r.scalar() or 0)
+
+    # 获取序时账数据
+    tbl = TbLedger.__table__
+    if account_code.endswith('*'):
+        code_filter = tbl.c.account_code.like(prefix + '%')
+    else:
+        code_filter = (tbl.c.account_code == account_code)
+    where = [tbl.c.project_id == project_id, tbl.c.year == year, code_filter, tbl.c.is_deleted == sa.false()]
+    if date_from:
+        where.append(tbl.c.voucher_date >= date_from)
+    if date_to:
+        where.append(tbl.c.voucher_date <= date_to)
+    stmt = (
+        sa.select(tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.summary,
+                   tbl.c.debit_amount, tbl.c.credit_amount, tbl.c.counterpart_account)
+        .where(*where).order_by(tbl.c.voucher_date, tbl.c.voucher_no)
+    )
+    result = await db.execute(stmt)
+    rows = result.fetchall()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    acct_label = account_code.replace('*', '')
+    ws.title = f"序时账_{acct_label}"
+
+    headers = ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "对方科目"]
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="F0ECF7", end_color="F0ECF7", fill_type="solid")
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(1, col, h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    # 期初余额行
+    opening_font = Font(bold=True, italic=True, color="4B2D77")
+    ws.cell(2, 1, "")
+    ws.cell(2, 2, "")
+    ws.cell(2, 3, "期初余额")
+    ws.cell(2, 6, opening)
+    for c in range(1, 8):
+        ws.cell(2, c).font = opening_font
+
+    subtotal_font = Font(bold=True)
+    subtotal_fill = PatternFill(start_color="FEF6E6", end_color="FEF6E6", fill_type="solid")
+
+    balance = opening
+    month_debit = 0.0
+    month_credit = 0.0
+    last_month = ""
+    excel_row = 3
+
+    for row in rows:
+        vd = row[0]
+        vd_str = vd.isoformat() if hasattr(vd, 'isoformat') else str(vd or '')
+        month = vd_str[:7]
+        d = float(row[3] or 0)
+        c = float(row[4] or 0)
+        balance += d - c
+        month_debit += d
+        month_credit += c
+
+        if not last_month:
+            last_month = month
+
+        # 月份变化时插入上月小计
+        if month != last_month and last_month:
+            ws.cell(excel_row, 3, f"{last_month} 本月合计")
+            ws.cell(excel_row, 4, month_debit - d)
+            ws.cell(excel_row, 5, month_credit - c)
+            ws.cell(excel_row, 6, balance - d + c)
+            for col in range(1, 8):
+                ws.cell(excel_row, col).font = subtotal_font
+                ws.cell(excel_row, col).fill = subtotal_fill
+            excel_row += 1
+            month_debit = d
+            month_credit = c
+            last_month = month
+
+        ws.cell(excel_row, 1, vd_str)
+        ws.cell(excel_row, 2, row[1])
+        ws.cell(excel_row, 3, row[2])
+        ws.cell(excel_row, 4, d if d else None)
+        ws.cell(excel_row, 5, c if c else None)
+        ws.cell(excel_row, 6, balance)
+        ws.cell(excel_row, 7, row[5])
+        excel_row += 1
+
+    # 最后一个月的小计
+    if rows:
+        ws.cell(excel_row, 3, f"{last_month} 本月合计")
+        ws.cell(excel_row, 4, month_debit)
+        ws.cell(excel_row, 5, month_credit)
+        ws.cell(excel_row, 6, balance)
+        for col in range(1, 8):
+            ws.cell(excel_row, col).font = subtotal_font
+            ws.cell(excel_row, col).fill = subtotal_fill
+
+    widths = [12, 12, 30, 16, 16, 16, 16]
+    for col, w in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = w
+
+    for col in [4, 5, 6]:
+        for r in range(2, excel_row + 1):
+            ws.cell(r, col).number_format = '#,##0.00'
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"序时账_{acct_label}_{year}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"},
+    )
+
+
+@router.get("/export-balance")
+async def export_balance_excel(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """导出科目余额表为 Excel"""
+    from fastapi.responses import StreamingResponse
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from app.models.audit_platform_models import TbBalance
+    import sqlalchemy as sa
+
+    tbl = TbBalance.__table__
+    stmt = (
+        sa.select(
+            tbl.c.account_code, tbl.c.account_name, tbl.c.level,
+            tbl.c.opening_balance, tbl.c.debit_amount,
+            tbl.c.credit_amount, tbl.c.closing_balance,
+        )
+        .where(tbl.c.project_id == project_id, tbl.c.year == year, tbl.c.is_deleted == sa.false())
+        .order_by(tbl.c.account_code)
+    )
+    result = await db.execute(stmt)
+    rows = result.fetchall()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "科目余额表"
+
+    headers = ["科目编号", "科目名称", "级次", "期初余额", "借方发生额", "贷方发生额", "期末余额"]
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="F0ECF7", end_color="F0ECF7", fill_type="solid")
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(1, col, h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    level1_font = Font(bold=True)
+    level1_fill = PatternFill(start_color="F8F5FC", end_color="F8F5FC", fill_type="solid")
+
+    for idx, row in enumerate(rows, 2):
+        level = row[2] or 1
+        ws.cell(idx, 1, row[0])
+        ws.cell(idx, 2, row[1])
+        ws.cell(idx, 3, level)
+        ws.cell(idx, 4, float(row[3]) if row[3] else None)
+        ws.cell(idx, 5, float(row[4]) if row[4] else None)
+        ws.cell(idx, 6, float(row[5]) if row[5] else None)
+        ws.cell(idx, 7, float(row[6]) if row[6] else None)
+        # 一级科目加粗+浅紫背景
+        if level == 1:
+            for c in range(1, 8):
+                ws.cell(idx, c).font = level1_font
+                ws.cell(idx, c).fill = level1_fill
+
+    widths = [16, 24, 6, 16, 16, 16, 16]
+    for col, w in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = w
+
+    for col in [4, 5, 6, 7]:
+        for row_idx in range(2, len(rows) + 2):
+            ws.cell(row_idx, col).number_format = '#,##0.00'
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"科目余额表_{year}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"},
+    )
+
+
 @router.get("/export-aux-balance")
 async def export_aux_balance_excel(
     project_id: UUID,

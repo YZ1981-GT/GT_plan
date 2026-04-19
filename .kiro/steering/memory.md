@@ -1128,3 +1128,7 @@ inclusion: always
 - 全局入口Hub页面模式（2026-04-19）：左侧导航的全局功能（合并项目/附件管理/函证管理/归档管理等）需要 Hub 页面作为桥接——展示项目卡片列表，点击跳转到 /projects/{id}/xxx 项目级页面；已创建 ConsolidationHub.vue（/consolidation）和 AttachmentHub.vue（/attachments），DefaultLayout 已加入全宽模式；其他全局导航项（函证/归档）也需要同样的 Hub 页面
 - 管理看板增强（2026-04-19）：去掉"试点"标签改为 production；新增 3 个后端 API（project-staff-hours 按项目查人员工时/staff-detail 按人员查项目+未来一周安排/available-staff 查可用人员）；前端新增三 Tab 查询面板（按项目/按人员/可用人员），支持搜索+表格+工时阈值筛选
 - 团队委派交互偏好（2026-04-19）：添加成员改为勾选模式（弹窗直接显示人员库表格+checkbox批量勾选），不用搜索下拉逐个选；支持搜索+部门筛选+已添加标记不可重复勾选+快速创建兜底
+
+- 查账页面导出Excel功能（2026-04-19）：三个视图均支持导出——科目余额表（GET /export-balance，一级科目加粗+浅紫背景）、序时账（GET /export-ledger/{code}，含期初余额行+月小计行+累计余额列）、辅助余额表（GET /export-aux-balance，含小计行+关联维度列+当前筛选条件）
+- 辅助余额表"仅小计"按钮修复（2026-04-19）：切换维度时强制 `_auxTableKey++` 重建表格确保数据刷新，`loadAuxSummaryForDim` 加 loading 状态+同步更新 `auxDimTypesFromServer`
+- 查账页面行样式优化（2026-04-19）：选中行浅蓝背景(#e8f4fd)+无左边框竖线，hover行更浅蓝灰(#f5f8fc)，去掉 el-table 默认选中行 ::after 伪元素

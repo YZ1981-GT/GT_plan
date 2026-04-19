@@ -100,6 +100,7 @@
         <el-tag type="info" size="small">账簿查询</el-tag>
         <el-tag size="small">{{ filteredFlatCount }} / {{ balanceData.length }}</el-tag>
         <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
+        <el-button size="small" type="success" plain @click="exportBalanceExcel">导出Excel</el-button>
       </div>
 
       <!-- 空状态 -->
@@ -305,6 +306,7 @@
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} 序时账</el-tag>
         <el-button size="small" @click="loadLedger" :loading="loading">刷新</el-button>
+        <el-button size="small" type="success" plain @click="exportLedgerExcel">导出Excel</el-button>
       </div>
       <el-table
         :data="ledgerDisplay"
@@ -1379,7 +1381,7 @@ function onAuxDimTypeChange(dimType: string) {
   if (auxTreeMode.value || auxSummaryOnly.value) {
     // 树形模式和仅小计模式都需要加载该维度的汇总数据
     loadAuxSummaryForDim().then(() => {
-      if (auxTreeMode.value) _auxTableKey.value++
+      _auxTableKey.value++  // 强制重建表格确保数据刷新
     })
   } else {
     loadAuxBalancePage()
@@ -1411,7 +1413,9 @@ function onToggleSummaryOnly() {
   _auxExpandedDetails.value = new Map()
   if (auxSummaryOnly.value) {
     // 进入仅小计模式，加载当前维度的汇总数据
-    loadAuxSummaryForDim()
+    loadAuxSummaryForDim().then(() => {
+      _auxTableKey.value++  // 强制重建表格
+    })
   } else if (!auxTreeMode.value) {
     loadAuxBalancePage()
   }
@@ -1545,19 +1549,24 @@ async function loadAuxSummaryForDim() {
   if (!dimType || (!auxTreeMode.value && !auxSummaryOnly.value)) {
     return
   }
-  // "全部"模式在仅小计下也需要加载（但数据量大，限制条数）
   const params: any = { year: year.value }
   if (dimType !== '全部') {
     params.dim_type = dimType
   }
   try {
+    loading.value = true
     const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
       { params }
     )
     const result = data.data ?? data
     auxSummaryData.value = result.rows || []
+    // 同时更新维度类型列表
+    if (result.dim_types) {
+      auxDimTypesFromServer.value = result.dim_types
+    }
   } catch { auxSummaryData.value = [] }
+  finally { loading.value = false }
 }
 
 // 后端预计算的汇总数据
@@ -1618,6 +1627,56 @@ async function exportAuxBalanceExcel() {
     const a = document.createElement('a')
     a.href = url
     a.download = `辅助余额表_${auxSelectedDimType.value || '全部'}_${year.value}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导出失败')
+  }
+}
+
+/** 导出科目余额表为 Excel */
+async function exportBalanceExcel() {
+  try {
+    const response = await http.get(
+      `/api/projects/${projectId.value}/ledger/export-balance`,
+      { params: { year: year.value }, responseType: 'blob' }
+    )
+    const blobData = response.data instanceof Blob ? response.data : new Blob([response.data])
+    const url = URL.createObjectURL(blobData)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `科目余额表_${currentProject.value?.client_name || ''}_${year.value}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导出失败')
+  }
+}
+
+/** 导出序时账为 Excel */
+async function exportLedgerExcel() {
+  try {
+    const params: any = { year: year.value }
+    if (dateRange.value?.length === 2) {
+      params.date_from = dateRange.value[0]
+      params.date_to = dateRange.value[1]
+    }
+    const response = await http.get(
+      `/api/projects/${projectId.value}/ledger/export-ledger/${encodeURIComponent(currentAccount.value)}`,
+      { params, responseType: 'blob' }
+    )
+    const blobData = response.data instanceof Blob ? response.data : new Blob([response.data])
+    const url = URL.createObjectURL(blobData)
+    const a = document.createElement('a')
+    a.href = url
+    const acctLabel = currentAccount.value.replace('*', '')
+    a.download = `序时账_${acctLabel}_${year.value}.xlsx`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -1828,19 +1887,25 @@ onUnmounted(() => {
   margin-bottom: var(--gt-space-2);
 }
 
-/* 选中行样式：浅蓝背景，去掉左边框（避免单列竖线） */
+/* 选中行样式：浅蓝背景，无左边框竖线 */
 :deep(.el-table__body tr.current-row > td.el-table__cell) {
   background: #e8f4fd !important;
+  border-left: none !important;
 }
 
 /* hover 行样式：更浅的蓝灰色 */
 :deep(.el-table__body tr:hover > td.el-table__cell) {
-  background: #f0f7ff !important;
+  background: #f5f8fc !important;
 }
 
 /* 选中行 + hover 同时生效 */
 :deep(.el-table__body tr.current-row:hover > td.el-table__cell) {
   background: #dceefb !important;
+}
+
+/* 去掉 el-table 默认的选中行左边框效果 */
+:deep(.el-table__body tr.current-row > td.el-table__cell::after) {
+  display: none !important;
 }
 
 .gt-aux-toolbar-header {

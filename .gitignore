@@ -54,3 +54,6 @@ test_collab.db
 
 # Test databases
 *.db
+
+# 原始数据文件
+数据/
