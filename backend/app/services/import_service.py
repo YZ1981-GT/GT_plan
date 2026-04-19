@@ -470,11 +470,15 @@ def _build_record_dict(data_type: str, row: dict, project_id: UUID, year: int, b
             "account_name": row.get("account_name"),
             "level": row.get("level"),
             "opening_balance": row.get("opening_balance"),
+            "opening_debit": row.get("opening_debit"),
+            "opening_credit": row.get("opening_credit"),
             "opening_qty": row.get("opening_qty"),
             "opening_fc": row.get("opening_fc"),
             "debit_amount": row.get("debit_amount"),
             "credit_amount": row.get("credit_amount"),
             "closing_balance": row.get("closing_balance"),
+            "closing_debit": row.get("closing_debit"),
+            "closing_credit": row.get("closing_credit"),
         })
     elif data_type == "tb_ledger":
         if not row.get("voucher_date") or not row.get("voucher_no"):
@@ -506,11 +510,16 @@ def _build_record_dict(data_type: str, row: dict, project_id: UUID, year: int, b
             "aux_name": row.get("aux_name"),
             "account_name": row.get("account_name"),
             "opening_balance": row.get("opening_balance"),
+            "opening_debit": row.get("opening_debit"),
+            "opening_credit": row.get("opening_credit"),
             "opening_qty": row.get("opening_qty"),
             "opening_fc": row.get("opening_fc"),
             "debit_amount": row.get("debit_amount"),
             "credit_amount": row.get("credit_amount"),
             "closing_balance": row.get("closing_balance"),
+            "closing_debit": row.get("closing_debit"),
+            "closing_credit": row.get("closing_credit"),
+            "aux_dimensions_raw": row.get("aux_dimensions_raw"),
         })
     elif data_type == "tb_aux_ledger":
         base.update({
@@ -531,6 +540,7 @@ def _build_record_dict(data_type: str, row: dict, project_id: UUID, year: int, b
             "credit_fc": row.get("credit_fc"),
             "summary": row.get("summary"),
             "preparer": row.get("preparer"),
+            "aux_dimensions_raw": row.get("aux_dimensions_raw"),
         })
     else:
         return None

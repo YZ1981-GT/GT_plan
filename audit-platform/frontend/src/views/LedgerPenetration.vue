@@ -65,7 +65,7 @@
         <span
           class="gt-balance-tab"
           :class="{ 'gt-balance-tab--active': balanceTab === 'aux' }"
-          @click="balanceTab = 'aux'; loadAllAuxBalance()"
+          @click="switchToAuxTab"
         >辅助余额表</span>
       </div>
 
@@ -149,36 +149,78 @@
 
       <!-- ═══ 辅助余额表视图 ═══ -->
       <div v-if="balanceTab === 'aux'">
-        <div class="gt-filter-row">
-          <el-input
-            v-model="auxSearchKeyword"
-            placeholder="搜索科目、辅助名称或编码..."
-            size="small"
-            clearable
-            :prefix-icon="Search"
-            style="width: 220px"
-          />
-          <el-select v-model="auxFilter" size="small" style="width: 180px" @change="auxPage = 1">
-            <el-option label="全部" value="all" />
-            <el-option label="期末有数" value="closing" />
-            <el-option label="期初有数" value="opening" />
-            <el-option label="本期有变动" value="changed" />
-            <el-option label="全部有数（期初+变动+期末）" value="all_nonzero" />
-          </el-select>
-          <div class="gt-filter-spacer" />
-          <el-tag size="small">{{ filteredAuxAll.length }} / {{ allAuxBalanceData.length }}</el-tag>
-          <el-button size="small" @click="loadAllAuxBalance" :loading="loading">刷新</el-button>
+        <!-- 控制区域（可折叠） -->
+        <div class="gt-aux-toolbar">
+          <div class="gt-aux-toolbar-header">
+            <el-tag size="small">{{ auxDisplayCount }} / {{ auxTotalRecords }}</el-tag>
+            <el-button size="small" :type="auxTreeMode ? 'primary' : ''" @click="toggleAuxTreeMode">
+              {{ auxTreeMode ? '扁平视图' : '树形视图' }}
+            </el-button>
+            <el-button size="small" :type="auxSummaryOnly ? 'warning' : ''" @click="onToggleSummaryOnly">
+              {{ auxSummaryOnly ? '显示明细' : '仅小计' }}
+            </el-button>
+            <el-button v-if="auxTreeMode" size="small" @click="toggleAuxExpandAll">
+              {{ auxAllExpanded ? '全部收起' : '全部展开' }}
+            </el-button>
+            <div class="gt-filter-spacer" />
+            <el-button size="small" @click="loadAllAuxBalance" :loading="loading">刷新</el-button>
+            <el-button size="small" type="success" plain @click="exportAuxBalanceExcel">导出Excel</el-button>
+            <el-button size="small" text @click="auxToolbarCollapsed = !auxToolbarCollapsed" style="padding: 4px 6px; min-width: auto">
+              {{ auxToolbarCollapsed ? '展开筛选 ▼' : '收起筛选 ▲' }}
+            </el-button>
+          </div>
+
+          <div v-show="!auxToolbarCollapsed">
+            <div class="gt-filter-row" style="margin-top: 6px">
+              <el-input
+                v-model="auxSearchKeyword"
+                placeholder="搜索科目、辅助名称或编码..."
+                size="small"
+                clearable
+                :prefix-icon="Search"
+                style="width: 220px"
+                @input="onAuxSearchInput"
+                @clear="onAuxSearchInput"
+              />
+              <el-select v-model="auxFilter" size="small" style="width: 140px" @change="onAuxFilterChange">
+                <el-option label="全部" value="all" />
+                <el-option label="期末有数" value="closing" />
+                <el-option label="期初有数" value="opening" />
+                <el-option label="本期有变动" value="changed" />
+              </el-select>
+            </div>
+
+            <!-- 维度类型标签 -->
+            <div v-if="auxDimTypes.length > 0" class="gt-dim-tabs">
+              <span
+                v-for="dt in auxDimTypes" :key="dt.type"
+                class="gt-dim-tab"
+                :class="{ 'gt-dim-tab--active': auxSelectedDimType === dt.type }"
+                @click="onAuxDimTypeChange(dt.type)"
+              >
+                {{ dt.type }}
+                <el-tag size="small" type="info" style="margin-left: 4px; transform: scale(0.85)">{{ dt.count.toLocaleString() }}</el-tag>
+              </span>
+            </div>
+          </div>
         </div>
 
         <!-- 空状态 -->
-        <div v-if="!loading && allAuxBalanceData.length === 0" class="gt-empty-state">
+        <div v-if="!loading && auxSummaryData.length === 0 && auxPagedRows.length === 0" class="gt-empty-state">
           <p style="font-size: 15px; color: #999">暂无辅助余额数据</p>
           <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel 文件</p>
         </div>
 
         <el-table
           v-else
-          :data="pagedAuxAll"
+          ref="auxBalanceTableRef"
+          :key="_auxTableKey"
+          :data="auxTreeMode ? treeAuxBalance : auxFlatDisplayRows"
+          :row-key="auxTreeMode ? '_tree_key' : undefined"
+          :tree-props="auxTreeMode ? { children: 'children', hasChildren: '_hasChildren' } : undefined"
+          :lazy="auxTreeMode && !auxAllExpanded"
+          :load="auxTreeMode && !auxAllExpanded ? loadAuxTreeChildren : undefined"
+          :default-expand-all="auxAllExpanded"
           border
           size="small"
           :max-height="tableHeight"
@@ -189,35 +231,58 @@
         >
           <el-table-column prop="account_code" label="科目编号" width="130" sortable />
           <el-table-column prop="account_name" label="科目名称" width="150" show-overflow-tooltip />
-          <el-table-column prop="aux_type" label="辅助类型" width="90" />
-          <el-table-column prop="aux_code" label="辅助编码" width="100" show-overflow-tooltip />
+          <el-table-column v-if="!auxTreeMode" prop="aux_type" label="辅助类型" width="90" />
+          <el-table-column prop="aux_code" label="辅助编码" width="100" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="auxSummaryOnly && row._isSubtotal" class="gt-link" @click.stop="toggleAuxExpand(row)">
+                {{ auxExpandedKeys.has(`${row.account_code}|${row.aux_code}`) ? '−' : '+' }} {{ row.aux_code }}
+              </span>
+              <span v-else>{{ row.aux_code }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="aux_name" label="辅助名称" min-width="160" show-overflow-tooltip>
             <template #default="{ row }">
-              <span class="gt-link" @click.stop="drillToAuxLedgerFromBalance(row)">{{ row.aux_name }}</span>
+              <span v-if="!row._isGroup" class="gt-link" @click.stop="drillToAuxLedgerFromBalance(row)">{{ row.aux_name }}</span>
+              <span v-else style="font-weight: 600; color: #4b2d77">{{ row.aux_name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="关联维度" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="!row._isGroup && row.aux_dimensions_raw" style="color: #999">
+                {{ formatOtherDims(row.aux_dimensions_raw, row.aux_type || auxSelectedDimType) }}
+              </span>
             </template>
           </el-table-column>
           <el-table-column prop="opening_balance" label="期初余额" width="130" align="right" sortable>
-            <template #default="{ row }">{{ fmtAmt(row.opening_balance) }}</template>
+            <template #default="{ row }">
+              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.opening_balance) }}</span>
+            </template>
           </el-table-column>
           <el-table-column prop="debit_amount" label="借方发生额" width="130" align="right" sortable>
-            <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+            <template #default="{ row }">
+              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.debit_amount) }}</span>
+            </template>
           </el-table-column>
           <el-table-column prop="credit_amount" label="贷方发生额" width="130" align="right" sortable>
-            <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+            <template #default="{ row }">
+              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.credit_amount) }}</span>
+            </template>
           </el-table-column>
           <el-table-column prop="closing_balance" label="期末余额" width="130" align="right" sortable>
             <template #default="{ row }">
-              <span class="gt-link" @click.stop="drillToAuxLedgerFromBalance(row)">{{ fmtAmt(row.closing_balance) }}</span>
+              <span v-if="!row._isGroup" class="gt-link" @click.stop="drillToAuxLedgerFromBalance(row)">{{ fmtAmt(row.closing_balance) }}</span>
+              <span v-else style="font-weight: 600">{{ fmtAmt(row.closing_balance) }}</span>
             </template>
           </el-table-column>
         </el-table>
-        <div class="gt-pagination" v-if="filteredAuxAll.length > auxPageSize">
+        <div class="gt-pagination" v-if="!auxTreeMode && auxFlatTotal > auxPageSize">
           <el-pagination
             v-model:current-page="auxPage"
             :page-size="auxPageSize"
-            :total="filteredAuxAll.length"
+            :total="auxFlatTotal"
             layout="prev, pager, next, total"
             size="small"
+            @current-change="loadAuxBalancePage"
           />
         </div>
       </div>
@@ -377,12 +442,123 @@
     </template>
 
   </div>
+
+  <!-- ── 智能导入弹窗 ── -->
+  <el-dialog
+    v-model="importDialogVisible"
+    title="智能导入四表数据"
+    width="720px"
+    append-to-body
+    destroy-on-close
+  >
+    <!-- 步骤1：上传文件 -->
+    <div v-if="importStep === 'upload'">
+      <el-upload
+        ref="uploadRef"
+        drag
+        multiple
+        :auto-upload="false"
+        accept=".xlsx,.xls"
+        :on-change="onImportFileChange"
+      >
+        <el-icon style="font-size: 40px; color: #c0c4cc"><Upload /></el-icon>
+        <div style="margin-top: 8px; color: #666">拖拽文件到此处，或点击选择</div>
+        <div style="font-size: 12px; color: #999; margin-top: 4px">
+          支持多个文件（如余额表 + 多个序时账），自动识别合并
+        </div>
+      </el-upload>
+      <div style="margin-top: 12px">
+        <span style="font-size: 13px; color: #666">年度：</span>
+        <el-input-number v-model="importYear" :min="2000" :max="2099" size="small" style="width: 120px" />
+        <span style="font-size: 12px; color: #999; margin-left: 8px">不填则自动从文件内容提取</span>
+      </div>
+    </div>
+
+    <!-- 步骤2：预览确认 -->
+    <div v-if="importStep === 'preview'" style="max-height: 500px; overflow-y: auto">
+      <el-descriptions :column="2" size="small" border style="margin-bottom: 12px">
+        <el-descriptions-item label="识别年度">{{ previewResult?.year }}</el-descriptions-item>
+        <el-descriptions-item label="余额表">{{ previewResult?.summary?.balance || 0 }} 行</el-descriptions-item>
+        <el-descriptions-item label="辅助余额表">{{ previewResult?.summary?.aux_balance || 0 }} 行</el-descriptions-item>
+        <el-descriptions-item label="序时账">{{ previewResult?.summary?.ledger || 0 }} 行</el-descriptions-item>
+        <el-descriptions-item label="辅助明细账">{{ previewResult?.summary?.aux_ledger || 0 }} 行</el-descriptions-item>
+      </el-descriptions>
+
+      <!-- 辅助核算维度确认 -->
+      <div v-if="previewResult?.aux_dimensions?.length" style="margin-bottom: 12px">
+        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px">辅助核算维度（{{ previewResult.aux_dimensions.length }} 种）</div>
+        <el-table :data="previewResult.aux_dimensions" size="small" max-height="200" border>
+          <el-table-column prop="type" label="维度类型" width="160" />
+          <el-table-column prop="count" label="记录数" width="100" align="right">
+            <template #default="{ row }">{{ row.count.toLocaleString() }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 校验结果 -->
+      <div v-if="previewResult?.validation?.length" style="margin-bottom: 12px">
+        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px; color: #e6a23c">
+          一致性校验（{{ previewResult.validation.length }} 条）
+        </div>
+        <div v-for="(v, i) in previewResult.validation.slice(0, 10)" :key="i"
+             style="font-size: 12px; padding: 4px 0; border-bottom: 1px solid #f0f0f0">
+          <el-tag :type="v.level === 'error' ? 'danger' : 'warning'" size="small" style="margin-right: 6px">
+            {{ v.level }}
+          </el-tag>
+          {{ v.message }}
+        </div>
+      </div>
+
+      <!-- 文件诊断 -->
+      <div style="margin-bottom: 8px">
+        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px">文件解析诊断</div>
+        <div v-for="(d, i) in previewResult?.diagnostics" :key="i"
+             style="font-size: 12px; padding: 3px 0; color: #666">
+          <el-tag :type="d.status === 'ok' ? 'success' : d.status === 'error' ? 'danger' : 'info'" size="small" style="margin-right: 4px">
+            {{ d.data_type || '?' }}
+          </el-tag>
+          {{ d.file }} / {{ d.sheet }} — {{ d.row_count?.toLocaleString() || 0 }} 行
+          <span v-if="d.balance_count != null" style="color: #409eff">（余额{{ d.balance_count }}, 辅助{{ d.aux_balance_count }}）</span>
+          <span v-if="d.ledger_count != null" style="color: #409eff">（序时账{{ d.ledger_count?.toLocaleString() }}, 辅助{{ d.aux_ledger_count?.toLocaleString() }}）</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 步骤3：导入中 -->
+    <div v-if="importStep === 'importing'" style="text-align: center; padding: 40px 0">
+      <el-icon class="is-loading" style="font-size: 32px; color: #409eff"><Loading /></el-icon>
+      <div style="margin-top: 12px; color: #666">正在写入数据库，请稍候...</div>
+    </div>
+
+    <!-- 步骤4：完成 -->
+    <div v-if="importStep === 'done'" style="text-align: center; padding: 30px 0">
+      <el-icon style="font-size: 40px; color: #67c23a"><CircleCheck /></el-icon>
+      <div style="margin-top: 12px; font-size: 15px">导入完成</div>
+      <div v-if="importedResult" style="margin-top: 8px; font-size: 13px; color: #666">
+        <span v-for="(cnt, dt) in importedResult" :key="dt" style="margin-right: 12px">
+          {{ dt }}: {{ cnt.toLocaleString() }} 条
+        </span>
+      </div>
+    </div>
+
+    <template #footer>
+      <el-button v-if="importStep === 'upload'" @click="importDialogVisible = false">取消</el-button>
+      <el-button v-if="importStep === 'upload'" type="primary" :disabled="importFiles.length === 0" :loading="previewing" @click="doPreview">
+        解析预览
+      </el-button>
+      <el-button v-if="importStep === 'preview'" @click="importStep = 'upload'">返回修改</el-button>
+      <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" @click="doImport">
+        确认导入
+      </el-button>
+      <el-button v-if="importStep === 'done'" type="primary" @click="onImportDone">完成</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, CircleCheck } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
@@ -465,11 +641,82 @@ function onYearChange(newYear: number) {
 }
 
 function goToImport() {
-  // 跳转到科目导入步骤（步骤2），带上 returnTo 参数以便导入完成后跳回
   router.push({
     path: '/projects/new',
     query: { projectId: projectId.value, returnTo: 'ledger' },
   })
+}
+
+// ── 智能导入 ──
+const importDialogVisible = ref(false)
+const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
+const importFiles = ref<File[]>([])
+const importYear = ref<number | undefined>(undefined)
+const previewResult = ref<any>(null)
+const importedResult = ref<any>(null)
+const previewing = ref(false)
+const importing = ref(false)
+const uploadRef = ref()
+
+function onImportFileChange(file: any) {
+  if (file?.raw) {
+    importFiles.value.push(file.raw)
+  }
+}
+
+async function doPreview() {
+  if (!importFiles.value.length) return
+  previewing.value = true
+  try {
+    const formData = new FormData()
+    for (const f of importFiles.value) {
+      formData.append('files', f)
+    }
+    const url = `/api/projects/${projectId.value}/ledger/smart-preview` +
+      (importYear.value ? `?year=${importYear.value}` : '')
+    const { data } = await http.post(url, formData)
+    previewResult.value = data
+    importStep.value = 'preview'
+  } catch (e: any) {
+    ElMessage.error(e?.message || '解析失败')
+  } finally {
+    previewing.value = false
+  }
+}
+
+async function doImport() {
+  if (!importFiles.value.length) return
+  importing.value = true
+  importStep.value = 'importing'
+  try {
+    const formData = new FormData()
+    for (const f of importFiles.value) {
+      formData.append('files', f)
+    }
+    const yr = previewResult.value?.year || importYear.value
+    const url = `/api/projects/${projectId.value}/ledger/smart-import` +
+      (yr ? `?year=${yr}` : '')
+    const { data } = await http.post(url, formData)
+    importedResult.value = data?.imported || data
+    importStep.value = 'done'
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导入失败')
+    importStep.value = 'preview'
+  } finally {
+    importing.value = false
+  }
+}
+
+function onImportDone() {
+  importDialogVisible.value = false
+  // 清除缓存，强制重新加载
+  _auxBalanceLoadedKey.value = ''
+  loadAvailableYears()
+  loadBalance()
+  // 如果当前在辅助余额表 Tab，也刷新
+  if (balanceTab.value === 'aux') {
+    loadAllAuxBalance()
+  }
 }
 
 // 路由变化时重新加载（不在初始化时触发，由 onMounted 处理）
@@ -477,6 +724,7 @@ let _initialized = false
 watch([projectId, year], () => {
   if (!_initialized) return
   if (projectId.value) {
+    _auxBalanceLoadedKey.value = ''  // 清除辅助余额表缓存
     loadCurrentProject()
     loadAvailableYears()
     currentLevel.value = 'balance'
@@ -778,6 +1026,25 @@ function fmtAmt(v: any): string {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+/** 从原始维度字符串中提取当前维度以外的其他维度信息 */
+function formatOtherDims(raw: string, currentDimType: string): string {
+  if (!raw) return ''
+  const parts = raw.split(/[;；]/).map(s => s.trim()).filter(Boolean)
+  const others: string[] = []
+  for (const part of parts) {
+    const colonIdx = part.indexOf(':')
+    if (colonIdx < 0) continue
+    const dimType = part.substring(0, colonIdx).trim()
+    if (dimType === currentDimType) continue
+    const value = part.substring(colonIdx + 1).trim()
+    // 简化显示：类型:名称（去掉编码）
+    const commaIdx = value.indexOf(',')
+    const displayName = commaIdx > 0 ? value.substring(commaIdx + 1).trim() : value
+    others.push(`${dimType}:${displayName}`)
+  }
+  return others.join(' | ')
+}
+
 function ledgerRowClass({ row }: { row: any }): string {
   if (row._type === 'opening') return 'gt-ledger-opening'
   if (row._type === 'subtotal') return 'gt-ledger-subtotal'
@@ -797,11 +1064,6 @@ function balanceRowStyle({ row }: { row: any }) {
     style.fontStyle = 'italic'
   }
   return style
-}
-
-function auxRowStyle({ row }: { row: any }) {
-  // 同一科目的行用相同背景色区分
-  return {}
 }
 
 // ── 加载数据 ──
@@ -832,11 +1094,14 @@ async function loadLedger() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    // 使用游标分页（首次加载不传 cursor）
-    const { data } = await http.get(
-      `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
-    )
+    // 首次加载时从后端获取期初余额（确保 running_balance 准确）
+    const [{ data }, { data: obData }] = await Promise.all([
+      http.get(`/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }),
+      http.get(`/api/projects/${projectId.value}/ledger/opening-balance/${encodeURIComponent(currentAccount.value)}`, { params: { year: year.value } }),
+    ])
     const result = data.data ?? data
+    const obResult = obData.data ?? obData
+    currentAccountOpening.value = num(obResult?.opening_balance)
     ledgerItems.value = result.items ?? result ?? []
     ledgerTotal.value = result.total ?? ledgerItems.value.length
     ledgerCursor.value = result.next_cursor ?? null
@@ -891,58 +1156,476 @@ async function loadAuxBalance() {
 }
 
 // ── 辅助余额表（全量，Tab 视图用） ──
-const allAuxBalanceData = ref<any[]>([])
+const allAuxBalanceData = ref<any[]>([])  // 保留用于降级，但不主动加载
+const auxTotalRecords = computed(() =>
+  auxDimTypesFromServer.value.reduce((s: number, d: any) => s + (d.total_records || 0), 0)
+)
+const auxTreeMode = ref(false)
+const auxSummaryOnly = ref(false)
+const auxExpandedKeys = ref(new Set<string>())
+const auxToolbarCollapsed = ref(false)  // 仅小计模式下已展开的 key
+const auxAllExpanded = ref(false)
+const auxBalanceTableRef = ref<any>(null)
+const auxSelectedDimType = ref('')
 
-const filteredAuxAll = computed(() => {
-  let rows = allAuxBalanceData.value
+/** 切换树形/扁平模式 */
+function toggleAuxTreeMode() {
+  auxTreeMode.value = !auxTreeMode.value
+  if (auxTreeMode.value) {
+    // 进入树形模式时，自动选中数据量最大的维度类型
+    const types = auxDimTypes.value.filter(t => t.type !== '全部')
+    if (types.length > 0) {
+      auxSelectedDimType.value = types[0].type
+      loadAuxSummaryForDim()  // 加载该维度的汇总数据
+    }
+  } else {
+    // 回到扁平模式，重新加载分页数据
+    loadAuxBalancePage()
+  }
+}
 
-  // 搜索
-  if (auxSearchKeyword.value) {
-    const kw = auxSearchKeyword.value.toLowerCase()
-    rows = rows.filter(r =>
-      (r.account_code || '').toLowerCase().includes(kw) ||
-      (r.account_name || '').toLowerCase().includes(kw) ||
-      (r.aux_name || '').toLowerCase().includes(kw) ||
-      (r.aux_code || '').toLowerCase().includes(kw)
-    )
+/** 维度类型列表（优先用后端预计算，降级用前端计算） */
+const auxDimTypes = computed(() => {
+  // 后端有汇总数据时直接用
+  if (auxDimTypesFromServer.value.length > 0) {
+    const types: { type: string; count: number }[] = []
+    if (!auxTreeMode.value) {
+      const total = auxDimTypesFromServer.value.reduce((s: number, d: any) => s + d.total_records, 0)
+      types.push({ type: '全部', count: total })
+    }
+    for (const d of auxDimTypesFromServer.value) {
+      types.push({ type: d.type, count: d.total_records })
+    }
+    return types
   }
 
-  // 筛选
-  const f = auxFilter.value
-  if (f === 'closing') {
-    rows = rows.filter(r => num(r.closing_balance) !== 0)
-  } else if (f === 'opening') {
-    rows = rows.filter(r => num(r.opening_balance) !== 0)
-  } else if (f === 'changed') {
-    rows = rows.filter(r => num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0)
-  } else if (f === 'all_nonzero') {
-    rows = rows.filter(r =>
-      num(r.opening_balance) !== 0 &&
-      (num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0) &&
-      num(r.closing_balance) !== 0
-    )
+  // 降级：从原始数据计算
+  const counts = new Map<string, number>()
+  for (const r of allAuxBalanceData.value) {
+    const t = r.aux_type || '?'
+    counts.set(t, (counts.get(t) || 0) + 1)
   }
-
-  return rows
+  const types: { type: string; count: number }[] = []
+  if (!auxTreeMode.value) {
+    types.push({ type: '全部', count: allAuxBalanceData.value.length })
+  }
+  for (const [t, c] of [...counts.entries()].sort((a, b) => b[1] - a[1])) {
+    types.push({ type: t, count: c })
+  }
+  return types
 })
 
-const pagedAuxAll = computed(() => {
-  const start = (auxPage.value - 1) * auxPageSize
-  return filteredAuxAll.value.slice(start, start + auxPageSize)
+/** 当前显示的数据条数 */
+const auxDisplayCount = computed(() => {
+  if (auxTreeMode.value) {
+    // 树形模式用汇总数据的维度记录数
+    const dt = auxSelectedDimType.value
+    const dim = auxDimTypesFromServer.value.find((d: any) => d.type === dt)
+    return dim ? dim.total_records : 0
+  }
+  return auxPagedTotal.value
+})
+
+/** 预计算：按维度类型+科目编号的分组汇总（优先用后端汇总数据） */
+const _auxGroupCache = computed(() => {
+  const cache = new Map<string, Map<string, { name: string; count: number; opening: number; debit: number; credit: number; closing: number }>>()
+  const useSummary = auxSummaryData.value.length > 0
+  const source = useSummary ? auxSummaryData.value : allAuxBalanceData.value
+
+  for (const row of source) {
+    const dimType = useSummary ? row.dim_type : (row.aux_type || '?')
+    if (!cache.has(dimType)) cache.set(dimType, new Map())
+    const groups = cache.get(dimType)!
+    const code = row.account_code || '?'
+    if (!groups.has(code)) {
+      groups.set(code, { name: row.account_name || '', count: 0, opening: 0, debit: 0, credit: 0, closing: 0 })
+    }
+    const g = groups.get(code)!
+    g.count += useSummary ? (row.record_count || 1) : 1
+    g.opening += num(row.opening_balance)
+    g.debit += num(row.debit_amount)
+    g.credit += num(row.credit_amount)
+    g.closing += num(row.closing_balance)
+  }
+  return cache
+})
+
+/** 辅助余额表树形视图：从预计算缓存取科目汇总行。
+ *  全部展开时用汇总数据构建完整二级树（不用 lazy），收起时只返回一级节点（用 lazy）。
+ */
+const treeAuxBalance = computed(() => {
+  if (!auxTreeMode.value) return []
+  const dimType = auxSelectedDimType.value
+  if (!dimType) return []
+
+  const groups = _auxGroupCache.value.get(dimType)
+  if (!groups) return []
+
+  // 全部展开模式：用汇总数据构建完整二级树
+  const buildChildren = auxAllExpanded.value
+  const summaryByCode = buildChildren ? _buildSummaryByCode(dimType) : null
+
+  const tree: any[] = []
+  for (const [code, g] of groups) {
+    const node: any = {
+      _tree_key: code,
+      _isGroup: true,
+      _level: 'account',
+      _hasChildren: g.count > 0,
+      account_code: code,
+      account_name: g.name,
+      aux_type: '',
+      aux_code: '',
+      aux_name: `${g.count} 条明细`,
+      opening_balance: g.opening,
+      debit_amount: g.debit,
+      credit_amount: g.credit,
+      closing_balance: g.closing,
+    }
+
+    if (buildChildren && summaryByCode) {
+      const auxItems = summaryByCode.get(code) || []
+      node.children = auxItems.map((item: any) => ({
+        _tree_key: `${code}_${item.aux_code}_group`,
+        _isGroup: item.record_count > 1,
+        _level: 'aux',
+        _hasChildren: item.record_count > 1,
+        _parentCode: code,
+        _auxKey: item.aux_code || item.aux_name || '?',
+        account_code: code,
+        account_name: g.name,
+        aux_type: dimType,
+        aux_code: item.aux_code,
+        aux_name: item.record_count > 1 ? `${item.aux_name} (${item.record_count}条)` : item.aux_name,
+        opening_balance: item.opening_balance,
+        debit_amount: item.debit_amount,
+        credit_amount: item.credit_amount,
+        closing_balance: item.closing_balance,
+      }))
+    }
+
+    tree.push(node)
+  }
+
+  return tree
+})
+
+/** 从汇总数据按科目分组（全部展开时用） */
+function _buildSummaryByCode(dimType: string): Map<string, any[]> {
+  const map = new Map<string, any[]>()
+  const source = auxSummaryData.value.length > 0 ? auxSummaryData.value : []
+  for (const row of source) {
+    if ((row.dim_type || row.aux_type) !== dimType) continue
+    const code = row.account_code || '?'
+    if (!map.has(code)) map.set(code, [])
+    map.get(code)!.push(row)
+  }
+  return map
+}
+
+/** 懒加载树形子节点（两级），从后端按需查询 */
+function loadAuxTreeChildren(row: any, _treeNode: any, resolve: (data: any[]) => void) {
+  const dimType = auxSelectedDimType.value
+
+  if (row._isGroup && row._level === 'account') {
+    // 第一级展开科目：从汇总数据中取该科目的辅助编码列表
+    const code = row.account_code
+    const items = auxSummaryData.value.filter(r => r.dim_type === dimType && r.account_code === code)
+
+    const children: any[] = items.map(item => {
+      if (item.record_count <= 1) {
+        return { ...item, _tree_key: `${code}_${item.aux_code}_single`, _isGroup: false, aux_type: dimType }
+      }
+      return {
+        _tree_key: `${code}_${item.aux_code}_group`, _isGroup: true, _level: 'aux',
+        _hasChildren: true, _parentCode: code, _auxKey: item.aux_code,
+        account_code: code, account_name: row.account_name, aux_type: dimType,
+        aux_code: item.aux_code, aux_name: `${item.aux_name} (${item.record_count}条)`,
+        opening_balance: item.opening_balance, debit_amount: item.debit_amount,
+        credit_amount: item.credit_amount, closing_balance: item.closing_balance,
+      }
+    })
+    resolve(children)
+
+  } else if (row._isGroup && row._level === 'aux') {
+    // 第二级展开辅助编码：从后端按需查询明细
+    const code = row._parentCode
+    const auxCode = row._auxKey
+    http.get(`/api/projects/${projectId.value}/ledger/aux-balance-detail`, {
+      params: { year: year.value, account_code: code, dim_type: dimType, aux_code: auxCode }
+    }).then(({ data }) => {
+      const items = (data.data ?? data ?? []).map((item: any, idx: number) => ({
+        ...item, _tree_key: `${code}_${auxCode}_${idx}`, _isGroup: false,
+      }))
+      resolve(items)
+    }).catch(() => resolve([]))
+
+  } else {
+    resolve([])
+  }
+}
+
+function toggleAuxExpandAll() {
+  auxAllExpanded.value = !auxAllExpanded.value
+  // 切换展开/收起时强制重建 table（lazy 模式不支持批量展开）
+  _auxTableKey.value++
+}
+
+function onAuxDimTypeChange(dimType: string) {
+  auxSelectedDimType.value = dimType
+  auxExpandedKeys.value = new Set()
+  _auxExpandedDetails.value = new Map()
+  auxPage.value = 1
+  if (auxTreeMode.value || auxSummaryOnly.value) {
+    // 树形模式和仅小计模式都需要加载该维度的汇总数据
+    loadAuxSummaryForDim().then(() => {
+      if (auxTreeMode.value) _auxTableKey.value++
+    })
+  } else {
+    loadAuxBalancePage()
+  }
+}
+
+let _auxSearchTimer: any = null
+function onAuxSearchInput() {
+  clearTimeout(_auxSearchTimer)
+  _auxSearchTimer = setTimeout(() => {
+    auxPage.value = 1
+    if (!auxTreeMode.value && !auxSummaryOnly.value) {
+      loadAuxBalancePage()
+    }
+  }, 400)
+}
+
+function onAuxFilterChange() {
+  auxPage.value = 1
+  if (!auxTreeMode.value && !auxSummaryOnly.value) {
+    loadAuxBalancePage()
+  }
+}
+
+function onToggleSummaryOnly() {
+  auxSummaryOnly.value = !auxSummaryOnly.value
+  auxPage.value = 1
+  auxExpandedKeys.value = new Set()
+  _auxExpandedDetails.value = new Map()
+  if (auxSummaryOnly.value) {
+    // 进入仅小计模式，加载当前维度的汇总数据
+    loadAuxSummaryForDim()
+  } else if (!auxTreeMode.value) {
+    loadAuxBalancePage()
+  }
+}
+
+// 用于强制重建 el-table 的 key
+const _auxTableKey = ref(0)
+
+function auxRowStyle({ row }: { row: any }) {
+  if (row._isGroup) {
+    return { background: '#f8f5fc', fontWeight: '600' }
+  }
+  if (row._isSubtotal) {
+    return { background: '#fef6e6', fontWeight: '600', borderTop: '1px solid #e6a23c' }
+  }
+  if (row._isDetail) {
+    return { background: '#f9f9f9', paddingLeft: '20px' }
+  }
+  return {}
+}
+
+// 仅小计模式下已展开的明细数据缓存
+const _auxExpandedDetails = ref(new Map<string, any[]>())
+
+async function toggleAuxExpand(row: any) {
+  const key = `${row.account_code}|${row.aux_code}`
+  const newSet = new Set(auxExpandedKeys.value)
+  if (newSet.has(key)) {
+    newSet.delete(key)
+  } else {
+    // 从后端加载明细
+    if (!_auxExpandedDetails.value.has(key)) {
+      try {
+        const { data } = await http.get(
+          `/api/projects/${projectId.value}/ledger/aux-balance-detail`,
+          { params: { year: year.value, account_code: row.account_code, dim_type: auxSelectedDimType.value, aux_code: row.aux_code } }
+        )
+        _auxExpandedDetails.value.set(key, (data.data ?? data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
+      } catch { _auxExpandedDetails.value.set(key, []) }
+    }
+    newSet.add(key)
+  }
+  auxExpandedKeys.value = newSet
+}
+
+const auxFlatTotal = computed(() => {
+  if (auxSummaryOnly.value) {
+    const dimType = auxSelectedDimType.value
+    if (dimType && dimType !== '全部') {
+      return auxSummaryData.value.filter(r => r.dim_type === dimType).length
+    }
+    return auxSummaryData.value.length
+  }
+  return auxPagedTotal.value
+})
+
+/** 扁平视图显示数据 */
+const auxFlatDisplayRows = computed(() => {
+  if (auxTreeMode.value) return []
+
+  // 仅小计模式：用后端汇总数据分页显示
+  if (auxSummaryOnly.value) {
+    let rows = auxSummaryData.value
+    const dimType = auxSelectedDimType.value
+    if (dimType && dimType !== '全部') {
+      rows = rows.filter(r => r.dim_type === dimType)
+    }
+    const start = (auxPage.value - 1) * auxPageSize
+    const page = rows.slice(start, start + auxPageSize)
+
+    // 构建显示行（含展开的明细）
+    const display: any[] = []
+    for (const r of page) {
+      const isMulti = (r.record_count || 1) > 1
+      const summaryRow = {
+        ...r,
+        aux_type: r.dim_type || r.aux_type,
+        _isSubtotal: isMulti,
+        aux_name: isMulti ? `${r.aux_name} (${r.record_count}条)` : r.aux_name,
+      }
+      display.push(summaryRow)
+
+      // 插入已展开的明细行
+      if (isMulti) {
+        const key = `${r.account_code}|${r.aux_code}`
+        if (auxExpandedKeys.value.has(key)) {
+          const details = _auxExpandedDetails.value.get(key) || []
+          display.push(...details)
+        }
+      }
+    }
+    return display
+  }
+
+  // 普通模式：直接用后端分页数据
+  return auxPagedRows.value
 })
 
 async function loadAllAuxBalance() {
   if (!projectId.value) return
   loading.value = true
   try {
-    // 查所有科目的辅助余额（不传 account_code）
-    const { data } = await http.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance-all`,
-      { params: { year: year.value } }
+    // 只加载维度类型列表（轻量，不加载全部汇总行）
+    const { data: summaryData } = await http.get(
+      `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
+      { params: { year: year.value, dim_type: '__types_only__' } }
     )
-    allAuxBalanceData.value = data.data ?? data ?? []
-  } catch { allAuxBalanceData.value = [] }
+    const summary = summaryData.data ?? summaryData
+    auxDimTypesFromServer.value = summary.dim_types || []
+
+    // 设置默认选中维度
+    if (!auxSelectedDimType.value || auxSelectedDimType.value === '') {
+      auxSelectedDimType.value = '全部'
+    }
+    _auxBalanceLoadedKey.value = `${projectId.value}_${year.value}`
+
+    // 加载当前维度的汇总数据（用于树形视图）
+    await loadAuxSummaryForDim()
+    // 加载扁平视图第一页
+    await loadAuxBalancePage()
+  } catch (e) {
+    console.error('loadAllAuxBalance error:', e)
+    auxSummaryData.value = []; auxPagedRows.value = []
+  }
   finally { loading.value = false }
+}
+
+/** 加载指定维度的汇总数据（树形视图和仅小计模式用） */
+async function loadAuxSummaryForDim() {
+  const dimType = auxSelectedDimType.value
+  if (!dimType || (!auxTreeMode.value && !auxSummaryOnly.value)) {
+    return
+  }
+  // "全部"模式在仅小计下也需要加载（但数据量大，限制条数）
+  const params: any = { year: year.value }
+  if (dimType !== '全部') {
+    params.dim_type = dimType
+  }
+  try {
+    const { data } = await http.get(
+      `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
+      { params }
+    )
+    const result = data.data ?? data
+    auxSummaryData.value = result.rows || []
+  } catch { auxSummaryData.value = [] }
+}
+
+// 后端预计算的汇总数据
+const auxSummaryData = ref<any[]>([])
+const auxDimTypesFromServer = ref<any[]>([])
+
+// 扁平视图后端分页数据
+const auxPagedRows = ref<any[]>([])
+const auxPagedTotal = ref(0)
+
+async function loadAuxBalancePage() {
+  try {
+    const params: any = { year: year.value, page: auxPage.value, page_size: auxPageSize }
+    if (auxSelectedDimType.value && auxSelectedDimType.value !== '全部') {
+      params.dim_type = auxSelectedDimType.value
+    }
+    if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
+    if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
+
+    const { data } = await http.get(
+      `/api/projects/${projectId.value}/ledger/aux-balance-paged`,
+      { params }
+    )
+    const result = data.data ?? data
+    auxPagedRows.value = result.rows || []
+    auxPagedTotal.value = result.total || 0
+  } catch { auxPagedRows.value = [] }
+}
+
+// 缓存标记：project_id + year 组合，避免重复加载
+const _auxBalanceLoadedKey = ref('')
+
+function switchToAuxTab() {
+  balanceTab.value = 'aux'
+  const key = `${projectId.value}_${year.value}`
+  if (_auxBalanceLoadedKey.value !== key) {
+    loadAllAuxBalance()
+  }
+}
+
+async function exportAuxBalanceExcel() {
+  try {
+    const params: any = { year: year.value }
+    if (auxSelectedDimType.value && auxSelectedDimType.value !== '全部') {
+      params.dim_type = auxSelectedDimType.value
+    }
+    // 搜索和筛选条件也传给后端（当前视图条件）
+    if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
+    if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
+
+    const response = await http.get(
+      `/api/projects/${projectId.value}/ledger/export-aux-balance`,
+      { params, responseType: 'blob' }
+    )
+    // http.ts 拦截器可能解包了，兼容两种情况
+    const blobData = response.data instanceof Blob ? response.data : new Blob([response.data])
+    const url = URL.createObjectURL(blobData)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `辅助余额表_${auxSelectedDimType.value || '全部'}_${year.value}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导出失败')
+  }
 }
 
 function drillToAuxLedgerFromBalance(row: any) {
@@ -1138,5 +1821,46 @@ onUnmounted(() => {
   background: #fef6e6 !important;
   font-weight: 600;
   border-top: 1px solid #e6a23c;
+}
+
+/* 辅助余额表维度标签 */
+.gt-aux-toolbar {
+  margin-bottom: var(--gt-space-2);
+}
+
+/* 选中行样式：浅蓝背景，去掉左边框（避免单列竖线） */
+:deep(.el-table__body tr.current-row > td.el-table__cell) {
+  background: #e8f4fd !important;
+}
+
+/* hover 行样式：更浅的蓝灰色 */
+:deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: #f0f7ff !important;
+}
+
+/* 选中行 + hover 同时生效 */
+:deep(.el-table__body tr.current-row:hover > td.el-table__cell) {
+  background: #dceefb !important;
+}
+
+.gt-aux-toolbar-header {
+  display: flex; align-items: center; gap: var(--gt-space-2); flex-wrap: wrap;
+}
+.gt-dim-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-bottom: var(--gt-space-2); padding: 6px 0;
+}
+.gt-dim-tab {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; font-size: 13px; cursor: pointer;
+  border-radius: var(--gt-radius-sm); border: 1px solid #e8e8e8;
+  color: #666; background: #fafafa; transition: all 0.15s;
+}
+.gt-dim-tab:hover { border-color: var(--gt-color-primary-lighter); color: var(--gt-color-primary); }
+.gt-dim-tab--active {
+  background: var(--gt-color-primary-bg, #f0ecf7);
+  border-color: var(--gt-color-primary);
+  color: var(--gt-color-primary);
+  font-weight: 600;
 }
 </style>

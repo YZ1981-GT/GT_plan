@@ -53,6 +53,8 @@ _BALANCE_COLUMN_MAP = {
     "年初数": "opening_balance",
     "期初数量": "opening_qty",
     "期初外币": "opening_fc",
+    "本期发生额": "debit_amount",
+    "本年累计": "year_debit_amount",
     "借方发生额": "debit_amount",
     "借方金额": "debit_amount",
     "本期借方": "debit_amount",
@@ -73,6 +75,7 @@ _BALANCE_COLUMN_MAP = {
     "币种名称": "currency_code",
     "单位编码": "company_code",
     "公司编码": "company_code",
+    "组织编码": "company_code",
     "期初方向": "opening_direction",
     "期末方向": "closing_direction",
     # English
@@ -112,6 +115,7 @@ _LEDGER_COLUMN_MAP = {
     "会计期间": "accounting_period",
     "月份": "accounting_period",
     "凭证月份": "accounting_period",
+    "期间": "accounting_period",
     "凭证类型": "voucher_type",
     "凭证字": "voucher_type",
     "凭证号": "voucher_no",
@@ -272,6 +276,7 @@ _AUX_LEDGER_COLUMN_MAP = {
     "会计月份": "accounting_period",
     "会计期间": "accounting_period",
     "凭证月份": "accounting_period",
+    "期间": "accounting_period",
     "凭证类型": "voucher_type",
     "凭证字": "voucher_type",
     "凭证号": "voucher_no",
@@ -281,6 +286,8 @@ _AUX_LEDGER_COLUMN_MAP = {
     "借方发生额": "debit_amount",
     "贷方金额": "credit_amount",
     "贷方发生额": "credit_amount",
+    "借方": "debit_amount",
+    "贷方": "credit_amount",
     "借方数量": "debit_qty",
     "贷方数量": "credit_qty",
     "借方外币发生额": "debit_fc",
@@ -290,9 +297,17 @@ _AUX_LEDGER_COLUMN_MAP = {
     "摘要": "summary",
     "制单人": "preparer",
     "编制人": "preparer",
+    "填制人": "preparer",
     "币种": "currency_code",
+    "币种名称": "currency_code",
     "单位编码": "company_code",
     "公司编码": "company_code",
+    "审核人": "reviewer",
+    "记账人": "bookkeeper",
+    "分录号": "entry_seq",
+    "单价": "unit_price",
+    "汇率": "exchange_rate",
+    "计量单位": "unit",
     # English
     "account_code": "account_code",
     "account_name": "account_name",
@@ -314,17 +329,6 @@ _AUX_LEDGER_COLUMN_MAP = {
     "preparer": "preparer",
     "currency_code": "currency_code",
     "company_code": "company_code",
-    # 新增：丰桔出行等企业导出格式
-    "分录号": "entry_seq",
-    "凭证月份": "accounting_period",
-    "单价": "unit_price",
-    "汇率": "exchange_rate",
-    "计量单位": "unit",
-    "币种名称": "currency_code",
-    "币种": "currency_code",
-    "填制人": "preparer",
-    "审核人": "reviewer",
-    "记账人": "bookkeeper",
     "reviewer": "reviewer",
     "bookkeeper": "bookkeeper",
     "unit_price": "unit_price",
@@ -398,6 +402,11 @@ def _parse_date(value: str | None) -> date | None:
     """Parse a string to date, supporting multiple formats."""
     if value is None:
         return None
+    # openpyxl returns datetime objects directly
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
     value = str(value).strip()
     if not value or value == "None":
         return None
@@ -407,6 +416,15 @@ def _parse_date(value: str | None) -> date | None:
         except ValueError:
             continue
     return None
+
+
+def _parse_period(value: str | None) -> int | None:
+    """解析期间字符串为会计月份。如 '2025年1期' → 1, '2025年10期' → 10"""
+    if value is None:
+        return None
+    import re
+    m = re.search(r'(\d+)\s*期', str(value))
+    return int(m.group(1)) if m else None
 
 
 # ---------------------------------------------------------------------------
@@ -734,9 +752,19 @@ class GenericParser(BaseParser):
             voucher_no = str(row.get("voucher_no", "")).strip()
             if not voucher_date or not voucher_no:
                 return None
+            # 解析会计期间（支持 "2025年1期" 格式）
+            ap_raw = row.get("accounting_period")
+            accounting_period = _parse_period(ap_raw) if isinstance(ap_raw, str) and '期' in str(ap_raw) else None
+            if accounting_period is None and ap_raw is not None:
+                try:
+                    accounting_period = int(ap_raw)
+                except (ValueError, TypeError):
+                    pass
             base.update({
                 "voucher_date": voucher_date,
                 "voucher_no": voucher_no,
+                "accounting_period": accounting_period,
+                "voucher_type": str(row.get("voucher_type", "")).strip() or None,
                 "debit_amount": _parse_decimal(row.get("debit_amount")),
                 "credit_amount": _parse_decimal(row.get("credit_amount")),
                 "counterpart_account": str(row.get("counterpart_account", "")).strip() or None,
@@ -757,12 +785,22 @@ class GenericParser(BaseParser):
                 "closing_balance": _parse_decimal(row.get("closing_balance")),
             })
         elif data_type == "tb_aux_ledger":
+            # 解析会计期间
+            ap_raw = row.get("accounting_period")
+            accounting_period = _parse_period(ap_raw) if isinstance(ap_raw, str) and '期' in str(ap_raw) else None
+            if accounting_period is None and ap_raw is not None:
+                try:
+                    accounting_period = int(ap_raw)
+                except (ValueError, TypeError):
+                    pass
             base.update({
                 "aux_type": str(row.get("aux_type", "")).strip() or None,
                 "aux_code": str(row.get("aux_code", "")).strip() or None,
                 "aux_name": str(row.get("aux_name", "")).strip() or None,
                 "voucher_date": _parse_date(row.get("voucher_date")),
                 "voucher_no": str(row.get("voucher_no", "")).strip() or None,
+                "accounting_period": accounting_period,
+                "voucher_type": str(row.get("voucher_type", "")).strip() or None,
                 "debit_amount": _parse_decimal(row.get("debit_amount")),
                 "credit_amount": _parse_decimal(row.get("credit_amount")),
                 "summary": str(row.get("summary", "")).strip() or None,

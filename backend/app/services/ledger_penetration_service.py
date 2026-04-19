@@ -83,6 +83,29 @@ class LedgerPenetrationService:
         result = await self.db.execute(stmt)
         return [dict(r._mapping) for r in result.fetchall()]
 
+    async def get_account_opening_balance(
+        self, project_id: UUID, year: int, account_code: str,
+    ) -> Decimal:
+        """获取科目期初余额（用于序时账 running_balance 计算）。
+
+        前缀查询时（如 1122*），汇总所有匹配科目的期初余额。
+        """
+        tbl = TbBalance.__table__
+        if account_code.endswith('*'):
+            prefix = account_code[:-1]
+            code_filter = tbl.c.account_code.like(prefix + '%')
+        else:
+            code_filter = (tbl.c.account_code == account_code)
+
+        stmt = sa.select(sa.func.coalesce(sa.func.sum(tbl.c.opening_balance), 0)).where(
+            tbl.c.project_id == project_id,
+            tbl.c.year == year,
+            code_filter,
+            tbl.c.is_deleted == sa.false(),
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar() or Decimal(0)
+
     async def get_ledger_entries(
         self, project_id: UUID, year: int, account_code: str,
         date_from: str | None = None, date_to: str | None = None,
@@ -161,7 +184,7 @@ class LedgerPenetrationService:
     async def get_all_aux_balance(
         self, project_id: UUID, year: int,
     ) -> list[dict]:
-        """全量辅助余额（所有科目）"""
+        """全量辅助余额（所有科目，含原始维度组合字符串）"""
         tbl = TbAuxBalance.__table__
         stmt = (
             sa.select(
@@ -169,6 +192,7 @@ class LedgerPenetrationService:
                 tbl.c.aux_type, tbl.c.aux_code, tbl.c.aux_name,
                 tbl.c.opening_balance, tbl.c.debit_amount,
                 tbl.c.credit_amount, tbl.c.closing_balance,
+                tbl.c.aux_dimensions_raw,
             )
             .where(
                 tbl.c.project_id == project_id,
@@ -257,6 +281,7 @@ class LedgerPenetrationService:
         """序时账游标分页 — 基于 (voucher_date, id) 的 keyset pagination。
 
         比 OFFSET 分页在大数据量（10万+行）下性能稳定，不随页码增大退化。
+        返回 running_balance（累计余额）和 total（总行数）。
         """
         tbl = TbLedger.__table__
 
@@ -278,13 +303,22 @@ class LedgerPenetrationService:
         if date_to:
             where_clauses.append(tbl.c.voucher_date <= date_to)
 
+        # 首次请求时查总数（后续翻页不重复查）
+        total = None
+        if cursor is None:
+            count_base = sa.select(sa.func.count()).select_from(
+                sa.select(tbl.c.id).where(*where_clauses).subquery()
+            )
+            total = (await self.db.execute(count_base)).scalar() or 0
+
         # 解析游标: "date|id" 格式
+        cursor_clauses = list(where_clauses)
         if cursor:
             try:
                 parts = cursor.split("|", 1)
                 cursor_date = parts[0]
                 cursor_id = parts[1] if len(parts) > 1 else ""
-                where_clauses.append(
+                cursor_clauses.append(
                     sa.or_(
                         tbl.c.voucher_date > cursor_date,
                         sa.and_(
@@ -294,7 +328,7 @@ class LedgerPenetrationService:
                     )
                 )
             except (ValueError, IndexError):
-                pass  # 无效游标，忽略
+                pass
 
         stmt = (
             sa.select(
@@ -302,10 +336,11 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.counterpart_account, tbl.c.summary,
+                tbl.c.accounting_period, tbl.c.voucher_type,
             )
-            .where(*where_clauses)
+            .where(*cursor_clauses)
             .order_by(tbl.c.voucher_date, tbl.c.id)
-            .limit(limit + 1)  # 多取一条判断 has_more
+            .limit(limit + 1)
         )
 
         result = await self.db.execute(stmt)
@@ -321,12 +356,15 @@ class LedgerPenetrationService:
             vd_str = vd.isoformat() if hasattr(vd, "isoformat") else str(vd)
             next_cursor = f"{vd_str}|{last['id']}"
 
-        return {
+        resp = {
             "items": items,
             "next_cursor": next_cursor,
             "has_more": has_more,
             "limit": limit,
         }
+        if total is not None:
+            resp["total"] = total
+        return resp
 
     async def get_aux_ledger_entries_cursor(
         self, project_id: UUID, year: int, account_code: str,

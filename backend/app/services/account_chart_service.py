@@ -28,6 +28,78 @@ from app.models.audit_platform_schemas import (
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# 核算维度解析工具（供四表导入使用）
+# ---------------------------------------------------------------------------
+
+import hashlib as _hashlib
+import re as _re_aux
+
+_AUX_CODE_CACHE: dict[str, str] = {}
+
+
+def _generate_aux_code(aux_type: str, aux_name: str) -> str:
+    """为没有编码的辅助核算名称生成唯一占位编码。"""
+    key = f"{aux_type}:{aux_name}"
+    if key in _AUX_CODE_CACHE:
+        return _AUX_CODE_CACHE[key]
+    prefix = aux_type[:2].upper() if aux_type else "XX"
+    h = _hashlib.md5(key.encode()).hexdigest()[:6].upper()
+    code = f"AUTO_{prefix}_{h}"
+    _AUX_CODE_CACHE[key] = code
+    return code
+
+
+def parse_aux_dimensions(dim_str: str) -> list[dict]:
+    """解析核算维度字符串为多条辅助核算记录。
+
+    输入格式示例：
+      "金融机构:YG0001,工商银行; 银行账户:3100021509024876090; 成本中心:YG130108,财务部"
+
+    返回：
+      [{"aux_type": "金融机构", "aux_code": "YG0001", "aux_name": "工商银行"}, ...]
+    """
+    if not dim_str or not dim_str.strip():
+        return []
+
+    results = []
+    parts = _re_aux.split(r'[;；]', dim_str.strip())
+
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+
+        colon_idx = part.find(':')
+        if colon_idx < 0:
+            colon_idx = part.find('：')
+        if colon_idx < 0:
+            continue
+
+        aux_type = part[:colon_idx].strip()
+        value_part = part[colon_idx + 1:].strip()
+        if not aux_type or not value_part:
+            continue
+
+        comma_idx = value_part.find(',')
+        if comma_idx < 0:
+            comma_idx = value_part.find('，')
+
+        if comma_idx > 0:
+            aux_code = value_part[:comma_idx].strip()
+            aux_name = value_part[comma_idx + 1:].strip()
+        else:
+            if _re_aux.match(r'^[A-Za-z0-9\-_.]+$', value_part):
+                aux_code = value_part
+                aux_name = value_part
+            else:
+                aux_name = value_part
+                aux_code = _generate_aux_code(aux_type, aux_name)
+
+        results.append({"aux_type": aux_type, "aux_code": aux_code, "aux_name": aux_name})
+
+    return results
+
 # Seed data directory
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
@@ -264,12 +336,15 @@ async def import_client_chart(
     file: UploadFile,
     db: AsyncSession,
     column_mapping: dict[str, str | None] | None = None,
+    skip_auto_import: bool = False,
 ) -> AccountImportResult:
     """Import client account chart from Excel/CSV file.
 
     Parses account_code, account_name, direction, parent_code.
     Validates required columns (account_code + account_name).
     Writes to account_chart with source=client.
+    
+    skip_auto_import: 跳过旧的 _auto_import_data_sheets（调用方会用 smart_import_engine 处理）
 
     Args:
         column_mapping: Optional user-confirmed mapping {original_header: standard_field}.
@@ -317,19 +392,24 @@ async def import_client_chart(
             )
         normalized_rows = _normalize_columns(rows)
 
-    # Validate required fields after normalization
+    # Validate required fields after normalization (only for account chart data)
     if normalized_rows:
         sample = normalized_rows[0]
-        missing = []
-        if "account_code" not in sample:
-            missing.append("account_code/科目编码")
-        if "account_name" not in sample:
-            missing.append("account_name/科目名称")
-        if missing and column_mapping:
-            raise HTTPException(
-                status_code=400,
-                detail=f"列映射中缺少必填字段: {', '.join(missing)}",
-            )
+        has_account_code = "account_code" in sample
+        has_account_name = "account_name" in sample
+        # 如果有凭证日期/凭证号，说明是序时账而非科目表，跳过科目表校验
+        is_ledger = "voucher_date" in sample or "voucher_no" in sample
+        if not is_ledger:
+            missing = []
+            if not has_account_code:
+                missing.append("account_code/科目编码")
+            if not has_account_name:
+                missing.append("account_name/科目名称")
+            if missing and column_mapping:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"科目表列映射中缺少必填字段: {', '.join(missing)}（如果上传的是序时账，请忽略此校验）",
+                )
 
     # Build records
     records: list[AccountChart] = []
@@ -430,10 +510,10 @@ async def import_client_chart(
     db.add_all(records)
     await db.commit()
 
-    # ── 自动导入其他 sheet 的四表数据 ──
+    # ── 自动导入其他 sheet 的四表数据（如果调用方会用 smart_import_engine 处理则跳过） ──
     other_sheets_result = {}
     sheet_diagnostics = []
-    if filename_lower.endswith((".xlsx", ".xls")):
+    if not skip_auto_import and filename_lower.endswith((".xlsx", ".xls")):
         try:
             print(f"[AUTO_IMPORT] 开始自动导入四表数据: project={project_id}, content_size={len(content)}")
             other_sheets_result, sheet_diagnostics = await _auto_import_data_sheets(
@@ -823,6 +903,7 @@ _COLUMN_MAP = {
     "会计月份": "accounting_period",
     "会计期间": "accounting_period",
     "月份": "accounting_period",
+    "期间": "accounting_period",
     "accounting_period": "accounting_period",
     "凭证类型": "voucher_type",
     "凭证字": "voucher_type",
@@ -869,6 +950,13 @@ _COLUMN_MAP = {
     "记账人": "bookkeeper",
     "期初方向": "opening_direction",
     "期末方向": "closing_direction",
+    "组织编码": "company_code",
+    "核算组织": "company_name",
+    "最后操作人": "preparer",
+    "主表项目": "cashflow_item",
+    "补充资料": "cashflow_supplement",
+    "过账": "is_posted",
+    "状态": "voucher_status",
     "借方累计": "debit_amount",
     "贷方累计": "credit_amount",
     "辅助账核算项目": "aux_info",
@@ -963,13 +1051,82 @@ async def preview_file(file: UploadFile, skip_rows: int | None = None) -> dict:
                     "rows": [...],  # first 20 rows (after skipping)
                     "total_rows": 150,
                     "column_mapping": {"col1": "account_code", ...},
-                    "file_type_guess": "ledger"
+                    "file_type_guess": "ledger",
+                    "key_columns": {...}  # 关键列标注
                 },
                 ...
             ],
             "active_sheet": 0
         }
     """
+    # 四表关键列定义（用于前端高亮和标注）
+    _KEY_COLUMNS: dict[str, dict] = {
+        "balance": {
+            "required": {"account_code": "科目编码"},
+            "important": {
+                "account_name": "科目名称",
+                "opening_balance": "期初余额",
+                "debit_amount": "借方发生额",
+                "credit_amount": "贷方发生额",
+                "closing_balance": "期末余额",
+            },
+            "optional": {
+                "aux_type": "核算维度（含辅助核算信息时自动拆分为辅助余额表）",
+                "level": "科目级次",
+                "company_code": "组织编码",
+            },
+        },
+        "ledger": {
+            "required": {
+                "account_code": "科目编码",
+                "voucher_date": "记账日期/凭证日期",
+                "voucher_no": "凭证号",
+            },
+            "important": {
+                "account_name": "科目名称",
+                "debit_amount": "借方金额",
+                "credit_amount": "贷方金额",
+                "summary": "摘要",
+            },
+            "optional": {
+                "aux_type": "核算维度（含辅助核算信息时自动拆分为辅助明细账）",
+                "voucher_type": "凭证类型",
+                "accounting_period": "会计期间/期间",
+                "preparer": "制单人",
+            },
+        },
+        "aux_balance": {
+            "required": {
+                "account_code": "科目编码",
+                "aux_type": "辅助类型/核算维度",
+            },
+            "important": {
+                "aux_code": "辅助编码/核算编码",
+                "aux_name": "辅助名称/核算名称",
+                "opening_balance": "期初余额",
+                "closing_balance": "期末余额",
+            },
+            "optional": {
+                "debit_amount": "借方发生额",
+                "credit_amount": "贷方发生额",
+            },
+        },
+        "aux_ledger": {
+            "required": {"account_code": "科目编码"},
+            "important": {
+                "aux_type": "辅助类型/核算维度",
+                "aux_code": "辅助编码",
+                "aux_name": "辅助名称",
+                "voucher_date": "凭证日期",
+                "debit_amount": "借方金额",
+                "credit_amount": "贷方金额",
+            },
+            "optional": {
+                "voucher_no": "凭证号",
+                "summary": "摘要",
+            },
+        },
+    }
     if not file.filename:
         raise HTTPException(status_code=400, detail="未提供文件")
 
@@ -1005,13 +1162,26 @@ async def preview_file(file: UploadFile, skip_rows: int | None = None) -> dict:
             headers = list(rows[0].keys())
             column_mapping = {h: _match_column(h) for h in headers}
             mapped_cols = {v for v in column_mapping.values() if v}
+            guessed = _guess_file_type(mapped_cols)
+            key_cols = _KEY_COLUMNS.get(guessed, {})
+            # 标注每列的重要性级别
+            column_importance = {}
+            for h, mapped in column_mapping.items():
+                if mapped and mapped in key_cols.get("required", {}):
+                    column_importance[h] = {"level": "required", "label": key_cols["required"][mapped]}
+                elif mapped and mapped in key_cols.get("important", {}):
+                    column_importance[h] = {"level": "important", "label": key_cols["important"][mapped]}
+                elif mapped and mapped in key_cols.get("optional", {}):
+                    column_importance[h] = {"level": "optional", "label": key_cols["optional"][mapped]}
             sheets.append({
                 "sheet_name": sheet_name,
                 "headers": headers,
                 "rows": rows[:20],
                 "total_rows": len(rows),
                 "column_mapping": column_mapping,
-                "file_type_guess": _guess_file_type(mapped_cols),
+                "file_type_guess": guessed,
+                "key_columns": key_cols,
+                "column_importance": column_importance,
             })
         if not sheets:
             raise HTTPException(status_code=400, detail="所有工作表均无有效数据")
@@ -1115,8 +1285,16 @@ def _detect_header_row(ws, max_scan: int = 5) -> int:
     策略：扫描前 max_scan 行，找到第一行"看起来像表头"的行。
     表头特征：多个非空单元格，且内容是短文本（非长段落说明）。
     说明行特征：第一个单元格很长（>30字符），或以数字序号开头（如"1."、"2."）。
+    合并表头特征：如"科目余额表"标题行+说明行+双行表头（Row 3-4），返回第一行表头位置。
     """
     rows_iter = ws.iter_rows(values_only=True)
+    # 关键列名关键词（用于识别表头行）
+    _HEADER_KEYWORDS = {
+        "科目编码", "科目代码", "科目名称", "凭证日期", "记账日期",
+        "借方", "贷方", "期初", "期末", "摘要", "凭证号", "凭证类型",
+        "核算维度", "辅助类型", "序号", "编码", "名称", "余额",
+        "account_code", "account_name", "debit", "credit",
+    }
     for i in range(max_scan):
         try:
             row = next(rows_iter)
@@ -1130,6 +1308,13 @@ def _detect_header_row(ws, max_scan: int = 5) -> int:
             continue
 
         first_cell = non_empty[0]
+
+        # 检查是否包含关键列名关键词（强信号）
+        has_header_kw = any(
+            kw in cell for cell in non_empty for kw in _HEADER_KEYWORDS
+        )
+        if has_header_kw and len(non_empty) >= 2:
+            return i
 
         # 说明行特征：以数字序号开头（"1."、"2."），或第一个单元格超长
         is_instruction = (

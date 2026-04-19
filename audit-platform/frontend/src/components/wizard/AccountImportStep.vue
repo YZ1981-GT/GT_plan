@@ -1,7 +1,7 @@
 <template>
-  <div class="gt-account-import-step">
+  <div class="gt-account-import-step" v-loading="previewing || importing" :element-loading-text="loadingText" element-loading-background="rgba(255,255,255,0.85)">
     <h2 class="step-title">数据导入</h2>
-    <p class="step-desc">上传 Excel/CSV 文件（科目表、序时账、余额表、辅助账等），系统自动识别列并预览</p>
+    <p class="step-desc">上传 Excel/CSV 文件（科目表、序时账、余额表、辅助账等），支持多个文件同时上传，系统自动识别列并预览</p>
 
     <!-- Phase 1: Upload -->
     <div v-if="phase === 'upload'" class="upload-section">
@@ -9,11 +9,11 @@
         ref="uploadRef"
         class="upload-area"
         drag
+        multiple
         :auto-upload="false"
-        :limit="1"
         accept=".xlsx,.xls,.csv"
         :on-change="onFileChange"
-        :on-exceed="onExceed"
+        :file-list="fileList"
       >
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
         <div class="el-upload__text">
@@ -21,7 +21,7 @@
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持 .xlsx / .xls / .csv 格式，可上传科目表、序时账、余额表、辅助账等
+            支持 .xlsx / .xls / .csv 格式，可同时上传多个文件（如余额表 + 多个序时账）
           </div>
         </template>
       </el-upload>
@@ -29,7 +29,7 @@
       <el-button
         type="primary"
         :loading="previewing"
-        :disabled="!selectedFile"
+        :disabled="selectedFiles.length === 0"
         style="margin-top: 16px"
         @click="handlePreview"
       >
@@ -90,9 +90,10 @@
             :key="header"
             :prop="header"
             min-width="160"
+            :class-name="getColumnClass(header)"
           >
             <template #header>
-              <div class="column-mapping-header">
+              <div class="column-mapping-header" :class="getColumnClass(header)">
                 <el-select
                   v-model="columnMapping[header]"
                   size="small"
@@ -112,11 +113,17 @@
                       :label="opt.label"
                       :value="opt.value"
                       :disabled="isFieldUsed(opt.value, header)"
-                    />
+                    >
+                      <span>{{ opt.label }}</span>
+                      <el-tag v-if="_getKeyFields().has(opt.value)" size="small" type="danger" style="margin-left: 4px; transform: scale(0.8)">关键</el-tag>
+                      <el-tag v-else-if="_getImportantFields().has(opt.value)" size="small" type="warning" style="margin-left: 4px; transform: scale(0.8)">重要</el-tag>
+                    </el-option>
                   </el-option-group>
                 </el-select>
                 <div class="header-label">
-                  <el-icon v-if="columnMapping[header]" class="matched-icon"><CircleCheckFilled /></el-icon>
+                  <el-icon v-if="isKeyField(columnMapping[header])" class="key-matched-icon"><CircleCheckFilled /></el-icon>
+                  <el-icon v-else-if="isImportantField(columnMapping[header])" class="important-matched-icon"><CircleCheckFilled /></el-icon>
+                  <el-icon v-else-if="columnMapping[header]" class="matched-icon"><CircleCheckFilled /></el-icon>
                   <el-icon v-else class="unmatched-icon"><WarningFilled /></el-icon>
                   <span>{{ header }}</span>
                 </div>
@@ -339,9 +346,18 @@ import { useWizardStore } from '@/stores/wizard'
 
 const wizardStore = useWizardStore()
 const uploadRef = ref<UploadInstance>()
-const selectedFile = ref<File | null>(null)
+const selectedFiles = ref<File[]>([])
+const fileList = ref<any[]>([])
 const previewing = ref(false)
 const importing = ref(false)
+const importProgress = ref('')  // 导入进度文字
+
+const loadingText = computed(() => {
+  if (previewing.value) return '正在解析文件，请稍候...'
+  if (importing.value && importProgress.value) return importProgress.value
+  if (importing.value) return '正在导入数据，请稍候...'
+  return ''
+})
 
 type Phase = 'upload' | 'preview' | 'result'
 const phase = ref<Phase>('upload')
@@ -362,10 +378,18 @@ const FIELD_GROUPS = [
   {
     label: '金额信息',
     options: [
-      { value: 'debit_amount', label: '借方金额' },
-      { value: 'credit_amount', label: '贷方金额' },
-      { value: 'opening_balance', label: '期初余额' },
-      { value: 'closing_balance', label: '期末余额' },
+      { value: 'debit_amount', label: '借方发生额' },
+      { value: 'credit_amount', label: '贷方发生额' },
+      { value: 'opening_balance', label: '期初余额（净额）' },
+      { value: 'opening_debit', label: '期初借方金额' },
+      { value: 'opening_credit', label: '期初贷方金额' },
+      { value: 'closing_balance', label: '期末余额（净额）' },
+      { value: 'closing_debit', label: '期末借方金额' },
+      { value: 'closing_credit', label: '期末贷方金额' },
+      { value: 'year_opening_debit', label: '年初借方金额' },
+      { value: 'year_opening_credit', label: '年初贷方金额' },
+      { value: 'year_debit', label: '本年累计借方' },
+      { value: 'year_credit', label: '本年累计贷方' },
       { value: 'opening_qty', label: '期初数量' },
       { value: 'opening_fc', label: '期初外币' },
       { value: 'debit_qty', label: '借方数量' },
@@ -392,6 +416,7 @@ const FIELD_GROUPS = [
   {
     label: '辅助核算',
     options: [
+      { value: 'aux_dimensions', label: '核算维度（混合）' },
       { value: 'aux_type', label: '核算项目类型编号' },
       { value: 'aux_type_name', label: '核算项目类型名称' },
       { value: 'aux_code', label: '核算项目编号' },
@@ -501,42 +526,59 @@ const fileTypeTagType = ref('')
 const activeSheet = computed(() => previewSheets.value[activeSheetIdx.value] || null)
 
 async function onSheetChange(idx: number) {
-  // 1. 保存当前 sheet 的映射到缓存（切换时不丢失）
-  const prevIdx = activeSheetIdx.value
-  if (Object.keys(columnMapping).length > 0) {
-    sheetMappingCache[prevIdx] = { ...columnMapping }
-  }
-
-  // 2. 切换到新 sheet
-  activeSheetIdx.value = idx
-  for (const key of Object.keys(columnMapping)) delete columnMapping[key]
-
-  const sheet = previewSheets.value[idx]
-  if (!sheet) return
-
-  // 3. 优先从内存缓存恢复（用户手动调整过的映射）
-  const cached = sheetMappingCache[idx]
-  if (cached && Object.keys(cached).length > 0) {
-    // 只恢复当前 sheet 有的列头（避免残留其他 sheet 的 key）
-    for (const h of sheet.headers) {
-      if (cached[h] !== undefined) {
-        columnMapping[h] = cached[h]
+  _isSheetChanging = true
+  try {
+    // 1. 保存当前 sheet 的映射到缓存
+    const prevIdx = activeSheetIdx.value
+    const prevSheet = previewSheets.value[prevIdx]
+    if (prevSheet) {
+      const save: Record<string, string | null> = {}
+      for (const h of prevSheet.headers) {
+        save[h] = columnMapping[h] ?? null
       }
+      sheetMappingCache[prevIdx] = save
     }
-  } else {
-    // 4. 没有缓存时，先用自动匹配结果
-    for (const [h, v] of Object.entries(sheet.column_mapping)) {
-      columnMapping[h] = v
-    }
-    // 5. 再用后端保存的映射覆盖
-    const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers)
-    for (const [h, v] of Object.entries(saved)) {
-      if (v) columnMapping[h] = v
-    }
-  }
 
-  fileTypeLabel.value = FILE_TYPE_LABELS[sheet.file_type_guess] || '未识别类型'
-  fileTypeTagType.value = FILE_TYPE_TAG[sheet.file_type_guess] || 'info'
+    // 2. 清空当前映射
+    for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+
+    // 3. 切换到新 sheet
+    activeSheetIdx.value = idx
+    const sheet = previewSheets.value[idx]
+    if (!sheet) return
+
+    // 4. 恢复映射
+    const cached = sheetMappingCache[idx]
+    if (cached) {
+      for (const h of sheet.headers) {
+        if (cached[h] !== undefined && cached[h] !== null) {
+          columnMapping[h] = cached[h]
+        }
+      }
+    } else {
+      if (sheet.column_mapping) {
+        for (const [h, v] of Object.entries(sheet.column_mapping)) {
+          if (v) columnMapping[h] = v
+        }
+      }
+      try {
+        const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers)
+        for (const [h, v] of Object.entries(saved)) {
+          if (v) columnMapping[h] = v
+        }
+      } catch { /* ignore */ }
+      const newCache: Record<string, string | null> = {}
+      for (const h of sheet.headers) {
+        newCache[h] = columnMapping[h] ?? null
+      }
+      sheetMappingCache[idx] = newCache
+    }
+
+    fileTypeLabel.value = FILE_TYPE_LABELS[sheet.file_type_guess] || '未识别类型'
+    fileTypeTagType.value = FILE_TYPE_TAG[sheet.file_type_guess] || 'info'
+  } finally {
+    _isSheetChanging = false
+  }
 }
 
 function categoryLabel(cat: string): string { return CATEGORY_LABELS[cat] || cat }
@@ -614,12 +656,78 @@ function toElTreeData(nodes: AccountTreeNode[]): Record<string, unknown>[] {
 }
 
 function isFieldUsed(fieldValue: string, currentHeader: string): boolean {
-  // 只检查当前 sheet 的列头（不同 sheet 可以独立映射同一字段）
   const currentHeaders = activeSheet.value?.headers || []
   for (const h of currentHeaders) {
     if (h !== currentHeader && columnMapping[h] === fieldValue) return true
   }
   return false
+}
+
+// 按数据类型区分的关键字段
+const _KEY_FIELDS_BY_TYPE: Record<string, Set<string>> = {
+  balance: new Set([
+    'account_code', 'account_name',
+    'opening_balance', 'opening_debit', 'opening_credit',
+    'closing_balance', 'closing_debit', 'closing_credit',
+    'year_opening_debit', 'year_opening_credit',
+    'debit_amount', 'credit_amount',
+    'aux_dimensions',
+  ]),
+  ledger: new Set([
+    'account_code', 'account_name',
+    'voucher_date', 'voucher_no',
+    'debit_amount', 'credit_amount',
+    'summary', 'aux_dimensions',
+  ]),
+  aux_balance: new Set([
+    'account_code', 'aux_type', 'aux_code', 'aux_name',
+    'opening_balance', 'closing_balance',
+    'debit_amount', 'credit_amount',
+  ]),
+  aux_ledger: new Set([
+    'account_code', 'aux_type', 'aux_code', 'aux_name',
+    'voucher_date', 'voucher_no',
+    'debit_amount', 'credit_amount',
+  ]),
+}
+
+const _IMPORTANT_FIELDS_BY_TYPE: Record<string, Set<string>> = {
+  balance: new Set(['direction', 'level', 'company_code']),
+  ledger: new Set(['accounting_period', 'voucher_type', 'preparer', 'counterpart_account']),
+  aux_balance: new Set(['direction', 'company_code']),
+  aux_ledger: new Set(['accounting_period', 'voucher_type', 'summary', 'preparer']),
+}
+
+// 通用兜底
+const _KEY_FIELDS_DEFAULT = new Set([
+  'account_code', 'account_name', 'debit_amount', 'credit_amount',
+  'opening_balance', 'closing_balance', 'voucher_date', 'voucher_no',
+])
+
+function _getKeyFields(): Set<string> {
+  const ft = activeSheet.value?.file_type_guess || ''
+  return _KEY_FIELDS_BY_TYPE[ft] || _KEY_FIELDS_DEFAULT
+}
+
+function _getImportantFields(): Set<string> {
+  const ft = activeSheet.value?.file_type_guess || ''
+  return _IMPORTANT_FIELDS_BY_TYPE[ft] || new Set(['accounting_period', 'voucher_type', 'preparer', 'direction', 'level'])
+}
+
+function isKeyField(field: string | null | undefined): boolean {
+  return !!field && _getKeyFields().has(field)
+}
+
+function isImportantField(field: string | null | undefined): boolean {
+  return !!field && _getImportantFields().has(field)
+}
+
+function getColumnClass(header: string): string {
+  const mapped = columnMapping[header]
+  if (!mapped) return ''
+  if (_getKeyFields().has(mapped)) return 'col-key-matched'
+  if (_getImportantFields().has(mapped)) return 'col-important-matched'
+  return 'col-other-matched'
 }
 
 function getSheetMappedCount(sheetIdx: number): number {
@@ -628,27 +736,36 @@ function getSheetMappedCount(sheetIdx: number): number {
   return Object.values(cached).filter(v => v !== null && v !== undefined && v !== '').length
 }
 
-function onFileChange(file: UploadFile) {
-  selectedFile.value = file.raw || null
-}
-
-function onExceed() {
-  ElMessage.warning('只能上传一个文件，请先移除已选文件')
+function onFileChange(file: UploadFile, fileListVal: UploadFile[]) {
+  selectedFiles.value = fileListVal.map(f => f.raw!).filter(Boolean)
 }
 
 async function handlePreview() {
-  if (!selectedFile.value || !wizardStore.projectId) return
+  if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
   previewing.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', selectedFile.value)
-    const { data } = await http.post(
-      `/api/projects/${wizardStore.projectId}/account-chart/preview`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
-    const result: PreviewResponse = data.data ?? data
-    previewSheets.value = result.sheets || []
+    // 支持多文件：逐个上传预览，合并所有 sheet
+    const allSheets: any[] = []
+    for (const file of selectedFiles.value) {
+      const formData = new FormData()
+      formData.append('file', file)
+      const { data } = await http.post(
+        `/api/projects/${wizardStore.projectId}/account-chart/preview`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 },
+      )
+      const result: PreviewResponse = data.data ?? data
+      const sheets = result.sheets || []
+      // 给 sheet 名加文件名前缀（避免多文件同名 sheet 冲突）
+      for (const s of sheets) {
+        if (selectedFiles.value.length > 1) {
+          s.sheet_name = `[${file.name}] ${s.sheet_name}`
+        }
+        s._source_file = file.name
+        allSheets.push(s)
+      }
+    }
+    previewSheets.value = allSheets
 
     // 对所有 sheet 预先做自动列名匹配（存入缓存，切换时直接恢复）
     for (let i = 0; i < previewSheets.value.length; i++) {
@@ -704,7 +821,7 @@ function handleReupload() {
   activeSheetIdx.value = 0
   importResult.value = null
   clientTree.value = null
-  selectedFile.value = null
+  selectedFiles.value = []
   for (const key of Object.keys(columnMapping)) delete columnMapping[key]
   uploadRef.value?.clearFiles()
 }
@@ -717,12 +834,34 @@ const hasAnyMapping = computed(() => {
   return Object.values(columnMapping).some(v => v !== null && v !== undefined)
 })
 
-// 映射变化时自动防抖保存（用户修改下拉后 800ms 自动持久化，无需手动点按钮）
+// 映射变化时自动防抖保存
 let _saveMappingTimer: ReturnType<typeof setTimeout> | null = null
+let _isSheetChanging = false  // 切换 sheet 期间暂停 watch
+
 watch(columnMapping, () => {
+  if (_isSheetChanging) return  // 切换 sheet 期间不触发
+
   // 保存到内存缓存（立即）
   const idx = activeSheetIdx.value
-  sheetMappingCache[idx] = { ...columnMapping }
+  const sheet = previewSheets.value[idx]
+  if (sheet) {
+    const save: Record<string, string | null> = {}
+    for (const h of sheet.headers) {
+      save[h] = columnMapping[h] ?? null
+    }
+    sheetMappingCache[idx] = save
+  }
+
+  // 同步到 wizardStore（供"保存"按钮使用）
+  wizardStore.stepData['account_import'] = {
+    column_mappings: { ...sheetMappingCache },
+    active_sheet: idx,
+    sheets: previewSheets.value.map(s => ({
+      sheet_name: s.sheet_name,
+      file_type_guess: s.file_type_guess,
+      total_rows: s.total_rows,
+    })),
+  }
 
   // 防抖保存当前 sheet 到后端（800ms）
   if (_saveMappingTimer) clearTimeout(_saveMappingTimer)
@@ -844,50 +983,127 @@ async function loadSavedMapping(fileType: string, headers: string[]): Promise<Re
 }
 
 async function handleImport() {
-  if (!selectedFile.value || !wizardStore.projectId) return
+  if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
   importing.value = true
+
+  // 启动进度轮询
+  const pollTimer = setInterval(async () => {
+    try {
+      const { data } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+      const status = data.data ?? data
+      if (status && typeof status === 'object' && status.message) {
+        importProgress.value = status.message
+      }
+    } catch { /* ignore */ }
+  }, 2000)
+
   try {
-    const formData = new FormData()
-    formData.append('file', selectedFile.value)
+    // 多文件逐个导入，合并结果
+    let totalImported = 0
+    let allDataSheets: Record<string, number> = {}
+    let lastResult: any = null
 
-    // Build clean mapping (exclude null / empty)
-    const cleanMapping: Record<string, string> = {}
-    for (const [h, v] of Object.entries(columnMapping)) {
-      if (v) cleanMapping[h] = v
+    for (let fileIdx = 0; fileIdx < selectedFiles.value.length; fileIdx++) {
+      const file = selectedFiles.value[fileIdx]
+      const totalFiles = selectedFiles.value.length
+      const fileSizeMB = (file.size / 1024 / 1024).toFixed(1)
+      importProgress.value = `正在导入第 ${fileIdx + 1}/${totalFiles} 个文件：${file.name}（${fileSizeMB}MB）...`
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const sheetIdx = previewSheets.value.findIndex(s => s._source_file === file.name)
+      const mapping = sheetIdx >= 0 ? sheetMappingCache[sheetIdx] : columnMapping
+      const cleanMapping: Record<string, string> = {}
+      for (const [h, v] of Object.entries(mapping || {})) {
+        if (v) cleanMapping[h] = v
+      }
+      formData.append('column_mapping', JSON.stringify(cleanMapping))
+
+      // 大文件（>10MB）用异步导入，小文件用同步
+      const isLargeFile = file.size > 10 * 1024 * 1024
+      if (isLargeFile) {
+        // 异步导入：立即返回，轮询进度
+        await http.post(
+          `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
+        )
+        // 等待后台任务完成（轮询进度直到 100% 或失败）
+        let done = false
+        while (!done) {
+          await new Promise(r => setTimeout(r, 2000))
+          try {
+            const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+            const status = statusData.data ?? statusData
+            if (status && typeof status === 'object') {
+              const pct = status.progress ?? 0
+              const msg = status.message || ''
+              importProgress.value = `[${pct}%] ${msg}`
+              if (pct >= 100 || pct < 0) {
+                done = true
+                if (pct < 0) {
+                  ElMessage.error(msg || '导入失败')
+                }
+              }
+            } else {
+              done = true  // 锁已释放，任务完成
+            }
+          } catch {
+            done = true
+          }
+        }
+        // 异步导入不返回详细结果，用默认值
+        totalImported += 0
+      } else {
+        // 小文件同步导入
+        const { data } = await http.post(
+          `/api/projects/${wizardStore.projectId}/account-chart/import`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 },
+        )
+        const result: AccountImportResult = data.data ?? data
+        lastResult = result
+        totalImported += result.total_imported || 0
+        for (const [dt, cnt] of Object.entries(result.data_sheets_imported || {})) {
+          allDataSheets[dt] = (allDataSheets[dt] || 0) + (cnt as number)
+        }
+      }
+      // 更新进度
+      const sheetLabels: Record<string, string> = { tb_balance: '余额表', tb_ledger: '序时账', tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细' }
+      const doneParts: string[] = []
+      for (const [dt, cnt] of Object.entries(allDataSheets)) {
+        if (cnt > 0) doneParts.push(`${sheetLabels[dt] || dt} ${cnt.toLocaleString()}条`)
+      }
+      importProgress.value = `已完成 ${fileIdx + 1}/${selectedFiles.value.length} 个文件` +
+        (totalImported > 0 ? `，科目 ${totalImported} 个` : '') +
+        (doneParts.length > 0 ? `，${doneParts.join('、')}` : '') +
+        (fileIdx + 1 < selectedFiles.value.length ? '，继续处理下一个...' : '，正在完成...')
     }
-    formData.append('column_mapping', JSON.stringify(cleanMapping))
 
-    const { data } = await http.post(
-      `/api/projects/${wizardStore.projectId}/account-chart/import`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
-    )
-    const result: AccountImportResult = data.data ?? data
-    importResult.value = result
+    importResult.value = lastResult
+    if (importResult.value) {
+      importResult.value.total_imported = totalImported
+      importResult.value.data_sheets_imported = allDataSheets
+    }
 
-    // 构建导入结果消息
-    let msg = `成功导入 ${result.total_imported} 个科目`
-    const datSheets = result.data_sheets_imported || {}
+    let msg = `成功导入 ${totalImported} 个科目`
     const sheetLabels: Record<string, string> = {
-      tb_balance: '余额表',
-      tb_ledger: '序时账',
-      tb_aux_balance: '辅助余额',
-      tb_aux_ledger: '辅助明细',
+      tb_balance: '余额表', tb_ledger: '序时账',
+      tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细',
     }
     const parts: string[] = []
-    for (const [dt, cnt] of Object.entries(datSheets)) {
+    for (const [dt, cnt] of Object.entries(allDataSheets)) {
       if (cnt > 0) parts.push(`${sheetLabels[dt] || dt} ${cnt.toLocaleString()} 条`)
     }
     if (parts.length > 0) msg += `，同时导入 ${parts.join('、')}`
     ElMessage.success(msg)
 
-    // 导入成功后自动保存列映射
     saveMapping(true)
 
     await wizardStore.saveStep('account_import', {
-      total_imported: result.total_imported,
-      by_category: result.by_category,
-      data_sheets_imported: result.data_sheets_imported || {},
+      total_imported: totalImported,
+      data_sheets_imported: allDataSheets,
     })
 
     phase.value = 'result'
@@ -895,12 +1111,14 @@ async function handleImport() {
   } catch {
     // Error handled by http interceptor
   } finally {
+    clearInterval(pollTimer)
     importing.value = false
+    importProgress.value = ''
   }
 }
 
 async function importOtherSheets() {
-  if (!selectedFile.value || !wizardStore.projectId) return
+  if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
 
   // 从向导基本信息中获取审计年度（而非硬编码当前年）
   const basicInfo = wizardStore.stepData?.basic_info as Record<string, any> | undefined
@@ -939,7 +1157,7 @@ async function importOtherSheets() {
   for (const item of sheetsToImport) {
     try {
       const formData = new FormData()
-      formData.append('file', selectedFile.value)
+      formData.append('file', selectedFiles.value[0])
       formData.append('source_type', 'generic')
       formData.append('data_type', item.dataType)
       formData.append('year', String(year))
@@ -1117,6 +1335,7 @@ defineExpose({
     }
     return true
   },
+  saveMapping,
 })
 </script>
 
@@ -1192,10 +1411,33 @@ defineExpose({
   color: #67c23a;
   font-size: 14px;
 }
+.key-matched-icon {
+  color: #409eff;
+  font-size: 14px;
+}
+.important-matched-icon {
+  color: #67c23a;
+  font-size: 14px;
+}
 
 .unmatched-icon {
   color: #e6a23c;
   font-size: 14px;
+}
+
+/* 关键列高亮 */
+.col-key-matched { background: #ecf5ff !important; }
+.col-important-matched { background: #f0f9eb !important; }
+.col-other-matched { background: #fafafa !important; }
+
+:deep(.col-key-matched) { background: #ecf5ff !important; }
+:deep(.col-important-matched) { background: #f0f9eb !important; }
+
+.column-mapping-header.col-key-matched {
+  border-bottom: 2px solid #409eff;
+}
+.column-mapping-header.col-important-matched {
+  border-bottom: 2px solid #67c23a;
 }
 
 .preview-actions {

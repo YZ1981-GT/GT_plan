@@ -245,21 +245,17 @@ class TbBalance(Base):
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     account_code: Mapped[str] = mapped_column(String, nullable=False)
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    level: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)  # 科目级次
-    opening_balance: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
-    opening_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 期初数量
-    opening_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 期初外币
-    debit_amount: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
-    credit_amount: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
-    closing_balance: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
+    level: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    opening_balance: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    opening_debit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    opening_credit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    opening_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)
+    opening_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    debit_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    credit_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    closing_balance: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    closing_debit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    closing_credit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
     currency_code: Mapped[str] = mapped_column(
         String(3), server_default=text("'CNY'"), nullable=False
     )
@@ -370,20 +366,16 @@ class TbAuxBalance(Base):
     aux_type_name: Mapped[str | None] = mapped_column(String, nullable=True)  # 核算项目类型名称
     aux_code: Mapped[str | None] = mapped_column(String, nullable=True)
     aux_name: Mapped[str | None] = mapped_column(String, nullable=True)
-    opening_balance: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
-    opening_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)  # 期初数量
-    opening_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)  # 期初外币
-    debit_amount: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
-    credit_amount: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
-    closing_balance: Mapped[Decimal | None] = mapped_column(
-        sa.Numeric(20, 2), nullable=True
-    )
+    opening_balance: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    opening_debit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    opening_credit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    opening_qty: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 4), nullable=True)
+    opening_fc: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    debit_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    credit_amount: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    closing_balance: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    closing_debit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
+    closing_credit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
     currency_code: Mapped[str] = mapped_column(
         String(3), server_default=text("'CNY'"), nullable=False
     )
@@ -395,6 +387,7 @@ class TbAuxBalance(Base):
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    aux_dimensions_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # 原始维度组合字符串
 
     __table_args__ = (
         Index(
@@ -455,6 +448,7 @@ class TbAuxLedger(Base):
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    aux_dimensions_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # 原始维度组合字符串
 
     __table_args__ = (
         Index(

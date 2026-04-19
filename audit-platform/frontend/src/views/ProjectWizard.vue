@@ -142,18 +142,15 @@ async function handleSave() {
     return
   }
 
-  // Step-specific validation and save
   if (currentStep === 'basic_info') {
     if (!basicInfoRef.value) return
     const data = await basicInfoRef.value.validate()
     if (!data) return
-
     await wizardStore.saveStep('basic_info', data as unknown as Record<string, unknown>)
     ElMessage.success('保存成功')
   } else {
-    // For other steps, save current step data from store
     const stepData = wizardStore.stepData[currentStep]
-    if (stepData) {
+    if (stepData && Object.keys(stepData).length > 0) {
       await wizardStore.saveStep(currentStep, stepData)
       ElMessage.success('保存成功')
     } else {

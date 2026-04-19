@@ -34,28 +34,61 @@
       </el-table-column>
     </el-table>
 
-    <!-- 添加成员弹窗 -->
-    <el-dialog append-to-body v-model="showAddDialog" title="添加团队成员" width="500px">
-      <el-form label-width="80px">
-        <el-form-item label="搜索人员">
-          <el-select v-model="selectedStaffId" filterable remote :remote-method="searchStaff"
-            placeholder="输入姓名或工号搜索" style="width: 100%" :loading="searching">
-            <el-option v-for="s in searchResults" :key="s.id" :label="`${s.name} (${s.employee_no || ''}) - ${s.title || ''}`" :value="s.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button link type="primary" @click="showQuickCreate = true">搜不到？快速创建人员</el-button>
-        </el-form-item>
-        <!-- 候选人负荷预览 -->
-        <el-form-item v-if="selectedStaffId && selectedStaffWorkload" label="当前负荷">
-          <div style="font-size: 13px; color: #666">
-            参与 {{ selectedStaffWorkload.project_count }} 个项目，本周 {{ selectedStaffWorkload.week_hours }}h
-          </div>
-        </el-form-item>
-      </el-form>
+    <!-- 添加成员弹窗：勾选模式 -->
+    <el-dialog append-to-body v-model="showAddDialog" width="700px" :close-on-click-modal="false">
+      <template #header>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; color: var(--gt-color-primary)">
+          <el-icon><User /></el-icon> 从人员库选择成员
+        </div>
+      </template>
+
+      <!-- 搜索栏 -->
+      <div style="display: flex; gap: 10px; margin-bottom: 12px">
+        <el-input v-model="staffSearch" placeholder="搜索姓名/工号" clearable style="flex: 1" @input="debouncedLoadStaffList" />
+        <el-select v-model="staffDeptFilter" placeholder="部门" clearable style="width: 150px" @change="loadStaffList">
+          <el-option label="审计一部" value="审计一部" />
+          <el-option label="审计二部" value="审计二部" />
+          <el-option label="审计三部" value="审计三部" />
+        </el-select>
+      </div>
+
+      <!-- 人员列表（勾选） -->
+      <el-table
+        ref="staffTableRef"
+        :data="staffListForSelect"
+        v-loading="staffListLoading"
+        size="small"
+        max-height="360"
+        @selection-change="onStaffSelectionChange"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="45" :selectable="isSelectable" />
+        <el-table-column prop="name" label="姓名" width="100">
+          <template #default="{ row }">
+            <span style="font-weight: 600">{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="employee_no" label="工号" width="90" />
+        <el-table-column prop="department" label="部门" width="100" />
+        <el-table-column prop="title" label="职级" width="90" />
+        <el-table-column prop="partner_name" label="所属合伙人" width="110" />
+        <el-table-column label="状态" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="isAlreadyAdded(row.id)" type="info" size="small">已添加</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div style="margin-top: 8px; font-size: 13px; color: #888">
+        已选 <span style="color: var(--gt-color-primary); font-weight: 600">{{ selectedStaffIds.length }}</span> 人
+        <el-button link type="primary" size="small" @click="showQuickCreate = true" style="margin-left: 16px">搜不到？快速创建</el-button>
+      </div>
+
       <template #footer>
         <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" :disabled="!selectedStaffId" @click="addMember">确认添加</el-button>
+        <el-button type="primary" :disabled="selectedStaffIds.length === 0" @click="addSelectedMembers">
+          添加 {{ selectedStaffIds.length }} 人
+        </el-button>
       </template>
     </el-dialog>
 
@@ -88,6 +121,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { User } from '@element-plus/icons-vue'
 import { listStaff, createStaff, listAssignments, saveAssignments, type StaffMember, type Assignment } from '@/services/staffApi'
 import { useWizardStore } from '@/stores/wizard'
 import http from '@/utils/http'
@@ -110,50 +144,76 @@ interface MemberRow {
 const members = ref<MemberRow[]>([])
 const showAddDialog = ref(false)
 const showQuickCreate = ref(false)
-const selectedStaffId = ref('')
-const selectedStaffWorkload = ref<any>(null)
-const searchResults = ref<StaffMember[]>([])
-const searching = ref(false)
 const creating = ref(false)
 const newStaff = ref({ name: '', title: '', department: '', phone: '' })
 
-// 选中人员时加载负荷数据
-watch(selectedStaffId, async (id) => {
-  if (!id) { selectedStaffWorkload.value = null; return }
-  try {
-    const { data } = await http.get('/api/dashboard/staff-workload')
-    const all = data.data ?? data
-    selectedStaffWorkload.value = (Array.isArray(all) ? all : []).find((s: any) => s.staff_id === id) || null
-  } catch { selectedStaffWorkload.value = null }
-})
+// 勾选模式相关
+const staffSearch = ref('')
+const staffDeptFilter = ref('')
+const staffListForSelect = ref<StaffMember[]>([])
+const staffListLoading = ref(false)
+const selectedStaffIds = ref<string[]>([])
+const staffTableRef = ref<any>(null)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-async function searchStaff(query: string) {
-  if (!query || query.length < 1) { searchResults.value = []; return }
-  searching.value = true
-  try {
-    const res = await listStaff({ search: query, limit: 20 })
-    searchResults.value = res.items
-  } finally { searching.value = false }
+function debouncedLoadStaffList() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(loadStaffList, 300)
 }
 
-function addMember() {
-  const staff = searchResults.value.find(s => s.id === selectedStaffId.value)
-  if (!staff) return
-  if (members.value.some(m => m.staff_id === staff.id)) {
-    ElMessage.warning('该成员已在团队中')
-    return
+async function loadStaffList() {
+  staffListLoading.value = true
+  try {
+    const res = await listStaff({
+      search: staffSearch.value || undefined,
+      department: staffDeptFilter.value || undefined,
+      limit: 50,
+    })
+    staffListForSelect.value = res.items || []
+  } catch { staffListForSelect.value = [] }
+  finally { staffListLoading.value = false }
+}
+
+function isAlreadyAdded(id: string): boolean {
+  return members.value.some(m => m.staff_id === id)
+}
+
+function isSelectable(row: StaffMember): boolean {
+  return !isAlreadyAdded(row.id)
+}
+
+function onStaffSelectionChange(selection: StaffMember[]) {
+  selectedStaffIds.value = selection.map(s => s.id)
+}
+
+function addSelectedMembers() {
+  for (const id of selectedStaffIds.value) {
+    if (isAlreadyAdded(id)) continue
+    const staff = staffListForSelect.value.find(s => s.id === id)
+    if (!staff) continue
+    members.value.push({
+      staff_id: staff.id,
+      staff_name: staff.name,
+      staff_title: staff.title || '',
+      employee_no: staff.employee_no || '',
+      role: 'auditor',
+      assigned_cycles: [],
+    })
   }
-  members.value.push({
-    staff_id: staff.id,
-    staff_name: staff.name,
-    staff_title: staff.title || '',
-    employee_no: staff.employee_no || '',
-    role: 'auditor',
-    assigned_cycles: [],
-  })
+  ElMessage.success(`已添加 ${selectedStaffIds.value.length} 名成员`)
   showAddDialog.value = false
-  selectedStaffId.value = ''
+  selectedStaffIds.value = []
 }
+
+// 打开弹窗时加载人员列表
+watch(showAddDialog, (v) => {
+  if (v) {
+    staffSearch.value = ''
+    staffDeptFilter.value = ''
+    selectedStaffIds.value = []
+    loadStaffList()
+  }
+})
 
 function removeMember(index: number) { members.value.splice(index, 1) }
 function onRoleChange(_: number) { /* auto-save handled by validate */ }
@@ -163,13 +223,22 @@ async function quickCreateStaff() {
   if (!newStaff.value.name) { ElMessage.warning('请输入姓名'); return }
   creating.value = true
   try {
-    const staff = await createStaff(newStaff.value)
-    selectedStaffId.value = staff.id
-    searchResults.value = [staff]
+    const staff = await createStaff({ ...newStaff.value, source: 'custom' })
     showQuickCreate.value = false
     newStaff.value = { name: '', title: '', department: '', phone: '' }
     ElMessage.success('人员创建成功')
-    addMember()
+    // 刷新列表并自动添加
+    await loadStaffList()
+    if (!isAlreadyAdded(staff.id)) {
+      members.value.push({
+        staff_id: staff.id,
+        staff_name: staff.name,
+        staff_title: staff.title || '',
+        employee_no: staff.employee_no || '',
+        role: 'auditor',
+        assigned_cycles: [],
+      })
+    }
   } finally { creating.value = false }
 }
 

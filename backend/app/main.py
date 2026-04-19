@@ -37,6 +37,7 @@ from app.routers.sampling import router as sampling_router
 from app.routers.gt_coding import router as gt_coding_router
 from app.routers.t_accounts import router as t_accounts_router
 from app.routers.ledger_penetration import router as ledger_penetration_router
+from app.routers.data_lifecycle import router as data_lifecycle_router
 from app.routers.metabase import router as metabase_router
 from app.routers.attachments import router as attachments_router
 from app.routers.custom_templates import router as custom_templates_router
@@ -179,6 +180,7 @@ app.include_router(sampling_router)
 app.include_router(gt_coding_router)
 app.include_router(t_accounts_router)
 app.include_router(ledger_penetration_router)
+app.include_router(data_lifecycle_router)
 app.include_router(metabase_router)
 app.include_router(attachments_router)
 app.include_router(custom_templates_router)

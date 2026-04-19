@@ -666,6 +666,7 @@ inclusion: always
 - 四表导入诊断机制（2026-04-15）：`_auto_import_data_sheets` 新增 `sheet_diagnostics` 返回每个 sheet 的识别结果（类型/匹配列/缺失列/行数），缺少必需列的 sheet 跳过导入并记录警告；`AccountImportResult` 新增 `sheet_diagnostics` 字段；前端导入结果页余额表缺失时显示红色警告+诊断详情，`AccountImportStep.validate()` 阻止进入科目映射步骤
 - 两套列名映射不一致修复（2026-04-15）：`account_chart_service._COLUMN_MAP`（识别阶段）和 `parsers.py._COLUMN_MAPS`（解析阶段）存在严重不一致，识别阶段判断为余额表但解析阶段关键列映射不到导致0条写入；已将 parsers.py 四个映射表（_BALANCE/_LEDGER/_AUX_BALANCE/_AUX_LEDGER_COLUMN_MAP）与 _COLUMN_MAP 完全同步，新增 50+ 个列名映射（借方累计/贷方累计/期末数/年初数/凭证字号/核算维度等），清理重复条目
 - 列映射保存偏好：点"保存映射"应一次保存所有 sheet 的映射（不仅当前 sheet），保存后自动进入参照映射库供其他项目引用；防抖自动保存只存当前 sheet，手动保存和确认导入时才全量保存
+- 保存按钮vs保存映射按钮（2026-04-19 用户明确）："保存"按钮保存当前步骤状态（列映射配置）到项目向导wizard_state；"保存映射"按钮是将匹配结果作为模板供同集团其他企业参考用；列映射变化时自动同步到wizardStore.stepData供"保存"按钮使用
 - attachments 表列缺失已修复（2026-04-15）：手动 ALTER TABLE 补齐 attachment_type/reference_id/reference_type/storage_type 四列（迁移019未执行的遗留问题，memory.md 中已有记录但未实际执行）
 - 科目分类推断改造（2026-04-15）：`_infer_category` 从纯编码首位硬编码改为名称关键词优先+编码兜底——新增 `_NAME_CATEGORY_KEYWORDS`（40+个关键词覆盖权益/收入/费用），6xxx 损益类细分（6001-6399=收入，6400+=费用），4xxx 区分标准成本类（4001/4101）和权益类；解决用户编码体系中 4001=实收资本被误归为资产类的问题
 - 新建项目 wizard reset 修复（2026-04-15）：`ProjectWizard.vue` onMounted 在无 projectId 参数时调用 `wizardStore.reset()`，解决新建项目弹出已有项目数据的问题
@@ -679,6 +680,35 @@ inclusion: always
 - 查账页面筛选偏好：余额表需支持多种筛选（期末有数/期初有数/期初+期末都有数/本期有变动/借方有发生额/贷方有发生额/仅一级科目），一级科目行加粗，显示筛选计数
 - 查账页面穿透交互：余额表从 VirtualScrollTable 改为 el-table（支持排序+双击+行样式），科目编号和期末余额单击可穿透，双击行也可穿透；序时账→凭证同理
 - 四表数据导入现状（2026-04-15）：tb_balance 827行、tb_ledger 15162行已成功导入；tb_aux_balance/tb_aux_ledger 仍为0行（可能有其他列缺失问题待排查）
+- 四表数据导入现状（2026-04-19 重庆和平药房）：tb_balance 407行、tb_aux_balance 127618行、tb_ledger 1147414行（两个序时账文件合并：1-10月104万+10月下旬10万）、tb_aux_ledger 2732674行；项目ID=6687b8ce-7a83-4816-bd4a-c2d173d4b683；21种辅助核算维度（成本中心/客户/业态/三方收款标识/税率/金融机构/银行账户/医保类型等）
+- 核算维度解析架构（2026-04-19）：新增 `parse_aux_dimensions()` 函数（account_chart_service.py），解析格式 `类型:编码,名称; 类型:编码,名称` 为多条辅助核算记录；没有编码的维度自动生成 `AUTO_XX_hash` 占位编码（MD5前6位+类型前缀）；同一维度名称保证编码唯一
+- 四表导入脚本（2026-04-19）：`backend/scripts/import_heping_data.py` 专用脚本处理特殊格式——①科目余额表双行合并表头（Row 3-4）直接按列号解析 ②序时账多文件合并（read_only模式流式读取百万行）③核算维度列自动拆分为辅助余额/辅助明细记录；支持 `--dry-run` 模式
+- 多文件上传端点（2026-04-19）：`POST /ledger/upload-multi` 支持多个文件同时上传合并导入（适用于序时账按月份分文件的场景）
+- 通用导入规则增强（2026-04-19）：①_COLUMN_MAP 新增"期间"→accounting_period、"组织编码"→company_code、"核算组织"→company_name、"最后操作人"→preparer ②parsers.py _parse_date 支持 datetime 对象（openpyxl 直接返回）③新增 _parse_period 解析"2025年1期"格式 ④_parse_single_row 的 ledger/aux_ledger 分支新增 accounting_period 和 voucher_type 字段 ⑤preview_file 返回 key_columns 和 column_importance 标注关键列重要性（required/important/optional）⑥_detect_header_row 增加关键词匹配（科目编码/凭证日期等）提高表头识别准确率
+- 通用智能导入引擎（2026-04-19）：新增 `backend/app/services/smart_import_engine.py`，替代专用脚本，支持任意企业导出格式——①`detect_header_rows` 自动检测单行/双行合并表头（扫描前8行，关键词匹配+子列名检测）②`merge_header_rows` 合并双行表头为组合列名（如"年初余额_借方金额"→year_opening_debit）③`smart_match_column` 优先匹配合并表头组合名→基础列名→清洗后匹配 ④"核算维度"映射为 aux_dimensions（混合维度列），不映射为 aux_type（避免误判为独立辅助表）⑤`convert_balance_rows` 自动从借贷两列计算净额（不依赖方向列）⑥`validate_aux_consistency` 三项校验（维度存在性/期初+变动=期末/明细账vs余额表发生额）⑦`smart_parse_files` 多文件入口自动检测合并单元格切换完整模式（3.9s打开+0.5s遍历50000行）⑧新增 `POST /ledger/smart-preview`（预览不写库）和 `POST /ledger/smart-import`（解析+写库）两个API端点，支持 custom_mapping 参数手动指定列映射
+- openpyxl read_only 模式限制（2026-04-19）：合并单元格的文件在 read_only 模式下只返回1列（左上角单元格），必须用完整模式打开；完整模式打开50000行文件约4秒，iter_rows遍历约0.5秒，可接受；序时账100万行文件用 read_only 模式无问题（无合并单元格）
+- uvicorn --reload 与脚本冲突（2026-04-19）：从 backend/ 目录运行 Python 脚本时，uvicorn 的 --reload 文件监控会导致脚本卡死；解决方案：从项目根目录运行（`python -u backend/scripts/xxx.py`）或停止 uvicorn
+- 四表导入偏好（2026-04-19 用户提出）：①每个单位导出格式不同，必须用通用解析规则而非专用脚本 ②辅助核算维度有多个时需要让用户确认（smart-preview 先预览再 smart-import 写入）③辅助余额表和辅助明细账之间要做一致性校对（名称/编号/期初+变动=期末）④年度信息要从文件内容自动提取，支持多文件上传 ⑤解析有问题时支持手动关键列表头对应（custom_mapping 参数）
+- 查账页面导入数据偏好（2026-04-19 用户改回）："导入数据"按钮改回跳转到项目向导科目导入步骤（带returnTo=ledger参数），不用弹窗式智能导入；弹窗代码保留备用
+- 大文件上传界面锁定偏好（2026-04-19）：上传大文件解析期间必须锁定界面（v-loading遮罩），不能让用户点其他内容，直到完成后才解除
+- preview端点大文件优化（2026-04-19）：<10MB用完整模式（正确处理合并单元格），>10MB用read_only模式（快速）；先读前10行原始数据（raw_first_rows）供用户确认表头位置；前端preview请求timeout从30s增加到120s；detect_header_rows修复：只有1个非空单元格的行一律当标题行跳过
+- 上传文档智能识别规则（2026-04-19 用户要求）：如果上传的不是一个Excel含4个sheet的标准格式，而是独立的科目余额表和序时账等复杂文档，优先用smart_import_engine先处理表头识别（双行合并表头、列名映射），解析后的标准化表头和映射结果传到前端的列映射确认界面供用户确认调整
+- import端点统一改用smart_import_engine（2026-04-19）：account_chart.py的import端点不再调用旧的import_client_chart（旧解析器用单行表头，和前端smart_import_engine的合并表头名不匹配导致列映射失效），改为直接用smart_parse_files解析+从结果中提取科目表（余额表+序时账的account_code/name去重）+write_four_tables写入四表
+- 核算维度实际数据分析（2026-04-19 和平药房）：50051行含核算维度，4215种不同维度片段，21种辅助核算类型；绝大多数（4192种）格式为 `类型:编号,名称`；仅3种类型无编号需自动生成（减值方式6条/职工福利事项191条/计提方式3条）；银行账户号码（纯数字无逗号）当作编号和名称相同；parse_aux_dimensions 0个解析错误
+- 辅助余额表与科目余额表的关系（2026-04-19 用户明确）：辅助余额表是科目余额表中有辅助核算科目的下级明细展开，不能直接对比；同一科目可能挂多个维度类型（如金融机构+银行账户+成本中心），每个维度类型各自汇总不一定等于科目余额（因为维度组合的笛卡尔积）；校验策略改为找期末汇总最接近科目余额的维度类型比对
+- 四表一致性校验重写（2026-04-19）：`validate_aux_consistency` 替换为 `validate_four_tables`，5项校验：①科目余额表内部勾稽 ②辅助余额表内部勾稽 ③科目余额表vs辅助余额表（按科目找最近维度类型比对）④序时账vs科目余额表（按科目汇总发生额）⑤辅助明细账vs辅助余额表（按维度组合汇总）；每类最多展示3条详情+汇总计数
+- 大数据量处理优化（2026-04-19）：辅助明细账270万行约315MB内存；校验时>50万行改为抽样前10万行；写入时每5万行flush一次减少事务压力；和平药房实测：余额表50000行+序时账114万行解析约18秒
+- 辅助明细账流式写入优化（2026-04-19 复盘）：convert_ledger_rows不再在内存中生成辅助明细账行（之前273万行占3.2GB），改为只返回序时账行（带_aux_dim_str原始维度字符串）+维度统计；write_four_tables中边遍历序时账边拆分维度边写入辅助明细账（buffer满10000条flush），内存从4.4GB降到1.2GB（减少74%）
+- 四表查询性能基准（2026-04-19 和平药房实测）：tb_balance 407行/208KB、tb_aux_balance 12.7万行/33MB、tb_ledger 114万行/402MB、tb_aux_ledger 273万行/920MB；新增5个部分索引（idx_tb_ledger_penetrate/idx_tb_aux_ledger_penetrate/idx_tb_aux_balance_account/idx_tb_ledger_voucher/idx_tb_ledger_period，均WHERE is_deleted=false）；穿透索引包含排序列避免外部磁盘排序；分页100条查询从442ms降到4ms（Index Scan 0.066ms），游标分页3ms，COUNT从203ms降到60ms
+- 四表大数据量建议（2026-04-19）：①前端必须分页（单科目可能11万条凭证）②CHUNK_SIZE已从10000增大到50000（INSERT次数减少80%）③超500万行考虑COPY命令替代INSERT ④多企业累积千万级考虑按project_id分区 ⑤不需要Redis缓存余额表（5ms够快）不需要物化视图（分页已毫秒级）
+- 大文件导入加速（2026-04-19 已完成）：①方案1真正后台异步——新增`POST /account-chart/import-async`端点（asyncio.create_task后台处理+ImportQueueService实时进度5%→20%→30%→95%→100%），前端>10MB自动走异步+轮询，<10MB走同步 ②方案2 COPY命令——新增`fast_writer.py`（asyncpg copy_to_table+TSV格式+10万行/批+失败降级INSERT），尚未集成到write_four_tables待测试 ③CHUNK_SIZE=50000+进度回调+前端2秒轮询量化进度
+- 多企业容量规划（2026-04-19）：单企业≈400万行/1.3GB（四表合计），10企业13GB，50企业66GB，100企业132GB；短期方案已实施（归档+并发控制），中期50+企业时迁移HASH 32分区表
+- 数据生命周期管理（2026-04-19）：新增 `data_lifecycle_service.py`（容量监控+项目归档/恢复/物理清理）+ `import_queue_service.py`（导入并发控制，同项目互斥，全局最大3并发，进度跟踪）+ `data_lifecycle.py` 路由7个端点（capacity/stats/archive/restore/purge/import-queue），已注册到main.py
+- smart-import并发控制（2026-04-19）：smart-import端点集成ImportQueueService，同一项目导入中返回409冲突，进度更新10%→50%→100%，finally释放锁
+- 穿透查询API增强（2026-04-19）：①新增 `GET /ledger/opening-balance/{code}` 获取科目期初余额（前端running_balance计算用）②新增 `GET /ledger/stats` 四表数据统计（行数+最后导入时间）③entries端点统一走游标分页（前端传limit参数时自动切换）④游标分页首次请求返回total总数（后续翻页不重复查）⑤前端loadLedger并行请求entries+opening-balance确保running_balance准确
+- write_four_tables bug修复（2026-04-19）：record_count在flush分支里重复累加已修正
+- 期初期末两种表达方式（2026-04-19 用户明确）：①"期初借方金额+期初贷方金额"（分列）直接存借贷两列，同时算出opening_balance净额方便查询 ②"期初余额+借贷方向"（净额+方向）存opening_balance，opening_debit/opening_credit为None；两种模式并存不强制统一；`_safe_decimal` 修复：0是有效值不再返回None
+- tb_balance/tb_aux_balance 新增4列（2026-04-19）：opening_debit/opening_credit/closing_debit/closing_credit（NUMERIC(20,2)），已ALTER TABLE ADD COLUMN；ORM模型+import_service._build_record_dict已同步更新
 - 科目级次字段（2026-04-15）：`tb_balance` 新增 `level` 列（INTEGER），解析器从 Excel"科目级次"列提取（无则从编码推断 `_infer_level_from_code`），`get_balance_summary` API 返回 level，前端 `getLevel(row)` 优先用后端 level 字段；已回填 827 行（111 个一级 + 716 个二级）
 - 折叠级次偏好：科目余额表的树形折叠必须支持 3 级、4 级、5 级及以上的多级嵌套，不能只处理 1-2 级
 - 筛选后折叠偏好：筛选后仍需保持树形折叠展开（自动补充缺失的祖先节点，祖先用灰色斜体区分），筛选模式下默认全部展开让用户直接看到匹配结果
@@ -692,7 +722,12 @@ inclusion: always
 - 穿透链路完整（2026-04-15）：余额表 → 序时账（含期初行+余额列+月小计） → 凭证分录 / 辅助余额（序时账页面新增"辅助余额"按钮） → 辅助明细；面包屑支持所有层级回退+Enter返回
 - 辅助余额表Tab偏好（2026-04-15）：辅助余额表应与科目余额表同级展示（Tab切换，不是穿透下级），位于"科目余额表"标题旁；新增 `GET /ledger/aux-balance-all` 全量辅助余额API + `get_all_aux_balance` 服务方法；双击辅助余额行直接进入辅助明细账
 - tb_aux_balance/tb_aux_ledger 补齐 account_name 列（2026-04-15）：ORM 模型有但数据库缺失，`get_all_aux_balance` 查询时报 UndefinedColumnError；已 ALTER TABLE ADD COLUMN 修复
-- 辅助余额表树形视图（待实现）：用户要求辅助余额表也支持树形视图（按科目编号分组折叠），逻辑同科目余额表
+- 辅助余额表树形视图（2026-04-19 已完成）：三级懒加载树——第一级科目汇总（`_auxGroupCache`预计算）→第二级按辅助编码+名称分组汇总（财务部/人力资源部平级，只有1条的直接显示不嵌套）→第三级明细行；全部lazy懒加载不卡；`_auxGroupCache`在数据加载时预热（`void _auxGroupCache.value`）
+- 辅助余额表关联维度显示（2026-04-19）：tb_aux_balance/tb_aux_ledger新增`aux_dimensions_raw`列（TEXT，存原始维度组合字符串）；树形视图明细行新增"关联维度"列，用`formatOtherDims`提取当前维度以外的其他维度；和平药房余额表已重新导入（reimport_balance.py），127618行aux_dimensions_raw已填充
+- 辅助余额表后端预计算架构（2026-04-19 已实现）：新建`tb_aux_balance_summary`表；`write_four_tables`写完后自动`rebuild_aux_balance_summary`（SQL聚合，12.7万→3.1万条）；通用规则任何企业导入都自动触发
+- 辅助余额表前端零重计算架构（2026-04-19 复盘重构）：前端不再加载12.7万行原始数据；扁平视图用`GET /ledger/aux-balance-paged`后端分页（含搜索/筛选/维度过滤）；树形视图用`_auxGroupCache`基于3.1万行汇总数据；展开明细用`GET /ledger/aux-balance-detail`后端按需查询；导出用`GET /ledger/export-aux-balance`后端生成Excel；删除了filteredAuxAll/auxSummaryRows/pagedAuxAll/_auxDataIndex等前端重计算computed
+- 前端计算后移偏好（2026-04-19 用户明确）：前端尽可能快，计算都放后端；入库时慢一点可以接受，查询时要快
+- 辅助余额表维度标签分类（2026-04-19）：12.7万行全部构建树形DOM会卡，改为按维度类型显示标签栏（成本中心/客户/业态/...+各自数量）；树形模式下必须选一个具体维度（不提供"全部"，进入树形时自动选数据量最大的维度），扁平模式下有"全部"选项；维度标签在两种模式下都显示统一过滤
 - tb_aux_balance/tb_aux_ledger 已成功导入（2026-04-15）：tb_aux_balance 3497行、tb_aux_ledger 13637行；辅助余额表加前端分页（每页100行）解决3497行渲染卡顿
 - 辅助余额表借贷发生额为空（非bug）：用友等财务软件导出的"辅助账月余额表"只有期初/期末余额，无借贷发生额；发生额在"辅助账明细表"中；可从 tb_aux_ledger 按科目+辅助维度汇总回填
 - 查账导入表头匹配（待实现）：用户要求导入数据时弹出表头字段匹配确认，改造为三步流程：上传→预览+列映射确认→导入；复用科目导入步骤的 preview API
@@ -1092,3 +1127,4 @@ inclusion: always
 - 仪表盘与项目列表分离（2026-04-19）：`/` 路径改为全宽模式（hideMiddle=true, isBrowseMode=false），显示 Dashboard.vue 统计卡片+快捷操作；`/projects` 保持三栏浏览模式显示项目列表；之前 `/` 被当成浏览模式导致仪表盘内容被 MiddleProjectList 覆盖
 - 全局入口Hub页面模式（2026-04-19）：左侧导航的全局功能（合并项目/附件管理/函证管理/归档管理等）需要 Hub 页面作为桥接——展示项目卡片列表，点击跳转到 /projects/{id}/xxx 项目级页面；已创建 ConsolidationHub.vue（/consolidation）和 AttachmentHub.vue（/attachments），DefaultLayout 已加入全宽模式；其他全局导航项（函证/归档）也需要同样的 Hub 页面
 - 管理看板增强（2026-04-19）：去掉"试点"标签改为 production；新增 3 个后端 API（project-staff-hours 按项目查人员工时/staff-detail 按人员查项目+未来一周安排/available-staff 查可用人员）；前端新增三 Tab 查询面板（按项目/按人员/可用人员），支持搜索+表格+工时阈值筛选
+- 团队委派交互偏好（2026-04-19）：添加成员改为勾选模式（弹窗直接显示人员库表格+checkbox批量勾选），不用搜索下拉逐个选；支持搜索+部门筛选+已添加标记不可重复勾选+快速创建兜底
