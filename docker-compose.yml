@@ -1,279 +1,616 @@
 ﻿# ============================================================
+
 # 瀹¤浣滀笟骞冲彴 鈥?Docker Compose 寮€鍙戠幆澧?
+
 # 鍚姩椤哄簭锛歅ostgreSQL 鈫?Redis 鈫?Backend 鈫?ONLYOFFICE
+
 # ============================================================
 
+
+
 services:
+
   # ----------------------------------------------------------
+
   # PostgreSQL 16
+
   # ----------------------------------------------------------
+
   postgres:
+
     image: postgres:16-alpine
+
     container_name: audit-postgres
+
     restart: unless-stopped
+
     ports:
+
       - "${PG_PORT:-5432}:5432"
+
     environment:
+
       POSTGRES_USER: ${PG_USER:-postgres}
+
       POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+
       POSTGRES_DB: ${PG_DB:-audit_platform}
+
     volumes:
+
       - pg_data:/var/lib/postgresql/data
+
     healthcheck:
+
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres}"]
+
       interval: 5s
+
       timeout: 5s
+
       retries: 5
+
       start_period: 10s
 
+
+
   # ----------------------------------------------------------
+
   # Redis 7
+
   # ----------------------------------------------------------
+
   redis:
+
     image: redis:7-alpine
+
     container_name: audit-redis
+
     restart: unless-stopped
+
     ports:
+
       - "${REDIS_PORT:-6379}:6379"
+
     volumes:
+
       - redis_data:/data
+
     healthcheck:
+
       test: ["CMD", "redis-cli", "ping"]
+
       interval: 5s
+
       timeout: 5s
+
       retries: 5
+
       start_period: 5s
 
+
+
   # ----------------------------------------------------------
+
   # FastAPI Backend锛堟湰鍦版瀯寤猴級
+
   # ----------------------------------------------------------
+
   backend:
+
     build:
+
       context: ./backend
+
       dockerfile: Dockerfile
+
       args:
+
         http_proxy: ""
+
         https_proxy: ""
+
         HTTP_PROXY: ""
+
         HTTPS_PROXY: ""
+
     container_name: audit-backend
+
     restart: unless-stopped
+
     ports:
+
       - "${API_PORT:-8000}:8000"
+
     environment:
+
       DATABASE_URL: postgresql+asyncpg://${PG_USER:-postgres}:${PG_PASSWORD:-postgres}@postgres:5432/${PG_DB:-audit_platform}
+
       REDIS_URL: redis://redis:6379/0
+
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-120}
+
       JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+
       CORS_ORIGINS: http://localhost:5173,http://localhost:3030
+
       ONLYOFFICE_URL: ${ONLYOFFICE_URL:-http://onlyoffice:80}
+
       WOPI_BASE_URL: ${WOPI_BASE_URL:-http://backend:8000/wopi}
+
       STORAGE_ROOT: ${STORAGE_ROOT:-./storage}
+
       ATTACHMENT_PRIMARY_STORAGE: ${ATTACHMENT_PRIMARY_STORAGE:-paperless}
+
       ATTACHMENT_FALLBACK_TO_LOCAL: ${ATTACHMENT_FALLBACK_TO_LOCAL:-true}
+
       ATTACHMENT_LOCAL_STORAGE_ROOT: ${ATTACHMENT_LOCAL_STORAGE_ROOT:-./storage/attachments}
+
       PAPERLESS_URL: ${PAPERLESS_URL:-http://localhost:8010}
+
       PAPERLESS_TOKEN: ${PAPERLESS_TOKEN:-}
+
       PAPERLESS_TIMEOUT: ${PAPERLESS_TIMEOUT:-30}
-      MINERU_ENABLED: ${MINERU_ENABLED:-false}
-      MINERU_API_URL: ${MINERU_API_URL:-http://mineru:8000}
-      MINERU_USE_CLI: ${MINERU_USE_CLI:-true}
+
+      MINERU_ENABLED: ${MINERU_ENABLED:-true}
+
+      MINERU_API_URL: ${MINERU_API_URL:-http://host.docker.internal:8002}
+
+      MINERU_USE_CLI: ${MINERU_USE_CLI:-false}
+
+      OLLAMA_ENABLED: ${OLLAMA_ENABLED:-true}
+
+      OLLAMA_API_URL: ${OLLAMA_API_URL:-http://host.docker.internal:11434}
+
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:8b}
+
     volumes:
+
       - ./storage:/app/storage
+
     depends_on:
+
       postgres:
+
         condition: service_healthy
+
       redis:
+
         condition: service_healthy
+
     healthcheck:
+
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+
       interval: 10s
+
       timeout: 5s
+
       retries: 5
+
       start_period: 30s
 
-  # ----------------------------------------------------------
-  # ONLYOFFICE Document Server 8.2
-  # ----------------------------------------------------------
-  onlyoffice:
-    image: onlyoffice/documentserver:8.2
-    container_name: audit-onlyoffice
-    restart: unless-stopped
-    ports:
-      - "${OFFICE_PORT:-8080}:80"
-    volumes:
-      - office_data:/var/lib/onlyoffice
-    depends_on:
-      backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost/healthcheck || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+
 
   # ----------------------------------------------------------
-  # Metabase 鈥?鏁版嵁鍙鍖栫湅鏉?
+
+  # ONLYOFFICE Document Server 8.2
+
   # ----------------------------------------------------------
-  metabase:
-    image: metabase/metabase:latest
-    container_name: audit-metabase
+
+  onlyoffice:
+
+    image: onlyoffice/documentserver:8.2
+
+    container_name: audit-onlyoffice
+
     restart: unless-stopped
+
     ports:
-      - "${METABASE_PORT:-3000}:3000"
-    environment:
-      MB_DB_TYPE: postgres
-      MB_DB_DBNAME: ${PG_DB:-audit_platform}
-      MB_DB_PORT: 5432
-      MB_DB_USER: ${PG_USER:-postgres}
-      MB_DB_PASS: ${PG_PASSWORD:-postgres}
-      MB_DB_HOST: postgres
-      MB_EMBEDDING_SECRET_KEY: ${METABASE_EMBEDDING_SECRET:-audit-metabase-secret-key}
-      JAVA_TIMEZONE: Asia/Shanghai
+
+      - "${OFFICE_PORT:-8080}:80"
+
     volumes:
-      - metabase_data:/metabase-data
+
+      - office_data:/var/lib/onlyoffice
+
     depends_on:
-      postgres:
+
+      backend:
+
         condition: service_healthy
+
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+
+      test: ["CMD-SHELL", "curl -f http://localhost/healthcheck || exit 1"]
+
       interval: 15s
+
       timeout: 10s
+
       retries: 5
+
+      start_period: 60s
+
+
+
+  # ----------------------------------------------------------
+
+  # Metabase - 数据可视化看板
+
+  # ----------------------------------------------------------
+
+  metabase:
+
+    image: metabase/metabase:latest
+
+    container_name: audit-metabase
+
+    restart: unless-stopped
+
+    ports:
+
+      - "${METABASE_PORT:-3000}:3000"
+
+    environment:
+
+      MB_DB_TYPE: postgres
+
+      MB_DB_DBNAME: ${PG_DB:-audit_platform}
+
+      MB_DB_PORT: 5432
+
+      MB_DB_USER: ${PG_USER:-postgres}
+
+      MB_DB_PASS: ${PG_PASSWORD:-postgres}
+
+      MB_DB_HOST: postgres
+
+      MB_EMBEDDING_SECRET_KEY: ${METABASE_EMBEDDING_SECRET:-audit-metabase-secret-key}
+
+      JAVA_TIMEZONE: Asia/Shanghai
+
+    volumes:
+
+      - metabase_data:/metabase-data
+
+    depends_on:
+
+      postgres:
+
+        condition: service_healthy
+
+    healthcheck:
+
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+
+      interval: 15s
+
+      timeout: 10s
+
+      retries: 5
+
       start_period: 90s
 
-  # ----------------------------------------------------------
-  # Paperless-ngx 鈥?闄勪欢鏂囨。绠＄悊 + OCR
-  # ----------------------------------------------------------
-  paperless:
-    image: ghcr.io/paperless-ngx/paperless-ngx:latest
-    container_name: audit-paperless
-    restart: unless-stopped
-    ports:
-      - "${PAPERLESS_PORT:-8010}:8000"
-    environment:
-      PAPERLESS_DBHOST: postgres
-      PAPERLESS_DBPORT: 5432
-      PAPERLESS_DBNAME: ${PAPERLESS_DB:-paperless}
-      PAPERLESS_DBUSER: ${PG_USER:-postgres}
-      PAPERLESS_DBPASS: ${PG_PASSWORD:-postgres}
-      PAPERLESS_REDIS: redis://redis:6379/1
-      PAPERLESS_OCR_LANGUAGE: chi_sim+eng
-      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET:-audit-paperless-secret-key}
-      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-admin}
-      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:-admin}
-      PAPERLESS_URL: http://localhost:${PAPERLESS_PORT:-8010}
-    volumes:
-      - paperless_data:/usr/src/paperless/data
-      - paperless_media:/usr/src/paperless/media
-      - ./storage/consume:/usr/src/paperless/consume
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/ || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+
 
   # ----------------------------------------------------------
-  # vLLM 鈥?Qwen3.5-27B-NVFP4 鏈湴澶фā鍨嬫帹鐞嗭紙GPU锛?
-  # 妯″瀷缂撳瓨锛欴:\vllm\hf-cache锛堝凡涓嬭浇锛?
-  # 鍚姩锛歞ocker compose --profile gpu up vllm
-  # API锛歨ttp://localhost:8100/v1锛圤penAI 鍏煎锛?
+
+  # Paperless-ngx - 附件文档管理 + OCR
+
   # ----------------------------------------------------------
-  vllm:
-    image: vllm/vllm-openai:cu130-nightly
-    container_name: audit-vllm
+
+  paperless:
+
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+
+    container_name: audit-paperless
+
     restart: unless-stopped
+
     ports:
-      - "${VLLM_PORT:-8100}:8000"
-    ipc: host
-    runtime: nvidia
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    volumes:
-      - ${VLLM_HF_CACHE:-D:/vllm/hf-cache}:/root/.cache/huggingface
+
+      - "${PAPERLESS_PORT:-8010}:8000"
+
     environment:
-      - HF_TOKEN=${HF_TOKEN:-}
-      - VLLM_NVFP4_GEMM_BACKEND=${NVFP4_BACKEND:-marlin}
-      - HF_HUB_OFFLINE=1
-      - TRANSFORMERS_OFFLINE=1
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - >-
-        vllm serve Kbenkhaled/Qwen3.5-27B-NVFP4
-        --host=0.0.0.0
-        --port=8000
-        --max-model-len=${VLLM_MAX_MODEL_LEN:-32768}
-        --gpu-memory-utilization=${VLLM_GPU_MEM:-0.95}
-        --max-num-seqs=4
-        --max-num-batched-tokens=32768
-        --kv-cache-dtype=fp8
-        --reasoning-parser=qwen3
-        --enable-auto-tool-choice
-        --enable-prefix-caching
-        --tool-call-parser=qwen3_coder
-        --language-model-only
-    profiles:
-      - gpu
+
+      PAPERLESS_DBHOST: postgres
+
+      PAPERLESS_DBPORT: 5432
+
+      PAPERLESS_DBNAME: ${PAPERLESS_DB:-paperless}
+
+      PAPERLESS_DBUSER: ${PG_USER:-postgres}
+
+      PAPERLESS_DBPASS: ${PG_PASSWORD:-postgres}
+
+      PAPERLESS_REDIS: redis://redis:6379/1
+
+      PAPERLESS_OCR_LANGUAGE: chi_sim+eng
+
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET:-audit-paperless-secret-key}
+
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER:-admin}
+
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD:-admin}
+
+      PAPERLESS_URL: http://localhost:${PAPERLESS_PORT:-8010}
+
+    volumes:
+
+      - paperless_data:/usr/src/paperless/data
+
+      - paperless_media:/usr/src/paperless/media
+
+      - ./storage/consume:/usr/src/paperless/consume
+
+    depends_on:
+
+      postgres:
+
+        condition: service_healthy
+
+      redis:
+
+        condition: service_healthy
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
+
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/ || exit 1"]
+
+      interval: 15s
+
       timeout: 10s
+
       retries: 5
+
+      start_period: 60s
+
+
+
+  # ----------------------------------------------------------
+
+  # vLLM 鈥?Qwen3.5-27B-NVFP4 鏈湴澶фā鍨嬫帹鐞嗭紙GPU锛?
+
+  # 妯″瀷缂撳瓨锛欴:\vllm\hf-cache锛堝凡涓嬭浇锛?
+
+  # 鍚姩锛歞ocker compose --profile gpu up vllm
+
+  # API锛歨ttp://localhost:8100/v1锛圤penAI 鍏煎锛?
+
+  # ----------------------------------------------------------
+
+  vllm:
+
+    image: vllm/vllm-openai:cu130-nightly
+
+    container_name: audit-vllm
+
+    restart: unless-stopped
+
+    ports:
+
+      - "${VLLM_PORT:-8100}:8000"
+
+    ipc: host
+
+    runtime: nvidia
+
+    deploy:
+
+      resources:
+
+        reservations:
+
+          devices:
+
+            - driver: nvidia
+
+              count: all
+
+              capabilities: [gpu]
+
+    volumes:
+
+      - ${VLLM_HF_CACHE:-D:/vllm/hf-cache}:/root/.cache/huggingface
+
+    environment:
+
+      - HF_TOKEN=${HF_TOKEN:-}
+
+      - VLLM_NVFP4_GEMM_BACKEND=${NVFP4_BACKEND:-marlin}
+
+      - HF_HUB_OFFLINE=1
+
+      - TRANSFORMERS_OFFLINE=1
+
+    entrypoint: ["/bin/bash", "-c"]
+
+    command:
+
+      - >-
+
+        vllm serve Kbenkhaled/Qwen3.5-27B-NVFP4
+
+        --host=0.0.0.0
+
+        --port=8000
+
+        --max-model-len=${VLLM_MAX_MODEL_LEN:-32768}
+
+        --gpu-memory-utilization=${VLLM_GPU_MEM:-0.95}
+
+        --max-num-seqs=4
+
+        --max-num-batched-tokens=32768
+
+        --kv-cache-dtype=fp8
+
+        --reasoning-parser=qwen3
+
+        --enable-auto-tool-choice
+
+        --enable-prefix-caching
+
+        --tool-call-parser=qwen3_coder
+
+        --language-model-only
+
+    profiles:
+
+      - gpu
+
+    healthcheck:
+
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+
+      interval: 30s
+
+      timeout: 10s
+
+      retries: 5
+
       start_period: 120s
 
+
+
   # ----------------------------------------------------------
+
   # MinerU 鈥?GPU 鍔犻€?PDF 瑙ｆ瀽锛圤CR + 琛ㄦ牸 + 鍏紡璇嗗埆锛?
+
   # 鍚姩锛歞ocker compose --profile gpu up mineru
+
   # API锛歨ttp://localhost:8002锛圡inerU Router锛?
+
   # WebUI锛歨ttp://localhost:7860锛圙radio锛?
+
   # ----------------------------------------------------------
+
   mineru:
+
     image: mineru:latest
+
     container_name: audit-mineru
+
     restart: unless-stopped
+
     runtime: nvidia
+
     environment:
+
       - NVIDIA_VISIBLE_DEVICES=all
+
     ports:
+
       - "${MINERU_ROUTER_PORT:-8002}:8002"
+
       - "${MINERU_WEBUI_PORT:-7860}:7860"
+
     volumes:
+
       - ./storage/mineru:/app/output
+
       - ./storage/attachments:/app/input
+
     shm_size: 32g
+
     ipc: host
+
     profiles:
+
       - gpu
+
     healthcheck:
+
       test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+
       interval: 30s
+
       timeout: 10s
+
       retries: 3
+
       start_period: 60s
 
+
+
+  # ----------------------------------------------------------
+
+  # Ollama - 本地LLM模型服务
+
+  # 启动：docker compose up ollama
+
+  # API：http://localhost:11434
+
+  # 模型：ollama pull qwen2.5:7b / ollama pull llama3.1:8b
+
+  # ----------------------------------------------------------
+
+  ollama:
+
+    image: ollama/ollama:latest
+
+    container_name: audit-ollama
+
+    restart: unless-stopped
+
+    runtime: nvidia
+
+    environment:
+
+      - NVIDIA_VISIBLE_DEVICES=all
+
+      - OLLAMA_HOST=0.0.0.0
+
+    ports:
+
+      - "${OLLAMA_PORT:-11434}:11434"
+
+    volumes:
+
+      - ollama_data:/root/.ollama
+
+    healthcheck:
+
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+
+      interval: 30s
+
+      timeout: 10s
+
+      retries: 3
+
+      start_period: 30s
+
+
+
 # ----------------------------------------------------------
-# 鍛藉悕鍗?
+
+# 命名卷
+
 # ----------------------------------------------------------
+
 volumes:
+
   pg_data:
+
   redis_data:
+
   office_data:
+
   metabase_data:
+
   paperless_data:
+
   paperless_media:
+
+  ollama_data:
+
+
+
 
 

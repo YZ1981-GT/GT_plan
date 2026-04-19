@@ -717,6 +717,7 @@ class EventType(str, enum.Enum):
     MAPPING_CHANGED = "mapping.changed"
     DATA_IMPORTED = "data.imported"
     IMPORT_ROLLED_BACK = "import.rolled_back"
+    IMPORT_PROGRESS = "import.progress"
     MATERIALITY_CHANGED = "materiality.changed"
     TRIAL_BALANCE_UPDATED = "trial_balance.updated"
     REPORTS_UPDATED = "reports.updated"

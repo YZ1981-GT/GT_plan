@@ -271,15 +271,11 @@
         </el-table-column>
         <el-table-column prop="counterpart_account" label="对方科目" width="120" show-overflow-tooltip />
       </el-table>
-      <div class="gt-pagination" v-if="ledgerTotal > ledgerPageSize">
-        <el-pagination
-          v-model:current-page="ledgerPage"
-          :page-size="ledgerPageSize"
-          :total="ledgerTotal"
-          layout="prev, pager, next, total"
-          size="small"
-          @current-change="loadLedger"
-        />
+      <div class="gt-pagination" v-if="ledgerHasMore || ledgerTotal > ledgerPageSize">
+        <el-button v-if="ledgerHasMore" @click="loadMoreLedger" :loading="ledgerLoadingMore" size="small" type="primary" plain>
+          加载更多
+        </el-button>
+        <el-tag size="small" type="info" style="margin-left: 8px">已加载 {{ ledgerItems.length }} / {{ ledgerTotal }} 条</el-tag>
       </div>
     </template>
 
@@ -520,6 +516,11 @@ const ledgerItems = ref<any[]>([])
 const ledgerTotal = ref(0)
 const ledgerPage = ref(1)
 const ledgerPageSize = 200
+
+// ── 游标分页状态 ──
+const ledgerCursor = ref<string | null>(null)
+const ledgerHasMore = ref(false)
+const ledgerLoadingMore = ref(false)
 
 /** 序时账增强显示：期初行 + 每笔余额 + 月小计行 */
 const ledgerDisplay = computed(() => {
@@ -826,7 +827,29 @@ async function loadBalance() {
 async function loadLedger() {
   loading.value = true
   try {
-    const params: any = { year: year.value, page: ledgerPage.value, page_size: ledgerPageSize }
+    const params: any = { year: year.value, limit: ledgerPageSize }
+    if (dateRange.value?.length === 2) {
+      params.date_from = dateRange.value[0]
+      params.date_to = dateRange.value[1]
+    }
+    // 使用游标分页（首次加载不传 cursor）
+    const { data } = await http.get(
+      `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
+    )
+    const result = data.data ?? data
+    ledgerItems.value = result.items ?? result ?? []
+    ledgerTotal.value = result.total ?? ledgerItems.value.length
+    ledgerCursor.value = result.next_cursor ?? null
+    ledgerHasMore.value = result.has_more ?? false
+  } catch { ledgerItems.value = []; ledgerHasMore.value = false }
+  finally { loading.value = false }
+}
+
+async function loadMoreLedger() {
+  if (!ledgerHasMore.value || !ledgerCursor.value || ledgerLoadingMore.value) return
+  ledgerLoadingMore.value = true
+  try {
+    const params: any = { year: year.value, limit: ledgerPageSize, cursor: ledgerCursor.value }
     if (dateRange.value?.length === 2) {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
@@ -835,10 +858,12 @@ async function loadLedger() {
       `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
     )
     const result = data.data ?? data
-    ledgerItems.value = result.items ?? result ?? []
-    ledgerTotal.value = result.total ?? 0
-  } catch { ledgerItems.value = [] }
-  finally { loading.value = false }
+    const newItems = result.items ?? result ?? []
+    ledgerItems.value = [...ledgerItems.value, ...newItems]
+    ledgerCursor.value = result.next_cursor ?? null
+    ledgerHasMore.value = result.has_more ?? false
+  } catch { ledgerHasMore.value = false }
+  finally { ledgerLoadingMore.value = false }
 }
 
 async function loadVoucher() {

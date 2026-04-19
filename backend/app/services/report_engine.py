@@ -1,4 +1,4 @@
-"""报表生成引擎 — 公式驱动取数 + 增量更新 + 平衡校验 + 穿透查询
+"""报表生成引擎 — 公式驱动取数 + 增量更新 + 平衡校验 + 穿透查询 + Redis缓存
 
 核心功能：
 - generate_all_reports: 根据 report_config 逐行执行公式生成四张报表
@@ -6,6 +6,7 @@
 - regenerate_affected: 增量更新受影响行
 - check_balance: 资产负债表/利润表/跨报表一致性校验
 - drilldown: 报表行穿透查询
+- Redis 缓存: TTL=10min, key=report:{project_id}:{report_type}
 
 Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 2.9, 8.2, 8.5
 """
@@ -13,11 +14,13 @@ Validates: Requirements 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 2.9, 8.2, 8.5
 from __future__ import annotations
 
 import ast
+import json
 import logging
 import operator
 import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -32,6 +35,9 @@ from app.models.report_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Cache TTL for report data (10 minutes)
+REPORT_CACHE_TTL = 600
 
 # Regex patterns for formula tokens
 _TB_PATTERN = re.compile(r"TB\('([^']+)','([^']+)'\)")
@@ -251,14 +257,109 @@ class ReportFormulaParser:
         return [m.group(1) for m in _ROW_PATTERN.finditer(formula)]
 
 
+class _DecimalEncoder(json.JSONEncoder):
+    """JSON encoder for Decimal and date types."""
+    def default(self, o: Any) -> Any:
+        if isinstance(o, Decimal):
+            return str(o)
+        if hasattr(o, 'isoformat'):
+            return o.isoformat()
+        return super().default(o)
+
+
 class ReportEngine:
     """报表生成引擎
 
     根据 report_config 配置和试算表数据生成四张财务报表。
+    支持 Redis 缓存（TTL=10min）和事件驱动缓存失效。
     """
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, redis: Any = None):
         self.db = db
+        self.redis = redis
+
+    # ------------------------------------------------------------------
+    # Redis 缓存
+    # ------------------------------------------------------------------
+
+    def _cache_key(self, project_id: UUID, report_type: str) -> str:
+        return f"report:{project_id}:{report_type}"
+
+    async def _get_cached_report(self, project_id: UUID, report_type: str) -> list[dict] | None:
+        """从 Redis 读取缓存的报表数据"""
+        if not self.redis:
+            return None
+        try:
+            key = self._cache_key(project_id, report_type)
+            cached = await self.redis.get(key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
+        return None
+
+    async def _set_cached_report(self, project_id: UUID, report_type: str, data: list[dict]) -> None:
+        """写入报表缓存"""
+        if not self.redis:
+            return
+        try:
+            key = self._cache_key(project_id, report_type)
+            await self.redis.setex(key, REPORT_CACHE_TTL, json.dumps(data, cls=_DecimalEncoder))
+        except Exception:
+            pass
+
+    async def _invalidate_report_cache(self, project_id: UUID, report_type: str | None = None) -> int:
+        """失效报表缓存。report_type=None 时失效所有类型。"""
+        if not self.redis:
+            return 0
+        count = 0
+        try:
+            if report_type:
+                key = self._cache_key(project_id, report_type)
+                count = await self.redis.delete(key)
+            else:
+                for rt in ("balance_sheet", "income_statement", "cash_flow_statement", "equity_statement"):
+                    key = self._cache_key(project_id, rt)
+                    count += await self.redis.delete(key)
+        except Exception:
+            pass
+        return count
+
+    async def get_report_cached(
+        self, project_id: UUID, year: int, report_type: str,
+    ) -> list[dict] | None:
+        """获取报表数据（优先缓存）"""
+        cached = await self._get_cached_report(project_id, report_type)
+        if cached is not None:
+            return cached
+
+        # 从数据库加载
+        rt = FinancialReportType(report_type)
+        result = await self.db.execute(
+            sa.select(FinancialReport).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.report_type == rt,
+                FinancialReport.is_deleted == sa.false(),
+            ).order_by(FinancialReport.row_code)
+        )
+        rows = result.scalars().all()
+        if not rows:
+            return None
+
+        data = [
+            {
+                "row_code": r.row_code,
+                "row_name": r.row_name,
+                "current_period_amount": str(r.current_period_amount or 0),
+                "prior_period_amount": str(r.prior_period_amount or 0),
+                "formula_used": r.formula_used,
+                "source_accounts": r.source_accounts,
+            }
+            for r in rows
+        ]
+        await self._set_cached_report(project_id, report_type, data)
+        return data
 
     # ------------------------------------------------------------------
     # 加载报表配置
@@ -322,6 +423,21 @@ class ReportEngine:
                 global_row_cache, now,
             )
             results[report_type.value] = report_rows
+
+            # 写入缓存
+            await self._set_cached_report(project_id, report_type.value, report_rows)
+
+        # 发布 REPORTS_UPDATED 事件
+        try:
+            from app.services.event_bus import event_bus
+            await event_bus.publish(EventPayload(
+                event_type=EventType.REPORTS_UPDATED,
+                project_id=project_id,
+                year=year,
+                extra={"report_types": list(results.keys())},
+            ))
+        except Exception:
+            logger.warning("Failed to publish REPORTS_UPDATED event", exc_info=True)
 
         return results
 
@@ -496,6 +612,8 @@ class ReportEngine:
                         global_row_cache[config.row_code] = row.current_period_amount
 
         await self.db.flush()
+        # 失效受影响报表类型的缓存
+        await self._invalidate_report_cache(project_id)
         return regenerated
 
     def _is_affected(self, formula: str | None, changed_accounts: list[str]) -> bool:

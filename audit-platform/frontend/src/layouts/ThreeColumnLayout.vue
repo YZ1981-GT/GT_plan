@@ -314,6 +314,34 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+// ── 移动端手势支持 ──
+let touchStartX = 0
+let touchStartY = 0
+const SWIPE_THRESHOLD = 60
+
+function onTouchStart(e: TouchEvent) {
+  const touch = e.touches[0]
+  touchStartX = touch.clientX
+  touchStartY = touch.clientY
+}
+
+function onTouchEnd(e: TouchEvent) {
+  const touch = e.changedTouches[0]
+  const dx = touch.clientX - touchStartX
+  const dy = touch.clientY - touchStartY
+
+  // 只处理水平滑动（水平位移 > 垂直位移）
+  if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return
+
+  if (dx > 0) {
+    // 右滑：展开导航
+    sidebarCollapsed.value = false
+  } else {
+    // 左滑：收起导航
+    sidebarCollapsed.value = true
+  }
+}
+
 async function handleLogout() {
   await authStore.logout()
   router.push('/login')
@@ -322,10 +350,15 @@ async function handleLogout() {
 onMounted(() => {
   loadPrefs()
   document.addEventListener('keydown', onKeydown)
+  // 移动端手势
+  document.addEventListener('touchstart', onTouchStart, { passive: true })
+  document.addEventListener('touchend', onTouchEnd, { passive: true })
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('touchstart', onTouchStart)
+  document.removeEventListener('touchend', onTouchEnd)
 })
 </script>
 
@@ -606,7 +639,11 @@ onUnmounted(() => {
 }
 
 /* ── 响应式 ── */
-@media (max-width: 1200px) {
+
+/* Desktop: > 1280px — default layout */
+
+/* Tablet: 768px - 1280px */
+@media (max-width: 1280px) {
   .gt-three-col:not(.gt-three-col--collapsed) .gt-sidebar {
     width: 56px !important;
   }
@@ -616,6 +653,62 @@ onUnmounted(() => {
   .gt-three-col:not(.gt-three-col--collapsed) .gt-nav-item {
     justify-content: center;
     padding: 10px 0;
+  }
+}
+
+/* Tablet: 768px - 1024px — hide middle column */
+@media (max-width: 1024px) {
+  .gt-middle {
+    display: none !important;
+  }
+  .gt-catalog {
+    display: none !important;
+  }
+}
+
+/* Mobile: < 768px — single column layout */
+@media (max-width: 768px) {
+  .gt-three-col {
+    flex-direction: column;
+  }
+  .gt-sidebar {
+    position: fixed;
+    z-index: 1000;
+    height: auto;
+    width: 100% !important;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--gt-border, #e4e7ed);
+  }
+  .gt-sidebar .gt-nav-list {
+    flex-direction: row;
+    gap: 0;
+  }
+  .gt-sidebar .gt-nav-item {
+    padding: 8px 12px;
+    flex-direction: column;
+    font-size: 11px;
+  }
+  .gt-sidebar .gt-nav-label {
+    display: block;
+    font-size: 10px;
+  }
+  .gt-middle {
+    display: none !important;
+  }
+  .gt-catalog {
+    display: none !important;
+  }
+  .gt-main-area {
+    margin-top: 56px;
+    width: 100%;
+  }
+  .gt-topbar {
+    font-size: 14px;
+  }
+  .gt-topbar .gt-logo-text {
+    display: none;
   }
 }
 

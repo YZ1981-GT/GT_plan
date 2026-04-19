@@ -613,6 +613,104 @@ async def _soft_delete_existing(
     return result.rowcount
 
 
+async def start_import_streaming(
+    project_id: UUID,
+    content: bytes,
+    data_type: str,
+    year: int,
+    db: AsyncSession,
+    batch_id: UUID | None = None,
+) -> dict:
+    """流式导入大 Excel 文件 — 分批解析+分批校验+分批写入。
+
+    使用 GenericParser.parse_streaming() 流式读取，避免一次性加载到内存。
+    适用于 26 万+行的大文件。CSV 文件仍用原有 start_import() 逻辑。
+
+    Returns:
+        {"record_count": int, "batch_id": UUID}
+    """
+    data_type = normalize_data_type(data_type)
+    table_model = _TABLE_MAP[data_type]
+
+    # 创建 batch 记录
+    batch = ImportBatch(
+        project_id=project_id,
+        year=year,
+        source_type="generic",
+        file_name="streaming_import",
+        data_type=data_type,
+        status=ImportStatus.processing,
+        started_at=datetime.utcnow(),
+    )
+    if batch_id:
+        batch.id = batch_id
+    db.add(batch)
+    await db.flush()
+
+    parser = GenericParser()
+    total_rows = 0
+
+    try:
+        for chunk in parser.parse_streaming(content, data_type, chunk_size=CHUNK_SIZE):
+            if not chunk:
+                continue
+
+            records = []
+            for row in chunk:
+                record = _build_record_dict(data_type, row, project_id, year, batch.id)
+                if record:
+                    records.append(record)
+
+            if records:
+                await db.execute(table_model.__table__.insert(), records)
+                total_rows += len(records)
+
+            # 发布进度事件
+            try:
+                await event_bus.publish_immediate(EventPayload(
+                    event_type=EventType.IMPORT_PROGRESS,
+                    project_id=project_id,
+                    year=year,
+                    batch_id=batch.id,
+                    extra={"rows_imported": total_rows, "data_type": data_type},
+                ))
+            except Exception:
+                pass  # 进度事件失败不阻断导入
+
+            # 定期 flush
+            if total_rows % 50000 == 0 and total_rows > 0:
+                await db.flush()
+
+        batch.record_count = total_rows
+        batch.status = ImportStatus.completed
+        batch.completed_at = datetime.utcnow()
+        await db.commit()
+
+        # 发布导入完成事件
+        await event_bus.publish(EventPayload(
+            event_type=EventType.DATA_IMPORTED,
+            project_id=project_id,
+            year=year,
+            batch_id=batch.id,
+        ))
+
+        # 回填 account_name
+        await _backfill_account_names(project_id, batch.id, data_type, db)
+
+        return {"record_count": total_rows, "batch_id": batch.id}
+
+    except Exception as e:
+        logger.exception("Streaming import failed: %s", e)
+        batch.status = ImportStatus.failed
+        batch.validation_summary = {"error": str(e)}
+        batch.completed_at = datetime.utcnow()
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        raise
+
+
 async def check_duplicates(
     project_id: UUID, year: int, data_type: str, db: AsyncSession
 ) -> dict:

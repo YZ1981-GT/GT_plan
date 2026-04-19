@@ -246,6 +246,157 @@ class LedgerPenetrationService:
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     # ------------------------------------------------------------------
+    # 游标分页（keyset pagination）
+    # ------------------------------------------------------------------
+
+    async def get_ledger_entries_cursor(
+        self, project_id: UUID, year: int, account_code: str,
+        cursor: str | None = None, limit: int = 100,
+        date_from: str | None = None, date_to: str | None = None,
+    ) -> dict:
+        """序时账游标分页 — 基于 (voucher_date, id) 的 keyset pagination。
+
+        比 OFFSET 分页在大数据量（10万+行）下性能稳定，不随页码增大退化。
+        """
+        tbl = TbLedger.__table__
+
+        # 判断是否前缀查询
+        if account_code.endswith('*'):
+            prefix = account_code[:-1]
+            code_filter = tbl.c.account_code.like(prefix + '%')
+        else:
+            code_filter = (tbl.c.account_code == account_code)
+
+        where_clauses = [
+            tbl.c.project_id == project_id,
+            tbl.c.year == year,
+            code_filter,
+            tbl.c.is_deleted == sa.false(),
+        ]
+        if date_from:
+            where_clauses.append(tbl.c.voucher_date >= date_from)
+        if date_to:
+            where_clauses.append(tbl.c.voucher_date <= date_to)
+
+        # 解析游标: "date|id" 格式
+        if cursor:
+            try:
+                parts = cursor.split("|", 1)
+                cursor_date = parts[0]
+                cursor_id = parts[1] if len(parts) > 1 else ""
+                where_clauses.append(
+                    sa.or_(
+                        tbl.c.voucher_date > cursor_date,
+                        sa.and_(
+                            tbl.c.voucher_date == cursor_date,
+                            sa.cast(tbl.c.id, sa.String) > cursor_id,
+                        ),
+                    )
+                )
+            except (ValueError, IndexError):
+                pass  # 无效游标，忽略
+
+        stmt = (
+            sa.select(
+                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
+                tbl.c.account_code, tbl.c.account_name,
+                tbl.c.debit_amount, tbl.c.credit_amount,
+                tbl.c.counterpart_account, tbl.c.summary,
+            )
+            .where(*where_clauses)
+            .order_by(tbl.c.voucher_date, tbl.c.id)
+            .limit(limit + 1)  # 多取一条判断 has_more
+        )
+
+        result = await self.db.execute(stmt)
+        rows = [dict(r._mapping) for r in result.fetchall()]
+
+        has_more = len(rows) > limit
+        items = rows[:limit]
+
+        next_cursor = None
+        if has_more and items:
+            last = items[-1]
+            vd = last.get("voucher_date")
+            vd_str = vd.isoformat() if hasattr(vd, "isoformat") else str(vd)
+            next_cursor = f"{vd_str}|{last['id']}"
+
+        return {
+            "items": items,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "limit": limit,
+        }
+
+    async def get_aux_ledger_entries_cursor(
+        self, project_id: UUID, year: int, account_code: str,
+        cursor: str | None = None, limit: int = 100,
+        aux_type: str | None = None, aux_code: str | None = None,
+    ) -> dict:
+        """辅助明细账游标分页"""
+        tbl = TbAuxLedger.__table__
+
+        where_clauses = [
+            tbl.c.project_id == project_id,
+            tbl.c.year == year,
+            tbl.c.account_code == account_code,
+            tbl.c.is_deleted == sa.false(),
+        ]
+        if aux_type:
+            where_clauses.append(tbl.c.aux_type == aux_type)
+        if aux_code:
+            where_clauses.append(tbl.c.aux_code == aux_code)
+
+        if cursor:
+            try:
+                parts = cursor.split("|", 1)
+                cursor_date = parts[0]
+                cursor_id = parts[1] if len(parts) > 1 else ""
+                where_clauses.append(
+                    sa.or_(
+                        tbl.c.voucher_date > cursor_date,
+                        sa.and_(
+                            tbl.c.voucher_date == cursor_date,
+                            sa.cast(tbl.c.id, sa.String) > cursor_id,
+                        ),
+                    )
+                )
+            except (ValueError, IndexError):
+                pass
+
+        stmt = (
+            sa.select(
+                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
+                tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code,
+                tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
+                tbl.c.summary,
+            )
+            .where(*where_clauses)
+            .order_by(tbl.c.voucher_date, tbl.c.id)
+            .limit(limit + 1)
+        )
+
+        result = await self.db.execute(stmt)
+        rows = [dict(r._mapping) for r in result.fetchall()]
+
+        has_more = len(rows) > limit
+        items = rows[:limit]
+
+        next_cursor = None
+        if has_more and items:
+            last = items[-1]
+            vd = last.get("voucher_date")
+            vd_str = vd.isoformat() if hasattr(vd, "isoformat") else str(vd)
+            next_cursor = f"{vd_str}|{last['id']}"
+
+        return {
+            "items": items,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "limit": limit,
+        }
+
+    # ------------------------------------------------------------------
     # 一次性穿透（CTE 多层级）
     # ------------------------------------------------------------------
 

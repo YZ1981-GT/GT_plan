@@ -133,6 +133,61 @@ class PrefillService:
         }
 
 
+    # ------------------------------------------------------------------
+    # 7.5  batch_prefill — concurrent prefill using asyncio.gather
+    # ------------------------------------------------------------------
+
+    async def batch_prefill(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        year: int,
+        wp_ids: list[UUID],
+    ) -> dict[str, Any]:
+        """Batch prefill multiple workpapers concurrently.
+
+        Uses asyncio.gather for parallel execution.
+        Redis cache stub for future implementation.
+
+        Validates: Requirements 6.4, 6.5 (Phase 8 Task 3.3)
+        """
+        import asyncio
+
+        tasks = [
+            self.prefill_workpaper(db, project_id, year, wp_id)
+            for wp_id in wp_ids
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        success = {}
+        errors = {}
+        for wp_id, result in zip(wp_ids, results):
+            if isinstance(result, Exception):
+                errors[str(wp_id)] = str(result)
+            else:
+                success[str(wp_id)] = result
+
+        return {
+            "total": len(wp_ids),
+            "success_count": len(success),
+            "error_count": len(errors),
+            "results": success,
+            "errors": errors,
+        }
+
+    # ------------------------------------------------------------------
+    # Redis cache stub for prefill results
+    # ------------------------------------------------------------------
+
+    async def _get_cached_prefill(self, wp_id: UUID) -> dict | None:
+        """Redis cache stub — returns None (cache miss)."""
+        return None
+
+    async def _set_cached_prefill(self, wp_id: UUID, data: dict) -> None:
+        """Redis cache stub — no-op."""
+        pass
+
+
 class ParseService:
     """解析回写服务
 

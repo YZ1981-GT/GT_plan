@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     # ChromaDB 向量数据库
     CHROMADB_URL: str = "http://localhost:8000"
+    # Phase 8: 事件总线去重窗口（毫秒）
+    EVENT_DEBOUNCE_MS: int = 500
+    # Phase 8: 公式引擎超时（秒）
+    FORMULA_EXECUTE_TIMEOUT: int = 10
+    # Phase 8: 数据加密密钥
+    ENCRYPTION_KEY: str = ""
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

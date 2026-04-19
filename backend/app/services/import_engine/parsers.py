@@ -443,6 +443,7 @@ class GenericParser(BaseParser):
     - 大文件（百万行）：openpyxl read_only 模式流式读取
     - 多 sheet：智能识别"序时账1/序时账2"等命名模式并合并
     - 自动跳过空 sheet 和非数据 sheet（如"说明"、"目录"）
+    - parse_streaming(): 流式解析，每次 yield 一批行，避免一次性加载到内存
 
     Validates: Requirements 4.1, 4.2
     """
@@ -461,6 +462,82 @@ class GenericParser(BaseParser):
 
     # 应跳过的 sheet 名称关键词
     _SKIP_SHEET_KEYWORDS = ["说明", "目录", "封面", "模板", "template", "readme"]
+
+    def parse_streaming(
+        self, content: bytes, data_type: str, chunk_size: int = 1000,
+    ):
+        """流式解析 Excel 文件 — 每次 yield 一批已解析的行。
+
+        使用 openpyxl read_only=True 模式，避免一次性加载整个文件到内存。
+        适用于大文件（26万+行），峰值内存显著低于全量加载。
+
+        CSV 文件不走此方法（CSV 本身是流式的，用 parse() 即可）。
+
+        Args:
+            content: Excel 文件字节内容
+            data_type: 数据类型 (tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger)
+            chunk_size: 每批行数，默认 1000
+
+        Yields:
+            list[dict]: 每批已解析、已规范化的行字典列表
+        """
+        data_type = normalize_data_type(data_type)
+        column_map = _COLUMN_MAPS[data_type]
+
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(
+                io.BytesIO(content), read_only=True, data_only=True,
+            )
+        except Exception:
+            # 非 Excel 文件，回退到全量解析
+            all_rows = self.parse(content, data_type)
+            if all_rows:
+                yield all_rows
+            return
+
+        try:
+            for ws in wb.worksheets:
+                if data_type and not self._should_include_sheet(ws.title, data_type):
+                    continue
+                if ws.max_row is None or ws.max_row < 2:
+                    continue
+
+                rows_iter = ws.iter_rows(values_only=True)
+                try:
+                    header = next(rows_iter)
+                except StopIteration:
+                    continue
+
+                headers = [str(h).strip() if h else f"col_{i}" for i, h in enumerate(header)]
+                if all(h.startswith("col_") for h in headers):
+                    continue
+
+                chunk: list[dict] = []
+                for row in rows_iter:
+                    if all(cell is None for cell in row):
+                        continue
+                    row_dict = {}
+                    for i, cell in enumerate(row):
+                        if i < len(headers):
+                            row_dict[headers[i]] = str(cell) if cell is not None else ""
+                    chunk.append(row_dict)
+
+                    if len(chunk) >= chunk_size:
+                        normalized = self._normalize_columns(chunk, column_map)
+                        parsed = self._parse_values(normalized, data_type)
+                        if parsed:
+                            yield parsed
+                        chunk = []
+
+                # Yield remaining rows in this sheet
+                if chunk:
+                    normalized = self._normalize_columns(chunk, column_map)
+                    parsed = self._parse_values(normalized, data_type)
+                    if parsed:
+                        yield parsed
+        finally:
+            wb.close()
 
     def parse(self, content: bytes, data_type: str) -> list[dict]:
         """Parse Excel or CSV content for the given data type."""

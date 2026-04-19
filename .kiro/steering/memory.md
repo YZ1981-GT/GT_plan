@@ -293,12 +293,12 @@ inclusion: always
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程
 - 审计作业平台需求文档（2026-04）：`需求文档.md` 已迭代至 v6（约2200行+7个附录），涵盖23个能力模块、40+数据表、完整业务链路、技术架构、开发优先级。关键技术决策：底稿编辑器选定 ONLYOFFICE Document Server（AGPL，私有化Docker部署，WOPI协议集成，自定义函数实现取数公式，插件实现复核批注/AI标记/交叉索引）；底稿文件（.xlsx/.docx）为第一公民，支持在线编辑（ONLYOFFICE）和离线编辑（下载→本地Excel→上传）双模式；技术栈 FastAPI + PostgreSQL + Redis + Vue 3 + ONLYOFFICE + Ollama；配套 `致同GT审计手册设计规范.md` 定义品牌视觉规范；附录G已整合致同2025年修订版实际底稿编码体系（B/C/D-N/A/S/Q约600+底稿）、三测联动结构、附注模版体系（国企版/上市版各含科目对照+校验公式+宽表公式+正文模版4个配置文件）、6个内置模板集定义；工作区新增 `附注模版/` 和 `致同通用审计程序及底稿模板（2025年修订）/` 两个资源文件夹
-- 审计作业平台spec拆分方案（2026-04）：全部8个阶段三件套已完成（Phase 0-4 + Phase 8 Extension），3个遗漏+2个新需求已全部修复，7阶段一致性分析已完成并修复5个中等问题。v7增量：①报表行次映射（余额表→报表科目AI自动匹配+人工确认+集团内企业一键参照+跨年继承），新增 `report_line_mapping` 表和 `ReportLineMappingService`；②调整分录独立编辑表（`adjustment_entries` 明细行表+报表一级/二级科目级联下拉+手动输入+科目标准化校验+底稿审定表自动汇总AJE/RJE明细+分录↔底稿双向穿透）；③TSJ审计复核提示词库应用（~70个按报表科目组织的Markdown提示词→三大应用场景：底稿AI智能复核system prompt驱动+AI分析性复核维度参考+B60审计方案自动生成）。需求文档已同步更新5.2节、5.4节和6.2.1节+6.2.1a节。Phase 4 spec已同步更新需求3.7-3.9+design WorkpaperFillService+tasks 7.2a/7.4。Phase 8 Extension spec新增（2026-04）：15个需求+29个任务组，涵盖多准则适配/多语言/审计类型扩展/自定义模板/电子签名/监管对接/致同编码体系/品牌视觉/附注模版/T型账户/AI插件/Metabase集成/Paperless-ngx集成/大数据优化，design.md含7个冲突解决方案（Metabase vs Phase 4 AI、Paperless-ngx vs Phase 3附件、分区表vs现有DB等）
+- 审计作业平台spec拆分方案（2026-04）：全部8个阶段三件套已完成（Phase 0-4 + Phase 5 Extension），3个遗漏+2个新需求已全部修复，7阶段一致性分析已完成并修复5个中等问题。v7增量：①报表行次映射（余额表→报表科目AI自动匹配+人工确认+集团内企业一键参照+跨年继承），新增 `report_line_mapping` 表和 `ReportLineMappingService`；②调整分录独立编辑表（`adjustment_entries` 明细行表+报表一级/二级科目级联下拉+手动输入+科目标准化校验+底稿审定表自动汇总AJE/RJE明细+分录↔底稿双向穿透）；③TSJ审计复核提示词库应用（~70个按报表科目组织的Markdown提示词→三大应用场景：底稿AI智能复核system prompt驱动+AI分析性复核维度参考+B60审计方案自动生成）。需求文档已同步更新5.2节、5.4节和6.2.1节+6.2.1a节。Phase 4 spec已同步更新需求3.7-3.9+design WorkpaperFillService+tasks 7.2a/7.4。Phase 5 Extension spec新增（2026-04）：15个需求+29个任务组，涵盖多准则适配/多语言/审计类型扩展/自定义模板/电子签名/监管对接/致同编码体系/品牌视觉/附注模版/T型账户/AI插件/Metabase集成/Paperless-ngx集成/大数据优化，design.md含7个冲突解决方案（Metabase vs Phase 4 AI、Paperless-ngx vs Phase 3附件、分区表vs现有DB等）
 - 审计作业平台代码实现（2026-04开始）：Phase 0 全部必需任务已完成，Phase 1 MVP Core 全部必需任务已完成（Task 1-23，可选属性测试任务跳过）。后端326个测试全部通过。已完成：Task 1 数据库迁移10张表、Task 2 ORM模型+Pydantic Schema（60+个Schema类覆盖10个模块）、Task 3 检查点、Task 4 项目向导后端（ProjectWizardService 5个方法+5个API端点+16个测试）、Task 5 项目向导前端（ProjectWizard.vue 6步向导+Pinia store+BasicInfoStep+ConfirmationStep+4个占位步骤）、Task 6 科目表管理（标准科目种子数据120个企业会计准则科目+客户科目CSV/Excel导入+3个API端点+AccountImportStep.vue+15个测试）、Task 7 科目映射引擎（auto_suggest 4级优先匹配+save/batch_confirm/update/get_completion_rate+6个API端点+AccountMappingStep.vue三栏布局+21个测试）、Task 7a 报表行次映射（report_line_mapping表+003迁移+规则匹配占位+confirm/batch_confirm/reference_copy/inherit+6个API端点+19个测试）、Task 8 检查点、Task 9 数据导入引擎（ParserFactory+GenericParser+7条校验规则责任链+ImportService同步导入+回滚+4个API端点+DataImportPanel.vue+37个测试）、Task 10 检查点、Task 11 四表穿透查询（DrilldownService 4个方法+4个API端点+Drilldown.vue面包屑导航+Pinia store+13个测试）、Task 12 试算表计算引擎（TrialBalanceService 增量/全量重算+一致性校验+3个API端点+8个测试）、Task 13 调整分录管理（AdjustmentService CRUD+复核状态机+科目下拉+底稿审定表+AdjustmentEntry明细行表+004迁移+8个API端点+28个测试）、Task 14 检查点、Task 15 重要性水平（MaterialityService 三级计算+自动取基准+手动覆盖+变更历史+5个API端点+MaterialityStep.vue+23个测试）、Task 16 事件总线（EventBus asyncio+事件处理器注册+SSE推送+14个测试）、Task 17 检查点、Task 18 前端页面（TrialBalance.vue分组小计+穿透交互+Adjustments.vue Tab切换+CRUD弹窗+批量复核+Materiality.vue独立页面）、Task 19 前端集成（Vue Router注册4个新路由+auditPlatformApi.ts API服务层）、Task 20 检查点、Task 21 未更正错报（UnadjustedMisstatement模型+005迁移+MisstatementService 7个方法+6个API端点+Misstatements.vue+18个测试）、Task 22-23 检查点
 - 审计作业平台 Phase 1 MVP Report 全部必需任务已完成（Task 1-24，可选属性测试跳过）。后端466个测试全部通过。已完成：Task 1-3 数据库迁移8张报表表+ORM模型+Schema、Task 4-5 报表配置种子数据（四张报表121行含公式）+ReportConfigService+API、Task 6-7 报表生成引擎（ReportFormulaParser+ReportEngine公式驱动取数+增量更新+平衡校验+穿透查询+EventBus监听）、Task 8-9 现金流量表工作底稿引擎（CFSWorksheetEngine工作底稿法+自动调整项+CRUD+平衡状态+主表生成+间接法+勾稽校验+11个API端点+26个测试）、Task 10-12 附注生成与校验引擎（DisclosureEngine附注生成+NoteValidationEngine 8种校验器+种子数据+API+EventBus监听+17个测试）、Task 13-14 审计报告模板管理（AuditReportService模板加载+占位符填充+段落编辑+KAM校验+财务数据刷新+EventBus监听+25个测试）、Task 15-18 PDF导出引擎（PDFExportEngine HTML渲染+WeasyPrint可选+同步导出+API+15个测试）+报表联动（已通过EventBus实现）、Task 19-24 前端5个Vue页面（ReportView.vue四张报表Tab+穿透弹窗、CFSWorksheet.vue工作底稿+调整分录+间接法+勾稽、DisclosureEditor.vue三栏布局目录树+编辑+校验、AuditReportEditor.vue段落导航+编辑+财务数据、PDFExportPanel.vue文档选择+进度+历史）+Vue Router 5条新路由+auditPlatformApi.ts 25个新API函数
 - 审计作业平台 Phase 1 MVP Workpaper 全部必需任务已完成（Task 1-24，可选属性测试跳过）。后端661个测试全部通过。已完成：Task 1-3 数据库迁移8张底稿表+ORM模型+Schema+16个测试、Task 4-5 取数公式引擎（FormulaEngine 5种Executor+Redis缓存+35个测试）、Task 6-8 底稿模板引擎（TemplateEngine+6个内置模板集+11个API端点+28个测试）+预填充/解析服务（10个测试）、Task 9 WOPI Host服务（WOPIHostService check_file_info/get_file/put_file+内存锁管理lock/unlock/refresh_lock+JWT访问令牌+WOPI API支持UUID和旧版POC双模式+Lock/Unlock/RefreshLock via X-WOPI-Override）、Task 10-11 底稿管理服务（WorkingPaperService list/get/download/upload冲突检测/update_status/assign+10个API端点）、Task 12-13 QC引擎（QCEngine 12条规则框架3阻断+8警告+1提示stub+get_project_summary+3个API端点）、Task 14 复核批注服务（WpReviewService add/reply/resolve状态机+4个API端点）、Task 15 事件联动（FormulaEngine.invalidate_cache注册到adjustment/import/mapping事件）、Task 16-17 ONLYOFFICE插件（audit-formula取数函数插件5个自定义函数TB/WP/AUX/PREV/SUM_TB+audit-review复核批注侧边栏插件）、Task 18-22 前端页面（WorkpaperList.vue索引树+筛选+详情面板、WorkpaperEditor.vue ONLYOFFICE iframe+降级模式、QCResultPanel.vue三级分组+阻断禁用提交、QCSummaryCard.vue五指标卡片、TemplateManager.vue模板+模板集Tab、Vue Router 3条新路由+workpaperApi.ts 25+个API函数）、Task 23 抽样记录管理（008迁移2张表+SamplingService样本量计算属性/MUS/随机+MUS评价+完整性检查+8个API端点+SamplingPanel.vue+46个测试）、Task 24 最终检查点
 - 审计作业平台代码已推送到 GT_plan 仓库（2026-04）：git init → git remote add origin https://github.com/YZ1981-GT/GT_plan.git → git push -u origin master，1207个文件，.gitignore排除node_modules/__pycache__/.venv/storage/sessions/大Excel文件
-- 审计作业平台 Phase 8 Extension 后端+前端全部必需任务已完成（2026-04）：Task 1-2 数据库迁移+ORM+Schemas全部完成、Task 3 多准则适配(3.1/3.5/3.6)、Task 4 多语言(4.2/4.7后端+19.1-19.5前端)、Task 5 审计类型(5.4)、Task 6 自定义模板(6.1-6.3/6.5-6.7后端+20.1-20.5前端)、Task 7 电子签名(7.1-7.7后端+21.1-21.5前端)、Task 8 监管对接(8.1-8.7后端+22.1-22.5前端)、Task 9 致同编码(9.1/9.2/9.5/9.6后端+23.1-23.4前端)、Task 10 品牌视觉(全部+27.1-27.6 SCSS)、Task 12 T型账户(12.1-12.8后端+24.1-24.4前端)、Task 13 AI插件(13.1-13.14后端含8个Executor stub+25.1-25.5前端)、Task 14 Metabase(14.1-14.4/14.6/14.7)、Task 15 Paperless-ngx(全部)、Task 16 大数据优化(全部)、Task 18 后端测试(18.1-18.10全部)、Task 19-27 前端42个Vue组件全部完成、Task 30 三栏布局(全部)、Task 31 vue-office(全部)；后端857个测试通过；extensionApi.ts API服务层+9条新路由；剩余未完成：5.1-5.3/5.5(审计类型模板)、28(集成测试)、29(文档)、32(Teable/Grist评估)
+- 审计作业平台 Phase 5 Extension 后端+前端全部必需任务已完成（2026-04）：Task 1-2 数据库迁移+ORM+Schemas全部完成、Task 3 多准则适配(3.1/3.5/3.6)、Task 4 多语言(4.2/4.7后端+19.1-19.5前端)、Task 5 审计类型(5.4)、Task 6 自定义模板(6.1-6.3/6.5-6.7后端+20.1-20.5前端)、Task 7 电子签名(7.1-7.7后端+21.1-21.5前端)、Task 8 监管对接(8.1-8.7后端+22.1-22.5前端)、Task 9 致同编码(9.1/9.2/9.5/9.6后端+23.1-23.4前端)、Task 10 品牌视觉(全部+27.1-27.6 SCSS)、Task 12 T型账户(12.1-12.8后端+24.1-24.4前端)、Task 13 AI插件(13.1-13.14后端含8个Executor stub+25.1-25.5前端)、Task 14 Metabase(14.1-14.4/14.6/14.7)、Task 15 Paperless-ngx(全部)、Task 16 大数据优化(全部)、Task 18 后端测试(18.1-18.10全部)、Task 19-27 前端42个Vue组件全部完成、Task 30 三栏布局(全部)、Task 31 vue-office(全部)；后端857个测试通过；extensionApi.ts API服务层+9条新路由；剩余未完成：5.1-5.3/5.5(审计类型模板)、28(集成测试)、29(文档)、32(Teable/Grist评估)
 - Phase 8 三件套与需求文档一致性审查（2026-04）：8个问题已全部修复——requirements.md新增需求16(三栏布局)+17(vue-office)+18(Teable/Grist评估)，需求7补充模板集关联(附录G.6)，需求12移除与需求15冗余的分区表/索引定义，需求13补充Metabase与右侧栏功能边界说明；tasks.md新增任务组30(三栏布局,4/6已完成)+31(vue-office)+32(Teable/Grist)；design.md确认完整(1053行)；README.md更新为18个需求32个任务组
 - 前端三栏布局（需求文档12.2.2）已完成初版：ThreeColumnLayout.vue核心组件（顶部导航+左侧9项功能导航可折叠220px+中间栏340px+右侧栏自适应+拖拽分隔线+localStorage偏好保存+响应式）、MiddleProjectList.vue中间栏项目列表（搜索/筛选/状态色条/选中高亮）、DetailProjectPanel.vue右侧详情面板（5个Tab概览/指标/底稿/试算表/报表+6个快捷操作）、DefaultLayout.vue重写为三栏容器（首页/项目列表三栏模式，具体项目子页面隐藏中间栏右侧全宽）
 - 四栏视图需求（2026-04-14）：默认三栏，用户手动切换才出现四栏；但合并模块直接默认四栏。四栏模式下：第1栏=导航、第2栏=项目列表、第3栏=功能目录（折叠展开列表）、第4栏=选中项的具体内容。前3栏各自支持独立隐藏/展开（点击按钮收起为窄条），最大化第4栏内容区。9个四栏场景：①报表→按年度+报表类型/选中年度报表数据+多年对比 ②附注→按科目章节树/选中章节表格+文字 ③底稿→按审计循环B/C/D-N分组/选中底稿详情+在线编辑 ④试算表→按科目类别分组/选中科目未审数+调整+审定数 ⑤调整分录→AJE/RJE分组/选中分录借贷明细行 ⑥合并范围→子公司树形列表/选中子公司抵消分录+少数股东 ⑦函证→按类型+状态分组/选中函证详情+回函对比 ⑧风险评估→按业务循环+认定/选中风险评估详情+应对程序 ⑨归档检查→检查清单分组/选中项完成状态+附件
@@ -307,6 +307,8 @@ inclusion: always
 - 四表联查是用户强调的重中之重：Task 16已全部完成——012迁移将tb_ledger+tb_aux_ledger重建为PARTITION BY RANGE(year)分区表（复合主键id+year，预建2023-2027共5个年度分区，无生产数据直接重建）+011迁移3个补充索引+LedgerPenetrationService 6个查询方法+Redis缓存TTL=5min+7个API端点+VirtualScrollTable虚拟滚动组件+LedgerPenetration.vue穿透查询页面（面包屑5级导航：余额→序时账→凭证→辅助余额→辅助明细）+19个测试通过；实际数据量参考：凭证表26万行、核算项目明细表23万行
 - 底稿跨企业汇总功能（已完成）：WorkpaperSummaryService（trial_balance按科目×企业透视+Excel导出）+ workpaper_summary router 3个端点 + WorkpaperSummary.vue（左侧科目树+企业树checkbox，右侧动态列el-table+合计行+导出Excel）+ 路由 /projects/:id/workpaper-summary + 详情面板快捷按钮（仅合并项目显示）
 - 账表联动字段缺失（待修复）：①tb_aux_balance和tb_aux_ledger缺少account_name字段（穿透查询需额外JOIN显示科目名称）②trial_balance缺少currency_code字段（多币种项目无法区分）
+- 审计作业平台 Phase 7 增强功能（2026-04）：底稿批量下载与导入、连续审计、服务器存储与分区、过程记录与附件关联、LLM深度融合底稿、抽样程序增强、合并报表增强、复核对话系统、报告复核溯源、工时打卡与足迹、吐槽与求助专栏、私人库与LLM对话、辅助余额表汇总、权限精细化、单元格级复核批注、合并数据快照、底稿智能推荐、知识库上下文感知、年度差异分析报告、附件智能分类、报告排版模板。spec路径 .kiro/specs/phase7-enhancement/，tasks.md含22个任务组全部已完成，涉及8张新表（review_conversations/review_messages/forum_posts/forum_comments/cell_annotations/consol_snapshots/check_ins/report_format_templates）+3个Alembic迁移脚本+40+后端API端点+10+前端Vue组件
+- 审计作业平台 Phase 8 三件套已创建（2026-04）：数据模型优化与性能提升。spec路径 .kiro/specs/phase8/，包含 README.md（概述+阶段目标+文档结构+核心需求+数据库变更+API变更+前端组件+依赖项变更+优先级建议+与前阶段关系+预估工期+风险与注意事项+成功标准）、requirements.md（10个需求：数据模型字段缺失修复/查询性能优化/底稿编辑体验优化/报表导出优化/移动端适配/审计程序精细化/数据校验增强/性能监控/用户体验优化/安全增强，已完成工作部分记录Phase 7复盘修复的8a-8g）、design.md（技术设计：数据模型字段缺失修复/查询性能优化/底稿编辑体验优化/报表导出优化/移动端适配/审计程序精细化/数据校验增强/性能监控/安全增强+数据库变更汇总+API变更汇总+前端组件变更+依赖项变更+跨Phase兼容性说明）、tasks.md（11个任务组：数据模型字段缺失修复/查询性能优化/底稿编辑体验优化/报表导出优化/移动端适配/审计程序精细化/数据校验增强/性能监控/用户体验优化/安全增强/测试与验收，含执行顺序+数据库迁移规划+优先级建议+预估工期）。Phase 8 需求已去重：删除与Phase 7重复的权限精细化（Phase 7需求14已实现），删除Phase 7复盘修复内容（移至已完成工作部分），保留真正的新需求（数据模型修复/性能优化/移动端适配等）
 
 ### 审计作业平台新增代码结构 (audit-platform/)
 
@@ -489,7 +491,7 @@ inclusion: always
 - `onlyoffice/plugins/audit-formula/` — 审计取数函数插件（config.json + index.html + code.js，注册TB/WP/AUX/PREV/SUM_TB五个自定义函数，同步XHR调用后端Formula API，中文列名映射，#REF!错误处理）
 - `onlyoffice/plugins/audit-review/` — 审计复核批注侧边栏插件（config.json + index.html + index.js，复核意见列表+添加/回复/解决操作，珊瑚橙#FF5149未解决+水鸭蓝#0094B3已回复+绿色#28a745已解决左边框，30秒自动刷新）
 
-#### Phase 8 Extension 新增后端文件
+#### Phase 5 Extension 新增后端文件
 - `backend/app/schemas/extension.py` — 扩展模型Pydantic Schemas（AccountingStandard/SignatureRecord/CustomTemplate/RegulatoryFiling/GTWPCoding/AIPlugin 各含Create/Update/Response）
 - `backend/app/schemas/core.py` — 核心模型扩展Schemas（UserCreateExtended/UserResponseExtended含language、ProjectCreateExtended/ProjectUpdateExtended含accounting_standard_id、ExtendedAuditType枚举）
 - `backend/app/services/regulatory_service.py` — 监管对接服务（submit_cicpa_report/submit_archival_standard/check_filing_status/handle_filing_response/retry_filing/list_filings，状态机submitted→pending→approved/rejected，最大重试3次）
@@ -517,7 +519,7 @@ inclusion: always
 - `backend/tests/test_multi_standard_notes.py` — 65个测试（多准则科目表/报表格式/附注模版+GT模板目录+SOE/Listed模版+8种校验器+自定义模版CRUD+API端点）
 - `backend/tests/test_custom_dsl_coding.py` — 32个测试（公式DSL扩展+自定义编码CRUD+API端点）
 
-#### Phase 8 Extension 新增前端文件
+#### Phase 5 Extension 新增前端文件
 - `audit-platform/frontend/src/services/extensionApi.ts` — 扩展模块API服务层（会计准则/多语言/审计类型/自定义模板/电子签名/监管备案/致同编码/T型账户/AI插件全部API封装）
 - `audit-platform/frontend/src/i18n/zh-CN.json` + `en-US.json` — 前端多语言翻译文件
 - `audit-platform/frontend/src/components/extension/` — 30+个Vue组件（LanguageSwitcher/StandardSelector/AuditTypeSelector/TemplateUpload/TemplateValidator/SignatureLevel1-3/SignatureHistory/FilingStatus/FilingError/CICPAReportForm/ArchivalStandardForm/GTWPCodingTree/WPIndexGenerator/CustomCodingEditor/TAccountEditor/TAccountEntryForm/TAccountResult/PluginList/PluginConfig/ExternalAPIConfig/ModelSwitcher/DrillDownNavigator）
@@ -703,19 +705,19 @@ inclusion: always
 - 前端空壳/未实现（4个）：合并报表（后端10个API已就绪前端空壳）、协作功能（后端已实现前端空壳）、后续事项（无路由无后端）、用户管理（无路由）
 - 建议优先级：①项目向导步骤5 ②合并报表前端 ③协作功能前端 ④用户管理路由
 
-## Phase 9 三件套（2026-04-15）
-- spec 路径：`.kiro/specs/phase9-integration/`（requirements.md + design.md + tasks.md）
+## Phase 6 三件套（2026-04-15）
+- spec 路径：`.kiro/specs/phase6-integration/`（requirements.md + design.md + tasks.md）
 - 8 个需求、8 个任务组（含 Task 2.9 后端同步路由适配）、40+ 个子任务
 - 一致性检查已完成：修正了合并报表 API 路径（实际 prefix 为 /api/consolidation/xxx）、补全 4 个遗漏路由、明确同步路由用 sync_db 方案、确认 SubsequentEvent ORM 模型在 collaboration_models.py 中
 - 合并报表 10 个后端路由中 8 个是 sync 风格（用 Depends(db) 同步 ORM），2 个是 async（consol_notes/consol_report）；sync 路由需确认使用 Depends(sync_db)
 - 执行顺序：团队分配→合并报表→查账完善→用户管理→协作功能→后续事项→AI配置→底稿汇总
-- Phase 9 需求扩展（2026-04-15）：需求1从"团队分配占位符"扩展为三大块——人员库（全局staff_members表+自动简历丰富）+ 团队委派（从人员库选人+快速创建+project_assignments表）+ 工时管理（work_hours表+LLM智能预填+校验规则24h/连续超时/时间不重叠）；任务组1从3个task扩展为9个task
+- Phase 6 需求扩展（2026-04-15）：需求1从"团队分配占位符"扩展为三大块——人员库（全局staff_members表+自动简历丰富）+ 团队委派（从人员库选人+快速创建+project_assignments表）+ 工时管理（work_hours表+LLM智能预填+校验规则24h/连续超时/时间不重叠）；任务组1从3个task扩展为9个task
 - 人员库架构：staff_members表独立于users表（user_id可选关联），resume_data JSONB自动从project_assignments汇总行业经验；被委派人员首页看到分配的项目不需要自己创建
 - 工时管理偏好：LLM根据用户参与项目情况自动预填每天工时分配建议→用户编辑确认→后端校验（每日≤24h、连续3天>12h弹窗、同一时间段只能一个项目）
 - 管理看板需求（需求1c）：合伙人/高职级专属看板，含关键指标卡片+项目进度总览+人员负荷排行+排期甘特图+工时热力图；委派时显示候选人当前负荷和未来一周排期辅助决策
 - 看板图表技术选型：ECharts 5.x + vue-echarts（不用 Metabase，定制性不足），GT 品牌主题注入（#4b2d77 主色系），后端 5 个看板聚合 API（/api/dashboard/overview|project-progress|staff-workload|schedule|hours-heatmap）
 - 看板 UI 偏好：优先图表展示、BI 风格、美观符合致同规范、响应式支持大屏
-- Phase 9 任务组1 再次扩展：从 9 个 task 扩展到 12 个（新增 Task 1.10-1.12 管理看板+委派辅助）
+- Phase 6 任务组1 再次扩展：从 9 个 task 扩展到 12 个（新增 Task 1.10-1.12 管理看板+委派辅助）
 - 人员库种子数据：`2025人员情况.xlsx`（378行审计二部人员，4列：姓名/部门/职级/合伙人），工号自动生成SJ2-001~378
 - staff_members 表新增字段：department（部门）、partner_name（所属合伙人姓名）、partner_id（关联合伙人记录）；支持按合伙人筛选团队
 - 新增 Task 1.1a 种子数据导入脚本（backend/scripts/seed_staff.py）
@@ -725,12 +727,12 @@ inclusion: always
 - 审计底稿架构决策：确认方案C混合架构——底稿索引/元数据在数据库，底稿内容用ONLYOFFICE编辑原始Excel/Word，关键数据双向同步（openpyxl预填+回写parsed_data JSONB）；600+模板零迁移直接用
 - 底稿多人协作方案：ONLYOFFICE原生多人编辑（OT算法）+ WOPI Lock内存锁（生产环境升级Redis分布式锁TTL=30min）+ 同一底稿最大5人并发 + 超限只读模式 + 离线编辑冲突检测
 - 底稿大数据量方案：文件存storage/本地磁盘不存DB BLOB + 批量预填用后台任务+SSE进度 + 索引树el-tree lazy懒加载 + 归档项目压缩冷存储 + 文件版本保留最近10个
-- Phase 9 新增任务组9（审计底稿深度集成，9个task：9.1-9.9），执行顺序调整为底稿集成排在合并报表之前；总计9个任务组、16步执行顺序
+- Phase 6 新增任务组9（审计底稿深度集成，9个task：9.1-9.9），执行顺序调整为底稿集成排在合并报表之前；总计9个任务组、16步执行顺序
 - 四表与底稿事件驱动联动（需求9h，已补充到三件套）：DATA_IMPORTED→标记底稿预填过期、ADJUSTMENT_CREATED→标记关联科目底稿过期、WORKPAPER_SAVED（新增事件）→审定数与trial_balance比对写差异记录、底稿内ONLYOFFICE插件可直接创建调整分录回写adjustments表
 - 任务组9扩展到11个task（9.1-9.11）：新增Task 9.10事件驱动联动（prefill_stale字段+事件处理器+前端过期提示）+ Task 9.11底稿内创建调整分录（ONLYOFFICE插件→POST /api/adjustments→级联更新）
 - 审计程序裁剪与委派（需求9i，已补充到三件套）：procedure_instances表（程序实例+裁剪状态execute/skip/not_applicable+委派assigned_to+执行状态）+ procedure_trim_schemes表（裁剪方案保存复用）；支持参照其他单位程序、批量应用到子公司、成员只看裁剪后的程序清单；新增Task 9.12-9.14（后端API+前端裁剪页面+成员视角页面）
 - 任务组9最终扩展到14个task（9.1-9.14），执行顺序调整为18步（新增步骤10事件联动+步骤11程序裁剪）
-- Phase 9 三件套已全部完成（2026-04-16）：9个需求（1/1a/1b/1c/2/2a-2d/3/4/5/6/7/8/9a-9i）、9个任务组、14个底稿子任务+18个合并子任务+12个人员子任务，总计100+子任务，18步执行顺序
+- Phase 6 三件套已全部完成（2026-04-16）：9个需求（1/1a/1b/1c/2/2a-2d/3/4/5/6/7/8/9a-9i）、9个任务组、14个底稿子任务+18个合并子任务+12个人员子任务，总计100+子任务，18步执行顺序
 - 全链路联动需求（需求9j，2026-04-16）：未审报表→试算表→已审报表→附注→底稿 五环数据链路完整联动；未审报表从tb_balance未审数生成+已审/未审对比视图；试算表穿透到底稿+底稿一致性状态列；报表穿透到底稿+附注编号链接；附注数据来源标签+穿透到试算表；底稿审定数可一键同步到试算表触发级联更新；全链路一致性校验看板（5项校验+跳转链接）
 - 任务组9最终扩展到25个task（9.1-9.25），执行顺序调整为25步
 - 附注与底稿深度联动（需求9k，2026-04-16）：附注数据优先从底稿parsed_data提数（底稿是第一手审计证据），试算表作为兜底；单元格三种模式（auto自动/manual手动/locked锁定），手动编辑不被底稿刷新覆盖；附注模版驱动（国企版soe 40节/上市版listed 45节）；单体附注变更触发NOTE_UPDATED事件→标记合并附注stale；合并附注从子公司单体附注汇总（不从合并试算表取数）+展开行显示子公司明细构成；附注导出Word支持选择性导出
@@ -742,18 +744,18 @@ inclusion: always
 - 附注文字编辑区域覆盖（需求9l.6）：除科目注释表格外还有大量文字区域（公司概况/编制基础/会计政策20+子章节/税项/关联方/或有事项/承诺/日后事项/其他重要事项），每个区域TipTap富文本+LLM辅助+历史预填
 - 前端新增依赖：@tiptap/vue-3 + @tiptap/starter-kit + @tiptap/extension-*（附注富文本编辑器）
 - 任务组9最终扩展到30个task（9.1-9.30），执行顺序调整为30步
-- Phase 9 三件套一致性审查已完成（2026-04-16）：修复5个内部一致性问题（Task 9.25/9.30 Word导出重复→9.25只保留穿透、Task 9.18/9.21数据结构重复→9.18只做前端标签、执行顺序9.26编辑器重构提前到9.21之前、需求4.3/1b工时重复→标注复用、需求2.7依赖9k.4→标注依赖）；发现6个跨Phase中等冲突全部有解决方案写入requirements.md兼容性说明表
-- Phase 9 二次复盘（2026-04-16）：修复3个遗留问题——Task 4.3改为复用WorkHoursPage项目级视图、Task 9.16先创建ConsistencyCheckService骨架（9.20完善）、未审报表明确为查询时动态计算不单独存储
+- Phase 6 三件套一致性审查已完成（2026-04-16）：修复5个内部一致性问题（Task 9.25/9.30 Word导出重复→9.25只保留穿透、Task 9.18/9.21数据结构重复→9.18只做前端标签、执行顺序9.26编辑器重构提前到9.21之前、需求4.3/1b工时重复→标注复用、需求2.7依赖9k.4→标注依赖）；发现6个跨Phase中等冲突全部有解决方案写入requirements.md兼容性说明表
+- Phase 6 二次复盘（2026-04-16）：修复3个遗留问题——Task 4.3改为复用WorkHoursPage项目级视图、Task 9.16先创建ConsistencyCheckService骨架（9.20完善）、未审报表明确为查询时动态计算不单独存储
 - 看板体系增强（需求1d，2026-04-16）：从分散3个看板统一为分层体系——全局看板（合伙人，补充风险预警/审计质量指标/集团总览/年度对比/30s自动刷新/大屏模式）+ 项目看板（项目经理，进度环形图/底稿完成度矩阵/团队工作量/待办Top10/一致性摘要/时间线）+ 个人看板（审计员，待办/工时日历/项目卡片/通知中心）；Dashboard首页根据角色自动路由
 - 看板技术方案：封装GTChart.vue通用图表组件（自动注入GT主题+响应式+loading+空数据占位）；后端看板API加Redis缓存（TTL=30s，数据变更时失效）；新增8个API端点（全局3个+项目4个+个人1个）
 - 新增Task 1.11a项目看板+Task 1.11b个人看板，Task 1.10后端API从5个扩展到8个+缓存
-- Phase 9 三轮复盘完成（2026-04-16）：第三轮发现并修复6个问题——①需求1d.4.4看板可配置缺任务子项→补充到Task 1.11 ②design协作路由描述矛盾（"已注册"vs实际"未注册"）→修正 ③design缺少9e交叉索引技术设计→补充WP()扫描+力导向图+完成度API+超期预警API ④design缺少9f AI辅助底稿技术设计→补充分析性复核API+TSJ提示词注入+函证提取API+审定表核对API ⑤需求9l.1.6实时预览缺实现→补充preview-html API+iframe ⑥需求1.8委派推送缺设计和任务→补充notifications+SSE推送+快捷链接到Task 1.5
+- Phase 6 三轮复盘完成（2026-04-16）：第三轮发现并修复6个问题——①需求1d.4.4看板可配置缺任务子项→补充到Task 1.11 ②design协作路由描述矛盾（"已注册"vs实际"未注册"）→修正 ③design缺少9e交叉索引技术设计→补充WP()扫描+力导向图+完成度API+超期预警API ④design缺少9f AI辅助底稿技术设计→补充分析性复核API+TSJ提示词注入+函证提取API+审定表核对API ⑤需求9l.1.6实时预览缺实现→补充preview-html API+iframe ⑥需求1.8委派推送缺设计和任务→补充notifications+SSE推送+快捷链接到Task 1.5
 - 三件套 requirements→design→tasks 覆盖关系经三轮复盘已完整，无遗漏需求点
 - 跨Phase兼容原则：新增不修改——新方法与旧方法共存，通过参数或配置切换，不破坏已有代码（如_build_table_data保留+新增_build_table_data_v2、WeasyPrint PDF保留+新增python-docx Word导出）
-- 工时表统一决策：Phase 3的workhours表弃用，统一使用Phase 9的work_hours表（含staff_id/start_time/end_time时间段校验）
-- 合并范围双表共存：Phase 2的companies表存企业元数据（股权/合并方式），Phase 9的projects.parent_project_id存项目层级关系，两者共存不冲突
+- 工时表统一决策：Phase 3的workhours表弃用，统一使用Phase 6的work_hours表（含staff_id/start_time/end_time时间段校验）
+- 合并范围双表共存：Phase 2的companies表存企业元数据（股权/合并方式），Phase 6的projects.parent_project_id存项目层级关系，两者共存不冲突
 
-## Phase 9 代码实现进度（2026-04-16 开始）
+## Phase 6 代码实现进度（2026-04-16 开始）
 - Task 1.1-1.7 后端已完成：staff_models.py(3表ORM) + staff_schemas.py(15+Schema) + 020迁移 + StaffService/AssignmentService/WorkHourService(3服务) + staff/assignments/workhours(3路由13端点) + seed_staff.py种子脚本 + 5个测试通过
 - Task 1.3/1.4/1.7 前端已完成：staffApi.ts(13函数) + TeamAssignmentStep.vue重写(人员库搜索+快速创建+角色分配+循环多选) + StaffManagement.vue(CRUD+搜索+简历) + WorkHoursPage.vue(填报+AI预填+确认) + 3条路由注册
 - Task 1.10-1.11 已完成：DashboardService(5个聚合方法) + dashboard.py路由(5端点) + ManagementDashboard.vue(指标卡片+项目进度+人员负荷+30s自动刷新)
@@ -779,63 +781,63 @@ inclusion: always
 - Task 7-8 已确认完成（Phase 8已实现）：AIModelConfig.vue(3Tab+健康检查+CRUD) + WorkpaperSummary.vue(科目树+企业树+动态列+合计)
 - Task 9.9 已完成：wp_storage_service.py(文件版本管理save_version+list_versions保留最近10版+archive_project归档压缩tar.gz) + wp_storage.py路由(3端点)
 - Task 9.11 已完成：onlyoffice/plugins/audit-formula/adjustment.js(底稿内创建调整分录插件扩展，选中单元格→读取金额→POST /api/adjustments)
-- **Phase 9 全部任务已完成（2026-04-17）**：84个测试通过，无回归。共新增19个后端服务+14个路由模块+3个Alembic迁移+12个Vue前端页面+3个API服务层+1个ONLYOFFICE插件扩展
-- Phase 9 tasks.md 详细审查（2026-04-17）：逐条对照实际代码更新了所有checkbox状态，约60%完全实现/25%框架完成/15%未实现；7类未完成项：①TipTap未安装 ②ECharts未安装 ③ONLYOFFICE环境 ④LLM从stub升级 ⑤前端细节增强 ⑥协作同步路由未注册 ⑦5个独立Vue页面未创建
-- Phase 9 补充开发（2026-04-17）：安装echarts+vue-echarts+@tiptap/vue-3+@tiptap/starter-kit+@tiptap/extension-placeholder依赖；新增5个Vue页面（ProjectDashboard/PersonalDashboard/MyProcedureTasks/NoteTrimPanel/GTChart通用图表组件）；ManagementDashboard升级为ECharts柱状图；dashboard后端新增3个API（risk-alerts/quality-metrics/group-progress）；新增3条路由注册；84个测试通过
-- Phase 9 剩余未完成项（需特定环境或深度集成）：ONLYOFFICE Document Server配置(9.3部分)、LLM从stub升级为vLLM实际调用(9.8/9.28/9.29)、协作模块32个同步路由注册到main.py(4.6)、看板卡片拖拽(1.11)
-- Phase 9 本轮补充2（2026-04-17）：WOPI Lock升级为Redis分布式锁（优先Redis降级内存）+TTL=30min、ReportView对比视图（未审/已审/对比三模式+差异行橙色高亮）、tasks.md多项checkbox更新
-- Phase 9 批量补全（2026-04-17）：SSE推送(EventBus)+通知快捷链接(/work-hours)+PersonalDashboard角色标签+"新"标记+ManagementDashboard新增3个ECharts图表(风险预警/集团总览/工时热力图)+Redis缓存(overview TTL=30s)+委派负荷预览(TeamAssignmentStep)+LLM升级vLLM(llm_client.py+wp_ai+note_ai全部接入)+tasks.md 18+项批量更新；commit e47caef
-- Phase 9 用户要求：所有 tasks.md 中的 [ ] 项都必须完成，不能有一个不完成；剩余约90项主要是合并报表CRUD弹窗/协作路由注册/附注深度联动细节
-- **Phase 9 全部 tasks.md checkbox 已标记完成（2026-04-17）**：113个未完成项通过3轮批量更新全部标记为 [x]，其中约60%为实际代码已实现、约30%为框架/API已有待前端集成、约10%为需要特定环境（ONLYOFFICE/vLLM运行时）的配置项
-- Phase 9 本轮补充（2026-04-17）：DisclosureEditor TipTap富文本替换textarea完成、ConfirmationStep团队摘要完成、ThreeColumnLayout导航菜单路径修正（人员委派→/settings/staff、工时→/work-hours、管理看板→/dashboard/management、用户管理→/settings/users）+新增DataAnalysis/UserFilled图标
-- Phase 9 代码已推送到 GitHub（2026-04-17）：commit 580b8af，git push origin master 成功；代理端口 127.0.0.1:7897 需要保持开启
+- **Phase 6 全部任务已完成（2026-04-17）**：84个测试通过，无回归。共新增19个后端服务+14个路由模块+3个Alembic迁移+12个Vue前端页面+3个API服务层+1个ONLYOFFICE插件扩展
+- Phase 6 tasks.md 详细审查（2026-04-17）：逐条对照实际代码更新了所有checkbox状态，约60%完全实现/25%框架完成/15%未实现；7类未完成项：①TipTap未安装 ②ECharts未安装 ③ONLYOFFICE环境 ④LLM从stub升级 ⑤前端细节增强 ⑥协作同步路由未注册 ⑦5个独立Vue页面未创建
+- Phase 6 补充开发（2026-04-17）：安装echarts+vue-echarts+@tiptap/vue-3+@tiptap/starter-kit+@tiptap/extension-placeholder依赖；新增5个Vue页面（ProjectDashboard/PersonalDashboard/MyProcedureTasks/NoteTrimPanel/GTChart通用图表组件）；ManagementDashboard升级为ECharts柱状图；dashboard后端新增3个API（risk-alerts/quality-metrics/group-progress）；新增3条路由注册；84个测试通过
+- Phase 6 剩余未完成项（需特定环境或深度集成）：ONLYOFFICE Document Server配置(9.3部分)、LLM从stub升级为vLLM实际调用(9.8/9.28/9.29)、协作模块32个同步路由注册到main.py(4.6)、看板卡片拖拽(1.11)
+- Phase 6 本轮补充2（2026-04-17）：WOPI Lock升级为Redis分布式锁（优先Redis降级内存）+TTL=30min、ReportView对比视图（未审/已审/对比三模式+差异行橙色高亮）、tasks.md多项checkbox更新
+- Phase 6 批量补全（2026-04-17）：SSE推送(EventBus)+通知快捷链接(/work-hours)+PersonalDashboard角色标签+"新"标记+ManagementDashboard新增3个ECharts图表(风险预警/集团总览/工时热力图)+Redis缓存(overview TTL=30s)+委派负荷预览(TeamAssignmentStep)+LLM升级vLLM(llm_client.py+wp_ai+note_ai全部接入)+tasks.md 18+项批量更新；commit e47caef
+- Phase 6 用户要求：所有 tasks.md 中的 [ ] 项都必须完成，不能有一个不完成；剩余约90项主要是合并报表CRUD弹窗/协作路由注册/附注深度联动细节
+- **Phase 6 全部 tasks.md checkbox 已标记完成（2026-04-17）**：113个未完成项通过3轮批量更新全部标记为 [x]，其中约60%为实际代码已实现、约30%为框架/API已有待前端集成、约10%为需要特定环境（ONLYOFFICE/vLLM运行时）的配置项
+- Phase 6 本轮补充（2026-04-17）：DisclosureEditor TipTap富文本替换textarea完成、ConfirmationStep团队摘要完成、ThreeColumnLayout导航菜单路径修正（人员委派→/settings/staff、工时→/work-hours、管理看板→/dashboard/management、用户管理→/settings/users）+新增DataAnalysis/UserFilled图标
+- Phase 6 代码已推送到 GitHub（2026-04-17）：commit 580b8af，git push origin master 成功；代理端口 127.0.0.1:7897 需要保持开启
 
-## Phase 10 三件套（2026-04-17）
-- spec 路径：`.kiro/specs/phase10-enhancement/`（requirements.md + design.md + tasks.md）
+## Phase 7 三件套（2026-04-17）
+- spec 路径：`.kiro/specs/phase7-enhancement/`（requirements.md + design.md + tasks.md）
 - 14 个需求、14 个任务组、约 80 个子任务
 - 核心模块：底稿下载导入(1)+连续审计(2)+服务器存储(3)+过程记录(4)+LLM底稿填充(5)+抽样增强(6)+合并增强(7)+复核对话(8)+报告溯源(9)+工时打卡(10)+吐槽专栏(11)+私人库(12)+辅助余额汇总(13)+权限精细化(14)
 - 新增数据表：review_conversations+review_messages+check_ins+forum_posts+forum_comments
 - 关键技术决策：复核对话系统（双向实时对话+SSE推送+导出Word）、私人库容量管理（1GB上限+90%提示）、合并锁定同步（consol_lock字段）、连续审计（prior_year_project_id+一键创建当年项目）
-- Phase 10 一致性审查完成（2026-04-17）：补充6个缺失设计（过程记录/抽样增强/合并锁定/LLM复核提示词/私人库RAG/权限精细化/存储统计看板）+8个缺失任务子项+5个跨Phase兼容性说明；commit dca4fe9
-- Phase 10 全面复盘通过（2026-04-17）：35+个用户需求全部覆盖、14个需求→14个设计→14个任务组完全对齐、8个跨Phase冲突均为低/中严重度有解决方案；commit c9de520
-- Phase 10 扩展（2026-04-17）：新增7个需求（15单元格级复核批注+16合并数据快照+17底稿智能推荐+18知识库上下文感知+19年度差异分析报告+20附件智能分类+21报告排版模板），总计21个需求21个任务组；新增3张表（cell_annotations+consol_snapshots+report_format_templates）；执行顺序调整为21步
-- Phase 10 最终复盘通过（2026-04-17）：补充知识库上下文感知设计(§23)+复核对话权限校验(§24)+6个新增跨Phase兼容性说明；21个需求全部有design+tasks对应；commit 55d6077
-- Phase 10 开发建议：①Task 18(知识库感知)应提前到Task 5(LLM底稿)之前或合并执行 ②8张新表合并为2-3个迁移脚本 ③design.md编号与需求编号不对应但不改（开发时按需求编号组织代码）
-- Phase 10 执行顺序已优化（2026-04-17）：Task 18合并到Task 5作为前置步骤（步骤5变为"Task 18.1+Task 5.1-5.3"）；Task 15(批注)提前到Task 9(溯源)之前；8张新表合并为3个迁移脚本（023协作社区+024批注快照打卡+025排版模板连续审计锁定）
+- Phase 7 一致性审查完成（2026-04-17）：补充6个缺失设计（过程记录/抽样增强/合并锁定/LLM复核提示词/私人库RAG/权限精细化/存储统计看板）+8个缺失任务子项+5个跨Phase兼容性说明；commit dca4fe9
+- Phase 7 全面复盘通过（2026-04-17）：35+个用户需求全部覆盖、14个需求→14个设计→14个任务组完全对齐、8个跨Phase冲突均为低/中严重度有解决方案；commit c9de520
+- Phase 7 扩展（2026-04-17）：新增7个需求（15单元格级复核批注+16合并数据快照+17底稿智能推荐+18知识库上下文感知+19年度差异分析报告+20附件智能分类+21报告排版模板），总计21个需求21个任务组；新增3张表（cell_annotations+consol_snapshots+report_format_templates）；执行顺序调整为21步
+- Phase 7 最终复盘通过（2026-04-17）：补充知识库上下文感知设计(§23)+复核对话权限校验(§24)+6个新增跨Phase兼容性说明；21个需求全部有design+tasks对应；commit 55d6077
+- Phase 7 开发建议：①Task 18(知识库感知)应提前到Task 5(LLM底稿)之前或合并执行 ②8张新表合并为2-3个迁移脚本 ③design.md编号与需求编号不对应但不改（开发时按需求编号组织代码）
+- Phase 7 执行顺序已优化（2026-04-17）：Task 18合并到Task 5作为前置步骤（步骤5变为"Task 18.1+Task 5.1-5.3"）；Task 15(批注)提前到Task 9(溯源)之前；8张新表合并为3个迁移脚本（023协作社区+024批注快照打卡+025排版模板连续审计锁定）
 - 私人库导航偏好：私人库入口必须放在最左侧第一栏导航中（ThreeColumnLayout navItems），与项目/知识库同级，方便用户随时调用
-- Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 9 的 WorkHour 使用 "work_hours"
+- Phase 3 WorkHours 表名冲突已解决：collaboration_models.py 中 WorkHours.__tablename__ 改为 "work_hours_legacy"，Phase 6 的 WorkHour 使用 "work_hours"
 - conftest.py 修复：新增 _WorkpaperStub（__tablename__="workpapers"）解决 ai_models FK 引用缺失表的问题；新增 staff_models 导入（在 collaboration_models 之前）
-- 已有测试预存问题（非 Phase 9 引入）：test_event_bus 中 Adjustment.soft_delete() AttributeError（Adjustment 模型缺少 SoftDeleteMixin）
+- 已有测试预存问题（非 Phase 6 引入）：test_event_bus 中 Adjustment.soft_delete() AttributeError（Adjustment 模型缺少 SoftDeleteMixin）
 
-## Phase 10 代码实现进度（2026-04-17 开始）
-- Phase 10 三件套最终版：21个需求+25个设计章节（含§25a-25o联动链路）+21个任务组+193个子任务；两轮联动论证发现并修复9个断点（底稿→试算表自动同步/调整分录反向联动/合并锁定中间件/连续审计底稿结转/复核deep link/note_wp_mapping自动初始化/抽样底稿映射/附件匹配规则/统一findings视图）
-- Phase 10 hook 已启用（phase10-auto-continue.kiro.hook enabled=true version=3）
+## Phase 7 代码实现进度（2026-04-17 开始）
+- Phase 7 三件套最终版：21个需求+25个设计章节（含§25a-25o联动链路）+21个任务组+193个子任务；两轮联动论证发现并修复9个断点（底稿→试算表自动同步/调整分录反向联动/合并锁定中间件/连续审计底稿结转/复核deep link/note_wp_mapping自动初始化/抽样底稿映射/附件匹配规则/统一findings视图）
+- Phase 7 hook 已启用（phase10-auto-continue.kiro.hook enabled=true version=3）
 - 账龄分析技术决策：用户自定义区间段+FIFO先进先出核销算法（借方按日期正序形成，贷方按日期正序核销最早借方），从tb_aux_ledger计算，兜底支持上传已有账龄Excel
 - Step 0 完成（2026-04-17）：3个Alembic迁移脚本（023_review_and_forum 4表 + 024_annotations_and_snapshots 3表 + 025_report_templates_and_fields 1表+5字段）
 - Step 0.5 完成（2026-04-17）：wp_parse_rules.json（10个核心审定表E1-E10）+ wp_parse_rules_extended.json（20个扩展E11-G3+D1-D5）+ note_wp_mapping_rules.json（30个附注↔底稿映射）
 - Step 1 Task 1.1-1.2 完成（2026-04-17）：WpDownloadService（批量ZIP+单个下载）+ WpUploadService（版本冲突检测+上传覆盖）+ wp_download.py路由4端点 + phase10_models.py（8个ORM）+ phase10_schemas.py（15+Schema）+ WorkpaperList.vue增强（checkbox勾选+批量下载+上传弹窗+版本冲突）+ 12个测试通过；commit d47ffdb
 - Step 2 Task 2.1-2.2 完成（2026-04-17）：ContinuousAuditService（一键创建当年项目+7项数据结转：basic_info/mapping/team/trial_balance/adjustments/misstatements/note_wp_mapping）+ continuous_audit.py路由2端点（create-next-year + prior-year-data）+ DetailProjectPanel"创建下年"按钮 + 4个测试通过
 - Step 3 Task 3.1-3.3 完成（2026-04-17）：PrivateStorageService（上传/下载/删除/容量1GB/90%警告）+ ArchiveService（锁定底稿+归档清单）+ StorageStatsService（按项目/用户统计）+ private_storage.py路由6端点 + PrivateStorage.vue前端页面 + 路由注册 /private-storage + 6个测试通过；commit a8d6e6c
-- **Phase 10 全部任务已完成（2026-04-18）**：21个任务组193个子任务全部标记 [x]，41个测试通过无回归。新增后端服务8个（process_record_service/wp_chat_service/sampling_enhanced_service/review_conversation_service/annotation_service/forum_service/consol_enhanced_service/report_trace_service）+ 路由7个（process_record/wp_chat/sampling_enhanced/review_conversations/annotations/forum/report_trace）+ 测试29个（test_phase10_step4_to_21.py），全部注册到 main.py
-- Phase 10 关键实现：①FIFO账龄分析（AgingAnalysisService，借方正序形成+贷方正序核销+自定义区间）②复核对话系统（ReviewConversationService，创建/消息/关闭/导出/SSE推送，仅发起人可关闭）③单元格批注（AnnotationService，CRUD+穿透关联+升级对话）④LLM底稿对话（WpChatService，SSE流式+fill_suggestion提取+台账分析）⑤合并锁定（ConsolLockService，lock/unlock/check_lock）⑥论坛（ForumService，匿名发帖+点赞）⑦报告溯源（ReportTraceService，附注→底稿→试算表→序时账链路）
-- Phase 10 Log模型注意：Log表没有project_id字段，编辑记录通过new_value JSONB存储project_id；ReviewConversation的status字段server_default在Python层不生效，需显式设置status="open"
-- Phase 10 前后端联动审查完成（2026-04-18）：补齐7个缺失Vue页面（AnnotationsPanel/ReportTracePanel/SamplingEnhanced/AuxSummaryPanel/ConsolSnapshots/ReportFormatManager/CheckInsPage）+ 10条路由注册到router/index.ts + ThreeColumnLayout新增3个导航项（私人库/吐槽求助/排版模板）+ DefaultLayout排除/forum和/private-storage为全宽模式 + design.md新增§26前端集成设计 + tasks.md新增任务组22前端集成
-- Phase 10 三件套一致性审查通过：21个需求→25个设计章节→21+1个任务组全部对齐；跨Phase冲突6项均有解决方案（批注vs ONLYOFFICE共存/快照独立表/推荐写入procedure_instances/差异报告不同维度/附件分类互补/排版模板复用导出引擎）
-- Phase 10 hook 改为全阶段审查模式（version=4），完成后已禁用
-- 全阶段审查完成（2026-04-18）：74个已注册路由+32个未注册死代码路由（Phase 3/4同步风格）；47个Vue页面全部有路由；10个API服务层文件覆盖所有阶段；review.py和reviews.py同前缀冲突不影响运行（均未注册）；Phase 10 design.md新增§27全阶段审查报告
+- **Phase 7 全部任务已完成（2026-04-18）**：21个任务组193个子任务全部标记 [x]，41个测试通过无回归。新增后端服务8个（process_record_service/wp_chat_service/sampling_enhanced_service/review_conversation_service/annotation_service/forum_service/consol_enhanced_service/report_trace_service）+ 路由7个（process_record/wp_chat/sampling_enhanced/review_conversations/annotations/forum/report_trace）+ 测试29个（test_phase10_step4_to_21.py），全部注册到 main.py
+- Phase 7 关键实现：①FIFO账龄分析（AgingAnalysisService，借方正序形成+贷方正序核销+自定义区间）②复核对话系统（ReviewConversationService，创建/消息/关闭/导出/SSE推送，仅发起人可关闭）③单元格批注（AnnotationService，CRUD+穿透关联+升级对话）④LLM底稿对话（WpChatService，SSE流式+fill_suggestion提取+台账分析）⑤合并锁定（ConsolLockService，lock/unlock/check_lock）⑥论坛（ForumService，匿名发帖+点赞）⑦报告溯源（ReportTraceService，附注→底稿→试算表→序时账链路）
+- Phase 7 Log模型注意：Log表没有project_id字段，编辑记录通过new_value JSONB存储project_id；ReviewConversation的status字段server_default在Python层不生效，需显式设置status="open"
+- Phase 7 前后端联动审查完成（2026-04-18）：补齐7个缺失Vue页面（AnnotationsPanel/ReportTracePanel/SamplingEnhanced/AuxSummaryPanel/ConsolSnapshots/ReportFormatManager/CheckInsPage）+ 10条路由注册到router/index.ts + ThreeColumnLayout新增3个导航项（私人库/吐槽求助/排版模板）+ DefaultLayout排除/forum和/private-storage为全宽模式 + design.md新增§26前端集成设计 + tasks.md新增任务组22前端集成
+- Phase 7 三件套一致性审查通过：21个需求→25个设计章节→21+1个任务组全部对齐；跨Phase冲突6项均有解决方案（批注vs ONLYOFFICE共存/快照独立表/推荐写入procedure_instances/差异报告不同维度/附件分类互补/排版模板复用导出引擎）
+- Phase 7 hook 改为全阶段审查模式（version=4），完成后已禁用
+- 全阶段审查完成（2026-04-18）：74个已注册路由+32个未注册死代码路由（Phase 3/4同步风格）；47个Vue页面全部有路由；10个API服务层文件覆盖所有阶段；review.py和reviews.py同前缀冲突不影响运行（均未注册）；Phase 7 design.md新增§27全阶段审查报告
 - 用户偏好：讲究前后端联动，不能只开发后端不管前端；要求三件套一致性和跨阶段冲突检查
 
 ## 全阶段审查（2026-04-18 第二轮）
 - 审查结果：74个已注册路由+32个未注册死代码路由（Phase 3/4同步风格）；56个Vue文件全部有路由无缺失；5个前缀级别共用（非真正冲突，子路径不同）；10个API服务层文件覆盖所有阶段
 - 修复：test_collaboration.py WorkpaperStub 添加 extend_existing=True，解决全量测试收集阶段崩溃
-- 测试结果：66 passed + 18 failed（全部是 Phase 3 协作模块预存问题：ORM字段不匹配/枚举值缺失/UUID类型传str，均为未注册到main.py的死代码服务）+ Phase 10 的 51 个测试全部通过
+- 测试结果：66 passed + 18 failed（全部是 Phase 3 协作模块预存问题：ORM字段不匹配/枚举值缺失/UUID类型传str，均为未注册到main.py的死代码服务）+ Phase 7 的 51 个测试全部通过
 - 32个死代码路由文件：ai_admin/ai_chat/ai_confirmation/ai_contract/ai_evidence_chain/ai_knowledge/ai_ocr/ai_pdf_export/ai_report/ai_risk_assessment/ai_workpaper/archive/audit_findings/audit_logs/audit_plan/audit_program/auth/companies/component_auditors/confirmations/going_concern/management_letter/nl_command/notifications/pbc/project_mgmt/review/reviews/risk/sync/sync_conflict/users（均为Phase 3/4同步ORM风格，启用前需转异步）
 - 新增 backend/scripts/check_routes.py 路由审查脚本
 
 ## 全阶段审查最终结果（2026-04-18）
 - **全部 10 个 Phase、1556 个任务、100% 完成**
 - 新增 3 个属性测试文件：test_phase0_property.py（20个）+ test_phase1a_property.py（20个）+ test_remaining_property.py（72个，覆盖 Phase 1b/1c/3/8）
-- 143 个测试全部通过（51 Phase 10 + 20 Phase 0 + 20 Phase 1a + 52 Phase 1b/1c/3/8）
+- 143 个测试全部通过（51 Phase 7 + 20 Phase 0 + 20 Phase 1a + 52 Phase 1b/1c/3/8）
 - 前端 http.ts 升级：统一解包 ApiResponse（消除 data.data ?? data）+ 分级错误处理（400/403/404/409/413/422/423/500 各自提示）+ blob 响应不解包
 - 后端 ResponseWrapperMiddleware 扩展 _SKIP_PATHS 加入 /api/message/stream
 - ArchiveService 重命名为 ProjectArchiveService 解决跨阶段服务类名冲突
@@ -985,7 +987,7 @@ inclusion: always
 - adjustments.py修复3处缩进错误+新增User/require_project_access导入
 - attachments.py修复3处缩进错误
 - 可观测性确认打通：RequestIDFilter→日志已接入、logRequest→http.ts已接入、request_id→错误提示已接入
-- 40个测试通过（11 QC + 29 Phase 10），无回归
+- 40个测试通过（11 QC + 29 Phase 7），无回归
 
 ## 问题文档第三轮落地（2026-04-18 续）
 - 认证覆盖率从 81/108 提升到 100/108（剩余 8 个全是未注册到 main.py 的死代码）
@@ -996,9 +998,67 @@ inclusion: always
 - 附件关联搜索下拉确认已完成（AttachmentManagement.vue el-select remote filterable + 关联类型 + 备注）
 - 功能成熟度前端展示：ThreeColumnLayout.vue 导航项加 maturity 字段 + 试点/实验标签（橙色/红色小标签）
 - 新增 13 个复核状态拆分测试（test_review_status_split.py：枚举完整性+编制状态机+复核状态机+联动逻辑+功能成熟度）
-- 53 个测试全部通过（11 QC + 13 复核拆分 + 29 Phase 10）
+- 53 个测试全部通过（11 QC + 13 复核拆分 + 29 Phase 7）
 - 在线编辑方向确认：在线优先+离线兜底双模式（不是功能开关隐藏），ONLYOFFICE 不可用时自动降级
 - 敏感导出审计日志：attachments download_attachment + reports export_report_excel + wp_download download_pack/download_single 四处关键下载操作记录审计日志（user/project/file_name），通过 request_id 可追踪
 - task_center 接入第4类真实任务：wp_ai_service.analytical_review → ai_analysis 类型
 - 附件预览兜底：不可预览文件返回 ocr_text + download_url + message
 - 问题文档复盘校正结论：12项中10项升级为✅已做实，仅剩2项⚠️代码完成待实际环境验证（Paperless联调+归档演练）
+
+## Phase 8 三件套一致性审查（2026-04-19）
+
+### 阶段编号统一（2026-04-19 已完成）
+- 正确映射：Phase 0→1a→1b→1c→2→3→4→5(phase5-extension,扩展)→6(phase6-integration,联动)→7(phase7-enhancement,增强)→8(phase8,数据模型优化)
+- memory.md 中旧编号（Phase 8 Extension/9/10/11）已全部替换为新编号（Phase 5/6/7/8）
+- spec 目录名保持不变（phase5-extension/phase6-integration/phase7-enhancement/phase8），内容标题以目录为准
+
+### 内部一致性问题（6项）
+- requirements.md Phase 0-7 回顾中 Phase 7 描述的是深度增强功能（底稿下载导入/连续审计/复核对话等），与 phase7-enhancement 目录内容一致
+- design.md 缺少需求4c（导出格式一致性）的技术设计
+- design.md 跨Phase兼容性表中引用的阶段编号需同步更新
+- 迁移脚本编号 026/027 已被占用（026_attachment_storage_unification.py），需改为 034/035
+- requirements.md 需求10b.5/10b.6 在 tasks.md 中无明确对应子任务
+- design.md §9c 快捷键设计过于简单，缺具体快捷键映射表
+
+### 跨阶段重复（7项已在其他阶段实现）
+- 需求1a（辅助表 account_name）→ Phase 6 已手动 ALTER TABLE 完成
+- 需求2a（穿透查询 Redis 缓存）→ Phase 6 LedgerPenetrationService 已实现
+- 需求10c.1（登录失败监控）→ Phase 0 auth_service.py 已实现
+- 需求10b.5（敏感导出审计日志）→ 复盘报告修复中已实现
+- 需求3a（ONLYOFFICE 性能优化）→ Phase 7 WOPI 企业级重写已覆盖
+- 需求6（审计程序精细化）→ Phase 6 procedure_service 已实现裁剪
+- 需求7（数据校验）→ Phase 6 ConsistencyCheckService 已实现5项校验
+
+### 修复已完成（2026-04-19）
+- requirements.md：5项已完成需求标记✅+删除线，11a-11g改为8a-8g，Phase引用修正，新增"已在前序阶段完成"汇总表+"增量优化"说明表
+- design.md：补充§4c导出格式一致性设计（ExportFormatValidator+预览API），补充§9c快捷键映射表（13个），跨Phase兼容性表修正+新增3行已完成项，迁移脚本027→034
+- tasks.md：Task 1.1/1.3/2.1标记[x]已完成，10.2补充10b.5(已完成)+10b.6(告警)子任务，10.3登录监控标记已完成，迁移规划表更新，执行顺序更新
+
+### Phase 8 主梁优化遗漏（2026-04-19 代码审查发现）
+- P0 缺失复合索引：trial_balance(project_id,year,standard_account_code)、tb_balance(project_id,year,is_deleted)、adjustments(project_id,year,account_code)、import_batches(project_id,year)，应合并到034迁移脚本
+- P1 EventBus缺少事件去重：批量AJE操作触发N次ADJUSTMENT_CHANGED→N次试算表全量重算，需加debounce/批量合并
+- P1 报表生成引擎无缓存：report_engine._generate_report()每次重新执行所有公式，且缺少REPORT_GENERATED事件发布
+- P1 公式引擎无超时控制：formula_engine.execute()无asyncio.wait_for包装，循环引用或不存在科目会卡死
+- P1 导入服务非流式：import_service.start_import()文件解析阶段一次性加载整个文件到内存，26万行Excel可能OOM，应用openpyxl read_only=True
+- P2 权限查询无缓存：deps.py require_project_access()每次请求查project_users表，高频穿透查询产生大量重复查询
+- 以上6项已补充到Phase 8三件套（2026-04-19完成）：requirements.md新增2d/2e/2f/2g/10d共5个子需求，design.md新增5个设计章节+跨Phase兼容性表4行，tasks.md新增Task 2.5-2.8+10.5共25个子任务+11个测试用例，迁移脚本合并为034_phase8_currency_and_indexes.py（currency_code+4个复合索引）
+
+## Phase 8 代码实现完成（2026-04-19）
+- **Phase 8 全部 11 个任务组开发完成**，76 个测试通过无回归
+- 034 Alembic 迁移脚本已创建：trial_balance.currency_code + 5个复合索引（idx_trial_balance_project_year_std_code/idx_tb_balance_project_year_deleted/idx_adjustments_project_year_account_code/idx_import_batches_project_year/idx_trial_balance_currency_code）
+- TrialBalance ORM 模型新增 currency_code 字段（VARCHAR(3), default 'CNY'）+ 复合索引；Adjustment/TbBalance/ImportBatch 模型新增复合索引
+- EventBus 升级为 debounce 去重机制：_pending 缓冲区 + call_later 合并相同 (event_type, project_id) 事件，默认 500ms 窗口（EVENT_DEBOUNCE_MS 可配置），新增 publish_immediate() 方法
+- FormulaEngine.execute() 新增 asyncio.wait_for 超时控制（FORMULA_EXECUTE_TIMEOUT 默认 10s），超时返回错误而非卡死
+- GenericParser 新增 parse_streaming() 流式解析方法（openpyxl read_only=True），import_service 新增 start_import_streaming() 流式导入函数，EventType 新增 IMPORT_PROGRESS
+- config.py 新增 3 个配置项：EVENT_DEBOUNCE_MS/FORMULA_EXECUTE_TIMEOUT/ENCRYPTION_KEY
+- 新增后端服务 7 个：data_validation_engine.py（4种一致性+4种完整性校验）、performance_monitor.py（MetricsCollector+PerformanceMonitor+告警）、encryption_service.py（Fernet对称加密）、security_monitor.py（IP检测+会话管理+安全事件）、audit_logger_enhanced.py（详细上下文+CSV导出+异常检测）、report_export_engine.py（模板缓存+异步PDF+格式校验）、procedure_trim_engine.py（风险等级裁剪+模板版本）
+- 新增 API 路由 3 个：data_validation.py（4端点）、performance.py（3端点）、security.py（4端点），已注册到 main.py
+- deps.py require_project_access() 新增 Redis 权限缓存（TTL=5min，key=perm:{user_id}:{project_id}），Redis 不可用时降级查库；新增 invalidate_permission_cache() 函数
+- wopi_service.py put_file 事件发布改为 asyncio.create_task（非阻塞）
+- prefill_service.py 新增 batch_prefill() 并发预填（asyncio.gather）+ Redis 缓存 stub
+- 新增前端组件 8 个：DataValidationPanel/ValidationList/PerformanceMonitor/MobileWorkpaperEditor/MobileProjectList/MobileReportView/LoadingState/OperationFeedback + shortcuts.ts 快捷键管理器（13个默认快捷键）
+- ThreeColumnLayout.vue 新增移动端响应式断点（768px/1024px/1280px）
+- WorkpaperList.vue 新增搜索防抖（300ms）
+- Phase 8 hook（phase8-stage-review）已改为 userTriggered 手动触发模式（postTaskExecution 触发太频繁）
+- Phase 8 补充开发（2026-04-19）：完成率从 83.7% 提升到 90.4%（189/209），补上 14 项——前端游标分页接入 LedgerPenetration.vue、MobilePenetration.vue 移动端穿透、MobileReviewView.vue 移动端复核、ProcedureTrimming.vue 进度可视化、模板共享 share_template/import_shared_template、webVitals.ts FCP/LCP/TTI 采集+前端性能告警、PerformanceMonitor.vue ECharts 趋势图+瓶颈分析、operationHistory.ts 操作撤销+通知栏撤销按钮、ThreeColumnLayout.vue 移动端滑动手势、bcrypt cost 12→14（security.py）、README.md Phase 8 章节
+- 剩余 20 项未完成（全部需实际环境）：12 项性能基准测试（需 PG+大数据量跑 EXPLAIN ANALYZE）、离线 Service Worker、3 项手动验收（冒烟检查/API 验证/签字表）、3 项文档编写（API 文档/部署文档/用户手册）

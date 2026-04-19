@@ -284,8 +284,9 @@ class WOPIHostService:
         except Exception as e:
             logger.warning("audit log for online save failed: %s", e)
 
-        # 7. 发布 WORKPAPER_SAVED 事件
+        # 7. 发布 WORKPAPER_SAVED 事件（异步，不阻塞保存响应）
         try:
+            import asyncio as _asyncio
             from app.models.audit_platform_schemas import EventType, EventPayload
             from app.services.event_bus import event_bus
             payload = EventPayload(
@@ -298,7 +299,7 @@ class WOPIHostService:
                     "content_hash": content_hash,
                 },
             )
-            await event_bus.publish(payload)
+            _asyncio.create_task(event_bus.publish(payload))
         except Exception as e:
             logger.warning("event publish after online save failed: %s", e)
 

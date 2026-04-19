@@ -370,6 +370,141 @@ class DrilldownService:
         )
 
     # ------------------------------------------------------------------
+    # CTE 优化四表联查（Phase 8 Task 2.3）
+    # ------------------------------------------------------------------
+
+    async def get_balance_with_ledger_summary(
+        self, project_id: UUID, year: int,
+        account_codes: list[str] | None = None,
+    ) -> list[dict]:
+        """CTE 优化四表联查 — 一次查询获取余额+序时账汇总+辅助维度计数。
+
+        使用 CTE 替代多次独立查询，减少 DB 往返（N+1 → 1）。
+        """
+        bal = TbBalance.__table__
+        led = TbLedger.__table__
+        aux = TbAuxBalance.__table__
+
+        # CTE 1: 序时账按科目汇总
+        ledger_cte = (
+            sa.select(
+                led.c.account_code,
+                sa.func.coalesce(sa.func.sum(led.c.debit_amount), 0).label("ledger_debit"),
+                sa.func.coalesce(sa.func.sum(led.c.credit_amount), 0).label("ledger_credit"),
+                sa.func.count().label("voucher_count"),
+            )
+            .where(
+                led.c.project_id == project_id,
+                led.c.year == year,
+                led.c.is_deleted == sa.false(),
+            )
+            .group_by(led.c.account_code)
+        ).cte("ledger_summary")
+
+        # CTE 2: 辅助维度计数
+        aux_cte = (
+            sa.select(
+                aux.c.account_code,
+                sa.func.count(sa.distinct(aux.c.aux_type)).label("aux_type_count"),
+                sa.func.count().label("aux_row_count"),
+            )
+            .where(
+                aux.c.project_id == project_id,
+                aux.c.year == year,
+                aux.c.is_deleted == sa.false(),
+            )
+            .group_by(aux.c.account_code)
+        ).cte("aux_summary")
+
+        # 主查询: 余额表 LEFT JOIN 两个 CTE
+        stmt = (
+            sa.select(
+                bal.c.account_code,
+                bal.c.account_name,
+                bal.c.level,
+                bal.c.opening_balance,
+                bal.c.debit_amount,
+                bal.c.credit_amount,
+                bal.c.closing_balance,
+                ledger_cte.c.ledger_debit,
+                ledger_cte.c.ledger_credit,
+                ledger_cte.c.voucher_count,
+                aux_cte.c.aux_type_count,
+                aux_cte.c.aux_row_count,
+            )
+            .select_from(
+                bal
+                .outerjoin(ledger_cte, bal.c.account_code == ledger_cte.c.account_code)
+                .outerjoin(aux_cte, bal.c.account_code == aux_cte.c.account_code)
+            )
+            .where(
+                bal.c.project_id == project_id,
+                bal.c.year == year,
+                bal.c.is_deleted == sa.false(),
+            )
+            .order_by(bal.c.account_code)
+        )
+
+        if account_codes:
+            stmt = stmt.where(bal.c.account_code.in_(account_codes))
+
+        result = await self.db.execute(stmt)
+        return [
+            {
+                "account_code": r.account_code,
+                "account_name": r.account_name,
+                "level": r.level,
+                "opening_balance": r.opening_balance,
+                "debit_amount": r.debit_amount,
+                "credit_amount": r.credit_amount,
+                "closing_balance": r.closing_balance,
+                "ledger_debit": r.ledger_debit,
+                "ledger_credit": r.ledger_credit,
+                "voucher_count": r.voucher_count or 0,
+                "has_aux": (r.aux_row_count or 0) > 0,
+                "aux_type_count": r.aux_type_count or 0,
+            }
+            for r in result.fetchall()
+        ]
+
+    async def batch_get_ledger_summaries(
+        self, project_id: UUID, year: int,
+        account_codes: list[str],
+    ) -> dict[str, dict]:
+        """批量获取多个科目的序时账汇总（减少 N+1 查询）。
+
+        返回 {account_code: {debit, credit, count}} 字典。
+        """
+        if not account_codes:
+            return {}
+
+        tbl = TbLedger.__table__
+        stmt = (
+            sa.select(
+                tbl.c.account_code,
+                sa.func.coalesce(sa.func.sum(tbl.c.debit_amount), 0).label("total_debit"),
+                sa.func.coalesce(sa.func.sum(tbl.c.credit_amount), 0).label("total_credit"),
+                sa.func.count().label("entry_count"),
+            )
+            .where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.account_code.in_(account_codes),
+                tbl.c.is_deleted == sa.false(),
+            )
+            .group_by(tbl.c.account_code)
+        )
+        result = await self.db.execute(stmt)
+        return {
+            r.account_code: {
+                "total_debit": r.total_debit,
+                "total_credit": r.total_credit,
+                "entry_count": r.entry_count,
+            }
+            for r in result.fetchall()
+        }
+
+    # ------------------------------------------------------------------
     # 凭证分录查询（按凭证号穿透，显示完整借贷分录）
     # ------------------------------------------------------------------
 

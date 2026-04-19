@@ -12,6 +12,7 @@ Validates: Requirements 2.1-2.10
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -401,6 +402,40 @@ class FormulaEngine:
 
         Validates: Requirements 2.8, 2.9, 2.10
         """
+        try:
+            from app.core.config import settings
+            timeout = settings.FORMULA_EXECUTE_TIMEOUT
+        except Exception:
+            timeout = 10
+
+        try:
+            return await asyncio.wait_for(
+                self._execute_inner(db, project_id, year, formula_type, params),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                "Formula timeout (%ds): type=%s project=%s account=%s",
+                timeout,
+                formula_type,
+                project_id,
+                params.get("account_code", "?"),
+            )
+            return {
+                "value": None,
+                "cached": False,
+                "error": f"公式执行超时({timeout}s): {formula_type}",
+            }
+
+    async def _execute_inner(
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        year: int,
+        formula_type: str,
+        params: dict,
+    ) -> dict:
+        """Inner execute logic, wrapped by timeout in execute()."""
         # Validate formula type
         if formula_type not in self._executors:
             # Check custom functions

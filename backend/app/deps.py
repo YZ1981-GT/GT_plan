@@ -121,9 +121,12 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     """项目级权限校验依赖工厂。
 
     - admin 角色跳过检查
-    - 其他角色查询 project_users 表，按 edit > review > readonly 层级比较
+    - Redis 缓存权限查询结果（TTL=5min）
+    - Redis 不可用时降级为直接查库
     - 权限不足返回 403
     """
+
+    PERM_CACHE_TTL = 300  # 5 minutes
 
     async def dependency(
         project_id: UUID,
@@ -132,6 +135,15 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     ) -> User:
         # admin 跳过项目权限检查
         if current_user.role.value == "admin":
+            return current_user
+
+        # Try Redis cache first
+        cached_level = await _get_cached_permission(current_user.id, project_id)
+        if cached_level is not None:
+            user_level = PERMISSION_HIERARCHY.get(cached_level, 0)
+            required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
+            if user_level < required_level:
+                raise HTTPException(status_code=403, detail="权限不足")
             return current_user
 
         # 查询 project_users 表
@@ -147,10 +159,12 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         if project_user is None:
             raise HTTPException(status_code=403, detail="权限不足")
 
+        # Cache the permission level
+        level_value = project_user.permission_level.value
+        await _set_cached_permission(current_user.id, project_id, level_value)
+
         # 比较权限层级
-        user_level = PERMISSION_HIERARCHY.get(
-            project_user.permission_level.value, 0
-        )
+        user_level = PERMISSION_HIERARCHY.get(level_value, 0)
         required_level = PERMISSION_HIERARCHY.get(min_permission, 0)
 
         if user_level < required_level:
@@ -159,6 +173,50 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
         return current_user
 
     return dependency
+
+
+# ---------------------------------------------------------------------------
+# Permission cache helpers (Redis, graceful degradation)
+# ---------------------------------------------------------------------------
+
+PERM_CACHE_TTL = 300  # 5 minutes
+
+
+async def _get_cached_permission(user_id: UUID, project_id: UUID) -> str | None:
+    """从 Redis 获取缓存的权限级别，不可用时返回 None（降级查库）。"""
+    try:
+        from app.core.redis import redis_client
+        if redis_client is None:
+            return None
+        cache_key = f"perm:{user_id}:{project_id}"
+        cached = await redis_client.get(cache_key)
+        return cached.decode() if cached else None
+    except Exception:
+        return None
+
+
+async def _set_cached_permission(user_id: UUID, project_id: UUID, level: str) -> None:
+    """写入权限缓存。"""
+    try:
+        from app.core.redis import redis_client
+        if redis_client is None:
+            return
+        cache_key = f"perm:{user_id}:{project_id}"
+        await redis_client.setex(cache_key, PERM_CACHE_TTL, level)
+    except Exception:
+        pass
+
+
+async def invalidate_permission_cache(user_id: UUID, project_id: UUID) -> None:
+    """权限变更时主动失效缓存。"""
+    try:
+        from app.core.redis import redis_client
+        if redis_client is None:
+            return
+        cache_key = f"perm:{user_id}:{project_id}"
+        await redis_client.delete(cache_key)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------

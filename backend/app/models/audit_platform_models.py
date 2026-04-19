@@ -277,6 +277,10 @@ class TbBalance(Base):
             "idx_tb_balance_project_year_account",
             "project_id", "year", "account_code",
         ),
+        Index(
+            "idx_tb_balance_project_year_deleted",
+            "project_id", "year", "is_deleted",
+        ),
     )
 
 
@@ -526,6 +530,10 @@ class Adjustment(Base):
             "idx_adjustments_project_entry_group",
             "project_id", "entry_group_id",
         ),
+        Index(
+            "idx_adjustments_project_year_account_code",
+            "project_id", "year", "account_code",
+        ),
     )
 
 
@@ -568,6 +576,9 @@ class TrialBalance(Base):
     opening_balance: Mapped[Decimal | None] = mapped_column(
         sa.Numeric(20, 2), nullable=True
     )
+    currency_code: Mapped[str] = mapped_column(
+        String(3), server_default=text("'CNY'"), nullable=False
+    )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -579,6 +590,10 @@ class TrialBalance(Base):
             "uq_trial_balance_project_year_company_account",
             "project_id", "year", "company_code", "standard_account_code",
             unique=True,
+        ),
+        Index(
+            "idx_trial_balance_project_year_std_code",
+            "project_id", "year", "standard_account_code",
         ),
     )
 

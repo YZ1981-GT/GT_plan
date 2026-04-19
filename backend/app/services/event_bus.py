@@ -26,11 +26,13 @@ EventHandler = Callable[[EventPayload], Coroutine[Any, Any, None]]
 
 
 class EventBus:
-    """进程内事件总线，基于 asyncio 实现"""
+    """进程内事件总线，基于 asyncio 实现，支持 debounce 去重"""
 
-    def __init__(self) -> None:
+    def __init__(self, debounce_ms: int = 500) -> None:
         self._handlers: dict[EventType, list[EventHandler]] = defaultdict(list)
         self._sse_queues: list[asyncio.Queue[EventPayload | None]] = []
+        self._pending: dict[str, dict] = {}  # debounce 缓冲区
+        self._debounce_ms: int = debounce_ms
 
     def subscribe(self, event_type: EventType, handler: EventHandler) -> None:
         """注册事件处理器"""
@@ -39,11 +41,42 @@ class EventBus:
         logger.info("EventBus: subscribed %s to %s", handler_name, event_type.value)
 
     async def publish(self, payload: EventPayload) -> None:
-        """发布事件，依次调用所有已注册的处理器"""
+        """发布事件，相同 (event_type, project_id) 在 debounce 窗口内合并为一次"""
+        dedup_key = f"{payload.event_type.value}:{payload.project_id}"
+
+        # 合并 account_codes
+        if dedup_key in self._pending:
+            self._pending[dedup_key]["handle"].cancel()
+            existing_codes = self._pending[dedup_key]["payload"].account_codes or []
+            new_codes = payload.account_codes or []
+            payload.account_codes = list(set(existing_codes + new_codes)) if (existing_codes or new_codes) else None
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # 没有运行中的事件循环，直接分发
+            await self._dispatch(payload)
+            return
+
+        handle = loop.call_later(
+            self._debounce_ms / 1000,
+            lambda p=payload: asyncio.ensure_future(self._dispatch(p)),
+        )
+        self._pending[dedup_key] = {"handle": handle, "payload": payload}
+
+    async def publish_immediate(self, payload: EventPayload) -> None:
+        """立即发布事件，不经过 debounce（供需要立即触发的场景使用）"""
+        await self._dispatch(payload)
+
+    async def _dispatch(self, payload: EventPayload) -> None:
+        """实际分发事件到处理器"""
+        dedup_key = f"{payload.event_type.value}:{payload.project_id}"
+        self._pending.pop(dedup_key, None)
+
         event_type = payload.event_type
         handlers = self._handlers.get(event_type, [])
         logger.info(
-            "EventBus: publishing %s (project=%s, accounts=%s), %d handler(s)",
+            "EventBus: dispatching %s (project=%s, accounts=%s), %d handler(s)",
             event_type.value,
             payload.project_id,
             payload.account_codes,
@@ -92,4 +125,10 @@ class EventBus:
 # ---------------------------------------------------------------------------
 # Global singleton
 # ---------------------------------------------------------------------------
-event_bus = EventBus()
+try:
+    from app.core.config import settings
+    _debounce_ms = settings.EVENT_DEBOUNCE_MS
+except Exception:
+    _debounce_ms = 500
+
+event_bus = EventBus(debounce_ms=_debounce_ms)

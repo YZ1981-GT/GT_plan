@@ -74,13 +74,25 @@ async def get_ledger_entries(
     year: int = Query(...),
     date_from: str | None = None,
     date_to: str | None = None,
+    cursor: str | None = Query(None, description="游标分页: date|id 格式"),
+    limit: int = Query(100, ge=1, le=1000),
     page: int = 1,
     page_size: int = 100,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """序时账明细（按科目穿透）"""
+    """序时账明细（按科目穿透）— 支持游标分页和传统分页
+
+    当提供 cursor 参数时使用游标分页（推荐大数据量场景），
+    否则使用传统 OFFSET 分页。
+    """
     svc = _svc(db, None)
+    if cursor is not None:
+        return await svc.get_ledger_entries_cursor(
+            project_id, year, account_code,
+            cursor=cursor, limit=limit,
+            date_from=date_from, date_to=date_to,
+        )
     return await svc.get_ledger_entries(
         project_id, year, account_code, date_from, date_to, page, page_size,
     )
@@ -132,13 +144,21 @@ async def get_aux_ledger_entries(
     year: int = Query(...),
     aux_type: str | None = None,
     aux_code: str | None = None,
+    cursor: str | None = Query(None, description="游标分页: date|id 格式"),
+    limit: int = Query(100, ge=1, le=1000),
     page: int = 1,
     page_size: int = 100,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """辅助明细账（按辅助维度穿透）"""
+    """辅助明细账（按辅助维度穿透）— 支持游标分页和传统分页"""
     svc = _svc(db, None)
+    if cursor is not None:
+        return await svc.get_aux_ledger_entries_cursor(
+            project_id, year, account_code,
+            cursor=cursor, limit=limit,
+            aux_type=aux_type, aux_code=aux_code,
+        )
     return await svc.get_aux_ledger_entries(
         project_id, year, account_code, aux_type, aux_code, page, page_size,
     )

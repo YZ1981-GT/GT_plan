@@ -8,6 +8,27 @@
       </div>
     </div>
 
+    <!-- 程序执行进度可视化 -->
+    <div class="gt-proc-progress">
+      <div class="gt-proc-progress-stats">
+        <span>总计 <b>{{ progressStats.total }}</b></span>
+        <span style="color: #67c23a">已完成 <b>{{ progressStats.completed }}</b></span>
+        <span style="color: #e6a23c">进行中 <b>{{ progressStats.in_progress }}</b></span>
+        <span style="color: #909399">未开始 <b>{{ progressStats.pending }}</b></span>
+        <span style="color: #f56c6c">跳过 <b>{{ progressStats.skipped }}</b></span>
+      </div>
+      <el-progress
+        :percentage="progressStats.total > 0 ? Math.round(progressStats.completed / progressStats.total * 100) : 0"
+        :stroke-width="12"
+        :color="[
+          { color: '#909399', percentage: 20 },
+          { color: '#e6a23c', percentage: 60 },
+          { color: '#67c23a', percentage: 100 },
+        ]"
+        style="margin-top: 8px"
+      />
+    </div>
+
     <!-- 审计循环 Tab -->
     <el-tabs v-model="activeCycle" @tab-change="loadProcedures">
       <el-tab-pane v-for="c in cycles" :key="c.code" :label="c.label" :name="c.code" />
@@ -86,6 +107,16 @@ const saving = ref(false)
 const showRefDialog = ref(false)
 const refProjectId = ref('')
 
+const progressStats = computed(() => {
+  const procs = procedures.value
+  const total = procs.length
+  const completed = procs.filter(p => p.execution_status === 'completed' || p.execution_status === 'reviewed').length
+  const in_progress = procs.filter(p => p.execution_status === 'in_progress').length
+  const skipped = procs.filter(p => p.status === 'skip' || p.status === 'not_applicable').length
+  const pending = total - completed - in_progress - skipped
+  return { total, completed, in_progress, skipped, pending }
+})
+
 function execTagType(s: string) {
   return { not_started: 'info', in_progress: 'warning', completed: 'success', reviewed: '' }[s] || 'info'
 }
@@ -145,5 +176,12 @@ onMounted(loadProcedures)
 .gt-procedure { padding: var(--gt-space-4); }
 .gt-proc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
 .gt-proc-actions { display: flex; gap: var(--gt-space-2); }
+.gt-proc-progress {
+  margin-bottom: var(--gt-space-3); padding: 12px 16px;
+  background: #f8f5fc; border-radius: var(--gt-radius-md, 8px);
+  border: 1px solid #e0d4f0;
+}
+.gt-proc-progress-stats { display: flex; gap: 16px; font-size: 13px; color: #666; }
+.gt-proc-progress-stats b { font-size: 15px; }
 .gt-text-muted { color: #ccc; }
 </style>

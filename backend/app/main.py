@@ -87,6 +87,9 @@ from app.routers.forum import router as forum_router
 from app.routers.report_trace import router as report_trace_router
 from app.routers.feature_flags import router as feature_flags_router
 from app.routers.task_center import router as task_center_router
+from app.routers.data_validation import router as data_validation_router
+from app.routers.performance import router as performance_router
+from app.routers.security import router as security_router
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.audit_log import AuditLogMiddleware
@@ -224,3 +227,6 @@ app.include_router(forum_router)
 app.include_router(report_trace_router)
 app.include_router(feature_flags_router)
 app.include_router(task_center_router)
+app.include_router(data_validation_router)
+app.include_router(performance_router)
+app.include_router(security_router)

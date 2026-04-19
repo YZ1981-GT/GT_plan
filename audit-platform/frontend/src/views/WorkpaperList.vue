@@ -4,6 +4,14 @@
     <div class="gt-wp-filter-bar">
       <h2 class="gt-page-title">底稿管理</h2>
       <div class="gt-wp-filters">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索底稿..."
+          clearable
+          size="default"
+          style="width: 200px"
+          @input="onSearchDebounce"
+        />
         <el-select v-model="filterCycle" placeholder="审计循环" clearable size="default" style="width: 160px">
           <el-option v-for="c in cycleOptions" :key="c.value" :label="c.label" :value="c.value" />
         </el-select>
@@ -218,6 +226,15 @@ const projectId = computed(() => route.params.projectId as string)
 const loading = ref(false)
 const qcLoading = ref(false)
 const downloadLoading = ref(false)
+const searchKeyword = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+function onSearchDebounce() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    fetchData()
+  }, 300)
+}
 const uploadLoading = ref(false)
 const wpList = ref<WorkpaperDetail[]>([])
 const wpIndex = ref<WpIndexItem[]>([])

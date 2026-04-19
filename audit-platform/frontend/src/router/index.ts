@@ -287,6 +287,31 @@ const router = createRouter({
           name: 'CheckIns',
           component: () => import('@/views/CheckInsPage.vue'),
         },
+        // ── Phase 8 Routes ──
+        {
+          path: 'projects/:projectId/data-validation',
+          name: 'DataValidation',
+          component: () => import('@/views/DataValidationPanel.vue'),
+          props: (route: any) => ({ projectId: route.params.projectId }),
+        },
+        {
+          path: 'admin/performance',
+          name: 'PerformanceMonitor',
+          component: () => import('@/views/PerformanceMonitor.vue'),
+        },
+        // ── Mobile Routes ──
+        {
+          path: 'projects/:projectId/mobile-penetration',
+          name: 'MobilePenetration',
+          component: () => import('@/views/MobilePenetration.vue'),
+          props: (route: any) => ({ projectId: route.params.projectId }),
+        },
+        {
+          path: 'projects/:projectId/mobile-review',
+          name: 'MobileReviewView',
+          component: () => import('@/views/MobileReviewView.vue'),
+          props: (route: any) => ({ projectId: route.params.projectId }),
+        },
       ],
     },
     {
