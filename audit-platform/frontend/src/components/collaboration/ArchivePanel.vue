@@ -47,7 +47,7 @@
     </div>
 
     <!-- 密码设置弹窗 -->
-    <el-dialog v-model="showPasswordDialog" title="导出PDF设置密码" width="400px">
+    <el-dialog append-to-body v-model="showPasswordDialog" title="导出PDF设置密码" width="400px">
       <el-form>
         <el-form-item label="PDF密码">
           <el-input v-model="pdfPassword" type="password" show-password placeholder="请输入密码（可选）" />

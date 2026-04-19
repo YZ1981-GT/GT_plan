@@ -19,7 +19,7 @@
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="showCreate" :title="editingUser ? '编辑用户' : '新增用户'" width="450px">
+    <el-dialog append-to-body v-model="showCreate" :title="editingUser ? '编辑用户' : '新增用户'" width="450px">
       <el-form :model="form" label-width="80px">
         <el-form-item label="用户名"><el-input v-model="form.username" /></el-form-item>
         <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>

@@ -87,7 +87,7 @@
     </el-table>
 
     <!-- 新建/编辑弹窗 -->
-    <el-dialog v-model="formVisible" :title="isEditing ? '编辑错报' : '新增错报'" width="600px" destroy-on-close>
+    <el-dialog append-to-body v-model="formVisible" :title="isEditing ? '编辑错报' : '新增错报'" width="600px" destroy-on-close>
       <el-form :model="form" label-width="100px">
         <el-form-item label="错报类型">
           <el-select v-model="form.misstatement_type" style="width: 100%">

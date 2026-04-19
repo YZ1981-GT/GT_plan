@@ -65,7 +65,7 @@
     </el-tabs>
 
     <!-- 新建评价弹窗 -->
-    <el-dialog v-model="showEvalDialog" title="新建持续经营评价" width="650px">
+    <el-dialog append-to-body v-model="showEvalDialog" title="新建持续经营评价" width="650px">
       <el-form :model="evalForm" label-width="130px">
         <el-form-item label="管理层评价" required>
           <el-input

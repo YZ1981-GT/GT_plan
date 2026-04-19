@@ -542,7 +542,7 @@ inclusion: always
 - Alembic 多 head 冲突：迁移脚本 009-014 各有两个同名文件导致 `Multiple head revisions` 错误，暂用 `ALTER TABLE ADD COLUMN IF NOT EXISTS` 和 `CREATE TABLE IF NOT EXISTS` 直接补齐 Phase 8 变更，待后续合并迁移链
 - Phase 8 手动创建的表（本地PG）：gt_wp_coding、t_accounts、t_account_entries、accounting_standards、signature_records、wp_template_custom、regulatory_filing、ai_plugins、attachments、attachment_working_paper；手动加的列：users.language、projects.accounting_standard_id/company_code/template_type/report_scope/parent_company_name/parent_company_code/ultimate_company_name/ultimate_company_code/parent_project_id/consol_level
 - 测试用户：admin/admin123（role=admin）已创建，yangzhi/123456 密码已重置
-- DefaultLayout 三栏路由判断：`/projects/new` 和 `/extension/*` 路径需特殊处理为全宽模式（hideMiddle=true, isBrowseMode=false），否则会被当成浏览模式显示 DetailProjectPanel 而非 router-view
+- DefaultLayout 三栏路由判断：重构为 FULLWIDTH_PATHS 数组 + FULLWIDTH_PREFIXES 前缀数组（不再用一长串 ||），后续加新全宽页面只需往数组加一行；全宽路径包括 / /projects/new /recycle-bin /forum /private-storage /knowledge /consolidation /attachments /confirmation /archive /work-hours，前缀包括 /extension/ /settings /dashboard/
 - 合并报表集团架构信息放置方案：选择方案A（基本信息中展开折叠面板），不新增向导步骤；选择"合并报表"时自动展开"集团架构信息（三码体系）"折叠面板，填写上级企业名称/代码、最终控制方名称/代码；子公司清单和持股比例在后续"合并项目"模块中配置
 - projects 表新增4列：parent_company_name/parent_company_code/ultimate_company_name/ultimate_company_code（合并报表三码体系），用 ALTER TABLE ADD COLUMN IF NOT EXISTS 直接加列
 - 合并与单户联动架构：一个合并项目 = 一组单户项目 + 合并层；projects 表新增 parent_project_id（UUID FK→projects.id）和 consol_level（int 1-15）；前端用递归 ProjectTreeNode 组件构建树形列表，合并项目为父节点（紫色左边框+📁图标），单户项目为子节点
@@ -1062,3 +1062,33 @@ inclusion: always
 - Phase 8 hook（phase8-stage-review）已改为 userTriggered 手动触发模式（postTaskExecution 触发太频繁）
 - Phase 8 补充开发（2026-04-19）：完成率从 83.7% 提升到 90.4%（189/209），补上 14 项——前端游标分页接入 LedgerPenetration.vue、MobilePenetration.vue 移动端穿透、MobileReviewView.vue 移动端复核、ProcedureTrimming.vue 进度可视化、模板共享 share_template/import_shared_template、webVitals.ts FCP/LCP/TTI 采集+前端性能告警、PerformanceMonitor.vue ECharts 趋势图+瓶颈分析、operationHistory.ts 操作撤销+通知栏撤销按钮、ThreeColumnLayout.vue 移动端滑动手势、bcrypt cost 12→14（security.py）、README.md Phase 8 章节
 - 剩余 20 项未完成（全部需实际环境）：12 项性能基准测试（需 PG+大数据量跑 EXPLAIN ANALYZE）、离线 Service Worker、3 项手动验收（冒烟检查/API 验证/签字表）、3 项文档编写（API 文档/部署文档/用户手册）
+- Phase 8 代码已推送到 GitHub（2026-04-19）：commit 28dcbce，66 个文件变更（7900 行新增），rebase 到远程 f8ca284 之上无冲突；spec 目录名统一完成（phase8-extension→phase5-extension、phase9-integration→phase6-integration、phase10-enhancement→phase7-enhancement）
+- 运行环境配置修复（2026-04-19）：根目录 .env 的 CORS_ORIGINS 从 JSON 数组格式改为逗号分隔（与 config.py split(",") 一致）；Redis Docker 映射端口为 6380（非默认 6379），两个 .env 已统一为 redis://localhost:6380/0；backend/.env API_PORT 改为 9980
+- 缺失依赖修复：PyJWT 未安装导致 metabase_service.py import jwt 失败，已 pip install PyJWT（2.12.1）
+- PaddleOCR 启动阻塞：首次导入时 PaddleOCR 会检查模型源连接（耗时数十秒），需设置 PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True 跳过
+- 当前运行状态（2026-04-19）：后端 uvicorn 在 9980 端口运行（PID 16776，系统 Python 而非 .venv），前端 Vite 在 3031 端口（3030 被占用自动递增），/api/health 返回 PG+Redis 均 ok
+- ORM 模型 bug 修复（2026-04-19）：①ai_models.py FK `workpapers.id` → `working_paper.id`（表名错误）②consolidation_models.py 6处 `server_default="'xxx'"` → `server_default="xxx"`（PG 枚举值多引号导致 InvalidTextRepresentationError）③alembic/005 移除重复枚举手动创建
+- 数据库初始化方案：Alembic 迁移链有多处枚举重复创建 bug（005/006 等），改用 `Base.metadata.create_all` 一次性建表 + 手动标记 `alembic_version=034`，绕过迁移脚本问题；_init_db.py 脚本已删除但逻辑可复现
+- 数据库当前状态（2026-04-19）：116 张表全部创建成功，admin 用户 admin/admin123（role=admin），alembic_version=034
+- consolidation_models server_default 规则：PG 枚举列用 `server_default="xxx"` 纯字符串（不带引号），或用 `server_default=text("'xxx'")`（text 函数包裹）；绝不能用 `server_default="'xxx'"`（双层引号）
+- 导航布局调整（2026-04-19）：左侧栏从 17 项精简到 10 项（核心业务：仪表盘/项目/人员委派/工时/管理看板/合并项目/函证/归档/附件/用户管理），7 个全局工具移到顶部栏右侧图标（知识库/私人库/AI模型/排版模板/吐槽求助 | 回收站/系统设置），中间竖线分隔工具入口和系统操作
+- 系统设置前后端联动（2026-04-19）：新增 system_settings.py 路由（GET/PUT /api/settings + GET /api/settings/health），19 个白名单可编辑配置项（LLM/OCR/安全/性能等），敏感字段脱敏，仅 admin 可修改，运行时生效重启恢复 .env；前端 SystemSettings.vue 7 个分组折叠面板+行内编辑+服务健康检测（PG/Redis/vLLM/Ollama/ONLYOFFICE/Paperless）+JWT 弱密钥警告；路由 /settings 已注册
+- 系统设置 UI 偏好：默认简洁模式（只显示 AI模型/文件存储/外部服务/性能参数 4 个分组，隐藏数据库/安全/OCR 等专业配置），右上角切换专家模式显示全部；配置项显示中文友好名（如"对话模型"而非 DEFAULT_CHAT_MODEL），专家模式下双行显示中文名+英文代码名；JWT 弱密钥警告仅专家模式显示
+- UI 对比度问题（2026-04-19 用户反馈）：紫色主题（#4b2d77）的 text 按钮在紫色高亮行/选中态背景上看不清，全局性问题需要逐页修复；解决方案：①选中行背景用更浅的 #f5f0ff（而非 #f0ebf8）②编辑按钮用 plain 有边框样式（而非 text 无边框）③选中行内的 text 按钮强制深色 #1a1a2e；其他页面（底稿列表/试算表/调整分录等）也可能有同样问题待排查
+- 私人库修复（2026-04-19）：userId 从硬编码 'me' 改为 authStore.user.id 真实 UUID；数据解包适配 http.ts；错误提示改为 el-alert 友好显示；新增下载按钮
+- 知识库前端新增（2026-04-19）：KnowledgeBase.vue 9 个分类卡片（底稿模板/监管规定/会计准则/质控标准/审计程序/行业指引/提示词/报告模板/笔记），路由 /knowledge 已注册+DefaultLayout 全宽模式
+- 知识库架构需求（2026-04-19 用户提出）：需要全局知识库（所有项目共享的参考资料，如会计准则/监管规定/行业指引）+ 项目级知识库（项目专属的底稿/附注/工作记录），两层架构待实现
+- 知识库两层架构已实现（2026-04-19）：knowledge_base.py 路由 10 个端点已注册到 main.py；全局知识库 /api/knowledge/ 存储 ~/.gt_audit_helper/knowledge/{category}/（9 个分类）；项目级知识库 /api/projects/{id}/knowledge/ 存储 storage/projects/{id}/knowledge/；前端 KnowledgeBase.vue 双 Tab（全局分类卡片+项目下拉选择），支持上传/下载/删除
+- 用户信息恢复机制（2026-04-19）：App.vue onMounted 自动检测 token 存在但 user 为 null 时调用 fetchUserProfile() 恢复用户信息（页面刷新后 localStorage 只恢复 token 不恢复 user 对象）；auth.ts 新增 userId getter；PrivateStorage 等需要 userId 的页面先 ensureUser() 再加载数据
+- 前端数据解包统一规范（2026-04-19）：http.ts 响应拦截器已自动解包 ApiResponse（response.data = d.data），所以前端调用应统一用 `const { data } = await http.get(url)` 解构；phase10Api.ts 等旧代码中的 `r.data?.data ?? r.data` 双层解包是错误的，会导致拿不到数据或页面卡住；所有 API 服务层文件需逐步统一
+- 弹窗遮罩偏好（2026-04-19）：不要深灰色遮罩，改用半透明白色（rgba(255,255,255,0.6) + backdrop-filter: blur(2px)），全局性偏好，其他页面弹窗也应统一
+- el-dialog 必须加 append-to-body（2026-04-19）：三栏布局 .gt-body 有 overflow:hidden，不加 append-to-body 的 el-dialog 会被截断；全局性规则，所有页面的 el-dialog 都需要加此属性
+- el-dialog append-to-body 批量修复（2026-04-19）：49 个 Vue 文件共约 55 个 el-dialog 已全部加上 append-to-body，包括 views/ 下 17 个文件和 components/ 下 32 个文件
+- 人员库两层维护（2026-04-19）：staff_members 新增 source 字段（seed=初始导入不可删/custom=用户自定义可增删改，默认 custom）；staff.py 新增 DELETE 端点（仅 custom 可删）；前端表格新增"来源"列标签+自定义人员显示删除按钮；种子数据脚本 seed_staff.py 导入时应标记 source=seed
+- 工时管理联动修复（2026-04-19）：新增 GET /api/staff/me/staff-id 端点（user_id 匹配→用户名匹配自动关联→自动创建 custom 记录三级降级）；WorkHoursPage onMounted 改为先获取 staff_id 再加载数据，不再用空占位
+- staffApi.ts 全量重写（2026-04-19）：去掉所有 `data.data ?? data` 双层解包，统一用 `{ data }` 解构；数组返回加 Array.isArray 防御；StaffMember 接口新增 source 字段
+- 种子数据导入完成（2026-04-19 新数据库）：staff_members 376 条（source=seed），admin 用户自动创建 staff_member（source=custom，staff_id=4c56afd7）；人员→委派→工时→看板四环数据基础就绪
+- FastAPI 路由顺序规则（2026-04-19）：固定路径（如 /my/assignments）必须在参数路径（如 /{project_id}/assignments）之前定义，否则 FastAPI 把 "my" 当 UUID 解析导致 422；assignments.py 已修复此问题
+- 仪表盘与项目列表分离（2026-04-19）：`/` 路径改为全宽模式（hideMiddle=true, isBrowseMode=false），显示 Dashboard.vue 统计卡片+快捷操作；`/projects` 保持三栏浏览模式显示项目列表；之前 `/` 被当成浏览模式导致仪表盘内容被 MiddleProjectList 覆盖
+- 全局入口Hub页面模式（2026-04-19）：左侧导航的全局功能（合并项目/附件管理/函证管理/归档管理等）需要 Hub 页面作为桥接——展示项目卡片列表，点击跳转到 /projects/{id}/xxx 项目级页面；已创建 ConsolidationHub.vue（/consolidation）和 AttachmentHub.vue（/attachments），DefaultLayout 已加入全宽模式；其他全局导航项（函证/归档）也需要同样的 Hub 页面
+- 管理看板增强（2026-04-19）：去掉"试点"标签改为 production；新增 3 个后端 API（project-staff-hours 按项目查人员工时/staff-detail 按人员查项目+未来一周安排/available-staff 查可用人员）；前端新增三 Tab 查询面板（按项目/按人员/可用人员），支持搜索+表格+工时阈值筛选

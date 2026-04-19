@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="质量自检结果" width="700px" @close="$emit('close')">
+  <el-dialog append-to-body v-model="visible" title="质量自检结果" width="700px" @close="$emit('close')">
     <template v-if="result">
       <!-- 汇总 -->
       <div class="qc-header">

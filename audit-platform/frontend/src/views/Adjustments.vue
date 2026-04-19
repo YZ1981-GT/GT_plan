@@ -81,7 +81,7 @@
     </div>
 
     <!-- 驳回原因弹窗 -->
-    <el-dialog v-model="showRejectDialog" title="驳回原因" width="400px">
+    <el-dialog append-to-body v-model="showRejectDialog" title="驳回原因" width="400px">
       <el-input v-model="rejectReason" type="textarea" :rows="3" placeholder="请输入驳回原因" />
       <template #footer>
         <el-button @click="showRejectDialog = false">取消</el-button>
@@ -90,7 +90,7 @@
     </el-dialog>
 
     <!-- 新建/编辑分录弹窗 -->
-    <el-dialog v-model="formDialogVisible" :title="isEditing ? '编辑分录' : '新建分录'" width="800px" destroy-on-close>
+    <el-dialog append-to-body v-model="formDialogVisible" :title="isEditing ? '编辑分录' : '新建分录'" width="800px" destroy-on-close>
       <el-form :model="form" label-width="90px">
         <el-form-item label="类型" v-if="!isEditing">
           <el-radio-group v-model="form.adjustment_type">

@@ -138,7 +138,7 @@ class Company(Base, SoftDeleteMixin, TimestampMixin):
     consol_method: Mapped[ConsolMethod | None] = mapped_column(Enum(ConsolMethod), nullable=True)
     acquisition_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     disposal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    functional_currency: Mapped[str] = mapped_column(String(3), server_default="'CNY'", nullable=True)
+    functional_currency: Mapped[str] = mapped_column(String(3), server_default="CNY", nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
 
 
@@ -157,7 +157,7 @@ class ConsolScope(Base, SoftDeleteMixin, TimestampMixin):
     inclusion_reason: Mapped[InclusionReason | None] = mapped_column(Enum(InclusionReason), nullable=True)
     exclusion_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     scope_change_type: Mapped[ScopeChangeType] = mapped_column(
-        Enum(ScopeChangeType), server_default="'none'", nullable=False
+        Enum(ScopeChangeType), server_default="none", nullable=False
     )
     scope_change_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -198,7 +198,7 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     is_continuous: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     prior_year_entry_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     review_status: Mapped[ReviewStatusEnum] = mapped_column(
-        Enum(ReviewStatusEnum), server_default="'draft'", nullable=False
+        Enum(ReviewStatusEnum), server_default="draft", nullable=False
     )
     reviewer_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -235,7 +235,7 @@ class InternalArAp(Base, SoftDeleteMixin, TimestampMixin):
     difference_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
     difference_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     reconciliation_status: Mapped[ReconciliationStatus] = mapped_column(
-        Enum(ReconciliationStatus), server_default="'unmatched'", nullable=False
+        Enum(ReconciliationStatus), server_default="unmatched", nullable=False
     )
 
 
@@ -287,7 +287,7 @@ class ForexTranslation(Base, SoftDeleteMixin, TimestampMixin):
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     functional_currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    reporting_currency: Mapped[str] = mapped_column(String(3), server_default="'CNY'", nullable=True)
+    reporting_currency: Mapped[str] = mapped_column(String(3), server_default="CNY", nullable=True)
     bs_closing_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     pl_average_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     equity_historical_rate: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
@@ -329,7 +329,7 @@ class ComponentInstruction(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     special_attention_items: Mapped[str | None] = mapped_column(Text, nullable=True)
     instruction_file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[InstructionStatus] = mapped_column(
-        Enum(InstructionStatus), server_default="'draft'", nullable=False
+        Enum(InstructionStatus), server_default="draft", nullable=False
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -351,5 +351,5 @@ class ComponentResult(Base, SoftDeleteMixin, TimestampMixin):
     group_team_evaluation: Mapped[str | None] = mapped_column(Text, nullable=True)
     needs_additional_procedures: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     evaluation_status: Mapped[EvaluationStatusEnum] = mapped_column(
-        Enum(EvaluationStatusEnum), server_default="'pending'", nullable=False
+        Enum(EvaluationStatusEnum), server_default="pending", nullable=False
     )

@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="CA证书签名 (Level 3)" width="400px" @close="$emit('close')">
+  <el-dialog append-to-body v-model="visible" title="CA证书签名 (Level 3)" width="400px" @close="$emit('close')">
     <el-result icon="info" title="CA证书签名功能开发中" sub-title="该功能需要对接CA证书服务商，预计后续版本支持">
       <template #extra>
         <el-button @click="visible = false">关闭</el-button>

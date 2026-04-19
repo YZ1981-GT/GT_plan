@@ -149,7 +149,7 @@
             </div>
 
             <!-- 新增意见弹窗 -->
-            <el-dialog v-model="showAddAnnotation" title="新增复核意见" width="400px">
+            <el-dialog append-to-body v-model="showAddAnnotation" title="新增复核意见" width="400px">
               <el-form label-width="60px">
                 <el-form-item label="内容">
                   <el-input v-model="newAnnotation.content" type="textarea" :rows="3" placeholder="输入复核意见" />
@@ -174,7 +174,7 @@
     </div>
 
     <!-- 上传弹窗 -->
-    <el-dialog v-model="uploadDialogVisible" title="上传底稿" width="500px">
+    <el-dialog append-to-body v-model="uploadDialogVisible" title="上传底稿" width="500px">
       <el-alert v-if="uploadConflict" type="warning" :closable="false" show-icon style="margin-bottom: 16px">
         版本冲突：服务器版本 v{{ uploadConflict.server_version }}，您的版本 v{{ uploadConflict.uploaded_version }}
       </el-alert>

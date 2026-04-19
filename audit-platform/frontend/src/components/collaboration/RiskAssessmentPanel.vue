@@ -98,7 +98,7 @@
     </el-table>
 
     <!-- Add Risk Dialog -->
-    <el-dialog v-model="showAddDialog" title="添加风险评估" width="600px">
+    <el-dialog append-to-body v-model="showAddDialog" title="添加风险评估" width="600px">
       <el-form :model="newRisk" label-width="120px">
         <el-form-item label="科目/循环">
           <el-input v-model="newRisk.account_or_cycle" placeholder="如: 销售收入" />

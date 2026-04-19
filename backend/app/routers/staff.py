@@ -97,3 +97,76 @@ async def get_projects(
 ):
     svc = StaffService(db)
     return await svc.get_projects(staff_id)
+
+
+@router.delete("/{staff_id}")
+async def delete_staff(
+    staff_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """删除人员（仅允许删除 source=custom 的自定义人员）"""
+    from app.models.staff_models import StaffMember
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.select(StaffMember).where(StaffMember.id == staff_id, StaffMember.is_deleted == False)
+    )
+    staff = result.scalar_one_or_none()
+    if not staff:
+        raise HTTPException(status_code=404, detail="人员不存在")
+
+    source = getattr(staff, "source", "custom")
+    if source == "seed":
+        raise HTTPException(status_code=400, detail="初始导入的人员不允许删除")
+
+    staff.is_deleted = True
+    await db.commit()
+    return {"message": "已删除", "id": str(staff_id)}
+
+
+@router.get("/me/staff-id")
+async def get_my_staff_id(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """获取当前登录用户关联的 staff_member ID"""
+    from app.models.staff_models import StaffMember
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.select(StaffMember).where(
+            StaffMember.user_id == user.id,
+            StaffMember.is_deleted == False,
+        )
+    )
+    staff = result.scalar_one_or_none()
+    if staff:
+        return {"staff_id": str(staff.id), "name": staff.name}
+
+    # 如果没有关联，尝试按用户名匹配
+    result = await db.execute(
+        sa.select(StaffMember).where(
+            StaffMember.name == user.username,
+            StaffMember.is_deleted == False,
+        )
+    )
+    staff = result.scalar_one_or_none()
+    if staff:
+        # 自动关联
+        staff.user_id = user.id
+        await db.commit()
+        return {"staff_id": str(staff.id), "name": staff.name}
+
+    # 都没找到，自动创建一条 custom 记录
+    from app.models.staff_models import StaffMember as SM
+    import uuid
+    new_staff = SM(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        name=user.username,
+        source="custom",
+    )
+    db.add(new_staff)
+    await db.commit()
+    return {"staff_id": str(new_staff.id), "name": new_staff.name, "auto_created": True}

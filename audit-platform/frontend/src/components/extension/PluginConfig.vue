@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" :title="`插件配置 - ${plugin?.plugin_name || ''}`" width="600px" @close="$emit('close')">
+  <el-dialog append-to-body v-model="visible" :title="`插件配置 - ${plugin?.plugin_name || ''}`" width="600px" @close="$emit('close')">
     <el-form label-width="100px" size="default" v-if="plugin">
       <el-form-item label="插件名称">
         <el-input :model-value="plugin.plugin_name" disabled />

@@ -35,7 +35,7 @@
     </el-table>
 
     <!-- 添加成员弹窗 -->
-    <el-dialog v-model="showAddDialog" title="添加团队成员" width="500px">
+    <el-dialog append-to-body v-model="showAddDialog" title="添加团队成员" width="500px">
       <el-form label-width="80px">
         <el-form-item label="搜索人员">
           <el-select v-model="selectedStaffId" filterable remote :remote-method="searchStaff"

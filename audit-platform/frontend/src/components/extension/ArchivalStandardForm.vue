@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="电子底稿归档标准备案" width="600px" @close="resetForm">
+  <el-dialog append-to-body v-model="visible" title="电子底稿归档标准备案" width="600px" @close="resetForm">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" size="default">
       <el-form-item label="项目ID" prop="project_id">
         <el-input v-model="form.project_id" placeholder="选择或输入项目ID" />

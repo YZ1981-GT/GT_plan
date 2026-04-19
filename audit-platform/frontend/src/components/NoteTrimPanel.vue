@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="附注章节裁剪" width="700px">
+  <el-dialog append-to-body v-model="visible" title="附注章节裁剪" width="700px">
     <el-table :data="sections" border size="small" v-loading="loading" max-height="500">
       <el-table-column prop="section_number" label="编号" width="80" />
       <el-table-column prop="section_title" label="章节标题" min-width="200" />

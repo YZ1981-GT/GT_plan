@@ -82,7 +82,7 @@
     </el-table>
 
     <!-- 穿透弹窗 -->
-    <el-dialog v-model="drilldownVisible" :title="`穿透查询 — ${drilldownData?.row_name || ''}`" width="700px">
+    <el-dialog append-to-body v-model="drilldownVisible" :title="`穿透查询 — ${drilldownData?.row_name || ''}`" width="700px">
       <div v-if="drilldownData" class="gt-rv-drilldown-content">
         <div class="gt-rv-dd-section">
           <span class="gt-rv-dd-label">公式：</span>

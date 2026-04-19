@@ -76,7 +76,7 @@
     </div>
 
     <!-- Add Item Dialog -->
-    <el-dialog v-model="showAddDialog" title="添加管理建议事项" width="650px">
+    <el-dialog append-to-body v-model="showAddDialog" title="添加管理建议事项" width="650px">
       <el-form :model="newItem" label-width="130px">
         <el-form-item label="缺陷类型">
           <el-select v-model="newItem.deficiency_type">
@@ -114,7 +114,7 @@
     </el-dialog>
 
     <!-- Update Follow-up Dialog -->
-    <el-dialog v-model="showFollowUpDialog" title="更新跟踪状态" width="500px">
+    <el-dialog append-to-body v-model="showFollowUpDialog" title="更新跟踪状态" width="500px">
       <el-form label-width="120px">
         <el-form-item label="当前状态">
           <el-tag :type="followUpTag(selectedItem?.follow_up_status)" size="small">
@@ -152,7 +152,7 @@
     </el-dialog>
 
     <!-- Carry Forward Dialog -->
-    <el-dialog v-model="showCarryForwardDialog" title="上年事项结转" width="400px">
+    <el-dialog append-to-body v-model="showCarryForwardDialog" title="上年事项结转" width="400px">
       <el-form label-width="120px">
         <el-form-item label="来源项目">
           <el-input v-model="sourceProjectId" placeholder="请输入上年项目ID" />

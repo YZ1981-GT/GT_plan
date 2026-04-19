@@ -21,11 +21,19 @@
       <el-table-column prop="title" label="职级" width="100" />
       <el-table-column prop="partner_name" label="所属合伙人" width="120" />
       <el-table-column prop="specialty" label="专业领域" min-width="150" />
+      <el-table-column label="来源" width="80" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.source === 'seed' ? 'info' : 'success'" size="small">
+            {{ row.source === 'seed' ? '初始' : '自定义' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="phone" label="联系电话" width="130" />
       <el-table-column label="操作" width="150" align="center">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="editStaff(row)">编辑</el-button>
           <el-button link type="primary" size="small" @click="viewResume(row)">简历</el-button>
+          <el-button v-if="row.source === 'custom'" link type="danger" size="small" @click="onDeleteStaff(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -35,7 +43,7 @@
       @current-change="onPageChange" />
 
     <!-- 创建/编辑弹窗 -->
-    <el-dialog v-model="showCreateDialog" :title="editingStaff ? '编辑人员' : '新增人员'" width="500px">
+    <el-dialog append-to-body v-model="showCreateDialog" :title="editingStaff ? '编辑人员' : '新增人员'" width="500px">
       <el-form :model="formData" label-width="90px">
         <el-form-item label="姓名" required><el-input v-model="formData.name" /></el-form-item>
         <el-form-item label="工号"><el-input v-model="formData.employee_no" /></el-form-item>
@@ -57,7 +65,7 @@
     </el-dialog>
 
     <!-- 简历弹窗 -->
-    <el-dialog v-model="showResumeDialog" title="人员简历" width="600px">
+    <el-dialog append-to-body v-model="showResumeDialog" title="人员简历" width="600px">
       <div v-if="resumeData">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="姓名">{{ resumeData.name }}</el-descriptions-item>
@@ -79,8 +87,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { listStaff, createStaff, updateStaff, getStaffResume, type StaffMember } from '@/services/staffApi'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { listStaff, createStaff, updateStaff, getStaffResume, deleteStaff, type StaffMember } from '@/services/staffApi'
 
 const titles = ['合伙人', '总监', '高级经理', '经理', '高级审计员', '审计员', '实习生']
 
@@ -142,7 +150,7 @@ async function saveStaff() {
       await updateStaff(editingStaff.value.id, formData.value)
       ElMessage.success('更新成功')
     } else {
-      await createStaff(formData.value)
+      await createStaff({ ...formData.value, source: 'custom' })
       ElMessage.success('创建成功')
     }
     showCreateDialog.value = false
@@ -150,6 +158,15 @@ async function saveStaff() {
     formData.value = { name: '', employee_no: '', department: '', title: '', partner_name: '', specialty: '', phone: '', email: '' }
     await loadStaff()
   } finally { saving.value = false }
+}
+
+async function onDeleteStaff(row: StaffMember) {
+  await ElMessageBox.confirm(`确定删除「${row.name}」？此操作仅对自定义人员有效。`, '删除确认', { type: 'warning' })
+  try {
+    await deleteStaff(row.id)
+    ElMessage.success('已删除')
+    await loadStaff()
+  } catch { ElMessage.error('删除失败') }
 }
 
 onMounted(loadStaff)

@@ -98,7 +98,7 @@
     </el-table>
 
     <!-- Reference copy dialog -->
-    <el-dialog v-model="showReferenceCopy" title="一键参照复制" width="400px">
+    <el-dialog append-to-body v-model="showReferenceCopy" title="一键参照复制" width="400px">
       <el-form label-width="100px">
         <el-form-item label="源企业名称">
           <el-input v-model="sourceCompanyCode" placeholder="输入源企业客户名称" />

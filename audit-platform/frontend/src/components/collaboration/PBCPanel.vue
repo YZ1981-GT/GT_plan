@@ -40,7 +40,7 @@
     </el-table>
 
     <!-- Update Status Dialog -->
-    <el-dialog v-model="updateDialogVisible" title="更新PBC状态" width="420px">
+    <el-dialog append-to-body v-model="updateDialogVisible" title="更新PBC状态" width="420px">
       <el-form ref="updateFormRef" :model="updateForm" label-width="100px">
         <el-form-item label="PBC名称">
           <span class="form-text">{{ currentItem?.item_name }}</span>

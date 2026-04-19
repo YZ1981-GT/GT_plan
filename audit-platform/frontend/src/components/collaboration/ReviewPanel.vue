@@ -73,7 +73,7 @@
     </div>
 
     <!-- 新建复核意见对话框 -->
-    <el-dialog v-model="createDialogVisible" title="新建复核意见" width="500px">
+    <el-dialog append-to-body v-model="createDialogVisible" title="新建复核意见" width="500px">
       <el-form :model="reviewForm" label-width="100px">
         <el-form-item label="复核级别" required>
           <el-select v-model="reviewForm.review_level" placeholder="选择复核级别" style="width: 100%">
@@ -97,7 +97,7 @@
     </el-dialog>
 
     <!-- 回复对话框 -->
-    <el-dialog v-model="replyDialogVisible" title="编制人回复" width="500px">
+    <el-dialog append-to-body v-model="replyDialogVisible" title="编制人回复" width="500px">
       <div v-if="selectedReview" class="reply-section">
         <p class="reply-label">复核意见：</p>
         <p class="reply-content">{{ selectedReview.comments }}</p>

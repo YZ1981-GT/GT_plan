@@ -38,7 +38,7 @@
     </el-table>
 
     <!-- 新建函证弹窗 -->
-    <el-dialog v-model="showCreateDialog" title="新建函证" width="500px">
+    <el-dialog append-to-body v-model="showCreateDialog" title="新建函证" width="500px">
       <el-form :model="createForm" label-width="100px">
         <el-form-item label="交易对手" required>
           <el-input v-model="createForm.counterparty" placeholder="请输入交易对手名称" />
@@ -65,7 +65,7 @@
     </el-dialog>
 
     <!-- 审核弹窗 -->
-    <el-dialog v-model="showReviewDialog" title="函证审核" width="500px">
+    <el-dialog append-to-body v-model="showReviewDialog" title="函证审核" width="500px">
       <div v-if="currentRow">
         <p><strong>函证名称：</strong>{{ currentRow.confirmation_name }}</p>
         <p><strong>交易对手：</strong>{{ currentRow.counterparty }}</p>

@@ -67,16 +67,29 @@ const catalogTitle = computed(() => {
 })
 
 // 浏览模式：首页/项目列表/其他一级模块（非具体项目子页面和新建向导）
+// 全宽模式路径（不显示中间栏项目列表）
+const FULLWIDTH_PATHS = [
+  '/', '/projects/new', '/recycle-bin', '/forum', '/private-storage',
+  '/knowledge', '/consolidation', '/attachments', '/confirmation',
+  '/archive', '/work-hours',
+]
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/']
+
+function isFullWidthPath(p: string): boolean {
+  if (FULLWIDTH_PATHS.includes(p)) return true
+  return FULLWIDTH_PREFIXES.some(prefix => p.startsWith(prefix))
+}
+
 const isBrowseMode = computed(() => {
   const p = route.path
-  if (p === '/projects/new' || p.startsWith('/extension/') || p.startsWith('/settings/') || p === '/recycle-bin' || p === '/forum' || p === '/private-storage') return false
-  return p === '/' || p === '/projects' || !p.match(/^\/projects\/[^/]+\//)
+  if (isFullWidthPath(p)) return false
+  return p === '/projects' || !p.match(/^\/projects\/[^/]+\//)
 })
 
-// 隐藏中间栏：在具体项目子页面、新建向导、扩展页面、设置页面、回收站、论坛、私人库时
+// 隐藏中间栏
 const hideMiddle = computed(() => {
   const p = route.path
-  if (p === '/projects/new' || p.startsWith('/extension/') || p.startsWith('/settings/') || p === '/recycle-bin' || p === '/forum' || p === '/private-storage') return true
+  if (isFullWidthPath(p)) return true
   return !!p.match(/^\/projects\/[^/]+\//)
 })
 

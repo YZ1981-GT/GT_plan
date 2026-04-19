@@ -67,7 +67,7 @@
     <el-button style="margin-top: 12px" @click="addCustom">+ 新增自定义程序</el-button>
 
     <!-- 参照弹窗 -->
-    <el-dialog v-model="showRefDialog" title="参照其他单位程序" width="450px">
+    <el-dialog append-to-body v-model="showRefDialog" title="参照其他单位程序" width="450px">
       <el-form label-width="80px">
         <el-form-item label="参照项目">
           <el-input v-model="refProjectId" placeholder="输入项目ID" />

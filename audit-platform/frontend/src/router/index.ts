@@ -283,6 +283,26 @@ const router = createRouter({
           component: () => import('@/views/ReportFormatManager.vue'),
         },
         {
+          path: 'settings',
+          name: 'SystemSettings',
+          component: () => import('@/views/SystemSettings.vue'),
+        },
+        {
+          path: 'knowledge',
+          name: 'KnowledgeBase',
+          component: () => import('@/views/KnowledgeBase.vue'),
+        },
+        {
+          path: 'consolidation',
+          name: 'ConsolidationHub',
+          component: () => import('@/views/ConsolidationHub.vue'),
+        },
+        {
+          path: 'attachments',
+          name: 'AttachmentHub',
+          component: () => import('@/views/AttachmentHub.vue'),
+        },
+        {
           path: 'staff/:staffId/check-ins',
           name: 'CheckIns',
           component: () => import('@/views/CheckInsPage.vue'),

@@ -31,7 +31,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="showReviewDialog" title="复核详情" width="600px">
+    <el-dialog append-to-body v-model="showReviewDialog" title="复核详情" width="600px">
       <div v-if="currentReview">
         <p><strong>复核级别：</strong>{{ levelName(currentReview.review_level) }}</p>
         <p><strong>状态：</strong>{{ currentReview.review_status }}</p>
@@ -46,7 +46,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showRejectDialog" title="驳回复核" width="400px">
+    <el-dialog append-to-body v-model="showRejectDialog" title="驳回复核" width="400px">
       <el-form>
         <el-form-item label="驳回原因" required>
           <el-input v-model="rejectComments" type="textarea" :rows="3" />

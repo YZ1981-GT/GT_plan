@@ -101,7 +101,7 @@
     </el-table>
 
     <!-- 新建程序对话框 -->
-    <el-dialog v-model="createDialogVisible" title="新建审计程序" width="600px">
+    <el-dialog append-to-body v-model="createDialogVisible" title="新建审计程序" width="600px">
       <el-form :model="procedureForm" label-width="110px">
         <el-form-item label="程序编号" required>
           <el-input v-model="procedureForm.procedure_code" placeholder="如：AP-001" />
@@ -164,7 +164,7 @@
     </el-dialog>
 
     <!-- 关联底稿对话框 -->
-    <el-dialog v-model="linkDialogVisible" title="关联底稿" width="400px">
+    <el-dialog append-to-body v-model="linkDialogVisible" title="关联底稿" width="400px">
       <el-form label-width="80px">
         <el-form-item label="底稿编号">
           <el-input v-model="linkForm.related_wp_code" placeholder="输入底稿编号" />

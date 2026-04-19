@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="备案错误信息" width="500px" @close="$emit('close')">
+  <el-dialog append-to-body v-model="visible" title="备案错误信息" width="500px" @close="$emit('close')">
     <template v-if="filing">
       <el-alert type="error" :closable="false" show-icon style="margin-bottom: 16px">
         <template #title>备案处理失败</template>

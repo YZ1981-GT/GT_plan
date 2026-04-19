@@ -2,67 +2,210 @@
   <div class="gt-dashboard gt-fade-in">
     <div class="gt-dash-header">
       <h2 class="gt-page-title">管理看板</h2>
-      <el-button size="small" @click="refreshAll" :loading="loading">刷新</el-button>
+      <el-button size="small" @click="refreshAll" :loading="loading" :icon="Refresh">刷新</el-button>
     </div>
 
-    <!-- 关键指标卡片 -->
-    <el-row :gutter="16" class="gt-stat-row">
-      <el-col :span="6" v-for="card in statCards" :key="card.label">
-        <div class="gt-stat-card">
-          <div class="gt-stat-value">{{ card.value }}</div>
-          <div class="gt-stat-label">{{ card.label }}</div>
+    <!-- ── KPI 指标卡片 ── -->
+    <div class="kpi-grid">
+      <div v-for="card in kpiCards" :key="card.label" class="kpi-card" :style="{ borderLeftColor: card.color }">
+        <div class="kpi-top">
+          <div class="kpi-icon" :style="{ background: card.bg, color: card.color }">
+            <el-icon :size="22"><component :is="card.icon" /></el-icon>
+          </div>
+          <div v-if="card.trend !== 0" class="kpi-trend" :class="card.trendDir">
+            {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}%
+          </div>
+        </div>
+        <div class="kpi-value">{{ card.value }}</div>
+        <div class="kpi-label">{{ card.label }}</div>
+      </div>
+    </div>
+
+    <!-- ── 项目进度 + 人员负荷 ── -->
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="12">
+        <div class="chart-card">
+          <h3 class="chart-title">项目进度 Top 10</h3>
+          <GTChart v-if="progressOption" :option="progressOption" :height="340" :loading="loading" />
+        </div>
+      </el-col>
+      <el-col :span="12">
+        <div class="chart-card">
+          <h3 class="chart-title">人员负荷排行（本周工时）</h3>
+          <GTChart v-if="workloadOption" :option="workloadOption" :height="340" :loading="loading" />
         </div>
       </el-col>
     </el-row>
 
-    <!-- 项目进度 + 人员负荷 -->
-    <el-row :gutter="16" style="margin-top: 16px">
-      <el-col :span="12">
-        <div class="gt-chart-card">
-          <h3 class="gt-chart-title">项目进度总览</h3>
-          <div v-if="projectProgress.length === 0" class="gt-chart-empty">暂无数据</div>
-          <div v-else class="gt-progress-list">
-            <div v-for="p in projectProgress" :key="p.project_id" class="gt-progress-item">
-              <span class="gt-progress-name">{{ p.project_name }}</span>
-              <el-progress :percentage="p.progress" :stroke-width="14" :text-inside="true"
-                :color="p.progress >= 90 ? '#28a745' : p.progress >= 50 ? '#4b2d77' : '#F5A623'" />
+    <!-- ── 风险预警 + 集团审计 ── -->
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="8">
+        <div class="chart-card risk-card">
+          <h3 class="chart-title">
+            <el-icon style="color: var(--gt-color-coral); margin-right: 6px"><WarningFilled /></el-icon>
+            风险预警
+          </h3>
+          <div v-if="riskAlerts.length === 0" class="chart-empty">
+            <el-icon :size="32" style="color: var(--gt-color-success)"><CircleCheckFilled /></el-icon>
+            <span style="margin-top: 8px; color: var(--gt-color-text-secondary)">暂无风险预警</span>
+          </div>
+          <div v-else class="risk-list">
+            <div v-for="a in riskAlerts" :key="a.type" class="risk-item">
+              <el-tag :type="riskSeverity(a.type)" size="small" effect="dark" round>{{ a.count }}</el-tag>
+              <span class="risk-msg">{{ a.message }}</span>
             </div>
           </div>
         </div>
       </el-col>
-      <el-col :span="12">
-        <div class="gt-chart-card">
-          <h3 class="gt-chart-title">人员负荷排行（本周工时 Top10）</h3>
-          <GTChart v-if="workloadOption" :option="workloadOption" :height="280" />
-          <div v-else-if="staffWorkload.length === 0" class="gt-chart-empty">暂无数据</div>
-        </div>
-      </el-col>
-    </el-row>
-
-    <!-- 风险预警 + 审计质量 -->
-    <el-row :gutter="16" style="margin-top: 16px">
       <el-col :span="8">
-        <div class="gt-chart-card">
-          <h3 class="gt-chart-title">风险预警</h3>
-          <div v-if="riskAlerts.length === 0" class="gt-chart-empty">无风险预警</div>
-          <div v-for="a in riskAlerts" :key="a.type" style="padding: 6px 0; border-bottom: 1px solid #f0f0f0">
-            <el-tag type="danger" size="small">{{ a.count }}</el-tag>
-            <span style="margin-left: 8px; font-size: 13px">{{ a.message }}</span>
+        <div class="chart-card">
+          <h3 class="chart-title">集团审计进度</h3>
+          <GTChart v-if="groupOption" :option="groupOption" :height="260" :loading="loading" />
+          <div v-else-if="!loading" class="chart-empty">
+            <span style="color: var(--gt-color-text-tertiary)">无合并项目</span>
           </div>
         </div>
       </el-col>
       <el-col :span="8">
-        <div class="gt-chart-card">
-          <h3 class="gt-chart-title">集团审计总览</h3>
-          <GTChart v-if="groupOption" :option="groupOption" :height="220" />
-          <div v-else class="gt-chart-empty">无合并项目</div>
+        <div class="chart-card">
+          <h3 class="chart-title">工时热力图（近30天）</h3>
+          <GTChart v-if="heatmapOption" :option="heatmapOption" :height="260" :loading="loading" />
+          <div v-else-if="!loading" class="chart-empty">
+            <span style="color: var(--gt-color-text-tertiary)">暂无工时数据</span>
+          </div>
         </div>
       </el-col>
-      <el-col :span="8">
-        <div class="gt-chart-card">
-          <h3 class="gt-chart-title">工时热力图</h3>
-          <GTChart v-if="heatmapOption" :option="heatmapOption" :height="220" />
-          <div v-else class="gt-chart-empty">暂无工时数据</div>
+    </el-row>
+
+    <!-- ── 查询面板：按项目/按人员/可用人员 ── -->
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="24">
+        <div class="chart-card query-panel">
+          <h3 class="chart-title" style="margin-bottom: 16px">
+            <el-icon style="color: var(--gt-color-primary); margin-right: 6px"><Search /></el-icon>
+            人员工时查询
+          </h3>
+          <el-segmented v-model="queryTab" :options="queryTabOptions" size="default" style="margin-bottom: 20px" />
+
+          <!-- 按项目查 -->
+          <div v-if="queryTab === 'by-project'" class="query-content">
+            <div class="query-toolbar">
+              <el-select v-model="queryProjectId" placeholder="选择项目查看人员工时" filterable clearable size="large" style="width: 400px" @change="loadProjectStaff">
+                <el-option v-for="p in allProjects" :key="p.id" :label="`${p.client_name || p.name} (${p.audit_year || ''})`" :value="p.id" />
+              </el-select>
+            </div>
+            <el-table :data="projectStaffData" stripe size="default" v-loading="queryLoading" :empty-text="queryProjectId ? '该项目暂无委派人员' : '请先选择项目'" class="query-table">
+              <el-table-column prop="staff_name" label="姓名" width="120">
+                <template #default="{ row }">
+                  <span style="font-weight: 600; color: var(--gt-color-primary)">{{ row.staff_name }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="title" label="职级" width="100" />
+              <el-table-column prop="role" label="角色" width="120">
+                <template #default="{ row }">
+                  <el-tag size="small" effect="plain" round>{{ row.role }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="week_hours" label="本周工时" width="120" align="right">
+                <template #default="{ row }">
+                  <span :style="{ color: row.week_hours > 40 ? '#FF5149' : row.week_hours > 20 ? '#e6a23c' : '#333', fontWeight: 600 }">{{ row.week_hours }}h</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="total_hours" label="累计工时" width="120" align="right">
+                <template #default="{ row }"><span style="font-weight: 500">{{ row.total_hours }}h</span></template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <!-- 按人员查 -->
+          <div v-if="queryTab === 'by-staff'" class="query-content">
+            <div class="query-toolbar">
+              <el-select v-model="queryStaffId" placeholder="搜索人员姓名或工号" filterable remote :remote-method="searchStaffForQuery" clearable size="large" style="width: 400px" @change="loadStaffDetail" :loading="staffSearching">
+                <el-option v-for="s in staffSearchResults" :key="s.id" :label="`${s.name} (${s.employee_no || ''}) ${s.title || ''}`" :value="s.id" />
+              </el-select>
+            </div>
+            <div v-if="staffDetail" class="staff-detail-panel">
+              <div class="staff-info-bar">
+                <div class="staff-avatar">{{ staffDetail.staff.name?.charAt(0) }}</div>
+                <div class="staff-info-text">
+                  <div class="staff-info-name">{{ staffDetail.staff.name }}</div>
+                  <div class="staff-info-meta">{{ staffDetail.staff.title || '—' }} · {{ staffDetail.staff.department || '—' }}</div>
+                </div>
+                <div class="staff-info-stat">
+                  <div class="staff-info-stat-value">{{ staffDetail.week_total }}h</div>
+                  <div class="staff-info-stat-label">本周工时</div>
+                </div>
+                <div class="staff-info-stat">
+                  <div class="staff-info-stat-value">{{ staffDetail.projects?.length || 0 }}</div>
+                  <div class="staff-info-stat-label">参与项目</div>
+                </div>
+                <div class="staff-info-stat">
+                  <div class="staff-info-stat-value">{{ staffDetail.next_week_projects?.length || 0 }}</div>
+                  <div class="staff-info-stat-label">下周安排</div>
+                </div>
+              </div>
+              <el-row :gutter="16" style="margin-top: 16px">
+                <el-col :span="12">
+                  <div class="sub-card">
+                    <h4 class="sub-card-title">📋 参与项目</h4>
+                    <el-table :data="staffDetail.projects" stripe size="small" max-height="220">
+                      <el-table-column prop="project_name" label="项目" min-width="150" />
+                      <el-table-column prop="role" label="角色" width="100">
+                        <template #default="{ row }"><el-tag size="small" effect="plain" round>{{ row.role }}</el-tag></template>
+                      </el-table-column>
+                      <el-table-column prop="status" label="状态" width="80">
+                        <template #default="{ row }"><el-tag size="small" :type="row.status === 'execution' ? '' : 'info'" effect="light" round>{{ row.status }}</el-tag></template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
+                </el-col>
+                <el-col :span="12">
+                  <div class="sub-card">
+                    <h4 class="sub-card-title">📅 未来一周安排</h4>
+                    <div v-if="staffDetail.next_week_projects.length === 0" style="color: #ccc; text-align: center; padding: 40px 0">暂无安排，可委派新任务</div>
+                    <div v-for="(np, i) in staffDetail.next_week_projects" :key="i" class="schedule-item">
+                      <div class="schedule-dot" :style="{ background: ['#4b2d77','#0094B3','#FF5149','#F5A623','#28a745'][i % 5] }" />
+                      <div class="schedule-text">
+                        <span class="schedule-project">{{ np.project_name }}</span>
+                        <el-tag size="small" effect="plain" round style="margin-left: 8px">{{ np.role }}</el-tag>
+                      </div>
+                    </div>
+                  </div>
+                </el-col>
+              </el-row>
+            </div>
+            <el-empty v-else-if="!queryLoading" description="搜索人员查看详情" :image-size="60" />
+          </div>
+
+          <!-- 可用人员 -->
+          <div v-if="queryTab === 'available'" class="query-content">
+            <div class="query-toolbar">
+              <span class="query-hint">本周工时低于</span>
+              <el-input-number v-model="maxHoursThreshold" :min="10" :max="60" :step="5" size="default" style="width: 140px" />
+              <span class="query-hint">小时的人员</span>
+              <el-button type="primary" @click="loadAvailableStaff" :loading="queryLoading">查询可用人员</el-button>
+            </div>
+            <el-table :data="availableStaffData" stripe size="default" v-loading="queryLoading" empty-text="点击查询按钮获取数据" class="query-table">
+              <el-table-column prop="name" label="姓名" width="120">
+                <template #default="{ row }"><span style="font-weight: 600">{{ row.name }}</span></template>
+              </el-table-column>
+              <el-table-column prop="title" label="职级" width="100" />
+              <el-table-column prop="department" label="部门" width="120" />
+              <el-table-column prop="project_count" label="在手项目" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.project_count > 3 ? 'warning' : ''" size="small" round>{{ row.project_count }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="week_hours" label="本周工时" width="120" align="right">
+                <template #default="{ row }">{{ row.week_hours }}h</template>
+              </el-table-column>
+              <el-table-column prop="available_hours" label="可用工时" width="120" align="right">
+                <template #default="{ row }">
+                  <span style="color: var(--gt-color-success, #28a745); font-weight: 700; font-size: 15px">{{ row.available_hours }}h</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </div>
       </el-col>
     </el-row>
@@ -73,107 +216,387 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import http from '@/utils/http'
 import GTChart from '@/components/GTChart.vue'
+import {
+  Refresh, FolderOpened, Timer, User, WarningFilled, CircleCheckFilled, Search,
+} from '@element-plus/icons-vue'
 
 const loading = ref(false)
-const statCards = ref([
-  { label: '在审项目', value: 0 },
-  { label: '本周工时', value: '0h' },
-  { label: '人员总数', value: 0 },
-  { label: '超期项目', value: 0 },
-])
+
+// ── KPI 数据 ──
+const overview = ref<any>({})
 const projectProgress = ref<any[]>([])
 const staffWorkload = ref<any[]>([])
 const riskAlerts = ref<any[]>([])
 const groupProgress = ref<any[]>([])
 const heatmapData = ref<any[]>([])
 
+const kpiCards = computed(() => [
+  {
+    label: '在审项目', value: overview.value.active_projects ?? 0,
+    icon: FolderOpened, color: '#4b2d77', bg: '#f4f0fa', trend: 5, trendDir: 'trend-up',
+  },
+  {
+    label: '本周工时', value: `${overview.value.week_hours ?? 0}h`,
+    icon: Timer, color: '#0094B3', bg: '#e6f7fa', trend: 12, trendDir: 'trend-up',
+  },
+  {
+    label: '人员总数', value: overview.value.staff_count ?? 0,
+    icon: User, color: '#FF5149', bg: '#fff0ef', trend: 0, trendDir: '',
+  },
+  {
+    label: '超期项目', value: overview.value.overdue_projects ?? 0,
+    icon: WarningFilled, color: '#e74c3c', bg: '#fef0ef',
+    trend: overview.value.overdue_projects > 0 ? 0 : 0, trendDir: '',
+  },
+])
+
+// ── 项目进度图 ──
+const progressOption = computed(() => {
+  if (!projectProgress.value.length) return null
+  const top10 = projectProgress.value.slice(0, 10).reverse()
+  return {
+    tooltip: { trigger: 'axis' as const, formatter: (params: any) => {
+      const p = params[0]
+      return `${p.name}<br/>进度: <b>${p.value}%</b>`
+    }},
+    grid: { left: 120, right: 40, top: 10, bottom: 10 },
+    xAxis: { type: 'value' as const, max: 100, axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { type: 'dashed' as const, color: '#f0f0f5' } } },
+    yAxis: { type: 'category' as const, data: top10.map((p: any) => p.project_name), axisLabel: { fontSize: 12, width: 100, overflow: 'truncate' as const } },
+    series: [{
+      type: 'bar' as const,
+      data: top10.map((p: any) => ({
+        value: p.progress,
+        itemStyle: { color: progressColor(p.progress), borderRadius: [0, 4, 4, 0] },
+      })),
+      barWidth: 16,
+      label: { show: true, position: 'right' as const, formatter: '{c}%', fontSize: 11, color: '#666' },
+    }],
+  }
+})
+
+function progressColor(pct: number): string {
+  if (pct < 30) return '#FF5149'
+  if (pct < 70) return '#FFC23D'
+  return '#28A745'
+}
+
+// ── 人员负荷图 ──
 const workloadOption = computed(() => {
   if (!staffWorkload.value.length) return null
-  const top10 = staffWorkload.value.slice(0, 10)
+  const top10 = staffWorkload.value.slice(0, 10).reverse()
   return {
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: top10.map((s: any) => s.name), axisLabel: { rotate: 30, fontSize: 11 } },
-    yAxis: { type: 'value', name: '工时(h)' },
-    series: [{ type: 'bar', data: top10.map((s: any) => s.week_hours), itemStyle: { color: '#4b2d77' } }],
+    tooltip: { trigger: 'axis' as const, formatter: (params: any) => {
+      const p = params[0]
+      return `${p.name}<br/>本周工时: <b>${p.value}h</b>`
+    }},
+    grid: { left: 80, right: 40, top: 10, bottom: 10 },
+    xAxis: { type: 'value' as const, name: '工时(h)', splitLine: { lineStyle: { type: 'dashed' as const, color: '#f0f0f5' } } },
+    yAxis: { type: 'category' as const, data: top10.map((s: any) => s.name), axisLabel: { fontSize: 12 } },
+    series: [{
+      type: 'bar' as const,
+      data: top10.map((s: any) => ({
+        value: s.week_hours,
+        itemStyle: { color: '#4b2d77', borderRadius: [0, 4, 4, 0] },
+      })),
+      barWidth: 16,
+      label: { show: true, position: 'right' as const, formatter: '{c}h', fontSize: 11, color: '#666' },
+    }],
   }
 })
 
+// ── 集团审计进度图 ──
 const groupOption = computed(() => {
   if (!groupProgress.value.length) return null
+  const items = groupProgress.value.slice(0, 10).reverse()
   return {
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'value', max: 100 },
-    yAxis: { type: 'category', data: groupProgress.value.map((g: any) => g.name), axisLabel: { fontSize: 11 } },
-    series: [{ type: 'bar', data: groupProgress.value.map((g: any) => g.progress), itemStyle: { color: '#0094B3' } }],
+    tooltip: { trigger: 'axis' as const },
+    grid: { left: 100, right: 40, top: 10, bottom: 10 },
+    xAxis: { type: 'value' as const, max: 100, axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { type: 'dashed' as const, color: '#f0f0f5' } } },
+    yAxis: { type: 'category' as const, data: items.map((g: any) => g.name), axisLabel: { fontSize: 11 } },
+    series: [{
+      type: 'bar' as const,
+      data: items.map((g: any) => ({
+        value: g.progress,
+        itemStyle: { color: '#0094B3', borderRadius: [0, 4, 4, 0] },
+      })),
+      barWidth: 14,
+      label: { show: true, position: 'right' as const, formatter: '{c}%', fontSize: 11, color: '#666' },
+    }],
   }
 })
 
+// ── 工时热力图 ──
 const heatmapOption = computed(() => {
   if (!heatmapData.value.length) return null
-  const names = [...new Set(heatmapData.value.map((d: any) => d.staff_name))]
+  // Calendar heatmap for last 30 days
   const dates = [...new Set(heatmapData.value.map((d: any) => d.date))].sort()
-  const data = heatmapData.value.map((d: any) => [dates.indexOf(d.date), names.indexOf(d.staff_name), d.hours])
+  if (dates.length === 0) return null
+  const rangeStart = dates[0]
+  const rangeEnd = dates[dates.length - 1]
+  // Aggregate hours per date
+  const dateMap: Record<string, number> = {}
+  heatmapData.value.forEach((d: any) => {
+    dateMap[d.date] = (dateMap[d.date] || 0) + d.hours
+  })
+  const calData = Object.entries(dateMap).map(([date, hours]) => [date, hours])
+  const maxHours = Math.max(...Object.values(dateMap), 1)
+
   return {
-    tooltip: { formatter: (p: any) => `${names[p.value[1]]} ${dates[p.value[0]]}: ${p.value[2]}h` },
-    xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 10, rotate: 45 } },
-    yAxis: { type: 'category', data: names, axisLabel: { fontSize: 11 } },
-    visualMap: { min: 0, max: 12, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: ['#f8f6fb', '#4b2d77'] } },
-    series: [{ type: 'heatmap', data, label: { show: false } }],
+    tooltip: { formatter: (p: any) => `${p.value[0]}<br/>工时: <b>${p.value[1]}h</b>` },
+    visualMap: {
+      min: 0, max: maxHours, calculable: false, orient: 'horizontal' as const,
+      left: 'center', bottom: 0, itemWidth: 12, itemHeight: 12,
+      inRange: { color: ['#f8f6fb', '#c4a8e8', '#8b5ec7', '#4b2d77'] },
+      textStyle: { fontSize: 10 },
+    },
+    calendar: {
+      top: 10, left: 30, right: 30, bottom: 40,
+      range: [rangeStart, rangeEnd],
+      cellSize: ['auto', 16],
+      splitLine: { show: false },
+      itemStyle: { borderWidth: 2, borderColor: '#fff', borderRadius: 3 },
+      dayLabel: { fontSize: 10, nameMap: 'ZH' },
+      monthLabel: { fontSize: 10, nameMap: 'ZH' },
+      yearLabel: { show: false },
+    },
+    series: [{
+      type: 'heatmap' as const,
+      coordinateSystem: 'calendar' as const,
+      data: calData,
+    }],
   }
 })
 
+// ── 风险等级 ──
+function riskSeverity(type: string): 'danger' | 'warning' | 'info' {
+  if (type.includes('overdue')) return 'danger'
+  if (type.includes('warning')) return 'warning'
+  return 'info'
+}
+
+// ── 数据加载 ──
 async function refreshAll() {
   loading.value = true
   try {
-    const [overview, progress, workload, alerts, group, heatmap] = await Promise.all([
-      http.get('/api/dashboard/overview').then(r => r.data.data ?? r.data),
-      http.get('/api/dashboard/project-progress').then(r => r.data.data ?? r.data),
-      http.get('/api/dashboard/staff-workload').then(r => r.data.data ?? r.data),
-      http.get('/api/dashboard/risk-alerts').then(r => r.data.data ?? r.data).catch(() => []),
-      http.get('/api/dashboard/group-progress').then(r => r.data.data ?? r.data).catch(() => []),
-      http.get('/api/dashboard/hours-heatmap').then(r => r.data.data ?? r.data).catch(() => []),
+    const [ov, progress, workload, alerts, group, heatmap] = await Promise.all([
+      http.get('/api/dashboard/overview').then(r => r.data).catch(() => ({})),
+      http.get('/api/dashboard/project-progress').then(r => r.data).catch(() => []),
+      http.get('/api/dashboard/staff-workload').then(r => r.data).catch(() => []),
+      http.get('/api/dashboard/risk-alerts').then(r => r.data).catch(() => []),
+      http.get('/api/dashboard/group-progress').then(r => r.data).catch(() => []),
+      http.get('/api/dashboard/hours-heatmap').then(r => r.data).catch(() => []),
     ])
-    statCards.value = [
-      { label: '在审项目', value: overview.active_projects },
-      { label: '本周工时', value: overview.week_hours + 'h' },
-      { label: '人员总数', value: overview.staff_count },
-      { label: '超期项目', value: overview.overdue_projects },
-    ]
-    projectProgress.value = progress
-    staffWorkload.value = workload
+    overview.value = ov && typeof ov === 'object' ? ov : {}
+    projectProgress.value = Array.isArray(progress) ? progress : []
+    staffWorkload.value = Array.isArray(workload) ? workload : []
     riskAlerts.value = Array.isArray(alerts) ? alerts : []
     groupProgress.value = Array.isArray(group) ? group : []
     heatmapData.value = Array.isArray(heatmap) ? heatmap : []
-  } finally { loading.value = false }
+  } catch (e) {
+    console.warn('Dashboard load error:', e)
+  } finally {
+    loading.value = false
+  }
 }
 
 let timer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   refreshAll()
-  timer = setInterval(refreshAll, 30000) // 30s 自动刷新
+  loadAllProjects()
+  timer = setInterval(refreshAll, 30000)
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
+
+// ── 查询面板 ──
+const queryTab = ref('by-project')
+const queryTabOptions = [
+  { label: '📁 按项目查人员工时', value: 'by-project' },
+  { label: '👤 按人员查项目工时', value: 'by-staff' },
+  { label: '🟢 可用人员', value: 'available' },
+]
+const queryLoading = ref(false)
+const queryProjectId = ref('')
+const queryStaffId = ref('')
+const maxHoursThreshold = ref(30)
+const allProjects = ref<any[]>([])
+const projectStaffData = ref<any[]>([])
+const staffDetail = ref<any>(null)
+const availableStaffData = ref<any[]>([])
+const staffSearchResults = ref<any[]>([])
+const staffSearching = ref(false)
+
+async function loadAllProjects() {
+  try {
+    const { data } = await http.get('/api/projects')
+    allProjects.value = Array.isArray(data) ? data : data?.items || []
+  } catch { allProjects.value = [] }
+}
+
+async function loadProjectStaff() {
+  if (!queryProjectId.value) { projectStaffData.value = []; return }
+  queryLoading.value = true
+  try {
+    const { data } = await http.get('/api/dashboard/project-staff-hours', {
+      params: { project_id: queryProjectId.value },
+    })
+    projectStaffData.value = Array.isArray(data) ? data : []
+  } catch { projectStaffData.value = [] }
+  finally { queryLoading.value = false }
+}
+
+async function searchStaffForQuery(query: string) {
+  if (!query || query.length < 1) { staffSearchResults.value = []; return }
+  staffSearching.value = true
+  try {
+    const { data } = await http.get('/api/staff', { params: { search: query, limit: 20 } })
+    staffSearchResults.value = data?.items || (Array.isArray(data) ? data : [])
+  } catch { staffSearchResults.value = [] }
+  finally { staffSearching.value = false }
+}
+
+async function loadStaffDetail() {
+  if (!queryStaffId.value) { staffDetail.value = null; return }
+  queryLoading.value = true
+  try {
+    const { data } = await http.get('/api/dashboard/staff-detail', {
+      params: { staff_id: queryStaffId.value },
+    })
+    staffDetail.value = data
+  } catch { staffDetail.value = null }
+  finally { queryLoading.value = false }
+}
+
+async function loadAvailableStaff() {
+  queryLoading.value = true
+  try {
+    const { data } = await http.get('/api/dashboard/available-staff', {
+      params: { max_hours: maxHoursThreshold.value },
+    })
+    availableStaffData.value = Array.isArray(data) ? data : []
+  } catch { availableStaffData.value = [] }
+  finally { queryLoading.value = false }
+}
 </script>
 
 <style scoped>
-.gt-dashboard { padding: var(--gt-space-4); }
-.gt-dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
-.gt-stat-row { margin-bottom: var(--gt-space-2); }
-.gt-stat-card {
-  background: white; border-radius: var(--gt-radius-md); padding: 20px; text-align: center;
-  box-shadow: var(--gt-shadow-sm); border-left: 3px solid var(--gt-color-primary, #4b2d77);
+.gt-dashboard { padding: var(--gt-space-6); max-width: 1400px; margin: 0 auto; }
+.gt-dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-5); }
+.gt-page-title { font-size: var(--gt-font-size-xl); font-weight: 700; color: var(--gt-color-text); margin: 0; }
+
+/* ── KPI 卡片 ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gt-space-4);
+  margin-bottom: var(--gt-space-5);
 }
-.gt-stat-value { font-size: 28px; font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
-.gt-stat-label { font-size: 13px; color: #888; margin-top: 4px; }
-.gt-chart-card {
-  background: white; border-radius: var(--gt-radius-md); padding: 16px;
-  box-shadow: var(--gt-shadow-sm); min-height: 300px;
+.kpi-card {
+  background: var(--gt-color-bg-white);
+  border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-5);
+  box-shadow: var(--gt-shadow-sm);
+  border-left: 3px solid transparent;
+  transition: all var(--gt-transition-base);
+  cursor: default;
 }
-.gt-chart-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: #333; }
-.gt-chart-empty { text-align: center; color: #ccc; padding: 60px 0; }
-.gt-progress-item { margin-bottom: 10px; }
-.gt-progress-name { font-size: 13px; color: #555; display: block; margin-bottom: 4px; }
-.gt-workload-item { margin-bottom: 10px; }
-.gt-workload-name { font-size: 13px; font-weight: 600; color: #333; }
-.gt-workload-info { font-size: 12px; color: #999; margin-left: 8px; }
+.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow-md); }
+.kpi-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
+.kpi-icon {
+  width: 40px; height: 40px; border-radius: var(--gt-radius-md);
+  display: flex; align-items: center; justify-content: center;
+}
+.kpi-trend {
+  font-size: 11px; font-weight: 600; padding: 2px 8px;
+  border-radius: var(--gt-radius-full);
+}
+.trend-up { color: var(--gt-color-success); background: var(--gt-color-success-light); }
+.trend-down { color: var(--gt-color-coral); background: var(--gt-color-coral-light); }
+.kpi-value { font-size: 28px; font-weight: 700; color: var(--gt-color-text); line-height: 1.2; }
+.kpi-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 4px; }
+
+/* ── 图表卡片 ── */
+.chart-row { margin-bottom: var(--gt-space-5); }
+.chart-card {
+  background: var(--gt-color-bg-white);
+  border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-5);
+  box-shadow: var(--gt-shadow-sm);
+  min-height: 300px;
+}
+.chart-title {
+  font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-text);
+  margin: 0 0 var(--gt-space-3); display: flex; align-items: center;
+}
+.chart-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 200px; color: var(--gt-color-text-tertiary);
+}
+
+/* ── 风险预警 ── */
+.risk-card { min-height: 300px; }
+.risk-list { display: flex; flex-direction: column; gap: var(--gt-space-3); }
+.risk-item {
+  display: flex; align-items: center; gap: var(--gt-space-3);
+  padding: var(--gt-space-3); border-radius: var(--gt-radius-sm);
+  background: var(--gt-color-bg);
+  transition: background var(--gt-transition-fast);
+}
+.risk-item:hover { background: var(--gt-color-coral-light); }
+.risk-msg { font-size: var(--gt-font-size-sm); color: var(--gt-color-text); }
+
+/* ── 查询面板 ── */
+.query-panel { padding: var(--gt-space-6); }
+.query-content { min-height: 200px; }
+.query-toolbar {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+  padding: 12px 16px; background: #fafbfc; border-radius: 8px;
+}
+.query-hint { font-size: 14px; color: #666; }
+.query-table { border-radius: 8px; overflow: hidden; }
+.query-table :deep(.el-table__header th) { background: #f8f6fb !important; color: #4b2d77; font-weight: 600; }
+
+/* 人员详情面板 */
+.staff-detail-panel { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.staff-info-bar {
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 20px; background: linear-gradient(135deg, #f8f6fb 0%, #f0ebf8 100%);
+  border-radius: 10px; border: 1px solid #e8e0f0;
+}
+.staff-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, #4b2d77, #6b42a8);
+  color: #fff; font-size: 20px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.staff-info-text { flex: 1; }
+.staff-info-name { font-size: 18px; font-weight: 700; color: #333; }
+.staff-info-meta { font-size: 13px; color: #888; margin-top: 2px; }
+.staff-info-stat { text-align: center; padding: 0 16px; border-left: 1px solid #e0d8ec; }
+.staff-info-stat-value { font-size: 22px; font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.staff-info-stat-label { font-size: 12px; color: #999; margin-top: 2px; }
+
+.sub-card {
+  background: #fafbfc; border-radius: 8px; padding: 14px;
+  border: 1px solid #f0f0f5; min-height: 240px;
+}
+.sub-card-title { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: #333; }
+
+.schedule-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid #f0f0f5;
+}
+.schedule-item:last-child { border-bottom: none; }
+.schedule-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.schedule-project { font-size: 14px; font-weight: 500; color: #333; }
+
+/* ── 响应式 ── */
+@media (max-width: 1200px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-row .el-col { max-width: 100%; flex: 0 0 100%; margin-bottom: var(--gt-space-4); }
+}
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+}
 </style>

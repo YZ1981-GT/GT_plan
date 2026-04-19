@@ -27,7 +27,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="addDialogVisible" title="添加项目成员" width="520px">
+    <el-dialog append-to-body v-model="addDialogVisible" title="添加项目成员" width="520px">
       <el-form :model="addForm" :rules="addRules" ref="addFormRef" label-width="100px">
         <el-form-item label="用户" prop="user_id">
           <el-select v-model="addForm.user_id" filterable placeholder="搜索用户">

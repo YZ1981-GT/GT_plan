@@ -201,7 +201,7 @@
     />
 
     <!-- 结转弹窗 -->
-    <el-dialog v-model="carryForwardVisible" title="结转至下一期" width="500px" class="gt-dialog">
+    <el-dialog append-to-body v-model="carryForwardVisible" title="结转至下一期" width="500px" class="gt-dialog">
       <el-form :model="carryForwardForm" label-width="100px">
         <el-form-item label="目标期间">
           <el-date-picker
@@ -231,7 +231,7 @@
     </el-dialog>
 
     <!-- 驳回原因弹窗 -->
-    <el-dialog v-model="rejectVisible" title="驳回原因" width="450px" class="gt-dialog">
+    <el-dialog append-to-body v-model="rejectVisible" title="驳回原因" width="450px" class="gt-dialog">
       <el-form>
         <el-form-item label="驳回原因">
           <el-input

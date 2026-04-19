@@ -17,7 +17,7 @@
       <el-table-column prop="treatment" label="处理方式" width="120" />
       <el-table-column prop="review_status" label="状态" width="100" />
     </el-table>
-    <el-dialog v-model="showCreate" title="新增后续事项" width="550px">
+    <el-dialog append-to-body v-model="showCreate" title="新增后续事项" width="550px">
       <el-form :model="form" label-width="90px">
         <el-form-item label="事项类型">
           <el-radio-group v-model="form.event_type">

@@ -33,7 +33,7 @@
     </el-table>
 
     <!-- 填报弹窗 -->
-    <el-dialog v-model="showCreateDialog" title="填报工时" width="450px">
+    <el-dialog append-to-body v-model="showCreateDialog" title="填报工时" width="450px">
       <el-form :model="form" label-width="80px">
         <el-form-item label="日期" required>
           <el-date-picker v-model="form.work_date" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -65,7 +65,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listWorkHours, createWorkHour, updateWorkHour, getAISuggestions, getMyAssignments, type WorkHourRecord } from '@/services/staffApi'
+import { listWorkHours, createWorkHour, updateWorkHour, getAISuggestions, getMyAssignments, getMyStaffId, type WorkHourRecord } from '@/services/staffApi'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -131,16 +131,19 @@ async function showAISuggest() {
 }
 
 onMounted(async () => {
-  // 获取当前用户关联的 staff_id（简化：从 my/assignments 推断）
+  // 获取当前用户关联的 staff_id
+  try {
+    const staffInfo = await getMyStaffId()
+    currentStaffId.value = staffInfo.staff_id
+  } catch {
+    ElMessage.warning('未找到人员信息，请联系管理员')
+  }
+
+  // 获取我参与的项目列表（用于填报工时时选择项目）
   try {
     myProjects.value = await getMyAssignments()
-    // TODO: 从 staff_members 中查找当前 user_id 对应的 staff_id
-    // 暂时用第一个 assignment 的 staff_id 或空
-    if (myProjects.value.length > 0) {
-      // 需要后端提供 /api/my/staff-id 端点，暂用占位
-      currentStaffId.value = ''
-    }
   } catch { /* ignore */ }
+
   if (currentStaffId.value) await loadHours()
 })
 </script>

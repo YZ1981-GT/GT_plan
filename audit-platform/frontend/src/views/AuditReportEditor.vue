@@ -69,7 +69,7 @@
     </el-row>
 
     <!-- 生成报告弹窗 -->
-    <el-dialog v-model="showGenerateDialog" title="生成审计报告" width="450px">
+    <el-dialog append-to-body v-model="showGenerateDialog" title="生成审计报告" width="450px">
       <el-form label-width="100px">
         <el-form-item label="意见类型">
           <el-select v-model="genForm.opinion_type" style="width: 100%">

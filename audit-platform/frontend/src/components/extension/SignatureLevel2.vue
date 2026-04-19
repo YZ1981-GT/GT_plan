@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="手写签名 (Level 2)" width="560px" @close="onClose">
+  <el-dialog append-to-body v-model="visible" title="手写签名 (Level 2)" width="560px" @close="onClose">
     <div class="gt-sig-canvas-wrap">
       <canvas
         ref="canvasRef"

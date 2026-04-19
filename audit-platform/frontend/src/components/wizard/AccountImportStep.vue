@@ -141,7 +141,7 @@
       </div>
 
       <!-- 参照映射弹窗 -->
-      <el-dialog v-model="showRefMappingDialog" title="参照已有映射" width="600px" destroy-on-close>
+      <el-dialog append-to-body v-model="showRefMappingDialog" title="参照已有映射" width="600px" destroy-on-close>
         <p style="color: var(--gt-color-text-secondary); margin-bottom: 12px">
           选择一个项目，将其保存的列映射关系应用到当前文件
         </p>

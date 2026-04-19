@@ -16,13 +16,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # 创建 misstatement_type 枚举
-    misstatement_type_enum = sa.Enum(
-        "factual", "judgmental", "projected",
-        name="misstatement_type",
-    )
-    misstatement_type_enum.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         "unadjusted_misstatements",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),

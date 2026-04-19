@@ -99,7 +99,7 @@
     </el-row>
 
     <!-- 新建/编辑调整分录弹窗 -->
-    <el-dialog v-model="showAdjForm" :title="editingAdj ? '编辑调整分录' : '新建调整分录'" width="550px" destroy-on-close>
+    <el-dialog append-to-body v-model="showAdjForm" :title="editingAdj ? '编辑调整分录' : '新建调整分录'" width="550px" destroy-on-close>
       <el-form :model="adjForm" label-width="90px">
         <el-form-item label="描述">
           <el-input v-model="adjForm.description" />

@@ -161,18 +161,18 @@ export interface ForumPostItem {
 export async function listPosts(category?: string) {
   const params: Record<string, string> = {}
   if (category) params.category = category
-  const r = await http.get('/api/forum/posts', { params })
-  return r.data?.data ?? r.data ?? []
+  const { data } = await http.get('/api/forum/posts', { params })
+  return Array.isArray(data) ? data : data?.items || data?.posts || []
 }
 
 export async function createPost(body: { title: string; content: string; category?: string; is_anonymous?: boolean }) {
-  const r = await http.post('/api/forum/posts', body)
-  return r.data?.data ?? r.data
+  const { data } = await http.post('/api/forum/posts', body)
+  return data
 }
 
 export async function getComments(postId: string) {
-  const r = await http.get(`/api/forum/posts/${postId}/comments`)
-  return r.data?.data ?? r.data ?? []
+  const { data } = await http.get(`/api/forum/posts/${postId}/comments`)
+  return Array.isArray(data) ? data : data?.items || data?.comments || []
 }
 
 export async function createComment(postId: string, content: string) {

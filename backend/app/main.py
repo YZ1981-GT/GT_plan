@@ -90,6 +90,8 @@ from app.routers.task_center import router as task_center_router
 from app.routers.data_validation import router as data_validation_router
 from app.routers.performance import router as performance_router
 from app.routers.security import router as security_router
+from app.routers.system_settings import router as system_settings_router
+from app.routers.knowledge_base import router as knowledge_base_router
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.audit_log import AuditLogMiddleware
@@ -230,3 +232,5 @@ app.include_router(task_center_router)
 app.include_router(data_validation_router)
 app.include_router(performance_router)
 app.include_router(security_router)
+app.include_router(system_settings_router)
+app.include_router(knowledge_base_router)

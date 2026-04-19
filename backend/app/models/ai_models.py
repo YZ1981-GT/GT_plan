@@ -1050,7 +1050,7 @@ class AIWorkpaperTask(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     workpaper_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workpapers.id"), nullable=False
+        ForeignKey("working_paper.id"), nullable=False
     )
     task_type: Mapped[str] = mapped_column(nullable=False)
     status: Mapped[WorkpaperTaskStatus] = mapped_column(
@@ -1090,7 +1090,7 @@ class AIWorkpaperFill(Base):
         ForeignKey("ai_workpaper_tasks.id"), nullable=True
     )
     workpaper_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("workpapers.id"), nullable=False
+        ForeignKey("working_paper.id"), nullable=False
     )
     field_path: Mapped[str] = mapped_column(nullable=False)
     field_value: Mapped[str | None] = mapped_column(Text, nullable=True)

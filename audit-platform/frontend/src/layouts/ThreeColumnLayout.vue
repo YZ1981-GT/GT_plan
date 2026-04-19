@@ -17,10 +17,49 @@
         </el-breadcrumb>
       </div>
       <div class="gt-topbar-right">
+        <!-- 顶部快捷入口（全局工具） -->
+        <el-tooltip content="知识库" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/knowledge')">
+            <el-icon :size="18"><Reading /></el-icon>
+          </div>
+        </el-tooltip>
+        <el-tooltip content="私人库" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/private-storage')">
+            <el-icon :size="18"><Suitcase /></el-icon>
+          </div>
+        </el-tooltip>
+        <el-tooltip content="AI 模型" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/settings/ai-models')">
+            <el-icon :size="18"><Cpu /></el-icon>
+          </div>
+        </el-tooltip>
+        <el-tooltip content="排版模板" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/settings/report-format')">
+            <el-icon :size="18"><Document /></el-icon>
+          </div>
+        </el-tooltip>
+        <el-tooltip content="吐槽求助" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/forum')">
+            <el-icon :size="18"><ChatDotSquare /></el-icon>
+          </div>
+        </el-tooltip>
+
+        <div class="gt-topbar-divider" />
+
         <!-- 视图切换按钮（三栏/四栏） -->
         <el-tooltip :content="fourColumnMode ? '切换三栏视图' : '切换四栏视图'" placement="bottom">
           <div class="gt-topbar-btn" @click="fourColumnMode = !fourColumnMode">
             <el-icon :size="18"><Grid v-if="!fourColumnMode" /><Menu v-else /></el-icon>
+          </div>
+        </el-tooltip>
+        <el-tooltip content="回收站" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/recycle-bin')">
+            <el-icon :size="18"><DeleteFilled /></el-icon>
+          </div>
+        </el-tooltip>
+        <el-tooltip content="系统设置" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/settings')">
+            <el-icon :size="18"><Setting /></el-icon>
           </div>
         </el-tooltip>
         <el-tooltip content="通知" placement="bottom">
@@ -180,25 +219,21 @@ const navItems = [
   { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
   { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production' },
   { key: 'team', label: '人员委派', icon: User, path: '/settings/staff', maturity: 'production' },
-  { key: 'knowledge', label: '知识库', icon: Reading, path: '/knowledge', maturity: 'production' },
   { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production' },
-  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'pilot' },
+  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
   { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'pilot' },
   { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
   { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production' },
   { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
   { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production' },
-  { key: 'ai-models', label: 'AI 模型', icon: Cpu, path: '/settings/ai-models', maturity: 'pilot' },
-  { key: 'private-storage', label: '私人库', icon: Suitcase, path: '/private-storage', maturity: 'production' },
-  { key: 'forum', label: '吐槽求助', icon: ChatDotSquare, path: '/forum', maturity: 'production' },
-  { key: 'report-format', label: '排版模板', icon: Document, path: '/settings/report-format', maturity: 'pilot' },
-  { key: 'settings', label: '系统设置', icon: Setting, path: '/settings', maturity: 'production' },
-  { key: 'recycle-bin', label: '回收站', icon: DeleteFilled, path: '/recycle-bin', maturity: 'production' },
 ]
 
 const activeNav = computed(() => {
   const p = route.path
   if (p === '/') return 'dashboard'
+  // 顶部栏路由不高亮左侧导航
+  const topBarPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum', '/recycle-bin', '/settings']
+  if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
   for (const item of navItems) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }
@@ -417,6 +452,13 @@ onUnmounted(() => {
   transition: all var(--gt-transition-fast);
 }
 .gt-topbar-btn:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
+
+.gt-topbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--gt-color-border-light);
+  margin: 0 2px;
+}
 
 .gt-user-info {
   display: flex;

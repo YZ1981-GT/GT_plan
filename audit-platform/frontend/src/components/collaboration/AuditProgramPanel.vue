@@ -115,7 +115,7 @@
     </div>
 
     <!-- Add Procedure Dialog -->
-    <el-dialog v-model="showAddDialog" title="添加审计程序" width="600px">
+    <el-dialog append-to-body v-model="showAddDialog" title="添加审计程序" width="600px">
       <el-form :model="newProcedure" label-width="120px">
         <el-form-item label="程序编号">
           <el-input v-model="newProcedure.procedure_code" placeholder="如: AP-SALES-001" />
@@ -163,7 +163,7 @@
     </el-dialog>
 
     <!-- Link Workpaper Dialog -->
-    <el-dialog v-model="showLinkDialog" title="关联底稿" width="400px">
+    <el-dialog append-to-body v-model="showLinkDialog" title="关联底稿" width="400px">
       <el-form label-width="100px">
         <el-form-item label="底稿代码">
           <el-input v-model="linkWorkpaperCode" placeholder="如: WP-SALES-001" />

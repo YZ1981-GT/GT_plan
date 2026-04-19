@@ -19,7 +19,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showInvite" title="邀请成员" width="500px">
+    <el-dialog append-to-body v-model="showInvite" title="邀请成员" width="500px">
       <el-form :model="inviteForm" label-width="100px">
         <el-form-item label="用户名">
           <el-input v-model="inviteForm.username" />

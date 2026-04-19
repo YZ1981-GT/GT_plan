@@ -24,7 +24,7 @@
     </el-steps>
 
     <!-- 门控条件弹窗 -->
-    <el-dialog v-model="showGateDialog" title="门控条件检查" width="600px">
+    <el-dialog append-to-body v-model="showGateDialog" title="门控条件检查" width="600px">
       <el-table :data="gateItems" stripe>
         <el-table-column prop="phase" label="阶段" width="150" />
         <el-table-column prop="condition" label="门控条件" />

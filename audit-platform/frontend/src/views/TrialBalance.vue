@@ -90,7 +90,7 @@
     </div>
 
     <!-- 调整分录明细弹窗 -->
-    <el-dialog v-model="adjDialogVisible" :title="`${adjDialogType} 调整明细 — ${adjDialogAccount}`" width="700px">
+    <el-dialog append-to-body v-model="adjDialogVisible" :title="`${adjDialogType} 调整明细 — ${adjDialogAccount}`" width="700px">
       <el-table :data="adjDialogList" border stripe>
         <el-table-column prop="adjustment_no" label="编号" width="120" />
         <el-table-column prop="description" label="摘要" min-width="180" />

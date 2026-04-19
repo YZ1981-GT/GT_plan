@@ -107,7 +107,7 @@
     </div>
 
     <!-- Details Dialog -->
-    <el-dialog v-model="detailsVisible" title="合并范围详情" width="560px">
+    <el-dialog append-to-body v-model="detailsVisible" title="合并范围详情" width="560px">
       <el-descriptions v-if="detailsRow" :column="2" border size="small">
         <el-descriptions-item label="公司代码">{{ detailsRow.companyCode }}</el-descriptions-item>
         <el-descriptions-item label="公司名称">{{ detailsRow.companyName }}</el-descriptions-item>

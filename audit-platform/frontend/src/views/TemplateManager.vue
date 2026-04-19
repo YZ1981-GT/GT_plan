@@ -50,7 +50,7 @@
     </el-tabs>
 
     <!-- 上传模板弹窗 -->
-    <el-dialog v-model="showUploadDialog" title="上传模板" width="500px" destroy-on-close>
+    <el-dialog append-to-body v-model="showUploadDialog" title="上传模板" width="500px" destroy-on-close>
       <el-form :model="uploadForm" label-width="90px">
         <el-form-item label="模板编号" required>
           <el-input v-model="uploadForm.template_code" placeholder="如 D10" />

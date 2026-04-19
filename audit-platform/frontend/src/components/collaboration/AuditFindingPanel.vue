@@ -83,7 +83,7 @@
     </div>
 
     <!-- Add Finding Dialog -->
-    <el-dialog v-model="showAddDialog" title="添加审计发现" width="650px">
+    <el-dialog append-to-body v-model="showAddDialog" title="添加审计发现" width="650px">
       <el-form :model="newFinding" label-width="130px">
         <el-form-item label="发现描述">
           <el-input v-model="newFinding.finding_description" type="textarea" :rows="3" />

@@ -12,7 +12,8 @@
       <el-radio-button label="share">分享</el-radio-button>
     </el-radio-group>
 
-    <div class="gt-post-list">
+    <div class="gt-post-list" v-loading="loading">
+      <el-empty v-if="!loading && posts.length === 0" description="暂无帖子，点击右上角发帖" />
       <el-card v-for="post in posts" :key="post.id" shadow="hover" class="gt-post-card">
         <div class="gt-post-header">
           <el-tag :type="categoryTag(post.category)" size="small">{{ categoryLabel(post.category) }}</el-tag>
@@ -39,22 +40,38 @@
       </el-card>
     </div>
 
-    <el-dialog v-model="showCreate" title="发帖" width="500px">
-      <el-form label-width="60px">
+    <el-dialog v-model="showCreate" title="发帖" width="560px" :close-on-click-modal="false" append-to-body>
+      <template #header>
+        <div class="gt-dialog-header">
+          <el-icon :size="22" style="color: var(--gt-color-primary, #4b2d77)"><EditPen /></el-icon>
+          <span>发布新帖</span>
+        </div>
+      </template>
+      <el-form label-width="70px" label-position="left" style="padding: 0 8px">
         <el-form-item label="分类">
-          <el-select v-model="form.category">
-            <el-option label="吐槽" value="vent" />
-            <el-option label="求助" value="help" />
-            <el-option label="分享" value="share" />
-          </el-select>
+          <el-radio-group v-model="form.category">
+            <el-radio-button value="vent">🔥 吐槽</el-radio-button>
+            <el-radio-button value="help">🙋 求助</el-radio-button>
+            <el-radio-button value="share">💡 分享</el-radio-button>
+          </el-radio-group>
         </el-form-item>
-        <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
-        <el-form-item label="内容"><el-input v-model="form.content" type="textarea" :rows="4" /></el-form-item>
-        <el-form-item><el-checkbox v-model="form.is_anonymous">匿名发布</el-checkbox></el-form-item>
+        <el-form-item label="标题">
+          <el-input v-model="form.title" placeholder="一句话描述你的问题或想法" maxlength="100" show-word-limit />
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input v-model="form.content" type="textarea" :rows="6" placeholder="详细描述..." maxlength="2000" show-word-limit />
+        </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="form.is_anonymous">
+            <el-icon style="margin-right: 4px"><Hide /></el-icon>匿名发布
+          </el-checkbox>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreate = false">取消</el-button>
-        <el-button type="primary" @click="onCreatePost">发布</el-button>
+        <el-button type="primary" @click="onCreatePost" :disabled="!form.title || !form.content">
+          <el-icon style="margin-right: 4px"><Promotion /></el-icon>发布
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -64,6 +81,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listPosts, createPost, getComments, createComment, likePost, type ForumPostItem } from '@/services/phase10Api'
+import { EditPen, Hide, Promotion } from '@element-plus/icons-vue'
 
 const category = ref('')
 const posts = ref<ForumPostItem[]>([])
@@ -72,11 +90,22 @@ const form = ref({ title: '', content: '', category: 'share', is_anonymous: fals
 const expandedPost = ref('')
 const comments = ref<any[]>([])
 const commentText = ref('')
+const loading = ref(false)
 
 function categoryTag(c: string) { return c === 'vent' ? 'danger' : c === 'help' ? 'warning' : 'success' }
 function categoryLabel(c: string) { return c === 'vent' ? '吐槽' : c === 'help' ? '求助' : '分享' }
 
-async function fetchPosts() { posts.value = await listPosts(category.value || undefined) }
+async function fetchPosts() {
+  loading.value = true
+  try {
+    posts.value = await listPosts(category.value || undefined)
+  } catch (e: any) {
+    posts.value = []
+    ElMessage.error('加载帖子失败: ' + (e?.message || ''))
+  } finally {
+    loading.value = false
+  }
+}
 
 async function onCreatePost() {
   if (!form.value.title || !form.value.content) return ElMessage.warning('请填写标题和内容')
@@ -123,4 +152,24 @@ onMounted(fetchPosts)
 .gt-comment { padding: 4px 0; font-size: var(--gt-font-size-sm); }
 .gt-comment-author { color: var(--gt-color-primary); font-weight: 600; margin-right: 8px; }
 .gt-comment-input { display: flex; gap: var(--gt-space-1); margin-top: var(--gt-space-1); }
+
+/* 弹窗头部 */
+.gt-dialog-header {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 17px; font-weight: 600; color: var(--gt-color-primary, #4b2d77);
+}
+
+/* 去掉弹窗灰色遮罩 */
+:deep(.el-overlay) {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(2px);
+}
+/* 弹窗内容不截断 */
+:deep(.el-dialog) {
+  overflow: visible;
+}
+:deep(.el-dialog__body) {
+  padding-bottom: 8px;
+  overflow: visible;
+}
 </style>

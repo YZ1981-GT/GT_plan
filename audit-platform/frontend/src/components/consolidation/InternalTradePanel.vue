@@ -210,7 +210,7 @@
     </div>
 
     <!-- ─── Detail Dialog ───────────────────────────────────────────── -->
-    <el-dialog v-model="detailVisible" title="内部交易详情" width="640px">
+    <el-dialog append-to-body v-model="detailVisible" title="内部交易详情" width="640px">
       <el-descriptions v-if="detailRow" :column="2" border size="small">
         <el-descriptions-item label="交易编号">{{ detailRow.trade_no || '—' }}</el-descriptions-item>
         <el-descriptions-item label="日期">{{ detailRow.trade_date || '—' }}</el-descriptions-item>
@@ -252,7 +252,7 @@
     </el-dialog>
 
     <!-- ─── Matrix Detail Dialog ────────────────────────────────────── -->
-    <el-dialog v-model="matrixDetailVisible" title="交易明细" width="700px">
+    <el-dialog append-to-body v-model="matrixDetailVisible" title="交易明细" width="700px">
       <div class="matrix-detail-header">
         <span>卖方：<strong>{{ matrixDetailSeller }}</strong></span>
         <span class="arrow">→</span>

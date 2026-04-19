@@ -67,7 +67,7 @@
     />
 
     <!-- 关联底稿弹窗 -->
-    <el-dialog v-model="associateVisible" title="关联到底稿" width="480px">
+    <el-dialog append-to-body v-model="associateVisible" title="关联到底稿" width="480px">
       <el-form label-width="80px" size="small">
         <el-form-item label="搜索底稿">
           <el-select

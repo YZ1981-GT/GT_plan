@@ -65,7 +65,7 @@
     </el-tabs>
 
     <!-- 新建对话框 -->
-    <el-dialog v-model="dialogVisible" title="新建期后事项" width="500px">
+    <el-dialog append-to-body v-model="dialogVisible" title="新建期后事项" width="500px">
       <el-form :model="eventForm" label-width="100px">
         <el-form-item label="event_date">
           <el-date-picker

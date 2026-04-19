@@ -28,7 +28,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="isEditing ? '编辑清单项' : '添加清单项'" width="480px">
+    <el-dialog append-to-body v-model="dialogVisible" :title="isEditing ? '编辑清单项' : '添加清单项'" width="480px">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="事项编号" prop="item_code">
           <el-input v-model="form.item_code" placeholder="如: SE-01" />

@@ -53,7 +53,7 @@
     </el-table>
 
     <!-- Add Milestone Dialog -->
-    <el-dialog v-model="addDialogVisible" title="添加里程碑" width="460px">
+    <el-dialog append-to-body v-model="addDialogVisible" title="添加里程碑" width="460px">
       <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="110px">
         <el-form-item label="里程碑名称" prop="milestone_name">
           <el-input v-model="addForm.milestone_name" placeholder="请输入里程碑名称" />

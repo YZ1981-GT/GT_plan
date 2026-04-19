@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="密码确认签名 (Level 1)" width="400px" @close="onClose">
+  <el-dialog append-to-body v-model="visible" title="密码确认签名 (Level 1)" width="400px" @close="onClose">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
       <el-form-item label="用户名">
         <el-input :model-value="username" disabled />

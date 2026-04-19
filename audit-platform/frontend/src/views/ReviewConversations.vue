@@ -58,7 +58,7 @@
     </div>
 
     <!-- 创建对话弹窗 -->
-    <el-dialog v-model="showCreateDialog" title="发起复核对话" width="480px">
+    <el-dialog append-to-body v-model="showCreateDialog" title="发起复核对话" width="480px">
       <el-form label-width="80px">
         <el-form-item label="标题"><el-input v-model="createForm.title" /></el-form-item>
         <el-form-item label="对象类型">

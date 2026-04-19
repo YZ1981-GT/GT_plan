@@ -15,7 +15,7 @@
         <template #default="{ row }">{{ row.created_at?.slice(0, 16) }}</template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="showCreate" title="新建排版模板" width="500px">
+    <el-dialog append-to-body v-model="showCreate" title="新建排版模板" width="500px">
       <el-form label-width="80px">
         <el-form-item label="名称"><el-input v-model="form.template_name" /></el-form-item>
         <el-form-item label="类型">

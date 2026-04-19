@@ -73,6 +73,7 @@ class StaffMember(Base, SoftDeleteMixin, TimestampMixin):
     email: Mapped[str | None] = mapped_column(String(200), nullable=True)
     join_date: Mapped[date | None] = mapped_column(nullable=True)
     resume_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    source: Mapped[str] = mapped_column(String(20), server_default=text("'custom'"), nullable=False)  # seed / custom
 
     __table_args__ = (
         Index("idx_staff_department", "department", postgresql_where=text("is_deleted = false")),
