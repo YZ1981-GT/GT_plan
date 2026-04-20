@@ -75,7 +75,8 @@ async def preview_file(
     filename_lower = file.filename.lower()
 
     if filename_lower.endswith(".csv"):
-        # CSV 用原有逻辑（小文件）
+        # CSV 用原有逻辑（小文件）—— 需要 seek 回起点因为 content 已经 read 过
+        await file.seek(0)
         return await account_chart_service.preview_file(file, skip_rows=skip_rows)
 
     # Excel：小文件用完整模式（正确处理合并单元格），大文件用 read_only（快速）

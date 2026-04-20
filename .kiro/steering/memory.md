@@ -27,7 +27,10 @@ inclusion: always
 
 ### 基础环境
 - Git 远程仓库：https://github.com/YZ1981-GT/GT_plan.git（master分支），本地新初始化时需先 `git init` → `git remote add origin` → 用 `git config --global --unset http.proxy` 清代理后 pull/push；代理端口 127.0.0.1:7897 不通时会报 "Failed to connect to 127.0.0.1 port 7897"
-- Python 3.12 虚拟环境 (.venv)，本地已安装 Docker 28.3.3、Ollama 0.11.10
+- Python 3.12 虚拟环境 (.venv)，本地已安装 Docker 28.3.3（Docker Desktop 29.2.1）、Ollama 0.11.10
+- Docker 镜像加速器：daemon.json 中 registry-mirrors 会被 Docker Desktop 覆盖，需用完整镜像名拉取（如 `docker pull docker.1ms.run/library/postgres:16-alpine`）再 `docker tag` 为标准名
+- 新环境初始化数据库：用 `backend/scripts/_init_tables.py`（Base.metadata.create_all 同步建表，需 psycopg2-binary）+ `backend/scripts/_create_admin.py`（创建 admin/admin123），不走 Alembic 迁移链（有多处枚举冲突）；建表后需执行 `backend/scripts/_fix_db.py` 补齐 Mixin 列（import_batches 缺 is_deleted/deleted_at/updated_at，create_all 未正确继承 SoftDeleteMixin 列）
+- 后端额外依赖：psycopg2-binary（同步建表/脚本用，requirements.txt 未列出但 .venv 已安装）
 - 使用 Kiro steering + hooks 机制管理工作流
 - 四大模块统一架构：四/五步工作流 + SSE 流式通信 + LLM 驱动 + Word 导出
 - 本地 vLLM 模型：`Kbenkhaled/Qwen3.5-27B-NVFP4`（NVFP4 量化，FP8 KV cache，128K 上下文），模型缓存在 `D:\vllm\hf-cache\hub\models--Kbenkhaled--Qwen3.5-27B-NVFP4`（已下载完成）

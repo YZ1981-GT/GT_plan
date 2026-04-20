@@ -1221,7 +1221,7 @@ def _apply_custom_mapping(rows: list[dict], mapping: dict[str, str | None]) -> l
     return normalized
 
 
-def _parse_csv(content: bytes, skip_rows: int = 0) -> list[dict]:
+def _parse_csv(content: bytes, skip_rows: int | None = 0) -> list[dict]:
     """Parse CSV file content into list of dicts."""
     for encoding in ("utf-8-sig", "gbk", "utf-8"):
         try:
@@ -1233,8 +1233,9 @@ def _parse_csv(content: bytes, skip_rows: int = 0) -> list[dict]:
         raise HTTPException(status_code=400, detail="无法识别文件编码，请使用 UTF-8 或 GBK 编码")
 
     lines = text.strip().splitlines()
-    if skip_rows > 0 and len(lines) > skip_rows:
-        lines = lines[skip_rows:]
+    _skip = skip_rows or 0
+    if _skip > 0 and len(lines) > _skip:
+        lines = lines[_skip:]
     reader = csv.DictReader(io.StringIO("\n".join(lines)))
     return list(reader)
 
