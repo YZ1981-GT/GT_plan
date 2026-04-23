@@ -120,8 +120,6 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-
-const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
 

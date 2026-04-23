@@ -472,7 +472,6 @@ async def smart_import(
     并发控制：同一项目同一时间只允许一个导入任务。
     """
     import json
-    from app.services.smart_import_engine import smart_parse_files, write_four_tables
     from app.services.import_queue_service import ImportQueueService
 
     # 并发控制
@@ -498,27 +497,24 @@ async def smart_import(
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="自定义列映射JSON格式错误")
 
-        ImportQueueService.update_progress(project_id, 10, "解析文件中...")
-        result = smart_parse_files(file_contents, year_override=year, custom_mapping=mapping)
+        def _on_progress(pct: int, msg: str):
+            ImportQueueService.update_progress(project_id, pct, msg)
 
-        ImportQueueService.update_progress(project_id, 50, "写入数据库中...")
-        imported = await write_four_tables(
+        from app.services.smart_import_engine import smart_import_streaming
+        result = await smart_import_streaming(
             project_id=project_id,
-            year=result["year"],
-            balance_rows=result["balance_rows"],
-            aux_balance_rows=result["aux_balance_rows"],
-            ledger_rows=result["ledger_rows"],
-            aux_ledger_rows=result["aux_ledger_rows"],
+            file_contents=file_contents,
             db=db,
+            year_override=year,
+            custom_mapping=mapping,
+            progress_callback=_on_progress,
         )
 
-        ImportQueueService.update_progress(project_id, 100, "完成")
         return {
-            "imported": imported,
+            "imported": result["data_sheets_imported"],
             "year": result["year"],
-            "aux_dimensions": result["aux_dimensions"],
-            "validation": result["validation"],
-            "diagnostics": result["diagnostics"],
+            "diagnostics": result["sheet_diagnostics"],
+            "errors": result["errors"],
         }
     finally:
         ImportQueueService.release_lock(project_id)

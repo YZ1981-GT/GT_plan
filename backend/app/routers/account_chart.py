@@ -210,16 +210,29 @@ async def preview_file(
 )
 async def import_client_chart(
     project_id: UUID,
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(default=[]),
+    file: UploadFile | None = File(default=None),
     column_mapping: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AccountImportResult:
-    """导入科目表 + 四表数据。
+    """导入科目表 + 四表数据（支持多文件一次上传）。
 
-    使用 smart_import_engine 统一处理（支持双行合并表头、核算维度拆分）。
+    使用 smart_import_streaming 统一处理：
+    - 多文件安全：只 soft-delete 一次，不会后续文件覆盖前面的
+    - 内存可控：逐 sheet 解析并写入
+    - 自动提取科目表、四表数据、诊断信息
     """
     import json
+    from app.services.smart_import_engine import smart_import_streaming
+    from app.services.import_queue_service import ImportQueueService
+
+    # 兼容单文件 / 多文件两种前端传参方式
+    all_files: list[UploadFile] = list(files) if files else []
+    if file is not None:
+        all_files.append(file)
+    if not all_files:
+        raise HTTPException(status_code=400, detail="未提供文件")
 
     parsed_mapping = None
     if column_mapping:
@@ -228,114 +241,44 @@ async def import_client_chart(
         except (json.JSONDecodeError, TypeError):
             pass
 
-    content = await file.read()
-    filename = file.filename or "upload.xlsx"
+    # 读取所有文件内容
+    file_contents: list[tuple[str, bytes]] = []
+    for f in all_files:
+        ct = await f.read()
+        file_contents.append((f.filename or "upload.xlsx", ct))
 
-    # 用 smart_import_engine 解析
-    from app.services.smart_import_engine import smart_parse_files, write_four_tables
+    def _on_progress(pct: int, msg: str):
+        ImportQueueService.update_progress(project_id, min(pct, 99), msg)
 
-    parsed = smart_parse_files(
-        [(filename, content)],
+    result = await smart_import_streaming(
+        project_id=project_id,
+        file_contents=file_contents,
+        db=db,
         custom_mapping=parsed_mapping,
+        progress_callback=_on_progress,
     )
 
-    # 1. 从余额表数据中提取科目表（account_code + account_name 去重）
-    from app.services.account_chart_service import _infer_category, _infer_direction, _infer_level
-    from app.models.audit_platform_models import AccountChart, AccountCategory, AccountSource
-    import sqlalchemy as sa
-
-    seen_codes = set()
-    records = []
-    by_category: dict[str, int] = {}
-
-    for row in parsed["balance_rows"]:
-        code = str(row.get("account_code", "")).strip()
-        name = str(row.get("account_name", "")).strip()
-        if not code or not name or code in seen_codes:
-            continue
-        seen_codes.add(code)
-        category = _infer_category(code, name)
-        direction = _infer_direction(category)
-        level = row.get("level") or _infer_level(code, None)
-        records.append(AccountChart(
-            project_id=project_id, account_code=code, account_name=name,
-            direction=direction, level=level, category=category,
-            source=AccountSource.client,
-        ))
-        by_category[category.value] = by_category.get(category.value, 0) + 1
-
-    # 也从序时账中提取科目
-    for row in parsed["ledger_rows"]:
-        code = str(row.get("account_code", "")).strip()
-        name = str(row.get("account_name", "")).strip()
-        if not code or code in seen_codes:
-            continue
-        seen_codes.add(code)
-        if name:
-            category = _infer_category(code, name)
-            direction = _infer_direction(category)
-            records.append(AccountChart(
-                project_id=project_id, account_code=code, account_name=name,
-                direction=direction, level=_infer_level(code, None), category=category,
-                source=AccountSource.client,
-            ))
-            by_category[category.value] = by_category.get(category.value, 0) + 1
-
-    # 写入科目表（先删旧数据）
-    if records:
-        tbl = AccountChart.__table__
-        await db.execute(
-            sa.update(tbl).where(tbl.c.project_id == project_id, tbl.c.source == "client")
-            .values(is_deleted=True)
-        )
-        db.add_all(records)
-        await db.commit()
-
-    # 2. 写入四表数据
-    data_sheets: dict[str, int] = {}
-    errors: list[str] = []
-    sheet_diagnostics = _build_sheet_diagnostics(parsed.get("diagnostics"))
-    if parsed["balance_rows"] or parsed["ledger_rows"]:
-        try:
-            from app.services.import_queue_service import ImportQueueService
-
-            def _on_progress(stage: str, current: int, total: int, msg: str):
-                pct = min(99, int(current / max(total, 1) * 100))
-                ImportQueueService.update_progress(project_id, pct, msg)
-
-            imported = await write_four_tables(
-                project_id, parsed["year"],
-                parsed["balance_rows"], parsed["aux_balance_rows"],
-                parsed["ledger_rows"], parsed["aux_ledger_rows"],
-                db,
-                progress_callback=_on_progress,
-            )
-            data_sheets = imported
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("四表导入失败: %s", e)
-            errors.append(f"四表导入失败: {e}")
-
     return AccountImportResult(
-        total_imported=len(records),
-        by_category=by_category,
-        errors=errors,
-        data_sheets_imported=data_sheets,
-        sheet_diagnostics=sheet_diagnostics,
-        year=parsed["year"],
+        total_imported=result["total_accounts"],
+        by_category=result["by_category"],
+        errors=result["errors"],
+        data_sheets_imported=result["data_sheets_imported"],
+        sheet_diagnostics=result["sheet_diagnostics"],
+        year=result["year"],
     )
 
 
 @router.post("/{project_id}/account-chart/import-async")
 async def import_async(
     project_id: UUID,
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(default=[]),
+    file: UploadFile | None = File(default=None),
     column_mapping: str | None = Form(None),
     current_user: User = Depends(get_current_user),
 ):
-    """异步导入：立即返回任务ID，后台处理，前端轮询进度。
+    """异步导入（多文件支持）：立即返回，后台处理，前端轮询进度。
 
-    适合大文件（>10MB），避免 HTTP 超时。
+    适合大文件（>10MB）或多文件场景，避免 HTTP 超时。
     """
     import asyncio
     import json
@@ -346,8 +289,14 @@ async def import_async(
     if not ok:
         raise HTTPException(status_code=409, detail=msg)
 
-    content = await file.read()
-    filename = file.filename or "upload.xlsx"
+    # 兼容单文件 / 多文件
+    all_files: list[UploadFile] = list(files) if files else []
+    if file is not None:
+        all_files.append(file)
+    if not all_files:
+        ImportQueueService.release_lock(project_id)
+        raise HTTPException(status_code=400, detail="未提供文件")
+
     parsed_mapping = None
     if column_mapping:
         try:
@@ -355,90 +304,57 @@ async def import_async(
         except (json.JSONDecodeError, TypeError):
             pass
 
+    # 预读所有文件到内存（multipart 上传完成后释放连接）
+    file_contents: list[tuple[str, bytes]] = []
+    for f in all_files:
+        ct = await f.read()
+        file_contents.append((f.filename or "upload.xlsx", ct))
+
     # 后台任务
     async def _do_import():
         from app.core.database import async_session
-        from app.services.smart_import_engine import smart_parse_files, write_four_tables
-        from app.services.account_chart_service import _infer_category, _infer_direction, _infer_level
-        from app.models.audit_platform_models import AccountChart, AccountSource
-        import sqlalchemy as sa
+        from app.services.smart_import_engine import smart_import_streaming
 
         try:
-            ImportQueueService.update_progress(project_id, 5, "正在解析文件...")
-
-            parsed = smart_parse_files([(filename, content)], custom_mapping=parsed_mapping)
-
             ImportQueueService.update_progress(
-                project_id, 20,
-                f"解析完成: 余额表{len(parsed['balance_rows'])}行, 序时账{len(parsed['ledger_rows'])}行"
+                project_id, 2,
+                f"开始导入 {len(file_contents)} 个文件…",
             )
 
+            def _on_progress(pct: int, msg: str):
+                ImportQueueService.update_progress(project_id, pct, msg)
+
             async with async_session() as db:
-                # 科目表
-                seen = set()
-                records = []
-                for row in parsed["balance_rows"] + parsed["ledger_rows"]:
-                    code = str(row.get("account_code", "")).strip()
-                    name = str(row.get("account_name", "")).strip()
-                    if not code or not name or code in seen:
-                        continue
-                    seen.add(code)
-                    cat = _infer_category(code, name)
-                    records.append(AccountChart(
-                        project_id=project_id, account_code=code, account_name=name,
-                        direction=_infer_direction(cat), level=_infer_level(code, None),
-                        category=cat, source=AccountSource.client,
-                    ))
-
-                if records:
-                    tbl = AccountChart.__table__
-                    await db.execute(sa.update(tbl).where(
-                        tbl.c.project_id == project_id, tbl.c.source == "client"
-                    ).values(is_deleted=True))
-                    db.add_all(records)
-                    await db.commit()
-
-                ImportQueueService.update_progress(project_id, 30, f"科目表: {len(records)}个, 开始写入四表...")
-
-                # 四表
-                def _on_progress(stage, current, total, msg):
-                    pct = 30 + min(65, int(current / max(total, 1) * 65))
-                    ImportQueueService.update_progress(project_id, pct, msg)
-
-                imported = await write_four_tables(
-                    project_id, parsed["year"],
-                    parsed["balance_rows"], parsed["aux_balance_rows"],
-                    parsed["ledger_rows"], parsed["aux_ledger_rows"],
-                    db, progress_callback=_on_progress,
+                result = await smart_import_streaming(
+                    project_id=project_id,
+                    file_contents=file_contents,
+                    db=db,
+                    custom_mapping=parsed_mapping,
+                    progress_callback=_on_progress,
                 )
 
-                # 汇总诊断信息供前端结果页展示
-                diag = _build_sheet_diagnostics(parsed.get("diagnostics"))
-
-                by_category: dict[str, int] = {}
-                for r in records:
-                    cat = r.category.value
-                    by_category[cat] = by_category.get(cat, 0) + 1
-
                 result_payload = {
-                    "total_imported": len(records),
-                    "by_category": by_category,
-                    "errors": [],
-                    "data_sheets_imported": imported,
-                    "sheet_diagnostics": diag,
-                    "year": parsed["year"],
+                    "total_imported": result["total_accounts"],
+                    "by_category": result["by_category"],
+                    "errors": result["errors"],
+                    "data_sheets_imported": result["data_sheets_imported"],
+                    "sheet_diagnostics": result["sheet_diagnostics"],
+                    "year": result["year"],
                 }
-                ImportQueueService.update_progress(project_id, 100, f"导入完成: {imported}", result=result_payload)
+                ImportQueueService.update_progress(
+                    project_id, 100,
+                    f"导入完成: {result['data_sheets_imported']}",
+                    result=result_payload,
+                )
 
         except Exception as e:
             import traceback
-            logger_name = __name__
             import logging
-            logging.getLogger(logger_name).error("异步导入失败: %s\n%s", e, traceback.format_exc())
+            logging.getLogger(__name__).error(
+                "异步导入失败: %s\n%s", e, traceback.format_exc(),
+            )
             ImportQueueService.update_progress(
-                project_id,
-                -1,
-                f"导入失败: {e}",
+                project_id, -1, f"导入失败: {e}",
                 result={
                     "total_imported": 0,
                     "by_category": {},
@@ -449,16 +365,14 @@ async def import_async(
                 },
             )
         finally:
-            # 延迟释放锁（让前端有时间读取最终状态）
             await asyncio.sleep(3)
             ImportQueueService.release_lock(project_id)
 
-    # 启动后台任务
     asyncio.create_task(_do_import())
 
     return {
         "status": "accepted",
-        "message": "导入任务已提交，请轮询进度",
+        "message": f"导入任务已提交（{len(file_contents)} 个文件），请轮询进度",
         "project_id": str(project_id),
     }
 

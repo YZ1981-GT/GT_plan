@@ -999,157 +999,107 @@ async function handleImport() {
   }, 2000)
 
   try {
-    // 多文件逐个导入，合并结果
-    let totalImported = 0
-    let allDataSheets: Record<string, number> = {}
-    let lastResult: any = null
-    let importedYear: number | null = null
-    const allByCategory: Record<string, number> = {}
-    const allDiagnostics: SheetDiagnostic[] = []
-    const allErrors: string[] = []
+    // ── 构建 FormData（所有文件 + 合并映射一次发送） ──
+    const formData = new FormData()
+    let totalSizeBytes = 0
+    for (const file of selectedFiles.value) {
+      formData.append('files', file)
+      totalSizeBytes += file.size
+    }
+    const totalSizeMB = (totalSizeBytes / 1024 / 1024).toFixed(1)
 
-    for (let fileIdx = 0; fileIdx < selectedFiles.value.length; fileIdx++) {
-      const file = selectedFiles.value[fileIdx]
-      const totalFiles = selectedFiles.value.length
-      const fileSizeMB = (file.size / 1024 / 1024).toFixed(1)
-      importProgress.value = `正在导入第 ${fileIdx + 1}/${totalFiles} 个文件：${file.name}（${fileSizeMB}MB）...`
-
-      const formData = new FormData()
-      formData.append('file', file)
-
-      // 组装按 sheet 的列映射（当前文件包含的所有 sheet）
-      const perSheetMapping: Record<string, Record<string, string>> = {}
-      for (let i = 0; i < previewSheets.value.length; i++) {
-        if (previewSheets.value[i]._source_file !== file.name) continue
-        const cached = sheetMappingCache[i]
-        if (!cached) continue
-        const clean: Record<string, string> = {}
-        for (const [h, v] of Object.entries(cached)) {
-          if (v) clean[h] = v
-        }
-        if (Object.keys(clean).length > 0) {
-          perSheetMapping[previewSheets.value[i].sheet_name] = clean
-        }
+    // 组装所有 sheet 的列映射（按原始 sheet 名）
+    const perSheetMapping: Record<string, Record<string, string>> = {}
+    for (let i = 0; i < previewSheets.value.length; i++) {
+      const cached = sheetMappingCache[i]
+      if (!cached) continue
+      const clean: Record<string, string> = {}
+      for (const [h, v] of Object.entries(cached)) {
+        if (v) clean[h] = v
       }
-      // 单 sheet 时回退到全局映射，保持向后兼容
-      const sheetNames = Object.keys(perSheetMapping)
-      const mappingToSend = sheetNames.length === 1
-        ? perSheetMapping[sheetNames[0]]
-        : perSheetMapping
-      formData.append('column_mapping', JSON.stringify(mappingToSend))
+      if (Object.keys(clean).length > 0) {
+        // 使用原始 sheet 名（去掉多文件前缀 "[file.xlsx] "）
+        let sheetName = previewSheets.value[i].sheet_name
+        const prefixMatch = sheetName.match(/^\[.+?\]\s+(.+)$/)
+        if (prefixMatch) sheetName = prefixMatch[1]
+        perSheetMapping[sheetName] = clean
+      }
+    }
+    const sheetNames = Object.keys(perSheetMapping)
+    const mappingToSend = sheetNames.length === 1
+      ? perSheetMapping[sheetNames[0]]
+      : perSheetMapping
+    formData.append('column_mapping', JSON.stringify(mappingToSend))
 
-      // 大文件（>10MB）用异步导入，小文件用同步
-      const isLargeFile = file.size > 10 * 1024 * 1024
-      if (isLargeFile) {
-        // 异步导入：立即返回，轮询进度
-        await http.post(
-          `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
-          formData,
-          { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
-        )
-        // 等待后台任务完成（轮询进度直到 100% 或失败或 idle）
-        let done = false
-        let asyncImportFailed = false
-        let asyncImportError = ''
-        while (!done) {
-          await new Promise(r => setTimeout(r, 2000))
-          try {
-            const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
-            const status = statusData.data ?? statusData
-            if (status && typeof status === 'object') {
-              const pct = status.progress ?? 0
-              const msg = status.message || ''
-              importProgress.value = `[${pct}%] ${msg}`
-              if (pct >= 100 || pct < 0 || status.status === 'idle') {
-                done = true
-                if (pct < 0) {
-                  asyncImportFailed = true
-                  asyncImportError = msg || '导入失败'
-                  ElMessage.error(msg || '导入失败')
-                }
-                // 从轮询结果中读取实际导入统计
-                const res = status.result
-                if (res && typeof res === 'object') {
-                  lastResult = res
-                  totalImported += res.total_imported || 0
-                  if (importedYear == null && typeof res.year === 'number') importedYear = res.year
-                  for (const [cat, cnt] of Object.entries(res.by_category || {})) {
-                    allByCategory[cat] = (allByCategory[cat] || 0) + (cnt as number)
-                  }
-                  if (Array.isArray(res.sheet_diagnostics)) allDiagnostics.push(...res.sheet_diagnostics)
-                  if (Array.isArray(res.errors)) allErrors.push(...res.errors)
-                  for (const [dt, cnt] of Object.entries(res.data_sheets_imported || {})) {
-                    allDataSheets[dt] = (allDataSheets[dt] || 0) + (cnt as number)
-                  }
-                }
+    importProgress.value = `正在上传 ${selectedFiles.value.length} 个文件（${totalSizeMB} MB）…`
+
+    // ── 大文件或多文件用异步，小单文件用同步 ──
+    const useAsync = totalSizeBytes > 10 * 1024 * 1024 || selectedFiles.value.length > 2
+
+    let finalResult: AccountImportResult | null = null
+
+    if (useAsync) {
+      // 异步导入：立即返回，轮询进度
+      await http.post(
+        `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
+      )
+      // 等待后台任务完成
+      let done = false
+      while (!done) {
+        await new Promise(r => setTimeout(r, 2000))
+        try {
+          const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+          const status = statusData.data ?? statusData
+          if (status && typeof status === 'object') {
+            const pct = status.progress ?? 0
+            const msg = status.message || ''
+            importProgress.value = `[${pct}%] ${msg}`
+            if (pct >= 100 || pct < 0 || status.status === 'idle') {
+              done = true
+              if (pct < 0) {
+                ElMessage.error(msg || '导入失败')
+                throw new Error(msg || '导入失败')
               }
-            } else {
-              done = true  // 锁已释放，任务完成
+              const res = status.result
+              if (res && typeof res === 'object') {
+                finalResult = res as AccountImportResult
+              }
             }
-          } catch {
+          } else {
             done = true
           }
-        }
-        if (asyncImportFailed) {
-          throw new Error(asyncImportError || '导入失败')
-        }
-        // 异步导入结果已从轮询读取；兜底防未读到
-        if (!lastResult) totalImported += 0
-      } else {
-        // 小文件同步导入
-        const { data } = await http.post(
-          `/api/projects/${wizardStore.projectId}/account-chart/import`,
-          formData,
-          { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 },
-        )
-        const result: AccountImportResult = data.data ?? data
-        lastResult = result
-        totalImported += result.total_imported || 0
-        if (importedYear == null && typeof result.year === 'number') importedYear = result.year
-        for (const [cat, cnt] of Object.entries(result.by_category || {})) {
-          allByCategory[cat] = (allByCategory[cat] || 0) + (cnt as number)
-        }
-        if (Array.isArray(result.sheet_diagnostics)) allDiagnostics.push(...result.sheet_diagnostics)
-        if (Array.isArray(result.errors)) allErrors.push(...result.errors)
-        for (const [dt, cnt] of Object.entries(result.data_sheets_imported || {})) {
-          allDataSheets[dt] = (allDataSheets[dt] || 0) + (cnt as number)
+        } catch (e) {
+          if (e instanceof Error && e.message.includes('导入失败')) throw e
+          done = true
         }
       }
-      // 更新进度
-      const sheetLabels: Record<string, string> = { tb_balance: '余额表', tb_ledger: '序时账', tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细' }
-      const doneParts: string[] = []
-      for (const [dt, cnt] of Object.entries(allDataSheets)) {
-        if (cnt > 0) doneParts.push(`${sheetLabels[dt] || dt} ${cnt.toLocaleString()}条`)
-      }
-      importProgress.value = `已完成 ${fileIdx + 1}/${selectedFiles.value.length} 个文件` +
-        (totalImported > 0 ? `，科目 ${totalImported} 个` : '') +
-        (doneParts.length > 0 ? `，${doneParts.join('、')}` : '') +
-        (fileIdx + 1 < selectedFiles.value.length ? '，继续处理下一个...' : '，正在完成...')
+    } else {
+      // 同步导入
+      const { data } = await http.post(
+        `/api/projects/${wizardStore.projectId}/account-chart/import`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 },
+      )
+      finalResult = (data.data ?? data) as AccountImportResult
     }
 
-    importResult.value = lastResult || {
-      total_imported: totalImported,
-      by_category: {},
-      errors: [],
-      data_sheets_imported: {},
-      sheet_diagnostics: [],
-      year: importedYear,
+    // ── 处理结果 ──
+    importResult.value = finalResult || {
+      total_imported: 0, by_category: {}, errors: [],
+      data_sheets_imported: {}, sheet_diagnostics: [], year: null,
     }
-    importResult.value.total_imported = totalImported
-    importResult.value.by_category = allByCategory
-    importResult.value.data_sheets_imported = allDataSheets
-    importResult.value.sheet_diagnostics = allDiagnostics
-    importResult.value.errors = allErrors
-    importResult.value.year = importedYear ?? importResult.value.year ?? null
+    const importedYear = importResult.value.year ?? null
 
-    let msg = `成功导入 ${totalImported} 个科目`
+    let msg = `成功导入 ${importResult.value.total_imported} 个科目`
     const sheetLabels: Record<string, string> = {
       tb_balance: '余额表', tb_ledger: '序时账',
       tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细',
     }
     const parts: string[] = []
-    for (const [dt, cnt] of Object.entries(allDataSheets)) {
-      if (cnt > 0) parts.push(`${sheetLabels[dt] || dt} ${cnt.toLocaleString()} 条`)
+    for (const [dt, cnt] of Object.entries(importResult.value.data_sheets_imported || {})) {
+      if ((cnt as number) > 0) parts.push(`${sheetLabels[dt] || dt} ${(cnt as number).toLocaleString()} 条`)
     }
     if (parts.length > 0) msg += `，同时导入 ${parts.join('、')}`
     ElMessage.success(msg)
@@ -1157,12 +1107,12 @@ async function handleImport() {
     saveMapping(true)
 
     await wizardStore.saveStep('account_import', {
-      total_imported: totalImported,
-      by_category: allByCategory,
-      errors: allErrors,
-      data_sheets_imported: allDataSheets,
-      sheet_diagnostics: allDiagnostics,
-      year: importResult.value.year,
+      total_imported: importResult.value.total_imported,
+      by_category: importResult.value.by_category,
+      errors: importResult.value.errors,
+      data_sheets_imported: importResult.value.data_sheets_imported,
+      sheet_diagnostics: importResult.value.sheet_diagnostics,
+      year: importedYear,
     })
 
     phase.value = 'result'

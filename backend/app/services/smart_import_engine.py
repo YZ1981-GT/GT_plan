@@ -1393,6 +1393,420 @@ async def write_four_tables(
     return result
 
 
+async def smart_import_streaming(
+    project_id: UUID,
+    file_contents: list[tuple[str, bytes]],
+    db,  # AsyncSession
+    year_override: int | None = None,
+    custom_mapping: Optional[dict] = None,
+    progress_callback=None,
+) -> dict:
+    """多文件流式导入：逐 sheet 解析并写入，内存可控，只 soft-delete 一次。
+
+    与 smart_parse_files() + write_four_tables() 两步方案的区别：
+    - 多文件安全：只在开头软删除一次旧数据，不会后续文件覆盖前面的
+    - 内存可控：每次只在内存中保留一个 sheet 的数据行
+    - 自动提取科目表：从余额表和序时账行中提取 account_code/name
+
+    Args:
+        project_id: 项目ID
+        file_contents: [(filename, content_bytes), ...]
+        db: AsyncSession
+        year_override: 用户指定年度（优先于自动提取）
+        custom_mapping: 列映射（全局 dict 或按 sheet 嵌套 dict）
+        progress_callback: (pct: int, msg: str) -> None
+
+    Returns:
+        {
+            "total_accounts": int,
+            "by_category": dict,
+            "data_sheets_imported": dict,
+            "sheet_diagnostics": list,  # 已规范化，可直接返回前端
+            "year": int,
+            "errors": list,
+        }
+    """
+    import openpyxl
+    import uuid as _uuid
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import (
+        TbBalance, TbLedger, TbAuxBalance, TbAuxLedger,
+        ImportBatch, ImportStatus, AccountChart, AccountSource,
+    )
+    from app.services.account_chart_service import (
+        _infer_category, _infer_direction, _infer_level as _infer_level_svc,
+    )
+
+    CHUNK = 50_000
+
+    def _prog(pct: int, msg: str = ""):
+        if progress_callback:
+            try:
+                progress_callback(pct, msg)
+            except Exception:
+                pass
+
+    # ── Phase 0: Quick scan to detect year ──────────────────────────────────
+    detected_year = year_override
+    total_size = sum(len(c) for _, c in file_contents)
+    sheet_count_est = 0
+
+    if detected_year is None:
+        for fn, ct in file_contents:
+            try:
+                wb0 = openpyxl.load_workbook(io.BytesIO(ct), read_only=True, data_only=True)
+                for ws0 in wb0.worksheets:
+                    sheet_count_est += 1
+                    if detected_year is None:
+                        detected_year = extract_year_from_content(
+                            [{f"c{j}": v for j, v in enumerate(r)}
+                             for i, r in enumerate(ws0.iter_rows(max_row=25, values_only=True))],
+                            filename=fn,
+                        )
+                wb0.close()
+            except Exception:
+                continue
+    else:
+        # Still count sheets for progress estimation
+        for fn, ct in file_contents:
+            try:
+                wb0 = openpyxl.load_workbook(io.BytesIO(ct), read_only=True, data_only=True)
+                sheet_count_est += len(wb0.worksheets)
+                wb0.close()
+            except Exception:
+                pass
+
+    if detected_year is None:
+        detected_year = datetime.now().year - 1
+    year = detected_year
+
+    _prog(5, f"年度 {year}，{len(file_contents)} 个文件，{total_size/1024/1024:.1f} MB")
+
+    # ── Phase 1: ImportBatch 记录 + 一次性软删除旧数据 ──────────────────────
+    _TABLE_MAP = {
+        "tb_balance": TbBalance,
+        "tb_aux_balance": TbAuxBalance,
+        "tb_ledger": TbLedger,
+        "tb_aux_ledger": TbAuxLedger,
+    }
+    batches: dict[str, ImportBatch] = {}
+    for dt_key, model in _TABLE_MAP.items():
+        batch = ImportBatch(
+            project_id=project_id, year=year, source_type="smart_import",
+            file_name=f"multi_{dt_key}", data_type=dt_key,
+            status=ImportStatus.processing, started_at=datetime.utcnow(),
+        )
+        db.add(batch)
+        batches[dt_key] = batch
+        # soft-delete 旧记录（只执行一次）
+        tbl = model.__table__
+        await db.execute(
+            sa.update(tbl)
+            .where(tbl.c.project_id == project_id, tbl.c.year == year,
+                   tbl.c.is_deleted == sa.false())
+            .values(is_deleted=True)
+        )
+
+    # soft-delete 旧科目表
+    ac_tbl = AccountChart.__table__
+    await db.execute(
+        sa.update(ac_tbl)
+        .where(ac_tbl.c.project_id == project_id, ac_tbl.c.source == "client")
+        .values(is_deleted=True)
+    )
+    await db.flush()
+    _prog(10, "旧数据已清理，开始解析文件…")
+
+    # ── Phase 2: 逐文件逐 sheet 流式处理 ────────────────────────────────────
+    counts: dict[str, int] = {k: 0 for k in _TABLE_MAP}
+    diagnostics: list[dict] = []
+    errors: list[str] = []
+    seen_codes: set[str] = set()
+    acct_records: list[AccountChart] = []
+    by_category: dict[str, int] = {}
+    _aux_type_counts: dict[str, int] = {}
+    sheets_done = 0
+
+    for file_idx, (filename, content) in enumerate(file_contents):
+        logger.info("流式导入 %d/%d: %s (%d bytes)",
+                     file_idx + 1, len(file_contents), filename, len(content))
+
+        # 探测是否需要 full mode（合并单元格）
+        needs_full = False
+        try:
+            wb_probe = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            for _ws in wb_probe.worksheets:
+                try:
+                    rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
+                    if rows5 and max(len(r) for r in rows5) <= 3:
+                        needs_full = True
+                        break
+                except Exception:
+                    pass
+            wb_probe.close()
+        except Exception:
+            pass
+
+        try:
+            wb = openpyxl.load_workbook(
+                io.BytesIO(content),
+                read_only=(not needs_full), data_only=True,
+            )
+        except Exception as e:
+            diagnostics.append({"file": filename, "sheet": None,
+                                "status": "error", "message": f"无法打开: {e}"})
+            errors.append(f"无法打开 {filename}: {e}")
+            continue
+
+        for ws in wb.worksheets:
+            sname = ws.title
+            if any(kw in sname.lower() for kw in ("说明", "目录", "封面", "模板")):
+                continue
+
+            sheets_done += 1
+            pct = 10 + int(sheets_done / max(sheet_count_est, 1) * 78)
+            _prog(min(pct, 88), f"解析 {filename} / {sname}")
+
+            # ── 解析 sheet ──
+            try:
+                parsed = smart_parse_sheet(ws)
+            except Exception as e:
+                diagnostics.append({"file": filename, "sheet": sname,
+                                    "status": "error", "message": str(e)})
+                continue
+
+            # ── 应用自定义映射 ──
+            sm = None
+            if custom_mapping:
+                if any(isinstance(v, dict) for v in custom_mapping.values()):
+                    sm = custom_mapping.get(sname)
+                else:
+                    sm = custom_mapping
+            if sm:
+                orig_headers = list(parsed["headers"])
+                orig_cm = dict(parsed["column_mapping"])
+                handled = {orig_cm.get(h, h) for h in orig_headers}
+                for h, sf in sm.items():
+                    if h in orig_headers:
+                        parsed["column_mapping"][h] = sf
+                new_rows = []
+                for row in parsed["rows"]:
+                    nr: dict = {}
+                    for h in orig_headers:
+                        ck = orig_cm.get(h, h)
+                        if ck not in row:
+                            continue
+                        nr[parsed["column_mapping"].get(h, ck)] = row[ck]
+                    for k, v in row.items():
+                        if k not in handled:
+                            nr[k] = v
+                    new_rows.append(nr)
+                parsed["rows"] = new_rows
+                parsed["data_type"] = _guess_data_type(set(parsed["column_mapping"].values()))
+
+            if parsed.get("year") is None:
+                parsed["year"] = extract_year_from_content(parsed["rows"], filename=filename)
+
+            dt = parsed["data_type"]
+            matched_fields = set(parsed["column_mapping"].values())
+            miss_req, miss_rec = _detect_missing_fields(dt, matched_fields)
+
+            diag: dict = {
+                "file": filename, "sheet": sname, "data_type": dt,
+                "row_count": parsed["row_count"],
+                "header_count": parsed["header_count"],
+                "matched_cols": sorted(matched_fields),
+                "missing_cols": miss_req, "missing_recommended": miss_rec,
+                "column_mapping": parsed["column_mapping"],
+                "status": "ok",
+            }
+
+            # ── 按数据类型转换 & 写入 ──
+            if dt == "balance":
+                bal, aux_bal = convert_balance_rows(parsed["rows"])
+                diag["balance_count"] = len(bal)
+                diag["aux_balance_count"] = len(aux_bal)
+
+                bal_tbl = TbBalance.__table__
+                for i in range(0, len(bal), CHUNK):
+                    recs = [{"id": _uuid.uuid4(), "project_id": project_id,
+                             "year": year, "import_batch_id": batches["tb_balance"].id,
+                             "is_deleted": False, **r} for r in bal[i:i + CHUNK]]
+                    if recs:
+                        await db.execute(bal_tbl.insert(), recs)
+                        counts["tb_balance"] += len(recs)
+                        await db.flush()
+
+                aux_tbl = TbAuxBalance.__table__
+                for i in range(0, len(aux_bal), CHUNK):
+                    recs = [{"id": _uuid.uuid4(), "project_id": project_id,
+                             "year": year, "import_batch_id": batches["tb_aux_balance"].id,
+                             "is_deleted": False, **r} for r in aux_bal[i:i + CHUNK]]
+                    if recs:
+                        await db.execute(aux_tbl.insert(), recs)
+                        counts["tb_aux_balance"] += len(recs)
+                        await db.flush()
+
+                for r in aux_bal:
+                    t = r.get("aux_type", "?")
+                    _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
+
+                # 提取科目
+                for row in parsed["rows"]:
+                    code = str(row.get("account_code", "")).strip()
+                    name = str(row.get("account_name", "")).strip()
+                    if code and name and code not in seen_codes:
+                        seen_codes.add(code)
+                        cat = _infer_category(code, name)
+                        acct_records.append(AccountChart(
+                            project_id=project_id, account_code=code,
+                            account_name=name, direction=_infer_direction(cat),
+                            level=_infer_level_svc(code, None),
+                            category=cat, source=AccountSource.client,
+                        ))
+                        by_category[cat.value] = by_category.get(cat.value, 0) + 1
+
+                del bal, aux_bal
+
+            elif dt == "ledger":
+                led, _, aux_stats = convert_ledger_rows(parsed["rows"])
+                diag["ledger_count"] = len(led)
+                diag["aux_ledger_count"] = sum(aux_stats.values())
+                for t, c in aux_stats.items():
+                    _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+
+                led_tbl = TbLedger.__table__
+                aux_led_tbl = TbAuxLedger.__table__
+                led_buf: list[dict] = []
+                aux_buf: list[dict] = []
+
+                for row in led:
+                    adim = row.pop("_aux_dim_str", "")
+                    led_buf.append({
+                        "id": _uuid.uuid4(), "project_id": project_id,
+                        "year": year, "import_batch_id": batches["tb_ledger"].id,
+                        "is_deleted": False, **row,
+                    })
+                    if adim and (":" in adim or "：" in adim):
+                        for dim in parse_aux_dimensions(adim):
+                            aux_buf.append({
+                                "id": _uuid.uuid4(), "project_id": project_id,
+                                "year": year,
+                                "import_batch_id": batches["tb_aux_ledger"].id,
+                                "is_deleted": False,
+                                "aux_type": dim["aux_type"],
+                                "aux_code": dim["aux_code"],
+                                "aux_name": dim["aux_name"],
+                                "aux_dimensions_raw": adim,
+                                **row,
+                            })
+                    if len(led_buf) >= CHUNK:
+                        await db.execute(led_tbl.insert(), led_buf)
+                        counts["tb_ledger"] += len(led_buf)
+                        led_buf.clear()
+                        await db.flush()
+                    if len(aux_buf) >= CHUNK:
+                        await db.execute(aux_led_tbl.insert(), aux_buf)
+                        counts["tb_aux_ledger"] += len(aux_buf)
+                        aux_buf.clear()
+                        await db.flush()
+
+                if led_buf:
+                    await db.execute(led_tbl.insert(), led_buf)
+                    counts["tb_ledger"] += len(led_buf)
+                if aux_buf:
+                    await db.execute(aux_led_tbl.insert(), aux_buf)
+                    counts["tb_aux_ledger"] += len(aux_buf)
+                await db.flush()
+
+                # 提取科目
+                for row in parsed["rows"]:
+                    code = str(row.get("account_code", "")).strip()
+                    name = str(row.get("account_name", "")).strip()
+                    if code and name and code not in seen_codes:
+                        seen_codes.add(code)
+                        cat = _infer_category(code, name)
+                        acct_records.append(AccountChart(
+                            project_id=project_id, account_code=code,
+                            account_name=name, direction=_infer_direction(cat),
+                            level=_infer_level_svc(code, None),
+                            category=cat, source=AccountSource.client,
+                        ))
+                        by_category[cat.value] = by_category.get(cat.value, 0) + 1
+
+                del led
+
+            elif dt in ("aux_balance", "aux_ledger"):
+                diag["status"] = "skipped"
+                diag["message"] = "独立辅助表暂不处理（已从余额表/序时账自动拆分）"
+            else:
+                diag["status"] = "skipped"
+                diag["message"] = f"未识别的数据类型: {dt}"
+
+            diagnostics.append(diag)
+            # 释放 parsed rows
+            parsed["rows"] = []
+
+        wb.close()
+
+    # ── Phase 3: 写入科目表 ─────────────────────────────────────────────────
+    if acct_records:
+        db.add_all(acct_records)
+        await db.flush()
+    _prog(90, f"科目 {len(acct_records)} 个，正在完成…")
+
+    # ── Phase 4: 更新 batch 状态 ────────────────────────────────────────────
+    for dt_key, batch in batches.items():
+        batch.record_count = counts[dt_key]
+        batch.status = ImportStatus.completed
+        batch.completed_at = datetime.utcnow()
+    await db.commit()
+
+    # ── Phase 5: 辅助余额汇总 + 事件 ───────────────────────────────────────
+    if counts.get("tb_aux_balance", 0) > 0:
+        try:
+            sc = await rebuild_aux_balance_summary(project_id, year, db)
+            counts["aux_summary"] = sc
+        except Exception as e:
+            logger.warning("辅助余额汇总失败: %s", e)
+
+    try:
+        from app.services.event_bus import event_bus
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        await event_bus.publish(EventPayload(
+            event_type=EventType.DATA_IMPORTED,
+            project_id=project_id,
+            year=year,
+        ))
+        logger.info("DATA_IMPORTED 事件: project=%s, year=%d, counts=%s",
+                     project_id, year, counts)
+    except Exception as e:
+        logger.warning("DATA_IMPORTED 事件发布失败: %s", e)
+
+    _prog(100, "导入完成")
+
+    # 规范化诊断结构
+    norm_diag: list[dict] = []
+    for d in diagnostics:
+        norm_diag.append({
+            "sheet_name": d.get("sheet", ""),
+            "guessed_type": d.get("data_type", "unknown"),
+            "matched_cols": d.get("matched_cols", []),
+            "missing_cols": d.get("missing_cols", []),
+            "missing_recommended": d.get("missing_recommended", []),
+            "row_count": d.get("row_count", 0),
+        })
+
+    return {
+        "total_accounts": len(acct_records),
+        "by_category": by_category,
+        "data_sheets_imported": counts,
+        "sheet_diagnostics": norm_diag,
+        "year": year,
+        "errors": errors,
+    }
+
+
 async def rebuild_aux_balance_summary(project_id: UUID, year: int, db) -> int:
     """重建辅助余额汇总表（按维度类型+科目+辅助编码分组）。
 
