@@ -74,7 +74,9 @@ async def copy_insert(
 
     # 获取 raw asyncpg connection
     raw_conn = await db_session.connection()
-    asyncpg_conn = await raw_conn.get_raw_connection()
+    raw_dbapi = await raw_conn.get_raw_connection()
+    # SQLAlchemy AsyncAdapt wrapper → 原生 asyncpg connection
+    asyncpg_conn = raw_dbapi.driver_connection if hasattr(raw_dbapi, 'driver_connection') else raw_dbapi
 
     for start in range(0, total, BATCH):
         chunk = rows[start:start + BATCH]

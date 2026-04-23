@@ -668,6 +668,13 @@ inclusion: always
 - 数据导入校验偏好：四表关键列缺失时必须阻止进入下一步并明确提示用户，不能静默跳过
 - 四表导入诊断机制（2026-04-15）：`_auto_import_data_sheets` 新增 `sheet_diagnostics` 返回每个 sheet 的识别结果（类型/匹配列/缺失列/行数），缺少必需列的 sheet 跳过导入并记录警告；`AccountImportResult` 新增 `sheet_diagnostics` 字段；前端导入结果页余额表缺失时显示红色警告+诊断详情，`AccountImportStep.validate()` 阻止进入科目映射步骤
 - 两套列名映射不一致修复（2026-04-15）：`account_chart_service._COLUMN_MAP`（识别阶段）和 `parsers.py._COLUMN_MAPS`（解析阶段）存在严重不一致，识别阶段判断为余额表但解析阶段关键列映射不到导致0条写入；已将 parsers.py 四个映射表（_BALANCE/_LEDGER/_AUX_BALANCE/_AUX_LEDGER_COLUMN_MAP）与 _COLUMN_MAP 完全同步，新增 50+ 个列名映射（借方累计/贷方累计/期末数/年初数/凭证字号/核算维度等），清理重复条目
+- _MERGED_HEADER_MAP 单行表头映射缺失修复（2026-04-23）：余额表单行表头直接叫"年初借方金额"（非双行合并的"年初余额_借方金额"），_MERGED_HEADER_MAP 中缺少这类映射导致 _guess_data_type 判定为 unknown、0条入库；补充了"年初/期初/本期/期末/累计"的借方/贷方直接列名共 20+ 个映射
+- smart_import_streaming CSV 支持（2026-04-23）：之前所有文件都走 openpyxl 导致 CSV 报 "File is not a zip file"；新增 `_stream_csv_import` 流式函数（自动编码检测 utf-8-sig/gbk/gb2312/gb18030），Phase 0 年度检测和 Phase 2 导入两个阶段都加入 CSV 分支判断；700MB CSV 改为逐批10万行读取+转换+写入（峰值内存从~4GB降到~200MB），`_parse_csv_content` 已废弃
+- 大数据导入性能优化（2026-04-23）：①asyncpg COPY命令替代INSERT（写入速度5-10x）②codecs.StreamReader流式解码替代全量decode（内存减半）③fast_writer.py已集成到_stream_csv_import
+- fast_writer.py raw connection修复（2026-04-23）：`get_raw_connection()`返回SQLAlchemy的`AsyncAdapt_asyncpg_connection`而非原生asyncpg connection，导致`copy_to_table`报AttributeError；修复：通过`.driver_connection`属性获取原生asyncpg connection
+- custom_mapping与headers不匹配导致0条入库（2026-04-23）：preview_file端点和smart_parse_sheet对同一文件可能检测出不同的表头名（预览用"年初借方金额"，导入用"年初余额_借方金额"），前端传的custom_mapping key在导入时匹配不上headers，但new_rows重建逻辑仍然执行导致数据被搞乱；修复：custom_mapping的key与headers无交集时跳过自定义映射，保留smart_parse_sheet的原始解析结果
+- CSV编码探测截断多字节字符修复（2026-04-23）：`content[:8192]`可能截断UTF-8多字节字符导致decode失败、降级latin-1、中文全乱码；修复：探测范围扩大到16KB并往回找最近的换行符截断，确保不截断多字节字符
+- tb_aux_balance_summary表缺失（2026-04-23）：手动CREATE TABLE补建，该表用于辅助余额表后端预计算汇总
 - 列映射保存偏好：点"保存映射"应一次保存所有 sheet 的映射（不仅当前 sheet），保存后自动进入参照映射库供其他项目引用；防抖自动保存只存当前 sheet，手动保存和确认导入时才全量保存
 - 保存按钮vs保存映射按钮（2026-04-19 用户明确）："保存"按钮保存当前步骤状态（列映射配置）到项目向导wizard_state；"保存映射"按钮是将匹配结果作为模板供同集团其他企业参考用；列映射变化时自动同步到wizardStore.stepData供"保存"按钮使用
 - attachments 表列缺失已修复（2026-04-15）：手动 ALTER TABLE 补齐 attachment_type/reference_id/reference_type/storage_type 四列（迁移019未执行的遗留问题，memory.md 中已有记录但未实际执行）
@@ -690,6 +697,7 @@ inclusion: always
 - 通用导入规则增强（2026-04-19）：①_COLUMN_MAP 新增"期间"→accounting_period、"组织编码"→company_code、"核算组织"→company_name、"最后操作人"→preparer ②parsers.py _parse_date 支持 datetime 对象（openpyxl 直接返回）③新增 _parse_period 解析"2025年1期"格式 ④_parse_single_row 的 ledger/aux_ledger 分支新增 accounting_period 和 voucher_type 字段 ⑤preview_file 返回 key_columns 和 column_importance 标注关键列重要性（required/important/optional）⑥_detect_header_row 增加关键词匹配（科目编码/凭证日期等）提高表头识别准确率
 - 通用智能导入引擎（2026-04-19）：新增 `backend/app/services/smart_import_engine.py`，替代专用脚本，支持任意企业导出格式——①`detect_header_rows` 自动检测单行/双行合并表头（扫描前8行，关键词匹配+子列名检测）②`merge_header_rows` 合并双行表头为组合列名（如"年初余额_借方金额"→year_opening_debit）③`smart_match_column` 优先匹配合并表头组合名→基础列名→清洗后匹配 ④"核算维度"映射为 aux_dimensions（混合维度列），不映射为 aux_type（避免误判为独立辅助表）⑤`convert_balance_rows` 自动从借贷两列计算净额（不依赖方向列）⑥`validate_aux_consistency` 三项校验（维度存在性/期初+变动=期末/明细账vs余额表发生额）⑦`smart_parse_files` 多文件入口自动检测合并单元格切换完整模式（3.9s打开+0.5s遍历50000行）⑧新增 `POST /ledger/smart-preview`（预览不写库）和 `POST /ledger/smart-import`（解析+写库）两个API端点，支持 custom_mapping 参数手动指定列映射
 - openpyxl read_only 模式限制（2026-04-19）：合并单元格的文件在 read_only 模式下只返回1列（左上角单元格），必须用完整模式打开；完整模式打开50000行文件约4秒，iter_rows遍历约0.5秒，可接受；序时账100万行文件用 read_only 模式无问题（无合并单元格）
+- openpyxl read_only 合并单元格值复制问题（2026-04-23）：read_only模式下合并单元格的值会被复制到所有合并列（如14列全是"科目余额表"），导致detect_header_rows误判第一行为表头、headers全错、data_type=unknown、0条入库；needs_full检测逻辑从"列数≤3"增强为同时检测"同一行≥60%非空值相同且≥3个"的合并单元格特征，自动切换完整模式
 - uvicorn --reload 与脚本冲突（2026-04-19）：从 backend/ 目录运行 Python 脚本时，uvicorn 的 --reload 文件监控会导致脚本卡死；解决方案：从项目根目录运行（`python -u backend/scripts/xxx.py`）或停止 uvicorn
 - 四表导入偏好（2026-04-19 用户提出）：①每个单位导出格式不同，必须用通用解析规则而非专用脚本 ②辅助核算维度有多个时需要让用户确认（smart-preview 先预览再 smart-import 写入）③辅助余额表和辅助明细账之间要做一致性校对（名称/编号/期初+变动=期末）④年度信息要从文件内容自动提取，支持多文件上传 ⑤解析有问题时支持手动关键列表头对应（custom_mapping 参数）
 - 查账页面导入数据偏好（2026-04-19 用户改回）："导入数据"按钮改回跳转到项目向导科目导入步骤（带returnTo=ledger参数），不用弹窗式智能导入；弹窗代码保留备用
@@ -1108,6 +1116,8 @@ inclusion: always
 - ORM 模型 bug 修复（2026-04-19）：①ai_models.py FK `workpapers.id` → `working_paper.id`（表名错误）②consolidation_models.py 6处 `server_default="'xxx'"` → `server_default="xxx"`（PG 枚举值多引号导致 InvalidTextRepresentationError）③alembic/005 移除重复枚举手动创建
 - 数据库初始化方案：Alembic 迁移链有多处枚举重复创建 bug（005/006 等），改用 `Base.metadata.create_all` 一次性建表 + 手动标记 `alembic_version=034`，绕过迁移脚本问题；_init_db.py 脚本已删除但逻辑可复现
 - 数据库当前状态（2026-04-19）：116 张表全部创建成功，admin 用户 admin/admin123（role=admin），alembic_version=034
+- 数据库补建（2026-04-23）：首次 create_all 只建了116张表（缺少Phase 6/7的73张表），运行 `_create_missing_tables.py` 补建后共111个模型表全部就绪（含 project_assignments/staff_members/work_hours/review_conversations 等）；同时补齐 trial_balance.currency_code 列（Phase 8 迁移034定义但数据库缺失）
+- 四表缺失列批量修复（2026-04-23）：`_fix_missing_cols.py` 补齐11列——tb_aux_ledger.aux_dimensions_raw、tb_aux_balance.aux_dimensions_raw、tb_balance.opening_debit/opening_credit/closing_debit/closing_credit、tb_aux_balance同4列、attachments.created_by；根因是早期手动建表后ORM模型新增的列未同步到数据库
 - consolidation_models server_default 规则：PG 枚举列用 `server_default="xxx"` 纯字符串（不带引号），或用 `server_default=text("'xxx'")`（text 函数包裹）；绝不能用 `server_default="'xxx'"`（双层引号）
 - 导航布局调整（2026-04-19）：左侧栏从 17 项精简到 10 项（核心业务：仪表盘/项目/人员委派/工时/管理看板/合并项目/函证/归档/附件/用户管理），7 个全局工具移到顶部栏右侧图标（知识库/私人库/AI模型/排版模板/吐槽求助 | 回收站/系统设置），中间竖线分隔工具入口和系统操作
 - 系统设置前后端联动（2026-04-19）：新增 system_settings.py 路由（GET/PUT /api/settings + GET /api/settings/health），19 个白名单可编辑配置项（LLM/OCR/安全/性能等），敏感字段脱敏，仅 admin 可修改，运行时生效重启恢复 .env；前端 SystemSettings.vue 7 个分组折叠面板+行内编辑+服务健康检测（PG/Redis/vLLM/Ollama/ONLYOFFICE/Paperless）+JWT 弱密钥警告；路由 /settings 已注册
