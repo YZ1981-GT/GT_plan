@@ -18,7 +18,7 @@ from app.services.trial_balance_service import TrialBalanceService
 logger = logging.getLogger(__name__)
 
 
-def _make_handler(service_class, method_name: str):
+def _make_handler(service_class, method_name: str, after_commit_event_type: EventType | None = None):
     """创建一个带独立数据库会话的事件处理器，异常时自动回滚"""
 
     async def handler(payload: EventPayload) -> None:
@@ -28,6 +28,16 @@ def _make_handler(service_class, method_name: str):
                 method = getattr(svc, method_name)
                 await method(payload)
                 await session.commit()
+                if after_commit_event_type is not None and payload.year is not None:
+                    await event_bus.publish_immediate(EventPayload(
+                        event_type=after_commit_event_type,
+                        project_id=payload.project_id,
+                        year=payload.year,
+                        account_codes=payload.account_codes,
+                        batch_id=payload.batch_id,
+                        entry_group_id=payload.entry_group_id,
+                        extra=payload.extra,
+                    ))
             except Exception:
                 await session.rollback()
                 raise
@@ -38,7 +48,11 @@ def _make_handler(service_class, method_name: str):
 
 def _make_tb_handler(method_name: str):
     """创建 TrialBalanceService 事件处理器（向后兼容）"""
-    return _make_handler(TrialBalanceService, method_name)
+    return _make_handler(
+        TrialBalanceService,
+        method_name,
+        after_commit_event_type=EventType.TRIAL_BALANCE_UPDATED,
+    )
 
 
 def register_event_handlers() -> None:
@@ -79,7 +93,11 @@ def register_event_handlers() -> None:
     from app.services.report_engine import ReportEngine
     event_bus.subscribe(
         EventType.TRIAL_BALANCE_UPDATED,
-        _make_handler(ReportEngine, "on_trial_balance_updated"),
+        _make_handler(
+            ReportEngine,
+            "on_trial_balance_updated",
+            after_commit_event_type=EventType.REPORTS_UPDATED,
+        ),
     )
 
     # 报表更新 → 附注增量更新

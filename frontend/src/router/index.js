@@ -13,6 +13,12 @@ const AIContractView = () => import('@/views/ai/AIContractView.vue')
 const AIEvidenceView = () => import('@/views/ai/AIEvidenceView.vue')
 const AIWorkpaperView = () => import('@/views/ai/AIWorkpaperView.vue')
 
+// 报表联动页面
+const UnadjustedReportView = () => import('@/views/reports/UnadjustedReportView.vue')
+const AdjustedReportView = () => import('@/views/reports/AdjustedReportView.vue')
+const TrialBalanceView = () => import('@/views/reports/TrialBalanceView.vue')
+const AdjustmentEntriesView = () => import('@/views/reports/AdjustmentEntriesView.vue')
+
 const routes = [
   {
     path: '/ai/chat',
@@ -49,6 +55,31 @@ const routes = [
     name: 'AIWorkpaper',
     component: AIWorkpaperView,
     meta: { title: '底稿 AI 填充', requiresAuth: true },
+  },
+  // 报表联动
+  {
+    path: '/reports/unadjusted',
+    name: 'UnadjustedReport',
+    component: UnadjustedReportView,
+    meta: { title: '未审报表', requiresAuth: true },
+  },
+  {
+    path: '/reports/adjusted',
+    name: 'AdjustedReport',
+    component: AdjustedReportView,
+    meta: { title: '审定报表', requiresAuth: true },
+  },
+  {
+    path: '/reports/trial-balance',
+    name: 'TrialBalance',
+    component: TrialBalanceView,
+    meta: { title: '试算平衡表', requiresAuth: true },
+  },
+  {
+    path: '/reports/adjustment-entries',
+    name: 'AdjustmentEntries',
+    component: AdjustmentEntriesView,
+    meta: { title: '调整分录', requiresAuth: true },
   },
 ]
 

@@ -204,7 +204,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument,
@@ -215,6 +215,7 @@ import http from '@/utils/http'
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
 const activeTab = ref('overview')
+const projectYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
 
 // 底稿索引树
 const wpTree = ref<any[]>([])
@@ -240,7 +241,7 @@ watch(() => props.project?.id, async (newId) => {
   } catch { wpTree.value = [] }
   // 加载试算表预览（前20行）
   try {
-    const { data } = await http.get(`/api/projects/${newId}/trial-balance`, { params: { year: new Date().getFullYear() } })
+    const { data } = await http.get(`/api/projects/${newId}/trial-balance`, { params: { year: projectYear.value } })
     const rows = data.data ?? data ?? []
     trialBalanceRows.value = rows.slice(0, 20)
   } catch { trialBalanceRows.value = [] }
@@ -261,7 +262,10 @@ watch(() => props.project?.id, async (newId) => {
 
 function goTo(page: string) {
   if (!props.project) return
-  router.push(`/projects/${props.project.id}/${page}`)
+  router.push({
+    path: `/projects/${props.project.id}/${page}`,
+    query: { year: String(projectYear.value) },
+  })
 }
 
 function editProject() {

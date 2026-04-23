@@ -8,6 +8,9 @@
           <el-radio-button value="unadjusted">未审报表</el-radio-button>
           <el-radio-button value="compare">对比视图</el-radio-button>
         </el-radio-group>
+        <el-button v-if="reportMode === 'unadjusted'" type="primary" @click="onSyncUnadjusted" :loading="syncLoading">
+          刷新同步未审数
+        </el-button>
         <el-button @click="onGenerate" :loading="genLoading">重新生成</el-button>
         <el-button @click="onConsistencyCheck" :loading="checkLoading">一致性校验</el-button>
         <el-button @click="onExportExcel">导出 Excel</el-button>
@@ -113,7 +116,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  generateReports, getReport, getReportDrilldown, getReportConsistencyCheck,
+  generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
   type ReportRow, type ReportDrilldownData, type ReportConsistencyCheck,
 } from '@/services/auditPlatformApi'
@@ -126,6 +129,7 @@ const year = computed(() => Number(route.query.year) || new Date().getFullYear()
 const loading = ref(false)
 const genLoading = ref(false)
 const checkLoading = ref(false)
+const syncLoading = ref(false)
 const activeTab = ref('balance_sheet')
 const reportMode = ref('audited')
 const rows = ref<ReportRow[]>([])
@@ -192,6 +196,17 @@ function compareRowClassName({ row }: { row: any }) {
 
 function onTabChange() { fetchReport() }
 
+async function onSyncUnadjusted() {
+  syncLoading.value = true
+  try {
+    await recalcTrialBalance(projectId.value, year.value)
+    await fetchReport()
+    ElMessage.success('未审数已按四表账套科目重新同步')
+  } finally {
+    syncLoading.value = false
+  }
+}
+
 async function onGenerate() {
   genLoading.value = true
   try {
@@ -222,7 +237,16 @@ async function onDrilldown(row: ReportRow) {
   drilldownLoading.value = true
   drilldownData.value = null
   try {
-    drilldownData.value = await getReportDrilldown(projectId.value, year.value, activeTab.value, row.row_code)
+    const result = await getReportDrilldown(projectId.value, year.value, activeTab.value, row.row_code)
+    drilldownData.value = {
+      ...result,
+      accounts: result.accounts.map((item: any) => ({
+        ...item,
+        amount: reportMode.value === 'unadjusted'
+          ? (item.unadjusted_amount ?? item.amount ?? '0')
+          : (item.audited_amount ?? item.amount ?? '0'),
+      })),
+    }
   } catch {
     ElMessage.error('穿透查询失败')
   } finally {

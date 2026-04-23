@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
-from app.models.audit_platform_schemas import EventPayload, EventType
+from app.models.audit_platform_schemas import EventPayload
 from app.models.report_models import (
     FinancialReport,
     FinancialReportType,
@@ -141,9 +141,7 @@ class ReportFormulaParser:
 
         # Phase 9: 未审模式下，审定数列替换为未审数列
         if self._use_unadjusted and column_name in ("期末余额", "审定数"):
-            unadj = row.unadjusted_debit or Decimal("0")
-            unadj_cr = row.unadjusted_credit or Decimal("0")
-            return unadj - unadj_cr
+            return row.unadjusted_amount or Decimal("0")
 
         field = _COLUMN_MAP.get(column_name)
         if field is None:
@@ -151,9 +149,9 @@ class ReportFormulaParser:
             return Decimal("0")
 
         if field == "_period_amount":
-            audited = row.audited_amount or Decimal("0")
+            amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
             opening = row.opening_balance or Decimal("0")
-            return audited - opening
+            return amount - opening
 
         val = getattr(row, field, None)
         return val if val is not None else Decimal("0")
@@ -184,7 +182,9 @@ class ReportFormulaParser:
 
         total = Decimal("0")
         for row in rows:
-            if field == "_period_amount":
+            if self._use_unadjusted and column_name in ("期末余额", "审定数"):
+                total += row.unadjusted_amount or Decimal("0")
+            elif field == "_period_amount":
                 audited = row.audited_amount or Decimal("0")
                 opening = row.opening_balance or Decimal("0")
                 total += audited - opening
@@ -426,18 +426,6 @@ class ReportEngine:
 
             # 写入缓存
             await self._set_cached_report(project_id, report_type.value, report_rows)
-
-        # 发布 REPORTS_UPDATED 事件
-        try:
-            from app.services.event_bus import event_bus
-            await event_bus.publish(EventPayload(
-                event_type=EventType.REPORTS_UPDATED,
-                project_id=project_id,
-                year=year,
-                extra={"report_types": list(results.keys())},
-            ))
-        except Exception:
-            logger.warning("Failed to publish REPORTS_UPDATED event", exc_info=True)
 
         return results
 
@@ -765,6 +753,7 @@ class ReportEngine:
                             contributing.append({
                                 "account_code": tb_row.standard_account_code,
                                 "account_name": tb_row.account_name,
+                                "unadjusted_amount": str(tb_row.unadjusted_amount or 0),
                                 "audited_amount": str(tb_row.audited_amount or 0),
                                 "opening_balance": str(tb_row.opening_balance or 0),
                             })
@@ -783,6 +772,7 @@ class ReportEngine:
                         contributing.append({
                             "account_code": tb_row.standard_account_code,
                             "account_name": tb_row.account_name,
+                            "unadjusted_amount": str(tb_row.unadjusted_amount or 0),
                             "audited_amount": str(tb_row.audited_amount or 0),
                             "opening_balance": str(tb_row.opening_balance or 0),
                         })

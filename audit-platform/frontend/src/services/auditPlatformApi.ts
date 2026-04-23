@@ -45,7 +45,7 @@ export interface AdjustmentEntry {
   id: string
   entry_group_id: string
   adjustment_no: string
-  adjustment_type: 'AJE' | 'RJE'
+  adjustment_type: 'aje' | 'rje' | 'AJE' | 'RJE'
   description: string | null
   review_status: string
   created_by: string | null
@@ -267,7 +267,14 @@ export interface ReportDrilldownData {
   row_code: string
   row_name: string
   formula: string
-  accounts: Array<{ code: string; name: string; amount: string }>
+  accounts: Array<{
+    code: string
+    name: string
+    amount: string
+    unadjusted_amount?: string
+    audited_amount?: string
+    wp_id?: string | null
+  }>
 }
 
 export interface ReportConsistencyCheck {
@@ -289,12 +296,35 @@ export async function getReport(projectId: string, year: number, reportType: str
 
 export async function getReportDrilldown(projectId: string, year: number, reportType: string, rowCode: string): Promise<ReportDrilldownData> {
   const { data } = await http.get(`/api/reports/${projectId}/${year}/${reportType}/drilldown/${rowCode}`)
-  return data.data ?? data
+  const raw = data.data ?? data
+  return {
+    row_code: raw.row_code,
+    row_name: raw.row_name,
+    formula: raw.formula,
+    accounts: (raw.contributing_accounts || []).map((item: any) => ({
+      code: item.account_code,
+      name: item.account_name,
+      amount: item.audited_amount ?? item.amount ?? '0',
+      unadjusted_amount: item.unadjusted_amount ?? item.amount ?? '0',
+      audited_amount: item.audited_amount ?? item.amount ?? '0',
+      wp_id: item.wp_id ?? null,
+    })),
+  }
 }
 
 export async function getReportConsistencyCheck(projectId: string, year: number): Promise<ReportConsistencyCheck> {
   const { data } = await http.get(`/api/reports/${projectId}/${year}/consistency-check`)
-  return data.data ?? data
+  const raw = data.data ?? data
+  return {
+    consistent: raw.consistent ?? raw.all_passed ?? false,
+    checks: (raw.checks || []).map((item: any) => ({
+      name: item.name ?? item.check_name ?? '',
+      passed: !!item.passed,
+      expected: item.expected ?? item.expected_value ?? '',
+      actual: item.actual ?? item.actual_value ?? '',
+      diff: item.diff ?? item.difference ?? '',
+    })),
+  }
 }
 
 export function getReportExcelUrl(projectId: string, year: number, reportType: string): string {

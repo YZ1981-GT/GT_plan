@@ -15,10 +15,10 @@
       <el-table v-else-if="reportRows.length" :data="reportRows" size="small" stripe border max-height="calc(100vh - 160px)">
         <el-table-column prop="row_name" label="项目" min-width="200" fixed />
         <el-table-column label="期末数" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.current_amount) }}</template>
+          <template #default="{ row }">{{ fmtAmt(row.current_period_amount) }}</template>
         </el-table-column>
         <el-table-column label="年初数" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.prior_amount) }}</template>
+          <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
         </el-table-column>
       </el-table>
       <el-empty v-else description="暂无报表数据" :image-size="60" />
@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/utils/http'
 import DetailProjectPanel from './DetailProjectPanel.vue'
@@ -68,6 +68,7 @@ const reportRows = ref<any[]>([])
 const reportLoading = ref(false)
 const noteContent = ref('')
 const tbDetail = ref<any>(null)
+const selectedYear = computed(() => Number(props.catalogItem?.year || props.project?.audit_year) || new Date().getFullYear())
 
 function fmtAmt(v: any): string {
   const n = Number(v)
@@ -100,18 +101,18 @@ watch(() => props.catalogItem, async (item) => {
   if (item.type === 'note') {
     try {
       const { data } = await http.get(
-        `/api/disclosure-notes/${pid}/${new Date().getFullYear()}/${item.code}`,
+        `/api/disclosure-notes/${pid}/${selectedYear.value}/${item.code}`,
         { validateStatus: (s: number) => s < 600 }
       )
       const section = data?.data ?? data
-      noteContent.value = section?.content || '<p>暂无内容</p>'
+      noteContent.value = section?.text_content || section?.content || '<p>暂无内容</p>'
     } catch { noteContent.value = '' }
   }
 
   if (item.type === 'trial_balance') {
     try {
       const { data } = await http.get(`/api/projects/${pid}/trial-balance`, {
-        params: { year: new Date().getFullYear() },
+        params: { year: selectedYear.value },
         validateStatus: (s: number) => s < 600,
       })
       const rows = data.data ?? data ?? []

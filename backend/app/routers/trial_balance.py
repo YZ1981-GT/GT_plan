@@ -9,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
+from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.deps import check_consol_lock
+from app.services.event_bus import event_bus
 from app.services.materiality_service import MaterialityService
 from app.services.trial_balance_service import TrialBalanceService
 
@@ -71,6 +73,11 @@ async def recalc_trial_balance(
     svc = TrialBalanceService(db)
     await svc.full_recalc(project_id, year, company_code)
     await db.commit()
+    await event_bus.publish_immediate(EventPayload(
+        event_type=EventType.TRIAL_BALANCE_UPDATED,
+        project_id=project_id,
+        year=year,
+    ))
     return {"message": "重算完成"}
 
 

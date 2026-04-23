@@ -26,8 +26,8 @@
     <!-- Tab 切换 -->
     <el-tabs v-model="activeTab" @tab-change="onTabChange">
       <el-tab-pane label="全部" name="all" />
-      <el-tab-pane label="AJE" name="AJE" />
-      <el-tab-pane label="RJE" name="RJE" />
+      <el-tab-pane label="AJE" name="aje" />
+      <el-tab-pane label="RJE" name="rje" />
     </el-tabs>
 
     <!-- 分录列表 -->
@@ -37,8 +37,8 @@
       <el-table-column prop="adjustment_no" label="编号" width="120" />
       <el-table-column prop="adjustment_type" label="类型" width="70">
         <template #default="{ row }">
-          <el-tag :type="row.adjustment_type === 'AJE' ? 'danger' : 'warning'" size="small">
-            {{ row.adjustment_type }}
+          <el-tag :type="normalizeAdjustmentType(row.adjustment_type) === 'aje' ? 'danger' : 'warning'" size="small">
+            {{ formatAdjustmentType(row.adjustment_type) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -94,8 +94,8 @@
       <el-form :model="form" label-width="90px">
         <el-form-item label="类型" v-if="!isEditing">
           <el-radio-group v-model="form.adjustment_type">
-            <el-radio value="AJE">AJE</el-radio>
-            <el-radio value="RJE">RJE</el-radio>
+            <el-radio value="aje">AJE</el-radio>
+            <el-radio value="rje">RJE</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="摘要">
@@ -182,7 +182,7 @@ const formDialogVisible = ref(false)
 const isEditing = ref(false)
 const editingGroupId = ref('')
 const form = ref({
-  adjustment_type: 'AJE',
+  adjustment_type: 'aje',
   description: '',
   line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
 })
@@ -205,6 +205,14 @@ function statusTagType(s: string) {
 function statusLabel(s: string) {
   const m: Record<string, string> = { draft: '草稿', pending_review: '待复核', approved: '已批准', rejected: '已驳回' }
   return m[s] || s
+}
+
+function normalizeAdjustmentType(type: string) {
+  return String(type || '').toLowerCase()
+}
+
+function formatAdjustmentType(type: string) {
+  return normalizeAdjustmentType(type).toUpperCase()
 }
 
 async function fetchEntries() {
@@ -252,7 +260,7 @@ function openCreateDialog() {
   isEditing.value = false
   editingGroupId.value = ''
   form.value = {
-    adjustment_type: 'AJE',
+    adjustment_type: 'aje',
     description: '',
     line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
   }
@@ -263,7 +271,7 @@ function openEditDialog(row: any) {
   isEditing.value = true
   editingGroupId.value = row.entry_group_id
   form.value = {
-    adjustment_type: row.adjustment_type,
+    adjustment_type: normalizeAdjustmentType(row.adjustment_type),
     description: row.description || '',
     line_items: (row.line_items || []).map((li: any) => ({
       standard_account_code: li.standard_account_code,

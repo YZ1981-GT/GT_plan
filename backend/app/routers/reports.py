@@ -22,12 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
+from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.models.report_models import FinancialReport, FinancialReportType
 from app.models.report_schemas import (
     ReportGenerateRequest,
     ReportRow,
 )
+from app.services.event_bus import event_bus
 from app.services.report_engine import ReportEngine
 
 router = APIRouter(
@@ -47,6 +49,12 @@ async def generate_reports(
     try:
         results = await engine.generate_all_reports(data.project_id, data.year)
         await db.commit()
+        await event_bus.publish_immediate(EventPayload(
+            event_type=EventType.REPORTS_UPDATED,
+            project_id=data.project_id,
+            year=data.year,
+            extra={"report_types": list(results.keys())},
+        ))
         return {
             "message": "报表生成成功",
             "report_types": list(results.keys()),

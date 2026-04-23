@@ -43,7 +43,7 @@
       <el-table-column label="RJE调整" width="140" align="right">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && row.rje_adjustment !== '0'"
-            class="clickable" @click="onAdjClick(row, 'RJE')">
+            class="clickable" @click="onAdjClick(row, 'rje')">
             {{ fmtAmt(row.rje_adjustment) }}
           </span>
           <span v-else :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
@@ -54,7 +54,7 @@
       <el-table-column label="AJE调整" width="140" align="right">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && row.aje_adjustment !== '0'"
-            class="clickable" @click="onAdjClick(row, 'AJE')">
+            class="clickable" @click="onAdjClick(row, 'aje')">
             {{ fmtAmt(row.aje_adjustment) }}
           </span>
           <span v-else :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
@@ -292,7 +292,7 @@ function onUnadjustedClick(_row: TrialBalanceRow) {
 }
 
 async function onAdjClick(row: TrialBalanceRow, type: string) {
-  adjDialogType.value = type
+  adjDialogType.value = type.toUpperCase()
   adjDialogAccount.value = `${row.standard_account_code} ${row.account_name || ''}`
   adjDialogVisible.value = true
   try {

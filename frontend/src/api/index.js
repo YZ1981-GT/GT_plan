@@ -387,6 +387,83 @@ class EventSourceWithBody extends EventTarget {
   }
 }
 
+// ============ 报表联动 API ============
+
+export const auditReports = {
+  /** 获取未审报表（动态计算） */
+  getUnadjusted: (projectId, year, reportType) =>
+    request(`/reports/${projectId}/${year}/${reportType}?unadjusted=true`),
+
+  /** 获取审定报表 */
+  getAdjusted: (projectId, year, reportType) =>
+    request(`/reports/${projectId}/${year}/${reportType}`),
+
+  /** 生成/重新生成四张报表 */
+  generate: (projectId, year) =>
+    request('/reports/generate', {
+      method: 'POST',
+      body: JSON.stringify({ project_id: projectId, year }),
+    }),
+
+  /** 跨报表一致性校验 */
+  consistencyCheck: (projectId, year) =>
+    request(`/reports/${projectId}/${year}/consistency-check`),
+
+  /** 穿透查询 */
+  drilldown: (projectId, year, reportType, rowCode) =>
+    request(`/reports/${projectId}/${year}/${reportType}/drilldown/${rowCode}`),
+}
+
+export const trialBalance = {
+  /** 获取试算平衡表 */
+  get: (projectId, year, companyCode = '001') => {
+    const qs = new URLSearchParams({ year, company_code: companyCode }).toString()
+    return request(`/projects/${projectId}/trial-balance?${qs}`)
+  },
+
+  /** 手动触发全量重算 */
+  recalc: (projectId, year, companyCode = '001') => {
+    const qs = new URLSearchParams({ year, company_code: companyCode }).toString()
+    return request(`/projects/${projectId}/trial-balance/recalc?${qs}`, {
+      method: 'POST',
+    })
+  },
+
+  /** 数据一致性校验 */
+  checkConsistency: (projectId, year, companyCode = '001') => {
+    const qs = new URLSearchParams({ year, company_code: companyCode }).toString()
+    return request(`/projects/${projectId}/trial-balance/consistency-check?${qs}`)
+  },
+}
+
+export const adjustmentEntries = {
+  /** 获取调整分录列表 */
+  list: (projectId, year, params = {}) => {
+    const qs = new URLSearchParams({ year, ...params }).toString()
+    return request(`/projects/${projectId}/adjustments?${qs}`)
+  },
+
+  /** 创建调整分录 */
+  create: (projectId, data) =>
+    request(`/projects/${projectId}/adjustments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** 修改调整分录 */
+  update: (projectId, entryGroupId, data) =>
+    request(`/projects/${projectId}/adjustments/${entryGroupId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  /** 删除调整分录 */
+  delete: (projectId, entryGroupId) =>
+    request(`/projects/${projectId}/adjustments/${entryGroupId}`, {
+      method: 'DELETE',
+    }),
+}
+
 export default {
   aiAdmin,
   aiOCR,
@@ -396,4 +473,7 @@ export default {
   aiChat,
   aiConfirmation,
   aiKnowledge,
+  auditReports,
+  trialBalance,
+  adjustmentEntries,
 }

@@ -95,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { DataLine, Notebook, Document, TrendCharts } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 
@@ -124,13 +124,13 @@ const tabs = [
 ]
 
 // 报表
-const currentYear = new Date().getFullYear()
-const reportYears = [currentYear, currentYear - 1, currentYear - 2]
+const currentYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
+const reportYears = computed(() => [currentYear.value, currentYear.value - 1, currentYear.value - 2])
 const reportTypes = [
   { key: 'balance_sheet', label: '资产负债表' },
   { key: 'income_statement', label: '利润表' },
-  { key: 'cash_flow', label: '现金流量表' },
-  { key: 'equity_change', label: '所有者权益变动表' },
+  { key: 'cash_flow_statement', label: '现金流量表' },
+  { key: 'equity_statement', label: '所有者权益变动表' },
 ]
 
 // 附注
@@ -161,8 +161,8 @@ function selectItem(type: string, data: any) {
 
 // 默认展开第一组
 watch(activeTab, () => {
-  if (activeTab.value === 'reports' && !expanded[`report-${currentYear}`]) {
-    expanded[`report-${currentYear}`] = true
+  if (activeTab.value === 'reports' && !expanded[`report-${currentYear.value}`]) {
+    expanded[`report-${currentYear.value}`] = true
   }
 }, { immediate: true })
 
@@ -172,13 +172,14 @@ watch(() => props.project?.id, async (pid) => {
 
   // 加载附注章节（静默失败，数据可能还没生成）
   try {
-    const { data } = await http.get(`/api/disclosure-notes/${pid}/${currentYear}`, {
+    const { data } = await http.get(`/api/disclosure-notes/${pid}/${currentYear.value}`, {
       validateStatus: (s: number) => s < 500,  // 4xx 不抛异常
     })
     if (data) {
       const d = data.data ?? data
       noteSections.value = Array.isArray(d) ? d.map((s: any) => ({
-        code: s.section_code || s.code || '', title: s.section_title || s.title || '',
+        code: s.note_section || s.section_code || s.code || '',
+        title: s.section_title || s.title || '',
       })) : []
     }
   } catch { noteSections.value = [] }
@@ -186,7 +187,7 @@ watch(() => props.project?.id, async (pid) => {
   // 加载试算表分类（静默失败）
   try {
     const { data } = await http.get(`/api/projects/${pid}/trial-balance`, {
-      params: { year: currentYear },
+      params: { year: currentYear.value },
       validateStatus: (s: number) => s < 600,
     })
     if (data && Array.isArray(data.data ?? data)) {
