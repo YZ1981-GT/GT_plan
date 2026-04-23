@@ -218,6 +218,44 @@ FIELD_LABELS = {
     "direction": "借贷方向",
 }
 
+_REQUIRED_FIELD_GROUPS: dict[str, list[tuple[str, set[str]]]] = {
+    "balance": [
+        ("account_code", {"account_code"}),
+    ],
+    "ledger": [
+        ("account_code", {"account_code"}),
+        ("voucher_date", {"voucher_date"}),
+        ("voucher_no", {"voucher_no"}),
+    ],
+    "aux_balance": [
+        ("account_code", {"account_code"}),
+        ("aux_type", {"aux_type"}),
+    ],
+    "aux_ledger": [
+        ("account_code", {"account_code"}),
+    ],
+}
+
+_RECOMMENDED_FIELD_GROUPS: dict[str, list[tuple[str, set[str]]]] = {
+    "balance": [
+        ("opening_balance", {"opening_balance", "opening_debit", "opening_credit", "year_opening_debit", "year_opening_credit"}),
+        ("debit_amount", {"debit_amount"}),
+        ("credit_amount", {"credit_amount"}),
+        ("closing_balance", {"closing_balance", "closing_debit", "closing_credit"}),
+    ],
+    "ledger": [
+        ("debit_amount", {"debit_amount"}),
+        ("credit_amount", {"credit_amount"}),
+        ("summary", {"summary"}),
+    ],
+    "aux_balance": [
+        ("opening_balance", {"opening_balance", "opening_debit", "opening_credit"}),
+        ("closing_balance", {"closing_balance", "closing_debit", "closing_credit"}),
+        ("aux_code", {"aux_code"}),
+        ("aux_name", {"aux_name"}),
+    ],
+}
+
 # 合并表头列名 → 标准字段（覆盖双行合并产生的组合名）
 _MERGED_HEADER_MAP = {
     # 年初余额
@@ -259,6 +297,18 @@ _MERGED_HEADER_MAP = {
 
 # 基础列名映射（从 account_chart_service._COLUMN_MAP 复用）
 from app.services.account_chart_service import _COLUMN_MAP as _BASE_COLUMN_MAP
+
+
+def _detect_missing_fields(data_type: str, matched_fields: set[str]) -> tuple[list[str], list[str]]:
+    missing_required = [
+        display for display, candidates in _REQUIRED_FIELD_GROUPS.get(data_type, [])
+        if not any(field in matched_fields for field in candidates)
+    ]
+    missing_recommended = [
+        display for display, candidates in _RECOMMENDED_FIELD_GROUPS.get(data_type, [])
+        if not any(field in matched_fields for field in candidates)
+    ]
+    return missing_required, missing_recommended
 
 
 def smart_match_column(header: str) -> Optional[str]:
@@ -926,14 +976,16 @@ def validate_four_tables(
 def smart_parse_files(
     file_contents: list[tuple[str, bytes]],
     year_override: Optional[int] = None,
-    custom_mapping: Optional[dict[str, str]] = None,
+    custom_mapping: Optional[dict[str, str] | dict[str, dict[str, str]]] = None,
 ) -> dict:
     """智能解析多个文件，返回四表数据 + 维度信息 + 校验结果。
 
     Args:
         file_contents: [(filename, content_bytes), ...]
         year_override: 用户指定年度（优先于自动提取）
-        custom_mapping: 用户手动指定的列映射 {原始列名: 标准字段名}
+        custom_mapping: 用户手动指定的列映射。
+            - 全局映射: {原始列名: 标准字段名}
+            - 按 sheet 映射: {sheet_name: {原始列名: 标准字段名}}
 
     Returns:
         {
@@ -1018,24 +1070,48 @@ def smart_parse_files(
                 })
                 continue
 
-            # 应用用户自定义映射
+            # 应用用户自定义映射（支持全局或按 sheet）
+            sheet_mapping = None
             if custom_mapping:
-                for h, std_field in custom_mapping.items():
-                    if h in parsed["column_mapping"]:
+                # 检测是否是按 sheet 的嵌套映射
+                if any(isinstance(v, dict) for v in custom_mapping.values()):
+                    sheet_mapping = custom_mapping.get(sheet_name)
+                else:
+                    sheet_mapping = custom_mapping  # type: ignore[assignment]
+
+            if sheet_mapping:
+                original_headers = list(parsed["headers"])
+                original_column_mapping = dict(parsed["column_mapping"])
+                handled_keys = {
+                    original_column_mapping.get(header, header)
+                    for header in original_headers
+                }
+                for h, std_field in sheet_mapping.items():
+                    if h in original_headers:
                         parsed["column_mapping"][h] = std_field
-                # 重新映射数据行
                 new_rows = []
                 for row in parsed["rows"]:
                     new_row = {}
+                    for header in original_headers:
+                        current_key = original_column_mapping.get(header, header)
+                        if current_key not in row:
+                            continue
+                        mapped = parsed["column_mapping"].get(header, current_key)
+                        new_row[mapped] = row[current_key]
                     for k, v in row.items():
-                        mapped = custom_mapping.get(k, k)
-                        new_row[mapped] = v
+                        if k not in handled_keys:
+                            new_row[k] = v
                     new_rows.append(new_row)
                 parsed["rows"] = new_rows
-                parsed["data_type"] = _guess_data_type(set(custom_mapping.values()))
+                parsed["data_type"] = _guess_data_type(set(parsed["column_mapping"].values()))
+
+            if parsed.get("year") is None:
+                parsed["year"] = extract_year_from_content(parsed["rows"], filename=filename)
 
             dt = parsed["data_type"]
             row_count = parsed["row_count"]
+            matched_fields = set(parsed["column_mapping"].values())
+            missing_cols, missing_recommended = _detect_missing_fields(dt, matched_fields)
 
             # 提取年度
             if detected_year is None and parsed.get("year"):
@@ -1047,6 +1123,9 @@ def smart_parse_files(
                 "data_type": dt,
                 "row_count": row_count,
                 "header_count": parsed["header_count"],
+                "matched_cols": sorted(matched_fields),
+                "missing_cols": missing_cols,
+                "missing_recommended": missing_recommended,
                 "column_mapping": parsed["column_mapping"],
                 "status": "ok",
             }
@@ -1296,6 +1375,20 @@ async def write_four_tables(
             logger.info("辅助余额汇总: project=%s, year=%d, %d 条", project_id, year, summary_count)
         except Exception as e:
             logger.warning("辅助余额汇总失败（不影响导入）: %s", e)
+
+    # ── 发布数据导入完成事件，驱动后续重算与缓存失效 ──
+    try:
+        from app.services.event_bus import event_bus
+        from app.models.audit_platform_schemas import EventPayload, EventType
+
+        await event_bus.publish(EventPayload(
+            event_type=EventType.DATA_IMPORTED,
+            project_id=project_id,
+            year=year,
+        ))
+        logger.info("DATA_IMPORTED 事件已发布: project=%s, year=%d, result=%s", project_id, year, result)
+    except Exception as e:
+        logger.warning("DATA_IMPORTED 事件发布失败（不影响导入）: %s", e)
 
     return result
 

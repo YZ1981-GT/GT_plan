@@ -83,4 +83,7 @@ async def get_import_status(
 ):
     """查看项目导入状态"""
     status = ImportQueueService.get_status(project_id)
-    return {"status": status or "idle"}
+    if status:
+        return status
+    # 无活跃任务时返回占位对象，使前端轮询能正常解析
+    return {"status": "idle", "message": "无活跃导入任务", "progress": 0}

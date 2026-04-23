@@ -56,12 +56,20 @@ class ImportQueueService:
         _import_locks.pop(str(project_id), None)
 
     @staticmethod
-    def update_progress(project_id: UUID, progress: int, message: str = ""):
-        """更新导入进度（0-100）。"""
+    def update_progress(project_id: UUID, progress: int, message: str = "", result: dict | None = None):
+        """更新导入进度（0-100），可选存储最终结果。"""
         pid = str(project_id)
         if pid in _import_locks:
             _import_locks[pid]["progress"] = progress
             _import_locks[pid]["message"] = message
+            if progress < 0:
+                _import_locks[pid]["status"] = "failed"
+            elif progress >= 100:
+                _import_locks[pid]["status"] = "completed"
+            else:
+                _import_locks[pid]["status"] = "processing"
+            if result is not None:
+                _import_locks[pid]["result"] = result
 
     @staticmethod
     def get_status(project_id: UUID) -> Optional[dict]:

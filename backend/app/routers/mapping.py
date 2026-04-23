@@ -5,7 +5,7 @@ Validates: Requirements 3.1-3.8
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -17,6 +17,8 @@ from app.models.audit_platform_schemas import (
     MappingResponse,
     MappingResult,
     MappingSuggestion,
+    MappingUpdateInput,
+    MappingYearInput,
 )
 from app.models.core import User
 from app.services import mapping_service
@@ -46,6 +48,7 @@ async def auto_suggest(
 )
 async def auto_match(
     project_id: UUID,
+    body: MappingYearInput | None = Body(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AutoMatchResult:
@@ -53,7 +56,7 @@ async def auto_match(
 
     已映射的科目不会被覆盖，返回完整匹配详情供用户确认。
     """
-    return await mapping_service.auto_match(project_id, db)
+    return await mapping_service.auto_match(project_id, db, year=body.year if body else None)
 
 
 @router.get(
@@ -97,7 +100,7 @@ async def save_mapping(
 async def update_mapping(
     project_id: UUID,
     mapping_id: UUID,
-    body: dict,
+    body: MappingUpdateInput,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> MappingResponse:
@@ -105,12 +108,8 @@ async def update_mapping(
 
     Validates: Requirements 3.7
     """
-    new_standard_code = body.get("standard_account_code")
-    if not new_standard_code:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail="缺少 standard_account_code")
     record = await mapping_service.update_mapping(
-        project_id, mapping_id, new_standard_code, db
+        project_id, mapping_id, body.standard_account_code, db, year=body.year
     )
     return MappingResponse.model_validate(record)
 

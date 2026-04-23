@@ -104,11 +104,14 @@ def register_event_handlers() -> None:
     async def _invalidate_formula_cache_on_adjustment(payload: EventPayload) -> None:
         """调整分录变更 → 失效涉及科目的公式缓存"""
         try:
+            if not payload.year:
+                logger.warning("Skip formula cache invalidation: missing year for event %s", payload.event_type)
+                return
             from app.core.redis import redis_client
             engine = FormulaEngine(redis_client=redis_client)
             await engine.invalidate_cache(
                 project_id=payload.project_id,
-                year=payload.year or 2025,
+                year=payload.year,
                 affected_accounts=payload.account_codes,
             )
         except Exception:
@@ -117,11 +120,14 @@ def register_event_handlers() -> None:
     async def _invalidate_formula_cache_all(payload: EventPayload) -> None:
         """数据导入 → 失效全部公式缓存"""
         try:
+            if not payload.year:
+                logger.warning("Skip formula cache invalidation: missing year for event %s", payload.event_type)
+                return
             from app.core.redis import redis_client
             engine = FormulaEngine(redis_client=redis_client)
             await engine.invalidate_cache(
                 project_id=payload.project_id,
-                year=payload.year or 2025,
+                year=payload.year,
             )
         except Exception:
             logger.warning("Formula cache invalidation failed (Redis unavailable)")
@@ -180,5 +186,6 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
 
     logger.info("Phase 9 workpaper event handlers registered")

@@ -37,6 +37,48 @@ logger = logging.getLogger(__name__)
 _FUZZY_THRESHOLD = 0.7
 
 
+async def _resolve_event_year(
+    project_id: UUID,
+    db: AsyncSession,
+    year: int | None = None,
+) -> int | None:
+    """优先使用显式 year，缺失时再从 tb_balance 推断。"""
+    if year is not None:
+        return year
+
+    year_result = await db.execute(
+        select(TbBalance.year).where(
+            TbBalance.project_id == project_id,
+            TbBalance.is_deleted == False,  # noqa: E712
+        ).distinct().order_by(TbBalance.year.desc()).limit(1)
+    )
+    return year_result.scalar_one_or_none()
+
+
+async def _publish_mapping_changed(
+    project_id: UUID,
+    db: AsyncSession,
+    account_codes: list[str] | None = None,
+    year: int | None = None,
+) -> None:
+    """发布 MAPPING_CHANGED 事件（显式 year 优先，缺失时回退推断）。"""
+    try:
+        normalized_codes = [code for code in (account_codes or []) if code]
+        resolved_year = await _resolve_event_year(project_id, db, year=year)
+
+        payload = EventPayload(
+            event_type=EventType.MAPPING_CHANGED,
+            project_id=project_id,
+            year=resolved_year,
+            account_codes=normalized_codes or None,
+        )
+        await event_bus.publish(payload)
+        logger.info("MAPPING_CHANGED 事件已发布: project=%s, year=%s, codes=%s", project_id, resolved_year, normalized_codes or None)
+    except Exception as e:
+        logger.warning("MAPPING_CHANGED 事件发布失败（不影响映射）: %s", e)
+
+
+
 # ---------------------------------------------------------------------------
 # Similarity helpers (stdlib only — no external deps)
 # ---------------------------------------------------------------------------
@@ -126,6 +168,7 @@ async def auto_suggest(
 async def auto_match(
     project_id: UUID,
     db: AsyncSession,
+    year: int | None = None,
 ) -> AutoMatchResult:
     """Auto-match and directly save all mappings.
 
@@ -171,6 +214,7 @@ async def auto_match(
     if saved > 0:
         await db.flush()
         await db.commit()
+        await _publish_mapping_changed(project_id, db, account_codes=None, year=year)
 
     total_client = await _count_client_accounts(project_id, db)
     mapped_count = await _count_mapped_accounts(project_id, db)
@@ -314,6 +358,7 @@ async def save_mapping(
     project_id: UUID,
     mapping: MappingInput,
     db: AsyncSession,
+    skip_event: bool = False,
 ) -> AccountMapping:
     """Save a single mapping to account_mapping table.
 
@@ -330,6 +375,7 @@ async def save_mapping(
         )
     )
     record = existing.scalar_one_or_none()
+    old_standard_code = record.standard_account_code if record else None
 
     if record:
         # Update existing mapping
@@ -349,6 +395,17 @@ async def save_mapping(
     await db.flush()
     await db.commit()
     await db.refresh(record)
+
+    if not skip_event:
+        changed_codes = list(dict.fromkeys([
+            code for code in [old_standard_code, mapping.standard_account_code] if code
+        ]))
+        await _publish_mapping_changed(
+            project_id, db,
+            account_codes=changed_codes,
+            year=mapping.year,
+        )
+
     return record
 
 
@@ -367,9 +424,17 @@ async def batch_confirm(
     Validates: Requirements 3.5
     """
     confirmed = 0
+    explicit_years = [m.year for m in mappings if m.year is not None]
+    event_year = explicit_years[0] if explicit_years else None
+    if len(set(explicit_years)) > 1:
+        logger.warning("batch_confirm 收到多个 year，使用第一个: project=%s, years=%s", project_id, sorted(set(explicit_years)))
     for m in mappings:
-        await save_mapping(project_id, m, db)
+        await save_mapping(project_id, m, db, skip_event=True)
         confirmed += 1
+
+    # 批量确认涉及面较广，统一触发全量重算更稳妥
+    if confirmed > 0:
+        await _publish_mapping_changed(project_id, db, account_codes=None, year=event_year)
 
     # Calculate completion rate
     total_client = await _count_client_accounts(project_id, db)
@@ -424,6 +489,7 @@ async def update_mapping(
     mapping_id: UUID,
     new_standard_code: str,
     db: AsyncSession,
+    year: int | None = None,
 ) -> AccountMapping:
     """Update mapping, publish MAPPING_CHANGED event (log for now).
 
@@ -456,12 +522,12 @@ async def update_mapping(
         old_code,
         new_standard_code,
     )
-    payload = EventPayload(
-        event_type=EventType.MAPPING_CHANGED,
-        project_id=project_id,
+    await _publish_mapping_changed(
+        project_id,
+        db,
         account_codes=[old_code, new_standard_code],
+        year=year,
     )
-    await event_bus.publish(payload)
 
     return record
 

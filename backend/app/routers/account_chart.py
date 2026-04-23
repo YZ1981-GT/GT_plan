@@ -21,6 +21,25 @@ from app.services import account_chart_service
 router = APIRouter(prefix="/api/projects", tags=["account-chart"])
 
 
+def _build_sheet_diagnostics(diagnostics: list[dict] | None) -> list[dict]:
+    """规范化智能导入诊断结构，供前端结果页稳定展示。"""
+    normalized: list[dict] = []
+    for sheet in diagnostics or []:
+        column_mapping = sheet.get("column_mapping") or {}
+        matched_cols = sheet.get("matched_cols")
+        if not isinstance(matched_cols, list):
+            matched_cols = sorted(set(column_mapping.values())) if isinstance(column_mapping, dict) else []
+        normalized.append({
+            "sheet_name": sheet.get("sheet", ""),
+            "guessed_type": sheet.get("data_type", "unknown"),
+            "matched_cols": matched_cols,
+            "missing_cols": sheet.get("missing_cols") or [],
+            "missing_recommended": sheet.get("missing_recommended") or [],
+            "row_count": sheet.get("row_count", 0),
+        })
+    return normalized
+
+
 @router.get(
     "/{project_id}/account-chart/standard",
     response_model=list[AccountChartResponse],
@@ -274,6 +293,8 @@ async def import_client_chart(
 
     # 2. 写入四表数据
     data_sheets: dict[str, int] = {}
+    errors: list[str] = []
+    sheet_diagnostics = _build_sheet_diagnostics(parsed.get("diagnostics"))
     if parsed["balance_rows"] or parsed["ledger_rows"]:
         try:
             from app.services.import_queue_service import ImportQueueService
@@ -293,12 +314,15 @@ async def import_client_chart(
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning("四表导入失败: %s", e)
+            errors.append(f"四表导入失败: {e}")
 
     return AccountImportResult(
         total_imported=len(records),
         by_category=by_category,
-        errors=[],
+        errors=errors,
         data_sheets_imported=data_sheets,
+        sheet_diagnostics=sheet_diagnostics,
+        year=parsed["year"],
     )
 
 
@@ -388,14 +412,42 @@ async def import_async(
                     db, progress_callback=_on_progress,
                 )
 
-                ImportQueueService.update_progress(project_id, 100, f"导入完成: {imported}")
+                # 汇总诊断信息供前端结果页展示
+                diag = _build_sheet_diagnostics(parsed.get("diagnostics"))
+
+                by_category: dict[str, int] = {}
+                for r in records:
+                    cat = r.category.value
+                    by_category[cat] = by_category.get(cat, 0) + 1
+
+                result_payload = {
+                    "total_imported": len(records),
+                    "by_category": by_category,
+                    "errors": [],
+                    "data_sheets_imported": imported,
+                    "sheet_diagnostics": diag,
+                    "year": parsed["year"],
+                }
+                ImportQueueService.update_progress(project_id, 100, f"导入完成: {imported}", result=result_payload)
 
         except Exception as e:
             import traceback
             logger_name = __name__
             import logging
             logging.getLogger(logger_name).error("异步导入失败: %s\n%s", e, traceback.format_exc())
-            ImportQueueService.update_progress(project_id, -1, f"导入失败: {e}")
+            ImportQueueService.update_progress(
+                project_id,
+                -1,
+                f"导入失败: {e}",
+                result={
+                    "total_imported": 0,
+                    "by_category": {},
+                    "errors": [f"导入失败: {e}"],
+                    "data_sheets_imported": {},
+                    "sheet_diagnostics": [],
+                    "year": None,
+                },
+            )
         finally:
             # 延迟释放锁（让前端有时间读取最终状态）
             await asyncio.sleep(3)

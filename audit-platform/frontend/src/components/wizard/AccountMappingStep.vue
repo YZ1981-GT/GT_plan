@@ -224,6 +224,17 @@ const unmatchedRows = computed(() =>
 
 const unmatchedCount = computed(() => unmatchedRows.value.length)
 
+const mappingYear = computed<number | null>(() => {
+  const importStep = wizardStore.stepData.account_import as Record<string, unknown> | undefined
+  if (typeof importStep?.year === 'number') return importStep.year as number
+
+  const basicInfo = wizardStore.stepData.basic_info as Record<string, unknown> | undefined
+  if (typeof basicInfo?.audit_year === 'number') return basicInfo.audit_year as number
+  if (typeof basicInfo?.year === 'number') return basicInfo.year as number
+
+  return null
+})
+
 // --- Methods ---
 
 function matchMethodLabel(method: string): string {
@@ -288,6 +299,7 @@ async function handleAutoMatch() {
   try {
     const { data } = await http.post(
       `/api/projects/${wizardStore.projectId}/mapping/auto-match`,
+      mappingYear.value != null ? { year: mappingYear.value } : undefined,
     )
     const result = data.data ?? data
     const details: MappingSuggestion[] = result.details || []
@@ -314,12 +326,13 @@ async function handleAutoMatch() {
 async function handleMappingChange(row: TableRow, stdCode: string) {
   if (!wizardStore.projectId || !stdCode) return
   try {
+    const yearPayload = mappingYear.value ?? undefined
     let record: MappingRecord
     if (row.mapping_id) {
       // Update existing
       const { data } = await http.put(
         `/api/projects/${wizardStore.projectId}/mapping/${row.mapping_id}`,
-        { standard_account_code: stdCode },
+        { standard_account_code: stdCode, year: yearPayload },
       )
       record = data.data ?? data
     } else {
@@ -331,6 +344,7 @@ async function handleMappingChange(row: TableRow, stdCode: string) {
           original_account_name: row.account_name,
           standard_account_code: stdCode,
           mapping_type: 'manual',
+          year: yearPayload,
         },
       )
       record = data.data ?? data

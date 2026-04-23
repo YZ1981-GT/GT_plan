@@ -191,6 +191,7 @@ class AccountImportResult(BaseModel):
     errors: list[str] = []
     data_sheets_imported: dict[str, int] = {}  # {data_type: record_count}
     sheet_diagnostics: list[dict] = []  # [{sheet_name, guessed_type, matched_cols, missing_cols, row_count}]
+    year: int | None = None
 
 
 # ===================================================================
@@ -204,6 +205,16 @@ class MappingInput(BaseModel):
     original_account_name: str | None = None
     standard_account_code: str
     mapping_type: MappingType = MappingType.manual
+    year: int | None = None
+
+
+class MappingUpdateInput(BaseModel):
+    standard_account_code: str
+    year: int | None = None
+
+
+class MappingYearInput(BaseModel):
+    year: int | None = None
 
 
 class MappingSuggestion(BaseModel):

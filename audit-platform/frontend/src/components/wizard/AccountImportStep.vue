@@ -219,7 +219,7 @@
       >
         <template #default>
           <div style="margin-top: 6px">
-            <div v-for="d in importResult.sheet_diagnostics" :key="d.sheet_name"
+            <div v-for="(d, idx) in importResult.sheet_diagnostics" :key="`${d.sheet_name}_${idx}`"
               style="font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px"
             >
               <el-icon v-if="isSheetOk(d)" style="color: #67c23a"><CircleCheck /></el-icon>
@@ -467,6 +467,7 @@ interface AccountImportResult {
   errors: string[]
   data_sheets_imported?: Record<string, number>
   sheet_diagnostics?: SheetDiagnostic[]
+  year?: number | null
 }
 
 interface SheetDiagnostic {
@@ -991,7 +992,7 @@ async function handleImport() {
     try {
       const { data } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
       const status = data.data ?? data
-      if (status && typeof status === 'object' && status.message) {
+      if (status && typeof status === 'object' && status.message && status.status !== 'idle') {
         importProgress.value = status.message
       }
     } catch { /* ignore */ }
@@ -1002,6 +1003,10 @@ async function handleImport() {
     let totalImported = 0
     let allDataSheets: Record<string, number> = {}
     let lastResult: any = null
+    let importedYear: number | null = null
+    const allByCategory: Record<string, number> = {}
+    const allDiagnostics: SheetDiagnostic[] = []
+    const allErrors: string[] = []
 
     for (let fileIdx = 0; fileIdx < selectedFiles.value.length; fileIdx++) {
       const file = selectedFiles.value[fileIdx]
@@ -1012,13 +1017,26 @@ async function handleImport() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const sheetIdx = previewSheets.value.findIndex(s => s._source_file === file.name)
-      const mapping = sheetIdx >= 0 ? sheetMappingCache[sheetIdx] : columnMapping
-      const cleanMapping: Record<string, string> = {}
-      for (const [h, v] of Object.entries(mapping || {})) {
-        if (v) cleanMapping[h] = v
+      // 组装按 sheet 的列映射（当前文件包含的所有 sheet）
+      const perSheetMapping: Record<string, Record<string, string>> = {}
+      for (let i = 0; i < previewSheets.value.length; i++) {
+        if (previewSheets.value[i]._source_file !== file.name) continue
+        const cached = sheetMappingCache[i]
+        if (!cached) continue
+        const clean: Record<string, string> = {}
+        for (const [h, v] of Object.entries(cached)) {
+          if (v) clean[h] = v
+        }
+        if (Object.keys(clean).length > 0) {
+          perSheetMapping[previewSheets.value[i].sheet_name] = clean
+        }
       }
-      formData.append('column_mapping', JSON.stringify(cleanMapping))
+      // 单 sheet 时回退到全局映射，保持向后兼容
+      const sheetNames = Object.keys(perSheetMapping)
+      const mappingToSend = sheetNames.length === 1
+        ? perSheetMapping[sheetNames[0]]
+        : perSheetMapping
+      formData.append('column_mapping', JSON.stringify(mappingToSend))
 
       // 大文件（>10MB）用异步导入，小文件用同步
       const isLargeFile = file.size > 10 * 1024 * 1024
@@ -1029,8 +1047,10 @@ async function handleImport() {
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
         )
-        // 等待后台任务完成（轮询进度直到 100% 或失败）
+        // 等待后台任务完成（轮询进度直到 100% 或失败或 idle）
         let done = false
+        let asyncImportFailed = false
+        let asyncImportError = ''
         while (!done) {
           await new Promise(r => setTimeout(r, 2000))
           try {
@@ -1040,10 +1060,27 @@ async function handleImport() {
               const pct = status.progress ?? 0
               const msg = status.message || ''
               importProgress.value = `[${pct}%] ${msg}`
-              if (pct >= 100 || pct < 0) {
+              if (pct >= 100 || pct < 0 || status.status === 'idle') {
                 done = true
                 if (pct < 0) {
+                  asyncImportFailed = true
+                  asyncImportError = msg || '导入失败'
                   ElMessage.error(msg || '导入失败')
+                }
+                // 从轮询结果中读取实际导入统计
+                const res = status.result
+                if (res && typeof res === 'object') {
+                  lastResult = res
+                  totalImported += res.total_imported || 0
+                  if (importedYear == null && typeof res.year === 'number') importedYear = res.year
+                  for (const [cat, cnt] of Object.entries(res.by_category || {})) {
+                    allByCategory[cat] = (allByCategory[cat] || 0) + (cnt as number)
+                  }
+                  if (Array.isArray(res.sheet_diagnostics)) allDiagnostics.push(...res.sheet_diagnostics)
+                  if (Array.isArray(res.errors)) allErrors.push(...res.errors)
+                  for (const [dt, cnt] of Object.entries(res.data_sheets_imported || {})) {
+                    allDataSheets[dt] = (allDataSheets[dt] || 0) + (cnt as number)
+                  }
                 }
               }
             } else {
@@ -1053,8 +1090,11 @@ async function handleImport() {
             done = true
           }
         }
-        // 异步导入不返回详细结果，用默认值
-        totalImported += 0
+        if (asyncImportFailed) {
+          throw new Error(asyncImportError || '导入失败')
+        }
+        // 异步导入结果已从轮询读取；兜底防未读到
+        if (!lastResult) totalImported += 0
       } else {
         // 小文件同步导入
         const { data } = await http.post(
@@ -1065,6 +1105,12 @@ async function handleImport() {
         const result: AccountImportResult = data.data ?? data
         lastResult = result
         totalImported += result.total_imported || 0
+        if (importedYear == null && typeof result.year === 'number') importedYear = result.year
+        for (const [cat, cnt] of Object.entries(result.by_category || {})) {
+          allByCategory[cat] = (allByCategory[cat] || 0) + (cnt as number)
+        }
+        if (Array.isArray(result.sheet_diagnostics)) allDiagnostics.push(...result.sheet_diagnostics)
+        if (Array.isArray(result.errors)) allErrors.push(...result.errors)
         for (const [dt, cnt] of Object.entries(result.data_sheets_imported || {})) {
           allDataSheets[dt] = (allDataSheets[dt] || 0) + (cnt as number)
         }
@@ -1081,11 +1127,20 @@ async function handleImport() {
         (fileIdx + 1 < selectedFiles.value.length ? '，继续处理下一个...' : '，正在完成...')
     }
 
-    importResult.value = lastResult
-    if (importResult.value) {
-      importResult.value.total_imported = totalImported
-      importResult.value.data_sheets_imported = allDataSheets
+    importResult.value = lastResult || {
+      total_imported: totalImported,
+      by_category: {},
+      errors: [],
+      data_sheets_imported: {},
+      sheet_diagnostics: [],
+      year: importedYear,
     }
+    importResult.value.total_imported = totalImported
+    importResult.value.by_category = allByCategory
+    importResult.value.data_sheets_imported = allDataSheets
+    importResult.value.sheet_diagnostics = allDiagnostics
+    importResult.value.errors = allErrors
+    importResult.value.year = importedYear ?? importResult.value.year ?? null
 
     let msg = `成功导入 ${totalImported} 个科目`
     const sheetLabels: Record<string, string> = {
@@ -1103,7 +1158,11 @@ async function handleImport() {
 
     await wizardStore.saveStep('account_import', {
       total_imported: totalImported,
+      by_category: allByCategory,
+      errors: allErrors,
       data_sheets_imported: allDataSheets,
+      sheet_diagnostics: allDiagnostics,
+      year: importResult.value.year,
     })
 
     phase.value = 'result'
@@ -1120,9 +1179,10 @@ async function handleImport() {
 async function importOtherSheets() {
   if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
 
-  // 从向导基本信息中获取审计年度（而非硬编码当前年）
+  // 优先使用导入识别出的年度，其次回退向导基本信息
+  const importStep = wizardStore.stepData?.account_import as Record<string, any> | undefined
   const basicInfo = wizardStore.stepData?.basic_info as Record<string, any> | undefined
-  const year = basicInfo?.audit_year || basicInfo?.year || new Date().getFullYear()
+  const year = importResult.value?.year || importStep?.year || basicInfo?.audit_year || basicInfo?.year || new Date().getFullYear()
 
   // 识别每个 sheet 的数据类型，跳过科目表（已导入）
   const typeMap: Record<string, string> = {
@@ -1313,8 +1373,10 @@ onMounted(async () => {
       importResult.value = {
         total_imported: (saved.total_imported as number) || 0,
         by_category: (saved.by_category as Record<string, number>) || {},
-        errors: [],
+        errors: (saved.errors as string[]) || [],
         data_sheets_imported: (saved.data_sheets_imported as Record<string, number>) || {},
+        sheet_diagnostics: (saved.sheet_diagnostics as SheetDiagnostic[]) || [],
+        year: (saved.year as number | null | undefined) ?? null,
       }
       phase.value = 'result'
     }
