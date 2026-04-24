@@ -70,19 +70,21 @@ async def purge_project(
 
 @router.get("/import-queue")
 async def get_import_queue(
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """查看当前导入队列"""
-    return {"active": ImportQueueService.get_all_active()}
+    return {"active": await ImportQueueService.get_all_active(db)}
 
 
 @router.get("/import-queue/{project_id}")
 async def get_import_status(
     project_id: UUID,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """查看项目导入状态"""
-    status = ImportQueueService.get_status(project_id)
+    status = await ImportQueueService.get_status(project_id, db)
     if status:
         return status
     # 无活跃任务时返回占位对象，使前端轮询能正常解析

@@ -216,6 +216,21 @@ class TestImportClientChart:
         assert "不支持" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
+    async def test_import_xls_rejected(self, db_session: AsyncSession):
+        from app.services import account_chart_service as svc
+
+        project = await _create_test_project(db_session)
+        file = UploadFile(
+            filename="chart.xls",
+            file=io.BytesIO(b"legacy excel content"),
+        )
+
+        with pytest.raises(Exception) as exc_info:
+            await svc.import_client_chart(project.id, file, db_session)
+        assert exc_info.value.status_code == 400
+        assert ".xls" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
     async def test_import_direction_inference(self, db_session: AsyncSession):
         """When direction is not provided, infer from account code."""
         from app.services import account_chart_service as svc
@@ -226,6 +241,30 @@ class TestImportClientChart:
 
         result = await svc.import_client_chart(project.id, file, db_session)
         assert result.total_imported == 3
+
+
+# ===================================================================
+# preview_file
+# ===================================================================
+
+
+class TestPreviewFile:
+    @pytest.mark.asyncio
+    async def test_preview_csv_samples_first_20_rows(self):
+        from app.services import account_chart_service as svc
+
+        csv_rows = ["科目编码,科目名称"]
+        for i in range(30):
+            csv_rows.append(f"100{i:02d},科目{i}")
+        file = _make_csv_upload("\n".join(csv_rows), filename="preview.csv")
+
+        result = await svc.preview_file(file)
+
+        assert result["active_sheet"] == 0
+        assert len(result["sheets"]) == 1
+        assert result["sheets"][0]["total_rows"] == 30
+        assert len(result["sheets"][0]["rows"]) == 20
+        assert result["sheets"][0]["rows"][0]["科目编码"] == "10000"
 
 
 # ===================================================================

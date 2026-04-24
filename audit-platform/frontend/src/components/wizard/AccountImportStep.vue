@@ -11,7 +11,7 @@
         drag
         multiple
         :auto-upload="false"
-        accept=".xlsx,.xls,.csv"
+        accept=".xlsx,.csv"
         :on-change="onFileChange"
         :file-list="fileList"
       >
@@ -21,7 +21,7 @@
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持 .xlsx / .xls / .csv 格式，可同时上传多个文件（如余额表 + 多个序时账）
+            支持 .xlsx / .csv 格式，可同时上传多个文件（如余额表 + 多个序时账）
           </div>
         </template>
       </el-upload>

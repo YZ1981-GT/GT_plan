@@ -13,7 +13,7 @@ from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.base import Base
-from app.models.core import Project, ProjectStatus, ProjectType
+from app.models.core import Project, ProjectStatus, ProjectType, User, ProjectUser
 from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
@@ -39,12 +39,23 @@ async def db_session() -> AsyncSession:
 @pytest_asyncio.fixture
 async def seeded_db(db_session: AsyncSession):
     """Seed project + balance + ledger + aux data"""
+    user = User(
+        id=FAKE_USER_ID, username="tester", email="t@test.com",
+        hashed_password="x", role="member",
+    )
+    db_session.add(user)
+
     project = Project(
         id=FAKE_PROJECT_ID, name="穿透查询测试", client_name="测试",
         project_type=ProjectType.annual, status=ProjectStatus.execution,
         created_by=FAKE_USER_ID,
     )
     db_session.add(project)
+
+    db_session.add(ProjectUser(
+        project_id=FAKE_PROJECT_ID, user_id=FAKE_USER_ID,
+        role="auditor", permission_level="edit", is_deleted=False,
+    ))
 
     # 科目余额
     for code, name, opening, debit, credit in [
@@ -238,8 +249,21 @@ async def client(db_session: AsyncSession, seeded_db):
     async def override_get_redis():
         yield fake_redis
 
+    from app.deps import get_current_user
+
+    class _FakeUser:
+        id = FAKE_USER_ID
+
+        class _Role:
+            value = "member"
+        role = _Role()
+
+    async def override_get_current_user():
+        return _FakeUser()
+
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_redis] = override_get_redis
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:

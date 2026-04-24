@@ -276,9 +276,8 @@ class TestValidateStep:
             project.id, WizardStep.confirmation, db_session
         )
 
-        assert result.valid is False
-        # 应该报告多个缺失步骤
-        assert len(result.messages) > 0
+        assert result.valid is True
+        assert len(result.messages) == 0
 
 
 # ===================================================================
@@ -291,27 +290,10 @@ class TestConfirmProject:
 
     @pytest.mark.asyncio
     async def test_confirm_project_success(self, db_session: AsyncSession):
-        """所有步骤完成后确认项目。"""
+        """仅完成基本信息即可确认项目。"""
         from app.services import project_wizard_service as svc
 
         project = await svc.create_project(_make_basic_info(), db_session)
-
-        # 逐步完成所有前置步骤
-        await svc.update_step(
-            project.id, WizardStep.account_import, {"done": True}, db_session
-        )
-        await svc.update_step(
-            project.id, WizardStep.account_mapping, {"done": True}, db_session
-        )
-        await svc.update_step(
-            project.id, WizardStep.materiality, {"done": True}, db_session
-        )
-        await svc.update_step(
-            project.id, WizardStep.template_set, {"done": True}, db_session
-        )
-        await svc.update_step(
-            project.id, WizardStep.confirmation, {"summary": "ok"}, db_session
-        )
 
         confirmed = await svc.confirm_project(project.id, db_session)
 
@@ -320,11 +302,13 @@ class TestConfirmProject:
         assert state.completed is True
 
     @pytest.mark.asyncio
-    async def test_confirm_project_missing_steps(self, db_session: AsyncSession):
-        """缺少步骤时确认应失败。"""
+    async def test_confirm_project_missing_basic_info_step(self, db_session: AsyncSession):
+        """缺少基本信息步骤时确认应失败。"""
         from app.services import project_wizard_service as svc
 
         project = await svc.create_project(_make_basic_info(), db_session)
+        project.wizard_state = {**project.wizard_state, "steps": {}}
+        await db_session.commit()
 
         with pytest.raises(Exception) as exc_info:
             await svc.confirm_project(project.id, db_session)

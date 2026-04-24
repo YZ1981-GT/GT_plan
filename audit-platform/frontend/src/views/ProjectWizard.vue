@@ -16,8 +16,6 @@
     <!-- Content Area -->
     <div v-loading="wizardStore.loading" class="gt-wizard-content">
       <BasicInfoStep v-if="wizardStore.currentStepKey === 'basic_info'" ref="basicInfoRef" />
-      <AccountImportStep v-else-if="wizardStore.currentStepKey === 'account_import'" ref="accountImportRef" />
-      <AccountMappingStep v-else-if="wizardStore.currentStepKey === 'account_mapping'" />
       <MaterialityStep v-else-if="wizardStore.currentStepKey === 'materiality'" />
       <TeamAssignmentStep v-else-if="wizardStore.currentStepKey === 'team_assignment'" />
       <ConfirmationStep v-else-if="wizardStore.currentStepKey === 'confirmation'" />
@@ -62,8 +60,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useWizardStore, STEP_LABELS, type StepKey } from '@/stores/wizard'
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
-import AccountImportStep from '@/components/wizard/AccountImportStep.vue'
-import AccountMappingStep from '@/components/wizard/AccountMappingStep.vue'
 import MaterialityStep from '@/components/wizard/MaterialityStep.vue'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import ConfirmationStep from '@/components/wizard/ConfirmationStep.vue'
@@ -73,12 +69,9 @@ const router = useRouter()
 const wizardStore = useWizardStore()
 
 const basicInfoRef = ref<InstanceType<typeof BasicInfoStep> | null>(null)
-const accountImportRef = ref<InstanceType<typeof AccountImportStep> | null>(null)
 
 const stepKeys: StepKey[] = [
   'basic_info',
-  'account_import',
-  'account_mapping',
   'materiality',
   'team_assignment',
   'confirmation',
@@ -125,10 +118,6 @@ async function handleNext() {
     } else {
       await wizardStore.saveStep('basic_info', data as unknown as Record<string, unknown>)
     }
-  }
-
-  if (currentStep === 'account_import') {
-    if (accountImportRef.value && !accountImportRef.value.validate()) return
   }
 
   wizardStore.goNext()

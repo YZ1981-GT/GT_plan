@@ -234,6 +234,10 @@ _REQUIRED_FIELD_GROUPS: dict[str, list[tuple[str, set[str]]]] = {
     "aux_ledger": [
         ("account_code", {"account_code"}),
     ],
+    "account_chart": [
+        ("account_code", {"account_code"}),
+        ("account_name", {"account_name"}),
+    ],
 }
 
 _RECOMMENDED_FIELD_GROUPS: dict[str, list[tuple[str, set[str]]]] = {
@@ -321,7 +325,14 @@ _MERGED_HEADER_MAP = {
 }
 
 # 基础列名映射（从 account_chart_service._COLUMN_MAP 复用）
-from app.services.account_chart_service import _COLUMN_MAP as _BASE_COLUMN_MAP
+from app.models.audit_platform_models import AccountCategory, AccountChart, AccountDirection, AccountSource
+from app.services.account_chart_service import (
+    _COLUMN_MAP as _BASE_COLUMN_MAP,
+    _infer_category,
+    _infer_direction,
+    _infer_level as _infer_level_svc,
+    parse_aux_dimensions,
+)
 
 
 def _detect_missing_fields(data_type: str, matched_fields: set[str]) -> tuple[list[str], list[str]]:
@@ -357,13 +368,6 @@ def smart_match_column(header: str) -> Optional[str]:
     if cleaned in _BASE_COLUMN_MAP:
         return _BASE_COLUMN_MAP[cleaned]
     return None
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. 核算维度解析（复用 account_chart_service.parse_aux_dimensions）
-# ─────────────────────────────────────────────────────────────────────────────
-
-from app.services.account_chart_service import parse_aux_dimensions
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -404,6 +408,72 @@ def extract_year_from_content(rows: list[dict], filename: str = "") -> Optional[
             return int(m.group(1))
 
     return None
+
+
+def _resolve_account_category(code: str, name: str, category_raw) -> AccountCategory:
+    category = _infer_category(code, name)
+    category_str = str(category_raw or "").strip().lower()
+    category_map = {
+        "资产": AccountCategory.asset,
+        "asset": AccountCategory.asset,
+        "负债": AccountCategory.liability,
+        "liability": AccountCategory.liability,
+        "权益": AccountCategory.equity,
+        "equity": AccountCategory.equity,
+        "收入": AccountCategory.revenue,
+        "revenue": AccountCategory.revenue,
+        "费用": AccountCategory.expense,
+        "expense": AccountCategory.expense,
+        "成本": AccountCategory.expense,
+        "cost": AccountCategory.expense,
+    }
+    return category_map.get(category_str, category)
+
+
+def _resolve_account_direction(direction_raw, category: AccountCategory) -> AccountDirection:
+    direction_str = str(direction_raw or "").strip().lower()
+    if direction_str in ("debit", "借", "借方"):
+        return AccountDirection.debit
+    if direction_str in ("credit", "贷", "贷方"):
+        return AccountDirection.credit
+    return _infer_direction(category)
+
+
+def _append_account_record(
+    *,
+    row: dict,
+    project_id: UUID,
+    seen_codes: set[str],
+    acct_records: list[AccountChart],
+    by_category: dict[str, int],
+) -> bool:
+    code = str(row.get("account_code", "")).strip()
+    name = str(row.get("account_name", "")).strip()
+    if not code or not name or code in seen_codes:
+        return False
+
+    parent_code = str(row.get("parent_code", "")).strip() or None
+    category = _resolve_account_category(code, name, row.get("category"))
+    direction = _resolve_account_direction(row.get("direction"), category)
+    level = _infer_level_svc(code, parent_code)
+
+    level_str = str(row.get("level", "")).strip()
+    if level_str.isdigit():
+        level = int(level_str)
+
+    seen_codes.add(code)
+    acct_records.append(AccountChart(
+        project_id=project_id,
+        account_code=code,
+        account_name=name,
+        direction=direction,
+        level=level,
+        category=category,
+        parent_code=parent_code,
+        source=AccountSource.client,
+    ))
+    by_category[category.value] = by_category.get(category.value, 0) + 1
+    return True
 
 
 
@@ -1222,6 +1292,29 @@ def smart_parse_files(
 # 9. 数据库写入
 # ─────────────────────────────────────────────────────────────────────────────
 
+async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
+    """Soft-delete all four table data for a given project+year.
+
+    Ensures that each project-year has exactly one effective dataset
+    and old data from previous imports does not remain as a mix.
+    """
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
+
+    for model in (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger):
+        tbl = model.__table__
+        await db.execute(
+            sa.update(tbl)
+            .where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.is_deleted == sa.false(),
+            )
+            .values(is_deleted=True)
+        )
+    await db.flush()
+
+
 async def write_four_tables(
     project_id: UUID,
     year: int,
@@ -1446,12 +1539,6 @@ async def _stream_csv_import(
     import codecs
     import csv
     import uuid as _uuid
-    from app.models.audit_platform_models import (
-        AccountChart, AccountSource,
-    )
-    from app.services.account_chart_service import (
-        _infer_category, _infer_direction, _infer_level as _infer_level_svc,
-    )
     from app.services.fast_writer import copy_insert
 
     def _prog(pct, msg=""):
@@ -1533,7 +1620,12 @@ async def _stream_csv_import(
         "status": "ok",
     }
 
-    if dt not in ("ledger", "balance"):
+    if dt == "account_chart" and miss_req:
+        diag["status"] = "skipped"
+        diag["message"] = f"CSV 科目表缺少必需列: {', '.join(miss_req)}"
+        return {"diag": diag, "errors": []}
+
+    if dt not in ("ledger", "balance", "account_chart"):
         diag["status"] = "skipped"
         diag["message"] = f"CSV 未识别的数据类型: {dt}"
         return {"diag": diag, "errors": []}
@@ -1618,18 +1710,13 @@ async def _stream_csv_import(
 
         # 提取科目
         for row in rows:
-            code = str(row.get("account_code", "")).strip()
-            name = str(row.get("account_name", "")).strip()
-            if code and name and code not in seen_codes:
-                seen_codes.add(code)
-                cat = _infer_category(code, name)
-                acct_records.append(AccountChart(
-                    project_id=project_id, account_code=code,
-                    account_name=name, direction=_infer_direction(cat),
-                    level=_infer_level_svc(code, None),
-                    category=cat, source=AccountSource.client,
-                ))
-                by_category[cat.value] = by_category.get(cat.value, 0) + 1
+            _append_account_record(
+                row=row,
+                project_id=project_id,
+                seen_codes=seen_codes,
+                acct_records=acct_records,
+                by_category=by_category,
+            )
 
     def _parse_lines(lines: list[str]) -> list[dict]:
         """将一批 CSV 行解析为 dict 列表。"""
@@ -1719,10 +1806,7 @@ async def smart_import_streaming(
     import sqlalchemy as sa
     from app.models.audit_platform_models import (
         TbBalance, TbLedger, TbAuxBalance, TbAuxLedger,
-        ImportBatch, ImportStatus, AccountChart, AccountSource,
-    )
-    from app.services.account_chart_service import (
-        _infer_category, _infer_direction, _infer_level as _infer_level_svc,
+        ImportBatch, ImportStatus,
     )
 
     CHUNK = 50_000
@@ -1779,7 +1863,10 @@ async def smart_import_streaming(
 
     _prog(5, f"年度 {year}，{len(file_contents)} 个文件，{total_size/1024/1024:.1f} MB")
 
-    # ── Phase 1: ImportBatch 记录 + 一次性软删除旧数据 ──────────────────────
+    # ── Phase 0: 统一清理该 project+year 的全部四表旧数据 ────────────────
+    await _clear_project_year_tables(project_id, year, db)
+
+    # ── Phase 1: ImportBatch 记录 ─────────────────────────────────────────
     _TABLE_MAP = {
         "tb_balance": TbBalance,
         "tb_aux_balance": TbAuxBalance,
@@ -1795,14 +1882,6 @@ async def smart_import_streaming(
         )
         db.add(batch)
         batches[dt_key] = batch
-        # soft-delete 旧记录（只执行一次）
-        tbl = model.__table__
-        await db.execute(
-            sa.update(tbl)
-            .where(tbl.c.project_id == project_id, tbl.c.year == year,
-                   tbl.c.is_deleted == sa.false())
-            .values(is_deleted=True)
-        )
 
     # soft-delete 旧科目表
     ac_tbl = AccountChart.__table__
@@ -1827,6 +1906,16 @@ async def smart_import_streaming(
     for file_idx, (filename, content) in enumerate(file_contents):
         logger.info("流式导入 %d/%d: %s (%d bytes)",
                      file_idx + 1, len(file_contents), filename, len(content))
+
+        if filename.lower().endswith('.xls'):
+            diagnostics.append({
+                "file": filename,
+                "sheet": None,
+                "status": "error",
+                "message": "暂不支持 Excel 97-2003 (.xls) 文件，请先转换为 .xlsx 后再上传",
+            })
+            errors.append(f"暂不支持 .xls 文件: {filename}，请先转换为 .xlsx 后再上传")
+            continue
 
         # ── CSV 文件单独处理（流式：逐批读取+写入，不全部加载到内存） ──
         if filename.lower().endswith('.csv'):
@@ -1977,6 +2066,13 @@ async def smart_import_streaming(
                 "status": "ok",
             }
 
+            if dt == "account_chart" and miss_req:
+                diag["status"] = "skipped"
+                diag["message"] = f"科目表缺少必需列: {', '.join(miss_req)}"
+                diagnostics.append(diag)
+                parsed["rows"] = []
+                continue
+
             # ── 按数据类型转换 & 写入 ──
             logger.info("Sheet %s: data_type=%s, row_count=%d, matched=%s",
                         sname, dt, parsed["row_count"], sorted(matched_fields)[:5])
@@ -2012,18 +2108,13 @@ async def smart_import_streaming(
 
                 # 提取科目
                 for row in parsed["rows"]:
-                    code = str(row.get("account_code", "")).strip()
-                    name = str(row.get("account_name", "")).strip()
-                    if code and name and code not in seen_codes:
-                        seen_codes.add(code)
-                        cat = _infer_category(code, name)
-                        acct_records.append(AccountChart(
-                            project_id=project_id, account_code=code,
-                            account_name=name, direction=_infer_direction(cat),
-                            level=_infer_level_svc(code, None),
-                            category=cat, source=AccountSource.client,
-                        ))
-                        by_category[cat.value] = by_category.get(cat.value, 0) + 1
+                    _append_account_record(
+                        row=row,
+                        project_id=project_id,
+                        seen_codes=seen_codes,
+                        acct_records=acct_records,
+                        by_category=by_category,
+                    )
 
                 del bal, aux_bal
 
@@ -2080,20 +2171,27 @@ async def smart_import_streaming(
 
                 # 提取科目
                 for row in parsed["rows"]:
-                    code = str(row.get("account_code", "")).strip()
-                    name = str(row.get("account_name", "")).strip()
-                    if code and name and code not in seen_codes:
-                        seen_codes.add(code)
-                        cat = _infer_category(code, name)
-                        acct_records.append(AccountChart(
-                            project_id=project_id, account_code=code,
-                            account_name=name, direction=_infer_direction(cat),
-                            level=_infer_level_svc(code, None),
-                            category=cat, source=AccountSource.client,
-                        ))
-                        by_category[cat.value] = by_category.get(cat.value, 0) + 1
+                    _append_account_record(
+                        row=row,
+                        project_id=project_id,
+                        seen_codes=seen_codes,
+                        acct_records=acct_records,
+                        by_category=by_category,
+                    )
 
                 del led
+
+            elif dt == "account_chart":
+                added_before = len(acct_records)
+                for row in parsed["rows"]:
+                    _append_account_record(
+                        row=row,
+                        project_id=project_id,
+                        seen_codes=seen_codes,
+                        acct_records=acct_records,
+                        by_category=by_category,
+                    )
+                diag["account_count"] = len(acct_records) - added_before
 
             elif dt in ("aux_balance", "aux_ledger"):
                 diag["status"] = "skipped"

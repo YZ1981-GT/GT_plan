@@ -26,6 +26,7 @@ from app.models.audit_platform_schemas import (
     ImportProgress,
     ImportValidationResult,
 )
+from app.services.import_queue_service import IMPORT_JOB_DATA_TYPE
 from app.services.import_engine.parsers import (
     GenericParser,
     ParserFactory,
@@ -289,7 +290,10 @@ async def get_import_batches(
     """List all import batches for a project."""
     result = await db.execute(
         select(ImportBatch)
-        .where(ImportBatch.project_id == project_id)
+        .where(
+            ImportBatch.project_id == project_id,
+            ImportBatch.data_type != IMPORT_JOB_DATA_TYPE,
+        )
         .order_by(ImportBatch.created_at.desc())
     )
     batches = result.scalars().all()

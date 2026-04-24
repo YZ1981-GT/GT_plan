@@ -9,46 +9,279 @@
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Any, Optional
 from uuid import UUID
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import async_session
+from app.models.audit_platform_models import ImportBatch, ImportStatus
 
 logger = logging.getLogger(__name__)
 
 # 全局导入锁（project_id -> 导入状态）
 _import_locks: dict[str, dict] = {}
 _MAX_CONCURRENT_IMPORTS = 3  # 最大并发导入数
+_STALE_IMPORT_TIMEOUT = timedelta(hours=4)
+IMPORT_JOB_DATA_TYPE = "__smart_import_job__"
 
 
 class ImportQueueService:
     """导入队列管理"""
 
     @staticmethod
-    def acquire_lock(project_id: UUID, user_id: str = "") -> tuple[bool, str]:
+    def _cleanup_stale_memory_locks():
+        cutoff = datetime.utcnow() - _STALE_IMPORT_TIMEOUT
+        stale_projects: list[str] = []
+        for pid, info in _import_locks.items():
+            started = info.get("started")
+            if not started:
+                continue
+            try:
+                started_at = datetime.fromisoformat(started)
+            except ValueError:
+                continue
+            if started_at < cutoff:
+                stale_projects.append(pid)
+        for pid in stale_projects:
+            _import_locks.pop(pid, None)
+
+    @staticmethod
+    async def _expire_stale_jobs(db: AsyncSession):
+        cutoff = datetime.utcnow() - _STALE_IMPORT_TIMEOUT
+        result = await db.execute(
+            select(ImportBatch).where(
+                ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+                ImportBatch.status == ImportStatus.processing,
+                ImportBatch.started_at.is_not(None),
+                ImportBatch.started_at < cutoff,
+            )
+        )
+        stale_batches = result.scalars().all()
+        if not stale_batches:
+            return
+
+        now = datetime.utcnow()
+        for batch in stale_batches:
+            summary = dict(batch.validation_summary or {})
+            summary.update({
+                "job": True,
+                "progress": -1,
+                "message": "导入任务已失效，请重新发起导入",
+                "error": "导入任务已失效，请重新发起导入",
+            })
+            batch.status = ImportStatus.failed
+            batch.completed_at = now
+            batch.validation_summary = summary
+            _import_locks.pop(str(batch.project_id), None)
+        await db.commit()
+
+    @staticmethod
+    async def _get_active_job_batch(project_id: UUID, db: AsyncSession) -> ImportBatch | None:
+        result = await db.execute(
+            select(ImportBatch)
+            .where(
+                ImportBatch.project_id == project_id,
+                ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+                ImportBatch.status == ImportStatus.processing,
+            )
+            .order_by(ImportBatch.created_at.desc())
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def _get_latest_job_batch(project_id: UUID, db: AsyncSession) -> ImportBatch | None:
+        result = await db.execute(
+            select(ImportBatch)
+            .where(
+                ImportBatch.project_id == project_id,
+                ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+            )
+            .order_by(ImportBatch.created_at.desc())
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def _count_active_jobs(db: AsyncSession) -> int:
+        result = await db.execute(
+            select(func.count())
+            .select_from(ImportBatch)
+            .where(
+                ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+                ImportBatch.status == ImportStatus.processing,
+            )
+        )
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    def _build_status_payload(batch_id: UUID | str, payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "batch_id": str(batch_id),
+            "status": payload.get("status", ImportStatus.processing.value),
+            "message": payload.get("message", ""),
+            "progress": payload.get("progress", 0),
+            "result": payload.get("result"),
+            "started": payload.get("started"),
+            "user": payload.get("user"),
+        }
+
+    @staticmethod
+    def _build_batch_payload(batch: ImportBatch) -> dict[str, Any]:
+        summary = dict(batch.validation_summary or {})
+        progress = summary.get("progress")
+        if progress is None:
+            if batch.status == ImportStatus.completed:
+                progress = 100
+            elif batch.status == ImportStatus.failed:
+                progress = -1
+            else:
+                progress = 0
+        message = summary.get("message") or summary.get("error") or ""
+        return {
+            "batch_id": str(batch.id),
+            "status": batch.status.value,
+            "message": message,
+            "progress": progress,
+            "result": summary.get("result"),
+            "started": batch.started_at.isoformat() if batch.started_at else None,
+            "user": summary.get("user"),
+        }
+
+    @staticmethod
+    async def _update_job_batch(
+        batch_id: UUID,
+        db: AsyncSession,
+        *,
+        status: ImportStatus,
+        progress: int,
+        message: str,
+        result: dict | None = None,
+        year: int | None = None,
+        record_count: int | None = None,
+    ):
+        batch = await db.get(ImportBatch, batch_id)
+        if batch is None:
+            return
+
+        summary = dict(batch.validation_summary or {})
+        summary.update({
+            "job": True,
+            "progress": progress,
+            "message": message,
+        })
+        if result is not None:
+            summary["result"] = result
+        if status == ImportStatus.failed:
+            summary["error"] = message
+
+        batch.status = status
+        batch.completed_at = datetime.utcnow()
+        batch.validation_summary = summary
+        if year is not None and year > 0:
+            batch.year = year
+        if record_count is not None:
+            batch.record_count = record_count
+        await db.commit()
+
+    @staticmethod
+    async def persist_progress(
+        batch_id: UUID,
+        *,
+        progress: int,
+        message: str,
+        result: dict | None = None,
+    ):
+        try:
+            async with async_session() as db:
+                batch = await db.get(ImportBatch, batch_id)
+                if batch is None or batch.status != ImportStatus.processing:
+                    return
+
+                summary = dict(batch.validation_summary or {})
+                if (
+                    summary.get("progress") == progress
+                    and summary.get("message") == message
+                    and (result is None or summary.get("result") == result)
+                ):
+                    return
+
+                summary.update({
+                    "job": True,
+                    "progress": progress,
+                    "message": message,
+                })
+                if result is not None:
+                    summary["result"] = result
+                batch.validation_summary = summary
+                await db.commit()
+        except Exception:
+            logger.exception("持久化导入进度失败: batch_id=%s progress=%s", batch_id, progress)
+
+    @staticmethod
+    async def acquire_lock(
+        project_id: UUID,
+        user_id: str,
+        db: AsyncSession,
+        *,
+        source_type: str,
+        file_name: str,
+        year: int = 0,
+    ) -> tuple[bool, str, UUID | None]:
         """尝试获取导入锁。
 
         Returns:
             (success, message)
         """
         pid = str(project_id)
+        ImportQueueService._cleanup_stale_memory_locks()
+        await ImportQueueService._expire_stale_jobs(db)
 
         # 检查该项目是否已有导入在进行
         if pid in _import_locks:
             lock = _import_locks[pid]
-            return False, f"项目正在导入中（{lock.get('user', '?')} 于 {lock.get('started', '?')} 开始）"
+            return False, f"项目正在导入中（{lock.get('user', '?')} 于 {lock.get('started', '?')} 开始）", None
+
+        active_batch = await ImportQueueService._get_active_job_batch(project_id, db)
+        if active_batch is not None:
+            started = active_batch.started_at.isoformat() if active_batch.started_at else "?"
+            return False, f"项目正在导入中（{started} 开始）", None
 
         # 检查总并发数
-        active = len(_import_locks)
+        active = await ImportQueueService._count_active_jobs(db)
         if active >= _MAX_CONCURRENT_IMPORTS:
-            return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试"
+            return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试", None
+
+        started_at = datetime.utcnow()
+        batch = ImportBatch(
+            project_id=project_id,
+            year=year,
+            source_type=source_type,
+            file_name=file_name,
+            data_type=IMPORT_JOB_DATA_TYPE,
+            status=ImportStatus.processing,
+            started_at=started_at,
+            validation_summary={
+                "job": True,
+                "progress": 0,
+                "message": "导入任务已创建",
+                "user": user_id,
+            },
+        )
+        db.add(batch)
+        await db.commit()
+        await db.refresh(batch)
 
         _import_locks[pid] = {
+            "batch_id": str(batch.id),
             "user": user_id,
-            "started": datetime.utcnow().isoformat(),
+            "started": started_at.isoformat(),
             "progress": 0,
-            "status": "processing",
+            "status": ImportStatus.processing.value,
+            "message": "导入任务已创建",
         }
-        return True, "OK"
+        return True, "OK", batch.id
 
     @staticmethod
     def release_lock(project_id: UUID):
@@ -63,23 +296,115 @@ class ImportQueueService:
             _import_locks[pid]["progress"] = progress
             _import_locks[pid]["message"] = message
             if progress < 0:
-                _import_locks[pid]["status"] = "failed"
+                _import_locks[pid]["status"] = ImportStatus.failed.value
             elif progress >= 100:
-                _import_locks[pid]["status"] = "completed"
+                _import_locks[pid]["status"] = ImportStatus.completed.value
             else:
-                _import_locks[pid]["status"] = "processing"
+                _import_locks[pid]["status"] = ImportStatus.processing.value
             if result is not None:
                 _import_locks[pid]["result"] = result
+            batch_id = _import_locks[pid].get("batch_id")
+            if batch_id and 0 <= progress < 100:
+                asyncio.create_task(
+                    ImportQueueService.persist_progress(
+                        UUID(str(batch_id)),
+                        progress=progress,
+                        message=message,
+                        result=result,
+                    )
+                )
 
     @staticmethod
-    def get_status(project_id: UUID) -> Optional[dict]:
+    async def complete_job(
+        project_id: UUID,
+        batch_id: UUID,
+        db: AsyncSession,
+        *,
+        message: str,
+        result: dict | None = None,
+        year: int | None = None,
+        record_count: int | None = None,
+    ):
+        ImportQueueService.update_progress(project_id, 100, message, result=result)
+        await ImportQueueService._update_job_batch(
+            batch_id,
+            db,
+            status=ImportStatus.completed,
+            progress=100,
+            message=message,
+            result=result,
+            year=year,
+            record_count=record_count,
+        )
+        ImportQueueService.release_lock(project_id)
+
+    @staticmethod
+    async def fail_job(
+        project_id: UUID,
+        batch_id: UUID,
+        db: AsyncSession,
+        *,
+        message: str,
+        result: dict | None = None,
+        year: int | None = None,
+    ):
+        await db.rollback()
+        ImportQueueService.update_progress(project_id, -1, message, result=result)
+        await ImportQueueService._update_job_batch(
+            batch_id,
+            db,
+            status=ImportStatus.failed,
+            progress=-1,
+            message=message,
+            result=result,
+            year=year,
+        )
+        ImportQueueService.release_lock(project_id)
+
+    @staticmethod
+    async def get_status(project_id: UUID, db: AsyncSession) -> Optional[dict]:
         """获取导入状态。"""
-        return _import_locks.get(str(project_id))
+        pid = str(project_id)
+        state = _import_locks.get(pid)
+        if state is not None:
+            return ImportQueueService._build_status_payload(
+                state.get("batch_id", ""),
+                state,
+            )
+
+        await ImportQueueService._expire_stale_jobs(db)
+        batch = await ImportQueueService._get_latest_job_batch(project_id, db)
+        if batch is None:
+            return None
+        return ImportQueueService._build_batch_payload(batch)
 
     @staticmethod
-    def get_all_active() -> list[dict]:
+    async def get_all_active(db: AsyncSession) -> list[dict]:
         """获取所有活跃的导入任务。"""
-        return [
-            {"project_id": pid, **info}
-            for pid, info in _import_locks.items()
-        ]
+        await ImportQueueService._expire_stale_jobs(db)
+        result = await db.execute(
+            select(ImportBatch)
+            .where(
+                ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+                ImportBatch.status == ImportStatus.processing,
+            )
+            .order_by(ImportBatch.created_at.desc())
+        )
+        active_batches = result.scalars().all()
+        active_map: dict[str, dict[str, Any]] = {}
+        for batch in active_batches:
+            pid = str(batch.project_id)
+            if pid in _import_locks:
+                active_map[pid] = {
+                    "project_id": pid,
+                    **ImportQueueService._build_status_payload(
+                        _import_locks[pid].get("batch_id", batch.id),
+                        _import_locks[pid],
+                    ),
+                }
+            else:
+                active_map[pid] = {
+                    "project_id": pid,
+                    **ImportQueueService._build_batch_payload(batch),
+                }
+        return list(active_map.values())

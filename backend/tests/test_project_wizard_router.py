@@ -9,12 +9,14 @@ import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import Base, UserRole
+from app.models.core import Project
 from app.routers.project_wizard import router
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
@@ -201,8 +203,8 @@ class TestValidateStep:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["valid"] is False
-        assert len(body["messages"]) > 0
+        assert body["valid"] is True
+        assert len(body["messages"]) == 0
 
 
 # ===================================================================
@@ -218,19 +220,6 @@ class TestConfirmProject:
         create_resp = await client.post("/api/projects", json=BASIC_INFO)
         project_id = create_resp.json()["id"]
 
-        # 完成所有前置步骤
-        for step in [
-            "account_import",
-            "account_mapping",
-            "materiality",
-            "template_set",
-            "confirmation",
-        ]:
-            await client.put(
-                f"/api/projects/{project_id}/wizard/{step}",
-                json={"done": True},
-            )
-
         resp = await client.post(f"/api/projects/{project_id}/wizard/confirm")
         assert resp.status_code == 200
         body = resp.json()
@@ -238,9 +227,16 @@ class TestConfirmProject:
         assert body["audit_year"] == 2024
 
     @pytest.mark.asyncio
-    async def test_confirm_project_missing_steps(self, client: AsyncClient):
+    async def test_confirm_project_missing_basic_info(self, client: AsyncClient, db_session: AsyncSession):
         create_resp = await client.post("/api/projects", json=BASIC_INFO)
         project_id = create_resp.json()["id"]
+
+        result = await db_session.execute(
+            select(Project).where(Project.id == uuid.UUID(project_id))
+        )
+        project = result.scalar_one()
+        project.wizard_state = {**project.wizard_state, "steps": {}}
+        await db_session.commit()
 
         resp = await client.post(f"/api/projects/{project_id}/wizard/confirm")
         assert resp.status_code == 400

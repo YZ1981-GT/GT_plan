@@ -4,6 +4,7 @@ Validates: Requirements 4.1, 4.2, 4.7-4.20, 4.23
 """
 
 import io
+import asyncio
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -50,6 +51,17 @@ async def db_session() -> AsyncSession:
     )
     async with session_factory() as session:
         yield session
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def patch_import_queue_async_session(monkeypatch):
+    from app.services import import_queue_service
+
+    session_factory = async_sessionmaker(
+        test_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    monkeypatch.setattr(import_queue_service, "async_session", session_factory)
+    yield
 
 
 async def _create_test_project(db: AsyncSession) -> Project:
@@ -612,6 +624,41 @@ class TestImportService:
         assert batch.data_type == "tb_balance"
 
     @pytest.mark.asyncio
+    async def test_smart_import_streaming_account_chart_csv(self, db_session: AsyncSession):
+        from sqlalchemy import select
+        from app.services.smart_import_engine import smart_import_streaming
+
+        project = await _create_test_project(db_session)
+        csv_content = (
+            "科目编码,科目名称,借贷方向,父科目编码\n"
+            "1001,库存现金,借,\n"
+            "100101,人民币现金,借,1001\n"
+        )
+
+        result = await smart_import_streaming(
+            project_id=project.id,
+            file_contents=[("chart.csv", csv_content.encode("utf-8-sig"))],
+            db=db_session,
+            year_override=2024,
+        )
+
+        assert result["total_accounts"] == 2
+        assert result["data_sheets_imported"]["tb_balance"] == 0
+        assert result["data_sheets_imported"]["tb_ledger"] == 0
+
+        query = await db_session.execute(
+            select(AccountChart).where(
+                AccountChart.project_id == project.id,
+                AccountChart.source == AccountSource.client,
+                AccountChart.is_deleted.is_(False),
+            )
+        )
+        records = query.scalars().all()
+
+        assert len(records) == 2
+        assert {r.account_code for r in records} == {"1001", "100101"}
+
+    @pytest.mark.asyncio
     async def test_start_import_ledger(self, db_session: AsyncSession):
         from app.services import import_service
 
@@ -751,6 +798,140 @@ class TestImportService:
         batches = await import_service.get_import_batches(project.id, db_session)
         assert len(batches) == 1
         assert batches[0].file_name == "data.csv"
+
+    @pytest.mark.asyncio
+    async def test_import_queue_lock_blocks_same_project(self, db_session: AsyncSession):
+        from sqlalchemy import select
+        from app.services.import_queue_service import ImportQueueService, IMPORT_JOB_DATA_TYPE
+
+        project = await _create_test_project(db_session)
+
+        ok, msg, batch_id = await ImportQueueService.acquire_lock(
+            project.id,
+            "tester-a",
+            db_session,
+            source_type="smart_import",
+            file_name="chart.xlsx",
+            year=0,
+        )
+        assert ok is True
+        assert batch_id is not None
+
+        ok2, msg2, batch_id2 = await ImportQueueService.acquire_lock(
+            project.id,
+            "tester-b",
+            db_session,
+            source_type="smart_import",
+            file_name="chart-2.xlsx",
+            year=0,
+        )
+        assert ok2 is False
+        assert batch_id2 is None
+        assert "项目正在导入中" in msg2
+
+        result = await db_session.execute(
+            select(ImportBatch).where(ImportBatch.id == batch_id)
+        )
+        job_batch = result.scalar_one()
+        assert job_batch.data_type == IMPORT_JOB_DATA_TYPE
+        assert job_batch.status == ImportStatus.processing
+
+    @pytest.mark.asyncio
+    async def test_import_queue_status_falls_back_to_db_after_completion(self, db_session: AsyncSession):
+        from app.services.import_queue_service import ImportQueueService
+
+        project = await _create_test_project(db_session)
+
+        ok, msg, batch_id = await ImportQueueService.acquire_lock(
+            project.id,
+            "tester",
+            db_session,
+            source_type="smart_import",
+            file_name="chart.xlsx",
+            year=0,
+        )
+        assert ok is True
+        assert batch_id is not None
+
+        await ImportQueueService.complete_job(
+            project.id,
+            batch_id,
+            db_session,
+            message="导入完成",
+            result={"total_imported": 2},
+            year=2024,
+            record_count=2,
+        )
+
+        status = await ImportQueueService.get_status(project.id, db_session)
+        assert status is not None
+        assert status["batch_id"] == str(batch_id)
+        assert status["status"] == ImportStatus.completed.value
+        assert status["progress"] == 100
+        assert status["result"] == {"total_imported": 2}
+
+    @pytest.mark.asyncio
+    async def test_import_queue_processing_progress_persists_to_db(self, db_session: AsyncSession):
+        from app.services.import_queue_service import ImportQueueService
+
+        project = await _create_test_project(db_session)
+
+        ok, msg, batch_id = await ImportQueueService.acquire_lock(
+            project.id,
+            "tester",
+            db_session,
+            source_type="smart_import",
+            file_name="chart.xlsx",
+            year=0,
+        )
+        assert ok is True
+        assert batch_id is not None
+
+        ImportQueueService.update_progress(project.id, 35, "处理中")
+        await asyncio.sleep(0.05)
+        ImportQueueService.release_lock(project.id)
+
+        status = await ImportQueueService.get_status(project.id, db_session)
+        assert status is not None
+        assert status["batch_id"] == str(batch_id)
+        assert status["status"] == ImportStatus.processing.value
+        assert status["progress"] == 35
+        assert status["message"] == "处理中"
+
+    @pytest.mark.asyncio
+    async def test_get_import_batches_excludes_smart_job_batches(self, db_session: AsyncSession):
+        from app.services import import_service
+        from app.services.import_queue_service import ImportQueueService
+
+        project = await _create_test_project(db_session)
+
+        ok, msg, batch_id = await ImportQueueService.acquire_lock(
+            project.id,
+            "tester",
+            db_session,
+            source_type="smart_import",
+            file_name="chart.xlsx",
+            year=0,
+        )
+        assert ok is True
+        assert batch_id is not None
+
+        file = _make_csv_upload(
+            "科目编码,科目名称,期初余额,借方发生额,贷方发生额,期末余额\n"
+            "1001,库存现金,1000.00,500.00,300.00,1200.00\n"
+        )
+        await import_service.start_import(
+            project_id=project.id,
+            file=file,
+            source_type="generic",
+            data_type="tb_balance",
+            year=2024,
+            db=db_session,
+        )
+
+        batches = await import_service.get_import_batches(project.id, db_session)
+        assert len(batches) == 1
+        assert batches[0].data_type == "tb_balance"
 
     @pytest.mark.asyncio
     async def test_queue_unmapped(self, db_session: AsyncSession):
