@@ -444,13 +444,18 @@ async def smart_preview(
 
     result = smart_parse_files(file_contents, year_override=year)
 
+    # 辅助明细账行数从 diagnostics 中汇总（预览时不实际生成辅助明细行）
+    aux_ledger_est = 0
+    for d in result.get("diagnostics", []):
+        aux_ledger_est += d.get("aux_ledger_count", 0)
+
     return {
         "year": result["year"],
         "summary": {
             "balance": len(result["balance_rows"]),
             "aux_balance": len(result["aux_balance_rows"]),
             "ledger": len(result["ledger_rows"]),
-            "aux_ledger": len(result["aux_ledger_rows"]),
+            "aux_ledger": aux_ledger_est,
         },
         "aux_dimensions": result["aux_dimensions"],
         "validation": result["validation"],

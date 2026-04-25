@@ -292,6 +292,7 @@ inclusion: always
 
 ## 待办 / 进行中
 - 项目文件清理（2026-04）：已删除根目录 `__pycache__/`、`frontend/README.md`；`GT_底稿/审计实务操作手册-框架.md` 和 `致同GT审计手册设计规范.md` 待用户确认是否删除
+- 一次性脚本清理偏好（2026-04-23）：backend/scripts/ 下的一次性修复/调试/测试脚本（_fix_*/_debug_*/test_*等）用完即删，不留在仓库中；清理后保留12个长期运维脚本（_create_admin/_init_tables/_create_missing_tables/backup/check_auth*/check_routes/create_project/generate_types/import_heping_data/optimize_indexes/seed_staff）
 - 用户计划对每个细分程序逐一打磨升级
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程
@@ -697,7 +698,8 @@ inclusion: always
 - 通用导入规则增强（2026-04-19）：①_COLUMN_MAP 新增"期间"→accounting_period、"组织编码"→company_code、"核算组织"→company_name、"最后操作人"→preparer ②parsers.py _parse_date 支持 datetime 对象（openpyxl 直接返回）③新增 _parse_period 解析"2025年1期"格式 ④_parse_single_row 的 ledger/aux_ledger 分支新增 accounting_period 和 voucher_type 字段 ⑤preview_file 返回 key_columns 和 column_importance 标注关键列重要性（required/important/optional）⑥_detect_header_row 增加关键词匹配（科目编码/凭证日期等）提高表头识别准确率
 - 通用智能导入引擎（2026-04-19）：新增 `backend/app/services/smart_import_engine.py`，替代专用脚本，支持任意企业导出格式——①`detect_header_rows` 自动检测单行/双行合并表头（扫描前8行，关键词匹配+子列名检测）②`merge_header_rows` 合并双行表头为组合列名（如"年初余额_借方金额"→year_opening_debit）③`smart_match_column` 优先匹配合并表头组合名→基础列名→清洗后匹配 ④"核算维度"映射为 aux_dimensions（混合维度列），不映射为 aux_type（避免误判为独立辅助表）⑤`convert_balance_rows` 自动从借贷两列计算净额（不依赖方向列）⑥`validate_aux_consistency` 三项校验（维度存在性/期初+变动=期末/明细账vs余额表发生额）⑦`smart_parse_files` 多文件入口自动检测合并单元格切换完整模式（3.9s打开+0.5s遍历50000行）⑧新增 `POST /ledger/smart-preview`（预览不写库）和 `POST /ledger/smart-import`（解析+写库）两个API端点，支持 custom_mapping 参数手动指定列映射
 - openpyxl read_only 模式限制（2026-04-19）：合并单元格的文件在 read_only 模式下只返回1列（左上角单元格），必须用完整模式打开；完整模式打开50000行文件约4秒，iter_rows遍历约0.5秒，可接受；序时账100万行文件用 read_only 模式无问题（无合并单元格）
-- openpyxl read_only 合并单元格值复制问题（2026-04-23）：read_only模式下合并单元格的值会被复制到所有合并列（如14列全是"科目余额表"），导致detect_header_rows误判第一行为表头、headers全错、data_type=unknown、0条入库；needs_full检测逻辑从"列数≤3"增强为同时检测"同一行≥60%非空值相同且≥3个"的合并单元格特征，自动切换完整模式
+- openpyxl read_only 合并单元格值复制问题（2026-04-23）：read_only模式下合并单元格的值会被复制到所有合并列（如14列全是"科目余额表"），导致detect_header_rows误判第一行为表头、headers全错、data_type=unknown、0条入库；needs_full检测逻辑从"列数≤3"增强为同时检测"同一行≥60%非空值相同且≥3个"的合并单元格特征，自动切换完整模式；smart_parse_files和smart_import_streaming两处均已修复
+- smart_parse_files CSV支持缺失（2026-04-25）：查账页面"导入数据"弹窗调用smart-preview端点→smart_parse_files，该函数完全没有CSV处理（所有文件走openpyxl导致CSV报错被跳过）；新增`_parse_csv_for_preview`函数（流式解码+逐批解析），smart_parse_files文件循环中CSV文件走独立分支
 - uvicorn --reload 与脚本冲突（2026-04-19）：从 backend/ 目录运行 Python 脚本时，uvicorn 的 --reload 文件监控会导致脚本卡死；解决方案：从项目根目录运行（`python -u backend/scripts/xxx.py`）或停止 uvicorn
 - 四表导入偏好（2026-04-19 用户提出）：①每个单位导出格式不同，必须用通用解析规则而非专用脚本 ②辅助核算维度有多个时需要让用户确认（smart-preview 先预览再 smart-import 写入）③辅助余额表和辅助明细账之间要做一致性校对（名称/编号/期初+变动=期末）④年度信息要从文件内容自动提取，支持多文件上传 ⑤解析有问题时支持手动关键列表头对应（custom_mapping 参数）
 - 查账页面导入数据偏好（2026-04-19 用户改回）："导入数据"按钮改回跳转到项目向导科目导入步骤（带returnTo=ledger参数），不用弹窗式智能导入；弹窗代码保留备用

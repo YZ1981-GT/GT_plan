@@ -969,7 +969,8 @@ def validate_four_tables(
         if code not in bal_map:
             continue
         b_closing = bal_map[code]["closing"]
-        # 找该科目下期末汇总最接近科目余额的维度类型
+        # 每个维度类型的汇总都应该等于科目余额（核算维度是二级明细）
+        # 找最接近的维度类型比对，如实报出差异
         types_for_code = [(k[1], v) for k, v in aux_by_code_type.items() if k[0] == code]
         if not types_for_code:
             continue
@@ -978,19 +979,19 @@ def validate_four_tables(
         diff = b_closing - a_closing
         if abs(diff) > Decimal("0.01"):
             cross_bal_errors += 1
-            if cross_bal_errors <= 3:
+            if cross_bal_errors <= 5:
                 findings.append({
                     "level": "warning", "category": "余额表vs辅助余额表",
                     "message": f"{code}: 科目期末={b_closing}, 最近维度({best_type},{best['count']}条)汇总={a_closing}, 差{diff}",
                     "detail": {"account_code": code, "aux_type": best_type},
                 })
-    if cross_bal_errors > 3:
+    if cross_bal_errors > 5:
         findings.append({"level": "warning", "category": "余额表vs辅助余额表",
-                         "message": f"共 {cross_bal_errors} 个科目不一致", "detail": {"total": cross_bal_errors}})
-    else:
+                         "message": f"共 {cross_bal_errors} 个科目不一致（仅展示前5条）", "detail": {"total": cross_bal_errors}})
+    if cross_bal_errors == 0:
         findings.append({"level": "info", "category": "余额表vs辅助余额表",
-                         "message": f"有辅助核算的 {len(aux_codes)} 个科目中，{len(aux_codes)-cross_bal_errors} 个一致",
-                         "detail": {"total": len(aux_codes), "match": len(aux_codes)-cross_bal_errors}})
+                         "message": f"有辅助核算的 {len(aux_codes)} 个科目全部一致",
+                         "detail": {"total": len(aux_codes), "match": len(aux_codes)}})
 
     # ── 4. 序时账 vs 科目余额表 ──
     led_by_code: dict[str, list[Decimal]] = {}  # code -> [debit_sum, credit_sum]
@@ -1068,6 +1069,141 @@ def validate_four_tables(
 # 8. 核心入口：智能解析多文件 → 四表数据
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _parse_csv_for_preview(
+    content: bytes,
+    filename: str,
+    custom_mapping: Optional[dict] = None,
+    max_rows: int = 0,
+) -> dict:
+    """解析 CSV 文件用于预览/解析。
+
+    大文件时只解析全部行（预览需要完整数据用于转换），
+    但使用流式解码避免生成完整 str 副本。
+
+    Args:
+        max_rows: 最大读取行数，0=全部
+    """
+    import codecs
+    import csv
+
+    total_lines_est = content.count(b'\n')
+
+    # 编码探测（截断到换行符边界）
+    probe_end = min(16384, len(content))
+    while probe_end > 0 and content[probe_end - 1:probe_end] != b'\n':
+        probe_end -= 1
+    if probe_end == 0:
+        probe_end = min(16384, len(content))
+    sample = content[:probe_end]
+    encoding = None
+    for enc in ("utf-8-sig", "utf-8", "gbk", "gb2312", "gb18030"):
+        try:
+            sample.decode(enc)
+            encoding = enc
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if encoding is None:
+        encoding = "latin-1"
+
+    stream = codecs.getreader(encoding)(io.BytesIO(content))
+
+    # 检测表头
+    header_line = None
+    for _ in range(5):
+        line = stream.readline()
+        if not line:
+            break
+        cells = line.strip().split(',')
+        non_empty = [c.strip() for c in cells if c.strip()]
+        if len(non_empty) >= 3:
+            header_line = line.strip()
+            break
+
+    if header_line is None:
+        raise ValueError("CSV 文件未找到有效表头")
+
+    reader_header = list(csv.reader([header_line]))[0]
+    headers = [c.strip() if c.strip() else f"col_{j}" for j, c in enumerate(reader_header)]
+
+    # 列名映射
+    column_mapping: dict[str, str] = {}
+    for h in headers:
+        mapped = smart_match_column(h)
+        if mapped:
+            column_mapping[h] = mapped
+
+    if custom_mapping:
+        sm = custom_mapping.get("CSV", custom_mapping) if isinstance(custom_mapping, dict) else None
+        if sm and not any(isinstance(v, dict) for v in sm.values()):
+            for h, v in sm.items():
+                if h in headers and v:
+                    column_mapping[h] = v
+
+    mapped_fields = set(column_mapping.values())
+    dt = _guess_data_type(mapped_fields)
+
+    # 流式读取所有行
+    rows = []
+    row_count = 0
+    line_buf: list[str] = []
+    BATCH = 100_000
+
+    while True:
+        line = stream.readline()
+        if not line:
+            break
+        line = line.rstrip('\n').rstrip('\r')
+        if line:
+            line_buf.append(line)
+
+        if len(line_buf) >= BATCH:
+            for row_raw in csv.reader(line_buf):
+                if not row_raw or all(not c.strip() for c in row_raw):
+                    continue
+                padded = row_raw + [""] * max(0, len(headers) - len(row_raw))
+                row_dict = {}
+                for j, h in enumerate(headers):
+                    mapped = column_mapping.get(h, h)
+                    val = padded[j].strip() if j < len(padded) else ""
+                    row_dict[mapped] = val if val else None
+                rows.append(row_dict)
+                row_count += 1
+                if max_rows and row_count >= max_rows:
+                    break
+            line_buf.clear()
+            if max_rows and row_count >= max_rows:
+                break
+
+    # 处理剩余行
+    if line_buf and (not max_rows or row_count < max_rows):
+        for row_raw in csv.reader(line_buf):
+            if not row_raw or all(not c.strip() for c in row_raw):
+                continue
+            padded = row_raw + [""] * max(0, len(headers) - len(row_raw))
+            row_dict = {}
+            for j, h in enumerate(headers):
+                mapped = column_mapping.get(h, h)
+                val = padded[j].strip() if j < len(padded) else ""
+                row_dict[mapped] = val if val else None
+            rows.append(row_dict)
+            row_count += 1
+            if max_rows and row_count >= max_rows:
+                break
+
+    year_val = extract_year_from_content(rows[:100], filename=filename)
+
+    return {
+        "headers": headers,
+        "column_mapping": column_mapping,
+        "data_type": dt,
+        "rows": rows,
+        "year": year_val,
+        "row_count": row_count,
+        "total_lines_est": total_lines_est,
+    }
+
+
 def smart_parse_files(
     file_contents: list[tuple[str, bytes]],
     year_override: Optional[int] = None,
@@ -1107,6 +1243,56 @@ def smart_parse_files(
     for filename, content in file_contents:
         logger.info("解析文件: %s (%d bytes)", filename, len(content))
 
+        # ── CSV 文件单独处理 ──
+        if filename.lower().endswith('.csv'):
+            try:
+                csv_parsed = _parse_csv_for_preview(content, filename, custom_mapping)
+            except Exception as e:
+                diagnostics.append({
+                    "file": filename, "sheet": "CSV",
+                    "status": "error", "message": f"CSV 解析失败: {e}",
+                })
+                continue
+
+            dt = csv_parsed["data_type"]
+            matched_fields = set(csv_parsed["column_mapping"].values())
+            missing_cols, missing_recommended = _detect_missing_fields(dt, matched_fields)
+
+            if detected_year is None and csv_parsed.get("year"):
+                detected_year = csv_parsed["year"]
+
+            diag = {
+                "file": filename, "sheet": "CSV", "data_type": dt,
+                "row_count": csv_parsed["row_count"],
+                "header_count": 1,
+                "matched_cols": sorted(matched_fields),
+                "missing_cols": missing_cols,
+                "missing_recommended": missing_recommended,
+                "column_mapping": csv_parsed["column_mapping"],
+                "status": "ok",
+            }
+
+            if dt == "ledger":
+                led, _, aux_stats = convert_ledger_rows(csv_parsed["rows"])
+                all_ledger_rows.extend(led)
+                diag["ledger_count"] = len(led)
+                diag["aux_ledger_count"] = sum(aux_stats.values())
+                for t, c in aux_stats.items():
+                    _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+            elif dt == "balance":
+                bal, aux_bal = convert_balance_rows(csv_parsed["rows"])
+                all_balance_rows.extend(bal)
+                all_aux_balance_rows.extend(aux_bal)
+                diag["balance_count"] = len(bal)
+                diag["aux_balance_count"] = len(aux_bal)
+            else:
+                diag["status"] = "skipped"
+                diag["message"] = f"CSV 未识别的数据类型: {dt}"
+
+            diagnostics.append(diag)
+            continue
+
+        # ── Excel 文件处理 ──
         # 第一遍：read_only 模式快速扫描
         try:
             wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
@@ -1126,6 +1312,17 @@ def smart_parse_files(
                     max_cols = max(len(r) for r in first_rows)
                     if max_cols <= 3:
                         needs_full_mode = True
+                        break
+                    # 检测合并单元格特征：同一行多列值完全相同
+                    for row in first_rows:
+                        non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
+                        if len(non_empty) >= 4:
+                            from collections import Counter
+                            most_common_val, most_common_count = Counter(non_empty).most_common(1)[0]
+                            if most_common_count >= len(non_empty) * 0.6 and most_common_count >= 3:
+                                needs_full_mode = True
+                                break
+                    if needs_full_mode:
                         break
             except Exception:
                 pass
