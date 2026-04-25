@@ -584,9 +584,22 @@
     </div>
 
     <!-- 步骤3：导入中 -->
-    <div v-if="importStep === 'importing'" style="text-align: center; padding: 40px 0">
-      <el-icon class="is-loading" style="font-size: 32px; color: #409eff"><Loading /></el-icon>
-      <div style="margin-top: 12px; color: #666">正在写入数据库，请稍候...</div>
+    <div v-if="importStep === 'importing'" style="text-align: center; padding: 30px 0">
+      <el-progress
+        :percentage="importProgress"
+        :stroke-width="20"
+        :text-inside="true"
+        :status="importProgress >= 100 ? 'success' : ''"
+        style="max-width: 500px; margin: 0 auto"
+      />
+      <div style="margin-top: 12px; color: #666; font-size: 13px">{{ importProgressMsg || '正在写入数据库…' }}</div>
+      <div style="margin-top: 6px; color: #999; font-size: 12px">
+        已写入：
+        <span v-if="importProgressCounts.tb_balance">余额表 {{ importProgressCounts.tb_balance.toLocaleString() }} 条 </span>
+        <span v-if="importProgressCounts.tb_ledger">序时账 {{ importProgressCounts.tb_ledger.toLocaleString() }} 条 </span>
+        <span v-if="importProgressCounts.tb_aux_balance">辅助余额 {{ importProgressCounts.tb_aux_balance.toLocaleString() }} 条 </span>
+        <span v-if="importProgressCounts.tb_aux_ledger">辅助明细 {{ importProgressCounts.tb_aux_ledger.toLocaleString() }} 条 </span>
+      </div>
     </div>
 
     <!-- 步骤4：完成 -->
@@ -649,7 +662,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, CircleCheck, Warning } from '@element-plus/icons-vue'
+import { Search, Upload, CircleCheck, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
@@ -766,6 +779,9 @@ const importedResult = ref<any>(null)
 const previewing = ref(false)
 const importing = ref(false)
 const uploadRef = ref()
+const importProgress = ref(0)
+const importProgressMsg = ref('')
+const importProgressCounts = ref<Record<string, number>>({})
 
 function openImportDialog() {
   importDialogVisible.value = true
@@ -833,6 +849,31 @@ async function doImport() {
   if (!importFiles.value.length) return
   importing.value = true
   importStep.value = 'importing'
+  importProgress.value = 0
+  importProgressMsg.value = '准备导入…'
+  importProgressCounts.value = {}
+
+  // 启动进度轮询（每 1.5 秒查一次后端进度）
+  const pollTimer = setInterval(async () => {
+    try {
+      const { data: statusData } = await http.get(
+        `/api/data-lifecycle/import-queue/${projectId.value}`,
+        { timeout: 5000 },
+      )
+      const status = statusData?.data ?? statusData
+      if (status && typeof status === 'object') {
+        const pct = status.progress ?? 0
+        if (pct > 0) importProgress.value = Math.min(pct, 99)
+        if (status.message) importProgressMsg.value = status.message
+        // 从 result 中提取已写入的行数
+        const res = status.result
+        if (res?.data_sheets_imported || res?.imported) {
+          importProgressCounts.value = res.data_sheets_imported || res.imported || {}
+        }
+      }
+    } catch { /* 静默 */ }
+  }, 1500)
+
   try {
     const formData = new FormData()
     for (const f of importFiles.value) {
@@ -866,11 +907,14 @@ async function doImport() {
     const { data } = await http.post(url, formData, { timeout: 600000 })
     const result = data?.data ?? data
     importedResult.value = result?.imported || result?.data_sheets_imported || result
+    importProgress.value = 100
+    importProgressMsg.value = '导入完成'
     importStep.value = 'done'
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || e?.message || '导入失败')
     importStep.value = 'preview'
   } finally {
+    clearInterval(pollTimer)
     importing.value = false
   }
 }
