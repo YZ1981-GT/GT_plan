@@ -1440,10 +1440,15 @@ def smart_parse_files(
                 for t, c in aux_stats.items():
                     _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
 
-            elif dt in ("aux_balance", "aux_ledger"):
-                # 独立的辅助表（非从核算维度拆分）
-                diag["status"] = "skipped"
-                diag["message"] = "独立辅助表暂不处理（核算维度已从余额表/序时账自动拆分）"
+            elif dt == "aux_balance":
+                # 独立辅助余额表直接收集
+                all_aux_balance_rows.extend(parsed["rows"])
+                diag["aux_balance_count"] = len(parsed["rows"])
+
+            elif dt == "aux_ledger":
+                # 独立辅助明细账直接收集
+                all_aux_ledger_rows.extend(parsed["rows"])
+                diag["aux_ledger_count"] = len(parsed["rows"])
 
             else:
                 diag["status"] = "skipped"
@@ -1818,6 +1823,13 @@ async def _stream_csv_import(
         diag["status"] = "skipped"
         diag["message"] = f"CSV 科目表缺少必需列: {', '.join(miss_req)}"
         return {"diag": diag, "errors": []}
+
+    # 四表关键列缺失时也阻断（不入库）
+    if miss_req and dt in ("balance", "ledger", "aux_balance", "aux_ledger"):
+        _TYPE_LABELS = {"balance": "余额表", "ledger": "序时账", "aux_balance": "辅助余额表", "aux_ledger": "辅助明细账"}
+        diag["status"] = "skipped"
+        diag["message"] = f"CSV {_TYPE_LABELS.get(dt, dt)}缺少必需列: {', '.join(miss_req)}，请在列映射中手动指定"
+        return {"diag": diag, "errors": [diag["message"]]}
 
     if dt not in ("ledger", "balance", "account_chart"):
         diag["status"] = "skipped"
@@ -2267,6 +2279,16 @@ async def smart_import_streaming(
                 parsed["rows"] = []
                 continue
 
+            # 四表关键列缺失时也阻断（不入库）
+            if miss_req and dt in ("balance", "ledger", "aux_balance", "aux_ledger"):
+                _TYPE_LABELS = {"balance": "余额表", "ledger": "序时账", "aux_balance": "辅助余额表", "aux_ledger": "辅助明细账"}
+                diag["status"] = "skipped"
+                diag["message"] = f"{_TYPE_LABELS.get(dt, dt)}缺少必需列: {', '.join(miss_req)}，请在列映射中手动指定"
+                errors.append(diag["message"])
+                diagnostics.append(diag)
+                parsed["rows"] = []
+                continue
+
             # ── 按数据类型转换 & 写入 ──
             logger.info("Sheet %s: data_type=%s, row_count=%d, matched=%s",
                         sname, dt, parsed["row_count"], sorted(matched_fields)[:5])
@@ -2387,10 +2409,46 @@ async def smart_import_streaming(
                     )
                 diag["account_count"] = len(acct_records) - added_before
 
-            elif dt in ("aux_balance", "aux_ledger"):
-                diag["status"] = "skipped"
-                diag["message"] = "独立辅助表暂不处理（已从余额表/序时账自动拆分）"
-                logger.info("  skipped: %s", dt)
+            elif dt == "aux_balance":
+                # 独立辅助余额表（非从核算维度拆分）直接入库
+                aux_bal_rows = parsed["rows"]
+                diag["aux_balance_count"] = len(aux_bal_rows)
+                aux_tbl = TbAuxBalance.__table__
+                for i in range(0, len(aux_bal_rows), CHUNK):
+                    recs = [{"id": _uuid.uuid4(), "project_id": project_id,
+                             "year": year, "import_batch_id": batches["tb_aux_balance"].id,
+                             "is_deleted": False, **r} for r in aux_bal_rows[i:i + CHUNK]]
+                    if recs:
+                        await db.execute(aux_tbl.insert(), recs)
+                        counts["tb_aux_balance"] += len(recs)
+                        await db.flush()
+                for r in aux_bal_rows:
+                    t = r.get("aux_type", "?")
+                    _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
+                del aux_bal_rows
+
+            elif dt == "aux_ledger":
+                # 独立辅助明细账直接入库
+                aux_led_rows = parsed["rows"]
+                diag["aux_ledger_count"] = len(aux_led_rows)
+                aux_led_tbl = TbAuxLedger.__table__
+                buf: list[dict] = []
+                for row in aux_led_rows:
+                    buf.append({
+                        "id": _uuid.uuid4(), "project_id": project_id,
+                        "year": year, "import_batch_id": batches["tb_aux_ledger"].id,
+                        "is_deleted": False, **row,
+                    })
+                    if len(buf) >= CHUNK:
+                        await db.execute(aux_led_tbl.insert(), buf)
+                        counts["tb_aux_ledger"] += len(buf)
+                        buf.clear()
+                        await db.flush()
+                if buf:
+                    await db.execute(aux_led_tbl.insert(), buf)
+                    counts["tb_aux_ledger"] += len(buf)
+                    await db.flush()
+                del aux_led_rows
             else:
                 diag["status"] = "skipped"
                 diag["message"] = f"未识别的数据类型: {dt}"

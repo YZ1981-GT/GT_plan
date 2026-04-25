@@ -339,7 +339,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { UploadFilled, CircleCheckFilled, WarningFilled, Connection, CircleCheck, CircleClose, InfoFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import http from '@/utils/http'
 import { useWizardStore } from '@/stores/wizard'
@@ -706,9 +706,77 @@ const _KEY_FIELDS_DEFAULT = new Set([
   'opening_balance', 'closing_balance', 'voucher_date', 'voucher_no',
 ])
 
+// 必需字段（与后端 _REQUIRED_FIELD_GROUPS 一致，用于阻断导入）
+const _REQUIRED_FIELDS_BY_TYPE: Record<string, Array<{ label: string; candidates: Set<string> }>> = {
+  balance: [
+    { label: '科目编码', candidates: new Set(['account_code']) },
+  ],
+  ledger: [
+    { label: '科目编码', candidates: new Set(['account_code']) },
+    { label: '凭证日期', candidates: new Set(['voucher_date']) },
+    { label: '凭证号', candidates: new Set(['voucher_no']) },
+  ],
+  aux_balance: [
+    { label: '科目编码', candidates: new Set(['account_code']) },
+    { label: '辅助类型', candidates: new Set(['aux_type']) },
+  ],
+  aux_ledger: [
+    { label: '科目编码', candidates: new Set(['account_code']) },
+  ],
+  account_chart: [
+    { label: '科目编码', candidates: new Set(['account_code']) },
+    { label: '科目名称', candidates: new Set(['account_name']) },
+  ],
+}
+
+/** 检查所有 sheet 的必需字段是否已映射，返回缺失信息 */
+function checkRequiredFieldsMissing(): Array<{ sheet: string; type: string; missing: string[] }> {
+  const results: Array<{ sheet: string; type: string; missing: string[] }> = []
+  for (let i = 0; i < previewSheets.value.length; i++) {
+    const sheet = previewSheets.value[i]
+    const dt = sheet.file_type_guess || 'unknown'
+    if (dt === 'unknown') continue
+    const reqs = _REQUIRED_FIELDS_BY_TYPE[dt]
+    if (!reqs) continue
+    const cached = sheetMappingCache[i] || {}
+    const mappedFields = new Set(Object.values(cached).filter(Boolean))
+    const missing: string[] = []
+    for (const req of reqs) {
+      const found = [...req.candidates].some(c => mappedFields.has(c))
+      if (!found) missing.push(req.label)
+    }
+    if (missing.length > 0) {
+      results.push({ sheet: sheet.sheet_name, type: dt, missing })
+    }
+  }
+  return results
+}
+
 function _getKeyFields(): Set<string> {
   const ft = activeSheet.value?.file_type_guess || ''
   return _KEY_FIELDS_BY_TYPE[ft] || _KEY_FIELDS_DEFAULT
+}
+
+/** 前端版数据类型推断（与后端 _guess_data_type 逻辑一致） */
+function _guessDataTypeFrontend(fields: Set<string>): string {
+  const hasCode = fields.has('account_code')
+  const hasVoucherDate = fields.has('voucher_date')
+  const hasVoucherNo = fields.has('voucher_no')
+  const hasDebit = fields.has('debit_amount')
+  const hasCredit = fields.has('credit_amount')
+  const hasOpening = ['opening_balance', 'opening_debit', 'opening_credit', 'year_opening_debit', 'year_opening_credit'].some(f => fields.has(f))
+  const hasClosing = ['closing_balance', 'closing_debit', 'closing_credit'].some(f => fields.has(f))
+  const hasAuxDimensions = fields.has('aux_dimensions')
+  const hasAuxSeparate = ['aux_code', 'aux_name'].some(f => fields.has(f)) && fields.has('aux_type')
+
+  if (hasAuxSeparate && !hasAuxDimensions) {
+    return hasVoucherDate ? 'aux_ledger' : 'aux_balance'
+  }
+  if (hasVoucherDate && hasVoucherNo && (hasDebit || hasCredit)) return 'ledger'
+  if (hasCode && (hasOpening || hasClosing)) return 'balance'
+  if (hasCode && (hasDebit || hasCredit) && !hasVoucherDate) return 'balance'
+  if (hasCode) return 'account_chart'
+  return 'unknown'
 }
 
 function _getImportantFields(): Set<string> {
@@ -852,6 +920,15 @@ watch(columnMapping, () => {
       save[h] = columnMapping[h] ?? null
     }
     sheetMappingCache[idx] = save
+
+    // ── 重新推断数据类型（与后端 _guess_data_type 逻辑一致） ──
+    const mappedFields = new Set(Object.values(save).filter(Boolean) as string[])
+    const newType = _guessDataTypeFrontend(mappedFields)
+    if (newType !== sheet.file_type_guess) {
+      sheet.file_type_guess = newType
+      fileTypeLabel.value = FILE_TYPE_LABELS[newType] || '未识别类型'
+      fileTypeTagType.value = FILE_TYPE_TAG[newType] || 'info'
+    }
   }
 
   // 同步到 wizardStore（供"保存"按钮使用）
@@ -986,6 +1063,21 @@ async function loadSavedMapping(fileType: string, headers: string[]): Promise<Re
 
 async function handleImport() {
   if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
+
+  // 关键列硬阻断：检查所有 sheet 的必需字段是否已映射
+  const missingInfo = checkRequiredFieldsMissing()
+  if (missingInfo.length > 0) {
+    const details = missingInfo.map(m =>
+      `「${m.sheet}」(${m.type}) 缺少: ${m.missing.join('、')}`
+    ).join('\n')
+    ElMessageBox.alert(
+      `以下数据表缺少必需的关键列映射，无法导入：\n\n${details}\n\n请在列映射中手动指定这些列。`,
+      '关键列缺失',
+      { type: 'warning', confirmButtonText: '去修改映射' },
+    )
+    return
+  }
+
   importing.value = true
 
   // 启动进度轮询

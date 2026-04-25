@@ -110,9 +110,96 @@ async def preview_file(
         )
 
     if filename_lower.endswith(".csv"):
-        # CSV 用原有逻辑（小文件）—— 需要 seek 回起点因为 content 已经 read 过
-        await file.seek(0)
-        return await account_chart_service.preview_file(file, skip_rows=skip_rows)
+        # CSV 也走 smart_import_engine 统一路径（与 Excel 一致的表头检测+列映射）
+        import csv as _csv
+        import codecs
+
+        # 编码探测（16KB 采样，不截断多字节字符）
+        sample = content[:16384]
+        nl_pos = sample.rfind(b'\n')
+        if nl_pos > 0:
+            sample = sample[:nl_pos]
+        encoding = 'utf-8-sig'
+        for enc in ('utf-8-sig', 'gbk', 'gb2312', 'gb18030'):
+            try:
+                sample.decode(enc)
+                encoding = enc
+                break
+            except (UnicodeDecodeError, LookupError):
+                continue
+
+        text = content.decode(encoding, errors='replace')
+        reader = _csv.reader(io.StringIO(text))
+        all_rows_raw = []
+        for i, row in enumerate(reader):
+            if i >= 30:  # 前 30 行足够检测表头 + 预览 20 行数据
+                break
+            all_rows_raw.append(row)
+
+        if not all_rows_raw:
+            raise HTTPException(status_code=400, detail="CSV 文件为空")
+
+        # 用 smart_import_engine 的表头检测逻辑
+        from app.services.smart_import_engine import _HEADER_KEYWORDS, _SUBHEADER_KEYWORDS, _guess_data_type
+
+        # 简化的表头检测（CSV 通常是单行表头）
+        header_start = 0
+        for i, cells in enumerate(all_rows_raw):
+            non_empty = [c.strip() for c in cells if c.strip()]
+            if not non_empty:
+                continue
+            has_kw = any(kw in cell for cell in non_empty for kw in _HEADER_KEYWORDS)
+            is_title = len(non_empty) == 1 or (non_empty and len(non_empty[0]) > 30)
+            if is_title and not has_kw:
+                continue
+            if has_kw and len(non_empty) >= 2:
+                header_start = i
+                break
+            if len(non_empty) >= 3:
+                header_start = i
+                break
+
+        headers = [h.strip() if h.strip() else f"col_{j}" for j, h in enumerate(all_rows_raw[header_start])]
+
+        # 列名映射（与 Excel 完全一致）
+        column_mapping = {}
+        for h in headers:
+            mapped = smart_match_column(h)
+            if not mapped:
+                mapped = _match_column(h)
+            if mapped:
+                column_mapping[h] = mapped
+
+        # 数据行（表头之后，最多 20 行）
+        data_start = header_start + 1
+        rows = []
+        for row_raw in all_rows_raw[data_start:data_start + 20]:
+            padded = row_raw + [''] * max(0, len(headers) - len(row_raw))
+            row_dict = {headers[j]: padded[j].strip() for j in range(len(headers))}
+            rows.append(row_dict)
+
+        # 前 10 行原始数据
+        raw_first_rows = [
+            [c.strip() for c in row] for row in all_rows_raw[:min(10, len(all_rows_raw))]
+        ]
+
+        # 总行数估算（按换行符计数）
+        total_rows = text.count('\n') - data_start
+
+        mapped_cols = set(column_mapping.values())
+        file_type = _guess_data_type(mapped_cols) if mapped_cols else "unknown"
+
+        return {"sheets": [{
+            "sheet_name": file.filename or "CSV",
+            "headers": headers,
+            "rows": rows,
+            "total_rows": max(0, total_rows),
+            "column_mapping": column_mapping,
+            "file_type_guess": file_type,
+            "header_count": 1,
+            "header_start": header_start,
+            "raw_first_rows": raw_first_rows,
+        }], "active_sheet": 0}
 
     # Excel：小文件用完整模式（正确处理合并单元格），大文件用 read_only（快速）
     file_size_mb = len(content) / 1024 / 1024
