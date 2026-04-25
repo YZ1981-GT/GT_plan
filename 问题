@@ -1015,25 +1015,26 @@
 |------|------|---------|------|
 | **A. 试点前** | | | |
 | A.1 | 统一认证键值 | ✅ 已完成 | collaboration.ts 从 access_token 改为 token，与 auth.ts 统一 |
-| A.2 | 项目级权限与可见性 | ✅ 已完成 | deps.py 新增 check_consol_lock + get_visible_project_ids 依赖注入 |
+| A.2 | 项目级权限与可见性 | ⚠️ 部分完成 | deps.py 已新增依赖函数，working_paper/trial_balance/adjustments 主链路已接入；附件下载/底稿下载等链路仍待统一口径 |
 | A.3 | 真实用户写入过程记录 | ✅ 已完成 | 6个路由文件全部消除占位UUID，改用 Depends(get_current_user) |
 | A.4 | 附件上传与预览闭环 | ⚠️ 部分完成 | 后端附件路由已有，前端预览代理层需要部署 Paperless 后联调验证 |
-| A.5 | 在线编辑降级策略 | ✅ 已完成 | feature_flags.py 功能开关（online_editing 默认关闭）+ 功能成熟度分级（production/pilot/experimental） |
+| A.5 | 在线编辑降级策略 | ⚠️ 部分完成 | feature_flags.py 开关与成熟度分级已落地；WorkpaperList.vue 双模式骨架已具备，但正式 ONLYOFFICE 主打开链（iframe URL 与 WOPISrc 构造）仍未收口对齐 |
 | A.6 | 最小企业级运行基线 | ✅ 已完成 | request_id 中间件 + 结构化日志 JSONFormatter + 异步任务状态中心 + Web Vitals 监控 + 灾备脚本 |
 | **B. 扩大试点前** | | | |
-| B.1 | 复核批注接入主页面 | ✅ 已完成 | WorkpaperList.vue 新增复核意见面板（列表+新增+解决+未解决计数徽标） |
-| B.2 | 提交复核硬门槛 | ✅ 已完成 | 4项门禁（reviewer/QC/批注/AI确认），不满足时按钮禁用+tooltip显示原因 |
+| B.1 | 复核批注接入主页面 | ⚠️ 部分完成 | WorkpaperList.vue 面板已展示复核意见与未解决计数；但复核人操作闭环（一级/二级复核通过/退回按钮消费 updateReviewStatus）尚未真正接入 |
+| B.2 | 提交复核硬门槛 | ⚠️ 部分完成 | 后端 submit-review 已集中校验 reviewer/QC/批注/AI 四类门禁；但 draft 仍可提交（未强制 edit_complete 前置），前端预校验仍缺少 AI 确认项 |
 | B.3 | 做实阻断级 QC 规则 | ✅ 已完成 | 5条实质阻断规则（结论非空+AI确认+审定数公式+复核人分配+未解决批注） |
 | B.4 | 附件关联交互优化 | ⚠️ 部分完成 | 后端 wp-index 搜索 API 已有，前端附件关联改为搜索下拉需联调 |
 | B.5 | 异步任务中心 | ✅ 已完成 | task_center.py（create/update/get/list/stats）+ 3个API端点 |
 | B.6 | 实验功能标识 | ✅ 已完成 | feature_flags.py + feature_flags 路由 + 17个功能成熟度分级 |
 | **C. 全所推广前** | | | |
 | C.1 | 在线编辑路线决定 | ✅ 已决策 | 采用方案B：离线为正式主链路+在线编辑功能开关灰度验证 |
-| C.2 | 证据链与归档治理 | ✅ 已完成 | 归档锁定+云端推送（SFTP/S3/SMB）+本地清理+归档清单 |
+| C.2 | 证据链与归档治理 | ⚠️ 代码完成 | 归档锁定+云端推送+本地清理+归档清单代码已具备；Paperless 实机联调、恢复演练与抽样核对尚未执行 |
 | C.3 | 角色化项目工作台 | ✅ 已有 | ManagementDashboard（合伙人）+ ProjectDashboard（经理）+ PersonalDashboard（审计员）已在 Phase 9 实现 |
 | C.4 | 多代代码治理 | ⚠️ 部分完成 | token统一已修、32个死代码路由已标记、路径口径不统一已记录（breaking change不改） |
-| C.5 | 可观测性与测试保障 | ✅ 已完成 | 结构化日志+request_id追踪+Web Vitals+143个测试+灾备脚本 |
-| C.6 | 文件存储与灾备 | ✅ 已完成 | 三阶段架构（本地+Paperless元数据+云端归档）+ 上传双写 + backup.py（RPO=1天/RTO=4小时） |
+| C.5 | 可观测性 | ✅ 代码层已打通 | 结构化日志+request_id追踪+Web Vitals 已接入代码链路；request_id/日志/错误提示已对齐 |
+| C.5b | 测试保障 | ⚠️ 待执行 | 143 个测试资产已存在，但无 pytest / CI 执行记录留存；暂不作为已验收结论 |
+| C.6 | 文件存储与灾备 | ⚠️ 代码完成 | 三阶段架构+上传双写+backup.py 代码已具备；真实“备份→恢复→抽样核对”演练尚未执行 |
 
 ## 复盘校正结论（基于当前代码抽查，以下结论优先于上表）
 
@@ -1537,11 +1538,12 @@
 
 | 项目 | 原结论 | 最终结论 | 说明 |
 |------|--------|---------|------|
-| 项目级权限 | ⚠️ | ✅ 已做实 | 100/108 路由有认证，主链路全部 require_project_access |
+| 项目级权限 | ⚠️ | ⚠️ 部分完成 | 底稿/试算表/adjustments 主链路已接入 require_project_access；附件下载、底稿下载/批量下载等链路仍以 get_current_user 为主，待统一 |
 | 真实用户留痕 | ⚠️ | ✅ 已做实 | 6个路由消除占位UUID + 敏感下载审计日志 |
-| 在线编辑策略 | ⚠️ | ✅ 已做实 | 在线优先+离线兜底双模式，ONLYOFFICE 探测+自动降级 |
-| 运行基线 | ⚠️ | ✅ 已做实 | RequestIDFilter→日志、logRequest→http.ts、4类真实任务接入 |
-| 复核门禁 | ⚠️ | ✅ 已做实 | 状态拆分+后端 submit-review+4项门禁+13个测试 |
+| 在线编辑策略 | ⚠️ | ⚠️ 部分完成 | 双模式页面骨架已落地（在线按钮+降级提示+离线兜底面板）；但 iframe 仍直接指向 /wopi/files/{wpId}，正式 WOPISrc 打开链未对齐；列表页 /wopi/health 探测不等于 Document Server 真正可用 |
+| 运行基线（可观测性） | ⚠️ | ✅ 代码层已打通 | RequestIDFilter 已接入日志配置、logRequest 已接入 http.ts、错误提示带 request_id；代码链路已对齐 |
+| 运行基线（测试验证） | ⚠️ | ⚠️ 待执行 | 53 个测试资产已存在，但无 pytest / CI 实际执行记录留存；暂不作为已验收结论 |
+| 复核门禁 | ⚠️ | ⚠️ 部分完成 | 后端 submit-review 已集中校验 reviewer/QC/批注/AI 四类门禁；但 draft 状态仍可直接提交（未强制 edit_complete 前置）；前端预校验缺 AI 确认项；前后端 status/file_status/review_status 字段尚未全面对齐 |
 | QC 规则 | ⚠️ | ✅ 已修复 | description→message + 11个测试 |
 | 任务中心 | ⚠️ | ✅ 已做实 | 4类真实任务（OCR/解析/归档/AI分析） |
 | 功能成熟度 | ⚠️ | ✅ 已做实 | 导航栏试点/实验标签 + /api/feature-flags/maturity |
