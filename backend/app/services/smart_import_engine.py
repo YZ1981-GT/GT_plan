@@ -2265,32 +2265,47 @@ async def smart_import_streaming(
             _use_calamine = False
 
         if _use_calamine:
-            _prog(12, f"calamine 快速解析 {filename}")
+            _prog(12, f"读取 {filename}（{len(content)/1024/1024:.0f} MB）…")
             try:
                 cal_wb = CalamineWorkbook.from_buffer(content)
-                for sname in cal_wb.sheet_names:
+                total_sheets = len([s for s in cal_wb.sheet_names
+                                    if not any(kw in s.lower() for kw in ("说明", "目录", "封面", "模板"))])
+
+                for si, sname in enumerate(cal_wb.sheet_names):
                     if any(kw in sname.lower() for kw in ("说明", "目录", "封面", "模板")):
                         continue
 
                     sheets_done += 1
-                    cal_data = cal_wb.get_sheet_by_name(sname).to_python()
-                    if not cal_data or len(cal_data) < 2:
-                        continue
+                    sheet = cal_wb.get_sheet_by_name(sname)
+                    total_rows_est = sheet.total_height or 0
 
-                    # 转成 CSV bytes（内存中，不写磁盘）
+                    _prog(12, f"读取 {sname}（约 {total_rows_est:,} 行）…")
+
+                    # 逐行迭代转 CSV（不全量加载到内存）
                     import csv as _csv_mod
                     csv_buf = io.StringIO()
                     writer = _csv_mod.writer(csv_buf)
-                    for row in cal_data:
+                    row_count = 0
+                    for row in sheet.iter_rows():
                         writer.writerow([
                             str(c).strip() if c is not None else ""
                             for c in row
                         ])
+                        row_count += 1
+                        # 每 10 万行更新一次进度
+                        if row_count % 100_000 == 0:
+                            pct = 12 + int(row_count / max(total_rows_est, 1) * 30)
+                            _prog(min(pct, 42), f"读取 {sname}: {row_count:,}/{total_rows_est:,} 行")
+
+                    if row_count < 2:
+                        csv_buf.close()
+                        continue
+
                     csv_bytes = csv_buf.getvalue().encode("utf-8")
                     csv_buf.close()
 
                     csv_filename = f"{filename}[{sname}].csv"
-                    _prog(15, f"导入 {csv_filename} ({len(cal_data)} 行)")
+                    _prog(45, f"写入 {csv_filename}（{row_count:,} 行）…")
 
                     try:
                         csv_result = await _stream_csv_import(
@@ -2317,7 +2332,9 @@ async def smart_import_streaming(
                         diagnostics.append({"file": filename, "sheet": sname,
                                             "status": "error", "message": str(e)})
 
-                continue  # calamine 处理完毕，跳过后面的 openpyxl 路径
+                    del csv_bytes  # 释放内存
+
+                continue
             except Exception as e:
                 logger.warning("calamine 解析失败，降级为 openpyxl: %s", e)
                 # 降级到下面的 openpyxl 路径

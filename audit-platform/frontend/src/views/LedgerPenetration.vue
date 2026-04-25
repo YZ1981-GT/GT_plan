@@ -477,6 +477,9 @@
         <div style="font-size: 12px; color: #999; margin-top: 4px">
           支持多个文件（如余额表 + 多个序时账），自动识别合并
         </div>
+        <div style="font-size: 12px; color: #e6a23c; margin-top: 4px">
+          💡 大文件（>50MB）建议先在 Excel 中另存为 CSV 格式再上传，速度快 10 倍
+        </div>
       </el-upload>
       <div style="margin-top: 12px">
         <span style="font-size: 13px; color: #666">年度：</span>
