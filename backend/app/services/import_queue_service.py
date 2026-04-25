@@ -384,18 +384,33 @@ class ImportQueueService:
         result: dict | None = None,
         year: int | None = None,
     ):
-        await db.rollback()
+        # 先释放内存锁
         ImportQueueService.update_progress(project_id, -1, message, result=result)
-        await ImportQueueService._update_job_batch(
-            batch_id,
-            db,
-            status=ImportStatus.failed,
-            progress=-1,
-            message=message,
-            result=result,
-            year=year,
-        )
         ImportQueueService.release_lock(project_id)
+
+        # rollback 当前事务（可能已 abort）
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
+        # 用独立 session 更新 batch 状态（避免被 abort 的事务影响）
+        try:
+            async with async_session() as fresh_db:
+                batch = await fresh_db.get(ImportBatch, batch_id)
+                if batch:
+                    summary = dict(batch.validation_summary or {})
+                    summary.update({"job": True, "progress": -1, "message": message, "error": message})
+                    if result is not None:
+                        summary["result"] = result
+                    batch.status = ImportStatus.failed
+                    batch.completed_at = datetime.utcnow()
+                    batch.validation_summary = summary
+                    if year is not None and year > 0:
+                        batch.year = year
+                    await fresh_db.commit()
+        except Exception as e:
+            logger.warning("fail_job 更新 batch 失败: %s", e)
 
     @staticmethod
     async def get_status(project_id: UUID, db: AsyncSession) -> Optional[dict]:

@@ -2143,6 +2143,25 @@ async def smart_import_streaming(
 
     CHUNK = 50_000
 
+    async def _batch_insert(table_name: str, columns: list[str], rows: list[dict], batch_id) -> int:
+        """纯 SQLAlchemy 批量 INSERT（不用 COPY，避免事务冲突）。"""
+        if not rows:
+            return 0
+        from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
+        _TBL = {"tb_balance": TbBalance, "tb_ledger": TbLedger,
+                "tb_aux_balance": TbAuxBalance, "tb_aux_ledger": TbAuxLedger}
+        tbl = _TBL[table_name].__table__
+        records = []
+        for row in rows:
+            rec = {"id": _uuid.uuid4(), "project_id": project_id,
+                   "year": year, "import_batch_id": batch_id, "is_deleted": False}
+            for col in columns:
+                rec[col] = row.get(col)
+            records.append(rec)
+        await db.execute(tbl.insert(), records)
+        await db.flush()
+        return len(records)
+
     def _prog(pct: int, msg: str = ""):
         if progress_callback:
             try:
@@ -2471,7 +2490,6 @@ async def smart_import_streaming(
                 continue
 
             # ── 流式逐批读取 + 转换 + COPY 写入 ──
-            from app.services.fast_writer import copy_insert as _copy_insert
 
             # COPY 写入列定义（引用模块常量）
             _LEDGER_COLS = COPY_LEDGER_COLS
@@ -2518,17 +2536,11 @@ async def smart_import_streaming(
                 if dt == "balance":
                     bal, aux_bal = convert_balance_rows(batch_rows)
                     if bal:
-                        n = await _copy_insert(
-                            db, "tb_balance", _BALANCE_COLS, bal,
-                            project_id, year, batches["tb_balance"].id,
-                        )
+                        n = await _batch_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
                         counts["tb_balance"] += n
                         sheet_counts["tb_balance"] += n
                     if aux_bal:
-                        n = await _copy_insert(
-                            db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
-                            project_id, year, batches["tb_aux_balance"].id,
-                        )
+                        n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, aux_bal, batches["tb_aux_balance"].id)
                         counts["tb_aux_balance"] += n
                         sheet_counts["tb_aux_balance"] += n
                     for r in aux_bal:
@@ -2562,28 +2574,19 @@ async def smart_import_streaming(
                                     "aux_dimensions_raw": adim,
                                 })
                     if len(_led_buf) >= CHUNK:
-                        n = await _copy_insert(
-                            db, "tb_ledger", _LEDGER_COLS, _led_buf,
-                            project_id, year, batches["tb_ledger"].id,
-                        )
+                        n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
                         counts["tb_ledger"] += n
                         sheet_counts["tb_ledger"] += n
                         _led_buf.clear()
                     if len(_aux_led_buf) >= CHUNK:
-                        n = await _copy_insert(
-                            db, "tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf,
-                            project_id, year, batches["tb_aux_ledger"].id,
-                        )
+                        n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
                         counts["tb_aux_ledger"] += n
                         sheet_counts["tb_aux_ledger"] += n
                         _aux_led_buf.clear()
 
                 elif dt == "aux_balance":
                     if batch_rows:
-                        n = await _copy_insert(
-                            db, "tb_aux_balance", _AUX_BALANCE_COLS, batch_rows,
-                            project_id, year, batches["tb_aux_balance"].id,
-                        )
+                        n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, batch_rows, batches["tb_aux_balance"].id)
                         counts["tb_aux_balance"] += n
                         sheet_counts["tb_aux_balance"] += n
                     for r in batch_rows:
@@ -2593,10 +2596,7 @@ async def smart_import_streaming(
                 elif dt == "aux_ledger":
                     _aux_led_buf.extend(batch_rows)
                     if len(_aux_led_buf) >= CHUNK:
-                        n = await _copy_insert(
-                            db, "tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf,
-                            project_id, year, batches["tb_aux_ledger"].id,
-                        )
+                        n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
                         counts["tb_aux_ledger"] += n
                         sheet_counts["tb_aux_ledger"] += n
                         _aux_led_buf.clear()
@@ -2616,18 +2616,12 @@ async def smart_import_streaming(
 
             # ── flush 剩余缓冲（COPY） ──
             if _led_buf:
-                n = await _copy_insert(
-                    db, "tb_ledger", _LEDGER_COLS, _led_buf,
-                    project_id, year, batches["tb_ledger"].id,
-                )
+                n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
                 counts["tb_ledger"] += n
                 sheet_counts["tb_ledger"] += n
                 _led_buf.clear()
             if _aux_led_buf:
-                n = await _copy_insert(
-                    db, "tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf,
-                    project_id, year, batches["tb_aux_ledger"].id,
-                )
+                n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
                 counts["tb_aux_ledger"] += n
                 sheet_counts["tb_aux_ledger"] += n
                 _aux_led_buf.clear()
