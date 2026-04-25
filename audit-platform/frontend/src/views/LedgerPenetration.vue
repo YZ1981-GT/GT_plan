@@ -36,6 +36,9 @@
         <el-button size="small" @click="goToImport">
           <el-icon style="margin-right: 2px"><Upload /></el-icon> 导入数据
         </el-button>
+        <el-button size="small" @click="runValidation" :loading="validating" type="warning" plain>
+          <el-icon style="margin-right: 2px"><Warning /></el-icon> 数据校验
+        </el-button>
       </div>
     </div>
 
@@ -555,12 +558,42 @@
       <el-button v-if="importStep === 'done'" type="primary" @click="onImportDone">完成</el-button>
     </template>
   </el-dialog>
+
+  <!-- 数据校验弹窗 -->
+  <el-dialog v-model="validateDialogVisible" title="数据一致性校验" width="700px" append-to-body>
+    <div v-loading="validating" element-loading-text="正在校验...">
+      <div v-if="validateResult">
+        <el-descriptions :column="3" border size="small" style="margin-bottom: 12px">
+          <el-descriptions-item label="余额表科目">{{ validateResult.summary?.balance_count || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="辅助核算科目">{{ validateResult.summary?.aux_account_count || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="序时账科目">{{ validateResult.summary?.ledger_account_count || 0 }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div v-for="(f, idx) in validateResult.findings" :key="idx"
+          style="margin-bottom: 6px; font-size: 13px; display: flex; align-items: flex-start; gap: 6px">
+          <el-tag :type="f.level === 'error' ? 'danger' : f.level === 'warning' ? 'warning' : 'success'" size="small" style="flex-shrink: 0">
+            {{ f.category }}
+          </el-tag>
+          <span :style="{ color: f.level === 'error' ? '#f56c6c' : f.level === 'warning' ? '#e6a23c' : '#67c23a' }">
+            {{ f.message }}
+          </span>
+        </div>
+
+        <div v-if="!validateResult.findings?.length" style="color: #999; text-align: center; padding: 20px">
+          暂无校验结果
+        </div>
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="validateDialogVisible = false">关闭</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, CircleCheck } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, CircleCheck, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
@@ -648,6 +681,27 @@ function goToImport() {
 
 // ── 智能导入 ──
 const importDialogVisible = ref(false)
+
+// ── 数据校验 ──
+const validateDialogVisible = ref(false)
+const validating = ref(false)
+const validateResult = ref<any>(null)
+
+async function runValidation() {
+  validating.value = true
+  validateDialogVisible.value = true
+  validateResult.value = null
+  try {
+    const { data } = await http.get(
+      `/api/projects/${projectId.value}/ledger/validate?year=${selectedYear.value}`
+    )
+    validateResult.value = data.data ?? data
+  } catch {
+    ElMessage.error('校验失败')
+  } finally {
+    validating.value = false
+  }
+}
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
 const importFiles = ref<File[]>([])
 const importYear = ref<number | undefined>(undefined)

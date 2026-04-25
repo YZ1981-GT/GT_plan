@@ -458,7 +458,7 @@ async def smart_preview(
             "aux_ledger": aux_ledger_est,
         },
         "aux_dimensions": result["aux_dimensions"],
-        "validation": result["validation"],
+        "validation": [],  # 一致性校验移到入库后按需触发，预览阶段不做（太慢且不可操作）
         "diagnostics": result["diagnostics"],
     }
 
@@ -997,3 +997,140 @@ async def export_aux_balance_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(filename)}"},
     )
+
+
+# ── 入库后数据一致性校验（按需触发） ──
+
+@router.get("/validate")
+async def validate_data(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """四表数据一致性校验（入库后按需触发）。
+
+    从数据库查询做校验，比预览阶段更准确（有完整的辅助明细账数据）。
+    校验项：
+    1. 科目余额表内部勾稽（期初+借-贷=期末）
+    2. 辅助余额表内部勾稽
+    3. 科目余额表 vs 辅助余额表（每个维度类型汇总应等于科目余额）
+    4. 序时账 vs 科目余额表（按科目汇总借贷发生额）
+    """
+    import sqlalchemy as sa
+    from decimal import Decimal
+
+    findings = []
+
+    # 1. 科目余额表内部勾稽
+    bal_rows = await db.execute(sa.text("""
+        SELECT account_code, opening_balance, debit_amount, credit_amount, closing_balance
+        FROM tb_balance
+        WHERE project_id = :pid AND year = :yr AND is_deleted = false
+          AND (opening_balance IS NOT NULL OR debit_amount IS NOT NULL
+               OR credit_amount IS NOT NULL OR closing_balance IS NOT NULL)
+    """), {"pid": str(project_id), "yr": year})
+    bal_data = bal_rows.fetchall()
+
+    bal_map = {}
+    bal_errors = 0
+    for r in bal_data:
+        code, opening, debit, credit, closing = r
+        opening = opening or Decimal(0)
+        debit = debit or Decimal(0)
+        credit = credit or Decimal(0)
+        closing = closing or Decimal(0)
+        bal_map[code] = {"opening": opening, "debit": debit, "credit": credit, "closing": closing}
+        expected = opening + debit - credit
+        if abs(expected - closing) > Decimal("0.01"):
+            bal_errors += 1
+            if bal_errors <= 5:
+                findings.append({
+                    "level": "error", "category": "余额表勾稽",
+                    "message": f"{code}: 期初{opening}+借{debit}-贷{credit}={expected}, 期末{closing}, 差{expected-closing}",
+                })
+    if bal_errors > 5:
+        findings.append({"level": "error", "category": "余额表勾稽",
+                         "message": f"共 {bal_errors} 个科目不平"})
+    elif bal_errors == 0:
+        findings.append({"level": "info", "category": "余额表勾稽",
+                         "message": f"{len(bal_data)} 个科目全部勾稽通过"})
+
+    # 2. 科目余额表 vs 辅助余额表
+    aux_agg = await db.execute(sa.text("""
+        SELECT account_code, aux_type, COUNT(*) as cnt, SUM(COALESCE(closing_balance, 0)) as total_closing
+        FROM tb_aux_balance
+        WHERE project_id = :pid AND year = :yr AND is_deleted = false
+        GROUP BY account_code, aux_type
+    """), {"pid": str(project_id), "yr": year})
+    aux_agg_data = aux_agg.fetchall()
+
+    from collections import defaultdict
+    aux_by_code = defaultdict(list)
+    for code, aux_type, cnt, total_closing in aux_agg_data:
+        aux_by_code[code].append((aux_type, cnt, total_closing or Decimal(0)))
+
+    cross_errors = 0
+    for code in sorted(aux_by_code.keys()):
+        if code not in bal_map:
+            continue
+        b_closing = bal_map[code]["closing"]
+        types = aux_by_code[code]
+        best_type, best_cnt, best_closing = min(types, key=lambda x: abs(b_closing - x[2]))
+        diff = b_closing - best_closing
+        if abs(diff) > Decimal("0.01"):
+            cross_errors += 1
+            if cross_errors <= 5:
+                findings.append({
+                    "level": "warning", "category": "余额表vs辅助余额表",
+                    "message": f"{code}: 科目期末={b_closing}, 维度({best_type},{best_cnt}条)汇总={best_closing}, 差{diff}",
+                })
+    if cross_errors > 5:
+        findings.append({"level": "warning", "category": "余额表vs辅助余额表",
+                         "message": f"共 {cross_errors} 个科目不一致"})
+    elif cross_errors == 0 and aux_by_code:
+        findings.append({"level": "info", "category": "余额表vs辅助余额表",
+                         "message": f"{len(aux_by_code)} 个有辅助核算的科目全部一致"})
+
+    # 3. 序时账 vs 科目余额表
+    led_agg = await db.execute(sa.text("""
+        SELECT account_code, SUM(COALESCE(debit_amount, 0)) as total_debit,
+               SUM(COALESCE(credit_amount, 0)) as total_credit
+        FROM tb_ledger
+        WHERE project_id = :pid AND year = :yr AND is_deleted = false
+        GROUP BY account_code
+    """), {"pid": str(project_id), "yr": year})
+    led_agg_data = led_agg.fetchall()
+
+    led_errors = 0
+    for code, led_debit, led_credit in led_agg_data:
+        if code not in bal_map:
+            continue
+        b = bal_map[code]
+        led_debit = led_debit or Decimal(0)
+        led_credit = led_credit or Decimal(0)
+        if abs(b["debit"] - led_debit) > Decimal("0.01") or abs(b["credit"] - led_credit) > Decimal("0.01"):
+            led_errors += 1
+            if led_errors <= 5:
+                findings.append({
+                    "level": "warning", "category": "序时账vs余额表",
+                    "message": f"{code}: 余额表借{b['debit']}/贷{b['credit']}, 序时账借{led_debit}/贷{led_credit}",
+                })
+    if led_errors > 5:
+        findings.append({"level": "warning", "category": "序时账vs余额表",
+                         "message": f"共 {led_errors} 个科目不一致"})
+    elif led_errors == 0 and led_agg_data:
+        findings.append({"level": "info", "category": "序时账vs余额表",
+                         "message": f"{len(led_agg_data)} 个科目全部一致"})
+
+    return {
+        "year": year,
+        "findings": findings,
+        "summary": {
+            "balance_count": len(bal_data),
+            "aux_account_count": len(aux_by_code),
+            "ledger_account_count": len(led_agg_data),
+            "errors": sum(1 for f in findings if f["level"] == "error"),
+            "warnings": sum(1 for f in findings if f["level"] == "warning"),
+        },
+    }

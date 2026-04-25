@@ -1467,11 +1467,8 @@ def smart_parse_files(
         for t, c in sorted(_aux_type_counts.items(), key=lambda x: -x[1])
     ]
 
-    # 一致性校验（四表间交叉比对，辅助明细账用空列表——写入后再校验）
-    validation = validate_four_tables(
-        all_balance_rows, all_aux_balance_rows,
-        all_ledger_rows, [],  # 辅助明细账不在内存中
-    )
+    # 一致性校验移到入库后按需触发（预览阶段跳过，632MB CSV 全量校验太慢）
+    validation = []
 
     return {
         "balance_rows": all_balance_rows,
