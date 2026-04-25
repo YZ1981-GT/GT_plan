@@ -529,10 +529,46 @@
             {{ d.data_type || '?' }}
           </el-tag>
           {{ d.file }} / {{ d.sheet }} — {{ d.row_count?.toLocaleString() || 0 }} 行
-          <span v-if="d.balance_count != null" style="color: #409eff">（余额{{ d.balance_count }}, 辅助{{ d.aux_balance_count }}）</span>
-          <span v-if="d.ledger_count != null" style="color: #409eff">（序时账{{ d.ledger_count?.toLocaleString() }}, 辅助{{ d.aux_ledger_count?.toLocaleString() }}）</span>
+          <span v-if="d.missing_cols?.length" style="color: #f56c6c; margin-left: 6px">
+            缺少关键列：{{ d.missing_cols.join('、') }}
+          </span>
+          <span v-if="d.missing_recommended?.length" style="color: #e6a23c; margin-left: 6px">
+            建议补充：{{ d.missing_recommended.join('、') }}
+          </span>
         </div>
       </div>
+
+      <!-- 数据预览（前20行） -->
+      <template v-for="(d, di) in previewResult?.diagnostics" :key="'prev_' + di">
+        <div v-if="d.preview_rows?.length && d.headers?.length" style="margin-bottom: 16px">
+          <div style="font-weight: 600; margin-bottom: 6px; font-size: 13px; color: #303133">
+            {{ d.file }} / {{ d.sheet }} — 前 {{ d.preview_rows.length }} 行预览
+            <el-tag size="small" :type="d.data_type === 'ledger' ? 'primary' : d.data_type === 'balance' ? 'warning' : 'info'" style="margin-left: 6px">
+              {{ d.data_type }}
+            </el-tag>
+          </div>
+          <el-table :data="d.preview_rows" size="small" border max-height="240" style="width: 100%">
+            <el-table-column
+              v-for="h in d.headers"
+              :key="h"
+              :prop="h"
+              :label="h"
+              min-width="120"
+              show-overflow-tooltip
+            >
+              <template #header>
+                <div style="font-size: 11px; line-height: 1.3">
+                  <div>{{ h }}</div>
+                  <div v-if="d.column_mapping?.[h]" style="color: #409eff; font-weight: 600">
+                    → {{ d.column_mapping[h] }}
+                  </div>
+                  <div v-else style="color: #ccc">未映射</div>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </template>
     </div>
 
     <!-- 步骤3：导入中 -->

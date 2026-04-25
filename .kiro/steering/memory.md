@@ -711,7 +711,8 @@ inclusion: always
 - 通用智能导入引擎（2026-04-19）：新增 `backend/app/services/smart_import_engine.py`，替代专用脚本，支持任意企业导出格式——①`detect_header_rows` 自动检测单行/双行合并表头（扫描前8行，关键词匹配+子列名检测）②`merge_header_rows` 合并双行表头为组合列名（如"年初余额_借方金额"→year_opening_debit）③`smart_match_column` 优先匹配合并表头组合名→基础列名→清洗后匹配 ④"核算维度"映射为 aux_dimensions（混合维度列），不映射为 aux_type（避免误判为独立辅助表）⑤`convert_balance_rows` 自动从借贷两列计算净额（不依赖方向列）⑥`validate_aux_consistency` 三项校验（维度存在性/期初+变动=期末/明细账vs余额表发生额）⑦`smart_parse_files` 多文件入口自动检测合并单元格切换完整模式（3.9s打开+0.5s遍历50000行）⑧新增 `POST /ledger/smart-preview`（预览不写库）和 `POST /ledger/smart-import`（解析+写库）两个API端点，支持 custom_mapping 参数手动指定列映射
 - openpyxl read_only 模式限制（2026-04-19）：合并单元格的文件在 read_only 模式下只返回1列（左上角单元格），必须用完整模式打开；完整模式打开50000行文件约4秒，iter_rows遍历约0.5秒，可接受；序时账100万行文件用 read_only 模式无问题（无合并单元格）
 - openpyxl read_only 合并单元格值复制问题（2026-04-23）：read_only模式下合并单元格的值会被复制到所有合并列（如14列全是"科目余额表"），导致detect_header_rows误判第一行为表头、headers全错、data_type=unknown、0条入库；needs_full检测逻辑从"列数≤3"增强为同时检测"同一行≥60%非空值相同且≥3个"的合并单元格特征，自动切换完整模式；smart_parse_files和smart_import_streaming两处均已修复
-- smart_parse_files CSV支持缺失（2026-04-25）：查账页面"导入数据"弹窗调用smart-preview端点→smart_parse_files，该函数完全没有CSV处理（所有文件走openpyxl导致CSV报错被跳过）；新增`_parse_csv_for_preview`函数（流式解码+逐批解析），smart_parse_files文件循环中CSV文件走独立分支
+- smart-preview端点重写为只读表头（2026-04-25，commit fabc11f）：从smart_parse_files（全量读百万行）改为parse_sheet_header_only（只读前几行表头），行数用ws.max_row估算不遍历数据，百万行序时账从几十秒降到秒级；CSV同样只读前64KB；前端doPreview超时120s、doImport超时600s
+- 预览设计原则（2026-04-25 用户明确）：预览只需要表头+前20行数据用于识别四表关键列，不需要全部数据行；主要目的是自动识别表头并让用户确认/编辑列映射
 - uvicorn --reload 与脚本冲突（2026-04-19）：从 backend/ 目录运行 Python 脚本时，uvicorn 的 --reload 文件监控会导致脚本卡死；解决方案：从项目根目录运行（`python -u backend/scripts/xxx.py`）或停止 uvicorn
 - 四表导入偏好（2026-04-19 用户提出）：①每个单位导出格式不同，必须用通用解析规则而非专用脚本 ②辅助核算维度有多个时需要让用户确认（smart-preview 先预览再 smart-import 写入）③辅助余额表和辅助明细账之间要做一致性校对（名称/编号/期初+变动=期末）④年度信息要从文件内容自动提取，支持多文件上传 ⑤解析有问题时支持手动关键列表头对应（custom_mapping 参数）
 - 查账页面导入数据偏好（2026-04-19 用户改回）："导入数据"按钮改回跳转到项目向导科目导入步骤（带returnTo=ledger参数），不用弹窗式智能导入；弹窗代码保留备用

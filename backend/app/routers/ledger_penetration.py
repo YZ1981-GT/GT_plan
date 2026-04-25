@@ -16,6 +16,7 @@ Validates: Requirements 15.1-15.4
 from __future__ import annotations
 
 import io
+import re
 import urllib.parse
 from typing import Optional
 from uuid import UUID
@@ -498,6 +499,35 @@ async def smart_preview(
             if detected_year is None:
                 detected_year = extract_year_from_content([], filename=filename)
 
+            # 前 20 行数据预览
+            csv_preview_rows = []
+            data_lines = lines[header_idx + 1: header_idx + 21]
+            for dl in data_lines:
+                dl = dl.strip()
+                if not dl:
+                    continue
+                row_raw = list(_csv.reader([dl]))[0]
+                padded = row_raw + [''] * max(0, len(headers) - len(row_raw))
+                csv_preview_rows.append({headers[j]: padded[j].strip() for j in range(len(headers))})
+
+            # 内容辅助类型识别
+            if dt == "unknown" and csv_preview_rows:
+                import re as _re
+                _hints: set[str] = set()
+                for row in csv_preview_rows[:10]:
+                    for v in row.values():
+                        if not v:
+                            continue
+                        if _re.match(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}$', v):
+                            _hints.add("has_date")
+                        if _re.match(r'^-?\d+\.?\d*$', v.replace(',', '')):
+                            _hints.add("has_number")
+                if "has_date" in _hints and "has_number" in _hints:
+                    dt = "ledger"
+                elif "has_number" in _hints:
+                    dt = "balance"
+                miss_req, miss_rec = _detect_missing_fields(dt, mapped)
+
             diagnostics.append({
                 "file": filename, "sheet": "CSV", "data_type": dt,
                 "row_count": max(0, total_lines),
@@ -505,6 +535,8 @@ async def smart_preview(
                 "matched_cols": sorted(mapped),
                 "missing_cols": miss_req, "missing_recommended": miss_rec,
                 "column_mapping": col_map,
+                "headers": headers,
+                "preview_rows": csv_preview_rows,
                 "status": "ok" if not miss_req else "warning",
             })
             if dt == "ledger":
@@ -576,6 +608,53 @@ async def smart_preview(
             except Exception:
                 pass
 
+            # 读前 20 行数据供前端预览 + 辅助类型识别
+            preview_rows = []
+            data_start = meta["data_start"]
+            num_cols = meta["num_cols"]
+            headers = meta["headers"]
+            col_map = meta["column_mapping"]
+            try:
+                data_iter = ws.iter_rows(min_row=data_start + 1, max_row=data_start + 20, values_only=True)
+            except TypeError:
+                data_iter = ws.iter_rows(values_only=True)
+                for _ in range(data_start):
+                    try:
+                        next(data_iter)
+                    except StopIteration:
+                        data_iter = iter([])
+                        break
+
+            for row_vals in data_iter:
+                padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
+                if all(c is None for c in padded[:num_cols]):
+                    continue
+                row_dict = {}
+                for ci in range(num_cols):
+                    h = headers[ci]
+                    v = padded[ci]
+                    row_dict[h] = str(v).strip() if v is not None else ""
+                preview_rows.append(row_dict)
+
+            # 根据数据内容辅助修正类型识别（表头映射不够时用内容特征补充）
+            if dt == "unknown" and preview_rows:
+                _content_hints: set[str] = set()
+                for row in preview_rows[:10]:
+                    for h, v in row.items():
+                        if not v:
+                            continue
+                        # 日期特征 → voucher_date
+                        if re.match(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}$', v):
+                            _content_hints.add("has_date")
+                        # 纯数字带小数点 → 金额
+                        if re.match(r'^-?\d+\.?\d*$', v.replace(',', '')):
+                            _content_hints.add("has_number")
+                if "has_date" in _content_hints and "has_number" in _content_hints:
+                    dt = "ledger"
+                elif "has_number" in _content_hints:
+                    dt = "balance"
+                miss_req, miss_rec = _detect_missing_fields(dt, matched)
+
             if detected_year is None and meta.get("year"):
                 detected_year = meta["year"]
 
@@ -586,6 +665,8 @@ async def smart_preview(
                 "matched_cols": sorted(matched),
                 "missing_cols": miss_req, "missing_recommended": miss_rec,
                 "column_mapping": meta["column_mapping"],
+                "headers": headers,
+                "preview_rows": preview_rows,
                 "status": "ok" if not miss_req else "warning",
             })
 
