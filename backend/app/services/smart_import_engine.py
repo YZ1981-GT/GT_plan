@@ -2256,9 +2256,73 @@ async def smart_import_streaming(
             continue  # 跳过后面的 Excel 处理
 
         # ── Excel 文件处理 ──
-        # 优化：最多打开 2 次（完整模式读表头 + read_only 读数据）
-        # 第 1 次：read_only 打开，探测合并单元格 + 读数据（如果不需要完整模式则一次搞定）
-        # 第 2 次：仅在需要完整模式时打开，只读表头后关闭
+        # 快速路径：用 calamine（Rust）读 Excel 转 CSV，再走 _stream_csv_import
+        # calamine 比 openpyxl 快 10-50 倍（百万行从几十秒降到几秒）
+        try:
+            from python_calamine import CalamineWorkbook
+            _use_calamine = True
+        except ImportError:
+            _use_calamine = False
+
+        if _use_calamine:
+            _prog(12, f"calamine 快速解析 {filename}")
+            try:
+                cal_wb = CalamineWorkbook.from_buffer(content)
+                for sname in cal_wb.sheet_names:
+                    if any(kw in sname.lower() for kw in ("说明", "目录", "封面", "模板")):
+                        continue
+
+                    sheets_done += 1
+                    cal_data = cal_wb.get_sheet_by_name(sname).to_python()
+                    if not cal_data or len(cal_data) < 2:
+                        continue
+
+                    # 转成 CSV bytes（内存中，不写磁盘）
+                    import csv as _csv_mod
+                    csv_buf = io.StringIO()
+                    writer = _csv_mod.writer(csv_buf)
+                    for row in cal_data:
+                        writer.writerow([
+                            str(c).strip() if c is not None else ""
+                            for c in row
+                        ])
+                    csv_bytes = csv_buf.getvalue().encode("utf-8")
+                    csv_buf.close()
+
+                    csv_filename = f"{filename}[{sname}].csv"
+                    _prog(15, f"导入 {csv_filename} ({len(cal_data)} 行)")
+
+                    try:
+                        csv_result = await _stream_csv_import(
+                            content=csv_bytes,
+                            filename=csv_filename,
+                            project_id=project_id,
+                            year=year,
+                            batches=batches,
+                            db=db,
+                            custom_mapping=custom_mapping,
+                            seen_codes=seen_codes,
+                            acct_records=acct_records,
+                            by_category=by_category,
+                            counts=counts,
+                            _aux_type_counts=_aux_type_counts,
+                            progress_callback=_prog,
+                            chunk_size=CHUNK,
+                        )
+                        diagnostics.append(csv_result["diag"])
+                        if csv_result.get("errors"):
+                            errors.extend(csv_result["errors"])
+                    except Exception as e:
+                        logger.error("calamine CSV 导入异常: %s", e)
+                        diagnostics.append({"file": filename, "sheet": sname,
+                                            "status": "error", "message": str(e)})
+
+                continue  # calamine 处理完毕，跳过后面的 openpyxl 路径
+            except Exception as e:
+                logger.warning("calamine 解析失败，降级为 openpyxl: %s", e)
+                # 降级到下面的 openpyxl 路径
+
+        # ── openpyxl 降级路径（calamine 不可用或解析失败时） ──
 
         # 探测合并单元格（从文件头部几 KB 判断，不需要打开整个文件）
         needs_full_for_header = False
