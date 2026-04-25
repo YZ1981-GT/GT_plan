@@ -790,7 +790,13 @@ function openImportDialog() {
   importYear.value = selectedYear.value || year.value
   previewResult.value = null
   importedResult.value = null
+  importProgress.value = 0
+  importProgressMsg.value = ''
+  importProgressCounts.value = {}
   uploadRef.value?.clearFiles?.()
+
+  // 打开弹窗时自动释放可能残留的旧锁（静默）
+  http.post(`/api/projects/${projectId.value}/account-chart/import-reset`, {}, { timeout: 3000 }).catch(() => {})
 }
 
 function openImportDialogFromRoute() {
@@ -911,11 +917,24 @@ async function doImport() {
     importProgressMsg.value = '导入完成'
     importStep.value = 'done'
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || e?.message || '导入失败')
+    const status = e?.response?.status
+    const detail = e?.response?.data?.detail || e?.message || '导入失败'
+
+    if (status === 409) {
+      // 锁冲突：自动释放锁并提示重试
+      try {
+        await http.post(`/api/projects/${projectId.value}/account-chart/import-reset`, {}, { timeout: 5000 })
+      } catch { /* 静默 */ }
+      ElMessage.warning('上次导入的锁已自动释放，请重新点击「确认导入」')
+    } else {
+      ElMessage.error(detail)
+    }
     importStep.value = 'preview'
   } finally {
     clearInterval(pollTimer)
     importing.value = false
+    importProgress.value = 0
+    importProgressMsg.value = ''
   }
 }
 
