@@ -18,6 +18,11 @@
       </div>
       <div class="gt-topbar-right">
         <!-- 顶部快捷入口（全局工具） -->
+        <el-tooltip content="重置（清除卡住的导入任务）" placement="bottom">
+          <div class="gt-topbar-btn gt-topbar-btn--danger" @click="handleGlobalReset">
+            <el-icon :size="18"><RefreshRight /></el-icon>
+          </div>
+        </el-tooltip>
         <el-tooltip content="知识库" placement="bottom">
           <div class="gt-topbar-btn" @click="router.push('/knowledge')">
             <el-icon :size="18"><Reading /></el-icon>
@@ -196,11 +201,13 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
-  DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document,
+  DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, RefreshRight,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -377,6 +384,33 @@ function onTouchEnd(e: TouchEvent) {
   }
 }
 
+async function handleGlobalReset() {
+  // 从当前路由提取 projectId（如果在项目子页面）
+  const match = route.path.match(/^\/projects\/([^/]+)/)
+  const pid = match ? match[1] : null
+
+  try {
+    await ElMessageBox.confirm(
+      pid
+        ? '将清除当前项目卡住的导入任务，释放导入锁。\n已入库的数据不受影响。'
+        : '请先进入一个项目再重置。\n\n如需重置特定项目，请在项目详情页操作。',
+      '重置',
+      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+
+  if (!pid) return
+
+  try {
+    await http.post(`/api/projects/${pid}/account-chart/import-reset`)
+    ElMessage.success('已重置')
+  } catch {
+    ElMessage.error('重置失败')
+  }
+}
+
 async function handleLogout() {
   await authStore.logout()
   router.push('/login')
@@ -452,6 +486,8 @@ onUnmounted(() => {
   transition: all var(--gt-transition-fast);
 }
 .gt-topbar-btn:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
+.gt-topbar-btn--danger { color: #f56c6c; }
+.gt-topbar-btn--danger:hover { background: #fef0f0; color: #f56c6c; }
 
 .gt-topbar-divider {
   width: 1px;

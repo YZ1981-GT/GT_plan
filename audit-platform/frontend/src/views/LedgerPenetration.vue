@@ -753,10 +753,10 @@ async function doPreview() {
     const url = `/api/projects/${projectId.value}/ledger/smart-preview` +
       (importYear.value ? `?year=${importYear.value}` : '')
     const { data } = await http.post(url, formData)
-    previewResult.value = data
+    previewResult.value = data?.data ?? data
     importStep.value = 'preview'
   } catch (e: any) {
-    ElMessage.error(e?.message || '解析失败')
+    ElMessage.error(e?.response?.data?.detail || e?.message || '解析失败')
   } finally {
     previewing.value = false
   }
@@ -775,10 +775,11 @@ async function doImport() {
     const url = `/api/projects/${projectId.value}/ledger/smart-import` +
       (yr ? `?year=${yr}` : '')
     const { data } = await http.post(url, formData)
-    importedResult.value = data?.imported || data
+    const result = data?.data ?? data
+    importedResult.value = result?.imported || result?.data_sheets_imported || result
     importStep.value = 'done'
   } catch (e: any) {
-    ElMessage.error(e?.message || '导入失败')
+    ElMessage.error(e?.response?.data?.detail || e?.message || '导入失败')
     importStep.value = 'preview'
   } finally {
     importing.value = false
