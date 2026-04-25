@@ -405,6 +405,8 @@ async function handleGlobalReset() {
 
   try {
     await http.post(`/api/projects/${pid}/account-chart/import-reset`)
+    // 广播全局重置事件，让所有导入相关组件立即恢复状态
+    window.dispatchEvent(new CustomEvent('gt-import-reset', { detail: { projectId: pid } }))
     ElMessage.success('已重置')
   } catch {
     ElMessage.error('重置失败')

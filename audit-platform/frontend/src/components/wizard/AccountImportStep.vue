@@ -344,7 +344,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { UploadFilled, CircleCheckFilled, WarningFilled, Connection, CircleCheck, CircleClose, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile, UploadInstance } from 'element-plus'
@@ -958,7 +958,6 @@ onMounted(async () => {
     const { data } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
     const status = data?.data ?? data
     if (status && status.status === 'processing') {
-      // 有卡住的任务，检查是否超过 10 分钟
       const started = status.started ? new Date(status.started).getTime() : 0
       const elapsed = Date.now() - started
       if (elapsed > 10 * 60 * 1000) {
@@ -969,7 +968,29 @@ onMounted(async () => {
   } catch {
     // 静默
   }
+
+  // 监听顶部栏全局重置事件
+  window.addEventListener('gt-import-reset', _onGlobalReset)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('gt-import-reset', _onGlobalReset)
+})
+
+/** 顶部栏重置按钮触发时，立即恢复本组件所有状态 */
+function _onGlobalReset() {
+  phase.value = 'upload'
+  previewing.value = false
+  importing.value = false
+  importProgress.value = ''
+  previewSheets.value = []
+  activeSheetIdx.value = 0
+  importResult.value = null
+  clientTree.value = null
+  selectedFiles.value = []
+  for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+  uploadRef.value?.clearFiles()
+}
 
 // ── 列映射保存/加载 ──
 

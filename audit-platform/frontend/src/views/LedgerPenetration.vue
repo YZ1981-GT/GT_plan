@@ -1883,6 +1883,7 @@ function onKeyDown(e: KeyboardEvent) {
 }
 onMounted(async () => {
   document.addEventListener('keydown', onKeyDown)
+  window.addEventListener('gt-import-reset', _onGlobalReset)
   await loadProjectList()
   await loadCurrentProject()
   await loadAvailableYears()
@@ -1894,7 +1895,19 @@ onMounted(async () => {
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('gt-import-reset', _onGlobalReset)
 })
+
+/** 顶部栏重置按钮触发时，立即关闭导入弹窗并恢复状态 */
+function _onGlobalReset() {
+  importDialogVisible.value = false
+  importStep.value = 'upload'
+  previewing.value = false
+  importing.value = false
+  importFiles.value = []
+  previewResult.value = null
+  importedResult.value = null
+}
 </script>
 
 <style scoped>
