@@ -298,6 +298,7 @@ inclusion: always
 - 前端TS错误修复（2026-04-25）：audit-platform/frontend 179个TypeScript编译错误全部修复（30个Vue组件，主要集中在consolidation/collaboration），vue-tsc --noEmit 验证0错误；.gitignore新增 `审计报告模板/` 和 `ts_errors.txt`；审计报告模板（12个Word/Excel）从git中移除（本地保留）
 - 代码已推送GitHub（2026-04-25）：3个commit（清理冗余文件+修复179个TS错误+移除审计报告模板），ade8302..a55b3d7
 - 四表导入链路审查与修复（2026-04-25）：7个核心问题全部修复（commit be5d514）——①后端balance/ledger/aux_balance/aux_ledger关键列缺失时阻断导入 ②CSV预览改为走smart_import_engine统一路径 ③前端确认导入按钮增加关键列硬阻断（_REQUIRED_FIELDS_BY_TYPE与后端一致） ④独立辅助表文件支持直接入库 ⑤前端列映射变更后实时重新推断数据类型（_guessDataTypeFrontend） ⑥数据类型标签随映射变更实时更新 ⑦预览和导入解析路径统一
+- Excel大文件流式入库改造（2026-04-25，commit 98f3f22）：smart_import_streaming中Excel处理从smart_parse_sheet（全量读到内存）改为parse_sheet_header_only()+iter_sheet_rows()逐批流式；新增两个函数：parse_sheet_header_only只读表头零内存、iter_sheet_rows生成器每批50000行；百万行序时账峰值内存从~3.5GB降到~100MB；CSV流式处理（_stream_csv_import）保持不变已经是流式的
 - 用户计划对每个细分程序逐一打磨升级
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程

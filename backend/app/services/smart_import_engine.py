@@ -2387,6 +2387,7 @@ async def smart_import_streaming(
                         sname, dt, sorted(matched_fields)[:5])
 
             sheet_row_count = 0
+            sheet_counts: dict[str, int] = {"tb_balance": 0, "tb_aux_balance": 0, "tb_ledger": 0, "tb_aux_ledger": 0}
             bal_tbl = TbBalance.__table__
             aux_bal_tbl = TbAuxBalance.__table__
             led_tbl = TbLedger.__table__
@@ -2396,23 +2397,28 @@ async def smart_import_streaming(
             _led_buf: list[dict] = []
             _aux_led_buf: list[dict] = []
 
+            # 预计算自定义映射的重映射表（提到循环外，避免每批重复计算）
+            _has_custom_remap = bool(sm and matching_keys)
+            _orig_cm: dict[str, str] = {}
+            _handled_keys: set[str] = set()
+            if _has_custom_remap:
+                _orig_cm = {h: meta["column_mapping"].get(h, h) for h in meta["headers"]}
+                _handled_keys = set(_orig_cm.values())
+
             for batch_rows in iter_sheet_rows(ws, meta, batch_size=CHUNK):
                 sheet_row_count += len(batch_rows)
 
                 # 应用自定义映射到数据行（如果有）
-                if sm and matching_keys:
-                    orig_cm = {h: meta["column_mapping"].get(h, h) for h in meta["headers"]}
+                if _has_custom_remap:
                     remapped = []
                     for row in batch_rows:
                         nr: dict = {}
                         for h in meta["headers"]:
-                            ck = orig_cm.get(h, h)
+                            ck = _orig_cm.get(h, h)
                             if ck in row:
                                 nr[meta["column_mapping"].get(h, ck)] = row[ck]
-                        # 保留未映射的字段
-                        handled = set(orig_cm.values())
                         for k, v in row.items():
-                            if k not in handled:
+                            if k not in _handled_keys:
                                 nr[k] = v
                         remapped.append(nr)
                     batch_rows = remapped
@@ -2425,12 +2431,14 @@ async def smart_import_streaming(
                                  "is_deleted": False, **r} for r in bal]
                         await db.execute(bal_tbl.insert(), recs)
                         counts["tb_balance"] += len(recs)
+                        sheet_counts["tb_balance"] += len(recs)
                     if aux_bal:
                         recs = [{"id": _uuid.uuid4(), "project_id": project_id,
                                  "year": year, "import_batch_id": batches["tb_aux_balance"].id,
                                  "is_deleted": False, **r} for r in aux_bal]
                         await db.execute(aux_bal_tbl.insert(), recs)
                         counts["tb_aux_balance"] += len(recs)
+                        sheet_counts["tb_aux_balance"] += len(recs)
                     for r in aux_bal:
                         t = r.get("aux_type", "?")
                         _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
@@ -2512,20 +2520,22 @@ async def smart_import_streaming(
             if _led_buf:
                 await db.execute(led_tbl.insert(), _led_buf)
                 counts["tb_ledger"] += len(_led_buf)
+                sheet_counts["tb_ledger"] += len(_led_buf)
                 _led_buf.clear()
             if _aux_led_buf:
                 await db.execute(aux_led_tbl.insert(), _aux_led_buf)
                 counts["tb_aux_ledger"] += len(_aux_led_buf)
+                sheet_counts["tb_aux_ledger"] += len(_aux_led_buf)
                 _aux_led_buf.clear()
             await db.flush()
 
             diag["row_count"] = sheet_row_count
             if dt == "balance":
-                diag["balance_count"] = counts.get("tb_balance", 0)
-                diag["aux_balance_count"] = counts.get("tb_aux_balance", 0)
+                diag["balance_count"] = sheet_counts["tb_balance"]
+                diag["aux_balance_count"] = sheet_counts["tb_aux_balance"]
             elif dt == "ledger":
-                diag["ledger_count"] = counts.get("tb_ledger", 0)
-                diag["aux_ledger_count"] = counts.get("tb_aux_ledger", 0)
+                diag["ledger_count"] = sheet_counts["tb_ledger"]
+                diag["aux_ledger_count"] = sheet_counts["tb_aux_ledger"]
             elif dt == "aux_balance":
                 diag["aux_balance_count"] = sheet_row_count
             elif dt == "aux_ledger":
