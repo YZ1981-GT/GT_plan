@@ -428,6 +428,21 @@ async def import_client_chart(
         raise
 
 
+@router.post("/{project_id}/account-chart/import-reset")
+async def reset_import(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """强制释放导入锁 + 清理卡住的任务。
+
+    用于上传中断后前端自动恢复，或用户手动重置。
+    """
+    from app.services.import_queue_service import ImportQueueService
+    msg = await ImportQueueService.force_release(project_id, db)
+    return {"message": msg}
+
+
 @router.post("/{project_id}/account-chart/import-async")
 async def import_async(
     project_id: UUID,

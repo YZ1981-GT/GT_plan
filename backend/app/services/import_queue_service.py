@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # 全局导入锁（project_id -> 导入状态）
 _import_locks: dict[str, dict] = {}
 _MAX_CONCURRENT_IMPORTS = 3  # 最大并发导入数
-_STALE_IMPORT_TIMEOUT = timedelta(hours=4)
+_STALE_IMPORT_TIMEOUT = timedelta(minutes=30)  # 30分钟无进度视为卡死
 IMPORT_JOB_DATA_TYPE = "__smart_import_job__"
 
 
@@ -287,6 +287,35 @@ class ImportQueueService:
     def release_lock(project_id: UUID):
         """释放导入锁。"""
         _import_locks.pop(str(project_id), None)
+
+    @staticmethod
+    async def force_release(project_id: UUID, db: AsyncSession) -> str:
+        """强制释放导入锁 + 将卡住的 batch 标记为 failed。
+
+        用于上传中断后前端自动恢复。
+        """
+        pid = str(project_id)
+        _import_locks.pop(pid, None)
+
+        # 将该项目所有 processing 状态的 job batch 标记为 failed
+        result = await db.execute(
+            select(ImportBatch).where(
+                ImportBatch.project_id == project_id,
+                ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
+                ImportBatch.status == ImportStatus.processing,
+            )
+        )
+        stale_batches = result.scalars().all()
+        for batch in stale_batches:
+            batch.status = ImportStatus.failed
+            batch.completed_at = datetime.utcnow()
+            if batch.validation_summary and isinstance(batch.validation_summary, dict):
+                batch.validation_summary["error"] = "导入被中断，已自动清理"
+            else:
+                batch.validation_summary = {"error": "导入被中断，已自动清理"}
+        if stale_batches:
+            await db.commit()
+        return f"已释放锁，清理 {len(stale_batches)} 个卡住的任务"
 
     @staticmethod
     def update_progress(project_id: UUID, progress: int, message: str = "", result: dict | None = None):

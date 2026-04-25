@@ -878,8 +878,9 @@ async function handlePreview() {
     }
 
     phase.value = 'preview'
-  } catch {
-    // Error handled by http interceptor
+  } catch (err: any) {
+    const errMsg = err?.response?.data?.detail || err?.message || '文件预览失败'
+    ElMessage.error(errMsg)
   } finally {
     previewing.value = false
   }
@@ -895,6 +896,36 @@ function handleReupload() {
   for (const key of Object.keys(columnMapping)) delete columnMapping[key]
   uploadRef.value?.clearFiles()
 }
+
+/** 释放后端导入锁（上传中断/超时后自动调用） */
+async function _resetImportLock() {
+  if (!wizardStore.projectId) return
+  try {
+    await http.post(`/api/projects/${wizardStore.projectId}/account-chart/import-reset`)
+  } catch {
+    // 静默失败——锁会在 30 分钟后自动过期
+  }
+}
+
+// 页面加载时检查是否有卡住的导入任务，自动清理
+onMounted(async () => {
+  if (!wizardStore.projectId) return
+  try {
+    const { data } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+    const status = data?.data ?? data
+    if (status && status.status === 'processing') {
+      // 有卡住的任务，检查是否超过 10 分钟
+      const started = status.started ? new Date(status.started).getTime() : 0
+      const elapsed = Date.now() - started
+      if (elapsed > 10 * 60 * 1000) {
+        await _resetImportLock()
+        ElMessage.warning('检测到上次导入未完成，已自动清理，可重新导入')
+      }
+    }
+  } catch {
+    // 静默
+  }
+})
 
 // ── 列映射保存/加载 ──
 
@@ -1080,6 +1111,18 @@ async function handleImport() {
 
   importing.value = true
 
+  // 超时保护：5 分钟无响应自动恢复（防止页面永久卡死）
+  const IMPORT_TIMEOUT_MS = 5 * 60 * 1000
+  const timeoutTimer = setTimeout(() => {
+    if (importing.value) {
+      importing.value = false
+      importProgress.value = ''
+      ElMessage.error('导入超时（超过 5 分钟无响应），请检查网络后重试')
+      // 尝试释放后端锁
+      _resetImportLock()
+    }
+  }, IMPORT_TIMEOUT_MS)
+
   // 启动进度轮询
   const pollTimer = setInterval(async () => {
     try {
@@ -1138,9 +1181,12 @@ async function handleImport() {
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
       )
-      // 等待后台任务完成
+      // 等待后台任务完成（最多轮询 150 次 = 5 分钟）
       let done = false
-      while (!done) {
+      let pollCount = 0
+      const MAX_POLLS = 150
+      while (!done && pollCount < MAX_POLLS) {
+        pollCount++
         await new Promise(r => setTimeout(r, 2000))
         try {
           const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
@@ -1167,6 +1213,10 @@ async function handleImport() {
           if (e instanceof Error && e.message.includes('导入失败')) throw e
           done = true
         }
+      }
+      // 轮询超时检测
+      if (pollCount >= MAX_POLLS && !finalResult) {
+        throw new Error('异步导入超时（超过 5 分钟），请刷新页面后重试')
       }
     } else {
       // 同步导入
@@ -1210,10 +1260,15 @@ async function handleImport() {
 
     phase.value = 'result'
     await loadClientTree()
-  } catch {
-    // Error handled by http interceptor
+  } catch (err: any) {
+    // 导入失败：显示错误信息 + 自动释放后端锁
+    const errMsg = err?.response?.data?.detail || err?.message || '导入失败，请重试'
+    ElMessage.error(errMsg)
+    // 尝试释放后端锁（防止下次导入返回 409）
+    await _resetImportLock()
   } finally {
     clearInterval(pollTimer)
+    clearTimeout(timeoutTimer)
     importing.value = false
     importProgress.value = ''
   }
