@@ -1861,7 +1861,26 @@ async def _stream_csv_import(
     import codecs
     import csv
     import uuid as _uuid
-    from app.services.fast_writer import copy_insert
+
+    async def _do_insert(table_name: str, columns: list[str], rows: list[dict], batch_id) -> int:
+        """纯 SQLAlchemy 批量 INSERT（不用 COPY，避免事务冲突）。"""
+        if not rows:
+            return 0
+        from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
+        _TBL = {"tb_balance": TbBalance, "tb_ledger": TbLedger,
+                "tb_aux_balance": TbAuxBalance, "tb_aux_ledger": TbAuxLedger}
+        tbl = _TBL[table_name].__table__
+        import uuid as _u
+        records = []
+        for row in rows:
+            rec = {"id": _u.uuid4(), "project_id": project_id,
+                   "year": year, "import_batch_id": batch_id, "is_deleted": False}
+            for col in columns:
+                rec[col] = row.get(col)
+            records.append(rec)
+        await db.execute(tbl.insert(), records)
+        await db.flush()
+        return len(records)
 
     def _prog(pct, msg=""):
         if progress_callback:
@@ -1994,39 +2013,24 @@ async def _stream_csv_import(
                         })
 
             if led_rows:
-                n = await copy_insert(
-                    db, "tb_ledger", _LEDGER_COLS, led_rows,
-                    project_id, year, batches["tb_ledger"].id,
-                )
+                n = await _do_insert("tb_ledger", _LEDGER_COLS, led_rows, batches["tb_ledger"].id)
                 counts["tb_ledger"] += n
             if aux_rows:
-                n = await copy_insert(
-                    db, "tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows,
-                    project_id, year, batches["tb_aux_ledger"].id,
-                )
+                n = await _do_insert("tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows, batches["tb_aux_ledger"].id)
                 counts["tb_aux_ledger"] += n
 
         elif dt == "balance":
             bal, aux_bal = convert_balance_rows(rows)
             if bal:
-                n = await copy_insert(
-                    db, "tb_balance", _BALANCE_COLS, bal,
-                    project_id, year, batches["tb_balance"].id,
-                )
+                n = await _do_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
                 counts["tb_balance"] += n
             if aux_bal:
-                n = await copy_insert(
-                    db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
-                    project_id, year, batches["tb_aux_balance"].id,
-                )
+                n = await _do_insert("tb_aux_balance", _AUX_BALANCE_COLS, aux_bal, batches["tb_aux_balance"].id)
                 counts["tb_aux_balance"] += n
 
         elif dt == "aux_balance":
             if rows:
-                n = await copy_insert(
-                    db, "tb_aux_balance", _AUX_BALANCE_COLS, rows,
-                    project_id, year, batches["tb_aux_balance"].id,
-                )
+                n = await _do_insert("tb_aux_balance", _AUX_BALANCE_COLS, rows, batches["tb_aux_balance"].id)
                 counts["tb_aux_balance"] += n
             for r in rows:
                 t = r.get("aux_type", "?")
@@ -2034,10 +2038,7 @@ async def _stream_csv_import(
 
         elif dt == "aux_ledger":
             if rows:
-                n = await copy_insert(
-                    db, "tb_aux_ledger", _AUX_LEDGER_COLS, rows,
-                    project_id, year, batches["tb_aux_ledger"].id,
-                )
+                n = await _do_insert("tb_aux_ledger", _AUX_LEDGER_COLS, rows, batches["tb_aux_ledger"].id)
                 counts["tb_aux_ledger"] += n
 
         # 提取科目
