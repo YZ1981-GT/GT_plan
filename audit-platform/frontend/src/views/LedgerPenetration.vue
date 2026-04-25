@@ -459,8 +459,8 @@
     :close-on-press-escape="!previewing && !importing"
     :show-close="!previewing && !importing"
   >
-    <div v-loading="previewing || importing"
-         :element-loading-text="previewing ? '正在解析文件，请稍候...' : importing ? '正在导入数据，请稍候...' : ''"
+    <div v-loading="previewing"
+         :element-loading-text="'正在解析文件，请稍候...'"
          element-loading-background="rgba(255,255,255,0.85)">
     <!-- 步骤1：上传文件 -->
     <div v-if="importStep === 'upload'">
@@ -584,21 +584,31 @@
     </div>
 
     <!-- 步骤3：导入中 -->
-    <div v-if="importStep === 'importing'" style="text-align: center; padding: 30px 0">
+    <div v-if="importStep === 'importing'" style="padding: 24px 16px">
+      <div style="font-weight: 600; font-size: 16px; color: #303133; margin-bottom: 16px; text-align: center">
+        正在导入数据
+      </div>
       <el-progress
         :percentage="importProgress"
-        :stroke-width="20"
+        :stroke-width="26"
         :text-inside="true"
-        :status="importProgress >= 100 ? 'success' : ''"
-        style="max-width: 500px; margin: 0 auto"
+        :format="(pct: number) => `${pct}%`"
+        :color="[
+          { color: '#909399', percentage: 10 },
+          { color: '#e6a23c', percentage: 50 },
+          { color: '#409eff', percentage: 80 },
+          { color: '#67c23a', percentage: 100 },
+        ]"
+        style="margin-bottom: 16px"
       />
-      <div style="margin-top: 12px; color: #666; font-size: 13px">{{ importProgressMsg || '正在写入数据库…' }}</div>
-      <div style="margin-top: 6px; color: #999; font-size: 12px">
-        已写入：
-        <span v-if="importProgressCounts.tb_balance">余额表 {{ importProgressCounts.tb_balance.toLocaleString() }} 条 </span>
-        <span v-if="importProgressCounts.tb_ledger">序时账 {{ importProgressCounts.tb_ledger.toLocaleString() }} 条 </span>
-        <span v-if="importProgressCounts.tb_aux_balance">辅助余额 {{ importProgressCounts.tb_aux_balance.toLocaleString() }} 条 </span>
-        <span v-if="importProgressCounts.tb_aux_ledger">辅助明细 {{ importProgressCounts.tb_aux_ledger.toLocaleString() }} 条 </span>
+      <div style="text-align: center; color: #409eff; font-size: 14px; font-weight: 500; margin-bottom: 8px">
+        {{ importProgressMsg || '准备中…' }}
+      </div>
+      <div v-if="Object.keys(importProgressCounts).length > 0" style="text-align: center; font-size: 13px; color: #666; background: #f5f7fa; border-radius: 6px; padding: 10px; margin-top: 8px">
+        <span v-if="importProgressCounts.tb_balance" style="margin-right: 16px">📊 余额表 <b>{{ importProgressCounts.tb_balance.toLocaleString() }}</b> 条</span>
+        <span v-if="importProgressCounts.tb_ledger" style="margin-right: 16px">📝 序时账 <b>{{ importProgressCounts.tb_ledger.toLocaleString() }}</b> 条</span>
+        <span v-if="importProgressCounts.tb_aux_balance" style="margin-right: 16px">📋 辅助余额 <b>{{ importProgressCounts.tb_aux_balance.toLocaleString() }}</b> 条</span>
+        <span v-if="importProgressCounts.tb_aux_ledger">📄 辅助明细 <b>{{ importProgressCounts.tb_aux_ledger.toLocaleString() }}</b> 条</span>
       </div>
     </div>
 

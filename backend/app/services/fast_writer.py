@@ -111,9 +111,16 @@ async def copy_insert(
             written += count
         except Exception as e:
             logger.warning("COPY 失败，降级为 INSERT: %s", e)
-            # 降级为普通 INSERT
+            # COPY 失败后事务已 abort，必须先 rollback 再降级
+            try:
+                await asyncpg_conn.execute("ROLLBACK")
+                await asyncpg_conn.execute("BEGIN")
+            except Exception:
+                pass
+            # 降级为普通 INSERT（通过 SQLAlchemy 执行）
             import sqlalchemy as sa
             tbl = sa.table(table_name, *[sa.column(c) for c in all_columns])
+            insert_records = []
             for row in chunk:
                 rec = {
                     "id": _uuid.uuid4(), "project_id": project_id,
@@ -121,7 +128,12 @@ async def copy_insert(
                 }
                 for col in columns:
                     rec[col] = row.get(col)
-                await db_session.execute(tbl.insert().values(**rec))
+                insert_records.append(rec)
+            # 分批 INSERT（避免单条逐行太慢）
+            IBATCH = 5000
+            for i in range(0, len(insert_records), IBATCH):
+                await db_session.execute(tbl.insert(), insert_records[i:i + IBATCH])
+            await db_session.flush()
             written += len(chunk)
 
         if progress_callback:
