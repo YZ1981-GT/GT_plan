@@ -395,19 +395,40 @@ async function handleGlobalReset() {
     return
   }
 
-  // 尝试释放导入锁（从路由或 localStorage 提取 projectId）
-  const match = route.path.match(/^\/projects\/([^/]+)/)
-  const pid = match?.[1] || localStorage.getItem('gt-last-project-id') || null
-  if (pid) {
-    try {
-      await http.post(`/api/projects/${pid}/account-chart/import-reset`, {}, { timeout: 5000 })
-    } catch {
-      // 静默——后端可能已挂，刷新页面即可
-    }
+  // 先检测后端是否存活
+  let backendAlive = false
+  try {
+    await http.get('/api/health', { timeout: 3000 })
+    backendAlive = true
+  } catch {
+    backendAlive = false
   }
 
-  // 强制刷新页面——杀掉所有 pending 请求、清空所有组件状态
-  window.location.reload()
+  if (backendAlive) {
+    // 后端存活：尝试释放导入锁
+    const match = route.path.match(/^\/projects\/([^/]+)/)
+    const pid = match?.[1] || localStorage.getItem('gt-last-project-id') || null
+    if (pid) {
+      try {
+        await http.post(`/api/projects/${pid}/account-chart/import-reset`, {}, { timeout: 5000 })
+      } catch { /* 静默 */ }
+    }
+    window.location.reload()
+  } else {
+    // 后端不可用：提示用户并刷新（后端 --reload 模式会自动恢复）
+    try {
+      await ElMessageBox.alert(
+        '后端服务不可用（可能因大文件导入导致内存溢出）。\n\n' +
+        '页面将自动刷新，如果后端使用了 --reload 模式会自动恢复。\n' +
+        '如果刷新后仍然报错，请在终端手动重启后端：\n\n' +
+        'cd backend\n' +
+        'python -m uvicorn app.main:app --host 0.0.0.0 --port 9980 --reload',
+        '后端服务不可用',
+        { confirmButtonText: '刷新页面', type: 'error' },
+      )
+    } catch { /* 用户关闭弹窗 */ }
+    window.location.reload()
+  }
 }
 
 async function handleLogout() {

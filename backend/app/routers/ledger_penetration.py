@@ -745,14 +745,25 @@ async def smart_import(
 
     try:
         file_contents = []
+        total_size = 0
         for f in files:
             if not f.filename:
                 continue
             content = await f.read()
+            total_size += len(content)
             file_contents.append((f.filename, content))
 
         if not file_contents:
             raise HTTPException(status_code=400, detail="未提供文件")
+
+        # 内存保护：文件总大小超过 800MB 时拒绝（防止 OOM 杀死后端）
+        if total_size > 800 * 1024 * 1024:
+            ImportQueueService.release_lock(project_id)
+            raise HTTPException(
+                status_code=413,
+                detail=f"文件总大小 {total_size / 1024 / 1024:.0f} MB 超过限制（800MB），"
+                       f"请通过项目向导的数据导入步骤上传（支持异步处理大文件）",
+            )
 
         mapping = None
         if custom_mapping:
