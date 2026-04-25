@@ -685,12 +685,30 @@ async def smart_preview(
         from datetime import datetime as _dt
         detected_year = _dt.now().year - 1
 
+    # 估算辅助表行数：如果余额表/序时账含核算维度列，辅助行数≈主表行数
+    for d in diagnostics:
+        cm_vals = set((d.get("column_mapping") or {}).values())
+        if d.get("data_type") == "balance" and "aux_dimensions" in cm_vals:
+            summary["aux_balance"] += d.get("row_count", 0)
+        elif d.get("data_type") == "ledger" and "aux_dimensions" in cm_vals:
+            summary["aux_ledger"] += d.get("row_count", 0)
+
+    # 把 column_mapping 的英文值替换为中文标签（前端展示用）
+    from app.services.smart_import_engine import FIELD_LABELS
+    for d in diagnostics:
+        cm = d.get("column_mapping")
+        if cm:
+            d["column_mapping_labels"] = {
+                h: FIELD_LABELS.get(v, v) for h, v in cm.items()
+            }
+
     return {
         "year": detected_year,
         "summary": summary,
-        "aux_dimensions": [],  # 预览阶段不扫描维度（需要读全部数据行）
+        "aux_dimensions": [],
         "validation": [],
         "diagnostics": diagnostics,
+        "field_labels": FIELD_LABELS,  # 供前端下拉选择用
     }
 
 

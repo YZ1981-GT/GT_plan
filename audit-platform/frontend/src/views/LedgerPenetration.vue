@@ -552,17 +552,29 @@
               v-for="h in d.headers"
               :key="h"
               :prop="h"
-              :label="h"
-              min-width="120"
+              min-width="140"
               show-overflow-tooltip
             >
               <template #header>
-                <div style="font-size: 11px; line-height: 1.3">
-                  <div>{{ h }}</div>
-                  <div v-if="d.column_mapping?.[h]" style="color: #409eff; font-weight: 600">
-                    → {{ d.column_mapping[h] }}
-                  </div>
-                  <div v-else style="color: #ccc">未映射</div>
+                <div style="font-size: 11px; line-height: 1.4">
+                  <div style="color: #606266">{{ h }}</div>
+                  <el-select
+                    :model-value="d.column_mapping?.[h] || ''"
+                    size="small"
+                    placeholder="(忽略)"
+                    clearable
+                    filterable
+                    style="width: 100%; margin-top: 2px"
+                    @change="(val: string) => onMappingChange(di, h, val)"
+                  >
+                    <el-option label="(忽略)" value="" />
+                    <el-option
+                      v-for="(label, field) in (previewResult?.field_labels || {})"
+                      :key="field"
+                      :label="label"
+                      :value="field"
+                    />
+                  </el-select>
                 </div>
               </template>
             </el-table-column>
@@ -798,6 +810,25 @@ async function doPreview() {
   }
 }
 
+/** 用户在预览表格中修改列映射 */
+function onMappingChange(diagIdx: number, header: string, newField: string) {
+  if (!previewResult.value?.diagnostics?.[diagIdx]) return
+  const d = previewResult.value.diagnostics[diagIdx]
+  if (!d.column_mapping) d.column_mapping = {}
+  if (newField) {
+    d.column_mapping[header] = newField
+  } else {
+    delete d.column_mapping[header]
+  }
+  // 同步更新中文标签
+  if (!d.column_mapping_labels) d.column_mapping_labels = {}
+  if (newField && previewResult.value.field_labels) {
+    d.column_mapping_labels[header] = previewResult.value.field_labels[newField] || newField
+  } else {
+    delete d.column_mapping_labels[header]
+  }
+}
+
 async function doImport() {
   if (!importFiles.value.length) return
   importing.value = true
@@ -807,9 +838,31 @@ async function doImport() {
     for (const f of importFiles.value) {
       formData.append('files', f)
     }
+
+    // 收集用户编辑后的列映射（按 sheet 名）
+    const customMapping: Record<string, Record<string, string>> = {}
+    for (const d of (previewResult.value?.diagnostics || [])) {
+      if (d.column_mapping && d.sheet) {
+        const clean: Record<string, string> = {}
+        for (const [h, v] of Object.entries(d.column_mapping)) {
+          if (v) clean[h] = v as string
+        }
+        if (Object.keys(clean).length > 0) {
+          customMapping[d.sheet] = clean
+        }
+      }
+    }
+
     const yr = previewResult.value?.year || importYear.value
-    const url = `/api/projects/${projectId.value}/ledger/smart-import` +
-      (yr ? `?year=${yr}` : '')
+    let url = `/api/projects/${projectId.value}/ledger/smart-import`
+    const params = new URLSearchParams()
+    if (yr) params.set('year', String(yr))
+    if (Object.keys(customMapping).length > 0) {
+      params.set('custom_mapping', JSON.stringify(customMapping))
+    }
+    const qs = params.toString()
+    if (qs) url += `?${qs}`
+
     const { data } = await http.post(url, formData, { timeout: 600000 })
     const result = data?.data ?? data
     importedResult.value = result?.imported || result?.data_sheets_imported || result
