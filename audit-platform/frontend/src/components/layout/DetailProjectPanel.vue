@@ -62,6 +62,10 @@
                 <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
                 <span>查账</span>
               </div>
+              <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport" title="清除卡住的导入任务，释放导入锁">
+                <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
+                <span>重置</span>
+              </div>
               <div class="gt-quick-btn" @click="onCreateNextYear" title="一键创建当年项目（继承上年配置）">
                 <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
                 <span>创建下年</span>
@@ -214,7 +218,7 @@
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -278,6 +282,23 @@ function goTo(page: string) {
 function goToLedgerImport() {
   if (!props.project) return
   router.push({ path: `/projects/${props.project.id}/ledger`, query: { import: '1' } })
+}
+
+async function handleResetImport() {
+  if (!props.project) return
+  try {
+    await ElMessageBox.confirm(
+      '将清除当前项目卡住的导入任务，释放导入锁。\n已入库的数据不受影响。',
+      '确认重置',
+      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
+    )
+    await http.post(`/api/projects/${props.project.id}/account-chart/import-reset`)
+    ElMessage.success('已重置，可重新导入')
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.toString() !== 'cancel') {
+      ElMessage.error('重置失败，请稍后重试')
+    }
+  }
 }
 
 function editProject() {
