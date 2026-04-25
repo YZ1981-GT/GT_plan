@@ -455,7 +455,13 @@
     width="720px"
     append-to-body
     destroy-on-close
+    :close-on-click-modal="!previewing && !importing"
+    :close-on-press-escape="!previewing && !importing"
+    :show-close="!previewing && !importing"
   >
+    <div v-loading="previewing || importing"
+         :element-loading-text="previewing ? '正在解析文件，请稍候...' : importing ? '正在导入数据，请稍候...' : ''"
+         element-loading-background="rgba(255,255,255,0.85)">
     <!-- 步骤1：上传文件 -->
     <div v-if="importStep === 'upload'">
       <el-upload
@@ -545,6 +551,8 @@
         </span>
       </div>
     </div>
+
+    </div><!-- v-loading wrapper -->
 
     <template #footer>
       <el-button v-if="importStep === 'upload'" @click="importDialogVisible = false">取消</el-button>

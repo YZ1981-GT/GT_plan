@@ -709,7 +709,8 @@ inclusion: always
 - import端点统一改用smart_import_engine（2026-04-19）：account_chart.py的import端点不再调用旧的import_client_chart（旧解析器用单行表头，和前端smart_import_engine的合并表头名不匹配导致列映射失效），改为直接用smart_parse_files解析+从结果中提取科目表（余额表+序时账的account_code/name去重）+write_four_tables写入四表
 - 核算维度实际数据分析（2026-04-19 和平药房）：50051行含核算维度，4215种不同维度片段，21种辅助核算类型；绝大多数（4192种）格式为 `类型:编号,名称`；仅3种类型无编号需自动生成（减值方式6条/职工福利事项191条/计提方式3条）；银行账户号码（纯数字无逗号）当作编号和名称相同；parse_aux_dimensions 0个解析错误
 - 辅助余额表与科目余额表的关系（2026-04-25 用户纠正）：核算维度是科目的二级明细，每个维度类型下所有记录汇总应该等于科目余额；一致性校验必须如实报出所有差异，不能跳过或容忍大差异；之前"差异率>50%跳过"的逻辑已撤回
-- 四表一致性校验重写（2026-04-19）：`validate_aux_consistency` 替换为 `validate_four_tables`，5项校验：①科目余额表内部勾稽 ②辅助余额表内部勾稽 ③科目余额表vs辅助余额表（按科目找最近维度类型比对）④序时账vs科目余额表（按科目汇总发生额）⑤辅助明细账vs辅助余额表（按维度组合汇总）；每类最多展示3条详情+汇总计数
+- 四表一致性校验重写（2026-04-19）：`validate_aux_consistency` 替换为 `validate_four_tables`，5项校验：①科目余额表内部勾稽 ②辅助余额表内部勾稽 ③科目余额表vs辅助余额表（按科目找最近维度类型比对）④序时账vs科目余额表（按科目汇总发生额）⑤辅助明细账vs辅助余额表（按维度组合汇总）；每类最多展示5条详情+汇总计数
+- 一致性校验架构改为入库后按需触发（2026-04-25）：预览阶段去掉validate_four_tables调用（632MB CSV全量校验太慢且不可操作），smart_parse_files和smart-preview端点返回validation=[]；新增`GET /ledger/validate`端点从数据库SQL聚合做校验（3项：余额表勾稽/余额表vs辅助余额表/序时账vs余额表），前端查账页面新增"数据校验"按钮+弹窗展示结果
 - 大数据量处理优化（2026-04-19）：辅助明细账270万行约315MB内存；校验时>50万行改为抽样前10万行；写入时每5万行flush一次减少事务压力；和平药房实测：余额表50000行+序时账114万行解析约18秒
 - 辅助明细账流式写入优化（2026-04-19 复盘）：convert_ledger_rows不再在内存中生成辅助明细账行（之前273万行占3.2GB），改为只返回序时账行（带_aux_dim_str原始维度字符串）+维度统计；write_four_tables中边遍历序时账边拆分维度边写入辅助明细账（buffer满10000条flush），内存从4.4GB降到1.2GB（减少74%）
 - 四表查询性能基准（2026-04-19 和平药房实测）：tb_balance 407行/208KB、tb_aux_balance 12.7万行/33MB、tb_ledger 114万行/402MB、tb_aux_ledger 273万行/920MB；新增5个部分索引（idx_tb_ledger_penetrate/idx_tb_aux_ledger_penetrate/idx_tb_aux_balance_account/idx_tb_ledger_voucher/idx_tb_ledger_period，均WHERE is_deleted=false）；穿透索引包含排序列避免外部磁盘排序；分页100条查询从442ms降到4ms（Index Scan 0.066ms），游标分页3ms，COUNT从203ms降到60ms
