@@ -8,6 +8,9 @@ export interface BasicInfo {
   accounting_standard: string
   company_code: string
   template_type: string
+  custom_template_id: string
+  custom_template_name: string
+  custom_template_version: string
   report_scope: string
   parent_company_name: string
   parent_company_code: string
@@ -77,6 +80,20 @@ export const useWizardStore = defineStore('wizard', {
       return !!this.completedSteps[step]
     },
 
+    applyWizardState(state: WizardState) {
+      this.projectId = state.project_id
+      this.stepData = {}
+      this.completedSteps = {}
+      for (const [key, stepInfo] of Object.entries(state.steps)) {
+        this.stepData[key] = stepInfo.data
+        if (stepInfo.completed) {
+          this.completedSteps[key] = true
+        }
+      }
+      const idx = this.stepList.indexOf(state.current_step)
+      if (idx >= 0) this.currentStepIndex = idx
+    },
+
     /** Create project via POST /api/projects */
     async createProject(basicInfo: BasicInfo) {
       this.loading = true
@@ -93,6 +110,15 @@ export const useWizardStore = defineStore('wizard', {
         }
         if (basicInfo.template_type) {
           payload.template_type = basicInfo.template_type
+        }
+        if (basicInfo.template_type === 'custom' && basicInfo.custom_template_id) {
+          payload.custom_template_id = basicInfo.custom_template_id
+          if (basicInfo.custom_template_name) {
+            payload.custom_template_name = basicInfo.custom_template_name
+          }
+          if (basicInfo.custom_template_version) {
+            payload.custom_template_version = basicInfo.custom_template_version
+          }
         }
         if (basicInfo.report_scope) {
           payload.report_scope = basicInfo.report_scope
@@ -127,15 +153,7 @@ export const useWizardStore = defineStore('wizard', {
       try {
         const { data } = await http.get(`/api/projects/${projectId}/wizard`)
         const state: WizardState = data.data ?? data
-        this.projectId = state.project_id
-        for (const [key, stepInfo] of Object.entries(state.steps)) {
-          this.stepData[key] = stepInfo.data
-          if (stepInfo.completed) {
-            this.completedSteps[key] = true
-          }
-        }
-        const idx = this.stepList.indexOf(state.current_step)
-        if (idx >= 0) this.currentStepIndex = idx
+        this.applyWizardState(state)
       } finally {
         this.loading = false
       }
@@ -146,9 +164,9 @@ export const useWizardStore = defineStore('wizard', {
       if (!this.projectId) return
       this.loading = true
       try {
-        await http.put(`/api/projects/${this.projectId}/wizard/${step}`, stepData)
-        this.stepData[step] = { ...stepData }
-        this.completedSteps[step] = true
+        const { data } = await http.put(`/api/projects/${this.projectId}/wizard/${step}`, stepData)
+        const state: WizardState = data.data ?? data
+        this.applyWizardState(state)
       } finally {
         this.loading = false
       }

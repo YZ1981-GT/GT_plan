@@ -8,7 +8,7 @@
           <el-tag type="warning" effect="plain">未审数 — 基于试算表原始数据</el-tag>
         </div>
         <div class="right">
-          <el-select v-model="currentYear" placeholder="选择年度" style="width:120px;margin-right:12px;">
+          <el-select v-model="currentYear" placeholder="选择年度" style="width:120px;margin-right:12px;" @change="loadReport">
             <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
           </el-select>
           <el-button :icon="Refresh" type="primary" :loading="syncLoading" @click="handleRefresh">
@@ -77,21 +77,27 @@ import { useRoute, useRouter } from 'vue-router'
 import { Refresh, Link, List, EditPen, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import ReportTable from '@/components/reports/ReportTable.vue'
-import { auditReports, trialBalance } from '@/api/index.js'
+import { auditReports, trialBalance, getProjectAuditYear } from '@/api/index.js'
 
 const route = useRoute()
 const router = useRouter()
 
 // 项目与年度
 const currentProjectId = computed(() => route.query.project_id || localStorage.getItem('current_project_id') || '')
-const currentYear = ref(parseInt(route.query.year) || new Date().getFullYear())
+const routeYear = computed(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 2000 ? value : null
+})
+const routeType = computed(() => String(route.query.type || 'balance_sheet'))
+const projectYear = ref(null)
+const currentYear = ref(new Date().getFullYear())
 const yearOptions = computed(() => {
-  const y = new Date().getFullYear()
-  return [y, y - 1, y - 2]
+  const baseYear = currentYear.value || projectYear.value || routeYear.value || new Date().getFullYear()
+  return [baseYear, baseYear - 1, baseYear - 2]
 })
 
 // 报表类型
-const activeReportType = ref('balance_sheet')
+const activeReportType = ref(routeType.value)
 const reportData = ref([])
 const tableLoading = ref(false)
 const syncLoading = ref(false)
@@ -100,6 +106,25 @@ const syncResult = ref(null)
 // 穿透
 const drilldownVisible = ref(false)
 const drilldownData = ref([])
+
+async function ensureProjectYear() {
+  if (!currentProjectId.value) {
+    projectYear.value = null
+    currentYear.value = new Date().getFullYear()
+    return
+  }
+  if (routeYear.value !== null) {
+    projectYear.value = null
+    currentYear.value = routeYear.value
+    return
+  }
+  try {
+    projectYear.value = await getProjectAuditYear(currentProjectId.value)
+  } catch {
+    projectYear.value = null
+  }
+  currentYear.value = projectYear.value ?? new Date().getFullYear()
+}
 
 // 获取未审报表
 async function loadReport() {
@@ -170,7 +195,7 @@ async function handleDrilldown(row) {
     drilldownData.value = (result.contributing_accounts || []).map(a => ({
       account_code: a.account_code,
       account_name: a.account_name || '-',
-      amount: a.amount || 0,
+      amount: a.unadjusted_amount ?? a.amount ?? 0,
     }))
   } catch (err) {
     drilldownData.value = []
@@ -215,9 +240,15 @@ const reportTypeLabel = computed(() => {
 })
 
 // 监听参数变化
-watch([currentProjectId, currentYear], () => {
-  loadReport()
-}, { immediate: true })
+watch(
+  () => [currentProjectId.value, routeYear.value, routeType.value],
+  async () => {
+    activeReportType.value = routeType.value
+    await ensureProjectYear()
+    await loadReport()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

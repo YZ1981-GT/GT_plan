@@ -263,7 +263,7 @@ class DisclosureNoteGenerateRequest(BaseModel):
     """生成附注请求"""
     project_id: UUID
     year: int
-    template_type: SourceTemplate = SourceTemplate.soe
+    template_type: str = "soe"
 
 
 # ===================================================================

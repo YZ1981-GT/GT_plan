@@ -5,7 +5,7 @@ Validates: Requirements 1.1-1.8
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -21,6 +21,36 @@ from app.models.core import Project, User
 from app.services import project_wizard_service
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+
+def _extract_project_audit_year(project: Project) -> int | None:
+    wizard_state = project.wizard_state or {}
+    basic_info = (
+        wizard_state.get("steps", {}).get("basic_info", {}).get("data")
+        or wizard_state.get("basic_info", {}).get("data")
+        or {}
+    )
+    raw_year = basic_info.get("audit_year") or basic_info.get("year")
+    try:
+        audit_year = int(raw_year)
+    except (TypeError, ValueError):
+        return None
+    return audit_year if audit_year > 2000 else None
+
+
+def _to_project_response(project: Project) -> ProjectCreateResponse:
+    return ProjectCreateResponse(
+        id=project.id,
+        name=project.name,
+        client_name=project.client_name,
+        audit_year=_extract_project_audit_year(project),
+        project_type=project.project_type.value if project.project_type else None,
+        status=project.status.value,
+        report_scope=project.report_scope,
+        parent_project_id=project.parent_project_id,
+        consol_level=project.consol_level or 1,
+        created_at=project.created_at,
+    )
 
 
 @router.get("", response_model=list[ProjectCreateResponse])
@@ -59,21 +89,32 @@ async def list_projects(
         )
 
     projects = result.scalars().all()
-    return [
-        ProjectCreateResponse(
-            id=p.id,
-            name=p.name,
-            client_name=p.client_name,
-            audit_year=None,
-            project_type=p.project_type.value if p.project_type else None,
-            status=p.status.value,
-            report_scope=p.report_scope,
-            parent_project_id=p.parent_project_id,
-            consol_level=p.consol_level or 1,
-            created_at=p.created_at,
+    return [_to_project_response(p) for p in projects]
+
+
+@router.get("/{project_id}", response_model=ProjectCreateResponse)
+async def get_project(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ProjectCreateResponse:
+    from sqlalchemy import select
+    from app.models.core import ProjectUser
+
+    query = select(Project).where(
+        Project.id == project_id,
+        Project.is_deleted == False,  # noqa: E712
+    )
+    if current_user.role.value not in ("admin", "partner"):
+        query = query.join(ProjectUser, ProjectUser.project_id == Project.id).where(
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
         )
-        for p in projects
-    ]
+    result = await db.execute(query)
+    project = result.scalar_one_or_none()
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return _to_project_response(project)
 
 
 @router.post("", response_model=ProjectCreateResponse)
@@ -87,14 +128,7 @@ async def create_project(
     Validates: Requirements 1.2, 1.3
     """
     project = await project_wizard_service.create_project(data, db)
-    return ProjectCreateResponse(
-        id=project.id,
-        client_name=project.client_name,
-        audit_year=data.audit_year,
-        project_type=project.project_type.value if project.project_type else None,
-        status=project.status.value,
-        created_at=project.created_at,
-    )
+    return _to_project_response(project)
 
 
 @router.get("/{project_id}/wizard", response_model=WizardState)
@@ -153,20 +187,7 @@ async def confirm_project(
     Validates: Requirements 1.7
     """
     project = await project_wizard_service.confirm_project(project_id, db)
-    # 从 wizard_state 提取 audit_year
-    state = await project_wizard_service.get_wizard_state(project_id, db)
-    audit_year = None
-    basic_info = state.steps.get(WizardStep.basic_info.value)
-    if basic_info and basic_info.data:
-        audit_year = basic_info.data.get("audit_year")
-    return ProjectCreateResponse(
-        id=project.id,
-        client_name=project.client_name,
-        audit_year=audit_year,
-        project_type=project.project_type.value if project.project_type else None,
-        status=project.status.value,
-        created_at=project.created_at,
-    )
+    return _to_project_response(project)
 
 
 # ── 删除项目 ──

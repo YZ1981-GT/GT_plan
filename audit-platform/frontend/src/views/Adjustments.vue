@@ -154,18 +154,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
-  reviewAdjustment, getAdjustmentSummary, getAccountDropdown,
+  reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const routeYear = computed(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 2000 ? value : null
+})
+const projectYear = ref<number | null>(null)
+const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -213,6 +218,18 @@ function normalizeAdjustmentType(type: string) {
 
 function formatAdjustmentType(type: string) {
   return normalizeAdjustmentType(type).toUpperCase()
+}
+
+async function ensureProjectYear() {
+  if (routeYear.value !== null) {
+    projectYear.value = null
+    return
+  }
+  try {
+    projectYear.value = await getProjectAuditYear(projectId.value)
+  } catch {
+    projectYear.value = null
+  }
 }
 
 async function fetchEntries() {
@@ -343,11 +360,16 @@ async function batchReview(status: string) {
   fetchSummary()
 }
 
-onMounted(() => {
-  fetchEntries()
-  fetchSummary()
-  fetchAccountOptions()
-})
+watch(
+  () => [projectId.value, routeYear.value],
+  async () => {
+    await ensureProjectYear()
+    await fetchEntries()
+    await fetchSummary()
+    await fetchAccountOptions()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

@@ -16,6 +16,7 @@ from app.models.audit_platform_schemas import (
     ReportLine,
     ReportLineMappingConfirm,
     ReportLineMappingResponse,
+    ReportLineMappingUpdate,
 )
 from app.models.core import User
 from app.services import report_line_mapping_service as svc
@@ -57,6 +58,20 @@ async def get_mappings(
 
 
 @router.put(
+    "/{project_id}/report-line-mapping/{mapping_id}",
+    response_model=ReportLineMappingResponse,
+)
+async def update_mapping(
+    project_id: UUID,
+    mapping_id: UUID,
+    body: ReportLineMappingUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ReportLineMappingResponse:
+    return await svc.update_mapping(project_id, mapping_id, body, db)
+
+
+@router.put(
     "/{project_id}/report-line-mapping/{mapping_id}/confirm",
     response_model=ReportLineMappingResponse,
 )
@@ -89,6 +104,20 @@ async def batch_confirm(
     """
     count = await svc.batch_confirm(project_id, body.mapping_ids, db)
     return {"confirmed_count": count}
+
+
+@router.delete(
+    "/{project_id}/report-line-mapping/{mapping_id}",
+    response_model=dict,
+)
+async def delete_mapping(
+    project_id: UUID,
+    mapping_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    await svc.delete_mapping(project_id, mapping_id, db)
+    return {"deleted": True, "id": str(mapping_id)}
 
 
 @router.post(

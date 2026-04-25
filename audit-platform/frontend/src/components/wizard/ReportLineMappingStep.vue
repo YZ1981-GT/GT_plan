@@ -73,8 +73,16 @@
           <el-tag v-else type="warning" size="small">待确认</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
+          <el-button
+            type="primary"
+            size="small"
+            link
+            @click="handleEdit(row)"
+          >
+            编辑
+          </el-button>
           <el-button
             v-if="!row.is_confirmed"
             type="primary"
@@ -85,13 +93,13 @@
             确认
           </el-button>
           <el-button
-            v-if="!row.is_confirmed"
             type="danger"
             size="small"
             link
-            @click="handleReject(row)"
+            :loading="deletingId === row.id"
+            @click="handleDelete(row)"
           >
-            拒绝
+            {{ row.is_confirmed ? '删除' : '拒绝' }}
           </el-button>
         </template>
       </el-table-column>
@@ -115,12 +123,48 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog append-to-body v-model="showEditDialog" title="编辑报表行次映射" width="520px">
+      <el-form label-width="110px">
+        <el-form-item label="标准科目编码">
+          <el-input v-model="editForm.standard_account_code" disabled />
+        </el-form-item>
+        <el-form-item label="报表类型">
+          <el-select v-model="editForm.report_type" style="width: 100%">
+            <el-option label="资产负债表" value="balance_sheet" />
+            <el-option label="利润表" value="income_statement" />
+            <el-option label="现金流量表" value="cash_flow" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="行次编码">
+          <el-input v-model="editForm.report_line_code" />
+        </el-form-item>
+        <el-form-item label="行次名称">
+          <el-input v-model="editForm.report_line_name" />
+        </el-form-item>
+        <el-form-item label="行次级别">
+          <el-input-number v-model="editForm.report_line_level" :min="1" :max="10" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="父级行次编码">
+          <el-input v-model="editForm.parent_line_code" placeholder="可选" />
+        </el-form-item>
+        <el-form-item label="保存后确认">
+          <el-switch v-model="editForm.is_confirmed" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" :loading="editSaving" @click="handleSaveEdit">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -144,6 +188,17 @@ interface MappingRow {
   created_at: string
 }
 
+interface MappingEditForm {
+  id: string
+  standard_account_code: string
+  report_type: string
+  report_line_code: string
+  report_line_name: string
+  report_line_level: number
+  parent_line_code: string
+  is_confirmed: boolean
+}
+
 // --- State ---
 
 const mappings = ref<MappingRow[]>([])
@@ -153,6 +208,19 @@ const batchConfirming = ref(false)
 const showReferenceCopy = ref(false)
 const sourceCompanyCode = ref('')
 const referenceCopying = ref(false)
+const showEditDialog = ref(false)
+const editSaving = ref(false)
+const deletingId = ref('')
+const editForm = ref<MappingEditForm>({
+  id: '',
+  standard_account_code: '',
+  report_type: 'balance_sheet',
+  report_line_code: '',
+  report_line_name: '',
+  report_line_level: 1,
+  parent_line_code: '',
+  is_confirmed: false,
+})
 
 // --- Computed ---
 
@@ -248,13 +316,76 @@ async function handleConfirm(row: MappingRow) {
   }
 }
 
-async function handleReject(row: MappingRow) {
-  // Soft-delete the rejected mapping (mark as deleted on frontend)
-  const idx = mappings.value.findIndex((m) => m.id === row.id)
-  if (idx >= 0) {
-    mappings.value.splice(idx, 1)
+function handleEdit(row: MappingRow) {
+  editForm.value = {
+    id: row.id,
+    standard_account_code: row.standard_account_code,
+    report_type: row.report_type,
+    report_line_code: row.report_line_code,
+    report_line_name: row.report_line_name,
+    report_line_level: row.report_line_level,
+    parent_line_code: row.parent_line_code || '',
+    is_confirmed: row.is_confirmed,
   }
-  ElMessage.info('已移除该建议')
+  showEditDialog.value = true
+}
+
+async function handleSaveEdit() {
+  if (!props.projectId || !editForm.value.id) return
+  const reportLineCode = editForm.value.report_line_code.trim()
+  const reportLineName = editForm.value.report_line_name.trim()
+  if (!reportLineCode || !reportLineName) {
+    ElMessage.warning('请填写完整的报表行次编码和名称')
+    return
+  }
+  editSaving.value = true
+  try {
+    await http.put(
+      `/api/projects/${props.projectId}/report-line-mapping/${editForm.value.id}`,
+      {
+        report_type: editForm.value.report_type,
+        report_line_code: reportLineCode,
+        report_line_name: reportLineName,
+        report_line_level: editForm.value.report_line_level,
+        parent_line_code: editForm.value.parent_line_code.trim() || null,
+        is_confirmed: editForm.value.is_confirmed,
+      },
+    )
+    showEditDialog.value = false
+    ElMessage.success('映射已更新')
+    await loadMappings()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    editSaving.value = false
+  }
+}
+
+async function handleDelete(row: MappingRow) {
+  if (!props.projectId) return
+  try {
+    await ElMessageBox.confirm(
+      `确定要${row.is_confirmed ? '删除' : '拒绝'}该映射吗？`,
+      '提示',
+      { type: 'warning' },
+    )
+  } catch (err) {
+    if (err === 'cancel' || err === 'close') {
+      return
+    }
+    throw err
+  }
+
+  deletingId.value = row.id
+  try {
+    await http.delete(`/api/projects/${props.projectId}/report-line-mapping/${row.id}`)
+    ElMessage.success(row.is_confirmed ? '映射已删除' : '建议已拒绝')
+    await loadMappings()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    deletingId.value = ''
+  }
 }
 
 async function handleBatchConfirm() {

@@ -19,6 +19,7 @@ from app.models.audit_platform_schemas import (
     WizardStep,
     WizardStepData,
 )
+from app.services.note_template_service import NoteTemplateService
 
 # 步骤依赖链：每个步骤的前置步骤必须已完成
 STEP_ORDER: list[WizardStep] = [
@@ -58,6 +59,80 @@ STEP_DEPENDENCIES: dict[WizardStep, list[WizardStep]] = {
 BASIC_INFO_REQUIRED_FIELDS = ["client_name", "audit_year", "project_type", "accounting_standard"]
 
 
+def _normalize_basic_info(
+    data: BasicInfoSchema,
+    existing_basic_info: dict | None = None,
+) -> tuple[BasicInfoSchema, dict | None]:
+    template_service = NoteTemplateService()
+    if data.template_type != "custom":
+        data.custom_template_id = None
+        data.custom_template_name = None
+        data.custom_template_version = None
+        return data, None
+
+    if not data.custom_template_id:
+        raise HTTPException(status_code=400, detail="选择自定义附注模板时必须提供模板标识")
+
+    existing_snapshot = template_service.get_locked_template_snapshot(existing_basic_info)
+    if existing_snapshot is not None and existing_snapshot.get("id") == data.custom_template_id:
+        locked_snapshot = existing_snapshot
+    else:
+        template = template_service.get_template(data.custom_template_id)
+        if template is None:
+            raise HTTPException(status_code=400, detail="所选自定义附注模板不存在或已失效，请重新选择")
+        locked_snapshot = template_service.build_locked_template_snapshot(template)
+
+    data.custom_template_name = locked_snapshot.get("name") or data.custom_template_name
+    data.custom_template_version = locked_snapshot.get("version") or data.custom_template_version
+    return data, locked_snapshot
+
+
+def _sync_basic_info_to_project(project: Project, data: BasicInfoSchema) -> None:
+    project.name = f"{data.client_name}_{data.audit_year}"
+    project.client_name = data.client_name
+    project.project_type = data.project_type
+    project.manager_id = data.manager_id
+    project.partner_id = data.signing_partner_id
+    project.company_code = data.company_code
+    project.template_type = data.template_type
+    project.report_scope = data.report_scope
+    project.parent_company_name = data.parent_company_name
+    project.parent_company_code = data.parent_company_code
+    project.ultimate_company_name = data.ultimate_company_name
+    project.ultimate_company_code = data.ultimate_company_code
+
+
+def _validate_custom_template_messages(step_data: dict | None) -> list[ValidationMessage]:
+    data = step_data or {}
+    if data.get("template_type") != "custom":
+        return []
+
+    template_service = NoteTemplateService()
+    if template_service.get_locked_template_snapshot(data) is not None:
+        return []
+
+    template_id = data.get("custom_template_id")
+    if not template_id:
+        return [
+            ValidationMessage(
+                field="custom_template_id",
+                message="选择自定义附注模板时必须提供模板标识",
+                severity="error",
+            )
+        ]
+
+    template = template_service.get_template(str(template_id))
+    if template is None:
+        return [
+            ValidationMessage(
+                field="custom_template_id",
+                message="所选自定义附注模板不存在或已失效，请重新选择",
+                severity="error",
+            )
+        ]
+    return []
+
+
 def _build_initial_wizard_state(project_id: UUID) -> dict:
     """构建初始向导状态 JSONB 数据。"""
     state = WizardState(
@@ -95,6 +170,18 @@ async def _get_project_or_404(db: AsyncSession, project_id: UUID) -> Project:
     return project
 
 
+async def _backfill_locked_custom_template_snapshot(project: Project, db: AsyncSession) -> bool:
+    template_service = NoteTemplateService()
+    wizard_state, _, changed = template_service.backfill_locked_template_snapshot(project.wizard_state)
+    if not changed:
+        return False
+
+    project.wizard_state = wizard_state
+    await db.commit()
+    await db.refresh(project)
+    return True
+
+
 # ---------------------------------------------------------------------------
 # create_project
 # ---------------------------------------------------------------------------
@@ -105,26 +192,16 @@ async def create_project(data: BasicInfoSchema, db: AsyncSession) -> Project:
 
     Validates: Requirements 1.2, 1.3
     """
-    project = Project(
-        name=f"{data.client_name}_{data.audit_year}",
-        client_name=data.client_name,
-        project_type=data.project_type,
-        status=ProjectStatus.created,
-        manager_id=data.manager_id,
-        partner_id=data.signing_partner_id,
-        company_code=data.company_code,
-        template_type=data.template_type,
-        report_scope=data.report_scope,
-        parent_company_name=data.parent_company_name,
-        parent_company_code=data.parent_company_code,
-        ultimate_company_name=data.ultimate_company_name,
-        ultimate_company_code=data.ultimate_company_code,
-    )
+    data, custom_template_snapshot = _normalize_basic_info(data)
+    project = Project(status=ProjectStatus.created)
+    _sync_basic_info_to_project(project, data)
     db.add(project)
     await db.flush()  # 获取 project.id
 
     # 初始化 wizard_state，并将 basic_info 步骤数据写入
     basic_info_data = data.model_dump(mode="json")
+    if custom_template_snapshot is not None:
+        basic_info_data["custom_template_snapshot"] = custom_template_snapshot
     state = WizardState(
         project_id=project.id,
         current_step=WizardStep.basic_info,
@@ -155,6 +232,7 @@ async def get_wizard_state(project_id: UUID, db: AsyncSession) -> WizardState:
     Validates: Requirements 1.4, 1.5
     """
     project = await _get_project_or_404(db, project_id)
+    await _backfill_locked_custom_template_snapshot(project, db)
     return _parse_wizard_state(project)
 
 
@@ -194,9 +272,21 @@ async def update_step(
             )
 
     # 更新步骤数据
+    step_data = data
+    if step == WizardStep.basic_info:
+        existing_basic_info = state.steps.get(WizardStep.basic_info.value)
+        basic_info, custom_template_snapshot = _normalize_basic_info(
+            BasicInfoSchema.model_validate(data),
+            existing_basic_info.data if existing_basic_info is not None else None,
+        )
+        step_data = basic_info.model_dump(mode="json")
+        if custom_template_snapshot is not None:
+            step_data["custom_template_snapshot"] = custom_template_snapshot
+        _sync_basic_info_to_project(project, basic_info)
+
     state.steps[step.value] = WizardStepData(
         step=step,
-        data=data,
+        data=step_data,
         completed=True,
     )
     state.current_step = step
@@ -261,10 +351,12 @@ async def validate_step(
                             severity="error",
                         )
                     )
+            messages.extend(_validate_custom_template_messages(step_data.data))
 
     elif step == WizardStep.confirmation:
-        # 确认步骤的依赖已在上面通用逻辑中检查，这里不重复
-        pass
+        basic_info_step = state.steps.get(WizardStep.basic_info.value)
+        if basic_info_step is not None:
+            messages.extend(_validate_custom_template_messages(basic_info_step.data))
 
     return ValidationResult(valid=len(messages) == 0, messages=messages)
 

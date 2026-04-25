@@ -25,6 +25,10 @@
             <span class="info-value">{{ standardLabel }}</span>
           </div>
           <div class="info-row">
+            <span class="info-label">附注模板</span>
+            <span class="info-value">{{ templateLabel }}</span>
+          </div>
+          <div class="info-row">
             <span class="info-label">签字合伙人</span>
             <span class="info-value">{{ basicInfo.signing_partner_id || '—' }}</span>
           </div>
@@ -120,19 +124,44 @@ const STANDARD_MAP: Record<string, string> = {
   government: '政府会计准则',
 }
 
+const TEMPLATE_MAP: Record<string, string> = {
+  soe: '国企版',
+  listed: '上市版',
+  custom: '自定义',
+}
+
 const basicInfo = computed<BasicInfo>(() => {
   return (wizardStore.stepData.basic_info as unknown as BasicInfo) ?? {
     client_name: '',
     audit_year: null,
     project_type: '',
     accounting_standard: '',
-    signing_partner_id: '',
-    manager_id: '',
+    company_code: '',
+    template_type: 'soe',
+    custom_template_id: '',
+    custom_template_name: '',
+    custom_template_version: '',
+    report_scope: 'standalone',
+    parent_company_name: '',
+    parent_company_code: '',
+    ultimate_company_name: '',
+    ultimate_company_code: '',
+    signing_partner_id: null,
+    manager_id: null,
   }
 })
 
 const projectTypeLabel = computed(() => PROJECT_TYPE_MAP[basicInfo.value.project_type] ?? '—')
 const standardLabel = computed(() => STANDARD_MAP[basicInfo.value.accounting_standard] ?? '—')
+const templateLabel = computed(() => {
+  if (basicInfo.value.template_type === 'custom') {
+    const name = basicInfo.value.custom_template_name || TEMPLATE_MAP.custom
+    return basicInfo.value.custom_template_version
+      ? `${name}（${basicInfo.value.custom_template_version}）`
+      : name
+  }
+  return TEMPLATE_MAP[basicInfo.value.template_type] ?? '—'
+})
 
 const teamMembers = computed(() => {
   const ta = wizardStore.stepData.team_assignment as any

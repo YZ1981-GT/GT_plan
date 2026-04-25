@@ -1,5 +1,5 @@
 """附注模版自定义服务
-
+ 
 功能：
 - CRUD 自定义附注模版（按行业/客户）
 - 存储在 ~/.gt_audit_helper/note_templates/custom/
@@ -7,9 +7,10 @@
 
 Validates: Requirements 9.4, 9.5
 """
-
+ 
 from __future__ import annotations
-
+ 
+from copy import deepcopy
 import json
 import shutil
 from datetime import datetime
@@ -166,6 +167,94 @@ class NoteTemplateService:
         path = _get_custom_dir() / f"{template_id}.json"
         path.write_text(json.dumps(template, ensure_ascii=False, indent=2), encoding="utf-8")
         return template
+
+    # ------------------------------------------------------------------
+    # 项目锁定快照
+    # ------------------------------------------------------------------
+
+    def build_locked_template_snapshot(
+        self,
+        template: dict,
+        locked_at: str | None = None,
+    ) -> dict:
+        sections = template.get("sections")
+        return {
+            "id": template.get("id"),
+            "name": template.get("name"),
+            "version": template.get("version"),
+            "description": template.get("description"),
+            "sections": deepcopy(sections) if isinstance(sections, list) else [],
+            "locked_at": locked_at or datetime.now().isoformat(),
+        }
+
+    def get_locked_template_snapshot(self, basic_info: dict | None) -> dict | None:
+        info = basic_info or {}
+        snapshot = info.get("custom_template_snapshot")
+        if not isinstance(snapshot, dict):
+            return None
+
+        sections = snapshot.get("sections")
+        if not isinstance(sections, list):
+            return None
+
+        return {
+            "id": snapshot.get("id") or info.get("custom_template_id"),
+            "name": snapshot.get("name") or info.get("custom_template_name"),
+            "version": snapshot.get("version") or info.get("custom_template_version"),
+            "description": snapshot.get("description"),
+            "sections": deepcopy(sections),
+            "locked_at": snapshot.get("locked_at"),
+        }
+
+    def _get_basic_info_data_ref(self, wizard_state: dict | None) -> dict | None:
+        state = wizard_state if isinstance(wizard_state, dict) else None
+        if state is None:
+            return None
+
+        steps = state.get("steps")
+        if isinstance(steps, dict):
+            basic_step = steps.get("basic_info")
+            if isinstance(basic_step, dict):
+                data = basic_step.get("data")
+                if isinstance(data, dict):
+                    return data
+
+        basic_info = state.get("basic_info")
+        if isinstance(basic_info, dict):
+            data = basic_info.get("data")
+            if isinstance(data, dict):
+                return data
+        return None
+
+    def backfill_locked_template_snapshot(
+        self,
+        wizard_state: dict | None,
+    ) -> tuple[dict | None, dict | None, bool]:
+        state = deepcopy(wizard_state) if isinstance(wizard_state, dict) else None
+        basic_info = self._get_basic_info_data_ref(state)
+        if basic_info is None:
+            return wizard_state, None, False
+
+        locked_snapshot = self.get_locked_template_snapshot(basic_info)
+        if locked_snapshot is not None:
+            return state, locked_snapshot, False
+
+        if basic_info.get("template_type") != "custom":
+            return state, None, False
+
+        template_id = basic_info.get("custom_template_id")
+        if not isinstance(template_id, str) or not template_id:
+            return state, None, False
+
+        template = self.get_template(template_id)
+        if template is None:
+            return state, None, False
+
+        locked_snapshot = self.build_locked_template_snapshot(template)
+        basic_info["custom_template_name"] = locked_snapshot.get("name") or basic_info.get("custom_template_name")
+        basic_info["custom_template_version"] = locked_snapshot.get("version") or basic_info.get("custom_template_version")
+        basic_info["custom_template_snapshot"] = locked_snapshot
+        return state, locked_snapshot, True
 
     # ------------------------------------------------------------------
     # SOE / Listed 模版加载

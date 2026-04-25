@@ -113,19 +113,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
-  listAdjustments,
+  getProjectAuditYear, listAdjustments,
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
 
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const routeYear = computed(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 2000 ? value : null
+})
+const projectYear = ref<number | null>(null)
+const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
 
 const loading = ref(false)
 const recalcLoading = ref(false)
@@ -240,6 +245,18 @@ function statusLabel(s: string) {
   return m[s] || s
 }
 
+async function ensureProjectYear() {
+  if (routeYear.value !== null) {
+    projectYear.value = null
+    return
+  }
+  try {
+    projectYear.value = await getProjectAuditYear(projectId.value)
+  } catch {
+    projectYear.value = null
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -309,21 +326,28 @@ async function onAdjClick(row: TrialBalanceRow, type: string) {
   }
 }
 
-onMounted(fetchData)
+watch(
+  () => [projectId.value, routeYear.value],
+  async () => {
+    await ensureProjectYear()
+    await fetchData()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
-.gt-trial-balance { padding: var(--gt-space-4); }
-.gt-tb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
-.gt-tb-actions { display: flex; gap: var(--gt-space-2); }
-.clickable { cursor: pointer; color: var(--el-color-primary); }
-.clickable:hover { text-decoration: underline; }
-.subtotal-val { font-weight: 600; }
-.gt-tb-balance-indicator { margin-top: var(--gt-space-3); text-align: right; font-size: var(--gt-font-size-base); }
-.gt-tb-balanced { color: var(--gt-color-success); font-weight: 600; }
-.gt-tb-unbalanced { color: var(--gt-color-coral); font-weight: 600; }
+  .gt-trial-balance { padding: var(--gt-space-4); }
+  .gt-tb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+  .gt-tb-actions { display: flex; gap: var(--gt-space-2); }
+  .clickable { cursor: pointer; color: var(--el-color-primary); }
+  .clickable:hover { text-decoration: underline; }
+  .subtotal-val { font-weight: 600; }
+  .gt-tb-balance-indicator { margin-top: var(--gt-space-3); text-align: right; font-size: var(--gt-font-size-base); }
+  .gt-tb-balanced { color: var(--gt-color-success); font-weight: 600; }
+  .gt-tb-unbalanced { color: var(--gt-color-coral); font-weight: 600; }
 
-:deep(.subtotal-row) { background-color: var(--gt-color-primary-bg) !important; font-weight: 600; }
-:deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
-:deep(.highlight-row) { background-color: var(--gt-color-wheat-light) !important; }
+  :deep(.subtotal-row) { background-color: var(--gt-color-primary-bg) !important; font-weight: 600; }
+  :deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
+  :deep(.highlight-row) { background-color: var(--gt-color-wheat-light) !important; }
 </style>

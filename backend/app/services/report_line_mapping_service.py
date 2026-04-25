@@ -22,6 +22,7 @@ from app.models.audit_platform_schemas import (
     ReferenceCopyResult,
     ReportLine,
     ReportLineMappingResponse,
+    ReportLineMappingUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -539,6 +540,90 @@ async def inherit_from_prior_year(
         copied_count=copied_count,
         unmatched_accounts=list(set(unmatched)),
     )
+
+
+# ---------------------------------------------------------------------------
+# update_mapping
+# ---------------------------------------------------------------------------
+
+
+async def update_mapping(
+    project_id: UUID,
+    mapping_id: UUID,
+    data: ReportLineMappingUpdate,
+    db: AsyncSession,
+) -> ReportLineMappingResponse:
+    result = await db.execute(
+        select(ReportLineMapping).where(
+            ReportLineMapping.id == mapping_id,
+            ReportLineMapping.project_id == project_id,
+            ReportLineMapping.is_deleted == False,  # noqa: E712
+        )
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="映射记录不存在")
+
+    report_line_code = data.report_line_code.strip()
+    report_line_name = data.report_line_name.strip()
+    parent_line_code = (
+        data.parent_line_code.strip()
+        if data.parent_line_code and data.parent_line_code.strip()
+        else None
+    )
+    if not report_line_code or not report_line_name:
+        raise HTTPException(status_code=400, detail="报表行次编码和名称不能为空")
+
+    duplicate = await db.execute(
+        select(ReportLineMapping.id).where(
+            ReportLineMapping.project_id == project_id,
+            ReportLineMapping.standard_account_code == record.standard_account_code,
+            ReportLineMapping.report_type == data.report_type,
+            ReportLineMapping.id != mapping_id,
+            ReportLineMapping.is_deleted == False,  # noqa: E712
+        ).limit(1)
+    )
+    if duplicate.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=400, detail="该标准科目在当前报表类型下已存在其他映射")
+
+    record.report_type = data.report_type
+    record.report_line_code = report_line_code
+    record.report_line_name = report_line_name
+    record.report_line_level = data.report_line_level
+    record.parent_line_code = parent_line_code
+    record.mapping_type = ReportLineMappingType.manual
+    record.is_confirmed = data.is_confirmed
+
+    await db.flush()
+    await db.commit()
+    await db.refresh(record)
+    return ReportLineMappingResponse.model_validate(record)
+
+
+# ---------------------------------------------------------------------------
+# delete_mapping
+# ---------------------------------------------------------------------------
+
+
+async def delete_mapping(
+    project_id: UUID,
+    mapping_id: UUID,
+    db: AsyncSession,
+) -> None:
+    result = await db.execute(
+        select(ReportLineMapping).where(
+            ReportLineMapping.id == mapping_id,
+            ReportLineMapping.project_id == project_id,
+            ReportLineMapping.is_deleted == False,  # noqa: E712
+        )
+    )
+    record = result.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="映射记录不存在")
+
+    record.is_deleted = True
+    await db.flush()
+    await db.commit()
 
 
 # ---------------------------------------------------------------------------

@@ -112,19 +112,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
-  getReportExcelUrl,
+  getReportExcelUrl, getProjectAuditYear,
   type ReportRow, type ReportDrilldownData, type ReportConsistencyCheck,
 } from '@/services/auditPlatformApi'
 
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const routeYear = computed(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 2000 ? value : null
+})
+const projectYear = ref<number | null>(null)
+const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
 
 const loading = ref(false)
 const genLoading = ref(false)
@@ -151,6 +156,18 @@ function fmtAmt(v: string | number | null | undefined): string {
 function rowClassName({ row }: { row: ReportRow }) {
   if (row.is_total_row) return 'total-row'
   return ''
+}
+
+async function ensureProjectYear() {
+  if (routeYear.value !== null) {
+    projectYear.value = null
+    return
+  }
+  try {
+    projectYear.value = await getProjectAuditYear(projectId.value)
+  } catch {
+    projectYear.value = null
+  }
 }
 
 async function fetchReport() {
@@ -258,7 +275,14 @@ function openWorkpaper(wpId: string) {
   router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
 }
 
-onMounted(fetchReport)
+watch(
+  () => [projectId.value, routeYear.value],
+  async () => {
+    await ensureProjectYear()
+    await fetchReport()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

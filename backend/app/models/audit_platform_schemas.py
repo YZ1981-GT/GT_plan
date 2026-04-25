@@ -92,6 +92,9 @@ class BasicInfoSchema(BaseModel):
     accounting_standard: str  # enterprise / small_enterprise / financial / government
     company_code: str | None = None  # 企业代码（统一社会信用代码）
     template_type: str | None = None  # 附注模板类型：soe（国企版）/ listed（上市版）
+    custom_template_id: str | None = None
+    custom_template_name: str | None = None
+    custom_template_version: str | None = None
     report_scope: str | None = None  # 报表类型：standalone（单户）/ consolidated（合并）
     parent_company_name: str | None = None  # 上级企业名称（合并报表时填写）
     parent_company_code: str | None = None  # 上级企业代码
@@ -300,6 +303,16 @@ class ReportLineMappingResponse(BaseModel):
     is_confirmed: bool
     confidence_score: float | None = None
     created_at: datetime
+
+
+class ReportLineMappingUpdate(BaseModel):
+    """更新报表行次映射"""
+    report_type: ReportType
+    report_line_code: str
+    report_line_name: str
+    report_line_level: int = Field(ge=1, le=10)
+    parent_line_code: str | None = None
+    is_confirmed: bool = True
 
 
 class ReportLineMappingConfirm(BaseModel):

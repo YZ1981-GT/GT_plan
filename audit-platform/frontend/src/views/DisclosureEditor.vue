@@ -4,11 +4,16 @@
       <h2 class="gt-page-title">附注编辑</h2>
       <div class="gt-de-actions">
         <el-tag v-if="templateType" size="small" type="info" style="margin-right: 8px">
-          {{ templateType === 'soe' ? '国企版' : '上市版' }}
+          {{ templateTypeLabel }}
         </el-tag>
-        <el-select v-model="templateType" style="width: 120px" @change="onGenerate">
+        <el-select v-model="templateType" style="width: 180px" @change="handleTemplateChange">
           <el-option label="国企版" value="soe" />
           <el-option label="上市版" value="listed" />
+          <el-option
+            v-if="customTemplateId"
+            :label="customTemplateName ? `自定义：${customTemplateName}` : '自定义模板'"
+            value="custom"
+          />
         </el-select>
         <el-button @click="onRefreshFromWP" :loading="refreshLoading" size="small">从底稿刷新</el-button>
         <el-button @click="onGenerate" :loading="genLoading">生成附注</el-button>
@@ -46,22 +51,22 @@
             <div v-if="currentNote.content_type === 'table' || currentNote.content_type === 'mixed'">
               <el-table v-if="currentNote.table_data?.rows" :data="currentNote.table_data.rows"
                 border size="small" style="margin-bottom: 12px">
-                <el-table-column v-for="(h, hi) in (currentNote.table_data.headers || [])" :key="hi"
-                  :label="h" :min-width="hi === 0 ? 160 : 120" :align="hi === 0 ? 'left' : 'right'">
+                <el-table-column v-for="(h, hiRaw) in (currentNote.table_data.headers || [])" :key="hiRaw"
+                  :label="h" :min-width="Number(hiRaw) === 0 ? 160 : 120" :align="Number(hiRaw) === 0 ? 'left' : 'right'">
                   <template #default="{ row }">
-                    <template v-if="hi === 0">
+                    <template v-if="Number(hiRaw) === 0">
                       <span :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
                     </template>
                     <template v-else>
                       <div class="gt-cell-wrapper">
                         <el-input-number v-if="editMode && !row.is_total"
-                          v-model="row.values[hi - 1]" :controls="false" :precision="2"
+                          v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
                           size="small" style="width: 100%" />
                         <span v-else :class="{ 'total-val': row.is_total }">
-                          {{ fmtAmt(getCellValue(row, hi - 1)) }}
+                          {{ fmtAmt(getCellValue(row, Number(hiRaw) - 1)) }}
                         </span>
-                        <span v-if="getCellMode(row, hi - 1) === 'auto'" class="gt-cell-source" title="自动提数">📊</span>
-                        <span v-else-if="getCellMode(row, hi - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
+                        <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source" title="自动提数">📊</span>
+                        <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
                       </div>
                     </template>
                   </template>
@@ -120,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -146,6 +151,9 @@ const refreshLoading = ref(false)
 const exportLoading = ref(false)
 const editMode = ref(false)
 const templateType = ref('soe')
+const customTemplateId = ref('')
+const customTemplateName = ref('')
+const customTemplateVersion = ref('')
 
 const noteList = ref<DisclosureNoteTreeItem[]>([])
 const currentNote = ref<DisclosureNoteDetail | null>(null)
@@ -171,6 +179,15 @@ const treeData = computed<TreeNode[]>(() => {
     label: `${n.note_section} ${n.section_title}`,
     data: n,
   }))
+})
+
+const templateTypeLabel = computed(() => {
+  if (templateType.value === 'custom') {
+    return customTemplateVersion.value && customTemplateName.value
+      ? `自定义：${customTemplateName.value}（${customTemplateVersion.value}）`
+      : customTemplateName.value || '自定义模板'
+  }
+  return templateType.value === 'listed' ? '上市版' : '国企版'
 })
 
 function fmtAmt(v: any): string {
@@ -223,24 +240,61 @@ async function fetchTree() {
   finally { treeLoading.value = false }
 }
 
+async function loadProjectTemplateConfig() {
+  try {
+    const { data } = await http.get(`/api/projects/${projectId.value}/wizard`)
+    const state = data.data ?? data
+    const basicInfo = state?.steps?.basic_info?.data || state?.basic_info?.data || {}
+    customTemplateId.value = basicInfo.custom_template_id || ''
+    customTemplateName.value = basicInfo.custom_template_name || ''
+    customTemplateVersion.value = basicInfo.custom_template_version || ''
+    templateType.value = basicInfo.template_type || 'soe'
+    if (templateType.value === 'custom' && !customTemplateId.value) {
+      templateType.value = 'soe'
+    }
+  } catch {
+    templateType.value = 'soe'
+    customTemplateId.value = ''
+    customTemplateName.value = ''
+    customTemplateVersion.value = ''
+  }
+}
+
 async function onNodeClick(node: TreeNode) {
   detailLoading.value = true
   editMode.value = false
   try {
-    currentNote.value = await getDisclosureNoteDetail(projectId.value, year.value, node.data.note_section)
-    textContent.value = currentNote.value.text_content || ''
-    if (editor.value) editor.value.commands.setContent(textContent.value)
+    await fetchDetail(node.data.note_section)
   } catch { currentNote.value = null }
   finally { detailLoading.value = false }
 }
 
+async function fetchDetail(noteSection: string) {
+  currentNote.value = await getDisclosureNoteDetail(projectId.value, year.value, noteSection)
+  textContent.value = currentNote.value.text_content || ''
+  if (editor.value) editor.value.commands.setContent(textContent.value)
+}
+
 async function onGenerate() {
+  if (templateType.value === 'custom' && !customTemplateId.value) {
+    ElMessage.warning('当前项目未绑定自定义附注模板，请先在项目基本信息中选择')
+    return
+  }
   genLoading.value = true
   try {
     await generateDisclosureNotes(projectId.value, year.value, templateType.value)
     ElMessage.success('附注生成完成')
     await fetchTree()
   } finally { genLoading.value = false }
+}
+
+async function handleTemplateChange(value: string) {
+  if (value === 'custom' && !customTemplateId.value) {
+    ElMessage.warning('当前项目未绑定自定义附注模板，请先在项目基本信息中选择')
+    templateType.value = 'soe'
+    return
+  }
+  await onGenerate()
 }
 
 async function onValidate() {
@@ -270,7 +324,10 @@ async function onSave() {
   } finally { saveLoading.value = false }
 }
 
-onMounted(fetchTree)
+onMounted(async () => {
+  await loadProjectTemplateConfig()
+  await fetchTree()
+})
 </script>
 
 <style scoped>

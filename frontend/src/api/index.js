@@ -28,6 +28,25 @@ async function request(path, options = {}) {
   return response.json()
 }
 
+// ============ 共享函数 ============
+
+export async function listProjects() {
+  const data = await request('/projects')
+  const raw = data.data ?? data
+  return Array.isArray(raw) ? raw : (raw?.items ?? [])
+}
+
+export async function getProject(projectId) {
+  const data = await request(`/projects/${projectId}`)
+  return data.data ?? data
+}
+
+export async function getProjectAuditYear(projectId) {
+  const project = await getProject(projectId)
+  const auditYear = Number(project?.audit_year)
+  return Number.isFinite(auditYear) && auditYear > 2000 ? auditYear : null
+}
+
 // ============ AI 管理 API ============
 
 export const aiAdmin = {

@@ -7,7 +7,7 @@
           <el-tag type="primary" effect="plain">RJE 重分类 / AJE 审计调整</el-tag>
         </div>
         <div class="right">
-          <el-select v-model="currentYear" placeholder="选择年度" style="width:120px;margin-right:12px;">
+          <el-select v-model="currentYear" placeholder="选择年度" style="width:120px;margin-right:12px;" @change="loadData">
             <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
           </el-select>
           <el-button :icon="RefreshRight" @click="loadData">刷新</el-button>
@@ -140,20 +140,44 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { RefreshRight, Document, DocumentChecked, List } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { adjustmentEntries, trialBalance } from '@/api/index.js'
+import { adjustmentEntries, trialBalance, getProjectAuditYear } from '@/api/index.js'
 
 const route = useRoute()
 const router = useRouter()
 
 const currentProjectId = computed(() => route.query.project_id || localStorage.getItem('current_project_id') || '')
-const currentYear = ref(parseInt(route.query.year) || new Date().getFullYear())
+const routeYear = computed(() => {
+  const value = Number(route.query.year)
+  return Number.isFinite(value) && value > 2000 ? value : null
+})
+const projectYear = ref(null)
+const currentYear = ref(new Date().getFullYear())
 const yearOptions = computed(() => {
-  const y = new Date().getFullYear()
-  return [y, y - 1, y - 2]
+  const baseYear = currentYear.value || projectYear.value || routeYear.value || new Date().getFullYear()
+  return [baseYear, baseYear - 1, baseYear - 2]
 })
 
 const entries = ref([])
 const loading = ref(false)
+
+async function ensureProjectYear() {
+  if (!currentProjectId.value) {
+    projectYear.value = null
+    currentYear.value = new Date().getFullYear()
+    return
+  }
+  if (routeYear.value !== null) {
+    projectYear.value = null
+    currentYear.value = routeYear.value
+    return
+  }
+  try {
+    projectYear.value = await getProjectAuditYear(currentProjectId.value)
+  } catch {
+    projectYear.value = null
+  }
+  currentYear.value = projectYear.value ?? new Date().getFullYear()
+}
 
 const totalDebit = computed(() =>
   entries.value.reduce((s, r) => s + (Number(r.total_debit) || 0), 0)
@@ -246,9 +270,14 @@ function goToTrialBalance() {
   })
 }
 
-watch([currentProjectId, currentYear], () => {
-  loadData()
-}, { immediate: true })
+watch(
+  () => [currentProjectId.value, routeYear.value],
+  async () => {
+    await ensureProjectYear()
+    await loadData()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

@@ -56,6 +56,9 @@ async def generate_notes(
             "note_count": len(results),
             "notes": results,
         }
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"附注生成失败: {str(e)}")

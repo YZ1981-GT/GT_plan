@@ -53,6 +53,13 @@ class ContinuousAuditService:
         basic_info = ws.get("steps", {}).get("basic_info", {}).get("data", {})
         prior_year = basic_info.get("audit_year", datetime.utcnow().year)
         new_year = prior_year + 1
+        inherited_template_type = basic_info.get("template_type") or prior.template_type
+        inherited_report_scope = basic_info.get("report_scope") or prior.report_scope
+        inherited_company_code = basic_info.get("company_code") or prior.company_code
+        inherited_parent_company_name = basic_info.get("parent_company_name") or prior.parent_company_name
+        inherited_parent_company_code = basic_info.get("parent_company_code") or prior.parent_company_code
+        inherited_ultimate_company_name = basic_info.get("ultimate_company_name") or prior.ultimate_company_name
+        inherited_ultimate_company_code = basic_info.get("ultimate_company_code") or prior.ultimate_company_code
 
         # 2. 创建新项目
         new_project = Project(
@@ -62,13 +69,13 @@ class ContinuousAuditService:
             status=ProjectStatus.created,
             manager_id=prior.manager_id,
             partner_id=prior.partner_id,
-            company_code=prior.company_code,
-            template_type=prior.template_type,
-            report_scope=prior.report_scope,
-            parent_company_name=prior.parent_company_name,
-            parent_company_code=prior.parent_company_code,
-            ultimate_company_name=prior.ultimate_company_name,
-            ultimate_company_code=prior.ultimate_company_code,
+            company_code=inherited_company_code,
+            template_type=inherited_template_type,
+            report_scope=inherited_report_scope,
+            parent_company_name=inherited_parent_company_name,
+            parent_company_code=inherited_parent_company_code,
+            ultimate_company_name=inherited_ultimate_company_name,
+            ultimate_company_code=inherited_ultimate_company_code,
             parent_project_id=prior.parent_project_id,
             consol_level=prior.consol_level,
         )

@@ -1,8 +1,32 @@
 /**
- * 审计作业平台 API 服务层
- * 封装所有后端 API 调用
- */
-import http from '@/utils/http'
+  * 审计作业平台 API 服务层
+  * 封装所有后端 API 调用
+  */
+ import http from '@/utils/http'
+
+ export interface ProjectListItem {
+   id: string
+   name?: string | null
+   client_name?: string | null
+   audit_year?: number | string | null
+ }
+
+ export async function listProjects(): Promise<ProjectListItem[]> {
+   const { data } = await http.get('/api/projects')
+   const raw = data.data ?? data
+   return Array.isArray(raw) ? raw : (raw?.items ?? [])
+ }
+
+ export async function getProject(projectId: string): Promise<ProjectListItem> {
+  const { data } = await http.get(`/api/projects/${projectId}`)
+  return data.data ?? data
+}
+
+export async function getProjectAuditYear(projectId: string): Promise<number | null> {
+  const project = await getProject(projectId)
+  const auditYear = Number(project?.audit_year)
+  return Number.isFinite(auditYear) && auditYear > 2000 ? auditYear : null
+}
 
 // ─── Trial Balance ───
 

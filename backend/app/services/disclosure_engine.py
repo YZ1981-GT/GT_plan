@@ -17,11 +17,13 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
+from fastapi import HTTPException
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
 from app.models.audit_platform_schemas import EventPayload
+from app.models.core import Project
 from app.models.report_models import (
     ContentType,
     DisclosureNote,
@@ -30,6 +32,7 @@ from app.models.report_models import (
     NoteStatus,
     SourceTemplate,
 )
+from app.services.note_template_service import NoteTemplateService
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +45,95 @@ def _load_seed_data() -> dict:
         return json.load(f)
 
 
+def _extract_basic_info(wizard_state: dict | None) -> dict:
+    state = wizard_state or {}
+    return (
+        state.get("steps", {}).get("basic_info", {}).get("data")
+        or state.get("basic_info", {}).get("data")
+        or {}
+    )
+
+
 class DisclosureEngine:
     """附注生成引擎"""
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def _get_project_basic_info(self, project_id: UUID) -> dict:
+        result = await self.db.execute(
+            sa.select(Project).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+        project = result.scalar_one_or_none()
+        if project is None:
+            return {}
+
+        template_service = NoteTemplateService()
+        wizard_state, _, changed = template_service.backfill_locked_template_snapshot(project.wizard_state)
+        if changed:
+            project.wizard_state = wizard_state
+            await self.db.flush()
+        return _extract_basic_info(project.wizard_state)
+
+    async def _get_custom_template_sections(self, project_id: UUID) -> list[dict]:
+        basic_info = await self._get_project_basic_info(project_id)
+        template_service = NoteTemplateService()
+        locked_snapshot = template_service.get_locked_template_snapshot(basic_info)
+        if locked_snapshot is not None:
+            return locked_snapshot.get("sections", [])
+
+        template_id = basic_info.get("custom_template_id")
+        if not template_id:
+            logger.warning("project %s has no custom_template_id in wizard_state", project_id)
+            raise HTTPException(status_code=400, detail="当前项目未绑定有效的自定义附注模板，请先在项目基本信息中选择")
+
+        template = template_service.get_template(template_id)
+        if template is None:
+            logger.warning("custom note template %s not found for project %s", template_id, project_id)
+            raise HTTPException(status_code=400, detail="当前项目绑定的自定义附注模板不存在或已失效，请重新选择")
+        return template.get("sections", [])
+
+    async def _load_templates(self, project_id: UUID, template_type: str) -> list[dict]:
+        if template_type != "custom":
+            seed = _load_seed_data()
+            return seed.get("account_mapping_template", [])
+
+        sections = await self._get_custom_template_sections(project_id)
+        return [
+            {
+                "note_section": section.get("section_number", f"五、{idx + 1}"),
+                "section_title": section.get("section_title", ""),
+                "account_name": section.get("account_name") or section.get("section_title", ""),
+                "content_type": section.get("content_type")
+                or (
+                    "mixed"
+                    if section.get("table_template") and section.get("text_template")
+                    else "table"
+                    if section.get("table_template")
+                    else "text"
+                ),
+                "sort_order": idx * 10,
+                "table_template": section.get("table_template") or {},
+                "text_template": section.get("text_template"),
+            }
+            for idx, section in enumerate(sections)
+        ]
+
+    async def _get_active_template_type(self, project_id: UUID) -> str:
+        basic_info = await self._get_project_basic_info(project_id)
+        template_type = basic_info.get("template_type")
+        return template_type if isinstance(template_type, str) and template_type else "soe"
+
+    @staticmethod
+    def _persist_source_template(template_type: str) -> SourceTemplate | None:
+        if template_type == SourceTemplate.soe.value:
+            return SourceTemplate.soe
+        if template_type == SourceTemplate.listed.value:
+            return SourceTemplate.listed
+        return None
 
     # ------------------------------------------------------------------
     # 生成附注
@@ -55,22 +142,23 @@ class DisclosureEngine:
         self,
         project_id: UUID,
         year: int,
-        template_type: SourceTemplate = SourceTemplate.soe,
+        template_type: str = "soe",
     ) -> list[dict]:
         """根据模版生成附注初稿，写入 disclosure_notes 表。
 
         Validates: Requirements 4.2, 4.3, 4.8, 4.9
         """
-        seed = _load_seed_data()
-        templates = seed.get("account_mapping_template", [])
+        templates = await self._load_templates(project_id, template_type)
+        source_template = self._persist_source_template(template_type)
         results = []
 
         for tmpl in templates:
             note_section = tmpl["note_section"]
             section_title = tmpl["section_title"]
-            account_name = tmpl["account_name"]
+            account_name = tmpl.get("account_name") or section_title
             content_type_str = tmpl.get("content_type", "table")
             sort_order = tmpl.get("sort_order", 0)
+            text_content = tmpl.get("text_template") if content_type_str in ("text", "mixed") else None
 
             # Build table_data from template + trial balance
             table_data = None
@@ -95,7 +183,8 @@ class DisclosureEngine:
                 note.account_name = account_name
                 note.content_type = ContentType(content_type_str)
                 note.table_data = table_data
-                note.source_template = template_type
+                note.text_content = text_content
+                note.source_template = source_template
                 note.sort_order = sort_order
             else:
                 note = DisclosureNote(
@@ -106,8 +195,8 @@ class DisclosureEngine:
                     account_name=account_name,
                     content_type=ContentType(content_type_str),
                     table_data=table_data,
-                    text_content=None,
-                    source_template=template_type,
+                    text_content=text_content,
+                    source_template=source_template,
                     status=NoteStatus.draft,
                     sort_order=sort_order,
                 )
@@ -123,90 +212,6 @@ class DisclosureEngine:
         await self.db.flush()
         return results
 
-    async def _build_table_data(
-        self,
-        project_id: UUID,
-        year: int,
-        table_template: dict,
-    ) -> dict:
-        """从试算表取数构建 table_data。
-
-        Validates: Requirements 4.4, 4.8
-        """
-        headers = table_template.get("headers", ["项目", "期末余额", "期初余额"])
-        template_rows = table_template.get("rows", [])
-        result_rows = []
-        running_total_current = Decimal("0")
-        running_total_prior = Decimal("0")
-
-        for tmpl_row in template_rows:
-            label = tmpl_row.get("label", "")
-            account_codes = tmpl_row.get("account_codes", [])
-            is_total = tmpl_row.get("is_total", False)
-
-            if is_total:
-                # Total row: sum of all previous non-total rows
-                result_rows.append({
-                    "label": label,
-                    "values": [
-                        float(running_total_current),
-                        float(running_total_prior),
-                    ],
-                    "is_total": True,
-                })
-            elif account_codes:
-                # Fetch from trial balance
-                current_val = Decimal("0")
-                prior_val = Decimal("0")
-                for code in account_codes:
-                    tb_current = await self._get_tb_amount(project_id, year, code)
-                    tb_prior = await self._get_tb_amount(project_id, year, code, field="opening_balance")
-                    current_val += tb_current
-                    prior_val += tb_prior
-
-                running_total_current += current_val
-                running_total_prior += prior_val
-                result_rows.append({
-                    "label": label,
-                    "values": [float(current_val), float(prior_val)],
-                    "is_total": False,
-                })
-            else:
-                # No account codes — placeholder row (e.g. "减：坏账准备")
-                result_rows.append({
-                    "label": label,
-                    "values": [0.0, 0.0],
-                    "is_total": False,
-                })
-
-        return {
-            "headers": headers,
-            "rows": result_rows,
-            "check_roles": [],
-        }
-
-    async def _get_tb_amount(
-        self,
-        project_id: UUID,
-        year: int,
-        account_code: str,
-        field: str = "audited_amount",
-    ) -> Decimal:
-        """从试算表获取指定科目的金额"""
-        result = await self.db.execute(
-            sa.select(TrialBalance).where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.year == year,
-                TrialBalance.standard_account_code == account_code,
-                TrialBalance.is_deleted == sa.false(),
-            )
-        )
-        row = result.scalar_one_or_none()
-        if row is None:
-            return Decimal("0")
-        val = getattr(row, field, None)
-        return val if val is not None else Decimal("0")
-
     # ------------------------------------------------------------------
     # 增量更新
     # ------------------------------------------------------------------
@@ -221,28 +226,29 @@ class DisclosureEngine:
         简单实现：重新生成所有附注的 table_data。
         Validates: Requirements 8.1
         """
-        seed = _load_seed_data()
-        templates = seed.get("account_mapping_template", [])
+        template_type = await self._get_active_template_type(project_id)
+        templates = await self._load_templates(project_id, template_type)
         updated = 0
 
         for tmpl in templates:
+            content_type_str = tmpl.get("content_type", "table")
+            if content_type_str not in ("table", "mixed"):
+                continue
+
             note_section = tmpl["note_section"]
             table_template = tmpl.get("table_template", {})
 
-            # Check if any of the changed accounts are referenced
             if changed_accounts:
                 referenced_codes = set()
                 for row in table_template.get("rows", []):
                     referenced_codes.update(row.get("account_codes", []))
-                if not referenced_codes.intersection(set(changed_accounts)):
+                if referenced_codes and not referenced_codes.intersection(set(changed_accounts)):
                     continue
 
-            # Re-build table_data
             table_data = await self._build_table_data(
                 project_id, year, table_template,
             )
 
-            # Update in DB
             existing = await self.db.execute(
                 sa.select(DisclosureNote).where(
                     DisclosureNote.project_id == project_id,

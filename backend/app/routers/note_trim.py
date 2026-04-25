@@ -31,24 +31,28 @@ class NoteTrimRequest(BaseModel):
 @router.get("/{project_id}/sections")
 async def get_sections(
     project_id: UUID,
-    template_type: str = Query("soe"),
+    template_type: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = NoteTrimService(db)
-    return await svc.get_sections(project_id, template_type)
+    resolved_template_type = await svc.resolve_template_type(project_id, template_type)
+    sections = await svc.get_sections(project_id, resolved_template_type)
+    await db.commit()
+    return sections
 
 
 @router.put("/{project_id}/sections/trim")
 async def save_trim(
     project_id: UUID,
     data: NoteTrimRequest,
-    template_type: str = Query("soe"),
+    template_type: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = NoteTrimService(db)
-    count = await svc.save_trim(project_id, template_type, [i.model_dump() for i in data.items])
+    resolved_template_type = await svc.resolve_template_type(project_id, template_type)
+    count = await svc.save_trim(project_id, resolved_template_type, [i.model_dump() for i in data.items])
     await db.commit()
     return {"updated": count}
 
@@ -56,9 +60,12 @@ async def save_trim(
 @router.get("/{project_id}/sections/trim-scheme")
 async def get_trim_scheme(
     project_id: UUID,
-    template_type: str = Query("soe"),
+    template_type: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = NoteTrimService(db)
-    return await svc.get_trim_scheme(project_id, template_type) or {}
+    resolved_template_type = await svc.resolve_template_type(project_id, template_type)
+    scheme = await svc.get_trim_scheme(project_id, resolved_template_type) or {}
+    await db.commit()
+    return scheme

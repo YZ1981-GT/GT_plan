@@ -60,7 +60,39 @@
         <el-radio-group v-model="form.template_type">
           <el-radio-button value="soe">国企版</el-radio-button>
           <el-radio-button value="listed">上市版</el-radio-button>
+          <el-radio-button value="custom">自定义</el-radio-button>
         </el-radio-group>
+      </el-form-item>
+
+      <el-form-item v-if="form.template_type === 'custom'" label="自定义模板" prop="custom_template_id">
+        <el-select
+          v-model="form.custom_template_id"
+          placeholder="请选择自定义附注模板"
+          style="width: 100%"
+          filterable
+          clearable
+          :loading="customTemplateLoading"
+          @change="onCustomTemplateChange"
+        >
+          <el-option
+            v-for="item in customTemplates"
+            :key="item.id"
+            :label="customTemplateLabel(item)"
+            :value="item.id"
+          />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item
+        v-if="form.template_type === 'custom' && !customTemplateLoading && customTemplates.length === 0"
+        label="模板说明"
+      >
+        <el-alert
+          title="暂无可用的自定义附注模板，请先创建模板后再选择。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
       </el-form-item>
 
       <el-form-item label="报表类型" prop="report_scope">
@@ -113,14 +145,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import http from '@/utils/http'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
 
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
 const auditYearDate = ref<string>('')
 const groupPanelOpen = ref<string[]>(['group'])
+const customTemplateLoading = ref(false)
+const customTemplates = ref<Array<{ id: string; name: string; version?: string }>>([])
 
 const form = reactive<BasicInfo>({
   client_name: '',
@@ -129,6 +164,9 @@ const form = reactive<BasicInfo>({
   accounting_standard: '',
   company_code: '',
   template_type: 'soe',
+  custom_template_id: '',
+  custom_template_name: '',
+  custom_template_version: '',
   report_scope: 'standalone',
   parent_company_name: '',
   parent_company_code: '',
@@ -144,7 +182,60 @@ const rules: FormRules = {
   project_type: [{ required: true, message: '请选择项目类型', trigger: 'change' }],
   accounting_standard: [{ required: true, message: '请选择会计准则', trigger: 'change' }],
   template_type: [{ required: true, message: '请选择附注模板类型', trigger: 'change' }],
+  custom_template_id: [{
+    validator: (_rule, value, callback) => {
+      if (form.template_type === 'custom' && !value) {
+        callback(new Error('请选择自定义附注模板'))
+        return
+      }
+      callback()
+    },
+    trigger: 'change',
+  }],
   report_scope: [{ required: true, message: '请选择报表类型', trigger: 'change' }],
+}
+
+function customTemplateLabel(item: { id: string; name: string; version?: string }) {
+  const lockedName = item.id === form.custom_template_id && form.custom_template_name
+    ? form.custom_template_name
+    : item.name
+  const lockedVersion = item.id === form.custom_template_id && form.custom_template_version
+    ? form.custom_template_version
+    : item.version
+  return lockedVersion ? `${lockedName}（${lockedVersion}）` : lockedName
+}
+
+async function loadCustomTemplates() {
+  customTemplateLoading.value = true
+  try {
+    const { data } = await http.get('/api/note-templates/custom')
+    const list = data.data ?? data
+    customTemplates.value = Array.isArray(list) ? list : []
+  } finally {
+    customTemplateLoading.value = false
+  }
+}
+
+function clearCustomTemplateSelection() {
+  form.custom_template_id = ''
+  form.custom_template_name = ''
+  form.custom_template_version = ''
+}
+
+function onCustomTemplateChange(templateId: string | undefined) {
+  if (!templateId) {
+    clearCustomTemplateSelection()
+    return
+  }
+  const selected = customTemplates.value.find(item => item.id === templateId)
+  const keepLockedMetadata = templateId === form.custom_template_id && !!form.custom_template_version
+  form.custom_template_id = templateId
+  form.custom_template_name = keepLockedMetadata
+    ? (form.custom_template_name || selected?.name || '')
+    : (selected?.name || '')
+  form.custom_template_version = keepLockedMetadata
+    ? form.custom_template_version
+    : (selected?.version || '')
 }
 
 function onYearChange(val: string) {
@@ -157,12 +248,29 @@ function onReportScopeChange(val: string) {
   }
 }
 
-onMounted(() => {
+watch(() => form.template_type, async (val) => {
+  if (val === 'custom') {
+    await loadCustomTemplates()
+    if (form.custom_template_id) {
+      onCustomTemplateChange(form.custom_template_id)
+    }
+    return
+  }
+  clearCustomTemplateSelection()
+})
+
+onMounted(async () => {
   const saved = wizardStore.stepData.basic_info as unknown as BasicInfo | undefined
   if (saved) {
     Object.assign(form, saved)
     if (saved.audit_year) {
       auditYearDate.value = String(saved.audit_year)
+    }
+  }
+  if (form.template_type === 'custom') {
+    await loadCustomTemplates()
+    if (form.custom_template_id) {
+      onCustomTemplateChange(form.custom_template_id)
     }
   }
 })
