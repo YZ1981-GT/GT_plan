@@ -426,11 +426,17 @@ async def smart_preview(
     year: Optional[int] = Query(None, description="指定年度（不指定则自动提取）"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """智能预览：解析多个文件，返回识别结果 + 维度信息 + 校验结果。
+    """智能预览：只读表头+列映射+类型识别+行数估算，不读全部数据行。
 
-    不写入数据库，供用户确认后再调用 smart-import 写入。
+    大文件秒级响应（只扫描前几行），供用户确认后再调用 smart-import 写入。
     """
-    from app.services.smart_import_engine import smart_parse_files
+    import io
+    import openpyxl
+    from app.services.smart_import_engine import (
+        parse_sheet_header_only, detect_header_rows, smart_match_column,
+        _guess_data_type, _detect_missing_fields, extract_year_from_content,
+        _HEADER_KEYWORDS,
+    )
 
     file_contents = []
     for f in files:
@@ -442,24 +448,168 @@ async def smart_preview(
     if not file_contents:
         raise HTTPException(status_code=400, detail="未提供文件")
 
-    result = smart_parse_files(file_contents, year_override=year)
+    diagnostics = []
+    detected_year = year
+    summary = {"balance": 0, "aux_balance": 0, "ledger": 0, "aux_ledger": 0}
 
-    # 辅助明细账行数从 diagnostics 中汇总（预览时不实际生成辅助明细行）
-    aux_ledger_est = 0
-    for d in result.get("diagnostics", []):
-        aux_ledger_est += d.get("aux_ledger_count", 0)
+    for filename, content in file_contents:
+        # ── CSV ──
+        if filename.lower().endswith('.csv'):
+            import codecs, csv as _csv
+            # 编码探测
+            probe = content[:min(16384, len(content))]
+            nl = probe.rfind(b'\n')
+            if nl > 0:
+                probe = probe[:nl]
+            encoding = 'utf-8-sig'
+            for enc in ('utf-8-sig', 'gbk', 'gb2312', 'gb18030'):
+                try:
+                    probe.decode(enc)
+                    encoding = enc
+                    break
+                except (UnicodeDecodeError, LookupError):
+                    continue
+
+            text_head = content[:65536].decode(encoding, errors='replace')
+            lines = text_head.split('\n')
+
+            # 找表头
+            headers = []
+            header_idx = 0
+            for i, line in enumerate(lines[:5]):
+                cells = [c.strip() for c in line.split(',') if c.strip()]
+                if len(cells) >= 3:
+                    reader_row = list(_csv.reader([line.strip()]))[0]
+                    headers = [c.strip() if c.strip() else f"col_{j}" for j, c in enumerate(reader_row)]
+                    header_idx = i
+                    break
+
+            col_map = {}
+            for h in headers:
+                m = smart_match_column(h)
+                if m:
+                    col_map[h] = m
+
+            mapped = set(col_map.values())
+            dt = _guess_data_type(mapped) if mapped else "unknown"
+            miss_req, miss_rec = _detect_missing_fields(dt, mapped)
+            total_lines = content.count(b'\n') - header_idx
+
+            if detected_year is None:
+                detected_year = extract_year_from_content([], filename=filename)
+
+            diagnostics.append({
+                "file": filename, "sheet": "CSV", "data_type": dt,
+                "row_count": max(0, total_lines),
+                "header_count": 1,
+                "matched_cols": sorted(mapped),
+                "missing_cols": miss_req, "missing_recommended": miss_rec,
+                "column_mapping": col_map,
+                "status": "ok" if not miss_req else "warning",
+            })
+            if dt == "ledger":
+                summary["ledger"] += max(0, total_lines)
+            elif dt == "balance":
+                summary["balance"] += max(0, total_lines)
+            continue
+
+        # ── Excel ──
+        if filename.lower().endswith('.xls'):
+            diagnostics.append({"file": filename, "sheet": None, "data_type": "unknown",
+                                "row_count": 0, "status": "error",
+                                "message": "暂不支持 .xls 文件，请转换为 .xlsx"})
+            continue
+
+        # 探测合并单元格
+        needs_full = False
+        try:
+            wb_probe = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            for _ws in wb_probe.worksheets:
+                try:
+                    rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
+                    if rows5 and max(len(r) for r in rows5) <= 3:
+                        needs_full = True
+                        break
+                    for row in rows5:
+                        non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
+                        if len(non_empty) >= 4:
+                            from collections import Counter
+                            _, cnt = Counter(non_empty).most_common(1)[0]
+                            if cnt >= len(non_empty) * 0.6 and cnt >= 3:
+                                needs_full = True
+                                break
+                    if needs_full:
+                        break
+                except Exception:
+                    pass
+            wb_probe.close()
+        except Exception:
+            pass
+
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=(not needs_full), data_only=True)
+        except Exception as e:
+            diagnostics.append({"file": filename, "sheet": None, "data_type": "unknown",
+                                "row_count": 0, "status": "error", "message": str(e)})
+            continue
+
+        for ws in wb.worksheets:
+            sname = ws.title
+            if any(kw in sname.lower() for kw in ("说明", "目录", "封面", "模板")):
+                continue
+
+            try:
+                meta = parse_sheet_header_only(ws)
+            except Exception as e:
+                diagnostics.append({"file": filename, "sheet": sname, "data_type": "unknown",
+                                    "row_count": 0, "status": "error", "message": str(e)})
+                continue
+
+            dt = meta["data_type"]
+            matched = set(meta["column_mapping"].values())
+            miss_req, miss_rec = _detect_missing_fields(dt, matched)
+
+            # 行数估算（不遍历全部数据）
+            row_est = 0
+            try:
+                row_est = max(0, (ws.max_row or 0) - meta["data_start"])
+            except Exception:
+                pass
+
+            if detected_year is None and meta.get("year"):
+                detected_year = meta["year"]
+
+            diagnostics.append({
+                "file": filename, "sheet": sname, "data_type": dt,
+                "row_count": row_est,
+                "header_count": meta["header_count"],
+                "matched_cols": sorted(matched),
+                "missing_cols": miss_req, "missing_recommended": miss_rec,
+                "column_mapping": meta["column_mapping"],
+                "status": "ok" if not miss_req else "warning",
+            })
+
+            if dt == "ledger":
+                summary["ledger"] += row_est
+            elif dt == "balance":
+                summary["balance"] += row_est
+            elif dt == "aux_balance":
+                summary["aux_balance"] += row_est
+            elif dt == "aux_ledger":
+                summary["aux_ledger"] += row_est
+
+        wb.close()
+
+    if detected_year is None:
+        from datetime import datetime as _dt
+        detected_year = _dt.now().year - 1
 
     return {
-        "year": result["year"],
-        "summary": {
-            "balance": len(result["balance_rows"]),
-            "aux_balance": len(result["aux_balance_rows"]),
-            "ledger": len(result["ledger_rows"]),
-            "aux_ledger": aux_ledger_est,
-        },
-        "aux_dimensions": result["aux_dimensions"],
-        "validation": [],  # 一致性校验移到入库后按需触发，预览阶段不做（太慢且不可操作）
-        "diagnostics": result["diagnostics"],
+        "year": detected_year,
+        "summary": summary,
+        "aux_dimensions": [],  # 预览阶段不扫描维度（需要读全部数据行）
+        "validation": [],
+        "diagnostics": diagnostics,
     }
 
 

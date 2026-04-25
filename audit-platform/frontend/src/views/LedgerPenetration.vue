@@ -752,7 +752,7 @@ async function doPreview() {
     }
     const url = `/api/projects/${projectId.value}/ledger/smart-preview` +
       (importYear.value ? `?year=${importYear.value}` : '')
-    const { data } = await http.post(url, formData)
+    const { data } = await http.post(url, formData, { timeout: 120000 })
     previewResult.value = data?.data ?? data
     importStep.value = 'preview'
   } catch (e: any) {
@@ -774,7 +774,7 @@ async function doImport() {
     const yr = previewResult.value?.year || importYear.value
     const url = `/api/projects/${projectId.value}/ledger/smart-import` +
       (yr ? `?year=${yr}` : '')
-    const { data } = await http.post(url, formData)
+    const { data } = await http.post(url, formData, { timeout: 600000 })
     const result = data?.data ?? data
     importedResult.value = result?.imported || result?.data_sheets_imported || result
     importStep.value = 'done'
