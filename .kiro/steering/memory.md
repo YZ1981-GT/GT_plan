@@ -299,6 +299,7 @@ inclusion: always
 - 代码已推送GitHub（2026-04-25）：3个commit（清理冗余文件+修复179个TS错误+移除审计报告模板），ade8302..a55b3d7
 - 四表导入链路审查与修复（2026-04-25）：7个核心问题全部修复（commit be5d514）——①后端balance/ledger/aux_balance/aux_ledger关键列缺失时阻断导入 ②CSV预览改为走smart_import_engine统一路径 ③前端确认导入按钮增加关键列硬阻断（_REQUIRED_FIELDS_BY_TYPE与后端一致） ④独立辅助表文件支持直接入库 ⑤前端列映射变更后实时重新推断数据类型（_guessDataTypeFrontend） ⑥数据类型标签随映射变更实时更新 ⑦预览和导入解析路径统一
 - Excel大文件流式入库改造（2026-04-25，commit 98f3f22）：smart_import_streaming中Excel处理从smart_parse_sheet（全量读到内存）改为parse_sheet_header_only()+iter_sheet_rows()逐批流式；新增两个函数：parse_sheet_header_only只读表头零内存、iter_sheet_rows生成器每批50000行；百万行序时账峰值内存从~3.5GB降到~100MB；CSV流式处理（_stream_csv_import）保持不变已经是流式的
+- Excel合并单元格表头与数据行分离（2026-04-25，commit 99d32ce）：之前有合并单元格的文件整个用完整模式打开（百万行十几秒），改为完整模式只读表头（缓存到header_cache后关闭），数据行始终用read_only流式读取；打开时间从十几秒降到1-2秒
 - 流式入库复盘修复（2026-04-25，commit 0f2181e）：diag计数改为sheet_counts精确到当前sheet（非全局累计）、自定义映射_orig_cm预计算提到循环外
 - Excel流式路径统一COPY写入（2026-04-25）：Excel分支从db.execute(tbl.insert())改为copy_insert（COPY FROM STDIN），与CSV分支完全一致；缓冲中不再手动加id/project_id等公共字段，由copy_insert内部处理；copy_insert自带COPY失败→INSERT降级兜底
 - CSV/Excel路径全面对齐（2026-04-25）：①CSV分支_flush_batch补齐aux_balance/aux_ledger写入分支（之前只有ledger/balance） ②CSV白名单从(ledger,balance,account_chart)扩展为含aux_balance/aux_ledger ③COPY列定义从CSV/Excel两处重复提取为模块级常量COPY_LEDGER_COLS/COPY_BALANCE_COLS等；现在CSV和Excel两条路径功能完全对齐：都支持四表+独立辅助表、都用COPY写入、都有关键列阻断

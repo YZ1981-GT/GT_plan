@@ -201,7 +201,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
@@ -385,32 +385,29 @@ function onTouchEnd(e: TouchEvent) {
 }
 
 async function handleGlobalReset() {
-  // 从当前路由提取 projectId（如果在项目子页面）
-  const match = route.path.match(/^\/projects\/([^/]+)/)
-  const pid = match ? match[1] : null
-
   try {
     await ElMessageBox.confirm(
-      pid
-        ? '将清除当前项目卡住的导入任务，释放导入锁。\n已入库的数据不受影响。'
-        : '请先进入一个项目再重置。\n\n如需重置特定项目，请在项目详情页操作。',
+      '将强制停止当前任务并刷新页面。\n已入库的数据不受影响。',
       '重置',
-      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
+      { confirmButtonText: '确认重置', cancelButtonText: '取消', type: 'warning' },
     )
   } catch {
     return
   }
 
-  if (!pid) return
-
-  try {
-    await http.post(`/api/projects/${pid}/account-chart/import-reset`)
-    // 广播全局重置事件，让所有导入相关组件立即恢复状态
-    window.dispatchEvent(new CustomEvent('gt-import-reset', { detail: { projectId: pid } }))
-    ElMessage.success('已重置')
-  } catch {
-    ElMessage.error('重置失败')
+  // 尝试释放导入锁（从路由或 localStorage 提取 projectId）
+  const match = route.path.match(/^\/projects\/([^/]+)/)
+  const pid = match?.[1] || localStorage.getItem('gt-last-project-id') || null
+  if (pid) {
+    try {
+      await http.post(`/api/projects/${pid}/account-chart/import-reset`, {}, { timeout: 5000 })
+    } catch {
+      // 静默——后端可能已挂，刷新页面即可
+    }
   }
+
+  // 强制刷新页面——杀掉所有 pending 请求、清空所有组件状态
+  window.location.reload()
 }
 
 async function handleLogout() {

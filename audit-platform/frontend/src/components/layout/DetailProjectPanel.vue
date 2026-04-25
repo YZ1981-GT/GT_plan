@@ -288,15 +288,16 @@ async function handleResetImport() {
   if (!props.project) return
   try {
     await ElMessageBox.confirm(
-      '将清除当前项目卡住的导入任务，释放导入锁。\n已入库的数据不受影响。',
+      '将清除当前项目卡住的导入任务，释放导入锁，并刷新页面。\n已入库的数据不受影响。',
       '确认重置',
       { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
     )
     await http.post(`/api/projects/${props.project.id}/account-chart/import-reset`)
-    ElMessage.success('已重置，可重新导入')
+    window.location.reload()
   } catch (e: any) {
     if (e !== 'cancel' && e?.toString() !== 'cancel') {
-      ElMessage.error('重置失败，请稍后重试')
+      // 即使 API 失败也刷新
+      window.location.reload()
     }
   }
 }

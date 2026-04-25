@@ -163,6 +163,7 @@ function toggleCheck(id: string, checked: boolean) {
 
 function selectProject(project: any) {
   selectedId.value = project.id
+  localStorage.setItem('gt-last-project-id', project.id)
   emit('select', project)
 }
 
