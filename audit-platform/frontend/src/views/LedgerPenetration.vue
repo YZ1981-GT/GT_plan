@@ -934,15 +934,22 @@ async function doImport() {
     const detail = e?.response?.data?.detail || e?.message || '导入失败'
 
     if (status === 409) {
-      // 锁冲突：自动释放锁并提示重试
       try {
         await http.post(`/api/projects/${projectId.value}/account-chart/import-reset`, {}, { timeout: 5000 })
       } catch { /* 静默 */ }
       ElMessage.warning('上次导入的锁已自动释放，请重新点击「确认导入」')
+      importStep.value = 'preview'
     } else {
-      ElMessage.error(detail)
+      // 其他错误：停留在 importing 步骤显示错误，不回到 preview（避免"从头来"）
+      importProgressMsg.value = `❌ 导入失败：${detail}`
+      importProgress.value = 0
+      // 3 秒后自动回到 preview（用户可以重试）
+      setTimeout(() => {
+        if (importStep.value === 'importing') {
+          importStep.value = 'preview'
+        }
+      }, 5000)
     }
-    importStep.value = 'preview'
   } finally {
     clearInterval(pollTimer)
     importing.value = false
