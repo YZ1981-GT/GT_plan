@@ -58,3 +58,9 @@ test_collab.db
 # 原始数据文件
 数据/
 基础数据/
+
+# 临时文件
+ts_errors.txt
+
+# 审计报告模板（Word/Excel资源文件）
+审计报告模板/
