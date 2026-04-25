@@ -2296,9 +2296,11 @@ async def smart_import_streaming(
             continue  # 跳过后面的 Excel 处理
 
         # ── Excel 文件处理 ──
-        # 探测是否需要 full mode（合并单元格）
-        # read_only 模式下合并单元格的值会被复制到所有合并列，导致表头检测错误
-        needs_full = False
+        # 策略：表头检测可能需要完整模式（合并单元格），但数据行始终用 read_only 流式读取
+        # 1. 先用 read_only 探测前 5 行，判断是否有合并单元格
+        # 2. 如果有，用完整模式只读表头（前 10 行），然后关闭
+        # 3. 数据行始终用 read_only 模式流式读取（百万行不卡）
+        needs_full_for_header = False
         try:
             wb_probe = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
             for _ws in wb_probe.worksheets:
@@ -2306,21 +2308,18 @@ async def smart_import_streaming(
                     rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
                     if not rows5:
                         continue
-                    # 检测1：列数太少（原有逻辑）
                     if max(len(r) for r in rows5) <= 3:
-                        needs_full = True
+                        needs_full_for_header = True
                         break
-                    # 检测2：同一行多列值完全相同（合并单元格特征）
                     for row in rows5:
                         non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
                         if len(non_empty) >= 4:
-                            # 如果超过一半的非空值相同，说明是合并单元格
                             from collections import Counter
                             most_common_val, most_common_count = Counter(non_empty).most_common(1)[0]
                             if most_common_count >= len(non_empty) * 0.6 and most_common_count >= 3:
-                                needs_full = True
+                                needs_full_for_header = True
                                 break
-                    if needs_full:
+                    if needs_full_for_header:
                         break
                 except Exception:
                     pass
@@ -2328,14 +2327,29 @@ async def smart_import_streaming(
         except Exception:
             pass
 
-        if needs_full:
-            logger.info("  检测到合并单元格特征，使用完整模式: %s", filename)
+        if needs_full_for_header:
+            logger.info("  检测到合并单元格特征，表头用完整模式: %s", filename)
 
+        # 如果需要完整模式读表头，先打开完整模式提取表头信息，再用 read_only 读数据
+        header_cache: dict[str, dict] = {}  # sheet_name -> meta
+        if needs_full_for_header:
+            try:
+                wb_full = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                for ws_full in wb_full.worksheets:
+                    sn = ws_full.title
+                    if any(kw in sn.lower() for kw in ("说明", "目录", "封面", "模板")):
+                        continue
+                    try:
+                        header_cache[sn] = parse_sheet_header_only(ws_full)
+                    except Exception:
+                        pass
+                wb_full.close()
+            except Exception as e:
+                logger.warning("完整模式打开失败，降级为 read_only: %s", e)
+
+        # 数据行始终用 read_only 模式（百万行流式读取不卡）
         try:
-            wb = openpyxl.load_workbook(
-                io.BytesIO(content),
-                read_only=(not needs_full), data_only=True,
-            )
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         except Exception as e:
             diagnostics.append({"file": filename, "sheet": None,
                                 "status": "error", "message": f"无法打开: {e}"})
@@ -2351,9 +2365,12 @@ async def smart_import_streaming(
             pct = 10 + int(sheets_done / max(sheet_count_est, 1) * 78)
             _prog(min(pct, 88), f"解析 {filename} / {sname}")
 
-            # ── 解析表头（不读数据行，零内存） ──
+            # ── 解析表头（优先用完整模式缓存，否则用 read_only） ──
             try:
-                meta = parse_sheet_header_only(ws)
+                if sname in header_cache:
+                    meta = header_cache[sname]
+                else:
+                    meta = parse_sheet_header_only(ws)
             except Exception as e:
                 diagnostics.append({"file": filename, "sheet": sname,
                                     "status": "error", "message": str(e)})
