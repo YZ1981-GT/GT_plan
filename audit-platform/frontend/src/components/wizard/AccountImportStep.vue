@@ -1,7 +1,14 @@
 <template>
   <div class="gt-account-import-step" v-loading="previewing || importing" :element-loading-text="loadingText" element-loading-background="rgba(255,255,255,0.85)">
-    <h2 class="step-title">数据导入</h2>
-    <p class="step-desc">上传 Excel/CSV 文件（科目表、序时账、余额表、辅助账等），支持多个文件同时上传，系统自动识别列并预览</p>
+    <div class="step-header">
+      <div>
+        <h2 class="step-title">数据导入</h2>
+        <p class="step-desc">上传 Excel/CSV 文件（科目表、序时账、余额表、辅助账等），支持多个文件同时上传，系统自动识别列并预览</p>
+      </div>
+      <el-button type="danger" plain size="small" @click="handleForceReset" :loading="resetting">
+        <el-icon style="margin-right: 4px"><RefreshRight /></el-icon> 重置导入
+      </el-button>
+    </div>
 
     <!-- Phase 1: Upload -->
     <div v-if="phase === 'upload'" class="upload-section">
@@ -338,7 +345,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { UploadFilled, CircleCheckFilled, WarningFilled, Connection, CircleCheck, CircleClose, InfoFilled } from '@element-plus/icons-vue'
+import { UploadFilled, CircleCheckFilled, WarningFilled, Connection, CircleCheck, CircleClose, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import http from '@/utils/http'
@@ -897,6 +904,43 @@ function handleReupload() {
   uploadRef.value?.clearFiles()
 }
 
+const resetting = ref(false)
+
+/** 用户手动点击"重置导入"按钮 */
+async function handleForceReset() {
+  try {
+    await ElMessageBox.confirm(
+      '将清除当前导入状态，释放导入锁，恢复到初始上传界面。\n\n已入库的数据不受影响，下次导入会覆盖。',
+      '确认重置',
+      { confirmButtonText: '确认重置', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  resetting.value = true
+  try {
+    await _resetImportLock()
+    // 重置前端所有状态
+    phase.value = 'upload'
+    previewing.value = false
+    importing.value = false
+    importProgress.value = ''
+    previewSheets.value = []
+    activeSheetIdx.value = 0
+    importResult.value = null
+    clientTree.value = null
+    selectedFiles.value = []
+    for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+    uploadRef.value?.clearFiles()
+    ElMessage.success('已重置，可重新上传导入')
+  } catch {
+    ElMessage.error('重置失败，请刷新页面')
+  } finally {
+    resetting.value = false
+  }
+}
+
 /** 释放后端导入锁（上传中断/超时后自动调用） */
 async function _resetImportLock() {
   if (!wizardStore.projectId) return
@@ -1261,11 +1305,27 @@ async function handleImport() {
     phase.value = 'result'
     await loadClientTree()
   } catch (err: any) {
-    // 导入失败：显示错误信息 + 自动释放后端锁
+    const status = err?.response?.status
     const errMsg = err?.response?.data?.detail || err?.message || '导入失败，请重试'
-    ElMessage.error(errMsg)
-    // 尝试释放后端锁（防止下次导入返回 409）
-    await _resetImportLock()
+
+    if (status === 409) {
+      // 导入冲突：上一个任务可能卡住了，提供强制重置选项
+      try {
+        await ElMessageBox.confirm(
+          `${errMsg}\n\n如果上一次导入已中断或卡住，可以强制重置后重新导入。`,
+          '导入冲突',
+          { confirmButtonText: '强制重置', cancelButtonText: '稍后再试', type: 'warning' },
+        )
+        // 用户选择强制重置
+        await _resetImportLock()
+        ElMessage.success('已重置，请重新点击「确认导入」')
+      } catch {
+        // 用户选择稍后再试
+      }
+    } else {
+      ElMessage.error(errMsg)
+      await _resetImportLock()
+    }
   } finally {
     clearInterval(pollTimer)
     clearTimeout(timeoutTimer)
@@ -1504,6 +1564,13 @@ defineExpose({
 .gt-account-import-step {
   max-width: 960px;
   margin: 0 auto;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--gt-space-3);
 }
 
 .step-title {

@@ -27,6 +27,9 @@ _MAX_CONCURRENT_IMPORTS = 3  # 最大并发导入数
 _STALE_IMPORT_TIMEOUT = timedelta(minutes=30)  # 30分钟无进度视为卡死
 IMPORT_JOB_DATA_TYPE = "__smart_import_job__"
 
+# asyncio 互斥锁：保证 acquire_lock 的检查+写入原子性（单 worker 内有效）
+_acquire_mutex = asyncio.Lock()
+
 
 class ImportQueueService:
     """导入队列管理"""
@@ -231,57 +234,61 @@ class ImportQueueService:
     ) -> tuple[bool, str, UUID | None]:
         """尝试获取导入锁。
 
+        使用 asyncio.Lock 保证检查+写入的原子性，防止两个请求同时通过检查。
+
         Returns:
-            (success, message)
+            (success, message, batch_id)
         """
-        pid = str(project_id)
-        ImportQueueService._cleanup_stale_memory_locks()
-        await ImportQueueService._expire_stale_jobs(db)
+        async with _acquire_mutex:
+            pid = str(project_id)
+            ImportQueueService._cleanup_stale_memory_locks()
+            await ImportQueueService._expire_stale_jobs(db)
 
-        # 检查该项目是否已有导入在进行
-        if pid in _import_locks:
-            lock = _import_locks[pid]
-            return False, f"项目正在导入中（{lock.get('user', '?')} 于 {lock.get('started', '?')} 开始）", None
+            # 检查该项目是否已有导入在进行（内存锁）
+            if pid in _import_locks:
+                lock = _import_locks[pid]
+                return False, f"项目正在导入中（{lock.get('user', '?')} 于 {lock.get('started', '?')} 开始）", None
 
-        active_batch = await ImportQueueService._get_active_job_batch(project_id, db)
-        if active_batch is not None:
-            started = active_batch.started_at.isoformat() if active_batch.started_at else "?"
-            return False, f"项目正在导入中（{started} 开始）", None
+            # 检查数据库中是否有活跃任务（多 worker 兜底）
+            active_batch = await ImportQueueService._get_active_job_batch(project_id, db)
+            if active_batch is not None:
+                started = active_batch.started_at.isoformat() if active_batch.started_at else "?"
+                return False, f"项目正在导入中（{started} 开始）", None
 
-        # 检查总并发数
-        active = await ImportQueueService._count_active_jobs(db)
-        if active >= _MAX_CONCURRENT_IMPORTS:
-            return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试", None
+            # 检查总并发数
+            active = await ImportQueueService._count_active_jobs(db)
+            if active >= _MAX_CONCURRENT_IMPORTS:
+                return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试", None
 
-        started_at = datetime.utcnow()
-        batch = ImportBatch(
-            project_id=project_id,
-            year=year,
-            source_type=source_type,
-            file_name=file_name,
-            data_type=IMPORT_JOB_DATA_TYPE,
-            status=ImportStatus.processing,
-            started_at=started_at,
-            validation_summary={
-                "job": True,
-                "progress": 0,
-                "message": "导入任务已创建",
+            started_at = datetime.utcnow()
+            batch = ImportBatch(
+                project_id=project_id,
+                year=year,
+                source_type=source_type,
+                file_name=file_name,
+                data_type=IMPORT_JOB_DATA_TYPE,
+                status=ImportStatus.processing,
+                started_at=started_at,
+                validation_summary={
+                    "job": True,
+                    "progress": 0,
+                    "message": "导入任务已创建",
+                    "user": user_id,
+                },
+            )
+            db.add(batch)
+            await db.commit()
+            await db.refresh(batch)
+
+            _import_locks[pid] = {
+                "batch_id": str(batch.id),
                 "user": user_id,
-            },
-        )
-        db.add(batch)
-        await db.commit()
-        await db.refresh(batch)
-
-        _import_locks[pid] = {
-            "batch_id": str(batch.id),
-            "user": user_id,
-            "started": started_at.isoformat(),
-            "progress": 0,
-            "status": ImportStatus.processing.value,
-            "message": "导入任务已创建",
-        }
-        return True, "OK", batch.id
+                "started": started_at.isoformat(),
+                "progress": 0,
+                "status": ImportStatus.processing.value,
+                "message": "导入任务已创建",
+            }
+            return True, "OK", batch.id
 
     @staticmethod
     def release_lock(project_id: UUID):
