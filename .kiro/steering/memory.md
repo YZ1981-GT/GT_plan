@@ -297,7 +297,7 @@ inclusion: always
 - 文件清理（2026-04-25）：删除根目录旧前端 `frontend/`（早期AI原型）、`test_collab.db`（测试残留）、`backend/scripts/import_heping_data.py`（和平药房专用脚本，已被smart_import_engine替代）、`backend/tests/_patch_fixtures.py`（一次性批量替换脚本）、`backend/tests/test_staff_service_tmp.py`（临时测试文件，名称与内容不匹配）
 - 前端TS错误修复（2026-04-25）：audit-platform/frontend 179个TypeScript编译错误全部修复（30个Vue组件，主要集中在consolidation/collaboration），vue-tsc --noEmit 验证0错误；.gitignore新增 `审计报告模板/` 和 `ts_errors.txt`；审计报告模板（12个Word/Excel）从git中移除（本地保留）
 - 代码已推送GitHub（2026-04-25）：3个commit（清理冗余文件+修复179个TS错误+移除审计报告模板），ade8302..a55b3d7
-- 四表导入链路审查（2026-04-25）：发现7个核心问题待修复——①关键列缺失时balance/ledger没有阻断导入（只有account_chart会跳过）②预览(preview_file)和导入(smart_import_streaming)用两套不同解析路径导致表头名不一致 ③CSV预览走旧路径(account_chart_service.preview_file)而非smart_import_engine ④前端"确认导入"按钮没有关键列未映射的硬阻断 ⑤独立辅助表文件被直接跳过不入库 ⑥数据类型识别依赖列映射但映射可能不准 ⑦前端列映射变更后没有重新推断数据类型；改造方向：统一预览和导入的解析路径+前端关键列硬阻断+后端四表关键列校验+独立辅助表支持入库
+- 四表导入链路审查与修复（2026-04-25）：7个核心问题全部修复（commit be5d514）——①后端balance/ledger/aux_balance/aux_ledger关键列缺失时阻断导入 ②CSV预览改为走smart_import_engine统一路径 ③前端确认导入按钮增加关键列硬阻断（_REQUIRED_FIELDS_BY_TYPE与后端一致） ④独立辅助表文件支持直接入库 ⑤前端列映射变更后实时重新推断数据类型（_guessDataTypeFrontend） ⑥数据类型标签随映射变更实时更新 ⑦预览和导入解析路径统一
 - 用户计划对每个细分程序逐一打磨升级
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程

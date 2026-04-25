@@ -545,6 +545,9 @@ def _infer_level(code: str) -> int:
 def smart_parse_sheet(ws, *, read_only: bool = True) -> dict:
     """通用智能解析单个 worksheet。
 
+    注意：此函数会把所有数据行读入内存，仅适用于预览或小文件。
+    大文件流式导入请使用 parse_sheet_header_only() + iter_sheet_rows()。
+
     Returns:
         {
             "headers": [...],           # 合并后的列名
@@ -612,6 +615,117 @@ def smart_parse_sheet(ws, *, read_only: bool = True) -> dict:
         "year": year,
         "row_count": len(rows),
     }
+
+
+def parse_sheet_header_only(ws) -> dict:
+    """只解析表头和列映射，不读取数据行。用于流式导入场景。
+
+    Returns:
+        {
+            "headers": [...],
+            "header_start": int,
+            "header_count": int,
+            "column_mapping": {...},
+            "data_type": str,
+            "data_start": int,          # 数据起始行（0-indexed）
+            "num_cols": int,
+            "year": int | None,         # 从前几行提取的年度（采样）
+        }
+    """
+    header_start, header_count = detect_header_rows(ws)
+    headers = merge_header_rows(ws, header_start, header_count)
+
+    column_mapping = {}
+    for h in headers:
+        mapped = smart_match_column(h)
+        if mapped:
+            column_mapping[h] = mapped
+
+    mapped_fields = set(column_mapping.values())
+    data_type = _guess_data_type(mapped_fields)
+    data_start = header_start + header_count
+    num_cols = len(headers)
+
+    # 从前 30 行数据采样提取年度
+    sample_rows = []
+    try:
+        data_iter = ws.iter_rows(min_row=data_start + 1, max_row=data_start + 30, values_only=True)
+    except TypeError:
+        data_iter = ws.iter_rows(values_only=True)
+        for _ in range(data_start):
+            try:
+                next(data_iter)
+            except StopIteration:
+                data_iter = iter([])
+                break
+
+    for row_vals in data_iter:
+        padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
+        if all(c is None for c in padded[:num_cols]):
+            continue
+        row_dict = {}
+        for i in range(num_cols):
+            h = headers[i]
+            mapped = column_mapping.get(h, h)
+            row_dict[mapped] = padded[i]
+        sample_rows.append(row_dict)
+
+    year = extract_year_from_content(sample_rows)
+
+    return {
+        "headers": headers,
+        "header_start": header_start,
+        "header_count": header_count,
+        "column_mapping": column_mapping,
+        "data_type": data_type,
+        "data_start": data_start,
+        "num_cols": num_cols,
+        "year": year,
+    }
+
+
+def iter_sheet_rows(ws, meta: dict, batch_size: int = 50_000):
+    """逐批迭代 worksheet 数据行的生成器。每次 yield 一批 dict 列表。
+
+    Args:
+        ws: openpyxl worksheet
+        meta: parse_sheet_header_only() 的返回值
+        batch_size: 每批行数
+
+    Yields:
+        list[dict]  — 每批最多 batch_size 行
+    """
+    headers = meta["headers"]
+    column_mapping = meta["column_mapping"]
+    data_start = meta["data_start"]
+    num_cols = meta["num_cols"]
+
+    try:
+        data_iter = ws.iter_rows(min_row=data_start + 1, values_only=True)
+    except TypeError:
+        data_iter = ws.iter_rows(values_only=True)
+        for _ in range(data_start):
+            try:
+                next(data_iter)
+            except StopIteration:
+                return
+
+    batch: list[dict] = []
+    for row_vals in data_iter:
+        padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
+        if all(c is None for c in padded[:num_cols]):
+            continue
+        row_dict = {}
+        for i in range(num_cols):
+            h = headers[i]
+            mapped = column_mapping.get(h, h)
+            row_dict[mapped] = padded[i]
+        batch.append(row_dict)
+        if len(batch) >= batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
 
 
 def _parse_with_known_headers(ws, headers: list[str], header_start: int, header_count: int) -> dict:
@@ -2212,15 +2326,15 @@ async def smart_import_streaming(
             pct = 10 + int(sheets_done / max(sheet_count_est, 1) * 78)
             _prog(min(pct, 88), f"解析 {filename} / {sname}")
 
-            # ── 解析 sheet ──
+            # ── 解析表头（不读数据行，零内存） ──
             try:
-                parsed = smart_parse_sheet(ws)
+                meta = parse_sheet_header_only(ws)
             except Exception as e:
                 diagnostics.append({"file": filename, "sheet": sname,
                                     "status": "error", "message": str(e)})
                 continue
 
-            # ── 应用自定义映射 ──
+            # ── 应用自定义映射到表头 ──
             sm = None
             if custom_mapping:
                 if any(isinstance(v, dict) for v in custom_mapping.values()):
@@ -2228,47 +2342,28 @@ async def smart_import_streaming(
                 else:
                     sm = custom_mapping
             if sm:
-                orig_headers = list(parsed["headers"])
-                # 只有当自定义映射的 key 和解析出的 headers 有交集时才应用
+                orig_headers = list(meta["headers"])
                 matching_keys = [h for h in sm if h in orig_headers]
                 if matching_keys:
-                    orig_cm = dict(parsed["column_mapping"])
-                    handled = {orig_cm.get(h, h) for h in orig_headers}
                     for h, sf in sm.items():
-                        if h in orig_headers:
-                            parsed["column_mapping"][h] = sf
-                    new_rows = []
-                    for row in parsed["rows"]:
-                        nr: dict = {}
-                        for h in orig_headers:
-                            ck = orig_cm.get(h, h)
-                            if ck not in row:
-                                continue
-                            nr[parsed["column_mapping"].get(h, ck)] = row[ck]
-                        for k, v in row.items():
-                            if k not in handled:
-                                nr[k] = v
-                        new_rows.append(nr)
-                    parsed["rows"] = new_rows
-                    parsed["data_type"] = _guess_data_type(set(parsed["column_mapping"].values()))
-                else:
-                    logger.info("自定义映射 key 与 headers 不匹配，跳过: sm_keys=%s, headers=%s",
-                                list(sm.keys())[:5], orig_headers[:5])
+                        if h in orig_headers and sf:
+                            meta["column_mapping"][h] = sf
+                    meta["data_type"] = _guess_data_type(set(meta["column_mapping"].values()))
 
-            if parsed.get("year") is None:
-                parsed["year"] = extract_year_from_content(parsed["rows"], filename=filename)
+            if meta.get("year") is None:
+                meta["year"] = extract_year_from_content([], filename=filename)
 
-            dt = parsed["data_type"]
-            matched_fields = set(parsed["column_mapping"].values())
+            dt = meta["data_type"]
+            matched_fields = set(meta["column_mapping"].values())
             miss_req, miss_rec = _detect_missing_fields(dt, matched_fields)
 
             diag: dict = {
                 "file": filename, "sheet": sname, "data_type": dt,
-                "row_count": parsed["row_count"],
-                "header_count": parsed["header_count"],
+                "row_count": 0,  # 流式处理，最终更新
+                "header_count": meta["header_count"],
                 "matched_cols": sorted(matched_fields),
                 "missing_cols": miss_req, "missing_recommended": miss_rec,
-                "column_mapping": parsed["column_mapping"],
+                "column_mapping": meta["column_mapping"],
                 "status": "ok",
             }
 
@@ -2276,7 +2371,6 @@ async def smart_import_streaming(
                 diag["status"] = "skipped"
                 diag["message"] = f"科目表缺少必需列: {', '.join(miss_req)}"
                 diagnostics.append(diag)
-                parsed["rows"] = []
                 continue
 
             # 四表关键列缺失时也阻断（不入库）
@@ -2286,177 +2380,165 @@ async def smart_import_streaming(
                 diag["message"] = f"{_TYPE_LABELS.get(dt, dt)}缺少必需列: {', '.join(miss_req)}，请在列映射中手动指定"
                 errors.append(diag["message"])
                 diagnostics.append(diag)
-                parsed["rows"] = []
                 continue
 
-            # ── 按数据类型转换 & 写入 ──
-            logger.info("Sheet %s: data_type=%s, row_count=%d, matched=%s",
-                        sname, dt, parsed["row_count"], sorted(matched_fields)[:5])
-            if dt == "balance":
-                bal, aux_bal = convert_balance_rows(parsed["rows"])
-                logger.info("  balance: %d rows, aux: %d rows", len(bal), len(aux_bal))
-                diag["balance_count"] = len(bal)
-                diag["aux_balance_count"] = len(aux_bal)
+            # ── 流式逐批读取 + 转换 + 写入 ──
+            logger.info("Sheet %s: data_type=%s, streaming, matched=%s",
+                        sname, dt, sorted(matched_fields)[:5])
 
-                bal_tbl = TbBalance.__table__
-                for i in range(0, len(bal), CHUNK):
-                    recs = [{"id": _uuid.uuid4(), "project_id": project_id,
-                             "year": year, "import_batch_id": batches["tb_balance"].id,
-                             "is_deleted": False, **r} for r in bal[i:i + CHUNK]]
-                    if recs:
+            sheet_row_count = 0
+            bal_tbl = TbBalance.__table__
+            aux_bal_tbl = TbAuxBalance.__table__
+            led_tbl = TbLedger.__table__
+            aux_led_tbl = TbAuxLedger.__table__
+
+            # 用于 ledger 的跨批缓冲（不满 CHUNK 的尾部留到下一批）
+            _led_buf: list[dict] = []
+            _aux_led_buf: list[dict] = []
+
+            for batch_rows in iter_sheet_rows(ws, meta, batch_size=CHUNK):
+                sheet_row_count += len(batch_rows)
+
+                # 应用自定义映射到数据行（如果有）
+                if sm and matching_keys:
+                    orig_cm = {h: meta["column_mapping"].get(h, h) for h in meta["headers"]}
+                    remapped = []
+                    for row in batch_rows:
+                        nr: dict = {}
+                        for h in meta["headers"]:
+                            ck = orig_cm.get(h, h)
+                            if ck in row:
+                                nr[meta["column_mapping"].get(h, ck)] = row[ck]
+                        # 保留未映射的字段
+                        handled = set(orig_cm.values())
+                        for k, v in row.items():
+                            if k not in handled:
+                                nr[k] = v
+                        remapped.append(nr)
+                    batch_rows = remapped
+
+                if dt == "balance":
+                    bal, aux_bal = convert_balance_rows(batch_rows)
+                    if bal:
+                        recs = [{"id": _uuid.uuid4(), "project_id": project_id,
+                                 "year": year, "import_batch_id": batches["tb_balance"].id,
+                                 "is_deleted": False, **r} for r in bal]
                         await db.execute(bal_tbl.insert(), recs)
                         counts["tb_balance"] += len(recs)
-                        await db.flush()
-
-                aux_tbl = TbAuxBalance.__table__
-                for i in range(0, len(aux_bal), CHUNK):
-                    recs = [{"id": _uuid.uuid4(), "project_id": project_id,
-                             "year": year, "import_batch_id": batches["tb_aux_balance"].id,
-                             "is_deleted": False, **r} for r in aux_bal[i:i + CHUNK]]
-                    if recs:
-                        await db.execute(aux_tbl.insert(), recs)
+                    if aux_bal:
+                        recs = [{"id": _uuid.uuid4(), "project_id": project_id,
+                                 "year": year, "import_batch_id": batches["tb_aux_balance"].id,
+                                 "is_deleted": False, **r} for r in aux_bal]
+                        await db.execute(aux_bal_tbl.insert(), recs)
                         counts["tb_aux_balance"] += len(recs)
-                        await db.flush()
-
-                for r in aux_bal:
-                    t = r.get("aux_type", "?")
-                    _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
-
-                # 提取科目
-                for row in parsed["rows"]:
-                    _append_account_record(
-                        row=row,
-                        project_id=project_id,
-                        seen_codes=seen_codes,
-                        acct_records=acct_records,
-                        by_category=by_category,
-                    )
-
-                del bal, aux_bal
-
-            elif dt == "ledger":
-                led, _, aux_stats = convert_ledger_rows(parsed["rows"])
-                diag["ledger_count"] = len(led)
-                diag["aux_ledger_count"] = sum(aux_stats.values())
-                for t, c in aux_stats.items():
-                    _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
-
-                led_tbl = TbLedger.__table__
-                aux_led_tbl = TbAuxLedger.__table__
-                led_buf: list[dict] = []
-                aux_buf: list[dict] = []
-
-                for row in led:
-                    adim = row.pop("_aux_dim_str", "")
-                    led_buf.append({
-                        "id": _uuid.uuid4(), "project_id": project_id,
-                        "year": year, "import_batch_id": batches["tb_ledger"].id,
-                        "is_deleted": False, **row,
-                    })
-                    if adim and (":" in adim or "：" in adim):
-                        for dim in parse_aux_dimensions(adim):
-                            aux_buf.append({
-                                "id": _uuid.uuid4(), "project_id": project_id,
-                                "year": year,
-                                "import_batch_id": batches["tb_aux_ledger"].id,
-                                "is_deleted": False,
-                                "aux_type": dim["aux_type"],
-                                "aux_code": dim["aux_code"],
-                                "aux_name": dim["aux_name"],
-                                "aux_dimensions_raw": adim,
-                                **row,
-                            })
-                    if len(led_buf) >= CHUNK:
-                        await db.execute(led_tbl.insert(), led_buf)
-                        counts["tb_ledger"] += len(led_buf)
-                        led_buf.clear()
-                        await db.flush()
-                    if len(aux_buf) >= CHUNK:
-                        await db.execute(aux_led_tbl.insert(), aux_buf)
-                        counts["tb_aux_ledger"] += len(aux_buf)
-                        aux_buf.clear()
-                        await db.flush()
-
-                if led_buf:
-                    await db.execute(led_tbl.insert(), led_buf)
-                    counts["tb_ledger"] += len(led_buf)
-                if aux_buf:
-                    await db.execute(aux_led_tbl.insert(), aux_buf)
-                    counts["tb_aux_ledger"] += len(aux_buf)
-                await db.flush()
-
-                # 提取科目
-                for row in parsed["rows"]:
-                    _append_account_record(
-                        row=row,
-                        project_id=project_id,
-                        seen_codes=seen_codes,
-                        acct_records=acct_records,
-                        by_category=by_category,
-                    )
-
-                del led
-
-            elif dt == "account_chart":
-                added_before = len(acct_records)
-                for row in parsed["rows"]:
-                    _append_account_record(
-                        row=row,
-                        project_id=project_id,
-                        seen_codes=seen_codes,
-                        acct_records=acct_records,
-                        by_category=by_category,
-                    )
-                diag["account_count"] = len(acct_records) - added_before
-
-            elif dt == "aux_balance":
-                # 独立辅助余额表（非从核算维度拆分）直接入库
-                aux_bal_rows = parsed["rows"]
-                diag["aux_balance_count"] = len(aux_bal_rows)
-                aux_tbl = TbAuxBalance.__table__
-                for i in range(0, len(aux_bal_rows), CHUNK):
-                    recs = [{"id": _uuid.uuid4(), "project_id": project_id,
-                             "year": year, "import_batch_id": batches["tb_aux_balance"].id,
-                             "is_deleted": False, **r} for r in aux_bal_rows[i:i + CHUNK]]
-                    if recs:
-                        await db.execute(aux_tbl.insert(), recs)
-                        counts["tb_aux_balance"] += len(recs)
-                        await db.flush()
-                for r in aux_bal_rows:
-                    t = r.get("aux_type", "?")
-                    _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
-                del aux_bal_rows
-
-            elif dt == "aux_ledger":
-                # 独立辅助明细账直接入库
-                aux_led_rows = parsed["rows"]
-                diag["aux_ledger_count"] = len(aux_led_rows)
-                aux_led_tbl = TbAuxLedger.__table__
-                buf: list[dict] = []
-                for row in aux_led_rows:
-                    buf.append({
-                        "id": _uuid.uuid4(), "project_id": project_id,
-                        "year": year, "import_batch_id": batches["tb_aux_ledger"].id,
-                        "is_deleted": False, **row,
-                    })
-                    if len(buf) >= CHUNK:
-                        await db.execute(aux_led_tbl.insert(), buf)
-                        counts["tb_aux_ledger"] += len(buf)
-                        buf.clear()
-                        await db.flush()
-                if buf:
-                    await db.execute(aux_led_tbl.insert(), buf)
-                    counts["tb_aux_ledger"] += len(buf)
+                    for r in aux_bal:
+                        t = r.get("aux_type", "?")
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
                     await db.flush()
-                del aux_led_rows
-            else:
+
+                elif dt == "ledger":
+                    led, _, aux_stats = convert_ledger_rows(batch_rows)
+                    for t, c in aux_stats.items():
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+                    for row in led:
+                        adim = row.pop("_aux_dim_str", "")
+                        _led_buf.append({
+                            "id": _uuid.uuid4(), "project_id": project_id,
+                            "year": year, "import_batch_id": batches["tb_ledger"].id,
+                            "is_deleted": False, **row,
+                        })
+                        if adim and (":" in adim or "：" in adim):
+                            for dim in parse_aux_dimensions(adim):
+                                _aux_led_buf.append({
+                                    "id": _uuid.uuid4(), "project_id": project_id,
+                                    "year": year,
+                                    "import_batch_id": batches["tb_aux_ledger"].id,
+                                    "is_deleted": False,
+                                    "aux_type": dim["aux_type"],
+                                    "aux_code": dim["aux_code"],
+                                    "aux_name": dim["aux_name"],
+                                    "aux_dimensions_raw": adim,
+                                    **row,
+                                })
+                    if len(_led_buf) >= CHUNK:
+                        await db.execute(led_tbl.insert(), _led_buf)
+                        counts["tb_ledger"] += len(_led_buf)
+                        _led_buf.clear()
+                    if len(_aux_led_buf) >= CHUNK:
+                        await db.execute(aux_led_tbl.insert(), _aux_led_buf)
+                        counts["tb_aux_ledger"] += len(_aux_led_buf)
+                        _aux_led_buf.clear()
+                    await db.flush()
+
+                elif dt == "aux_balance":
+                    recs = [{"id": _uuid.uuid4(), "project_id": project_id,
+                             "year": year, "import_batch_id": batches["tb_aux_balance"].id,
+                             "is_deleted": False, **r} for r in batch_rows]
+                    if recs:
+                        await db.execute(aux_bal_tbl.insert(), recs)
+                        counts["tb_aux_balance"] += len(recs)
+                    for r in batch_rows:
+                        t = r.get("aux_type", "?")
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
+                    await db.flush()
+
+                elif dt == "aux_ledger":
+                    for row in batch_rows:
+                        _aux_led_buf.append({
+                            "id": _uuid.uuid4(), "project_id": project_id,
+                            "year": year, "import_batch_id": batches["tb_aux_ledger"].id,
+                            "is_deleted": False, **row,
+                        })
+                    if len(_aux_led_buf) >= CHUNK:
+                        await db.execute(aux_led_tbl.insert(), _aux_led_buf)
+                        counts["tb_aux_ledger"] += len(_aux_led_buf)
+                        _aux_led_buf.clear()
+                        await db.flush()
+
+                elif dt == "account_chart":
+                    pass  # 科目提取在下面统一做
+
+                # 提取科目（从每批数据中）
+                for row in batch_rows:
+                    _append_account_record(
+                        row=row,
+                        project_id=project_id,
+                        seen_codes=seen_codes,
+                        acct_records=acct_records,
+                        by_category=by_category,
+                    )
+
+            # ── flush 剩余缓冲 ──
+            if _led_buf:
+                await db.execute(led_tbl.insert(), _led_buf)
+                counts["tb_ledger"] += len(_led_buf)
+                _led_buf.clear()
+            if _aux_led_buf:
+                await db.execute(aux_led_tbl.insert(), _aux_led_buf)
+                counts["tb_aux_ledger"] += len(_aux_led_buf)
+                _aux_led_buf.clear()
+            await db.flush()
+
+            diag["row_count"] = sheet_row_count
+            if dt == "balance":
+                diag["balance_count"] = counts.get("tb_balance", 0)
+                diag["aux_balance_count"] = counts.get("tb_aux_balance", 0)
+            elif dt == "ledger":
+                diag["ledger_count"] = counts.get("tb_ledger", 0)
+                diag["aux_ledger_count"] = counts.get("tb_aux_ledger", 0)
+            elif dt == "aux_balance":
+                diag["aux_balance_count"] = sheet_row_count
+            elif dt == "aux_ledger":
+                diag["aux_ledger_count"] = sheet_row_count
+            elif dt == "account_chart":
+                diag["account_count"] = sheet_row_count
+
+            if dt == "unknown":
                 diag["status"] = "skipped"
                 diag["message"] = f"未识别的数据类型: {dt}"
                 logger.warning("  UNKNOWN data_type=%s, matched_fields=%s", dt, matched_fields)
 
             diagnostics.append(diag)
-            # 释放 parsed rows
-            parsed["rows"] = []
 
         wb.close()
 
