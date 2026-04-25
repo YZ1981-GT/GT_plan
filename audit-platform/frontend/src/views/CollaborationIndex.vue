@@ -31,7 +31,7 @@
           <el-table-column prop="received_status" label="状态" width="100" align="center">
             <template #default="{ row }">
               <el-tag :type="row.received_status === 'received' ? 'success' : row.received_status === 'overdue' ? 'danger' : 'info'" size="small">
-                {{ { not_received: '待提供', received: '已提供', overdue: '已逾期' }[row.received_status] || row.received_status }}
+                {{ ({ not_received: '待提供', received: '已提供', overdue: '已逾期' } as Record<string, string>)[row.received_status] || row.received_status }}
               </el-tag>
             </template>
           </el-table-column>
@@ -47,7 +47,7 @@
           <el-table-column prop="status" label="状态" width="100" align="center">
             <template #default="{ row }">
               <el-tag :type="row.status === 'replied' ? 'success' : row.status === 'sent' ? 'warning' : 'info'" size="small">
-                {{ { draft: '草稿', sent: '已发', replied: '已回', diff: '有差异' }[row.status] || row.status }}
+                {{ ({ draft: '草稿', sent: '已发', replied: '已回', diff: '有差异' } as Record<string, string>)[row.status] || row.status }}
               </el-tag>
             </template>
           </el-table-column>
@@ -59,12 +59,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import http from '@/utils/http'
+import { ref, onMounted } from 'vue'
 
-const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
 const activeTab = ref('timeline')
 const loading = ref(false)
 const timeline = ref<any[]>([])

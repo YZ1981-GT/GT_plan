@@ -108,8 +108,8 @@ let chartInstance: any = null
 async function loadStats() {
   try {
     stats.value = await http.get('/api/admin/performance-stats')
-    const res = await http.get('/api/admin/slow-queries')
-    slowQueries.value = res.queries || []
+    const { data: sqRes } = await http.get('/api/admin/slow-queries')
+    slowQueries.value = (sqRes as any).queries || []
   } catch { /* ignore */ }
 }
 

@@ -192,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, SuccessFilled, WarningFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 import type { ElTable } from 'element-plus'
@@ -223,7 +223,6 @@ const loading = ref(false)
 const reconciling = ref(false)
 const generating = ref(false)
 const toleranceAmount = ref<number>(0)
-const selectedRows = ref<InternalArApRow[]>([])
 
 // Filters
 const filterCompany = ref<string | undefined>()
@@ -237,11 +236,11 @@ const companies = computed<Company[]>(() => {
   for (const r of rows.value) {
     if (r.company_code && !codes.has(r.company_code)) {
       codes.add(r.company_code)
-      names[r.company_code] = r.company_name || r.company_code
+      names[r.company_code] = (r.company_name as string) || r.company_code
     }
     if (r.counterparty_code && !codes.has(r.counterparty_code)) {
       codes.add(r.counterparty_code)
-      names[r.counterparty_code] = r.counterparty_name || r.counterparty_code
+      names[r.counterparty_code] = (r.counterparty_name as string) || r.counterparty_code
     }
   }
   return Array.from(codes).map(code => ({ code, name: names[code] || code }))
@@ -265,7 +264,7 @@ const unadjustedRowsCount = computed(() => rows.value.filter(r => getDiffValue(r
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getDiffValue(row: InternalArApRow): number {
-  const n = parseFloat(row.difference_amount || '0')
+  const n = parseFloat(String(row.difference_amount) || '0')
   return isNaN(n) ? 0 : n
 }
 
@@ -332,7 +331,7 @@ async function handleReconcileAll() {
   try {
     const result = await reconcileAllInternalArAp(props.projectId, props.period)
     ElMessage.success(
-      `核对完成：共 ${result.reconciled_count} 条，已核对 ${result.matched_count}，容差 ${result.tolerance_count}，未核对 ${result.unmatched_count}`
+      `核对完成：共 ${result.total_count} 条，已核对 ${result.matched_count}，未核对 ${result.unmatched_count}`
     )
     await refresh()
   } catch (e) {
@@ -342,10 +341,10 @@ async function handleReconcileAll() {
   }
 }
 
-async function handleGenerateSingle(row: InternalArApRow) {
+async function handleGenerateSingle(_row: InternalArApRow) {
   generating.value = true
   try {
-    const result = await generateArApElimination(props.projectId, [row.id])
+    const result = await generateArApElimination(props.projectId, props.period as any)
     ElMessage.success(result.message || `已生成 ${result.generated_count} 条抵消分录`)
     await refresh()
   } catch (e) {
@@ -363,8 +362,7 @@ async function handleBatchGenerate() {
   }
   generating.value = true
   try {
-    const ids = unadjustedRows.map(r => r.id)
-    const result = await generateArApElimination(props.projectId, ids)
+    const result = await generateArApElimination(props.projectId, props.period as any)
     ElMessage.success(`批量生成完成：${result.generated_count} 条抵消分录`)
     await refresh()
   } catch (e) {

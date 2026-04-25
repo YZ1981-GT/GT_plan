@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Bell, Warning, Success, InfoFilled, CircleCheckFilled } from '@element-plus/icons-vue'
+import { Bell, Warning, CircleCheckFilled, InfoFilled } from '@element-plus/icons-vue'
 import { notificationApi } from '@/services/collaborationApi'
 
 const popoverVisible = ref(false)
@@ -124,7 +124,7 @@ function iconComponent(type: string) {
     REVIEW: Warning,
     AUDIT: InfoFilled,
     COMMENT: Bell,
-    APPROVAL: Success,
+    APPROVAL: CircleCheckFilled,
     DEFAULT: CircleCheckFilled,
   }
   return map[type] || Bell

@@ -150,8 +150,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useConsolidationStore } from '@/stores/consolidation'
 import {
   createComponentAuditor, updateComponentAuditor, deleteComponentAuditor,
-  createInstruction, updateInstruction, deleteInstruction,
-  createResult, updateResult, deleteResult,
+  deleteInstruction,
+  deleteResult,
 } from '@/services/consolidationApi'
 import type { ComponentAuditor, Instruction, InstructionResult } from '@/services/consolidationApi'
 import ComponentAuditorPanel from '@/components/consolidation/ComponentAuditorPanel.vue'
@@ -176,8 +176,6 @@ const selectedAuditorId = ref('')
 
 // ─── Legacy Forms ─────────────────────────────────────────────────────────────
 const auditorForm = ref({ component_name: '', auditor_name: '', auditor_email: '', scope: '', status: 'pending', component_auditor_id: '' })
-const instructionForm = ref({ instruction_no: '', content: '', issued_date: '', due_date: '', status: 'pending', component_auditor_id: '' })
-const resultForm = ref({ result_no: '', summary: '', received_date: '', status: 'pending', instruction_id: '', component_auditor_id: '' })
 
 const statusCards = computed(() => [
   { label: '待开始', status: 'pending', count: store.auditorsByStatus.pending.length },
@@ -194,7 +192,7 @@ function statusType(s: string) {
 function showAuditorDialog(row?: ComponentAuditor) {
   editingAuditor.value = row || null
   if (row) {
-    auditorForm.value = { component_name: row.component_name, auditor_name: row.auditor_name, auditor_email: row.auditor_email, scope: row.scope, status: row.status, component_auditor_id: row.id }
+    auditorForm.value = { component_name: row.component_name || '', auditor_name: row.auditor_name || '', auditor_email: row.auditor_email || '', scope: row.scope || '', status: row.status, component_auditor_id: row.id }
   } else {
     auditorForm.value = { component_name: '', auditor_name: '', auditor_email: '', scope: '', status: 'pending', component_auditor_id: '' }
   }
@@ -212,7 +210,7 @@ function onInstructionAdd(auditorId: string) {
   instructionFormVisible.value = true
 }
 
-function onResultAdd(instructionId: string) {
+function onResultAdd(_instructionId: string) {
   editingResult.value = null
   resultFormVisible.value = true
 }
@@ -226,18 +224,18 @@ function onAuditorSelected(auditor: ComponentAuditor) {
   selectedAuditorId.value = auditor.id
 }
 
-function onInstructionSelected(instruction: Instruction) {
+function onInstructionSelected(_instruction: Instruction) {
   // no-op for now
 }
 
 async function onInstructionSaved(instruction: Instruction) {
   await store.fetchInstructions(props.projectId)
-  auditorPanelRef.value?.loadInstructions(instruction.component_auditor_id)
+  auditorPanelRef.value?.loadInstructions(instruction.component_auditor_id || '')
 }
 
 async function onResultSaved(result: InstructionResult) {
   await store.fetchResults(props.projectId)
-  auditorPanelRef.value?.loadResults(result.instruction_id)
+  auditorPanelRef.value?.loadResults(result.instruction_id || '')
 }
 
 async function onSaveAuditor() {
@@ -275,7 +273,7 @@ async function onDeleteResult(row: InstructionResult) {
   await ElMessageBox.confirm('确认删除？', '提示')
   await deleteResult(row.id, props.projectId)
   store.results = store.results.filter(r => r.id !== row.id)
-  auditorPanelRef.value?.loadResults(row.instruction_id)
+  auditorPanelRef.value?.loadResults(row.instruction_id || '')
   ElMessage.success('删除成功')
 }
 

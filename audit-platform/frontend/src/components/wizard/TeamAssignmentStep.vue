@@ -124,7 +124,6 @@ import { ElMessage } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
 import { listStaff, createStaff, listAssignments, saveAssignments, type StaffMember, type Assignment } from '@/services/staffApi'
 import { useWizardStore } from '@/stores/wizard'
-import http from '@/utils/http'
 
 const props = defineProps<{ projectId?: string }>()
 const wizardStore = useWizardStore()

@@ -249,8 +249,7 @@ async function submitReview() {
       workpaper_id: props.workpaperId,
       project_id: props.projectId,
       review_level: reviewForm.value.review_level,
-      comments: reviewForm.value.comments,
-    })
+    } as any)
     ElMessage.success('复核意见已提交')
     createDialogVisible.value = false
     await loadReviews()

@@ -39,7 +39,7 @@
             </template>
           </el-table-column>
           <el-table-column label="确认状态" width="140">
-            <template #default="{ row }">
+            <template #default>
               <el-tag type="info" effect="plain">AI辅助-待人工确认</el-tag>
             </template>
           </el-table-column>
@@ -186,6 +186,7 @@ interface ReplyResult {
   extractedUnit?: string
   confirmedAmount?: number
   bookAmount?: number
+  unitMismatch?: boolean
   amountMismatch?: boolean
   hasSeal?: boolean
   sealMismatch?: boolean
@@ -272,7 +273,7 @@ async function runAddressVerify() {
   try {
     // 调用 API: POST /api/projects/{id}/confirmations/ai/address-verify
     const result = await confirmationAI.verifyAddresses(props.projectId)
-    addressResults.value = result.data || []
+    addressResults.value = (result.data || []) as any
     ElMessage.success('地址核查完成')
   } catch (e) {
     console.error('Address verification failed:', e)
@@ -458,7 +459,7 @@ onMounted(async () => {
   try {
     // 调用 API: GET /api/projects/{id}/confirmations/ai/checks
     const result = await confirmationAI.getChecks(props.projectId)
-    addressResults.value = result.data || []
+    addressResults.value = (result.data || []) as any
   } catch (e) {
     console.error('Failed to load checks:', e)
     // 不显示错误，让用户手动点击加载

@@ -12,9 +12,9 @@
       <el-table-column prop="project_role" label="项目角色" />
       <el-table-column prop="assigned_cycles" label="审计期间" />
       <el-table-column label="操作" width="160">
-        <template #default="{ row }">
-          <el-button size="small" @click="editRole(row)">修改角色</el-button>
-          <el-button size="small" type="danger" @click="removeMember(row)">移除</el-button>
+        <template #default="{ row: _row }">
+          <el-button size="small" @click="editRole(_row)">修改角色</el-button>
+          <el-button size="small" type="danger" @click="removeMember(_row)">移除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -80,7 +80,7 @@ async function removeMember(row: any) {
   teamMembers.value = teamMembers.value.filter(m => m.id !== row.id)
 }
 
-function editRole(row: any) {
+function editRole(_row: any) {
   // implement role edit dialog
 }
 </script>

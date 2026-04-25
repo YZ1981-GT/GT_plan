@@ -20,7 +20,7 @@
       <el-table-column prop="status" label="状态" width="80" align="center">
         <template #default="{ row }">
           <el-tag :type="row.status === 'confirmed' ? 'success' : row.status === 'approved' ? '' : 'info'" size="small">
-            {{ { draft: '草稿', confirmed: '已确认', approved: '已审批' }[row.status] || row.status }}
+            {{ ({ draft: '草稿', confirmed: '已确认', approved: '已审批' } as Record<string, string>)[row.status] || row.status }}
           </el-tag>
         </template>
       </el-table-column>
@@ -66,9 +66,6 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listWorkHours, createWorkHour, updateWorkHour, getAISuggestions, getMyAssignments, getMyStaffId, type WorkHourRecord } from '@/services/staffApi'
-import { useAuthStore } from '@/stores/auth'
-
-const authStore = useAuthStore()
 
 const hours = ref<WorkHourRecord[]>([])
 const loading = ref(false)

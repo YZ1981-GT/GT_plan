@@ -47,7 +47,7 @@ const completenessFindings = computed(() =>
 async function runValidation() {
   loading.value = true
   try {
-    const res = await http.post(`/api/projects/${props.projectId}/data-validation`)
+    const { data: res } = await http.post(`/api/projects/${props.projectId}/data-validation`)
     findings.value = res.findings || []
     summary.value = { total: res.total, ...res.by_severity }
     ElMessage.success(`校验完成，发现 ${res.total} 项问题`)

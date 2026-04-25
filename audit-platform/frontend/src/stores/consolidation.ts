@@ -88,25 +88,25 @@ export const useConsolidationStore = defineStore('consolidation', () => {
 
   async function fetchInternalTrades(projectId: string, year?: number) {
     loading.value = true
-    try { internalTrades.value = await api.getInternalTrades(projectId, year) }
+    try { internalTrades.value = await api.getInternalTrades(projectId, year ?? new Date().getFullYear()) }
     finally { loading.value = false }
   }
 
   async function fetchGoodwillRows(projectId: string, year?: number) {
     loading.value = true
-    try { goodwillRows.value = await api.getGoodwillRows(projectId, year) }
+    try { goodwillRows.value = await api.getGoodwillRows(projectId, year ?? new Date().getFullYear()) }
     finally { loading.value = false }
   }
 
   async function fetchForexRows(projectId: string, year?: number) {
     loading.value = true
-    try { forexRows.value = await api.getForexRows(projectId, year) }
+    try { forexRows.value = await api.getForexRows(projectId, year ?? new Date().getFullYear()) }
     finally { loading.value = false }
   }
 
   async function fetchMinorityInterestRows(projectId: string, year?: number) {
     loading.value = true
-    try { miRows.value = await api.getMinorityInterestRows(projectId, year) }
+    try { miRows.value = await api.getMinorityInterestRows(projectId, year ?? new Date().getFullYear()) }
     finally { loading.value = false }
   }
 
@@ -145,11 +145,11 @@ export const useConsolidationStore = defineStore('consolidation', () => {
         api.getForexTranslationNotes(projectId, period),
       ])
       consolScopeNotes.value = scope
-      subsidiaryNotes.value = subs
+      subsidiaryNotes.value = subs as any
       goodwillNotes.value = gw
       minorityInterestNotes.value = mi
       internalTradeNotes.value = tradeNotes
-      forexNotes.value = fx
+      forexNotes.value = fx as any
     } finally {
       loading.value = false
     }

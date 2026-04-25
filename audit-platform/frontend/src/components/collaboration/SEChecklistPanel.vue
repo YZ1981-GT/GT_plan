@@ -67,7 +67,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
-import { auditPlatformApi } from '@/services/auditPlatformApi'
+import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{ projectId: string }>()
@@ -114,8 +114,8 @@ const loadItems = async () => {
   if (!props.projectId) return
   loading.value = true
   try {
-    const res = await auditPlatformApi.getSEChecklist(props.projectId)
-    items.value = res.data
+    const res = await http.get(`/api/projects/${props.projectId}/se-checklist`)
+    items.value = res.data?.data ?? res.data
   } catch {
     items.value = []
   } finally {
@@ -141,10 +141,10 @@ const handleSave = async () => {
     if (!valid) return
     try {
       if (isEditing.value) {
-        await auditPlatformApi.updateSEChecklistItem(props.projectId, form.value.id, form.value)
+        await http.put(`/api/projects/${props.projectId}/se-checklist/${form.value.id}`, form.value)
         ElMessage.success('已更新')
       } else {
-        await auditPlatformApi.createSEChecklistItem(props.projectId, form.value)
+        await http.post(`/api/projects/${props.projectId}/se-checklist`, form.value)
         ElMessage.success('已添加')
       }
       dialogVisible.value = false
@@ -157,7 +157,7 @@ const handleSave = async () => {
 
 const handleDelete = async (row: any) => {
   try {
-    await auditPlatformApi.deleteSEChecklistItem(props.projectId, row.id)
+    await http.delete(`/api/projects/${props.projectId}/se-checklist/${row.id}`)
     ElMessage.success('已删除')
     loadItems()
   } catch {

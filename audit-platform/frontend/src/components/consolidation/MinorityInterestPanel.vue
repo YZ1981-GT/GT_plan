@@ -494,11 +494,11 @@ async function onDeleteEquity(row: LocalEquityRow, index: number) {
   equityRows.value.splice(index, 1)
   if (!equityRows.value.length) equityRows.value.push(makeEmptyEquity())
 }
-async function onDeleteProfit(row: LocalProfitRow, index: number) {
+async function onDeleteProfit(_row: LocalProfitRow, index: number) {
   profitRows.value.splice(index, 1)
   if (!profitRows.value.length) profitRows.value.push(makeEmptyProfit())
 }
-async function onDeleteChange(row: LocalChangeRow, index: number) {
+async function onDeleteChange(_row: LocalChangeRow, index: number) {
   changeRows.value.splice(index, 1)
   if (!changeRows.value.length) changeRows.value.push(makeEmptyChange())
 }

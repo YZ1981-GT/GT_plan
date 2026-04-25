@@ -103,7 +103,6 @@ import {
   Document, CircleCheck, Warning, Close, WarnTriangleFilled, Right, SuccessFilled,
   Refresh, Download
 } from '@element-plus/icons-vue'
-import type { FormInstance } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { evidenceChain } from '@/services/aiApi'
 import type {
@@ -112,24 +111,12 @@ import type {
   EvidenceChainSummary
 } from '@/services/aiApi'
 
-interface ChainTab {
-  label: string
-  value: string
-}
-
 const props = defineProps<{
   projectId: string
 }>()
 
 const currentTab = ref<string>('revenue')
 const loading = ref(false)
-
-const chainTabs: ChainTab[] = [
-  { label: '收入循环', value: 'revenue' },
-  { label: '采购循环', value: 'purchase' },
-  { label: '费用报销', value: 'expense' },
-  { label: '银行流水分析', value: 'bank-analysis' },
-]
 
 const summary = reactive<EvidenceChainSummary>({
   total: 0,

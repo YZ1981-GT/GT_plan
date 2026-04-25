@@ -80,7 +80,7 @@
             class="lines-table"
           >
             <el-table-column label="科目" min-width="200">
-              <template #default="{ row, $index }">
+              <template #default="{ row }">
                 <el-select
                   v-model="row.account_code"
                   filterable
@@ -384,16 +384,16 @@ function loadEntryData() {
     form.value = {
       entry_type: e.entry_type,
       year: String(e.year),
-      currency: e.lines[0]?.currency || 'CNY',
+      currency: (e.lines[0]?.currency as string) || 'CNY',
       description: e.description,
       related_company_codes: e.related_company_codes || [],
       lines: e.lines.map(l => ({
         account_code: l.account_code,
         account_name: l.account_name,
-        direction: (l.debit_amount || 0) > 0 ? 'debit' : 'credit',
+        direction: (l.debit_amount || 0) > 0 ? 'debit' as const : 'credit' as const,
         amount: Math.abs((l.debit_amount || 0) || (l.credit_amount || 0)),
-        currency: l.currency || 'CNY',
-        remark: l.remark || '',
+        currency: (l.currency as string) || 'CNY',
+        remark: (l.remark as string) || '',
       })),
       remark: '',
     }
@@ -453,7 +453,7 @@ async function onSave() {
         related_company_codes: form.value.related_company_codes,
         currency: form.value.currency,
       }
-      const result = await createEliminationEntry(payload)
+      const result = await createEliminationEntry(props.projectId, payload)
       ElMessage.success('创建成功')
       emit('saved', result)
       visible.value = false

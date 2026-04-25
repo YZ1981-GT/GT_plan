@@ -375,7 +375,7 @@ function isExtraRow(row: ConsolReportRow): boolean {
   return ['商誉', '少数股东权益', '少数股东权益合计', '少数股东损益', '归属于母公司净利润'].includes(row.account_name)
 }
 
-function isEditable(row: ConsolReportRow): boolean {
+function isEditable(_row: ConsolReportRow): boolean {
   return viewMode.value === 'edit'
 }
 
@@ -423,7 +423,7 @@ async function onSubmitReview() {
     await saveConsolReport(props.projectId, reportType.value, period.value, {
       ...reportData.value!,
       rows: reportRows.value,
-    } as ConsolReportData)
+    } as any)
     ElMessage.success('提交复核成功')
   } catch (e: any) {
     if (e !== 'cancel') {

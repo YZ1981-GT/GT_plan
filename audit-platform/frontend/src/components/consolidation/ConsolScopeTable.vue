@@ -117,7 +117,7 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="变更类型">
-          {{ scopeChangeLabel(detailsRow.scopeChangeType) }}
+          {{ scopeChangeLabel(detailsRow.scopeChangeType as string | null) }}
         </el-descriptions-item>
         <el-descriptions-item label="纳入原因" :span="2">{{ detailsRow.inclusionReason || '—' }}</el-descriptions-item>
         <el-descriptions-item label="排除原因" :span="2">{{ detailsRow.exclusionReason || '—' }}</el-descriptions-item>
@@ -129,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ElTable } from 'element-plus'
 import { getConsolScope, batchUpdateConsolScope, type ConsolScopeRow } from '@/services/consolidationApi'
@@ -303,9 +303,9 @@ function handleExport() {
         r.companyCode,
         r.companyName,
         r.isIncluded ? '纳入' : '排除',
-        consolMethodLabel(r.scopeChangeType || r.consolMethod),
-        scopeChangeLabel(r.scopeChangeType),
-        (r.notes || '').replace(/,/g, '，'),
+        consolMethodLabel((r.scopeChangeType || r.consolMethod) as string | null),
+        scopeChangeLabel(r.scopeChangeType as string | null),
+        ((r.notes as string) || '').replace(/,/g, '，'),
       ].join(','),
     ),
   ].join('\n')

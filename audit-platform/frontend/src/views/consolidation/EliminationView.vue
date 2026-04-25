@@ -86,7 +86,7 @@ import EliminationList from '@/components/consolidation/EliminationList.vue'
 import ConsolTrialBalance from '@/components/consolidation/ConsolTrialBalance.vue'
 import type { ConsolTrialBalanceEntry } from '@/services/consolidationApi'
 
-const props = defineProps<{
+defineProps<{
   projectId: string
   year: number
 }>()

@@ -75,7 +75,7 @@
       <el-col :span="12">
         <h3 class="gt-section-title">间接法补充资料</h3>
         <el-table v-if="indirectMethod" :data="indirectMethod.items" border size="small"
-          :row-class-name="({ row }) => row.is_total ? 'total-row' : ''">
+          :row-class-name="({ row }: any) => row.is_total ? 'total-row' : ''">
           <el-table-column prop="label" label="项目" min-width="250" />
           <el-table-column label="金额" width="150" align="right">
             <template #default="{ row }">{{ fmtAmt(row.amount) }}</template>
@@ -190,7 +190,7 @@ function categoryTagType(c: string) {
 async function fetchAll() {
   loading.value = true
   try {
-    const wsData = await getCFSWorksheet(projectId.value, year.value)
+    const wsData = await getCFSWorksheet(projectId.value, year.value) as any
     if (Array.isArray(wsData)) {
       worksheetRows.value = wsData
       adjustments.value = []

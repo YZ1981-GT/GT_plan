@@ -7,8 +7,8 @@
 
     <el-alert
       v-if="store.consistencyResult"
-      :type="store.consistencyResult.consistent ? 'success' : 'warning'"
-      :title="store.consistencyResult.consistent ? '数据一致' : `${store.consistencyResult.checks.filter(c => !c.passed).length} 项不一致`"
+      :type="store.consistencyResult.is_balanced ? 'success' : 'warning'"
+      :title="store.consistencyResult.is_balanced ? '数据一致' : `借贷不平衡，差额: ${store.consistencyResult.difference}`"
       show-icon
       style="margin-bottom: 12px"
     />

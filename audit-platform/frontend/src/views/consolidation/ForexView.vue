@@ -68,7 +68,7 @@ function formatNum(v: string | null) {
 function showDialog(row?: ForexRow) {
   editing.value = row || null
   if (row) {
-    form.value = { entity_name: row.entity_name, currency: row.currency, functional_currency: row.functional_currency, exchange_rate_used: row.exchange_rate_used, monetary_assets: row.monetary_assets, monetary_liabilities: row.monetary_liabilities, translation_differences: row.translation_differences, notes: row.notes, year: row.year }
+    form.value = { entity_name: row.entity_name || '', currency: row.currency || '', functional_currency: row.functional_currency || '', exchange_rate_used: row.exchange_rate_used || '', monetary_assets: row.monetary_assets || '', monetary_liabilities: row.monetary_liabilities || '', translation_differences: row.translation_differences || '', notes: row.notes || '', year: row.year }
   } else {
     form.value = { entity_name: '', currency: '', functional_currency: 'CNY', exchange_rate_used: '1', monetary_assets: '0', monetary_liabilities: '0', translation_differences: '0', notes: '', year: props.year }
   }

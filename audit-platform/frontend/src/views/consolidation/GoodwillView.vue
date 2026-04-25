@@ -70,7 +70,7 @@ function formatNum(v: string | null) {
 function showDialog(row?: GoodwillRow) {
   editing.value = row || null
   if (row) {
-    form.value = { cash_generating_unit: row.cash_generating_unit, acquisition_name: row.acquisition_name, initial_amount: row.initial_amount, cumulative_impairment: row.cumulative_impairment, net_amount: row.net_amount, recoverable_amount: row.recoverable_amount, impairment_test_date: row.impairment_test_date, notes: row.notes, year: row.year }
+    form.value = { cash_generating_unit: row.cash_generating_unit || '', acquisition_name: row.acquisition_name || '', initial_amount: row.initial_amount || '', cumulative_impairment: row.cumulative_impairment || '', net_amount: row.net_amount || '', recoverable_amount: row.recoverable_amount || '', impairment_test_date: row.impairment_test_date || '', notes: row.notes || '', year: row.year }
   } else {
     form.value = { cash_generating_unit: '', acquisition_name: '', initial_amount: '0', cumulative_impairment: '0', net_amount: '0', recoverable_amount: '0', impairment_test_date: '', notes: '', year: props.year }
   }

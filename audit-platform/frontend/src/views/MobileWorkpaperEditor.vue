@@ -15,10 +15,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
-const props = defineProps<{ wpId?: string; wpName?: string }>()
+defineProps<{ wpId?: string; wpName?: string }>()
 
 function handleDownload() {
   ElMessage.info('下载功能开发中')

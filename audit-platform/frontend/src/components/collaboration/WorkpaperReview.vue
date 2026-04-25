@@ -7,17 +7,17 @@
       <el-table-column prop="id" label="ID" width="200" />
       <el-table-column prop="title" label="标题" />
       <el-table-column label="复核状态" width="200">
-        <template #default="{ row }">
+        <template #default="{ row: _row }">
           <div class="review-levels">
-            <el-tag v-for="l in 3" :key="l" :type="getReviewTagType(row, l)" size="small">
-              {{ getReviewStatus(row, l) }}
+            <el-tag v-for="l in 3" :key="l" :type="getReviewTagType(_row, l)" size="small">
+              {{ getReviewStatus(_row, l) }}
             </el-tag>
           </div>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="120">
-        <template #default="{ row }">
-          <el-button size="small" @click="viewReviews(row)">查看</el-button>
+        <template #default="{ row: _row2 }">
+          <el-button size="small" @click="viewReviews(_row2)">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -34,7 +34,7 @@ onMounted(async () => {
   // Load workpapers with review info
 })
 
-function getReviewStatus(row: any, level: number) {
+function getReviewStatus(_row: any, _level: number) {
   // return status for each level
   return '待复核'
 }
@@ -48,7 +48,7 @@ function getReviewTagType(row: any, level: number) {
 
 async function viewReviews(row: any) {
   try {
-    const { data } = await reviewApi.list(row.id)
+    await reviewApi.list(row.id)
     // reviews loaded
   } catch (e) {
     console.error(e)

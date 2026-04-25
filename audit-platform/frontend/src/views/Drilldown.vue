@@ -234,7 +234,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useDrilldownStore } from '@/stores/drilldown'
 import type { BalanceRow, AuxBalanceRow } from '@/stores/drilldown'

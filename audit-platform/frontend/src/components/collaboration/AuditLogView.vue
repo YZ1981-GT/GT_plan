@@ -10,8 +10,8 @@
       <el-table-column prop="object_type" label="对象类型" />
       <el-table-column prop="object_id" label="对象ID" width="200" />
       <el-table-column label="详情" width="100">
-        <template #default="{ row }">
-          <el-button size="small" @click="viewDetail(row)">查看</el-button>
+        <template #default="{ row: _row }">
+          <el-button size="small" @click="viewDetail(_row)">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -45,7 +45,7 @@ async function fetchLogs() {
   }
 }
 
-function viewDetail(row: any) {
+function viewDetail(_row: any) {
   // TODO: open detail dialog
 }
 </script>

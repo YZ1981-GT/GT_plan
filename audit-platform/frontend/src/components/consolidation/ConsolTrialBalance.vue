@@ -229,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Download, Check } from '@element-plus/icons-vue'
 import {
@@ -237,7 +237,6 @@ import {
   exportConsolTrialExcel,
   type ConsolTrialBalanceEntry,
   type ConsolTrialBalanceFilter,
-  type EliminationEntryType,
 } from '@/services/consolidationApi'
 
 // ─── Props & Emits ─────────────────────────────────────────────────────────
@@ -294,17 +293,7 @@ const displayRows = computed(() => {
   return rows
 })
 
-// 分组汇总
-const groupTotals = computed(() => {
-  const groups: Record<string, { debit: number; credit: number }> = {}
-  displayRows.value.forEach(row => {
-    const cat = row.account_category || 'other'
-    if (!groups[cat]) groups[cat] = { debit: 0, credit: 0 }
-    if (row.consol_amount > 0) groups[cat].debit += row.consol_amount
-    else if (row.consol_amount < 0) groups[cat].credit += Math.abs(row.consol_amount)
-  })
-  return groups
-})
+// 分组汇总（保留计算逻辑供未来使用）
 
 // 合计行
 const totalIndividualSum = computed(() =>
@@ -364,7 +353,7 @@ function toggleDetail(row: ConsolTrialBalanceEntry, companyCode: string) {
   }
 }
 
-function onExpandChange(row: ConsolTrialBalanceEntry) {
+function onExpandChange(_row: ConsolTrialBalanceEntry) {
   // handled by el-table expand
 }
 

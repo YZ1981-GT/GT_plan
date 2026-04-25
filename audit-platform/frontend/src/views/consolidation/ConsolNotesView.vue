@@ -281,7 +281,7 @@
         <el-collapse-item name="forex" title="外币折算">
           <template #title>
             <span class="collapse-title">
-              <el-icon><Currency /></el-icon> 外币折算
+              <el-icon><Coin /></el-icon> 外币折算
             </span>
           </template>
           <div class="section-content">
@@ -367,7 +367,6 @@ import {
   Coin,
   User,
   Goods,
-  Currency,
   InfoFilled,
   Plus,
   Select,
@@ -473,12 +472,12 @@ async function loadAllNotes() {
       getForexTranslationNotes(props.projectId, period.value),
     ])
     consolScope.value = scope
-    subsidiaries.value = subs
+    subsidiaries.value = subs as any
     goodwill.value = gw
     minorityInterest.value = mi
     internalTrades.value = tradeNotes.trades
     internalArAp.value = tradeNotes.arap
-    forexTranslation.value = fx
+    forexTranslation.value = fx as any
   } catch (e: any) {
     ElMessage.error(e?.message || '加载附注数据失败')
   } finally {

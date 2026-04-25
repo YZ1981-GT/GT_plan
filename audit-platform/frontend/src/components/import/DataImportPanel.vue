@@ -197,7 +197,7 @@ async function startImport() {
     if (dup.has_duplicates) {
       // 弹窗让用户选择
       try {
-        const action = await ElMessageBox.confirm(
+        await ElMessageBox.confirm(
           `${dup.message}。\n\n选择"覆盖"将删除旧数据后重新导入，选择"跳过"将只导入新增记录。`,
           '检测到重复数据',
           {

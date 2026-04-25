@@ -21,7 +21,7 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 
 // 全局错误处理 — 防止组件错误导致白屏
-app.config.errorHandler = (err, instance, info) => {
+app.config.errorHandler = (err, _instance, info) => {
   console.error('[全局错误]', err, info)
   ElMessage.error('页面发生错误，请刷新重试')
 }

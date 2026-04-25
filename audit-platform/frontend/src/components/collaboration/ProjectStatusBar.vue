@@ -153,7 +153,7 @@ const gateItems = computed((): GateItem[] => {
   return items
 })
 
-function onStepClick(step: typeof steps[0], index: number) {
+function onStepClick(_step: typeof steps[0], index: number) {
   // 只能前进到当前阶段的下一阶段或已完成的阶段
   if (index <= currentStepIndex.value) {
     return

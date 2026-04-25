@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { riskApi } from '@/services/collaborationApi'
@@ -182,12 +182,6 @@ const newRisk = ref({
 })
 
 // Heatmap color mapping
-const riskColors: Record<string, string> = {
-  high: '#F56C6C',
-  medium: '#E6A23C',
-  low: '#67C23A',
-}
-
 function getHeatmapColor(ir: string, cr: string): string {
   const matrix: Record<string, Record<string, string>> = {
     high: { high: '#F56C6C', medium: '#E6A23C', low: '#E6A23C' },

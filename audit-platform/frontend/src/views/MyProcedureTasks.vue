@@ -32,7 +32,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import http from '@/utils/http'
 const router = useRouter()
 const loading = ref(false)
 const tasks = ref<any[]>([])
@@ -47,11 +46,11 @@ const groupedTasks = computed(() => {
 })
 const completedCount = computed(() => tasks.value.filter(t => t.execution_status === 'completed').length)
 const completionRate = computed(() => tasks.value.length ? Math.round(completedCount.value / tasks.value.length * 100) : 0)
-function openWP(row: any) {
+function openWP(_row: any) {
   // TODO: 需要 project_id 和 wp_id 来跳转
   router.push(`/poc`)
 }
-async function updateStatus(row: any) {
+async function updateStatus(_row: any) {
   // TODO: 调用后端更新 execution_status
 }
 onMounted(async () => {

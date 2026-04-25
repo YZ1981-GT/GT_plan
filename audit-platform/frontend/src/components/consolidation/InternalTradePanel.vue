@@ -221,11 +221,11 @@
           {{ detailRow.buyer_company_name || detailRow.buyer_company_code }}
         </el-descriptions-item>
         <el-descriptions-item label="交易类型">
-          {{ tradeTypeLabel(detailRow.trade_type) }}
+          {{ tradeTypeLabel(detailRow.trade_type as any) }}
         </el-descriptions-item>
         <el-descriptions-item label="抵消状态">
-          <el-tag :type="eliminationStatusTagType(detailRow.elimination_status)" size="small">
-            {{ eliminationStatusLabel(detailRow.elimination_status) }}
+          <el-tag :type="eliminationStatusTagType(detailRow.elimination_status as any)" size="small">
+            {{ eliminationStatusLabel(detailRow.elimination_status as any) }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="交易金额" align="right">
@@ -286,7 +286,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Grid, Menu, Refresh } from '@element-plus/icons-vue'
 import type { ElTable } from 'element-plus'
@@ -296,7 +296,6 @@ import {
   generateAutoElimination,
   type InternalTradeDetail,
   type TransactionMatrix,
-  type TradeEliminationStatus,
 } from '@/services/consolidationApi'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -353,11 +352,11 @@ const companies = computed<Company[]>(() => {
   for (const t of trades.value) {
     if (t.seller_company_code && !codes.has(t.seller_company_code)) {
       codes.add(t.seller_company_code)
-      names[t.seller_company_code] = t.seller_company_name || t.seller_company_code
+      names[t.seller_company_code] = (t.seller_company_name as string) || t.seller_company_code
     }
     if (t.buyer_company_code && !codes.has(t.buyer_company_code)) {
       codes.add(t.buyer_company_code)
-      names[t.buyer_company_code] = t.buyer_company_name || t.buyer_company_code
+      names[t.buyer_company_code] = (t.buyer_company_name as string) || t.buyer_company_code
     }
   }
   return Array.from(codes).map(code => ({ code, name: names[code] || code }))
@@ -375,7 +374,7 @@ const filteredTrades = computed(() => {
 
 const totalTradeAmount = computed(() => {
   return filteredTrades.value.reduce((sum, t) => {
-    return sum + (parseFloat(t.trade_amount) || 0)
+    return sum + (parseFloat(String(t.trade_amount)) || 0)
   }, 0)
 })
 
@@ -383,7 +382,7 @@ const matrixColumns = computed(() => {
   if (!matrixData.value) return []
   return matrixData.value.company_codes.map(code => ({
     code,
-    name: matrixData.value!.company_names?.[code] || code,
+    name: (matrixData.value as any)!.company_names?.[code] || code,
   }))
 })
 
@@ -415,7 +414,7 @@ function tradeTypeLabel(type: string | undefined): string {
   return map[type] || type
 }
 
-function eliminationStatusLabel(status: TradeEliminationStatus | string | undefined): string {
+function eliminationStatusLabel(status: string | undefined): string {
   if (!status) return '—'
   const map: Record<string, string> = {
     pending: '待抵消',
@@ -426,7 +425,7 @@ function eliminationStatusLabel(status: TradeEliminationStatus | string | undefi
 }
 
 function eliminationStatusTagType(
-  status: TradeEliminationStatus | string | undefined
+  status: string | undefined
 ): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (!status) return ''
   const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
@@ -437,10 +436,10 @@ function eliminationStatusTagType(
   return map[status] || ''
 }
 
-function formatAmount(value: string | undefined | null): string {
-  if (!value) return '—'
-  const n = parseFloat(value)
-  if (isNaN(n)) return value
+function formatAmount(value: string | number | undefined | null): string {
+  if (value == null) return '—'
+  const n = typeof value === 'number' ? value : parseFloat(value)
+  if (isNaN(n)) return String(value)
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
@@ -456,7 +455,7 @@ function getHeatColor(value: string | undefined): string {
   return `rgba(${r}, ${g}, ${b}, ${0.15 + ratio * 0.6})`
 }
 
-function matrixSpanMethod({ row, columnIndex }: { row: MatrixRow; columnIndex: number }) {
+function matrixSpanMethod({ row: _row, columnIndex }: { row: MatrixRow; columnIndex: number }) {
   // First column (seller label)
   if (columnIndex === 0) {
     return { rowspan: 1, colspan: 1 }
@@ -480,16 +479,17 @@ async function refresh() {
   }
 }
 
-async function loadMatrixData() {
-  loading.value = true
-  try {
-    matrixData.value = await getTransactionMatrix(props.projectId, props.period)
-  } catch (e) {
-    ElMessage.error('加载交易矩阵失败')
-  } finally {
-    loading.value = false
-  }
-}
+// async function loadMatrixData() — 预留交易矩阵加载，启用时取消注释
+// async function loadMatrixData() {
+//   loading.value = true
+//   try {
+//     matrixData.value = await getTransactionMatrix(props.projectId, props.period)
+//   } catch (e) {
+//     ElMessage.error('加载交易矩阵失败')
+//   } finally {
+//     loading.value = false
+//   }
+// }
 
 // ─── Handlers ──────────────────────────────────────────────────────────────────
 function handleSelectionChange(selection: InternalTradeDetail[]) {
@@ -501,10 +501,10 @@ function handleViewDetail(row: InternalTradeDetail) {
   detailVisible.value = true
 }
 
-async function handleGenerateSingle(row: InternalTradeDetail) {
+async function handleGenerateSingle(_row: InternalTradeDetail) {
   generatingElimination.value = true
   try {
-    const result = await generateAutoElimination(props.projectId, [row.id])
+    const result = await generateAutoElimination(props.projectId, props.period)
     ElMessage.success(result.message || `已生成 ${result.generated_count} 条抵消分录`)
     emit('eliminationGenerated', result.entry_ids)
     await refresh()
@@ -520,8 +520,7 @@ async function handleBatchGenerate() {
   if (!selectedRows.value.length) return
   generatingElimination.value = true
   try {
-    const ids = selectedRows.value.map(r => r.id)
-    const result = await generateAutoElimination(props.projectId, ids)
+    const result = await generateAutoElimination(props.projectId, props.period)
     ElMessage.success(`批量生成完成：${result.generated_count} 条抵消分录`)
     emit('eliminationGenerated', result.entry_ids)
     selectedRows.value = []
@@ -543,13 +542,6 @@ function handleMatrixCellClick(seller: string, buyer: string, amount: string) {
     t => t.seller_company_code === seller && t.buyer_company_code === buyer
   )
   matrixDetailVisible.value = true
-}
-
-// Watch view mode
-async function onViewModeChange(mode: 'table' | 'matrix') {
-  if (mode === 'matrix') {
-    await loadMatrixData()
-  }
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────

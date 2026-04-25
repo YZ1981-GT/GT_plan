@@ -18,7 +18,7 @@
 
     <!-- ── 统计卡片 ── -->
     <div class="stat-grid gt-stagger">
-      <div v-for="(card, idx) in statCards" :key="card.label" class="stat-card" :class="card.cls">
+      <div v-for="card in statCards" :key="card.label" class="stat-card" :class="card.cls">
         <div class="stat-top">
           <div class="stat-icon-wrap">
             <el-icon :size="24"><component :is="card.icon" /></el-icon>
@@ -107,7 +107,7 @@ import http from '@/utils/http'
 import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
-  Plus, List, Timer, DataBoard, Reading, Setting,
+  Plus, Timer, DataBoard, Reading, Setting,
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()

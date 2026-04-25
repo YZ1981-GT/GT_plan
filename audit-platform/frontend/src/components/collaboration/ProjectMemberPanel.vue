@@ -69,7 +69,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
-import { authApi } from '@/services/auditPlatformApi'
+import { authApi } from '@/services/collaborationApi'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -79,7 +79,7 @@ const loading = ref(false)
 const addDialogVisible = ref(false)
 const addFormRef = ref<FormInstance>()
 
-const canManage = computed(() => ['admin', 'partner', 'manager'].includes(authApi.getCurrentUser()?.role || ''))
+const canManage = computed(() => ['admin', 'partner', 'manager'].includes((authApi as any).getCurrentUser?.()?.role || ''))
 
 const addForm = ref({
   user_id: '',
@@ -101,9 +101,9 @@ const projectRoleLabel = (role: string) => ({
 const loadMembers = async () => {
   loading.value = true
   try {
-    const res = await authApi.getProjectMembers(props.projectId)
+    const res = await (authApi as any).getProjectMembers(props.projectId)
     members.value = res.data
-    const usersRes = await authApi.getUsers()
+    const usersRes = await (authApi as any).getUsers()
     const memberIds = new Set(members.value.map((m: any) => m.user_id))
     availableUsers.value = usersRes.data.filter((u: any) => !memberIds.has(u.id) && u.is_active)
   } catch {
@@ -123,7 +123,7 @@ const handleAdd = async () => {
   await addFormRef.value.validate(async (valid) => {
     if (!valid) return
     try {
-      await authApi.addProjectMember(props.projectId, addForm.value)
+      await (authApi as any).addProjectMember(props.projectId, addForm.value)
       ElMessage.success('成员已添加')
       addDialogVisible.value = false
       loadMembers()
@@ -135,7 +135,7 @@ const handleAdd = async () => {
 
 const handleRemove = async (row: any) => {
   try {
-    await authApi.removeProjectMember(props.projectId, row.user_id)
+    await (authApi as any).removeProjectMember(props.projectId, row.user_id)
     ElMessage.success('成员已移除')
     loadMembers()
   } catch {

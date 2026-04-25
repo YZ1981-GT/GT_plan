@@ -73,7 +73,7 @@ function formatNum(v: string | null) {
 function showDialog(row?: MinorityInterestRow) {
   editing.value = row || null
   if (row) {
-    form.value = { subsidiary_name: row.subsidiary_name, ownership_percentage: row.ownership_percentage, minority_percentage: row.minority_percentage, total_equity: row.total_equity, minority_interest_amount: row.minority_interest_amount, changes: row.changes, notes: row.notes, year: row.year }
+    form.value = { subsidiary_name: row.subsidiary_name || '', ownership_percentage: row.ownership_percentage || '', minority_percentage: row.minority_percentage || '', total_equity: row.total_equity || '', minority_interest_amount: row.minority_interest_amount || '', changes: row.changes || '', notes: row.notes || '', year: row.year }
   } else {
     form.value = { subsidiary_name: '', ownership_percentage: '100', minority_percentage: '0', total_equity: '0', minority_interest_amount: '0', changes: '', notes: '', year: props.year }
   }

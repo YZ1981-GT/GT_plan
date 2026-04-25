@@ -211,7 +211,7 @@ const formRules: FormRules = {
   due_date: [
     { required: true, message: '请选择截止日期', trigger: 'change' },
     {
-      validator: (rule, value, callback) => {
+      validator: (_rule, value, callback) => {
         if (value && formData.value.issued_date && value < formData.value.issued_date) {
           callback(new Error('截止日期不能早于发出日期'))
         } else {
@@ -316,7 +316,7 @@ function handleUploadError(err: any) {
   ElMessage.error('文件上传失败: ' + (err.message || '未知错误'))
 }
 
-function handleFileRemove(file: any, fileList: any[]) {
+function handleFileRemove(file: any, _fileList: any[]) {
   const idx = formData.value.attachments.indexOf(file.url)
   if (idx > -1) formData.value.attachments.splice(idx, 1)
 }

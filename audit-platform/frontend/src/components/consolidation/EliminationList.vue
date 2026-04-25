@@ -264,13 +264,11 @@ import {
   deleteEliminationEntry,
   carryForwardElimination,
   batchApproveEliminationEntries,
-  batchRejectEliminationEntries,
   getEliminationSummary,
   type EliminationEntry,
   type EliminationEntryType,
   type EliminationListFilter,
   type EliminationSummary,
-  type ReviewStatus,
 } from '@/services/consolidationApi'
 
 // ─── Props ─────────────────────────────────────────────────────────────────
@@ -494,13 +492,8 @@ async function onBatchApprove() {
   if (!selectedIds.value.length) return
   batchLoading.value = true
   try {
-    const result = await batchApproveEliminationEntries(selectedIds.value, props.projectId)
-    if (result.approved?.length) {
-      ElMessage.success(`成功审批 ${result.approved.length} 条`)
-    }
-    if (result.failed?.length) {
-      ElMessage.warning(`${result.failed.length} 条审批失败`)
-    }
+    const result = await batchApproveEliminationEntries(props.projectId, selectedIds.value)
+    ElMessage.success(`成功审批 ${result.length} 条`)
     tableRef.value?.clearSelection()
     onRefresh()
   } catch (e) {

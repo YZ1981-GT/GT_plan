@@ -273,7 +273,7 @@ async function doExport() {
   }
 }
 
-function getSummaries({ columns, data }: any) {
+function getSummaries({ columns }: any) {
   if (!summaryData.value) return []
   const gt = summaryData.value.grand_total
   return columns.map((_: any, idx: number) => {

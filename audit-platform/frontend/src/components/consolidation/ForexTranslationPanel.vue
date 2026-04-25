@@ -274,7 +274,6 @@ import { Plus, Check } from '@element-plus/icons-vue'
 import {
   getForexRows,
   createForexRow,
-  updateForexRow,
   getCompanyTree,
   type CompanyTreeNode,
   type ForexRow,
@@ -399,12 +398,12 @@ function onWorksheetChange(_i: number) {
   worksheetRows.value.forEach(r => { r._dirty = true })
 }
 
-async function onDeleteRateRow(row: LocalRateRow, index: number) {
+async function onDeleteRateRow(_row: LocalRateRow, index: number) {
   rateRows.value.splice(index, 1)
   if (!rateRows.value.length) rateRows.value.push(makeEmptyRate())
 }
 
-async function onDeleteWorksheetRow(row: LocalWorksheetRow, index: number) {
+async function onDeleteWorksheetRow(_row: LocalWorksheetRow, index: number) {
   worksheetRows.value.splice(index, 1)
   if (!worksheetRows.value.length) worksheetRows.value.push(makeEmptyWorksheet())
 }

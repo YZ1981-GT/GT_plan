@@ -44,14 +44,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
+import { ref } from 'vue'
 import GroupStructureTree from '@/components/consolidation/GroupStructureTree.vue'
 import CompanyForm from '@/components/consolidation/CompanyForm.vue'
 import ConsolScopeTable from '@/components/consolidation/ConsolScopeTable.vue'
 import type { CompanyTreeNode } from '@/services/consolidationApi'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
-const props = defineProps<{
+defineProps<{
   projectId: string
   year: number
 }>()
@@ -66,7 +66,7 @@ const editingParentId = ref<string | null>(null)
 const editingParentCode = ref<string | null>(null)
 
 // ─── Event Handlers ──────────────────────────────────────────────────────────
-function onNodeClick(node: CompanyTreeNode) {
+function onNodeClick(_node: CompanyTreeNode) {
   // Could show details in right panel in future
 }
 

@@ -61,7 +61,7 @@ class ShortcutManager {
 export const shortcutManager = new ShortcutManager()
 
 // Default shortcuts from design doc
-export function registerDefaultShortcuts(router: any) {
+export function registerDefaultShortcuts(_router: any) {
   shortcutManager.register('Ctrl+S', () => {
     document.dispatchEvent(new CustomEvent('shortcut:save'))
   }, '保存当前编辑内容', '底稿编辑/附注编辑/报告编辑')

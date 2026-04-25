@@ -146,15 +146,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   getComponentAuditors,
-  deleteComponentAuditor,
   getInstructions,
-  deleteInstruction,
   getResults,
-  deleteResult,
 } from '@/services/consolidationApi'
 import type { ComponentAuditor, Instruction, InstructionResult } from '@/services/consolidationApi'
 
@@ -336,25 +333,6 @@ function handleAddAuditor() {
   emit('auditor-add')
 }
 
-function handleEditAuditor(auditor: ComponentAuditor) {
-  emit('auditor-edit', auditor)
-}
-
-async function handleDeleteAuditor(auditor: ComponentAuditor) {
-  try {
-    await deleteComponentAuditor(auditor.id, props.projectId)
-    await loadAuditors()
-    if (selectedAuditor.value?.id === auditor.id) {
-      selectedAuditor.value = null
-      instructions.value = []
-      results.value = []
-    }
-    ElMessage.success('删除成功')
-  } catch {
-    ElMessage.error('删除失败')
-  }
-}
-
 function handleAddInstruction() {
   if (!selectedAuditor.value) return
   emit('instruction-add', selectedAuditor.value.id)
@@ -364,16 +342,6 @@ function handleEditInstruction(instruction: Instruction) {
   emit('instruction-edit', instruction)
 }
 
-async function handleDeleteInstruction(instruction: Instruction) {
-  try {
-    await deleteInstruction(instruction.id, props.projectId)
-    if (selectedAuditor.value) await loadInstructions(selectedAuditor.value.id)
-    ElMessage.success('删除成功')
-  } catch {
-    ElMessage.error('删除失败')
-  }
-}
-
 function handleAddResult() {
   if (!selectedInstruction.value) return
   emit('result-add', selectedInstruction.value.id)
@@ -381,16 +349,6 @@ function handleAddResult() {
 
 function handleEditResult(result: InstructionResult) {
   emit('result-edit', result)
-}
-
-async function handleDeleteResult(result: InstructionResult) {
-  try {
-    await deleteResult(result.id, props.projectId)
-    if (selectedInstruction.value) await loadResults(selectedInstruction.value.id)
-    ElMessage.success('删除成功')
-  } catch {
-    ElMessage.error('删除失败')
-  }
 }
 
 // ─── Watchers ───────────────────────────────────────────────────────────────

@@ -296,7 +296,7 @@
             :expand-on-click-node="true"
             class="account-tree"
           >
-            <template #default="{ node, data }">
+            <template #default="{ data }">
               <div class="tree-node" :class="{ 'tree-node--editing': editingCode === data.account_code }">
                 <span class="node-code">{{ data.account_code }}</span>
 
@@ -446,6 +446,7 @@ interface SheetPreview {
   total_rows: number
   column_mapping: Record<string, string | null>
   file_type_guess: string
+  _source_file?: string
 }
 
 interface PreviewResponse {
@@ -737,7 +738,7 @@ function getSheetMappedCount(sheetIdx: number): number {
   return Object.values(cached).filter(v => v !== null && v !== undefined && v !== '').length
 }
 
-function onFileChange(file: UploadFile, fileListVal: UploadFile[]) {
+function onFileChange(_file: UploadFile, fileListVal: UploadFile[]) {
   selectedFiles.value = fileListVal.map(f => f.raw!).filter(Boolean)
 }
 
@@ -1126,7 +1127,7 @@ async function handleImport() {
   }
 }
 
-async function importOtherSheets() {
+async function _importOtherSheets() {
   if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
 
   // 优先使用导入识别出的年度，其次回退向导基本信息
@@ -1348,6 +1349,7 @@ defineExpose({
     return true
   },
   saveMapping,
+  importOtherSheets: _importOtherSheets,
 })
 </script>
 

@@ -3,10 +3,6 @@
  * 协作与质控 API 服务层
  */
 import http from '@/utils/http'
-import type {
-  ProjectUser, User, Notification,
-  ReviewRecord, AuditLog, SyncStatus,
-} from '@/services/types'
 
 // Auth
 export const authApi = {
