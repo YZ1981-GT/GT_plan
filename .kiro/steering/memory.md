@@ -305,7 +305,7 @@ inclusion: always
 - CSV/Excel路径全面对齐（2026-04-25）：①CSV分支_flush_batch补齐aux_balance/aux_ledger写入分支（之前只有ledger/balance） ②CSV白名单从(ledger,balance,account_chart)扩展为含aux_balance/aux_ledger ③COPY列定义从CSV/Excel两处重复提取为模块级常量COPY_LEDGER_COLS/COPY_BALANCE_COLS等；现在CSV和Excel两条路径功能完全对齐：都支持四表+独立辅助表、都用COPY写入、都有关键列阻断
 - 导入中断恢复与多用户并发安全（2026-04-25，commit 50dd336+cc77deb）：①ImportQueueService锁超时从4小时缩短到30分钟 ②新增force_release()强制释放锁+清理卡住batch ③新增POST /import-reset端点 ④acquire_lock用asyncio.Lock包裹消除TOCTOU竞态 ⑤前端handleImport加5分钟超时保护+异步轮询150次上限 ⑥catch块从空改为显示错误+自动释放锁 ⑦409冲突弹出「强制重置」确认框 ⑧onMounted自动检测卡住超10分钟的任务并清理 ⑨页面顶部常驻「重置导入」按钮（所有阶段可见，二次确认后清空全部前端状态+调后端释放锁）
 - 导入重置按钮偏好（2026-04-25）：重置按钮放在顶部栏知识库图标左侧（ThreeColumnLayout.vue，所有页面全局可见），按钮名称叫「重置」；点击后自动从路由提取projectId+二次确认+调import-reset+结束当前任务+恢复前端；项目详情页快捷操作区也有重置按钮（DetailProjectPanel.vue）；AccountImportStep顶部也有常驻重置按钮
-- 全局重置改为强制刷新（2026-04-25，commit 66ca776）：从dispatch CustomEvent改为window.location.reload()强制刷新页面（更可靠，能杀掉pending的http请求）；不再要求必须在项目子页面，projectId优先从路由提取其次从localStorage(gt-last-project-id)取；选中项目时MiddleProjectList自动保存ID到localStorage；API调用设5秒超时后端挂了不阻塞，无论成功失败都刷新
+- 全局重置改为强制刷新（2026-04-25，commit 66ca776+df29993）：从dispatch CustomEvent改为window.location.reload()强制刷新页面；重置前先调/api/health检测后端（3秒超时），后端存活则释放锁+刷新，后端不可用则弹窗提示原因+手动重启命令+刷新；smart-import端点新增800MB文件总大小限制（防OOM杀死后端）
 - 用户计划对每个细分程序逐一打磨升级
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程

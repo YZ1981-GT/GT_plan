@@ -949,19 +949,13 @@ def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
 
 
 def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]:
-    """将序时账原始行转换为 (tb_ledger_rows, tb_aux_ledger_rows, aux_stats)。
+    """将序时账原始行转换为 (tb_ledger_rows, [], aux_stats)。
 
-    内存优化：辅助明细账只统计维度分布（aux_stats），不在内存中保留全部行。
-    实际的辅助明细账行在 write_four_tables 中流式生成写入。
-
-    Returns:
-        (ledger_rows, [], aux_stats)
-        - ledger_rows: 序时账行（带 _aux_dim_str 原始维度字符串）
-        - []: 空列表（辅助明细账不在内存中保留）
-        - aux_stats: {"成本中心": 12345, ...} 维度统计
+    只做字段提取和类型转换，不做维度解析（维度在写入时流式处理）。
+    aux_stats 只做简单计数（有维度字符串的行数），不实际解析。
     """
     ledger_rows = []
-    aux_stats: dict[str, int] = {}
+    aux_count = 0
 
     for row in rows:
         account_code = str(row.get("account_code", "")).strip()
@@ -981,18 +975,14 @@ def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]
         summary = str(row.get("summary", "")).strip() or None
         preparer = str(row.get("preparer", "")).strip() or None
 
-        # 核算维度原始字符串（保留，写入时再拆分）
         aux_dim_str = str(row.get("aux_dimensions", "")).strip()
         if not aux_dim_str:
             aux_dim_str = str(row.get("aux_type", "")).strip()
             if aux_dim_str and ":" not in aux_dim_str and "：" not in aux_dim_str:
                 aux_dim_str = ""
 
-        # 统计维度分布（不生成辅助明细行）
         if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
-            dims = parse_aux_dimensions(aux_dim_str)
-            for dim in dims:
-                aux_stats[dim["aux_type"]] = aux_stats.get(dim["aux_type"], 0) + 1
+            aux_count += 1
 
         ledger_rows.append({
             "account_code": account_code,
@@ -1007,10 +997,10 @@ def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]
             "preparer": preparer,
             "company_code": "default",
             "currency_code": "CNY",
-            "_aux_dim_str": aux_dim_str,  # 内部字段，写入时拆分
+            "_aux_dim_str": aux_dim_str,
         })
 
-    return ledger_rows, [], aux_stats
+    return ledger_rows, [], {"_has_aux": aux_count}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1628,24 +1618,21 @@ def smart_parse_files(
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
-    """Soft-delete all four table data for a given project+year.
+    """物理删除该 project+year 的全部四表旧数据。
 
-    Ensures that each project-year has exactly one effective dataset
-    and old data from previous imports does not remain as a mix.
+    用 DELETE 替代 soft-delete（UPDATE is_deleted=True），
+    百万行 DELETE 比 UPDATE 快 3-5 倍（不写旧行的 WAL）。
     """
     import sqlalchemy as sa
     from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
 
-    for model in (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger):
+    for model in (TbAuxLedger, TbAuxBalance, TbLedger, TbBalance):
         tbl = model.__table__
         await db.execute(
-            sa.update(tbl)
-            .where(
+            sa.delete(tbl).where(
                 tbl.c.project_id == project_id,
                 tbl.c.year == year,
-                tbl.c.is_deleted == sa.false(),
             )
-            .values(is_deleted=True)
         )
     await db.flush()
 
@@ -2491,15 +2478,25 @@ async def smart_import_streaming(
 
                 elif dt == "ledger":
                     led, _, aux_stats = convert_ledger_rows(batch_rows)
-                    for t, c in aux_stats.items():
-                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
                     for row in led:
                         adim = row.pop("_aux_dim_str", "")
                         _led_buf.append(row)
                         if adim and (":" in adim or "：" in adim):
+                            # 辅助明细只取关键列（不复制整个 row）
+                            base = {
+                                "account_code": row.get("account_code"),
+                                "account_name": row.get("account_name"),
+                                "voucher_date": row.get("voucher_date"),
+                                "voucher_no": row.get("voucher_no"),
+                                "debit_amount": row.get("debit_amount"),
+                                "credit_amount": row.get("credit_amount"),
+                                "summary": row.get("summary"),
+                                "company_code": row.get("company_code"),
+                                "currency_code": row.get("currency_code"),
+                            }
                             for dim in parse_aux_dimensions(adim):
                                 _aux_led_buf.append({
-                                    **row,
+                                    **base,
                                     "aux_type": dim["aux_type"],
                                     "aux_code": dim["aux_code"],
                                     "aux_name": dim["aux_name"],
