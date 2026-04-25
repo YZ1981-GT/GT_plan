@@ -39,6 +39,7 @@ inclusion: always
 - vLLM 已有独立部署配置在 `D:\vllm\vllm-qwen3.5-nvfp4-sm120\docker-compose.yml`（经过验证的参数），审计平台 docker-compose 已复用该配置
 - 文件上传限制：MAX_UPLOAD_SIZE_MB=100（config.py）
 - Docker Compose 统一管理：GPU 服务（vLLM/MinerU）用 `profiles: [gpu]` 按需启动，`docker-compose.mineru.yml` 已删除并整合到主 `docker-compose.yml`；MinerU 端口改为 8002（Router）+7860（WebUI）；启动命令 `docker compose --profile gpu up vllm mineru`
+- 前端唯一入口：`audit-platform/frontend/`（端口3030），Vue3+Element Plus+三栏布局；根目录旧 `frontend/`（端口5173，早期AI原型10个Vue文件）已于2026-04-25删除，其功能在新前端中均有更完善实现（AIPluginManagement/ReportView/TrialBalance等），且其调用的后端路由全部是未注册的死代码
 
 ### 项目根目录文件
 - `start.bat` — 开发模式一键启动（前后端分离，后端9980+前端3030）
@@ -292,7 +293,8 @@ inclusion: always
 
 ## 待办 / 进行中
 - 项目文件清理（2026-04）：已删除根目录 `__pycache__/`、`frontend/README.md`；`GT_底稿/审计实务操作手册-框架.md` 和 `致同GT审计手册设计规范.md` 待用户确认是否删除
-- 一次性脚本清理偏好（2026-04-23）：backend/scripts/ 下的一次性修复/调试/测试脚本（_fix_*/_debug_*/test_*等）用完即删，不留在仓库中；清理后保留12个长期运维脚本（_create_admin/_init_tables/_create_missing_tables/backup/check_auth*/check_routes/create_project/generate_types/import_heping_data/optimize_indexes/seed_staff）
+- 一次性脚本清理偏好（2026-04-23）：backend/scripts/ 下的一次性修复/调试/测试脚本（_fix_*/_debug_*/test_*等）用完即删，不留在仓库中；清理后保留11个长期运维脚本（_create_admin/_init_tables/_create_missing_tables/backup/check_auth*/check_routes/create_project/generate_types/optimize_indexes/seed_staff）
+- 文件清理（2026-04-25）：删除根目录旧前端 `frontend/`（早期AI原型）、`test_collab.db`（测试残留）、`backend/scripts/import_heping_data.py`（和平药房专用脚本，已被smart_import_engine替代）、`backend/tests/_patch_fixtures.py`（一次性批量替换脚本）、`backend/tests/test_staff_service_tmp.py`（临时测试文件，名称与内容不匹配）
 - 用户计划对每个细分程序逐一打磨升级
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程
