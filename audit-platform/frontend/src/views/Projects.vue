@@ -66,8 +66,12 @@
             <span class="gt-text-secondary" style="font-size: 13px">{{ formatDate(row.created_at) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" align="center" fixed="right">
+        <el-table-column label="操作" width="220" align="center" fixed="right">
           <template #default="{ row }">
+            <el-button type="primary" size="small" text @click="openImport(row.id)">
+              <el-icon><Upload /></el-icon>
+              账套导入
+            </el-button>
             <el-button type="primary" size="small" text @click="openProject(row.id)">
               <el-icon><Right /></el-icon>
               进入
@@ -83,7 +87,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/utils/http'
-import { FolderOpened, Plus, Right } from '@element-plus/icons-vue'
+import { FolderOpened, Plus, Right, Upload } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -102,6 +106,9 @@ async function loadProjects() {
 
 function goToCreateProject() { router.push('/projects/new') }
 function openProject(id: string) { router.push(`/projects/${id}/trial-balance`) }
+function openImport(id: string) {
+  router.push({ path: `/projects/${id}/ledger`, query: { import: '1' } })
+}
 
 function formatDate(d: string) {
   if (!d) return '—'

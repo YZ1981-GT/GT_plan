@@ -362,12 +362,14 @@ async def import_client_chart(
 
     if filename_lower.endswith(".csv"):
         rows = _parse_csv(content)
-    elif filename_lower.endswith((".xlsx", ".xls")):
+    elif filename_lower.endswith(".xls"):
+        _reject_legacy_excel_upload()
+    elif filename_lower.endswith(".xlsx"):
         rows = _parse_excel(content)  # skip_rows=None → 自动检测表头行
     else:
         raise HTTPException(
             status_code=400,
-            detail="不支持的文件格式，请上传 Excel (.xlsx/.xls) 或 CSV (.csv) 文件",
+            detail="不支持的文件格式，请上传 Excel (.xlsx) 或 CSV (.csv) 文件",
         )
 
     if not rows:
@@ -513,7 +515,7 @@ async def import_client_chart(
     # ── 自动导入其他 sheet 的四表数据（如果调用方会用 smart_import_engine 处理则跳过） ──
     other_sheets_result = {}
     sheet_diagnostics = []
-    if not skip_auto_import and filename_lower.endswith((".xlsx", ".xls")):
+    if not skip_auto_import and filename_lower.endswith(".xlsx"):
         try:
             print(f"[AUTO_IMPORT] 开始自动导入四表数据: project={project_id}, content_size={len(content)}")
             other_sheets_result, sheet_diagnostics = await _auto_import_data_sheets(
@@ -657,6 +659,10 @@ async def _auto_import_data_sheets(
     parser = GenericParser()
     result: dict[str, int] = {}
 
+    # 统一清理该 project+year 的全部四表旧数据，避免新旧混搭
+    from app.services.smart_import_engine import _clear_project_year_tables
+    await _clear_project_year_tables(project_id, year, db)
+
     for data_type in types_to_import:
         try:
             print(f"[AUTO_IMPORT] 解析 {data_type}...")
@@ -676,9 +682,6 @@ async def _auto_import_data_sheets(
             )
             db.add(batch)
             await db.flush()
-
-            # 覆盖旧数据
-            await _soft_delete_existing(project_id, year, data_type, db)
 
             # 批量写入
             table_model = _TABLE_MAP[data_type]
@@ -1036,6 +1039,70 @@ def _guess_file_type(mapped_cols: set[str]) -> str:
     return "unknown"
 
 
+def _reject_legacy_excel_upload() -> None:
+    raise HTTPException(
+        status_code=400,
+        detail="暂不支持 Excel 97-2003 (.xls) 文件，请先转换为 .xlsx 后再上传",
+    )
+
+
+def _detect_csv_encoding(content: bytes) -> str:
+    sample = content[: min(len(content), 16384)]
+    for encoding in ("utf-8-sig", "gbk", "utf-8"):
+        try:
+            sample.decode(encoding)
+            return encoding
+        except (UnicodeDecodeError, ValueError):
+            continue
+    raise HTTPException(status_code=400, detail="无法识别文件编码，请使用 UTF-8 或 GBK 编码")
+
+
+def _normalize_csv_row(row: dict) -> dict:
+    normalized: dict[str, str] = {}
+    for i, (header, value) in enumerate((row or {}).items()):
+        if header is None:
+            continue
+        key = str(header).strip() if str(header).strip() else f"col_{i}"
+        if isinstance(value, str):
+            normalized[key] = value.strip()
+        elif value is None:
+            normalized[key] = ""
+        else:
+            normalized[key] = str(value)
+    return normalized
+
+
+def _preview_csv(content: bytes, skip_rows: int | None = 0, preview_limit: int = 20) -> tuple[list[str], list[dict], int]:
+    encoding = _detect_csv_encoding(content)
+    stream = io.TextIOWrapper(io.BytesIO(content), encoding=encoding, newline="")
+    try:
+        _skip = skip_rows or 0
+        for _ in range(_skip):
+            try:
+                next(stream)
+            except StopIteration:
+                return [], [], 0
+
+        reader = csv.DictReader(stream)
+        headers = [str(h).strip() if h and str(h).strip() else f"col_{i}" for i, h in enumerate(reader.fieldnames or [])]
+        if not headers:
+            return [], [], 0
+
+        rows: list[dict] = []
+        total_rows = 0
+        for row in reader:
+            normalized = _normalize_csv_row(row)
+            if not normalized or not any(str(v).strip() for v in normalized.values()):
+                continue
+            total_rows += 1
+            if len(rows) < preview_limit:
+                rows.append(normalized)
+
+        return headers, rows, total_rows
+    finally:
+        stream.close()
+
+
 async def preview_file(file: UploadFile, skip_rows: int | None = None) -> dict:
     """Parse file, return first 20 rows per sheet + auto-matched column mapping.
 
@@ -1133,25 +1200,27 @@ async def preview_file(file: UploadFile, skip_rows: int | None = None) -> dict:
     filename_lower = file.filename.lower()
     content = await file.read()
 
+    if filename_lower.endswith(".xls"):
+        _reject_legacy_excel_upload()
+
     if filename_lower.endswith(".csv"):
-        rows = _parse_csv(content, skip_rows=skip_rows)
-        if not rows:
+        headers, rows, total_rows = _preview_csv(content, skip_rows=skip_rows, preview_limit=20)
+        if not headers or total_rows == 0:
             raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
-        headers = list(rows[0].keys())
         column_mapping = {h: _match_column(h) for h in headers}
         mapped_cols = {v for v in column_mapping.values() if v}
         return {
             "sheets": [{
                 "sheet_name": "CSV",
                 "headers": headers,
-                "rows": rows[:20],
-                "total_rows": len(rows),
+                "rows": rows,
+                "total_rows": total_rows,
                 "column_mapping": column_mapping,
                 "file_type_guess": _guess_file_type(mapped_cols),
             }],
             "active_sheet": 0,
         }
-    elif filename_lower.endswith((".xlsx", ".xls")):
+    elif filename_lower.endswith(".xlsx"):
         sheets_data = _parse_excel_multi_sheet(content, skip_rows=skip_rows)
         if not sheets_data:
             raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
@@ -1187,7 +1256,7 @@ async def preview_file(file: UploadFile, skip_rows: int | None = None) -> dict:
             raise HTTPException(status_code=400, detail="所有工作表均无有效数据")
         return {"sheets": sheets, "active_sheet": 0}
     else:
-        raise HTTPException(status_code=400, detail="不支持的文件格式")
+        raise HTTPException(status_code=400, detail="不支持的文件格式，请上传 Excel (.xlsx) 或 CSV (.csv) 文件")
 
 
 def _normalize_columns(rows: list[dict]) -> list[dict]:
@@ -1223,21 +1292,29 @@ def _apply_custom_mapping(rows: list[dict], mapping: dict[str, str | None]) -> l
 
 def _parse_csv(content: bytes, skip_rows: int | None = 0) -> list[dict]:
     """Parse CSV file content into list of dicts."""
-    for encoding in ("utf-8-sig", "gbk", "utf-8"):
-        try:
-            text = content.decode(encoding)
-            break
-        except (UnicodeDecodeError, ValueError):
-            continue
-    else:
-        raise HTTPException(status_code=400, detail="无法识别文件编码，请使用 UTF-8 或 GBK 编码")
+    encoding = _detect_csv_encoding(content)
+    stream = io.TextIOWrapper(io.BytesIO(content), encoding=encoding, newline="")
+    try:
+        _skip = skip_rows or 0
+        for _ in range(_skip):
+            try:
+                next(stream)
+            except StopIteration:
+                return []
 
-    lines = text.strip().splitlines()
-    _skip = skip_rows or 0
-    if _skip > 0 and len(lines) > _skip:
-        lines = lines[_skip:]
-    reader = csv.DictReader(io.StringIO("\n".join(lines)))
-    return list(reader)
+        reader = csv.DictReader(stream)
+        if not reader.fieldnames:
+            return []
+
+        rows: list[dict] = []
+        for row in reader:
+            normalized = _normalize_csv_row(row)
+            if not normalized or not any(str(v).strip() for v in normalized.values()):
+                continue
+            rows.append(normalized)
+        return rows
+    finally:
+        stream.close()
 
 
 def _parse_excel(content: bytes, skip_rows: int | None = None) -> list[dict]:

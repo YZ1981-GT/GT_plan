@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.core.redis import get_redis
 from app.services.ledger_penetration_service import LedgerPenetrationService
@@ -63,7 +63,7 @@ async def get_balance(
     year: int = Query(...),
     account_code: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """科目余额汇总"""
     svc = _svc(db, None)
@@ -76,7 +76,7 @@ async def get_opening_balance(
     account_code: str,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取科目期初余额（用于序时账 running_balance 计算）"""
     svc = _svc(db, None)
@@ -96,7 +96,7 @@ async def get_ledger_entries(
     page: int = 1,
     page_size: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """序时账明细（按科目穿透）— 支持游标分页和传统分页
 
@@ -122,7 +122,7 @@ async def get_voucher_entries(
     voucher_no: str,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """凭证分录明细（按凭证号穿透）"""
     svc = _svc(db, None)
@@ -135,7 +135,7 @@ async def get_aux_balance_summary(
     year: int = Query(...),
     dim_type: Optional[str] = Query(None, description="维度类型"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """辅助余额汇总（预计算，按维度+科目+辅助编码分组）。
 
@@ -196,7 +196,7 @@ async def get_aux_balance_paged(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """辅助余额表分页查询（后端筛选+分页，前端不加载全量数据）"""
     import sqlalchemy as sa
@@ -251,7 +251,7 @@ async def get_aux_balance_detail(
     dim_type: str = Query(...),
     aux_code: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """辅助余额明细查询（树形展开时按需加载）"""
     import sqlalchemy as sa
@@ -282,7 +282,7 @@ async def get_all_aux_balance(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """全量辅助余额（所有科目的辅助核算维度）"""
     svc = _svc(db, None)
@@ -296,7 +296,7 @@ async def get_aux_balance(
     year: int = Query(...),
     aux_type: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """辅助余额（按科目穿透到辅助维度）"""
     svc = _svc(db, None)
@@ -315,7 +315,7 @@ async def get_aux_ledger_entries(
     page: int = 1,
     page_size: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """辅助明细账（按辅助维度穿透）— 支持游标分页和传统分页"""
     svc = _svc(db, None)
@@ -336,7 +336,7 @@ async def clear_cache(
     year: int = Query(...),
     redis=Depends(get_redis),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """清除穿透查询缓存"""
     svc = _svc(db, redis)
@@ -350,7 +350,7 @@ async def upload_data(
     year: int = Query(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """上传四表数据文件（支持历史年度）。
 
@@ -378,7 +378,7 @@ async def upload_multi_files(
     year: int = Query(...),
     files: list[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """上传多个四表数据文件（支持多个序时账文件合并导入）。
 
@@ -424,7 +424,7 @@ async def smart_preview(
     project_id: UUID,
     files: list[UploadFile] = File(...),
     year: Optional[int] = Query(None, description="指定年度（不指定则自动提取）"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """智能预览：解析多个文件，返回识别结果 + 维度信息 + 校验结果。
 
@@ -465,7 +465,7 @@ async def smart_import(
     year: Optional[int] = Query(None, description="指定年度（不指定则自动提取）"),
     custom_mapping: Optional[str] = Query(None, description="自定义列映射JSON"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """智能导入：解析多个文件并写入数据库。
 
@@ -474,8 +474,18 @@ async def smart_import(
     import json
     from app.services.import_queue_service import ImportQueueService
 
-    # 并发控制
-    ok, msg = ImportQueueService.acquire_lock(project_id, str(current_user.id))
+    file_label = files[0].filename or "upload.xlsx"
+    if len(files) > 1:
+        file_label = f"{file_label} 等{len(files)}个文件"
+
+    ok, msg, job_batch_id = await ImportQueueService.acquire_lock(
+        project_id,
+        str(current_user.id),
+        db,
+        source_type="smart_import",
+        file_name=file_label,
+        year=year or 0,
+    )
     if not ok:
         raise HTTPException(status_code=409, detail=msg)
 
@@ -497,6 +507,12 @@ async def smart_import(
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="自定义列映射JSON格式错误")
 
+        ImportQueueService.update_progress(
+            project_id,
+            2,
+            f"开始导入 {len(file_contents)} 个文件…",
+        )
+
         def _on_progress(pct: int, msg: str):
             ImportQueueService.update_progress(project_id, pct, msg)
 
@@ -510,21 +526,53 @@ async def smart_import(
             progress_callback=_on_progress,
         )
 
-        return {
+        result_payload = {
             "imported": result["data_sheets_imported"],
             "year": result["year"],
             "diagnostics": result["sheet_diagnostics"],
             "errors": result["errors"],
+            "batch_id": str(job_batch_id) if job_batch_id is not None else None,
         }
-    finally:
-        ImportQueueService.release_lock(project_id)
+        total_records = sum(
+            int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
+        )
+        if job_batch_id is not None:
+            await ImportQueueService.complete_job(
+                project_id,
+                job_batch_id,
+                db,
+                message=f"导入完成: {result['data_sheets_imported']}",
+                result=result_payload,
+                year=result["year"],
+                record_count=total_records,
+            )
+        return result_payload
+    except Exception as e:
+        failure_payload = {
+            "imported": {},
+            "year": None,
+            "diagnostics": [],
+            "errors": [f"导入失败: {e}"],
+            "batch_id": str(job_batch_id) if job_batch_id is not None else None,
+        }
+        if job_batch_id is not None:
+            await ImportQueueService.fail_job(
+                project_id,
+                job_batch_id,
+                db,
+                message=f"导入失败: {e}",
+                result=failure_payload,
+            )
+        else:
+            ImportQueueService.release_lock(project_id)
+        raise
 
 
 @router.get("/years")
 async def get_available_years(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取该项目有数据的年度列表"""
     import sqlalchemy as sa
@@ -544,7 +592,7 @@ async def get_data_stats(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取四表数据统计（行数、最后导入时间）"""
     import sqlalchemy as sa
@@ -586,7 +634,7 @@ async def export_ledger_excel(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出序时账为 Excel（含期初余额行+月小计+累计余额）"""
     from fastapi.responses import StreamingResponse
@@ -731,7 +779,7 @@ async def export_balance_excel(
     project_id: UUID,
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出科目余额表为 Excel"""
     from fastapi.responses import StreamingResponse
@@ -812,7 +860,7 @@ async def export_aux_balance_excel(
     search: Optional[str] = Query(None, description="搜索关键词"),
     filter: Optional[str] = Query(None, description="筛选条件: closing/opening/changed"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """导出辅助余额表为 Excel（支持当前视图条件）"""
     from fastapi.responses import StreamingResponse

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_project_access
 from app.models.audit_platform_schemas import (
     AccountChartResponse,
     AccountImportResult,
@@ -40,6 +40,16 @@ def _build_sheet_diagnostics(diagnostics: list[dict] | None) -> list[dict]:
     return normalized
 
 
+def _ensure_supported_account_chart_uploads(files: list[UploadFile]) -> None:
+    for upload in files:
+        filename = (upload.filename or "").lower()
+        if filename.endswith(".xls"):
+            raise HTTPException(
+                status_code=400,
+                detail="暂不支持 Excel 97-2003 (.xls) 文件，请先转换为 .xlsx 后再上传",
+            )
+
+
 @router.get(
     "/{project_id}/account-chart/standard",
     response_model=list[AccountChartResponse],
@@ -47,7 +57,7 @@ def _build_sheet_diagnostics(diagnostics: list[dict] | None) -> list[dict]:
 async def get_standard_chart(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> list[AccountChartResponse]:
     """获取项目的标准科目表。
 
@@ -73,7 +83,7 @@ async def preview_file(
     project_id: UUID,
     file: UploadFile = File(...),
     skip_rows: int | None = Query(default=None, description="跳过前N行，None=自动检测表头"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """Preview uploaded file: return first 20 rows per sheet + auto-matched column mapping.
 
@@ -92,6 +102,12 @@ async def preview_file(
 
     content = await file.read()
     filename_lower = file.filename.lower()
+
+    if filename_lower.endswith(".xls"):
+        raise HTTPException(
+            status_code=400,
+            detail="暂不支持 Excel 97-2003 (.xls) 文件，请先转换为 .xlsx 后再上传",
+        )
 
     if filename_lower.endswith(".csv"):
         # CSV 用原有逻辑（小文件）—— 需要 seek 回起点因为 content 已经 read 过
@@ -214,7 +230,7 @@ async def import_client_chart(
     file: UploadFile | None = File(default=None),
     column_mapping: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> AccountImportResult:
     """导入科目表 + 四表数据（支持多文件一次上传）。
 
@@ -233,6 +249,7 @@ async def import_client_chart(
         all_files.append(file)
     if not all_files:
         raise HTTPException(status_code=400, detail="未提供文件")
+    _ensure_supported_account_chart_uploads(all_files)
 
     parsed_mapping = None
     if column_mapping:
@@ -241,31 +258,87 @@ async def import_client_chart(
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # 读取所有文件内容
-    file_contents: list[tuple[str, bytes]] = []
-    for f in all_files:
-        ct = await f.read()
-        file_contents.append((f.filename or "upload.xlsx", ct))
+    file_label = all_files[0].filename or "upload.xlsx"
+    if len(all_files) > 1:
+        file_label = f"{file_label} 等{len(all_files)}个文件"
 
-    def _on_progress(pct: int, msg: str):
-        ImportQueueService.update_progress(project_id, min(pct, 99), msg)
-
-    result = await smart_import_streaming(
-        project_id=project_id,
-        file_contents=file_contents,
-        db=db,
-        custom_mapping=parsed_mapping,
-        progress_callback=_on_progress,
+    ok, msg, job_batch_id = await ImportQueueService.acquire_lock(
+        project_id,
+        str(current_user.id),
+        db,
+        source_type="smart_import",
+        file_name=file_label,
+        year=0,
     )
+    if not ok:
+        raise HTTPException(status_code=409, detail=msg)
 
-    return AccountImportResult(
-        total_imported=result["total_accounts"],
-        by_category=result["by_category"],
-        errors=result["errors"],
-        data_sheets_imported=result["data_sheets_imported"],
-        sheet_diagnostics=result["sheet_diagnostics"],
-        year=result["year"],
-    )
+    try:
+        file_contents: list[tuple[str, bytes]] = []
+        for f in all_files:
+            ct = await f.read()
+            file_contents.append((f.filename or "upload.xlsx", ct))
+
+        ImportQueueService.update_progress(
+            project_id,
+            2,
+            f"开始导入 {len(file_contents)} 个文件…",
+        )
+
+        def _on_progress(pct: int, msg: str):
+            ImportQueueService.update_progress(project_id, min(pct, 99), msg)
+
+        result = await smart_import_streaming(
+            project_id=project_id,
+            file_contents=file_contents,
+            db=db,
+            custom_mapping=parsed_mapping,
+            progress_callback=_on_progress,
+        )
+
+        result_payload = {
+            "total_imported": result["total_accounts"],
+            "by_category": result["by_category"],
+            "errors": result["errors"],
+            "data_sheets_imported": result["data_sheets_imported"],
+            "sheet_diagnostics": result["sheet_diagnostics"],
+            "year": result["year"],
+        }
+        total_records = result["total_accounts"] + sum(
+            int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
+        )
+        if job_batch_id is not None:
+            await ImportQueueService.complete_job(
+                project_id,
+                job_batch_id,
+                db,
+                message=f"导入完成: {result['data_sheets_imported']}",
+                result=result_payload,
+                year=result["year"],
+                record_count=total_records,
+            )
+
+        return AccountImportResult(**result_payload)
+    except Exception as e:
+        failure_payload = {
+            "total_imported": 0,
+            "by_category": {},
+            "errors": [f"导入失败: {e}"],
+            "data_sheets_imported": {},
+            "sheet_diagnostics": [],
+            "year": None,
+        }
+        if job_batch_id is not None:
+            await ImportQueueService.fail_job(
+                project_id,
+                job_batch_id,
+                db,
+                message=f"导入失败: {e}",
+                result=failure_payload,
+            )
+        else:
+            ImportQueueService.release_lock(project_id)
+        raise
 
 
 @router.post("/{project_id}/account-chart/import-async")
@@ -274,7 +347,8 @@ async def import_async(
     files: list[UploadFile] = File(default=[]),
     file: UploadFile | None = File(default=None),
     column_mapping: str | None = Form(None),
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """异步导入（多文件支持）：立即返回，后台处理，前端轮询进度。
 
@@ -284,18 +358,13 @@ async def import_async(
     import json
     from app.services.import_queue_service import ImportQueueService
 
-    # 获取导入锁
-    ok, msg = ImportQueueService.acquire_lock(project_id, str(current_user.id))
-    if not ok:
-        raise HTTPException(status_code=409, detail=msg)
-
     # 兼容单文件 / 多文件
     all_files: list[UploadFile] = list(files) if files else []
     if file is not None:
         all_files.append(file)
     if not all_files:
-        ImportQueueService.release_lock(project_id)
         raise HTTPException(status_code=400, detail="未提供文件")
+    _ensure_supported_account_chart_uploads(all_files)
 
     parsed_mapping = None
     if column_mapping:
@@ -304,11 +373,46 @@ async def import_async(
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # 预读所有文件到内存（multipart 上传完成后释放连接）
-    file_contents: list[tuple[str, bytes]] = []
-    for f in all_files:
-        ct = await f.read()
-        file_contents.append((f.filename or "upload.xlsx", ct))
+    file_label = all_files[0].filename or "upload.xlsx"
+    if len(all_files) > 1:
+        file_label = f"{file_label} 等{len(all_files)}个文件"
+
+    ok, msg, job_batch_id = await ImportQueueService.acquire_lock(
+        project_id,
+        str(current_user.id),
+        db,
+        source_type="smart_import",
+        file_name=file_label,
+        year=0,
+    )
+    if not ok:
+        raise HTTPException(status_code=409, detail=msg)
+
+    try:
+        file_contents: list[tuple[str, bytes]] = []
+        for f in all_files:
+            ct = await f.read()
+            file_contents.append((f.filename or "upload.xlsx", ct))
+    except Exception as e:
+        failure_payload = {
+            "total_imported": 0,
+            "by_category": {},
+            "errors": [f"导入失败: {e}"],
+            "data_sheets_imported": {},
+            "sheet_diagnostics": [],
+            "year": None,
+        }
+        if job_batch_id is not None:
+            await ImportQueueService.fail_job(
+                project_id,
+                job_batch_id,
+                db,
+                message=f"导入失败: {e}",
+                result=failure_payload,
+            )
+        else:
+            ImportQueueService.release_lock(project_id)
+        raise
 
     # 后台任务
     async def _do_import():
@@ -341,11 +445,21 @@ async def import_async(
                     "sheet_diagnostics": result["sheet_diagnostics"],
                     "year": result["year"],
                 }
-                ImportQueueService.update_progress(
-                    project_id, 100,
-                    f"导入完成: {result['data_sheets_imported']}",
-                    result=result_payload,
+                total_records = result["total_accounts"] + sum(
+                    int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
                 )
+                if job_batch_id is not None:
+                    await ImportQueueService.complete_job(
+                        project_id,
+                        job_batch_id,
+                        db,
+                        message=f"导入完成: {result['data_sheets_imported']}",
+                        result=result_payload,
+                        year=result["year"],
+                        record_count=total_records,
+                    )
+                else:
+                    ImportQueueService.release_lock(project_id)
 
         except Exception as e:
             import traceback
@@ -353,20 +467,25 @@ async def import_async(
             logging.getLogger(__name__).error(
                 "异步导入失败: %s\n%s", e, traceback.format_exc(),
             )
-            ImportQueueService.update_progress(
-                project_id, -1, f"导入失败: {e}",
-                result={
-                    "total_imported": 0,
-                    "by_category": {},
-                    "errors": [f"导入失败: {e}"],
-                    "data_sheets_imported": {},
-                    "sheet_diagnostics": [],
-                    "year": None,
-                },
-            )
-        finally:
-            await asyncio.sleep(3)
-            ImportQueueService.release_lock(project_id)
+            failure_payload = {
+                "total_imported": 0,
+                "by_category": {},
+                "errors": [f"导入失败: {e}"],
+                "data_sheets_imported": {},
+                "sheet_diagnostics": [],
+                "year": None,
+            }
+            async with async_session() as db:
+                if job_batch_id is not None:
+                    await ImportQueueService.fail_job(
+                        project_id,
+                        job_batch_id,
+                        db,
+                        message=f"导入失败: {e}",
+                        result=failure_payload,
+                    )
+                else:
+                    ImportQueueService.release_lock(project_id)
 
     asyncio.create_task(_do_import())
 
@@ -374,6 +493,7 @@ async def import_async(
         "status": "accepted",
         "message": f"导入任务已提交（{len(file_contents)} 个文件），请轮询进度",
         "project_id": str(project_id),
+        "batch_id": str(job_batch_id) if job_batch_id is not None else None,
     }
 
 
@@ -384,7 +504,7 @@ async def import_async(
 async def get_client_chart(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> dict[str, list[AccountTreeNode]]:
     """获取客户科目表（树形结构按类别分组）。
 
@@ -416,7 +536,7 @@ async def save_column_mapping(
     project_id: UUID,
     body: SaveColumnMappingRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """保存用户确认的列映射（持久化到项目 wizard_state）"""
     from sqlalchemy import select
@@ -450,7 +570,7 @@ async def get_column_mappings(
     project_id: UUID,
     file_type: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取已保存的列映射"""
     from sqlalchemy import select
@@ -478,7 +598,7 @@ async def get_column_mappings(
 async def get_reference_projects(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取可参照的项目列表（有已保存列映射的其他项目）"""
     from sqlalchemy import select, func, cast, String
@@ -515,7 +635,7 @@ async def reference_copy_mappings(
     project_id: UUID,
     body: ReferenceMatchRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """从其他项目参照复制列映射"""
     from sqlalchemy import select
@@ -575,7 +695,7 @@ async def batch_update_accounts(
     project_id: UUID,
     body: BatchUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> dict:
     """批量更新客户科目（名称、借贷方向）"""
     from app.models.audit_platform_models import AccountChart, AccountSource, AccountDirection

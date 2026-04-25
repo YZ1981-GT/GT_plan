@@ -41,28 +41,17 @@
 
       <!-- Account Import -->
       <div class="gt-card summary-card">
-        <h3 class="card-title">科目导入</h3>
+        <h3 class="card-title">账套导入</h3>
         <div class="card-body">
           <div class="info-row">
             <span class="info-label">状态</span>
             <span class="info-value">
-              <el-tag v-if="isStepCompleted('account_import')" type="success" size="small">已完成</el-tag>
-              <el-tag v-else type="info" size="small">待完成</el-tag>
+              <el-tag type="info" size="small">建项后独立处理</el-tag>
             </span>
           </div>
-        </div>
-      </div>
-
-      <!-- Account Mapping -->
-      <div class="gt-card summary-card">
-        <h3 class="card-title">科目映射</h3>
-        <div class="card-body">
           <div class="info-row">
-            <span class="info-label">状态</span>
-            <span class="info-value">
-              <el-tag v-if="isStepCompleted('account_mapping')" type="success" size="small">已完成</el-tag>
-              <el-tag v-else type="info" size="small">待完成</el-tag>
-            </span>
+            <span class="info-label">入口</span>
+            <span class="info-value">项目页 / 查账页</span>
           </div>
         </div>
       </div>
@@ -172,7 +161,6 @@ const ROLE_LABEL_MAP: Record<string, string> = {
   signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员',
 }
 function roleLabel(role: string) { return ROLE_LABEL_MAP[role] || role }
-
 function isStepCompleted(step: string): boolean {
   return wizardStore.isStepCompleted(step)
 }

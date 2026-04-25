@@ -106,7 +106,7 @@
       <!-- 空状态 -->
       <div v-if="balanceTab === 'account' && !loading && balanceData.length === 0" class="gt-empty-state">
         <p style="font-size: 15px; color: #999">暂无科目余额数据</p>
-        <p style="font-size: 13px; color: #bbb">请在项目向导「科目导入」步骤上传包含余额表的 Excel 文件</p>
+        <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
       </div>
 
       <!-- 余额表 -->
@@ -209,7 +209,7 @@
         <!-- 空状态 -->
         <div v-if="!loading && auxSummaryData.length === 0 && auxPagedRows.length === 0" class="gt-empty-state">
           <p style="font-size: 15px; color: #999">暂无辅助余额数据</p>
-          <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel 文件</p>
+          <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
         </div>
 
         <el-table
@@ -448,7 +448,7 @@
   <!-- ── 智能导入弹窗 ── -->
   <el-dialog
     v-model="importDialogVisible"
-    title="智能导入四表数据"
+    title="账套导入"
     width="720px"
     append-to-body
     destroy-on-close
@@ -460,7 +460,7 @@
         drag
         multiple
         :auto-upload="false"
-        accept=".xlsx,.xls"
+        accept=".xlsx,.csv"
         :on-change="onImportFileChange"
       >
         <el-icon style="font-size: 40px; color: #c0c4cc"><Upload /></el-icon>
@@ -643,10 +643,7 @@ function onYearChange(newYear: number) {
 }
 
 function goToImport() {
-  router.push({
-    path: '/projects/new',
-    query: { projectId: projectId.value, returnTo: 'ledger' },
-  })
+  openImportDialog()
 }
 
 // ── 智能导入 ──
@@ -659,6 +656,23 @@ const importedResult = ref<any>(null)
 const previewing = ref(false)
 const importing = ref(false)
 const uploadRef = ref()
+
+function openImportDialog() {
+  importDialogVisible.value = true
+  importStep.value = 'upload'
+  importFiles.value = []
+  importYear.value = selectedYear.value || year.value
+  previewResult.value = null
+  importedResult.value = null
+  uploadRef.value?.clearFiles?.()
+}
+
+function openImportDialogFromRoute() {
+  openImportDialog()
+  const nextQuery = { ...route.query }
+  delete nextQuery.import
+  router.replace({ path: route.path, query: nextQuery })
+}
 
 function onImportFileChange(file: any) {
   if (file?.raw) {
@@ -732,6 +746,13 @@ watch([projectId, year], () => {
     currentLevel.value = 'balance'
     breadcrumbs.value = [{ label: '账簿查询', level: 'balance' }]
     loadBalance()
+  }
+})
+
+watch(() => route.query.import, (val) => {
+  if (!_initialized) return
+  if (val === '1') {
+    openImportDialogFromRoute()
   }
 })
 
@@ -1804,6 +1825,9 @@ onMounted(async () => {
   await loadAvailableYears()
   await loadBalance()
   _initialized = true
+  if (route.query.import === '1') {
+    openImportDialogFromRoute()
+  }
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)

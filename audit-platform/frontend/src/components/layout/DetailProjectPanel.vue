@@ -54,6 +54,10 @@
                 <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
                 <span>重要性</span>
               </div>
+              <div class="gt-quick-btn" @click="goToLedgerImport()">
+                <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
+                <span>账套导入</span>
+              </div>
               <div class="gt-quick-btn" @click="goTo('ledger')">
                 <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
                 <span>查账</span>
@@ -159,9 +163,12 @@
             <el-icon :size="40" color="var(--gt-color-primary)"><Search /></el-icon>
             <h4 style="margin: 12px 0 8px; color: var(--gt-color-text)">账证联动查询</h4>
             <p style="color: var(--gt-color-text-secondary); font-size: 13px; margin-bottom: 16px; text-align: center">
-              从科目余额表出发，逐级穿透到序时账、凭证、辅助账，支持五级下钻导航
+              建项后可先独立导入账套数据，再从科目余额表逐级穿透到序时账、凭证、辅助账
             </p>
-            <el-button type="primary" @click="goTo('ledger')">
+            <el-button type="primary" @click="goToLedgerImport()">
+              <el-icon><Upload /></el-icon> 账套导入
+            </el-button>
+            <el-button @click="goTo('ledger')">
               <el-icon><Search /></el-icon> 进入查账
             </el-button>
           </div>
@@ -207,7 +214,7 @@
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -266,6 +273,11 @@ function goTo(page: string) {
     path: `/projects/${props.project.id}/${page}`,
     query: { year: String(projectYear.value) },
   })
+}
+
+function goToLedgerImport() {
+  if (!props.project) return
+  router.push({ path: `/projects/${props.project.id}/ledger`, query: { import: '1' } })
 }
 
 function editProject() {

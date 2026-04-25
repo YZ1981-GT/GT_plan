@@ -33,16 +33,20 @@ export interface WizardState {
   completed: boolean
 }
 
-const STEP_KEYS = [
+export type StepKey =
+  | 'basic_info'
+  | 'account_import'
+  | 'account_mapping'
+  | 'materiality'
+  | 'team_assignment'
+  | 'confirmation'
+
+const STEP_KEYS: StepKey[] = [
   'basic_info',
-  'account_import',
-  'account_mapping',
   'materiality',
   'team_assignment',
   'confirmation',
-] as const
-
-export type StepKey = (typeof STEP_KEYS)[number]
+]
 
 export const STEP_LABELS: Record<StepKey, string> = {
   basic_info: '基本信息',
@@ -91,7 +95,12 @@ export const useWizardStore = defineStore('wizard', {
         }
       }
       const idx = this.stepList.indexOf(state.current_step)
-      if (idx >= 0) this.currentStepIndex = idx
+      if (idx >= 0) {
+        this.currentStepIndex = idx
+      } else {
+        const nextVisibleStep = this.stepList.findIndex((step) => !this.completedSteps[step])
+        this.currentStepIndex = nextVisibleStep >= 0 ? nextVisibleStep : this.stepList.length - 1
+      }
     },
 
     /** Create project via POST /api/projects */

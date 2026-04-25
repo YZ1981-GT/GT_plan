@@ -24,9 +24,8 @@ from app.services.note_template_service import NoteTemplateService
 # 步骤依赖链：每个步骤的前置步骤必须已完成
 STEP_ORDER: list[WizardStep] = [
     WizardStep.basic_info,
-    WizardStep.account_import,
-    WizardStep.account_mapping,
     WizardStep.materiality,
+    WizardStep.team_assignment,
     WizardStep.template_set,
     WizardStep.confirmation,
 ]
@@ -35,24 +34,10 @@ STEP_DEPENDENCIES: dict[WizardStep, list[WizardStep]] = {
     WizardStep.basic_info: [],
     WizardStep.account_import: [WizardStep.basic_info],
     WizardStep.account_mapping: [WizardStep.basic_info, WizardStep.account_import],
-    WizardStep.materiality: [
-        WizardStep.basic_info,
-        WizardStep.account_import,
-        WizardStep.account_mapping,
-    ],
+    WizardStep.materiality: [WizardStep.basic_info],
     WizardStep.team_assignment: [WizardStep.basic_info],
-    WizardStep.template_set: [
-        WizardStep.basic_info,
-        WizardStep.account_import,
-        WizardStep.account_mapping,
-        WizardStep.materiality,
-    ],
-    WizardStep.confirmation: [
-        WizardStep.basic_info,
-        WizardStep.account_import,
-        WizardStep.account_mapping,
-        # materiality 和 template_set 为可选步骤，不阻断项目创建
-    ],
+    WizardStep.template_set: [WizardStep.basic_info, WizardStep.materiality],
+    WizardStep.confirmation: [WizardStep.basic_info],
 }
 
 # basic_info 步骤的必填字段
@@ -373,10 +358,10 @@ async def confirm_project(project_id: UUID, db: AsyncSession) -> Project:
     """
     project = await _get_project_or_404(db, project_id)
 
-    if project.status not in (ProjectStatus.created, ProjectStatus.planning):
+    if project.status != ProjectStatus.created:
         raise HTTPException(
             status_code=400,
-            detail=f"项目状态为 {project.status.value}，无法确认（仅 created/planning 状态可确认）",
+            detail=f"项目状态为 {project.status.value}，无法确认（仅 created 状态可确认）",
         )
 
     # 校验确认步骤
