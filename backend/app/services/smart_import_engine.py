@@ -2155,39 +2155,12 @@ async def smart_import_streaming(
     total_size = sum(len(c) for _, c in file_contents)
     sheet_count_est = 0
 
+    # 年度检测只用文件名（不打开文件），sheet 计数延迟到 Phase 2
     if detected_year is None:
-        for fn, ct in file_contents:
-            # CSV 文件用文件名提取年度
-            if fn.lower().endswith('.csv'):
-                sheet_count_est += 1
-                if detected_year is None:
-                    detected_year = extract_year_from_content([], filename=fn)
-                continue
-            try:
-                wb0 = openpyxl.load_workbook(io.BytesIO(ct), read_only=True, data_only=True)
-                for ws0 in wb0.worksheets:
-                    sheet_count_est += 1
-                    if detected_year is None:
-                        detected_year = extract_year_from_content(
-                            [{f"c{j}": v for j, v in enumerate(r)}
-                             for i, r in enumerate(ws0.iter_rows(max_row=25, values_only=True))],
-                            filename=fn,
-                        )
-                wb0.close()
-            except Exception:
-                continue
-    else:
-        # Still count sheets for progress estimation
-        for fn, ct in file_contents:
-            if fn.lower().endswith('.csv'):
-                sheet_count_est += 1
-                continue
-            try:
-                wb0 = openpyxl.load_workbook(io.BytesIO(ct), read_only=True, data_only=True)
-                sheet_count_est += len(wb0.worksheets)
-                wb0.close()
-            except Exception:
-                pass
+        for fn, _ in file_contents:
+            detected_year = extract_year_from_content([], filename=fn)
+            if detected_year:
+                break
 
     if detected_year is None:
         detected_year = datetime.now().year - 1
@@ -2283,43 +2256,48 @@ async def smart_import_streaming(
             continue  # 跳过后面的 Excel 处理
 
         # ── Excel 文件处理 ──
-        # 策略：表头检测可能需要完整模式（合并单元格），但数据行始终用 read_only 流式读取
-        # 1. 先用 read_only 探测前 5 行，判断是否有合并单元格
-        # 2. 如果有，用完整模式只读表头（前 10 行），然后关闭
-        # 3. 数据行始终用 read_only 模式流式读取（百万行不卡）
+        # 优化：最多打开 2 次（完整模式读表头 + read_only 读数据）
+        # 第 1 次：read_only 打开，探测合并单元格 + 读数据（如果不需要完整模式则一次搞定）
+        # 第 2 次：仅在需要完整模式时打开，只读表头后关闭
+
+        # 探测合并单元格（从文件头部几 KB 判断，不需要打开整个文件）
         needs_full_for_header = False
+        # 用 read_only 打开一次，同时做探测和数据读取
         try:
-            wb_probe = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-            for _ws in wb_probe.worksheets:
-                try:
-                    rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
-                    if not rows5:
-                        continue
-                    if max(len(r) for r in rows5) <= 3:
-                        needs_full_for_header = True
-                        break
-                    for row in rows5:
-                        non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
-                        if len(non_empty) >= 4:
-                            from collections import Counter
-                            most_common_val, most_common_count = Counter(non_empty).most_common(1)[0]
-                            if most_common_count >= len(non_empty) * 0.6 and most_common_count >= 3:
-                                needs_full_for_header = True
-                                break
-                    if needs_full_for_header:
-                        break
-                except Exception:
-                    pass
-            wb_probe.close()
-        except Exception:
-            pass
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        except Exception as e:
+            diagnostics.append({"file": filename, "sheet": None,
+                                "status": "error", "message": f"无法打开: {e}"})
+            errors.append(f"无法打开 {filename}: {e}")
+            continue
 
-        if needs_full_for_header:
-            logger.info("  检测到合并单元格特征，表头用完整模式: %s", filename)
+        # 探测合并单元格特征
+        for _ws in wb.worksheets:
+            try:
+                rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
+                if not rows5:
+                    continue
+                if max(len(r) for r in rows5) <= 3:
+                    needs_full_for_header = True
+                    break
+                for row in rows5:
+                    non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
+                    if len(non_empty) >= 4:
+                        from collections import Counter
+                        _, cnt = Counter(non_empty).most_common(1)[0]
+                        if cnt >= len(non_empty) * 0.6 and cnt >= 3:
+                            needs_full_for_header = True
+                            break
+                if needs_full_for_header:
+                    break
+            except Exception:
+                pass
 
-        # 如果需要完整模式读表头，先打开完整模式提取表头信息，再用 read_only 读数据
-        header_cache: dict[str, dict] = {}  # sheet_name -> meta
+        # 如果需要完整模式读表头，单独打开一次只读表头
+        header_cache: dict[str, dict] = {}
         if needs_full_for_header:
+            wb.close()  # 先关 read_only
+            logger.info("  检测到合并单元格，完整模式读表头: %s", filename)
             try:
                 wb_full = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
                 for ws_full in wb_full.worksheets:
@@ -2332,16 +2310,16 @@ async def smart_import_streaming(
                         pass
                 wb_full.close()
             except Exception as e:
-                logger.warning("完整模式打开失败，降级为 read_only: %s", e)
+                logger.warning("完整模式打开失败: %s", e)
+            # 重新用 read_only 打开读数据
+            try:
+                wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            except Exception as e:
+                diagnostics.append({"file": filename, "sheet": None,
+                                    "status": "error", "message": f"无法打开: {e}"})
+                continue
 
-        # 数据行始终用 read_only 模式（百万行流式读取不卡）
-        try:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-        except Exception as e:
-            diagnostics.append({"file": filename, "sheet": None,
-                                "status": "error", "message": f"无法打开: {e}"})
-            errors.append(f"无法打开 {filename}: {e}")
-            continue
+        sheet_count_est += len(wb.worksheets)
 
         for ws in wb.worksheets:
             sname = ws.title
