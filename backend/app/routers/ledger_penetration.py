@@ -432,6 +432,10 @@ async def smart_preview(
     大文件秒级响应（只扫描前几行），供用户确认后再调用 smart-import 写入。
     """
     import io
+    import time as _perf_time
+    import logging as _logging
+    _logger = _logging.getLogger("smart_import_engine")
+    _t_preview_start = _perf_time.perf_counter()
     import openpyxl
     from app.services.smart_import_engine import (
         parse_sheet_header_only, detect_header_rows, smart_match_column,
@@ -554,8 +558,11 @@ async def smart_preview(
 
         # 探测合并单元格
         needs_full = False
+        _t_probe = _perf_time.perf_counter()
         try:
             wb_probe = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            _logger.info("[PERF] preview probe open (read_only) %s: %.2fs",
+                         filename, _perf_time.perf_counter() - _t_probe)
             for _ws in wb_probe.worksheets:
                 try:
                     rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
@@ -578,8 +585,11 @@ async def smart_preview(
         except Exception:
             pass
 
+        _t_wb_open = _perf_time.perf_counter()
         try:
             wb = openpyxl.load_workbook(io.BytesIO(content), read_only=(not needs_full), data_only=True)
+            _logger.info("[PERF] preview open (read_only=%s) %s: %.2fs",
+                         not needs_full, filename, _perf_time.perf_counter() - _t_wb_open)
         except Exception as e:
             diagnostics.append({"file": filename, "sheet": None, "data_type": "unknown",
                                 "row_count": 0, "status": "error", "message": str(e)})
@@ -701,6 +711,10 @@ async def smart_preview(
             d["column_mapping_labels"] = {
                 h: FIELD_LABELS.get(v, v) for h, v in cm.items()
             }
+
+    _logger.info("[PERF] ═══ smart_preview TOTAL: %.2fs, %d files, %d sheets ═══",
+                _perf_time.perf_counter() - _t_preview_start,
+                len(file_contents), len(diagnostics))
 
     return {
         "year": detected_year,

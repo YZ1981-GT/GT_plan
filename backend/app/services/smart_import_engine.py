@@ -1623,18 +1623,29 @@ async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
     用 DELETE 替代 soft-delete（UPDATE is_deleted=True），
     百万行 DELETE 比 UPDATE 快 3-5 倍（不写旧行的 WAL）。
     """
+    import time as _time
     import sqlalchemy as sa
     from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
 
+    _t_total = _time.perf_counter()
+    _table_names = {TbAuxLedger: "tb_aux_ledger", TbAuxBalance: "tb_aux_balance",
+                    TbLedger: "tb_ledger", TbBalance: "tb_balance"}
     for model in (TbAuxLedger, TbAuxBalance, TbLedger, TbBalance):
         tbl = model.__table__
-        await db.execute(
+        _t0 = _time.perf_counter()
+        result = await db.execute(
             sa.delete(tbl).where(
                 tbl.c.project_id == project_id,
                 tbl.c.year == year,
             )
         )
+        _elapsed = _time.perf_counter() - _t0
+        _rows = result.rowcount if result else 0
+        logger.info("[PERF] DELETE %s: %d rows in %.2fs",
+                    _table_names[model], _rows, _elapsed)
     await db.flush()
+    logger.info("[PERF] _clear_project_year_tables total: %.2fs",
+                _time.perf_counter() - _t_total)
 
 
 async def write_four_tables(
@@ -1866,6 +1877,7 @@ async def _stream_csv_import(
         """纯 SQLAlchemy 批量 INSERT（不用 COPY，避免事务冲突）。"""
         if not rows:
             return 0
+        import time as _time
         from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
         _TBL = {"tb_balance": TbBalance, "tb_ledger": TbLedger,
                 "tb_aux_balance": TbAuxBalance, "tb_aux_ledger": TbAuxLedger}
@@ -1878,8 +1890,13 @@ async def _stream_csv_import(
             for col in columns:
                 rec[col] = row.get(col)
             records.append(rec)
+        _t0 = _time.perf_counter()
         await db.execute(tbl.insert(), records)
         await db.flush()
+        _elapsed = _time.perf_counter() - _t0
+        logger.info("[PERF] CSV _do_insert %s: %d rows in %.2fs (%.0f rows/s)",
+                    table_name, len(records), _elapsed,
+                    len(records) / _elapsed if _elapsed > 0.001 else 0)
         return len(records)
 
     def _prog(pct, msg=""):
@@ -2148,6 +2165,7 @@ async def smart_import_streaming(
         """纯 SQLAlchemy 批量 INSERT（不用 COPY，避免事务冲突）。"""
         if not rows:
             return 0
+        import time as _time
         from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
         _TBL = {"tb_balance": TbBalance, "tb_ledger": TbLedger,
                 "tb_aux_balance": TbAuxBalance, "tb_aux_ledger": TbAuxLedger}
@@ -2159,8 +2177,13 @@ async def smart_import_streaming(
             for col in columns:
                 rec[col] = row.get(col)
             records.append(rec)
+        _t0 = _time.perf_counter()
         await db.execute(tbl.insert(), records)
         await db.flush()
+        _elapsed = _time.perf_counter() - _t0
+        logger.info("[PERF] _batch_insert %s: %d rows in %.2fs (%.0f rows/s)",
+                    table_name, len(records), _elapsed,
+                    len(records) / _elapsed if _elapsed > 0.001 else 0)
         return len(records)
 
     def _prog(pct: int, msg: str = ""):
@@ -2171,6 +2194,8 @@ async def smart_import_streaming(
                 pass
 
     # ── Phase 0: Quick scan to detect year ──────────────────────────────────
+    import time as _perf_time
+    _t_import_start = _perf_time.perf_counter()
     detected_year = year_override
     total_size = sum(len(c) for _, c in file_contents)
     sheet_count_est = 0
@@ -2189,7 +2214,9 @@ async def smart_import_streaming(
     _prog(5, f"年度 {year}，{len(file_contents)} 个文件，{total_size/1024/1024:.1f} MB")
 
     # ── Phase 0: 统一清理该 project+year 的全部四表旧数据 ────────────────
+    _t_clear = _perf_time.perf_counter()
     await _clear_project_year_tables(project_id, year, db)
+    logger.info("[PERF] Phase 0 clear old data: %.2fs", _perf_time.perf_counter() - _t_clear)
 
     # ── Phase 1: ImportBatch 记录 ─────────────────────────────────────────
     _TABLE_MAP = {
@@ -2287,7 +2314,10 @@ async def smart_import_streaming(
         if _use_calamine:
             _prog(12, f"读取 {filename}（{len(content)/1024/1024:.0f} MB）…")
             try:
+                _t_cal_open = _perf_time.perf_counter()
                 cal_wb = CalamineWorkbook.from_buffer(content)
+                logger.info("[PERF] calamine open %s: %.2fs",
+                            filename, _perf_time.perf_counter() - _t_cal_open)
                 total_sheets = len([s for s in cal_wb.sheet_names
                                     if not any(kw in s.lower() for kw in ("说明", "目录", "封面", "模板"))])
 
@@ -2306,6 +2336,7 @@ async def smart_import_streaming(
                     csv_buf = io.StringIO()
                     writer = _csv_mod.writer(csv_buf)
                     row_count = 0
+                    _t_cal_read = _perf_time.perf_counter()
                     for row in sheet.iter_rows():
                         writer.writerow([
                             str(c).strip() if c is not None else ""
@@ -2317,17 +2348,27 @@ async def smart_import_streaming(
                             pct = 12 + int(row_count / max(total_rows_est, 1) * 30)
                             _prog(min(pct, 42), f"读取 {sname}: {row_count:,}/{total_rows_est:,} 行")
 
+                    _cal_read_elapsed = _perf_time.perf_counter() - _t_cal_read
+                    logger.info("[PERF] calamine read sheet '%s': %d rows in %.2fs (%.0f rows/s)",
+                                sname, row_count, _cal_read_elapsed,
+                                row_count / _cal_read_elapsed if _cal_read_elapsed > 0.001 else 0)
+
                     if row_count < 2:
                         csv_buf.close()
                         continue
 
+                    _t_cal_encode = _perf_time.perf_counter()
                     csv_bytes = csv_buf.getvalue().encode("utf-8")
                     csv_buf.close()
+                    logger.info("[PERF] calamine CSV encode '%s': %.2fs, %d MB",
+                                sname, _perf_time.perf_counter() - _t_cal_encode,
+                                len(csv_bytes) // (1024 * 1024))
 
                     csv_filename = f"{filename}[{sname}].csv"
                     _prog(45, f"写入 {csv_filename}（{row_count:,} 行）…")
 
                     try:
+                        _t_csv_import = _perf_time.perf_counter()
                         csv_result = await _stream_csv_import(
                             content=csv_bytes,
                             filename=csv_filename,
@@ -2347,6 +2388,8 @@ async def smart_import_streaming(
                         diagnostics.append(csv_result["diag"])
                         if csv_result.get("errors"):
                             errors.extend(csv_result["errors"])
+                        logger.info("[PERF] _stream_csv_import '%s': %.2fs",
+                                    csv_filename, _perf_time.perf_counter() - _t_csv_import)
                     except Exception as e:
                         logger.error("calamine CSV 导入异常: %s", e)
                         diagnostics.append({"file": filename, "sheet": sname,
@@ -2361,9 +2404,9 @@ async def smart_import_streaming(
 
         # ── openpyxl 降级路径（calamine 不可用或解析失败时） ──
 
-        # 探测合并单元格（从文件头部几 KB 判断，不需要打开整个文件）
+        # 第一次打开：read_only 模式，同时探测合并单元格特征
         needs_full_for_header = False
-        # 用 read_only 打开一次，同时做探测和数据读取
+        _t_opx_open = _perf_time.perf_counter()
         try:
             wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         except Exception as e:
@@ -2371,8 +2414,10 @@ async def smart_import_streaming(
                                 "status": "error", "message": f"无法打开: {e}"})
             errors.append(f"无法打开 {filename}: {e}")
             continue
+        logger.info("[PERF] openpyxl open (read_only) %s: %.2fs",
+                    filename, _perf_time.perf_counter() - _t_opx_open)
 
-        # 探测合并单元格特征
+        # 探测合并单元格特征（只扫描前5行，不遍历数据）
         for _ws in wb.worksheets:
             try:
                 rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
@@ -2394,13 +2439,16 @@ async def smart_import_streaming(
             except Exception:
                 pass
 
-        # 如果需要完整模式读表头，单独打开一次只读表头
+        # 如果需要完整模式读表头，关闭 read_only → 完整模式打开一次（读表头+数据）
         header_cache: dict[str, dict] = {}
         if needs_full_for_header:
-            wb.close()  # 先关 read_only
-            logger.info("  检测到合并单元格，完整模式读表头: %s", filename)
+            wb.close()  # 关闭 read_only
+            logger.info("[PERF] merged cells detected, opening full mode: %s", filename)
+            _t_full = _perf_time.perf_counter()
             try:
                 wb_full = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                logger.info("[PERF] openpyxl open (full) %s: %.2fs",
+                            filename, _perf_time.perf_counter() - _t_full)
                 for ws_full in wb_full.worksheets:
                     sn = ws_full.title
                     if any(kw in sn.lower() for kw in ("说明", "目录", "封面", "模板")):
@@ -2413,8 +2461,11 @@ async def smart_import_streaming(
             except Exception as e:
                 logger.warning("完整模式打开失败: %s", e)
             # 重新用 read_only 打开读数据
+            _t_reopen = _perf_time.perf_counter()
             try:
                 wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+                logger.info("[PERF] openpyxl reopen (read_only) %s: %.2fs",
+                            filename, _perf_time.perf_counter() - _t_reopen)
             except Exception as e:
                 diagnostics.append({"file": filename, "sheet": None,
                                     "status": "error", "message": f"无法打开: {e}"})
@@ -2501,6 +2552,7 @@ async def smart_import_streaming(
             logger.info("Sheet %s: data_type=%s, streaming+COPY, matched=%s",
                         sname, dt, sorted(matched_fields)[:5])
 
+            _t_sheet_start = _perf_time.perf_counter()
             sheet_row_count = 0
             sheet_counts: dict[str, int] = {"tb_balance": 0, "tb_aux_balance": 0, "tb_ledger": 0, "tb_aux_ledger": 0}
 
@@ -2628,6 +2680,13 @@ async def smart_import_streaming(
                 _aux_led_buf.clear()
 
             diag["row_count"] = sheet_row_count
+            _sheet_elapsed = _perf_time.perf_counter() - _t_sheet_start
+            logger.info("[PERF] Sheet '%s' (%s): %d rows in %.2fs (%.0f rows/s), "
+                        "wrote bal=%d aux_bal=%d led=%d aux_led=%d",
+                        sname, dt, sheet_row_count, _sheet_elapsed,
+                        sheet_row_count / _sheet_elapsed if _sheet_elapsed > 0.001 else 0,
+                        sheet_counts.get("tb_balance", 0), sheet_counts.get("tb_aux_balance", 0),
+                        sheet_counts.get("tb_ledger", 0), sheet_counts.get("tb_aux_ledger", 0))
             if dt == "balance":
                 diag["balance_count"] = sheet_counts["tb_balance"]
                 diag["aux_balance_count"] = sheet_counts["tb_aux_balance"]
@@ -2651,19 +2710,25 @@ async def smart_import_streaming(
         wb.close()
 
     # ── Phase 3: 写入科目表 ─────────────────────────────────────────────────
+    _t_phase3 = _perf_time.perf_counter()
     if acct_records:
         db.add_all(acct_records)
         await db.flush()
+    logger.info("[PERF] Phase 3 write accounts: %d records in %.2fs",
+                len(acct_records), _perf_time.perf_counter() - _t_phase3)
     _prog(90, f"科目 {len(acct_records)} 个，正在完成…")
 
     # ── Phase 4: 更新 batch 状态 ────────────────────────────────────────────
+    _t_phase4 = _perf_time.perf_counter()
     for dt_key, batch in batches.items():
         batch.record_count = counts[dt_key]
         batch.status = ImportStatus.completed
         batch.completed_at = datetime.utcnow()
     await db.commit()
+    logger.info("[PERF] Phase 4 commit: %.2fs", _perf_time.perf_counter() - _t_phase4)
 
     # ── Phase 5: 辅助余额汇总 + 事件 ───────────────────────────────────────
+    _t_phase5 = _perf_time.perf_counter()
     if counts.get("tb_aux_balance", 0) > 0:
         try:
             sc = await rebuild_aux_balance_summary(project_id, year, db)
@@ -2685,6 +2750,13 @@ async def smart_import_streaming(
         logger.warning("DATA_IMPORTED 事件发布失败: %s", e)
 
     _prog(100, "导入完成")
+    _total_elapsed = _perf_time.perf_counter() - _t_import_start
+    logger.info("[PERF] ═══ smart_import_streaming TOTAL: %.2fs ═══ "
+                "bal=%d aux_bal=%d led=%d aux_led=%d accounts=%d",
+                _total_elapsed,
+                counts.get("tb_balance", 0), counts.get("tb_aux_balance", 0),
+                counts.get("tb_ledger", 0), counts.get("tb_aux_ledger", 0),
+                len(acct_records))
 
     # 规范化诊断结构
     norm_diag: list[dict] = []
