@@ -46,7 +46,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { listSubsequentEvents, createSubsequentEvent } from '@/services/commonApi'
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 const events = ref<any[]>([])
@@ -57,16 +57,14 @@ const form = ref({ event_type: 'adjusting', event_description: '', impact_amount
 async function loadEvents() {
   loading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/subsequent-events`)
-    events.value = data.data ?? data
-    if (!Array.isArray(events.value)) events.value = []
+    events.value = await listSubsequentEvents(projectId.value)
   } catch { events.value = [] }
   finally { loading.value = false }
 }
 async function saveEvent() {
   saving.value = true
   try {
-    await http.post(`/api/projects/${projectId.value}/subsequent-events`, form.value)
+    await createSubsequentEvent(projectId.value, form.value)
     ElMessage.success('保存成功')
     showCreate.value = false
     await loadEvents()

@@ -1,5 +1,5 @@
 <template>
-  <el-dialog
+  <el-dialog append-to-body
     :model-value="visible"
     :title="isEdit ? '编辑公司信息' : '新增公司'"
     width="640px"

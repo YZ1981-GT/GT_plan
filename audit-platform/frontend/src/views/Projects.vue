@@ -86,20 +86,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import http from '@/utils/http'
+import { listProjects } from '@/services/commonApi'
 import { FolderOpened, Plus, Right, Upload } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
 const projects = ref<any[]>([])
 
-onMounted(() => loadProjects())
+onMounted(() => loadProjectList())
 
-async function loadProjects() {
+async function loadProjectList() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/projects')
-    projects.value = data.data ?? data ?? []
+    projects.value = await listProjects()
   } catch { /* ignore */ }
   finally { loading.value = false }
 }

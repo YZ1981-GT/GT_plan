@@ -29,7 +29,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑少数股东权益' : '新增少数股东权益'" width="640px">
+    <el-dialog append-to-body v-model="dialogVisible" :title="editing ? '编辑少数股东权益' : '新增少数股东权益'" width="640px">
       <el-form :model="form" label-width="140px">
         <el-form-item label="子公司名称"><el-input v-model="form.subsidiary_name" /></el-form-item>
         <el-form-item label="母公司在子公司的持股比例">

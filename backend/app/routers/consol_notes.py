@@ -14,10 +14,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_current_user
-from app.core.database import get_sync_db
+from app.core.database import get_db
 from app.models.consolidation_schemas import ConsolDisclosureSection
 from app.services.consol_disclosure_service import (
     generate_consol_notes_sync,
@@ -35,7 +35,7 @@ class ConsolNotesIntegrateRequest(BaseModel):
     """合并附注整合请求"""
     project_id: UUID
     year: int
-    existing_notes: list[dict] | None = None  # 可选的 Phase 1 附注列表
+    existing_notes: list[dict] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -47,14 +47,10 @@ class ConsolNotesIntegrateRequest(BaseModel):
 async def create_consol_notes(
     project_id: UUID,
     year: int,
-    db: Session = Depends(get_sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """
-    生成合并附注
-
-    包含 7 个合并特有附注章节
-    """
+    """生成合并附注"""
     sections = generate_consol_notes_sync(db, project_id, year)
     return sections
 
@@ -63,7 +59,7 @@ async def create_consol_notes(
 async def get_consol_notes(
     project_id: UUID,
     year: int,
-    db: Session = Depends(get_sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """获取合并附注"""
@@ -74,7 +70,7 @@ async def get_consol_notes(
 @router.post("/integrate", response_model=list[ConsolDisclosureSection])
 async def integrate_notes(
     data: ConsolNotesIntegrateRequest,
-    db: Session = Depends(get_sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """将合并附注与 Phase 1 单体附注整合"""
@@ -88,7 +84,7 @@ async def integrate_notes(
 async def save_consol_notes(
     project_id: UUID,
     year: int,
-    db: Session = Depends(get_sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     """保存合并附注到数据库"""

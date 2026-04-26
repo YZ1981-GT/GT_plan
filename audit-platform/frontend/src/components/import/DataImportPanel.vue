@@ -157,7 +157,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   projectId: string
@@ -188,11 +188,10 @@ async function startImport() {
 
   // 1. 先检查是否有重复数据
   try {
-    const { data: dupCheck } = await http.get(
+    const dup = await api.get(
       `/api/projects/${props.projectId}/import/check-duplicates`,
       { params: { data_type: form.dataType, year: form.year } }
     )
-    const dup = dupCheck.data ?? dupCheck
 
     if (dup.has_duplicates) {
       // 弹窗让用户选择
@@ -241,13 +240,11 @@ async function doImport(onDuplicate: string) {
     formData.append('year', String(form.year))
     formData.append('on_duplicate', onDuplicate)
 
-    const res = await http.post(
+    const batch = await api.post(
       `/api/projects/${props.projectId}/import`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
-
-    const batch = res.data?.data || res.data
 
     if (batch.status === 'failed' && batch.validation_summary?.duplicate_action_required) {
       ElMessage.warning(batch.validation_summary.error)
@@ -273,10 +270,9 @@ async function doImport(onDuplicate: string) {
 
 async function loadProgress(batchId: string) {
   try {
-    const res = await http.get(
+    currentProgress.value = await api.get(
       `/api/projects/${props.projectId}/import/${batchId}/progress`
     )
-    currentProgress.value = res.data?.data || res.data
   } catch {
     // ignore
   }
@@ -284,10 +280,9 @@ async function loadProgress(batchId: string) {
 
 async function loadBatches() {
   try {
-    const res = await http.get(
+    batches.value = await api.get(
       `/api/projects/${props.projectId}/import/batches`
-    )
-    batches.value = res.data?.data || res.data || []
+    ) || []
   } catch {
     batches.value = []
   }
@@ -298,7 +293,7 @@ async function handleRollback(batchId: string) {
     await ElMessageBox.confirm('确定要回滚此批次导入吗？所有导入的记录将被删除。', '确认回滚', {
       type: 'warning',
     })
-    await http.post(`/api/projects/${props.projectId}/import/${batchId}/rollback`)
+    await api.post(`/api/projects/${props.projectId}/import/${batchId}/rollback`)
     ElMessage.success('回滚成功')
     await loadBatches()
   } catch {

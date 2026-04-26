@@ -43,7 +43,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { listUsers, createUser, updateUser } from '@/services/commonApi'
 const users = ref<any[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
@@ -53,9 +53,7 @@ const form = ref({ username: '', email: '', password: '', role: 'auditor' })
 async function loadUsers() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/users')
-    users.value = data.data ?? data
-    if (!Array.isArray(users.value)) users.value = []
+    users.value = await listUsers()
   } catch { users.value = [] }
   finally { loading.value = false }
 }
@@ -68,9 +66,9 @@ async function saveUser() {
   saving.value = true
   try {
     if (editingUser.value) {
-      await http.put(`/api/users/${editingUser.value.id}`, form.value)
+      await updateUser(editingUser.value.id, form.value)
     } else {
-      await http.post('/api/users', form.value)
+      await createUser(form.value)
     }
     ElMessage.success('保存成功')
     showCreate.value = false

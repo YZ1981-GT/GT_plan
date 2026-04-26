@@ -75,7 +75,7 @@ import {
   getWopiEditorUrl,
   type WorkpaperDetail,
 } from '@/services/workpaperApi'
-import http from '@/utils/http'
+import http from '@/utils/http' // Needed for WOPI lock refresh with custom headers
 
 const route = useRoute()
 const router = useRouter()

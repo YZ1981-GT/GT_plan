@@ -49,7 +49,10 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
+import {
+  listCustomTemplates, validateCustomTemplate as validateTpl,
+  publishCustomTemplate, deleteCustomTemplate,
+} from '@/services/commonApi'
 
 const router = useRouter()
 const loading = ref(false)
@@ -61,8 +64,7 @@ async function loadTemplates() {
   try {
     const params: any = {}
     if (filterCategory.value) params.category = filterCategory.value
-    const { data } = await http.get('/api/custom-templates', { params })
-    templates.value = (data.data ?? data ?? []).map((t: any) => ({ ...t, _validating: false }))
+    templates.value = (await listCustomTemplates(params)).map((t: any) => ({ ...t, _validating: false }))
   } catch { templates.value = [] }
   finally { loading.value = false }
 }
@@ -74,8 +76,7 @@ function editTemplate(row: any) {
 async function validateTemplate(row: any) {
   row._validating = true
   try {
-    const { data } = await http.post(`/api/custom-templates/${row.id}/validate`)
-    const result = data.data ?? data
+    const result = await validateTpl(row.id)
     if (result.valid) ElMessage.success('模板验证通过')
     else ElMessage.warning(`验证发现 ${result.issues?.length || 0} 个问题`)
   } catch { ElMessage.error('验证失败') }
@@ -85,7 +86,7 @@ async function validateTemplate(row: any) {
 async function publishTemplate(row: any) {
   try {
     await ElMessageBox.confirm('确认发布此模板？发布后其他用户可在模板市场中使用。', '发布确认')
-    await http.post(`/api/custom-templates/${row.id}/publish`)
+    await publishCustomTemplate(row.id)
     ElMessage.success('发布成功')
     loadTemplates()
   } catch { /* cancelled or error */ }
@@ -94,7 +95,7 @@ async function publishTemplate(row: any) {
 async function deleteTemplate(row: any) {
   try {
     await ElMessageBox.confirm('确认删除此模板？', '删除确认', { type: 'warning' })
-    await http.delete(`/api/custom-templates/${row.id}`)
+    await deleteCustomTemplate(row.id)
     ElMessage.success('已删除')
     loadTemplates()
   } catch { /* cancelled */ }

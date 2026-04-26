@@ -1,11 +1,11 @@
-"""底稿管理服务 — 列表/详情/离线下载上传/状态管理/分配
+"""底稿管理服务 — 列表/详情/离线上传/状态管理/分配
 
-MVP实现：
 - list_workpapers: 按循环/状态/编制人筛选
 - get_workpaper: 详情含索引+文件+QC状态
-- download_for_offline: stub预填充 + 返回文件信息
 - upload_offline_edit: 冲突检测 + 版本递增
-- update_status / assign_workpaper
+- update_status / update_review_status / assign_workpaper
+
+离线下载功能已迁移到 wp_download_service.WpDownloadService。
 
 Validates: Requirements 6.1, 7.1-7.5
 """
@@ -162,39 +162,6 @@ class WorkingPaperService:
         }
 
     # ------------------------------------------------------------------
-    # 10.2  download_for_offline
-    # ------------------------------------------------------------------
-
-    async def download_for_offline(
-        self,
-        db: AsyncSession,
-        wp_id: UUID,
-        project_id: UUID | None = None,
-    ) -> dict:
-        """下载底稿（离线编辑）：执行预填充 → 返回文件信息。
-
-        Validates: Requirements 7.1
-        """
-        query = sa.select(WorkingPaper).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
-        if project_id is not None:
-            query = query.where(WorkingPaper.project_id == project_id)
-        result = await db.execute(query)
-        wp = result.scalar_one_or_none()
-        if wp is None:
-            raise ValueError("底稿不存在")
-
-        # MVP stub: prefill is a no-op
-        return {
-            "wp_id": str(wp.id),
-            "file_path": wp.file_path,
-            "file_version": wp.file_version,
-            "message": "MVP stub — 预填充暂未实现，返回文件信息",
-        }
-
-    # ------------------------------------------------------------------
     # 10.3  upload_offline_edit
     # ------------------------------------------------------------------
 
@@ -238,7 +205,7 @@ class WorkingPaperService:
                 "message": f"版本冲突: 上传版本 {recorded_version} < 服务器版本 {wp.file_version}",
             }
 
-        # No conflict — increment version (stub: no actual file replacement)
+        # No conflict — increment version
         wp.file_version += 1
         wp.updated_at = datetime.now(timezone.utc)
         await db.flush()
@@ -340,6 +307,8 @@ class WorkingPaperService:
         wp_id: UUID,
         new_review_status: str,
         project_id: UUID | None = None,
+        reason: str | None = None,
+        rejected_by_id: UUID | None = None,
     ) -> dict:
         """更新底稿复核任务状态（独立于编制状态）。
 
@@ -385,6 +354,14 @@ class WorkingPaperService:
 
         wp.review_status = new_enum
         wp.updated_at = datetime.now(timezone.utc)
+
+        # 退回时强制填写退回原因并记录退回信息
+        if "rejected" in new_review_status:
+            if not reason or not reason.strip():
+                raise ValueError("退回时必须填写退回原因")
+            wp.rejection_reason = reason
+            wp.rejected_by = rejected_by_id
+            wp.rejected_at = datetime.utcnow()
 
         # 复核状态变化联动编制状态
         if new_review_status == "pending_level1":

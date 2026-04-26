@@ -5,7 +5,7 @@
       <el-button size="small" @click="loadPlugins" :loading="loading">刷新</el-button>
     </div>
 
-    <PluginList :plugins="plugins" :loading="loading" @config="openConfig" @toggled="loadPlugins" />
+    <PluginList :plugins="plugins" :loading="loading" :is-stub="isStubPlugin" @config="openConfig" @toggled="loadPlugins" @execute="executePlugin" />
 
     <el-divider />
 
@@ -34,7 +34,7 @@ import PluginList from '@/components/extension/PluginList.vue'
 import PluginConfig from '@/components/extension/PluginConfig.vue'
 import ModelSwitcher from '@/components/extension/ModelSwitcher.vue'
 import ExternalAPIConfig from '@/components/extension/ExternalAPIConfig.vue'
-import http from '@/utils/http'
+import { listAIPlugins } from '@/services/commonApi'
 
 const loading = ref(false)
 const plugins = ref<any[]>([])
@@ -43,11 +43,16 @@ const configPlugin = ref<any>(null)
 const activeTab = ref('model')
 const selectedModel = ref('')
 
+const STUB_PLUGIN_IDS = [
+  'invoice_verify', 'business_info', 'bank_reconcile', 'seal_check',
+  'voice_note', 'wp_review', 'continuous_audit', 'team_chat'
+]
+function isStubPlugin(id: string) { return STUB_PLUGIN_IDS.includes(id) }
+
 async function loadPlugins() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/ai-plugins')
-    plugins.value = (data.data ?? data ?? []).map((p: any) => ({ ...p, _toggling: false }))
+    plugins.value = (await listAIPlugins()).map((p: any) => ({ ...p, _toggling: false }))
   } catch { plugins.value = [] }
   finally { loading.value = false }
 }
@@ -59,6 +64,11 @@ function openConfig(plugin: any) {
 
 function onModelChange(model: string) {
   ElMessage.success(`已切换到模型: ${model}`)
+}
+
+function executePlugin(plugin: any) {
+  if (isStubPlugin(plugin.plugin_id)) return
+  ElMessage.info(`正在执行插件: ${plugin.plugin_name}`)
 }
 
 onMounted(loadPlugins)

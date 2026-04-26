@@ -88,7 +88,7 @@ class ConsolReportService:
     数据源从 trial_balance 切换为 consol_trial。
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     # ------------------------------------------------------------------
@@ -1077,7 +1077,7 @@ class ConsolReportService:
 # ============================================================================
 
 def generate_consol_reports_sync(
-    db: Session,
+    db: AsyncSession,
     project_id: UUID,
     year: int,
     applicable_standard: str = "enterprise",
@@ -1088,7 +1088,7 @@ def generate_consol_reports_sync(
 
 
 def verify_balance_sync(
-    db: Session,
+    db: AsyncSession,
     project_id: UUID,
     year: int,
 ) -> BalanceCheckResult:
@@ -1098,7 +1098,7 @@ def verify_balance_sync(
 
 
 def generate_consol_workpaper_sync(
-    db: Session,
+    db: AsyncSession,
     project_id: UUID,
     year: int,
 ) -> ConsolWorkpaperResult:
@@ -1108,7 +1108,7 @@ def generate_consol_workpaper_sync(
 
 
 def generate_consol_notes_sync(
-    db: Session,
+    db: AsyncSession,
     project_id: UUID,
     year: int,
 ) -> list[ConsolDisclosureSection]:

@@ -46,7 +46,7 @@
     </el-tabs>
 
     <!-- 新增/编辑弹窗 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="showCreateDialog"
       :title="editingModel ? '编辑模型' : '新增模型'"
       width="520px"

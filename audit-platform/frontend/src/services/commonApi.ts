@@ -309,3 +309,494 @@ export async function applyProcedureScheme(projectId: string, cycle: string, sou
   })
   return data
 }
+
+// ── 知识库（全局+项目级） ──
+
+export async function listKnowledgeLibraries(): Promise<any[]> {
+  const { data } = await http.get('/api/knowledge/libraries')
+  return Array.isArray(data) ? data : []
+}
+
+export async function listKnowledgeDocs(apiBase: string): Promise<any[]> {
+  const { data } = await http.get(apiBase)
+  return Array.isArray(data) ? data : data?.items || data?.documents || []
+}
+
+export async function uploadKnowledgeDoc(apiBase: string, formData: FormData): Promise<any> {
+  const { data } = await http.post(apiBase, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export async function downloadKnowledgeDoc(apiBase: string, name: string): Promise<Blob> {
+  const { data } = await http.get(`${apiBase}/${encodeURIComponent(name)}/download`, {
+    responseType: 'blob',
+  })
+  return data
+}
+
+export async function deleteKnowledgeDoc(apiBase: string, name: string): Promise<void> {
+  await http.delete(`${apiBase}/${encodeURIComponent(name)}`)
+}
+
+// ── 项目看板 ──
+
+export async function getWorkpaperProgress(projectId: string): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/workpapers/progress`)
+  return data
+}
+
+export async function getOverdueWorkpapers(projectId: string, days = 7): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/workpapers/overdue`, { params: { days } })
+  return Array.isArray(data) ? data : []
+}
+
+export async function getProjectWorkHours(projectId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/work-hours`)
+  return Array.isArray(data) ? data : []
+}
+
+
+// ── T型账户 ──
+
+export async function listTAccounts(projectId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/t-accounts`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function getTAccount(projectId: string, id: string): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/t-accounts/${id}`)
+  return data
+}
+
+export async function createTAccount(projectId: string, body: any): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/t-accounts`, body)
+  return data
+}
+
+export async function addTAccountEntry(projectId: string, accountId: string, entry: any): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/t-accounts/${accountId}/entries`, entry)
+  return data
+}
+
+export async function calculateTAccount(projectId: string, accountId: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/t-accounts/${accountId}/calculate`)
+  return data
+}
+
+// ── 自定义模板 ──
+
+export async function listCustomTemplates(params?: Record<string, any>): Promise<any[]> {
+  const { data } = await http.get('/api/custom-templates', { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function getCustomTemplate(id: string): Promise<any> {
+  const { data } = await http.get(`/api/custom-templates/${id}`)
+  return data
+}
+
+export async function createCustomTemplate(fd: FormData): Promise<any> {
+  const { data } = await http.post('/api/custom-templates', fd)
+  return data
+}
+
+export async function updateCustomTemplate(id: string, fd: FormData): Promise<any> {
+  const { data } = await http.put(`/api/custom-templates/${id}`, fd)
+  return data
+}
+
+export async function validateCustomTemplate(id: string): Promise<any> {
+  const { data } = await http.post(`/api/custom-templates/${id}/validate`)
+  return data
+}
+
+export async function publishCustomTemplate(id: string): Promise<void> {
+  await http.post(`/api/custom-templates/${id}/publish`)
+}
+
+export async function copyCustomTemplate(id: string): Promise<void> {
+  await http.post(`/api/custom-templates/${id}/copy`)
+}
+
+export async function deleteCustomTemplate(id: string): Promise<void> {
+  await http.delete(`/api/custom-templates/${id}`)
+}
+
+// ── 监管备案 ──
+
+export async function listFilings(params?: Record<string, any>): Promise<any[]> {
+  const { data } = await http.get('/api/regulatory/filings', { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function retryFiling(id: string): Promise<void> {
+  await http.post(`/api/regulatory/filings/${id}/retry`)
+}
+
+// ── AI插件 ──
+
+export async function listAIPlugins(): Promise<any[]> {
+  const { data } = await http.get('/api/ai-plugins')
+  return Array.isArray(data) ? data : []
+}
+
+// ── GT编码 ──
+
+export async function listGTCoding(): Promise<any[]> {
+  const { data } = await http.get('/api/gt-coding')
+  return Array.isArray(data) ? data : []
+}
+
+// ── 复核对话 ──
+
+export async function listReviewConversations(projectId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/review-conversations`)
+  return Array.isArray(data) ? data : []
+}
+
+// ── 穿透查询（移动端） ──
+
+export async function getLedgerBalance(projectId: string, year: number): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/ledger/balance`, { params: { year } })
+  return Array.isArray(data) ? data : []
+}
+
+export async function getLedgerEntries(projectId: string, code: string, year: number, page = 1, pageSize = 50): Promise<any> {
+  const { data } = await http.get(
+    `/api/projects/${projectId}/ledger/entries/${encodeURIComponent(code)}`,
+    { params: { year, page, page_size: pageSize } },
+  )
+  return data
+}
+
+// ── 集团架构（合并页面） ──
+
+export async function listChildProjects(parentProjectId: string): Promise<any[]> {
+  const { data } = await http.get('/api/projects', { params: { parent_project_id: parentProjectId } })
+  return Array.isArray(data) ? data : data?.items || []
+}
+
+
+// ── 管理看板 ──
+
+export async function getDashboardOverview(): Promise<any> {
+  const { data } = await http.get('/api/dashboard/overview')
+  return data && typeof data === 'object' ? data : {}
+}
+
+export async function getDashboardProjectProgress(): Promise<any[]> {
+  const { data } = await http.get('/api/dashboard/project-progress')
+  return Array.isArray(data) ? data : []
+}
+
+export async function getDashboardStaffWorkload(): Promise<any[]> {
+  const { data } = await http.get('/api/dashboard/staff-workload')
+  return Array.isArray(data) ? data : []
+}
+
+export async function getDashboardRiskAlerts(): Promise<any[]> {
+  const { data } = await http.get('/api/dashboard/risk-alerts')
+  return Array.isArray(data) ? data : []
+}
+
+export async function getDashboardGroupProgress(): Promise<any[]> {
+  const { data } = await http.get('/api/dashboard/group-progress')
+  return Array.isArray(data) ? data : []
+}
+
+export async function getDashboardHoursHeatmap(): Promise<any[]> {
+  const { data } = await http.get('/api/dashboard/hours-heatmap')
+  return Array.isArray(data) ? data : []
+}
+
+
+// ── 批注 ──
+
+export async function listWorkpaperAnnotations(projectId: string, objectType: string, objectId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/annotations`, {
+    params: { object_type: objectType, object_id: objectId },
+  })
+  return Array.isArray(data) ? data : []
+}
+
+export async function createAnnotation(projectId: string, body: any): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/annotations`, body)
+  return data
+}
+
+export async function updateAnnotation(id: string, body: any): Promise<any> {
+  const { data } = await http.put(`/api/annotations/${id}`, body)
+  return data
+}
+
+// ── 功能开关 ──
+
+export async function checkFeatureFlag(flag: string, projectId?: string): Promise<boolean> {
+  const { data } = await http.get(`/api/feature-flags/check/${flag}`, {
+    params: projectId ? { project_id: projectId } : undefined,
+    validateStatus: () => true,
+  })
+  return !!data?.enabled
+}
+
+export async function getFeatureMaturity(): Promise<Record<string, string>> {
+  const { data } = await http.get('/api/feature-flags/maturity')
+  return data && typeof data === 'object' ? data : {}
+}
+
+// ── 底稿提交复核 ──
+
+export async function submitWorkpaperReview(projectId: string, wpId: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/submit-review`)
+  return data
+}
+
+
+// ══════════════════════════════════════════════════════════
+// 以下从 enhancedApi.ts 迁移（Phase 7 增强功能）
+// ══════════════════════════════════════════════════════════
+
+// ── 过程记录 ──
+
+export async function getEditHistory(projectId: string, wpId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/process-record/projects/${projectId}/workpapers/${wpId}/edit-history`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function getWpAttachments(projectId: string, wpId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/process-record/projects/${projectId}/workpapers/${wpId}/attachments`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function getAttachmentWorkpapers(attachmentId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/process-record/attachments/${attachmentId}/workpapers`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function linkAttachment(attachmentId: string, wpId: string): Promise<void> {
+  await http.post('/api/process-record/link-attachment', { attachment_id: attachmentId, wp_id: wpId })
+}
+
+export async function getPendingAIContent(projectId: string, workpaperId?: string): Promise<any[]> {
+  const params: Record<string, string> = {}
+  if (workpaperId) params.workpaper_id = workpaperId
+  const { data } = await http.get(`/api/process-record/projects/${projectId}/ai-content/pending`, { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function confirmAIContent(contentId: string, status: string): Promise<void> {
+  await http.put(`/api/process-record/ai-content/${contentId}/confirm`, { status })
+}
+
+export async function checkUnconfirmedAI(projectId: string, wpId: string): Promise<any> {
+  const { data } = await http.get(`/api/process-record/projects/${projectId}/workpapers/${wpId}/ai-check`)
+  return data
+}
+
+// ── LLM 底稿对话 ──
+
+export function wpChatSSE(wpId: string, message: string, context?: Record<string, any>) {
+  return http.post(`/api/workpapers/${wpId}/ai/chat`, { message, context }, { responseType: 'stream' })
+}
+
+export async function generateLedgerAnalysis(projectId: string, body: { account_codes?: string[]; year?: number }): Promise<any> {
+  const { data } = await http.post(`/api/workpapers/projects/${projectId}/ai/generate-ledger-analysis`, body)
+  return data
+}
+
+// ── 抽样增强 ──
+
+export interface AgingBracket { label: string; min_days: number; max_days: number | null }
+
+export async function cutoffTest(projectId: string, body: {
+  account_codes: string[]; year: number; days_before?: number; days_after?: number; amount_threshold?: number
+}): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/sampling/cutoff-test`, body)
+  return data
+}
+
+export async function agingAnalysis(projectId: string, body: {
+  account_code: string; aging_brackets: AgingBracket[]; base_date: string; year?: number
+}): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/sampling/aging-analysis`, body)
+  return data
+}
+
+export async function monthlyDetail(projectId: string, body: { account_code: string; year: number }): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/sampling/monthly-detail`, body)
+  return data
+}
+
+// ── 复核对话 ──
+
+export interface ConversationItem {
+  id: string; project_id: string; initiator_id: string; target_id: string
+  related_object_type: string; status: string; title: string
+  message_count?: number; created_at?: string; closed_at?: string
+}
+
+export async function createConversation(projectId: string, body: {
+  target_id: string; related_object_type: string; related_object_id?: string; cell_ref?: string; title: string
+}): Promise<any> {
+  const { data } = await http.post(`/api/review-conversations?project_id=${projectId}`, body)
+  return data
+}
+
+export async function listConversations(projectId: string, status?: string): Promise<any[]> {
+  const params: Record<string, string> = { project_id: projectId }
+  if (status) params.status = status
+  const { data } = await http.get('/api/review-conversations', { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function getMessages(conversationId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/review-conversations/${conversationId}/messages`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function sendMessage(conversationId: string, body: {
+  content: string; message_type?: string; attachment_path?: string
+}): Promise<any> {
+  const { data } = await http.post(`/api/review-conversations/${conversationId}/messages`, body)
+  return data
+}
+
+export async function closeConversation(conversationId: string): Promise<void> {
+  await http.put(`/api/review-conversations/${conversationId}/close`)
+}
+
+export async function exportConversation(conversationId: string): Promise<any> {
+  const { data } = await http.post(`/api/review-conversations/${conversationId}/export`)
+  return data
+}
+
+// ── 论坛 ──
+
+export interface ForumPostItem {
+  id: string; author_id?: string; is_anonymous: boolean; category: string
+  title: string; content: string; like_count: number; comment_count?: number; created_at?: string
+}
+
+export async function listPosts(category?: string): Promise<any[]> {
+  const params: Record<string, string> = {}
+  if (category) params.category = category
+  const { data } = await http.get('/api/forum/posts', { params })
+  return Array.isArray(data) ? data : data?.items || data?.posts || []
+}
+
+export async function createPost(body: { title: string; content: string; category?: string; is_anonymous?: boolean }): Promise<any> {
+  const { data } = await http.post('/api/forum/posts', body)
+  return data
+}
+
+export async function getComments(postId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/forum/posts/${postId}/comments`)
+  return Array.isArray(data) ? data : data?.items || data?.comments || []
+}
+
+export async function createComment(postId: string, content: string): Promise<void> {
+  await http.post(`/api/forum/posts/${postId}/comments`, { content })
+}
+
+export async function likePost(postId: string): Promise<void> {
+  await http.post(`/api/forum/posts/${postId}/like`)
+}
+
+// ── 溯源 ──
+
+export async function traceSection(projectId: string, sectionNumber: string): Promise<any> {
+  const { data } = await http.get(`/api/report-review/${projectId}/trace/${encodeURIComponent(sectionNumber)}`)
+  return data
+}
+
+export async function findingsSummary(projectId: string): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/findings-summary`)
+  return data
+}
+
+// ── 打卡 ──
+
+export async function checkIn(staffId: string, body: {
+  latitude?: number; longitude?: number; location_name?: string; check_type?: string
+}): Promise<void> {
+  await http.post(`/api/staff/${staffId}/check-in`, body)
+}
+
+export async function listCheckIns(staffId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/staff/${staffId}/check-ins`)
+  return Array.isArray(data) ? data : []
+}
+
+// ── 辅助余额汇总 ──
+
+export async function auxSummary(projectId: string, year?: number): Promise<any[]> {
+  const params: Record<string, any> = {}
+  if (year) params.year = year
+  const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-summary`, { params })
+  return Array.isArray(data) ? data : []
+}
+
+// ── 合并锁定 ──
+
+export async function lockProject(projectId: string): Promise<void> {
+  await http.post(`/api/consolidation/${projectId}/lock`)
+}
+
+export async function unlockProject(projectId: string): Promise<void> {
+  await http.post(`/api/consolidation/${projectId}/unlock`)
+}
+
+export async function checkLockStatus(projectId: string): Promise<any> {
+  const { data } = await http.get(`/api/consolidation/${projectId}/lock-status`)
+  return data
+}
+
+// ── 快照 ──
+
+export async function listSnapshots(projectId: string): Promise<any[]> {
+  const { data } = await http.get(`/api/consolidation/${projectId}/snapshots`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function createSnapshot(projectId: string, year: number = 2025): Promise<void> {
+  await http.post(`/api/consolidation/${projectId}/snapshots?year=${year}`)
+}
+
+// ── 推荐 ──
+
+export async function recommendWorkpapers(projectId: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/ai/recommend-workpapers`)
+  return data
+}
+
+// ── 差异报告 ──
+
+export async function annualDiffReport(projectId: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/ai/annual-diff-report`)
+  return data
+}
+
+// ── 附件分类 ──
+
+export async function classifyAttachment(projectId: string, attachmentId: string, fileName: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/attachments/classify`, {
+    attachment_id: attachmentId, file_name: fileName,
+  })
+  return data
+}
+
+// ── 排版模板 ──
+
+export async function listFormatTemplates(): Promise<any[]> {
+  const { data } = await http.get('/api/report-format-templates')
+  return Array.isArray(data) ? data : []
+}
+
+export async function createFormatTemplate(body: {
+  template_name: string; template_type: string; config: Record<string, any>
+}): Promise<any> {
+  const { data } = await http.post('/api/report-format-templates', body)
+  return data
+}

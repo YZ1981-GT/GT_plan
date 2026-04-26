@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   modelValue: boolean
@@ -120,14 +120,14 @@ async function onSign() {
   const signatureData = canvasRef.value.toDataURL('image/png')
   signing.value = true
   try {
-    const { data } = await http.post('/api/signatures/sign', {
+    const data = await api.post('/api/signatures/sign', {
       object_type: props.objectType,
       object_id: props.objectId,
       signature_level: 'level2',
       signature_data: { image: signatureData },
     })
     ElMessage.success('手写签名成功')
-    emit('signed', data.data ?? data)
+    emit('signed', data)
     visible.value = false
   } catch { ElMessage.error('签名失败') }
   finally { signing.value = false }

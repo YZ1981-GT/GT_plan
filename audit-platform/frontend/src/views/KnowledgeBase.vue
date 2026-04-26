@@ -94,7 +94,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import {
+  listProjects, listKnowledgeLibraries, listKnowledgeDocs,
+  uploadKnowledgeDoc, downloadKnowledgeDoc, deleteKnowledgeDoc,
+} from '@/services/commonApi'
 
 interface Library { key: string; name: string; icon: string; doc_count: number; description?: string }
 
@@ -133,8 +136,7 @@ function docApiBase(): string {
 async function loadLibraries() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/knowledge/libraries')
-    libraries.value = Array.isArray(data) ? data : []
+    libraries.value = await listKnowledgeLibraries()
   } catch {
     // 降级使用默认分类
     libraries.value = [
@@ -153,11 +155,9 @@ async function loadLibraries() {
   }
 }
 
-async function loadProjects() {
+async function loadProjectList() {
   try {
-    const { data } = await http.get('/api/projects')
-    const list = Array.isArray(data) ? data : data?.items || []
-    projects.value = list
+    projects.value = await listProjects()
   } catch {
     projects.value = []
   }
@@ -177,8 +177,7 @@ async function loadDocuments() {
   docLoading.value = true
   documents.value = []
   try {
-    const { data } = await http.get(docApiBase())
-    documents.value = Array.isArray(data) ? data : data?.items || data?.documents || []
+    documents.value = await listKnowledgeDocs(docApiBase())
   } catch {
     documents.value = []
   } finally {
@@ -190,9 +189,7 @@ async function onUpload(file: any) {
   const formData = new FormData()
   formData.append('file', file.raw)
   try {
-    await http.post(docApiBase(), formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    await uploadKnowledgeDoc(docApiBase(), formData)
     ElMessage.success('上传成功')
     await loadDocuments()
     if (activeTab.value === 'global') await loadLibraries()
@@ -203,10 +200,8 @@ async function onUpload(file: any) {
 
 async function onDownload(name: string) {
   try {
-    const { data } = await http.get(`${docApiBase()}/${encodeURIComponent(name)}/download`, {
-      responseType: 'blob',
-    })
-    const url = URL.createObjectURL(data)
+    const blob = await downloadKnowledgeDoc(docApiBase(), name)
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = name
@@ -220,7 +215,7 @@ async function onDownload(name: string) {
 async function onDelete(name: string) {
   await ElMessageBox.confirm(`确定删除「${name}」？`, '删除确认', { type: 'warning' })
   try {
-    await http.delete(`${docApiBase()}/${encodeURIComponent(name)}`)
+    await deleteKnowledgeDoc(docApiBase(), name)
     ElMessage.success('已删除')
     await loadDocuments()
     if (activeTab.value === 'global') await loadLibraries()
@@ -236,7 +231,7 @@ function onTabChange() {
 
 async function refresh() {
   await loadLibraries()
-  if (activeTab.value === 'project') await loadProjects()
+  if (activeTab.value === 'project') await loadProjectList()
   if (showDocList.value) await loadDocuments()
 }
 
@@ -254,7 +249,7 @@ function formatTime(t: string | null) {
 
 onMounted(async () => {
   await loadLibraries()
-  await loadProjects()
+  await loadProjectList()
 })
 </script>
 

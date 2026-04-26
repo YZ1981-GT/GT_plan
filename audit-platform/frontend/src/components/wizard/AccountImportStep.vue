@@ -266,6 +266,32 @@
         </template>
       </el-alert>
 
+      <!-- 跳过行详情 -->
+      <div v-if="importResult?.skipped_rows?.length" class="gt-import-skipped" style="margin-bottom: 16px">
+        <el-alert type="warning" :closable="false">
+          <template #title>
+            <span style="display: inline-flex; align-items: center; gap: 8px">
+              跳过 {{ importResult.skipped_rows.length }} 行数据
+              <el-button text size="small" @click="showSkippedDetail = !showSkippedDetail">
+                {{ showSkippedDetail ? '收起' : '查看详情' }}
+              </el-button>
+            </span>
+          </template>
+        </el-alert>
+        <el-table
+          v-if="showSkippedDetail"
+          :data="importResult.skipped_rows"
+          size="small"
+          border
+          max-height="300"
+          style="margin-top: 8px"
+        >
+          <el-table-column prop="row_number" label="Excel行号" width="100" align="center" />
+          <el-table-column prop="reason" label="跳过原因" min-width="200" />
+          <el-table-column prop="sheet_name" label="Sheet" width="120" />
+        </el-table>
+      </div>
+
       <el-button @click="handleReupload" style="margin-bottom: 16px">重新上传</el-button>
     </div>
 
@@ -348,7 +374,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { UploadFilled, CircleCheckFilled, WarningFilled, Connection, CircleCheck, CircleClose, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile, UploadInstance } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { useWizardStore } from '@/stores/wizard'
 
 const wizardStore = useWizardStore()
@@ -475,7 +501,15 @@ interface AccountImportResult {
   errors: string[]
   data_sheets_imported?: Record<string, number>
   sheet_diagnostics?: SheetDiagnostic[]
+  skipped_rows?: SkippedRow[]
   year?: number | null
+}
+
+interface SkippedRow {
+  row_number: number
+  reason: string
+  sheet_name?: string
+  raw_data?: Record<string, string>
 }
 
 interface SheetDiagnostic {
@@ -498,6 +532,7 @@ interface AccountTreeNode {
 }
 
 const importResult = ref<AccountImportResult | null>(null)
+const showSkippedDetail = ref(false)
 const clientTree = ref<Record<string, AccountTreeNode[]> | null>(null)
 
 const treeProps = { children: 'children', label: 'account_name' }
@@ -826,12 +861,12 @@ async function handlePreview() {
     for (const file of selectedFiles.value) {
       const formData = new FormData()
       formData.append('file', file)
-      const { data } = await http.post(
+      const data = await api.post(
         `/api/projects/${wizardStore.projectId}/account-chart/preview`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 },
       )
-      const result: PreviewResponse = data.data ?? data
+      const result: PreviewResponse = data
       const sheets = result.sheets || []
       // 给 sheet 名加文件名前缀（避免多文件同名 sheet 冲突）
       for (const s of sheets) {
@@ -945,7 +980,7 @@ async function handleForceReset() {
 async function _resetImportLock() {
   if (!wizardStore.projectId) return
   try {
-    await http.post(`/api/projects/${wizardStore.projectId}/account-chart/import-reset`)
+    await api.post(`/api/projects/${wizardStore.projectId}/account-chart/import-reset`)
   } catch {
     // 静默失败——锁会在 30 分钟后自动过期
   }
@@ -955,8 +990,8 @@ async function _resetImportLock() {
 onMounted(async () => {
   if (!wizardStore.projectId) return
   try {
-    const { data } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
-    const status = data?.data ?? data
+    const data = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+    const status = data
     if (status && status.status === 'processing') {
       const started = status.started ? new Date(status.started).getTime() : 0
       const elapsed = Date.now() - started
@@ -1055,7 +1090,7 @@ async function saveCurrentSheetMapping() {
   }
   if (Object.keys(cleanMapping).length === 0) return
   try {
-    await http.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+    await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
       file_type: sheet.file_type_guess,
       sheet_name: sheet.sheet_name,
       mapping: cleanMapping,
@@ -1082,7 +1117,7 @@ async function saveMapping(silent = false) {
     if (Object.keys(cleanMapping).length === 0) continue
 
     try {
-      await http.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+      await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
         file_type: sheet.file_type_guess,
         sheet_name: sheet.sheet_name,
         mapping: cleanMapping,
@@ -1103,7 +1138,7 @@ async function saveMapping(silent = false) {
     }
     if (Object.keys(cleanMapping).length === 0) return
     try {
-      await http.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+      await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
         file_type: sheet.file_type_guess,
         sheet_name: sheet.sheet_name,
         mapping: cleanMapping,
@@ -1127,11 +1162,11 @@ async function loadSavedMapping(fileType: string, headers: string[]): Promise<Re
   // 优先从后端加载
   if (wizardStore.projectId) {
     try {
-      const { data } = await http.get(
+      const data = await api.get(
         `/api/projects/${wizardStore.projectId}/column-mappings`,
         { params: { file_type: fileType } }
       )
-      const mappings = data.data ?? data ?? {}
+      const mappings = data ?? {}
       // 找到匹配的映射
       for (const [_key, mapping] of Object.entries(mappings)) {
         if (mapping && typeof mapping === 'object') {
@@ -1191,8 +1226,8 @@ async function handleImport() {
   // 启动进度轮询
   const pollTimer = setInterval(async () => {
     try {
-      const { data } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
-      const status = data.data ?? data
+      const data = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+      const status = data
       if (status && typeof status === 'object' && status.message && status.status !== 'idle') {
         importProgress.value = status.message
       }
@@ -1241,7 +1276,7 @@ async function handleImport() {
 
     if (useAsync) {
       // 异步导入：立即返回，轮询进度
-      await http.post(
+      await api.post(
         `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
@@ -1254,8 +1289,8 @@ async function handleImport() {
         pollCount++
         await new Promise(r => setTimeout(r, 2000))
         try {
-          const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
-          const status = statusData.data ?? statusData
+          const statusData = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+          const status = statusData
           if (status && typeof status === 'object') {
             const pct = status.progress ?? 0
             const msg = status.message || ''
@@ -1285,12 +1320,12 @@ async function handleImport() {
       }
     } else {
       // 同步导入
-      const { data } = await http.post(
+      const data = await api.post(
         `/api/projects/${wizardStore.projectId}/account-chart/import`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 },
       )
-      finalResult = (data.data ?? data) as AccountImportResult
+      finalResult = data as AccountImportResult
     }
 
     // ── 处理结果 ──
@@ -1320,6 +1355,7 @@ async function handleImport() {
       errors: importResult.value.errors,
       data_sheets_imported: importResult.value.data_sheets_imported,
       sheet_diagnostics: importResult.value.sheet_diagnostics,
+      skipped_rows: importResult.value.skipped_rows,
       year: importedYear,
     })
 
@@ -1402,12 +1438,12 @@ async function _importOtherSheets() {
       formData.append('year', String(year))
       formData.append('on_duplicate', 'overwrite')
 
-      const { data } = await http.post(
+      const data = await api.post(
         `/api/projects/${wizardStore.projectId}/import`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 }
       )
-      const batch = data?.data ?? data
+      const batch = data
       if (batch?.record_count) totalRecords += batch.record_count
       importedCount++
     } catch {
@@ -1423,10 +1459,10 @@ async function _importOtherSheets() {
 async function loadClientTree() {
   if (!wizardStore.projectId) return
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${wizardStore.projectId}/account-chart/client`,
     )
-    clientTree.value = data.data ?? data
+    clientTree.value = data
     // 默认激活第一个大类
     if (clientTree.value) {
       const keys = Object.keys(clientTree.value)
@@ -1485,7 +1521,7 @@ async function saveEdits() {
       account_code: code,
       ...vals,
     }))
-    await http.put(
+    await api.put(
       `/api/projects/${wizardStore.projectId}/account-chart/batch-update`,
       { updates },
     )
@@ -1509,12 +1545,11 @@ watch(showRefMappingDialog, async (visible) => {
   if (!visible || !wizardStore.projectId) return
   loadingRefProjects.value = true
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${wizardStore.projectId}/column-mappings/reference-projects`,
       { validateStatus: (s: number) => s < 600 }
     )
-    const d = data?.data ?? data
-    refProjects.value = Array.isArray(d) ? d : []
+    refProjects.value = Array.isArray(data) ? data : []
   } catch {
     refProjects.value = []
   } finally {
@@ -1525,7 +1560,7 @@ watch(showRefMappingDialog, async (visible) => {
 async function applyRefMapping() {
   if (!selectedRefProject.value || !wizardStore.projectId) return
   try {
-    await http.post(
+    await api.post(
       `/api/projects/${wizardStore.projectId}/column-mappings/reference-copy`,
       { source_project_id: selectedRefProject.value.id }
     )
@@ -1555,6 +1590,7 @@ onMounted(async () => {
         errors: (saved.errors as string[]) || [],
         data_sheets_imported: (saved.data_sheets_imported as Record<string, number>) || {},
         sheet_diagnostics: (saved.sheet_diagnostics as SheetDiagnostic[]) || [],
+        skipped_rows: (saved.skipped_rows as SkippedRow[]) || [],
         year: (saved.year as number | null | undefined) ?? null,
       }
       phase.value = 'result'

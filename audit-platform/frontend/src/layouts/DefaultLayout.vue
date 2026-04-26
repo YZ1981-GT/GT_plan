@@ -35,7 +35,11 @@
       <!-- 具体子页面：右侧全宽显示路由内容 -->
       <div v-else class="gt-detail-content">
         <ErrorBoundary>
-          <router-view />
+          <router-view v-slot="{ Component }">
+            <Transition name="gt-page" mode="out-in">
+              <component :is="Component" />
+            </Transition>
+          </router-view>
         </ErrorBoundary>
       </div>
     </template>

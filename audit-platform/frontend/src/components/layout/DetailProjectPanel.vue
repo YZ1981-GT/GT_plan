@@ -221,7 +221,7 @@ import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
@@ -240,8 +240,8 @@ watch(() => props.project?.id, async (newId) => {
   if (!newId) { wpTree.value = []; trialBalanceRows.value = []; return }
   // 加载底稿索引树（致同编码体系）
   try {
-    const { data } = await http.get('/api/gt-coding/tree')
-    const tree = data.data ?? data ?? []
+    const data = await api.get('/api/gt-coding/tree')
+    const tree = data ?? []
     wpTree.value = tree.map((group: any) => ({
       label: group.label,
       count: group.children?.length || 0,
@@ -252,19 +252,18 @@ watch(() => props.project?.id, async (newId) => {
   } catch { wpTree.value = [] }
   // 加载试算表预览（前20行）
   try {
-    const { data } = await http.get(`/api/projects/${newId}/trial-balance`, { params: { year: projectYear.value } })
-    const rows = data.data ?? data ?? []
+    const data = await api.get(`/api/projects/${newId}/trial-balance`, { params: { year: projectYear.value } })
+    const rows = data ?? []
     trialBalanceRows.value = rows.slice(0, 20)
   } catch { trialBalanceRows.value = [] }
   // 加载附件列表（前10条，静默失败）
   try {
-    const { data } = await http.get(`/api/projects/${newId}/attachments`, {
+    const data = await api.get(`/api/projects/${newId}/attachments`, {
       params: { page_size: 10 },
       validateStatus: (s: number) => s < 600,
     })
-    if (data && !data.code || (data.code && data.code < 400)) {
-      const d = data.data ?? data
-      attachmentList.value = Array.isArray(d) ? d.slice(0, 10) : (d?.items ?? []).slice(0, 10)
+    if (data) {
+      attachmentList.value = Array.isArray(data) ? data.slice(0, 10) : (data?.items ?? []).slice(0, 10)
     } else {
       attachmentList.value = []
     }
@@ -292,7 +291,7 @@ async function handleResetImport() {
       '确认重置',
       { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
     )
-    await http.post(`/api/projects/${props.project.id}/account-chart/import-reset`)
+    await api.post(`/api/projects/${props.project.id}/account-chart/import-reset`)
     window.location.reload()
   } catch (e: any) {
     if (e !== 'cancel' && e?.toString() !== 'cancel') {
@@ -315,8 +314,8 @@ async function onCreateNextYear() {
       '创建下年项目',
       { confirmButtonText: '确定创建', cancelButtonText: '取消', type: 'info' },
     )
-    const { data } = await http.post(`/api/projects/${props.project.id}/create-next-year`)
-    const result = data.data ?? data
+    const data = await api.post(`/api/projects/${props.project.id}/create-next-year`)
+    const result = data
     ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)
     router.push(`/projects/new?projectId=${result.new_project_id}`)
   } catch (err: any) {

@@ -22,6 +22,8 @@ inclusion: always
 - 聊天消息操作按钮布局偏好：📋📄✏️📌等按钮不能叠在气泡内右上角（会被文字遮挡看不清），必须放在气泡外下方显示
 - 聊天面板窗口控制偏好：需要支持最大化/还原切换（⊞/⊡按钮），已实现 520×720 小窗 ↔ 全屏切换
 - 聊天 AI 回复排版偏好：Markdown 渲染必须有清晰层次，不能一大段纯文本；system prompt 用「## 【重要】回复格式强制要求」+禁止性措辞+示例模板强制 LLM 分段输出（温和措辞会被忽略）；CSS 中 h1/h2 加底部分隔线、段落间距 10px、列表项间距 6px
+- UI精致度偏好（2026-04-26）：按钮更圆润（默认圆角从4px提升到8px）、表格数据行间距从8px提升到10px（审计员盯屏一天太挤）、进度条加流动光泽动画、标签颜色降低饱和度更柔和、边框用0.5px半透明更细腻、图标统一用线性风格、页面切换加退出过渡动画
+- 功能收敛偏好（2026-04-26）：停止加新功能，空壳页面（<100行）从导航中移除或标记"开发中"灰色不可点击；审计员只需6-8个核心页面做到极致，不需要60个页面；按角色裁剪导航（审计员只看查账/调整/底稿/附注，项目经理多看看板/委派，合伙人多看总览/签字）
 
 ## 项目上下文
 
@@ -364,6 +366,8 @@ inclusion: always
 - 需求文档更新到v11（2026-04-26）：版本历史新增整改成果记录；第9.2章从简化描述重写为实际实现（编制/复核双状态机枚举值+5项提交复核硬门禁+14条QC规则分级清单+四种角色看板体系）；Phase 6/7/8状态升级；核心业务能力表新增25-28；附录B任务状态更新；v10复盘发现66-74标记已修复
 - UI统一化改进（2026-04-26）：新增gt-page-components.css全局页面组件样式库（7类可复用组件：页面横幅3变体+统计卡片6色+看板列+检查清单+风险指示点+简报渲染+团队效能），所有硬编码颜色替换为GT Token变量，横幅升级为网格纹理+径向光晕，4个页面（ReviewInbox/QCDashboard/PartnerDashboard/ProjectProgressBoard）重复样式收口到统一组件
 - UI全面精修层（2026-04-26）：新增gt-polish.css覆盖17类Element Plus组件精细化增强——按钮三段渐变+内发光+hover上浮、表格表头大写间距+紧凑行、标签统一22px+GT Token配色、进度条圆角+弹性动画、页签渐变下划线、输入框双层焦点阴影、树节点32px+当前深紫底、分页器活动页紫色发光、步骤条进行中外发光环、全局微动效统一过渡+焦点可见性+选中文本浅紫底；样式层级：gt-tokens→global→gt-page-components→gt-polish
+- UI精致度二次提升（2026-04-26）：①按钮默认圆角从4px→8px（var(--gt-radius-md)）②表格数据行间距从8px→10px（审计场景长时间阅读更舒适）③表格边框从1px solid→0.5px rgba半透明更细腻④进度条加流动光泽动画（gt-progress-shine 2.5s循环）⑤标签颜色降低饱和度（danger从#FF5149→#d94840、warning→#a67a00、success→#1e8a38、info→#007a94）⑥DefaultLayout router-view加Transition过渡动画（gt-page mode=out-in）
+- 空壳页面导航拦截（2026-04-26）：合并项目/函证管理/附件管理导航项maturity改为developing（灰色半透明+点击弹info提示不跳转）；顶部栏排版模板/吐槽求助同样改为disabled+提示；navItems新增developing状态+gt-nav-item--developing样式+gt-topbar-btn--disabled样式
 - UI精修规范已写入需求文档（2026-04-26）：12.2.1章节新增v11 UI精修规范（按钮/表格/标签/进度条/页签/输入框/树形控件/分页器/步骤条/全局微动效的具体参数）+样式层级架构图
 - 系统评审6个问题修复完成（2026-04-26）：①前端API调用统一✅（110处直接http调用→0处，新增apiProxy.ts代理层+commonApi.ts 40+函数，所有Vue页面统一通过api代理调用）②数据解包统一✅（apiProxy.ts直接返回业务数据，去掉data.data??data）③32个死代码路由文件已删除✅④window.open下载改为downloadFileAsBlob✅（7处受保护文件下载修复）⑤MyProcedureTasks改用commonApi服务层✅⑥ErrorBoundary.vue组件已创建并包裹DefaultLayout的router-view✅
 - 前端API调用规范（2026-04-26技术决策）：所有Vue页面禁止直接import http拼URL，必须通过apiProxy.ts（api.get/post/put/delete直接返回业务数据）或commonApi.ts（按业务域封装的函数）调用；新增文件：apiProxy.ts（代理层）+commonApi.ts（40+通用API函数覆盖项目/人员/看板/回收站/知识库/性能/附件/程序裁剪等）+ErrorBoundary.vue（组件级错误边界）
@@ -1222,7 +1226,7 @@ inclusion: always
 - 前端数据解包统一规范（2026-04-19）：http.ts 响应拦截器已自动解包 ApiResponse（response.data = d.data），所以前端调用应统一用 `const { data } = await http.get(url)` 解构；phase10Api.ts 等旧代码中的 `r.data?.data ?? r.data` 双层解包是错误的，会导致拿不到数据或页面卡住；所有 API 服务层文件需逐步统一
 - 弹窗遮罩偏好（2026-04-19）：不要深灰色遮罩，改用半透明白色（rgba(255,255,255,0.6) + backdrop-filter: blur(2px)），全局性偏好，其他页面弹窗也应统一
 - el-dialog 必须加 append-to-body（2026-04-19）：三栏布局 .gt-body 有 overflow:hidden，不加 append-to-body 的 el-dialog 会被截断；全局性规则，所有页面的 el-dialog 都需要加此属性
-- el-dialog append-to-body 批量修复（2026-04-19）：49 个 Vue 文件共约 55 个 el-dialog 已全部加上 append-to-body，包括 views/ 下 17 个文件和 components/ 下 32 个文件
+- el-dialog append-to-body 二次批量修复（2026-04-26）：重写 scripts/fix_dialog_append.py（re.DOTALL 处理多行标签+--dry-run 支持），修复 15 个遗漏文件，幂等验证通过；全部 el-dialog 现已覆盖 append-to-body（Phase 11 任务组 4 完成）
 - 人员库两层维护（2026-04-19）：staff_members 新增 source 字段（seed=初始导入不可删/custom=用户自定义可增删改，默认 custom）；staff.py 新增 DELETE 端点（仅 custom 可删）；前端表格新增"来源"列标签+自定义人员显示删除按钮；种子数据脚本 seed_staff.py 导入时应标记 source=seed
 - 工时管理联动修复（2026-04-19）：新增 GET /api/staff/me/staff-id 端点（user_id 匹配→用户名匹配自动关联→自动创建 custom 记录三级降级）；WorkHoursPage onMounted 改为先获取 staff_id 再加载数据，不再用空占位
 - staffApi.ts 全量重写（2026-04-19）：去掉所有 `data.data ?? data` 双层解包，统一用 `{ data }` 解构；数组返回加 Array.isArray 防御；StaffMember 接口新增 source 字段
@@ -1237,18 +1241,21 @@ inclusion: always
 - 辅助余额表"仅小计"按钮修复（2026-04-19）：切换维度时强制 `_auxTableKey++` 重建表格确保数据刷新，`loadAuxSummaryForDim` 加 loading 状态+同步更新 `auxDimTypesFromServer`
 - 查账页面行样式优化（2026-04-19）：选中行浅蓝背景(#e8f4fd)+无左边框竖线，hover行更浅蓝灰(#f5f8fc)，去掉 el-table 默认选中行 ::after 伪元素
 
-## 系统全面评审（2026-04-26 合伙人视角）
-- 系统规模统计：后端87个路由模块+141个服务文件+1888个测试用例，前端84个页面视图+110个组件+17个API服务层文件，main.py注册约90个router
+## 系统全面评审（2026-04-26 合伙人视角，清理后精确统计）
+- 系统规模统计（清理后实测）：后端路由88个文件14148行+服务层112个文件40796行+模型24个文件8594行+测试78个文件28399行1604个用例，前端页面84个21084行+组件110个28711行+API服务层17个文件，main.py注册90个router
 - 整体评估结论：架构设计和功能覆盖面属上乘水平，核心业务逻辑（事件驱动联动/四表穿透/底稿生命周期）设计思路正确；主要风险是"铺得太广、扎得不够深"，需要收敛聚焦阶段
 - 做得好的5点：①EventBus debounce去重+TrialBalanceService 4个事件处理器联动链路扎实 ②deps.py三级权限+Redis缓存+降级策略 ③http.ts 401刷新队列+请求去重+分级错误提示+request_id回显 ④四表穿透五级导航+多种筛选+树形/扁平切换 ⑤底稿7环节生命周期完整
-- 问题1-服务层膨胀：141个服务文件存在功能重叠（prefill 3个文件并存、导出3个文件并存、OCR 2个、导入4个），新人接手认知负担大，需做服务层收敛
-- 问题2-死代码路由：memory.md记录32个已删除但实际代码库中可能仍有残留的同步路由文件需确认清理状态
-- 问题3-前端页面深度不均：84个Vue页面中核心业务页面做得深入，大量辅助页面可能只是框架骨架；审计员80%时间花在查账→调整→底稿→附注4个核心场景
-- 问题4-Alembic迁移链失控：放弃Alembic改用create_all+手动ALTER TABLE，生产环境升级无回滚能力；建议从当前schema导出干净baseline迁移重新维护
-- 问题5-LLM集成大量stub残留：wp_ai/note_ai/ai_plugin等stub端点前端有入口但点击无效果，比没有按钮更糟糕
-- 问题6-前端API服务层碎片化：17个文件命名风格不统一（phase10Api按阶段命名对使用者无意义），建议按业务域重组为project/ledger/workpaper/report/admin
-- 问题7-缺少E2E集成测试：1888个测试均为单元测试（SQLite+fakeredis），缺少前后端联调E2E测试和核心业务链路集成测试
-- 决策建议：①先选2-3个项目深度试点再决定推广 ②砍功能比加功能重要，80%精力放核心链路稳定性 ③需要专职前端开发打磨交互细节 ④Alembic迁移和ONLYOFFICE/Paperless实机联调是上线硬前提
+- 前端页面深度分布：500+行7个（真正做深）、200-500行25个（基本可用）、100-200行28个（框架骨架）、50-100行15个、<50行9个（空壳）；空壳页面：AIChatView/AIWorkpaperView(12行)、MobileProjectList/MobileReportView(19行)、MobileWorkpaperEditor(32行)、ConsolSnapshots(41行)、CheckInsPage(43行)、AuxSummaryPanel(49行)
+- 后端stub残留：27个服务文件仍含stub/占位标记，包括ai_plugin_service/sign_service/regulatory_service/data_validation_engine/note_formula_engine/qc_engine/wopi_service/workhour_service/working_paper_service/wp_chat_service等
+- 前端API调用统一化完成（2026-04-26）：两轮修复共29个页面，从32个文件84个直接http调用降到3个文件5个（LedgerPenetration 4个复杂穿透调用+WorkpaperEditor 1个WOPI锁刷新，均有正当理由保留）；AttachmentManagement补齐了缺失的api import；API服务层从17个文件整合到14个（删除consolidationApiCompat.ts 168行死代码+extensionApi.ts 331行0消费者+enhancedApi.ts 280行迁移到commonApi），commonApi.ts从311行扩展到802行128个导出函数成为统一入口，index.ts重写为按业务域组织的11个命名空间
+- 问题1-服务层膨胀：112个服务文件存在功能重叠（prefill 3个文件并存285+155+327行、OCR 2个、AI入口4个），新人接手认知负担大
+- 问题2-前端页面深度不均：84个Vue页面中24个不到100行基本是空壳，审计员80%时间花在查账→调整→底稿→附注4个核心场景
+- 问题3-Alembic迁移链失控：放弃Alembic改用create_all+手动ALTER TABLE，生产环境升级无回滚能力
+- 问题4-LLM集成大量stub残留：27个服务文件含stub，前端有入口但点击无效果
+- 问题5-前端API服务层碎片化：17个文件命名风格不统一，建议按业务域重组为project/ledger/workpaper/report/admin
+- 问题6-缺少E2E集成测试：1604个测试均为单元测试（SQLite+fakeredis），缺少前后端联调E2E测试
+- 问题7-90个路由平铺在main.py：无分组无嵌套无统一版本前缀
+- 决策建议：①停止加新功能，砍掉空壳页面 ②统一前端API调用规范（禁止直接import http） ③补主链路E2E测试（建项→导数据→查账→调整→底稿→报告） ④服务层收敛（prefill/AI/OCR各合并为一个入口） ⑤找2-3个真实审计项目端到端试点
 
 ## 死代码清理（2026-04-26）
 - 删除31个死代码服务文件（Phase 3/4遗留：sync_service/review_service/notification_service/going_concern_service/risk_service/archive_service/company_service/audit_plan_service/audit_program_service/confirmation_service/confirmation_ai_service/evidence_chain_service/nl_command_service/management_letter_service/finding_service/group_structure_service/history_note_parser/fast_writer/forex_translation_service/pdf_export_service/report_export_engine/project_mgmt_service/sync_conflict_service/risk_assessment_service/template_scanner/workpaper_generator/encryption_service/ai_content_service/audit_log_service/pbc_service/utils.py），共33个文件
@@ -1262,6 +1269,42 @@ inclusion: always
 - ~~发现53个Vue文件import了http但实际只用api（无用import），待批量清理~~ → 误判：PowerShell正则在中文UTF-8文件中匹配不准确，Python精确扫描确认56个文件都确实在使用http.get/http.post，属于"API调用方式不统一"而非"无用import"
 - 前端API调用现状：56个Vue文件同时import http和api，部分调用走api.get（apiProxy），部分仍直接走http.get；统一改造需逐页修改，应在有E2E测试覆盖后再做
 - PowerShell Set-Content 编码陷阱（严重教训）：PowerShell的`Set-Content`和`-replace`处理含中文的UTF-8文件时会破坏编码（高字节被错误转换），导致中文字符不可逆丢失；必须用Python的pathlib.write_text(encoding='utf-8')处理Vue/TS文件的批量修改
-- WorkpaperWorkbench.vue编码损坏（2026-04-26）：该文件未提交git，被PowerShell Set-Content破坏152行中文文本（1694个replacement chars），已清除损坏字符使文件可编译（vue-tsc 0错误），但中文UI文本（横幅标题/按钮标签/注释/选项标签等）需手动恢复
+- WorkpaperWorkbench.vue编码损坏已修复（2026-04-26）：从2105行乱码完全重写为890行干净代码，所有中文文本恢复正确（底稿工作台/智能推荐/试算表数据/审计程序检查清单等），三栏布局+全部业务逻辑保留，0个TS诊断错误
 - 前端TS编译错误从26个降到20个（ThreeColumnLayout.vue编码损坏导致的15个错误通过git restore恢复，WorkpaperWorkbench.vue清理后0错误）
-- 待清理：prefill_service.py旧stub（FormulaCell/_scan_formulas迁移到prefill_engine.py后删除）、prefill_service_v2.py的mark_stale合并到prefill_engine.py后删除
+- prefill服务层收敛完成（2026-04-26）：prefill_service.py（旧stub）和prefill_service_v2.py已删除，功能全部合并到prefill_engine.py（新增mark_stale/FormulaCell/scan_formulas/detect_conflicts+兼容类PrefillService/ParseService），所有引用已更新，55个测试通过
+- Alembic迁移链合并完成（2026-04-26）：36个迁移文件归档到alembic/versions/_archived/，生成单一基线001_consolidated_baseline.py，新增consolidate_migrations.py脚本；未来增量迁移从此基线开始，本地PG需执行alembic stamp 001_consolidated
+- main.py路由分组重构完成（2026-04-26）：从250行（90个import+90个include_router）缩减到65行，新增router_registry.py按8个业务域分组注册（基础设施/项目数据/查账试算/报表附注/底稿管理/合并报表/团队看板/系统管理），561个路由全部正常加载
+- 前端导航按角色裁剪（2026-04-26）：ThreeColumnLayout navItems改为computed，每项加roles字段按用户角色过滤；审计员只看6项（仪表盘/项目/工时/函证/附件/工时），管理层多看人员委派/管理看板/合并/归档，admin额外看用户管理
+
+## 测试修复与环境更新（2026-04-26）
+- test_account_chart_service修复：test_load_standard_duplicate_rejected改为test_load_standard_duplicate_is_incremental（load_standard_template已改为增量更新不再抛异常）；test_import_empty_rows_skipped断言从errors==1改为errors==0（空行静默跳过不记error）
+- deps.py check_consol_lock降级修复：consol_lock列通过Alembic迁移032添加但未在Project ORM模型中定义，SQLite测试数据库中不存在该列；改为try/except优雅降级（列不存在时跳过检查）
+- test_ai_content_compliance.py已删除：测试的方法（create_ai_content/_is_ai_allowed/_is_critical_workpaper）在WorkpaperFillService中不存在，且引用已删除的pdf_export_service
+- test_ai_service.py修复：①test_health_check_healthy_fallback_model添加patch settings.DEFAULT_CHAT_MODEL='qwen2.5:7b'（config已改为vLLM Qwen3.5但测试环境用Ollama qwen2.5:7b）②test_chat_completion_sync_success和test_chat_completion_with_explicit_model从mock Ollama原生API改为mock _chat_sync方法（chat_completion已改用OpenAI兼容API）
+- pytest-asyncio版本冲突：系统Python装的是0.21.1与pytest 8.3.4不兼容（FixtureDef.unittest属性已移除），升级系统Python的pytest-asyncio到0.26.0解决
+- PaddleOCR与NumPy不兼容：np.sctypes在NumPy 2.0中被移除，PaddleOCR import时崩溃，影响test_ai_service/test_ai_services/test_ocr_service/test_knowledge_index等测试文件；这是环境依赖问题非代码问题
+- 代码已推送GitHub（2026-04-26）：commit 83627d0，195个文件变更（+14378/-27969），包含死代码清理+32个未注册路由删除+phase10Api重命名+测试修复
+- 测试环境：Ollama qwen2.5:7b（测试用），vLLM Qwen3.5-27B-NVFP4（生产用）；测试中需mock settings.DEFAULT_CHAT_MODEL
+- test_ai_services.py全面重写（2026-04-26）：20个测试全部通过。修复：所有服务类构造函数加mock_db参数（AIService/OCRService/WorkpaperFillService/ContractAnalysisService/KnowledgeIndexService/AIChatService）；删除已不存在的EvidenceChainService/OllamaClient测试；枚举名大小写修正（AIModelType.CHAT→.chat，SessionType.GENERAL→.general）；删除不存在的AIModelStatus/EvidenceType/ChatMessageCreate/FillTaskCreate/ContractAnalysisCreate/EvidenceChainCreate引用；测试方法改为调用实际存在的接口（_build_description_prompt/_parse_ai_response/_build_analysis_prompt等）
+
+- Phase 11 系统加固 spec 已创建（2026-04-26）：spec路径 .kiro/specs/phase11-system-hardening/，含 bugfix.md（12个问题的bug条件分析）+ design.md（P0/P1/P2逐问题技术方案）+ tasks.md（14个任务组62个子任务）+ consolidation-dev-plan.md（合并模块开发计划）+ consolidation-deep-dev.md（合并深度开发方案）
+- 合并报表核心公式决策（2026-04-26 用户纠正）：差额表只记录本级调整+本级抵消（不含个别数）；本级合并数 = Σ(下级审定数/合并数) + 本级差额净额；叶子节点的children_amount_sum=本企业审定数（从trial_balance取），中间节点的children_amount_sum=Σ(直接下级consolidated_amount)；net_difference=调整借方-调整贷方+抵消借方-抵消贷方；consolidated_amount=children_amount_sum+net_difference
+- 合并报表三码树形架构（2026-04-26）：company_code（本企业）+parent_company_code（直接上级）+ultimate_company_code（最终控制方）构建树形结构；支持三种汇总模式（self本级/children直接下级/descendants全部下级）；支持从合并数层层穿透到末端企业序时账（三层穿透：合并→企业构成→抵消分录→试算表）
+- 合并报表新增数据表（2026-04-26）：consol_worksheet（差额表，每个节点每个科目一行，含adjustment_debit/credit+elimination_debit/credit+net_difference+children_amount_sum+consolidated_amount）+ consol_query_template（自定义查询模板，支持行/列维度切换+转置+筛选+Excel导出）
+- 合并报表新增后端服务（2026-04-26设计）：consol_tree_service.py（三码树形构建）+ consol_worksheet_engine.py（差额表后序遍历计算引擎）+ consol_aggregation_service.py（三种汇总模式查询）+ consol_drilldown_service.py（三层穿透）+ consol_pivot_service.py（自定义透视查询+转置+Excel导出）
+- 合并报表前端API断裂修复（2026-04-26发现）：consolidationApi.ts只有一行export指向已删除的consolidationApiCompat，Pinia store和所有子组件的API调用全部断裂；需重建完整的consolidationApi.ts（40+个API函数+类型定义）
+- 合并报表现状盘点（2026-04-26）：后端13个服务文件3300+行+10个路由+12张ORM表（基础完整但全部同步ORM需改异步），前端14个子组件平均480行（较深）+11个页面（较薄），Pinia store 180行20+个action（完整）；核心问题是同步ORM阻塞+API服务层断裂+页面层未正确连接子组件
+- el-dialog append-to-body 回退已修复（2026-04-26）：Phase 11 任务组 4 用改进的 Python 脚本重新修复 15 个遗漏文件，全局零遗漏
+- 前端直接import http精确统计（2026-04-26）：Python扫描确认29个Vue文件仍直接import http（非之前PowerShell误判的56个），其中LedgerPenetration和WorkpaperEditor有正当理由保留
+- 底稿复核3项缺失确认（2026-04-26代码验证）：①submit-review门禁不检查open状态意见是否已replied ②update_review_status无rejection_reason参数（WorkingPaper模型缺rejection_reason/rejected_by/rejected_at字段）③退回历史信息丢失
+- 附注编辑器3项缺失确认（2026-04-26代码验证）：①disclosure_engine.py搜索prior_year/上年/opening/期初=0条匹配（无上年数据）②搜索formula/公式=0条匹配（无表格内公式）③note_validation_engine.py 8种校验中6种return []（stub）
+- AIChatPanel后端端点不存在确认（2026-04-26）：POST /api/ai/chat、POST /api/ai/chat/file-analysis、GET /api/projects/{id}/chat/history 三个端点在router_registry.py中均未注册，用户点击AIChatView会404
+- Phase 11 三件套最终状态（2026-04-26）：design.md 999行（P0×4+P1×4+P2×4+合并深度开发）、tasks.md 195行（24个任务组102个子任务）、bugfix.md 401行、consolidation-deep-dev.md 1605行（完整代码设计）、consolidation-dev-plan.md 893行；合并报表从"标记developing"改为直接开发落地（任务组15-24共10个任务组）
+- **Phase 11 系统加固全部完成（2026-04-26）**：24个任务组102个子任务全部标记[x]。P0（空壳页面移除+LLM stub隐藏+复核退回强制校验+el-dialog修复）、P1（附注上年数据+公式+合并developing+scope_cycles权限+dashboard真实指标）、P2（前端API统一27个组件+E2E测试3条链路+导入错误行号+stub清理）、合并深度开发（2张新表+5个后端服务+10个API端点+10个路由同步→异步+前端40+API函数+ConsolidationIndex 4Tab重写）；30个新测试全部通过
+- Phase 11 新增后端文件：consol_tree_service.py（三码树形）、consol_worksheet_engine.py（差额表计算引擎）、consol_aggregation_service.py（三种汇总模式）、consol_drilldown_service.py（三层穿透）、consol_pivot_service.py（透视+Excel导出+模板CRUD）、consol_worksheet.py路由（10端点）；consolidation_models.py新增ConsolWorksheet+ConsolQueryTemplate两个ORM模型
+- Phase 11 新增前端文件：consolidationApi.ts完整重写（40+API函数+20+TypeScript类型）、ConsolidationIndex.vue重写为4Tab（集团架构/差额表/穿透/自定义查询）
+- Phase 11 新增测试文件：test_dashboard_metrics.py（6个dashboard指标测试）、test_consol_worksheet.py（19个合并差额表测试）、backend/tests/e2e/（conftest.py+3个E2E链路测试，支持SQLite降级和PG双模式）
+- Phase 11 合并报表同步→异步改造完成：10个路由文件（consolidation/consol_scope/consol_trial/internal_trade/component_auditor/goodwill/forex/minority_interest/consol_notes/consol_report）全部从Depends(sync_db)+def改为Depends(get_db)+async def；8个服务文件从db.query()改为await db.execute(sa.select())
+- Phase 11 前端API统一化扩展：在之前29个文件基础上又完成21个组件迁移（4个布局组件+17个扩展组件），从import http改为import { api } from apiProxy
+- Phase 11 导入错误行号定位：convert_balance_rows/convert_ledger_rows新增diagnostics参数，smart_import_streaming收集skipped_rows（上限200条），前端AccountImportStep展示跳过行详情表格
+- Phase 11 stub清理：qc_engine.py去掉stubs标记（14/14规则全部实现）、working_paper_service.py删除download_for_offline旧stub方法+upload_offline_edit去掉stub注释

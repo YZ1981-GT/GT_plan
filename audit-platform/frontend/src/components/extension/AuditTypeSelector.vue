@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const auditTypes = [
   { value: 'annual_audit', label: '年度审计', description: '常规年度财务报表审计' },
@@ -67,8 +67,8 @@ async function onChange(val: string) {
   emit('update:modelValue', val)
   recommendation.value = ''
   try {
-    const { data } = await http.get(`/api/audit-types/${val}/recommendation`)
-    const result = data.data ?? data
+    const data = await api.get(`/api/audit-types/${val}/recommendation`)
+    const result = data
     recommendation.value = result.recommendation || result.message || ''
   } catch { /* ignore */ }
   emit('change', val, recommendation.value || null)

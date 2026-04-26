@@ -52,7 +52,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import http from '@/utils/http'
+import {
+  listPrivateFiles, getPrivateQuota, uploadPrivateFile,
+  downloadPrivateFile, deletePrivateFile,
+} from '@/services/commonApi'
 
 const authStore = useAuthStore()
 const loading = ref(false)
@@ -89,16 +92,15 @@ async function fetchFiles() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const { data: filesData } = await http.get(`/api/users/${uid}/private-storage`)
-    files.value = Array.isArray(filesData) ? filesData : filesData?.files || []
+    files.value = await listPrivateFiles(uid)
   } catch (e: any) {
     files.value = []
     errorMsg.value = e?.response?.data?.detail || e?.message || '加载文件列表失败'
   }
 
   try {
-    const { data: quotaData } = await http.get(`/api/users/${uid}/private-storage/quota`)
-    if (quotaData) quota.value = quotaData
+    const q = await getPrivateQuota(uid)
+    if (q) quota.value = q
   } catch {
     // 容量查询失败不阻断
   }
@@ -113,9 +115,7 @@ async function onFileSelect(file: any) {
   const formData = new FormData()
   formData.append('file', file.raw)
   try {
-    await http.post(`/api/users/${uid}/private-storage/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    await uploadPrivateFile(uid, formData)
     ElMessage.success('上传成功')
     await fetchFiles()
   } catch (err: any) {
@@ -127,10 +127,8 @@ async function onDownload(name: string) {
   const uid = getUserId()
   if (!uid) return
   try {
-    const { data } = await http.get(`/api/users/${uid}/private-storage/${name}/download`, {
-      responseType: 'blob',
-    })
-    const url = URL.createObjectURL(data)
+    const blob = await downloadPrivateFile(uid, name)
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = name
@@ -147,7 +145,7 @@ async function onDelete(name: string) {
 
   await ElMessageBox.confirm(`确定删除「${name}」？`, '删除确认', { type: 'warning' })
   try {
-    await http.delete(`/api/users/${uid}/private-storage/${name}`)
+    await deletePrivateFile(uid, name)
     ElMessage.success('已删除')
     await fetchFiles()
   } catch {

@@ -53,7 +53,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown, ArrowUp, Loading } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { listReviewConversations } from '@/services/commonApi'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -83,8 +83,7 @@ async function loadOpinions() {
   if (!projectId.value) return
   loading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/review-conversations`)
-    opinions.value = data.data ?? data ?? []
+    opinions.value = await listReviewConversations(projectId.value)
   } catch { opinions.value = [] }
   finally { loading.value = false }
 }

@@ -165,7 +165,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   projectId: string
@@ -275,11 +275,11 @@ async function loadMappings() {
     if (filterReportType.value) {
       params.report_type = filterReportType.value
     }
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${props.projectId}/report-line-mapping`,
       { params },
     )
-    mappings.value = data.data ?? data
+    mappings.value = data
   } catch {
     // Error handled by interceptor
   }
@@ -291,10 +291,10 @@ async function handleAiSuggest() {
   if (!props.projectId) return
   aiSuggesting.value = true
   try {
-    const { data } = await http.post(
+    const data = await api.post(
       `/api/projects/${props.projectId}/report-line-mapping/ai-suggest`,
     )
-    const suggestions = data.data ?? data
+    const suggestions = data
     ElMessage.success(`AI匹配完成，生成 ${suggestions.length} 条建议`)
     await loadMappings()
   } catch {
@@ -306,7 +306,7 @@ async function handleAiSuggest() {
 
 async function handleConfirm(row: MappingRow) {
   try {
-    await http.put(
+    await api.put(
       `/api/projects/${props.projectId}/report-line-mapping/${row.id}/confirm`,
     )
     row.is_confirmed = true
@@ -340,7 +340,7 @@ async function handleSaveEdit() {
   }
   editSaving.value = true
   try {
-    await http.put(
+    await api.put(
       `/api/projects/${props.projectId}/report-line-mapping/${editForm.value.id}`,
       {
         report_type: editForm.value.report_type,
@@ -378,7 +378,7 @@ async function handleDelete(row: MappingRow) {
 
   deletingId.value = row.id
   try {
-    await http.delete(`/api/projects/${props.projectId}/report-line-mapping/${row.id}`)
+    await api.delete(`/api/projects/${props.projectId}/report-line-mapping/${row.id}`)
     ElMessage.success(row.is_confirmed ? '映射已删除' : '建议已拒绝')
     await loadMappings()
   } catch {
@@ -392,11 +392,11 @@ async function handleBatchConfirm() {
   if (!props.projectId || unconfirmedIds.value.length === 0) return
   batchConfirming.value = true
   try {
-    const { data } = await http.post(
+    const data = await api.post(
       `/api/projects/${props.projectId}/report-line-mapping/batch-confirm`,
       { mapping_ids: unconfirmedIds.value },
     )
-    const result = data.data ?? data
+    const result = data
     ElMessage.success(`已批量确认 ${result.confirmed_count} 条映射`)
     await loadMappings()
   } catch {
@@ -413,11 +413,11 @@ async function handleReferenceCopy() {
   }
   referenceCopying.value = true
   try {
-    const { data } = await http.post(
+    const data = await api.post(
       `/api/projects/${props.projectId}/report-line-mapping/reference-copy`,
       { source_company_code: sourceCompanyCode.value },
     )
-    const result = data.data ?? data
+    const result = data
     ElMessage.success(`已复制 ${result.copied_count} 条映射`)
     if (result.unmatched_accounts?.length > 0) {
       ElMessage.warning(`${result.unmatched_accounts.length} 个科目未匹配: ${result.unmatched_accounts.join(', ')}`)

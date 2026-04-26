@@ -23,7 +23,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { listSnapshots, createSnapshot } from '@/services/enhancedApi'
+import { listSnapshots, createSnapshot } from '@/services/commonApi'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const snapshots = ref<any[]>([])

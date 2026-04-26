@@ -67,7 +67,10 @@ import { PieChart, BarChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, GridComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
-import http from '@/utils/http'
+import {
+  getWorkpaperProgress, getOverdueWorkpapers,
+  runConsistencyCheck as apiRunConsistencyCheck, getProjectWorkHours,
+} from '@/services/commonApi'
 
 use([PieChart, BarChart, TitleComponent, TooltipComponent, GridComponent, CanvasRenderer])
 
@@ -84,10 +87,10 @@ async function refresh() {
   loading.value = true
   try {
     const [wp, od, con, wh] = await Promise.all([
-      http.get(`/api/projects/${projectId.value}/workpapers/progress`).then(r => r.data.data ?? r.data).catch(() => null),
-      http.get(`/api/projects/${projectId.value}/workpapers/overdue?days=7`).then(r => r.data.data ?? r.data).catch(() => []),
-      http.get(`/api/projects/${projectId.value}/consistency-check?year=2025`).then(r => r.data.data ?? r.data).catch(() => null),
-      http.get(`/api/projects/${projectId.value}/work-hours`).then(r => r.data.data ?? r.data).catch(() => []),
+      getWorkpaperProgress(projectId.value).catch(() => null),
+      getOverdueWorkpapers(projectId.value).catch(() => []),
+      apiRunConsistencyCheck(projectId.value).catch(() => null),
+      getProjectWorkHours(projectId.value).catch(() => []),
     ])
     wpProgress.value = wp
     overdue.value = Array.isArray(od) ? od : []

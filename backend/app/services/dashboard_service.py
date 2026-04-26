@@ -61,8 +61,8 @@ class DashboardService:
             "active_projects": active_count,
             "week_hours": week_hours,
             "staff_count": staff_count,
-            "overdue_projects": 0,  # TODO: 需要 project_timelines 表
-            "pending_review_workpapers": 0,  # TODO: 需要 working_paper 状态统计
+            "overdue_projects": await self._get_overdue_projects(),
+            "pending_review_workpapers": await self._get_pending_review_workpapers(),
         }
 
         # 写入 Redis 缓存
@@ -216,11 +216,77 @@ class DashboardService:
 
     async def get_quality_metrics(self) -> dict:
         """审计质量指标"""
+        from app.models.workpaper_models import WorkingPaper, WpReviewStatus, WpQcResult
+        from app.models.audit_platform_models import Adjustment
+
+        # qc_pass_rate — 从 wp_qc_results 计算通过率
+        total_qc = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(WpQcResult)
+        )).scalar() or 0
+        passed_qc = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(WpQcResult).where(WpQcResult.passed == True)  # noqa
+        )).scalar() or 0
+        qc_pass_rate = round(passed_qc / total_qc * 100, 1) if total_qc > 0 else 0
+
+        # review_completion_rate — 从 working_paper 计算复核完成率
+        total_wp = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )).scalar() or 0
+        reviewed_wp = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                WorkingPaper.is_deleted == sa.false(),
+                WorkingPaper.review_status.in_([
+                    WpReviewStatus.level1_passed, WpReviewStatus.level2_passed,
+                ]),
+            )
+        )).scalar() or 0
+        review_completion_rate = round(reviewed_wp / total_wp * 100, 1) if total_wp > 0 else 0
+
+        # adjustment_count — 从 adjustments 表查询活跃数量
+        adj_count = (await self.db.execute(
+            sa.select(sa.func.count()).select_from(Adjustment).where(
+                Adjustment.is_deleted == sa.false(),
+            )
+        )).scalar() or 0
+
         return {
-            "qc_pass_rate": 0,  # TODO: 从 wp_qc_result 统计
-            "review_completion_rate": 0,  # TODO: 从 review_records 统计
-            "adjustment_count": 0,  # TODO: 从 adjustments 统计
+            "qc_pass_rate": qc_pass_rate,
+            "review_completion_rate": review_completion_rate,
+            "adjustment_count": adj_count,
         }
+
+    # ------------------------------------------------------------------
+    # 看板指标辅助方法
+    # ------------------------------------------------------------------
+
+    async def _get_overdue_projects(self) -> int:
+        """逾期项目数：创建超 180 天仍处于 planning/execution 状态且未归档"""
+        cutoff = datetime.now(timezone.utc) - timedelta(days=180)
+        result = await self.db.execute(
+            sa.select(sa.func.count()).select_from(Project).where(
+                Project.status.in_([ProjectStatus.execution, ProjectStatus.planning]),
+                Project.is_deleted == sa.false(),
+                Project.created_at < cutoff,
+            )
+        )
+        return result.scalar() or 0
+
+    async def _get_pending_review_workpapers(self) -> int:
+        """待复核底稿数：review_status 为 pending_level1 或 pending_level2"""
+        from app.models.workpaper_models import WorkingPaper, WpReviewStatus
+
+        result = await self.db.execute(
+            sa.select(sa.func.count()).select_from(WorkingPaper).where(
+                WorkingPaper.is_deleted == sa.false(),
+                WorkingPaper.review_status.in_([
+                    WpReviewStatus.pending_level1,
+                    WpReviewStatus.pending_level2,
+                ]),
+            )
+        )
+        return result.scalar() or 0
 
     async def get_group_progress(self) -> list[dict]:
         """集团审计子公司进度对比"""

@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   objectType: string
@@ -38,8 +38,8 @@ const records = ref<any[]>([])
 async function loadRecords() {
   if (!props.objectType || !props.objectId) return
   try {
-    const { data } = await http.get(`/api/signatures/${props.objectType}/${props.objectId}`)
-    records.value = data.data ?? data ?? []
+    const data = await api.get(`/api/signatures/${props.objectType}/${props.objectId}`)
+    records.value = data ?? []
   } catch { records.value = [] }
 }
 

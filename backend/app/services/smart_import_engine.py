@@ -842,7 +842,7 @@ def _guess_data_type(fields: set[str]) -> str:
 # 6. 四表数据转换（从原始行 → 标准化记录）
 # ─────────────────────────────────────────────────────────────────────────────
 
-def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
+def convert_balance_rows(rows: list[dict], diagnostics: list | None = None) -> tuple[list[dict], list[dict]]:
     """将余额表原始行转换为 (tb_balance_rows, tb_aux_balance_rows)。
 
     两种期初/期末模式都保留原始数据：
@@ -850,156 +850,207 @@ def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
     - 净额+方向模式（期初余额+方向）：存 opening_balance，不强制拆借贷
 
     核算维度列自动拆分为辅助余额表记录。
+
+    Args:
+        rows: 原始行列表
+        diagnostics: 可选列表，记录跳过的行（row_number + reason + raw_data）
     """
     balance_rows = []
     aux_balance_rows = []
 
-    for row in rows:
-        account_code = str(row.get("account_code", "")).strip()
-        if not account_code:
-            continue
+    for i, row in enumerate(rows):
+        excel_row = i + 2  # +2 因为第1行是表头，索引从0开始
+        try:
+            account_code = str(row.get("account_code", "")).strip()
+            if not account_code:
+                if diagnostics is not None:
+                    diagnostics.append({
+                        "row_number": excel_row,
+                        "reason": "科目编码为空",
+                        "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
+                    })
+                continue
 
-        account_name = str(row.get("account_name", "")).strip()
-        company_code = str(row.get("company_code", "")).strip() or "default"
+            account_name = str(row.get("account_name", "")).strip()
+            company_code = str(row.get("company_code", "")).strip() or "default"
 
-        # ── 期初 ──
-        od = _safe_decimal(row.get("opening_debit"))
-        oc = _safe_decimal(row.get("opening_credit"))
-        opening_bal = _safe_decimal(row.get("opening_balance"))
-        opening_dir = row.get("opening_direction") or row.get("direction")
+            # ── 期初 ──
+            od = _safe_decimal(row.get("opening_debit"))
+            oc = _safe_decimal(row.get("opening_credit"))
+            opening_bal = _safe_decimal(row.get("opening_balance"))
+            opening_dir = row.get("opening_direction") or row.get("direction")
 
-        # 年初余额作为备选
-        if od is None and oc is None and opening_bal is None:
-            od = _safe_decimal(row.get("year_opening_debit"))
-            oc = _safe_decimal(row.get("year_opening_credit"))
+            # 年初余额作为备选
+            if od is None and oc is None and opening_bal is None:
+                od = _safe_decimal(row.get("year_opening_debit"))
+                oc = _safe_decimal(row.get("year_opening_credit"))
 
-        # 分列模式：有借贷分列 → 保留原始借贷，同时算净额
-        if od is not None or oc is not None:
-            opening_balance = (od or Decimal(0)) - (oc or Decimal(0))
-        elif opening_bal is not None and opening_dir:
-            # 净额+方向模式：保留净额原值
-            opening_balance = opening_bal
-            dir_str = str(opening_dir).strip()
-            if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
-                opening_balance = -abs(opening_bal)
-            elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
-                opening_balance = abs(opening_bal)
-        else:
-            opening_balance = opening_bal  # 纯净额，无方向
+            # 分列模式：有借贷分列 → 保留原始借贷，同时算净额
+            if od is not None or oc is not None:
+                opening_balance = (od or Decimal(0)) - (oc or Decimal(0))
+            elif opening_bal is not None and opening_dir:
+                # 净额+方向模式：保留净额原值
+                opening_balance = opening_bal
+                dir_str = str(opening_dir).strip()
+                if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
+                    opening_balance = -abs(opening_bal)
+                elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
+                    opening_balance = abs(opening_bal)
+            else:
+                opening_balance = opening_bal  # 纯净额，无方向
 
-        # ── 期末 ──
-        cd = _safe_decimal(row.get("closing_debit"))
-        cc = _safe_decimal(row.get("closing_credit"))
-        closing_bal = _safe_decimal(row.get("closing_balance"))
-        closing_dir = row.get("closing_direction") or row.get("direction")
+            # ── 期末 ──
+            cd = _safe_decimal(row.get("closing_debit"))
+            cc = _safe_decimal(row.get("closing_credit"))
+            closing_bal = _safe_decimal(row.get("closing_balance"))
+            closing_dir = row.get("closing_direction") or row.get("direction")
 
-        if cd is not None or cc is not None:
-            closing_balance = (cd or Decimal(0)) - (cc or Decimal(0))
-        elif closing_bal is not None and closing_dir:
-            closing_balance = closing_bal
-            dir_str = str(closing_dir).strip()
-            if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
-                closing_balance = -abs(closing_bal)
-            elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
-                closing_balance = abs(closing_bal)
-        else:
-            closing_balance = closing_bal
+            if cd is not None or cc is not None:
+                closing_balance = (cd or Decimal(0)) - (cc or Decimal(0))
+            elif closing_bal is not None and closing_dir:
+                closing_balance = closing_bal
+                dir_str = str(closing_dir).strip()
+                if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
+                    closing_balance = -abs(closing_bal)
+                elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
+                    closing_balance = abs(closing_bal)
+            else:
+                closing_balance = closing_bal
 
-        debit_amount = _safe_decimal(row.get("debit_amount"))
-        credit_amount = _safe_decimal(row.get("credit_amount"))
+            debit_amount = _safe_decimal(row.get("debit_amount"))
+            credit_amount = _safe_decimal(row.get("credit_amount"))
 
-        # 核算维度处理
-        aux_dim_str = str(row.get("aux_dimensions", "")).strip()
-        if not aux_dim_str:
-            aux_dim_str = str(row.get("aux_type", "")).strip()
-            if aux_dim_str and ":" not in aux_dim_str and "：" not in aux_dim_str:
-                aux_dim_str = ""
+            # 核算维度处理
+            aux_dim_str = str(row.get("aux_dimensions", "")).strip()
+            if not aux_dim_str:
+                aux_dim_str = str(row.get("aux_type", "")).strip()
+                if aux_dim_str and ":" not in aux_dim_str and "：" not in aux_dim_str:
+                    aux_dim_str = ""
 
-        base_row = {
-            "account_code": account_code,
-            "account_name": account_name,
-            "company_code": company_code,
-            "opening_balance": opening_balance,
-            "opening_debit": od,
-            "opening_credit": oc,
-            "debit_amount": debit_amount,
-            "credit_amount": credit_amount,
-            "closing_balance": closing_balance,
-            "closing_debit": cd,
-            "closing_credit": cc,
-            "currency_code": "CNY",
-        }
+            base_row = {
+                "account_code": account_code,
+                "account_name": account_name,
+                "company_code": company_code,
+                "opening_balance": opening_balance,
+                "opening_debit": od,
+                "opening_credit": oc,
+                "debit_amount": debit_amount,
+                "credit_amount": credit_amount,
+                "closing_balance": closing_balance,
+                "closing_debit": cd,
+                "closing_credit": cc,
+                "currency_code": "CNY",
+            }
 
-        if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
-            dims = parse_aux_dimensions(aux_dim_str)
-            for dim in dims:
-                aux_balance_rows.append({
+            if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
+                dims = parse_aux_dimensions(aux_dim_str)
+                for dim in dims:
+                    aux_balance_rows.append({
+                        **base_row,
+                        "aux_type": dim["aux_type"],
+                        "aux_code": dim["aux_code"],
+                        "aux_name": dim["aux_name"],
+                        "aux_dimensions_raw": aux_dim_str,  # 保留原始维度组合
+                    })
+            else:
+                balance_rows.append({
                     **base_row,
-                    "aux_type": dim["aux_type"],
-                    "aux_code": dim["aux_code"],
-                    "aux_name": dim["aux_name"],
-                    "aux_dimensions_raw": aux_dim_str,  # 保留原始维度组合
+                    "level": _infer_level(account_code),
                 })
-        else:
-            balance_rows.append({
-                **base_row,
-                "level": _infer_level(account_code),
-            })
+        except Exception as e:
+            if diagnostics is not None:
+                diagnostics.append({
+                    "row_number": excel_row,
+                    "reason": f"{type(e).__name__}: {str(e)[:100]}",
+                    "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
+                })
+            continue
 
     return balance_rows, aux_balance_rows
 
 
-def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]:
+def convert_ledger_rows(rows: list[dict], diagnostics: list | None = None) -> tuple[list[dict], list[dict], dict]:
     """将序时账原始行转换为 (tb_ledger_rows, [], aux_stats)。
 
     只做字段提取和类型转换，不做维度解析（维度在写入时流式处理）。
     aux_stats 只做简单计数（有维度字符串的行数），不实际解析。
+
+    Args:
+        rows: 原始行列表
+        diagnostics: 可选列表，记录跳过的行（row_number + reason + raw_data）
     """
     ledger_rows = []
     aux_count = 0
 
-    for row in rows:
-        account_code = str(row.get("account_code", "")).strip()
-        if not account_code:
+    for i, row in enumerate(rows):
+        excel_row = i + 2  # +2 因为第1行是表头，索引从0开始
+        try:
+            account_code = str(row.get("account_code", "")).strip()
+            if not account_code:
+                if diagnostics is not None:
+                    diagnostics.append({
+                        "row_number": excel_row,
+                        "reason": "科目编码为空",
+                        "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
+                    })
+                continue
+
+            voucher_date = _parse_date_val(row.get("voucher_date"))
+            voucher_no = str(row.get("voucher_no", "")).strip()
+            if not voucher_date or not voucher_no:
+                if diagnostics is not None:
+                    missing = []
+                    if not voucher_date:
+                        missing.append("凭证日期")
+                    if not voucher_no:
+                        missing.append("凭证号")
+                    diagnostics.append({
+                        "row_number": excel_row,
+                        "reason": f"缺少必需字段: {', '.join(missing)}",
+                        "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
+                    })
+                continue
+
+            account_name = str(row.get("account_name", "")).strip()
+            voucher_type = str(row.get("voucher_type", "")).strip() or None
+            accounting_period = _parse_period_str(row.get("accounting_period"))
+            debit_amount = _safe_decimal(row.get("debit_amount"))
+            credit_amount = _safe_decimal(row.get("credit_amount"))
+            summary = str(row.get("summary", "")).strip() or None
+            preparer = str(row.get("preparer", "")).strip() or None
+
+            aux_dim_str = str(row.get("aux_dimensions", "")).strip()
+            if not aux_dim_str:
+                aux_dim_str = str(row.get("aux_type", "")).strip()
+                if aux_dim_str and ":" not in aux_dim_str and "：" not in aux_dim_str:
+                    aux_dim_str = ""
+
+            if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
+                aux_count += 1
+
+            ledger_rows.append({
+                "account_code": account_code,
+                "account_name": account_name,
+                "voucher_date": voucher_date,
+                "voucher_no": voucher_no,
+                "voucher_type": voucher_type,
+                "accounting_period": accounting_period,
+                "debit_amount": debit_amount,
+                "credit_amount": credit_amount,
+                "summary": summary,
+                "preparer": preparer,
+                "company_code": "default",
+                "currency_code": "CNY",
+                "_aux_dim_str": aux_dim_str,
+            })
+        except Exception as e:
+            if diagnostics is not None:
+                diagnostics.append({
+                    "row_number": excel_row,
+                    "reason": f"{type(e).__name__}: {str(e)[:100]}",
+                    "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
+                })
             continue
-
-        voucher_date = _parse_date_val(row.get("voucher_date"))
-        voucher_no = str(row.get("voucher_no", "")).strip()
-        if not voucher_date or not voucher_no:
-            continue
-
-        account_name = str(row.get("account_name", "")).strip()
-        voucher_type = str(row.get("voucher_type", "")).strip() or None
-        accounting_period = _parse_period_str(row.get("accounting_period"))
-        debit_amount = _safe_decimal(row.get("debit_amount"))
-        credit_amount = _safe_decimal(row.get("credit_amount"))
-        summary = str(row.get("summary", "")).strip() or None
-        preparer = str(row.get("preparer", "")).strip() or None
-
-        aux_dim_str = str(row.get("aux_dimensions", "")).strip()
-        if not aux_dim_str:
-            aux_dim_str = str(row.get("aux_type", "")).strip()
-            if aux_dim_str and ":" not in aux_dim_str and "：" not in aux_dim_str:
-                aux_dim_str = ""
-
-        if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
-            aux_count += 1
-
-        ledger_rows.append({
-            "account_code": account_code,
-            "account_name": account_name,
-            "voucher_date": voucher_date,
-            "voucher_no": voucher_no,
-            "voucher_type": voucher_type,
-            "accounting_period": accounting_period,
-            "debit_amount": debit_amount,
-            "credit_amount": credit_amount,
-            "summary": summary,
-            "preparer": preparer,
-            "company_code": "default",
-            "currency_code": "CNY",
-            "_aux_dim_str": aux_dim_str,
-        })
 
     return ledger_rows, [], {"_has_aux": aux_count}
 
@@ -2235,10 +2286,16 @@ async def smart_import_streaming(
                                   sheet_counts_cal, batches, counts,
                                   _BALANCE_COLS, _AUX_BALANCE_COLS,
                                   _LEDGER_COLS, _AUX_LEDGER_COLS,
-                                  _project_id, _seen_codes, _acct_records, _by_category):
+                                  _project_id, _seen_codes, _acct_records, _by_category,
+                                  _skipped_rows=None, _sheet_name=""):
         """处理一批 calamine 原始行：转换+写入数据库。"""
         if dt == "balance":
-            bal, aux_bal = convert_balance_rows(raw_batch)
+            diag_bal: list[dict] = [] if _skipped_rows is not None else []
+            bal, aux_bal = convert_balance_rows(raw_batch, diagnostics=diag_bal if _skipped_rows is not None else None)
+            if _skipped_rows is not None:
+                for d in diag_bal:
+                    d["sheet_name"] = _sheet_name
+                _skipped_rows.extend(diag_bal)
             if bal:
                 n = await _batch_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
                 counts["tb_balance"] += n
@@ -2249,7 +2306,12 @@ async def smart_import_streaming(
                 sheet_counts_cal["tb_aux_balance"] += n
 
         elif dt == "ledger":
-            led, _, _ = convert_ledger_rows(raw_batch)
+            diag_led: list[dict] = [] if _skipped_rows is not None else []
+            led, _, _ = convert_ledger_rows(raw_batch, diagnostics=diag_led if _skipped_rows is not None else None)
+            if _skipped_rows is not None:
+                for d in diag_led:
+                    d["sheet_name"] = _sheet_name
+                _skipped_rows.extend(diag_led)
             for r in led:
                 adim = r.pop("_aux_dim_str", "")
                 _led_buf.append(r)
@@ -2354,6 +2416,7 @@ async def smart_import_streaming(
     # ── Phase 2: 逐文件逐 sheet 流式处理 ────────────────────────────────────
     counts: dict[str, int] = {k: 0 for k in _TABLE_MAP}
     diagnostics: list[dict] = []
+    skipped_rows: list[dict] = []  # 记录跳过的行（row_number + reason + sheet_name）
     errors: list[str] = []
     seen_codes: set[str] = set()
     acct_records: list[AccountChart] = []
@@ -2531,7 +2594,8 @@ async def smart_import_streaming(
                                                      sheet_counts_cal, batches, counts,
                                                      _BALANCE_COLS, _AUX_BALANCE_COLS,
                                                      _LEDGER_COLS, _AUX_LEDGER_COLS,
-                                                     project_id, seen_codes, acct_records, by_category)
+                                                     project_id, seen_codes, acct_records, by_category,
+                                                     _skipped_rows=skipped_rows, _sheet_name=sname)
                             _raw_batch.clear()
                             # 让出事件循环，让进度轮询请求能被响应
                             await asyncio.sleep(0)
@@ -2547,7 +2611,8 @@ async def smart_import_streaming(
                                                  sheet_counts_cal, batches, counts,
                                                  _BALANCE_COLS, _AUX_BALANCE_COLS,
                                                  _LEDGER_COLS, _AUX_LEDGER_COLS,
-                                                 project_id, seen_codes, acct_records, by_category)
+                                                 project_id, seen_codes, acct_records, by_category,
+                                                 _skipped_rows=skipped_rows, _sheet_name=sname)
 
                     # flush 剩余缓冲
                     if _led_buf:
@@ -2766,7 +2831,11 @@ async def smart_import_streaming(
                     batch_rows = remapped
 
                 if dt == "balance":
-                    bal, aux_bal = convert_balance_rows(batch_rows)
+                    diag_bal_opx: list[dict] = []
+                    bal, aux_bal = convert_balance_rows(batch_rows, diagnostics=diag_bal_opx)
+                    for d in diag_bal_opx:
+                        d["sheet_name"] = sname
+                    skipped_rows.extend(diag_bal_opx)
                     if bal:
                         n = await _batch_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
                         counts["tb_balance"] += n
@@ -2780,7 +2849,11 @@ async def smart_import_streaming(
                         _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
 
                 elif dt == "ledger":
-                    led, _, aux_stats = convert_ledger_rows(batch_rows)
+                    diag_led_opx: list[dict] = []
+                    led, _, aux_stats = convert_ledger_rows(batch_rows, diagnostics=diag_led_opx)
+                    for d in diag_led_opx:
+                        d["sheet_name"] = sname
+                    skipped_rows.extend(diag_led_opx)
                     for row in led:
                         adim = row.pop("_aux_dim_str", "")
                         _led_buf.append(row)
@@ -2954,6 +3027,7 @@ async def smart_import_streaming(
         "by_category": by_category,
         "data_sheets_imported": counts,
         "sheet_diagnostics": norm_diag,
+        "skipped_rows": skipped_rows[:200],  # 最多返回200条，避免响应过大
         "year": year,
         "errors": errors,
     }

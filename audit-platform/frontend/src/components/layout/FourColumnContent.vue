@@ -55,7 +55,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import DetailProjectPanel from './DetailProjectPanel.vue'
 
 const props = defineProps<{
@@ -88,11 +88,11 @@ watch(() => props.catalogItem, async (item) => {
   if (item.type === 'report') {
     reportLoading.value = true
     try {
-      const { data } = await http.get(
+      const data = await api.get(
         `/api/reports/${pid}/${item.year}/${item.type_key || 'balance_sheet'}`,
         { validateStatus: (s: number) => s < 600 }
       )
-      const d = data?.data ?? data
+      const d = data
       reportRows.value = Array.isArray(d) ? d : (d?.rows ?? [])
     } catch { reportRows.value = [] }
     finally { reportLoading.value = false }
@@ -100,22 +100,22 @@ watch(() => props.catalogItem, async (item) => {
 
   if (item.type === 'note') {
     try {
-      const { data } = await http.get(
+      const data = await api.get(
         `/api/disclosure-notes/${pid}/${selectedYear.value}/${item.code}`,
         { validateStatus: (s: number) => s < 600 }
       )
-      const section = data?.data ?? data
+      const section = data
       noteContent.value = section?.text_content || section?.content || '<p>暂无内容</p>'
     } catch { noteContent.value = '' }
   }
 
   if (item.type === 'trial_balance') {
     try {
-      const { data } = await http.get(`/api/projects/${pid}/trial-balance`, {
+      const data = await api.get(`/api/projects/${pid}/trial-balance`, {
         params: { year: selectedYear.value },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data.data ?? data ?? []
+      const rows = data ?? []
       tbDetail.value = rows.find((r: any) => r.standard_account_code === item.code) || null
     } catch { tbDetail.value = null }
   }

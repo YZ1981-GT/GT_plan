@@ -144,6 +144,11 @@ const router = createRouter({
           name: 'WorkpaperSummary',
           component: () => import('@/views/WorkpaperSummary.vue'),
         },
+        // ── AIChatView / AIWorkpaperView routes removed (Phase 11) ──
+        // Backend endpoints (POST /api/ai/chat, POST /api/ai/chat/file-analysis,
+        // GET /api/projects/{id}/chat/history) are not registered in router_registry.py,
+        // so all operations return 404. Do NOT re-add these routes.
+
         // ── Phase 8 Extension Routes ──
         {
           path: 'projects/:projectId/t-accounts',

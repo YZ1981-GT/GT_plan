@@ -60,11 +60,16 @@
   box-shadow: 0 2px 6px rgba(75, 45, 119, 0.1) !important;
 }
 
+/* 全局按钮圆角提升：从 4px → 8px，更圆润柔和 */
+.el-button {
+  border-radius: var(--gt-radius-md) !important;
+}
+
 /* 小按钮更紧凑 */
 .el-button--small {
   padding: 5px 12px !important;
   font-size: 12px !important;
-  border-radius: var(--gt-radius-sm) !important;
+  border-radius: 6px !important;
 }
 .el-button--small.is-round {
   padding: 5px 14px !important;
@@ -77,21 +82,30 @@
 
 /* 表头更精致 */
 .el-table th.el-table__cell {
-  padding: 10px 12px !important;
+  padding: 10px 14px !important;
   font-size: 12px !important;
   text-transform: uppercase !important;
   letter-spacing: 0.8px !important;
   color: var(--gt-color-primary-dark) !important;
 }
 
-/* 数据行更紧凑 */
+/* 数据行间距加宽：审计场景长时间阅读更舒适 */
 .el-table td.el-table__cell {
-  padding: 8px 12px !important;
+  padding: 10px 14px !important;
 }
 
 /* 选中行 — 浅蓝而非深色 */
 .el-table .el-table__body tr.current-row > td.el-table__cell {
   background: #e8f4fd !important;
+}
+
+/* 表格外边框更细腻 */
+.el-table--border {
+  border: 0.5px solid rgba(75, 45, 119, 0.08) !important;
+}
+.el-table--border .el-table__inner-wrapper::after,
+.el-table--border::before {
+  display: none !important;
 }
 
 /* 表格内链接按钮 */
@@ -114,20 +128,20 @@
 }
 
 .el-tag--success {
-  background: var(--gt-color-success-light) !important;
-  color: var(--gt-color-success) !important;
+  background: #f0f9f2 !important;
+  color: #1e8a38 !important;
 }
 .el-tag--warning {
-  background: var(--gt-color-wheat-light) !important;
-  color: #b88a00 !important;
+  background: #fef9ec !important;
+  color: #a67a00 !important;
 }
 .el-tag--danger {
-  background: var(--gt-color-coral-light) !important;
-  color: var(--gt-color-coral) !important;
+  background: #fff5f4 !important;
+  color: #d94840 !important;
 }
 .el-tag--info {
-  background: var(--gt-color-teal-light) !important;
-  color: var(--gt-color-teal) !important;
+  background: #eef8fa !important;
+  color: #007a94 !important;
 }
 
 /* 小标签 */
@@ -151,6 +165,21 @@
 .el-progress-bar__inner {
   border-radius: var(--gt-radius-full) !important;
   transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 进度条流动光泽 */
+.el-progress-bar__inner::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: gt-progress-shine 2.5s ease-in-out infinite;
+}
+@keyframes gt-progress-shine {
+  0% { left: -60%; }
+  100% { left: 160%; }
 }
 
 /* 进度条文字 */
@@ -193,7 +222,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .el-input__wrapper {
-  border-radius: var(--gt-radius-sm) !important;
+  border-radius: 6px !important;
   box-shadow: 0 0 0 1px var(--gt-color-border) !important;
   transition: all var(--gt-transition-fast) !important;
 }
@@ -217,7 +246,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .el-select .el-input__wrapper {
-  border-radius: var(--gt-radius-sm) !important;
+  border-radius: 6px !important;
 }
 
 .el-select-dropdown__item {
@@ -430,7 +459,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .el-date-editor .el-input__wrapper {
-  border-radius: var(--gt-radius-sm) !important;
+  border-radius: 6px !important;
 }
 
 .el-picker-panel {

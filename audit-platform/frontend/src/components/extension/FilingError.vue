@@ -24,7 +24,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   modelValue: boolean
@@ -48,7 +48,7 @@ async function onRetry() {
   if (!props.filing?.id) return
   retrying.value = true
   try {
-    await http.post(`/api/regulatory/filings/${props.filing.id}/retry`)
+    await api.post(`/api/regulatory/filings/${props.filing.id}/retry`)
     ElMessage.success('重试请求已提交')
     emit('retried')
     visible.value = false

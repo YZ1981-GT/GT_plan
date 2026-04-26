@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, check_consol_lock, require_project_access
+from app.deps import get_current_user, check_consol_lock, require_project_access, get_user_scope_cycles
 from app.models.core import User
 from app.models.audit_platform_models import AdjustmentType, ReviewStatus
 from app.models.audit_platform_schemas import (
@@ -31,6 +31,7 @@ from app.models.audit_platform_schemas import (
     WPAdjustmentSummary,
 )
 from app.services.adjustment_service import AdjustmentService
+from app.services.mapping_service import get_codes_by_cycles
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/adjustments",
@@ -51,12 +52,28 @@ async def list_adjustments(
 ):
     """分录列表（支持 type/status 筛选，需项目成员权限）"""
     svc = AdjustmentService(db)
-    return await svc.list_entries(
+    result = await svc.list_entries(
         project_id, year,
         adjustment_type=adjustment_type,
         review_status=review_status,
         page=page, page_size=page_size,
     )
+
+    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None:
+        allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        if isinstance(result, dict) and "items" in result:
+            result["items"] = [
+                e for e in result["items"]
+                if any(
+                    li.get("standard_account_code") in allowed_codes
+                    for li in (e.get("line_items") or [])
+                )
+            ]
+            result["total"] = len(result["items"])
+
+    return result
 
 
 @router.post("")

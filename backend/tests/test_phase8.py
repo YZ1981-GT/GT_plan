@@ -634,7 +634,7 @@ class TestBatchPrefill:
     @pytest.mark.asyncio
     async def test_batch_prefill_concurrent(self):
         """batch_prefill 应并发预填多个底稿"""
-        from app.services.prefill_service import PrefillService
+        from app.services.prefill_engine import PrefillService
 
         svc = PrefillService()
         db = AsyncMock()
@@ -651,7 +651,7 @@ class TestBatchPrefill:
     @pytest.mark.asyncio
     async def test_batch_prefill_empty(self):
         """空列表应返回空结果"""
-        from app.services.prefill_service import PrefillService
+        from app.services.prefill_engine import PrefillService
 
         svc = PrefillService()
         result = await svc.batch_prefill(AsyncMock(), uuid.uuid4(), 2025, [])
@@ -660,7 +660,7 @@ class TestBatchPrefill:
     @pytest.mark.asyncio
     async def test_batch_prefill_cache_stub(self):
         """Redis 缓存 stub 应返回 None"""
-        from app.services.prefill_service import PrefillService
+        from app.services.prefill_engine import PrefillService
 
         svc = PrefillService()
         assert await svc._get_cached_prefill(uuid.uuid4()) is None

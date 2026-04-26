@@ -640,3 +640,58 @@ async def _get_unmapped_with_balance(
         }
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# scope_cycles → 科目编码映射（Phase 11 Task 7.2）
+# ---------------------------------------------------------------------------
+
+_WP_MAPPING_PATH = None
+
+
+def _get_wp_mapping_path():
+    global _WP_MAPPING_PATH
+    if _WP_MAPPING_PATH is None:
+        from pathlib import Path
+        _WP_MAPPING_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "wp_account_mapping.json"
+    return _WP_MAPPING_PATH
+
+
+async def get_codes_by_cycles(project_id: UUID, cycles: list[str]) -> set[str]:
+    """根据审计循环列表，返回对应的标准科目编码集合。
+
+    通过 wp_account_mapping.json 的 cycle→account_codes 映射。
+    """
+    import json
+    mapping_path = _get_wp_mapping_path()
+    if not mapping_path.exists():
+        return set()
+    with open(mapping_path, encoding="utf-8-sig") as f:
+        mappings = json.load(f)
+    items = mappings if isinstance(mappings, list) else mappings.get("mappings", [])
+    codes: set[str] = set()
+    for m in items:
+        if m.get("cycle") in cycles:
+            codes.update(m.get("account_codes", []))
+    return codes
+
+
+async def get_sections_by_cycles(project_id: UUID, cycles: list[str]) -> set[str]:
+    """根据审计循环列表，返回对应的附注章节编号集合。
+
+    通过 wp_account_mapping.json 的 cycle→note_section 映射。
+    """
+    import json
+    mapping_path = _get_wp_mapping_path()
+    if not mapping_path.exists():
+        return set()
+    with open(mapping_path, encoding="utf-8-sig") as f:
+        mappings = json.load(f)
+    sections: set[str] = set()
+    items = mappings if isinstance(mappings, list) else mappings.get("mappings", [])
+    for m in items:
+        if m.get("cycle") in cycles:
+            ns = m.get("note_section")
+            if ns:
+                sections.add(ns)
+    return sections

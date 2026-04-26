@@ -19,7 +19,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 interface Standard {
   id: string
@@ -54,8 +54,8 @@ watch(() => props.modelValue, (v) => { selected.value = v || '' })
 async function loadStandards() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/accounting-standards')
-    standards.value = (data.data ?? data ?? []).filter((s: Standard) => s.is_active)
+    const data = await api.get('/api/accounting-standards')
+    standards.value = (data ?? []).filter((s: Standard) => s.is_active)
   } catch { standards.value = [] }
   finally { loading.value = false }
 }

@@ -38,13 +38,13 @@
             <el-icon :size="18"><Cpu /></el-icon>
           </div>
         </el-tooltip>
-        <el-tooltip content="排版模板" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/settings/report-format')">
+        <el-tooltip content="排版模板（开发中）" placement="bottom">
+          <div class="gt-topbar-btn gt-topbar-btn--disabled" @click="ElMessage.info({ message: '排版模板正在开发中', grouping: true })">
             <el-icon :size="18"><Document /></el-icon>
           </div>
         </el-tooltip>
-        <el-tooltip content="吐槽求助" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/forum')">
+        <el-tooltip content="吐槽求助（开发中）" placement="bottom">
+          <div class="gt-topbar-btn gt-topbar-btn--disabled" @click="ElMessage.info({ message: '吐槽求助正在开发中', grouping: true })">
             <el-icon :size="18"><ChatDotSquare /></el-icon>
           </div>
         </el-tooltip>
@@ -100,9 +100,9 @@
             v-for="item in navItems"
             :key="item.key"
             class="gt-nav-item"
-            :class="{ 'gt-nav-item--active': activeNav === item.key }"
+            :class="{ 'gt-nav-item--active': activeNav === item.key, 'gt-nav-item--developing': item.maturity === 'developing' }"
             @click="onNavClick(item)"
-            :title="item.label"
+            :title="item.maturity === 'developing' ? item.label + '（开发中）' : item.label"
           >
             <el-icon :size="20"><component :is="item.icon" /></el-icon>
             <transition name="gt-fade">
@@ -110,6 +110,7 @@
                 {{ item.label }}
                 <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
                 <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
+                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">开发中</span>
               </span>
             </transition>
           </div>
@@ -201,13 +202,14 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, RefreshRight,
+  Cellphone, Camera, Location, TrendCharts,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -221,19 +223,35 @@ const props = defineProps<{
   catalogTitle?: string
 }>()
 
-// ── 导航项 ──
-const navItems = [
-  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
-  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production' },
-  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff', maturity: 'production' },
-  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production' },
-  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
-  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'pilot' },
-  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
-  { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production' },
-  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
-  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production' },
+// ── 导航项（roles: 哪些角色可见，空数组=所有角色可见） ──
+const ALL_NAV_ITEMS = [
+  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production', roles: [] },
+  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production', roles: [] },
+  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production', roles: [] },
+  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: ['admin', 'partner', 'manager', 'auditor'] },
+  { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'developing', roles: [] },
+  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
+  // ── 空壳页面（Phase 11 标记 developing，灰色不可点击） ──
+  { key: 'mobile-projects', label: '移动端项目', icon: Cellphone, path: '/mobile-projects', maturity: 'developing', roles: [] },
+  { key: 'mobile-reports', label: '移动端报表', icon: Cellphone, path: '/mobile-reports', maturity: 'developing', roles: [] },
+  { key: 'mobile-workpaper', label: '移动端底稿', icon: Cellphone, path: '/mobile-workpaper', maturity: 'developing', roles: [] },
+  { key: 'consol-snapshots', label: '合并快照', icon: Camera, path: '/consol-snapshots', maturity: 'developing', roles: ['admin', 'partner', 'manager'] },
+  { key: 'check-ins', label: '打卡签到', icon: Location, path: '/check-ins', maturity: 'developing', roles: [] },
+  { key: 'aux-summary', label: '辅助汇总', icon: TrendCharts, path: '/aux-summary', maturity: 'developing', roles: [] },
 ]
+
+// 按当前用户角色过滤导航项
+const navItems = computed(() => {
+  const role = authStore.user?.role || 'auditor'
+  return ALL_NAV_ITEMS.filter(item => {
+    if (item.roles.length === 0) return true
+    return item.roles.includes(role)
+  })
+})
 
 const activeNav = computed(() => {
   const p = route.path
@@ -241,7 +259,7 @@ const activeNav = computed(() => {
   // 顶部栏路由不高亮左侧导航
   const topBarPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum', '/recycle-bin', '/settings']
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
-  for (const item of navItems) {
+  for (const item of navItems.value) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }
   if (p.startsWith('/projects')) return 'projects'
@@ -249,7 +267,7 @@ const activeNav = computed(() => {
 })
 
 const currentModule = computed(() => {
-  const item = navItems.find(n => n.key === activeNav.value)
+  const item = navItems.value.find(n => n.key === activeNav.value)
   return item?.label || ''
 })
 
@@ -258,7 +276,11 @@ const emit = defineEmits<{
   (e: 'view-change', mode: 'three' | 'four'): void
 }>()
 
-function onNavClick(item: typeof navItems[0]) {
+function onNavClick(item: any) {
+  if (item.maturity === 'developing') {
+    ElMessage.info({ message: `「${item.label}」正在开发中，敬请期待`, grouping: true })
+    return
+  }
   emit('nav-change', item.key)
   router.push(item.path)
 }
@@ -398,7 +420,7 @@ async function handleGlobalReset() {
   // 先检测后端是否存活
   let backendAlive = false
   try {
-    await http.get('/api/health', { timeout: 3000 })
+    await api.get('/api/health', { timeout: 3000 })
     backendAlive = true
   } catch {
     backendAlive = false
@@ -410,7 +432,7 @@ async function handleGlobalReset() {
     const pid = match?.[1] || localStorage.getItem('gt-last-project-id') || null
     if (pid) {
       try {
-        await http.post(`/api/projects/${pid}/account-chart/import-reset`, {}, { timeout: 5000 })
+        await api.post(`/api/projects/${pid}/account-chart/import-reset`, {}, { timeout: 5000 })
       } catch { /* 静默 */ }
     }
     window.location.reload()
@@ -508,6 +530,8 @@ onUnmounted(() => {
 .gt-topbar-btn:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
 .gt-topbar-btn--danger { color: #f56c6c; }
 .gt-topbar-btn--danger:hover { background: #fef0f0; color: #f56c6c; }
+.gt-topbar-btn--disabled { opacity: 0.4; cursor: default; }
+.gt-topbar-btn--disabled:hover { background: transparent; color: var(--gt-color-text-tertiary); }
 
 .gt-topbar-divider {
   width: 1px;
@@ -586,6 +610,10 @@ onUnmounted(() => {
   color: #fff !important;
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.3);
 }
+.gt-nav-item--developing {
+  opacity: 0.5;
+  cursor: default;
+}
 .gt-nav-label { font-weight: 500; }
 .gt-maturity-badge {
   font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 3px;
@@ -593,6 +621,7 @@ onUnmounted(() => {
 }
 .gt-maturity-pilot { background: #fef0e6; color: #e6a23c; }
 .gt-maturity-exp { background: #fde2e2; color: #f56c6c; }
+.gt-maturity-dev { background: #f0f0f5; color: #999; }
 
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);

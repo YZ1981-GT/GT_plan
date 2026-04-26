@@ -1,5 +1,5 @@
 <template>
-  <el-dialog
+  <el-dialog append-to-body
     v-model="visible"
     :title="isEdit ? '编辑抵消分录' : '新建抵消分录'"
     width="800px"

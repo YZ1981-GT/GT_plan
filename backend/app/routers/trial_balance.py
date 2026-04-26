@@ -8,10 +8,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, get_user_scope_cycles
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.deps import check_consol_lock
+from app.services.mapping_service import get_codes_by_cycles
 from app.services.event_bus import event_bus
 from app.services.materiality_service import MaterialityService
 from app.services.trial_balance_service import TrialBalanceService
@@ -33,6 +34,12 @@ async def get_trial_balance(
     """获取试算表（四列结构），含重要性水平高亮标记"""
     svc = TrialBalanceService(db)
     rows = await svc.get_trial_balance(project_id, year, company_code)
+
+    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None:
+        allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        rows = [r for r in rows if r.standard_account_code in allowed_codes]
 
     # 获取重要性水平用于高亮
     mat_svc = MaterialityService(db)

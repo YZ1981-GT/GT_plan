@@ -147,10 +147,17 @@ class TestUpdateReviewStatus:
         mock_db.execute = AsyncMock(return_value=wp_result)
 
         svc = WorkingPaperService()
-        result = await svc.update_review_status(mock_db, mock_wp.id, "level1_rejected")
+        result = await svc.update_review_status(
+            mock_db, mock_wp.id, "level1_rejected",
+            reason="数据有误，需要修改",
+            rejected_by_id=uuid4(),
+        )
         assert result["review_status"] == "level1_rejected"
         # 联动：编制状态应变为 revision_required
         assert mock_wp.status == WpFileStatus.revision_required
+        # 退回原因已记录
+        assert mock_wp.rejection_reason == "数据有误，需要修改"
+        assert mock_wp.rejected_at is not None
 
     @pytest.mark.asyncio
     async def test_level2_passed_marks_review_passed(self, mock_db, mock_wp):

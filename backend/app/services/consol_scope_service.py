@@ -1,8 +1,9 @@
-"""合并范围服务"""
+"""合并范围服务 — 异步 ORM"""
 
 from uuid import UUID
 
-from sqlalchemy import and_
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consolidation_models import ConsolScope
 from app.models.consolidation_schemas import (
@@ -14,85 +15,84 @@ from app.models.consolidation_schemas import (
 )
 
 
-def get_scope_list(db, project_id: UUID, year: int) -> list[ConsolScope]:
-    return (
-        db.query(ConsolScope)
-        .filter(
+async def get_scope_list(db: AsyncSession, project_id: UUID, year: int) -> list[ConsolScope]:
+    result = await db.execute(
+        sa.select(ConsolScope).where(
             ConsolScope.project_id == project_id,
             ConsolScope.year == year,
             ConsolScope.is_deleted.is_(False),
         )
-        .all()
     )
+    return list(result.scalars().all())
 
 
-def get_scope_item(db, scope_id: UUID, project_id: UUID) -> ConsolScope | None:
-    return (
-        db.query(ConsolScope)
-        .filter(ConsolScope.id == scope_id, ConsolScope.project_id == project_id)
-        .first()
+async def get_scope_item(db: AsyncSession, scope_id: UUID, project_id: UUID) -> ConsolScope | None:
+    result = await db.execute(
+        sa.select(ConsolScope).where(
+            ConsolScope.id == scope_id,
+            ConsolScope.project_id == project_id,
+        )
     )
+    return result.scalar_one_or_none()
 
 
-def create_scope_item(db, project_id: UUID, data: ConsolScopeCreate) -> ConsolScope:
-    existing = (
-        db.query(ConsolScope)
-        .filter(
+async def create_scope_item(db: AsyncSession, project_id: UUID, data: ConsolScopeCreate) -> ConsolScope:
+    result = await db.execute(
+        sa.select(ConsolScope).where(
             ConsolScope.project_id == project_id,
             ConsolScope.year == data.year,
             ConsolScope.company_code == data.company_code,
             ConsolScope.is_deleted.is_(False),
         )
-        .first()
     )
+    existing = result.scalar_one_or_none()
     if existing:
         raise ValueError(f"合并范围项已存在: {data.year}/{data.company_code}")
 
     scope = ConsolScope(project_id=project_id, **data.model_dump())
     db.add(scope)
-    db.commit()
-    db.refresh(scope)
+    await db.commit()
+    await db.refresh(scope)
     return scope
 
 
-def update_scope_item(
-    db, scope_id: UUID, project_id: UUID, data: ConsolScopeUpdate
+async def update_scope_item(
+    db: AsyncSession, scope_id: UUID, project_id: UUID, data: ConsolScopeUpdate
 ) -> ConsolScope | None:
-    scope = get_scope_item(db, scope_id, project_id)
+    scope = await get_scope_item(db, scope_id, project_id)
     if not scope:
         return None
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(scope, key, value)
-    db.commit()
-    db.refresh(scope)
+    await db.commit()
+    await db.refresh(scope)
     return scope
 
 
-def delete_scope_item(db, scope_id: UUID, project_id: UUID) -> bool:
-    scope = get_scope_item(db, scope_id, project_id)
+async def delete_scope_item(db: AsyncSession, scope_id: UUID, project_id: UUID) -> bool:
+    scope = await get_scope_item(db, scope_id, project_id)
     if not scope:
         return False
     scope.soft_delete()
-    db.commit()
+    await db.commit()
     return True
 
 
-def batch_update_scope(
-    db, project_id: UUID, data: ConsolScopeBatchUpdate
+async def batch_update_scope(
+    db: AsyncSession, project_id: UUID, data: ConsolScopeBatchUpdate
 ) -> list[ConsolScope]:
     """批量更新合并范围"""
     results: list[ConsolScope] = []
     for item in data.scope_items:
-        existing = (
-            db.query(ConsolScope)
-            .filter(
+        result = await db.execute(
+            sa.select(ConsolScope).where(
                 ConsolScope.project_id == project_id,
                 ConsolScope.year == item.year,
                 ConsolScope.company_code == item.company_code,
                 ConsolScope.is_deleted.is_(False),
             )
-            .first()
         )
+        existing = result.scalar_one_or_none()
         if existing:
             for key, value in item.model_dump(exclude_unset=True).items():
                 setattr(existing, key, value)
@@ -102,14 +102,14 @@ def batch_update_scope(
             db.add(scope)
             results.append(scope)
 
-    db.commit()
+    await db.commit()
     for r in results:
-        db.refresh(r)
+        await db.refresh(r)
     return results
 
 
-def get_scope_summary(db, project_id: UUID, year: int) -> ConsolScopeSummary:
-    items = get_scope_list(db, project_id, year)
+async def get_scope_summary(db: AsyncSession, project_id: UUID, year: int) -> ConsolScopeSummary:
+    items = await get_scope_list(db, project_id, year)
     included = sum(1 for i in items if i.is_included)
     scope_changes = sum(
         1 for i in items if i.scope_change_type and i.scope_change_type.value != "none"

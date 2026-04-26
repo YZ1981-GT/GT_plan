@@ -27,7 +27,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 const props = defineProps<{ modelValue: boolean; projectId: string; templateType?: string }>()
 const emit = defineEmits(['update:modelValue', 'saved'])
 const visible = ref(props.modelValue)
@@ -41,15 +41,15 @@ const requestParams = computed(() => props.templateType ? { template_type: props
 async function loadSections() {
   loading.value = true
   try {
-    const { data } = await http.get(`/api/disclosure-notes/${props.projectId}/sections`, { params: requestParams.value })
-    sections.value = data.data ?? data
+    const data = await api.get(`/api/disclosure-notes/${props.projectId}/sections`, { params: requestParams.value })
+    sections.value = data
     if (!Array.isArray(sections.value)) sections.value = []
   } finally { loading.value = false }
 }
 async function saveTrim() {
   saving.value = true
   try {
-    await http.put(`/api/disclosure-notes/${props.projectId}/sections/trim`, {
+    await api.put(`/api/disclosure-notes/${props.projectId}/sections/trim`, {
       items: sections.value.map(s => ({ id: s.id, status: s.status, skip_reason: s.skip_reason })),
     }, { params: requestParams.value })
     ElMessage.success('裁剪已保存')

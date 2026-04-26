@@ -148,7 +148,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Monitor, Refresh, Edit, Loading, InfoFilled } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { getSystemSettings, updateSystemSetting, getSystemHealth } from '@/services/commonApi'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -457,9 +457,7 @@ function cancelEdit() {
 async function saveEdit(key: string) {
   saving.value = true
   try {
-    const { data: res } = await http.put('/api/settings', {
-      updates: { [key]: editingValue.value },
-    })
+    const res = await updateSystemSetting(key, editingValue.value)
     if (res.updated && Object.keys(res.updated).length > 0) {
       ElMessage.success(`${key} 已更新`)
       cancelEdit()
@@ -477,7 +475,7 @@ async function saveEdit(key: string) {
 async function loadSettings() {
   loading.value = true
   try {
-    const { data: res } = await http.get('/api/settings')
+    const res = await getSystemSettings()
     groups.value = res.groups || {}
     editableKeys.value = res.editable_keys || []
     jwtSecure.value = res.jwt_secure !== false
@@ -491,7 +489,7 @@ async function loadSettings() {
 async function checkHealth() {
   healthLoading.value = true
   try {
-    const { data: res } = await http.get('/api/settings/health')
+    const res = await getSystemHealth()
     healthResults.value = res.services || {}
   } catch {
     ElMessage.error('服务检测失败')

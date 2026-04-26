@@ -1,9 +1,10 @@
-"""商誉计算服务"""
+"""商誉计算服务 — 异步 ORM"""
 
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import and_
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consolidation_models import GoodwillCalc
 from app.models.consolidation_schemas import GoodwillInput, GoodwillCalcResponse
@@ -26,35 +27,33 @@ def calculate_goodwill(
     return goodwill, is_negative, treatment
 
 
-def get_goodwill_list(db, project_id: UUID, year: int) -> list[GoodwillCalc]:
-    return (
-        db.query(GoodwillCalc)
-        .filter(
+async def get_goodwill_list(db: AsyncSession, project_id: UUID, year: int) -> list[GoodwillCalc]:
+    result = await db.execute(
+        sa.select(GoodwillCalc).where(
             GoodwillCalc.project_id == project_id,
             GoodwillCalc.year == year,
             GoodwillCalc.is_deleted.is_(False),
         )
-        .all()
     )
+    return list(result.scalars().all())
 
 
-def get_goodwill(db, goodwill_id: UUID, project_id: UUID) -> GoodwillCalc | None:
-    return (
-        db.query(GoodwillCalc)
-        .filter(GoodwillCalc.id == goodwill_id, GoodwillCalc.project_id == project_id)
-        .first()
+async def get_goodwill(db: AsyncSession, goodwill_id: UUID, project_id: UUID) -> GoodwillCalc | None:
+    result = await db.execute(
+        sa.select(GoodwillCalc).where(
+            GoodwillCalc.id == goodwill_id,
+            GoodwillCalc.project_id == project_id,
+        )
     )
+    return result.scalar_one_or_none()
 
 
-def create_goodwill(db, project_id: UUID, data: GoodwillInput) -> GoodwillCalc:
+async def create_goodwill(db: AsyncSession, project_id: UUID, data: GoodwillInput) -> GoodwillCalc:
     goodwill_amount, is_negative, treatment = calculate_goodwill(
-        data.acquisition_cost,
-        data.identifiable_net_assets_fv,
-        data.parent_share_ratio,
+        data.acquisition_cost, data.identifiable_net_assets_fv, data.parent_share_ratio,
     )
     goodwill = GoodwillCalc(
-        project_id=project_id,
-        year=data.year,
+        project_id=project_id, year=data.year,
         subsidiary_company_code=data.subsidiary_company_code,
         acquisition_date=data.acquisition_date,
         acquisition_cost=data.acquisition_cost,
@@ -67,51 +66,47 @@ def create_goodwill(db, project_id: UUID, data: GoodwillInput) -> GoodwillCalc:
         current_year_impairment=Decimal("0"),
     )
     db.add(goodwill)
-    db.commit()
-    db.refresh(goodwill)
+    await db.commit()
+    await db.refresh(goodwill)
     return goodwill
 
 
-def update_goodwill(
-    db, goodwill_id: UUID, project_id: UUID, data: GoodwillInput
+async def update_goodwill(
+    db: AsyncSession, goodwill_id: UUID, project_id: UUID, data: GoodwillInput
 ) -> GoodwillCalc | None:
-    goodwill = get_goodwill(db, goodwill_id, project_id)
+    goodwill = await get_goodwill(db, goodwill_id, project_id)
     if not goodwill:
         return None
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(goodwill, key, value)
-
     goodwill_amount, is_negative, treatment = calculate_goodwill(
-        goodwill.acquisition_cost,
-        goodwill.identifiable_net_assets_fv,
-        goodwill.parent_share_ratio,
+        goodwill.acquisition_cost, goodwill.identifiable_net_assets_fv, goodwill.parent_share_ratio,
     )
     goodwill.goodwill_amount = goodwill_amount
     goodwill.is_negative_goodwill = is_negative
     goodwill.negative_goodwill_treatment = treatment
-
-    db.commit()
-    db.refresh(goodwill)
+    await db.commit()
+    await db.refresh(goodwill)
     return goodwill
 
 
-def record_impairment(
-    db, goodwill_id: UUID, project_id: UUID, impairment_amount: Decimal
+async def record_impairment(
+    db: AsyncSession, goodwill_id: UUID, project_id: UUID, impairment_amount: Decimal
 ) -> GoodwillCalc | None:
-    goodwill = get_goodwill(db, goodwill_id, project_id)
+    goodwill = await get_goodwill(db, goodwill_id, project_id)
     if not goodwill:
         return None
     goodwill.current_year_impairment = impairment_amount
     goodwill.accumulated_impairment = (goodwill.accumulated_impairment or Decimal("0")) + impairment_amount
-    db.commit()
-    db.refresh(goodwill)
+    await db.commit()
+    await db.refresh(goodwill)
     return goodwill
 
 
-def delete_goodwill(db, goodwill_id: UUID, project_id: UUID) -> bool:
-    goodwill = get_goodwill(db, goodwill_id, project_id)
+async def delete_goodwill(db: AsyncSession, goodwill_id: UUID, project_id: UUID) -> bool:
+    goodwill = await get_goodwill(db, goodwill_id, project_id)
     if not goodwill:
         return False
     goodwill.soft_delete()
-    db.commit()
+    await db.commit()
     return True

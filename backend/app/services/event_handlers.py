@@ -266,9 +266,8 @@ def register_event_handlers() -> None:
         """数据导入 → 标记所有底稿预填数据为过期"""
         try:
             async with async_session_factory() as session:
-                from app.services.prefill_service_v2 import PrefillServiceV2
-                svc = PrefillServiceV2(session)
-                count = await svc.mark_stale(payload.project_id)
+                from app.services.prefill_engine import mark_stale
+                count = await mark_stale(session, payload.project_id)
                 await session.commit()
                 logger.info(f"Marked {count} workpapers as stale for project {payload.project_id}")
         except Exception:
@@ -278,9 +277,8 @@ def register_event_handlers() -> None:
         """调整分录变更 → 标记关联科目底稿预填数据为过期"""
         try:
             async with async_session_factory() as session:
-                from app.services.prefill_service_v2 import PrefillServiceV2
-                svc = PrefillServiceV2(session)
-                count = await svc.mark_stale(payload.project_id, payload.account_codes)
+                from app.services.prefill_engine import mark_stale
+                count = await mark_stale(session, payload.project_id, payload.account_codes)
                 await session.commit()
                 logger.info(f"Marked {count} workpapers as stale (account change)")
         except Exception:

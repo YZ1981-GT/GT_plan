@@ -272,3 +272,32 @@ async def get_visible_project_ids(
         )
     )
     return [r[0] for r in result.all()]
+
+
+# ---------------------------------------------------------------------------
+# get_user_scope_cycles — 循环级权限过滤
+# ---------------------------------------------------------------------------
+
+
+async def get_user_scope_cycles(
+    current_user: User,
+    project_id: UUID,
+    db: AsyncSession,
+) -> list[str] | None:
+    """获取用户在指定项目中的循环范围限制。
+
+    admin/partner 返回 None（不限制）。
+    """
+    if current_user.role.value in ("admin", "partner"):
+        return None
+    result = await db.execute(
+        select(ProjectUser.scope_cycles).where(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == current_user.id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )
+    sc = result.scalar()
+    if sc and isinstance(sc, str) and sc.strip():
+        return [c.strip() for c in sc.split(",") if c.strip()]
+    return None

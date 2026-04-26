@@ -168,7 +168,7 @@ import { ref, reactive, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
@@ -226,11 +226,11 @@ async function autoPopulate() {
   autoLoading.value = true
   try {
     const year = getYear()
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${wizardStore.projectId}/materiality/benchmark`,
       { params: { year, benchmark_type: form.benchmark_type } }
     )
-    const resp = data.data ?? data
+    const resp = data
     const amount = Number(resp.benchmark_amount)
     benchmarkNum.value = amount
     form.benchmark_amount = String(amount)
@@ -255,7 +255,7 @@ async function onParamChange() {
 
   try {
     const year = getYear()
-    const { data } = await http.post(
+    const data = await api.post(
       `/api/projects/${wizardStore.projectId}/materiality/calculate`,
       {
         benchmark_type: form.benchmark_type,
@@ -266,7 +266,7 @@ async function onParamChange() {
       },
       { params: { year } }
     )
-    result.value = data.data ?? data
+    result.value = data
   } catch {
     // silent
   }
@@ -282,12 +282,12 @@ async function submitOverride() {
     if (overrideForm.performance_materiality != null) body.performance_materiality = String(overrideForm.performance_materiality)
     if (overrideForm.trivial_threshold != null) body.trivial_threshold = String(overrideForm.trivial_threshold)
 
-    const { data } = await http.put(
+    const data = await api.put(
       `/api/projects/${wizardStore.projectId}/materiality/override`,
       body,
       { params: { year } }
     )
-    result.value = data.data ?? data
+    result.value = data
     ElMessage.success('覆盖成功')
   } catch {
     // error handled by interceptor
@@ -314,11 +314,11 @@ onMounted(async () => {
   if (wizardStore.projectId) {
     try {
       const year = getYear()
-      const { data } = await http.get(
+      const data = await api.get(
         `/api/projects/${wizardStore.projectId}/materiality`,
         { params: { year } }
       )
-      const existing = data.data ?? data
+      const existing = data
       if (existing) {
         result.value = existing
         form.benchmark_type = existing.benchmark_type

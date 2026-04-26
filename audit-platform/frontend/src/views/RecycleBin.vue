@@ -73,7 +73,10 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
+import {
+  getRecycleBinStats, listRecycleBinItems,
+  restoreRecycleBinItem, permanentDeleteItem, emptyRecycleBin,
+} from '@/services/commonApi'
 
 const loading = ref(false)
 const items = ref<any[]>([])
@@ -90,8 +93,7 @@ const stats = reactive<{
 
 async function loadStats() {
   try {
-    const { data } = await http.get('/api/recycle-bin/stats')
-    const d = data.data ?? data
+    const d = await getRecycleBinStats()
     stats.total = d.total
     stats.limit = d.limit
     stats.is_over_limit = d.is_over_limit
@@ -104,8 +106,7 @@ async function loadItems() {
   try {
     const params: any = { page: page.value, page_size: pageSize }
     if (filterType.value) params.item_type = filterType.value
-    const { data } = await http.get('/api/recycle-bin', { params })
-    const d = data.data ?? data
+    const d = await listRecycleBinItems(params)
     items.value = d.items || []
     total.value = d.total || 0
   } catch { items.value = [] }
@@ -114,7 +115,7 @@ async function loadItems() {
 
 async function restoreItem(row: any) {
   try {
-    await http.post(`/api/recycle-bin/${row.type}/${row.id}/restore`)
+    await restoreRecycleBinItem(`${row.type}/${row.id}`)
     ElMessage.success(`${row.type_label}「${row.name}」已恢复`)
     await loadItems()
     await loadStats()
@@ -130,7 +131,7 @@ async function confirmDelete(row: any) {
       '永久删除',
       { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
     )
-    await http.delete(`/api/recycle-bin/${row.type}/${row.id}`)
+    await permanentDeleteItem(`${row.type}/${row.id}`)
     ElMessage.success('已永久删除')
     await loadItems()
     await loadStats()
@@ -144,9 +145,8 @@ async function confirmEmptyAll() {
       '清空回收站',
       { confirmButtonText: '确定清空', cancelButtonText: '取消', type: 'warning' }
     )
-    const { data } = await http.post('/api/recycle-bin/empty')
-    const d = data.data ?? data
-    ElMessage.success(d.message || '已清空')
+    await emptyRecycleBin()
+    ElMessage.success('已清空')
     await loadItems()
     await loadStats()
   } catch { /* cancelled */ }

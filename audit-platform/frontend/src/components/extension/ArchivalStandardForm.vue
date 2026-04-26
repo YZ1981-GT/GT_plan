@@ -37,7 +37,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -75,7 +75,7 @@ async function onSubmit() {
   if (!valid) return
   submitting.value = true
   try {
-    await http.post('/api/regulatory/archival-standard', form.value)
+    await api.post('/api/regulatory/archival-standard', form.value)
     ElMessage.success('归档备案提交成功')
     emit('submitted')
     visible.value = false

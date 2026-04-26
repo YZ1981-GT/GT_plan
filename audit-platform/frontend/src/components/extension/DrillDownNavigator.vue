@@ -67,7 +67,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Right, List, Document, DataAnalysis } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 interface Crumb {
   label: string
@@ -128,8 +128,8 @@ async function drillTo(targetLevel: string) {
     if (props.accountCode) params.account_code = props.accountCode
     if (props.voucherNo) params.voucher_no = props.voucherNo
 
-    const { data } = await http.get('/api/metabase/drilldown-url', { params })
-    const result = data.data ?? data
+    const data = await api.get('/api/metabase/drilldown-url', { params })
+    const result = data
     emit('drilldown', targetLevel, result.drilldown_url)
     router.push(result.drilldown_url)
   } catch { /* ignore */ }
@@ -137,8 +137,8 @@ async function drillTo(targetLevel: string) {
 
 async function loadDrilldownPaths() {
   try {
-    const { data } = await http.get('/api/metabase/drilldown-config')
-    drilldownPaths.value = data.data ?? data ?? []
+    const data = await api.get('/api/metabase/drilldown-config')
+    drilldownPaths.value = data ?? []
   } catch { drilldownPaths.value = [] }
 }
 

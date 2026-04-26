@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -353,3 +353,50 @@ class ComponentResult(Base, SoftDeleteMixin, TimestampMixin):
     evaluation_status: Mapped[EvaluationStatusEnum] = mapped_column(
         Enum(EvaluationStatusEnum), server_default="pending", nullable=False
     )
+
+
+# ---------------------------------------------------------------------------
+# 差额表 + 自定义查询模板（Phase 11 合并深度开发）
+# ---------------------------------------------------------------------------
+
+
+class ConsolWorksheet(Base, SoftDeleteMixin, TimestampMixin):
+    """合并差额表 — 每个节点(company_code)×科目×年度一行"""
+    __tablename__ = "consol_worksheet"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    node_company_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    account_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    adjustment_debit: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    adjustment_credit: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    elimination_debit: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    elimination_credit: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    net_difference: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    children_amount_sum: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+    consolidated_amount: Mapped[Decimal] = mapped_column(Numeric(20, 2), server_default="0", nullable=False)
+
+    __table_args__ = (
+        Index(
+            "uq_consol_worksheet_node_account_year",
+            "project_id", "node_company_code", "account_code", "year",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
+
+
+class ConsolQueryTemplate(Base, SoftDeleteMixin, TimestampMixin):
+    """自定义查询模板"""
+    __tablename__ = "consol_query_template"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    row_dimension: Mapped[str] = mapped_column(String(50), nullable=False)
+    col_dimension: Mapped[str] = mapped_column(String(50), nullable=False)
+    value_field: Mapped[str] = mapped_column(String(50), nullable=False)
+    filters: Mapped[dict | None] = mapped_column(JSONB, server_default="{}", nullable=True)
+    transpose: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+    aggregation_mode: Mapped[str] = mapped_column(String(20), server_default="self", nullable=False)

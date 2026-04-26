@@ -19,7 +19,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   modelValue: boolean
@@ -51,14 +51,14 @@ async function onSign() {
   if (!valid) return
   signing.value = true
   try {
-    const { data } = await http.post('/api/signatures/sign', {
+    const data = await api.post('/api/signatures/sign', {
       object_type: props.objectType,
       object_id: props.objectId,
       signature_level: 'level1',
       password: form.value.password,
     })
     ElMessage.success('签名成功')
-    emit('signed', data.data ?? data)
+    emit('signed', data)
     visible.value = false
   } catch { ElMessage.error('签名失败，请检查密码') }
   finally { signing.value = false }

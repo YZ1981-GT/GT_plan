@@ -285,6 +285,11 @@ class WorkingPaper(Base):
     prefill_stale: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rejected_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    rejected_at: Mapped[datetime | None] = mapped_column(nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

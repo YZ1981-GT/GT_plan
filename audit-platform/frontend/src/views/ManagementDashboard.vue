@@ -221,7 +221,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import http from '@/utils/http'
+import {
+  getDashboardOverview, getDashboardProjectProgress, getDashboardStaffWorkload,
+  getDashboardRiskAlerts, getDashboardGroupProgress, getDashboardHoursHeatmap,
+  getDashboardProjectStaffHours, getDashboardStaffDetail, getDashboardAvailableStaff,
+} from '@/services/commonApi'
 import api from '@/services/apiProxy'
 import GTChart from '@/components/GTChart.vue'
 import {
@@ -415,12 +419,12 @@ async function refreshAll() {
   loading.value = true
   try {
     const [ov, progress, workload, alerts, group, heatmap] = await Promise.all([
-      http.get('/api/dashboard/overview').then(r => r.data).catch(() => ({})),
-      http.get('/api/dashboard/project-progress').then(r => r.data).catch(() => []),
-      http.get('/api/dashboard/staff-workload').then(r => r.data).catch(() => []),
-      http.get('/api/dashboard/risk-alerts').then(r => r.data).catch(() => []),
-      http.get('/api/dashboard/group-progress').then(r => r.data).catch(() => []),
-      http.get('/api/dashboard/hours-heatmap').then(r => r.data).catch(() => []),
+      getDashboardOverview().catch(() => ({})),
+      getDashboardProjectProgress().catch(() => []),
+      getDashboardStaffWorkload().catch(() => []),
+      getDashboardRiskAlerts().catch(() => []),
+      getDashboardGroupProgress().catch(() => []),
+      getDashboardHoursHeatmap().catch(() => []),
     ])
     overview.value = ov && typeof ov === 'object' ? ov : {}
     projectProgress.value = Array.isArray(progress) ? progress : []

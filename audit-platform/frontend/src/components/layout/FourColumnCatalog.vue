@@ -97,7 +97,7 @@
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
 import { DataLine, Notebook, Document, TrendCharts } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   project: any
@@ -172,11 +172,11 @@ watch(() => props.project?.id, async (pid) => {
 
   // 加载附注章节（静默失败，数据可能还没生成）
   try {
-    const { data } = await http.get(`/api/disclosure-notes/${pid}/${currentYear.value}`, {
+    const data = await api.get(`/api/disclosure-notes/${pid}/${currentYear.value}`, {
       validateStatus: (s: number) => s < 500,  // 4xx 不抛异常
     })
     if (data) {
-      const d = data.data ?? data
+      const d = data
       noteSections.value = Array.isArray(d) ? d.map((s: any) => ({
         code: s.note_section || s.section_code || s.code || '',
         title: s.section_title || s.title || '',
@@ -186,12 +186,12 @@ watch(() => props.project?.id, async (pid) => {
 
   // 加载试算表分类（静默失败）
   try {
-    const { data } = await http.get(`/api/projects/${pid}/trial-balance`, {
+    const data = await api.get(`/api/projects/${pid}/trial-balance`, {
       params: { year: currentYear.value },
       validateStatus: (s: number) => s < 600,
     })
-    if (data && Array.isArray(data.data ?? data)) {
-      const rows = data.data ?? data ?? []
+    if (data && Array.isArray(data)) {
+      const rows = data ?? []
     const catMap: Record<string, any[]> = {}
     for (const r of rows) {
       const cat = r.account_category || 'other'
@@ -210,10 +210,10 @@ watch(() => props.project?.id, async (pid) => {
 
   // 加载底稿列表（按审计循环分组）
   try {
-    const { data } = await http.get(`/api/projects/${pid}/working-papers`, {
+    const data = await api.get(`/api/projects/${pid}/working-papers`, {
       validateStatus: (s: number) => s < 600,
     })
-    const wps = Array.isArray(data?.data ?? data) ? (data.data ?? data) : []
+    const wps = Array.isArray(data) ? (data) : []
     const cycleMap: Record<string, any[]> = {}
     for (const wp of wps) {
       const cycle = wp.audit_cycle || wp.wp_code?.charAt(0) || 'Z'

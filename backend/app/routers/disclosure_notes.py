@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, get_user_scope_cycles
 from app.models.core import User
 from app.models.report_schemas import (
     DisclosureNoteDetail,
@@ -76,6 +76,15 @@ async def get_notes_tree(
     tree = await engine.get_notes_tree(project_id, year)
     if not tree:
         raise HTTPException(status_code=404, detail="附注数据不存在，请先生成附注")
+
+    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的附注章节
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None:
+        from app.services.mapping_service import get_sections_by_cycles
+        allowed_sections = await get_sections_by_cycles(project_id, scope_cycles)
+        if allowed_sections:
+            tree = [n for n in tree if n.get("note_section") in allowed_sections]
+
     return tree
 
 
@@ -92,6 +101,20 @@ async def get_validation_results(
     if result is None:
         raise HTTPException(status_code=404, detail="校验结果不存在，请先执行校验")
     return NoteValidationResponse.model_validate(result)
+
+
+@router.get("/{project_id}/{year}/{note_section}/prior-year")
+async def get_prior_year_note(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取上年同一附注章节数据，用于前端双列对比。"""
+    engine = DisclosureEngine(db)
+    data = await engine.get_prior_year_data(project_id, year, note_section)
+    return data or {"year": year - 1, "table_data": None, "text_content": None}
 
 
 @router.get("/{project_id}/{year}/{note_section}")

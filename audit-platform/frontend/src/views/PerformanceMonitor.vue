@@ -95,7 +95,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import http from '../utils/http'
+import { api } from '@/services/apiProxy'
 
 const stats = ref<any>({})
 const slowQueries = ref<any[]>([])

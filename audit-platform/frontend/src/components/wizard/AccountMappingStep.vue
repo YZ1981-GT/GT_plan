@@ -154,7 +154,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Right, Connection } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { useWizardStore } from '@/stores/wizard'
 
 const wizardStore = useWizardStore()
@@ -297,11 +297,11 @@ async function handleAutoMatch() {
   if (!wizardStore.projectId) return
   autoMatching.value = true
   try {
-    const { data } = await http.post(
+    const data = await api.post(
       `/api/projects/${wizardStore.projectId}/mapping/auto-match`,
       mappingYear.value != null ? { year: mappingYear.value } : undefined,
     )
-    const result = data.data ?? data
+    const result = data
     const details: MappingSuggestion[] = result.details || []
     matchResultMsg.value = `自动匹配完成：新增 ${result.saved_count} 条，跳过已映射 ${result.skipped_count} 条，未匹配 ${result.unmatched_count} 条，完成率 ${result.completion_rate}%`
 
@@ -330,14 +330,14 @@ async function handleMappingChange(row: TableRow, stdCode: string) {
     let record: MappingRecord
     if (row.mapping_id) {
       // Update existing
-      const { data } = await http.put(
+      const data = await api.put(
         `/api/projects/${wizardStore.projectId}/mapping/${row.mapping_id}`,
         { standard_account_code: stdCode, year: yearPayload },
       )
-      record = data.data ?? data
+      record = data
     } else {
       // Create new
-      const { data } = await http.post(
+      const data = await api.post(
         `/api/projects/${wizardStore.projectId}/mapping`,
         {
           original_account_code: row.account_code,
@@ -347,7 +347,7 @@ async function handleMappingChange(row: TableRow, stdCode: string) {
           year: yearPayload,
         },
       )
-      record = data.data ?? data
+      record = data
     }
     // Update row in-place (no full reload, no flicker)
     row.standard_account_code = record.standard_account_code
@@ -365,19 +365,19 @@ async function handleMappingChange(row: TableRow, stdCode: string) {
 
 async function fetchMappings(): Promise<MappingRecord[]> {
   if (!wizardStore.projectId) return []
-  const { data } = await http.get(
+  const data = await api.get(
     `/api/projects/${wizardStore.projectId}/mapping`,
   )
-  return data.data ?? data
+  return data
 }
 
 async function loadClientAccounts() {
   if (!wizardStore.projectId) return
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${wizardStore.projectId}/account-chart/client`,
     )
-    const tree = data.data ?? data
+    const tree = data
     const flat: AccountItem[] = []
     for (const nodes of Object.values(tree) as AccountItem[][]) {
       flattenTree(nodes, flat)
@@ -404,10 +404,10 @@ function flattenTree(nodes: any[], result: AccountItem[]) {
 async function loadStandardAccounts() {
   if (!wizardStore.projectId) return
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${wizardStore.projectId}/account-chart/standard`,
     )
-    standardAccounts.value = data.data ?? data
+    standardAccounts.value = data
   } catch {
     // Silently fail
   }
@@ -416,10 +416,10 @@ async function loadStandardAccounts() {
 async function loadCompletionRate() {
   if (!wizardStore.projectId) return
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${wizardStore.projectId}/mapping/completion-rate`,
     )
-    const rate = data.data ?? data
+    const rate = data
     mappedCount.value = rate.mapped_count
     totalCount.value = rate.total_count
     completionRate.value = rate.completion_rate

@@ -82,7 +82,7 @@
     </div>
 
     <!-- 编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="editDialogVisible"
       :title="plan ? '编辑审计计划' : '创建审计计划'"
       width="700px"

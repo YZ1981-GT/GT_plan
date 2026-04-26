@@ -61,6 +61,7 @@ class AssignRequest(BaseModel):
 
 class ReviewStatusRequest(BaseModel):
     review_status: str
+    reason: str | None = None  # 退回时必填
 
 
 # ---------------------------------------------------------------------------
@@ -326,9 +327,9 @@ async def submit_review(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """专用提交复核端点 — 统一校验 4 项门禁后流转复核状态
+    """专用提交复核端点 — 统一校验 5 项门禁后流转复核状态
 
-    门禁：1.复核人已分配 2.QC阻断=0 3.未解决批注=0 4.AI未确认=0
+    门禁：1.复核人已分配 2.QC阻断=0 3.未解决批注=0 4.AI未确认=0 5.open复核意见已回复
     全部通过后：
       - 编制状态 → under_review
       - 复核状态 → pending_level1
@@ -401,6 +402,19 @@ async def submit_review(
     if unconfirmed_ai_count > 0:
         blocking_reasons.append(f"{unconfirmed_ai_count} 项未确认的 AI 生成内容")
 
+    # 门禁 5：所有 open 状态的复核意见必须已被 replied
+    from app.models.workpaper_models import ReviewRecord, ReviewCommentStatus
+    open_unreplied = await db.execute(
+        sa.select(sa.func.count()).select_from(ReviewRecord).where(
+            ReviewRecord.working_paper_id == wp_id,
+            ReviewRecord.status == ReviewCommentStatus.open,
+            ReviewRecord.is_deleted == sa.false(),
+        )
+    )
+    unreplied_count = open_unreplied.scalar() or 0
+    if unreplied_count > 0:
+        blocking_reasons.append(f"{unreplied_count} 条复核意见未回复（状态仍为 open）")
+
     if blocking_reasons:
         return {
             "status": "blocked",
@@ -443,7 +457,9 @@ async def update_review_status(
     svc = WorkingPaperService()
     try:
         result = await svc.update_review_status(
-            db=db, wp_id=wp_id, new_review_status=data.review_status, project_id=project_id
+            db=db, wp_id=wp_id, new_review_status=data.review_status,
+            project_id=project_id, reason=data.reason,
+            rejected_by_id=current_user.id,
         )
         await db.commit()
         return result

@@ -1,5 +1,5 @@
 <template>
-  <el-dialog
+  <el-dialog append-to-body
     v-model="dialogVisible"
     :title="isEditMode ? '编辑审计指令' : '新建审计指令'"
     width="600px"

@@ -26,11 +26,27 @@ from app.models.workpaper_models import WorkingPaper
 
 _logger = logging.getLogger(__name__)
 
-# 公式正则
+# ---------------------------------------------------------------------------
+# 公式正则 & FormulaCell（兼容旧 prefill_service 接口）
+# ---------------------------------------------------------------------------
+
 _FORMULA_RE = re.compile(
     r'=(TB|WP|AUX|PREV|SUM_TB)\s*\(([^)]*)\)',
     re.IGNORECASE,
 )
+
+
+class FormulaCell:
+    """Represents a formula cell found during scanning."""
+
+    def __init__(self, sheet: str, cell_ref: str, formula_type: str, raw_args: str):
+        self.sheet = sheet
+        self.cell_ref = cell_ref
+        self.formula_type = formula_type.upper()
+        self.raw_args = raw_args
+
+    def to_dict(self) -> dict:
+        return {"sheet": self.sheet, "cell_ref": self.cell_ref, "formula_type": self.formula_type, "raw_args": self.raw_args}
 
 
 def _parse_args(raw: str) -> list[str]:
@@ -325,3 +341,114 @@ async def parse_workpaper_real(
         "cross_ref_count": len(parsed["cross_refs"]),
         "message": "解析完成",
     }
+
+
+# ---------------------------------------------------------------------------
+# mark_stale — 标记底稿预填数据为过期（从 prefill_service_v2 迁移）
+# ---------------------------------------------------------------------------
+
+async def mark_stale(
+    db: AsyncSession,
+    project_id: UUID,
+    account_codes: list[str] | None = None,
+) -> int:
+    """标记底稿预填数据为过期"""
+    q = (
+        sa.update(WorkingPaper)
+        .where(
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == False,  # noqa: E712
+        )
+        .values(prefill_stale=True)
+    )
+    result = await db.execute(q)
+    return result.rowcount
+
+
+# ---------------------------------------------------------------------------
+# scan_formulas — 从文本列表中扫描公式（兼容旧 PrefillService 接口）
+# ---------------------------------------------------------------------------
+
+def scan_formulas(cell_texts: list[dict]) -> list[FormulaCell]:
+    """Scan a list of cell text entries for formula patterns."""
+    results: list[FormulaCell] = []
+    for entry in cell_texts:
+        text = entry.get("text", "")
+        sheet = entry.get("sheet", "Sheet1")
+        cell_ref = entry.get("cell_ref", "")
+        for match in _FORMULA_RE.finditer(text):
+            results.append(FormulaCell(
+                sheet=sheet, cell_ref=cell_ref,
+                formula_type=match.group(1).upper(),
+                raw_args=match.group(2).strip(),
+            ))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# detect_conflicts — 版本冲突检测（从 prefill_service 迁移）
+# ---------------------------------------------------------------------------
+
+async def detect_conflicts(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_id: UUID,
+    uploaded_version: int,
+) -> dict[str, Any]:
+    """Detect conflicts between uploaded file and server version."""
+    result = await db.execute(
+        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+    )
+    wp = result.scalar_one_or_none()
+    if wp is None:
+        return {"has_conflict": False, "error": "底稿不存在"}
+    current_version = wp.file_version
+    has_conflict = uploaded_version < current_version
+    return {
+        "has_conflict": has_conflict,
+        "uploaded_version": uploaded_version,
+        "server_version": current_version,
+        "conflicts": [] if not has_conflict else [
+            {"message": f"版本冲突: 上传版本 {uploaded_version} < 服务器版本 {current_version}"}
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# 兼容类（供旧测试代码导入，代理到模块级函数）
+# ---------------------------------------------------------------------------
+
+class PrefillService:
+    """兼容旧接口"""
+    def _scan_formulas(self, cell_texts: list[dict]) -> list[FormulaCell]:
+        return scan_formulas(cell_texts)
+
+    async def prefill_workpaper(self, db: AsyncSession, project_id: UUID, year: int, wp_id: UUID) -> dict:
+        return await prefill_workpaper_real(db, project_id, year, wp_id)
+
+    async def batch_prefill(self, db: AsyncSession, project_id: UUID, year: int, wp_ids: list[UUID]) -> dict:
+        import asyncio
+        tasks = [self.prefill_workpaper(db, project_id, year, wid) for wid in wp_ids]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        success, errors = {}, {}
+        for wid, r in zip(wp_ids, results):
+            if isinstance(r, Exception):
+                errors[str(wid)] = str(r)
+            else:
+                success[str(wid)] = r
+        return {"total": len(wp_ids), "success_count": len(success), "error_count": len(errors), "results": success, "errors": errors}
+
+    async def _get_cached_prefill(self, wp_id: UUID) -> dict | None:
+        return None
+
+    async def _set_cached_prefill(self, wp_id: UUID, data: dict) -> None:
+        pass
+
+
+class ParseService:
+    """兼容旧接口"""
+    async def parse_workpaper(self, db: AsyncSession, project_id: UUID, wp_id: UUID) -> dict:
+        return await parse_workpaper_real(db, project_id, wp_id)
+
+    async def detect_conflicts(self, db: AsyncSession, project_id: UUID, wp_id: UUID, uploaded_version: int) -> dict:
+        return await detect_conflicts(db, project_id, wp_id, uploaded_version)

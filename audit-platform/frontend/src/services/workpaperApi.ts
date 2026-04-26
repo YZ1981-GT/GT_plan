@@ -264,8 +264,10 @@ export async function updateWorkpaperStatus(projectId: string, wpId: string, sta
   return data.data ?? data
 }
 
-export async function updateReviewStatus(projectId: string, wpId: string, reviewStatus: string) {
-  const { data } = await http.put(`/api/projects/${projectId}/working-papers/${wpId}/review-status`, { review_status: reviewStatus })
+export async function updateReviewStatus(projectId: string, wpId: string, reviewStatus: string, reason?: string) {
+  const body: Record<string, any> = { review_status: reviewStatus }
+  if (reason) body.reason = reason
+  const { data } = await http.put(`/api/projects/${projectId}/working-papers/${wpId}/review-status`, body)
   return data.data ?? data
 }
 

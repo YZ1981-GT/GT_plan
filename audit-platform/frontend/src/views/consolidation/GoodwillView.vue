@@ -30,7 +30,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑商誉' : '新增商誉'" width="640px">
+    <el-dialog append-to-body v-model="dialogVisible" :title="editing ? '编辑商誉' : '新增商誉'" width="640px">
       <el-form :model="form" label-width="120px">
         <el-form-item label="现金产出单元"><el-input v-model="form.cash_generating_unit" /></el-form-item>
         <el-form-item label="收购项目"><el-input v-model="form.acquisition_name" /></el-form-item>

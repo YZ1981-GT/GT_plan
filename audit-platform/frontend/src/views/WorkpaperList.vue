@@ -114,6 +114,29 @@
               </span>
             </div>
 
+            <!-- 复核人操作区：仅在底稿处于待复核状态时显示 -->
+            <div v-if="isReviewable" class="gt-wp-reviewer-actions" style="margin-top: 16px">
+              <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--gt-color-text)">复核操作</h4>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <el-button type="success" @click="onReviewPass">
+                  {{ selectedWp?.review_status === 'pending_level2' ? '二级复核通过' : '一级复核通过' }}
+                </el-button>
+                <el-button type="warning" @click="onRejectClick">退回修改</el-button>
+              </div>
+            </div>
+
+            <!-- 退回底稿弹窗 -->
+            <el-dialog v-model="showRejectDialog" title="退回底稿" width="450px" append-to-body>
+              <el-input v-model="rejectReason" type="textarea" :rows="3"
+                placeholder="请填写退回原因（必填）" />
+              <template #footer>
+                <el-button @click="showRejectDialog = false">取消</el-button>
+                <el-button type="warning" @click="onConfirmReject" :disabled="!rejectReason.trim()">
+                  确认退回
+                </el-button>
+              </template>
+            </el-dialog>
+
             <!-- 复核批注面板 -->
             <div class="gt-wp-review-section" style="margin-top: 16px">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
@@ -207,17 +230,20 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Download, Monitor, Upload } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import {
+  listWorkpaperAnnotations, createAnnotation, updateAnnotation,
+  checkFeatureFlag, getFeatureMaturity, submitWorkpaperReview,
+  checkUnconfirmedAI,
+} from '@/services/commonApi'
 import {
   checkOnlineEditingAvailability,
   downloadWorkpaper,
   downloadWorkpaperPack,
   uploadWorkpaperFile,
   listWorkpapers, runQCCheck, getQCResults,
-  getWpIndex,
+  getWpIndex, updateReviewStatus,
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
-import { checkUnconfirmedAI } from '@/services/phase10Api'
 
 const route = useRoute()
 const router = useRouter()
@@ -265,6 +291,18 @@ const unresolvedCount = computed(() => annotations.value.filter((a: any) => a.st
 const unconfirmedAiCount = ref(0)
 const showAddAnnotation = ref(false)
 const newAnnotation = ref({ content: '', priority: 'medium' })
+
+// Reject dialog state
+const showRejectDialog = ref(false)
+const rejectReason = ref('')
+const rejectingWpId = ref('')
+
+// Whether the selected workpaper is in a reviewable state (pending_level1 or pending_level2)
+const isReviewable = computed(() => {
+  const rs = selectedWp.value?.review_status
+  return rs === 'pending_level1' || rs === 'level1_in_progress'
+    || rs === 'pending_level2' || rs === 'level2_in_progress'
+})
 
 // Filters
 const filterCycle = ref('')
@@ -582,9 +620,7 @@ async function onSubmitReview() {
   try {
     const currentWpId = selectedWp.value.id
     // 使用专用提交复核端点（后端统一校验 4 项门禁）
-    const { data } = await http.post(
-      `/api/projects/${projectId.value}/working-papers/${selectedWp.value.id}/submit-review`
-    )
+    const data = await submitWorkpaperReview(projectId.value, selectedWp.value.id)
     if (data?.status === 'blocked') {
       ElMessage.warning(`无法提交复核：${(data.blocking_reasons || []).join('；')}`)
       return
@@ -600,17 +636,14 @@ async function onSubmitReview() {
 async function loadAnnotations() {
   if (!selectedWp.value) { annotations.value = []; return }
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/annotations`, {
-      params: { object_type: 'workpaper', object_id: selectedWp.value.id },
-    })
-    annotations.value = Array.isArray(data) ? data : data?.items ?? []
+    annotations.value = await listWorkpaperAnnotations(projectId.value, 'workpaper', selectedWp.value.id)
   } catch { annotations.value = [] }
 }
 
 async function submitAnnotation() {
   if (!selectedWp.value || !newAnnotation.value.content) return
   try {
-    await http.post(`/api/projects/${projectId.value}/annotations`, {
+    await createAnnotation(projectId.value, {
       object_type: 'workpaper',
       object_id: selectedWp.value.id,
       content: newAnnotation.value.content,
@@ -625,20 +658,54 @@ async function submitAnnotation() {
 
 async function resolveAnnotation(id: string) {
   try {
-    await http.put(`/api/annotations/${id}`, { status: 'resolved' })
+    await updateAnnotation(id, { status: 'resolved' })
     ElMessage.success('已标记为解决')
     await loadAnnotations()
     await loadUnconfirmedAi()
   } catch { ElMessage.error('操作失败') }
 }
 
+function onRejectClick() {
+  if (!selectedWp.value) return
+  rejectingWpId.value = selectedWp.value.id
+  rejectReason.value = ''
+  showRejectDialog.value = true
+}
+
+async function onConfirmReject() {
+  if (!rejectingWpId.value || !rejectReason.value.trim()) return
+  const rs = selectedWp.value?.review_status
+  const rejectStatus = (rs === 'pending_level2' || rs === 'level2_in_progress')
+    ? 'level2_rejected' : 'level1_rejected'
+  try {
+    await updateReviewStatus(projectId.value, rejectingWpId.value, rejectStatus, rejectReason.value)
+    showRejectDialog.value = false
+    ElMessage.success('已退回')
+    await fetchData()
+    await selectWorkpaperById(rejectingWpId.value)
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || '退回失败')
+  }
+}
+
+async function onReviewPass() {
+  if (!selectedWp.value) return
+  const rs = selectedWp.value.review_status
+  const passStatus = (rs === 'pending_level2' || rs === 'level2_in_progress')
+    ? 'level2_passed' : 'level1_passed'
+  try {
+    await updateReviewStatus(projectId.value, selectedWp.value.id, passStatus)
+    ElMessage.success('复核通过')
+    await fetchData()
+    await selectWorkpaperById(selectedWp.value.id)
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || '操作失败')
+  }
+}
+
 async function refreshOnlineEditState() {
   try {
-    const { data } = await http.get('/api/feature-flags/check/online_editing', {
-      params: { project_id: projectId.value },
-    })
-    const result = data?.data ?? data
-    onlineEditEnabled.value = result?.enabled ?? true
+    onlineEditEnabled.value = await checkFeatureFlag('online_editing', projectId.value)
   } catch {
     onlineEditEnabled.value = true
   }
@@ -667,8 +734,8 @@ watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
   await fetchData()
   try {
-    const { data } = await http.get('/api/feature-flags/maturity')
-    onlineEditMaturity.value = data?.online_editing || 'pilot'
+    const maturity = await getFeatureMaturity()
+    onlineEditMaturity.value = maturity?.online_editing || 'pilot'
   } catch { /* 默认 pilot */ }
   await refreshOnlineEditState()
   await handleUploadRedirect()

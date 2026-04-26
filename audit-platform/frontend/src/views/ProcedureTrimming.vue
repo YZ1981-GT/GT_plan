@@ -85,7 +85,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import {
+  getProcedures, updateProcedureTrim, initProcedures,
+  addCustomProcedure, applyProcedureScheme,
+} from '@/services/commonApi'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -127,12 +130,9 @@ function execLabel(s: string) {
 async function loadProcedures() {
   loading.value = true
   try {
-    // 先尝试获取，没有则初始化
-    let { data } = await http.get(`/api/projects/${projectId.value}/procedures/${activeCycle.value}`)
-    let procs = data.data ?? data
+    let procs = await getProcedures(projectId.value, activeCycle.value)
     if (!procs || procs.length === 0) {
-      const initRes = await http.post(`/api/projects/${projectId.value}/procedures/${activeCycle.value}/init`)
-      procs = (initRes.data.data ?? initRes.data).procedures || []
+      procs = await initProcedures(projectId.value, activeCycle.value)
     }
     procedures.value = procs
   } finally { loading.value = false }
@@ -141,9 +141,8 @@ async function loadProcedures() {
 async function saveTrim() {
   saving.value = true
   try {
-    await http.put(`/api/projects/${projectId.value}/procedures/${activeCycle.value}/trim`, {
-      items: procedures.value.map(p => ({ id: p.id, status: p.status, skip_reason: p.skip_reason })),
-    })
+    await updateProcedureTrim(projectId.value, activeCycle.value,
+      procedures.value.map(p => ({ id: p.id, status: p.status, skip_reason: p.skip_reason })))
     ElMessage.success('裁剪已保存')
   } finally { saving.value = false }
 }
@@ -151,18 +150,14 @@ async function saveTrim() {
 async function addCustom() {
   const name = prompt('请输入自定义程序名称')
   if (!name) return
-  const { data } = await http.post(`/api/projects/${projectId.value}/procedures/${activeCycle.value}/custom`, {
-    procedure_name: name,
-  })
-  procedures.value.push(data.data ?? data)
+  const newProc = await addCustomProcedure(projectId.value, activeCycle.value, { procedure_name: name })
+  procedures.value.push(newProc)
 }
 
 async function applyRef() {
   if (!refProjectId.value) return
   try {
-    await http.post(`/api/projects/${projectId.value}/procedures/${activeCycle.value}/apply-scheme`, null, {
-      params: { source_project_id: refProjectId.value },
-    })
+    await applyProcedureScheme(projectId.value, activeCycle.value, refProjectId.value)
     ElMessage.success('已应用参照方案')
     showRefDialog.value = false
     await loadProcedures()

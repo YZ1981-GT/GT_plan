@@ -22,6 +22,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.consolidation_models import (
     Company,
@@ -72,7 +73,7 @@ class ConsolDisclosureService:
     3. 与 Phase 1 附注体系的整合
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     # ------------------------------------------------------------------
@@ -732,7 +733,7 @@ class ConsolDisclosureService:
 
 
 def generate_consol_notes_sync(
-    db: Session,
+    db: AsyncSession,
     project_id: UUID,
     year: int,
 ) -> list[ConsolDisclosureSection]:
@@ -742,7 +743,7 @@ def generate_consol_notes_sync(
 
 
 def integrate_consol_notes_sync(
-    db: Session,
+    db: AsyncSession,
     project_id: UUID,
     year: int,
     existing_notes: list[dict] | None = None,
@@ -753,7 +754,7 @@ def integrate_consol_notes_sync(
 
 
 def save_consol_notes_sync(
-    db: Session,
+    db: AsyncSession,
     project_id: UUID,
     year: int,
     sections: list[ConsolDisclosureSection],

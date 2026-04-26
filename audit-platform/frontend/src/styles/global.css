@@ -89,13 +89,13 @@ body {
   background: #faf9fc;
 }
 
-/* 表格外边框圆角 */
+/* 表格外边框圆角 + 更细腻 */
 .el-table--border::after,
 .el-table--border::before {
   display: none;
 }
 .el-table--border {
-  border: 1px solid var(--gt-color-border-light);
+  border: 0.5px solid rgba(75, 45, 119, 0.08);
 }
 
 .el-table .el-table__empty-text {
@@ -112,9 +112,8 @@ body {
   transform: scale(1.001);
 }
 
-/* 按钮 — 圆角更柔和，hover 微上浮 */
+/* 按钮 — hover 微上浮（圆角由 gt-polish.css 统一控制） */
 .el-button {
-  border-radius: var(--gt-radius-sm);
   font-weight: 500;
   transition: all var(--gt-transition-base);
   letter-spacing: 0.2px;

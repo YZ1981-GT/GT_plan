@@ -85,7 +85,7 @@ import { ElMessage } from 'element-plus'
 import {
   listConversations, getMessages, sendMessage, closeConversation,
   exportConversation, createConversation, type ConversationItem,
-} from '@/services/enhancedApi'
+} from '@/services/commonApi'
 
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')

@@ -41,7 +41,7 @@
           <el-button link type="primary" size="small" @click="viewDetail(row)">详情</el-button>
           <template v-if="row.filing_status === 'rejected' || row.error_message">
             <el-button link type="warning" size="small" @click="showError(row)">错误</el-button>
-            <el-button link type="success" size="small" @click="retryFiling(row)">重试</el-button>
+            <el-button link type="success" size="small" @click="retryFilingFn(row)">重试</el-button>
           </template>
         </template>
       </el-table-column>
@@ -63,7 +63,7 @@ import FilingStatus from '@/components/extension/FilingStatus.vue'
 import FilingError from '@/components/extension/FilingError.vue'
 import CICPAReportForm from '@/components/extension/CICPAReportForm.vue'
 import ArchivalStandardForm from '@/components/extension/ArchivalStandardForm.vue'
-import http from '@/utils/http'
+import { listFilings, retryFiling as retryFilingApi } from '@/services/commonApi'
 
 const loading = ref(false)
 const filings = ref<any[]>([])
@@ -80,8 +80,7 @@ async function loadFilings() {
     const params: any = {}
     if (filterType.value) params.filing_type = filterType.value
     if (filterStatus.value) params.filing_status = filterStatus.value
-    const { data } = await http.get('/api/regulatory/filings', { params })
-    filings.value = data.data ?? data ?? []
+    filings.value = await listFilings(params)
   } catch { filings.value = [] }
   finally { loading.value = false }
 }
@@ -95,9 +94,9 @@ function showError(row: any) {
   showErrorDialog.value = true
 }
 
-async function retryFiling(row: any) {
+async function retryFilingFn(row: any) {
   try {
-    await http.post(`/api/regulatory/filings/${row.id}/retry`)
+    await retryFilingApi(row.id)
     ElMessage.success('重试请求已提交')
     loadFilings()
   } catch { ElMessage.error('重试失败') }

@@ -40,7 +40,7 @@
 import { ref, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { listCustomTemplates, copyCustomTemplate } from '@/services/commonApi'
 
 const loading = ref(false)
 const templates = ref<any[]>([])
@@ -51,8 +51,7 @@ async function loadTemplates() {
   try {
     const params: any = { published: true }
     if (searchQuery.value) params.search = searchQuery.value
-    const { data } = await http.get('/api/custom-templates', { params })
-    templates.value = (data.data ?? data ?? []).map((t: any) => ({ ...t, _copying: false }))
+    templates.value = (await listCustomTemplates(params)).map((t: any) => ({ ...t, _copying: false }))
   } catch { templates.value = [] }
   finally { loading.value = false }
 }
@@ -60,7 +59,7 @@ async function loadTemplates() {
 async function copyToMine(t: any) {
   t._copying = true
   try {
-    await http.post(`/api/custom-templates/${t.id}/copy`)
+    await copyCustomTemplate(t.id)
     ElMessage.success('已复制到我的模板')
   } catch { ElMessage.error('复制失败') }
   finally { t._copying = false }

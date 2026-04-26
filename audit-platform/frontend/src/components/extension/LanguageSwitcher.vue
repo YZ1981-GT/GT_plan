@@ -25,7 +25,7 @@ import { computed } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from '@/i18n'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = withDefaults(defineProps<{
   userId?: string
@@ -50,7 +50,7 @@ async function switchLanguage(lang: string) {
 
   if (props.userId) {
     try {
-      await http.put(`/api/users/${props.userId}/language`, { language: lang })
+      await api.put(`/api/users/${props.userId}/language`, { language: lang })
     } catch {
       // 静默失败，本地已保存
     }

@@ -28,7 +28,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   modelValue: boolean
@@ -70,7 +70,7 @@ async function onSave() {
   }
   saving.value = true
   try {
-    await http.put(`/api/ai-plugins/${props.plugin.id}/config`, { config: parsed })
+    await api.put(`/api/ai-plugins/${props.plugin.id}/config`, { config: parsed })
     ElMessage.success('配置已保存')
     emit('saved')
     visible.value = false

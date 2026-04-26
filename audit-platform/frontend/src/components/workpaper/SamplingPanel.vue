@@ -84,7 +84,7 @@
     </el-tabs>
 
     <!-- 新建/编辑配置对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="showConfigDialog"
       :title="editingConfig ? '编辑抽样配置' : '新建抽样配置'"
       width="560px"
@@ -148,7 +148,7 @@
     </el-dialog>
 
     <!-- 新建/编辑记录对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="showRecordDialog"
       :title="editingRecord ? '编辑抽样记录' : '新建抽样记录'"
       width="560px"

@@ -17,7 +17,7 @@
     </el-tabs>
 
     <!-- 抵消分录详情弹窗（从试算表点击抵消列触发） -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="detailVisible"
       title="抵消分录明细"
       width="900px"

@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Connection } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { listProjects } from '@/services/commonApi'
 
 const loading = ref(false)
 const projects = ref<any[]>([])
@@ -53,8 +53,7 @@ function statusLabel(s: string) {
 onMounted(async () => {
   loading.value = true
   try {
-    const { data } = await http.get('/api/projects')
-    const all = Array.isArray(data) ? data : data?.items || []
+    const all = await listProjects()
     // 筛选合并项目（report_scope=consolidated 或有子项目）
     projects.value = all.filter((p: any) =>
       p.report_scope === 'consolidated' || p.parent_project_id === null && p.consol_level > 0

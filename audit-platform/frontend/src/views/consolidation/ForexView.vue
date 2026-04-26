@@ -28,7 +28,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editing ? '编辑折算' : '新增折算'" width="600px">
+    <el-dialog append-to-body v-model="dialogVisible" :title="editing ? '编辑折算' : '新增折算'" width="600px">
       <el-form :model="form" label-width="110px">
         <el-form-item label="主体"><el-input v-model="form.entity_name" /></el-form-item>
         <el-form-item label="外币"><el-input v-model="form.currency" /></el-form-item>

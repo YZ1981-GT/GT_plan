@@ -31,7 +31,7 @@
     </el-table>
 
     <!-- 编辑器弹窗 -->
-    <el-dialog v-model="showEditor" :title="`T型账户 - ${currentAccount?.account_name || ''}`" width="800px" destroy-on-close>
+    <el-dialog append-to-body v-model="showEditor" :title="`T型账户 - ${currentAccount?.account_name || ''}`" width="800px" destroy-on-close>
       <div class="gt-editor-layout" v-if="currentAccount">
         <TAccountEditor
           :account-name="currentAccount.account_name"
@@ -47,7 +47,7 @@
     </el-dialog>
 
     <!-- 新建弹窗 -->
-    <el-dialog v-model="showCreate" title="新建T型账户" width="500px">
+    <el-dialog append-to-body v-model="showCreate" title="新建T型账户" width="500px">
       <el-form label-width="100px" size="small">
         <el-form-item label="科目编号">
           <el-input v-model="newAccount.account_code" placeholder="如 1601" />
@@ -81,7 +81,10 @@ import { ElMessage } from 'element-plus'
 import TAccountEditor from '@/components/extension/TAccountEditor.vue'
 import TAccountEntryForm from '@/components/extension/TAccountEntryForm.vue'
 import TAccountResult from '@/components/extension/TAccountResult.vue'
-import http from '@/utils/http'
+import {
+  listTAccounts, getTAccount, createTAccount,
+  addTAccountEntry, calculateTAccount,
+} from '@/services/commonApi'
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
@@ -106,8 +109,7 @@ async function loadAccounts() {
   if (!projectId.value) return
   loading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/t-accounts`)
-    accounts.value = data.data ?? data ?? []
+    accounts.value = await listTAccounts(projectId.value)
   } catch { accounts.value = [] }
   finally { loading.value = false }
 }
@@ -120,8 +122,7 @@ async function openEditor(row: any) {
   currentAccount.value = row
   calcResult.value = null
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/t-accounts/${row.id}`)
-    const detail = data.data ?? data
+    const detail = await getTAccount(projectId.value, row.id)
     currentEntries.value = detail.entries ?? []
   } catch { currentEntries.value = [] }
   showEditor.value = true
@@ -130,19 +131,16 @@ async function openEditor(row: any) {
 async function addEntry(entry: any) {
   if (!currentAccount.value) return
   try {
-    await http.post(`/api/projects/${projectId.value}/t-accounts/${currentAccount.value.id}/entries`, entry)
+    await addTAccountEntry(projectId.value, currentAccount.value.id, entry)
     ElMessage.success('分录已添加')
-    // Reload entries
-    const { data } = await http.get(`/api/projects/${projectId.value}/t-accounts/${currentAccount.value.id}`)
-    const detail = data.data ?? data
+    const detail = await getTAccount(projectId.value, currentAccount.value.id)
     currentEntries.value = detail.entries ?? []
   } catch { ElMessage.error('添加失败') }
 }
 
 async function calculate(row: any) {
   try {
-    const { data } = await http.post(`/api/projects/${projectId.value}/t-accounts/${row.id}/calculate`)
-    calcResult.value = data.data ?? data
+    calcResult.value = await calculateTAccount(projectId.value, row.id)
     ElMessage.success('计算完成')
   } catch { ElMessage.error('计算失败') }
 }
@@ -151,7 +149,7 @@ async function createAccount() {
   if (!projectId.value) return
   creating.value = true
   try {
-    await http.post(`/api/projects/${projectId.value}/t-accounts`, newAccount.value)
+    await createTAccount(projectId.value, newAccount.value)
     ElMessage.success('T型账户已创建')
     showCreate.value = false
     loadAccounts()

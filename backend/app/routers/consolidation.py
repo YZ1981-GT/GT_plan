@@ -3,9 +3,10 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import sync_db, get_current_user
+from app.deps import get_current_user
+from app.core.database import get_db
 from app.models.consolidation_models import EliminationEntryType, ReviewStatusEnum
 from app.models.consolidation_schemas import (
     EliminationCreate,
@@ -28,53 +29,53 @@ router = APIRouter(prefix="/api/consolidation/eliminations", tags=["合并抵消
 
 
 @router.get("", response_model=list[EliminationEntryResponse])
-def list_eliminations(
+async def list_eliminations(
     project_id: UUID,
     year: int | None = None,
     entry_type: EliminationEntryType | None = None,
     review_status: ReviewStatusEnum | None = None,
-    db: Session = Depends(sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    return get_entries(db, project_id, year, entry_type, review_status)
+    return await get_entries(db, project_id, year, entry_type, review_status)
 
 
 @router.post("", response_model=EliminationEntryResponse, status_code=201)
-def create_elimination(
+async def create_elimination(
     project_id: UUID,
     data: EliminationCreate,
-    db: Session = Depends(sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     try:
-        return create_entry(db, project_id, data)
+        return await create_entry(db, project_id, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/{entry_id}", response_model=EliminationEntryResponse)
-def get_elimination(
+async def get_elimination(
     entry_id: UUID,
     project_id: UUID,
-    db: Session = Depends(sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    entry = get_entry(db, entry_id, project_id)
+    entry = await get_entry(db, entry_id, project_id)
     if not entry:
         raise HTTPException(status_code=404, detail="抵消分录不存在")
     return entry
 
 
 @router.put("/{entry_id}", response_model=EliminationEntryResponse)
-def update_elimination(
+async def update_elimination(
     entry_id: UUID,
     project_id: UUID,
     data: EliminationEntryUpdate,
-    db: Session = Depends(sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     try:
-        entry = update_entry(db, entry_id, project_id, data)
+        entry = await update_entry(db, entry_id, project_id, data)
         if not entry:
             raise HTTPException(status_code=404, detail="抵消分录不存在")
         return entry
@@ -83,29 +84,29 @@ def update_elimination(
 
 
 @router.delete("/{entry_id}", status_code=204)
-def delete_elimination(
+async def delete_elimination(
     entry_id: UUID,
     project_id: UUID,
-    db: Session = Depends(sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     try:
-        if not delete_entry(db, entry_id, project_id):
+        if not await delete_entry(db, entry_id, project_id):
             raise HTTPException(status_code=404, detail="抵消分录不存在")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{entry_id}/review", response_model=EliminationEntryResponse)
-def review_elimination(
+async def review_elimination(
     entry_id: UUID,
     project_id: UUID,
     action: EliminationReviewAction,
-    db: Session = Depends(sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     try:
-        entry = change_review_status(db, entry_id, project_id, action, user.id)
+        entry = await change_review_status(db, entry_id, project_id, action, user.id)
         if not entry:
             raise HTTPException(status_code=404, detail="抵消分录不存在")
         return entry
@@ -114,10 +115,10 @@ def review_elimination(
 
 
 @router.get("/summary/year", response_model=list[EliminationSummary])
-def elimination_summary(
+async def elimination_summary(
     project_id: UUID,
     year: int,
-    db: Session = Depends(sync_db),
+    db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    return get_summary(db, project_id, year)
+    return await get_summary(db, project_id, year)

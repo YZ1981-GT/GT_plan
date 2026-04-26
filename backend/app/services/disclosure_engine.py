@@ -365,3 +365,60 @@ class DisclosureEngine:
             payload.project_id, year, payload.account_codes,
         )
         await self.db.flush()
+
+    # ------------------------------------------------------------------
+    # 上年数据查询（Phase 11 Task 5.1 / 5.2）
+    # ------------------------------------------------------------------
+    async def get_prior_year_data(
+        self, project_id: UUID, year: int, note_section: str,
+    ) -> dict | None:
+        """查询上年（year-1）同一附注章节的 table_data，用于前端双列对比。"""
+        prior_year = year - 1
+        result = await self.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == prior_year,
+                DisclosureNote.note_section == note_section,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+        note = result.scalar_one_or_none()
+        if note:
+            return {
+                "year": prior_year,
+                "table_data": note.table_data,
+                "text_content": note.text_content,
+            }
+        # 兜底：从上年试算表取审定数
+        return await self._get_prior_from_trial_balance(project_id, prior_year, note_section)
+
+    async def _get_prior_from_trial_balance(
+        self, project_id: UUID, year: int, note_section: str,
+    ) -> dict | None:
+        """从上年试算表取审定数，构造简化的上年数据。"""
+        # 通过 note_section 找到关联的科目编码（从种子数据映射）
+        seed = _load_seed_data()
+        account_codes: list[str] = []
+        for section in seed.get("sections", []):
+            if section.get("note_section") == note_section:
+                account_codes = section.get("account_codes", [])
+                break
+        if not account_codes:
+            return None
+
+        result = await self.db.execute(
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.audited_amount,
+            ).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.standard_account_code.in_(account_codes),
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )
+        rows = result.all()
+        if not rows:
+            return None
+        amounts = {r.standard_account_code: float(r.audited_amount or 0) for r in rows}
+        return {"year": year, "table_data": None, "amounts": amounts}

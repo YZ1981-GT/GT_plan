@@ -25,10 +25,11 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import get_current_user, require_project_access, get_user_scope_cycles
 from app.models.core import User
 from app.core.redis import get_redis
 from app.services.ledger_penetration_service import LedgerPenetrationService
+from app.services.mapping_service import get_codes_by_cycles
 
 router = APIRouter(prefix="/api/projects/{project_id}/ledger", tags=["ledger-penetration"])
 
@@ -68,7 +69,15 @@ async def get_balance(
 ):
     """科目余额汇总"""
     svc = _svc(db, None)
-    return await svc.get_balance_summary(project_id, year, account_code)
+    rows = await svc.get_balance_summary(project_id, year, account_code)
+
+    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None:
+        allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
+        rows = [r for r in rows if r.get("account_code") in allowed_codes]
+
+    return rows
 
 
 @router.get("/opening-balance/{account_code}")

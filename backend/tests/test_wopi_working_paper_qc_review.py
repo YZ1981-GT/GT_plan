@@ -288,14 +288,6 @@ class TestWorkingPaperService:
         assert detail is None
 
     @pytest.mark.asyncio
-    async def test_download_for_offline(self, db_session, seeded_db):
-        from app.services.working_paper_service import WorkingPaperService
-        svc = WorkingPaperService()
-        result = await svc.download_for_offline(db_session, seeded_db["wp1"].id)
-        assert result["file_version"] == 1
-        assert "file_path" in result
-
-    @pytest.mark.asyncio
     async def test_upload_offline_edit_success(self, db_session, seeded_db):
         from app.services.working_paper_service import WorkingPaperService
         svc = WorkingPaperService()

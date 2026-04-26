@@ -43,7 +43,10 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import TemplateUpload from '@/components/extension/TemplateUpload.vue'
 import TemplateValidator from '@/components/extension/TemplateValidator.vue'
-import http from '@/utils/http'
+import {
+  getCustomTemplate, createCustomTemplate, updateCustomTemplate,
+  validateCustomTemplate,
+} from '@/services/commonApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,8 +75,7 @@ const rules: FormRules = {
 async function loadTemplate() {
   if (isNew.value) return
   try {
-    const { data } = await http.get(`/api/custom-templates/${templateId.value}`)
-    const t = data.data ?? data
+    const t = await getCustomTemplate(templateId.value)
     form.value.template_name = t.template_name
     form.value.category = t.category
     form.value.version = t.version
@@ -94,10 +96,10 @@ async function onSave() {
     if (form.value.file) fd.append('file', form.value.file)
 
     if (isNew.value) {
-      await http.post('/api/custom-templates', fd)
+      await createCustomTemplate(fd)
       ElMessage.success('模板创建成功')
     } else {
-      await http.put(`/api/custom-templates/${templateId.value}`, fd)
+      await updateCustomTemplate(templateId.value, fd)
       ElMessage.success('模板更新成功')
     }
     router.push('/extension/custom-templates')
@@ -108,8 +110,7 @@ async function onSave() {
 async function onValidate() {
   validating.value = true
   try {
-    const { data } = await http.post(`/api/custom-templates/${templateId.value}/validate`)
-    validationResult.value = data.data ?? data
+    validationResult.value = await validateCustomTemplate(templateId.value)
   } catch { ElMessage.error('验证请求失败') }
   finally { validating.value = false }
 }

@@ -17,7 +17,9 @@
         </el-select>
         <el-button @click="onRefreshFromWP" :loading="refreshLoading" size="small">从底稿刷新</el-button>
         <el-button @click="onGenerate" :loading="genLoading">生成附注</el-button>
-        <el-button @click="onValidate" :loading="validateLoading" type="warning">执行校验</el-button>
+        <el-tooltip content="当前仅支持余额核对和子项校验，其他校验规则开发中" placement="top">
+          <el-button @click="onValidate" :loading="validateLoading" type="warning">执行校验</el-button>
+        </el-tooltip>
         <el-button @click="onExportWord" :loading="exportLoading" type="primary">导出 Word</el-button>
       </div>
     </div>
@@ -61,7 +63,11 @@
                       <div class="gt-cell-wrapper">
                         <el-input-number v-if="editMode && !row.is_total"
                           v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
-                          size="small" style="width: 100%" />
+                          size="small" style="width: 100%"
+                          @change="onCellValueChange($index, Number(hiRaw) - 1, $event)" />
+                        <span v-else-if="row.is_total" :class="{ 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }">
+                          {{ fmtAmt(getCellValue(row, Number(hiRaw) - 1)) }}
+                        </span>
                         <span v-else :class="{ 'total-val': row.is_total }">
                           {{ fmtAmt(getCellValue(row, Number(hiRaw) - 1)) }}
                         </span>
@@ -69,6 +75,12 @@
                         <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
                       </div>
                     </template>
+                  </template>
+                </el-table-column>
+                <!-- 上年数据列 -->
+                <el-table-column v-if="priorYearNote?.table_data" label="上年数" width="120" align="right">
+                  <template #default="{ $index }">
+                    <span class="gt-prior-year-val">{{ fmtAmt(getPriorYearValue(currentNote.table_data.rows[$index], $index)) }}</span>
                   </template>
                 </el-table-column>
               </el-table>
@@ -128,7 +140,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -137,6 +149,7 @@ import {
   updateDisclosureNote, validateDisclosureNotes, getValidationResults,
   type DisclosureNoteTreeItem, type DisclosureNoteDetail, type NoteValidationFinding,
 } from '@/services/auditPlatformApi'
+import { api } from '@/services/apiProxy'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -159,7 +172,7 @@ const noteList = ref<DisclosureNoteTreeItem[]>([])
 const currentNote = ref<DisclosureNoteDetail | null>(null)
 const textContent = ref('')
 const validationFindings = ref<NoteValidationFinding[]>([])
-
+const priorYearNote = ref<any>(null)
 // TipTap 编辑器
 const editor = useEditor({
   extensions: [
@@ -211,10 +224,63 @@ function getCellMode(row: any, colIdx: number): string {
   return ''
 }
 
+function getPriorYearValue(row: any, rowIndex: number): any {
+  if (!priorYearNote.value?.table_data?.rows) return null
+  const priorRow = priorYearNote.value.table_data.rows[rowIndex]
+  if (!priorRow) return null
+  const values = priorRow.values || priorRow.cells || []
+  return values[0] ?? null
+}
+
+function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number) {
+  if (!currentNote.value?.table_data?.rows) return
+  const rows = currentNote.value.table_data.rows
+  const totalRowIndex = rows.findIndex((r: any) => r.is_total)
+  if (totalRowIndex < 0) return
+  // 纵向合计：所有非合计行的同列求和
+  let sum = 0
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].is_total) continue
+    const vals = rows[i].values || []
+    sum += parseFloat(vals[colIndex]) || 0
+  }
+  if (!rows[totalRowIndex].values) rows[totalRowIndex].values = []
+  rows[totalRowIndex].values[colIndex] = sum
+  // 横向公式
+  recalcHorizontalFormula(rowIndex)
+}
+
+function recalcHorizontalFormula(rowIndex: number) {
+  const row = currentNote.value?.table_data?.rows?.[rowIndex]
+  if (!row || !row.formula_type) return
+  if (row.formula_type === 'opening_plus_changes') {
+    const vals = row.values || []
+    if (vals.length >= 3) {
+      const opening = parseFloat(vals[0]) || 0
+      let changes = 0
+      for (let i = 1; i < vals.length - 1; i++) changes += parseFloat(vals[i]) || 0
+      vals[vals.length - 1] = opening + changes
+    }
+  }
+}
+
+function isFormulaMismatch(row: any, colIdx: number): boolean {
+  if (!row.is_total || !currentNote.value?.table_data?.rows) return false
+  const rows = currentNote.value.table_data.rows
+  let expected = 0
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].is_total) continue
+    const vals = rows[i].values || []
+    expected += parseFloat(vals[colIdx]) || 0
+  }
+  const actual = parseFloat((row.values || [])[colIdx]) || 0
+  return Math.abs(expected - actual) > 0.01
+}
+
 async function onRefreshFromWP() {
   refreshLoading.value = true
   try {
-    await http.post(`/api/disclosure-notes/${projectId.value}/${year.value}/refresh-from-workpapers`)
+    await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     ElMessage.success('已从底稿刷新数据')
     if (currentNote.value) await fetchDetail(currentNote.value.note_section)
   } catch { ElMessage.error('刷新失败') }
@@ -242,8 +308,7 @@ async function fetchTree() {
 
 async function loadProjectTemplateConfig() {
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/wizard`)
-    const state = data.data ?? data
+    const state = await getProjectWizardState(projectId.value)
     const basicInfo = state?.steps?.basic_info?.data || state?.basic_info?.data || {}
     customTemplateId.value = basicInfo.custom_template_id || ''
     customTemplateName.value = basicInfo.custom_template_name || ''
@@ -273,6 +338,12 @@ async function fetchDetail(noteSection: string) {
   currentNote.value = await getDisclosureNoteDetail(projectId.value, year.value, noteSection)
   textContent.value = currentNote.value.text_content || ''
   if (editor.value) editor.value.commands.setContent(textContent.value)
+  // 并行加载上年数据
+  try {
+    priorYearNote.value = await api.get(
+      `/api/disclosure-notes/${projectId.value}/${year.value}/${noteSection}/prior-year`
+    )
+  } catch { priorYearNote.value = null }
 }
 
 async function onGenerate() {
@@ -360,4 +431,6 @@ onMounted(async () => {
 .gt-de-tiptap-content { padding: 12px; min-height: 200px; }
 .gt-de-tiptap-content :deep(.ProseMirror) { outline: none; min-height: 180px; }
 .gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: #adb5bd; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
+.gt-prior-year-val { color: var(--gt-color-text-tertiary); font-style: italic; font-size: 12px; }
+.gt-formula-mismatch { color: var(--gt-color-coral, #FF5149) !important; font-weight: 700; text-decoration: underline wavy var(--gt-color-coral, #FF5149); }
 </style>

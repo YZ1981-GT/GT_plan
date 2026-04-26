@@ -33,7 +33,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import GTWPCodingTree from '@/components/extension/GTWPCodingTree.vue'
-import http from '@/utils/http'
+import { listGTCoding } from '@/services/commonApi'
 
 const loading = ref(false)
 const codingData = ref<any[]>([])
@@ -42,8 +42,7 @@ const selectedNode = ref<any>(null)
 async function loadCoding() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/gt-coding')
-    codingData.value = data.data ?? data ?? []
+    codingData.value = await listGTCoding()
   } catch { codingData.value = [] }
   finally { loading.value = false }
 }

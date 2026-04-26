@@ -70,7 +70,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import ProjectTreeNode from './ProjectTreeNode.vue'
 
 interface ProjectItem {
@@ -178,7 +178,7 @@ async function confirmDeleteOne(project: any) {
       '删除确认',
       { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
     )
-    await http.delete(`/api/projects/${project.id}`)
+    await api.delete(`/api/projects/${project.id}`)
     ElMessage.success('项目已删除')
     projects.value = projects.value.filter(p => p.id !== project.id)
     checkedIds.value = checkedIds.value.filter(i => i !== project.id)
@@ -193,7 +193,7 @@ async function confirmBatchDelete() {
       '批量删除确认',
       { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
     )
-    await http.post('/api/projects/batch-delete', { project_ids: checkedIds.value })
+    await api.post('/api/projects/batch-delete', { project_ids: checkedIds.value })
     ElMessage.success(`已删除 ${checkedIds.value.length} 个项目`)
     projects.value = projects.value.filter(p => !checkedIds.value.includes(p.id))
     if (selectedId.value && checkedIds.value.includes(selectedId.value)) selectedId.value = null
@@ -204,8 +204,8 @@ async function confirmBatchDelete() {
 async function loadProjects() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/projects')
-    projects.value = data.data ?? data ?? []
+    const data = await api.get('/api/projects')
+    projects.value = data ?? []
   } catch { /* ignore */ }
   finally { loading.value = false }
 }

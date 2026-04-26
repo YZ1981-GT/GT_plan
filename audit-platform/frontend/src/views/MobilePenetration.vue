@@ -59,7 +59,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowRight } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { getLedgerBalance, getLedgerEntries } from '@/services/commonApi'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -91,10 +91,7 @@ async function loadBalance() {
   if (!projectId.value) return
   loading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/ledger/balance`, {
-      params: { year: year.value },
-    })
-    items.value = data.data ?? data ?? []
+    items.value = await getLedgerBalance(projectId.value, year.value)
   } catch { items.value = [] }
   finally { loading.value = false }
 }
@@ -103,11 +100,7 @@ async function onDrill(item: any) {
   detailCode.value = item.account_code
   showDetail.value = true
   try {
-    const { data } = await http.get(
-      `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(item.account_code)}`,
-      { params: { year: year.value, page: 1, page_size: 50 } }
-    )
-    const result = data.data ?? data
+    const result = await getLedgerEntries(projectId.value, item.account_code, year.value)
     detailItems.value = result.items ?? result ?? []
   } catch { detailItems.value = [] }
 }

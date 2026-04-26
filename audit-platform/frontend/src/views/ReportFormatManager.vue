@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listFormatTemplates, createFormatTemplate } from '@/services/enhancedApi'
+import { listFormatTemplates, createFormatTemplate } from '@/services/commonApi'
 const templates = ref<any[]>([])
 const showCreate = ref(false)
 const form = ref({ template_name: '', template_type: 'audit_report', config: { font: '仿宋_GB2312', font_size: 12 } })

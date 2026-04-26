@@ -33,7 +33,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Paperclip } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { listProjects } from '@/services/commonApi'
 
 const loading = ref(false)
 const projects = ref<any[]>([])
@@ -48,8 +48,7 @@ function statusLabel(s: string) {
 onMounted(async () => {
   loading.value = true
   try {
-    const { data } = await http.get('/api/projects')
-    projects.value = Array.isArray(data) ? data : data?.items || []
+    projects.value = await listProjects()
   } catch { projects.value = [] }
   finally { loading.value = false }
 })

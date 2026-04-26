@@ -103,7 +103,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import http from '@/utils/http'
+import { listProjects, getMyAssignments } from '@/services/commonApi'
 import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
@@ -215,8 +215,7 @@ onMounted(async () => {
 
   // 加载项目统计
   try {
-    const { data } = await http.get('/api/projects')
-    const list = Array.isArray(data) ? data : data?.items || []
+    const list = await listProjects()
     stats.total = list.length
     stats.inProgress = list.filter((p: any) => ['execution', 'planning'].includes(p.status)).length
     stats.pendingReview = list.filter((p: any) => p.status === 'completion').length
@@ -227,8 +226,7 @@ onMounted(async () => {
 
   // 加载今日日程
   try {
-    const { data } = await http.get('/api/projects/my/assignments')
-    todaySchedule.value = Array.isArray(data) ? data.slice(0, 6) : []
+    todaySchedule.value = (await getMyAssignments()).slice(0, 6)
   } catch { /* ignore */ }
   loadingSchedule.value = false
 })

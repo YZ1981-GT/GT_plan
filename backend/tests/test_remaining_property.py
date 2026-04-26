@@ -57,11 +57,11 @@ class TestPrefillParseProperty:
     """7.5 预填充-解析往返"""
 
     def test_prefill_service_exists(self):
-        from app.services.prefill_service import PrefillService
+        from app.services.prefill_engine import PrefillService
         assert hasattr(PrefillService, 'prefill_workpaper')
 
     def test_parse_service_exists(self):
-        from app.services.prefill_service import ParseService
+        from app.services.prefill_engine import ParseService
         assert hasattr(ParseService, 'parse_workpaper')
 
 
@@ -84,7 +84,7 @@ class TestOfflineEditProperty:
     """10.6 离线编辑版本冲突"""
 
     def test_conflict_detection(self):
-        from app.services.prefill_service import ParseService
+        from app.services.prefill_engine import ParseService
         assert hasattr(ParseService, 'detect_conflicts')
 
 

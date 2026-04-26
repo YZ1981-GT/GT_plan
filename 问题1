@@ -1,0 +1,557 @@
+审计作业平台深度代码审查报告
+========================================
+审查日期：2026-04-26
+审查范围：backend/ + audit-platform/frontend/ 全部源码
+审查方法：逐文件代码阅读 + grep 搜索验证 + 路由注册表交叉比对
+
+系统规模（实测）：
+  后端：88 个路由文件 / 108 个服务文件 / 24 个模型文件 / 90 个已注册路由模块
+  前端：84 个 Vue 页面 / 110 个组件 / 14 个 API 服务层文件
+  测试：1604 个用例（全部为 SQLite + fakeredis 单元测试）
+
+一、做得好的地方——代码层面确认
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. 事件驱动联动链路（event_handlers.py + event_bus.py）
+
+这是整个系统最扎实的部分。代码验证：
+- event_bus.py 实现了 debounce 去重（默认 500ms 窗口），相同 (event_type, project_id, year) 的事件在窗口内合并
+- event_handlers.py 用 _make_handler 工厂函数为每个事件处理器创建独立的数据库会话（async with async_session_factory()），异常时自动 rollback
+- 完整的 5 级事件链已注册：
+    ADJUSTMENT_CREATED/UPDATED/DELETED → on_adjustment_changed → TRIAL_BALANCE_UPDATED
+    MAPPING_CHANGED → on_mapping_changed → TRIAL_BALANCE_UPDATED
+    DATA_IMPORTED → on_data_imported → TRIAL_BALANCE_UPDATED
+    TRIAL_BALANCE_UPDATED → on_trial_balance_updated → REPORTS_UPDATED
+    REPORTS_UPDATED → on_reports_updated → 附注增量更新
+    WORKPAPER_SAVED → _on_workpaper_saved → 审定数比对
+
+2. 四表穿透查询（LedgerPenetration.vue 2205 行）
+
+不是虚的，实际功能完整：
+- 五级穿透：余额表→序时账→凭证分录→辅助余额→辅助明细
+- 8 种筛选模式：期末有数/期初有数/本期有变动/借方有发生额/贷方有发生额/仅一级科目等
+- 树形/扁平视图切换，辅助余额表按维度类型标签分类
+- 导出 Excel（3 个导出端点：export-balance/export-ledger/export-aux-balance）
+- 游标分页（大数据量下毫秒级响应，已在 114 万行序时账上验证）
+
+3. 前端请求层（http.ts 约 250 行）
+
+工程化水平确实不错，代码验证：
+- 401 刷新队列：isRefreshing + refreshQueue 数组，并发 401 只触发一次 refresh
+- 请求去重：pendingMap（Map<string, AbortController>），相同 GET 请求取消前一个
+- 500 自动重试：最多 2 次，指数退避（1s, 2s）
+- 分级错误提示：400/403/404/409/413/422/423/500 各有独立提示文案
+- request_id 回显：从 X-Request-ID 响应头提取，显示在错误提示中
+
+4. 底稿生命周期（working_paper.py + prefill_engine.py + wopi_service.py）
+
+七个环节代码均已实现（非 stub）：
+- 创建：template_engine.py 真正复制 .xlsx 模板文件到 storage/projects/{id}/workpapers/{cycle}/
+- 预填充：prefill_engine.py 用 openpyxl 扫描 5 种公式（TB/SUM_TB/AUX/PREV/WP），执行后写回单元格
+- 编制：WOPI Host 支持 ONLYOFFICE 在线编辑，check_file_info/get_file/put_file 均为真实实现
+- 保存：put_file 企业级 8 步（锁校验→版本快照→写入→SHA256 校验→版本递增→审计留痕→事件发布→云端双写）
+- 解析：parse_workpaper_real() 提取审定数/未审数/AJE/RJE/结论文本/交叉引用
+- 级联：WORKPAPER_SAVED 事件触发审定数与 trial_balance 比对
+- 离线：下载→本地编辑→上传，冲突检测（版本号比对）
+
+二、核心问题——代码层面逐条验证
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【问题一】铺得太广，扎得不够深
+严重程度：高 | 影响范围：用户信任度
+
+空壳页面清单（经代码逐文件验证）：
+
+  文件名                          行数   问题描述
+  ─────────────────────────────────────────────────────────────────
+  AIChatView.vue                  12行   包装壳，引用 AIChatPanel.vue
+  AIWorkpaperView.vue             12行   同上模式
+  MobileProjectList.vue           19行   空壳
+  MobileReportView.vue            19行   空壳
+  MobileWorkpaperEditor.vue       32行   空壳
+  ConsolSnapshots.vue             41行   空壳
+  CheckInsPage.vue                43行   打卡功能，非审计核心业务
+  AuxSummaryPanel.vue             49行   空壳
+
+AIChatView.vue 的问题比"空壳"更严重——它引用的 AIChatPanel.vue（约 280 行）调用了
+3 个后端端点：
+  - POST /api/ai/chat          ← router_registry.py 中未注册，grep 确认不存在
+  - POST /api/ai/chat/file-analysis  ← 同上，不存在
+  - GET  /api/projects/{id}/chat/history  ← 同上，不存在
+
+用户点进去不是看到空白，而是所有操作都会 404 报错。
+（注：已注册的 AI 相关路由只有 /api/ai/health 和 /api/workpapers/{wp_id}/ai/chat，
+前者是健康检查，后者是底稿级 AI 对话，与 AIChatPanel 调用的端点完全不同）
+
+CheckInsPage.vue 调用 commonApi 的 checkIn/listCheckIns，后端端点存在但功能与审计
+无关。审计员看到"打卡签到"会困惑——这不是他们的工作流。
+
+真正做深的页面（500+ 行，功能完整可用）只有 6-7 个：
+  LedgerPenetration.vue   2205行  查账穿透
+  WorkpaperWorkbench.vue   890行  底稿工作台
+  WorkpaperList.vue        890行  底稿列表
+  Adjustments.vue          890行  调整分录
+  TrialBalance.vue         631行  试算表
+  DisclosureEditor.vue     280行  附注编辑（功能不完整，见问题七）
+  ReportView.vue           ~400行 报表查看
+
+▶ 建议操作：
+  在 ThreeColumnLayout.vue 的 navItems 中，给上述 8 个空壳页面设置
+  maturity: 'developing'（灰色不可点击+提示"开发中"）。
+  AIChatView 和 AIWorkpaperView 应直接从路由中移除（后端端点不存在，无法降级）。
+【问题二】合并报表模块——架构层面有阻塞风险
+严重程度：高 | 影响范围：系统整体性能
+
+后端 10 个合并路由全部使用同步 ORM（Depends(sync_db)）：
+  consolidation.py / consol_scope.py / consol_trial.py / internal_trade.py
+  component_auditor.py / goodwill.py / forex.py / minority_interest.py
+  consol_notes.py / consol_report.py
+
+技术风险：
+  - FastAPI 运行在 asyncio 事件循环上，同步 ORM 调用会阻塞整个事件循环
+  - 一个合并报表查询耗时 2 秒，期间所有异步请求（查账/调整/底稿）全部排队等待
+  - 审计忙季多人并发时，系统响应会急剧恶化
+
+前端 11 个 Vue 文件的实际完成度：
+  EliminationView.vue      120行  最完整，有抵消分录列表+合并试算表+详情弹窗
+  InternalTradeView.vue     45行  Tab 壳，依赖 InternalTradePanel/InternalArApPanel 子组件
+  其余 9 个                 30-80行  基本是 Tab 框架 + 加载按钮
+
+前端依赖的子组件（EliminationList/ConsolTrialBalance/InternalTradePanel 等）
+的数据加载全部走同步路由，实际使用时会触发上述阻塞问题。
+
+▶ 建议操作：
+  方案 A（推荐）：整个合并报表模块标记为 developing，导航灰色不可点击
+  方案 B：将 10 个同步路由改为异步 ORM（工作量约 2-3 天），改完后再开放
+
+【问题三】LLM / AI 功能 stub 残留——用户可感知的"假功能"
+严重程度：高 | 影响范围：用户信任度
+
+经代码验证，stub 分为三个层次：
+
+层次 1：完全 stub（8 个 AI 插件 Executor）
+  文件：ai_plugin_service.py
+  InvoiceVerifyExecutor / BusinessInfoExecutor / BankReconcileExecutor /
+  SealCheckExecutor / VoiceNoteExecutor / WpReviewExecutor /
+  ContinuousAuditExecutor / TeamChatExecutor
+  全部返回 {"status": "stub", "message": "...尚未实现..."}
+  前端 AIPluginManagement.vue 有完整的启用/禁用/配置 UI，用户启用后执行会看到"stub"
+
+层次 2：部分 stub（附注校验引擎）
+  文件：note_validation_engine.py（Phase 1 的附注校验，被 DisclosureEditor 调用）
+  已实现：validate_balance（余额核对）、validate_sub_item（子项校验）— 共 2 个
+  仍为 stub（return []）：validate_wide_table / validate_vertical / validate_cross_table /
+    validate_aging_transition / validate_completeness / validate_llm_review — 共 6 个
+  用户点"执行校验"按钮，8 种校验中 6 种永远返回空结果，只有余额核对和子项校验能发现问题
+
+  注意：note_formula_engine.py（Phase 5 的附注公式引擎）的 7 个非 LLM 校验器
+  （BalanceCheck/WideTableHorizontal/VerticalReconcile 等）代码逻辑是完整的，
+  但它与 note_validation_engine.py 是两套独立实现，DisclosureEditor 调用的是后者。
+  前者的完整实现并未被前端使用。
+
+层次 3：静默降级（AI 审计助手面板）
+  文件：WorkpaperWorkbench.vue 第 570 行
+  AI 变动分析调用 /api/wp-ai/{projectId}/analytical-review，LLM 不可用时：
+    catch { /* LLM 不可用时静默降级 */ }
+  用户看到的是空白的 AI 分析区域，没有任何提示说明为什么是空的。
+  AI 提问功能（第 627 行）倒是有友好提示："AI 服务暂时不可用，请稍后再试"
+
+▶ 建议操作：
+  1. AI 插件管理页面：移除 8 个预设插件的展示，或在每个插件卡片上标注"即将上线"
+  2. 附注校验：在"执行校验"按钮旁加提示"当前仅支持余额核对和子项校验"
+  3. AI 变动分析：静默降级改为显示"AI 分析服务未启动"提示卡片
+  4. 长期：将 note_formula_engine.py 的完整校验器接入 DisclosureEditor 替代 stub
+
+【问题四】前端 API 调用方式不统一——会导致随机 undefined
+
+严重程度：中 | 影响范围：数据展示正确性
+
+当前存在 3 种 API 调用方式并存：
+
+  方式 A：apiProxy.ts（api.get/api.post）
+    自动解包，直接返回业务数据
+    用法：const data = await api.get('/api/xxx')
+
+  方式 B：commonApi.ts（128 个函数）
+    手动 { data } 解构，部分函数有 data?.data ?? data 防御
+    用法：const list = await listProjects()
+
+  方式 C：直接 import http（56 个 Vue 文件仍在使用）
+    需要手动 { data } 解构
+    用法：const { data } = await http.get('/api/xxx')
+
+以 DisclosureEditor.vue 为例，同一个文件中混用了方式 B 和方式 C：
+  import { refreshDisclosureFromWorkpapers } from '@/services/commonApi'  ← 方式 B
+  import { generateDisclosureNotes, ... } from '@/services/auditPlatformApi'  ← 方式 C 变体
+
+解包链路分析：
+  后端 ResponseWrapperMiddleware 包装响应 → {code: 200, data: {实际数据}}
+  http.ts 响应拦截器检测到 code+data 结构 → 自动解包为 {实际数据}
+  如果 API 函数再做一次 data.data ?? data → 拿到 undefined 或错误层级的数据
+
+实际风险场景：
+  - 某些端点被 _SKIP_PATHS 跳过包装（如 /wopi/、/api/events/），返回原始数据
+  - 此时 http.ts 不解包，但 API 函数期望已解包的数据 → 多包一层
+  - 开发时用 mock 数据不会发现，生产环境随机出现
+
+▶ 建议操作：
+  统一为方式 A（apiProxy.ts），分批改造：
+  优先改造核心 8 个页面（查账/试算表/调整/底稿/报表/附注/向导/首页）
+  每改一个页面，验证数据展示正确后再改下一个
+【问题五】缺少端到端集成测试——核心联动链路从未在真实环境验证
+严重程度：高 | 影响范围：生产环境稳定性
+
+1604 个测试全部运行在 SQLite 内存数据库 + fakeredis 环境。
+与生产环境（PostgreSQL + Redis）的行为差异：
+
+  差异点                    SQLite 测试环境          PostgreSQL 生产环境
+  ──────────────────────────────────────────────────────────────────
+  行锁                      不支持 FOR UPDATE        支持，并发写入会等待
+  事务隔离                  SERIALIZABLE（默认）     READ COMMITTED（默认）
+  JSON 字段                 TEXT 模拟                原生 JSONB，支持索引
+  异步驱动                  aiosqlite                asyncpg
+  debounce timing           call_later 在测试中      call_later 在真实事件循环中
+                            可能立即执行             严格按 500ms 延迟
+
+这意味着：
+  - 事件驱动链路的 debounce 合并行为在测试中可能与生产不同
+  - 并发导入+并发调整的数据一致性从未被验证
+  - deps.py 的 Redis 权限缓存（TTL=5min）在 fakeredis 中的过期行为可能不同
+
+▶ 建议操作：
+  用 Docker Compose 搭建 E2E 测试环境（PG + Redis + 后端），至少覆盖 3 条主链路：
+  1. 创建项目 → 导入四表 → 验证试算表自动生成 → 验证报表联动
+  2. 创建 AJE → 验证试算表增量更新 → 验证报表更新 → 验证附注更新
+  3. 上传底稿 → 验证 WORKPAPER_SAVED 事件 → 验证审定数比对
+修改底稿审定数 → 验证 WORKPAPER_SAVED 事件触发 → 验证一致性状态
+
+【问题六】底稿复核流程——3 个关键缺失（审计合规风险）
+严重程度：高 | 影响范围：审计质量合规
+
+当前 4 项门禁（working_paper.py submit-review 端点）代码验证：
+  ✅ 门禁 1：复核人已分配（检查 wp.reviewer）
+  ✅ 门禁 2：QC 阻断级通过（检查 qc.blocking_count == 0）
+  ✅ 门禁 3：无未解决批注（检查 CellAnnotation status != resolved 的数量）
+  ✅ 门禁 4：无未确认 AI 内容（检查 AIContent confirmation_status == pending）
+
+缺失 1：复核意见未强制逐条回复
+  wp_review_service.py 状态机：open → replied → resolved
+  submit-review 门禁只检查 "status != resolved" 的数量 > 0
+  但不检查 "是否所有 open 状态的意见都已被 replied"
+  审计准则要求：复核意见必须逐条处理，不能跳过未回复的直接提交二级复核
+  
+  对比：调整分录的驳回做了强制校验（adjustment_service.py 第 336 行）：
+    if target == ReviewStatus.rejected and not change.reason:
+        raise ValueError("驳回时必须填写原因")
+  但底稿复核没有类似逻辑。
+
+缺失 2：退回时未强制填写退回原因
+  working_paper_service.py 的 update_review_status 方法只做状态流转：
+    level1_in_progress → level1_rejected（直接转，无 reason 参数）
+  WorkingPaper 模型没有 rejection_reason 字段
+  ReviewStatusRequest schema 只有 review_status: str，没有 reason 字段
+
+缺失 3：退回历史未永久保留
+  退回后 wp.status 变为 revision_required，但以下信息丢失：
+    - 谁退回的（无 rejected_by 字段）
+    - 什么时候退回的（无 rejected_at 字段）
+    - 为什么退回（无 rejection_reason 字段）
+  审计底稿的复核痕迹是质控检查的重点，这些信息必须永久保留
+
+▶ 建议操作：
+  1. WorkingPaper 模型新增 rejection_reason/rejected_by/rejected_at 三个字段
+  2. update_review_status 在 rejected 状态时强制要求 reason 参数
+  3. submit-review 门禁新增第 5 项：所有 open 状态的批注必须已被 replied
+  4. 每次退回记录写入 logs 表（已有 AuditLogMiddleware，但需要在业务层显式记录）
+
+【问题七】附注编辑器——核心产出物页面功能不完整
+严重程度：高 | 影响范围：审计员是否愿意用系统编附注
+
+DisclosureEditor.vue 约 280 行，三栏布局（目录树+编辑区+校验面板）框架完整，
+但经代码搜索验证，以下关键功能缺失：
+
+缺失 1：没有上年数据对比
+  在 disclosure_engine.py 中搜索 prior_year / 上年 / previous / opening / 期初
+  → 结果为 0 条匹配
+  附注最核心的展示需求是"本期数 vs 上年数"双列对比，当前完全没有。
+  审计员编附注时必须看到上年数据才能判断变动是否合理。
+
+缺失 2：没有表格内公式计算
+  在 disclosure_engine.py 和 DisclosureEditor.vue 中搜索 formula / 公式
+  → 结果为 0 条匹配
+  审计附注中大量变动表需要"期初 + 本期增加 - 本期减少 = 期末"的自动校验。
+  当前表格只有 el-input-number 手动输入，没有公式联动。
+  
+  注意：note_formula_engine.py 的 WideTableHorizontal 校验器有完整的
+  "期初+变动=期末"校验逻辑，但它是独立的校验服务，不是编辑器内的实时公式。
+  用户编辑表格时看不到实时计算结果，只能保存后点"执行校验"才能发现不平。
+
+缺失 3：表格与文字的混排不够灵活
+  当前 content_type 有三种：table / text / mixed
+  mixed 模式下，表格（el-table）和文字（TipTap）是上下堆叠的固定结构。
+  实际附注中，一个章节可能是：
+    一段文字说明 → 表格 A → 又一段文字 → 表格 B → 再一段文字
+  当前结构不支持这种交替排列，只能"先表格后文字"或"先文字后表格"。
+
+缺失 4：校验结果面板效果有限
+  如问题三所述，note_validation_engine.py 的 8 种校验中 6 种是 stub（return []）。
+  用户点"执行校验"后，右侧面板大概率只显示余额核对的结果，
+  宽表横向勾稽、纵向勾稽、交叉校验、账龄衔接、完整性检查全部返回空。
+
+▶ 建议操作（按优先级）：
+  P0：表格增加上年数据列（从 prior_year 试算表或上年附注数据读取）
+  P0：表格增加实时公式计算（期初+变动=期末，编辑时即时显示差异）
+  P1：将 note_formula_engine.py 的完整校验器接入替代 note_validation_engine.py 的 stub
+  P2：混排改为 TipTap 内嵌表格节点（或改为 block 列表，每个 block 可以是表格或文字）
+
+【问题八】数据导入——列映射模板已实现但交互不直观，错误定位缺行号
+严重程度：中 | 影响范围：首次使用体验
+
+列映射保存和参照复制的后端 API 已实现（account_chart.py）：
+  ✅ POST /{project_id}/column-mappings     — 保存映射到 wizard_state.column_mappings
+  ✅ GET  /{project_id}/column-mappings      — 读取已保存映射
+  ✅ GET  /{project_id}/column-mappings/reference-projects  — 获取可参照项目列表
+  ✅ POST /{project_id}/column-mappings/reference-copy      — 从其他项目复制映射
+
+但前端交互问题：
+  - "保存映射"和"参照其他项目"按钮不够醒目，用户可能不知道这两个功能存在
+  - 参照复制后没有 diff 对比（直接覆盖，用户看不到哪些列映射被改了）
+
+导入失败的错误定位精度不足：
+  smart_import_engine.py 的数据校验（validate_four_tables 函数，约 200 行）
+  报告格式为：
+    {"level": "error", "category": "余额表勾稽",
+     "message": "1001: 期初100+借200-贷150=150, 期末160, 差-10",
+     "detail": {"account_code": "1001"}}
+  
+  有科目编码级别的定位，但没有 Excel 行号。
+  当某一行数据格式异常（如日期格式错误、金额含中文字符）导致解析失败时，
+  用户只能看到"0 条入库"或"导入失败"，不知道具体是哪一行出了问题。
+
+  对比：convert_balance_rows / convert_ledger_rows 中的异常处理是 try/except 静默跳过，
+  跳过的行没有被记录到任何错误报告中。
+
+▶ 建议操作：
+  1. 前端：参照复制按钮改为更醒目的位置（如预览页面顶部横幅）
+  2. 后端：convert_*_rows 中 try/except 捕获异常时，记录行号和错误原因到 diagnostics
+  3. 前端：导入结果页展示"跳过 N 行（点击查看详情）"，详情列出行号+原因
+
+【问题九】权限体系——scope_cycles 只在底稿列表 1 个端点落地
+严重程度：中 | 影响范围：数据隔离合规
+
+代码搜索验证结果：
+
+  scope_cycles 在前端 Vue 文件中的出现次数：0 次
+  scope_cycles 在后端路由中的实际使用：仅 working_paper.py 的 list_workpapers 1 个端点
+
+  working_paper.py 第 78-93 行的实现：
+    if current_user.role.value not in ("admin", "partner"):
+        pu = await db.execute(select(ProjectUser.scope_cycles).where(...))
+        if pu and isinstance(pu, str) and pu.strip():
+            scope_cycles = [c.strip() for c in pu.split(",") if c.strip()]
+    svc.list_workpapers(..., scope_cycles=scope_cycles)
+
+  这意味着：
+    ✅ 底稿列表：审计员只能看到自己负责循环的底稿
+    ❌ 试算表（trial_balance.py）：所有科目全部可见
+    ❌ 调整分录（adjustments.py）：所有科目的调整全部可见
+    ❌ 查账穿透（ledger_penetration.py）：所有科目的序时账全部可见
+    ❌ 附注编辑（disclosure_notes.py）：所有附注章节全部可编辑
+    ❌ 报表查看（reports.py）：所有报表全部可见
+
+  实际场景：审计员 A 负责 D 销售循环，审计员 B 负责 E 货币资金循环。
+  当前系统中，A 可以在试算表页面看到 B 负责的货币资金科目数据，
+  也可以在查账页面穿透到 B 负责的银行存款序时账。
+  虽然不能编辑 B 的底稿，但能看到所有数据。
+
+  后端基础设施已就绪：
+    - ProjectUser 模型有 scope_cycles 字段（core.py 第 118 行）
+    - role_context_service.py 能返回用户的 scope_cycles
+    - permission_service.py 有 check_cycle_access 函数
+  缺的是在各个核心路由中调用这些基础设施。
+
+▶ 建议操作：
+  1. trial_balance.py：按 scope_cycles 过滤返回的科目行
+  2. adjustments.py：按 scope_cycles 过滤可见的调整分录
+  3. ledger_penetration.py：按 scope_cycles 过滤可查询的科目
+  4. disclosure_notes.py：按 scope_cycles 过滤可编辑的附注章节
+  5. 前端：从 roleContextStore 获取 scope_cycles，在请求参数中传给后端
+
+三、补充发现的问题
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+【问题十】el-dialog 大面积缺少 append-to-body——弹窗被三栏布局截断
+严重程度：中 | 影响范围：所有含弹窗的页面
+
+三栏布局 ThreeColumnLayout.vue 的 .gt-body 容器设置了 overflow: hidden，
+不加 append-to-body 的 el-dialog 会被截断（弹窗只显示一半或完全不可见）。
+
+经 grep 搜索，以下页面的 el-dialog 缺少 append-to-body（共 30+ 个弹窗）：
+
+  核心页面（影响日常使用）：
+    Adjustments.vue          — 新建/编辑分录弹窗 + 驳回原因弹窗
+    TrialBalance.vue         — 调整明细弹窗
+    WorkpaperList.vue        — 复核意见弹窗 + 上传弹窗
+    WorkpaperWorkbench.vue   — 委派分配弹窗
+    ReportView.vue           — 穿透详情弹窗
+    LedgerPenetration.vue    — 导入弹窗 + 校验弹窗
+    CFSWorksheet.vue         — 调整分录弹窗
+    AuditReportEditor.vue    — 生成配置弹窗
+    Misstatements.vue        — CRUD 弹窗
+
+  管理页面：
+    StaffManagement.vue      — 人员编辑弹窗 + 简历弹窗
+    WorkHoursPage.vue        — 工时填报弹窗
+    ReviewInbox.vue          — 退回原因弹窗
+    TemplateManager.vue      — 上传弹窗
+    AIModelConfig.vue        — 模型编辑弹窗
+    ForumPage.vue            — 发帖弹窗
+
+  合并报表页面：
+    EliminationView.vue      — 抵消分录详情弹窗
+    GoodwillView.vue         — 商誉编辑弹窗
+    MinorityInterestView.vue — 少数股东编辑弹窗
+    ForexView.vue            — 外币折算弹窗
+    ComponentAuditorView.vue — 审计师编辑弹窗
+
+  扩展页面：
+    TAccountManagement.vue   — T 型账户编辑弹窗 + 新建弹窗
+
+  注：memory.md 记录"49 个 Vue 文件共约 55 个 el-dialog 已全部加上 append-to-body"，
+  但实际搜索发现 30+ 个弹窗仍然缺少。可能是后续新增页面未遵循此规范，
+  或者之前的批量修复因 PowerShell 编码问题（memory.md 有记录）导致部分文件回退。
+
+▶ 建议操作：
+  用 Python 脚本批量修复（不用 PowerShell，避免编码损坏）：
+  将所有 <el-dialog 替换为 <el-dialog append-to-body
+
+【问题十一】后端 stub 服务完整清单——比问题三更全面
+严重程度：中 | 影响范围：功能可用性
+
+经 grep "stub|TODO|尚未实现|预留" 全面搜索，后端 stub 残留的完整清单：
+
+  ┌─────────────────────────────────────┬──────────────────────────────────────┐
+  │ 文件                                │ stub 内容                            │
+  ├─────────────────────────────────────┼──────────────────────────────────────┤
+  │ ai_plugin_service.py                │ 8 个 Executor 全部 stub              │
+  │ note_validation_engine.py           │ 8 种校验中 6 种 return []            │
+  │ data_validation_engine.py           │ 8 种校验中 5 种 return []            │
+  │                                     │ （report_note/workpaper_tb/          │
+  │                                     │  adjustment_report/format/range/     │
+  │                                     │  logic 全部 stub）                   │
+  │ qc_engine.py                        │ 14 条规则全部已实现（非 stub）       │
+  │                                     │ 但注释仍标记 "stubs"（误导）        │
+  │ working_paper_service.py            │ download_for_offline: "MVP stub"     │
+  │                                     │ upload_offline_edit: "stub: no       │
+  │                                     │   actual file replacement"           │
+  │ formula_engine.py                   │ WPExecutor: "MVP stub: return        │
+  │                                     │   placeholder"（跨底稿引用不可用）   │
+  │ sign_service.py                     │ level3 CA 证书签名: NotImplemented   │
+  │ regulatory_service.py               │ cicpa/archival 格式转换全部 stub     │
+  │ workhour_service.py                 │ ai_suggest LLM 预填: stub            │
+  │ wp_chat_service.py                  │ LLM 不可用时返回 stub 回复           │
+  │ dashboard_service.py                │ 5 个指标硬编码 0（overdue_projects/  │
+  │                                     │  pending_review/qc_pass_rate/        │
+  │                                     │  review_completion/adjustment_count）│
+  │ consol_enhanced_service.py          │ 外部报表导入: "stub"                 │
+  │ audit_logger_enhanced.py            │ export_excel: "stub，返回 CSV"       │
+  │ note_wp_mapping_service.py          │ update_mapping: "TODO: 存储到项目配置"│
+  │ cloud_storage_service.py            │ SFTP 地址: "192.168.1.100 预留"      │
+  └─────────────────────────────────────┴──────────────────────────────────────┘
+
+  特别注意：
+  - qc_engine.py 的注释写着 "stubs"，但代码实际已全部实现（14 条规则都有真实逻辑）。
+    这是注释过时，不是代码问题。但会误导代码审查者。
+  - working_paper_service.py 的 download_for_offline 和 upload_offline_edit 标记为 stub，
+    但 wp_download_service.py 的 WpDownloadService/WpUploadService 是真实实现。
+    存在两套服务并存的问题（旧 stub + 新实现），路由中已切换到新实现。
+  - formula_engine.py 的 WPExecutor（跨底稿引用）是 stub，意味着底稿中的
+    =WP("E1-2","B5") 公式无法执行，预填充时会返回 placeholder 值。
+
+▶ 建议操作：
+  1. qc_engine.py：更新注释，去掉 "stubs" 标记（代码已实现）
+  2. working_paper_service.py：删除旧 stub 方法，统一到 wp_download_service
+  3. dashboard_service.py：5 个硬编码 0 的指标接入真实数据查询
+  4. data_validation_engine.py：5 个 stub 校验至少实现 report_note 和 workpaper_tb
+  5. formula_engine.py WPExecutor：实现跨底稿引用（openpyxl 读取目标底稿单元格值）
+
+【问题十二】前端直接 import http 的文件精确统计——29 个文件待改造
+严重程度：低 | 影响范围：代码维护性
+
+经 Python 精确扫描（非 PowerShell），29 个 Vue 文件仍直接 import http：
+
+  核心页面（2 个，有正当理由保留）：
+    LedgerPenetration.vue    — 4 个复杂穿透调用（游标分页+流式响应）
+    WorkpaperEditor.vue      — 1 个 WOPI 锁刷新（需自定义 headers）
+
+  向导组件（5 个，应优先改造）：
+    BasicInfoStep.vue / AccountImportStep.vue / AccountMappingStep.vue /
+    MaterialityStep.vue / ReportLineMappingStep.vue
+
+  布局组件（4 个）：
+    ThreeColumnLayout.vue / MiddleProjectList.vue /
+    DetailProjectPanel.vue / FourColumnCatalog.vue / FourColumnContent.vue
+
+  扩展组件（13 个，优先级低）：
+    LanguageSwitcher / StandardSelector / PluginList / PluginConfig /
+    SignatureLevel1 / SignatureLevel2 / SignatureHistory / WPIndexGenerator /
+    CICPAReportForm / ArchivalStandardForm / AuditTypeSelector /
+    MetabaseDashboard / DrillDownNavigator / FilingError
+
+  其他（5 个）：
+    NoteTrimPanel / DataImportPanel / SamplingPanel /
+    SEChecklistPanel / CollaborationIndex（间接）
+
+  ResponseWrapperMiddleware 的 _SKIP_PATHS 列表：
+    "/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream"
+  这些路径的响应不会被包装，直接 import http 的文件如果调用这些端点，
+  解包行为与调用普通端点不同——这是 bug 的温床。
+
+▶ 建议操作：
+  按优先级分 3 批改造：
+  第 1 批：向导组件 5 个（影响新建项目流程）
+  第 2 批：布局组件 4 个（影响所有页面）
+  第 3 批：扩展组件 13 个（影响范围小，可延后）
+  LedgerPenetration 和 WorkpaperEditor 保留直接 http 调用（有正当理由）
+
+四、总体评价与优先级排序
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+架构设计水平在审计信息化领域属于上乘：
+  - 事件驱动联动链路（5 级事件链 + debounce 去重）
+  - 三级权限体系（edit/review/readonly + Redis 缓存 + 降级策略）
+  - 双模式底稿编辑（在线 WOPI + 离线下载上传 + 冲突检测）
+  - 四表穿透五级导航（2205 行深度实现）
+  - 对账引擎 8700 行 / 报告解析器 2000 行 / 导入引擎 2929 行
+
+核心风险：功能发散。8 个 Phase、90 个路由、84 个页面，开发资源摊得太薄。
+
+问题优先级排序（12 个问题）：
+
+  优先级   问题编号   问题描述                           修复工作量   影响
+  ──────────────────────────────────────────────────────────────────────────
+  P0       问题一     空壳页面从导航移除/路由删除         0.5 天      用户信任
+  P0       问题三     stub 入口隐藏或标注"即将上线"       1 天        用户信任
+  P0       问题六     底稿复核退回原因+逐条回复强制校验   2 天        审计合规
+  P0       问题十     el-dialog 批量加 append-to-body     0.5 天      弹窗可用性
+  P1       问题七     附注编辑器上年数据+公式计算         3-5 天      核心产出物
+  P1       问题二     合并报表模块标记 developing         0.5 天      系统性能
+  P1       问题九     scope_cycles 落地到核心 4 个路由    2 天        数据隔离
+  P1       问题十一   dashboard 5 个硬编码 0 指标接入     1 天        看板可信度
+  P2       问题四     前端 API 调用统一为 apiProxy        3-5 天      代码维护
+  P2       问题五     E2E 集成测试                        3 天        生产稳定
+  P2       问题八     导入错误行号定位                    1-2 天      导入体验
+  P2       问题十二   29 个文件 http→apiProxy 改造        2-3 天      代码规范
+
+立即进入"收敛期"的建议：
+  1. 停止新增功能模块
+  2. 用 1 周时间完成 4 个 P0 问题（空壳隐藏 + stub 标注 + 复核硬化 + 弹窗修复）
+  3. 把核心 8 个页面打磨到"审计员愿意用"的程度：
+     建项目 → 导数据 → 查账 → 做调整 → 编底稿 → 出报表 → 写附注 → 复核
+  4. 找 2-3 个真实审计项目做端到端试点
+  5. 空壳页面全部从导航移除，stub 服务的前端入口全部隐藏
+
+  P0 合计约 4 天，P1 合计约 7 天，P2 合计约 9 天。
+  全部 12 个问题修复约 20 个工作日（1 个月），建议先集中 1 周完成所有 P0。
+
+一个审计员能顺畅地完成一个完整项目的全流程，比有 84 个页面但每个都半成品要有价值得多。

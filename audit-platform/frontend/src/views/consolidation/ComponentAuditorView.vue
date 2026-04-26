@@ -106,7 +106,7 @@
     </template>
 
     <!-- 审计师弹窗 -->
-    <el-dialog v-model="auditorDialogVisible" :title="editingAuditor ? '编辑审计师' : '新增审计师'" width="520px">
+    <el-dialog append-to-body v-model="auditorDialogVisible" :title="editingAuditor ? '编辑审计师' : '新增审计师'" width="520px">
       <el-form :model="auditorForm" label-width="100px">
         <el-form-item label="组成部分"><el-input v-model="auditorForm.component_name" /></el-form-item>
         <el-form-item label="审计师姓名"><el-input v-model="auditorForm.auditor_name" /></el-form-item>

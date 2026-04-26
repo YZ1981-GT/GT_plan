@@ -147,7 +147,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { useWizardStore, type BasicInfo } from '@/stores/wizard'
 
 const wizardStore = useWizardStore()
@@ -208,9 +208,9 @@ function customTemplateLabel(item: { id: string; name: string; version?: string 
 async function loadCustomTemplates() {
   customTemplateLoading.value = true
   try {
-    const { data } = await http.get('/api/note-templates/custom')
-    const list = data.data ?? data
-    customTemplates.value = Array.isArray(list) ? list : []
+    const data = await api.get('/api/note-templates/custom')
+    const list = Array.isArray(data) ? data : []
+    customTemplates.value = list
   } finally {
     customTemplateLoading.value = false
   }

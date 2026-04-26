@@ -28,7 +28,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import ValidationList from '../components/common/ValidationList.vue'
-import http from '../utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{ projectId: string }>()
 

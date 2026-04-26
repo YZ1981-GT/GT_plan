@@ -72,7 +72,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { cutoffTest, agingAnalysis, monthlyDetail } from '@/services/enhancedApi'
+import { cutoffTest, agingAnalysis, monthlyDetail } from '@/services/commonApi'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const activeTab = ref('cutoff')

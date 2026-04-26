@@ -21,7 +21,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = withDefaults(defineProps<{
   projectId?: string
@@ -37,8 +37,8 @@ const embedUrl = ref('')
 
 async function loadDashboards() {
   try {
-    const { data } = await http.get('/api/metabase/dashboards')
-    dashboards.value = data.data ?? data ?? []
+    const data = await api.get('/api/metabase/dashboards')
+    dashboards.value = data ?? []
     if (props.defaultDashboard) {
       selectedDashboard.value = props.defaultDashboard
       await loadDashboard()
@@ -54,8 +54,8 @@ async function loadDashboard() {
     const params: any = { resource_type: 'dashboard', resource_id: config?.metabase_dashboard_id || 1 }
     if (props.projectId) params.project_id = props.projectId
     if (props.year) params.year = props.year
-    const { data } = await http.get('/api/metabase/embed-url', { params })
-    const result = data.data ?? data
+    const data = await api.get('/api/metabase/embed-url', { params })
+    const result = data
     embedUrl.value = result.embed_url || ''
   } catch { embedUrl.value = '' }
   finally { loading.value = false }

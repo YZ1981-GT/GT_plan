@@ -44,7 +44,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import http from '@/utils/http'
+import { runConsistencyCheck, getConsistencyCheck } from '@/services/commonApi'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -54,16 +54,14 @@ const result = ref<any>(null)
 async function runCheck() {
   loading.value = true
   try {
-    const { data } = await http.post(`/api/projects/${projectId.value}/consistency-check/run`, null, { params: { year: 2025 } })
-    result.value = data.data ?? data
+    result.value = await runConsistencyCheck(projectId.value)
   } finally { loading.value = false }
 }
 
 onMounted(async () => {
   loading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/consistency-check`, { params: { year: 2025 } })
-    result.value = data.data ?? data
+    result.value = await getConsistencyCheck(projectId.value)
   } catch { /* first time, no data */ }
   finally { loading.value = false }
 })
