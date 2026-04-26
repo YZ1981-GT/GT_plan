@@ -301,7 +301,9 @@ inclusion: always
 - Excel大文件流式入库改造（2026-04-25，commit 98f3f22）：smart_import_streaming中Excel处理从smart_parse_sheet（全量读到内存）改为parse_sheet_header_only()+iter_sheet_rows()逐批流式；新增两个函数：parse_sheet_header_only只读表头零内存、iter_sheet_rows生成器每批50000行；百万行序时账峰值内存从~3.5GB降到~100MB；CSV流式处理（_stream_csv_import）保持不变已经是流式的
 - Excel合并单元格表头与数据行分离（2026-04-25，commit 99d32ce）：之前有合并单元格的文件整个用完整模式打开（百万行十几秒），改为完整模式只读表头（缓存到header_cache后关闭），数据行始终用read_only流式读取；打开时间从十几秒降到1-2秒
 - Excel导入calamine加速（2026-04-25，commit acafd7f）：新增python-calamine 0.6.2依赖（Rust Excel解析器），Excel大文件优先用calamine秒级读取→转CSV bytes→走_stream_csv_import快速路径（COPY写入），比openpyxl快10-50倍；calamine不可用时自动降级为openpyxl；百万行序时账从~53秒降到~18秒
-- 导入性能优化（2026-04-25）：①convert_ledger_rows去掉重复的parse_aux_dimensions调用 ②辅助明细行从{**row}全量复制改为只取9个关键列 ③_clear_project_year_tables从UPDATE soft-delete改为DELETE物理删除（快3-5倍）④Excel文件打开次数从4次降到最多2次
+- 导入性能优化（2026-04-25）：①convert_ledger_rows去掉重复的parse_aux_dimensions调用 ②辅助明细行从{**row}全量复制改为只取9个关键列 ③Excel文件打开次数从4次降到最多2次
+- 导入慢根因定位（2026-04-26，commit b41edcd）：通过[PERF]日志定位两个根因——①_clear_project_year_tables DELETE 0行花11秒（tb_aux_ledger 874万行全索引扫描），改为只UPDATE ImportBatch状态为rolled_back（毫秒级）②预览阶段每个Excel打开两次（probe+open），合并为一次打开（序时账160MB从10.63s降到~6s）
+- 数据库实际数据量（2026-04-26）：tb_aux_ledger 874万行、tb_ledger 322万行、tb_balance 814行；表不是分区表（relkind=r普通表）
 - 流式入库复盘修复（2026-04-25，commit 0f2181e）：diag计数改为sheet_counts精确到当前sheet（非全局累计）、自定义映射_orig_cm预计算提到循环外
 - 彻底去掉COPY改用纯SQLAlchemy INSERT（2026-04-25，commit 017541b）：copy_insert通过raw asyncpg COPY和SQLAlchemy事务管理冲突（COPY失败→事务abort→后续所有SQL被拒绝），改为_batch_insert()纯db.execute(tbl.insert(), records)批量写入；_clear_project_year_tables从DELETE百万行改为只标记旧batch为rolled_back（秒级）；fail_job改用独立session更新batch状态；导入完成后Phase 4b异步标记旧数据is_deleted
 - CSV/Excel路径全面对齐（2026-04-25）：①CSV分支_flush_batch补齐aux_balance/aux_ledger写入分支（之前只有ledger/balance） ②CSV白名单从(ledger,balance,account_chart)扩展为含aux_balance/aux_ledger ③COPY列定义从CSV/Excel两处重复提取为模块级常量COPY_LEDGER_COLS/COPY_BALANCE_COLS等；现在CSV和Excel两条路径功能完全对齐：都支持四表+独立辅助表、都用COPY写入、都有关键列阻断

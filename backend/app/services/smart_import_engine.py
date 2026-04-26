@@ -2180,6 +2180,67 @@ async def smart_import_streaming(
                     len(records) / _elapsed if _elapsed > 0.001 else 0)
         return len(records)
 
+    async def _process_cal_batch(raw_batch, dt, _led_buf, _aux_led_buf,
+                                  sheet_counts_cal, batches, counts,
+                                  _BALANCE_COLS, _AUX_BALANCE_COLS,
+                                  _LEDGER_COLS, _AUX_LEDGER_COLS,
+                                  _project_id, _seen_codes, _acct_records, _by_category):
+        """处理一批 calamine 原始行：转换+写入数据库。"""
+        if dt == "balance":
+            bal, aux_bal = convert_balance_rows(raw_batch)
+            if bal:
+                n = await _batch_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
+                counts["tb_balance"] += n
+                sheet_counts_cal["tb_balance"] += n
+            if aux_bal:
+                n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, aux_bal, batches["tb_aux_balance"].id)
+                counts["tb_aux_balance"] += n
+                sheet_counts_cal["tb_aux_balance"] += n
+
+        elif dt == "ledger":
+            led, _, _ = convert_ledger_rows(raw_batch)
+            for r in led:
+                adim = r.pop("_aux_dim_str", "")
+                _led_buf.append(r)
+                if adim and (":" in adim or "：" in adim):
+                    base = {k: r.get(k) for k in ("account_code", "account_name", "voucher_date",
+                            "voucher_no", "debit_amount", "credit_amount", "summary",
+                            "company_code", "currency_code")}
+                    for dim in parse_aux_dimensions(adim):
+                        _aux_led_buf.append({**base, "aux_type": dim["aux_type"],
+                                             "aux_code": dim["aux_code"], "aux_name": dim["aux_name"],
+                                             "aux_dimensions_raw": adim})
+            if len(_led_buf) >= CHUNK:
+                n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
+                counts["tb_ledger"] += n
+                sheet_counts_cal["tb_ledger"] += n
+                _led_buf.clear()
+            if len(_aux_led_buf) >= CHUNK:
+                n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
+                counts["tb_aux_ledger"] += n
+                sheet_counts_cal["tb_aux_ledger"] += n
+                _aux_led_buf.clear()
+
+        elif dt == "aux_balance":
+            if raw_batch:
+                n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, raw_batch, batches["tb_aux_balance"].id)
+                counts["tb_aux_balance"] += n
+                sheet_counts_cal["tb_aux_balance"] += n
+
+        elif dt == "aux_ledger":
+            _aux_led_buf.extend(raw_batch)
+            if len(_aux_led_buf) >= CHUNK:
+                n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
+                counts["tb_aux_ledger"] += n
+                sheet_counts_cal["tb_aux_ledger"] += n
+                _aux_led_buf.clear()
+
+        # 提取科目
+        for row in raw_batch:
+            _append_account_record(row=row, project_id=_project_id,
+                                   seen_codes=_seen_codes, acct_records=_acct_records,
+                                   by_category=_by_category)
+
     def _prog(pct: int, msg: str = ""):
         if progress_callback:
             try:
@@ -2312,8 +2373,6 @@ async def smart_import_streaming(
                 cal_wb = CalamineWorkbook.from_buffer(content)
                 logger.info("[PERF] calamine open %s: %.2fs",
                             filename, _perf_time.perf_counter() - _t_cal_open)
-                total_sheets = len([s for s in cal_wb.sheet_names
-                                    if not any(kw in s.lower() for kw in ("说明", "目录", "封面", "模板"))])
 
                 for si, sname in enumerate(cal_wb.sheet_names):
                     if any(kw in sname.lower() for kw in ("说明", "目录", "封面", "模板")):
@@ -2322,78 +2381,151 @@ async def smart_import_streaming(
                     sheets_done += 1
                     sheet = cal_wb.get_sheet_by_name(sname)
                     total_rows_est = sheet.total_height or 0
-
                     _prog(12, f"读取 {sname}（约 {total_rows_est:,} 行）…")
 
-                    # 逐行迭代转 CSV（不全量加载到内存）
-                    import csv as _csv_mod
-                    csv_buf = io.StringIO()
-                    writer = _csv_mod.writer(csv_buf)
-                    row_count = 0
+                    # ── 第一步：读表头（前 10 行），做列映射 ──
                     _t_cal_read = _perf_time.perf_counter()
-                    for row in sheet.iter_rows():
-                        writer.writerow([
-                            str(c).strip() if c is not None else ""
-                            for c in row
-                        ])
-                        row_count += 1
-                        # 每 10 万行更新一次进度
-                        if row_count % 100_000 == 0:
-                            pct = 12 + int(row_count / max(total_rows_est, 1) * 30)
-                            _prog(min(pct, 42), f"读取 {sname}: {row_count:,}/{total_rows_est:,} 行")
+                    header_row = None
+                    header_idx = 0
+                    sample_rows_raw: list[list] = []
+                    for i, row in enumerate(sheet.iter_rows()):
+                        if i >= 10:
+                            break
+                        cells = [str(c).strip() if c is not None else "" for c in row]
+                        non_empty = [c for c in cells if c]
+                        if header_row is None and len(non_empty) >= 3:
+                            has_kw = any(kw in cell for cell in non_empty for kw in _HEADER_KEYWORDS)
+                            is_title = len(non_empty) == 1
+                            if has_kw or (not is_title and len(non_empty) >= 3):
+                                header_row = cells
+                                header_idx = i
+                                continue
+                        if header_row is not None:
+                            sample_rows_raw.append(cells)
 
-                    _cal_read_elapsed = _perf_time.perf_counter() - _t_cal_read
-                    logger.info("[PERF] calamine read sheet '%s': %d rows in %.2fs (%.0f rows/s)",
-                                sname, row_count, _cal_read_elapsed,
-                                row_count / _cal_read_elapsed if _cal_read_elapsed > 0.001 else 0)
-
-                    if row_count < 2:
-                        csv_buf.close()
+                    if header_row is None:
+                        diagnostics.append({"file": filename, "sheet": sname,
+                                            "data_type": "unknown", "row_count": 0,
+                                            "status": "skipped", "message": "未找到有效表头"})
                         continue
 
-                    _t_cal_encode = _perf_time.perf_counter()
-                    csv_bytes = csv_buf.getvalue().encode("utf-8")
-                    csv_buf.close()
-                    logger.info("[PERF] calamine CSV encode '%s': %.2fs, %d MB",
-                                sname, _perf_time.perf_counter() - _t_cal_encode,
-                                len(csv_bytes) // (1024 * 1024))
+                    headers = [h if h else f"col_{j}" for j, h in enumerate(header_row)]
+                    num_cols = len(headers)
 
-                    csv_filename = f"{filename}[{sname}].csv"
-                    _prog(45, f"写入 {csv_filename}（{row_count:,} 行）…")
+                    # 列映射
+                    col_map: dict[str, str] = {}
+                    for h in headers:
+                        m = smart_match_column(h)
+                        if m:
+                            col_map[h] = m
 
-                    try:
-                        _t_csv_import = _perf_time.perf_counter()
-                        csv_result = await _stream_csv_import(
-                            content=csv_bytes,
-                            filename=csv_filename,
-                            project_id=project_id,
-                            year=year,
-                            batches=batches,
-                            db=db,
-                            custom_mapping=custom_mapping,
-                            seen_codes=seen_codes,
-                            acct_records=acct_records,
-                            by_category=by_category,
-                            counts=counts,
-                            _aux_type_counts=_aux_type_counts,
-                            progress_callback=_prog,
-                            chunk_size=CHUNK,
-                        )
-                        diagnostics.append(csv_result["diag"])
-                        if csv_result.get("errors"):
-                            errors.extend(csv_result["errors"])
-                        logger.info("[PERF] _stream_csv_import '%s': %.2fs",
-                                    csv_filename, _perf_time.perf_counter() - _t_csv_import)
-                    except Exception as e:
-                        logger.error("calamine CSV 导入异常: %s", e)
-                        diagnostics.append({"file": filename, "sheet": sname,
-                                            "status": "error", "message": str(e)})
+                    # 应用自定义映射
+                    sm = None
+                    if custom_mapping:
+                        if any(isinstance(v, dict) for v in custom_mapping.values()):
+                            sm = custom_mapping.get(sname)
+                        else:
+                            sm = custom_mapping
+                    if sm:
+                        for h, sf in sm.items():
+                            if h in headers and sf:
+                                col_map[h] = sf
 
-                    del csv_bytes  # 释放内存
+                    mapped_fields = set(col_map.values())
+                    dt = _guess_data_type(mapped_fields)
+                    miss_req, miss_rec = _detect_missing_fields(dt, mapped_fields)
+
+                    if miss_req and dt in ("balance", "ledger", "aux_balance", "aux_ledger", "account_chart"):
+                        diagnostics.append({"file": filename, "sheet": sname, "data_type": dt,
+                                            "row_count": total_rows_est, "status": "skipped",
+                                            "missing_cols": miss_req, "missing_recommended": miss_rec,
+                                            "message": f"缺少必需列: {', '.join(miss_req)}"})
+                        continue
+
+                    logger.info("[PERF] calamine header parsed '%s': dt=%s, %d cols mapped, %.2fs",
+                                sname, dt, len(col_map), _perf_time.perf_counter() - _t_cal_read)
+
+                    # ── 第二步：逐批读取数据行，直接转 dict 写入数据库 ──
+                    _LEDGER_COLS = COPY_LEDGER_COLS
+                    _AUX_LEDGER_COLS = COPY_AUX_LEDGER_COLS
+                    _BALANCE_COLS = COPY_BALANCE_COLS
+                    _AUX_BALANCE_COLS = COPY_AUX_BALANCE_COLS
+
+                    _t_cal_write = _perf_time.perf_counter()
+                    row_count = 0
+                    _led_buf: list[dict] = []
+                    _aux_led_buf: list[dict] = []
+                    _raw_batch: list[dict] = []  # 攒一批原始行再转换
+                    sheet_counts_cal: dict[str, int] = {"tb_balance": 0, "tb_aux_balance": 0, "tb_ledger": 0, "tb_aux_ledger": 0}
+
+                    for row in sheet.iter_rows():
+                        if row_count <= header_idx:
+                            row_count += 1
+                            continue
+                        row_count += 1
+
+                        # 转成 dict
+                        cells = row
+                        row_dict: dict = {}
+                        for j in range(min(num_cols, len(cells))):
+                            h = headers[j]
+                            mapped = col_map.get(h, h)
+                            v = cells[j]
+                            row_dict[mapped] = str(v).strip() if v is not None else None
+                        _raw_batch.append(row_dict)
+
+                        # 攒满一批再处理
+                        if len(_raw_batch) >= CHUNK:
+                            await _process_cal_batch(_raw_batch, dt, _led_buf, _aux_led_buf,
+                                                     sheet_counts_cal, batches, counts,
+                                                     _BALANCE_COLS, _AUX_BALANCE_COLS,
+                                                     _LEDGER_COLS, _AUX_LEDGER_COLS,
+                                                     project_id, seen_codes, acct_records, by_category)
+                            _raw_batch.clear()
+
+                        # 进度更新
+                        if row_count % 50_000 == 0:
+                            pct = 12 + int(row_count / max(total_rows_est, 1) * 75)
+                            _prog(min(pct, 88), f"{sname}: {row_count:,}/{total_rows_est:,} 行")
+
+                    # 处理剩余
+                    if _raw_batch:
+                        await _process_cal_batch(_raw_batch, dt, _led_buf, _aux_led_buf,
+                                                 sheet_counts_cal, batches, counts,
+                                                 _BALANCE_COLS, _AUX_BALANCE_COLS,
+                                                 _LEDGER_COLS, _AUX_LEDGER_COLS,
+                                                 project_id, seen_codes, acct_records, by_category)
+
+                    # flush 剩余缓冲
+                    if _led_buf:
+                        n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
+                        counts["tb_ledger"] += n
+                        sheet_counts_cal["tb_ledger"] += n
+                    if _aux_led_buf:
+                        n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
+                        counts["tb_aux_ledger"] += n
+                        sheet_counts_cal["tb_aux_ledger"] += n
+
+                    _cal_elapsed = _perf_time.perf_counter() - _t_cal_write
+                    data_rows = row_count - header_idx - 1
+                    logger.info("[PERF] calamine sheet '%s' (%s): %d rows in %.2fs (%.0f rows/s), "
+                                "bal=%d aux_bal=%d led=%d aux_led=%d",
+                                sname, dt, data_rows, _cal_elapsed,
+                                data_rows / _cal_elapsed if _cal_elapsed > 0.001 else 0,
+                                sheet_counts_cal["tb_balance"], sheet_counts_cal["tb_aux_balance"],
+                                sheet_counts_cal["tb_ledger"], sheet_counts_cal["tb_aux_ledger"])
+
+                    diagnostics.append({
+                        "file": filename, "sheet": sname, "data_type": dt,
+                        "row_count": data_rows, "status": "ok",
+                        "matched_cols": sorted(mapped_fields),
+                        "missing_cols": miss_req, "missing_recommended": miss_rec,
+                    })
 
                 continue
             except Exception as e:
-                logger.warning("calamine 解析失败，降级为 openpyxl: %s", e)
+                import traceback
+                logger.warning("calamine 解析失败，降级为 openpyxl: %s\n%s", e, traceback.format_exc())
                 # 降级到下面的 openpyxl 路径
 
         # ── openpyxl 降级路径（calamine 不可用或解析失败时） ──
