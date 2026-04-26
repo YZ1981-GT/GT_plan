@@ -80,7 +80,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listPosts, createPost, getComments, createComment, likePost, type ForumPostItem } from '@/services/phase10Api'
+import { listPosts, createPost, getComments, createComment, likePost, type ForumPostItem } from '@/services/enhancedApi'
 import { EditPen, Hide, Promotion } from '@element-plus/icons-vue'
 
 const category = ref('')

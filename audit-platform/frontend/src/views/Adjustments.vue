@@ -1,8 +1,15 @@
 <template>
   <div class="gt-adjustments gt-fade-in">
-    <div class="gt-adj-header">
-      <h2 class="gt-page-title">调整分录</h2>
-      <el-button type="primary" @click="openCreateDialog">新建分录</el-button>
+    <!-- 页面横幅 -->
+    <div class="gt-adj-banner">
+      <div class="gt-adj-banner-text">
+        <h2>调整分录</h2>
+        <p>AJE {{ summary?.aje_count || 0 }} 笔 · RJE {{ summary?.rje_count || 0 }} 笔</p>
+      </div>
+      <div class="gt-adj-banner-actions">
+        <el-button size="small" type="primary" @click="openCreateDialog" round>新建分录</el-button>
+        <el-button size="small" @click="onExportSummary" round>导出汇总</el-button>
+      </div>
     </div>
 
     <!-- 汇总面板 -->
@@ -360,6 +367,15 @@ async function batchReview(status: string) {
   fetchSummary()
 }
 
+function onExportSummary() {
+  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
+    downloadFileAsBlob(
+      `/api/projects/${projectId.value}/adjustments/export-summary?year=${year.value}&format=excel`,
+      `审计调整汇总_${year.value}.xlsx`
+    )
+  })
+}
+
 watch(
   () => [projectId.value, routeYear.value],
   async () => {
@@ -373,18 +389,88 @@ watch(
 </script>
 
 <style scoped>
-.gt-adjustments { padding: var(--gt-space-4); }
-.gt-adj-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
-.gt-summary-panel { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-4); flex-wrap: wrap; }
-.gt-summary-card {
-  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-3) var(--gt-space-4);
-  box-shadow: var(--gt-shadow-sm); min-width: 120px; text-align: center;
+.gt-adjustments { padding: var(--gt-space-5); }
+
+/* ── 页面横幅 ── */
+.gt-adj-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 20px 28px;
+  margin-bottom: var(--gt-space-5);
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
 }
-.gt-summary-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
-.gt-summary-value { display: block; font-size: var(--gt-font-size-xl); font-weight: 600; color: var(--gt-color-primary); }
+.gt-adj-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 45%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.gt-adj-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+.gt-adj-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-adj-banner-actions { position: relative; z-index: 1; }
+.gt-adj-banner-actions .el-button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
+.gt-adj-banner-actions .el-button:hover { background: rgba(255,255,255,0.3); }
+
+/* 汇总面板 */
+.gt-summary-panel { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-5); flex-wrap: wrap; }
+.gt-summary-card {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-4) var(--gt-space-5);
+  box-shadow: var(--gt-shadow-sm); min-width: 140px; text-align: center;
+  border: 1px solid rgba(75, 45, 119, 0.04);
+  transition: all var(--gt-transition-base);
+  position: relative; overflow: hidden;
+}
+.gt-summary-card:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow-md); }
+.gt-summary-card::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--gt-gradient-primary);
+  opacity: 0;
+  transition: opacity var(--gt-transition-fast);
+}
+.gt-summary-card:hover::after { opacity: 1; }
+.gt-summary-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+.gt-summary-value { display: block; font-size: var(--gt-font-size-2xl); font-weight: 800; color: var(--gt-color-primary); margin: 4px 0; letter-spacing: -0.5px; }
 .gt-summary-sub { display: block; font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 2px; }
-.gt-adj-batch-actions { display: flex; align-items: center; gap: var(--gt-space-2); margin-top: var(--gt-space-3); }
-.gt-adj-line-items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-2); font-weight: 600; }
-.gt-adj-balance-diff { text-align: right; font-size: var(--gt-font-size-sm); color: var(--gt-color-success); }
-.gt-adj-balance-diff.gt-adj-unbalanced { color: var(--gt-color-coral); font-weight: 600; }
+
+/* 批量操作 */
+.gt-adj-batch-actions {
+  display: flex; align-items: center; gap: var(--gt-space-3);
+  margin-top: var(--gt-space-4);
+  padding: var(--gt-space-3) var(--gt-space-4);
+  background: linear-gradient(135deg, #f8f6fb, #f4f0fa);
+  border-radius: var(--gt-radius-md);
+  border: 1px solid rgba(75, 45, 119, 0.08);
+}
+
+/* 行项明细 */
+.gt-adj-line-items-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--gt-space-2); font-weight: 600;
+  padding-bottom: var(--gt-space-2);
+  border-bottom: 1px solid rgba(75, 45, 119, 0.06);
+}
+
+/* 借贷差额 */
+.gt-adj-balance-diff {
+  text-align: right; font-size: var(--gt-font-size-sm);
+  padding: var(--gt-space-2) var(--gt-space-3);
+  border-radius: var(--gt-radius-sm);
+  background: var(--gt-color-success-light);
+  color: var(--gt-color-success); font-weight: 600;
+  margin-top: var(--gt-space-2);
+}
+.gt-adj-balance-diff.gt-adj-unbalanced {
+  background: var(--gt-color-coral-light);
+  color: var(--gt-color-coral);
+}
+
+:deep(.el-tabs__item.is-active) { font-weight: 600; }
 </style>

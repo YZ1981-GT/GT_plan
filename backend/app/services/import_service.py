@@ -6,6 +6,7 @@ Validates: Requirements 4.3, 4.4, 4.5, 4.6, 4.21, 4.22, 4.23
 import logging
 from datetime import datetime
 from decimal import Decimal
+from typing import BinaryIO
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile
@@ -47,6 +48,7 @@ _TABLE_MAP = {
 }
 
 CHUNK_SIZE = 10000
+STREAMING_THRESHOLD_MB = 20
 
 
 # ---------------------------------------------------------------------------
@@ -629,20 +631,16 @@ async def _soft_delete_existing(
 
 async def start_import_streaming(
     project_id: UUID,
-    content: bytes,
+    content: bytes | BinaryIO,
     data_type: str,
     year: int,
     db: AsyncSession,
     batch_id: UUID | None = None,
-) -> dict:
-    """流式导入大 Excel 文件 — 分批解析+分批校验+分批写入。
-
-    使用 GenericParser.parse_streaming() 流式读取，避免一次性加载到内存。
-    适用于 26 万+行的大文件。CSV 文件仍用原有 start_import() 逻辑。
-
-    Returns:
-        {"record_count": int, "batch_id": UUID}
-    """
+    on_duplicate: str = "skip",
+    source_type: str = "generic",
+    file_name: str | None = None,
+) -> ImportBatch:
+    """Streaming import for large Excel/CSV files with chunked parse+insert."""
     data_type = normalize_data_type(data_type)
     table_model = _TABLE_MAP[data_type]
 
@@ -650,8 +648,8 @@ async def start_import_streaming(
     batch = ImportBatch(
         project_id=project_id,
         year=year,
-        source_type="generic",
-        file_name="streaming_import",
+        source_type=source_type,
+        file_name=file_name or "streaming_import",
         data_type=data_type,
         status=ImportStatus.processing,
         started_at=datetime.utcnow(),
@@ -665,6 +663,25 @@ async def start_import_streaming(
     total_rows = 0
 
     try:
+        existing_count = await _count_existing_records(project_id, year, data_type, db)
+        if existing_count > 0:
+            if on_duplicate == "error":
+                batch.status = ImportStatus.failed
+                batch.validation_summary = {
+                    "error": f"已存在 {existing_count} 条{data_type}数据（{year}年度），请选择覆盖或跳过",
+                    "existing_count": existing_count,
+                    "duplicate_action_required": True,
+                }
+                batch.completed_at = datetime.utcnow()
+                await db.commit()
+                return batch
+            if on_duplicate == "overwrite":
+                old_count = await _soft_delete_existing(project_id, year, data_type, db)
+                logger.info(
+                    "Streaming overwrite mode: soft-deleted %d existing records",
+                    old_count,
+                )
+
         for chunk in parser.parse_streaming(content, data_type, chunk_size=CHUNK_SIZE):
             if not chunk:
                 continue
@@ -711,18 +728,20 @@ async def start_import_streaming(
         # 回填 account_name
         await _backfill_account_names(project_id, batch.id, data_type, db)
 
-        return {"record_count": total_rows, "batch_id": batch.id}
+        return batch
 
     except Exception as e:
         logger.exception("Streaming import failed: %s", e)
-        batch.status = ImportStatus.failed
-        batch.validation_summary = {"error": str(e)}
-        batch.completed_at = datetime.utcnow()
         try:
             await db.rollback()
         except Exception:
             pass
-        raise
+        batch.status = ImportStatus.failed
+        batch.validation_summary = {"error": str(e)}
+        batch.completed_at = datetime.utcnow()
+        db.add(batch)
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
 
 
 async def check_duplicates(

@@ -9,6 +9,7 @@ import io
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from typing import BinaryIO
 
 from fastapi import HTTPException
 
@@ -482,7 +483,7 @@ class GenericParser(BaseParser):
     _SKIP_SHEET_KEYWORDS = ["说明", "目录", "封面", "模板", "template", "readme"]
 
     def parse_streaming(
-        self, content: bytes, data_type: str, chunk_size: int = 1000,
+        self, content: bytes | BinaryIO, data_type: str, chunk_size: int = 1000,
     ):
         """流式解析 Excel 文件 — 每次 yield 一批已解析的行。
 
@@ -502,16 +503,25 @@ class GenericParser(BaseParser):
         data_type = normalize_data_type(data_type)
         column_map = _COLUMN_MAPS[data_type]
 
+        workbook_input: bytes | BinaryIO
+        if hasattr(content, "seek"):
+            content.seek(0)
+            workbook_input = content
+        else:
+            workbook_input = io.BytesIO(content)
+
         try:
             import openpyxl
             wb = openpyxl.load_workbook(
-                io.BytesIO(content), read_only=True, data_only=True,
+                workbook_input, read_only=True, data_only=True,
             )
         except Exception:
-            # 非 Excel 文件，回退到全量解析
-            all_rows = self.parse(content, data_type)
-            if all_rows:
-                yield all_rows
+            # 非 Excel 文件，使用 CSV 分块流式解析，避免全量加载到内存。
+            for rows in self._parse_csv_streaming(content, chunk_size):
+                normalized = self._normalize_columns(rows, column_map)
+                parsed = self._parse_values(normalized, data_type)
+                if parsed:
+                    yield parsed
             return
 
         try:
@@ -685,6 +695,65 @@ class GenericParser(BaseParser):
 
         reader = csv.DictReader(io.StringIO(text))
         return list(reader)
+
+    def _parse_csv_streaming(self, content: bytes | BinaryIO, chunk_size: int):
+        """Parse CSV in chunks to keep memory usage bounded for large files."""
+        if hasattr(content, "read"):
+            binary = content
+            encodings = ("utf-8-sig", "gbk", "utf-8")
+            for encoding in encodings:
+                text_stream = None
+                try:
+                    if hasattr(binary, "seek"):
+                        binary.seek(0)
+                    text_stream = io.TextIOWrapper(binary, encoding=encoding, newline="")
+                    reader = csv.DictReader(text_stream)
+                    chunk: list[dict] = []
+                    for row in reader:
+                        chunk.append(row)
+                        if len(chunk) >= chunk_size:
+                            yield chunk
+                            chunk = []
+                    if chunk:
+                        yield chunk
+                    return
+                except UnicodeDecodeError:
+                    continue
+                finally:
+                    if text_stream is not None:
+                        try:
+                            text_stream.detach()
+                        except Exception:
+                            pass
+
+            raise HTTPException(
+                status_code=400,
+                detail="无法识别文件编码，请使用 UTF-8 或 GBK 编码",
+            )
+        else:
+            raw = content
+
+        for encoding in ("utf-8-sig", "gbk", "utf-8"):
+            try:
+                text = raw.decode(encoding)
+                break
+            except (UnicodeDecodeError, ValueError):
+                continue
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="无法识别文件编码，请使用 UTF-8 或 GBK 编码",
+            )
+
+        reader = csv.DictReader(io.StringIO(text))
+        chunk: list[dict] = []
+        for row in reader:
+            chunk.append(row)
+            if len(chunk) >= chunk_size:
+                yield chunk
+                chunk = []
+        if chunk:
+            yield chunk
 
     def _normalize_columns(
         self, rows: list[dict], column_map: dict[str, str]

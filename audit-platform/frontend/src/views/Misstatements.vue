@@ -1,8 +1,14 @@
 <template>
   <div class="gt-misstatements gt-fade-in">
-    <div class="gt-ms-header">
-      <h2 class="gt-page-title">未更正错报汇总</h2>
-      <el-button type="primary" @click="openCreateDialog">新增错报</el-button>
+    <!-- 页面横幅 -->
+    <div class="gt-ms-banner">
+      <div class="gt-ms-banner-text">
+        <h2>未更正错报汇总</h2>
+        <p>累计错报 vs 重要性水平</p>
+      </div>
+      <div class="gt-ms-banner-actions">
+        <el-button size="small" @click="openCreateDialog" round>新增错报</el-button>
+      </div>
     </div>
 
     <!-- 重要性水平对比卡片 -->
@@ -257,15 +263,54 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.gt-misstatements { padding: var(--gt-space-4); }
-.gt-ms-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
-.gt-ms-materiality-cards { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-4); flex-wrap: wrap; }
-.gt-ms-mat-card {
-  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-3) var(--gt-space-4);
-  box-shadow: var(--gt-shadow-sm); min-width: 130px; text-align: center;
+.gt-misstatements { padding: var(--gt-space-5); }
+
+/* ── 页面横幅 ── */
+.gt-ms-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 20px 28px;
+  margin-bottom: var(--gt-space-5);
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
 }
-.gt-ms-mat-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
-.gt-ms-mat-value { display: block; font-size: var(--gt-font-size-xl); font-weight: 600; color: var(--gt-color-primary); }
+.gt-ms-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 45%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.gt-ms-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+.gt-ms-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-ms-banner-actions { position: relative; z-index: 1; }
+.gt-ms-banner-actions .el-button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
+.gt-ms-banner-actions .el-button:hover { background: rgba(255,255,255,0.3); }
+
+.gt-ms-materiality-cards { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-5); flex-wrap: wrap; }
+.gt-ms-mat-card {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-4) var(--gt-space-5);
+  box-shadow: var(--gt-shadow-sm); min-width: 150px; text-align: center;
+  border: 1px solid rgba(75, 45, 119, 0.04);
+  transition: all var(--gt-transition-base);
+  position: relative; overflow: hidden;
+}
+.gt-ms-mat-card:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow-md); }
+.gt-ms-mat-card::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--gt-gradient-primary);
+  opacity: 0;
+  transition: opacity var(--gt-transition-fast);
+}
+.gt-ms-mat-card:hover::after { opacity: 1; }
+.gt-ms-mat-label { display: block; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); font-weight: 500; }
+.gt-ms-mat-value { display: block; font-size: var(--gt-font-size-xl); font-weight: 800; color: var(--gt-color-primary); margin-top: 4px; letter-spacing: -0.3px; }
 .gt-ms-mat-value.gt-ms-exceeded { color: var(--gt-color-coral); }
 .gt-ms-mat-value.gt-ms-complete { color: var(--gt-color-success); }
 .gt-ms-mat-value.gt-ms-incomplete { color: var(--gt-color-coral); }

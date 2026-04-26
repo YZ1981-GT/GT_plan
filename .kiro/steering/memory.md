@@ -240,6 +240,14 @@ inclusion: always
 ## 技术决策
 - AI 记忆方案：放弃 mem0 本地部署（太重6GB+），改用 Kiro 原生 steering + hook 轻量方案
 - 记忆系统架构：memory.md (always steering) + auto-save-memory hook (agentStop 触发自动保存)
+- 审计报告模板占位符替换：_build_placeholders 从 project.wizard_state.basic_info 读取 client_name 自动填入 {entity_name}，{entity_short_name} 默认用全称加引号（用户可手动修改），{report_scope} 根据 report_scope=consolidated 自动替换为"合并及母公司"
+- 审计报告模板种子数据升级（2026-04-26）：从简化7段升级为致同标准完整版（审计师责任段含5项具体工作描述+签章段独立），保留/否定/无法表示意见模板补充了形成基础段占位符
+- 顶部栏UI改进（2026-04-26）：6个纯图标按钮改为带文字标签的胶囊按钮组（知识库/私人库/AI/社区），系统操作类保留纯图标缩小为辅助级别；去掉"排版模板"入口减少噪音
+- 首页/看板动画增强（2026-04-26）：统计卡片数字改为 easeOutCubic 动画计数器（800ms），欢迎横幅加浮动粒子+旋转装饰SVG，管理看板顶部改为紫色渐变横幅，图表条形图改为渐变色
+- 报表引擎6个bug修复（2026-04-26）：①generate_unadjusted_report参数传递错误（project_id当作applicable_standard导致未审报表永远返回空）②_generate_report未保存indent_level/is_total_row到FinancialReport表 ③FinancialReport模型缺少indent_level/is_total_row两列（需ALTER TABLE补齐）④_COLUMN_MAP从3个扩展到8个（新增审定数/期初余额/未审数/RJE调整/AJE调整）⑤SUM_TB未审模式下_period_amount仍用audited_amount ⑥audit_report_service.py f-string中文弯引号SyntaxError
+- FinancialReport表新增列（2026-04-26）：indent_level INTEGER DEFAULT 0 + is_total_row BOOLEAN DEFAULT false，需在本地PG执行 ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS indent_level INTEGER DEFAULT 0; ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS is_total_row BOOLEAN DEFAULT false;
+- 调整分录→试算表→报表联动排查确认（2026-04-26）：事件驱动链路完整无bug，ADJUSTMENT_CREATED/UPDATED/DELETED → on_adjustment_changed增量重算rje/aje/audited → TRIAL_BALANCE_UPDATED → regenerate_affected增量更新报表 → REPORTS_UPDATED → 附注/审计报告刷新；EventBus 500ms debounce防重复
+- 全页面UI横幅统一（2026-04-26）：WorkpaperList/ConsolidationIndex/PDFExportPanel/Drilldown 4个页面从简单标题升级为紫色渐变横幅（网格纹理+径向光晕），与首页/管理看板/报表/试算表/调整分录/附注/审计报告/CFS/重要性/未更正错报风格统一
 - UTF-8 BOM 防御：所有 Python 脚本读取 JSON/HTML 文件统一用 `utf-8-sig` 编码
 - Word 导出统一排版规范：仿宋_GB2312+Arial Narrow、页边距3/3.18/3.2/2.54cm、表格上下1磅边框无左右、高风险标红、页脚页码
 - 底稿复核编制单位提取：ReviewEngine._extract_entity_name() 从 content_text 前2000字符正则匹配
@@ -290,6 +298,9 @@ inclusion: always
 - 回收站偏好：所有删除操作先进回收站（软删除），回收站上限 500 条超限提示清理；左侧栏底部显示回收站入口；支持按类型筛选、恢复、永久删除、清空
 - 文档同步偏好：每次功能变更后需同步更新需求文档（需求文档.md），保持文档与代码一致
 - 科目导入后预览偏好：按大类（资产/负债/权益/损益）Tab 分组，树形展开默认只展开1级科目（不全展开），每个节点显示科目编码+名称+借贷+级次，支持行内编辑（名称+借贷方向）和批量保存
+- 审计报告正文模板偏好：预设模板自动带入单位全称（从 client_name），简称需用户手动填入；报表口径（单体/合并）自动替换占位符；所有段落生成后必须支持用户二次编辑修改；财务数据刷新后保留用户已编辑的段落内容
+- 报表/附注/试算表编辑偏好：自动刷新数据后必须支持用户再次编辑修改，不能覆盖用户手动修改的内容；附注表格单元格支持 auto（自动提数）和 manual（手动编辑）两种模式，手动编辑不被刷新覆盖
+- 审计报告模板体系：4个维度（意见类型×公司类型×报表口径×单体/合并），种子数据已升级为致同标准7段式（审计意见/形成基础/关键审计事项/其他信息/管理层治理层责任/审计师责任/签章），占位符支持 {entity_name}/{entity_short_name}/{report_scope}/{audit_period}/{audit_year}/{signing_partner}/{report_date}
 
 ## 待办 / 进行中
 - 项目文件清理（2026-04）：已删除根目录 `__pycache__/`、`frontend/README.md`；`GT_底稿/审计实务操作手册-框架.md` 和 `致同GT审计手册设计规范.md` 待用户确认是否删除
@@ -300,7 +311,7 @@ inclusion: always
 - 四表导入链路审查与修复（2026-04-25）：7个核心问题全部修复（commit be5d514）——①后端balance/ledger/aux_balance/aux_ledger关键列缺失时阻断导入 ②CSV预览改为走smart_import_engine统一路径 ③前端确认导入按钮增加关键列硬阻断（_REQUIRED_FIELDS_BY_TYPE与后端一致） ④独立辅助表文件支持直接入库 ⑤前端列映射变更后实时重新推断数据类型（_guessDataTypeFrontend） ⑥数据类型标签随映射变更实时更新 ⑦预览和导入解析路径统一
 - Excel大文件流式入库改造（2026-04-25，commit 98f3f22）：smart_import_streaming中Excel处理从smart_parse_sheet（全量读到内存）改为parse_sheet_header_only()+iter_sheet_rows()逐批流式；新增两个函数：parse_sheet_header_only只读表头零内存、iter_sheet_rows生成器每批50000行；百万行序时账峰值内存从~3.5GB降到~100MB；CSV流式处理（_stream_csv_import）保持不变已经是流式的
 - Excel合并单元格表头与数据行分离（2026-04-25，commit 99d32ce）：之前有合并单元格的文件整个用完整模式打开（百万行十几秒），改为完整模式只读表头（缓存到header_cache后关闭），数据行始终用read_only流式读取；打开时间从十几秒降到1-2秒
-- Excel导入calamine加速（2026-04-25，commit acafd7f）：新增python-calamine 0.6.2依赖（Rust Excel解析器），Excel大文件优先用calamine秒级读取→转CSV bytes→走_stream_csv_import快速路径（COPY写入），比openpyxl快10-50倍；calamine不可用时自动降级为openpyxl；百万行序时账从~53秒降到~18秒
+- Excel导入calamine加速（2026-04-25→26重写，commit ff7cfc9+c07d343）：calamine iter_rows逐行读取→每5万行攒一批→convert_balance/ledger_rows→_batch_insert直接写入DB，跳过CSV中间步骤（省掉500MB CSV字符串生成+解析）；每批处理后await asyncio.sleep(0)让出事件循环让进度轮询能响应；百万行序时账总耗时~66秒（calamine遍历38s+Python转换5s+DB写入20s），Excel格式固有限制无法再快，CSV上传可降到15-20秒
 - 导入性能优化（2026-04-25）：①convert_ledger_rows去掉重复的parse_aux_dimensions调用 ②辅助明细行从{**row}全量复制改为只取9个关键列 ③Excel文件打开次数从4次降到最多2次
 - 导入慢根因定位（2026-04-26，commit b41edcd）：通过[PERF]日志定位两个根因——①_clear_project_year_tables DELETE 0行花11秒（tb_aux_ledger 874万行全索引扫描），改为只UPDATE ImportBatch状态为rolled_back（毫秒级）②预览阶段每个Excel打开两次（probe+open），合并为一次打开（序时账160MB从10.63s降到~6s）
 - 数据库实际数据量（2026-04-26）：tb_aux_ledger 874万行、tb_ledger 322万行、tb_balance 814行；表不是分区表（relkind=r普通表）
@@ -311,6 +322,62 @@ inclusion: always
 - 导入重置按钮偏好（2026-04-25）：重置按钮放在顶部栏知识库图标左侧（ThreeColumnLayout.vue，所有页面全局可见），按钮名称叫「重置」；点击后自动从路由提取projectId+二次确认+调import-reset+结束当前任务+恢复前端；项目详情页快捷操作区也有重置按钮（DetailProjectPanel.vue）；AccountImportStep顶部也有常驻重置按钮
 - 全局重置改为强制刷新（2026-04-25，commit 66ca776+df29993）：从dispatch CustomEvent改为window.location.reload()强制刷新页面；重置前先调/api/health检测后端（3秒超时），后端存活则释放锁+刷新，后端不可用则弹窗提示原因+手动重启命令+刷新；smart-import端点新增800MB文件总大小限制（防OOM杀死后端）
 - 用户计划对每个细分程序逐一打磨升级
+- 底稿落地整合方案（2026-04-26，结合"问题"文件复盘）：4个阶段——①补硬现有主链路（复核前端操作闭环+在线编辑主打开链收口+离线回传闭环+附件下载权限统一）②底稿模板索引与科目映射（扫描脚本scan_wp_templates.py+wp_account_mapping.json四级映射+操作手册结构化+模板文件存储到storage/templates/）③底稿预填充与穿透联动（从trial_balance自动填充审定表+底稿→试算表反向同步+穿透跳转+事件联动DATA_IMPORTED/ADJUSTMENT_CREATED标记prefill_stale）④底稿工作台与LLM集成（WorkpaperWorkbench.vue三栏布局+LLM分析性复核+TSJ提示词注入+底稿对话）
+- 底稿落地阶段一已完成（2026-04-26）：①WorkpaperList.vue新增复核人操作区（一级/二级复核通过+退回修改按钮+退回原因弹窗），调用PUT /review-status端点 ②wp_download.py全部5个端点升级为require_project_access ③submit-review后端已强制edit_complete+4项门禁 ④在线编辑主打开链确认完整（getOnlineEditSession→wopi_src→getWopiEditorUrl→ONLYOFFICE hosting/wopi/cell）
+- 底稿落地阶段二已完成（2026-04-26）：①scan_wp_templates.py扫描生成363个底稿模板索引（A59/B56/C50/D17/E5/F15/G15/H11/I6/J3/K14/L9/M10/N5/S87）②wp_account_mapping.json 38条映射覆盖D-N全部主要循环 ③wp_mapping_service.py映射服务（按底稿/科目/附注三维查找+get_prefill_data从试算表取数）④wp_mapping.py 5个API端点已注册到main.py ⑤workpaperApi.ts新增3个前端API函数
+- 底稿落地阶段三已完成（2026-04-26）：①TrialBalance.vue科目编码列可点击跳转关联底稿（Link图标+wpMappingIndex） ②event_handlers.py新增WORKPAPER_SAVED事件处理器（底稿上传后自动比对parsed_data.audited_amount与trial_balance汇总，写入wp_consistency状态） ③prefill_stale事件联动已确认完整
+- 底稿落地阶段四已完成（2026-04-26）：WorkpaperWorkbench.vue底稿工作台三栏布局（左栏按D-N循环分组底稿树+搜索+状态图标，中栏试算表数据卡片+科目明细表+穿透跳转按钮，右栏AI审计助手面板+按科目审计要点+提问输入框），路由/projects/:projectId/workpaper-bench已注册，DetailProjectPanel快捷操作新增"底稿工作台"入口
+- 底稿落地深化优化已完成（2026-04-26）：①TSJ提示词库接入✅（tsj_prompt_service.py从TSJ/目录加载70个Markdown，按科目匹配提取审计要点/检查清单/风险分级，GET /wp-mapping/tsj/{account_name}端点，前端动态加载替代硬编码fallback）②AI提问接入✅（右栏提问按钮调用/api/chat/stream传入底稿上下文，回答显示在水鸭蓝卡片，LLM不可用时友好提示）③批量预填充保持提示状态（后台任务，不阻断工作流）④"仅我的"checkbox已有UI待后端过滤（需WorkingPaper.assigned_to关联查询）
+- 审计助理视角需求清单（2026-04-26）：11项全部✅完成——必须有4项（底稿清单/数据填充/附件关联/复核追踪），很想要4项（穿透查询/变动分析AI/附件OCR/多人进度），锦上添花3项（审计程序检查清单/历史底稿参照/底稿模板智能推荐）
+- 底稿模板智能推荐已完成（2026-04-26）：后端recommend_workpapers方法（查询试算表有余额科目→匹配wp_account_mapping→补充通用必编B1/B60/A1→合并报表额外推荐B12/A1-14），前端横幅"智能推荐底稿"按钮+推荐面板（网格布局，编码+名称+必编/建议标签+原因，可收起），GET /wp-mapping/recommend端点
+- 项目经理视角需求清单（2026-04-26）：P0——待复核收件箱（列出所有待我复核的底稿按提交时间排序）、项目进度总览看板（每个循环/底稿状态可视化）；P1——团队任务分配（底稿工作台内直接分配）、审计调整汇总导出（AJE/RJE汇总Word/Excel给客户确认）、项目进度简报AI生成；P2——底稿交叉引用检查、客户沟通记录关联底稿；P3——底稿模板自定义、离线模式
+- 项目经理视角功能已实现（2026-04-26）：①pm_service.py（ReviewInboxService/BatchReviewService/ProjectProgressService/ProgressBriefService/CrossRefCheckService/ClientCommunicationService 6个服务）②pm_dashboard.py路由9个端点（全局+项目级收件箱/批量复核/进度看板/进度简报/交叉引用/客户沟通CRUD）③ReviewInbox.vue待复核收件箱（全局+项目级，表格多选+批量通过退回+退回原因弹窗）④ProjectProgressBoard.vue进度看板（四列看板+统计卡片+表格/简报三视图+调整汇总导出+交叉引用检查弹窗+客户沟通记录面板）⑤pmApi.ts前端API服务层 ⑥WorkpaperWorkbench.vue新增"分配"按钮+弹窗（编制人/复核人下拉从人员库加载）⑦doneCount从硬编码0改为真实底稿状态统计+树节点图标动态显示（⬜/📝/🔍/↩️/✅）
+- 质控复核人员视角功能已实现（2026-04-26）：①qc_dashboard_service.py（QCDashboardService/StaffProgressService/ReviewIssueTracker/ArchiveReadinessService 4个服务）②qc_dashboard.py路由4个端点（QC总览/按人员进度/未解决意见/归档前检查）③QCDashboard.vue质控看板（4Tab：质量总览+人员进度+未解决意见+归档检查，统计卡片+复核状态分布+最近失败列表+人员完成率进度条+归档5项检查清单）④qcDashboardApi.ts前端API服务层 ⑤QC规则做实：QC-10交叉引用存在性/QC-12抽样完整性/QC-13调整录入/QC-14编制日期合理性（从stub改为真实检查）⑥DetailProjectPanel新增"质控看板"快捷入口 ⑦路由/projects/:projectId/qc-dashboard已注册
+- QC规则现状（2026-04-26）：14条规则中5条阻断级全部做实（QC-01结论非空/QC-02 AI确认/QC-03公式一致/QC-04复核人分配/QC-05未解决批注），4条警告级做实（QC-10/12/13/14），4条警告级仍为stub（QC-06人工填写区/QC-07合计数/QC-08交叉索引一致/QC-09索引登记——需parsed_data结构化后才能校验）
+- 合伙人视角功能已实现（2026-04-26）：①partner_service.py（PartnerOverviewService/SignReadinessService/TeamEfficiencyService 3个服务）②partner_dashboard.py路由3个端点（全局总览/签字前检查/团队效能）③PartnerDashboard.vue合伙人看板（3Tab：项目总览风险排序+待签字+团队效能，风险预警横幅，签字前8项检查弹窗：二级复核/QC/意见/调整/错报/报告/KAM/独立性）④partnerApi.ts前端API服务层 ⑤左侧导航新增"合伙人看板"（TrendCharts图标，路由/dashboard/partner）
+- 四种角色看板体系（2026-04-26）：审计助理→底稿工作台WorkpaperWorkbench、项目经理→待复核收件箱ReviewInbox+进度看板ProjectProgressBoard、质控人员→QC看板QCDashboard、合伙人→合伙人看板PartnerDashboard；每个角色有独立的后端服务+路由+前端页面+API服务层
+- 多角色×多项目身份体系已实现（2026-04-26）：①role_context_service.py（RoleContextService：三层身份打通project_users→project_assignments→users.role降级+动态导航菜单+首页个性化内容）②role_context.py路由4个端点（/api/role-context/me全局上下文+me/nav导航+me/homepage首页+project/{id}项目角色）③roleContext.ts Pinia store（effectiveRole/canEditInProject/canReviewInProject getter）④DefaultLayout.vue集成onMounted初始化+watch projectId自动加载项目角色
+- 委派自动同步project_users已实现（2026-04-26）：AssignmentService.save_assignments新增_sync_project_users方法，委派时自动upsert project_users记录（角色映射：signing_partner/partner→review，manager→review，qc→review，auditor→edit），解决委派与require_project_access权限脱节问题
+- 底稿预填充从stub做实（2026-04-26）：prefill_engine.py的prefill_workpaper_real()真正打开.xlsx，正则扫描5种公式（TB/SUM_TB/AUX/PREV/WP），批量调用FormulaEngine执行，结果写回单元格值，原始公式保留到openpyxl Comment；working_paper.py的prefill端点已切换到真实实现
+- 底稿解析回写从stub做实（2026-04-26）：prefill_engine.py的parse_workpaper_real()打开.xlsx（data_only=True），关键词搜索提取审定数/未审数/AJE/RJE/结论文本/交叉引用（=WP()），写入WorkingPaper.parsed_data JSONB；WOPI put_file保存后自动create_task触发解析；QC规则QC-01/QC-03现在能从真实parsed_data检查
+- 底稿模板文件实际复制已实现（2026-04-26）：template_engine.py的generate_project_workpapers从stub改为真正复制模板.xlsx到storage/projects/{id}/workpapers/，优先从gt_template_library.json索引的file_path复制→其次WpTemplate.file_path→兜底创建空白xlsx（openpyxl生成含底稿编号/名称/年度的空白文件）
+- ONLYOFFICE插件挂载配置（2026-04-26）：docker-compose.yml的onlyoffice服务volumes新增audit-formula和audit-review两个插件目录挂载到/var/www/onlyoffice/documentserver/sdkjs-plugins/
+- 底稿编制全生命周期7环节复盘验证（2026-04-26）：全部做实无stub残留——①模板生成（shutil.copy2真实复制）②预填充（openpyxl扫描5种公式+FormulaEngine执行+写回+comment保留）③在线编辑（WOPI+3个插件+锁刷新+降级）④保存（8步企业级put_file）⑤解析回写（提取审定数/结论/交叉引用→parsed_data）⑥级联更新（WORKPAPER_SAVED事件）⑦离线编辑（下载+上传+冲突检测+自动解析）
+- 底稿复盘修复4项（2026-04-26）：①WOPI put_file自动解析改为独立session的create_task（避免主请求session关闭后失效）②parse_workpaper_real从read_only=True改为False（需随机访问右侧/下方单元格）③结论文本提取增加右侧+下方单元格两种模式 ④WpUploadService.upload_file解析调用从旧ParseService stub切换到parse_workpaper_real
+- 底稿按循环分目录预设（2026-04-26）：generate_project_workpapers文件路径从storage/projects/{id}/workpapers/{code}.xlsx改为storage/projects/{id}/workpapers/{cycle}/{code}.xlsx，按审计循环（D/E/F/G/H/I/J/K/L/M/N/A/S）自动创建子目录
+- 程序裁剪与底稿生成联动（2026-04-26）：generate_project_workpapers新增查询procedure_instances表，跳过status=skip/not_applicable的底稿；init_from_templates优先从gt_template_library.json（363条）加载不再依赖WpTemplate表；完整链路：ProcedureTrimming裁剪→generate跳过被裁剪→assign委派→MyProcedureTasks只显示execute+assigned_to=当前用户
+- MyProcedureTasks从空壳做实（2026-04-26）：获取staff_id→获取参与项目→遍历各循环加载被委派程序→按循环分组+执行状态下拉+完成率进度条+关联底稿跳转；新增PUT /procedures/instance/{id}/execution端点更新执行状态
+- 底稿表头自动填充已实现（2026-04-26）：wp_header_service.py的fill_workpaper_header()两种策略——①模板底稿搜索前10行关键词（编制单位/审计期间/索引号/编制人/复核人/交叉索引）填充右侧空单元格 ②空白底稿按致同标准5行表头布局写入（事务所名称/编制单位+审计期间/底稿名称+索引号/编制人+复核人+日期/交叉索引+审计阶段），仿宋_GB2312+浅紫色背景；在generate_project_workpapers和generate-from-codes两个入口自动触发
+- 底稿交叉索引自动生成（2026-04-26）：get_cross_ref_text()从wp_account_mapping.json读取同循环底稿关联关系（如E1-1自动引用E1-2现金明细+E1-3银行存款），审定表自动引用程序表，超5项截断；填充到表头第5行"交叉索引"字段
+- 底稿智能推荐一键生成（2026-04-26）：WorkpaperWorkbench推荐面板新增"一键生成推荐底稿"按钮，调用POST /generate-from-codes端点（按编码列表直接生成，跳过已存在的底稿，返回created/skipped计数）；生成后自动填充表头
+- 底稿表头信息来源：编制单位→Project.client_name，审计期间→audit_period_start/end（兜底wizard_state.audit_year），索引号→wp_code，交叉索引→同循环底稿+科目映射自动生成，审计阶段→循环前缀映射中文名（B/C→准备阶段，D-N→实施阶段，A→完成阶段）
+- 问题文件整改最终状态（2026-04-26）：A试点前6项（A1✅/A2✅/A3✅/A4⚠️代码完成/A5✅/A6✅），B扩大试点前6项（B1✅/B2✅/B3✅14条QC全部做实/B4⚠️代码完成/B5✅/B6✅），C全所推广前6项（C1✅/C2⚠️代码完成/C3✅/C4⚠️部分完成/C5✅/C6⚠️代码完成）；工作包WP-P0-01~04全部✅，WP-P1-01~03全部✅
+- QC规则14/14全部做实（2026-04-26）：QC-06人工填写区（检查parsed_data审定数/未审数非空）、QC-07合计数（审定数=未审数+AJE+RJE允许1元舍入）、QC-08交叉索引一致（parsed_data.cross_refs对应底稿必须存在）、QC-09索引登记（wp_index记录存在）、QC-11审计程序执行（关联procedure_instance的execution_status=completed）全部从stub做实
+- 进度简报LLM润色已实现（2026-04-26）：ProgressBriefService.generate_brief新增polish_with_llm参数，调用llm_client.chat_completion润色（prompt要求专业简洁+风险提示+下一步建议），前端新增"AI简报"按钮（polish=true），ProgressBrief类型新增raw_summary/llm_polished字段
+- scope_cycles循环级权限过滤已实现（2026-04-26）：WorkingPaperService.list_workpapers新增scope_cycles参数，working_paper.py路由自动从project_users.scope_cycles获取用户循环范围（admin/partner跳过），非空时只返回对应循环底稿
+- 前端动态导航已实现（2026-04-26）：ThreeColumnLayout.vue的navItems从硬编码改为computed，优先从roleContextStore.navItems获取（后端按角色动态返回），降级用硬编码；图标字符串→组件映射（_ICON_MAP）
+- ONLYOFFICE编辑器URL后端统一生成（2026-04-26）：get_online_edit_session返回新增editor_url字段（完整的{onlyoffice_url}/hosting/wopi/cell?WOPISrc=...），前端WorkpaperEditor优先使用session.editor_url降级用getWopiEditorUrl；checkOnlineEditingAvailability增强为同时检查后端/wopi/health和ONLYOFFICE /healthcheck
+- Paperless联调代码补齐（2026-04-26）：attachments.py新增GET /api/attachments/paperless-health（检查Paperless API可达性）+POST /api/attachments/{id}/retry-ocr（重置OCR状态为pending+创建任务中心任务）
+- 备份恢复验证脚本（2026-04-26）：新增backend/scripts/verify_backup.py（检查manifest.json完整性+数据库备份文件可读+抽样20个文件哈希比对+底稿文件计数+输出verification_report.json）
+- 仅剩3项需部署后验证（非代码问题）：①Paperless实机联调（上传→OCR→预览→下载）②归档恢复演练（backup.py→verify_backup.py→抽样核对）③ONLYOFFICE联调（编辑器打开→编辑→保存→版本递增）
+- 问题文件已删除（2026-04-26）：1684行复盘文件所有代码层面事项全部完成，关键结论已沉淀到需求文档v11（版本历史+第9.2章复核流程规则重写）和memory.md
+- 需求文档更新到v11（2026-04-26）：版本历史新增整改成果记录；第9.2章从简化描述重写为实际实现（编制/复核双状态机枚举值+5项提交复核硬门禁+14条QC规则分级清单+四种角色看板体系）；Phase 6/7/8状态升级；核心业务能力表新增25-28；附录B任务状态更新；v10复盘发现66-74标记已修复
+- UI统一化改进（2026-04-26）：新增gt-page-components.css全局页面组件样式库（7类可复用组件：页面横幅3变体+统计卡片6色+看板列+检查清单+风险指示点+简报渲染+团队效能），所有硬编码颜色替换为GT Token变量，横幅升级为网格纹理+径向光晕，4个页面（ReviewInbox/QCDashboard/PartnerDashboard/ProjectProgressBoard）重复样式收口到统一组件
+- UI全面精修层（2026-04-26）：新增gt-polish.css覆盖17类Element Plus组件精细化增强——按钮三段渐变+内发光+hover上浮、表格表头大写间距+紧凑行、标签统一22px+GT Token配色、进度条圆角+弹性动画、页签渐变下划线、输入框双层焦点阴影、树节点32px+当前深紫底、分页器活动页紫色发光、步骤条进行中外发光环、全局微动效统一过渡+焦点可见性+选中文本浅紫底；样式层级：gt-tokens→global→gt-page-components→gt-polish
+- UI精修规范已写入需求文档（2026-04-26）：12.2.1章节新增v11 UI精修规范（按钮/表格/标签/进度条/页签/输入框/树形控件/分页器/步骤条/全局微动效的具体参数）+样式层级架构图
+- 系统评审6个问题修复完成（2026-04-26）：①前端API调用统一✅（110处直接http调用→0处，新增apiProxy.ts代理层+commonApi.ts 40+函数，所有Vue页面统一通过api代理调用）②数据解包统一✅（apiProxy.ts直接返回业务数据，去掉data.data??data）③32个死代码路由文件已删除✅④window.open下载改为downloadFileAsBlob✅（7处受保护文件下载修复）⑤MyProcedureTasks改用commonApi服务层✅⑥ErrorBoundary.vue组件已创建并包裹DefaultLayout的router-view✅
+- 前端API调用规范（2026-04-26技术决策）：所有Vue页面禁止直接import http拼URL，必须通过apiProxy.ts（api.get/post/put/delete直接返回业务数据）或commonApi.ts（按业务域封装的函数）调用；新增文件：apiProxy.ts（代理层）+commonApi.ts（40+通用API函数覆盖项目/人员/看板/回收站/知识库/性能/附件/程序裁剪等）+ErrorBoundary.vue（组件级错误边界）
+- 审计实务4项改进全部完成（2026-04-26）：①底稿列表全局搜索框✅（searchKeyword前端过滤匹配编号+名称，纯前端无延迟）②审定数双击穿透到调整分录✅（WorkpaperWorkbench科目明细表审定数列@dblclick跳转/adjustments?account_code=xxx）③复核意见模板库✅（review_template_service.py 37条标准模板按10个分类，GET /templates+/template-categories端点）④归档检查清单从5项扩展到12项✅（+审计报告/KAM/独立性/期后事项/持续经营/管理层声明/索引完整性）
+- 底稿工作台新增功能（2026-04-26续）：①AI变动分析卡片（调用/ai/analytical-review，显示变动率+AI分析文字，>20%红色高亮，LLM不可用时静默降级）②附件OCR状态标签（✓成功绿/处理中黄/✗失败红）③上年数据参照区域（上年审定数+同比变动，虚线边框区分，并行加载year-1数据）④附件上传并关联实现（FormData上传→associate API关联wp_code）
+- 底稿工作台UI改进已完成（2026-04-26）：①左栏加"仅我的"checkbox+状态下拉筛选+进度概览条（已完成/总数+el-progress）+树节点状态图标+负责人标签 ②中栏附件区改为内嵌已关联附件列表（图标+文件名+类型大小+预览按钮）+上传并关联按钮 ③中栏新增"查看序时账"穿透跳转 ④首页Dashboard新增"我的待办"区域（待编底稿+待回复复核，图标+标题+描述+右箭头，hover向右微移4px，先尝试/api/staff/me/todos再用项目数据降级模拟）
+- "问题"文件核心结论（2026-04-26确认）：平台定位为"准生产试点平台"，采用方案A保守推进（离线底稿为正式主链路+在线编辑灰度验证）；当前最大问题不是功能不够多而是关键主链路未完全打实；5根主梁待补硬：底稿文件链路+复核链路+附件证据链+权限留痕+运行基线
+- 底稿落地关键数据结构：wp_account_mapping.json 建立底稿编码→标准科目编码→试算表行→附注章节的四级映射（如 E1-1→1001,1002,1012→trial_balance→五、1），是串联四表→试算表→底稿→附注的核心纽带
+- 底稿落地新增文件（2026-04-26）：backend/scripts/scan_wp_templates.py（扫描脚本）、backend/data/wp_account_mapping.json（38条四级映射）、backend/data/gt_template_library.json（363条模板索引，自动生成覆盖旧版70条）、backend/app/services/wp_mapping_service.py（映射服务）、backend/app/routers/wp_mapping.py（5个API端点）
+- Adjustment模型soft_delete已修复（2026-04-26）：Adjustment和AdjustmentEntry两个模型新增soft_delete()方法，test_update_entry_line_items和test_delete_entry测试恢复通过
+- 底稿落地阶段三穿透联动部分完成（2026-04-26）：TrialBalance.vue科目编码列升级为可点击链接（有关联底稿时显示🔗图标，点击跳转底稿列表页），页面加载时自动获取wp_mapping构建account_code→WpAccountMapping索引；prefill_stale事件联动已确认完整（DATA_IMPORTED→全部标记stale，ADJUSTMENT_CHANGED→关联科目标记stale）
+- 底稿落地阶段三剩余：底稿审定数→试算表反向同步（WOPI put_file或离线上传后解析Excel审定数与trial_balance比对）
+- 底稿落地阶段四待开发：WorkpaperWorkbench.vue底稿工作台三栏布局+LLM分析性复核+TSJ提示词注入+底稿对话
+- 底稿落地实施原则：先补硬再扩展（阶段一必须先完成不能跳过）、底稿文件不入库（Excel存磁盘数据库只存索引和parsed_data）、映射表是核心、离线优先（所有操作保证离线闭环可用在线编辑只是增强）
 - 首页聊天功能（全部60个子任务已完成）：spec 路径 .kiro/specs/homepage-chat/，待用户启动测试验收；复盘发现的优化点：①ChatPanel.tsx 超1000行，后续可拆分清理UI/导出逻辑为独立hook ②IndexedDB saveChatSession 流式输出时高频写入，可加debounce ③Whisper API 依赖供应商支持，不支持时需友好提示
 - 在线文档编辑（第一步已完成）：homepage-chat 中已改用 iframe + markdownToHtml 方案（弃用 @ranui/preview，Web Component 加载不稳定且预览空白）；第二步单独开 spec 改造四大工作模块的导出流程
 - 审计作业平台需求文档（2026-04）：`需求文档.md` 已迭代至 v6（约2200行+7个附录），涵盖23个能力模块、40+数据表、完整业务链路、技术架构、开发优先级。关键技术决策：底稿编辑器选定 ONLYOFFICE Document Server（AGPL，私有化Docker部署，WOPI协议集成，自定义函数实现取数公式，插件实现复核批注/AI标记/交叉索引）；底稿文件（.xlsx/.docx）为第一公民，支持在线编辑（ONLYOFFICE）和离线编辑（下载→本地Excel→上传）双模式；技术栈 FastAPI + PostgreSQL + Redis + Vue 3 + ONLYOFFICE + Ollama；配套 `致同GT审计手册设计规范.md` 定义品牌视觉规范；附录G已整合致同2025年修订版实际底稿编码体系（B/C/D-N/A/S/Q约600+底稿）、三测联动结构、附注模版体系（国企版/上市版各含科目对照+校验公式+宽表公式+正文模版4个配置文件）、6个内置模板集定义；工作区新增 `附注模版/` 和 `致同通用审计程序及底稿模板（2025年修订）/` 两个资源文件夹
@@ -1169,3 +1236,32 @@ inclusion: always
 - 查账页面导出Excel功能（2026-04-19）：三个视图均支持导出——科目余额表（GET /export-balance，一级科目加粗+浅紫背景）、序时账（GET /export-ledger/{code}，含期初余额行+月小计行+累计余额列）、辅助余额表（GET /export-aux-balance，含小计行+关联维度列+当前筛选条件）
 - 辅助余额表"仅小计"按钮修复（2026-04-19）：切换维度时强制 `_auxTableKey++` 重建表格确保数据刷新，`loadAuxSummaryForDim` 加 loading 状态+同步更新 `auxDimTypesFromServer`
 - 查账页面行样式优化（2026-04-19）：选中行浅蓝背景(#e8f4fd)+无左边框竖线，hover行更浅蓝灰(#f5f8fc)，去掉 el-table 默认选中行 ::after 伪元素
+
+## 系统全面评审（2026-04-26 合伙人视角）
+- 系统规模统计：后端87个路由模块+141个服务文件+1888个测试用例，前端84个页面视图+110个组件+17个API服务层文件，main.py注册约90个router
+- 整体评估结论：架构设计和功能覆盖面属上乘水平，核心业务逻辑（事件驱动联动/四表穿透/底稿生命周期）设计思路正确；主要风险是"铺得太广、扎得不够深"，需要收敛聚焦阶段
+- 做得好的5点：①EventBus debounce去重+TrialBalanceService 4个事件处理器联动链路扎实 ②deps.py三级权限+Redis缓存+降级策略 ③http.ts 401刷新队列+请求去重+分级错误提示+request_id回显 ④四表穿透五级导航+多种筛选+树形/扁平切换 ⑤底稿7环节生命周期完整
+- 问题1-服务层膨胀：141个服务文件存在功能重叠（prefill 3个文件并存、导出3个文件并存、OCR 2个、导入4个），新人接手认知负担大，需做服务层收敛
+- 问题2-死代码路由：memory.md记录32个已删除但实际代码库中可能仍有残留的同步路由文件需确认清理状态
+- 问题3-前端页面深度不均：84个Vue页面中核心业务页面做得深入，大量辅助页面可能只是框架骨架；审计员80%时间花在查账→调整→底稿→附注4个核心场景
+- 问题4-Alembic迁移链失控：放弃Alembic改用create_all+手动ALTER TABLE，生产环境升级无回滚能力；建议从当前schema导出干净baseline迁移重新维护
+- 问题5-LLM集成大量stub残留：wp_ai/note_ai/ai_plugin等stub端点前端有入口但点击无效果，比没有按钮更糟糕
+- 问题6-前端API服务层碎片化：17个文件命名风格不统一（phase10Api按阶段命名对使用者无意义），建议按业务域重组为project/ledger/workpaper/report/admin
+- 问题7-缺少E2E集成测试：1888个测试均为单元测试（SQLite+fakeredis），缺少前后端联调E2E测试和核心业务链路集成测试
+- 决策建议：①先选2-3个项目深度试点再决定推广 ②砍功能比加功能重要，80%精力放核心链路稳定性 ③需要专职前端开发打磨交互细节 ④Alembic迁移和ONLYOFFICE/Paperless实机联调是上线硬前提
+
+## 死代码清理（2026-04-26）
+- 删除31个死代码服务文件（Phase 3/4遗留：sync_service/review_service/notification_service/going_concern_service/risk_service/archive_service/company_service/audit_plan_service/audit_program_service/confirmation_service/confirmation_ai_service/evidence_chain_service/nl_command_service/management_letter_service/finding_service/group_structure_service/history_note_parser/fast_writer/forex_translation_service/pdf_export_service/report_export_engine/project_mgmt_service/sync_conflict_service/risk_assessment_service/template_scanner/workpaper_generator/encryption_service/ai_content_service/audit_log_service/pbc_service/utils.py），共33个文件
+- 删除16个对应死代码测试文件（test_collaboration/test_going_concern/test_nl_command_service/test_nl_command/test_risk_assessment/test_risk_assessment_pbt/test_confirmation_service/test_confirmation_ai/test_evidence_chain_service/test_evidence_chain/test_sync_service/test_management_letter/test_archive_service/test_notification_service/test_subsequent_events/test_consolidation/test_review_service）
+- 修复test_remaining_property.py和test_ai_services.py中引用已删除服务的测试方法
+- 清理working_paper.py路由中对旧stub prefill_service的无用import
+- phase10Api.ts重命名为enhancedApi.ts，更新10个Vue页面+services/index.ts引用
+- 修复WorkpaperWorkbench.vue 5处TS编译错误（添加api import+删除无用动态http import+删除未使用wpInfo变量）
+- 后端服务文件从141个降到108个，测试从1888个降到1614个（0收集错误）
+- 4个Phase 4 AI服务（ocr_service_v2/ai_chat_service/contract_analysis_service/workpaper_fill_service）保留未删——有实际业务逻辑+101个测试覆盖，只是未注册路由，属于"待激活"非死代码
+- ~~发现53个Vue文件import了http但实际只用api（无用import），待批量清理~~ → 误判：PowerShell正则在中文UTF-8文件中匹配不准确，Python精确扫描确认56个文件都确实在使用http.get/http.post，属于"API调用方式不统一"而非"无用import"
+- 前端API调用现状：56个Vue文件同时import http和api，部分调用走api.get（apiProxy），部分仍直接走http.get；统一改造需逐页修改，应在有E2E测试覆盖后再做
+- PowerShell Set-Content 编码陷阱（严重教训）：PowerShell的`Set-Content`和`-replace`处理含中文的UTF-8文件时会破坏编码（高字节被错误转换），导致中文字符不可逆丢失；必须用Python的pathlib.write_text(encoding='utf-8')处理Vue/TS文件的批量修改
+- WorkpaperWorkbench.vue编码损坏（2026-04-26）：该文件未提交git，被PowerShell Set-Content破坏152行中文文本（1694个replacement chars），已清除损坏字符使文件可编译（vue-tsc 0错误），但中文UI文本（横幅标题/按钮标签/注释/选项标签等）需手动恢复
+- 前端TS编译错误从26个降到20个（ThreeColumnLayout.vue编码损坏导致的15个错误通过git restore恢复，WorkpaperWorkbench.vue清理后0错误）
+- 待清理：prefill_service.py旧stub（FormulaCell/_scan_formulas迁移到prefill_engine.py后删除）、prefill_service_v2.py的mark_stale合并到prefill_engine.py后删除

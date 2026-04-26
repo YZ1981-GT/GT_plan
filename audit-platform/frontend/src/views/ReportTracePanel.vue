@@ -46,7 +46,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { traceSection, findingsSummary } from '@/services/phase10Api'
+import { traceSection, findingsSummary } from '@/services/enhancedApi'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const sectionNumber = ref('')

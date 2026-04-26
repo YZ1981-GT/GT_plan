@@ -106,6 +106,28 @@ class AuditReportService:
         return loaded
 
     # ------------------------------------------------------------------
+    # 获取项目基本信息
+    # ------------------------------------------------------------------
+    async def _get_project_basic_info(self, project_id: UUID) -> dict:
+        """从 project.wizard_state 读取 basic_info"""
+        from app.models.core import Project
+        result = await self.db.execute(
+            sa.select(Project).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+        project = result.scalar_one_or_none()
+        if not project or not project.wizard_state:
+            return {}
+        state = project.wizard_state
+        return (
+            state.get("steps", {}).get("basic_info", {}).get("data")
+            or state.get("basic_info", {}).get("data")
+            or {}
+        )
+
+    # ------------------------------------------------------------------
     # 获取模板列表
     # ------------------------------------------------------------------
     async def get_templates(
@@ -154,8 +176,11 @@ class AuditReportService:
         # 2. Fetch financial data from financial_report
         financial_data = await self._fetch_financial_data(project_id, year)
 
+        # 2b. Fetch project basic_info for entity_name etc.
+        basic_info = await self._get_project_basic_info(project_id)
+
         # 3. Build paragraphs dict with placeholders filled
-        placeholders = self._build_placeholders(project_id, year, financial_data)
+        placeholders = self._build_placeholders(project_id, year, financial_data, basic_info)
         paragraphs: dict[str, str] = {}
         for tmpl in templates:
             filled_text = self._fill_placeholders(tmpl.template_text, placeholders)
@@ -273,16 +298,29 @@ class AuditReportService:
         project_id: UUID,
         year: int,
         financial_data: dict,
+        basic_info: dict | None = None,
     ) -> dict[str, str]:
-        """构建占位符替换字典"""
+        """构建占位符替换字典，从项目基本信息读取单位名称等"""
+        info = basic_info or {}
+        entity_name = info.get("client_name") or "[被审计单位名称]"
+        report_scope = info.get("report_scope") or "standalone"
+        # 简称默认留空让用户手动填入
+        entity_short_name = info.get("entity_short_name") or ""
+        signing_partner = info.get("signing_partner_name") or "[签字注册会计师]"
+
         return {
-            "entity_name": "[被审计单位名称]",
+            "entity_name": entity_name,
+            "entity_short_name": entity_short_name if entity_short_name else f'"{entity_name}"',
             "audit_period": f"{year}年12月31日",
+            "audit_year": str(year),
             "total_assets": financial_data.get("total_assets", "0"),
+            "total_liabilities": financial_data.get("total_liabilities", "0"),
+            "total_equity": financial_data.get("total_equity", "0"),
             "total_revenue": financial_data.get("total_revenue", "0"),
             "net_profit": financial_data.get("net_profit", "0"),
             "report_date": "[报告日期]",
-            "signing_partner": "[签字注册会计师]",
+            "signing_partner": signing_partner,
+            "report_scope": "合并及母公司" if report_scope == "consolidated" else "",
         }
 
     def _fill_placeholders(self, text: str, placeholders: dict[str, str]) -> str:

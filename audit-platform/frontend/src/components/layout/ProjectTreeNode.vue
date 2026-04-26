@@ -126,23 +126,24 @@ function statusLabel(s: string) {
 .gt-node-row {
   display: flex;
   align-items: center;
-  margin-bottom: 1px;
-  border-radius: var(--gt-radius-sm);
+  margin-bottom: 2px;
+  border-radius: var(--gt-radius-md);
   background: var(--gt-color-bg-white);
   border: 1px solid transparent;
   cursor: pointer;
   transition: all var(--gt-transition-fast);
-  min-height: 36px;
+  min-height: 38px;
   padding-right: 4px;
 }
 .gt-node-row:hover {
-  border-color: var(--gt-color-primary-lighter);
+  border-color: rgba(75, 45, 119, 0.1);
   background: #faf8fd;
+  box-shadow: 0 1px 4px rgba(75, 45, 119, 0.06);
 }
 .gt-node-row--active {
   border-color: var(--gt-color-primary) !important;
   background: var(--gt-color-primary-bg) !important;
-  box-shadow: 0 0 0 1px var(--gt-color-primary);
+  box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12) !important;
 }
 .gt-node-row--consolidated {
   border-left: 2px solid var(--gt-color-primary-lighter);
@@ -167,11 +168,11 @@ function statusLabel(s: string) {
 
 .gt-node-check { flex-shrink: 0; margin: 0 2px; }
 
-.gt-node-status { width: 2px; flex-shrink: 0; align-self: stretch; border-radius: 1px; margin: 3px 1px; }
+.gt-node-status { width: 3px; flex-shrink: 0; align-self: stretch; border-radius: 2px; margin: 4px 2px; }
 .gt-status--created { background: var(--gt-color-text-tertiary); }
-.gt-status--planning { background: var(--gt-color-wheat); }
-.gt-status--execution { background: var(--gt-color-primary); }
-.gt-status--completion { background: var(--gt-color-success); }
+.gt-status--planning { background: linear-gradient(180deg, #FFC23D, #e6a817); }
+.gt-status--execution { background: var(--gt-gradient-primary); }
+.gt-status--completion { background: linear-gradient(180deg, #28A745, #1e8a38); }
 .gt-status--archived { background: var(--gt-color-border); }
 
 .gt-node-body { padding: 3px 6px; flex: 1; min-width: 0; }

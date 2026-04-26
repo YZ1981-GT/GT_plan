@@ -539,7 +539,7 @@ class TestStreamingImport:
         assert EventType.IMPORT_PROGRESS == "import.progress"
 
     def test_parse_streaming_csv_fallback(self):
-        """非 Excel 内容应回退到全量解析"""
+        """非 Excel 内容应回退到 CSV 流式解析"""
         from app.services.import_engine.parsers import GenericParser
 
         parser = GenericParser()
@@ -550,6 +550,18 @@ class TestStreamingImport:
         total_rows = sum(len(c) for c in chunks)
         assert total_rows == 1
         assert chunks[0][0]["account_code"] == "1001"
+
+    def test_parse_streaming_csv_file_like_chunks(self):
+        """CSV file-like 输入应按 chunk 分批返回"""
+        from app.services.import_engine.parsers import GenericParser
+        import io
+
+        parser = GenericParser()
+        csv_content = b"account_code,account_name,opening_balance\n1001,cash,100\n1002,bank,200\n"
+        chunks = list(parser.parse_streaming(io.BytesIO(csv_content), "tb_balance", chunk_size=1))
+        assert len(chunks) == 2
+        assert chunks[0][0]["account_code"] == "1001"
+        assert chunks[1][0]["account_code"] == "1002"
 
     def test_parse_streaming_excel_yields_chunks(self):
         """Excel 文件应分批 yield"""

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="data-validation-panel">
     <div class="panel-header">
       <h3>数据校验</h3>
@@ -47,7 +47,7 @@ const completenessFindings = computed(() =>
 async function runValidation() {
   loading.value = true
   try {
-    const { data: res } = await http.post(`/api/projects/${props.projectId}/data-validation`)
+    const res = await api.post(`/api/projects/${props.projectId}/data-validation`)
     findings.value = res.findings || []
     summary.value = { total: res.total, ...res.by_severity }
     ElMessage.success(`校验完成，发现 ${res.total} 项问题`)
@@ -60,7 +60,7 @@ async function runValidation() {
 
 async function handleFix(findingIds: string[]) {
   try {
-    await http.post(`/api/projects/${props.projectId}/data-validation/fix`, findingIds)
+    await api.post(`/api/projects/${props.projectId}/data-validation/fix`, findingIds)
     ElMessage.success('修复完成')
     await runValidation()
   } catch (e: any) {
@@ -69,7 +69,8 @@ async function handleFix(findingIds: string[]) {
 }
 
 async function exportFindings() {
-  window.open(`/api/projects/${props.projectId}/data-validation/export?format=csv`, '_blank')
+  const { downloadFileAsBlob } = await import('@/services/commonApi')
+  await downloadFileAsBlob(`/api/projects/${props.projectId}/data-validation/export?format=csv`, '数据校验结果.csv')
 }
 </script>
 

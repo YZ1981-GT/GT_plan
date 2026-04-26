@@ -1,6 +1,12 @@
 <template>
   <div class="gt-materiality gt-fade-in">
-    <h2 class="gt-page-title">重要性水平</h2>
+    <!-- 页面横幅 -->
+    <div class="gt-mat-banner">
+      <div class="gt-mat-banner-text">
+        <h2>重要性水平</h2>
+        <p>三级重要性计算与手动覆盖</p>
+      </div>
+    </div>
 
     <div class="gt-mat-layout">
       <!-- 左侧：配置表单 -->
@@ -221,19 +227,78 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.gt-materiality { padding: var(--gt-space-4); }
+.gt-materiality { padding: var(--gt-space-5); }
+
+/* ── 页面横幅 ── */
+.gt-mat-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 20px 28px;
+  margin-bottom: var(--gt-space-5);
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+}
+.gt-mat-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 45%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.gt-mat-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+.gt-mat-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+
+.gt-materiality .gt-page-title {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: var(--gt-space-5);
+}
+.gt-materiality .gt-page-title::before {
+  content: '';
+  width: 4px; height: 22px;
+  background: var(--gt-gradient-primary);
+  border-radius: 2px;
+}
+
 .gt-mat-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gt-space-6); }
-.gt-mat-form-section { background: var(--gt-color-bg-white); padding: var(--gt-space-5); border-radius: var(--gt-radius-md); box-shadow: var(--gt-shadow-sm); }
+
+.gt-mat-form-section {
+  background: var(--gt-color-bg-white); padding: var(--gt-space-5);
+  border-radius: var(--gt-radius-md); box-shadow: var(--gt-shadow-sm);
+  border: 1px solid rgba(75, 45, 119, 0.04);
+}
+
 .gt-mat-result-section { }
 .gt-mat-result-cards { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .gt-mat-result-card {
-  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-4);
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-5);
   text-align: center; box-shadow: var(--gt-shadow-sm);
+  border: 1px solid rgba(75, 45, 119, 0.04);
+  transition: all var(--gt-transition-base);
+  position: relative; overflow: hidden;
 }
-.gt-mat-result-card.gt-mat-result-card--primary { border-left: 4px solid var(--gt-color-primary); }
-.gt-mat-result-label { display: block; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); margin-bottom: var(--gt-space-1); }
-.gt-mat-result-value { display: block; font-size: var(--gt-font-size-2xl); font-weight: 600; color: var(--gt-color-text); }
-.gt-mat-result-card.gt-mat-result-card--primary .gt-mat-result-value { color: var(--gt-color-primary); }
+.gt-mat-result-card:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow-md); }
+.gt-mat-result-card.gt-mat-result-card--primary {
+  border-left: 4px solid var(--gt-color-primary);
+}
+.gt-mat-result-card.gt-mat-result-card--primary::after {
+  content: '';
+  position: absolute; top: -20px; right: -20px;
+  width: 60px; height: 60px; border-radius: 50%;
+  background: var(--gt-color-primary); opacity: 0.05;
+}
+.gt-mat-result-label { display: block; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary); margin-bottom: var(--gt-space-1); font-weight: 500; }
+.gt-mat-result-value { display: block; font-size: var(--gt-font-size-2xl); font-weight: 800; color: var(--gt-color-text); letter-spacing: -0.5px; }
+.gt-mat-result-card.gt-mat-result-card--primary .gt-mat-result-value {
+  background: var(--gt-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 .gt-mat-no-result { text-align: center; color: var(--gt-color-text-tertiary); padding: var(--gt-space-10); }
 .gt-mat-history-section { margin-top: var(--gt-space-8); }
 </style>

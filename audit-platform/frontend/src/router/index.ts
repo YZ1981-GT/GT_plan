@@ -100,6 +100,26 @@ const router = createRouter({
           component: () => import('@/views/WorkpaperEditor.vue'),
         },
         {
+          path: 'projects/:projectId/workpaper-bench',
+          name: 'WorkpaperWorkbench',
+          component: () => import('@/views/WorkpaperWorkbench.vue'),
+        },
+        {
+          path: 'projects/:projectId/review-inbox',
+          name: 'ReviewInbox',
+          component: () => import('@/views/ReviewInbox.vue'),
+        },
+        {
+          path: 'projects/:projectId/qc-dashboard',
+          name: 'QCDashboard',
+          component: () => import('@/views/QCDashboard.vue'),
+        },
+        {
+          path: 'projects/:projectId/progress-board',
+          name: 'ProjectProgressBoard',
+          component: () => import('@/views/ProjectProgressBoard.vue'),
+        },
+        {
           path: 'projects/:projectId/templates',
           name: 'TemplateManager',
           component: () => import('@/views/TemplateManager.vue'),
@@ -195,6 +215,11 @@ const router = createRouter({
           path: 'dashboard/management',
           name: 'ManagementDashboard',
           component: () => import('@/views/ManagementDashboard.vue'),
+        },
+        {
+          path: 'dashboard/partner',
+          name: 'PartnerDashboard',
+          component: () => import('@/views/PartnerDashboard.vue'),
         },
         {
           path: 'projects/:projectId/consistency',

@@ -125,3 +125,36 @@ async def batch_apply(
     result = await svc.batch_apply(project_id, cycle, [UUID(t) for t in data.target_project_ids])
     await db.commit()
     return result
+
+
+class ExecutionStatusUpdate(BaseModel):
+    execution_status: str  # not_started / in_progress / completed
+
+
+@router.put("/{project_id}/procedures/instance/{procedure_id}/execution")
+async def update_execution_status(
+    project_id: UUID,
+    procedure_id: UUID,
+    data: ExecutionStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """更新程序执行状态（审计助理标记进度）"""
+    from app.models.procedure_models import ProcedureInstance
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.select(ProcedureInstance).where(
+            ProcedureInstance.id == procedure_id,
+            ProcedureInstance.project_id == project_id,
+        )
+    )
+    proc = result.scalar_one_or_none()
+    if not proc:
+        from fastapi import HTTPException
+        raise HTTPException(404, "程序不存在")
+
+    proc.execution_status = data.execution_status
+    await db.flush()
+    await db.commit()
+    return {"id": str(proc.id), "execution_status": proc.execution_status}

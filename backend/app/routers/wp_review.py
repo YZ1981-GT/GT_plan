@@ -125,3 +125,24 @@ async def resolve_review(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── 复核意见模板库 ──
+
+@router.get("/templates")
+async def get_review_templates(
+    category: str | None = None,
+    current_user: User = Depends(get_current_user),
+):
+    """获取复核意见模板列表"""
+    from app.services.review_template_service import get_review_templates
+    return get_review_templates(category)
+
+
+@router.get("/template-categories")
+async def get_template_categories(
+    current_user: User = Depends(get_current_user),
+):
+    """获取模板分类列表"""
+    from app.services.review_template_service import get_template_categories
+    return get_template_categories()

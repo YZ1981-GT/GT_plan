@@ -47,8 +47,13 @@ _ROW_PATTERN = re.compile(r"ROW\('([^']+)'\)")
 # Column name mapping: Chinese → TrialBalance field
 _COLUMN_MAP = {
     "期末余额": "audited_amount",
+    "审定数": "audited_amount",
     "年初余额": "opening_balance",
+    "期初余额": "opening_balance",
     "本期发生额": "_period_amount",  # special: needs debit-credit calc
+    "未审数": "unadjusted_amount",
+    "RJE调整": "rje_adjustment",
+    "AJE调整": "aje_adjustment",
 }
 
 # ---------------------------------------------------------------------------
@@ -185,9 +190,9 @@ class ReportFormulaParser:
             if self._use_unadjusted and column_name in ("期末余额", "审定数"):
                 total += row.unadjusted_amount or Decimal("0")
             elif field == "_period_amount":
-                audited = row.audited_amount or Decimal("0")
+                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
                 opening = row.opening_balance or Decimal("0")
-                total += audited - opening
+                total += amount - opening
             else:
                 val = getattr(row, field, None)
                 total += val if val is not None else Decimal("0")
@@ -477,6 +482,8 @@ class ReportEngine:
                 row.formula_used = config.formula
                 row.source_accounts = source_accounts if source_accounts else None
                 row.generated_at = generated_at
+                row.indent_level = config.indent_level
+                row.is_total_row = config.is_total_row
             else:
                 row = FinancialReport(
                     project_id=project_id,
@@ -489,6 +496,8 @@ class ReportEngine:
                     formula_used=config.formula,
                     source_accounts=source_accounts if source_accounts else None,
                     generated_at=generated_at,
+                    indent_level=config.indent_level,
+                    is_total_row=config.is_total_row,
                 )
                 self.db.add(row)
 
@@ -497,6 +506,8 @@ class ReportEngine:
                 "row_name": config.row_name,
                 "current_period_amount": str(current_amount),
                 "prior_period_amount": str(prior_amount),
+                "indent_level": config.indent_level,
+                "is_total_row": config.is_total_row,
                 "formula_used": config.formula,
                 "source_accounts": source_accounts,
             })
@@ -818,7 +829,10 @@ class ReportEngine:
 
         Phase 9 Task 9.15: 动态计算，不存储到数据库。
         """
-        configs = await self._load_report_configs(project_id, year, report_type)
+        # 加载全部报表配置，然后筛选指定类型
+        all_configs = await self._load_report_configs("enterprise")
+        rt = report_type if isinstance(report_type, FinancialReportType) else FinancialReportType(report_type)
+        configs = all_configs.get(rt, [])
         if not configs:
             return []
 
@@ -829,7 +843,7 @@ class ReportEngine:
         rows = []
         row_values: dict[str, Decimal] = {}
 
-        for cfg in configs:
+        for cfg in sorted(configs, key=lambda r: r.row_number):
             try:
                 value = await parser.execute(cfg.formula, row_values)
             except Exception:

@@ -303,6 +303,23 @@ class WOPIHostService:
         except Exception as e:
             logger.warning("event publish after online save failed: %s", e)
 
+        # 7b. 自动解析 parsed_data（非阻塞，用独立 session 避免主请求 session 关闭后失效）
+        try:
+            from app.services.prefill_engine import parse_workpaper_real
+
+            async def _auto_parse():
+                try:
+                    from app.core.database import async_session
+                    async with async_session() as parse_db:
+                        await parse_workpaper_real(parse_db, wp.project_id, file_id)
+                        await parse_db.commit()
+                except Exception as _e:
+                    logger.warning("auto parse background failed: %s", _e)
+
+            _asyncio.create_task(_auto_parse())
+        except Exception as e:
+            logger.warning("auto parse after online save failed: %s", e)
+
         # 8. 云端双写（非阻塞）
         try:
             from app.services.cloud_storage_service import CloudStorageService, CLOUD_SYNC_ON_UPLOAD

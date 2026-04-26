@@ -32,7 +32,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { auxSummary } from '@/services/phase10Api'
+import { auxSummary } from '@/services/enhancedApi'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const year = ref(2025)

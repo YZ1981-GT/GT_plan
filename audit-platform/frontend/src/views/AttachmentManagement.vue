@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="gt-attachment-page">
     <div class="gt-att-header">
       <h2 class="gt-page-title">附件管理</h2>
@@ -147,7 +147,7 @@ async function searchWorkpapers(query: string) {
   if (!query || query.length < 1) { wpSearchResults.value = []; return }
   wpSearchLoading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/wp-index`)
+    const data = await api.get(`/api/projects/${projectId.value}/wp-index`)
     const items = Array.isArray(data) ? data : data?.data ?? []
     // 按编号或名称模糊过滤
     const q = query.toLowerCase()
@@ -164,8 +164,8 @@ async function loadAttachments() {
   try {
     const params: any = {}
     if (filterType.value) params.file_type = filterType.value
-    const { data } = await http.get(`/api/projects/${projectId.value}/attachments`, { params })
-    attachments.value = data.data ?? data ?? []
+    const data = await api.get(`/api/projects/${projectId.value}/attachments`, { params })
+    attachments.value = data ?? []
   } catch { attachments.value = [] }
   finally { loading.value = false }
 }
@@ -174,10 +174,10 @@ async function onSearch() {
   if (!searchQuery.value) { loadAttachments(); return }
   loading.value = true
   try {
-    const { data } = await http.get('/api/attachments/search', {
+    const data = await api.get('/api/attachments/search', {
       params: { project_id: projectId.value, q: searchQuery.value },
     })
-    attachments.value = data.data ?? data ?? []
+    attachments.value = data ?? []
   } catch { attachments.value = [] }
   finally { loading.value = false }
 }
@@ -208,7 +208,7 @@ function associateDialog(row: any) {
 async function submitAssociate() {
   if (!associateWpId.value) { ElMessage.warning('请选择底稿'); return }
   try {
-    await http.post(`/api/attachments/${associateAttachmentId.value}/associate`, {
+    await api.post(`/api/attachments/${associateAttachmentId.value}/associate`, {
       wp_id: associateWpId.value,
       association_type: associateType.value,
       notes: associateNotes.value || undefined,
@@ -231,7 +231,7 @@ async function uploadAttachment(options: any) {
   const formData = new FormData()
   formData.append('file', options.file)
   try {
-    const response = await http.post(
+    const response = await api.post(
       `/api/projects/${projectId.value}/attachments/upload`,
       formData,
     )
@@ -250,7 +250,7 @@ function onUploadSuccess() {
 
 async function retryOCR(row: any) {
   try {
-    await http.put(`/api/attachments/${row.id}/ocr-status`, { status: 'pending' })
+    await api.put(`/api/attachments/${row.id}/ocr-status`, { status: 'pending' })
     ElMessage.success('已重新提交 OCR 识别')
     await loadAttachments()
   } catch { ElMessage.error('重试失败') }

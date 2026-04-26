@@ -33,6 +33,7 @@ from app.routers.wp_template import router as wp_template_router
 from app.routers.working_paper import router as working_paper_router
 from app.routers.qc import router as qc_router
 from app.routers.wp_review import router as wp_review_router
+from app.routers.wp_mapping import router as wp_mapping_router
 from app.routers.sampling import router as sampling_router
 from app.routers.gt_coding import router as gt_coding_router
 from app.routers.t_accounts import router as t_accounts_router
@@ -93,6 +94,10 @@ from app.routers.performance import router as performance_router
 from app.routers.security import router as security_router
 from app.routers.system_settings import router as system_settings_router
 from app.routers.knowledge_base import router as knowledge_base_router
+from app.routers.pm_dashboard import router as pm_dashboard_router
+from app.routers.qc_dashboard import router as qc_dashboard_router
+from app.routers.partner_dashboard import router as partner_dashboard_router
+from app.routers.role_context import router as role_context_router
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.middleware.audit_log import AuditLogMiddleware
@@ -176,6 +181,7 @@ app.include_router(wp_template_router)
 app.include_router(working_paper_router)
 app.include_router(qc_router)
 app.include_router(wp_review_router)
+app.include_router(wp_mapping_router)
 app.include_router(sampling_router)
 app.include_router(gt_coding_router)
 app.include_router(t_accounts_router)
@@ -236,3 +242,7 @@ app.include_router(performance_router)
 app.include_router(security_router)
 app.include_router(system_settings_router)
 app.include_router(knowledge_base_router)
+app.include_router(pm_dashboard_router)
+app.include_router(qc_dashboard_router)
+app.include_router(partner_dashboard_router)
+app.include_router(role_context_router)

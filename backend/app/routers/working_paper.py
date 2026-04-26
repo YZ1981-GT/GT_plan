@@ -33,7 +33,6 @@ from app.models.phase10_schemas import DownloadPackRequest
 from app.services.feature_flags import get_feature_maturity, is_enabled
 from app.services.wopi_service import WOPIHostService
 from app.services.working_paper_service import WorkingPaperService
-from app.services.prefill_service import PrefillService, ParseService
 from app.services.wp_download_service import WpDownloadService, WpUploadService
 from app.models.workpaper_models import WpIndex, WpCrossRef, WorkingPaper, WpFileStatus
 
@@ -77,7 +76,21 @@ async def list_workpapers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """底稿列表（支持筛选，需项目成员权限）"""
+    """底稿列表（支持筛选，需项目成员权限）。自动按用户 scope_cycles 过滤。"""
+    # 获取用户的循环范围限制
+    scope_cycles = None
+    if current_user.role.value not in ("admin", "partner"):
+        from app.models.core import ProjectUser
+        pu = (await db.execute(
+            sa.select(ProjectUser.scope_cycles).where(
+                ProjectUser.project_id == project_id,
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,
+            )
+        )).scalar()
+        if pu and isinstance(pu, str) and pu.strip():
+            scope_cycles = [c.strip() for c in pu.split(",") if c.strip()]
+
     svc = WorkingPaperService()
     return await svc.list_workpapers(
         db=db,
@@ -85,6 +98,7 @@ async def list_workpapers(
         audit_cycle=audit_cycle,
         status=status,
         assigned_to=assigned_to,
+        scope_cycles=scope_cycles,
     )
 
 
@@ -167,14 +181,21 @@ async def get_online_edit_session(
         file_id=wp_id,
     )
     wopi_base_url = settings.WOPI_BASE_URL.rstrip("/")
+    wopi_src = f"{wopi_base_url}/files/{wp_id}?access_token={access_token}"
+
+    # 构造完整的 ONLYOFFICE 编辑器 URL
+    onlyoffice_url = getattr(settings, "ONLYOFFICE_URL", "http://localhost:8080").rstrip("/")
+    editor_url = f"{onlyoffice_url}/hosting/wopi/cell?WOPISrc={wopi_src}"
 
     return {
         "enabled": True,
         "maturity": maturity,
         "preferred_mode": "online",
-        "wopi_src": f"{wopi_base_url}/files/{wp_id}?access_token={access_token}",
+        "wopi_src": wopi_src,
         "access_token": access_token,
+        "editor_url": editor_url,
         "editor_base_url": str(request.base_url).rstrip("/"),
+        "onlyoffice_url": onlyoffice_url,
     }
 
 
@@ -438,9 +459,10 @@ async def prefill_workpaper(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """手动触发预填充（需编辑权限）"""
-    svc = PrefillService()
-    result = await svc.prefill_workpaper(db=db, project_id=project_id, year=year, wp_id=wp_id)
+    """手动触发预填充（需编辑权限）— 真正打开 .xlsx 扫描公式并写入"""
+    from app.services.prefill_engine import prefill_workpaper_real
+    result = await prefill_workpaper_real(db=db, project_id=project_id, year=year, wp_id=wp_id)
+    await db.commit()
     return result
 
 
@@ -451,9 +473,9 @@ async def parse_workpaper(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """手动触发解析回写（需编辑权限）"""
-    svc = ParseService()
-    result = await svc.parse_workpaper(db=db, project_id=project_id, wp_id=wp_id)
+    """手动触发解析回写（需编辑权限）— 真正打开 .xlsx 提取关键数据"""
+    from app.services.prefill_engine import parse_workpaper_real
+    result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id)
     await db.commit()
     return result
 

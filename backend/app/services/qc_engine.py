@@ -17,6 +17,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import (
+    WpFileStatus,
     WpIndex,
     WpQcResult,
     WpStatus,
@@ -210,74 +211,206 @@ class UnresolvedAnnotationsRule(QCRule):
 # ---------------------------------------------------------------------------
 
 class ManualInputCompleteRule(QCRule):
-    """Rule 6: 人工填写区完整。"""
+    """Rule 6: 人工填写区完整（从 parsed_data 检查关键字段非空）。"""
     severity = "warning"
     rule_id = "QC-06"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
-        return []
+        pd = context.working_paper.parsed_data or {}
+        findings = []
+        # 审定数必须有值
+        if pd.get("audited_amount") is None and pd.get("extracted_at"):
+            findings.append(QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                message="审定数未填写（parsed_data 中 audited_amount 为空）",
+            ))
+        # 未审数必须有值
+        if pd.get("unadjusted_amount") is None and pd.get("extracted_at"):
+            findings.append(QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                message="未审数未填写（parsed_data 中 unadjusted_amount 为空）",
+            ))
+        return findings
 
 
 class SubtotalAccuracyRule(QCRule):
-    """Rule 7: 内部合计数正确。"""
+    """Rule 7: 审定数 = 未审数 + AJE + RJE（宽松版，与 QC-03 互补）。"""
     severity = "warning"
     rule_id = "QC-07"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        pd = context.working_paper.parsed_data or {}
+        if not pd.get("extracted_at"):
+            return []
+        audited = pd.get("audited_amount")
+        unadj = pd.get("unadjusted_amount")
+        aje = pd.get("aje_adjustment", 0) or 0
+        rje = pd.get("rje_adjustment", 0) or 0
+        if audited is not None and unadj is not None:
+            expected = float(unadj) + float(aje) + float(rje)
+            diff = abs(float(audited) - expected)
+            # 允许 1 元以内的舍入差异（QC-03 是 0.01 的阻断级）
+            if diff > 1.0:
+                return [QCFindingItem(
+                    rule_id=self.rule_id, severity=self.severity,
+                    message=f"审定数({audited})与计算值({expected:.2f})差异 {diff:.2f}，请检查",
+                    expected_value=str(round(expected, 2)),
+                    actual_value=str(audited),
+                )]
         return []
 
 
 class CrossRefConsistencyRule(QCRule):
-    """Rule 8: 交叉索引一致性。"""
+    """Rule 8: 交叉索引一致性（parsed_data 中的 cross_refs 对应的底稿必须存在）。"""
     severity = "warning"
     rule_id = "QC-08"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
-        return []
+        pd = context.working_paper.parsed_data or {}
+        cross_refs = pd.get("cross_refs", [])
+        if not cross_refs:
+            return []
+        findings = []
+        for ref_code in cross_refs:
+            idx = (await context.db.execute(
+                sa.select(WpIndex).where(
+                    WpIndex.project_id == context.project_id,
+                    WpIndex.wp_code == ref_code,
+                    WpIndex.is_deleted == sa.false(),
+                )
+            )).scalar_one_or_none()
+            if not idx:
+                findings.append(QCFindingItem(
+                    rule_id=self.rule_id, severity=self.severity,
+                    message=f"交叉索引 {ref_code} 在项目底稿索引中不存在",
+                ))
+        return findings
 
 
 class IndexRegistrationRule(QCRule):
-    """Rule 9: 索引表登记。"""
+    """Rule 9: 底稿已在索引表中登记（wp_index 记录存在且状态非 not_started）。"""
     severity = "warning"
     rule_id = "QC-09"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        wp = context.working_paper
+        idx = (await context.db.execute(
+            sa.select(WpIndex).where(
+                WpIndex.id == wp.wp_index_id,
+                WpIndex.is_deleted == sa.false(),
+            )
+        )).scalar_one_or_none()
+        if not idx:
+            return [QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                message="底稿未在索引表中登记（wp_index 记录缺失）",
+            )]
         return []
 
 
 class CrossRefExistsRule(QCRule):
-    """Rule 10: 引用底稿存在。"""
+    """Rule 10: 引用底稿存在且已完成。"""
     severity = "warning"
     rule_id = "QC-10"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
-        return []
+        from app.models.workpaper_models import WpCrossRef
+        refs = (await context.db.execute(
+            sa.select(WpCrossRef).where(WpCrossRef.source_wp_id == context.working_paper.id)
+        )).scalars().all()
+        findings = []
+        for ref in refs:
+            target_code = ref.target_wp_code if hasattr(ref, 'target_wp_code') else None
+            if target_code:
+                # 检查目标底稿是否存在
+                target_idx = (await context.db.execute(
+                    sa.select(WpIndex).where(
+                        WpIndex.project_id == context.project_id,
+                        WpIndex.wp_code == target_code,
+                    )
+                )).scalar_one_or_none()
+                if not target_idx:
+                    findings.append(QCFindingItem(
+                        rule_id=self.rule_id, severity=self.severity,
+                        message=f"交叉引用的底稿 {target_code} 不存在",
+                        cell_reference=ref.cell_reference if hasattr(ref, 'cell_reference') else None,
+                    ))
+        return findings
 
 
 class AuditProcedureStatusRule(QCRule):
-    """Rule 11: 审计程序执行状态。"""
+    """Rule 11: 关联的审计程序是否已执行完成。"""
     severity = "warning"
     rule_id = "QC-11"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        # 检查底稿关联的审计程序是否已完成
+        wp = context.working_paper
+        idx = context.wp_index
+        if not idx:
+            return []
+        wp_code = idx.wp_code if idx else None
+        if not wp_code:
+            return []
+
+        from app.models.procedure_models import ProcedureInstance
+        proc = (await context.db.execute(
+            sa.select(ProcedureInstance).where(
+                ProcedureInstance.project_id == context.project_id,
+                ProcedureInstance.wp_code == wp_code,
+                ProcedureInstance.status == "execute",
+                ProcedureInstance.is_deleted == sa.false(),
+            )
+        )).scalar_one_or_none()
+
+        if proc and proc.execution_status != "completed":
+            return [QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                message=f"关联审计程序 {proc.procedure_code} 尚未完成（当前状态: {proc.execution_status}）",
+            )]
         return []
 
 
 class SamplingCompletenessRule(QCRule):
-    """Rule 12: 抽样记录完整。"""
+    """Rule 12: 抽样记录完整（有抽样配置则必须有记录）。"""
     severity = "warning"
     rule_id = "QC-12"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
-        return []
+        from app.models.workpaper_models import SamplingConfig, SamplingRecord
+        configs = (await context.db.execute(
+            sa.select(SamplingConfig).where(
+                SamplingConfig.working_paper_id == context.working_paper.id,
+            )
+        )).scalars().all()
+        findings = []
+        for cfg in configs:
+            records = (await context.db.execute(
+                sa.select(sa.func.count()).select_from(SamplingRecord).where(
+                    SamplingRecord.sampling_config_id == cfg.id,
+                )
+            )).scalar() or 0
+            if records == 0:
+                findings.append(QCFindingItem(
+                    rule_id=self.rule_id, severity=self.severity,
+                    message=f"抽样配置 {cfg.id} 已创建但无抽样记录",
+                ))
+        return findings
 
 
 class AdjustmentRecordedRule(QCRule):
-    """Rule 13: 调整事项已录入。"""
+    """Rule 13: 底稿中发现的调整事项已录入调整分录。"""
     severity = "warning"
     rule_id = "QC-13"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        pd = context.working_paper.parsed_data or {}
+        pending_adj = pd.get("pending_adjustments", [])
+        if pending_adj:
+            return [QCFindingItem(
+                rule_id=self.rule_id, severity=self.severity,
+                message=f"底稿中有 {len(pending_adj)} 项待录入的调整事项",
+            )]
         return []
 
 
@@ -286,11 +419,22 @@ class AdjustmentRecordedRule(QCRule):
 # ---------------------------------------------------------------------------
 
 class PreparationDateRule(QCRule):
-    """Rule 14: 编制日期合理。"""
+    """Rule 14: 编制日期合理（不早于项目开始、不晚于当前日期）。"""
     severity = "info"
     rule_id = "QC-14"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        wp = context.working_paper
+        if wp.created_at and wp.updated_at:
+            # 如果底稿创建超过90天还在draft状态，提示
+            from datetime import timedelta
+            if wp.status == WpFileStatus.draft:
+                age = (datetime.now(timezone.utc) - wp.created_at.replace(tzinfo=timezone.utc)).days
+                if age > 90:
+                    return [QCFindingItem(
+                        rule_id=self.rule_id, severity=self.severity,
+                        message=f"底稿创建已 {age} 天仍为草稿状态，请确认是否需要编制",
+                    )]
         return []
 
 

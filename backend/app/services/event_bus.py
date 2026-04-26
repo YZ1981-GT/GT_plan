@@ -34,6 +34,16 @@ class EventBus:
         self._pending: dict[str, dict] = {}  # debounce 缓冲区
         self._debounce_ms: int = debounce_ms
 
+    def _build_dedup_key(self, payload: EventPayload) -> str:
+        """构建 debounce 去重键。
+
+        说明：
+        - 同项目不同年度的事件不应互相合并。
+        - year=None 视为“全年/未知年度”事件，单独归并。
+        """
+        year_key = payload.year if payload.year is not None else "ALL_YEARS"
+        return f"{payload.event_type.value}:{payload.project_id}:{year_key}"
+
     def subscribe(self, event_type: EventType, handler: EventHandler) -> None:
         """注册事件处理器"""
         self._handlers[event_type].append(handler)
@@ -41,15 +51,19 @@ class EventBus:
         logger.info("EventBus: subscribed %s to %s", handler_name, event_type.value)
 
     async def publish(self, payload: EventPayload) -> None:
-        """发布事件，相同 (event_type, project_id) 在 debounce 窗口内合并为一次"""
-        dedup_key = f"{payload.event_type.value}:{payload.project_id}"
+        """发布事件，相同去重键在 debounce 窗口内合并为一次。"""
+        dedup_key = self._build_dedup_key(payload)
 
         # 合并 account_codes
         if dedup_key in self._pending:
             self._pending[dedup_key]["handle"].cancel()
             existing_codes = self._pending[dedup_key]["payload"].account_codes or []
             new_codes = payload.account_codes or []
-            payload.account_codes = list(set(existing_codes + new_codes)) if (existing_codes or new_codes) else None
+            if existing_codes or new_codes:
+                # 保持去重且稳定顺序，避免 set 带来的顺序抖动
+                payload.account_codes = list(dict.fromkeys(existing_codes + new_codes))
+            else:
+                payload.account_codes = None
 
         try:
             loop = asyncio.get_running_loop()
@@ -70,7 +84,7 @@ class EventBus:
 
     async def _dispatch(self, payload: EventPayload) -> None:
         """实际分发事件到处理器"""
-        dedup_key = f"{payload.event_type.value}:{payload.project_id}"
+        dedup_key = self._build_dedup_key(payload)
         self._pending.pop(dedup_key, None)
 
         event_type = payload.event_type

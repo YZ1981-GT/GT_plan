@@ -10,8 +10,8 @@
 
 - **Phase 0-7**：已完成开发（基础设施、核心功能、底稿管理、报表管理、合并报表、协作功能、AI 辅助、扩展功能、人员管理、深度增强）
 - **Phase 8**：已完成规划（数据模型优化与性能提升，三件套文档已创建）
-- **测试覆盖**：后端 143 个测试全部通过
-- **数据库迁移**：33 个 Alembic 迁移脚本（001-033）
+- **测试覆盖**：后端约 143 个测试（AI/OCR 相关用例受本地依赖版本影响）
+- **数据库迁移**：34 个 Alembic 迁移脚本（001-034）
 - **前端组件**：50+ Vue 组件
 - **API 端点**：100+ REST API 端点
 
@@ -38,7 +38,7 @@
 - **数据库**: PostgreSQL 16
 - **缓存**: Redis 7
 - **ORM**: SQLAlchemy (async)
-- **迁移**: Alembic（001-032 版本）
+- **迁移**: Alembic（001-034 版本）
 - **AI**: PaddleOCR、Tesseract、MinerU（可选）
 - **文档服务**: ONLYOFFICE Document Server
 - **附件管理**: Paperless-ngx
@@ -76,7 +76,7 @@
 1. **克隆项目**
 ```bash
 git clone <repository-url>
-cd GT_workplan
+cd GT_plan
 ```
 
 2. **配置环境变量**
@@ -93,10 +93,12 @@ docker-compose up -d
 4. **访问应用**
 - 后端 API: http://localhost:8000
 - API 文档: http://localhost:8000/docs
-- 前端: http://localhost:5173
+- 前端开发服务器: http://localhost:3030
 - Metabase: http://localhost:3000
 - Paperless-ngx: http://localhost:8010
 - ONLYOFFICE: http://localhost:8080
+
+> 说明：`docker-compose.yml` 默认不包含前端容器，前端请按下文“前端开发”单独启动。
 
 ### 可选：启动 MinerU（需要 GPU）
 
@@ -123,14 +125,13 @@ GT_plan/
 │   │   ├── services/      # 业务服务
 │   │   ├── routers/       # API 路由
 │   │   └── core/          # 核心配置
-│   ├── alembic/           # 数据库迁移（001-032）
+│   ├── alembic/           # 数据库迁移（001-034）
 │   ├── tests/             # 测试文件（143个测试）
 │   └── requirements.txt   # Python 依赖
 ├── audit-platform/         # 前端应用
 │   ├── frontend/          # Vue 3 前端
 │   │   ├── src/           # 源代码
 │   │   └── package.json   # Node 依赖
-│   └── backend/          # 后端应用（同 backend/）
 ├── storage/                # 存储目录
 │   ├── projects/          # 项目级存储
 │   └── users/             # 用户私人库
@@ -241,7 +242,9 @@ pytest
 ### 前端开发
 
 ```bash
-cd frontend
+cd audit-platform/frontend
+cp .env.example .env
+# 若后端运行在 8000，请将 VITE_API_BASE_URL 改为 http://localhost:8000
 npm install
 npm run dev
 ```
@@ -299,6 +302,22 @@ nvidia-smi
 ```bash
 docker-compose -f docker-compose.mineru.yml logs mineru
 ```
+
+## Large File Import Notes
+
+For project-year accounting data import (`tb_balance`, `tb_ledger`, `tb_aux_balance`, `tb_aux_ledger`), the backend now applies these rules:
+
+- `POST /api/projects/{project_id}/import` automatically switches to streaming mode for `generic` uploads when file type is `xlsx`/`xlsm`/`csv` and size is at least `20MB`.
+- Streaming mode processes rows in chunks and avoids router-level full-file loading into memory.
+- `on_duplicate=overwrite` performs soft-delete of existing same-year data before writing new rows.
+- Smart import cleanup now soft-deletes old four-table rows for the same `project_id + year` and marks previous completed batches as `rolled_back`.
+- Run Alembic migrations to apply import hot-path indexes (including revision `035`) before benchmarking.
+
+Recommended upload strategy for very large datasets:
+
+- Prefer single-sheet or well-structured workbook exports.
+- Use stable header names (account code/date/voucher fields) to reduce parser fallback costs.
+- Use `on_duplicate=overwrite` for full-period refresh to avoid mixed old/new rows.
 
 ## 贡献指南
 

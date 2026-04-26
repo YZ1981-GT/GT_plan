@@ -115,6 +115,92 @@ def register_event_handlers() -> None:
     )
 
     # ------------------------------------------------------------------
+    # 底稿保存 → 审定数比对 + 预填充过期标记 (阶段三)
+    # ------------------------------------------------------------------
+    async def _on_workpaper_saved(payload: EventPayload) -> None:
+        """底稿保存后：比对审定数与试算表，标记一致性状态"""
+        wp_id = payload.extra.get("wp_id") if payload.extra else None
+        if not wp_id:
+            return
+        async with async_session_factory() as session:
+            try:
+                from app.services.wp_mapping_service import WpMappingService
+                from app.models.workpaper_models import WorkingPaper
+                import sqlalchemy as _sa
+
+                # 1. 查找底稿及其 parsed_data
+                wp_result = await session.execute(
+                    _sa.select(WorkingPaper).where(
+                        WorkingPaper.id == wp_id,
+                        WorkingPaper.is_deleted == _sa.false(),
+                    )
+                )
+                wp = wp_result.scalar_one_or_none()
+                if not wp or not wp.parsed_data:
+                    return
+
+                # 2. 从 parsed_data 提取审定数
+                wp_audited = wp.parsed_data.get("audited_amount")
+                if wp_audited is None:
+                    return
+
+                # 3. 查找映射关系
+                from app.models.workpaper_models import WpIndex
+                idx_result = await session.execute(
+                    _sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+                )
+                wp_code = idx_result.scalar_one_or_none()
+                if not wp_code:
+                    return
+
+                svc = WpMappingService(session)
+                mapping = svc.find_by_wp_code(wp_code)
+                if not mapping:
+                    return
+
+                # 4. 从试算表取审定数比对
+                from decimal import Decimal
+                codes = mapping.get("account_codes", [])
+                if not codes:
+                    return
+
+                tb_result = await session.execute(
+                    _sa.select(
+                        _sa.func.coalesce(_sa.func.sum(TrialBalance.audited_amount), 0)
+                    ).where(
+                        TrialBalance.project_id == payload.project_id,
+                        TrialBalance.standard_account_code.in_(codes),
+                        TrialBalance.is_deleted == _sa.false(),
+                    )
+                )
+                tb_total = Decimal(str(tb_result.scalar() or 0))
+                wp_val = Decimal(str(wp_audited))
+                diff = abs(tb_total - wp_val)
+
+                # 5. 写入一致性状态到 parsed_data
+                wp.parsed_data = {
+                    **wp.parsed_data,
+                    "wp_consistency": {
+                        "status": "consistent" if diff < Decimal("0.01") else "inconsistent",
+                        "tb_amount": str(tb_total),
+                        "wp_amount": str(wp_val),
+                        "diff_amount": str(diff),
+                    },
+                }
+                await session.commit()
+                logger.info(
+                    "wp_consistency: wp=%s status=%s diff=%s",
+                    wp_id,
+                    wp.parsed_data["wp_consistency"]["status"],
+                    diff,
+                )
+            except Exception as e:
+                await session.rollback()
+                logger.warning("on_workpaper_saved consistency check failed: %s", e)
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved)
+
+    # ------------------------------------------------------------------
     # 数据变更 → 公式缓存失效 (Task 15.1)
     # ------------------------------------------------------------------
     from app.services.formula_engine import FormulaEngine

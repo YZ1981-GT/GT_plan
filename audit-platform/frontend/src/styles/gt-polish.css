@@ -1,0 +1,463 @@
+/**
+ * GT 视觉精修层 — 在现有 Token + Element Plus 覆盖基础上的精细化增强
+ * 目标：更精美、更动感、更简洁，严格遵循致同品牌规范
+ */
+
+/* ═══════════════════════════════════════════════════════════════
+   1. 按钮精修 — 更圆润、更有质感
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 主按钮：渐变更柔和 + 内发光 */
+.el-button--primary {
+  background: linear-gradient(135deg, #4b2d77 0%, #6b42a8 60%, #8b5fcf 100%) !important;
+  box-shadow: 0 2px 8px rgba(75, 45, 119, 0.3), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  border: none !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+}
+.el-button--primary:hover {
+  background: linear-gradient(135deg, #5a3690 0%, #7b52b8 60%, #9b6fdf 100%) !important;
+  box-shadow: 0 4px 16px rgba(75, 45, 119, 0.4), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+  transform: translateY(-1px);
+}
+.el-button--primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(75, 45, 119, 0.3), inset 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+/* 成功按钮 */
+.el-button--success {
+  background: linear-gradient(135deg, #1e8a38 0%, #28A745 60%, #3cc05e 100%) !important;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  border: none !important;
+}
+
+/* 警告按钮 */
+.el-button--warning {
+  background: linear-gradient(135deg, #e6a23c 0%, #f0b856 60%, #f5c97a 100%) !important;
+  box-shadow: 0 2px 8px rgba(230, 162, 60, 0.3), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+  border: none !important;
+  color: #5a3e00 !important;
+}
+
+/* 危险按钮 */
+.el-button--danger {
+  background: linear-gradient(135deg, #d93a33 0%, #FF5149 60%, #ff7b74 100%) !important;
+  box-shadow: 0 2px 8px rgba(255, 81, 73, 0.3), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  border: none !important;
+}
+
+/* 默认按钮 — 更精致的边框 */
+.el-button--default {
+  border: 1px solid var(--gt-color-border) !important;
+  background: var(--gt-color-bg-white) !important;
+  box-shadow: 0 1px 2px rgba(75, 45, 119, 0.04) !important;
+}
+.el-button--default:hover {
+  border-color: var(--gt-color-primary-lighter) !important;
+  color: var(--gt-color-primary) !important;
+  background: linear-gradient(180deg, #fff 0%, var(--gt-color-primary-bg) 100%) !important;
+  box-shadow: 0 2px 6px rgba(75, 45, 119, 0.1) !important;
+}
+
+/* 小按钮更紧凑 */
+.el-button--small {
+  padding: 5px 12px !important;
+  font-size: 12px !important;
+  border-radius: var(--gt-radius-sm) !important;
+}
+.el-button--small.is-round {
+  padding: 5px 14px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   2. 表格精修 — 更精致的行间距和对齐
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 表头更精致 */
+.el-table th.el-table__cell {
+  padding: 10px 12px !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.8px !important;
+  color: var(--gt-color-primary-dark) !important;
+}
+
+/* 数据行更紧凑 */
+.el-table td.el-table__cell {
+  padding: 8px 12px !important;
+}
+
+/* 选中行 — 浅蓝而非深色 */
+.el-table .el-table__body tr.current-row > td.el-table__cell {
+  background: #e8f4fd !important;
+}
+
+/* 表格内链接按钮 */
+.el-table .el-button.is-link,
+.el-table .el-button.is-text {
+  padding: 2px 6px !important;
+  font-size: 12px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   3. 标签精修 — 更柔和的配色
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-tag {
+  font-size: 11px !important;
+  padding: 0 8px !important;
+  height: 22px !important;
+  line-height: 22px !important;
+}
+
+.el-tag--success {
+  background: var(--gt-color-success-light) !important;
+  color: var(--gt-color-success) !important;
+}
+.el-tag--warning {
+  background: var(--gt-color-wheat-light) !important;
+  color: #b88a00 !important;
+}
+.el-tag--danger {
+  background: var(--gt-color-coral-light) !important;
+  color: var(--gt-color-coral) !important;
+}
+.el-tag--info {
+  background: var(--gt-color-teal-light) !important;
+  color: var(--gt-color-teal) !important;
+}
+
+/* 小标签 */
+.el-tag--small {
+  font-size: 10px !important;
+  padding: 0 6px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   4. 进度条精修 — 渐变色 + 圆角
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-progress-bar__outer {
+  border-radius: var(--gt-radius-full) !important;
+  background: var(--gt-color-bg) !important;
+}
+
+.el-progress-bar__inner {
+  border-radius: var(--gt-radius-full) !important;
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* 进度条文字 */
+.el-progress__text {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--gt-color-text-secondary) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   5. 页签精修 — 更精致的下划线
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-tabs__item {
+  font-size: 14px !important;
+  color: var(--gt-color-text-secondary) !important;
+  transition: all var(--gt-transition-fast) !important;
+}
+
+.el-tabs__item:hover {
+  color: var(--gt-color-primary) !important;
+}
+
+.el-tabs__item.is-active {
+  color: var(--gt-color-primary) !important;
+  font-weight: 700 !important;
+}
+
+.el-tabs__active-bar {
+  height: 3px !important;
+  border-radius: 2px !important;
+  background: var(--gt-gradient-primary) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   6. 输入框精修 — 更柔和的焦点
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-input__wrapper {
+  border-radius: var(--gt-radius-sm) !important;
+  box-shadow: 0 0 0 1px var(--gt-color-border) !important;
+  transition: all var(--gt-transition-fast) !important;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--gt-color-primary-lighter) !important;
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--gt-color-primary), 0 0 0 3px rgba(75, 45, 119, 0.1) !important;
+}
+
+/* 搜索框 — 圆角更大 */
+.el-input--prefix .el-input__wrapper {
+  border-radius: var(--gt-radius-md) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   7. 选择器精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-select .el-input__wrapper {
+  border-radius: var(--gt-radius-sm) !important;
+}
+
+.el-select-dropdown__item {
+  font-size: 13px !important;
+  padding: 6px 16px !important;
+  transition: all var(--gt-transition-fast) !important;
+}
+
+.el-select-dropdown__item:hover {
+  background: var(--gt-color-primary-bg) !important;
+}
+
+.el-select-dropdown__item.is-selected {
+  background: var(--gt-color-primary-bg) !important;
+  color: var(--gt-color-primary) !important;
+  font-weight: 600 !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   8. 复选框和单选框精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background: var(--gt-color-primary) !important;
+  border-color: var(--gt-color-primary) !important;
+}
+
+.el-radio__input.is-checked .el-radio__inner {
+  background: var(--gt-color-primary) !important;
+  border-color: var(--gt-color-primary) !important;
+}
+
+.el-radio-button__inner {
+  font-size: 13px !important;
+  padding: 6px 14px !important;
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background: var(--gt-color-primary) !important;
+  border-color: var(--gt-color-primary) !important;
+  box-shadow: -1px 0 0 0 var(--gt-color-primary) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   9. 徽标精修 — 更精致的发光
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-badge__content {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 0 5px !important;
+  height: 16px !important;
+  line-height: 16px !important;
+  border-radius: var(--gt-radius-full) !important;
+  box-shadow: 0 2px 6px rgba(255, 81, 73, 0.4) !important;
+}
+
+.el-badge__content--primary {
+  background: var(--gt-color-primary) !important;
+  box-shadow: 0 2px 6px rgba(75, 45, 119, 0.4) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   10. 描述列表精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-descriptions {
+  --el-descriptions-item-bordered-label-background: var(--gt-color-primary-bg) !important;
+}
+
+.el-descriptions__label {
+  font-size: 12px !important;
+  color: var(--gt-color-text-secondary) !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+
+.el-descriptions__content {
+  font-size: 13px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   11. 树形控件精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-tree-node__content {
+  height: 32px !important;
+  border-radius: var(--gt-radius-sm) !important;
+  transition: all var(--gt-transition-fast) !important;
+  padding-right: 8px !important;
+}
+
+.el-tree-node__content:hover {
+  background: var(--gt-color-primary-bg) !important;
+}
+
+.el-tree-node.is-current > .el-tree-node__content {
+  background: #e8e0f5 !important;
+  color: var(--gt-color-primary-dark) !important;
+  font-weight: 600 !important;
+}
+
+.el-tree-node__expand-icon {
+  color: var(--gt-color-text-tertiary) !important;
+  font-size: 14px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   12. 分页器精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-pagination .el-pager li {
+  border-radius: var(--gt-radius-sm) !important;
+  font-weight: 500 !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  line-height: 30px !important;
+}
+
+.el-pagination .el-pager li.is-active {
+  background: var(--gt-color-primary) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 6px rgba(75, 45, 119, 0.3) !important;
+}
+
+.el-pagination .btn-prev,
+.el-pagination .btn-next {
+  border-radius: var(--gt-radius-sm) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   13. 步骤条精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-step__head.is-finish .el-step__icon {
+  background: var(--gt-color-primary) !important;
+  border-color: var(--gt-color-primary) !important;
+  color: #fff !important;
+}
+
+.el-step__head.is-process .el-step__icon {
+  background: var(--gt-color-primary) !important;
+  border-color: var(--gt-color-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 4px rgba(75, 45, 119, 0.15) !important;
+}
+
+.el-step__title.is-finish {
+  color: var(--gt-color-primary) !important;
+  font-weight: 600 !important;
+}
+
+.el-step__title.is-process {
+  color: var(--gt-color-primary-dark) !important;
+  font-weight: 700 !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   14. 空状态精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-empty {
+  padding: var(--gt-space-10) 0 !important;
+}
+
+.el-empty__image svg {
+  opacity: 0.4;
+}
+
+.el-empty__description p {
+  font-size: 13px !important;
+  color: var(--gt-color-text-tertiary) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   15. 上传组件精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-upload-dragger {
+  border: 2px dashed var(--gt-color-border) !important;
+  border-radius: var(--gt-radius-md) !important;
+  background: var(--gt-color-bg) !important;
+  transition: all var(--gt-transition-fast) !important;
+  padding: var(--gt-space-8) var(--gt-space-5) !important;
+}
+
+.el-upload-dragger:hover {
+  border-color: var(--gt-color-primary-lighter) !important;
+  background: var(--gt-color-primary-bg) !important;
+}
+
+.el-upload-dragger .el-icon {
+  font-size: 40px !important;
+  color: var(--gt-color-primary-lighter) !important;
+  margin-bottom: var(--gt-space-3) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   16. 日期选择器精修
+   ═══════════════════════════════════════════════════════════════ */
+
+.el-date-editor .el-input__wrapper {
+  border-radius: var(--gt-radius-sm) !important;
+}
+
+.el-picker-panel {
+  border-radius: var(--gt-radius-md) !important;
+  box-shadow: var(--gt-shadow-lg) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   17. 全局微动效增强
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 所有可交互元素的过渡 */
+a, button, .el-button, .el-tag, .el-tree-node__content,
+.el-table .el-table__body tr, .el-menu-item, .el-tabs__item {
+  transition: all var(--gt-transition-fast) !important;
+}
+
+/* 焦点可见性（可访问性） */
+*:focus-visible {
+  outline: 2px solid var(--gt-color-primary-light) !important;
+  outline-offset: 2px !important;
+  border-radius: var(--gt-radius-xs) !important;
+}
+
+/* 选中文本颜色 */
+::selection {
+  background: rgba(75, 45, 119, 0.15);
+  color: var(--gt-color-primary-dark);
+}

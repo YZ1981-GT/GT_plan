@@ -277,6 +277,10 @@ class TbBalance(Base):
             "idx_tb_balance_project_year_deleted",
             "project_id", "year", "is_deleted",
         ),
+        Index(
+            "idx_tb_balance_import_batch",
+            "import_batch_id",
+        ),
     )
 
 
@@ -339,6 +343,14 @@ class TbLedger(Base):
             "idx_tb_ledger_project_year_account",
             "project_id", "year", "account_code",
         ),
+        Index(
+            "idx_tb_ledger_project_year_deleted",
+            "project_id", "year", "is_deleted",
+        ),
+        Index(
+            "idx_tb_ledger_import_batch",
+            "import_batch_id",
+        ),
     )
 
 
@@ -393,6 +405,14 @@ class TbAuxBalance(Base):
         Index(
             "idx_tb_aux_balance_project_year_account_aux",
             "project_id", "year", "account_code", "aux_type",
+        ),
+        Index(
+            "idx_tb_aux_balance_project_year_deleted",
+            "project_id", "year", "is_deleted",
+        ),
+        Index(
+            "idx_tb_aux_balance_import_batch",
+            "import_batch_id",
         ),
     )
 
@@ -455,6 +475,14 @@ class TbAuxLedger(Base):
             "idx_tb_aux_ledger_project_year_account_aux",
             "project_id", "year", "account_code", "aux_type",
         ),
+        Index(
+            "idx_tb_aux_ledger_project_year_deleted",
+            "project_id", "year", "is_deleted",
+        ),
+        Index(
+            "idx_tb_aux_ledger_import_batch",
+            "import_batch_id",
+        ),
     )
 
 
@@ -514,6 +542,10 @@ class Adjustment(Base):
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    def soft_delete(self) -> None:
+        """标记为软删除"""
+        self.is_deleted = True
 
     __table_args__ = (
         Index(
@@ -738,6 +770,10 @@ class AdjustmentEntry(Base):
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    def soft_delete(self) -> None:
+        """标记为软删除"""
+        self.is_deleted = True
 
     __table_args__ = (
         Index("idx_adjustment_entries_adjustment_id", "adjustment_id"),

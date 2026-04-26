@@ -317,30 +317,46 @@ function onAuxLedgerPageChange(page: number) {
 
 <style scoped>
 .gt-drilldown {
-  padding: var(--gt-space-4);
+  padding: var(--gt-space-5);
 }
 .gt-drilldown-breadcrumb {
   margin-bottom: var(--gt-space-4);
+  padding: 12px 18px;
+  background: var(--gt-color-bg-white);
+  border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-xs);
+  border: 1px solid rgba(75, 45, 119, 0.04);
 }
 .gt-drilldown-crumb-link {
   cursor: pointer;
-  color: var(--el-color-primary);
+  color: var(--gt-color-primary);
+  font-weight: 500;
+  transition: color var(--gt-transition-fast);
 }
 .gt-drilldown-crumb-link:hover {
-  text-decoration: underline;
+  color: var(--gt-color-primary-light);
 }
 .gt-drilldown-filter-bar {
   display: flex;
   gap: var(--gt-space-2);
-  margin-bottom: var(--gt-space-3);
+  margin-bottom: var(--gt-space-4);
   flex-wrap: wrap;
   align-items: center;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #faf9fd, #f4f0fa);
+  border-radius: var(--gt-radius-md);
+  border: 1px solid rgba(75, 45, 119, 0.06);
 }
 .gt-drilldown-account-link {
   cursor: pointer;
-  color: var(--el-color-primary);
+  color: var(--gt-color-primary);
+  font-weight: 500;
+  transition: all var(--gt-transition-fast);
+  padding: 1px 4px;
+  border-radius: var(--gt-radius-sm);
 }
 .gt-drilldown-account-link:hover {
-  text-decoration: underline;
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary-light);
 }
 </style>

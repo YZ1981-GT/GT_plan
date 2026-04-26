@@ -135,7 +135,12 @@ class TestAIServiceHealthCheck:
         with patch(
             "app.services.ai_service._get_ollama_client",
             return_value=mock_client_instance,
-        ):
+        ), patch(
+            "app.services.ai_service.settings"
+        ) as mock_settings:
+            mock_settings.DEFAULT_CHAT_MODEL = "qwen2.5:7b"
+            mock_settings.OLLAMA_BASE_URL = "http://localhost:11434"
+            mock_settings.LLM_BASE_URL = "http://localhost:11434/v1"
             result = await service.health_check()
 
         assert result["ollama_status"] == "healthy"
@@ -251,26 +256,18 @@ class TestAIServiceChatCompletion:
 
     @pytest.mark.asyncio
     async def test_chat_completion_sync_success(self):
-        """chat_completion returns the LLM response text from /api/chat."""
+        """chat_completion returns the LLM response text."""
         mock_model = _mock_model(model_name="llama3")
         mock_result = _mock_execute_result(scalar_value=mock_model)
 
         mock_db = MagicMock()
         mock_db.execute = AsyncMock(return_value=mock_result)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"message": {"content": "Hello from LLM"}}
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-
         service = AIService(mock_db)
-        with patch(
-            "app.services.ai_service._get_ollama_client",
-            return_value=mock_client_instance,
+        with patch.object(
+            service, "_chat_sync",
+            new_callable=AsyncMock,
+            return_value="Hello from LLM",
         ):
             result = await service.chat_completion(
                 [{"role": "user", "content": "hello"}],
@@ -329,19 +326,11 @@ class TestAIServiceChatCompletion:
         mock_db = MagicMock()
         mock_db.execute = AsyncMock(return_value=mock_result)
 
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"message": {"content": "custom response"}}
-
-        mock_client_instance = MagicMock()
-        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock()
-        mock_client_instance.post = AsyncMock(return_value=mock_response)
-
         service = AIService(mock_db)
-        with patch(
-            "app.services.ai_service._get_ollama_client",
-            return_value=mock_client_instance,
+        with patch.object(
+            service, "_chat_sync",
+            new_callable=AsyncMock,
+            return_value="custom response",
         ):
             result = await service.chat_completion(
                 [{"role": "user", "content": "test"}],

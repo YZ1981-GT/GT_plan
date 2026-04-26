@@ -194,34 +194,6 @@ class TestPhase3Services:
         from app.services.auth_service import login, refresh, logout
         assert callable(login)
 
-    def test_review_service_exists(self):
-        from app.services.review_service import ReviewService
-        assert ReviewService is not None
-
-    def test_subsequent_event_service_exists(self):
-        from app.services.subsequent_event_service import SubsequentEventService
-        assert SubsequentEventService is not None
-
-    def test_sync_service_exists(self):
-        from app.services.sync_service import SyncService
-        assert SyncService is not None
-
-    def test_confirmation_service_exists(self):
-        from app.services.confirmation_service import ConfirmationService
-        assert ConfirmationService is not None
-
-    def test_archive_service_exists(self):
-        from app.services.archive_service import ArchiveService
-        assert ArchiveService is not None
-
-    def test_going_concern_service_exists(self):
-        from app.services.going_concern_service import GoingConcernService
-        assert GoingConcernService is not None
-
-    def test_notification_service_exists(self):
-        from app.services.notification_service import NotificationService
-        assert NotificationService is not None
-
 
 class TestPhase3RiskProperty:
     """29.3-29.4 风险评估属性"""

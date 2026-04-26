@@ -24,7 +24,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { checkIn, listCheckIns } from '@/services/phase10Api'
+import { checkIn, listCheckIns } from '@/services/enhancedApi'
 const route = useRoute()
 const staffId = ref(route.params.staffId as string || '')
 const checkIns = ref<any[]>([])

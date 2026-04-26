@@ -49,8 +49,12 @@ class WorkingPaperService:
         audit_cycle: str | None = None,
         status: str | None = None,
         assigned_to: UUID | None = None,
+        scope_cycles: list[str] | None = None,
     ) -> list[dict]:
         """获取项目底稿列表（支持按循环、状态、编制人筛选）。
+
+        scope_cycles: 用户被分配的循环范围（从 project_users.scope_cycles 或
+        project_assignments.assigned_cycles 获取），非空时只返回这些循环的底稿。
 
         Validates: Requirements 6.1
         """
@@ -70,6 +74,8 @@ class WorkingPaperService:
             query = query.where(WpIndex.status == status)
         if assigned_to:
             query = query.where(WorkingPaper.assigned_to == assigned_to)
+        if scope_cycles:
+            query = query.where(WpIndex.audit_cycle.in_(scope_cycles))
 
         query = query.order_by(WpIndex.wp_code)
         result = await db.execute(query)

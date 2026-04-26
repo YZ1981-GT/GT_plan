@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="performance-monitor">
     <h3>性能监控</h3>
     <el-row :gutter="16">
@@ -107,8 +107,8 @@ let chartInstance: any = null
 
 async function loadStats() {
   try {
-    stats.value = await http.get('/api/admin/performance-stats')
-    const { data: sqRes } = await http.get('/api/admin/slow-queries')
+    stats.value = await api.get('/api/admin/performance-stats')
+    const sqRes = await api.get('/api/admin/slow-queries')
     slowQueries.value = (sqRes as any).queries || []
   } catch { /* ignore */ }
 }
@@ -116,7 +116,7 @@ async function loadStats() {
 async function loadTrends() {
   trendLoading.value = true
   try {
-    const res = await http.get('/api/admin/performance-metrics', {
+    const res = await api.get('/api/admin/performance-metrics', {
       params: { hours: 24 },
     })
     const metrics = res.data ?? res ?? []
@@ -131,7 +131,7 @@ async function loadTrends() {
 
 async function loadBottlenecks() {
   try {
-    const res = await http.get('/api/admin/performance-stats')
+    const res = await api.get('/api/admin/performance-stats')
     const data = res.data ?? res ?? {}
 
     const items: any[] = []

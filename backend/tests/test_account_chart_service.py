@@ -117,16 +117,15 @@ class TestLoadStandardTemplate:
             assert a.parent_code is not None
 
     @pytest.mark.asyncio
-    async def test_load_standard_duplicate_rejected(self, db_session: AsyncSession):
+    async def test_load_standard_duplicate_is_incremental(self, db_session: AsyncSession):
+        """Duplicate load should succeed (incremental: skip existing, insert new only)."""
         from app.services import account_chart_service as svc
 
         project = await _create_test_project(db_session)
-        await svc.load_standard_template(project.id, "enterprise", db_session)
-
-        with pytest.raises(Exception) as exc_info:
-            await svc.load_standard_template(project.id, "enterprise", db_session)
-        assert exc_info.value.status_code == 400
-        assert "重复" in str(exc_info.value.detail)
+        first = await svc.load_standard_template(project.id, "enterprise", db_session)
+        second = await svc.load_standard_template(project.id, "enterprise", db_session)
+        # Second load returns all accounts (existing + any new), no exception
+        assert len(second) >= len(first)
 
     @pytest.mark.asyncio
     async def test_load_unsupported_standard(self, db_session: AsyncSession):
@@ -198,7 +197,8 @@ class TestImportClientChart:
         result = await svc.import_client_chart(project.id, file, db_session)
 
         assert result.total_imported == 2
-        assert len(result.errors) == 1  # One skipped row
+        # Empty rows are silently skipped, not counted as errors
+        assert len(result.errors) == 0
 
     @pytest.mark.asyncio
     async def test_import_unsupported_format(self, db_session: AsyncSession):

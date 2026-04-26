@@ -25,8 +25,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.models.workpaper_models import WpIndex, WorkingPaper, WpStatus, WpSourceType
 from app.models.workpaper_schemas import TemplateResponse, TemplateSetResponse
 from app.services.template_engine import TemplateEngine
+import sqlalchemy as sa
 
 router = APIRouter(tags=["templates"])
 
@@ -278,3 +280,121 @@ async def generate_project_workpapers(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class GenerateFromCodesRequest(BaseModel):
+    wp_codes: list[str]
+    year: int = 2025
+
+
+@router.post("/api/projects/{project_id}/working-papers/generate-from-codes")
+async def generate_from_codes(
+    project_id: UUID,
+    data: GenerateFromCodesRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """从推荐的底稿编码列表直接生成底稿文件（不需要模板集）"""
+    import json
+    import shutil
+    from pathlib import Path
+
+    lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
+    template_lib: dict[str, dict] = {}
+    if lib_path.exists():
+        try:
+            with open(lib_path, "r", encoding="utf-8-sig") as f:
+                lib_data = json.load(f)
+            for item in lib_data.get("templates", lib_data) if isinstance(lib_data, dict) else lib_data:
+                template_lib[item.get("code", item.get("wp_code", ""))] = item
+        except Exception:
+            pass
+
+    project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
+    created = 0
+    skipped = 0
+
+    for code in data.wp_codes:
+        # 检查是否已存在
+        existing = await db.execute(
+            sa.select(WpIndex).where(
+                WpIndex.project_id == project_id,
+                WpIndex.wp_code == code,
+                WpIndex.is_deleted == sa.false(),
+            )
+        )
+        if existing.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        lib_entry = template_lib.get(code, {})
+        wp_name = lib_entry.get("name", lib_entry.get("wp_name", f"底稿{code}"))
+        cycle = lib_entry.get("cycle_prefix", code[0] if code else "X")
+
+        # 创建 wp_index
+        wp_index = WpIndex(
+            project_id=project_id,
+            wp_code=code,
+            wp_name=wp_name,
+            audit_cycle=cycle,
+            status=WpStatus.not_started,
+        )
+        db.add(wp_index)
+        await db.flush()
+
+        # 文件目录
+        cycle_dir = project_wp_dir / cycle
+        cycle_dir.mkdir(parents=True, exist_ok=True)
+        dest_file = cycle_dir / f"{code}.xlsx"
+
+        # 复制模板文件
+        copied = False
+        src_path = lib_entry.get("file_path", "")
+        if src_path:
+            src = Path(src_path)
+            if src.exists():
+                shutil.copy2(src, dest_file)
+                copied = True
+
+        if not copied:
+            try:
+                import openpyxl
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = code
+                ws["A1"] = f"底稿编号: {code}"
+                ws["A2"] = f"底稿名称: {wp_name}"
+                ws["A3"] = f"审计年度: {data.year}"
+                wb.save(str(dest_file))
+                wb.close()
+            except Exception:
+                dest_file.write_bytes(b"")
+
+        # 创建 working_paper
+        wp = WorkingPaper(
+            project_id=project_id,
+            wp_index_id=wp_index.id,
+            file_path=str(dest_file),
+            source_type=WpSourceType.template,
+            file_version=1,
+            created_by=current_user.id,
+        )
+        db.add(wp)
+
+        # 填充底稿表头（编制单位/审计期间/索引号/交叉索引等）
+        try:
+            from app.services.wp_header_service import fill_workpaper_header
+            await fill_workpaper_header(
+                db=db, project_id=project_id, wp_id=wp.id,
+                file_path=str(dest_file), wp_code=code, wp_name=wp_name,
+                cycle=cycle,
+            )
+        except Exception as _e:
+            import logging
+            logging.getLogger(__name__).warning("fill header failed for %s: %s", code, _e)
+
+        created += 1
+
+    await db.flush()
+    await db.commit()
+    return {"created": created, "skipped": skipped, "message": f"已生成 {created} 个底稿，跳过 {skipped} 个已存在"}

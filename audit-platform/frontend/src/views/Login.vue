@@ -83,12 +83,39 @@ async function handleLogin() {
 /* ── 左侧品牌 ── */
 .gt-login-brand {
   flex: 1;
-  background: linear-gradient(135deg, var(--gt-color-primary-dark) 0%, var(--gt-color-primary) 50%, var(--gt-color-primary-light) 100%);
+  background: var(--gt-gradient-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+  /* 网格纹理 */
+  background-image:
+    var(--gt-gradient-primary),
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px, 30px 30px;
+}
+.gt-login-brand::before {
+  content: '';
+  position: absolute;
+  top: -30%; right: -15%;
+  width: 50%; height: 160%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  animation: loginGlow 10s ease-in-out infinite;
+}
+@keyframes loginGlow {
+  0%, 100% { opacity: 0.5; transform: translate(0, 0); }
+  50% { opacity: 1; transform: translate(-30px, 20px); }
+}
+.gt-login-brand::after {
+  content: '';
+  position: absolute;
+  bottom: -20%; left: -10%;
+  width: 40%; height: 140%;
+  background: radial-gradient(ellipse, rgba(0,148,179,0.12) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .brand-content {
@@ -110,6 +137,7 @@ async function handleLogin() {
   font-weight: 700;
   letter-spacing: 2px;
   margin-bottom: var(--gt-space-2);
+  text-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 
 .brand-desc {
@@ -152,6 +180,25 @@ async function handleLogin() {
   justify-content: center;
   background: var(--gt-color-bg-white);
   padding: var(--gt-space-8);
+  position: relative;
+}
+.gt-login-form-wrap::before {
+  content: '';
+  position: absolute;
+  top: 60px; right: 40px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(75, 45, 119, 0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+.gt-login-form-wrap::after {
+  content: '';
+  position: absolute;
+  bottom: 80px; left: 30px;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 148, 179, 0.03) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .gt-login-card {
@@ -162,7 +209,10 @@ async function handleLogin() {
 .login-title {
   font-size: var(--gt-font-size-2xl);
   font-weight: 700;
-  color: var(--gt-color-text);
+  background: var(--gt-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: var(--gt-space-1);
 }
 

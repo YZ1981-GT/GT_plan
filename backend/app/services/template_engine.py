@@ -404,9 +404,14 @@ class TemplateEngine:
         2. For each code, find the latest published (or draft) template
         3. Create wp_index record
         4. Create working_paper record with file_path in project dir
+        5. Copy template .xlsx to project workpaper directory
 
         Validates: Requirements 1.8, 6.2, 6.3
         """
+        import json
+        import shutil
+        from pathlib import Path
+
         ts_result = await db.execute(
             sa.select(WpTemplateSet).where(WpTemplateSet.id == template_set_id)
         )
@@ -417,7 +422,40 @@ class TemplateEngine:
         template_codes = template_set.template_codes or []
         workpapers: list[WorkingPaper] = []
 
+        # 加载程序裁剪结果（跳过被裁剪的底稿）
+        from app.models.procedure_models import ProcedureInstance
+        trimmed_q = sa.select(ProcedureInstance.wp_code, ProcedureInstance.status).where(
+            ProcedureInstance.project_id == project_id,
+            ProcedureInstance.is_deleted == sa.false(),
+            ProcedureInstance.status.in_(["skip", "not_applicable"]),
+        )
+        trimmed_codes = set()
+        for wp_code, status in (await db.execute(trimmed_q)).all():
+            if wp_code:
+                trimmed_codes.add(wp_code)
+
+        # 加载模板库索引（用于查找模板文件路径）
+        lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
+        template_lib: dict[str, dict] = {}
+        if lib_path.exists():
+            try:
+                with open(lib_path, "r", encoding="utf-8-sig") as f:
+                    lib_data = json.load(f)
+                for item in lib_data:
+                    template_lib[item.get("wp_code", "")] = item
+            except Exception:
+                pass
+
+        # 项目底稿目录（按审计循环分子目录）
+        project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
+        project_wp_dir.mkdir(parents=True, exist_ok=True)
+
         for code in template_codes:
+            # 跳过被裁剪的底稿
+            if code in trimmed_codes:
+                logger.info("skip trimmed workpaper: %s", code)
+                continue
+
             # Find latest template for this code
             tpl_result = await db.execute(
                 sa.select(WpTemplate)
@@ -434,21 +472,66 @@ class TemplateEngine:
             tpl = tpl_result.scalar_one_or_none()
 
             # Determine wp_name from template or fallback
-            wp_name = tpl.template_name if tpl else f"底稿{code}"
+            lib_entry = template_lib.get(code, {})
+            wp_name = tpl.template_name if tpl else lib_entry.get("wp_name", f"底稿{code}")
+            audit_cycle = (tpl.audit_cycle if tpl else lib_entry.get("cycle_prefix")) or None
 
             # Create wp_index
             wp_index = WpIndex(
                 project_id=project_id,
                 wp_code=code,
                 wp_name=wp_name,
-                audit_cycle=tpl.audit_cycle if tpl else None,
+                audit_cycle=audit_cycle,
                 status=WpStatus.not_started,
             )
             db.add(wp_index)
             await db.flush()
 
+            # 目标文件路径（按循环分子目录）
+            cycle_dir = project_wp_dir / (audit_cycle or "OTHER")
+            cycle_dir.mkdir(parents=True, exist_ok=True)
+            dest_file = cycle_dir / f"{code}.xlsx"
+            file_path = str(dest_file)
+
+            # 尝试复制模板文件
+            copied = False
+            # 优先从模板库索引的 file_path 复制
+            src_path_str = lib_entry.get("file_path", "")
+            if src_path_str:
+                src = Path(src_path_str)
+                if src.exists() and src.is_file():
+                    shutil.copy2(src, dest_file)
+                    copied = True
+                else:
+                    logger.debug("template source not found: %s (code=%s)", src_path_str, code)
+
+            # 其次从 WpTemplate.file_path 复制
+            if not copied and tpl and tpl.file_path:
+                tpl_src = Path(tpl.file_path)
+                if tpl_src.exists() and tpl_src.is_file():
+                    shutil.copy2(tpl_src, dest_file)
+                    copied = True
+                else:
+                    logger.debug("WpTemplate file not found: %s (code=%s)", tpl.file_path, code)
+
+            # 如果都没有源文件，创建空白 xlsx（含标准表头）
+            if not copied:
+                logger.info("no template source for %s, creating blank workpaper with header", code)
+                try:
+                    import openpyxl
+                    wb = openpyxl.Workbook()
+                    ws = wb.active
+                    ws.title = code
+                    ws["A1"] = f"底稿编号: {code}"
+                    ws["A2"] = f"底稿名称: {wp_name}"
+                    ws["A3"] = f"审计年度: {year}"
+                    wb.save(str(dest_file))
+                    wb.close()
+                except Exception:
+                    # openpyxl 不可用时写空文件
+                    dest_file.write_bytes(b"")
+
             # Create working_paper
-            file_path = f"{project_id}/{year}/{code}.xlsx"
             wp = WorkingPaper(
                 project_id=project_id,
                 wp_index_id=wp_index.id,
@@ -458,7 +541,20 @@ class TemplateEngine:
                 created_by=created_by,
             )
             db.add(wp)
+
+            # 填充底稿表头（编制单位/审计期间/索引号/交叉索引等）
+            try:
+                from app.services.wp_header_service import fill_workpaper_header
+                await fill_workpaper_header(
+                    db=db, project_id=project_id, wp_id=wp.id,
+                    file_path=file_path, wp_code=code, wp_name=wp_name,
+                    cycle=audit_cycle,
+                )
+            except Exception as _e:
+                logger.warning("fill header failed for %s: %s", code, _e)
+
             workpapers.append(wp)
 
         await db.flush()
+        logger.info("generate_project_workpapers: project=%s codes=%d files=%d", project_id, len(template_codes), len(workpapers))
         return workpapers

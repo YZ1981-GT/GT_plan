@@ -34,14 +34,16 @@
       />
       <!-- 具体子页面：右侧全宽显示路由内容 -->
       <div v-else class="gt-detail-content">
-        <router-view />
+        <ErrorBoundary>
+          <router-view />
+        </ErrorBoundary>
       </div>
     </template>
   </ThreeColumnLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ThreeColumnLayout from './ThreeColumnLayout.vue'
 import MiddleProjectList from '@/components/layout/MiddleProjectList.vue'
@@ -49,13 +51,32 @@ import MiddlePlaceholder from '@/components/layout/MiddlePlaceholder.vue'
 import DetailProjectPanel from '@/components/layout/DetailProjectPanel.vue'
 import FourColumnCatalog from '@/components/layout/FourColumnCatalog.vue'
 import FourColumnContent from '@/components/layout/FourColumnContent.vue'
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import { useRoleContextStore } from '@/stores/roleContext'
 
 const route = useRoute()
+const roleStore = useRoleContextStore()
 const selectedProject = ref<any>(null)
 const activeModule = ref('projects')
 const fourCol = ref(false)
 const activeCatalog = ref('reports')
 const selectedCatalogItem = ref<any>(null)
+
+// 初始化角色上下文
+onMounted(async () => {
+  if (!roleStore.loaded) {
+    await roleStore.initialize()
+  }
+})
+
+// 进入项目子页面时加载项目角色
+watch(() => route.params.projectId, async (pid) => {
+  if (pid && typeof pid === 'string') {
+    await roleStore.loadProjectRole(pid)
+  } else {
+    roleStore.currentProjectRole = null
+  }
+}, { immediate: true })
 
 const catalogTitle = computed(() => {
   if (!fourCol.value) return ''

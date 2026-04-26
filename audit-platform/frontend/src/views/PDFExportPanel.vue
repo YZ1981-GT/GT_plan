@@ -1,7 +1,11 @@
 <template>
   <div class="gt-pdf-export gt-fade-in">
-    <div class="gt-pe-header">
-      <h2 class="gt-page-title">PDF 导出</h2>
+    <!-- 页面横幅 -->
+    <div class="gt-pe-banner">
+      <div class="gt-pe-banner-text">
+        <h2>PDF 导出</h2>
+        <p>选择文档 · 设置密码 · 一键导出</p>
+      </div>
     </div>
 
     <el-row :gutter="16">
@@ -177,7 +181,9 @@ function stopPolling() {
 }
 
 function onDownload(taskId: string) {
-  window.open(getExportDownloadUrl(taskId), '_blank')
+  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
+    downloadFileAsBlob(getExportDownloadUrl(taskId), `审计报告_${taskId.slice(0, 8)}.pdf`)
+  })
 }
 
 async function fetchHistory() {
@@ -192,14 +198,51 @@ onUnmounted(stopPolling)
 </script>
 
 <style scoped>
-.gt-pdf-export { padding: var(--gt-space-4); }
-.gt-pe-header { margin-bottom: var(--gt-space-4); }
-.gt-pe-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-4); box-shadow: var(--gt-shadow-sm); }
-.gt-pe-panel-title { margin: 0 0 var(--gt-space-3); font-size: var(--gt-font-size-base); color: var(--gt-color-primary); }
-.gt-pe-doc-checkboxes { display: flex; flex-direction: column; gap: var(--gt-space-2); }
-.gt-pe-progress-section { margin-top: var(--gt-space-2); }
+.gt-pdf-export { padding: var(--gt-space-5); }
+
+/* ── 页面横幅 ── */
+.gt-pe-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 20px 28px;
+  margin-bottom: var(--gt-space-5);
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+}
+.gt-pe-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 45%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.gt-pe-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+.gt-pe-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+
+.gt-pe-panel {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-5); box-shadow: var(--gt-shadow-sm);
+  border: 1px solid rgba(75, 45, 119, 0.04);
+}
+.gt-pe-panel-title {
+  margin: 0 0 var(--gt-space-3); font-size: var(--gt-font-size-md); font-weight: 600;
+  color: var(--gt-color-primary);
+  display: flex; align-items: center; gap: 8px;
+}
+.gt-pe-panel-title::before {
+  content: '';
+  width: 3px; height: 14px;
+  background: var(--gt-gradient-primary);
+  border-radius: 2px;
+}
+.gt-pe-doc-checkboxes { display: flex; flex-direction: column; gap: var(--gt-space-3); }
+.gt-pe-progress-section { margin-top: var(--gt-space-3); }
 .gt-pe-progress-info { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
-.gt-pe-download-link { margin-top: var(--gt-space-2); display: flex; align-items: center; gap: var(--gt-space-2); }
+.gt-pe-download-link { margin-top: var(--gt-space-3); display: flex; align-items: center; gap: var(--gt-space-2); }
 .gt-pe-file-size { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); }
 .gt-pe-error-msg { margin-top: var(--gt-space-2); color: var(--gt-color-coral); font-size: var(--gt-font-size-sm); }
 </style>

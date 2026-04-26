@@ -378,3 +378,63 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
         return StreamingResponse(open(local_path, "rb"), media_type=mime)
 
     return {"previewable": False, "file_name": file_name, "ocr_text": att.get("ocr_text", ""), "download_url": f"/api/attachments/{attachment_id}/download", "message": "文件暂不可预览，请下载查看"}
+
+
+# ── Paperless 健康检查 ──
+
+@router.get("/api/attachments/paperless-health")
+async def check_paperless_health(current_user: User = Depends(get_current_user)):
+    """检查 Paperless-ngx 服务是否可用"""
+    import os
+    import httpx
+
+    paperless_url = os.environ.get("PAPERLESS_URL", "http://localhost:8010")
+    paperless_token = os.environ.get("PAPERLESS_TOKEN", "")
+
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"{paperless_url}/api/",
+                headers={"Authorization": f"Token {paperless_token}"} if paperless_token else {},
+            )
+            if resp.status_code == 200:
+                return {"available": True, "url": paperless_url, "message": "Paperless 服务正常"}
+            return {"available": False, "url": paperless_url, "status": resp.status_code, "message": f"Paperless 返回 {resp.status_code}"}
+    except httpx.ConnectError:
+        return {"available": False, "url": paperless_url, "message": "Paperless 服务不可达"}
+    except Exception as e:
+        return {"available": False, "url": paperless_url, "message": str(e)}
+
+
+# ── 附件重试 OCR ──
+
+@router.post("/api/attachments/{attachment_id}/retry-ocr")
+async def retry_ocr(
+    attachment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """重试 OCR 处理（将状态重置为 pending，触发重新处理）"""
+    svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(404, "附件不存在")
+
+    # 更新 OCR 状态为 pending
+    from app.models.phase10_models import Attachment as AttachmentModel
+    result = await db.execute(
+        sa.select(AttachmentModel).where(AttachmentModel.id == attachment_id)
+    )
+    att_obj = result.scalar_one_or_none()
+    if att_obj:
+        att_obj.ocr_status = "pending"
+        await db.flush()
+        await db.commit()
+
+    # 创建 OCR 重试任务
+    try:
+        from app.services.task_center import create_task, TaskType
+        task_id = create_task(TaskType.ocr_upload, project_id=att.get("project_id", ""), object_id=str(attachment_id))
+        return {"message": "OCR 重试任务已创建", "task_id": task_id}
+    except Exception:
+        return {"message": "OCR 状态已重置为 pending"}

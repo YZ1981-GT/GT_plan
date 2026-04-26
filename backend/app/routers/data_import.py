@@ -21,6 +21,24 @@ from app.services import import_service
 router = APIRouter(prefix="/api/projects/{project_id}/import", tags=["import"])
 
 
+def _should_use_streaming(source_type: str, file: UploadFile) -> bool:
+    """大文件导入分流：generic 的 xlsx/csv 使用流式路径。"""
+    if source_type != "generic":
+        return False
+    if not file.filename:
+        return False
+    suffix = file.filename.lower().rsplit(".", 1)[-1] if "." in file.filename else ""
+    if suffix not in {"xlsx", "xlsm", "csv"}:
+        return False
+    size = file.size
+    if size is None and hasattr(file, "file") and hasattr(file.file, "seek") and hasattr(file.file, "tell"):
+        current = file.file.tell()
+        file.file.seek(0, 2)
+        size = file.file.tell()
+        file.file.seek(current)
+    return bool(size and size >= import_service.STREAMING_THRESHOLD_MB * 1024 * 1024)
+
+
 @router.post("", response_model=ImportBatchResponse)
 async def upload_and_import(
     project_id: UUID,
@@ -46,15 +64,28 @@ async def upload_and_import(
             detail=f"文件大小超过限制（最大 {settings.MAX_UPLOAD_SIZE_MB}MB）",
         )
 
-    batch = await import_service.start_import(
-        project_id=project_id,
-        file=file,
-        source_type=source_type,
-        data_type=data_type,
-        year=year,
-        db=db,
-        on_duplicate=on_duplicate,
-    )
+    if _should_use_streaming(source_type, file):
+        file.file.seek(0)
+        batch = await import_service.start_import_streaming(
+            project_id=project_id,
+            content=file.file,
+            data_type=data_type,
+            year=year,
+            db=db,
+            on_duplicate=on_duplicate,
+            source_type=source_type,
+            file_name=file.filename,
+        )
+    else:
+        batch = await import_service.start_import(
+            project_id=project_id,
+            file=file,
+            source_type=source_type,
+            data_type=data_type,
+            year=year,
+            db=db,
+            on_duplicate=on_duplicate,
+        )
     return ImportBatchResponse.model_validate(batch)
 
 

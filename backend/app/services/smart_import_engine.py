@@ -1619,28 +1619,78 @@ def smart_parse_files(
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
-    """标记旧 batch 为已替换（不删除/不扫描数据行）。
+    """将旧批次对应四表数据软删除，并标记批次为 rolled_back。
 
-    之前用 DELETE 物理删除，但 874 万行的表即使删 0 行也要 11 秒（全索引扫描）。
-    改为只更新 ImportBatch 状态（1 条 UPDATE，毫秒级）。
-    查询时通过 is_deleted=false 过滤，导入完成后异步标记旧数据。
+    说明：
+    - 仅更新当前 project_id + year 的已完成导入批次对应数据。
+    - 使用 project/year 条件限制更新范围，避免无界扫描。
     """
     import time as _time
     import sqlalchemy as sa
-    from app.models.audit_platform_models import ImportBatch, ImportStatus
+    from app.models.audit_platform_models import (
+        ImportBatch,
+        ImportStatus,
+        TbAuxBalance,
+        TbAuxLedger,
+        TbBalance,
+        TbLedger,
+    )
 
     _t0 = _time.perf_counter()
+    old_batch_ids = (
+        await db.execute(
+            sa.select(ImportBatch.id).where(
+                ImportBatch.project_id == project_id,
+                ImportBatch.year == year,
+                ImportBatch.status == ImportStatus.completed,
+                ImportBatch.data_type != "__smart_import_job__",
+            )
+        )
+    ).scalars().all()
+
+    if not old_batch_ids:
+        logger.info(
+            "[PERF] _clear_project_year_tables: no previous completed batches, %.2fs",
+            _time.perf_counter() - _t0,
+        )
+        return
+
+    table_models = (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger)
+    for model in table_models:
+        tbl = model.__table__
+        await db.execute(
+            sa.update(tbl).where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.is_deleted == sa.false(),
+                tbl.c.import_batch_id.in_(old_batch_ids),
+            ).values(is_deleted=True)
+        )
+
+    # 兼容历史数据：对于没有 import_batch_id 的旧行，也按 project/year 软删除。
+    for model in table_models:
+        tbl = model.__table__
+        await db.execute(
+            sa.update(tbl).where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.is_deleted == sa.false(),
+                tbl.c.import_batch_id.is_(None),
+            ).values(is_deleted=True)
+        )
+
     await db.execute(
         sa.update(ImportBatch.__table__).where(
-            ImportBatch.project_id == project_id,
-            ImportBatch.year == year,
+            ImportBatch.id.in_(old_batch_ids),
             ImportBatch.status == ImportStatus.completed,
-            ImportBatch.data_type != "__smart_import_job__",
         ).values(status=ImportStatus.rolled_back)
     )
     await db.flush()
-    logger.info("[PERF] _clear_project_year_tables (batch status only): %.2fs",
-                _time.perf_counter() - _t0)
+    logger.info(
+        "[PERF] _clear_project_year_tables: batches=%d, %.2fs",
+        len(old_batch_ids),
+        _time.perf_counter() - _t0,
+    )
 
 
 async def write_four_tables(

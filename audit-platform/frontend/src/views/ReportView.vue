@@ -1,20 +1,21 @@
 <template>
   <div class="gt-report-view gt-fade-in">
-    <div class="gt-rv-header">
-      <h2 class="gt-page-title">财务报表</h2>
-      <div class="gt-rv-actions">
-        <el-radio-group v-model="reportMode" size="small" style="margin-right: 12px" @change="fetchReport">
-          <el-radio-button value="audited">已审报表</el-radio-button>
-          <el-radio-button value="unadjusted">未审报表</el-radio-button>
-          <el-radio-button value="compare">对比视图</el-radio-button>
+    <!-- 页面横幅 -->
+    <div class="gt-rv-banner">
+      <div class="gt-rv-banner-text">
+        <h2>财务报表</h2>
+        <p>{{ activeTabLabel }} · {{ reportModeLabel }}</p>
+      </div>
+      <div class="gt-rv-banner-actions">
+        <el-radio-group v-model="reportMode" size="small" @change="fetchReport">
+          <el-radio-button value="audited">已审</el-radio-button>
+          <el-radio-button value="unadjusted">未审</el-radio-button>
+          <el-radio-button value="compare">对比</el-radio-button>
         </el-radio-group>
-        <el-button v-if="reportMode === 'unadjusted'" type="primary" @click="onSyncUnadjusted" :loading="syncLoading">
-          刷新同步未审数
-        </el-button>
-        <el-button @click="onGenerate" :loading="genLoading">重新生成</el-button>
-        <el-button @click="onConsistencyCheck" :loading="checkLoading">一致性校验</el-button>
-        <el-button @click="onExportExcel">导出 Excel</el-button>
-        <el-button type="primary" @click="$router.push({ name: 'PDFExport', params: { projectId } })">导出 PDF</el-button>
+        <el-button v-if="reportMode === 'unadjusted'" type="primary" size="small" @click="onSyncUnadjusted" :loading="syncLoading" round>刷新未审数</el-button>
+        <el-button size="small" @click="onGenerate" :loading="genLoading" round>重新生成</el-button>
+        <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading" round>一致性校验</el-button>
+        <el-button size="small" @click="onExportExcel" round>导出 Excel</el-button>
       </div>
     </div>
 
@@ -138,6 +139,15 @@ const syncLoading = ref(false)
 const activeTab = ref('balance_sheet')
 const reportMode = ref('audited')
 const rows = ref<ReportRow[]>([])
+
+const activeTabLabel = computed(() => {
+  const m: Record<string, string> = { balance_sheet: '资产负债表', income_statement: '利润表', cash_flow_statement: '现金流量表', equity_statement: '权益变动表' }
+  return m[activeTab.value] || ''
+})
+const reportModeLabel = computed(() => {
+  const m: Record<string, string> = { audited: '已审报表', unadjusted: '未审报表', compare: '对比视图' }
+  return m[reportMode.value] || ''
+})
 const compareRows = ref<any[]>([])
 const consistencyResult = ref<ReportConsistencyCheck | null>(null)
 
@@ -245,7 +255,10 @@ async function onConsistencyCheck() {
 }
 
 function onExportExcel() {
-  window.open(getReportExcelUrl(projectId.value, year.value, activeTab.value), '_blank')
+  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
+    const url = getReportExcelUrl(projectId.value, year.value, activeTab.value)
+    downloadFileAsBlob(url, `报表_${activeTab.value}_${year.value}.xlsx`)
+  })
 }
 
 async function onDrilldown(row: ReportRow) {
@@ -286,15 +299,68 @@ watch(
 </script>
 
 <style scoped>
-.gt-report-view { padding: var(--gt-space-4); }
-.gt-rv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
-.gt-rv-actions { display: flex; gap: var(--gt-space-2); }
-.gt-rv-amount-cell { cursor: pointer; color: var(--el-color-primary); }
-.gt-rv-amount-cell:hover { text-decoration: underline; }
-.gt-rv-check-item { font-size: var(--gt-font-size-sm); margin-top: var(--gt-space-1); }
-.gt-rv-drilldown-content .gt-rv-dd-section { margin-bottom: var(--gt-space-2); }
-.gt-rv-dd-label { font-weight: 600; color: var(--gt-color-text-secondary); }
-.gt-rv-dd-section code { background: var(--gt-color-bg); padding: 2px 6px; border-radius: var(--gt-radius-sm); font-size: var(--gt-font-size-sm); }
-:deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
-:deep(.diff-row) { background-color: #fff3e0 !important; }
+.gt-report-view { padding: var(--gt-space-5); }
+
+/* ── 页面横幅 ── */
+.gt-rv-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 20px 28px;
+  margin-bottom: var(--gt-space-5);
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+}
+.gt-rv-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 45%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.gt-rv-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+.gt-rv-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-rv-banner-actions {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  position: relative; z-index: 1;
+}
+.gt-rv-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.gt-rv-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
+.gt-rv-banner-actions :deep(.el-radio-button__inner) { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.85); }
+.gt-rv-banner-actions :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) { background: rgba(255,255,255,0.25); color: #fff; font-weight: 600; }
+
+/* ── 金额单元格 ── */
+.gt-rv-amount-cell {
+  cursor: pointer; color: var(--gt-color-primary); font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  transition: all var(--gt-transition-fast);
+  padding: 2px 4px; border-radius: var(--gt-radius-sm);
+}
+.gt-rv-amount-cell:hover { color: var(--gt-color-primary-light); background: var(--gt-color-primary-bg); }
+
+.gt-rv-check-item {
+  font-size: var(--gt-font-size-sm); margin-top: var(--gt-space-1);
+  padding: 6px 10px; background: rgba(255,81,73,0.06); border-radius: var(--gt-radius-md);
+  border-left: 3px solid var(--gt-color-coral);
+}
+
+.gt-rv-drilldown-content .gt-rv-dd-section { margin-bottom: var(--gt-space-3); }
+.gt-rv-dd-label { font-weight: 600; color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); }
+.gt-rv-dd-section code {
+  background: linear-gradient(135deg, #f8f6fb, #f4f0fa);
+  padding: 4px 12px; border-radius: var(--gt-radius-md);
+  font-size: var(--gt-font-size-sm); border: 1px solid rgba(75,45,119,0.08);
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  display: inline-block;
+}
+
+:deep(.total-row) { background: linear-gradient(90deg, #ece4f5, #e8e0f0) !important; font-weight: 700; }
+:deep(.total-row td) { border-bottom: 2px solid var(--gt-color-primary-lighter) !important; }
+:deep(.diff-row) { background: linear-gradient(90deg, #fff8f0, #fff3e0) !important; }
+:deep(.el-tabs__item) { font-size: 14px; }
+:deep(.el-tabs__item.is-active) { font-weight: 600; }
+:deep(.el-tabs__active-bar) { height: 3px; border-radius: 2px; }
 </style>

@@ -1,13 +1,17 @@
 <template>
   <div class="gt-audit-report gt-fade-in">
     <div class="gt-ar-header">
-      <h2 class="gt-page-title">审计报告</h2>
-      <div class="gt-ar-actions">
-        <el-button @click="showGenerateDialog = true" type="primary">生成报告</el-button>
-        <el-button v-if="report" @click="onStatusChange('review')"
-          :disabled="report.status === 'final'">提交复核</el-button>
-        <el-button v-if="report" @click="onStatusChange('final')"
-          :disabled="report.status === 'final'" type="success">定稿</el-button>
+      <div class="gt-ar-banner">
+        <div class="gt-ar-banner-text">
+          <h2>审计报告</h2>
+          <p v-if="report">{{ opinionLabel(report.opinion_type) }} · {{ report.company_type === 'listed' ? '上市公司' : '非上市' }} · {{ statusLabel(report.status) }}</p>
+          <p v-else>选择意见类型生成报告</p>
+        </div>
+        <div class="gt-ar-banner-actions">
+          <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
+          <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
+          <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
+        </div>
       </div>
     </div>
 
@@ -39,12 +43,20 @@
         <div class="gt-ar-panel gt-ar-editor-panel">
           <div class="gt-ar-editor-header">
             <h4>{{ activeSection }}</h4>
+            <el-tag v-if="report.status !== 'final'" size="small" type="info">可编辑</el-tag>
+            <el-tag v-else size="small" type="success">已定稿</el-tag>
           </div>
-          <el-input v-model="sectionContent" type="textarea" :rows="16"
-            :disabled="report.status === 'final'" placeholder="段落内容" />
+          <div class="gt-ar-edit-hint" v-if="report.status !== 'final'">
+            直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
+          </div>
+          <el-input v-model="sectionContent" type="textarea" :rows="20"
+            :disabled="report.status === 'final'" placeholder="段落内容"
+            class="gt-ar-textarea" />
           <div class="gt-ar-editor-footer">
             <el-button type="primary" @click="onSaveParagraph" :loading="saveLoading"
               :disabled="report.status === 'final'">保存段落</el-button>
+            <el-button @click="onRefreshFinancialData" :loading="refreshLoading"
+              :disabled="report.status === 'final'">刷新财务数据</el-button>
           </div>
         </div>
       </el-col>
@@ -69,7 +81,7 @@
     </el-row>
 
     <!-- 生成报告弹窗 -->
-    <el-dialog append-to-body v-model="showGenerateDialog" title="生成审计报告" width="450px">
+    <el-dialog append-to-body v-model="showGenerateDialog" title="生成审计报告" width="500px">
       <el-form label-width="100px">
         <el-form-item label="意见类型">
           <el-select v-model="genForm.opinion_type" style="width: 100%">
@@ -85,11 +97,17 @@
             <el-option label="上市公司" value="listed" />
           </el-select>
         </el-form-item>
-        <el-form-item label="报告语言">
-          <el-select v-model="genForm.language" style="width: 100%">
-            <el-option label="中文" value="zh-CN" />
-            <el-option label="English" value="en-US" />
+        <el-form-item label="报表口径">
+          <el-select v-model="genForm.report_scope" style="width: 100%">
+            <el-option label="单体报表" value="standalone" />
+            <el-option label="合并报表" value="consolidated" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="单位简称">
+          <el-input v-model="genForm.entity_short_name" placeholder="如"XX公司"，留空则用全称" />
+          <div style="font-size: 12px; color: #999; margin-top: 4px">
+            生成后正文中的简称可随时修改
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -116,11 +134,17 @@ const year = computed(() => Number(route.query.year) || new Date().getFullYear()
 const loading = ref(false)
 const genLoading = ref(false)
 const saveLoading = ref(false)
+const refreshLoading = ref(false)
 const report = ref<AuditReportData | null>(null)
 const activeSection = ref('')
 const sectionContent = ref('')
 const showGenerateDialog = ref(false)
-const genForm = ref({ opinion_type: 'unqualified', company_type: 'non_listed', language: 'zh-CN' })
+const genForm = ref({
+  opinion_type: 'unqualified',
+  company_type: 'non_listed',
+  report_scope: 'standalone',
+  entity_short_name: '',
+})
 
 const sectionNames = computed(() => {
   if (!report.value?.paragraphs) return []
@@ -197,25 +221,110 @@ async function onStatusChange(status: string) {
   } catch { /* error handled by http interceptor */ }
 }
 
+async function onRefreshFinancialData() {
+  if (!report.value) return
+  refreshLoading.value = true
+  try {
+    // 重新生成会刷新财务数据但保留用户编辑的段落
+    await generateAuditReport(projectId.value, year.value, report.value.opinion_type, report.value.company_type)
+    await fetchReport()
+    ElMessage.success('财务数据已刷新，段落内容已保留')
+  } finally { refreshLoading.value = false }
+}
+
 onMounted(fetchReport)
 </script>
 
 <style scoped>
-.gt-audit-report { padding: var(--gt-space-4); }
-.gt-ar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
-.gt-ar-actions { display: flex; gap: var(--gt-space-2); }
+.gt-audit-report { padding: var(--gt-space-5); }
+
+.gt-ar-header {
+  margin-bottom: var(--gt-space-4);
+}
+.gt-ar-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 18px 28px;
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+}
+.gt-ar-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 45%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.gt-ar-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+.gt-ar-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-ar-banner-actions {
+  display: flex; gap: 8px; align-items: center;
+  position: relative; z-index: 1;
+}
+.gt-ar-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.gt-ar-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
+.gt-ar-actions { display: flex; gap: var(--gt-space-2); align-items: center; flex-wrap: wrap; }
 .gt-ar-body { height: calc(100vh - 180px); }
-.gt-ar-panel { background: var(--gt-color-bg-white); border-radius: var(--gt-radius-sm); padding: var(--gt-space-3); box-shadow: var(--gt-shadow-sm); height: 100%; overflow-y: auto; }
-.gt-ar-panel-title { margin: 0 0 var(--gt-space-2); font-size: var(--gt-font-size-base); color: var(--gt-color-primary); }
-.gt-ar-nav-info { display: flex; gap: var(--gt-space-1); flex-wrap: wrap; margin-bottom: var(--gt-space-2); }
+
+.gt-ar-panel {
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  padding: var(--gt-space-4); box-shadow: var(--gt-shadow-sm);
+  height: 100%; overflow-y: auto;
+  border: 1px solid rgba(75, 45, 119, 0.04);
+  transition: box-shadow var(--gt-transition-base);
+}
+.gt-ar-panel:hover { box-shadow: var(--gt-shadow-md); }
+
+.gt-ar-panel-title {
+  margin: 0 0 var(--gt-space-3); font-size: var(--gt-font-size-md); font-weight: 600;
+  color: var(--gt-color-primary);
+  display: flex; align-items: center; gap: 8px;
+}
+.gt-ar-panel-title::before {
+  content: '';
+  width: 3px; height: 14px;
+  background: var(--gt-gradient-primary);
+  border-radius: 2px;
+}
+
+.gt-ar-nav-info { display: flex; gap: var(--gt-space-1); flex-wrap: wrap; margin-bottom: var(--gt-space-3); }
 .gt-ar-section-menu { border-right: none; }
-.gt-ar-editor-header { margin-bottom: var(--gt-space-2); }
-.gt-ar-editor-header h4 { margin: 0; font-size: var(--gt-font-size-md); }
-.gt-ar-editor-footer { margin-top: var(--gt-space-3); text-align: right; }
+
+.gt-ar-editor-header {
+  margin-bottom: var(--gt-space-3);
+  padding-bottom: var(--gt-space-3);
+  border-bottom: 1px solid rgba(75, 45, 119, 0.06);
+}
+.gt-ar-editor-header h4 { margin: 0; font-size: var(--gt-font-size-md); font-weight: 600; }
+.gt-ar-edit-hint {
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-teal);
+  padding: 6px 10px; margin-bottom: var(--gt-space-2);
+  background: var(--gt-color-teal-light); border-radius: var(--gt-radius-sm);
+}
+.gt-ar-textarea :deep(.el-textarea__inner) {
+  font-family: var(--gt-font-family);
+  font-size: var(--gt-font-size-base);
+  line-height: 1.8;
+}
+.gt-ar-editor-footer { margin-top: var(--gt-space-4); text-align: right; padding-top: var(--gt-space-3); border-top: 1px solid rgba(75, 45, 119, 0.06); display: flex; justify-content: flex-end; gap: var(--gt-space-2); }
+
+/* 财务数据面板 */
 .gt-ar-fin-data-list { margin-bottom: var(--gt-space-3); }
-.gt-ar-fin-data-item { display: flex; justify-content: space-between; padding: var(--gt-space-1) 0; border-bottom: 1px solid var(--gt-color-border-light); font-size: var(--gt-font-size-sm); }
+.gt-ar-fin-data-item {
+  display: flex; justify-content: space-between;
+  padding: var(--gt-space-2) var(--gt-space-2);
+  border-radius: var(--gt-radius-sm);
+  font-size: var(--gt-font-size-sm);
+  transition: background var(--gt-transition-fast);
+}
+.gt-ar-fin-data-item:hover { background: var(--gt-color-primary-bg); }
+.gt-ar-fin-data-item:not(:last-child) { border-bottom: 1px solid rgba(75, 45, 119, 0.04); }
 .gt-ar-fin-key { color: var(--gt-color-text-secondary); }
-.gt-ar-fin-val { font-weight: 600; color: var(--gt-color-primary); }
+.gt-ar-fin-val { font-weight: 700; color: var(--gt-color-primary); }
 .gt-ar-data-meta { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: var(--gt-space-2); }
 .gt-ar-empty-state { text-align: center; padding: 60px 0; color: var(--gt-color-text-tertiary); }
 .gt-ar-empty-hint { color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-sm); text-align: center; padding: var(--gt-space-5) 0; }

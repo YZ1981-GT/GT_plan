@@ -37,7 +37,10 @@ class ProcedureService:
         return [self._to_dict(r) for r in rows]
 
     async def init_from_templates(self, project_id: UUID, cycle: str) -> list[dict]:
-        """从模板初始化程序实例"""
+        """从模板初始化程序实例（优先从 gt_template_library.json，其次从 WpTemplate 表）"""
+        import json
+        from pathlib import Path
+
         # 检查是否已初始化
         existing = await self.db.execute(
             sa.select(sa.func.count()).select_from(ProcedureInstance).where(
@@ -49,23 +52,46 @@ class ProcedureService:
         if (existing.scalar() or 0) > 0:
             return await self.get_procedures(project_id, cycle)
 
-        # 从 wp_template 加载该循环的模板
-        tmpl_q = sa.select(WpTemplate).where(
-            WpTemplate.audit_cycle == cycle,
-            WpTemplate.is_deleted == False,  # noqa
-        ).order_by(WpTemplate.template_code)
-        templates = (await self.db.execute(tmpl_q)).scalars().all()
+        # 优先从 gt_template_library.json 加载
+        lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
+        lib_items = []
+        if lib_path.exists():
+            try:
+                with open(lib_path, "r", encoding="utf-8-sig") as f:
+                    lib_data = json.load(f)
+                lib_items = [item for item in lib_data if item.get("cycle_prefix") == cycle]
+            except Exception:
+                pass
 
-        for i, t in enumerate(templates):
-            pi = ProcedureInstance(
-                project_id=project_id,
-                audit_cycle=cycle,
-                procedure_code=t.template_code,
-                procedure_name=t.template_name,
-                sort_order=i * 10,
-                wp_code=t.template_code,
-            )
-            self.db.add(pi)
+        if lib_items:
+            for i, item in enumerate(lib_items):
+                pi = ProcedureInstance(
+                    project_id=project_id,
+                    audit_cycle=cycle,
+                    procedure_code=item.get("wp_code", f"{cycle}-{i}"),
+                    procedure_name=item.get("wp_name", f"程序{cycle}-{i}"),
+                    sort_order=i * 10,
+                    wp_code=item.get("wp_code"),
+                )
+                self.db.add(pi)
+        else:
+            # 降级：从 wp_template 加载该循环的模板
+            tmpl_q = sa.select(WpTemplate).where(
+                WpTemplate.audit_cycle == cycle,
+                WpTemplate.is_deleted == False,  # noqa
+            ).order_by(WpTemplate.template_code)
+            templates = (await self.db.execute(tmpl_q)).scalars().all()
+
+            for i, t in enumerate(templates):
+                pi = ProcedureInstance(
+                    project_id=project_id,
+                    audit_cycle=cycle,
+                    procedure_code=t.template_code,
+                    procedure_name=t.template_name,
+                    sort_order=i * 10,
+                    wp_code=t.template_code,
+                )
+                self.db.add(pi)
 
         await self.db.flush()
         return await self.get_procedures(project_id, cycle)

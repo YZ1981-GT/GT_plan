@@ -92,6 +92,9 @@ class AssignmentService:
 
         await self.db.flush()
 
+        # 自动同步 project_users 表（解决委派与权限脱节问题）
+        await self._sync_project_users(project_id, created)
+
         # 发送通知给被委派人员
         await self._send_assignment_notifications(project_id, created)
 
@@ -144,6 +147,62 @@ class AssignmentService:
                     related_object_id=project_id,
                 )
                 self.db.add(notif)
+
+    async def _sync_project_users(
+        self, project_id: UUID, assignments: list[ProjectAssignment]
+    ) -> None:
+        """委派时自动同步 project_users 表，确保 require_project_access 不会 403"""
+        from app.models.core import ProjectUser, ProjectUserRole, PermissionLevel
+
+        ROLE_MAP = {
+            "signing_partner": (ProjectUserRole.partner, PermissionLevel.review),
+            "partner": (ProjectUserRole.partner, PermissionLevel.review),
+            "合伙人": (ProjectUserRole.partner, PermissionLevel.review),
+            "manager": (ProjectUserRole.manager, PermissionLevel.review),
+            "项目经理": (ProjectUserRole.manager, PermissionLevel.review),
+            "qc": (ProjectUserRole.qc, PermissionLevel.review),
+            "质控": (ProjectUserRole.qc, PermissionLevel.review),
+            "auditor": (ProjectUserRole.auditor, PermissionLevel.edit),
+            "审计员": (ProjectUserRole.auditor, PermissionLevel.edit),
+            "assistant": (ProjectUserRole.auditor, PermissionLevel.edit),
+            "助理": (ProjectUserRole.auditor, PermissionLevel.edit),
+        }
+
+        for pa in assignments:
+            staff = (await self.db.execute(
+                sa.select(StaffMember.user_id).where(StaffMember.id == pa.staff_id)
+            )).scalar()
+            if not staff:
+                continue
+
+            mapped = ROLE_MAP.get(pa.role, (ProjectUserRole.readonly, PermissionLevel.readonly))
+
+            # upsert: 查找已有记录
+            existing = (await self.db.execute(
+                sa.select(ProjectUser).where(
+                    ProjectUser.project_id == project_id,
+                    ProjectUser.user_id == staff,
+                    ProjectUser.is_deleted == False,
+                )
+            )).scalar_one_or_none()
+
+            if existing:
+                # 更新角色（取更高权限）
+                from app.models.base import PermissionLevel as PL
+                PERM_ORDER = {PL.readonly: 0, PL.review: 1, PL.edit: 2}
+                if PERM_ORDER.get(mapped[1], 0) > PERM_ORDER.get(existing.permission_level, 0):
+                    existing.role = mapped[0]
+                    existing.permission_level = mapped[1]
+            else:
+                pu = ProjectUser(
+                    project_id=project_id,
+                    user_id=staff,
+                    role=mapped[0],
+                    permission_level=mapped[1],
+                )
+                self.db.add(pu)
+
+        await self.db.flush()
 
     async def get_my_assignments(self, user_id: UUID) -> list[dict]:
         """获取当前用户被委派的项目列表"""

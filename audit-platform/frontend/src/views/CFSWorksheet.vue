@@ -1,11 +1,15 @@
 <template>
   <div class="gt-cfs-worksheet gt-fade-in">
-    <div class="gt-cfs-header">
-      <h2 class="gt-page-title">现金流量表工作底稿</h2>
-      <div class="gt-cfs-actions">
-        <el-button @click="onGenerate" :loading="genLoading">生成工作底稿</el-button>
-        <el-button @click="onAutoGenerate" :loading="autoLoading">自动生成调整项</el-button>
-        <el-button @click="showAdjForm = true" type="primary">新建调整分录</el-button>
+    <!-- 页面横幅 -->
+    <div class="gt-cfs-banner">
+      <div class="gt-cfs-banner-text">
+        <h2>现金流量表工作底稿</h2>
+        <p>工作底稿法编制现金流量表</p>
+      </div>
+      <div class="gt-cfs-banner-actions">
+        <el-button size="small" @click="onGenerate" :loading="genLoading" round>生成底稿</el-button>
+        <el-button size="small" @click="onAutoGenerate" :loading="autoLoading" round>自动调整项</el-button>
+        <el-button size="small" @click="showAdjForm = true" round>新建调整</el-button>
       </div>
     </div>
 
@@ -269,17 +273,66 @@ onMounted(fetchAll)
 </script>
 
 <style scoped>
-.gt-cfs-worksheet { padding: var(--gt-space-4); }
-.gt-cfs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
+.gt-cfs-worksheet { padding: var(--gt-space-5); }
+
+/* ── 页面横幅 ── */
+.gt-cfs-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 20px 28px;
+  margin-bottom: var(--gt-space-5);
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+}
+.gt-cfs-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 45%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+  pointer-events: none;
+}
+.gt-cfs-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+.gt-cfs-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-cfs-banner-actions {
+  display: flex; gap: 8px; align-items: center;
+  position: relative; z-index: 1;
+}
+.gt-cfs-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.gt-cfs-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
 .gt-cfs-actions { display: flex; gap: var(--gt-space-2); }
 .gt-cfs-unallocated { color: var(--gt-color-coral); font-weight: 600; }
-.gt-cfs-reconciliation-badge { margin-top: var(--gt-space-2); font-size: var(--gt-font-size-base); font-weight: 600; }
-.gt-cfs-reconciliation-badge.gt-cfs-pass { color: var(--gt-color-success); }
-.gt-cfs-reconciliation-badge.gt-cfs-fail { color: var(--gt-color-coral); }
-.gt-cfs-verify-panel { background: var(--gt-color-bg-white); padding: var(--gt-space-3); border-radius: var(--gt-radius-sm); box-shadow: var(--gt-shadow-sm); }
-.gt-cfs-verify-item { padding: 6px 0; font-size: var(--gt-font-size-base); }
+
+.gt-cfs-reconciliation-badge {
+  margin-top: var(--gt-space-3); font-size: var(--gt-font-size-base); font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: var(--gt-radius-full);
+}
+.gt-cfs-reconciliation-badge.gt-cfs-pass { color: var(--gt-color-success); background: var(--gt-color-success-light); }
+.gt-cfs-reconciliation-badge.gt-cfs-fail { color: var(--gt-color-coral); background: var(--gt-color-coral-light); }
+
+.gt-cfs-verify-panel {
+  background: var(--gt-color-bg-white); padding: var(--gt-space-4);
+  border-radius: var(--gt-radius-md); box-shadow: var(--gt-shadow-sm);
+  border: 1px solid rgba(75, 45, 119, 0.04);
+}
+.gt-cfs-verify-item {
+  padding: 8px 12px; font-size: var(--gt-font-size-base);
+  border-radius: var(--gt-radius-sm); margin-bottom: 4px;
+  transition: background var(--gt-transition-fast);
+}
+.gt-cfs-verify-item:hover { background: var(--gt-color-bg); }
 .gt-cfs-verify-item.gt-cfs-pass { color: var(--gt-color-success); }
 .gt-cfs-verify-item.gt-cfs-fail { color: var(--gt-color-coral); }
-.gt-cfs-verify-diff { margin-left: var(--gt-space-2); font-weight: 600; }
-:deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
+.gt-cfs-verify-diff { margin-left: var(--gt-space-2); font-weight: 700; }
+
+:deep(.total-row) {
+  background: linear-gradient(90deg, #ece4f5, #e8e0f0) !important;
+  font-weight: 700;
+}
+:deep(.total-row td) { border-bottom: 2px solid var(--gt-color-primary-lighter) !important; }
+:deep(.el-tabs__item.is-active) { font-weight: 600; }
 </style>

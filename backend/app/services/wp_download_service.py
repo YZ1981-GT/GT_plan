@@ -179,14 +179,13 @@ class WpUploadService:
         except Exception as e:
             logger.warning("cloud sync on upload failed (non-blocking): %s", e)
 
-        # 触发 ParseService 解析关键单元格 → 回写 parsed_data
+        # 触发解析关键单元格 → 回写 parsed_data（使用真实解析引擎）
         try:
-            from app.services.prefill_service import ParseService
+            from app.services.prefill_engine import parse_workpaper_real
             from app.services.task_center import create_task, update_task, TaskType, TaskStatus
             parse_task_id = create_task(TaskType.parse_workpaper, project_id=str(project_id), object_id=str(wp_id))
             update_task(parse_task_id, TaskStatus.processing)
-            parse_svc = ParseService()
-            parse_result = await parse_svc.parse_workpaper(db=db, project_id=project_id, wp_id=wp_id)
+            parse_result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id)
             update_task(parse_task_id, TaskStatus.success, result=parse_result)
             logger.info("parse after upload: wp=%s result=%s", wp_id, parse_result.get("status"))
         except Exception as e:

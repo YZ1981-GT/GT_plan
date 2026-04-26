@@ -267,6 +267,59 @@ class TestEventBus:
         await bus.publish(payload)
         assert queue.empty()
 
+    @pytest.mark.asyncio
+    async def test_debounce_merges_same_year_events(self):
+        """同项目同年度同事件类型在窗口内应合并"""
+        bus = EventBus(debounce_ms=20)
+        handler = AsyncMock()
+        bus.subscribe(EventType.ADJUSTMENT_UPDATED, handler)
+        project_id = uuid.uuid4()
+
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_UPDATED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["1001"],
+        ))
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_UPDATED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["6001"],
+        ))
+
+        await asyncio.sleep(0.08)
+        handler.assert_awaited_once()
+        merged_payload = handler.await_args.args[0]
+        assert merged_payload.year == 2025
+        assert merged_payload.account_codes == ["1001", "6001"]
+
+    @pytest.mark.asyncio
+    async def test_debounce_does_not_merge_cross_year_events(self):
+        """同项目跨年度事件不应合并"""
+        bus = EventBus(debounce_ms=20)
+        handler = AsyncMock()
+        bus.subscribe(EventType.ADJUSTMENT_UPDATED, handler)
+        project_id = uuid.uuid4()
+
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_UPDATED,
+            project_id=project_id,
+            year=2024,
+            account_codes=["1001"],
+        ))
+        await bus.publish(EventPayload(
+            event_type=EventType.ADJUSTMENT_UPDATED,
+            project_id=project_id,
+            year=2025,
+            account_codes=["6001"],
+        ))
+
+        await asyncio.sleep(0.08)
+        assert handler.await_count == 2
+        years = {call.args[0].year for call in handler.await_args_list}
+        assert years == {2024, 2025}
+
 
 # ===================================================================
 # 事件处理器联动测试

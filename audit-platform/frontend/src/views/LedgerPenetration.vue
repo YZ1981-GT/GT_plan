@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="gt-penetration">
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
@@ -678,6 +678,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, CircleCheck, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import api from '@/services/apiProxy'
 
 const route = useRoute()
 const router = useRouter()
@@ -708,7 +709,7 @@ const availableYears = ref<number[]>([])
 async function loadAvailableYears() {
   if (!projectId.value) return
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/ledger/years`)
+    const data = await api.get(`/api/projects/${projectId.value}/ledger/years`)
     const result = data?.data ?? data
     availableYears.value = result?.years ?? []
   } catch {
@@ -718,7 +719,7 @@ async function loadAvailableYears() {
 
 async function loadProjectList() {
   try {
-    const { data } = await http.get('/api/projects')
+    const data = await api.get('/api/projects')
     const list = data?.data ?? data ?? []
     projectList.value = Array.isArray(list) ? list : []
   } catch {
@@ -729,7 +730,7 @@ async function loadProjectList() {
 async function loadCurrentProject() {
   if (!projectId.value) return
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/wizard`)
+    const data = await api.get(`/api/projects/${projectId.value}/wizard`)
     const ws = data?.data ?? data
     const basicInfo = ws?.steps?.basic_info?.data || {}
     currentProject.value = {
@@ -774,10 +775,10 @@ async function runValidation() {
   validateDialogVisible.value = true
   validateResult.value = null
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/validate?year=${selectedYear.value}`
     )
-    validateResult.value = data.data ?? data
+    validateResult.value = data
   } catch {
     ElMessage.error('校验失败')
   } finally {
@@ -835,7 +836,7 @@ async function doPreview() {
     }
     const url = `/api/projects/${projectId.value}/ledger/smart-preview` +
       (importYear.value ? `?year=${importYear.value}` : '')
-    const { data } = await http.post(url, formData, { timeout: 120000 })
+    const data = await api.post(url, formData, { timeout: 120000 })
     previewResult.value = data?.data ?? data
     importStep.value = 'preview'
   } catch (e: any) {
@@ -875,7 +876,7 @@ async function doImport() {
   // 启动进度轮询（每 1.5 秒查一次后端进度）
   const pollTimer = setInterval(async () => {
     try {
-      const { data: statusData } = await http.get(
+      const statusData = await api.get(
         `/api/data-lifecycle/import-queue/${projectId.value}`,
         { timeout: 5000 },
       )
@@ -923,7 +924,7 @@ async function doImport() {
     const qs = params.toString()
     if (qs) url += `?${qs}`
 
-    const { data } = await http.post(url, formData, { timeout: 600000 })
+    const data = await api.post(url, formData, { timeout: 600000 })
     const result = data?.data ?? data
     importedResult.value = result?.imported || result?.data_sheets_imported || result
     importProgress.value = 100
@@ -935,7 +936,7 @@ async function doImport() {
 
     if (status === 409) {
       try {
-        await http.post(`/api/projects/${projectId.value}/account-chart/import-reset`, {}, { timeout: 5000 })
+        await api.post(`/api/projects/${projectId.value}/account-chart/import-reset`, {}, { timeout: 5000 })
       } catch { /* 静默 */ }
       ElMessage.warning('上次导入的锁已自动释放，请重新点击「确认导入」')
       importStep.value = 'preview'
@@ -1332,10 +1333,10 @@ async function loadBalance() {
   }
   loading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/ledger/balance`, {
+    const data = await api.get(`/api/projects/${projectId.value}/ledger/balance`, {
       params: { year: year.value },
     })
-    balanceData.value = data.data ?? data ?? []
+    balanceData.value = data ?? []
     // debug log removed for production
   } catch (e) {
     console.error('[Ledger] loadBalance failed:', e)
@@ -1357,7 +1358,7 @@ async function loadLedger() {
       http.get(`/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }),
       http.get(`/api/projects/${projectId.value}/ledger/opening-balance/${encodeURIComponent(currentAccount.value)}`, { params: { year: year.value } }),
     ])
-    const result = data.data ?? data
+    const result = data
     const obResult = obData.data ?? obData
     currentAccountOpening.value = num(obResult?.opening_balance)
     ledgerItems.value = result.items ?? result ?? []
@@ -1377,10 +1378,10 @@ async function loadMoreLedger() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
     )
-    const result = data.data ?? data
+    const result = data
     const newItems = result.items ?? result ?? []
     ledgerItems.value = [...ledgerItems.value, ...newItems]
     ledgerCursor.value = result.next_cursor ?? null
@@ -1392,11 +1393,11 @@ async function loadMoreLedger() {
 async function loadVoucher() {
   loading.value = true
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/voucher/${encodeURIComponent(currentVoucher.value)}`,
       { params: { year: year.value } }
     )
-    voucherItems.value = data.data ?? data ?? []
+    voucherItems.value = data ?? []
   } catch { voucherItems.value = [] }
   finally { loading.value = false }
 }
@@ -1404,11 +1405,11 @@ async function loadVoucher() {
 async function loadAuxBalance() {
   loading.value = true
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance/${currentAccount.value}`,
       { params: { year: year.value } }
     )
-    auxBalanceItems.value = data.data ?? data ?? []
+    auxBalanceItems.value = data ?? []
   } catch { auxBalanceItems.value = [] }
   finally { loading.value = false }
 }
@@ -1612,7 +1613,7 @@ function loadAuxTreeChildren(row: any, _treeNode: any, resolve: (data: any[]) =>
     http.get(`/api/projects/${projectId.value}/ledger/aux-balance-detail`, {
       params: { year: year.value, account_code: code, dim_type: dimType, aux_code: auxCode }
     }).then(({ data }) => {
-      const items = (data.data ?? data ?? []).map((item: any, idx: number) => ({
+      const items = (data ?? []).map((item: any, idx: number) => ({
         ...item, _tree_key: `${code}_${auxCode}_${idx}`, _isGroup: false,
       }))
       resolve(items)
@@ -1705,11 +1706,11 @@ async function toggleAuxExpand(row: any) {
     // 从后端加载明细
     if (!_auxExpandedDetails.value.has(key)) {
       try {
-        const { data } = await http.get(
+        const data = await api.get(
           `/api/projects/${projectId.value}/ledger/aux-balance-detail`,
           { params: { year: year.value, account_code: row.account_code, dim_type: auxSelectedDimType.value, aux_code: row.aux_code } }
         )
-        _auxExpandedDetails.value.set(key, (data.data ?? data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
+        _auxExpandedDetails.value.set(key, (data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
       } catch { _auxExpandedDetails.value.set(key, []) }
     }
     newSet.add(key)
@@ -1775,7 +1776,7 @@ async function loadAllAuxBalance() {
   loading.value = true
   try {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
-    const { data: summaryData } = await http.get(
+    const summaryData = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
       { params: { year: year.value, dim_type: '__types_only__' } }
     )
@@ -1811,11 +1812,11 @@ async function loadAuxSummaryForDim() {
   }
   try {
     loading.value = true
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
       { params }
     )
-    const result = data.data ?? data
+    const result = data
     auxSummaryData.value = result.rows || []
     // 同时更新维度类型列表
     if (result.dim_types) {
@@ -1842,11 +1843,11 @@ async function loadAuxBalancePage() {
     if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-paged`,
       { params }
     )
-    const result = data.data ?? data
+    const result = data
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0
   } catch { auxPagedRows.value = [] }
@@ -1873,7 +1874,7 @@ async function exportAuxBalanceExcel() {
     if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
-    const response = await http.get(
+    const response = await api.get(
       `/api/projects/${projectId.value}/ledger/export-aux-balance`,
       { params, responseType: 'blob' }
     )
@@ -1896,7 +1897,7 @@ async function exportAuxBalanceExcel() {
 /** 导出科目余额表为 Excel */
 async function exportBalanceExcel() {
   try {
-    const response = await http.get(
+    const response = await api.get(
       `/api/projects/${projectId.value}/ledger/export-balance`,
       { params: { year: year.value }, responseType: 'blob' }
     )
@@ -1923,7 +1924,7 @@ async function exportLedgerExcel() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    const response = await http.get(
+    const response = await api.get(
       `/api/projects/${projectId.value}/ledger/export-ledger/${encodeURIComponent(currentAccount.value)}`,
       { params, responseType: 'blob' }
     )
@@ -1960,11 +1961,11 @@ function drillToAuxLedgerFromBalance(row: any) {
 async function loadAuxLedger() {
   loading.value = true
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-entries/${currentAccount.value}`,
       { params: { year: year.value, aux_type: currentAuxType.value, aux_code: currentAuxCode.value, page: auxLedgerPage.value, page_size: 100 } }
     )
-    const result = data.data ?? data
+    const result = data
     auxLedgerItems.value = result.items ?? result ?? []
     auxLedgerTotal.value = result.total ?? 0
   } catch { auxLedgerItems.value = [] }

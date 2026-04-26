@@ -1,12 +1,15 @@
 <template>
   <div class="gt-trial-balance gt-fade-in">
-    <!-- 顶部操作栏 -->
-    <div class="gt-tb-header">
-      <h2 class="gt-page-title">试算表</h2>
-      <div class="gt-tb-actions">
-        <el-button @click="onConsistencyCheck" :loading="checkLoading">一致性校验</el-button>
-        <el-button @click="onRecalc" :loading="recalcLoading">全量重算</el-button>
-        <el-button type="primary" @click="onExport">导出 Excel</el-button>
+    <!-- 页面横幅 -->
+    <div class="gt-tb-banner">
+      <div class="gt-tb-banner-text">
+        <h2>试算表</h2>
+        <p>{{ year }}年度 · {{ rows.length }} 个科目</p>
+      </div>
+      <div class="gt-tb-banner-actions">
+        <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading" round>一致性校验</el-button>
+        <el-button size="small" @click="onRecalc" :loading="recalcLoading" round>全量重算</el-button>
+        <el-button size="small" @click="onExport" round>导出 Excel</el-button>
       </div>
     </div>
 
@@ -29,7 +32,17 @@
       style="width: 100%"
       :row-class-name="rowClassName"
     >
-      <el-table-column prop="standard_account_code" label="科目编码" width="130" />
+      <el-table-column prop="standard_account_code" label="科目编码" width="130">
+        <template #default="{ row }">
+          <span v-if="!row._isSubtotal && !row._isTotal && getLinkedWp(row.standard_account_code)"
+            class="clickable" @click="onOpenWorkpaper(row.standard_account_code)"
+            :title="'打开底稿 ' + getLinkedWp(row.standard_account_code)?.wp_name">
+            {{ row.standard_account_code }}
+            <el-icon style="margin-left:2px; font-size:11px; vertical-align:middle"><Link /></el-icon>
+          </span>
+          <span v-else>{{ row.standard_account_code }}</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="account_name" label="科目名称" min-width="180" />
       <el-table-column label="未审数" width="150" align="right">
         <template #default="{ row }">
@@ -116,11 +129,13 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Link } from '@element-plus/icons-vue'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
   getProjectAuditYear, listAdjustments,
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
+import { getAllWpMappings, type WpAccountMapping } from '@/services/workpaperApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -143,6 +158,24 @@ const adjDialogVisible = ref(false)
 const adjDialogType = ref('')
 const adjDialogAccount = ref('')
 const adjDialogList = ref<any[]>([])
+
+// 底稿-科目映射
+const wpMappings = ref<WpAccountMapping[]>([])
+const wpMappingIndex = ref<Record<string, WpAccountMapping>>({})
+
+function getLinkedWp(accountCode: string): WpAccountMapping | undefined {
+  return wpMappingIndex.value[accountCode]
+}
+
+function onOpenWorkpaper(accountCode: string) {
+  const mapping = getLinkedWp(accountCode)
+  if (!mapping) return
+  // 跳转到底稿列表页，高亮对应底稿
+  router.push({
+    path: `/projects/${projectId.value}/workpapers`,
+    query: { highlight: mapping.wp_code },
+  })
+}
 
 const CATEGORY_ORDER = ['asset', 'liability', 'equity', 'revenue', 'cost', 'expense']
 const CATEGORY_LABELS: Record<string, string> = {
@@ -287,8 +320,9 @@ async function onConsistencyCheck() {
 }
 
 function onExport() {
-  // 简单实现：打开导出URL
-  window.open(`/api/projects/${projectId.value}/trial-balance/export?year=${year.value}`, '_blank')
+  import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
+    downloadFileAsBlob(`/api/projects/${projectId.value}/trial-balance/export?year=${year.value}`, `试算表_${year.value}.xlsx`)
+  })
 }
 
 function openWorkpaper(row: TrialBalanceRow) {
@@ -331,23 +365,91 @@ watch(
   async () => {
     await ensureProjectYear()
     await fetchData()
+    // 加载底稿-科目映射
+    try {
+      wpMappings.value = await getAllWpMappings(projectId.value)
+      const idx: Record<string, WpAccountMapping> = {}
+      for (const m of wpMappings.value) {
+        for (const code of m.account_codes) {
+          idx[code] = m
+        }
+      }
+      wpMappingIndex.value = idx
+    } catch { /* ignore */ }
   },
   { immediate: true }
 )
 </script>
 
 <style scoped>
-  .gt-trial-balance { padding: var(--gt-space-4); }
-  .gt-tb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); }
-  .gt-tb-actions { display: flex; gap: var(--gt-space-2); }
-  .clickable { cursor: pointer; color: var(--el-color-primary); }
-  .clickable:hover { text-decoration: underline; }
-  .subtotal-val { font-weight: 600; }
-  .gt-tb-balance-indicator { margin-top: var(--gt-space-3); text-align: right; font-size: var(--gt-font-size-base); }
-  .gt-tb-balanced { color: var(--gt-color-success); font-weight: 600; }
-  .gt-tb-unbalanced { color: var(--gt-color-coral); font-weight: 600; }
+  .gt-trial-balance { padding: var(--gt-space-5); }
 
-  :deep(.subtotal-row) { background-color: var(--gt-color-primary-bg) !important; font-weight: 600; }
-  :deep(.total-row) { background-color: #e8e0f0 !important; font-weight: 700; }
-  :deep(.highlight-row) { background-color: var(--gt-color-wheat-light) !important; }
+  /* ── 页面横幅 ── */
+  .gt-tb-banner {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--gt-gradient-primary);
+    border-radius: var(--gt-radius-lg);
+    padding: 20px 28px;
+    margin-bottom: var(--gt-space-5);
+    color: #fff;
+    position: relative; overflow: hidden;
+    box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
+    background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 100% 100%, 20px 20px, 20px 20px;
+  }
+  .gt-tb-banner::before {
+    content: '';
+    position: absolute; top: -40%; right: -10%;
+    width: 45%; height: 180%;
+    background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .gt-tb-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
+  .gt-tb-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+  .gt-tb-banner-actions {
+    display: flex; gap: 8px; align-items: center;
+    position: relative; z-index: 1;
+  }
+  .gt-tb-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+  .gt-tb-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
+
+  .clickable {
+    cursor: pointer; color: var(--gt-color-primary); font-weight: 500;
+    transition: color var(--gt-transition-fast);
+  }
+  .clickable:hover { color: var(--gt-color-primary-light); text-decoration: underline; }
+  .subtotal-val { font-weight: 700; }
+
+  .gt-tb-balance-indicator {
+    margin-top: var(--gt-space-4); text-align: right;
+    font-size: var(--gt-font-size-base);
+  }
+  .gt-tb-balanced {
+    color: var(--gt-color-success); font-weight: 600;
+    padding: 6px 14px; border-radius: var(--gt-radius-full);
+    background: var(--gt-color-success-light);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .gt-tb-unbalanced {
+    color: var(--gt-color-coral); font-weight: 600;
+    padding: 6px 14px; border-radius: var(--gt-radius-full);
+    background: var(--gt-color-coral-light);
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+
+  :deep(.subtotal-row) {
+    background: linear-gradient(90deg, #f8f5fd, var(--gt-color-primary-bg)) !important;
+    font-weight: 600;
+  }
+  :deep(.subtotal-row td) { border-bottom: 1px solid var(--gt-color-primary-lighter) !important; }
+  :deep(.total-row) {
+    background: linear-gradient(90deg, #ece4f5, #e8e0f0) !important;
+    font-weight: 700;
+  }
+  :deep(.total-row td) { border-bottom: 2px solid var(--gt-color-primary-lighter) !important; }
+  :deep(.highlight-row) {
+    background: linear-gradient(90deg, #fffbf0, var(--gt-color-wheat-light)) !important;
+  }
+
+  :deep(.el-tabs__item.is-active) { font-weight: 600; }
 </style>

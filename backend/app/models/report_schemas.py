@@ -51,6 +51,8 @@ class ReportRow(BaseModel):
     row_name: str | None = None
     current_period_amount: Decimal | None = None
     prior_period_amount: Decimal | None = None
+    indent_level: int = 0
+    is_total_row: bool = False
     formula_used: str | None = None
     source_accounts: list[str] | None = None
 

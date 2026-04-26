@@ -77,7 +77,9 @@ export interface OnlineEditSession {
   preferred_mode: 'online' | 'offline'
   wopi_src: string | null
   access_token: string | null
+  editor_url: string | null
   editor_base_url: string | null
+  onlyoffice_url: string | null
 }
 
 export interface QCFinding {
@@ -357,13 +359,83 @@ export function getWopiEditorUrl(
 
 export async function checkOnlineEditingAvailability(): Promise<boolean> {
   try {
-    const healthResp = await http.get('/wopi/health', { timeout: 5000, validateStatus: () => true })
-    return healthResp.status === 200
+    // 1. 检查后端 WOPI 服务
+    const wopiResp = await http.get('/wopi/health', { timeout: 5000, validateStatus: () => true })
+    if (wopiResp.status !== 200) return false
+
+    // 2. 检查 ONLYOFFICE Document Server
+    const ooUrl = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
+    try {
+      const ooResp = await fetch(`${ooUrl}/healthcheck`, { signal: AbortSignal.timeout(5000) })
+      if (!ooResp.ok) return false
+    } catch {
+      // Document Server 不可达
+      return false
+    }
+
+    return true
   } catch {
     return false
   }
 }
 
+
+// ─── WP-Account Mapping ───
+
+export interface WpAccountMapping {
+  wp_code: string
+  cycle: string
+  wp_name: string
+  account_codes: string[]
+  account_name: string
+  report_row: string | null
+  note_section: string | null
+}
+
+export interface WpPrefillData {
+  wp_code: string
+  wp_name: string
+  account_name: string
+  report_row: string | null
+  note_section: string | null
+  accounts: Array<{
+    code: string
+    name: string
+    unadjusted: string
+    audited: string
+    opening: string
+    rje: string
+    aje: string
+  }>
+  total_unadjusted: string
+  total_audited: string
+}
+
+export async function getWpMappingByAccount(projectId: string, accountCode: string): Promise<WpAccountMapping[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/by-account/${accountCode}`)
+  return data.data ?? data ?? []
+}
+
+export async function getWpPrefillData(projectId: string, wpCode: string, year: number): Promise<WpPrefillData | null> {
+  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/prefill/${wpCode}`, { params: { year } })
+  const result = data.data ?? data
+  return result?.accounts ? result : null
+}
+
+export async function getAllWpMappings(projectId: string): Promise<WpAccountMapping[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/all`)
+  return data.data ?? data ?? []
+}
+
+export interface WpRecommendation extends WpAccountMapping {
+  reason: string
+  priority: 'required' | 'recommended' | 'optional'
+}
+
+export async function getWpRecommendations(projectId: string, year: number, reportScope: string = 'standalone'): Promise<WpRecommendation[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/recommend`, { params: { year, report_scope: reportScope } })
+  return data.data ?? data ?? []
+}
 
 // ─── Sampling ───
 

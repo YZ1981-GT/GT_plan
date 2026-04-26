@@ -25,14 +25,24 @@
   --gt-color-success: #28A745;          /* 成功绿：完成/通过 */
   --gt-color-success-light: #edf7ef;
 
+  /* ── 渐变预设 ── */
+  --gt-gradient-primary: linear-gradient(135deg, #4b2d77 0%, #6b42a8 50%, #A06DFF 100%);
+  --gt-gradient-teal: linear-gradient(135deg, #007a94 0%, #0094B3 50%, #33c4d9 100%);
+  --gt-gradient-coral: linear-gradient(135deg, #d93a33 0%, #FF5149 50%, #ff7b74 100%);
+  --gt-gradient-success: linear-gradient(135deg, #1e8a38 0%, #28A745 50%, #4cd964 100%);
+  --gt-gradient-warm: linear-gradient(135deg, #4b2d77 0%, #0094B3 100%);
+  --gt-gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8f7fc 100%);
+  --gt-gradient-sidebar: linear-gradient(180deg, #f8f7fc 0%, #f0edf5 100%);
+
   /* ── 中性色 ── */
   --gt-color-text: #1d1d1f;
   --gt-color-text-secondary: #6e6e73;
   --gt-color-text-tertiary: #999;
   --gt-color-border: #e5e5ea;
   --gt-color-border-light: #f0f0f5;
-  --gt-color-bg: #f7f7fa;
+  --gt-color-bg: #f5f4f9;
   --gt-color-bg-white: #ffffff;
+  --gt-color-bg-elevated: #faf9fd;
 
   /* ── 焦点色（可访问性 10.9） ── */
   --gt-color-focus: #A06DFF;
@@ -51,6 +61,7 @@
   --gt-space-16: 64px;
 
   /* ══ 10.4 圆角规范（small 4px / medium 8px / large 12px） ══ */
+  --gt-radius-xs: 3px;
   --gt-radius-sm: 4px;
   --gt-radius-md: 8px;
   --gt-radius-lg: 12px;

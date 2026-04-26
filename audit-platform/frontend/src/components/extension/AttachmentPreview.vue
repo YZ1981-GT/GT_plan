@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-dialog
     v-model="visible"
     :title="fileName"
@@ -124,7 +124,7 @@ async function loadPreview() {
   loading.value = true
   revokePreviewSrc()
   try {
-    const response = await http.get(props.fileUrl, { responseType: 'blob' })
+    const response = await api.get(props.fileUrl, { responseType: 'blob' })
     previewSrc.value = window.URL.createObjectURL(response.data as Blob)
   } catch {
     loading.value = false

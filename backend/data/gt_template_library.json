@@ -1,102 +1,3275 @@
 {
-  "description": "致同标准底稿模板库目录 — 600+模板条目按编码体系组织",
+  "description": "致同标准底稿模板库目录 — 自动扫描生成",
   "version": "2025-R1",
+  "scan_source": "致同通用审计程序及底稿模板（2025年修订）",
+  "total_count": 363,
   "templates": [
-    {"code": "B1", "name": "业务承接评价表", "wp_type": "preliminary", "cycle_prefix": "B", "file_path": "templates/B/B1-业务承接评价表.xlsx", "description": "评估是否承接审计业务"},
-    {"code": "B2", "name": "审计业务约定书", "wp_type": "preliminary", "cycle_prefix": "B", "file_path": "templates/B/B2-审计业务约定书.xlsx", "description": "审计业务约定书模板"},
-    {"code": "B3", "name": "前任注册会计师沟通函", "wp_type": "preliminary", "cycle_prefix": "B", "file_path": "templates/B/B3-前任沟通函.xlsx", "description": "与前任注册会计师沟通"},
-    {"code": "B4", "name": "独立性声明", "wp_type": "preliminary", "cycle_prefix": "B", "file_path": "templates/B/B4-独立性声明.xlsx", "description": "项目组独立性声明"},
-    {"code": "B5", "name": "项目组讨论记录", "wp_type": "preliminary", "cycle_prefix": "B", "file_path": "templates/B/B5-项目组讨论记录.xlsx", "description": "项目组讨论记录"},
-    {"code": "B10", "name": "了解被审计单位及其环境", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B10-了解被审计单位.xlsx", "description": "了解被审计单位及其环境"},
-    {"code": "B11", "name": "了解内部控制", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B11-了解内部控制.xlsx", "description": "了解内部控制设计与执行"},
-    {"code": "B12", "name": "集团审计计划", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B12-集团审计计划.xlsx", "description": "集团审计总体计划"},
-    {"code": "B20", "name": "风险评估结果汇总", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B20-风险评估结果.xlsx", "description": "风险评估结果汇总表"},
-    {"code": "B23-1", "name": "销售循环穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-1-销售循环穿行测试.xlsx", "description": "销售循环穿行测试底稿"},
-    {"code": "B23-2", "name": "货币资金穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-2-货币资金穿行测试.xlsx", "description": "货币资金穿行测试底稿"},
-    {"code": "B23-3", "name": "存货循环穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-3-存货循环穿行测试.xlsx", "description": "存货循环穿行测试底稿"},
-    {"code": "B23-4", "name": "投资循环穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-4-投资循环穿行测试.xlsx", "description": "投资循环穿行测试底稿"},
-    {"code": "B23-5", "name": "固定资产穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-5-固定资产穿行测试.xlsx", "description": "固定资产穿行测试底稿"},
-    {"code": "B23-6", "name": "在建工程穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-6-在建工程穿行测试.xlsx", "description": "在建工程穿行测试底稿"},
-    {"code": "B23-7", "name": "无形资产穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-7-无形资产穿行测试.xlsx", "description": "无形资产穿行测试底稿"},
-    {"code": "B23-8", "name": "研发穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-8-研发穿行测试.xlsx", "description": "研发穿行测试底稿"},
-    {"code": "B23-9", "name": "职工薪酬穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-9-职工薪酬穿行测试.xlsx", "description": "职工薪酬穿行测试底稿"},
-    {"code": "B23-10", "name": "管理循环穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-10-管理循环穿行测试.xlsx", "description": "管理循环穿行测试底稿"},
-    {"code": "B23-11", "name": "税金循环穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-11-税金循环穿行测试.xlsx", "description": "税金循环穿行测试底稿"},
-    {"code": "B23-12", "name": "债务循环穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-12-债务循环穿行测试.xlsx", "description": "债务循环穿行测试底稿"},
-    {"code": "B23-13", "name": "租赁循环穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-13-租赁循环穿行测试.xlsx", "description": "租赁循环穿行测试底稿"},
-    {"code": "B23-14", "name": "关联方穿行测试", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B23-14-关联方穿行测试.xlsx", "description": "关联方穿行测试底稿"},
-    {"code": "B60", "name": "总体审计策略和具体审计计划", "wp_type": "risk_assessment", "cycle_prefix": "B", "file_path": "templates/B/B60-审计策略和计划.xlsx", "description": "总体审计策略和具体审计计划"},
-    {"code": "C1", "name": "企业层面控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C1-企业层面控制测试.xlsx", "description": "企业层面内部控制测试"},
-    {"code": "C2", "name": "销售循环控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C2-销售循环控制测试.xlsx", "description": "销售循环控制测试底稿"},
-    {"code": "C3", "name": "货币资金控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C3-货币资金控制测试.xlsx", "description": "货币资金控制测试底稿"},
-    {"code": "C4", "name": "存货循环控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C4-存货循环控制测试.xlsx", "description": "存货循环控制测试底稿"},
-    {"code": "C5", "name": "投资循环控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C5-投资循环控制测试.xlsx", "description": "投资循环控制测试底稿"},
-    {"code": "C6", "name": "固定资产控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C6-固定资产控制测试.xlsx", "description": "固定资产控制测试底稿"},
-    {"code": "C7", "name": "在建工程控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C7-在建工程控制测试.xlsx", "description": "在建工程控制测试底稿"},
-    {"code": "C8", "name": "无形资产控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C8-无形资产控制测试.xlsx", "description": "无形资产控制测试底稿"},
-    {"code": "C9", "name": "研发控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C9-研发控制测试.xlsx", "description": "研发控制测试底稿"},
-    {"code": "C10", "name": "职工薪酬控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C10-职工薪酬控制测试.xlsx", "description": "职工薪酬控制测试底稿"},
-    {"code": "C11", "name": "管理循环控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C11-管理循环控制测试.xlsx", "description": "管理循环控制测试底稿"},
-    {"code": "C12", "name": "税金循环控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C12-税金循环控制测试.xlsx", "description": "税金循环控制测试底稿"},
-    {"code": "C13", "name": "债务循环控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C13-债务循环控制测试.xlsx", "description": "债务循环控制测试底稿"},
-    {"code": "C21", "name": "IT一般性控制测试", "wp_type": "control_test", "cycle_prefix": "C", "file_path": "templates/C/C21-IT一般性控制.xlsx", "description": "IT一般性控制测试"},
-    {"code": "D0", "name": "销售循环审计总结", "wp_type": "substantive", "cycle_prefix": "D", "file_path": "templates/D/D0-销售循环审计总结.xlsx", "description": "销售循环审计总结"},
-    {"code": "D1", "name": "营业收入审定表", "wp_type": "substantive", "cycle_prefix": "D", "file_path": "templates/D/D1-营业收入审定表.xlsx", "description": "营业收入审定表"},
-    {"code": "D2", "name": "应收票据审定表", "wp_type": "substantive", "cycle_prefix": "D", "file_path": "templates/D/D2-应收票据审定表.xlsx", "description": "应收票据审定表"},
-    {"code": "D3", "name": "应收账款审定表", "wp_type": "substantive", "cycle_prefix": "D", "file_path": "templates/D/D3-应收账款审定表.xlsx", "description": "应收账款审定表"},
-    {"code": "D4", "name": "预收账款审定表", "wp_type": "substantive", "cycle_prefix": "D", "file_path": "templates/D/D4-预收账款审定表.xlsx", "description": "预收账款审定表"},
-    {"code": "D5", "name": "合同资产审定表", "wp_type": "substantive", "cycle_prefix": "D", "file_path": "templates/D/D5-合同资产审定表.xlsx", "description": "合同资产审定表"},
-    {"code": "D6", "name": "合同负债审定表", "wp_type": "substantive", "cycle_prefix": "D", "file_path": "templates/D/D6-合同负债审定表.xlsx", "description": "合同负债审定表"},
-    {"code": "E0", "name": "货币资金循环审计总结", "wp_type": "substantive", "cycle_prefix": "E", "file_path": "templates/E/E0-货币资金审计总结.xlsx", "description": "货币资金循环审计总结"},
-    {"code": "E1", "name": "货币资金审定表", "wp_type": "substantive", "cycle_prefix": "E", "file_path": "templates/E/E1-货币资金审定表.xlsx", "description": "货币资金审定表"},
-    {"code": "F0", "name": "存货循环审计总结", "wp_type": "substantive", "cycle_prefix": "F", "file_path": "templates/F/F0-存货循环审计总结.xlsx", "description": "存货循环审计总结"},
-    {"code": "F1", "name": "存货审定表", "wp_type": "substantive", "cycle_prefix": "F", "file_path": "templates/F/F1-存货审定表.xlsx", "description": "存货审定表"},
-    {"code": "F2", "name": "营业成本审定表", "wp_type": "substantive", "cycle_prefix": "F", "file_path": "templates/F/F2-营业成本审定表.xlsx", "description": "营业成本审定表"},
-    {"code": "G0", "name": "投资循环审计总结", "wp_type": "substantive", "cycle_prefix": "G", "file_path": "templates/G/G0-投资循环审计总结.xlsx", "description": "投资循环审计总结"},
-    {"code": "G1", "name": "长期股权投资审定表", "wp_type": "substantive", "cycle_prefix": "G", "file_path": "templates/G/G1-长期股权投资审定表.xlsx", "description": "长期股权投资审定表"},
-    {"code": "G2", "name": "交易性金融资产审定表", "wp_type": "substantive", "cycle_prefix": "G", "file_path": "templates/G/G2-交易性金融资产审定表.xlsx", "description": "交易性金融资产审定表"},
-    {"code": "H0", "name": "固定资产循环审计总结", "wp_type": "substantive", "cycle_prefix": "H", "file_path": "templates/H/H0-固定资产审计总结.xlsx", "description": "固定资产循环审计总结"},
-    {"code": "H1", "name": "固定资产审定表", "wp_type": "substantive", "cycle_prefix": "H", "file_path": "templates/H/H1-固定资产审定表.xlsx", "description": "固定资产审定表"},
-    {"code": "H2", "name": "在建工程审定表", "wp_type": "substantive", "cycle_prefix": "H", "file_path": "templates/H/H2-在建工程审定表.xlsx", "description": "在建工程审定表"},
-    {"code": "H3", "name": "使用权资产审定表", "wp_type": "substantive", "cycle_prefix": "H", "file_path": "templates/H/H3-使用权资产审定表.xlsx", "description": "使用权资产审定表"},
-    {"code": "I0", "name": "无形资产循环审计总结", "wp_type": "substantive", "cycle_prefix": "I", "file_path": "templates/I/I0-无形资产审计总结.xlsx", "description": "无形资产循环审计总结"},
-    {"code": "I1", "name": "无形资产审定表", "wp_type": "substantive", "cycle_prefix": "I", "file_path": "templates/I/I1-无形资产审定表.xlsx", "description": "无形资产审定表"},
-    {"code": "I2", "name": "研发支出审定表", "wp_type": "substantive", "cycle_prefix": "I", "file_path": "templates/I/I2-研发支出审定表.xlsx", "description": "研发支出审定表"},
-    {"code": "I3", "name": "商誉审定表", "wp_type": "substantive", "cycle_prefix": "I", "file_path": "templates/I/I3-商誉审定表.xlsx", "description": "商誉审定表"},
-    {"code": "J0", "name": "职工薪酬循环审计总结", "wp_type": "substantive", "cycle_prefix": "J", "file_path": "templates/J/J0-职工薪酬审计总结.xlsx", "description": "职工薪酬循环审计总结"},
-    {"code": "J1", "name": "应付职工薪酬审定表", "wp_type": "substantive", "cycle_prefix": "J", "file_path": "templates/J/J1-应付职工薪酬审定表.xlsx", "description": "应付职工薪酬审定表"},
-    {"code": "K0", "name": "管理循环审计总结", "wp_type": "substantive", "cycle_prefix": "K", "file_path": "templates/K/K0-管理循环审计总结.xlsx", "description": "管理循环审计总结"},
-    {"code": "K1", "name": "管理费用审定表", "wp_type": "substantive", "cycle_prefix": "K", "file_path": "templates/K/K1-管理费用审定表.xlsx", "description": "管理费用审定表"},
-    {"code": "K2", "name": "销售费用审定表", "wp_type": "substantive", "cycle_prefix": "K", "file_path": "templates/K/K2-销售费用审定表.xlsx", "description": "销售费用审定表"},
-    {"code": "K3", "name": "财务费用审定表", "wp_type": "substantive", "cycle_prefix": "K", "file_path": "templates/K/K3-财务费用审定表.xlsx", "description": "财务费用审定表"},
-    {"code": "L0", "name": "债务循环审计总结", "wp_type": "substantive", "cycle_prefix": "L", "file_path": "templates/L/L0-债务循环审计总结.xlsx", "description": "债务循环审计总结"},
-    {"code": "L1", "name": "短期借款审定表", "wp_type": "substantive", "cycle_prefix": "L", "file_path": "templates/L/L1-短期借款审定表.xlsx", "description": "短期借款审定表"},
-    {"code": "L2", "name": "长期借款审定表", "wp_type": "substantive", "cycle_prefix": "L", "file_path": "templates/L/L2-长期借款审定表.xlsx", "description": "长期借款审定表"},
-    {"code": "L3", "name": "应付债券审定表", "wp_type": "substantive", "cycle_prefix": "L", "file_path": "templates/L/L3-应付债券审定表.xlsx", "description": "应付债券审定表"},
-    {"code": "M0", "name": "权益循环审计总结", "wp_type": "substantive", "cycle_prefix": "M", "file_path": "templates/M/M0-权益循环审计总结.xlsx", "description": "权益循环审计总结"},
-    {"code": "M1", "name": "实收资本审定表", "wp_type": "substantive", "cycle_prefix": "M", "file_path": "templates/M/M1-实收资本审定表.xlsx", "description": "实收资本审定表"},
-    {"code": "N0", "name": "税金循环审计总结", "wp_type": "substantive", "cycle_prefix": "N", "file_path": "templates/N/N0-税金循环审计总结.xlsx", "description": "税金循环审计总结"},
-    {"code": "N1", "name": "应交税费审定表", "wp_type": "substantive", "cycle_prefix": "N", "file_path": "templates/N/N1-应交税费审定表.xlsx", "description": "应交税费审定表"},
-    {"code": "N2", "name": "所得税费用审定表", "wp_type": "substantive", "cycle_prefix": "N", "file_path": "templates/N/N2-所得税费用审定表.xlsx", "description": "所得税费用审定表"},
-    {"code": "Q0", "name": "关联方循环审计总结", "wp_type": "substantive", "cycle_prefix": "Q", "file_path": "templates/Q/Q0-关联方审计总结.xlsx", "description": "关联方循环审计总结"},
-    {"code": "Q1", "name": "关联方关系及交易", "wp_type": "substantive", "cycle_prefix": "Q", "file_path": "templates/Q/Q1-关联方关系及交易.xlsx", "description": "关联方关系及交易底稿"},
-    {"code": "A1", "name": "审计差异汇总表", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A1-审计差异汇总表.xlsx", "description": "审计差异汇总表"},
-    {"code": "A2", "name": "管理层声明书", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A2-管理层声明书.xlsx", "description": "管理层声明书"},
-    {"code": "A3", "name": "审计报告", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A3-审计报告.docx", "description": "审计报告模板"},
-    {"code": "A4", "name": "管理建议书", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A4-管理建议书.docx", "description": "管理建议书模板"},
-    {"code": "A5", "name": "审计总结", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A5-审计总结.xlsx", "description": "审计总结"},
-    {"code": "A10", "name": "期后事项检查", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A10-期后事项检查.xlsx", "description": "期后事项检查底稿"},
-    {"code": "A20", "name": "持续经营评价", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A20-持续经营评价.xlsx", "description": "持续经营评价底稿"},
-    {"code": "A30", "name": "质量控制复核", "wp_type": "completion", "cycle_prefix": "A", "file_path": "templates/A/A30-质量控制复核.xlsx", "description": "质量控制复核底稿"},
-    {"code": "S1", "name": "期初余额审计", "wp_type": "specific", "cycle_prefix": "S", "file_path": "templates/S/S1-期初余额审计.xlsx", "description": "首次接受委托期初余额审计"},
-    {"code": "S2", "name": "会计政策变更", "wp_type": "specific", "cycle_prefix": "S", "file_path": "templates/S/S2-会计政策变更.xlsx", "description": "会计政策变更审计"},
-    {"code": "S3", "name": "非货币性资产交换", "wp_type": "specific", "cycle_prefix": "S", "file_path": "templates/S/S3-非货币性资产交换.xlsx", "description": "非货币性资产交换审计"},
-    {"code": "S4", "name": "债务重组", "wp_type": "specific", "cycle_prefix": "S", "file_path": "templates/S/S4-债务重组.xlsx", "description": "债务重组审计"},
-    {"code": "S5", "name": "IPO专项审计", "wp_type": "specific", "cycle_prefix": "S", "file_path": "templates/S/S5-IPO专项审计.xlsx", "description": "IPO专项审计底稿"},
-    {"code": "T1", "name": "IPE测试模板", "wp_type": "general", "cycle_prefix": "T", "file_path": "templates/T/T1-IPE测试模板.xlsx", "description": "信息处理控制测试模板"},
-    {"code": "T2", "name": "函证模板", "wp_type": "general", "cycle_prefix": "T", "file_path": "templates/T/T2-函证模板.xlsx", "description": "函证模板"},
-    {"code": "T3", "name": "分析性程序模板", "wp_type": "general", "cycle_prefix": "T", "file_path": "templates/T/T3-分析性程序模板.xlsx", "description": "分析性程序模板"},
-    {"code": "Z1", "name": "永久性档案黄页", "wp_type": "permanent", "cycle_prefix": "Z", "file_path": "templates/Z/Z1-永久性档案黄页.xlsx", "description": "永久性档案索引"}
-  ],
-  "total_count_note": "实际模板库包含600+模板，此处为关键模板目录摘要。完整模板文件(.xlsx/.docx)需另行部署。"
+    {
+      "code": "A1",
+      "name": "财务报告程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A1 财务报告/A1 财务报告程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A1-11",
+      "name": "业务报告签发流转控制表+业务报告文号规则",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A1 财务报告/A1-11 业务报告签发流转控制表+业务报告文号规则.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A1-13",
+      "name": "完成阶段分析性复核（母公司）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A1 财务报告/A1-13 完成阶段分析性复核（母公司）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A1-14",
+      "name": "完成阶段分析性复核（合并）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A1 财务报告/A1-14 完成阶段分析性复核（合并）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A1-17",
+      "name": "对应数据",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A1 财务报告/A1-17 对应数据.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A1-18",
+      "name": "采用新金融工具准则衔接影响数核对 N",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A1 财务报告/A1-18 采用新金融工具准则衔接影响数核对 N.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A10",
+      "name": "与治理层沟通程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A10 与治理层沟通/A10 与治理层沟通程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A10-2",
+      "name": "与治理层的沟通记录（通用）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A10 与治理层沟通/A10-2 与治理层的沟通记录（通用）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A11",
+      "name": "期后事项程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A11 期后事项/A11 期后事项程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A12",
+      "name": "律师回复程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A12 律师回复/A12 律师回复程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A13",
+      "name": "错报（程序表及底稿）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A13 错报/A13 错报（程序表及底稿）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A14",
+      "name": "内部控制缺陷程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A14 内部控制缺陷/A14 内部控制缺陷程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A14-1",
+      "name": " 内部控制缺陷汇总表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A14 内部控制缺陷/A14-1  内部控制缺陷汇总表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A14-2",
+      "name": "企业层面控制缺陷评价",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A14 内部控制缺陷/A14-2 企业层面控制缺陷评价.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A14-3",
+      "name": " IT缺陷汇总及评价",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A14 内部控制缺陷/A14-3  IT缺陷汇总及评价.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A14-4",
+      "name": "业务流程层面控制缺陷评价",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A14 内部控制缺陷/A14-4 业务流程层面控制缺陷评价.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A14-5",
+      "name": "与其他缺陷一同进行评价",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A14 内部控制缺陷/A14-5 与其他缺陷一同进行评价.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A14-6",
+      "name": "非财务报告内部控制缺陷评价",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A14 内部控制缺陷/A14-6 非财务报告内部控制缺陷评价.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A15",
+      "name": "持续经营假设的考虑程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A15 持续经营假设的考虑/A15 持续经营假设的考虑程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A15-1",
+      "name": "持续经营调查表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A15 持续经营假设的考虑/A15-1 持续经营调查表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A16",
+      "name": " 管理层声明书程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A16 管理层声明书/A16  管理层声明书程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A17",
+      "name": " 重大事项概要程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A17 重大事项概要/A17  重大事项概要程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A17-5",
+      "name": "审计工作完成核对表（适用于财报审计）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/2.总结程序（A11-A20 )/A17 重大事项概要/A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A2",
+      "name": "调整分录程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A2 调整分录/A2 调整分录程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A2-1",
+      "name": "A2-1、A2-2单体报表试算",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A2 调整分录/A2-1、A2-2单体报表试算.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A21-1",
+      "name": "项目现场负责人复核表及复核记录（适用于财报审计）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A21 项目现场负责人复核/A21-1 项目现场负责人复核表及复核记录（适用于财报审计）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A21-2",
+      "name": "项目现场负责人复核表及复核记录（适用于内控审计）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A21 项目现场负责人复核/A21-2 项目现场负责人复核表及复核记录（适用于内控审计）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A22-1",
+      "name": "项目负责经理复核(适用于财报审计)",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A22 项目负责经理复核/A22-1 项目负责经理复核(适用于财报审计).xlsx",
+      "description": ""
+    },
+    {
+      "code": "A22-2",
+      "name": "项目负责经理复核表（适用于内控审计）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A22 项目负责经理复核/A22-2 项目负责经理复核表（适用于内控审计）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A23-1",
+      "name": "项目合伙人复核(适用于财报审计)",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A23 项目合伙人复核/A23-1 项目合伙人复核(适用于财报审计).xlsx",
+      "description": ""
+    },
+    {
+      "code": "A23-2",
+      "name": "项目合伙人复核表（适用于内控审计）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A23 项目合伙人复核/A23-2 项目合伙人复核表（适用于内控审计）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A24-1",
+      "name": " 项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A24 项目质量复核合伙人复核/A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A24-2",
+      "name": "项目质量复核合伙人复核(适用于内控审计)",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A24 项目质量复核合伙人复核/A24-2 项目质量复核合伙人复核(适用于内控审计).xlsx",
+      "description": ""
+    },
+    {
+      "code": "A25-1",
+      "name": "质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企)",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A25 质量控制复核人复核/A25-1 质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企).xlsx",
+      "description": ""
+    },
+    {
+      "code": "A25-2",
+      "name": "质量控制复核表及复核记录(适用于内控审计)",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A25 质量控制复核人复核/A25-2 质量控制复核表及复核记录(适用于内控审计).xlsx",
+      "description": ""
+    },
+    {
+      "code": "A28",
+      "name": "税务专家复核",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A28 税务专家复核.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A3",
+      "name": "合并流程程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A3 合并流程/A3 合并流程程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A3-1",
+      "name": "合并报表试算-2019",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A3 合并流程/A3-1、-2 合并报表试算-2019.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A3-3",
+      "name": "结构化主体纳入合并范围的判断",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A3 合并流程/A3-3 结构化主体纳入合并范围的判断.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A3-4",
+      "name": "合并报表试算（含金融企业报表项目）-清洁版-2019",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A3 合并流程/A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A3-5",
+      "name": "合并附注汇总-2019",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A3 合并流程/A3-5 合并附注汇总-2019.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A3-6",
+      "name": "母公司附注汇总-2019",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A3 合并流程/A3-6 母公司附注汇总-2019.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A3-7",
+      "name": "A3-7内部往来核对表、A3-8商誉减值测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A3 合并流程/A3-7内部往来核对表、A3-8商誉减值测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A30",
+      "name": "电子底稿归档检查表",
+      "wp_type": "inspection",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A30 电子底稿归档检查表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A31",
+      "name": "审计标识一览表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/3.质量控制（A21-A30）/A31 审计标识一览表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A4",
+      "name": "经营分部程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A4 经营分部/A4 经营分部程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A4-1",
+      "name": "经营分部列报信息2019",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A4 经营分部/A4-1 经营分部列报信息2019.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A5",
+      "name": "财务报表支持程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A5 财务报表支持/A5 财务报表支持程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A5-1",
+      "name": "现金流量表审计",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A5 财务报表支持/A5-1 现金流量表审计.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A5-2",
+      "name": "承诺事项",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A5 财务报表支持/A5-2 承诺事项.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A5-3",
+      "name": "或有事项",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A5 财务报表支持/A5-3 或有事项.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A5-4",
+      "name": "持续经营净利润和终止经营净利润",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A5 财务报表支持/A5-4 持续经营净利润和终止经营净利润.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A6",
+      "name": "组成部分会计师报告（集团审计）程序程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A6 组成部分会计师报告/A6 组成部分会计师报告（集团审计）程序程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A6-1",
+      "name": "财务报告文件包（含经审计的财务报表及附注等）",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A6 组成部分会计师报告/A6-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A7",
+      "name": "关联交易程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A7 关联交易/A7 关联交易程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A7-1",
+      "name": "汇总关联方交易及关联往来",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A7 关联交易/A7-1 汇总关联方交易及关联往来.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A7-2",
+      "name": "关联方交易附注披露信息",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A7 关联交易/A7-2 关联方交易附注披露信息.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A8",
+      "name": "其他信息程序表20170720",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A8  其他信息/A8 其他信息程序表20170720.xlsx",
+      "description": ""
+    },
+    {
+      "code": "A9",
+      "name": "内部控制建议程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "A",
+      "cycle_name": "完成阶段",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/5.完成阶段（A1-A30）/1.报告与沟通（A1-A10）/A9 内控建议书/A9 内部控制建议程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B1-1",
+      "name": "风险评估表（适用于承接）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B1 业务承接和保持/B1-1 风险评估表（适用于承接）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B1-2",
+      "name": "风险评估表（适用于保持）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B1 业务承接和保持/B1-2 风险评估表（适用于保持）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B1-5",
+      "name": "KAA检查程序表",
+      "wp_type": "inspection",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B1 业务承接和保持/B1-5 KAA检查程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B10",
+      "name": "了解被审计单位及其环境和适用的财务报告编制基础",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B10 了解被审计单位及其环境和适用的财务报告编制基础.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B11",
+      "name": "检查相关信息或文件记录程序表",
+      "wp_type": "inspection",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B11 检查相关信息或文件记录程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B12",
+      "name": "与相关人员访谈程序及记录",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B12 与相关人员访谈程序及记录.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B13",
+      "name": "初步分析程序表",
+      "wp_type": "analytical",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B13 初步分析程序/B13 初步分析程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B13-2",
+      "name": "B13-2~5未审报表初步分析",
+      "wp_type": "analytical",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B13 初步分析程序/B13-2~5未审报表初步分析.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B15",
+      "name": "重要性计算表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B15 重要性计算表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B18",
+      "name": "了解内部审计程序表",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B18 了解内审/B18 了解内部审计程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B19",
+      "name": "识别关联方程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B19 识别关联方/B19 识别关联方程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B19-1",
+      "name": "识别未披露的关联方关系及异常关联交易",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B10 了解被审计单位及其环境/B19 识别关联方/B19-1 识别未披露的关联方关系及异常关联交易.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B1A",
+      "name": "业务承接程序表（适用于首次承接）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B1 业务承接和保持/B1A 业务承接程序表（适用于首次承接）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B1B",
+      "name": "业务保持程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B1 业务承接和保持/B1B 业务保持程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B2",
+      "name": "与前任注册会计师的沟通程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B2 与前任注册会计师的沟通/B2 与前任注册会计师的沟通程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B2-5",
+      "name": "与前任注册会计师沟通后的评价（就业务承接事项）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B2 与前任注册会计师的沟通/B2-5 与前任注册会计师沟通后的评价（就业务承接事项）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B22A",
+      "name": "了解企业层面控制 - 控制环境",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B20 了解内部控制/B22 企业层面控制（了解与评价）/B22A-1 了解企业层面控制 - 控制环境.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B22B",
+      "name": "了解企业层面控制 - 控制矩阵",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B20 了解内部控制/B22 企业层面控制（了解与评价）/B22B 了解企业层面控制 - 控制矩阵.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B22C",
+      "name": "评价设计有效性 - 企业层面",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B20 了解内部控制/B22 企业层面控制（了解与评价）/B22C 评价设计有效性 - 企业层面.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23",
+      "name": "职责分离 - 通用模板",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B20 了解内部控制/B23 业务层面内控了解/B23-XX-5 职责分离 - 通用模板.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-1",
+      "name": "B23-1了解收入循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-1了解收入循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-10",
+      "name": "B23-10了解管理循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-10了解管理循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-11",
+      "name": "B23-11了解所得税循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-11了解所得税循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-12",
+      "name": "B23-12了解流转税循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-12了解流转税循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-13",
+      "name": "B23-13了解债务循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-13了解债务循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-14",
+      "name": "B23-14了解权益循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-14了解权益循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-15",
+      "name": "了解信息处理控制",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B20 了解内部控制/B23 业务层面内控了解/B23-15 了解信息处理控制.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-2",
+      "name": "B23-2了解其他业务循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-2了解其他业务循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-3",
+      "name": "B23-3了解货币资金循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-3了解货币资金循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-4",
+      "name": "B23-4了解存货循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-4了解存货循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-5",
+      "name": "B23-5了解长期股权投资循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-5了解长期股权投资循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-6",
+      "name": "B23-6了解金融资产循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-6了解金融资产循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-7",
+      "name": "B23-7了解固定资产循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-7了解固定资产循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-8",
+      "name": "B23-8了解无形资产循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-8了解无形资产循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23-9",
+      "name": "B23-9了解职工薪酬循环流程和内部控制记录表（参考）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.3内控了解1（特殊行业适用）/B23-9了解职工薪酬循环流程和内部控制记录表（参考）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B23V",
+      "name": "B23V-10了解管理循环流程和内部控制记录表",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/2.风险评估/2.1 B23V 了解业务层面控制（Voyager软件适用）/B23V-10了解管理循环流程和内部控制记录表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B3",
+      "name": "独立性确认程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/1.初步业务活动（B1-B5）/B3 独立性/B3 独立性确认程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30",
+      "name": "集团审计程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/现行准则（中英）/中文版/B30 集团审计程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30-1",
+      "name": "了解组成部分（2021年6月）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/现行准则（中英）/中文版/B30-1 了解组成部分（2021年6月）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30-12",
+      "name": "组成部分已识别错报汇总表（2024年3月）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/新准则（中英）/中文版/B30-12 组成部分已识别错报汇总表（2024年3月）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30-13",
+      "name": "财务报告文件包（含经审计的财务报表及附注等）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/现行准则（中英）/中文版/B30-13-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30-15",
+      "name": "组成部分预算和实际收费信息（2024年3月）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/新准则（中英）/中文版/B30-15 组成部分预算和实际收费信息（2024年3月）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30-2C",
+      "name": "组成部分审计范围 - 非成员所（2024年3月）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/新准则（中英）/中文版/B30-2C 组成部分审计范围 - 非成员所（2024年3月）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30-2D",
+      "name": "组成部分注册会计师文档记录（2024年3月）",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/新准则（中英）/中文版/B30-2D 组成部分注册会计师文档记录（2024年3月）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B30-8",
+      "name": "了解组成部分注册会计师（2023年6月）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B30 集团审计/现行准则（中英）/中文版/B30-8 了解组成部分注册会计师（2023年6月）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B40",
+      "name": "项目组讨论程序表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B40 项目组讨论/B40 项目组讨论程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B50",
+      "name": "汇总风险评估结果程序表",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B50 汇总风险评估结果程序表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B50-1",
+      "name": "汇总识别的风险因素",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B50-1 汇总识别的风险因素.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B50-2",
+      "name": "财务报表层次风险（含财务报表层次特别风险）",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B50-2 财务报表层次风险（含财务报表层次特别风险）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B50-3",
+      "name": "认定层次重大错报风险",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B50-3 认定层次重大错报风险.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B50-4",
+      "name": "汇总认定层次特别风险",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B50-4 汇总认定层次特别风险.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B51",
+      "name": "舞弊风险因素（三因素分析）",
+      "wp_type": "fraud_response",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B51 舞弊风险因素（三因素分析）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B51-3",
+      "name": "识别对货币资金需保持警觉的情形程序",
+      "wp_type": "risk_assessment",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B51-3 识别对货币资金需保持警觉的情形程序.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B51-5",
+      "name": "识别收入确认方面可能存在舞弊风险的迹象程序",
+      "wp_type": "fraud_response",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B51-5 识别收入确认方面可能存在舞弊风险的迹象程序.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B52",
+      "name": "舞弊 - 管理层凌驾于控制之上的风险",
+      "wp_type": "fraud_response",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B50 风险评估结果/B52 舞弊 - 管理层凌驾于控制之上的风险.xlsx",
+      "description": ""
+    },
+    {
+      "code": "B60-1",
+      "name": "审计项目工时预算与控制表",
+      "wp_type": "substantive",
+      "cycle_prefix": "B",
+      "cycle_name": "初步业务活动/风险评估",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/2.风险评估（B11-B60）/B60 总体审计策略/B60-1 审计项目工时预算与控制表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C1",
+      "name": "企业层面控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C1 企业层面控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C10",
+      "name": "职工薪酬循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C10 职工薪酬业务循环控制测试/C10 职工薪酬循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C10-2",
+      "name": "职工薪酬循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C10 职工薪酬业务循环控制测试/C10-2 职工薪酬循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C10V",
+      "name": "职工薪酬循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C10V 职工薪酬循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C11",
+      "name": "管理循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C11 管理业务循环控制测试/C11 管理循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C11-2",
+      "name": "管理循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C11 管理业务循环控制测试/C11-2 管理循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C11V",
+      "name": "管理循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C11V 管理循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C12",
+      "name": "税金循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C12 税金业务循环控制测试/C12 税金循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C12-2",
+      "name": "税金循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C12 税金业务循环控制测试/C12-2 税金循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C12V",
+      "name": "所得税循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C12V 所得税循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C13",
+      "name": "债务循环业务层面控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C13 债务业务循环控制测试/C13 债务循环业务层面控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C13-2",
+      "name": "债务循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C13 债务业务循环控制测试/C13-2 债务循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C13V",
+      "name": "流转税循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C13V 流转税循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C14",
+      "name": "租赁循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C14 租赁业务循环控制测试/C14 租赁循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C14-2",
+      "name": "租赁循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C14 租赁业务循环控制测试/C14-2 租赁循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C14V",
+      "name": "债务循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C14V 债务循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C15",
+      "name": "关联方循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C15 关联方及交易业务控制测试/C15 关联方循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C15-2",
+      "name": "关联方循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C15 关联方及交易业务控制测试/C15-2 关联方循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C15V",
+      "name": "权益循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C15V 权益循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C2",
+      "name": "销售循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C2 销售业务循环控制测试/C2 销售循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C2-2",
+      "name": "销售循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C2 销售业务循环控制测试/C2-2 销售循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C21",
+      "name": "具有信息技术专业技能的项目组成员",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C21 具有信息技术专业技能的项目组成员.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C21-1",
+      "name": " IT审计发现汇总表",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C21-1  IT审计发现汇总表.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C22",
+      "name": "IT一般控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C22 IT一般控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C23",
+      "name": "会计分录 - 控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C23 会计分录 - 控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C24",
+      "name": "会计分录 - 细节测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C24 会计分录 - 细节测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C25",
+      "name": "利用内审工作",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C25 利用内审工作.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C26",
+      "name": "信息处理控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C26 信息处理控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C2V",
+      "name": "收入循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C2V 收入循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C3",
+      "name": "货币资金循环业务层面控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C3 货币资金业务循环控制测试/C3 货币资金循环业务层面控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C3-2",
+      "name": "货币资金循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C3 货币资金业务循环控制测试/C3-2 货币资金循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C3V",
+      "name": "其他业务循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C3V 其他业务循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C4",
+      "name": "存货循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C4 存货业务循环控制测试/C4 存货循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C4-2",
+      "name": "存货循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C4 存货业务循环控制测试/C4-2 存货循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C4V",
+      "name": "货币资金循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C4V 货币资金循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C5",
+      "name": "投资循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C5 投资业务循环控制测试/C5 投资循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C5-2",
+      "name": "投资循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C5 投资业务循环控制测试/C5-2 投资循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C5V",
+      "name": "存货循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C5V 存货循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C6",
+      "name": "固定资产循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C6 固定资产循环控制测试/C6 固定资产循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C6-2",
+      "name": "固定资产循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C6 固定资产循环控制测试/C6-2 固定资产循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C6V",
+      "name": "长期股权投资循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C6V 长期股权投资循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C7",
+      "name": "在建工程循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C7 在建工程循环控制测试/C7 在建工程循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C7-2",
+      "name": "在建工程循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C7 在建工程循环控制测试/C7-2 在建工程循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C7V",
+      "name": "金融资产循环内控测试（含衍生金融工具）",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C7V 金融资产循环内控测试（含衍生金融工具）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C8",
+      "name": "无形资产及其他长期资产循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C8 无形资产及其他长期资产循环控制测试/C8 无形资产及其他长期资产循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C8-2",
+      "name": "无形资产及其他长期资产循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C8 无形资产及其他长期资产循环控制测试/C8-2 无形资产及其他长期资产循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C8V",
+      "name": "固定资产循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C8V 固定资产循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C9",
+      "name": "研发循环控制测试",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C9 研发业务循环控制测试/C9 研发循环控制测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C9-2",
+      "name": "研发循环评价控制偏差",
+      "wp_type": "control_test",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/3.风险应对-一般性程序与控制测试（C1-C26）/C9 研发业务循环控制测试/C9-2 研发循环评价控制偏差.xlsx",
+      "description": ""
+    },
+    {
+      "code": "C9V",
+      "name": "无形资产循环内控测试",
+      "wp_type": "substantive",
+      "cycle_prefix": "C",
+      "cycle_name": "控制测试",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/3.风险应对-控制测试与一般性程序/C2V-15V 业务层面内控测试（Voyager软件适用）/C9V 无形资产循环内控测试.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D0",
+      "name": "收入循环函证",
+      "wp_type": "confirmation",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D0 收入循环函证.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D1",
+      "name": "应收票据",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D1 应收票据.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D2-1至D2-4",
+      "name": " 应收账款- 审定表明细表（Leap-常规程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D2应收账款/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D2-5",
+      "name": " 应收账款 -分析程序（Leap应对措施-分析程序）",
+      "wp_type": "analytical",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D2应收账款/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D2-6至D2-13",
+      "name": " 应收账款 -检查（Leap应对措施-检查）",
+      "wp_type": "inspection",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D3",
+      "name": "预收账款",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D3 预收账款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-12",
+      "name": "营业收入-合同检查（Leap-常规程序）",
+      "wp_type": "inspection",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-13至D4-20",
+      "name": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）",
+      "wp_type": "inspection",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-1至D4-4",
+      "name": "营业收入 - 审定表明细表（Leap-常规程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-21",
+      "name": "D4-21营业收入-关联方检查（Leap-常规程序）",
+      "wp_type": "inspection",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-22至D4-32",
+      "name": "上市 新三板 重组 舞弊应对",
+      "wp_type": "fraud_response",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-33至D4-36",
+      "name": "其他业务收入",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-33至D4-36 其他业务收入.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-5",
+      "name": "营业收入-会计政策（Leap-常规程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D4-6至D4-11",
+      "name": "- 分析程序（Leap应对措施-分析程序）",
+      "wp_type": "analytical",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D4 营业收入/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D5",
+      "name": "应收款项融资",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D5 应收款项融资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D6",
+      "name": "合同资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D6 合同资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "D7",
+      "name": "合同负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "D",
+      "cycle_name": "收入循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/D 收入循环/D7 合同负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "E0",
+      "name": "货币资金 - 函证（Leap应对措施-函证）",
+      "wp_type": "confirmation",
+      "cycle_prefix": "E",
+      "cycle_name": "货币资金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/E 货币资金循环/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "E1-14至E1-15",
+      "name": " 货币资金 -分析程序（Leap应对措施-分析程序）",
+      "wp_type": "analytical",
+      "cycle_prefix": "E",
+      "cycle_name": "货币资金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/E 货币资金循环/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "E1-18至E1-23",
+      "name": " 货币资金 -检查（Leap应对措施-检查）",
+      "wp_type": "inspection",
+      "cycle_prefix": "E",
+      "cycle_name": "货币资金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/E 货币资金循环/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "E1-1至E1-11",
+      "name": "货币资金- 审定表明细表（Leap-常规程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "E",
+      "cycle_name": "货币资金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/E 货币资金循环/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "E1-26至E1-32",
+      "name": " 货币资金-IPO 上市 新三板 重组 舞弊应对",
+      "wp_type": "fraud_response",
+      "cycle_prefix": "E",
+      "cycle_name": "货币资金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/E 货币资金循环/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F0",
+      "name": "存货循环函证",
+      "wp_type": "confirmation",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F0 存货循环函证.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F1",
+      "name": "预付账款",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F1 预付账款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-16",
+      "name": "存货及跌价准备-会计政策（Leap-常规程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-18至F2-20",
+      "name": "存货及跌价准备-分析类（Leap应对措施-分析程序）",
+      "wp_type": "analytical",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-1至F2-14",
+      "name": "存货及跌价准备-审定明细表类（Leap-常规程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-21至F2-26",
+      "name": "存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-29至F2-35",
+      "name": "存货及跌价准备 -检查类（Leap应对措施-检查）",
+      "wp_type": "inspection",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-38至F2-44",
+      "name": " 存货及跌价准备 -计价测试（Leap-存货程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-47至F2-49",
+      "name": "存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-52",
+      "name": "存货及跌价准备 -关联交易（Leap-常规程序）",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-55至F2-58",
+      "name": "合同履约成本",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-55至F2-58 合同履约成本.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F2-61至F2-72",
+      "name": "存货及跌价准备-IPO 上市 新三板 重组 舞弊应对",
+      "wp_type": "fraud_response",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F2 存货及跌价准备/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F3",
+      "name": "应付票据",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F3 应付票据.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F4",
+      "name": "应付账款",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F4 应付账款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "F5",
+      "name": "营业成本",
+      "wp_type": "substantive",
+      "cycle_prefix": "F",
+      "cycle_name": "存货循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/F 存货循环/F5 营业成本.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G0",
+      "name": "投资循环函证",
+      "wp_type": "confirmation",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G0 投资循环函证.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G1",
+      "name": "交易性金融资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G1 交易性金融资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G10",
+      "name": "交易性金融负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G10 交易性金融负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G11",
+      "name": "投资收益",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G11 投资收益.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G12",
+      "name": "净敞口套期收益",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G12 净敞口套期收益.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G13",
+      "name": "公允价值变动收益",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G13 公允价值变动收益.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G14",
+      "name": "信用减值损失",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G14 信用减值损失.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G2",
+      "name": "应收利息",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G2 应收利息.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G3",
+      "name": "应收股利",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G3 应收股利.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G4",
+      "name": "债权投资",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G4 债权投资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G5",
+      "name": "长期应收款",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G5 长期应收款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G6",
+      "name": "其他债权投资",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G6 其他债权投资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G7",
+      "name": "长期股权投资",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G7 长期股权投资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G8",
+      "name": "其他权益工具投资",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G8 其他权益工具投资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "G9",
+      "name": "其他非流动金融资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "G",
+      "cycle_name": "投资循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/G 投资循环/G9 其他非流动金融资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H0",
+      "name": "固定资产循环函证",
+      "wp_type": "confirmation",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H0 固定资产循环函证.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H1",
+      "name": "固定资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H1 固定资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H10",
+      "name": "资产处置损益",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H10 资产处置损益.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H2",
+      "name": "在建工程",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H2 在建工程.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H3",
+      "name": "投资性房地产",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H3 投资性房地产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H4",
+      "name": "工程物资",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H4 工程物资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H5",
+      "name": "油气资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H5 油气资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H6",
+      "name": "固定资产清理",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H6 固定资产清理.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H7",
+      "name": "生产性生物资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H7 生产性生物资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H8",
+      "name": "使用权资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H8 使用权资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "H9",
+      "name": "租赁负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "H",
+      "cycle_name": "固定资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/H 固定资产循环/H9 租赁负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "I1",
+      "name": "无形资产、累计摊销及减值准备",
+      "wp_type": "substantive",
+      "cycle_prefix": "I",
+      "cycle_name": "无形资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/I 无形资产循环/I1 无形资产、累计摊销及减值准备.xlsx",
+      "description": ""
+    },
+    {
+      "code": "I2",
+      "name": "开发支出",
+      "wp_type": "substantive",
+      "cycle_prefix": "I",
+      "cycle_name": "无形资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/I 无形资产循环/I2 开发支出.xlsx",
+      "description": ""
+    },
+    {
+      "code": "I3",
+      "name": "商誉",
+      "wp_type": "substantive",
+      "cycle_prefix": "I",
+      "cycle_name": "无形资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/I 无形资产循环/I3 商誉.xlsx",
+      "description": ""
+    },
+    {
+      "code": "I4",
+      "name": "长期待摊费用",
+      "wp_type": "substantive",
+      "cycle_prefix": "I",
+      "cycle_name": "无形资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/I 无形资产循环/I4 长期待摊费用.xlsx",
+      "description": ""
+    },
+    {
+      "code": "I5",
+      "name": "其他非流动资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "I",
+      "cycle_name": "无形资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/I 无形资产循环/I5 其他非流动资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "I6",
+      "name": "研发费用",
+      "wp_type": "substantive",
+      "cycle_prefix": "I",
+      "cycle_name": "无形资产循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/I 无形资产循环/I6 研发费用.xlsx",
+      "description": ""
+    },
+    {
+      "code": "J1",
+      "name": "应付职工薪酬",
+      "wp_type": "substantive",
+      "cycle_prefix": "J",
+      "cycle_name": "职工薪酬循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/J 职工薪酬循环/J1 应付职工薪酬.xlsx",
+      "description": ""
+    },
+    {
+      "code": "J2",
+      "name": "长期应付职工薪酬-设定受益计划净资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "J",
+      "cycle_name": "职工薪酬循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/J 职工薪酬循环/J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "J3",
+      "name": "股份支付",
+      "wp_type": "substantive",
+      "cycle_prefix": "J",
+      "cycle_name": "职工薪酬循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/J 职工薪酬循环/J3 股份支付.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K0",
+      "name": "管理循环函证",
+      "wp_type": "confirmation",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K0 管理循环函证.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K1",
+      "name": "其他应收款",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K1 其他应收款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K10",
+      "name": "其他收益",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K10 其他收益.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K11",
+      "name": "资产减值损失",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K11 资产减值损失.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K12",
+      "name": "营业外收入",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K12 营业外收入.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K13",
+      "name": "营业外支出",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K13 营业外支出.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K2",
+      "name": "其他流动资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K2 其他流动资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K3",
+      "name": "其他应付款",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K3 其他应付款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K4",
+      "name": "其他流动负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K4 其他流动负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K5",
+      "name": "预计负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K5 预计负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K6",
+      "name": "持有待售资产和负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K6 持有待售资产和负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K7",
+      "name": "递延收益",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K7 递延收益.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K8",
+      "name": "销售费用",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K8 销售费用.xlsx",
+      "description": ""
+    },
+    {
+      "code": "K9",
+      "name": "管理费用",
+      "wp_type": "substantive",
+      "cycle_prefix": "K",
+      "cycle_name": "管理循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/K 管理循环/K9 管理费用.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L0",
+      "name": "债务循环函证",
+      "wp_type": "confirmation",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L0 债务循环函证.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L1",
+      "name": "短期借款",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L1 短期借款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L2",
+      "name": "应付利息",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L2 应付利息.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L3",
+      "name": "长期借款",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L3 长期借款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L4",
+      "name": "应付债券",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L4 应付债券.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L5",
+      "name": "长期应付款",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L5 长期应付款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L6",
+      "name": "专项应付款",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L6 专项应付款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L7",
+      "name": "其他非流动负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L7 其他非流动负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "L8",
+      "name": "财务费用",
+      "wp_type": "substantive",
+      "cycle_prefix": "L",
+      "cycle_name": "债务循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/L 债务循环/L8 财务费用.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M1",
+      "name": "应付股利（利润）",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M1 应付股利（利润）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M10",
+      "name": "其他权益工具",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M10 其他权益工具.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M2",
+      "name": "实收资本（股本）",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M2 实收资本（股本）.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M3",
+      "name": "库存股",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M3 库存股.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M4",
+      "name": "资本公积",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M4 资本公积.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M5",
+      "name": "盈余公积",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M5 盈余公积.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M6",
+      "name": "未分配利润",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M6 未分配利润.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M7",
+      "name": "专项储备",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M7 专项储备.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M8",
+      "name": "一般风险准备",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M8 一般风险准备.xlsx",
+      "description": ""
+    },
+    {
+      "code": "M9",
+      "name": "其他综合收益",
+      "wp_type": "substantive",
+      "cycle_prefix": "M",
+      "cycle_name": "权益循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/M 权益循环/M9 其他综合收益.xlsx",
+      "description": ""
+    },
+    {
+      "code": "N1",
+      "name": "递延所得税资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "N",
+      "cycle_name": "税金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/N 税金循环/N1 递延所得税资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "N2",
+      "name": "应交税费",
+      "wp_type": "substantive",
+      "cycle_prefix": "N",
+      "cycle_name": "税金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/N 税金循环/N2 应交税费.xlsx",
+      "description": ""
+    },
+    {
+      "code": "N3",
+      "name": "递延所得税负债",
+      "wp_type": "substantive",
+      "cycle_prefix": "N",
+      "cycle_name": "税金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/N 税金循环/N3 递延所得税负债.xlsx",
+      "description": ""
+    },
+    {
+      "code": "N4",
+      "name": "税金及附加",
+      "wp_type": "substantive",
+      "cycle_prefix": "N",
+      "cycle_name": "税金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/N 税金循环/N4 税金及附加.xlsx",
+      "description": ""
+    },
+    {
+      "code": "N5",
+      "name": "所得税费用",
+      "wp_type": "substantive",
+      "cycle_prefix": "N",
+      "cycle_name": "税金循环",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/N 税金循环/N5 所得税费用.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S1",
+      "name": "对被审计单位违反法规行为的考虑2019",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S1 对被审计单位违反法规行为的考虑2019.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S10",
+      "name": "对环境事项的考虑",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S10 对环境事项的考虑.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S11",
+      "name": "利用服务机构活动",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S11 利用服务机构活动.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S12",
+      "name": "利用专家（注册会计师的专家）的工作",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S12 利用专家（注册会计师的专家）的工作.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S13",
+      "name": "利用管理层的专家编制的信息形成审计证据",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S13 利用管理层的专家编制的信息形成审计证据.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S14",
+      "name": "会计估计和相关披露",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S14 会计估计和相关披露.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S15",
+      "name": "每股收益和净资产收益率",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S15 每股收益和净资产收益率.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S16",
+      "name": "套期活动",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S16 套期活动.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S17",
+      "name": "非经常性损益",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S17 非经常性损益.xls",
+      "description": ""
+    },
+    {
+      "code": "S2",
+      "name": "首次接受委托时对期初余额的审计2019",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S2 首次接受委托时对期初余额的审计2019.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S20",
+      "name": "营业收入扣除情况核查底稿202504",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S20 营业收入扣除情况核查底稿202504.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S21",
+      "name": "数据资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S21 数据资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S3",
+      "name": "会计政策变更、前期差错会计、估计变更2020",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S3 会计政策变更、前期差错会计、估计变更2020.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-1",
+      "name": "S32-1专项核查-自我交易虚增利润的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-1专项核查-自我交易虚增利润的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-10",
+      "name": "S32-10专项核查-资产减值估计不足的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-10专项核查-资产减值估计不足的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-11",
+      "name": "S32-11专项核查-延迟资产转固减少折旧的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-11专项核查-延迟资产转固减少折旧的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-12",
+      "name": "S32-12专项核查-其他粉饰业绩或财务造假的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-12专项核查-其他粉饰业绩或财务造假的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-13",
+      "name": "专项核查-期后业绩下滑情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-13 专项核查-期后业绩下滑情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-2",
+      "name": "S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-3",
+      "name": "S32-3专项核查-关联方代为支付成本费用的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-3专项核查-关联方代为支付成本费用的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-4",
+      "name": "S32-4专项检查-保荐机构、PE及其关联方进行利益输送的情形",
+      "wp_type": "inspection",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-4专项检查-保荐机构、PE及其关联方进行利益输送的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-5",
+      "name": "专项核查-体外资金支付货款承担成本的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-5 专项核查-体外资金支付货款承担成本的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-6",
+      "name": "S32-6专项核查-互联网造假虚增收入的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-6专项核查-互联网造假虚增收入的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-7",
+      "name": "S32-7专项核查-成本费用资本化的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-7专项核查-成本费用资本化的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-8",
+      "name": "专项核查-压缩员工薪金的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-8 专项核查-压缩员工薪金的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S32-9",
+      "name": "S32-9专项核查-延迟成本费用增加利润的情形",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S32 应对551文提示风险的核查程序/S32-9专项核查-延迟成本费用增加利润的情形.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-1",
+      "name": "S33-1财务报告内部控制制度",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-1财务报告内部控制制度/S33-1财务报告内部控制制度.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-2",
+      "name": "S33-2财务与非财务信息印证",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-2财务与非财务信息印证.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-3",
+      "name": "S33-3盈利异常增长和异常交易",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-3盈利异常增长和异常交易.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-4",
+      "name": "S33-4关联方关系及其交易",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-4关联方关系及其交易.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-5",
+      "name": "S33-5收入及毛利率",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-5收入及毛利率.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-6",
+      "name": "S33-6主要客户和供应商",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-6主要客户和供应商.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-7",
+      "name": "S33-7存货及其他资产",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-7存货及其他资产.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-8",
+      "name": "S33-8现金收付交易",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-8现金收付交易.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S33-9",
+      "name": "S33-9财务异常信息",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S33 应对14号公告提示风险的核查程序/S33-9财务异常信息.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34",
+      "name": "-0证监会及沪深北证券交易所需会计师核查事项清单",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34 -0证监会及沪深北证券交易所需会计师核查事项清单.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-1",
+      "name": "军工等涉秘业务企业信息披露豁免",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-1 军工等涉秘业务企业信息披露豁免.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-10",
+      "name": "财务性投资",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-10 财务性投资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-11",
+      "name": "业务重组",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-11 业务重组.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-12",
+      "name": "经营业绩下滑",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-12 经营业绩下滑.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-13",
+      "name": "持续经营能力",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-13 持续经营能力.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-14",
+      "name": "财务内控",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-14 财务内控.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-15",
+      "name": "现金交易",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-15 现金交易.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-16",
+      "name": "第三方回款",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-16 第三方回款.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-17",
+      "name": "会计政策、会计估计变更和差错更正",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-17 会计政策、会计估计变更和差错更正.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-18",
+      "name": "引用第三方数据",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-18 引用第三方数据.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-19",
+      "name": "经销商模式",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-19 经销商模式.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-2",
+      "name": "期权激励计划",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-2 期权激励计划.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-20",
+      "name": "劳务外包",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-20 劳务外包.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-21",
+      "name": "委外加工",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-21 委外加工.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-22",
+      "name": "股权集中企业的公司治理有效性、内控规范性与独立性",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-22 股权集中企业的公司治理有效性、内控规范性与独立性.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-23",
+      "name": "通过互联网开展业务相关信息系统核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-23 通过互联网开展业务相关信息系统核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-24",
+      "name": "信息系统专项核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-24 信息系统专项核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-25",
+      "name": "资金流水核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-25 资金流水核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-26",
+      "name": "尚未盈利或最近一期存在累计未弥补亏损",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-26 尚未盈利或最近一期存在累计未弥补亏损.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-27",
+      "name": "研发投入的认定及内控",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-27 研发投入的认定及内控.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-28",
+      "name": "研发支出资本化",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-28 研发支出资本化.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-29",
+      "name": "科研项目相关政府补助的会计处理",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-29 科研项目相关政府补助的会计处理.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-3",
+      "name": "股份支付",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-3 股份支付.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-30",
+      "name": "对赌协议",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-30 对赌协议.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-31",
+      "name": "存货",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-31 存货.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-32",
+      "name": "期间费用核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-32 期间费用核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-33",
+      "name": "商誉减值核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-33 商誉减值核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-34",
+      "name": "涉农企业",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-34 涉农企业.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-35",
+      "name": "收入核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-35 收入核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-36",
+      "name": "投资收益占比",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-36 投资收益占比.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-37",
+      "name": "现金流异常",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-37 现金流异常.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-38",
+      "name": "估值调整协议",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-38 估值调整协议.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-39",
+      "name": "应收票据和应收款项融资",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-39 应收票据和应收款项融资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-4",
+      "name": "关联交易",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-4 关联交易.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-40",
+      "name": "在建工程核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-40 在建工程核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-41",
+      "name": "主要客户和供应商核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-41 主要客户和供应商核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-5",
+      "name": "应收账款减值",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-5 应收账款减值.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-6",
+      "name": "固定资产使用及减值",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-6 固定资产使用及减值.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-7",
+      "name": "税收优惠",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-7 税收优惠.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-8",
+      "name": "合并中无形资产认定与客户关系",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-8 合并中无形资产认定与客户关系.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S34-9",
+      "name": "共同投资",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S34 首发审核特项底稿/S34-9 共同投资.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S35-1",
+      "name": "关联交易",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S35 再融资审核特项底稿/S35-1 关联交易.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S35-2",
+      "name": "财务性投资核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S35 再融资审核特项底稿/S35-2 财务性投资核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S35-3",
+      "name": "现金分红核查",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S35 再融资审核特项底稿/S35-3 现金分红核查.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S35-4",
+      "name": "商誉减值",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S35 再融资审核特项底稿/S35-4 商誉减值.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S35-5",
+      "name": "募集资金涉及收购核查要点",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S35 再融资审核特项底稿/S35-5 募集资金涉及收购核查要点.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S4",
+      "name": "非货币性资产交换202401",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S4 非货币性资产交换202401.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S5",
+      "name": "债务重组202401",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S5 债务重组202401.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S6",
+      "name": "对大股东及关联方资金占用和违规担保情况审核程序",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S8",
+      "name": "租赁",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S8 租赁.xlsx",
+      "description": ""
+    },
+    {
+      "code": "S9",
+      "name": "对电子商务的考虑",
+      "wp_type": "substantive",
+      "cycle_prefix": "S",
+      "cycle_name": "特定项目程序",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/6.特定项目程序（S）/S9 对电子商务的考虑.xlsx",
+      "description": ""
+    },
+    {
+      "code": "T1",
+      "name": "由被审计单位生成的信息（IPE）测试模板",
+      "wp_type": "confirmation",
+      "cycle_prefix": "T",
+      "cycle_name": "T类",
+      "file_path": "致同通用审计程序及底稿模板（2025年修订）/2.参考-通用底稿（函证、监盘、抽样等）/T1 由被审计单位生成的信息（IPE）测试模板.xlsx",
+      "description": ""
+    }
+  ]
 }

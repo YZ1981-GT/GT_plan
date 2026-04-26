@@ -1,13 +1,20 @@
-<template>
+﻿<template>
   <div class="gt-dashboard gt-fade-in">
-    <div class="gt-dash-header">
-      <h2 class="gt-page-title">管理看板</h2>
-      <el-button size="small" @click="refreshAll" :loading="loading" :icon="Refresh">刷新</el-button>
+    <!-- 顶部横幅 -->
+    <div class="gt-mgmt-banner">
+      <div class="gt-mgmt-banner-text">
+        <h2 class="gt-mgmt-title">管理看板</h2>
+        <p class="gt-mgmt-subtitle">实时掌握项目进度、人员负荷与风险预警</p>
+      </div>
+      <div class="gt-mgmt-banner-actions">
+        <el-button size="default" @click="refreshAll" :loading="loading" :icon="Refresh" round>刷新数据</el-button>
+      </div>
+      <div class="gt-mgmt-banner-deco"></div>
     </div>
 
     <!-- ── KPI 指标卡片 ── -->
     <div class="kpi-grid">
-      <div v-for="card in kpiCards" :key="card.label" class="kpi-card" :style="{ borderLeftColor: card.color }">
+      <div v-for="card in kpiCards" :key="card.label" class="kpi-card" :style="{ borderLeftColor: card.color, '--kpi-accent': card.color }">
         <div class="kpi-top">
           <div class="kpi-icon" :style="{ background: card.bg, color: card.color }">
             <el-icon :size="22"><component :is="card.icon" /></el-icon>
@@ -16,13 +23,13 @@
             {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}%
           </div>
         </div>
-        <div class="kpi-value">{{ card.value }}</div>
+        <div class="kpi-value">{{ card.value }}<span v-if="card.suffix" class="kpi-suffix">{{ card.suffix }}</span></div>
         <div class="kpi-label">{{ card.label }}</div>
       </div>
     </div>
 
     <!-- ── 项目进度 + 人员负荷 ── -->
-    <el-row :gutter="16" class="chart-row">
+    <el-row :gutter="16" class="chart-row gt-stagger">
       <el-col :span="12">
         <div class="chart-card">
           <h3 class="chart-title">项目进度 Top 10</h3>
@@ -38,7 +45,7 @@
     </el-row>
 
     <!-- ── 风险预警 + 集团审计 ── -->
-    <el-row :gutter="16" class="chart-row">
+    <el-row :gutter="16" class="chart-row gt-stagger">
       <el-col :span="8">
         <div class="chart-card risk-card">
           <h3 class="chart-title">
@@ -213,14 +220,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import http from '@/utils/http'
+import api from '@/services/apiProxy'
 import GTChart from '@/components/GTChart.vue'
 import {
   Refresh, FolderOpened, Timer, User, WarningFilled, CircleCheckFilled, Search,
 } from '@element-plus/icons-vue'
 
 const loading = ref(false)
+
+// ── 数字动画 ──
+function useAnimNum(target: () => number, dur = 800) {
+  const d = ref(0)
+  let raf = 0
+  watch(target, (to) => {
+    cancelAnimationFrame(raf)
+    const from = d.value; const start = performance.now()
+    function step(now: number) {
+      const t = Math.min((now - start) / dur, 1)
+      d.value = Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3)))
+      if (t < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+  }, { immediate: true })
+  return d
+}
 
 // ── KPI 数据 ──
 const overview = ref<any>({})
@@ -230,22 +255,27 @@ const riskAlerts = ref<any[]>([])
 const groupProgress = ref<any[]>([])
 const heatmapData = ref<any[]>([])
 
+const animActive = useAnimNum(() => overview.value.active_projects ?? 0)
+const animWeekHours = useAnimNum(() => overview.value.week_hours ?? 0)
+const animStaff = useAnimNum(() => overview.value.staff_count ?? 0)
+const animOverdue = useAnimNum(() => overview.value.overdue_projects ?? 0)
+
 const kpiCards = computed(() => [
   {
-    label: '在审项目', value: overview.value.active_projects ?? 0,
+    label: '在审项目', value: animActive.value, suffix: '',
     icon: FolderOpened, color: '#4b2d77', bg: '#f4f0fa', trend: 5, trendDir: 'trend-up',
   },
   {
-    label: '本周工时', value: `${overview.value.week_hours ?? 0}h`,
+    label: '本周工时', value: animWeekHours.value, suffix: 'h',
     icon: Timer, color: '#0094B3', bg: '#e6f7fa', trend: 12, trendDir: 'trend-up',
   },
   {
-    label: '人员总数', value: overview.value.staff_count ?? 0,
-    icon: User, color: '#FF5149', bg: '#fff0ef', trend: 0, trendDir: '',
+    label: '人员总数', value: animStaff.value, suffix: '',
+    icon: User, color: '#28A745', bg: '#edf7ef', trend: 0, trendDir: '',
   },
   {
-    label: '超期项目', value: overview.value.overdue_projects ?? 0,
-    icon: WarningFilled, color: '#e74c3c', bg: '#fef0ef',
+    label: '超期项目', value: animOverdue.value, suffix: '',
+    icon: WarningFilled, color: '#FF5149', bg: '#fff0ef',
     trend: overview.value.overdue_projects > 0 ? 0 : 0, trendDir: '',
   },
 ])
@@ -274,10 +304,10 @@ const progressOption = computed(() => {
   }
 })
 
-function progressColor(pct: number): string {
-  if (pct < 30) return '#FF5149'
-  if (pct < 70) return '#FFC23D'
-  return '#28A745'
+function progressColor(pct: number): any {
+  if (pct < 30) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#FF5149' }, { offset: 1, color: '#ff7b74' }] }
+  if (pct < 70) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#e6a817' }, { offset: 1, color: '#FFC23D' }] }
+  return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#1e8a38' }, { offset: 1, color: '#28A745' }] }
 }
 
 // ── 人员负荷图 ──
@@ -296,10 +326,13 @@ const workloadOption = computed(() => {
       type: 'bar' as const,
       data: top10.map((s: any) => ({
         value: s.week_hours,
-        itemStyle: { color: '#4b2d77', borderRadius: [0, 4, 4, 0] },
+        itemStyle: {
+          color: { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#4b2d77' }, { offset: 1, color: '#A06DFF' }] },
+          borderRadius: [0, 6, 6, 0],
+        },
       })),
-      barWidth: 16,
-      label: { show: true, position: 'right' as const, formatter: '{c}h', fontSize: 11, color: '#666' },
+      barWidth: 18,
+      label: { show: true, position: 'right' as const, formatter: '{c}h', fontSize: 11, color: '#666', fontWeight: 600 },
     }],
   }
 })
@@ -317,9 +350,12 @@ const groupOption = computed(() => {
       type: 'bar' as const,
       data: items.map((g: any) => ({
         value: g.progress,
-        itemStyle: { color: '#0094B3', borderRadius: [0, 4, 4, 0] },
+        itemStyle: {
+          color: { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#007a94' }, { offset: 1, color: '#0094B3' }] },
+          borderRadius: [0, 6, 6, 0],
+        },
       })),
-      barWidth: 14,
+      barWidth: 16,
       label: { show: true, position: 'right' as const, formatter: '{c}%', fontSize: 11, color: '#666' },
     }],
   }
@@ -427,7 +463,7 @@ const staffSearching = ref(false)
 
 async function loadAllProjects() {
   try {
-    const { data } = await http.get('/api/projects')
+    const data = await api.get('/api/projects')
     allProjects.value = Array.isArray(data) ? data : data?.items || []
   } catch { allProjects.value = [] }
 }
@@ -436,7 +472,7 @@ async function loadProjectStaff() {
   if (!queryProjectId.value) { projectStaffData.value = []; return }
   queryLoading.value = true
   try {
-    const { data } = await http.get('/api/dashboard/project-staff-hours', {
+    const data = await api.get('/api/dashboard/project-staff-hours', {
       params: { project_id: queryProjectId.value },
     })
     projectStaffData.value = Array.isArray(data) ? data : []
@@ -448,7 +484,7 @@ async function searchStaffForQuery(query: string) {
   if (!query || query.length < 1) { staffSearchResults.value = []; return }
   staffSearching.value = true
   try {
-    const { data } = await http.get('/api/staff', { params: { search: query, limit: 20 } })
+    const data = await api.get('/api/staff', { params: { search: query, limit: 20 } })
     staffSearchResults.value = data?.items || (Array.isArray(data) ? data : [])
   } catch { staffSearchResults.value = [] }
   finally { staffSearching.value = false }
@@ -458,7 +494,7 @@ async function loadStaffDetail() {
   if (!queryStaffId.value) { staffDetail.value = null; return }
   queryLoading.value = true
   try {
-    const { data } = await http.get('/api/dashboard/staff-detail', {
+    const data = await api.get('/api/dashboard/staff-detail', {
       params: { staff_id: queryStaffId.value },
     })
     staffDetail.value = data
@@ -469,7 +505,7 @@ async function loadStaffDetail() {
 async function loadAvailableStaff() {
   queryLoading.value = true
   try {
-    const { data } = await http.get('/api/dashboard/available-staff', {
+    const data = await api.get('/api/dashboard/available-staff', {
       params: { max_hours: maxHoursThreshold.value },
     })
     availableStaffData.value = Array.isArray(data) ? data : []
@@ -480,8 +516,57 @@ async function loadAvailableStaff() {
 
 <style scoped>
 .gt-dashboard { padding: var(--gt-space-6); max-width: 1400px; margin: 0 auto; }
-.gt-dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-5); }
-.gt-page-title { font-size: var(--gt-font-size-xl); font-weight: 700; color: var(--gt-color-text); margin: 0; }
+
+/* ── 管理看板横幅 ── */
+.gt-mgmt-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 28px 36px;
+  margin-bottom: var(--gt-space-6);
+  color: #fff;
+  position: relative; overflow: hidden;
+  box-shadow: 0 8px 32px rgba(75, 45, 119, 0.25);
+  /* 网格纹理 */
+  background-image:
+    var(--gt-gradient-primary),
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 20px 20px, 20px 20px;
+}
+.gt-mgmt-banner::before {
+  content: '';
+  position: absolute; top: -40%; right: -10%;
+  width: 50%; height: 180%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  animation: bannerGlow 8s ease-in-out infinite;
+}
+@keyframes bannerGlow {
+  0%, 100% { opacity: 0.6; transform: translate(0, 0); }
+  50% { opacity: 1; transform: translate(-15px, 8px); }
+}
+.gt-mgmt-banner-deco {
+  position: absolute; bottom: -20px; right: 40px;
+  width: 80px; height: 80px; border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  animation: floatBannerDeco 5s ease-in-out infinite;
+}
+.gt-mgmt-banner-deco::after {
+  content: '';
+  position: absolute; top: -40px; left: -60px;
+  width: 50px; height: 50px; border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+}
+@keyframes floatBannerDeco {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-12px) scale(1.05); }
+}
+.gt-mgmt-title { font-size: 22px; font-weight: 700; margin: 0 0 4px; text-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.gt-mgmt-subtitle { font-size: 13px; opacity: 0.8; margin: 0; }
+.gt-mgmt-banner-actions { position: relative; z-index: 1; }
+.gt-mgmt-banner-actions .el-button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
+.gt-mgmt-banner-actions .el-button:hover { background: rgba(255,255,255,0.3); }
 
 /* ── KPI 卡片 ── */
 .kpi-grid {
@@ -498,21 +583,41 @@ async function loadAvailableStaff() {
   border-left: 3px solid transparent;
   transition: all var(--gt-transition-base);
   cursor: default;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(75, 45, 119, 0.04);
+  border-left-width: 3px;
 }
-.kpi-card:hover { transform: translateY(-2px); box-shadow: var(--gt-shadow-md); }
+.kpi-card:hover { transform: translateY(-3px); box-shadow: var(--gt-shadow-lg); }
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  top: -25px; right: -25px;
+  width: 70px; height: 70px;
+  border-radius: 50%;
+  background: var(--kpi-accent, #4b2d77);
+  opacity: 0.06;
+  transition: all var(--gt-transition-base);
+}
+.kpi-card:hover::after { transform: scale(1.4); opacity: 0.12; }
 .kpi-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
 .kpi-icon {
-  width: 40px; height: 40px; border-radius: var(--gt-radius-md);
+  width: 44px; height: 44px; border-radius: var(--gt-radius-lg);
   display: flex; align-items: center; justify-content: center;
 }
 .kpi-trend {
-  font-size: 11px; font-weight: 600; padding: 2px 8px;
+  font-size: 11px; font-weight: 600; padding: 3px 8px;
   border-radius: var(--gt-radius-full);
 }
 .trend-up { color: var(--gt-color-success); background: var(--gt-color-success-light); }
 .trend-down { color: var(--gt-color-coral); background: var(--gt-color-coral-light); }
-.kpi-value { font-size: 28px; font-weight: 700; color: var(--gt-color-text); line-height: 1.2; }
-.kpi-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 4px; }
+.kpi-value {
+  font-size: 32px; font-weight: 800; line-height: 1.1; letter-spacing: -1px;
+  color: var(--kpi-accent, var(--gt-color-text));
+  font-variant-numeric: tabular-nums;
+}
+.kpi-suffix { font-size: 16px; font-weight: 500; color: var(--gt-color-text-secondary); margin-left: 2px; }
+.kpi-label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); margin-top: 4px; font-weight: 500; }
 
 /* ── 图表卡片 ── */
 .chart-row { margin-bottom: var(--gt-space-5); }
@@ -522,26 +627,50 @@ async function loadAvailableStaff() {
   padding: var(--gt-space-5);
   box-shadow: var(--gt-shadow-sm);
   min-height: 300px;
+  border: 1px solid rgba(75, 45, 119, 0.04);
+  transition: all var(--gt-transition-base);
+  position: relative;
 }
+.chart-card:hover { box-shadow: var(--gt-shadow-md); }
+.chart-card::before {
+  content: '';
+  position: absolute; top: 0; left: 12px; right: 12px;
+  height: 3px; border-radius: 0 0 3px 3px;
+  background: var(--gt-gradient-primary);
+  opacity: 0;
+  transition: opacity var(--gt-transition-base);
+}
+.chart-card:hover::before { opacity: 1; }
 .chart-title {
   font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-text);
   margin: 0 0 var(--gt-space-3); display: flex; align-items: center;
 }
+.chart-title::before {
+  content: '';
+  width: 3px; height: 14px;
+  background: var(--gt-gradient-primary);
+  border-radius: 2px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
 .chart-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-height: 200px; color: var(--gt-color-text-tertiary);
+  gap: 8px;
 }
+.chart-empty .el-icon { opacity: 0.4; }
 
 /* ── 风险预警 ── */
 .risk-card { min-height: 300px; }
 .risk-list { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .risk-item {
   display: flex; align-items: center; gap: var(--gt-space-3);
-  padding: var(--gt-space-3); border-radius: var(--gt-radius-sm);
+  padding: var(--gt-space-3); border-radius: var(--gt-radius-md);
   background: var(--gt-color-bg);
-  transition: background var(--gt-transition-fast);
+  transition: all var(--gt-transition-fast);
+  border: 1px solid transparent;
 }
-.risk-item:hover { background: var(--gt-color-coral-light); }
+.risk-item:hover { background: var(--gt-color-coral-light); border-color: rgba(255, 81, 73, 0.15); }
 .risk-msg { font-size: var(--gt-font-size-sm); color: var(--gt-color-text); }
 
 /* ── 查询面板 ── */
@@ -549,7 +678,8 @@ async function loadAvailableStaff() {
 .query-content { min-height: 200px; }
 .query-toolbar {
   display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
-  padding: 12px 16px; background: #fafbfc; border-radius: 8px;
+  padding: 14px 18px; background: linear-gradient(135deg, #faf9fd 0%, #f4f0fa 100%); border-radius: var(--gt-radius-md);
+  border: 1px solid rgba(75, 45, 119, 0.06);
 }
 .query-hint { font-size: 14px; color: #666; }
 .query-table { border-radius: 8px; overflow: hidden; }
@@ -561,20 +691,22 @@ async function loadAvailableStaff() {
 
 .staff-info-bar {
   display: flex; align-items: center; gap: 20px;
-  padding: 16px 20px; background: linear-gradient(135deg, #f8f6fb 0%, #f0ebf8 100%);
-  border-radius: 10px; border: 1px solid #e8e0f0;
+  padding: 18px 22px; background: linear-gradient(135deg, #f8f6fb 0%, #f0ebf8 100%);
+  border-radius: var(--gt-radius-lg); border: 1px solid rgba(75, 45, 119, 0.08);
+  box-shadow: 0 2px 12px rgba(75, 45, 119, 0.06);
 }
 .staff-avatar {
-  width: 48px; height: 48px; border-radius: 50%;
-  background: linear-gradient(135deg, #4b2d77, #6b42a8);
-  color: #fff; font-size: 20px; font-weight: 700;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--gt-gradient-primary);
+  color: #fff; font-size: 22px; font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(75, 45, 119, 0.25);
 }
 .staff-info-text { flex: 1; }
 .staff-info-name { font-size: 18px; font-weight: 700; color: #333; }
 .staff-info-meta { font-size: 13px; color: #888; margin-top: 2px; }
 .staff-info-stat { text-align: center; padding: 0 16px; border-left: 1px solid #e0d8ec; }
-.staff-info-stat-value { font-size: 22px; font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.staff-info-stat-value { font-size: 24px; font-weight: 800; color: var(--gt-color-primary, #4b2d77); letter-spacing: -0.5px; }
 .staff-info-stat-label { font-size: 12px; color: #999; margin-top: 2px; }
 
 .sub-card {
