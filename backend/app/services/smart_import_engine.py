@@ -9,6 +9,7 @@
 5. 辅助余额表 vs 辅助明细账一致性校验
 """
 
+import asyncio
 import hashlib
 import io
 import logging
@@ -2482,6 +2483,8 @@ async def smart_import_streaming(
                                                      _LEDGER_COLS, _AUX_LEDGER_COLS,
                                                      project_id, seen_codes, acct_records, by_category)
                             _raw_batch.clear()
+                            # 让出事件循环，让进度轮询请求能被响应
+                            await asyncio.sleep(0)
 
                         # 进度更新
                         if row_count % 50_000 == 0:
