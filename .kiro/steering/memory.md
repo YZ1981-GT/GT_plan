@@ -1308,3 +1308,13 @@ inclusion: always
 - Phase 11 前端API统一化扩展：在之前29个文件基础上又完成21个组件迁移（4个布局组件+17个扩展组件），从import http改为import { api } from apiProxy
 - Phase 11 导入错误行号定位：convert_balance_rows/convert_ledger_rows新增diagnostics参数，smart_import_streaming收集skipped_rows（上限200条），前端AccountImportStep展示跳过行详情表格
 - Phase 11 stub清理：qc_engine.py去掉stubs标记（14/14规则全部实现）、working_paper_service.py删除download_for_offline旧stub方法+upload_offline_edit去掉stub注释
+- 代码已推送GitHub（2026-04-26）：Phase 11 系统加固 commit d50680c，290个文件变更（+12037/-5713），83627d0..d50680c master→master；同时清理了临时UUID目录和80+个export HTML文件
+- 底稿深度开发方案文档（2026-04-26）：`底稿开发.md` 9章节，覆盖现状诊断（12项做实+7项未打实+7项缺失）、6个修复项、4种角色功能拓展、人机协同5阶段工作流、实施优先级P0-P3共20天；核心新功能：审计说明智能生成（wp_explanation_service.py）、复核工作台（ReviewWorkstation.vue）、数据一致性监控（DataConsistencyMonitor.vue）、QC规则QC-15~18内容级检查、角色化视图裁剪
+- 底稿人机协同核心原则（2026-04-26技术决策）：AI草拟→人工确认→AI优化→人工定稿；所有AI内容存parsed_data.ai_content（status=pending/confirmed/rejected）；QC-02阻断未确认AI内容提交复核；LLM调用统一temperature=0.3+max_tokens=2000+超时30s+失败不阻断手动操作
+- 底稿开发方案补充7项延伸功能（2026-04-26用户确认）：P4优先级（7天）——模板热更新（新旧版对比+批量升级保留数据）、离线工作包（整循环打包+manifest+冲突回传）、编制时间统计（WOPI lock自动采集+wp_edit_sessions表）、底稿间数据穿透（交叉引用可点击跳转+反向引用）、审计程序与底稿双向绑定（procedure_instances新增working_paper_id FK）、推荐反馈闭环（采纳率统计+规则自优化）、归档导出标准目录包（致同编码体系+索引表+调整汇总）；已写入底稿开发.md第十章
+- 底稿开发文档优化完成（2026-04-26）：9.1文件清单补齐第十章5个新服务+5个修改文件并标注优先级编号，9.2数据模型补齐wp_edit_sessions新表+procedure_instances新增working_paper_id FK，新增9.5风险与外部依赖表（5个外部依赖降级方案+4个关键风险应对）
+- 三类模板三层架构决策（2026-04-26）：第一层致同标准模板只读（底稿360xlsx+51md/报表4×5准则JSON/附注国企40节+上市45节JSON）→第二层项目级克隆可改→第三层用户自定义不受更新影响；已写入底稿开发.md第十一章
+- 底稿51个md文件处理方案（2026-04-26）：11个操作手册md接入LLM知识库（新增wp_manual_service.py类似tsj_prompt_service模式）、11个底稿模板库md驱动parse结构识别、1个Excel制作规格md驱动QC自动化、29个BC控制底稿md接入程序引导
+- 附注md合并方案（2026-04-26）：8个附注模版md中科目对照/校验公式/宽表公式合并到note_template_soe/listed.json对应字段，正文模板md接入LLM上下文供AI生成会计政策引用；新增scripts/merge_note_templates.py合并脚本
+- 报表行次补全待办（2026-04-26）：report_config_seed.json需补全新准则科目（使用权资产/合同资产/合同负债/债权投资/其他综合收益/租赁负债等12+行），EQ权益变动表从10行扩展到25+行
+- 用户偏好：文档分步写入（2026-04-26），大段内容必须分步追加，不要一次性写入整个章节，避免工具超时或截断
