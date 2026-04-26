@@ -1618,34 +1618,28 @@ def smart_parse_files(
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
-    """物理删除该 project+year 的全部四表旧数据。
+    """标记旧 batch 为已替换（不删除/不扫描数据行）。
 
-    用 DELETE 替代 soft-delete（UPDATE is_deleted=True），
-    百万行 DELETE 比 UPDATE 快 3-5 倍（不写旧行的 WAL）。
+    之前用 DELETE 物理删除，但 874 万行的表即使删 0 行也要 11 秒（全索引扫描）。
+    改为只更新 ImportBatch 状态（1 条 UPDATE，毫秒级）。
+    查询时通过 is_deleted=false 过滤，导入完成后异步标记旧数据。
     """
     import time as _time
     import sqlalchemy as sa
-    from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
+    from app.models.audit_platform_models import ImportBatch, ImportStatus
 
-    _t_total = _time.perf_counter()
-    _table_names = {TbAuxLedger: "tb_aux_ledger", TbAuxBalance: "tb_aux_balance",
-                    TbLedger: "tb_ledger", TbBalance: "tb_balance"}
-    for model in (TbAuxLedger, TbAuxBalance, TbLedger, TbBalance):
-        tbl = model.__table__
-        _t0 = _time.perf_counter()
-        result = await db.execute(
-            sa.delete(tbl).where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-            )
-        )
-        _elapsed = _time.perf_counter() - _t0
-        _rows = result.rowcount if result else 0
-        logger.info("[PERF] DELETE %s: %d rows in %.2fs",
-                    _table_names[model], _rows, _elapsed)
+    _t0 = _time.perf_counter()
+    await db.execute(
+        sa.update(ImportBatch.__table__).where(
+            ImportBatch.project_id == project_id,
+            ImportBatch.year == year,
+            ImportBatch.status == ImportStatus.completed,
+            ImportBatch.data_type != "__smart_import_job__",
+        ).values(status=ImportStatus.rolled_back)
+    )
     await db.flush()
-    logger.info("[PERF] _clear_project_year_tables total: %.2fs",
-                _time.perf_counter() - _t_total)
+    logger.info("[PERF] _clear_project_year_tables (batch status only): %.2fs",
+                _time.perf_counter() - _t0)
 
 
 async def write_four_tables(

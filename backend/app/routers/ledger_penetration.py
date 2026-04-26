@@ -556,14 +556,15 @@ async def smart_preview(
                                 "message": "暂不支持 .xls 文件，请转换为 .xlsx"})
             continue
 
-        # 探测合并单元格
+        # 探测合并单元格 + 打开文件（合并为一次打开）
         needs_full = False
         _t_probe = _perf_time.perf_counter()
         try:
-            wb_probe = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-            _logger.info("[PERF] preview probe open (read_only) %s: %.2fs",
+            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            _logger.info("[PERF] preview open (read_only) %s: %.2fs",
                          filename, _perf_time.perf_counter() - _t_probe)
-            for _ws in wb_probe.worksheets:
+            # 探测合并单元格
+            for _ws in wb.worksheets:
                 try:
                     rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
                     if rows5 and max(len(r) for r in rows5) <= 3:
@@ -581,15 +582,12 @@ async def smart_preview(
                         break
                 except Exception:
                     pass
-            wb_probe.close()
-        except Exception:
-            pass
-
-        _t_wb_open = _perf_time.perf_counter()
-        try:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=(not needs_full), data_only=True)
-            _logger.info("[PERF] preview open (read_only=%s) %s: %.2fs",
-                         not needs_full, filename, _perf_time.perf_counter() - _t_wb_open)
+            if needs_full:
+                wb.close()
+                _t_full = _perf_time.perf_counter()
+                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                _logger.info("[PERF] preview reopen (full) %s: %.2fs",
+                             filename, _perf_time.perf_counter() - _t_full)
         except Exception as e:
             diagnostics.append({"file": filename, "sheet": None, "data_type": "unknown",
                                 "row_count": 0, "status": "error", "message": str(e)})
