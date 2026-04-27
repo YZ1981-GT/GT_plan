@@ -78,7 +78,7 @@
           检测到：{{ fileTypeLabel }}
         </el-tag>
         <span class="row-count">
-          {{ activeSheet.sheet_name }} — 共 {{ activeSheet.total_rows }} 行数据，预览前 {{ activeSheet.rows.length }} 行（已跳过前2行）
+          {{ activeSheet.sheet_name }} — 共 {{ activeSheet.total_rows }} 行数据，预览前 {{ activeSheet.rows.length }} 行（表头第 {{ (activeSheet.header_start ?? 0) + 1 }} 行开始，共 {{ activeSheet.header_count ?? 1 }} 行）
         </span>
       </div>
 
@@ -479,6 +479,8 @@ interface SheetPreview {
   total_rows: number
   column_mapping: Record<string, string | null>
   file_type_guess: string
+  header_count?: number
+  header_start?: number
   _source_file?: string
 }
 
@@ -493,6 +495,7 @@ const previewSheets = ref<SheetPreview[]>([])
 const activeSheetIdx = ref(0)
 const columnMapping = reactive<Record<string, string | null>>({})
 const uploadToken = ref('')
+const previewYear = ref<number | null>(null)
 
 // 每个 sheet 的映射缓存（切换 sheet 时不丢失手动调整）
 const sheetMappingCache = reactive<Record<number, Record<string, string | null>>>({})
@@ -609,7 +612,7 @@ async function onSheetChange(idx: number) {
         }
       }
       try {
-        const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers)
+        const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers, sheet)
         for (const [h, v] of Object.entries(saved)) {
           if (v) columnMapping[h] = v
         }
@@ -851,15 +854,42 @@ function getSheetMappedCount(sheetIdx: number): number {
   return Object.values(cached).filter(v => v !== null && v !== undefined && v !== '').length
 }
 
+function getBaseSheetName(sheet: Pick<SheetPreview, 'sheet_name'>): string {
+  const prefixMatch = sheet.sheet_name.match(/^\[.+?\]\s+(.+)$/)
+  return prefixMatch ? prefixMatch[1] : sheet.sheet_name
+}
+
+function getMappingSheetKey(sheet: Pick<SheetPreview, 'sheet_name' | '_source_file'>): string {
+  const sheetName = getBaseSheetName(sheet)
+  return sheet._source_file ? `${sheet._source_file}/${sheetName}` : sheetName
+}
+
+function clearSheetMappingCache() {
+  for (const key of Object.keys(sheetMappingCache)) delete sheetMappingCache[Number(key)]
+}
+
 function onFileChange(_file: UploadFile, fileListVal: UploadFile[]) {
   uploadToken.value = ''
+  previewYear.value = null
   selectedFiles.value = fileListVal.map(f => f.raw!).filter(Boolean)
+  phase.value = 'upload'
+  previewSheets.value = []
+  activeSheetIdx.value = 0
+  importResult.value = null
+  clientTree.value = null
+  for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+  clearSheetMappingCache()
 }
 
 async function handlePreview() {
   if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
   previewing.value = true
   try {
+    previewYear.value = null
+    previewSheets.value = []
+    activeSheetIdx.value = 0
+    for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+    clearSheetMappingCache()
     const formData = new FormData()
     for (const file of selectedFiles.value) {
       formData.append('files', file)
@@ -871,6 +901,7 @@ async function handlePreview() {
     )
     const result: PreviewResponse = data
     uploadToken.value = result.upload_token || ''
+    previewYear.value = result.year ?? null
     const allSheets: any[] = []
     const sheets = result.sheets || []
     for (const s of sheets) {
@@ -896,7 +927,7 @@ async function handlePreview() {
 
       // 2. 尝试从后端加载已保存的映射覆盖
       try {
-        const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers)
+        const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers, sheet)
         for (const [h, v] of Object.entries(saved)) {
           if (v) autoMapping[h] = v
         }
@@ -939,8 +970,9 @@ function handleReupload() {
   clientTree.value = null
   selectedFiles.value = []
   uploadToken.value = ''
+  previewYear.value = null
   for (const key of Object.keys(columnMapping)) delete columnMapping[key]
-  for (const key of Object.keys(sheetMappingCache)) delete sheetMappingCache[Number(key)]
+  clearSheetMappingCache()
   uploadRef.value?.clearFiles()
 }
 
@@ -972,8 +1004,9 @@ async function handleForceReset() {
     clientTree.value = null
     selectedFiles.value = []
     uploadToken.value = ''
+    previewYear.value = null
     for (const key of Object.keys(columnMapping)) delete columnMapping[key]
-    for (const key of Object.keys(sheetMappingCache)) delete sheetMappingCache[Number(key)]
+    clearSheetMappingCache()
     uploadRef.value?.clearFiles()
     ElMessage.success('已重置，可重新上传导入')
   } catch {
@@ -1030,7 +1063,10 @@ function _onGlobalReset() {
   importResult.value = null
   clientTree.value = null
   selectedFiles.value = []
+  uploadToken.value = ''
+  previewYear.value = null
   for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+  clearSheetMappingCache()
   uploadRef.value?.clearFiles()
 }
 
@@ -1099,7 +1135,7 @@ async function saveCurrentSheetMapping() {
   try {
     await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
       file_type: sheet.file_type_guess,
-      sheet_name: sheet.sheet_name,
+      sheet_name: getMappingSheetKey(sheet),
       mapping: cleanMapping,
     })
   } catch {
@@ -1126,7 +1162,7 @@ async function saveMapping(silent = false) {
     try {
       await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
         file_type: sheet.file_type_guess,
-        sheet_name: sheet.sheet_name,
+        sheet_name: getMappingSheetKey(sheet),
         mapping: cleanMapping,
       })
       savedCount++
@@ -1147,7 +1183,7 @@ async function saveMapping(silent = false) {
     try {
       await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
         file_type: sheet.file_type_guess,
-        sheet_name: sheet.sheet_name,
+        sheet_name: getMappingSheetKey(sheet),
         mapping: cleanMapping,
       })
       savedCount = 1
@@ -1165,7 +1201,7 @@ async function saveMapping(silent = false) {
   }
 }
 
-async function loadSavedMapping(fileType: string, headers: string[]): Promise<Record<string, string | null>> {
+async function loadSavedMapping(fileType: string, headers: string[], sheet?: SheetPreview): Promise<Record<string, string | null>> {
   // 优先从后端加载
   if (wizardStore.projectId) {
     try {
@@ -1174,8 +1210,20 @@ async function loadSavedMapping(fileType: string, headers: string[]): Promise<Re
         { params: { file_type: fileType } }
       )
       const mappings = data ?? {}
+      const preferredKeys = sheet
+        ? [`${fileType}:${getMappingSheetKey(sheet)}`, `${fileType}:${getBaseSheetName(sheet)}`, fileType]
+        : [fileType]
+      const mappingEntries = Object.entries(mappings as Record<string, unknown>)
+      mappingEntries.sort(([left], [right]) => {
+        const leftScore = preferredKeys.indexOf(left)
+        const rightScore = preferredKeys.indexOf(right)
+        if (leftScore === -1 && rightScore === -1) return 0
+        if (leftScore === -1) return 1
+        if (rightScore === -1) return -1
+        return leftScore - rightScore
+      })
       // 找到匹配的映射
-      for (const [_key, mapping] of Object.entries(mappings)) {
+      for (const [_key, mapping] of mappingEntries) {
         if (mapping && typeof mapping === 'object') {
           const result: Record<string, string | null> = {}
           for (const h of headers) {
@@ -1263,12 +1311,7 @@ async function handleImport() {
         if (v) clean[h] = v
       }
       if (Object.keys(clean).length > 0) {
-        // 使用原始 sheet 名（去掉多文件前缀 "[file.xlsx] "）
-        let sheetName = previewSheets.value[i].sheet_name
-        const prefixMatch = sheetName.match(/^\[.+?\]\s+(.+)$/)
-        if (prefixMatch) sheetName = prefixMatch[1]
-        const sourceFile = previewSheets.value[i]._source_file
-        const mappingKey = sourceFile ? `${sourceFile}/${sheetName}` : sheetName
+        const mappingKey = getMappingSheetKey(previewSheets.value[i])
         perSheetMapping[mappingKey] = clean
       }
     }
@@ -1278,7 +1321,9 @@ async function handleImport() {
       : perSheetMapping
     formData.append('column_mapping', JSON.stringify(mappingToSend))
 
-    importProgress.value = `正在上传 ${selectedFiles.value.length} 个文件（${totalSizeMB} MB）…`
+    importProgress.value = uploadToken.value
+      ? '正在复用预览文件并提交导入任务…'
+      : `正在上传 ${selectedFiles.value.length} 个文件（${totalSizeMB} MB）…`
 
     // ── 大文件或多文件用异步，小单文件用同步 ──
     const useAsync = totalSizeBytes > 10 * 1024 * 1024 || selectedFiles.value.length > 2
@@ -1290,7 +1335,7 @@ async function handleImport() {
       let importUrl = `/api/projects/${wizardStore.projectId}/account-chart/import-async`
       const importParams = new URLSearchParams()
       if (uploadToken.value) importParams.append('upload_token', uploadToken.value)
-      if (result.year) importParams.append('year', String(result.year))
+      if (previewYear.value !== null) importParams.append('year', String(previewYear.value))
       if (importParams.toString()) importUrl += `?${importParams.toString()}`
       await api.post(
         importUrl,
@@ -1339,7 +1384,7 @@ async function handleImport() {
       let importUrl = `/api/projects/${wizardStore.projectId}/account-chart/import`
       const importParams = new URLSearchParams()
       if (uploadToken.value) importParams.append('upload_token', uploadToken.value)
-      if (result.year) importParams.append('year', String(result.year))
+      if (previewYear.value !== null) importParams.append('year', String(previewYear.value))
       if (importParams.toString()) importUrl += `?${importParams.toString()}`
       const data = await api.post(
         importUrl,
@@ -1591,7 +1636,7 @@ async function applyRefMapping() {
     // 重新加载当前 sheet 的映射
     const sheet = activeSheet.value
     if (sheet) {
-      const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers)
+      const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers, sheet)
       for (const [h, v] of Object.entries(saved)) {
         if (v) columnMapping[h] = v
       }
