@@ -531,3 +531,89 @@ export async function musSamplingEvaluate(projectId: string, recordId: string, m
   })
   return data.data ?? data
 }
+
+// ─── Phase 12: 审计说明智能生成 ───
+
+export interface GenerateDraftResponse {
+  generation_id: string
+  prompt_version: string
+  draft_text: string
+  structured?: Record<string, string>
+  data_sources: string[]
+  confidence: string
+  suggestions: string[]
+}
+
+export interface ConfirmDraftResponse {
+  explanation_status: string
+  last_parsed_sync_at?: string
+}
+
+export interface ReviewIssue {
+  description: string
+  severity: string
+  suggested_action?: string
+}
+
+export interface WorkpaperReadinessCheck {
+  check_name: string
+  passed: boolean
+  detail?: string
+}
+
+export interface WorkpaperReadinessResponse {
+  all_passed: boolean
+  checks: WorkpaperReadinessCheck[]
+  total_workpapers: number
+  check_duration_ms: number
+}
+
+export interface JobStatusResponse {
+  id: string
+  job_type: string
+  status: string
+  progress_total: number
+  progress_done: number
+  failed_count: number
+  items: Array<{ id: string; wp_id: string; status: string; error_message?: string }>
+  created_at: string
+}
+
+export async function generateExplanation(projectId: string, wpId: string): Promise<GenerateDraftResponse> {
+  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/generate-explanation`)
+  return data.data ?? data
+}
+
+export async function confirmExplanation(projectId: string, wpId: string, generationId: string, finalText: string): Promise<ConfirmDraftResponse> {
+  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/confirm-explanation`, {
+    generation_id: generationId, final_text: finalText,
+  })
+  return data.data ?? data
+}
+
+export async function refineExplanation(projectId: string, wpId: string, generationId: string, userEdits: string, feedback?: string) {
+  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/refine-explanation`, {
+    generation_id: generationId, user_edits: userEdits, feedback,
+  })
+  return data.data ?? data
+}
+
+export async function reviewContent(projectId: string, wpId: string): Promise<{ issues: ReviewIssue[] }> {
+  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/review-content`)
+  return data.data ?? data
+}
+
+export async function checkWorkpaperReadiness(projectId: string): Promise<WorkpaperReadinessResponse> {
+  const { data } = await http.post(`/api/projects/${projectId}/partner/workpaper-readiness`)
+  return data.data ?? data
+}
+
+export async function getJobStatus(projectId: string, jobId: string): Promise<JobStatusResponse> {
+  const { data } = await http.get(`/api/projects/${projectId}/jobs/${jobId}`)
+  return data.data ?? data
+}
+
+export async function retryJob(projectId: string, jobId: string) {
+  const { data } = await http.post(`/api/projects/${projectId}/jobs/${jobId}/retry`)
+  return data.data ?? data
+}

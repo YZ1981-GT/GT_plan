@@ -24,6 +24,7 @@ import app.models.extension_models  # noqa: E402, F401
 import app.models.gt_coding_models  # noqa: E402, F401
 import app.models.t_account_models  # noqa: E402, F401
 import app.models.attachment_models  # noqa: E402, F401
+import app.models.phase13_models  # noqa: E402, F401  — Phase 13: Word导出
 
 # Stub for 'workpapers' table referenced by AI models FK
 import sqlalchemy as _sa

@@ -15,10 +15,14 @@ ENV https_proxy=
 ENV HTTP_PROXY=
 ENV HTTPS_PROXY=
 
-# 系统依赖（curl 用于健康检查）
+# 系统依赖（curl 用于健康检查，fonts-wqy-zenhei 中文字体）
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
+
+# 复制仿宋_GB2312字体（如果可用）
+COPY fonts/FangSong_GB2312.ttf /usr/share/fonts/truetype/fangsong/ 2>/dev/null || true
+RUN fc-cache -fv 2>/dev/null || true
 
 WORKDIR /app
 

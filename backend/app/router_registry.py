@@ -64,9 +64,12 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.note_ai import router as nai_router
     from app.routers.report_trace import router as rt_router
 
+    # Phase 13: Word 导出
+    from app.routers.word_export import router as word_export_router
+
     for r in [rc_router, reports_router, cfs_router, dn_router, ar_router,
               export_router, nt_router, nwm_router, ntr_router, nai_router,
-              rt_router]:
+              rt_router, word_export_router]:
         app.include_router(r, tags=["报表与附注"])
 
     # ═══ 5. 底稿管理 ═══
@@ -90,11 +93,12 @@ def register_all_routers(app: FastAPI) -> None:
 
     # Phase 12
     from app.routers.wp_explanation import router as wpexpl_router
+    from app.routers.background_jobs import router as bgjob_router
 
     for r in [formula_router, wpt_router, wp_router, qc_router, wpr_router,
               wpm_router, wpp_router, wpai_router, wps_router, wpd_router,
               wpc_router, samp_router, sampe_router, wsum_router, pr_router,
-              rconv_router, ann_router, wpexpl_router]:
+              rconv_router, ann_router, wpexpl_router, bgjob_router]:
         app.include_router(r, tags=["底稿管理"])
 
     # ═══ 6. 合并报表 ═══
