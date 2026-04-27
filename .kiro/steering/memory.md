@@ -1328,3 +1328,7 @@ inclusion: always
 
 - Phase 13 三件套大幅细化（2026-04-27）：从纯"Word导出"扩展为"审计报告·报表·附注生成与导出"完整业务闭环；新增6个维度：①名称联动（10个占位符+报表口径自动切换）②报表数据快照（report_snapshot表+过期检测）③集团模板参照（母公司模板→子企业一键复制+差异三色高亮+template_reference表）④上年报告LLM智能复用（上传上年报告/附注→解析→LLM预填当期70%+内容+prior_year_document表）⑤附注章节编辑增强（Block模型表格+叙述交替+auto/manual/locked三模式+数据标签+上年参照侧边栏）⑥存储路径规范（reports/prior_year/templates/三级目录）；总工期从16天扩展到26天；新增11个后端服务+3张新表+15个API端点
 - 用户偏好：审计报告/附注的业务深度（2026-04-27）——不能只做技术层面的"导出Word"，必须覆盖正文名称编辑处理、报表数据拉取保存、附注各章节内容编辑、集团模板参照（母公司改好子企业参照）、上年报告上传LLM智能复用等完整业务场景
+
+- 文档目录迁移（2026-04-27）：底稿开发.md、底稿开发_v2.md、需求文档.md 从项目根目录移到 docs/ 目录（远程其他用户操作，本地 pull 合并）
+- Phase 12 P0+P1 部分代码已实现（2026-04-27）：新增 wp_explanation_service.py（审计说明生成）+ wp_explanation.py 路由 + phase12_models.py + phase12_schemas.py + background_job_service.py + phase12_001迁移脚本；修改 qc_engine.py（QC-15~18内容级规则）+ prefill_engine.py（解析增强）+ partner_service.py/partner_dashboard.py（签字前检查）+ workpaper_models.py + router_registry.py；已推送 commit 83bc36c
+- 远程新增文件（2026-04-27 其他用户提交）：fast_writer.py（大文件写入）+ ledger_import_upload_service.py（序时账导入上传）+ docs/ledger-import-large-file-remediation-plan.md（大文件导入修复方案）；smart_import_engine.py 和 ledger_penetration.py 有较大改动
