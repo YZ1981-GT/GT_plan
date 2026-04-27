@@ -1318,3 +1318,10 @@ inclusion: always
 - 附注md合并方案（2026-04-26）：8个附注模版md中科目对照/校验公式/宽表公式合并到note_template_soe/listed.json对应字段，正文模板md接入LLM上下文供AI生成会计政策引用；新增scripts/merge_note_templates.py合并脚本
 - 报表行次补全待办（2026-04-26）：report_config_seed.json需补全新准则科目（使用权资产/合同资产/合同负债/债权投资/其他综合收益/租赁负债等12+行），EQ权益变动表从10行扩展到25+行
 - 用户偏好：文档分步写入（2026-04-26），大段内容必须分步追加，不要一次性写入整个章节，避免工具超时或截断
+
+- "问题1"审查报告文件已删除（2026-04-27）：557行代码审查报告内容已完整整合到memory.md（Phase 11系统加固章节），12个问题全部在Phase 11中完成修复，无需保留独立文件
+- Phase 12 底稿深度开发 spec 已创建（2026-04-27）：spec路径 .kiro/specs/phase12-workpaper-deep/，含 requirements.md（P0×4+P1×5+P2×8需求+非功能需求+范围边界）+ design.md（人机协同五阶段工作流+4角色功能设计+10个核心服务设计+8组API+降级服务）+ tasks.md（5个阶段+40天工期+里程碑+回滚计划+技术债务）
+- Phase 12 三件套审查建议（2026-04-27待用户确认）：①P2-1(QC规则)/P2-2(签字前检查)应升级为P1（审计合规硬性要求）②阶段4 Word导出引擎（8天）建议拆出为独立Phase 13（与底稿关联度偏弱）③design.md缺少prompt工程细节和gt_word_engine技术设计④tasks.md P1-5批量操作0.5天不够建议改1.5天、阶段2加2天buffer⑤500张批量刷新<30秒偏乐观建议改<120秒⑥WpVisualizationService.get_formula_cells应从parsed_data缓存读取而非实时解析Excel
+
+- Phase 12 三件套已调整（2026-04-27）：①P2-1(QC规则)/P2-2(签字前检查)升级为P1-6/P1-7 ②Word导出引擎拆出到Phase 13 ③P1-5批量操作从0.5天改为1.5天 ④阶段2从10天改为12天（含buffer）⑤500张批量刷新指标从<30秒改为<120秒 ⑥WpVisualizationService改为从parsed_data缓存读取 ⑦generate_draft补充完整prompt工程（三段式+few-shot+JSON schema+token预算分配）⑧总工期从40天缩减到33天
+- Phase 13 Word导出引擎 spec 已创建（2026-04-27）：spec路径 .kiro/specs/phase13-word-export/，双方案策略（方案B模板填充优先+方案A从零生成降级）；requirements.md（P0基础引擎4项+P1模板填充4项+P2增强3项+致同排版规范6节）；design.md（GTWordEngine核心类+3个文档导出器+WordTemplateFiller+WOPI集成+页码/三线表/字体技术难点）；tasks.md（4阶段16天：基础引擎4天+三文档导出6天+模板填充4天+集成测试2天）
