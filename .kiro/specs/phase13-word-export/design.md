@@ -1,4 +1,4 @@
-# Phase 13: 致同标准 Word 导出引擎 - 设计文档
+# Phase 13: 审计报告·报表·附注生成与导出 - 设计文档
 
 ---
 
@@ -349,4 +349,462 @@ def set_table_borders(table):
 2. 同时设置 fallback：rFonts ascii="FangSong" hAnsi="FangSong"
 3. Docker 环境需安装中文字体包（fonts-wqy-zenhei）
 4. 或在 Dockerfile 中 COPY 仿宋_GB2312.ttf 到 /usr/share/fonts/
+```
+
+
+---
+
+## 4. 审计报告正文名称联动处理
+
+### 4.1 占位符体系
+
+审计报告正文中涉及大量需要联动替换的名称和表述：
+
+```
+占位符清单（从 project.wizard_state.basic_info 读取）：
+
+| 占位符 | 来源 | 联动规则 |
+|--------|------|---------|
+| {entity_name} | client_name | 修改后全文替换所有出现位置 |
+| {entity_short_name} | 用户手动填入 | 默认=全称加引号，如"XX公司" |
+| {report_scope} | report_scope字段 | consolidated→"合并及母公司财务报表"，standalone→"财务报表" |
+| {audit_period} | audit_period_start/end | "2025年1月1日至2025年12月31日" |
+| {audit_year} | audit_year | "2025" |
+| {signing_partner} | 从project_assignments取签字合伙人 | |
+| {report_date} | 用户填入 | 默认=审计期间结束日后30天 |
+| {firm_name} | 系统配置 | "致同会计师事务所（特殊普通合伙）" |
+| {cpa_name_1} | 用户填入 | 签字注册会计师1 |
+| {cpa_name_2} | 用户填入 | 签字注册会计师2 |
+
+联动替换逻辑：
+- 用户在"基本信息"中修改 entity_name → 触发全文扫描替换
+- 正文中"XX有限公司"等硬编码文本也需被替换（模糊匹配旧名称）
+- 替换后高亮标记已替换位置（黄色背景），供用户确认
+```
+
+### 4.2 报表口径自动切换
+
+```python
+# 根据 report_scope 自动替换正文表述
+SCOPE_REPLACEMENTS = {
+    "consolidated": {
+        "财务报表": "合并及母公司财务报表",
+        "资产负债表": "合并及母公司资产负债表",
+        "利润表": "合并及母公司利润表",
+        "现金流量表": "合并及母公司现金流量表",
+        "所有者权益变动表": "合并及母公司所有者权益变动表",
+        "财务报表附注": "合并及母公司财务报表附注",
+    },
+    "standalone": {
+        # 单体报表不需要替换，保持原文
+    }
+}
+```
+
+---
+
+## 5. 报表数据拉取与快照机制
+
+### 5.1 数据拉取链路
+
+```
+trial_balance (试算表)
+    ↓ report_engine.generate_all_reports()
+    ↓ 公式计算：TB()/SUM_TB()/ROW()
+financial_report (报表行数据)
+    ↓ 保存快照
+report_snapshot (数据快照表)
+    ↓ 导出时从快照读取
+Word 文件
+```
+
+### 5.2 快照策略
+
+```python
+class ReportSnapshotService:
+    async def create_snapshot(self, db, project_id, year) -> dict:
+        """
+        1. 调用 report_engine.generate_all_reports() 重新计算
+        2. 计算 trial_balance 数据哈希（用于检测过期）
+        3. 将4张报表行数据序列化为 JSONB 存入 report_snapshot
+        4. 返回 snapshot_id
+        
+        过期检测：
+        - 导出时比对当前 trial_balance 哈希 vs 快照哈希
+        - 不一致→提示"报表数据已变更，是否重新生成？"
+        - 用户可选择：用旧快照导出 / 重新生成快照
+        """
+
+    async def get_latest_snapshot(self, db, project_id, year, report_type):
+        """获取最新快照，如不存在则自动创建"""
+```
+
+---
+
+## 6. 集团模板参照机制
+
+### 6.1 参照流程
+
+```
+母公司项目（已完成报告编辑）
+    ↓ 子企业点击"参照母公司"
+复制母公司 reports/ 下的已确认文档到子企业 templates/
+    ↓ 自动替换
+替换占位符：{entity_name}→子企业名称，{entity_short_name}→子企业简称
+    ↓ 差异标记
+黄色高亮：单位名称替换位置
+蓝色高亮：金额数据占位符（需从子企业试算表重新拉取）
+绿色高亮：会计政策可能需要调整的段落
+    ↓ 子企业编辑
+用户逐处确认/修改高亮位置
+    ↓ 填充子企业数据
+报表数据从子企业 trial_balance 拉取填充
+附注表格数据从子企业 disclosure_note 拉取填充
+```
+
+### 6.2 参照服务设计
+
+```python
+class TemplateReferenceService:
+    async def reference_from_parent(self, db, source_project_id, 
+                                     target_project_id, doc_types) -> dict:
+        """
+        从母公司项目参照模板到子企业项目
+        
+        参数：
+        - source_project_id: 母公司项目ID
+        - target_project_id: 子企业项目ID  
+        - doc_types: ['audit_report', 'notes', 'all']
+        
+        步骤：
+        1. 验证母公司项目存在且有已确认文档
+        2. 复制文档到子企业 templates/ 目录
+        3. 读取子企业 basic_info，替换占位符
+        4. 标记差异位置（返回 diff_markers 列表）
+        5. 记录参照关系到 template_reference 表
+        
+        返回：
+        {
+            "copied_files": ["audit_report.docx", "notes.docx"],
+            "diff_markers": [
+                {"file": "notes.docx", "location": "第五章第3节", 
+                 "type": "policy_diff", "reason": "子企业可能有不同折旧政策"}
+            ],
+            "reference_id": "uuid"
+        }
+        """
+
+    async def list_referenceable_projects(self, db, project_id) -> list:
+        """
+        列出可参照的项目（同集团的母公司/兄弟企业）
+        通过 parent_project_id 关系链查找
+        """
+```
+
+---
+
+## 7. 上年报告 LLM 智能复用
+
+### 7.1 上年文档解析
+
+```python
+class PriorYearDocumentService:
+    async def upload_and_parse(self, db, project_id, year, 
+                                file, doc_type) -> dict:
+        """
+        上传上年报告/附注并解析
+        
+        Word 文件解析（python-docx）：
+        - 审计报告：识别7段式结构，提取各段文本
+        - 附注：识别章节目录→按章节拆分→表格数据提取→叙述文本提取
+        
+        PDF 文件解析（MinerU GPU 加速 + OCR 兜底）：
+        - 文字层直接提取
+        - 扫描版 OCR
+        - 表格识别（MinerU 表格检测）
+        
+        解析结果存储：
+        - 原始文件 → storage/projects/{id}/prior_year/
+        - 解析结果 → prior_year_document 表 parsed_data JSONB
+        
+        parsed_data 结构（审计报告）：
+        {
+            "paragraphs": [
+                {"type": "opinion", "text": "..."},
+                {"type": "basis", "text": "..."},
+                {"type": "kam", "items": [{"title": "...", "description": "...", "response": "..."}]},
+                {"type": "other_info", "text": "..."},
+                {"type": "management_responsibility", "text": "..."},
+                {"type": "auditor_responsibility", "text": "..."},
+                {"type": "signature", "text": "..."}
+            ]
+        }
+        
+        parsed_data 结构（附注）：
+        {
+            "sections": [
+                {
+                    "code": "五、1",
+                    "title": "货币资金",
+                    "tables": [{"headers": [...], "rows": [...]}],
+                    "narrative": "本公司货币资金主要包括...",
+                    "prior_closing": 1200000,
+                    "prior_opening": 1100000
+                }
+            ]
+        }
+        """
+```
+
+### 7.2 LLM 智能预填审计报告
+
+```python
+class ReportLLMService:
+    async def prefill_audit_report(self, db, project_id, year) -> dict:
+        """
+        根据上年报告 + 当期数据生成当期报告草稿
+        
+        处理逻辑（按段落类型分别处理）：
+        
+        1. 审计意见段：
+           - 默认沿用上年意见类型（标准无保留/保留/否定/无法表示）
+           - 替换单位名称、审计期间、报表口径
+           - 如果当期有重大调整（AJE金额>重要性水平）→ LLM 提示可能需要修改意见类型
+        
+        2. 形成基础段：
+           - 沿用上年模板
+           - 替换占位符
+        
+        3. 关键审计事项（KAM）：
+           - 上年 KAM 列表作为参考
+           - LLM 分析当期数据：哪些科目变动大/有重大调整/有特殊风险
+           - 建议保留/删除/新增 KAM 项
+           - 每个 KAM 的"审计应对"段落根据当期实际执行程序更新
+        
+        4. 其他信息段/管理层责任段/审计师责任段：
+           - 基本沿用上年（标准化段落）
+           - 替换占位符
+        
+        5. 签章段：
+           - 更新签字合伙人、日期
+        
+        Prompt 模板：
+        [system] 你是致同会计师事务所的审计报告编写专家。
+        根据上年审计报告和当期审计数据，生成当期审计报告草稿。
+        保留上年的措辞风格和结构，仅更新数据引用和必要变更。
+        对于需要人工判断的变更点，用 [需确认: 原因] 标记。
+        
+        [user] 
+        上年报告：{prior_year_paragraphs}
+        当期变动摘要：{current_year_changes}
+        当期重大调整：{significant_adjustments}
+        当期重要性水平：{materiality}
+        
+        返回：
+        {
+            "paragraphs": [...],  # 当期报告各段草稿
+            "changes_from_prior": [  # 与上年的差异清单
+                {"paragraph": "opinion", "change": "意见类型未变", "needs_review": false},
+                {"paragraph": "kam", "change": "建议新增KAM：商誉减值", "needs_review": true}
+            ],
+            "confidence": "high"
+        }
+        """
+```
+
+### 7.3 LLM 智能预填附注
+
+```python
+class NoteLLMService:
+    async def prefill_disclosure_notes(self, db, project_id, year) -> dict:
+        """
+        根据上年附注 + 当期数据生成当期附注草稿
+        
+        按章节类型分别处理：
+        
+        类型1：纯表格章节（如货币资金、应收账款明细）
+        - 上年期末 → 当期期初（直接复制）
+        - 当期期末 → 从 trial_balance / disclosure_note 拉取
+        - 变动额 = 期末 - 期初（自动计算）
+        - 不需要 LLM，纯数据填充
+        
+        类型2：表格+变动说明（如固定资产变动表）
+        - 表格部分同类型1
+        - 变动说明 → LLM 生成：
+          输入：科目期初/期末/变动额 + 调整分录明细 + 上年变动说明
+          输出：当期变动说明（200字内，引用具体数据）
+          Prompt：参照上年说明的措辞风格，更新数据引用
+        
+        类型3：纯叙述章节（如会计政策、税项说明）
+        - 默认沿用上年文本
+        - LLM 检查：是否有新准则变更需要更新
+          输入：上年会计政策文本 + 当年新准则清单（从知识库加载）
+          输出：需要更新的段落 + 更新建议
+        - 无变更 → 直接复制上年文本
+        - 有变更 → 标记 [需确认: 新准则XXX可能影响此政策]
+        
+        类型4：关联方/或有事项/承诺等特殊章节
+        - 上年文本作为参考
+        - LLM 提示：这些章节通常每年变化较大，建议人工重写
+        - 提供上年文本供参考，不自动生成
+        
+        返回：
+        {
+            "sections": [
+                {
+                    "code": "五、1",
+                    "title": "货币资金",
+                    "fill_type": "table_only",
+                    "tables": [...],  # 已填充数据的表格
+                    "narrative": null,
+                    "needs_review": false
+                },
+                {
+                    "code": "五、10",
+                    "title": "固定资产",
+                    "fill_type": "table_and_narrative",
+                    "tables": [...],
+                    "narrative": "本期固定资产增加主要系...",
+                    "narrative_source": "llm",
+                    "needs_review": true,
+                    "review_reason": "变动说明由AI生成，请核实数据引用"
+                },
+                {
+                    "code": "三、1",
+                    "title": "会计政策",
+                    "fill_type": "narrative_only",
+                    "narrative": "（沿用上年）...",
+                    "changes_detected": ["新收入准则解释第X号可能影响收入确认政策"],
+                    "needs_review": true
+                }
+            ],
+            "stats": {
+                "total_sections": 40,
+                "auto_filled": 25,
+                "llm_generated": 10,
+                "manual_required": 5
+            }
+        }
+        """
+```
+
+---
+
+## 8. 附注章节编辑处理
+
+### 8.1 章节编辑模型
+
+```
+每个附注章节的编辑区由以下 block 组成（支持交替排列）：
+
+┌─────────────────────────────────────────┐
+│ Block 1: 叙述文本（TipTap 富文本编辑器）  │
+│ "本公司货币资金主要包括库存现金、银行..."  │
+├─────────────────────────────────────────┤
+│ Block 2: 表格（el-table 可编辑）          │
+│ ┌────────┬────────┬────────┬────────┐  │
+│ │ 项目    │ 期末余额 │ 期初余额 │ 变动   │  │
+│ ├────────┼────────┼────────┼────────┤  │
+│ │ 库存现金 │ auto   │ auto   │ =期末-期初│ │
+│ │ 银行存款 │ auto   │ manual │ =期末-期初│ │
+│ │ 合计    │ =SUM   │ =SUM   │ =SUM   │  │
+│ └────────┴────────┴────────┴────────┘  │
+├─────────────────────────────────────────┤
+│ Block 3: 叙述文本                        │
+│ "本期银行存款增加主要系..."               │
+├─────────────────────────────────────────┤
+│ Block 4: 表格（账龄分析表）               │
+│ ...                                      │
+└─────────────────────────────────────────┘
+
+单元格三种模式：
+- auto（蓝色背景）：从 trial_balance 自动取数，刷新时更新
+- manual（白色背景）：用户手动输入，刷新时不覆盖
+- locked（灰色背景）：公式计算结果，不可编辑（如合计行、变动列）
+```
+
+### 8.2 附注数据来源优先级
+
+```
+每个附注表格单元格的数据来源按以下优先级：
+
+1. 用户手动输入（manual模式）→ 最高优先，永不被覆盖
+2. 底稿 parsed_data（如果底稿已完成）→ 底稿是第一手审计证据
+3. trial_balance 审定数 → 试算表是汇总数据
+4. 上年附注期末值 → 作为当期期初值
+5. LLM 生成 → 叙述性文本的草稿
+
+刷新逻辑：
+- 点击"刷新数据" → 只更新 auto 模式单元格
+- manual 模式单元格保持不变
+- locked 模式单元格重新计算公式
+- 刷新后显示变更摘要弹窗（旧值→新值）
+```
+
+### 8.3 附注叙述文本编辑
+
+```
+叙述文本编辑器（TipTap）功能：
+1. 基础格式：加粗/斜体/下划线/列表/缩进
+2. 数据标签：插入 {{amount:1001:closing}} 标签 → 渲染为实际金额
+   - 点击标签 → 跳转到试算表对应行
+   - 数据变更时标签自动更新
+3. AI 辅助：
+   - "AI 生成变动说明" 按钮 → 调用 NoteLLMService
+   - "AI 润色" 按钮 → 优化措辞但保留数据引用
+   - AI 生成内容用虚线边框标记，需用户确认
+4. 上年参照：
+   - 侧边栏显示上年同章节文本（只读）
+   - 可一键复制上年文本到编辑器
+   - 复制后自动标记需要更新的数据引用（黄色高亮）
+```
+
+---
+
+## 9. API 设计补充
+
+### 9.1 集团参照 API
+
+```yaml
+GET /api/projects/{id}/template-reference/available
+  - 列出可参照的项目（同集团母公司/兄弟企业）
+  - 返回: [{ project_id, client_name, relationship, has_confirmed_report }]
+
+POST /api/projects/{id}/template-reference/copy
+  - 从母公司参照模板
+  - body: { source_project_id, doc_types: ["audit_report", "notes"] }
+  - 返回: { copied_files[], diff_markers[] }
+```
+
+### 9.2 上年文档 API
+
+```yaml
+POST /api/projects/{id}/prior-year/upload
+  - 上传上年报告/附注
+  - body: FormData(file, doc_type, year)
+  - 返回: { document_id, parsed_sections_count }
+
+GET /api/projects/{id}/prior-year/{doc_type}
+  - 获取上年文档解析结果
+  - 返回: { parsed_data }
+
+POST /api/projects/{id}/prior-year/prefill-report
+  - LLM 智能预填审计报告
+  - 返回: SSE 流式（逐段输出）
+
+POST /api/projects/{id}/prior-year/prefill-notes
+  - LLM 智能预填附注
+  - 返回: SSE 流式（逐章节输出）
+```
+
+### 9.3 报表快照 API
+
+```yaml
+POST /api/projects/{id}/report-snapshot/create
+  - 创建报表数据快照
+  - 返回: { snapshot_id, is_stale: false }
+
+GET /api/projects/{id}/report-snapshot/latest
+  - 获取最新快照（含过期检测）
+  - 返回: { snapshot_id, data, is_stale, stale_reason }
 ```
