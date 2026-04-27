@@ -732,7 +732,13 @@ def _build_sheet_context(ws, sheet_mapping: Optional[dict[str, str]] = None) -> 
     }
 
 
-def _iter_sheet_row_dicts(ws, sheet_context: dict, max_data_rows: int | None = None) -> Iterator[dict]:
+def _iter_sheet_row_dicts(
+    ws,
+    sheet_context: dict,
+    max_data_rows: int | None = None,
+    *,
+    use_mapped_headers: bool = True,
+) -> Iterator[dict]:
     headers = sheet_context["headers"]
     column_mapping = sheet_context["column_mapping"]
     company_name = sheet_context.get("company_code")
@@ -760,7 +766,7 @@ def _iter_sheet_row_dicts(ws, sheet_context: dict, max_data_rows: int | None = N
         row_dict = {}
         for i in range(num_cols):
             header = headers[i]
-            mapped = column_mapping.get(header, header)
+            mapped = column_mapping.get(header, header) if use_mapped_headers else header
             row_dict[mapped] = padded[i]
         if company_name:
             row_dict["company_code"] = company_name
@@ -790,6 +796,7 @@ def smart_parse_sheet(
     *,
     read_only: bool = True,
     max_data_rows: int | None = None,
+    include_raw_rows: bool = False,
     sheet_mapping: Optional[dict[str, str]] = None,
 ) -> dict:
     """通用智能解析单个 worksheet。
@@ -812,6 +819,16 @@ def smart_parse_sheet(
     """
     sheet_context = _build_sheet_context(ws, sheet_mapping=sheet_mapping)
     rows = list(_iter_sheet_row_dicts(ws, sheet_context, max_data_rows=max_data_rows))
+    raw_rows = []
+    if include_raw_rows:
+        raw_rows = list(
+            _iter_sheet_row_dicts(
+                ws,
+                sheet_context,
+                max_data_rows=max_data_rows,
+                use_mapped_headers=False,
+            )
+        )
     row_count = len(rows)
     total_row_estimate = sheet_context.get("total_row_estimate")
     if max_data_rows is None or total_row_estimate is None:
@@ -825,6 +842,7 @@ def smart_parse_sheet(
         "column_mapping": sheet_context["column_mapping"],
         "data_type": sheet_context["data_type"],
         "rows": rows,
+        "raw_rows": raw_rows,
         "year": year,
         "row_count": row_count,
         "total_row_estimate": total_row_estimate,
@@ -1450,6 +1468,7 @@ def _parse_csv_for_preview(
     dt = _guess_data_type(mapped_fields)
 
     rows: list[dict] = []
+    raw_rows: list[dict] = []
     row_count = 0
     BATCH = 100_000
 
@@ -1461,19 +1480,24 @@ def _parse_csv_for_preview(
             if wide_table_detected:
                 padded = row_raw + [""] * max(0, mid - len(row_raw))
                 row_dict = {}
+                raw_row = {}
                 for j, h in enumerate(headers):
                     mapped = column_mapping.get(h, h)
                     data_idx = j
                     val = padded[data_idx].strip() if data_idx < len(padded) else ""
+                    raw_row[h] = val
                     row_dict[mapped] = val if val else None
             else:
                 padded = row_raw + [""] * max(0, len(headers) - len(row_raw))
                 row_dict = {}
+                raw_row = {}
                 for j, h in enumerate(headers):
                     mapped = column_mapping.get(h, h)
                     val = padded[j].strip() if j < len(padded) else ""
+                    raw_row[h] = val
                     row_dict[mapped] = val if val else None
             rows.append(row_dict)
+            raw_rows.append(raw_row)
             row_count += 1
             if max_rows and row_count >= max_rows:
                 break
@@ -1516,9 +1540,12 @@ def _parse_csv_for_preview(
         "content_inferred": content_inferred,
         "data_type": dt,
         "rows": rows,
+        "raw_rows": raw_rows,
         "year": year_val,
         "row_count": row_count,
         "total_lines_est": total_lines_est,
+        "header_start": max(header_line_number - 1, 0),
+        "header_count": 1,
         "wide_table_detected": wide_table_detected,
     }
 
@@ -1592,6 +1619,7 @@ def smart_parse_files(
                 "file": filename, "sheet": "CSV", "data_type": dt,
                 "row_count": csv_parsed["row_count"],
                 "total_row_estimate": est_total,
+                "header_start": csv_parsed.get("header_start", 0),
                 "header_count": 1,
                 "matched_cols": sorted(matched_fields),
                 "missing_cols": missing_cols,
@@ -1601,6 +1629,7 @@ def smart_parse_files(
                 # 以下字段供前端手动映射调整
                 "raw_headers": csv_parsed.get("raw_headers", csv_parsed["headers"]),
                 "headers": csv_parsed["headers"],
+                "preview_rows_data": csv_parsed.get("raw_rows", []),
                 "wide_table_detected": csv_parsed.get("wide_table_detected", False),
                 "content_inferred": csv_parsed.get("content_inferred", {}),
             }
@@ -1723,6 +1752,7 @@ def smart_parse_files(
                 parsed = smart_parse_sheet(
                     ws,
                     max_data_rows=(preview_rows if preview_mode else None),
+                    include_raw_rows=preview_mode,
                     sheet_mapping=sheet_mapping,
                 )
             except Exception as e:
@@ -1751,6 +1781,7 @@ def smart_parse_files(
                 "data_type": dt,
                 "row_count": row_count,
                 "total_row_estimate": total_estimate,
+                "header_start": parsed["header_start"],
                 "header_count": parsed["header_count"],
                 "matched_cols": sorted(matched_fields),
                 "missing_cols": missing_cols,
@@ -1760,6 +1791,7 @@ def smart_parse_files(
                 # 以下字段供前端手动映射调整和企业信息展示
                 "raw_headers": parsed["headers"],
                 "headers": parsed["headers"],
+                "preview_rows_data": parsed.get("raw_rows", []),
                 "company_code": parsed.get("company_code"),
                 "year": parsed.get("year"),
                 "wide_table_detected": False,

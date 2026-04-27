@@ -433,60 +433,16 @@ async def smart_preview(
     不写入数据库，不转换数据，只解析表头 + 前 N 行做数据类型识别，
     供用户确认后再调用 smart-import 后台异步写入。
     """
-    from app.services.ledger_import_upload_service import LedgerImportUploadService
-    from app.services.smart_import_engine import smart_parse_files
+    from app.services.ledger_import_application_service import LedgerImportApplicationService
 
-    all_files = list(files) if files else []
-    if upload_token:
-        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
-    else:
-        if not all_files:
-            raise HTTPException(status_code=400, detail="未提供文件")
-        manifest = await LedgerImportUploadService.create_bundle(
-            project_id,
-            str(current_user.id),
-            all_files,
-        )
-        upload_token = manifest["upload_token"]
-        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
-
-    result = smart_parse_files(
-        file_sources,
-        year_override=year,
-        preview_mode=True,
+    return await LedgerImportApplicationService.preview(
+        project_id=project_id,
+        user_id=str(current_user.id),
+        files=files,
+        upload_token=upload_token,
+        year=year,
         preview_rows=preview_rows,
     )
-
-    # 预览模式下从 diagnostics 汇总估算行数
-    balance_est = 0
-    aux_balance_est = 0
-    ledger_est = 0
-    aux_ledger_est = 0
-    for d in result.get("diagnostics", []):
-        est = d.get("total_row_estimate") or d.get("row_count", 0)
-        dt = d.get("data_type", "")
-        if dt in ("balance", "aux_balance"):
-            balance_est += est
-            aux_balance_est += d.get("aux_balance_count_est", 0)
-        elif dt in ("ledger", "aux_ledger"):
-            ledger_est += est
-            aux_ledger_est += d.get("aux_ledger_count_est", 0)
-
-    return {
-        "year": result["year"],
-        "summary": {
-            "balance": balance_est,
-            "aux_balance": aux_balance_est,
-            "ledger": ledger_est,
-            "aux_ledger": aux_ledger_est,
-        },
-        "aux_dimensions": result.get("aux_dimensions", []),
-        "validation": [],
-        "diagnostics": result["diagnostics"],
-        "preview_mode": True,
-        "preview_rows": preview_rows,
-        "upload_token": upload_token,
-    }
 
 
 @router.post("/smart-import")
@@ -504,131 +460,18 @@ async def smart_import(
     立即返回 accepted，前端通过 /api/data-lifecycle/import-queue/{project_id} 轮询进度。
     适合大文件（>10MB 或 >100万行）避免 HTTP 超时。
     """
-    import asyncio
-    import json
-    from app.services.import_queue_service import ImportQueueService
-    from app.services.ledger_import_upload_service import LedgerImportUploadService
+    from app.services.ledger_import_application_service import LedgerImportApplicationService
 
-    # 兼容单文件 / 多文件
-    all_files = list(files) if files else []
-    if upload_token:
-        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
-    else:
-        if not all_files:
-            raise HTTPException(status_code=400, detail="未提供文件")
-        manifest = await LedgerImportUploadService.create_bundle(
-            project_id,
-            str(current_user.id),
-            all_files,
-        )
-        upload_token = manifest["upload_token"]
-        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
-
-    file_label = file_sources[0][0] if file_sources else "upload.xlsx"
-    if len(file_sources) > 1:
-        file_label = f"{file_label} 等{len(file_sources)}个文件"
-
-    ok, msg, job_batch_id = await ImportQueueService.acquire_lock(
-        project_id,
-        str(current_user.id),
-        db,
-        source_type="smart_import",
-        file_name=file_label,
-        year=year or 0,
+    return await LedgerImportApplicationService.submit_import_job(
+        project_id=project_id,
+        user_id=str(current_user.id),
+        db=db,
+        files=files,
+        upload_token=upload_token,
+        year=year,
+        custom_mapping=custom_mapping,
+        payload_style="ledger",
     )
-    if not ok:
-        raise HTTPException(status_code=409, detail=msg)
-
-    mapping = None
-    if custom_mapping:
-        try:
-            mapping = json.loads(custom_mapping)
-        except json.JSONDecodeError:
-            ImportQueueService.release_lock(project_id)
-            raise HTTPException(status_code=400, detail="自定义列映射JSON格式错误")
-
-    # 后台任务
-    async def _do_import():
-        from app.core.database import async_session
-        from app.services.smart_import_engine import smart_import_streaming
-
-        try:
-            ImportQueueService.update_progress(
-                project_id,
-                2,
-                f"开始导入 {len(file_sources)} 个文件…",
-            )
-
-            def _on_progress(pct: int, msg: str):
-                ImportQueueService.update_progress(project_id, pct, msg)
-
-            async with async_session() as db:
-                result = await smart_import_streaming(
-                    project_id=project_id,
-                    file_contents=file_sources,
-                    db=db,
-                    year_override=year,
-                    custom_mapping=mapping,
-                    progress_callback=_on_progress,
-                )
-
-            result_payload = {
-                "imported": result["data_sheets_imported"],
-                "year": result["year"],
-                "diagnostics": result["sheet_diagnostics"],
-                "errors": result["errors"],
-                "batch_id": str(job_batch_id) if job_batch_id is not None else None,
-            }
-            total_records = result["total_accounts"] + sum(
-                int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
-            )
-            if job_batch_id is not None:
-                async with async_session() as db:
-                    await ImportQueueService.complete_job(
-                        project_id,
-                        job_batch_id,
-                        db,
-                        message=f"导入完成: {result['data_sheets_imported']}",
-                        result=result_payload,
-                        year=result["year"],
-                        record_count=total_records,
-                    )
-            else:
-                ImportQueueService.release_lock(project_id)
-        except Exception as e:
-            import traceback
-            import logging
-            logging.getLogger(__name__).error(
-                "异步导入失败: %s\n%s", e, traceback.format_exc(),
-            )
-            failure_payload = {
-                "imported": {},
-                "year": None,
-                "diagnostics": [],
-                "errors": [f"导入失败: {e}"],
-                "batch_id": str(job_batch_id) if job_batch_id is not None else None,
-            }
-            async with async_session() as db:
-                if job_batch_id is not None:
-                    await ImportQueueService.fail_job(
-                        project_id,
-                        job_batch_id,
-                        db,
-                        message=f"导入失败: {e}",
-                        result=failure_payload,
-                    )
-                else:
-                    ImportQueueService.release_lock(project_id)
-
-    asyncio.create_task(_do_import())
-
-    return {
-        "status": "accepted",
-        "message": f"导入任务已提交（{len(file_sources)} 个文件），请轮询进度",
-        "project_id": str(project_id),
-        "batch_id": str(job_batch_id) if job_batch_id is not None else None,
-        "upload_token": upload_token,
-    }
 
 
 @router.get("/years")

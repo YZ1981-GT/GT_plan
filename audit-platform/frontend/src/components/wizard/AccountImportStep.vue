@@ -485,11 +485,14 @@ interface SheetPreview {
 interface PreviewResponse {
   sheets: SheetPreview[]
   active_sheet: number
+  upload_token?: string
+  year?: number | null
 }
 
 const previewSheets = ref<SheetPreview[]>([])
 const activeSheetIdx = ref(0)
 const columnMapping = reactive<Record<string, string | null>>({})
+const uploadToken = ref('')
 
 // 每个 sheet 的映射缓存（切换 sheet 时不丢失手动调整）
 const sheetMappingCache = reactive<Record<number, Record<string, string | null>>>({})
@@ -849,6 +852,7 @@ function getSheetMappedCount(sheetIdx: number): number {
 }
 
 function onFileChange(_file: UploadFile, fileListVal: UploadFile[]) {
+  uploadToken.value = ''
   selectedFiles.value = fileListVal.map(f => f.raw!).filter(Boolean)
 }
 
@@ -856,26 +860,25 @@ async function handlePreview() {
   if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
   previewing.value = true
   try {
-    // 支持多文件：逐个上传预览，合并所有 sheet
-    const allSheets: any[] = []
+    const formData = new FormData()
     for (const file of selectedFiles.value) {
-      const formData = new FormData()
-      formData.append('file', file)
-      const data = await api.post(
-        `/api/projects/${wizardStore.projectId}/account-chart/preview`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 },
-      )
-      const result: PreviewResponse = data
-      const sheets = result.sheets || []
-      // 给 sheet 名加文件名前缀（避免多文件同名 sheet 冲突）
-      for (const s of sheets) {
-        if (selectedFiles.value.length > 1) {
-          s.sheet_name = `[${file.name}] ${s.sheet_name}`
-        }
-        s._source_file = file.name
-        allSheets.push(s)
+      formData.append('files', file)
+    }
+    const data = await api.post(
+      `/api/projects/${wizardStore.projectId}/account-chart/preview`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 },
+    )
+    const result: PreviewResponse = data
+    uploadToken.value = result.upload_token || ''
+    const allSheets: any[] = []
+    const sheets = result.sheets || []
+    for (const s of sheets) {
+      const sourceFile = s._source_file || ''
+      if (selectedFiles.value.length > 1 && sourceFile) {
+        s.sheet_name = `[${sourceFile}] ${s.sheet_name}`
       }
+      allSheets.push(s)
     }
     previewSheets.value = allSheets
 
@@ -935,7 +938,9 @@ function handleReupload() {
   importResult.value = null
   clientTree.value = null
   selectedFiles.value = []
+  uploadToken.value = ''
   for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+  for (const key of Object.keys(sheetMappingCache)) delete sheetMappingCache[Number(key)]
   uploadRef.value?.clearFiles()
 }
 
@@ -966,7 +971,9 @@ async function handleForceReset() {
     importResult.value = null
     clientTree.value = null
     selectedFiles.value = []
+    uploadToken.value = ''
     for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+    for (const key of Object.keys(sheetMappingCache)) delete sheetMappingCache[Number(key)]
     uploadRef.value?.clearFiles()
     ElMessage.success('已重置，可重新上传导入')
   } catch {
@@ -1193,7 +1200,7 @@ async function loadSavedMapping(fileType: string, headers: string[]): Promise<Re
 }
 
 async function handleImport() {
-  if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
+  if ((!selectedFiles.value.length && !uploadToken.value) || !wizardStore.projectId) return
 
   // 关键列硬阻断：检查所有 sheet 的必需字段是否已映射
   const missingInfo = checkRequiredFieldsMissing()
@@ -1239,8 +1246,10 @@ async function handleImport() {
     const formData = new FormData()
     let totalSizeBytes = 0
     for (const file of selectedFiles.value) {
-      formData.append('files', file)
       totalSizeBytes += file.size
+      if (!uploadToken.value) {
+        formData.append('files', file)
+      }
     }
     const totalSizeMB = (totalSizeBytes / 1024 / 1024).toFixed(1)
 
@@ -1258,7 +1267,9 @@ async function handleImport() {
         let sheetName = previewSheets.value[i].sheet_name
         const prefixMatch = sheetName.match(/^\[.+?\]\s+(.+)$/)
         if (prefixMatch) sheetName = prefixMatch[1]
-        perSheetMapping[sheetName] = clean
+        const sourceFile = previewSheets.value[i]._source_file
+        const mappingKey = sourceFile ? `${sourceFile}/${sheetName}` : sheetName
+        perSheetMapping[mappingKey] = clean
       }
     }
     const sheetNames = Object.keys(perSheetMapping)
@@ -1276,8 +1287,13 @@ async function handleImport() {
 
     if (useAsync) {
       // 异步导入：立即返回，轮询进度
+      let importUrl = `/api/projects/${wizardStore.projectId}/account-chart/import-async`
+      const importParams = new URLSearchParams()
+      if (uploadToken.value) importParams.append('upload_token', uploadToken.value)
+      if (result.year) importParams.append('year', String(result.year))
+      if (importParams.toString()) importUrl += `?${importParams.toString()}`
       await api.post(
-        `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
+        importUrl,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
       )
@@ -1320,8 +1336,13 @@ async function handleImport() {
       }
     } else {
       // 同步导入
+      let importUrl = `/api/projects/${wizardStore.projectId}/account-chart/import`
+      const importParams = new URLSearchParams()
+      if (uploadToken.value) importParams.append('upload_token', uploadToken.value)
+      if (result.year) importParams.append('year', String(result.year))
+      if (importParams.toString()) importUrl += `?${importParams.toString()}`
       const data = await api.post(
-        `/api/projects/${wizardStore.projectId}/account-chart/import`,
+        importUrl,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 },
       )

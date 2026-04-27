@@ -81,7 +81,9 @@ async def get_standard_chart(
 @router.post("/{project_id}/account-chart/preview")
 async def preview_file(
     project_id: UUID,
-    file: UploadFile = File(...),
+    files: list[UploadFile] | None = File(None),
+    file: UploadFile | None = File(None),
+    upload_token: str | None = Query(default=None, description="预览上传产物令牌"),
     skip_rows: int | None = Query(default=None, description="跳过前N行，None=自动检测表头"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
@@ -90,221 +92,16 @@ async def preview_file(
     大文件优化：使用 smart_import_engine 的智能表头检测（支持双行合并表头），
     只读取前 20 行数据用于预览，不加载全部数据。
     """
-    import io
-    import openpyxl
-    from app.services.smart_import_engine import (
-        detect_header_rows, merge_header_rows, smart_match_column, _guess_data_type,
+    from app.services.ledger_import_application_service import LedgerImportApplicationService
+
+    return await LedgerImportApplicationService.preview(
+        project_id=project_id,
+        user_id=str(current_user.id),
+        files=files,
+        file=file,
+        upload_token=upload_token,
+        preview_rows=20,
     )
-    from app.services.account_chart_service import _COLUMN_MAP, _match_column, _guess_file_type
-
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="未提供文件")
-
-    content = await file.read()
-    filename_lower = file.filename.lower()
-
-    if filename_lower.endswith(".xls"):
-        raise HTTPException(
-            status_code=400,
-            detail="暂不支持 Excel 97-2003 (.xls) 文件，请先转换为 .xlsx 后再上传",
-        )
-
-    if filename_lower.endswith(".csv"):
-        # CSV 也走 smart_import_engine 统一路径（与 Excel 一致的表头检测+列映射）
-        import csv as _csv
-        import codecs
-
-        # 编码探测（16KB 采样，不截断多字节字符）
-        sample = content[:16384]
-        nl_pos = sample.rfind(b'\n')
-        if nl_pos > 0:
-            sample = sample[:nl_pos]
-        encoding = 'utf-8-sig'
-        for enc in ('utf-8-sig', 'gbk', 'gb2312', 'gb18030'):
-            try:
-                sample.decode(enc)
-                encoding = enc
-                break
-            except (UnicodeDecodeError, LookupError):
-                continue
-
-        text = content.decode(encoding, errors='replace')
-        reader = _csv.reader(io.StringIO(text))
-        all_rows_raw = []
-        for i, row in enumerate(reader):
-            if i >= 30:  # 前 30 行足够检测表头 + 预览 20 行数据
-                break
-            all_rows_raw.append(row)
-
-        if not all_rows_raw:
-            raise HTTPException(status_code=400, detail="CSV 文件为空")
-
-        # 用 smart_import_engine 的表头检测逻辑
-        from app.services.smart_import_engine import _HEADER_KEYWORDS, _SUBHEADER_KEYWORDS, _guess_data_type
-
-        # 简化的表头检测（CSV 通常是单行表头）
-        header_start = 0
-        for i, cells in enumerate(all_rows_raw):
-            non_empty = [c.strip() for c in cells if c.strip()]
-            if not non_empty:
-                continue
-            has_kw = any(kw in cell for cell in non_empty for kw in _HEADER_KEYWORDS)
-            is_title = len(non_empty) == 1 or (non_empty and len(non_empty[0]) > 30)
-            if is_title and not has_kw:
-                continue
-            if has_kw and len(non_empty) >= 2:
-                header_start = i
-                break
-            if len(non_empty) >= 3:
-                header_start = i
-                break
-
-        headers = [h.strip() if h.strip() else f"col_{j}" for j, h in enumerate(all_rows_raw[header_start])]
-
-        # 列名映射（与 Excel 完全一致）
-        column_mapping = {}
-        for h in headers:
-            mapped = smart_match_column(h)
-            if not mapped:
-                mapped = _match_column(h)
-            if mapped:
-                column_mapping[h] = mapped
-
-        # 数据行（表头之后，最多 20 行）
-        data_start = header_start + 1
-        rows = []
-        for row_raw in all_rows_raw[data_start:data_start + 20]:
-            padded = row_raw + [''] * max(0, len(headers) - len(row_raw))
-            row_dict = {headers[j]: padded[j].strip() for j in range(len(headers))}
-            rows.append(row_dict)
-
-        # 前 10 行原始数据
-        raw_first_rows = [
-            [c.strip() for c in row] for row in all_rows_raw[:min(10, len(all_rows_raw))]
-        ]
-
-        # 总行数估算（按换行符计数）
-        total_rows = text.count('\n') - data_start
-
-        mapped_cols = set(column_mapping.values())
-        file_type = _guess_data_type(mapped_cols) if mapped_cols else "unknown"
-
-        return {"sheets": [{
-            "sheet_name": file.filename or "CSV",
-            "headers": headers,
-            "rows": rows,
-            "total_rows": max(0, total_rows),
-            "column_mapping": column_mapping,
-            "file_type_guess": file_type,
-            "header_count": 1,
-            "header_start": header_start,
-            "raw_first_rows": raw_first_rows,
-        }], "active_sheet": 0}
-
-    # Excel：小文件用完整模式（正确处理合并单元格），大文件用 read_only（快速）
-    file_size_mb = len(content) / 1024 / 1024
-    use_full_mode = file_size_mb < 10  # 10MB 以下用完整模式
-
-    try:
-        if use_full_mode:
-            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-        else:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"无法打开文件: {e}")
-
-    sheets = []
-    for ws in wb.worksheets:
-        name_lower = ws.title.lower()
-        if any(kw in name_lower for kw in ("说明", "目录", "封面")):
-            continue
-
-        max_col = ws.max_column or 50  # read_only 模式下可能没有 max_column
-
-        # 第一步：读前 10 行原始数据（供用户确认表头位置）
-        raw_rows = []
-        if use_full_mode:
-            for row_idx in range(1, min(11, (ws.max_row or 1) + 1)):
-                row_vals = []
-                for col in range(1, max_col + 1):
-                    v = ws.cell(row_idx, col).value
-                    row_vals.append(str(v).strip() if v is not None else "")
-                raw_rows.append(row_vals)
-        else:
-            # read_only 模式用 iter_rows
-            for i, row in enumerate(ws.iter_rows(max_row=10, values_only=True)):
-                raw_rows.append([str(c).strip() if c else "" for c in row])
-
-        # 第二步：智能检测表头位置
-        hs, hc = detect_header_rows(ws)
-        headers = merge_header_rows(ws, hs, hc)
-
-        # 第三步：列名映射
-        column_mapping = {}
-        for h in headers:
-            mapped = smart_match_column(h)
-            if not mapped:
-                mapped = _match_column(h)
-            if mapped:
-                column_mapping[h] = mapped
-
-        # 第四步：读前 20 行数据（表头之后）
-        data_start = hs + hc
-        num_cols = len(headers)
-        rows = []
-        if use_full_mode:
-            for row_idx in range(data_start + 1, min(data_start + 21, (ws.max_row or 0) + 1)):
-                row_dict = {}
-                all_none = True
-                for col in range(1, num_cols + 1):
-                    v = ws.cell(row_idx, col).value
-                    h = headers[col - 1] if col - 1 < len(headers) else f"col_{col}"
-                    row_dict[h] = str(v).strip() if v is not None else ""
-                    if v is not None:
-                        all_none = False
-                if not all_none:
-                    rows.append(row_dict)
-        else:
-            # read_only 模式
-            count = 0
-            for i, row_vals in enumerate(ws.iter_rows(values_only=True)):
-                if i < data_start:
-                    continue
-                if count >= 20:
-                    break
-                padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
-                if all(c is None for c in padded[:num_cols]):
-                    continue
-                row_dict = {}
-                for j in range(num_cols):
-                    h = headers[j]
-                    row_dict[h] = str(padded[j]).strip() if padded[j] is not None else ""
-                rows.append(row_dict)
-                count += 1
-
-        total_rows = max(0, (ws.max_row or 0) - data_start) if use_full_mode else 0
-
-        mapped_cols = set(column_mapping.values())
-        file_type = _guess_data_type(mapped_cols) if mapped_cols else "unknown"
-
-        sheets.append({
-            "sheet_name": ws.title,
-            "headers": headers,
-            "rows": rows,
-            "total_rows": total_rows,
-            "column_mapping": column_mapping,
-            "file_type_guess": file_type,
-            "header_count": hc,
-            "header_start": hs,
-            "raw_first_rows": raw_rows,  # 前 10 行原始数据
-        })
-
-    wb.close()
-
-    if not sheets:
-        raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
-
-    return {"sheets": sheets, "active_sheet": 0}
 
 
 @router.post(
@@ -313,8 +110,10 @@ async def preview_file(
 )
 async def import_client_chart(
     project_id: UUID,
-    files: list[UploadFile] = File(default=[]),
+    files: list[UploadFile] | None = File(None),
     file: UploadFile | None = File(default=None),
+    upload_token: str | None = Query(default=None, description="预览上传产物令牌"),
+    year: int | None = Query(default=None, description="指定年度（不指定则自动提取）"),
     column_mapping: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
@@ -326,106 +125,19 @@ async def import_client_chart(
     - 内存可控：逐 sheet 解析并写入
     - 自动提取科目表、四表数据、诊断信息
     """
-    import json
-    from app.services.smart_import_engine import smart_import_streaming
-    from app.services.import_queue_service import ImportQueueService
+    from app.services.ledger_import_application_service import LedgerImportApplicationService
 
-    # 兼容单文件 / 多文件两种前端传参方式
-    all_files: list[UploadFile] = list(files) if files else []
-    if file is not None:
-        all_files.append(file)
-    if not all_files:
-        raise HTTPException(status_code=400, detail="未提供文件")
-    _ensure_supported_account_chart_uploads(all_files)
-
-    parsed_mapping = None
-    if column_mapping:
-        try:
-            parsed_mapping = json.loads(column_mapping)
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-    file_label = all_files[0].filename or "upload.xlsx"
-    if len(all_files) > 1:
-        file_label = f"{file_label} 等{len(all_files)}个文件"
-
-    ok, msg, job_batch_id = await ImportQueueService.acquire_lock(
-        project_id,
-        str(current_user.id),
-        db,
-        source_type="smart_import",
-        file_name=file_label,
-        year=0,
+    result_payload = await LedgerImportApplicationService.run_account_chart_import(
+        project_id=project_id,
+        user_id=str(current_user.id),
+        db=db,
+        files=files,
+        file=file,
+        upload_token=upload_token,
+        year=year,
+        column_mapping=column_mapping,
     )
-    if not ok:
-        raise HTTPException(status_code=409, detail=msg)
-
-    try:
-        file_contents: list[tuple[str, bytes]] = []
-        for f in all_files:
-            ct = await f.read()
-            file_contents.append((f.filename or "upload.xlsx", ct))
-
-        ImportQueueService.update_progress(
-            project_id,
-            2,
-            f"开始导入 {len(file_contents)} 个文件…",
-        )
-
-        def _on_progress(pct: int, msg: str):
-            ImportQueueService.update_progress(project_id, min(pct, 99), msg)
-
-        result = await smart_import_streaming(
-            project_id=project_id,
-            file_contents=file_contents,
-            db=db,
-            custom_mapping=parsed_mapping,
-            progress_callback=_on_progress,
-        )
-
-        result_payload = {
-            "total_imported": result["total_accounts"],
-            "by_category": result["by_category"],
-            "errors": result["errors"],
-            "data_sheets_imported": result["data_sheets_imported"],
-            "sheet_diagnostics": result["sheet_diagnostics"],
-            "year": result["year"],
-        }
-        total_records = result["total_accounts"] + sum(
-            int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
-        )
-        if job_batch_id is not None:
-            await ImportQueueService.complete_job(
-                project_id,
-                job_batch_id,
-                db,
-                message=f"导入完成: {result['data_sheets_imported']}",
-                result=result_payload,
-                year=result["year"],
-                record_count=total_records,
-            )
-
-        return AccountImportResult(**result_payload)
-    except Exception as e:
-        failure_payload = {
-            "total_imported": 0,
-            "by_category": {},
-            "errors": [f"导入失败: {e}"],
-            "data_sheets_imported": {},
-            "sheet_diagnostics": [],
-            "year": None,
-        }
-        if job_batch_id is not None:
-            await ImportQueueService.fail_job(
-                project_id,
-                job_batch_id,
-                db,
-                message=f"导入失败: {e}",
-                result=failure_payload,
-            )
-        else:
-            ImportQueueService.release_lock(project_id)
-        raise
+    return AccountImportResult(**result_payload)
 
 
 @router.post("/{project_id}/account-chart/import-reset")
@@ -446,8 +158,10 @@ async def reset_import(
 @router.post("/{project_id}/account-chart/import-async")
 async def import_async(
     project_id: UUID,
-    files: list[UploadFile] = File(default=[]),
+    files: list[UploadFile] | None = File(None),
     file: UploadFile | None = File(default=None),
+    upload_token: str | None = Query(default=None, description="预览上传产物令牌"),
+    year: int | None = Query(default=None, description="指定年度（不指定则自动提取）"),
     column_mapping: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
@@ -456,147 +170,19 @@ async def import_async(
 
     适合大文件（>10MB）或多文件场景，避免 HTTP 超时。
     """
-    import asyncio
-    import json
-    from app.services.import_queue_service import ImportQueueService
+    from app.services.ledger_import_application_service import LedgerImportApplicationService
 
-    # 兼容单文件 / 多文件
-    all_files: list[UploadFile] = list(files) if files else []
-    if file is not None:
-        all_files.append(file)
-    if not all_files:
-        raise HTTPException(status_code=400, detail="未提供文件")
-    _ensure_supported_account_chart_uploads(all_files)
-
-    parsed_mapping = None
-    if column_mapping:
-        try:
-            parsed_mapping = json.loads(column_mapping)
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-    file_label = all_files[0].filename or "upload.xlsx"
-    if len(all_files) > 1:
-        file_label = f"{file_label} 等{len(all_files)}个文件"
-
-    ok, msg, job_batch_id = await ImportQueueService.acquire_lock(
-        project_id,
-        str(current_user.id),
-        db,
-        source_type="smart_import",
-        file_name=file_label,
-        year=0,
+    return await LedgerImportApplicationService.submit_import_job(
+        project_id=project_id,
+        user_id=str(current_user.id),
+        db=db,
+        files=files,
+        file=file,
+        upload_token=upload_token,
+        year=year,
+        custom_mapping=column_mapping,
+        payload_style="account_chart",
     )
-    if not ok:
-        raise HTTPException(status_code=409, detail=msg)
-
-    try:
-        file_contents: list[tuple[str, bytes]] = []
-        for f in all_files:
-            ct = await f.read()
-            file_contents.append((f.filename or "upload.xlsx", ct))
-    except Exception as e:
-        failure_payload = {
-            "total_imported": 0,
-            "by_category": {},
-            "errors": [f"导入失败: {e}"],
-            "data_sheets_imported": {},
-            "sheet_diagnostics": [],
-            "year": None,
-        }
-        if job_batch_id is not None:
-            await ImportQueueService.fail_job(
-                project_id,
-                job_batch_id,
-                db,
-                message=f"导入失败: {e}",
-                result=failure_payload,
-            )
-        else:
-            ImportQueueService.release_lock(project_id)
-        raise
-
-    # 后台任务
-    async def _do_import():
-        from app.core.database import async_session
-        from app.services.smart_import_engine import smart_import_streaming
-
-        try:
-            ImportQueueService.update_progress(
-                project_id, 2,
-                f"开始导入 {len(file_contents)} 个文件…",
-            )
-
-            def _on_progress(pct: int, msg: str):
-                ImportQueueService.update_progress(project_id, pct, msg)
-
-            async with async_session() as db:
-                result = await smart_import_streaming(
-                    project_id=project_id,
-                    file_contents=file_contents,
-                    db=db,
-                    custom_mapping=parsed_mapping,
-                    progress_callback=_on_progress,
-                )
-
-                result_payload = {
-                    "total_imported": result["total_accounts"],
-                    "by_category": result["by_category"],
-                    "errors": result["errors"],
-                    "data_sheets_imported": result["data_sheets_imported"],
-                    "sheet_diagnostics": result["sheet_diagnostics"],
-                    "year": result["year"],
-                }
-                total_records = result["total_accounts"] + sum(
-                    int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
-                )
-                if job_batch_id is not None:
-                    await ImportQueueService.complete_job(
-                        project_id,
-                        job_batch_id,
-                        db,
-                        message=f"导入完成: {result['data_sheets_imported']}",
-                        result=result_payload,
-                        year=result["year"],
-                        record_count=total_records,
-                    )
-                else:
-                    ImportQueueService.release_lock(project_id)
-
-        except Exception as e:
-            import traceback
-            import logging
-            logging.getLogger(__name__).error(
-                "异步导入失败: %s\n%s", e, traceback.format_exc(),
-            )
-            failure_payload = {
-                "total_imported": 0,
-                "by_category": {},
-                "errors": [f"导入失败: {e}"],
-                "data_sheets_imported": {},
-                "sheet_diagnostics": [],
-                "year": None,
-            }
-            async with async_session() as db:
-                if job_batch_id is not None:
-                    await ImportQueueService.fail_job(
-                        project_id,
-                        job_batch_id,
-                        db,
-                        message=f"导入失败: {e}",
-                        result=failure_payload,
-                    )
-                else:
-                    ImportQueueService.release_lock(project_id)
-
-    asyncio.create_task(_do_import())
-
-    return {
-        "status": "accepted",
-        "message": f"导入任务已提交（{len(file_contents)} 个文件），请轮询进度",
-        "project_id": str(project_id),
-        "batch_id": str(job_batch_id) if job_batch_id is not None else None,
-    }
 
 
 @router.get(
