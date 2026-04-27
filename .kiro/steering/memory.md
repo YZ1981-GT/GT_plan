@@ -1325,3 +1325,6 @@ inclusion: always
 
 - Phase 12 三件套已调整（2026-04-27）：①P2-1(QC规则)/P2-2(签字前检查)升级为P1-6/P1-7 ②Word导出引擎拆出到Phase 13 ③P1-5批量操作从0.5天改为1.5天 ④阶段2从10天改为12天（含buffer）⑤500张批量刷新指标从<30秒改为<120秒 ⑥WpVisualizationService改为从parsed_data缓存读取 ⑦generate_draft补充完整prompt工程（三段式+few-shot+JSON schema+token预算分配）⑧总工期从40天缩减到33天
 - Phase 13 Word导出引擎 spec 已创建（2026-04-27）：spec路径 .kiro/specs/phase13-word-export/，双方案策略（方案B模板填充优先+方案A从零生成降级）；requirements.md（P0基础引擎4项+P1模板填充4项+P2增强3项+致同排版规范6节）；design.md（GTWordEngine核心类+3个文档导出器+WordTemplateFiller+WOPI集成+页码/三线表/字体技术难点）；tasks.md（4阶段16天：基础引擎4天+三文档导出6天+模板填充4天+集成测试2天）
+
+- Phase 13 三件套大幅细化（2026-04-27）：从纯"Word导出"扩展为"审计报告·报表·附注生成与导出"完整业务闭环；新增6个维度：①名称联动（10个占位符+报表口径自动切换）②报表数据快照（report_snapshot表+过期检测）③集团模板参照（母公司模板→子企业一键复制+差异三色高亮+template_reference表）④上年报告LLM智能复用（上传上年报告/附注→解析→LLM预填当期70%+内容+prior_year_document表）⑤附注章节编辑增强（Block模型表格+叙述交替+auto/manual/locked三模式+数据标签+上年参照侧边栏）⑥存储路径规范（reports/prior_year/templates/三级目录）；总工期从16天扩展到26天；新增11个后端服务+3张新表+15个API端点
+- 用户偏好：审计报告/附注的业务深度（2026-04-27）——不能只做技术层面的"导出Word"，必须覆盖正文名称编辑处理、报表数据拉取保存、附注各章节内容编辑、集团模板参照（母公司改好子企业参照）、上年报告上传LLM智能复用等完整业务场景
