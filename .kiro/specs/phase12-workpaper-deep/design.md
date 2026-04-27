@@ -53,6 +53,15 @@ AI不替代审计判断，AI是审计助理的"副驾驶"
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### 1.3 设计收敛原则
+
+| 原则 | 说明 |
+|------|------|
+| MVP优先 | 本期上线承诺限定为P0 + P1-1/P1-2/P1-4/P1-6/P1-7，增强项在核心闭环稳定后插入 |
+| 单一真相源 | 底稿工作簿是审计说明、审定数、结论的最终归档载体，`parsed_data` 仅作为缓存和检索镜像 |
+| 长任务job化 | 批量刷新、批量生成、批量提交复核、打包下载统一走后台任务模型，前端依赖 `job_id` 恢复进度 |
+| 全链路可追溯 | AI生成必须记录 `prompt_version`、`model`、`generation_id`、`confirmed_by`，支持回放与审计 |
+
 ---
 
 ## 2. 角色化功能设计
@@ -62,7 +71,7 @@ AI不替代审计判断，AI是审计助理的"副驾驶"
 ```
 ┌──────────────────────────────────────────────────┐
 │ 底稿列表（仅自己负责的循环）                      │
-│ 底稿编辑（在线/离线双模式）                      │
+│ 底稿编辑（在线为主，离线接口预留）                │
 │ 预填充刷新（过期提示）                           │
 │ ┌────────────────────────────────────────┐     │
 │ │ ★ 审计说明AI生成面板                    │     │
@@ -99,7 +108,7 @@ AI不替代审计判断，AI是审计助理的"副驾驶"
 │ │ 快捷键：Ctrl+Enter通过，Ctrl+Shift+Enter退回│  │
 │ └────────────────────────────────────────┘     │
 │ 数据一致性监控（底稿vs试算表vs附注）              │
-│ 批量操作（分配/刷新/生成说明/下载）               │
+│ 批量操作（分配/刷新/生成说明/下载，job跟踪）      │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -134,7 +143,7 @@ AI不替代审计判断，AI是审计助理的"副驾驶"
 │ │ 独立抽查工作台                          │     │
 │ │ - 智能抽样：风险分层+循环均匀+编制人覆盖│     │
 │ │ - 抽查清单：检查项逐项确认              │     │
-│ │ - 抽查报告：LLM生成草稿→导出Word        │     │
+│ │ - 抽查报告：结构化草稿（HTML/Markdown）  │     │
 │ └────────────────────────────────────────┘     │
 │ 合规性检查（格式+内容+时间）                     │
 └──────────────────────────────────────────────────┘
@@ -184,66 +193,93 @@ AI不替代审计判断，AI是审计助理的"副驾驶"
 
 ### 3.2 数据模型变更
 
+> 注：MVP阶段优先落地 `wp_explanation_service`、`wp_ai_service`、`qc_engine`、`wopi_service` 与后台任务编排；推荐反馈、抽查工作台与其他增强服务按后续阶段插入。
+
+底稿工作簿是最终归档载体，`parsed_data` 仅作为缓存和检索镜像，供列表、工作台与QC快速读取。
+
 ```sql
--- WorkingPaper表新增字段
+-- WorkingPaper表新增结构化字段
+ALTER TABLE working_papers ADD COLUMN workflow_status VARCHAR(30) DEFAULT 'draft';
+ALTER TABLE working_papers ADD COLUMN explanation_status VARCHAR(30) DEFAULT 'not_started';
+ALTER TABLE working_papers ADD COLUMN consistency_status VARCHAR(30) DEFAULT 'unknown';
+ALTER TABLE working_papers ADD COLUMN last_parsed_sync_at TIMESTAMP;
+ALTER TABLE working_papers ADD COLUMN prefill_stale_reason VARCHAR(50);
 ALTER TABLE working_papers ADD COLUMN partner_reviewed_at TIMESTAMP;
 ALTER TABLE working_papers ADD COLUMN partner_reviewed_by UUID REFERENCES users(id);
 
--- parsed_data JSONB结构扩展
+-- parsed_data JSONB结构扩展（缓存镜像，不作为最终归档权威源）
 {
     "audited_amount": 12000,
     "conclusion": "...",
-    "audit_explanation": "...",        -- 新增
-    "procedure_status": {...},          -- 新增
-    "attachment_refs": [...],           -- 新增
-    "ai_content": {                     -- 新增
-        "explanation_draft": {
-            "text": "...",
-            "generated_at": "2025-03-15T10:30:00",
-            "model": "Qwen3.5-27B",
-            "status": "confirmed",      -- pending/confirmed/rejected
-            "confirmed_by": "user_id",
-            "confirmed_at": "2025-03-15T11:00:00",
-            "user_edits": "..."
-        },
+    "audit_explanation": "...",        -- 工作簿说明正文的缓存镜像
+    "procedure_status": {...},
+    "attachment_refs": [...],
+    "formula_cells": [...],
+    "ai_content": {
+        "latest_generation_id": "uuid",
+        "latest_status": "confirmed",  -- ai_drafted/user_edited/confirmed/sync_failed
+        "last_confirmed_at": "2025-03-15T11:00:00",
         "review_suggestions": [...]
     }
 }
 
--- 新增表：底稿编辑时间采集
-CREATE TABLE wp_edit_sessions (
+-- 新增表：AI生成历史（完整留痕）
+CREATE TABLE wp_ai_generations (
     id UUID PRIMARY KEY,
     wp_id UUID REFERENCES working_papers(id),
-    user_id UUID REFERENCES users(id),
-    start_at TIMESTAMP,
-    end_at TIMESTAMP,
-    edit_mode VARCHAR(20),
-    duration_minutes INTEGER
+    prompt_version VARCHAR(50) NOT NULL,
+    model VARCHAR(100) NOT NULL,
+    input_hash VARCHAR(64),
+    output_text TEXT,
+    output_structured JSONB,
+    status VARCHAR(30),                -- drafted/confirmed/rejected
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    confirmed_by UUID REFERENCES users(id),
+    confirmed_at TIMESTAMP
 );
 
--- procedure_instances新增外键（双向绑定）
-ALTER TABLE procedure_instances ADD COLUMN working_paper_id UUID REFERENCES working_papers(id);
-
--- 新增表：底稿推荐反馈记录
-CREATE TABLE wp_recommendation_feedback (
+-- 新增表：批量/长任务编排
+CREATE TABLE background_jobs (
     id UUID PRIMARY KEY,
     project_id UUID REFERENCES projects(id),
-    recommend_batch_id UUID,           -- 一次推荐操作的批次ID
+    job_type VARCHAR(50) NOT NULL,     -- prefill/generate_explanation/submit_review/download_pack
+    status VARCHAR(30) NOT NULL,       -- queued/running/partial_failed/succeeded/failed/cancelled
+    payload JSONB,
+    progress_total INTEGER DEFAULT 0,
+    progress_done INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    initiated_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE background_job_items (
+    id UUID PRIMARY KEY,
+    job_id UUID REFERENCES background_jobs(id),
     wp_id UUID REFERENCES working_papers(id),
-    wp_code VARCHAR(20),
-    action VARCHAR(20),                -- 'accepted'|'skipped'|'manually_added'
-    action_by UUID REFERENCES users(id),
-    action_at TIMESTAMP,
-    project_type VARCHAR(20),          -- 用于统计：年审/专项/IPO
-    industry VARCHAR(50),              -- 用于统计
-    created_at TIMESTAMP DEFAULT NOW()
+    status VARCHAR(30) NOT NULL,
+    error_message TEXT,
+    finished_at TIMESTAMP
 );
 
 -- 新增索引：用于统计查询
+CREATE INDEX idx_wp_ai_generations_wp ON wp_ai_generations(wp_id, created_at DESC);
+CREATE INDEX idx_background_jobs_project ON background_jobs(project_id, created_at DESC);
+CREATE INDEX idx_background_job_items_job ON background_job_items(job_id, status);
 CREATE INDEX idx_wp_feedback_project ON wp_recommendation_feedback(project_id);
 CREATE INDEX idx_wp_feedback_action ON wp_recommendation_feedback(action, action_at);
 CREATE INDEX idx_wp_feedback_type ON wp_recommendation_feedback(project_type, industry);
 ```
+
+### 3.3 状态机定义
+
+| 对象 | 状态 | 允许转移 | 阻断条件 |
+|------|------|---------|---------|
+| `workflow_status` | `draft` → `in_progress` → `self_checked` → `submitted_for_review` → `review_passed` / `review_returned` → `partner_checked` → `archived` | 退回后可重新进入 `in_progress` | QC阻断、说明未同步、数据不一致时不可提交复核 |
+| `explanation_status` | `not_started` → `ai_drafted` → `user_edited` → `confirmed` → `written_back` → `synced` | 写回失败进入 `sync_failed`，修复后重新写回 | `sync_failed` 或 `not_started` 时不可提交复核 |
+| `prefill` 新鲜度 | `fresh` / `stale_by_tb` / `stale_by_adjustment` / `stale_by_template` / `refreshing` | `stale_*` 经刷新进入 `refreshing`，成功后回到 `fresh` | stale 超24小时触发警告 |
+| `job_status` | `queued` → `running` → `succeeded` / `partial_failed` / `failed` / `cancelled` | `partial_failed` / `failed` 可经 retry 回到 `running` | `failed` 前端需展示失败项并允许恢复 |
 
 ---
 
@@ -257,6 +293,8 @@ class WpExplanationService:
 
     async def generate_draft(self, db, project_id, year, wp_id) -> dict:
         """
+        只生成草稿，不直接覆盖工作簿正文。
+
         数据采集（token预算分配，总上下文≤6000 tokens）：
         1. 试算表数据（~200 tokens）：审定数/未审数/AJE/RJE/变动率/上年同期
         2. 调整分录明细（~300 tokens）：最多5条，金额+摘要
@@ -264,62 +302,11 @@ class WpExplanationService:
         4. TSJ审计要点（~500 tokens）：截取前500字
         5. 抽样结果（~200 tokens）：样本量/异常数/结论
         6. 预留输出空间（~2000 tokens）
-        
-        Prompt构建（三段式 + few-shot）：
-        
-        [system prompt]
-        你是致同会计师事务所的资深审计员。根据提供的审计数据，
-        按照致同标准四段式格式撰写审计说明。
-        
-        要求：
-        - 200-500字，专业术语准确
-        - 必须引用具体数据（金额精确到元，变动率精确到%）
-        - 严格按JSON格式输出
-        
-        输出JSON schema：
-        {
-          "audit_objective": "审计目标（1-2句）",
-          "procedures_performed": "执行的审计程序（3-5条）",
-          "findings": "审计发现（含具体数据引用）",
-          "conclusion": "审计结论（1-2句）",
-          "full_text": "完整审计说明（四段合并的连贯文本）"
-        }
-        
-        [few-shot示例 — 从TSJ提示词库动态选取同类科目的示例]
-        示例输入：货币资金E1-1，审定数1,200,000元，未审数1,150,000元，AJE +50,000元
-        示例输出：{
-          "audit_objective": "验证货币资金期末余额的存在性、完整性和准确性。",
-          "procedures_performed": "1.获取银行对账单并编制银行存款余额调节表；2.对库存现金实施监盘程序；3.检查大额资金收支的原始凭证；4.核实银行存款利息收入的合理性；5.检查外币账户期末汇率折算。",
-          "findings": "经审计，货币资金未审数1,150,000元，经审计调整增加50,000元（调整事项：XX银行利息收入漏记），审定数为1,200,000元。银行存款余额调节表调节后余额一致，未发现未达账项异常。",
-          "conclusion": "货币资金期末余额1,200,000元在所有重大方面是公允的。"
-        }
-        
-        [user prompt — 动态拼接实际数据]
-        当前底稿：{wp_code} {wp_name}
-        科目：{account_name}（{account_code}）
-        审计循环：{cycle_name}
-        
-        试算表数据：
-        - 未审数：{unadjusted_amount}元
-        - AJE调整：{aje_amount}元（{aje_count}笔）
-        - RJE调整：{rje_amount}元（{rje_count}笔）
-        - 审定数：{audited_amount}元
-        - 上年审定数：{prior_year_amount}元
-        - 变动率：{change_rate}%
-        
-        调整分录明细：
-        {adjustment_details}
-        
-        TSJ审计要点：
-        {tsj_key_points}
-        
-        抽样结果：
-        {sampling_summary}
-        
-        请根据以上数据撰写审计说明。
-        
+
         返回：
         {
+            "generation_id": "uuid",
+            "prompt_version": "wp_expl_v3",
             "draft_text": "完整审计说明文本",
             "structured": { objective, procedures, findings, conclusion },
             "data_sources": ["trial_balance", "adjustments", ...],
@@ -328,12 +315,28 @@ class WpExplanationService:
         }
         """
 
-    async def refine_draft(self, db, wp_id, user_edits, feedback) -> dict:
-        """用户修改后AI优化，保留用户修改，针对性优化"""
+    async def confirm_draft(self, db, wp_id, generation_id, final_text, user_id) -> dict:
+        """
+        人工确认后的唯一生效入口：
+        1. 将final_text写回底稿工作簿指定区域
+        2. 写回成功后刷新 parsed_data.audit_explanation
+        3. 更新 explanation_status='written_back' -> 'synced'
+        4. 记录 confirmed_by / confirmed_at / last_parsed_sync_at
+        """
 
-    async def batch_generate(self, db, project_id, year, wp_ids) -> list[dict]:
-        """批量生成：SSE流式返回进度"""
+    async def refine_draft(self, db, wp_id, generation_id, user_edits, feedback) -> dict:
+        """基于用户修改优化草稿，但不绕过 confirm_draft 直接生效"""
+
+    async def batch_generate(self, db, project_id, year, wp_ids) -> dict:
+        """创建后台任务，返回job_id，由 BackgroundJobService 推进"""
 ```
+
+### 4.1.1 审计说明写回与同步机制
+
+1. `generate_draft` 仅生成草稿并留痕，不直接覆盖工作簿正文。
+2. 用户点击“采纳/确认”时统一走 `confirm_draft`，先写回底稿工作簿。
+3. 写回成功后立即触发解析刷新，更新 `parsed_data.audit_explanation` 与 `last_parsed_sync_at`。
+4. 如写回或解析失败，`explanation_status=sync_failed`，QC与提交复核全部阻断，前端提示重试。
 
 ### 4.2 AI预审服务
 
@@ -345,7 +348,7 @@ class WpAiService:
         1. 数据一致性：底稿审定数 vs 试算表
         2. 说明完整性：字数、关键要素（程序/发现/结论）
         3. 结论合理性：与审定数是否匹配
-        
+
         返回：{
             "issues": [
                 {
@@ -358,6 +361,30 @@ class WpAiService:
         """
 ```
 
+### 4.2.1 后台任务编排服务
+
+```python
+class BackgroundJobService:
+    """统一管理批量刷新/生成/提交/下载等长任务"""
+
+    async def create_job(self, db, project_id, job_type, wp_ids, payload, user_id) -> dict:
+        """创建 background_jobs + background_job_items，返回 job_id"""
+
+    async def run_job(self, db, job_id) -> None:
+        """
+        统一执行模型：
+        - queued -> running
+        - 按wp粒度记录成功/失败
+        - 结束后置为 succeeded / partial_failed / failed
+        """
+
+    async def retry_job(self, db, job_id) -> dict:
+        """仅重试失败项，保留原始审计轨迹"""
+
+    async def get_job_stream(self, job_id):
+        """SSE事件流：started/progress/item_failed/completed"""
+```
+
 ### 4.3 QC引擎增强
 
 ```python
@@ -365,6 +392,7 @@ class WpAiService:
 
 QC-15 审计说明完整性:
   - parsed_data.audit_explanation非空且≥50字
+  - explanation_status必须为synced
   - 包含关键要素：执行程序描述+审计发现+审计结论
 
 QC-16 数据引用一致性:
@@ -395,7 +423,7 @@ class WpMappingFeedbackService:
         - action: 'accepted'/'skipped'/'manually_added'
         - accepted: 用户采纳了推荐
         - skipped: 用户跳过了推荐
-        - manully_added: 用户手动添加了非推荐底稿（标记为遗漏）
+        - manually_added: 用户手动添加了非推荐底稿（标记为遗漏）
         """
 
     async def get_recommend_stats(self, db, filters) -> dict:
@@ -632,14 +660,14 @@ class AvailabilityFallbackService:
         5. 重试机制：每30秒检测一次服务恢复，恢复后清除降级标志
         """
 
-    async def handle_batch_interrupt(self, batch_id) -> dict:
+    async def handle_batch_interrupt(self, job_id) -> dict:
         """
         批量操作中断处理：
-        1. 记录中断点（batch_progress表：batch_id, completed_index, failed_index）
-        2. 已完成的保存结果到数据库
-        3. 未完成的标记为failed
-        4. 前端显示"操作中断，已完成X/Y"并提供"重试"按钮
-        5. 重试时从failed_index继续
+        1. 已完成项保留在 `background_job_items` 中为 succeeded
+        2. 未完成项统一标记为 failed 或 cancelled
+        3. 前端基于 `job_id` 恢复展示进度、失败项和错误原因
+        4. 用户点击重试时仅重放失败项，保留原始审计轨迹
+        5. 页面刷新后可通过 `GET /jobs/{job_id}` 继续查看状态
         """
 
     async def handle_network_recovery(self, user_id) -> dict:
@@ -677,42 +705,60 @@ class AvailabilityFallbackService:
 ```yaml
 POST /api/projects/{id}/wp-ai/{wp_id}/generate-explanation
   - 生成审计说明草稿
-  - 返回: { draft_text, data_sources, confidence, suggestions }
+  - 返回: { generation_id, prompt_version, draft_text, data_sources, confidence, suggestions }
+
+POST /api/projects/{id}/wp-ai/{wp_id}/confirm-explanation
+  - 人工确认并写回底稿工作簿
+  - body: { generation_id, final_text }
+  - 返回: { explanation_status, last_parsed_sync_at }
 
 POST /api/projects/{id}/wp-ai/{wp_id}/refine-explanation
   - 根据用户反馈优化草稿
-  - body: { user_edits, feedback }
+  - body: { generation_id, user_edits, feedback }
 
 POST /api/projects/{id}/wp-ai/{wp_id}/review-content
   - AI审阅底稿内容
   - 返回: { issues: [{ description, severity, suggested_action }] }
 ```
 
-### 5.2 批量操作API
+### 5.2 批量操作与后台任务API
 
 ```yaml
 POST /api/projects/{id}/working-papers/assign/batch
   - 批量分配编制人/复核人
   - body: { wp_ids[], assignee_id, role }
+  - 返回: { job_id, status }
 
 POST /api/projects/{id}/working-papers/prefill/batch
   - 批量刷新预填充
   - body: { wp_ids[] }
-  - 返回: SSE流式进度
+  - 返回: { job_id, status }
 
 POST /api/projects/{id}/wp-ai/batch-explanation
   - 批量生成审计说明
   - body: { wp_ids[] }
-  - 返回: SSE流式进度
+  - 返回: { job_id, status }
 
 POST /api/projects/{id}/working-papers/submit-review/batch
   - 批量提交复核（带QC门禁检查）
   - body: { wp_ids[] }
-  - 返回: { succeeded[], failed: [{wp_id, reason, qc_issues[]}] }
+  - 返回: { job_id, status }
 
 POST /api/projects/{id}/working-papers/download-pack
   - 批量下载ZIP
   - body: { wp_ids[] }
+  - 返回: { job_id, status }
+
+GET /api/projects/{id}/jobs/{job_id}
+  - 获取后台任务状态
+  - 返回: { status, progress_total, progress_done, failed_count, items[] }
+
+GET /api/projects/{id}/jobs/{job_id}/events
+  - SSE订阅后台任务事件流
+
+POST /api/projects/{id}/jobs/{job_id}/retry
+  - 重试失败项
+  - 返回: { job_id, retried_count }
 ```
 
 ### 5.3 合伙人API
