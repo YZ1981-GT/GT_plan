@@ -33,6 +33,17 @@ export interface WizardState {
   completed: boolean
 }
 
+export interface ValidationMessage {
+  field: string
+  message: string
+  severity: string
+}
+
+export interface ValidationResult {
+  valid: boolean
+  messages: ValidationMessage[]
+}
+
 export type StepKey =
   | 'basic_info'
   | 'account_import'
@@ -43,6 +54,8 @@ export type StepKey =
 
 const STEP_KEYS: StepKey[] = [
   'basic_info',
+  'account_import',
+  'account_mapping',
   'materiality',
   'team_assignment',
   'confirmation',
@@ -56,6 +69,14 @@ export const STEP_LABELS: Record<StepKey, string> = {
   team_assignment: '团队分工',
   confirmation: '确认',
 }
+
+export const CONFIRMATION_REQUIRED_STEPS: StepKey[] = [
+  'basic_info',
+  'account_import',
+  'account_mapping',
+  'materiality',
+  'team_assignment',
+]
 
 export const useWizardStore = defineStore('wizard', {
   state: () => ({
@@ -176,6 +197,23 @@ export const useWizardStore = defineStore('wizard', {
         const { data } = await http.put(`/api/projects/${this.projectId}/wizard/${step}`, stepData)
         const state: WizardState = data.data ?? data
         this.applyWizardState(state)
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async validateStep(step: StepKey): Promise<ValidationResult> {
+      if (!this.projectId) {
+        return {
+          valid: false,
+          messages: [{ field: 'project_id', message: '请先创建项目', severity: 'error' }],
+        }
+      }
+
+      this.loading = true
+      try {
+        const { data } = await http.post(`/api/projects/${this.projectId}/wizard/validate/${step}`)
+        return (data.data ?? data) as ValidationResult
       } finally {
         this.loading = false
       }

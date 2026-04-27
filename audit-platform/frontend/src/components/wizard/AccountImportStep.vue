@@ -199,6 +199,46 @@
         style="margin-bottom: 16px"
       />
 
+      <el-alert
+        v-if="validationSummary.total > 0"
+        :title="validationSummaryTitle"
+        :type="validationSummaryAlertType"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      >
+        <template #default>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px">
+            <el-tag v-if="validationSummary.fatal > 0" type="danger">fatal {{ validationSummary.fatal }}</el-tag>
+            <el-tag v-if="validationSummary.error > 0" type="danger">error {{ validationSummary.error }}</el-tag>
+            <el-tag v-if="validationSummary.warning > 0" type="warning">warning {{ validationSummary.warning }}</el-tag>
+            <el-tag v-if="validationSummary.info > 0" type="info">info {{ validationSummary.info }}</el-tag>
+          </div>
+          <div v-if="blockingValidationItems.length" style="margin-top: 10px">
+            <div
+              v-for="(item, idx) in blockingValidationItems"
+              :key="`${item.rule_code}_${idx}`"
+              style="font-size: 13px; margin-bottom: 6px; color: #f56c6c"
+            >
+              <strong>{{ item.file || '当前文件' }}</strong>
+              <span v-if="item.sheet"> / {{ item.sheet }}</span>
+              <span>：{{ item.message }}</span>
+            </div>
+          </div>
+          <div v-if="nonBlockingValidationItems.length" style="margin-top: 10px">
+            <div
+              v-for="(item, idx) in nonBlockingValidationItems"
+              :key="`${item.rule_code}_${idx}`"
+              style="font-size: 13px; margin-bottom: 6px; color: #e6a23c"
+            >
+              <strong>{{ item.file || '当前文件' }}</strong>
+              <span v-if="item.sheet"> / {{ item.sheet }}</span>
+              <span>：{{ item.message }}</span>
+            </div>
+          </div>
+        </template>
+      </el-alert>
+
       <!-- Data sheets imported -->
       <el-alert
         v-if="importResult.data_sheets_imported && Object.keys(importResult.data_sheets_imported).length > 0"
@@ -507,8 +547,20 @@ interface AccountImportResult {
   errors: string[]
   data_sheets_imported?: Record<string, number>
   sheet_diagnostics?: SheetDiagnostic[]
+  validation?: ValidationItem[]
   skipped_rows?: SkippedRow[]
   year?: number | null
+}
+
+interface ValidationItem {
+  file?: string | null
+  sheet?: string | null
+  rule_code: string
+  severity: 'fatal' | 'error' | 'warning' | 'info' | string
+  message: string
+  details?: Record<string, unknown>
+  sample_rows?: Record<string, string>[]
+  blocking?: boolean
 }
 
 interface SkippedRow {
@@ -685,6 +737,53 @@ const hasBalanceData = computed(() => {
   if (!importResult.value?.data_sheets_imported) return false
   return (importResult.value.data_sheets_imported['tb_balance'] ?? 0) > 0
 })
+
+const validationItems = computed<ValidationItem[]>(() => importResult.value?.validation || [])
+
+const validationSummary = computed(() => {
+  const summary = { total: 0, fatal: 0, error: 0, warning: 0, info: 0 }
+  for (const item of validationItems.value) {
+    summary.total += 1
+    if (item.severity === 'fatal') summary.fatal += 1
+    else if (item.severity === 'error') summary.error += 1
+    else if (item.severity === 'warning') summary.warning += 1
+    else summary.info += 1
+  }
+  return summary
+})
+
+const blockingValidationItems = computed(() => validationItems.value.filter(item => item.blocking))
+const nonBlockingValidationItems = computed(() => validationItems.value.filter(item => !item.blocking))
+
+const validationSummaryAlertType = computed(() => {
+  if (validationSummary.value.fatal > 0 || validationSummary.value.error > 0) return 'warning'
+  if (validationSummary.value.warning > 0) return 'info'
+  return 'success'
+})
+
+const validationSummaryTitle = computed(() => {
+  if (validationSummary.value.fatal > 0 || validationSummary.value.error > 0) {
+    return '导入已完成，但存在需要处理的校验问题'
+  }
+  if (validationSummary.value.warning > 0) {
+    return '导入已完成，存在可继续关注的警告信息'
+  }
+  return '导入校验通过'
+})
+
+function extractValidationMessage(items: ValidationItem[] | undefined, fallback: string): string {
+  if (!items?.length) return fallback
+  const prioritized = items
+    .filter(item => item.blocking || item.severity === 'fatal' || item.severity === 'error')
+  const source = prioritized.length ? prioritized : items
+  return source
+    .slice(0, 3)
+    .map((item) => {
+      const location = [item.file, item.sheet].filter(Boolean).join(' / ')
+      return location ? `${location}：${item.message}` : item.message
+    })
+    .join('；') || fallback
+}
 
 function countNodes(nodes: AccountTreeNode[]): number {
   let count = 0
@@ -1397,7 +1496,7 @@ async function handleImport() {
     // ── 处理结果 ──
     importResult.value = finalResult || {
       total_imported: 0, by_category: {}, errors: [],
-      data_sheets_imported: {}, sheet_diagnostics: [], year: null,
+      data_sheets_imported: {}, sheet_diagnostics: [], validation: [], year: null,
     }
     const importedYear = importResult.value.year ?? null
 
@@ -1421,6 +1520,7 @@ async function handleImport() {
       errors: importResult.value.errors,
       data_sheets_imported: importResult.value.data_sheets_imported,
       sheet_diagnostics: importResult.value.sheet_diagnostics,
+      validation: importResult.value.validation,
       skipped_rows: importResult.value.skipped_rows,
       year: importedYear,
     })
@@ -1429,7 +1529,11 @@ async function handleImport() {
     await loadClientTree()
   } catch (err: any) {
     const status = err?.response?.status
-    const errMsg = err?.response?.data?.detail || err?.message || '导入失败，请重试'
+    const errValidation = err?.response?.data?.validation as ValidationItem[] | undefined
+    const errMsg = extractValidationMessage(
+      errValidation,
+      err?.response?.data?.detail || err?.message || '导入失败，请重试',
+    )
 
     if (status === 409) {
       // 导入冲突：上一个任务可能卡住了，提供强制重置选项
@@ -1454,71 +1558,6 @@ async function handleImport() {
     clearTimeout(timeoutTimer)
     importing.value = false
     importProgress.value = ''
-  }
-}
-
-async function _importOtherSheets() {
-  if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
-
-  // 优先使用导入识别出的年度，其次回退向导基本信息
-  const importStep = wizardStore.stepData?.account_import as Record<string, any> | undefined
-  const basicInfo = wizardStore.stepData?.basic_info as Record<string, any> | undefined
-  const year = importResult.value?.year || importStep?.year || basicInfo?.audit_year || basicInfo?.year || new Date().getFullYear()
-
-  // 识别每个 sheet 的数据类型，跳过科目表（已导入）
-  const typeMap: Record<string, string> = {
-    'balance': 'tb_balance',
-    'ledger': 'tb_ledger',
-    'aux_balance': 'tb_aux_balance',
-    'aux_ledger': 'tb_aux_ledger',
-  }
-
-  // 收集需要导入的 sheet 类型
-  const sheetsToImport: { sheetName: string; dataType: string; guessedType: string }[] = []
-  for (const sheet of previewSheets.value) {
-    const guessedType = sheet.file_type_guess
-    if (guessedType === 'account_chart' || guessedType === 'unknown' || !typeMap[guessedType]) {
-      continue
-    }
-    sheetsToImport.push({
-      sheetName: sheet.sheet_name,
-      dataType: typeMap[guessedType],
-      guessedType,
-    })
-  }
-
-  if (sheetsToImport.length === 0) return
-
-  // 显示导入进度
-  ElMessage.info(`正在导入 ${sheetsToImport.length} 张数据表，请稍候...`)
-
-  let importedCount = 0
-  let totalRecords = 0
-
-  for (const item of sheetsToImport) {
-    try {
-      const formData = new FormData()
-      formData.append('file', selectedFiles.value[0])
-      formData.append('source_type', 'generic')
-      formData.append('data_type', item.dataType)
-      formData.append('year', String(year))
-      formData.append('on_duplicate', 'overwrite')
-
-      const data = await api.post(
-        `/api/projects/${wizardStore.projectId}/import`,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 }
-      )
-      const batch = data
-      if (batch?.record_count) totalRecords += batch.record_count
-      importedCount++
-    } catch {
-      // 单个 sheet 导入失败不阻断其他
-    }
-  }
-
-  if (importedCount > 0) {
-    ElMessage.success(`导入完成：${importedCount} 张表，共 ${totalRecords.toLocaleString()} 条记录`)
   }
 }
 
@@ -1679,7 +1718,6 @@ defineExpose({
     return true
   },
   saveMapping,
-  importOtherSheets: _importOtherSheets,
 })
 </script>
 

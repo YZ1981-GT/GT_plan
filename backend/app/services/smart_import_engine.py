@@ -929,6 +929,7 @@ def _guess_data_type(fields: set[str]) -> str:
     # aux_dimensions 是混合维度列（需要拆分），不等于独立辅助表
     has_aux_dimensions = "aux_dimensions" in fields
     has_aux_separate = any(f in fields for f in ("aux_code", "aux_name")) and "aux_type" in fields
+    has_chart_features = any(f in fields for f in ("direction", "parent_code", "level", "category"))
 
     # 独立辅助核算列（非混合维度列）- 只有当文件不含主表核心字段时才判定为独立辅助表
     if has_aux_separate and not has_aux_dimensions:
@@ -943,6 +944,11 @@ def _guess_data_type(fields: set[str]) -> str:
     # 序时账（可能含核算维度列，拆分后生成辅助明细账）
     if has_voucher_date and has_voucher_no and (has_debit or has_credit):
         return "ledger"
+
+    # 科目表：当出现科目名称且存在方向/父级/级次/类别等科目表特征时，优先识别为科目表，
+    # 避免仅因“借贷方向”列命中 credit/debit 关键字而被误判为余额表。
+    if has_code and "account_name" in fields and has_chart_features and not has_voucher_date:
+        return "account_chart"
 
     # 余额表（可能含核算维度列，拆分后生成辅助余额表）
     if has_code and (has_opening or has_closing):
@@ -1681,6 +1687,18 @@ def smart_parse_files(
                 all_aux_balance_rows.extend(aux_bal)
                 diag["balance_count"] = len(bal)
                 diag["aux_balance_count"] = len(aux_bal)
+            elif dt == "account_chart":
+                added_before = len(acct_records)
+                for row in csv_parsed["rows"]:
+                    _append_account_record(
+                        row=row,
+                        project_id=project_id,
+                        seen_codes=seen_codes,
+                        acct_records=acct_records,
+                        by_category=by_category,
+                        staged=True,
+                    )
+                diag["account_count"] = len(acct_records) - added_before
             else:
                 diag["status"] = "skipped"
                 diag["message"] = f"CSV 未识别的数据类型: {dt}"
@@ -2818,7 +2836,7 @@ async def smart_import_streaming(
         await db.commit()
         raise ValueError("；".join(errors[:5]))
 
-    staged_total = sum(counts.values())
+    staged_total = sum(counts.values()) + len(acct_records)
     if staged_total <= 0:
         for dt_key, batch in batches.items():
             batch.record_count = counts[dt_key]
@@ -2865,12 +2883,17 @@ async def smart_import_streaming(
     norm_diag: list[dict] = []
     for d in diagnostics:
         norm_diag.append({
+            "file": d.get("file"),
+            "sheet": d.get("sheet", ""),
             "sheet_name": d.get("sheet", ""),
+            "data_type": d.get("data_type", "unknown"),
             "guessed_type": d.get("data_type", "unknown"),
             "matched_cols": d.get("matched_cols", []),
             "missing_cols": d.get("missing_cols", []),
             "missing_recommended": d.get("missing_recommended", []),
             "row_count": d.get("row_count", 0),
+            "status": d.get("status", "ok"),
+            "message": d.get("message"),
         })
 
     return {

@@ -429,6 +429,25 @@ async function loadCompletionRate() {
   }
 }
 
+async function validate(): Promise<boolean> {
+  if (!wizardStore.projectId) return false
+
+  await loadCompletionRate()
+
+  if (totalCount.value === 0) {
+    ElMessage.warning('请先完成科目导入')
+    return false
+  }
+
+  await wizardStore.saveStep('account_mapping', {
+    mapped_count: mappedCount.value,
+    total_count: totalCount.value,
+    completion_rate: completionRate.value,
+    year: mappingYear.value,
+  })
+  return true
+}
+
 onMounted(async () => {
   await Promise.all([
     loadClientAccounts(),
@@ -439,6 +458,8 @@ onMounted(async () => {
   rebuildTable(clientAccounts.value, mappings, [])
   await loadCompletionRate()
 })
+
+defineExpose({ validate })
 </script>
 
 <style scoped>

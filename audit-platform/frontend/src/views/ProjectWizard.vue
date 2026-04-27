@@ -16,8 +16,10 @@
     <!-- Content Area -->
     <div v-loading="wizardStore.loading" class="gt-wizard-content">
       <BasicInfoStep v-if="wizardStore.currentStepKey === 'basic_info'" ref="basicInfoRef" />
-      <MaterialityStep v-else-if="wizardStore.currentStepKey === 'materiality'" />
-      <TeamAssignmentStep v-else-if="wizardStore.currentStepKey === 'team_assignment'" />
+      <AccountImportStep v-else-if="wizardStore.currentStepKey === 'account_import'" ref="accountImportRef" />
+      <AccountMappingStep v-else-if="wizardStore.currentStepKey === 'account_mapping'" ref="accountMappingRef" />
+      <MaterialityStep v-else-if="wizardStore.currentStepKey === 'materiality'" ref="materialityRef" />
+      <TeamAssignmentStep v-else-if="wizardStore.currentStepKey === 'team_assignment'" ref="teamAssignmentRef" :project-id="wizardStore.projectId ?? undefined" />
       <ConfirmationStep v-else-if="wizardStore.currentStepKey === 'confirmation'" />
     </div>
 
@@ -60,6 +62,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useWizardStore, STEP_LABELS, type StepKey } from '@/stores/wizard'
 import BasicInfoStep from '@/components/wizard/BasicInfoStep.vue'
+import AccountImportStep from '@/components/wizard/AccountImportStep.vue'
+import AccountMappingStep from '@/components/wizard/AccountMappingStep.vue'
 import MaterialityStep from '@/components/wizard/MaterialityStep.vue'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import ConfirmationStep from '@/components/wizard/ConfirmationStep.vue'
@@ -68,10 +72,24 @@ const route = useRoute()
 const router = useRouter()
 const wizardStore = useWizardStore()
 
-const basicInfoRef = ref<InstanceType<typeof BasicInfoStep> | null>(null)
+type DataStepRef = {
+  validate: () => Promise<Record<string, unknown> | null>
+}
+
+type BoolStepRef = {
+  validate: () => Promise<boolean> | boolean
+}
+
+const basicInfoRef = ref<DataStepRef | null>(null)
+const accountImportRef = ref<BoolStepRef | null>(null)
+const accountMappingRef = ref<BoolStepRef | null>(null)
+const materialityRef = ref<DataStepRef | null>(null)
+const teamAssignmentRef = ref<BoolStepRef | null>(null)
 
 const stepKeys: StepKey[] = [
   'basic_info',
+  'account_import',
+  'account_mapping',
   'materiality',
   'team_assignment',
   'confirmation',
@@ -92,8 +110,49 @@ onUnmounted(() => {
   // Don't reset — allow resuming if user navigates back
 })
 
+async function validateAndPersistCurrentStep(step: StepKey): Promise<boolean> {
+  if (step === 'basic_info') {
+    if (!basicInfoRef.value) return false
+    const data = await basicInfoRef.value.validate()
+    if (!data) return false
+
+    if (!wizardStore.projectId) {
+      await wizardStore.createProject(data as any)
+    } else {
+      await wizardStore.saveStep('basic_info', data)
+    }
+    return true
+  }
+
+  if (step === 'account_import') {
+    if (!accountImportRef.value) return false
+    return Boolean(await accountImportRef.value.validate())
+  }
+
+  if (step === 'account_mapping') {
+    if (!accountMappingRef.value) return false
+    return Boolean(await accountMappingRef.value.validate())
+  }
+
+  if (step === 'materiality') {
+    if (!materialityRef.value) return false
+    const data = await materialityRef.value.validate()
+    if (!data) return false
+    await wizardStore.saveStep('materiality', data)
+    return true
+  }
+
+  if (step === 'team_assignment') {
+    if (!teamAssignmentRef.value) return false
+    return Boolean(await teamAssignmentRef.value.validate())
+  }
+
+  return true
+}
+
 function getStepStatus(idx: number): string | undefined {
-  if (idx < wizardStore.currentStepIndex) return 'success'
+  const step = stepKeys[idx]
+  if (wizardStore.isStepCompleted(step)) return 'success'
   if (idx === wizardStore.currentStepIndex) return 'process'
   return 'wait'
 }
@@ -106,19 +165,8 @@ function onStepClick(idx: number) {
 async function handleNext() {
   const currentStep = wizardStore.currentStepKey
 
-  // Step-specific validation
-  if (currentStep === 'basic_info') {
-    if (!basicInfoRef.value) return
-    const data = await basicInfoRef.value.validate()
-    if (!data) return
-
-    // Create project if not yet created, otherwise save step
-    if (!wizardStore.projectId) {
-      await wizardStore.createProject(data)
-    } else {
-      await wizardStore.saveStep('basic_info', data as unknown as Record<string, unknown>)
-    }
-  }
+  const ok = await validateAndPersistCurrentStep(currentStep)
+  if (!ok) return
 
   wizardStore.goNext()
 }
@@ -131,21 +179,15 @@ async function handleSave() {
     return
   }
 
-  if (currentStep === 'basic_info') {
-    if (!basicInfoRef.value) return
-    const data = await basicInfoRef.value.validate()
-    if (!data) return
-    await wizardStore.saveStep('basic_info', data as unknown as Record<string, unknown>)
-    ElMessage.success('保存成功')
-  } else {
-    const stepData = wizardStore.stepData[currentStep]
-    if (stepData && Object.keys(stepData).length > 0) {
-      await wizardStore.saveStep(currentStep, stepData)
-      ElMessage.success('保存成功')
-    } else {
-      ElMessage.warning('当前步骤无数据可保存')
-    }
+  if (currentStep === 'confirmation') {
+    ElMessage.warning('当前步骤无数据可保存')
+    return
   }
+
+  const ok = await validateAndPersistCurrentStep(currentStep)
+  if (!ok) return
+
+  ElMessage.success('保存成功')
 }
 
 function handlePrev() {
@@ -153,6 +195,44 @@ function handlePrev() {
 }
 
 async function handleConfirm() {
+  if (!wizardStore.projectId) {
+    ElMessage.warning('请先创建项目')
+    return
+  }
+
+  const validation = await wizardStore.validateStep('confirmation')
+  if (!validation.valid) {
+    const fieldToStep: Record<string, StepKey> = {
+      basic_info: 'basic_info',
+      account_import: 'account_import',
+      account_mapping: 'account_mapping',
+      materiality: 'materiality',
+      team_assignment: 'team_assignment',
+      custom_template_id: 'basic_info',
+    }
+    const details = validation.messages
+      .map((item) => {
+        const mappedStep = fieldToStep[item.field]
+        if (mappedStep) return `${STEP_LABELS[mappedStep]}：${item.message}`
+        return item.message
+      })
+      .join('\n')
+
+    await ElMessageBox.alert(
+      `当前还不能确认创建，请先处理以下项：\n\n${details}`,
+      '前置步骤未完成',
+      { type: 'warning', confirmButtonText: '我知道了' },
+    )
+
+    const firstBlockingStep = validation.messages
+      .map(item => fieldToStep[item.field])
+      .find((step): step is StepKey => Boolean(step))
+    if (firstBlockingStep) {
+      wizardStore.goToStep(stepKeys.indexOf(firstBlockingStep))
+    }
+    return
+  }
+
   try {
     await ElMessageBox.confirm('确认创建项目？项目将进入计划阶段。', '确认', {
       confirmButtonText: '确认',

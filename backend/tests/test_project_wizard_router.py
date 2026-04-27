@@ -82,6 +82,25 @@ BASIC_INFO = {
 }
 
 
+async def _complete_confirmation_steps(client: AsyncClient, project_id: str) -> None:
+    await client.put(
+        f"/api/projects/{project_id}/wizard/account_import",
+        json={"file_name": "chart.xlsx", "count": 50},
+    )
+    await client.put(
+        f"/api/projects/{project_id}/wizard/account_mapping",
+        json={"mapped_count": 10, "total_count": 10, "completion_rate": 100},
+    )
+    await client.put(
+        f"/api/projects/{project_id}/wizard/materiality",
+        json={"benchmark_type": "revenue"},
+    )
+    await client.put(
+        f"/api/projects/{project_id}/wizard/team_assignment",
+        json={"members": []},
+    )
+
+
 # ===================================================================
 # POST /api/projects — 创建项目
 # ===================================================================
@@ -203,6 +222,25 @@ class TestValidateStep:
         )
         assert resp.status_code == 200
         body = resp.json()
+        assert body["valid"] is False
+        assert {item["field"] for item in body["messages"]} >= {
+            "account_import",
+            "account_mapping",
+            "materiality",
+            "team_assignment",
+        }
+
+    @pytest.mark.asyncio
+    async def test_validate_confirmation_ready(self, client: AsyncClient):
+        create_resp = await client.post("/api/projects", json=BASIC_INFO)
+        project_id = create_resp.json()["id"]
+        await _complete_confirmation_steps(client, project_id)
+
+        resp = await client.post(
+            f"/api/projects/{project_id}/wizard/validate/confirmation"
+        )
+        assert resp.status_code == 200
+        body = resp.json()
         assert body["valid"] is True
         assert len(body["messages"]) == 0
 
@@ -219,12 +257,22 @@ class TestConfirmProject:
     async def test_confirm_project_success(self, client: AsyncClient):
         create_resp = await client.post("/api/projects", json=BASIC_INFO)
         project_id = create_resp.json()["id"]
+        await _complete_confirmation_steps(client, project_id)
 
         resp = await client.post(f"/api/projects/{project_id}/wizard/confirm")
         assert resp.status_code == 200
         body = resp.json()
         assert body["status"] == "planning"
         assert body["audit_year"] == 2024
+
+    @pytest.mark.asyncio
+    async def test_confirm_project_missing_required_steps(self, client: AsyncClient):
+        create_resp = await client.post("/api/projects", json=BASIC_INFO)
+        project_id = create_resp.json()["id"]
+
+        resp = await client.post(f"/api/projects/{project_id}/wizard/confirm")
+        assert resp.status_code == 400
+        assert "account_import" in resp.text
 
     @pytest.mark.asyncio
     async def test_confirm_project_missing_basic_info(self, client: AsyncClient, db_session: AsyncSession):

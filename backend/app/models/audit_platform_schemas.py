@@ -194,6 +194,7 @@ class AccountImportResult(BaseModel):
     errors: list[str] = []
     data_sheets_imported: dict[str, int] = {}  # {data_type: record_count}
     sheet_diagnostics: list[dict] = []  # [{sheet_name, guessed_type, matched_cols, missing_cols, row_count}]
+    validation: list[dict[str, Any]] = []
     year: int | None = None
 
 

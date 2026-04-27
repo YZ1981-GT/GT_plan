@@ -51,6 +51,35 @@ def _make_basic_info(**overrides) -> BasicInfoSchema:
     return BasicInfoSchema(**defaults)
 
 
+async def _complete_confirmation_steps(project_id: uuid.UUID, db_session: AsyncSession) -> None:
+    from app.services import project_wizard_service as svc
+
+    await svc.update_step(
+        project_id,
+        WizardStep.account_import,
+        {"file_name": "chart.xlsx", "imported_count": 100},
+        db_session,
+    )
+    await svc.update_step(
+        project_id,
+        WizardStep.account_mapping,
+        {"mapped_count": 10, "total_count": 10, "completion_rate": 100},
+        db_session,
+    )
+    await svc.update_step(
+        project_id,
+        WizardStep.materiality,
+        {"benchmark_type": "revenue"},
+        db_session,
+    )
+    await svc.update_step(
+        project_id,
+        WizardStep.team_assignment,
+        {"members": []},
+        db_session,
+    )
+
+
 # ===================================================================
 # create_project
 # ===================================================================
@@ -276,6 +305,25 @@ class TestValidateStep:
             project.id, WizardStep.confirmation, db_session
         )
 
+        assert result.valid is False
+        assert {m.field for m in result.messages} >= {
+            "account_import",
+            "account_mapping",
+            "materiality",
+            "team_assignment",
+        }
+
+    @pytest.mark.asyncio
+    async def test_validate_confirmation_ready_after_required_steps(self, db_session: AsyncSession):
+        from app.services import project_wizard_service as svc
+
+        project = await svc.create_project(_make_basic_info(), db_session)
+        await _complete_confirmation_steps(project.id, db_session)
+
+        result = await svc.validate_step(
+            project.id, WizardStep.confirmation, db_session
+        )
+
         assert result.valid is True
         assert len(result.messages) == 0
 
@@ -290,16 +338,27 @@ class TestConfirmProject:
 
     @pytest.mark.asyncio
     async def test_confirm_project_success(self, db_session: AsyncSession):
-        """仅完成基本信息即可确认项目。"""
         from app.services import project_wizard_service as svc
 
         project = await svc.create_project(_make_basic_info(), db_session)
+        await _complete_confirmation_steps(project.id, db_session)
 
         confirmed = await svc.confirm_project(project.id, db_session)
 
         assert confirmed.status == ProjectStatus.planning
         state = svc._parse_wizard_state(confirmed)
         assert state.completed is True
+
+    @pytest.mark.asyncio
+    async def test_confirm_project_missing_required_steps(self, db_session: AsyncSession):
+        from app.services import project_wizard_service as svc
+
+        project = await svc.create_project(_make_basic_info(), db_session)
+
+        with pytest.raises(Exception) as exc_info:
+            await svc.confirm_project(project.id, db_session)
+        assert exc_info.value.status_code == 400
+        assert "account_import" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
     async def test_confirm_project_missing_basic_info_step(self, db_session: AsyncSession):

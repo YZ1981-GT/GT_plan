@@ -274,12 +274,14 @@ class LedgerImportApplicationService:
 
     @classmethod
     def build_account_chart_result_payload(cls, result: dict[str, Any]) -> dict[str, Any]:
+        sheet_diagnostics = result.get("sheet_diagnostics")
         return {
             "total_imported": int(result.get("total_accounts") or 0),
             "by_category": result.get("by_category") or {},
             "errors": result.get("errors") or [],
             "data_sheets_imported": result.get("data_sheets_imported") or {},
-            "sheet_diagnostics": cls._normalize_sheet_diagnostics(result.get("sheet_diagnostics")),
+            "sheet_diagnostics": cls._normalize_sheet_diagnostics(sheet_diagnostics),
+            "validation": cls._build_validation_report(sheet_diagnostics),
             "year": result.get("year"),
         }
 
@@ -291,6 +293,16 @@ class LedgerImportApplicationService:
             "errors": [f"导入失败: {error_message}"],
             "data_sheets_imported": {},
             "sheet_diagnostics": [],
+            "validation": [{
+                "file": None,
+                "sheet": None,
+                "rule_code": "import_failed",
+                "severity": "fatal",
+                "message": f"导入失败: {error_message}",
+                "details": {},
+                "sample_rows": [],
+                "blocking": True,
+            }],
             "year": None,
         }
 
@@ -301,10 +313,12 @@ class LedgerImportApplicationService:
         *,
         job_batch_id: UUID | None,
     ) -> dict[str, Any]:
+        diagnostics = result.get("sheet_diagnostics")
         return {
             "imported": result.get("data_sheets_imported") or {},
             "year": result.get("year"),
-            "diagnostics": cls._normalize_sheet_diagnostics(result.get("sheet_diagnostics")),
+            "diagnostics": cls._normalize_sheet_diagnostics(diagnostics),
+            "validation": cls._build_validation_report(diagnostics),
             "errors": result.get("errors") or [],
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
         }
@@ -315,6 +329,16 @@ class LedgerImportApplicationService:
             "imported": {},
             "year": None,
             "diagnostics": [],
+            "validation": [{
+                "file": None,
+                "sheet": None,
+                "rule_code": "import_failed",
+                "severity": "fatal",
+                "message": f"导入失败: {error_message}",
+                "details": {},
+                "sample_rows": [],
+                "blocking": True,
+            }],
             "errors": [f"导入失败: {error_message}"],
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
         }

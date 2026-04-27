@@ -24,6 +24,8 @@ from app.services.note_template_service import NoteTemplateService
 # 步骤依赖链：每个步骤的前置步骤必须已完成
 STEP_ORDER: list[WizardStep] = [
     WizardStep.basic_info,
+    WizardStep.account_import,
+    WizardStep.account_mapping,
     WizardStep.materiality,
     WizardStep.team_assignment,
     WizardStep.template_set,
@@ -37,7 +39,13 @@ STEP_DEPENDENCIES: dict[WizardStep, list[WizardStep]] = {
     WizardStep.materiality: [WizardStep.basic_info],
     WizardStep.team_assignment: [WizardStep.basic_info],
     WizardStep.template_set: [WizardStep.basic_info, WizardStep.materiality],
-    WizardStep.confirmation: [WizardStep.basic_info],
+    WizardStep.confirmation: [
+        WizardStep.basic_info,
+        WizardStep.account_import,
+        WizardStep.account_mapping,
+        WizardStep.materiality,
+        WizardStep.team_assignment,
+    ],
 }
 
 # basic_info 步骤的必填字段

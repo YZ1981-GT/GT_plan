@@ -578,11 +578,39 @@
     <div v-if="importStep === 'done'" style="text-align: center; padding: 30px 0">
       <el-icon style="font-size: 40px; color: #67c23a"><CircleCheck /></el-icon>
       <div style="margin-top: 12px; font-size: 15px">导入完成</div>
-      <div v-if="importedResult" style="margin-top: 8px; font-size: 13px; color: #666">
-        <span v-for="(cnt, dt) in importedResult" :key="dt" style="margin-right: 12px">
-          {{ dt }}: {{ typeof cnt === 'number' ? cnt.toLocaleString() : cnt }} 条
+      <div v-if="importedResultSummaryEntries.length" style="margin-top: 8px; font-size: 13px; color: #666">
+        <span v-for="item in importedResultSummaryEntries" :key="item.key" style="margin-right: 12px">
+          {{ item.label }}: {{ item.value }}
         </span>
       </div>
+      <el-alert
+        v-if="importValidationSummary.total > 0"
+        :title="importValidationSummaryTitle"
+        :type="importValidationSummaryAlertType"
+        :closable="false"
+        show-icon
+        style="margin-top: 16px; text-align: left"
+      >
+        <template #default>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px">
+            <el-tag v-if="importValidationSummary.fatal > 0" type="danger">fatal {{ importValidationSummary.fatal }}</el-tag>
+            <el-tag v-if="importValidationSummary.error > 0" type="danger">error {{ importValidationSummary.error }}</el-tag>
+            <el-tag v-if="importValidationSummary.warning > 0" type="warning">warning {{ importValidationSummary.warning }}</el-tag>
+            <el-tag v-if="importValidationSummary.info > 0" type="info">info {{ importValidationSummary.info }}</el-tag>
+          </div>
+          <div v-if="importBlockingValidationItems.length" style="margin-top: 10px">
+            <div
+              v-for="(item, idx) in importBlockingValidationItems"
+              :key="`${item.rule_code}_${idx}`"
+              style="font-size: 13px; margin-bottom: 6px; color: #f56c6c"
+            >
+              <strong>{{ item.file || '当前文件' }}</strong>
+              <span v-if="item.sheet"> / {{ item.sheet }}</span>
+              <span>：{{ item.message }}</span>
+            </div>
+          </div>
+        </template>
+      </el-alert>
     </div>
 
     </div><!-- v-loading wrapper -->
@@ -748,11 +776,91 @@ const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
 const importFiles = ref<File[]>([])
 const importYear = ref<number | undefined>(undefined)
 const previewResult = ref<any>(null)
-const importedResult = ref<any>(null)
+interface ImportValidationItem {
+  file?: string | null
+  sheet?: string | null
+  rule_code: string
+  severity: 'fatal' | 'error' | 'warning' | 'info' | string
+  message: string
+  blocking?: boolean
+}
+
+interface LedgerImportResultPayload {
+  imported?: Record<string, number>
+  year?: number | null
+  diagnostics?: Array<Record<string, unknown>>
+  validation?: ImportValidationItem[]
+  errors?: string[]
+  batch_id?: string | null
+}
+
+const importedResult = ref<LedgerImportResultPayload | null>(null)
 const uploadToken = ref('')
 const previewing = ref(false)
 const importing = ref(false)
 const uploadRef = ref()
+
+const DATA_TYPE_LABELS: Record<string, string> = {
+  tb_balance: '余额表',
+  tb_ledger: '序时账',
+  tb_aux_balance: '辅助余额',
+  tb_aux_ledger: '辅助明细',
+}
+
+const importedResultSummaryEntries = computed(() => {
+  const imported = importedResult.value?.imported || {}
+  return Object.entries(imported).map(([key, value]) => ({
+    key,
+    label: DATA_TYPE_LABELS[key] || key,
+    value: `${typeof value === 'number' ? value.toLocaleString() : value} 条`,
+  }))
+})
+
+const importValidationItems = computed<ImportValidationItem[]>(() => importedResult.value?.validation || [])
+
+const importValidationSummary = computed(() => {
+  const summary = { total: 0, fatal: 0, error: 0, warning: 0, info: 0 }
+  for (const item of importValidationItems.value) {
+    summary.total += 1
+    if (item.severity === 'fatal') summary.fatal += 1
+    else if (item.severity === 'error') summary.error += 1
+    else if (item.severity === 'warning') summary.warning += 1
+    else summary.info += 1
+  }
+  return summary
+})
+
+const importBlockingValidationItems = computed(() => importValidationItems.value.filter(item => item.blocking))
+
+const importValidationSummaryAlertType = computed(() => {
+  if (importValidationSummary.value.fatal > 0 || importValidationSummary.value.error > 0) return 'warning'
+  if (importValidationSummary.value.warning > 0) return 'info'
+  return 'success'
+})
+
+const importValidationSummaryTitle = computed(() => {
+  if (importValidationSummary.value.fatal > 0 || importValidationSummary.value.error > 0) {
+    return '导入已完成，但存在需要处理的校验问题'
+  }
+  if (importValidationSummary.value.warning > 0) {
+    return '导入已完成，存在可继续关注的警告信息'
+  }
+  return '导入校验通过'
+})
+
+function extractImportValidationMessage(items: ImportValidationItem[] | undefined, fallback: string): string {
+  if (!items?.length) return fallback
+  const prioritized = items
+    .filter(item => item.blocking || item.severity === 'fatal' || item.severity === 'error')
+  const source = prioritized.length ? prioritized : items
+  return source
+    .slice(0, 3)
+    .map((item) => {
+      const location = [item.file, item.sheet].filter(Boolean).join(' / ')
+      return location ? `${location}：${item.message}` : item.message
+    })
+    .join('；') || fallback
+}
 
 // ── 列映射手动调整 ──
 const userColumnMapping = ref<Record<string, Record<string, string>>>({})
@@ -921,7 +1029,9 @@ async function doImport() {
               throw new Error(msg || '导入失败')
             }
             const payload = status.result
-            importedResult.value = payload?.imported || payload
+            importedResult.value = (payload?.imported && !payload?.validation)
+              ? { imported: payload.imported }
+              : payload
             importStep.value = 'done'
             ElMessage.success(msg || '导入完成')
             // 刷新数据
@@ -941,7 +1051,12 @@ async function doImport() {
       }
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '导入失败')
+    const errValidation = e?.response?.data?.validation as ImportValidationItem[] | undefined
+    const errMsg = extractImportValidationMessage(
+      errValidation,
+      e?.response?.data?.detail || e?.message || '导入失败',
+    )
+    ElMessage.error(errMsg)
     importStep.value = 'preview'
   } finally {
     importing.value = false

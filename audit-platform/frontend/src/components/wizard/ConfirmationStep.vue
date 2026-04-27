@@ -3,6 +3,15 @@
     <h2 class="step-title">确认项目配置</h2>
     <p class="step-desc">请确认以下项目配置信息，确认后项目将进入计划阶段</p>
 
+    <el-alert
+      v-if="pendingConfirmationStepLabels.length > 0"
+      :title="`确认创建前仍需完成：${pendingConfirmationStepLabels.join('、')}`"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 16px"
+    />
+
     <div class="summary-cards">
       <!-- Basic Info -->
       <div class="gt-card summary-card">
@@ -46,12 +55,38 @@
           <div class="info-row">
             <span class="info-label">状态</span>
             <span class="info-value">
-              <el-tag type="info" size="small">建项后独立处理</el-tag>
+              <el-tag v-if="isStepCompleted('account_import')" type="success" size="small">已完成</el-tag>
+              <el-tag v-else type="info" size="small">待完成</el-tag>
             </span>
           </div>
           <div class="info-row">
-            <span class="info-label">入口</span>
-            <span class="info-value">项目页 / 查账页</span>
+            <span class="info-label">科目数</span>
+            <span class="info-value">{{ importedAccountCountLabel }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">导入年度</span>
+            <span class="info-value">{{ importYearLabel }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">数据表记录</span>
+            <span class="info-value">{{ importedDataRowCountLabel }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="gt-card summary-card">
+        <h3 class="card-title">科目映射</h3>
+        <div class="card-body">
+          <div class="info-row">
+            <span class="info-label">状态</span>
+            <span class="info-value">
+              <el-tag v-if="isStepCompleted('account_mapping')" type="success" size="small">已完成</el-tag>
+              <el-tag v-else type="info" size="small">待完成</el-tag>
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">完成率</span>
+            <span class="info-value">{{ mappingCompletionLabel }}</span>
           </div>
         </div>
       </div>
@@ -95,7 +130,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useWizardStore, type BasicInfo } from '@/stores/wizard'
+import { CONFIRMATION_REQUIRED_STEPS, STEP_LABELS, useWizardStore, type BasicInfo, type StepKey } from '@/stores/wizard'
 
 const wizardStore = useWizardStore()
 
@@ -150,6 +185,59 @@ const templateLabel = computed(() => {
       : name
   }
   return TEMPLATE_MAP[basicInfo.value.template_type] ?? '—'
+})
+
+const accountImport = computed<Record<string, unknown>>(() => {
+  return (wizardStore.stepData.account_import as Record<string, unknown> | undefined) ?? {}
+})
+
+const accountMapping = computed<Record<string, unknown>>(() => {
+  return (wizardStore.stepData.account_mapping as Record<string, unknown> | undefined) ?? {}
+})
+
+const importedAccountCountLabel = computed(() => {
+  const total = accountImport.value.total_imported
+  return typeof total === 'number' ? total.toLocaleString() : '—'
+})
+
+const importYearLabel = computed(() => {
+  const year = accountImport.value.year ?? basicInfo.value.audit_year
+  return typeof year === 'number' ? String(year) : '—'
+})
+
+const importedDataRowCountLabel = computed(() => {
+  const bySheet = accountImport.value.data_sheets_imported
+  if (!bySheet || typeof bySheet !== 'object') return '—'
+
+  const total = Object.values(bySheet as Record<string, unknown>).reduce<number>((sum, count) => {
+    return sum + (typeof count === 'number' ? count : 0)
+  }, 0)
+
+  return total > 0 ? total.toLocaleString() : '—'
+})
+
+const mappingCompletionLabel = computed(() => {
+  const rate = accountMapping.value.completion_rate
+  const mapped = accountMapping.value.mapped_count
+  const total = accountMapping.value.total_count
+
+  if (typeof rate !== 'number' && typeof mapped !== 'number' && typeof total !== 'number') {
+    return '—'
+  }
+
+  const rateLabel = typeof rate === 'number' ? `${rate}%` : '—'
+  if (typeof mapped === 'number' && typeof total === 'number') {
+    return `${rateLabel}（${mapped}/${total}）`
+  }
+  return rateLabel
+})
+
+const pendingConfirmationSteps = computed<StepKey[]>(() => {
+  return CONFIRMATION_REQUIRED_STEPS.filter(step => !wizardStore.isStepCompleted(step))
+})
+
+const pendingConfirmationStepLabels = computed(() => {
+  return pendingConfirmationSteps.value.map(step => STEP_LABELS[step])
 })
 
 const teamMembers = computed(() => {
