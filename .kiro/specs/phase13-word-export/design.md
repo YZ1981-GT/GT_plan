@@ -26,10 +26,10 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                        API层                                 │
 │  export.py（增强）                                           │
-│  POST /projects/{id}/export/audit-report-word                │
-│  POST /projects/{id}/export/financial-reports-word            │
-│  POST /projects/{id}/export/disclosure-notes-word             │
-│  POST /projects/{id}/export/full-package                     │
+│  POST /projects/{id}/exports/*/generate                      │
+│  POST /projects/{id}/exports/{task_id}/confirm               │
+│  POST /projects/{id}/exports/full-package                    │
+│  GET  /projects/{id}/jobs/{job_id}                           │
 └────────────────────┬────────────────────────────────────────┘
                      │
 ┌────────────────────▼────────────────────────────────────────┐
@@ -46,9 +46,19 @@
 │  │WordExporter      │  └────────────────────────────┘      │
 │  │NoteWordExporter  │                                       │
 │  │（增强版）        │                                       │
-│  └──────────────────┘                                       │
+│  └──────────────────┘   ExportTaskService / ExportJobService │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### 1.3 设计收敛原则
+
+| 原则 | 说明 |
+|------|------|
+| 模板优先 | 本期主交付路径为方案B（模板填充 + ONLYOFFICE 编辑），方案A仅保留降级导出基线 |
+| 单一真相源 | `reports/` 目录下已确认版本是最终交付物；模板、自定义模板快照、报表快照仅作为输入与镜像 |
+| 长任务 job 化 | 全套导出、批量渲染、上年解析、LLM 预填统一走 `job_id`，支持页面刷新恢复与失败重试 |
+| 单向数据流 | `trial_balance`、`audit_report`、`disclosure_note` 等源数据只流向快照和文档，不反向改写 |
+| 模板快照优先 | 附注 `custom` 模板优先读取项目级 `custom_template_snapshot`，切换模板不得覆盖已确认用户修改 |
 
 ---
 
@@ -215,6 +225,7 @@ python-docx 填充数据到占位符/书签
 | 权益变动表模板.docx | 同上 | 同上 |
 | 附注模板_国企版.docx | 同上 | 章节结构+表格格式+占位符 |
 | 附注模板_上市版.docx | 同上 | 同上 |
+| 项目级自定义附注模板.docx | storage/projects/{id}/templates/ | 来源于 `custom_template_snapshot` 或集团参照锁定版本 |
 
 ### 3.3 填充服务设计
 
@@ -236,6 +247,7 @@ class WordTemplateFiller:
 
     async def fill_disclosure_notes(self, db, project_id, year) -> Path:
         """打开附注模板 → 填充表格数据+叙述文本 → 三色处理 → 保存
+           模板解析顺序：custom_template_snapshot > 项目 templates/ > 系统模板 `soe/listed`
            表格区域：定位书签 → 填入数字
            叙述区域：替换占位符 → 填入会计政策文本
            三色处理：删除蓝色段落 + 红色转黑色
@@ -250,48 +262,107 @@ class WordTemplateFiller:
 ```
 填充后的 Word 文件复用底稿的 WOPI 机制：
 1. 文件保存到 storage/projects/{id}/reports/{filename}.docx
-2. 创建 ExportTask 记录（file_path, status=draft）
+2. 创建 ExportTask 记录（file_path, status=generated）并登记版本v1
 3. 前端用 ONLYOFFICE iframe 打开编辑
-4. 用户微调措辞、补充内容、调整格式
-5. 保存 = WOPI put_file → 版本递增
-6. 下载 = 直接下载当前版本 .docx
-7. 状态流转：draft → confirmed → signed
+4. 用户微调措辞、补充内容、调整格式，状态进入 editing
+5. 保存 = WOPI put_file → 版本递增到 export_task_versions
+6. 用户点击确认后状态变为 confirmed，才允许全套打包/集团参照
+7. 下载 = 直接下载当前 confirmed 或最新 editing 版本 .docx
+8. 状态流转：draft → generating → generated → editing → confirmed → signed
 ```
+
+### 3.5 ExportTask 状态与后台任务模型
+
+```python
+class ExportTaskService:
+    """导出状态机与版本管理"""
+
+    async def create_task(self, db, project_id, doc_type, template_type, user_id) -> dict:
+        """创建 export_task + export_task_versions 基线记录"""
+
+    async def confirm_task(self, db, export_task_id, user_id) -> dict:
+        """
+        人工确认后的唯一生效入口：
+        1. 校验当前版本存在且文件可下载
+        2. 更新 status='confirmed'
+        3. 记录 confirmed_by / confirmed_at
+        4. 仅 confirmed 版本允许 full_package、template_reference、signed
+        """
+
+class ExportJobService:
+    """统一管理全套导出、重算、解析、LLM预填等长任务"""
+
+    async def create_job(self, db, project_id, job_type, payload, user_id) -> dict:
+        """创建 export_jobs + export_job_items，返回 job_id"""
+
+    async def retry_job(self, db, job_id) -> dict:
+        """仅重试失败项，保留已完成文件和原始审计轨迹"""
+```
+
+| 对象 | 状态 | 允许转移 | 阻断条件 |
+|------|------|---------|---------|
+| `export_task.status` | `draft` → `generating` → `generated` → `editing` → `confirmed` → `signed` | `confirmed` 可 reopen 回 `editing` 并生成新版本 | `draft/editing/generated` 不可用于 ZIP 打包、集团参照、签发 |
+| `snapshot_status` | `missing` / `fresh` / `stale` / `refreshing` | `stale` 经重算进入 `refreshing`，成功后回到 `fresh` | `stale` 时需显式选择沿用旧快照或重算 |
+| `job_status` | `queued` → `running` → `succeeded` / `partial_failed` / `failed` / `cancelled` | `partial_failed` / `failed` 可经 retry 回到 `running` | 前端需展示失败项并支持恢复 |
 
 ---
 
 ## 4. API 设计
 
 ```yaml
-# 方案A：从零生成
-POST /api/projects/{id}/export/audit-report-word
-  返回: .docx 文件流
+POST /api/projects/{id}/exports/audit-report/generate
+  - 生成审计报告草稿并创建 ExportTask
+  - 返回: { export_task_id, status, editor_url }
 
-POST /api/projects/{id}/export/financial-reports-word
-  query: { report_types: "BS,IS,CFS,EQ" }
-  返回: .docx 文件流
+POST /api/projects/{id}/exports/financial-reports/generate
+  - 生成报表文档并绑定最新快照
+  - body: { report_types: ["BS", "IS", "CFS", "EQ"], snapshot_strategy: "reuse"|"refresh" }
+  - 返回: [{ export_task_id, report_type, status, editor_url }]
 
-POST /api/projects/{id}/export/disclosure-notes-word
-  body: { sections: ["五、1", "五、2"], template_type: "soe"|"listed" }
-  返回: .docx 文件流
+POST /api/projects/{id}/exports/disclosure-notes/generate
+  - 生成附注草稿
+  - body: { template_type: "soe"|"listed"|"custom", sections?: [] }
+  - 返回: { export_task_id, status, editor_url }
 
-# 方案B：模板填充
-POST /api/projects/{id}/export/fill-audit-report
-  返回: { file_path, editor_url }
+POST /api/projects/{id}/exports/{export_task_id}/confirm
+  - 人工确认当前导出版本
+  - 返回: { status, confirmed_at }
 
-POST /api/projects/{id}/export/fill-financial-reports
-  返回: [{ report_type, file_path, editor_url }]
+GET /api/projects/{id}/exports/history
+  - 返回: [{ id, doc_type, file_path, status, created_at, confirmed_at }]
 
-POST /api/projects/{id}/export/fill-disclosure-notes
-  body: { template_type: "soe"|"listed" }
-  返回: { file_path, editor_url }
+POST /api/projects/{id}/exports/full-package
+  - 发起全套导出与 ZIP 打包
+  - body: { export_task_ids[] }
+  - 返回: { job_id, status }
 
-# 通用
-POST /api/projects/{id}/export/full-package
-  返回: .zip 文件流
+GET /api/projects/{id}/jobs/{job_id}
+  - 获取后台任务状态
+  - 返回: { status, progress_total, progress_done, failed_count, items[] }
 
-GET /api/projects/{id}/export/history
-  返回: [{ id, type, file_path, status, created_at }]
+POST /api/projects/{id}/jobs/{job_id}/retry
+  - 重试失败项
+  - 返回: { job_id, retried_count }
+
+GET /api/projects/{id}/template-reference/available
+  - 列出可参照项目
+
+POST /api/projects/{id}/template-reference/copy
+  - body: { source_project_id, doc_types: ["audit_report", "notes"] }
+  - 返回: { copied_files[], diff_markers[] }
+
+POST /api/projects/{id}/prior-year/upload
+  - 上传上年报告/附注并触发解析
+  - body: FormData(file, doc_type, year)
+  - 返回: { document_id, job_id }
+
+POST /api/projects/{id}/prior-year/prefill-report
+  - 发起审计报告 LLM 预填
+  - 返回: { job_id, status }
+
+POST /api/projects/{id}/prior-year/prefill-notes
+  - 发起附注 LLM 预填
+  - 返回: { job_id, status }
 ```
 
 ---
@@ -782,7 +853,7 @@ POST /api/projects/{id}/template-reference/copy
 POST /api/projects/{id}/prior-year/upload
   - 上传上年报告/附注
   - body: FormData(file, doc_type, year)
-  - 返回: { document_id, parsed_sections_count }
+  - 返回: { document_id, job_id }
 
 GET /api/projects/{id}/prior-year/{doc_type}
   - 获取上年文档解析结果
@@ -790,11 +861,11 @@ GET /api/projects/{id}/prior-year/{doc_type}
 
 POST /api/projects/{id}/prior-year/prefill-report
   - LLM 智能预填审计报告
-  - 返回: SSE 流式（逐段输出）
+  - 返回: { job_id, status }
 
 POST /api/projects/{id}/prior-year/prefill-notes
   - LLM 智能预填附注
-  - 返回: SSE 流式（逐章节输出）
+  - 返回: { job_id, status }
 ```
 
 ### 9.3 报表快照 API

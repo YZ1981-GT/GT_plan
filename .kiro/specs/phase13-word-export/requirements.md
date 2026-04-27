@@ -24,7 +24,17 @@
 | 智能复用 | 上传上年报告后，LLM 自动预填当期 70%+ 内容 |
 | 数据准确 | 报表数据从 trial_balance 实时拉取，与试算表零差异 |
 
-### 1.3 双方案策略
+### 1.3 本期交付策略
+
+| 层级 | 范围 | 目标 |
+|------|------|------|
+| MVP（本期必须上线） | P0-1~P0-5、P1-1~P1-3、P1-6、P2-7、P2-8 | 形成“生成→编辑→确认→下载/打包”的文档导出闭环 |
+| 增强（MVP稳定后插入） | P1-4、P1-5 | 提升集团项目复用效率与模板差异可见性 |
+| 延后（下一子阶段） | P2-1~P2-6 | 引入上年文档解析、LLM预填和附注章节增强能力 |
+
+> 本文保留完整需求池，但默认排期、灰度上线与验收以 MVP 为准；增强项需在 MVP 稳定后单独确认资源。
+
+### 1.4 双方案策略
 
 | | 方案A: python-docx 从零生成 | 方案B: Word 模板填充+ONLYOFFICE 编辑 |
 |---|---|---|
@@ -41,6 +51,8 @@
 
 ### 2.1 P0 — 基础引擎+数据拉取
 
+> 说明：P0 全部纳入本期，但 `P0-1` 在 MVP 中只要求满足降级导出基线，不作为主交付路径。
+
 | 序号 | 需求 | 用户故事 | 验收标准 |
 |------|------|---------|---------|
 | P0-1 | 统一 Word 导出引擎 | 作为系统，所有导出文档必须遵循致同排版规范 | 页面设置+样式+三线表+页眉页脚+三色文本处理+千分位 |
@@ -50,6 +62,8 @@
 | P0-5 | 附注 Word 导出增强 | 作为审计员，附注导出必须处理三色文本和多级标题 | 继承 GTWordEngine+三色处理+多级标题编号+选择性导出+裁剪状态跳过 |
 
 ### 2.2 P1 — 模板体系+集团参照
+
+> 说明：`P1-1`、`P1-2`、`P1-3`、`P1-6` 纳入本期MVP；`P1-4`、`P1-5` 作为增强项，在MVP稳定后插入。
 
 | 序号 | 需求 | 用户故事 | 验收标准 |
 |------|------|---------|---------|
@@ -61,6 +75,8 @@
 | P1-6 | 前端导出交互 | 作为审计员，导出流程应该简单直观 | "生成Word"→"在线编辑"→"下载"三步；状态标签：草稿/已确认/已签发 |
 
 ### 2.3 P2 — 上年报告智能复用
+
+> 说明：`P2-7`、`P2-8` 为本期MVP补充能力；`P2-1`~`P2-6` 默认延后到下一子阶段。
 
 | 序号 | 需求 | 用户故事 | 验收标准 |
 |------|------|---------|---------|
@@ -103,6 +119,15 @@ storage/projects/{project_id}/
 
 **集团参照路径**：子企业参照母公司时，从母公司项目的 `reports/` 目录复制已确认文档到子企业的 `templates/` 目录，替换占位符后作为子企业的模板。
 
+### 3.1 数据权威源与同步要求
+
+| 对象 | 权威源 | 缓存/镜像 | 同步要求 |
+|------|--------|-----------|---------|
+| 审计报告/报表/附注最终交付物 | `storage/projects/{project_id}/reports/` 下已确认版本 | 导出历史列表、当前编辑态 | 仅 `confirmed` 版本可作为最终下载、ZIP 打包和集团参照输入 |
+| 报表导出数值 | `report_snapshot` | 前端预览态 | 导出默认读取快照；`trial_balance` 哈希变化后必须提示重算或显式沿用旧快照 |
+| 附注模板选择 | 系统模板 `soe/listed` 或项目级 `custom_template_snapshot` | 前端当前模板选择态 | `custom` 优先读取项目级快照；模板切换不得覆盖用户已确认的自定义内容 |
+| 源账/试算表/附注源数据 | `trial_balance` / `audit_report` / `disclosure_note` | Word 文档和导出中间文件 | 仅允许单向流向导出文档与快照，不反向改写源表 |
+
 ---
 
 ## 4. 致同标准排版规范
@@ -140,6 +165,8 @@ storage/projects/{project_id}/
 
 ## 5. 非功能需求
 
+### 5.1 性能需求
+
 | 指标 | 目标值 |
 |------|--------|
 | 单文档导出 | <10秒 |
@@ -147,11 +174,93 @@ storage/projects/{project_id}/
 | 导出文件大小 | <5MB（单文档） |
 | 并发导出 | 10人同时导出不阻塞 |
 
+> 说明：所有性能指标默认按 P95 统计，且长任务必须支持基于 `job_id` 的进度恢复。
+
+### 5.2 可靠性与可用性需求
+
+| 场景 | 要求 | 验收标准 |
+|------|------|---------|
+| ONLYOFFICE 不可用 | 自动降级到方案A或仅保留已生成版本下载 | 降级检测<1秒，不阻断用户下载 |
+| 模板缺失/字体异常 | 生成前预检并阻断错误模板，给出明确错误原因 | 模板或字体问题可在导出前发现并提示 |
+| 全套导出中断 | 已完成文件保留结果，未完成项标记失败并支持 `job_id` 重试 | 页面刷新后30秒内可恢复任务视图 |
+| 报表快照过期 | 必须提示重算或显式沿用旧快照 | 不允许静默导出旧数据 |
+
+### 5.3 安全与流程控制
+
+- 所有最终导出文档必须经人工确认后才能作为正式交付物
+- `draft/editing` 状态文档不可作为 ZIP 打包、集团参照或签发输入
+- 导出链路不得反向改写 `trial_balance`、`audit_report`、`disclosure_note` 等源数据
+
+### 5.4 AI增强上线门槛（阶段4）
+
+| 项目 | 要求 | 上线门槛 |
+|------|------|---------|
+| 上年解析样本集 | 至少30份典型报告/附注，覆盖 Word/PDF 两类输入 | 主要文档类型均有样本 |
+| 事实准确性 | LLM 预填内容中的金额、期间、单位名称需与输入一致 | 事实错误率<1% |
+| 幻觉控制 | 不允许虚构未提供的政策、KAM、证据或结论 | 幻觉率<2% |
+| 人工可采纳率 | 用户允许直接采纳或小改后采纳 | 可采纳率>60% |
+| 可回溯性 | 每次 LLM 预填都记录输入来源、prompt_version、确认人 | 生产环境100%留痕 |
+
 ---
 
 ## 6. 数据模型新增
 
-### 6.1 报表数据快照表
+### 6.1 导出任务与版本表
+
+```sql
+CREATE TABLE export_task (
+    id UUID PRIMARY KEY,
+    project_id UUID REFERENCES projects(id),
+    doc_type VARCHAR(20),               -- audit_report/financial_report/disclosure_notes/full_package
+    status VARCHAR(30),                 -- draft/generating/generated/editing/confirmed/signed
+    file_path TEXT,
+    template_type VARCHAR(20),          -- soe/listed/custom
+    snapshot_id UUID,
+    confirmed_by UUID REFERENCES users(id),
+    confirmed_at TIMESTAMP,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE export_task_versions (
+    id UUID PRIMARY KEY,
+    export_task_id UUID REFERENCES export_task(id),
+    version_no INTEGER,
+    file_path TEXT,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### 6.2 导出后台任务表
+
+```sql
+CREATE TABLE export_jobs (
+    id UUID PRIMARY KEY,
+    project_id UUID REFERENCES projects(id),
+    job_type VARCHAR(30),               -- generate/full_package/retry
+    status VARCHAR(30),                 -- queued/running/partial_failed/succeeded/failed/cancelled
+    payload JSONB,
+    progress_total INTEGER DEFAULT 0,
+    progress_done INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    initiated_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE export_job_items (
+    id UUID PRIMARY KEY,
+    job_id UUID REFERENCES export_jobs(id),
+    export_task_id UUID REFERENCES export_task(id),
+    status VARCHAR(30),
+    error_message TEXT,
+    finished_at TIMESTAMP
+);
+```
+
+### 6.3 报表数据快照表
 
 ```sql
 CREATE TABLE report_snapshot (
@@ -166,7 +275,7 @@ CREATE TABLE report_snapshot (
 );
 ```
 
-### 6.2 上年文档解析表
+### 6.4 上年文档解析表
 
 ```sql
 CREATE TABLE prior_year_document (
@@ -182,7 +291,7 @@ CREATE TABLE prior_year_document (
 );
 ```
 
-### 6.3 集团模板参照记录表
+### 6.5 集团模板参照记录表
 
 ```sql
 CREATE TABLE template_reference (
@@ -204,4 +313,8 @@ CREATE TABLE template_reference (
 |------|------|---------|
 | PDF 导出优化 | 当前 WeasyPrint 方案可用 | 按需优化 |
 | Excel 报表导出 | 已有 openpyxl 导出 | 不重复建设 |
+| 集团模板参照 / 模板差异标记 | 依赖MVP模板闭环和项目级模板快照稳定 | MVP稳定后插入 |
+| 上年文档解析 / LLM预填 / 附注章节增强 | 依赖解析、评估与人工确认机制 | 下一子阶段 |
 | 批量项目导出 | 单项目优先 | 远期规划 |
+
+> P2需求池保留，但默认不进入当前承诺排期；是否插入由MVP交付质量和资源情况再决定。
