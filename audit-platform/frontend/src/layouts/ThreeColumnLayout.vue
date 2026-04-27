@@ -18,11 +18,6 @@
       </div>
       <div class="gt-topbar-right">
         <!-- 顶部快捷入口（全局工具） -->
-        <el-tooltip content="重置（清除卡住的导入任务）" placement="bottom">
-          <div class="gt-topbar-btn gt-topbar-btn--danger" @click="handleGlobalReset">
-            <el-icon :size="18"><RefreshRight /></el-icon>
-          </div>
-        </el-tooltip>
         <el-tooltip content="知识库" placement="bottom">
           <div class="gt-topbar-btn" @click="router.push('/knowledge')">
             <el-icon :size="18"><Reading /></el-icon>
@@ -38,13 +33,13 @@
             <el-icon :size="18"><Cpu /></el-icon>
           </div>
         </el-tooltip>
-        <el-tooltip content="排版模板（开发中）" placement="bottom">
-          <div class="gt-topbar-btn gt-topbar-btn--disabled" @click="ElMessage.info({ message: '排版模板正在开发中', grouping: true })">
+        <el-tooltip content="排版模板" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/settings/report-format')">
             <el-icon :size="18"><Document /></el-icon>
           </div>
         </el-tooltip>
-        <el-tooltip content="吐槽求助（开发中）" placement="bottom">
-          <div class="gt-topbar-btn gt-topbar-btn--disabled" @click="ElMessage.info({ message: '吐槽求助正在开发中', grouping: true })">
+        <el-tooltip content="吐槽求助" placement="bottom">
+          <div class="gt-topbar-btn" @click="router.push('/forum')">
             <el-icon :size="18"><ChatDotSquare /></el-icon>
           </div>
         </el-tooltip>
@@ -67,6 +62,14 @@
             <el-icon :size="18"><Setting /></el-icon>
           </div>
         </el-tooltip>
+        <!-- 后台导入任务指示 -->
+        <el-tooltip v-if="bgImportStatus" :content="bgImportStatus.message" placement="bottom">
+          <div class="gt-topbar-btn gt-import-indicator" @click="navigateToImport">
+            <el-icon :size="18" class="is-loading"><Loading /></el-icon>
+            <span class="gt-import-label">导入中</span>
+          </div>
+        </el-tooltip>
+
         <el-tooltip content="通知" placement="bottom">
           <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
             <el-icon :size="18"><Bell /></el-icon>
@@ -100,9 +103,9 @@
             v-for="item in navItems"
             :key="item.key"
             class="gt-nav-item"
-            :class="{ 'gt-nav-item--active': activeNav === item.key, 'gt-nav-item--developing': item.maturity === 'developing' }"
+            :class="{ 'gt-nav-item--active': activeNav === item.key }"
             @click="onNavClick(item)"
-            :title="item.maturity === 'developing' ? item.label + '（开发中）' : item.label"
+            :title="item.label"
           >
             <el-icon :size="20"><component :is="item.icon" /></el-icon>
             <transition name="gt-fade">
@@ -110,7 +113,6 @@
                 {{ item.label }}
                 <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
                 <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
-                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">开发中</span>
               </span>
             </transition>
           </div>
@@ -202,14 +204,13 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { api } from '@/services/apiProxy'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
-  DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, RefreshRight,
-  Cellphone, Camera, Location, TrendCharts,
+  DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -223,35 +224,19 @@ const props = defineProps<{
   catalogTitle?: string
 }>()
 
-// ── 导航项（roles: 哪些角色可见，空数组=所有角色可见） ──
-const ALL_NAV_ITEMS = [
-  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production', roles: [] },
-  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production', roles: [] },
-  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production', roles: [] },
-  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: ['admin', 'partner', 'manager', 'auditor'] },
-  { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'developing', roles: [] },
-  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
-  // ── 空壳页面（Phase 11 标记 developing，灰色不可点击） ──
-  { key: 'mobile-projects', label: '移动端项目', icon: Cellphone, path: '/mobile-projects', maturity: 'developing', roles: [] },
-  { key: 'mobile-reports', label: '移动端报表', icon: Cellphone, path: '/mobile-reports', maturity: 'developing', roles: [] },
-  { key: 'mobile-workpaper', label: '移动端底稿', icon: Cellphone, path: '/mobile-workpaper', maturity: 'developing', roles: [] },
-  { key: 'consol-snapshots', label: '合并快照', icon: Camera, path: '/consol-snapshots', maturity: 'developing', roles: ['admin', 'partner', 'manager'] },
-  { key: 'check-ins', label: '打卡签到', icon: Location, path: '/check-ins', maturity: 'developing', roles: [] },
-  { key: 'aux-summary', label: '辅助汇总', icon: TrendCharts, path: '/aux-summary', maturity: 'developing', roles: [] },
+// ── 导航项 ──
+const navItems = [
+  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
+  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production' },
+  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff', maturity: 'production' },
+  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production' },
+  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
+  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'pilot' },
+  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
+  { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production' },
+  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
+  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production' },
 ]
-
-// 按当前用户角色过滤导航项
-const navItems = computed(() => {
-  const role = authStore.user?.role || 'auditor'
-  return ALL_NAV_ITEMS.filter(item => {
-    if (item.roles.length === 0) return true
-    return item.roles.includes(role)
-  })
-})
 
 const activeNav = computed(() => {
   const p = route.path
@@ -259,7 +244,7 @@ const activeNav = computed(() => {
   // 顶部栏路由不高亮左侧导航
   const topBarPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum', '/recycle-bin', '/settings']
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
-  for (const item of navItems.value) {
+  for (const item of navItems) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }
   if (p.startsWith('/projects')) return 'projects'
@@ -267,7 +252,7 @@ const activeNav = computed(() => {
 })
 
 const currentModule = computed(() => {
-  const item = navItems.value.find(n => n.key === activeNav.value)
+  const item = navItems.find(n => n.key === activeNav.value)
   return item?.label || ''
 })
 
@@ -276,11 +261,7 @@ const emit = defineEmits<{
   (e: 'view-change', mode: 'three' | 'four'): void
 }>()
 
-function onNavClick(item: any) {
-  if (item.maturity === 'developing') {
-    ElMessage.info({ message: `「${item.label}」正在开发中，敬请期待`, grouping: true })
-    return
-  }
+function onNavClick(item: typeof navItems[0]) {
   emit('nav-change', item.key)
   router.push(item.path)
 }
@@ -406,52 +387,54 @@ function onTouchEnd(e: TouchEvent) {
   }
 }
 
-async function handleGlobalReset() {
-  try {
-    await ElMessageBox.confirm(
-      '将强制停止当前任务并刷新页面。\n已入库的数据不受影响。',
-      '重置',
-      { confirmButtonText: '确认重置', cancelButtonText: '取消', type: 'warning' },
-    )
-  } catch {
+// ── 后台导入任务全局轮询 ──
+const bgImportStatus = ref<{ projectId: string; message: string; progress: number } | null>(null)
+let importPollTimer: ReturnType<typeof setInterval> | null = null
+
+async function pollImportQueue() {
+  const projectId = route.params.projectId as string
+  if (!projectId) {
+    bgImportStatus.value = null
     return
   }
-
-  // 先检测后端是否存活
-  let backendAlive = false
   try {
-    await api.get('/api/health', { timeout: 3000 })
-    backendAlive = true
-  } catch {
-    backendAlive = false
-  }
-
-  if (backendAlive) {
-    // 后端存活：尝试释放导入锁
-    const match = route.path.match(/^\/projects\/([^/]+)/)
-    const pid = match?.[1] || localStorage.getItem('gt-last-project-id') || null
-    if (pid) {
-      try {
-        await api.post(`/api/projects/${pid}/account-chart/import-reset`, {}, { timeout: 5000 })
-      } catch { /* 静默 */ }
+    const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${projectId}`)
+    const status = statusData.data ?? statusData
+    if (status && status.status === 'processing') {
+      bgImportStatus.value = {
+        projectId,
+        message: `[${status.progress ?? 0}%] ${status.message || '后台导入中...'}`,
+        progress: status.progress ?? 0,
+      }
+    } else if (bgImportStatus.value) {
+      const prev = bgImportStatus.value
+      bgImportStatus.value = null
+      if (prev.progress >= 0 && status?.status !== 'failed') {
+        ElMessage.success(status?.message || '后台导入已完成')
+      } else if (status?.status === 'failed') {
+        ElMessage.error(status?.message || '后台导入失败')
+      }
     }
-    window.location.reload()
-  } else {
-    // 后端不可用：提示用户并刷新（后端 --reload 模式会自动恢复）
-    try {
-      await ElMessageBox.alert(
-        '后端服务不可用（可能因大文件导入导致内存溢出）。\n\n' +
-        '页面将自动刷新，如果后端使用了 --reload 模式会自动恢复。\n' +
-        '如果刷新后仍然报错，请在终端手动重启后端：\n\n' +
-        'cd backend\n' +
-        'python -m uvicorn app.main:app --host 0.0.0.0 --port 9980 --reload',
-        '后端服务不可用',
-        { confirmButtonText: '刷新页面', type: 'error' },
-      )
-    } catch { /* 用户关闭弹窗 */ }
-    window.location.reload()
+  } catch {
+    // ignore
   }
 }
+
+function navigateToImport() {
+  const pid = bgImportStatus.value?.projectId || route.params.projectId
+  if (pid) {
+    router.push({ path: `/projects/${pid}/ledger`, query: { import: '1' } })
+  }
+}
+
+watch(() => route.params.projectId, (newId) => {
+  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
+  bgImportStatus.value = null
+  if (newId) {
+    pollImportQueue()
+    importPollTimer = setInterval(pollImportQueue, 10000)
+  }
+}, { immediate: true })
 
 async function handleLogout() {
   await authStore.logout()
@@ -470,6 +453,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
   document.removeEventListener('touchend', onTouchEnd)
+  if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
 })
 </script>
 
@@ -528,16 +512,30 @@ onUnmounted(() => {
   transition: all var(--gt-transition-fast);
 }
 .gt-topbar-btn:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
-.gt-topbar-btn--danger { color: #f56c6c; }
-.gt-topbar-btn--danger:hover { background: #fef0f0; color: #f56c6c; }
-.gt-topbar-btn--disabled { opacity: 0.4; cursor: default; }
-.gt-topbar-btn--disabled:hover { background: transparent; color: var(--gt-color-text-tertiary); }
 
 .gt-topbar-divider {
   width: 1px;
   height: 20px;
   background: var(--gt-color-border-light);
   margin: 0 2px;
+}
+
+.gt-import-indicator {
+  color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--gt-radius-sm);
+}
+.gt-import-indicator:hover {
+  background: var(--gt-color-primary-lighter);
+}
+.gt-import-label {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .gt-user-info {
@@ -610,10 +608,6 @@ onUnmounted(() => {
   color: #fff !important;
   box-shadow: 0 2px 8px rgba(75, 45, 119, 0.3);
 }
-.gt-nav-item--developing {
-  opacity: 0.5;
-  cursor: default;
-}
 .gt-nav-label { font-weight: 500; }
 .gt-maturity-badge {
   font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 3px;
@@ -621,7 +615,6 @@ onUnmounted(() => {
 }
 .gt-maturity-pilot { background: #fef0e6; color: #e6a23c; }
 .gt-maturity-exp { background: #fde2e2; color: #f56c6c; }
-.gt-maturity-dev { background: #f0f0f5; color: #999; }
 
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);

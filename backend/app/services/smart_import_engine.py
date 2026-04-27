@@ -9,14 +9,15 @@
 5. 辅助余额表 vs 辅助明细账一致性校验
 """
 
-import asyncio
 import hashlib
 import io
 import logging
 import re
+from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Optional
+from pathlib import Path
+from typing import Iterator, Optional
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -219,28 +220,6 @@ FIELD_LABELS = {
     "direction": "借贷方向",
 }
 
-# ── COPY 写入列定义（四表通用，CSV 和 Excel 分支共用） ──
-COPY_LEDGER_COLS = [
-    "company_code", "voucher_date", "voucher_no", "account_code",
-    "account_name", "debit_amount", "credit_amount", "summary",
-    "preparer", "currency_code", "accounting_period", "voucher_type",
-    "entry_seq", "debit_qty", "credit_qty", "debit_fc", "credit_fc",
-]
-COPY_AUX_LEDGER_COLS = COPY_LEDGER_COLS + [
-    "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
-]
-COPY_BALANCE_COLS = [
-    "company_code", "account_code", "account_name", "direction", "level",
-    "opening_balance", "opening_debit", "opening_credit",
-    "closing_balance", "closing_debit", "closing_credit",
-    "debit_amount", "credit_amount",
-    "year_opening_debit", "year_opening_credit",
-    "opening_qty", "opening_fc", "currency_code",
-]
-COPY_AUX_BALANCE_COLS = COPY_BALANCE_COLS + [
-    "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
-]
-
 _REQUIRED_FIELD_GROUPS: dict[str, list[tuple[str, set[str]]]] = {
     "balance": [
         ("account_code", {"account_code"}),
@@ -371,7 +350,7 @@ def _detect_missing_fields(data_type: str, matched_fields: set[str]) -> tuple[li
 
 
 def smart_match_column(header: str) -> Optional[str]:
-    """智能匹配列名到标准字段。优先匹配合并表头组合名。"""
+    """智能匹配列名到标准字段。优先匹配合并表头组合名，支持模糊匹配。"""
     h = header.strip()
     # 1. 合并表头组合名精确匹配
     if h in _MERGED_HEADER_MAP:
@@ -390,12 +369,99 @@ def smart_match_column(header: str) -> Optional[str]:
         return "aux_dimensions"
     if cleaned in _BASE_COLUMN_MAP:
         return _BASE_COLUMN_MAP[cleaned]
+    # 5. 模糊匹配：关键词包含（如"辅助核算_核算维度"含"核算维度"）
+    for keyword, mapped in ("核算维度", "aux_dimensions"), ("辅助核算", "aux_dimensions"), ("核算项目", "aux_dimensions"):
+        if keyword in h:
+            return mapped
+    # 6. 子串匹配常见列名（处理如"科目编码_V2"这类带后缀的列名）
+    for src, dst in _BASE_COLUMN_MAP.items():
+        if len(src) >= 3 and src in h:
+            return dst
+    for src, dst in _MERGED_HEADER_MAP.items():
+        if len(src) >= 3 and src in h:
+            return dst
+    return None
+
+
+def _infer_column_by_content(values: list[str]) -> Optional[str]:
+    """根据列内容推断标准字段类型（当表头无法识别时）。
+
+    返回标准字段名如 "aux_dimensions", "account_code" 等，或 None。
+    """
+    if not values:
+        return None
+    non_empty = [v for v in values if v and str(v).strip()]
+    if len(non_empty) < 3:
+        return None
+
+    samples = non_empty[:50]
+
+    # 核算维度：格式为 "类型:编码,名称; 类型:编码,名称" 或包含冒号+逗号
+    aux_dim_pattern = re.compile(r'[^:]+:[^,]+,[^;]+')
+    aux_matches = sum(1 for v in samples if aux_dim_pattern.search(str(v)))
+    if aux_matches >= max(3, len(samples) * 0.3):
+        return "aux_dimensions"
+
+    # 科目编码：大部分是数字+点号格式（如 1002, 1122.01.03）
+    code_pattern = re.compile(r'^\d+(\.\d+)*$')
+    code_matches = sum(1 for v in samples if code_pattern.match(str(v).strip()))
+    if code_matches >= len(samples) * 0.5:
+        return "account_code"
+
+    # 科目名称：中文字符为主，长度适中
+    name_matches = sum(1 for v in samples if len(str(v).strip()) >= 2 and bool(re.search(r'[\u4e00-\u9fff]', str(v))))
+    if name_matches >= len(samples) * 0.5:
+        # 如果前面有科目编码列，这更可能是科目名称
+        return "account_name"
+
+    # 借方/贷方金额：大部分是数字（含负数、小数点、逗号分隔）
+    amount_pattern = re.compile(r'^-?[\d,]+\.?\d*$')
+    amount_matches = sum(1 for v in samples if amount_pattern.match(str(v).strip().replace(',', '')))
+    if amount_matches >= len(samples) * 0.5:
+        # 无法区分借方还是贷方，返回通用金额标记
+        return "debit_amount"  # 默认借方，后续可人工调整
+
+    # 日期：大部分是日期格式
+    date_patterns = [
+        re.compile(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}'),
+        re.compile(r'^\d{4}年\d{1,2}月\d{1,2}日'),
+    ]
+    date_matches = sum(1 for v in samples if any(p.match(str(v).strip()) for p in date_patterns))
+    if date_matches >= len(samples) * 0.3:
+        return "voucher_date"
+
     return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. 年度自动提取
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _extract_company_info(rows_before_header: list[list[str | None]]) -> tuple[str | None, int | None]:
+    """从表头前的信息行提取企业名称和年度。
+
+    典型格式：
+      '核算组织：重庆和平药房连锁有限责任公司; 开始期间：2025年1期;...'
+    Returns:
+        (company_name, year)
+    """
+    for row in rows_before_header:
+        text = " ".join(str(c).strip() for c in row if c)
+        if not text:
+            continue
+        # 企业名称
+        m = re.search(r'核算组织[：:]\s*([^;；,，]+)', text)
+        company_name = m.group(1).strip() if m else None
+        # 年度
+        year = None
+        ym = re.search(r'(20\d{2})\s*年', text)
+        if ym:
+            year = int(ym.group(1))
+        # 只在找到企业名称或年度时才返回，否则继续扫描
+        if company_name or year:
+            return company_name, year
+    return None, None
+
 
 def extract_year_from_content(rows: list[dict], filename: str = "") -> Optional[int]:
     """从文件内容或文件名中提取年度。
@@ -469,6 +535,7 @@ def _append_account_record(
     seen_codes: set[str],
     acct_records: list[AccountChart],
     by_category: dict[str, int],
+    staged: bool = False,
 ) -> bool:
     code = str(row.get("account_code", "")).strip()
     name = str(row.get("account_name", "")).strip()
@@ -494,6 +561,7 @@ def _append_account_record(
         category=category,
         parent_code=parent_code,
         source=AccountSource.client,
+        is_deleted=staged,
     ))
     by_category[category.value] = by_category.get(category.value, 0) + 1
     return True
@@ -565,11 +633,169 @@ def _infer_level(code: str) -> int:
     return 5
 
 
-def smart_parse_sheet(ws, *, read_only: bool = True) -> dict:
+def _source_size_bytes(source) -> int:
+    if isinstance(source, (bytes, bytearray)):
+        return len(source)
+    if isinstance(source, (str, Path)):
+        try:
+            return Path(source).stat().st_size
+        except OSError:
+            return 0
+    return 0
+
+
+@contextmanager
+def _open_binary_source(source):
+    if isinstance(source, (bytes, bytearray)):
+        yield io.BytesIO(source)
+        return
+    if isinstance(source, (str, Path)):
+        with Path(source).open("rb") as fh:
+            yield fh
+        return
+    if hasattr(source, "seek"):
+        try:
+            source.seek(0)
+        except Exception:
+            pass
+    yield source
+
+
+def _workbook_input(source):
+    if isinstance(source, (bytes, bytearray)):
+        return io.BytesIO(source)
+    if isinstance(source, (str, Path)):
+        return str(source)
+    if hasattr(source, "seek"):
+        try:
+            source.seek(0)
+        except Exception:
+            pass
+    return source
+
+
+def _detect_stream_encoding(sample: bytes) -> str:
+    for enc in ("utf-8-sig", "utf-8", "gbk", "gb2312", "gb18030"):
+        try:
+            sample.decode(enc)
+            return enc
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return "latin-1"
+
+
+def _build_sheet_context(ws, sheet_mapping: Optional[dict[str, str]] = None) -> dict:
+    header_start, header_count = detect_header_rows(ws)
+    headers = merge_header_rows(ws, header_start, header_count)
+
+    column_mapping = {}
+    for h in headers:
+        mapped = smart_match_column(h)
+        if mapped:
+            column_mapping[h] = mapped
+    if sheet_mapping:
+        for h, std_field in sheet_mapping.items():
+            if h in headers and std_field:
+                column_mapping[h] = std_field
+
+    rows_before_header: list[list[str | None]] = []
+    if header_start > 0:
+        try:
+            max_col = ws.max_column or 1
+            for r in range(1, header_start + 1):
+                rows_before_header.append([
+                    ws.cell(r, c).value for c in range(1, max_col + 1)
+                ])
+        except Exception:
+            header_iter = ws.iter_rows(max_row=header_start, values_only=True)
+            for row_vals in header_iter:
+                rows_before_header.append(list(row_vals))
+    company_name, info_year = _extract_company_info(rows_before_header)
+
+    data_start = header_start + header_count
+    total_row_estimate = None
+    try:
+        if ws.max_row and ws.max_row > data_start:
+            total_row_estimate = ws.max_row - data_start
+    except Exception:
+        total_row_estimate = None
+
+    return {
+        "headers": headers,
+        "header_start": header_start,
+        "header_count": header_count,
+        "column_mapping": column_mapping,
+        "data_type": _guess_data_type(set(column_mapping.values())),
+        "company_code": company_name,
+        "info_year": info_year,
+        "total_row_estimate": total_row_estimate,
+    }
+
+
+def _iter_sheet_row_dicts(ws, sheet_context: dict, max_data_rows: int | None = None) -> Iterator[dict]:
+    headers = sheet_context["headers"]
+    column_mapping = sheet_context["column_mapping"]
+    company_name = sheet_context.get("company_code")
+    data_start = sheet_context["header_start"] + sheet_context["header_count"]
+    num_cols = len(headers)
+
+    try:
+        data_iter = ws.iter_rows(min_row=data_start + 1, values_only=True)
+    except TypeError:
+        data_iter = ws.iter_rows(values_only=True)
+        for _ in range(data_start):
+            try:
+                next(data_iter)
+            except StopIteration:
+                data_iter = iter(())
+                break
+
+    row_count = 0
+    for row_vals in data_iter:
+        if max_data_rows is not None and row_count >= max_data_rows:
+            break
+        padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
+        if all(c is None for c in padded[:num_cols]):
+            continue
+        row_dict = {}
+        for i in range(num_cols):
+            header = headers[i]
+            mapped = column_mapping.get(header, header)
+            row_dict[mapped] = padded[i]
+        if company_name:
+            row_dict["company_code"] = company_name
+        row_count += 1
+        yield row_dict
+
+
+def _iter_sheet_row_batches(
+    ws,
+    sheet_context: dict,
+    *,
+    batch_size: int,
+    max_data_rows: int | None = None,
+) -> Iterator[list[dict]]:
+    batch: list[dict] = []
+    for row in _iter_sheet_row_dicts(ws, sheet_context, max_data_rows=max_data_rows):
+        batch.append(row)
+        if len(batch) >= batch_size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def smart_parse_sheet(
+    ws,
+    *,
+    read_only: bool = True,
+    max_data_rows: int | None = None,
+    sheet_mapping: Optional[dict[str, str]] = None,
+) -> dict:
     """通用智能解析单个 worksheet。
 
-    注意：此函数会把所有数据行读入内存，仅适用于预览或小文件。
-    大文件流式导入请使用 parse_sheet_header_only() + iter_sheet_rows()。
+    Args:
+        max_data_rows: 最大解析数据行数，None 表示全部解析（用于预览模式限制内存）。
 
     Returns:
         {
@@ -580,175 +806,30 @@ def smart_parse_sheet(ws, *, read_only: bool = True) -> dict:
             "data_type": str,           # 识别的数据类型
             "rows": [...],              # 原始数据行（dict）
             "year": int | None,         # 自动提取的年度
+            "row_count": int,           # 实际解析行数
+            "total_row_estimate": int | None,  # 总行数估算（仅当 max_data_rows 有限制时）
         }
     """
-    header_start, header_count = detect_header_rows(ws)
-    headers = merge_header_rows(ws, header_start, header_count)
-
-    # 列名映射
-    column_mapping = {}
-    for h in headers:
-        mapped = smart_match_column(h)
-        if mapped:
-            column_mapping[h] = mapped
-
-    # 读取数据行
-    data_start = header_start + header_count
-    num_cols = len(headers)
-    rows = []
-
-    # 尝试用 min_row 参数（非 read_only 模式更高效）
-    try:
-        data_iter = ws.iter_rows(min_row=data_start + 1, values_only=True)
-    except TypeError:
-        data_iter = ws.iter_rows(values_only=True)
-        for _ in range(data_start):
-            try:
-                next(data_iter)
-            except StopIteration:
-                data_iter = iter([])
-                break
-
-    for row_vals in data_iter:
-        # 补齐列数（read_only 模式下合并单元格可能导致列数不足）
-        padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
-        if all(c is None for c in padded[:num_cols]):
-            continue
-        row_dict = {}
-        for i in range(num_cols):
-            h = headers[i]
-            mapped = column_mapping.get(h, h)
-            row_dict[mapped] = padded[i]
-        rows.append(row_dict)
-
-    # 识别数据类型
-    mapped_fields = set(column_mapping.values())
-    data_type = _guess_data_type(mapped_fields)
-
-    # 提取年度
-    year = extract_year_from_content(rows)
+    sheet_context = _build_sheet_context(ws, sheet_mapping=sheet_mapping)
+    rows = list(_iter_sheet_row_dicts(ws, sheet_context, max_data_rows=max_data_rows))
+    row_count = len(rows)
+    total_row_estimate = sheet_context.get("total_row_estimate")
+    if max_data_rows is None or total_row_estimate is None:
+        total_row_estimate = row_count
+    year = sheet_context.get("info_year") or extract_year_from_content(rows)
 
     return {
-        "headers": headers,
-        "header_start": header_start,
-        "header_count": header_count,
-        "column_mapping": column_mapping,
-        "data_type": data_type,
+        "headers": sheet_context["headers"],
+        "header_start": sheet_context["header_start"],
+        "header_count": sheet_context["header_count"],
+        "column_mapping": sheet_context["column_mapping"],
+        "data_type": sheet_context["data_type"],
         "rows": rows,
         "year": year,
-        "row_count": len(rows),
+        "row_count": row_count,
+        "total_row_estimate": total_row_estimate,
+        "company_code": sheet_context.get("company_code"),
     }
-
-
-def parse_sheet_header_only(ws) -> dict:
-    """只解析表头和列映射，不读取数据行。用于流式导入场景。
-
-    Returns:
-        {
-            "headers": [...],
-            "header_start": int,
-            "header_count": int,
-            "column_mapping": {...},
-            "data_type": str,
-            "data_start": int,          # 数据起始行（0-indexed）
-            "num_cols": int,
-            "year": int | None,         # 从前几行提取的年度（采样）
-        }
-    """
-    header_start, header_count = detect_header_rows(ws)
-    headers = merge_header_rows(ws, header_start, header_count)
-
-    column_mapping = {}
-    for h in headers:
-        mapped = smart_match_column(h)
-        if mapped:
-            column_mapping[h] = mapped
-
-    mapped_fields = set(column_mapping.values())
-    data_type = _guess_data_type(mapped_fields)
-    data_start = header_start + header_count
-    num_cols = len(headers)
-
-    # 从前 30 行数据采样提取年度
-    sample_rows = []
-    try:
-        data_iter = ws.iter_rows(min_row=data_start + 1, max_row=data_start + 30, values_only=True)
-    except TypeError:
-        data_iter = ws.iter_rows(values_only=True)
-        for _ in range(data_start):
-            try:
-                next(data_iter)
-            except StopIteration:
-                data_iter = iter([])
-                break
-
-    for row_vals in data_iter:
-        padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
-        if all(c is None for c in padded[:num_cols]):
-            continue
-        row_dict = {}
-        for i in range(num_cols):
-            h = headers[i]
-            mapped = column_mapping.get(h, h)
-            row_dict[mapped] = padded[i]
-        sample_rows.append(row_dict)
-
-    year = extract_year_from_content(sample_rows)
-
-    return {
-        "headers": headers,
-        "header_start": header_start,
-        "header_count": header_count,
-        "column_mapping": column_mapping,
-        "data_type": data_type,
-        "data_start": data_start,
-        "num_cols": num_cols,
-        "year": year,
-    }
-
-
-def iter_sheet_rows(ws, meta: dict, batch_size: int = 50_000):
-    """逐批迭代 worksheet 数据行的生成器。每次 yield 一批 dict 列表。
-
-    Args:
-        ws: openpyxl worksheet
-        meta: parse_sheet_header_only() 的返回值
-        batch_size: 每批行数
-
-    Yields:
-        list[dict]  — 每批最多 batch_size 行
-    """
-    headers = meta["headers"]
-    column_mapping = meta["column_mapping"]
-    data_start = meta["data_start"]
-    num_cols = meta["num_cols"]
-
-    try:
-        data_iter = ws.iter_rows(min_row=data_start + 1, values_only=True)
-    except TypeError:
-        data_iter = ws.iter_rows(values_only=True)
-        for _ in range(data_start):
-            try:
-                next(data_iter)
-            except StopIteration:
-                return
-
-    batch: list[dict] = []
-    for row_vals in data_iter:
-        padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
-        if all(c is None for c in padded[:num_cols]):
-            continue
-        row_dict = {}
-        for i in range(num_cols):
-            h = headers[i]
-            mapped = column_mapping.get(h, h)
-            row_dict[mapped] = padded[i]
-        batch.append(row_dict)
-        if len(batch) >= batch_size:
-            yield batch
-            batch = []
-    if batch:
-        yield batch
 
 
 def _parse_with_known_headers(ws, headers: list[str], header_start: int, header_count: int) -> dict:
@@ -758,6 +839,21 @@ def _parse_with_known_headers(ws, headers: list[str], header_start: int, header_
         mapped = smart_match_column(h)
         if mapped:
             column_mapping[h] = mapped
+
+    # 从表头前的信息行提取企业和年度
+    rows_before_header: list[list[str | None]] = []
+    if header_start > 0:
+        try:
+            _max_col = ws.max_column or 1
+            for r in range(1, header_start + 1):
+                rows_before_header.append([
+                    ws.cell(r, c).value for c in range(1, _max_col + 1)
+                ])
+        except Exception:
+            _rh_iter = ws.iter_rows(max_row=header_start, values_only=True)
+            for _row_vals in _rh_iter:
+                rows_before_header.append(list(_row_vals))
+    company_name, info_year = _extract_company_info(rows_before_header)
 
     data_start = header_start + header_count
     num_cols = len(headers)
@@ -779,11 +875,13 @@ def _parse_with_known_headers(ws, headers: list[str], header_start: int, header_
             h = headers[i]
             mapped = column_mapping.get(h, h)
             row_dict[mapped] = padded[i]
+        if company_name:
+            row_dict["company_code"] = company_name
         rows.append(row_dict)
 
     mapped_fields = set(column_mapping.values())
     data_type = _guess_data_type(mapped_fields)
-    year = extract_year_from_content(rows)
+    year = info_year or extract_year_from_content(rows)
 
     return {
         "headers": headers,
@@ -794,6 +892,7 @@ def _parse_with_known_headers(ws, headers: list[str], header_start: int, header_
         "rows": rows,
         "year": year,
         "row_count": len(rows),
+        "company_code": company_name,
     }
 
 
@@ -813,11 +912,15 @@ def _guess_data_type(fields: set[str]) -> str:
     has_aux_dimensions = "aux_dimensions" in fields
     has_aux_separate = any(f in fields for f in ("aux_code", "aux_name")) and "aux_type" in fields
 
-    # 独立辅助核算列（非混合维度列）
+    # 独立辅助核算列（非混合维度列）- 只有当文件不含主表核心字段时才判定为独立辅助表
     if has_aux_separate and not has_aux_dimensions:
-        if has_voucher_date:
-            return "aux_ledger"
-        return "aux_balance"
+        has_balance_core = has_code and (has_opening or has_closing or has_debit or has_credit)
+        has_ledger_core = has_voucher_date and has_voucher_no and (has_debit or has_credit)
+        if not has_balance_core and not has_ledger_core:
+            if has_voucher_date:
+                return "aux_ledger"
+            return "aux_balance"
+        # 含主表核心字段 → 继续走 balance/ledger 判定（带辅助维度的余额表/序时账）
 
     # 序时账（可能含核算维度列，拆分后生成辅助明细账）
     if has_voucher_date and has_voucher_no and (has_debit or has_credit):
@@ -842,7 +945,7 @@ def _guess_data_type(fields: set[str]) -> str:
 # 6. 四表数据转换（从原始行 → 标准化记录）
 # ─────────────────────────────────────────────────────────────────────────────
 
-def convert_balance_rows(rows: list[dict], diagnostics: list | None = None) -> tuple[list[dict], list[dict]]:
+def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
     """将余额表原始行转换为 (tb_balance_rows, tb_aux_balance_rows)。
 
     两种期初/期末模式都保留原始数据：
@@ -850,209 +953,184 @@ def convert_balance_rows(rows: list[dict], diagnostics: list | None = None) -> t
     - 净额+方向模式（期初余额+方向）：存 opening_balance，不强制拆借贷
 
     核算维度列自动拆分为辅助余额表记录。
-
-    Args:
-        rows: 原始行列表
-        diagnostics: 可选列表，记录跳过的行（row_number + reason + raw_data）
     """
     balance_rows = []
     aux_balance_rows = []
 
-    for i, row in enumerate(rows):
-        excel_row = i + 2  # +2 因为第1行是表头，索引从0开始
-        try:
-            account_code = str(row.get("account_code", "")).strip()
-            if not account_code:
-                if diagnostics is not None:
-                    diagnostics.append({
-                        "row_number": excel_row,
-                        "reason": "科目编码为空",
-                        "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
-                    })
-                continue
-
-            account_name = str(row.get("account_name", "")).strip()
-            company_code = str(row.get("company_code", "")).strip() or "default"
-
-            # ── 期初 ──
-            od = _safe_decimal(row.get("opening_debit"))
-            oc = _safe_decimal(row.get("opening_credit"))
-            opening_bal = _safe_decimal(row.get("opening_balance"))
-            opening_dir = row.get("opening_direction") or row.get("direction")
-
-            # 年初余额作为备选
-            if od is None and oc is None and opening_bal is None:
-                od = _safe_decimal(row.get("year_opening_debit"))
-                oc = _safe_decimal(row.get("year_opening_credit"))
-
-            # 分列模式：有借贷分列 → 保留原始借贷，同时算净额
-            if od is not None or oc is not None:
-                opening_balance = (od or Decimal(0)) - (oc or Decimal(0))
-            elif opening_bal is not None and opening_dir:
-                # 净额+方向模式：保留净额原值
-                opening_balance = opening_bal
-                dir_str = str(opening_dir).strip()
-                if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
-                    opening_balance = -abs(opening_bal)
-                elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
-                    opening_balance = abs(opening_bal)
-            else:
-                opening_balance = opening_bal  # 纯净额，无方向
-
-            # ── 期末 ──
-            cd = _safe_decimal(row.get("closing_debit"))
-            cc = _safe_decimal(row.get("closing_credit"))
-            closing_bal = _safe_decimal(row.get("closing_balance"))
-            closing_dir = row.get("closing_direction") or row.get("direction")
-
-            if cd is not None or cc is not None:
-                closing_balance = (cd or Decimal(0)) - (cc or Decimal(0))
-            elif closing_bal is not None and closing_dir:
-                closing_balance = closing_bal
-                dir_str = str(closing_dir).strip()
-                if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
-                    closing_balance = -abs(closing_bal)
-                elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
-                    closing_balance = abs(closing_bal)
-            else:
-                closing_balance = closing_bal
-
-            debit_amount = _safe_decimal(row.get("debit_amount"))
-            credit_amount = _safe_decimal(row.get("credit_amount"))
-
-            # 核算维度处理
-            aux_dim_str = str(row.get("aux_dimensions", "")).strip()
-            if not aux_dim_str:
-                aux_dim_str = str(row.get("aux_type", "")).strip()
-                if aux_dim_str and ":" not in aux_dim_str and "：" not in aux_dim_str:
-                    aux_dim_str = ""
-
-            base_row = {
-                "account_code": account_code,
-                "account_name": account_name,
-                "company_code": company_code,
-                "opening_balance": opening_balance,
-                "opening_debit": od,
-                "opening_credit": oc,
-                "debit_amount": debit_amount,
-                "credit_amount": credit_amount,
-                "closing_balance": closing_balance,
-                "closing_debit": cd,
-                "closing_credit": cc,
-                "currency_code": "CNY",
-            }
-
-            if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
-                dims = parse_aux_dimensions(aux_dim_str)
-                for dim in dims:
-                    aux_balance_rows.append({
-                        **base_row,
-                        "aux_type": dim["aux_type"],
-                        "aux_code": dim["aux_code"],
-                        "aux_name": dim["aux_name"],
-                        "aux_dimensions_raw": aux_dim_str,  # 保留原始维度组合
-                    })
-            else:
-                balance_rows.append({
-                    **base_row,
-                    "level": _infer_level(account_code),
-                })
-        except Exception as e:
-            if diagnostics is not None:
-                diagnostics.append({
-                    "row_number": excel_row,
-                    "reason": f"{type(e).__name__}: {str(e)[:100]}",
-                    "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
-                })
+    for row in rows:
+        account_code = str(row.get("account_code", "")).strip()
+        if not account_code:
             continue
+
+        account_name = str(row.get("account_name", "")).strip()
+        company_code = str(row.get("company_code", "")).strip() or "default"
+
+        # ── 期初 ──
+        od = _safe_decimal(row.get("opening_debit"))
+        oc = _safe_decimal(row.get("opening_credit"))
+        opening_bal = _safe_decimal(row.get("opening_balance"))
+        opening_dir = row.get("opening_direction") or row.get("direction")
+
+        # 年初余额作为备选
+        if od is None and oc is None and opening_bal is None:
+            od = _safe_decimal(row.get("year_opening_debit"))
+            oc = _safe_decimal(row.get("year_opening_credit"))
+
+        # 分列模式：有借贷分列 → 保留原始借贷，同时算净额
+        if od is not None or oc is not None:
+            opening_balance = (od or Decimal(0)) - (oc or Decimal(0))
+        elif opening_bal is not None and opening_dir:
+            # 净额+方向模式：保留净额原值
+            opening_balance = opening_bal
+            dir_str = str(opening_dir).strip()
+            if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
+                opening_balance = -abs(opening_bal)
+            elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
+                opening_balance = abs(opening_bal)
+        else:
+            opening_balance = opening_bal  # 纯净额，无方向
+
+        # ── 期末 ──
+        cd = _safe_decimal(row.get("closing_debit"))
+        cc = _safe_decimal(row.get("closing_credit"))
+        closing_bal = _safe_decimal(row.get("closing_balance"))
+        closing_dir = row.get("closing_direction") or row.get("direction")
+
+        if cd is not None or cc is not None:
+            closing_balance = (cd or Decimal(0)) - (cc or Decimal(0))
+        elif closing_bal is not None and closing_dir:
+            closing_balance = closing_bal
+            dir_str = str(closing_dir).strip()
+            if dir_str in ("贷", "贷方", "C", "c", "credit", "Credit"):
+                closing_balance = -abs(closing_bal)
+            elif dir_str in ("借", "借方", "D", "d", "debit", "Debit"):
+                closing_balance = abs(closing_bal)
+        else:
+            closing_balance = closing_bal
+
+        debit_amount = _safe_decimal(row.get("debit_amount"))
+        credit_amount = _safe_decimal(row.get("credit_amount"))
+
+        # 核算维度处理（支持单列表"核算维度"和多列表"辅助类型+辅助编码+辅助名称"两种格式）
+        aux_dim_str = str(row.get("aux_dimensions", "")).strip()
+
+        # 多列格式：辅助类型 + 辅助编码（不含冒号分隔）
+        if not aux_dim_str:
+            aux_type_val = str(row.get("aux_type", "")).strip()
+            aux_code_val = str(row.get("aux_code", "")).strip()
+            if aux_type_val and aux_code_val:
+                aux_name_val = str(row.get("aux_name", "")).strip() or aux_code_val
+                aux_dim_str = f"{aux_type_val}:{aux_code_val},{aux_name_val}"
+            elif aux_type_val and ":" not in aux_type_val and "：" not in aux_type_val:
+                # 只有辅助类型名称，无编码 → 不是有效辅助维度
+                aux_dim_str = ""
+
+        base_row = {
+            "account_code": account_code,
+            "account_name": account_name,
+            "company_code": company_code,
+            "opening_balance": opening_balance,
+            "opening_debit": od,
+            "opening_credit": oc,
+            "debit_amount": debit_amount,
+            "credit_amount": credit_amount,
+            "closing_balance": closing_balance,
+            "closing_debit": cd,
+            "closing_credit": cc,
+            "currency_code": "CNY",
+        }
+
+        if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
+            dims = parse_aux_dimensions(aux_dim_str)
+            for dim in dims:
+                aux_balance_rows.append({
+                    **base_row,
+                    "aux_type": dim["aux_type"],
+                    "aux_code": dim["aux_code"],
+                    "aux_name": dim["aux_name"],
+                    "aux_dimensions_raw": aux_dim_str,  # 保留原始维度组合
+                })
+        else:
+            balance_rows.append({
+                **base_row,
+                "level": _infer_level(account_code),
+            })
 
     return balance_rows, aux_balance_rows
 
 
-def convert_ledger_rows(rows: list[dict], diagnostics: list | None = None) -> tuple[list[dict], list[dict], dict]:
-    """将序时账原始行转换为 (tb_ledger_rows, [], aux_stats)。
+def convert_ledger_rows(rows: list[dict]) -> tuple[list[dict], list[dict], dict]:
+    """将序时账原始行转换为 (tb_ledger_rows, tb_aux_ledger_rows, aux_stats)。
 
-    只做字段提取和类型转换，不做维度解析（维度在写入时流式处理）。
-    aux_stats 只做简单计数（有维度字符串的行数），不实际解析。
+    内存优化：辅助明细账只统计维度分布（aux_stats），不在内存中保留全部行。
+    实际的辅助明细账行在 write_four_tables 中流式生成写入。
 
-    Args:
-        rows: 原始行列表
-        diagnostics: 可选列表，记录跳过的行（row_number + reason + raw_data）
+    Returns:
+        (ledger_rows, [], aux_stats)
+        - ledger_rows: 序时账行（带 _aux_dim_str 原始维度字符串）
+        - []: 空列表（辅助明细账不在内存中保留）
+        - aux_stats: {"成本中心": 12345, ...} 维度统计
     """
     ledger_rows = []
-    aux_count = 0
+    aux_stats: dict[str, int] = {}
 
-    for i, row in enumerate(rows):
-        excel_row = i + 2  # +2 因为第1行是表头，索引从0开始
-        try:
-            account_code = str(row.get("account_code", "")).strip()
-            if not account_code:
-                if diagnostics is not None:
-                    diagnostics.append({
-                        "row_number": excel_row,
-                        "reason": "科目编码为空",
-                        "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
-                    })
-                continue
-
-            voucher_date = _parse_date_val(row.get("voucher_date"))
-            voucher_no = str(row.get("voucher_no", "")).strip()
-            if not voucher_date or not voucher_no:
-                if diagnostics is not None:
-                    missing = []
-                    if not voucher_date:
-                        missing.append("凭证日期")
-                    if not voucher_no:
-                        missing.append("凭证号")
-                    diagnostics.append({
-                        "row_number": excel_row,
-                        "reason": f"缺少必需字段: {', '.join(missing)}",
-                        "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
-                    })
-                continue
-
-            account_name = str(row.get("account_name", "")).strip()
-            voucher_type = str(row.get("voucher_type", "")).strip() or None
-            accounting_period = _parse_period_str(row.get("accounting_period"))
-            debit_amount = _safe_decimal(row.get("debit_amount"))
-            credit_amount = _safe_decimal(row.get("credit_amount"))
-            summary = str(row.get("summary", "")).strip() or None
-            preparer = str(row.get("preparer", "")).strip() or None
-
-            aux_dim_str = str(row.get("aux_dimensions", "")).strip()
-            if not aux_dim_str:
-                aux_dim_str = str(row.get("aux_type", "")).strip()
-                if aux_dim_str and ":" not in aux_dim_str and "：" not in aux_dim_str:
-                    aux_dim_str = ""
-
-            if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
-                aux_count += 1
-
-            ledger_rows.append({
-                "account_code": account_code,
-                "account_name": account_name,
-                "voucher_date": voucher_date,
-                "voucher_no": voucher_no,
-                "voucher_type": voucher_type,
-                "accounting_period": accounting_period,
-                "debit_amount": debit_amount,
-                "credit_amount": credit_amount,
-                "summary": summary,
-                "preparer": preparer,
-                "company_code": "default",
-                "currency_code": "CNY",
-                "_aux_dim_str": aux_dim_str,
-            })
-        except Exception as e:
-            if diagnostics is not None:
-                diagnostics.append({
-                    "row_number": excel_row,
-                    "reason": f"{type(e).__name__}: {str(e)[:100]}",
-                    "raw_data": {k: str(v)[:50] for k, v in row.items() if v},
-                })
+    for row in rows:
+        account_code = str(row.get("account_code", "")).strip()
+        if not account_code:
             continue
 
-    return ledger_rows, [], {"_has_aux": aux_count}
+        voucher_date = _parse_date_val(row.get("voucher_date"))
+        voucher_no = str(row.get("voucher_no", "")).strip()
+        if not voucher_date or not voucher_no:
+            continue
+
+        account_name = str(row.get("account_name", "")).strip()
+        voucher_type = str(row.get("voucher_type", "")).strip() or None
+        accounting_period = _parse_period_str(row.get("accounting_period"))
+        debit_amount = _safe_decimal(row.get("debit_amount"))
+        credit_amount = _safe_decimal(row.get("credit_amount"))
+        summary = str(row.get("summary", "")).strip() or None
+        preparer = str(row.get("preparer", "")).strip() or None
+
+        # 核算维度原始字符串（保留，写入时再拆分）
+        # 支持单列表"核算维度"和多列表"辅助类型+辅助编码+辅助名称"两种格式
+        aux_dim_str = str(row.get("aux_dimensions", "")).strip()
+
+        # 多列格式：辅助类型 + 辅助编码
+        if not aux_dim_str:
+            aux_type_val = str(row.get("aux_type", "")).strip()
+            aux_code_val = str(row.get("aux_code", "")).strip()
+            if aux_type_val and aux_code_val:
+                aux_name_val = str(row.get("aux_name", "")).strip() or aux_code_val
+                aux_dim_str = f"{aux_type_val}:{aux_code_val},{aux_name_val}"
+            elif aux_type_val and ":" not in aux_type_val and "：" not in aux_type_val:
+                aux_dim_str = ""
+
+        # 统计维度分布（不生成辅助明细行）
+        if aux_dim_str and (":" in aux_dim_str or "：" in aux_dim_str):
+            dims = parse_aux_dimensions(aux_dim_str)
+            for dim in dims:
+                aux_stats[dim["aux_type"]] = aux_stats.get(dim["aux_type"], 0) + 1
+
+        company_code = str(row.get("company_code", "")).strip() or "default"
+
+        ledger_rows.append({
+            "account_code": account_code,
+            "account_name": account_name,
+            "voucher_date": voucher_date,
+            "voucher_no": voucher_no,
+            "voucher_type": voucher_type,
+            "accounting_period": accounting_period,
+            "debit_amount": debit_amount,
+            "credit_amount": credit_amount,
+            "summary": summary,
+            "preparer": preparer,
+            "company_code": company_code,
+            "currency_code": "CNY",
+            "_aux_dim_str": aux_dim_str,  # 内部字段，写入时拆分
+        })
+
+    return ledger_rows, [], aux_stats
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1242,150 +1320,215 @@ def validate_four_tables(
     return findings
 
 
+def _resolve_sheet_mapping(
+    custom_mapping: Optional[dict],
+    filename: str,
+    sheet_name: str,
+) -> Optional[dict[str, str]]:
+    if not custom_mapping:
+        return None
+    if not any(isinstance(v, dict) for v in custom_mapping.values()):
+        return custom_mapping
+
+    keys = [
+        f"{filename}/{sheet_name}",
+        sheet_name,
+    ]
+    if sheet_name == "CSV":
+        keys.append("CSV")
+
+    for key in keys:
+        value = custom_mapping.get(key)
+        if isinstance(value, dict):
+            return value
+    return None
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. 核心入口：智能解析多文件 → 四表数据
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _parse_csv_for_preview(
-    content: bytes,
+    content,
     filename: str,
     custom_mapping: Optional[dict] = None,
     max_rows: int = 0,
 ) -> dict:
-    """解析 CSV 文件用于预览/解析。
-
-    大文件时只解析全部行（预览需要完整数据用于转换），
-    但使用流式解码避免生成完整 str 副本。
-
-    Args:
-        max_rows: 最大读取行数，0=全部
-    """
+    """解析 CSV 文件用于预览/解析。"""
     import codecs
     import csv
 
-    total_lines_est = content.count(b'\n')
+    total_bytes = _source_size_bytes(content)
+    with _open_binary_source(content) as raw_probe:
+        sample = raw_probe.read(65536)
+    if not sample:
+        raise ValueError("CSV 文件为空")
 
-    # 编码探测（截断到换行符边界）
-    probe_end = min(16384, len(content))
-    while probe_end > 0 and content[probe_end - 1:probe_end] != b'\n':
-        probe_end -= 1
-    if probe_end == 0:
-        probe_end = min(16384, len(content))
-    sample = content[:probe_end]
-    encoding = None
-    for enc in ("utf-8-sig", "utf-8", "gbk", "gb2312", "gb18030"):
-        try:
-            sample.decode(enc)
-            encoding = enc
-            break
-        except (UnicodeDecodeError, LookupError):
-            continue
-    if encoding is None:
-        encoding = "latin-1"
+    encoding = _detect_stream_encoding(sample)
+    sample_line_count = sample.count(b'\n')
+    if sample_line_count > 0 and total_bytes > 0:
+        avg_line_bytes = max(len(sample) / sample_line_count, 1)
+        total_lines_est = max(int(total_bytes / avg_line_bytes), 1)
+    else:
+        total_lines_est = 0
 
-    stream = codecs.getreader(encoding)(io.BytesIO(content))
-
-    # 检测表头
     header_line = None
-    for _ in range(5):
-        line = stream.readline()
-        if not line:
-            break
-        cells = line.strip().split(',')
-        non_empty = [c.strip() for c in cells if c.strip()]
-        if len(non_empty) >= 3:
-            header_line = line.strip()
-            break
+    header_line_number = 0
+    with _open_binary_source(content) as raw_header:
+        stream = codecs.getreader(encoding)(raw_header)
+        for idx in range(5):
+            line = stream.readline()
+            if not line:
+                break
+            cells = line.strip().split(',')
+            non_empty = [c.strip() for c in cells if c.strip()]
+            if len(non_empty) >= 3:
+                header_line = line.strip()
+                header_line_number = idx + 1
+                break
 
     if header_line is None:
         raise ValueError("CSV 文件未找到有效表头")
 
     reader_header = list(csv.reader([header_line]))[0]
-    headers = [c.strip() if c.strip() else f"col_{j}" for j, c in enumerate(reader_header)]
+    raw_headers = [c.strip() if c.strip() else f"col_{j}" for j, c in enumerate(reader_header)]
 
-    # 列名映射
+    headers = raw_headers[:]
+    mid = len(raw_headers) // 2
+    wide_table_detected = False
+
+    if len(raw_headers) >= 60:
+        first_half_matches = sum(1 for h in raw_headers[:mid] if smart_match_column(h))
+        second_half_matches = sum(1 for h in raw_headers[mid:] if smart_match_column(h))
+        if second_half_matches >= 5 and second_half_matches > first_half_matches * 2:
+            wide_table_detected = True
+            headers = raw_headers[mid:]
+
     column_mapping: dict[str, str] = {}
+    header_mapped: set[str] = set()
     for h in headers:
         mapped = smart_match_column(h)
         if mapped:
             column_mapping[h] = mapped
+            header_mapped.add(h)
 
-    if custom_mapping:
-        sm = custom_mapping.get("CSV", custom_mapping) if isinstance(custom_mapping, dict) else None
-        if sm and not any(isinstance(v, dict) for v in sm.values()):
-            for h, v in sm.items():
-                if h in headers and v:
-                    column_mapping[h] = v
+    content_inferred: dict[str, str] = {}
+    if len(column_mapping) < 3:
+        _preview_rows_for_inference: list[list[str]] = []
+        with _open_binary_source(content) as raw_infer:
+            _temp_stream = codecs.getreader(encoding)(raw_infer)
+            for _ in range(header_line_number):
+                if not _temp_stream.readline():
+                    break
+            for _ in range(20):
+                line = _temp_stream.readline()
+                if not line:
+                    break
+                cells = list(csv.reader([line.strip()]))[0] if line.strip() else []
+                if cells:
+                    _preview_rows_for_inference.append(cells)
+        for j, h in enumerate(headers):
+            if h not in column_mapping or not column_mapping[h]:
+                col_values = []
+                for cells in _preview_rows_for_inference:
+                    idx = j
+                    if idx < len(cells):
+                        col_values.append(cells[idx])
+                inferred = _infer_column_by_content(col_values)
+                if inferred:
+                    column_mapping[h] = inferred
+                    content_inferred[h] = inferred
+
+    sheet_mapping = _resolve_sheet_mapping(custom_mapping, filename, "CSV")
+    if sheet_mapping:
+        for h, v in sheet_mapping.items():
+            if h in headers and v:
+                column_mapping[h] = v
 
     mapped_fields = set(column_mapping.values())
     dt = _guess_data_type(mapped_fields)
 
-    # 流式读取所有行
-    rows = []
+    rows: list[dict] = []
     row_count = 0
-    line_buf: list[str] = []
     BATCH = 100_000
 
-    while True:
-        line = stream.readline()
-        if not line:
-            break
-        line = line.rstrip('\n').rstrip('\r')
-        if line:
-            line_buf.append(line)
-
-        if len(line_buf) >= BATCH:
-            for row_raw in csv.reader(line_buf):
-                if not row_raw or all(not c.strip() for c in row_raw):
-                    continue
+    def _consume_lines(lines: list[str]):
+        nonlocal row_count
+        for row_raw in csv.reader(lines):
+            if not row_raw or all(not c.strip() for c in row_raw):
+                continue
+            if wide_table_detected:
+                padded = row_raw + [""] * max(0, mid - len(row_raw))
+                row_dict = {}
+                for j, h in enumerate(headers):
+                    mapped = column_mapping.get(h, h)
+                    data_idx = j
+                    val = padded[data_idx].strip() if data_idx < len(padded) else ""
+                    row_dict[mapped] = val if val else None
+            else:
                 padded = row_raw + [""] * max(0, len(headers) - len(row_raw))
                 row_dict = {}
                 for j, h in enumerate(headers):
                     mapped = column_mapping.get(h, h)
                     val = padded[j].strip() if j < len(padded) else ""
                     row_dict[mapped] = val if val else None
-                rows.append(row_dict)
-                row_count += 1
-                if max_rows and row_count >= max_rows:
-                    break
-            line_buf.clear()
-            if max_rows and row_count >= max_rows:
-                break
-
-    # 处理剩余行
-    if line_buf and (not max_rows or row_count < max_rows):
-        for row_raw in csv.reader(line_buf):
-            if not row_raw or all(not c.strip() for c in row_raw):
-                continue
-            padded = row_raw + [""] * max(0, len(headers) - len(row_raw))
-            row_dict = {}
-            for j, h in enumerate(headers):
-                mapped = column_mapping.get(h, h)
-                val = padded[j].strip() if j < len(padded) else ""
-                row_dict[mapped] = val if val else None
             rows.append(row_dict)
             row_count += 1
             if max_rows and row_count >= max_rows:
                 break
 
+    with _open_binary_source(content) as raw_data:
+        stream = codecs.getreader(encoding)(raw_data)
+        total_lines = 0
+        for _ in range(header_line_number):
+            if not stream.readline():
+                break
+            total_lines += 1
+
+        line_buf: list[str] = []
+        while True:
+            line = stream.readline()
+            if not line:
+                break
+            total_lines += 1
+            line = line.rstrip('\n').rstrip('\r')
+            if not line:
+                continue
+            if not max_rows or row_count < max_rows:
+                line_buf.append(line)
+                if len(line_buf) >= BATCH:
+                    _consume_lines(line_buf)
+                    line_buf.clear()
+
+        if line_buf and (not max_rows or row_count < max_rows):
+            _consume_lines(line_buf)
+
+        total_lines_est = max(total_lines_est, total_lines)
+
     year_val = extract_year_from_content(rows[:100], filename=filename)
 
     return {
         "headers": headers,
+        "raw_headers": raw_headers,
         "column_mapping": column_mapping,
+        "header_mapped": header_mapped,
+        "content_inferred": content_inferred,
         "data_type": dt,
         "rows": rows,
         "year": year_val,
         "row_count": row_count,
         "total_lines_est": total_lines_est,
+        "wide_table_detected": wide_table_detected,
     }
 
 
 def smart_parse_files(
-    file_contents: list[tuple[str, bytes]],
+    file_contents: list[tuple[str, object]],
     year_override: Optional[int] = None,
     custom_mapping: Optional[dict[str, str] | dict[str, dict[str, str]]] = None,
+    preview_mode: bool = False,
+    preview_rows: int = 50,
 ) -> dict:
     """智能解析多个文件，返回四表数据 + 维度信息 + 校验结果。
 
@@ -1395,6 +1538,8 @@ def smart_parse_files(
         custom_mapping: 用户手动指定的列映射。
             - 全局映射: {原始列名: 标准字段名}
             - 按 sheet 映射: {sheet_name: {原始列名: 标准字段名}}
+        preview_mode: 预览模式（只解析前 N 行，不做数据转换，节省内存）
+        preview_rows: 预览模式下单 sheet/CSV 最大解析行数
 
     Returns:
         {
@@ -1419,12 +1564,13 @@ def smart_parse_files(
     _aux_type_counts: dict[str, int] = {}  # 维度统计（从余额表+序时账合并）
 
     for filename, content in file_contents:
-        logger.info("解析文件: %s (%d bytes)", filename, len(content))
+        logger.info("解析文件: %s (%d bytes) preview=%s", filename, _source_size_bytes(content), preview_mode)
 
         # ── CSV 文件单独处理 ──
         if filename.lower().endswith('.csv'):
             try:
-                csv_parsed = _parse_csv_for_preview(content, filename, custom_mapping)
+                csv_max_rows = preview_rows if preview_mode else 0
+                csv_parsed = _parse_csv_for_preview(content, filename, custom_mapping, max_rows=csv_max_rows)
             except Exception as e:
                 diagnostics.append({
                     "file": filename, "sheet": "CSV",
@@ -1439,25 +1585,68 @@ def smart_parse_files(
             if detected_year is None and csv_parsed.get("year"):
                 detected_year = csv_parsed["year"]
 
+            total_lines_est = csv_parsed.get("total_lines_est", csv_parsed["row_count"])
+            est_total = max(total_lines_est - 1, csv_parsed["row_count"])  # 减去表头行
+
             diag = {
                 "file": filename, "sheet": "CSV", "data_type": dt,
                 "row_count": csv_parsed["row_count"],
+                "total_row_estimate": est_total,
                 "header_count": 1,
                 "matched_cols": sorted(matched_fields),
                 "missing_cols": missing_cols,
                 "missing_recommended": missing_recommended,
                 "column_mapping": csv_parsed["column_mapping"],
                 "status": "ok",
+                # 以下字段供前端手动映射调整
+                "raw_headers": csv_parsed.get("raw_headers", csv_parsed["headers"]),
+                "headers": csv_parsed["headers"],
+                "wide_table_detected": csv_parsed.get("wide_table_detected", False),
+                "content_inferred": csv_parsed.get("content_inferred", {}),
             }
 
-            if dt == "ledger":
+            if preview_mode:
+                diag["status"] = "preview"
+                # 预览模式也做数据转换拆分，估算辅助表行数
+                if dt == "ledger":
+                    led, _, aux_stats = convert_ledger_rows(csv_parsed["rows"])
+                    diag["ledger_count_est"] = est_total
+                    aux_led_est = 0
+                    if csv_parsed["row_count"] > 0:
+                        ratio = sum(aux_stats.values()) / csv_parsed["row_count"]
+                        aux_led_est = int(est_total * ratio)
+                    diag["aux_ledger_count_est"] = aux_led_est
+                    for t, c in aux_stats.items():
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+                elif dt == "balance" or dt == "aux_balance":
+                    bal, aux_bal = convert_balance_rows(csv_parsed["rows"])
+                    diag["balance_count_est"] = est_total
+                    aux_bal_est = 0
+                    if csv_parsed["row_count"] > 0:
+                        ratio = len(aux_bal) / csv_parsed["row_count"]
+                        aux_bal_est = int(est_total * ratio)
+                    diag["aux_balance_count_est"] = aux_bal_est
+                elif dt == "aux_ledger":
+                    led, _, aux_stats = convert_ledger_rows(csv_parsed["rows"])
+                    diag["ledger_count_est"] = est_total
+                    aux_led_est = 0
+                    if csv_parsed["row_count"] > 0:
+                        ratio = sum(aux_stats.values()) / csv_parsed["row_count"]
+                        aux_led_est = int(est_total * ratio)
+                    diag["aux_ledger_count_est"] = aux_led_est
+                    for t, c in aux_stats.items():
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+                diagnostics.append(diag)
+                continue
+
+            if dt == "ledger" or dt == "aux_ledger":
                 led, _, aux_stats = convert_ledger_rows(csv_parsed["rows"])
                 all_ledger_rows.extend(led)
                 diag["ledger_count"] = len(led)
                 diag["aux_ledger_count"] = sum(aux_stats.values())
                 for t, c in aux_stats.items():
                     _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
-            elif dt == "balance":
+            elif dt == "balance" or dt == "aux_balance":
                 bal, aux_bal = convert_balance_rows(csv_parsed["rows"])
                 all_balance_rows.extend(bal)
                 all_aux_balance_rows.extend(aux_bal)
@@ -1473,7 +1662,7 @@ def smart_parse_files(
         # ── Excel 文件处理 ──
         # 第一遍：read_only 模式快速扫描
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            wb = openpyxl.load_workbook(_workbook_input(content), read_only=True, data_only=True)
         except Exception as e:
             diagnostics.append({
                 "file": filename, "sheet": None,
@@ -1482,7 +1671,6 @@ def smart_parse_files(
             continue
 
         needs_full_mode = False
-        sheet_col_counts = {}  # sheet_name -> max_column (from full mode probe)
         for ws in wb.worksheets:
             try:
                 first_rows = list(ws.iter_rows(max_row=5, values_only=True))
@@ -1508,15 +1696,14 @@ def smart_parse_files(
 
         # 如果需要完整模式（有合并单元格），直接用完整模式打开
         # 完整模式打开约4秒，iter_rows遍历50000行约0.4秒，可接受
-        header_cache = {}
         if needs_full_mode:
             logger.info("  检测到合并单元格，使用完整模式: %s", filename)
 
         try:
             if needs_full_mode:
-                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                wb = openpyxl.load_workbook(_workbook_input(content), data_only=True)
             else:
-                wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+                wb = openpyxl.load_workbook(_workbook_input(content), read_only=True, data_only=True)
         except Exception as e:
             diagnostics.append({
                 "file": filename, "sheet": None,
@@ -1532,7 +1719,12 @@ def smart_parse_files(
                 continue
 
             try:
-                parsed = smart_parse_sheet(ws)
+                sheet_mapping = _resolve_sheet_mapping(custom_mapping, filename, sheet_name)
+                parsed = smart_parse_sheet(
+                    ws,
+                    max_data_rows=(preview_rows if preview_mode else None),
+                    sheet_mapping=sheet_mapping,
+                )
             except Exception as e:
                 diagnostics.append({
                     "file": filename, "sheet": sheet_name,
@@ -1540,46 +1732,12 @@ def smart_parse_files(
                 })
                 continue
 
-            # 应用用户自定义映射（支持全局或按 sheet）
-            sheet_mapping = None
-            if custom_mapping:
-                # 检测是否是按 sheet 的嵌套映射
-                if any(isinstance(v, dict) for v in custom_mapping.values()):
-                    sheet_mapping = custom_mapping.get(sheet_name)
-                else:
-                    sheet_mapping = custom_mapping  # type: ignore[assignment]
-
-            if sheet_mapping:
-                original_headers = list(parsed["headers"])
-                original_column_mapping = dict(parsed["column_mapping"])
-                handled_keys = {
-                    original_column_mapping.get(header, header)
-                    for header in original_headers
-                }
-                for h, std_field in sheet_mapping.items():
-                    if h in original_headers:
-                        parsed["column_mapping"][h] = std_field
-                new_rows = []
-                for row in parsed["rows"]:
-                    new_row = {}
-                    for header in original_headers:
-                        current_key = original_column_mapping.get(header, header)
-                        if current_key not in row:
-                            continue
-                        mapped = parsed["column_mapping"].get(header, current_key)
-                        new_row[mapped] = row[current_key]
-                    for k, v in row.items():
-                        if k not in handled_keys:
-                            new_row[k] = v
-                    new_rows.append(new_row)
-                parsed["rows"] = new_rows
-                parsed["data_type"] = _guess_data_type(set(parsed["column_mapping"].values()))
-
             if parsed.get("year") is None:
                 parsed["year"] = extract_year_from_content(parsed["rows"], filename=filename)
 
             dt = parsed["data_type"]
             row_count = parsed["row_count"]
+            total_estimate = parsed.get("total_row_estimate")
             matched_fields = set(parsed["column_mapping"].values())
             missing_cols, missing_recommended = _detect_missing_fields(dt, matched_fields)
 
@@ -1592,22 +1750,72 @@ def smart_parse_files(
                 "sheet": sheet_name,
                 "data_type": dt,
                 "row_count": row_count,
+                "total_row_estimate": total_estimate,
                 "header_count": parsed["header_count"],
                 "matched_cols": sorted(matched_fields),
                 "missing_cols": missing_cols,
                 "missing_recommended": missing_recommended,
                 "column_mapping": parsed["column_mapping"],
                 "status": "ok",
+                # 以下字段供前端手动映射调整和企业信息展示
+                "raw_headers": parsed["headers"],
+                "headers": parsed["headers"],
+                "company_code": parsed.get("company_code"),
+                "year": parsed.get("year"),
+                "wide_table_detected": False,
+                "content_inferred": {},
             }
 
-            if dt == "balance":
+            if preview_mode:
+                diag["status"] = "preview"
+                est = total_estimate if total_estimate is not None else row_count
+                if dt == "balance":
+                    bal, aux_bal = convert_balance_rows(parsed["rows"])
+                    diag["balance_count_est"] = est
+                    aux_bal_est = 0
+                    if row_count > 0:
+                        ratio = len(aux_bal) / row_count
+                        aux_bal_est = int(est * ratio)
+                    diag["aux_balance_count_est"] = aux_bal_est
+                elif dt == "ledger":
+                    led, _, aux_stats = convert_ledger_rows(parsed["rows"])
+                    diag["ledger_count_est"] = est
+                    aux_led_est = 0
+                    if row_count > 0:
+                        ratio = sum(aux_stats.values()) / row_count
+                        aux_led_est = int(est * ratio)
+                    diag["aux_ledger_count_est"] = aux_led_est
+                    for t, c in aux_stats.items():
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+                elif dt == "aux_balance":
+                    bal, aux_bal = convert_balance_rows(parsed["rows"])
+                    diag["balance_count_est"] = est
+                    aux_bal_est = 0
+                    if row_count > 0:
+                        ratio = len(aux_bal) / row_count
+                        aux_bal_est = int(est * ratio)
+                    diag["aux_balance_count_est"] = aux_bal_est
+                elif dt == "aux_ledger":
+                    led, _, aux_stats = convert_ledger_rows(parsed["rows"])
+                    diag["ledger_count_est"] = est
+                    aux_led_est = 0
+                    if row_count > 0:
+                        ratio = sum(aux_stats.values()) / row_count
+                        aux_led_est = int(est * ratio)
+                    diag["aux_ledger_count_est"] = aux_led_est
+                    for t, c in aux_stats.items():
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+                diagnostics.append(diag)
+                continue
+
+            if dt == "balance" or dt == "aux_balance":
                 bal, aux_bal = convert_balance_rows(parsed["rows"])
                 all_balance_rows.extend(bal)
                 all_aux_balance_rows.extend(aux_bal)
                 diag["balance_count"] = len(bal)
                 diag["aux_balance_count"] = len(aux_bal)
 
-            elif dt == "ledger":
+            elif dt == "ledger" or dt == "aux_ledger":
                 led, _, aux_stats = convert_ledger_rows(parsed["rows"])
                 all_ledger_rows.extend(led)
                 # 辅助明细账不在内存中保留，写入时从 _aux_dim_str 流式拆分
@@ -1617,16 +1825,6 @@ def smart_parse_files(
                 # 合并维度统计
                 for t, c in aux_stats.items():
                     _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
-
-            elif dt == "aux_balance":
-                # 独立辅助余额表直接收集
-                all_aux_balance_rows.extend(parsed["rows"])
-                diag["aux_balance_count"] = len(parsed["rows"])
-
-            elif dt == "aux_ledger":
-                # 独立辅助明细账直接收集
-                all_aux_ledger_rows.extend(parsed["rows"])
-                diag["aux_ledger_count"] = len(parsed["rows"])
 
             else:
                 diag["status"] = "skipped"
@@ -1670,78 +1868,26 @@ def smart_parse_files(
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
-    """将旧批次对应四表数据软删除，并标记批次为 rolled_back。
+    """Soft-delete all four table data for a given project+year.
 
-    说明：
-    - 仅更新当前 project_id + year 的已完成导入批次对应数据。
-    - 使用 project/year 条件限制更新范围，避免无界扫描。
+    Ensures that each project-year has exactly one effective dataset
+    and old data from previous imports does not remain as a mix.
     """
-    import time as _time
     import sqlalchemy as sa
-    from app.models.audit_platform_models import (
-        ImportBatch,
-        ImportStatus,
-        TbAuxBalance,
-        TbAuxLedger,
-        TbBalance,
-        TbLedger,
-    )
+    from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
 
-    _t0 = _time.perf_counter()
-    old_batch_ids = (
+    for model in (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger):
+        tbl = model.__table__
         await db.execute(
-            sa.select(ImportBatch.id).where(
-                ImportBatch.project_id == project_id,
-                ImportBatch.year == year,
-                ImportBatch.status == ImportStatus.completed,
-                ImportBatch.data_type != "__smart_import_job__",
+            sa.update(tbl)
+            .where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.is_deleted == sa.false(),
             )
+            .values(is_deleted=True)
         )
-    ).scalars().all()
-
-    if not old_batch_ids:
-        logger.info(
-            "[PERF] _clear_project_year_tables: no previous completed batches, %.2fs",
-            _time.perf_counter() - _t0,
-        )
-        return
-
-    table_models = (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger)
-    for model in table_models:
-        tbl = model.__table__
-        await db.execute(
-            sa.update(tbl).where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.is_deleted == sa.false(),
-                tbl.c.import_batch_id.in_(old_batch_ids),
-            ).values(is_deleted=True)
-        )
-
-    # 兼容历史数据：对于没有 import_batch_id 的旧行，也按 project/year 软删除。
-    for model in table_models:
-        tbl = model.__table__
-        await db.execute(
-            sa.update(tbl).where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.is_deleted == sa.false(),
-                tbl.c.import_batch_id.is_(None),
-            ).values(is_deleted=True)
-        )
-
-    await db.execute(
-        sa.update(ImportBatch.__table__).where(
-            ImportBatch.id.in_(old_batch_ids),
-            ImportBatch.status == ImportStatus.completed,
-        ).values(status=ImportStatus.rolled_back)
-    )
     await db.flush()
-    logger.info(
-        "[PERF] _clear_project_year_tables: batches=%d, %.2fs",
-        len(old_batch_ids),
-        _time.perf_counter() - _t0,
-    )
 
 
 async def write_four_tables(
@@ -1812,10 +1958,10 @@ async def write_four_tables(
                 record_count += len(recs)
                 written_total += len(recs)
                 _progress(data_type, written_total, total_est, f"{data_type}: {record_count:,} / {len(rows):,}")
-            if record_count > 0 and record_count % 50000 < CHUNK_SIZE:
-                await db.flush()
+            # 每批提交，减少事务持有时间和锁竞争
+            await db.commit()
+            batch.record_count = record_count
 
-        batch.record_count = record_count
         batch.status = ImportStatus.completed
         batch.completed_at = datetime.utcnow()
         result[data_type] = record_count
@@ -1885,15 +2031,18 @@ async def write_four_tables(
                 led_count += len(led_buf)
                 written_total += len(led_buf)
                 led_buf.clear()
-                await db.flush()
                 _progress("tb_ledger", written_total, total_est, f"序时账: {led_count:,}, 辅助明细: {aux_count:,}")
             if len(aux_buf) >= CHUNK_SIZE:
                 await db.execute(aux_tbl.insert(), aux_buf)
                 aux_count += len(aux_buf)
                 written_total += len(aux_buf)
                 aux_buf.clear()
-                await db.flush()
                 _progress("tb_aux_ledger", written_total, total_est, f"序时账: {led_count:,}, 辅助明细: {aux_count:,}")
+            # 有数据写入时提交，减少事务粒度
+            if len(led_buf) == 0 and len(aux_buf) == 0 and (led_count > 0 or aux_count > 0):
+                await db.commit()
+                led_batch.record_count = led_count
+                aux_batch.record_count = aux_count
 
         # 写入剩余
         if led_buf:
@@ -1902,6 +2051,8 @@ async def write_four_tables(
         if aux_buf:
             await db.execute(aux_tbl.insert(), aux_buf)
             aux_count += len(aux_buf)
+        if led_count > 0 or aux_count > 0:
+            await db.commit()
 
         led_batch.record_count = led_count
         led_batch.status = ImportStatus.completed
@@ -1943,7 +2094,7 @@ async def write_four_tables(
 
 async def _stream_csv_import(
     *,
-    content: bytes,
+    content,
     filename: str,
     project_id,
     year: int,
@@ -1967,33 +2118,7 @@ async def _stream_csv_import(
     """
     import codecs
     import csv
-    import uuid as _uuid
-
-    async def _do_insert(table_name: str, columns: list[str], rows: list[dict], batch_id) -> int:
-        """纯 SQLAlchemy 批量 INSERT（不用 COPY，避免事务冲突）。"""
-        if not rows:
-            return 0
-        import time as _time
-        from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
-        _TBL = {"tb_balance": TbBalance, "tb_ledger": TbLedger,
-                "tb_aux_balance": TbAuxBalance, "tb_aux_ledger": TbAuxLedger}
-        tbl = _TBL[table_name].__table__
-        import uuid as _u
-        records = []
-        for row in rows:
-            rec = {"id": _u.uuid4(), "project_id": project_id,
-                   "year": year, "import_batch_id": batch_id, "is_deleted": False}
-            for col in columns:
-                rec[col] = row.get(col)
-            records.append(rec)
-        _t0 = _time.perf_counter()
-        await db.execute(tbl.insert(), records)
-        await db.flush()
-        _elapsed = _time.perf_counter() - _t0
-        logger.info("[PERF] CSV _do_insert %s: %d rows in %.2fs (%.0f rows/s)",
-                    table_name, len(records), _elapsed,
-                    len(records) / _elapsed if _elapsed > 0.001 else 0)
-        return len(records)
+    from app.services.fast_writer import copy_insert
 
     def _prog(pct, msg=""):
         if progress_callback:
@@ -2002,50 +2127,50 @@ async def _stream_csv_import(
             except Exception:
                 pass
 
-    # ── 流式解码：不生成完整 str ──
-    total_bytes = len(content)
-    total_lines_est = content.count(b'\n')
+    total_bytes = _source_size_bytes(content)
+    with _open_binary_source(content) as raw_probe:
+        sample = raw_probe.read(65536)
+    if not sample:
+        raise ValueError("CSV 文件为空")
+
+    encoding = _detect_stream_encoding(sample)
+    sample_line_count = sample.count(b'\n')
+    if sample_line_count > 0 and total_bytes > 0:
+        avg_line_bytes = max(len(sample) / sample_line_count, 1)
+        total_lines_est = max(int(total_bytes / avg_line_bytes), 1)
+    else:
+        total_lines_est = 0
     _prog(12, f"CSV {filename}: ~{total_lines_est:,} 行, {total_bytes/1024/1024:.0f} MB")
 
-    # 探测编码（截断到最后一个换行符，避免截断多字节字符）
-    probe_end = min(16384, len(content))
-    # 往回找最近的换行符
-    while probe_end > 0 and content[probe_end - 1:probe_end] != b'\n':
-        probe_end -= 1
-    if probe_end == 0:
-        probe_end = min(16384, len(content))
-    sample = content[:probe_end]
-    encoding = None
-    for enc in ("utf-8-sig", "utf-8", "gbk", "gb2312", "gb18030"):
-        try:
-            sample.decode(enc)
-            encoding = enc
-            break
-        except (UnicodeDecodeError, LookupError):
-            continue
-    if encoding is None:
-        encoding = "latin-1"
-    logger.info("CSV 编码检测: %s (probe %d bytes)", encoding, probe_end)
-
-    stream = codecs.getreader(encoding)(io.BytesIO(content))
-
-    # ── 检测表头 ──
     header_line = None
-    for _ in range(5):
-        line = stream.readline()
-        if not line:
-            break
-        cells = line.strip().split(',')
-        non_empty = [c.strip() for c in cells if c.strip()]
-        if len(non_empty) >= 3:
-            header_line = line.strip()
-            break
+    header_line_number = 0
+    with _open_binary_source(content) as raw_header:
+        stream = codecs.getreader(encoding)(raw_header)
+        for idx in range(5):
+            line = stream.readline()
+            if not line:
+                break
+            cells = line.strip().split(',')
+            non_empty = [c.strip() for c in cells if c.strip()]
+            if len(non_empty) >= 3:
+                header_line = line.strip()
+                header_line_number = idx + 1
+                break
 
     if header_line is None:
         raise ValueError("CSV 文件未找到有效表头")
 
     reader_header = list(csv.reader([header_line]))[0]
-    headers = [c.strip() if c.strip() else f"col_{j}" for j, c in enumerate(reader_header)]
+    raw_headers = [c.strip() if c.strip() else f"col_{j}" for j, c in enumerate(reader_header)]
+    headers = raw_headers[:]
+    mid = len(raw_headers) // 2
+    wide_table_detected = False
+    if len(raw_headers) >= 60:
+        first_half_matches = sum(1 for h in raw_headers[:mid] if smart_match_column(h))
+        second_half_matches = sum(1 for h in raw_headers[mid:] if smart_match_column(h))
+        if second_half_matches >= 5 and second_half_matches > first_half_matches * 2:
+            wide_table_detected = True
+            headers = raw_headers[mid:]
 
     # ── 列名映射 ──
     column_mapping: dict[str, str] = {}
@@ -2054,12 +2179,11 @@ async def _stream_csv_import(
         if mapped:
             column_mapping[h] = mapped
 
-    if custom_mapping:
-        sm = custom_mapping.get("CSV", custom_mapping) if isinstance(custom_mapping, dict) else None
-        if sm and not any(isinstance(v, dict) for v in sm.values()):
-            for h, v in sm.items():
-                if h in headers and v:
-                    column_mapping[h] = v
+    sheet_mapping = _resolve_sheet_mapping(custom_mapping, filename, "CSV")
+    if sheet_mapping:
+        for h, v in sheet_mapping.items():
+            if h in headers and v:
+                column_mapping[h] = v
 
     mapped_fields = set(column_mapping.values())
     dt = _guess_data_type(mapped_fields)
@@ -2079,23 +2203,32 @@ async def _stream_csv_import(
         diag["message"] = f"CSV 科目表缺少必需列: {', '.join(miss_req)}"
         return {"diag": diag, "errors": []}
 
-    # 四表关键列缺失时也阻断（不入库）
-    if miss_req and dt in ("balance", "ledger", "aux_balance", "aux_ledger"):
-        _TYPE_LABELS = {"balance": "余额表", "ledger": "序时账", "aux_balance": "辅助余额表", "aux_ledger": "辅助明细账"}
-        diag["status"] = "skipped"
-        diag["message"] = f"CSV {_TYPE_LABELS.get(dt, dt)}缺少必需列: {', '.join(miss_req)}，请在列映射中手动指定"
-        return {"diag": diag, "errors": [diag["message"]]}
-
-    if dt not in ("ledger", "balance", "aux_balance", "aux_ledger", "account_chart"):
+    if dt not in ("ledger", "balance", "account_chart"):
         diag["status"] = "skipped"
         diag["message"] = f"CSV 未识别的数据类型: {dt}"
         return {"diag": diag, "errors": []}
 
-    # ── COPY 写入列定义（引用模块常量） ──
-    _LEDGER_COLS = COPY_LEDGER_COLS
-    _AUX_LEDGER_COLS = COPY_AUX_LEDGER_COLS
-    _BALANCE_COLS = COPY_BALANCE_COLS
-    _AUX_BALANCE_COLS = COPY_AUX_BALANCE_COLS
+    # ── COPY 写入列定义 ──
+    _LEDGER_COLS = [
+        "company_code", "voucher_date", "voucher_no", "account_code",
+        "account_name", "debit_amount", "credit_amount", "summary",
+        "preparer", "currency_code", "accounting_period", "voucher_type",
+        "entry_seq", "debit_qty", "credit_qty", "debit_fc", "credit_fc",
+    ]
+    _AUX_LEDGER_COLS = _LEDGER_COLS + [
+        "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
+    ]
+    _BALANCE_COLS = [
+        "company_code", "account_code", "account_name", "direction", "level",
+        "opening_balance", "opening_debit", "opening_credit",
+        "closing_balance", "closing_debit", "closing_credit",
+        "debit_amount", "credit_amount",
+        "year_opening_debit", "year_opening_credit",
+        "opening_qty", "opening_fc", "currency_code",
+    ]
+    _AUX_BALANCE_COLS = _BALANCE_COLS + [
+        "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
+    ]
 
     # ── 流式主循环 ──
     LINES_PER_BATCH = 100_000
@@ -2104,7 +2237,7 @@ async def _stream_csv_import(
     line_buf: list[str] = []
 
     async def _flush_batch(rows: list[dict]):
-        """转换一批原始行并用 COPY 写入。"""
+        """转换一批原始行并用 COPY 写入，每批提交以缩小事务粒度。"""
         if dt == "ledger":
             led, _, aux_stats = convert_ledger_rows(rows)
             for t, c in aux_stats.items():
@@ -2126,33 +2259,39 @@ async def _stream_csv_import(
                         })
 
             if led_rows:
-                n = await _do_insert("tb_ledger", _LEDGER_COLS, led_rows, batches["tb_ledger"].id)
+                n = await copy_insert(
+                    db, "tb_ledger", _LEDGER_COLS, led_rows,
+                    project_id, year, batches["tb_ledger"].id,
+                    is_deleted=True,
+                )
                 counts["tb_ledger"] += n
             if aux_rows:
-                n = await _do_insert("tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows, batches["tb_aux_ledger"].id)
+                n = await copy_insert(
+                    db, "tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows,
+                    project_id, year, batches["tb_aux_ledger"].id,
+                    is_deleted=True,
+                )
                 counts["tb_aux_ledger"] += n
 
         elif dt == "balance":
             bal, aux_bal = convert_balance_rows(rows)
             if bal:
-                n = await _do_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
+                n = await copy_insert(
+                    db, "tb_balance", _BALANCE_COLS, bal,
+                    project_id, year, batches["tb_balance"].id,
+                    is_deleted=True,
+                )
                 counts["tb_balance"] += n
             if aux_bal:
-                n = await _do_insert("tb_aux_balance", _AUX_BALANCE_COLS, aux_bal, batches["tb_aux_balance"].id)
+                n = await copy_insert(
+                    db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
+                    project_id, year, batches["tb_aux_balance"].id,
+                    is_deleted=True,
+                )
                 counts["tb_aux_balance"] += n
 
-        elif dt == "aux_balance":
-            if rows:
-                n = await _do_insert("tb_aux_balance", _AUX_BALANCE_COLS, rows, batches["tb_aux_balance"].id)
-                counts["tb_aux_balance"] += n
-            for r in rows:
-                t = r.get("aux_type", "?")
-                _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
-
-        elif dt == "aux_ledger":
-            if rows:
-                n = await _do_insert("tb_aux_ledger", _AUX_LEDGER_COLS, rows, batches["tb_aux_ledger"].id)
-                counts["tb_aux_ledger"] += n
+        # 每批 COPY 后提交，减少锁持有时间
+        await db.commit()
 
         # 提取科目
         for row in rows:
@@ -2162,6 +2301,7 @@ async def _stream_csv_import(
                 seen_codes=seen_codes,
                 acct_records=acct_records,
                 by_category=by_category,
+                staged=True,
             )
 
     def _parse_lines(lines: list[str]) -> list[dict]:
@@ -2170,40 +2310,52 @@ async def _stream_csv_import(
         for row_raw in csv.reader(lines):
             if not row_raw or all(not c.strip() for c in row_raw):
                 continue
-            padded = row_raw + [""] * max(0, len(headers) - len(row_raw))
-            row_dict = {}
-            for j, h in enumerate(headers):
-                mapped = column_mapping.get(h, h)
-                val = padded[j].strip() if j < len(padded) else ""
-                row_dict[mapped] = val if val else None
+            if wide_table_detected:
+                padded = row_raw + [""] * max(0, mid - len(row_raw))
+                row_dict = {}
+                for j, h in enumerate(headers):
+                    mapped = column_mapping.get(h, h)
+                    val = padded[j].strip() if j < len(padded) else ""
+                    row_dict[mapped] = val if val else None
+            else:
+                padded = row_raw + [""] * max(0, len(headers) - len(row_raw))
+                row_dict = {}
+                for j, h in enumerate(headers):
+                    mapped = column_mapping.get(h, h)
+                    val = padded[j].strip() if j < len(padded) else ""
+                    row_dict[mapped] = val if val else None
             result.append(row_dict)
         return result
 
-    # 逐行读取（流式解码）
-    while True:
-        line = stream.readline()
-        if not line:
-            break
-        line = line.rstrip('\n').rstrip('\r')
-        if line:
-            line_buf.append(line)
+    with _open_binary_source(content) as raw_data:
+        stream = codecs.getreader(encoding)(raw_data)
+        for _ in range(header_line_number):
+            if not stream.readline():
+                break
 
-        if len(line_buf) >= LINES_PER_BATCH:
+        while True:
+            line = stream.readline()
+            if not line:
+                break
+            line = line.rstrip('\n').rstrip('\r')
+            if line:
+                line_buf.append(line)
+
+            if len(line_buf) >= LINES_PER_BATCH:
+                parsed_rows = _parse_lines(line_buf)
+                row_count += len(parsed_rows)
+                if parsed_rows:
+                    await _flush_batch(parsed_rows)
+                pct = 15 + int(row_count / max(total_lines_est, 1) * 70)
+                _prog(min(pct, 88), f"CSV: {row_count:,}/{total_lines_est:,} 行")
+                line_buf.clear()
+
+        if line_buf:
             parsed_rows = _parse_lines(line_buf)
             row_count += len(parsed_rows)
             if parsed_rows:
                 await _flush_batch(parsed_rows)
-            pct = 15 + int(row_count / max(total_lines_est, 1) * 70)
-            _prog(min(pct, 88), f"CSV: {row_count:,}/{total_lines_est:,} 行")
             line_buf.clear()
-
-    # 处理剩余行
-    if line_buf:
-        parsed_rows = _parse_lines(line_buf)
-        row_count += len(parsed_rows)
-        if parsed_rows:
-            await _flush_batch(parsed_rows)
-        line_buf.clear()
 
     diag["row_count"] = row_count
     _prog(88, f"CSV 完成: {row_count:,} 行")
@@ -2216,143 +2368,42 @@ async def _stream_csv_import(
 
 async def smart_import_streaming(
     project_id: UUID,
-    file_contents: list[tuple[str, bytes]],
+    file_contents: list[tuple[str, object]],
     db,  # AsyncSession
     year_override: int | None = None,
     custom_mapping: Optional[dict] = None,
     progress_callback=None,
 ) -> dict:
-    """多文件流式导入：逐 sheet 解析并写入，内存可控，只 soft-delete 一次。
-
-    与 smart_parse_files() + write_four_tables() 两步方案的区别：
-    - 多文件安全：只在开头软删除一次旧数据，不会后续文件覆盖前面的
-    - 内存可控：每次只在内存中保留一个 sheet 的数据行
-    - 自动提取科目表：从余额表和序时账行中提取 account_code/name
-
-    Args:
-        project_id: 项目ID
-        file_contents: [(filename, content_bytes), ...]
-        db: AsyncSession
-        year_override: 用户指定年度（优先于自动提取）
-        custom_mapping: 列映射（全局 dict 或按 sheet 嵌套 dict）
-        progress_callback: (pct: int, msg: str) -> None
-
-    Returns:
-        {
-            "total_accounts": int,
-            "by_category": dict,
-            "data_sheets_imported": dict,
-            "sheet_diagnostics": list,  # 已规范化，可直接返回前端
-            "year": int,
-            "errors": list,
-        }
-    """
+    """多文件流式导入：逐批解析并隐藏写入，成功后统一激活。"""
     import openpyxl
-    import uuid as _uuid
     import sqlalchemy as sa
     from app.models.audit_platform_models import (
         TbBalance, TbLedger, TbAuxBalance, TbAuxLedger,
         ImportBatch, ImportStatus,
     )
+    from app.services.fast_writer import copy_insert
 
     CHUNK = 50_000
-
-    async def _batch_insert(table_name: str, columns: list[str], rows: list[dict], batch_id) -> int:
-        """纯 SQLAlchemy 批量 INSERT（不用 COPY，避免事务冲突）。"""
-        if not rows:
-            return 0
-        import time as _time
-        from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
-        _TBL = {"tb_balance": TbBalance, "tb_ledger": TbLedger,
-                "tb_aux_balance": TbAuxBalance, "tb_aux_ledger": TbAuxLedger}
-        tbl = _TBL[table_name].__table__
-        records = []
-        for row in rows:
-            rec = {"id": _uuid.uuid4(), "project_id": project_id,
-                   "year": year, "import_batch_id": batch_id, "is_deleted": False}
-            for col in columns:
-                rec[col] = row.get(col)
-            records.append(rec)
-        _t0 = _time.perf_counter()
-        await db.execute(tbl.insert(), records)
-        await db.flush()
-        _elapsed = _time.perf_counter() - _t0
-        logger.info("[PERF] _batch_insert %s: %d rows in %.2fs (%.0f rows/s)",
-                    table_name, len(records), _elapsed,
-                    len(records) / _elapsed if _elapsed > 0.001 else 0)
-        return len(records)
-
-    async def _process_cal_batch(raw_batch, dt, _led_buf, _aux_led_buf,
-                                  sheet_counts_cal, batches, counts,
-                                  _BALANCE_COLS, _AUX_BALANCE_COLS,
-                                  _LEDGER_COLS, _AUX_LEDGER_COLS,
-                                  _project_id, _seen_codes, _acct_records, _by_category,
-                                  _skipped_rows=None, _sheet_name=""):
-        """处理一批 calamine 原始行：转换+写入数据库。"""
-        if dt == "balance":
-            diag_bal: list[dict] = [] if _skipped_rows is not None else []
-            bal, aux_bal = convert_balance_rows(raw_batch, diagnostics=diag_bal if _skipped_rows is not None else None)
-            if _skipped_rows is not None:
-                for d in diag_bal:
-                    d["sheet_name"] = _sheet_name
-                _skipped_rows.extend(diag_bal)
-            if bal:
-                n = await _batch_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
-                counts["tb_balance"] += n
-                sheet_counts_cal["tb_balance"] += n
-            if aux_bal:
-                n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, aux_bal, batches["tb_aux_balance"].id)
-                counts["tb_aux_balance"] += n
-                sheet_counts_cal["tb_aux_balance"] += n
-
-        elif dt == "ledger":
-            diag_led: list[dict] = [] if _skipped_rows is not None else []
-            led, _, _ = convert_ledger_rows(raw_batch, diagnostics=diag_led if _skipped_rows is not None else None)
-            if _skipped_rows is not None:
-                for d in diag_led:
-                    d["sheet_name"] = _sheet_name
-                _skipped_rows.extend(diag_led)
-            for r in led:
-                adim = r.pop("_aux_dim_str", "")
-                _led_buf.append(r)
-                if adim and (":" in adim or "：" in adim):
-                    base = {k: r.get(k) for k in ("account_code", "account_name", "voucher_date",
-                            "voucher_no", "debit_amount", "credit_amount", "summary",
-                            "company_code", "currency_code")}
-                    for dim in parse_aux_dimensions(adim):
-                        _aux_led_buf.append({**base, "aux_type": dim["aux_type"],
-                                             "aux_code": dim["aux_code"], "aux_name": dim["aux_name"],
-                                             "aux_dimensions_raw": adim})
-            if len(_led_buf) >= CHUNK:
-                n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
-                counts["tb_ledger"] += n
-                sheet_counts_cal["tb_ledger"] += n
-                _led_buf.clear()
-            if len(_aux_led_buf) >= CHUNK:
-                n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
-                counts["tb_aux_ledger"] += n
-                sheet_counts_cal["tb_aux_ledger"] += n
-                _aux_led_buf.clear()
-
-        elif dt == "aux_balance":
-            if raw_batch:
-                n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, raw_batch, batches["tb_aux_balance"].id)
-                counts["tb_aux_balance"] += n
-                sheet_counts_cal["tb_aux_balance"] += n
-
-        elif dt == "aux_ledger":
-            _aux_led_buf.extend(raw_batch)
-            if len(_aux_led_buf) >= CHUNK:
-                n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
-                counts["tb_aux_ledger"] += n
-                sheet_counts_cal["tb_aux_ledger"] += n
-                _aux_led_buf.clear()
-
-        # 提取科目
-        for row in raw_batch:
-            _append_account_record(row=row, project_id=_project_id,
-                                   seen_codes=_seen_codes, acct_records=_acct_records,
-                                   by_category=_by_category)
+    _LEDGER_COLS = [
+        "company_code", "voucher_date", "voucher_no", "account_code",
+        "account_name", "debit_amount", "credit_amount", "summary",
+        "preparer", "currency_code", "accounting_period", "voucher_type",
+        "entry_seq", "debit_qty", "credit_qty", "debit_fc", "credit_fc",
+    ]
+    _AUX_LEDGER_COLS = _LEDGER_COLS + [
+        "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
+    ]
+    _BALANCE_COLS = [
+        "company_code", "account_code", "account_name", "direction", "level",
+        "opening_balance", "opening_debit", "opening_credit",
+        "closing_balance", "closing_debit", "closing_credit",
+        "debit_amount", "credit_amount",
+        "year_opening_debit", "year_opening_credit",
+        "opening_qty", "opening_fc", "currency_code",
+    ]
+    _AUX_BALANCE_COLS = _BALANCE_COLS + [
+        "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
+    ]
 
     def _prog(pct: int, msg: str = ""):
         if progress_callback:
@@ -2361,19 +2412,41 @@ async def smart_import_streaming(
             except Exception:
                 pass
 
-    # ── Phase 0: Quick scan to detect year ──────────────────────────────────
-    import time as _perf_time
-    _t_import_start = _perf_time.perf_counter()
     detected_year = year_override
-    total_size = sum(len(c) for _, c in file_contents)
+    total_size = sum(_source_size_bytes(c) for _, c in file_contents)
     sheet_count_est = 0
 
-    # 年度检测只用文件名（不打开文件），sheet 计数延迟到 Phase 2
     if detected_year is None:
-        for fn, _ in file_contents:
-            detected_year = extract_year_from_content([], filename=fn)
-            if detected_year:
-                break
+        for fn, ct in file_contents:
+            if fn.lower().endswith('.csv'):
+                sheet_count_est += 1
+                if detected_year is None:
+                    detected_year = extract_year_from_content([], filename=fn)
+                continue
+            try:
+                wb0 = openpyxl.load_workbook(_workbook_input(ct), read_only=True, data_only=True)
+                for ws0 in wb0.worksheets:
+                    sheet_count_est += 1
+                    if detected_year is None:
+                        detected_year = extract_year_from_content(
+                            [{f"c{j}": v for j, v in enumerate(r)}
+                             for r in ws0.iter_rows(max_row=25, values_only=True)],
+                            filename=fn,
+                        )
+                wb0.close()
+            except Exception:
+                continue
+    else:
+        for fn, ct in file_contents:
+            if fn.lower().endswith('.csv'):
+                sheet_count_est += 1
+                continue
+            try:
+                wb0 = openpyxl.load_workbook(_workbook_input(ct), read_only=True, data_only=True)
+                sheet_count_est += len(wb0.worksheets)
+                wb0.close()
+            except Exception:
+                pass
 
     if detected_year is None:
         detected_year = datetime.now().year - 1
@@ -2381,12 +2454,6 @@ async def smart_import_streaming(
 
     _prog(5, f"年度 {year}，{len(file_contents)} 个文件，{total_size/1024/1024:.1f} MB")
 
-    # ── Phase 0: 统一清理该 project+year 的全部四表旧数据 ────────────────
-    _t_clear = _perf_time.perf_counter()
-    await _clear_project_year_tables(project_id, year, db)
-    logger.info("[PERF] Phase 0 clear old data: %.2fs", _perf_time.perf_counter() - _t_clear)
-
-    # ── Phase 1: ImportBatch 记录 ─────────────────────────────────────────
     _TABLE_MAP = {
         "tb_balance": TbBalance,
         "tb_aux_balance": TbAuxBalance,
@@ -2394,29 +2461,63 @@ async def smart_import_streaming(
         "tb_aux_ledger": TbAuxLedger,
     }
     batches: dict[str, ImportBatch] = {}
-    for dt_key, model in _TABLE_MAP.items():
+    for dt_key in _TABLE_MAP:
         batch = ImportBatch(
-            project_id=project_id, year=year, source_type="smart_import",
-            file_name=f"multi_{dt_key}", data_type=dt_key,
-            status=ImportStatus.processing, started_at=datetime.utcnow(),
+            project_id=project_id,
+            year=year,
+            source_type="smart_import",
+            file_name=f"multi_{dt_key}",
+            data_type=dt_key,
+            status=ImportStatus.processing,
+            started_at=datetime.utcnow(),
         )
         db.add(batch)
         batches[dt_key] = batch
-
-    # soft-delete 旧科目表
-    ac_tbl = AccountChart.__table__
-    await db.execute(
-        sa.update(ac_tbl)
-        .where(ac_tbl.c.project_id == project_id, ac_tbl.c.source == "client")
-        .values(is_deleted=True)
-    )
     await db.flush()
-    _prog(10, "旧数据已清理，开始解析文件…")
+    _prog(10, "开始解析文件…")
 
-    # ── Phase 2: 逐文件逐 sheet 流式处理 ────────────────────────────────────
+    async def _activate_staged_rows(account_ids: list[UUID]) -> None:
+        for dt_key, model in _TABLE_MAP.items():
+            tbl = model.__table__
+            await db.execute(
+                sa.update(tbl)
+                .where(
+                    tbl.c.project_id == project_id,
+                    tbl.c.year == year,
+                    tbl.c.is_deleted == sa.false(),
+                )
+                .values(is_deleted=True)
+            )
+            await db.execute(
+                sa.update(tbl)
+                .where(
+                    tbl.c.project_id == project_id,
+                    tbl.c.year == year,
+                    tbl.c.import_batch_id == batches[dt_key].id,
+                )
+                .values(is_deleted=False)
+            )
+
+        ac_tbl = AccountChart.__table__
+        await db.execute(
+            sa.update(ac_tbl)
+            .where(
+                ac_tbl.c.project_id == project_id,
+                ac_tbl.c.source == AccountSource.client,
+                ac_tbl.c.is_deleted == sa.false(),
+            )
+            .values(is_deleted=True)
+        )
+        if account_ids:
+            await db.execute(
+                sa.update(ac_tbl)
+                .where(ac_tbl.c.id.in_(account_ids))
+                .values(is_deleted=False)
+            )
+        await db.flush()
+
     counts: dict[str, int] = {k: 0 for k in _TABLE_MAP}
     diagnostics: list[dict] = []
-    skipped_rows: list[dict] = []  # 记录跳过的行（row_number + reason + sheet_name）
     errors: list[str] = []
     seen_codes: set[str] = set()
     acct_records: list[AccountChart] = []
@@ -2425,8 +2526,13 @@ async def smart_import_streaming(
     sheets_done = 0
 
     for file_idx, (filename, content) in enumerate(file_contents):
-        logger.info("流式导入 %d/%d: %s (%d bytes)",
-                     file_idx + 1, len(file_contents), filename, len(content))
+        logger.info(
+            "流式导入 %d/%d: %s (%d bytes)",
+            file_idx + 1,
+            len(file_contents),
+            filename,
+            _source_size_bytes(content),
+        )
 
         if filename.lower().endswith('.xls'):
             diagnostics.append({
@@ -2438,11 +2544,9 @@ async def smart_import_streaming(
             errors.append(f"暂不支持 .xls 文件: {filename}，请先转换为 .xlsx 后再上传")
             continue
 
-        # ── CSV 文件单独处理（流式：逐批读取+写入，不全部加载到内存） ──
         if filename.lower().endswith('.csv'):
             sheets_done += 1
             _prog(12, f"解析 CSV {filename}")
-
             try:
                 csv_result = await _stream_csv_import(
                     content=content,
@@ -2466,256 +2570,47 @@ async def smart_import_streaming(
             except Exception as e:
                 import traceback
                 logger.error("CSV 导入异常: %s\n%s", e, traceback.format_exc())
-                diagnostics.append({"file": filename, "sheet": "CSV",
-                                    "status": "error", "message": str(e)})
+                diagnostics.append({"file": filename, "sheet": "CSV", "status": "error", "message": str(e)})
                 errors.append(f"CSV 导入失败 {filename}: {e}")
-            continue  # 跳过后面的 Excel 处理
+            continue
 
-        # ── Excel 文件处理 ──
-        # 快速路径：用 calamine（Rust）读 Excel 转 CSV，再走 _stream_csv_import
-        # calamine 比 openpyxl 快 10-50 倍（百万行从几十秒降到几秒）
+        needs_full = False
         try:
-            from python_calamine import CalamineWorkbook
-            _use_calamine = True
-        except ImportError:
-            _use_calamine = False
-
-        if _use_calamine:
-            _prog(12, f"读取 {filename}（{len(content)/1024/1024:.0f} MB）…")
-            try:
-                _t_cal_open = _perf_time.perf_counter()
-                cal_wb = CalamineWorkbook.from_buffer(content)
-                logger.info("[PERF] calamine open %s: %.2fs",
-                            filename, _perf_time.perf_counter() - _t_cal_open)
-
-                for si, sname in enumerate(cal_wb.sheet_names):
-                    if any(kw in sname.lower() for kw in ("说明", "目录", "封面", "模板")):
+            wb_probe = openpyxl.load_workbook(_workbook_input(content), read_only=True, data_only=True)
+            for _ws in wb_probe.worksheets:
+                try:
+                    rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
+                    if not rows5:
                         continue
+                    if max(len(r) for r in rows5) <= 3:
+                        needs_full = True
+                        break
+                    for row in rows5:
+                        non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
+                        if len(non_empty) >= 4:
+                            from collections import Counter
+                            _, most_common_count = Counter(non_empty).most_common(1)[0]
+                            if most_common_count >= len(non_empty) * 0.6 and most_common_count >= 3:
+                                needs_full = True
+                                break
+                    if needs_full:
+                        break
+                except Exception:
+                    pass
+            wb_probe.close()
+        except Exception:
+            pass
 
-                    sheets_done += 1
-                    sheet = cal_wb.get_sheet_by_name(sname)
-                    total_rows_est = sheet.total_height or 0
-                    _prog(12, f"读取 {sname}（约 {total_rows_est:,} 行）…")
-
-                    # ── 第一步：读表头（前 10 行），做列映射 ──
-                    _t_cal_read = _perf_time.perf_counter()
-                    header_row = None
-                    header_idx = 0
-                    sample_rows_raw: list[list] = []
-                    for i, row in enumerate(sheet.iter_rows()):
-                        if i >= 10:
-                            break
-                        cells = [str(c).strip() if c is not None else "" for c in row]
-                        non_empty = [c for c in cells if c]
-                        if header_row is None and len(non_empty) >= 3:
-                            has_kw = any(kw in cell for cell in non_empty for kw in _HEADER_KEYWORDS)
-                            is_title = len(non_empty) == 1
-                            if has_kw or (not is_title and len(non_empty) >= 3):
-                                header_row = cells
-                                header_idx = i
-                                continue
-                        if header_row is not None:
-                            sample_rows_raw.append(cells)
-
-                    if header_row is None:
-                        diagnostics.append({"file": filename, "sheet": sname,
-                                            "data_type": "unknown", "row_count": 0,
-                                            "status": "skipped", "message": "未找到有效表头"})
-                        continue
-
-                    headers = [h if h else f"col_{j}" for j, h in enumerate(header_row)]
-                    num_cols = len(headers)
-
-                    # 列映射
-                    col_map: dict[str, str] = {}
-                    for h in headers:
-                        m = smart_match_column(h)
-                        if m:
-                            col_map[h] = m
-
-                    # 应用自定义映射
-                    sm = None
-                    if custom_mapping:
-                        if any(isinstance(v, dict) for v in custom_mapping.values()):
-                            sm = custom_mapping.get(sname)
-                        else:
-                            sm = custom_mapping
-                    if sm:
-                        for h, sf in sm.items():
-                            if h in headers and sf:
-                                col_map[h] = sf
-
-                    mapped_fields = set(col_map.values())
-                    dt = _guess_data_type(mapped_fields)
-                    miss_req, miss_rec = _detect_missing_fields(dt, mapped_fields)
-
-                    if miss_req and dt in ("balance", "ledger", "aux_balance", "aux_ledger", "account_chart"):
-                        diagnostics.append({"file": filename, "sheet": sname, "data_type": dt,
-                                            "row_count": total_rows_est, "status": "skipped",
-                                            "missing_cols": miss_req, "missing_recommended": miss_rec,
-                                            "message": f"缺少必需列: {', '.join(miss_req)}"})
-                        continue
-
-                    logger.info("[PERF] calamine header parsed '%s': dt=%s, %d cols mapped, %.2fs",
-                                sname, dt, len(col_map), _perf_time.perf_counter() - _t_cal_read)
-
-                    # ── 第二步：逐批读取数据行，直接转 dict 写入数据库 ──
-                    _LEDGER_COLS = COPY_LEDGER_COLS
-                    _AUX_LEDGER_COLS = COPY_AUX_LEDGER_COLS
-                    _BALANCE_COLS = COPY_BALANCE_COLS
-                    _AUX_BALANCE_COLS = COPY_AUX_BALANCE_COLS
-
-                    _t_cal_write = _perf_time.perf_counter()
-                    row_count = 0
-                    _led_buf: list[dict] = []
-                    _aux_led_buf: list[dict] = []
-                    _raw_batch: list[dict] = []  # 攒一批原始行再转换
-                    sheet_counts_cal: dict[str, int] = {"tb_balance": 0, "tb_aux_balance": 0, "tb_ledger": 0, "tb_aux_ledger": 0}
-
-                    for row in sheet.iter_rows():
-                        if row_count <= header_idx:
-                            row_count += 1
-                            continue
-                        row_count += 1
-
-                        # 转成 dict
-                        cells = row
-                        row_dict: dict = {}
-                        for j in range(min(num_cols, len(cells))):
-                            h = headers[j]
-                            mapped = col_map.get(h, h)
-                            v = cells[j]
-                            row_dict[mapped] = str(v).strip() if v is not None else None
-                        _raw_batch.append(row_dict)
-
-                        # 攒满一批再处理
-                        if len(_raw_batch) >= CHUNK:
-                            await _process_cal_batch(_raw_batch, dt, _led_buf, _aux_led_buf,
-                                                     sheet_counts_cal, batches, counts,
-                                                     _BALANCE_COLS, _AUX_BALANCE_COLS,
-                                                     _LEDGER_COLS, _AUX_LEDGER_COLS,
-                                                     project_id, seen_codes, acct_records, by_category,
-                                                     _skipped_rows=skipped_rows, _sheet_name=sname)
-                            _raw_batch.clear()
-                            # 让出事件循环，让进度轮询请求能被响应
-                            await asyncio.sleep(0)
-
-                        # 进度更新
-                        if row_count % 50_000 == 0:
-                            pct = 12 + int(row_count / max(total_rows_est, 1) * 75)
-                            _prog(min(pct, 88), f"{sname}: {row_count:,}/{total_rows_est:,} 行")
-
-                    # 处理剩余
-                    if _raw_batch:
-                        await _process_cal_batch(_raw_batch, dt, _led_buf, _aux_led_buf,
-                                                 sheet_counts_cal, batches, counts,
-                                                 _BALANCE_COLS, _AUX_BALANCE_COLS,
-                                                 _LEDGER_COLS, _AUX_LEDGER_COLS,
-                                                 project_id, seen_codes, acct_records, by_category,
-                                                 _skipped_rows=skipped_rows, _sheet_name=sname)
-
-                    # flush 剩余缓冲
-                    if _led_buf:
-                        n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
-                        counts["tb_ledger"] += n
-                        sheet_counts_cal["tb_ledger"] += n
-                    if _aux_led_buf:
-                        n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
-                        counts["tb_aux_ledger"] += n
-                        sheet_counts_cal["tb_aux_ledger"] += n
-
-                    _cal_elapsed = _perf_time.perf_counter() - _t_cal_write
-                    data_rows = row_count - header_idx - 1
-                    logger.info("[PERF] calamine sheet '%s' (%s): %d rows in %.2fs (%.0f rows/s), "
-                                "bal=%d aux_bal=%d led=%d aux_led=%d",
-                                sname, dt, data_rows, _cal_elapsed,
-                                data_rows / _cal_elapsed if _cal_elapsed > 0.001 else 0,
-                                sheet_counts_cal["tb_balance"], sheet_counts_cal["tb_aux_balance"],
-                                sheet_counts_cal["tb_ledger"], sheet_counts_cal["tb_aux_ledger"])
-
-                    diagnostics.append({
-                        "file": filename, "sheet": sname, "data_type": dt,
-                        "row_count": data_rows, "status": "ok",
-                        "matched_cols": sorted(mapped_fields),
-                        "missing_cols": miss_req, "missing_recommended": miss_rec,
-                    })
-
-                continue
-            except Exception as e:
-                import traceback
-                logger.warning("calamine 解析失败，降级为 openpyxl: %s\n%s", e, traceback.format_exc())
-                # 降级到下面的 openpyxl 路径
-
-        # ── openpyxl 降级路径（calamine 不可用或解析失败时） ──
-
-        # 第一次打开：read_only 模式，同时探测合并单元格特征
-        needs_full_for_header = False
-        _t_opx_open = _perf_time.perf_counter()
         try:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            wb = openpyxl.load_workbook(
+                _workbook_input(content),
+                read_only=(not needs_full),
+                data_only=True,
+            )
         except Exception as e:
-            diagnostics.append({"file": filename, "sheet": None,
-                                "status": "error", "message": f"无法打开: {e}"})
+            diagnostics.append({"file": filename, "sheet": None, "status": "error", "message": f"无法打开: {e}"})
             errors.append(f"无法打开 {filename}: {e}")
             continue
-        logger.info("[PERF] openpyxl open (read_only) %s: %.2fs",
-                    filename, _perf_time.perf_counter() - _t_opx_open)
-
-        # 探测合并单元格特征（只扫描前5行，不遍历数据）
-        for _ws in wb.worksheets:
-            try:
-                rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
-                if not rows5:
-                    continue
-                if max(len(r) for r in rows5) <= 3:
-                    needs_full_for_header = True
-                    break
-                for row in rows5:
-                    non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
-                    if len(non_empty) >= 4:
-                        from collections import Counter
-                        _, cnt = Counter(non_empty).most_common(1)[0]
-                        if cnt >= len(non_empty) * 0.6 and cnt >= 3:
-                            needs_full_for_header = True
-                            break
-                if needs_full_for_header:
-                    break
-            except Exception:
-                pass
-
-        # 如果需要完整模式读表头，关闭 read_only → 完整模式打开一次（读表头+数据）
-        header_cache: dict[str, dict] = {}
-        if needs_full_for_header:
-            wb.close()  # 关闭 read_only
-            logger.info("[PERF] merged cells detected, opening full mode: %s", filename)
-            _t_full = _perf_time.perf_counter()
-            try:
-                wb_full = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-                logger.info("[PERF] openpyxl open (full) %s: %.2fs",
-                            filename, _perf_time.perf_counter() - _t_full)
-                for ws_full in wb_full.worksheets:
-                    sn = ws_full.title
-                    if any(kw in sn.lower() for kw in ("说明", "目录", "封面", "模板")):
-                        continue
-                    try:
-                        header_cache[sn] = parse_sheet_header_only(ws_full)
-                    except Exception:
-                        pass
-                wb_full.close()
-            except Exception as e:
-                logger.warning("完整模式打开失败: %s", e)
-            # 重新用 read_only 打开读数据
-            _t_reopen = _perf_time.perf_counter()
-            try:
-                wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-                logger.info("[PERF] openpyxl reopen (read_only) %s: %.2fs",
-                            filename, _perf_time.perf_counter() - _t_reopen)
-            except Exception as e:
-                diagnostics.append({"file": filename, "sheet": None,
-                                    "status": "error", "message": f"无法打开: {e}"})
-                continue
-
-        sheet_count_est += len(wb.worksheets)
 
         for ws in wb.worksheets:
             sname = ws.title
@@ -2726,47 +2621,27 @@ async def smart_import_streaming(
             pct = 10 + int(sheets_done / max(sheet_count_est, 1) * 78)
             _prog(min(pct, 88), f"解析 {filename} / {sname}")
 
-            # ── 解析表头（优先用完整模式缓存，否则用 read_only） ──
             try:
-                if sname in header_cache:
-                    meta = header_cache[sname]
-                else:
-                    meta = parse_sheet_header_only(ws)
+                sheet_mapping = _resolve_sheet_mapping(custom_mapping, filename, sname)
+                sheet_context = _build_sheet_context(ws, sheet_mapping=sheet_mapping)
             except Exception as e:
-                diagnostics.append({"file": filename, "sheet": sname,
-                                    "status": "error", "message": str(e)})
+                diagnostics.append({"file": filename, "sheet": sname, "status": "error", "message": str(e)})
+                errors.append(f"解析失败 {filename}/{sname}: {e}")
                 continue
 
-            # ── 应用自定义映射到表头 ──
-            sm = None
-            if custom_mapping:
-                if any(isinstance(v, dict) for v in custom_mapping.values()):
-                    sm = custom_mapping.get(sname)
-                else:
-                    sm = custom_mapping
-            if sm:
-                orig_headers = list(meta["headers"])
-                matching_keys = [h for h in sm if h in orig_headers]
-                if matching_keys:
-                    for h, sf in sm.items():
-                        if h in orig_headers and sf:
-                            meta["column_mapping"][h] = sf
-                    meta["data_type"] = _guess_data_type(set(meta["column_mapping"].values()))
-
-            if meta.get("year") is None:
-                meta["year"] = extract_year_from_content([], filename=filename)
-
-            dt = meta["data_type"]
-            matched_fields = set(meta["column_mapping"].values())
+            dt = sheet_context["data_type"]
+            matched_fields = set(sheet_context["column_mapping"].values())
             miss_req, miss_rec = _detect_missing_fields(dt, matched_fields)
-
             diag: dict = {
-                "file": filename, "sheet": sname, "data_type": dt,
-                "row_count": 0,  # 流式处理，最终更新
-                "header_count": meta["header_count"],
+                "file": filename,
+                "sheet": sname,
+                "data_type": dt,
+                "row_count": 0,
+                "header_count": sheet_context["header_count"],
                 "matched_cols": sorted(matched_fields),
-                "missing_cols": miss_req, "missing_recommended": miss_rec,
-                "column_mapping": meta["column_mapping"],
+                "missing_cols": miss_req,
+                "missing_recommended": miss_rec,
+                "column_mapping": sheet_context["column_mapping"],
                 "status": "ok",
             }
 
@@ -2776,211 +2651,164 @@ async def smart_import_streaming(
                 diagnostics.append(diag)
                 continue
 
-            # 四表关键列缺失时也阻断（不入库）
-            if miss_req and dt in ("balance", "ledger", "aux_balance", "aux_ledger"):
-                _TYPE_LABELS = {"balance": "余额表", "ledger": "序时账", "aux_balance": "辅助余额表", "aux_ledger": "辅助明细账"}
-                diag["status"] = "skipped"
-                diag["message"] = f"{_TYPE_LABELS.get(dt, dt)}缺少必需列: {', '.join(miss_req)}，请在列映射中手动指定"
-                errors.append(diag["message"])
-                diagnostics.append(diag)
-                continue
+            if dt == "balance":
+                total_rows = 0
+                total_bal = 0
+                total_aux_bal = 0
+                for batch_rows in _iter_sheet_row_batches(ws, sheet_context, batch_size=CHUNK):
+                    total_rows += len(batch_rows)
+                    bal, aux_bal = convert_balance_rows(batch_rows)
+                    total_bal += len(bal)
+                    total_aux_bal += len(aux_bal)
 
-            # ── 流式逐批读取 + 转换 + COPY 写入 ──
-
-            # COPY 写入列定义（引用模块常量）
-            _LEDGER_COLS = COPY_LEDGER_COLS
-            _AUX_LEDGER_COLS = COPY_AUX_LEDGER_COLS
-            _BALANCE_COLS = COPY_BALANCE_COLS
-            _AUX_BALANCE_COLS = COPY_AUX_BALANCE_COLS
-
-            logger.info("Sheet %s: data_type=%s, streaming+COPY, matched=%s",
-                        sname, dt, sorted(matched_fields)[:5])
-
-            _t_sheet_start = _perf_time.perf_counter()
-            sheet_row_count = 0
-            sheet_counts: dict[str, int] = {"tb_balance": 0, "tb_aux_balance": 0, "tb_ledger": 0, "tb_aux_ledger": 0}
-
-            # 用于 ledger 的跨批缓冲（不满 CHUNK 的尾部留到下一批）
-            _led_buf: list[dict] = []
-            _aux_led_buf: list[dict] = []
-
-            # 预计算自定义映射的重映射表（提到循环外，避免每批重复计算）
-            _has_custom_remap = bool(sm and matching_keys)
-            _orig_cm: dict[str, str] = {}
-            _handled_keys: set[str] = set()
-            if _has_custom_remap:
-                _orig_cm = {h: meta["column_mapping"].get(h, h) for h in meta["headers"]}
-                _handled_keys = set(_orig_cm.values())
-
-            for batch_rows in iter_sheet_rows(ws, meta, batch_size=CHUNK):
-                sheet_row_count += len(batch_rows)
-
-                # 应用自定义映射到数据行（如果有）
-                if _has_custom_remap:
-                    remapped = []
-                    for row in batch_rows:
-                        nr: dict = {}
-                        for h in meta["headers"]:
-                            ck = _orig_cm.get(h, h)
-                            if ck in row:
-                                nr[meta["column_mapping"].get(h, ck)] = row[ck]
-                        for k, v in row.items():
-                            if k not in _handled_keys:
-                                nr[k] = v
-                        remapped.append(nr)
-                    batch_rows = remapped
-
-                if dt == "balance":
-                    diag_bal_opx: list[dict] = []
-                    bal, aux_bal = convert_balance_rows(batch_rows, diagnostics=diag_bal_opx)
-                    for d in diag_bal_opx:
-                        d["sheet_name"] = sname
-                    skipped_rows.extend(diag_bal_opx)
                     if bal:
-                        n = await _batch_insert("tb_balance", _BALANCE_COLS, bal, batches["tb_balance"].id)
+                        n = await copy_insert(
+                            db, "tb_balance", _BALANCE_COLS, bal,
+                            project_id, year, batches["tb_balance"].id,
+                            is_deleted=True,
+                        )
                         counts["tb_balance"] += n
-                        sheet_counts["tb_balance"] += n
                     if aux_bal:
-                        n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, aux_bal, batches["tb_aux_balance"].id)
+                        n = await copy_insert(
+                            db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
+                            project_id, year, batches["tb_aux_balance"].id,
+                            is_deleted=True,
+                        )
                         counts["tb_aux_balance"] += n
-                        sheet_counts["tb_aux_balance"] += n
                     for r in aux_bal:
                         t = r.get("aux_type", "?")
                         _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
+                    for row in batch_rows:
+                        _append_account_record(
+                            row=row,
+                            project_id=project_id,
+                            seen_codes=seen_codes,
+                            acct_records=acct_records,
+                            by_category=by_category,
+                            staged=True,
+                        )
+                    await db.commit()
 
-                elif dt == "ledger":
-                    diag_led_opx: list[dict] = []
-                    led, _, aux_stats = convert_ledger_rows(batch_rows, diagnostics=diag_led_opx)
-                    for d in diag_led_opx:
-                        d["sheet_name"] = sname
-                    skipped_rows.extend(diag_led_opx)
+                diag["row_count"] = total_rows
+                diag["balance_count"] = total_bal
+                diag["aux_balance_count"] = total_aux_bal
+
+            elif dt == "ledger":
+                total_rows = 0
+                total_led = 0
+                total_aux = 0
+                for batch_rows in _iter_sheet_row_batches(ws, sheet_context, batch_size=CHUNK):
+                    total_rows += len(batch_rows)
+                    led, _, aux_stats = convert_ledger_rows(batch_rows)
+                    total_led += len(led)
+                    total_aux += sum(aux_stats.values())
+                    for t, c in aux_stats.items():
+                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + c
+
+                    led_rows: list[dict] = []
+                    aux_rows: list[dict] = []
                     for row in led:
                         adim = row.pop("_aux_dim_str", "")
-                        _led_buf.append(row)
+                        led_rows.append(row)
                         if adim and (":" in adim or "：" in adim):
-                            # 辅助明细只取关键列（不复制整个 row）
-                            base = {
-                                "account_code": row.get("account_code"),
-                                "account_name": row.get("account_name"),
-                                "voucher_date": row.get("voucher_date"),
-                                "voucher_no": row.get("voucher_no"),
-                                "debit_amount": row.get("debit_amount"),
-                                "credit_amount": row.get("credit_amount"),
-                                "summary": row.get("summary"),
-                                "company_code": row.get("company_code"),
-                                "currency_code": row.get("currency_code"),
-                            }
                             for dim in parse_aux_dimensions(adim):
-                                _aux_led_buf.append({
-                                    **base,
+                                aux_rows.append({
+                                    **row,
                                     "aux_type": dim["aux_type"],
                                     "aux_code": dim["aux_code"],
                                     "aux_name": dim["aux_name"],
                                     "aux_dimensions_raw": adim,
                                 })
-                    if len(_led_buf) >= CHUNK:
-                        n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
+
+                    if led_rows:
+                        n = await copy_insert(
+                            db, "tb_ledger", _LEDGER_COLS, led_rows,
+                            project_id, year, batches["tb_ledger"].id,
+                            is_deleted=True,
+                        )
                         counts["tb_ledger"] += n
-                        sheet_counts["tb_ledger"] += n
-                        _led_buf.clear()
-                    if len(_aux_led_buf) >= CHUNK:
-                        n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
+                    if aux_rows:
+                        n = await copy_insert(
+                            db, "tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows,
+                            project_id, year, batches["tb_aux_ledger"].id,
+                            is_deleted=True,
+                        )
                         counts["tb_aux_ledger"] += n
-                        sheet_counts["tb_aux_ledger"] += n
-                        _aux_led_buf.clear()
+                    for row in batch_rows:
+                        _append_account_record(
+                            row=row,
+                            project_id=project_id,
+                            seen_codes=seen_codes,
+                            acct_records=acct_records,
+                            by_category=by_category,
+                            staged=True,
+                        )
+                    await db.commit()
+                    _prog(min(pct, 88), f"解析 {filename} / {sname}: {total_rows:,} 行")
 
-                elif dt == "aux_balance":
-                    if batch_rows:
-                        n = await _batch_insert("tb_aux_balance", _AUX_BALANCE_COLS, batch_rows, batches["tb_aux_balance"].id)
-                        counts["tb_aux_balance"] += n
-                        sheet_counts["tb_aux_balance"] += n
-                    for r in batch_rows:
-                        t = r.get("aux_type", "?")
-                        _aux_type_counts[t] = _aux_type_counts.get(t, 0) + 1
+                diag["row_count"] = total_rows
+                diag["ledger_count"] = total_led
+                diag["aux_ledger_count"] = total_aux
 
-                elif dt == "aux_ledger":
-                    _aux_led_buf.extend(batch_rows)
-                    if len(_aux_led_buf) >= CHUNK:
-                        n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
-                        counts["tb_aux_ledger"] += n
-                        sheet_counts["tb_aux_ledger"] += n
-                        _aux_led_buf.clear()
-
-                elif dt == "account_chart":
-                    pass  # 科目提取在下面统一做
-
-                # 提取科目（从每批数据中）
-                for row in batch_rows:
-                    _append_account_record(
-                        row=row,
-                        project_id=project_id,
-                        seen_codes=seen_codes,
-                        acct_records=acct_records,
-                        by_category=by_category,
-                    )
-
-            # ── flush 剩余缓冲（COPY） ──
-            if _led_buf:
-                n = await _batch_insert("tb_ledger", _LEDGER_COLS, _led_buf, batches["tb_ledger"].id)
-                counts["tb_ledger"] += n
-                sheet_counts["tb_ledger"] += n
-                _led_buf.clear()
-            if _aux_led_buf:
-                n = await _batch_insert("tb_aux_ledger", _AUX_LEDGER_COLS, _aux_led_buf, batches["tb_aux_ledger"].id)
-                counts["tb_aux_ledger"] += n
-                sheet_counts["tb_aux_ledger"] += n
-                _aux_led_buf.clear()
-
-            diag["row_count"] = sheet_row_count
-            _sheet_elapsed = _perf_time.perf_counter() - _t_sheet_start
-            logger.info("[PERF] Sheet '%s' (%s): %d rows in %.2fs (%.0f rows/s), "
-                        "wrote bal=%d aux_bal=%d led=%d aux_led=%d",
-                        sname, dt, sheet_row_count, _sheet_elapsed,
-                        sheet_row_count / _sheet_elapsed if _sheet_elapsed > 0.001 else 0,
-                        sheet_counts.get("tb_balance", 0), sheet_counts.get("tb_aux_balance", 0),
-                        sheet_counts.get("tb_ledger", 0), sheet_counts.get("tb_aux_ledger", 0))
-            if dt == "balance":
-                diag["balance_count"] = sheet_counts["tb_balance"]
-                diag["aux_balance_count"] = sheet_counts["tb_aux_balance"]
-            elif dt == "ledger":
-                diag["ledger_count"] = sheet_counts["tb_ledger"]
-                diag["aux_ledger_count"] = sheet_counts["tb_aux_ledger"]
-            elif dt == "aux_balance":
-                diag["aux_balance_count"] = sheet_row_count
-            elif dt == "aux_ledger":
-                diag["aux_ledger_count"] = sheet_row_count
             elif dt == "account_chart":
-                diag["account_count"] = sheet_row_count
+                total_rows = 0
+                added_before = len(acct_records)
+                for batch_rows in _iter_sheet_row_batches(ws, sheet_context, batch_size=CHUNK):
+                    total_rows += len(batch_rows)
+                    for row in batch_rows:
+                        _append_account_record(
+                            row=row,
+                            project_id=project_id,
+                            seen_codes=seen_codes,
+                            acct_records=acct_records,
+                            by_category=by_category,
+                            staged=True,
+                        )
+                diag["row_count"] = total_rows
+                diag["account_count"] = len(acct_records) - added_before
 
-            if dt == "unknown":
+            elif dt in ("aux_balance", "aux_ledger"):
+                diag["status"] = "skipped"
+                diag["message"] = "独立辅助表暂不处理（已从余额表/序时账自动拆分）"
+            else:
                 diag["status"] = "skipped"
                 diag["message"] = f"未识别的数据类型: {dt}"
-                logger.warning("  UNKNOWN data_type=%s, matched_fields=%s", dt, matched_fields)
 
             diagnostics.append(diag)
 
         wb.close()
 
-    # ── Phase 3: 写入科目表 ─────────────────────────────────────────────────
-    _t_phase3 = _perf_time.perf_counter()
+    if errors:
+        for dt_key, batch in batches.items():
+            batch.record_count = counts[dt_key]
+            batch.status = ImportStatus.failed
+            batch.completed_at = datetime.utcnow()
+        await db.commit()
+        raise ValueError("；".join(errors[:5]))
+
+    staged_total = sum(counts.values())
+    if staged_total <= 0:
+        for dt_key, batch in batches.items():
+            batch.record_count = counts[dt_key]
+            batch.status = ImportStatus.failed
+            batch.completed_at = datetime.utcnow()
+        await db.commit()
+        raise ValueError("未解析到可导入的数据，请确认文件内容、sheet 类型与列映射")
+
+    account_ids: list[UUID] = []
     if acct_records:
         db.add_all(acct_records)
         await db.flush()
-    logger.info("[PERF] Phase 3 write accounts: %d records in %.2fs",
-                len(acct_records), _perf_time.perf_counter() - _t_phase3)
-    _prog(90, f"科目 {len(acct_records)} 个，正在完成…")
+        account_ids = [record.id for record in acct_records if getattr(record, "id", None)]
+    _prog(90, f"科目 {len(acct_records)} 个，准备激活…")
 
-    # ── Phase 4: 更新 batch 状态 ────────────────────────────────────────────
-    _t_phase4 = _perf_time.perf_counter()
+    await _activate_staged_rows(account_ids)
     for dt_key, batch in batches.items():
         batch.record_count = counts[dt_key]
         batch.status = ImportStatus.completed
         batch.completed_at = datetime.utcnow()
     await db.commit()
-    logger.info("[PERF] Phase 4 commit: %.2fs", _perf_time.perf_counter() - _t_phase4)
 
-    # ── Phase 5: 辅助余额汇总 + 事件 ───────────────────────────────────────
-    _t_phase5 = _perf_time.perf_counter()
     if counts.get("tb_aux_balance", 0) > 0:
         try:
             sc = await rebuild_aux_balance_summary(project_id, year, db)
@@ -2996,21 +2824,12 @@ async def smart_import_streaming(
             project_id=project_id,
             year=year,
         ))
-        logger.info("DATA_IMPORTED 事件: project=%s, year=%d, counts=%s",
-                     project_id, year, counts)
+        logger.info("DATA_IMPORTED 事件: project=%s, year=%d, counts=%s", project_id, year, counts)
     except Exception as e:
         logger.warning("DATA_IMPORTED 事件发布失败: %s", e)
 
     _prog(100, "导入完成")
-    _total_elapsed = _perf_time.perf_counter() - _t_import_start
-    logger.info("[PERF] ═══ smart_import_streaming TOTAL: %.2fs ═══ "
-                "bal=%d aux_bal=%d led=%d aux_led=%d accounts=%d",
-                _total_elapsed,
-                counts.get("tb_balance", 0), counts.get("tb_aux_balance", 0),
-                counts.get("tb_ledger", 0), counts.get("tb_aux_ledger", 0),
-                len(acct_records))
 
-    # 规范化诊断结构
     norm_diag: list[dict] = []
     for d in diagnostics:
         norm_diag.append({
@@ -3027,7 +2846,6 @@ async def smart_import_streaming(
         "by_category": by_category,
         "data_sheets_imported": counts,
         "sheet_diagnostics": norm_diag,
-        "skipped_rows": skipped_rows[:200],  # 最多返回200条，避免响应过大
         "year": year,
         "errors": errors,
     }

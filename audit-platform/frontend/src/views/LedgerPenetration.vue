@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="gt-penetration">
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
@@ -459,8 +459,8 @@
     :close-on-press-escape="!previewing && !importing"
     :show-close="!previewing && !importing"
   >
-    <div v-loading="previewing"
-         :element-loading-text="'正在解析文件，请稍候...'"
+    <div v-loading="previewing || importing"
+         :element-loading-text="previewing ? '正在解析文件，请稍候...' : importing ? '正在导入数据，请稍候...' : ''"
          element-loading-background="rgba(255,255,255,0.85)">
     <!-- 步骤1：上传文件 -->
     <div v-if="importStep === 'upload'">
@@ -477,9 +477,6 @@
         <div style="font-size: 12px; color: #999; margin-top: 4px">
           支持多个文件（如余额表 + 多个序时账），自动识别合并
         </div>
-        <div style="font-size: 12px; color: #e6a23c; margin-top: 4px">
-          💡 大文件（>50MB）建议先在 Excel 中另存为 CSV 格式再上传，速度快 10 倍
-        </div>
       </el-upload>
       <div style="margin-top: 12px">
         <span style="font-size: 13px; color: #666">年度：</span>
@@ -490,6 +487,15 @@
 
     <!-- 步骤2：预览确认 -->
     <div v-if="importStep === 'preview'" style="max-height: 500px; overflow-y: auto">
+      <el-alert
+        v-if="previewResult?.preview_mode"
+        title="预览模式说明"
+        type="info"
+        :closable="false"
+        style="margin-bottom: 12px"
+        :description="`仅解析前 ${previewResult?.preview_rows || 50} 行用于确认列映射，实际数据量以后台导入结果为准。`"
+        show-icon
+      />
       <el-descriptions :column="2" size="small" border style="margin-bottom: 12px">
         <el-descriptions-item label="识别年度">{{ previewResult?.year }}</el-descriptions-item>
         <el-descriptions-item label="余额表">{{ previewResult?.summary?.balance || 0 }} 行</el-descriptions-item>
@@ -497,31 +503,6 @@
         <el-descriptions-item label="序时账">{{ previewResult?.summary?.ledger || 0 }} 行</el-descriptions-item>
         <el-descriptions-item label="辅助明细账">{{ previewResult?.summary?.aux_ledger || 0 }} 行</el-descriptions-item>
       </el-descriptions>
-
-      <!-- 辅助核算维度确认 -->
-      <div v-if="previewResult?.aux_dimensions?.length" style="margin-bottom: 12px">
-        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px">辅助核算维度（{{ previewResult.aux_dimensions.length }} 种）</div>
-        <el-table :data="previewResult.aux_dimensions" size="small" max-height="200" border>
-          <el-table-column prop="type" label="维度类型" width="160" />
-          <el-table-column prop="count" label="记录数" width="100" align="right">
-            <template #default="{ row }">{{ row.count.toLocaleString() }}</template>
-          </el-table-column>
-        </el-table>
-      </div>
-
-      <!-- 校验结果 -->
-      <div v-if="previewResult?.validation?.length" style="margin-bottom: 12px">
-        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px; color: #e6a23c">
-          一致性校验（{{ previewResult.validation.length }} 条）
-        </div>
-        <div v-for="(v, i) in previewResult.validation.slice(0, 10)" :key="i"
-             style="font-size: 12px; padding: 4px 0; border-bottom: 1px solid #f0f0f0">
-          <el-tag :type="v.level === 'error' ? 'danger' : 'warning'" size="small" style="margin-right: 6px">
-            {{ v.level }}
-          </el-tag>
-          {{ v.message }}
-        </div>
-      </div>
 
       <!-- 文件诊断 -->
       <div style="margin-bottom: 8px">
@@ -532,86 +513,64 @@
             {{ d.data_type || '?' }}
           </el-tag>
           {{ d.file }} / {{ d.sheet }} — {{ d.row_count?.toLocaleString() || 0 }} 行
-          <span v-if="d.missing_cols?.length" style="color: #f56c6c; margin-left: 6px">
-            缺少关键列：{{ d.missing_cols.join('、') }}
-          </span>
-          <span v-if="d.missing_recommended?.length" style="color: #e6a23c; margin-left: 6px">
-            建议补充：{{ d.missing_recommended.join('、') }}
-          </span>
+          <span v-if="d.company_code" style="color: #67c23a; margin-left: 4px">{{ d.company_code }}</span>
+          <span v-if="d.year" style="color: #67c23a; margin-left: 2px">{{ d.year }}年</span>
+          <span v-if="d.balance_count_est != null" style="color: #409eff">（估算余额 {{ d.balance_count_est.toLocaleString() }}）</span>
+          <span v-if="d.ledger_count_est != null" style="color: #409eff">（估算序时账 {{ d.ledger_count_est.toLocaleString() }}）</span>
+          <span v-if="d.balance_count != null" style="color: #409eff">（余额{{ d.balance_count }}, 辅助{{ d.aux_balance_count }}）</span>
+          <span v-if="d.ledger_count != null" style="color: #409eff">（序时账{{ d.ledger_count?.toLocaleString() }}, 辅助{{ d.aux_ledger_count?.toLocaleString() }}）</span>
+          <el-tag v-if="d.wide_table_detected" size="small" type="warning" style="margin-left: 4px">宽表格式</el-tag>
         </div>
       </div>
 
-      <!-- 数据预览（前20行） -->
-      <template v-for="(d, di) in previewResult?.diagnostics" :key="'prev_' + di">
-        <div v-if="d.preview_rows?.length && d.headers?.length" style="margin-bottom: 16px">
-          <div style="font-weight: 600; margin-bottom: 6px; font-size: 13px; color: #303133">
-            {{ d.file }} / {{ d.sheet }} — 前 {{ d.preview_rows.length }} 行预览
-            <el-tag size="small" :type="d.data_type === 'ledger' ? 'primary' : d.data_type === 'balance' ? 'warning' : 'info'" style="margin-left: 6px">
-              {{ d.data_type }}
-            </el-tag>
-          </div>
-          <el-table :data="d.preview_rows" size="small" border max-height="240" style="width: 100%">
-            <el-table-column
-              v-for="h in d.headers"
-              :key="h"
-              :prop="h"
-              min-width="140"
-              show-overflow-tooltip
-            >
-              <template #header>
-                <div style="font-size: 11px; line-height: 1.4">
-                  <div style="color: #606266">{{ h }}</div>
-                  <el-select
-                    :model-value="d.column_mapping?.[h] || ''"
-                    size="small"
-                    placeholder="(忽略)"
-                    clearable
-                    filterable
-                    style="width: 100%; margin-top: 2px"
-                    @change="(val: string) => onMappingChange(di, h, val)"
-                  >
-                    <el-option label="(忽略)" value="" />
-                    <el-option
-                      v-for="(label, field) in (previewResult?.field_labels || {})"
-                      :key="field"
-                      :label="label"
-                      :value="field"
-                    />
-                  </el-select>
-                </div>
-              </template>
-            </el-table-column>
-          </el-table>
+      <!-- 列映射手动调整 -->
+      <div v-for="(d, i) in previewResult?.diagnostics" :key="`map-${i}`" style="margin-bottom: 12px">
+        <div style="font-weight: 600; margin-bottom: 6px; font-size: 14px">
+          列映射调整 — {{ d.file }}
+          <el-tag v-if="d.wide_table_detected" size="small" type="warning" style="margin-left: 4px">检测到宽表格式（前数据后列名）</el-tag>
         </div>
-      </template>
+        <el-table :data="d.headers || []" size="small" border style="width: 100%" max-height="300">
+          <el-table-column type="index" width="50" />
+          <el-table-column label="原始列名" prop="header" width="200">
+            <template #default="{ row }">
+              <span :style="{ color: (d.column_mapping || {})[row] ? '#333' : '#999' }">{{ row }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="识别方式" width="100">
+            <template #default="{ row }">
+              <el-tag v-if="(d.content_inferred || {})[row]" size="small" type="warning">内容推断</el-tag>
+              <el-tag v-else-if="(d.column_mapping || {})[row]" size="small" type="success">表头匹配</el-tag>
+              <el-tag v-else size="small" type="info">未识别</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="映射到标准字段" min-width="200">
+            <template #default="{ row }">
+              <el-select
+                v-model="userColumnMapping[`${d.file}/${d.sheet}`][row]"
+                size="small"
+                clearable
+                placeholder="选择标准字段（不映射则留空）"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="opt in STANDARD_FIELDS"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </div>
 
     <!-- 步骤3：导入中 -->
-    <div v-if="importStep === 'importing'" style="padding: 24px 16px">
-      <div style="font-weight: 600; font-size: 16px; color: #303133; margin-bottom: 16px; text-align: center">
-        正在导入数据
-      </div>
-      <el-progress
-        :percentage="importProgress"
-        :stroke-width="26"
-        :text-inside="true"
-        :format="(pct: number) => `${pct}%`"
-        :color="[
-          { color: '#909399', percentage: 10 },
-          { color: '#e6a23c', percentage: 50 },
-          { color: '#409eff', percentage: 80 },
-          { color: '#67c23a', percentage: 100 },
-        ]"
-        style="margin-bottom: 16px"
-      />
-      <div style="text-align: center; color: #409eff; font-size: 14px; font-weight: 500; margin-bottom: 8px">
-        {{ importProgressMsg || '准备中…' }}
-      </div>
-      <div v-if="Object.keys(importProgressCounts).length > 0" style="text-align: center; font-size: 13px; color: #666; background: #f5f7fa; border-radius: 6px; padding: 10px; margin-top: 8px">
-        <span v-if="importProgressCounts.tb_balance" style="margin-right: 16px">📊 余额表 <b>{{ importProgressCounts.tb_balance.toLocaleString() }}</b> 条</span>
-        <span v-if="importProgressCounts.tb_ledger" style="margin-right: 16px">📝 序时账 <b>{{ importProgressCounts.tb_ledger.toLocaleString() }}</b> 条</span>
-        <span v-if="importProgressCounts.tb_aux_balance" style="margin-right: 16px">📋 辅助余额 <b>{{ importProgressCounts.tb_aux_balance.toLocaleString() }}</b> 条</span>
-        <span v-if="importProgressCounts.tb_aux_ledger">📄 辅助明细 <b>{{ importProgressCounts.tb_aux_ledger.toLocaleString() }}</b> 条</span>
+    <div v-if="importStep === 'importing'" style="text-align: center; padding: 40px 0">
+      <el-icon class="is-loading" style="font-size: 32px; color: #409eff"><Loading /></el-icon>
+      <div style="margin-top: 12px; color: #666">
+        正在后台写入数据库，可关闭弹窗继续操作…<br>
+        <span style="font-size: 12px; color: #999">{{ bgImportMessage }}</span>
       </div>
     </div>
 
@@ -621,7 +580,7 @@
       <div style="margin-top: 12px; font-size: 15px">导入完成</div>
       <div v-if="importedResult" style="margin-top: 8px; font-size: 13px; color: #666">
         <span v-for="(cnt, dt) in importedResult" :key="dt" style="margin-right: 12px">
-          {{ dt }}: {{ cnt.toLocaleString() }} 条
+          {{ dt }}: {{ typeof cnt === 'number' ? cnt.toLocaleString() : cnt }} 条
         </span>
       </div>
     </div>
@@ -637,6 +596,7 @@
       <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" @click="doImport">
         确认导入
       </el-button>
+      <el-button v-if="importStep === 'importing'" @click="importDialogVisible = false">关闭（后台继续）</el-button>
       <el-button v-if="importStep === 'done'" type="primary" @click="onImportDone">完成</el-button>
     </template>
   </el-dialog>
@@ -675,10 +635,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, CircleCheck, Warning } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, CircleCheck, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http' // TODO: migrate remaining 4 http calls to commonApi (ledger entries/opening-balance/aux-detail/import-reset)
-import api from '@/services/apiProxy'
+import http from '@/utils/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -709,7 +668,7 @@ const availableYears = ref<number[]>([])
 async function loadAvailableYears() {
   if (!projectId.value) return
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/ledger/years`)
+    const { data } = await http.get(`/api/projects/${projectId.value}/ledger/years`)
     const result = data?.data ?? data
     availableYears.value = result?.years ?? []
   } catch {
@@ -719,7 +678,7 @@ async function loadAvailableYears() {
 
 async function loadProjectList() {
   try {
-    const data = await api.get('/api/projects')
+    const { data } = await http.get('/api/projects')
     const list = data?.data ?? data ?? []
     projectList.value = Array.isArray(list) ? list : []
   } catch {
@@ -730,7 +689,7 @@ async function loadProjectList() {
 async function loadCurrentProject() {
   if (!projectId.value) return
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/wizard`)
+    const { data } = await http.get(`/api/projects/${projectId.value}/wizard`)
     const ws = data?.data ?? data
     const basicInfo = ws?.steps?.basic_info?.data || {}
     currentProject.value = {
@@ -775,10 +734,10 @@ async function runValidation() {
   validateDialogVisible.value = true
   validateResult.value = null
   try {
-    const data = await api.get(
+    const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/validate?year=${selectedYear.value}`
     )
-    validateResult.value = data
+    validateResult.value = data.data ?? data
   } catch {
     ElMessage.error('校验失败')
   } finally {
@@ -790,12 +749,55 @@ const importFiles = ref<File[]>([])
 const importYear = ref<number | undefined>(undefined)
 const previewResult = ref<any>(null)
 const importedResult = ref<any>(null)
+const uploadToken = ref('')
 const previewing = ref(false)
 const importing = ref(false)
 const uploadRef = ref()
-const importProgress = ref(0)
-const importProgressMsg = ref('')
-const importProgressCounts = ref<Record<string, number>>({})
+
+// ── 列映射手动调整 ──
+const userColumnMapping = ref<Record<string, Record<string, string>>>({})
+// key: "filename/sheet", value: {原始列名: 标准字段名}
+
+const STANDARD_FIELDS = [
+  { value: '', label: '（不映射）' },
+  { value: 'account_code', label: '科目编码' },
+  { value: 'account_name', label: '科目名称' },
+  { value: 'voucher_date', label: '凭证日期' },
+  { value: 'voucher_no', label: '凭证号' },
+  { value: 'debit_amount', label: '借方金额' },
+  { value: 'credit_amount', label: '贷方金额' },
+  { value: 'opening_balance', label: '期初余额' },
+  { value: 'closing_balance', label: '期末余额' },
+  { value: 'aux_dimensions', label: '核算维度（混合）' },
+  { value: 'aux_type', label: '辅助类型' },
+  { value: 'aux_code', label: '辅助编码' },
+  { value: 'aux_name', label: '辅助名称' },
+  { value: 'summary', label: '摘要' },
+  { value: 'direction', label: '借贷方向' },
+  { value: 'preparer', label: '制单人' },
+  { value: 'accounting_period', label: '会计期间' },
+  { value: 'counterpart_account', label: '对方科目' },
+]
+
+function initColumnMapping() {
+  userColumnMapping.value = {}
+  if (!previewResult.value?.diagnostics) return
+  for (const d of previewResult.value.diagnostics) {
+    const key = `${d.file}/${d.sheet}`
+    const mapping: Record<string, string> = {}
+    if (d.column_mapping) {
+      for (const [col, field] of Object.entries(d.column_mapping)) {
+        if (field) mapping[col] = field as string
+      }
+    }
+    userColumnMapping.value[key] = mapping
+  }
+}
+
+// ── 后台导入轮询状态 ──
+const bgImportPolling = ref(false)
+const bgImportMessage = ref('')
+let _importPollTimer: ReturnType<typeof setInterval> | null = null
 
 function openImportDialog() {
   importDialogVisible.value = true
@@ -804,13 +806,13 @@ function openImportDialog() {
   importYear.value = selectedYear.value || year.value
   previewResult.value = null
   importedResult.value = null
-  importProgress.value = 0
-  importProgressMsg.value = ''
-  importProgressCounts.value = {}
+  uploadToken.value = ''
+  importing.value = false
+  previewing.value = false
+  bgImportPolling.value = false
+  bgImportMessage.value = ''
+  if (_importPollTimer) { clearInterval(_importPollTimer); _importPollTimer = null }
   uploadRef.value?.clearFiles?.()
-
-  // 打开弹窗时自动释放可能残留的旧锁（静默）
-  http.post(`/api/projects/${projectId.value}/account-chart/import-reset`, {}, { timeout: 3000 }).catch(() => {})
 }
 
 function openImportDialogFromRoute() {
@@ -822,6 +824,7 @@ function openImportDialogFromRoute() {
 
 function onImportFileChange(file: any) {
   if (file?.raw) {
+    uploadToken.value = ''
     importFiles.value.push(file.raw)
   }
 }
@@ -834,128 +837,116 @@ async function doPreview() {
     for (const f of importFiles.value) {
       formData.append('files', f)
     }
-    const url = `/api/projects/${projectId.value}/ledger/smart-preview` +
-      (importYear.value ? `?year=${importYear.value}` : '')
-    const data = await api.post(url, formData, { timeout: 120000 })
-    previewResult.value = data?.data ?? data
+    const params = new URLSearchParams()
+    if (importYear.value) params.append('year', String(importYear.value))
+    params.append('preview_rows', '50')
+    const url = `/api/projects/${projectId.value}/ledger/smart-preview?${params.toString()}`
+    const { data } = await http.post(url, formData)
+    previewResult.value = data
+    uploadToken.value = data?.upload_token || ''
+    initColumnMapping()
     importStep.value = 'preview'
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || e?.message || '解析失败')
+    ElMessage.error(e?.message || '解析失败')
   } finally {
     previewing.value = false
   }
 }
 
-/** 用户在预览表格中修改列映射 */
-function onMappingChange(diagIdx: number, header: string, newField: string) {
-  if (!previewResult.value?.diagnostics?.[diagIdx]) return
-  const d = previewResult.value.diagnostics[diagIdx]
-  if (!d.column_mapping) d.column_mapping = {}
-  if (newField) {
-    d.column_mapping[header] = newField
-  } else {
-    delete d.column_mapping[header]
-  }
-  // 同步更新中文标签
-  if (!d.column_mapping_labels) d.column_mapping_labels = {}
-  if (newField && previewResult.value.field_labels) {
-    d.column_mapping_labels[header] = previewResult.value.field_labels[newField] || newField
-  } else {
-    delete d.column_mapping_labels[header]
-  }
-}
-
 async function doImport() {
-  if (!importFiles.value.length) return
+  if ((!importFiles.value.length && !uploadToken.value) || !projectId.value) return
   importing.value = true
   importStep.value = 'importing'
-  importProgress.value = 0
-  importProgressMsg.value = '准备导入…'
-  importProgressCounts.value = {}
+  bgImportPolling.value = true
 
-  // 启动进度轮询（每 1.5 秒查一次后端进度）
-  const pollTimer = setInterval(async () => {
+  // 启动轮询（即使关闭弹窗也继续）
+  if (_importPollTimer) clearInterval(_importPollTimer)
+  _importPollTimer = setInterval(async () => {
     try {
-      const statusData = await api.get(
-        `/api/data-lifecycle/import-queue/${projectId.value}`,
-        { timeout: 5000 },
+      const { data: statusData } = await http.get(
+        `/api/data-lifecycle/import-queue/${projectId.value}`
       )
-      const status = statusData?.data ?? statusData
-      if (status && typeof status === 'object') {
-        const pct = status.progress ?? 0
-        if (pct > 0) importProgress.value = Math.min(pct, 99)
-        if (status.message) importProgressMsg.value = status.message
-        // 从 result 中提取已写入的行数
-        const res = status.result
-        if (res?.data_sheets_imported || res?.imported) {
-          importProgressCounts.value = res.data_sheets_imported || res.imported || {}
-        }
+      const status = statusData.data ?? statusData
+      if (status && typeof status === 'object' && status.message && status.status !== 'idle') {
+        bgImportMessage.value = status.message
       }
-    } catch { /* 静默 */ }
-  }, 1500)
+    } catch { /* ignore */ }
+  }, 3000)
 
   try {
     const formData = new FormData()
-    for (const f of importFiles.value) {
-      formData.append('files', f)
-    }
-
-    // 收集用户编辑后的列映射（按 sheet 名）
-    const customMapping: Record<string, Record<string, string>> = {}
-    for (const d of (previewResult.value?.diagnostics || [])) {
-      if (d.column_mapping && d.sheet) {
-        const clean: Record<string, string> = {}
-        for (const [h, v] of Object.entries(d.column_mapping)) {
-          if (v) clean[h] = v as string
-        }
-        if (Object.keys(clean).length > 0) {
-          customMapping[d.sheet] = clean
-        }
+    if (!uploadToken.value) {
+      for (const f of importFiles.value) {
+        formData.append('files', f)
       }
     }
-
     const yr = previewResult.value?.year || importYear.value
+    const mappingParam = Object.keys(userColumnMapping.value).length > 0
+      ? JSON.stringify(userColumnMapping.value)
+      : ''
     let url = `/api/projects/${projectId.value}/ledger/smart-import`
     const params = new URLSearchParams()
-    if (yr) params.set('year', String(yr))
-    if (Object.keys(customMapping).length > 0) {
-      params.set('custom_mapping', JSON.stringify(customMapping))
-    }
-    const qs = params.toString()
-    if (qs) url += `?${qs}`
+    if (yr) params.append('year', String(yr))
+    if (uploadToken.value) params.append('upload_token', uploadToken.value)
+    if (mappingParam) params.append('custom_mapping', mappingParam)
+    if (params.toString()) url += '?' + params.toString()
+    const { data } = await http.post(url, formData, {
+      timeout: 60000, // 提交任务本身很快，但给足时间
+    })
+    uploadToken.value = data?.upload_token || uploadToken.value
 
-    const data = await api.post(url, formData, { timeout: 600000 })
-    const result = data?.data ?? data
-    importedResult.value = result?.imported || result?.data_sheets_imported || result
-    importProgress.value = 100
-    importProgressMsg.value = '导入完成'
-    importStep.value = 'done'
-  } catch (e: any) {
-    const status = e?.response?.status
-    const detail = e?.response?.data?.detail || e?.message || '导入失败'
-
-    if (status === 409) {
+    // 任务已提交，开始轮询进度
+    let done = false
+    let pollCount = 0
+    const MAX_POLL = 400 // 最多轮询 20 分钟（400 * 3s）
+    while (!done) {
+      await new Promise(r => setTimeout(r, 3000))
+      pollCount += 1
+      if (pollCount > MAX_POLL) {
+        done = true
+        throw new Error('导入任务仍在后台运行，请稍后刷新页面查看结果')
+      }
       try {
-        await api.post(`/api/projects/${projectId.value}/account-chart/import-reset`, {}, { timeout: 5000 })
-      } catch { /* 静默 */ }
-      ElMessage.warning('上次导入的锁已自动释放，请重新点击「确认导入」')
-      importStep.value = 'preview'
-    } else {
-      // 其他错误：停留在 importing 步骤显示错误，不回到 preview（避免"从头来"）
-      importProgressMsg.value = `❌ 导入失败：${detail}`
-      importProgress.value = 0
-      // 3 秒后自动回到 preview（用户可以重试）
-      setTimeout(() => {
-        if (importStep.value === 'importing') {
-          importStep.value = 'preview'
+        const { data: statusData } = await http.get(
+          `/api/data-lifecycle/import-queue/${projectId.value}`
+        )
+        const status = statusData.data ?? statusData
+        if (status && typeof status === 'object') {
+          const pct = status.progress ?? 0
+          const msg = status.message || ''
+          bgImportMessage.value = `[${pct}%] ${msg}`
+          if (pct >= 100 || pct < 0 || status.status === 'idle') {
+            done = true
+            if (pct < 0) {
+              throw new Error(msg || '导入失败')
+            }
+            const payload = status.result
+            importedResult.value = payload?.imported || payload
+            importStep.value = 'done'
+            ElMessage.success(msg || '导入完成')
+            // 刷新数据
+            _auxBalanceLoadedKey.value = ''
+            loadAvailableYears()
+            loadBalance()
+            if (balanceTab.value === 'aux') {
+              loadAllAuxBalance()
+            }
+          }
+        } else {
+          done = true
         }
-      }, 5000)
+      } catch (e: any) {
+        if (e instanceof Error && e.message.includes('导入失败')) throw e
+        done = true
+      }
     }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导入失败')
+    importStep.value = 'preview'
   } finally {
-    clearInterval(pollTimer)
     importing.value = false
-    importProgress.value = 0
-    importProgressMsg.value = ''
+    bgImportPolling.value = false
+    if (_importPollTimer) { clearInterval(_importPollTimer); _importPollTimer = null }
   }
 }
 
@@ -1333,10 +1324,10 @@ async function loadBalance() {
   }
   loading.value = true
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/ledger/balance`, {
+    const { data } = await http.get(`/api/projects/${projectId.value}/ledger/balance`, {
       params: { year: year.value },
     })
-    balanceData.value = data ?? []
+    balanceData.value = data.data ?? data ?? []
     // debug log removed for production
   } catch (e) {
     console.error('[Ledger] loadBalance failed:', e)
@@ -1358,7 +1349,7 @@ async function loadLedger() {
       http.get(`/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }),
       http.get(`/api/projects/${projectId.value}/ledger/opening-balance/${encodeURIComponent(currentAccount.value)}`, { params: { year: year.value } }),
     ])
-    const result = data
+    const result = data.data ?? data
     const obResult = obData.data ?? obData
     currentAccountOpening.value = num(obResult?.opening_balance)
     ledgerItems.value = result.items ?? result ?? []
@@ -1378,10 +1369,10 @@ async function loadMoreLedger() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    const data = await api.get(
+    const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
     )
-    const result = data
+    const result = data.data ?? data
     const newItems = result.items ?? result ?? []
     ledgerItems.value = [...ledgerItems.value, ...newItems]
     ledgerCursor.value = result.next_cursor ?? null
@@ -1393,11 +1384,11 @@ async function loadMoreLedger() {
 async function loadVoucher() {
   loading.value = true
   try {
-    const data = await api.get(
+    const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/voucher/${encodeURIComponent(currentVoucher.value)}`,
       { params: { year: year.value } }
     )
-    voucherItems.value = data ?? []
+    voucherItems.value = data.data ?? data ?? []
   } catch { voucherItems.value = [] }
   finally { loading.value = false }
 }
@@ -1405,11 +1396,11 @@ async function loadVoucher() {
 async function loadAuxBalance() {
   loading.value = true
   try {
-    const data = await api.get(
+    const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/aux-balance/${currentAccount.value}`,
       { params: { year: year.value } }
     )
-    auxBalanceItems.value = data ?? []
+    auxBalanceItems.value = data.data ?? data ?? []
   } catch { auxBalanceItems.value = [] }
   finally { loading.value = false }
 }
@@ -1424,7 +1415,6 @@ const auxSummaryOnly = ref(false)
 const auxExpandedKeys = ref(new Set<string>())
 const auxToolbarCollapsed = ref(false)  // 仅小计模式下已展开的 key
 const auxAllExpanded = ref(false)
-const auxBalanceTableRef = ref<any>(null)
 const auxSelectedDimType = ref('')
 
 /** 切换树形/扁平模式 */
@@ -1613,7 +1603,7 @@ function loadAuxTreeChildren(row: any, _treeNode: any, resolve: (data: any[]) =>
     http.get(`/api/projects/${projectId.value}/ledger/aux-balance-detail`, {
       params: { year: year.value, account_code: code, dim_type: dimType, aux_code: auxCode }
     }).then(({ data }) => {
-      const items = (data ?? []).map((item: any, idx: number) => ({
+      const items = (data.data ?? data ?? []).map((item: any, idx: number) => ({
         ...item, _tree_key: `${code}_${auxCode}_${idx}`, _isGroup: false,
       }))
       resolve(items)
@@ -1706,11 +1696,11 @@ async function toggleAuxExpand(row: any) {
     // 从后端加载明细
     if (!_auxExpandedDetails.value.has(key)) {
       try {
-        const data = await api.get(
+        const { data } = await http.get(
           `/api/projects/${projectId.value}/ledger/aux-balance-detail`,
           { params: { year: year.value, account_code: row.account_code, dim_type: auxSelectedDimType.value, aux_code: row.aux_code } }
         )
-        _auxExpandedDetails.value.set(key, (data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
+        _auxExpandedDetails.value.set(key, (data.data ?? data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
       } catch { _auxExpandedDetails.value.set(key, []) }
     }
     newSet.add(key)
@@ -1776,7 +1766,7 @@ async function loadAllAuxBalance() {
   loading.value = true
   try {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
-    const summaryData = await api.get(
+    const { data: summaryData } = await http.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
       { params: { year: year.value, dim_type: '__types_only__' } }
     )
@@ -1812,11 +1802,11 @@ async function loadAuxSummaryForDim() {
   }
   try {
     loading.value = true
-    const data = await api.get(
+    const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
       { params }
     )
-    const result = data
+    const result = data.data ?? data
     auxSummaryData.value = result.rows || []
     // 同时更新维度类型列表
     if (result.dim_types) {
@@ -1843,11 +1833,11 @@ async function loadAuxBalancePage() {
     if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
-    const data = await api.get(
+    const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-paged`,
       { params }
     )
-    const result = data
+    const result = data.data ?? data
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0
   } catch { auxPagedRows.value = [] }
@@ -1874,7 +1864,7 @@ async function exportAuxBalanceExcel() {
     if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
-    const response = await api.get(
+    const response = await http.get(
       `/api/projects/${projectId.value}/ledger/export-aux-balance`,
       { params, responseType: 'blob' }
     )
@@ -1897,7 +1887,7 @@ async function exportAuxBalanceExcel() {
 /** 导出科目余额表为 Excel */
 async function exportBalanceExcel() {
   try {
-    const response = await api.get(
+    const response = await http.get(
       `/api/projects/${projectId.value}/ledger/export-balance`,
       { params: { year: year.value }, responseType: 'blob' }
     )
@@ -1924,7 +1914,7 @@ async function exportLedgerExcel() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    const response = await api.get(
+    const response = await http.get(
       `/api/projects/${projectId.value}/ledger/export-ledger/${encodeURIComponent(currentAccount.value)}`,
       { params, responseType: 'blob' }
     )
@@ -1961,11 +1951,11 @@ function drillToAuxLedgerFromBalance(row: any) {
 async function loadAuxLedger() {
   loading.value = true
   try {
-    const data = await api.get(
+    const { data } = await http.get(
       `/api/projects/${projectId.value}/ledger/aux-entries/${currentAccount.value}`,
       { params: { year: year.value, aux_type: currentAuxType.value, aux_code: currentAuxCode.value, page: auxLedgerPage.value, page_size: 100 } }
     )
-    const result = data
+    const result = data.data ?? data
     auxLedgerItems.value = result.items ?? result ?? []
     auxLedgerTotal.value = result.total ?? 0
   } catch { auxLedgerItems.value = [] }
@@ -2056,7 +2046,6 @@ function onKeyDown(e: KeyboardEvent) {
 }
 onMounted(async () => {
   document.addEventListener('keydown', onKeyDown)
-  window.addEventListener('gt-import-reset', _onGlobalReset)
   await loadProjectList()
   await loadCurrentProject()
   await loadAvailableYears()
@@ -2068,19 +2057,7 @@ onMounted(async () => {
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
-  window.removeEventListener('gt-import-reset', _onGlobalReset)
 })
-
-/** 顶部栏重置按钮触发时，立即关闭导入弹窗并恢复状态 */
-function _onGlobalReset() {
-  importDialogVisible.value = false
-  importStep.value = 'upload'
-  previewing.value = false
-  importing.value = false
-  importFiles.value = []
-  previewResult.value = null
-  importedResult.value = null
-}
 </script>
 
 <style scoped>

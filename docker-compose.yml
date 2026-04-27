@@ -171,6 +171,7 @@ services:
     volumes:
 
       - ./storage:/app/storage
+      - ./backend/app:/app/app
 
     depends_on:
 

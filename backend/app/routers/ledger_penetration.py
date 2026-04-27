@@ -16,7 +16,6 @@ Validates: Requirements 15.1-15.4
 from __future__ import annotations
 
 import io
-import re
 import urllib.parse
 from typing import Optional
 from uuid import UUID
@@ -25,11 +24,10 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, get_user_scope_cycles
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.core.redis import get_redis
 from app.services.ledger_penetration_service import LedgerPenetrationService
-from app.services.mapping_service import get_codes_by_cycles
 
 router = APIRouter(prefix="/api/projects/{project_id}/ledger", tags=["ledger-penetration"])
 
@@ -69,15 +67,7 @@ async def get_balance(
 ):
     """科目余额汇总"""
     svc = _svc(db, None)
-    rows = await svc.get_balance_summary(project_id, year, account_code)
-
-    # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
-    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
-    if scope_cycles is not None:
-        allowed_codes = await get_codes_by_cycles(project_id, scope_cycles)
-        rows = [r for r in rows if r.get("account_code") in allowed_codes]
-
-    return rows
+    return await svc.get_balance_summary(project_id, year, account_code)
 
 
 @router.get("/opening-balance/{account_code}")
@@ -432,326 +422,111 @@ async def upload_multi_files(
 @router.post("/smart-preview")
 async def smart_preview(
     project_id: UUID,
-    files: list[UploadFile] = File(...),
+    files: list[UploadFile] | None = File(None),
+    upload_token: Optional[str] = Query(None, description="上传产物令牌，可复用预览上传的文件"),
     year: Optional[int] = Query(None, description="指定年度（不指定则自动提取）"),
+    preview_rows: int = Query(50, description="预览模式最大解析行数（默认50，限制内存占用）"),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """智能预览：只读表头+列映射+类型识别+行数估算，不读全部数据行。
+    """智能预览：轻量解析前 N 行，返回识别结果 + 列映射 + 总行估算。
 
-    大文件秒级响应（只扫描前几行），供用户确认后再调用 smart-import 写入。
+    不写入数据库，不转换数据，只解析表头 + 前 N 行做数据类型识别，
+    供用户确认后再调用 smart-import 后台异步写入。
     """
-    import io
-    import time as _perf_time
-    import logging as _logging
-    _logger = _logging.getLogger("smart_import_engine")
-    _t_preview_start = _perf_time.perf_counter()
-    import openpyxl
-    from app.services.smart_import_engine import (
-        parse_sheet_header_only, detect_header_rows, smart_match_column,
-        _guess_data_type, _detect_missing_fields, extract_year_from_content,
-        _HEADER_KEYWORDS,
+    from app.services.ledger_import_upload_service import LedgerImportUploadService
+    from app.services.smart_import_engine import smart_parse_files
+
+    all_files = list(files) if files else []
+    if upload_token:
+        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
+    else:
+        if not all_files:
+            raise HTTPException(status_code=400, detail="未提供文件")
+        manifest = await LedgerImportUploadService.create_bundle(
+            project_id,
+            str(current_user.id),
+            all_files,
+        )
+        upload_token = manifest["upload_token"]
+        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
+
+    result = smart_parse_files(
+        file_sources,
+        year_override=year,
+        preview_mode=True,
+        preview_rows=preview_rows,
     )
 
-    file_contents = []
-    for f in files:
-        if not f.filename:
-            continue
-        content = await f.read()
-        file_contents.append((f.filename, content))
-
-    if not file_contents:
-        raise HTTPException(status_code=400, detail="未提供文件")
-
-    diagnostics = []
-    detected_year = year
-    summary = {"balance": 0, "aux_balance": 0, "ledger": 0, "aux_ledger": 0}
-
-    for filename, content in file_contents:
-        # ── CSV ──
-        if filename.lower().endswith('.csv'):
-            import codecs, csv as _csv
-            # 编码探测
-            probe = content[:min(16384, len(content))]
-            nl = probe.rfind(b'\n')
-            if nl > 0:
-                probe = probe[:nl]
-            encoding = 'utf-8-sig'
-            for enc in ('utf-8-sig', 'gbk', 'gb2312', 'gb18030'):
-                try:
-                    probe.decode(enc)
-                    encoding = enc
-                    break
-                except (UnicodeDecodeError, LookupError):
-                    continue
-
-            text_head = content[:65536].decode(encoding, errors='replace')
-            lines = text_head.split('\n')
-
-            # 找表头
-            headers = []
-            header_idx = 0
-            for i, line in enumerate(lines[:5]):
-                cells = [c.strip() for c in line.split(',') if c.strip()]
-                if len(cells) >= 3:
-                    reader_row = list(_csv.reader([line.strip()]))[0]
-                    headers = [c.strip() if c.strip() else f"col_{j}" for j, c in enumerate(reader_row)]
-                    header_idx = i
-                    break
-
-            col_map = {}
-            for h in headers:
-                m = smart_match_column(h)
-                if m:
-                    col_map[h] = m
-
-            mapped = set(col_map.values())
-            dt = _guess_data_type(mapped) if mapped else "unknown"
-            miss_req, miss_rec = _detect_missing_fields(dt, mapped)
-            total_lines = content.count(b'\n') - header_idx
-
-            if detected_year is None:
-                detected_year = extract_year_from_content([], filename=filename)
-
-            # 前 20 行数据预览
-            csv_preview_rows = []
-            data_lines = lines[header_idx + 1: header_idx + 21]
-            for dl in data_lines:
-                dl = dl.strip()
-                if not dl:
-                    continue
-                row_raw = list(_csv.reader([dl]))[0]
-                padded = row_raw + [''] * max(0, len(headers) - len(row_raw))
-                csv_preview_rows.append({headers[j]: padded[j].strip() for j in range(len(headers))})
-
-            # 内容辅助类型识别
-            if dt == "unknown" and csv_preview_rows:
-                import re as _re
-                _hints: set[str] = set()
-                for row in csv_preview_rows[:10]:
-                    for v in row.values():
-                        if not v:
-                            continue
-                        if _re.match(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}$', v):
-                            _hints.add("has_date")
-                        if _re.match(r'^-?\d+\.?\d*$', v.replace(',', '')):
-                            _hints.add("has_number")
-                if "has_date" in _hints and "has_number" in _hints:
-                    dt = "ledger"
-                elif "has_number" in _hints:
-                    dt = "balance"
-                miss_req, miss_rec = _detect_missing_fields(dt, mapped)
-
-            diagnostics.append({
-                "file": filename, "sheet": "CSV", "data_type": dt,
-                "row_count": max(0, total_lines),
-                "header_count": 1,
-                "matched_cols": sorted(mapped),
-                "missing_cols": miss_req, "missing_recommended": miss_rec,
-                "column_mapping": col_map,
-                "headers": headers,
-                "preview_rows": csv_preview_rows,
-                "status": "ok" if not miss_req else "warning",
-            })
-            if dt == "ledger":
-                summary["ledger"] += max(0, total_lines)
-            elif dt == "balance":
-                summary["balance"] += max(0, total_lines)
-            continue
-
-        # ── Excel ──
-        if filename.lower().endswith('.xls'):
-            diagnostics.append({"file": filename, "sheet": None, "data_type": "unknown",
-                                "row_count": 0, "status": "error",
-                                "message": "暂不支持 .xls 文件，请转换为 .xlsx"})
-            continue
-
-        # 探测合并单元格 + 打开文件（合并为一次打开）
-        needs_full = False
-        _t_probe = _perf_time.perf_counter()
-        try:
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-            _logger.info("[PERF] preview open (read_only) %s: %.2fs",
-                         filename, _perf_time.perf_counter() - _t_probe)
-            # 探测合并单元格
-            for _ws in wb.worksheets:
-                try:
-                    rows5 = list(_ws.iter_rows(max_row=5, values_only=True))
-                    if rows5 and max(len(r) for r in rows5) <= 3:
-                        needs_full = True
-                        break
-                    for row in rows5:
-                        non_empty = [str(c).strip() for c in row if c is not None and str(c).strip()]
-                        if len(non_empty) >= 4:
-                            from collections import Counter
-                            _, cnt = Counter(non_empty).most_common(1)[0]
-                            if cnt >= len(non_empty) * 0.6 and cnt >= 3:
-                                needs_full = True
-                                break
-                    if needs_full:
-                        break
-                except Exception:
-                    pass
-            if needs_full:
-                wb.close()
-                _t_full = _perf_time.perf_counter()
-                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-                _logger.info("[PERF] preview reopen (full) %s: %.2fs",
-                             filename, _perf_time.perf_counter() - _t_full)
-        except Exception as e:
-            diagnostics.append({"file": filename, "sheet": None, "data_type": "unknown",
-                                "row_count": 0, "status": "error", "message": str(e)})
-            continue
-
-        for ws in wb.worksheets:
-            sname = ws.title
-            if any(kw in sname.lower() for kw in ("说明", "目录", "封面", "模板")):
-                continue
-
-            try:
-                meta = parse_sheet_header_only(ws)
-            except Exception as e:
-                diagnostics.append({"file": filename, "sheet": sname, "data_type": "unknown",
-                                    "row_count": 0, "status": "error", "message": str(e)})
-                continue
-
-            dt = meta["data_type"]
-            matched = set(meta["column_mapping"].values())
-            miss_req, miss_rec = _detect_missing_fields(dt, matched)
-
-            # 行数估算（不遍历全部数据）
-            row_est = 0
-            try:
-                row_est = max(0, (ws.max_row or 0) - meta["data_start"])
-            except Exception:
-                pass
-
-            # 读前 20 行数据供前端预览 + 辅助类型识别
-            preview_rows = []
-            data_start = meta["data_start"]
-            num_cols = meta["num_cols"]
-            headers = meta["headers"]
-            col_map = meta["column_mapping"]
-            try:
-                data_iter = ws.iter_rows(min_row=data_start + 1, max_row=data_start + 20, values_only=True)
-            except TypeError:
-                data_iter = ws.iter_rows(values_only=True)
-                for _ in range(data_start):
-                    try:
-                        next(data_iter)
-                    except StopIteration:
-                        data_iter = iter([])
-                        break
-
-            for row_vals in data_iter:
-                padded = list(row_vals) + [None] * max(0, num_cols - len(row_vals))
-                if all(c is None for c in padded[:num_cols]):
-                    continue
-                row_dict = {}
-                for ci in range(num_cols):
-                    h = headers[ci]
-                    v = padded[ci]
-                    row_dict[h] = str(v).strip() if v is not None else ""
-                preview_rows.append(row_dict)
-
-            # 根据数据内容辅助修正类型识别（表头映射不够时用内容特征补充）
-            if dt == "unknown" and preview_rows:
-                _content_hints: set[str] = set()
-                for row in preview_rows[:10]:
-                    for h, v in row.items():
-                        if not v:
-                            continue
-                        # 日期特征 → voucher_date
-                        if re.match(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}$', v):
-                            _content_hints.add("has_date")
-                        # 纯数字带小数点 → 金额
-                        if re.match(r'^-?\d+\.?\d*$', v.replace(',', '')):
-                            _content_hints.add("has_number")
-                if "has_date" in _content_hints and "has_number" in _content_hints:
-                    dt = "ledger"
-                elif "has_number" in _content_hints:
-                    dt = "balance"
-                miss_req, miss_rec = _detect_missing_fields(dt, matched)
-
-            if detected_year is None and meta.get("year"):
-                detected_year = meta["year"]
-
-            diagnostics.append({
-                "file": filename, "sheet": sname, "data_type": dt,
-                "row_count": row_est,
-                "header_count": meta["header_count"],
-                "matched_cols": sorted(matched),
-                "missing_cols": miss_req, "missing_recommended": miss_rec,
-                "column_mapping": meta["column_mapping"],
-                "headers": headers,
-                "preview_rows": preview_rows,
-                "status": "ok" if not miss_req else "warning",
-            })
-
-            if dt == "ledger":
-                summary["ledger"] += row_est
-            elif dt == "balance":
-                summary["balance"] += row_est
-            elif dt == "aux_balance":
-                summary["aux_balance"] += row_est
-            elif dt == "aux_ledger":
-                summary["aux_ledger"] += row_est
-
-        wb.close()
-
-    if detected_year is None:
-        from datetime import datetime as _dt
-        detected_year = _dt.now().year - 1
-
-    # 估算辅助表行数：如果余额表/序时账含核算维度列，辅助行数≈主表行数
-    for d in diagnostics:
-        cm_vals = set((d.get("column_mapping") or {}).values())
-        if d.get("data_type") == "balance" and "aux_dimensions" in cm_vals:
-            summary["aux_balance"] += d.get("row_count", 0)
-        elif d.get("data_type") == "ledger" and "aux_dimensions" in cm_vals:
-            summary["aux_ledger"] += d.get("row_count", 0)
-
-    # 把 column_mapping 的英文值替换为中文标签（前端展示用）
-    from app.services.smart_import_engine import FIELD_LABELS
-    for d in diagnostics:
-        cm = d.get("column_mapping")
-        if cm:
-            d["column_mapping_labels"] = {
-                h: FIELD_LABELS.get(v, v) for h, v in cm.items()
-            }
-
-    _logger.info("[PERF] ═══ smart_preview TOTAL: %.2fs, %d files, %d sheets ═══",
-                _perf_time.perf_counter() - _t_preview_start,
-                len(file_contents), len(diagnostics))
+    # 预览模式下从 diagnostics 汇总估算行数
+    balance_est = 0
+    aux_balance_est = 0
+    ledger_est = 0
+    aux_ledger_est = 0
+    for d in result.get("diagnostics", []):
+        est = d.get("total_row_estimate") or d.get("row_count", 0)
+        dt = d.get("data_type", "")
+        if dt in ("balance", "aux_balance"):
+            balance_est += est
+            aux_balance_est += d.get("aux_balance_count_est", 0)
+        elif dt in ("ledger", "aux_ledger"):
+            ledger_est += est
+            aux_ledger_est += d.get("aux_ledger_count_est", 0)
 
     return {
-        "year": detected_year,
-        "summary": summary,
-        "aux_dimensions": [],
+        "year": result["year"],
+        "summary": {
+            "balance": balance_est,
+            "aux_balance": aux_balance_est,
+            "ledger": ledger_est,
+            "aux_ledger": aux_ledger_est,
+        },
+        "aux_dimensions": result.get("aux_dimensions", []),
         "validation": [],
-        "diagnostics": diagnostics,
-        "field_labels": FIELD_LABELS,  # 供前端下拉选择用
+        "diagnostics": result["diagnostics"],
+        "preview_mode": True,
+        "preview_rows": preview_rows,
+        "upload_token": upload_token,
     }
 
 
 @router.post("/smart-import")
 async def smart_import(
     project_id: UUID,
-    files: list[UploadFile] = File(...),
+    files: list[UploadFile] | None = File(None),
+    upload_token: Optional[str] = Query(None, description="预览阶段上传产物令牌"),
     year: Optional[int] = Query(None, description="指定年度（不指定则自动提取）"),
     custom_mapping: Optional[str] = Query(None, description="自定义列映射JSON"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """智能导入：解析多个文件并写入数据库。
+    """智能导入（异步后台）：解析多个文件并写入数据库。
 
-    并发控制：同一项目同一时间只允许一个导入任务。
+    立即返回 accepted，前端通过 /api/data-lifecycle/import-queue/{project_id} 轮询进度。
+    适合大文件（>10MB 或 >100万行）避免 HTTP 超时。
     """
+    import asyncio
     import json
     from app.services.import_queue_service import ImportQueueService
+    from app.services.ledger_import_upload_service import LedgerImportUploadService
 
-    file_label = files[0].filename or "upload.xlsx"
-    if len(files) > 1:
-        file_label = f"{file_label} 等{len(files)}个文件"
+    # 兼容单文件 / 多文件
+    all_files = list(files) if files else []
+    if upload_token:
+        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
+    else:
+        if not all_files:
+            raise HTTPException(status_code=400, detail="未提供文件")
+        manifest = await LedgerImportUploadService.create_bundle(
+            project_id,
+            str(current_user.id),
+            all_files,
+        )
+        upload_token = manifest["upload_token"]
+        file_sources = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
+
+    file_label = file_sources[0][0] if file_sources else "upload.xlsx"
+    if len(file_sources) > 1:
+        file_label = f"{file_label} 等{len(file_sources)}个文件"
 
     ok, msg, job_batch_id = await ImportQueueService.acquire_lock(
         project_id,
@@ -764,94 +539,96 @@ async def smart_import(
     if not ok:
         raise HTTPException(status_code=409, detail=msg)
 
-    try:
-        file_contents = []
-        total_size = 0
-        for f in files:
-            if not f.filename:
-                continue
-            content = await f.read()
-            total_size += len(content)
-            file_contents.append((f.filename, content))
-
-        if not file_contents:
-            raise HTTPException(status_code=400, detail="未提供文件")
-
-        # 内存保护：文件总大小超过 800MB 时拒绝（防止 OOM 杀死后端）
-        if total_size > 800 * 1024 * 1024:
+    mapping = None
+    if custom_mapping:
+        try:
+            mapping = json.loads(custom_mapping)
+        except json.JSONDecodeError:
             ImportQueueService.release_lock(project_id)
-            raise HTTPException(
-                status_code=413,
-                detail=f"文件总大小 {total_size / 1024 / 1024:.0f} MB 超过限制（800MB），"
-                       f"请通过项目向导的数据导入步骤上传（支持异步处理大文件）",
-            )
+            raise HTTPException(status_code=400, detail="自定义列映射JSON格式错误")
 
-        mapping = None
-        if custom_mapping:
-            try:
-                mapping = json.loads(custom_mapping)
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=400, detail="自定义列映射JSON格式错误")
-
-        ImportQueueService.update_progress(
-            project_id,
-            2,
-            f"开始导入 {len(file_contents)} 个文件…",
-        )
-
-        def _on_progress(pct: int, msg: str):
-            ImportQueueService.update_progress(project_id, pct, msg)
-
+    # 后台任务
+    async def _do_import():
+        from app.core.database import async_session
         from app.services.smart_import_engine import smart_import_streaming
-        result = await smart_import_streaming(
-            project_id=project_id,
-            file_contents=file_contents,
-            db=db,
-            year_override=year,
-            custom_mapping=mapping,
-            progress_callback=_on_progress,
-        )
 
-        result_payload = {
-            "imported": result["data_sheets_imported"],
-            "year": result["year"],
-            "diagnostics": result["sheet_diagnostics"],
-            "errors": result["errors"],
-            "batch_id": str(job_batch_id) if job_batch_id is not None else None,
-        }
-        total_records = sum(
-            int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
-        )
-        if job_batch_id is not None:
-            await ImportQueueService.complete_job(
+        try:
+            ImportQueueService.update_progress(
                 project_id,
-                job_batch_id,
-                db,
-                message=f"导入完成: {result['data_sheets_imported']}",
-                result=result_payload,
-                year=result["year"],
-                record_count=total_records,
+                2,
+                f"开始导入 {len(file_sources)} 个文件…",
             )
-        return result_payload
-    except Exception as e:
-        failure_payload = {
-            "imported": {},
-            "year": None,
-            "diagnostics": [],
-            "errors": [f"导入失败: {e}"],
-            "batch_id": str(job_batch_id) if job_batch_id is not None else None,
-        }
-        if job_batch_id is not None:
-            await ImportQueueService.fail_job(
-                project_id,
-                job_batch_id,
-                db,
-                message=f"导入失败: {e}",
-                result=failure_payload,
+
+            def _on_progress(pct: int, msg: str):
+                ImportQueueService.update_progress(project_id, pct, msg)
+
+            async with async_session() as db:
+                result = await smart_import_streaming(
+                    project_id=project_id,
+                    file_contents=file_sources,
+                    db=db,
+                    year_override=year,
+                    custom_mapping=mapping,
+                    progress_callback=_on_progress,
+                )
+
+            result_payload = {
+                "imported": result["data_sheets_imported"],
+                "year": result["year"],
+                "diagnostics": result["sheet_diagnostics"],
+                "errors": result["errors"],
+                "batch_id": str(job_batch_id) if job_batch_id is not None else None,
+            }
+            total_records = result["total_accounts"] + sum(
+                int(v) for v in result["data_sheets_imported"].values() if isinstance(v, int)
             )
-        else:
-            ImportQueueService.release_lock(project_id)
-        raise
+            if job_batch_id is not None:
+                async with async_session() as db:
+                    await ImportQueueService.complete_job(
+                        project_id,
+                        job_batch_id,
+                        db,
+                        message=f"导入完成: {result['data_sheets_imported']}",
+                        result=result_payload,
+                        year=result["year"],
+                        record_count=total_records,
+                    )
+            else:
+                ImportQueueService.release_lock(project_id)
+        except Exception as e:
+            import traceback
+            import logging
+            logging.getLogger(__name__).error(
+                "异步导入失败: %s\n%s", e, traceback.format_exc(),
+            )
+            failure_payload = {
+                "imported": {},
+                "year": None,
+                "diagnostics": [],
+                "errors": [f"导入失败: {e}"],
+                "batch_id": str(job_batch_id) if job_batch_id is not None else None,
+            }
+            async with async_session() as db:
+                if job_batch_id is not None:
+                    await ImportQueueService.fail_job(
+                        project_id,
+                        job_batch_id,
+                        db,
+                        message=f"导入失败: {e}",
+                        result=failure_payload,
+                    )
+                else:
+                    ImportQueueService.release_lock(project_id)
+
+    asyncio.create_task(_do_import())
+
+    return {
+        "status": "accepted",
+        "message": f"导入任务已提交（{len(file_sources)} 个文件），请轮询进度",
+        "project_id": str(project_id),
+        "batch_id": str(job_batch_id) if job_batch_id is not None else None,
+        "upload_token": upload_token,
+    }
 
 
 @router.get("/years")

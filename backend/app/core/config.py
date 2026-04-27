@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     MINERU_USE_CLI: bool = True  # 使用 CLI 模式（直接调用本地 mineru 命令）
     # 文件上传限制
     MAX_UPLOAD_SIZE_MB: int = 100  # 最大上传文件大小（MB）
+    LEDGER_UPLOAD_STORAGE_ROOT: str = "./storage/ledger_uploads"
+    LEDGER_UPLOAD_TTL_HOURS: int = 24
     # LLM 服务配置（默认使用本地 vLLM）
     LLM_BASE_URL: str = "http://localhost:8100/v1"  # vLLM OpenAI 兼容 API
     LLM_API_KEY: str = "not-needed"  # vLLM 本地不需要 API Key
