@@ -302,6 +302,22 @@ class WorkingPaper(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
+    # Phase 12: 新增状态字段
+    workflow_status: Mapped[str] = mapped_column(
+        String(30), server_default=text("'draft'"), nullable=False
+    )
+    explanation_status: Mapped[str] = mapped_column(
+        String(30), server_default=text("'not_started'"), nullable=False
+    )
+    consistency_status: Mapped[str] = mapped_column(
+        String(30), server_default=text("'unknown'"), nullable=False
+    )
+    last_parsed_sync_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    partner_reviewed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    partner_reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+
     __table_args__ = (
         Index(
             "uq_working_paper_project_index",

@@ -40,6 +40,17 @@ async def check_sign_readiness(
     return await svc.check_sign_readiness(project_id)
 
 
+@router.post("/api/projects/{project_id}/partner/workpaper-readiness")
+async def check_workpaper_readiness(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("review")),
+):
+    """Phase 12 P1-7: 签字前底稿专项检查（5项）"""
+    svc = SignReadinessService(db)
+    return await svc.check_workpaper_readiness(project_id)
+
+
 @router.get("/api/partner/team-efficiency")
 async def get_team_efficiency(
     days: int = Query(30, ge=7, le=365),

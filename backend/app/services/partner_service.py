@@ -259,6 +259,80 @@ class SignReadinessService:
             "total_checks": len(checks),
         }
 
+    async def check_workpaper_readiness(self, project_id: uuid.UUID) -> dict[str, Any]:
+        """Phase 12 P1-7: 签字前底稿专项检查（5项）。"""
+        import time
+        start = time.monotonic()
+        base = [WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == False]
+        checks = []
+        all_pass = True
+
+        total_q = select(func.count()).select_from(WorkingPaper).where(*base)
+        total = (await self.db.execute(total_q)).scalar() or 0
+
+        # 1. 复核状态
+        reviewed_q = select(func.count()).select_from(WorkingPaper).where(
+            *base, WorkingPaper.review_status == WpReviewStatus.level2_passed)
+        reviewed = (await self.db.execute(reviewed_q)).scalar() or 0
+        p1 = reviewed == total and total > 0
+        checks.append({"check_name": "复核状态", "passed": p1,
+                        "detail": f"{reviewed}/{total} 已通过二级复核"})
+        if not p1: all_pass = False
+
+        # 2. QC通过
+        from app.models.workpaper_models import WpQcResult
+        qc_fail_q = select(func.count()).select_from(WpQcResult).where(
+            WpQcResult.project_id == project_id, WpQcResult.blocking_count > 0)
+        qc_fail = (await self.db.execute(qc_fail_q)).scalar() or 0
+        p2 = qc_fail == 0
+        checks.append({"check_name": "QC通过", "passed": p2,
+                        "detail": f"{qc_fail} 张底稿有阻断项" if qc_fail else "全部通过"})
+        if not p2: all_pass = False
+
+        # 3. 说明非空
+        no_expl_q = select(func.count()).select_from(WorkingPaper).where(
+            *base, sa.or_(
+                WorkingPaper.explanation_status == "not_started",
+                WorkingPaper.explanation_status.is_(None),
+            ))
+        no_expl = (await self.db.execute(no_expl_q)).scalar() or 0
+        p3 = no_expl == 0
+        checks.append({"check_name": "说明非空", "passed": p3,
+                        "detail": f"{no_expl} 张底稿审计说明为空" if no_expl else "全部已填写"})
+        if not p3: all_pass = False
+
+        # 4. 数据一致
+        inconsistent_q = select(func.count()).select_from(WorkingPaper).where(
+            *base, WorkingPaper.consistency_status == "inconsistent")
+        inconsistent = (await self.db.execute(inconsistent_q)).scalar() or 0
+        p4 = inconsistent == 0
+        checks.append({"check_name": "数据一致", "passed": p4,
+                        "detail": f"{inconsistent} 张底稿数据不一致" if inconsistent else "全部一致"})
+        if not p4: all_pass = False
+
+        # 5. 证据充分（简化：检查是否有附件关联）
+        try:
+            no_att_q = sa.text("""
+                SELECT COUNT(*) FROM working_paper wp
+                WHERE wp.project_id = :pid AND wp.is_deleted = false
+                AND NOT EXISTS (SELECT 1 FROM attachment_working_paper awp WHERE awp.working_paper_id = wp.id)
+            """)
+            no_att = (await self.db.execute(no_att_q, {"pid": str(project_id)})).scalar() or 0
+        except Exception:
+            no_att = 0
+        p5 = no_att == 0
+        checks.append({"check_name": "证据充分", "passed": p5,
+                        "detail": f"{no_att} 张底稿无附件" if no_att else "全部有附件"})
+        if not p5: all_pass = False
+
+        elapsed = int((time.monotonic() - start) * 1000)
+        return {
+            "all_passed": all_pass,
+            "checks": checks,
+            "total_workpapers": total,
+            "check_duration_ms": elapsed,
+        }
+
 
 class TeamEfficiencyService:
     """团队效能分析 — 合伙人关注团队产出"""

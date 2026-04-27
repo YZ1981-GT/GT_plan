@@ -88,10 +88,13 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.review_conversations import router as rconv_router
     from app.routers.annotations import router as ann_router
 
+    # Phase 12
+    from app.routers.wp_explanation import router as wpexpl_router
+
     for r in [formula_router, wpt_router, wp_router, qc_router, wpr_router,
               wpm_router, wpp_router, wpai_router, wps_router, wpd_router,
               wpc_router, samp_router, sampe_router, wsum_router, pr_router,
-              rconv_router, ann_router]:
+              rconv_router, ann_router, wpexpl_router]:
         app.include_router(r, tags=["底稿管理"])
 
     # ═══ 6. 合并报表 ═══

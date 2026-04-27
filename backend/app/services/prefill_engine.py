@@ -242,6 +242,7 @@ async def parse_workpaper_real(
         "rje_adjustment": 0,
         "conclusion": None,
         "conclusion_text": None,
+        "audit_explanation": None,
         "cross_refs": [],
         "ai_content": [],
         "extracted_at": None,
@@ -253,6 +254,7 @@ async def parse_workpaper_real(
     _AJE_KW = ["AJE", "审计调整", "调整分录"]
     _RJE_KW = ["RJE", "重分类"]
     _CONCLUSION_KW = ["审计结论", "结论", "审计意见", "Conclusion"]
+    _EXPLANATION_KW = ["审计说明", "审计结论", "执行情况", "审计程序执行", "审计发现", "Explanation"]
     _WP_REF_RE = re.compile(r'=WP\s*\(\s*["\']([^"\']+)["\']', re.IGNORECASE)
 
     for ws in wb.worksheets:
@@ -307,6 +309,36 @@ async def parse_workpaper_real(
                                 break
                         except Exception:
                             pass
+
+                # 审计说明提取
+                if parsed["audit_explanation"] is None:
+                    for ekw in _EXPLANATION_KW:
+                        if ekw in s:
+                            parts = []
+                            if len(s) > len(ekw) + 20:
+                                parts.append(s)
+                            for co in range(1, 6):
+                                try:
+                                    rc = ws.cell(row=cell.row, column=cell.column + co)
+                                    if rc.value and str(rc.value).strip():
+                                        parts.append(str(rc.value).strip())
+                                    else:
+                                        break
+                                except Exception:
+                                    break
+                            if not parts:
+                                for ro in range(1, 10):
+                                    try:
+                                        bc = ws.cell(row=cell.row + ro, column=cell.column)
+                                        if bc.value and str(bc.value).strip():
+                                            parts.append(str(bc.value).strip())
+                                        else:
+                                            break
+                                    except Exception:
+                                        break
+                            if parts:
+                                parsed["audit_explanation"] = "\n".join(parts)
+                            break
 
                 # 交叉引用
                 if isinstance(val, str):

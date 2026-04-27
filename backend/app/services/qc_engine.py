@@ -439,6 +439,110 @@ class PreparationDateRule(QCRule):
 
 
 # ---------------------------------------------------------------------------
+# Phase 12: 内容级QC规则 (QC-15 ~ QC-18)
+# ---------------------------------------------------------------------------
+
+class ExplanationCompletenessRule(QCRule):
+    """QC-15: 审计说明完整性。"""
+    severity = "blocking"
+    rule_id = "QC-15"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        wp = context.working_paper
+        pd = wp.parsed_data or {}
+        explanation = pd.get("audit_explanation", "")
+        findings = []
+        if not explanation:
+            findings.append(QCFindingItem(rule_id=self.rule_id, severity=self.severity,
+                                          message="审计说明为空，请填写或使用AI生成"))
+            return findings
+        if len(explanation) < 50:
+            findings.append(QCFindingItem(rule_id=self.rule_id, severity=self.severity,
+                                          message=f"审计说明过短（{len(explanation)}字），至少需要50字",
+                                          actual_value=len(explanation), expected_value=50))
+        expl_status = getattr(wp, "explanation_status", "not_started")
+        if expl_status not in ("synced", "written_back"):
+            findings.append(QCFindingItem(rule_id=self.rule_id, severity="warning",
+                                          message=f"审计说明同步状态异常: {expl_status}"))
+        return findings
+
+
+class DataReferenceConsistencyRule(QCRule):
+    """QC-16: 数据引用一致性 — 底稿审定数 vs 试算表，误差>0.01元阻断。"""
+    severity = "blocking"
+    rule_id = "QC-16"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        wp = context.working_paper
+        pd = wp.parsed_data or {}
+        wp_amount = pd.get("audited_amount")
+        if wp_amount is None:
+            return []
+        from app.models.audit_platform_models import TrialBalance
+        tbs = (await context.db.execute(
+            sa.select(TrialBalance).where(
+                TrialBalance.project_id == context.project_id,
+                TrialBalance.year == context.year,
+                TrialBalance.is_deleted == False,
+            )
+        )).scalars().all()
+        for tb in tbs[:1]:
+            tb_amt = float(tb.audited_debit or 0) - float(tb.audited_credit or 0)
+            diff = abs(float(wp_amount) - tb_amt)
+            if diff > 0.01:
+                return [QCFindingItem(rule_id=self.rule_id, severity=self.severity,
+                                      message=f"底稿审定数({wp_amount:,.2f})与试算表({tb_amt:,.2f})差异{diff:,.2f}元",
+                                      expected_value=tb_amt, actual_value=wp_amount)]
+        return []
+
+
+class AttachmentSufficiencyRule(QCRule):
+    """QC-17: 附件证据充分性 — 底稿至少关联1个附件。"""
+    severity = "blocking"
+    rule_id = "QC-17"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        try:
+            result = await context.db.execute(
+                sa.text("SELECT COUNT(*) FROM attachment_working_paper WHERE working_paper_id = :wid"),
+                {"wid": str(context.working_paper.id)})
+            count = result.scalar() or 0
+        except Exception:
+            count = 0
+        if count == 0:
+            return [QCFindingItem(rule_id=self.rule_id, severity=self.severity,
+                                  message="底稿未关联任何附件证据", actual_value=0, expected_value=1)]
+        return []
+
+
+class CrossRefIntegrityRule(QCRule):
+    """QC-18: 交叉引用完整性 — 引用的底稿编号存在且状态≠draft。"""
+    severity = "warning"
+    rule_id = "QC-18"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        pd = context.working_paper.parsed_data or {}
+        refs = pd.get("cross_refs", [])
+        if not refs:
+            return []
+        findings = []
+        for ref_code in refs:
+            ref_q = sa.select(WorkingPaper).join(WpIndex).where(
+                WpIndex.wp_code == ref_code,
+                WorkingPaper.project_id == context.project_id,
+                WorkingPaper.is_deleted == False,
+            )
+            ref_wp = (await context.db.execute(ref_q)).scalar_one_or_none()
+            if not ref_wp:
+                findings.append(QCFindingItem(rule_id=self.rule_id, severity=self.severity,
+                                              message=f"交叉引用 {ref_code} 对应底稿不存在"))
+            elif ref_wp.status == WpFileStatus.draft:
+                findings.append(QCFindingItem(rule_id=self.rule_id, severity=self.severity,
+                                              message=f"交叉引用 {ref_code} 对应底稿仍为草稿"))
+        return findings
+
+
+# ---------------------------------------------------------------------------
 # QCEngine
 # ---------------------------------------------------------------------------
 
@@ -467,6 +571,11 @@ class QCEngine:
             AdjustmentRecordedRule(),
             # 提示级
             PreparationDateRule(),
+            # Phase 12: 内容级规则
+            ExplanationCompletenessRule(),
+            DataReferenceConsistencyRule(),
+            AttachmentSufficiencyRule(),
+            CrossRefIntegrityRule(),
         ]
 
     async def check(

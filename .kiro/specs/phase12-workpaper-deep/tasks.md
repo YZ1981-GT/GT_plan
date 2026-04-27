@@ -1,593 +1,228 @@
-# Phase 12: 底稿深度开发 - 任务文档
-
----
-
-## 1. 实施路线图
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  阶段0: 规格硬化与上线基线 (2天)                                │
-│  ┌────────────────────────────────────────────┐               │
-│  │MVP范围收敛+状态机+SSOT+job_id模型+迁移/回滚│               │
-│  └────────────────────────────────────────────┘               │
-│                                                               │
-│  阶段1: P0问题修复 (3天)                                        │
-│  ┌─────────┐                                                   │
-│  │P0-1~P0-4│                                                   │
-│  └─────────┘                                                   │
-│                                                               │
-│  阶段2: MVP核心闭环 (9天)                                       │
-│  ┌────────────────────────────────────────────┐               │
-│  │P1-1审计说明生成+P1-2复核工作台             │               │
-│  │P1-4数据一致性+P1-6 QC规则+P1-7签字前检查   │               │
-│  └────────────────────────────────────────────┘               │
-│                                                               │
-│  阶段2.5: 后台任务与可用性基线 (2天，可并行)                    │
-│  ┌────────────────────────────────────────────┐               │
-│  │job_id任务编排+失败重试+刷新恢复+锁冲突处理 │               │
-│  └────────────────────────────────────────────┘               │
-│                                                               │
-│  阶段3: AI评估与灰度上线 (3天)                                  │
-│  ┌────────────────────────────────────────────┐               │
-│  │样本评估+prompt版本固化+灰度开关+上线观察   │               │
-│  └────────────────────────────────────────────┘               │
-│                                                               │
-│  阶段4: 增强项/后续候选 (8天，默认不纳入当前承诺)               │
-│  ┌────────────────────────────────────────────┐               │
-│  │P1-3/P1-5及P2能力按MVP质量与资源情况再插入  │               │
-│  └────────────────────────────────────────────┘               │
-└─────────────────────────────────────────────────────────────────┘
-
-MVP承诺工期：17天（阶段0→阶段3，阶段2.5并行）
-增强项与下一子阶段：另行排期，不进入当前上线承诺
-关键路径：阶段0 → 阶段1 → 阶段2 → 阶段3
-并行路径：阶段2.5 与 阶段2后半段并行
-```
-
-### 1.1 阶段依赖关系
-
-| 阶段 | 依赖阶段 | 说明 | 可并行度 |
-|------|---------|------|---------|
-| 阶段0 | 无 | 对齐需求/设计/任务、固化状态机和上线闸口 | 无 |
-| 阶段1 | 阶段0 | P0问题修复，形成MVP开发基线 | 低 |
-| 阶段2 | 阶段1 | 仅实现MVP闭环需求 | 无 |
-| 阶段2.5 | 阶段2（部分） | 后台任务与可用性，可与阶段2后半段并行 | 高 |
-| 阶段3 | 阶段2 + 阶段2.5 | 完成AI评估、灰度放量和上线观察 | 中 |
-| 阶段4 | 阶段3 | 增强项是否插入取决于MVP质量与资源 | 可选 |
-
----
-
-## 1.2 规格硬化与实施前置（2天）
-
-| 任务 | 输出物 | 工作量 | 负责人 |
-|------|--------|--------|--------|
-| 对齐requirements/design/tasks中的MVP/增强/延后范围 | 三件套统一口径 | 0.5天 | 产品/架构 |
-| 固化状态机、权限矩阵、SSOT、`job_id` 契约 | 状态与接口基线 | 0.5天 | 架构/后端 |
-| 定义AI评估样本集、`prompt_version` 管理与上线门槛 | 评估方案 | 0.5天 | AI/产品 |
-| 输出数据库迁移顺序、feature flag与回滚清单 | 上线实施清单 | 0.5天 | 后端/运维 |
-
-**验收标准**：
-- requirements、design、tasks 对MVP范围和延后项表述一致
-- 长任务统一采用 `job_id + 状态查询 + 失败重试` 模型
-- AI上线门槛至少包含事实错误率、幻觉率、可采纳率、样本覆盖范围
-- 迁移、灰度、回滚均有明确负责人和触发条件
-
-## 2. 阶段1：P0问题修复（3天）
-
-### 2.1 P0-1: prefill_stale前端通知
-
-| 任务 | 文件 | 工作量 | 负责人 |
-|------|------|--------|--------|
-| 底稿列表添加stale标记 | WorkpaperList.vue | 0.5天 | 前端 |
-| 编辑器顶部过期横幅 | WorkpaperEditor.vue | 0.25天 | 前端 |
-| 工作台树节点标记 | WorkpaperWorkbench.vue | 0.25天 | 前端 |
-
-**验收标准**：
-- prefill_stale=true的底稿在三个位置均显示明显提示
-- 点击刷新按钮调用POST /prefill/{wp_id}
-- 刷新成功后标记消失
-
-### 2.2 P0-2: WOPI只读浏览模式
-
-| 任务 | 文件 | 工作量 | 负责人 |
-|------|------|--------|--------|
-| check_file_info增强 | wopi_service.py | 0.25天 | 后端 |
-| 只读模式UI适配 | WorkpaperEditor.vue | 0.25天 | 前端 |
-
-**验收标准**：
-- 非锁持有者打开底稿显示只读
-- 复核人角色始终只读
-- ReadOnlyReason正确显示
-
-### 2.3 P0-3: parse_workpaper_real审计说明提取
-
-| 任务 | 文件 | 工作量 | 负责人 |
-|------|------|--------|--------|
-| 审计说明提取逻辑 | prefill_engine.py | 0.5天 | 后端 |
-
-**验收标准**：
-- 识别"审计说明"/"审计结论"/"执行情况"等关键词
-- 提取连续非空单元格文本
-- 写入parsed_data.audit_explanation
-
-### 2.4 P0-4: 底稿列表角色裁剪
-
-| 任务 | 文件 | 工作量 | 负责人 |
-|------|------|--------|--------|
-| 前端配合scope_cycles过滤 | WorkpaperList.vue | 0.5天 | 前端 |
-| 验证后端过滤已生效 | working_paper.py | 0.25天 | 后端 |
-
-**验收标准**：
-- 审计助理只看到自己负责循环的底稿
-- 项目经理看到全部底稿
-- 切换角色后列表自动刷新
-
----
-
-## 3. 阶段2：MVP核心闭环（9天）
-
-> 本阶段当前承诺范围仅包括 P1-1、P1-2、P1-4、P1-6、P1-7；P1-3、P1-5 作为增强项，待MVP稳定后再插入。
-
-### 3.1 P1-1: 审计说明智能生成（3.5天）
-
-#### 3.1.1 后端服务（2天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 创建服务文件 | wp_explanation_service.py | 0.25天 |
-| 实现 `generate_draft` + `confirm_draft` | - | 0.75天 |
-| 实现 `refine_draft` 与 `prompt_version` 留痕 | - | 0.5天 |
-| 实现 `wp_ai_generations` 写入与写回后刷新 | - | 0.25天 |
-| 创建API路由 | wp_explanation.py | 0.25天 |
-
-#### 3.1.2 前端交互（1.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 审计说明面板UI | WorkpaperWorkbench.vue | 0.5天 |
-| 流式输出与生成态展示 | - | 0.5天 |
-| TipTap编辑器集成 | - | 0.25天 |
-| 采纳/重试/手动切换与写回状态展示 | - | 0.25天 |
-
-**验收标准**：
-- 点击"生成"后首字节<3秒，完整流程<10秒
-- 流式显示草稿，可编辑、可采纳、可重新生成
-- 采纳后必须先写回底稿工作簿，再刷新 `parsed_data.audit_explanation`
-- 每次生成均记录 `generation_id`、`prompt_version`、`model`
-
-### 3.2 P1-2: 复核工作台（3天）
-
-#### 3.2.1 复核工作台组件（2天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 创建ReviewWorkstation.vue | - | 0.5天 |
-| 待复核队列左栏 | - | 0.5天 |
-| 底稿预览中栏 | - | 0.5天 |
-| 复核操作右栏 | - | 0.5天 |
-
-#### 3.2.2 AI预审服务（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| review_workpaper_content方法 | wp_ai_service.py | 0.5天 |
-| AI预审结果展示 | ReviewWorkstation.vue | 0.5天 |
-
-**验收标准**：
-- 显示待复核队列
-- 只读预览关键数据标红
-- AI预审显示问题列表
-- Ctrl+Enter通过，Ctrl+Shift+Enter退回
-
-### 3.3 P1-3: 进度总览面板（增强项，MVP稳定后插入）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| ProjectProgressBoard.vue底稿Tab增强 | - | 0.5天 |
-| 进度矩阵实现 | - | 0.5天 |
-| 甘特图实现 | - | 0.5天 |
-| 人员负荷视图 | - | 0.5天 |
-
-**验收标准**：
-- 一眼看清全项目进度
-- 矩阵点击展开底稿列表
-- 甘特条显示编制周期
-- 识别负荷不均
-
-### 3.4 P1-4: 数据一致性监控（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 创建DataConsistencyMonitor.vue | - | 0.5天 |
-| 一致性矩阵实现 | - | 0.25天 |
-| 重新预填与人工差异说明保留逻辑 | - | 0.25天 |
-
-**验收标准**：
-- 底稿vs试算表差异标红
-- 显示差异金额
-- 支持重新预填，并保留人工填写的差异原因说明
-
-### 3.5 P1-5: 批量操作面板（增强项，MVP稳定后插入）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 批量模式checkbox | WorkpaperList.vue | 0.25天 |
-| 批量操作菜单 | - | 0.25天 |
-| 后端批量API（5个端点） | wp_batch.py | 0.5天 |
-| `job_id` 状态查询/失败重试/进度订阅集成 | - | 0.5天 |
-
-**验收标准**：
-- checkbox全选/循环选/状态选
-- 批量分配/刷新/生成说明/提交复核/下载
-- 返回 `job_id`，支持状态恢复、失败项重试与页面刷新后继续查看进度
-
-### 3.6 P1-6: 内容级QC规则（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| QC-15说明完整性 | qc_engine.py | 0.25天 |
-| QC-16数据一致性 | - | 0.25天 |
-| QC-17附件充分性 | - | 0.25天 |
-| QC-18交叉引用完整性 | - | 0.25天 |
-
-**验收标准**：
-- 4条规则准确率>95%，误报率<5%
-- QC-16阻断级：底稿审定数vs试算表误差>0.01元即阻断
-
-### 3.7 P1-7: 签字前底稿专项检查（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| partner/workpaper-readiness接口 | partner_service.py | 0.5天 |
-| 签字前检查清单弹窗 | PartnerDashboard.vue | 0.5天 |
-
-**验收标准**：
-- 5项检查：复核状态/QC通过/说明非空/数据一致/证据充分
-- 500张底稿检查耗时<10秒
-- 未通过项列出明细，点击跳转
-
----
-
-## 3.8 阶段2.5：后台任务与可用性基线（2天，与阶段2后半段并行）
-
-### 3.8.1 AI生成失败降级（0.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| LLM服务检测与降级标志 | availability_fallback_service.py | 0.25天 |
-| 前端降级提示与手动模式 | WorkpaperWorkbench.vue | 0.25天 |
-
-### 3.8.2 `job_id` 后台任务与失败重试（0.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| `background_jobs` / `background_job_items` 表创建 | migration | 0.25天 |
-| 失败项重试、进度恢复与状态查询逻辑 | wp_batch.py | 0.25天 |
-
-### 3.8.3 网络中断与页面刷新恢复（0.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 本地暂存（IndexedDB） | utils/offline_storage.js | 0.25天 |
-| 自动同步API、`job_id` 恢复与冲突检测 | sync_service.py | 0.25天 |
-
-### 3.8.4 底稿锁定冲突处理（0.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 锁冲突提示UI | WorkpaperEditor.vue | 0.25天 |
-| 稍后提醒定时器 | - | 0.25天 |
-
----
-
-## 3.9 阶段3：AI评估、数据迁移与灰度上线（3天）
-
-### 3.9.1 AI评估样本与门槛验证（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 建立30-50张典型底稿评估集 | docs/eval-plan | 0.25天 |
-| 标注事实错误率/幻觉率/可采纳率指标 | - | 0.5天 |
-| 评估结果复核与上线结论 | - | 0.25天 |
-
-### 3.9.2 Prompt版本固化与数据迁移演练（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| `prompt_version` 基线固化与回溯清单 | wp_explanation_service.py | 0.25天 |
-| 历史底稿 `explanation_status` / `last_parsed_sync_at` 补录脚本 | migration | 0.5天 |
-| 迁移回滚演练 | - | 0.25天 |
-
-### 3.9.3 灰度上线与观察（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| feature flag / 角色灰度开关 | config + frontend | 0.25天 |
-| 灰度监控看板与告警阈值 | monitoring | 0.25天 |
-| 上线观察、问题回收与放量标准 | runbook | 0.5天 |
-
-**验收标准**：
-- AI评估达到 requirements 中定义的上线门槛
-- 数据迁移可回滚，演练结果可复现
-- 灰度发布支持按项目/角色控制开关
-- 上线观察期内有明确放量与回退标准
-
----
-
-## 4. 阶段4：角色化体验优化与增强能力（8天，MVP稳定后插入）
-
-### 4.1 风险底稿聚焦视图（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 风险底稿筛选逻辑 | partner_service.py | 0.5天 |
-| 风险底稿列表展示 | PartnerDashboard.vue | 0.5天 |
-
-### 4.2 独立抽查工作台（2天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| QCDashboard抽查Tab | QCDashboard.vue | 0.5天 |
-| 智能抽样算法 | qc_service.py | 0.5天 |
-| 抽查清单交互 | - | 0.5天 |
-| 抽查报告生成 | - | 0.5天 |
-
-### 4.3 底稿推荐反馈闭环（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 创建反馈记录表 | migration | 0.25天 |
-| 推荐记录与反馈API | wp_mapping_feedback_service.py | 0.5天 |
-| 采纳率统计与规则优化 | - | 0.25天 |
-
-### 4.5 底稿编制智能引导（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 底稿类型识别与引导生成 | wp_guidance_service.py | 0.5天 |
-| 程序进度检查与提示 | - | 0.25天 |
-| Workbench引导面板UI | WorkpaperWorkbench.vue | 0.25天 |
-
-### 4.6 数据提取可视化增强（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 公式单元格识别与高亮 | wp_visualization_service.py | 0.25天 |
-| 数据来源追溯API | - | 0.25天 |
-| 刷新差异对比弹窗 | WorkpaperEditor.vue | 0.25天 |
-| 前端高亮与hover提示 | - | 0.25天 |
-
-### 4.7 底稿对话上下文增强（0.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 上下文注入增强 | wp_chat_service.py | 0.25天 |
-| 数值建议提取与应用 | - | 0.25天 |
-
-### 4.8 ONLYOFFICE插件部署验证（0.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 插件部署检查脚本 | scripts/check_onlyoffice_plugins.py | 0.25天 |
-| audit-formula插件增强 | onlyoffice/plugins/audit-formula/ | 0.25天 |
-
-### 4.9 证据链可视化（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 证据链服务 | attachment_evidence_chain_service.py | 0.5天 |
-| 关联列表UI | WorkpaperWorkbench.vue | 0.25天 |
-| 证据图谱+时间线 | - | 0.25天 |
-
----
-
-## 5. 阶段5：延伸功能+模板管理（8天）
-
-### 5.1 模板热更新服务（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| wp_template_migration_service.py | - | 0.5天 |
-| 差异对比API | - | 0.25天 |
-| 批量升级API | - | 0.25天 |
-
-### 5.2 底稿离线工作包（2天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| wp_offline_pack_service.py | - | 1天 |
-| 打包下载API | - | 0.5天 |
-| 回传同步API | - | 0.5天 |
-
-### 5.3 底稿编制时间统计（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| wp_edit_sessions表创建 | migration | 0.25天 |
-| WOPI采集编辑时间 | wopi_service.py | 0.5天 |
-| 时间统计展示 | - | 0.25天 |
-
-### 5.4 底稿间数据穿透（1天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 交叉引用可点击跳转 | WorkpaperWorkbench.vue | 0.5天 |
-| WP()公式hover提示 | - | 0.25天 |
-| 反向引用查询 | - | 0.25天 |
-
-### 5.5 审计程序与底稿双向绑定（1.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| procedure_instances新增wp_id | migration | 0.25天 |
-| 程序裁剪联动底稿状态 | procedure_service.py | 0.5天 |
-| 底稿完成联动程序状态 | working_paper_service.py | 0.5天 |
-| 前端联动展示 | - | 0.25天 |
-
-### 5.6 归档导出标准目录包（1.5天）
-
-| 任务 | 文件 | 工作量 |
-|------|------|--------|
-| 标准目录结构定义 | - | 0.5天 |
-| 底稿索引表生成 | wp_storage_service.py | 0.5天 |
-| 调整汇总表导出 | - | 0.5天 |
-
----
-
-## 6. 测试验收（并行进行）
-
-### 6.1 测试分层
-
-| 层级 | 时间 | 内容 | 通过标准 |
-|------|------|------|---------|
-| 单元测试 | 持续 | wp_explanation_service / qc_engine / background_job_service | 覆盖率>80% |
-| 集成测试 | 阶段2结束 | 写回工作簿→刷新 parsed_data → QC门禁 → 提交复核 | 无死锁、无脏状态 |
-| 端到端测试 | 阶段3结束 | 编制→生成说明→确认→复核→签字前检查 | 满足MVP链路 |
-| 性能测试 | 阶段3结束 | 500张底稿批量刷新、500张签字前检查 | 分别<120秒、<10秒 |
-| 用户验收 | 阶段3灰度期 | 3助理+2经理实际使用 | SUS>75，可采纳率>60% |
-
-### 6.2 关键验收场景
-
-1. **写回同步场景**：AI草稿确认后先写回工作簿，再刷新 parsed_data，explanation_status=synced
-2. **大数据量**：500张底稿批量刷新，页面刷新后可通过 job_id 恢复进度
-3. **LLM故障**：vLLM停止，自动降级手动模式，不阻断编制闭环
-4. **并发编辑**：5人同时查看同一张底稿（只读），响应<1秒
-5. **灰度上线**：仅灰度项目/角色可见新能力，关闭开关后回退到旧流程
-
----
-
-## 7. 交付物清单
-
-### 7.1 代码交付物
-
-| 类型 | 文件 | 说明 |
-|------|------|------|
-| 后端服务 | wp_explanation_service.py | 审计说明生成 |
-| 后端服务 | wp_ai_service.py (增强) | AI预审 |
-| 后端服务 | wp_batch.py | 批量操作API |
-| 后端服务 | wp_explanation.py | 审计说明路由 |
-| 后端服务 | background_job_service.py | job_id 后台任务编排 |
-| 后端服务 | wp_template_migration_service.py | 模板热更新 |
-| 后端服务 | wp_offline_pack_service.py | 离线工作包 |
-| 后端服务 | qc_engine.py (增强) | QC-15~18 |
-| 后端服务 | wp_mapping_feedback_service.py | 推荐反馈闭环 |
-| 后端服务 | wp_guidance_service.py | 智能引导服务 |
-| 后端服务 | wp_visualization_service.py | 数据可视化 |
-| 后端服务 | wp_chat_service.py (增强) | 对话上下文增强 |
-| 后端服务 | onlyoffice_plugin_service.py | 插件部署验证 |
-| 后端服务 | availability_fallback_service.py | 可用性降级服务 |
-| 后端服务 | attachment_evidence_chain_service.py | 证据链可视化 |
-| 前端组件 | ReviewWorkstation.vue | 复核工作台 |
-| 前端组件 | DataConsistencyMonitor.vue | 数据一致性监控 |
-| 前端组件 | ProjectProgressBoard.vue (增强) | 进度面板 |
-| 前端组件 | PartnerDashboard.vue (增强) | 合伙人视图 |
-| 前端组件 | WorkpaperWorkbench.vue (增强) | 审计说明面板 |
-| 前端组件 | WorkpaperList.vue (增强) | 批量操作+stale标记 |
-| 前端组件 | WorkpaperEditor.vue (增强) | 过期横幅+只读模式 |
-
-### 7.2 数据库变更
-
-| 类型 | 变更 | 说明 |
-|------|------|------|
-| 新增表 | wp_ai_generations | AI生成历史留痕（prompt_version、model、确认信息） |
-| 新增表 | background_jobs | 长任务主表（job_id） |
-| 新增表 | background_job_items | 长任务明细项 |
-| 新增表 | wp_edit_sessions | 编辑时间采集 |
-| 新增表 | wp_recommendation_feedback | 底稿推荐反馈记录（采纳/跳过/手动添加） |
-| 新增字段 | working_papers.workflow_status | 底稿工作流状态 |
-| 新增字段 | working_papers.explanation_status | 审计说明状态 |
-| 新增字段 | working_papers.consistency_status | 数据一致性状态 |
-| 新增字段 | working_papers.last_parsed_sync_at | 最近解析同步时间 |
-| 新增字段 | working_papers.partner_reviewed_at | 合伙人已阅时间 |
-| 新增字段 | working_papers.partner_reviewed_by | 合伙人已阅人 |
-| 新增字段 | procedure_instances.working_paper_id | 双向绑定 |
-| JSON扩展 | parsed_data.ai_content | AI内容追踪 |
-| JSON扩展 | parsed_data.audit_explanation | 审计说明 |
-| JSON扩展 | parsed_data.procedure_status | 程序执行状态 |
-| JSON扩展 | parsed_data.attachment_refs | 附件引用 |
-| JSON扩展 | parsed_data.formula_cells | 公式单元格缓存（位置+公式+来源） |
-
-### 7.2.1 数据库迁移脚本
-
-| 迁移文件 | 变更内容 | 执行时机 | 回滚脚本 |
-|---------|---------|---------|---------|
-| 001_add_wp_ai_generations.sql | 新增AI生成留痕表 | 阶段2开始前 | 001_drop_wp_ai_generations.sql |
-| 002_add_background_jobs.sql | 新增后台任务主表/明细表 | 阶段2.5开始前 | 002_drop_background_jobs.sql |
-| 003_alter_working_papers_status.sql | 新增工作流/说明/一致性状态字段 | 阶段2开始前 | 003_revert_working_papers_status.sql |
-| 004_add_wp_recommendation_feedback.sql | 新增推荐反馈表+索引 | 阶段4开始前 | 004_drop_wp_recommendation_feedback.sql |
-| 005_add_wp_edit_sessions.sql | 新增编辑时间采集表 | 阶段5开始前 | 005_drop_wp_edit_sessions.sql |
-| 006_alter_procedure_instances.sql | 新增wp_id外键 | 阶段5开始前 | 006_revert_procedure_instances.sql |
-| 007_add_attachment_working_paper_index.sql | 附件关联表索引优化 | 阶段4开始前 | 007_drop_attachment_index.sql |
-| 008_backfill_explanation_status.sql | 补录历史底稿说明同步状态 | 阶段3灰度前 | 008_revert_explanation_status.sql |
-
-### 7.3 文档交付物
-
-| 文档 | 说明 |
-|------|------|
-| API文档 | 批量操作API、审计说明API、合伙人API |
-| 用户手册 | 审计助理/项目经理/合伙人/质控操作指南 |
-| 运维手册 | 监控指标、告警阈值、故障处理 |
-| 培训材料 | 视频+一页纸快速参考 |
-
----
-
-## 8. 风险与应对
-
-| 风险 | 可能性 | 影响 | 应对措施 |
-|------|--------|------|---------|
-| LLM输出质量不稳定 | 中 | 高 | 所有AI内容必须人工确认，QC-02阻断 |
-| 工作簿写回成功但解析刷新失败 | 中 | 高 | 标记 explanation_status=sync_failed，阻断提交复核并提供重试 |
-| ONLYOFFICE插件加载失败 | 低 | 中 | 取数公式显示为文本，不影响离线编辑 |
-| 大项目批量操作性能差 | 中 | 中 | 后台任务分片执行 + job_id 恢复 + 失败项重试 |
-| 离线工作包冲突 | 中 | 中 | manifest版本比对，人工选择，不自动覆盖 |
-| 用户抵触AI生成内容 | 中 | 高 | 可一键切换手动模式，不强制使用 |
-
----
-
-## 8.1 回滚计划
-
-| 场景 | 回滚方案 | 回滚时间 | 负责人 |
-|------|---------|---------|--------|
-| 数据库迁移失败 | 执行对应downgrade脚本回滚 | <30分钟 | DBA |
-| 新功能导致系统不稳定 | 切换feature flag关闭新功能 | <5分钟 | 开发负责人 |
-| LLM降级后无法恢复 | 手动模式持续，等待vLLM修复 | 人工介入 | 运维 |
-| 批量操作数据错误 | 按 background_job_items 回滚失败批次或关闭批量入口 | <10分钟 | 开发负责人 |
-| 历史状态补录异常 | 执行状态回滚脚本并恢复旧口径字段 | <30分钟 | DBA |
-| ONLYOFFICE插件故障 | 切换为离线下载模式 | <2分钟 | 运维 |
-| 前端性能严重下降 | 降级为旧版UI（保留核心功能） | <10分钟 | 前端负责人 |
-
-**回滚触发条件**：
-- 错误率 > 5% 持续10分钟
-- 响应时间 > 5秒 持续5分钟
-- 用户投诉 > 3次/小时
-- 监控告警P0级别
-
----
-
-## 9. 里程碑与检查点
-
-| 里程碑 | 日期 | 检查内容 |
-|--------|------|---------|
-| 规格硬化完成 | T+2 | MVP范围、状态机、SSOT、job_id、上线门槛统一 |
-| P0完成 | T+5 | stale通知、只读模式、说明提取、角色裁剪 |
-| MVP闭环完成 | T+14 | 审计说明生成、复核工作台、数据一致性、QC规则、签字前检查 |
-| 灰度上线完成 | T+17 | AI评估达标、迁移演练完成、灰度观察通过 |
-| 增强项完成 | 待定 | 按资源与MVP质量决定是否插入 |
-
-**MVP总工期**：17天（含规格硬化、灰度验证）
-**增强项工期**：另行评估，不纳入本期承诺
-**Word导出引擎**：已拆分到 Phase 13 独立迭代
-
----
-
-## 10. 技术债务
-
-| 债务项 | 影响 | 计划处理 | 优先级 |
-|--------|------|---------|--------|
-| attachment_working_paper表无索引 | 大项目查询慢 | 阶段4补充索引（007迁移脚本） | P1 |
-| parsed_data JSONB查询性能差 | 大数据量卡顿 | 考虑拆分独立表（远期规划） | P2 |
-| WOPI锁无超时自动释放 | 死锁风险 | 阶段2.5补充心跳检测 | P1 |
-| 前端组件重复代码 | 维护成本高 | 阶段5重构公共组件 | P2 |
-| QC规则硬编码 | 规则扩展困难 | P3阶段考虑规则引擎 | P3 |
-| parsed_data 与工作簿双写窗口 | 容易出现同步状态漂移 | 后续考虑事件驱动同步 | P1 |
-| AI prompt无版本管理 | 回溯困难 | 阶段2已补 prompt_version 留痕，后续补配置中心 | P2 |
+# Phase 12: 底稿深度开发 - 实施任务
+
+## 阶段0: 规格硬化与实施前置
+
+- [x] 1. 数据库迁移：新增 wp_ai_generations 表
+  - [x] 1.1 创建 WpAiGeneration ORM 模型（id, wp_id, prompt_version, model, input_hash, output_text, output_structured, status, created_by, created_at, confirmed_by, confirmed_at）
+  - [x] 1.2 创建 Alembic 迁移脚本 001_add_wp_ai_generations.sql
+  - [x] 1.3 添加索引 idx_wp_ai_generations_wp(wp_id, created_at DESC)
+
+- [x] 2. 数据库迁移：新增 background_jobs / background_job_items 表
+  - [x] 2.1 创建 BackgroundJob ORM 模型（id, project_id, job_type, status, payload, progress_total, progress_done, failed_count, initiated_by, created_at, updated_at）
+  - [x] 2.2 创建 BackgroundJobItem ORM 模型（id, job_id, wp_id, status, error_message, finished_at）
+  - [x] 2.3 创建迁移脚本 002_add_background_jobs.sql
+  - [x] 2.4 添加索引 idx_background_jobs_project 和 idx_background_job_items_job
+
+- [x] 3. 数据库迁移：working_papers 表新增状态字段
+  - [x] 3.1 新增 workflow_status VARCHAR(30) DEFAULT 'draft'
+  - [x] 3.2 新增 explanation_status VARCHAR(30) DEFAULT 'not_started'
+  - [x] 3.3 新增 consistency_status VARCHAR(30) DEFAULT 'unknown'
+  - [x] 3.4 新增 last_parsed_sync_at TIMESTAMP
+  - [x] 3.5 新增 partner_reviewed_at TIMESTAMP 和 partner_reviewed_by UUID
+  - [x] 3.6 创建迁移脚本 003_alter_working_papers_status.sql
+
+- [x] 4. Pydantic Schema 定义
+  - [x] 4.1 创建 wp_explanation_schemas.py（GenerateDraftResponse, ConfirmDraftRequest, RefineDraftRequest, AiGenerationRecord）
+  - [x] 4.2 创建 background_job_schemas.py（JobCreateResponse, JobStatusResponse, JobItemResponse, JobRetryResponse）
+  - [x] 4.3 扩展 workpaper_schemas.py 新增 workflow_status / explanation_status / consistency_status 字段
+
+## 阶段1: P0问题修复
+
+- [x] 5. P0-1: prefill_stale 前端通知
+  - [x] 5.1 WorkpaperList.vue 底稿列表添加 stale 橙色⚠图标（prefill_stale=true 时显示）
+  - [x] 5.2 WorkpaperEditor.vue 编辑器顶部添加黄色过期横幅（含刷新按钮调用 POST /prefill/{wp_id}）
+  - [x] 5.3 WorkpaperWorkbench.vue 工作台树节点添加 stale 标记图标
+
+- [x] 6. P0-2: WOPI 只读浏览模式
+  - [x] 6.1 wopi_service.py check_file_info 增强：非锁持有者返回 ReadOnly=True + ReadOnlyReason
+  - [x] 6.2 wopi_service.py check_file_info 增强：复核人角色始终返回只读
+  - [x] 6.3 WorkpaperEditor.vue 只读模式 UI 适配（隐藏编辑工具栏，显示只读原因提示）
+
+- [x] 7. P0-3: parse_workpaper_real 审计说明提取
+  - [x] 7.1 prefill_engine.py 新增审计说明提取逻辑：识别"审计说明"/"审计结论"/"执行情况"等关键词
+  - [x] 7.2 提取关键词后连续非空单元格文本，写入 parsed_data.audit_explanation
+
+- [x] 8. P0-4: 底稿列表角色裁剪
+  - [x] 8.1 WorkpaperList.vue 前端配合 scope_cycles 参数过滤底稿列表
+  - [x] 8.2 working_paper.py 验证后端 list_workpapers 的 scope_cycles 过滤已生效
+
+## 阶段2: MVP核心闭环
+
+- [x] 9. P1-1 后端：审计说明智能生成服务
+  - [x] 9.1 创建 backend/app/services/wp_explanation_service.py（WpExplanationService 类）
+  - [x] 9.2 实现 generate_draft 方法：数据采集（TB+调整+科目+TSJ+抽样）→ Prompt构建 → LLM调用 → 返回草稿+generation_id+prompt_version
+  - [x] 9.3 实现 confirm_draft 方法：写回底稿工作簿 → 刷新 parsed_data.audit_explanation → 更新 explanation_status → 记录 confirmed_by/confirmed_at
+  - [x] 9.4 实现 refine_draft 方法：基于用户修改和反馈优化草稿
+  - [x] 9.5 实现 wp_ai_generations 表写入（每次生成记录 generation_id, prompt_version, model, status）
+  - [x] 9.6 创建 backend/app/routers/wp_explanation.py 路由（POST generate-explanation, POST confirm-explanation, POST refine-explanation）
+  - [x] 9.7 注册路由到 main.py / router_registry.py
+
+- [ ] 10. P1-1 前端：审计说明交互面板
+  - [ ] 10.1 WorkpaperWorkbench.vue 新增审计说明生成面板（右栏或独立区域）
+  - [ ] 10.2 实现 SSE 流式输出草稿展示（首字节<3秒目标）
+  - [ ] 10.3 集成 TipTap 编辑器用于草稿编辑
+  - [ ] 10.4 实现采纳/重新生成/手动编写三种模式切换
+  - [ ] 10.5 采纳后调用 confirm-explanation API，展示写回状态（syncing → synced / sync_failed）
+
+- [ ] 11. P1-2 前端：复核工作台组件
+  - [ ] 11.1 创建 audit-platform/frontend/src/views/ReviewWorkstation.vue 三栏布局
+  - [ ] 11.2 左栏：待复核队列列表（按提交时间排序，区分首次/退回重提交）
+  - [ ] 11.3 中栏：底稿只读预览（关键数据标红：审定数、差异、AI生成内容）
+  - [ ] 11.4 右栏：复核操作区（AI预审结果 + 复核意见输入 + 通过/退回按钮）
+  - [ ] 11.5 快捷键支持：Ctrl+Enter 通过，Ctrl+Shift+Enter 退回
+  - [ ] 11.6 注册路由 /projects/:projectId/review-workstation
+
+- [ ] 12. P1-2 后端：AI预审服务
+  - [ ] 12.1 wp_ai_service.py 新增 review_workpaper_content 方法（数据一致性+说明完整性+结论合理性三项检查）
+  - [ ] 12.2 创建 POST /api/projects/{id}/wp-ai/{wp_id}/review-content API 端点
+  - [ ] 12.3 返回 issues 列表（description, severity: warning/blocking, suggested_action）
+
+- [ ] 13. P1-4: 数据一致性监控
+  - [ ] 13.1 创建 audit-platform/frontend/src/components/workpaper/DataConsistencyMonitor.vue
+  - [ ] 13.2 实现一致性矩阵：底稿审定数 vs 试算表审定数，差异>0.01元标红
+  - [ ] 13.3 实现重新预填按钮（调用 POST /prefill/{wp_id}）
+  - [ ] 13.4 保留人工填写的差异原因说明（不被刷新覆盖）
+
+- [ ] 14. P1-6: 内容级QC规则
+  - [ ] 14.1 qc_engine.py 新增 QC-15 审计说明完整性规则（parsed_data.audit_explanation 非空且≥50字，explanation_status=synced，包含程序+发现+结论）
+  - [ ] 14.2 qc_engine.py 新增 QC-16 数据引用一致性规则（parsed_data.audited_amount vs trial_balance.audited_amount，误差>0.01元阻断）
+  - [ ] 14.3 qc_engine.py 新增 QC-17 附件证据充分性规则（重要性以上科目底稿至少关联1个附件）
+  - [ ] 14.4 qc_engine.py 新增 QC-18 交叉引用完整性规则（parsed_data.cross_refs 引用的底稿编号存在且状态≠draft）
+
+- [ ] 15. P1-7: 签字前底稿专项检查
+  - [ ] 15.1 partner_service.py 新增 check_workpaper_readiness 方法（5项检查：复核状态/QC通过/说明非空/数据一致/证据充分）
+  - [ ] 15.2 创建 POST /api/projects/{id}/partner/workpaper-readiness API 端点
+  - [ ] 15.3 PartnerDashboard.vue 新增签字前检查清单弹窗（未通过项列出明细，点击跳转）
+
+## 阶段2.5: 后台任务与可用性基线
+
+- [ ] 16. AI生成失败降级
+  - [ ] 16.1 创建 backend/app/services/availability_fallback_service.py（AvailabilityFallbackService 类）
+  - [ ] 16.2 实现 handle_llm_failure：检测 vLLM 服务状态，设置 Redis 降级标志 llm_fallback=true，每30秒检测恢复
+  - [ ] 16.3 WorkpaperWorkbench.vue 前端降级提示："AI服务暂不可用"+ 手动编写模式切换
+
+- [ ] 17. 后台任务编排服务
+  - [ ] 17.1 创建 backend/app/services/background_job_service.py（BackgroundJobService 类）
+  - [ ] 17.2 实现 create_job：创建 background_jobs + background_job_items 记录，返回 job_id
+  - [ ] 17.3 实现 run_job：按 wp 粒度执行，记录成功/失败，结束后置为 succeeded/partial_failed/failed
+  - [ ] 17.4 实现 retry_job：仅重试失败项，保留原始审计轨迹
+  - [ ] 17.5 实现 get_job_status / get_job_stream（SSE 事件流）
+  - [ ] 17.6 创建 backend/app/routers/background_jobs.py 路由（GET /jobs/{job_id}, GET /jobs/{job_id}/events, POST /jobs/{job_id}/retry）
+  - [ ] 17.7 注册路由到 router_registry.py
+
+- [ ] 18. 网络中断与页面刷新恢复
+  - [ ] 18.1 前端 utils/offline_storage.ts：IndexedDB 本地暂存未同步数据（<10MB 限制）
+  - [ ] 18.2 后端 POST /api/sync-pending-data 端点：接收前端暂存数据，冲突检测（版本号比对），无冲突合并保存
+
+- [ ] 19. 底稿锁定冲突处理
+  - [ ] 19.1 WorkpaperEditor.vue 锁冲突提示 UI："其他用户正在编辑"+ "只读浏览"/"稍后提醒"两个选项
+  - [ ] 19.2 "稍后提醒"定时器（30秒后检测锁释放，自动通知用户）
+
+## 阶段3: AI评估与灰度上线
+
+- [ ] 20. Prompt版本固化
+  - [ ] 20.1 wp_explanation_service.py 中 prompt_version 基线固化为 'wp_expl_v1'
+  - [ ] 20.2 创建历史底稿 explanation_status / last_parsed_sync_at 补录迁移脚本 008_backfill_explanation_status.sql
+
+- [ ] 21. 灰度上线开关
+  - [ ] 21.1 feature_flags.py 新增 'wp_ai_explanation' 功能开关（默认关闭，按项目/角色控制）
+  - [ ] 21.2 前端审计说明生成面板根据功能开关显示/隐藏
+  - [ ] 21.3 后端 generate-explanation API 检查功能开关，关闭时返回 403
+
+## 阶段4: 角色化体验优化与增强能力
+
+- [ ] 22. P1-3: 进度总览面板
+  - [ ] 22.1 ProjectProgressBoard.vue 底稿 Tab 增强：进度矩阵（循环×状态）
+  - [ ] 22.2 关键指标卡片（完成率/待复核/逾期/stale）
+  - [ ] 22.3 甘特图实现（编制周期可视化，ECharts）
+  - [ ] 22.4 人员负荷视图（识别负荷不均）
+
+- [ ] 23. P1-5: 批量操作面板
+  - [ ] 23.1 WorkpaperList.vue 新增批量模式 checkbox（全选/循环选/状态选）
+  - [ ] 23.2 批量操作菜单（分配/刷新/生成说明/提交复核/下载）
+  - [ ] 23.3 创建 backend/app/routers/wp_batch.py 5个批量API端点（assign/prefill/batch-explanation/submit-review/download-pack）
+  - [ ] 23.4 批量API统一返回 job_id，集成 BackgroundJobService
+  - [ ] 23.5 前端 job_id 状态查询/失败重试/进度订阅（SSE）集成
+  - [ ] 23.6 注册 wp_batch 路由到 router_registry.py
+
+- [ ] 24. P2-1: 风险底稿聚焦视图
+  - [ ] 24.1 partner_service.py 新增 get_risk_workpapers 方法（筛选：金额>重要性/有AJE/QC阻断/被退回/prefill_stale）
+  - [ ] 24.2 创建 GET /api/projects/{id}/partner/risk-workpapers API 端点
+  - [ ] 24.3 PartnerDashboard.vue 新增风险底稿列表展示
+
+- [ ] 25. P2-2: 独立抽查工作台
+  - [ ] 25.1 创建 backend/app/services/qc_sampling_service.py（智能抽样算法：风险分层+循环均匀+编制人覆盖）
+  - [ ] 25.2 QCDashboard.vue 新增抽查 Tab（抽查清单交互+逐项确认）
+  - [ ] 25.3 抽查报告生成（结构化 HTML/Markdown 草稿）
+
+- [ ] 26. P2-3: 证据链可视化
+  - [ ] 26.1 创建 backend/app/services/attachment_evidence_chain_service.py（get_wp_attachments, quick_attach, generate_evidence_graph, get_attachment_timeline）
+  - [ ] 26.2 创建证据链 API 路由（GET attachments, POST quick-attach, GET evidence-graph, GET attachment-timeline）
+  - [ ] 26.3 WorkpaperWorkbench.vue 新增关联附件列表 + 快速关联 + 证据图谱（ECharts 力导向图）
+
+- [ ] 27. P2-4: 底稿推荐反馈闭环
+  - [ ] 27.1 数据库迁移：创建 wp_recommendation_feedback 表 + 索引
+  - [ ] 27.2 创建 backend/app/services/wp_mapping_feedback_service.py（record_recommendation, record_feedback, get_recommend_stats, optimize_recommend_rules）
+  - [ ] 27.3 创建反馈 API 路由（POST recommend-feedback, GET recommend-stats）
+
+- [ ] 28. P2-5: 底稿编制智能引导
+  - [ ] 28.1 创建 backend/app/services/wp_guidance_service.py（get_guidance 按底稿类型返回引导, check_procedure_progress 检查程序执行状态）
+  - [ ] 28.2 创建引导 API 路由（GET guidance, GET procedure-check）
+  - [ ] 28.3 WorkpaperWorkbench.vue 新增引导面板 UI
+
+- [ ] 29. P2-6: 数据提取可视化增强
+  - [ ] 29.1 创建 backend/app/services/wp_visualization_service.py（get_formula_cells 从 parsed_data 缓存读取, get_cell_data_source, compare_refresh_diff, generate_diff_summary）
+  - [ ] 29.2 创建可视化 API 路由（GET formula-cells, GET cell-data-source, POST compare-refresh）
+  - [ ] 29.3 WorkpaperEditor.vue 公式单元格高亮 + hover 显示来源 + 刷新差异对比弹窗
+
+- [ ] 30. 底稿对话上下文增强
+  - [ ] 30.1 wp_chat_service.py 增强 build_enhanced_context（注入底稿数据+关联科目+审计程序+QC结果+复核意见+TSJ要点）
+  - [ ] 30.2 实现 extract_suggestion 从 LLM 回复提取数值建议（cell_ref + suggested_value + reason）
+
+- [ ] 31. ONLYOFFICE插件部署验证
+  - [ ] 31.1 创建 backend/scripts/check_onlyoffice_plugins.py（检查容器内插件目录+config.json+XHR可达性）
+  - [ ] 31.2 audit-formula 插件增强：新增 EXPLAIN() 和 REFRESH() 函数，错误提示本地化为中文
+
+## 阶段5: 延伸功能与模板管理
+
+- [ ] 32. 模板热更新服务
+  - [ ] 32.1 创建 backend/app/services/wp_template_migration_service.py（compare_versions 新旧模板差异对比, batch_upgrade 批量升级保留用户数据）
+  - [ ] 32.2 创建模板热更新 API 路由（POST compare, POST batch-upgrade）
+
+- [ ] 33. 底稿离线工作包
+  - [ ] 33.1 创建 backend/app/services/wp_offline_pack_service.py（pack_workpapers 整循环打包ZIP+manifest, unpack_and_sync 回传同步+冲突检测）
+  - [ ] 33.2 创建离线工作包 API 路由（POST download-pack, POST upload-pack）
+
+- [ ] 34. 底稿编制时间统计
+  - [ ] 34.1 数据库迁移：创建 wp_edit_sessions 表（id, wp_id, user_id, started_at, ended_at, duration_seconds, source）
+  - [ ] 34.2 wopi_service.py 增强：WOPI lock/unlock 时自动采集编辑时间写入 wp_edit_sessions
+  - [ ] 34.3 创建编辑时间统计 API（GET /working-papers/{wp_id}/edit-time）
+
+- [ ] 35. 底稿间数据穿透
+  - [ ] 35.1 WorkpaperWorkbench.vue 交叉引用可点击跳转（parsed_data.cross_refs 中的底稿编号渲染为链接）
+  - [ ] 35.2 WP() 公式 hover 提示（显示引用底稿名称和当前值）
+  - [ ] 35.3 后端反向引用查询 API（GET /working-papers/{wp_id}/reverse-refs）
+
+- [ ] 36. 审计程序与底稿双向绑定
+  - [ ] 36.1 数据库迁移：procedure_instances 新增 working_paper_id UUID FK
+  - [ ] 36.2 procedure_service.py 增强：程序裁剪时联动底稿状态（skip→底稿标记不适用）
+  - [ ] 36.3 working_paper_service.py 增强：底稿完成时联动程序状态（edit_complete→程序标记已执行）
+
+- [ ] 37. 归档导出标准目录包
+  - [ ] 37.1 定义致同标准归档目录结构（按审计循环 B/C/D-N/A/S 分目录）
+  - [ ] 37.2 wp_storage_service.py 增强：生成底稿索引表（编号/名称/编制人/复核人/状态/页数）
+  - [ ] 37.3 调整汇总表导出（AJE/RJE 汇总 Excel）
+
+## 测试与验收
+
+- [ ] 38. 单元测试
+  - [ ] 38.1 wp_explanation_service 测试（generate_draft/confirm_draft/refine_draft，至少15个用例）
+  - [ ] 38.2 qc_engine QC-15~18 测试（每条规则通过/阻断各1个用例，至少8个）
+  - [ ] 38.3 background_job_service 测试（create/run/retry/status，至少10个用例）
+  - [ ] 38.4 partner_service workpaper_readiness 测试（5项检查各通过/失败，至少10个用例）
+  - [ ] 38.5 availability_fallback_service 测试（降级/恢复，至少4个用例）
+
+- [ ] 39. 集成测试
+  - [ ] 39.1 写回同步场景：AI草稿确认 → 写回工作簿 → 刷新 parsed_data → explanation_status=synced
+  - [ ] 39.2 QC门禁场景：explanation_status≠synced 时提交复核被阻断
+  - [ ] 39.3 后台任务场景：创建 job → 执行 → 部分失败 → 重试失败项 → 全部成功
