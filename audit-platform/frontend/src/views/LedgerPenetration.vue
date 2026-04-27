@@ -576,41 +576,17 @@
 
     <!-- 步骤4：完成 -->
     <div v-if="importStep === 'done'" style="text-align: center; padding: 30px 0">
-      <el-icon style="font-size: 40px; color: #67c23a"><CircleCheck /></el-icon>
-      <div style="margin-top: 12px; font-size: 15px">导入完成</div>
-      <div v-if="importedResultSummaryEntries.length" style="margin-top: 8px; font-size: 13px; color: #666">
-        <span v-for="item in importedResultSummaryEntries" :key="item.key" style="margin-right: 12px">
-          {{ item.label }}: {{ item.value }}
-        </span>
-      </div>
-      <el-alert
-        v-if="importValidationSummary.total > 0"
-        :title="importValidationSummaryTitle"
-        :type="importValidationSummaryAlertType"
-        :closable="false"
-        show-icon
-        style="margin-top: 16px; text-align: left"
-      >
-        <template #default>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px">
-            <el-tag v-if="importValidationSummary.fatal > 0" type="danger">fatal {{ importValidationSummary.fatal }}</el-tag>
-            <el-tag v-if="importValidationSummary.error > 0" type="danger">error {{ importValidationSummary.error }}</el-tag>
-            <el-tag v-if="importValidationSummary.warning > 0" type="warning">warning {{ importValidationSummary.warning }}</el-tag>
-            <el-tag v-if="importValidationSummary.info > 0" type="info">info {{ importValidationSummary.info }}</el-tag>
-          </div>
-          <div v-if="importBlockingValidationItems.length" style="margin-top: 10px">
-            <div
-              v-for="(item, idx) in importBlockingValidationItems"
-              :key="`${item.rule_code}_${idx}`"
-              style="font-size: 13px; margin-bottom: 6px; color: #f56c6c"
-            >
-              <strong>{{ item.file || '当前文件' }}</strong>
-              <span v-if="item.sheet"> / {{ item.sheet }}</span>
-              <span>：{{ item.message }}</span>
-            </div>
-          </div>
-        </template>
-      </el-alert>
+      <ImportCompletionSummary
+        title="导入完成"
+        :summary-entries="importedResultSummaryEntries"
+        :validation-summary="importValidationSummary"
+        :grouped-validation-items="groupedImportValidationItems"
+        :validation-title="importValidationSummaryTitle"
+        :validation-alert-type="importValidationSummaryAlertType"
+        :show-success-icon="true"
+        container-style="text-align: center; padding: 30px 0"
+        validation-panel-style="margin-top: 16px; text-align: left"
+      />
     </div>
 
     </div><!-- v-loading wrapper -->
@@ -663,9 +639,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, CircleCheck, Warning } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
+import { buildImportFormData } from '@/utils/importFormData'
+import { applyImportPreviewSuccess, buildImportPreviewFormData, buildImportPreviewUrl, resolveImportPreviewSuccess } from '@/utils/importPreview'
+import { buildImportJobUrl, fetchImportQueueStatus } from '@/utils/importJobRequest'
+import { applyImportSuccess, resolveImportSuccess } from '@/utils/importSuccess'
+import { resolveImportCompletionToast, resolveImportFailureMessage, shouldFinishImportPolling, hasImportFailed } from '@/utils/useImportJobFlow'
+import { runImportPollingFlow } from '@/utils/useImportPollingFlow'
+import { useImportValidation } from '@/utils/useImportValidation'
 
 const route = useRoute()
 const router = useRouter()
@@ -785,11 +769,19 @@ interface ImportValidationItem {
   blocking?: boolean
 }
 
+interface ImportValidationSummary {
+  total: number
+  blocking_count: number
+  has_blocking?: boolean
+  by_severity: Record<string, number>
+}
+
 interface LedgerImportResultPayload {
   imported?: Record<string, number>
   year?: number | null
   diagnostics?: Array<Record<string, unknown>>
   validation?: ImportValidationItem[]
+  validation_summary?: ImportValidationSummary
   errors?: string[]
   batch_id?: string | null
 }
@@ -816,51 +808,15 @@ const importedResultSummaryEntries = computed(() => {
   }))
 })
 
-const importValidationItems = computed<ImportValidationItem[]>(() => importedResult.value?.validation || [])
-
-const importValidationSummary = computed(() => {
-  const summary = { total: 0, fatal: 0, error: 0, warning: 0, info: 0 }
-  for (const item of importValidationItems.value) {
-    summary.total += 1
-    if (item.severity === 'fatal') summary.fatal += 1
-    else if (item.severity === 'error') summary.error += 1
-    else if (item.severity === 'warning') summary.warning += 1
-    else summary.info += 1
-  }
-  return summary
-})
-
-const importBlockingValidationItems = computed(() => importValidationItems.value.filter(item => item.blocking))
-
-const importValidationSummaryAlertType = computed(() => {
-  if (importValidationSummary.value.fatal > 0 || importValidationSummary.value.error > 0) return 'warning'
-  if (importValidationSummary.value.warning > 0) return 'info'
-  return 'success'
-})
-
-const importValidationSummaryTitle = computed(() => {
-  if (importValidationSummary.value.fatal > 0 || importValidationSummary.value.error > 0) {
-    return '导入已完成，但存在需要处理的校验问题'
-  }
-  if (importValidationSummary.value.warning > 0) {
-    return '导入已完成，存在可继续关注的警告信息'
-  }
-  return '导入校验通过'
-})
-
-function extractImportValidationMessage(items: ImportValidationItem[] | undefined, fallback: string): string {
-  if (!items?.length) return fallback
-  const prioritized = items
-    .filter(item => item.blocking || item.severity === 'fatal' || item.severity === 'error')
-  const source = prioritized.length ? prioritized : items
-  return source
-    .slice(0, 3)
-    .map((item) => {
-      const location = [item.file, item.sheet].filter(Boolean).join(' / ')
-      return location ? `${location}：${item.message}` : item.message
-    })
-    .join('；') || fallback
-}
+const {
+  validationSummary: importValidationSummary,
+  groupedValidationItems: groupedImportValidationItems,
+  validationSummaryAlertType: importValidationSummaryAlertType,
+  validationSummaryTitle: importValidationSummaryTitle,
+} = useImportValidation<ImportValidationItem, ImportValidationSummary>(
+  () => importedResult.value?.validation,
+  () => importedResult.value?.validation_summary,
+)
 
 // ── 列映射手动调整 ──
 const userColumnMapping = ref<Record<string, Record<string, string>>>({})
@@ -941,19 +897,32 @@ async function doPreview() {
   if (!importFiles.value.length) return
   previewing.value = true
   try {
-    const formData = new FormData()
-    for (const f of importFiles.value) {
-      formData.append('files', f)
-    }
-    const params = new URLSearchParams()
-    if (importYear.value) params.append('year', String(importYear.value))
-    params.append('preview_rows', '50')
-    const url = `/api/projects/${projectId.value}/ledger/smart-preview?${params.toString()}`
+    const formData = buildImportPreviewFormData(importFiles.value)
+    const url = buildImportPreviewUrl({
+      basePath: `/api/projects/${projectId.value}/ledger/smart-preview`,
+      year: importYear.value,
+      previewRows: 50,
+    })
     const { data } = await http.post(url, formData)
-    previewResult.value = data
-    uploadToken.value = data?.upload_token || ''
-    initColumnMapping()
-    importStep.value = 'preview'
+    const previewSuccess = resolveImportPreviewSuccess({
+      result: data,
+      nextStage: 'preview' as const,
+      getUploadToken: result => result?.upload_token,
+      getYear: result => result?.year,
+    })
+    await applyImportPreviewSuccess({
+      previewSuccess,
+      applyUploadToken: (value) => { uploadToken.value = value },
+      applyPayload: (payload) => { previewResult.value = payload },
+      enterStage: (stage) => { importStep.value = stage },
+      afterEnterStage: async ({ payload, nextStage, uploadToken: landedUploadToken, year: landedYear }) => {
+        void payload
+        void nextStage
+        void landedUploadToken
+        void landedYear
+        initColumnMapping()
+      },
+    })
   } catch (e: any) {
     ElMessage.error(e?.message || '解析失败')
   } finally {
@@ -982,77 +951,79 @@ async function doImport() {
   }, 3000)
 
   try {
-    const formData = new FormData()
-    if (!uploadToken.value) {
-      for (const f of importFiles.value) {
-        formData.append('files', f)
-      }
-    }
     const yr = previewResult.value?.year || importYear.value
     const mappingParam = Object.keys(userColumnMapping.value).length > 0
       ? JSON.stringify(userColumnMapping.value)
       : ''
-    let url = `/api/projects/${projectId.value}/ledger/smart-import`
-    const params = new URLSearchParams()
-    if (yr) params.append('year', String(yr))
-    if (uploadToken.value) params.append('upload_token', uploadToken.value)
-    if (mappingParam) params.append('custom_mapping', mappingParam)
-    if (params.toString()) url += '?' + params.toString()
+    const formData = buildImportFormData({
+      files: importFiles.value,
+      uploadToken: uploadToken.value,
+    })
+    const url = buildImportJobUrl({
+      basePath: `/api/projects/${projectId.value}/ledger/smart-import`,
+      year: yr,
+      uploadToken: uploadToken.value,
+      customMapping: mappingParam,
+    })
     const { data } = await http.post(url, formData, {
       timeout: 60000, // 提交任务本身很快，但给足时间
     })
     uploadToken.value = data?.upload_token || uploadToken.value
 
-    // 任务已提交，开始轮询进度
-    let done = false
-    let pollCount = 0
-    const MAX_POLL = 400 // 最多轮询 20 分钟（400 * 3s）
-    while (!done) {
-      await new Promise(r => setTimeout(r, 3000))
-      pollCount += 1
-      if (pollCount > MAX_POLL) {
-        done = true
-        throw new Error('导入任务仍在后台运行，请稍后刷新页面查看结果')
-      }
-      try {
-        const { data: statusData } = await http.get(
-          `/api/data-lifecycle/import-queue/${projectId.value}`
-        )
-        const status = statusData.data ?? statusData
+    await runImportPollingFlow({
+      maxPolls: 400,
+      timeoutMessage: '导入任务仍在后台运行，请稍后刷新页面查看结果',
+      onWait: () => new Promise<void>(resolve => setTimeout(resolve, 3000)),
+      fetchStatus: async () => {
+        const statusData = await fetchImportQueueStatus(() => http.get(`/api/data-lifecycle/import-queue/${projectId.value}`))
+        return statusData.data ?? statusData
+      },
+      onStatus: (status) => {
         if (status && typeof status === 'object') {
           const pct = status.progress ?? 0
           const msg = status.message || ''
           bgImportMessage.value = `[${pct}%] ${msg}`
-          if (pct >= 100 || pct < 0 || status.status === 'idle') {
-            done = true
-            if (pct < 0) {
-              throw new Error(msg || '导入失败')
-            }
-            const payload = status.result
-            importedResult.value = (payload?.imported && !payload?.validation)
-              ? { imported: payload.imported }
-              : payload
-            importStep.value = 'done'
-            ElMessage.success(msg || '导入完成')
-            // 刷新数据
+        }
+      },
+      shouldFinish: (status) => shouldFinishImportPolling(status),
+      hasFailed: (status) => hasImportFailed(status),
+      getFailureMessage: (status) => status?.message || '导入失败',
+      onSuccessStatus: (status) => {
+        const payload = status?.result
+        const resolvedImportedResult = (payload?.imported && !payload?.validation)
+          ? { imported: payload.imported }
+          : payload
+        const importSuccess = resolveImportSuccess({
+          result: resolvedImportedResult,
+          nextStage: 'done' as const,
+        })
+        const completionToast = resolveImportCompletionToast(
+          status?.message || null,
+          resolvedImportedResult?.validation_summary,
+        )
+        if (completionToast.type === 'warning') {
+          ElMessage.warning(completionToast.message)
+        } else {
+          ElMessage.success(completionToast.message)
+        }
+        return applyImportSuccess({
+          success: importSuccess,
+          applyResult: (result) => { importedResult.value = result },
+          enterStage: (stage) => { importStep.value = stage },
+          afterEnterStage: async () => {
             _auxBalanceLoadedKey.value = ''
             loadAvailableYears()
             loadBalance()
             if (balanceTab.value === 'aux') {
               loadAllAuxBalance()
             }
-          }
-        } else {
-          done = true
-        }
-      } catch (e: any) {
-        if (e instanceof Error && e.message.includes('导入失败')) throw e
-        done = true
-      }
-    }
+          },
+        })
+      },
+    })
   } catch (e: any) {
     const errValidation = e?.response?.data?.validation as ImportValidationItem[] | undefined
-    const errMsg = extractImportValidationMessage(
+    const errMsg = resolveImportFailureMessage(
       errValidation,
       e?.response?.data?.detail || e?.message || '导入失败',
     )

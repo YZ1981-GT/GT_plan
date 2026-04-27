@@ -516,18 +516,11 @@ async def import_client_chart(
     other_sheets_result = {}
     sheet_diagnostics = []
     if not skip_auto_import and filename_lower.endswith(".xlsx"):
-        try:
-            print(f"[AUTO_IMPORT] 开始自动导入四表数据: project={project_id}, content_size={len(content)}")
-            other_sheets_result, sheet_diagnostics = await _auto_import_data_sheets(
-                project_id, content, year=None, db=db,
-            )
-            print(f"[AUTO_IMPORT] 四表导入结果: {other_sheets_result}")
-            print(f"[AUTO_IMPORT] 诊断: {sheet_diagnostics}")
-        except Exception as e:
-            import traceback
-            print(f"[AUTO_IMPORT] 自动导入四表数据失败: {e}")
-            traceback.print_exc()
-            errors.append(f"四表数据自动导入失败: {str(e)}")
+        logger.warning("deprecated legacy auto import path used: account_chart_service.import_client_chart(skip_auto_import=False), project=%s file=%s", project_id, file.filename)
+        raise HTTPException(
+            status_code=410,
+            detail="旧 account_chart 自动联动四表导入已废弃，请改用 LedgerImportApplicationService 或 /ledger/smart-preview + /ledger/smart-import",
+        )
 
     return AccountImportResult(
         total_imported=len(records),
@@ -556,6 +549,8 @@ async def _auto_import_data_sheets(
     content: bytes,
     year: int | None,
     db: AsyncSession,
+    *,
+    allow_deprecated_internal_use: bool = False,
 ) -> tuple[dict[str, int], list[dict]]:
     """解析 Excel 所有 sheet，自动识别余额表/序时账/辅助账并导入。
 
@@ -563,6 +558,11 @@ async def _auto_import_data_sheets(
       - imported_counts: {data_type: record_count}
       - diagnostics: [{sheet_name, guessed_type, matched_cols, missing_cols, row_count}]
     """
+    if not allow_deprecated_internal_use:
+        raise HTTPException(
+            status_code=410,
+            detail="_auto_import_data_sheets 已废弃且仅限内部兼容调用，请改用 LedgerImportApplicationService",
+        )
     from app.services.import_engine.parsers import GenericParser
 
     # 硬性必需列（缺少会导致解析器丢弃整行，无法入库）

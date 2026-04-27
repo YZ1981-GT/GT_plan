@@ -191,53 +191,14 @@
 
     <!-- Phase 3: Import Result -->
     <div v-if="phase === 'result' && importResult" class="result-section">
-      <el-alert
+      <ImportCompletionSummary
         :title="`成功导入 ${importResult.total_imported} 个科目`"
-        type="success"
-        :closable="false"
-        show-icon
-        style="margin-bottom: 16px"
+        :validation-summary="validationSummary"
+        :grouped-validation-items="groupedValidationItems"
+        :validation-title="validationSummaryTitle"
+        :validation-alert-type="validationSummaryAlertType"
+        validation-panel-style="margin-bottom: 16px"
       />
-
-      <el-alert
-        v-if="validationSummary.total > 0"
-        :title="validationSummaryTitle"
-        :type="validationSummaryAlertType"
-        :closable="false"
-        show-icon
-        style="margin-bottom: 16px"
-      >
-        <template #default>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px">
-            <el-tag v-if="validationSummary.fatal > 0" type="danger">fatal {{ validationSummary.fatal }}</el-tag>
-            <el-tag v-if="validationSummary.error > 0" type="danger">error {{ validationSummary.error }}</el-tag>
-            <el-tag v-if="validationSummary.warning > 0" type="warning">warning {{ validationSummary.warning }}</el-tag>
-            <el-tag v-if="validationSummary.info > 0" type="info">info {{ validationSummary.info }}</el-tag>
-          </div>
-          <div v-if="blockingValidationItems.length" style="margin-top: 10px">
-            <div
-              v-for="(item, idx) in blockingValidationItems"
-              :key="`${item.rule_code}_${idx}`"
-              style="font-size: 13px; margin-bottom: 6px; color: #f56c6c"
-            >
-              <strong>{{ item.file || '当前文件' }}</strong>
-              <span v-if="item.sheet"> / {{ item.sheet }}</span>
-              <span>：{{ item.message }}</span>
-            </div>
-          </div>
-          <div v-if="nonBlockingValidationItems.length" style="margin-top: 10px">
-            <div
-              v-for="(item, idx) in nonBlockingValidationItems"
-              :key="`${item.rule_code}_${idx}`"
-              style="font-size: 13px; margin-bottom: 6px; color: #e6a23c"
-            >
-              <strong>{{ item.file || '当前文件' }}</strong>
-              <span v-if="item.sheet"> / {{ item.sheet }}</span>
-              <span>：{{ item.message }}</span>
-            </div>
-          </div>
-        </template>
-      </el-alert>
 
       <!-- Data sheets imported -->
       <el-alert
@@ -410,15 +371,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { UploadFilled, CircleCheckFilled, WarningFilled, Connection, CircleCheck, CircleClose, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { UploadFilled, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { useWizardStore } from '@/stores/wizard'
+import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
+import { useProjectWizardStore } from '@/stores/projectWizard'
+import { buildImportFormData, shouldReuseImportUploadToken } from '@/utils/importFormData'
+import { applyImportPreviewSuccess, buildImportPreviewFormData, buildImportPreviewUrl, resolveImportPreviewSuccess } from '@/utils/importPreview'
+import { buildImportSuccessMessage } from '@/utils/importValidation'
+import { buildImportJobUrl, fetchImportQueueStatus } from '@/utils/importJobRequest'
+import { applyImportSuccess, resolveImportSuccess } from '@/utils/importSuccess'
+import { hasImportFailed, resolveImportCompletionToast, resolveImportFailureMessage, shouldFinishImportPolling } from '@/utils/useImportJobFlow'
+import { runImportPollingFlow } from '@/utils/useImportPollingFlow'
+import { useImportValidation } from '@/utils/useImportValidation'
 
-const wizardStore = useWizardStore()
 const uploadRef = ref<UploadInstance>()
+const wizardStore = useProjectWizardStore()
 const selectedFiles = ref<File[]>([])
 const fileList = ref<any[]>([])
 const previewing = ref(false)
@@ -548,6 +518,7 @@ interface AccountImportResult {
   data_sheets_imported?: Record<string, number>
   sheet_diagnostics?: SheetDiagnostic[]
   validation?: ValidationItem[]
+  validation_summary?: ValidationSummary
   skipped_rows?: SkippedRow[]
   year?: number | null
 }
@@ -561,6 +532,13 @@ interface ValidationItem {
   details?: Record<string, unknown>
   sample_rows?: Record<string, string>[]
   blocking?: boolean
+}
+
+interface ValidationSummary {
+  total: number
+  blocking_count: number
+  has_blocking?: boolean
+  by_severity: Record<string, number>
 }
 
 interface SkippedRow {
@@ -738,52 +716,15 @@ const hasBalanceData = computed(() => {
   return (importResult.value.data_sheets_imported['tb_balance'] ?? 0) > 0
 })
 
-const validationItems = computed<ValidationItem[]>(() => importResult.value?.validation || [])
-
-const validationSummary = computed(() => {
-  const summary = { total: 0, fatal: 0, error: 0, warning: 0, info: 0 }
-  for (const item of validationItems.value) {
-    summary.total += 1
-    if (item.severity === 'fatal') summary.fatal += 1
-    else if (item.severity === 'error') summary.error += 1
-    else if (item.severity === 'warning') summary.warning += 1
-    else summary.info += 1
-  }
-  return summary
-})
-
-const blockingValidationItems = computed(() => validationItems.value.filter(item => item.blocking))
-const nonBlockingValidationItems = computed(() => validationItems.value.filter(item => !item.blocking))
-
-const validationSummaryAlertType = computed(() => {
-  if (validationSummary.value.fatal > 0 || validationSummary.value.error > 0) return 'warning'
-  if (validationSummary.value.warning > 0) return 'info'
-  return 'success'
-})
-
-const validationSummaryTitle = computed(() => {
-  if (validationSummary.value.fatal > 0 || validationSummary.value.error > 0) {
-    return '导入已完成，但存在需要处理的校验问题'
-  }
-  if (validationSummary.value.warning > 0) {
-    return '导入已完成，存在可继续关注的警告信息'
-  }
-  return '导入校验通过'
-})
-
-function extractValidationMessage(items: ValidationItem[] | undefined, fallback: string): string {
-  if (!items?.length) return fallback
-  const prioritized = items
-    .filter(item => item.blocking || item.severity === 'fatal' || item.severity === 'error')
-  const source = prioritized.length ? prioritized : items
-  return source
-    .slice(0, 3)
-    .map((item) => {
-      const location = [item.file, item.sheet].filter(Boolean).join(' / ')
-      return location ? `${location}：${item.message}` : item.message
-    })
-    .join('；') || fallback
-}
+const {
+  validationSummary,
+  groupedValidationItems,
+  validationSummaryAlertType,
+  validationSummaryTitle,
+} = useImportValidation<ValidationItem, ValidationSummary>(
+  () => importResult.value?.validation,
+  () => importResult.value?.validation_summary,
+)
 
 function countNodes(nodes: AccountTreeNode[]): number {
   let count = 0
@@ -989,70 +930,78 @@ async function handlePreview() {
     activeSheetIdx.value = 0
     for (const key of Object.keys(columnMapping)) delete columnMapping[key]
     clearSheetMappingCache()
-    const formData = new FormData()
-    for (const file of selectedFiles.value) {
-      formData.append('files', file)
-    }
+    const formData = buildImportPreviewFormData(selectedFiles.value)
+    const previewUrl = buildImportPreviewUrl({
+      basePath: `/api/projects/${wizardStore.projectId}/account-chart/preview`,
+    })
     const data = await api.post(
-      `/api/projects/${wizardStore.projectId}/account-chart/preview`,
+      previewUrl,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 },
     )
-    const result: PreviewResponse = data
-    uploadToken.value = result.upload_token || ''
-    previewYear.value = result.year ?? null
-    const allSheets: any[] = []
-    const sheets = result.sheets || []
-    for (const s of sheets) {
-      const sourceFile = s._source_file || ''
-      if (selectedFiles.value.length > 1 && sourceFile) {
-        s.sheet_name = `[${sourceFile}] ${s.sheet_name}`
-      }
-      allSheets.push(s)
-    }
-    previewSheets.value = allSheets
-
-    // 对所有 sheet 预先做自动列名匹配（存入缓存，切换时直接恢复）
-    for (let i = 0; i < previewSheets.value.length; i++) {
-      const sheet = previewSheets.value[i]
-      const autoMapping: Record<string, string | null> = {}
-
-      // 1. 使用后端返回的自动匹配结果
-      if (sheet.column_mapping) {
-        for (const [h, v] of Object.entries(sheet.column_mapping)) {
-          if (v) autoMapping[h] = v
+    const previewSuccess = resolveImportPreviewSuccess<PreviewResponse, Phase>({
+      result: data as PreviewResponse,
+      nextStage: 'preview',
+      getUploadToken: result => result.upload_token,
+      getYear: result => result.year,
+    })
+    await applyImportPreviewSuccess({
+      previewSuccess,
+      applyUploadToken: (value) => { uploadToken.value = value },
+      applyYear: (value) => { previewYear.value = value },
+      applyPayload: (result) => {
+        const allSheets: any[] = []
+        const sheets = result.sheets || []
+        for (const s of sheets) {
+          const sourceFile = s._source_file || ''
+          if (selectedFiles.value.length > 1 && sourceFile) {
+            s.sheet_name = `[${sourceFile}] ${s.sheet_name}`
+          }
+          allSheets.push(s)
         }
-      }
+        previewSheets.value = allSheets
+      },
+      enterStage: (stage) => { phase.value = stage },
+      afterEnterStage: async ({ payload, nextStage, uploadToken: landedUploadToken, year: landedYear }) => {
+        void payload
+        void nextStage
+        void landedUploadToken
+        void landedYear
+        for (let i = 0; i < previewSheets.value.length; i++) {
+          const sheet = previewSheets.value[i]
+          const autoMapping: Record<string, string | null> = {}
 
-      // 2. 尝试从后端加载已保存的映射覆盖
-      try {
-        const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers, sheet)
-        for (const [h, v] of Object.entries(saved)) {
-          if (v) autoMapping[h] = v
+          if (sheet.column_mapping) {
+            for (const [h, v] of Object.entries(sheet.column_mapping)) {
+              if (v) autoMapping[h] = v
+            }
+          }
+
+          try {
+            const saved = await loadSavedMapping(sheet.file_type_guess, sheet.headers, sheet)
+            for (const [h, v] of Object.entries(saved)) {
+              if (v) autoMapping[h] = v
+            }
+          } catch { /* ignore */ }
+
+          sheetMappingCache[i] = autoMapping
         }
-      } catch { /* ignore */ }
 
-      // 存入缓存
-      sheetMappingCache[i] = autoMapping
-    }
-
-    // 激活第一个 sheet
-    if (previewSheets.value.length > 0) {
-      activeSheetIdx.value = 0
-      // 从缓存恢复（不再重复请求后端）
-      const cached = sheetMappingCache[0]
-      if (cached) {
-        for (const key of Object.keys(columnMapping)) delete columnMapping[key]
-        for (const [h, v] of Object.entries(cached)) {
-          columnMapping[h] = v
+        if (previewSheets.value.length > 0) {
+          activeSheetIdx.value = 0
+          const cached = sheetMappingCache[0]
+          if (cached) {
+            for (const key of Object.keys(columnMapping)) delete columnMapping[key]
+            for (const [h, v] of Object.entries(cached)) {
+              columnMapping[h] = v
+            }
+          }
+          const sheet = previewSheets.value[0]
+          fileTypeLabel.value = FILE_TYPE_LABELS[sheet.file_type_guess] || '未识别类型'
+          fileTypeTagType.value = FILE_TYPE_TAG[sheet.file_type_guess] || 'info'
         }
-      }
-      const sheet = previewSheets.value[0]
-      fileTypeLabel.value = FILE_TYPE_LABELS[sheet.file_type_guess] || '未识别类型'
-      fileTypeTagType.value = FILE_TYPE_TAG[sheet.file_type_guess] || 'info'
-    }
-
-    phase.value = 'preview'
+      },
+    })
   } catch (err: any) {
     const errMsg = err?.response?.data?.detail || err?.message || '文件预览失败'
     ElMessage.error(errMsg)
@@ -1389,14 +1338,9 @@ async function handleImport() {
   }, 2000)
 
   try {
-    // ── 构建 FormData（所有文件 + 合并映射一次发送） ──
-    const formData = new FormData()
     let totalSizeBytes = 0
     for (const file of selectedFiles.value) {
       totalSizeBytes += file.size
-      if (!uploadToken.value) {
-        formData.append('files', file)
-      }
     }
     const totalSizeMB = (totalSizeBytes / 1024 / 1024).toFixed(1)
 
@@ -1418,9 +1362,14 @@ async function handleImport() {
     const mappingToSend = sheetNames.length === 1
       ? perSheetMapping[sheetNames[0]]
       : perSheetMapping
-    formData.append('column_mapping', JSON.stringify(mappingToSend))
+    const formData = buildImportFormData({
+      files: selectedFiles.value,
+      uploadToken: uploadToken.value,
+      mappingFieldName: 'column_mapping',
+      mappingPayload: JSON.stringify(mappingToSend),
+    })
 
-    importProgress.value = uploadToken.value
+    importProgress.value = shouldReuseImportUploadToken(uploadToken.value)
       ? '正在复用预览文件并提交导入任务…'
       : `正在上传 ${selectedFiles.value.length} 个文件（${totalSizeMB} MB）…`
 
@@ -1431,60 +1380,45 @@ async function handleImport() {
 
     if (useAsync) {
       // 异步导入：立即返回，轮询进度
-      let importUrl = `/api/projects/${wizardStore.projectId}/account-chart/import-async`
-      const importParams = new URLSearchParams()
-      if (uploadToken.value) importParams.append('upload_token', uploadToken.value)
-      if (previewYear.value !== null) importParams.append('year', String(previewYear.value))
-      if (importParams.toString()) importUrl += `?${importParams.toString()}`
+      const importUrl = buildImportJobUrl({
+        basePath: `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
+        uploadToken: uploadToken.value,
+        year: previewYear.value,
+      })
       await api.post(
         importUrl,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
       )
-      // 等待后台任务完成（最多轮询 150 次 = 5 分钟）
-      let done = false
-      let pollCount = 0
-      const MAX_POLLS = 150
-      while (!done && pollCount < MAX_POLLS) {
-        pollCount++
-        await new Promise(r => setTimeout(r, 2000))
-        try {
-          const statusData = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
-          const status = statusData
+      await runImportPollingFlow({
+        maxPolls: 150,
+        timeoutMessage: '异步导入超时（超过 5 分钟），请刷新页面后重试',
+        onWait: () => new Promise<void>(resolve => setTimeout(resolve, 2000)),
+        fetchStatus: () => fetchImportQueueStatus(() => api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)),
+        onStatus: (status) => {
           if (status && typeof status === 'object') {
             const pct = status.progress ?? 0
             const msg = status.message || ''
             importProgress.value = `[${pct}%] ${msg}`
-            if (pct >= 100 || pct < 0 || status.status === 'idle') {
-              done = true
-              if (pct < 0) {
-                ElMessage.error(msg || '导入失败')
-                throw new Error(msg || '导入失败')
-              }
-              const res = status.result
-              if (res && typeof res === 'object') {
-                finalResult = res as AccountImportResult
-              }
-            }
-          } else {
-            done = true
           }
-        } catch (e) {
-          if (e instanceof Error && e.message.includes('导入失败')) throw e
-          done = true
-        }
-      }
-      // 轮询超时检测
-      if (pollCount >= MAX_POLLS && !finalResult) {
-        throw new Error('异步导入超时（超过 5 分钟），请刷新页面后重试')
-      }
+        },
+        shouldFinish: (status) => shouldFinishImportPolling(status),
+        hasFailed: (status) => hasImportFailed(status),
+        getFailureMessage: (status) => status?.message || '导入失败',
+        onSuccessStatus: (status) => {
+          const res = status?.result
+          if (res && typeof res === 'object') {
+            finalResult = res as AccountImportResult
+          }
+        },
+      })
     } else {
       // 同步导入
-      let importUrl = `/api/projects/${wizardStore.projectId}/account-chart/import`
-      const importParams = new URLSearchParams()
-      if (uploadToken.value) importParams.append('upload_token', uploadToken.value)
-      if (previewYear.value !== null) importParams.append('year', String(previewYear.value))
-      if (importParams.toString()) importUrl += `?${importParams.toString()}`
+      const importUrl = buildImportJobUrl({
+        basePath: `/api/projects/${wizardStore.projectId}/account-chart/import`,
+        uploadToken: uploadToken.value,
+        year: previewYear.value,
+      })
       const data = await api.post(
         importUrl,
         formData,
@@ -1494,43 +1428,60 @@ async function handleImport() {
     }
 
     // ── 处理结果 ──
-    importResult.value = finalResult || {
+    const resolvedImportResult = finalResult || {
       total_imported: 0, by_category: {}, errors: [],
       data_sheets_imported: {}, sheet_diagnostics: [], validation: [], year: null,
     }
-    const importedYear = importResult.value.year ?? null
+    const importSuccess = resolveImportSuccess<typeof resolvedImportResult, Phase>({
+      result: resolvedImportResult,
+      nextStage: 'result',
+    })
+    const importedYear = resolvedImportResult.year ?? null
 
-    let msg = `成功导入 ${importResult.value.total_imported} 个科目`
     const sheetLabels: Record<string, string> = {
       tb_balance: '余额表', tb_ledger: '序时账',
       tb_aux_balance: '辅助余额', tb_aux_ledger: '辅助明细',
     }
-    const parts: string[] = []
-    for (const [dt, cnt] of Object.entries(importResult.value.data_sheets_imported || {})) {
-      if ((cnt as number) > 0) parts.push(`${sheetLabels[dt] || dt} ${(cnt as number).toLocaleString()} 条`)
+    const msg = buildImportSuccessMessage(
+      `成功导入 ${resolvedImportResult.total_imported} 个科目`,
+      Object.entries(resolvedImportResult.data_sheets_imported || {}).map(([key, count]) => ({
+        key,
+        label: sheetLabels[key] || key,
+        count: Number(count) || 0,
+      })),
+    )
+    const completionToast = resolveImportCompletionToast(msg, resolvedImportResult.validation_summary)
+    if (completionToast.type === 'warning') {
+      ElMessage.warning(completionToast.message)
+    } else {
+      ElMessage.success(completionToast.message)
     }
-    if (parts.length > 0) msg += `，同时导入 ${parts.join('、')}`
-    ElMessage.success(msg)
 
-    saveMapping(true)
+    await applyImportSuccess({
+      success: importSuccess,
+      applyResult: (result) => { importResult.value = result },
+      enterStage: (stage) => { phase.value = stage },
+      afterEnterStage: async ({ result }) => {
+        saveMapping(true)
 
-    await wizardStore.saveStep('account_import', {
-      total_imported: importResult.value.total_imported,
-      by_category: importResult.value.by_category,
-      errors: importResult.value.errors,
-      data_sheets_imported: importResult.value.data_sheets_imported,
-      sheet_diagnostics: importResult.value.sheet_diagnostics,
-      validation: importResult.value.validation,
-      skipped_rows: importResult.value.skipped_rows,
-      year: importedYear,
+        await wizardStore.saveStep('account_import', {
+          total_imported: result.total_imported,
+          by_category: result.by_category,
+          errors: result.errors,
+          data_sheets_imported: result.data_sheets_imported,
+          sheet_diagnostics: result.sheet_diagnostics,
+          validation: result.validation,
+          skipped_rows: result.skipped_rows,
+          year: importedYear,
+        })
+
+        await loadClientTree()
+      },
     })
-
-    phase.value = 'result'
-    await loadClientTree()
   } catch (err: any) {
     const status = err?.response?.status
     const errValidation = err?.response?.data?.validation as ValidationItem[] | undefined
-    const errMsg = extractValidationMessage(
+    const errMsg = resolveImportFailureMessage(
       errValidation,
       err?.response?.data?.detail || err?.message || '导入失败，请重试',
     )

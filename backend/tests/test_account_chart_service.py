@@ -5,10 +5,12 @@ Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
 
 import io
 import uuid
+from decimal import Decimal
 
 import pytest
 import pytest_asyncio
 from fastapi import UploadFile
+from openpyxl import Workbook
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.base import Base, ProjectStatus
@@ -229,6 +231,43 @@ class TestImportClientChart:
             await svc.import_client_chart(project.id, file, db_session)
         assert exc_info.value.status_code == 400
         assert ".xls" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_import_xlsx_with_legacy_auto_import_disabled(self, db_session: AsyncSession):
+        from app.services import account_chart_service as svc
+
+        project = await _create_test_project(db_session)
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "科目表"
+        sheet.append(["科目编码", "科目名称", "借贷方向"])
+        sheet.append(["1001", "库存现金", "借"])
+        stream = io.BytesIO()
+        workbook.save(stream)
+        file = UploadFile(filename="chart.xlsx", file=io.BytesIO(stream.getvalue()))
+
+        with pytest.raises(Exception) as exc_info:
+            await svc.import_client_chart(project.id, file, db_session, skip_auto_import=False)
+
+        assert exc_info.value.status_code == 410
+        assert "旧 account_chart 自动联动四表导入已废弃" in str(exc_info.value.detail)
+
+    @pytest.mark.asyncio
+    async def test_auto_import_data_sheets_requires_internal_flag(self, db_session: AsyncSession):
+        from app.services import account_chart_service as svc
+
+        project = await _create_test_project(db_session)
+
+        with pytest.raises(Exception) as exc_info:
+            await svc._auto_import_data_sheets(
+                project.id,
+                b"fake-xlsx-content",
+                year=2024,
+                db=db_session,
+            )
+
+        assert exc_info.value.status_code == 410
+        assert "_auto_import_data_sheets 已废弃且仅限内部兼容调用" in str(exc_info.value.detail)
 
     @pytest.mark.asyncio
     async def test_import_direction_inference(self, db_session: AsyncSession):

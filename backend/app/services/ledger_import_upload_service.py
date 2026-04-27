@@ -76,18 +76,22 @@ class LedgerImportUploadService:
     ) -> dict[str, Any]:
         cls.cleanup_expired_bundles(project_id)
 
+        valid_uploads = [upload for upload in files if upload and upload.filename]
+        max_file_count = max(1, settings.LEDGER_UPLOAD_MAX_FILE_COUNT)
+        if len(valid_uploads) > max_file_count:
+            raise HTTPException(status_code=413, detail=f"上传文件数超过限制（最多 {max_file_count} 个）")
+
         upload_token = uuid4().hex
         bundle_dir = cls._bundle_dir(project_id, upload_token)
         bundle_dir.mkdir(parents=True, exist_ok=True)
         max_bytes = max(1, settings.MAX_UPLOAD_SIZE_MB) * 1024 * 1024
+        max_total_bytes = max(1, settings.LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB) * 1024 * 1024
 
         manifest_files: list[dict[str, Any]] = []
         total_size = 0
 
         try:
-            for index, upload in enumerate(files):
-                if not upload.filename:
-                    continue
+            for index, upload in enumerate(valid_uploads):
                 safe_name = cls._safe_filename(upload.filename, index)
                 stored_name = f"{index:02d}_{safe_name}"
                 target_path = bundle_dir / stored_name
@@ -109,6 +113,11 @@ class LedgerImportUploadService:
                     pass
 
                 total_size += size
+                if total_size > max_total_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"上传总大小超过限制（最大 {settings.LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB}MB）",
+                    )
                 manifest_files.append({
                     "filename": safe_name,
                     "stored_name": stored_name,

@@ -12,6 +12,7 @@ from decimal import Decimal
 import pytest
 import pytest_asyncio
 from fastapi import UploadFile
+from openpyxl import Workbook
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.models.base import Base
@@ -81,6 +82,18 @@ def _make_csv_upload(content: str, filename: str = "data.csv") -> UploadFile:
     """Create a mock UploadFile from CSV string."""
     file_bytes = content.encode("utf-8-sig")
     return UploadFile(filename=filename, file=io.BytesIO(file_bytes))
+
+
+def _make_xlsx_bytes(rows: list[list[object]], sheet_name: str = "Sheet1") -> bytes:
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = sheet_name
+    for row in rows:
+        worksheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    workbook.close()
+    return buffer.getvalue()
 
 
 # ===================================================================
@@ -657,6 +670,77 @@ class TestImportService:
 
         assert len(records) == 2
         assert {r.account_code for r in records} == {"1001", "100101"}
+
+    @pytest.mark.asyncio
+    async def test_smart_import_streaming_csv_ledger_missing_account_code_fails(self, db_session: AsyncSession):
+        from sqlalchemy import func, select
+        from app.services.smart_import_engine import smart_import_streaming
+
+        project = await _create_test_project(db_session)
+        csv_content = (
+            "凭证日期,凭证号,借方金额,贷方金额,摘要\n"
+            "2024-01-15,PZ-001,500.00,0,收到现金\n"
+        )
+
+        with pytest.raises(ValueError, match="CSV 序时账缺少必需列: 科目编码"):
+            await smart_import_streaming(
+                project_id=project.id,
+                file_contents=[("ledger_missing_account_code.csv", csv_content.encode("utf-8-sig"))],
+                db=db_session,
+                year_override=2024,
+            )
+
+        ledger_count = await db_session.execute(
+            select(func.count(TbLedger.id)).where(TbLedger.project_id == project.id)
+        )
+        assert ledger_count.scalar_one() == 0
+
+    @pytest.mark.asyncio
+    async def test_smart_import_streaming_excel_account_chart_missing_name_fails(self, db_session: AsyncSession):
+        from sqlalchemy import func, select
+        from app.services.smart_import_engine import smart_import_streaming
+
+        project = await _create_test_project(db_session)
+        workbook_bytes = _make_xlsx_bytes(
+            [
+                ["科目编码"],
+                ["1001"],
+            ],
+            sheet_name="科目表",
+        )
+
+        with pytest.raises(ValueError, match="科目表缺少必需列: 科目名称"):
+            await smart_import_streaming(
+                project_id=project.id,
+                file_contents=[("chart_missing_name.xlsx", workbook_bytes)],
+                db=db_session,
+                year_override=2024,
+            )
+
+        chart_count = await db_session.execute(
+            select(func.count(AccountChart.id)).where(
+                AccountChart.project_id == project.id,
+                AccountChart.source == AccountSource.client,
+            )
+        )
+        assert chart_count.scalar_one() == 0
+
+    @pytest.mark.asyncio
+    async def test_write_four_tables_legacy_path_is_disabled(self, db_session: AsyncSession):
+        from app.services.smart_import_engine import write_four_tables
+
+        project = await _create_test_project(db_session)
+
+        with pytest.raises(RuntimeError, match="write_four_tables 已废弃"):
+            await write_four_tables(
+                project_id=project.id,
+                year=2024,
+                balance_rows=[],
+                aux_balance_rows=[],
+                ledger_rows=[],
+                aux_ledger_rows=[],
+                db=db_session,
+            )
 
     @pytest.mark.asyncio
     async def test_start_import_ledger(self, db_session: AsyncSession):

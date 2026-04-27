@@ -6,6 +6,7 @@ Validates: Requirements 15.1-15.5
 import uuid
 from datetime import date
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -229,6 +230,38 @@ class TestLedgerPenetrationService:
         svc = LedgerPenetrationService(db_session, redis=None)
         result = await svc.penetrate_cached(FAKE_PROJECT_ID, YEAR, drill_level="total")
         assert "total" in result
+
+    @pytest.mark.asyncio
+    async def test_legacy_upload_endpoint_returns_gone(self):
+        from fastapi import HTTPException
+        from app.routers.ledger_penetration import upload_data
+
+        with pytest.raises(HTTPException, match="旧 /ledger/upload 导入入口已废弃") as exc:
+            await upload_data(
+                project_id=uuid.uuid4(),
+                year=2025,
+                file=AsyncMock(),
+                db=AsyncMock(),
+                current_user=AsyncMock(),
+            )
+
+        assert exc.value.status_code == 410
+
+    @pytest.mark.asyncio
+    async def test_legacy_upload_multi_endpoint_returns_gone(self):
+        from fastapi import HTTPException
+        from app.routers.ledger_penetration import upload_multi_files
+
+        with pytest.raises(HTTPException, match="旧 /ledger/upload-multi 导入入口已废弃") as exc:
+            await upload_multi_files(
+                project_id=uuid.uuid4(),
+                year=2025,
+                files=[],
+                db=AsyncMock(),
+                current_user=AsyncMock(),
+            )
+
+        assert exc.value.status_code == 410
 
 
 # ── API 测试 ──

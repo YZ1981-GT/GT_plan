@@ -352,24 +352,11 @@ async def upload_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """上传四表数据文件（支持历史年度）。
-
-    自动识别 Excel 中的余额表/序时账/辅助账 sheet 并导入。
-    """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="未提供文件")
-
-    content = await file.read()
-    from app.services.account_chart_service import _auto_import_data_sheets
-    result, diagnostics = await _auto_import_data_sheets(
-        project_id, content, year=year, db=db,
+    """上传四表数据文件（支持历史年度）."""
+    raise HTTPException(
+        status_code=410,
+        detail="旧 /ledger/upload 导入入口已废弃，请改用 /ledger/smart-preview 与 /ledger/smart-import",
     )
-    return {
-        "imported": result,
-        "diagnostics": diagnostics,
-        "year": year,
-        "file_name": file.filename,
-    }
 
 
 @router.post("/upload-multi")
@@ -380,38 +367,11 @@ async def upload_multi_files(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """上传多个四表数据文件（支持多个序时账文件合并导入）。
-
-    适用场景：序时账按月份分多个文件导出（如1-10月、11-12月）。
-    所有文件的数据会合并到同一个项目和年度。
-    """
-    if not files:
-        raise HTTPException(status_code=400, detail="未提供文件")
-
-    from app.services.account_chart_service import _auto_import_data_sheets
-
-    all_results: dict[str, int] = {}
-    all_diagnostics: list[dict] = []
-    file_names: list[str] = []
-
-    for file in files:
-        if not file.filename:
-            continue
-        content = await file.read()
-        result, diagnostics = await _auto_import_data_sheets(
-            project_id, content, year=year, db=db,
-        )
-        file_names.append(file.filename)
-        for dt, count in result.items():
-            all_results[dt] = all_results.get(dt, 0) + count
-        all_diagnostics.extend(diagnostics)
-
-    return {
-        "imported": all_results,
-        "diagnostics": all_diagnostics,
-        "year": year,
-        "file_names": file_names,
-    }
+    """上传多个四表数据文件（支持多个序时账文件合并导入）."""
+    raise HTTPException(
+        status_code=410,
+        detail="旧 /ledger/upload-multi 导入入口已废弃，请改用 /ledger/smart-preview 与 /ledger/smart-import",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

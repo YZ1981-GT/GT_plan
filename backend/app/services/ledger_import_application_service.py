@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import async_session
 from app.services.import_queue_service import ImportQueueService
 from app.services.ledger_import_upload_service import LedgerImportUploadService
-from app.services.smart_import_engine import smart_import_streaming, smart_parse_files
+from app.services.smart_import_engine import SmartImportError, smart_import_streaming, smart_parse_files
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +231,29 @@ class LedgerImportApplicationService:
                 })
         return report
 
+    @staticmethod
+    def _build_validation_summary(validation: list[dict[str, Any]] | None) -> dict[str, Any]:
+        by_severity = {
+            "fatal": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0,
+        }
+        blocking_count = 0
+        for item in validation or []:
+            severity = str(item.get("severity") or "info").lower()
+            if severity not in by_severity:
+                by_severity[severity] = 0
+            by_severity[severity] += 1
+            if item.get("blocking"):
+                blocking_count += 1
+        return {
+            "total": len(validation or []),
+            "blocking_count": blocking_count,
+            "has_blocking": blocking_count > 0,
+            "by_severity": by_severity,
+        }
+
     @classmethod
     async def preview(
         cls,
@@ -259,11 +282,13 @@ class LedgerImportApplicationService:
             preview_rows=preview_rows,
         )
         diagnostics = result.get("diagnostics") or []
+        validation = cls._build_validation_report(diagnostics)
         return {
             "year": result.get("year"),
             "summary": cls._build_preview_summary(diagnostics),
             "aux_dimensions": result.get("aux_dimensions", []),
-            "validation": cls._build_validation_report(diagnostics),
+            "validation": validation,
+            "validation_summary": cls._build_validation_summary(validation),
             "diagnostics": diagnostics,
             "preview_mode": True,
             "preview_rows": preview_rows,
@@ -275,25 +300,33 @@ class LedgerImportApplicationService:
     @classmethod
     def build_account_chart_result_payload(cls, result: dict[str, Any]) -> dict[str, Any]:
         sheet_diagnostics = result.get("sheet_diagnostics")
+        normalized_diagnostics = cls._normalize_sheet_diagnostics(sheet_diagnostics)
+        validation = cls._build_validation_report(sheet_diagnostics)
         return {
             "total_imported": int(result.get("total_accounts") or 0),
             "by_category": result.get("by_category") or {},
             "errors": result.get("errors") or [],
             "data_sheets_imported": result.get("data_sheets_imported") or {},
-            "sheet_diagnostics": cls._normalize_sheet_diagnostics(sheet_diagnostics),
-            "validation": cls._build_validation_report(sheet_diagnostics),
+            "sheet_diagnostics": normalized_diagnostics,
+            "diagnostics": normalized_diagnostics,
+            "validation": validation,
+            "validation_summary": cls._build_validation_summary(validation),
             "year": result.get("year"),
         }
 
-    @staticmethod
-    def build_account_chart_failure_payload(error_message: str) -> dict[str, Any]:
-        return {
-            "total_imported": 0,
-            "by_category": {},
-            "errors": [f"导入失败: {error_message}"],
-            "data_sheets_imported": {},
-            "sheet_diagnostics": [],
-            "validation": [{
+    @classmethod
+    def build_account_chart_failure_payload(
+        cls,
+        error_message: str,
+        *,
+        diagnostics: list[dict[str, Any]] | None = None,
+        errors: list[str] | None = None,
+        year: int | None = None,
+    ) -> dict[str, Any]:
+        normalized_diagnostics = cls._normalize_sheet_diagnostics(diagnostics)
+        validation = cls._build_validation_report(diagnostics)
+        if not validation:
+            validation = [{
                 "file": None,
                 "sheet": None,
                 "rule_code": "import_failed",
@@ -302,8 +335,17 @@ class LedgerImportApplicationService:
                 "details": {},
                 "sample_rows": [],
                 "blocking": True,
-            }],
-            "year": None,
+            }]
+        return {
+            "total_imported": 0,
+            "by_category": {},
+            "errors": errors or [f"导入失败: {error_message}"],
+            "data_sheets_imported": {},
+            "sheet_diagnostics": normalized_diagnostics,
+            "diagnostics": normalized_diagnostics,
+            "validation": validation,
+            "validation_summary": cls._build_validation_summary(validation),
+            "year": year,
         }
 
     @classmethod
@@ -314,22 +356,33 @@ class LedgerImportApplicationService:
         job_batch_id: UUID | None,
     ) -> dict[str, Any]:
         diagnostics = result.get("sheet_diagnostics")
+        normalized_diagnostics = cls._normalize_sheet_diagnostics(diagnostics)
+        validation = cls._build_validation_report(diagnostics)
         return {
             "imported": result.get("data_sheets_imported") or {},
             "year": result.get("year"),
-            "diagnostics": cls._normalize_sheet_diagnostics(diagnostics),
-            "validation": cls._build_validation_report(diagnostics),
+            "diagnostics": normalized_diagnostics,
+            "sheet_diagnostics": normalized_diagnostics,
+            "validation": validation,
+            "validation_summary": cls._build_validation_summary(validation),
             "errors": result.get("errors") or [],
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
         }
 
-    @staticmethod
-    def build_ledger_failure_payload(error_message: str, *, job_batch_id: UUID | None) -> dict[str, Any]:
-        return {
-            "imported": {},
-            "year": None,
-            "diagnostics": [],
-            "validation": [{
+    @classmethod
+    def build_ledger_failure_payload(
+        cls,
+        error_message: str,
+        *,
+        job_batch_id: UUID | None,
+        diagnostics: list[dict[str, Any]] | None = None,
+        errors: list[str] | None = None,
+        year: int | None = None,
+    ) -> dict[str, Any]:
+        normalized_diagnostics = cls._normalize_sheet_diagnostics(diagnostics)
+        validation = cls._build_validation_report(diagnostics)
+        if not validation:
+            validation = [{
                 "file": None,
                 "sheet": None,
                 "rule_code": "import_failed",
@@ -338,8 +391,15 @@ class LedgerImportApplicationService:
                 "details": {},
                 "sample_rows": [],
                 "blocking": True,
-            }],
-            "errors": [f"导入失败: {error_message}"],
+            }]
+        return {
+            "imported": {},
+            "year": year,
+            "diagnostics": normalized_diagnostics,
+            "sheet_diagnostics": normalized_diagnostics,
+            "validation": validation,
+            "validation_summary": cls._build_validation_summary(validation),
+            "errors": errors or [f"导入失败: {error_message}"],
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
         }
 
@@ -407,7 +467,15 @@ class LedgerImportApplicationService:
                 )
             return result_payload
         except Exception as exc:
-            failure_payload = cls.build_account_chart_failure_payload(str(exc))
+            diagnostics = exc.diagnostics if isinstance(exc, SmartImportError) else None
+            failure_errors = exc.errors if isinstance(exc, SmartImportError) else None
+            failure_year = exc.year if isinstance(exc, SmartImportError) else year
+            failure_payload = cls.build_account_chart_failure_payload(
+                str(exc),
+                diagnostics=diagnostics,
+                errors=failure_errors,
+                year=failure_year,
+            )
             if job_batch_id is not None:
                 await ImportQueueService.fail_job(
                     project_id,
@@ -498,10 +566,24 @@ class LedgerImportApplicationService:
                 import traceback
 
                 logger.error("异步导入失败: %s\n%s", exc, traceback.format_exc())
+                diagnostics = exc.diagnostics if isinstance(exc, SmartImportError) else None
+                failure_errors = exc.errors if isinstance(exc, SmartImportError) else None
+                failure_year = exc.year if isinstance(exc, SmartImportError) else year
                 if payload_style == "account_chart":
-                    failure_payload = cls.build_account_chart_failure_payload(str(exc))
+                    failure_payload = cls.build_account_chart_failure_payload(
+                        str(exc),
+                        diagnostics=diagnostics,
+                        errors=failure_errors,
+                        year=failure_year,
+                    )
                 else:
-                    failure_payload = cls.build_ledger_failure_payload(str(exc), job_batch_id=job_batch_id)
+                    failure_payload = cls.build_ledger_failure_payload(
+                        str(exc),
+                        job_batch_id=job_batch_id,
+                        diagnostics=diagnostics,
+                        errors=failure_errors,
+                        year=failure_year,
+                    )
 
                 async with async_session() as status_db:
                     if job_batch_id is not None:

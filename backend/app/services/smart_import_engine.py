@@ -22,6 +22,20 @@ from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
+class SmartImportError(ValueError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        diagnostics: list[dict] | None = None,
+        errors: list[str] | None = None,
+        year: int | None = None,
+    ):
+        super().__init__(message)
+        self.diagnostics = diagnostics or []
+        self.errors = errors or []
+        self.year = year
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. 智能表头检测与合并
 # ─────────────────────────────────────────────────────────────────────────────
@@ -347,6 +361,17 @@ def _detect_missing_fields(data_type: str, matched_fields: set[str]) -> tuple[li
         if not any(field in matched_fields for field in candidates)
     ]
     return missing_required, missing_recommended
+
+
+def _build_missing_required_import_error(data_type: str, missing_fields: list[str], source_label: str | None = None) -> str:
+    display_name = {
+        "balance": "余额表",
+        "ledger": "序时账",
+        "account_chart": "科目表",
+    }.get(data_type, "工作表")
+    prefix = f"{source_label} " if source_label else ""
+    field_labels = [FIELD_LABELS.get(field, field) for field in missing_fields]
+    return f"{prefix}{display_name}缺少必需列: {', '.join(field_labels)}"
 
 
 def smart_match_column(header: str) -> Optional[str]:
@@ -1187,7 +1212,7 @@ def validate_four_tables(
     findings = []
 
     # ── 1. 科目余额表内部勾稽 ──
-    bal_map = {}  # account_code -> {opening, debit, credit, closing}
+    bal_map = {}  # account_code → {opening, debit, credit, closing}
     bal_errors = 0
     for r in balance_rows:
         code = r["account_code"]
@@ -1274,7 +1299,7 @@ def validate_four_tables(
                          "detail": {"total": len(aux_codes), "match": len(aux_codes)}})
 
     # ── 4. 序时账 vs 科目余额表 ──
-    led_by_code: dict[str, list[Decimal]] = {}  # code -> [debit_sum, credit_sum]
+    led_by_code: dict[str, list[Decimal]] = {}  # code → [debit_sum, credit_sum]
     for r in ledger_rows:
         code = r["account_code"]
         if code not in led_by_code:
@@ -1951,6 +1976,7 @@ async def write_four_tables(
     progress_callback=None,  # (stage, current, total, message) -> None
 ) -> dict[str, int]:
     """将四表数据写入数据库。返回 {data_type: record_count}。"""
+    raise RuntimeError("write_four_tables 已废弃，请改用 smart_import_streaming 或 LedgerImportApplicationService")
     import uuid as _uuid
     import sqlalchemy as sa
     from app.models.audit_platform_models import (
@@ -2072,7 +2098,6 @@ async def write_four_tables(
                         "import_batch_id": aux_batch.id, "is_deleted": False,
                         "aux_type": dim["aux_type"], "aux_code": dim["aux_code"], "aux_name": dim["aux_name"],
                         "aux_dimensions_raw": aux_dim_str,
-                        **row,
                     })
 
             # 分块写入（增大到 50000 减少 INSERT 次数）
@@ -2238,7 +2263,7 @@ async def _stream_csv_import(
     mapped_fields = set(column_mapping.values())
     dt = _guess_data_type(mapped_fields)
     miss_req, miss_rec = _detect_missing_fields(dt, mapped_fields)
-
+ 
     diag = {
         "file": filename, "sheet": "CSV", "data_type": dt,
         "row_count": 0, "header_count": 1,
@@ -2246,13 +2271,21 @@ async def _stream_csv_import(
         "missing_cols": miss_req, "missing_recommended": miss_rec,
         "column_mapping": column_mapping,
         "status": "ok",
+        # 以下字段供前端手动映射调整和企业信息展示
+        "raw_headers": raw_headers,
+        "headers": headers,
+        "preview_rows_data": [],
+        "company_code": "",
+        "year": "",
+        "wide_table_detected": False,
+        "content_inferred": {},
     }
 
-    if dt == "account_chart" and miss_req:
-        diag["status"] = "skipped"
-        diag["message"] = f"CSV 科目表缺少必需列: {', '.join(miss_req)}"
-        return {"diag": diag, "errors": []}
-
+    if dt in ("ledger", "balance", "account_chart") and miss_req:
+        diag["status"] = "error"
+        diag["message"] = _build_missing_required_import_error(dt, miss_req, "CSV")
+        return {"diag": diag, "errors": [f"{filename}: {diag['message']}"]}
+ 
     if dt not in ("ledger", "balance", "account_chart"):
         diag["status"] = "skipped"
         diag["message"] = f"CSV 未识别的数据类型: {dt}"
@@ -2298,7 +2331,7 @@ async def _stream_csv_import(
             for row in led:
                 adim = row.pop("_aux_dim_str", "")
                 led_rows.append(row)
-                if adim and (":" in adim or "\uff1a" in adim):
+                if adim and (":" in adim or "：" in adim):
                     for dim in parse_aux_dimensions(adim):
                         aux_rows.append({
                             **row,
@@ -2538,15 +2571,6 @@ async def smart_import_streaming(
                 )
                 .values(is_deleted=True)
             )
-            await db.execute(
-                sa.update(tbl)
-                .where(
-                    tbl.c.project_id == project_id,
-                    tbl.c.year == year,
-                    tbl.c.import_batch_id == batches[dt_key].id,
-                )
-                .values(is_deleted=False)
-            )
 
         ac_tbl = AccountChart.__table__
         await db.execute(
@@ -2658,7 +2682,7 @@ async def smart_import_streaming(
                 data_only=True,
             )
         except Exception as e:
-            diagnostics.append({"file": filename, "sheet": None, "status": "error", "message": f"无法打开: {e}"})
+            diagnostics.append({"file": filename, "sheet": None, "status": "error", "message": f"无法打开文件: {e}"})
             errors.append(f"无法打开 {filename}: {e}")
             continue
 
@@ -2695,10 +2719,11 @@ async def smart_import_streaming(
                 "status": "ok",
             }
 
-            if dt == "account_chart" and miss_req:
-                diag["status"] = "skipped"
-                diag["message"] = f"科目表缺少必需列: {', '.join(miss_req)}"
+            if dt in ("ledger", "balance", "account_chart") and miss_req:
+                diag["status"] = "error"
+                diag["message"] = _build_missing_required_import_error(dt, miss_req)
                 diagnostics.append(diag)
+                errors.append(f"{filename}/{sname}: {diag['message']}")
                 continue
 
             if dt == "balance":
@@ -2834,7 +2859,12 @@ async def smart_import_streaming(
             batch.status = ImportStatus.failed
             batch.completed_at = datetime.utcnow()
         await db.commit()
-        raise ValueError("；".join(errors[:5]))
+        raise SmartImportError(
+            "；".join(errors[:5]),
+            diagnostics=diagnostics,
+            errors=errors,
+            year=year,
+        )
 
     staged_total = sum(counts.values()) + len(acct_records)
     if staged_total <= 0:
@@ -2843,7 +2873,12 @@ async def smart_import_streaming(
             batch.status = ImportStatus.failed
             batch.completed_at = datetime.utcnow()
         await db.commit()
-        raise ValueError("未解析到可导入的数据，请确认文件内容、sheet 类型与列映射")
+        raise SmartImportError(
+            "未解析到可导入的数据，请确认文件内容、sheet 类型与列映射",
+            diagnostics=diagnostics,
+            errors=errors,
+            year=year,
+        )
 
     account_ids: list[UUID] = []
     if acct_records:
