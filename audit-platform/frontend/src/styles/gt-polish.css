@@ -232,7 +232,12 @@
 }
 
 .el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 1px var(--gt-color-primary), 0 0 0 3px rgba(75, 45, 119, 0.1) !important;
+  box-shadow: 0 0 0 1px var(--gt-color-primary-light) !important;
+}
+
+/* 去掉浏览器原生 input focus outline */
+.el-input__inner:focus {
+  outline: none !important;
 }
 
 /* 搜索框 — 圆角更大 */

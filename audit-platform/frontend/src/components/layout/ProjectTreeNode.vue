@@ -50,7 +50,6 @@
             />
             <el-button
               class="gt-node-action-inline gt-node-action--danger"
-              type="danger"
               :icon="Delete"
               size="small"
               text

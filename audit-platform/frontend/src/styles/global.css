@@ -274,7 +274,7 @@ body {
   box-shadow: 0 0 0 1px var(--gt-color-primary-lighter) !important;
 }
 .el-input__wrapper.is-focus {
-  box-shadow: var(--gt-focus-ring) !important;
+  box-shadow: 0 0 0 1px var(--gt-color-primary-light) !important;
 }
 
 /* 警告提示 */

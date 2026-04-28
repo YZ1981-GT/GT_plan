@@ -32,7 +32,7 @@ from app.services.ai_service import AIService, AIServiceUnavailableError
 
 try:
     from paddleocr import PaddleOCR
-except ImportError:
+except Exception:
     PaddleOCR = None  # type: ignore
 
 from app.models import (

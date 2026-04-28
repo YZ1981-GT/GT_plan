@@ -1,0 +1,119 @@
+openapi: 3.0.3
+info:
+  title: Phase14 Gate Engine API
+  version: 0.2.0
+tags:
+  - name: GateEngine
+servers:
+  - url: /api
+paths:
+  /gate/evaluate:
+    post:
+      tags: [GateEngine]
+      summary: Evaluate gate rules for submit/sign/export
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GateEvaluateRequest"
+            examples:
+              submitReview:
+                value:
+                  gate_type: submit_review
+                  project_id: "8aab6f73-6d84-4aa3-9f4f-2a6fd8d7d7c1"
+                  wp_id: "1fdbce8b-3061-48d6-b6f9-cf51554f3c01"
+                  actor_id: "b6f2e2b3-5f43-4121-9f61-df7240c96a6c"
+                  context:
+                    note_version: 12
+                    snapshot_id: "snap_20260428_1015"
+      responses:
+        "200":
+          description: Evaluation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GateEvaluateResponse"
+              examples:
+                blocked:
+                  value:
+                    decision: block
+                    hit_rules:
+                      - rule_code: QC-23
+                        error_code: QC_LLM_PENDING_CONFIRMATION
+                        severity: blocking
+                        message: "LLM key content has pending confirmation."
+                        location:
+                          wp_id: "1fdbce8b-3061-48d6-b6f9-cf51554f3c01"
+                          section: "audit_explanation"
+                        suggested_action: "Confirm or reject pending LLM items."
+                    trace_id: "trc_20260428_abc123"
+        "400":
+          description: Invalid context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Gate blocked by rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    GateEvaluateRequest:
+      type: object
+      required: [gate_type, project_id, actor_id]
+      properties:
+        gate_type:
+          type: string
+          enum: [submit_review, sign_off, export_package]
+        project_id:
+          type: string
+          format: uuid
+        wp_id:
+          type: string
+          format: uuid
+        actor_id:
+          type: string
+          format: uuid
+        context:
+          type: object
+          additionalProperties: true
+    GateRuleHit:
+      type: object
+      required: [rule_code, error_code, severity, message]
+      properties:
+        rule_code: { type: string }
+        error_code: { type: string }
+        severity:
+          type: string
+          enum: [blocking, warning, info]
+        message: { type: string }
+        location:
+          type: object
+          additionalProperties: true
+        suggested_action: { type: string }
+    GateEvaluateResponse:
+      type: object
+      required: [decision, hit_rules, trace_id]
+      properties:
+        decision:
+          type: string
+          enum: [allow, warn, block]
+        hit_rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/GateRuleHit"
+        trace_id: { type: string }
+    ErrorResponse:
+      type: object
+      required: [error_code, message, trace_id]
+      properties:
+        error_code: { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+        trace_id: { type: string }

@@ -8,10 +8,10 @@
         </el-button>
         <el-button
           v-if="checkedIds.length > 0"
-          type="danger"
           size="small"
-          plain
+          text
           @click="confirmBatchDelete"
+          style="color: var(--gt-color-text-secondary)"
         >
           <el-icon><Delete /></el-icon> 删除选中 ({{ checkedIds.length }})
         </el-button>

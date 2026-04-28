@@ -1,0 +1,158 @@
+openapi: 3.0.3
+info:
+  title: Phase15 Task Tree & Event Orchestration API
+  version: 0.2.0
+tags:
+  - name: TaskTree
+  - name: TaskEvents
+servers:
+  - url: /api
+paths:
+  /task-tree:
+    get:
+      tags: [TaskTree]
+      summary: Query task tree by project and filters
+      parameters:
+        - in: query
+          name: project_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: root_level
+          schema: { type: string, enum: [unit, account, workpaper, evidence] }
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, in_progress, blocked, done] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Tree result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskTreeListResponse"
+  /task-tree/reassign:
+    post:
+      tags: [TaskTree]
+      summary: Reassign a task node and propagate ownership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskReassignRequest"
+      responses:
+        "200":
+          description: Reassigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskNodeResponse"
+        "409":
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /task-events/replay:
+    post:
+      tags: [TaskEvents]
+      summary: Replay failed event from compensation queue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventReplayRequest"
+      responses:
+        "200":
+          description: Replay accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventReplayResponse"
+        "429":
+          description: Replay limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    TaskNode:
+      type: object
+      required: [id, project_id, node_level, status, ref_id]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        node_level:
+          type: string
+          enum: [unit, account, workpaper, evidence]
+        parent_id: { type: string, format: uuid }
+        ref_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [pending, in_progress, blocked, done]
+        assignee_id: { type: string, format: uuid }
+        due_at: { type: string, format: date-time }
+        meta:
+          type: object
+          additionalProperties: true
+    TaskTreeListResponse:
+      type: object
+      required: [items, total, page, page_size, trace_id]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskNode"
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+        trace_id: { type: string }
+    TaskReassignRequest:
+      type: object
+      required: [task_node_id, assignee_id, operator_id, reason_code]
+      properties:
+        task_node_id: { type: string, format: uuid }
+        assignee_id: { type: string, format: uuid }
+        operator_id: { type: string, format: uuid }
+        reason_code: { type: string }
+    TaskNodeResponse:
+      type: object
+      required: [item, trace_id]
+      properties:
+        item:
+          $ref: "#/components/schemas/TaskNode"
+        trace_id: { type: string }
+    EventReplayRequest:
+      type: object
+      required: [event_id, operator_id, reason_code]
+      properties:
+        event_id: { type: string, format: uuid }
+        operator_id: { type: string, format: uuid }
+        reason_code: { type: string }
+    EventReplayResponse:
+      type: object
+      required: [event_id, status, trace_id]
+      properties:
+        event_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [queued, replaying, succeeded, failed]
+        trace_id: { type: string }
+    ErrorResponse:
+      type: object
+      required: [error_code, message, trace_id]
+      properties:
+        error_code: { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+        trace_id: { type: string }

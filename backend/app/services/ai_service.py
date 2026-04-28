@@ -22,7 +22,7 @@ import httpx
 
 try:
     import paddleocr  # type: ignore
-except ImportError:
+except Exception:
     paddleocr = None  # type: ignore
 
 from sqlalchemy import select, update

@@ -1,0 +1,195 @@
+openapi: 3.0.3
+info:
+  title: Phase16 Evidence Package & Version Line API
+  version: 0.2.0
+tags:
+  - name: VersionLine
+  - name: EvidenceIntegrity
+  - name: OfflineConflicts
+servers:
+  - url: /api
+paths:
+  /version-line/{project_id}:
+    get:
+      tags: [VersionLine]
+      summary: Get version lineage for a project
+      parameters:
+        - in: path
+          name: project_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Version line data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionLineResponse"
+  /exports/{export_id}/integrity:
+    get:
+      tags: [EvidenceIntegrity]
+      summary: Get evidence package integrity check result
+      parameters:
+        - in: path
+          name: export_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Integrity report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrityResponse"
+  /offline/conflicts/detect:
+    post:
+      tags: [OfflineConflicts]
+      summary: Detect offline conflicts at procedure+field granularity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConflictDetectRequest"
+      responses:
+        "200":
+          description: Conflicts list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictDetectResponse"
+  /offline/conflicts/resolve:
+    post:
+      tags: [OfflineConflicts]
+      summary: Resolve one offline conflict and trigger QC replay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConflictResolveRequest"
+      responses:
+        "200":
+          description: Conflict resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictResolveResponse"
+        "409":
+          description: Conflict already resolved or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    VersionLineNode:
+      type: object
+      required: [id, object_type, object_id, version_no, trace_id]
+      properties:
+        id: { type: string, format: uuid }
+        object_type:
+          type: string
+          enum: [report, note, workpaper, procedure]
+        object_id: { type: string, format: uuid }
+        version_no: { type: integer }
+        source_snapshot_id: { type: string }
+        trace_id: { type: string }
+        created_at: { type: string, format: date-time }
+    VersionLineResponse:
+      type: object
+      required: [project_id, items, trace_id]
+      properties:
+        project_id: { type: string, format: uuid }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/VersionLineNode"
+        trace_id: { type: string }
+    IntegrityFileCheck:
+      type: object
+      required: [file_path, sha256, check_status]
+      properties:
+        file_path: { type: string }
+        sha256: { type: string }
+        signature_digest: { type: string }
+        check_status:
+          type: string
+          enum: [passed, failed]
+    IntegrityResponse:
+      type: object
+      required: [export_id, manifest_hash, file_checks, trace_id]
+      properties:
+        export_id: { type: string, format: uuid }
+        manifest_hash: { type: string }
+        file_checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrityFileCheck"
+        trace_id: { type: string }
+    ConflictItem:
+      type: object
+      required: [id, procedure_id, field_name, status]
+      properties:
+        id: { type: string, format: uuid }
+        procedure_id: { type: string, format: uuid }
+        field_name: { type: string }
+        local_value:
+          type: object
+          additionalProperties: true
+        remote_value:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [open, resolved, rejected]
+        trace_id: { type: string }
+    ConflictDetectRequest:
+      type: object
+      required: [project_id, wp_id]
+      properties:
+        project_id: { type: string, format: uuid }
+        wp_id: { type: string, format: uuid }
+    ConflictDetectResponse:
+      type: object
+      required: [items, total, trace_id]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConflictItem"
+        total: { type: integer }
+        trace_id: { type: string }
+    ConflictResolveRequest:
+      type: object
+      required: [conflict_id, resolution, resolver_id, reason_code]
+      properties:
+        conflict_id: { type: string, format: uuid }
+        resolution:
+          type: string
+          enum: [accept_local, accept_remote, manual_merge]
+        merged_value:
+          type: object
+          additionalProperties: true
+        resolver_id: { type: string, format: uuid }
+        reason_code: { type: string }
+    ConflictResolveResponse:
+      type: object
+      required: [conflict_id, status, qc_replay_job_id, trace_id]
+      properties:
+        conflict_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [resolved, rejected]
+        qc_replay_job_id: { type: string }
+        trace_id: { type: string }
+    ErrorResponse:
+      type: object
+      required: [error_code, message, trace_id]
+      properties:
+        error_code: { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true
+        trace_id: { type: string }
