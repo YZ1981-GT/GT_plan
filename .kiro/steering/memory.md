@@ -1528,3 +1528,10 @@ inclusion: always
 - 公式分层保护已完成（2026-04-29，commit c358920已推送）：FormulaManagerDialog新增isPresetFormula()判断（source以check_presets.开头或为试算表审定数/报表行次引用），预设公式行显示灰色"预设"标签不可编辑，用户自定义公式行保留编辑/保存按钮
 - 公式预设可编辑修正（2026-04-29，commit 646eb9d已推送）：预设公式允许用户修改（按钮文字"修改"区别于自定义的"编辑"），来源列显示蓝色"预设"标签+来源文字；用户偏好确认：预设公式都可以预设好但不一定准确，不同项目结构不同需要用户自行修改
 - 公式体系复盘发现5个待改进问题（2026-04-29）：①公式执行没有依赖排序（合计行可能在子项之前执行导致结果错误）②公式执行结果没有校验反馈（用户不知道哪些公式异常）③底稿页面没有接入公式管理④合并差额表页面没有公式查看入口⑤公式变更没有审计留痕（合规要求）
+- 公式体系5项优化已完成（2026-04-29，commit 4377fb6已推送）：①_topological_sort_formulas Kahn算法拓扑排序（vertical_sum依赖子项行，horizontal_balance依赖cell引用，循环依赖降级追加末尾）②execute_note_formulas返回results列表（每个公式old/new/status）+anomalies异常检测（合计行为0报异常）③底稿公式由ONLYOFFICE插件处理暂不接入全局管理④差额表net_difference固定公式只读⑤report_config_service.update_config新增user_id参数+写入Log表（action=formula_updated，_diff记录old→new+row_code/row_name/report_type）
+
+## 本轮工作总结（2026-04-29 完整会话）
+- 共18个commit（cc8f47d→4377fb6），全部已推送GitHub
+- 完成内容：企业级加固12项(P0-P2)+Phase17数据集版本治理+账表导入企业级改造+跨阶段修复+全流程断点修复(P0+P1)+报表结构补全(4套624行)+公式体系完整建设(三分类+跨表引用+可视化选择器+依赖排序+审计留痕)
+- 当前系统状态：627路由正常加载、15+测试通过、审计员8步全流程理论可走通、复核流程端到端可走通、公式体系完整、报表结构致同标准4套
+- 代码层面可做的已全部完成，下一步需要运行环境验证：①执行建表(_init_tables.py+alembic stamp)②加载种子数据(POST /report-config/seed)③导入真实项目数据验证公式④启动vLLM/ONLYOFFICE验证相关功能

@@ -130,7 +130,12 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createCompany, updateCompany, type CompanyCreatePayload, type CompanyUpdatePayload } from '@/services/consolidationApi'
+import { createConsolScope, updateConsolScope, type ConsolScopeItem } from '@/services/consolidationApi'
+
+type CompanyCreatePayload = Partial<ConsolScopeItem>
+type CompanyUpdatePayload = Partial<ConsolScopeItem>
+const createCompany = (projectId: string, data: CompanyCreatePayload) => createConsolScope(projectId, data)
+const updateCompany = (companyId: string, projectId: string, data: CompanyUpdatePayload) => updateConsolScope(companyId, projectId, data)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CompanyFormData {
@@ -290,7 +295,7 @@ async function handleSubmit() {
           functional_currency: form.value.functionalCurrency,
           is_active: true,
         }
-        await createCompany(payload)
+        await createCompany(props.projectId!, payload)
       }
 
       ElMessage.success(isEdit.value ? '更新成功' : '创建成功')

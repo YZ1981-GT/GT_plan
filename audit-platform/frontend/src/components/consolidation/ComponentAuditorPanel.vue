@@ -256,7 +256,7 @@ function qualificationLabel(rating: string): string {
 }
 
 // ─── Status Helpers ──────────────────────────────────────────────────────────
-function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+function statusTagType(status: string | undefined): '' | 'success' | 'warning' | 'info' | 'danger' {
   const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = {
     active: 'success',
     inactive: 'info',
@@ -264,10 +264,10 @@ function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'd
     in_progress: 'warning',
     completed: 'success',
   }
-  return map[status] || ''
+  return map[status || ''] || ''
 }
 
-function statusLabel(status: string): string {
+function statusLabel(status: string | undefined): string {
   const map: Record<string, string> = {
     active: '活跃',
     inactive: '非活跃',
@@ -275,7 +275,7 @@ function statusLabel(status: string): string {
     in_progress: '进行中',
     completed: '已完成',
   }
-  return map[status] || status
+  return map[status || ''] || status || ''
 }
 
 function instructionStatusType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {

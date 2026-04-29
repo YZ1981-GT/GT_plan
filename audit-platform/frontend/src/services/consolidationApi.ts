@@ -16,6 +16,9 @@ export interface ConsolScopeItem {
   consol_method: string
   is_included: boolean
   scope_change_type?: string
+  acquisition_date?: string
+  parent_code?: string
+  functional_currency?: string
 }
 
 export interface ConsolScopeSummary {
@@ -96,12 +99,17 @@ export interface ComponentAuditor {
   project_id: string
   firm_name: string
   contact_person?: string
+  auditor_name?: string
+  auditor_email?: string
+  component_name?: string
+  scope?: string
   status?: string
 }
 
 export interface Instruction {
   id: string
   component_auditor_id: string
+  instruction_no?: string
   status: string
   content?: string
 }
@@ -109,8 +117,12 @@ export interface Instruction {
 export interface InstructionResult {
   id: string
   component_auditor_id: string
+  instruction_id?: string
+  result_no?: string
   evaluation_status: string
   opinion_type?: string
+  status?: string
+  content?: string
 }
 
 export interface ComponentDashboard {
@@ -316,6 +328,14 @@ export async function getResults(projectId: string, auditorId?: string): Promise
   let url = `/api/consolidation/component-auditor/results?project_id=${projectId}`
   if (auditorId) url += `&auditor_id=${auditorId}`
   return api.get(url)
+}
+
+export async function createResult(projectId: string, data: any): Promise<InstructionResult> {
+  return api.post(`/api/consolidation/component-auditor/results?project_id=${projectId}`, data)
+}
+
+export async function updateResult(resultId: string, projectId: string, data: any): Promise<InstructionResult> {
+  return api.put(`/api/consolidation/component-auditor/results/${resultId}?project_id=${projectId}`, data)
 }
 
 export async function getComponentDashboard(projectId: string): Promise<ComponentDashboard> {
