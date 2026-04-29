@@ -49,13 +49,16 @@ class ConfirmTemplateRequest(BaseModel):
 async def upload_and_parse(
     project_id: UUID,
     file: UploadFile = File(...),
+    max_rows: int = Query(default=5000, ge=100, le=50000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """上传 Excel → 解析为 structure.json + 返回 HTML 预览
 
-    用户上传 Excel 文档，自动解析为结构化数据，
-    返回 HTML 预览供用户在线编辑确认。
+    大文件处理策略：
+    - <10MB: 同步解析，直接返回 HTML 预览
+    - >=10MB: 同步解析但 HTML 预览分页（首页500行）
+    - max_rows 参数控制最大解析行数（默认5000，序时账用流式导入不走此接口）
     """
     if not file.filename or not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx/.xls 文件")
@@ -69,9 +72,12 @@ async def upload_and_parse(
     content = await file.read()
     excel_path.write_bytes(content)
 
+    file_size_mb = len(content) / 1024 / 1024
+    is_large = file_size_mb >= 10
+
     # 解析为 structure.json
     try:
-        structure = excel_to_structure(str(excel_path))
+        structure = excel_to_structure(str(excel_path), max_rows=max_rows)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Excel 解析失败: {e}")
 
@@ -80,8 +86,17 @@ async def upload_and_parse(
     structure_path = project_dir / f"{stem}.structure.json"
     structure_path.write_text(json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # 生成 HTML 预览
-    html = structure_to_html(structure, editable=True)
+    # 生成 HTML 预览（大文件分页，只渲染首页）
+    total_rows = 0
+    if structure.get("sheets"):
+        sheet = structure["sheets"][0]
+        rows_meta = sheet.get("rows", [])
+        total_rows = len(rows_meta) if rows_meta else len(sheet.get("cells", {}))
+
+    if is_large or total_rows > 500:
+        html = structure_to_html(structure, editable=True, page=1, page_size=500)
+    else:
+        html = structure_to_html(structure, editable=True)
 
     # 保存 HTML
     html_path = project_dir / f"{stem}.html"
@@ -89,13 +104,16 @@ async def upload_and_parse(
 
     return {
         "file_name": file.filename,
+        "file_size_mb": round(file_size_mb, 1),
         "structure_path": str(structure_path),
         "excel_path": str(excel_path),
         "html_path": str(html_path),
         "sheet_count": len(structure.get("sheets", [])),
         "sheets": [{"name": s["name"], "cells": len(s.get("cells", {}))} for s in structure.get("sheets", [])],
+        "total_rows": total_rows,
+        "is_large": is_large or total_rows > 500,
         "html_preview": html,
-        "message": "Excel 解析成功，请在线编辑确认",
+        "message": f"Excel 解析成功（{total_rows}行），{'大文件已分页显示首500行' if is_large or total_rows > 500 else '请在线编辑确认'}",
     }
 
 
@@ -105,17 +123,35 @@ async def get_html_preview(
     file_stem: str,
     sheet_index: int = Query(default=0),
     editable: bool = Query(default=True),
+    page: int = Query(default=0, description="分页页码（0=不分页，1=第一页）"),
+    page_size: int = Query(default=500, ge=50, le=5000),
     current_user: User = Depends(get_current_user),
 ):
-    """获取 HTML 预览（可编辑模式）"""
+    """获取 HTML 预览（可编辑模式，支持大表格分页）"""
     structure_path = Path("storage") / "projects" / str(project_id) / "excel_html" / f"{file_stem}.structure.json"
     if not structure_path.exists():
         raise HTTPException(status_code=404, detail="结构文件不存在")
 
     structure = json.loads(structure_path.read_text(encoding="utf-8"))
-    html = structure_to_html(structure, sheet_index=sheet_index, editable=editable)
+    html = structure_to_html(structure, sheet_index=sheet_index, editable=editable, page=page, page_size=page_size)
 
-    return {"html": html, "sheet_index": sheet_index, "version": structure.get("metadata", {}).get("version", 1)}
+    # 返回分页元数据
+    sheets = structure.get("sheets", [])
+    total_rows = 0
+    if sheet_index < len(sheets):
+        sheet = sheets[sheet_index]
+        rows_meta = sheet.get("rows", [])
+        total_rows = len(rows_meta) if rows_meta else len(sheet.get("cells", {}))
+
+    return {
+        "html": html,
+        "sheet_index": sheet_index,
+        "version": structure.get("metadata", {}).get("version", 1),
+        "total_rows": total_rows,
+        "page": page,
+        "page_size": page_size,
+        "is_large": total_rows > 500,
+    }
 
 
 @router.post("/save-edits/{file_stem}")

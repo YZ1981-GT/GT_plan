@@ -37,13 +37,13 @@ _logger = logging.getLogger(__name__)
 
 # ═══ Excel → structure.json ═══
 
-def excel_to_structure(file_path: str, max_rows: int = 200, max_cols: int = 30) -> dict:
+def excel_to_structure(file_path: str, max_rows: int = 5000, max_cols: int = 50) -> dict:
     """解析 Excel 文件为 structure.json 格式
 
     Args:
         file_path: Excel 文件路径
-        max_rows: 最大解析行数（防止大文件卡死）
-        max_cols: 最大解析列数
+        max_rows: 最大解析行数（默认5000，底稿/附注足够；序时账用流式导入不走此接口）
+        max_cols: 最大解析列数（默认50）
 
     Returns:
         structure.json 字典
@@ -124,8 +124,19 @@ def excel_to_structure(file_path: str, max_rows: int = 200, max_cols: int = 30) 
 
 # ═══ structure.json → HTML ═══
 
-def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = False) -> str:
+def structure_to_html(
+    structure: dict,
+    sheet_index: int = 0,
+    editable: bool = False,
+    page: int = 0,
+    page_size: int = 500,
+) -> str:
     """将 structure.json 渲染为 HTML 表格
+
+    大表格分页渲染：
+    - page=0 表示不分页（渲染全部，适用于小表格<500行）
+    - page>=1 表示分页模式，每页 page_size 行
+    - 返回的 HTML 包含分页元数据（data-total-rows/data-page/data-page-size）
 
     Args:
         structure: structure.json 字典
@@ -157,8 +168,20 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
                     skip_cells.add(f"{r}:{c}")
 
     # 确定表格尺寸
-    max_row = len(rows) if rows else _get_max_dimension(cells, 0)
+    total_rows = len(rows) if rows else _get_max_dimension(cells, 0)
     max_col = len(cols) if cols else _get_max_dimension(cells, 1)
+
+    # 分页逻辑
+    if page >= 1 and total_rows > page_size:
+        start_row = (page - 1) * page_size
+        end_row = min(start_row + page_size, total_rows)
+        max_row = end_row - start_row
+        total_pages = (total_rows + page_size - 1) // page_size
+    else:
+        start_row = 0
+        end_row = total_rows
+        max_row = total_rows
+        total_pages = 1
 
     # 生成 HTML
     html_parts = [
@@ -175,7 +198,7 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
         '.gt-excel-table .gt-row-header { background: #f8f8f8; text-align: center; font-size: 9px; color: #909399; width: 30px; min-width: 30px; user-select: none; }',
         '.gt-excel-table .gt-col-header { background: #f8f8f8; text-align: center; font-size: 9px; color: #909399; height: 20px; user-select: none; }',
         '</style>',
-        '<table class="gt-excel-table" border="1" cellspacing="0" cellpadding="4">',
+        f'<table class="gt-excel-table" border="1" cellspacing="0" cellpadding="4" data-total-rows="{total_rows}" data-page="{page}" data-page-size="{page_size}" data-total-pages="{total_pages}">',
     ]
 
     # 列头行（A, B, C...）— 仅编辑模式显示
@@ -196,7 +219,8 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
             html_parts.append(f'<col style="width:{col.get("width", 80)}px">')
         html_parts.append("</colgroup>")
 
-    for r in range(max_row):
+    for r_offset in range(max_row):
+        r = start_row + r_offset  # 实际行号（分页偏移）
         row_height = rows[r].get("height", 20) if r < len(rows) else 20
         html_parts.append(f'<tr style="height:{row_height}px">')
 
