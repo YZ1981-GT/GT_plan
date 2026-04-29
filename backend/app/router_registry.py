@@ -96,10 +96,13 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.wp_explanation import router as wpexpl_router
     from app.routers.background_jobs import router as bgjob_router
 
+    # 底稿通用数据规则
+    from app.routers.wp_data_rules import router as wpdr_router
+
     for r in [formula_router, wpt_router, wp_router, qc_router, wpr_router,
               wpm_router, wpp_router, wpai_router, wps_router, wpd_router,
               wpc_router, samp_router, sampe_router, wsum_router, pr_router,
-              rconv_router, ann_router, wpexpl_router, bgjob_router]:
+              rconv_router, ann_router, wpexpl_router, bgjob_router, wpdr_router]:
         app.include_router(r, tags=["底稿管理"])
 
     # ═══ 6. 合并报表 ═══
