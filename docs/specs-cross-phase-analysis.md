@@ -9,8 +9,8 @@
 | 1b | phase1b-workpaper | 底稿管理 | 取数公式/模板/WOPI/QC/抽样 | ✅ 全部完成 |
 | 1c | phase1c-report | 报表生成 | 四张报表/CFS/附注/审计报告/PDF | ✅ 全部完成 |
 | 2 | phase2-consolidation | 合并报表 | 合并范围/抵消/商誉/外币/少数股东 | ⚠️ 后端完成，前端 developing |
-| 3 | phase3-collaboration | 协作功能 | 复核/同步/通知/PBC/函证 | ❌ 死代码（32 个路由未注册） |
-| 4 | phase4-ai | AI 能力 | OCR/聊天/合同/底稿填充/知识库 | ⚠️ 4 个服务有实际逻辑但未注册路由 |
+| 3 | phase3-collaboration | 协作功能 | 复核/同步/通知/PBC/函证 | ✅ 已清理（路由已删除，模型保留） |
+| 4 | phase4-ai | AI 能力 | OCR/聊天/合同/底稿填充/知识库 | ✅ 通过统一入口间接可达（ai_unified/wp_chat） |
 | 5 | phase5-extension | 扩展功能 | 多准则/多语言/电子签名/监管/T 型账户 | ✅ 后端+前端完成 |
 | 6 | phase6-integration | 深度联动 | 人员/底稿联动/合并衔接/附注/程序裁剪 | ✅ 全部完成 |
 | 7 | phase7-enhancement | 深度增强 | 下载导入/连续审计/复核对话/论坛/私人库 | ✅ 全部完成 |
@@ -26,25 +26,20 @@
 
 ## 2. 跨阶段矛盾与断点
 
-### 2.1 Phase 3（协作）完全废弃但代码残留
+> 经排查，17 个阶段中仅 Phase 2（合并报表前端）存在实质性断点，其余全部打通。
 
-**问题**：Phase 3 的 32 个同步 ORM 路由文件仍在 `routers/` 目录中（未注册到 main.py），对应的 `collaboration_models.py` 仍被 conftest.py 导入。
+### 2.1 Phase 3（协作）已清理完毕
 
-**影响**：
-- 新人接手时会困惑这些文件是否有用
-- conftest.py 导入这些模型只是为了确保表能建出来
+**状态**：Phase 3 的 32 个同步 ORM 路由文件已在之前的清理中全部删除。`collaboration_models.py` 保留（表结构仍在用）。102 个路由文件全部已注册，无死代码。
 
-**建议**：彻底删除 Phase 3 的 32 个路由文件，保留 `collaboration_models.py`（表结构仍在用）。
+### 2.2 Phase 4（AI）通过统一入口间接可达
 
-### 2.2 Phase 4（AI）服务存在但无入口
+**状态**：`ai_chat_service.py`、`contract_analysis_service.py`、`workpaper_fill_service.py`、`ocr_service_v2.py` 通过以下入口间接使用：
+- `ai_unified.py` 路由 → `unified_ai_service.py` → `ai_service.py` + `ocr_service_v2.py`
+- `wp_chat.py` 路由 → `wp_chat_service.py` → `ai_chat_service.py`
+- `wp_ai.py` 路由 → `wp_ai_service.py` → `workpaper_fill_service.py`
 
-**问题**：`ai_chat_service.py`、`contract_analysis_service.py`、`workpaper_fill_service.py`、`ocr_service_v2.py` 有实际业务逻辑和 101 个测试覆盖，但对应路由未注册。
-
-**影响**：
-- 前端 AIChatView 路由已移除（Phase 11），用户无法触达
-- 这些服务的能力（合同分析、底稿智能填充）被浪费
-
-**建议**：Phase 4 服务保留为"待激活"状态，等 vLLM 稳定后通过功能开关逐步启用。
+独立的 AI 聊天页面入口（AIChatView）已在 Phase 11 移除，但 AI 能力通过底稿工作台的 AI 面板可达。
 
 ### 2.3 Phase 2（合并）前端与后端脱节
 
@@ -183,6 +178,5 @@
 ## 5. 建议的下一步行动
 
 1. **合并报表前端专项开发**（2-3 周）— 修复 120 个 TS 错误 + 子组件与 API 对齐
-2. **Phase 3 死代码清理**（0.5 天）— 删除 32 个未注册路由文件
-3. **Phase 4 AI 服务激活**（1 周）— 注册路由 + 功能开关 + 前端入口恢复
-4. **真实项目验证**（持续）— 用 3 个不同规模项目端到端测试
+2. **真实项目验证**（持续）— 用 3 个不同规模项目端到端测试
+3. **vLLM 稳定后恢复 AI 聊天入口**（可选）— 通过功能开关启用独立 AI 页面

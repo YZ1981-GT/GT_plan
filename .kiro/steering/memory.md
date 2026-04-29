@@ -1544,3 +1544,6 @@ inclusion: always
 - 账表导入企业级改造建议文档最终排查（2026-04-29）：8大建议中6项完整完成（统一入口/数据集版本/Durable Job/上传产物/验证报告/事件语义），2项基础到位有环境依赖（安全审计缺Prometheus指标/测试增强缺失败场景+性能基准）；P0落地4项全部完成，P1完成2/3（共享存储仍为本地），P2完成2/3（观测面板缺）；文档保留作为架构参考不删除
 - docs/底稿开发.md(v1,1627行)已删除（2026-04-29，commit bbfaae2），内容被底稿开发_v2.md(9196行)完全覆盖；docs/目录现存：底稿开发_v2.md+账表导入企业级平台下一阶段改造建议.md+ledger-import-large-file-remediation-plan.md+mineru-deployment.md
 - docs/ledger-import-large-file-remediation-plan.md已删除（2026-04-29，commit 86ccb4a），核心修复项已全部实现；docs/目录现存3个文件：底稿开发_v2.md(架构参考)+账表导入企业级平台下一阶段改造建议.md(架构参考)+mineru-deployment.md(运维参考)
+- 16阶段跨阶段分析报告已生成（2026-04-29，commit 541670d已推送）：docs/specs-cross-phase-analysis.md，含阶段命名统一表+3个跨阶段断点+企业级6维度分析+4种角色覆盖+下一步建议
+- 跨阶段分析结论：17个阶段中14个完全完成，3个有问题（Phase2合并前端120个TS错误标记developing/Phase3协作32个死代码路由/Phase4 AI 4个服务待激活）；企业级6维度（可视化7/9+联动7/7+溯源7/7+留痕6/6+人机互动7/7+LLM辅助7/7）；4种角色需求全部覆盖
+- 下一步建议4项：①合并报表前端专项开发(2-3周)②Phase3死代码清理(0.5天)③Phase4 AI服务激活(1周)④真实项目验证(持续)
