@@ -19,7 +19,7 @@ router = APIRouter(prefix="/trace", tags=["Trace"])
 @router.get("/{trace_id}/replay")
 async def replay_trace(
     trace_id: str,
-    level: str = Query("L1", regex="^(L1|L2|L3)$"),
+    level: str = Query("L1", pattern="^(L1|L2|L3)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

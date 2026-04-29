@@ -1470,3 +1470,6 @@ inclusion: always
 - P0全部4项完成并推送（2026-04-29，commit 4e3d5b7）：①附注校验器6个stub做实✅②审计报告新增POST refresh-financial-data端点+前端改用专用端点（降级走重新生成）+auditPlatformApi.ts新增refreshAuditReportFinancialData函数✅③附注Word导出修复：前端从window.open(GET)改为http.post+blob下载（修复POST端点被GET 405）✅④底稿→附注刷新链路验证通过（note_wp_mapping.py prefix=/api/disclosure-notes，前端调用路径匹配）✅
 - 审计员8步工作流后4步断点已全部修复，全流程理论上可走通
 - 断点修复计划P1待做：复核流程端到端验证(2天)+操作diff审计记录(1天)
+- P1全部完成并推送（2026-04-29，commit fa7a4fe）：①WorkpaperList.vue复核批注面板新增"回复"按钮+回复弹窗（showReplyDialog/replyContent/submitReply调用updateAnnotation status=replied）②adjustment_service.py update_entry新增操作diff审计记录（Log表new_value._diff含old_lines/new_lines/old_description/new_description）③复核流程验证结论：ReviewInbox数据来源正确+批注面板完整（新增/回复/解决+门禁联动）+退回原因弹窗已有
+- 审计全流程断点修复计划P0+P1全部完成（6项），仅剩P2 AIChatView标记developing（低优先级，Phase11已有类似处理）
+- 审计员8步全流程+复核流程理论上可端到端走通
