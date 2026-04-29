@@ -269,6 +269,51 @@ def _eq_rows(is_consolidated: bool, is_listed: bool) -> list[dict]:
 # 主函数：生成 4 套报表
 # ═══════════════════════════════════════════════════════════════════
 
+def _categorize_formula(row: dict) -> None:
+    """给每行自动添加公式分类、说明和来源标注。
+
+    三类公式：
+    - auto_calc: 自动运算（从试算表取数或行次求和）
+    - logic_check: 逻辑审核（平衡校验、勾稽关系）
+    - reasonability: 提示合理性（变动率异常、占比异常）
+    """
+    formula = row.get("formula")
+    if not formula:
+        row["formula_category"] = None
+        row["formula_description"] = None
+        row["formula_source"] = None
+        return
+
+    # 分类逻辑
+    if "TB(" in formula or "SUM_TB(" in formula:
+        row["formula_category"] = "auto_calc"
+        row["formula_source"] = "试算表审定数"
+        # 生成说明
+        if "SUM_TB(" in formula:
+            row["formula_description"] = "从试算表按科目范围汇总期末余额"
+        elif " + " in formula or " - " in formula:
+            row["formula_description"] = "从试算表取多个科目余额合计"
+        else:
+            row["formula_description"] = "从试算表取单科目期末余额"
+    elif "ROW(" in formula:
+        row["formula_category"] = "auto_calc"
+        row["formula_source"] = "报表行次引用"
+        if row.get("is_total_row"):
+            row["formula_description"] = "合计行：引用上方明细行求和"
+        else:
+            row["formula_description"] = "引用其他报表行次计算"
+    else:
+        row["formula_category"] = "auto_calc"
+        row["formula_source"] = "自定义公式"
+        row["formula_description"] = "自定义计算公式"
+
+    # 特殊行的逻辑审核标记
+    row_name = row.get("row_name", "")
+    if "合计" in row_name or "总计" in row_name:
+        # 合计行同时具有逻辑审核属性（验证子项之和=合计）
+        pass  # 保持 auto_calc，逻辑审核在校验引擎中处理
+
+
 def generate_all() -> list[dict]:
     """生成致同标准 4 套报表种子数据"""
     configs = [
@@ -288,6 +333,9 @@ def generate_all() -> list[dict]:
             ("equity_change", _eq_rows),
         ]:
             rows = gen_fn(is_consol, is_listed)
+            # 给每行添加公式分类
+            for row in rows:
+                _categorize_formula(row)
             result.append({
                 "report_type": report_type,
                 "applicable_standard": standard,

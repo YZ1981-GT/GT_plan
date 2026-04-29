@@ -1489,3 +1489,5 @@ inclusion: always
 - 报表联动链路确认：report_config→ReportEngine执行公式→trial_balance取数→financial_report表→前端ReportView展示+穿透弹窗；已审/未审报表都从report_config加载行次；合并报表未使用report_config生成行次（断点）
 - 报表溯源能力确认完整：formula_used+source_accounts+drilldown穿透+version_line版本戳+report_snapshot快照
 - 报表结构待修复：①applicable_standard需从项目配置动态获取（project.template_type+report_scope映射到soe_consolidated等）②check_balance的row_code需与新种子数据对齐③合并报表需接入report_config生成合并报表行次
+- 报表结构联动3个问题已修复并推送（2026-04-29，commit ab78a63）：①reports.py新增_resolve_applicable_standard()从Project.template_type+report_scope动态映射到soe_consolidated等4套标准（降级enterprise兼容旧数据），generate_reports端点调用时传入②report_engine.py check_balance()所有row_code改为优先新(BS-039/070/091/099/IS-024/CFS-053)降级旧(BS-021/044/056/057/IS-019/CF-042)③audit_report_service._fetch_financial_data的5个关键指标row_code对齐新种子数据
+- 报表结构完整联动链路已打通：项目配置→_resolve_applicable_standard→_load_report_configs(4套)→执行公式→trial_balance取数→financial_report表→check_balance兼容新旧→前端ReportView展示

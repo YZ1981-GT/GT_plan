@@ -118,6 +118,15 @@ class ReportConfig(Base):
         sa.Integer, server_default=text("0"), nullable=False
     )
     formula: Mapped[str | None] = mapped_column(Text, nullable=True)
+    formula_category: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )  # auto_calc(自动运算) / logic_check(逻辑审核) / reasonability(提示合理性)
+    formula_description: Mapped[str | None] = mapped_column(
+        String(200), nullable=True
+    )  # 公式简短说明
+    formula_source: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # 公式来源标注（如"试算表审定数"/"报表行次引用"/"手工填列"）
     applicable_standard: Mapped[str] = mapped_column(String, nullable=False)
     is_total_row: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False

@@ -63,6 +63,9 @@ class ReportConfigService:
                     row_name=row["row_name"],
                     indent_level=row.get("indent_level", 0),
                     formula=row.get("formula"),
+                    formula_category=row.get("formula_category"),
+                    formula_description=row.get("formula_description"),
+                    formula_source=row.get("formula_source"),
                     applicable_standard=standard,
                     is_total_row=row.get("is_total_row", False),
                     parent_row_code=row.get("parent_row_code"),
@@ -172,7 +175,7 @@ class ReportConfigService:
         if row is None:
             raise ValueError("配置行不存在")
 
-        allowed_fields = {"row_name", "indent_level", "formula", "is_total_row", "parent_row_code"}
+        allowed_fields = {"row_name", "indent_level", "formula", "is_total_row", "parent_row_code", "formula_category", "formula_description", "formula_source"}
         for key, value in updates.items():
             if key in allowed_fields:
                 setattr(row, key, value)

@@ -17,6 +17,7 @@
         <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading" round>一致性校验</el-button>
         <el-button size="small" @click="onExportExcel" round>导出 Excel</el-button>
         <el-button size="small" @click="onEditConfig" round>编辑结构</el-button>
+        <el-button size="small" @click="showFormulaManager = true" round>公式管理</el-button>
       </div>
     </div>
 
@@ -110,6 +111,9 @@
       </div>
       <div v-else v-loading="drilldownLoading" style="min-height: 100px" />
     </el-dialog>
+
+    <!-- 公式管理弹窗 -->
+    <FormulaManagerDialog v-model="showFormulaManager" :rows="rows" @saved="fetchReport" />
   </div>
 </template>
 
@@ -117,6 +121,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import FormulaManagerDialog from '@/components/report/FormulaManagerDialog.vue'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl, getProjectAuditYear,
@@ -156,6 +161,7 @@ const consistencyResult = ref<ReportConsistencyCheck | null>(null)
 const drilldownVisible = ref(false)
 const drilldownLoading = ref(false)
 const drilldownData = ref<ReportDrilldownData | null>(null)
+const showFormulaManager = ref(false)
 
 function fmtAmt(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return '-'
