@@ -150,6 +150,10 @@ def register_all_routers(app: FastAPI) -> None:
               se_router, forum_router]:
         app.include_router(r, tags=["团队与看板"])
 
+    # 角色AI辅助
+    from app.routers.role_ai_features import router as rai_router
+    app.include_router(rai_router, tags=["团队与看板"])
+
     # ═══ 8. 系统管理与扩展 ═══
     from app.routers.gt_coding import router as gtc_router
     from app.routers.t_accounts import router as ta_router
