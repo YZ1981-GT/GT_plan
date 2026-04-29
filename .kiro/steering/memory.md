@@ -1480,3 +1480,6 @@ inclusion: always
 - 报表结构现状分析（2026-04-29）：report_config_seed.json预设简化版（BS 44行/IS 21行/CFS 46行/EQ 10行），与致同标准（BS 70+行/IS 30+行）相比缺失新准则科目（使用权资产/合同资产/合同负债/债权投资/商誉/租赁负债/一年内到期等）；公式语法支持TB/SUM_TB/ROW三种
 - 报表结构自定义能力：已支持clone为项目级配置+修改行名/公式/缩进/合计标记（PUT /report-config/{id}）；未支持新增/删除行次、前端无报表结构编辑UI、不支持拖拽排序、不支持从Excel导入报表结构
 - 报表结构待改进：P0补全BS/IS行次到致同标准（新准则科目）+前端增加编辑入口；P1支持新增/删除行API+前端编辑器+Excel模板导入
+- 报表行次补全到致同标准已完成（2026-04-29，commit 55b13f9已推送）：新增generate_report_seed.py脚本生成4套报表（soe_consolidated/soe_standalone/listed_consolidated/listed_standalone），16个配置块624行；BS含新准则科目（合同资产/使用权资产/债权投资/租赁负债/衍生金融/持有待售等），IS含信用减值/资产减值/其他收益/资产处置/每股收益（上市版），CFS完整三大类53行，EQ 17行变动项目；合并版多少数股东权益/损益，上市版多每股收益
+- 报表结构体系确认：致同两套标准（国企soe+上市listed）×两种口径（合并consolidated+单体standalone）= 4套，applicable_standard字段值为soe_consolidated/soe_standalone/listed_consolidated/listed_standalone
+- 报表结构待做：前端报表结构编辑UI（支持行名/公式修改+新增/删除行+拖拽排序）

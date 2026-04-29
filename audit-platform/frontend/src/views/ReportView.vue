@@ -16,6 +16,7 @@
         <el-button size="small" @click="onGenerate" :loading="genLoading" round>重新生成</el-button>
         <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading" round>一致性校验</el-button>
         <el-button size="small" @click="onExportExcel" round>导出 Excel</el-button>
+        <el-button size="small" @click="onEditConfig" round>编辑结构</el-button>
       </div>
     </div>
 
@@ -259,6 +260,10 @@ function onExportExcel() {
     const url = getReportExcelUrl(projectId.value, year.value, activeTab.value)
     downloadFileAsBlob(url, `报表_${activeTab.value}_${year.value}.xlsx`)
   })
+}
+
+function onEditConfig() {
+  router.push(`/projects/${projectId.value}/report-config`)
 }
 
 async function onDrilldown(row: ReportRow) {

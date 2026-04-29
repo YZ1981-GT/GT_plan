@@ -70,6 +70,11 @@ const router = createRouter({
           component: () => import(/* webpackPrefetch: true */ '@/views/ReportView.vue'),
         },
         {
+          path: 'projects/:projectId/report-config',
+          name: 'ReportConfigEditor',
+          component: () => import('@/views/ReportConfigEditor.vue'),
+        },
+        {
           path: 'projects/:projectId/cfs-worksheet',
           name: 'CFSWorksheet',
           component: () => import('@/views/CFSWorksheet.vue'),
