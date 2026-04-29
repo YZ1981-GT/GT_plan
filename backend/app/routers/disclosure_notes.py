@@ -233,3 +233,50 @@ async def upload_history(
         "year": year,
         "note": "请通过 multipart/form-data 上传 .docx 或 .pdf 文件",
     }
+
+
+@router.post("/{project_id}/{year}/{note_section}/clear-formulas")
+async def clear_formulas(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """一键清除指定附注章节的所有自动公式，切换为手动编辑模式。
+
+    将所有 auto 模式的单元格切换为 manual，保留当前数值不变。
+    用户后续编辑不会被自动提数覆盖。
+    """
+    from app.services.note_wp_mapping_service import NoteWpMappingService
+
+    svc = NoteWpMappingService(db)
+    try:
+        count = await svc.clear_formulas(project_id, year, note_section)
+        await db.commit()
+        return {"message": f"已清除 {count} 个单元格的自动公式", "cleared_count": count}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{project_id}/{year}/{note_section}/restore-auto")
+async def restore_auto_mode(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """恢复指定附注章节的自动提数模式。
+
+    从底稿 parsed_data 重新提取数据，将 manual 单元格恢复为 auto。
+    """
+    from app.services.note_wp_mapping_service import NoteWpMappingService
+
+    svc = NoteWpMappingService(db)
+    try:
+        count = await svc.restore_auto_mode(project_id, year, note_section)
+        await db.commit()
+        return {"message": f"已恢复 {count} 个单元格为自动提数", "restored_count": count}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

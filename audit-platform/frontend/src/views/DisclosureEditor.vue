@@ -107,6 +107,8 @@
               <template v-else>
                 <el-button @click="editMode = false">取消</el-button>
                 <el-button type="primary" @click="onSave" :loading="saveLoading">保存</el-button>
+                <el-button type="warning" @click="onClearAllFormulas">一键清除公式</el-button>
+                <el-button @click="onRestoreAutoMode">恢复自动提数</el-button>
               </template>
             </div>
           </template>
@@ -302,6 +304,43 @@ async function onRefreshFromWP() {
 async function onFormulaApplied() {
   // 公式应用后刷新当前附注数据
   if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+}
+
+async function onClearAllFormulas() {
+  // 一键清除公式：将所有 auto 单元格切换为 manual 模式
+  if (!currentNote.value?.table_data?.rows) return
+  try {
+    const { default: http } = await import('@/utils/http')
+    await http.post(
+      `/api/disclosure-notes/${projectId.value}/${year.value}/${currentNote.value.note_section}/clear-formulas`
+    )
+    ElMessage.success('公式已清除，所有单元格切换为手动编辑模式')
+    await fetchDetail(currentNote.value.note_section)
+  } catch {
+    // 降级：前端直接修改模式标记
+    for (const row of currentNote.value.table_data.rows) {
+      if (row._cell_modes) {
+        for (const key of Object.keys(row._cell_modes)) {
+          if (row._cell_modes[key] === 'auto') {
+            row._cell_modes[key] = 'manual'
+          }
+        }
+      }
+    }
+    ElMessage.success('公式已清除（本地模式）')
+  }
+}
+
+async function onRestoreAutoMode() {
+  // 恢复自动提数：从底稿重新提取数据并恢复 auto 模式
+  if (!currentNote.value) return
+  try {
+    await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+    ElMessage.success('已恢复自动提数模式')
+    await fetchDetail(currentNote.value.note_section)
+  } catch {
+    ElMessage.error('恢复失败')
+  }
 }
 
 async function onExportWord() {

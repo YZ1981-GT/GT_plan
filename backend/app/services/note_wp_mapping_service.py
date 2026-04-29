@@ -150,3 +150,82 @@ class NoteWpMappingService:
         note.table_data = td
         await self.db.flush()
         return {"status": "ok", "mode": mode}
+
+    async def clear_formulas(self, project_id: UUID, year: int, note_section: str) -> int:
+        """一键清除指定章节所有自动公式，切换为手动模式。
+
+        保留当前数值不变，只改变 mode 标记。
+        后续编辑不会被自动提数覆盖。
+        """
+        note = (await self.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.note_section == note_section,
+            )
+        )).scalar_one_or_none()
+        if not note or not note.table_data:
+            return 0
+
+        td = note.table_data
+        rows = td.get("rows", [])
+        cleared = 0
+
+        for row in rows:
+            values = row.get("values") or row.get("cells") or []
+            cell_modes = row.get("_cell_modes") or {}
+
+            for i in range(len(values)):
+                key = str(i)
+                current_mode = cell_modes.get(key, "auto")
+                if current_mode == "auto":
+                    cell_modes[key] = "manual"
+                    cleared += 1
+
+            row["_cell_modes"] = cell_modes
+
+        note.table_data = td
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(note, "table_data")
+        await self.db.flush()
+
+        logger.info(f"[CLEAR_FORMULAS] project={project_id} section={note_section} cleared={cleared}")
+        return cleared
+
+    async def restore_auto_mode(self, project_id: UUID, year: int, note_section: str) -> int:
+        """恢复指定章节为自动提数模式。
+
+        将所有 manual 单元格恢复为 auto，并从底稿重新提取数据。
+        """
+        note = (await self.db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.note_section == note_section,
+            )
+        )).scalar_one_or_none()
+        if not note or not note.table_data:
+            return 0
+
+        td = note.table_data
+        rows = td.get("rows", [])
+        restored = 0
+
+        for row in rows:
+            cell_modes = row.get("_cell_modes") or {}
+            for key, mode in list(cell_modes.items()):
+                if mode == "manual":
+                    cell_modes[key] = "auto"
+                    restored += 1
+            row["_cell_modes"] = cell_modes
+
+        note.table_data = td
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(note, "table_data")
+        await self.db.flush()
+
+        # 触发从底稿重新提数
+        await self.refresh_from_workpapers(project_id, year)
+
+        logger.info(f"[RESTORE_AUTO] project={project_id} section={note_section} restored={restored}")
+        return restored
