@@ -1540,3 +1540,5 @@ inclusion: always
 - 剩余TS错误：约120个集中在consolidation/组件（已标记developing不影响核心）+约15个unused variable（TS6133不影响运行）
 - 前端TS错误批量修复已完成（2026-04-29，commit 9d89a98已推送）：非合并报表15个错误全部修复——commonApi新增listAnnotations()、AttachmentPreview添加api别名、AccountImportStep import路径修正(@/stores/wizard)、DisclosureEditor slot加$index、WorkpaperWorkbench补齐year参数、移除多处unused import；剩余约120个错误全部在consolidation/组件（developing模块不影响核心）
 - 本轮最终commit数：21个（cc8f47d→9d89a98），全部已推送GitHub
+- 审计全流程断点修复计划文档已删除（2026-04-29，commit b399d22已推送）：P0+P1+P2全部完成确认后清理，本轮最终22个commit（cc8f47d→b399d22）
+- 账表导入企业级改造建议文档最终排查（2026-04-29）：8大建议中6项完整完成（统一入口/数据集版本/Durable Job/上传产物/验证报告/事件语义），2项基础到位有环境依赖（安全审计缺Prometheus指标/测试增强缺失败场景+性能基准）；P0落地4项全部完成，P1完成2/3（共享存储仍为本地），P2完成2/3（观测面板缺）；文档保留作为架构参考不删除
