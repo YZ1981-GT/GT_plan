@@ -87,7 +87,7 @@ async def update_report_config(
     """修改配置行"""
     svc = ReportConfigService(db)
     try:
-        row = await svc.update_config(config_id, updates)
+        row = await svc.update_config(config_id, updates, user_id=current_user.id)
         await db.commit()
         return ReportConfigRow.model_validate(row)
     except ValueError as e:

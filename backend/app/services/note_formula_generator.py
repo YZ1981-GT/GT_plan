@@ -153,6 +153,61 @@ def _find_row_by_keyword(rows: list[dict], keyword: str) -> int | None:
     return None
 
 
+def _topological_sort_formulas(formulas: dict[str, dict], rows: list[dict]) -> list[str]:
+    """拓扑排序公式：被引用的行先执行，引用方后执行。
+
+    vertical_sum 类型的公式引用其他行，需要先算子项再算合计。
+    其他类型（horizontal_balance/cross_table）无行间依赖，按原序。
+    """
+    import re
+
+    keys = list(formulas.keys())
+    # 构建依赖图：key → 依赖的 keys
+    deps: dict[str, set[str]] = {k: set() for k in keys}
+
+    for key, fdef in formulas.items():
+        expr = fdef.get("expression", "")
+        ftype = fdef.get("type", "")
+
+        if ftype == "vertical_sum":
+            # SUM(start:end, col) → 依赖 start~end 行的同列
+            match = re.match(r"SUM\((\d+):(\d+),\s*(\d+)\)", expr)
+            if match:
+                start, end, col = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                for i in range(start, end + 1):
+                    dep_key = f"{i}:{col}"
+                    if dep_key in formulas:
+                        deps[key].add(dep_key)
+
+        elif ftype in ("horizontal_balance", "book_value"):
+            # cell(row,col) → 依赖指定行列
+            for m in re.finditer(r"cell\((\d+),(\d+)\)", expr):
+                dep_key = f"{m.group(1)}:{m.group(2)}"
+                if dep_key in formulas:
+                    deps[key].add(dep_key)
+
+    # Kahn's algorithm 拓扑排序
+    in_degree = {k: len(deps[k]) for k in keys}
+    queue = [k for k in keys if in_degree[k] == 0]
+    sorted_result: list[str] = []
+
+    while queue:
+        node = queue.pop(0)
+        sorted_result.append(node)
+        for k in keys:
+            if node in deps[k]:
+                deps[k].discard(node)
+                in_degree[k] -= 1
+                if in_degree[k] == 0:
+                    queue.append(k)
+
+    # 如果有循环依赖，把剩余的追加到末尾
+    remaining = [k for k in keys if k not in sorted_result]
+    sorted_result.extend(remaining)
+
+    return sorted_result
+
+
 async def execute_note_formulas(
     db: AsyncSession,
     project_id: UUID,
@@ -203,8 +258,13 @@ async def execute_note_formulas(
 
     executed = 0
     updated = 0
+    exec_results: list[dict] = []  # 每个公式的执行结果
 
-    for key, formula_def in formulas.items():
+    # 依赖排序：先执行被引用的行（子项），再执行引用方（合计行）
+    sorted_keys = _topological_sort_formulas(formulas, rows)
+
+    for key in sorted_keys:
+        formula_def = formulas[key]
         parts = key.split(":")
         if len(parts) != 2:
             continue
@@ -241,9 +301,20 @@ async def execute_note_formulas(
             # 确保 values 列表足够长
             while len(values) <= col_idx:
                 values.append(None)
+            old_value = values[col_idx]
             values[col_idx] = float(calc_value)
             row["values"] = values
             updated += 1
+            exec_results.append({
+                "cell": key, "type": formula_def.get("type"),
+                "old": old_value, "new": float(calc_value), "status": "ok",
+            })
+        else:
+            exec_results.append({
+                "cell": key, "type": formula_def.get("type"),
+                "old": None, "new": None, "status": "skipped",
+                "reason": "计算结果为空",
+            })
 
         executed += 1
 
@@ -252,7 +323,13 @@ async def execute_note_formulas(
     flag_modified(note, "table_data")
     await db.flush()
 
-    return {"executed": executed, "updated": updated}
+    # 异常检测：合计行为0但子项有数据
+    anomalies = []
+    for r in exec_results:
+        if r["status"] == "ok" and r["new"] == 0 and r.get("type") == "vertical_sum":
+            anomalies.append({"cell": r["cell"], "message": "合计行为0，请检查子项是否有数据"})
+
+    return {"executed": executed, "updated": updated, "results": exec_results, "anomalies": anomalies}
 
 
 # ---------------------------------------------------------------------------

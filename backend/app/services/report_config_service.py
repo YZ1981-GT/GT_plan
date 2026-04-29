@@ -169,16 +169,40 @@ class ReportConfigService:
         self,
         config_id: UUID,
         updates: dict,
+        user_id: UUID | None = None,
     ) -> ReportConfig:
-        """修改报表配置行（仅允许修改项目级配置）"""
+        """修改报表配置行"""
         row = await self.get_config(config_id)
         if row is None:
             raise ValueError("配置行不存在")
 
+        # 记录变更前的值（审计留痕）
+        old_values = {}
         allowed_fields = {"row_name", "indent_level", "formula", "is_total_row", "parent_row_code", "formula_category", "formula_description", "formula_source"}
         for key, value in updates.items():
             if key in allowed_fields:
+                old_values[key] = getattr(row, key, None)
                 setattr(row, key, value)
+
+        # 公式变更审计留痕
+        if old_values and user_id:
+            try:
+                from app.models.core import Log
+                diff_log = Log(
+                    action="formula_updated",
+                    resource_type="report_config",
+                    resource_id=str(config_id),
+                    new_value={
+                        "_diff": {k: {"old": str(old_values.get(k)), "new": str(updates.get(k))} for k in old_values if old_values[k] != updates.get(k)},
+                        "row_code": row.row_code,
+                        "row_name": row.row_name,
+                        "report_type": row.report_type.value if row.report_type else None,
+                    },
+                    performed_by=user_id,
+                )
+                self.db.add(diff_log)
+            except Exception:
+                pass  # 审计留痕失败不阻断业务
 
         await self.db.flush()
         return row
