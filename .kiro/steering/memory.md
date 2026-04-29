@@ -1436,3 +1436,9 @@ inclusion: always
 - 读路径统一已完成（2026-04-29）：新增backend/app/services/dataset_query.py（get_active_filter异步版/sync_active_filter同步版/get_active_dataset_id_or_none便捷入口），过渡策略：当前用is_deleted=false兼容，未来四表加dataset_id列后切换为dataset_id过滤
 - 账表导入企业级改造8大建议完成状态：①统一入口✅②数据集版本✅③Durable Job✅④上传产物✅⑤三层校验✅⑥事件语义✅⑦安全审计运维✅部分（指标待Prometheus）⑧测试增强✅部分（性能基准待真实数据）
 - Phase 17 新增文件清单：dataset_models.py+dataset_service.py+import_job_service.py+import_validation_service.py+dataset_query.py+routers/ledger_datasets.py+alembic/versions/phase17_001_dataset_version_model.py，626个路由全部加载
+- 代码已推送GitHub（2026-04-29）：commit cc8f47d，企业级加固P0-P2共12项+Phase17数据集版本治理，origin/master已同步
+
+## 16阶段跨阶段分析（2026-04-29）
+- 8条联动关系全部正常无断点（Phase0→所有/1a→6/1a→1c/1b→12/1c→13/6→14/14→15/15→16）
+- 发现6个跨阶段问题：①Phase17 dataset_id字段四表未加（数据集版本未真正生效）②Phase12 wp_explanation直接用llm_client不走ai_plugin（正确路径无需改）③Phase13 ReportSnapshot与Phase17 LedgerDataset语义不同层级不冲突④Phase15 task_event_bus与Phase0 event_bus注册位置不统一（lifespan vs router_registry）⑤Phase3 32个死代码路由仍存在增加噪音⑥Phase5多准则科目表未动态切换（远期）
+- 进一步修改计划：P0四表加dataset_id列→P1事件处理器注册统一→P2 Phase3死代码清理→P3多准则动态切换（远期）

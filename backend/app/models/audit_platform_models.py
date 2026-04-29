@@ -262,6 +262,9 @@ class TbBalance(Base):
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True, index=True
+    )  # Phase 17: 关联 ledger_datasets，读路径统一后用此字段过滤
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -328,6 +331,9 @@ class TbLedger(Base):
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True, index=True
+    )  # Phase 17: 关联 ledger_datasets
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -394,6 +400,9 @@ class TbAuxBalance(Base):
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True, index=True
+    )  # Phase 17: 关联 ledger_datasets
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -463,6 +472,9 @@ class TbAuxLedger(Base):
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True, index=True
+    )  # Phase 17: 关联 ledger_datasets
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

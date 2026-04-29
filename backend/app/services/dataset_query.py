@@ -49,10 +49,15 @@ async def get_active_filter(
         table.c.is_deleted == sa.false(),
     )
 
-    # 未来扩展：当四表有 dataset_id 列时
-    # active_id = await DatasetService.get_active_dataset_id(db, project_id, year)
-    # if active_id and hasattr(table.c, 'dataset_id'):
-    #     return sa.and_(base_filter, table.c.dataset_id == active_id)
+    # 四表已有 dataset_id 列，优先用 active dataset 过滤
+    active_id = await DatasetService.get_active_dataset_id(db, project_id, year)
+    if active_id and hasattr(table.c, 'dataset_id'):
+        return sa.and_(
+            table.c.project_id == project_id,
+            table.c.year == year,
+            table.c.dataset_id == active_id,
+            table.c.is_deleted == sa.false(),
+        )
 
     return base_filter
 

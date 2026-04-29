@@ -30,6 +30,14 @@ async def lifespan(app: FastAPI):
     setup_logging(level="INFO", json_format=False)
     register_event_handlers()
 
+    # Phase 14: 注册门禁规则
+    from app.services.gate_rules_phase14 import register_phase14_rules
+    register_phase14_rules()
+
+    # Phase 15: 注册任务事件处理器（统一在 lifespan 中注册）
+    from app.services.task_event_handlers import register_event_handlers as register_task_handlers
+    register_task_handlers()
+
     # 恢复 Redis Stream 中未处理的事件（服务重启后自动补偿）
     from app.services.event_bus import event_bus
     try:

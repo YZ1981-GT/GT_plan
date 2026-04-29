@@ -188,9 +188,7 @@ def register_all_routers(app: FastAPI) -> None:
     for r in [task_tree_router, issues_router, task_events_router]:
         app.include_router(r, prefix="/api", tags=["任务树与编排"])
 
-    # Phase 15: 注册事件处理器
-    from app.services.task_event_handlers import register_event_handlers
-    register_event_handlers()
+    # Note: Phase 15 事件处理器注册已统一到 main.py lifespan 中
 
     # ═══ 11. Phase 16: 取证包与版本链 ═══
     from app.routers.version_line import router as version_line_router
