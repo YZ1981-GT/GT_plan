@@ -161,12 +161,17 @@ async def execute_note_formulas(
 ) -> dict[str, Any]:
     """执行附注表格中的自动运算公式，回填计算结果。
 
+    支持的公式语法：
+    - 表内引用: cell(row,col), SUM(start:end, col)
+    - 跨表引用: REPORT('BS-002','期末'), TB('1001','审定数'), NOTE('五、3','合计','期末')
+
     流程：
     1. 加载附注数据
     2. 从 _formulas 中读取公式定义
-    3. 按依赖顺序执行公式
-    4. 将计算结果写回 table_data.rows[].values[]
-    5. 只更新 mode=auto 的单元格
+    3. 预加载跨表数据（报表/试算表/其他附注）
+    4. 按依赖顺序执行公式
+    5. 将计算结果写回 table_data.rows[].values[]
+    6. 只更新 mode=auto 的单元格
 
     Returns: {"executed": N, "updated": M}
     """
@@ -193,6 +198,9 @@ async def execute_note_formulas(
         if formulas:
             td["_formulas"] = formulas
 
+    # 预加载跨表数据
+    cross_table_data = await _load_cross_table_data(db, project_id, year)
+
     executed = 0
     updated = 0
 
@@ -216,14 +224,18 @@ async def execute_note_formulas(
 
         # 执行公式
         formula_type = formula_def.get("type")
+        expression = formula_def.get("expression", "")
         calc_value = None
 
         if formula_type == "vertical_sum":
-            calc_value = _exec_vertical_sum(rows, formula_def.get("expression", ""), col_idx)
-        elif formula_type == "horizontal_balance":
-            calc_value = _exec_horizontal(rows, formula_def.get("expression", ""))
-        elif formula_type == "book_value":
-            calc_value = _exec_horizontal(rows, formula_def.get("expression", ""))
+            calc_value = _exec_vertical_sum(rows, expression, col_idx)
+        elif formula_type in ("horizontal_balance", "book_value"):
+            calc_value = _exec_horizontal(rows, expression)
+        elif formula_type == "cross_table":
+            calc_value = _exec_cross_table(expression, cross_table_data)
+        else:
+            # 通用公式：尝试解析跨表引用
+            calc_value = _exec_generic(expression, rows, cross_table_data)
 
         if calc_value is not None:
             # 确保 values 列表足够长
@@ -241,6 +253,166 @@ async def execute_note_formulas(
     await db.flush()
 
     return {"executed": executed, "updated": updated}
+
+
+# ---------------------------------------------------------------------------
+# 跨表数据加载
+# ---------------------------------------------------------------------------
+
+async def _load_cross_table_data(db: AsyncSession, project_id: UUID, year: int) -> dict[str, Any]:
+    """预加载跨表数据供公式引用。
+
+    Returns: {
+        "report": {"BS-002": {"current": 1000, "prior": 900}, ...},
+        "tb": {"1001": {"audited": 500, "unadjusted": 480, "opening": 450}, ...},
+        "notes": {"五、3": {"total_closing": 1200, "total_opening": 1100}, ...},
+    }
+    """
+    from app.models.report_models import FinancialReport
+    from app.models.audit_platform_models import TrialBalance
+
+    cross_data: dict[str, Any] = {"report": {}, "tb": {}, "notes": {}}
+
+    # 加载报表数据
+    try:
+        result = await db.execute(
+            sa.select(
+                FinancialReport.row_code,
+                FinancialReport.current_period_amount,
+                FinancialReport.prior_period_amount,
+            ).where(
+                FinancialReport.project_id == project_id,
+                FinancialReport.year == year,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        for row_code, current, prior in result.all():
+            cross_data["report"][row_code] = {
+                "current": float(current) if current else 0,
+                "prior": float(prior) if prior else 0,
+            }
+    except Exception:
+        pass
+
+    # 加载试算表数据
+    try:
+        result = await db.execute(
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.audited_amount,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.opening_balance,
+            ).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.year == year,
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )
+        for code, audited, unadjusted, opening in result.all():
+            cross_data["tb"][code] = {
+                "audited": float(audited) if audited else 0,
+                "unadjusted": float(unadjusted) if unadjusted else 0,
+                "opening": float(opening) if opening else 0,
+            }
+    except Exception:
+        pass
+
+    # 加载其他附注合计值
+    try:
+        result = await db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+            )
+        )
+        for note in result.scalars().all():
+            if note.table_data and isinstance(note.table_data, dict):
+                rows = note.table_data.get("rows") or []
+                # 取最后一个合计行的第一列数值作为 total
+                total_rows = [r for r in rows if r.get("is_total")]
+                if total_rows:
+                    values = total_rows[-1].get("values") or []
+                    cross_data["notes"][note.note_section] = {
+                        "total_closing": float(values[0]) if values and values[0] else 0,
+                        "total_opening": float(values[1]) if len(values) > 1 and values[1] else 0,
+                    }
+    except Exception:
+        pass
+
+    return cross_data
+
+
+def _exec_cross_table(expression: str, cross_data: dict[str, Any]) -> float | None:
+    """执行跨表引用公式。
+
+    支持语法：
+    - REPORT('BS-002','期末') → cross_data["report"]["BS-002"]["current"]
+    - REPORT('BS-002','期初') → cross_data["report"]["BS-002"]["prior"]
+    - TB('1001','审定数') → cross_data["tb"]["1001"]["audited"]
+    - TB('1001','未审数') → cross_data["tb"]["1001"]["unadjusted"]
+    - TB('1001','期初') → cross_data["tb"]["1001"]["opening"]
+    - NOTE('五、3','合计','期末') → cross_data["notes"]["五、3"]["total_closing"]
+    """
+    import re
+
+    try:
+        # REPORT('row_code','period')
+        report_match = re.search(r"REPORT\('([^']+)','([^']+)'\)", expression)
+        if report_match:
+            row_code = report_match.group(1)
+            period = report_match.group(2)
+            report_data = cross_data.get("report", {}).get(row_code, {})
+            if "期末" in period or "current" in period:
+                return report_data.get("current", 0)
+            elif "期初" in period or "prior" in period:
+                return report_data.get("prior", 0)
+
+        # TB('account_code','column')
+        tb_match = re.search(r"TB\('([^']+)','([^']+)'\)", expression)
+        if tb_match:
+            account_code = tb_match.group(1)
+            column = tb_match.group(2)
+            tb_data = cross_data.get("tb", {}).get(account_code, {})
+            if "审定" in column or "audited" in column:
+                return tb_data.get("audited", 0)
+            elif "未审" in column or "unadjusted" in column:
+                return tb_data.get("unadjusted", 0)
+            elif "期初" in column or "opening" in column:
+                return tb_data.get("opening", 0)
+            elif "期末" in column:
+                return tb_data.get("audited", 0)  # 期末余额=审定数
+
+        # NOTE('section','合计','period')
+        note_match = re.search(r"NOTE\('([^']+)','[^']*','([^']+)'\)", expression)
+        if note_match:
+            section = note_match.group(1)
+            period = note_match.group(2)
+            note_data = cross_data.get("notes", {}).get(section, {})
+            if "期末" in period:
+                return note_data.get("total_closing", 0)
+            elif "期初" in period:
+                return note_data.get("total_opening", 0)
+
+        return None
+    except Exception:
+        return None
+
+
+def _exec_generic(expression: str, rows: list[dict], cross_data: dict[str, Any]) -> float | None:
+    """通用公式执行：支持混合引用（表内+跨表）"""
+    import re
+
+    # 先尝试跨表引用
+    cross_result = _exec_cross_table(expression, cross_data)
+    if cross_result is not None:
+        return cross_result
+
+    # 再尝试表内引用
+    horizontal_result = _exec_horizontal(rows, expression)
+    if horizontal_result is not None:
+        return horizontal_result
+
+    return None
 
 
 def _exec_vertical_sum(rows: list[dict], expression: str, col_idx: int) -> float | None:

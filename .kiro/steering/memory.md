@@ -1512,3 +1512,6 @@ inclusion: always
 - 附注模板现状确认（2026-04-29）：两套模板note_template_soe.json(40章节)+note_template_listed.json(45章节)，每章节含table_template(headers+rows)+check_presets(校验规则)+wide_table_presets(宽表公式)+text_template(文字模板)；check_presets对应7种校验（balance/sub_item/aging/movement/book_value/horizontal_balance/ecl_three_stage）
 - 附注模板缺失4项：①check_presets未自动转化为前端可执行公式（"应用自动运算"无法真正计算）②单体版附注无独立模板（只有合并版soe/listed）③movement/book_value专项校验逻辑未实现④wide_table_presets的horizontal_balance缺固定资产/无形资产"原值-折旧=账面价值"专项
 - 附注修复优先级：①从check_presets自动生成前端可执行公式→②补单体版差异标记→③补movement/book_value专项校验
+- 附注模板3项修复已完成（2026-04-29，commit 08466d9已推送）：①新增note_formula_generator.py（generate_formulas_for_table从check_presets自动生成3种公式vertical_sum/horizontal_balance/book_value，execute_note_formulas执行回填只更新auto单元格，公式存储在table_data._formulas字典key="row_idx:col_idx"），新增POST apply-formulas端点②两套模板每章节新增scope字段（both/consolidated_only/standalone_only），国企版"国有资本"标记standalone_only③validate_wide_table增强book_value专项（检测账面价值期末行，自动查找原值/折旧/减值行计算差额）
+- 用户需求（跨表公式引用）：附注公式编辑时需支持跨表指标选择——引用报表行金额REPORT('BS-002','期末')、引用试算表科目TB('1001','审定数')、引用其他附注章节合计值NOTE('五、3','合计','期末')；当前只支持表内引用cell(row,col)/SUM(start:end,col)
+- 附注vs报表一致性校验：check_presets.balance规则已实现（validate_cross_table从financial_report取报表金额与附注合计比对），但用户自定义公式中无法引用报表数据
