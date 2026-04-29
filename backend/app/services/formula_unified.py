@@ -320,15 +320,24 @@ async def execute_formula(
     # 解析跨表引用并获取值
     cross_values: dict[str, float] = {}
     if parsed["cross_refs"]:
-        from app.services.data_fetch_custom import CustomFetchService, SourceType
-        svc = CustomFetchService(db, project_id, year)
+        # 优先从预加载的 _tb_context 取值（避免N+1查询）
+        tb_context = sheet_cells.get("_tb_context", {}) if sheet_cells else {}
 
         for cr in parsed["cross_refs"]:
-            source = _cross_ref_to_source(cr)
-            if source:
-                val = await svc._fetch_from_source(source)
-                cross_values[cr["raw"]] = float(val) if val is not None else 0
-                sources.append({"type": cr["type"], "args": cr["args"], "value": cross_values[cr["raw"]]})
+            # 尝试从缓存取值
+            cached_val = _try_get_from_cache(cr, tb_context)
+            if cached_val is not None:
+                cross_values[cr["raw"]] = cached_val
+                sources.append({"type": cr["type"], "args": cr["args"], "value": cached_val, "source": "cache"})
+            else:
+                # 缓存未命中，走数据库查询
+                from app.services.data_fetch_custom import CustomFetchService
+                svc = CustomFetchService(db, project_id, year)
+                source = _cross_ref_to_source(cr)
+                if source:
+                    val = await svc._fetch_from_source(source)
+                    cross_values[cr["raw"]] = float(val) if val is not None else 0
+                    sources.append({"type": cr["type"], "args": cr["args"], "value": cross_values[cr["raw"]], "source": "db"})
 
     # 构建可计算的表达式
     expr = formula.lstrip("=").strip()
@@ -383,6 +392,35 @@ async def execute_formula(
         return {"value": result, "sources": sources, "error": None}
     except Exception as e:
         return {"value": None, "sources": sources, "error": str(e)}
+
+
+def _try_get_from_cache(cr: dict, tb_context: dict) -> float | None:
+    """尝试从预加载的 _tb_context 缓存中获取跨表引用值
+
+    仅支持 TB 类型引用（最常见的跨表引用），其他类型返回 None 走数据库。
+    """
+    if cr["type"] != "TB" or not tb_context:
+        return None
+
+    args = cr.get("args", [])
+    if len(args) < 2:
+        return None
+
+    account_code = args[0].strip()
+    field_name = args[1].strip()
+
+    # 中文字段名映射
+    field_map = {
+        "审定数": "audited_amount", "未审数": "unadjusted_amount",
+        "期初": "opening_balance", "AJE": "aje_adjustment", "RJE": "rje_adjustment",
+        "期末": "audited_amount",
+    }
+    field = field_map.get(field_name, field_name)
+
+    account_data = tb_context.get(account_code)
+    if account_data and field in account_data:
+        return account_data[field]
+    return None
 
 
 def _cross_ref_to_source(cr: dict) -> dict | None:

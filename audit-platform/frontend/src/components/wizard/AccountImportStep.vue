@@ -1002,6 +1002,9 @@ async function handlePreview() {
           const sheet = previewSheets.value[0]
           fileTypeLabel.value = FILE_TYPE_LABELS[sheet.file_type_guess] || '未识别类型'
           fileTypeTagType.value = FILE_TYPE_TAG[sheet.file_type_guess] || 'info'
+
+          // 预览完成后自动执行一次智能匹配（补全未识别的列）
+          setTimeout(() => smartEnhanceMapping(), 300)
         }
       },
     })
@@ -1506,7 +1509,7 @@ async function handleImport() {
     if (completionToast.type === 'warning') {
       ElMessage.warning(completionToast.message)
     } else {
-      ElMessage.success(completionToast.message)
+      ElMessage.success(completionToast.message + '（试算表正在自动更新...）')
     }
 
     await applyImportSuccess({

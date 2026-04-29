@@ -662,6 +662,30 @@ async def execute_formulas(
     if not formula_cells:
         return {"executed": 0, "message": "无公式需要执行"}
 
+    # 预加载 trial_balance 全量数据（避免N+1查询）
+    from app.models.audit_platform_models import TrialBalance
+    tb_result = await db.execute(
+        sa.select(TrialBalance).where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.year == year,
+            TrialBalance.is_deleted == sa.false(),
+        )
+    )
+    _tb_cache = {row.standard_account_code: row for row in tb_result.scalars().all()}
+
+    # 将 trial_balance 数据注入到 cells 上下文中（供 execute_formula 使用）
+    # 格式：_tb_context.{account_code}.{field} = value
+    cells["_tb_context"] = {
+        code: {
+            "audited_amount": float(row.audited_amount) if row.audited_amount else 0,
+            "unadjusted_amount": float(row.unadjusted_amount) if row.unadjusted_amount else 0,
+            "opening_balance": float(row.opening_balance) if row.opening_balance else 0,
+            "aje_adjustment": float(row.aje_adjustment) if row.aje_adjustment else 0,
+            "rje_adjustment": float(row.rje_adjustment) if row.rje_adjustment else 0,
+        }
+        for code, row in _tb_cache.items()
+    }
+
     executed = 0
     errors = []
 
@@ -675,6 +699,9 @@ async def execute_formulas(
             cells[key]["value"] = result["value"]
             cells[key]["_calc_sources"] = result.get("sources", [])
             executed += 1
+
+    # 清理临时上下文
+    cells.pop("_tb_context", None)
 
     # 保存更新后的 structure
     sheet["cells"] = cells
