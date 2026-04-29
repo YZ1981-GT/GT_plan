@@ -155,6 +155,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.recycle_bin import router as rb_router
     from app.routers.private_storage import router as ps_router
     from app.routers.knowledge_base import router as kb_router
+    from app.routers.knowledge_folders import router as kf_router
     from app.routers.feature_flags import router as ff_router
     from app.routers.task_center import router as tc_router
     from app.routers.performance import router as perf_router
@@ -164,7 +165,7 @@ def register_all_routers(app: FastAPI) -> None:
     for r in [gtc_router, ta_router, mb_router, att_router, cust_router,
               as_router, i18n_router, at_router, sig_router, aip_router,
               reg_router, aiu_router, aim_router, rb_router, ps_router,
-              kb_router, ff_router, tc_router, perf_router, sec_router,
+              kb_router, kf_router, ff_router, tc_router, perf_router, sec_router,
               ss_router]:
         app.include_router(r, tags=["系统管理"])
 

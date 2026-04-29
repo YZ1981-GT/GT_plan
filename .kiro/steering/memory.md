@@ -1558,3 +1558,10 @@ inclusion: always
 - 待实现：①各生成页面增加"选择参照文档"UI入口②LLM调用统一增加context_documents参数③上年报告/底稿自动作为默认参照（用户可取消）④参照文档内容截断到token预算内
 - 知识库RAG辅助生成已完成（2026-04-29，commit 1a008c9已推送）：llm_client.chat_completion新增context_documents参数（自动注入system消息，截断8000字符）；新增reference_doc_service.py（load_prior_year_notes/report/workpaper+load_from_knowledge_base+load_context统一入口5种source_type）；note_ai.py generate_policy接入（自动加载上年同章节附注）；wp_explanation_service.py generate_draft接入（自动加载上年同编号底稿）
 - RAG技术决策：参照文档注入位置为第一条system消息之后；截断策略8000字符（约2000 tokens）；连续审计场景自动带入上年数据（用户无需手动选择）；返回reference_count告知前端
+- RAG参照文档全面接入完成（2026-04-29，commit f8e9404已推送）：8个LLM场景中6个已接入（generate_policy+generate_analysis+check_completeness+ai_complete+generate_draft+analytical_review），2个不需要（workhour ai_suggest纯数据/pm_service generate_brief纯润色）；各场景参照来源：附注生成→上年同章节附注，底稿生成→上年同编号底稿，完整性检查→知识库会计准则
+
+## 知识库权限与文件夹管理需求（2026-04-29 用户提出）
+- 知识库权限需求：项目组公开参考资料需设置项目组级别权限（哪些项目组可以访问哪些文档），项目共享后其他成员可调用LLM提高效率
+- 知识库文件夹管理需求：支持在预制文件夹下自定义添加单个/多个文档、自定义新建单个/多个文件夹、文件夹下同理支持嵌套（树形目录结构）
+- 当前知识库现状：knowledge_service有9个固定分类（底稿模板库/监管规定库/会计准则库/质控标准库/审计程序库/行业指引库/提示词库/报告模板库/笔记库），文件存储在~/.gt_audit_helper/knowledge/{category}/，无权限控制、无自定义文件夹、无嵌套目录
+- 待实现：①知识库文档增加project_access权限字段（public/project_ids列表）②支持自定义文件夹CRUD（嵌套树形）③文件夹和文档的批量上传④权限过滤（用户只能看到有权限的文档）⑤前端KnowledgeBase.vue改造为树形目录+权限标签
