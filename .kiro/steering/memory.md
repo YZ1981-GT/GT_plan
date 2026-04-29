@@ -1452,3 +1452,15 @@ inclusion: always
 - Phase17关键遗漏已修复，该条待办可标记完成
 - 账表导入深入复盘发现3个关键缺口（2026-04-29）：①run_account_chart_import缺ImportJob记录（同步导入无作业追溯）②Business Validation未接入导入流程（import_validation_service的4个BV规则未被smart_import_streaming调用，三层校验第二层形同虚设）③create_bundle未写入ImportArtifact数据库记录（上传产物只有本地文件无DB追溯）
 - 其他发现：Durable Job仍用asyncio.create_task（过渡方案可接受，建议lifespan启动时扫描running状态ImportJob标记timed_out）；导入操作缺结构化审计记录（files/mapping/result/duration）；缺完整端到端链路测试
+- 3个企业级缺口已修复并推送（2026-04-29，commit cfc6fbe）：①run_account_chart_import加ImportJob记录（同步导入也有pending→running→completed/failed追溯）②Business Validation接入smart_import_streaming（激活前调用run_business_validation，当前为信息采集不阻断）③create_bundle写入ImportArtifact数据库记录（storage_uri/file_manifest/expires_at/file_count，失败降级不阻断上传）
+- 账表导入8大建议最终状态：①统一入口✅②数据集版本✅③Durable Job✅过渡④上传产物✅⑤三层校验✅⑥事件语义✅⑦安全审计⚠️基础到位待结构化记录⑧测试增强⚠️框架到位待端到端链路
+
+## 资深合伙人视角全面评估（2026-04-29）
+- 核心矛盾：系统铺了60+页面但真正能让审计员完整走完一个项目的只有3-4个页面（查账/试算表/调整分录/底稿列表）
+- 生产就绪页面（4个）：LedgerPenetration 2268行✅、TrialBalance ~500行✅、Adjustments ~600行✅、WorkpaperList 848行⚠️（Phase14门禁待验证）
+- 有断点页面（4个）：DisclosureEditor（6/8校验器stub）、AuditReportEditor（财务数据刷新链路待验证）、AIChatView（后端3端点404）、ConsolidationIndex（同步ORM）
+- 审计员日常工作流8步：导入→查账→调整→试算表→底稿→附注→报告→Word导出；前4步已打通，后4步有断点（底稿→附注刷新未验证/附注校验6种stub/报告→Word导出前端调用待验证）
+- 复核流程缺失验证：ReviewInbox数据来源是否真实、批注逐条回复前端交互是否完整、退回原因前端展示位置
+- 数据安全缺失：操作diff记录（调整分录和底稿状态变更缺old_value/new_value）
+- 最终建议4步：P0用1个真实项目走完全流程记录断点→P1修复断点→P2复核流程测试→P3三种规模压力测试
+- 核心结论：需要从"开发者视角"切换到"审计员视角"——不是看API数量和代码行数，而是看能否完成一个真实年审项目

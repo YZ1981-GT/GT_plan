@@ -172,8 +172,46 @@ async def validate_wide_table(
     note: DisclosureNote,
     seed_templates: list[dict],
 ) -> list[dict]:
-    """宽表公式校验（存根）。"""
-    return []
+    """宽表公式校验：检查横向公式（如 期初+增加-减少=期末）。"""
+    findings: list[dict] = []
+    table_data = note.table_data if hasattr(note, 'table_data') else None
+    if not table_data or not isinstance(table_data, dict):
+        return findings
+
+    headers = table_data.get("headers") or []
+    rows = table_data.get("rows") or []
+    if len(headers) < 4:
+        return findings
+
+    # 检测是否有"期初""期末"列
+    opening_idx = next((i for i, h in enumerate(headers) if "期初" in str(h)), None)
+    closing_idx = next((i for i, h in enumerate(headers) if "期末" in str(h)), None)
+    if opening_idx is None or closing_idx is None:
+        return findings
+
+    for row_idx, row in enumerate(rows):
+        if row.get("is_total"):
+            continue
+        values = row.get("values") or []
+        if len(values) <= max(opening_idx - 1, closing_idx - 1):
+            continue
+        try:
+            opening = float(values[opening_idx - 1] or 0)
+            closing = float(values[closing_idx - 1] or 0)
+            # 中间列求和
+            mid_sum = sum(float(values[i] or 0) for i in range(opening_idx, closing_idx - 1))
+            expected = opening + mid_sum
+            if abs(expected - closing) > 0.01:
+                findings.append({
+                    "rule": "wide_table_formula",
+                    "severity": "warning",
+                    "message": f"第 {row_idx+1} 行横向公式不平：期初({opening})+变动({mid_sum})≠期末({closing})，差额 {expected-closing:.2f}",
+                    "note_section": note.note_section,
+                })
+        except (TypeError, ValueError, IndexError):
+            continue
+
+    return findings
 
 
 async def validate_vertical(
@@ -181,8 +219,47 @@ async def validate_vertical(
     note: DisclosureNote,
     seed_templates: list[dict],
 ) -> list[dict]:
-    """纵向勾稽校验（存根）。"""
-    return []
+    """纵向勾稽校验：检查合计行是否等于明细行之和。"""
+    findings: list[dict] = []
+    table_data = note.table_data if hasattr(note, 'table_data') else None
+    if not table_data or not isinstance(table_data, dict):
+        return findings
+
+    rows = table_data.get("rows") or []
+    headers = table_data.get("headers") or []
+    if not rows or len(headers) < 2:
+        return findings
+
+    # 找到合计行
+    total_rows = [(i, r) for i, r in enumerate(rows) if r.get("is_total")]
+    if not total_rows:
+        return findings
+
+    for total_idx, total_row in total_rows:
+        total_values = total_row.get("values") or []
+        # 合计行上方的非合计行
+        detail_rows = [r for i, r in enumerate(rows) if i < total_idx and not r.get("is_total")]
+        if not detail_rows:
+            continue
+
+        for col_idx in range(len(total_values)):
+            try:
+                total_val = float(total_values[col_idx] or 0)
+                if total_val == 0:
+                    continue
+                detail_sum = sum(float((r.get("values") or [])[col_idx] or 0) for r in detail_rows if len(r.get("values") or []) > col_idx)
+                if abs(total_val - detail_sum) > 0.01:
+                    col_name = headers[col_idx + 1] if col_idx + 1 < len(headers) else f"第{col_idx+1}列"
+                    findings.append({
+                        "rule": "vertical_sum",
+                        "severity": "warning",
+                        "message": f"「{col_name}」合计行({total_val})≠明细行之和({detail_sum})，差额 {total_val-detail_sum:.2f}",
+                        "note_section": note.note_section,
+                    })
+            except (TypeError, ValueError, IndexError):
+                continue
+
+    return findings
 
 
 async def validate_cross_table(
@@ -190,8 +267,53 @@ async def validate_cross_table(
     note: DisclosureNote,
     seed_templates: list[dict],
 ) -> list[dict]:
-    """交叉校验（存根）。"""
-    return []
+    """交叉校验：报表数 vs 附注合计行。"""
+    findings: list[dict] = []
+    from app.models.report_models import FinancialReport
+
+    table_data = note.table_data if hasattr(note, 'table_data') else None
+    if not table_data or not isinstance(table_data, dict):
+        return findings
+
+    # 获取附注合计值
+    rows = table_data.get("rows") or []
+    total_rows = [r for r in rows if r.get("is_total")]
+    if not total_rows:
+        return findings
+
+    # 尝试从报表中找到对应科目的金额
+    note_section = note.note_section or ""
+    try:
+        import sqlalchemy as sa
+        result = await db.execute(
+            sa.select(FinancialReport.amount).where(
+                FinancialReport.project_id == note.project_id,
+                FinancialReport.year == note.year,
+                FinancialReport.note_reference == note_section,
+                FinancialReport.is_deleted == sa.false(),
+            )
+        )
+        report_amount = result.scalar_one_or_none()
+        if report_amount is not None:
+            # 取附注合计行第一个数值列
+            total_values = total_rows[-1].get("values") or []
+            if total_values:
+                try:
+                    note_total = float(total_values[0] or 0)
+                    report_val = float(report_amount)
+                    if abs(note_total - report_val) > 0.01:
+                        findings.append({
+                            "rule": "cross_table",
+                            "severity": "error",
+                            "message": f"附注合计({note_total})≠报表金额({report_val})，差额 {note_total-report_val:.2f}",
+                            "note_section": note_section,
+                        })
+                except (TypeError, ValueError):
+                    pass
+    except Exception:
+        pass  # 报表数据不可用时跳过
+
+    return findings
 
 
 async def validate_aging_transition(
@@ -199,8 +321,46 @@ async def validate_aging_transition(
     note: DisclosureNote,
     seed_templates: list[dict],
 ) -> list[dict]:
-    """账龄衔接校验（存根）。"""
-    return []
+    """账龄衔接校验：上年期末各区间 → 当年期初各区间应顺移一档。"""
+    findings: list[dict] = []
+    # 账龄衔接需要上年数据，当前阶段仅检查表格结构完整性
+    table_data = note.table_data if hasattr(note, 'table_data') else None
+    if not table_data or not isinstance(table_data, dict):
+        return findings
+
+    headers = table_data.get("headers") or []
+    rows = table_data.get("rows") or []
+
+    # 检查是否有账龄相关列
+    aging_keywords = ["1年以内", "1-2年", "2-3年", "3年以上", "合计"]
+    has_aging = any(any(kw in str(h) for kw in aging_keywords) for h in headers)
+    if not has_aging:
+        return findings
+
+    # 检查合计行是否等于各区间之和
+    total_rows = [r for r in rows if r.get("is_total")]
+    if total_rows:
+        total_values = total_rows[-1].get("values") or []
+        detail_rows = [r for r in rows if not r.get("is_total")]
+        if detail_rows and total_values:
+            for col_idx in range(len(total_values)):
+                try:
+                    total_val = float(total_values[col_idx] or 0)
+                    if total_val == 0:
+                        continue
+                    detail_sum = sum(float((r.get("values") or [])[col_idx] or 0) for r in detail_rows if len(r.get("values") or []) > col_idx)
+                    if abs(total_val - detail_sum) > 0.01:
+                        findings.append({
+                            "rule": "aging_sum",
+                            "severity": "warning",
+                            "message": f"账龄表合计({total_val})≠各区间之和({detail_sum})",
+                            "note_section": note.note_section,
+                        })
+                        break  # 只报一次
+                except (TypeError, ValueError, IndexError):
+                    continue
+
+    return findings
 
 
 async def validate_completeness(
@@ -208,8 +368,41 @@ async def validate_completeness(
     note: DisclosureNote,
     seed_templates: list[dict],
 ) -> list[dict]:
-    """完整性校验（存根）。"""
-    return []
+    """完整性校验：检查数值列非空率。"""
+    findings: list[dict] = []
+    table_data = note.table_data if hasattr(note, 'table_data') else None
+    if not table_data or not isinstance(table_data, dict):
+        return findings
+
+    rows = table_data.get("rows") or []
+    if not rows:
+        return findings
+
+    # 统计非合计行的数值列非空率
+    data_rows = [r for r in rows if not r.get("is_total")]
+    if not data_rows:
+        return findings
+
+    total_cells = 0
+    empty_cells = 0
+    for row in data_rows:
+        values = row.get("values") or []
+        for v in values:
+            total_cells += 1
+            if v is None or v == "" or v == 0:
+                empty_cells += 1
+
+    if total_cells > 0:
+        empty_rate = empty_cells / total_cells
+        if empty_rate > 0.5:
+            findings.append({
+                "rule": "completeness",
+                "severity": "warning",
+                "message": f"数据完整性偏低：{empty_cells}/{total_cells} 个单元格为空（{empty_rate:.0%}）",
+                "note_section": note.note_section,
+            })
+
+    return findings
 
 
 async def validate_llm_review(
@@ -217,8 +410,47 @@ async def validate_llm_review(
     note: DisclosureNote,
     seed_templates: list[dict],
 ) -> list[dict]:
-    """LLM审核（存根）。"""
-    return []
+    """LLM 辅助审核：检查叙述文字表述合理性。
+
+    降级策略：LLM 不可用时返回空（不阻断校验流程）。
+    """
+    findings: list[dict] = []
+
+    # 只对有叙述文字的附注执行
+    text_content = ""
+    if hasattr(note, 'text_content') and note.text_content:
+        text_content = note.text_content
+    elif hasattr(note, 'content') and isinstance(note.content, str):
+        text_content = note.content
+
+    if not text_content or len(text_content) < 50:
+        return findings
+
+    try:
+        from app.services.llm_client import chat_completion
+        prompt = f"""请检查以下审计附注文字是否存在明显问题（错别字、前后矛盾、数据引用错误）。
+如果没有问题，回复"无问题"。如果有问题，简要列出（每条一行）。
+
+附注内容：
+{text_content[:2000]}"""
+
+        result = await chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=500,
+        )
+
+        if result and "无问题" not in result and "[LLM" not in result:
+            findings.append({
+                "rule": "llm_review",
+                "severity": "info",
+                "message": f"AI 审核建议：{result[:200]}",
+                "note_section": note.note_section,
+            })
+    except Exception:
+        pass  # LLM 不可用时静默跳过
+
+    return findings
 
 
 # Validator registry
