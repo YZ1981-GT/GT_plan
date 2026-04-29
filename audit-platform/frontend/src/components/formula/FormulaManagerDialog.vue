@@ -73,8 +73,13 @@
       </el-table-column>
       <el-table-column label="操作" width="90" align="center">
         <template #default="{ row }">
-          <el-button v-if="editingId !== row.id" size="small" link type="primary" @click="startEdit(row)">编辑</el-button>
-          <el-button v-else size="small" link type="success" @click="saveEdit(row)">保存</el-button>
+          <template v-if="isPresetFormula(row)">
+            <el-tag size="small" type="info">预设</el-tag>
+          </template>
+          <template v-else>
+            <el-button v-if="editingId !== row.id" size="small" link type="primary" @click="startEdit(row)">编辑</el-button>
+            <el-button v-else size="small" link type="success" @click="saveEdit(row)">保存</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -133,6 +138,12 @@ const categoryCounts = computed(() => ({
   logic_check: allFormulaRows.value.filter(r => r.formula_category === 'logic_check').length,
   reasonability: allFormulaRows.value.filter(r => r.formula_category === 'reasonability').length,
 }))
+
+function isPresetFormula(row: any): boolean {
+  // 预设公式来源标记为 check_presets.xxx，不允许用户编辑
+  const source = row.formula_source || ''
+  return source.startsWith('check_presets.') || source === '试算表审定数' || source === '报表行次引用'
+}
 
 function categoryTagType(cat: string | null) {
   if (cat === 'auto_calc') return 'primary'
