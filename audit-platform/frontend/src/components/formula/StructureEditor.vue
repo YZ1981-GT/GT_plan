@@ -84,6 +84,19 @@
       @dblclick="onCellDblClick"
     />
 
+    <!-- 分页控件（大表格时显示） -->
+    <div class="pagination-bar" v-if="isLargeTable">
+      <span class="page-info">共 {{ totalRows }} 行，每页 {{ pageSize }} 行</span>
+      <el-pagination
+        v-model:current-page="currentPage"
+        :page-size="pageSize"
+        :total="totalRows"
+        layout="prev, pager, next, jumper"
+        small
+        @current-change="onPageChange"
+      />
+    </div>
+
     <!-- 可视选择器弹窗 -->
     <CellSelector
       v-model="showSelector"
@@ -155,6 +168,10 @@ const currentCellInfo = ref<any>(null)
 const selectedCell = ref('')
 const pendingEdits = ref<any[]>([])
 const tableContainer = ref<HTMLElement>()
+const currentPage = ref(1)
+const pageSize = ref(500)
+const totalRows = ref(0)
+const isLargeTable = ref(false)
 
 const formulaTypeMap: Record<string, string> = {
   vertical_sum: '纵向合计',
@@ -174,8 +191,15 @@ let lockRefreshTimer: ReturnType<typeof setInterval> | null = null
 async function loadContent() {
   try {
     if (props.fileStem) {
-      const result = await getExcelHtmlPreview(props.projectId, props.fileStem)
+      const result = await getExcelHtmlPreview(props.projectId, props.fileStem, 0) as any
       htmlContent.value = result.html
+      totalRows.value = result.total_rows || 0
+      isLargeTable.value = result.is_large || totalRows.value > 500
+      if (isLargeTable.value && currentPage.value === 1) {
+        // 大表格重新加载分页版本
+        const paged = await getExcelHtmlPreview(props.projectId, props.fileStem, 0) as any
+        htmlContent.value = paged.html
+      }
     } else if (props.module) {
       const result = await getModuleHtml(props.projectId, props.module, {
         ...props.moduleParams,
@@ -185,6 +209,20 @@ async function loadContent() {
     }
   } catch {
     htmlContent.value = '<p>加载失败</p>'
+  }
+}
+
+async function onPageChange(page: number) {
+  if (!props.fileStem) return
+  currentPage.value = page
+  try {
+    const { data } = await (await import('@/utils/http')).default.get(
+      `/api/projects/${props.projectId}/excel-html/preview/${props.fileStem}`,
+      { params: { page, page_size: pageSize.value, editable: true } }
+    )
+    htmlContent.value = data.html || data?.data?.html || ''
+  } catch {
+    ElMessage.error('加载分页数据失败')
   }
 }
 
@@ -564,4 +602,8 @@ async function loadSelectorData() {
 .info-toggle { display: flex; justify-content: space-between; align-items: center; padding: 4px 12px; background: #fafafa; border-bottom: 1px solid #eee; font-size: 12px; color: #606266; cursor: pointer; }
 .info-toggle:hover { background: #f5f0ff; }
 .toggle-hint { color: #c0c4cc; font-size: 11px; }
+
+/* 分页控件 */
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-top: 1px solid #e8e8e8; background: #fafafa; }
+.page-info { font-size: 12px; color: #909399; }
 </style>
