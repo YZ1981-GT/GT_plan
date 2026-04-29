@@ -19,6 +19,7 @@
       </el-button-group>
       <el-divider direction="vertical" />
       <el-button size="small" @click="saveEdits" :loading="saving" type="primary">保存</el-button>
+      <el-button size="small" @click="runFormulas" :loading="calculating">执行公式</el-button>
       <el-button size="small" @click="$emit('export-excel')">导出Excel</el-button>
       <el-button size="small" @click="$emit('export-word')">导出Word</el-button>
       <el-divider direction="vertical" />
@@ -69,8 +70,13 @@ import {
   getExcelHtmlPreview,
   saveExcelHtmlEdits,
   getModuleHtml,
+  acquireEditLock,
+  releaseEditLock,
+  refreshEditLock,
+  listFileVersions,
+  rollbackFileVersion,
+  executeFormulas,
 } from '@/services/commonApi'
-import http from '@/utils/http'
 
 const props = defineProps<{
   projectId: string
@@ -87,6 +93,7 @@ const emit = defineEmits<{
 
 const htmlContent = ref('')
 const saving = ref(false)
+const calculating = ref(false)
 const showSelector = ref(false)
 const showVersions = ref(false)
 const versions = ref<any[]>([])
@@ -235,11 +242,28 @@ async function saveEdits() {
   }
 }
 
+async function runFormulas() {
+  if (!props.fileStem) return
+  calculating.value = true
+  try {
+    const result = await executeFormulas(props.projectId, props.fileStem)
+    await loadContent()
+    if (result.errors?.length) {
+      ElMessage.warning(`执行完成：${result.executed}/${result.total_formulas} 成功，${result.errors.length} 个错误`)
+    } else {
+      ElMessage.success(`公式执行完成：${result.executed} 个单元格已更新`)
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '公式执行失败')
+  } finally {
+    calculating.value = false
+  }
+}
+
 async function loadVersions() {
   if (!props.fileStem) return
   try {
-    const { data } = await http.get(`/api/projects/${props.projectId}/excel-html/versions/${props.fileStem}`)
-    versions.value = Array.isArray(data) ? data : []
+    versions.value = await listFileVersions(props.projectId, props.fileStem)
   } catch { versions.value = [] }
 }
 
@@ -250,7 +274,7 @@ async function diffVersion(version: number) {
 async function rollbackVersion(version: number) {
   await ElMessageBox.confirm(`确定回滚到版本 ${version}？当前未保存的编辑将丢失。`, '确认回滚')
   try {
-    await http.post(`/api/projects/${props.projectId}/excel-html/versions/${props.fileStem}/rollback/${version}`)
+    await rollbackFileVersion(props.projectId, props.fileStem!)
     ElMessage.success(`已回滚到版本 ${version}`)
     await loadContent()
   } catch (e: any) {
@@ -262,11 +286,11 @@ async function rollbackVersion(version: number) {
 async function acquireLock() {
   if (!props.fileStem) return
   try {
-    await http.post(`/api/projects/${props.projectId}/excel-html/lock/${props.fileStem}`)
+    await acquireEditLock(props.projectId, props.fileStem)
     // 定期刷新锁
     lockRefreshTimer = setInterval(async () => {
       try {
-        await http.put(`/api/projects/${props.projectId}/excel-html/lock/${props.fileStem}/refresh`)
+        await refreshEditLock(props.projectId, props.fileStem!)
       } catch { /* 锁过期 */ }
     }, 4 * 60 * 1000) // 4分钟刷新一次
   } catch (e: any) {
@@ -280,7 +304,7 @@ async function releaseLock() {
   if (!props.fileStem) return
   if (lockRefreshTimer) { clearInterval(lockRefreshTimer); lockRefreshTimer = null }
   try {
-    await http.delete(`/api/projects/${props.projectId}/excel-html/lock/${props.fileStem}`)
+    await releaseEditLock(props.projectId, props.fileStem)
   } catch { /* ignore */ }
 }
 

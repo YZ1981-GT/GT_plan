@@ -622,3 +622,79 @@ async def refresh_lock(
     if not refreshed:
         raise HTTPException(status_code=423, detail="锁已过期或不属于当前用户")
     return {"refreshed": True}
+
+
+
+# ═══ 公式执行 ═══
+
+@router.post("/execute-formulas/{file_stem}")
+async def execute_formulas(
+    project_id: UUID,
+    file_stem: str,
+    sheet_index: int = Query(default=0),
+    year: int = Query(default=2025),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """执行 structure.json 中所有公式并回填计算结果
+
+    遍历所有含 formula 的单元格，调用 execute_formula 计算值并写回。
+    """
+    from app.services.formula_unified import execute_formula
+    from app.services.excel_html_converter import save_version_snapshot
+
+    project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
+    structure_path = project_dir / f"{file_stem}.structure.json"
+
+    if not structure_path.exists():
+        raise HTTPException(status_code=404, detail="结构文件不存在")
+
+    structure = json.loads(structure_path.read_text(encoding="utf-8"))
+    sheets = structure.get("sheets", [])
+    if sheet_index >= len(sheets):
+        raise HTTPException(status_code=400, detail="Sheet索引越界")
+
+    sheet = sheets[sheet_index]
+    cells = sheet.get("cells", {})
+
+    # 找出所有有公式的单元格
+    formula_cells = {k: v for k, v in cells.items() if v.get("formula")}
+    if not formula_cells:
+        return {"executed": 0, "message": "无公式需要执行"}
+
+    executed = 0
+    errors = []
+
+    for key, cell_data in formula_cells.items():
+        formula = cell_data["formula"]
+        result = await execute_formula(formula, db, project_id, year, cells)
+
+        if result.get("error"):
+            errors.append({"cell": key, "formula": formula, "error": result["error"]})
+        elif result.get("value") is not None:
+            cells[key]["value"] = result["value"]
+            cells[key]["_calc_sources"] = result.get("sources", [])
+            executed += 1
+
+    # 保存更新后的 structure
+    sheet["cells"] = cells
+    structure["metadata"]["version"] = structure["metadata"].get("version", 0) + 1
+    structure["metadata"]["last_calc_at"] = __import__("datetime").datetime.utcnow().isoformat()
+    structure_path.write_text(json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # 版本快照
+    save_version_snapshot(structure, str(project_dir / "versions"))
+
+    # 同步 Excel + HTML
+    from app.services.excel_html_converter import structure_to_excel, structure_to_html
+    structure_to_excel(structure, str(project_dir / f"{file_stem}.xlsx"))
+    html = structure_to_html(structure, sheet_index=sheet_index, editable=True)
+    (project_dir / f"{file_stem}.html").write_text(html, encoding="utf-8")
+
+    return {
+        "executed": executed,
+        "total_formulas": len(formula_cells),
+        "errors": errors[:10],
+        "version": structure["metadata"]["version"],
+        "message": f"已执行 {executed}/{len(formula_cells)} 个公式",
+    }

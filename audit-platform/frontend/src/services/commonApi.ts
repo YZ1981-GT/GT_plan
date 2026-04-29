@@ -952,3 +952,51 @@ export async function exportModuleWord(projectId: string, module: string, params
   })
   return response.data
 }
+
+// ── 四式联动：编辑锁 ──
+
+export async function acquireEditLock(projectId: string, fileStem: string): Promise<{ locked: boolean }> {
+  const { data } = await http.post(`/api/projects/${projectId}/excel-html/lock/${fileStem}`)
+  return data
+}
+
+export async function releaseEditLock(projectId: string, fileStem: string): Promise<void> {
+  await http.delete(`/api/projects/${projectId}/excel-html/lock/${fileStem}`)
+}
+
+export async function refreshEditLock(projectId: string, fileStem: string): Promise<void> {
+  await http.put(`/api/projects/${projectId}/excel-html/lock/${fileStem}/refresh`)
+}
+
+// ── 四式联动：版本管理 ──
+
+export async function listFileVersions(projectId: string, fileStem: string): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/excel-html/versions/${fileStem}`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function diffFileVersions(projectId: string, fileStem: string, v1: number, v2: number): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/excel-html/versions/${fileStem}/diff`, { params: { v1, v2 } })
+  return data
+}
+
+export async function rollbackFileVersion(projectId: string, fileStem: string, version: number): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/excel-html/versions/${fileStem}/rollback/${version}`)
+  return data
+}
+
+// ── 四式联动：公式执行 ──
+
+export async function executeFormulas(projectId: string, fileStem: string, params?: { sheet_index?: number; year?: number }): Promise<{
+  executed: number; total_formulas: number; errors: any[]; version: number
+}> {
+  const { data } = await http.post(`/api/projects/${projectId}/excel-html/execute-formulas/${fileStem}`, null, { params })
+  return data
+}
+
+// ── 四式联动：单元格信息 ──
+
+export async function getCellInfo(projectId: string, fileStem: string, cell: string): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/excel-html/cell-info/${fileStem}`, { params: { cell } })
+  return data
+}
