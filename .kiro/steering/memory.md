@@ -1569,3 +1569,5 @@ inclusion: always
 - 知识库权限模型：文件夹级access_level+project_ids→文档继承或独立设置；权限过滤在list_folders/list_documents中自动执行；预制9个分类文件夹（与现有knowledge_service对应）
 - 知识库升级复盘发现5个问题（2026-04-29）：①新旧知识库并存冲突（旧knowledge_service文件系统+旧API /api/knowledge/ vs 新knowledge_folder_service数据库+新API /api/knowledge-library/）②RAG检索未接入新模型（reference_doc_service.load_from_knowledge_base仍调旧KnowledgeService）③文档内容提取不完整（PDF/DOCX上传只保存文件未提取content_text）④前端KnowledgeBase.vue未改造为树形目录⑤private权限缺user_id过滤
 - 知识库最关键待修：①新旧统一（让旧API代理到新服务或迁移）②RAG接入新模型（从KnowledgeDocument.content_text检索）
+- 知识库5项修复已完成（2026-04-29，commit 36032cc已推送）：①RAG检索优先新模型KnowledgeDocument.content_text（ilike模糊匹配category+keywords，无结果降级旧KnowledgeService）②文档上传提取增强（txt/md直接读+docx用python-docx+pdf用PyPDF2前50页，返回text_extracted标记）③private权限list_folders新增user_id参数（created_by==user_id才可见）④新旧API并存策略（旧/api/knowledge/保持兼容，新/api/knowledge-library/并行）⑤前端改造待后续专项
+- 知识库新增依赖需求：python-docx（已有）+PyPDF2（需确认是否已安装，PDF提取用）

@@ -1,183 +1,204 @@
 <template>
-  <div class="gt-knowledge">
-    <div class="gt-kb-header">
-      <h2>知识库</h2>
-      <el-button size="small" type="primary" @click="refresh" :loading="loading">
-        <el-icon><Refresh /></el-icon> 刷新
-      </el-button>
+  <div class="gt-knowledge gt-fade-in">
+    <!-- 页面横幅 -->
+    <div class="gt-kb-banner">
+      <div class="gt-kb-banner-text">
+        <h2>知识库</h2>
+        <p>{{ folderTree.length }} 个分类 · {{ totalDocs }} 个文档</p>
+      </div>
+      <div class="gt-kb-banner-actions">
+        <el-button size="small" @click="onCreateFolder" round>新建文件夹</el-button>
+        <el-button size="small" @click="onUploadDocs" round>上传文档</el-button>
+        <el-button size="small" @click="loadTree" :loading="treeLoading" round>刷新</el-button>
+      </div>
     </div>
 
-    <!-- 全局 / 项目 Tab 切换 -->
-    <el-tabs v-model="activeTab" @tab-change="onTabChange">
-      <el-tab-pane label="全局知识库" name="global">
-        <p class="gt-kb-desc">所有项目共享的参考资料（会计准则、监管规定、行业指引等）</p>
-      </el-tab-pane>
-      <el-tab-pane label="项目知识库" name="project">
-        <p class="gt-kb-desc">
-          项目专属文档（底稿、附注、工作记录等）
-          <el-select
-            v-model="selectedProjectId"
-            placeholder="选择项目"
-            size="small"
-            filterable
-            style="width: 280px; margin-left: 12px"
-            @change="loadProjectDocs"
+    <!-- 主体：左树 + 右文档列表 -->
+    <el-row :gutter="12" class="gt-kb-body">
+      <!-- 左侧：文件夹树 -->
+      <el-col :span="7">
+        <div class="gt-kb-panel gt-kb-tree-panel">
+          <h4 class="gt-kb-panel-title">目录</h4>
+          <el-tree
+            :data="folderTree"
+            :props="{ label: 'name', children: 'children' }"
+            node-key="id"
+            highlight-current
+            default-expand-all
+            @node-click="onFolderClick"
           >
-            <el-option
-              v-for="p in projects"
-              :key="p.id"
-              :label="`${p.client_name || p.name} (${p.audit_year || ''})`"
-              :value="p.id"
-            />
-          </el-select>
-        </p>
-      </el-tab-pane>
-    </el-tabs>
+            <template #default="{ data }">
+              <div class="gt-kb-tree-node">
+                <span>{{ data.name }}</span>
+                <el-tag v-if="data.category" size="small" type="info" style="margin-left: 4px">预制</el-tag>
+                <el-tag v-if="data.access_level === 'project_group'" size="small" type="warning" style="margin-left: 4px">项目组</el-tag>
+                <el-tag v-if="data.access_level === 'private'" size="small" type="danger" style="margin-left: 4px">私有</el-tag>
+                <span class="gt-kb-doc-count">({{ data.doc_count }})</span>
+              </div>
+            </template>
+          </el-tree>
+          <el-empty v-if="!treeLoading && folderTree.length === 0" description="暂无文件夹" :image-size="60" />
+        </div>
+      </el-col>
 
-    <!-- 全局知识库：分类卡片 -->
-    <template v-if="activeTab === 'global'">
-      <div class="gt-kb-grid">
-        <div
-          v-for="lib in libraries"
-          :key="lib.key"
-          class="gt-kb-card"
-          :class="{ 'gt-kb-card--active': selectedCategory === lib.key }"
-          @click="selectCategory(lib.key)"
-        >
-          <div class="gt-kb-card-icon">{{ lib.icon }}</div>
-          <div class="gt-kb-card-info">
-            <div class="gt-kb-card-name">{{ lib.name }}</div>
-            <div class="gt-kb-card-count">{{ lib.doc_count ?? 0 }} 个文档</div>
+      <!-- 右侧：文档列表 -->
+      <el-col :span="17">
+        <div class="gt-kb-panel gt-kb-doc-panel">
+          <div class="gt-kb-doc-header">
+            <h4>{{ selectedFolder?.name || '请选择文件夹' }}</h4>
+            <el-button v-if="selectedFolder" size="small" type="primary" @click="onUploadToFolder">
+              上传到此文件夹
+            </el-button>
+          </div>
+          <el-table v-if="documents.length" :data="documents" size="small" border stripe>
+            <el-table-column prop="name" label="文档名称" min-width="250" show-overflow-tooltip />
+            <el-table-column prop="file_type" label="类型" width="70" align="center">
+              <template #default="{ row }">
+                <el-tag size="small">{{ row.file_type || '—' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="大小" width="90" align="right">
+              <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
+            </el-table-column>
+            <el-table-column label="权限" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.access_level === 'project_group'" size="small" type="warning">项目组</el-tag>
+                <el-tag v-else-if="row.access_level === 'private'" size="small" type="danger">私有</el-tag>
+                <el-tag v-else size="small" type="success">公开</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="created_at" label="创建时间" width="110">
+              <template #default="{ row }">{{ row.created_at?.slice(0, 10) || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="80" align="center">
+              <template #default="{ row }">
+                <el-button size="small" link type="danger" @click="onDeleteDoc(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="selectedFolder && !docLoading && documents.length === 0" description="暂无文档" :image-size="60" />
+          <div v-if="!selectedFolder" class="gt-kb-placeholder">
+            <p>← 请从左侧选择一个文件夹查看文档</p>
           </div>
         </div>
-      </div>
-    </template>
+      </el-col>
+    </el-row>
 
-    <!-- 文档列表（全局分类 或 项目级） -->
-    <div v-if="showDocList" class="gt-kb-detail">
-      <div class="gt-kb-detail-header">
-        <h3>{{ docListTitle }}</h3>
-        <el-upload :auto-upload="false" :show-file-list="false" @change="onUpload">
-          <el-button size="small" type="primary">上传文档</el-button>
-        </el-upload>
-      </div>
+    <!-- 新建文件夹弹窗 -->
+    <el-dialog v-model="showCreateFolder" title="新建文件夹" width="400px" append-to-body>
+      <el-form label-width="80px">
+        <el-form-item label="名称">
+          <el-input v-model="newFolderName" placeholder="文件夹名称" />
+        </el-form-item>
+        <el-form-item label="位置">
+          <el-select v-model="newFolderParent" placeholder="顶级（根目录）" clearable style="width: 100%">
+            <el-option v-for="f in flatFolders" :key="f.id" :label="f.name" :value="f.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="权限">
+          <el-radio-group v-model="newFolderAccess">
+            <el-radio value="public">公开</el-radio>
+            <el-radio value="project_group">项目组</el-radio>
+            <el-radio value="private">私有</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCreateFolder = false">取消</el-button>
+        <el-button type="primary" @click="doCreateFolder" :disabled="!newFolderName">创建</el-button>
+      </template>
+    </el-dialog>
 
-      <el-table :data="documents" stripe size="small" v-loading="docLoading">
-        <el-table-column prop="name" label="文档名称" min-width="250" show-overflow-tooltip />
-        <el-table-column label="大小" width="100" align="right">
-          <template #default="{ row }">{{ formatSize(row.size) }}</template>
-        </el-table-column>
-        <el-table-column label="更新时间" width="180">
-          <template #default="{ row }">{{ formatTime(row.modified_at) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" align="center">
-          <template #default="{ row }">
-            <el-button size="small" @click="onDownload(row.name)">下载</el-button>
-            <el-button type="danger" size="small" text @click="onDelete(row.name)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <el-empty v-if="!docLoading && documents.length === 0" description="暂无文档，点击上传添加" />
-    </div>
-
-    <!-- 项目未选择提示 -->
-    <el-empty
-      v-if="activeTab === 'project' && !selectedProjectId"
-      description="请先选择一个项目"
-      style="margin-top: 40px"
-    />
+    <!-- 上传文档弹窗 -->
+    <el-dialog v-model="showUpload" title="上传文档" width="500px" append-to-body>
+      <el-upload
+        drag
+        multiple
+        :auto-upload="false"
+        v-model:file-list="uploadFiles"
+        accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.pptx"
+      >
+        <el-icon style="font-size: 40px; color: #c0c4cc"><Upload /></el-icon>
+        <div>拖拽文件到此处，或点击选择</div>
+        <template #tip>
+          <div style="color: #999; font-size: 12px">支持 PDF/Word/Excel/TXT/Markdown</div>
+        </template>
+      </el-upload>
+      <template #footer>
+        <el-button @click="showUpload = false">取消</el-button>
+        <el-button type="primary" @click="doUpload" :loading="uploading" :disabled="uploadFiles.length === 0">
+          上传 ({{ uploadFiles.length }} 个文件)
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
-import {
-  listProjects, listKnowledgeLibraries, listKnowledgeDocs,
-  uploadKnowledgeDoc, downloadKnowledgeDoc, deleteKnowledgeDoc,
-} from '@/services/commonApi'
+import { Upload } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 
-interface Library { key: string; name: string; icon: string; doc_count: number; description?: string }
-
-const loading = ref(false)
-const docLoading = ref(false)
-const activeTab = ref('global')
-const selectedCategory = ref('')
-const selectedProjectId = ref('')
+const folderTree = ref<any[]>([])
 const documents = ref<any[]>([])
-const projects = ref<any[]>([])
+const selectedFolder = ref<any>(null)
+const treeLoading = ref(false)
+const docLoading = ref(false)
 
-const libraries = ref<Library[]>([])
+// 新建文件夹
+const showCreateFolder = ref(false)
+const newFolderName = ref('')
+const newFolderParent = ref<string | null>(null)
+const newFolderAccess = ref('public')
 
-const showDocList = computed(() => {
-  if (activeTab.value === 'global') return !!selectedCategory.value
-  return !!selectedProjectId.value
+// 上传
+const showUpload = ref(false)
+const uploadFiles = ref<any[]>([])
+const uploading = ref(false)
+
+const totalDocs = computed(() => {
+  let count = 0
+  const countTree = (nodes: any[]) => {
+    for (const n of nodes) {
+      count += n.doc_count || 0
+      if (n.children) countTree(n.children)
+    }
+  }
+  countTree(folderTree.value)
+  return count
 })
 
-const docListTitle = computed(() => {
-  if (activeTab.value === 'global') {
-    const lib = libraries.value.find(l => l.key === selectedCategory.value)
-    return lib?.name || selectedCategory.value
+const flatFolders = computed(() => {
+  const result: any[] = []
+  const flatten = (nodes: any[], prefix = '') => {
+    for (const n of nodes) {
+      result.push({ id: n.id, name: prefix + n.name })
+      if (n.children) flatten(n.children, prefix + n.name + ' / ')
+    }
   }
-  const proj = projects.value.find(p => p.id === selectedProjectId.value)
-  return proj ? `${proj.client_name || proj.name} — 项目文档` : '项目文档'
+  flatten(folderTree.value)
+  return result
 })
 
-// 当前文档操作的 API 基础路径
-function docApiBase(): string {
-  if (activeTab.value === 'global') {
-    return `/api/knowledge/${selectedCategory.value}/documents`
-  }
-  return `/api/projects/${selectedProjectId.value}/knowledge/documents`
-}
-
-async function loadLibraries() {
-  loading.value = true
+async function loadTree() {
+  treeLoading.value = true
   try {
-    libraries.value = await listKnowledgeLibraries()
+    const { data } = await http.get('/api/knowledge-library/tree')
+    folderTree.value = Array.isArray(data) ? data : (data?.data || [])
   } catch {
-    // 降级使用默认分类
-    libraries.value = [
-      { key: 'workpaper_templates', name: '底稿模板库', icon: '📋', doc_count: 0 },
-      { key: 'regulations', name: '监管规定库', icon: '⚖️', doc_count: 0 },
-      { key: 'accounting_standards', name: '会计准则库', icon: '📖', doc_count: 0 },
-      { key: 'quality_control', name: '质控标准库', icon: '✅', doc_count: 0 },
-      { key: 'audit_procedures', name: '审计程序库', icon: '📝', doc_count: 0 },
-      { key: 'industry_guides', name: '行业指引库', icon: '🏭', doc_count: 0 },
-      { key: 'prompts', name: '提示词库', icon: '💡', doc_count: 0 },
-      { key: 'report_templates', name: '报告模板库', icon: '📄', doc_count: 0 },
-      { key: 'notes', name: '笔记库', icon: '📌', doc_count: 0 },
-    ]
+    folderTree.value = []
   } finally {
-    loading.value = false
+    treeLoading.value = false
   }
 }
 
-async function loadProjectList() {
-  try {
-    projects.value = await listProjects()
-  } catch {
-    projects.value = []
-  }
-}
-
-async function selectCategory(key: string) {
-  selectedCategory.value = key
-  await loadDocuments()
-}
-
-async function loadProjectDocs() {
-  if (!selectedProjectId.value) return
-  await loadDocuments()
-}
-
-async function loadDocuments() {
+async function onFolderClick(node: any) {
+  selectedFolder.value = node
   docLoading.value = true
-  documents.value = []
   try {
-    documents.value = await listKnowledgeDocs(docApiBase())
+    const { data } = await http.get(`/api/knowledge-library/folders/${node.id}/documents`)
+    documents.value = Array.isArray(data) ? data : (data?.data || [])
   } catch {
     documents.value = []
   } finally {
@@ -185,103 +206,101 @@ async function loadDocuments() {
   }
 }
 
-async function onUpload(file: any) {
-  const formData = new FormData()
-  formData.append('file', file.raw)
-  try {
-    await uploadKnowledgeDoc(docApiBase(), formData)
-    ElMessage.success('上传成功')
-    await loadDocuments()
-    if (activeTab.value === 'global') await loadLibraries()
-  } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '上传失败')
-  }
+function onCreateFolder() {
+  newFolderName.value = ''
+  newFolderParent.value = selectedFolder.value?.id || null
+  newFolderAccess.value = 'public'
+  showCreateFolder.value = true
 }
 
-async function onDownload(name: string) {
+async function doCreateFolder() {
   try {
-    const blob = await downloadKnowledgeDoc(docApiBase(), name)
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = name
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch {
-    ElMessage.error('下载失败')
-  }
+    await http.post('/api/knowledge-library/folders', {
+      name: newFolderName.value,
+      parent_id: newFolderParent.value,
+      access_level: newFolderAccess.value,
+    })
+    ElMessage.success('文件夹创建成功')
+    showCreateFolder.value = false
+    await loadTree()
+  } catch { ElMessage.error('创建失败') }
 }
 
-async function onDelete(name: string) {
-  await ElMessageBox.confirm(`确定删除「${name}」？`, '删除确认', { type: 'warning' })
+function onUploadDocs() {
+  if (!selectedFolder.value) {
+    ElMessage.warning('请先选择一个文件夹')
+    return
+  }
+  uploadFiles.value = []
+  showUpload.value = true
+}
+
+function onUploadToFolder() {
+  uploadFiles.value = []
+  showUpload.value = true
+}
+
+async function doUpload() {
+  if (!selectedFolder.value || uploadFiles.value.length === 0) return
+  uploading.value = true
   try {
-    await deleteKnowledgeDoc(docApiBase(), name)
+    const formData = new FormData()
+    for (const f of uploadFiles.value) {
+      formData.append('files', f.raw)
+    }
+    const { data } = await http.post(
+      `/api/knowledge-library/folders/${selectedFolder.value.id}/upload`,
+      formData,
+    )
+    const result = data?.data ?? data
+    ElMessage.success(`上传成功：${result?.uploaded || 0} 个文件`)
+    showUpload.value = false
+    // 刷新文档列表
+    await onFolderClick(selectedFolder.value)
+    await loadTree()
+  } catch { ElMessage.error('上传失败') }
+  finally { uploading.value = false }
+}
+
+async function onDeleteDoc(doc: any) {
+  await ElMessageBox.confirm(`确认删除文档「${doc.name}」？`, '删除确认')
+  try {
+    await http.delete(`/api/knowledge-library/documents/${doc.id}`)
     ElMessage.success('已删除')
-    await loadDocuments()
-    if (activeTab.value === 'global') await loadLibraries()
-  } catch {
-    ElMessage.error('删除失败')
-  }
+    if (selectedFolder.value) await onFolderClick(selectedFolder.value)
+    await loadTree()
+  } catch { ElMessage.error('删除失败') }
 }
 
-function onTabChange() {
-  documents.value = []
-  selectedCategory.value = ''
-}
-
-async function refresh() {
-  await loadLibraries()
-  if (activeTab.value === 'project') await loadProjectList()
-  if (showDocList.value) await loadDocuments()
-}
-
-function formatSize(bytes: number) {
+function formatSize(bytes: number): string {
   if (!bytes) return '—'
-  if (bytes < 1024) return bytes + 'B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB'
-  return (bytes / 1024 / 1024).toFixed(1) + 'MB'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
 }
 
-function formatTime(t: string | null) {
-  if (!t) return '—'
-  return t.slice(0, 19).replace('T', ' ')
-}
-
-onMounted(async () => {
-  await loadLibraries()
-  await loadProjectList()
-})
+onMounted(loadTree)
 </script>
 
 <style scoped>
-.gt-knowledge { padding: 20px; }
-.gt-kb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.gt-kb-header h2 { margin: 0; font-size: 20px; color: #333; }
-.gt-kb-desc { color: #888; font-size: 13px; margin: 0 0 16px; display: flex; align-items: center; }
-
-.gt-kb-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px; margin-bottom: 24px;
-}
-.gt-kb-card {
-  display: flex; align-items: center; gap: 12px;
-  padding: 16px; border: 1px solid #eee; border-radius: 8px;
-  cursor: pointer; transition: all 0.2s; background: #fff;
-}
-.gt-kb-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75,45,119,0.08); }
-.gt-kb-card--active {
-  border-color: var(--gt-color-primary, #4b2d77);
-  background: #f5f0ff;
-  box-shadow: 0 2px 8px rgba(75,45,119,0.12);
-}
-.gt-kb-card-icon { font-size: 28px; }
-.gt-kb-card-name { font-size: 14px; font-weight: 600; color: #333; }
-.gt-kb-card-count { font-size: 12px; color: #999; margin-top: 2px; }
-
-.gt-kb-detail { margin-top: 8px; }
-.gt-kb-detail-header {
+.gt-knowledge { padding: var(--gt-space-5); }
+.gt-kb-banner {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee;
+  background: var(--gt-gradient-primary);
+  border-radius: var(--gt-radius-lg);
+  padding: 16px 24px; margin-bottom: 16px; color: #fff;
+  position: relative; overflow: hidden;
 }
-.gt-kb-detail-header h3 { margin: 0; font-size: 16px; color: #333; }
+.gt-kb-banner-text h2 { margin: 0 0 2px; font-size: 18px; }
+.gt-kb-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-kb-banner-actions { display: flex; gap: 8px; }
+.gt-kb-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.gt-kb-body { min-height: 500px; }
+.gt-kb-panel { background: #fff; border-radius: var(--gt-radius-md); border: 1px solid #f0f0f0; padding: 16px; height: 100%; }
+.gt-kb-panel-title { margin: 0 0 12px; font-size: 14px; color: var(--gt-color-text); }
+.gt-kb-tree-node { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.gt-kb-doc-count { font-size: 11px; color: #999; margin-left: 2px; }
+.gt-kb-doc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.gt-kb-doc-header h4 { margin: 0; font-size: 14px; }
+.gt-kb-placeholder { text-align: center; padding: 60px 0; color: #999; }
 </style>
