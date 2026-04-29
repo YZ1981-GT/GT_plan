@@ -609,3 +609,367 @@ async def list_wp_cross_refs(
         }
         for i in items
     ]
+
+
+# ═══ 底稿看板视图 + 批量操作 + 编制时间 + 程序联动 ═══
+
+class BatchAssignRequest(BaseModel):
+    wp_ids: list[str]
+    assigned_to: UUID | None = None
+    reviewer: UUID | None = None
+
+
+class BatchSubmitRequest(BaseModel):
+    wp_ids: list[str]
+
+
+@router.get("/working-papers-kanban")
+async def get_workpapers_kanban(
+    project_id: UUID,
+    audit_cycle: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """底稿看板视图 — 按状态分组统计
+
+    返回4列看板数据：待编制 / 编制中 / 待复核 / 已通过
+    每列包含底稿列表（编号/名称/负责人/天数）
+    """
+    query = sa.select(WpIndex, WorkingPaper).outerjoin(
+        WorkingPaper, sa.and_(
+            WorkingPaper.wp_index_id == WpIndex.id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    ).where(
+        WpIndex.project_id == project_id,
+        WpIndex.is_deleted == sa.false(),
+    )
+    if audit_cycle:
+        query = query.where(WpIndex.audit_cycle == audit_cycle)
+    query = query.order_by(WpIndex.wp_code)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    kanban = {
+        "not_started": [],   # 待编制
+        "in_progress": [],   # 编制中
+        "under_review": [],  # 待复核
+        "completed": [],     # 已通过
+    }
+
+    for idx_row, wp in rows:
+        status = wp.status.value if wp and wp.status else "not_started"
+        item = {
+            "wp_id": str(wp.id) if wp else None,
+            "wp_code": idx_row.wp_code,
+            "wp_name": idx_row.wp_name,
+            "audit_cycle": idx_row.audit_cycle,
+            "status": status,
+            "assigned_to": str(wp.assigned_to) if wp and wp.assigned_to else None,
+            "reviewer": str(wp.reviewer) if wp and hasattr(wp, 'reviewer') and wp.reviewer else None,
+        }
+
+        if status in ("not_started",):
+            kanban["not_started"].append(item)
+        elif status in ("draft", "edit_complete"):
+            kanban["in_progress"].append(item)
+        elif status in ("under_review", "review_level1", "review_level2"):
+            kanban["under_review"].append(item)
+        elif status in ("review_passed", "archived"):
+            kanban["completed"].append(item)
+        else:
+            kanban["in_progress"].append(item)
+
+    # 统计
+    stats = {k: len(v) for k, v in kanban.items()}
+    stats["total"] = sum(stats.values())
+    stats["completion_rate"] = round(stats["completed"] / max(stats["total"], 1) * 100, 1)
+
+    return {"kanban": kanban, "stats": stats}
+
+
+@router.post("/working-papers/batch-assign")
+async def batch_assign(
+    project_id: UUID,
+    data: BatchAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("review")),
+):
+    """批量分配底稿（编制人/复核人）"""
+    updated = 0
+    for wp_id_str in data.wp_ids:
+        wp_id = UUID(wp_id_str)
+        result = await db.execute(
+            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
+        )
+        wp = result.scalar_one_or_none()
+        if not wp:
+            continue
+        if data.assigned_to is not None:
+            wp.assigned_to = data.assigned_to
+        if data.reviewer is not None:
+            wp.reviewer = data.reviewer
+        updated += 1
+
+    await db.flush()
+    await db.commit()
+    return {"updated": updated, "message": f"已批量分配 {updated} 个底稿"}
+
+
+@router.post("/working-papers/batch-submit")
+async def batch_submit_review(
+    project_id: UUID,
+    data: BatchSubmitRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """批量提交复核（跳过不满足条件的底稿）"""
+    submitted = 0
+    skipped = []
+
+    for wp_id_str in data.wp_ids:
+        wp_id = UUID(wp_id_str)
+        result = await db.execute(
+            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
+        )
+        wp = result.scalar_one_or_none()
+        if not wp:
+            skipped.append({"wp_id": wp_id_str, "reason": "不存在"})
+            continue
+        if wp.status != WpFileStatus.edit_complete:
+            skipped.append({"wp_id": wp_id_str, "reason": f"状态为{wp.status.value}，需先完成编制"})
+            continue
+
+        # 简化门禁：检查复核人是否已分配
+        if not wp.reviewer:
+            skipped.append({"wp_id": wp_id_str, "reason": "未分配复核人"})
+            continue
+
+        wp.status = WpFileStatus.under_review
+        submitted += 1
+
+    await db.flush()
+    await db.commit()
+    return {"submitted": submitted, "skipped": skipped, "message": f"已提交 {submitted} 个，跳过 {len(skipped)} 个"}
+
+
+@router.post("/working-papers/batch-export")
+async def batch_export_zip(
+    project_id: UUID,
+    data: BatchSubmitRequest,  # 复用 wp_ids 字段
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """批量导出底稿为 ZIP"""
+    import io
+    import zipfile
+    from pathlib import Path
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for wp_id_str in data.wp_ids:
+            wp_id = UUID(wp_id_str)
+            result = await db.execute(
+                sa.select(WorkingPaper, WpIndex)
+                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+                .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
+            )
+            row = result.first()
+            if not row:
+                continue
+            wp, idx = row
+            if wp.file_path:
+                fp = Path(wp.file_path)
+                if fp.exists():
+                    arcname = f"{idx.audit_cycle or 'OTHER'}/{idx.wp_code}.xlsx"
+                    zf.write(fp, arcname)
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=workpapers_{project_id}.zip"},
+    )
+
+
+@router.get("/working-papers/{wp_id}/edit-time")
+async def get_edit_time(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取底稿编制时间统计
+
+    从审计日志中提取编辑时间段（首次编辑→提交复核）。
+    """
+    from app.models.core import Log
+
+    # 查找该底稿的编辑相关日志
+    result = await db.execute(
+        sa.select(Log.created_at, Log.action).where(
+            sa.or_(
+                sa.and_(Log.action == "workpaper_online_open", Log.new_value.contains(str(wp_id))),
+                sa.and_(Log.action == "workpaper_online_save", Log.new_value.contains(str(wp_id))),
+            )
+        ).order_by(Log.created_at)
+    )
+    logs = result.all()
+
+    if not logs:
+        return {"wp_id": str(wp_id), "total_minutes": 0, "sessions": 0, "message": "无编辑记录"}
+
+    # 计算编辑时间（相邻 open-save 配对）
+    total_minutes = 0
+    sessions = 0
+    first_edit = logs[0][0] if logs else None
+    last_edit = logs[-1][0] if logs else None
+
+    # 简化计算：总时长 = 最后一次操作 - 第一次操作
+    if first_edit and last_edit and first_edit != last_edit:
+        diff = (last_edit - first_edit).total_seconds() / 60
+        total_minutes = round(diff, 1)
+        sessions = len([l for l in logs if l[1] == "workpaper_online_open"])
+
+    return {
+        "wp_id": str(wp_id),
+        "total_minutes": total_minutes,
+        "sessions": sessions,
+        "first_edit": first_edit.isoformat() if first_edit else None,
+        "last_edit": last_edit.isoformat() if last_edit else None,
+    }
+
+
+@router.get("/working-papers/{wp_id}/cross-links")
+async def get_cross_links(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取底稿间可点击的穿透链接
+
+    返回当前底稿引用的其他底稿列表（含跳转URL）。
+    基于 wp_account_mapping.json 的同循环关联 + 交叉索引。
+    """
+    from app.services.wp_data_rules import get_mapping_for_wp, _load_mapping
+
+    # 获取当前底稿信息
+    result = await db.execute(
+        sa.select(WpIndex).where(WpIndex.id == (
+            sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id).scalar_subquery()
+        ))
+    )
+    idx = result.scalar_one_or_none()
+    if not idx:
+        return {"links": []}
+
+    wp_code = idx.wp_code
+    cycle = idx.audit_cycle
+
+    # 同循环的其他底稿
+    mappings = _load_mapping()
+    same_cycle = [m for m in mappings if m.get("cycle") == cycle and m.get("wp_code") != wp_code]
+
+    links = []
+    for m in same_cycle:
+        # 查找该底稿是否存在
+        target_result = await db.execute(
+            sa.select(WpIndex.id, WorkingPaper.id).outerjoin(
+                WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id
+            ).where(
+                WpIndex.project_id == project_id,
+                WpIndex.wp_code == m["wp_code"],
+                WpIndex.is_deleted == sa.false(),
+            ).limit(1)
+        )
+        target = target_result.first()
+        links.append({
+            "wp_code": m["wp_code"],
+            "wp_name": m.get("wp_name", ""),
+            "exists": target is not None,
+            "wp_id": str(target[1]) if target and target[1] else None,
+            "jump_url": f"/projects/{project_id}/workpapers?code={m['wp_code']}",
+            "relation": "同循环关联",
+        })
+
+    # 审定表 ↔ 附注链接
+    mapping = get_mapping_for_wp(wp_code)
+    if mapping and mapping.get("note_section"):
+        links.append({
+            "wp_code": f"附注{mapping['note_section']}",
+            "wp_name": f"附注 {mapping['note_section']} {mapping.get('account_name', '')}",
+            "exists": True,
+            "jump_url": f"/projects/{project_id}/disclosure-notes?section={mapping['note_section']}",
+            "relation": "对应附注",
+        })
+
+    # 审定表 ↔ 报表行次链接
+    if mapping and mapping.get("report_row"):
+        links.append({
+            "wp_code": mapping["report_row"],
+            "wp_name": f"报表行次 {mapping['report_row']}",
+            "exists": True,
+            "jump_url": f"/projects/{project_id}/reports?row={mapping['report_row']}",
+            "relation": "对应报表",
+        })
+
+    return {"wp_code": wp_code, "links": links, "count": len(links)}
+
+
+@router.post("/working-papers/{wp_id}/sync-procedure")
+async def sync_procedure_status(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """底稿状态与审计程序联动
+
+    底稿提交复核时 → 对应程序实例标记为 completed
+    底稿退回时 → 对应程序实例标记为 in_progress
+    """
+    from app.models.procedure_models import ProcedureInstance
+
+    # 获取底稿编号
+    result = await db.execute(
+        sa.select(WorkingPaper, WpIndex)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == sa.false())
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    wp, idx = row
+    wp_code = idx.wp_code
+    wp_status = wp.status.value if wp.status else "draft"
+
+    # 映射底稿状态到程序执行状态
+    if wp_status in ("under_review", "review_passed", "archived"):
+        exec_status = "completed"
+    elif wp_status in ("revision_required",):
+        exec_status = "in_progress"
+    elif wp_status in ("draft", "edit_complete"):
+        exec_status = "in_progress"
+    else:
+        exec_status = "not_started"
+
+    # 更新对应的程序实例
+    updated = await db.execute(
+        sa.update(ProcedureInstance).where(
+            ProcedureInstance.project_id == project_id,
+            ProcedureInstance.wp_code == wp_code,
+            ProcedureInstance.is_deleted == sa.false(),
+        ).values(execution_status=exec_status)
+    )
+
+    await db.flush()
+    await db.commit()
+    return {
+        "wp_code": wp_code,
+        "wp_status": wp_status,
+        "procedure_status": exec_status,
+        "updated": updated.rowcount,
+    }

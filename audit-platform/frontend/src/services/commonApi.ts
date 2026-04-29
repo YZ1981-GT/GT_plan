@@ -1028,3 +1028,40 @@ export async function getImportOverview(projectId: string, year = 2025): Promise
   const { data } = await http.get(`/api/projects/${projectId}/import-intelligence/overview`, { params: { year } })
   return data
 }
+
+// ── 底稿看板+批量操作+穿透链接 ──
+
+export async function getWorkpapersKanban(projectId: string, auditCycle?: string): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/working-papers-kanban`, { params: auditCycle ? { audit_cycle: auditCycle } : undefined })
+  return data
+}
+
+export async function batchAssignWorkpapers(projectId: string, wpIds: string[], assignedTo?: string, reviewer?: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/working-papers/batch-assign`, { wp_ids: wpIds, assigned_to: assignedTo, reviewer })
+  return data
+}
+
+export async function batchSubmitReview(projectId: string, wpIds: string[]): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/working-papers/batch-submit`, { wp_ids: wpIds })
+  return data
+}
+
+export async function batchExportWorkpapers(projectId: string, wpIds: string[]): Promise<Blob> {
+  const response = await http.post(`/api/projects/${projectId}/working-papers/batch-export`, { wp_ids: wpIds }, { responseType: 'blob' })
+  return response.data
+}
+
+export async function getWorkpaperEditTime(projectId: string, wpId: string): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/edit-time`)
+  return data
+}
+
+export async function getWorkpaperCrossLinks(projectId: string, wpId: string): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/cross-links`)
+  return data
+}
+
+export async function syncWorkpaperProcedure(projectId: string, wpId: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/sync-procedure`)
+  return data
+}
