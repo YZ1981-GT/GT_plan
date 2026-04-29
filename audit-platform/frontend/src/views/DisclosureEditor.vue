@@ -21,6 +21,7 @@
           <el-button @click="onValidate" :loading="validateLoading" type="warning">执行校验</el-button>
         </el-tooltip>
         <el-button @click="showNoteFormulaManager = true">公式管理</el-button>
+        <el-button @click="openStructureEditor" type="info" plain>结构化编辑</el-button>
         <el-button @click="onExportWord" :loading="exportLoading" type="primary">导出 Word</el-button>
       </div>
     </div>
@@ -145,6 +146,17 @@
       :year="year"
       @applied="onFormulaApplied"
     />
+
+    <!-- 结构化编辑器弹窗 -->
+    <el-dialog v-model="showStructureEditor" title="结构化编辑" width="90%" fullscreen append-to-body>
+      <StructureEditor
+        v-if="showStructureEditor && currentNote"
+        :project-id="projectId"
+        module="disclosure_note"
+        :module-params="{ note_section: currentNote.note_section, year }"
+        @saved="onStructureEditorSaved"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -153,6 +165,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import NoteFormulaDialog from '@/components/formula/NoteFormulaDialog.vue'
+import StructureEditor from '@/components/formula/StructureEditor.vue'
 import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -176,6 +189,7 @@ const saveLoading = ref(false)
 const refreshLoading = ref(false)
 const exportLoading = ref(false)
 const showNoteFormulaManager = ref(false)
+const showStructureEditor = ref(false)
 const editMode = ref(false)
 const templateType = ref('soe')
 const customTemplateId = ref('')
@@ -304,6 +318,21 @@ async function onRefreshFromWP() {
 async function onFormulaApplied() {
   // 公式应用后刷新当前附注数据
   if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+}
+
+function openStructureEditor() {
+  if (!currentNote.value) {
+    ElMessage.warning('请先选择一个附注章节')
+    return
+  }
+  showStructureEditor.value = true
+}
+
+async function onStructureEditorSaved() {
+  // 结构化编辑器保存后刷新当前附注数据
+  showStructureEditor.value = false
+  if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+  ElMessage.success('结构化编辑已同步')
 }
 
 async function onClearAllFormulas() {

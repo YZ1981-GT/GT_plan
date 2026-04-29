@@ -142,6 +142,9 @@
 
       <!-- Action buttons -->
       <div class="preview-actions">
+        <el-button @click="smartEnhanceMapping" type="primary" plain>
+          智能匹配
+        </el-button>
         <el-button @click="showRefMappingDialog = true" type="info" plain>
           <el-icon><Connection /></el-icon> 参照映射
         </el-button>
@@ -1188,6 +1191,55 @@ async function saveCurrentSheetMapping() {
     })
   } catch {
     // 静默失败
+  }
+}
+
+async function smartEnhanceMapping() {
+  const sheet = activeSheet.value
+  if (!sheet || !wizardStore.projectId) return
+
+  const existingMapping: Record<string, string> = {}
+  for (const h of sheet.headers) {
+    if (columnMapping[h]) existingMapping[h] = columnMapping[h]!
+  }
+
+  try {
+    const { data } = await api.post(
+      `/api/projects/${wizardStore.projectId}/import-intelligence/enhance-mapping`,
+      { headers: sheet.headers, existing_mapping: existingMapping }
+    )
+    const result = data?.data ?? data
+
+    let applied = 0
+    // 应用高置信度匹配
+    if (result.enhanced) {
+      for (const [h, field] of Object.entries(result.enhanced)) {
+        if (!columnMapping[h]) {
+          columnMapping[h] = field as string
+          applied++
+        }
+      }
+    }
+    // 应用建议（confidence >= 0.7 自动采纳）
+    if (result.suggestions) {
+      for (const sug of result.suggestions) {
+        if (!columnMapping[sug.header] && sug.confidence >= 0.7) {
+          columnMapping[sug.header] = sug.suggested_field
+          applied++
+        }
+      }
+    }
+
+    const unmatched = result.unmatched?.length || 0
+    if (applied > 0) {
+      ElMessage.success(`智能匹配完成：新增 ${applied} 列映射${unmatched > 0 ? `，${unmatched} 列仍需手动` : ''}`)
+    } else if (unmatched > 0) {
+      ElMessage.info(`所有可识别列已匹配，${unmatched} 列无法自动识别请手动指定`)
+    } else {
+      ElMessage.info('所有列已匹配完成')
+    }
+  } catch {
+    ElMessage.warning('智能匹配服务暂不可用，请手动选择')
   }
 }
 
