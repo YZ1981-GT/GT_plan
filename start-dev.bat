@@ -7,7 +7,7 @@ if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 set "BACKEND_DIR=%ROOT_DIR%\backend"
 set "FRONTEND_DIR=%ROOT_DIR%\audit-platform\frontend"
 
-set "BACKEND_PORT=8000"
+set "BACKEND_PORT=9980"
 set "FRONTEND_PORT=3030"
 
 set "BACKEND_TITLE=GT Backend Dev"
@@ -34,7 +34,9 @@ if not exist "%FRONTEND_DIR%\node_modules" (
   exit /b 1
 )
 
-if exist "%BACKEND_DIR%\.venv\Scripts\python.exe" (
+if exist "%ROOT_DIR%\.venv\Scripts\python.exe" (
+  set "BACKEND_START_CMD="%ROOT_DIR%\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload"
+) else if exist "%BACKEND_DIR%\.venv\Scripts\python.exe" (
   set "BACKEND_START_CMD="%BACKEND_DIR%\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload"
 ) else (
   where py >nul 2>nul
