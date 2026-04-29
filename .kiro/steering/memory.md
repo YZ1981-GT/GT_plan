@@ -1538,3 +1538,5 @@ inclusion: always
 - 前端TS错误修复+建表脚本增强已完成（2026-04-29，commit 01a060d+4397ee0已推送）：consolidationApi.ts类型补全（ConsolScopeItem+ComponentAuditor+InstructionResult+Instruction新增字段+createResult/updateResult函数）；_init_tables.py新增dataset_models/phase12-16_models导入+建表后自动加载report_config_seed.json 624行种子数据（幂等，已有数据跳过）
 - 本轮总计20个commit（cc8f47d→4397ee0），全部已推送GitHub
 - 剩余TS错误：约120个集中在consolidation/组件（已标记developing不影响核心）+约15个unused variable（TS6133不影响运行）
+- 前端TS错误批量修复已完成（2026-04-29，commit 9d89a98已推送）：非合并报表15个错误全部修复——commonApi新增listAnnotations()、AttachmentPreview添加api别名、AccountImportStep import路径修正(@/stores/wizard)、DisclosureEditor slot加$index、WorkpaperWorkbench补齐year参数、移除多处unused import；剩余约120个错误全部在consolidation/组件（developing模块不影响核心）
+- 本轮最终commit数：21个（cc8f47d→9d89a98），全部已推送GitHub
