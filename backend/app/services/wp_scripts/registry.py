@@ -1,7 +1,16 @@
-"""底稿精细化脚本注册表
+"""底稿处理注册表 — 统一委托给通用处理引擎
 
-根据底稿编号前缀匹配对应的精细化脚本。
-每个脚本提供：extract_data / generate_audit_explanation / get_review_checklist
+所有底稿通过 wp_generic_processor 通用规则处理，
+不再为每个科目维护独立脚本。
+
+通用规则覆盖：
+- 表头行自动检测（关键词扫描）
+- 列含义自动映射（项目/期末/期初/调整/增减）
+- 合计行自动识别
+- Sheet类型自动推断（审定表/明细表/分析表/变动表/账龄表）
+- 数据提取为结构化格式（接入四式联动）
+
+如需特定科目的额外处理逻辑，在 wp_parse_rules.json 中配置规则即可。
 """
 
 from __future__ import annotations
@@ -9,57 +18,42 @@ from __future__ import annotations
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# 脚本注册表：wp_code 前缀 → 模块
-_SCRIPT_REGISTRY = {
-    "E1": "app.services.wp_scripts.e1_cash",
-    "D1": "app.services.wp_scripts.d1_receivable",
-    "H1": "app.services.wp_scripts.h1_fixed_asset",
-}
-
-
-def get_script_module(wp_code: str):
-    """根据底稿编号获取对应的精细化脚本模块"""
-    import importlib
-    for prefix, module_path in _SCRIPT_REGISTRY.items():
-        if wp_code.startswith(prefix):
-            return importlib.import_module(module_path)
-    return None
-
 
 async def run_extract(db: AsyncSession, project_id: UUID, year: int, wp_code: str) -> dict | None:
-    """执行数据提取"""
-    mod = get_script_module(wp_code)
-    if mod and hasattr(mod, "extract_data"):
-        return await mod.extract_data(db, project_id, year)
-    return None
+    """执行数据提取 — 委托给通用处理引擎"""
+    from app.services.wp_generic_processor import parse_workpaper_generic
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.select(WorkingPaper)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WpIndex.project_id == project_id, WpIndex.wp_code == wp_code,
+               WorkingPaper.is_deleted == sa.false())
+        .limit(1)
+    )
+    wp = result.scalar_one_or_none()
+    if not wp or not wp.file_path:
+        return None
+
+    return parse_workpaper_generic(wp.file_path, wp_code)
 
 
 async def run_generate_explanation(db: AsyncSession, project_id: UUID, year: int, wp_code: str) -> str | None:
-    """执行审计说明生成"""
-    mod = get_script_module(wp_code)
-    if mod and hasattr(mod, "generate_audit_explanation"):
-        return await mod.generate_audit_explanation(db, project_id, year)
-    return None
+    """审计说明生成 — 委托给 wp_explanation_service（LLM辅助）"""
+    try:
+        from app.services.wp_explanation_service import WpExplanationService
+        svc = WpExplanationService(db)
+        result = await svc.generate_draft(project_id=project_id, wp_code=wp_code, year=year)
+        return result.get("explanation", "")
+    except Exception:
+        return None
 
 
 def get_review_checklist(wp_code: str) -> list[dict] | None:
-    """获取复核要点清单"""
-    mod = get_script_module(wp_code)
-    if mod and hasattr(mod, "get_review_checklist"):
-        return mod.get_review_checklist()
-    return None
-
-
-def list_available_scripts() -> list[dict]:
-    """列出所有可用的精细化脚本"""
-    import importlib
-    result = []
-    for prefix, module_path in _SCRIPT_REGISTRY.items():
-        try:
-            mod = importlib.import_module(module_path)
-            doc = mod.__doc__ or ""
-            first_line = doc.strip().split("\n")[0] if doc else prefix
-            result.append({"prefix": prefix, "name": first_line, "module": module_path})
-        except Exception:
-            result.append({"prefix": prefix, "name": prefix, "module": module_path, "error": True})
-    return result
+    """复核要点清单 — 从 TSJ 提示词库加载"""
+    try:
+        from app.services.tsj_prompt_service import get_review_points
+        return get_review_points(wp_code)
+    except Exception:
+        return None

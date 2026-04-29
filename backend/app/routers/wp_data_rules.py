@@ -220,3 +220,78 @@ async def note_dynamic_rows(
     from app.services.note_data_extractor import generate_dynamic_rows
     rows = await generate_dynamic_rows(db, project_id, year, note_section, top_n, min_amount)
     return {"note_section": note_section, "rows": rows, "count": len(rows)}
+
+
+
+# ═══ 通用底稿解析（规则驱动） ═══
+
+@router.get("/projects/{project_id}/parse-workpaper/{wp_code}")
+async def parse_workpaper_generic(
+    project_id: UUID,
+    wp_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """通用底稿解析 — 自动识别所有Sheet结构并提取数据
+
+    无需为每个科目写脚本，通用规则自动处理：
+    - 表头行检测（关键词扫描）
+    - 列含义映射（项目/期末/期初/调整/增减）
+    - 合计行识别
+    - Sheet类型推断（审定表/明细表/分析表/变动表/账龄表）
+
+    如果 wp_parse_rules.json 中有该底稿的专用规则则优先使用，否则纯通用。
+    """
+    from app.services.wp_generic_processor import parse_workpaper_generic as _parse
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+
+    # 查找底稿文件路径
+    result = await db.execute(
+        sa.select(WorkingPaper)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(
+            WpIndex.project_id == project_id,
+            WpIndex.wp_code == wp_code,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+        .limit(1)
+    )
+    wp = result.scalar_one_or_none()
+    if not wp or not wp.file_path:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"底稿 {wp_code} 不存在或无文件")
+
+    parsed = _parse(wp.file_path, wp_code)
+    return parsed
+
+
+@router.get("/projects/{project_id}/parse-all-workpapers")
+async def parse_all_workpapers(
+    project_id: UUID,
+    cycle: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """批量解析项目下所有底稿（通用规则）"""
+    from app.services.wp_generic_processor import parse_workpaper_generic as _parse
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+
+    query = (
+        sa.select(WorkingPaper, WpIndex)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WpIndex.project_id == project_id, WorkingPaper.is_deleted == sa.false())
+    )
+    if cycle:
+        query = query.where(WpIndex.audit_cycle == cycle)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    parsed_results = []
+    for wp, idx in rows:
+        if wp.file_path:
+            parsed = _parse(wp.file_path, idx.wp_code)
+            if "error" not in parsed:
+                parsed_results.append(parsed)
+
+    return {"count": len(parsed_results), "items": parsed_results}
