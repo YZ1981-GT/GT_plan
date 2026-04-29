@@ -514,6 +514,11 @@ export async function getDashboardHoursHeatmap(): Promise<any[]> {
 
 // ── 批注 ──
 
+export async function listAnnotations(projectId: string, params?: Record<string, any>): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/annotations`, { params })
+  return Array.isArray(data) ? data : []
+}
+
 export async function listWorkpaperAnnotations(projectId: string, objectType: string, objectId: string): Promise<any[]> {
   const { data } = await http.get(`/api/projects/${projectId}/annotations`, {
     params: { object_type: objectType, object_id: objectId },
