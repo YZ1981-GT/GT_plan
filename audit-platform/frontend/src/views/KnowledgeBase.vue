@@ -7,6 +7,9 @@
         <p>{{ folderTree.length }} 个分类 · {{ totalDocs }} 个文档</p>
       </div>
       <div class="gt-kb-banner-actions">
+        <el-input v-model="searchKeyword" placeholder="搜索文档..." size="small" clearable style="width: 180px"
+          @keyup.enter="onSearch" />
+        <el-button size="small" @click="onSearch" :loading="searchLoading" round>搜索</el-button>
         <el-button size="small" @click="onCreateFolder" round>新建文件夹</el-button>
         <el-button size="small" @click="onUploadDocs" round>上传文档</el-button>
         <el-button size="small" @click="loadTree" :loading="treeLoading" round>刷新</el-button>
@@ -28,7 +31,7 @@
             @node-click="onFolderClick"
           >
             <template #default="{ data }">
-              <div class="gt-kb-tree-node">
+              <div class="gt-kb-tree-node" @contextmenu.prevent="onFolderContextMenu(data, $event)">
                 <span>{{ data.name }}</span>
                 <el-tag v-if="data.category" size="small" type="info" style="margin-left: 4px">预制</el-tag>
                 <el-tag v-if="data.access_level === 'project_group'" size="small" type="warning" style="margin-left: 4px">项目组</el-tag>
@@ -70,8 +73,10 @@
             <el-table-column prop="created_at" label="创建时间" width="110">
               <template #default="{ row }">{{ row.created_at?.slice(0, 10) || '—' }}</template>
             </el-table-column>
-            <el-table-column label="操作" width="80" align="center">
+            <el-table-column label="操作" width="130" align="center">
               <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="onPreviewDoc(row)">预览</el-button>
+                <el-button size="small" link type="warning" @click="onMoveDoc(row)">移动</el-button>
                 <el-button size="small" link type="danger" @click="onDeleteDoc(row)">删除</el-button>
               </template>
             </el-table-column>
@@ -145,6 +150,9 @@ const documents = ref<any[]>([])
 const selectedFolder = ref<any>(null)
 const treeLoading = ref(false)
 const docLoading = ref(false)
+const searchKeyword = ref('')
+const searchLoading = ref(false)
+const searchResults = ref<any[]>([])
 
 // 新建文件夹
 const showCreateFolder = ref(false)
@@ -277,6 +285,71 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
+// 全文搜索
+async function onSearch() {
+  if (!searchKeyword.value.trim()) return
+  searchLoading.value = true
+  try {
+    const { data } = await http.get('/api/knowledge-library/search', { params: { q: searchKeyword.value } })
+    const results = Array.isArray(data) ? data : (data?.data || [])
+    documents.value = results
+    selectedFolder.value = { name: `搜索结果: "${searchKeyword.value}" (${results.length} 条)` }
+  } catch { ElMessage.error('搜索失败') }
+  finally { searchLoading.value = false }
+}
+
+// 文档预览
+async function onPreviewDoc(doc: any) {
+  try {
+    const { data } = await http.get(`/api/knowledge-library/documents/${doc.id}/preview`)
+    const result = data?.data ?? data
+    if (result.preview_type === 'text') {
+      ElMessageBox.alert(result.content?.slice(0, 3000) || '无内容', `预览: ${doc.name}`, {
+        confirmButtonText: '关闭',
+        customStyle: { maxHeight: '500px', overflow: 'auto' },
+      })
+    } else if (result.preview_type === 'download') {
+      window.open(result.download_url, '_blank')
+    } else {
+      ElMessage.info('该文档暂不支持预览')
+    }
+  } catch { ElMessage.error('预览失败') }
+}
+
+// 移动文档
+async function onMoveDoc(doc: any) {
+  const { value } = await ElMessageBox.prompt('输入目标文件夹名称（从列表中选择）', '移动文档', {
+    inputPlaceholder: '目标文件夹ID',
+  })
+  if (!value) return
+  // 从 flatFolders 中查找匹配的文件夹
+  const target = flatFolders.value.find(f => f.name.includes(value) || f.id === value)
+  if (!target) {
+    ElMessage.warning('未找到匹配的文件夹')
+    return
+  }
+  try {
+    await http.put(`/api/knowledge-library/documents/${doc.id}/move`, { target_folder_id: target.id })
+    ElMessage.success(`已移动到「${target.name}」`)
+    if (selectedFolder.value) await onFolderClick(selectedFolder.value)
+    await loadTree()
+  } catch { ElMessage.error('移动失败') }
+}
+
+// 文件夹右键重命名
+async function onFolderContextMenu(folder: any, event: MouseEvent) {
+  event.preventDefault()
+  const { value } = await ElMessageBox.prompt(`重命名文件夹「${folder.name}」`, '重命名', {
+    inputValue: folder.name,
+  })
+  if (!value || value === folder.name) return
+  try {
+    await http.put(`/api/knowledge-library/folders/${folder.id}/rename`, { name: value })
+    ElMessage.success('重命名成功')
+    await loadTree()
+  } catch { ElMessage.error('重命名失败') }
 }
 
 onMounted(loadTree)

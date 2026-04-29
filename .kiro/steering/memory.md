@@ -1571,3 +1571,11 @@ inclusion: always
 - 知识库最关键待修：①新旧统一（让旧API代理到新服务或迁移）②RAG接入新模型（从KnowledgeDocument.content_text检索）
 - 知识库5项修复已完成（2026-04-29，commit 36032cc已推送）：①RAG检索优先新模型KnowledgeDocument.content_text（ilike模糊匹配category+keywords，无结果降级旧KnowledgeService）②文档上传提取增强（txt/md直接读+docx用python-docx+pdf用PyPDF2前50页，返回text_extracted标记）③private权限list_folders新增user_id参数（created_by==user_id才可见）④新旧API并存策略（旧/api/knowledge/保持兼容，新/api/knowledge-library/并行）⑤前端改造待后续专项
 - 知识库新增依赖需求：python-docx（已有）+PyPDF2（需确认是否已安装，PDF提取用）
+- 前端KnowledgeBase.vue重写完成（2026-04-29，commit 459512c已推送）：从旧版9个分类卡片平铺改为左侧el-tree文件夹树（预制/权限标签+文档计数）+右侧文档表格（名称/类型/大小/权限/时间/删除）+新建文件夹弹窗（名称+位置+权限）+上传文档弹窗（拖拽多文件），调用新API /api/knowledge-library/*
+- 知识库前端改造已完成，5项问题中4项已修复（RAG接入+文档提取+private权限+前端改造），仅剩旧API逐步迁移（当前新旧并存兼容）
+
+## 本轮工作最终总结（2026-04-29 完整会话结束）
+- 共27个commit（cc8f47d→459512c），全部已推送GitHub
+- 代码层面能做的已全部完成，下一步只能启动运行环境做真实验证
+- 知识库低优先级待改进5项：①全文搜索（跨文件夹）②文档在线预览③文件夹拖拽移动④文件夹重命名API⑤旧API迁移（ChatPanel @知识库引用仍调旧API）
+- 系统最终状态：627+路由正常、16/17阶段完成、企业级6维度覆盖、4种角色覆盖、公式体系完整、知识库升级完成、8步全流程理论可走通

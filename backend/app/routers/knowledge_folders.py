@@ -219,3 +219,197 @@ async def init_preset_folders(
     count = await svc.init_preset_folders()
     await db.commit()
     return {"message": f"初始化了 {count} 个预制文件夹", "created": count}
+
+
+@router.get("/search")
+async def search_documents(
+    q: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """全文搜索（跨文件夹搜索文档名和内容）"""
+    from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+    import sqlalchemy as _sa
+
+    query = (
+        _sa.select(
+            KnowledgeDocument.id,
+            KnowledgeDocument.name,
+            KnowledgeDocument.file_type,
+            KnowledgeDocument.file_size,
+            KnowledgeDocument.created_at,
+            KnowledgeFolder.name.label("folder_name"),
+            KnowledgeFolder.id.label("folder_id"),
+        )
+        .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
+        .where(
+            KnowledgeDocument.is_deleted == _sa.false(),
+            KnowledgeFolder.is_deleted == _sa.false(),
+            _sa.or_(
+                KnowledgeDocument.name.ilike(f"%{q}%"),
+                KnowledgeDocument.content_text.ilike(f"%{q}%"),
+                KnowledgeDocument.tags.cast(_sa.String).ilike(f"%{q}%"),
+            ),
+        )
+        .order_by(KnowledgeDocument.created_at.desc())
+        .limit(50)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    return [
+        {
+            "id": str(r.id),
+            "name": r.name,
+            "file_type": r.file_type,
+            "file_size": r.file_size,
+            "folder_name": r.folder_name,
+            "folder_id": str(r.folder_id),
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.put("/folders/{folder_id}/rename")
+async def rename_folder(
+    folder_id: UUID,
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """重命名文件夹"""
+    from app.models.knowledge_models import KnowledgeFolder
+    import sqlalchemy as _sa
+
+    new_name = data.get("name", "").strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="名称不能为空")
+
+    result = await db.execute(
+        _sa.select(KnowledgeFolder).where(
+            KnowledgeFolder.id == folder_id,
+            KnowledgeFolder.is_deleted == _sa.false(),
+        )
+    )
+    folder = result.scalar_one_or_none()
+    if not folder:
+        raise HTTPException(status_code=404, detail="文件夹不存在")
+
+    folder.name = new_name
+    await db.commit()
+    return {"id": str(folder.id), "name": folder.name, "message": "重命名成功"}
+
+
+@router.put("/documents/{doc_id}/move")
+async def move_document(
+    doc_id: UUID,
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """移动文档到其他文件夹"""
+    from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+    import sqlalchemy as _sa
+
+    target_folder_id = data.get("target_folder_id")
+    if not target_folder_id:
+        raise HTTPException(status_code=400, detail="目标文件夹不能为空")
+
+    # 验证文档存在
+    doc_result = await db.execute(
+        _sa.select(KnowledgeDocument).where(
+            KnowledgeDocument.id == doc_id,
+            KnowledgeDocument.is_deleted == _sa.false(),
+        )
+    )
+    doc = doc_result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    # 验证目标文件夹存在
+    folder_result = await db.execute(
+        _sa.select(KnowledgeFolder).where(
+            KnowledgeFolder.id == UUID(target_folder_id),
+            KnowledgeFolder.is_deleted == _sa.false(),
+        )
+    )
+    if not folder_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="目标文件夹不存在")
+
+    doc.folder_id = UUID(target_folder_id)
+    await db.commit()
+    return {"id": str(doc.id), "name": doc.name, "new_folder_id": target_folder_id, "message": "移动成功"}
+
+
+@router.get("/documents/{doc_id}/preview")
+async def preview_document(
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """文档预览（返回文本内容或下载链接）"""
+    from app.models.knowledge_models import KnowledgeDocument
+    import sqlalchemy as _sa
+
+    result = await db.execute(
+        _sa.select(KnowledgeDocument).where(
+            KnowledgeDocument.id == doc_id,
+            KnowledgeDocument.is_deleted == _sa.false(),
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    # 文本类文档直接返回内容
+    if doc.content_text:
+        return {
+            "id": str(doc.id),
+            "name": doc.name,
+            "file_type": doc.file_type,
+            "preview_type": "text",
+            "content": doc.content_text[:100000],  # 最多 100K 字符
+        }
+
+    # 二进制文档返回下载链接
+    if doc.storage_path:
+        from pathlib import Path
+        if Path(doc.storage_path).exists():
+            return {
+                "id": str(doc.id),
+                "name": doc.name,
+                "file_type": doc.file_type,
+                "preview_type": "download",
+                "download_url": f"/api/knowledge-library/documents/{doc_id}/download",
+            }
+
+    return {"id": str(doc.id), "name": doc.name, "preview_type": "unavailable", "message": "无法预览"}
+
+
+@router.get("/documents/{doc_id}/download")
+async def download_document(
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """下载文档文件"""
+    from app.models.knowledge_models import KnowledgeDocument
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    import sqlalchemy as _sa
+
+    result = await db.execute(
+        _sa.select(KnowledgeDocument).where(
+            KnowledgeDocument.id == doc_id,
+            KnowledgeDocument.is_deleted == _sa.false(),
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc or not doc.storage_path:
+        raise HTTPException(status_code=404, detail="文档不存在或无文件")
+
+    file_path = Path(doc.storage_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    return FileResponse(file_path, filename=doc.name)
