@@ -489,6 +489,28 @@ async def submit_review(
             db=db, wp_id=wp_id, new_review_status="pending_level1", project_id=project_id,
         )
         await db.commit()
+
+        # 自动同步程序状态（底稿提交复核→程序标记completed）
+        try:
+            from app.models.procedure_models import ProcedureInstance
+            wp_result = await db.execute(
+                sa.select(WpIndex.wp_code).where(WpIndex.id == (
+                    sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id).scalar_subquery()
+                ))
+            )
+            wp_code_row = wp_result.scalar_one_or_none()
+            if wp_code_row:
+                await db.execute(
+                    sa.update(ProcedureInstance).where(
+                        ProcedureInstance.project_id == project_id,
+                        ProcedureInstance.wp_code == wp_code_row,
+                        ProcedureInstance.is_deleted == sa.false(),
+                    ).values(execution_status="completed")
+                )
+                await db.commit()
+        except Exception:
+            pass  # 程序联动失败不阻断提交
+
         return {
             "status": "submitted",
             "can_submit": True,
