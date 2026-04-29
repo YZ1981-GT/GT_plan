@@ -1,6 +1,6 @@
 {
   "description": "底稿编码 → 标准科目 → 试算表 → 附注章节 四级映射表",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "mappings": [
     {"wp_code": "E1-1", "cycle": "E", "wp_name": "货币资金审定表", "account_codes": ["1001","1002","1012"], "account_name": "货币资金", "report_row": "BS-002", "note_section": "五、1"},
     {"wp_code": "E1-2", "cycle": "E", "wp_name": "现金明细表", "account_codes": ["1001"], "account_name": "库存现金", "report_row": null, "note_section": null},
@@ -39,6 +39,24 @@
     {"wp_code": "M4", "cycle": "M", "wp_name": "未分配利润审定表", "account_codes": ["4104"], "account_name": "未分配利润", "report_row": "BS-055", "note_section": "五、28"},
     {"wp_code": "N1", "cycle": "N", "wp_name": "应交税费审定表", "account_codes": ["2221"], "account_name": "应交税费", "report_row": "BS-036", "note_section": "五、20"},
     {"wp_code": "N2", "cycle": "N", "wp_name": "所得税费用审定表", "account_codes": ["6801"], "account_name": "所得税费用", "report_row": null, "note_section": "五、35"},
-    {"wp_code": "N3", "cycle": "N", "wp_name": "递延所得税审定表", "account_codes": ["1811","2901"], "account_name": "递延所得税", "report_row": "BS-018", "note_section": "五、15"}
+    {"wp_code": "N3", "cycle": "N", "wp_name": "递延所得税审定表", "account_codes": ["1811","2901"], "account_name": "递延所得税", "report_row": "BS-018", "note_section": "五、15"},
+    {"wp_code": "G4", "cycle": "G", "wp_name": "债权投资审定表", "account_codes": ["1504","1505","1506","1507"], "account_name": "债权投资", "report_row": "BS-011", "note_section": null},
+    {"wp_code": "G5", "cycle": "G", "wp_name": "其他权益工具投资审定表", "account_codes": ["1503"], "account_name": "其他权益工具投资", "report_row": null, "note_section": null},
+    {"wp_code": "H3", "cycle": "H", "wp_name": "使用权资产审定表", "account_codes": ["1641","1642","1643"], "account_name": "使用权资产", "report_row": "BS-019", "note_section": "五、11"},
+    {"wp_code": "L4", "cycle": "L", "wp_name": "租赁负债审定表", "account_codes": ["2601"], "account_name": "租赁负债", "report_row": "BS-042", "note_section": "五、23"},
+    {"wp_code": "L5", "cycle": "L", "wp_name": "应付债券审定表", "account_codes": ["2502"], "account_name": "应付债券", "report_row": "BS-043", "note_section": null},
+    {"wp_code": "D7", "cycle": "D", "wp_name": "应收款项融资审定表", "account_codes": ["1124"], "account_name": "应收款项融资", "report_row": null, "note_section": null},
+    {"wp_code": "M5", "cycle": "M", "wp_name": "其他综合收益审定表", "account_codes": ["3102"], "account_name": "其他综合收益", "report_row": "BS-053", "note_section": "五、26"},
+    {"wp_code": "M6", "cycle": "M", "wp_name": "库存股审定表", "account_codes": ["4003"], "account_name": "库存股", "report_row": null, "note_section": null},
+    {"wp_code": "K10", "cycle": "K", "wp_name": "营业外收入审定表", "account_codes": ["6301"], "account_name": "营业外收入", "report_row": null, "note_section": "五、36"},
+    {"wp_code": "K11", "cycle": "K", "wp_name": "营业外支出审定表", "account_codes": ["6711"], "account_name": "营业外支出", "report_row": null, "note_section": "五、37"},
+    {"wp_code": "D8", "cycle": "D", "wp_name": "营业成本审定表", "account_codes": ["6401","6402"], "account_name": "营业成本", "report_row": "IS-002", "note_section": "五、29"},
+    {"wp_code": "G6", "cycle": "G", "wp_name": "其他非流动金融资产审定表", "account_codes": ["1510"], "account_name": "其他非流动金融资产", "report_row": null, "note_section": null},
+    {"wp_code": "I4", "cycle": "I", "wp_name": "开发支出审定表", "account_codes": ["1703"], "account_name": "开发支出", "report_row": null, "note_section": null},
+    {"wp_code": "L6", "cycle": "L", "wp_name": "长期应付款审定表", "account_codes": ["2701"], "account_name": "长期应付款", "report_row": "BS-044", "note_section": null},
+    {"wp_code": "K12", "cycle": "K", "wp_name": "信用减值损失审定表", "account_codes": ["6701"], "account_name": "信用减值损失", "report_row": null, "note_section": null},
+    {"wp_code": "K13", "cycle": "K", "wp_name": "资产减值损失审定表", "account_codes": ["6702"], "account_name": "资产减值损失", "report_row": null, "note_section": null},
+    {"wp_code": "K14", "cycle": "K", "wp_name": "资产处置收益审定表", "account_codes": ["6115"], "account_name": "资产处置收益", "report_row": null, "note_section": null},
+    {"wp_code": "K15", "cycle": "K", "wp_name": "其他收益审定表", "account_codes": ["6117"], "account_name": "其他收益", "report_row": null, "note_section": null}
   ]
 }

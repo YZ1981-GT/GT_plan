@@ -68,7 +68,11 @@ class Transform:
 # ═══ 取数规则定义 ═══
 
 class FetchRule:
-    """单条取数规则"""
+    """单条取数规则
+
+    统一格式：与 note_formula_generator 的 _formulas 兼容。
+    预设公式可通过 from_note_formula() 转换为 FetchRule。
+    """
 
     def __init__(self, data: dict):
         self.rule_id = data.get("rule_id", str(uuid.uuid4()))
@@ -81,6 +85,28 @@ class FetchRule:
         self.description = data.get("description", "")
         self.created_by = data.get("created_by")
         self.created_at = data.get("created_at", datetime.utcnow().isoformat())
+        # 来源标记（preset=预设公式/custom=用户自定义）
+        self.origin = data.get("origin", "custom")
+
+    @classmethod
+    def from_note_formula(cls, key: str, formula_def: dict, note_section: str) -> "FetchRule":
+        """从 note_formula_generator 的 _formulas 格式转换
+
+        key 格式: "row_idx:col_idx"
+        formula_def: {"type": "vertical_sum", "expression": "SUM(0:2, 1)", ...}
+        """
+        parts = key.split(":")
+        row_idx = int(parts[0]) if len(parts) > 0 else 0
+        col_idx = int(parts[1]) if len(parts) > 1 else 0
+
+        return cls({
+            "rule_id": f"preset_{note_section}_{key}",
+            "target": {"type": "note", "section": note_section, "row": row_idx, "col": col_idx},
+            "sources": [{"type": "note_internal", "expression": formula_def.get("expression", "")}],
+            "transform": Transform.DIRECT,
+            "description": formula_def.get("description", ""),
+            "origin": "preset",
+        })
 
     def to_dict(self) -> dict:
         return {
@@ -91,6 +117,7 @@ class FetchRule:
             "description": self.description,
             "created_by": self.created_by,
             "created_at": self.created_at,
+            "origin": self.origin,
         }
 
 
@@ -182,11 +209,44 @@ class CustomFetchService:
             result = await self.execute_rule(rule)
             results.append(result)
 
+        # 持久化溯源记录到项目配置
+        await self._persist_traces()
+
         return {
             "executed": len(results),
             "results": results,
             "traces": [t.to_dict() for t in self._traces],
         }
+
+    async def _persist_traces(self):
+        """持久化溯源记录到 Project.wizard_state.fetch_trace_history"""
+        if not self._traces:
+            return
+        try:
+            from app.models.core import Project
+            from sqlalchemy.orm.attributes import flag_modified
+
+            project = (await self.db.execute(
+                sa.select(Project).where(Project.id == self.project_id)
+            )).scalar_one_or_none()
+            if not project:
+                return
+
+            ws = project.wizard_state or {}
+            history = ws.get("fetch_trace_history", [])
+
+            # 追加新记录（保留最近500条）
+            for t in self._traces:
+                history.append(t.to_dict())
+            if len(history) > 500:
+                history = history[-500:]
+
+            ws["fetch_trace_history"] = history
+            project.wizard_state = ws
+            flag_modified(project, "wizard_state")
+            await self.db.flush()
+        except Exception as e:
+            _logger.warning("persist traces failed: %s", e)
 
     def get_traces(self) -> list[dict]:
         """获取所有溯源记录"""

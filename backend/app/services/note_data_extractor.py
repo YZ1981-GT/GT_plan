@@ -234,6 +234,8 @@ async def generate_dynamic_rows(
     project_id: UUID,
     year: int,
     note_section: str,
+    top_n: int = 20,
+    min_amount: float = 0,
 ) -> list[dict[str, Any]]:
     """为浮动行表格生成动态行数据
 
@@ -241,6 +243,10 @@ async def generate_dynamic_rows(
     1. 辅助余额表（tb_aux_balance）按维度分组
     2. 底稿 parsed_data 中的明细行
     3. 模板预设行（兜底）
+
+    参数：
+    - top_n: 最多显示行数（默认20），超出合并为"其他"
+    - min_amount: 最小金额阈值（默认0），低于此值合并为"其他"
 
     返回格式：[{label, 期末余额, 期初余额, source}, ...]
     """
@@ -277,18 +283,46 @@ async def generate_dynamic_rows(
             if row.opening_balance:
                 grouped[key]["opening"] += Decimal(str(row.opening_balance))
 
+        # 按期末余额绝对值排序
+        sorted_items = sorted(
+            grouped.values(),
+            key=lambda x: abs(x["closing"]),
+            reverse=True,
+        )
+
+        # 应用阈值过滤 + Top N 限制
         rows = []
+        other_closing = Decimal("0")
+        other_opening = Decimal("0")
+        other_count = 0
         total_closing = Decimal("0")
         total_opening = Decimal("0")
-        for item in grouped.values():
-            rows.append({
-                "label": item["label"],
-                "期末余额": str(item["closing"]),
-                "期初余额": str(item["opening"]),
-                "source": "aux_balance",
-            })
+
+        for i, item in enumerate(sorted_items):
             total_closing += item["closing"]
             total_opening += item["opening"]
+
+            if i < top_n and abs(float(item["closing"])) >= min_amount:
+                rows.append({
+                    "label": item["label"],
+                    "期末余额": str(item["closing"]),
+                    "期初余额": str(item["opening"]),
+                    "source": "aux_balance",
+                })
+            else:
+                other_closing += item["closing"]
+                other_opening += item["opening"]
+                other_count += 1
+
+        # 追加"其他"合并行
+        if other_count > 0:
+            rows.append({
+                "label": f"其他（{other_count}项）",
+                "期末余额": str(other_closing),
+                "期初余额": str(other_opening),
+                "source": "aggregated",
+                "is_other": True,
+            })
 
         # 追加合计行
         rows.append({
@@ -442,30 +476,71 @@ async def _calc_derived_field(
     db: AsyncSession, project_id: UUID, year: int,
     account_code: str, field: str,
 ) -> Decimal | None:
-    """计算衍生字段"""
+    """计算衍生字段
+
+    变动表的"本期增加/减少"从序时账(tb_ledger)按借贷方向汇总，
+    而非简单的余额差推算（余额差不准确，如固定资产有多笔增减）。
+    """
     if field == "_adjustment_total":
         aje = await _get_account_value(db, project_id, year, account_code, "aje_adjustment")
         rje = await _get_account_value(db, project_id, year, account_code, "rje_adjustment")
         return (aje or Decimal("0")) + (rje or Decimal("0"))
 
     if field == "_period_increase":
-        # 本期增加 = 审定数 - 期初（简化计算，正数部分）
-        audited = await _get_account_value(db, project_id, year, account_code, "audited_amount")
-        opening = await _get_account_value(db, project_id, year, account_code, "opening_balance")
-        diff = (audited or Decimal("0")) - (opening or Decimal("0"))
-        return diff if diff > 0 else Decimal("0")
+        # 本期增加 = 序时账借方发生额合计（资产类科目借方增加）
+        from app.models.audit_platform_models import TbLedger
+        result = await db.execute(
+            sa.select(sa.func.coalesce(sa.func.sum(TbLedger.debit_amount), 0)).where(
+                TbLedger.project_id == project_id,
+                TbLedger.year == year,
+                TbLedger.account_code == account_code,
+                TbLedger.is_deleted == sa.false(),
+            )
+        )
+        val = result.scalar()
+        return Decimal(str(val)) if val else Decimal("0")
 
     if field == "_period_decrease":
-        audited = await _get_account_value(db, project_id, year, account_code, "audited_amount")
-        opening = await _get_account_value(db, project_id, year, account_code, "opening_balance")
-        diff = (opening or Decimal("0")) - (audited or Decimal("0"))
-        return diff if diff > 0 else Decimal("0")
+        # 本期减少 = 序时账贷方发生额合计（资产类科目贷方减少）
+        from app.models.audit_platform_models import TbLedger
+        result = await db.execute(
+            sa.select(sa.func.coalesce(sa.func.sum(TbLedger.credit_amount), 0)).where(
+                TbLedger.project_id == project_id,
+                TbLedger.year == year,
+                TbLedger.account_code == account_code,
+                TbLedger.is_deleted == sa.false(),
+            )
+        )
+        val = result.scalar()
+        return Decimal(str(val)) if val else Decimal("0")
+
+    if field == "_period_provision":
+        # 本期计提（折旧/摊销）= 贷方发生额（累计折旧科目贷方增加）
+        from app.models.audit_platform_models import TbLedger
+        result = await db.execute(
+            sa.select(sa.func.coalesce(sa.func.sum(TbLedger.credit_amount), 0)).where(
+                TbLedger.project_id == project_id,
+                TbLedger.year == year,
+                TbLedger.account_code == account_code,
+                TbLedger.is_deleted == sa.false(),
+            )
+        )
+        val = result.scalar()
+        return Decimal(str(val)) if val else Decimal("0")
 
     if field == "_book_value_closing":
         return await _get_account_value(db, project_id, year, account_code, "audited_amount")
 
     if field == "_book_value_opening":
         return await _get_account_value(db, project_id, year, account_code, "opening_balance")
+
+    if field == "_depreciation_opening":
+        # 累计折旧期初 = 上年累计折旧审定数
+        return await _get_account_value(db, project_id, year - 1, account_code, "audited_amount")
+
+    if field == "_depreciation_closing":
+        # 累计折旧期末 = 当年审定数
+        return await _get_account_value(db, project_id, year, account_code, "audited_amount")
 
     return None
 

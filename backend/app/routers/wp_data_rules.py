@@ -206,10 +206,17 @@ async def note_dynamic_rows(
     project_id: UUID,
     note_section: str,
     year: int = Query(default=2025),
+    top_n: int = Query(default=20, ge=5, le=100),
+    min_amount: float = Query(default=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """生成浮动行数据（从辅助余额表/底稿明细动态生成）"""
+    """生成浮动行数据（从辅助余额表/底稿明细动态生成）
+
+    参数：
+    - top_n: 最多显示行数（默认20，超出合并为"其他"）
+    - min_amount: 最小金额阈值（默认0，低于此值合并为"其他"）
+    """
     from app.services.note_data_extractor import generate_dynamic_rows
-    rows = await generate_dynamic_rows(db, project_id, year, note_section)
+    rows = await generate_dynamic_rows(db, project_id, year, note_section, top_n, min_amount)
     return {"note_section": note_section, "rows": rows, "count": len(rows)}
