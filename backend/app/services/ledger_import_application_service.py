@@ -439,6 +439,22 @@ class LedgerImportApplicationService:
         if not ok:
             raise HTTPException(status_code=409, detail=msg)
 
+        # Phase 17: 同步导入也创建 ImportJob 记录（确保所有导入可追溯）
+        sync_job_id = None
+        try:
+            sync_job = await ImportJobService.create_job(
+                db,
+                project_id=project_id,
+                year=year or 0,
+                custom_mapping=parsed_mapping,
+                created_by=UUID(user_id) if user_id else None,
+            )
+            sync_job_id = sync_job.id
+            await ImportJobService.transition(db, sync_job_id, JobStatus.running, progress_pct=1, progress_message="同步导入开始")
+            await db.flush()
+        except Exception as e:
+            logger.debug("创建同步 ImportJob 失败（降级）: %s", e)
+
         try:
             ImportQueueService.update_progress(
                 project_id,
@@ -458,6 +474,14 @@ class LedgerImportApplicationService:
                 progress_callback=_on_progress,
             )
             result_payload = cls.build_account_chart_result_payload(result)
+
+            # 标记 ImportJob 完成
+            if sync_job_id:
+                try:
+                    await ImportJobService.transition(db, sync_job_id, JobStatus.completed, progress_pct=100, progress_message="导入完成", result_summary=result_payload.get("data_sheets_imported"))
+                except Exception:
+                    pass
+
             if job_batch_id is not None:
                 await ImportQueueService.complete_job(
                     project_id,
@@ -470,6 +494,13 @@ class LedgerImportApplicationService:
                 )
             return result_payload
         except Exception as exc:
+            # 标记 ImportJob 失败
+            if sync_job_id:
+                try:
+                    await ImportJobService.transition(db, sync_job_id, JobStatus.failed, error_message=str(exc)[:500])
+                except Exception:
+                    pass
+
             diagnostics = exc.diagnostics if isinstance(exc, SmartImportError) else None
             failure_errors = exc.errors if isinstance(exc, SmartImportError) else None
             failure_year = exc.year if isinstance(exc, SmartImportError) else year

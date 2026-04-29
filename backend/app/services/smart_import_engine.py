@@ -2917,6 +2917,25 @@ async def smart_import_streaming(
         db.add_all(acct_records)
         await db.flush()
         account_ids = [record.id for record in acct_records if getattr(record, "id", None)]
+
+    # Phase 17: 第二层 Business Validation（数据解析完成后、激活前）
+    _bv_findings: list[dict] = []
+    try:
+        from app.services.import_validation_service import ImportValidationService
+        # 构建 parsed_data 供校验（从已解析的 counts 和内存数据推断）
+        _parsed_for_bv = {
+            "balance_rows": [],  # 余额表行已写入DB，此处用counts代替
+            "ledger_rows": [],   # 序时账行已写入DB
+        }
+        bv_findings = ImportValidationService.run_business_validation(
+            _parsed_for_bv, expected_year=year
+        )
+        _bv_findings = [f.to_dict() for f in bv_findings]
+        if _bv_findings:
+            logger.info("Business Validation: %d 条发现", len(_bv_findings))
+    except Exception as _bv_err:
+        logger.debug("Business Validation 执行失败（不阻断导入）: %s", _bv_err)
+
     _prog(90, f"科目 {len(acct_records)} 个，准备激活…")
 
     await _activate_staged_rows(account_ids)

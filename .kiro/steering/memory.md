@@ -1447,3 +1447,8 @@ inclusion: always
 - 跨阶段分析4项修改计划全部完成（P0四表dataset_id✅/P1事件注册统一✅/P2 Phase3清理✅/P3多准则远期不动✅）
 - Phase17关键遗漏（2026-04-29复盘发现）：写路径未接入dataset_id——smart_import_streaming写入四表时未填充dataset_id（永远NULL），导致get_active_filter永远走is_deleted降级分支；需要在导入流程中创建LedgerDataset(staged)→写入时填充dataset_id→完成后DatasetService.activate()
 - 其他待修复：trace.py regex=改为pattern=（FastAPI弃用警告）、PaddleOCR启动阻塞需设PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True
+- 写路径接入dataset_id已完成（2026-04-29，commit 6a4154c已推送）：smart_import_streaming改造——导入开始创建LedgerDataset(staged)+四表写入时每条记录填充dataset_id+成功后DatasetService.activate()+失败时mark_failed()；三处record dict构建（balance chunk/ledger buf/aux buf）均已加dataset_id=_dataset_id；get_active_filter现在能真正通过dataset_id过滤不再永远降级
+- Phase17数据集版本治理完整链路已打通：导入→create_staged→写入(dataset_id)→activate(staged→active,旧→superseded)→LEDGER_DATASET_ACTIVATED事件；失败→mark_failed(staged→failed)；读路径→get_active_filter查active dataset_id过滤四表
+- Phase17关键遗漏已修复，该条待办可标记完成
+- 账表导入深入复盘发现3个关键缺口（2026-04-29）：①run_account_chart_import缺ImportJob记录（同步导入无作业追溯）②Business Validation未接入导入流程（import_validation_service的4个BV规则未被smart_import_streaming调用，三层校验第二层形同虚设）③create_bundle未写入ImportArtifact数据库记录（上传产物只有本地文件无DB追溯）
+- 其他发现：Durable Job仍用asyncio.create_task（过渡方案可接受，建议lifespan启动时扫描running状态ImportJob标记timed_out）；导入操作缺结构化审计记录（files/mapping/result/duration）；缺完整端到端链路测试

@@ -139,6 +139,31 @@ class LedgerImportUploadService:
                 json.dumps(manifest, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+
+            # Phase 17: 写入 ImportArtifact 数据库记录（上传产物可追溯）
+            try:
+                from app.core.database import async_session
+                from app.models.dataset_models import ImportArtifact, ArtifactStatus
+                import uuid as _uuid
+                artifact = ImportArtifact(
+                    id=_uuid.uuid4(),
+                    project_id=project_id,
+                    upload_token=upload_token,
+                    status=ArtifactStatus.active,
+                    storage_uri=f"local://{str(bundle_dir)}",
+                    total_size_bytes=total_size,
+                    file_manifest=manifest_files,
+                    file_count=len(manifest_files),
+                    expires_at=datetime.utcnow() + timedelta(hours=settings.LEDGER_UPLOAD_TTL_HOURS),
+                    created_by=_uuid.UUID(user_id) if user_id else None,
+                )
+                async with async_session() as art_db:
+                    art_db.add(artifact)
+                    await art_db.commit()
+            except Exception as _art_err:
+                import logging as _log
+                _log.getLogger(__name__).debug("ImportArtifact 记录创建失败（降级）: %s", _art_err)
+
             return manifest
         except Exception:
             shutil.rmtree(bundle_dir, ignore_errors=True)
