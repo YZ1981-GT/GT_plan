@@ -104,8 +104,14 @@ async def login(
 # refresh
 # ---------------------------------------------------------------------------
 
-async def refresh(refresh_token: str, redis: Redis) -> str:
-    """验证 refresh_token 有效性，生成新 access_token。"""
+async def refresh(refresh_token: str, redis: Redis) -> dict:
+    """验证 refresh_token 有效性，实现 token rotation。
+
+    Token Rotation 安全机制：
+    - 每次刷新时废弃旧 refresh_token（加入黑名单）
+    - 签发全新的 access_token + refresh_token 对
+    - 旧 token 立即失效，防止泄露后被持续利用
+    """
 
     # 检查 refresh_token 是否存在于 Redis
     rt_key = _refresh_token_key(refresh_token)
@@ -130,8 +136,31 @@ async def refresh(refresh_token: str, redis: Redis) -> str:
     if sub is None:
         raise HTTPException(status_code=401, detail="token 缺少用户信息")
 
-    # 生成新 access_token
-    return create_access_token({"sub": sub})
+    # --- Token Rotation: 废弃旧 token，签发新 token 对 ---
+
+    # 1. 将旧 refresh_token 加入黑名单
+    old_ttl = await redis.ttl(rt_key)
+    if old_ttl <= 0:
+        old_ttl = settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    await redis.set(bl_key, "1", ex=old_ttl)
+
+    # 2. 删除旧 refresh_token 记录
+    await redis.delete(rt_key)
+
+    # 3. 生成新 token 对
+    token_data = {"sub": sub}
+    new_access_token = create_access_token(token_data)
+    new_refresh_token = create_refresh_token(token_data)
+
+    # 4. 存储新 refresh_token 到 Redis
+    new_rt_key = _refresh_token_key(new_refresh_token)
+    new_rt_ttl = settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS * 86400
+    await redis.set(new_rt_key, sub, ex=new_rt_ttl)
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+    }
 
 
 # ---------------------------------------------------------------------------

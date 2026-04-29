@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { VueQueryPlugin } from '@tanstack/vue-query'
 import ElementPlus from 'element-plus'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -8,10 +9,12 @@ import './styles/global.css'
 import App from './App.vue'
 import router from './router'
 import { initWebVitals } from './utils/monitor'
+import { queryClient } from './utils/queryClient'
 
 const app = createApp(App)
 
 app.use(createPinia())
+app.use(VueQueryPlugin, { queryClient })
 app.use(router)
 app.use(ElementPlus)
 

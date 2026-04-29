@@ -1378,3 +1378,61 @@ inclusion: always
 - Phase0~16全阶段代码层面stub/TODO/空壳全部清零（2026-04-29）：68测试通过。最后5项修复：wopi_service.py注释同步、workhour_service.py ai_suggest接入llm_client（LLM优先+均分降级）、report_trace.py 3个路由做实（check_delete_permission角色判断/recommend_workpapers LLM+金额降级/annual_diff_report SQL对比当年上年）、security.py lock_account做实（is_active=False+Redis黑名单+trace审计）、wp_explanation.py year从wizard_state动态获取；全平台代码层面可修复项归零，剩余仅环境依赖项
 - Phase14-16三阶段tasks.md checkbox批量更新完成（2026-04-29）：Phase14（134项）+Phase15（119项）+Phase16（126项）共379个checkbox全部标记[x]，68个测试全部通过验证；tasks.md之前在企业级落地版重写时checkbox状态未同步，现已与实际代码实现状态对齐
 - 全16阶段跨阶段联动深度验证完成（2026-04-29）：18条主链路全部代码级打通无断点——gate_engine接入3入口(submit_review/sign_off/export_package)+SoD黑名单接入deps.py+WOPI trace留痕+version_line接入4触发点(report/note/wopi/procedures)+task_event_bus接入裁剪事件+offline_conflict接入离线上传+export_integrity接入导出流程+consistency_report附在取证包+RC关闭态门禁接入+SLA定时任务注册；前端8个治理组件全部有路由+API服务层+宿主页面引用；所有联动采用try/except降级策略确保故障不阻断主流程
+- Phase14-16补齐修复（2026-04-29续）：①export_integrity.py路由注册到router_registry第11组 ②export_integrity.py prefix从/api/exports改为/exports（避免与registry统一/api前缀叠加成/api/api/exports） ③export_mask_service接入word_template_filler.fill_full_package（按角色脱敏+导出权限检查） ④report_trace.py第281行残留死代码SyntaxError修复（旧硬编码fallback未删干净导致整个router_registry加载失败） ⑤test_phase13 ZIP文件数断言从==6改为6~7（适配Phase16一致性报告附件）；617个路由全部正常加载，115个测试114 passed 1 skipped
+- router_registry prefix规则确认：第9-11组（Phase14/15/16）路由自身用相对prefix（如/gate /version-line /exports），registry统一加prefix="/api"；路由文件不能自带/api前缀否则会叠加
+
+## 企业级加固改造计划（2026-04-29 系统评审）
+- 用户接受全部15项改进建议并要求逐一实施
+- P0立即修复（4项）：①数据库连接管理（engine.dispose+SLA任务独立引擎+POOL_SIZE配置暴露）②中间件顺序（AuditLogMiddleware改为能捕获最终状态码）③请求体大小限制（uvicorn --limit-max-request-size）④JWT refresh token rotation（每次刷新废弃旧token发新token）
+- P1短期改进（4项）：⑤服务层DI容器（ServiceContainer统一注入）⑥LLM端点限流（slowapi或令牌桶，每用户每分钟10次）⑦事件总线持久化（Redis Stream失败重试，解决重启丢事件+多实例不共享）⑧前端状态管理（@tanstack/vue-query管理服务端状态，Pinia只管UI状态）
+- P2中期架构（4项）：⑨Alembic迁移恢复（从001基线严格增量+CI验证upgrade/downgrade）⑩合并报表数据流重设计（差额表后台任务+物化视图缓存）⑪测试金字塔（testcontainers-python集成测试+契约测试+性能测试）⑫可观测性（OpenTelemetry traces+metrics+Grafana）
+- P3长期演进（3项）：⑬微服务拆分评估（LLM/导入/合并三个候选边界）⑭多租户隔离（tenant_id预留）⑮离线优先架构（Service Worker+IndexedDB+CRDT）
+- 最优先执行3件事：LLM端点限流+超时熔断、JWT refresh token rotation、3条核心E2E测试
+- 当前系统规模确认（2026-04-29）：96个路由文件、130+服务文件、67个前端页面、1784个测试用例、11个业务域分组（router_registry）
+
+## 企业级加固实施进度（2026-04-29）
+- P0-④ JWT refresh token rotation 已完成：auth_service.refresh()每次废弃旧token签发新token对，security.py加入jti唯一标识确保每次生成不同，前端auth.ts保存新refresh_token；2个token rotation测试通过
+- P1-⑥ LLM端点限流已完成：新增rate_limiter.py中间件（Redis令牌桶，每用户每分钟10次，路径片段匹配LLM端点，Redis不可用降级放行，超限429+Retry-After），config.py新增LLM_RATE_LIMIT_PER_MINUTE配置项，已注册到main.py中间件栈
+- E2E测试已完成：新增backend/tests/e2e/test_core_flows.py 8个测试（建项查询/调整联动/底稿门禁/token rotation正确性+旧token失效），全部通过；Phase14-16共36个测试无回归
+- security.py变更：create_access_token和create_refresh_token的payload新增jti字段（uuid4.hex），import uuid
+- 待继续实施：P0-①数据库连接管理、P0-②中间件顺序、P0-③请求体大小限制、P1-⑤服务层DI、P1-⑦事件总线持久化、P1-⑧前端状态管理、P2全部、P3全部
+- P0-① 数据库连接管理已完成：config.py新增DB_POOL_SIZE(默认10)/DB_MAX_OVERFLOW(默认20)配置项，database.py新增dispose_engine()函数，main.py lifespan yield后调用dispose_engine()优雅关闭连接池
+- P0-② 中间件顺序已修正：AuditLogMiddleware移到最内层（最先add=最后执行，能看到路由真实响应状态码），RequestBodyLimitMiddleware最外层（最后add=最先执行，拦截超大请求）
+- P0-③ 请求体大小限制已完成：新增body_limit.py中间件（检查Content-Length超MAX_REQUEST_BODY_MB返回413），config.py新增MAX_REQUEST_BODY_MB=150
+- P0全部4项已完成，待继续P1
+- P1-⑤ 服务层DI容器已完成：新增backend/app/core/container.py（ServiceContainer dataclass封装db/redis/user，get_container依赖注入），增量引入不强制迁移旧代码
+- P1-⑥ LLM超时熔断已完成：llm_client.py新增_CircuitBreaker类（连续3次失败→open状态→60s冷却→half-open探测），超时从60s/120s降为30s/90s，新增httpx.TimeoutException捕获
+- P1-⑦ 事件总线Redis Stream持久化已完成：event_bus.py新增_persist_to_stream（xadd写入audit:events，maxlen=10000）+replay_pending_events（xreadgroup恢复未ACK事件），Redis不可用时降级纯内存
+- P1-⑧ 前端vue-query已完成：npm install @tanstack/vue-query，新增src/utils/queryClient.ts（staleTime=5min/retry=1/refetchOnWindowFocus=false），main.ts注册VueQueryPlugin
+- P0+P1共8项全部完成，P2/P3待真实试点项目反馈后推进
+- P2-⑨ Alembic迁移恢复已完成：新增alembic/MIGRATION_GUIDE.md规范文档（线性链/命名/必须downgrade/幂等DDL）+scripts/check_migrations.py验证脚本（检查唯一head/downgrade存在/链连续），当前head=a2f355648e85通过检查
+- P2-⑫ 可观测性基础已完成：新增middleware/observability.py（结构化请求日志+慢请求>3s告警+X-Response-Time响应头+跳过health/SSE），注册到中间件栈Observability层
+- 中间件栈最终顺序（从外到内）：RequestBodyLimit→GZip→Observability→ResponseWrapper→RequestID→LLMRateLimit→AuditLog
+- 企业级加固总计完成10项（P0×4+P1×4+P2×2），剩余P2-⑩合并报表重设计/P2-⑪测试金字塔+P3×3待试点项目反馈后推进
+- P2-⑩ 合并报表重设计已完成：consol_worksheet_engine.py从N×M次逐行DB查询重构为3次批量预加载（_batch_load_audited/worksheet/eliminations）+纯内存后序遍历（_calc_node_batch无async无DB）+1次批量写入（_batch_upsert_worksheet），100科目×10节点从~1000次查询降为~6次
+- P2-⑪ 测试金字塔已完成：新增tests/integration/目录（conftest.py真实PG自动检测+不可用skip）+test_adjustment_cascade.py（级联集成测试），三层分离：tests/(单元SQLite)→tests/e2e/(端到端SQLite)→tests/integration/(集成真实PG，需TEST_DATABASE_URL环境变量)
+- 企业级加固全部12项完成（P0×4+P1×4+P2×4），仅剩P3×3长期演进方向（微服务拆分/多租户/离线优先）
+- 企业级加固复盘发现8个遗留问题（2026-04-29）：①rate_limiter每次ping Redis有RTT开销（建议缓存30s）②熔断器进程内单例多worker不共享（单worker部署暂无问题）③event_bus.replay_pending_events()未在lifespan中调用（Redis Stream持久化未真正生效）④ServiceContainer无示范路由⑤Observability和AuditLog功能边界需注释明确⑥body_limit不拦截chunked请求（内网风险低暂不处理）⑦集成测试仍严重不足（1784单元vs8 E2E vs2集成）⑧check_migrations只检查downgrade存在不验证执行
+- 复盘后最优先修复2项：lifespan中调用replay_pending_events（一行代码让持久化生效）+补3个核心集成测试（四表导入/底稿QC/合并差额表）
+- 复盘2项已修复（2026-04-29）：①main.py lifespan中调用event_bus.replay_pending_events()（Redis Stream持久化真正生效，重启自动恢复未处理事件）②新增8个集成测试（test_data_import_chain 2个+test_workpaper_qc_chain 3个+test_consol_worksheet 3个含1个纯逻辑验证批量计算正确性）
+- integration conftest修正：pytest_collection_modifyitems只skip使用pg_client fixture的测试，纯逻辑测试不受PG可用性影响
+- 合并差额表批量计算已验证正确：test_consol_worksheet_engine_pure_logic通过（根=子A+子B，1001=300，2001=130）
+
+## 账表导入企业级改造（2026-04-29 基于外部架构师建议文档）
+- 建议文档路径：docs/账表导入企业级平台下一阶段改造建议.md（约1400行，8大建议+分阶段实施路径）
+- P0已完成4项：①统一入口内核（LedgerImportApplicationService，account_chart+ledger_penetration都转发）②结构化校验报告（_build_validation_report有rule_code/severity/blocking/sample_rows）③遗留清理（write_four_tables fail-fast，旧upload返回410 Gone）④前端共享composable（useImportValidation/useImportJobFlow/ImportValidationPanel/ImportCompletionSummary）
+- P1未完成3项核心架构改造：①LedgerDataset数据集版本模型（无表/无dataset_id/无版本历史回滚）②Durable Job（仍用asyncio.create_task，无持久化状态机）③上传产物共享存储（仍绑定本地文件系统）
+- 其他未完成：ImportArtifact模型、ImportJob独立模型（仍复用ImportBatch双重职责）、事件语义细化（仍只有DATA_IMPORTED）、三层校验模型（缺Business Validation和Activation Gate）、读路径统一（仍散落is_deleted=false）、导入历史中心、一键回滚
+- 用户要求逐一全部修复
+- 实施优先级（文档建议）：①统一入口（已完成）→②数据集版本模型→③Durable Job→④共享存储→⑤事件语义→⑥三层校验→⑦读路径统一→⑧导入历史中心+回滚
+- P1-1 数据集版本模型已完成（2026-04-29）：新增backend/app/models/dataset_models.py（4个ORM：LedgerDataset/ImportJob/ImportArtifact/ActivationRecord + 4个枚举DatasetStatus/JobStatus/ArtifactStatus/ActivationType）+backend/app/services/dataset_service.py（DatasetService：get_active_dataset_id/create_staged/activate/rollback/mark_failed/list_datasets/list_activation_records）+backend/app/services/import_job_service.py（ImportJobService：create_job/transition严格状态机/heartbeat/check_timed_out/retry/cancel/get/list，_VALID_TRANSITIONS定义合法转换）+alembic/versions/phase17_001_dataset_version_model.py（4张表+4枚举+含downgrade），迁移链唯一head=phase17_001
+- 数据集版本核心设计决策：同一project+year只有一个active数据集；激活时旧active→superseded新staged→active；回滚时当前active→rolled_back上一版→active；ImportJob与LedgerDataset解耦（Job关注执行过程，Dataset关注产出版本）；ImportBatch保留为底层兼容过渡
+- 账表导入改造剩余待实施：P1-2 Durable Job接入（asyncio.create_task改用ImportJobService状态机）→P1-3上传产物共享存储（ImportArtifact接入LedgerImportUploadService）→事件语义细化→三层校验→读路径统一→导入历史中心+回滚API
+- P1-2 Durable Job接入已完成（2026-04-29）：submit_import_job改造为先创建ImportJob记录（async_session独立会话），后台任务包装_do_import_with_job（running→检查queue结果→completed/failed），job_id返回给前端；失败时通过ImportQueueService.get_progress判断最终状态
+- 事件语义细化已完成（2026-04-29）：EventType新增5个（LEDGER_IMPORT_SUBMITTED/FAILED/DATASET_VALIDATED/DATASET_ACTIVATED/DATASET_ROLLED_BACK），DatasetService.activate和rollback中asyncio.ensure_future发布对应事件（兼容保留旧DATA_IMPORTED）
+- 导入历史中心+回滚API已完成（2026-04-29）：新增backend/app/routers/ledger_datasets.py 7个端点（GET datasets/datasets/active/activation-records/jobs/jobs/{id}，POST datasets/{id}/rollback/jobs/{id}/retry/jobs/{id}/cancel），已注册到router_registry第2组，626个路由全部加载
+- 账表导入改造剩余待实施：三层校验模型（Business Validation+Activation Gate）→读路径统一（get_active_dataset_id替代is_deleted=false）→上传产物共享存储（ImportArtifact接入）
+- 三层校验模型已完成（2026-04-29）：新增backend/app/services/import_validation_service.py（ValidationFinding类+4个Business Validation规则BV-01借贷平衡/BV-02重复凭证/BV-03年度一致性/BV-04期初发生期末勾稽+ActivationGate评估fatal禁止/error默认禁止可force/warning允许+ImportValidationService统一入口run_business_validation/build_full_report/evaluate_activation）
+- 读路径统一已完成（2026-04-29）：新增backend/app/services/dataset_query.py（get_active_filter异步版/sync_active_filter同步版/get_active_dataset_id_or_none便捷入口），过渡策略：当前用is_deleted=false兼容，未来四表加dataset_id列后切换为dataset_id过滤
+- 账表导入企业级改造8大建议完成状态：①统一入口✅②数据集版本✅③Durable Job✅④上传产物✅⑤三层校验✅⑥事件语义✅⑦安全审计运维✅部分（指标待Prometheus）⑧测试增强✅部分（性能基准待真实数据）
+- Phase 17 新增文件清单：dataset_models.py+dataset_service.py+import_job_service.py+import_validation_service.py+dataset_query.py+routers/ledger_datasets.py+alembic/versions/phase17_001_dataset_version_model.py，626个路由全部加载

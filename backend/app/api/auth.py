@@ -38,15 +38,22 @@ async def refresh(
     body: RefreshRequest,
     redis: Redis = Depends(get_redis),
 ) -> dict:
-    """使用 refresh_token 获取新的 access_token。
+    """使用 refresh_token 获取新的 token 对（Token Rotation）。
+
+    每次刷新时旧 refresh_token 立即失效，返回全新的 access_token + refresh_token。
+    前端需保存新的 refresh_token 用于下次刷新。
 
     Validates: Requirements 3.2
     """
-    new_access_token = await auth_service.refresh(
+    tokens = await auth_service.refresh(
         refresh_token=body.refresh_token,
         redis=redis,
     )
-    return {"access_token": new_access_token, "token_type": "bearer"}
+    return {
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
+        "token_type": "bearer",
+    }
 
 
 @router.post("/logout")

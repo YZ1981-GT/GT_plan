@@ -9,8 +9,8 @@ from app.core.config import settings
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
     pool_pre_ping=True,  # 自动检测断开的连接
     pool_recycle=3600,    # 1小时回收连接（防止数据库端超时断开）
 )
@@ -30,6 +30,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI 依赖注入：提供异步数据库会话，请求结束后自动关闭。"""
     async with async_session() as session:
         yield session
+
+
+async def dispose_engine() -> None:
+    """优雅关闭连接池，在应用关闭时调用。"""
+    await engine.dispose()
 
 
 def get_sync_db():

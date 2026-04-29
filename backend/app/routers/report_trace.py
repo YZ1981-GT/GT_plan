@@ -278,10 +278,6 @@ async def recommend_workpapers(project_id: UUID, db: AsyncSession = Depends(get_
             for i, r in enumerate(wps[:10])
         ] if 'wps' in dir() else [],
         "ai_generated": False,
-    }            {"wp_code": "E9-1", "priority": "high", "reason": "固定资产金额重大"},
-            {"wp_code": "E1-1", "priority": "high", "reason": "货币资金需函证"},
-            {"wp_code": "E3-1", "priority": "medium", "reason": "应收账款需账龄分析"},
-        ]
     }
 
 

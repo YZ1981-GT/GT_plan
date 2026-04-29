@@ -343,8 +343,10 @@ async def create_full_package(
         # Execute fill
         filler = WordTemplateFiller(db)
         try:
+            # 获取用户角色用于脱敏
+            user_role = getattr(current_user, 'role', 'assistant')
             zip_path = await filler.fill_full_package(
-                db, project_id, body.year, current_user.id
+                db, project_id, body.year, current_user.id, actor_role=user_role
             )
             await job_svc.update_progress(job.id, done=6, failed=0)
         except Exception as fill_err:

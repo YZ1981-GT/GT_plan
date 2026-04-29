@@ -14,6 +14,8 @@ if not Path(_env_file).exists() and _root_env.exists():
 class Settings(BaseSettings):
     # 数据库
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform"
+    DB_POOL_SIZE: int = 10       # 连接池常驻连接数
+    DB_MAX_OVERFLOW: int = 20    # 连接池最大溢出连接数
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
     # JWT
@@ -49,6 +51,7 @@ class Settings(BaseSettings):
     MINERU_USE_CLI: bool = True  # 使用 CLI 模式（直接调用本地 mineru 命令）
     # 文件上传限制
     MAX_UPLOAD_SIZE_MB: int = 100  # 最大上传文件大小（MB）
+    MAX_REQUEST_BODY_MB: int = 150  # 全局请求体大小上限（MB），略大于上传限制以容纳 multipart 开销
     LEDGER_UPLOAD_STORAGE_ROOT: str = "./storage/ledger_uploads"
     LEDGER_UPLOAD_TTL_HOURS: int = 24
     LEDGER_UPLOAD_MAX_FILE_COUNT: int = 20
@@ -71,6 +74,8 @@ class Settings(BaseSettings):
     FORMULA_EXECUTE_TIMEOUT: int = 10
     # Phase 8: 数据加密密钥
     ENCRYPTION_KEY: str = ""
+    # LLM 限流配置
+    LLM_RATE_LIMIT_PER_MINUTE: int = 10  # 每用户每分钟最大 LLM 调用次数
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

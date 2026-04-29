@@ -999,7 +999,9 @@ class TestWordTemplateFiller:
         # Verify ZIP contents
         with zf.ZipFile(str(zip_path), "r") as z:
             names = z.namelist()
-            assert len(names) == 6  # 1 audit + 4 reports + 1 notes
+            # 1 audit + 4 reports + 1 notes + 1 consistency_report.json (Phase 16)
+            assert len(names) >= 6
+            assert len(names) <= 7  # consistency_report may or may not be present
 
         # Cleanup
         import shutil

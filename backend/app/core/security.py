@@ -1,5 +1,6 @@
 """安全工具模块 — JWT 编解码、密码哈希"""
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -15,12 +16,13 @@ def create_access_token(data: dict) -> str:
       - sub: 用户 ID（字符串）
       - exp: 过期时间
       - type: "access"
+      - jti: 唯一标识（确保每次生成不同）
     """
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
     )
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({"exp": expire, "type": "access", "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
@@ -31,12 +33,13 @@ def create_refresh_token(data: dict) -> str:
       - sub: 用户 ID（字符串）
       - exp: 过期时间
       - type: "refresh"
+      - jti: 唯一标识（Token Rotation 依赖此字段区分新旧 token）
     """
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(
         days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS
     )
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({"exp": expire, "type": "refresh", "jti": uuid.uuid4().hex})
     return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 

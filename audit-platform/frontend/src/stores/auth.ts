@@ -70,8 +70,11 @@ export const useAuthStore = defineStore('auth', {
         refresh_token: this.refreshToken,
       })
       const payload = data.data ?? data
+      // Token Rotation: 后端每次刷新都签发新的 refresh_token
       this.token = payload.access_token
+      this.refreshToken = payload.refresh_token ?? this.refreshToken
       localStorage.setItem('token', this.token!)
+      localStorage.setItem('refreshToken', this.refreshToken!)
     },
 
     async fetchUserProfile() {

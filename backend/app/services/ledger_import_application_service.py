@@ -10,6 +10,9 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
+from app.models.dataset_models import JobStatus
+from app.services.dataset_service import DatasetService
+from app.services.import_job_service import ImportJobService
 from app.services.import_queue_service import ImportQueueService
 from app.services.ledger_import_upload_service import LedgerImportUploadService
 from app.services.smart_import_engine import SmartImportError, smart_import_streaming, smart_parse_files
@@ -598,11 +601,66 @@ class LedgerImportApplicationService:
                     else:
                         ImportQueueService.release_lock(project_id)
 
-        asyncio.create_task(_do_import())
+        # 创建持久化 ImportJob 记录（Durable Job）
+        import_job = None
+        try:
+            async with async_session() as job_db:
+                import_job = await ImportJobService.create_job(
+                    job_db,
+                    project_id=project_id,
+                    year=year or 0,
+                    custom_mapping=parsed_mapping,
+                    created_by=UUID(user_id) if user_id else None,
+                )
+                await job_db.commit()
+                job_id = import_job.id
+        except Exception as e:
+            logger.warning("创建 ImportJob 记录失败（降级为无持久化）: %s", e)
+            job_id = None
+
+        # 包装后台任务，加入状态机转换
+        async def _do_import_with_job():
+            if job_id:
+                try:
+                    async with async_session() as jdb:
+                        await ImportJobService.transition(jdb, job_id, JobStatus.running, progress_pct=1, progress_message="开始导入")
+                        await jdb.commit()
+                except Exception:
+                    pass
+
+            try:
+                await _do_import()
+            except Exception:
+                pass  # _do_import 内部已处理异常
+
+            # 检查最终状态（通过 ImportQueueService 的结果判断）
+            queue_status = ImportQueueService.get_progress(project_id)
+            if job_id:
+                try:
+                    async with async_session() as jdb:
+                        if queue_status and queue_status.get("status") == "failed":
+                            await ImportJobService.transition(
+                                jdb, job_id, JobStatus.failed,
+                                progress_pct=queue_status.get("progress", 0),
+                                error_message=queue_status.get("message", "导入失败"),
+                            )
+                        else:
+                            await ImportJobService.transition(
+                                jdb, job_id, JobStatus.completed,
+                                progress_pct=100,
+                                progress_message="导入完成",
+                                result_summary=queue_status.get("result") if queue_status else None,
+                            )
+                        await jdb.commit()
+                except Exception as e:
+                    logger.debug("更新 ImportJob 状态失败: %s", e)
+
+        asyncio.create_task(_do_import_with_job())
         return {
             "status": "accepted",
             "message": f"导入任务已提交（{len(file_sources)} 个文件），请轮询进度",
             "project_id": str(project_id),
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
+            "job_id": str(job_id) if job_id else None,
             "upload_token": resolved_token,
         }

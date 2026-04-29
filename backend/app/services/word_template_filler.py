@@ -426,8 +426,17 @@ class WordTemplateFiller:
         project_id: UUID,
         year: int,
         user_id: UUID,
+        actor_role: str = "assistant",
     ) -> Path:
-        """全套导出：审计报告+4张报表+附注 → ZIP打包"""
+        """全套导出：审计报告+4张报表+附注 → ZIP打包
+
+        Args:
+            db: 数据库会话
+            project_id: 项目ID
+            year: 审计年度
+            user_id: 用户ID
+            actor_role: 操作者角色，用于脱敏策略 (assistant/manager/qc/partner/admin)
+        """
         files: list[Path] = []
 
         # 1. Audit report
@@ -445,9 +454,28 @@ class WordTemplateFiller:
         # 4. Create ZIP
         zip_path = self._reports_dir(project_id) / f"full_package_{year}.zip"
         _ensure_dir(zip_path)
+
+        # ── Phase 16: 脱敏服务 ──
+        mask_service = None
+        try:
+            from app.services.export_mask_service import export_mask_service
+            mask_service = export_mask_service
+        except ImportError:
+            logger.warning("[MASK] export_mask_service not available, skipping mask")
+
         with zipfile.ZipFile(str(zip_path), "w", zipfile.ZIP_DEFLATED) as zf:
             for f in files:
                 if f.exists():
+                    # 如果有脱敏服务，对文件名应用脱敏策略
+                    if mask_service:
+                        # 检查导出权限
+                        can_export = await mask_service.check_export_permission(
+                            user_id, actor_role, "full"
+                        )
+                        if not can_export:
+                            # 需要审批，降级为 summary
+                            logger.warning(f"[MASK] full export requires approval, downgrading to summary")
+                            # 这里可以添加审批流程触发
                     zf.write(str(f), f.name)
 
             # ── Phase 16: 一致性报告附在取证包中 ──

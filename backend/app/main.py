@@ -17,6 +17,9 @@ from app.middleware.error_handler import (
 )
 from app.middleware.response import ResponseWrapperMiddleware
 from app.middleware.request_id import RequestIDMiddleware
+from app.middleware.rate_limiter import LLMRateLimitMiddleware
+from app.middleware.body_limit import RequestBodyLimitMiddleware
+from app.middleware.observability import ObservabilityMiddleware
 from app.services.event_handlers import register_event_handlers
 from app.router_registry import register_all_routers
 
@@ -27,11 +30,22 @@ async def lifespan(app: FastAPI):
     setup_logging(level="INFO", json_format=False)
     register_event_handlers()
 
+    # 恢复 Redis Stream 中未处理的事件（服务重启后自动补偿）
+    from app.services.event_bus import event_bus
+    try:
+        replayed = await event_bus.replay_pending_events()
+        if replayed:
+            import logging
+            logging.getLogger("audit_platform").info(f"[启动] 恢复了 {replayed} 个未处理事件")
+    except Exception:
+        pass  # Redis 不可用时静默跳过
+
     # Phase 15: SLA 超时定时检查（每 15 分钟）
     import asyncio
     _sla_task = None
 
     async def _sla_check_loop():
+        """使用独立会话避免与请求连接池竞争"""
         while True:
             try:
                 await asyncio.sleep(900)  # 15 分钟
@@ -53,13 +67,17 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # 清理
+    # 优雅关闭
     if _sla_task:
         _sla_task.cancel()
         try:
             await _sla_task
         except asyncio.CancelledError:
             pass
+
+    # 关闭数据库连接池
+    from app.core.database import dispose_engine
+    await dispose_engine()
 
 
 app = FastAPI(
@@ -80,11 +98,16 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# --- 中间件（LIFO：最后添加的最先执行） ---
-app.add_middleware(AuditLogMiddleware)
-app.add_middleware(RequestIDMiddleware)
-app.add_middleware(ResponseWrapperMiddleware)
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+# --- 中间件（LIFO：最后添加的最先执行=洋葱最外层） ---
+# 洋葱模型从外到内：BodyLimit → GZip → Observability → ResponseWrapper → RequestID → RateLimit → AuditLog
+# 添加顺序从内到外（先添加=最内层）：
+app.add_middleware(AuditLogMiddleware)          # 最内层，记录路由真实响应状态码
+app.add_middleware(LLMRateLimitMiddleware)      # LLM 限流
+app.add_middleware(RequestIDMiddleware)         # 注入 request_id
+app.add_middleware(ResponseWrapperMiddleware)   # 统一响应格式
+app.add_middleware(ObservabilityMiddleware)     # 请求指标采集 + 慢请求告警
+app.add_middleware(GZipMiddleware, minimum_size=1000)  # 压缩响应
+app.add_middleware(RequestBodyLimitMiddleware)  # 最外层，最先拦截超大请求
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()],

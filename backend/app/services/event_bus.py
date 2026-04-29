@@ -1,4 +1,4 @@
-"""进程内事件总线 — 基于 asyncio
+"""进程内事件总线 — 基于 asyncio + Redis Stream 持久化
 
 提供 publish/subscribe 机制，用于服务间解耦联动：
 - 调整分录 CRUD → 试算表增量重算
@@ -7,12 +7,18 @@
 - 导入回滚 → 试算表全量重算
 - 重要性水平变更 → 通知前端
 
+Redis Stream 持久化：
+- 事件发布时同时写入 Redis Stream（audit:events）
+- 服务重启后可从 Stream 恢复未处理事件
+- Redis 不可用时降级为纯内存模式
+
 Validates: Requirements 10.1-10.6
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import defaultdict
 from typing import Any, Callable, Coroutine
@@ -24,15 +30,21 @@ logger = logging.getLogger(__name__)
 # Type alias for async event handlers
 EventHandler = Callable[[EventPayload], Coroutine[Any, Any, None]]
 
+# Redis Stream 配置
+_STREAM_KEY = "audit:events"
+_STREAM_MAX_LEN = 10000  # 保留最近 1 万条事件
+_CONSUMER_GROUP = "event_handlers"
+
 
 class EventBus:
-    """进程内事件总线，基于 asyncio 实现，支持 debounce 去重"""
+    """进程内事件总线，基于 asyncio 实现，支持 debounce 去重 + Redis Stream 持久化"""
 
     def __init__(self, debounce_ms: int = 500) -> None:
         self._handlers: dict[EventType, list[EventHandler]] = defaultdict(list)
         self._sse_queues: list[asyncio.Queue[EventPayload | None]] = []
         self._pending: dict[str, dict] = {}  # debounce 缓冲区
         self._debounce_ms: int = debounce_ms
+        self._redis_available: bool | None = None  # 延迟检测
 
     def _build_dedup_key(self, payload: EventPayload) -> str:
         """构建 debounce 去重键。
@@ -97,6 +109,9 @@ class EventBus:
             len(handlers),
         )
 
+        # 持久化到 Redis Stream（异步，不阻断分发）
+        asyncio.ensure_future(self._persist_to_stream(payload))
+
         for handler in handlers:
             try:
                 await handler(payload)
@@ -110,6 +125,95 @@ class EventBus:
 
         # Push to SSE queues for frontend notification
         await self._notify_sse(payload)
+
+    # ------------------------------------------------------------------
+    # Redis Stream 持久化
+    # ------------------------------------------------------------------
+
+    async def _get_redis(self):
+        """获取 Redis 客户端，不可用返回 None"""
+        if self._redis_available is False:
+            return None
+        try:
+            from app.core.redis import redis_client
+            await redis_client.ping()
+            self._redis_available = True
+            return redis_client
+        except Exception:
+            self._redis_available = False
+            logger.debug("EventBus: Redis not available, running in memory-only mode")
+            return None
+
+    async def _persist_to_stream(self, payload: EventPayload) -> None:
+        """将事件写入 Redis Stream，失败静默降级"""
+        redis = await self._get_redis()
+        if not redis:
+            return
+        try:
+            event_data = {
+                "event_type": payload.event_type.value,
+                "project_id": str(payload.project_id) if payload.project_id else "",
+                "year": str(payload.year) if payload.year else "",
+                "account_codes": json.dumps(payload.account_codes) if payload.account_codes else "[]",
+            }
+            await redis.xadd(_STREAM_KEY, event_data, maxlen=_STREAM_MAX_LEN)
+        except Exception as e:
+            logger.debug("EventBus: failed to persist event to Redis Stream: %s", e)
+
+    async def replay_pending_events(self) -> int:
+        """服务重启后从 Redis Stream 恢复未确认事件（可在 lifespan 中调用）
+
+        Returns:
+            恢复并重新分发的事件数量
+        """
+        redis = await self._get_redis()
+        if not redis:
+            return 0
+
+        try:
+            # 确保 consumer group 存在
+            try:
+                await redis.xgroup_create(_STREAM_KEY, _CONSUMER_GROUP, id="0", mkstream=True)
+            except Exception:
+                pass  # group 已存在
+
+            # 读取 pending 事件
+            messages = await redis.xreadgroup(
+                _CONSUMER_GROUP, "worker-1", {_STREAM_KEY: ">"}, count=100, block=0
+            )
+            if not messages:
+                return 0
+
+            count = 0
+            for stream_name, entries in messages:
+                for msg_id, data in entries:
+                    try:
+                        event_type = EventType(data.get("event_type", ""))
+                        payload = EventPayload(
+                            event_type=event_type,
+                            project_id=data.get("project_id") or None,
+                            year=int(data["year"]) if data.get("year") else None,
+                            account_codes=json.loads(data.get("account_codes", "[]")) or None,
+                        )
+                        # 直接分发，不再持久化（避免循环）
+                        handlers = self._handlers.get(event_type, [])
+                        for handler in handlers:
+                            try:
+                                await handler(payload)
+                            except Exception:
+                                pass
+                        # ACK
+                        await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
+                        count += 1
+                    except Exception:
+                        # 无法解析的消息直接 ACK 跳过
+                        await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
+
+            logger.info("EventBus: replayed %d pending events from Redis Stream", count)
+            return count
+        except Exception as e:
+            logger.warning("EventBus: replay_pending_events failed: %s", e)
+            return 0
 
     # ------------------------------------------------------------------
     # SSE support

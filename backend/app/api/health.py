@@ -1,35 +1,35 @@
 """健康检查路由 — GET /health（无需认证）
 
+示范 ServiceContainer 用法：将 db + redis 打包为一个依赖注入。
+
 Validates: Requirements 4.8, 4.9
 """
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from redis.asyncio import Redis
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.redis import get_redis
+from app.core.container import ServiceContainer, get_container
 
 router = APIRouter(tags=["健康检查"])
 
 
 @router.get("/health")
 async def health_check(
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
+    ctx: ServiceContainer = Depends(get_container),
 ) -> JSONResponse:
     """检查 PostgreSQL 和 Redis 连接状态。
 
     全部可用 → 200，任一不可用 → 503 + 详情。
+
+    使用 ServiceContainer 简化依赖注入（示范用法）。
     """
     services: dict[str, str] = {}
     all_healthy = True
 
     # PostgreSQL 检查
     try:
-        await db.execute(text("SELECT 1"))
+        await ctx.db.execute(text("SELECT 1"))
         services["postgres"] = "ok"
     except Exception:
         services["postgres"] = "unavailable"
@@ -37,7 +37,7 @@ async def health_check(
 
     # Redis 检查
     try:
-        await redis.ping()
+        await ctx.redis.ping()
         services["redis"] = "ok"
     except Exception:
         services["redis"] = "unavailable"

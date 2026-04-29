@@ -11,7 +11,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 
-router = APIRouter(prefix="/api/exports", tags=["取证完整性"])
+router = APIRouter(prefix="/exports", tags=["取证完整性"])
 logger = logging.getLogger(__name__)
 
 

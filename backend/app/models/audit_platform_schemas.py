@@ -748,6 +748,12 @@ class EventType(str, enum.Enum):
     REPORTS_UPDATED = "reports.updated"
     WORKPAPER_SAVED = "workpaper.saved"
     NOTE_UPDATED = "note.updated"
+    # Phase 17: 细化导入事件语义
+    LEDGER_IMPORT_SUBMITTED = "ledger.import_submitted"
+    LEDGER_IMPORT_FAILED = "ledger.import_failed"
+    LEDGER_DATASET_VALIDATED = "ledger.dataset_validated"
+    LEDGER_DATASET_ACTIVATED = "ledger.dataset_activated"
+    LEDGER_DATASET_ROLLED_BACK = "ledger.dataset_rolled_back"
 
 
 class EventPayload(BaseModel):

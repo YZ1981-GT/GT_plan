@@ -28,10 +28,11 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.data_import import router as data_import_router
     from app.routers.data_lifecycle import router as data_lifecycle_router
     from app.routers.continuous_audit import router as continuous_audit_router
+    from app.routers.ledger_datasets import router as ledger_datasets_router
 
     for r in [project_wizard_router, account_chart_router, mapping_router,
               rlm_router, data_import_router, data_lifecycle_router,
-              continuous_audit_router]:
+              continuous_audit_router, ledger_datasets_router]:
         app.include_router(r, tags=["项目与数据"])
 
     # ═══ 3. 查账与试算（四表穿透/试算表/调整/重要性/错报） ═══
@@ -195,6 +196,8 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.version_line import router as version_line_router
     from app.routers.offline_conflicts import router as conflict_router
     from app.routers.consistency_replay import router as consistency_replay_router
+    from app.routers.export_integrity import router as export_integrity_router
 
-    for r in [version_line_router, conflict_router, consistency_replay_router]:
+    for r in [version_line_router, conflict_router, consistency_replay_router,
+              export_integrity_router]:
         app.include_router(r, prefix="/api", tags=["取证与版本链"])
