@@ -36,17 +36,30 @@ async def generate_policy(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """会计政策自动生成（接入 vLLM）"""
+    """会计政策自动生成（接入 vLLM + RAG 参照上年附注）"""
     from app.services.llm_client import chat_completion
+    from app.services.reference_doc_service import ReferenceDocService
+
+    # RAG: 加载上年同章节附注作为参照
+    context_docs = await ReferenceDocService.load_context(
+        db, project_id, data.year or 2025,
+        source_type="prior_year_notes",
+        section_hint=data.section_number,
+    )
+
     prompt = f"请为{data.template_type}版附注的「{data.section_number}」章节生成标准会计政策文本。行业：{data.industry or '一般企业'}。要求简洁专业，符合中国企业会计准则。"
     try:
-        text = await chat_completion([
-            {"role": "system", "content": "你是审计附注编写专家，请生成标准会计政策文本。"},
-            {"role": "user", "content": prompt},
-        ], max_tokens=1500)
+        text = await chat_completion(
+            [
+                {"role": "system", "content": "你是审计附注编写专家，请生成标准会计政策文本。如有参照文档请参考其格式和内容。"},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=1500,
+            context_documents=context_docs if context_docs else None,
+        )
     except Exception:
         text = f"根据{data.template_type}模版，{data.section_number}章节的标准会计政策文本。（LLM 服务暂不可用）"
-    return {"section_number": data.section_number, "generated_text": text, "source": "llm"}
+    return {"section_number": data.section_number, "generated_text": text, "source": "llm", "reference_count": len(context_docs)}
 
 
 @router.post("/{project_id}/ai/generate-analysis")

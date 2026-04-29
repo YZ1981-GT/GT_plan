@@ -1547,3 +1547,12 @@ inclusion: always
 - 16阶段跨阶段分析报告已生成（2026-04-29，commit 541670d已推送）：docs/specs-cross-phase-analysis.md，含阶段命名统一表+3个跨阶段断点+企业级6维度分析+4种角色覆盖+下一步建议
 - 跨阶段分析结论：17个阶段中14个完全完成，3个有问题（Phase2合并前端120个TS错误标记developing/Phase3协作32个死代码路由/Phase4 AI 4个服务待激活）；企业级6维度（可视化7/9+联动7/7+溯源7/7+留痕6/6+人机互动7/7+LLM辅助7/7）；4种角色需求全部覆盖
 - 下一步建议4项：①合并报表前端专项开发(2-3周)②Phase3死代码清理(0.5天)③Phase4 AI服务激活(1周)④真实项目验证(持续)
+- 跨阶段分析报告已更新修正（2026-04-29，commit 2f25195已推送）：Phase3状态修正为"已清理完毕"（102个路由全部已注册无死代码）；Phase4状态修正为"通过统一入口间接可达"（ai_unified→ai_service, wp_chat→ai_chat_service, wp_ai→workpaper_fill_service）；17个阶段中16个完全完成，仅Phase2合并报表前端存在实质断点（120个TS错误需2-3周专项开发）
+- 下一步建议缩减为3项：①合并报表前端专项开发(2-3周)②真实项目验证(持续)③vLLM稳定后恢复AI聊天入口(可选)
+
+## 知识库+RAG辅助生成需求（2026-04-29 用户提出）
+- 核心需求：生成附注正文/审计报告/部分底稿时，需要参考上年报告、上年底稿、其他参照材料，利用知识库功能+LLM实现RAG辅助生成
+- 应用场景：①附注正文生成时参照上年附注（会计政策/变动分析/叙述文字）②审计报告生成时参照上年报告（KAM/其他信息段）③底稿编制时参照上年底稿（审计说明/结论）④任何LLM生成场景都应支持选择参照文档注入上下文
+- 实现方式：在有关页面（DisclosureEditor/AuditReportEditor/WorkpaperWorkbench）增加"参照文档"选择器，用户可从知识库/上年数据中选择参照材料，LLM生成时自动注入为上下文（RAG模式）
+- 技术路径：knowledge_service已有9个分类知识库+文档CRUD+搜索能力，knowledge_retriever已有按章节标题关键词匹配+token预算控制+get_formatted_for_chapter格式化注入prompt；需要在LLM调用入口（llm_client/wp_explanation_service/note_ai等）统一支持context_documents参数
+- 待实现：①各生成页面增加"选择参照文档"UI入口②LLM调用统一增加context_documents参数③上年报告/底稿自动作为默认参照（用户可取消）④参照文档内容截断到token预算内

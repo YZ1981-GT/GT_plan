@@ -54,6 +54,14 @@ class WpExplanationService:
         input_text = self._build_prompt(context_data)
         input_hash = hashlib.sha256(input_text.encode()).hexdigest()[:16]
 
+        # 2.5 RAG: 加载上年底稿作为参照
+        from app.services.reference_doc_service import ReferenceDocService
+        context_docs = await ReferenceDocService.load_context(
+            self.db, project_id, year,
+            source_type="prior_year_workpaper",
+            wp_code=wp.wp_code if hasattr(wp, 'wp_code') else None,
+        )
+
         # 3. 调用 LLM
         from app.services.llm_client import chat_completion
         from app.core.config import settings
@@ -65,7 +73,10 @@ class WpExplanationService:
         ]
 
         try:
-            draft_text = await chat_completion(messages, model=model_name, temperature=0.3, max_tokens=2000)
+            draft_text = await chat_completion(
+                messages, model=model_name, temperature=0.3, max_tokens=2000,
+                context_documents=context_docs if context_docs else None,
+            )
         except Exception as e:
             logger.error("LLM调用失败: %s", e)
             return {"error": f"AI服务暂不可用: {e}"}

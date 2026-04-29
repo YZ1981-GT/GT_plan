@@ -69,6 +69,7 @@ async def chat_completion(
     temperature: float = 0.3,
     max_tokens: int = 2000,
     stream: bool = False,
+    context_documents: list[str] | None = None,
 ) -> str | AsyncGenerator[str, None]:
     """调用 LLM chat completion API
 
@@ -76,11 +77,30 @@ async def chat_completion(
         messages: [{"role": "system"|"user"|"assistant", "content": "..."}]
         model: 模型名称，默认使用 DEFAULT_CHAT_MODEL
         stream: 是否流式返回
+        context_documents: 参照文档内容列表（RAG 模式），自动注入为 system 消息
 
     Returns:
         非流式：完整回复文本
         流式：AsyncGenerator[str, None]
     """
+    # RAG: 将参照文档注入为 system 上下文
+    if context_documents:
+        context_text = "\n\n---\n\n".join(context_documents)
+        # 截断到合理长度（预留 token 给用户消息和回复）
+        max_context_chars = 8000  # 约 2000 tokens
+        if len(context_text) > max_context_chars:
+            context_text = context_text[:max_context_chars] + "\n\n[...参照文档已截断...]"
+
+        context_msg = {
+            "role": "system",
+            "content": f"以下是参照文档，请在生成内容时参考：\n\n{context_text}",
+        }
+        # 插入到 messages 的第一条 system 消息之后（或最前面）
+        if messages and messages[0].get("role") == "system":
+            messages = [messages[0], context_msg] + messages[1:]
+        else:
+            messages = [context_msg] + messages
+
     payload = {
         "model": model or _MODEL,
         "messages": messages,
