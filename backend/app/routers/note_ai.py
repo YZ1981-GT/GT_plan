@@ -69,17 +69,25 @@ async def generate_analysis(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """变动分析自动生成（接入 vLLM）"""
+    """变动分析自动生成（接入 vLLM + RAG 参照上年附注）"""
     from app.services.llm_client import chat_completion
+    from app.services.reference_doc_service import ReferenceDocService
+
+    context_docs = await ReferenceDocService.load_context(
+        db, project_id, data.year or 2025,
+        source_type="prior_year_notes",
+        section_hint=data.section_number,
+    )
+
     prompt = f"附注章节「{data.section_number}」，本期数据：{data.current_data}，上期数据：{data.prior_data}。请用一段话分析变动原因。"
     try:
         text = await chat_completion([
-            {"role": "system", "content": "你是审计分析师，请分析附注数据变动原因，语言简洁专业。"},
+            {"role": "system", "content": "你是审计分析师，请分析附注数据变动原因，语言简洁专业。如有上年参照请对比分析。"},
             {"role": "user", "content": prompt},
-        ], max_tokens=500)
+        ], max_tokens=500, context_documents=context_docs if context_docs else None)
     except Exception:
         text = "本期余额较上期变动，主要系...（LLM 服务暂不可用）"
-    return {"section_number": data.section_number, "generated_text": text, "source": "llm"}
+    return {"section_number": data.section_number, "generated_text": text, "source": "llm", "reference_count": len(context_docs)}
 
 
 @router.post("/{project_id}/ai/check-completeness")
@@ -88,16 +96,25 @@ async def check_completeness(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """披露完整性检查（接入 vLLM）"""
+    """披露完整性检查（接入 vLLM + RAG 参照知识库准则）"""
     from app.services.llm_client import chat_completion
+    from app.services.reference_doc_service import ReferenceDocService
+
+    context_docs = await ReferenceDocService.load_context(
+        db, project_id, 2025,
+        source_type="knowledge_base",
+        knowledge_category="accounting_standards",
+        knowledge_keywords=["披露", "附注", "准则"],
+    )
+
     try:
         text = await chat_completion([
-            {"role": "system", "content": "你是审计附注审核专家。请检查以下附注是否遗漏必要披露事项（关联方交易、或有事项、日后事项等）。"},
+            {"role": "system", "content": "你是审计附注审核专家。请检查附注是否遗漏必要披露事项（关联方交易、或有事项、日后事项等）。"},
             {"role": "user", "content": "请列出常见的必要披露事项清单，并标注是否可能遗漏。"},
-        ], max_tokens=800)
-        return {"missing_sections": [], "suggestions": [text]}
+        ], max_tokens=800, context_documents=context_docs if context_docs else None)
+        return {"missing_sections": [], "suggestions": [text], "reference_count": len(context_docs)}
     except Exception:
-        return {"missing_sections": [], "suggestions": ["LLM 服务暂不可用"]}
+        return {"missing_sections": [], "suggestions": ["LLM 服务暂不可用"], "reference_count": 0}
 
 
 @router.post("/{project_id}/ai/check-expression")
@@ -119,13 +136,21 @@ async def ai_complete(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """智能续写（接入 vLLM）"""
+    """智能续写（接入 vLLM + RAG 参照上年附注风格）"""
     from app.services.llm_client import chat_completion
+    from app.services.reference_doc_service import ReferenceDocService
+
+    context_docs = await ReferenceDocService.load_context(
+        db, project_id, 2025,
+        source_type="prior_year_notes",
+        section_hint=section_number,
+    )
+
     try:
         text = await chat_completion([
-            {"role": "system", "content": "你是审计附注编写助手。请续写以下文本，保持专业风格。只输出续写部分。"},
+            {"role": "system", "content": "你是审计附注编写助手。请续写以下文本，保持专业风格。参考上年附注的表述风格。只输出续写部分。"},
             {"role": "user", "content": f"请续写：{current_text}"},
-        ], max_tokens=200)
-        return {"suggestions": [current_text + text]}
+        ], max_tokens=200, context_documents=context_docs if context_docs else None)
+        return {"suggestions": [current_text + text], "reference_count": len(context_docs)}
     except Exception:
-        return {"suggestions": [current_text + "...（LLM 服务暂不可用）"]}
+        return {"suggestions": [current_text + "...（LLM 服务暂不可用）"], "reference_count": 0}

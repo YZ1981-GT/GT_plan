@@ -1556,3 +1556,5 @@ inclusion: always
 - 实现方式：在有关页面（DisclosureEditor/AuditReportEditor/WorkpaperWorkbench）增加"参照文档"选择器，用户可从知识库/上年数据中选择参照材料，LLM生成时自动注入为上下文（RAG模式）
 - 技术路径：knowledge_service已有9个分类知识库+文档CRUD+搜索能力，knowledge_retriever已有按章节标题关键词匹配+token预算控制+get_formatted_for_chapter格式化注入prompt；需要在LLM调用入口（llm_client/wp_explanation_service/note_ai等）统一支持context_documents参数
 - 待实现：①各生成页面增加"选择参照文档"UI入口②LLM调用统一增加context_documents参数③上年报告/底稿自动作为默认参照（用户可取消）④参照文档内容截断到token预算内
+- 知识库RAG辅助生成已完成（2026-04-29，commit 1a008c9已推送）：llm_client.chat_completion新增context_documents参数（自动注入system消息，截断8000字符）；新增reference_doc_service.py（load_prior_year_notes/report/workpaper+load_from_knowledge_base+load_context统一入口5种source_type）；note_ai.py generate_policy接入（自动加载上年同章节附注）；wp_explanation_service.py generate_draft接入（自动加载上年同编号底稿）
+- RAG技术决策：参照文档注入位置为第一条system消息之后；截断策略8000字符（约2000 tokens）；连续审计场景自动带入上年数据（用户无需手动选择）；返回reference_count告知前端
