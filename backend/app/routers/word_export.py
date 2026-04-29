@@ -289,8 +289,43 @@ async def create_full_package(
 ):
     """全套导出：审计报告+4张报表+附注 → ZIP打包
 
+    Phase 14: 导出前统一门禁评估（export_package）
     Creates an ExportJob and triggers fill_full_package.
     """
+    # ── Phase 14: 统一门禁引擎评估（export_package） ──
+    try:
+        from app.services.gate_engine import gate_engine as _gate_engine
+        gate_result = await _gate_engine.evaluate(
+            db=db,
+            gate_type="export_package",
+            project_id=project_id,
+            wp_id=None,
+            actor_id=current_user.id,
+            context={"year": body.year, "template_type": body.template_type},
+        )
+        if gate_result.decision == "block":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=409, detail={
+                "status": "blocked",
+                "gate_decision": "block",
+                "hit_rules": [
+                    {
+                        "rule_code": h.rule_code,
+                        "error_code": h.error_code,
+                        "severity": h.severity,
+                        "message": h.message,
+                        "suggested_action": h.suggested_action,
+                    }
+                    for h in gate_result.hit_rules
+                ],
+                "trace_id": gate_result.trace_id,
+            })
+    except HTTPException:
+        raise
+    except Exception as _gate_err:
+        import logging
+        logging.getLogger(__name__).warning(f"[GATE] export gate eval failed: {_gate_err}")
+
     from app.services.export_job_service import ExportJobService
     from app.services.word_template_filler import WordTemplateFiller
 

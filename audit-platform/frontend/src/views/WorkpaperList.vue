@@ -97,9 +97,25 @@
               <el-button @click="onUpload">上传</el-button>
               <el-button type="warning" @click="onQCCheck" :loading="qcLoading">自检</el-button>
               <el-tooltip :disabled="!hasBlocking" :content="blockingReasons.join('；')" placement="top">
-                <el-button type="success" @click="onSubmitReview" :disabled="hasBlocking">提交复核</el-button>
+                <el-button type="success" @click="onSubmitReview" :disabled="hasBlocking || submitLoading" :loading="submitLoading">提交复核</el-button>
               </el-tooltip>
             </div>
+
+            <!-- Phase 14: 门禁阻断面板 -->
+            <GateBlockPanel
+              :state="gateState"
+              :hit-rules="gateHitRules"
+              :trace-id="gateTraceId"
+              @jump="handleGateJump"
+            />
+
+            <!-- Phase 14: SoD 冲突弹窗 -->
+            <SoDConflictDialog
+              v-model="showSodDialog"
+              :conflict-type="sodConflictType"
+              :policy-code="sodPolicyCode"
+              :trace-id="sodTraceId"
+            />
             <el-alert v-if="!onlineEditReady" type="info" :closable="false" style="margin-top:8px" show-icon>
               {{ onlineEditNotice }}
             </el-alert>
@@ -230,6 +246,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Download, Monitor, Upload } from '@element-plus/icons-vue'
+import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
+import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
   checkFeatureFlag, getFeatureMaturity, submitWorkpaperReview,
@@ -252,6 +270,18 @@ const projectId = computed(() => route.params.projectId as string)
 const loading = ref(false)
 const qcLoading = ref(false)
 const downloadLoading = ref(false)
+const submitLoading = ref(false)
+
+// Phase 14: 门禁阻断面板状态
+const gateState = ref<'normal' | 'evaluating' | 'blocked' | 'warned' | 'error'>('normal')
+const gateHitRules = ref<any[]>([])
+const gateTraceId = ref('')
+
+// Phase 14: SoD 冲突弹窗
+const showSodDialog = ref(false)
+const sodConflictType = ref('')
+const sodPolicyCode = ref('')
+const sodTraceId = ref('')
 const searchKeyword = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -617,19 +647,70 @@ async function onQCCheck() {
 
 async function onSubmitReview() {
   if (!selectedWp.value) return
+  submitLoading.value = true
+  gateState.value = 'evaluating'
+  gateHitRules.value = []
+  gateTraceId.value = ''
   try {
     const currentWpId = selectedWp.value.id
-    // 使用专用提交复核端点（后端统一校验 4 项门禁）
+    // 使用专用提交复核端点（后端统一校验门禁引擎 + 4 项门禁）
     const data = await submitWorkpaperReview(projectId.value, selectedWp.value.id)
     if (data?.status === 'blocked') {
-      ElMessage.warning(`无法提交复核：${(data.blocking_reasons || []).join('；')}`)
+      // Phase 14: 展示门禁阻断面板
+      gateState.value = 'blocked'
+      gateHitRules.value = data.hit_rules || []
+      gateTraceId.value = data.trace_id || ''
+      if (!gateHitRules.value.length) {
+        // 旧格式兼容
+        ElMessage.warning(`无法提交复核：${(data.blocking_reasons || []).join('；')}`)
+      }
       return
     }
+    gateState.value = 'normal'
     ElMessage.success('已提交复核')
     await fetchData()
     await selectWorkpaperById(currentWpId)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '提交失败')
+    const detail = err?.response?.data?.detail
+    if (detail?.hit_rules) {
+      // 409 门禁阻断响应
+      gateState.value = 'blocked'
+      gateHitRules.value = detail.hit_rules || []
+      gateTraceId.value = detail.trace_id || ''
+    } else if (detail?.error_code === 'SOD_CONFLICT_DETECTED') {
+      // SoD 冲突
+      sodConflictType.value = detail.message || ''
+      sodPolicyCode.value = detail.policy_code || ''
+      sodTraceId.value = detail.trace_id || ''
+      showSodDialog.value = true
+    } else {
+      gateState.value = 'error'
+      gateTraceId.value = detail?.trace_id || ''
+      ElMessage.error(detail?.message || detail || '提交失败')
+    }
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+// Phase 14: 门禁阻断项跳转处理
+function handleGateJump(location: Record<string, any>) {
+  const section = location.section
+  if (section === 'procedure_status' && location.procedure_ids?.length) {
+    // 跳转到程序裁剪页
+    router.push(`/projects/${projectId.value}/procedures?highlight=${location.procedure_ids[0]}`)
+  } else if (section === 'audit_explanation') {
+    // 跳转到底稿工作台说明编辑区
+    router.push(`/projects/${projectId.value}/workpaper-bench`)
+  } else if (section === 'audit_conclusion') {
+    router.push(`/projects/${projectId.value}/workpaper-bench`)
+  } else if (section === 'consistency') {
+    // 跳转到一致性看板
+    router.push(`/projects/${projectId.value}/consistency`)
+  } else if (section === 'disclosure_notes') {
+    router.push(`/projects/${projectId.value}/disclosure-notes`)
+  } else if (section === 'audit_report') {
+    router.push(`/projects/${projectId.value}/audit-report`)
   }
 }
 

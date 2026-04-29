@@ -124,6 +124,23 @@ const router = createRouter({
           name: 'TemplateManager',
           component: () => import('@/views/TemplateManager.vue'),
         },
+        // Phase 15: 任务树与问题单
+        {
+          path: 'projects/:projectId/task-tree',
+          name: 'TaskTreeView',
+          component: () => import('@/views/TaskTreeView.vue'),
+        },
+        {
+          path: 'projects/:projectId/issues',
+          name: 'IssueTicketList',
+          component: () => import('@/views/IssueTicketList.vue'),
+        },
+        // Phase 16: 离线冲突工作台
+        {
+          path: 'projects/:projectId/offline-conflicts',
+          name: 'OfflineConflictWorkbench',
+          component: () => import('@/views/OfflineConflictWorkbench.vue'),
+        },
         {
           path: 'projects/:projectId/ledger',
           name: 'LedgerPenetration',

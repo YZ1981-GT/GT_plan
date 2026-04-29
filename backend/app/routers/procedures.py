@@ -69,6 +69,51 @@ async def save_trim(
 ):
     svc = ProcedureService(db)
     count = await svc.save_trim(project_id, cycle, [i.model_dump() for i in data.items])
+
+    # ── Phase 15: 发布裁剪事件到事件总线 ──
+    try:
+        from app.services.task_event_bus import task_event_bus
+        from app.services.trace_event_service import generate_trace_id
+        for item in data.items:
+            if item.status in ("skip", "not_applicable"):
+                event_type = "trim_applied"
+            else:
+                event_type = "trim_rollback"
+            await task_event_bus.publish(
+                db=db,
+                project_id=project_id,
+                event_type=event_type,
+                task_node_id=None,
+                payload={
+                    "procedure_id": item.id,
+                    "cycle": cycle,
+                    "status": item.status,
+                    "skip_reason": item.skip_reason,
+                    "ref_id": item.id,
+                    "version": "1",
+                },
+                trace_id=generate_trace_id(),
+            )
+    except Exception as _evt_err:
+        import logging
+        logging.getLogger(__name__).warning(f"[EVENT_BUS] trim event publish failed: {_evt_err}")
+
+    # ── Phase 14: trace 留痕 ──
+    try:
+        from app.services.trace_event_service import trace_event_service, generate_trace_id as _gen_tid
+        await trace_event_service.write(
+            db=db,
+            project_id=project_id,
+            event_type="trim_applied",
+            object_type="procedure",
+            object_id=project_id,
+            actor_id=user.id,
+            action=f"save_trim:{cycle}:{count}_items",
+            trace_id=_gen_tid(),
+        )
+    except Exception:
+        pass
+
     await db.commit()
     return {"updated": count}
 

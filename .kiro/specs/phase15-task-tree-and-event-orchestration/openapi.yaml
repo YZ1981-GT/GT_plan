@@ -1,10 +1,14 @@
 openapi: 3.0.3
 info:
   title: Phase15 Task Tree & Event Orchestration API
-  version: 0.2.0
+  version: 0.3.0
+  description: |
+    Aligned with v2 doc sections: 4.5.15A issue_ticket, 5.9.14~5.9.17 RC enhancements, WP-P2-5/P2-7/P2-9/ENT-09
 tags:
   - name: TaskTree
   - name: TaskEvents
+  - name: IssueTickets
+  - name: RCEnhanced
 servers:
   - url: /api
 paths:
@@ -23,6 +27,9 @@ paths:
         - in: query
           name: status
           schema: { type: string, enum: [pending, in_progress, blocked, done] }
+        - in: query
+          name: assignee_id
+          schema: { type: string, format: uuid }
         - in: query
           name: page
           schema: { type: integer, minimum: 1, default: 1 }
@@ -82,6 +89,147 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /issues/from-conversation:
+    post:
+      tags: [IssueTickets]
+      summary: Create issue ticket from review conversation (v2 4.5.15A)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueFromConversationRequest"
+      responses:
+        "200":
+          description: Issue created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueTicketResponse"
+        "422":
+          description: Missing required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /issues:
+    get:
+      tags: [IssueTickets]
+      summary: List issue tickets with filters
+      parameters:
+        - in: query
+          name: project_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, in_fix, pending_recheck, closed, rejected] }
+        - in: query
+          name: severity
+          schema: { type: string, enum: [blocker, major, minor, suggestion] }
+        - in: query
+          name: source
+          schema: { type: string, enum: [L2, L3, Q] }
+        - in: query
+          name: owner_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, default: 50 }
+      responses:
+        "200":
+          description: Issue list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueTicketListResponse"
+
+  /issues/{issue_id}/status:
+    put:
+      tags: [IssueTickets]
+      summary: Update issue ticket status
+      parameters:
+        - in: path
+          name: issue_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueStatusUpdateRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueTicketResponse"
+        "409":
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /issues/{issue_id}/escalate:
+    post:
+      tags: [IssueTickets]
+      summary: Escalate issue ticket (L2->L3->Q)
+      parameters:
+        - in: path
+          name: issue_id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueEscalateRequest"
+      responses:
+        "200":
+          description: Escalated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueTicketResponse"
+
+  /review-conversations/{id}/export-evidence:
+    post:
+      tags: [RCEnhanced]
+      summary: Export conversation as evidence package (v2 5.9.14.6)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RCExportEvidenceRequest"
+      responses:
+        "200":
+          description: Export created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RCExportEvidenceResponse"
+        "422":
+          description: Compliance blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     TaskNode:
@@ -90,31 +238,24 @@ components:
       properties:
         id: { type: string, format: uuid }
         project_id: { type: string, format: uuid }
-        node_level:
-          type: string
-          enum: [unit, account, workpaper, evidence]
+        node_level: { type: string, enum: [unit, account, workpaper, evidence] }
         parent_id: { type: string, format: uuid }
         ref_id: { type: string, format: uuid }
-        status:
-          type: string
-          enum: [pending, in_progress, blocked, done]
+        status: { type: string, enum: [pending, in_progress, blocked, done] }
         assignee_id: { type: string, format: uuid }
         due_at: { type: string, format: date-time }
-        meta:
-          type: object
-          additionalProperties: true
+        meta: { type: object, additionalProperties: true }
+
     TaskTreeListResponse:
       type: object
       required: [items, total, page, page_size, trace_id]
       properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/TaskNode"
+        items: { type: array, items: { $ref: "#/components/schemas/TaskNode" } }
         total: { type: integer }
         page: { type: integer }
         page_size: { type: integer }
         trace_id: { type: string }
+
     TaskReassignRequest:
       type: object
       required: [task_node_id, assignee_id, operator_id, reason_code]
@@ -123,13 +264,14 @@ components:
         assignee_id: { type: string, format: uuid }
         operator_id: { type: string, format: uuid }
         reason_code: { type: string }
+
     TaskNodeResponse:
       type: object
       required: [item, trace_id]
       properties:
-        item:
-          $ref: "#/components/schemas/TaskNode"
+        item: { $ref: "#/components/schemas/TaskNode" }
         trace_id: { type: string }
+
     EventReplayRequest:
       type: object
       required: [event_id, operator_id, reason_code]
@@ -137,22 +279,107 @@ components:
         event_id: { type: string, format: uuid }
         operator_id: { type: string, format: uuid }
         reason_code: { type: string }
+
     EventReplayResponse:
       type: object
       required: [event_id, status, trace_id]
       properties:
         event_id: { type: string, format: uuid }
-        status:
-          type: string
-          enum: [queued, replaying, succeeded, failed]
+        status: { type: string, enum: [queued, replaying, succeeded, failed] }
         trace_id: { type: string }
+
+    IssueTicket:
+      type: object
+      required: [id, project_id, source, severity, category, title, owner_id, status, trace_id]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        wp_id: { type: string, format: uuid }
+        task_node_id: { type: string, format: uuid }
+        conversation_id: { type: string, format: uuid }
+        source: { type: string, enum: [L2, L3, Q] }
+        severity: { type: string, enum: [blocker, major, minor, suggestion] }
+        category: { type: string }
+        title: { type: string }
+        description: { type: string }
+        owner_id: { type: string, format: uuid }
+        due_at: { type: string, format: date-time }
+        status: { type: string, enum: [open, in_fix, pending_recheck, closed, rejected] }
+        thread_id: { type: string, format: uuid }
+        evidence_refs: { type: array, items: { type: object } }
+        reason_code: { type: string }
+        trace_id: { type: string }
+        created_at: { type: string, format: date-time }
+        closed_at: { type: string, format: date-time }
+
+    IssueFromConversationRequest:
+      type: object
+      required: [conversation_id, operator_id, sla_level]
+      properties:
+        conversation_id: { type: string, format: uuid }
+        task_node_id: { type: string, format: uuid }
+        operator_id: { type: string, format: uuid }
+        sla_level: { type: string, enum: [P0, P1, P2] }
+
+    IssueTicketResponse:
+      type: object
+      required: [issue_id, status, trace_id]
+      properties:
+        issue_id: { type: string, format: uuid }
+        status: { type: string }
+        trace_id: { type: string }
+
+    IssueTicketListResponse:
+      type: object
+      required: [items, total, page, page_size, trace_id]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/IssueTicket" } }
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+        trace_id: { type: string }
+
+    IssueStatusUpdateRequest:
+      type: object
+      required: [status, operator_id, reason_code]
+      properties:
+        status: { type: string, enum: [in_fix, pending_recheck, closed, rejected] }
+        operator_id: { type: string, format: uuid }
+        reason_code: { type: string }
+        evidence_refs: { type: array, items: { type: object } }
+
+    IssueEscalateRequest:
+      type: object
+      required: [from_level, to_level, reason_code]
+      properties:
+        from_level: { type: string, enum: [L2, L3] }
+        to_level: { type: string, enum: [L3, Q] }
+        reason_code: { type: string }
+
+    RCExportEvidenceRequest:
+      type: object
+      required: [purpose, receiver, export_scope, mask_policy]
+      properties:
+        purpose: { type: string }
+        receiver: { type: string }
+        export_scope: { type: string, enum: [full_timeline, summary, attachments_only] }
+        mask_policy: { type: string }
+        include_hash_manifest: { type: boolean, default: true }
+
+    RCExportEvidenceResponse:
+      type: object
+      required: [export_id, file_url, hash, trace_id]
+      properties:
+        export_id: { type: string }
+        file_url: { type: string }
+        hash: { type: string }
+        trace_id: { type: string }
+
     ErrorResponse:
       type: object
       required: [error_code, message, trace_id]
       properties:
         error_code: { type: string }
         message: { type: string }
-        details:
-          type: object
-          additionalProperties: true
+        details: { type: object, additionalProperties: true }
         trace_id: { type: string }

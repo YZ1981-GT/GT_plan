@@ -1,9 +1,10 @@
 """WOPI Host 服务 — 文件元信息查询、读取、写入、锁管理、访问令牌
 
-MVP实现：
-- check_file_info: 从 working_paper 表获取元数据
-- get_file / put_file: stub（返回占位数据/递增版本号）
-- lock/unlock/refresh_lock: 内存字典模拟 Redis 锁
+企业级实现：
+- check_file_info: 从 working_paper 表获取元数据 + 动态 UserCanWrite（编制/复核/只读/签字窗口四场景）+ trace 写入
+- get_file: 从本地磁盘读取底稿文件
+- put_file: 企业级 8 步保存（锁校验→版本快照→写入→哈希校验→DB更新→审计留痕→事件发布→云端双写）+ 版本链写入
+- lock/unlock/refresh_lock: Redis 优先 + 内存降级，TTL=30min
 - generate_access_token / validate_access_token: 复用 JWT 模块
 
 Validates: Requirements 3.1, 3.2, 3.3, 3.7
@@ -121,11 +122,63 @@ class WOPIHostService:
             "Size": file_size,
             "OwnerId": str(wp.created_by) if wp.created_by else "",
             "Version": str(wp.file_version),
-            "UserCanWrite": True,
+            "UserCanWrite": True,  # 下方动态覆盖
             "UserCanNotWriteRelative": True,
             "SupportsLocks": True,
             "UserFriendlyName": str(user_id) if user_id else "",
         }
+
+        # ── Phase 14: 动态 UserCanWrite 判定（对齐 v2 WP-ENT-03） ──
+        # 场景1: 编制人 + draft/edit_complete → 可写
+        # 场景2: 复核人/合伙人 → 只读
+        # 场景3: 非锁持有者 → 只读
+        # 场景4: 签字窗口(partner_ready/signed_off) → 只读
+        can_write = False
+        readonly_reason = ""
+
+        wp_status = getattr(wp, 'file_status', None) or getattr(wp, 'workflow_status', 'draft')
+        preparer_id = getattr(wp, 'preparer_id', None) or getattr(wp, 'created_by', None)
+        reviewer_id = getattr(wp, 'reviewer_id', None)
+        partner_id = getattr(wp, 'partner_reviewed_by', None)
+
+        # 签字窗口：全员只读
+        if wp_status in ('partner_ready', 'signed_off', 'archived', 'partner_checked'):
+            readonly_reason = "签字窗口只读"
+        # 复核人/合伙人：只读
+        elif user_id and (user_id == reviewer_id or user_id == partner_id):
+            readonly_reason = "复核模式"
+        # 编制人 + 可编辑状态：可写
+        elif user_id and user_id == preparer_id and wp_status in ('draft', 'edit_complete', 'in_progress', 'revision_required'):
+            # 检查锁持有者
+            lock_holder = self._locks.get(str(file_id))
+            if lock_holder and lock_holder.get("user_id") != str(user_id):
+                readonly_reason = "其他用户正在编辑"
+            else:
+                can_write = True
+        else:
+            readonly_reason = "无编辑权限"
+
+        info["UserCanWrite"] = can_write
+        if not can_write:
+            info["ReadOnly"] = True
+            info["ReadOnlyReason"] = readonly_reason
+
+        # ── Phase 14: 写 trace_events ──
+        try:
+            from app.services.trace_event_service import trace_event_service
+            await trace_event_service.write(
+                db=db,
+                project_id=getattr(wp, 'project_id', None) or user_id,
+                event_type="wopi_access",
+                object_type="workpaper",
+                object_id=file_id,
+                actor_id=user_id or file_id,
+                action=f"check_file_info:{'write' if can_write else 'readonly'}",
+                decision="allow" if can_write else "block",
+                reason_code=readonly_reason if readonly_reason else None,
+            )
+        except Exception:
+            pass  # trace 写入失败不阻断
 
         # 记录编辑会话打开事件
         try:
@@ -341,6 +394,21 @@ class WOPIHostService:
             "put_file SUCCESS: wp=%s v%d→v%d size=%d hash=%s",
             file_id, old_version, wp.file_version, len(content), content_hash[:12],
         )
+
+        # ── Phase 16: 版本链写入 ──
+        try:
+            from app.services.version_line_service import version_line_service
+            await version_line_service.write_stamp(
+                db=db,
+                project_id=wp.project_id,
+                object_type="workpaper",
+                object_id=file_id,
+                version_no=wp.file_version,
+                source_snapshot_id=content_hash[:16],
+            )
+        except Exception as _vl_err:
+            logger.warning("version_line write_stamp failed: %s", _vl_err)
+
         return {
             "version": wp.file_version,
             "content_hash": content_hash,

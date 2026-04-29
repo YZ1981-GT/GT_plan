@@ -151,6 +151,24 @@ class ExportJobService:
                 job.status = ExportJobStatus.partial_failed.value
             else:
                 job.status = ExportJobStatus.failed.value
+
+            # ── Phase 16: 导出完成后自动生成取证包 hash ──
+            if job.status == ExportJobStatus.succeeded.value:
+                try:
+                    from app.services.export_integrity_service import export_integrity_service
+                    from pathlib import Path
+                    import glob
+                    # 查找导出文件
+                    export_dir = Path("storage") / "exports" / str(job_id)
+                    if export_dir.exists():
+                        files = [str(f) for f in export_dir.rglob("*") if f.is_file()]
+                        if files:
+                            manifest = await export_integrity_service.build_manifest(str(job_id), files)
+                            await export_integrity_service.persist_checks(self.db, str(job_id), manifest["files"])
+                            logger.info(f"[INTEGRITY] export hash generated: job={job_id} files={len(files)}")
+                except Exception as _int_err:
+                    logger.warning(f"[INTEGRITY] export hash generation failed: {_int_err}")
+
         elif done > 0 or failed > 0:
             job.status = ExportJobStatus.running.value
 

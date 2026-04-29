@@ -195,6 +195,28 @@ class WpUploadService:
                 pass
             logger.warning("parse after upload failed (non-blocking): %s", e)
 
+        # ── Phase 16: 离线冲突细粒度检测 ──
+        try:
+            from app.services.offline_conflict_service import offline_conflict_service
+            conflicts = await offline_conflict_service.detect(db, project_id, wp_id)
+            if conflicts:
+                logger.info(f"[CONFLICT] detected {len(conflicts)} field-level conflicts for wp={wp_id}")
+        except Exception as _conflict_err:
+            logger.warning(f"[CONFLICT] detect failed (non-blocking): {_conflict_err}")
+
+        # ── Phase 16: 版本链写入 ──
+        try:
+            from app.services.version_line_service import version_line_service
+            await version_line_service.write_stamp(
+                db=db,
+                project_id=project_id,
+                object_type="workpaper",
+                object_id=wp_id,
+                version_no=wp.file_version,
+            )
+        except Exception as _vl_err:
+            logger.warning(f"[VERSION_LINE] write_stamp failed (non-blocking): {_vl_err}")
+
         # 发布 WORKPAPER_SAVED 事件 → 级联更新试算表和报表
         try:
             from app.models.audit_platform_schemas import EventType, EventPayload

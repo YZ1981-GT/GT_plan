@@ -1,0 +1,42 @@
+{
+  "QC_PROCEDURE_MANDATORY_TRIMMED": {
+    "zh": "不允许裁剪 mandatory 审计程序「{procedure_name}」，请恢复程序或走例外审批流程。",
+    "en": "Cannot trim mandatory procedure '{procedure_name}'. Restore or request exception approval."
+  },
+  "QC_PROCEDURE_EVIDENCE_MISSING": {
+    "zh": "conditional 程序「{procedure_name}」裁剪缺少证据引用，请补充 trim_evidence_refs 后重试。",
+    "en": "Conditional procedure '{procedure_name}' trimmed without evidence. Add trim_evidence_refs."
+  },
+  "QC_CONCLUSION_WITHOUT_EVIDENCE": {
+    "zh": "关键结论缺少证据锚点，请为底稿「{wp_code}」的结论绑定 evidence_id。",
+    "en": "Key conclusion lacks evidence anchor. Bind evidence_id for workpaper '{wp_code}'."
+  },
+  "QC_LOW_CONFIDENCE_SINGLE_SOURCE": {
+    "zh": "关键结论仅依赖低置信证据（OCR置信度<0.7），请补充第二证据或人工确认说明。",
+    "en": "Key conclusion relies on single low-confidence evidence (OCR<0.7). Add secondary evidence."
+  },
+  "QC_LLM_PENDING_CONFIRMATION": {
+    "zh": "存在未确认的 LLM 关键内容，请逐条执行「采纳并确认」或「拒绝」后重新提交。",
+    "en": "Pending LLM content exists. Confirm or reject each item before resubmitting."
+  },
+  "QC_LLM_TRIM_CONFLICT": {
+    "zh": "LLM 推荐内容与裁剪策略冲突，请回退 AI 采纳并按裁剪规则处理。",
+    "en": "LLM recommendation conflicts with trim policy. Revert AI adoption and follow trim rules."
+  },
+  "QC_REPORT_NOTE_VERSION_STALE": {
+    "zh": "审计报告正文引用附注版本已过期，请刷新引用并重新确认关键段落。",
+    "en": "Report references stale note version. Refresh references and re-confirm key paragraphs."
+  },
+  "QC_NOTE_SOURCE_MAPPING_MISSING": {
+    "zh": "附注关键披露缺少来源映射（{count}项），请补齐 source_cells 并重跑一致性检查。",
+    "en": "Key disclosure missing source mapping ({count} items). Complete source_cells and re-check."
+  },
+  "SOD_CONFLICT_DETECTED": {
+    "zh": "职责分离冲突：{conflict_type}。请联系合伙人指定替补人员。",
+    "en": "SoD conflict: {conflict_type}. Contact partner to assign substitute."
+  },
+  "GATE_CONTEXT_INVALID": {
+    "zh": "门禁评估上下文缺失必填字段，请检查请求参数。",
+    "en": "Gate evaluation context missing required fields. Check request parameters."
+  }
+}

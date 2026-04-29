@@ -1,0 +1,49 @@
+{
+  "阅读包": {
+    "description": "业务可读字段，中文列名，供审计团队内部阅读",
+    "fields": [
+      {"key": "project_name", "label": "项目名称", "source": "projects.client_name"},
+      {"key": "audit_year", "label": "审计年度", "source": "projects.wizard_state.basic_info.audit_year"},
+      {"key": "report_opinion", "label": "审计意见类型", "source": "audit_reports.opinion_type"},
+      {"key": "materiality_level", "label": "重要性水平", "source": "materiality.overall_materiality"},
+      {"key": "total_adjustments", "label": "调整分录合计", "source": "adjustments.SUM(amount)"},
+      {"key": "unadjusted_total", "label": "未更正错报合计", "source": "unadjusted_misstatements.SUM(amount)"},
+      {"key": "workpaper_count", "label": "底稿数量", "source": "working_papers.COUNT(*)"},
+      {"key": "workpaper_completion", "label": "底稿完成率", "source": "working_papers.COUNT(status=archived)/COUNT(*)"},
+      {"key": "qc_pass_rate", "label": "QC通过率", "source": "wp_qc_results.pass_rate"},
+      {"key": "key_findings", "label": "关键发现", "source": "issue_tickets.WHERE(severity=blocker)"},
+      {"key": "team_members", "label": "项目组成员", "source": "project_assignments.staff_name"},
+      {"key": "sign_date", "label": "签字日期", "source": "audit_reports.report_date"}
+    ]
+  },
+  "取证包": {
+    "description": "全量字段 + hash + trace_id，供质控/监管/归档使用",
+    "fields": [
+      {"key": "project_name", "label": "项目名称", "source": "projects.client_name"},
+      {"key": "audit_year", "label": "审计年度", "source": "projects.wizard_state.basic_info.audit_year"},
+      {"key": "report_opinion", "label": "审计意见类型", "source": "audit_reports.opinion_type"},
+      {"key": "materiality_level", "label": "重要性水平", "source": "materiality.overall_materiality"},
+      {"key": "total_adjustments", "label": "调整分录合计", "source": "adjustments.SUM(amount)"},
+      {"key": "unadjusted_total", "label": "未更正错报合计", "source": "unadjusted_misstatements.SUM(amount)"},
+      {"key": "workpaper_count", "label": "底稿数量", "source": "working_papers.COUNT(*)"},
+      {"key": "workpaper_completion", "label": "底稿完成率", "source": "working_papers.COUNT(status=archived)/COUNT(*)"},
+      {"key": "qc_pass_rate", "label": "QC通过率", "source": "wp_qc_results.pass_rate"},
+      {"key": "key_findings", "label": "关键发现", "source": "issue_tickets.WHERE(severity=blocker)"},
+      {"key": "team_members", "label": "项目组成员", "source": "project_assignments.staff_name"},
+      {"key": "sign_date", "label": "签字日期", "source": "audit_reports.report_date"},
+      {"key": "consistency_report", "label": "一致性复算报告", "source": "consistency_replay_engine.generate_report()"},
+      {"key": "version_line", "label": "版本链", "source": "version_line_stamps.WHERE(project_id)"},
+      {"key": "gate_decisions", "label": "门禁决策记录", "source": "gate_decisions.WHERE(project_id)"},
+      {"key": "trace_events", "label": "操作留痕", "source": "trace_events.WHERE(project_id)"},
+      {"key": "manifest_hash", "label": "包完整性哈希", "source": "SHA256(manifest.json)"},
+      {"key": "export_trace_id", "label": "导出追踪ID", "source": "trace_events.trace_id"}
+    ]
+  },
+  "脱敏规则": {
+    "assistant": ["client_contact_phone", "client_contact_email", "bank_account_number"],
+    "manager": ["client_contact_phone", "client_contact_email", "bank_account_number", "amount_above_threshold"],
+    "qc": ["client_contact_phone", "client_contact_email", "bank_account_number", "client_id_number"],
+    "partner": [],
+    "admin": []
+  }
+}

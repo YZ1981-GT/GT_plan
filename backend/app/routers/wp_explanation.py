@@ -40,9 +40,24 @@ async def generate_explanation(
     from app.services.wp_explanation_service import WpExplanationService
 
     svc = WpExplanationService(db)
+    # 从项目获取审计年度
+    try:
+        from app.models.core import Project
+        proj_result = await db.execute(
+            sa.select(Project).where(Project.id == project_id)
+        )
+        proj = proj_result.scalar_one_or_none()
+        audit_year = 2025  # 默认值
+        if proj and proj.wizard_state:
+            steps = proj.wizard_state.get("steps", {})
+            basic = steps.get("basic_info", {}).get("data", {})
+            audit_year = basic.get("audit_year", 2025)
+    except Exception:
+        audit_year = 2025
+
     result = await svc.generate_draft(
         project_id=project_id,
-        year=2025,  # TODO: 从项目获取
+        year=audit_year,
         wp_id=wp_id,
         user_id=current_user.id,
     )

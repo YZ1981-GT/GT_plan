@@ -1,32 +1,26 @@
 openapi: 3.0.3
 info:
   title: Phase14 Gate Engine API
-  version: 0.2.0
+  version: 0.3.0
+  description: |
+    Aligned with v2 doc sections: 5.9.2 WP-ENT-01/02/04, 5.9.3 D-01/D-02/A-01/A-02, 3.2 QC-19~26
 tags:
   - name: GateEngine
+  - name: TraceReplay
+  - name: SoDGuard
 servers:
   - url: /api
 paths:
   /gate/evaluate:
     post:
       tags: [GateEngine]
-      summary: Evaluate gate rules for submit/sign/export
+      summary: Evaluate gate rules for submit/sign/export (v2 5.9.3 A-01)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/GateEvaluateRequest"
-            examples:
-              submitReview:
-                value:
-                  gate_type: submit_review
-                  project_id: "8aab6f73-6d84-4aa3-9f4f-2a6fd8d7d7c1"
-                  wp_id: "1fdbce8b-3061-48d6-b6f9-cf51554f3c01"
-                  actor_id: "b6f2e2b3-5f43-4121-9f61-df7240c96a6c"
-                  context:
-                    note_version: 12
-                    snapshot_id: "snap_20260428_1015"
       responses:
         "200":
           description: Evaluation result
@@ -34,20 +28,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GateEvaluateResponse"
-              examples:
-                blocked:
-                  value:
-                    decision: block
-                    hit_rules:
-                      - rule_code: QC-23
-                        error_code: QC_LLM_PENDING_CONFIRMATION
-                        severity: blocking
-                        message: "LLM key content has pending confirmation."
-                        location:
-                          wp_id: "1fdbce8b-3061-48d6-b6f9-cf51554f3c01"
-                          section: "audit_explanation"
-                        suggested_action: "Confirm or reject pending LLM items."
-                    trace_id: "trc_20260428_abc123"
         "400":
           description: Invalid context
           content:
@@ -60,6 +40,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /trace/{trace_id}/replay:
+    get:
+      tags: [TraceReplay]
+      summary: Replay trace event chain (v2 5.9.3 A-02 / WP-ENT-05)
+      parameters:
+        - in: path
+          name: trace_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: level
+          schema:
+            type: string
+            enum: [L1, L2, L3]
+            default: L1
+          description: "L1=summary, L2=with snapshots, L3=with content_hash for verification"
+      responses:
+        "200":
+          description: Trace replay result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TraceReplayResponse"
+        "404":
+          description: Trace not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sod/check:
+    post:
+      tags: [SoDGuard]
+      summary: Check Separation of Duties conflict (v2 WP-ENT-04 / 4.5.14)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SoDCheckRequest"
+      responses:
+        "200":
+          description: SoD check passed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SoDCheckResponse"
+        "403":
+          description: SoD conflict detected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     GateEvaluateRequest:
@@ -81,20 +116,30 @@ components:
         context:
           type: object
           additionalProperties: true
+
     GateRuleHit:
       type: object
       required: [rule_code, error_code, severity, message]
       properties:
-        rule_code: { type: string }
-        error_code: { type: string }
+        rule_code:
+          type: string
+          description: "QC-19 ~ QC-26"
+        error_code:
+          type: string
+          description: "e.g. QC_PROCEDURE_MANDATORY_TRIMMED"
         severity:
           type: string
           enum: [blocking, warning, info]
         message: { type: string }
         location:
           type: object
+          properties:
+            wp_id: { type: string, format: uuid }
+            section: { type: string }
+            procedure_id: { type: string, format: uuid }
           additionalProperties: true
         suggested_action: { type: string }
+
     GateEvaluateResponse:
       type: object
       required: [decision, hit_rules, trace_id]
@@ -107,6 +152,66 @@ components:
           items:
             $ref: "#/components/schemas/GateRuleHit"
         trace_id: { type: string }
+
+    TraceEvent:
+      type: object
+      required: [id, event_type, object_type, object_id, actor_id, action, trace_id, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        event_type: { type: string }
+        object_type: { type: string }
+        object_id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid }
+        actor_role: { type: string }
+        action: { type: string }
+        decision: { type: string }
+        reason_code: { type: string }
+        from_status: { type: string }
+        to_status: { type: string }
+        before_snapshot:
+          type: object
+          additionalProperties: true
+        after_snapshot:
+          type: object
+          additionalProperties: true
+        content_hash: { type: string }
+        version_no: { type: integer }
+        trace_id: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TraceReplayResponse:
+      type: object
+      required: [trace_id, events, replay_status]
+      properties:
+        trace_id: { type: string }
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/TraceEvent"
+        replay_status:
+          type: string
+          enum: [complete, partial, broken]
+
+    SoDCheckRequest:
+      type: object
+      required: [project_id, wp_id, actor_id, target_role]
+      properties:
+        project_id: { type: string, format: uuid }
+        wp_id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid }
+        target_role:
+          type: string
+          enum: [preparer, reviewer, partner_approver, qc_reviewer]
+
+    SoDCheckResponse:
+      type: object
+      required: [allowed, trace_id]
+      properties:
+        allowed: { type: boolean }
+        conflict_type: { type: string }
+        policy_code: { type: string }
+        trace_id: { type: string }
+
     ErrorResponse:
       type: object
       required: [error_code, message, trace_id]

@@ -166,3 +166,35 @@ def register_all_routers(app: FastAPI) -> None:
               kb_router, ff_router, tc_router, perf_router, sec_router,
               ss_router]:
         app.include_router(r, tags=["系统管理"])
+
+    # ═══ 9. Phase 14: 门禁引擎与治理 ═══
+    from app.routers.gate import router as gate_router
+    from app.routers.trace import router as trace_router
+    from app.routers.sod import router as sod_router
+
+    for r in [gate_router, trace_router, sod_router]:
+        app.include_router(r, prefix="/api" if not hasattr(r, 'prefix') or not r.prefix.startswith('/api') else "", tags=["门禁与治理"])
+
+    # Phase 14: 注册门禁规则
+    from app.services.gate_rules_phase14 import register_phase14_rules
+    register_phase14_rules()
+
+    # ═══ 10. Phase 15: 任务树与事件编排 ═══
+    from app.routers.task_tree import router as task_tree_router
+    from app.routers.issues import router as issues_router
+    from app.routers.task_events import router as task_events_router
+
+    for r in [task_tree_router, issues_router, task_events_router]:
+        app.include_router(r, prefix="/api", tags=["任务树与编排"])
+
+    # Phase 15: 注册事件处理器
+    from app.services.task_event_handlers import register_event_handlers
+    register_event_handlers()
+
+    # ═══ 11. Phase 16: 取证包与版本链 ═══
+    from app.routers.version_line import router as version_line_router
+    from app.routers.offline_conflicts import router as conflict_router
+    from app.routers.consistency_replay import router as consistency_replay_router
+
+    for r in [version_line_router, conflict_router, consistency_replay_router]:
+        app.include_router(r, prefix="/api", tags=["取证与版本链"])

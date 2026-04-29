@@ -64,6 +64,29 @@ async def get_current_user(
     except Exception:
         logger.debug("Redis unavailable for blacklist check, skipping")
 
+    # Phase 14: SoD 角色变更黑名单检查
+    # 角色变更后旧 token 在 5 秒内失效（Redis key: sod_revoke:{user_id}:{project_id}）
+    try:
+        from app.core.redis import redis_client as _redis
+        if _redis:
+            # 从 token payload 提取 user_id，检查是否有 SoD 撤销标记
+            _payload_pre = decode_token(token)
+            _uid = _payload_pre.get("sub")
+            if _uid:
+                # 检查全局 SoD 撤销（不限项目）
+                _sod_key = f"sod_revoke:{_uid}:*"
+                # 简化实现：检查 sod_revoke:{user_id} 前缀
+                _sod_global = await _redis.get(f"sod_revoke:{_uid}")
+                if _sod_global:
+                    raise HTTPException(status_code=403, detail={
+                        "error_code": "SOD_TOKEN_REVOKED",
+                        "message": "角色变更后 Token 已失效，请重新登录",
+                    })
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # Redis 不可用时降级跳过
+
     try:
         payload = decode_token(token)
     except JWTError:

@@ -210,6 +210,24 @@ class DisclosureEngine:
             })
 
         await self.db.flush()
+
+        # ── Phase 16: 版本链写入 ──
+        try:
+            from app.services.version_line_service import version_line_service
+            latest = await version_line_service.get_latest_version(
+                self.db, project_id, "note", project_id
+            )
+            await version_line_service.write_stamp(
+                db=self.db,
+                project_id=project_id,
+                object_type="note",
+                object_id=project_id,
+                version_no=latest + 1,
+            )
+        except Exception as _vl_err:
+            import logging
+            logging.getLogger(__name__).warning(f"[VERSION_LINE] note write_stamp failed: {_vl_err}")
+
         return results
 
     # ------------------------------------------------------------------

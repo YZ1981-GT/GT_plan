@@ -180,10 +180,13 @@ class WorkHourService:
         return warnings
 
     # ------------------------------------------------------------------
-    # LLM 智能预填（stub，后续接入 vLLM）
+    # LLM 智能预填（优先 vLLM 推理，降级为均分策略）
     # ------------------------------------------------------------------
     async def ai_suggest(self, staff_id: UUID, target_date: date) -> list[dict]:
-        """根据用户参与的项目情况，生成工时分配建议"""
+        """根据用户参与的项目情况，生成工时分配建议
+
+        优先调用 LLM 生成个性化建议，LLM 不可用时降级为均分策略。
+        """
         # 获取该人员当前参与的项目
         q = (
             sa.select(
@@ -204,7 +207,49 @@ class WorkHourService:
         if not projects:
             return []
 
-        # 简单均分策略（后续替换为 LLM 推理）
+        # 尝试 LLM 推理
+        try:
+            from app.services.llm_client import chat_completion
+            import json
+
+            project_list = ", ".join([f"{p.project_name}({p.role})" for p in projects])
+            prompt = f"""你是审计工时管理助手。请为以下审计员分配 {target_date} 的工时建议（总计 8 小时）。
+
+参与项目：{project_list}
+
+请以 JSON 数组格式返回，每项包含 project_name、hours（小数）、description（简短工作描述）。
+优先分配给执行阶段的项目，计划阶段的项目分配较少工时。"""
+
+            response = await chat_completion(prompt)
+            if response and not response.startswith("[LLM"):
+                # 解析 LLM 返回
+                text = response.strip()
+                if text.startswith("```"):
+                    text = text.split("```")[1]
+                    if text.startswith("json"):
+                        text = text[4:]
+                llm_suggestions = json.loads(text)
+                if isinstance(llm_suggestions, list) and len(llm_suggestions) > 0:
+                    # 映射 project_id
+                    name_to_id = {p.project_name: str(p.project_id) for p in projects}
+                    result = []
+                    for s in llm_suggestions:
+                        pid = name_to_id.get(s.get("project_name", ""))
+                        if pid:
+                            result.append({
+                                "project_id": pid,
+                                "project_name": s.get("project_name", ""),
+                                "work_date": str(target_date),
+                                "hours": float(s.get("hours", 2)),
+                                "description": s.get("description", "审计工作"),
+                                "ai_generated": True,
+                            })
+                    if result:
+                        return result
+        except Exception as _llm_err:
+            logger.debug(f"[WORKHOUR] LLM suggest failed, fallback to even split: {_llm_err}")
+
+        # 降级：均分策略
         hours_per_project = Decimal("8") / len(projects) if projects else Decimal("8")
         suggestions = []
         for p in projects:
@@ -214,5 +259,6 @@ class WorkHourService:
                 "work_date": str(target_date),
                 "hours": float(round(hours_per_project, 1)),
                 "description": f"参与 {p.project_name} 审计工作",
+                "ai_generated": False,
             })
         return suggestions

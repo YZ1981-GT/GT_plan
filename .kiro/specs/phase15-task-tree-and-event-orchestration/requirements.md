@@ -42,6 +42,9 @@
 | P0-2 | 事件总线与补偿 | 作为运维，我希望失败事件可重试可回放 | 失败进入补偿池，可按 `event_id` 重放 |
 | P0-3 | 状态机统一 | 作为研发，我希望状态值口径统一 | 全链路统一 `pending/in_progress/blocked/done` |
 | P0-4 | 对话转问题单 | 作为复核人，我希望关键讨论可升级跟踪 | 可绑定 `task_node_id` 并升级 SLA |
+| P0-5 | 统一问题单模型（issue_tickets） | 作为质控，我希望 L2/L3/Q 问题统一管理 | 新增 `issue_tickets` 表，统一 `source(L2/L3/Q)/severity/category/owner/status/thread_id`（对齐 v2 4.5.15A） |
+| P0-6 | RC 数据模型增强 | 作为研发，我希望复核对话具备完整字段 | review_conversations 增强（priority/sla_due_at/resolved_at/resolved_by/resolution_code/trace_id）+ review_messages 增强（reply_to/mentions/edited_at/redaction_flag/message_version/trace_id/reason_code）（对齐 v2 5.9.16） |
+| P0-7 | RC 参与者与导出留痕 | 作为审计，我希望会话参与者和导出有完整记录 | 新增 `review_conversation_participants` 表 + `review_conversation_exports` 表（对齐 v2 5.9.16.1/5.9.16.2） |
 
 ### 2.2 P1 — 流程增强能力
 
@@ -58,7 +61,8 @@
 | `WP-P2-5` | 未开发 | P0-1/P0-3 | 四级任务树主路径可用 |
 | `WP-P2-7` | 未开发 | P0-2 | trim 失败补偿可重放可追溯 |
 | `WP-P2-8` | 部分完成 | P1-2 | 模板恢复后任务联动生效 |
-| `WP-P2-9` | 部分完成 | P0-4/P1-3 | 线程升级与SLA闭环稳定 |
+| `WP-P2-9` | 部分完成 | P0-4/P0-5/P0-6/P0-7/P1-3 | 统一问题单+线程升级+SLA闭环+RC数据模型完整 |
+| `WP-ENT-09` | 未开发 | P0-2 | 联动补偿闭环，补偿任务可追溯率=100% |
 
 ---
 
@@ -78,6 +82,9 @@
 |------|------|---------|
 | 取证包 hash 与签名校验 | 导出合规治理能力 | Phase 16 |
 | 全租户级网关/配额治理 | 平台级治理能力 | 企业级平台迭代 |
+| WP-ENT-10 AI治理制度化 | 模型/Prompt/策略版本审计+关键场景强制人工确认，属于平台运营层（v2 P1） | 企业级平台迭代（建议 Phase 17） |
+| WP-ENT-11 驾驶舱落地 | 指标字典+取数+告警+钻取 trace 全量接通，属于运营可视化层（v2 P2） | 企业级平台迭代（建议 Phase 17） |
+| WP-ENT-12 发布门槛产品化 | 四套脚本（contract/trace/dashboard/permission）接入流水线，属于 DevOps 治理层（v2 P2） | 企业级平台迭代（建议 Phase 17） |
 
 > P1 需求池保留，但默认不进入当前上线承诺；是否插入由 MVP 交付质量与资源情况再决定。
 

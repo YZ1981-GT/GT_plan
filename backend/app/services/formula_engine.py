@@ -2,7 +2,7 @@
 
 支持5种公式类型：
 - TB(account_code, column_name) — 从 trial_balance 取数
-- WP(wp_code, cell_ref) — 跨底稿引用（MVP stub）
+- WP(wp_code, cell_ref) — 跨底稿引用（从 parsed_data 或 Excel 文件读取）
 - AUX(account_code, aux_type, aux_name, column_name) — 从辅助余额表取数
 - PREV(inner_formula) — 上年数据（year-1 递归）
 - SUM_TB(account_range, column_name) — 科目范围汇总
@@ -106,8 +106,10 @@ class TBExecutor:
 
 
 class WPExecutor:
-    """WP(wp_code, cell_ref) → 跨底稿引用（MVP stub）
+    """WP(wp_code, cell_ref) → 跨底稿引用
 
+    从 working_paper.parsed_data 读取指定字段值。
+    如果 parsed_data 中没有，尝试从 Excel 文件读取单元格。
     Validates: Requirements 2.1, 2.3
     """
 
@@ -124,12 +126,84 @@ class WPExecutor:
         if not wp_code or not cell_ref:
             return FormulaError(message="WP函数需要wp_code和cell_ref参数")
 
-        # MVP stub: return placeholder
-        # Full implementation would query working_paper table for file_path,
-        # then use openpyxl to read the cell value
-        return FormulaError(
-            message=f"WP({wp_code},{cell_ref})暂不支持，MVP阶段请使用离线编辑"
-        )
+        try:
+            import sqlalchemy as sa
+            from app.models.workpaper_models import WorkingPaper
+
+            # 查询目标底稿
+            stmt = sa.select(WorkingPaper).where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.wp_code == wp_code,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+            result = await db.execute(stmt)
+            wp = result.scalar_one_or_none()
+            if not wp:
+                return FormulaError(message=f"底稿 {wp_code} 不存在")
+
+            # 优先从 parsed_data 读取
+            if wp.parsed_data:
+                # cell_ref 格式：字段名（如 audited_amount/conclusion/aje_amount）
+                # 或 Sheet!CellRef 格式（如 Sheet1!B15）
+                if cell_ref in wp.parsed_data:
+                    val = wp.parsed_data[cell_ref]
+                    if val is not None:
+                        try:
+                            return Decimal(str(val))
+                        except Exception:
+                            return val
+
+                # 尝试常见字段映射
+                field_map = {
+                    "审定数": "audited_amount",
+                    "未审数": "unadjusted_amount",
+                    "AJE": "aje_amount",
+                    "RJE": "rje_amount",
+                    "结论": "conclusion",
+                }
+                mapped = field_map.get(cell_ref, cell_ref)
+                if mapped in wp.parsed_data:
+                    val = wp.parsed_data[mapped]
+                    if val is not None:
+                        try:
+                            return Decimal(str(val))
+                        except Exception:
+                            return val
+
+            # 如果 parsed_data 没有，尝试从 Excel 文件读取
+            if wp.file_path:
+                try:
+                    from pathlib import Path
+                    import openpyxl
+
+                    fp = Path(wp.file_path)
+                    if fp.exists() and fp.suffix in ('.xlsx', '.xlsm'):
+                        # 解析 cell_ref：Sheet1!B15 或直接 B15
+                        if '!' in cell_ref:
+                            sheet_name, cell_addr = cell_ref.split('!', 1)
+                        else:
+                            sheet_name = None
+                            cell_addr = cell_ref
+
+                        wb = openpyxl.load_workbook(str(fp), data_only=True, read_only=True)
+                        ws = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
+                        val = ws[cell_addr].value
+                        wb.close()
+
+                        if val is not None:
+                            try:
+                                return Decimal(str(val))
+                            except Exception:
+                                return val
+                except Exception as _e:
+                    import logging
+                    logging.getLogger(__name__).debug(f"WP({wp_code},{cell_ref}) Excel read failed: {_e}")
+
+            return FormulaError(
+                message=f"WP({wp_code},{cell_ref}) 未找到值（parsed_data 和 Excel 均无数据）"
+            )
+        except Exception as e:
+            return FormulaError(message=f"WP({wp_code},{cell_ref}) 执行失败: {e}")
 
 
 class AUXExecutor:

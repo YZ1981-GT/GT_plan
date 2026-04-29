@@ -46,9 +46,45 @@ async def check_workpaper_readiness(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """Phase 12 P1-7: 签字前底稿专项检查（5项）"""
+    """Phase 12 P1-7: 签字前底稿专项检查（5项）+ Phase 14 门禁引擎"""
+    # Phase 14: 统一门禁引擎评估（sign_off）
+    gate_result_data = None
+    try:
+        from app.services.gate_engine import gate_engine as _gate_engine
+        gate_result = await _gate_engine.evaluate(
+            db=db,
+            gate_type="sign_off",
+            project_id=project_id,
+            wp_id=None,
+            actor_id=current_user.id,
+            context={},
+        )
+        gate_result_data = {
+            "gate_decision": gate_result.decision,
+            "gate_hit_rules": [
+                {
+                    "rule_code": h.rule_code,
+                    "error_code": h.error_code,
+                    "severity": h.severity,
+                    "message": h.message,
+                    "suggested_action": h.suggested_action,
+                }
+                for h in gate_result.hit_rules
+            ],
+            "gate_trace_id": gate_result.trace_id,
+        }
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).warning(f"[GATE] sign_off gate eval failed: {_e}")
+
     svc = SignReadinessService(db)
-    return await svc.check_workpaper_readiness(project_id)
+    readiness = await svc.check_workpaper_readiness(project_id)
+
+    # 合并门禁结果
+    if gate_result_data:
+        readiness["gate_engine"] = gate_result_data
+
+    return readiness
 
 
 @router.get("/api/partner/team-efficiency")

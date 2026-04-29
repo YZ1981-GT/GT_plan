@@ -149,8 +149,43 @@ class AuditLoggerEnhanced:
         return output.getvalue().encode("utf-8-sig")
 
     def export_excel(self, logs: list[dict] | None = None) -> bytes:
-        """导出为 Excel（stub，返回 CSV）。"""
-        return self.export_csv(logs)
+        """导出为 Excel（openpyxl）。"""
+        try:
+            import openpyxl
+            from io import BytesIO
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "审计日志"
+
+            # 表头
+            headers = ["ID", "事件类型", "操作者", "角色", "对象类型", "对象ID", "操作", "时间"]
+            for col, h in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=h)
+                cell.font = openpyxl.styles.Font(bold=True, name="仿宋_GB2312")
+
+            # 数据行
+            data = logs if logs is not None else []
+            for row_idx, log in enumerate(data, 2):
+                ws.cell(row=row_idx, column=1, value=log.get("id", ""))
+                ws.cell(row=row_idx, column=2, value=log.get("event_type", ""))
+                ws.cell(row=row_idx, column=3, value=log.get("actor_id", ""))
+                ws.cell(row=row_idx, column=4, value=log.get("actor_role", ""))
+                ws.cell(row=row_idx, column=5, value=log.get("resource_type", log.get("object_type", "")))
+                ws.cell(row=row_idx, column=6, value=log.get("resource_id", log.get("object_id", "")))
+                ws.cell(row=row_idx, column=7, value=log.get("action", ""))
+                ws.cell(row=row_idx, column=8, value=log.get("created_at", ""))
+
+            # 列宽
+            for col in range(1, len(headers) + 1):
+                ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 20
+
+            buf = BytesIO()
+            wb.save(buf)
+            return buf.getvalue()
+        except ImportError:
+            # openpyxl 不可用时降级为 CSV
+            return self.export_csv(logs)
 
     # ---- Retention ----
 

@@ -432,6 +432,26 @@ class ReportEngine:
             # 写入缓存
             await self._set_cached_report(project_id, report_type.value, report_rows)
 
+        # ── Phase 16: 版本链写入（每种报表类型写一个版本戳） ──
+        try:
+            from app.services.version_line_service import version_line_service
+            for rt in type_order:
+                if rt.value in results:
+                    latest = await version_line_service.get_latest_version(
+                        self.db, project_id, "report", project_id
+                    )
+                    await version_line_service.write_stamp(
+                        db=self.db,
+                        project_id=project_id,
+                        object_type="report",
+                        object_id=project_id,
+                        version_no=latest + 1,
+                    )
+                    break  # 一次生成写一个版本戳即可
+        except Exception as _vl_err:
+            import logging
+            logging.getLogger(__name__).warning(f"[VERSION_LINE] report write_stamp failed: {_vl_err}")
+
         return results
 
     async def _generate_report(

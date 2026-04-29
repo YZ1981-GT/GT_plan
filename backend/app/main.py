@@ -23,10 +23,43 @@ from app.router_registry import register_all_routers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时注册事件处理器"""
+    """应用生命周期：启动时注册事件处理器 + Phase 15 SLA 定时检查"""
     setup_logging(level="INFO", json_format=False)
     register_event_handlers()
+
+    # Phase 15: SLA 超时定时检查（每 15 分钟）
+    import asyncio
+    _sla_task = None
+
+    async def _sla_check_loop():
+        while True:
+            try:
+                await asyncio.sleep(900)  # 15 分钟
+                from app.core.database import async_session
+                from app.services.issue_ticket_service import issue_ticket_service
+                async with async_session() as db:
+                    escalated = await issue_ticket_service.check_sla_timeout(db)
+                    if escalated:
+                        await db.commit()
+                        import logging
+                        logging.getLogger("sla_check").info(f"[SLA] auto-escalated {len(escalated)} issues")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                import logging
+                logging.getLogger("sla_check").warning(f"[SLA] check loop error: {e}")
+
+    _sla_task = asyncio.create_task(_sla_check_loop())
+
     yield
+
+    # 清理
+    if _sla_task:
+        _sla_task.cancel()
+        try:
+            await _sla_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(

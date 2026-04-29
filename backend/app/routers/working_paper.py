@@ -353,6 +353,66 @@ async def submit_review(
             detail=f"当前编制状态 {current_s} 不允许提交复核，需先完成编制（edit_complete）",
         )
 
+    # ── Phase 14: 统一门禁引擎评估 ──
+    try:
+        from app.services.gate_engine import gate_engine as _gate_engine
+        gate_result = await _gate_engine.evaluate(
+            db=db,
+            gate_type="submit_review",
+            project_id=project_id,
+            wp_id=wp_id,
+            actor_id=current_user.id,
+            context={"wp_status": wp.status, "year": getattr(wp, 'year', None)},
+        )
+        if gate_result.decision == "block":
+            return {
+                "status": "blocked",
+                "blocking_reasons": [
+                    f"[{h.rule_code}] {h.message}" for h in gate_result.hit_rules
+                    if h.severity == "blocking"
+                ],
+                "hit_rules": [
+                    {
+                        "rule_code": h.rule_code,
+                        "error_code": h.error_code,
+                        "severity": h.severity,
+                        "message": h.message,
+                        "location": h.location,
+                        "suggested_action": h.suggested_action,
+                    }
+                    for h in gate_result.hit_rules
+                ],
+                "can_submit": False,
+                "trace_id": gate_result.trace_id,
+            }
+    except Exception as _gate_err:
+        import logging
+        logging.getLogger(__name__).warning(f"[GATE] submit_review gate eval failed: {_gate_err}")
+        # 门禁引擎故障不阻断，降级走原有门禁逻辑
+
+    # ── Phase 14: SoD 职责分离校验 ──
+    try:
+        from app.services.sod_guard_service import sod_guard_service as _sod_svc
+        sod_result = await _sod_svc.check(
+            db=db,
+            project_id=project_id,
+            wp_id=wp_id,
+            actor_id=current_user.id,
+            target_role="reviewer",
+        )
+        if not sod_result.allowed:
+            raise HTTPException(status_code=403, detail={
+                "error_code": "SOD_CONFLICT_DETECTED",
+                "message": sod_result.conflict_type,
+                "policy_code": sod_result.policy_code,
+                "trace_id": sod_result.trace_id,
+            })
+    except HTTPException:
+        raise
+    except Exception as _sod_err:
+        import logging
+        logging.getLogger(__name__).warning(f"[SOD] submit_review sod check failed: {_sod_err}")
+
     blocking_reasons = []
 
     # 门禁 1：复核人已分配

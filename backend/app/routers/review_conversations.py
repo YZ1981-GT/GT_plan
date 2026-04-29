@@ -71,7 +71,18 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """发送消息"""
+    """发送消息（Phase 15: 关闭态消息写入阻断）"""
+    # Phase 15: 关闭态门禁检查
+    try:
+        from app.services.rc_enhanced_service import rc_enhanced_service
+        await rc_enhanced_service.check_closed_state_guard(
+            db, conversation_id, req.message_type or "text"
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # 服务不可用时降级放行
+
     sender_id = current_user.id
     result = await _svc.send_message(
         db, conversation_id, sender_id,

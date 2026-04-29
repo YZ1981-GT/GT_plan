@@ -37,14 +37,44 @@ class NoteWpMappingService:
         self.db = db
 
     async def get_mapping(self, project_id: UUID) -> dict:
-        """获取附注-底稿映射关系"""
-        # 从项目配置或默认映射获取
+        """获取附注-底稿映射关系 — 优先从项目配置读取，降级用默认映射"""
+        try:
+            from app.models.core import Project
+            result = await self.db.execute(
+                sa.select(Project).where(Project.id == project_id)
+            )
+            project = result.scalar_one_or_none()
+            if project and project.wizard_state:
+                custom = project.wizard_state.get("note_wp_mapping")
+                if custom and isinstance(custom, dict) and len(custom) > 0:
+                    return custom
+        except Exception:
+            pass
         return dict(DEFAULT_WP_MAPPING)
 
     async def update_mapping(self, project_id: UUID, mapping: dict) -> dict:
-        """更新映射关系"""
-        # TODO: 存储到项目配置
-        return mapping
+        """更新映射关系 — 持久化到项目 wizard_state.note_wp_mapping"""
+        try:
+            from app.models.core import Project
+            result = await self.db.execute(
+                sa.select(Project).where(Project.id == project_id)
+            )
+            project = result.scalar_one_or_none()
+            if not project:
+                return {"error": "项目不存在", "mapping": mapping}
+
+            ws = project.wizard_state or {}
+            ws["note_wp_mapping"] = mapping
+            project.wizard_state = ws
+            # 标记 JSONB 字段已修改（SQLAlchemy 需要显式标记）
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(project, "wizard_state")
+            await self.db.flush()
+            logger.info(f"[NOTE_WP_MAPPING] updated: project={project_id} keys={len(mapping)}")
+            return mapping
+        except Exception as e:
+            logger.warning(f"[NOTE_WP_MAPPING] update failed: {e}")
+            return mapping
 
     async def refresh_from_workpapers(self, project_id: UUID, year: int) -> dict:
         """从底稿重新提数到附注"""

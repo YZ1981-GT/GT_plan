@@ -86,6 +86,7 @@ CREATE TABLE offline_conflicts (
     remote_value JSONB,
     status VARCHAR(16) NOT NULL,        -- open/resolved/rejected
     resolver_id UUID NULL,
+    reason_code VARCHAR(64) NULL,       -- 处置原因码（对齐 v2 4.5.6 统一原因码）
     trace_id VARCHAR(64) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
     resolved_at TIMESTAMP NULL
@@ -130,6 +131,65 @@ class MergeQueueService:
 
 约束：冲突关闭前必须触发 QC 重跑并记录结果。
 
+### 4.4 ConsistencyReplayEngine（对齐 v2 WP-ENT-07）
+
+```python
+class ConsistencyReplayEngine:
+    """可复算一致性引擎：按快照复算并输出差异项"""
+
+    async def replay_consistency(self, project_id, snapshot_id=None) -> dict:
+        """
+        按快照复算五层一致性链路：
+        1. 四表(tb_balance) -> 试算表(trial_balance)：未审数汇总一致
+        2. 试算表 -> 报表(financial_report)：公式驱动取数一致
+        3. 报表 -> 附注(disclosure_notes)：关键科目金额一致
+        4. 附注 -> 底稿(working_papers.parsed_data)：审定数/结论一致
+        5. 底稿 -> 试算表：审定数反向校验
+
+        输出：
+        {
+            "snapshot_id": "snap_xxx",
+            "layers": [
+                {
+                    "from": "tb_balance",
+                    "to": "trial_balance",
+                    "status": "consistent",  # consistent/inconsistent
+                    "diffs": []
+                },
+                {
+                    "from": "trial_balance",
+                    "to": "financial_report",
+                    "status": "inconsistent",
+                    "diffs": [
+                        {
+                            "object_type": "report_line",
+                            "object_id": "xxx",
+                            "field": "audited_amount",
+                            "expected": 12000.00,
+                            "actual": 12500.00,
+                            "diff": 500.00,
+                            "severity": "blocking"  # blocking if diff > 0.01
+                        }
+                    ]
+                }
+            ],
+            "overall_status": "inconsistent",
+            "blocking_count": 1,
+            "trace_id": "trc_xxx"
+        }
+        """
+
+    async def generate_consistency_report(self, project_id) -> dict:
+        """
+        生成可复算一致性报告（附在导出包中）：
+        - 复算时间戳
+        - 各层级一致性状态
+        - 差异明细（含 object_type/field/expected/actual/diff）
+        - 阻断级差异数量
+        - trace_id 可回溯
+        """
+```
+
 ---
 
 ## 5. API 设计
@@ -148,6 +208,14 @@ POST /api/offline/conflicts/detect
 POST /api/offline/conflicts/resolve
   - 输入: conflict_id, resolution, merged_value?, resolver_id, reason_code
   - 输出: resolved/rejected + qc_replay_job_id
+
+POST /api/consistency/replay
+  - 输入: project_id, snapshot_id?
+  - 输出: layers[], overall_status, blocking_count, trace_id
+  - 对齐 v2 WP-ENT-07
+
+GET /api/consistency/report/{project_id}
+  - 输出: 可复算一致性报告（附在导出包中）
 ```
 
 关键错误码：
@@ -156,6 +224,8 @@ POST /api/offline/conflicts/resolve
 - `CONFLICT_RESOLUTION_INVALID`
 - `CONFLICT_ALREADY_RESOLVED`
 - `REPLAY_TRACE_INCOMPLETE`
+- `CONSISTENCY_REPLAY_FAILED` — 复算引擎执行失败
+- `CONSISTENCY_BLOCKING_DIFF` — 存在阻断级差异（diff > 0.01）
 
 ---
 

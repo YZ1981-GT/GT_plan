@@ -231,7 +231,30 @@ class ProjectProgressService:
             "cycles": cycles,
             "total": total_stats,
             "board_items": board_items,
+            "task_tree_stats": await self._get_task_tree_stats(project_id),
         }
+
+    async def _get_task_tree_stats(self, project_id: uuid.UUID) -> dict:
+        """Phase 15 联动：从 task_tree_nodes 聚合完成率"""
+        try:
+            from app.services.task_tree_service import task_tree_service
+            stats = await task_tree_service.get_stats(self.db, project_id)
+            # 计算总完成率
+            total_nodes = 0
+            done_nodes = 0
+            for level, status_counts in stats.items():
+                for status, count in status_counts.items():
+                    total_nodes += count
+                    if status == "done":
+                        done_nodes += count
+            return {
+                "by_level": stats,
+                "total_nodes": total_nodes,
+                "done_nodes": done_nodes,
+                "completion_rate": round(done_nodes / total_nodes * 100, 1) if total_nodes > 0 else 0,
+            }
+        except Exception:
+            return {"by_level": {}, "total_nodes": 0, "done_nodes": 0, "completion_rate": 0}
 
 
 def _classify_status(status: WpFileStatus | None, review_status: WpReviewStatus | None) -> str:

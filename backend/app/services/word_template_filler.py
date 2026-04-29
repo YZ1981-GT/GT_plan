@@ -450,6 +450,17 @@ class WordTemplateFiller:
                 if f.exists():
                     zf.write(str(f), f.name)
 
+            # ── Phase 16: 一致性报告附在取证包中 ──
+            try:
+                from app.services.consistency_replay_engine import consistency_replay_engine
+                import json as _json
+                report = await consistency_replay_engine.generate_consistency_report(db, project_id, year)
+                consistency_json = _json.dumps(report, ensure_ascii=False, indent=2)
+                zf.writestr("consistency_report.json", consistency_json)
+                logger.info(f"[CONSISTENCY] report attached to package: status={report.get('overall_status')}")
+            except Exception as _cr_err:
+                logger.warning(f"[CONSISTENCY] report attachment failed (non-blocking): {_cr_err}")
+
         logger.info(
             "全套导出完成: project_id=%s, year=%d, %d files → %s",
             project_id, year, len(files), zip_path,

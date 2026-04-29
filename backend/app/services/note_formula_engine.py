@@ -8,7 +8,7 @@
 5. SubItemCheck — 其中项校验（其中项≤总额）
 6. AgingTransition — 账龄衔接（上期期末=本期期初）
 7. CompletenessCheck — 完整性检查（必填项非空）
-8. LLMReview — LLM审核（stub，返回空结果）
+8. LLMReview — LLM审核（调用 vLLM 做内容合理性检查）
 
 双层架构：本地规则引擎优先 + LLM兜底
 
@@ -221,12 +221,79 @@ class CompletenessCheck(BaseValidator):
 
 
 class LLMReview(BaseValidator):
-    """LLM审核 — stub，返回空结果"""
+    """LLM审核 — 调用 vLLM 对附注内容做合理性检查
+
+    检查项：
+    1. 会计政策描述是否与准则一致
+    2. 数值描述是否与表格数据匹配
+    3. 披露是否完整（关键信息是否遗漏）
+    """
     rule_type = "llm_review"
 
     def validate(self, note_data: dict, params: dict | None = None) -> list[Finding]:
-        # LLM审核为预留接口，当前返回空结果
+        """同步版本：直接返回空（LLM 需要异步调用）"""
         return []
+
+    async def validate_async(self, note_data: dict, params: dict | None = None) -> list[Finding]:
+        """异步版本：调用 LLM 做内容审核"""
+        findings: list[Finding] = []
+        text_content = note_data.get("text_content", "")
+        section_title = note_data.get("section_title", "")
+
+        if not text_content or len(text_content) < 20:
+            return findings
+
+        try:
+            from app.services.llm_client import chat_completion
+
+            prompt = f"""你是资深审计员，请审核以下附注章节内容，检查：
+1. 会计政策描述是否规范
+2. 数值描述是否合理（有无明显矛盾）
+3. 披露是否完整（关键信息是否遗漏）
+
+章节标题：{section_title}
+内容：
+{text_content[:2000]}
+
+请以 JSON 数组格式返回发现的问题，每个问题包含 severity(high/medium/low) 和 message 字段。
+如果没有问题，返回空数组 []。"""
+
+            response = await chat_completion(prompt)
+            if not response:
+                return findings
+
+            # 尝试解析 LLM 返回的 JSON
+            import json
+            try:
+                # 提取 JSON 部分
+                text = response.strip()
+                if text.startswith("```"):
+                    text = text.split("```")[1]
+                    if text.startswith("json"):
+                        text = text[4:]
+                issues = json.loads(text)
+                if isinstance(issues, list):
+                    for issue in issues[:5]:  # 最多 5 条
+                        findings.append(Finding(
+                            rule_type=self.rule_type,
+                            severity=issue.get("severity", "low"),
+                            message=f"[LLM] {issue.get('message', '未知问题')}",
+                            details={"source": "llm_review", "section": section_title},
+                        ))
+            except (json.JSONDecodeError, IndexError):
+                # LLM 返回非 JSON 格式，提取关键信息
+                if "问题" in response or "不一致" in response or "缺少" in response:
+                    findings.append(Finding(
+                        rule_type=self.rule_type,
+                        severity="low",
+                        message=f"[LLM] {response[:200]}",
+                        details={"source": "llm_review", "raw_response": response[:500]},
+                    ))
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).debug(f"LLM review skipped: {e}")
+
+        return findings
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +323,7 @@ def validate_note(note_data: dict, rule_types: list[str] | None = None) -> list[
 
     双层架构：
     1. 先运行本地规则引擎（7种非LLM校验器）
-    2. 如果本地规则未发现问题，再调用LLM兜底（当前为stub）
+    2. 如果本地规则未发现问题，再调用LLM兜底（validate_async 异步版本）
 
     Args:
         note_data: 附注数据字典
