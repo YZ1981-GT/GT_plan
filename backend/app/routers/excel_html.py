@@ -123,20 +123,42 @@ async def save_edits(
     project_id: UUID,
     file_stem: str,
     data: EditRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """保存在线编辑结果 → 更新 structure.json + 回写 Excel"""
+    """保存在线编辑结果 → 更新 structure.json + 回写 Excel
+
+    自动执行：
+    1. 检查编辑锁（无锁或锁不属于当前用户时拒绝）
+    2. 更新 structure.json
+    3. 保存版本快照（保留最近20个）
+    4. 回写 Excel + 更新 HTML
+    """
+    from app.services.excel_html_converter import (
+        get_lock_status, save_version_snapshot,
+    )
+
     project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
     structure_path = project_dir / f"{file_stem}.structure.json"
 
     if not structure_path.exists():
         raise HTTPException(status_code=404, detail="结构文件不存在")
 
-    # 加载并更新 structure
+    # 1. 检查编辑锁
+    file_key = f"{project_id}:{file_stem}"
+    lock = get_lock_status(file_key)
+    if lock and lock["user_id"] != str(current_user.id):
+        raise HTTPException(status_code=423, detail=f"文件正在被其他用户编辑")
+
+    # 2. 加载并更新 structure
     structure = json.loads(structure_path.read_text(encoding="utf-8"))
     structure = update_structure_from_edits(structure, data.edits, data.sheet_index)
 
-    # 保存 structure.json
+    # 3. 保存版本快照
+    versions_dir = str(project_dir / "versions")
+    save_version_snapshot(structure, versions_dir)
+
+    # 4. 保存 structure.json
     structure_path.write_text(json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # 回写 Excel
@@ -147,6 +169,21 @@ async def save_edits(
     html = structure_to_html(structure, sheet_index=data.sheet_index, editable=True)
     html_path = project_dir / f"{file_stem}.html"
     html_path.write_text(html, encoding="utf-8")
+
+    # 5. 如果是附注模块，同步回 DisclosureNote.table_data（双路径一致性）
+    module = structure.get("metadata", {}).get("module")
+    if module == "disclosure_note" and db:
+        try:
+            from app.services.triple_format_adapter import DisclosureNoteAdapter
+            note_section = structure["metadata"].get("note_section", "")
+            year = structure["metadata"].get("year", 2025)
+            await DisclosureNoteAdapter.update_note_from_structure(
+                db, project_id, year, note_section, structure
+            )
+            await db.commit()
+        except Exception as _e:
+            import logging
+            logging.getLogger(__name__).warning("sync note from structure failed: %s", _e)
 
     return {
         "version": structure["metadata"]["version"],

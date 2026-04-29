@@ -275,3 +275,200 @@ def validate_formula(formula: str, max_row: int, max_col: int) -> dict[str, Any]
         "errors": errors,
         "parsed": parsed,
     }
+
+
+# ═══ 公式执行桥接 ═══
+
+async def execute_formula(
+    formula: str,
+    db,
+    project_id: UUID,
+    year: int,
+    sheet_cells: dict | None = None,
+) -> dict[str, Any]:
+    """统一公式执行入口
+
+    自动识别公式类型并调度到对应引擎执行：
+    - 表内引用(cell/SUM) → 从 sheet_cells 直接计算
+    - 跨表引用(TB/RPT/NOTE/WP/AUX) → 调用 data_fetch_custom
+    - 混合公式 → 先解析跨表引用替换为值，再计算表内部分
+
+    Args:
+        formula: 公式字符串（支持所有统一语法）
+        db: 数据库会话
+        project_id: 项目ID
+        year: 年度
+        sheet_cells: 当前表格的 cells 字典（用于表内引用）
+
+    Returns:
+        {"value": Decimal|float|None, "sources": [...], "error": str|None}
+    """
+    parsed = parse_formula(formula)
+    sources = []
+    error = None
+
+    if parsed["type"] == "empty":
+        return {"value": None, "sources": [], "error": None}
+
+    if parsed["type"] == "literal":
+        # 纯字面量
+        try:
+            return {"value": float(formula.lstrip("=").strip()), "sources": [], "error": None}
+        except ValueError:
+            return {"value": None, "sources": [], "error": "非数值字面量"}
+
+    # 解析跨表引用并获取值
+    cross_values: dict[str, float] = {}
+    if parsed["cross_refs"]:
+        from app.services.data_fetch_custom import CustomFetchService, SourceType
+        svc = CustomFetchService(db, project_id, year)
+
+        for cr in parsed["cross_refs"]:
+            source = _cross_ref_to_source(cr)
+            if source:
+                val = await svc._fetch_from_source(source)
+                cross_values[cr["raw"]] = float(val) if val is not None else 0
+                sources.append({"type": cr["type"], "args": cr["args"], "value": cross_values[cr["raw"]]})
+
+    # 构建可计算的表达式
+    expr = formula.lstrip("=").strip()
+
+    # 替换跨表引用为值
+    for raw, val in cross_values.items():
+        expr = expr.replace(raw, str(val))
+
+    # 替换表内单元格引用为值
+    if sheet_cells:
+        def _replace_excel_ref(m):
+            col = _letter_to_col(m.group(1))
+            row = int(m.group(2)) - 1
+            key = f"{row}:{col}"
+            cell = sheet_cells.get(key, {})
+            v = cell.get("value")
+            return str(float(v)) if v is not None and _is_number(v) else "0"
+
+        def _replace_coord_ref(m):
+            row, col = int(m.group(1)), int(m.group(2))
+            key = f"{row}:{col}"
+            cell = sheet_cells.get(key, {})
+            v = cell.get("value")
+            return str(float(v)) if v is not None and _is_number(v) else "0"
+
+        # 先处理 SUM 函数
+        def _replace_sum_range(m):
+            start_col = _letter_to_col(m.group(1)[:1])  # 简化：取第一个字母
+            sm = _EXCEL_CELL_RE.match(m.group(1))
+            em = _EXCEL_CELL_RE.match(m.group(2))
+            if sm and em:
+                s_row = int(sm.group(2)) - 1
+                e_row = int(em.group(2)) - 1
+                col = _letter_to_col(sm.group(1))
+                total = 0.0
+                for r in range(s_row, e_row + 1):
+                    cell = sheet_cells.get(f"{r}:{col}", {})
+                    v = cell.get("value")
+                    if v is not None and _is_number(v):
+                        total += float(v)
+                return str(total)
+            return "0"
+
+        expr = _SUM_RANGE_RE.sub(_replace_sum_range, expr)
+        expr = _COORD_CELL_RE.sub(_replace_coord_ref, expr)
+        expr = _EXCEL_CELL_RE.sub(_replace_excel_ref, expr)
+
+    # 安全计算表达式
+    try:
+        import ast
+        result = _safe_eval(expr)
+        return {"value": result, "sources": sources, "error": None}
+    except Exception as e:
+        return {"value": None, "sources": sources, "error": str(e)}
+
+
+def _cross_ref_to_source(cr: dict) -> dict | None:
+    """将跨表引用转为 data_fetch_custom 的 source 格式"""
+    cr_type = cr["type"]
+    args = cr["args"]
+
+    if cr_type == "TB" and len(args) >= 2:
+        field_map = {"审定数": "audited_amount", "未审数": "unadjusted_amount",
+                     "期初": "opening_balance", "AJE": "aje_adjustment", "RJE": "rje_adjustment",
+                     "期末": "audited_amount"}
+        return {"type": "trial_balance", "account_code": args[0], "field": field_map.get(args[1], args[1])}
+    elif cr_type == "RPT" and len(args) >= 2:
+        field_map = {"期末": "amount", "期初": "prior_amount"}
+        return {"type": "report", "row_code": args[0], "field": field_map.get(args[1], "amount")}
+    elif cr_type == "NOTE" and len(args) >= 3:
+        return {"type": "note", "section": args[0], "row_label": args[1], "col_header": args[2]}
+    elif cr_type == "WP" and len(args) >= 2:
+        field_map = {"审定数": "audited_amount", "未审数": "unadjusted_amount", "期初": "opening_balance"}
+        return {"type": "workpaper", "wp_code": args[0], "data_key": field_map.get(args[1], args[1])}
+    elif cr_type == "AUX" and len(args) >= 3:
+        field_map = {"期末": "closing_balance", "期初": "opening_balance"}
+        return {"type": "aux_balance", "account_code": args[0], "aux_code": args[1], "field": field_map.get(args[2], args[2])}
+    return None
+
+
+def _is_number(v) -> bool:
+    """判断值是否可转为数字"""
+    if isinstance(v, (int, float)):
+        return True
+    if isinstance(v, str):
+        try:
+            float(v)
+            return True
+        except ValueError:
+            return False
+    return False
+
+
+def _safe_eval(expr: str) -> float | None:
+    """安全计算数学表达式（只允许数字和+-*/()）"""
+    import ast
+    import operator
+
+    # 清理：只保留数字、运算符、小数点、括号、空格
+    allowed = set("0123456789.+-*/() ")
+    cleaned = "".join(c for c in expr if c in allowed).strip()
+    if not cleaned:
+        return None
+
+    try:
+        tree = ast.parse(cleaned, mode="eval")
+        return _eval_node(tree.body)
+    except Exception:
+        return None
+
+
+def _eval_node(node) -> float:
+    """递归求值 AST 节点"""
+    import ast
+    import operator
+
+    ops = {
+        ast.Add: operator.add,
+        ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+        ast.USub: operator.neg,
+    }
+
+    if isinstance(node, ast.Constant):
+        return float(node.value)
+    elif isinstance(node, ast.BinOp):
+        left = _eval_node(node.left)
+        right = _eval_node(node.right)
+        op = ops.get(type(node.op))
+        if op is None:
+            raise ValueError(f"不支持的运算符: {type(node.op)}")
+        if isinstance(node.op, ast.Div) and right == 0:
+            return 0.0  # 除零返回0
+        return op(left, right)
+    elif isinstance(node, ast.UnaryOp):
+        operand = _eval_node(node.operand)
+        op = ops.get(type(node.op))
+        if op:
+            return op(operand)
+        raise ValueError(f"不支持的一元运算符")
+    else:
+        raise ValueError(f"不支持的节点类型: {type(node)}")
