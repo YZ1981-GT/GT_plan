@@ -893,3 +893,34 @@ export async function createCustomWorkpaper(projectId: string, body: {
   const { data } = await http.post(`/api/projects/${projectId}/working-papers/create-custom`, body)
   return data
 }
+
+// ── Excel↔HTML 互转 ──
+
+export async function uploadExcelForParse(projectId: string, file: File): Promise<any> {
+  const fd = new FormData()
+  fd.append('file', file)
+  const { data } = await http.post(`/api/projects/${projectId}/excel-html/upload-parse`, fd)
+  return data
+}
+
+export async function getExcelHtmlPreview(projectId: string, fileStem: string, sheetIndex = 0): Promise<{ html: string; version: number }> {
+  const { data } = await http.get(`/api/projects/${projectId}/excel-html/preview/${fileStem}`, { params: { sheet_index: sheetIndex, editable: true } })
+  return data
+}
+
+export async function saveExcelHtmlEdits(projectId: string, fileStem: string, edits: any[], sheetIndex = 0): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/excel-html/save-edits/${fileStem}`, { edits, sheet_index: sheetIndex })
+  return data
+}
+
+export async function confirmExcelAsTemplate(projectId: string, fileStem: string, body: {
+  template_name: string; template_type?: string; wp_code?: string; audit_cycle?: string
+}): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/excel-html/confirm-template/${fileStem}`, body)
+  return data
+}
+
+export async function syncFromOnlyoffice(projectId: string, fileStem: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/excel-html/sync-from-onlyoffice/${fileStem}`)
+  return data
+}

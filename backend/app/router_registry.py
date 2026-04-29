@@ -100,12 +100,14 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.wp_data_rules import router as wpdr_router
     # 自定义取数+溯源
     from app.routers.data_fetch_custom import router as dfc_router
+    # Excel↔HTML互转
+    from app.routers.excel_html import router as exhtml_router
 
     for r in [formula_router, wpt_router, wp_router, qc_router, wpr_router,
               wpm_router, wpp_router, wpai_router, wps_router, wpd_router,
               wpc_router, samp_router, sampe_router, wsum_router, pr_router,
               rconv_router, ann_router, wpexpl_router, bgjob_router, wpdr_router,
-              dfc_router]:
+              dfc_router, exhtml_router]:
         app.include_router(r, tags=["底稿管理"])
 
     # ═══ 6. 合并报表 ═══
