@@ -427,3 +427,65 @@ async def export_module_word(
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=filename,
     )
+
+
+
+@router.get("/cell-info/{file_stem}")
+async def get_cell_info(
+    project_id: UUID,
+    file_stem: str,
+    cell: str = Query(..., description="单元格坐标如 0:1"),
+    sheet_index: int = Query(default=0),
+    current_user: User = Depends(get_current_user),
+):
+    """获取单元格详细信息（地址/公式/合并范围/取数规则）
+
+    用于公式编辑栏显示当前选中单元格的完整信息。
+    """
+    from app.services.excel_html_converter import _col_to_letter
+
+    structure_path = Path("storage") / "projects" / str(project_id) / "excel_html" / f"{file_stem}.structure.json"
+    if not structure_path.exists():
+        raise HTTPException(status_code=404, detail="结构文件不存在")
+
+    structure = json.loads(structure_path.read_text(encoding="utf-8"))
+    sheets = structure.get("sheets", [])
+    if sheet_index >= len(sheets):
+        raise HTTPException(status_code=404, detail="Sheet不存在")
+
+    sheet = sheets[sheet_index]
+    cells = sheet.get("cells", {})
+    merges = sheet.get("merges", [])
+
+    cell_data = cells.get(cell, {})
+    parts = cell.split(":")
+    r, c = int(parts[0]), int(parts[1])
+
+    # Excel 风格地址
+    addr = f"{_col_to_letter(c)}{r + 1}"
+
+    # 检查是否在合并区域内
+    merge_info = None
+    for m in merges:
+        if m["start_row"] <= r <= m["end_row"] and m["start_col"] <= c <= m["end_col"]:
+            merge_info = {
+                "range": f"{_col_to_letter(m['start_col'])}{m['start_row']+1}:{_col_to_letter(m['end_col'])}{m['end_row']+1}",
+                "start": f"{m['start_row']}:{m['start_col']}",
+                "end": f"{m['end_row']}:{m['end_col']}",
+                "rowspan": m["end_row"] - m["start_row"] + 1,
+                "colspan": m["end_col"] - m["start_col"] + 1,
+            }
+            break
+
+    return {
+        "cell": cell,
+        "address": addr,
+        "value": cell_data.get("value"),
+        "formula": cell_data.get("formula"),
+        "formula_type": cell_data.get("_formula_type"),
+        "formula_desc": cell_data.get("_formula_desc"),
+        "fetch_rule_id": cell_data.get("fetch_rule_id"),
+        "style": cell_data.get("style"),
+        "merge": merge_info,
+        "is_merged": merge_info is not None,
+    }

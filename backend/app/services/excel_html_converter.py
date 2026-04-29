@@ -163,18 +163,35 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
     # 生成 HTML
     html_parts = [
         '<style>',
-        '.gt-excel-table { border-collapse: collapse; font-family: "仿宋_GB2312", "SimSun", serif; font-size: 10pt; width: 100%; }',
-        '.gt-excel-table td { border: 1px solid #d0d0d0; padding: 4px 6px; vertical-align: middle; }',
+        '.gt-excel-table { border-collapse: collapse; font-family: "仿宋_GB2312", "SimSun", serif; font-size: 10pt; width: 100%; position: relative; }',
+        '.gt-excel-table td { border: 1px solid #d0d0d0; padding: 4px 6px; vertical-align: middle; position: relative; }',
         '.gt-excel-table tr:first-child td { background: #f4f0fa; font-weight: bold; text-align: center; }',
         '.gt-excel-table td[contenteditable="true"]:focus { outline: 2px solid #4b2d77; background: #faf8ff; }',
         '.gt-excel-table td[data-fetch-rule] { background: #f0f9ff; border-bottom: 2px solid #0094b3; cursor: pointer; }',
+        '.gt-excel-table td[data-formula] { background: #fffbf0; }',
+        '.gt-excel-table td[data-merged="true"] { background: #f9f5ff; }',
+        '.gt-excel-table .gt-cell-coord { position: absolute; top: 1px; right: 2px; font-size: 8px; color: #c0c4cc; pointer-events: none; font-family: monospace; }',
+        '.gt-excel-table td:hover .gt-cell-coord { color: #4b2d77; }',
+        '.gt-excel-table .gt-row-header { background: #f8f8f8; text-align: center; font-size: 9px; color: #909399; width: 30px; min-width: 30px; user-select: none; }',
+        '.gt-excel-table .gt-col-header { background: #f8f8f8; text-align: center; font-size: 9px; color: #909399; height: 20px; user-select: none; }',
         '</style>',
         '<table class="gt-excel-table" border="1" cellspacing="0" cellpadding="4">',
     ]
 
+    # 列头行（A, B, C...）— 仅编辑模式显示
+    if editable:
+        html_parts.append('<tr class="gt-col-header-row">')
+        html_parts.append('<td class="gt-col-header"></td>')  # 左上角空格
+        for c in range(max_col):
+            col_letter = _col_to_letter(c)
+            html_parts.append(f'<td class="gt-col-header">{col_letter}</td>')
+        html_parts.append('</tr>')
+
     # colgroup
     if cols:
         html_parts.append("<colgroup>")
+        if editable:
+            html_parts.append('<col style="width:30px">')  # 行号列
         for col in cols:
             html_parts.append(f'<col style="width:{col.get("width", 80)}px">')
         html_parts.append("</colgroup>")
@@ -182,6 +199,10 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
     for r in range(max_row):
         row_height = rows[r].get("height", 20) if r < len(rows) else 20
         html_parts.append(f'<tr style="height:{row_height}px">')
+
+        # 行号（仅编辑模式）
+        if editable:
+            html_parts.append(f'<td class="gt-row-header">{r + 1}</td>')
 
         for c in range(max_col):
             key = f"{r}:{c}"
@@ -196,7 +217,8 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
 
             # 构建 td 属性
             attrs = []
-            if key in merge_map:
+            is_merged = key in merge_map
+            if is_merged:
                 m = merge_map[key]
                 rowspan = m["end_row"] - m["start_row"] + 1
                 colspan = m["end_col"] - m["start_col"] + 1
@@ -204,6 +226,10 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
                     attrs.append(f'rowspan="{rowspan}"')
                 if colspan > 1:
                     attrs.append(f'colspan="{colspan}"')
+                attrs.append('data-merged="true"')
+                # 合并范围地址（如 A1:C3）
+                merge_addr = f"{_col_to_letter(m['start_col'])}{m['start_row']+1}:{_col_to_letter(m['end_col'])}{m['end_row']+1}"
+                attrs.append(f'data-merge-range="{merge_addr}"')
 
             # 样式
             css = _style_to_css(style)
@@ -211,7 +237,11 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
                 attrs.append(f'style="{css}"')
 
             # 数据属性（供前端取数联动）
+            # Excel 风格地址（如 B3）
+            cell_addr = f"{_col_to_letter(c)}{r + 1}"
             attrs.append(f'data-cell="{key}"')
+            attrs.append(f'data-addr="{cell_addr}"')
+            attrs.append(f'title="{cell_addr}"')
             if formula:
                 attrs.append(f'data-formula="{_escape_html(formula)}"')
             if fetch_rule_id:
@@ -223,7 +253,10 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
 
             attr_str = " ".join(attrs)
             display_value = _format_display_value(value)
-            html_parts.append(f"<td {attr_str}>{display_value}</td>")
+
+            # 编辑模式下显示坐标标签
+            coord_label = f'<span class="gt-cell-coord">{cell_addr}</span>' if editable else ""
+            html_parts.append(f"<td {attr_str}>{display_value}{coord_label}</td>")
 
         html_parts.append("</tr>")
 
@@ -762,6 +795,18 @@ def _format_display_value(value) -> str:
 def _escape_html(s: str) -> str:
     """HTML 转义"""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def _col_to_letter(col_index: int) -> str:
+    """列索引(0-based)转 Excel 列字母（0→A, 1→B, 25→Z, 26→AA）"""
+    result = ""
+    idx = col_index
+    while True:
+        result = chr(65 + idx % 26) + result
+        idx = idx // 26 - 1
+        if idx < 0:
+            break
+    return result
 
 
 def _get_max_dimension(cells: dict, axis: int) -> int:
