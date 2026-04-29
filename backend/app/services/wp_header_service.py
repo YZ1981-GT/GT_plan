@@ -112,11 +112,20 @@ async def fill_workpaper_header(
     cycle: str | None = None,
     assigned_to_name: str | None = None,
     reviewer_name: str | None = None,
+    is_custom: bool = False,
 ) -> dict[str, Any]:
     """填充底稿表头信息
 
     对于从模板复制的底稿：搜索已有表头区域并填充
-    对于空白生成的底稿：按标准布局写入表头
+    对于空白生成的底稿或自定义底稿(is_custom=True)：按标准布局写入表头
+
+    通用规则（适用于所有底稿）：
+    1. 编制单位 = Project.client_name
+    2. 审计期间 = audit_period_start ~ audit_period_end
+    3. 索引号 = wp_code
+    4. 底稿名称 = wp_name
+    5. 交叉索引 = 同循环关联底稿自动生成
+    6. 审计阶段 = 根据循环前缀映射中文名
     """
     try:
         import openpyxl
@@ -168,13 +177,16 @@ async def fill_workpaper_header(
     ws = wb.active
 
     # 策略：先尝试搜索已有表头关键词并填充，找不到则按标准布局写入
-    filled_by_search = _try_fill_existing_header(
-        ws, client_name, period_text, wp_name, wp_code,
-        assigned_to_name, reviewer_name, xref_text,
-    )
+    # 自定义底稿(is_custom)强制写入标准表头
+    filled_by_search = False
+    if not is_custom:
+        filled_by_search = _try_fill_existing_header(
+            ws, client_name, period_text, wp_name, wp_code,
+            assigned_to_name, reviewer_name, xref_text,
+        )
 
     if not filled_by_search:
-        # 空白底稿：按标准布局写入表头
+        # 空白底稿或自定义底稿：按标准布局写入表头
         _write_standard_header(
             ws, client_name, period_text, wp_name, wp_code,
             cycle, assigned_to_name, reviewer_name, xref_text,

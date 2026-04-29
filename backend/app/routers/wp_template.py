@@ -398,3 +398,97 @@ async def generate_from_codes(
     await db.flush()
     await db.commit()
     return {"created": created, "skipped": skipped, "message": f"已生成 {created} 个底稿，跳过 {skipped} 个已存在"}
+
+
+class CreateCustomWorkpaperRequest(BaseModel):
+    wp_code: str
+    wp_name: str
+    audit_cycle: str | None = None
+    year: int = 2025
+
+
+@router.post("/api/projects/{project_id}/working-papers/create-custom")
+async def create_custom_workpaper(
+    project_id: UUID,
+    data: CreateCustomWorkpaperRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """创建自定义底稿（用户自建，非模板生成）
+
+    自动填充致同标准表头（编制单位/审计期间/索引号/交叉索引等）。
+    """
+    from pathlib import Path
+
+    # 检查编号是否已存在
+    existing = await db.execute(
+        sa.select(WpIndex).where(
+            WpIndex.project_id == project_id,
+            WpIndex.wp_code == data.wp_code,
+            WpIndex.is_deleted == sa.false(),
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail=f"底稿编号 {data.wp_code} 已存在")
+
+    cycle = data.audit_cycle or (data.wp_code[0] if data.wp_code else "X")
+
+    # 创建 wp_index
+    wp_index = WpIndex(
+        project_id=project_id,
+        wp_code=data.wp_code,
+        wp_name=data.wp_name,
+        audit_cycle=cycle,
+        status=WpStatus.not_started,
+    )
+    db.add(wp_index)
+    await db.flush()
+
+    # 创建空白 xlsx
+    project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
+    cycle_dir = project_wp_dir / cycle
+    cycle_dir.mkdir(parents=True, exist_ok=True)
+    dest_file = cycle_dir / f"{data.wp_code}.xlsx"
+
+    try:
+        import openpyxl
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = data.wp_code
+        wb.save(str(dest_file))
+        wb.close()
+    except Exception:
+        dest_file.write_bytes(b"")
+
+    # 创建 working_paper
+    wp = WorkingPaper(
+        project_id=project_id,
+        wp_index_id=wp_index.id,
+        file_path=str(dest_file),
+        source_type=WpSourceType.manual,
+        file_version=1,
+        created_by=current_user.id,
+    )
+    db.add(wp)
+    await db.flush()
+
+    # 自定义底稿强制写入标准表头（is_custom=True）
+    try:
+        from app.services.wp_header_service import fill_workpaper_header
+        await fill_workpaper_header(
+            db=db, project_id=project_id, wp_id=wp.id,
+            file_path=str(dest_file), wp_code=data.wp_code, wp_name=data.wp_name,
+            cycle=cycle, is_custom=True,
+        )
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).warning("fill custom header failed for %s: %s", data.wp_code, _e)
+
+    await db.commit()
+    return {
+        "wp_id": str(wp.id),
+        "wp_code": data.wp_code,
+        "wp_name": data.wp_name,
+        "file_path": str(dest_file),
+        "message": "自定义底稿创建成功，表头已自动填充",
+    }

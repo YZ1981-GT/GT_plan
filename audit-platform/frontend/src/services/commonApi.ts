@@ -883,3 +883,13 @@ export async function pullTemplateToProject(projectId: string, templateId: strin
   const { data } = await http.post(`/api/template-library/projects/${projectId}/pull/${templateId}`)
   return data
 }
+
+export async function createCustomWorkpaper(projectId: string, body: {
+  wp_code: string
+  wp_name: string
+  audit_cycle?: string
+  year?: number
+}): Promise<{ wp_id: string; wp_code: string; message: string }> {
+  const { data } = await http.post(`/api/projects/${projectId}/working-papers/create-custom`, body)
+  return data
+}

@@ -1,6 +1,7 @@
 """模板库初始化脚本
 
-从 gt_template_library.json 和报告模板种子数据批量注册到 template_library 表。
+从 gt_template_library.json 和报告模板种子数据批量注册到 template_library 表，
+同时将模板文件路径统一到知识库目录下。
 
 用法：python backend/scripts/init_template_library.py
 """
@@ -22,6 +23,11 @@ from app.models.base import Base
 from app.models.template_library_models import TemplateLibraryItem, TemplateLevel, TemplateType
 Base.metadata.create_all(engine, tables=[TemplateLibraryItem.__table__])
 
+# 知识库模板统一存储路径
+KNOWLEDGE_ROOT = Path.home() / ".gt_audit_helper" / "knowledge"
+WP_TEMPLATE_DIR = KNOWLEDGE_ROOT / "workpaper_templates"
+REPORT_TEMPLATE_DIR = KNOWLEDGE_ROOT / "report_templates"
+
 
 def load_workpaper_templates():
     """从 gt_template_library.json 加载底稿模板"""
@@ -41,13 +47,21 @@ def load_workpaper_templates():
     for item in data:
         if not isinstance(item, dict):
             continue
+        wp_code = item.get("code", item.get("wp_code", ""))
+        cycle = item.get("cycle_prefix", item.get("audit_cycle", ""))
+        file_path = item.get("file_path", "")
+
+        # 统一路径：知识库目录下按循环分子目录
+        # 原始 file_path 保留用于实际复制，knowledge_path 用于统一管理
+        knowledge_path = str(WP_TEMPLATE_DIR / cycle / f"{wp_code}.xlsx") if cycle and wp_code else ""
+
         templates.append({
             "name": item.get("name", item.get("wp_name", "")),
             "template_type": TemplateType.workpaper_preset,
             "level": TemplateLevel.firm_default,
-            "wp_code": item.get("code", item.get("wp_code", "")),
-            "audit_cycle": item.get("cycle_prefix", item.get("audit_cycle", "")),
-            "file_path": item.get("file_path", ""),
+            "wp_code": wp_code,
+            "audit_cycle": cycle,
+            "file_path": file_path,  # 保留原始路径用于复制
             "description": item.get("description", ""),
         })
     return templates
@@ -71,7 +85,19 @@ def load_report_templates():
     ]
 
 
+def ensure_knowledge_dirs():
+    """确保知识库模板目录存在"""
+    WP_TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
+    REPORT_TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
+    # 按审计循环创建子目录
+    for cycle in "A B C D E F G H I J K L M N Q S".split():
+        (WP_TEMPLATE_DIR / cycle).mkdir(exist_ok=True)
+    print(f"  Knowledge dirs ensured: {WP_TEMPLATE_DIR}")
+
+
 def main():
+    ensure_knowledge_dirs()
+
     with Session(engine) as session:
         # 检查是否已初始化
         existing = session.query(TemplateLibraryItem).filter(

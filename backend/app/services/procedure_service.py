@@ -37,7 +37,16 @@ class ProcedureService:
         return [self._to_dict(r) for r in rows]
 
     async def init_from_templates(self, project_id: UUID, cycle: str) -> list[dict]:
-        """从模板初始化程序实例（优先从 gt_template_library.json，其次从 WpTemplate 表）"""
+        """从模板初始化程序实例
+
+        优先级：
+        1. template_library 表中项目已选择的底稿模板
+        2. gt_template_library.json 全量模板
+        3. WpTemplate 表（降级）
+
+        裁剪衔接：初始化后用户可通过 save_trim 裁剪程序，
+        generate_project_workpapers 会跳过 status=skip/not_applicable 的底稿。
+        """
         import json
         from pathlib import Path
 
@@ -52,30 +61,61 @@ class ProcedureService:
         if (existing.scalar() or 0) > 0:
             return await self.get_procedures(project_id, cycle)
 
-        # 优先从 gt_template_library.json 加载
-        lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
+        # 优先从 template_library 表加载项目已选择的底稿模板
         lib_items = []
-        if lib_path.exists():
-            try:
-                with open(lib_path, "r", encoding="utf-8-sig") as f:
-                    lib_data = json.load(f)
-                lib_items = [item for item in lib_data if item.get("cycle_prefix") == cycle]
-            except Exception:
-                pass
+        try:
+            from app.models.template_library_models import TemplateLibraryItem, ProjectTemplateSelection, TemplateType
+            sel_q = (
+                sa.select(TemplateLibraryItem)
+                .join(ProjectTemplateSelection, ProjectTemplateSelection.template_id == TemplateLibraryItem.id)
+                .where(
+                    ProjectTemplateSelection.project_id == project_id,
+                    ProjectTemplateSelection.is_active == sa.true(),
+                    TemplateLibraryItem.template_type == TemplateType.workpaper_preset,
+                    TemplateLibraryItem.audit_cycle == cycle,
+                    TemplateLibraryItem.is_deleted == sa.false(),
+                )
+                .order_by(TemplateLibraryItem.wp_code)
+            )
+            sel_items = (await self.db.execute(sel_q)).scalars().all()
+            for item in sel_items:
+                lib_items.append({
+                    "wp_code": item.wp_code,
+                    "wp_name": item.name,
+                    "cycle_prefix": item.audit_cycle,
+                })
+        except Exception:
+            pass
+
+        # 降级：从 gt_template_library.json 加载
+        if not lib_items:
+            lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
+            if lib_path.exists():
+                try:
+                    with open(lib_path, "r", encoding="utf-8-sig") as f:
+                        raw = json.load(f)
+                    all_items = raw.get("templates", []) if isinstance(raw, dict) else raw
+                    lib_items = [
+                        item for item in all_items
+                        if isinstance(item, dict) and item.get("cycle_prefix") == cycle
+                    ]
+                except Exception:
+                    pass
 
         if lib_items:
             for i, item in enumerate(lib_items):
+                wp_code = item.get("wp_code", item.get("code", f"{cycle}-{i}"))
                 pi = ProcedureInstance(
                     project_id=project_id,
                     audit_cycle=cycle,
-                    procedure_code=item.get("wp_code", f"{cycle}-{i}"),
-                    procedure_name=item.get("wp_name", f"程序{cycle}-{i}"),
+                    procedure_code=wp_code,
+                    procedure_name=item.get("wp_name", item.get("name", f"程序{cycle}-{i}")),
                     sort_order=i * 10,
-                    wp_code=item.get("wp_code"),
+                    wp_code=wp_code,
                 )
                 self.db.add(pi)
         else:
-            # 降级：从 wp_template 加载该循环的模板
+            # 最终降级：从 wp_template 加载该循环的模板
             tmpl_q = sa.select(WpTemplate).where(
                 WpTemplate.audit_cycle == cycle,
                 WpTemplate.is_deleted == False,  # noqa
