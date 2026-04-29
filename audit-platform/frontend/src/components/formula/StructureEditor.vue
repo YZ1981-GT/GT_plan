@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import FormulaBar from './FormulaBar.vue'
 import CellSelector from './CellSelector.vue'
@@ -126,6 +126,7 @@ import {
   rollbackFileVersion,
   executeFormulas,
 } from '@/services/commonApi'
+import http from '@/utils/http'
 
 const props = defineProps<{
   projectId: string
@@ -339,8 +340,19 @@ async function runFormulas() {
   try {
     const result = await executeFormulas(props.projectId, props.fileStem)
     await loadContent()
+
+    // 高亮出错的单元格
     if (result.errors?.length) {
-      ElMessage.warning(`执行完成：${result.executed}/${result.total_formulas} 成功，${result.errors.length} 个错误`)
+      setTimeout(() => {
+        for (const err of result.errors) {
+          const td = tableContainer.value?.querySelector(`td[data-cell="${err.cell}"]`) as HTMLElement
+          if (td) {
+            td.classList.add('gt-formula-error')
+            td.title = `公式错误: ${err.error}\n公式: ${err.formula || ''}`
+          }
+        }
+      }, 100) // 等待 v-html 渲染完成
+      ElMessage.warning(`执行完成：${result.executed}/${result.total_formulas} 成功，${result.errors.length} 个错误（红色标记）`)
     } else {
       ElMessage.success(`公式执行完成：${result.executed} 个单元格已更新`)
     }
@@ -402,11 +414,103 @@ async function releaseLock() {
 onMounted(async () => {
   await acquireLock()
   await loadContent()
+  await loadSelectorData()
+  // 注册键盘快捷键
+  document.addEventListener('keydown', onKeyDown)
 })
 
 onUnmounted(() => {
   releaseLock()
+  document.removeEventListener('keydown', onKeyDown)
 })
+
+// ═══ 键盘快捷键 ═══
+
+function onKeyDown(e: KeyboardEvent) {
+  // Ctrl+S 保存
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault()
+    saveEdits()
+    return
+  }
+  // Ctrl+Z 撤销最后一条编辑
+  if (e.ctrlKey && e.key === 'z') {
+    e.preventDefault()
+    if (pendingEdits.value.length) {
+      pendingEdits.value.pop()
+      ElMessage.info(`撤销一条编辑（剩余 ${pendingEdits.value.length} 条）`)
+    }
+    return
+  }
+  // Escape 取消选中
+  if (e.key === 'Escape') {
+    tableContainer.value?.querySelectorAll('td.gt-selected').forEach(el => el.classList.remove('gt-selected'))
+    currentCellInfo.value = null
+    selectedCell.value = ''
+    return
+  }
+
+  // 以下快捷键需要有选中单元格
+  if (!selectedCell.value) return
+  const [row, col] = selectedCell.value.split(':').map(Number)
+
+  // Tab → 下一列
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    _navigateTo(row, col + (e.shiftKey ? -1 : 1))
+    return
+  }
+  // Enter → 下一行
+  if (e.key === 'Enter' && !e.ctrlKey) {
+    // 如果当前在 contenteditable 编辑中，不拦截
+    const active = document.activeElement
+    if (active && active.tagName === 'TD' && (active as HTMLElement).isContentEditable) return
+    e.preventDefault()
+    _navigateTo(row + 1, col)
+    return
+  }
+  // 方向键导航（仅在非编辑状态）
+  const active = document.activeElement
+  if (active && active.tagName === 'TD' && (active as HTMLElement).isContentEditable) return
+  if (e.key === 'ArrowUp') { e.preventDefault(); _navigateTo(row - 1, col) }
+  if (e.key === 'ArrowDown') { e.preventDefault(); _navigateTo(row + 1, col) }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); _navigateTo(row, col - 1) }
+  if (e.key === 'ArrowRight') { e.preventDefault(); _navigateTo(row, col + 1) }
+}
+
+function _navigateTo(row: number, col: number) {
+  if (row < 0 || col < 0) return
+  const key = `${row}:${col}`
+  const td = tableContainer.value?.querySelector(`td[data-cell="${key}"]`) as HTMLElement
+  if (td) {
+    td.click()  // 触发 onCellClick
+    td.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
+}
+
+// ═══ 加载 CellSelector 所需数据 ═══
+
+async function loadSelectorData() {
+  try {
+    // 加载试算表数据
+    const { data: tbData } = await http.get(`/api/projects/${props.projectId}/trial-balance`, { params: { year: 2025 } })
+    trialBalanceData.value = Array.isArray(tbData) ? tbData : (tbData?.data || [])
+  } catch { trialBalanceData.value = [] }
+
+  try {
+    // 加载报表行次数据
+    const { data: rptData } = await http.get(`/api/projects/${props.projectId}/reports`, { params: { year: 2025 } })
+    reportData.value = Array.isArray(rptData) ? rptData : (rptData?.rows || rptData?.data || [])
+  } catch { reportData.value = [] }
+
+  // 附注章节列表（静态）
+  noteSections.value = [
+    '五、1', '五、2', '五、3', '五、4', '五、5', '五、6', '五、7', '五、8', '五、9', '五、10',
+    '五、11', '五、12', '五、13', '五、14', '五、15', '五、16', '五、17', '五、18', '五、19', '五、20',
+    '五、21', '五、22', '五、23', '五、24', '五、25', '五、26', '五、27', '五、28', '五、29', '五、30',
+    '五、31', '五、32', '五、33', '五、34', '五、35', '五、36', '五、37',
+  ]
+}
 </script>
 
 <style scoped>
@@ -415,6 +519,7 @@ onUnmounted(() => {
 .table-container { flex: 1; overflow: auto; padding: 12px; }
 .table-container :deep(td.gt-selected) { outline: 2px solid #4b2d77 !important; background: #faf8ff !important; }
 .table-container :deep(td.gt-dep-highlight) { outline: 1px dashed #e6a23c !important; background: #fdf6ec !important; }
+.table-container :deep(td.gt-formula-error) { background: #fef0f0 !important; border: 1px solid #f56c6c !important; cursor: help; }
 
 /* 可视化维度：显示公式 */
 .table-container.show-formulas :deep(td[data-formula])::after {
