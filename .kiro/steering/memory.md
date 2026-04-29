@@ -1473,3 +1473,10 @@ inclusion: always
 - P1全部完成并推送（2026-04-29，commit fa7a4fe）：①WorkpaperList.vue复核批注面板新增"回复"按钮+回复弹窗（showReplyDialog/replyContent/submitReply调用updateAnnotation status=replied）②adjustment_service.py update_entry新增操作diff审计记录（Log表new_value._diff含old_lines/new_lines/old_description/new_description）③复核流程验证结论：ReviewInbox数据来源正确+批注面板完整（新增/回复/解决+门禁联动）+退回原因弹窗已有
 - 审计全流程断点修复计划P0+P1全部完成（6项），仅剩P2 AIChatView标记developing（低优先级，Phase11已有类似处理）
 - 审计员8步全流程+复核流程理论上可端到端走通
+- P2收尾完成并推送（2026-04-29，commit 942003a）：trace.py regex=改为pattern=修复FastAPI弃用警告；AIChatView确认已在Phase11路由移除（文件保留但不可达）
+- 审计全流程断点修复计划P0+P1+P2全部完成（7项），627路由正常加载，15测试通过
+- 本轮总计8个commit（cc8f47d→942003a）：企业级加固12项+Phase17数据集版本+跨阶段修复+全流程断点修复+复核流程+操作diff
+- 下一步：用一个真实审计项目从头到尾走一遍验证（导入→查账→调整→试算表→底稿→附注→报告→Word导出+复核流程）
+- 报表结构现状分析（2026-04-29）：report_config_seed.json预设简化版（BS 44行/IS 21行/CFS 46行/EQ 10行），与致同标准（BS 70+行/IS 30+行）相比缺失新准则科目（使用权资产/合同资产/合同负债/债权投资/商誉/租赁负债/一年内到期等）；公式语法支持TB/SUM_TB/ROW三种
+- 报表结构自定义能力：已支持clone为项目级配置+修改行名/公式/缩进/合计标记（PUT /report-config/{id}）；未支持新增/删除行次、前端无报表结构编辑UI、不支持拖拽排序、不支持从Excel导入报表结构
+- 报表结构待改进：P0补全BS/IS行次到致同标准（新准则科目）+前端增加编辑入口；P1支持新增/删除行API+前端编辑器+Excel模板导入
