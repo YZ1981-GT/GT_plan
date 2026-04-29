@@ -1579,3 +1579,5 @@ inclusion: always
 - 代码层面能做的已全部完成，下一步只能启动运行环境做真实验证
 - 知识库低优先级待改进5项：①全文搜索（跨文件夹）②文档在线预览③文件夹拖拽移动④文件夹重命名API⑤旧API迁移（ChatPanel @知识库引用仍调旧API）
 - 系统最终状态：627+路由正常、16/17阶段完成、企业级6维度覆盖、4种角色覆盖、公式体系完整、知识库升级完成、8步全流程理论可走通
+- 知识库5项完善已完成（2026-04-29，commit 0988c56已推送）：后端新增5个端点（GET /search全文搜索+PUT /folders/{id}/rename重命名+PUT /documents/{id}/move移动+GET /documents/{id}/preview预览+GET /documents/{id}/download下载），knowledge_folders.py从8个端点增到13个；前端KnowledgeBase.vue新增搜索框+预览弹窗+移动操作+右键重命名
+- 本轮最终commit数：28个（cc8f47d→0988c56），全部已推送GitHub

@@ -1,5 +1,8 @@
 """审计作业平台 — FastAPI 应用入口"""
 
+import os
+os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -41,12 +44,13 @@ async def lifespan(app: FastAPI):
     # 恢复 Redis Stream 中未处理的事件（服务重启后自动补偿）
     from app.services.event_bus import event_bus
     try:
-        replayed = await event_bus.replay_pending_events()
+        import asyncio as _aio
+        replayed = await _aio.wait_for(event_bus.replay_pending_events(), timeout=5.0)
         if replayed:
             import logging
             logging.getLogger("audit_platform").info(f"[启动] 恢复了 {replayed} 个未处理事件")
     except Exception:
-        pass  # Redis 不可用时静默跳过
+        pass  # Redis 不可用或超时时静默跳过
 
     # Phase 15: SLA 超时定时检查（每 15 分钟）
     import asyncio
