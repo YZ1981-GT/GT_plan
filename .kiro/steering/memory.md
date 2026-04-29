@@ -1581,3 +1581,17 @@ inclusion: always
 - 系统最终状态：627+路由正常、16/17阶段完成、企业级6维度覆盖、4种角色覆盖、公式体系完整、知识库升级完成、8步全流程理论可走通
 - 知识库5项完善已完成（2026-04-29，commit 0988c56已推送）：后端新增5个端点（GET /search全文搜索+PUT /folders/{id}/rename重命名+PUT /documents/{id}/move移动+GET /documents/{id}/preview预览+GET /documents/{id}/download下载），knowledge_folders.py从8个端点增到13个；前端KnowledgeBase.vue新增搜索框+预览弹窗+移动操作+右键重命名
 - 本轮最终commit数：28个（cc8f47d→0988c56），全部已推送GitHub
+- 启动修复已完成（2026-04-29，commit 4b1c139已推送）：main.py顶部设置PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True+lifespan中replay_pending_events加asyncio.wait_for(timeout=5s)防止阻塞；PaddleOCR 5个模型已下载到~/.paddlex/official_models/（PP-LCNet_x1_0_doc_ori/UVDoc/PP-LCNet_x1_0_textline_ori/PP-OCRv5_server_det 87.9MB/PP-OCRv5_server_rec 84.4MB）
+- 系统已成功运行：PG 141张表+556行种子数据、Redis 6379端口、后端9980端口/api/health返回healthy
+- 启动阻塞根因：replay_pending_events中xreadgroup(block=0)在Redis Stream不存在时无限等待，加timeout=5s解决
+- Redis端口确认：实际运行在6379（非之前memory记录的6380），根目录.env已配置为redis://localhost:6379/0
+- 底稿模板企业级评估（2026-04-29）：当前方案试点阶段够用，全所推广需补2项——①模板版本管理（记录版本号+项目底稿关联模板版本+更新时升级提示）②parsed_data提取增强（审计程序执行状态/样本明细/异常事项，供QC和看板使用）；ONLYOFFICE强依赖已有降级路径（prefill_engine服务端执行公式）
+- 用户要求（底稿精细化）：每个底稿需要单独做具体的脚本来配套提取填充数据（不是通用脚本一刀切），同时利用LLM模型辅助完成（如审计说明生成/异常分析/结论建议），需要精细化打磨；底稿复核也需要精细化处理（不同类型底稿的复核要点不同）
+- 底稿精细化方向：①每种底稿类型（E1货币资金/D1应收账款/H1固定资产等）有独立的提取规则（wp_parse_rules.json已有10个核心+20个扩展）②每种底稿的LLM prompt需要针对性设计（TSJ提示词库70个已按科目分类）③复核时按底稿类型加载对应的复核要点清单（review_template_service 37条标准模板按10个分类）④这些都需要逐个底稿打磨，不是一次性能完成的工作
+
+## 底稿模板实际结构分析（2026-04-29）
+- 模板文件位置：致同通用审计程序及底稿模板（2025年修订）/1.致同审计程序及底稿模板（2025年）/4.风险应对-实质性程序（D-N）/
+- E1货币资金实际结构：1个Excel含16个sheet（底稿目录/实质性程序表E1A/附注披露上市+国企/审定表E1-1/现金明细E1-2/银行存款明细E1-3人民币版+外币版/数字货币E1-4/调整分录汇总E1-5/余额调节表E1-6/现金盘点E1-7+E1-8/银行存单盘点E1-9/银行账户清单E1-10/银行承诺E1-11）
+- E1-1审定表布局：A列项目名/B列期初未审/C列期初调整/D列期初审定/E列期末未审/F列期末调整/G列期末审定/H列变动额；行7库存现金/行8银行存款/行11其他货币资金/行12数字货币/行13应计利息/行18合计/行20试算平衡表数/行21差异数；行23起为仅人民币部分（同结构）
+- 用户反馈：当前精细化脚本太简单，需要根据每个科目对应的底稿模版实际情况来处理，先分析预设模版再写脚本
+- 底稿精细化正确方向：①先用openpyxl分析模板每个sheet的行列结构②根据实际单元格位置定义提取/填充规则③每个sheet独立处理（审定表/明细表/分析程序表各有不同逻辑）④LLM辅助基于实际提取的结构化数据生成说明
