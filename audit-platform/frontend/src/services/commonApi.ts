@@ -805,3 +805,81 @@ export async function createFormatTemplate(body: {
   const { data } = await http.post('/api/report-format-templates', body)
   return data
 }
+
+// ── 模板库三层体系 ──
+
+export interface TemplateLibraryItem {
+  id: string
+  name: string
+  type: string
+  level: string
+  level_label?: string
+  wp_code?: string
+  audit_cycle?: string
+  report_scope?: string
+  description?: string
+  group_name?: string
+  version?: string
+  source_template_id?: string
+}
+
+export interface ProjectTemplateSelection {
+  selection_id: string
+  template_id: string
+  template_name: string
+  template_type: string
+  level: string
+  group_name?: string
+  wp_code?: string
+  report_scope?: string
+  pulled_at?: string
+  linked_trial_balance: boolean
+  linked_adjustments: boolean
+  linked_attachments: boolean
+}
+
+export async function getAvailableTemplates(params?: {
+  template_type?: string
+  group_id?: string
+}): Promise<TemplateLibraryItem[]> {
+  const { data } = await http.get('/api/template-library/available', { params })
+  return Array.isArray(data) ? data : []
+}
+
+export async function listFirmTemplates(templateType?: string): Promise<TemplateLibraryItem[]> {
+  const { data } = await http.get('/api/template-library/firm', {
+    params: templateType ? { template_type: templateType } : undefined,
+  })
+  return Array.isArray(data) ? data : []
+}
+
+export async function createGroupTemplate(body: {
+  source_template_id: string
+  group_id: string
+  group_name: string
+}): Promise<{ id: string; name: string; message: string }> {
+  const { data } = await http.post('/api/template-library/group', body)
+  return data
+}
+
+export async function listGroupTemplates(groupId: string, templateType?: string): Promise<TemplateLibraryItem[]> {
+  const { data } = await http.get(`/api/template-library/group/${groupId}`, {
+    params: templateType ? { template_type: templateType } : undefined,
+  })
+  return Array.isArray(data) ? data : []
+}
+
+export async function selectTemplateForProject(projectId: string, templateId: string): Promise<{ selection_id: string }> {
+  const { data } = await http.post(`/api/template-library/projects/${projectId}/select`, { template_id: templateId })
+  return data
+}
+
+export async function getProjectTemplates(projectId: string): Promise<ProjectTemplateSelection[]> {
+  const { data } = await http.get(`/api/template-library/projects/${projectId}/templates`)
+  return Array.isArray(data) ? data : []
+}
+
+export async function pullTemplateToProject(projectId: string, templateId: string): Promise<{ template_name: string; target_path: string }> {
+  const { data } = await http.post(`/api/template-library/projects/${projectId}/pull/${templateId}`)
+  return data
+}

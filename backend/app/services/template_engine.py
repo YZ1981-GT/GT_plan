@@ -435,14 +435,38 @@ class TemplateEngine:
                 trimmed_codes.add(wp_code)
 
         # 加载模板库索引（用于查找模板文件路径）
+        # Phase 17: 优先从 template_library 表查找项目已选择的模板
+        from app.models.template_library_models import TemplateLibraryItem, ProjectTemplateSelection, TemplateLevel
+        project_template_map: dict[str, str] = {}  # wp_code → file_path
+        try:
+            sel_q = (
+                sa.select(TemplateLibraryItem.wp_code, TemplateLibraryItem.file_path)
+                .join(ProjectTemplateSelection, ProjectTemplateSelection.template_id == TemplateLibraryItem.id)
+                .where(
+                    ProjectTemplateSelection.project_id == project_id,
+                    ProjectTemplateSelection.is_active == sa.true(),
+                    TemplateLibraryItem.wp_code.isnot(None),
+                    TemplateLibraryItem.file_path.isnot(None),
+                )
+            )
+            for wp_code, fp in (await db.execute(sel_q)).all():
+                if wp_code and fp:
+                    project_template_map[wp_code] = fp
+        except Exception:
+            pass  # 表不存在时降级
+
+        # 降级：从 gt_template_library.json 加载
         lib_path = Path(__file__).parent.parent.parent / "data" / "gt_template_library.json"
         template_lib: dict[str, dict] = {}
         if lib_path.exists():
             try:
                 with open(lib_path, "r", encoding="utf-8-sig") as f:
-                    lib_data = json.load(f)
+                    lib_raw = json.load(f)
+                # 支持两种格式：直接数组 或 {templates: [...]} 包装对象
+                lib_data = lib_raw.get("templates", []) if isinstance(lib_raw, dict) else lib_raw
                 for item in lib_data:
-                    template_lib[item.get("wp_code", "")] = item
+                    if isinstance(item, dict):
+                        template_lib[item.get("code", item.get("wp_code", ""))] = item
             except Exception:
                 pass
 
@@ -473,8 +497,8 @@ class TemplateEngine:
 
             # Determine wp_name from template or fallback
             lib_entry = template_lib.get(code, {})
-            wp_name = tpl.template_name if tpl else lib_entry.get("wp_name", f"底稿{code}")
-            audit_cycle = (tpl.audit_cycle if tpl else lib_entry.get("cycle_prefix")) or None
+            wp_name = tpl.template_name if tpl else lib_entry.get("name", lib_entry.get("wp_name", f"底稿{code}"))
+            audit_cycle = (tpl.audit_cycle if tpl else lib_entry.get("cycle_prefix", lib_entry.get("audit_cycle"))) or None
 
             # Create wp_index
             wp_index = WpIndex(
@@ -495,15 +519,24 @@ class TemplateEngine:
 
             # 尝试复制模板文件
             copied = False
-            # 优先从模板库索引的 file_path 复制
-            src_path_str = lib_entry.get("file_path", "")
-            if src_path_str:
-                src = Path(src_path_str)
-                if src.exists() and src.is_file():
-                    shutil.copy2(src, dest_file)
+            # 优先从项目已选择的模板库复制
+            if code in project_template_map:
+                src_path = Path(project_template_map[code])
+                if src_path.exists():
+                    shutil.copy2(src_path, dest_file)
                     copied = True
-                else:
-                    logger.debug("template source not found: %s (code=%s)", src_path_str, code)
+                    logger.info("copied from template_library: %s → %s", src_path, dest_file)
+
+            # 其次从模板库索引的 file_path 复制
+            if not copied:
+                src_path_str = lib_entry.get("file_path", "")
+                if src_path_str:
+                    src = Path(src_path_str)
+                    if src.exists() and src.is_file():
+                        shutil.copy2(src, dest_file)
+                        copied = True
+                    else:
+                        logger.debug("template source not found: %s (code=%s)", src_path_str, code)
 
             # 其次从 WpTemplate.file_path 复制
             if not copied and tpl and tpl.file_path:
