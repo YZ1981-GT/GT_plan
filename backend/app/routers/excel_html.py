@@ -269,3 +269,113 @@ async def download_file(
         media_type=media_types[format],
         filename=file_path.name,
     )
+
+
+
+# ═══ 统一模块接口：任意模块 → 三形式 ═══
+
+@router.get("/module/{module}/structure")
+async def get_module_structure(
+    project_id: UUID,
+    module: str,
+    year: int = Query(default=2025),
+    wp_code: str | None = Query(None),
+    note_section: str | None = Query(None),
+    report_type: str | None = Query(None),
+    entry_type: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """统一接口：获取任意模块的 structure.json
+
+    module: workpaper / disclosure_note / financial_report /
+            adjustment_summary / trial_balance / consol_worksheet
+    """
+    from app.services.triple_format_adapter import module_to_structure
+
+    kwargs = {}
+    if wp_code:
+        kwargs["wp_code"] = wp_code
+    if note_section:
+        kwargs["note_section"] = note_section
+    if report_type:
+        kwargs["report_type"] = report_type
+    if entry_type:
+        kwargs["entry_type"] = entry_type
+
+    result = await module_to_structure(db, project_id, year, module, **kwargs)
+    return result
+
+
+@router.get("/module/{module}/html")
+async def get_module_html(
+    project_id: UUID,
+    module: str,
+    year: int = Query(default=2025),
+    editable: bool = Query(default=True),
+    wp_code: str | None = Query(None),
+    note_section: str | None = Query(None),
+    report_type: str | None = Query(None),
+    entry_type: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """统一接口：获取任意模块的 HTML 渲染"""
+    from app.services.triple_format_adapter import module_to_html
+
+    kwargs = {}
+    if wp_code:
+        kwargs["wp_code"] = wp_code
+    if note_section:
+        kwargs["note_section"] = note_section
+    if report_type:
+        kwargs["report_type"] = report_type
+    if entry_type:
+        kwargs["entry_type"] = entry_type
+
+    html = await module_to_html(db, project_id, year, module, editable=editable, **kwargs)
+    return {"module": module, "html": html}
+
+
+@router.post("/module/{module}/export-excel")
+async def export_module_excel(
+    project_id: UUID,
+    module: str,
+    year: int = Query(default=2025),
+    wp_code: str | None = Query(None),
+    note_section: str | None = Query(None),
+    report_type: str | None = Query(None),
+    entry_type: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """统一接口：任意模块导出 Excel"""
+    from fastapi.responses import FileResponse
+    from app.services.triple_format_adapter import module_to_excel
+
+    kwargs = {}
+    if wp_code:
+        kwargs["wp_code"] = wp_code
+    if note_section:
+        kwargs["note_section"] = note_section
+    if report_type:
+        kwargs["report_type"] = report_type
+    if entry_type:
+        kwargs["entry_type"] = entry_type
+
+    # 生成临时文件
+    output_dir = Path("storage") / "projects" / str(project_id) / "exports"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{module}_{wp_code or note_section or report_type or entry_type or 'data'}.xlsx"
+    output_path = str(output_dir / filename)
+
+    try:
+        await module_to_excel(db, project_id, year, module, output_path, **kwargs)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return FileResponse(
+        path=output_path,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=filename,
+    )
