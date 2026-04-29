@@ -946,8 +946,51 @@ def structure_to_word(structure: dict, output_path: str, sheet_index: int = 0) -
                 except (IndexError, Exception):
                     pass
 
+    # 页眉：事务所名称
+    header = section.header
+    header_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+    header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    header_run = header_para.add_run("致同会计师事务所（特殊普通合伙）")
+    header_run.font.name = "仿宋_GB2312"
+    header_run._element.rPr.rFonts.set(qn("w:eastAsia"), "仿宋_GB2312")
+    header_run.font.size = Pt(9)
+    header_run.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+
+    # 页脚：页码
+    footer = section.footer
+    footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _add_page_number(footer_para)
+
     doc.save(output_path)
     return output_path
+
+
+def _add_page_number(paragraph):
+    """在段落中插入页码域代码"""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    run = paragraph.add_run()
+    fldChar1 = OxmlElement("w:fldChar")
+    fldChar1.set(qn("w:fldCharType"), "begin")
+    run._element.append(fldChar1)
+
+    instrText = OxmlElement("w:instrText")
+    instrText.set(qn("xml:space"), "preserve")
+    instrText.text = " PAGE "
+    run._element.append(instrText)
+
+    fldChar2 = OxmlElement("w:fldChar")
+    fldChar2.set(qn("w:fldCharType"), "separate")
+    run._element.append(fldChar2)
+
+    run2 = paragraph.add_run("1")
+    run2.font.size = Pt(9)
+
+    fldChar3 = OxmlElement("w:fldChar")
+    fldChar3.set(qn("w:fldCharType"), "end")
+    run2._element.append(fldChar3)
 
 
 def _apply_three_line_border(table):
@@ -1015,3 +1058,177 @@ def _format_word_value(value) -> str:
 def _is_numeric(value) -> bool:
     """判断是否为数值"""
     return isinstance(value, (int, float))
+
+
+
+# ═══ 版本管理：对比 + 回滚 ═══
+
+def save_version_snapshot(structure: dict, storage_dir: str) -> str:
+    """保存 structure.json 版本快照
+
+    每次编辑保存时调用，保留最近20个版本。
+    文件名格式：{stem}.v{version}.json
+    """
+    version = structure.get("metadata", {}).get("version", 1)
+    stem = structure.get("metadata", {}).get("source_file", "data").replace(".xlsx", "")
+
+    sp = Path(storage_dir)
+    sp.mkdir(parents=True, exist_ok=True)
+
+    snapshot_path = sp / f"{stem}.v{version}.json"
+    snapshot_path.write_text(json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # 清理旧版本（保留最近20个）
+    snapshots = sorted(sp.glob(f"{stem}.v*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for old in snapshots[20:]:
+        old.unlink(missing_ok=True)
+
+    return str(snapshot_path)
+
+
+def list_versions(storage_dir: str, stem: str) -> list[dict]:
+    """列出所有版本快照"""
+    sp = Path(storage_dir)
+    if not sp.exists():
+        return []
+
+    snapshots = sorted(sp.glob(f"{stem}.v*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    versions = []
+    for s in snapshots:
+        try:
+            data = json.loads(s.read_text(encoding="utf-8"))
+            meta = data.get("metadata", {})
+            versions.append({
+                "version": meta.get("version", 0),
+                "file": s.name,
+                "edited_at": meta.get("last_edited_at", meta.get("created_at", "")),
+                "synced_from": meta.get("synced_from", ""),
+                "size": s.stat().st_size,
+            })
+        except Exception:
+            pass
+    return versions
+
+
+def diff_versions(storage_dir: str, stem: str, v1: int, v2: int) -> dict:
+    """对比两个版本的差异
+
+    返回变更的单元格列表（新增/修改/删除）。
+    """
+    sp = Path(storage_dir)
+    f1 = sp / f"{stem}.v{v1}.json"
+    f2 = sp / f"{stem}.v{v2}.json"
+
+    if not f1.exists() or not f2.exists():
+        return {"error": "版本文件不存在"}
+
+    s1 = json.loads(f1.read_text(encoding="utf-8"))
+    s2 = json.loads(f2.read_text(encoding="utf-8"))
+
+    cells1 = s1.get("sheets", [{}])[0].get("cells", {}) if s1.get("sheets") else {}
+    cells2 = s2.get("sheets", [{}])[0].get("cells", {}) if s2.get("sheets") else {}
+
+    changes = []
+
+    # 修改和删除
+    for key, cell1 in cells1.items():
+        cell2 = cells2.get(key)
+        if cell2 is None:
+            changes.append({"cell": key, "type": "deleted", "old_value": cell1.get("value"), "new_value": None})
+        elif cell1.get("value") != cell2.get("value") or cell1.get("formula") != cell2.get("formula"):
+            changes.append({
+                "cell": key, "type": "modified",
+                "old_value": cell1.get("value"), "new_value": cell2.get("value"),
+                "old_formula": cell1.get("formula"), "new_formula": cell2.get("formula"),
+            })
+
+    # 新增
+    for key, cell2 in cells2.items():
+        if key not in cells1:
+            changes.append({"cell": key, "type": "added", "old_value": None, "new_value": cell2.get("value")})
+
+    return {
+        "v1": v1, "v2": v2,
+        "changes_count": len(changes),
+        "changes": changes,
+    }
+
+
+def rollback_to_version(storage_dir: str, stem: str, target_version: int) -> dict | None:
+    """回滚到指定版本"""
+    sp = Path(storage_dir)
+    target_file = sp / f"{stem}.v{target_version}.json"
+
+    if not target_file.exists():
+        return None
+
+    data = json.loads(target_file.read_text(encoding="utf-8"))
+    # 更新版本号（回滚也算一次新版本）
+    data["metadata"]["version"] = data["metadata"].get("version", 0)
+    data["metadata"]["rolled_back_from"] = target_version
+    data["metadata"]["rolled_back_at"] = datetime.utcnow().isoformat()
+
+    return data
+
+
+# ═══ 编辑锁（防止多人同时编辑冲突） ═══
+
+import time as _time
+
+# 内存锁（单实例部署足够，多实例需升级Redis）
+_edit_locks: dict[str, dict] = {}  # key → {"user_id": ..., "locked_at": ..., "expires_at": ...}
+_LOCK_TTL = 300  # 5分钟自动过期
+
+
+def acquire_edit_lock(file_key: str, user_id: str) -> dict:
+    """获取编辑锁
+
+    Returns:
+        {"locked": True, "by": user_id} 成功
+        {"locked": False, "held_by": other_user, "expires_in": seconds} 失败
+    """
+    _cleanup_expired_locks()
+
+    existing = _edit_locks.get(file_key)
+    if existing and existing["user_id"] != user_id:
+        expires_in = max(0, int(existing["expires_at"] - _time.time()))
+        return {"locked": False, "held_by": existing["user_id"], "expires_in": expires_in}
+
+    _edit_locks[file_key] = {
+        "user_id": user_id,
+        "locked_at": _time.time(),
+        "expires_at": _time.time() + _LOCK_TTL,
+    }
+    return {"locked": True, "by": user_id}
+
+
+def release_edit_lock(file_key: str, user_id: str) -> bool:
+    """释放编辑锁"""
+    existing = _edit_locks.get(file_key)
+    if existing and existing["user_id"] == user_id:
+        del _edit_locks[file_key]
+        return True
+    return False
+
+
+def refresh_edit_lock(file_key: str, user_id: str) -> bool:
+    """刷新锁过期时间（用户仍在编辑）"""
+    existing = _edit_locks.get(file_key)
+    if existing and existing["user_id"] == user_id:
+        existing["expires_at"] = _time.time() + _LOCK_TTL
+        return True
+    return False
+
+
+def get_lock_status(file_key: str) -> dict | None:
+    """查询锁状态"""
+    _cleanup_expired_locks()
+    return _edit_locks.get(file_key)
+
+
+def _cleanup_expired_locks():
+    """清理过期锁"""
+    now = _time.time()
+    expired = [k for k, v in _edit_locks.items() if v["expires_at"] < now]
+    for k in expired:
+        del _edit_locks[k]

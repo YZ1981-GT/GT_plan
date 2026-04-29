@@ -489,3 +489,99 @@ async def get_cell_info(
         "merge": merge_info,
         "is_merged": merge_info is not None,
     }
+
+
+
+# ═══ 版本管理 ═══
+
+@router.get("/versions/{file_stem}")
+async def list_file_versions(
+    project_id: UUID,
+    file_stem: str,
+    current_user: User = Depends(get_current_user),
+):
+    """列出文件的所有版本快照"""
+    from app.services.excel_html_converter import list_versions
+    storage_dir = str(Path("storage") / "projects" / str(project_id) / "excel_html" / "versions")
+    return list_versions(storage_dir, file_stem)
+
+
+@router.get("/versions/{file_stem}/diff")
+async def diff_file_versions(
+    project_id: UUID,
+    file_stem: str,
+    v1: int = Query(...),
+    v2: int = Query(...),
+    current_user: User = Depends(get_current_user),
+):
+    """对比两个版本的差异"""
+    from app.services.excel_html_converter import diff_versions
+    storage_dir = str(Path("storage") / "projects" / str(project_id) / "excel_html" / "versions")
+    return diff_versions(storage_dir, file_stem, v1, v2)
+
+
+@router.post("/versions/{file_stem}/rollback/{version}")
+async def rollback_file_version(
+    project_id: UUID,
+    file_stem: str,
+    version: int,
+    current_user: User = Depends(get_current_user),
+):
+    """回滚到指定版本"""
+    from app.services.excel_html_converter import rollback_to_version, save_version_snapshot
+    storage_dir = str(Path("storage") / "projects" / str(project_id) / "excel_html" / "versions")
+    structure = rollback_to_version(storage_dir, file_stem, version)
+    if not structure:
+        raise HTTPException(status_code=404, detail=f"版本 {version} 不存在")
+
+    # 保存回滚后的版本
+    project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
+    structure_path = project_dir / f"{file_stem}.structure.json"
+    structure_path.write_text(json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    return {"message": f"已回滚到版本 {version}", "current_version": structure["metadata"]["version"]}
+
+
+# ═══ 编辑锁 ═══
+
+@router.post("/lock/{file_stem}")
+async def acquire_lock(
+    project_id: UUID,
+    file_stem: str,
+    current_user: User = Depends(get_current_user),
+):
+    """获取编辑锁（防止多人同时编辑冲突）"""
+    from app.services.excel_html_converter import acquire_edit_lock
+    file_key = f"{project_id}:{file_stem}"
+    result = acquire_edit_lock(file_key, str(current_user.id))
+    if not result["locked"]:
+        raise HTTPException(status_code=423, detail=f"文件正在被其他用户编辑，剩余 {result['expires_in']} 秒")
+    return result
+
+
+@router.delete("/lock/{file_stem}")
+async def release_lock(
+    project_id: UUID,
+    file_stem: str,
+    current_user: User = Depends(get_current_user),
+):
+    """释放编辑锁"""
+    from app.services.excel_html_converter import release_edit_lock
+    file_key = f"{project_id}:{file_stem}"
+    released = release_edit_lock(file_key, str(current_user.id))
+    return {"released": released}
+
+
+@router.put("/lock/{file_stem}/refresh")
+async def refresh_lock(
+    project_id: UUID,
+    file_stem: str,
+    current_user: User = Depends(get_current_user),
+):
+    """刷新编辑锁（用户仍在编辑时定期调用）"""
+    from app.services.excel_html_converter import refresh_edit_lock
+    file_key = f"{project_id}:{file_stem}"
+    refreshed = refresh_edit_lock(file_key, str(current_user.id))
+    if not refreshed:
+        raise HTTPException(status_code=423, detail="锁已过期或不属于当前用户")
+    return {"refreshed": True}
