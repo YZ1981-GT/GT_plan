@@ -95,6 +95,7 @@ class KnowledgeFolderService:
         self,
         parent_id: UUID | None = None,
         user_project_ids: list[UUID] | None = None,
+        user_id: UUID | None = None,
     ) -> list[KnowledgeFolder]:
         """列出文件夹（含权限过滤）"""
         query = sa.select(KnowledgeFolder).where(
@@ -109,15 +110,17 @@ class KnowledgeFolderService:
         folders = list(result.scalars().all())
 
         # 权限过滤
-        if user_project_ids is not None:
+        if user_project_ids is not None or user_id is not None:
             filtered = []
             for f in folders:
                 if f.access_level == KnowledgeAccessLevel.public:
                     filtered.append(f)
                 elif f.access_level == KnowledgeAccessLevel.project_group:
-                    if f.project_ids and any(str(pid) in [str(x) for x in f.project_ids] for pid in user_project_ids):
+                    if user_project_ids and f.project_ids and any(str(pid) in [str(x) for x in f.project_ids] for pid in user_project_ids):
                         filtered.append(f)
-                # private: 只有创建者可见（需要 user_id 参数，暂跳过）
+                elif f.access_level == KnowledgeAccessLevel.private:
+                    if user_id and f.created_by == user_id:
+                        filtered.append(f)
             return filtered
 
         return folders

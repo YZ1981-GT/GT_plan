@@ -138,10 +138,35 @@ async def upload_documents(
             content = await file.read()
             f.write(content)
 
-        # 提取文本内容（简单处理：txt/md 直接读取）
+        # 提取文本内容
         content_text = None
-        if file.filename.endswith((".txt", ".md")):
+        filename_lower = file.filename.lower()
+        if filename_lower.endswith((".txt", ".md")):
             content_text = content.decode("utf-8", errors="ignore")[:50000]
+        elif filename_lower.endswith(".docx"):
+            # Word 文档提取文本
+            try:
+                import io
+                from docx import Document as DocxDocument
+                doc_obj = DocxDocument(io.BytesIO(content))
+                paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
+                content_text = "\n".join(paragraphs)[:50000]
+            except Exception:
+                pass
+        elif filename_lower.endswith(".pdf"):
+            # PDF 提取文本（简单方式，复杂 PDF 需要 OCR）
+            try:
+                import io
+                import PyPDF2
+                reader = PyPDF2.PdfReader(io.BytesIO(content))
+                pages_text = []
+                for page in reader.pages[:50]:  # 最多 50 页
+                    text = page.extract_text()
+                    if text:
+                        pages_text.append(text)
+                content_text = "\n".join(pages_text)[:50000]
+            except Exception:
+                pass
 
         doc = await svc.create_document(
             folder_id=folder_id,
@@ -152,7 +177,7 @@ async def upload_documents(
             content_text=content_text,
             created_by=current_user.id,
         )
-        uploaded.append({"id": str(doc.id), "name": doc.name, "size": len(content)})
+        uploaded.append({"id": str(doc.id), "name": doc.name, "size": len(content), "text_extracted": content_text is not None})
 
     await db.commit()
     return {"uploaded": len(uploaded), "files": uploaded}

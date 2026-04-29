@@ -141,16 +141,53 @@ class ReferenceDocService:
         category: str = "notes",
         keywords: list[str] | None = None,
         max_docs: int = 3,
+        db: AsyncSession | None = None,
     ) -> list[str]:
-        """从知识库加载参照文档"""
-        from app.services.knowledge_service import KnowledgeService
+        """从知识库加载参照文档（优先新模型，降级旧服务）"""
 
+        # 优先从新知识库模型（KnowledgeDocument.content_text）检索
+        if db:
+            try:
+                from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+                import sqlalchemy as _sa
+
+                query = (
+                    _sa.select(KnowledgeDocument.name, KnowledgeDocument.content_text)
+                    .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
+                    .where(
+                        KnowledgeDocument.is_deleted == _sa.false(),
+                        KnowledgeDocument.content_text.isnot(None),
+                        KnowledgeFolder.is_deleted == _sa.false(),
+                    )
+                )
+                # 按分类过滤
+                if category:
+                    query = query.where(KnowledgeFolder.category == category)
+                # 按关键词过滤（文档名或内容包含关键词）
+                if keywords:
+                    keyword_filters = []
+                    for kw in keywords:
+                        keyword_filters.append(KnowledgeDocument.name.ilike(f"%{kw}%"))
+                        keyword_filters.append(KnowledgeDocument.content_text.ilike(f"%{kw}%"))
+                    query = query.where(_sa.or_(*keyword_filters))
+
+                query = query.limit(max_docs)
+                result = await db.execute(query)
+                rows = result.all()
+
+                if rows:
+                    return [f"【知识库 - {name}】\n{(text or '')[:2000]}" for name, text in rows]
+            except Exception as e:
+                logger.debug(f"新知识库检索失败，降级到旧服务: {e}")
+
+        # 降级：从旧 KnowledgeService（文件系统）加载
         try:
+            from app.services.knowledge_service import KnowledgeService
+
             docs_list = KnowledgeService.list_documents(category)
             if not docs_list:
                 return []
 
-            # 按关键词过滤
             if keywords:
                 filtered = []
                 for doc in docs_list:
@@ -210,6 +247,7 @@ class ReferenceDocService:
                 project_id,
                 category=knowledge_category or "notes",
                 keywords=knowledge_keywords,
+                db=db,
             )
             docs.extend(kb)
 

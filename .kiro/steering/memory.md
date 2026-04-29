@@ -1565,3 +1565,7 @@ inclusion: always
 - 知识库文件夹管理需求：支持在预制文件夹下自定义添加单个/多个文档、自定义新建单个/多个文件夹、文件夹下同理支持嵌套（树形目录结构）
 - 当前知识库现状：knowledge_service有9个固定分类（底稿模板库/监管规定库/会计准则库/质控标准库/审计程序库/行业指引库/提示词库/报告模板库/笔记库），文件存储在~/.gt_audit_helper/knowledge/{category}/，无权限控制、无自定义文件夹、无嵌套目录
 - 待实现：①知识库文档增加project_access权限字段（public/project_ids列表）②支持自定义文件夹CRUD（嵌套树形）③文件夹和文档的批量上传④权限过滤（用户只能看到有权限的文档）⑤前端KnowledgeBase.vue改造为树形目录+权限标签
+- 知识库升级已完成（2026-04-29，commit 4b05588已推送）：新增knowledge_models.py（KnowledgeFolder树形自引用+KnowledgeDocument+KnowledgeAccessLevel枚举public/project_group/private）+knowledge_folder_service.py（KnowledgeFolderService含init_preset_folders/create/list权限过滤/get_folder_tree递归/delete级联+KnowledgeDocumentService含CRUD/batch_create）+knowledge_folders.py路由8个端点（/api/knowledge-library/tree/folders/documents/upload/init-presets），已注册到router_registry第8组
+- 知识库权限模型：文件夹级access_level+project_ids→文档继承或独立设置；权限过滤在list_folders/list_documents中自动执行；预制9个分类文件夹（与现有knowledge_service对应）
+- 知识库升级复盘发现5个问题（2026-04-29）：①新旧知识库并存冲突（旧knowledge_service文件系统+旧API /api/knowledge/ vs 新knowledge_folder_service数据库+新API /api/knowledge-library/）②RAG检索未接入新模型（reference_doc_service.load_from_knowledge_base仍调旧KnowledgeService）③文档内容提取不完整（PDF/DOCX上传只保存文件未提取content_text）④前端KnowledgeBase.vue未改造为树形目录⑤private权限缺user_id过滤
+- 知识库最关键待修：①新旧统一（让旧API代理到新服务或迁移）②RAG接入新模型（从KnowledgeDocument.content_text检索）
