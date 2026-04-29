@@ -363,10 +363,12 @@ async def export_module_excel(
     if entry_type:
         kwargs["entry_type"] = entry_type
 
-    # 生成临时文件
+    # 生成临时文件（加时间戳防并发冲突）
+    import time
     output_dir = Path("storage") / "projects" / str(project_id) / "exports"
     output_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{module}_{wp_code or note_section or report_type or entry_type or 'data'}.xlsx"
+    ts = int(time.time() * 1000)
+    filename = f"{module}_{wp_code or note_section or report_type or entry_type or 'data'}_{ts}.xlsx"
     output_path = str(output_dir / filename)
 
     try:
@@ -377,5 +379,51 @@ async def export_module_excel(
     return FileResponse(
         path=output_path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=filename,
+    )
+
+
+
+@router.post("/module/{module}/export-word")
+async def export_module_word(
+    project_id: UUID,
+    module: str,
+    year: int = Query(default=2025),
+    wp_code: str | None = Query(None),
+    note_section: str | None = Query(None),
+    report_type: str | None = Query(None),
+    entry_type: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """统一接口：任意模块导出 Word（致同三线表排版）"""
+    from fastapi.responses import FileResponse
+    from app.services.triple_format_adapter import module_to_word
+    import time
+
+    kwargs = {}
+    if wp_code:
+        kwargs["wp_code"] = wp_code
+    if note_section:
+        kwargs["note_section"] = note_section
+    if report_type:
+        kwargs["report_type"] = report_type
+    if entry_type:
+        kwargs["entry_type"] = entry_type
+
+    output_dir = Path("storage") / "projects" / str(project_id) / "exports"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    ts = int(time.time() * 1000)
+    filename = f"{module}_{wp_code or note_section or report_type or entry_type or 'data'}_{ts}.docx"
+    output_path = str(output_dir / filename)
+
+    try:
+        await module_to_word(db, project_id, year, module, output_path, **kwargs)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return FileResponse(
+        path=output_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=filename,
     )

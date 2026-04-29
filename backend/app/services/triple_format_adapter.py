@@ -204,7 +204,7 @@ class DisclosureNoteAdapter:
         db: AsyncSession, project_id: UUID, year: int, note_section: str,
         structure: dict,
     ) -> None:
-        """从 structure.json 更新附注表格数据"""
+        """从 structure.json 更新附注表格数据（支持新增浮动行）"""
         from app.models.report_models import DisclosureNote
         from sqlalchemy.orm.attributes import flag_modified
 
@@ -225,18 +225,45 @@ class DisclosureNoteAdapter:
         # 重建 table_data
         td = note.table_data or {}
         headers = td.get("headers", [])
-        rows = td.get("rows", [])
+        num_data_cols = len(headers) - 1 if headers else 0
 
-        # 更新数据行的 values
-        for r in range(len(rows)):
+        # 确定数据行数（从 structure 中推断，跳过表头行0）
+        max_row = 0
+        for key in cells:
+            parts = key.split(":")
+            if len(parts) == 2:
+                r = int(parts[0])
+                if r > max_row:
+                    max_row = r
+
+        # 重建 rows（支持新增行）
+        new_rows = []
+        for r in range(1, max_row + 1):
+            # 标签列
+            label_cell = cells.get(f"{r}:0", {})
+            label = label_cell.get("value", "")
+
+            # 数据列
             values = []
-            for c in range(len(headers) - 1):
-                key = f"{r+1}:{c+1}"
-                cell = cells.get(key, {})
+            for c in range(1, num_data_cols + 1):
+                cell = cells.get(f"{r}:{c}", {})
                 values.append(cell.get("value"))
-            rows[r]["values"] = values
 
-        td["rows"] = rows
+            # 检测是否为合计行
+            is_total = bool(label_cell.get("style", {}).get("bold")) and "合计" in str(label)
+
+            row_data: dict[str, Any] = {"label": label, "values": values}
+            if is_total:
+                row_data["is_total"] = True
+
+            # 保留 _cell_modes（如果原行存在）
+            old_rows = td.get("rows", [])
+            if r - 1 < len(old_rows) and old_rows[r - 1].get("_cell_modes"):
+                row_data["_cell_modes"] = old_rows[r - 1]["_cell_modes"]
+
+            new_rows.append(row_data)
+
+        td["rows"] = new_rows
         note.table_data = td
         flag_modified(note, "table_data")
         await db.flush()
@@ -452,7 +479,7 @@ class ConsolWorksheetAdapter:
 
         for r, row in enumerate(rows):
             cells[f"{r+1}:0"] = {"value": row.account_code}
-            cells[f"{r+1}:1"] = {"value": row.account_name or ""}
+            cells[f"{r+1}:1"] = {"value": ""}  # account_name 需从 trial_balance 关联获取
             cells[f"{r+1}:2"] = {"value": float(row.children_amount_sum) if row.children_amount_sum else None}
             cells[f"{r+1}:3"] = {"value": float(row.adjustment_debit) if row.adjustment_debit else None}
             cells[f"{r+1}:4"] = {"value": float(row.adjustment_credit) if row.adjustment_credit else None}
@@ -538,6 +565,23 @@ async def module_to_excel(
     if not structure or "error" in structure:
         raise ValueError(f"无法生成: {structure.get('error', '')}")
     return structure_to_excel(structure, output_path)
+
+
+async def module_to_word(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    module: str,
+    output_path: str,
+    **kwargs,
+) -> str:
+    """统一入口：任意模块 → Word 文件（致同三线表排版）"""
+    from app.services.excel_html_converter import structure_to_word
+
+    structure = await module_to_structure(db, project_id, year, module, **kwargs)
+    if not structure or "error" in structure:
+        raise ValueError(f"无法生成: {structure.get('error', '')}")
+    return structure_to_word(structure, output_path)
 
 
 # ═══ 辅助函数 ═══

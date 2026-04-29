@@ -924,3 +924,31 @@ export async function syncFromOnlyoffice(projectId: string, fileStem: string): P
   const { data } = await http.post(`/api/projects/${projectId}/excel-html/sync-from-onlyoffice/${fileStem}`)
   return data
 }
+
+// ── 三形式联动统一模块接口 ──
+
+export async function getModuleStructure(projectId: string, module: string, params?: Record<string, any>): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/excel-html/module/${module}/structure`, { params })
+  return data
+}
+
+export async function getModuleHtml(projectId: string, module: string, params?: Record<string, any>): Promise<{ module: string; html: string }> {
+  const { data } = await http.get(`/api/projects/${projectId}/excel-html/module/${module}/html`, { params })
+  return data
+}
+
+export async function exportModuleExcel(projectId: string, module: string, params?: Record<string, any>): Promise<Blob> {
+  const response = await http.post(`/api/projects/${projectId}/excel-html/module/${module}/export-excel`, null, {
+    params,
+    responseType: 'blob',
+  })
+  return response.data
+}
+
+export async function exportModuleWord(projectId: string, module: string, params?: Record<string, any>): Promise<Blob> {
+  const response = await http.post(`/api/projects/${projectId}/excel-html/module/${module}/export-word`, null, {
+    params,
+    responseType: 'blob',
+  })
+  return response.data
+}

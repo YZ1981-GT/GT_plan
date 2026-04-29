@@ -161,7 +161,16 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
     max_col = len(cols) if cols else _get_max_dimension(cells, 1)
 
     # 生成 HTML
-    html_parts = ['<table class="gt-excel-table" border="1" cellspacing="0" cellpadding="4">']
+    html_parts = [
+        '<style>',
+        '.gt-excel-table { border-collapse: collapse; font-family: "仿宋_GB2312", "SimSun", serif; font-size: 10pt; width: 100%; }',
+        '.gt-excel-table td { border: 1px solid #d0d0d0; padding: 4px 6px; vertical-align: middle; }',
+        '.gt-excel-table tr:first-child td { background: #f4f0fa; font-weight: bold; text-align: center; }',
+        '.gt-excel-table td[contenteditable="true"]:focus { outline: 2px solid #4b2d77; background: #faf8ff; }',
+        '.gt-excel-table td[data-fetch-rule] { background: #f0f9ff; border-bottom: 2px solid #0094b3; cursor: pointer; }',
+        '</style>',
+        '<table class="gt-excel-table" border="1" cellspacing="0" cellpadding="4">',
+    ]
 
     # colgroup
     if cols:
@@ -497,3 +506,199 @@ def _get_max_dimension(cells: dict, axis: int) -> int:
             if val > max_val:
                 max_val = val
     return max_val
+
+
+# ═══ structure.json → Word (.docx) ═══
+
+def structure_to_word(structure: dict, output_path: str, sheet_index: int = 0) -> str:
+    """将 structure.json 导出为 Word 文档（致同排版规范）
+
+    表格样式：三线表（上下1磅边框，无左右边框）
+    字体：仿宋_GB2312 + Arial Narrow（数字）
+    """
+    from docx import Document
+    from docx.shared import Pt, Cm, Inches, RGBColor
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+
+    doc = Document()
+
+    # 页面设置（致同标准：页边距 3/3.18/3.2/2.54 cm）
+    section = doc.sections[0]
+    section.left_margin = Cm(3)
+    section.right_margin = Cm(3.18)
+    section.top_margin = Cm(3.2)
+    section.bottom_margin = Cm(2.54)
+
+    sheets = structure.get("sheets", [])
+    if sheet_index >= len(sheets):
+        doc.save(output_path)
+        return output_path
+
+    sheet = sheets[sheet_index]
+    cells = sheet.get("cells", {})
+    merges = sheet.get("merges", [])
+    cols = sheet.get("cols", [])
+    rows_meta = sheet.get("rows", [])
+
+    # 确定表格尺寸
+    max_row = len(rows_meta) if rows_meta else _get_max_dimension(cells, 0)
+    max_col = len(cols) if cols else _get_max_dimension(cells, 1)
+
+    if max_row == 0 or max_col == 0:
+        doc.save(output_path)
+        return output_path
+
+    # 添加标题（sheet名称）
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = title.add_run(sheet.get("name", ""))
+    run.font.name = "仿宋_GB2312"
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), "仿宋_GB2312")
+    run.font.size = Pt(14)
+    run.font.bold = True
+
+    # 创建表格
+    table = doc.add_table(rows=max_row, cols=max_col)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    # 致同三线表样式：上下边框1磅，无左右边框
+    _apply_three_line_border(table)
+
+    # 填充单元格
+    merge_map = {}
+    skip_cells_set = set()
+    for m in merges:
+        key = f"{m['start_row']}:{m['start_col']}"
+        merge_map[key] = m
+        for r in range(m["start_row"], m["end_row"] + 1):
+            for c in range(m["start_col"], m["end_col"] + 1):
+                if f"{r}:{c}" != key:
+                    skip_cells_set.add(f"{r}:{c}")
+
+    for r in range(max_row):
+        for c in range(max_col):
+            key = f"{r}:{c}"
+            if key in skip_cells_set:
+                continue
+
+            cell_data = cells.get(key, {})
+            value = cell_data.get("value", "")
+            style = cell_data.get("style", {})
+
+            # Word 单元格
+            word_cell = table.cell(r, c)
+
+            # 处理合并
+            if key in merge_map:
+                m = merge_map[key]
+                if m["end_row"] > m["start_row"] or m["end_col"] > m["start_col"]:
+                    try:
+                        merge_target = table.cell(m["end_row"], m["end_col"])
+                        word_cell.merge(merge_target)
+                    except Exception:
+                        pass
+
+            # 写入内容
+            paragraph = word_cell.paragraphs[0]
+            text = _format_word_value(value)
+            run = paragraph.add_run(text)
+
+            # 字体设置
+            if _is_numeric(value):
+                run.font.name = "Arial Narrow"
+                run._element.rPr.rFonts.set(qn("w:eastAsia"), "仿宋_GB2312")
+            else:
+                run.font.name = "仿宋_GB2312"
+                run._element.rPr.rFonts.set(qn("w:eastAsia"), "仿宋_GB2312")
+
+            run.font.size = Pt(10)
+
+            # 样式
+            if style.get("bold"):
+                run.font.bold = True
+            if style.get("textAlign") == "center":
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif style.get("textAlign") == "right" or _is_numeric(value):
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    # 设置列宽
+    if cols:
+        for i, col in enumerate(cols):
+            width_cm = col.get("width", 80) / 37.8  # 像素→厘米（近似）
+            for row in table.rows:
+                try:
+                    row.cells[i].width = Cm(min(width_cm, 6))
+                except (IndexError, Exception):
+                    pass
+
+    doc.save(output_path)
+    return output_path
+
+
+def _apply_three_line_border(table):
+    """致同三线表样式：表格上下1磅边框，表头下1磅，无左右边框"""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    tbl = table._tbl
+    tblPr = tbl.tblPr if tbl.tblPr is not None else OxmlElement("w:tblPr")
+
+    borders = OxmlElement("w:tblBorders")
+
+    for border_name in ["top", "bottom"]:
+        border = OxmlElement(f"w:{border_name}")
+        border.set(qn("w:val"), "single")
+        border.set(qn("w:sz"), "8")  # 1磅
+        border.set(qn("w:space"), "0")
+        border.set(qn("w:color"), "000000")
+        borders.append(border)
+
+    # 无左右边框
+    for border_name in ["left", "right"]:
+        border = OxmlElement(f"w:{border_name}")
+        border.set(qn("w:val"), "none")
+        border.set(qn("w:sz"), "0")
+        border.set(qn("w:space"), "0")
+        borders.append(border)
+
+    # 表头下边框（insideH 只对第一行生效需要单独处理）
+    insideH = OxmlElement("w:insideH")
+    insideH.set(qn("w:val"), "single")
+    insideH.set(qn("w:sz"), "4")  # 0.5磅
+    insideH.set(qn("w:space"), "0")
+    insideH.set(qn("w:color"), "808080")
+    borders.append(insideH)
+
+    insideV = OxmlElement("w:insideV")
+    insideV.set(qn("w:val"), "none")
+    insideV.set(qn("w:sz"), "0")
+    insideV.set(qn("w:space"), "0")
+    borders.append(insideV)
+
+    tblPr.append(borders)
+    if tbl.tblPr is None:
+        tbl.append(tblPr)
+
+
+def _format_word_value(value) -> str:
+    """格式化 Word 单元格显示值"""
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        if value == 0:
+            return "-"
+        if value == int(value):
+            return f"{int(value):,}"
+        return f"{value:,.2f}"
+    if isinstance(value, int):
+        if value == 0:
+            return "-"
+        return f"{value:,}"
+    return str(value)
+
+
+def _is_numeric(value) -> bool:
+    """判断是否为数值"""
+    return isinstance(value, (int, float))
