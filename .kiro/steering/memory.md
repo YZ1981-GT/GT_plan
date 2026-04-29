@@ -1442,3 +1442,8 @@ inclusion: always
 - 8条联动关系全部正常无断点（Phase0→所有/1a→6/1a→1c/1b→12/1c→13/6→14/14→15/15→16）
 - 发现6个跨阶段问题：①Phase17 dataset_id字段四表未加（数据集版本未真正生效）②Phase12 wp_explanation直接用llm_client不走ai_plugin（正确路径无需改）③Phase13 ReportSnapshot与Phase17 LedgerDataset语义不同层级不冲突④Phase15 task_event_bus与Phase0 event_bus注册位置不统一（lifespan vs router_registry）⑤Phase3 32个死代码路由仍存在增加噪音⑥Phase5多准则科目表未动态切换（远期）
 - 进一步修改计划：P0四表加dataset_id列→P1事件处理器注册统一→P2 Phase3死代码清理→P3多准则动态切换（远期）
+- 跨阶段修复已完成并推送（2026-04-29，commit ceb2638）：①四表ORM新增dataset_id列（nullable+indexed）②dataset_query.py get_active_filter启用dataset_id优先过滤（有active dataset用dataset_id，无则降级is_deleted=false）③事件处理器注册统一到main.py lifespan（Phase0 event_handlers+Phase14 gate_rules+Phase15 task_event_handlers），router_registry只做路由注册④Phase3死代码已在之前清理（_inactive/为空）
+- 本地PG待执行：ALTER TABLE tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger ADD COLUMN IF NOT EXISTS dataset_id UUID（ORM已加但数据库需手动补列）
+- 跨阶段分析4项修改计划全部完成（P0四表dataset_id✅/P1事件注册统一✅/P2 Phase3清理✅/P3多准则远期不动✅）
+- Phase17关键遗漏（2026-04-29复盘发现）：写路径未接入dataset_id——smart_import_streaming写入四表时未填充dataset_id（永远NULL），导致get_active_filter永远走is_deleted降级分支；需要在导入流程中创建LedgerDataset(staged)→写入时填充dataset_id→完成后DatasetService.activate()
+- 其他待修复：trace.py regex=改为pattern=（FastAPI弃用警告）、PaddleOCR启动阻塞需设PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True

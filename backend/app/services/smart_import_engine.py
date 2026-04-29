@@ -2028,7 +2028,7 @@ async def write_four_tables(
         for i in range(0, len(rows), CHUNK_SIZE):
             chunk = rows[i:i + CHUNK_SIZE]
             recs = [{"id": _uuid.uuid4(), "project_id": project_id, "year": year,
-                     "import_batch_id": batch.id, "is_deleted": False, **row} for row in chunk]
+                     "import_batch_id": batch.id, "dataset_id": _dataset_id, "is_deleted": False, **row} for row in chunk]
             if recs:
                 await db.execute(tbl.insert(), recs)
                 record_count += len(recs)
@@ -2086,7 +2086,7 @@ async def write_four_tables(
 
             led_buf.append({
                 "id": _uuid.uuid4(), "project_id": project_id, "year": year,
-                "import_batch_id": led_batch.id, "is_deleted": False, **row,
+                "import_batch_id": led_batch.id, "dataset_id": _dataset_id, "is_deleted": False, **row,
             })
 
             # 流式拆分辅助明细账
@@ -2095,7 +2095,7 @@ async def write_four_tables(
                 for dim in dims:
                     aux_buf.append({
                         "id": _uuid.uuid4(), "project_id": project_id, "year": year,
-                        "import_batch_id": aux_batch.id, "is_deleted": False,
+                        "import_batch_id": aux_batch.id, "dataset_id": _dataset_id, "is_deleted": False,
                         "aux_type": dim["aux_type"], "aux_code": dim["aux_code"], "aux_name": dim["aux_name"],
                         "aux_dimensions_raw": aux_dim_str,
                     })
@@ -2557,6 +2557,24 @@ async def smart_import_streaming(
         db.add(batch)
         batches[dt_key] = batch
     await db.flush()
+
+    # Phase 17: 创建 staged 数据集版本
+    _dataset_id = None
+    try:
+        from app.services.dataset_service import DatasetService
+        _source_files = [fn for fn, _ in file_contents]
+        _dataset = await DatasetService.create_staged(
+            db,
+            project_id=project_id,
+            year=year,
+            source_type="import",
+            source_summary={"files": _source_files, "file_count": len(_source_files)},
+        )
+        _dataset_id = _dataset.id
+        await db.flush()
+    except Exception as _ds_err:
+        logger.warning("创建 LedgerDataset 失败（降级为无版本）: %s", _ds_err)
+
     _prog(10, "开始解析文件…")
 
     async def _activate_staged_rows(account_ids: list[UUID]) -> None:
@@ -2858,6 +2876,13 @@ async def smart_import_streaming(
             batch.record_count = counts[dt_key]
             batch.status = ImportStatus.failed
             batch.completed_at = datetime.utcnow()
+        # Phase 17: 标记数据集失败
+        if _dataset_id:
+            try:
+                from app.services.dataset_service import DatasetService
+                await DatasetService.mark_failed(db, _dataset_id)
+            except Exception:
+                pass
         await db.commit()
         raise SmartImportError(
             "；".join(errors[:5]),
@@ -2872,6 +2897,13 @@ async def smart_import_streaming(
             batch.record_count = counts[dt_key]
             batch.status = ImportStatus.failed
             batch.completed_at = datetime.utcnow()
+        # Phase 17: 标记数据集失败
+        if _dataset_id:
+            try:
+                from app.services.dataset_service import DatasetService
+                await DatasetService.mark_failed(db, _dataset_id)
+            except Exception:
+                pass
         await db.commit()
         raise SmartImportError(
             "未解析到可导入的数据，请确认文件内容、sheet 类型与列映射",
@@ -2892,6 +2924,19 @@ async def smart_import_streaming(
         batch.record_count = counts[dt_key]
         batch.status = ImportStatus.completed
         batch.completed_at = datetime.utcnow()
+
+    # Phase 17: 激活数据集版本
+    if _dataset_id:
+        try:
+            from app.services.dataset_service import DatasetService
+            await DatasetService.activate(
+                db,
+                dataset_id=_dataset_id,
+                record_summary=counts,
+            )
+        except Exception as _act_err:
+            logger.warning("数据集激活失败（不影响导入）: %s", _act_err)
+
     await db.commit()
 
     if counts.get("tb_aux_balance", 0) > 0:
