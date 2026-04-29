@@ -82,6 +82,7 @@
       v-html="htmlContent"
       @click="onCellClick"
       @dblclick="onCellDblClick"
+      @focusout="onCellBlur"
     />
 
     <!-- 分页控件（大表格时显示） -->
@@ -285,6 +286,33 @@ function onCellDblClick(e: MouseEvent) {
   const td = (e.target as HTMLElement).closest('td[data-cell]') as HTMLElement
   if (!td || !td.isContentEditable) return
   // 双击进入编辑模式，浏览器原生 contenteditable 处理
+}
+
+// 自动保存定时器
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+function onCellBlur(e: FocusEvent) {
+  const td = (e.target as HTMLElement).closest('td[data-cell]') as HTMLElement
+  if (!td || !td.isContentEditable) return
+
+  const cellKey = td.dataset.cell || ''
+  const newValue = td.textContent?.replace(/[A-Z]\d+$/g, '').trim() || ''
+
+  // 检查值是否变化（与 currentCellInfo 对比）
+  if (cellKey && currentCellInfo.value?.cell === cellKey) {
+    const oldValue = String(currentCellInfo.value.value || '').trim()
+    if (newValue !== oldValue) {
+      pendingEdits.value.push({ action: 'edit', cell: cellKey, value: newValue })
+
+      // 自动保存（5秒无操作后）
+      if (autoSaveTimer) clearTimeout(autoSaveTimer)
+      autoSaveTimer = setTimeout(() => {
+        if (pendingEdits.value.length > 0 && props.fileStem) {
+          saveEdits()
+        }
+      }, 5000)
+    }
+  }
 }
 
 function onUpdateFormula(cell: string, formula: string) {

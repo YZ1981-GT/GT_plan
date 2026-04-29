@@ -185,13 +185,20 @@ def _parse_sheet_generic(ws, rules: dict | None) -> dict | None:
 _HEADER_KEYWORDS = {"项目", "名称", "科目", "期末", "期初", "余额", "借方", "贷方",
                     "审定", "未审", "调整", "合计", "金额", "本期", "上期", "增加", "减少"}
 
+# 高权重关键词（出现即强烈暗示是表头行）
+_HIGH_WEIGHT_KEYWORDS = {"期末余额", "期初余额", "审定数", "未审数", "借方金额", "贷方金额",
+                         "本期增加", "本期减少", "累计折旧", "账面价值", "坏账准备"}
+
 
 def _detect_header_row(rows: list[list], rule: dict | None) -> int | None:
     """检测表头行位置
 
     规则：
     1. 如果有规则指定 header_keywords，用规则匹配
-    2. 否则扫描前15行，找到包含最多关键词的行
+    2. 否则扫描前15行，用加权评分找最佳表头行
+       - 高权重关键词（如"期末余额"）得3分
+       - 普通关键词（如"项目"）得1分
+       - 跳过只有1-2个非空单元格的行（标题行/说明行）
     """
     rule_keywords = set(rule.get("header_keywords", [])) if rule else set()
     target_keywords = rule_keywords or _HEADER_KEYWORDS
@@ -211,13 +218,21 @@ def _detect_header_row(rows: list[list], rule: dict | None) -> int | None:
             if not s:
                 continue
             non_empty += 1
-            for kw in target_keywords:
-                if kw in s:
-                    score += 1
-                    break
 
-        # 表头行应该有多个非空单元格且匹配关键词
-        if non_empty >= 2 and score >= 2 and score > best_score:
+            # 高权重匹配（完整词组）
+            for hw in _HIGH_WEIGHT_KEYWORDS:
+                if hw in s:
+                    score += 3
+                    break
+            else:
+                # 普通关键词匹配
+                for kw in target_keywords:
+                    if kw in s:
+                        score += 1
+                        break
+
+        # 表头行应该有3+个非空单元格（排除标题行/说明行只有1-2个）
+        if non_empty >= 3 and score >= 2 and score > best_score:
             best_score = score
             best_row = i
 
