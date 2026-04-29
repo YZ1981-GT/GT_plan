@@ -280,3 +280,29 @@ async def restore_auto_mode(
         return {"message": f"已恢复 {count} 个单元格为自动提数", "restored_count": count}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{project_id}/{year}/{note_section}/apply-formulas")
+async def apply_formulas(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """执行附注表格中的自动运算公式，回填计算结果。
+
+    只更新 mode=auto 的单元格，manual 单元格不受影响。
+    公式从 check_presets 自动生成（纵向合计/横向平衡/账面价值）。
+    """
+    from app.services.note_formula_generator import execute_note_formulas
+
+    try:
+        result = await execute_note_formulas(db, project_id, year, note_section)
+        await db.commit()
+        return {
+            "message": f"公式已执行：{result['executed']} 个公式，更新 {result['updated']} 个单元格",
+            **result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"公式执行失败: {str(e)}")

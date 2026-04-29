@@ -113,12 +113,16 @@ async function onApply() {
   }
   applying.value = true
   try {
-    // 调用后端附注校验+重算（触发纵向/横向公式计算）
-    await http.post(`/api/disclosure-notes/${props.projectId}/${props.year}/validate`)
-    ElMessage.success('公式已应用，附注数据已重算')
+    // 调用后端执行附注公式（从 check_presets 自动生成并计算）
+    const noteSection = props.currentNote.note_section
+    const { data } = await http.post(
+      `/api/disclosure-notes/${props.projectId}/${props.year}/${noteSection}/apply-formulas`
+    )
+    const result = data?.data ?? data
+    ElMessage.success(`公式已应用：执行 ${result?.executed || 0} 个，更新 ${result?.updated || 0} 个单元格`)
     emit('applied')
-  } catch {
-    ElMessage.error('应用失败')
+  } catch (e: any) {
+    ElMessage.error('应用失败: ' + (e?.response?.data?.detail || e?.message || ''))
   } finally {
     applying.value = false
   }

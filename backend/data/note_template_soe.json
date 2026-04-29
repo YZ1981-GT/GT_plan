@@ -2,45 +2,1241 @@
   "description": "国企版附注模版 — 约40个附注章节，覆盖主要科目",
   "template_type": "soe",
   "sections": [
-    {"section_number": "五、1", "section_title": "货币资金", "account_name": "货币资金", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "库存现金"}, {"label": "银行存款"}, {"label": "其他货币资金"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、2", "section_title": "应收票据", "account_name": "应收票据", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "银行承兑汇票"}, {"label": "商业承兑汇票"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、3", "section_title": "应收账款", "account_name": "应收账款", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "应收账款"}, {"label": "减：坏账准备"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item", "aging"], "wide_table_presets": ["aging_transition"], "text_template": null},
-    {"section_number": "五、4", "section_title": "预付款项", "account_name": "预付款项", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "预付款项"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、5", "section_title": "其他应收款", "account_name": "其他应收款", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "其他应收款"}, {"label": "减：坏账准备"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item", "aging"], "wide_table_presets": ["aging_transition"], "text_template": null},
-    {"section_number": "五、6", "section_title": "存货", "account_name": "存货", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "原材料"}, {"label": "在产品"}, {"label": "库存商品"}, {"label": "减：存货跌价准备"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、7", "section_title": "长期股权投资", "account_name": "长期股权投资", "content_type": "table", "table_template": {"headers": ["被投资单位", "期末余额", "期初余额"], "rows": [{"label": "子公司"}, {"label": "联营企业"}, {"label": "合营企业"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、8", "section_title": "投资性房地产", "account_name": "投资性房地产", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "房屋建筑物"}, {"label": "土地使用权"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、9", "section_title": "固定资产", "account_name": "固定资产", "content_type": "table", "table_template": {"headers": ["项目", "房屋建筑物", "机器设备", "运输工具", "电子设备", "合计"], "rows": [{"label": "原值期初"}, {"label": "本期增加"}, {"label": "本期减少"}, {"label": "原值期末"}, {"label": "累计折旧期初"}, {"label": "本期计提"}, {"label": "本期减少"}, {"label": "累计折旧期末"}, {"label": "账面价值期末"}, {"label": "账面价值期初"}]}, "check_presets": ["balance", "movement"], "wide_table_presets": ["horizontal_balance"], "text_template": null},
-    {"section_number": "五、10", "section_title": "在建工程", "account_name": "在建工程", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "在建工程"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、11", "section_title": "使用权资产", "account_name": "使用权资产", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "使用权资产"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、12", "section_title": "无形资产", "account_name": "无形资产", "content_type": "table", "table_template": {"headers": ["项目", "土地使用权", "软件", "专利权", "合计"], "rows": [{"label": "原值期初"}, {"label": "本期增加"}, {"label": "本期减少"}, {"label": "原值期末"}, {"label": "累计摊销期初"}, {"label": "本期摊销"}, {"label": "累计摊销期末"}, {"label": "账面价值期末"}, {"label": "账面价值期初"}]}, "check_presets": ["balance", "movement"], "wide_table_presets": ["horizontal_balance"], "text_template": null},
-    {"section_number": "五、13", "section_title": "商誉", "account_name": "商誉", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "商誉原值"}, {"label": "减：减值准备"}, {"label": "账面价值", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、14", "section_title": "长期待摊费用", "account_name": "长期待摊费用", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "长期待摊费用"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、15", "section_title": "递延所得税资产/负债", "account_name": "递延所得税", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "递延所得税资产"}, {"label": "递延所得税负债"}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、16", "section_title": "短期借款", "account_name": "短期借款", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "信用借款"}, {"label": "抵押借款"}, {"label": "质押借款"}, {"label": "保证借款"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、17", "section_title": "应付账款", "account_name": "应付账款", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "应付账款"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、18", "section_title": "预收款项/合同负债", "account_name": "合同负债", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "合同负债"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、19", "section_title": "应付职工薪酬", "account_name": "应付职工薪酬", "content_type": "table", "table_template": {"headers": ["项目", "期初余额", "本期增加", "本期减少", "期末余额"], "rows": [{"label": "短期薪酬"}, {"label": "离职后福利"}, {"label": "辞退福利"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "movement"], "wide_table_presets": ["horizontal_balance"], "text_template": null},
-    {"section_number": "五、20", "section_title": "应交税费", "account_name": "应交税费", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "增值税"}, {"label": "企业所得税"}, {"label": "个人所得税"}, {"label": "城建税"}, {"label": "其他"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、21", "section_title": "其他应付款", "account_name": "其他应付款", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "其他应付款"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、22", "section_title": "长期借款", "account_name": "长期借款", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "长期借款"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、23", "section_title": "租赁负债", "account_name": "租赁负债", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "租赁负债"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、24", "section_title": "实收资本", "account_name": "实收资本", "content_type": "table", "table_template": {"headers": ["投资者", "期末余额", "比例(%)", "期初余额", "比例(%)"], "rows": []}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、25", "section_title": "资本公积", "account_name": "资本公积", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "资本溢价"}, {"label": "其他资本公积"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、26", "section_title": "其他综合收益", "account_name": "其他综合收益", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": []}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、27", "section_title": "盈余公积", "account_name": "盈余公积", "content_type": "table", "table_template": {"headers": ["项目", "期末余额", "期初余额"], "rows": [{"label": "法定盈余公积"}, {"label": "任意盈余公积"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、28", "section_title": "未分配利润", "account_name": "未分配利润", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "期初未分配利润"}, {"label": "加：本期净利润"}, {"label": "减：提取盈余公积"}, {"label": "减：分配股利"}, {"label": "期末未分配利润", "is_total": true}]}, "check_presets": ["balance", "vertical_reconcile"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、29", "section_title": "营业收入/营业成本", "account_name": "营业收入", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "主营业务收入"}, {"label": "其他业务收入"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、30", "section_title": "税金及附加", "account_name": "税金及附加", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "城建税"}, {"label": "教育费附加"}, {"label": "房产税"}, {"label": "土地使用税"}, {"label": "印花税"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、31", "section_title": "销售费用", "account_name": "销售费用", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "职工薪酬"}, {"label": "广告宣传费"}, {"label": "运输费"}, {"label": "其他"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、32", "section_title": "管理费用", "account_name": "管理费用", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "职工薪酬"}, {"label": "折旧摊销"}, {"label": "办公费"}, {"label": "其他"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、33", "section_title": "财务费用", "account_name": "财务费用", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "利息支出"}, {"label": "减：利息收入"}, {"label": "汇兑损益"}, {"label": "手续费"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、34", "section_title": "研发费用", "account_name": "研发费用", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "研发费用"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、35", "section_title": "所得税费用", "account_name": "所得税费用", "content_type": "table", "table_template": {"headers": ["项目", "本期金额", "上期金额"], "rows": [{"label": "当期所得税费用"}, {"label": "递延所得税费用"}, {"label": "合计", "is_total": true}]}, "check_presets": ["balance", "sub_item"], "wide_table_presets": [], "text_template": null},
-    {"section_number": "五、36", "section_title": "关联方关系及交易", "account_name": "关联方", "content_type": "table", "table_template": {"headers": ["关联方名称", "关系", "交易类型", "交易金额"], "rows": []}, "check_presets": [], "wide_table_presets": [], "text_template": "本公司的关联方关系及交易情况如下："},
-    {"section_number": "五、37", "section_title": "或有事项", "account_name": "或有事项", "content_type": "text", "table_template": null, "check_presets": [], "wide_table_presets": [], "text_template": "截至资产负债表日，本公司存在以下或有事项："},
-    {"section_number": "五、38", "section_title": "承诺事项", "account_name": "承诺事项", "content_type": "text", "table_template": null, "check_presets": [], "wide_table_presets": [], "text_template": "截至资产负债表日，本公司存在以下承诺事项："},
-    {"section_number": "五、39", "section_title": "资产负债表日后事项", "account_name": "日后事项", "content_type": "text", "table_template": null, "check_presets": [], "wide_table_presets": [], "text_template": "自资产负债表日至审计报告日之间，发生以下事项："},
-    {"section_number": "五、40", "section_title": "国有资本经营相关信息", "account_name": "国有资本", "content_type": "text", "table_template": null, "check_presets": [], "wide_table_presets": [], "text_template": "本公司国有资本经营相关信息如下："}
-  ]
+    {
+      "section_number": "五、1",
+      "section_title": "货币资金",
+      "account_name": "货币资金",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "库存现金"
+          },
+          {
+            "label": "银行存款"
+          },
+          {
+            "label": "其他货币资金"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、2",
+      "section_title": "应收票据",
+      "account_name": "应收票据",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "银行承兑汇票"
+          },
+          {
+            "label": "商业承兑汇票"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、3",
+      "section_title": "应收账款",
+      "account_name": "应收账款",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "应收账款"
+          },
+          {
+            "label": "减：坏账准备"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item",
+        "aging"
+      ],
+      "wide_table_presets": [
+        "aging_transition"
+      ],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、4",
+      "section_title": "预付款项",
+      "account_name": "预付款项",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "预付款项"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、5",
+      "section_title": "其他应收款",
+      "account_name": "其他应收款",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "其他应收款"
+          },
+          {
+            "label": "减：坏账准备"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item",
+        "aging"
+      ],
+      "wide_table_presets": [
+        "aging_transition"
+      ],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、6",
+      "section_title": "存货",
+      "account_name": "存货",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "原材料"
+          },
+          {
+            "label": "在产品"
+          },
+          {
+            "label": "库存商品"
+          },
+          {
+            "label": "减：存货跌价准备"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、7",
+      "section_title": "长期股权投资",
+      "account_name": "长期股权投资",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "被投资单位",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "子公司"
+          },
+          {
+            "label": "联营企业"
+          },
+          {
+            "label": "合营企业"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、8",
+      "section_title": "投资性房地产",
+      "account_name": "投资性房地产",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "房屋建筑物"
+          },
+          {
+            "label": "土地使用权"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、9",
+      "section_title": "固定资产",
+      "account_name": "固定资产",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "房屋建筑物",
+          "机器设备",
+          "运输工具",
+          "电子设备",
+          "合计"
+        ],
+        "rows": [
+          {
+            "label": "原值期初"
+          },
+          {
+            "label": "本期增加"
+          },
+          {
+            "label": "本期减少"
+          },
+          {
+            "label": "原值期末"
+          },
+          {
+            "label": "累计折旧期初"
+          },
+          {
+            "label": "本期计提"
+          },
+          {
+            "label": "本期减少"
+          },
+          {
+            "label": "累计折旧期末"
+          },
+          {
+            "label": "账面价值期末"
+          },
+          {
+            "label": "账面价值期初"
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "movement"
+      ],
+      "wide_table_presets": [
+        "horizontal_balance"
+      ],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、10",
+      "section_title": "在建工程",
+      "account_name": "在建工程",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "在建工程"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、11",
+      "section_title": "使用权资产",
+      "account_name": "使用权资产",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "使用权资产"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、12",
+      "section_title": "无形资产",
+      "account_name": "无形资产",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "土地使用权",
+          "软件",
+          "专利权",
+          "合计"
+        ],
+        "rows": [
+          {
+            "label": "原值期初"
+          },
+          {
+            "label": "本期增加"
+          },
+          {
+            "label": "本期减少"
+          },
+          {
+            "label": "原值期末"
+          },
+          {
+            "label": "累计摊销期初"
+          },
+          {
+            "label": "本期摊销"
+          },
+          {
+            "label": "累计摊销期末"
+          },
+          {
+            "label": "账面价值期末"
+          },
+          {
+            "label": "账面价值期初"
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "movement"
+      ],
+      "wide_table_presets": [
+        "horizontal_balance"
+      ],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、13",
+      "section_title": "商誉",
+      "account_name": "商誉",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "商誉原值"
+          },
+          {
+            "label": "减：减值准备"
+          },
+          {
+            "label": "账面价值",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、14",
+      "section_title": "长期待摊费用",
+      "account_name": "长期待摊费用",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "长期待摊费用"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、15",
+      "section_title": "递延所得税资产/负债",
+      "account_name": "递延所得税",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "递延所得税资产"
+          },
+          {
+            "label": "递延所得税负债"
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、16",
+      "section_title": "短期借款",
+      "account_name": "短期借款",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "信用借款"
+          },
+          {
+            "label": "抵押借款"
+          },
+          {
+            "label": "质押借款"
+          },
+          {
+            "label": "保证借款"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、17",
+      "section_title": "应付账款",
+      "account_name": "应付账款",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "应付账款"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、18",
+      "section_title": "预收款项/合同负债",
+      "account_name": "合同负债",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "合同负债"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、19",
+      "section_title": "应付职工薪酬",
+      "account_name": "应付职工薪酬",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期初余额",
+          "本期增加",
+          "本期减少",
+          "期末余额"
+        ],
+        "rows": [
+          {
+            "label": "短期薪酬"
+          },
+          {
+            "label": "离职后福利"
+          },
+          {
+            "label": "辞退福利"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "movement"
+      ],
+      "wide_table_presets": [
+        "horizontal_balance"
+      ],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、20",
+      "section_title": "应交税费",
+      "account_name": "应交税费",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "增值税"
+          },
+          {
+            "label": "企业所得税"
+          },
+          {
+            "label": "个人所得税"
+          },
+          {
+            "label": "城建税"
+          },
+          {
+            "label": "其他"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、21",
+      "section_title": "其他应付款",
+      "account_name": "其他应付款",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "其他应付款"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、22",
+      "section_title": "长期借款",
+      "account_name": "长期借款",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "长期借款"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、23",
+      "section_title": "租赁负债",
+      "account_name": "租赁负债",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "租赁负债"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、24",
+      "section_title": "实收资本",
+      "account_name": "实收资本",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "投资者",
+          "期末余额",
+          "比例(%)",
+          "期初余额",
+          "比例(%)"
+        ],
+        "rows": []
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、25",
+      "section_title": "资本公积",
+      "account_name": "资本公积",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "资本溢价"
+          },
+          {
+            "label": "其他资本公积"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、26",
+      "section_title": "其他综合收益",
+      "account_name": "其他综合收益",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": []
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、27",
+      "section_title": "盈余公积",
+      "account_name": "盈余公积",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "期末余额",
+          "期初余额"
+        ],
+        "rows": [
+          {
+            "label": "法定盈余公积"
+          },
+          {
+            "label": "任意盈余公积"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、28",
+      "section_title": "未分配利润",
+      "account_name": "未分配利润",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "期初未分配利润"
+          },
+          {
+            "label": "加：本期净利润"
+          },
+          {
+            "label": "减：提取盈余公积"
+          },
+          {
+            "label": "减：分配股利"
+          },
+          {
+            "label": "期末未分配利润",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "vertical_reconcile"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、29",
+      "section_title": "营业收入/营业成本",
+      "account_name": "营业收入",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "主营业务收入"
+          },
+          {
+            "label": "其他业务收入"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、30",
+      "section_title": "税金及附加",
+      "account_name": "税金及附加",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "城建税"
+          },
+          {
+            "label": "教育费附加"
+          },
+          {
+            "label": "房产税"
+          },
+          {
+            "label": "土地使用税"
+          },
+          {
+            "label": "印花税"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、31",
+      "section_title": "销售费用",
+      "account_name": "销售费用",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "职工薪酬"
+          },
+          {
+            "label": "广告宣传费"
+          },
+          {
+            "label": "运输费"
+          },
+          {
+            "label": "其他"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、32",
+      "section_title": "管理费用",
+      "account_name": "管理费用",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "职工薪酬"
+          },
+          {
+            "label": "折旧摊销"
+          },
+          {
+            "label": "办公费"
+          },
+          {
+            "label": "其他"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、33",
+      "section_title": "财务费用",
+      "account_name": "财务费用",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "利息支出"
+          },
+          {
+            "label": "减：利息收入"
+          },
+          {
+            "label": "汇兑损益"
+          },
+          {
+            "label": "手续费"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、34",
+      "section_title": "研发费用",
+      "account_name": "研发费用",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "研发费用"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、35",
+      "section_title": "所得税费用",
+      "account_name": "所得税费用",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "项目",
+          "本期金额",
+          "上期金额"
+        ],
+        "rows": [
+          {
+            "label": "当期所得税费用"
+          },
+          {
+            "label": "递延所得税费用"
+          },
+          {
+            "label": "合计",
+            "is_total": true
+          }
+        ]
+      },
+      "check_presets": [
+        "balance",
+        "sub_item"
+      ],
+      "wide_table_presets": [],
+      "text_template": null,
+      "scope": "both"
+    },
+    {
+      "section_number": "五、36",
+      "section_title": "关联方关系及交易",
+      "account_name": "关联方",
+      "content_type": "table",
+      "table_template": {
+        "headers": [
+          "关联方名称",
+          "关系",
+          "交易类型",
+          "交易金额"
+        ],
+        "rows": []
+      },
+      "check_presets": [],
+      "wide_table_presets": [],
+      "text_template": "本公司的关联方关系及交易情况如下：",
+      "scope": "both"
+    },
+    {
+      "section_number": "五、37",
+      "section_title": "或有事项",
+      "account_name": "或有事项",
+      "content_type": "text",
+      "table_template": null,
+      "check_presets": [],
+      "wide_table_presets": [],
+      "text_template": "截至资产负债表日，本公司存在以下或有事项：",
+      "scope": "both"
+    },
+    {
+      "section_number": "五、38",
+      "section_title": "承诺事项",
+      "account_name": "承诺事项",
+      "content_type": "text",
+      "table_template": null,
+      "check_presets": [],
+      "wide_table_presets": [],
+      "text_template": "截至资产负债表日，本公司存在以下承诺事项：",
+      "scope": "both"
+    },
+    {
+      "section_number": "五、39",
+      "section_title": "资产负债表日后事项",
+      "account_name": "日后事项",
+      "content_type": "text",
+      "table_template": null,
+      "check_presets": [],
+      "wide_table_presets": [],
+      "text_template": "自资产负债表日至审计报告日之间，发生以下事项：",
+      "scope": "both"
+    },
+    {
+      "section_number": "五、40",
+      "section_title": "国有资本经营相关信息",
+      "account_name": "国有资本",
+      "content_type": "text",
+      "table_template": null,
+      "check_presets": [],
+      "wide_table_presets": [],
+      "text_template": "本公司国有资本经营相关信息如下：",
+      "scope": "standalone_only"
+    }
+  ],
+  "scopes": {
+    "both": "合并和单体均适用",
+    "consolidated_only": "仅合并报表适用",
+    "standalone_only": "仅单体报表适用"
+  }
 }

@@ -1507,3 +1507,8 @@ inclusion: always
 - 支持一键清除公式（清除后变为手动编辑模式，不再自动计算）
 - 三种单元格模式：auto（自动提数+公式计算）→ manual（手动编辑）→ locked（锁定不可改）
 - 一键清除公式 = 将所有auto单元格切换为manual模式
+- 附注公式管理增强已完成（2026-04-29，commit 9e06c9f已推送）：DisclosureEditor编辑模式新增"一键清除公式"按钮（auto→manual保留数值）+"恢复自动提数"按钮（manual→auto+从底稿重新提取）；后端新增POST clear-formulas+restore-auto两个端点；NoteWpMappingService新增clear_formulas()/restore_auto_mode()方法（遍历table_data.rows._cell_modes切换+flag_modified标记JSONB）
+- 附注单元格模式存储方式：table_data.rows[i]._cell_modes = {"0": "auto", "1": "manual", ...}，key为列索引字符串，value为模式
+- 附注模板现状确认（2026-04-29）：两套模板note_template_soe.json(40章节)+note_template_listed.json(45章节)，每章节含table_template(headers+rows)+check_presets(校验规则)+wide_table_presets(宽表公式)+text_template(文字模板)；check_presets对应7种校验（balance/sub_item/aging/movement/book_value/horizontal_balance/ecl_three_stage）
+- 附注模板缺失4项：①check_presets未自动转化为前端可执行公式（"应用自动运算"无法真正计算）②单体版附注无独立模板（只有合并版soe/listed）③movement/book_value专项校验逻辑未实现④wide_table_presets的horizontal_balance缺固定资产/无形资产"原值-折旧=账面价值"专项
+- 附注修复优先级：①从check_presets自动生成前端可执行公式→②补单体版差异标记→③补movement/book_value专项校验

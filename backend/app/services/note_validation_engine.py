@@ -211,6 +211,36 @@ async def validate_wide_table(
         except (TypeError, ValueError, IndexError):
             continue
 
+    # book_value 专项：原值 - 累计折旧/摊销 - 减值准备 = 账面价值
+    bv_row_idx = next((i for i, r in enumerate(rows) if "账面价值" in str(r.get("label", "")) and "期末" in str(r.get("label", ""))), None)
+    orig_row_idx = next((i for i, r in enumerate(rows) if "原值期末" in str(r.get("label", ""))), None)
+    depr_row_idx = next((i for i, r in enumerate(rows) if any(kw in str(r.get("label", "")) for kw in ("累计折旧期末", "累计摊销期末"))), None)
+    impair_row_idx = next((i for i, r in enumerate(rows) if "减值准备期末" in str(r.get("label", "")) or r.get("label", "") == "减值准备"), None)
+
+    if bv_row_idx is not None and orig_row_idx is not None:
+        bv_values = rows[bv_row_idx].get("values") or []
+        orig_values = rows[orig_row_idx].get("values") or []
+        depr_values = rows[depr_row_idx].get("values") or [] if depr_row_idx is not None else []
+        impair_values = rows[impair_row_idx].get("values") or [] if impair_row_idx is not None else []
+
+        for col in range(min(len(bv_values), len(orig_values))):
+            try:
+                bv = float(bv_values[col] or 0)
+                orig = float(orig_values[col] or 0)
+                depr = float(depr_values[col] or 0) if col < len(depr_values) else 0
+                impair = float(impair_values[col] or 0) if col < len(impair_values) else 0
+                expected_bv = orig - depr - impair
+                if abs(expected_bv - bv) > 0.01 and orig != 0:
+                    col_name = headers[col + 1] if col + 1 < len(headers) else f"第{col+1}列"
+                    findings.append({
+                        "rule": "book_value_formula",
+                        "severity": "warning",
+                        "message": f"「{col_name}」账面价值({bv})≠原值({orig})-折旧({depr})-减值({impair})={expected_bv}，差额 {bv-expected_bv:.2f}",
+                        "note_section": note.note_section,
+                    })
+            except (TypeError, ValueError):
+                continue
+
     return findings
 
 
