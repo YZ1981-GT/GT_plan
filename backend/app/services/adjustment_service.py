@@ -268,6 +268,29 @@ class AdjustmentService:
                 project_id, adj_rows[0].year, affected_codes, entry_group_id,
             )
 
+            # Phase 17: 操作 diff 审计记录
+            try:
+                from app.models.core import Log
+                diff_log = Log(
+                    action="adjustment_updated",
+                    resource_type="adjustment",
+                    resource_id=str(entry_group_id),
+                    new_value={
+                        "_diff": {
+                            "old_lines": [{"account": r.account_code, "debit": str(r.debit_amount), "credit": str(r.credit_amount)} for r in adj_rows],
+                            "new_lines": [{"account": li.standard_account_code, "debit": str(li.debit_amount), "credit": str(li.credit_amount)} for li in data.line_items],
+                            "old_description": adj_rows[0].description,
+                            "new_description": desc,
+                        },
+                        "project_id": str(project_id),
+                        "year": adj_rows[0].year,
+                    },
+                    performed_by=user_id,
+                )
+                self.db.add(diff_log)
+            except Exception:
+                pass  # diff 记录失败不阻断业务
+
             return resp
 
         await self.db.flush()

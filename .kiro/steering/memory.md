@@ -1467,3 +1467,6 @@ inclusion: always
 - 审计全流程断点修复计划文档已生成（2026-04-29）：docs/审计全流程断点修复计划.md，P0/P1/P2共11天，含8步工作流断点分析+验收标准+风险降级策略
 - P0附注校验器6个stub做实已完成（2026-04-29，commit 441d8a0已推送）：validate_wide_table横向公式/validate_vertical纵向合计/validate_cross_table报表vs附注交叉/validate_aging_transition账龄区间求和/validate_completeness非空率/validate_llm_review LLM辅助（降级静默），8个VALIDATORS全部有实际逻辑
 - 断点修复计划P0剩余3项：审计报告财务数据刷新链路打通(1天)+Word导出前端调用链路验证(1天)+底稿→附注从底稿刷新链路验证(0.5天)
+- P0全部4项完成并推送（2026-04-29，commit 4e3d5b7）：①附注校验器6个stub做实✅②审计报告新增POST refresh-financial-data端点+前端改用专用端点（降级走重新生成）+auditPlatformApi.ts新增refreshAuditReportFinancialData函数✅③附注Word导出修复：前端从window.open(GET)改为http.post+blob下载（修复POST端点被GET 405）✅④底稿→附注刷新链路验证通过（note_wp_mapping.py prefix=/api/disclosure-notes，前端调用路径匹配）✅
+- 审计员8步工作流后4步断点已全部修复，全流程理论上可走通
+- 断点修复计划P1待做：复核流程端到端验证(2天)+操作diff审计记录(1天)

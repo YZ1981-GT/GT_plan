@@ -178,8 +178,9 @@
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="100">
+                <el-table-column label="操作" width="140">
                   <template #default="{ row }">
+                    <el-button v-if="row.status === 'open'" size="small" text type="primary" @click="replyAnnotation(row)">回复</el-button>
                     <el-button v-if="row.status !== 'resolved'" size="small" text type="success" @click="resolveAnnotation(row.id)">解决</el-button>
                   </template>
                 </el-table-column>
@@ -744,6 +745,27 @@ async function resolveAnnotation(id: string) {
     await loadAnnotations()
     await loadUnconfirmedAi()
   } catch { ElMessage.error('操作失败') }
+}
+
+// 回复批注
+const showReplyDialog = ref(false)
+const replyTarget = ref<any>(null)
+const replyContent = ref('')
+
+function replyAnnotation(row: any) {
+  replyTarget.value = row
+  replyContent.value = ''
+  showReplyDialog.value = true
+}
+
+async function submitReply() {
+  if (!replyTarget.value || !replyContent.value) return
+  try {
+    await updateAnnotation(replyTarget.value.id, { status: 'replied', reply_content: replyContent.value })
+    ElMessage.success('回复已提交')
+    showReplyDialog.value = false
+    await loadAnnotations()
+  } catch { ElMessage.error('回复失败') }
 }
 
 function onRejectClick() {
