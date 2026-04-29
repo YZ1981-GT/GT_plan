@@ -139,3 +139,28 @@ async def update_status(
         return AuditReportResponse.model_validate(report)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{project_id}/{year}/refresh-financial-data")
+async def refresh_financial_data(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """刷新审计报告中的财务数据引用。
+
+    从 financial_report 表拉取最新的资产总额/负债/权益/收入/净利润，
+    更新到审计报告的 financial_data JSONB 字段。
+
+    如果 financial_report 表无数据，建议先调用报表生成接口。
+    """
+    svc = AuditReportService(db)
+    report = await svc.refresh_financial_data(project_id, year)
+    if report is None:
+        raise HTTPException(status_code=404, detail="审计报告不存在，请先生成")
+    await db.commit()
+    return {
+        "message": "财务数据已刷新",
+        "financial_data": report.financial_data,
+    }

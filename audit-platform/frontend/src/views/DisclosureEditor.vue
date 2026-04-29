@@ -290,7 +290,23 @@ async function onRefreshFromWP() {
 async function onExportWord() {
   exportLoading.value = true
   try {
-    window.open(`/api/disclosure-notes/${projectId.value}/${year.value}/export-word`, '_blank')
+    const { default: http } = await import('@/utils/http')
+    const resp = await http.post(
+      `/api/disclosure-notes/${projectId.value}/${year.value}/export-word`,
+      {},
+      { responseType: 'blob' }
+    )
+    // 下载 blob
+    const blob = new Blob([resp.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `附注_${year.value}.docx`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('附注 Word 导出成功')
+  } catch (e: any) {
+    ElMessage.error('导出失败：' + (e?.message || '请稍后重试'))
   } finally { exportLoading.value = false }
 }
 

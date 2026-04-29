@@ -225,10 +225,21 @@ async function onRefreshFinancialData() {
   if (!report.value) return
   refreshLoading.value = true
   try {
-    // 重新生成会刷新财务数据但保留用户编辑的段落
-    await generateAuditReport(projectId.value, year.value, report.value.opinion_type, report.value.company_type)
-    await fetchReport()
-    ElMessage.success('财务数据已刷新，段落内容已保留')
+    const { refreshAuditReportFinancialData } = await import('@/services/auditPlatformApi')
+    const result = await refreshAuditReportFinancialData(projectId.value, year.value)
+    if (result?.financial_data) {
+      report.value.financial_data = result.financial_data
+    }
+    ElMessage.success('财务数据已刷新')
+  } catch (e: any) {
+    // 降级：如果专用端点不可用，走重新生成
+    try {
+      await generateAuditReport(projectId.value, year.value, report.value.opinion_type, report.value.company_type)
+      await fetchReport()
+      ElMessage.success('财务数据已刷新（通过重新生成）')
+    } catch {
+      ElMessage.warning('刷新失败，请确认报表已生成')
+    }
   } finally { refreshLoading.value = false }
 }
 

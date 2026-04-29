@@ -1464,3 +1464,6 @@ inclusion: always
 - 数据安全缺失：操作diff记录（调整分录和底稿状态变更缺old_value/new_value）
 - 最终建议4步：P0用1个真实项目走完全流程记录断点→P1修复断点→P2复核流程测试→P3三种规模压力测试
 - 核心结论：需要从"开发者视角"切换到"审计员视角"——不是看API数量和代码行数，而是看能否完成一个真实年审项目
+- 审计全流程断点修复计划文档已生成（2026-04-29）：docs/审计全流程断点修复计划.md，P0/P1/P2共11天，含8步工作流断点分析+验收标准+风险降级策略
+- P0附注校验器6个stub做实已完成（2026-04-29，commit 441d8a0已推送）：validate_wide_table横向公式/validate_vertical纵向合计/validate_cross_table报表vs附注交叉/validate_aging_transition账龄区间求和/validate_completeness非空率/validate_llm_review LLM辅助（降级静默），8个VALIDATORS全部有实际逻辑
+- 断点修复计划P0剩余3项：审计报告财务数据刷新链路打通(1天)+Word导出前端调用链路验证(1天)+底稿→附注从底稿刷新链路验证(0.5天)

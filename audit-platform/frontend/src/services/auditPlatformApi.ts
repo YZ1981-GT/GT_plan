@@ -546,6 +546,11 @@ export async function updateAuditReportStatus(reportId: string, status: string) 
   return data.data ?? data
 }
 
+export async function refreshAuditReportFinancialData(projectId: string, year: number) {
+  const { data } = await http.post(`/api/audit-report/${projectId}/${year}/refresh-financial-data`)
+  return data.data ?? data
+}
+
 // ─── PDF Export (PDF导出) ───
 
 export interface ExportTaskData {
