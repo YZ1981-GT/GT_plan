@@ -118,7 +118,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Upload, Document } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
-import http, { downloadFile } from '@/utils/http'
+import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
 
 const route = useRoute()

@@ -531,6 +531,11 @@ export async function updateAnnotation(id: string, body: any): Promise<any> {
   return data
 }
 
+export async function listAnnotations(projectId: string, filters?: { status?: string; priority?: string }): Promise<any[]> {
+  const { data } = await http.get(`/api/projects/${projectId}/annotations`, { params: filters })
+  return Array.isArray(data) ? data : (data?.data || [])
+}
+
 // ── 功能开关 ──
 
 export async function checkFeatureFlag(flag: string, projectId?: string): Promise<boolean> {

@@ -53,7 +53,7 @@ import { useAuthStore } from '@/stores/auth'
 import { getMyStaffId, getMyProcedureTasks, updateProcedureTrim } from '@/services/commonApi'
 
 const router = useRouter()
-const authStore = useAuthStore()
+// const authStore = useAuthStore()
 const loading = ref(false)
 const tasks = ref<any[]>([])
 

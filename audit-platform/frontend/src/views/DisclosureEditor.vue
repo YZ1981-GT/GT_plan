@@ -56,7 +56,7 @@
                 border size="small" style="margin-bottom: 12px">
                 <el-table-column v-for="(h, hiRaw) in (currentNote.table_data.headers || [])" :key="hiRaw"
                   :label="h" :min-width="Number(hiRaw) === 0 ? 160 : 120" :align="Number(hiRaw) === 0 ? 'left' : 'right'">
-                  <template #default="{ row }">
+                  <template #default="{ row, $index }">
                     <template v-if="Number(hiRaw) === 0">
                       <span :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
                     </template>

@@ -69,6 +69,7 @@ import VueOfficePdf from '@vue-office/pdf'
 import '@vue-office/docx/lib/index.css'
 import '@vue-office/excel/lib/index.css'
 import http, { downloadFile } from '@/utils/http'
+const api = http  // alias for backward compatibility
 
 const props = defineProps<{
   modelValue: boolean

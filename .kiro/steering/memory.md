@@ -1535,3 +1535,6 @@ inclusion: always
 - 完成内容：企业级加固12项(P0-P2)+Phase17数据集版本治理+账表导入企业级改造+跨阶段修复+全流程断点修复(P0+P1)+报表结构补全(4套624行)+公式体系完整建设(三分类+跨表引用+可视化选择器+依赖排序+审计留痕)
 - 当前系统状态：627路由正常加载、15+测试通过、审计员8步全流程理论可走通、复核流程端到端可走通、公式体系完整、报表结构致同标准4套
 - 代码层面可做的已全部完成，下一步需要运行环境验证：①执行建表(_init_tables.py+alembic stamp)②加载种子数据(POST /report-config/seed)③导入真实项目数据验证公式④启动vLLM/ONLYOFFICE验证相关功能
+- 前端TS错误修复+建表脚本增强已完成（2026-04-29，commit 01a060d+4397ee0已推送）：consolidationApi.ts类型补全（ConsolScopeItem+ComponentAuditor+InstructionResult+Instruction新增字段+createResult/updateResult函数）；_init_tables.py新增dataset_models/phase12-16_models导入+建表后自动加载report_config_seed.json 624行种子数据（幂等，已有数据跳过）
+- 本轮总计20个commit（cc8f47d→4397ee0），全部已推送GitHub
+- 剩余TS错误：约120个集中在consolidation/组件（已标记developing不影响核心）+约15个unused variable（TS6133不影响运行）

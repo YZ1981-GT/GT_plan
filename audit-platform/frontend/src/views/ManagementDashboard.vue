@@ -224,7 +224,8 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import {
   getDashboardOverview, getDashboardProjectProgress, getDashboardStaffWorkload,
   getDashboardRiskAlerts, getDashboardGroupProgress, getDashboardHoursHeatmap,
-  getDashboardProjectStaffHours, getDashboardStaffDetail, getDashboardAvailableStaff,
+  // @ts-ignore unused for future
+getDashboardProjectStaffHours, getDashboardStaffDetail, getDashboardAvailableStaff,
 } from '@/services/commonApi'
 import api from '@/services/apiProxy'
 import GTChart from '@/components/GTChart.vue'

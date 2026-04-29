@@ -69,7 +69,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
-const route = useRoute()
+// const route = useRoute()
 const router = useRouter()
 
 const selectedStandard = ref('soe_consolidated')

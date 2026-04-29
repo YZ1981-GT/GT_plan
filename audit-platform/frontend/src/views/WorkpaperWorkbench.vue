@@ -552,7 +552,7 @@ async function loadPrefillData(m: WpAccountMapping) {
   prefillLoading.value = true
   prefillData.value = null
   try {
-    prefillData.value = await getWpPrefillData(projectId.value, m.wp_code)
+    prefillData.value = await getWpPrefillData(projectId.value, m.wp_code, year.value)
   } catch { /* 静默 */ }
   prefillLoading.value = false
 }
@@ -599,7 +599,7 @@ async function onBatchPrefill() {
 async function onSmartRecommend() {
   recommendLoading.value = true
   try {
-    recommendations.value = await getWpRecommendations(projectId.value)
+    recommendations.value = await getWpRecommendations(projectId.value, year.value)
   } catch (e: any) {
     ElMessage.warning(e?.message || '获取推荐失败')
   }
