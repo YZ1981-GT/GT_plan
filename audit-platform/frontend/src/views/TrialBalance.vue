@@ -10,6 +10,7 @@
         <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading" round>一致性校验</el-button>
         <el-button size="small" @click="onRecalc" :loading="recalcLoading" round>全量重算</el-button>
         <el-button size="small" @click="onExport" round>导出 Excel</el-button>
+        <el-button size="small" @click="showFormulaManager = true" round>公式管理</el-button>
       </div>
     </div>
 
@@ -122,6 +123,15 @@
         </el-table-column>
       </el-table>
     </el-dialog>
+
+    <!-- 公式管理弹窗 -->
+    <FormulaManagerDialog
+      v-model="showFormulaManager"
+      :rows="rows"
+      :project-id="projectId"
+      :year="year"
+      @applied="fetchData"
+    />
   </div>
 </template>
 
@@ -130,6 +140,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Link } from '@element-plus/icons-vue'
+import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
   getProjectAuditYear, listAdjustments,
@@ -150,6 +161,7 @@ const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().g
 const loading = ref(false)
 const recalcLoading = ref(false)
 const checkLoading = ref(false)
+const showFormulaManager = ref(false)
 const rows = ref<TrialBalanceRow[]>([])
 const consistencyResult = ref<ConsistencyResult | null>(null)
 

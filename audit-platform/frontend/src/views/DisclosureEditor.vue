@@ -152,7 +152,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import NoteFormulaDialog from '@/components/report/NoteFormulaDialog.vue'
+import NoteFormulaDialog from '@/components/formula/NoteFormulaDialog.vue'
 import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'

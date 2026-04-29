@@ -128,7 +128,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import FormulaManagerDialog from '@/components/report/FormulaManagerDialog.vue'
+import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl, getProjectAuditYear,

@@ -1517,3 +1517,8 @@ inclusion: always
 - 附注vs报表一致性校验：check_presets.balance规则已实现（validate_cross_table从financial_report取报表金额与附注合计比对），但用户自定义公式中无法引用报表数据
 - 跨表公式引用已完成（2026-04-29，commit 8e212e4已推送）：note_formula_generator.py新增_load_cross_table_data()预加载报表/试算表/其他附注数据+_exec_cross_table()执行跨表引用+_exec_generic()混合引用；支持3种语法REPORT('BS-002','期末')/TB('1001','审定数')/NOTE('五、3','合计','期末')；execute_note_formulas增强为预加载跨表数据+新增cross_table公式类型
 - 附注vs报表一致性校验实现方式：用户在附注合计行设置公式REPORT('BS-002','期末')，应用后自动从报表取数填入，数值不一致时立即可见
+- 公式可视化选择器已完成（2026-04-29，commit b115084已推送）：新增FormulaRefPicker.vue（三Tab报表行/试算表科目/其他附注+搜索过滤+表格点选+期间列选择+预览区友好标签+确认插入），NoteFormulaDialog集成（公式编辑行append slot"引用"按钮+openRefPicker懒加载数据+onInsertRef追加公式）
+- 公式名称编号可读性规范：[BS-002] 货币资金 · 期末 / [1001] 库存现金 · 审定数 / [五、3] 应收账款 · 合计 · 期末（方括号编码+中文名+取数维度）
+- 用户要求（公式全局化）：公式处理需全局考虑（报表/附注/试算表/底稿等多处都需要），可视化界面要满足致同规范要求；当前FormulaRefPicker只在附注公式弹窗中使用，需要提升为全局共享组件供所有页面复用
+- 用户纠正（合并差额表公式）：差额表只记录本级调整+本级抵消（不含子公司之和），net_difference=调整借方-调整贷方+抵消借方-抵消贷方；差额表的公式不应包含"子公司之和"，那是consolidated_amount的计算逻辑不是差额表本身的公式
+- 公式全局化重构决策：FormulaRefPicker/FormulaManagerDialog从components/report/提升为全局共享组件，报表/附注/试算表/底稿/合并差额表5个页面统一接入
