@@ -139,3 +139,77 @@ async def batch_extract(
             results.append(data)
 
     return {"cycle": cycle, "count": len(results), "items": results}
+
+
+# ═══ 附注表格取数（三种样式 + 三种模式） ═══
+
+@router.get("/projects/{project_id}/note-table/{note_section}/style")
+async def get_note_table_style(
+    project_id: UUID,
+    note_section: str,
+    current_user: User = Depends(get_current_user),
+):
+    """获取附注章节的表格样式（fixed_rows/dynamic_rows/mixed）"""
+    from app.services.note_data_extractor import identify_table_style
+    style = identify_table_style(note_section)
+    return {"note_section": note_section, "table_style": style.value}
+
+
+@router.get("/projects/{project_id}/note-table/{note_section}/cell")
+async def note_cell(
+    project_id: UUID,
+    note_section: str,
+    row_label: str = Query(...),
+    col_header: str = Query(...),
+    year: int = Query(default=2025),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """固定单元格取数：NOTE_CELL(section, row_label, col_header)"""
+    from app.services.note_data_extractor import note_cell_fetch
+    val = await note_cell_fetch(db, project_id, year, note_section, row_label, col_header)
+    return {"note_section": note_section, "row": row_label, "col": col_header, "value": str(val) if val is not None else None}
+
+
+@router.get("/projects/{project_id}/note-table/{note_section}/column")
+async def note_column(
+    project_id: UUID,
+    note_section: str,
+    col_header: str = Query(...),
+    year: int = Query(default=2025),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """整列取数：NOTE_COL(section, col_header) → 支持浮动行填充"""
+    from app.services.note_data_extractor import note_column_fetch
+    rows = await note_column_fetch(db, project_id, year, note_section, col_header)
+    return {"note_section": note_section, "col": col_header, "rows": rows}
+
+
+@router.get("/projects/{project_id}/note-table/{note_section}/row")
+async def note_row(
+    project_id: UUID,
+    note_section: str,
+    row_label: str = Query(...),
+    year: int = Query(default=2025),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """整行取数：NOTE_ROW(section, row_label) → 支持变动表多列"""
+    from app.services.note_data_extractor import note_row_fetch
+    data = await note_row_fetch(db, project_id, year, note_section, row_label)
+    return {"note_section": note_section, **data}
+
+
+@router.get("/projects/{project_id}/note-table/{note_section}/dynamic-rows")
+async def note_dynamic_rows(
+    project_id: UUID,
+    note_section: str,
+    year: int = Query(default=2025),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """生成浮动行数据（从辅助余额表/底稿明细动态生成）"""
+    from app.services.note_data_extractor import generate_dynamic_rows
+    rows = await generate_dynamic_rows(db, project_id, year, note_section)
+    return {"note_section": note_section, "rows": rows, "count": len(rows)}
