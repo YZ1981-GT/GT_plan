@@ -1065,3 +1065,14 @@ export async function syncWorkpaperProcedure(projectId: string, wpId: string): P
   const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/sync-procedure`)
   return data
 }
+
+// ── 工时与底稿编辑时间关联 ──
+
+export async function getEditTimeSuggestions(staffId: string, targetDate: string): Promise<{
+  suggestions: Array<{ wp_id: string; wp_name: string; duration_minutes: number; start_time: string; end_time: string }>
+  total_hours: number
+  message: string
+}> {
+  const { data } = await http.get('/api/work-hours/edit-time-suggest', { params: { staff_id: staffId, target_date: targetDate } })
+  return data
+}

@@ -44,6 +44,11 @@
               <el-icon :size="12"><User /></el-icon>
               <span class="card-assignee">{{ item.assigned_to?.slice(0, 8) }}</span>
             </div>
+            <div class="card-footer card-actions" v-else>
+              <el-button size="small" text type="primary" @click.stop="$emit('assign', item)">
+                分配
+              </el-button>
+            </div>
           </div>
 
           <div v-if="!kanbanData[col.key]?.length" class="column-empty">
@@ -67,6 +72,7 @@ const props = defineProps<{
 
 defineEmits<{
   'select': [item: any]
+  'assign': [item: any]
 }>()
 
 const loading = ref(false)
@@ -181,5 +187,6 @@ defineExpose({ refresh: loadKanban })
 }
 .card-name { font-size: 13px; color: #1a1a2e; line-height: 1.5; font-weight: 500; }
 .card-footer { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; color: #909399; }
+.card-actions { justify-content: flex-end; }
 .card-assignee { color: #606266; font-weight: 500; }
 </style>
