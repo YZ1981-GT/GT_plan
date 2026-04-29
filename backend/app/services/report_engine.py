@@ -682,8 +682,13 @@ class ReportEngine:
             return val
 
         # 1. 资产负债表平衡：资产合计 = 负债和所有者权益总计
-        total_assets = await _get_amount(FinancialReportType.balance_sheet, "BS-021")
-        total_liab_equity = await _get_amount(FinancialReportType.balance_sheet, "BS-057")
+        # 兼容新旧两套 row_code（旧: BS-021/BS-057，新: BS-039/BS-099）
+        total_assets = await _get_amount(FinancialReportType.balance_sheet, "BS-039")
+        if total_assets is None:
+            total_assets = await _get_amount(FinancialReportType.balance_sheet, "BS-021")
+        total_liab_equity = await _get_amount(FinancialReportType.balance_sheet, "BS-099")
+        if total_liab_equity is None:
+            total_liab_equity = await _get_amount(FinancialReportType.balance_sheet, "BS-057")
         if total_assets is not None and total_liab_equity is not None:
             diff = total_assets - total_liab_equity
             checks.append({
@@ -695,8 +700,12 @@ class ReportEngine:
             })
 
         # 2. 资产负债表平衡：负债合计+权益合计=负债和所有者权益总计
-        total_liab = await _get_amount(FinancialReportType.balance_sheet, "BS-044")
-        total_equity = await _get_amount(FinancialReportType.balance_sheet, "BS-056")
+        total_liab = await _get_amount(FinancialReportType.balance_sheet, "BS-070")
+        if total_liab is None:
+            total_liab = await _get_amount(FinancialReportType.balance_sheet, "BS-044")
+        total_equity = await _get_amount(FinancialReportType.balance_sheet, "BS-091")
+        if total_equity is None:
+            total_equity = await _get_amount(FinancialReportType.balance_sheet, "BS-056")
         if total_liab is not None and total_equity is not None and total_liab_equity is not None:
             calc = total_liab + total_equity
             diff = calc - total_liab_equity
@@ -709,8 +718,12 @@ class ReportEngine:
             })
 
         # 3. 跨报表：BS未分配利润变动 vs IS净利润 (simplified check)
-        bs_retained = await _get_amount(FinancialReportType.balance_sheet, "BS-055")
-        is_net_profit = await _get_amount(FinancialReportType.income_statement, "IS-019")
+        bs_retained = await _get_amount(FinancialReportType.balance_sheet, "BS-088")
+        if bs_retained is None:
+            bs_retained = await _get_amount(FinancialReportType.balance_sheet, "BS-055")
+        is_net_profit = await _get_amount(FinancialReportType.income_statement, "IS-024")
+        if is_net_profit is None:
+            is_net_profit = await _get_amount(FinancialReportType.income_statement, "IS-019")
         if bs_retained is not None and is_net_profit is not None:
             checks.append({
                 "check_name": "跨报表：利润表净利润",
@@ -722,7 +735,9 @@ class ReportEngine:
 
         # 4. 跨报表：CFS期末现金 vs BS货币资金
         bs_cash = await _get_amount(FinancialReportType.balance_sheet, "BS-002")
-        cfs_ending_cash = await _get_amount(FinancialReportType.cash_flow_statement, "CF-042")
+        cfs_ending_cash = await _get_amount(FinancialReportType.cash_flow_statement, "CFS-053")
+        if cfs_ending_cash is None:
+            cfs_ending_cash = await _get_amount(FinancialReportType.cash_flow_statement, "CF-042")
         if bs_cash is not None and cfs_ending_cash is not None:
             diff = bs_cash - cfs_ending_cash
             checks.append({

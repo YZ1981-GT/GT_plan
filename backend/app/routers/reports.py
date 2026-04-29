@@ -38,6 +38,38 @@ router = APIRouter(
 )
 
 
+async def _resolve_applicable_standard(db: AsyncSession, project_id: UUID) -> str:
+    """从项目配置动态确定报表标准。
+
+    映射规则：
+    - template_type (soe/listed) + report_scope (consolidated/standalone)
+    - 组合为 "soe_consolidated" / "listed_standalone" 等
+    - 降级为 "enterprise"（兼容旧数据）
+    """
+    from app.models.core import Project
+    result = await db.execute(
+        sa.select(Project.template_type, Project.report_scope).where(
+            Project.id == project_id,
+            Project.is_deleted == sa.false(),
+        )
+    )
+    row = result.one_or_none()
+    if not row:
+        return "enterprise"
+
+    template_type = row[0] or "soe"  # 默认国企版
+    report_scope = row[1] or "standalone"  # 默认单体
+
+    standard = f"{template_type}_{report_scope}"
+
+    # 验证是否为有效标准名
+    valid_standards = {"soe_consolidated", "soe_standalone", "listed_consolidated", "listed_standalone", "enterprise"}
+    if standard not in valid_standards:
+        return "enterprise"
+
+    return standard
+
+
 @router.post("/generate")
 async def generate_reports(
     data: ReportGenerateRequest,
@@ -45,9 +77,12 @@ async def generate_reports(
     current_user: User = Depends(get_current_user),
 ):
     """生成/重新生成四张报表"""
+    # 从项目配置动态确定报表标准（国企/上市 × 合并/单体）
+    applicable_standard = await _resolve_applicable_standard(db, data.project_id)
+
     engine = ReportEngine(db)
     try:
-        results = await engine.generate_all_reports(data.project_id, data.year)
+        results = await engine.generate_all_reports(data.project_id, data.year, applicable_standard)
         await db.commit()
         await event_bus.publish_immediate(EventPayload(
             event_type=EventType.REPORTS_UPDATED,

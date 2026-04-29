@@ -1483,3 +1483,9 @@ inclusion: always
 - 报表行次补全到致同标准已完成（2026-04-29，commit 55b13f9已推送）：新增generate_report_seed.py脚本生成4套报表（soe_consolidated/soe_standalone/listed_consolidated/listed_standalone），16个配置块624行；BS含新准则科目（合同资产/使用权资产/债权投资/租赁负债/衍生金融/持有待售等），IS含信用减值/资产减值/其他收益/资产处置/每股收益（上市版），CFS完整三大类53行，EQ 17行变动项目；合并版多少数股东权益/损益，上市版多每股收益
 - 报表结构体系确认：致同两套标准（国企soe+上市listed）×两种口径（合并consolidated+单体standalone）= 4套，applicable_standard字段值为soe_consolidated/soe_standalone/listed_consolidated/listed_standalone
 - 报表结构待做：前端报表结构编辑UI（支持行名/公式修改+新增/删除行+拖拽排序）
+- 前端报表结构编辑UI已完成（2026-04-29，commit 8842bb5已推送）：新增ReportConfigEditor.vue（4套标准切换+4张报表切换+双击行内编辑row_name/formula/indent_level+新增行+删除行二次确认+批量保存PUT /report-config/{id}+合计行/分类标题行视觉区分），ReportView.vue新增"编辑结构"按钮跳转，路由/projects/:projectId/report-config已注册
+- 报表结构编辑待补：后端需新增POST /report-config端点支持新增行（当前只有PUT修改），前端onAddRow的_isNew行暂时跳过保存
+- 报表结构联动分析发现2个关键问题（2026-04-29）：①generate_all_reports的applicable_standard默认"enterprise"与新种子数据（soe_consolidated/listed_standalone等）不匹配，新624行种子数据不会被默认加载②check_balance中引用的row_code（BS-021/BS-057/BS-044/BS-056/BS-055）与新种子数据的row_code不一致（新数据资产总计=BS-039，负债权益总计=BS-099）
+- 报表联动链路确认：report_config→ReportEngine执行公式→trial_balance取数→financial_report表→前端ReportView展示+穿透弹窗；已审/未审报表都从report_config加载行次；合并报表未使用report_config生成行次（断点）
+- 报表溯源能力确认完整：formula_used+source_accounts+drilldown穿透+version_line版本戳+report_snapshot快照
+- 报表结构待修复：①applicable_standard需从项目配置动态获取（project.template_type+report_scope映射到soe_consolidated等）②check_balance的row_code需与新种子数据对齐③合并报表需接入report_config生成合并报表行次

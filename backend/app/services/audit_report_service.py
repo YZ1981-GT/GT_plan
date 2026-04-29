@@ -271,11 +271,11 @@ class AuditReportService:
         data: dict[str, str] = {}
 
         key_rows = {
-            "total_assets": (FinancialReportType.balance_sheet, "BS-021"),
-            "total_liabilities": (FinancialReportType.balance_sheet, "BS-044"),
-            "total_equity": (FinancialReportType.balance_sheet, "BS-056"),
+            "total_assets": (FinancialReportType.balance_sheet, "BS-039"),
+            "total_liabilities": (FinancialReportType.balance_sheet, "BS-070"),
+            "total_equity": (FinancialReportType.balance_sheet, "BS-091"),
             "total_revenue": (FinancialReportType.income_statement, "IS-001"),
-            "net_profit": (FinancialReportType.income_statement, "IS-019"),
+            "net_profit": (FinancialReportType.income_statement, "IS-024"),
         }
 
         for key, (report_type, row_code) in key_rows.items():
