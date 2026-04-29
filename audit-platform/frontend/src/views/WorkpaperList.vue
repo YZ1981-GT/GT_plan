@@ -3,6 +3,12 @@
     <!-- 顶部筛选栏 -->
     <div class="gt-wp-filter-bar">
       <h2 class="gt-page-title">底稿管理</h2>
+      <div class="gt-wp-view-toggle">
+        <el-radio-group v-model="viewMode" size="small">
+          <el-radio-button value="list">列表</el-radio-button>
+          <el-radio-button value="kanban">看板</el-radio-button>
+        </el-radio-group>
+      </div>
       <div class="gt-wp-filters">
         <el-input
           v-model="searchKeyword"
@@ -28,8 +34,15 @@
       </div>
     </div>
 
-    <!-- 主体：左树 + 右详情 -->
-    <div class="gt-wp-body">
+    <!-- 主体：看板视图 / 列表视图 -->
+    <WorkpaperKanban
+      v-if="viewMode === 'kanban'"
+      :project-id="projectId"
+      :audit-cycle="filterCycle"
+      @select="onKanbanSelect"
+      @assign="onKanbanAssign"
+    />
+    <div v-else class="gt-wp-body">
       <!-- 左侧索引树 -->
       <div class="gt-wp-tree-panel">
         <el-tree
@@ -249,6 +262,7 @@ import { ElMessage } from 'element-plus'
 import { Download, Monitor, Upload } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
+import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
   checkFeatureFlag, getFeatureMaturity, submitWorkpaperReview,
@@ -284,6 +298,7 @@ const sodConflictType = ref('')
 const sodPolicyCode = ref('')
 const sodTraceId = ref('')
 const searchKeyword = ref('')
+const viewMode = ref('list')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 function onSearchDebounce() {
@@ -480,6 +495,19 @@ function reviewStatusLabel(s: string | undefined) {
     level2_passed: '二级通过', level2_rejected: '二级退回',
   }
   return m[s] || s
+}
+
+function onKanbanSelect(item: any) {
+  if (item.wp_id) {
+    // 切换到列表视图并选中该底稿
+    viewMode.value = 'list'
+    // TODO: 自动选中该底稿
+  }
+}
+
+function onKanbanAssign(item: any) {
+  ElMessage.info(`分配底稿 ${item.wp_code}（弹出分配弹窗）`)
+  // TODO: 弹出分配弹窗
 }
 
 async function fetchData() {
@@ -847,7 +875,8 @@ onMounted(async () => {
 
 <style scoped>
 .gt-wp-list { padding: var(--gt-space-4); height: 100%; display: flex; flex-direction: column; }
-.gt-wp-filter-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
+.gt-wp-filter-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); flex-wrap: wrap; gap: 8px; }
+.gt-wp-view-toggle { margin: 0 12px; }
 .gt-wp-filters { display: flex; gap: var(--gt-space-2); align-items: center; }
 .gt-wp-body { display: flex; gap: var(--gt-space-4); flex: 1; min-height: 0; }
 .gt-wp-tree-panel {
