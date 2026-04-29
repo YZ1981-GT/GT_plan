@@ -1543,3 +1543,4 @@ inclusion: always
 - 审计全流程断点修复计划文档已删除（2026-04-29，commit b399d22已推送）：P0+P1+P2全部完成确认后清理，本轮最终22个commit（cc8f47d→b399d22）
 - 账表导入企业级改造建议文档最终排查（2026-04-29）：8大建议中6项完整完成（统一入口/数据集版本/Durable Job/上传产物/验证报告/事件语义），2项基础到位有环境依赖（安全审计缺Prometheus指标/测试增强缺失败场景+性能基准）；P0落地4项全部完成，P1完成2/3（共享存储仍为本地），P2完成2/3（观测面板缺）；文档保留作为架构参考不删除
 - docs/底稿开发.md(v1,1627行)已删除（2026-04-29，commit bbfaae2），内容被底稿开发_v2.md(9196行)完全覆盖；docs/目录现存：底稿开发_v2.md+账表导入企业级平台下一阶段改造建议.md+ledger-import-large-file-remediation-plan.md+mineru-deployment.md
+- docs/ledger-import-large-file-remediation-plan.md已删除（2026-04-29，commit 86ccb4a），核心修复项已全部实现；docs/目录现存3个文件：底稿开发_v2.md(架构参考)+账表导入企业级平台下一阶段改造建议.md(架构参考)+mineru-deployment.md(运维参考)
