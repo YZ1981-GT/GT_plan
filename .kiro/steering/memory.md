@@ -1515,3 +1515,5 @@ inclusion: always
 - 附注模板3项修复已完成（2026-04-29，commit 08466d9已推送）：①新增note_formula_generator.py（generate_formulas_for_table从check_presets自动生成3种公式vertical_sum/horizontal_balance/book_value，execute_note_formulas执行回填只更新auto单元格，公式存储在table_data._formulas字典key="row_idx:col_idx"），新增POST apply-formulas端点②两套模板每章节新增scope字段（both/consolidated_only/standalone_only），国企版"国有资本"标记standalone_only③validate_wide_table增强book_value专项（检测账面价值期末行，自动查找原值/折旧/减值行计算差额）
 - 用户需求（跨表公式引用）：附注公式编辑时需支持跨表指标选择——引用报表行金额REPORT('BS-002','期末')、引用试算表科目TB('1001','审定数')、引用其他附注章节合计值NOTE('五、3','合计','期末')；当前只支持表内引用cell(row,col)/SUM(start:end,col)
 - 附注vs报表一致性校验：check_presets.balance规则已实现（validate_cross_table从financial_report取报表金额与附注合计比对），但用户自定义公式中无法引用报表数据
+- 跨表公式引用已完成（2026-04-29，commit 8e212e4已推送）：note_formula_generator.py新增_load_cross_table_data()预加载报表/试算表/其他附注数据+_exec_cross_table()执行跨表引用+_exec_generic()混合引用；支持3种语法REPORT('BS-002','期末')/TB('1001','审定数')/NOTE('五、3','合计','期末')；execute_note_formulas增强为预加载跨表数据+新增cross_table公式类型
+- 附注vs报表一致性校验实现方式：用户在附注合计行设置公式REPORT('BS-002','期末')，应用后自动从报表取数填入，数值不一致时立即可见

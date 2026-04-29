@@ -27,7 +27,11 @@
         <el-table-column prop="target" label="目标单元格" width="120" />
         <el-table-column label="公式" min-width="250">
           <template #default="{ row }">
-            <el-input v-if="row._editing" v-model="row.formula" size="small" />
+            <el-input v-if="row._editing" v-model="row.formula" size="small">
+              <template #append>
+                <el-button size="small" @click="openRefPicker(row)">引用</el-button>
+              </template>
+            </el-input>
             <code v-else style="font-size: 11px">{{ row.formula }}</code>
           </template>
         </el-table-column>
@@ -59,6 +63,15 @@
       <el-button type="primary" @click="onApply" :loading="applying">应用自动运算</el-button>
       <el-button @click="visible = false">关闭</el-button>
     </template>
+
+    <!-- 引用选择器 -->
+    <FormulaRefPicker
+      v-model="showRefPicker"
+      :report-rows="refPickerData.reportRows"
+      :tb-rows="refPickerData.tbRows"
+      :note-rows="refPickerData.noteRows"
+      @insert="onInsertRef"
+    />
   </el-dialog>
 </template>
 
@@ -66,6 +79,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import FormulaRefPicker from './FormulaRefPicker.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -86,6 +100,35 @@ const visible = computed({
 
 const activeCategory = ref('auto_calc')
 const applying = ref(false)
+const showRefPicker = ref(false)
+const editingRow = ref<any>(null)
+
+// 引用选择器数据（懒加载）
+const refPickerData = ref<{ reportRows: any[], tbRows: any[], noteRows: any[] }>({
+  reportRows: [], tbRows: [], noteRows: [],
+})
+
+async function openRefPicker(row: any) {
+  editingRow.value = row
+  // 加载引用数据
+  try {
+    if (!refPickerData.value.reportRows.length) {
+      const [reportResp, tbResp] = await Promise.all([
+        http.get(`/api/reports/${props.projectId}/${props.year}/balance_sheet`).catch(() => ({ data: [] })),
+        http.get(`/api/trial-balance/`, { params: { project_id: props.projectId, year: props.year } }).catch(() => ({ data: [] })),
+      ])
+      refPickerData.value.reportRows = Array.isArray(reportResp.data) ? reportResp.data : (reportResp.data?.data || [])
+      refPickerData.value.tbRows = Array.isArray(tbResp.data) ? tbResp.data : (tbResp.data?.data || [])
+    }
+  } catch { /* 静默 */ }
+  showRefPicker.value = true
+}
+
+function onInsertRef(formula: string, _label: string) {
+  if (editingRow.value) {
+    editingRow.value.formula = (editingRow.value.formula || '') + formula
+  }
+}
 
 // 附注公式列表（从 currentNote.table_data 推断）
 const formulas = ref<any[]>([])
