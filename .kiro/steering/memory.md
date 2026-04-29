@@ -1525,3 +1525,4 @@ inclusion: always
 - 公式全局化重构已完成（2026-04-29）：FormulaRefPicker/FormulaManagerDialog/NoteFormulaDialog从components/report/移到components/formula/，ReportView+DisclosureEditor+TrialBalance三个页面均已接入公式管理按钮
 - 用户要求（公式分层）：公式编辑功能/界面/跨表引用选择器是全局共享的，但表格自身的校对公式（如纵向合计/横向平衡/账面价值）是预设在模板中的不能放到全局——即check_presets中的规则是表格级预设（随模板走），FormulaRefPicker/FormulaManagerDialog是全局工具（供用户自定义编辑时使用）
 - 公式两层架构确认：①模板预设层（check_presets→generate_formulas_for_table自动生成，随附注模板/报表配置走，不可全局修改）②用户自定义层（FormulaManagerDialog/FormulaRefPicker，用户可编辑/新增/删除，覆盖预设或新增跨表引用）
+- 公式分层保护已完成（2026-04-29，commit c358920已推送）：FormulaManagerDialog新增isPresetFormula()判断（source以check_presets.开头或为试算表审定数/报表行次引用），预设公式行显示灰色"预设"标签不可编辑，用户自定义公式行保留编辑/保存按钮

@@ -68,18 +68,16 @@
       </el-table-column>
       <el-table-column label="来源" width="100">
         <template #default="{ row }">
+          <el-tag v-if="isPresetFormula(row)" size="small" type="info" style="margin-right: 2px">预设</el-tag>
           <span style="font-size: 11px; color: #aaa">{{ row.formula_source || '' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="90" align="center">
         <template #default="{ row }">
-          <template v-if="isPresetFormula(row)">
-            <el-tag size="small" type="info">预设</el-tag>
-          </template>
-          <template v-else>
-            <el-button v-if="editingId !== row.id" size="small" link type="primary" @click="startEdit(row)">编辑</el-button>
-            <el-button v-else size="small" link type="success" @click="saveEdit(row)">保存</el-button>
-          </template>
+          <el-button v-if="editingId !== row.id" size="small" link type="primary" @click="startEdit(row)">
+            {{ isPresetFormula(row) ? '修改' : '编辑' }}
+          </el-button>
+          <el-button v-else size="small" link type="success" @click="saveEdit(row)">保存</el-button>
         </template>
       </el-table-column>
     </el-table>
