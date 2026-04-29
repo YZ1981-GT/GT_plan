@@ -1000,3 +1000,31 @@ export async function getCellInfo(projectId: string, fileStem: string, cell: str
   const { data } = await http.get(`/api/projects/${projectId}/excel-html/cell-info/${fileStem}`, { params: { cell } })
   return data
 }
+
+// ── 导入智能增强 ──
+
+export async function enhanceColumnMapping(projectId: string, headers: string[], existingMapping: Record<string, string>): Promise<{
+  enhanced: Record<string, string>
+  suggestions: Array<{ header: string; suggested_field: string; confidence: number }>
+  unmatched: string[]
+}> {
+  const { data } = await http.post(`/api/projects/${projectId}/import-intelligence/enhance-mapping`, { headers, existing_mapping: existingMapping })
+  return data
+}
+
+export async function getImportQualityCheck(projectId: string, year = 2025): Promise<{
+  score: number; grade: string; findings: any[]; summary: string
+}> {
+  const { data } = await http.get(`/api/projects/${projectId}/import-intelligence/quality-check`, { params: { year } })
+  return data
+}
+
+export async function prepareIncrementalImport(projectId: string, mode: string, period?: string, year = 2025): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/import-intelligence/prepare-incremental`, { mode, period }, { params: { year } })
+  return data
+}
+
+export async function getImportOverview(projectId: string, year = 2025): Promise<any> {
+  const { data } = await http.get(`/api/projects/${projectId}/import-intelligence/overview`, { params: { year } })
+  return data
+}
