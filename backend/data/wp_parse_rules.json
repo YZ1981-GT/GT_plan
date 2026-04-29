@@ -1,97 +1,156 @@
-{
-  "_comment": "底稿模板解析规则 — 定义每种底稿的关键单元格位置",
-  "_usage": "ParseService 根据 wp_code 前缀匹配规则，用 openpyxl 读写指定单元格",
-  "rules": {
-    "E1-1": {
-      "name": "货币资金审定表",
-      "account_codes": ["1001", "1002", "1012"],
-      "sheet": "审定表",
-      "audited_cell": "F25",
-      "adjustment_cell": "E25",
-      "opening_cell": "C25",
-      "unadjusted_cell": "D25",
-      "conclusion_cell": "B30"
-    },
-    "E2-1": {
-      "name": "交易性金融资产审定表",
-      "account_codes": ["1101"],
-      "sheet": "审定表",
-      "audited_cell": "F20",
-      "adjustment_cell": "E20",
-      "opening_cell": "C20",
-      "unadjusted_cell": "D20"
-    },
-    "E3-1": {
-      "name": "应收票据审定表",
-      "account_codes": ["1121"],
-      "sheet": "审定表",
-      "audited_cell": "F20",
-      "adjustment_cell": "E20",
-      "opening_cell": "C20",
-      "unadjusted_cell": "D20"
-    },
-    "E4-1": {
-      "name": "应收账款审定表",
-      "account_codes": ["1122"],
-      "sheet": "审定表",
-      "audited_cell": "F25",
-      "adjustment_cell": "E25",
-      "opening_cell": "C25",
-      "unadjusted_cell": "D25"
-    },
-    "E5-1": {
-      "name": "预付账款审定表",
-      "account_codes": ["1123"],
-      "sheet": "审定表",
-      "audited_cell": "F20",
-      "adjustment_cell": "E20",
-      "opening_cell": "C20",
-      "unadjusted_cell": "D20"
-    },
-    "E6-1": {
-      "name": "其他应收款审定表",
-      "account_codes": ["1221"],
-      "sheet": "审定表",
-      "audited_cell": "F25",
-      "adjustment_cell": "E25",
-      "opening_cell": "C25",
-      "unadjusted_cell": "D25"
-    },
-    "E7-1": {
-      "name": "存货审定表",
-      "account_codes": ["1401", "1402", "1403", "1405"],
-      "sheet": "审定表",
-      "audited_cell": "F30",
-      "adjustment_cell": "E30",
-      "opening_cell": "C30",
-      "unadjusted_cell": "D30"
-    },
-    "E8-1": {
-      "name": "长期股权投资审定表",
-      "account_codes": ["1511"],
-      "sheet": "审定表",
-      "audited_cell": "F25",
-      "adjustment_cell": "E25",
-      "opening_cell": "C25",
-      "unadjusted_cell": "D25"
-    },
-    "E9-1": {
-      "name": "固定资产审定表",
-      "account_codes": ["1601", "1602"],
-      "sheet": "审定表",
-      "audited_cell": "F25",
-      "adjustment_cell": "E25",
-      "opening_cell": "C25",
-      "unadjusted_cell": "D25"
-    },
-    "E10-1": {
-      "name": "无形资产审定表",
-      "account_codes": ["1701", "1702"],
-      "sheet": "审定表",
-      "audited_cell": "F20",
-      "adjustment_cell": "E20",
-      "opening_cell": "C20",
-      "unadjusted_cell": "D20"
-    }
+[
+  {
+    "wp_code": "E1",
+    "name": "货币资金",
+    "account_codes": ["1001", "1002", "1012"],
+    "sheets": [
+      {"name_pattern": "审定表|E1-1", "type": "summary", "header_keywords": ["项目", "期初未审", "期末审定", "变动额"], "columns": {"label": {"keywords": ["项目"]}, "opening": {"keywords": ["期初未审", "期初"]}, "unadjusted": {"keywords": ["期末未审", "未审"]}, "adjustment": {"keywords": ["期末调整", "调整"]}, "closing_balance": {"keywords": ["期末审定", "审定"]}, "change": {"keywords": ["变动额", "变动"]}}},
+      {"name_pattern": "现金明细|E1-2", "type": "detail", "header_keywords": ["币种", "金额", "折合人民币"]},
+      {"name_pattern": "银行存款|E1-3", "type": "detail", "header_keywords": ["开户银行", "账号", "币种", "余额"]},
+      {"name_pattern": "调整分录|E1-5", "type": "adjustment", "header_keywords": ["编号", "科目", "借方", "贷方"]}
+    ]
+  },
+  {
+    "wp_code": "D2",
+    "name": "应收账款",
+    "account_codes": ["1122"],
+    "sheets": [
+      {"name_pattern": "审定表|D2-1", "type": "summary", "header_keywords": ["项目", "期初", "期末", "审定"], "columns": {"label": {"keywords": ["项目", "内容"]}, "opening": {"keywords": ["期初", "年初"]}, "unadjusted": {"keywords": ["未审", "账面"]}, "adjustment": {"keywords": ["调整", "重分类"]}, "closing_balance": {"keywords": ["期末审定", "审定数"]}}},
+      {"name_pattern": "明细表|D2-2", "type": "detail", "header_keywords": ["客户名称", "余额", "账龄"]},
+      {"name_pattern": "坏账准备|D2-3", "type": "movement", "header_keywords": ["项目", "期初", "计提", "转回", "核销", "期末"], "columns": {"label": {"keywords": ["项目", "类别"]}, "opening": {"keywords": ["期初"]}, "provision": {"keywords": ["计提", "本期计提"]}, "decrease": {"keywords": ["转回", "核销"]}, "closing_balance": {"keywords": ["期末"]}}},
+      {"name_pattern": "账龄|D2-4|aging", "type": "aging", "header_keywords": ["客户", "1年以内", "1-2年", "2-3年", "3年以上"]},
+      {"name_pattern": "调整分录|D2-5", "type": "adjustment", "header_keywords": ["编号", "科目", "借方", "贷方"]}
+    ]
+  },
+  {
+    "wp_code": "D3",
+    "name": "应收票据",
+    "account_codes": ["1121"],
+    "sheets": [
+      {"name_pattern": "审定表|D3-1", "type": "summary", "header_keywords": ["项目", "期末", "期初"]},
+      {"name_pattern": "明细|D3-2", "type": "detail", "header_keywords": ["出票人", "票面金额", "到期日"]}
+    ]
+  },
+  {
+    "wp_code": "F1",
+    "name": "存货",
+    "account_codes": ["1401", "1402", "1403", "1405", "1461"],
+    "sheets": [
+      {"name_pattern": "审定表|F1-1", "type": "summary", "header_keywords": ["项目", "期末", "期初", "审定"], "columns": {"label": {"keywords": ["项目", "存货类别"]}, "opening": {"keywords": ["期初"]}, "closing_balance": {"keywords": ["期末审定", "审定"]}}},
+      {"name_pattern": "明细|F1-2", "type": "detail", "header_keywords": ["存货名称", "数量", "单价", "金额"]},
+      {"name_pattern": "跌价准备|F1-3", "type": "movement", "header_keywords": ["项目", "期初", "计提", "转回", "期末"]}
+    ]
+  },
+  {
+    "wp_code": "G1",
+    "name": "长期股权投资",
+    "account_codes": ["1511"],
+    "sheets": [
+      {"name_pattern": "审定表|G1-1", "type": "summary", "header_keywords": ["被投资单位", "持股比例", "期末", "期初"]},
+      {"name_pattern": "明细|G1-2", "type": "detail", "header_keywords": ["被投资单位", "投资成本", "持股比例", "账面价值"]},
+      {"name_pattern": "权益法|G1-3", "type": "analysis", "header_keywords": ["被投资单位", "投资收益", "其他综合收益"]}
+    ]
+  },
+  {
+    "wp_code": "H1",
+    "name": "固定资产",
+    "account_codes": ["1601", "1602"],
+    "sheets": [
+      {"name_pattern": "审定表|H1-1", "type": "summary", "header_keywords": ["项目", "房屋", "机器", "运输", "电子", "合计"], "columns": {"label": {"keywords": ["项目"]}, "closing_balance": {"keywords": ["合计", "期末"]}}},
+      {"name_pattern": "明细|H1-2", "type": "detail", "header_keywords": ["资产名称", "原值", "累计折旧", "账面价值"]},
+      {"name_pattern": "折旧测算|H1-12", "type": "analysis", "header_keywords": ["资产类别", "原值", "残值率", "年限", "月折旧"]},
+      {"name_pattern": "减值|H1-14", "type": "analysis", "header_keywords": ["资产", "账面价值", "可收回金额", "减值"]},
+      {"name_pattern": "调整分录|H1-3", "type": "adjustment", "header_keywords": ["编号", "科目", "借方", "贷方"]}
+    ]
+  },
+  {
+    "wp_code": "H2",
+    "name": "在建工程",
+    "account_codes": ["1604"],
+    "sheets": [
+      {"name_pattern": "审定表|H2-1", "type": "summary", "header_keywords": ["项目", "期初", "增加", "转固", "期末"], "columns": {"label": {"keywords": ["项目名称", "工程"]}, "opening": {"keywords": ["期初"]}, "increase": {"keywords": ["增加", "本期投入"]}, "decrease": {"keywords": ["转固", "转入固定"]}, "closing_balance": {"keywords": ["期末"]}}}
+    ]
+  },
+  {
+    "wp_code": "I1",
+    "name": "无形资产",
+    "account_codes": ["1701", "1702"],
+    "sheets": [
+      {"name_pattern": "审定表|I1-1", "type": "summary", "header_keywords": ["项目", "原值", "摊销", "减值", "账面价值"], "columns": {"label": {"keywords": ["项目", "类别"]}, "opening": {"keywords": ["期初", "原值期初"]}, "provision": {"keywords": ["摊销", "本期摊销"]}, "closing_balance": {"keywords": ["账面价值", "期末"]}}}
+    ]
+  },
+  {
+    "wp_code": "J1",
+    "name": "应付职工薪酬",
+    "account_codes": ["2211"],
+    "sheets": [
+      {"name_pattern": "审定表|J1-1", "type": "summary", "header_keywords": ["项目", "期初", "增加", "减少", "期末"], "columns": {"label": {"keywords": ["项目", "薪酬类别"]}, "opening": {"keywords": ["期初"]}, "increase": {"keywords": ["增加", "本期计提"]}, "decrease": {"keywords": ["减少", "本期发放"]}, "closing_balance": {"keywords": ["期末"]}}}
+    ]
+  },
+  {
+    "wp_code": "K1",
+    "name": "管理费用",
+    "account_codes": ["6602"],
+    "sheets": [
+      {"name_pattern": "审定表|K1-1", "type": "summary", "header_keywords": ["项目", "本期", "上期"], "columns": {"label": {"keywords": ["项目", "费用项目"]}, "closing_balance": {"keywords": ["本期金额", "本期"]}, "opening": {"keywords": ["上期金额", "上期"]}}}
+    ]
+  },
+  {
+    "wp_code": "K2",
+    "name": "销售费用",
+    "account_codes": ["6601"],
+    "sheets": [
+      {"name_pattern": "审定表|K2-1", "type": "summary", "header_keywords": ["项目", "本期", "上期"], "columns": {"label": {"keywords": ["项目"]}, "closing_balance": {"keywords": ["本期"]}, "opening": {"keywords": ["上期"]}}}
+    ]
+  },
+  {
+    "wp_code": "K3",
+    "name": "财务费用",
+    "account_codes": ["6603"],
+    "sheets": [
+      {"name_pattern": "审定表|K3-1", "type": "summary", "header_keywords": ["项目", "本期", "上期"], "columns": {"label": {"keywords": ["项目"]}, "closing_balance": {"keywords": ["本期"]}, "opening": {"keywords": ["上期"]}}}
+    ]
+  },
+  {
+    "wp_code": "L1",
+    "name": "短期借款",
+    "account_codes": ["2001"],
+    "sheets": [
+      {"name_pattern": "审定表|L1-1", "type": "summary", "header_keywords": ["借款类型", "期末", "期初"]},
+      {"name_pattern": "明细|L1-2", "type": "detail", "header_keywords": ["贷款银行", "借款金额", "利率", "到期日"]}
+    ]
+  },
+  {
+    "wp_code": "L2",
+    "name": "长期借款",
+    "account_codes": ["2501"],
+    "sheets": [
+      {"name_pattern": "审定表|L2-1", "type": "summary", "header_keywords": ["借款类型", "期末", "期初"]},
+      {"name_pattern": "明细|L2-2", "type": "detail", "header_keywords": ["贷款银行", "借款金额", "利率", "起止日期"]}
+    ]
+  },
+  {
+    "wp_code": "M1",
+    "name": "实收资本",
+    "account_codes": ["4001"],
+    "sheets": [
+      {"name_pattern": "审定表|M1-1", "type": "summary", "header_keywords": ["股东", "出资额", "持股比例"]}
+    ]
+  },
+  {
+    "wp_code": "N1",
+    "name": "应交税费",
+    "account_codes": ["2221"],
+    "sheets": [
+      {"name_pattern": "审定表|N1-1", "type": "summary", "header_keywords": ["税种", "期末", "期初"], "columns": {"label": {"keywords": ["税种", "项目"]}, "closing_balance": {"keywords": ["期末"]}, "opening": {"keywords": ["期初"]}}}
+    ]
+  },
+  {
+    "wp_code": "D1",
+    "name": "营业收入",
+    "account_codes": ["6001", "6051"],
+    "sheets": [
+      {"name_pattern": "审定表|D1-1", "type": "summary", "header_keywords": ["项目", "本期", "上期"], "columns": {"label": {"keywords": ["项目", "收入类别"]}, "closing_balance": {"keywords": ["本期"]}, "opening": {"keywords": ["上期"]}}}
+    ]
   }
-}
+]

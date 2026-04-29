@@ -381,35 +381,47 @@ _RULES_CACHE: dict[str, dict] = {}
 
 
 def _load_rules_for_wp(wp_code: str) -> dict | None:
-    """加载底稿解析规则"""
+    """加载底稿解析规则
+
+    规则文件格式：[{wp_code: "E1", name: "...", sheets: [...]}]
+    匹配逻辑：wp_code 精确匹配或前缀匹配（如 "E1" 匹配 "E1-1"）
+    """
     if wp_code in _RULES_CACHE:
         return _RULES_CACHE[wp_code]
 
-    # 从 wp_parse_rules.json 加载
-    rules_path = Path(__file__).parent.parent.parent / "data" / "wp_parse_rules.json"
-    if rules_path.exists():
+    def _load_file(path: Path):
+        if not path.exists():
+            return
         try:
-            all_rules = json.loads(rules_path.read_text(encoding="utf-8"))
-            for rule in all_rules:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            # 支持新格式（数组）和旧格式（{rules: {...}}）
+            if isinstance(raw, list):
+                rules_list = raw
+            elif isinstance(raw, dict) and "rules" in raw:
+                # 旧格式兼容：转为新格式
+                rules_list = [{"wp_code": k, **v} for k, v in raw["rules"].items()]
+            else:
+                rules_list = []
+
+            for rule in rules_list:
                 code = rule.get("wp_code", "")
                 _RULES_CACHE[code] = rule
-                if code == wp_code:
-                    return rule
         except Exception:
             pass
 
-    # 从扩展规则加载
-    ext_path = Path(__file__).parent.parent.parent / "data" / "wp_parse_rules_extended.json"
-    if ext_path.exists():
-        try:
-            ext_rules = json.loads(ext_path.read_text(encoding="utf-8"))
-            for rule in ext_rules:
-                code = rule.get("wp_code", "")
-                _RULES_CACHE[code] = rule
-                if code == wp_code:
-                    return rule
-        except Exception:
-            pass
+    # 加载两个规则文件
+    data_dir = Path(__file__).parent.parent.parent / "data"
+    _load_file(data_dir / "wp_parse_rules.json")
+    _load_file(data_dir / "wp_parse_rules_extended.json")
+
+    # 精确匹配
+    if wp_code in _RULES_CACHE:
+        return _RULES_CACHE[wp_code]
+
+    # 前缀匹配（如 "E1-1" 匹配规则 "E1"）
+    prefix = wp_code.split("-")[0] if "-" in wp_code else wp_code
+    if prefix in _RULES_CACHE:
+        return _RULES_CACHE[prefix]
 
     return None
 
