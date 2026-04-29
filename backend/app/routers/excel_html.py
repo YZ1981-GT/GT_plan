@@ -317,7 +317,7 @@ async def sync_from_onlyoffice(
 async def download_file(
     project_id: UUID,
     file_stem: str,
-    format: str = Query(default="xlsx", regex="^(xlsx|html|json)$"),
+    format: str = Query(default="xlsx", pattern="^(xlsx|html|json)$"),
     current_user: User = Depends(get_current_user),
 ):
     """下载文件（支持三种格式）"""
