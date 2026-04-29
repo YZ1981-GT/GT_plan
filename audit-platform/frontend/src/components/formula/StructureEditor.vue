@@ -24,11 +24,60 @@
       <el-button size="small" @click="$emit('export-word')">导出Word</el-button>
       <el-divider direction="vertical" />
       <el-button size="small" text @click="showVersions = true">版本历史</el-button>
+      <el-divider direction="vertical" />
+      <!-- 可视化维度切换 -->
+      <el-checkbox v-model="showFormulas" size="small">显示公式</el-checkbox>
+      <el-checkbox v-model="showSources" size="small">显示数据源</el-checkbox>
+      <el-checkbox v-model="showStatus" size="small">显示状态</el-checkbox>
+    </div>
+
+    <!-- 多维信息面板（选中单元格时显示） -->
+    <div class="info-panel" v-if="currentCellInfo && showInfoPanel">
+      <div class="info-grid">
+        <!-- 基本信息 -->
+        <div class="info-card">
+          <div class="info-card-title">📍 位置</div>
+          <div class="info-card-body">
+            <span class="info-label">地址:</span> <code>{{ currentCellInfo.address }}</code>
+            <span v-if="currentCellInfo.is_merged" class="info-badge merge">合并 {{ currentCellInfo.merge?.range }}</span>
+          </div>
+        </div>
+        <!-- 公式信息 -->
+        <div class="info-card" v-if="currentCellInfo.formula">
+          <div class="info-card-title">📐 公式</div>
+          <div class="info-card-body">
+            <code class="formula-code">{{ currentCellInfo.formula }}</code>
+            <el-tag v-if="currentCellInfo.formula_type" size="small" effect="plain">{{ formulaTypeMap[currentCellInfo.formula_type] || currentCellInfo.formula_type }}</el-tag>
+          </div>
+        </div>
+        <!-- 数据源溯源 -->
+        <div class="info-card" v-if="currentCellInfo.fetch_rule_id">
+          <div class="info-card-title">🔗 数据源</div>
+          <div class="info-card-body">
+            <span class="info-badge source">取数规则绑定</span>
+            <el-button size="small" text type="primary" @click="traceSource">查看来源 →</el-button>
+          </div>
+        </div>
+        <!-- 值信息 -->
+        <div class="info-card">
+          <div class="info-card-title">💾 值</div>
+          <div class="info-card-body">
+            <span class="value-display">{{ formatValue(currentCellInfo.value) }}</span>
+            <span class="info-label" v-if="pendingEdits.length"> ({{ pendingEdits.length }}项未保存)</span>
+          </div>
+        </div>
+      </div>
+      <el-button class="close-panel" size="small" text @click="showInfoPanel = false">收起 ▲</el-button>
+    </div>
+    <div class="info-toggle" v-else-if="currentCellInfo" @click="showInfoPanel = true">
+      <span>{{ currentCellInfo.address }} | {{ currentCellInfo.formula || formatValue(currentCellInfo.value) || '空' }}</span>
+      <span class="toggle-hint">展开 ▼</span>
     </div>
 
     <!-- HTML 表格区域 -->
     <div
       class="table-container"
+      :class="{'show-formulas': showFormulas, 'show-sources': showSources, 'show-status': showStatus}"
       ref="tableContainer"
       v-html="htmlContent"
       @click="onCellClick"
@@ -96,11 +145,22 @@ const saving = ref(false)
 const calculating = ref(false)
 const showSelector = ref(false)
 const showVersions = ref(false)
+const showInfoPanel = ref(true)
+const showFormulas = ref(false)
+const showSources = ref(false)
+const showStatus = ref(false)
 const versions = ref<any[]>([])
 const currentCellInfo = ref<any>(null)
 const selectedCell = ref('')
 const pendingEdits = ref<any[]>([])
 const tableContainer = ref<HTMLElement>()
+
+const formulaTypeMap: Record<string, string> = {
+  vertical_sum: '纵向合计',
+  horizontal_balance: '横向平衡',
+  book_value: '账面价值',
+  cross_table: '跨表引用',
+}
 
 // 外部数据（供 CellSelector 使用）
 const trialBalanceData = ref<any[]>([])
@@ -143,12 +203,43 @@ function onCellClick(e: MouseEvent) {
     address: td.dataset.addr || '',
     value: td.textContent?.replace(/[A-Z]\d+$/g, '').trim(),
     formula: td.dataset.formula || null,
-    formula_type: null,
+    formula_type: td.dataset.formulaType || null,
     formula_desc: null,
     fetch_rule_id: td.dataset.fetchRule || null,
     merge: td.dataset.mergeRange ? { range: td.dataset.mergeRange } : null,
     is_merged: td.dataset.merged === 'true',
   }
+
+  // 可视化维度：高亮公式依赖的单元格
+  if (showFormulas.value && td.dataset.formula) {
+    _highlightFormulaDeps(td.dataset.formula)
+  }
+}
+
+function _highlightFormulaDeps(formula: string) {
+  // 清除旧高亮
+  tableContainer.value?.querySelectorAll('td.gt-dep-highlight').forEach(el => el.classList.remove('gt-dep-highlight'))
+
+  // 解析公式中的单元格引用（简单正则匹配 A1-Z99 格式）
+  const refs = formula.match(/[A-Z]{1,2}\d{1,3}/g) || []
+  for (const ref of refs) {
+    const td = tableContainer.value?.querySelector(`td[data-addr="${ref}"]`)
+    if (td) td.classList.add('gt-dep-highlight')
+  }
+}
+
+function traceSource() {
+  ElMessage.info('溯源跳转：查看数据来源（调用 trace-forward API）')
+  // TODO: 调用 trace-forward 显示来源弹窗
+}
+
+function formatValue(val: any): string {
+  if (val === null || val === undefined) return ''
+  if (typeof val === 'number') {
+    if (val === 0) return '-'
+    return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  }
+  return String(val)
 }
 
 function onCellDblClick(e: MouseEvent) {
@@ -320,7 +411,52 @@ onUnmounted(() => {
 
 <style scoped>
 .structure-editor { display: flex; flex-direction: column; height: 100%; }
-.editor-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #e8e8e8; background: #fff; }
+.editor-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #e8e8e8; background: #fff; flex-wrap: wrap; }
 .table-container { flex: 1; overflow: auto; padding: 12px; }
 .table-container :deep(td.gt-selected) { outline: 2px solid #4b2d77 !important; background: #faf8ff !important; }
+.table-container :deep(td.gt-dep-highlight) { outline: 1px dashed #e6a23c !important; background: #fdf6ec !important; }
+
+/* 可视化维度：显示公式 */
+.table-container.show-formulas :deep(td[data-formula])::after {
+  content: attr(data-formula);
+  display: block;
+  font-size: 9px;
+  color: #b7791f;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  opacity: 0.8;
+}
+/* 可视化维度：显示数据源 */
+.table-container.show-sources :deep(td[data-fetch-rule])::before {
+  content: "🔗";
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  font-size: 10px;
+}
+/* 可视化维度：显示状态（有值=绿色左边框，空=灰色，有公式=橙色） */
+.table-container.show-status :deep(td[data-formula]) { border-left: 3px solid #e6a23c !important; }
+.table-container.show-status :deep(td[data-fetch-rule]) { border-left: 3px solid #0094b3 !important; }
+
+/* 多维信息面板 */
+.info-panel { padding: 8px 12px; background: #f9f7fc; border-bottom: 1px solid #e8e0f0; }
+.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.info-card { padding: 6px 10px; background: #fff; border-radius: 6px; border: 1px solid #f0ebf8; }
+.info-card-title { font-size: 11px; color: #909399; margin-bottom: 3px; }
+.info-card-body { font-size: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.info-label { color: #909399; }
+.info-badge { font-size: 10px; padding: 1px 6px; border-radius: 3px; }
+.info-badge.merge { background: #f0e6ff; color: #7c3aed; }
+.info-badge.source { background: #e0f7fa; color: #0094b3; }
+.formula-code { font-size: 11px; background: #fffbf0; padding: 2px 6px; border-radius: 3px; color: #b7791f; }
+.value-display { font-weight: 600; color: #303133; font-family: 'Arial Narrow', monospace; }
+.close-panel { margin-top: 4px; }
+
+/* 收起状态的信息条 */
+.info-toggle { display: flex; justify-content: space-between; align-items: center; padding: 4px 12px; background: #fafafa; border-bottom: 1px solid #eee; font-size: 12px; color: #606266; cursor: pointer; }
+.info-toggle:hover { background: #f5f0ff; }
+.toggle-hint { color: #c0c4cc; font-size: 11px; }
 </style>
