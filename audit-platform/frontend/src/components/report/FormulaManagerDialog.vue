@@ -83,6 +83,9 @@
       <span style="font-size: 12px; color: #999; float: left; line-height: 32px">
         共 {{ allFormulaRows.length }} 个公式行
       </span>
+      <el-button type="primary" @click="onApplyFormulas" :loading="applying">
+        应用自动运算
+      </el-button>
       <el-button @click="visible = false">关闭</el-button>
     </template>
   </el-dialog>
@@ -96,11 +99,14 @@ import http from '@/utils/http'
 const props = defineProps<{
   modelValue: boolean
   rows: any[]
+  projectId?: string
+  year?: number
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [val: boolean]
   'saved': []
+  'applied': []
 }>()
 
 const visible = computed({
@@ -113,6 +119,7 @@ const editingId = ref<string | null>(null)
 const editFormula = ref('')
 const editCategory = ref('auto_calc')
 const editDescription = ref('')
+const applying = ref(false)
 
 const allFormulaRows = computed(() => props.rows.filter(r => r.formula))
 
@@ -165,6 +172,27 @@ async function saveEdit(row: any) {
     emit('saved')
   } catch {
     ElMessage.error('保存失败')
+  }
+}
+
+async function onApplyFormulas() {
+  if (!props.projectId || !props.year) {
+    ElMessage.warning('缺少项目信息，无法应用公式')
+    return
+  }
+  applying.value = true
+  try {
+    // 调用后端重新生成报表（执行所有自动运算公式）
+    await http.post('/api/reports/generate', {
+      project_id: props.projectId,
+      year: props.year,
+    })
+    ElMessage.success('自动运算公式已应用，报表数据已刷新')
+    emit('applied')
+  } catch (e: any) {
+    ElMessage.error('应用失败: ' + (e?.message || '请稍后重试'))
+  } finally {
+    applying.value = false
   }
 }
 </script>

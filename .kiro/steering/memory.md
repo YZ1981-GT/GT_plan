@@ -1491,3 +1491,7 @@ inclusion: always
 - 报表结构待修复：①applicable_standard需从项目配置动态获取（project.template_type+report_scope映射到soe_consolidated等）②check_balance的row_code需与新种子数据对齐③合并报表需接入report_config生成合并报表行次
 - 报表结构联动3个问题已修复并推送（2026-04-29，commit ab78a63）：①reports.py新增_resolve_applicable_standard()从Project.template_type+report_scope动态映射到soe_consolidated等4套标准（降级enterprise兼容旧数据），generate_reports端点调用时传入②report_engine.py check_balance()所有row_code改为优先新(BS-039/070/091/099/IS-024/CFS-053)降级旧(BS-021/044/056/057/IS-019/CF-042)③audit_report_service._fetch_financial_data的5个关键指标row_code对齐新种子数据
 - 报表结构完整联动链路已打通：项目配置→_resolve_applicable_standard→_load_report_configs(4套)→执行公式→trial_balance取数→financial_report表→check_balance兼容新旧→前端ReportView展示
+- 公式管理体系已完成（2026-04-29，commit b582303已推送）：ReportConfig模型新增formula_category(auto_calc/logic_check/reasonability)+formula_description+formula_source三字段；generate_report_seed.py新增_categorize_formula()自动分类（TB/SUM_TB→auto_calc+试算表审定数，ROW→auto_calc+报表行次引用）；新增FormulaManagerDialog.vue公式管理弹窗（三分类Tab+计数徽标+行内编辑公式/分类/说明+保存PUT）；ReportView.vue新增"公式管理"按钮入口；report_config_service.py update_config/load_seed_data支持新字段
+- 公式三分类体系：⚡auto_calc自动运算（从试算表取数/行次求和）、🔍logic_check逻辑审核（平衡校验/勾稽关系）、💡reasonability提示合理性（变动率/占比异常）
+- 用户偏好（公式管理）：公式需分3类+每个界面有按键弹窗编辑+公式下匹配简短说明+标注源头
+- 用户偏好（公式应用）：自动运算类公式点击"应用"后表中数值要立即重新计算刷新（不只是配置信息，是可执行的实时计算引擎）；附注表格页面也需要同样的公式管理+应用机制

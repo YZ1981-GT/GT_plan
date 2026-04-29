@@ -113,7 +113,14 @@
     </el-dialog>
 
     <!-- 公式管理弹窗 -->
-    <FormulaManagerDialog v-model="showFormulaManager" :rows="rows" @saved="fetchReport" />
+    <FormulaManagerDialog
+      v-model="showFormulaManager"
+      :rows="rows"
+      :project-id="projectId"
+      :year="year"
+      @saved="fetchReport"
+      @applied="fetchReport"
+    />
   </div>
 </template>
 

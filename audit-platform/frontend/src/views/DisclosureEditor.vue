@@ -20,6 +20,7 @@
         <el-tooltip content="当前仅支持余额核对和子项校验，其他校验规则开发中" placement="top">
           <el-button @click="onValidate" :loading="validateLoading" type="warning">执行校验</el-button>
         </el-tooltip>
+        <el-button @click="showNoteFormulaManager = true">公式管理</el-button>
         <el-button @click="onExportWord" :loading="exportLoading" type="primary">导出 Word</el-button>
       </div>
     </div>
@@ -133,6 +134,15 @@
         </div>
       </el-col>
     </el-row>
+
+    <!-- 附注公式管理弹窗 -->
+    <NoteFormulaDialog
+      v-model="showNoteFormulaManager"
+      :current-note="currentNote"
+      :project-id="projectId"
+      :year="year"
+      @applied="onFormulaApplied"
+    />
   </div>
 </template>
 
@@ -140,6 +150,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import NoteFormulaDialog from '@/components/report/NoteFormulaDialog.vue'
 import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -162,6 +173,7 @@ const validateLoading = ref(false)
 const saveLoading = ref(false)
 const refreshLoading = ref(false)
 const exportLoading = ref(false)
+const showNoteFormulaManager = ref(false)
 const editMode = ref(false)
 const templateType = ref('soe')
 const customTemplateId = ref('')
@@ -285,6 +297,11 @@ async function onRefreshFromWP() {
     if (currentNote.value) await fetchDetail(currentNote.value.note_section)
   } catch { ElMessage.error('刷新失败') }
   finally { refreshLoading.value = false }
+}
+
+async function onFormulaApplied() {
+  // 公式应用后刷新当前附注数据
+  if (currentNote.value) await fetchDetail(currentNote.value.note_section)
 }
 
 async function onExportWord() {

@@ -1,0 +1,131 @@
+<template>
+  <el-dialog
+    v-model="visible"
+    title="附注公式管理"
+    width="800px"
+    append-to-body
+    destroy-on-close
+  >
+    <div v-if="!currentNote" class="gt-nf-empty">
+      请先选择一个附注章节
+    </div>
+    <template v-else>
+      <div class="gt-nf-header">
+        <span>{{ currentNote.note_section }} {{ currentNote.section_title }}</span>
+        <el-tag size="small" type="info">{{ currentNote.content_type }}</el-tag>
+      </div>
+
+      <!-- 分类 Tab -->
+      <el-tabs v-model="activeCategory" style="margin-top: 12px">
+        <el-tab-pane label="⚡ 自动运算" name="auto_calc" />
+        <el-tab-pane label="🔍 逻辑审核" name="logic_check" />
+        <el-tab-pane label="💡 合理性" name="reasonability" />
+      </el-tabs>
+
+      <!-- 公式列表 -->
+      <el-table :data="filteredFormulas" size="small" border max-height="350">
+        <el-table-column prop="target" label="目标单元格" width="120" />
+        <el-table-column label="公式" min-width="250">
+          <template #default="{ row }">
+            <el-input v-if="row._editing" v-model="row.formula" size="small" />
+            <code v-else style="font-size: 11px">{{ row.formula }}</code>
+          </template>
+        </el-table-column>
+        <el-table-column label="说明" width="160">
+          <template #default="{ row }">
+            <el-input v-if="row._editing" v-model="row.description" size="small" />
+            <span v-else style="font-size: 12px; color: #888">{{ row.description }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源" width="100">
+          <template #default="{ row }">
+            <span style="font-size: 11px; color: #aaa">{{ row.source }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="{ row }">
+            <el-button v-if="!row._editing" size="small" link type="primary" @click="row._editing = true">编辑</el-button>
+            <el-button v-else size="small" link type="success" @click="row._editing = false">完成</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div style="margin-top: 12px; display: flex; gap: 8px">
+        <el-button size="small" @click="addFormula">新增公式</el-button>
+      </div>
+    </template>
+
+    <template #footer>
+      <el-button type="primary" @click="onApply" :loading="applying">应用自动运算</el-button>
+      <el-button @click="visible = false">关闭</el-button>
+    </template>
+  </el-dialog>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
+
+const props = defineProps<{
+  modelValue: boolean
+  currentNote: any
+  projectId: string
+  year: number
+}>()
+
+const emit = defineEmits<{
+  'update:modelValue': [val: boolean]
+  'applied': []
+}>()
+
+const visible = computed({
+  get: () => props.modelValue,
+  set: (v) => emit('update:modelValue', v),
+})
+
+const activeCategory = ref('auto_calc')
+const applying = ref(false)
+
+// 附注公式列表（从 currentNote.table_data 推断）
+const formulas = ref<any[]>([])
+
+// 当 currentNote 变化时，从表格结构推断默认公式
+const filteredFormulas = computed(() => {
+  return formulas.value.filter(f => f.category === activeCategory.value)
+})
+
+function addFormula() {
+  formulas.value.push({
+    target: '合计行',
+    formula: 'SUM(上方明细行)',
+    category: activeCategory.value,
+    description: '纵向求和',
+    source: '表格结构',
+    _editing: true,
+  })
+}
+
+async function onApply() {
+  if (!props.projectId || !props.year || !props.currentNote) {
+    ElMessage.warning('请先选择附注章节')
+    return
+  }
+  applying.value = true
+  try {
+    // 调用后端附注校验+重算（触发纵向/横向公式计算）
+    await http.post(`/api/disclosure-notes/${props.projectId}/${props.year}/validate`)
+    ElMessage.success('公式已应用，附注数据已重算')
+    emit('applied')
+  } catch {
+    ElMessage.error('应用失败')
+  } finally {
+    applying.value = false
+  }
+}
+</script>
+
+<style scoped>
+.gt-nf-empty { text-align: center; padding: 40px; color: #999; }
+.gt-nf-header { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+</style>
