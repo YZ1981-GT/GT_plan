@@ -236,10 +236,19 @@ def structure_to_html(structure: dict, sheet_index: int = 0, editable: bool = Fa
 def update_structure_from_edits(structure: dict, edits: list[dict], sheet_index: int = 0) -> dict:
     """将前端编辑结果更新到 structure.json
 
-    Args:
-        structure: 原始 structure.json
-        edits: 编辑列表 [{"cell": "0:1", "value": "新值", "formula": null}, ...]
-        sheet_index: 编辑的 sheet 索引
+    支持的编辑操作：
+    - 单元格修改: {"action": "edit", "cell": "0:1", "value": "新值", "formula": null}
+    - 插入行: {"action": "insert_row", "at": 3}  → 在第3行前插入空行
+    - 删除行: {"action": "delete_row", "at": 3}  → 删除第3行
+    - 插入列: {"action": "insert_col", "at": 2}  → 在第2列前插入空列
+    - 删除列: {"action": "delete_col", "at": 2}  → 删除第2列
+    - 设置公式: {"action": "set_formula", "cell": "5:1", "formula": "SUM(1:4, 1)", "type": "vertical_sum"}
+
+    增删行列时自动调整：
+    - 所有单元格坐标重新映射
+    - 公式中的行列引用自动偏移
+    - 合并单元格范围自动调整
+    - fetch_rule_id 绑定跟随单元格移动
 
     Returns:
         更新后的 structure.json
@@ -249,30 +258,289 @@ def update_structure_from_edits(structure: dict, edits: list[dict], sheet_index:
         return structure
 
     sheet = sheets[sheet_index]
-    cells = sheet.get("cells", {})
 
     for edit in edits:
-        key = edit.get("cell", "")
-        if not key:
-            continue
+        action = edit.get("action", "edit")
 
-        if key not in cells:
-            cells[key] = {}
+        if action == "edit":
+            _apply_cell_edit(sheet, edit)
+        elif action == "insert_row":
+            _insert_row(sheet, edit.get("at", 0))
+        elif action == "delete_row":
+            _delete_row(sheet, edit.get("at", 0))
+        elif action == "insert_col":
+            _insert_col(sheet, edit.get("at", 0))
+        elif action == "delete_col":
+            _delete_col(sheet, edit.get("at", 0))
+        elif action == "set_formula":
+            _set_formula(sheet, edit)
 
-        if "value" in edit:
-            cells[key]["value"] = edit["value"]
-        if "formula" in edit:
-            cells[key]["formula"] = edit["formula"]
-        if "fetch_rule_id" in edit:
-            cells[key]["fetch_rule_id"] = edit["fetch_rule_id"]
-        if "style" in edit:
-            cells[key]["style"] = edit["style"]
-
-    sheet["cells"] = cells
     structure["metadata"]["version"] = structure["metadata"].get("version", 0) + 1
     structure["metadata"]["last_edited_at"] = datetime.utcnow().isoformat()
 
     return structure
+
+
+def _apply_cell_edit(sheet: dict, edit: dict):
+    """应用单元格编辑"""
+    cells = sheet.get("cells", {})
+    key = edit.get("cell", "")
+    if not key:
+        return
+
+    if key not in cells:
+        cells[key] = {}
+
+    if "value" in edit:
+        cells[key]["value"] = edit["value"]
+    if "formula" in edit:
+        cells[key]["formula"] = edit["formula"]
+    if "fetch_rule_id" in edit:
+        cells[key]["fetch_rule_id"] = edit["fetch_rule_id"]
+    if "style" in edit:
+        cells[key]["style"] = edit["style"]
+
+    sheet["cells"] = cells
+
+
+def _insert_row(sheet: dict, at: int):
+    """插入行：所有 row >= at 的单元格行号+1，公式引用自动调整"""
+    cells = sheet.get("cells", {})
+    merges = sheet.get("merges", [])
+    rows_meta = sheet.get("rows", [])
+
+    # 重建 cells（行号偏移）
+    new_cells = {}
+    for key, cell_data in cells.items():
+        r, c = _parse_key(key)
+        if r >= at:
+            new_cells[f"{r+1}:{c}"] = cell_data
+        else:
+            new_cells[f"{r}:{c}"] = cell_data
+
+    # 调整公式中的行引用
+    for key, cell_data in new_cells.items():
+        if cell_data.get("formula"):
+            cell_data["formula"] = _shift_formula_rows(cell_data["formula"], at, 1)
+
+    # 调整合并单元格
+    for m in merges:
+        if m["start_row"] >= at:
+            m["start_row"] += 1
+        if m["end_row"] >= at:
+            m["end_row"] += 1
+
+    # 插入行元数据
+    if at <= len(rows_meta):
+        rows_meta.insert(at, {"height": 22})
+
+    sheet["cells"] = new_cells
+    sheet["merges"] = merges
+    sheet["rows"] = rows_meta
+
+
+def _delete_row(sheet: dict, at: int):
+    """删除行：移除该行所有单元格，后续行号-1，公式引用自动调整"""
+    cells = sheet.get("cells", {})
+    merges = sheet.get("merges", [])
+    rows_meta = sheet.get("rows", [])
+
+    # 重建 cells（删除目标行，后续行号-1）
+    new_cells = {}
+    for key, cell_data in cells.items():
+        r, c = _parse_key(key)
+        if r == at:
+            continue  # 删除该行
+        elif r > at:
+            new_cells[f"{r-1}:{c}"] = cell_data
+        else:
+            new_cells[f"{r}:{c}"] = cell_data
+
+    # 调整公式中的行引用
+    for key, cell_data in new_cells.items():
+        if cell_data.get("formula"):
+            cell_data["formula"] = _shift_formula_rows(cell_data["formula"], at, -1)
+
+    # 调整合并单元格
+    new_merges = []
+    for m in merges:
+        if m["start_row"] == at and m["end_row"] == at:
+            continue  # 完全在被删行内，移除
+        if m["start_row"] > at:
+            m["start_row"] -= 1
+        if m["end_row"] > at:
+            m["end_row"] -= 1
+        if m["end_row"] >= m["start_row"]:
+            new_merges.append(m)
+
+    # 删除行元数据
+    if at < len(rows_meta):
+        rows_meta.pop(at)
+
+    sheet["cells"] = new_cells
+    sheet["merges"] = new_merges
+    sheet["rows"] = rows_meta
+
+
+def _insert_col(sheet: dict, at: int):
+    """插入列：所有 col >= at 的单元格列号+1"""
+    cells = sheet.get("cells", {})
+    merges = sheet.get("merges", [])
+    cols_meta = sheet.get("cols", [])
+
+    new_cells = {}
+    for key, cell_data in cells.items():
+        r, c = _parse_key(key)
+        if c >= at:
+            new_cells[f"{r}:{c+1}"] = cell_data
+        else:
+            new_cells[f"{r}:{c}"] = cell_data
+
+    # 调整公式中的列引用
+    for key, cell_data in new_cells.items():
+        if cell_data.get("formula"):
+            cell_data["formula"] = _shift_formula_cols(cell_data["formula"], at, 1)
+
+    for m in merges:
+        if m["start_col"] >= at:
+            m["start_col"] += 1
+        if m["end_col"] >= at:
+            m["end_col"] += 1
+
+    if at <= len(cols_meta):
+        cols_meta.insert(at, {"width": 100})
+
+    sheet["cells"] = new_cells
+    sheet["merges"] = merges
+    sheet["cols"] = cols_meta
+
+
+def _delete_col(sheet: dict, at: int):
+    """删除列：移除该列所有单元格，后续列号-1"""
+    cells = sheet.get("cells", {})
+    merges = sheet.get("merges", [])
+    cols_meta = sheet.get("cols", [])
+
+    new_cells = {}
+    for key, cell_data in cells.items():
+        r, c = _parse_key(key)
+        if c == at:
+            continue
+        elif c > at:
+            new_cells[f"{r}:{c-1}"] = cell_data
+        else:
+            new_cells[f"{r}:{c}"] = cell_data
+
+    for key, cell_data in new_cells.items():
+        if cell_data.get("formula"):
+            cell_data["formula"] = _shift_formula_cols(cell_data["formula"], at, -1)
+
+    new_merges = []
+    for m in merges:
+        if m["start_col"] == at and m["end_col"] == at:
+            continue
+        if m["start_col"] > at:
+            m["start_col"] -= 1
+        if m["end_col"] > at:
+            m["end_col"] -= 1
+        if m["end_col"] >= m["start_col"]:
+            new_merges.append(m)
+
+    if at < len(cols_meta):
+        cols_meta.pop(at)
+
+    sheet["cells"] = new_cells
+    sheet["merges"] = new_merges
+    sheet["cols"] = cols_meta
+
+
+def _set_formula(sheet: dict, edit: dict):
+    """设置/更新单元格公式"""
+    cells = sheet.get("cells", {})
+    key = edit.get("cell", "")
+    if not key:
+        return
+
+    if key not in cells:
+        cells[key] = {}
+
+    cells[key]["formula"] = edit.get("formula", "")
+    if edit.get("type"):
+        cells[key]["_formula_type"] = edit["type"]
+    if edit.get("description"):
+        cells[key]["_formula_desc"] = edit["description"]
+
+    sheet["cells"] = cells
+
+
+# ═══ 公式引用自动调整 ═══
+
+import re
+
+_CELL_REF_PATTERN = re.compile(r'cell\((\d+),\s*(\d+)\)')
+_SUM_PATTERN = re.compile(r'SUM\((\d+):(\d+),\s*(\d+)\)')
+_ROW_REF_PATTERN = re.compile(r'(?<!\d)(\d+)(?=:|\))')
+
+
+def _shift_formula_rows(formula: str, at: int, delta: int) -> str:
+    """调整公式中的行引用（插入/删除行时）
+
+    cell(row, col) → row >= at 时 row += delta
+    SUM(start:end, col) → start/end >= at 时调整
+    """
+    def _shift_cell_ref(m):
+        r, c = int(m.group(1)), int(m.group(2))
+        if r >= at:
+            r += delta
+        if r < 0:
+            r = 0
+        return f"cell({r}, {c})"
+
+    def _shift_sum_ref(m):
+        start, end, col = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if start >= at:
+            start += delta
+        if end >= at:
+            end += delta
+        start = max(0, start)
+        end = max(start, end)
+        return f"SUM({start}:{end}, {col})"
+
+    result = _CELL_REF_PATTERN.sub(_shift_cell_ref, formula)
+    result = _SUM_PATTERN.sub(_shift_sum_ref, result)
+    return result
+
+
+def _shift_formula_cols(formula: str, at: int, delta: int) -> str:
+    """调整公式中的列引用（插入/删除列时）
+
+    cell(row, col) → col >= at 时 col += delta
+    SUM(start:end, col) → col >= at 时调整
+    """
+    def _shift_cell_ref(m):
+        r, c = int(m.group(1)), int(m.group(2))
+        if c >= at:
+            c += delta
+        if c < 0:
+            c = 0
+        return f"cell({r}, {c})"
+
+    def _shift_sum_ref(m):
+        start, end, col = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if col >= at:
+            col += delta
+        col = max(0, col)
+        return f"SUM({start}:{end}, {col})"
+
+    result = _CELL_REF_PATTERN.sub(_shift_cell_ref, formula)
+    result = _SUM_PATTERN.sub(_shift_sum_ref, result)
+    return result
+
+
+def _parse_key(key: str) -> tuple[int, int]:
+    """解析 "row:col" 键"""
+    parts = key.split(":")
+    return int(parts[0]), int(parts[1])
 
 
 # ═══ structure.json → Excel 回写 ═══
