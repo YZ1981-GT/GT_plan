@@ -91,25 +91,20 @@ class DataValidationEngine:
         try:
             import sqlalchemy as sa
             from app.models.audit_platform_models import TbBalance, TbAuxBalance
+            from app.services.dataset_query import get_active_filter
 
             # Check: sum of aux balances should match main balance per account
+            balance_filter = await get_active_filter(self.db, TbBalance.__table__, project_id, year)
+            aux_filter = await get_active_filter(self.db, TbAuxBalance.__table__, project_id, year)
             bal_q = sa.select(
                 TbBalance.account_code,
                 sa.func.sum(TbBalance.closing_balance).label("bal_total"),
-            ).where(
-                TbBalance.project_id == project_id,
-                TbBalance.year == year,
-                TbBalance.is_deleted == False,
-            ).group_by(TbBalance.account_code)
+            ).where(balance_filter).group_by(TbBalance.account_code)
 
             aux_q = sa.select(
                 TbAuxBalance.account_code,
                 sa.func.sum(TbAuxBalance.closing_balance).label("aux_total"),
-            ).where(
-                TbAuxBalance.project_id == project_id,
-                TbAuxBalance.year == year,
-                TbAuxBalance.is_deleted == False,
-            ).group_by(TbAuxBalance.account_code)
+            ).where(aux_filter).group_by(TbAuxBalance.account_code)
 
             bal_rows = (await self.db.execute(bal_q)).all()
             aux_rows = (await self.db.execute(aux_q)).all()
@@ -264,11 +259,10 @@ class DataValidationEngine:
         try:
             import sqlalchemy as sa
             from app.models.audit_platform_models import TbBalance
+            from app.services.dataset_query import get_active_filter
 
             q = sa.select(TbBalance).where(
-                TbBalance.project_id == project_id,
-                TbBalance.year == year,
-                TbBalance.is_deleted == False,
+                await get_active_filter(self.db, TbBalance.__table__, project_id, year)
             )
             rows = (await self.db.execute(q)).scalars().all()
             for row in rows:
@@ -292,12 +286,11 @@ class DataValidationEngine:
         try:
             import sqlalchemy as sa
             from app.models.audit_platform_models import TbBalance
+            from app.services.dataset_query import get_active_filter
             import re
 
             q = sa.select(TbBalance.id, TbBalance.account_code, TbBalance.closing_balance).where(
-                TbBalance.project_id == project_id,
-                TbBalance.year == year,
-                TbBalance.is_deleted == False,
+                await get_active_filter(self.db, TbBalance.__table__, project_id, year)
             ).limit(500)
             rows = (await self.db.execute(q)).all()
 

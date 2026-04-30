@@ -5,11 +5,11 @@ Validates: Requirements 3.1-3.8
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.audit_platform_schemas import (
     AutoMatchResult,
     MappingCompletionRate,
@@ -32,14 +32,15 @@ router = APIRouter(prefix="/api/projects", tags=["mapping"])
 )
 async def auto_suggest(
     project_id: UUID,
+    year: int | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> list[MappingSuggestion]:
     """自动匹配建议：编码前缀→名称精确→名称模糊。
 
     Validates: Requirements 3.1
     """
-    return await mapping_service.auto_suggest(project_id, db)
+    return await mapping_service.auto_suggest(project_id, db, year=year)
 
 
 @router.post(
@@ -50,7 +51,7 @@ async def auto_match(
     project_id: UUID,
     body: MappingYearInput | None = Body(default=None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> AutoMatchResult:
     """自动匹配并直接保存映射结果。
 
@@ -66,7 +67,7 @@ async def auto_match(
 async def get_mappings(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> list[MappingResponse]:
     """获取映射列表。
 
@@ -83,7 +84,7 @@ async def save_mapping(
     project_id: UUID,
     mapping: MappingInput,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> MappingResponse:
     """保存单条映射。
 
@@ -102,7 +103,7 @@ async def update_mapping(
     mapping_id: UUID,
     body: MappingUpdateInput,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> MappingResponse:
     """修改映射。
 
@@ -122,7 +123,7 @@ async def batch_confirm(
     project_id: UUID,
     mappings: list[MappingInput],
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ) -> MappingResult:
     """批量确认映射。
 
@@ -137,11 +138,12 @@ async def batch_confirm(
 )
 async def get_completion_rate(
     project_id: UUID,
+    year: int | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ) -> MappingCompletionRate:
     """获取映射完成率。
 
     Validates: Requirements 3.5, 3.6
     """
-    return await mapping_service.get_completion_rate(project_id, db)
+    return await mapping_service.get_completion_rate(project_id, db, year=year)

@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import datetime
 from collections import defaultdict
 from typing import Any, Callable, Coroutine
 
@@ -45,6 +46,15 @@ class EventBus:
         self._pending: dict[str, dict] = {}  # debounce 缓冲区
         self._debounce_ms: int = debounce_ms
         self._redis_available: bool | None = None  # 延迟检测
+        self._last_replay_report: dict[str, Any] = {
+            "checked_at": None,
+            "redis_available": None,
+            "read_count": 0,
+            "success_count": 0,
+            "failed_count": 0,
+            "acked_count": 0,
+            "last_error": None,
+        }
 
     def _build_dedup_key(self, payload: EventPayload) -> str:
         """构建 debounce 去重键。
@@ -166,11 +176,22 @@ class EventBus:
         Returns:
             恢复并重新分发的事件数量
         """
+        report = {
+            "checked_at": datetime.utcnow().isoformat(),
+            "redis_available": False,
+            "read_count": 0,
+            "success_count": 0,
+            "failed_count": 0,
+            "acked_count": 0,
+            "last_error": None,
+        }
         redis = await self._get_redis()
         if not redis:
+            self._last_replay_report = report
             return 0
 
         try:
+            report["redis_available"] = True
             # 确保 consumer group 存在
             try:
                 await redis.xgroup_create(_STREAM_KEY, _CONSUMER_GROUP, id="0", mkstream=True)
@@ -182,11 +203,13 @@ class EventBus:
                 _CONSUMER_GROUP, "worker-1", {_STREAM_KEY: ">"}, count=100, block=0
             )
             if not messages:
+                self._last_replay_report = report
                 return 0
 
             count = 0
             for stream_name, entries in messages:
                 for msg_id, data in entries:
+                    report["read_count"] += 1
                     try:
                         event_type = EventType(data.get("event_type", ""))
                         payload = EventPayload(
@@ -201,19 +224,31 @@ class EventBus:
                             try:
                                 await handler(payload)
                             except Exception:
-                                pass
+                                report["failed_count"] += 1
+                                report["last_error"] = f"handler failed for {event_type.value}"
                         # ACK
                         await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
+                        report["acked_count"] += 1
+                        report["success_count"] += 1
                         count += 1
-                    except Exception:
+                    except Exception as item_exc:
+                        report["failed_count"] += 1
+                        report["last_error"] = str(item_exc)
                         # 无法解析的消息直接 ACK 跳过
                         await redis.xack(_STREAM_KEY, _CONSUMER_GROUP, msg_id)
+                        report["acked_count"] += 1
 
             logger.info("EventBus: replayed %d pending events from Redis Stream", count)
+            self._last_replay_report = report
             return count
         except Exception as e:
             logger.warning("EventBus: replay_pending_events failed: %s", e)
+            report["last_error"] = str(e)
+            self._last_replay_report = report
             return 0
+
+    def get_replay_report(self) -> dict[str, Any]:
+        return dict(self._last_replay_report)
 
     # ------------------------------------------------------------------
     # SSE support

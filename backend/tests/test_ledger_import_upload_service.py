@@ -4,6 +4,7 @@ import uuid
 import pytest
 from fastapi import HTTPException, UploadFile
 
+from app.services.import_artifact_storage import ImportArtifactStorage
 from app.services.ledger_import_upload_service import LedgerImportUploadService
 
 
@@ -26,6 +27,33 @@ async def test_create_bundle_rejects_excess_file_count(monkeypatch):
         await LedgerImportUploadService.create_bundle(project_id, "tester", files)
 
     assert exc.value.status_code == 413
+
+
+def test_s3_uri_and_parse(monkeypatch):
+    project_id = uuid.uuid4()
+    monkeypatch.setattr("app.services.import_artifact_storage.settings.LEDGER_ARTIFACT_S3_BUCKET", "bucket")
+    monkeypatch.setattr("app.services.import_artifact_storage.settings.LEDGER_ARTIFACT_S3_PREFIX", "prefix")
+
+    uri = ImportArtifactStorage.s3_uri(project_id, "token")
+    location = ImportArtifactStorage.parse_s3_uri(uri)
+
+    assert uri == f"s3://bucket/prefix/{project_id}/token"
+    assert location is not None
+    assert location.bucket == "bucket"
+    assert location.prefix == f"prefix/{project_id}/token"
+
+
+def test_s3_failure_injection_readonly(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.services.import_artifact_storage.settings.LEDGER_ARTIFACT_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr("app.services.import_artifact_storage.settings.LEDGER_ARTIFACT_STORAGE_FAILURE_MODE", "readonly")
+
+    with pytest.raises(Exception, match="readonly"):
+        ImportArtifactStorage.upload_bundle(
+            project_id=uuid.uuid4(),
+            upload_token="token",
+            bundle_dir=tmp_path,
+            manifest={"files": []},
+        )
 
 
 @pytest.mark.asyncio

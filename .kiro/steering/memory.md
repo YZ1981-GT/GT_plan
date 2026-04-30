@@ -1419,7 +1419,7 @@ inclusion: always
 - 合并差额表批量计算已验证正确：test_consol_worksheet_engine_pure_logic通过（根=子A+子B，1001=300，2001=130）
 
 ## 账表导入企业级改造（2026-04-29 基于外部架构师建议文档）
-- 建议文档路径：docs/账表导入企业级平台下一阶段改造建议.md（约1400行，8大建议+分阶段实施路径）
+- 账表导入权威文档：`docs/账表导入智能优先落地实施方案.md`（已合并原运行手册 + 原企业级改造建议精华；运维见文中 §14）
 - P0已完成4项：①统一入口内核（LedgerImportApplicationService，account_chart+ledger_penetration都转发）②结构化校验报告（_build_validation_report有rule_code/severity/blocking/sample_rows）③遗留清理（write_four_tables fail-fast，旧upload返回410 Gone）④前端共享composable（useImportValidation/useImportJobFlow/ImportValidationPanel/ImportCompletionSummary）
 - P1未完成3项核心架构改造：①LedgerDataset数据集版本模型（无表/无dataset_id/无版本历史回滚）②Durable Job（仍用asyncio.create_task，无持久化状态机）③上传产物共享存储（仍绑定本地文件系统）
 - 其他未完成：ImportArtifact模型、ImportJob独立模型（仍复用ImportBatch双重职责）、事件语义细化（仍只有DATA_IMPORTED）、三层校验模型（缺Business Validation和Activation Gate）、读路径统一（仍散落is_deleted=false）、导入历史中心、一键回滚
@@ -1541,10 +1541,10 @@ inclusion: always
 - 前端TS错误批量修复已完成（2026-04-29，commit 9d89a98已推送）：非合并报表15个错误全部修复——commonApi新增listAnnotations()、AttachmentPreview添加api别名、AccountImportStep import路径修正(@/stores/wizard)、DisclosureEditor slot加$index、WorkpaperWorkbench补齐year参数、移除多处unused import；剩余约120个错误全部在consolidation/组件（developing模块不影响核心）
 - 本轮最终commit数：21个（cc8f47d→9d89a98），全部已推送GitHub
 - 审计全流程断点修复计划文档已删除（2026-04-29，commit b399d22已推送）：P0+P1+P2全部完成确认后清理，本轮最终22个commit（cc8f47d→b399d22）
-- 账表导入企业级改造建议文档最终排查（2026-04-29）：8大建议中6项完整完成（统一入口/数据集版本/Durable Job/上传产物/验证报告/事件语义），2项基础到位有环境依赖（安全审计缺Prometheus指标/测试增强缺失败场景+性能基准）；P0落地4项全部完成，P1完成2/3（共享存储仍为本地），P2完成2/3（观测面板缺）；文档保留作为架构参考不删除
-- docs/底稿开发.md(v1,1627行)已删除（2026-04-29，commit bbfaae2），内容被底稿开发_v2.md(9196行)完全覆盖；docs/目录现存：底稿开发_v2.md+账表导入企业级平台下一阶段改造建议.md+ledger-import-large-file-remediation-plan.md+mineru-deployment.md
-- docs/ledger-import-large-file-remediation-plan.md已删除（2026-04-29，commit 86ccb4a），核心修复项已全部实现；docs/目录现存3个文件：底稿开发_v2.md(架构参考)+账表导入企业级平台下一阶段改造建议.md(架构参考)+mineru-deployment.md(运维参考)
-- 16阶段跨阶段分析报告已生成（2026-04-29，commit 541670d已推送）：docs/specs-cross-phase-analysis.md，含阶段命名统一表+3个跨阶段断点+企业级6维度分析+4种角色覆盖+下一步建议
+- 账表导入企业级改造建议文档最终排查（2026-04-29）：8大建议中多项已入代码；原独立《企业级改造建议》《生产运行手册》已于 2026-04-30 并入 `docs/账表导入智能优先落地实施方案.md`（§14 运维 + §25 附录）
+- docs/底稿开发.md(v1,1627行)已删除（2026-04-29，commit bbfaae2），内容被底稿开发_v2.md(9196行)完全覆盖；docs/目录账表导入以 `账表导入智能优先落地实施方案.md` 为单一权威（2026-04-30 合并 production runbook + 改造建议附录）
+- docs/ledger-import-large-file-remediation-plan.md已删除（2026-04-29，commit 86ccb4a），核心修复项已全部实现；账表导入文档已收敛为单一 `账表导入智能优先落地实施方案.md`（2026-04-30）
+- 16阶段跨阶段分析报告（原 docs/specs-cross-phase-analysis.md）已于 2026-04-30 删除归档：结论摘要——17 阶段中仅 Phase2 合并报表前端为实质断点（developing/TS 与 API 对齐），其余已打通；导入联动主链含 LEDGER_DATASET_ACTIVATED + outbox；全文仅保留于 Git 历史。
 - 跨阶段分析结论：17个阶段中14个完全完成，3个有问题（Phase2合并前端120个TS错误标记developing/Phase3协作32个死代码路由/Phase4 AI 4个服务待激活）；企业级6维度（可视化7/9+联动7/7+溯源7/7+留痕6/6+人机互动7/7+LLM辅助7/7）；4种角色需求全部覆盖
 - 下一步建议4项：①合并报表前端专项开发(2-3周)②Phase3死代码清理(0.5天)③Phase4 AI服务激活(1周)④真实项目验证(持续)
 - 跨阶段分析报告已更新修正（2026-04-29，commit 2f25195已推送）：Phase3状态修正为"已清理完毕"（102个路由全部已注册无死代码）；Phase4状态修正为"通过统一入口间接可达"（ai_unified→ai_service, wp_chat→ai_chat_service, wp_ai→workpaper_fill_service）；17个阶段中16个完全完成，仅Phase2合并报表前端存在实质断点（120个TS错误需2-3周专项开发）

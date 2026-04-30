@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile
 
 from app.core.config import settings
+from app.services.import_artifact_storage import ImportArtifactStorage
 
 logger = logging.getLogger(__name__)
 
@@ -140,29 +141,34 @@ class LedgerImportUploadService:
                 encoding="utf-8",
             )
 
-            # Phase 17: 写入 ImportArtifact 数据库记录（上传产物可追溯）
-            try:
-                from app.core.database import async_session
-                from app.models.dataset_models import ImportArtifact, ArtifactStatus
-                import uuid as _uuid
-                artifact = ImportArtifact(
-                    id=_uuid.uuid4(),
+            storage_uri = f"sharedfs://{bundle_dir.resolve().as_posix()}"
+            artifact_files = manifest_files
+            if ImportArtifactStorage.is_s3_enabled():
+                storage_uri, artifact_files = ImportArtifactStorage.upload_bundle(
                     project_id=project_id,
                     upload_token=upload_token,
-                    status=ArtifactStatus.active,
-                    storage_uri=f"local://{str(bundle_dir)}",
+                    bundle_dir=bundle_dir,
+                    manifest=manifest,
+                )
+
+            # Artifact 记录是跨实例 worker 读取上传产物的入口，失败必须阻断提交。
+            from app.core.database import async_session
+            import uuid as _uuid
+            from app.services.import_artifact_service import ImportArtifactService
+
+            async with async_session() as art_db:
+                await ImportArtifactService.create_bundle_artifact(
+                    art_db,
+                    project_id=project_id,
+                    upload_token=upload_token,
+                    storage_uri=storage_uri,
+                    bundle_dir=bundle_dir,
+                    manifest_files=artifact_files,
                     total_size_bytes=total_size,
-                    file_manifest=manifest_files,
-                    file_count=len(manifest_files),
                     expires_at=datetime.utcnow() + timedelta(hours=settings.LEDGER_UPLOAD_TTL_HOURS),
                     created_by=_uuid.UUID(user_id) if user_id else None,
                 )
-                async with async_session() as art_db:
-                    art_db.add(artifact)
-                    await art_db.commit()
-            except Exception as _art_err:
-                import logging as _log
-                _log.getLogger(__name__).debug("ImportArtifact 记录创建失败（降级）: %s", _art_err)
+                await art_db.commit()
 
             return manifest
         except Exception:
@@ -190,6 +196,23 @@ class LedgerImportUploadService:
     def get_bundle_files(cls, project_id: UUID, upload_token: str) -> list[tuple[str, Path]]:
         manifest = cls.load_manifest(project_id, upload_token)
         bundle_dir = cls._bundle_dir(project_id, upload_token)
+        return cls._files_from_manifest(bundle_dir, manifest)
+
+    @classmethod
+    def get_bundle_files_from_path(cls, bundle_dir: Path) -> list[tuple[str, Path]]:
+        manifest_path = bundle_dir / "manifest.json"
+        if not manifest_path.exists():
+            raise HTTPException(status_code=404, detail="上传产物清单不存在，请重新上传")
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"上传清单损坏: {exc}") from exc
+        if cls._is_expired(manifest.get("created_at")):
+            raise HTTPException(status_code=404, detail="上传文件已过期，请重新上传")
+        return cls._files_from_manifest(bundle_dir, manifest)
+
+    @staticmethod
+    def _files_from_manifest(bundle_dir: Path, manifest: dict[str, Any]) -> list[tuple[str, Path]]:
         file_entries: list[tuple[str, Path]] = []
         for item in manifest.get("files", []):
             filename = item.get("filename") or item.get("stored_name")

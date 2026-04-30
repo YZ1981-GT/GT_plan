@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, get_visible_project_ids, require_project_access
 from app.models.core import User
 from app.services.data_lifecycle_service import DataLifecycleService
 from app.services.import_queue_service import ImportQueueService
@@ -73,15 +73,17 @@ async def get_import_queue(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """查看当前导入队列"""
-    return {"active": await ImportQueueService.get_all_active(db)}
+    """查看当前用户可见项目的导入队列。"""
+    active = await ImportQueueService.get_all_active(db)
+    visible_ids = {str(pid) for pid in await get_visible_project_ids(current_user, db)}
+    return {"active": [item for item in active if item.get("project_id") in visible_ids]}
 
 
 @router.get("/import-queue/{project_id}")
 async def get_import_status(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """查看项目导入状态"""
     status = await ImportQueueService.get_status(project_id, db)

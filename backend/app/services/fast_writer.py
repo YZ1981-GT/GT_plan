@@ -30,6 +30,7 @@ def _build_payload(
     import_batch_id: UUID,
     *,
     is_deleted: bool,
+    dataset_id: UUID | None = None,
 ) -> list[dict[str, Any]]:
     payload: list[dict[str, Any]] = []
     for row in rows:
@@ -38,6 +39,7 @@ def _build_payload(
             "project_id": project_id,
             "year": year,
             "import_batch_id": import_batch_id,
+            "dataset_id": dataset_id,
             "is_deleted": is_deleted,
         }
         for col in columns:
@@ -56,6 +58,7 @@ async def copy_insert(
     import_batch_id: UUID,
     *,
     is_deleted: bool = False,
+    dataset_id: UUID | None = None,
 ) -> int:
     if not rows:
         return 0
@@ -67,8 +70,9 @@ async def copy_insert(
         year,
         import_batch_id,
         is_deleted=is_deleted,
+        dataset_id=dataset_id,
     )
-    all_columns = ["id", "project_id", "year", "import_batch_id", "is_deleted", *columns]
+    all_columns = ["id", "project_id", "year", "import_batch_id", "dataset_id", "is_deleted", *columns]
 
     try:
         conn = await db.connection()

@@ -35,6 +35,7 @@ from app.models.audit_platform_schemas import BasicInfoSchema
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -670,6 +671,125 @@ class TestImportService:
 
         assert len(records) == 2
         assert {r.account_code for r in records} == {"1001", "100101"}
+
+    @pytest.mark.asyncio
+    async def test_smart_import_streaming_staged_dataset_failure_stops_import(
+        self,
+        db_session: AsyncSession,
+        monkeypatch,
+    ):
+        from sqlalchemy import func, select
+        from app.services.dataset_service import DatasetService
+        from app.services.smart_import_engine import SmartImportError, smart_import_streaming
+
+        project = await _create_test_project(db_session)
+        project_id = project.id
+        csv_content = (
+            "科目编码,科目名称,期初余额,借方发生额,贷方发生额,期末余额\n"
+            "1001,库存现金,100.00,20.00,10.00,110.00\n"
+        )
+
+        async def fail_create_staged(*args, **kwargs):
+            raise RuntimeError("dataset store unavailable")
+
+        monkeypatch.setattr(DatasetService, "create_staged", fail_create_staged)
+
+        with pytest.raises(SmartImportError, match="创建数据集版本失败"):
+            await smart_import_streaming(
+                project_id=project.id,
+                file_contents=[("balance.csv", csv_content.encode("utf-8-sig"))],
+                db=db_session,
+                year_override=2024,
+            )
+
+        await db_session.rollback()
+        balance_count = await db_session.execute(
+            select(func.count(TbBalance.id)).where(TbBalance.project_id == project_id)
+        )
+        assert balance_count.scalar_one() == 0
+
+    @pytest.mark.asyncio
+    async def test_smart_import_streaming_activation_failure_keeps_previous_visible(
+        self,
+        db_session: AsyncSession,
+        monkeypatch,
+    ):
+        from sqlalchemy import select
+        from app.models.dataset_models import DatasetStatus
+        from app.services.dataset_service import DatasetService
+        from app.services.smart_import_engine import SmartImportError, smart_import_streaming
+
+        project = await _create_test_project(db_session)
+        project_id = project.id
+        previous = await DatasetService.create_staged(db_session, project_id=project_id, year=2024)
+        await DatasetService.activate(db_session, previous.id)
+        db_session.add(TbBalance(
+            project_id=project_id,
+            year=2024,
+            company_code="001",
+            account_code="1001",
+            account_name="旧库存现金",
+            dataset_id=previous.id,
+            is_deleted=False,
+        ))
+        await db_session.commit()
+
+        async def fail_activate(*args, **kwargs):
+            raise RuntimeError("activation failed")
+
+        monkeypatch.setattr(DatasetService, "activate", fail_activate)
+        csv_content = (
+            "科目编码,科目名称,借贷方向,父科目编码\n"
+            "1002,新银行存款,借,\n"
+        )
+
+        with pytest.raises(SmartImportError, match="数据集激活失败"):
+            await smart_import_streaming(
+                project_id=project_id,
+                file_contents=[("chart.csv", csv_content.encode("utf-8-sig"))],
+                db=db_session,
+                year_override=2024,
+            )
+
+        old_row = (await db_session.execute(
+            select(TbBalance).where(
+                TbBalance.project_id == project_id,
+                TbBalance.account_code == "1001",
+            )
+        )).scalar_one()
+        await db_session.refresh(previous)
+
+        assert old_row.is_deleted is False
+        assert previous.status == DatasetStatus.active
+
+    @pytest.mark.asyncio
+    async def test_smart_import_streaming_blocks_large_full_mode_excel(
+        self,
+        db_session: AsyncSession,
+        monkeypatch,
+    ):
+        from app.core.config import settings
+        from app.services import smart_import_engine
+        from app.services.smart_import_engine import SmartImportError, smart_import_streaming
+
+        project = await _create_test_project(db_session)
+        workbook_bytes = _make_xlsx_bytes(
+            [
+                ["科目编码", "科目名称"],
+                ["1001", "库存现金"],
+            ],
+            sheet_name="科目表",
+        )
+        monkeypatch.setattr(settings, "LEDGER_IMPORT_FULL_MODE_MAX_FILE_MB", 1)
+        monkeypatch.setattr(smart_import_engine, "_source_size_bytes", lambda _content: 2 * 1024 * 1024)
+
+        with pytest.raises(SmartImportError, match="文件超过非只读 Excel 解析阈值"):
+            await smart_import_streaming(
+                project_id=project.id,
+                file_contents=[("large-merged.xlsx", workbook_bytes)],
+                db=db_session,
+                year_override=2024,
+            )
 
     @pytest.mark.asyncio
     async def test_smart_import_streaming_csv_ledger_missing_account_code_fails(self, db_session: AsyncSession):

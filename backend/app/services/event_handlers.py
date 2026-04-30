@@ -12,18 +12,40 @@ import logging
 
 from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType
+from app.models.dataset_models import ImportEventConsumption
 from app.services.event_bus import event_bus
 from app.services.trial_balance_service import TrialBalanceService
+from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
 
 
 def _make_handler(service_class, method_name: str, after_commit_event_type: EventType | None = None):
     """创建一个带独立数据库会话的事件处理器，异常时自动回滚"""
+    handler_key = f"{service_class.__name__}.{method_name}"
 
     async def handler(payload: EventPayload) -> None:
         async with async_session_factory() as session:
             try:
+                # Import outbox 事件携带稳定 event_id，使用 DB 唯一约束做跨实例幂等。
+                dedup_event_id = None
+                if isinstance(payload.extra, dict):
+                    dedup_event_id = payload.extra.get("__event_id")
+                if dedup_event_id:
+                    session.add(
+                        ImportEventConsumption(
+                            event_id=str(dedup_event_id),
+                            handler_name=handler_key,
+                            project_id=payload.project_id,
+                            year=payload.year,
+                        )
+                    )
+                    try:
+                        await session.flush()
+                    except IntegrityError:
+                        await session.rollback()
+                        logger.info("Skip duplicated event delivery: event_id=%s handler=%s", dedup_event_id, handler_key)
+                        return
                 svc = service_class(session)
                 method = getattr(svc, method_name)
                 await method(payload)
@@ -42,7 +64,7 @@ def _make_handler(service_class, method_name: str, after_commit_event_type: Even
                 await session.rollback()
                 raise
 
-    handler.__qualname__ = f"{service_class.__name__}.{method_name}"
+    handler.__qualname__ = handler_key
     return handler
 
 
@@ -81,6 +103,14 @@ def register_event_handlers() -> None:
     event_bus.subscribe(
         EventType.DATA_IMPORTED,
         _make_tb_handler("on_data_imported"),
+    )
+    event_bus.subscribe(
+        EventType.LEDGER_DATASET_ACTIVATED,
+        _make_tb_handler("on_data_imported"),
+    )
+    event_bus.subscribe(
+        EventType.LEDGER_DATASET_ROLLED_BACK,
+        _make_tb_handler("on_import_rolled_back"),
     )
 
     # 导入回滚 → 全量重算
@@ -125,6 +155,7 @@ def register_event_handlers() -> None:
         async with async_session_factory() as session:
             try:
                 from app.services.wp_mapping_service import WpMappingService
+                from app.models.audit_platform_models import TrialBalance
                 from app.models.workpaper_models import WorkingPaper
                 import sqlalchemy as _sa
 
@@ -253,6 +284,14 @@ def register_event_handlers() -> None:
         _invalidate_formula_cache_all,
     )
     event_bus.subscribe(
+        EventType.LEDGER_DATASET_ACTIVATED,
+        _invalidate_formula_cache_all,
+    )
+    event_bus.subscribe(
+        EventType.LEDGER_DATASET_ROLLED_BACK,
+        _invalidate_formula_cache_all,
+    )
+    event_bus.subscribe(
         EventType.MAPPING_CHANGED,
         _invalidate_formula_cache_on_adjustment,
     )
@@ -285,6 +324,8 @@ def register_event_handlers() -> None:
             logger.warning("Failed to mark workpapers stale on adjustment change")
 
     event_bus.subscribe(EventType.DATA_IMPORTED, _mark_workpapers_stale_all)
+    event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _mark_workpapers_stale_all)
+    event_bus.subscribe(EventType.LEDGER_DATASET_ROLLED_BACK, _mark_workpapers_stale_all)
     event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_workpapers_stale_by_account)

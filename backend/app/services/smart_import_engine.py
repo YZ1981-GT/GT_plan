@@ -561,6 +561,7 @@ def _append_account_record(
     acct_records: list[AccountChart],
     by_category: dict[str, int],
     staged: bool = False,
+    dataset_id: UUID | None = None,
 ) -> bool:
     code = str(row.get("account_code", "")).strip()
     name = str(row.get("account_name", "")).strip()
@@ -586,6 +587,7 @@ def _append_account_record(
         category=category,
         parent_code=parent_code,
         source=AccountSource.client,
+        dataset_id=dataset_id,
         is_deleted=staged,
     ))
     by_category[category.value] = by_category.get(category.value, 0) + 1
@@ -1949,7 +1951,7 @@ async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
     and old data from previous imports does not remain as a mix.
     """
     import sqlalchemy as sa
-    from app.models.audit_platform_models import TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
+    from app.models.audit_platform_models import ImportBatch, ImportStatus, TbBalance, TbLedger, TbAuxBalance, TbAuxLedger
 
     for model in (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger):
         tbl = model.__table__
@@ -1962,6 +1964,15 @@ async def _clear_project_year_tables(project_id: UUID, year: int, db) -> None:
             )
             .values(is_deleted=True)
         )
+    await db.execute(
+        sa.update(ImportBatch)
+        .where(
+            ImportBatch.project_id == project_id,
+            ImportBatch.year == year,
+            ImportBatch.status == ImportStatus.completed,
+        )
+        .values(status=ImportStatus.rolled_back)
+    )
     await db.flush()
 
 
@@ -2182,6 +2193,7 @@ async def _stream_csv_import(
     counts: dict,
     _aux_type_counts: dict,
     progress_callback,
+    dataset_id: UUID | None = None,
     chunk_size: int = 50_000,
 ) -> dict:
     """流式处理 CSV 大文件：流式解码 + 逐批转换 + COPY 写入。
@@ -2346,6 +2358,7 @@ async def _stream_csv_import(
                     db, "tb_ledger", _LEDGER_COLS, led_rows,
                     project_id, year, batches["tb_ledger"].id,
                     is_deleted=True,
+                    dataset_id=dataset_id,
                 )
                 counts["tb_ledger"] += n
             if aux_rows:
@@ -2353,6 +2366,7 @@ async def _stream_csv_import(
                     db, "tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows,
                     project_id, year, batches["tb_aux_ledger"].id,
                     is_deleted=True,
+                    dataset_id=dataset_id,
                 )
                 counts["tb_aux_ledger"] += n
 
@@ -2363,6 +2377,7 @@ async def _stream_csv_import(
                     db, "tb_balance", _BALANCE_COLS, bal,
                     project_id, year, batches["tb_balance"].id,
                     is_deleted=True,
+                    dataset_id=dataset_id,
                 )
                 counts["tb_balance"] += n
             if aux_bal:
@@ -2370,6 +2385,7 @@ async def _stream_csv_import(
                     db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
                     project_id, year, batches["tb_aux_balance"].id,
                     is_deleted=True,
+                    dataset_id=dataset_id,
                 )
                 counts["tb_aux_balance"] += n
 
@@ -2385,6 +2401,7 @@ async def _stream_csv_import(
                 acct_records=acct_records,
                 by_category=by_category,
                 staged=True,
+                dataset_id=dataset_id,
             )
 
     def _parse_lines(lines: list[str]) -> list[dict]:
@@ -2456,10 +2473,13 @@ async def smart_import_streaming(
     year_override: int | None = None,
     custom_mapping: Optional[dict] = None,
     progress_callback=None,
+    job_id: UUID | None = None,
+    created_by: UUID | None = None,
+    force_activate: bool = False,
 ) -> dict:
     """多文件流式导入：逐批解析并隐藏写入，成功后统一激活。"""
     import openpyxl
-    import sqlalchemy as sa
+    from app.core.config import settings
     from app.models.audit_platform_models import (
         TbBalance, TbLedger, TbAuxBalance, TbAuxLedger,
         ImportBatch, ImportStatus,
@@ -2569,44 +2589,20 @@ async def smart_import_streaming(
             year=year,
             source_type="import",
             source_summary={"files": _source_files, "file_count": len(_source_files)},
+            job_id=job_id,
+            created_by=created_by,
         )
         _dataset_id = _dataset.id
         await db.flush()
     except Exception as _ds_err:
-        logger.warning("创建 LedgerDataset 失败（降级为无版本）: %s", _ds_err)
+        logger.exception("创建 LedgerDataset 失败，已终止导入")
+        raise SmartImportError(
+            f"创建数据集版本失败: {_ds_err}",
+            errors=[str(_ds_err)],
+            year=year,
+        ) from _ds_err
 
     _prog(10, "开始解析文件…")
-
-    async def _activate_staged_rows(account_ids: list[UUID]) -> None:
-        for dt_key, model in _TABLE_MAP.items():
-            tbl = model.__table__
-            await db.execute(
-                sa.update(tbl)
-                .where(
-                    tbl.c.project_id == project_id,
-                    tbl.c.year == year,
-                    tbl.c.is_deleted == sa.false(),
-                )
-                .values(is_deleted=True)
-            )
-
-        ac_tbl = AccountChart.__table__
-        await db.execute(
-            sa.update(ac_tbl)
-            .where(
-                ac_tbl.c.project_id == project_id,
-                ac_tbl.c.source == AccountSource.client,
-                ac_tbl.c.is_deleted == sa.false(),
-            )
-            .values(is_deleted=True)
-        )
-        if account_ids:
-            await db.execute(
-                sa.update(ac_tbl)
-                .where(ac_tbl.c.id.in_(account_ids))
-                .values(is_deleted=False)
-            )
-        await db.flush()
 
     counts: dict[str, int] = {k: 0 for k in _TABLE_MAP}
     diagnostics: list[dict] = []
@@ -2654,6 +2650,7 @@ async def smart_import_streaming(
                     counts=counts,
                     _aux_type_counts=_aux_type_counts,
                     progress_callback=_prog,
+                    dataset_id=_dataset_id,
                     chunk_size=CHUNK,
                 )
                 diagnostics.append(csv_result["diag"])
@@ -2692,6 +2689,21 @@ async def smart_import_streaming(
             wb_probe.close()
         except Exception:
             pass
+
+        full_mode_limit_bytes = max(1, settings.LEDGER_IMPORT_FULL_MODE_MAX_FILE_MB) * 1024 * 1024
+        if needs_full and _source_size_bytes(content) > full_mode_limit_bytes:
+            diagnostics.append({
+                "file": filename,
+                "sheet": None,
+                "status": "error",
+                "message": (
+                    "该 Excel 需要非只读模式解析合并/复杂表头，文件超过 "
+                    f"{settings.LEDGER_IMPORT_FULL_MODE_MAX_FILE_MB}MB 内存保护阈值。"
+                    "请拆分文件、另存为 CSV，或调高 LEDGER_IMPORT_FULL_MODE_MAX_FILE_MB。"
+                ),
+            })
+            errors.append(f"{filename}: 文件超过非只读 Excel 解析阈值")
+            continue
 
         try:
             wb = openpyxl.load_workbook(
@@ -2759,6 +2771,7 @@ async def smart_import_streaming(
                             db, "tb_balance", _BALANCE_COLS, bal,
                             project_id, year, batches["tb_balance"].id,
                             is_deleted=True,
+                            dataset_id=_dataset_id,
                         )
                         counts["tb_balance"] += n
                     if aux_bal:
@@ -2766,6 +2779,7 @@ async def smart_import_streaming(
                             db, "tb_aux_balance", _AUX_BALANCE_COLS, aux_bal,
                             project_id, year, batches["tb_aux_balance"].id,
                             is_deleted=True,
+                            dataset_id=_dataset_id,
                         )
                         counts["tb_aux_balance"] += n
                     for r in aux_bal:
@@ -2779,6 +2793,7 @@ async def smart_import_streaming(
                             acct_records=acct_records,
                             by_category=by_category,
                             staged=True,
+                            dataset_id=_dataset_id,
                         )
                     await db.commit()
 
@@ -2818,6 +2833,7 @@ async def smart_import_streaming(
                             db, "tb_ledger", _LEDGER_COLS, led_rows,
                             project_id, year, batches["tb_ledger"].id,
                             is_deleted=True,
+                            dataset_id=_dataset_id,
                         )
                         counts["tb_ledger"] += n
                     if aux_rows:
@@ -2825,6 +2841,7 @@ async def smart_import_streaming(
                             db, "tb_aux_ledger", _AUX_LEDGER_COLS, aux_rows,
                             project_id, year, batches["tb_aux_ledger"].id,
                             is_deleted=True,
+                            dataset_id=_dataset_id,
                         )
                         counts["tb_aux_ledger"] += n
                     for row in batch_rows:
@@ -2835,6 +2852,7 @@ async def smart_import_streaming(
                             acct_records=acct_records,
                             by_category=by_category,
                             staged=True,
+                            dataset_id=_dataset_id,
                         )
                     await db.commit()
                     _prog(min(pct, 88), f"解析 {filename} / {sname}: {total_rows:,} 行")
@@ -2856,6 +2874,7 @@ async def smart_import_streaming(
                             acct_records=acct_records,
                             by_category=by_category,
                             staged=True,
+                            dataset_id=_dataset_id,
                         )
                 diag["row_count"] = total_rows
                 diag["account_count"] = len(acct_records) - added_before
@@ -2922,39 +2941,71 @@ async def smart_import_streaming(
     _bv_findings: list[dict] = []
     try:
         from app.services.import_validation_service import ImportValidationService
-        # 构建 parsed_data 供校验（从已解析的 counts 和内存数据推断）
-        _parsed_for_bv = {
-            "balance_rows": [],  # 余额表行已写入DB，此处用counts代替
-            "ledger_rows": [],   # 序时账行已写入DB
-        }
-        bv_findings = ImportValidationService.run_business_validation(
-            _parsed_for_bv, expected_year=year
-        )
+        bv_findings = []
+        if _dataset_id:
+            bv_findings = await ImportValidationService.run_dataset_business_validation(
+                db,
+                project_id=project_id,
+                year=year,
+                dataset_id=_dataset_id,
+            )
         _bv_findings = [f.to_dict() for f in bv_findings]
         if _bv_findings:
             logger.info("Business Validation: %d 条发现", len(_bv_findings))
+        gate = ImportValidationService.evaluate_activation(_bv_findings, force=force_activate)
+        if not gate.get("allowed"):
+            if _dataset_id:
+                try:
+                    from app.services.dataset_service import DatasetService
+                    await DatasetService.mark_failed(db, _dataset_id)
+                except Exception:
+                    pass
+            await db.commit()
+            blocking = gate.get("blocking_findings") or []
+            raise SmartImportError(
+                "导入校验未通过，已阻止激活",
+                diagnostics=diagnostics,
+                errors=[item.get("message", "校验未通过") for item in blocking],
+                year=year,
+            )
     except Exception as _bv_err:
+        if isinstance(_bv_err, SmartImportError):
+            raise
         logger.debug("Business Validation 执行失败（不阻断导入）: %s", _bv_err)
 
     _prog(90, f"科目 {len(acct_records)} 个，准备激活…")
 
-    await _activate_staged_rows(account_ids)
     for dt_key, batch in batches.items():
         batch.record_count = counts[dt_key]
         batch.status = ImportStatus.completed
         batch.completed_at = datetime.utcnow()
 
     # Phase 17: 激活数据集版本
+    _activated_dataset = None
     if _dataset_id:
+        from app.services.dataset_service import DatasetService
         try:
-            from app.services.dataset_service import DatasetService
-            await DatasetService.activate(
+            _activated_dataset = await DatasetService.activate(
                 db,
                 dataset_id=_dataset_id,
+                activated_by=created_by,
                 record_summary=counts,
+                validation_summary={
+                    "business_validation": _bv_findings,
+                    "total": len(_bv_findings),
+                    "blocking_count": sum(1 for item in _bv_findings if item.get("blocking")),
+                    "has_blocking": any(item.get("blocking") for item in _bv_findings),
+                },
             )
         except Exception as _act_err:
-            logger.warning("数据集激活失败（不影响导入）: %s", _act_err)
+            await DatasetService.mark_failed(db, _dataset_id)
+            await db.commit()
+            raise SmartImportError(
+                f"数据集激活失败: {_act_err}",
+                diagnostics=diagnostics,
+                errors=[str(_act_err)],
+                year=year,
+            ) from _act_err
 
     await db.commit()
 
@@ -2965,17 +3016,19 @@ async def smart_import_streaming(
         except Exception as e:
             logger.warning("辅助余额汇总失败: %s", e)
 
-    try:
-        from app.services.event_bus import event_bus
-        from app.models.audit_platform_schemas import EventPayload, EventType
-        await event_bus.publish(EventPayload(
-            event_type=EventType.DATA_IMPORTED,
-            project_id=project_id,
-            year=year,
-        ))
-        logger.info("DATA_IMPORTED 事件: project=%s, year=%d, counts=%s", project_id, year, counts)
-    except Exception as e:
-        logger.warning("DATA_IMPORTED 事件发布失败: %s", e)
+    if _activated_dataset is not None:
+        try:
+            from app.services.dataset_service import DatasetService
+            await DatasetService.publish_dataset_activated(_activated_dataset)
+            logger.info(
+                "LEDGER_DATASET_ACTIVATED 事件: project=%s, year=%d, dataset=%s, counts=%s",
+                project_id,
+                year,
+                _dataset_id,
+                counts,
+            )
+        except Exception as e:
+            logger.warning("LEDGER_DATASET_ACTIVATED 事件发布失败: %s", e)
 
     _prog(100, "导入完成")
 
@@ -3001,6 +3054,7 @@ async def smart_import_streaming(
         "data_sheets_imported": counts,
         "sheet_diagnostics": norm_diag,
         "year": year,
+        "dataset_id": str(_dataset_id) if _dataset_id else None,
         "errors": errors,
     }
 

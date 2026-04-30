@@ -14,10 +14,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import require_project_access
 from app.models.core import User
+from app.models.dataset_models import JobStatus
 from app.services.dataset_service import DatasetService
 from app.services.import_job_service import ImportJobService
+from app.services.import_job_runner import ImportJobRunner
+from app.services.import_queue_service import ImportQueueService
+from app.services.import_artifact_service import ImportArtifactService
 
 router = APIRouter(prefix="/api/projects/{project_id}/ledger-import", tags=["数据集版本"])
 
@@ -27,7 +31,7 @@ async def list_datasets(
     project_id: UUID,
     year: int = 2025,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询数据集版本历史"""
     datasets = await DatasetService.list_datasets(db, project_id, year)
@@ -52,7 +56,7 @@ async def get_active_dataset(
     project_id: UUID,
     year: int = 2025,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询当前 active 数据集"""
     dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
@@ -68,7 +72,7 @@ async def rollback_dataset(
     year: int = 2025,
     reason: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """回滚到上一版本数据集"""
     result = await DatasetService.rollback(
@@ -79,6 +83,7 @@ async def rollback_dataset(
     if not result:
         raise HTTPException(status_code=400, detail="无法回滚：没有上一版本或当前无 active 数据集")
     await db.commit()
+    await DatasetService.publish_dataset_rolled_back_from_record(result)
     return {
         "message": "回滚成功",
         "restored_dataset_id": str(result.id),
@@ -91,7 +96,7 @@ async def list_activation_records(
     project_id: UUID,
     year: int = 2025,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询激活/回滚操作历史"""
     records = await DatasetService.list_activation_records(db, project_id, year)
@@ -113,7 +118,7 @@ async def list_import_jobs(
     project_id: UUID,
     year: int | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询导入作业历史"""
     jobs = await ImportJobService.list_jobs(db, project_id, year)
@@ -134,12 +139,37 @@ async def list_import_jobs(
     ]
 
 
+@router.get("/artifacts")
+async def list_import_artifacts(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """查询上传产物历史"""
+    artifacts = await ImportArtifactService.list_artifacts(db, project_id=project_id)
+    return [
+        {
+            "id": str(a.id),
+            "upload_token": a.upload_token,
+            "status": a.status.value,
+            "storage_uri": a.storage_uri,
+            "checksum": a.checksum,
+            "total_size_bytes": a.total_size_bytes,
+            "file_manifest": a.file_manifest,
+            "file_count": a.file_count,
+            "expires_at": a.expires_at.isoformat() if a.expires_at else None,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+        for a in artifacts
+    ]
+
+
 @router.get("/jobs/{job_id}")
 async def get_import_job(
     project_id: UUID,
     job_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询单个导入作业状态"""
     job = await ImportJobService.get_job(db, job_id)
@@ -151,9 +181,12 @@ async def get_import_job(
         "status": job.status.value,
         "current_phase": job.current_phase,
         "progress_pct": job.progress_pct,
+        "progress": -1 if job.status.value in ("failed", "timed_out", "canceled") else (100 if job.status.value == "completed" else job.progress_pct),
         "progress_message": job.progress_message,
+        "message": job.progress_message or job.error_message,
         "error_message": job.error_message,
         "result_summary": job.result_summary,
+        "result": job.result_summary,
         "retry_count": job.retry_count,
         "max_retries": job.max_retries,
         "created_at": job.created_at.isoformat() if job.created_at else None,
@@ -167,12 +200,19 @@ async def retry_import_job(
     project_id: UUID,
     job_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """重试失败的导入作业"""
     try:
+        existing = await ImportJobService.get_job(db, job_id)
+        if not existing or existing.project_id != project_id:
+            raise HTTPException(status_code=404, detail="作业不存在")
         job = await ImportJobService.retry(db, job_id)
+        await ImportJobService.transition(db, job.id, JobStatus.queued, progress_pct=0, progress_message="重试作业已排队")
         await db.commit()
+        from app.core.config import settings
+        if settings.LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED:
+            ImportJobRunner.enqueue(job.id)
         return {"message": f"作业已重新排队（第 {job.retry_count} 次重试）", "job_id": str(job.id)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -183,12 +223,28 @@ async def cancel_import_job(
     project_id: UUID,
     job_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """取消导入作业"""
     try:
+        existing = await ImportJobService.get_job(db, job_id)
+        if not existing or existing.project_id != project_id:
+            raise HTTPException(status_code=404, detail="作业不存在")
+        existing_status = existing.status
         job = await ImportJobService.cancel(db, job_id)
         await db.commit()
+        ImportJobRunner.request_cancel(job.id)
+        if existing_status in (JobStatus.pending, JobStatus.queued):
+            ImportQueueService.release_lock(project_id)
+            batch_id_raw = (job.options or {}).get("queue_batch_id")
+            if batch_id_raw:
+                await ImportQueueService.fail_job(
+                    project_id,
+                    UUID(batch_id_raw),
+                    db,
+                    message="导入已取消",
+                    year=job.year,
+                )
         return {"message": "作业已取消", "job_id": str(job.id)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

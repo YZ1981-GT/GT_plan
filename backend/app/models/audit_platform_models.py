@@ -133,6 +133,13 @@ class ImportBatch(Base):
 
     __table_args__ = (
         Index("idx_import_batches_project_year", "project_id", "year"),
+        Index(
+            "uq_import_batches_one_processing_smart_job",
+            "project_id",
+            unique=True,
+            postgresql_where=text("data_type = '__smart_import_job__' AND status = 'processing'"),
+            sqlite_where=text("data_type = '__smart_import_job__' AND status = 'processing'"),
+        ),
     )
 
 
@@ -168,6 +175,9 @@ class AccountChart(Base):
         sa.Enum(AccountSource, name="account_source", create_type=False),
         nullable=False,
     )
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True, index=True
+    )  # Phase 17: 客户科目表关联业务级账表数据集
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -180,6 +190,10 @@ class AccountChart(Base):
             "project_id", "account_code", "source",
             unique=True,
             postgresql_where=text("is_deleted = false"),
+        ),
+        Index(
+            "idx_account_chart_project_dataset_deleted",
+            "project_id", "dataset_id", "is_deleted",
         ),
     )
 

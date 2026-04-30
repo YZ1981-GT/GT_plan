@@ -311,6 +311,96 @@ class ImportValidationService:
         return findings
 
     @staticmethod
+    async def run_dataset_business_validation(
+        db: AsyncSession,
+        *,
+        project_id: UUID,
+        year: int,
+        dataset_id: UUID,
+    ) -> list[ValidationFinding]:
+        """Execute business validation against staged rows already written to DB."""
+        from app.models.audit_platform_models import TbBalance, TbLedger
+
+        findings: list[ValidationFinding] = []
+
+        ledger_tbl = TbLedger.__table__
+        voucher_stmt = (
+            sa.select(
+                ledger_tbl.c.voucher_no,
+                sa.func.coalesce(sa.func.sum(ledger_tbl.c.debit_amount), 0).label("debit"),
+                sa.func.coalesce(sa.func.sum(ledger_tbl.c.credit_amount), 0).label("credit"),
+            )
+            .where(
+                ledger_tbl.c.project_id == project_id,
+                ledger_tbl.c.year == year,
+                ledger_tbl.c.dataset_id == dataset_id,
+                ledger_tbl.c.is_deleted == sa.true(),
+            )
+            .group_by(ledger_tbl.c.voucher_no)
+            .having(sa.func.abs(
+                sa.func.coalesce(sa.func.sum(ledger_tbl.c.debit_amount), 0)
+                - sa.func.coalesce(sa.func.sum(ledger_tbl.c.credit_amount), 0)
+            ) > 0.01)
+            .limit(20)
+        )
+        unbalanced = [
+            {"voucher_no": row.voucher_no, "debit": str(row.debit), "credit": str(row.credit)}
+            for row in (await db.execute(voucher_stmt)).fetchall()
+        ]
+        if unbalanced:
+            findings.append(ValidationFinding(
+                rule_code="BV-01",
+                severity="error",
+                message=f"发现 {len(unbalanced)} 张凭证借贷不平衡",
+                details={"sample_count": len(unbalanced)},
+                sample_rows=unbalanced[:5],
+            ))
+
+        balance_tbl = TbBalance.__table__
+        balance_stmt = (
+            sa.select(
+                balance_tbl.c.account_code,
+                balance_tbl.c.opening_balance,
+                balance_tbl.c.debit_amount,
+                balance_tbl.c.credit_amount,
+                balance_tbl.c.closing_balance,
+            )
+            .where(
+                balance_tbl.c.project_id == project_id,
+                balance_tbl.c.year == year,
+                balance_tbl.c.dataset_id == dataset_id,
+                balance_tbl.c.is_deleted == sa.true(),
+                sa.func.abs(
+                    sa.func.coalesce(balance_tbl.c.opening_balance, 0)
+                    + sa.func.coalesce(balance_tbl.c.debit_amount, 0)
+                    - sa.func.coalesce(balance_tbl.c.credit_amount, 0)
+                    - sa.func.coalesce(balance_tbl.c.closing_balance, 0)
+                ) > 0.01,
+            )
+            .limit(20)
+        )
+        balance_errors = [
+            {
+                "account_code": row.account_code,
+                "opening": str(row.opening_balance),
+                "debit": str(row.debit_amount),
+                "credit": str(row.credit_amount),
+                "closing": str(row.closing_balance),
+            }
+            for row in (await db.execute(balance_stmt)).fetchall()
+        ]
+        if balance_errors:
+            findings.append(ValidationFinding(
+                rule_code="BV-04",
+                severity="warning",
+                message=f"发现 {len(balance_errors)} 个科目期初+发生不等于期末",
+                details={"sample_count": len(balance_errors)},
+                sample_rows=balance_errors[:5],
+            ))
+
+        return findings
+
+    @staticmethod
     def build_full_report(
         schema_findings: list[dict[str, Any]],
         business_findings: list[ValidationFinding],

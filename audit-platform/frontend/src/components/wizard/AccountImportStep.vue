@@ -1046,7 +1046,15 @@ async function handleForceReset() {
 
   resetting.value = true
   try {
-    await _resetImportLock()
+    const resetRes = await _resetImportLock(undefined, true)
+    if (!resetRes.ok) {
+      if (resetRes.code === 'IMPORT_RESET_JOB_ID_REQUIRED') {
+        ElMessage.warning('重置失败：请先定位具体导入作业再重置，或确认执行项目级强制重置。')
+      } else {
+        ElMessage.error(resetRes.message || '重置失败，请刷新页面')
+      }
+      return
+    }
     // 重置前端所有状态
     phase.value = 'upload'
     previewing.value = false
@@ -1063,20 +1071,38 @@ async function handleForceReset() {
     clearSheetMappingCache()
     uploadRef.value?.clearFiles()
     ElMessage.success('已重置，可重新上传导入')
-  } catch {
-    ElMessage.error('重置失败，请刷新页面')
   } finally {
     resetting.value = false
   }
 }
 
 /** 释放后端导入锁（上传中断/超时后自动调用） */
-async function _resetImportLock() {
-  if (!wizardStore.projectId) return
+async function _resetImportLock(
+  jobId?: string | null,
+  force = false,
+): Promise<{ ok: boolean; code?: string; message?: string }> {
+  if (!wizardStore.projectId) {
+    return { ok: false, message: '缺少项目ID，无法重置导入' }
+  }
   try {
-    await api.post(`/api/projects/${wizardStore.projectId}/account-chart/import-reset`)
-  } catch {
-    // 静默失败——锁会在 30 分钟后自动过期
+    const params: Record<string, any> = {}
+    if (jobId) params.job_id = jobId
+    if (!jobId && force) params.force = true
+    const data = await api.post(`/api/projects/${wizardStore.projectId}/account-chart/import-reset`, null, { params })
+    return { ok: true, message: data?.message || '重置成功' }
+  } catch (err: any) {
+    const detail = err?.response?.data?.detail
+    if (detail && typeof detail === 'object') {
+      return {
+        ok: false,
+        code: detail.code,
+        message: detail.message || err?.message,
+      }
+    }
+    return {
+      ok: false,
+      message: typeof detail === 'string' ? detail : (err?.message || '重置失败'),
+    }
   }
 }
 
@@ -1086,12 +1112,17 @@ onMounted(async () => {
   try {
     const data = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
     const status = data
-    if (status && status.status === 'processing') {
+    const activeStatuses = new Set(['pending', 'queued', 'running', 'validating', 'writing', 'activating', 'processing'])
+    const currentStatus = String(status?.status || '')
+    const jobId = status?.job_id ? String(status.job_id) : null
+    if (status && activeStatuses.has(currentStatus) && jobId) {
       const started = status.started ? new Date(status.started).getTime() : 0
       const elapsed = Date.now() - started
       if (elapsed > 10 * 60 * 1000) {
-        await _resetImportLock()
-        ElMessage.warning('检测到上次导入未完成，已自动清理，可重新导入')
+        const resetRes = await _resetImportLock(jobId)
+        if (resetRes.ok) {
+          ElMessage.warning('检测到上次导入未完成，已自动清理，可重新导入')
+        }
       }
     }
   } catch {
@@ -1223,10 +1254,11 @@ async function smartEnhanceMapping() {
         }
       }
     }
-    // 应用建议（confidence >= 0.7 自动采纳）
+    const autoApplyThreshold = Number(result.auto_apply_threshold ?? 0.85)
+    // 应用达到后端配置阈值的建议
     if (result.suggestions) {
       for (const sug of result.suggestions) {
-        if (!columnMapping[sug.header] && sug.confidence >= 0.7) {
+        if (!columnMapping[sug.header] && sug.confidence >= autoApplyThreshold) {
           columnMapping[sug.header] = sug.suggested_field
           applied++
         }
@@ -1369,29 +1401,6 @@ async function handleImport() {
 
   importing.value = true
 
-  // 超时保护：5 分钟无响应自动恢复（防止页面永久卡死）
-  const IMPORT_TIMEOUT_MS = 5 * 60 * 1000
-  const timeoutTimer = setTimeout(() => {
-    if (importing.value) {
-      importing.value = false
-      importProgress.value = ''
-      ElMessage.error('导入超时（超过 5 分钟无响应），请检查网络后重试')
-      // 尝试释放后端锁
-      _resetImportLock()
-    }
-  }, IMPORT_TIMEOUT_MS)
-
-  // 启动进度轮询
-  const pollTimer = setInterval(async () => {
-    try {
-      const data = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
-      const status = data
-      if (status && typeof status === 'object' && status.message && status.status !== 'idle') {
-        importProgress.value = status.message
-      }
-    } catch { /* ignore */ }
-  }, 2000)
-
   try {
     let totalSizeBytes = 0
     for (const file of selectedFiles.value) {
@@ -1428,62 +1437,48 @@ async function handleImport() {
       ? '正在复用预览文件并提交导入任务…'
       : `正在上传 ${selectedFiles.value.length} 个文件（${totalSizeMB} MB）…`
 
-    // ── 大文件或多文件用异步，小单文件用同步 ──
-    const useAsync = totalSizeBytes > 10 * 1024 * 1024 || selectedFiles.value.length > 2
-
     let finalResult: AccountImportResult | null = null
+    let importJobId: string | null = null
 
-    if (useAsync) {
-      // 异步导入：立即返回，轮询进度
-      const importUrl = buildImportJobUrl({
-        basePath: `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
-        uploadToken: uploadToken.value,
-        year: previewYear.value,
-      })
-      await api.post(
-        importUrl,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
-      )
-      await runImportPollingFlow({
-        maxPolls: 150,
-        timeoutMessage: '异步导入超时（超过 5 分钟），请刷新页面后重试',
-        onWait: () => new Promise<void>(resolve => setTimeout(resolve, 2000)),
-        fetchStatus: () => fetchImportQueueStatus(() => api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)),
-        onStatus: (status) => {
-          if (status && typeof status === 'object') {
-            const pct = status.progress ?? 0
-            const msg = status.message || ''
-            importProgress.value = `[${pct}%] ${msg}`
-          }
-        },
-        shouldFinish: (status) => shouldFinishImportPolling(status),
-        hasFailed: (status) => hasImportFailed(status),
-        getFailureMessage: (status) => status?.message || '导入失败',
-        onSuccessStatus: (status) => {
-          const res = status?.result
-          if (res && typeof res === 'object') {
-            finalResult = res as AccountImportResult
-          }
-        },
-      })
-    } else {
-      // 同步导入
-      const importUrl = buildImportJobUrl({
-        basePath: `/api/projects/${wizardStore.projectId}/account-chart/import`,
-        uploadToken: uploadToken.value,
-        year: previewYear.value,
-      })
-      const data = await api.post(
-        importUrl,
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 },
-      )
-      finalResult = data as AccountImportResult
+    const importUrl = buildImportJobUrl({
+      basePath: `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
+      uploadToken: uploadToken.value,
+      year: previewYear.value,
+    })
+    const submitResp = await api.post(
+      importUrl,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
+    )
+    importJobId = submitResp?.job_id || null
+    if (!importJobId) {
+      throw new Error('导入任务提交成功但未返回 job_id，请刷新后在导入历史查看任务状态')
     }
+    await runImportPollingFlow({
+      maxPolls: 400,
+      timeoutMessage: '导入任务仍在后台运行，请稍后刷新页面查看结果',
+      onWait: () => new Promise<void>(resolve => setTimeout(resolve, 2000)),
+      fetchStatus: () => fetchImportQueueStatus(() => api.get(`/api/projects/${wizardStore.projectId}/ledger-import/jobs/${importJobId}`)),
+      onStatus: (status) => {
+        if (status && typeof status === 'object') {
+          const pct = status.progress ?? 0
+          const msg = status.message || ''
+          importProgress.value = `[${pct}%] ${msg}`
+        }
+      },
+      shouldFinish: (status) => shouldFinishImportPolling(status),
+      hasFailed: (status) => hasImportFailed(status),
+      getFailureMessage: (status) => status?.message || '导入失败',
+      onSuccessStatus: (status) => {
+        const res = status?.result
+        if (res && typeof res === 'object') {
+          finalResult = res as AccountImportResult
+        }
+      },
+    })
 
     // ── 处理结果 ──
-    const resolvedImportResult = finalResult || {
+    const resolvedImportResult: AccountImportResult = finalResult || {
       total_imported: 0, by_category: {}, errors: [],
       data_sheets_imported: {}, sheet_diagnostics: [], validation: [], year: null,
     }
@@ -1544,24 +1539,40 @@ async function handleImport() {
     if (status === 409) {
       // 导入冲突：上一个任务可能卡住了，提供强制重置选项
       try {
+        let queuedJobId: string | null = null
+        try {
+          const queueStatus = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+          queuedJobId = queueStatus?.job_id ? String(queueStatus.job_id) : null
+        } catch {
+          queuedJobId = null
+        }
         await ElMessageBox.confirm(
           `${errMsg}\n\n如果上一次导入已中断或卡住，可以强制重置后重新导入。`,
           '导入冲突',
           { confirmButtonText: '强制重置', cancelButtonText: '稍后再试', type: 'warning' },
         )
         // 用户选择强制重置
-        await _resetImportLock()
-        ElMessage.success('已重置，请重新点击「确认导入」')
+        const resetRes = await _resetImportLock(queuedJobId, !queuedJobId)
+        if (!resetRes.ok) {
+          if (resetRes.code === 'IMPORT_RESET_JOB_ID_REQUIRED') {
+            ElMessage.warning('重置失败：未定位到作业ID，系统已拒绝项目级重置。请到导入历史选择具体作业后重试。')
+          } else {
+            ElMessage.error(resetRes.message || '重置失败，请稍后重试')
+          }
+        } else {
+          ElMessage.success(
+            queuedJobId
+              ? '已按作业重置，请重新点击「确认导入」'
+              : '未获取到作业ID，已执行项目级重置，请重新点击「确认导入」',
+          )
+        }
       } catch {
         // 用户选择稍后再试
       }
     } else {
       ElMessage.error(errMsg)
-      await _resetImportLock()
     }
   } finally {
-    clearInterval(pollTimer)
-    clearTimeout(timeoutTimer)
     importing.value = false
     importProgress.value = ''
   }

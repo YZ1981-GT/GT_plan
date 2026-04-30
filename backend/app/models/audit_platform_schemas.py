@@ -194,7 +194,15 @@ class AccountImportResult(BaseModel):
     errors: list[str] = []
     data_sheets_imported: dict[str, int] = {}  # {data_type: record_count}
     sheet_diagnostics: list[dict] = []  # [{sheet_name, guessed_type, matched_cols, missing_cols, row_count}]
+    diagnostics: list[dict] = []
     validation: list[dict[str, Any]] = []
+    validation_summary: dict[str, Any] = {}
+    suggested_mapping: dict[str, str] = {}
+    confidence_by_field: dict[str, float] = {}
+    reasons: dict[str, str] = {}
+    rule_version: str | None = None
+    auto_apply_threshold: float | None = None
+    needs_confirmation: list[str] = []
     year: int | None = None
 
 

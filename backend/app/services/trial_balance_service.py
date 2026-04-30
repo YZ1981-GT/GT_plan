@@ -23,6 +23,7 @@ from app.models.audit_platform_models import (
     TrialBalance,
 )
 from app.models.audit_platform_schemas import EventPayload
+from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class TrialBalanceService:
         bal = TbBalance.__table__
         mp = AccountMapping.__table__
         ac = AccountChart.__table__
+        balance_filter = await get_active_filter(self.db, bal, project_id, year)
 
         # 1. 汇总查询：客户余额 → 映射 → 标准科目
         agg_q = (
@@ -71,11 +73,7 @@ class TrialBalanceService:
                     ),
                 )
             )
-            .where(
-                bal.c.project_id == project_id,
-                bal.c.year == year,
-                bal.c.is_deleted == sa.false(),
-            )
+            .where(balance_filter)
             .group_by(mp.c.standard_account_code)
         )
 

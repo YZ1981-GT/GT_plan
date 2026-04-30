@@ -21,6 +21,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+
 _logger = logging.getLogger(__name__)
 
 
@@ -101,6 +103,11 @@ def fuzzy_match_column(header: str, threshold: float = 0.6) -> tuple[str | None,
     return None, 0.0
 
 
+def _auto_apply_threshold() -> float:
+    threshold = float(settings.LEDGER_IMPORT_AUTO_APPLY_CONFIDENCE_THRESHOLD)
+    return min(max(threshold, 0.0), 1.0)
+
+
 def enhance_column_mapping(headers: list[str], existing_mapping: dict[str, str]) -> dict[str, Any]:
     """增强列映射：对未匹配的列尝试模糊匹配
 
@@ -118,6 +125,7 @@ def enhance_column_mapping(headers: list[str], existing_mapping: dict[str, str])
     enhanced = {}
     suggestions = []
     unmatched = []
+    auto_apply_threshold = _auto_apply_threshold()
 
     matched_fields = set(existing_mapping.values())
 
@@ -127,7 +135,7 @@ def enhance_column_mapping(headers: list[str], existing_mapping: dict[str, str])
 
         field, confidence = fuzzy_match_column(h)
         if field and field not in matched_fields:
-            if confidence >= 0.8:
+            if confidence >= auto_apply_threshold:
                 enhanced[h] = field
                 matched_fields.add(field)
             elif confidence >= 0.6:
@@ -142,7 +150,12 @@ def enhance_column_mapping(headers: list[str], existing_mapping: dict[str, str])
         else:
             unmatched.append(h)
 
-    return {"enhanced": enhanced, "suggestions": suggestions, "unmatched": unmatched}
+    return {
+        "enhanced": enhanced,
+        "suggestions": suggestions,
+        "unmatched": unmatched,
+        "auto_apply_threshold": auto_apply_threshold,
+    }
 
 
 # ═══ 2. 多Sheet智能识别增强 ═══

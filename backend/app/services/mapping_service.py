@@ -30,11 +30,30 @@ from app.models.audit_platform_schemas import (
 )
 from app.services.event_bus import event_bus
 from app.models.audit_platform_schemas import EventPayload, EventType
+from app.services.dataset_query import get_active_filter
+from app.services.dataset_service import DatasetService
 
 logger = logging.getLogger(__name__)
 
 # Fuzzy match threshold
 _FUZZY_THRESHOLD = 0.7
+
+
+async def _client_account_filters(
+    project_id: UUID,
+    db: AsyncSession,
+    year: int | None = None,
+) -> list[Any]:
+    filters: list[Any] = [
+        AccountChart.project_id == project_id,
+        AccountChart.source == AccountSource.client,
+        AccountChart.is_deleted == False,  # noqa: E712
+    ]
+    if year is not None:
+        active_dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
+        if active_dataset_id is not None:
+            filters.append(AccountChart.dataset_id == active_dataset_id)
+    return filters
 
 
 async def _resolve_event_year(
@@ -113,6 +132,7 @@ def _fuzzy_score(a: str, b: str) -> float:
 async def auto_suggest(
     project_id: UUID,
     db: AsyncSession,
+    year: int | None = None,
 ) -> list[MappingSuggestion]:
     """Auto-matching algorithm by priority:
 
@@ -124,12 +144,9 @@ async def auto_suggest(
     Validates: Requirements 3.1
     """
     # Fetch client accounts
+    client_filters = await _client_account_filters(project_id, db, year)
     client_result = await db.execute(
-        select(AccountChart).where(
-            AccountChart.project_id == project_id,
-            AccountChart.source == AccountSource.client,
-            AccountChart.is_deleted == False,  # noqa: E712
-        ).order_by(AccountChart.account_code)
+        select(AccountChart).where(*client_filters).order_by(AccountChart.account_code)
     )
     client_accounts = client_result.scalars().all()
 
@@ -176,7 +193,7 @@ async def auto_match(
     Already-mapped accounts are skipped (not overwritten).
     Returns the full result with details for user review.
     """
-    suggestions = await auto_suggest(project_id, db)
+    suggestions = await auto_suggest(project_id, db, year=year)
 
     # Get existing mappings to skip
     existing_result = await db.execute(
@@ -216,7 +233,7 @@ async def auto_match(
         await db.commit()
         await _publish_mapping_changed(project_id, db, account_codes=None, year=year)
 
-    total_client = await _count_client_accounts(project_id, db)
+    total_client = await _count_client_accounts(project_id, db, year=year)
     mapped_count = await _count_mapped_accounts(project_id, db)
     rate = (mapped_count / total_client * 100) if total_client > 0 else 0.0
     unmatched = total_client - mapped_count
@@ -437,7 +454,7 @@ async def batch_confirm(
         await _publish_mapping_changed(project_id, db, account_codes=None, year=event_year)
 
     # Calculate completion rate
-    total_client = await _count_client_accounts(project_id, db)
+    total_client = await _count_client_accounts(project_id, db, year=event_year)
     mapped_count = await _count_mapped_accounts(project_id, db)
     rate = (mapped_count / total_client * 100) if total_client > 0 else 0.0
 
@@ -456,6 +473,7 @@ async def batch_confirm(
 async def get_completion_rate(
     project_id: UUID,
     db: AsyncSession,
+    year: int | None = None,
 ) -> MappingCompletionRate:
     """Completion rate = mapped_count / total_client_accounts * 100%.
 
@@ -464,12 +482,12 @@ async def get_completion_rate(
 
     Validates: Requirements 3.5, 3.6
     """
-    total_client = await _count_client_accounts(project_id, db)
+    total_client = await _count_client_accounts(project_id, db, year=year)
     mapped_count = await _count_mapped_accounts(project_id, db)
     rate = (mapped_count / total_client * 100) if total_client > 0 else 0.0
 
     # Find unmapped client accounts with non-zero balances
-    unmapped_with_balance = await _get_unmapped_with_balance(project_id, db)
+    unmapped_with_balance = await _get_unmapped_with_balance(project_id, db, year=year)
 
     return MappingCompletionRate(
         mapped_count=mapped_count,
@@ -560,14 +578,11 @@ async def get_mappings(
 # ---------------------------------------------------------------------------
 
 
-async def _count_client_accounts(project_id: UUID, db: AsyncSession) -> int:
+async def _count_client_accounts(project_id: UUID, db: AsyncSession, year: int | None = None) -> int:
     """Count total client accounts for a project."""
+    client_filters = await _client_account_filters(project_id, db, year)
     result = await db.execute(
-        select(func.count(AccountChart.id)).where(
-            AccountChart.project_id == project_id,
-            AccountChart.source == AccountSource.client,
-            AccountChart.is_deleted == False,  # noqa: E712
-        )
+        select(func.count(AccountChart.id)).where(*client_filters)
     )
     return result.scalar_one()
 
@@ -586,6 +601,7 @@ async def _count_mapped_accounts(project_id: UUID, db: AsyncSession) -> int:
 async def _get_unmapped_with_balance(
     project_id: UUID,
     db: AsyncSession,
+    year: int | None = None,
 ) -> list[dict[str, Any]]:
     """Get unmapped client accounts that have non-zero balances.
 
@@ -601,12 +617,9 @@ async def _get_unmapped_with_balance(
     mapped_codes = {row[0] for row in mapped_result.all()}
 
     # Get client accounts
+    client_filters = await _client_account_filters(project_id, db, year)
     client_result = await db.execute(
-        select(AccountChart).where(
-            AccountChart.project_id == project_id,
-            AccountChart.source == AccountSource.client,
-            AccountChart.is_deleted == False,  # noqa: E712
-        )
+        select(AccountChart).where(*client_filters)
     )
     client_accounts = client_result.scalars().all()
 
@@ -618,17 +631,21 @@ async def _get_unmapped_with_balance(
         return []
 
     # Check which unmapped accounts have non-zero balances
+    balance_filters: list[Any] = [
+        TbBalance.project_id == project_id,
+        TbBalance.account_code.in_(unmapped_codes),
+        TbBalance.closing_balance != Decimal("0"),
+    ]
+    if year is not None:
+        balance_filters.append(await get_active_filter(db, TbBalance.__table__, project_id, year))
+    else:
+        balance_filters.append(TbBalance.is_deleted == False)  # noqa: E712
     balance_result = await db.execute(
         select(
             TbBalance.account_code,
             TbBalance.account_name,
             TbBalance.closing_balance,
-        ).where(
-            TbBalance.project_id == project_id,
-            TbBalance.account_code.in_(unmapped_codes),
-            TbBalance.is_deleted == False,  # noqa: E712
-            TbBalance.closing_balance != Decimal("0"),
-        )
+        ).where(*balance_filters)
     )
     rows = balance_result.all()
 

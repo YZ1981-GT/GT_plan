@@ -37,6 +37,19 @@ from app.models.audit_platform_models import (
     TbLedger,
     TrialBalance,
 )
+from app.models.dataset_models import (
+    ActivationRecord,
+    ActivationType,
+    ArtifactStatus,
+    DatasetStatus,
+    ImportArtifact,
+    ImportEventConsumption,
+    ImportEventOutbox,
+    ImportJob,
+    JobStatus,
+    LedgerDataset,
+    OutboxStatus,
+)
 from app.models.report_models import (
     AuditReport,
     AuditReportTemplate,
@@ -101,6 +114,11 @@ __all__ = [
     "AdjustmentType",
     "ReviewStatus",
     "ImportStatus",
+    "DatasetStatus",
+    "JobStatus",
+    "ArtifactStatus",
+    "ActivationType",
+    "OutboxStatus",
     # --- audit platform models ---
     "AccountChart",
     "AccountMapping",
@@ -112,6 +130,12 @@ __all__ = [
     "TrialBalance",
     "Materiality",
     "ImportBatch",
+    "LedgerDataset",
+    "ImportJob",
+    "ImportArtifact",
+    "ImportEventOutbox",
+    "ImportEventConsumption",
+    "ActivationRecord",
     # --- report enums ---
     "FinancialReportType",
     "CashFlowCategory",

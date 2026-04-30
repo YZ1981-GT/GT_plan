@@ -36,6 +36,7 @@
         <el-button size="small" @click="goToImport">
           <el-icon style="margin-right: 2px"><Upload /></el-icon> 导入数据
         </el-button>
+        <el-button size="small" plain @click="goToImportHistory">导入历史</el-button>
         <el-button size="small" @click="runValidation" :loading="validating" type="warning" plain>
           <el-icon style="margin-right: 2px"><Warning /></el-icon> 数据校验
         </el-button>
@@ -650,6 +651,7 @@ import { applyImportSuccess, resolveImportSuccess } from '@/utils/importSuccess'
 import { resolveImportCompletionToast, resolveImportFailureMessage, shouldFinishImportPolling, hasImportFailed } from '@/utils/useImportJobFlow'
 import { runImportPollingFlow } from '@/utils/useImportPollingFlow'
 import { useImportValidation } from '@/utils/useImportValidation'
+import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -731,6 +733,13 @@ function onYearChange(newYear: number) {
 
 function goToImport() {
   openImportDialog()
+}
+
+function goToImportHistory() {
+  router.push({
+    path: `/projects/${projectId.value}/ledger/import-history`,
+    query: { year: String(selectedYear.value) },
+  })
 }
 
 // ── 智能导入 ──
@@ -861,7 +870,6 @@ function initColumnMapping() {
 // ── 后台导入轮询状态 ──
 const bgImportPolling = ref(false)
 const bgImportMessage = ref('')
-let _importPollTimer: ReturnType<typeof setInterval> | null = null
 
 function openImportDialog() {
   importDialogVisible.value = true
@@ -875,7 +883,6 @@ function openImportDialog() {
   previewing.value = false
   bgImportPolling.value = false
   bgImportMessage.value = ''
-  if (_importPollTimer) { clearInterval(_importPollTimer); _importPollTimer = null }
   uploadRef.value?.clearFiles?.()
 }
 
@@ -903,7 +910,7 @@ async function doPreview() {
       year: importYear.value,
       previewRows: 50,
     })
-    const { data } = await http.post(url, formData)
+    const data = await smartPreviewLedgerImport(projectId.value, url, formData)
     const previewSuccess = resolveImportPreviewSuccess({
       result: data,
       nextStage: 'preview' as const,
@@ -936,20 +943,6 @@ async function doImport() {
   importStep.value = 'importing'
   bgImportPolling.value = true
 
-  // 启动轮询（即使关闭弹窗也继续）
-  if (_importPollTimer) clearInterval(_importPollTimer)
-  _importPollTimer = setInterval(async () => {
-    try {
-      const { data: statusData } = await http.get(
-        `/api/data-lifecycle/import-queue/${projectId.value}`
-      )
-      const status = statusData.data ?? statusData
-      if (status && typeof status === 'object' && status.message && status.status !== 'idle') {
-        bgImportMessage.value = status.message
-      }
-    } catch { /* ignore */ }
-  }, 3000)
-
   try {
     const yr = previewResult.value?.year || importYear.value
     const mappingParam = Object.keys(userColumnMapping.value).length > 0
@@ -958,26 +951,26 @@ async function doImport() {
     const formData = buildImportFormData({
       files: importFiles.value,
       uploadToken: uploadToken.value,
+      mappingFieldName: 'custom_mapping',
+      mappingPayload: mappingParam,
     })
     const url = buildImportJobUrl({
       basePath: `/api/projects/${projectId.value}/ledger/smart-import`,
       year: yr,
       uploadToken: uploadToken.value,
-      customMapping: mappingParam,
     })
-    const { data } = await http.post(url, formData, {
-      timeout: 60000, // 提交任务本身很快，但给足时间
-    })
+    const data = await submitSmartLedgerImport(projectId.value, url, formData)
     uploadToken.value = data?.upload_token || uploadToken.value
+    const importJobId = data?.job_id || null
+    if (!importJobId) {
+      throw new Error('导入任务提交成功但未返回 job_id，请刷新后在导入历史查看任务状态')
+    }
 
     await runImportPollingFlow({
       maxPolls: 400,
       timeoutMessage: '导入任务仍在后台运行，请稍后刷新页面查看结果',
       onWait: () => new Promise<void>(resolve => setTimeout(resolve, 3000)),
-      fetchStatus: async () => {
-        const statusData = await fetchImportQueueStatus(() => http.get(`/api/data-lifecycle/import-queue/${projectId.value}`))
-        return statusData.data ?? statusData
-      },
+      fetchStatus: () => fetchImportQueueStatus(() => getImportJob(projectId.value, importJobId)),
       onStatus: (status) => {
         if (status && typeof status === 'object') {
           const pct = status.progress ?? 0
@@ -1012,6 +1005,7 @@ async function doImport() {
           enterStage: (stage) => { importStep.value = stage },
           afterEnterStage: async () => {
             _auxBalanceLoadedKey.value = ''
+            await getActiveLedgerDataset(projectId.value, yr)
             loadAvailableYears()
             loadBalance()
             if (balanceTab.value === 'aux') {
@@ -1032,7 +1026,6 @@ async function doImport() {
   } finally {
     importing.value = false
     bgImportPolling.value = false
-    if (_importPollTimer) { clearInterval(_importPollTimer); _importPollTimer = null }
   }
 }
 
@@ -1091,7 +1084,7 @@ const auxPage = ref(1)
 const auxPageSize = 100
 const dateRange = ref<string[] | null>(null)
 
-interface Crumb { label: string; level: Level; account?: string; voucher?: string }
+interface Crumb { label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string }
 const breadcrumbs = ref<Crumb[]>([{ label: '账簿查询', level: 'balance' }])
 
 // ── 数据 ──
@@ -2029,7 +2022,13 @@ function drillToAuxLedgerFromBalance(row: any) {
   auxLedgerPage.value = 1
   breadcrumbs.value = [
     { label: '账簿查询', level: 'balance' },
-    { label: `${row.account_code} ${row.aux_name || row.aux_code || ''}`, level: 'aux_ledger' },
+    {
+      label: `${row.account_code} ${row.aux_name || row.aux_code || ''}`,
+      level: 'aux_ledger',
+      account: currentAccount.value,
+      auxType: currentAuxType.value,
+      auxCode: currentAuxCode.value,
+    },
   ]
   loadAuxLedger()
 }
@@ -2099,7 +2098,11 @@ function drillToAuxLedger(row: any) {
   currentLevel.value = 'aux_ledger'
   auxLedgerPage.value = 1
   breadcrumbs.value.push({
-    label: `${row.aux_name || row.aux_code}`, level: 'aux_ledger',
+    label: `${row.aux_name || row.aux_code}`,
+    level: 'aux_ledger',
+    account: currentAccount.value,
+    auxType: currentAuxType.value,
+    auxCode: currentAuxCode.value,
   })
   loadAuxLedger()
 }
@@ -2110,7 +2113,14 @@ function navigateTo(index: number) {
   currentLevel.value = crumb.level
   if (crumb.level === 'balance') loadBalance()
   else if (crumb.level === 'ledger') { currentAccount.value = crumb.account || ''; loadLedger() }
+  else if (crumb.level === 'voucher') { currentVoucher.value = crumb.voucher || ''; loadVoucher() }
   else if (crumb.level === 'aux_balance') { currentAccount.value = crumb.account || ''; loadAuxBalance() }
+  else if (crumb.level === 'aux_ledger') {
+    currentAccount.value = crumb.account || currentAccount.value
+    currentAuxType.value = crumb.auxType || currentAuxType.value
+    currentAuxCode.value = crumb.auxCode || currentAuxCode.value
+    loadAuxLedger()
+  }
 }
 
 function refresh() {

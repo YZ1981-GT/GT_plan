@@ -21,6 +21,7 @@ from app.services import project_wizard_service
 from app.services.import_queue_service import ImportQueueService
 
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
+SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)

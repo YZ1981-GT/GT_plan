@@ -291,12 +291,19 @@ async function handleResetImport() {
       '确认重置',
       { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
     )
-    await api.post(`/api/projects/${props.project.id}/account-chart/import-reset`)
+    await api.post(`/api/projects/${props.project.id}/account-chart/import-reset`, null, {
+      params: { force: true },
+    })
     window.location.reload()
   } catch (e: any) {
     if (e !== 'cancel' && e?.toString() !== 'cancel') {
-      // 即使 API 失败也刷新
-      window.location.reload()
+      const detail = e?.response?.data?.detail
+      if (detail?.code === 'IMPORT_RESET_JOB_ID_REQUIRED') {
+        ElMessage.warning('请在导入历史中选择具体作业后重置，或由管理员执行项目级强制重置。')
+      } else {
+        // 即使 API 失败也刷新，防止前端状态残留
+        window.location.reload()
+      }
     }
   }
 }

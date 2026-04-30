@@ -14,6 +14,7 @@ from app.core.redis import get_redis  # noqa: E402
 from app.models.base import Base  # noqa: E402
 import app.models.core  # noqa: E402, F401
 import app.models.audit_platform_models  # noqa: E402, F401
+import app.models.dataset_models  # noqa: E402, F401
 import app.models.report_models  # noqa: E402, F401
 import app.models.workpaper_models  # noqa: E402, F401
 import app.models.consolidation_models  # noqa: E402, F401

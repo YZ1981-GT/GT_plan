@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 查找 .env 文件：优先 backend/.env，其次项目根目录 .env
@@ -56,6 +57,37 @@ class Settings(BaseSettings):
     LEDGER_UPLOAD_TTL_HOURS: int = 24
     LEDGER_UPLOAD_MAX_FILE_COUNT: int = 20
     LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB: int = 200
+    LEDGER_ARTIFACT_STORAGE_BACKEND: str = "local"  # local, s3
+    LEDGER_ARTIFACT_S3_ENDPOINT_URL: str = ""
+    LEDGER_ARTIFACT_S3_REGION: str = "us-east-1"
+    LEDGER_ARTIFACT_S3_BUCKET: str = ""
+    LEDGER_ARTIFACT_S3_PREFIX: str = "ledger-import"
+    LEDGER_ARTIFACT_S3_ACCESS_KEY_ID: str = ""
+    LEDGER_ARTIFACT_S3_SECRET_ACCESS_KEY: str = ""
+    LEDGER_ARTIFACT_S3_USE_SSL: bool = True
+    LEDGER_ARTIFACT_DOWNLOAD_ROOT: str = "./storage/ledger_artifact_cache"
+    LEDGER_ARTIFACT_STORAGE_FAILURE_MODE: str = ""  # timeout, readonly, unavailable
+    LEDGER_IMPORT_AUTO_APPLY_CONFIDENCE_THRESHOLD: float = 0.85
+    LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED: bool = True
+    LEDGER_IMPORT_WORKER_POLL_INTERVAL_SECONDS: int = 30
+    LEDGER_IMPORT_WORKER_BATCH_SIZE: int = 3
+    LEDGER_IMPORT_FULL_MODE_MAX_FILE_MB: int = Field(default=30, ge=1)
+    LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED: bool = True
+    LEDGER_IMPORT_OUTBOX_REPLAY_INTERVAL_SECONDS: int = 30
+    LEDGER_IMPORT_OUTBOX_REPLAY_MAX_BACKOFF_SECONDS: int = 300
+    LEDGER_IMPORT_OUTBOX_REPLAY_JITTER_RATIO: float = 0.2
+    LEDGER_IMPORT_OUTBOX_REPLAY_LIMIT: int = 100
+    LEDGER_IMPORT_OUTBOX_MAX_RETRY_ATTEMPTS: int = 20
+    LEDGER_IMPORT_SLO_FAILURE_RATE_WARN_THRESHOLD: float = Field(default=0.05, ge=0.0, le=1.0)
+    LEDGER_IMPORT_SLO_TIMEOUT_RATE_CRITICAL_THRESHOLD: float = Field(default=0.02, ge=0.0, le=1.0)
+    LEDGER_IMPORT_SLO_P95_DURATION_SECONDS_WARN_THRESHOLD: int = Field(default=1800, ge=1)
+    LEDGER_IMPORT_SLO_QUEUE_DELAY_P95_SECONDS_WARN_THRESHOLD: int = Field(default=300, ge=1)
+    LEDGER_IMPORT_SLO_OUTBOX_BACKLOG_WARN_THRESHOLD: int = Field(default=20, ge=1)
+    LEDGER_IMPORT_SLO_ACTIVE_JOBS_WARN_THRESHOLD: int = Field(default=10, ge=1)
+    LEDGER_IMPORT_EVENT_CONSUMPTION_CLEANUP_ENABLED: bool = True
+    LEDGER_IMPORT_EVENT_CONSUMPTION_RETENTION_DAYS: int = Field(default=180, ge=1)
+    LEDGER_IMPORT_EVENT_CONSUMPTION_CLEANUP_INTERVAL_SECONDS: int = Field(default=3600, ge=60)
+    LEDGER_IMPORT_EVENT_CONSUMPTION_CLEANUP_BATCH_SIZE: int = Field(default=5000, ge=1)
     # LLM 服务配置（默认使用本地 vLLM）
     LLM_BASE_URL: str = "http://localhost:8100/v1"  # vLLM OpenAI 兼容 API
     LLM_API_KEY: str = "not-needed"  # vLLM 本地不需要 API Key

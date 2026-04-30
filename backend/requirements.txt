@@ -12,6 +12,7 @@ passlib[bcrypt]
 httpx
 python-multipart
 openpyxl
+boto3
 
 # OCR dependencies (optional, install as needed)
 # paddleocr

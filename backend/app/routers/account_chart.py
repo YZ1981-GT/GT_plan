@@ -3,9 +3,10 @@
 Validates: Requirements 2.2, 2.5, 2.6
 """
 
+import time
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -17,6 +18,7 @@ from app.models.audit_platform_schemas import (
 )
 from app.models.core import User
 from app.services import account_chart_service
+from app.services.import_ops_audit_service import ImportOpsAuditService
 
 router = APIRouter(prefix="/api/projects", tags=["account-chart"])
 
@@ -143,6 +145,9 @@ async def import_client_chart(
 @router.post("/{project_id}/account-chart/import-reset")
 async def reset_import(
     project_id: UUID,
+    request: Request,
+    job_id: UUID | None = Query(default=None, description="可选：指定要重置的导入作业ID（推荐）"),
+    force: bool = Query(default=False, description="未提供 job_id 时，是否允许项目级重置"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
@@ -151,8 +156,57 @@ async def reset_import(
     用于上传中断后前端自动恢复，或用户手动重置。
     """
     from app.services.import_queue_service import ImportQueueService
-    msg = await ImportQueueService.force_release(project_id, db)
-    return {"message": msg}
+
+    started_at = time.perf_counter()
+    scope = {"project_id": str(project_id), "job_id": str(job_id) if job_id else None}
+    params = {"force": force}
+
+    if job_id is None and not force:
+        await ImportOpsAuditService.log_operation(
+            user_id=current_user.id,
+            action_type="import_reset",
+            project_id=project_id,
+            params=params,
+            scope=scope,
+            outcome="rejected",
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+            result={"code": "IMPORT_RESET_JOB_ID_REQUIRED"},
+            request=request,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "IMPORT_RESET_JOB_ID_REQUIRED",
+                "message": "未提供 job_id，拒绝项目级重置；如确认执行请显式 force=true",
+            },
+        )
+    try:
+        msg = await ImportQueueService.force_release(project_id, db, job_id=job_id, force=force)
+        await ImportOpsAuditService.log_operation(
+            user_id=current_user.id,
+            action_type="import_reset",
+            project_id=project_id,
+            params=params,
+            scope=scope,
+            outcome="success",
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+            result={"message": msg},
+            request=request,
+        )
+        return {"message": msg}
+    except Exception as exc:
+        await ImportOpsAuditService.log_operation(
+            user_id=current_user.id,
+            action_type="import_reset",
+            project_id=project_id,
+            params=params,
+            scope=scope,
+            outcome="failed",
+            duration_ms=int((time.perf_counter() - started_at) * 1000),
+            error=str(exc),
+            request=request,
+        )
+        raise
 
 
 @router.post("/{project_id}/account-chart/import-async")
@@ -191,6 +245,7 @@ async def import_async(
 )
 async def get_client_chart(
     project_id: UUID,
+    year: int | None = Query(default=None, description="指定年度，提供后优先返回 active dataset 的客户科目表"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ) -> dict[str, list[AccountTreeNode]]:
@@ -198,7 +253,7 @@ async def get_client_chart(
 
     Validates: Requirements 2.6
     """
-    return await account_chart_service.get_client_chart_tree(project_id, db)
+    return await account_chart_service.get_client_chart_tree(project_id, db, year=year)
 
 
 # ── 列映射保存/加载（持久化到 wizard_state） ──

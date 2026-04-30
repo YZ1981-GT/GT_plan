@@ -9,6 +9,7 @@ export interface ImportPollingFlowOptions<TStatus> {
   onSuccessStatus?: (status: TStatus) => Promise<void> | void
   onError?: (error: unknown) => Promise<void> | void
   timeoutMessage: string
+  shouldIgnoreError?: (error: unknown) => boolean
 }
 
 export async function runImportPollingFlow<TStatus>(
@@ -42,10 +43,11 @@ export async function runImportPollingFlow<TStatus>(
       if (options.onError) {
         await options.onError(error)
       }
-      if (error instanceof Error && error.message.includes('导入失败')) {
-        throw error
+      if (options.shouldIgnoreError?.(error)) {
+        done = true
+        continue
       }
-      done = true
+      throw error
     }
   }
 }

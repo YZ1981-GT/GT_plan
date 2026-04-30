@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from typing import Any
@@ -9,9 +8,8 @@ from uuid import UUID
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session
+from app.core.config import settings
 from app.models.dataset_models import JobStatus
-from app.services.dataset_service import DatasetService
 from app.services.import_job_service import ImportJobService
 from app.services.import_queue_service import ImportQueueService
 from app.services.ledger_import_upload_service import LedgerImportUploadService
@@ -21,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class LedgerImportApplicationService:
+    SMART_SUGGESTION_RULE_VERSION = "import-rules-2026.04"
+
     @staticmethod
     def collect_uploads(
         files: list[UploadFile] | None = None,
@@ -53,6 +53,22 @@ class LedgerImportApplicationService:
     ) -> tuple[str, list[tuple[str, object]]]:
         uploads = cls.collect_uploads(files=files, file=file)
         if upload_token:
+            from app.core.database import async_session
+            from app.services.import_artifact_service import ImportArtifactService
+
+            async with async_session() as db:
+                artifact = await ImportArtifactService.get_by_upload_token(
+                    db,
+                    project_id=project_id,
+                    upload_token=upload_token,
+                )
+                if artifact and artifact.storage_uri:
+                    bundle_dir = ImportArtifactService.materialize_bundle(
+                        artifact.storage_uri,
+                        upload_token=upload_token,
+                    )
+                    if bundle_dir is not None:
+                        return upload_token, LedgerImportUploadService.get_bundle_files_from_path(bundle_dir)
             return upload_token, LedgerImportUploadService.get_bundle_files(project_id, upload_token)
 
         if not uploads:
@@ -257,6 +273,72 @@ class LedgerImportApplicationService:
             "by_severity": by_severity,
         }
 
+    @staticmethod
+    def _auto_apply_threshold() -> float:
+        threshold = float(settings.LEDGER_IMPORT_AUTO_APPLY_CONFIDENCE_THRESHOLD)
+        return min(max(threshold, 0.0), 1.0)
+
+    @classmethod
+    def _build_suggestion_contract(cls, diagnostics: list[dict[str, Any]] | None) -> dict[str, Any]:
+        suggested_mapping: dict[str, str] = {}
+        confidence_by_field: dict[str, float] = {}
+        reasons: dict[str, str] = {}
+        needs_confirmation: list[str] = []
+        auto_apply_threshold = cls._auto_apply_threshold()
+
+        for diag in diagnostics or []:
+            if diag.get("status") == "error":
+                continue
+            data_type = str(diag.get("data_type") or "unknown")
+            column_mapping = diag.get("column_mapping") or {}
+            if not isinstance(column_mapping, dict):
+                continue
+
+            header_mapped = diag.get("header_mapped")
+            if not isinstance(header_mapped, (set, list, tuple)):
+                header_mapped = []
+            header_mapped_set = {str(item) for item in header_mapped}
+            content_inferred = diag.get("content_inferred") or {}
+            if not isinstance(content_inferred, dict):
+                content_inferred = {}
+
+            for source_column, standard_field in column_mapping.items():
+                if not standard_field:
+                    continue
+                field_key = f"{data_type}.{standard_field}"
+                source_column_str = str(source_column)
+
+                if source_column_str in content_inferred:
+                    confidence = 0.76
+                    reason = "value_pattern"
+                elif not header_mapped_set or source_column_str in header_mapped_set:
+                    confidence = 0.92
+                    reason = "header_similarity"
+                else:
+                    confidence = 0.88
+                    reason = "manual_or_saved_mapping"
+
+                previous_confidence = confidence_by_field.get(field_key, -1.0)
+                if confidence < previous_confidence:
+                    continue
+
+                suggested_mapping[field_key] = source_column_str
+                confidence_by_field[field_key] = round(confidence, 2)
+                reasons[field_key] = reason
+
+        for field_key, confidence in confidence_by_field.items():
+            if confidence < auto_apply_threshold:
+                needs_confirmation.append(field_key)
+
+        return {
+            "suggested_mapping": suggested_mapping,
+            "confidence_by_field": confidence_by_field,
+            "reasons": reasons,
+            "rule_version": cls.SMART_SUGGESTION_RULE_VERSION,
+            "auto_apply_threshold": auto_apply_threshold,
+            "needs_confirmation": sorted(needs_confirmation),
+        }
+
     @classmethod
     async def preview(
         cls,
@@ -286,12 +368,14 @@ class LedgerImportApplicationService:
         )
         diagnostics = result.get("diagnostics") or []
         validation = cls._build_validation_report(diagnostics)
+        suggestion_contract = cls._build_suggestion_contract(diagnostics)
         return {
             "year": result.get("year"),
             "summary": cls._build_preview_summary(diagnostics),
             "aux_dimensions": result.get("aux_dimensions", []),
             "validation": validation,
             "validation_summary": cls._build_validation_summary(validation),
+            **suggestion_contract,
             "diagnostics": diagnostics,
             "preview_mode": True,
             "preview_rows": preview_rows,
@@ -305,6 +389,7 @@ class LedgerImportApplicationService:
         sheet_diagnostics = result.get("sheet_diagnostics")
         normalized_diagnostics = cls._normalize_sheet_diagnostics(sheet_diagnostics)
         validation = cls._build_validation_report(sheet_diagnostics)
+        suggestion_contract = cls._build_suggestion_contract(sheet_diagnostics)
         return {
             "total_imported": int(result.get("total_accounts") or 0),
             "by_category": result.get("by_category") or {},
@@ -314,6 +399,7 @@ class LedgerImportApplicationService:
             "diagnostics": normalized_diagnostics,
             "validation": validation,
             "validation_summary": cls._build_validation_summary(validation),
+            **suggestion_contract,
             "year": result.get("year"),
         }
 
@@ -328,6 +414,7 @@ class LedgerImportApplicationService:
     ) -> dict[str, Any]:
         normalized_diagnostics = cls._normalize_sheet_diagnostics(diagnostics)
         validation = cls._build_validation_report(diagnostics)
+        suggestion_contract = cls._build_suggestion_contract(diagnostics)
         if not validation:
             validation = [{
                 "file": None,
@@ -348,6 +435,7 @@ class LedgerImportApplicationService:
             "diagnostics": normalized_diagnostics,
             "validation": validation,
             "validation_summary": cls._build_validation_summary(validation),
+            **suggestion_contract,
             "year": year,
         }
 
@@ -361,6 +449,7 @@ class LedgerImportApplicationService:
         diagnostics = result.get("sheet_diagnostics")
         normalized_diagnostics = cls._normalize_sheet_diagnostics(diagnostics)
         validation = cls._build_validation_report(diagnostics)
+        suggestion_contract = cls._build_suggestion_contract(diagnostics)
         return {
             "imported": result.get("data_sheets_imported") or {},
             "year": result.get("year"),
@@ -368,6 +457,7 @@ class LedgerImportApplicationService:
             "sheet_diagnostics": normalized_diagnostics,
             "validation": validation,
             "validation_summary": cls._build_validation_summary(validation),
+            **suggestion_contract,
             "errors": result.get("errors") or [],
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
         }
@@ -384,6 +474,7 @@ class LedgerImportApplicationService:
     ) -> dict[str, Any]:
         normalized_diagnostics = cls._normalize_sheet_diagnostics(diagnostics)
         validation = cls._build_validation_report(diagnostics)
+        suggestion_contract = cls._build_suggestion_contract(diagnostics)
         if not validation:
             validation = [{
                 "file": None,
@@ -403,6 +494,7 @@ class LedgerImportApplicationService:
             "validation": validation,
             "validation_summary": cls._build_validation_summary(validation),
             "errors": errors or [f"导入失败: {error_message}"],
+            **suggestion_contract,
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
         }
 
@@ -450,6 +542,7 @@ class LedgerImportApplicationService:
                 created_by=UUID(user_id) if user_id else None,
             )
             sync_job_id = sync_job.id
+            await ImportJobService.transition(db, sync_job_id, JobStatus.queued, progress_pct=0, progress_message="同步导入已排队")
             await ImportJobService.transition(db, sync_job_id, JobStatus.running, progress_pct=1, progress_message="同步导入开始")
             await db.flush()
         except Exception as e:
@@ -557,141 +650,46 @@ class LedgerImportApplicationService:
         if not ok:
             raise HTTPException(status_code=409, detail=msg)
 
-        async def _do_import() -> None:
-            try:
-                ImportQueueService.update_progress(
-                    project_id,
-                    2,
-                    f"开始导入 {len(file_sources)} 个文件…",
-                )
+        from app.services.import_artifact_service import ImportArtifactService
 
-                def _on_progress(pct: int, message: str):
-                    ImportQueueService.update_progress(project_id, pct, message)
+        artifact = await ImportArtifactService.get_by_upload_token(
+            db,
+            project_id=project_id,
+            upload_token=resolved_token,
+        )
+        created_by = UUID(user_id) if user_id else None
+        import_job = await ImportJobService.create_job(
+            db,
+            project_id=project_id,
+            year=year or 0,
+            artifact_id=artifact.id if artifact else None,
+            custom_mapping=parsed_mapping,
+            options={
+                "payload_style": payload_style,
+                "queue_batch_id": str(job_batch_id) if job_batch_id is not None else None,
+                "upload_token": resolved_token,
+                "force_activate": False,
+            },
+            created_by=created_by,
+        )
+        await ImportJobService.transition(
+            db,
+            import_job.id,
+            JobStatus.queued,
+            progress_pct=0,
+            progress_message="导入作业已排队",
+        )
+        await db.commit()
 
-                async with async_session() as import_db:
-                    result = await smart_import_streaming(
-                        project_id=project_id,
-                        file_contents=file_sources,
-                        db=import_db,
-                        year_override=year,
-                        custom_mapping=parsed_mapping,
-                        progress_callback=_on_progress,
-                    )
-
-                if payload_style == "account_chart":
-                    result_payload = cls.build_account_chart_result_payload(result)
-                else:
-                    result_payload = cls.build_ledger_job_result_payload(result, job_batch_id=job_batch_id)
-
-                if job_batch_id is not None:
-                    async with async_session() as status_db:
-                        await ImportQueueService.complete_job(
-                            project_id,
-                            job_batch_id,
-                            status_db,
-                            message=f"导入完成: {result.get('data_sheets_imported')}",
-                            result=result_payload,
-                            year=result.get("year"),
-                            record_count=cls._count_total_records(result),
-                        )
-                else:
-                    ImportQueueService.release_lock(project_id)
-            except Exception as exc:
-                import traceback
-
-                logger.error("异步导入失败: %s\n%s", exc, traceback.format_exc())
-                diagnostics = exc.diagnostics if isinstance(exc, SmartImportError) else None
-                failure_errors = exc.errors if isinstance(exc, SmartImportError) else None
-                failure_year = exc.year if isinstance(exc, SmartImportError) else year
-                if payload_style == "account_chart":
-                    failure_payload = cls.build_account_chart_failure_payload(
-                        str(exc),
-                        diagnostics=diagnostics,
-                        errors=failure_errors,
-                        year=failure_year,
-                    )
-                else:
-                    failure_payload = cls.build_ledger_failure_payload(
-                        str(exc),
-                        job_batch_id=job_batch_id,
-                        diagnostics=diagnostics,
-                        errors=failure_errors,
-                        year=failure_year,
-                    )
-
-                async with async_session() as status_db:
-                    if job_batch_id is not None:
-                        await ImportQueueService.fail_job(
-                            project_id,
-                            job_batch_id,
-                            status_db,
-                            message=f"导入失败: {exc}",
-                            result=failure_payload,
-                            year=year,
-                        )
-                    else:
-                        ImportQueueService.release_lock(project_id)
-
-        # 创建持久化 ImportJob 记录（Durable Job）
-        import_job = None
-        try:
-            async with async_session() as job_db:
-                import_job = await ImportJobService.create_job(
-                    job_db,
-                    project_id=project_id,
-                    year=year or 0,
-                    custom_mapping=parsed_mapping,
-                    created_by=UUID(user_id) if user_id else None,
-                )
-                await job_db.commit()
-                job_id = import_job.id
-        except Exception as e:
-            logger.warning("创建 ImportJob 记录失败（降级为无持久化）: %s", e)
-            job_id = None
-
-        # 包装后台任务，加入状态机转换
-        async def _do_import_with_job():
-            if job_id:
-                try:
-                    async with async_session() as jdb:
-                        await ImportJobService.transition(jdb, job_id, JobStatus.running, progress_pct=1, progress_message="开始导入")
-                        await jdb.commit()
-                except Exception:
-                    pass
-
-            try:
-                await _do_import()
-            except Exception:
-                pass  # _do_import 内部已处理异常
-
-            # 检查最终状态（通过 ImportQueueService 的结果判断）
-            queue_status = ImportQueueService.get_progress(project_id)
-            if job_id:
-                try:
-                    async with async_session() as jdb:
-                        if queue_status and queue_status.get("status") == "failed":
-                            await ImportJobService.transition(
-                                jdb, job_id, JobStatus.failed,
-                                progress_pct=queue_status.get("progress", 0),
-                                error_message=queue_status.get("message", "导入失败"),
-                            )
-                        else:
-                            await ImportJobService.transition(
-                                jdb, job_id, JobStatus.completed,
-                                progress_pct=100,
-                                progress_message="导入完成",
-                                result_summary=queue_status.get("result") if queue_status else None,
-                            )
-                        await jdb.commit()
-                except Exception as e:
-                    logger.debug("更新 ImportJob 状态失败: %s", e)
-
-        asyncio.create_task(_do_import_with_job())
+        ImportQueueService.update_progress(project_id, 1, "导入作业已排队")
+        if settings.LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED:
+            from app.services.import_job_runner import ImportJobRunner
+            ImportJobRunner.enqueue(import_job.id)
         return {
             "status": "accepted",
             "message": f"导入任务已提交（{len(file_sources)} 个文件），请轮询进度",
             "project_id": str(project_id),
             "batch_id": str(job_batch_id) if job_batch_id is not None else None,
-            "job_id": str(job_id) if job_id else None,
+            "job_id": str(import_job.id),
             "upload_token": resolved_token,
         }

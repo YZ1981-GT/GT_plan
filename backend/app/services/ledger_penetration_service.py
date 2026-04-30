@@ -30,6 +30,7 @@ from app.models.audit_platform_models import (
     TbBalance,
     TbLedger,
 )
+from app.services.dataset_query import get_active_filter
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -60,6 +61,7 @@ class LedgerPenetrationService:
     ) -> list[dict]:
         """第一层：科目余额汇总"""
         tbl = TbBalance.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = (
             sa.select(
                 tbl.c.account_code,
@@ -70,11 +72,7 @@ class LedgerPenetrationService:
                 tbl.c.credit_amount,
                 tbl.c.closing_balance,
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.is_deleted == sa.false(),
-            )
+            .where(active_filter)
             .order_by(tbl.c.account_code)
         )
         if account_code:
@@ -97,11 +95,10 @@ class LedgerPenetrationService:
         else:
             code_filter = (tbl.c.account_code == account_code)
 
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = sa.select(sa.func.coalesce(sa.func.sum(tbl.c.opening_balance), 0)).where(
-            tbl.c.project_id == project_id,
-            tbl.c.year == year,
+            active_filter,
             code_filter,
-            tbl.c.is_deleted == sa.false(),
         )
         result = await self.db.execute(stmt)
         return result.scalar() or Decimal(0)
@@ -124,6 +121,7 @@ class LedgerPenetrationService:
         else:
             code_filter = (tbl.c.account_code == account_code)
 
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         base = (
             sa.select(
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
@@ -131,12 +129,7 @@ class LedgerPenetrationService:
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.counterpart_account, tbl.c.summary,
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                code_filter,
-                tbl.c.is_deleted == sa.false(),
-            )
+            .where(active_filter, code_filter)
         )
         if date_from:
             base = base.where(tbl.c.voucher_date >= date_from)
@@ -163,6 +156,7 @@ class LedgerPenetrationService:
     ) -> list[dict]:
         """第三层：凭证分录明细（按凭证号穿透）"""
         tbl = TbLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = (
             sa.select(
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
@@ -170,12 +164,7 @@ class LedgerPenetrationService:
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.voucher_no == voucher_no,
-                tbl.c.is_deleted == sa.false(),
-            )
+            .where(active_filter, tbl.c.voucher_no == voucher_no)
             .order_by(tbl.c.account_code)
         )
         result = await self.db.execute(stmt)
@@ -186,6 +175,7 @@ class LedgerPenetrationService:
     ) -> list[dict]:
         """全量辅助余额（所有科目，含原始维度组合字符串）"""
         tbl = TbAuxBalance.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = (
             sa.select(
                 tbl.c.account_code, tbl.c.account_name,
@@ -194,11 +184,7 @@ class LedgerPenetrationService:
                 tbl.c.credit_amount, tbl.c.closing_balance,
                 tbl.c.aux_dimensions_raw,
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.is_deleted == sa.false(),
-            )
+            .where(active_filter)
             .order_by(tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code)
         )
         result = await self.db.execute(stmt)
@@ -210,18 +196,14 @@ class LedgerPenetrationService:
     ) -> list[dict]:
         """辅助余额（按科目穿透到辅助维度）"""
         tbl = TbAuxBalance.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = (
             sa.select(
                 tbl.c.aux_type, tbl.c.aux_code, tbl.c.aux_name,
                 tbl.c.opening_balance, tbl.c.debit_amount,
                 tbl.c.credit_amount, tbl.c.closing_balance,
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.account_code == account_code,
-                tbl.c.is_deleted == sa.false(),
-            )
+            .where(active_filter, tbl.c.account_code == account_code)
             .order_by(tbl.c.aux_type, tbl.c.aux_code)
         )
         if aux_type:
@@ -237,6 +219,7 @@ class LedgerPenetrationService:
     ) -> dict:
         """辅助明细账（按辅助维度穿透）"""
         tbl = TbAuxLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         base = (
             sa.select(
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
@@ -244,12 +227,7 @@ class LedgerPenetrationService:
                 tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.account_code == account_code,
-                tbl.c.is_deleted == sa.false(),
-            )
+            .where(active_filter, tbl.c.account_code == account_code)
         )
         if aux_type:
             base = base.where(tbl.c.aux_type == aux_type)
@@ -293,10 +271,8 @@ class LedgerPenetrationService:
             code_filter = (tbl.c.account_code == account_code)
 
         where_clauses = [
-            tbl.c.project_id == project_id,
-            tbl.c.year == year,
+            await get_active_filter(self.db, tbl, project_id, year),
             code_filter,
-            tbl.c.is_deleted == sa.false(),
         ]
         if date_from:
             where_clauses.append(tbl.c.voucher_date >= date_from)
@@ -375,10 +351,8 @@ class LedgerPenetrationService:
         tbl = TbAuxLedger.__table__
 
         where_clauses = [
-            tbl.c.project_id == project_id,
-            tbl.c.year == year,
+            await get_active_filter(self.db, tbl, project_id, year),
             tbl.c.account_code == account_code,
-            tbl.c.is_deleted == sa.false(),
         ]
         if aux_type:
             where_clauses.append(tbl.c.aux_type == aux_type)

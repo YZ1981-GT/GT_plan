@@ -152,6 +152,11 @@ const router = createRouter({
           component: () => import('@/views/LedgerPenetration.vue'),
         },
         {
+          path: 'projects/:projectId/ledger/import-history',
+          name: 'LedgerImportHistory',
+          component: () => import('@/views/LedgerImportHistory.vue'),
+        },
+        {
           path: 'projects/:projectId/attachments',
           name: 'AttachmentManagement',
           component: () => import('@/views/AttachmentManagement.vue'),

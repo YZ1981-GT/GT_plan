@@ -66,6 +66,13 @@ class ActivationType(str, enum.Enum):
     rollback = "rollback"
 
 
+class OutboxStatus(str, enum.Enum):
+    """导入事件 outbox 发布状态"""
+    pending = "pending"
+    published = "published"
+    failed = "failed"
+
+
 # ---------------------------------------------------------------------------
 # LedgerDataset — 业务级数据集版本
 # ---------------------------------------------------------------------------
@@ -303,4 +310,65 @@ class ActivationRecord(Base):
 
     __table_args__ = (
         Index("idx_activation_records_project_year", "project_id", "year"),
+    )
+
+
+class ImportEventOutbox(Base):
+    """导入域事件 outbox。
+
+    与激活/回滚状态变更在同一事务写入，提交后异步发布并标记 published。
+    如果进程在 commit 与 publish 之间崩溃，pending 记录可被重放补偿。
+    """
+
+    __tablename__ = "import_event_outbox"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    status: Mapped[OutboxStatus] = mapped_column(
+        sa.Enum(OutboxStatus, name="import_event_outbox_status", create_type=False),
+        server_default=text("'pending'"),
+        nullable=False,
+    )
+    attempt_count: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    published_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    __table_args__ = (
+        Index("idx_import_event_outbox_status", "status", "created_at"),
+        Index("idx_import_event_outbox_project_year", "project_id", "year"),
+    )
+
+
+class ImportEventConsumption(Base):
+    """事件消费幂等记录。
+
+    使用 (event_id, handler_name) 唯一约束保证同一事件不会被同一处理器重复执行。
+    """
+
+    __tablename__ = "import_event_consumptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    event_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    handler_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
+    year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    consumed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index("uq_import_event_consumptions_event_handler", "event_id", "handler_name", unique=True),
+        Index("idx_import_event_consumptions_project_year", "project_id", "year"),
     )

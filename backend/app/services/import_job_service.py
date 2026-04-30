@@ -25,13 +25,26 @@ from app.models.dataset_models import ImportJob, JobStatus
 
 
 # 合法状态转换
+RUNNING_STATUSES = (
+    JobStatus.running,
+    JobStatus.validating,
+    JobStatus.writing,
+    JobStatus.activating,
+)
+
+ACTIVE_STATUSES = (
+    JobStatus.pending,
+    JobStatus.queued,
+    *RUNNING_STATUSES,
+)
+
 _VALID_TRANSITIONS: dict[JobStatus, set[JobStatus]] = {
     JobStatus.pending: {JobStatus.queued, JobStatus.canceled},
     JobStatus.queued: {JobStatus.running, JobStatus.canceled, JobStatus.timed_out},
     JobStatus.running: {JobStatus.validating, JobStatus.failed, JobStatus.canceled, JobStatus.timed_out},
     JobStatus.validating: {JobStatus.writing, JobStatus.failed, JobStatus.canceled},
     JobStatus.writing: {JobStatus.activating, JobStatus.failed, JobStatus.canceled},
-    JobStatus.activating: {JobStatus.completed, JobStatus.failed},
+    JobStatus.activating: {JobStatus.completed, JobStatus.failed, JobStatus.canceled},
     JobStatus.completed: set(),
     JobStatus.failed: {JobStatus.pending},  # 重试时回到 pending
     JobStatus.canceled: set(),
@@ -66,6 +79,28 @@ class ImportJobService:
         db.add(job)
         await db.flush()
         return job
+
+    @staticmethod
+    async def set_progress(
+        db: AsyncSession,
+        job_id: UUID,
+        *,
+        progress_pct: int,
+        progress_message: str | None = None,
+        current_phase: str | None = None,
+    ) -> None:
+        """Persist heartbeat/progress for a running job without changing status."""
+        values: dict = {
+            "progress_pct": max(0, min(progress_pct, 100)),
+            "heartbeat_at": datetime.utcnow(),
+        }
+        if progress_message is not None:
+            values["progress_message"] = progress_message
+        if current_phase is not None:
+            values["current_phase"] = current_phase
+        await db.execute(
+            sa.update(ImportJob).where(ImportJob.id == job_id).values(**values)
+        )
 
     @staticmethod
     async def transition(
@@ -115,6 +150,49 @@ class ImportJobService:
         job.heartbeat_at = now
 
         return job
+
+    @staticmethod
+    async def claim_queued_job(db: AsyncSession, job_id: UUID) -> ImportJob | None:
+        """Atomically claim a queued job for execution.
+
+        The project-level queue lock prevents normal duplicate submissions. This
+        extra compare-and-set makes recovery/worker races harmless: only one
+        runner can move the job from queued to running.
+        """
+        now = datetime.utcnow()
+        result = await db.execute(
+            sa.update(ImportJob)
+            .where(
+                ImportJob.id == job_id,
+                ImportJob.status == JobStatus.queued,
+            )
+            .values(
+                status=JobStatus.running,
+                current_phase=JobStatus.running.value,
+                progress_pct=1,
+                progress_message="开始导入",
+                started_at=now,
+                heartbeat_at=now,
+            )
+            .returning(ImportJob)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def active_project_job_exists(
+        db: AsyncSession,
+        project_id: UUID,
+        *,
+        excluding_job_id: UUID | None = None,
+    ) -> bool:
+        query = sa.select(sa.func.count()).select_from(ImportJob).where(
+            ImportJob.project_id == project_id,
+            ImportJob.status.in_(RUNNING_STATUSES),
+        )
+        if excluding_job_id is not None:
+            query = query.where(ImportJob.id != excluding_job_id)
+        result = await db.execute(query)
+        return int(result.scalar_one() or 0) > 0
 
     @staticmethod
     async def heartbeat(db: AsyncSession, job_id: UUID) -> None:
@@ -179,6 +257,8 @@ class ImportJobService:
         job.error_message = None
         job.started_at = None
         job.completed_at = None
+        job.heartbeat_at = None
+        job.current_phase = JobStatus.pending.value
 
         return job
 

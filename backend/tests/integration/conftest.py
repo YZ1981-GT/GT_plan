@@ -69,6 +69,7 @@ async def pg_client():
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
     from sqlalchemy.orm import sessionmaker
     from app.models.base import Base
+    import app.models.dataset_models  # noqa: F401
     from app.main import app
     from app.core.database import get_db
     from app.core.redis import get_redis

@@ -25,6 +25,7 @@ from app.models.audit_platform_schemas import (
     AccountImportResult,
     AccountTreeNode,
 )
+from app.services.dataset_service import DatasetService
 
 logger = logging.getLogger(__name__)
 
@@ -747,17 +748,26 @@ async def get_standard_chart(
 async def get_client_chart_tree(
     project_id: UUID,
     db: AsyncSession,
+    year: int | None = None,
 ) -> dict[str, list[AccountTreeNode]]:
     """Get client account chart as tree structure grouped by category.
 
     Validates: Requirements 2.6
     """
+    filters = [
+        AccountChart.project_id == project_id,
+        AccountChart.source == AccountSource.client,
+        AccountChart.is_deleted == False,  # noqa: E712
+    ]
+    if year is not None:
+        active_dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
+        if active_dataset_id is not None:
+            filters.append(AccountChart.dataset_id == active_dataset_id)
+
     result = await db.execute(
-        select(AccountChart).where(
-            AccountChart.project_id == project_id,
-            AccountChart.source == AccountSource.client,
-            AccountChart.is_deleted == False,  # noqa: E712
-        ).order_by(AccountChart.account_code)
+        select(AccountChart)
+        .where(*filters)
+        .order_by(AccountChart.account_code)
     )
     accounts = result.scalars().all()
 

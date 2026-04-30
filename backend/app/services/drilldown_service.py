@@ -25,6 +25,7 @@ from app.models.audit_platform_schemas import (
     LedgerRow,
     PageResult,
 )
+from app.services.dataset_query import get_active_filter
 
 
 class DrilldownService:
@@ -40,16 +41,16 @@ class DrilldownService:
         # 基础查询：tb_balance LEFT JOIN account_chart 获取 category/level
         bal = TbBalance.__table__
         ac = AccountChart.__table__
+        balance_filter = await get_active_filter(self.db, bal, project_id, year)
+        aux_filter = await get_active_filter(self.db, TbAuxBalance.__table__, project_id, year)
 
         # 子查询：检查科目是否有辅助核算数据
         has_aux_subq = (
             sa.select(sa.literal(True))
             .select_from(TbAuxBalance.__table__)
             .where(
-                TbAuxBalance.project_id == project_id,
-                TbAuxBalance.year == year,
+                aux_filter,
                 TbAuxBalance.account_code == bal.c.account_code,
-                TbAuxBalance.is_deleted == sa.false(),
             )
             .correlate(bal)
             .exists()
@@ -73,14 +74,11 @@ class DrilldownService:
                         ac.c.account_code == bal.c.account_code,
                         ac.c.source == AccountSource.client.value,
                         ac.c.is_deleted == sa.false(),
+                        sa.or_(ac.c.dataset_id == bal.c.dataset_id, bal.c.dataset_id.is_(None)),
                     ),
                 )
             )
-            .where(
-                bal.c.project_id == project_id,
-                bal.c.year == year,
-                bal.c.is_deleted == sa.false(),
-            )
+            .where(balance_filter)
         )
 
         # 应用筛选条件
@@ -135,6 +133,8 @@ class DrilldownService:
         """
         tbl = TbLedger.__table__
         bal = TbBalance.__table__
+        ledger_filter = await get_active_filter(self.db, tbl, project_id, year)
+        balance_filter = await get_active_filter(self.db, bal, project_id, year)
 
         # 获取该科目的期初余额（用于计算 running balance）
         opening_q = (
@@ -142,10 +142,8 @@ class DrilldownService:
                 sa.func.coalesce(sa.func.sum(bal.c.opening_balance), 0).label("opening")
             )
             .where(
-                bal.c.project_id == project_id,
-                bal.c.year == year,
+                balance_filter,
                 bal.c.account_code == account_code,
-                bal.c.is_deleted == sa.false(),
             )
         )
         opening_result = await self.db.execute(opening_q)
@@ -153,10 +151,8 @@ class DrilldownService:
 
         # 基础筛选条件
         where_clauses = [
-            tbl.c.project_id == project_id,
-            tbl.c.year == year,
+            ledger_filter,
             tbl.c.account_code == account_code,
-            tbl.c.is_deleted == sa.false(),
         ]
         if filters.date_from is not None:
             where_clauses.append(tbl.c.voucher_date >= filters.date_from)
@@ -259,6 +255,7 @@ class DrilldownService:
     ) -> list[AuxBalanceRow]:
         """穿透到辅助余额表：按辅助维度分组"""
         tbl = TbAuxBalance.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
 
         q = (
             sa.select(
@@ -271,10 +268,8 @@ class DrilldownService:
                 tbl.c.closing_balance,
             )
             .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
+                active_filter,
                 tbl.c.account_code == account_code,
-                tbl.c.is_deleted == sa.false(),
             )
             .order_by(tbl.c.aux_type, tbl.c.aux_code)
         )
@@ -304,6 +299,7 @@ class DrilldownService:
     ) -> PageResult:
         """穿透到辅助明细账"""
         tbl = TbAuxLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
 
         base_q = (
             sa.select(
@@ -320,10 +316,8 @@ class DrilldownService:
                 tbl.c.preparer,
             )
             .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
+                active_filter,
                 tbl.c.account_code == account_code,
-                tbl.c.is_deleted == sa.false(),
             )
         )
 
@@ -384,6 +378,9 @@ class DrilldownService:
         bal = TbBalance.__table__
         led = TbLedger.__table__
         aux = TbAuxBalance.__table__
+        balance_filter = await get_active_filter(self.db, bal, project_id, year)
+        ledger_filter = await get_active_filter(self.db, led, project_id, year)
+        aux_filter = await get_active_filter(self.db, aux, project_id, year)
 
         # CTE 1: 序时账按科目汇总
         ledger_cte = (
@@ -393,11 +390,7 @@ class DrilldownService:
                 sa.func.coalesce(sa.func.sum(led.c.credit_amount), 0).label("ledger_credit"),
                 sa.func.count().label("voucher_count"),
             )
-            .where(
-                led.c.project_id == project_id,
-                led.c.year == year,
-                led.c.is_deleted == sa.false(),
-            )
+            .where(ledger_filter)
             .group_by(led.c.account_code)
         ).cte("ledger_summary")
 
@@ -408,11 +401,7 @@ class DrilldownService:
                 sa.func.count(sa.distinct(aux.c.aux_type)).label("aux_type_count"),
                 sa.func.count().label("aux_row_count"),
             )
-            .where(
-                aux.c.project_id == project_id,
-                aux.c.year == year,
-                aux.c.is_deleted == sa.false(),
-            )
+            .where(aux_filter)
             .group_by(aux.c.account_code)
         ).cte("aux_summary")
 
@@ -437,11 +426,7 @@ class DrilldownService:
                 .outerjoin(ledger_cte, bal.c.account_code == ledger_cte.c.account_code)
                 .outerjoin(aux_cte, bal.c.account_code == aux_cte.c.account_code)
             )
-            .where(
-                bal.c.project_id == project_id,
-                bal.c.year == year,
-                bal.c.is_deleted == sa.false(),
-            )
+            .where(balance_filter)
             .order_by(bal.c.account_code)
         )
 
@@ -479,6 +464,7 @@ class DrilldownService:
             return {}
 
         tbl = TbLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = (
             sa.select(
                 tbl.c.account_code,
@@ -487,10 +473,8 @@ class DrilldownService:
                 sa.func.count().label("entry_count"),
             )
             .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
+                active_filter,
                 tbl.c.account_code.in_(account_codes),
-                tbl.c.is_deleted == sa.false(),
             )
             .group_by(tbl.c.account_code)
         )
@@ -516,6 +500,7 @@ class DrilldownService:
         返回该凭证的所有分录行 + 借方合计 + 贷方合计 + 是否平衡。
         """
         tbl = TbLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
 
         stmt = (
             sa.select(
@@ -531,10 +516,8 @@ class DrilldownService:
                 tbl.c.preparer,
             )
             .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
+                active_filter,
                 tbl.c.voucher_no == voucher_no,
-                tbl.c.is_deleted == sa.false(),
             )
             .order_by(tbl.c.account_code)
         )
@@ -588,6 +571,7 @@ class DrilldownService:
         使用 GROUP BY 在数据库层面聚合，支持百万行序时账。
         """
         tbl = TbLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
 
         # 按凭证号分组聚合
         group_q = (
@@ -603,11 +587,7 @@ class DrilldownService:
                 sa.func.coalesce(sa.func.sum(tbl.c.credit_amount), 0).label("total_credit"),
                 sa.func.count().label("entry_count"),
             )
-            .where(
-                tbl.c.project_id == project_id,
-                tbl.c.year == year,
-                tbl.c.is_deleted == sa.false(),
-            )
+            .where(active_filter)
             .group_by(tbl.c.voucher_no)
         )
 
@@ -677,6 +657,8 @@ class DrilldownService:
         """
         bal = TbBalance.__table__
         led = TbLedger.__table__
+        balance_filter = await get_active_filter(self.db, bal, project_id, year)
+        ledger_filter = await get_active_filter(self.db, led, project_id, year)
 
         # 序时账按科目汇总
         ledger_agg = (
@@ -686,11 +668,7 @@ class DrilldownService:
                 sa.func.coalesce(sa.func.sum(led.c.credit_amount), 0).label("ledger_credit"),
                 sa.func.count().label("voucher_count"),
             )
-            .where(
-                led.c.project_id == project_id,
-                led.c.year == year,
-                led.c.is_deleted == sa.false(),
-            )
+            .where(ledger_filter)
             .group_by(led.c.account_code)
         ).subquery("ledger_agg")
 
@@ -713,11 +691,7 @@ class DrilldownService:
                     bal.c.account_code == ledger_agg.c.account_code,
                 )
             )
-            .where(
-                bal.c.project_id == project_id,
-                bal.c.year == year,
-                bal.c.is_deleted == sa.false(),
-            )
+            .where(balance_filter)
             .order_by(bal.c.account_code)
         )
 

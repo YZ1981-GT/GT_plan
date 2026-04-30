@@ -20,13 +20,14 @@ import urllib.parse
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access
+from app.deps import require_project_access
 from app.models.core import User
 from app.core.redis import get_redis
+from app.services.dataset_query import get_active_filter
 from app.services.ledger_penetration_service import LedgerPenetrationService
 
 router = APIRouter(prefix="/api/projects/{project_id}/ledger", tags=["ledger-penetration"])
@@ -203,7 +204,7 @@ async def get_aux_balance_paged(
     from app.models.audit_platform_models import TbAuxBalance
     tbl = TbAuxBalance.__table__
 
-    where = [tbl.c.project_id == project_id, tbl.c.year == year, tbl.c.is_deleted == sa.false()]
+    where = [await get_active_filter(db, tbl, project_id, year)]
     if dim_type and dim_type != '全部':
         where.append(tbl.c.aux_type == dim_type)
     if search:
@@ -259,8 +260,8 @@ async def get_aux_balance_detail(
     tbl = TbAuxBalance.__table__
 
     where = [
-        tbl.c.project_id == project_id, tbl.c.year == year,
-        tbl.c.is_deleted == sa.false(), tbl.c.account_code == account_code,
+        await get_active_filter(db, tbl, project_id, year),
+        tbl.c.account_code == account_code,
         tbl.c.aux_type == dim_type,
     ]
     if aux_code:
@@ -411,7 +412,8 @@ async def smart_import(
     files: list[UploadFile] | None = File(None),
     upload_token: Optional[str] = Query(None, description="预览阶段上传产物令牌"),
     year: Optional[int] = Query(None, description="指定年度（不指定则自动提取）"),
-    custom_mapping: Optional[str] = Query(None, description="自定义列映射JSON"),
+    custom_mapping: Optional[str] = Form(None, description="自定义列映射JSON"),
+    custom_mapping_query: Optional[str] = Query(None, description="兼容旧版 query custom_mapping"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
@@ -429,7 +431,7 @@ async def smart_import(
         files=files,
         upload_token=upload_token,
         year=year,
-        custom_mapping=custom_mapping,
+        custom_mapping=custom_mapping or custom_mapping_query,
         payload_style="ledger",
     )
 
@@ -442,7 +444,21 @@ async def get_available_years(
 ):
     """获取该项目有数据的年度列表"""
     import sqlalchemy as sa
+    from app.models.dataset_models import DatasetStatus, LedgerDataset
     from app.models.audit_platform_models import TbBalance
+
+    dataset_result = await db.execute(
+        sa.select(sa.distinct(LedgerDataset.year))
+        .where(
+            LedgerDataset.project_id == project_id,
+            LedgerDataset.status == DatasetStatus.active,
+        )
+        .order_by(LedgerDataset.year.desc())
+    )
+    dataset_years = [row[0] for row in dataset_result.fetchall()]
+    if dataset_years:
+        return {"years": dataset_years}
+
     tbl = TbBalance.__table__
     result = await db.execute(
         sa.select(sa.distinct(tbl.c.year))
@@ -468,10 +484,9 @@ async def get_data_stats(
     for name, model in [("balance", TbBalance), ("aux_balance", TbAuxBalance),
                          ("ledger", TbLedger), ("aux_ledger", TbAuxLedger)]:
         tbl = model.__table__
+        active_filter = await get_active_filter(db, tbl, project_id, year)
         r = await db.execute(
-            sa.select(sa.func.count()).where(
-                tbl.c.project_id == project_id, tbl.c.year == year, tbl.c.is_deleted == sa.false()
-            )
+            sa.select(sa.func.count()).where(active_filter)
         )
         stats[name] = r.scalar() or 0
 
@@ -519,7 +534,7 @@ async def export_ledger_excel(
         code_filter_b = (tbl_b.c.account_code == account_code)
     ob_r = await db.execute(
         sa.select(sa.func.coalesce(sa.func.sum(tbl_b.c.opening_balance), 0))
-        .where(tbl_b.c.project_id == project_id, tbl_b.c.year == year, code_filter_b, tbl_b.c.is_deleted == sa.false())
+        .where(await get_active_filter(db, tbl_b, project_id, year), code_filter_b)
     )
     opening = float(ob_r.scalar() or 0)
 
@@ -529,7 +544,7 @@ async def export_ledger_excel(
         code_filter = tbl.c.account_code.like(prefix + '%')
     else:
         code_filter = (tbl.c.account_code == account_code)
-    where = [tbl.c.project_id == project_id, tbl.c.year == year, code_filter, tbl.c.is_deleted == sa.false()]
+    where = [await get_active_filter(db, tbl, project_id, year), code_filter]
     if date_from:
         where.append(tbl.c.voucher_date >= date_from)
     if date_to:
@@ -661,7 +676,7 @@ async def export_balance_excel(
             tbl.c.opening_balance, tbl.c.debit_amount,
             tbl.c.credit_amount, tbl.c.closing_balance,
         )
-        .where(tbl.c.project_id == project_id, tbl.c.year == year, tbl.c.is_deleted == sa.false())
+        .where(await get_active_filter(db, tbl, project_id, year))
         .order_by(tbl.c.account_code)
     )
     result = await db.execute(stmt)
@@ -744,7 +759,7 @@ async def export_aux_balance_excel(
             tbl.c.credit_amount, tbl.c.closing_balance,
             tbl.c.aux_dimensions_raw,
         )
-        .where(tbl.c.project_id == project_id, tbl.c.year == year, tbl.c.is_deleted == sa.false())
+        .where(await get_active_filter(db, tbl, project_id, year))
         .order_by(tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code)
     )
     if dim_type:
@@ -880,17 +895,29 @@ async def validate_data(
     """
     import sqlalchemy as sa
     from decimal import Decimal
+    from app.models.audit_platform_models import TbAuxBalance, TbBalance, TbLedger
 
     findings = []
 
     # 1. 科目余额表内部勾稽
-    bal_rows = await db.execute(sa.text("""
-        SELECT account_code, opening_balance, debit_amount, credit_amount, closing_balance
-        FROM tb_balance
-        WHERE project_id = :pid AND year = :yr AND is_deleted = false
-          AND (opening_balance IS NOT NULL OR debit_amount IS NOT NULL
-               OR credit_amount IS NOT NULL OR closing_balance IS NOT NULL)
-    """), {"pid": str(project_id), "yr": year})
+    bal_tbl = TbBalance.__table__
+    bal_rows = await db.execute(
+        sa.select(
+            bal_tbl.c.account_code,
+            bal_tbl.c.opening_balance,
+            bal_tbl.c.debit_amount,
+            bal_tbl.c.credit_amount,
+            bal_tbl.c.closing_balance,
+        ).where(
+            await get_active_filter(db, bal_tbl, project_id, year),
+            sa.or_(
+                bal_tbl.c.opening_balance.isnot(None),
+                bal_tbl.c.debit_amount.isnot(None),
+                bal_tbl.c.credit_amount.isnot(None),
+                bal_tbl.c.closing_balance.isnot(None),
+            ),
+        )
+    )
     bal_data = bal_rows.fetchall()
 
     bal_map = {}
@@ -918,12 +945,17 @@ async def validate_data(
                          "message": f"{len(bal_data)} 个科目全部勾稽通过"})
 
     # 2. 科目余额表 vs 辅助余额表
-    aux_agg = await db.execute(sa.text("""
-        SELECT account_code, aux_type, COUNT(*) as cnt, SUM(COALESCE(closing_balance, 0)) as total_closing
-        FROM tb_aux_balance
-        WHERE project_id = :pid AND year = :yr AND is_deleted = false
-        GROUP BY account_code, aux_type
-    """), {"pid": str(project_id), "yr": year})
+    aux_tbl = TbAuxBalance.__table__
+    aux_agg = await db.execute(
+        sa.select(
+            aux_tbl.c.account_code,
+            aux_tbl.c.aux_type,
+            sa.func.count().label("cnt"),
+            sa.func.sum(sa.func.coalesce(aux_tbl.c.closing_balance, 0)).label("total_closing"),
+        )
+        .where(await get_active_filter(db, aux_tbl, project_id, year))
+        .group_by(aux_tbl.c.account_code, aux_tbl.c.aux_type)
+    )
     aux_agg_data = aux_agg.fetchall()
 
     from collections import defaultdict
@@ -954,13 +986,16 @@ async def validate_data(
                          "message": f"{len(aux_by_code)} 个有辅助核算的科目全部一致"})
 
     # 3. 序时账 vs 科目余额表
-    led_agg = await db.execute(sa.text("""
-        SELECT account_code, SUM(COALESCE(debit_amount, 0)) as total_debit,
-               SUM(COALESCE(credit_amount, 0)) as total_credit
-        FROM tb_ledger
-        WHERE project_id = :pid AND year = :yr AND is_deleted = false
-        GROUP BY account_code
-    """), {"pid": str(project_id), "yr": year})
+    led_tbl = TbLedger.__table__
+    led_agg = await db.execute(
+        sa.select(
+            led_tbl.c.account_code,
+            sa.func.sum(sa.func.coalesce(led_tbl.c.debit_amount, 0)).label("total_debit"),
+            sa.func.sum(sa.func.coalesce(led_tbl.c.credit_amount, 0)).label("total_credit"),
+        )
+        .where(await get_active_filter(db, led_tbl, project_id, year))
+        .group_by(led_tbl.c.account_code)
+    )
     led_agg_data = led_agg.fetchall()
 
     led_errors = 0

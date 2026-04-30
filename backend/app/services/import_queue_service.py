@@ -14,10 +14,12 @@ from typing import Any, Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
 from app.models.audit_platform_models import ImportBatch, ImportStatus
+from app.models.dataset_models import ImportJob, JobStatus
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +155,23 @@ class ImportQueueService:
         }
 
     @staticmethod
+    def _build_import_job_payload(job: ImportJob) -> dict[str, Any]:
+        progress = int(job.progress_pct or 0)
+        if job.status in (JobStatus.failed, JobStatus.timed_out, JobStatus.canceled):
+            progress = -1
+        elif job.status == JobStatus.completed:
+            progress = 100
+        message = job.progress_message or job.error_message or ""
+        return {
+            "job_id": str(job.id),
+            "status": job.status.value,
+            "message": message,
+            "progress": progress,
+            "result": job.result_summary,
+            "started": job.started_at.isoformat() if job.started_at else None,
+        }
+
+    @staticmethod
     async def _update_job_batch(
         batch_id: UUID,
         db: AsyncSession,
@@ -234,7 +253,7 @@ class ImportQueueService:
     ) -> tuple[bool, str, UUID | None]:
         """尝试获取导入锁。
 
-        使用 asyncio.Lock 保证检查+写入的原子性，防止两个请求同时通过检查。
+        数据库唯一索引保证跨实例互斥；asyncio.Lock 仅减少单进程内重复提交竞争。
 
         Returns:
             (success, message, batch_id)
@@ -244,12 +263,7 @@ class ImportQueueService:
             ImportQueueService._cleanup_stale_memory_locks()
             await ImportQueueService._expire_stale_jobs(db)
 
-            # 检查该项目是否已有导入在进行（内存锁）
-            if pid in _import_locks:
-                lock = _import_locks[pid]
-                return False, f"项目正在导入中（{lock.get('user', '?')} 于 {lock.get('started', '?')} 开始）", None
-
-            # 检查数据库中是否有活跃任务（多 worker 兜底）
+            # 检查数据库中是否有活跃任务（跨 Web/worker 实例唯一可信来源）
             active_batch = await ImportQueueService._get_active_job_batch(project_id, db)
             if active_batch is not None:
                 started = active_batch.started_at.isoformat() if active_batch.started_at else "?"
@@ -277,8 +291,14 @@ class ImportQueueService:
                 },
             )
             db.add(batch)
-            await db.commit()
-            await db.refresh(batch)
+            try:
+                await db.commit()
+                await db.refresh(batch)
+            except IntegrityError:
+                await db.rollback()
+                active_batch = await ImportQueueService._get_active_job_batch(project_id, db)
+                started = active_batch.started_at.isoformat() if active_batch and active_batch.started_at else "?"
+                return False, f"项目正在导入中（{started} 开始）", None
 
             _import_locks[pid] = {
                 "batch_id": str(batch.id),
@@ -296,11 +316,65 @@ class ImportQueueService:
         _import_locks.pop(str(project_id), None)
 
     @staticmethod
-    async def force_release(project_id: UUID, db: AsyncSession) -> str:
-        """强制释放导入锁 + 将卡住的 batch 标记为 failed。
+    async def force_release(
+        project_id: UUID,
+        db: AsyncSession,
+        *,
+        job_id: UUID | None = None,
+        force: bool = False,
+    ) -> str:
+        """强制释放导入锁。
 
-        用于上传中断后前端自动恢复。
+        - 提供 job_id 时：精确取消指定作业，并清理其关联 queue batch。
+        - 不提供 job_id 时：仅在 force=True 下执行项目级清理。
         """
+        if job_id is not None:
+            from app.services.import_job_service import ImportJobService
+            from app.services.import_job_runner import ImportJobRunner
+
+            job = await ImportJobService.get_job(db, job_id)
+            if job is None or job.project_id != project_id:
+                return "未找到指定作业，未执行重置"
+
+            prev_status = job.status
+            canceled = False
+            try:
+                await ImportJobService.cancel(db, job_id)
+                canceled = True
+            except ValueError:
+                # 已终态或不可取消时不强制改状态，但仍尝试释放残留锁。
+                pass
+
+            ImportJobRunner.request_cancel(job_id)
+            ImportQueueService.release_lock(project_id)
+
+            batch_id_raw = (job.options or {}).get("queue_batch_id")
+            if batch_id_raw:
+                try:
+                    batch_id = UUID(str(batch_id_raw))
+                    batch = await db.get(ImportBatch, batch_id)
+                    if (
+                        batch is not None
+                        and batch.project_id == project_id
+                        and batch.data_type == IMPORT_JOB_DATA_TYPE
+                        and batch.status == ImportStatus.processing
+                    ):
+                        summary = dict(batch.validation_summary or {})
+                        summary.update({"job": True, "progress": -1, "message": "导入被手动重置", "error": "导入被手动重置"})
+                        batch.status = ImportStatus.failed
+                        batch.completed_at = datetime.utcnow()
+                        batch.validation_summary = summary
+                except Exception:
+                    logger.warning("force_release(job_id) 更新 batch 失败: %s", batch_id_raw)
+
+            await db.commit()
+            if canceled:
+                return f"已重置作业 {job_id}（{prev_status.value} → canceled）"
+            return f"已清理作业 {job_id} 的残留锁（当前状态: {prev_status.value}）"
+
+        if not force:
+            return "未提供 job_id，已拒绝项目级重置（如需继续请显式 force=true）"
+
         pid = str(project_id)
         _import_locks.pop(pid, None)
 
@@ -415,6 +489,15 @@ class ImportQueueService:
     @staticmethod
     async def get_status(project_id: UUID, db: AsyncSession) -> Optional[dict]:
         """获取导入状态。"""
+        latest_job_result = await db.execute(
+            select(ImportJob)
+            .where(ImportJob.project_id == project_id)
+            .order_by(ImportJob.created_at.desc())
+        )
+        latest_job = latest_job_result.scalars().first()
+        if latest_job is not None:
+            return ImportQueueService._build_import_job_payload(latest_job)
+
         pid = str(project_id)
         state = _import_locks.get(pid)
         if state is not None:
@@ -432,6 +515,28 @@ class ImportQueueService:
     @staticmethod
     async def get_all_active(db: AsyncSession) -> list[dict]:
         """获取所有活跃的导入任务。"""
+        active_jobs_result = await db.execute(
+            select(ImportJob)
+            .where(ImportJob.status.in_([
+                JobStatus.pending,
+                JobStatus.queued,
+                JobStatus.running,
+                JobStatus.validating,
+                JobStatus.writing,
+                JobStatus.activating,
+            ]))
+            .order_by(ImportJob.created_at.desc())
+        )
+        active_jobs = active_jobs_result.scalars().all()
+        if active_jobs:
+            return [
+                {
+                    "project_id": str(job.project_id),
+                    **ImportQueueService._build_import_job_payload(job),
+                }
+                for job in active_jobs
+            ]
+
         await ImportQueueService._expire_stale_jobs(db)
         result = await db.execute(
             select(ImportBatch)
