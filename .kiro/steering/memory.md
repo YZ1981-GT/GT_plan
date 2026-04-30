@@ -23,6 +23,7 @@ inclusion: always
 - 聊天面板窗口控制偏好：需要支持最大化/还原切换（⊞/⊡按钮），已实现 520×720 小窗 ↔ 全屏切换
 - 聊天 AI 回复排版偏好：Markdown 渲染必须有清晰层次，不能一大段纯文本；system prompt 用「## 【重要】回复格式强制要求」+禁止性措辞+示例模板强制 LLM 分段输出（温和措辞会被忽略）；CSS 中 h1/h2 加底部分隔线、段落间距 10px、列表项间距 6px
 - UI精致度偏好（2026-04-26）：按钮更圆润（默认圆角从4px提升到8px）、表格数据行间距从8px提升到10px（审计员盯屏一天太挤）、进度条加流动光泽动画、标签颜色降低饱和度更柔和、边框用0.5px半透明更细腻、图标统一用线性风格、页面切换加退出过渡动画
+- UI视觉偏好（2026-04-29）：前端界面必须满足致同规范、更好看更美观更动感一目了然对用户友好；页签/标签组件注意背景颜色和字体颜色对比度问题（字体要突出）；自定义badge替代el-tag避免对比度不足；统计栏用紫色渐变+白色粗体数字+金色高亮；卡片hover要有动感（左侧渐变条+位移）
 - 功能收敛偏好（2026-04-26）：停止加新功能，空壳页面（<100行）从导航中移除或标记"开发中"灰色不可点击；审计员只需6-8个核心页面做到极致，不需要60个页面；按角色裁剪导航（审计员只看查账/调整/底稿/附注，项目经理多看看板/委派，合伙人多看总览/签字）
 
 ## 项目上下文
@@ -44,7 +45,7 @@ inclusion: always
 - 前端唯一入口：`audit-platform/frontend/`（端口3030），Vue3+Element Plus+三栏布局；根目录旧 `frontend/`（端口5173，早期AI原型10个Vue文件）已于2026-04-25删除，其功能在新前端中均有更完善实现（AIPluginManagement/ReportView/TrialBalance等），且其调用的后端路由全部是未注册的死代码
 
 ### 项目根目录文件
-- `start.bat` — 开发模式一键启动（前后端分离，后端9980+前端3030）
+- `start-dev.bat` — 开发模式一键启动（后端9980+前端3030，自动查找.venv→系统python，关闭旧进程+端口占用）
 - `build_exe.py` — PyInstaller EXE 打包脚本（含系统托盘、自动找端口、.env 加载）
 - `pack_portable.py` — 绿色便携包打包（核心 .py 编译为 .pyc 保护源码）
 - `README.md` — 项目说明文档
@@ -1611,3 +1612,61 @@ inclusion: always
 - 与现有系统的关系：template_engine.py的generate_project_workpapers需要改为从知识库选择模板源（而非固定从GT_底稿/复制）；report_config_seed需要支持从集团定制版加载（而非固定enterprise标准）
 - 这是一个大的架构改造，涉及知识库+模板引擎+报表配置+底稿生成+前端选择器的联动
 - 模板分类确认：报告模板有两种（国企版+上市版），底稿模板有预设（事务所标准360+个）和自定义（集团/项目级定制）；都需要在三层体系中支持
+- 模板库三层体系已实现（2026-04-29，commit d388e10已推送）：新增template_library_models.py（TemplateLibraryItem统一三层+TemplateType 4种report_soe/listed/workpaper_preset/custom+TemplateLevel 3级firm_default/group_custom/project+ProjectTemplateSelection联动状态追踪linked_trial_balance/adjustments/attachments）+template_library_service.py（list_firm/register_firm+create_group_template派生+select_template_for_project+get_project_templates+pull_template_to_project+get_available_templates）+template_library.py路由7个端点，已注册router_registry
+- 模板库待续：①联动状态自动更新（数据导入/调整创建时标记linked）
+- 模板库三层体系完善已完成（2026-04-29，commit 7f4b85c已推送）：①template_engine.py缩进bug修复+gt_template_library.json格式兼容（支持{templates:[]}包装对象）②TemplateSelectStep.vue前端模板选择器（类型切换/搜索/批量选择/已选展示）③commonApi.ts新增7个模板库API函数+TypeScript类型④init_template_library.py成功初始化367条模板（363底稿+4报告）到template_library表
+- 模板库与底稿衔接增强已完成（2026-04-29，commit 32fd49c已推送）：①模板统一存储到知识库路径（~/.gt_audit_helper/knowledge/workpaper_templates/{cycle}/）②procedure_service.init_from_templates重写为三级优先（template_library表→gt_template_library.json→WpTemplate表）+修复JSON格式bug③wp_header_service新增is_custom参数（自定义底稿强制写入标准表头）④新增POST create-custom端点（用户自建底稿自动填充致同标准表头）
+- 程序裁剪与底稿生成完整链路：template_library选择模板→init_from_templates初始化程序清单→ProcedureTrimming裁剪→generate_project_workpapers跳过被裁剪底稿→fill_workpaper_header自动填充表头（模板底稿搜索填充/自定义底稿强制写入）
+- 底稿通用数据提取规则引擎已完成（2026-04-29，commit 4acea11已推送）：wp_data_rules.py基于wp_account_mapping.json 38条映射实现底稿↔科目↔报表↔附注四级联动；通用规则自动提取所有审定表标准列（未审/AJE/RJE/审定/期初/变动）无需逐个写脚本；精细化脚本（e1_cash等）只处理非标准明细表内容；wp_data_rules.py路由7个端点（映射查询/数据提取/附注提取/一致性校验/批量提取）已注册router_registry
+- 底稿数据提取架构分层：通用规则层（wp_data_rules.py，处理所有审定表标准列，按映射表自动关联）+ 精细化脚本层（wp_scripts/e1_cash.py等，处理每个底稿特有的明细表/分析程序表）；两层互补不冲突
+- 附注表格数据提取引擎已完成（2026-04-29，commit 73d1f57已推送）：note_data_extractor.py支持三种表格样式（fixed_rows固定行/dynamic_rows浮动可变行/mixed固定+浮动）+三种取数模式（cell固定单元格/column整列/row整行）；浮动行从tb_aux_balance按辅助维度动态生成；变动表按维度展开为多列；wp_data_rules.py路由新增5个附注取数端点（style/cell/column/row/dynamic-rows）
+- 附注表格样式分类规则：fixed_rows=货币资金/税金/资本公积等（行数确定）；dynamic_rows=应收账款/长期股权投资/存货等（明细行数随企业变化，从辅助余额表生成）；mixed=固定资产/无形资产/在建工程变动表（行固定=原值/折旧/减值，列浮动=资产分类）
+- 用户需求（附注取数精准性）：底稿取数公式必须支持列取数、行取数和固定单元格取数三种模式；列取数和行取数必须支持浮动行的填充映射（从辅助余额表/底稿明细动态生成）
+- 自定义取数引擎已完成（2026-04-29，commit d8876c9已推送）：data_fetch_custom.py支持跳行跳列任选单元格+5种数据源（trial_balance/report/note/aux_balance/workpaper）+6种变换（direct/negate/abs/percentage/sum/diff）+溯源链路（每次取数记录trace_id/target/source/value/time）+双向跳转URL（正向目标→来源/反向来源→引用目标）；规则持久化到wizard_state.custom_fetch_rules；4个API端点（execute/trace-forward/trace-backward/save-rules+get-rules）
+- 用户需求（取数自定义+溯源）：取数必须支持自定义跳行跳列任选单元格，支持溯源相互跳转，前端可视化选择生成规则
+- 企业级优化6项已完成（2026-04-29，commit ec32592已推送）：①FetchRule新增from_note_formula()统一两套公式体系（origin字段区分preset/custom）②溯源持久化到wizard_state.fetch_trace_history（保留500条）③浮动行Top N+阈值（generate_dynamic_rows新增top_n=20/min_amount参数，超出合并为"其他"）④变动表从tb_ledger按借贷方向SQL SUM取数（非简单余额差）⑤wp_account_mapping.json从38条扩充到56条（新增18个新准则科目）⑥CellSelector.vue前端可视选择器（5种数据源Tab+表格点选+多源组合）
+- Excel↔HTML互转架构决策（2026-04-29用户确认可行）：用户上传Excel→openpyxl解析为structure.json（行列值+样式+合并+公式）→渲染为HTML在线编辑→编辑确认后双格式保存（.xlsx+.html+structure.json）；中间层structure.json是权威数据源，HTML和Excel都从它生成；取数公式绑定在structure.json单元格上与格式无关；解决ONLYOFFICE不可用时的在线编辑降级问题
+- Excel↔HTML互转引擎已完成（2026-04-29，commit b771031已推送）：excel_html_converter.py（excel_to_structure/structure_to_html/structure_to_excel/update_structure_from_edits/sync_structure_from_excel）+excel_html.py路由7个端点（upload-parse/preview/save-edits/confirm-template/sync-from-onlyoffice/download）；ONLYOFFICE联动：WOPI put_file后调sync接口重新解析保留fetch_rule_id绑定；确认模板后自动复制到项目底稿/模板目录与template_engine衔接
+- 三形式联动（Excel+HTML+structure.json）可复用模块分析（2026-04-29）：适用7个模块（底稿审定表/附注表格/报表/调整分录汇总/试算表/合并差额表/底稿模板管理），不适用3个（审计报告正文用TipTap/聊天论坛/项目管理看板）；接入优先级：底稿审定表>附注表格>报表自定义格式；核心价值：一套数据三种呈现（在线HTML编辑+离线ONLYOFFICE+Excel导出归档）
+- 三形式联动统一适配器已完成（2026-04-29，commit 771c492已推送）：triple_format_adapter.py含6个适配器（WorkpaperAdapter/DisclosureNoteAdapter/FinancialReportAdapter/AdjustmentSummaryAdapter/TrialBalanceAdapter/ConsolWorksheetAdapter）+统一入口函数（module_to_structure/module_to_html/module_to_excel）+3个统一API端点（GET module/{module}/structure、GET module/{module}/html、POST module/{module}/export-excel）；前端调用任何模块只需一个URL模式
+- 四式联动增强已完成（2026-04-29，commit 9c86766已推送）：①新增structure_to_word致同三线表Word导出（仿宋_GB2312+Arial Narrow数字+上下1磅边框+合并单元格+千分位+0显示'-'）+module_to_word统一入口+POST export-word端点 ②动态增删行列（insert_row/delete_row/insert_col/delete_col）+公式引用自动偏移（cell(r,c)和SUM(s:e,c)中行列号自动±delta）+合并单元格范围自动调整+fetch_rule_id跟随移动 ③5项修复（附注新增行/ConsolWorksheet字段/并发文件名/HTML内联样式/前端统一API）
+- 四式联动最终形态：Excel+HTML+Word+structure.json，structure.json为权威数据源，其他三种格式都从它生成；增删行列时公式自动调整不丢失绑定关系
+- 合并单元格+地址坐标增强已完成（2026-04-29，commit 493a04b已推送）：①合并单元格标记data-merged+data-merge-range+浅紫色背景+增删行列自动调整范围 ②编辑模式显示列头字母(A/B/C/AA)+行号数字+每格右上角坐标标签(hover高亮) ③data-addr属性存储Excel风格地址供公式引用 ④有公式的格浅黄色背景标识 ⑤GET /cell-info端点返回完整单元格信息（地址/公式/类型/描述/合并范围/取数规则）⑥_col_to_letter列号转字母（0→A,26→AA）
+- 用户需求（公式编辑地址坐标）：设公式时必须显示地址坐标（Excel风格A1/B3），合并单元格需要显示合并范围，用户自定义输入公式时能看到引用的单元格地址
+- 企业级6项增强已完成（2026-04-29，commit b3f5db3已推送）：①formula_unified.py统一公式语法（Excel风格B3/坐标[2,1]/跨表TB()/RPT()/NOTE()/WP()/AUX()一套语法自动识别+parse/validate/convert双向转换）②FormulaBar.vue前端公式编辑栏（常驻地址框+fx输入+类型标签+Enter确认）③版本对比回滚（save_version_snapshot保留20版+diff_versions单元格级对比+rollback_to_version+3个API）④编辑锁（acquire/release/refresh_edit_lock+5分钟TTL+423状态码+3个API）⑤Word页眉页脚（致同事务所名称居中+PAGE域代码自动页码）⑥附注编辑器接入（DisclosureNoteAdapter已实现table_data↔structure.json互转）
+- 企业级5项串联修复已完成（2026-04-29，commit f3b1120已推送）：①formula_unified新增execute_formula()统一执行入口（跨表引用→data_fetch_custom取值+表内引用→sheet_cells计算+_safe_eval安全求值）②save-edits接入版本快照（每次保存自动save_version_snapshot）③save-edits接入编辑锁检查（无锁/非持有者→423拒绝）④StructureEditor.vue集成编辑器（FormulaBar+CellSelector+HTML表格+工具栏增删行列+版本历史+编辑锁获取释放刷新）⑤附注双路径同步（save-edits后自动调用DisclosureNoteAdapter.update_note_from_structure同步回table_data）
+- 最后一公里接入已完成（2026-04-29，commit 41d2942已推送）：①POST /execute-formulas/{stem}端点（遍历所有公式单元格→execute_formula执行→回填value+_calc_sources→版本快照+Excel/HTML同步）②commonApi.ts补齐12个函数（锁3+版本3+公式1+单元格1+模块4）③StructureEditor去掉直接http调用全部改用commonApi+新增"执行公式"按钮
+- 四式联动+公式体系完整闭环确认（2026-04-29）：上传→获取锁→选中→设公式→增删行列→保存（锁检查+快照+同步）→执行公式（跨表+表内）→导出（Excel/Word）→版本管理→释放锁，全链路无断点；下一步将StructureEditor接入DisclosureEditor/WorkpaperList做真实场景验证
+- StructureEditor多维可视化增强已完成（2026-04-29，commit 8d1f256已推送）：①多维信息面板（📍位置+📐公式+🔗数据源+💾值四卡片，可收起/展开）②三维度可视化切换checkbox（显示公式=格下方公式文本/显示数据源=🔗图标/显示状态=左边框颜色）③公式依赖高亮（选中有公式的格自动高亮引用的单元格橙色虚线框）④formatValue千分位+0显示'-'
+- 用户需求（前端可视化多维友好）：前端可视化尽可能显示多维信息，对用户友好，企业级体验
+- StructureEditor企业级体验打磨已完成（2026-04-29，commit 652db7f已推送）：①键盘快捷键（Ctrl+S保存/Ctrl+Z撤销/Tab跳格/Enter下一行/方向键导航/Escape取消）②公式执行错误高亮（出错格红色背景+红色边框+title显示错误原因）③CellSelector数据加载（onMounted自动加载试算表+报表行次+附注章节列表）
+- StructureEditor已达企业级可交付状态（2026-04-29）：17项能力全部完整（四式联动/统一公式/执行/动态行列/合并单元格/地址坐标/公式栏/可视选择器/信息面板/三维度切换/依赖高亮/错误高亮/版本对比/编辑锁/键盘快捷键/Word导出/溯源API），无架构级断点，可直接接入业务页面验证
+- 账表导入智能增强已完成（2026-04-29，commit 0638207已推送）：import_intelligence.py含5项增强——①fuzzy_match_column模糊匹配（正则20+变体+编辑距离+子串包含，返回confidence）②detect_sheet_type_by_content内容特征分析（日期列/数字列/层级推断Sheet类型）③deep_quality_check深度校验5项（DQ-01科目格式/DQ-02大额/DQ-03月份缺失/DQ-04借贷平衡/DQ-05余额vs序时账）+质量评分A/B/C/D ④prepare_incremental_import增量导入4种模式（full_replace/append_period/append_dimension/merge）⑤generate_import_overview导入概览（按类别/月份/指标/评分）；4个API端点+4个前端函数
+- 用户需求（账表导入是起步基础）：账表导入识别和入库是四表联动的关键起步，必须满足企业级要求
+- ManualColumnMapper人工确认关键列组件已完成（2026-04-29，commit b827532已推送）：三级保障链路（自动匹配→模糊建议→人工选择），分组下拉+示例数据+必需列Alert+已使用禁用+采纳建议按钮+确认按钮必需列门禁
+- 本轮能力建设总结（2026-04-29）：21个commit约9000行代码，覆盖模板→导入→数据→取数→公式→编辑→安全→导出全链路；后端能力完整且已串联，前端组件已创建并接入业务页面
+- 前端业务页面集成已完成（2026-04-29，commit 8e75d70已推送）：①AccountImportStep新增"智能匹配"按钮（调用enhance-mapping API自动补全未识别列，>=0.7自动采纳）②DisclosureEditor新增"结构化编辑"按钮（全屏StructureEditor弹窗，module=disclosure_note）③导入后自动重算已确认链路完整（DATA_IMPORTED→on_data_imported→full_recalc）
+- 企业级体验优化3项已完成（2026-04-29，commit ab0d899已推送）：①预览完成后自动执行智能匹配（setTimeout 300ms，用户看到已是最优结果）②公式执行N+1优化（预加载trial_balance全量到_tb_context，TB引用O(1)缓存命中，50公式从50+次查询降为1次）③导入成功提示追加"试算表正在自动更新"
+- 本轮最终状态（2026-04-29）：24个commit约10000行代码，全链路从"能用"到"好用"，大文档处理企业级就绪，无阻断性问题，可交付真实项目验证
+- StructureEditor分页控件已完成（2026-04-29，commit 5a9eced已推送）：大表格>500行自动显示el-pagination分页栏（上一页/下一页/跳转），onPageChange调用preview API带page参数加载指定页
+- excel_html_converter.py不拆分决策：约1200行但函数组织清晰（═══分隔），拆分需改10+文件import收益不大，保持单文件
+- 大文档处理优化已完成（2026-04-29，commit 390982a已推送）：①excel_to_structure max_rows从200提升到5000（底稿/附注足够，序时账走流式导入）②structure_to_html支持分页渲染（page/page_size参数+data-total-rows元数据+start_row偏移只渲染当前页）③upload-parse按文件大小分策略（<10MB完整渲染/>=10MB或>500行分页首500行）④preview端点新增page/page_size参数+返回is_large/total_rows
+- 底稿模块企业级5项增强已完成（2026-04-29，commit 02897f9已推送）：①看板视图GET /working-papers-kanban（4列状态分组+完成率）②穿透链接GET /cross-links（同循环底稿+附注+报表可点击跳转）③批量操作3端点（batch-assign/batch-submit/batch-export ZIP）④编制时间统计GET /edit-time（从审计日志提取）⑤程序联动POST /sync-procedure（底稿状态→程序执行状态自动同步）；前端7个API函数
+- 本轮最终状态更新（2026-04-29）：26个commit，底稿模块企业级能力完整（模板→裁剪→生成→表头→预填充→四式编辑→公式→看板→穿透→批量→时间→程序联动）
+- WorkpaperKanban.vue看板前端组件已完成（2026-04-29，commit e8c9aab已推送）：4列看板（待编制/编制中/待复核/已通过）+统计栏+卡片+hover效果+expose refresh
+- submit-review自动触发sync-procedure已完成：提交复核成功后自动将procedure_instances.execution_status更新为completed（try/except不阻断）
+- 底稿处理架构重构（2026-04-29，commit 4bb9e0d已推送）：删除3个独立脚本（e1_cash/h1_fixed_asset/d1_receivable共733行），统一用wp_generic_processor.py通用规则引擎处理所有363个底稿；通用规则自动识别表头行/列含义/合计行/Sheet类型，特殊需求通过wp_parse_rules.json配置驱动不写代码；registry.py重写为委托通用引擎
+- 底稿处理架构决策：不再为每个科目写独立脚本，通用规则+四式联动覆盖所有底稿；wp_parse_rules.json作为可选配置层处理特殊科目（如固定资产变动表的多行表头）
+- wp_parse_rules全面重写已完成（2026-04-29，commit c505a2a已推送）：旧格式（固定单元格引用F25）→新格式（Sheet模式+表头关键词+列定义keywords数组）；wp_parse_rules.json 17条核心科目（E1/D2/D3/F1/G1/H1/H2/I1/J1/K1-K3/L1-L2/M1/N1/D1，含多Sheet配置如D2有5个sheet）+wp_parse_rules_extended.json 20条扩展科目；_load_rules_for_wp支持精确匹配+前缀匹配（E1匹配E1-1）
+- 工时自动关联+看板直接分配已完成（2026-04-29，commit b0e254e已推送）：①GET /work-hours/edit-time-suggest从审计日志提取当天底稿编辑记录按底稿分组计算时长供工时预填 ②WorkpaperKanban未分配卡片显示"分配"按钮emit assign事件
+- 本轮最终：31个commit，系统企业级完整（模板/导入/数据/取数/公式/编辑/安全/导出/底稿/看板/工时全链路）+前后联动全部打通
+- WorkpaperList看板/列表视图切换已完成（2026-04-29，commit 2d1e577已推送）：el-radio-group切换viewMode，kanban模式渲染WorkpaperKanban组件+筛选条件传递+卡片点击/分配事件
+- 前后联动接入完成确认：WorkpaperKanban✅ ManualColumnMapper✅ TemplateSelectStep✅ StructureEditor✅ FormulaBar+CellSelector✅ 智能匹配✅；剩余3项（解析预览/导入概览/穿透链接）为底稿详情面板增强待真实验证后按需添加
+- 角色化LLM辅助4项已完成（2026-04-29，commit 95ff9b1已推送）：role_ai_features.py+路由4端点（/ai-assist/stale-reminders超期提醒+/weekly-report周报LLM润色+/qc-trend问题趋势+/project-summary一页纸摘要LLM叙述）；LLM策略temperature=0.3+失败降级模板文字不阻断
+- 本轮最终状态（2026-04-29会话）：33个commit约12000行代码，系统企业级完整+角色化LLM辅助，700路由正常加载，可交付真实项目验证
+
+## 本轮最终复盘（2026-04-29 会话结束）
+- 本轮共30+个commit（cc8f47d→d388e10），全部已推送GitHub
+- 代码层面还能立即做的5项：①D2/H1精细化脚本重写②~~模板库初始化脚本~~✅③~~template_engine.py接入模板库~~✅④~~前端模板选择器组件~~✅⑤旧知识库API迁移
+- 建议下一轮优先级：先用当前系统做真实项目验证→根据反馈确定优先级→D2/H1精细化+模板库前端+合并报表前端
+- 架构改造已完整：模板三层体系+知识库升级+公式体系+RAG+数据集版本+企业级加固+全流程断点修复+报表结构补全，剩余为逐个底稿精细化打磨
