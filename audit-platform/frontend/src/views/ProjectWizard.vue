@@ -1,7 +1,7 @@
 <template>
   <div class="gt-project-wizard gt-fade-in">
-    <!-- Step Bar -->
-    <div class="gt-wizard-header">
+    <!-- Step Bar (hidden when single step) -->
+    <div v-if="stepKeys.length > 1" class="gt-wizard-header">
       <el-steps :active="wizardStore.currentStepIndex" finish-status="success" align-center>
         <el-step
           v-for="(key, idx) in stepKeys"
@@ -88,11 +88,6 @@ const teamAssignmentRef = ref<BoolStepRef | null>(null)
 
 const stepKeys: StepKey[] = [
   'basic_info',
-  'account_import',
-  'account_mapping',
-  'materiality',
-  'team_assignment',
-  'confirmation',
 ]
 
 onMounted(async () => {

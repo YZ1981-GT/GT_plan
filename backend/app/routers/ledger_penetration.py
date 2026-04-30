@@ -396,14 +396,19 @@ async def smart_preview(
     """
     from app.services.ledger_import_application_service import LedgerImportApplicationService
 
-    return await LedgerImportApplicationService.preview(
-        project_id=project_id,
-        user_id=str(current_user.id),
-        files=files,
-        upload_token=upload_token,
-        year=year,
-        preview_rows=preview_rows,
-    )
+    try:
+        return await LedgerImportApplicationService.preview(
+            project_id=project_id,
+            user_id=str(current_user.id),
+            files=files,
+            upload_token=upload_token,
+            year=year,
+            preview_rows=preview_rows,
+        )
+    except Exception as e:
+        import traceback, logging
+        logging.getLogger(__name__).error(f"smart-preview error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"文件解析失败: {str(e)[:200]}")
 
 
 @router.post("/smart-import")

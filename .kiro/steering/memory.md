@@ -24,6 +24,7 @@ inclusion: always
 - 聊天 AI 回复排版偏好：Markdown 渲染必须有清晰层次，不能一大段纯文本；system prompt 用「## 【重要】回复格式强制要求」+禁止性措辞+示例模板强制 LLM 分段输出（温和措辞会被忽略）；CSS 中 h1/h2 加底部分隔线、段落间距 10px、列表项间距 6px
 - UI精致度偏好（2026-04-26）：按钮更圆润（默认圆角从4px提升到8px）、表格数据行间距从8px提升到10px（审计员盯屏一天太挤）、进度条加流动光泽动画、标签颜色降低饱和度更柔和、边框用0.5px半透明更细腻、图标统一用线性风格、页面切换加退出过渡动画
 - UI视觉偏好（2026-04-29）：前端界面必须满足致同规范、更好看更美观更动感一目了然对用户友好；页签/标签组件注意背景颜色和字体颜色对比度问题（字体要突出）；自定义badge替代el-tag避免对比度不足；统计栏用紫色渐变+白色粗体数字+金色高亮；卡片hover要有动感（左侧渐变条+位移）
+- 按钮样式修复（2026-04-30）：gt-polish.css和global.css的.el-button--danger用!important给所有按钮加实心渐变背景，导致text/plain模式按钮文字被遮挡；修复：按钮样式区分三种模式（实心:not(.is-text):not(.is-plain)保持渐变+白字、plain浅色背景+深色边框+深色字、text/link透明背景+纯文字色）
 - 功能收敛偏好（2026-04-26）：停止加新功能，空壳页面（<100行）从导航中移除或标记"开发中"灰色不可点击；审计员只需6-8个核心页面做到极致，不需要60个页面；按角色裁剪导航（审计员只看查账/调整/底稿/附注，项目经理多看看板/委派，合伙人多看总览/签字）
 
 ## 项目上下文
@@ -40,7 +41,7 @@ inclusion: always
 - vLLM Docker 配置：镜像 `vllm/vllm-openai:cu130-nightly`，端口 8100，`HF_HUB_OFFLINE=1` 离线模式，NVFP4_BACKEND=marlin，max-model-len=32768，gpu-memory-utilization=0.89，启动命令 `docker compose --profile gpu up vllm`
 - vLLM 已验证可用（2026-04-14）：API `http://localhost:8100/v1`，Qwen3.5 默认开启 thinking 模式（reasoning_content），审计平台调用时需加 `chat_template_kwargs: {enable_thinking: false}` 获取直接回复
 - vLLM 已有独立部署配置在 `D:\vllm\vllm-qwen3.5-nvfp4-sm120\docker-compose.yml`（经过验证的参数），审计平台 docker-compose 已复用该配置
-- 文件上传限制：MAX_UPLOAD_SIZE_MB=100（config.py）
+- 文件上传限制：MAX_UPLOAD_SIZE_MB=800 / MAX_REQUEST_BODY_MB=850（config.py，2026-04-30从100/150提升，覆盖600+MB序时账CSV）；前端预览超时从120s提升到300s
 - Docker Compose 统一管理：GPU 服务（vLLM/MinerU）用 `profiles: [gpu]` 按需启动，`docker-compose.mineru.yml` 已删除并整合到主 `docker-compose.yml`；MinerU 端口改为 8002（Router）+7860（WebUI）；启动命令 `docker compose --profile gpu up vllm mineru`
 - 前端唯一入口：`audit-platform/frontend/`（端口3030），Vue3+Element Plus+三栏布局；根目录旧 `frontend/`（端口5173，早期AI原型10个Vue文件）已于2026-04-25删除，其功能在新前端中均有更完善实现（AIPluginManagement/ReportView/TrialBalance等），且其调用的后端路由全部是未注册的死代码
 
@@ -248,7 +249,7 @@ inclusion: always
 - 顶部栏UI改进（2026-04-26）：6个纯图标按钮改为带文字标签的胶囊按钮组（知识库/私人库/AI/社区），系统操作类保留纯图标缩小为辅助级别；去掉"排版模板"入口减少噪音
 - 首页/看板动画增强（2026-04-26）：统计卡片数字改为 easeOutCubic 动画计数器（800ms），欢迎横幅加浮动粒子+旋转装饰SVG，管理看板顶部改为紫色渐变横幅，图表条形图改为渐变色
 - 报表引擎6个bug修复（2026-04-26）：①generate_unadjusted_report参数传递错误（project_id当作applicable_standard导致未审报表永远返回空）②_generate_report未保存indent_level/is_total_row到FinancialReport表 ③FinancialReport模型缺少indent_level/is_total_row两列（需ALTER TABLE补齐）④_COLUMN_MAP从3个扩展到8个（新增审定数/期初余额/未审数/RJE调整/AJE调整）⑤SUM_TB未审模式下_period_amount仍用audited_amount ⑥audit_report_service.py f-string中文弯引号SyntaxError
-- FinancialReport表新增列（2026-04-26）：indent_level INTEGER DEFAULT 0 + is_total_row BOOLEAN DEFAULT false，需在本地PG执行 ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS indent_level INTEGER DEFAULT 0; ALTER TABLE financial_report ADD COLUMN IF NOT EXISTS is_total_row BOOLEAN DEFAULT false;
+- FinancialReport表新增列（2026-04-26）：indent_level INTEGER DEFAULT 0 + is_total_row BOOLEAN DEFAULT false；本地PG已于2026-04-30实际执行ALTER TABLE补齐（之前只记录未执行导致报表页500错误）
 - 调整分录→试算表→报表联动排查确认（2026-04-26）：事件驱动链路完整无bug，ADJUSTMENT_CREATED/UPDATED/DELETED → on_adjustment_changed增量重算rje/aje/audited → TRIAL_BALANCE_UPDATED → regenerate_affected增量更新报表 → REPORTS_UPDATED → 附注/审计报告刷新；EventBus 500ms debounce防重复
 - 全页面UI横幅统一（2026-04-26）：WorkpaperList/ConsolidationIndex/PDFExportPanel/Drilldown 4个页面从简单标题升级为紫色渐变横幅（网格纹理+径向光晕），与首页/管理看板/报表/试算表/调整分录/附注/审计报告/CFS/重要性/未更正错报风格统一
 - UTF-8 BOM 防御：所有 Python 脚本读取 JSON/HTML 文件统一用 `utf-8-sig` 编码
@@ -651,7 +652,7 @@ inclusion: always
 - AI模型配置管理（2026-04-14）：新增 /api/ai-models CRUD+激活+健康检查+种子数据 API（ai_models.py路由），前端新增 AIModelConfig.vue 页面（三Tab对话/嵌入/OCR+健康状态卡片+CRUD弹窗）+ ModelTable.vue 组件 + aiModelApi.ts 服务层；左侧栏新增「AI 模型」导航项（Cpu图标），路由 /settings/ai-models，DefaultLayout 已处理 /settings/ 前缀为全宽模式
 - LLM 调用全面切换到本地 vLLM（2026-04-14）：ai_service.py 从 Ollama 原生 API 改为 OpenAI 兼容 API，新增 `_get_llm_client()` 指向 `http://localhost:8100/v1`；`_chat_sync`/`_chat_stream`/`embedding` 全部改用 OpenAI 格式；config.py 新增 LLM_BASE_URL/LLM_API_KEY/DEFAULT_CHAT_MODEL/DEFAULT_EMBEDDING_MODEL/LLM_TEMPERATURE/LLM_MAX_TOKENS/LLM_ENABLE_THINKING/OLLAMA_BASE_URL/CHROMADB_URL 共9个配置项；默认模型 `Kbenkhaled/Qwen3.5-27B-NVFP4`；Qwen3.5 thinking 模式默认关闭（`chat_template_kwargs: {enable_thinking: false}`）；init_default_models 种子数据改为 openai_compatible provider；Ollama 保留为备用
 - 回收站架构（2026-04-14）：`SoftDeleteMixin` 新增 `soft_delete()` 方法（设 is_deleted=True + deleted_at=now()），全部 24 处服务层软删除操作统一改为调用 `soft_delete()`；新增 recycle_bin.py 路由（5个端点：列表/恢复/永久删除/清空/统计），支持 12 种数据类型；上限 500 条超限提示；ai_chat 物理删除和 import_service rollback 物理删除保持不变（不进回收站）；前端 RecycleBin.vue + 左侧栏导航 + 路由 /recycle-bin
-- 项目向导确认步骤依赖放宽（2026-04-14）：confirmation 步骤只要求 basic_info + account_import + account_mapping 三个核心步骤完成即可创建项目，materiality 和 template_set 改为可选（项目创建后再补充）
+- 项目向导简化（2026-04-30）：新建项目改为单页（只有基本信息表单+确认创建按钮），无步骤条；科目导入/科目映射/重要性水平/团队分工改为项目创建后的独立功能入口；stepKeys=['basic_info']，stepKeys.length<=1时隐藏el-steps
 
 ## 代码审查与修复（2026-04-14）
 
@@ -1663,7 +1664,19 @@ inclusion: always
 - WorkpaperList看板/列表视图切换已完成（2026-04-29，commit 2d1e577已推送）：el-radio-group切换viewMode，kanban模式渲染WorkpaperKanban组件+筛选条件传递+卡片点击/分配事件
 - 前后联动接入完成确认：WorkpaperKanban✅ ManualColumnMapper✅ TemplateSelectStep✅ StructureEditor✅ FormulaBar+CellSelector✅ 智能匹配✅；剩余3项（解析预览/导入概览/穿透链接）为底稿详情面板增强待真实验证后按需添加
 - 角色化LLM辅助4项已完成（2026-04-29，commit 95ff9b1已推送）：role_ai_features.py+路由4端点（/ai-assist/stale-reminders超期提醒+/weekly-report周报LLM润色+/qc-trend问题趋势+/project-summary一页纸摘要LLM叙述）；LLM策略temperature=0.3+失败降级模板文字不阻断
-- 本轮最终状态（2026-04-29会话）：33个commit约12000行代码，系统企业级完整+角色化LLM辅助，700路由正常加载，可交付真实项目验证
+- 本轮最终状态（2026-04-29会话）：34个commit约12000行代码，系统企业级完整+角色化LLM辅助，700路由正常加载，可交付真实项目验证
+- 远程合并Phase17导入平台改造（2026-04-30同步）：新增import_event_outbox/import_event_consumptions表+import_job_runner+import_slo_service+import_ops_audit等；本地需执行Base.metadata.create_all补建缺失表
+- 本地PG缺失表已补建（2026-04-30）：通过create_all补建import_event_outbox/import_event_consumptions等Phase17新增表，后台outbox循环报错已解决
+- 大文件预览超时问题（2026-04-30）：600MB序时账CSV通过预览接口上传+解析超时导致Network Error；前端超时从120s→600s；后端预览接口已只读前20行（preview_rows=20），瓶颈是HTTP传输600MB文件本身；前端已加>50MB大文件提示"请耐心等待"；正确做法是先只上传科目余额表（小文件）做预览，序时账在确认导入阶段走流式导入
+- 查账页面导入弹窗修复（2026-04-30）：LedgerPenetration.vue的"账套导入"弹窗调用/ledger/smart-preview；大文件解决方案：>50MB时前端file.slice(0, 64*1024)只上传前64KB做表头识别（秒级完成），确认列映射后正式导入走流式处理完整文件；≤50MB完整上传；smartPreviewLedgerImport已加timeout=600000
+- 导入500错误排查（2026-04-30）：用Python requests直接测试后端返回200正常（3.6MB余额表），问题是前端File对象在Vite HMR热更新后引用失效导致FormData为空→后端收到空请求返回500；已加validFiles有效性检查（f.size>0过滤+失效时提示重新选择）
+- smart-preview 500根因定位与修复（2026-04-30）：create_bundle写入import_artifacts时外键约束违反（project_id不在projects表中）导致500；修复：artifact写入改为try/except降级（失败只记warning日志不阻断预览），预览阶段只需文件在本地磁盘即可完成表头解析，artifact记录是给后续import阶段跨节点用的
+- 大文件预览架构决策：预览只需表头+前20行做列映射确认，不需要上传完整文件；前端slice前64KB是最优解（无需改后端，浏览器端截取秒级响应）
+- 人员库Excel批量导入已完成（2026-04-30）：StaffManagement.vue新增"Excel导入"按钮+隐藏file input；后端POST /api/staff/import-excel端点（openpyxl解析，格式：姓名/部门/职级/所属合伙人，已存在姓名跳过）
+- 左侧导航"人员库"（原"人员委派"已改名）→ /settings/staff 人员库页面（标题也改为"人员库"）；项目级人员委派在项目详情页快捷操作的"人员委派"按钮弹窗中（TeamAssignmentStep组件）
+- 报表页无数据时显示预设模板结构（2026-04-30）：ReportView.vue在getReport返回404时自动从/api/report-config加载预设行次（行次+项目名称+缩进+合计标记），金额列为空；用户看到完整报表框架后点"重新生成"填充数据
+- report_config_seed.json修复（2026-04-30）：equity_change→equity_statement（8处枚举名不匹配导致种子加载500）；修复后POST /seed成功加载68行种子数据
+- 用户需求（报表预设模板）：报表数据不存在时不能显示空白No Data，必须参照国企版/上市版的合并和单体模版把预设表格样式呈现出来
 
 ## 本轮最终复盘（2026-04-29 会话结束）
 - 本轮共30+个commit（cc8f47d→d388e10），全部已推送GitHub

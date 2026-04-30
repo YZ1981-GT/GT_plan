@@ -51,8 +51,8 @@ class Settings(BaseSettings):
     MINERU_API_URL: str = "http://localhost:8000"
     MINERU_USE_CLI: bool = True  # 使用 CLI 模式（直接调用本地 mineru 命令）
     # 文件上传限制
-    MAX_UPLOAD_SIZE_MB: int = 100  # 最大上传文件大小（MB）
-    MAX_REQUEST_BODY_MB: int = 150  # 全局请求体大小上限（MB），略大于上传限制以容纳 multipart 开销
+    MAX_UPLOAD_SIZE_MB: int = 800  # 最大上传文件大小（MB）
+    MAX_REQUEST_BODY_MB: int = 850  # 全局请求体大小上限（MB），略大于上传限制以容纳 multipart 开销
     LEDGER_UPLOAD_STORAGE_ROOT: str = "./storage/ledger_uploads"
     LEDGER_UPLOAD_TTL_HOURS: int = 24
     LEDGER_UPLOAD_MAX_FILE_COUNT: int = 20

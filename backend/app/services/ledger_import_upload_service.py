@@ -151,24 +151,28 @@ class LedgerImportUploadService:
                     manifest=manifest,
                 )
 
-            # Artifact 记录是跨实例 worker 读取上传产物的入口，失败必须阻断提交。
+            # Artifact 记录是跨实例 worker 读取上传产物的入口。
+            # 预览阶段写入失败不阻断（降级为仅本地文件），导入阶段会重试。
             from app.core.database import async_session
             import uuid as _uuid
             from app.services.import_artifact_service import ImportArtifactService
 
-            async with async_session() as art_db:
-                await ImportArtifactService.create_bundle_artifact(
-                    art_db,
-                    project_id=project_id,
-                    upload_token=upload_token,
-                    storage_uri=storage_uri,
-                    bundle_dir=bundle_dir,
-                    manifest_files=artifact_files,
-                    total_size_bytes=total_size,
-                    expires_at=datetime.utcnow() + timedelta(hours=settings.LEDGER_UPLOAD_TTL_HOURS),
-                    created_by=_uuid.UUID(user_id) if user_id else None,
-                )
-                await art_db.commit()
+            try:
+                async with async_session() as art_db:
+                    await ImportArtifactService.create_bundle_artifact(
+                        art_db,
+                        project_id=project_id,
+                        upload_token=upload_token,
+                        storage_uri=storage_uri,
+                        bundle_dir=bundle_dir,
+                        manifest_files=artifact_files,
+                        total_size_bytes=total_size,
+                        expires_at=datetime.utcnow() + timedelta(hours=settings.LEDGER_UPLOAD_TTL_HOURS),
+                        created_by=_uuid.UUID(user_id) if user_id else None,
+                    )
+                    await art_db.commit()
+            except Exception as artifact_err:
+                logger.warning(f"Artifact 记录写入失败（不阻断预览）: {artifact_err}")
 
             return manifest
         except Exception:

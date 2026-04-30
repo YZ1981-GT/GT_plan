@@ -1707,11 +1707,11 @@
     ]
   },
   {
-    "report_type": "equity_change",
+    "report_type": "equity_statement",
     "applicable_standard": "soe_consolidated",
     "template_variant": "soe",
     "scope": "consolidated",
-    "description": "equity_change — 致同国企版合并",
+    "description": "equity_statement — 致同国企版合并",
     "rows": [
       {
         "row_code": "EQ-001",
@@ -3567,11 +3567,11 @@
     ]
   },
   {
-    "report_type": "equity_change",
+    "report_type": "equity_statement",
     "applicable_standard": "soe_standalone",
     "template_variant": "soe",
     "scope": "standalone",
-    "description": "equity_change — 致同国企版单体",
+    "description": "equity_statement — 致同国企版单体",
     "rows": [
       {
         "row_code": "EQ-001",
@@ -5523,11 +5523,11 @@
     ]
   },
   {
-    "report_type": "equity_change",
+    "report_type": "equity_statement",
     "applicable_standard": "listed_consolidated",
     "template_variant": "listed",
     "scope": "consolidated",
-    "description": "equity_change — 致同上市版合并",
+    "description": "equity_statement — 致同上市版合并",
     "rows": [
       {
         "row_code": "EQ-001",
@@ -7419,11 +7419,11 @@
     ]
   },
   {
-    "report_type": "equity_change",
+    "report_type": "equity_statement",
     "applicable_standard": "listed_standalone",
     "template_variant": "listed",
     "scope": "standalone",
-    "description": "equity_change — 致同上市版单体",
+    "description": "equity_statement — 致同上市版单体",
     "rows": [
       {
         "row_code": "EQ-001",

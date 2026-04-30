@@ -902,13 +902,14 @@ function onImportFileChange(file: any) {
 
 async function doPreview() {
   if (!importFiles.value.length) return
+
   previewing.value = true
   try {
     const formData = buildImportPreviewFormData(importFiles.value)
     const url = buildImportPreviewUrl({
       basePath: `/api/projects/${projectId.value}/ledger/smart-preview`,
       year: importYear.value,
-      previewRows: 50,
+      previewRows: 20,
     })
     const data = await smartPreviewLedgerImport(projectId.value, url, formData)
     const previewSuccess = resolveImportPreviewSuccess({
@@ -931,7 +932,7 @@ async function doPreview() {
       },
     })
   } catch (e: any) {
-    ElMessage.error(e?.message || '解析失败')
+    ElMessage.error(e?.message || '解析失败，请尝试先只上传科目余额表')
   } finally {
     previewing.value = false
   }
@@ -948,16 +949,51 @@ async function doImport() {
     const mappingParam = Object.keys(userColumnMapping.value).length > 0
       ? JSON.stringify(userColumnMapping.value)
       : ''
+
+    // 大文件策略：先上传完整文件（显示上传进度），再用token触发后台导入
+    let resolvedToken = uploadToken.value
+    const totalSize = importFiles.value.reduce((sum: number, f: File) => sum + f.size, 0)
+
+    if (!resolvedToken && totalSize > 50 * 1024 * 1024) {
+      // 大文件：先上传存储
+      bgImportMessage.value = '正在上传文件到服务器...'
+      const uploadFormData = new FormData()
+      for (const f of importFiles.value) {
+        uploadFormData.append('files', f)
+      }
+      try {
+        const uploadResp = await http.post(
+          `/api/projects/${projectId.value}/ledger/smart-preview?year=${yr}&preview_rows=5`,
+          uploadFormData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 0,  // 无超时，大文件上传可能很久
+            onUploadProgress: (e: any) => {
+              if (e.total) {
+                const pct = Math.round(e.loaded / e.total * 100)
+                bgImportMessage.value = `上传中... ${pct}%（${(e.loaded/1024/1024).toFixed(0)}/${(e.total/1024/1024).toFixed(0)}MB）`
+              }
+            },
+          }
+        )
+        const respData = uploadResp.data?.data ?? uploadResp.data
+        resolvedToken = respData?.upload_token || ''
+        bgImportMessage.value = '文件上传完成，正在提交导入任务...'
+      } catch (uploadErr: any) {
+        throw new Error(`文件上传失败: ${uploadErr?.message || '网络错误'}`)
+      }
+    }
+
     const formData = buildImportFormData({
-      files: importFiles.value,
-      uploadToken: uploadToken.value,
+      files: resolvedToken ? [] : importFiles.value,  // 有token则不重复传文件
+      uploadToken: resolvedToken,
       mappingFieldName: 'custom_mapping',
       mappingPayload: mappingParam,
     })
     const url = buildImportJobUrl({
       basePath: `/api/projects/${projectId.value}/ledger/smart-import`,
       year: yr,
-      uploadToken: uploadToken.value,
+      uploadToken: resolvedToken,
     })
     const data = await submitSmartLedgerImport(projectId.value, url, formData)
     uploadToken.value = data?.upload_token || uploadToken.value

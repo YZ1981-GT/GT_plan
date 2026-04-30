@@ -128,6 +128,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
@@ -221,11 +222,42 @@ async function fetchReport() {
       rows.value = await getReport(projectId.value, year.value, activeTab.value, reportMode.value === 'unadjusted')
       compareRows.value = []
     }
-  } catch {
-    rows.value = []
+  } catch (err: any) {
+    // 404 = 报表未生成，加载预设模板结构显示空表格框架
+    if (err?.response?.status === 404) {
+      await loadTemplateRows()
+    } else {
+      rows.value = []
+    }
     compareRows.value = []
   } finally {
     loading.value = false
+  }
+}
+
+async function loadTemplateRows() {
+  // 从报表配置加载预设行次（显示空值的模板框架）
+  try {
+    const { data } = await http.get('/api/report-config', {
+      params: { report_type: activeTab.value }
+    })
+    const configs = data?.data ?? data
+    if (Array.isArray(configs) && configs.length > 0) {
+      rows.value = configs.map((r: any) => ({
+        row_code: r.row_code || '',
+        row_name: r.row_name || '',
+        amount: null,
+        prior_amount: null,
+        indent_level: r.indent_level || 0,
+        is_total_row: r.is_total || false,
+        formula_used: r.formula || '',
+      }))
+    } else {
+      rows.value = []
+    }
+  } catch {
+    // 配置也没有，显示空
+    rows.value = []
   }
 }
 

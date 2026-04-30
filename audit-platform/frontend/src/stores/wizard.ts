@@ -72,10 +72,6 @@ export const STEP_LABELS: Record<StepKey, string> = {
 
 export const CONFIRMATION_REQUIRED_STEPS: StepKey[] = [
   'basic_info',
-  'account_import',
-  'account_mapping',
-  'materiality',
-  'team_assignment',
 ]
 
 export const useWizardStore = defineStore('wizard', {

@@ -926,6 +926,14 @@ function onFileChange(_file: UploadFile, fileListVal: UploadFile[]) {
 
 async function handlePreview() {
   if (selectedFiles.value.length === 0 || !wizardStore.projectId) return
+
+  // 大文件检测：>50MB的文件提示用户
+  const totalSize = selectedFiles.value.reduce((sum, f) => sum + f.size, 0)
+  const totalSizeMB = totalSize / 1024 / 1024
+  if (totalSizeMB > 50) {
+    ElMessage.info(`文件较大（${totalSizeMB.toFixed(0)}MB），解析预览可能需要1-3分钟，请耐心等待...`)
+  }
+
   previewing.value = true
   try {
     previewYear.value = null
@@ -940,7 +948,7 @@ async function handlePreview() {
     const data = await api.post(
       previewUrl,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 },
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 600000 },
     )
     const previewSuccess = resolveImportPreviewSuccess<PreviewResponse, Phase>({
       result: data as PreviewResponse,

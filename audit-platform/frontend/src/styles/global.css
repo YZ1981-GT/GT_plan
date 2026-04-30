@@ -144,9 +144,20 @@ body {
   border: none;
 }
 
-.el-button--danger {
+.el-button--danger:not(.is-text):not(.is-link) {
   background: var(--gt-gradient-coral);
   border: none;
+}
+.el-button--danger.is-text,
+.el-button--danger.is-link {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.el-button--primary.is-text,
+.el-button--primary.is-link {
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* 圆角按钮增强 */

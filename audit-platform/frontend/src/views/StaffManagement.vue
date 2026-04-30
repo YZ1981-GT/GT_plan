@@ -11,6 +11,8 @@
           <el-option label="审计三部" value="审计三部" />
         </el-select>
         <el-button type="primary" @click="showCreateDialog = true">新增人员</el-button>
+        <el-button @click="triggerImport">Excel导入</el-button>
+        <input ref="importFileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImportFile" />
       </div>
     </div>
 
@@ -102,6 +104,7 @@ const filterDept = ref('')
 const showCreateDialog = ref(false)
 const showResumeDialog = ref(false)
 const editingStaff = ref<StaffMember | null>(null)
+const importFileInput = ref<HTMLInputElement>()
 const saving = ref(false)
 const resumeData = ref<any>(null)
 
@@ -169,11 +172,37 @@ async function onDeleteStaff(row: StaffMember) {
   } catch { ElMessage.error('删除失败') }
 }
 
+function triggerImport() {
+  importFileInput.value?.click()
+}
+
+async function handleImportFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await (await import('@/utils/http')).default.post('/api/staff/import-excel', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const result = data?.data ?? data
+    ElMessage.success(`导入成功：新增 ${result?.imported || 0} 人，跳过 ${result?.skipped || 0} 人`)
+    await loadStaff()
+  } catch (err: any) {
+    ElMessage.error(err?.response?.data?.detail || err?.message || 'Excel导入失败')
+  } finally {
+    input.value = ''  // 清空文件选择
+  }
+}
+
 onMounted(loadStaff)
 </script>
 
 <style scoped>
 .gt-staff-page { padding: var(--gt-space-4); }
 .gt-staff-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); flex-wrap: wrap; gap: var(--gt-space-2); }
+.gt-staff-header .gt-page-title { font-size: 14px; }
 .gt-staff-actions { display: flex; gap: var(--gt-space-2); align-items: center; }
 </style>

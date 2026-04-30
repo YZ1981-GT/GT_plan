@@ -228,7 +228,7 @@ const props = defineProps<{
 const navItems = [
   { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
   { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production' },
-  { key: 'team', label: '人员委派', icon: User, path: '/settings/staff', maturity: 'production' },
+  { key: 'team', label: '人员库', icon: User, path: '/settings/staff', maturity: 'production' },
   { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production' },
   { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
   { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'pilot' },

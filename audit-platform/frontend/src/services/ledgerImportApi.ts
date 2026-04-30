@@ -99,7 +99,10 @@ export async function getImportJob(projectId: string, jobId: string): Promise<Im
 
 export async function smartPreviewLedgerImport(projectId: string, url: string, formData: FormData) {
   void projectId
-  const { data } = await http.post(url, formData)
+  const { data } = await http.post(url, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 600000,  // 10分钟（大文件上传需要时间）
+  })
   return data?.data ?? data
 }
 

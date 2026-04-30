@@ -70,6 +70,10 @@
                 <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
                 <span>创建下年</span>
               </div>
+              <div class="gt-quick-btn" @click="showTeamAssign = true" title="为项目分配团队成员">
+                <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
+                <span>人员委派</span>
+              </div>
               <div
                 v-if="project.report_scope === 'consolidated'"
                 class="gt-quick-btn"
@@ -211,6 +215,16 @@
     <div v-else class="gt-empty-state">
       <el-empty description="请从左侧选择一个项目" :image-size="100" />
     </div>
+
+    <!-- 人员委派弹窗 -->
+    <el-dialog v-model="showTeamAssign" title="人员委派" width="900px" append-to-body destroy-on-close>
+      <div style="min-height: 500px;">
+        <TeamAssignmentStep v-if="showTeamAssign" :project-id="project.id" />
+      </div>
+      <template #footer>
+        <el-button @click="showTeamAssign = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -218,14 +232,16 @@
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
 const activeTab = ref('overview')
+const showTeamAssign = ref(false)
 const projectYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
 
 // 底稿索引树

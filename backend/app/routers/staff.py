@@ -5,9 +5,10 @@ Phase 9 Task 1.2
 
 from __future__ import annotations
 
+import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -170,3 +171,70 @@ async def get_my_staff_id(
     db.add(new_staff)
     await db.commit()
     return {"staff_id": str(new_staff.id), "name": new_staff.name, "auto_created": True}
+
+
+@router.post("/import-excel")
+async def import_staff_from_excel(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """从Excel批量导入人员
+
+    Excel格式：姓名/部门/职级/所属合伙人（第一行为表头）
+    """
+    import openpyxl
+    import io
+
+    if not file.filename or not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="仅支持 .xlsx/.xls 文件")
+
+    content = await file.read()
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"文件解析失败: {e}")
+
+    ws = wb.active
+    imported = 0
+    skipped = 0
+
+    # 跳过表头行
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    wb.close()
+
+    from app.models.staff_models import StaffMember
+    import sqlalchemy as sa
+
+    for row in rows:
+        if not row or not row[0]:
+            continue
+        name = str(row[0]).strip()
+        if not name:
+            continue
+
+        # 检查是否已存在
+        existing = await db.execute(
+            sa.select(StaffMember).where(StaffMember.name == name, StaffMember.is_deleted == sa.false())
+        )
+        if existing.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        department = str(row[1]).strip() if len(row) > 1 and row[1] else None
+        title = str(row[2]).strip() if len(row) > 2 and row[2] else None
+        partner_name = str(row[3]).strip() if len(row) > 3 and row[3] else None
+
+        staff = StaffMember(
+            id=uuid.uuid4(),
+            name=name,
+            department=department,
+            title=title,
+            partner_name=partner_name,
+            source="custom",
+        )
+        db.add(staff)
+        imported += 1
+
+    await db.commit()
+    return {"imported": imported, "skipped": skipped, "total_rows": len(rows)}
