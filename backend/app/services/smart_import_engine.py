@@ -2036,10 +2036,16 @@ async def write_four_tables(
         )
 
         record_count = 0
+        valid_cols = {c.name for c in tbl.columns}
         for i in range(0, len(rows), CHUNK_SIZE):
             chunk = rows[i:i + CHUNK_SIZE]
-            recs = [{"id": _uuid.uuid4(), "project_id": project_id, "year": year,
-                     "import_batch_id": batch.id, "dataset_id": _dataset_id, "is_deleted": False, **row} for row in chunk]
+            recs = []
+            for row in chunk:
+                # 只保留表中存在的列，过滤掉 direction 等不属于该表的字段
+                filtered = {k: v for k, v in row.items() if k in valid_cols}
+                filtered.update({"id": _uuid.uuid4(), "project_id": project_id, "year": year,
+                                 "import_batch_id": batch.id, "dataset_id": _dataset_id, "is_deleted": False})
+                recs.append(filtered)
             if recs:
                 await db.execute(tbl.insert(), recs)
                 record_count += len(recs)
@@ -2314,11 +2320,10 @@ async def _stream_csv_import(
         "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
     ]
     _BALANCE_COLS = [
-        "company_code", "account_code", "account_name", "direction", "level",
+        "company_code", "account_code", "account_name", "level",
         "opening_balance", "opening_debit", "opening_credit",
         "closing_balance", "closing_debit", "closing_credit",
         "debit_amount", "credit_amount",
-        "year_opening_debit", "year_opening_credit",
         "opening_qty", "opening_fc", "currency_code",
     ]
     _AUX_BALANCE_COLS = _BALANCE_COLS + [
@@ -2497,11 +2502,10 @@ async def smart_import_streaming(
         "aux_type", "aux_code", "aux_name", "aux_dimensions_raw",
     ]
     _BALANCE_COLS = [
-        "company_code", "account_code", "account_name", "direction", "level",
+        "company_code", "account_code", "account_name", "level",
         "opening_balance", "opening_debit", "opening_credit",
         "closing_balance", "closing_debit", "closing_credit",
         "debit_amount", "credit_amount",
-        "year_opening_debit", "year_opening_credit",
         "opening_qty", "opening_fc", "currency_code",
     ]
     _AUX_BALANCE_COLS = _BALANCE_COLS + [

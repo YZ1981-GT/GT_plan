@@ -170,5 +170,71 @@
       {"name_pattern": "审定表", "type": "summary", "header_keywords": ["项目", "期末", "期初"]},
       {"name_pattern": "明细", "type": "detail", "header_keywords": ["供应商", "金额", "账龄"]}
     ]
+  },
+  {
+    "wp_code": "L5",
+    "name": "应付债券",
+    "account_codes": ["2502"],
+    "sheets": [
+      {"name_pattern": "审定表", "type": "summary", "header_keywords": ["项目", "期末", "期初"]},
+      {"name_pattern": "明细", "type": "detail", "header_keywords": ["债券名称", "面值", "利率", "到期日"]}
+    ]
+  },
+  {
+    "wp_code": "L6",
+    "name": "长期应付款",
+    "account_codes": ["2701"],
+    "sheets": [
+      {"name_pattern": "审定表", "type": "summary", "header_keywords": ["项目", "期末", "期初"]},
+      {"name_pattern": "明细", "type": "detail", "header_keywords": ["往来单位", "金额", "性质"]}
+    ]
+  },
+  {
+    "wp_code": "L7",
+    "name": "预计负债",
+    "account_codes": ["2801"],
+    "sheets": [
+      {"name_pattern": "审定表", "type": "summary", "header_keywords": ["项目", "期末", "期初"]}
+    ]
+  },
+  {
+    "wp_code": "K16",
+    "name": "投资收益",
+    "account_codes": ["6111"],
+    "sheets": [
+      {"name_pattern": "审定表", "type": "summary", "header_keywords": ["项目", "本期", "上期"], "columns": {"label": {"keywords": ["项目"]}, "closing_balance": {"keywords": ["本期"]}, "opening": {"keywords": ["上期"]}}}
+    ]
+  },
+  {
+    "wp_code": "K17",
+    "name": "公允价值变动收益",
+    "account_codes": ["6101"],
+    "sheets": [
+      {"name_pattern": "审定表", "type": "summary", "header_keywords": ["项目", "本期", "上期"]}
+    ]
+  },
+  {
+    "wp_code": "K18",
+    "name": "递延收益",
+    "account_codes": ["2401"],
+    "sheets": [
+      {"name_pattern": "审定表", "type": "summary", "header_keywords": ["项目", "期初", "增加", "减少", "期末"], "columns": {"label": {"keywords": ["项目"]}, "opening": {"keywords": ["期初"]}, "increase": {"keywords": ["增加", "本期新增"]}, "decrease": {"keywords": ["减少", "本期摊销"]}, "closing_balance": {"keywords": ["期末"]}}}
+    ]
+  },
+  {
+    "wp_code": "D0",
+    "name": "收入循环函证",
+    "account_codes": ["1121", "1122"],
+    "sheets": [
+      {"name_pattern": "函证汇总|函证", "type": "summary", "header_keywords": ["客户", "函证金额", "回函金额", "差异"]}
+    ]
+  },
+  {
+    "wp_code": "E0",
+    "name": "银行询证函",
+    "account_codes": ["1002"],
+    "sheets": [
+      {"name_pattern": "询证函|函证", "type": "summary", "header_keywords": ["银行", "账号", "余额", "回函"]}
+    ]
   }
 ]

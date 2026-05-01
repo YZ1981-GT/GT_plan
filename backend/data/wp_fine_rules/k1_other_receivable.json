@@ -1,0 +1,162 @@
+{
+  "wp_code": "K1",
+  "name": "其他应收款",
+  "wp_name": "其他应收款",
+  "cycle": "K",
+  "note": "映射表中K6=其他应收款，但实际模板文件为K1 其他应收款.xlsx（K管理循环）",
+  "account_codes": ["1221"],
+  "source_files": [
+    {
+      "file_pattern": "K1 其他应收款.xlsx",
+      "is_primary": true
+    }
+  ],
+  "sheets": [
+    {
+      "exact_name": "审定表K1-1",
+      "code": "K1-1",
+      "type": "summary",
+      "table_type": "three_section",
+      "header_rows": [5, 6],
+      "data_start_row": 7,
+      "columns": {
+        "opening_unaudited": {"col": 2, "keywords": ["期初", "未审数"]},
+        "opening_aje": {"col": 3, "keywords": ["期初", "账项调整"]},
+        "opening_reclass": {"col": 4, "keywords": ["期初", "重分类调整"]},
+        "opening_audited": {"col": 5, "keywords": ["期初", "审定数"]},
+        "closing_unaudited": {"col": 6, "keywords": ["期末", "未审数"]},
+        "closing_aje": {"col": 7, "keywords": ["期末", "账项调整"]},
+        "closing_reclass": {"col": 8, "keywords": ["期末", "重分类调整"]},
+        "closing_audited": {"col": 9, "keywords": ["期末", "审定数"]},
+        "change_amount": {"col": 10, "keywords": ["变动额"]},
+        "change_rate": {"col": 11, "keywords": ["变动率"]}
+      },
+      "key_rows": {
+        "section1_title": 7,
+        "gross_title": 8,
+        "gross_items": [9, 10, 11, 12, 13],
+        "gross_total": 14,
+        "bad_debt_title": 15,
+        "bad_debt_items": [16, 17, 18, 19, 20],
+        "bad_debt_total": 21,
+        "net_title": 22,
+        "net_items": [23, 24, 25, 26, 27],
+        "net_total": 28,
+        "aging_title": 29,
+        "aging_gross_title": 30,
+        "aging_gross_items": [31, 32, 33, 34, 35, 36],
+        "aging_gross_total": 37,
+        "aging_bad_debt_title": 38
+      },
+      "sections": [
+        {"name": "原值", "start_row": 8, "end_row": 14, "items": ["单项计提", "按组合计提", "账龄组合", "客户类型组合", "其他组合"]},
+        {"name": "坏账准备", "start_row": 15, "end_row": 21, "items": ["单项计提", "按组合计提", "账龄组合", "客户类型组合", "其他组合"]},
+        {"name": "净值", "start_row": 22, "end_row": 28, "items": ["单项计提", "按组合计提", "账龄组合", "客户类型组合", "其他组合"]},
+        {"name": "账龄原值", "start_row": 30, "end_row": 37, "items": ["一年以内", "一到二年", "二到三年", "三到四年", "四到五年", "五年以上"]}
+      ]
+    },
+    {
+      "exact_name": "实质性程序表 K1A",
+      "code": "K1A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "附注披露信息(上市公司）",
+      "type": "disclosure_listed"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "disclosure_soe"
+    },
+    {
+      "exact_name": "明细表K1-2",
+      "code": "K1-2",
+      "type": "detail",
+      "description": "其他应收款明细"
+    },
+    {
+      "exact_name": "坏账准备明细表K1-3",
+      "code": "K1-3",
+      "type": "detail",
+      "description": "坏账准备明细"
+    },
+    {
+      "exact_name": "调整分录汇总K1-4",
+      "code": "K1-4",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "大额其他应收款情况分析表K1-5",
+      "code": "K1-5",
+      "type": "analysis",
+      "description": "大额分析"
+    },
+    {
+      "exact_name": "信用减值损失会计政策检查K1-6",
+      "code": "K1-6",
+      "type": "check",
+      "description": "ECL会计政策检查"
+    },
+    {
+      "exact_name": "三阶段划分检查表K1-7",
+      "code": "K1-7",
+      "type": "check",
+      "description": "ECL三阶段划分"
+    },
+    {
+      "exact_name": "坏账准备测算K1-8",
+      "code": "K1-8",
+      "type": "check",
+      "description": "坏账准备测算"
+    },
+    {
+      "exact_name": "坏账准备转回（收回）、核销检查表K1-9",
+      "code": "K1-9",
+      "type": "check",
+      "description": "坏账转回核销检查"
+    },
+    {
+      "exact_name": "长期未收回款项检查表K1-10",
+      "code": "K1-10",
+      "type": "check",
+      "description": "长期未收回检查"
+    },
+    {
+      "exact_name": "关联方及交易检查表K1-11",
+      "code": "K1-11",
+      "type": "check",
+      "description": "关联方交易检查"
+    },
+    {
+      "exact_name": "其他应收款检查表K1-12",
+      "code": "K1-12",
+      "type": "check",
+      "description": "综合检查"
+    }
+  ],
+  "cross_references": [
+    {"from": "K1-1:R14:C9", "to": "TB('1221','审定数')", "description": "原值小计=试算表审定数（含坏账前）"},
+    {"from": "K1-1:R28:C9", "to": "REPORT('BS-007','期末')", "description": "净值合计=报表其他应收款"},
+    {"from": "K1-1:R28:C9", "to": "K1-1:R14:C9 - K1-1:R21:C9", "description": "净值=原值-坏账准备"},
+    {"from": "K1-1:R37:C9", "to": "K1-1:R14:C9", "description": "账龄合计=原值合计"},
+    {"from": "K1-2", "to": "K1-1:R14:C9", "description": "明细表合计=原值合计"},
+    {"from": "K1-3", "to": "K1-1:R21:C9", "description": "坏账明细合计=坏账合计"},
+    {"from": "K1-4", "to": "K1-1:R14:C7", "description": "调整分录汇总=审定表调整列"},
+    {"from": "K1-8", "to": "K1-1:R21:C9", "description": "坏账测算结果=审定表坏账合计"}
+  ],
+  "audit_checks": [
+    {"id": "K1-CHK-01", "type": "balance", "severity": "blocking", "description": "净值=原值-坏账准备"},
+    {"id": "K1-CHK-02", "type": "balance", "severity": "blocking", "description": "原值合计=试算表审定数"},
+    {"id": "K1-CHK-03", "type": "cross_ref", "severity": "warning", "description": "净值合计=报表其他应收款"},
+    {"id": "K1-CHK-04", "type": "cross_ref", "severity": "warning", "description": "账龄合计=原值合计"},
+    {"id": "K1-CHK-05", "type": "completeness", "severity": "warning", "description": "明细表已填写"},
+    {"id": "K1-CHK-06", "type": "completeness", "severity": "warning", "description": "坏账准备明细已填写"},
+    {"id": "K1-CHK-07", "type": "check", "severity": "warning", "description": "ECL三阶段划分检查已填写"},
+    {"id": "K1-CHK-08", "type": "check", "severity": "warning", "description": "坏账准备测算已填写"},
+    {"id": "K1-CHK-09", "type": "aging", "severity": "warning", "description": "账龄分段合理性"},
+    {"id": "K1-CHK-10", "type": "check", "severity": "info", "description": "长期未收回款项检查已填写"},
+    {"id": "K1-CHK-11", "type": "check", "severity": "info", "description": "关联方交易检查已填写"},
+    {"id": "K1-CHK-12", "type": "formula", "severity": "blocking", "description": "净值=原值-坏账准备（R28=R14-R21，逐行校验）"},
+    {"id": "K1-CHK-13", "type": "formula", "severity": "warning", "description": "原值各项之和=原值小计（R9+R10+R11+R12+R13=R14）"}
+  ]
+}

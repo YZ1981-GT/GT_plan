@@ -3,13 +3,13 @@
     <!-- 顶部筛选栏 -->
     <div class="gt-wp-filter-bar">
       <h2 class="gt-page-title">底稿管理</h2>
-      <div class="gt-wp-view-toggle">
+      <div v-if="treeData.length > 0" class="gt-wp-view-toggle">
         <el-radio-group v-model="viewMode" size="small">
           <el-radio-button value="list">列表</el-radio-button>
           <el-radio-button value="kanban">看板</el-radio-button>
         </el-radio-group>
       </div>
-      <div class="gt-wp-filters">
+      <div v-if="treeData.length > 0" class="gt-wp-filters">
         <el-input
           v-model="searchKeyword"
           placeholder="搜索底稿..."
@@ -42,6 +42,51 @@
       @select="onKanbanSelect"
       @assign="onKanbanAssign"
     />
+    <!-- 无底稿时：两栏布局（左操作入口 + 右审计程序总览） -->
+    <div v-else-if="!loading && treeData.length === 0" class="gt-wp-intro-layout">
+      <!-- 左栏：操作入口 -->
+      <div class="gt-wp-intro-half">
+        <div class="gt-wp-intro-icon">📋</div>
+        <div class="gt-wp-intro-title">暂无底稿</div>
+        <div class="gt-wp-intro-desc">前往底稿工作台生成项目底稿</div>
+        <el-button type="primary" @click="goToWorkbench" style="margin-top: 20px">前往底稿工作台</el-button>
+      </div>
+
+      <!-- 右栏：审计程序总览（简洁列表，点击跳转） -->
+      <div class="gt-wp-intro-half gt-wp-intro-half--guide">
+        <h3 class="gt-wp-guide-title">审计程序与底稿体系</h3>
+        <div class="gt-wp-guide-flow">
+          <span class="gt-wp-flow-tag" style="background:#7c5cbf">B 风险评估</span>
+          <span class="gt-wp-flow-arrow">→</span>
+          <span class="gt-wp-flow-tag" style="background:#6a4fa0">C 控制测试</span>
+          <span class="gt-wp-flow-arrow">→</span>
+          <span class="gt-wp-flow-tag" style="background:#e6553a">D-N 实质性程序</span>
+          <span class="gt-wp-flow-arrow">→</span>
+          <span class="gt-wp-flow-tag" style="background:#1a8a5c">A 完成阶段</span>
+          <span class="gt-wp-flow-tag" style="background:#7f8c8d;margin-left:4px">S 特定项目</span>
+        </div>
+        <div class="gt-wp-guide-list">
+          <div
+            v-for="g in auditCycleGuide" :key="g.cycle"
+            class="gt-wp-guide-row"
+            @click="onGuideClick(g.cycle)"
+          >
+            <span class="gt-wp-guide-badge" :style="{ background: g.color }">{{ g.cycle }}</span>
+            <span class="gt-wp-guide-name">{{ g.name }}</span>
+            <span class="gt-wp-guide-count">{{ g.count }} 个底稿</span>
+            <span class="gt-wp-guide-arrow">›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 加载中 -->
+    <div v-else-if="loading" class="gt-wp-empty-full">
+      <el-icon class="is-loading" style="font-size: 28px; color: var(--gt-color-primary)"><Loading /></el-icon>
+      <div style="margin-top: 12px; font-size: 14px; color: #999">加载中...</div>
+    </div>
+
+    <!-- 有数据时：左右分栏 -->
     <div v-else class="gt-wp-body">
       <!-- 左侧索引树 -->
       <div class="gt-wp-tree-panel">
@@ -65,7 +110,6 @@
             </div>
           </template>
         </el-tree>
-        <el-empty v-if="!loading && treeData.length === 0" description="暂无底稿" :image-size="80" />
       </div>
 
       <!-- 右侧详情面板 -->
@@ -143,9 +187,59 @@
               </span>
             </div>
 
+            <!-- 精细化审计检查结果 -->
+            <div v-if="fineCheckResults.length" class="gt-wp-fine-checks" style="margin-top: 12px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="font-size:13px;font-weight:600;color:#333">审计检查</span>
+                <el-tag size="small" :type="fineChecksPassed ? 'success' : 'warning'">
+                  {{ fineChecksPassedCount }}/{{ fineCheckResults.length }} 通过
+                </el-tag>
+                <el-button size="small" text @click="loadFineChecks" :loading="fineChecksLoading">刷新</el-button>
+              </div>
+              <div v-for="chk in fineCheckResults" :key="chk.code" class="gt-fine-check-item"
+                :class="{ 'gt-fine-check-pass': chk.passed === true, 'gt-fine-check-fail': chk.passed === false, 'gt-fine-check-pending': chk.passed === null }">
+                <span class="gt-fine-check-code">{{ chk.code }}</span>
+                <span class="gt-fine-check-desc">{{ chk.description }}</span>
+                <span v-if="chk.passed === true" class="gt-fine-check-status">✓</span>
+                <span v-else-if="chk.passed === false" class="gt-fine-check-status" style="color:#e6a23c">
+                  ✗ {{ chk.message }}
+                  <el-button size="small" text type="primary" style="margin-left:4px;font-size:11px" @click="onCheckJump(chk)">定位</el-button>
+                </span>
+                <span v-else class="gt-fine-check-status" style="color:#999">待验证</span>
+              </div>
+            </div>
+
             <!-- 复核人操作区：仅在底稿处于待复核状态时显示 -->
             <div v-if="isReviewable" class="gt-wp-reviewer-actions" style="margin-top: 16px">
               <h4 style="margin: 0 0 8px; font-size: 14px; color: var(--gt-color-text)">复核操作</h4>
+
+              <!-- TSJ复核提示词清单 -->
+              <div v-if="tsjReviewData" class="gt-tsj-review-panel" style="margin-bottom: 12px">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:600;color:#4b2d77">📋 复核要点（{{ tsjReviewData.account_name }}）</span>
+                  <el-button size="small" text @click="showTsjDetail = !showTsjDetail">{{ showTsjDetail ? '收起' : '展开' }}</el-button>
+                </div>
+                <!-- 风险领域 -->
+                <div v-if="tsjReviewData.risk_areas?.length" style="margin-bottom:6px">
+                  <div v-for="(area, i) in tsjReviewData.risk_areas.slice(0, showTsjDetail ? 99 : 3)" :key="i"
+                    style="font-size:11px;color:#666;padding:2px 0">
+                    <el-tag :type="area.includes('高风险') ? 'danger' : area.includes('中风险') ? 'warning' : 'info'" size="small" style="margin-right:4px">
+                      {{ area.includes('高风险') ? '高' : area.includes('中风险') ? '中' : '低' }}
+                    </el-tag>
+                    {{ area }}
+                  </div>
+                </div>
+                <!-- 复核清单 -->
+                <div v-if="showTsjDetail && tsjReviewData.checklist?.length" style="margin-top:8px">
+                  <div style="font-size:11px;font-weight:600;color:#333;margin-bottom:4px">复核清单：</div>
+                  <div v-for="(item, i) in tsjReviewData.checklist" :key="i"
+                    style="font-size:11px;color:#555;padding:1px 0;display:flex;align-items:flex-start;gap:4px">
+                    <el-checkbox size="small" style="flex-shrink:0" />
+                    <span>{{ item }}</span>
+                  </div>
+                </div>
+              </div>
+
               <div style="display: flex; gap: 8px; flex-wrap: wrap">
                 <el-button type="success" @click="onReviewPass">
                   {{ selectedWp?.review_status === 'pending_level2' ? '二级复核通过' : '一级复核通过' }}
@@ -173,25 +267,52 @@
                   复核意见
                   <el-badge v-if="unresolvedCount > 0" :value="unresolvedCount" type="danger" style="margin-left: 8px" />
                 </h4>
-                <el-button size="small" type="primary" @click="showAddAnnotation = true">新增意见</el-button>
+                <div style="display:flex;gap:6px">
+                  <el-button size="small" @click="goToConversation" title="发起复核对话（支持多轮讨论）">💬 对话</el-button>
+                  <el-button size="small" type="primary" @click="showAddAnnotation = true">新增意见</el-button>
+                </div>
               </div>
-              <el-table v-if="annotations.length" :data="annotations" size="small" stripe max-height="200">
-                <el-table-column prop="content" label="内容" min-width="200" show-overflow-tooltip />
-                <el-table-column prop="priority" label="优先级" width="80">
+              <!-- 意见筛选 -->
+              <div v-if="annotations.length > 3" style="margin-bottom:6px">
+                <el-radio-group v-model="annotationFilter" size="small">
+                  <el-radio-button value="">全部 ({{ annotations.length }})</el-radio-button>
+                  <el-radio-button value="open">待处理 ({{ annotations.filter(a => a.status === 'open').length }})</el-radio-button>
+                  <el-radio-button value="replied">已回复 ({{ annotations.filter(a => a.status === 'replied').length }})</el-radio-button>
+                  <el-radio-button value="resolved">已解决 ({{ annotations.filter(a => a.status === 'resolved').length }})</el-radio-button>
+                </el-radio-group>
+              </div>
+              <el-table v-if="filteredAnnotations.length" :data="filteredAnnotations" size="small" stripe max-height="250"
+                :row-class-name="annotationRowClass">
+                <el-table-column prop="content" label="内容" min-width="200">
+                  <template #default="{ row }">
+                    <div>
+                      <span style="font-size:12px">{{ row.content }}</span>
+                      <div v-if="row.reply_content" style="margin-top:4px;padding:4px 8px;background:#f0f9eb;border-radius:4px;font-size:11px;color:#67c23a">
+                        ↳ 回复：{{ row.reply_content }}
+                      </div>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="priority" label="优先级" width="60">
                   <template #default="{ row }">
                     <el-tag :type="row.priority === 'high' ? 'danger' : row.priority === 'medium' ? 'warning' : 'info'" size="small">
                       {{ row.priority === 'high' ? '高' : row.priority === 'medium' ? '中' : '低' }}
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="status" label="状态" width="80">
+                <el-table-column prop="status" label="状态" width="70">
                   <template #default="{ row }">
                     <el-tag :type="row.status === 'resolved' ? 'success' : row.status === 'replied' ? 'warning' : 'danger'" size="small">
                       {{ row.status === 'resolved' ? '已解决' : row.status === 'replied' ? '已回复' : '待处理' }}
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="140">
+                <el-table-column label="时间" width="70">
+                  <template #default="{ row }">
+                    <span style="font-size:10px;color:#999">{{ row.created_at?.slice(5, 16) }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120">
                   <template #default="{ row }">
                     <el-button v-if="row.status === 'open'" size="small" text type="primary" @click="replyAnnotation(row)">回复</el-button>
                     <el-button v-if="row.status !== 'resolved'" size="small" text type="success" @click="resolveAnnotation(row.id)">解决</el-button>
@@ -222,7 +343,7 @@
             </el-dialog>
           </div>
         </template>
-        <el-empty v-else description="请从左侧选择底稿" :image-size="120" />
+        <el-empty v-else description="请从左侧选择底稿" :image-size="100" />
       </div>
     </div>
 
@@ -259,7 +380,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Download, Monitor, Upload } from '@element-plus/icons-vue'
+import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
@@ -315,6 +436,16 @@ const selectedWpIds = ref<string[]>([])
 const qcResult = ref<QCResult | null>(null)
 const treeRef = ref<any>(null)
 
+// 精细化审计检查
+const fineCheckResults = ref<any[]>([])
+const fineChecksLoading = ref(false)
+const fineChecksPassed = computed(() => fineCheckResults.value.length > 0 && fineCheckResults.value.every(c => c.passed !== false))
+const fineChecksPassedCount = computed(() => fineCheckResults.value.filter(c => c.passed === true).length)
+
+// TSJ复核提示词
+const tsjReviewData = ref<any>(null)
+const showTsjDetail = ref(false)
+
 // Upload dialog
 const uploadDialogVisible = ref(false)
 const uploadFile = ref<File | null>(null)
@@ -334,6 +465,24 @@ const onlineEditNotice = computed(() => {
 // Review annotations
 const annotations = ref<any[]>([])
 const unresolvedCount = computed(() => annotations.value.filter((a: any) => a.status !== 'resolved').length)
+const annotationFilter = ref('')
+const filteredAnnotations = computed(() => {
+  if (!annotationFilter.value) return annotations.value
+  return annotations.value.filter((a: any) => a.status === annotationFilter.value)
+})
+
+function annotationRowClass({ row }: { row: any }) {
+  if (row.status === 'open' && row.priority === 'high') return 'gt-ann-row-urgent'
+  return ''
+}
+
+function goToConversation() {
+  if (!selectedWp.value) return
+  router.push({
+    path: `/projects/${projectId.value}/review-conversations`,
+    query: { wp_id: selectedWp.value.id, wp_code: selectedWp.value.wp_code },
+  })
+}
 const unconfirmedAiCount = ref(0)
 const showAddAnnotation = ref(false)
 const newAnnotation = ref({ content: '', priority: 'medium' })
@@ -510,6 +659,40 @@ function onKanbanAssign(item: any) {
   // TODO: 弹出分配弹窗
 }
 
+function goToWorkbench() {
+  router.push(`/projects/${projectId.value}/workpaper-bench`)
+}
+
+function goToTemplates() {
+  router.push(`/projects/${projectId.value}/templates`)
+}
+
+// ── 审计程序指南数据（右栏） ──
+const guideExpanded = ref('')
+
+const auditCycleGuide = [
+  { cycle: 'B', name: '初步业务活动/风险评估', color: '#7c5cbf', count: 56 },
+  { cycle: 'C', name: '控制测试', color: '#6a4fa0', count: 50 },
+  { cycle: 'D', name: '收入循环', color: '#e6553a', count: 17 },
+  { cycle: 'E', name: '货币资金循环', color: '#d4a017', count: 5 },
+  { cycle: 'F', name: '存货循环', color: '#2e86c1', count: 15 },
+  { cycle: 'G', name: '投资循环', color: '#1a8a5c', count: 15 },
+  { cycle: 'H', name: '固定资产循环', color: '#7d6608', count: 11 },
+  { cycle: 'I', name: '无形资产循环', color: '#5b2c6f', count: 6 },
+  { cycle: 'J', name: '职工薪酬循环', color: '#c0392b', count: 3 },
+  { cycle: 'K', name: '管理循环', color: '#2980b9', count: 14 },
+  { cycle: 'L', name: '债务循环', color: '#117a65', count: 9 },
+  { cycle: 'M', name: '权益循环', color: '#4b2d77', count: 10 },
+  { cycle: 'N', name: '税金循环', color: '#6c3483', count: 5 },
+  { cycle: 'A', name: '完成阶段', color: '#1a8a5c', count: 59 },
+  { cycle: 'S', name: '特定项目程序', color: '#7f8c8d', count: 87 },
+]
+
+function onGuideClick(cycle: string) {
+  // 跳转到底稿工作台，按循环筛选
+  router.push({ path: `/projects/${projectId.value}/workpaper-bench`, query: { cycle } })
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -548,6 +731,76 @@ async function loadUnconfirmedAi() {
   }
 }
 
+async function loadFineChecks() {
+  if (!selectedWp.value) {
+    fineCheckResults.value = []
+    return
+  }
+  fineChecksLoading.value = true
+  try {
+    const { fineExtractWorkpaper } = await import('@/services/commonApi')
+    const result = await fineExtractWorkpaper(projectId.value, selectedWp.value.id)
+    fineCheckResults.value = result?.checks || []
+  } catch {
+    fineCheckResults.value = []
+  } finally {
+    fineChecksLoading.value = false
+  }
+}
+
+function onCheckJump(chk: any) {
+  // 根据检查类型跳转到对应位置
+  const type = chk.type || ''
+  if (type === 'balance' && chk.code?.includes('CHK-02')) {
+    // 跳转到报表
+    router.push({ path: `/projects/${projectId.value}/reports`, query: { highlight: 'BS-002' } })
+  } else if (type === 'cross_ref' && chk.code?.includes('CHK-03')) {
+    // 跳转到现金明细表（在线编辑）
+    if (selectedWp.value) {
+      router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: selectedWp.value.id } })
+    }
+  } else if (type === 'cross_ref' && chk.code?.includes('CHK-04')) {
+    // 跳转到银行明细表
+    if (selectedWp.value) {
+      router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: selectedWp.value.id } })
+    }
+  } else if (type === 'balance' && chk.code?.includes('CHK-01')) {
+    // 跳转到试算表
+    router.push({ path: `/projects/${projectId.value}/trial-balance` })
+  } else {
+    // 默认跳转到底稿编辑
+    if (selectedWp.value) {
+      router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: selectedWp.value.id } })
+    }
+  }
+}
+
+async function loadTsjReviewPrompts() {
+  if (!selectedWp.value) {
+    tsjReviewData.value = null
+    return
+  }
+  try {
+    const wpName = selectedWp.value.wp_name || ''
+    // 从底稿名称提取科目名（如"货币资金审定表"→"货币资金"）
+    const accountName = wpName.replace(/审定表|明细表|程序表|汇总表|盘点表|调节表|核对表/g, '').trim()
+    if (!accountName) { tsjReviewData.value = null; return }
+
+    const { data } = await import('@/utils/http').then(m =>
+      m.default.get(`/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(accountName)}`, {
+        validateStatus: (s: number) => s < 600,
+      })
+    )
+    if (data?.tips?.length || data?.checklist?.length || data?.risk_areas?.length) {
+      tsjReviewData.value = data
+    } else {
+      tsjReviewData.value = null
+    }
+  } catch {
+    tsjReviewData.value = null
+  }
+}
+
 async function selectWorkpaperById(wpId: string) {
   const wp = wpList.value.find((w: WorkpaperDetail) => w.wp_index_id === wpId || w.id === wpId)
   if (wp) {
@@ -571,6 +824,8 @@ async function selectWorkpaperById(wpId: string) {
     try { qcResult.value = await getQCResults(projectId.value, selectedWp.value.id) } catch { /* no QC yet */ }
     await loadAnnotations()
     await loadUnconfirmedAi()
+    loadFineChecks()  // 非阻塞加载审计检查
+    loadTsjReviewPrompts()  // 非阻塞加载TSJ复核提示词
   }
 }
 
@@ -786,7 +1041,7 @@ function replyAnnotation(row: any) {
   showReplyDialog.value = true
 }
 
-async function submitReply() {
+async function _submitReply() {
   if (!replyTarget.value || !replyContent.value) return
   try {
     await updateAnnotation(replyTarget.value.id, { status: 'replied', reply_content: replyContent.value })
@@ -895,4 +1150,82 @@ onMounted(async () => {
 .gt-wp-detail-actions { display: flex; gap: var(--gt-space-2); margin-top: var(--gt-space-4); flex-wrap: wrap; }
 .gt-wp-qc-summary-inline { margin-top: var(--gt-space-3); display: flex; align-items: center; gap: var(--gt-space-2); }
 .gt-wp-qc-counts { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
+
+/* 加载中全宽 */
+.gt-wp-empty-full {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); min-height: 300px;
+}
+
+/* 全宽空状态 */
+.gt-wp-empty-full {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); min-height: 300px;
+}
+.gt-wp-empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.7; }
+.gt-wp-empty-title { font-size: 18px; font-weight: 600; color: #444; margin-bottom: 6px; }
+.gt-wp-empty-desc { font-size: 14px; color: #999; }
+/* 精细化审计检查 */
+.gt-fine-check-item {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  font-size: 12px; border-radius: 4px; margin-bottom: 2px;
+}
+.gt-fine-check-pass { background: #f0f9eb; }
+.gt-fine-check-fail { background: #fdf6ec; }
+.gt-fine-check-pending { background: #f5f5f5; }
+.gt-fine-check-code { font-weight: 600; color: #666; min-width: 70px; }
+.gt-fine-check-desc { flex: 1; color: #333; }
+.gt-fine-check-status { font-size: 11px; white-space: nowrap; }
+:deep(.gt-ann-row-urgent) { background: #fef0f0 !important; }
+
+/* ── 两栏引导布局 ── */
+.gt-wp-intro-layout {
+  flex: 1; display: flex; gap: var(--gt-space-4); min-height: 0;
+}
+.gt-wp-intro-half {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); padding: var(--gt-space-5);
+}
+.gt-wp-intro-half--guide {
+  align-items: stretch; justify-content: flex-start; overflow-y: auto;
+}
+.gt-wp-intro-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.7; }
+.gt-wp-intro-title { font-size: 18px; font-weight: 600; color: #444; margin-bottom: 6px; }
+.gt-wp-intro-desc { font-size: 13px; color: #999; text-align: center; }
+
+.gt-wp-guide-title {
+  margin: 0 0 12px; font-size: 16px; font-weight: 600; color: var(--gt-color-primary);
+}
+
+/* 流程横条 */
+.gt-wp-guide-flow {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 16px;
+  padding: 10px 12px; background: #f8f5fd; border-radius: 8px; flex-wrap: wrap;
+}
+.gt-wp-flow-tag {
+  display: inline-block; padding: 3px 10px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap;
+}
+.gt-wp-flow-arrow { color: #bbb; font-size: 13px; }
+
+/* 循环列表 */
+.gt-wp-guide-list { display: flex; flex-direction: column; }
+.gt-wp-guide-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-bottom: 1px solid #f5f5f5; cursor: pointer; border-radius: 6px;
+  transition: background 0.15s;
+}
+.gt-wp-guide-row:hover { background: #f8f5fd; }
+.gt-wp-guide-row:last-child { border-bottom: none; }
+.gt-wp-guide-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 22px; padding: 0 7px;
+  border-radius: 11px; font-size: 11px; font-weight: 700; color: #fff;
+}
+.gt-wp-guide-name { flex: 1; font-size: 13px; color: #333; }
+.gt-wp-guide-count { font-size: 12px; color: #aaa; white-space: nowrap; }
+.gt-wp-guide-arrow { font-size: 16px; color: #ccc; font-weight: 300; }
 </style>

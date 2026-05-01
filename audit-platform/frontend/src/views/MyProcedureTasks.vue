@@ -49,11 +49,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { useAuthStore } from '@/stores/auth'
 import { getMyStaffId, getMyProcedureTasks, updateProcedureTrim } from '@/services/commonApi'
 
 const router = useRouter()
-// const authStore = useAuthStore()
 const loading = ref(false)
 const tasks = ref<any[]>([])
 

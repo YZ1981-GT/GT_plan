@@ -482,7 +482,7 @@ watch(
   async ([projectId, year]) => {
     if (_syncingScopeFromRoute) return
     const nextQuery: Record<string, any> = { ...route.query }
-    const normalizedProjectId = (projectId || '').trim()
+    const normalizedProjectId = String(projectId || '').trim()
     if (normalizedProjectId) nextQuery.project_id = normalizedProjectId
     else delete nextQuery.project_id
     if (year) nextQuery.year = String(year)

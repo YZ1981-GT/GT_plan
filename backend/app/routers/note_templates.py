@@ -154,3 +154,53 @@ async def rollback_template(template_id: str, body: RollbackRequest):
         return svc.rollback_version(template_id, body.target_version)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── 附注校验预设公式（供公式管理中心一键导入） ──
+
+@router.get("/api/note-templates/preset-formulas/{template_type}")
+async def get_note_preset_formulas(template_type: str):
+    """获取附注校验预设公式列表（从 check_presets 生成）
+
+    template_type: soe 或 listed
+    返回该模板类型下所有章节的预设校验公式
+    """
+    import json
+    import os
+    data_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data", "note_check_preset_formulas.json"
+    )
+    if not os.path.exists(data_path):
+        return []
+    with open(data_path, "r", encoding="utf-8") as f:
+        all_presets = json.load(f)
+    key = template_type.lower()
+    if key not in ("soe", "listed"):
+        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
+    return all_presets.get(key, [])
+
+
+# ── 报表Excel公式预设（供公式管理中心加载） ──
+
+@router.get("/api/report-templates/excel-formulas/{template_type}")
+async def get_report_excel_formulas(template_type: str):
+    """获取报表Excel模板中的计算公式
+
+    template_type: soe 或 listed
+    返回按sheet分组的公式列表
+    """
+    import json
+    import os
+    data_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data", "report_excel_formulas.json"
+    )
+    if not os.path.exists(data_path):
+        return {}
+    with open(data_path, "r", encoding="utf-8") as f:
+        all_formulas = json.load(f)
+    key = template_type.lower()
+    if key not in ("soe", "listed"):
+        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
+    return all_formulas.get(key, {})

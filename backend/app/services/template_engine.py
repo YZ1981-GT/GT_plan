@@ -588,6 +588,66 @@ class TemplateEngine:
 
             workpapers.append(wp)
 
+            # ── 多文件底稿：从精细化规则复制关联文件 ──
+            try:
+                from app.services.wp_fine_rule_engine import load_fine_rule
+                fine_rule = load_fine_rule(code)
+                if fine_rule and fine_rule.get("source_files"):
+                    src_files = fine_rule["source_files"]
+                    # 主文件已复制（上面的逻辑），处理其余文件
+                    for sf_idx, sf in enumerate(src_files):
+                        sf_name = sf.get("file", "")
+                        if not sf_name or sf_idx == 0:
+                            continue  # 跳过主文件（已处理）
+                        # 从模板目录查找源文件
+                        sf_src = None
+                        if lib_entry.get("file_path"):
+                            sf_src = Path(lib_entry["file_path"]).parent / sf_name
+                        if not sf_src or not sf_src.exists():
+                            # 尝试从模板根目录查找
+                            for search_dir in [
+                                Path("致同通用审计程序及底稿模板（2025年修订）"),
+                            ]:
+                                for found in search_dir.rglob(sf_name):
+                                    sf_src = found
+                                    break
+                                if sf_src and sf_src.exists():
+                                    break
+                        if not sf_src or not sf_src.exists():
+                            logger.debug("companion file not found: %s for %s", sf_name, code)
+                            continue
+                        # 生成伴随底稿编码（如 E0, E1-14）
+                        companion_code = sf_name.split(" ")[0].split("至")[0].strip()
+                        if companion_code == code or companion_code in trimmed_codes:
+                            continue
+                        # 复制文件
+                        companion_dest = cycle_dir / f"{companion_code}.xlsx"
+                        if not companion_dest.exists():
+                            shutil.copy2(sf_src, companion_dest)
+                            # 创建伴随底稿的 wp_index + working_paper
+                            comp_index = WpIndex(
+                                project_id=project_id,
+                                wp_code=companion_code,
+                                wp_name=sf.get("description", sf_name),
+                                audit_cycle=audit_cycle,
+                                status=WpStatus.not_started,
+                            )
+                            db.add(comp_index)
+                            await db.flush()
+                            comp_wp = WorkingPaper(
+                                project_id=project_id,
+                                wp_index_id=comp_index.id,
+                                file_path=str(companion_dest),
+                                source_type=WpSourceType.template,
+                                file_version=1,
+                                created_by=created_by,
+                            )
+                            db.add(comp_wp)
+                            workpapers.append(comp_wp)
+                            logger.info("companion workpaper generated: %s → %s", code, companion_code)
+            except Exception as _mf_err:
+                logger.debug("multi-file generation for %s: %s", code, _mf_err)
+
         await db.flush()
         logger.info("generate_project_workpapers: project=%s codes=%d files=%d", project_id, len(template_codes), len(workpapers))
         return workpapers

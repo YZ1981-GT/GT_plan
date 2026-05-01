@@ -39,35 +39,9 @@ router = APIRouter(
 
 
 async def _resolve_applicable_standard(db: AsyncSession, project_id: UUID) -> str:
-    """从项目配置动态确定报表标准。
-
-    映射规则：
-    - template_type (soe/listed) + report_scope (consolidated/standalone)
-    - 组合为 "soe_consolidated" / "listed_standalone" 等
-    - 降级为 "enterprise"（兼容旧数据）
-    """
-    from app.models.core import Project
-    result = await db.execute(
-        sa.select(Project.template_type, Project.report_scope).where(
-            Project.id == project_id,
-            Project.is_deleted == sa.false(),
-        )
-    )
-    row = result.one_or_none()
-    if not row:
-        return "enterprise"
-
-    template_type = row[0] or "soe"  # 默认国企版
-    report_scope = row[1] or "standalone"  # 默认单体
-
-    standard = f"{template_type}_{report_scope}"
-
-    # 验证是否为有效标准名
-    valid_standards = {"soe_consolidated", "soe_standalone", "listed_consolidated", "listed_standalone", "enterprise"}
-    if standard not in valid_standards:
-        return "enterprise"
-
-    return standard
+    """从项目配置动态确定报表标准（代理到服务层）。"""
+    from app.services.report_config_service import ReportConfigService
+    return await ReportConfigService.resolve_applicable_standard(db, project_id)
 
 
 @router.post("/generate")
@@ -111,13 +85,36 @@ async def consistency_check(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """跨报表一致性校验"""
+    """公式审核——执行 logic_check + reasonability 类型公式校验"""
+    applicable_standard = await _resolve_applicable_standard(db, project_id)
     engine = ReportEngine(db)
-    checks = await engine.check_balance(project_id, year)
+    checks = await engine.run_audit_checks(project_id, year, applicable_standard)
+
+    logic_checks = [c for c in checks if c["category"] == "logic_check"]
+    reason_checks = [c for c in checks if c["category"] == "reasonability"]
     all_passed = all(c["passed"] for c in checks) if checks else True
+
     return {
-        "all_passed": all_passed,
-        "checks": checks,
+        "consistent": all_passed,
+        "total": len(checks),
+        "logic_check_count": len(logic_checks),
+        "logic_check_passed": len([c for c in logic_checks if c["passed"]]),
+        "reasonability_count": len(reason_checks),
+        "reasonability_passed": len([c for c in reason_checks if c["passed"]]),
+        "checks": [
+            {
+                "name": c["name"],
+                "category": c["category"],
+                "category_label": c["category_label"],
+                "passed": c["passed"],
+                "expected": c["expected"],
+                "actual": c["actual"],
+                "diff": c["diff"],
+                "formula": c["formula"],
+                "source": c["source"],
+            }
+            for c in checks
+        ],
     }
 
 
@@ -127,12 +124,17 @@ async def get_report(
     year: int,
     report_type: FinancialReportType,
     unadjusted: bool = Query(False, description="是否返回未审报表数据"),
+    applicable_standard: str | None = Query(None, description="报表标准，如 soe_consolidated"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取指定报表数据（支持未审/已审切换）"""
+    """获取指定报表数据（支持未审/已审切换+国企/上市切换）"""
+    # 确定标准
+    std = applicable_standard
+    if not std:
+        std = await _resolve_applicable_standard(db, project_id)
+
     if unadjusted:
-        # 未审报表：动态计算，不存储
         engine = ReportEngine(db)
         try:
             rows = await engine.generate_unadjusted_report(project_id, year, report_type)
@@ -151,8 +153,26 @@ async def get_report(
         .order_by(FinancialReport.row_code)
     )
     rows = result.scalars().all()
+
     if not rows:
+        # 无已生成数据——返回该标准的模板行次结构（空值）
+        from app.services.report_config_service import ReportConfigService
+        svc = ReportConfigService(db)
+        configs = await svc.list_configs(report_type=report_type, applicable_standard=std)
+        if configs:
+            return [
+                ReportRow(
+                    id=c.id, project_id=project_id, year=year,
+                    report_type=report_type, row_code=c.row_code or '',
+                    row_name=c.row_name or '', row_number=c.row_number or 0,
+                    current_period_amount=None, prior_period_amount=None,
+                    indent_level=c.indent_level or 0, is_total_row=c.is_total_row or False,
+                    formula_used=c.formula or '',
+                )
+                for c in configs
+            ]
         raise HTTPException(status_code=404, detail="报表数据不存在，请先生成报表")
+
     return [ReportRow.model_validate(r) for r in rows]
 
 

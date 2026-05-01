@@ -356,26 +356,18 @@ export function getWopiEditorUrl(
   onlyofficeUrl: string = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080',
 ): string {
   const normalizedBaseUrl = onlyofficeUrl.replace(/\/$/, '')
-  return `${normalizedBaseUrl}/hosting/wopi/cell?WOPISrc=${encodeURIComponent(wopiSrc)}`
+  return `${normalizedBaseUrl}/hosting/wopi/cell/edit?WOPISrc=${encodeURIComponent(wopiSrc)}`
 }
 
 export async function checkOnlineEditingAvailability(): Promise<boolean> {
   try {
-    // 1. 检查后端 WOPI 服务
+    // 通过后端 /wopi/health 统一检查（后端会同时检测 ONLYOFFICE 可达性）
+    // 避免前端直接跨域请求 ONLYOFFICE /healthcheck 被 CORS 拦截
     const wopiResp = await http.get('/wopi/health', { timeout: 5000, validateStatus: () => true })
     if (wopiResp.status !== 200) return false
-
-    // 2. 检查 ONLYOFFICE Document Server
-    const ooUrl = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
-    try {
-      const ooResp = await fetch(`${ooUrl}/healthcheck`, { signal: AbortSignal.timeout(5000) })
-      if (!ooResp.ok) return false
-    } catch {
-      // Document Server 不可达
-      return false
-    }
-
-    return true
+    const data = wopiResp.data?.data ?? wopiResp.data
+    // 后端返回 onlyoffice_available 字段
+    return data?.onlyoffice_available !== false
   } catch {
     return false
   }

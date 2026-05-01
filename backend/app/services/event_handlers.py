@@ -332,3 +332,34 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
 
     logger.info("Phase 9 workpaper event handlers registered")
+
+    # ── 地址坐标注册表缓存失效 ──
+    from app.services.address_registry import address_registry
+
+    async def _invalidate_addr_tb(payload):
+        """调整/导入变更 → 失效试算表域缓存"""
+        pid = getattr(payload, 'project_id', '') or (payload.data or {}).get('project_id', '')
+        if pid:
+            address_registry.invalidate(pid, domain='tb')
+
+    async def _invalidate_addr_report(payload):
+        """报表更新 → 失效报表域缓存"""
+        pid = getattr(payload, 'project_id', '') or (payload.data or {}).get('project_id', '')
+        if pid:
+            address_registry.invalidate(pid, domain='report')
+
+    async def _invalidate_addr_all(payload):
+        """数据导入 → 失效该项目全部缓存"""
+        pid = getattr(payload, 'project_id', '') or (payload.data or {}).get('project_id', '')
+        if pid:
+            address_registry.invalidate(pid)
+
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _invalidate_addr_tb)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _invalidate_addr_tb)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _invalidate_addr_tb)
+    event_bus.subscribe(EventType.TRIAL_BALANCE_UPDATED, _invalidate_addr_tb)
+    event_bus.subscribe(EventType.REPORTS_UPDATED, _invalidate_addr_report)
+    event_bus.subscribe(EventType.DATA_IMPORTED, _invalidate_addr_all)
+    event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _invalidate_addr_all)
+
+    logger.info("Address registry cache invalidation handlers registered")

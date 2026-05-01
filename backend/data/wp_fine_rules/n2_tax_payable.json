@@ -1,0 +1,143 @@
+{
+  "wp_code": "N2",
+  "name": "应交税费",
+  "wp_name": "应交税费",
+  "cycle": "N",
+  "account_codes": ["2221"],
+  "source_files": [
+    {
+      "file_pattern": "N2 应交税费.xlsx",
+      "is_primary": true
+    }
+  ],
+  "sheets": [
+    {
+      "exact_name": "应交税费审定表N2-1",
+      "code": "N2-1",
+      "type": "summary",
+      "table_type": "standard",
+      "header_rows": [5, 6],
+      "data_start_row": 7,
+      "columns": {
+        "opening_unaudited": {"col": 2, "keywords": ["期初", "未审数"]},
+        "opening_aje": {"col": 3, "keywords": ["期初", "账项调整"]},
+        "opening_reclass": {"col": 4, "keywords": ["期初", "重分类调整"]},
+        "opening_audited": {"col": 5, "keywords": ["期初", "审定数"]},
+        "closing_unaudited": {"col": 6, "keywords": ["期末", "未审数"]},
+        "closing_aje": {"col": 7, "keywords": ["期末", "账项调整"]},
+        "closing_reclass": {"col": 8, "keywords": ["期末", "重分类调整"]},
+        "closing_audited": {"col": 9, "keywords": ["期末", "审定数"]},
+        "change_unaudited_amount": {"col": 10, "keywords": ["未审", "变动额"]},
+        "change_unaudited_rate": {"col": 11, "keywords": ["未审", "变动率"]},
+        "change_audited_amount": {"col": 12, "keywords": ["审定", "变动额"]},
+        "change_audited_rate": {"col": 13, "keywords": ["审定", "变动率"]}
+      },
+      "key_rows": {
+        "data_items": [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+        "total": 22,
+        "tb_check": 23,
+        "diff": 24,
+        "audit_note": 25,
+        "audit_conclusion": 29
+      },
+      "sections": [
+        {"name": "按税种分类", "start_row": 7, "end_row": 22, "items": ["企业所得税", "增值税", "消费税", "资源税", "土地增值税", "城市维护建设税", "车船牌照税", "房产税", "土地使用税", "教育费附加", "矿产资源补偿费", "代扣代缴外国企业所得税", "代扣代缴个人所得税"]}
+      ]
+    },
+    {
+      "exact_name": "应交税费审计程序表N2A",
+      "code": "N2A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "disclosure_listed"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "disclosure_soe"
+    },
+    {
+      "exact_name": "应交税费明细表N2-2",
+      "code": "N2-2",
+      "type": "detail",
+      "description": "应交税费明细"
+    },
+    {
+      "exact_name": "调整分录汇总表N2-3",
+      "code": "N2-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "税收政策检查N2-4",
+      "code": "N2-4",
+      "type": "check",
+      "description": "税收政策检查"
+    },
+    {
+      "exact_name": "应交税金认定表N2-5",
+      "code": "N2-5",
+      "type": "check",
+      "description": "税金认定"
+    },
+    {
+      "exact_name": "增值税测算表N2-6",
+      "code": "N2-6",
+      "type": "check",
+      "description": "增值税测算"
+    },
+    {
+      "exact_name": "出口退税核对表N2-7",
+      "code": "N2-7",
+      "type": "check",
+      "description": "出口退税核对"
+    },
+    {
+      "exact_name": "应交其他税费测算表N2-8",
+      "code": "N2-8",
+      "type": "check",
+      "description": "其他税费测算"
+    },
+    {
+      "exact_name": "房产税测算表N2-9",
+      "code": "N2-9",
+      "type": "check",
+      "description": "房产税测算"
+    },
+    {
+      "exact_name": "土地增值税测算表N2-10",
+      "code": "N2-10",
+      "type": "check",
+      "description": "土地增值税测算"
+    },
+    {
+      "exact_name": "应交税费检查表N2-11",
+      "code": "N2-11",
+      "type": "check",
+      "description": "综合检查"
+    }
+  ],
+  "cross_references": [
+    {"from": "N2-1:R22:C9", "to": "TB('2221','审定数')", "description": "审定表合计=试算表审定数"},
+    {"from": "N2-1:R22:C5", "to": "TB('2221','期初余额')", "description": "期初审定=试算表期初"},
+    {"from": "N2-2", "to": "N2-1:R22:C9", "description": "明细表合计=审定表合计"},
+    {"from": "N2-3", "to": "N2-1:R22:C7", "description": "调整分录汇总=审定表调整列"},
+    {"from": "N2-5", "to": "N2-1", "description": "税金认定表引用审定表各税种"},
+    {"from": "N2-6", "to": "N2-1:R8:C9", "description": "增值税测算=审定表增值税行"},
+    {"from": "N2-8", "to": "N2-1", "description": "其他税费测算引用审定表各行"}
+  ],
+  "audit_checks": [
+    {"id": "N2-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计=试算表审定数"},
+    {"id": "N2-CHK-02", "type": "cross_ref", "severity": "warning", "description": "明细表合计与审定表一致"},
+    {"id": "N2-CHK-03", "type": "completeness", "severity": "warning", "description": "明细表已填写"},
+    {"id": "N2-CHK-04", "type": "check", "severity": "warning", "description": "税收政策检查已完成"},
+    {"id": "N2-CHK-05", "type": "check", "severity": "warning", "description": "税金认定表已完成"},
+    {"id": "N2-CHK-06", "type": "check", "severity": "warning", "description": "增值税测算已完成"},
+    {"id": "N2-CHK-07", "type": "reconciliation", "severity": "warning", "description": "增值税测算与账面一致"},
+    {"id": "N2-CHK-08", "type": "check", "severity": "info", "description": "出口退税核对已完成（如适用）"},
+    {"id": "N2-CHK-09", "type": "check", "severity": "info", "description": "房产税测算已完成（如适用）"},
+    {"id": "N2-CHK-10", "type": "check", "severity": "info", "description": "土地增值税测算已完成（如适用）"},
+    {"id": "N2-CHK-11", "type": "reconciliation", "severity": "warning", "description": "各税种测算与账面差异合理"},
+    {"id": "N2-CHK-12", "type": "formula", "severity": "blocking", "description": "各税种之和=合计（R7~R19=R22）"}
+  ]
+}

@@ -95,7 +95,7 @@ async function loadData() {
 }
 
 function handlePageChange(p: number) { page.value = p; loadData() }
-function handleRowClick(row: IssueTicket) {
+function handleRowClick(_row: IssueTicket) {
   // TODO: 打开问题单详情弹窗
 }
 

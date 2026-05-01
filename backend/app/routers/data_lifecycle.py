@@ -83,7 +83,7 @@ async def get_import_queue(
 async def get_import_status(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("readonly")),
+    current_user: User = Depends(get_current_user),
 ):
     """查看项目导入状态"""
     status = await ImportQueueService.get_status(project_id, db)

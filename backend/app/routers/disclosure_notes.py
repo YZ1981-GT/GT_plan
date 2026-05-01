@@ -42,7 +42,7 @@ router = APIRouter(
 async def generate_notes(
     data: DisclosureNoteGenerateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
     """生成附注初稿"""
     engine = DisclosureEngine(db)

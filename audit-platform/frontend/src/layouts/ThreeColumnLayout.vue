@@ -398,7 +398,9 @@ async function pollImportQueue() {
     return
   }
   try {
-    const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${projectId}`)
+    const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${projectId}`, {
+      validateStatus: (s: number) => s < 600,
+    })
     const status = statusData.data ?? statusData
     if (status && status.status === 'processing') {
       bgImportStatus.value = {

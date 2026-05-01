@@ -2,13 +2,31 @@
   <div class="gt-adjustments gt-fade-in">
     <!-- 页面横幅 -->
     <div class="gt-adj-banner">
-      <div class="gt-adj-banner-text">
-        <h2>调整分录</h2>
-        <p>AJE {{ summary?.aje_count || 0 }} 笔 · RJE {{ summary?.rje_count || 0 }} 笔</p>
+      <div class="gt-adj-banner-row1">
+        <h2 class="gt-adj-title">调整分录</h2>
+        <div class="gt-adj-info-bar">
+          <div class="gt-adj-info-item">
+            <span class="gt-adj-info-label">单位</span>
+            <el-select v-model="selectedProjectId" size="small" class="gt-adj-unit-select" filterable @change="onProjectChange">
+              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+          </div>
+          <div class="gt-adj-info-sep" />
+          <div class="gt-adj-info-item">
+            <span class="gt-adj-info-label">年度</span>
+            <el-select v-model="selectedYear" size="small" class="gt-adj-year-select" @change="onYearChange">
+              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
+            </el-select>
+          </div>
+          <div class="gt-adj-info-sep" />
+          <div class="gt-adj-info-item">
+            <span class="gt-adj-info-badge">AJE {{ summary?.aje_count || 0 }} 笔 · RJE {{ summary?.rje_count || 0 }} 笔</span>
+          </div>
+        </div>
       </div>
-      <div class="gt-adj-banner-actions">
-        <el-button size="small" type="primary" @click="openCreateDialog" round>新建分录</el-button>
-        <el-button size="small" @click="onExportSummary" round>导出汇总</el-button>
+      <div class="gt-adj-banner-row2">
+        <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
+        <el-button size="small" @click="onExportSummary">📤 导出汇总</el-button>
       </div>
     </div>
 
@@ -162,16 +180,22 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
+import { useProjectSelector } from '@/composables/useProjectSelector'
 
 const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
+const router = useRouter()
+const {
+  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
+  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
+} = useProjectSelector('adjustments')
+
 const routeYear = computed(() => {
   const value = Number(route.query.year)
   return Number.isFinite(value) && value > 2000 ? value : null
@@ -380,9 +404,12 @@ watch(
   () => [projectId.value, routeYear.value],
   async () => {
     await ensureProjectYear()
+    syncFromRoute()
+    selectedYear.value = year.value
     await fetchEntries()
     await fetchSummary()
     await fetchAccountOptions()
+    if (!projectOptions.value.length) loadProjectOptions()
   },
   { immediate: true }
 )
@@ -393,10 +420,10 @@ watch(
 
 /* ── 页面横幅 ── */
 .gt-adj-banner {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; flex-direction: column; gap: 10px;
   background: var(--gt-gradient-primary);
   border-radius: var(--gt-radius-lg);
-  padding: 20px 28px;
+  padding: 18px 28px;
   margin-bottom: var(--gt-space-5);
   color: #fff;
   position: relative; overflow: hidden;
@@ -411,11 +438,33 @@ watch(
   background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
   pointer-events: none;
 }
-.gt-adj-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-.gt-adj-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
-.gt-adj-banner-actions { position: relative; z-index: 1; }
-.gt-adj-banner-actions .el-button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
-.gt-adj-banner-actions .el-button:hover { background: rgba(255,255,255,0.3); }
+.gt-adj-banner-row1 {
+  display: flex; align-items: center; gap: 16px;
+  position: relative; z-index: 1;
+}
+.gt-adj-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.gt-adj-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gt-adj-info-item { display: flex; align-items: center; gap: 4px; }
+.gt-adj-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
+.gt-adj-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.gt-adj-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
+.gt-adj-unit-select, .gt-adj-year-select { width: 160px; }
+.gt-adj-unit-select :deep(.el-input__wrapper),
+.gt-adj-year-select :deep(.el-input__wrapper) {
+  background: rgba(255,255,255,0.15) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  box-shadow: none !important;
+}
+.gt-adj-unit-select :deep(.el-input__inner),
+.gt-adj-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
+.gt-adj-unit-select :deep(.el-input__suffix),
+.gt-adj-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
+.gt-adj-banner-row2 {
+  display: flex; gap: 8px; align-items: center;
+  position: relative; z-index: 1;
+}
+.gt-adj-banner-row2 .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.gt-adj-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
 
 /* 汇总面板 */
 .gt-summary-panel { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-5); flex-wrap: wrap; }

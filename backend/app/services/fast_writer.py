@@ -90,5 +90,13 @@ async def copy_insert(
         logger.warning("copy_insert fallback to SQL execute for %s: %s", table_name, exc)
 
     table = sa.table(table_name, *[sa.column(col) for col in all_columns])
+    # SQLite doesn't support UUID/Decimal natively — convert to compatible types
+    from decimal import Decimal as _Decimal
+    for record in payload:
+        for k, v in record.items():
+            if isinstance(v, UUID):
+                record[k] = str(v)
+            elif isinstance(v, _Decimal):
+                record[k] = float(v)
     await db.execute(table.insert(), payload)
     return len(payload)

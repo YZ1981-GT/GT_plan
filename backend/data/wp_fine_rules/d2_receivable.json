@@ -1,0 +1,375 @@
+{
+  "wp_code": "D2",
+  "name": "应收账款",
+  "version": "2025-R2",
+  "description": "D2应收账款精细化解析规则 — 基于致同2025年修订版模板精确Sheet名称",
+  "account_codes": ["1122"],
+  "aging_presets": {
+    "three_year": {
+      "name": "三年段",
+      "description": "适用于大多数企业的标准三年段账龄分析",
+      "segments": [
+        {"key": "within_1y", "label": "1年以内", "min_days": 0, "max_days": 365, "default_rate": 0.05},
+        {"key": "1_to_2y", "label": "1-2年", "min_days": 366, "max_days": 730, "default_rate": 0.10},
+        {"key": "2_to_3y", "label": "2-3年", "min_days": 731, "max_days": 1095, "default_rate": 0.30},
+        {"key": "over_3y", "label": "3年以上", "min_days": 1096, "max_days": null, "default_rate": 1.00}
+      ],
+      "sub_segments": {
+        "within_1y": [
+          {"key": "within_6m", "label": "6个月以内", "min_days": 0, "max_days": 180},
+          {"key": "6m_to_1y", "label": "6个月至1年", "min_days": 181, "max_days": 365}
+        ]
+      }
+    },
+    "five_year": {
+      "name": "五年段",
+      "description": "适用于账龄较长的企业（如工程/房地产/政府项目）",
+      "segments": [
+        {"key": "within_1y", "label": "1年以内", "min_days": 0, "max_days": 365, "default_rate": 0.05},
+        {"key": "1_to_2y", "label": "1-2年", "min_days": 366, "max_days": 730, "default_rate": 0.10},
+        {"key": "2_to_3y", "label": "2-3年", "min_days": 731, "max_days": 1095, "default_rate": 0.20},
+        {"key": "3_to_4y", "label": "3-4年", "min_days": 1096, "max_days": 1460, "default_rate": 0.50},
+        {"key": "4_to_5y", "label": "4-5年", "min_days": 1461, "max_days": 1825, "default_rate": 0.80},
+        {"key": "over_5y", "label": "5年以上", "min_days": 1826, "max_days": null, "default_rate": 1.00}
+      ],
+      "sub_segments": {
+        "within_1y": [
+          {"key": "within_3m", "label": "3个月以内", "min_days": 0, "max_days": 90},
+          {"key": "3m_to_6m", "label": "3-6个月", "min_days": 91, "max_days": 180},
+          {"key": "6m_to_1y", "label": "6个月至1年", "min_days": 181, "max_days": 365}
+        ]
+      }
+    },
+    "custom": {
+      "name": "自定义",
+      "description": "用户自定义账龄分段（从项目配置或wizard_state读取）",
+      "segments": [],
+      "note": "segments为空时从project.wizard_state.aging_segments读取用户自定义分段"
+    }
+  },
+  "aging_config": {
+    "default_preset": "three_year",
+    "ecl_model": "simplified",
+    "provision_method": "portfolio",
+    "provision_note": "按组合计提：账龄组合使用迁徙率模型或历史损失率+前瞻性调整",
+    "individual_threshold": "单项金额重大且存在客观减值证据的应收账款单独计提",
+    "applicable_accounts": ["1122", "1121", "1221", "1131", "1141"]
+  },
+  "source_files": [
+    {
+      "file": "D2应收账款/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+      "description": "常规程序：审定表+明细表+坏账准备+调整分录",
+      "sheets": [
+        "底稿目录",
+        "应收账款实质性程序表D2A",
+        "审定表D2-1",
+        "附注披露信息(上市公司）D2-1",
+        "附注披露信息（国企）D2-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "明细表D2-2",
+        "坏账准备明细表D2-3",
+        "调整分录汇总表D2-4"
+      ]
+    },
+    {
+      "file": "D0 收入循环函证.xlsx",
+      "description": "收入循环函证程序（D循环共用）",
+      "sheets": [
+        "底稿目录",
+        "函证程序表D0A",
+        "函证结果汇总表D0-1",
+        "核实被函证单位信息D0-2",
+        "跟函函证过程控制D0-3",
+        "函证差异调节表D0-4",
+        "函证差异检查表（示例）",
+        "合同负债及销售替代程序D0-5",
+        "应收及销售替代程序D0-6",
+        "邮件传真回函可靠性验证D0-7",
+        "函证程序舞弊风险评价表D0-8"
+      ]
+    },
+    {
+      "file": "D2应收账款/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "description": "分析程序",
+      "sheets": [
+        "附注披露信息(上市公司）D2-1",
+        "附注披露信息（国企）D2-1",
+        "应收账款分析表D2-5"
+      ]
+    },
+    {
+      "file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "description": "检查程序",
+      "sheets": [
+        "底稿目录",
+        "附注披露信息(上市公司）D2-1",
+        "附注披露信息（国企）D2-1",
+        "关联方及交易检查表D2-6",
+        "应收账款检查表D2-7",
+        "坏账准备计提会计政策检查D2-8",
+        "应收坏账准备测算D2-9",
+        "预期信用损失的计量测试D2-10",
+        "坏账准备转回（收回）、核销检查表D2-11",
+        "应收账款质押出售情况检查表D2-12",
+        "应收账款业务模式分析D2-13"
+      ]
+    },
+    {
+      "file": "D2应收账款/应收账款预期信用损失计提及保理合同分析参考示例.xlsx",
+      "description": "预期信用损失计提参考示例",
+      "sheets": [
+        "预期信用损失的计量测试D2-10",
+        "前瞻性调整D2-10-1（打分卡)",
+        "前瞻性调整D2-10-1（量化分析）",
+        "变量相关性分析D2-10-2",
+        "多重共线性分析D2-10-2",
+        "应收账款保理合同检查（示例）"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "code": "D2A",
+      "exact_name": "应收账款实质性程序表D2A",
+      "type": "procedure",
+      "description": "实质性程序表（审计程序清单+执行情况）"
+    },
+    {
+      "code": "D2-1",
+      "exact_name": "审定表D2-1",
+      "type": "summary",
+      "header_rows": [5, 6],
+      "data_start_row": 7,
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
+          "opening_adjustment": {"col": 3, "label": "期初账项调整"},
+          "opening_reclass": {"col": 4, "label": "期初重分类调整"},
+          "opening_audited": {"col": 5, "label": "期初审定数"},
+          "closing_unadjusted": {"col": 6, "label": "期末未审数"},
+          "closing_adjustment": {"col": 7, "label": "期末账项调整"},
+          "closing_reclass": {"col": 8, "label": "期末重分类调整"},
+          "closing_audited": {"col": 9, "label": "期末审定数"},
+          "change_amount": {"col": 10, "label": "变动额"},
+          "change_rate": {"col": 11, "label": "变动率"}
+        }
+      },
+      "key_rows": {
+        "section1_title": {"row": 7, "label": "一、应收账款原值"},
+        "individual_provision": {"row": 8, "label": "单项计提坏账准备"},
+        "portfolio_provision": {"row": 9, "label": "按组合计提坏账准备"},
+        "aging_portfolio": {"row": 10, "label": "账龄组合"},
+        "customer_portfolio": {"row": 11, "label": "客户类型组合"},
+        "gross_subtotal": {"row": 13, "label": "小计", "is_total": true},
+        "section2_title": {"row": 14, "label": "二、应收账款坏账准备"},
+        "bad_debt_individual": {"row": 15, "label": "单项计提坏账准备"},
+        "bad_debt_portfolio": {"row": 16, "label": "按组合计提坏账准备"},
+        "bad_debt_subtotal": {"row": 20, "label": "小计", "is_total": true},
+        "section3_title": {"row": 21, "label": "三、应收账款净值"},
+        "net_individual": {"row": 22, "label": "单项计提坏账准备"},
+        "net_portfolio": {"row": 23, "label": "按组合计提坏账准备"},
+        "net_subtotal": {"row": 25, "label": "小计", "is_total": true, "report_row": "BS-005"},
+        "tb_balance": {"row": 27, "label": "试算平衡表数"},
+        "diff": {"row": 28, "label": "差异数"}
+      }
+    },
+    {
+      "code": "D2-2",
+      "exact_name": "明细表D2-2",
+      "type": "detail",
+      "header_rows": [11, 12],
+      "data_start_row": 13,
+      "layout": {
+        "columns": {
+          "seq": {"col": 1, "label": "序号"},
+          "customer_name": {"col": 2, "label": "客户名称"},
+          "company_code": {"col": 3, "label": "公司代码"},
+          "related_party_type": {"col": 4, "label": "关联方类型"},
+          "opening_unadjusted": {"col": 5, "label": "期初未审余额"},
+          "opening_adjustment": {"col": 6, "label": "期初账项调整"},
+          "opening_reclass": {"col": 7, "label": "期初重分类调整"},
+          "opening_audited": {"col": 8, "label": "期初审定余额"}
+        }
+      },
+      "description": "应收账款原值明细（按客户+账龄）",
+      "link_to_summary": {"target": "D2-1", "target_row": 13, "target_col": 9, "description": "明细合计→审定表原值小计"}
+    },
+    {
+      "code": "D2-3",
+      "exact_name": "坏账准备明细表D2-3",
+      "type": "movement",
+      "header_rows": [10, 11],
+      "data_start_row": 12,
+      "layout": {
+        "columns": {
+          "label": {"col": 1, "label": "项目"},
+          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
+          "opening_adjustment": {"col": 3, "label": "期初账项调整"},
+          "opening_reclass": {"col": 4, "label": "重分类调整"},
+          "opening_audited": {"col": 5, "label": "期初审定数"},
+          "provision": {"col": 6, "label": "计提"},
+          "other_increase": {"col": 7, "label": "其他增加"},
+          "reversal": {"col": 8, "label": "转回"},
+          "write_off": {"col": 9, "label": "核销"},
+          "other_decrease": {"col": 10, "label": "其他减少"},
+          "closing_unadjusted": {"col": 11, "label": "期末未审数"}
+        }
+      },
+      "key_rows": {
+        "individual": {"row": 12, "label": "按单项评估计提"},
+        "portfolio": {"row": 17, "label": "信用风险组合计提"},
+        "total": {"row": 22, "label": "合计", "is_total": true}
+      },
+      "link_to_summary": {"target": "D2-1", "target_row": 20, "target_col": 9, "description": "坏账合计→审定表坏账小计"}
+    },
+    {
+      "code": "D2-4",
+      "exact_name": "调整分录汇总表D2-4",
+      "type": "adjustment",
+      "header_rows": [5],
+      "data_start_row": 6,
+      "layout": {
+        "columns": {
+          "description": {"col": 1, "label": "调整事项说明"},
+          "category": {"col": 2, "label": "类别"},
+          "report_item": {"col": 3, "label": "报表项目"},
+          "account_name": {"col": 4, "label": "科目名称"},
+          "note_item": {"col": 5, "label": "附注项目"},
+          "debit": {"col": 7, "label": "借方调整金额"},
+          "credit": {"col": 8, "label": "贷方调整金额"},
+          "index_ref": {"col": 9, "label": "索引"},
+          "remark": {"col": 10, "label": "备注"}
+        }
+      }
+    },
+    {
+      "code": "D2-5",
+      "exact_name": "应收账款分析表D2-5",
+      "type": "analysis",
+      "source_file": "D2应收账款/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "description": "应收账款余额分析（期初vs期末/周转率/账龄分布趋势）"
+    },
+    {
+      "code": "D2-6",
+      "exact_name": "关联方及交易检查表D2-6",
+      "type": "check",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D2-7",
+      "exact_name": "应收账款检查表D2-7",
+      "type": "check",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D2-8",
+      "exact_name": "坏账准备计提会计政策检查D2-8",
+      "type": "check",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D2-9",
+      "exact_name": "应收坏账准备测算D2-9",
+      "type": "calculation",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "description": "坏账准备独立测算（按账龄/组合计提比例）"
+    },
+    {
+      "code": "D2-10",
+      "exact_name": "预期信用损失的计量测试D2-10",
+      "type": "calculation",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+      "description": "ECL预期信用损失计量测试"
+    },
+    {
+      "code": "D2-11",
+      "exact_name": "坏账准备转回（收回）、核销检查表D2-11",
+      "type": "check",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D2-12",
+      "exact_name": "应收账款质押出售情况检查表D2-12",
+      "type": "check",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D2-13",
+      "exact_name": "应收账款业务模式分析D2-13",
+      "type": "analysis",
+      "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D2A-note-listed",
+      "exact_name": "附注披露信息(上市公司）D2-1",
+      "type": "note_disclosure",
+      "description": "上市公司附注披露检查表"
+    },
+    {
+      "code": "D2A-note-soe",
+      "exact_name": "附注披露信息（国企）D2-1",
+      "type": "note_disclosure",
+      "description": "国企附注披露检查表"
+    },
+    {
+      "code": "D2-note-listed",
+      "exact_name": "附注披露信息(上市公司)",
+      "type": "disclosure_listed",
+      "description": "上市公司附注披露（主文件）"
+    },
+    {
+      "code": "D2-note-soe",
+      "exact_name": "附注披露信息(国企)",
+      "type": "disclosure_soe",
+      "description": "国企附注披露（主文件）"
+    },
+    {
+      "code": "D0A",
+      "exact_name": "函证程序表D0A",
+      "type": "procedure",
+      "source_file": "D0 收入循环函证.xlsx",
+      "description": "收入循环函证程序表"
+    },
+    {
+      "code": "D0-1",
+      "exact_name": "函证结果汇总表D0-1",
+      "type": "confirmation_summary",
+      "source_file": "D0 收入循环函证.xlsx"
+    },
+    {
+      "code": "D0-4",
+      "exact_name": "函证差异调节表D0-4",
+      "type": "reconciliation",
+      "source_file": "D0 收入循环函证.xlsx"
+    }
+  ],
+  "cross_references": [
+    {"from": "D2-1.R25.C9", "to": "report://BS/BS-005#期末", "description": "审定表净值小计 = 资产负债表应收账款"},
+    {"from": "D2-1.R13.C9", "to": "D2-2.合计.期末审定", "description": "审定表原值小计 = 明细表合计"},
+    {"from": "D2-1.R20.C9", "to": "D2-3.R22.C11", "description": "审定表坏账小计 = 坏账准备明细合计"},
+    {"from": "D2-1.R25.C9", "to": "D2-1.R13.C9 - D2-1.R20.C9", "description": "净值 = 原值 - 坏账准备"},
+    {"from": "D2-1.R27.C9", "to": "tb://1122#审定数", "description": "试算平衡表数 = 试算表应收账款审定数"},
+    {"from": "D2-2.关联方", "to": "D2-6.关联方检查", "description": "明细表关联方 → 关联方检查表"},
+    {"from": "D2-3.R22", "to": "D2-9.测算合计", "description": "坏账准备合计 → 独立测算合计"},
+    {"from": "D2-3.期初+变动", "to": "D2-3.期末", "description": "期初+计提+其他增加-转回-核销-其他减少 = 期末"},
+    {"from": "D0-1.回函金额", "to": "D2-2.函证金额", "description": "函证结果 → 明细表确认"}
+  ],
+  "audit_checks": [
+    {"code": "D2-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表净值小计 = 试算表应收账款审定数"},
+    {"code": "D2-CHK-02", "type": "balance", "severity": "blocking", "description": "审定表净值小计 = 报表应收账款行"},
+    {"code": "D2-CHK-03", "type": "cross_ref", "severity": "warning", "description": "审定表原值小计 = 明细表合计"},
+    {"code": "D2-CHK-04", "type": "cross_ref", "severity": "warning", "description": "审定表坏账小计 = 坏账准备明细合计"},
+    {"code": "D2-CHK-05", "type": "formula", "severity": "blocking", "description": "净值 = 原值 - 坏账准备（各行）"},
+    {"code": "D2-CHK-06", "type": "movement", "severity": "warning", "description": "坏账准备：期初+计提+其他增加-转回-核销-其他减少 = 期末"},
+    {"code": "D2-CHK-07", "type": "confirmation", "severity": "warning", "description": "函证回函金额与明细表确认金额一致"},
+    {"code": "D2-CHK-08", "type": "completeness", "severity": "info", "description": "前五大客户占比分析（集中度风险）"},
+    {"code": "D2-CHK-09", "type": "analysis", "severity": "info", "description": "应收账款周转率与上年比较"},
+    {"code": "D2-CHK-10", "type": "analysis", "severity": "warning", "description": "账龄超过1年的应收账款占比及坏账计提充分性"},
+    {"code": "D2-CHK-11", "type": "check", "severity": "warning", "description": "ECL预期信用损失计量测试结果与账面一致"},
+    {"code": "D2-CHK-12", "type": "aging", "severity": "warning", "description": "账龄分段合计 = 应收账款原值合计（各段之和无遗漏）"},
+    {"code": "D2-CHK-13", "type": "aging", "severity": "info", "description": "各账龄段坏账计提比例与会计政策一致"},
+    {"code": "D2-CHK-14", "type": "aging", "severity": "warning", "description": "账龄迁徙率合理性（本期迁徙率与历史迁徙率偏差<20%）"}
+  ]
+}

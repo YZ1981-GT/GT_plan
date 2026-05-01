@@ -1,0 +1,257 @@
+{
+  "wp_code": "D4",
+  "name": "营业收入",
+  "wp_name": "营业收入",
+  "cycle": "D",
+  "account_codes": ["6001", "6051"],
+  "source_files": [
+    {
+      "file_pattern": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+      "is_primary": true
+    },
+    {
+      "file_pattern": "D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+      "description": "会计政策检查"
+    },
+    {
+      "file_pattern": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+      "description": "分析程序"
+    },
+    {
+      "file_pattern": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+      "description": "合同检查"
+    },
+    {
+      "file_pattern": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+      "description": "检查程序"
+    },
+    {
+      "file_pattern": "D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+      "description": "关联方检查"
+    },
+    {
+      "file_pattern": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+      "description": "IPO/上市/舞弊应对"
+    },
+    {
+      "file_pattern": "D4-33至D4-36 其他业务收入.xlsx",
+      "description": "其他业务收入"
+    }
+  ],
+  "sheet_rules": [
+    {
+      "code": "D4A",
+      "exact_name": "营业收入审计程序表D4A",
+      "type": "procedure"
+    },
+    {
+      "code": "D4-1",
+      "exact_name": "营业收入审定表D4-1",
+      "type": "summary",
+      "table_type": "income_statement",
+      "header_rows": [5, 6],
+      "data_start_row": 7,
+      "layout": {
+        "columns": {
+          "label": {"col": 1, "label": "项目"},
+          "current_unadjusted": {"col": 2, "label": "本期未审数"},
+          "current_adjustment": {"col": 3, "label": "本期账项调整"},
+          "current_reclass": {"col": 4, "label": "本期重分类调整"},
+          "closing_audited": {"col": 5, "label": "本期审定数"},
+          "prior_unadjusted": {"col": 6, "label": "上期未审数"},
+          "prior_adjustment": {"col": 7, "label": "上期账项调整"},
+          "prior_reclass": {"col": 8, "label": "上期重分类调整"},
+          "prior_audited": {"col": 9, "label": "上期审定数"}
+        }
+      },
+      "key_rows": {
+        "main_revenue_title": {"row": 7, "label": "主营业务收入："},
+        "main_revenue_subtotal": {"row": 12, "label": "小计", "is_total": true},
+        "other_revenue_title": {"row": 13, "label": "其他业务收入："},
+        "other_revenue_subtotal": {"row": 18, "label": "小计", "is_total": true},
+        "total": {"row": 19, "label": "合计", "is_total": true, "report_row": "IS-001"},
+        "tb_balance": {"row": 20, "label": "试算平衡表数"},
+        "diff": {"row": 21, "label": "差异数"}
+      },
+      "sections": [
+        {"name": "主营业务收入", "start_row": 7, "end_row": 12, "items": ["产品/服务类别（动态）"]},
+        {"name": "其他业务收入", "start_row": 13, "end_row": 18, "items": ["其他业务类别（动态）"]}
+      ]
+    },
+    {
+      "code": "D4-listed",
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "disclosure_listed"
+    },
+    {
+      "code": "D4-soe",
+      "exact_name": "附注披露信息（国企）",
+      "type": "disclosure_soe"
+    },
+    {
+      "code": "D4-2",
+      "exact_name": "主营业务收入明细表D4-2",
+      "type": "detail",
+      "description": "主营业务收入按产品/客户明细"
+    },
+    {
+      "code": "D4-3",
+      "exact_name": "其他业务收入明细表D4-3",
+      "type": "detail",
+      "description": "其他业务收入明细"
+    },
+    {
+      "code": "D4-4",
+      "exact_name": "营业收入调整分录汇总D4-4",
+      "type": "adjustment"
+    },
+    {
+      "code": "D4-5",
+      "exact_name": "营业收入会计政策检查D4-5",
+      "type": "check",
+      "description": "收入确认会计政策检查（五步法）",
+      "source_file": "D4-5 营业收入-会计政策（Leap-常规程序）.xlsx"
+    },
+    {
+      "code": "D4-6",
+      "exact_name": "重要指标分析D4-6",
+      "type": "analysis",
+      "description": "收入/毛利/应收周转等指标分析",
+      "source_file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx"
+    },
+    {
+      "code": "D4-7",
+      "exact_name": "毛利率分析表D4-7",
+      "type": "analysis",
+      "description": "毛利率分析（按产品/期间）",
+      "source_file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx"
+    },
+    {
+      "code": "D4-8",
+      "exact_name": "重要产品毛利分析D4-8",
+      "type": "analysis",
+      "source_file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx"
+    },
+    {
+      "code": "D4-9",
+      "exact_name": "重要客户结构分析D4-9",
+      "type": "analysis",
+      "source_file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx"
+    },
+    {
+      "code": "D4-12",
+      "exact_name": "合同检查表D4-12",
+      "type": "check",
+      "description": "收入合同检查",
+      "source_file": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx"
+    },
+    {
+      "code": "D4-13",
+      "exact_name": "营业收入账面金额与ERP系统核对记录D4-13",
+      "type": "reconciliation",
+      "description": "ERP系统核对",
+      "source_file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D4-14",
+      "exact_name": "营业收入发生检查表D4-14",
+      "type": "check",
+      "description": "收入发生认定检查",
+      "source_file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D4-15",
+      "exact_name": "营业收入完整性检查表D4-15",
+      "type": "check",
+      "description": "收入完整性检查",
+      "source_file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D4-17",
+      "exact_name": "营业收入截止测试（账到单据）D4-17",
+      "type": "cutoff",
+      "description": "截止测试（从账到单据）",
+      "source_file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D4-18",
+      "exact_name": "营业收入截止测试（单据到账）D4-18",
+      "type": "cutoff",
+      "description": "截止测试（从单据到账）",
+      "source_file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D4-19",
+      "exact_name": "销售折扣与折让检查D4-19",
+      "type": "check",
+      "description": "折扣折让检查",
+      "source_file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D4-20",
+      "exact_name": "销售退货检查表 D4-20",
+      "type": "check",
+      "description": "销售退货检查",
+      "source_file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "D4-21",
+      "exact_name": "关联方销售情况及价格分析D4-21",
+      "type": "check",
+      "description": "关联方销售检查",
+      "source_file": "D4-21营业收入-关联方检查（Leap-常规程序）.xlsx"
+    },
+    {
+      "code": "D4-33",
+      "exact_name": "其他业务毛利率分析表D4-33",
+      "type": "analysis",
+      "description": "其他业务毛利率分析",
+      "source_file": "D4-33至D4-36 其他业务收入.xlsx"
+    },
+    {
+      "code": "D4-35",
+      "exact_name": "其他业务收入检查表D4-35",
+      "type": "check",
+      "description": "其他业务收入检查",
+      "source_file": "D4-33至D4-36 其他业务收入.xlsx"
+    },
+    {
+      "code": "D4-36",
+      "exact_name": "其他业务收入截止性测试D4-36",
+      "type": "cutoff",
+      "description": "其他业务收入截止测试",
+      "source_file": "D4-33至D4-36 其他业务收入.xlsx"
+    }
+  ],
+  "cross_references": [
+    {"from": "D4-1:R19:C5", "to": "TB('6001','审定数') + TB('6051','审定数')", "description": "审定表合计=试算表主营+其他收入"},
+    {"from": "D4-1:R12:C5", "to": "TB('6001','审定数')", "description": "主营小计=试算表主营业务收入"},
+    {"from": "D4-1:R18:C5", "to": "TB('6051','审定数')", "description": "其他小计=试算表其他业务收入"},
+    {"from": "D4-1:R19:C5", "to": "REPORT('IS-001','本期')", "description": "审定表合计=利润表营业收入"},
+    {"from": "D4-2", "to": "D4-1:R12:C5", "description": "主营明细合计=审定表主营小计"},
+    {"from": "D4-3", "to": "D4-1:R18:C5", "description": "其他明细合计=审定表其他小计"},
+    {"from": "D4-4", "to": "D4-1:R19:C3", "description": "调整分录汇总=审定表调整列"},
+    {"from": "D4-7", "to": "D4-1", "description": "毛利率分析引用审定表收入数据"},
+    {"from": "D4-1:R19:C5", "to": "D4-1:R12:C5 + D4-1:R18:C5", "description": "合计=主营小计+其他小计"}
+  ],
+  "audit_checks": [
+    {"id": "D4-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计=试算表主营+其他收入"},
+    {"id": "D4-CHK-02", "type": "formula", "severity": "blocking", "description": "合计=主营小计+其他小计"},
+    {"id": "D4-CHK-03", "type": "cross_ref", "severity": "warning", "description": "审定表合计=利润表营业收入"},
+    {"id": "D4-CHK-04", "type": "cross_ref", "severity": "warning", "description": "主营明细合计与审定表一致"},
+    {"id": "D4-CHK-05", "type": "completeness", "severity": "warning", "description": "主营明细表已填写"},
+    {"id": "D4-CHK-06", "type": "completeness", "severity": "warning", "description": "其他业务明细表已填写"},
+    {"id": "D4-CHK-07", "type": "check", "severity": "warning", "description": "收入确认会计政策检查已完成"},
+    {"id": "D4-CHK-08", "type": "analysis", "severity": "warning", "description": "毛利率分析已执行"},
+    {"id": "D4-CHK-09", "type": "cutoff", "severity": "warning", "description": "截止测试已执行（账到单据+单据到账）"},
+    {"id": "D4-CHK-10", "type": "check", "severity": "warning", "description": "收入发生认定检查已完成"},
+    {"id": "D4-CHK-11", "type": "check", "severity": "warning", "description": "收入完整性检查已完成"},
+    {"id": "D4-CHK-12", "type": "check", "severity": "warning", "description": "合同检查已完成"},
+    {"id": "D4-CHK-13", "type": "reconciliation", "severity": "warning", "description": "ERP系统核对已完成"},
+    {"id": "D4-CHK-14", "type": "check", "severity": "info", "description": "关联方销售检查已完成"},
+    {"id": "D4-CHK-15", "type": "check", "severity": "info", "description": "折扣折让检查已完成"},
+    {"id": "D4-CHK-16", "type": "check", "severity": "info", "description": "销售退货检查已完成"},
+    {"id": "D4-CHK-17", "type": "analysis", "severity": "info", "description": "客户结构分析已执行"},
+    {"id": "D4-CHK-18", "type": "formula", "severity": "blocking", "description": "主营小计+其他小计=合计（R12+R18=R19）"}
+  ]
+}

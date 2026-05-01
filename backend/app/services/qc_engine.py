@@ -543,6 +543,52 @@ class CrossRefIntegrityRule(QCRule):
 
 
 # ---------------------------------------------------------------------------
+# QC-27: 精细化审计检查联动
+# ---------------------------------------------------------------------------
+
+class FineCheckBlockingRule(QCRule):
+    """QC-27: 精细化审计检查阻断 — fine_checks 中 blocking 级检查未通过则阻断提交。"""
+    severity = "blocking"
+    rule_id = "QC-27"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        pd = context.working_paper.parsed_data or {}
+        fine_checks = pd.get("fine_checks", [])
+        if not fine_checks:
+            return []
+        findings = []
+        for chk in fine_checks:
+            if chk.get("severity") == "blocking" and not chk.get("passed", True):
+                findings.append(QCFindingItem(
+                    rule_id=self.rule_id,
+                    severity="blocking",
+                    message=f"审计检查 {chk.get('code', '?')} 未通过: {chk.get('description', chk.get('message', ''))}"
+                ))
+        return findings
+
+
+class FineCheckWarningRule(QCRule):
+    """QC-28: 精细化审计检查警告 — fine_checks 中 warning 级检查未通过产生警告。"""
+    severity = "warning"
+    rule_id = "QC-28"
+
+    async def check(self, context: QCContext) -> list[QCFindingItem]:
+        pd = context.working_paper.parsed_data or {}
+        fine_checks = pd.get("fine_checks", [])
+        if not fine_checks:
+            return []
+        findings = []
+        for chk in fine_checks:
+            if chk.get("severity") == "warning" and not chk.get("passed", True):
+                findings.append(QCFindingItem(
+                    rule_id=self.rule_id,
+                    severity="warning",
+                    message=f"审计检查 {chk.get('code', '?')} 未通过: {chk.get('description', chk.get('message', ''))}"
+                ))
+        return findings
+
+
+# ---------------------------------------------------------------------------
 # QCEngine
 # ---------------------------------------------------------------------------
 
@@ -576,6 +622,9 @@ class QCEngine:
             DataReferenceConsistencyRule(),
             AttachmentSufficiencyRule(),
             CrossRefIntegrityRule(),
+            # 精细化审计检查联动
+            FineCheckBlockingRule(),
+            FineCheckWarningRule(),
         ]
 
     async def check(

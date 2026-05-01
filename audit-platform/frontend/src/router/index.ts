@@ -75,6 +75,11 @@ const router = createRouter({
           component: () => import('@/views/ReportConfigEditor.vue'),
         },
         {
+          path: 'projects/:projectId/audit-checks',
+          name: 'AuditCheckDashboard',
+          component: () => import('@/views/AuditCheckDashboard.vue'),
+        },
+        {
           path: 'projects/:projectId/cfs-worksheet',
           name: 'CFSWorksheet',
           component: () => import('@/views/CFSWorksheet.vue'),
@@ -328,16 +333,19 @@ const router = createRouter({
           path: 'projects/:projectId/aux-summary',
           name: 'AuxSummary',
           component: () => import('@/views/AuxSummaryPanel.vue'),
+          meta: { developing: true },
         },
         {
           path: 'projects/:projectId/consol-snapshots',
           name: 'ConsolSnapshots',
           component: () => import('@/views/ConsolSnapshots.vue'),
+          meta: { developing: true },
         },
         {
           path: 'settings/report-format',
           name: 'ReportFormatManager',
           component: () => import('@/views/ReportFormatManager.vue'),
+          meta: { developing: true },
         },
         {
           path: 'settings',
@@ -363,6 +371,7 @@ const router = createRouter({
           path: 'staff/:staffId/check-ins',
           name: 'CheckIns',
           component: () => import('@/views/CheckInsPage.vue'),
+          meta: { developing: true },
         },
         // ── Phase 8 Routes ──
         {
@@ -381,12 +390,14 @@ const router = createRouter({
           path: 'projects/:projectId/mobile-penetration',
           name: 'MobilePenetration',
           component: () => import('@/views/MobilePenetration.vue'),
+          meta: { developing: true },
           props: (route: any) => ({ projectId: route.params.projectId }),
         },
         {
           path: 'projects/:projectId/mobile-review',
           name: 'MobileReviewView',
           component: () => import('@/views/MobileReviewView.vue'),
+          meta: { developing: true },
           props: (route: any) => ({ projectId: route.params.projectId }),
         },
       ],
@@ -401,6 +412,14 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const authStore = useAuthStore()
+
+  // Developing pages → show toast and redirect back
+  if (to.meta.developing) {
+    import('element-plus').then(({ ElMessage }) => {
+      ElMessage.info('该功能正在开发中，敬请期待')
+    })
+    return false
+  }
 
   // Already logged in → redirect away from login
   if (to.path === '/login' && authStore.isAuthenticated) {

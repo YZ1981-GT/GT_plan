@@ -53,8 +53,7 @@ class AiGenerationRecord(BaseModel):
     confirmed_by: UUID | None = None
     confirmed_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 # ---------------------------------------------------------------------------
@@ -73,8 +72,7 @@ class JobItemResponse(BaseModel):
     error_message: str | None = None
     finished_at: datetime | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class JobStatusResponse(BaseModel):
@@ -87,8 +85,7 @@ class JobStatusResponse(BaseModel):
     items: list[JobItemResponse] = []
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class JobRetryResponse(BaseModel):

@@ -3,42 +3,258 @@
     "wp_code": "E1",
     "name": "货币资金",
     "account_codes": ["1001", "1002", "1012"],
+    "fine_rules": "wp_fine_rules/e1_cash.json",
     "sheets": [
-      {"name_pattern": "审定表|E1-1", "type": "summary", "header_keywords": ["项目", "期初未审", "期末审定", "变动额"], "columns": {"label": {"keywords": ["项目"]}, "opening": {"keywords": ["期初未审", "期初"]}, "unadjusted": {"keywords": ["期末未审", "未审"]}, "adjustment": {"keywords": ["期末调整", "调整"]}, "closing_balance": {"keywords": ["期末审定", "审定"]}, "change": {"keywords": ["变动额", "变动"]}}},
-      {"name_pattern": "现金明细|E1-2", "type": "detail", "header_keywords": ["币种", "金额", "折合人民币"]},
-      {"name_pattern": "银行存款|E1-3", "type": "detail", "header_keywords": ["开户银行", "账号", "币种", "余额"]},
-      {"name_pattern": "调整分录|E1-5", "type": "adjustment", "header_keywords": ["编号", "科目", "借方", "贷方"]}
+      {"name_pattern": "审定表|E1-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "期初", "期末", "审定", "变动"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目名称", "项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审", "期初数"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初调整", "账项调整"]},
+         "opening_audited": {"col": 4, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 5, "keywords": ["期末未审", "未审数"]},
+         "closing_adjustment": {"col": 6, "keywords": ["期末调整", "账项调整"]},
+         "closing_balance": {"col": 7, "keywords": ["期末审定", "审定数"]},
+         "change_amount": {"col": 8, "keywords": ["变动额"]},
+         "change_rate": {"col": 9, "keywords": ["变动率"]},
+         "reason": {"col": 10, "keywords": ["原因分析"]}
+       },
+       "key_rows": {
+         "cash": {"row": 7, "label": "库存现金", "account_code": "1001"},
+         "bank_deposit": {"row": 8, "label": "银行存款（本金）", "account_code": "1002"},
+         "other_monetary": {"row": 11, "label": "其他货币资金（本金）", "account_code": "1012"},
+         "total": {"row": 18, "label": "合计", "is_total": true},
+         "tb_balance": {"row": 20, "label": "试算平衡表数"},
+         "diff": {"row": 21, "label": "差异数"}
+       }
+      },
+      {"name_pattern": "现金明细|E1-2", "type": "detail", "header_rows": [13, 14], "data_start_row": 15,
+       "header_keywords": ["币种", "期初余额", "本期增加", "本期减少", "期末余额", "折算汇率", "审定数"],
+       "columns": {
+         "currency": {"col": 1, "keywords": ["币种"]},
+         "opening_balance": {"col": 2, "keywords": ["期初余额"]},
+         "closing_fc": {"col": 5, "keywords": ["期末余额", "原币"]},
+         "exchange_rate": {"col": 6, "keywords": ["折算汇率"]},
+         "closing_rmb": {"col": 7, "keywords": ["折算人民币", "人民币金额"]},
+         "closing_audited": {"col": 9, "keywords": ["审定数", "期末审定"]}
+       }
+      },
+      {"name_pattern": "银行存款.*明细|E1-3", "type": "detail", "header_rows": [9, 10], "data_start_row": 11,
+       "header_keywords": ["开户银行", "银行账号", "账户性质", "期末余额", "对账单", "回函"],
+       "columns": {
+         "bank_name": {"col": 1, "keywords": ["开户银行"]},
+         "account_no": {"col": 3, "keywords": ["银行账号", "账号"]},
+         "closing_balance": {"col": 8, "keywords": ["期末余额"]},
+         "closing_audited": {"col": 10, "keywords": ["审定数", "期末审定"]},
+         "bank_statement": {"col": 11, "keywords": ["对账单余额"]},
+         "confirmation": {"col": 13, "keywords": ["回函确认"]}
+       }
+      },
+      {"name_pattern": "调整分录|E1-5", "type": "adjustment", "header_rows": [5], "data_start_row": 6,
+       "header_keywords": ["调整事项", "科目名称", "借方", "贷方"],
+       "columns": {
+         "description": {"col": 1, "keywords": ["调整事项"]},
+         "category": {"col": 2, "keywords": ["类别"]},
+         "account_name": {"col": 4, "keywords": ["科目名称"]},
+         "debit": {"col": 7, "keywords": ["借方"]},
+         "credit": {"col": 8, "keywords": ["贷方"]}
+       }
+      },
+      {"name_pattern": "余额调节|E1-6", "type": "reconciliation", "header_rows": [14, 15], "data_start_row": 16,
+       "header_keywords": ["项目", "审计前金额", "原始凭证"]
+      },
+      {"name_pattern": "现金.*盘点|E1-7|E1-8", "type": "count"},
+      {"name_pattern": "存单盘点|E1-9", "type": "count"},
+      {"name_pattern": "银行账户.*清单|E1-10", "type": "verification", "header_rows": [11, 12], "data_start_row": 13,
+       "header_keywords": ["开户银行", "账号", "账户性质", "账户状态"]
+      },
+      {"name_pattern": "承诺|E1-11", "type": "confirmation"}
     ]
   },
   {
     "wp_code": "D2",
     "name": "应收账款",
     "account_codes": ["1122"],
+    "fine_rules": "wp_fine_rules/d2_receivable.json",
     "sheets": [
-      {"name_pattern": "审定表|D2-1", "type": "summary", "header_keywords": ["项目", "期初", "期末", "审定"], "columns": {"label": {"keywords": ["项目", "内容"]}, "opening": {"keywords": ["期初", "年初"]}, "unadjusted": {"keywords": ["未审", "账面"]}, "adjustment": {"keywords": ["调整", "重分类"]}, "closing_balance": {"keywords": ["期末审定", "审定数"]}}},
-      {"name_pattern": "明细表|D2-2", "type": "detail", "header_keywords": ["客户名称", "余额", "账龄"]},
-      {"name_pattern": "坏账准备|D2-3", "type": "movement", "header_keywords": ["项目", "期初", "计提", "转回", "核销", "期末"], "columns": {"label": {"keywords": ["项目", "类别"]}, "opening": {"keywords": ["期初"]}, "provision": {"keywords": ["计提", "本期计提"]}, "decrease": {"keywords": ["转回", "核销"]}, "closing_balance": {"keywords": ["期末"]}}},
-      {"name_pattern": "账龄|D2-4|aging", "type": "aging", "header_keywords": ["客户", "1年以内", "1-2年", "2-3年", "3年以上"]},
-      {"name_pattern": "调整分录|D2-5", "type": "adjustment", "header_keywords": ["编号", "科目", "借方", "贷方"]}
+      {"name_pattern": "审定表D2-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "期初", "期末", "审定", "重分类", "变动"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_reclass": {"col": 4, "keywords": ["期初重分类"]},
+         "opening_audited": {"col": 5, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 6, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 7, "keywords": ["期末账项调整"]},
+         "closing_reclass": {"col": 8, "keywords": ["期末重分类"]},
+         "closing_balance": {"col": 9, "keywords": ["期末审定", "审定数"]},
+         "change_amount": {"col": 10, "keywords": ["变动额"]},
+         "change_rate": {"col": 11, "keywords": ["变动率"]}
+       },
+       "key_rows": {
+         "gross_subtotal": {"row": 13, "label": "原值小计", "is_total": true},
+         "bad_debt_subtotal": {"row": 20, "label": "坏账准备小计", "is_total": true},
+         "net_subtotal": {"row": 25, "label": "净值小计", "is_total": true, "report_row": "BS-005"},
+         "tb_balance": {"row": 27, "label": "试算平衡表数"},
+         "diff": {"row": 28, "label": "差异数"}
+       }
+      },
+      {"name_pattern": "明细表D2-2", "type": "detail", "header_rows": [11, 12], "data_start_row": 13,
+       "header_keywords": ["序号", "客户名称", "公司代码", "关联方", "期初", "期末", "账龄"],
+       "columns": {
+         "seq": {"col": 1, "keywords": ["序号"]},
+         "customer_name": {"col": 2, "keywords": ["客户名称"]},
+         "company_code": {"col": 3, "keywords": ["公司代码"]},
+         "related_party": {"col": 4, "keywords": ["关联方"]},
+         "opening_unadjusted": {"col": 5, "keywords": ["期初未审"]},
+         "opening_audited": {"col": 8, "keywords": ["期初审定"]}
+       }
+      },
+      {"name_pattern": "坏账准备明细表D2-3", "type": "movement", "header_rows": [10, 11], "data_start_row": 12,
+       "header_keywords": ["项目", "期初", "计提", "其他增加", "转回", "核销", "其他减少", "期末"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_reclass": {"col": 4, "keywords": ["重分类"]},
+         "opening_audited": {"col": 5, "keywords": ["期初审定"]},
+         "provision": {"col": 6, "keywords": ["计提"]},
+         "other_increase": {"col": 7, "keywords": ["其他增加"]},
+         "reversal": {"col": 8, "keywords": ["转回"]},
+         "write_off": {"col": 9, "keywords": ["核销"]},
+         "other_decrease": {"col": 10, "keywords": ["其他减少"]},
+         "closing_unadjusted": {"col": 11, "keywords": ["期末未审"]}
+       },
+       "key_rows": {
+         "individual": {"row": 12, "label": "按单项评估计提"},
+         "portfolio": {"row": 17, "label": "信用风险组合计提"},
+         "total": {"row": 22, "label": "合计", "is_total": true}
+       }
+      },
+      {"name_pattern": "调整分录汇总表D2-4", "type": "adjustment", "header_rows": [5], "data_start_row": 6,
+       "header_keywords": ["调整事项", "科目名称", "借方", "贷方"],
+       "columns": {
+         "description": {"col": 1, "keywords": ["调整事项"]},
+         "category": {"col": 2, "keywords": ["类别"]},
+         "account_name": {"col": 4, "keywords": ["科目名称"]},
+         "debit": {"col": 7, "keywords": ["借方"]},
+         "credit": {"col": 8, "keywords": ["贷方"]}
+       }
+      },
+      {"name_pattern": "应收账款分析表D2-5", "type": "analysis",
+       "source_file": "D2应收账款/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx"
+      },
+      {"name_pattern": "关联方及交易检查表D2-6", "type": "check",
+       "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+      },
+      {"name_pattern": "应收账款检查表D2-7", "type": "check",
+       "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+      },
+      {"name_pattern": "坏账准备计提会计政策检查D2-8", "type": "check",
+       "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+      },
+      {"name_pattern": "应收坏账准备测算D2-9", "type": "calculation",
+       "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+      },
+      {"name_pattern": "预期信用损失的计量测试D2-10", "type": "calculation",
+       "source_file": "D2应收账款/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx"
+      }
     ]
   },
   {
-    "wp_code": "D3",
+    "wp_code": "D1",
     "name": "应收票据",
     "account_codes": ["1121"],
+    "fine_rules": "wp_fine_rules/d1_notes_receivable.json",
     "sheets": [
-      {"name_pattern": "审定表|D3-1", "type": "summary", "header_keywords": ["项目", "期末", "期初"]},
-      {"name_pattern": "明细|D3-2", "type": "detail", "header_keywords": ["出票人", "票面金额", "到期日"]}
+      {"name_pattern": "审定表D1-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "期初", "期末", "审定", "重分类"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_reclass": {"col": 4, "keywords": ["期初重分类"]},
+         "opening_audited": {"col": 5, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 6, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 7, "keywords": ["期末账项调整"]},
+         "closing_reclass": {"col": 8, "keywords": ["期末重分类"]},
+         "closing_balance": {"col": 9, "keywords": ["期末审定", "审定数"]},
+         "change_amount": {"col": 10, "keywords": ["变动额"]},
+         "change_rate": {"col": 11, "keywords": ["变动率"]}
+       },
+       "key_rows": {
+         "gross_subtotal": {"row": 10, "label": "原值小计", "is_total": true},
+         "bad_debt_subtotal": {"row": 14, "label": "坏账准备小计", "is_total": true},
+         "net_total": {"row": 18, "label": "净值合计", "is_total": true, "report_row": "BS-004"},
+         "tb_balance": {"row": 19, "label": "试算平衡表数"},
+         "diff": {"row": 20, "label": "差异数"}
+       }
+      },
+      {"name_pattern": "原值明细表（按类别）D1-2", "type": "detail", "header_rows": [10], "data_start_row": 11},
+      {"name_pattern": "原值明细表（按客户）D1-3", "type": "detail"},
+      {"name_pattern": "坏账准备明细表D1-4", "type": "movement", "header_rows": [10, 11], "data_start_row": 12},
+      {"name_pattern": "调整分录汇总表D1-5", "type": "adjustment", "header_rows": [5], "data_start_row": 6},
+      {"name_pattern": "应收票据业务模式分析D1-6", "type": "analysis"},
+      {"name_pattern": "应收票据备查簿核对D1-7", "type": "verification"},
+      {"name_pattern": "应收票据贴现", "type": "detail"},
+      {"name_pattern": "应收票据监盘D1-10", "type": "count"},
+      {"name_pattern": "关联方关系及交易检查表D1-11", "type": "check"},
+      {"name_pattern": "应收票据检查表D1-13", "type": "check"},
+      {"name_pattern": "坏账准备会计政策检查D1-14", "type": "check"},
+      {"name_pattern": "坏账准备测试表D1-15", "type": "calculation"}
     ]
   },
   {
     "wp_code": "F1",
-    "name": "存货",
-    "account_codes": ["1401", "1402", "1403", "1405", "1461"],
+    "name": "预付账款",
+    "account_codes": ["1123"],
+    "fine_rules": "wp_fine_rules/f1_prepayment.json",
     "sheets": [
-      {"name_pattern": "审定表|F1-1", "type": "summary", "header_keywords": ["项目", "期末", "期初", "审定"], "columns": {"label": {"keywords": ["项目", "存货类别"]}, "opening": {"keywords": ["期初"]}, "closing_balance": {"keywords": ["期末审定", "审定"]}}},
-      {"name_pattern": "明细|F1-2", "type": "detail", "header_keywords": ["存货名称", "数量", "单价", "金额"]},
-      {"name_pattern": "跌价准备|F1-3", "type": "movement", "header_keywords": ["项目", "期初", "计提", "转回", "期末"]}
+      {"name_pattern": "审定表F1-1", "type": "summary", "header_keywords": ["项目", "期初", "期末", "审定"]}
+    ]
+  },
+  {
+    "wp_code": "F2",
+    "name": "存货及跌价准备",
+    "account_codes": ["1401", "1402", "1403", "1405", "1461", "1408"],
+    "fine_rules": "wp_fine_rules/f2_inventory.json",
+    "sheets": [
+      {"name_pattern": "存货审定表F2-1", "type": "summary", "header_rows": [5], "data_start_row": 6,
+       "header_keywords": ["项目", "期初数", "本期增加", "本期减少", "期末数"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening": {"col": 2, "keywords": ["期初数", "期初"]},
+         "increase": {"col": 3, "keywords": ["本期增加", "增加"]},
+         "decrease": {"col": 4, "keywords": ["本期减少", "减少"]},
+         "closing_balance": {"col": 5, "keywords": ["期末数", "期末"]},
+         "index_ref": {"col": 6, "keywords": ["索引"]}
+       },
+       "key_rows": {
+         "section1": {"row": 6, "label": "一、原值"},
+         "raw_material": {"row": 8, "label": "原材料"},
+         "wip": {"row": 11, "label": "在产品"},
+         "finished_goods": {"row": 14, "label": "库存商品"},
+         "total_net": {"row": 144, "label": "净值合计", "is_total": true, "report_row": "BS-008"},
+         "tb_balance": {"row": 146, "label": "试算平衡表数"},
+         "diff": {"row": 148, "label": "差异数"}
+       }
+      },
+      {"name_pattern": "明细汇总表F2-2", "type": "detail",
+       "header_keywords": ["存货类别", "期初", "增加", "减少", "期末"]
+      },
+      {"name_pattern": "原材料明细表F2-3", "type": "detail"},
+      {"name_pattern": "材料采购.*明细表F2-4", "type": "detail"},
+      {"name_pattern": "周转材料.*明细表F2-5", "type": "detail"},
+      {"name_pattern": "自制半成品明细表F2-6", "type": "detail"},
+      {"name_pattern": "委托加工物资明细表F2-7", "type": "detail"},
+      {"name_pattern": "库存商品明细表F2-8", "type": "detail"},
+      {"name_pattern": "发出商品F2-9", "type": "detail"},
+      {"name_pattern": "开发产品F2-10", "type": "detail"},
+      {"name_pattern": "开发成本F2-11", "type": "detail"},
+      {"name_pattern": "合同履约成本F2-12", "type": "detail"},
+      {"name_pattern": "消耗性生物资产F2-13", "type": "detail"},
+      {"name_pattern": "调整分录汇总F2-14", "type": "adjustment", "header_rows": [5], "data_start_row": 6}
     ]
   },
   {
@@ -55,12 +271,41 @@
     "wp_code": "H1",
     "name": "固定资产",
     "account_codes": ["1601", "1602"],
+    "fine_rules": "wp_fine_rules/h1_fixed_asset.json",
     "sheets": [
-      {"name_pattern": "审定表|H1-1", "type": "summary", "header_keywords": ["项目", "房屋", "机器", "运输", "电子", "合计"], "columns": {"label": {"keywords": ["项目"]}, "closing_balance": {"keywords": ["合计", "期末"]}}},
-      {"name_pattern": "明细|H1-2", "type": "detail", "header_keywords": ["资产名称", "原值", "累计折旧", "账面价值"]},
-      {"name_pattern": "折旧测算|H1-12", "type": "analysis", "header_keywords": ["资产类别", "原值", "残值率", "年限", "月折旧"]},
-      {"name_pattern": "减值|H1-14", "type": "analysis", "header_keywords": ["资产", "账面价值", "可收回金额", "减值"]},
-      {"name_pattern": "调整分录|H1-3", "type": "adjustment", "header_keywords": ["编号", "科目", "借方", "贷方"]}
+      {"name_pattern": "审定表H1-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "期初", "期末", "审定", "变动"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_audited": {"col": 4, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 5, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 6, "keywords": ["期末账项调整"]},
+         "closing_balance": {"col": 7, "keywords": ["期末审定", "审定数"]},
+         "change_amount": {"col": 8, "keywords": ["变动额"]},
+         "change_rate": {"col": 9, "keywords": ["变动率"]}
+       }
+      },
+      {"name_pattern": "明细表H1-2", "type": "detail"},
+      {"name_pattern": "调整分录汇总H1-3", "type": "adjustment"},
+      {"name_pattern": "闲置检查表H1-4", "type": "check"},
+      {"name_pattern": "会计政策估计检查表H1-5", "type": "check"},
+      {"name_pattern": "分析表H1-6", "type": "analysis"},
+      {"name_pattern": "增加检查表H1-7", "type": "check"},
+      {"name_pattern": "减少检查表H1-8", "type": "check"},
+      {"name_pattern": "监盘计划H1-9", "type": "count"},
+      {"name_pattern": "盘点检查表H1-10", "type": "count"},
+      {"name_pattern": "监盘小结H1-11", "type": "count"},
+      {"name_pattern": "折旧测算表.*H1-12", "type": "calculation"},
+      {"name_pattern": "折旧分配分析表H1-13", "type": "analysis"},
+      {"name_pattern": "减值测算表H1-14", "type": "calculation"},
+      {"name_pattern": "可收回金额测试表H1-15", "type": "calculation"},
+      {"name_pattern": "房屋建筑物权属检查表H1-16", "type": "check"},
+      {"name_pattern": "运输设备权属检查表H1-17", "type": "check"},
+      {"name_pattern": "关联交易检查表H1-18", "type": "check"},
+      {"name_pattern": "经营租出.*H1-19", "type": "check"},
+      {"name_pattern": "融资租出.*H1-20", "type": "check"}
     ]
   },
   {
@@ -83,16 +328,74 @@
     "wp_code": "J1",
     "name": "应付职工薪酬",
     "account_codes": ["2211"],
+    "fine_rules": "wp_fine_rules/j1_employee_compensation.json",
     "sheets": [
-      {"name_pattern": "审定表|J1-1", "type": "summary", "header_keywords": ["项目", "期初", "增加", "减少", "期末"], "columns": {"label": {"keywords": ["项目", "薪酬类别"]}, "opening": {"keywords": ["期初"]}, "increase": {"keywords": ["增加", "本期计提"]}, "decrease": {"keywords": ["减少", "本期发放"]}, "closing_balance": {"keywords": ["期末"]}}}
+      {"name_pattern": "审定表J1-1", "type": "summary", "header_rows": [6, 7], "data_start_row": 8,
+       "header_keywords": ["项目", "期初", "期末", "审定", "变动"],
+       "columns": {
+         "label": {"keywords": ["项目名称", "项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_audited": {"col": 4, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 5, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 6, "keywords": ["期末账项调整"]},
+         "closing_balance": {"col": 7, "keywords": ["期末审定", "审定数"]},
+         "change_unaudited_amount": {"col": 8, "keywords": ["未审变动额"]},
+         "change_unaudited_rate": {"col": 9, "keywords": ["未审变动率"]},
+         "change_audited_amount": {"col": 10, "keywords": ["审定变动额"]},
+         "change_audited_rate": {"col": 11, "keywords": ["审定变动率"]}
+       },
+       "note": "Sheet名末尾有空格：审定表J1-1 "
+      },
+      {"name_pattern": "明细表J1-2", "type": "detail"},
+      {"name_pattern": "调整分录汇总表J1-3", "type": "adjustment"},
+      {"name_pattern": "月度分析表J1-4", "type": "analysis"},
+      {"name_pattern": "计提情况检查表J1-6", "type": "check"},
+      {"name_pattern": "分配情况检查表J1-7", "type": "check"},
+      {"name_pattern": "检查表J1-8", "type": "check"},
+      {"name_pattern": "非货币性福利检查表J1-9", "type": "check"},
+      {"name_pattern": "辞退福利检查表J1-10", "type": "check"}
     ]
   },
   {
     "wp_code": "K1",
-    "name": "管理费用",
-    "account_codes": ["6602"],
+    "name": "其他应收款",
+    "account_codes": ["1221"],
+    "fine_rules": "wp_fine_rules/k1_other_receivable.json",
     "sheets": [
-      {"name_pattern": "审定表|K1-1", "type": "summary", "header_keywords": ["项目", "本期", "上期"], "columns": {"label": {"keywords": ["项目", "费用项目"]}, "closing_balance": {"keywords": ["本期金额", "本期"]}, "opening": {"keywords": ["上期金额", "上期"]}}}
+      {"name_pattern": "审定表K1-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "期初", "期末", "审定", "重分类"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_reclass": {"col": 4, "keywords": ["期初重分类"]},
+         "opening_audited": {"col": 5, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 6, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 7, "keywords": ["期末账项调整"]},
+         "closing_reclass": {"col": 8, "keywords": ["期末重分类"]},
+         "closing_balance": {"col": 9, "keywords": ["期末审定", "审定数"]},
+         "change_amount": {"col": 10, "keywords": ["变动额"]},
+         "change_rate": {"col": 11, "keywords": ["变动率"]}
+       },
+       "key_rows": {
+         "gross_subtotal": {"row": 14, "label": "原值小计", "is_total": true},
+         "bad_debt_subtotal": {"row": 21, "label": "坏账准备小计", "is_total": true},
+         "net_total": {"row": 28, "label": "净值合计", "is_total": true, "report_row": "BS-007"},
+         "aging_total": {"row": 37, "label": "账龄合计", "is_total": true}
+       }
+      },
+      {"name_pattern": "明细表K1-2", "type": "detail"},
+      {"name_pattern": "坏账准备明细表K1-3", "type": "detail"},
+      {"name_pattern": "调整分录汇总K1-4", "type": "adjustment"},
+      {"name_pattern": "大额.*分析表K1-5", "type": "analysis"},
+      {"name_pattern": "信用减值损失.*检查K1-6", "type": "check"},
+      {"name_pattern": "三阶段.*检查表K1-7", "type": "check"},
+      {"name_pattern": "坏账准备测算K1-8", "type": "calculation"},
+      {"name_pattern": "坏账准备转回.*核销.*K1-9", "type": "check"},
+      {"name_pattern": "长期未收回.*K1-10", "type": "check"},
+      {"name_pattern": "关联方.*K1-11", "type": "check"},
+      {"name_pattern": "其他应收款检查表K1-12", "type": "check"}
     ]
   },
   {
@@ -115,9 +418,34 @@
     "wp_code": "L1",
     "name": "短期借款",
     "account_codes": ["2001"],
+    "fine_rules": "wp_fine_rules/l1_short_term_loan.json",
     "sheets": [
-      {"name_pattern": "审定表|L1-1", "type": "summary", "header_keywords": ["借款类型", "期末", "期初"]},
-      {"name_pattern": "明细|L1-2", "type": "detail", "header_keywords": ["贷款银行", "借款金额", "利率", "到期日"]}
+      {"name_pattern": "审定表L1-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "期初", "期末", "审定", "重分类"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_reclass": {"col": 4, "keywords": ["期初重分类"]},
+         "opening_audited": {"col": 5, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 6, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 7, "keywords": ["期末账项调整"]},
+         "closing_reclass": {"col": 8, "keywords": ["期末重分类"]},
+         "closing_balance": {"col": 9, "keywords": ["期末审定", "审定数"]},
+         "change_unaudited_amount": {"col": 10, "keywords": ["未审变动额"]},
+         "change_unaudited_rate": {"col": 11, "keywords": ["未审变动率"]},
+         "change_audited_amount": {"col": 12, "keywords": ["审定变动额"]},
+         "change_audited_rate": {"col": 13, "keywords": ["审定变动率"]}
+       }
+      },
+      {"name_pattern": "明细表L1-2", "type": "detail"},
+      {"name_pattern": "调整分录汇总L1-3", "type": "adjustment"},
+      {"name_pattern": "征信报告核对表L1-4", "type": "check"},
+      {"name_pattern": "利息测算表L1-5", "type": "check"},
+      {"name_pattern": "贷款合同检查L1-6", "type": "check"},
+      {"name_pattern": "逾期贷款检查表L1-7", "type": "check"},
+      {"name_pattern": "抵质押资产检查表L1-8", "type": "check"},
+      {"name_pattern": "短期借款检查表L1-9", "type": "check"}
     ]
   },
   {
@@ -138,19 +466,119 @@
     ]
   },
   {
-    "wp_code": "N1",
+    "wp_code": "N2",
     "name": "应交税费",
     "account_codes": ["2221"],
+    "fine_rules": "wp_fine_rules/n2_tax_payable.json",
     "sheets": [
-      {"name_pattern": "审定表|N1-1", "type": "summary", "header_keywords": ["税种", "期末", "期初"], "columns": {"label": {"keywords": ["税种", "项目"]}, "closing_balance": {"keywords": ["期末"]}, "opening": {"keywords": ["期初"]}}}
+      {"name_pattern": "应交税费审定表N2-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "期初", "期末", "审定", "重分类"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_reclass": {"col": 4, "keywords": ["期初重分类"]},
+         "opening_audited": {"col": 5, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 6, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 7, "keywords": ["期末账项调整"]},
+         "closing_reclass": {"col": 8, "keywords": ["期末重分类"]},
+         "closing_balance": {"col": 9, "keywords": ["期末审定", "审定数"]},
+         "change_unaudited_amount": {"col": 10, "keywords": ["未审变动额"]},
+         "change_unaudited_rate": {"col": 11, "keywords": ["未审变动率"]},
+         "change_audited_amount": {"col": 12, "keywords": ["审定变动额"]},
+         "change_audited_rate": {"col": 13, "keywords": ["审定变动率"]}
+       }
+      },
+      {"name_pattern": "应交税费明细表N2-2", "type": "detail"},
+      {"name_pattern": "调整分录汇总表N2-3", "type": "adjustment"},
+      {"name_pattern": "税收政策检查N2-4", "type": "check"},
+      {"name_pattern": "应交税金认定表N2-5", "type": "check"},
+      {"name_pattern": "增值税测算表N2-6", "type": "check"},
+      {"name_pattern": "出口退税核对表N2-7", "type": "check"},
+      {"name_pattern": "应交其他税费测算表N2-8", "type": "check"},
+      {"name_pattern": "房产税测算表N2-9", "type": "check"},
+      {"name_pattern": "土地增值税测算表N2-10", "type": "check"},
+      {"name_pattern": "应交税费检查表N2-11", "type": "check"}
     ]
   },
   {
-    "wp_code": "D1",
+    "wp_code": "F4",
+    "name": "应付账款",
+    "account_codes": ["2202"],
+    "fine_rules": "wp_fine_rules/f4_payable.json",
+    "sheets": [
+      {"name_pattern": "审定表F4-1", "type": "summary", "header_rows": [6, 7], "data_start_row": 8,
+       "header_keywords": ["项目", "期初", "期末", "审定", "重分类"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "opening_unadjusted": {"col": 2, "keywords": ["期初未审"]},
+         "opening_adjustment": {"col": 3, "keywords": ["期初账项调整"]},
+         "opening_reclass": {"col": 4, "keywords": ["期初重分类"]},
+         "opening_audited": {"col": 5, "keywords": ["期初审定"]},
+         "closing_unadjusted": {"col": 6, "keywords": ["期末未审"]},
+         "closing_adjustment": {"col": 7, "keywords": ["期末账项调整"]},
+         "closing_reclass": {"col": 8, "keywords": ["期末重分类"]},
+         "closing_balance": {"col": 9, "keywords": ["期末审定", "审定数"]},
+         "change_amount": {"col": 10, "keywords": ["变动额"]},
+         "change_rate": {"col": 11, "keywords": ["变动率"]}
+       }
+      },
+      {"name_pattern": "明细表F4-2", "type": "detail"},
+      {"name_pattern": "调整分录汇总F4-3", "type": "adjustment"},
+      {"name_pattern": "实质性分析F4-4", "type": "analysis"},
+      {"name_pattern": "长期挂账检查表F4-5", "type": "check"},
+      {"name_pattern": "关联方.*检查表F4-6", "type": "check"},
+      {"name_pattern": "未入账检查表F4-7", "type": "check"},
+      {"name_pattern": "应付账款检查表F4-8", "type": "check"},
+      {"name_pattern": "供应商融资检查表F4-9", "type": "check"}
+    ]
+  },
+  {
+    "wp_code": "K9",
+    "name": "管理费用",
+    "account_codes": ["6602"],
+    "sheets": [
+      {"name_pattern": "审定表K9-1", "type": "summary", "header_keywords": ["项目", "本期", "上期"],
+       "columns": {"label": {"keywords": ["项目", "费用项目"]}, "closing_balance": {"keywords": ["本期金额", "本期"]}, "opening": {"keywords": ["上期金额", "上期"]}}}
+    ]
+  },
+  {
+    "wp_code": "D4",
     "name": "营业收入",
     "account_codes": ["6001", "6051"],
+    "fine_rules": "wp_fine_rules/d4_revenue.json",
     "sheets": [
-      {"name_pattern": "审定表|D1-1", "type": "summary", "header_keywords": ["项目", "本期", "上期"], "columns": {"label": {"keywords": ["项目", "收入类别"]}, "closing_balance": {"keywords": ["本期"]}, "opening": {"keywords": ["上期"]}}}
+      {"name_pattern": "营业收入审定表D4-1", "type": "summary", "header_rows": [5, 6], "data_start_row": 7,
+       "header_keywords": ["项目", "本期", "上期", "审定", "重分类"],
+       "columns": {
+         "label": {"col": 1, "keywords": ["项目"]},
+         "current_unadjusted": {"col": 2, "keywords": ["本期未审"]},
+         "current_adjustment": {"col": 3, "keywords": ["本期账项调整"]},
+         "current_reclass": {"col": 4, "keywords": ["本期重分类"]},
+         "closing_balance": {"col": 5, "keywords": ["本期审定", "审定数"]},
+         "prior_unadjusted": {"col": 6, "keywords": ["上期未审"]},
+         "prior_adjustment": {"col": 7, "keywords": ["上期账项调整"]},
+         "prior_reclass": {"col": 8, "keywords": ["上期重分类"]},
+         "prior_audited": {"col": 9, "keywords": ["上期审定"]}
+       }
+      },
+      {"name_pattern": "主营业务收入明细表D4-2", "type": "detail"},
+      {"name_pattern": "其他业务收入明细表D4-3", "type": "detail"},
+      {"name_pattern": "营业收入调整分录汇总D4-4", "type": "adjustment"},
+      {"name_pattern": "营业收入会计政策检查D4-5", "type": "check",
+       "source_file": "D4 营业收入/D4-5 营业收入-会计政策（Leap-常规程序）.xlsx"},
+      {"name_pattern": "毛利率分析表D4-7", "type": "analysis",
+       "source_file": "D4 营业收入/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx"},
+      {"name_pattern": "合同检查表D4-12", "type": "check",
+       "source_file": "D4 营业收入/D4-12 营业收入-合同检查（Leap-常规程序）.xlsx"},
+      {"name_pattern": "营业收入发生检查表D4-14", "type": "check",
+       "source_file": "D4 营业收入/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"},
+      {"name_pattern": "营业收入截止测试.*D4-17", "type": "cutoff",
+       "source_file": "D4 营业收入/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"},
+      {"name_pattern": "营业收入截止测试.*D4-18", "type": "cutoff",
+       "source_file": "D4 营业收入/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx"},
+      {"name_pattern": "关联方销售.*D4-21", "type": "check",
+       "source_file": "D4 营业收入/D4-21营业收入-关联方检查（Leap-常规程序）.xlsx"}
     ]
   }
 ]

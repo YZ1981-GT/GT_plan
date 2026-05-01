@@ -1,0 +1,343 @@
+{
+  "wp_code": "F2",
+  "name": "存货及跌价准备",
+  "version": "2025-R1",
+  "description": "F2存货及跌价准备精细化解析规则 — 基于致同2025年修订版模板",
+  "account_codes": ["1401", "1402", "1403", "1405", "1461", "1408"],
+  "source_files": [
+    {
+      "file": "F2 存货及跌价准备/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "description": "常规程序：审定表+明细汇总+11类存货明细+调整分录",
+      "sheets": [
+        "修订说明", "底稿目录", "存货实质性程序表F2A", "存货审定表F2-1",
+        "附注披露信息（上市公司）", "附注披露信息（国企）",
+        "明细汇总表F2-2", "一、原材料明细表F2-3", "二、材料采购、在途物资明细表F2-4",
+        "三、周转材料、低值易耗品，包装物明细表F2-5", "四、自制半成品明细表F2-6",
+        "五、委托加工物资明细表F2-7", "六、库存商品明细表F2-8", "七、发出商品F2-9",
+        "八、开发产品F2-10", "九、开发成本F2-11", "十、合同履约成本F2-12",
+        "十一、消耗性生物资产F2-13", "调整分录汇总F2-14"
+      ]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx",
+      "description": "会计政策检查",
+      "sheets": ["会计政策、核算流程F2-16"]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+      "description": "分析程序",
+      "sheets": ["存货总体分析表F2-18", "存货产销量变动分析表F2-19", "产品年度成本比较分析F2-20"]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+      "description": "存货监盘",
+      "sheets": ["监盘计划F2-22", "存货监盘程序表F2-21A", "监盘小结F2-23",
+                  "存货监盘记录F2-24", "抽盘结果汇总表F2-25", "盘点倒轧表F2-26"]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+      "description": "检查程序",
+      "sheets": ["截止测试-入库（记账凭证至原始凭证）F2-29", "截止测试-入库（原始凭证至记账凭证）F2-30",
+                  "截止测试-出库（记账凭证至原始凭证）F2-31", "截止测试-出库（原始凭证至记账凭证）F2-32",
+                  "存货检查表F2-33", "存货盘亏盘盈检查F2-34",
+                  "委托加工物资核查表F2-35"]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+      "description": "计价测试",
+      "sheets": ["计价方法测试表-平均F2-38", "库存商品计价测试F2-39", "在产品计价测试F2-40",
+                  "生产成本明细表F2-41", "发出商品计价测试F2-42",
+                  "制造费用明细表F2-43", "开发成本计价测试F2-44"]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+      "description": "跌价准备测试",
+      "sheets": ["跌价准备测试表F2-47", "长库龄 呆滞 超过保质期存货明细表F2-48", "跌价转回F2-49"]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx",
+      "description": "关联交易",
+      "sheets": ["关联采购分析表F2-52"]
+    },
+    {
+      "file": "F2 存货及跌价准备/F2-55至F2-58 合同履约成本.xlsx",
+      "description": "合同履约成本",
+      "sheets": ["合同履约成本审定表F2-55", "合同履约成本明细F2-56",
+                  "合同履约成本减值F2-57", "合同履约成本检查F2-58"]
+    },
+    {
+      "file": "F0 存货循环函证.xlsx",
+      "description": "存货循环函证（F循环共用）",
+      "sheets": ["函证程序表F0A", "函证结果汇总表F0-1", "核实被函证单位信息F0-2"]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "code": "F2A",
+      "exact_name": "存货实质性程序表F2A",
+      "type": "procedure"
+    },
+    {
+      "code": "F2-1",
+      "exact_name": "存货审定表F2-1",
+      "type": "summary",
+      "header_rows": [5],
+      "data_start_row": 6,
+      "description": "多段式审定表：一、原值(R6-R20未审+R21-R34调整+R35-R48审定) 二、跌价准备 三、净值，每段13个存货类别",
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening": {"col": 2, "label": "期初数"},
+          "increase": {"col": 3, "label": "本期增加"},
+          "decrease": {"col": 4, "label": "本期减少"},
+          "closing": {"col": 5, "label": "期末数"},
+          "index_ref": {"col": 6, "label": "索引"}
+        }
+      },
+      "key_rows": {
+        "section1_title": {"row": 6, "label": "一、原值"},
+        "raw_material": {"row": 8, "label": "原材料"},
+        "wip": {"row": 11, "label": "在产品"},
+        "finished_goods": {"row": 14, "label": "库存商品"},
+        "contract_cost": {"row": 18, "label": "合同履约成本"},
+        "total_gross": {"row": 48, "label": "审定数合计", "is_total": true},
+        "total_provision": {"row": 96, "label": "跌价准备审定合计", "is_total": true},
+        "total_net": {"row": 144, "label": "净值合计", "is_total": true, "report_row": "BS-008"},
+        "tb_balance": {"row": 146, "label": "试算平衡表数"},
+        "diff": {"row": 148, "label": "差异数"}
+      }
+    },
+    {
+      "code": "F2-2",
+      "exact_name": "明细汇总表F2-2",
+      "type": "detail",
+      "description": "存货明细汇总（按类别汇总各明细表数据）",
+      "link_to_summary": {"target": "F2-1", "description": "明细汇总→审定表原值"}
+    },
+    {
+      "code": "F2-3",
+      "exact_name": "一、原材料明细表F2-3",
+      "type": "detail"
+    },
+    {
+      "code": "F2-8",
+      "exact_name": "六、库存商品明细表F2-8",
+      "type": "detail"
+    },
+    {
+      "code": "F2-14",
+      "exact_name": "调整分录汇总F2-14",
+      "type": "adjustment",
+      "header_rows": [5],
+      "data_start_row": 6
+    },
+    {
+      "code": "F2-22",
+      "exact_name": "监盘计划F2-22",
+      "type": "count",
+      "source_file": "F2 存货及跌价准备/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx"
+    },
+    {
+      "code": "F2-29",
+      "exact_name": "截止测试-入库（记账凭证至原始凭证）F2-29",
+      "type": "cutoff",
+      "source_file": "F2 存货及跌价准备/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "F2-38",
+      "exact_name": "计价方法测试表-平均F2-38",
+      "type": "calculation",
+      "source_file": "F2 存货及跌价准备/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx"
+    },
+    {
+      "code": "F2-47",
+      "exact_name": "跌价准备测试表F2-47",
+      "type": "calculation",
+      "source_file": "F2 存货及跌价准备/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+      "description": "跌价准备独立测算（可变现净值vs账面价值）"
+    },
+    {
+      "code": "F2-48",
+      "exact_name": "长库龄 呆滞 超过保质期存货明细表F2-48",
+      "type": "calculation",
+      "source_file": "F2 存货及跌价准备/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx"
+    },
+    {
+      "code": "F2A-note-listed",
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "F2A-note-soe",
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "F2-4",
+      "exact_name": "二、材料采购、在途物资明细表F2-4",
+      "type": "detail"
+    },
+    {
+      "code": "F2-5",
+      "exact_name": "三、周转材料、低值易耗品，包装物明细表F2-5",
+      "type": "detail"
+    },
+    {
+      "code": "F2-6",
+      "exact_name": "四、自制半成品明细表F2-6",
+      "type": "detail"
+    },
+    {
+      "code": "F2-7",
+      "exact_name": "五、委托加工物资明细表F2-7",
+      "type": "detail"
+    },
+    {
+      "code": "F2-9",
+      "exact_name": "七、发出商品F2-9",
+      "type": "detail"
+    },
+    {
+      "code": "F2-10",
+      "exact_name": "八、开发产品F2-10",
+      "type": "detail"
+    },
+    {
+      "code": "F2-11",
+      "exact_name": "九、开发成本F2-11",
+      "type": "detail"
+    },
+    {
+      "code": "F2-12",
+      "exact_name": "十、合同履约成本F2-12",
+      "type": "detail"
+    },
+    {
+      "code": "F2-13",
+      "exact_name": "十一、消耗性生物资产F2-13",
+      "type": "detail"
+    },
+    {
+      "code": "F2-16",
+      "exact_name": "会计政策、核算流程F2-16",
+      "type": "check",
+      "description": "会计政策检查",
+      "source_file": "F2 存货及跌价准备/F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx"
+    },
+    {
+      "code": "F2-18",
+      "exact_name": "存货总体分析表F2-18",
+      "type": "analysis",
+      "source_file": "F2 存货及跌价准备/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx"
+    },
+    {
+      "code": "F2-19",
+      "exact_name": "存货产销量变动分析表F2-19",
+      "type": "analysis",
+      "source_file": "F2 存货及跌价准备/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx"
+    },
+    {
+      "code": "F2-20",
+      "exact_name": "产品年度成本比较分析F2-20",
+      "type": "analysis",
+      "source_file": "F2 存货及跌价准备/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx"
+    },
+    {
+      "code": "F2-21A",
+      "exact_name": "存货监盘程序表F2-21A",
+      "type": "procedure",
+      "source_file": "F2 存货及跌价准备/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx"
+    },
+    {
+      "code": "F2-23",
+      "exact_name": "监盘小结F2-23",
+      "type": "count",
+      "source_file": "F2 存货及跌价准备/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx"
+    },
+    {
+      "code": "F2-25",
+      "exact_name": "抽盘结果汇总表F2-25",
+      "type": "count",
+      "source_file": "F2 存货及跌价准备/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx"
+    },
+    {
+      "code": "F2-26",
+      "exact_name": "盘点倒轧表F2-26",
+      "type": "count",
+      "source_file": "F2 存货及跌价准备/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx"
+    },
+    {
+      "code": "F2-30",
+      "exact_name": "截止测试-入库（原始凭证至记账凭证）F2-30",
+      "type": "cutoff",
+      "source_file": "F2 存货及跌价准备/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "F2-31",
+      "exact_name": "截止测试-出库（记账凭证至原始凭证）F2-31",
+      "type": "cutoff",
+      "source_file": "F2 存货及跌价准备/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "F2-32",
+      "exact_name": "截止测试-出库（原始凭证至记账凭证）F2-32",
+      "type": "cutoff",
+      "source_file": "F2 存货及跌价准备/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "F2-35",
+      "exact_name": "委托加工物资核查表F2-35",
+      "type": "check",
+      "source_file": "F2 存货及跌价准备/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx"
+    },
+    {
+      "code": "F2-41",
+      "exact_name": "生产成本明细表F2-41",
+      "type": "detail",
+      "source_file": "F2 存货及跌价准备/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx"
+    },
+    {
+      "code": "F2-43",
+      "exact_name": "制造费用明细表F2-43",
+      "type": "detail",
+      "source_file": "F2 存货及跌价准备/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx"
+    },
+    {
+      "code": "F2-49",
+      "exact_name": "跌价转回F2-49",
+      "type": "check",
+      "source_file": "F2 存货及跌价准备/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx"
+    },
+    {
+      "code": "F2-52",
+      "exact_name": "关联采购分析表F2-52",
+      "type": "check",
+      "description": "关联方采购检查",
+      "source_file": "F2 存货及跌价准备/F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx"
+    }
+  ],
+  "cross_references": [
+    {"from": "F2-1.净值合计", "to": "report://BS/BS-008#期末", "description": "审定表净值合计 = 资产负债表存货"},
+    {"from": "F2-1.原值合计", "to": "F2-2.合计", "description": "审定表原值合计 = 明细汇总表合计"},
+    {"from": "F2-1.净值", "to": "F2-1.原值 - F2-1.跌价", "description": "净值 = 原值 - 跌价准备"},
+    {"from": "F2-1.试算平衡表数", "to": "tb://1401#审定数+tb://1402#审定数+tb://1403#审定数+tb://1405#审定数+tb://1461#审定数", "description": "试算平衡表数 = 试算表存货相关科目之和"},
+    {"from": "F2-2.各类别", "to": "F2-3~F2-13.合计", "description": "明细汇总各类别 = 对应明细表合计"},
+    {"from": "F2-47.跌价合计", "to": "F2-1.跌价合计", "description": "跌价准备测算合计 = 审定表跌价准备"},
+    {"from": "F2-21.监盘", "to": "F2-1.期末", "description": "监盘结果 → 审定表期末数"},
+    {"from": "F2-32.关联方", "to": "F2-2.关联方", "description": "关联方存货交易 → 明细汇总"}
+  ],
+  "audit_checks": [
+    {"code": "F2-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表净值合计 = 试算表存货科目审定数之和"},
+    {"code": "F2-CHK-02", "type": "balance", "severity": "blocking", "description": "审定表净值合计 = 报表存货行"},
+    {"code": "F2-CHK-03", "type": "formula", "severity": "blocking", "description": "净值 = 原值 - 跌价准备"},
+    {"code": "F2-CHK-04", "type": "cross_ref", "severity": "warning", "description": "审定表原值合计 = 明细汇总表合计"},
+    {"code": "F2-CHK-05", "type": "movement", "severity": "warning", "description": "各类别：期初+增加-减少 = 期末"},
+    {"code": "F2-CHK-06", "type": "cross_ref", "severity": "warning", "description": "跌价准备测算合计 = 审定表跌价准备"},
+    {"code": "F2-CHK-07", "type": "completeness", "severity": "warning", "description": "监盘覆盖率（监盘金额/存货总额）"},
+    {"code": "F2-CHK-08", "type": "cutoff", "severity": "warning", "description": "截止测试无跨期事项"},
+    {"code": "F2-CHK-09", "type": "analysis", "severity": "info", "description": "存货周转率与上年比较"},
+    {"code": "F2-CHK-10", "type": "analysis", "severity": "warning", "description": "库龄超过1年的存货占比及跌价计提充分性"},
+    {"code": "F2-CHK-11", "type": "check", "severity": "warning", "description": "存货质押情况已检查并披露"},
+    {"code": "F2-CHK-12", "type": "check", "severity": "info", "description": "计价测试结果与账面一致"}
+  ]
+}

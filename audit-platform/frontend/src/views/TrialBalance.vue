@@ -2,15 +2,33 @@
   <div class="gt-trial-balance gt-fade-in">
     <!-- 页面横幅 -->
     <div class="gt-tb-banner">
-      <div class="gt-tb-banner-text">
-        <h2>试算表</h2>
-        <p>{{ year }}年度 · {{ rows.length }} 个科目</p>
+      <div class="gt-tb-banner-row1">
+        <h2 class="gt-tb-title">试算表</h2>
+        <div class="gt-tb-info-bar">
+          <div class="gt-tb-info-item">
+            <span class="gt-tb-info-label">单位</span>
+            <el-select v-model="selectedProjectId" size="small" class="gt-tb-unit-select" filterable @change="onProjectChange">
+              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+          </div>
+          <div class="gt-tb-info-sep" />
+          <div class="gt-tb-info-item">
+            <span class="gt-tb-info-label">年度</span>
+            <el-select v-model="selectedYear" size="small" class="gt-tb-year-select" @change="onYearChange">
+              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
+            </el-select>
+          </div>
+          <div class="gt-tb-info-sep" />
+          <div class="gt-tb-info-item">
+            <span class="gt-tb-info-badge">{{ rows.length }} 个科目</span>
+          </div>
+        </div>
       </div>
-      <div class="gt-tb-banner-actions">
-        <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading" round>一致性校验</el-button>
-        <el-button size="small" @click="onRecalc" :loading="recalcLoading" round>全量重算</el-button>
-        <el-button size="small" @click="onExport" round>导出 Excel</el-button>
-        <el-button size="small" @click="showFormulaManager = true" round>公式管理</el-button>
+      <div class="gt-tb-banner-row2">
+        <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
+        <el-button size="small" @click="onRecalc" :loading="recalcLoading">🔄 全量重算</el-button>
+        <el-button size="small" @click="onExport">📤 导出Excel</el-button>
+        <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
       </div>
     </div>
 
@@ -147,10 +165,15 @@ import {
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
 import { getAllWpMappings, type WpAccountMapping } from '@/services/workpaperApi'
+import { useProjectSelector } from '@/composables/useProjectSelector'
 
 const route = useRoute()
 const router = useRouter()
-const projectId = computed(() => route.params.projectId as string)
+const {
+  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
+  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
+} = useProjectSelector('trial-balance')
+
 const routeYear = computed(() => {
   const value = Number(route.query.year)
   return Number.isFinite(value) && value > 2000 ? value : null
@@ -376,7 +399,10 @@ watch(
   () => [projectId.value, routeYear.value],
   async () => {
     await ensureProjectYear()
+    syncFromRoute()
+    selectedYear.value = year.value
     await fetchData()
+    if (!projectOptions.value.length) loadProjectOptions()
     // 加载底稿-科目映射
     try {
       wpMappings.value = await getAllWpMappings(projectId.value)
@@ -398,10 +424,10 @@ watch(
 
   /* ── 页面横幅 ── */
   .gt-tb-banner {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; flex-direction: column; gap: 10px;
     background: var(--gt-gradient-primary);
     border-radius: var(--gt-radius-lg);
-    padding: 20px 28px;
+    padding: 18px 28px;
     margin-bottom: var(--gt-space-5);
     color: #fff;
     position: relative; overflow: hidden;
@@ -416,14 +442,52 @@ watch(
     background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
     pointer-events: none;
   }
-  .gt-tb-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-  .gt-tb-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
-  .gt-tb-banner-actions {
+  .gt-tb-banner-row1 {
+    display: flex; align-items: center; gap: 16px;
+    position: relative; z-index: 1;
+  }
+  .gt-tb-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+  .gt-tb-info-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .gt-tb-info-item {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .gt-tb-info-label {
+    font-size: 11px; opacity: 0.8; white-space: nowrap;
+  }
+  .gt-tb-info-badge {
+    font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px;
+    border-radius: 10px; white-space: nowrap;
+  }
+  .gt-tb-info-sep {
+    width: 1px; height: 16px; background: rgba(255,255,255,0.25);
+  }
+  .gt-tb-unit-select, .gt-tb-year-select {
+    width: 160px;
+  }
+  .gt-tb-unit-select :deep(.el-input__wrapper),
+  .gt-tb-year-select :deep(.el-input__wrapper) {
+    background: rgba(255,255,255,0.15) !important;
+    border: 1px solid rgba(255,255,255,0.25) !important;
+    box-shadow: none !important;
+  }
+  .gt-tb-unit-select :deep(.el-input__inner),
+  .gt-tb-year-select :deep(.el-input__inner) {
+    color: #fff !important; font-size: 12px;
+  }
+  .gt-tb-unit-select :deep(.el-input__suffix),
+  .gt-tb-year-select :deep(.el-input__suffix) {
+    color: rgba(255,255,255,0.7) !important;
+  }
+  .gt-tb-banner-row2 {
     display: flex; gap: 8px; align-items: center;
     position: relative; z-index: 1;
   }
-  .gt-tb-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
-  .gt-tb-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
+  .gt-tb-banner-row2 .el-button {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff;
+  }
+  .gt-tb-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
 
   .clickable {
     cursor: pointer; color: var(--gt-color-primary); font-weight: 500;

@@ -4,7 +4,7 @@
     <div class="gt-page-banner gt-page-banner--purple">
       <div class="gt-page-banner__content">
         <h2 class="gt-page-banner__title">合并报表</h2>
-        <p class="gt-page-banner__desc">集团架构 · 差额表 · 穿透查询 · 自定义分析</p>
+        <p class="gt-page-banner__desc">集团架构 · 差额表 · 穿透查询 · 合并报表 · 合并附注</p>
       </div>
     </div>
 
@@ -157,7 +157,132 @@
           <el-empty v-if="!pivotResult && !loading" description="点击查询按钮执行透视分析" />
         </div>
       </el-tab-pane>
+
+      <!-- Tab 5: 合并报表 -->
+      <el-tab-pane label="合并报表" name="consol_report">
+        <div class="gt-tab-content">
+          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+            <el-select v-model="consolReportTemplateType" size="small" style="width:100px" @change="loadConsolReport">
+              <el-option label="国企版" value="soe" />
+              <el-option label="上市版" value="listed" />
+            </el-select>
+            <el-select v-model="consolReportType" size="small" style="width:140px" @change="loadConsolReport">
+              <el-option label="资产负债表" value="balance_sheet" />
+              <el-option label="利润表" value="income_statement" />
+              <el-option label="现金流量表" value="cash_flow_statement" />
+              <el-option label="权益变动表" value="equity_statement" />
+              <el-option label="现金流附表" value="cash_flow_supplement" />
+              <el-option label="资产减值准备表" value="impairment_provision" />
+            </el-select>
+            <el-button size="small" type="primary" @click="loadConsolReport" :loading="consolReportLoading">🔄 刷新</el-button>
+            <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
+            <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
+          </div>
+          <el-table v-if="consolReportRows.length" :data="consolReportRows" border size="small" max-height="calc(100vh - 320px)" style="width:100%"
+            :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }"
+            :row-class-name="consolReportRowClass">
+            <el-table-column prop="row_code" label="行次" width="90" />
+            <el-table-column prop="row_name" label="项目" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px', fontWeight: row.is_total_row ? 700 : 400 }">{{ row.row_name }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="合并本期" width="140" align="right">
+              <template #default="{ row }">{{ fmtAmt(row.current_period_amount) }}</template>
+            </el-table-column>
+            <el-table-column label="合并上期" width="140" align="right">
+              <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else-if="!consolReportLoading" description="选择报表类型后点击刷新" />
+        </div>
+      </el-tab-pane>
+
+      <!-- Tab 6: 合并附注 -->
+      <el-tab-pane label="合并附注" name="consol_note">
+        <div class="gt-tab-content">
+          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+            <el-select v-model="consolNoteTemplateType" size="small" style="width:100px" @change="loadConsolNoteTree">
+              <el-option label="国企版" value="soe" />
+              <el-option label="上市版" value="listed" />
+            </el-select>
+            <el-button size="small" @click="showConsolNoteConversion = true">🔄 转换规则</el-button>
+            <el-button size="small" @click="loadConsolNoteTree" :loading="consolNoteLoading">🔄 刷新</el-button>
+          </div>
+          <div style="display:flex;gap:16px;min-height:400px">
+            <div style="width:260px;flex-shrink:0;border:1px solid #e8e4f0;border-radius:8px;overflow-y:auto;padding:8px">
+              <el-input v-model="noteTreeSearch" size="small" placeholder="搜索..." clearable style="margin-bottom:6px" />
+              <el-tree :data="consolNoteTree" :props="{ label: 'label', children: 'children' }"
+                :filter-node-method="filterNoteNode" ref="noteTreeRef"
+                highlight-current default-expand-all @node-click="onNoteNodeClick">
+                <template #default="{ data }">
+                  <span style="font-size:12px">{{ data.label }}
+                    <el-tag v-if="data.table_count" size="small" type="info" style="margin-left:4px">{{ data.table_count }}表</el-tag>
+                  </span>
+                </template>
+              </el-tree>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div v-if="selectedNoteSection">
+                <h4 style="margin:0 0 8px">{{ selectedNoteSection.title }}</h4>
+                <el-tag v-if="selectedNoteSection.scope && selectedNoteSection.scope !== 'both'" :type="selectedNoteSection.scope === 'consolidated_only' ? 'warning' : 'info'" size="small" style="margin-bottom:8px">
+                  {{ selectedNoteSection.scope === 'consolidated_only' ? '仅合并' : '仅单体' }}
+                </el-tag>
+                <el-tabs v-if="selectedNoteSection.tables?.length > 1" v-model="activeNoteTable" type="card" size="small">
+                  <el-tab-pane v-for="(tbl, idx) in selectedNoteSection.tables" :key="idx" :label="tbl.name || `表${idx+1}`" :name="String(idx)">
+                    <el-table :data="tbl.rows || []" border size="small" max-height="350" style="width:100%"
+                      :header-cell-style="{ background: '#f8f6fb', fontSize: '11px' }">
+                      <el-table-column v-for="(h, hi) in (tbl.headers || [])" :key="hi" :label="h" min-width="120" align="right">
+                        <template #default="{ row }">{{ row.values?.[hi] ?? '-' }}</template>
+                      </el-table-column>
+                    </el-table>
+                  </el-tab-pane>
+                </el-tabs>
+                <el-table v-else-if="selectedNoteSection.tables?.length === 1" :data="selectedNoteSection.tables[0].rows || []" border size="small" max-height="350" style="width:100%"
+                  :header-cell-style="{ background: '#f8f6fb', fontSize: '11px' }">
+                  <el-table-column v-for="(h, hi) in (selectedNoteSection.tables[0].headers || [])" :key="hi" :label="h" min-width="120" align="right">
+                    <template #default="{ row }">{{ row.values?.[hi] ?? '-' }}</template>
+                  </el-table-column>
+                </el-table>
+                <el-empty v-else description="该章节暂无表格" />
+              </div>
+              <el-empty v-else description="请在左侧选择章节" />
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
+
+    <!-- 报表转换规则弹窗 -->
+    <el-dialog v-model="showConsolConversion" title="国企/上市报表转换规则" width="80%" top="4vh" append-to-body destroy-on-close>
+      <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px;color:#999">{{ consolReportTemplateType === 'soe' ? '国企版 → 上市版' : '上市版 → 国企版' }}</span>
+        <el-button size="small" @click="loadConsolMappingPreset" :loading="consolMappingLoading">一键加载预设</el-button>
+        <el-button size="small" type="primary" @click="applyConsolConversion" :loading="consolMappingLoading">应用转换</el-button>
+      </div>
+      <el-table :data="consolMappingRules" border size="small" max-height="60vh" style="width:100%"
+        :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }">
+        <el-table-column label="源行次" prop="source_code" width="100" />
+        <el-table-column label="源项目" prop="source_name" min-width="200" show-overflow-tooltip />
+        <el-table-column label="→" width="40" align="center"><template #default><span>→</span></template></el-table-column>
+        <el-table-column label="目标行次" width="100">
+          <template #default="{ row }"><el-input v-model="row.target_code" size="small" /></template>
+        </el-table-column>
+        <el-table-column label="目标项目" min-width="200">
+          <template #default="{ row }"><el-input v-model="row.target_name" size="small" /></template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <!-- 附注转换弹窗 -->
+    <el-dialog v-model="showConsolNoteConversion" title="国企/上市附注模板切换" width="400px" append-to-body>
+      <p style="font-size:13px;color:#666;margin-bottom:16px">
+        切换模板后附注章节结构会更新。国企版约165章节，上市版约174章节。
+      </p>
+      <el-button type="primary" @click="switchNoteTemplate">
+        切换为{{ consolNoteTemplateType === 'soe' ? '上市版' : '国企版' }}
+      </el-button>
+    </el-dialog>
   </div>
 </template>
 
@@ -172,6 +297,7 @@ import {
   type WorksheetNode, type PivotResult, type QueryTemplate,
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
+import http from '@/utils/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -362,6 +488,163 @@ function fmtAmt(v: any): string {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// ─── Tab 5: 合并报表 ─────────────────────────────────────────────────────────
+const consolReportTemplateType = ref('soe')
+const consolReportType = ref('balance_sheet')
+const consolReportLoading = ref(false)
+const consolReportRows = ref<any[]>([])
+const showConsolConversion = ref(false)
+const consolMappingLoading = ref(false)
+const consolMappingRules = ref<any[]>([])
+
+function consolReportRowClass({ row }: { row: any }) {
+  if (row.is_total_row) return 'gt-total-row'
+  return ''
+}
+
+async function loadConsolReport() {
+  consolReportLoading.value = true
+  try {
+    const standard = `${consolReportTemplateType.value}_consolidated`
+    const { data } = await http.get('/api/report-config', {
+      params: { report_type: consolReportType.value, applicable_standard: standard, project_id: projectId.value },
+      validateStatus: (s: number) => s < 600,
+    })
+    const rows = data?.data ?? data ?? []
+    consolReportRows.value = Array.isArray(rows) ? rows : []
+  } catch { consolReportRows.value = [] }
+  finally { consolReportLoading.value = false }
+}
+
+async function loadConsolMappingPreset() {
+  consolMappingLoading.value = true
+  try {
+    const { data } = await http.get('/api/report-mapping/preset', {
+      params: { report_type: consolReportType.value },
+      validateStatus: (s: number) => s < 600,
+    })
+    consolMappingRules.value = data?.data ?? data ?? []
+  } catch { consolMappingRules.value = [] }
+  finally { consolMappingLoading.value = false }
+}
+
+async function applyConsolConversion() {
+  consolMappingLoading.value = true
+  try {
+    // 切换模板类型
+    consolReportTemplateType.value = consolReportTemplateType.value === 'soe' ? 'listed' : 'soe'
+    await loadConsolReport()
+    showConsolConversion.value = false
+    ElMessage.success('已切换为' + (consolReportTemplateType.value === 'soe' ? '国企版' : '上市版'))
+  } finally { consolMappingLoading.value = false }
+}
+
+function exportConsolReport() {
+  const standard = `${consolReportTemplateType.value}_consolidated`
+  window.open(`/api/reports/${projectId.value}/${year.value}/export?report_type=${consolReportType.value}&applicable_standard=${standard}`, '_blank')
+}
+
+function getConsolReportConfigData(): Record<string, any> {
+  return { rows: consolReportRows.value, template_type: consolReportTemplateType.value, report_type: consolReportType.value }
+}
+
+function onConsolReportTemplateApplied(_data: Record<string, any>) {
+  loadConsolReport()
+}
+
+// ─── Tab 6: 合并附注 ─────────────────────────────────────────────────────────
+const consolNoteTemplateType = ref('soe')
+const consolNoteLoading = ref(false)
+const consolNoteTree = ref<any[]>([])
+const selectedNoteSection = ref<any>(null)
+const activeNoteTable = ref('0')
+const noteTreeSearch = ref('')
+const noteTreeRef = ref<any>(null)
+const showConsolNoteConversion = ref(false)
+
+async function loadConsolNoteTree() {
+  consolNoteLoading.value = true
+  try {
+    const { data } = await http.get(`/api/note-templates/${consolNoteTemplateType.value}`, {
+      validateStatus: (s: number) => s < 600,
+    })
+    const sections = data?.data ?? data ?? []
+    if (!Array.isArray(sections)) { consolNoteTree.value = []; return }
+
+    // 按章节分组构建树
+    const chapterMap: Record<string, { label: string; children: any[] }> = {}
+    const chapterOrder = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+    const chapterLabels: Record<string, string> = {
+      '一': '一、公司概况', '二': '二、编制基础', '三': '三、会计政策',
+      '四': '四、税项', '五': '五、报表科目注释', '六': '六、其他',
+    }
+
+    for (const sec of sections) {
+      const sectionId = sec.section_id || sec.note_section || ''
+      const title = sec.section_title || sec.title || ''
+      const chapterMatch = sectionId.match(/^([一二三四五六七八九十]+)/)
+      const chapter = chapterMatch ? chapterMatch[1] : '其他'
+
+      if (!chapterMap[chapter]) {
+        chapterMap[chapter] = { label: chapterLabels[chapter] || `${chapter}、其他`, children: [] }
+      }
+      chapterMap[chapter].children.push({
+        key: sectionId,
+        label: title.length > 25 ? title.slice(0, 25) + '...' : title,
+        title: title,
+        section_id: sectionId,
+        scope: sec.scope || 'both',
+        tables: sec.tables || (sec.table_template ? [sec.table_template] : []),
+        table_count: (sec.tables || []).length || (sec.table_template ? 1 : 0),
+      })
+    }
+
+    const tree: any[] = []
+    for (const ch of chapterOrder) {
+      if (chapterMap[ch]) {
+        tree.push({ key: `chapter_${ch}`, label: chapterMap[ch].label, children: chapterMap[ch].children })
+      }
+    }
+    if (chapterMap['其他']) {
+      tree.push({ key: 'chapter_other', label: '其他', children: chapterMap['其他'].children })
+    }
+    consolNoteTree.value = tree
+  } catch { consolNoteTree.value = [] }
+  finally { consolNoteLoading.value = false }
+}
+
+function filterNoteNode(value: string, data: any) {
+  if (!value) return true
+  return (data.label || '').includes(value) || (data.title || '').includes(value)
+}
+
+function onNoteNodeClick(data: any) {
+  if (data.section_id) {
+    selectedNoteSection.value = data
+    activeNoteTable.value = '0'
+  }
+}
+
+function switchNoteTemplate() {
+  consolNoteTemplateType.value = consolNoteTemplateType.value === 'soe' ? 'listed' : 'soe'
+  selectedNoteSection.value = null
+  loadConsolNoteTree()
+  showConsolNoteConversion.value = false
+  ElMessage.success('已切换为' + (consolNoteTemplateType.value === 'soe' ? '国企版' : '上市版'))
+}
+
+function getConsolNoteConfigData(): Record<string, any> {
+  return { template_type: consolNoteTemplateType.value }
+}
+
+function onConsolNoteTemplateApplied(_data: Record<string, any>) {
+  loadConsolNoteTree()
+}
+
+watch(noteTreeSearch, (val) => {
+  noteTreeRef.value?.filter(val)
+})
+
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 onMounted(async () => {
   await loadGroupTree()
@@ -371,6 +654,8 @@ onMounted(async () => {
 watch(activeTab, (tab) => {
   if (tab === 'worksheet') loadWorksheet()
   if (tab === 'drilldown') loadDrillCompanies()
+  if (tab === 'consol_report') loadConsolReport()
+  if (tab === 'consol_note' && !consolNoteTree.value.length) loadConsolNoteTree()
 })
 </script>
 

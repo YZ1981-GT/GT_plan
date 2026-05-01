@@ -54,6 +54,10 @@
                 <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
                 <span>重要性</span>
               </div>
+              <div class="gt-quick-btn" @click="goTo('audit-checks')">
+                <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
+                <span>审计检查</span>
+              </div>
               <div class="gt-quick-btn" @click="goToLedgerImport()">
                 <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
                 <span>账套导入</span>
@@ -232,10 +236,11 @@
 import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 
 const props = defineProps<{ project: any | null }>()
@@ -254,30 +259,34 @@ const attachmentList = ref<any[]>([])
 // 选中项目变化时加载数据
 watch(() => props.project?.id, async (newId) => {
   if (!newId) { wpTree.value = []; trialBalanceRows.value = []; return }
-  // 加载底稿索引树（致同编码体系）
+  // 加载底稿索引树（致同编码体系，静默失败）
   try {
-    const data = await api.get('/api/gt-coding/tree')
-    const tree = data ?? []
-    wpTree.value = tree.map((group: any) => ({
+    const { data: raw } = await http.get('/api/gt-coding/tree', { validateStatus: (s: number) => s < 600 })
+    const tree = raw?.data ?? raw ?? []
+    wpTree.value = Array.isArray(tree) ? tree.map((group: any) => ({
       label: group.label,
       count: group.children?.length || 0,
       children: (group.children || []).map((c: any) => ({
         label: `${c.code_range} ${c.cycle_name}`,
       })),
-    }))
+    })) : []
   } catch { wpTree.value = [] }
-  // 加载试算表预览（前20行）
+  // 加载试算表预览（前20行，静默失败）
   try {
-    const data = await api.get(`/api/projects/${newId}/trial-balance`, { params: { year: projectYear.value } })
-    const rows = data ?? []
-    trialBalanceRows.value = rows.slice(0, 20)
+    const { data: raw } = await http.get(`/api/projects/${newId}/trial-balance`, {
+      params: { year: projectYear.value },
+      validateStatus: (s: number) => s < 600,
+    })
+    const rows = raw?.data ?? raw ?? []
+    trialBalanceRows.value = Array.isArray(rows) ? rows.slice(0, 20) : []
   } catch { trialBalanceRows.value = [] }
   // 加载附件列表（前10条，静默失败）
   try {
-    const data = await api.get(`/api/projects/${newId}/attachments`, {
+    const { data: raw } = await http.get(`/api/projects/${newId}/attachments`, {
       params: { page_size: 10 },
       validateStatus: (s: number) => s < 600,
     })
+    const data = raw?.data ?? raw
     if (data) {
       attachmentList.value = Array.isArray(data) ? data.slice(0, 10) : (data?.items ?? []).slice(0, 10)
     } else {

@@ -1,0 +1,25 @@
+{
+  "wp_code": "F1",
+  "wp_name": "预付账款",
+  "cycle": "F",
+  "account_codes": ["1123"],
+  "source_files": [
+    {
+      "file_pattern": "F1 预付账款.xlsx",
+      "is_primary": true
+    }
+  ],
+  "sheets": [
+    {
+      "exact_name": "审定表F1-1",
+      "type": "summary",
+      "table_type": "standard"
+    }
+  ],
+  "cross_references": [
+    {"from": "F1-1:total:C9", "to": "TB('1123','审定数')", "description": "审定表合计=试算表审定数"}
+  ],
+  "audit_checks": [
+    {"id": "F1-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计=试算表审定数"}
+  ]
+}

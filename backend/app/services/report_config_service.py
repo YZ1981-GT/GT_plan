@@ -26,8 +26,32 @@ SEED_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "repor
 class ReportConfigService:
     """报表格式配置服务"""
 
+    VALID_STANDARDS = {"soe_consolidated", "soe_standalone", "listed_consolidated", "listed_standalone", "enterprise"}
+
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    async def resolve_applicable_standard(db: AsyncSession, project_id: UUID) -> str:
+        """从项目配置动态确定报表标准。
+
+        映射规则：template_type (soe/listed) + report_scope (consolidated/standalone)
+        组合为 "soe_consolidated" / "listed_standalone" 等，降级为 "enterprise"。
+        """
+        from app.models.core import Project
+        result = await db.execute(
+            sa.select(Project.template_type, Project.report_scope).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+        row = result.one_or_none()
+        if not row:
+            return "enterprise"
+        template_type = row[0] or "soe"
+        report_scope = row[1] or "standalone"
+        standard = f"{template_type}_{report_scope}"
+        return standard if standard in ReportConfigService.VALID_STANDARDS else "enterprise"
 
     # ------------------------------------------------------------------
     # 加载种子数据

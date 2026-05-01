@@ -146,6 +146,8 @@ async def get_html_preview(
     return {
         "html": html,
         "sheet_index": sheet_index,
+        "sheet_count": len(sheets),
+        "sheet_names": [s.get("name", f"Sheet{i+1}") for i, s in enumerate(sheets)],
         "version": structure.get("metadata", {}).get("version", 1),
         "total_rows": total_rows,
         "page": page,

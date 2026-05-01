@@ -17,6 +17,12 @@
       >
         未匹配 ({{ unmatchedCount }})
       </el-button>
+      <SharedTemplatePicker
+        config-type="account_mapping"
+        :project-id="wizardStore.projectId || ''"
+        :get-config-data="getMappingConfigData"
+        @applied="onMappingTemplateApplied"
+      />
       <div class="toolbar-spacer" />
       <div class="completion-info">
         <span class="rate-label">完成率</span>
@@ -156,6 +162,7 @@ import { Right, Connection } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useWizardStore } from '@/stores/wizard'
+import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 
 const wizardStore = useWizardStore()
 
@@ -196,6 +203,7 @@ interface TableRow {
   account_code: string
   account_name: string
   standard_account_code: string
+  standard_account_name?: string
   match_method: string
   confidence: number | null
   mapping_id: string | null
@@ -458,6 +466,41 @@ onMounted(async () => {
   rebuildTable(clientAccounts.value, mappings, [])
   await loadCompletionRate()
 })
+
+// ── 共享模板 ──
+function getMappingConfigData(): Record<string, any> {
+  const mappings = tableRows.value
+    .filter(r => r.standard_account_code)
+    .map(r => ({
+      account_code: r.account_code,
+      account_name: r.account_name,
+      standard_account_code: r.standard_account_code,
+      standard_account_name: r.standard_account_name,
+      match_method: r.match_method || 'manual',
+    }))
+  return { mappings, total: tableRows.value.length, mapped: mappings.length }
+}
+
+function onMappingTemplateApplied(data: Record<string, any>) {
+  const templateMappings = data?.mappings || []
+  if (!templateMappings.length) {
+    ElMessage.warning('模板中无映射数据')
+    return
+  }
+  let applied = 0
+  for (const tm of templateMappings) {
+    const row = tableRows.value.find(r => r.account_code === tm.account_code && !r.standard_account_code)
+    if (row) {
+      row.standard_account_code = tm.standard_account_code
+      row.standard_account_name = tm.standard_account_name
+      row.match_method = 'template'
+      row.confidence = 0.95
+      applied++
+    }
+  }
+  ElMessage.success(`已引用 ${applied} 条映射（已有映射的科目不覆盖）`)
+  loadCompletionRate()
+}
 
 defineExpose({ validate })
 </script>

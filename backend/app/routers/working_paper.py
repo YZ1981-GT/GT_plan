@@ -186,7 +186,7 @@ async def get_online_edit_session(
 
     # 构造完整的 ONLYOFFICE 编辑器 URL
     onlyoffice_url = getattr(settings, "ONLYOFFICE_URL", "http://localhost:8080").rstrip("/")
-    editor_url = f"{onlyoffice_url}/hosting/wopi/cell?WOPISrc={wopi_src}"
+    editor_url = f"{onlyoffice_url}/hosting/wopi/cell/edit?WOPISrc={wopi_src}"
 
     return {
         "enabled": True,
@@ -212,13 +212,20 @@ async def download_workpaper(
     try:
         info = await svc.download_single(db=db, project_id=project_id, wp_id=wp_id)
         from pathlib import Path
+        from urllib.parse import quote
 
         file_path = Path(info["file_path"])
+        file_name = info["file_name"]
+        # RFC 5987: 中文文件名用 filename* 编码，ASCII 回退用 filename
+        ascii_name = file_name.encode("ascii", "ignore").decode() or "workpaper.xlsx"
+        utf8_name = quote(file_name, safe="")
+        disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
+
         return StreamingResponse(
             open(file_path, "rb"),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={
-                "Content-Disposition": f'attachment; filename="{info["file_name"]}"',
+                "Content-Disposition": disposition,
                 "X-WP-Version": str(info["file_version"]),
             },
         )

@@ -2,9 +2,27 @@
   <div class="gt-materiality gt-fade-in">
     <!-- 页面横幅 -->
     <div class="gt-mat-banner">
-      <div class="gt-mat-banner-text">
-        <h2>重要性水平</h2>
-        <p>三级重要性计算与手动覆盖</p>
+      <div class="gt-mat-banner-row1">
+        <h2 class="gt-mat-title">重要性水平</h2>
+        <div class="gt-mat-info-bar">
+          <div class="gt-mat-info-item">
+            <span class="gt-mat-info-label">单位</span>
+            <el-select v-model="selectedProjectId" size="small" class="gt-mat-unit-select" filterable @change="onProjectChange">
+              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+          </div>
+          <div class="gt-mat-info-sep" />
+          <div class="gt-mat-info-item">
+            <span class="gt-mat-info-label">年度</span>
+            <el-select v-model="selectedYear" size="small" class="gt-mat-year-select" @change="onYearChange">
+              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
+            </el-select>
+          </div>
+          <div class="gt-mat-info-sep" />
+          <div class="gt-mat-info-item">
+            <span class="gt-mat-info-badge">三级重要性计算与手动覆盖</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -123,10 +141,15 @@ import {
   getMaterialityHistory, getMaterialityBenchmark,
   type MaterialityData,
 } from '@/services/auditPlatformApi'
+import { useProjectSelector } from '@/composables/useProjectSelector'
 
 const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+
+const {
+  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
+  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
+} = useProjectSelector('materiality')
 
 const autoLoading = ref(false)
 const overrideLoading = ref(false)
@@ -209,6 +232,8 @@ async function fetchHistory() {
 }
 
 onMounted(async () => {
+  syncFromRoute()
+  loadProjectOptions()
   // Load existing
   try {
     const existing = await getMateriality(projectId.value, year.value)
@@ -251,6 +276,27 @@ onMounted(async () => {
 }
 .gt-mat-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
 .gt-mat-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-mat-banner-row1 {
+  display: flex; align-items: center; gap: 16px;
+  position: relative; z-index: 1;
+}
+.gt-mat-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.gt-mat-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gt-mat-info-item { display: flex; align-items: center; gap: 4px; }
+.gt-mat-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
+.gt-mat-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.gt-mat-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
+.gt-mat-unit-select, .gt-mat-year-select { width: 160px; }
+.gt-mat-unit-select :deep(.el-input__wrapper),
+.gt-mat-year-select :deep(.el-input__wrapper) {
+  background: rgba(255,255,255,0.15) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  box-shadow: none !important;
+}
+.gt-mat-unit-select :deep(.el-input__inner),
+.gt-mat-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
+.gt-mat-unit-select :deep(.el-input__suffix),
+.gt-mat-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
 
 .gt-materiality .gt-page-title {
   display: flex; align-items: center; gap: 10px;

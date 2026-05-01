@@ -125,59 +125,71 @@ async def upload_documents(
     import shutil
 
     svc = KnowledgeDocumentService(db)
-    storage_base = Path(settings.STORAGE_ROOT) / "knowledge" / str(folder_id)
+    storage_root = Path(settings.STORAGE_ROOT)
+    if not storage_root.is_absolute():
+        # 相对路径时，确保相对于 backend/ 目录
+        backend_root = Path(__file__).resolve().parent.parent.parent
+        storage_root = backend_root / settings.STORAGE_ROOT
+    storage_base = storage_root / "knowledge" / str(folder_id)
     storage_base.mkdir(parents=True, exist_ok=True)
+
+    import logging
+    _log = logging.getLogger(__name__)
+    _log.info(f"[KB Upload] received {len(files)} files for folder {folder_id}")
 
     uploaded = []
     for file in files:
+        _log.info(f"[KB Upload] file: filename={file.filename!r} content_type={file.content_type} size={file.size}")
         if not file.filename:
+            _log.warning("[KB Upload] skipping file with empty filename")
             continue
-        # 保存文件
-        file_path = storage_base / file.filename
-        with open(file_path, "wb") as f:
+        try:
+            # 保存文件（只取文件名，去掉路径前缀）
+            safe_name = Path(file.filename).name or file.filename
+            file_path = storage_base / safe_name
             content = await file.read()
-            f.write(content)
+            with open(file_path, "wb") as f:
+                f.write(content)
 
-        # 提取文本内容
-        content_text = None
-        filename_lower = file.filename.lower()
-        if filename_lower.endswith((".txt", ".md")):
-            content_text = content.decode("utf-8", errors="ignore")[:50000]
-        elif filename_lower.endswith(".docx"):
-            # Word 文档提取文本
+            # 提取文本内容（可选，失败不阻断）
+            content_text = None
+            filename_lower = file.filename.lower()
             try:
-                import io
-                from docx import Document as DocxDocument
-                doc_obj = DocxDocument(io.BytesIO(content))
-                paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
-                content_text = "\n".join(paragraphs)[:50000]
+                if filename_lower.endswith((".txt", ".md")):
+                    content_text = content.decode("utf-8", errors="ignore")[:50000]
+                elif filename_lower.endswith(".docx"):
+                    import io
+                    from docx import Document as DocxDocument
+                    doc_obj = DocxDocument(io.BytesIO(content))
+                    paragraphs = [p.text for p in doc_obj.paragraphs if p.text.strip()]
+                    content_text = "\n".join(paragraphs)[:50000]
+                elif filename_lower.endswith(".pdf"):
+                    import io
+                    import PyPDF2
+                    reader = PyPDF2.PdfReader(io.BytesIO(content))
+                    pages_text = []
+                    for page in reader.pages[:50]:
+                        text = page.extract_text()
+                        if text:
+                            pages_text.append(text)
+                    content_text = "\n".join(pages_text)[:50000]
             except Exception:
-                pass
-        elif filename_lower.endswith(".pdf"):
-            # PDF 提取文本（简单方式，复杂 PDF 需要 OCR）
-            try:
-                import io
-                import PyPDF2
-                reader = PyPDF2.PdfReader(io.BytesIO(content))
-                pages_text = []
-                for page in reader.pages[:50]:  # 最多 50 页
-                    text = page.extract_text()
-                    if text:
-                        pages_text.append(text)
-                content_text = "\n".join(pages_text)[:50000]
-            except Exception:
-                pass
+                pass  # 文本提取失败不阻断文件保存
 
-        doc = await svc.create_document(
-            folder_id=folder_id,
-            name=file.filename,
-            file_type=file.filename.rsplit(".", 1)[-1] if "." in file.filename else None,
-            file_size=len(content),
-            storage_path=str(file_path),
-            content_text=content_text,
-            created_by=current_user.id,
-        )
-        uploaded.append({"id": str(doc.id), "name": doc.name, "size": len(content), "text_extracted": content_text is not None})
+            doc = await svc.create_document(
+                folder_id=folder_id,
+                name=safe_name,
+                file_type=safe_name.rsplit(".", 1)[-1] if "." in safe_name else None,
+                file_size=len(content),
+                storage_path=str(file_path),
+                content_text=content_text,
+                created_by=current_user.id,
+            )
+            uploaded.append({"id": str(doc.id), "name": doc.name, "size": len(content), "text_extracted": content_text is not None})
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Upload file failed: {file.filename}: {e}")
+            continue  # 单个文件失败不阻断其他文件
 
     await db.commit()
     return {"uploaded": len(uploaded), "files": uploaded}

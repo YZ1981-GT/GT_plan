@@ -16,19 +16,29 @@
           <el-option label="资产负债表" value="balance_sheet" />
           <el-option label="利润表" value="income_statement" />
           <el-option label="现金流量表" value="cash_flow_statement" />
-          <el-option label="权益变动表" value="equity_change" />
+          <el-option label="权益变动表" value="equity_statement" />
+          <el-option label="现金流附表" value="cash_flow_supplement" />
+          <el-option label="资产减值准备表" value="impairment_provision" />
         </el-select>
         <el-button size="small" type="primary" @click="onSaveAll" :loading="saving">保存修改</el-button>
-        <el-button size="small" @click="onAddRow">新增行</el-button>
+        <el-button size="small" @click="onInsertAbove">↑ 在上方插入</el-button>
+        <el-button size="small" @click="onAddRow">末尾新增</el-button>
+        <el-button size="small" @click="onDeleteSelected" :disabled="selectedRows.length === 0" style="color: #fff; opacity: 0.8;">删除选中 ({{ selectedRows.length }})</el-button>
         <el-button size="small" @click="router.back()">返回</el-button>
       </div>
     </div>
 
     <el-table :data="rows" v-loading="loading" border size="small" style="width: 100%"
-      row-key="row_code" :row-class-name="rowClassName">
-      <el-table-column prop="row_number" label="序号" width="60" align="center" />
-      <el-table-column prop="row_code" label="行次编码" width="100" />
-      <el-table-column label="项目名称" min-width="250">
+      row-key="row_code" :row-class-name="rowClassName"
+      @selection-change="onSelectionChange" ref="tableRef">
+      <el-table-column type="selection" width="40" />
+      <el-table-column prop="row_number" label="序号" width="80" align="center" />
+      <el-table-column prop="row_code" label="行次编码" min-width="110">
+        <template #default="{ row }">
+          <span style="white-space: nowrap;">{{ row.row_code }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="项目名称" min-width="300">
         <template #default="{ row }">
           <div :style="{ paddingLeft: (row.indent_level || 0) * 20 + 'px', display: 'flex', alignItems: 'center', gap: '4px' }">
             <el-tag v-if="row.is_total_row" size="small" type="warning">合计</el-tag>
@@ -37,26 +47,25 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="公式" min-width="300">
-        <template #default="{ row }">
-          <el-input v-if="row._editing" v-model="row.formula" size="small" placeholder="如 TB('1001','期末余额')" />
-          <code v-else-if="row.formula" @dblclick="row._editing = true" style="cursor: pointer; font-size: 11px; color: #666">
-            {{ row.formula.length > 60 ? row.formula.slice(0, 60) + '...' : row.formula }}
-          </code>
-          <span v-else style="color: #ccc">—</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="缩进" width="70" align="center">
+      <el-table-column label="缩进" width="80" align="center">
         <template #default="{ row }">
           <el-input-number v-if="row._editing" v-model="row.indent_level" :min="0" :max="3" size="small" :controls="false" style="width: 50px" />
           <span v-else>{{ row.indent_level }}</span>
         </template>
       </el-table-column>
+      <el-table-column label="合计" width="60" align="center">
+        <template #default="{ row }">
+          <el-checkbox v-if="row._editing" v-model="row.is_total_row" />
+          <span v-else-if="row.is_total_row" style="color: #1e8a38;">✓</span>
+          <span v-else style="color: #ddd;">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="120" align="center">
-        <template #default="{ row, $index }">
-          <el-button v-if="!row._editing" size="small" link type="primary" @click="row._editing = true">编辑</el-button>
-          <el-button v-if="row._editing" size="small" link type="success" @click="row._editing = false">完成</el-button>
-          <el-button size="small" link type="danger" @click="onDeleteRow($index)">删除</el-button>
+        <template #default="{ row }">
+          <div style="white-space: nowrap; display: flex; justify-content: center; gap: 4px;">
+            <el-button v-if="!row._editing" size="small" link type="primary" @click="row._editing = true">编辑</el-button>
+            <el-button v-if="row._editing" size="small" link type="success" @click="row._editing = false">完成</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -65,11 +74,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
-// const route = useRoute()
 const router = useRouter()
 
 const selectedStandard = ref('soe_consolidated')
@@ -123,14 +131,18 @@ async function loadConfig() {
   }
 }
 
-function onAddRow() {
-  const lastRow = rows.value[rows.value.length - 1]
-  const nextNumber = lastRow ? (lastRow.row_number || 0) + 1 : 1
-  const nextCode = `NEW-${String(nextNumber).padStart(3, '0')}`
-  rows.value.push({
+// 多选
+const selectedRows = ref<any[]>([])
+const tableRef = ref<any>(null)
+function onSelectionChange(selection: any[]) {
+  selectedRows.value = selection
+}
+
+function _makeNewRow(number: number) {
+  return {
     id: null,
-    row_code: nextCode,
-    row_number: nextNumber,
+    row_code: `NEW-${String(number).padStart(3, '0')}`,
+    row_number: number,
     row_name: '新行',
     indent_level: 1,
     formula: null,
@@ -138,21 +150,44 @@ function onAddRow() {
     parent_row_code: null,
     _editing: true,
     _isNew: true,
-  })
+  }
 }
 
-async function onDeleteRow(index: number) {
-  const row = rows.value[index]
-  await ElMessageBox.confirm(`确认删除行「${row.row_name}」？`, '删除确认')
-  if (row.id && !row._isNew) {
-    try {
-      await http.delete(`/api/report-config/${row.id}`)
-    } catch {
-      ElMessage.error('删除失败')
-      return
-    }
+function onAddRow() {
+  const lastRow = rows.value[rows.value.length - 1]
+  const nextNumber = lastRow ? (lastRow.row_number || 0) + 1 : 1
+  rows.value.push(_makeNewRow(nextNumber))
+}
+
+function onInsertAbove() {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先选中一行')
+    return
   }
-  rows.value.splice(index, 1)
+  // 在第一个选中行的上方插入
+  const firstSelected = selectedRows.value[0]
+  const idx = rows.value.indexOf(firstSelected)
+  if (idx < 0) return
+  const number = firstSelected.row_number || idx + 1
+  rows.value.splice(idx, 0, _makeNewRow(number))
+  // 重新编号
+  rows.value.forEach((r, i) => { r.row_number = i + 1 })
+}
+
+async function onDeleteSelected() {
+  if (selectedRows.value.length === 0) return
+  await ElMessageBox.confirm(`确认删除选中的 ${selectedRows.value.length} 行？`, '批量删除确认')
+  for (const row of selectedRows.value) {
+    if (row.id && !row._isNew) {
+      try {
+        await http.delete(`/api/report-config/${row.id}`)
+      } catch { /* ignore */ }
+    }
+    const idx = rows.value.indexOf(row)
+    if (idx >= 0) rows.value.splice(idx, 1)
+  }
+  selectedRows.value = []
+  rows.value.forEach((r, i) => { r.row_number = i + 1 })
   ElMessage.success('已删除')
 }
 
@@ -162,11 +197,24 @@ async function onSaveAll() {
     let savedCount = 0
     for (const row of rows.value) {
       if (row._isNew) {
-        // TODO: 后端需要 POST /report-config 新增行的端点
-        // 暂时跳过新增行的保存
-        continue
-      }
-      if (row.id) {
+        // 新增行 — POST 创建
+        const { data: created } = await http.post('/api/report-config', {
+          report_type: selectedReportType.value,
+          applicable_standard: selectedStandard.value,
+          row_number: row.row_number,
+          row_code: row.row_code,
+          row_name: row.row_name,
+          indent_level: row.indent_level,
+          formula: row.formula,
+          is_total_row: row.is_total_row,
+        })
+        const newRow = created?.data ?? created
+        if (newRow?.id) {
+          row.id = newRow.id
+          row._isNew = false
+        }
+        savedCount++
+      } else if (row.id) {
         await http.put(`/api/report-config/${row.id}`, {
           row_name: row.row_name,
           formula: row.formula,
@@ -176,7 +224,7 @@ async function onSaveAll() {
         savedCount++
       }
     }
-    ElMessage.success(`已保存 ${savedCount} 行修改`)
+    ElMessage.success(`已保存 ${savedCount} 行`)
     rows.value.forEach(r => { r._editing = false })
   } catch (e: any) {
     ElMessage.error('保存失败: ' + (e?.message || ''))

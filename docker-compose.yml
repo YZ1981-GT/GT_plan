@@ -215,6 +215,10 @@ services:
 
       - "${OFFICE_PORT:-8080}:80"
 
+    environment:
+      - WOPI_ENABLED=true
+      - JWT_ENABLED=false
+
     volumes:
 
       - office_data:/var/lib/onlyoffice

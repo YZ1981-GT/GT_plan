@@ -2,7 +2,15 @@
   <div class="gt-tpl-manager gt-fade-in">
     <div class="gt-tpl-header">
       <h2 class="gt-page-title">模板管理</h2>
-      <el-button type="primary" @click="showUploadDialog = true">上传模板</el-button>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <SharedTemplatePicker
+          config-type="workpaper_template"
+          :project-id="projectId"
+          :get-config-data="getTemplateConfigData"
+          @applied="onTemplateConfigApplied"
+        />
+        <el-button type="primary" @click="showUploadDialog = true">上传模板</el-button>
+      </div>
     </div>
 
     <el-tabs v-model="activeTab">
@@ -84,13 +92,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listTemplates, uploadTemplate, createTemplateVersion, deleteTemplate,
   listTemplateSets,
   type TemplateItem, type TemplateSetItem,
 } from '@/services/workpaperApi'
+import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+
+const route = useRoute()
+const projectId = computed(() => (route.params.projectId as string) || '')
 
 const activeTab = ref('templates')
 const tplLoading = ref(false)
@@ -179,6 +192,33 @@ onMounted(() => {
   fetchTemplates()
   fetchSets()
 })
+
+// ── 共享模板 ──
+function getTemplateConfigData(): Record<string, any> {
+  return {
+    templates: templates.value.map(t => ({
+      template_code: t.template_code,
+      template_name: t.template_name,
+      audit_cycle: t.audit_cycle,
+      status: t.status,
+    })),
+    sets: templateSets.value.map(s => ({
+      set_name: s.set_name,
+      template_codes: s.template_codes,
+      applicable_audit_type: s.applicable_audit_type,
+    })),
+  }
+}
+
+function onTemplateConfigApplied(data: Record<string, any>) {
+  const tpls = data?.templates || []
+  if (tpls.length) {
+    ElMessage.success(`已引用 ${tpls.length} 个模板配置，请刷新查看`)
+    fetchTemplates()
+  } else {
+    ElMessage.info('模板中无数据')
+  }
+}
 </script>
 
 <style scoped>

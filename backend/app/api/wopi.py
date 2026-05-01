@@ -308,15 +308,16 @@ async def get_lock_status(
 @router.get("/health")
 async def wopi_health():
     """WOPI 服务健康检查 — 前端用于探测在线编辑可用性"""
-    import httpx
+    import urllib.request
+    import urllib.error
 
     onlyoffice_url = settings.ONLYOFFICE_URL.rstrip("/")
     try:
-        async with httpx.AsyncClient(timeout=3) as client:
-            resp = await client.get(f"{onlyoffice_url}/healthcheck")
-        if resp.status_code == 200:
+        req = urllib.request.Request(f"{onlyoffice_url}/healthcheck")
+        resp = urllib.request.urlopen(req, timeout=5)
+        if resp.status == 200:
             return JSONResponse(content={"status": "ok", "service": "wopi", "onlyoffice_available": True})
-    except httpx.RequestError:
+    except (urllib.error.URLError, OSError, Exception):
         pass
     return JSONResponse(
         status_code=503,

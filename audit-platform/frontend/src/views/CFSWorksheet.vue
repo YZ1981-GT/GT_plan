@@ -2,14 +2,32 @@
   <div class="gt-cfs-worksheet gt-fade-in">
     <!-- 页面横幅 -->
     <div class="gt-cfs-banner">
-      <div class="gt-cfs-banner-text">
-        <h2>现金流量表工作底稿</h2>
-        <p>工作底稿法编制现金流量表</p>
+      <div class="gt-cfs-banner-row1">
+        <h2 class="gt-cfs-title">现金流量表工作底稿</h2>
+        <div class="gt-cfs-info-bar">
+          <div class="gt-cfs-info-item">
+            <span class="gt-cfs-info-label">单位</span>
+            <el-select v-model="selectedProjectId" size="small" class="gt-cfs-unit-select" filterable @change="onProjectChange">
+              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+          </div>
+          <div class="gt-cfs-info-sep" />
+          <div class="gt-cfs-info-item">
+            <span class="gt-cfs-info-label">年度</span>
+            <el-select v-model="selectedYear" size="small" class="gt-cfs-year-select" @change="onYearChange">
+              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
+            </el-select>
+          </div>
+          <div class="gt-cfs-info-sep" />
+          <div class="gt-cfs-info-item">
+            <span class="gt-cfs-info-badge">工作底稿法编制</span>
+          </div>
+        </div>
       </div>
-      <div class="gt-cfs-banner-actions">
-        <el-button size="small" @click="onGenerate" :loading="genLoading" round>生成底稿</el-button>
-        <el-button size="small" @click="onAutoGenerate" :loading="autoLoading" round>自动调整项</el-button>
-        <el-button size="small" @click="showAdjForm = true" round>新建调整</el-button>
+      <div class="gt-cfs-banner-row2">
+        <el-button size="small" @click="onGenerate" :loading="genLoading">生成底稿</el-button>
+        <el-button size="small" @click="onAutoGenerate" :loading="autoLoading">自动调整项</el-button>
+        <el-button size="small" @click="showAdjForm = true">新建调整</el-button>
       </div>
     </div>
 
@@ -149,10 +167,15 @@ import {
   autoGenerateCFSAdjustments, getCFSIndirectMethod, getCFSVerify,
   type CFSWorksheetRow, type CFSReconciliation, type CFSIndirectMethod,
 } from '@/services/auditPlatformApi'
+import { useProjectSelector } from '@/composables/useProjectSelector'
 
 const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+
+const {
+  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
+  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
+} = useProjectSelector('cfs-worksheet')
 
 const loading = ref(false)
 const genLoading = ref(false)
@@ -269,7 +292,11 @@ async function submitAdj() {
   } finally { adjSubmitting.value = false }
 }
 
-onMounted(fetchAll)
+onMounted(() => {
+  syncFromRoute()
+  loadProjectOptions()
+  fetchAll()
+})
 </script>
 
 <style scoped>
@@ -277,10 +304,10 @@ onMounted(fetchAll)
 
 /* ── 页面横幅 ── */
 .gt-cfs-banner {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; flex-direction: column; gap: 10px;
   background: var(--gt-gradient-primary);
   border-radius: var(--gt-radius-lg);
-  padding: 20px 28px;
+  padding: 18px 28px;
   margin-bottom: var(--gt-space-5);
   color: #fff;
   position: relative; overflow: hidden;
@@ -297,6 +324,33 @@ onMounted(fetchAll)
 }
 .gt-cfs-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
 .gt-cfs-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
+.gt-cfs-banner-row1 {
+  display: flex; align-items: center; gap: 16px;
+  position: relative; z-index: 1;
+}
+.gt-cfs-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.gt-cfs-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gt-cfs-info-item { display: flex; align-items: center; gap: 4px; }
+.gt-cfs-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
+.gt-cfs-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.gt-cfs-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
+.gt-cfs-unit-select, .gt-cfs-year-select { width: 160px; }
+.gt-cfs-unit-select :deep(.el-input__wrapper),
+.gt-cfs-year-select :deep(.el-input__wrapper) {
+  background: rgba(255,255,255,0.15) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  box-shadow: none !important;
+}
+.gt-cfs-unit-select :deep(.el-input__inner),
+.gt-cfs-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
+.gt-cfs-unit-select :deep(.el-input__suffix),
+.gt-cfs-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
+.gt-cfs-banner-row2 {
+  display: flex; gap: 8px; align-items: center;
+  position: relative; z-index: 1;
+}
+.gt-cfs-banner-row2 .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.gt-cfs-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
 .gt-cfs-banner-actions {
   display: flex; gap: 8px; align-items: center;
   position: relative; z-index: 1;

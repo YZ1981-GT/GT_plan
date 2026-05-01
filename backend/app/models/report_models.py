@@ -25,11 +25,13 @@ from app.models.base import Base
 
 
 class FinancialReportType(str, enum.Enum):
-    """财务报表类型（四张报表）"""
+    """财务报表类型"""
     balance_sheet = "balance_sheet"
     income_statement = "income_statement"
     cash_flow_statement = "cash_flow_statement"
     equity_statement = "equity_statement"
+    cash_flow_supplement = "cash_flow_supplement"
+    impairment_provision = "impairment_provision"
 
 
 class CashFlowCategory(str, enum.Enum):

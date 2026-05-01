@@ -188,7 +188,7 @@ def structure_to_html(
         '<style>',
         '.gt-excel-table { border-collapse: collapse; font-family: "仿宋_GB2312", "SimSun", serif; font-size: 10pt; width: 100%; position: relative; }',
         '.gt-excel-table td { border: 1px solid #d0d0d0; padding: 4px 6px; vertical-align: middle; position: relative; }',
-        '.gt-excel-table tr:first-child td { background: #f4f0fa; font-weight: bold; text-align: center; }',
+        '.gt-excel-table tr.gt-col-header-row td { background: #f4f0fa; font-weight: bold; text-align: center; }',
         '.gt-excel-table td[contenteditable="true"]:focus { outline: 2px solid #4b2d77; background: #faf8ff; }',
         '.gt-excel-table td[data-fetch-rule] { background: #f0f9ff; border-bottom: 2px solid #0094b3; cursor: pointer; }',
         '.gt-excel-table td[data-formula] { background: #fffbf0; }',
@@ -222,7 +222,9 @@ def structure_to_html(
     for r_offset in range(max_row):
         r = start_row + r_offset  # 实际行号（分页偏移）
         row_height = rows[r].get("height", 20) if r < len(rows) else 20
-        html_parts.append(f'<tr style="height:{row_height}px">')
+        # 第一行数据通常是表头行（项目/期末余额/期初余额）
+        row_class = ' class="gt-data-header-row"' if r == 0 else ''
+        html_parts.append(f'<tr{row_class} style="height:{row_height}px">')
 
         # 行号（仅编辑模式）
         if editable:

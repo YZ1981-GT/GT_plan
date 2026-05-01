@@ -9,6 +9,12 @@
         </div>
         <div class="gt-ar-banner-actions">
           <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
+          <SharedTemplatePicker
+            config-type="report_template"
+            :project-id="projectId"
+            :get-config-data="getReportConfigData"
+            @applied="onReportTemplateApplied"
+          />
           <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
           <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
         </div>
@@ -126,6 +132,7 @@ import {
   generateAuditReport, getAuditReport, updateAuditReportParagraph,
   updateAuditReportStatus, type AuditReportData,
 } from '@/services/auditPlatformApi'
+import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -244,6 +251,45 @@ async function onRefreshFinancialData() {
 }
 
 onMounted(fetchReport)
+
+// ── 共享模板 ──
+function getReportConfigData(): Record<string, any> {
+  if (!report.value) return {}
+  return {
+    opinion_type: report.value.opinion_type,
+    company_type: report.value.company_type,
+    paragraphs: report.value.paragraphs || {},
+    status: report.value.status,
+  }
+}
+
+function onReportTemplateApplied(data: Record<string, any>) {
+  if (!report.value) {
+    ElMessage.warning('请先生成报告再引用模板')
+    return
+  }
+  const paragraphs = data?.paragraphs || {}
+  if (!Object.keys(paragraphs).length) {
+    ElMessage.warning('模板中无段落数据')
+    return
+  }
+  let applied = 0
+  for (const [key, content] of Object.entries(paragraphs)) {
+    if (report.value.paragraphs && !report.value.paragraphs[key]) {
+      report.value.paragraphs[key] = content as string
+      applied++
+    }
+  }
+  if (applied > 0) {
+    ElMessage.success(`已引用 ${applied} 个段落（已有内容的段落不覆盖）`)
+    // 刷新当前编辑区
+    if (activeSection.value && report.value.paragraphs?.[activeSection.value]) {
+      sectionContent.value = report.value.paragraphs[activeSection.value]
+    }
+  } else {
+    ElMessage.info('所有段落已有内容，未覆盖')
+  }
+}
 </script>
 
 <style scoped>

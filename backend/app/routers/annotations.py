@@ -35,6 +35,23 @@ async def create_annotation(
         req.cell_ref, req.priority, req.mentioned_user_ids,
     )
     await db.commit()
+
+    # 发布SSE通知（质控意见/复核意见创建）
+    try:
+        from app.services.event_bus import event_bus
+        await event_bus.publish({
+            "type": "ANNOTATION_CREATED",
+            "project_id": str(project_id),
+            "annotation_id": str(result.get("id", "")),
+            "object_type": req.object_type,
+            "object_id": str(req.object_id) if req.object_id else None,
+            "author_id": str(author_id),
+            "priority": req.priority,
+            "preview": req.content[:80] if req.content else "",
+        })
+    except Exception:
+        pass
+
     return result
 
 
@@ -64,6 +81,19 @@ current_user: User = Depends(get_current_user),
     try:
         result = await _svc.update_annotation(db, annotation_id, req.status, req.content)
         await db.commit()
+
+        # 发布SSE通知（意见回复/解决）
+        try:
+            from app.services.event_bus import event_bus
+            await event_bus.publish({
+                "type": "ANNOTATION_UPDATED",
+                "annotation_id": str(annotation_id),
+                "new_status": req.status,
+                "reply_content": req.content[:80] if req.content else None,
+            })
+        except Exception:
+            pass
+
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -62,6 +62,24 @@ class WpExplanationService:
             wp_code=wp.wp_code if hasattr(wp, 'wp_code') else None,
         )
 
+        # 2.6 加载操作手册上下文（按循环自动匹配）
+        try:
+            from app.services.wp_manual_service import get_context_for_llm
+            # 从底稿编号推断循环前缀
+            wp_code = getattr(wp, 'wp_code', '') or ''
+            cycle = wp_code[0].upper() if wp_code else ''
+            if cycle and cycle.isalpha():
+                manual_context = get_context_for_llm(cycle, wp_code, max_total_chars=6000)
+                if manual_context and not manual_context.startswith("（"):
+                    if not context_docs:
+                        context_docs = []
+                    context_docs.append({
+                        "source": f"操作手册（{cycle}循环）",
+                        "content": manual_context,
+                    })
+        except Exception as _manual_err:
+            logger.debug("load manual context failed (non-blocking): %s", _manual_err)
+
         # 3. 调用 LLM
         from app.services.llm_client import chat_completion
         from app.core.config import settings

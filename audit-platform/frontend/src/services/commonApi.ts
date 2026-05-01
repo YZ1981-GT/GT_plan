@@ -1076,3 +1076,219 @@ export async function getEditTimeSuggestions(staffId: string, targetDate: string
   const { data } = await http.get('/api/work-hours/edit-time-suggest', { params: { staff_id: staffId, target_date: targetDate } })
   return data
 }
+
+// ── 统一地址坐标注册表 ──
+
+export interface AddressEntry {
+  uri: string
+  domain: string       // report / note / wp / tb / aux
+  source: string
+  path: string
+  cell: string
+  label: string
+  formula_ref: string
+  jump_route: string
+  row_code: string
+  account_code: string
+  note_section: string
+  wp_code: string
+  tags: string[]
+}
+
+export async function searchAddresses(projectId: string, params?: {
+  year?: number; keyword?: string; domain?: string; template_type?: string; limit?: number
+}): Promise<{ total: number; items: AddressEntry[] }> {
+  const { data } = await http.get('/api/address-registry', {
+    params: { project_id: projectId, ...params },
+  })
+  return data
+}
+
+export async function getAddressStats(projectId: string, year?: number, templateType?: string): Promise<{
+  total: number; by_domain: Record<string, number>; domains: string[]
+}> {
+  const { data } = await http.get('/api/address-registry/stats', {
+    params: { project_id: projectId, year, template_type: templateType },
+  })
+  return data
+}
+
+export async function resolveAddress(uri: string, projectId: string, year?: number): Promise<{
+  found: boolean; uri: string; label?: string; formula_ref?: string; jump_route?: string
+}> {
+  const { data } = await http.get('/api/address-registry/resolve', {
+    params: { uri, project_id: projectId, year },
+  })
+  return data
+}
+
+export async function validateFormulaRefs(formula: string, projectId: string, year?: number, templateType?: string): Promise<{
+  valid: boolean; issues: Array<{ ref: string; uri: string; status: string; message: string }>
+}> {
+  const { data } = await http.post('/api/address-registry/validate', {
+    formula, project_id: projectId, year, template_type: templateType,
+  })
+  return data
+}
+
+export async function getJumpRoute(params: {
+  uri?: string; formula_ref?: string; project_id: string; year?: number
+}): Promise<{ route: string; uri: string; formula_ref: string }> {
+  const { data } = await http.post('/api/address-registry/jump', params)
+  return data
+}
+
+export async function invalidateAddressCache(projectId: string, params?: {
+  year?: number; domain?: string; template_type?: string; all?: boolean
+}): Promise<void> {
+  await http.post('/api/address-registry/invalidate', {
+    project_id: projectId, ...params,
+  })
+}
+
+// ── 底稿三式联动 ──
+
+export async function getWorkpaperStructure(projectId: string, wpId: string, forceRebuild = false): Promise<{
+  wp_id: string; wp_code: string; structure: any; row_count: number; has_formulas: boolean
+}> {
+  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/structure`, {
+    params: forceRebuild ? { force_rebuild: true } : undefined,
+  })
+  return data
+}
+
+export async function saveWorkpaperStructure(projectId: string, wpId: string, structure: any, syncExcel = true): Promise<{
+  wp_id: string; version: number; excel_synced: boolean
+}> {
+  const { data } = await http.post(`/api/projects/${projectId}/workpapers/${wpId}/structure`, {
+    structure, sync_excel: syncExcel,
+  })
+  return data
+}
+
+export async function rebuildWorkpaperStructure(projectId: string, wpId: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/workpapers/${wpId}/structure/rebuild`)
+  return data
+}
+
+export async function getWorkpaperStructureHtml(projectId: string, wpId: string, page = 1, pageSize = 200): Promise<{
+  html: string; total_rows: number; page: number; is_large: boolean
+}> {
+  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/structure/html`, {
+    params: { page, page_size: pageSize },
+  })
+  return data
+}
+
+export async function batchGenerateStructures(projectId: string): Promise<{
+  total: number; generated: number; skipped: number; errors: any[]
+}> {
+  const { data } = await http.post(`/api/projects/${projectId}/workpapers/batch-structure`)
+  return data
+}
+
+export async function getWorkpaperAddresses(projectId: string, wpId: string): Promise<{
+  wp_code: string; addresses: any[]; count: number
+}> {
+  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/structure/addresses`)
+  return data
+}
+
+// ── 底稿操作手册 ──
+
+export async function listWpManuals(): Promise<{ cycles: Record<string, any[]>; total: number }> {
+  const { data } = await http.get('/api/wp-manuals')
+  return data
+}
+
+export async function getWpManualStats(): Promise<any> {
+  const { data } = await http.get('/api/wp-manuals/stats')
+  return data
+}
+
+export async function getCycleManuals(cycle: string): Promise<{ cycle: string; files: any[]; count: number }> {
+  const { data } = await http.get(`/api/wp-manuals/${cycle}`)
+  return data
+}
+
+export async function getCycleManualContent(cycle: string): Promise<{ content: string }> {
+  const { data } = await http.get(`/api/wp-manuals/${cycle}/manual`)
+  return data
+}
+
+export async function getCycleLlmContext(cycle: string, wpCode?: string): Promise<{ context: string; char_count: number }> {
+  const { data } = await http.get(`/api/wp-manuals/${cycle}/context`, {
+    params: wpCode ? { wp_code: wpCode } : undefined,
+  })
+  return data
+}
+
+// ── 底稿精细化规则 ──
+
+export async function listWpFineRules(): Promise<{ rules: Array<{ wp_code: string; name: string; sheets: number; checks: number }> }> {
+  const { data } = await http.get('/api/wp-fine-rules')
+  return data
+}
+
+export async function getWpFineRule(wpCode: string): Promise<any> {
+  const { data } = await http.get(`/api/wp-fine-rules/${wpCode}`)
+  return data
+}
+
+export async function fineExtractWorkpaper(projectId: string, wpId: string): Promise<any> {
+  const { data } = await http.post(`/api/projects/${projectId}/workpapers/${wpId}/fine-extract`)
+  return data
+}
+
+// ── 底稿依赖关系（B→C→D联动） ──
+
+export async function getWpDependencies(projectId: string, wpId: string): Promise<{
+  wp_code: string; cycle: string; dependencies: any[]; all_satisfied: boolean;
+  warnings: string[]; control_effectiveness: string | null; impact: any
+}> {
+  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/dependencies`)
+  return data
+}
+
+export async function getCycleDependencyGraph(cycle: string): Promise<{
+  cycle: string; nodes: any[]; edges: any[]
+}> {
+  const { data } = await http.get(`/api/wp-dependencies/cycle/${cycle}`)
+  return data
+}
+
+export async function listCycleDependencies(): Promise<Record<string, any>> {
+  const { data } = await http.get('/api/wp-dependencies/cycles')
+  return data
+}
+
+// ── 账龄分析 ──
+
+export async function getAgingPresets(): Promise<any> {
+  const { data } = await http.get('/api/aging/presets')
+  return data
+}
+
+export async function getProjectAgingConfig(projectId: string): Promise<{
+  preset: string; custom_segments: any[]; custom_rates: Record<string, number>; effective_segments: any[]
+}> {
+  const { data } = await http.get(`/api/projects/${projectId}/aging/config`)
+  return data
+}
+
+export async function saveProjectAgingConfig(projectId: string, config: {
+  preset: string; custom_segments?: any[]; custom_rates?: Record<string, number>
+}): Promise<any> {
+  const { data } = await http.put(`/api/projects/${projectId}/aging/config`, config)
+  return data
+}
+
+export async function calculateAgingProvision(projectId: string, params: {
+  year?: number; account_code?: string; preset?: string; custom_segments?: any[]; custom_rates?: Record<string, number>
+}): Promise<{
+  preset: string; segments: Array<{ key: string; label: string; balance: number; rate: number; provision: number }>;
+  total_balance: number; total_provision: number; provision_rate: number
+}> {
+  const { data } = await http.post(`/api/projects/${projectId}/aging/calculate`, params)
+  return data
+}

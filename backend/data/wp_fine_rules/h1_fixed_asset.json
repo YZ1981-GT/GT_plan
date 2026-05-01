@@ -1,0 +1,246 @@
+{
+  "wp_code": "H1",
+  "name": "固定资产",
+  "wp_name": "固定资产",
+  "cycle": "H",
+  "account_codes": ["1601", "1602"],
+  "source_files": [
+    {
+      "file_pattern": "H1 固定资产.xlsx",
+      "is_primary": true
+    },
+    {
+      "file_pattern": "H0 固定资产循环函证.xlsx",
+      "description": "函证程序"
+    }
+  ],
+  "sheet_rules": [
+    {
+      "code": "H1A",
+      "exact_name": "固定资产审计程序表H1A",
+      "type": "procedure"
+    },
+    {
+      "code": "H1-1",
+      "exact_name": "审定表H1-1",
+      "type": "summary",
+      "table_type": "four_section",
+      "header_rows": [5, 6],
+      "data_start_row": 7,
+      "layout": {
+        "columns": {
+          "label": {"col": 1, "label": "项目"},
+          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
+          "opening_adjustment": {"col": 3, "label": "期初账项调整"},
+          "opening_audited": {"col": 4, "label": "期初审定数"},
+          "closing_unadjusted": {"col": 5, "label": "期末未审数"},
+          "closing_adjustment": {"col": 6, "label": "期末账项调整"},
+          "closing_audited": {"col": 7, "label": "期末审定数"},
+          "change_amount": {"col": 8, "label": "变动额"},
+          "change_rate": {"col": 9, "label": "变动率"}
+        }
+      },
+      "key_rows": {
+        "gross_title": {"row": 7, "label": "一、固定资产原值"},
+        "gross_building": {"row": 8, "label": "房屋及建筑物"},
+        "gross_machinery": {"row": 9, "label": "机器设备"},
+        "gross_vehicle": {"row": 10, "label": "运输设备"},
+        "gross_office": {"row": 11, "label": "办公设备"},
+        "gross_other": {"row": 12, "label": "其他设备"},
+        "gross_total": {"row": 13, "label": "合计", "is_total": true},
+        "depreciation_title": {"row": 14, "label": "二、累计折旧"},
+        "depreciation_building": {"row": 15, "label": "房屋及建筑物"},
+        "depreciation_machinery": {"row": 16, "label": "机器设备"},
+        "depreciation_vehicle": {"row": 17, "label": "运输设备"},
+        "depreciation_office": {"row": 18, "label": "办公设备"},
+        "depreciation_other": {"row": 19, "label": "其他设备"},
+        "depreciation_total": {"row": 20, "label": "合计", "is_total": true},
+        "impairment_title": {"row": 21, "label": "三、减值准备"},
+        "impairment_building": {"row": 22, "label": "房屋及建筑物"},
+        "impairment_machinery": {"row": 23, "label": "机器设备"},
+        "impairment_vehicle": {"row": 24, "label": "运输设备"},
+        "impairment_office": {"row": 25, "label": "办公设备"},
+        "impairment_other": {"row": 26, "label": "其他设备"},
+        "impairment_total": {"row": 27, "label": "合计", "is_total": true},
+        "net_title": {"row": 28, "label": "四、净值"},
+        "net_building": {"row": 29, "label": "房屋及建筑物"},
+        "net_machinery": {"row": 30, "label": "机器设备"},
+        "net_vehicle": {"row": 31, "label": "运输设备"},
+        "net_office": {"row": 32, "label": "办公设备"},
+        "net_other": {"row": 33, "label": "其他设备"},
+        "total": {"row": 34, "label": "合计", "is_total": true, "report_row": "BS-014"}
+      },
+      "sections": [
+        {"name": "固定资产原值", "start_row": 7, "end_row": 13, "items": ["房屋及建筑物", "机器设备", "运输设备", "办公设备", "其他设备"]},
+        {"name": "累计折旧", "start_row": 14, "end_row": 20, "items": ["房屋及建筑物", "机器设备", "运输设备", "办公设备", "其他设备"]},
+        {"name": "减值准备", "start_row": 21, "end_row": 27, "items": ["房屋及建筑物", "机器设备", "运输设备", "办公设备", "其他设备"]},
+        {"name": "净值", "start_row": 28, "end_row": 34, "items": ["房屋及建筑物", "机器设备", "运输设备", "办公设备", "其他设备"]}
+      ]
+    },
+    {
+      "code": "H1-listed",
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "disclosure_listed"
+    },
+    {
+      "code": "H1-soe",
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "disclosure_soe"
+    },
+    {
+      "code": "H1-2",
+      "exact_name": "明细表H1-2",
+      "type": "detail",
+      "description": "固定资产明细（按资产编号逐项）"
+    },
+    {
+      "code": "H1-3",
+      "exact_name": "调整分录汇总H1-3",
+      "type": "adjustment"
+    },
+    {
+      "code": "H1-4",
+      "exact_name": "闲置检查表H1-4",
+      "type": "check",
+      "description": "闲置固定资产检查"
+    },
+    {
+      "code": "H1-5",
+      "exact_name": "会计政策估计检查表H1-5",
+      "type": "check",
+      "description": "折旧政策/残值率/使用年限检查"
+    },
+    {
+      "code": "H1-6",
+      "exact_name": "分析表H1-6",
+      "type": "analysis",
+      "description": "固定资产分析程序"
+    },
+    {
+      "code": "H1-7",
+      "exact_name": "增加检查表H1-7",
+      "type": "check",
+      "description": "本期增加固定资产检查"
+    },
+    {
+      "code": "H1-8",
+      "exact_name": "减少检查表H1-8",
+      "type": "check",
+      "description": "本期减少固定资产检查"
+    },
+    {
+      "code": "H1-9",
+      "exact_name": "监盘计划H1-9",
+      "type": "count",
+      "description": "固定资产监盘计划"
+    },
+    {
+      "code": "H1-10",
+      "exact_name": "盘点检查表H1-10",
+      "type": "count",
+      "description": "固定资产盘点记录"
+    },
+    {
+      "code": "H1-11",
+      "exact_name": "监盘小结H1-11",
+      "type": "count",
+      "description": "监盘小结"
+    },
+    {
+      "code": "H1-12a",
+      "exact_name": "折旧测算表（不含减值）-直线法H1-12",
+      "type": "calculation",
+      "description": "折旧测算（不含减值，直线法）"
+    },
+    {
+      "code": "H1-12b",
+      "exact_name": "折旧测算表（含减值）H1-12",
+      "type": "calculation",
+      "description": "折旧测算（含减值）"
+    },
+    {
+      "code": "H1-12c",
+      "exact_name": "折旧测算表（多次减值）H1-12",
+      "type": "calculation",
+      "description": "折旧测算（多次减值）"
+    },
+    {
+      "code": "H1-13",
+      "exact_name": "折旧分配分析表H1-13",
+      "type": "analysis",
+      "description": "折旧费用分配到成本/费用"
+    },
+    {
+      "code": "H1-14",
+      "exact_name": "减值测算表H1-14",
+      "type": "calculation",
+      "description": "固定资产减值测算"
+    },
+    {
+      "code": "H1-15",
+      "exact_name": "可收回金额测试表H1-15",
+      "type": "calculation",
+      "description": "可收回金额测试"
+    },
+    {
+      "code": "H1-16",
+      "exact_name": "房屋建筑物权属检查表H1-16",
+      "type": "check",
+      "description": "房屋建筑物产权检查"
+    },
+    {
+      "code": "H1-17",
+      "exact_name": "运输设备权属检查表H1-17",
+      "type": "check",
+      "description": "运输设备权属检查"
+    },
+    {
+      "code": "H1-18",
+      "exact_name": "关联交易检查表H1-18",
+      "type": "check",
+      "description": "关联方交易检查"
+    },
+    {
+      "code": "H1-19",
+      "exact_name": "经营租出固定资产检查表H1-19",
+      "type": "check",
+      "description": "经营租出检查"
+    },
+    {
+      "code": "H1-20",
+      "exact_name": "融资租出固定资产检查表H1-20",
+      "type": "check",
+      "description": "融资租出检查"
+    }
+  ],
+  "cross_references": [
+    {"from": "H1-1:R34:C7", "to": "TB('1601','审定数') - TB('1602','审定数')", "description": "净值合计=原值-折旧（试算表）"},
+    {"from": "H1-1:R13:C7", "to": "TB('1601','审定数')", "description": "原值合计=试算表固定资产原值"},
+    {"from": "H1-1:R20:C7", "to": "TB('1602','审定数')", "description": "折旧合计=试算表累计折旧"},
+    {"from": "H1-1:R34:C7", "to": "REPORT('BS-014','期末')", "description": "净值合计=报表固定资产"},
+    {"from": "H1-1:R34:C7", "to": "H1-1:R13:C7 - H1-1:R20:C7 - H1-1:R27:C7", "description": "净值=原值-折旧-减值"},
+    {"from": "H1-2", "to": "H1-1:R13:C7", "description": "明细表原值合计=审定表原值合计"},
+    {"from": "H1-3", "to": "H1-1:R13:C6", "description": "调整分录汇总=审定表调整列"},
+    {"from": "H1-12a", "to": "H1-1:R20:C7", "description": "折旧测算合计=审定表折旧合计"},
+    {"from": "H1-14", "to": "H1-1:R27:C7", "description": "减值测算合计=审定表减值合计"},
+    {"from": "H1-6", "to": "H1-1", "description": "分析程序引用审定表数据"}
+  ],
+  "audit_checks": [
+    {"id": "H1-CHK-01", "type": "balance", "severity": "blocking", "description": "净值=原值-累计折旧-减值准备（逐类别）"},
+    {"id": "H1-CHK-02", "type": "balance", "severity": "blocking", "description": "原值合计=试算表固定资产原值"},
+    {"id": "H1-CHK-03", "type": "balance", "severity": "blocking", "description": "折旧合计=试算表累计折旧"},
+    {"id": "H1-CHK-04", "type": "cross_ref", "severity": "warning", "description": "净值合计=报表固定资产"},
+    {"id": "H1-CHK-05", "type": "formula", "severity": "warning", "description": "各类别净值=原值-折旧-减值（逐行校验）"},
+    {"id": "H1-CHK-06", "type": "cross_ref", "severity": "warning", "description": "明细表原值合计与审定表一致"},
+    {"id": "H1-CHK-07", "type": "completeness", "severity": "warning", "description": "明细表已填写"},
+    {"id": "H1-CHK-08", "type": "check", "severity": "warning", "description": "折旧测算已完成"},
+    {"id": "H1-CHK-09", "type": "check", "severity": "warning", "description": "增加检查表已填写"},
+    {"id": "H1-CHK-10", "type": "check", "severity": "warning", "description": "减少检查表已填写"},
+    {"id": "H1-CHK-11", "type": "check", "severity": "warning", "description": "监盘已执行（计划+盘点+小结）"},
+    {"id": "H1-CHK-12", "type": "check", "severity": "warning", "description": "会计政策估计检查已完成"},
+    {"id": "H1-CHK-13", "type": "check", "severity": "info", "description": "闲置检查已完成"},
+    {"id": "H1-CHK-14", "type": "check", "severity": "info", "description": "权属检查已完成（房屋+运输）"},
+    {"id": "H1-CHK-15", "type": "analysis", "severity": "info", "description": "分析程序已执行"},
+    {"id": "H1-CHK-16", "type": "check", "severity": "info", "description": "关联交易检查已完成"}
+  ]
+}

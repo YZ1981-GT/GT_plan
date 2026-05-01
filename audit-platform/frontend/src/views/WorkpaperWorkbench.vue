@@ -526,26 +526,26 @@ async function refreshAll() {
   loading.value = true
   try {
     mappings.value = await getAllWpMappings(projectId.value)
-    // 加载底稿状态
-    try {
-      const wps = await api.get(`/api/projects/${projectId.value}/working-papers`)
-      const list = Array.isArray(wps) ? wps : (wps?.items || [])
-      const map: Record<string, any> = {}
-      for (const w of list) {
-        map[w.wp_code] = { status: w.status, review_status: w.review_status || '', assigned_to: w.assigned_to }
-      }
-      wpStatusMap.value = map
-    } catch { /* 静默 */ }
-    // 加载年度
-    try {
-      const y = await getProjectAuditYear(projectId.value)
-      if (y) year.value = y
-    } catch { /* 静默 */ }
-  } catch (e: any) {
-    ElMessage.error('加载底稿映射失败：' + (e?.message || ''))
-  } finally {
-    loading.value = false
+  } catch {
+    // 映射数据不存在时静默（新项目无映射）
+    mappings.value = []
   }
+  // 加载底稿状态（非关键，静默）
+  try {
+    const wps = await api.get(`/api/projects/${projectId.value}/working-papers`, { validateStatus: (s: number) => s < 500 })
+    const list = Array.isArray(wps) ? wps : (wps?.items || [])
+    const map: Record<string, any> = {}
+    for (const w of list) {
+      map[w.wp_code] = { id: w.id, status: w.status, review_status: w.review_status || '', assigned_to: w.assigned_to }
+    }
+    wpStatusMap.value = map
+  } catch { /* 静默 */ }
+  // 加载年度（非关键，静默）
+  try {
+    const y = await getProjectAuditYear(projectId.value)
+    if (y) year.value = y
+  } catch { /* 静默 */ }
+  loading.value = false
 }
 
 async function loadPrefillData(m: WpAccountMapping) {
@@ -559,7 +559,10 @@ async function loadPrefillData(m: WpAccountMapping) {
 
 async function loadAttachments(wpCode: string) {
   try {
-    const data = await api.get(`/api/attachments`, { params: { wp_code: wpCode, project_id: projectId.value } })
+    const data = await api.get(`/api/attachments`, {
+      params: { wp_code: wpCode, project_id: projectId.value },
+      validateStatus: (s: number) => s < 500,
+    })
     attachments.value = Array.isArray(data) ? data : (data?.items || [])
   } catch { attachments.value = [] }
 }
@@ -569,9 +572,14 @@ async function loadAiAnalysis(m: WpAccountMapping) {
   aiAnalysis.value = null
   try {
     const data = await api.get(`/api/projects/${projectId.value}/wp-ai/analytical-review`, {
-      params: { account_name: m.account_name, year: year.value }
+      params: { account_name: m.account_name, year: year.value },
+      validateStatus: (s: number) => s < 500,
     })
-    aiAnalysis.value = data
+    if (data && !data.error) {
+      aiAnalysis.value = data
+    } else {
+      aiAnalysis.value = { unavailable: true, message: 'AI 分析服务未启动，请检查 vLLM 是否运行' }
+    }
   } catch {
     aiAnalysis.value = { unavailable: true, message: 'AI 分析服务未启动，请检查 vLLM 是否运行' }
   }
@@ -610,7 +618,7 @@ async function onGenerateRecommended() {
   generatingWps.value = true
   try {
     const codes = recommendations.value.map(r => r.wp_code)
-    await api.post(`/api/projects/${projectId.value}/working-papers/generate-from-codes`, { codes })
+    await api.post(`/api/projects/${projectId.value}/working-papers/generate-from-codes`, { wp_codes: codes, year: year.value })
     ElMessage.success('底稿生成完成')
     recommendations.value = []
     await refreshAll()
@@ -638,7 +646,34 @@ async function onAskAI() {
 
 function onOpenWorkpaper() {
   if (!selectedMapping.value) return
-  router.push(`/projects/${projectId.value}/workpapers/${selectedMapping.value.wp_code}/edit`)
+  const wpCode = selectedMapping.value.wp_code
+  const wpStatus = wpStatusMap.value[wpCode]
+  if (wpStatus && (wpStatus as any).id) {
+    router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: (wpStatus as any).id } })
+  } else {
+    // 底稿尚未生成，直接触发生成
+    ElMessage.info(`底稿 ${wpCode} 尚未生成，正在为您创建...`)
+    generateSingleWorkpaper(wpCode)
+  }
+}
+
+async function generateSingleWorkpaper(wpCode: string) {
+  try {
+    await api.post(`/api/projects/${projectId.value}/working-papers/generate-from-codes`, {
+      wp_codes: [wpCode],
+      year: year.value,
+    })
+    ElMessage.success(`底稿 ${wpCode} 已生成`)
+    await refreshAll()
+    // 生成后重新尝试打开
+    const wpStatus = wpStatusMap.value[wpCode]
+    if (wpStatus && (wpStatus as any).id) {
+      router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: (wpStatus as any).id } })
+    }
+  } catch (e: any) {
+    const msg = typeof e?.message === 'string' ? e.message : '生成失败'
+    ElMessage.warning(`底稿 ${wpCode} 生成失败：${msg}`)
+  }
 }
 
 function onGoTrialBalance() {

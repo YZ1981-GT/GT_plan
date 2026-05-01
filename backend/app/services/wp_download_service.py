@@ -42,8 +42,13 @@ class WpDownloadService:
             raise ValueError("底稿不存在")
         wp, idx = row
         file_path = Path(wp.file_path)
+        # 相对路径可能相对于 backend/ 目录（底稿生成时的 cwd）
         if not file_path.exists():
-            raise ValueError(f"底稿文件不存在: {wp.file_path}")
+            backend_path = Path(__file__).resolve().parent.parent.parent / wp.file_path
+            if backend_path.exists():
+                file_path = backend_path
+            else:
+                raise ValueError(f"底稿文件不存在: {wp.file_path}")
         return {
             "file_path": str(file_path),
             "file_name": f"{idx.wp_code}_{idx.wp_name}.xlsx",
@@ -235,6 +240,23 @@ class WpUploadService:
             "upload_file: wp=%s, new_version=%d, size=%d bytes",
             wp_id, wp.file_version, len(file_content),
         )
+
+        # ── 三式联动：自动生成 structure.json ──
+        try:
+            from app.services.wp_structure_bridge import generate_structure_for_workpaper
+            # 获取底稿编号
+            from app.models.workpaper_models import WpIndex
+            idx_r = await db.execute(
+                sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+            )
+            wp_code = idx_r.scalar_one_or_none() or ""
+            generate_structure_for_workpaper(
+                str(file_path), wp_code, str(project_id)
+            )
+            logger.info("structure.json generated after upload: wp=%s", wp_id)
+        except Exception as _struct_err:
+            logger.warning("structure generation after upload failed (non-blocking): %s", _struct_err)
+
         return {
             "status": "success",
             "wp_id": str(wp.id),

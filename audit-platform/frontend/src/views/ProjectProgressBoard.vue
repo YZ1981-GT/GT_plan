@@ -222,7 +222,7 @@ function bucketTagType(b: string) {
   return m[b] || ''
 }
 
-function goToWorkpaper(item: BoardItem) {
+function goToWorkpaper(_item: BoardItem) {
   router.push(`/projects/${projectId.value}/workpapers`)
 }
 

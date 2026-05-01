@@ -347,11 +347,34 @@ async def generate_from_codes(
         cycle_dir.mkdir(parents=True, exist_ok=True)
         dest_file = cycle_dir / f"{code}.xlsx"
 
-        # 复制模板文件
+        # 复制模板文件（优先从知识库底稿模板目录查找）
         copied = False
         src_path = lib_entry.get("file_path", "")
+        template_name = lib_entry.get("name", "") or wp_name
+
+        # 1. 知识库底稿模板目录: ~/.gt_audit_helper/knowledge/workpaper_templates/{cycle}/
+        import os
+        kb_base = Path(os.path.expanduser("~/.gt_audit_helper/knowledge/workpaper_templates"))
+        kb_file = kb_base / cycle / f"{template_name}.xlsx" if template_name else None
+        # 也尝试用原始文件名
         if src_path:
+            kb_file_by_name = kb_base / cycle / Path(src_path).name
+        else:
+            kb_file_by_name = None
+
+        for candidate in [kb_file, kb_file_by_name]:
+            if candidate and candidate.exists():
+                shutil.copy2(candidate, dest_file)
+                copied = True
+                break
+
+        # 2. 回退：从原始模板路径查找（项目根目录）
+        if not copied and src_path:
             src = Path(src_path)
+            if not src.exists():
+                root_src = Path(__file__).resolve().parent.parent.parent.parent / src_path
+                if root_src.exists():
+                    src = root_src
             if src.exists():
                 shutil.copy2(src, dest_file)
                 copied = True

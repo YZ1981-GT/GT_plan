@@ -22,6 +22,8 @@ function getRequestKey(config: InternalAxiosRequestConfig): string {
 
 function addPending(config: InternalAxiosRequestConfig) {
   const key = getRequestKey(config)
+  // 跳过 FormData 上传请求（文件上传不参与去重）
+  if (config.data instanceof FormData) return
   if (config.method?.toUpperCase() === 'GET' && pendingMap.has(key)) {
     // 取消前一个相同请求
     pendingMap.get(key)!.abort()

@@ -44,21 +44,10 @@ export interface ValidationResult {
   messages: ValidationMessage[]
 }
 
-export type StepKey =
-  | 'basic_info'
-  | 'account_import'
-  | 'account_mapping'
-  | 'materiality'
-  | 'team_assignment'
-  | 'confirmation'
+export type StepKey = 'basic_info' | 'account_import' | 'account_mapping' | 'materiality' | 'team_assignment' | 'confirmation'
 
 const STEP_KEYS: StepKey[] = [
   'basic_info',
-  'account_import',
-  'account_mapping',
-  'materiality',
-  'team_assignment',
-  'confirmation',
 ]
 
 export const STEP_LABELS: Record<StepKey, string> = {

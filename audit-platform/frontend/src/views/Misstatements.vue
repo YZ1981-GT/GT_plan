@@ -2,12 +2,30 @@
   <div class="gt-misstatements gt-fade-in">
     <!-- 页面横幅 -->
     <div class="gt-ms-banner">
-      <div class="gt-ms-banner-text">
-        <h2>未更正错报汇总</h2>
-        <p>累计错报 vs 重要性水平</p>
+      <div class="gt-ms-banner-row1">
+        <h2 class="gt-ms-title">未更正错报汇总</h2>
+        <div class="gt-ms-info-bar">
+          <div class="gt-ms-info-item">
+            <span class="gt-ms-info-label">单位</span>
+            <el-select v-model="selectedProjectId" size="small" class="gt-ms-unit-select" filterable @change="onProjectChange">
+              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
+            </el-select>
+          </div>
+          <div class="gt-ms-info-sep" />
+          <div class="gt-ms-info-item">
+            <span class="gt-ms-info-label">年度</span>
+            <el-select v-model="selectedYear" size="small" class="gt-ms-year-select" @change="onYearChange">
+              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
+            </el-select>
+          </div>
+          <div class="gt-ms-info-sep" />
+          <div class="gt-ms-info-item">
+            <span class="gt-ms-info-badge">累计错报 vs 重要性水平</span>
+          </div>
+        </div>
       </div>
-      <div class="gt-ms-banner-actions">
-        <el-button size="small" @click="openCreateDialog" round>新增错报</el-button>
+      <div class="gt-ms-banner-row2">
+        <el-button size="small" @click="openCreateDialog">+ 新增错报</el-button>
       </div>
     </div>
 
@@ -141,10 +159,15 @@ import {
   deleteMisstatement, getMisstatementSummary,
   type MisstatementItem, type MisstatementSummaryData,
 } from '@/services/auditPlatformApi'
+import { useProjectSelector } from '@/composables/useProjectSelector'
 
 const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+
+const {
+  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
+  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
+} = useProjectSelector('misstatements')
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -257,8 +280,10 @@ async function onDelete(row: MisstatementItem) {
 }
 
 onMounted(() => {
+  syncFromRoute()
   fetchItems()
   fetchSummary()
+  loadProjectOptions()
 })
 </script>
 
@@ -267,10 +292,10 @@ onMounted(() => {
 
 /* ── 页面横幅 ── */
 .gt-ms-banner {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; flex-direction: column; gap: 10px;
   background: var(--gt-gradient-primary);
   border-radius: var(--gt-radius-lg);
-  padding: 20px 28px;
+  padding: 18px 28px;
   margin-bottom: var(--gt-space-5);
   color: #fff;
   position: relative; overflow: hidden;
@@ -285,11 +310,33 @@ onMounted(() => {
   background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
   pointer-events: none;
 }
-.gt-ms-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-.gt-ms-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
-.gt-ms-banner-actions { position: relative; z-index: 1; }
-.gt-ms-banner-actions .el-button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
-.gt-ms-banner-actions .el-button:hover { background: rgba(255,255,255,0.3); }
+.gt-ms-banner-row1 {
+  display: flex; align-items: center; gap: 16px;
+  position: relative; z-index: 1;
+}
+.gt-ms-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
+.gt-ms-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gt-ms-info-item { display: flex; align-items: center; gap: 4px; }
+.gt-ms-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
+.gt-ms-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
+.gt-ms-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
+.gt-ms-unit-select, .gt-ms-year-select { width: 160px; }
+.gt-ms-unit-select :deep(.el-input__wrapper),
+.gt-ms-year-select :deep(.el-input__wrapper) {
+  background: rgba(255,255,255,0.15) !important;
+  border: 1px solid rgba(255,255,255,0.25) !important;
+  box-shadow: none !important;
+}
+.gt-ms-unit-select :deep(.el-input__inner),
+.gt-ms-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
+.gt-ms-unit-select :deep(.el-input__suffix),
+.gt-ms-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
+.gt-ms-banner-row2 {
+  display: flex; gap: 8px; align-items: center;
+  position: relative; z-index: 1;
+}
+.gt-ms-banner-row2 .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.gt-ms-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
 
 .gt-ms-materiality-cards { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-5); flex-wrap: wrap; }
 .gt-ms-mat-card {

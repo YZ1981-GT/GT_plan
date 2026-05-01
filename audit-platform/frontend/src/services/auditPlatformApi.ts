@@ -304,6 +304,11 @@ export interface ReportDrilldownData {
 export interface ReportConsistencyCheck {
   consistent: boolean
   checks: Array<{ name: string; passed: boolean; expected: string; actual: string; diff: string }>
+  total?: number
+  logic_check_passed?: number
+  logic_check_count?: number
+  reasonability_passed?: number
+  reasonability_count?: number
 }
 
 export async function generateReports(projectId: string, year: number) {
@@ -311,9 +316,10 @@ export async function generateReports(projectId: string, year: number) {
   return data.data ?? data
 }
 
-export async function getReport(projectId: string, year: number, reportType: string, unadjusted: boolean = false): Promise<ReportRow[]> {
+export async function getReport(projectId: string, year: number, reportType: string, unadjusted: boolean = false, applicableStandard?: string): Promise<ReportRow[]> {
   const params: any = {}
   if (unadjusted) params.unadjusted = true
+  if (applicableStandard) params.applicable_standard = applicableStandard
   const { data } = await http.get(`/api/reports/${projectId}/${year}/${reportType}`, { params })
   return data.data ?? data
 }

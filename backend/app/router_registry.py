@@ -71,10 +71,11 @@ def register_all_routers(app: FastAPI) -> None:
 
     # Phase 13: Word 导出
     from app.routers.word_export import router as word_export_router
+    from app.routers.report_mapping import router as report_mapping_router
 
     for r in [rc_router, reports_router, cfs_router, dn_router, ar_router,
               export_router, nt_router, nwm_router, ntr_router, nai_router,
-              rt_router, word_export_router]:
+              rt_router, word_export_router, report_mapping_router]:
         app.include_router(r, tags=["报表与附注"])
 
     # ═══ 5. 底稿管理 ═══
@@ -113,6 +114,26 @@ def register_all_routers(app: FastAPI) -> None:
               rconv_router, ann_router, wpexpl_router, bgjob_router, wpdr_router,
               dfc_router, exhtml_router]:
         app.include_router(r, tags=["底稿管理"])
+
+    # 底稿三式联动
+    from app.routers.wp_structure import router as wpstruct_router
+    app.include_router(wpstruct_router, tags=["底稿管理"])
+
+    # 底稿操作手册
+    from app.routers.wp_manuals import router as wpmanual_router
+    app.include_router(wpmanual_router, tags=["底稿管理"])
+
+    # 底稿精细化规则
+    from app.routers.wp_fine_rules import router as wpfine_router
+    app.include_router(wpfine_router, tags=["底稿管理"])
+
+    # 底稿依赖关系（B→C→D联动）
+    from app.routers.wp_dependencies import router as wpdep_router
+    app.include_router(wpdep_router, tags=["底稿管理"])
+
+    # 账龄分析
+    from app.routers.aging_analysis import router as aging_router
+    app.include_router(aging_router, tags=["底稿管理"])
 
     # ═══ 6. 合并报表 ═══
     from app.routers.consolidation import router as consol_router
@@ -178,13 +199,18 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.performance import router as perf_router
     from app.routers.security import router as sec_router
     from app.routers.system_settings import router as ss_router
+    from app.routers.shared_config import router as sc_router
 
     for r in [gtc_router, ta_router, mb_router, att_router, cust_router,
               as_router, i18n_router, at_router, sig_router, aip_router,
               reg_router, aiu_router, aim_router, rb_router, ps_router,
               kb_router, kf_router, tl_router, ff_router, tc_router, perf_router, sec_router,
-              ss_router]:
+              ss_router, sc_router]:
         app.include_router(r, tags=["系统管理"])
+
+    # 地址坐标注册表
+    from app.routers.address_registry import router as addr_router
+    app.include_router(addr_router, tags=["系统管理"])
 
     # ═══ 9. Phase 14: 门禁引擎与治理 ═══
     from app.routers.gate import router as gate_router

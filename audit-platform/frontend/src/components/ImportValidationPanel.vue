@@ -86,7 +86,7 @@ interface ValidationDisplayItem extends ImportValidationItemLike {
   message: string
 }
 
-const props = defineProps<{
+const _props = defineProps<{
   summary: ResolvedImportValidationSummary
   groupedItems: GroupedImportValidationItems<ValidationDisplayItem>
   title: string

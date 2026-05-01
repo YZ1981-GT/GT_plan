@@ -25,7 +25,16 @@ inclusion: always
 - UI精致度偏好（2026-04-26）：按钮更圆润（默认圆角从4px提升到8px）、表格数据行间距从8px提升到10px（审计员盯屏一天太挤）、进度条加流动光泽动画、标签颜色降低饱和度更柔和、边框用0.5px半透明更细腻、图标统一用线性风格、页面切换加退出过渡动画
 - UI视觉偏好（2026-04-29）：前端界面必须满足致同规范、更好看更美观更动感一目了然对用户友好；页签/标签组件注意背景颜色和字体颜色对比度问题（字体要突出）；自定义badge替代el-tag避免对比度不足；统计栏用紫色渐变+白色粗体数字+金色高亮；卡片hover要有动感（左侧渐变条+位移）
 - 按钮样式修复（2026-04-30）：gt-polish.css和global.css的.el-button--danger用!important给所有按钮加实心渐变背景，导致text/plain模式按钮文字被遮挡；修复：按钮样式区分三种模式（实心:not(.is-text):not(.is-plain)保持渐变+白字、plain浅色背景+深色边框+深色字、text/link透明背景+纯文字色）
+- 表格列宽偏好：所有数据表格必须支持用户拖拽调整列宽（el-table border + resizable），不能出现列头文字截断换行的情况
+- 报表表头冻结偏好：报表页面横幅+Tab+表头行必须冻结在顶部，数据区域独立滚动；el-table用max-height自带冻结，矩阵表格用thead sticky
+- 报表横幅信息展示偏好：横幅区域必须显示单位名称+年度+模板类型（国企版/上市版）+口径（合并/单体），全部支持下拉切换；单位切换跳转到对应项目的报表页
+- 报表按钮命名偏好：一致性校验改为"审核"（按预设公式执行审核校验）；重新生成改为"🔄 刷新数据"（调整分录/数据变动后重新取数计算）
+- 报表审核弹窗需求（2026-04-30）：审核结果不能只显示"通过/未通过"简单提示，需要弹窗展示完整审核过程——按公式类型分组显示（总数/通过/未通过），每条公式可展开查看完整公式+期望值+实际值+差额，未通过项支持溯源跳转到具体错误位置（修改后返回审核弹窗），弹窗保持打开直到用户手动关闭
+- 国企/上市报表自由切换需求（2026-04-30）：横幅区域国企版/上市版改为下拉可切换；右侧新增"转换规则"按钮→弹窗编辑报表项目映射规则（预设一套默认映射+用户可编辑确认）；首次转换后按映射规则计算的数据保存到数据库（标注映射版本），后续切换直接读缓存不重算；映射规则变更后标记需重算；附注也需要同样的国企/上市转换机制
+- 报表模板严格对照偏好（2026-04-30）：报表行次必须严格参照审计报告模板目录下的Excel模板sheet页签，国企版和上市版的合并和单体都要一一对应，不能自己编造行次
 - 功能收敛偏好（2026-04-26）：停止加新功能，空壳页面（<100行）从导航中移除或标记"开发中"灰色不可点击；审计员只需6-8个核心页面做到极致，不需要60个页面；按角色裁剪导航（审计员只看查账/调整/底稿/附注，项目经理多看看板/委派，合伙人多看总览/签字）
+- 空状态页面偏好：无数据时不要左右分栏各自显示空状态引导，合并为一个全宽简洁空状态（图标+一句话+一个按钮），不要啰嗦的步骤说明
+- 底稿管理空状态偏好：两栏flex:1平均分配——左栏操作入口（前往底稿工作台），右栏简洁列表总览（流程横条+13个循环每行一个徽标/名称/底稿数/›箭头，点击跳转到程序裁剪页查看详情），不要用折叠面板太重
 
 ## 项目上下文
 
@@ -33,7 +42,7 @@ inclusion: always
 - Git 远程仓库：https://github.com/YZ1981-GT/GT_plan.git（master分支），本地新初始化时需先 `git init` → `git remote add origin` → 用 `git config --global --unset http.proxy` 清代理后 pull/push；代理端口 127.0.0.1:7897 不通时会报 "Failed to connect to 127.0.0.1 port 7897"
 - Python 3.12 虚拟环境 (.venv)，本地已安装 Docker 28.3.3（Docker Desktop 29.2.1）、Ollama 0.11.10
 - Docker 镜像加速器：daemon.json 中 registry-mirrors 会被 Docker Desktop 覆盖，需用完整镜像名拉取（如 `docker pull docker.1ms.run/library/postgres:16-alpine`）再 `docker tag` 为标准名
-- 新环境初始化数据库：用 `backend/scripts/_init_tables.py`（Base.metadata.create_all 同步建表，需 psycopg2-binary）+ `backend/scripts/_create_admin.py`（创建 admin/admin123），不走 Alembic 迁移链（有多处枚举冲突）；建表后需执行 `backend/scripts/_fix_db.py` 补齐 Mixin 列（import_batches 缺 is_deleted/deleted_at/updated_at，create_all 未正确继承 SoftDeleteMixin 列）
+- 新环境初始化数据库：用 `backend/scripts/_init_tables.py`（自动扫描app/models/*.py所有模块+Base.metadata.create_all同步建表+调用6个/seed端点加载种子数据，需psycopg2-binary+后端运行中）+ `backend/scripts/_create_admin.py`（创建 admin/admin123），不走 Alembic 迁移链（有多处枚举冲突）；建表后需执行 `backend/scripts/_fix_db.py` 补齐 Mixin 列（import_batches 缺 is_deleted/deleted_at/updated_at，create_all 未正确继承 SoftDeleteMixin 列）
 - 后端额外依赖：psycopg2-binary（同步建表/脚本用，requirements.txt 未列出但 .venv 已安装）
 - 使用 Kiro steering + hooks 机制管理工作流
 - 四大模块统一架构：四/五步工作流 + SSE 流式通信 + LLM 驱动 + Word 导出
@@ -307,6 +316,14 @@ inclusion: always
 - 审计报告模板体系：4个维度（意见类型×公司类型×报表口径×单体/合并），种子数据已升级为致同标准7段式（审计意见/形成基础/关键审计事项/其他信息/管理层治理层责任/审计师责任/签章），占位符支持 {entity_name}/{entity_short_name}/{report_scope}/{audit_period}/{audit_year}/{signing_partner}/{report_date}
 
 ## 待办 / 进行中
+- 深度复盘9项改进（2026-05-01）：P0②✅ ⑨✅；P1①✅ ④✅ ⑥✅ 全部完成；P2⑤scope标注✅⑦表格单击编辑✅⑧公式管理树动态加载✅③z-index验证✅ 全部完成
+- 公式管理表格选择功能（2026-05-01）：FormulaManagerDialog新增checkbox多选列+批量操作栏（标记分类/清除公式）+行样式按分类着色+来源列（预设/自定义标签）+highlight-current-row；StructureEditor本地公式管理也新增checkbox多选+批量删除+单击行自动填充编辑Tab
+- 试算表横幅增强完成（2026-05-01）：TrialBalance.vue新增selectedProjectId/projectOptions/selectedYear/yearOptions+单位切换跳转+年度切换+loadProjectOptions从/api/projects加载+CSS两行横幅布局（row1信息+row2操作按钮）+下拉框半透明白色样式
+- 报表Excel公式已提取（2026-05-01）：report_excel_formulas.json国企版771公式/上市版541公式，API GET /api/report-templates/excel-formulas/{soe|listed}
+- 模板复盘6个问题（2026-05-01）：P0①✅国企版"续："已合并到其他应收款 ②✅上市版33个标题已清理模板提示文字；P1③上市版校验公式仅179条需补全 ④✅已生成soe_listed_mapping_preset.json(243条映射覆盖5张报表)；P2⑤附注scope字段逐科目标注合并/单体差异 ⑥上市版五章29个无表格章节排查
+- 试算表/未审表/审定表样式统一（2026-05-01用户要求）：参照审定表样式逐一改造试算表和未审报表页面；注意合并和单体有差异（列数/科目范围不同）；附注也需区分合并/单体；6个核心数据页面（试算表+调整分录+未更正错报+重要性水平+现金流工作底稿+报表）横幅已全部统一为两行布局（信息选择器+操作按钮）+单位/年度切换
+- 附注校验公式从md导入（2026-05-01待做）：解析国企版校验公式预设.md(758条)+上市版校验公式预设.md(179条)，更新note_check_preset_formulas.json；同时解析科目对照模板.md和宽表公式预设.md
+- SharedTemplatePicker接入剩余3页面（2026-05-01完成）：AccountMappingStep（科目映射保存/引用模板+未映射科目自动填充）+AuditReportEditor（报告模板保存/引用+段落不覆盖）+TemplateManager（底稿模板配置保存/引用）；全部5类配置（report_mapping/account_mapping/formula_config/report_template/workpaper_template）均已接入SharedTemplatePicker
 - 项目文件清理（2026-04）：已删除根目录 `__pycache__/`、`frontend/README.md`；`GT_底稿/审计实务操作手册-框架.md` 和 `致同GT审计手册设计规范.md` 待用户确认是否删除
 - 一次性脚本清理偏好（2026-04-23）：backend/scripts/ 下的一次性修复/调试/测试脚本（_fix_*/_debug_*/test_*等）用完即删，不留在仓库中；清理后保留11个长期运维脚本（_create_admin/_init_tables/_create_missing_tables/backup/check_auth*/check_routes/create_project/generate_types/optimize_indexes/seed_staff）
 - 文件清理（2026-04-25）：删除根目录旧前端 `frontend/`（早期AI原型）、`test_collab.db`（测试残留）、`backend/scripts/import_heping_data.py`（和平药房专用脚本，已被smart_import_engine替代）、`backend/tests/_patch_fixtures.py`（一次性批量替换脚本）、`backend/tests/test_staff_service_tmp.py`（临时测试文件，名称与内容不匹配）
@@ -361,6 +378,7 @@ inclusion: always
 - scope_cycles循环级权限过滤已实现（2026-04-26）：WorkingPaperService.list_workpapers新增scope_cycles参数，working_paper.py路由自动从project_users.scope_cycles获取用户循环范围（admin/partner跳过），非空时只返回对应循环底稿
 - 前端动态导航已实现（2026-04-26）：ThreeColumnLayout.vue的navItems从硬编码改为computed，优先从roleContextStore.navItems获取（后端按角色动态返回），降级用硬编码；图标字符串→组件映射（_ICON_MAP）
 - ONLYOFFICE编辑器URL后端统一生成（2026-04-26）：get_online_edit_session返回新增editor_url字段（完整的{onlyoffice_url}/hosting/wopi/cell?WOPISrc=...），前端WorkpaperEditor优先使用session.editor_url降级用getWopiEditorUrl；checkOnlineEditingAvailability增强为同时检查后端/wopi/health和ONLYOFFICE /healthcheck
+- ONLYOFFICE集成方式从WOPI hosting改为Document Server API（2026-05-01）：WOPI hosting模式（/hosting/wopi/cell/edit?WOPISrc=...）在8.2版本静态资源全部404，改为动态加载api.js+new DocsAPI.DocEditor()初始化；document.url用WOPI GetFile端点（/wopi/files/{id}/contents?access_token=...），callbackUrl同路径；JWT已禁用（开发阶段）
 - Paperless联调代码补齐（2026-04-26）：attachments.py新增GET /api/attachments/paperless-health（检查Paperless API可达性）+POST /api/attachments/{id}/retry-ocr（重置OCR状态为pending+创建任务中心任务）
 - 备份恢复验证脚本（2026-04-26）：新增backend/scripts/verify_backup.py（检查manifest.json完整性+数据库备份文件可读+抽样20个文件哈希比对+底稿文件计数+输出verification_report.json）
 - 仅剩3项需部署后验证（非代码问题）：①Paperless实机联调（上传→OCR→预览→下载）②归档恢复演练（backup.py→verify_backup.py→抽样核对）③ONLYOFFICE联调（编辑器打开→编辑→保存→版本递增）
@@ -652,7 +670,7 @@ inclusion: always
 - AI模型配置管理（2026-04-14）：新增 /api/ai-models CRUD+激活+健康检查+种子数据 API（ai_models.py路由），前端新增 AIModelConfig.vue 页面（三Tab对话/嵌入/OCR+健康状态卡片+CRUD弹窗）+ ModelTable.vue 组件 + aiModelApi.ts 服务层；左侧栏新增「AI 模型」导航项（Cpu图标），路由 /settings/ai-models，DefaultLayout 已处理 /settings/ 前缀为全宽模式
 - LLM 调用全面切换到本地 vLLM（2026-04-14）：ai_service.py 从 Ollama 原生 API 改为 OpenAI 兼容 API，新增 `_get_llm_client()` 指向 `http://localhost:8100/v1`；`_chat_sync`/`_chat_stream`/`embedding` 全部改用 OpenAI 格式；config.py 新增 LLM_BASE_URL/LLM_API_KEY/DEFAULT_CHAT_MODEL/DEFAULT_EMBEDDING_MODEL/LLM_TEMPERATURE/LLM_MAX_TOKENS/LLM_ENABLE_THINKING/OLLAMA_BASE_URL/CHROMADB_URL 共9个配置项；默认模型 `Kbenkhaled/Qwen3.5-27B-NVFP4`；Qwen3.5 thinking 模式默认关闭（`chat_template_kwargs: {enable_thinking: false}`）；init_default_models 种子数据改为 openai_compatible provider；Ollama 保留为备用
 - 回收站架构（2026-04-14）：`SoftDeleteMixin` 新增 `soft_delete()` 方法（设 is_deleted=True + deleted_at=now()），全部 24 处服务层软删除操作统一改为调用 `soft_delete()`；新增 recycle_bin.py 路由（5个端点：列表/恢复/永久删除/清空/统计），支持 12 种数据类型；上限 500 条超限提示；ai_chat 物理删除和 import_service rollback 物理删除保持不变（不进回收站）；前端 RecycleBin.vue + 左侧栏导航 + 路由 /recycle-bin
-- 项目向导简化（2026-04-30）：新建项目改为单页（只有基本信息表单+确认创建按钮），无步骤条；科目导入/科目映射/重要性水平/团队分工改为项目创建后的独立功能入口；stepKeys=['basic_info']，stepKeys.length<=1时隐藏el-steps
+- 项目向导精简为单页（2026-04-30）：ProjectWizard.vue从6步向导改为纯基本信息单页，删除步骤条/5个子步骤组件引用(AccountImport/AccountMapping/Materiality/TeamAssignment/Confirmation)/上一步下一步按钮/handleNext/getStepStatus/onStepClick等死代码；wizard.ts的STEP_KEYS从6步缩减为['basic_info']，StepKey类型和STEP_LABELS同步精简；底部按钮改为"保存"+"确认创建"（已有项目时显示"确认"）；科目导入/科目映射/重要性水平/团队分工改为项目创建后各自独立页面入口
 
 ## 代码审查与修复（2026-04-14）
 
@@ -1214,6 +1232,12 @@ inclusion: always
 - 数据库初始化方案：Alembic 迁移链有多处枚举重复创建 bug（005/006 等），改用 `Base.metadata.create_all` 一次性建表 + 手动标记 `alembic_version=034`，绕过迁移脚本问题；_init_db.py 脚本已删除但逻辑可复现
 - 数据库当前状态（2026-04-19）：116 张表全部创建成功，admin 用户 admin/admin123（role=admin），alembic_version=034
 - 数据库补建（2026-04-23）：首次 create_all 只建了116张表（缺少Phase 6/7的73张表），运行 `_create_missing_tables.py` 补建后共111个模型表全部就绪（含 project_assignments/staff_members/work_hours/review_conversations 等）；同时补齐 trial_balance.currency_code 列（Phase 8 迁移034定义但数据库缺失）
+- gt_wp_coding表修复（2026-04-30）：_init_tables.py漏导入gt_coding_models导致500；根治方案：_init_tables.py从手动import列表改为importlib自动扫描app/models/*.py（36个模块0遗漏），种子数据从硬编码ReportConfig字段改为调用后端6个/seed端点（report-config/gt-coding/ai-models/ai-plugins/accounting-standards/template-sets，全部幂等），后端未运行时优雅降级只建表
+- financial_report表缺列修复（2026-04-30）：indent_level和is_total_row两列数据库缺失（ORM有但早期建表时未包含），ALTER TABLE补齐；report_engine.py两处datetime.now(timezone.utc)改为datetime.utcnow()修复asyncpg时区类型不匹配（与import_service同类问题）
+- report_config表缺列修复（2026-04-30）：formula_category/formula_description/formula_source/parent_row_code四列ALTER TABLE补齐
+- report_config list端点修复（2026-04-30）：applicable_standard默认值"enterprise"与实际种子数据（soe_consolidated等4套）不匹配导致返回空；改为支持project_id参数自动解析标准名；_resolve_applicable_standard从reports.py路由层提取到ReportConfigService.resolve_applicable_standard静态方法（消除路由间交叉导入），reports.py改为代理调用
+- import_jobs表缺列修复（2026-04-30）：artifact_id/custom_mapping/options/current_phase/result_summary/heartbeat_at/timeout_seconds共7列ALTER TABLE补齐，导致/api/data-lifecycle/import-queue/{pid}返回500
+- 非关键请求静默处理（2026-04-30）：DetailProjectPanel（gt-coding/tree、trial-balance、attachments）和ThreeColumnLayout（import-queue）的非关键请求改用http.get+validateStatus:s<600，跳过全局错误拦截器避免弹红色提示
 - 四表缺失列批量修复（2026-04-23）：`_fix_missing_cols.py` 补齐11列——tb_aux_ledger.aux_dimensions_raw、tb_aux_balance.aux_dimensions_raw、tb_balance.opening_debit/opening_credit/closing_debit/closing_credit、tb_aux_balance同4列、attachments.created_by；根因是早期手动建表后ORM模型新增的列未同步到数据库
 - consolidation_models server_default 规则：PG 枚举列用 `server_default="xxx"` 纯字符串（不带引号），或用 `server_default=text("'xxx'")`（text 函数包裹）；绝不能用 `server_default="'xxx'"`（双层引号）
 - 导航布局调整（2026-04-19）：左侧栏从 17 项精简到 10 项（核心业务：仪表盘/项目/人员委派/工时/管理看板/合并项目/函证/归档/附件/用户管理），7 个全局工具移到顶部栏右侧图标（知识库/私人库/AI模型/排版模板/吐槽求助 | 回收站/系统设置），中间竖线分隔工具入口和系统操作
@@ -1318,7 +1342,7 @@ inclusion: always
 - 三类模板三层架构决策（2026-04-26）：第一层致同标准模板只读（底稿360xlsx+51md/报表4×5准则JSON/附注国企40节+上市45节JSON）→第二层项目级克隆可改→第三层用户自定义不受更新影响；已写入底稿开发.md第十一章
 - 底稿51个md文件处理方案（2026-04-26）：11个操作手册md接入LLM知识库（新增wp_manual_service.py类似tsj_prompt_service模式）、11个底稿模板库md驱动parse结构识别、1个Excel制作规格md驱动QC自动化、29个BC控制底稿md接入程序引导
 - 附注md合并方案（2026-04-26）：8个附注模版md中科目对照/校验公式/宽表公式合并到note_template_soe/listed.json对应字段，正文模板md接入LLM上下文供AI生成会计政策引用；新增scripts/merge_note_templates.py合并脚本
-- 报表行次补全待办（2026-04-26）：report_config_seed.json需补全新准则科目（使用权资产/合同资产/合同负债/债权投资/其他综合收益/租赁负债等12+行），EQ权益变动表从10行扩展到25+行
+- 报表行次补全已完成（2026-04-30）：从模板Excel精确提取1153行替代旧版624行，含现金流量表补充资料
 - 用户偏好：文档分步写入（2026-04-26），大段内容必须分步追加，不要一次性写入整个章节，避免工具超时或截断
 
 - "问题1"审查报告文件已删除（2026-04-27）：557行代码审查报告内容已完整整合到memory.md（Phase 11系统加固章节），12个问题全部在Phase 11中完成修复，无需保留独立文件
@@ -1482,11 +1506,15 @@ inclusion: always
 - 报表结构现状分析（2026-04-29）：report_config_seed.json预设简化版（BS 44行/IS 21行/CFS 46行/EQ 10行），与致同标准（BS 70+行/IS 30+行）相比缺失新准则科目（使用权资产/合同资产/合同负债/债权投资/商誉/租赁负债/一年内到期等）；公式语法支持TB/SUM_TB/ROW三种
 - 报表结构自定义能力：已支持clone为项目级配置+修改行名/公式/缩进/合计标记（PUT /report-config/{id}）；未支持新增/删除行次、前端无报表结构编辑UI、不支持拖拽排序、不支持从Excel导入报表结构
 - 报表结构待改进：P0补全BS/IS行次到致同标准（新准则科目）+前端增加编辑入口；P1支持新增/删除行API+前端编辑器+Excel模板导入
-- 报表行次补全到致同标准已完成（2026-04-29，commit 55b13f9已推送）：新增generate_report_seed.py脚本生成4套报表（soe_consolidated/soe_standalone/listed_consolidated/listed_standalone），16个配置块624行；BS含新准则科目（合同资产/使用权资产/债权投资/租赁负债/衍生金融/持有待售等），IS含信用减值/资产减值/其他收益/资产处置/每股收益（上市版），CFS完整三大类53行，EQ 17行变动项目；合并版多少数股东权益/损益，上市版多每股收益
+- 报表行次从模板Excel重新提取（2026-04-30）：report_config_seed.json升级到1191行（22个配置块=4套×5张报表+国企版2套资产减值准备表）；新增impairment_provision报表类型（19行，国企版专有企财06表）+cash_flow_supplement（30行）；FinancialReportType枚举含7个值（BS/IS/CFS/EQ/CFSS/IMP）；report_engine type_order同步包含6张报表；前端ReportView 6个Tab（资产负债表/利润表/现金流量表/所有者权益变动表/现金流附表/资产减值准备表）
 - 报表结构体系确认：致同两套标准（国企soe+上市listed）×两种口径（合并consolidated+单体standalone）= 4套，applicable_standard字段值为soe_consolidated/soe_standalone/listed_consolidated/listed_standalone
 - 报表结构待做：前端报表结构编辑UI（支持行名/公式修改+新增/删除行+拖拽排序）
+- 权益变动表矩阵视图（2026-04-30）：ReportView.vue新增专用矩阵表格（activeTab=equity_statement时渲染），行=33个变动项目，列=12个权益组成部分×2期（本年金额+上年金额），项目列sticky固定+数据列横向滚动；待办：后端financial_report表需改造支持矩阵存储（当前只有current_period_amount单值，无法按列拆分）
+- 现金流附表偏好（2026-04-30）：现金流附表只保留补充资料一个表（将净利润调节+不涉及现金收支的重大投资和筹资活动+现金及现金等价物净变动），不需要"取得/处置子公司现金净额"和"现金等价物构成"两个表；前端ReportView新增"现金流附表"Tab（cash_flow_supplement），用普通两列格式（项目+本期发生额+上期发生额）
+- 资产减值准备表矩阵视图（2026-04-30）：ReportView.vue新增专用矩阵表格（activeTab=impairment_provision时渲染），行=19个减值准备项目，列=11列（年初账面余额/本期增加4列计提+合并+其他+合计/本期减少5列转回+转销+合并+其他+合计/期末账面余额），严格按国企版企财06表模板列结构
+- 国企/上市转换映射已实现（2026-04-30）：新增report_mapping_service.py（三层匹配：同义词表soe_listed_mapping_preset.json+精确匹配+模糊匹配）+report_mapping.py路由3端点+前端弹窗5个Tab覆盖全部报表类型；转换规则弹窗支持一键加载全部预设+保存全部规则
 - 前端报表结构编辑UI已完成（2026-04-29，commit 8842bb5已推送）：新增ReportConfigEditor.vue（4套标准切换+4张报表切换+双击行内编辑row_name/formula/indent_level+新增行+删除行二次确认+批量保存PUT /report-config/{id}+合计行/分类标题行视觉区分），ReportView.vue新增"编辑结构"按钮跳转，路由/projects/:projectId/report-config已注册
-- 报表结构编辑待补：后端需新增POST /report-config端点支持新增行（当前只有PUT修改），前端onAddRow的_isNew行暂时跳过保存
+- 报表结构编辑已完善（2026-04-30）：后端新增POST /report-config（新增行）+DELETE /report-config/{id}（删除行）；前端去掉公式列（公式在单独的公式管理界面），加多选框+在上方插入行+批量删除选中行+合计行checkbox列；报表类型下拉扩展到6张表
 - 报表结构联动分析发现2个关键问题（2026-04-29）：①generate_all_reports的applicable_standard默认"enterprise"与新种子数据（soe_consolidated/listed_standalone等）不匹配，新624行种子数据不会被默认加载②check_balance中引用的row_code（BS-021/BS-057/BS-044/BS-056/BS-055）与新种子数据的row_code不一致（新数据资产总计=BS-039，负债权益总计=BS-099）
 - 报表联动链路确认：report_config→ReportEngine执行公式→trial_balance取数→financial_report表→前端ReportView展示+穿透弹窗；已审/未审报表都从report_config加载行次；合并报表未使用report_config生成行次（断点）
 - 报表溯源能力确认完整：formula_used+source_accounts+drilldown穿透+version_line版本戳+report_snapshot快照
@@ -1494,26 +1522,59 @@ inclusion: always
 - 报表结构联动3个问题已修复并推送（2026-04-29，commit ab78a63）：①reports.py新增_resolve_applicable_standard()从Project.template_type+report_scope动态映射到soe_consolidated等4套标准（降级enterprise兼容旧数据），generate_reports端点调用时传入②report_engine.py check_balance()所有row_code改为优先新(BS-039/070/091/099/IS-024/CFS-053)降级旧(BS-021/044/056/057/IS-019/CF-042)③audit_report_service._fetch_financial_data的5个关键指标row_code对齐新种子数据
 - 报表结构完整联动链路已打通：项目配置→_resolve_applicable_standard→_load_report_configs(4套)→执行公式→trial_balance取数→financial_report表→check_balance兼容新旧→前端ReportView展示
 - 公式管理体系已完成（2026-04-29，commit b582303已推送）：ReportConfig模型新增formula_category(auto_calc/logic_check/reasonability)+formula_description+formula_source三字段；generate_report_seed.py新增_categorize_formula()自动分类（TB/SUM_TB→auto_calc+试算表审定数，ROW→auto_calc+报表行次引用）；新增FormulaManagerDialog.vue公式管理弹窗（三分类Tab+计数徽标+行内编辑公式/分类/说明+保存PUT）；ReportView.vue新增"公式管理"按钮入口；report_config_service.py update_config/load_seed_data支持新字段
-- 公式三分类体系：⚡auto_calc自动运算（从试算表取数/行次求和）、🔍logic_check逻辑审核（平衡校验/勾稽关系）、💡reasonability提示合理性（变动率/占比异常）
+- 公式三分类体系：⚡auto_calc自动运算（从试算表取数/行次求和）、🔍logic_check逻辑审核（平衡校验/勾稽关系/数值一致性/账龄逻辑勾稽）、💡reasonability提示合理性（变动率/占比异常/必填原因不为空/大金额变动说明）
+- 审核公式执行规则（2026-04-30）：审核按钮只执行logic_check和reasonability两类公式（auto_calc不参与审核因为自动运算了）；审核弹窗按类型分组显示（逻辑审核/提示性审核），与公式管理的formula_category字段联动
+- 审核公式引擎已实现（2026-04-30）：report_engine.py新增run_audit_checks方法（内置平衡校验4条+从report_config加载logic_check/reasonability公式逐条执行），API返回分类统计；前端审核弹窗3个Tab（全部/逻辑审核/提示性审核）+公式/来源列+溯源跳转
 - 用户偏好（公式管理）：公式需分3类+每个界面有按键弹窗编辑+公式下匹配简短说明+标注源头
+- 公式管理升级需求（2026-04-30）：公式管理弹窗需升级为多层级配置中心——左侧树形导航（报表6张表/附注按章节/底稿按循环），支持按层级1-2-3折展到具体sheet；右侧公式配置表格（行次+公式+分类+说明）；自动运算公式点击"应用"后映射到前后端，刷新时按公式重新计算数据
+- 公式管理中心已实现（2026-04-30）：FormulaManagerDialog重写为左右分栏（左侧el-tree三大类报表/附注/底稿/表间审核+右侧公式表格），弹窗95%宽度；报表6个子节点带公式数量徽标；附注7大类+具体科目；底稿3层（循环→科目→sheet）；表间审核3组（报表↔附注/报表↔底稿/附注↔底稿）+自定义规则
+- 公式编辑弹窗需求（2026-04-30）：每行支持多条公式（不同类型）；点击编辑弹出专用弹窗（非行内输入）；弹窗内可视化源表引用（支持快捷输入+鼠标点选源表行）；公式语法说明区帮助用户理解TB/ROW/NOTE/WP等函数含义
+- 公式编辑弹窗已实现（2026-04-30）：新增FormulaEditDialog.vue（左右分栏：左侧多条公式配置区含类型选择+说明+表达式textarea+快捷插入按钮TB/ROW/SUM_TB/NOTE/WP/REPORT，右侧语法帮助区7种函数说明）；FormulaManagerDialog中点击编辑/添加公式改为打开此弹窗，保存后自动PUT到后端
 - 用户偏好（公式应用）：自动运算类公式点击"应用"后表中数值要立即重新计算刷新（不只是配置信息，是可执行的实时计算引擎）；附注表格页面也需要同样的公式管理+应用机制
 - 公式应用功能已完成（2026-04-29，commit 688dead已推送）：FormulaManagerDialog新增"应用自动运算"按钮（调POST /api/reports/generate重算→emit applied→fetchReport刷新表格），新增projectId/year props；附注编辑器新增NoteFormulaDialog.vue公式管理弹窗（三分类Tab+公式列表+新增/编辑+应用调validate端点→onFormulaApplied刷新当前附注）
 - 公式应用机制：报表页面点"应用"→后端执行TB/SUM_TB/ROW公式从trial_balance取数→写入financial_report→前端刷新；附注页面点"应用"→后端validate触发纵向/横向公式计算→前端刷新
+- 公式取数按钮交互偏好（2026-05-01）：TB/ROW/NOTE/WP/REPORT/SUM_TB等取数函数按钮点击后必须弹窗让用户从实际数据源中鼠标选择（试算表科目/报表行次/附注章节/底稿列表），不能插入空引号让用户手动填写；ROW/REPORT先弹报表类型选择再弹行次列表
+- 新增SUM_ROW连续行范围求和函数（2026-05-01）：SUM_ROW('BS-002','BS-026')表示从BS-002到BS-026连续行求和，弹窗分两步选择起始行和结束行；与ROW()逐个相加互补（连续用SUM_ROW，不连续用ROW+ROW）
+- 公式编辑弹窗数据源一览偏好（2026-05-01）：右侧面板需显示报表/附注/底稿/试算表所有sheet的简写编码标签，点击标签直接跳转到对应数据源弹窗选择；标签按四组排列（报表6张BS/IS/CFS/EQ/CFSS/IMP、附注18个常用科目、底稿14个常用编码、试算表）
+- 公式编辑弹窗三栏布局（2026-05-01）：左栏=公式配置（flex:1），中栏=数据源一览（280px，报表/附注/底稿/试算表列表行，每行简写编码+名称+sheet明细，点击跳转），右栏=语法说明（280px）；数据源一览必须独立成栏不能塞在语法说明里
+- 公式函数完整覆盖（2026-05-01）：27个按钮分4行（取数9个TB/ROW/SUM_ROW/SUM_TB/NOTE/WP/REPORT/AUX/PREV + 比较6个 + 函数5个IF/ABS/ROUND/MAX/MIN + 审计8个非空/非零/变动率/区间/必填原因/容差/同比/占比）；每个按钮必须有title悬停释义；公式区字体11px等宽+按钮10px紧凑
+- 公式看板已实现（2026-05-01）：FormulaManagerDialog新增"📊 公式看板"按钮→弹窗全局审核公式总览，支持4种分组维度（按报表类型/公式分类/数据源类型/全部平铺）+搜索+分类筛选+折叠展开+行内编辑跳转；打开时自动加载6张报表全部公式数据
+- 共享配置模板三层体系已实现（2026-05-01）：shared_config_templates表+config_references表+SharedConfigService+7个API端点+SharedTemplatePicker.vue通用组件；三层共享system(事务所默认)/group(集团级)/personal(个人级)；5类配置report_mapping/account_mapping/formula_config/report_template/workpaper_template；集团模板供同集团子企业引用避免重复修订，个人模板跨项目复用；已接入公式管理，其他页面只需加一行组件
+- 共享配置需求（2026-05-01用户要求）：国企/上市转换规则、科目映射、公式审核、报告模板、底稿模板5类配置都需要支持集团级和个人级的保存为模板+引用模板功能，避免不同项目重复修订；权限控制：集团模板同集团可见、个人模板本人可见、公开模板所有人可见
+- 多条公式存储方式（2026-05-01技术决策）：report_config.formula字段用换行符\n拼接多条公式，formula_description用中文分号；拼接；加载时自动拆分还原为多条FormulaItem
+- 附注校验预设公式已生成（2026-05-01）：_gen_note_preset_formulas.py从check_presets提取8种校验类型（balance/sub_item/movement/aging/vertical_reconcile/book_value/cross_check/ecl_three_stage）生成note_check_preset_formulas.json（SOE 55条+Listed 67条），GET /api/note-templates/preset-formulas/{soe|listed}端点；公式管理中心"导入预设"按钮已支持附注节点加载
+- 用户要求（2026-05-01）：附注模版中的校验公式（check_presets）要直接预设到公式管理的模板中，方便一键导入；SharedTemplatePicker还需接入科目映射/报告模板/底稿模板3个页面（待做）
 
 ## 附注编辑器需求明确（2026-04-29 用户要求）
 - 附注模板体系：两套合并模板（国企soe+上市listed），单体只是部分章节略有不同
+- 附注模板加载bug修复（2026-05-01）：disclosure_engine._load_templates从旧种子文件note_templates_seed.json（仅6条）改为从完整模板note_template_soe.json（40章节）/note_template_listed.json（45章节）加载；前端onMounted自动生成（目录为空时自动调onGenerate）
+- 附注_build_table_data缺失方法修复（2026-05-01）：generate_notes和update_note_values调用self._build_table_data但方法从未定义导致AttributeError；已实现完整方法（从table_template构建headers+rows，自动从trial_balance按科目名/编码取数填充期末/期初，合计行自动求和，试算表不可用时值为空）
 - 附注编辑器UI要求：报表主要项目情况下每个报表科目一个表格一个界面，用多层级前端显示方式（树形导航→选中科目→右侧显示该科目的表格）
 - 每个界面支持用户直接编辑（手动模式）
 - 默认是自动提取数据状态（从底稿parsed_data自动填入）
 - 根据底稿中数据直接配置好自动运算公式（如合计=子项之和、期初+变动=期末）
 - 支持一键清除公式（清除后变为手动编辑模式，不再自动计算）
+- 附注目录树形分组结构（2026-05-01）：按章节分组（一公司概况/二编制基础/三会计政策/四税项/五报表科目注释/六其他），五章内按资产(1-15)/负债(16-23)/权益(24-28)/损益(29-35)/其他(36+)二级分组；一~四章和六章显示占位待补充内容；五章默认展开
 - 三种单元格模式：auto（自动提数+公式计算）→ manual（手动编辑）→ locked（锁定不可改）
 - 一键清除公式 = 将所有auto单元格切换为manual模式
+- 附注公式管理统一（2026-05-01）：附注页从NoteFormulaDialog替换为FormulaManagerDialog（与报表页完全相同的公式管理中心），支持树形导航/国企上市切换/预设导入/公式看板/共享模板
+- "结构化编辑"改名为"表样编辑"（2026-05-01）：StructureEditor标题+DisclosureEditor按钮+提示消息统一改名；StructureEditor工具栏新增"⚙️ 公式管理"按钮调出FormulaManagerDialog
+- 表样编辑器HTML结构注意（2026-05-01）：后端excel_html_converter生成的HTML无thead，列头行用class="gt-col-header-row"标识，行号列用class="gt-row-header"；CSS选择器必须用class名而非tr:first-child/nth-child（后端内联style有tr:first-child高亮会误伤数据行）
 - 附注公式管理增强已完成（2026-04-29，commit 9e06c9f已推送）：DisclosureEditor编辑模式新增"一键清除公式"按钮（auto→manual保留数值）+"恢复自动提数"按钮（manual→auto+从底稿重新提取）；后端新增POST clear-formulas+restore-auto两个端点；NoteWpMappingService新增clear_formulas()/restore_auto_mode()方法（遍历table_data.rows._cell_modes切换+flag_modified标记JSONB）
 - 附注单元格模式存储方式：table_data.rows[i]._cell_modes = {"0": "auto", "1": "manual", ...}，key为列索引字符串，value为模式
 - 附注模板现状确认（2026-04-29）：两套模板note_template_soe.json(40章节)+note_template_listed.json(45章节)，每章节含table_template(headers+rows)+check_presets(校验规则)+wide_table_presets(宽表公式)+text_template(文字模板)；check_presets对应7种校验（balance/sub_item/aging/movement/book_value/horizontal_balance/ecl_three_stage）
 - 附注模板缺失4项：①check_presets未自动转化为前端可执行公式（"应用自动运算"无法真正计算）②单体版附注无独立模板（只有合并版soe/listed）③movement/book_value专项校验逻辑未实现④wide_table_presets的horizontal_balance缺固定资产/无形资产"原值-折旧=账面价值"专项
 - 附注修复优先级：①从check_presets自动生成前端可执行公式→②补单体版差异标记→③补movement/book_value专项校验
+- 表样编辑器公式管理双Tab（2026-05-01）：Tab1已有公式列表（从表格data-formula属性提取）+Tab2公式编辑（目标定位+公式textarea+取数9按钮+运算符9按钮+函数8按钮+添加到列表）；添加后自动切回Tab1
+- 附注模板精细化需求（2026-05-01用户要求）：当前模板是简化版（每科目仅1个简单表格），需按实际审计报告模板中的表格逐一落地——一个科目可能有多个sheet表格（如应收账款有账龄表+坏账准备表+前五名明细表），每个章节还需预留正文文字区域
+- 附注模板多表格升级已完成（2026-05-01）：模板JSON从table_template单表格升级为tables数组+text_sections数组；7个关键科目升级为多表格（应收账款3表/其他应收款3表/存货2表/固定资产3表/无形资产1表/应付职工薪酬2表/营业收入3表）；后端generate_notes遍历tables数组逐个_build_table_data，存储在table_data._tables；前端el-tabs卡片切换多表格
+- 附注模板v2精细化完成（2026-05-01）：按致同标准补全17个关键科目完整表格集合，国企版61个表格/上市版66个表格；应收账款5表（账龄+坏账分类+组合计提+坏账变动+前五名）、固定资产5表（变动+闲置+融资租入+经营租出+抵押）、其他应收款4表、营业收入4表、应收票据3表、长期股权投资3表、应付职工薪酬3表等
+- 附注模板v3补全完成（2026-05-01）：补全19个遗漏科目，国企版72表/上市版77表（修正后）；应付账款2表（明细+账龄，无前五名）、其他应付款3表、关联方5表、递延所得税3表等
+- 附注模板从md全量提取完成（2026-05-01）：从附注模版/国企报表附注.md(303KB)+上市报表附注.md(519KB)解析，国企版166章节263表格（五章94科目）/上市版174章节433表格（五章74科目）；上市版章节编号已修正（四、→五、，排除税项）；替代了之前手工编写的72表简化版
+- 附注模板严格对照原则（2026-05-01用户纠正）：不能凭想象添加表格，必须严格以实际致同附注模板为准；如应付账款无前五名披露要求，不能自行增加；需要用户提供实际模板Word文件逐一核对
+- 附注模板Word文件位置：审计报告模板/国企版/合并/1.1-2025国企财务报表附注20260106.docx（434个表格）、审计报告模板/上市版/合并_上市/3.2025年度上市公司财务报表附注模板-2026.01.15.docx；当前JSON模板仅覆盖72/434个表格，后续需写自动解析脚本从Word全量导入
+- 附注模板Word结构分析（2026-05-01）：Word模板用Heading 1/3/4多层级样式组织，"财务报表主要项目注释"是Heading 1大标题，具体科目表格分散在文档中无统一编号前缀；需要更智能的解析器按Heading层级+表格位置关系提取，简单正则匹配不够
+- 附注模版md文件位置（2026-05-01发现）：附注模版/目录下8个md文件——国企版校验公式预设.md(163KB)+上市版校验公式预设.md(73KB)+国企版科目对照模板.md(29KB)+上市版科目对照模板.md(8KB)+国企版宽表公式预设.md(11KB)+上市版宽表公式预设.md(6KB)+国企报表附注.md(303KB)+上市报表附注.md(519KB)；校验公式md按科目逐表格列出每条公式（编号+类型+表达式），类型含余额/宽表/纵向/交叉/跨科目/其中项/二级明细/完整性/LLM审核共9种；待解析导入到note_check_preset_formulas.json
 - 附注模板3项修复已完成（2026-04-29，commit 08466d9已推送）：①新增note_formula_generator.py（generate_formulas_for_table从check_presets自动生成3种公式vertical_sum/horizontal_balance/book_value，execute_note_formulas执行回填只更新auto单元格，公式存储在table_data._formulas字典key="row_idx:col_idx"），新增POST apply-formulas端点②两套模板每章节新增scope字段（both/consolidated_only/standalone_only），国企版"国有资本"标记standalone_only③validate_wide_table增强book_value专项（检测账面价值期末行，自动查找原值/折旧/减值行计算差额）
 - 用户需求（跨表公式引用）：附注公式编辑时需支持跨表指标选择——引用报表行金额REPORT('BS-002','期末')、引用试算表科目TB('1001','审定数')、引用其他附注章节合计值NOTE('五、3','合计','期末')；当前只支持表内引用cell(row,col)/SUM(start:end,col)
 - 附注vs报表一致性校验：check_presets.balance规则已实现（validate_cross_table从financial_report取报表金额与附注合计比对），但用户自定义公式中无法引用报表数据
@@ -1540,6 +1601,47 @@ inclusion: always
 - 前端TS错误修复+建表脚本增强已完成（2026-04-29，commit 01a060d+4397ee0已推送）：consolidationApi.ts类型补全（ConsolScopeItem+ComponentAuditor+InstructionResult+Instruction新增字段+createResult/updateResult函数）；_init_tables.py新增dataset_models/phase12-16_models导入+建表后自动加载report_config_seed.json 624行种子数据（幂等，已有数据跳过）
 - 本轮总计20个commit（cc8f47d→4397ee0），全部已推送GitHub
 - 剩余TS错误：约120个集中在consolidation/组件（已标记developing不影响核心）+约15个unused variable（TS6133不影响运行）
+- 前端TS实质错误清零（2026-05-01）：非合并模块实质TS错误从18个降到0个（ReportConsistencyCheck类型补全+ReportView模板行字段修正+StepKey扩展6步+LedgerPenetration类型断言+PerformanceMonitor trim修复+DisclosureEditor补watch导入+FormulaBar/StructureEditor/FormulaManagerDialog清理未使用变量+rollbackFileVersion补参数+AccountMappingStep补standard_account_name字段）；剩余23个均为TS6133未使用变量警告（13个文件）；合并模块211个TS错误待专项修复
+- 系统复盘（2026-05-01）：TS错误231=215合并+16未使用(_前缀)+0实质；后端1845测试+E2E 13/13全通过；90个Vue页面12个<50行空壳；路由115个+服务171个+11组业务域；数据配置15个JSON共2.8MB；系统功能完整度95%+，最大价值是用真实项目验证而非加新功能
+- 本轮会话完成39项（2026-05-01最终）：P2四项+SharedTemplatePicker5页+6页横幅+TS清零18→0+公式多选+地址坐标库(四维缓存)+三式联动桥接+WorkpaperEditor降级+映射86条+规则45条+操作手册51md+E2E修复13/13+合并6Tab+未使用变量24→16+useProjectSelector6页+空壳6页developing+Pydantic V2+E1精细化27Sheet+精细化引擎多文件+审计检查执行+多Sheet Tab+附注取数优先底稿+多文件structure+WOPI自动重建+多文件底稿生成+审计检查前端展示+BCD依赖联动+TSJ复核接入+审计检查跳转+报表→附注跳转+底稿智能提示；新增6个后端服务+~30个API端点+~25个前端函数
+- 下一步优先级（2026-05-01更新）：本周①BCD依赖关系图ECharts✅②审计检查仪表盘✅③检查失败LLM修复建议；下周④底稿完成度热力图⑤公式依赖网络图⑥全局搜索跳转⑦文件级裁剪粒度；之后⑧合并模块215个TS修复⑨D2/H1精细化规则⑩异常交易识别⑪KAM自动草拟⑫真实项目验证
+- BCD依赖关系图+审计检查仪表盘完成（2026-05-01）：DependencyGraph.vue可复用组件（三列流程图B→C→D+节点状态+控制结论标签+循环切换）+AuditCheckDashboard.vue页面（5汇总卡片+按循环分组折叠+逐条检查展示+底部依赖图）+路由/projects/:id/audit-checks+DetailProjectPanel新增"审计检查"快捷入口
+- 质控互动增强完成（2026-05-01）：WorkpaperList复核意见面板增强（状态筛选栏+回复内容内联显示+时间列+高优先级红色高亮+💬对话按钮跳转ReviewConversations）+annotations.py创建/更新时发布SSE事件（ANNOTATION_CREATED/UPDATED含项目ID/优先级/预览，前端可实时刷新）
+- 底稿模板三步走计划（2026-05-01）：①补全解析规则覆盖（通用解析器增强+映射补全到70+条+规则补全到40+条）②三式联动接入底稿（upload后自动excel_to_structure+WorkpaperEditor降级用StructureEditor+审定表公式自动绑定TB()取数+保存时structure_to_excel回写）③操作手册md接入LLM知识库（40个md加载到审计程序库+底稿工作台AI面板按循环加载）
+- 底稿三式联动桥接已完成（2026-05-01）：wp_structure_bridge.py（generate_structure_for_workpaper自动转换+_auto_bind_formulas审定表公式自动绑定TB()取数+save_structure_to_excel回写+get_workpaper_structure缓存优先+batch_generate_structures批量生成+get_workpaper_addresses地址注册）+wp_structure.py路由6端点（get/save/rebuild/html/batch/addresses）已注册router_registry第5组；upload_file后自动生成structure.json（非阻塞）；commonApi.ts新增6个前端函数
+- WorkpaperEditor降级模式修正（2026-05-01→纠正）：ONLYOFFICE不可用时不再加载StructureEditor（StructureEditor只用于附注表样编辑），改为直接显示下载/上传面板（📥图标+下载底稿+上传回传+返回按钮），底稿是Excel文件用HTML表格编辑体验差
+- 底稿映射补全到86条（2026-05-01）：wp_account_mapping.json从56→86条（+30条：函证D0/E0+明细表D2-2~K9-2+新科目L5/L6/L7/K16/K17/K18/D5-1/D6-1/D7-1），version升级到2025-R3
+- 底稿解析规则补全到28条（2026-05-01）：wp_parse_rules_extended.json从20→28条（+8条：L5应付债券/L6长期应付款/L7预计负债/K16投资收益/K17公允价值变动/K18递延收益/D0函证/E0银行询证函）；核心规则17条不变，总计45条
+- 底稿精细化规则引擎（2026-05-01）：wp_fine_rule_engine.py（load_fine_rule/extract_with_fine_rule按精确行列号提取+list_fine_rules）+wp_fine_rules.py路由3端点（列表/详情/提取）已注册router_registry第5组；规则文件存放在backend/data/wp_fine_rules/{code}.json；与通用解析器互补（通用处理标准审定表，精细化处理每个科目特有的多Sheet结构+交叉引用+审计检查）
+- E1货币资金精细化规则完成（2026-05-01）：e1_cash.json覆盖5个Excel文件27个Sheet（exact_name与模板完全一致），审定表E1-1精确到R7-R21×C1-C10+仅人民币R23起，8条交叉引用+10条审计检查（含severity分级blocking/warning/info）；引擎支持多文件（source_file字段自动打开对应Excel）+精确名称优先匹配降级模式匹配
+- E1货币资金8步全链路复盘通过（2026-05-01）：模板生成(5文件)→表头填充→智能提示(TSJ+操作手册+BCD依赖)→数据预填(TB公式)→ONLYOFFICE编辑(16Sheet)→审计检查(10条)→交叉引用(8条)→提交复核(5门禁)→质控互动(意见+对话+SSE)→联动更新(底稿→试算→报表→附注)，无断点；下一步D2应收账款精细化
+- D2应收账款精细化规则完成（2026-05-01）：d2_receivable.json覆盖5个Excel文件19个Sheet规则（D2-1至D2-4常规+D0函证+D2-5分析+D2-6至D2-13检查+ECL参考示例），审定表D2-1三段式（原值R7-R13/坏账R14-R20/净值R21-R25）含重分类列C4/C8，9条交叉引用+14条审计检查（含ECL计量+账龄集中度+迁徙率）；精细化规则累计2个科目（E1+D2）
+- D循环编号映射修正（2026-05-01）：wp_account_mapping.json D1从"营业收入"改为"应收票据"(1121)，D2="应收账款"(1122)，D3="预收账款"(2203)，D4新增"营业收入"(6001/6051)——与实际模板目录一致（D0函证/D1应收票据/D2应收账款/D3预收账款/D4营业收入/D5应收款项融资/D6合同资产/D7合同负债）；D2-4从"账龄分析"改为"调整分录汇总表"
+- wp_parse_rules D2升级（2026-05-01）：从5个简单Sheet升级为10个精确列映射Sheet（审定表含重分类列+key_rows三段小计+明细表含关联方列+坏账变动表11列+调整分录+分析程序+6个检查程序），引用fine_rules路径
+- D1应收票据精细化规则完成（2026-05-01）：d1_notes_receivable.json覆盖2个文件（主文件21Sheet+D0函证共用）19个Sheet规则，审定表D1-1三段式按票据类型（银行承兑/商业承兑）分行，坏账准备D1-4比D2多期末调整列C12/C13/C14共14列，8条交叉引用+10条审计检查（含贴现/背书未到期披露+票据监盘+质押检查）；wp_parse_rules旧D3条目改为D1+升级13Sheet；精细化规则累计3个科目（E1+D2+D1）共34条审计检查+25条交叉引用
+- 审计检查执行器补全（2026-05-01）：_run_audit_checks从3种扩展到9种检查类型（+formula净值=原值-坏账逐行/completeness明细表数据/aging账龄分段/confirmation函证结果/check+analysis+cutoff Sheet填写/reconciliation余额调节）；fine-extract结果自动持久化到parsed_data.fine_checks
+- F循环编号映射修正（2026-05-01）：F1从"存货"改为"预付账款"(1123)，F2新增"存货及跌价准备"(1401~1461)——与实际模板一致（F0函证/F1预付账款/F2存货及跌价准备/F3应付票据/F4应付账款/F5营业成本）；映射总数86→87条
+- F2存货精细化规则完成（2026-05-01）：f2_inventory.json覆盖10个Excel文件13个Sheet规则，审定表F2-1多段式148行（一、原值13类别×3段未审/调整/审定+二、跌价准备+三、净值），8条交叉引用+12条审计检查（含监盘覆盖率+计价测试+跌价准备测算）；精细化规则累计4个科目（E1+D2+D1+F2）共46条审计检查+33条交叉引用
+- F2断点修复（2026-05-01）：wp_parse_rules旧F1改为F2+14Sheet精确列映射（6列变动表格式期初/增加/减少/期末/索引）；aging_analysis_service扩展存货库龄分析INVENTORY_AGING_PRESETS（三年段/五年段，跌价率0~100%），calculate端点自动识别存货科目(140x/146x)走库龄分析+新增/aging/inventory-presets端点
+- 底稿精细化整体复盘（2026-05-01）：4科目共性问题——①审定表结构差异大（6/10/11/12列）_auto_bind_formulas需按类型分派②监盘覆盖率/变动校验需接入实际数据③aging/confirmation检查仍返回"待验证"；扩展计划10个核心科目覆盖80%日常工作：立即P0-1审定表类型分派→本周K9+K6+J1+L1+N1（简单科目快速复制）→下周H1固定资产+D4营业收入（复杂科目攻坚）
+- 账龄分析服务完成（2026-05-01用户要求三年段+五年段+自定义）：aging_analysis_service.py（三年段4段+五年段6段+自定义预设，含子分段+默认计提比例+迁徙率）+aging_analysis.py路由4端点（预设/项目配置读写/计算）已注册router_registry第5组；项目级配置持久化到wizard_state.aging_config（preset+custom_segments+custom_rates）；适用科目1122/1121/1221/1141共用；D2-CHK-12~14新增3条账龄相关审计检查
+- 底稿精细化规则用户要求（2026-05-01）：Sheet名称必须与实际模板完全一致不能自己编，目录结构也要准确；每个科目的所有Excel文件和Sheet都要覆盖（如E1有5个Excel共约50个Sheet）
+- E1货币资金三式联动复盘发现5个断点（2026-05-01）：全部修复完成——P0①audit_checks实际执行已修复（_run_audit_checks实现balance/cross_ref/movement三种检查）；P1②StructureEditor多Sheet Tab切换已修复（sheetNames+activeSheetIndex+后端返回sheet_names/sheet_count）③附注取数已改为三级优先（底稿parsed_data>试算表>空值，通过wp_account_mapping映射科目名）④多文件structure生成已修复（generate_structures_for_cycle从精细化规则source_files逐个生成）；P2⑤双行表头通过精细化规则header_rows+key_rows精确行号解决
+- 在线编辑偏好（2026-05-01用户明确）：ONLYOFFICE在线编辑必须启动，HTML表格模式只是降级方案实际编辑体验不好（复制粘贴不顺畅）；前端.env已补齐VITE_ONLYOFFICE_URL=http://localhost:8080
+- WOPI保存后坐标自动同步（2026-05-01技术决策）：ONLYOFFICE保存→WOPI put_file自动触发三步（7b parse_workpaper_real提取parsed_data→7c generate_structure_for_workpaper重建structure.json含坐标→event_handlers失效address_registry wp域缓存），Excel坐标（A1/B7）固定不变无需手动转换；WorkpaperEditor"同步公式"按钮仅为备用手动刷新入口
+- useProjectSelector composable接入全部6页面完成（2026-05-01）：TrialBalance+Adjustments+Misstatements+Materiality+CFSWorksheet共5页面替换为composable调用（ReportView保留独立实现因结构差异大），总计减少约150行重复代码
+- 空壳页面标记developing（2026-05-01）：6个<50行页面（ConsolSnapshots/CheckInsPage/AuxSummaryPanel/ReportFormatManager/MobilePenetration/MobileReviewView）路由加meta.developing=true，beforeEach守卫拦截显示"功能开发中"提示阻止导航
+- E1角色需求复盘发现4个缺口（2026-05-01）：P0①多文件底稿自动生成已修复（template_engine生成主底稿后自动从精细化规则source_files复制关联文件E0/E1-14/E1-18/E1-26，每个创建独立WpIndex+WorkingPaper）②审计检查结果前端展示已修复（WorkpaperList详情面板新增审计检查区域，选中底稿自动调fineExtractWorkpaper显示通过/失败/待验证）；P1③裁剪粒度待做（需文件级裁剪）；P2④函证管理空壳待做
+- 裁剪粒度需求（2026-05-01）：实际需要按文件级别裁剪而非底稿编码整体裁剪——E1循环中E1A/E1-1/E1-3/E1-6/E1-10/E1-11是必编，E1-2/E1-4/E1-7~9按业务情况选编，E0函证必编但独立文件，E1-14分析/E1-18检查/E1-26 IPO可选
+- BCD三类底稿联动（2026-05-01技术决策）：不做强制顺序阻断（审计实务常并行编制），做状态提示+数据联动；wp_dependency_service.py定义12个循环的B→C→D依赖关系（CYCLE_DEPENDENCIES），check_dependencies检查前置状态+读取C类parsed_data.control_effectiveness联动D类程序范围（有效0.7/部分1.0/无效1.5抽样系数），get_generation_order保证structure.json生成顺序B(0)→C(1)→D-N(2)→A(3)；wp_dependencies.py路由5端点已注册router_registry第5组
+- 四维度改进3项完成（2026-05-01）：#6审计检查→跳转定位（WorkpaperList检查失败项加"定位"按钮按类型跳转试算表/报表/底稿）+#9报表行→附注跳转（ReportView项目列📝图标跳转附注章节，26个行次映射）+#16底稿编制智能提示（WorkpaperEditor状态栏💡摘要+展开面板显示TSJ要点+高风险警告+BCD依赖状态+控制测试结论影响）
+- TSJ复核提示词接入复核流程（2026-05-01）：WorkpaperList复核操作区顶部自动显示TSJ风险领域标签（高/中/低）+复核清单checkbox（按科目名从底稿名称提取自动匹配）；TSJ完整应用矩阵5个场景全部接入（编制/AI说明/AI复核/人工复核/AI对话）
+- Pydantic V2迁移（2026-05-01）：phase12_schemas.py 3处class Config→model_config={"from_attributes":True}，pytest warnings从22降到19
+- 底稿模板处理决策（2026-05-01）：不逐个写解析脚本，增强wp_generic_processor.py通用解析器自动识别能力，只对特殊结构（固定资产变动表多行表头等）写专项规则；模板总量363个Excel（D-N 141个+B 56个+C 50个+A 59个+S 87个）+操作手册md约40个
+- 统一地址坐标注册表（2026-05-01）：address_registry.py+address_registry.py路由8端点（搜索/统计/解析/校验/跳转/失效/解析工具），URI格式{domain}://{source}/{path}#{cell}（report/note/wp/tb/aux五域），公式引用↔URI双向转换，溯源跳转路由自动生成，公式有效性校验；四维缓存project_id×year×template_type×domain（TTL分级tb/aux=60s、wp=120s、report/note=300s，上限500槽LRU淘汰），事件驱动自动失效（ADJUSTMENT→tb域、REPORTS_UPDATED→report域、DATA_IMPORTED→全部域）；commonApi.ts新增6个前端函数；已注册到router_registry第8组+event_handlers自动失效
+- 底稿操作手册服务已完成（2026-05-01）：wp_manual_service.py（51个md文件按11个循环索引+lru_cache+get_context_for_llm按优先级合并操作手册+模板库+控制底稿供AI面板使用）+wp_manuals.py路由7端点已注册router_registry第5组；wp_explanation_service.py generate_draft自动注入操作手册上下文（按循环匹配）；commonApi.ts新增5个前端函数
+- E2E测试修复（2026-05-01）：smart_import_engine.py _BALANCE_COLS移除direction和year_opening_debit/year_opening_credit（TbBalance表无这些列）+write_four_tables新增valid_cols过滤；fast_writer.py copy_insert SQLite降级路径新增UUID→str和Decimal→float转换；13个E2E测试全部通过
+- 合并报表+附注页面已完成（2026-05-01）：ConsolidationIndex.vue从4Tab扩展到6Tab（+合并报表+合并附注），合并报表支持国企/上市双模板切换+6张报表类型+转换规则弹窗+一键加载预设+导出Excel；合并附注支持国企/上市切换+树形目录（按章节分组）+多表格Tab+scope标签+搜索过滤
 - 前端TS错误批量修复已完成（2026-04-29，commit 9d89a98已推送）：非合并报表15个错误全部修复——commonApi新增listAnnotations()、AttachmentPreview添加api别名、AccountImportStep import路径修正(@/stores/wizard)、DisclosureEditor slot加$index、WorkpaperWorkbench补齐year参数、移除多处unused import；剩余约120个错误全部在consolidation/组件（developing模块不影响核心）
 - 本轮最终commit数：21个（cc8f47d→9d89a98），全部已推送GitHub
 - 审计全流程断点修复计划文档已删除（2026-04-29，commit b399d22已推送）：P0+P1+P2全部完成确认后清理，本轮最终22个commit（cc8f47d→b399d22）
@@ -1587,6 +1689,14 @@ inclusion: always
 - 系统已成功运行：PG 141张表+556行种子数据、Redis 6379端口、后端9980端口/api/health返回healthy
 - 启动阻塞根因：replay_pending_events中xreadgroup(block=0)在Redis Stream不存在时无限等待，加timeout=5s解决
 - Redis端口确认：实际运行在6379（非之前memory记录的6380），根目录.env已配置为redis://localhost:6379/0
+- WOPI_BASE_URL必须用host.docker.internal（2026-05-01修复）：ONLYOFFICE运行在Docker容器内，容器内localhost指向容器自己而非宿主机，WOPI回调失败导致iframe空白；根目录.env和backend/.env的WOPI_BASE_URL从http://localhost改为http://host.docker.internal:9980/wopi；同时修复根目录.env端口不一致（8000→9980）
+- .env读取优先级陷阱：pydantic-settings从cwd查找.env，后端从项目根目录启动时读的是根目录.env（非backend/.env），两个文件配置必须保持同步
+- WOPI CheckFileInfo修复（2026-05-01）：①BaseFileName用Path().name替代split("/")（Windows路径\分隔符兼容）②_locks是模块级变量不是实例属性（self._locks→_locks）③UserCanWrite默认改为True仅归档/复核通过时只读（之前preparer_id匹配太严格导致永远只读）
+- 底稿文件路径解析陷阱：wp.file_path存的是相对于backend/的路径（如storage/projects/.../D1.xlsx），后端从项目根目录启动时Path(wp.file_path).exists()为False；download_single/WOPI get_file/check_file_info三处统一加回退逻辑（Path(__file__).parent.parent.parent / wp.file_path）
+- STORAGE_ROOT相对路径通用陷阱：settings.STORAGE_ROOT="./storage"是相对路径，后端cwd不同时解析到不同位置；所有使用STORAGE_ROOT的端点（知识库上传/底稿生成/附件存储）都需要用Path(__file__).resolve()回退到backend/目录
+- 中文文件名下载修复：Content-Disposition直接用中文会报latin-1编码错误，改用RFC 5987格式filename*=UTF-8''加urllib.parse.quote编码
+- http.ts请求去重与文件上传冲突（2026-05-01修复）：addPending对所有请求设置AbortController，多个文件上传到同一URL时signal被覆盖导致CancelledError；修复：FormData上传请求跳过去重机制（if config.data instanceof FormData return）；最终方案：知识库批量上传改用原生fetch绕过http.ts全部拦截器（去重/重试/解包），避免axios拦截器链与批量上传的各种冲突
+- webkitdirectory上传文件名含路径（2026-05-02根因）：浏览器webkitdirectory选择的文件UploadFile.filename包含相对路径（如B5/B50 xxx.xlsx），后端storage_base/file.filename尝试写入不存在的子目录导致FileNotFoundError被try/except吞掉，文件丢失但返回200；修复：后端用Path(file.filename).name只取纯文件名
 - 底稿模板企业级评估（2026-04-29）：当前方案试点阶段够用，全所推广需补2项——①模板版本管理（记录版本号+项目底稿关联模板版本+更新时升级提示）②parsed_data提取增强（审计程序执行状态/样本明细/异常事项，供QC和看板使用）；ONLYOFFICE强依赖已有降级路径（prefill_engine服务端执行公式）
 - 用户要求（底稿精细化）：每个底稿需要单独做具体的脚本来配套提取填充数据（不是通用脚本一刀切），同时利用LLM模型辅助完成（如审计说明生成/异常分析/结论建议），需要精细化打磨；底稿复核也需要精细化处理（不同类型底稿的复核要点不同）
 - 底稿精细化方向：①每种底稿类型（E1货币资金/D1应收账款/H1固定资产等）有独立的提取规则（wp_parse_rules.json已有10个核心+20个扩展）②每种底稿的LLM prompt需要针对性设计（TSJ提示词库70个已按科目分类）③复核时按底稿类型加载对应的复核要点清单（review_template_service 37条标准模板按10个分类）④这些都需要逐个底稿打磨，不是一次性能完成的工作
@@ -1617,6 +1727,9 @@ inclusion: always
 - 模板库待续：①联动状态自动更新（数据导入/调整创建时标记linked）
 - 模板库三层体系完善已完成（2026-04-29，commit 7f4b85c已推送）：①template_engine.py缩进bug修复+gt_template_library.json格式兼容（支持{templates:[]}包装对象）②TemplateSelectStep.vue前端模板选择器（类型切换/搜索/批量选择/已选展示）③commonApi.ts新增7个模板库API函数+TypeScript类型④init_template_library.py成功初始化367条模板（363底稿+4报告）到template_library表
 - 模板库与底稿衔接增强已完成（2026-04-29，commit 32fd49c已推送）：①模板统一存储到知识库路径（~/.gt_audit_helper/knowledge/workpaper_templates/{cycle}/）②procedure_service.init_from_templates重写为三级优先（template_library表→gt_template_library.json→WpTemplate表）+修复JSON格式bug③wp_header_service新增is_custom参数（自定义底稿强制写入标准表头）④新增POST create-custom端点（用户自建底稿自动填充致同标准表头）
+- 底稿模板已初始化到知识库（2026-05-01）：init_wp_templates_to_knowledge.py将363个致同模板按循环复制到~/.gt_audit_helper/knowledge/workpaper_templates/{A-T}/；generate-from-codes模板查找优先级改为：知识库目录→项目根目录原始路径→空白兜底
+- 知识库文件夹上传（2026-05-01）：KnowledgeBase.vue上传弹窗新增"选择文件夹"模式（webkitdirectory+拖拽），自动按子目录结构创建文件夹并上传
+- 知识库上传偏好：大量文件上传必须后台执行不阻塞UI，右上角固定圆形进度指示器显示进度；文件夹上传必须保留原始目录层级结构不能打散；支持批量选择文件夹/文档执行删除；上传的Excel/Word文档需支持右侧预览；文件夹上传按层级深度优先处理（先上传当前层文件→刷新树让用户看到→再创建子文件夹→递归），不要等全部完成才刷新
 - 程序裁剪与底稿生成完整链路：template_library选择模板→init_from_templates初始化程序清单→ProcedureTrimming裁剪→generate_project_workpapers跳过被裁剪底稿→fill_workpaper_header自动填充表头（模板底稿搜索填充/自定义底稿强制写入）
 - 底稿通用数据提取规则引擎已完成（2026-04-29，commit 4acea11已推送）：wp_data_rules.py基于wp_account_mapping.json 38条映射实现底稿↔科目↔报表↔附注四级联动；通用规则自动提取所有审定表标准列（未审/AJE/RJE/审定/期初/变动）无需逐个写脚本；精细化脚本（e1_cash等）只处理非标准明细表内容；wp_data_rules.py路由7个端点（映射查询/数据提取/附注提取/一致性校验/批量提取）已注册router_registry
 - 底稿数据提取架构分层：通用规则层（wp_data_rules.py，处理所有审定表标准列，按映射表自动关联）+ 精细化脚本层（wp_scripts/e1_cash.py等，处理每个底稿特有的明细表/分析程序表）；两层互补不冲突
@@ -1683,3 +1796,61 @@ inclusion: always
 - 代码层面还能立即做的5项：①D2/H1精细化脚本重写②~~模板库初始化脚本~~✅③~~template_engine.py接入模板库~~✅④~~前端模板选择器组件~~✅⑤旧知识库API迁移
 - 建议下一轮优先级：先用当前系统做真实项目验证→根据反馈确定优先级→D2/H1精细化+模板库前端+合并报表前端
 - 架构改造已完整：模板三层体系+知识库升级+公式体系+RAG+数据集版本+企业级加固+全流程断点修复+报表结构补全，剩余为逐个底稿精细化打磨
+
+- wp_structure_bridge.py孤立代码修复（2026-05-01）：_auto_bind_formulas重写时旧函数尾部代码残留在_bind_by_col_number末尾（引用未定义变量closing_col/primary_account/col_map/header_row_idx/wp_code），导致SyntaxError；已清理，13个E2E测试全部通过
+- _auto_bind_formulas三种审定表类型分派已完成：standard标准型（E1）绑定审定数列+三段型three_section（D1/D2含重分类列）+变动表movement（F2/H1绑定期末数列）；_detect_table_type按列定义自动识别；_bind_by_col_number按精确列号绑定降级表头关键词匹配
+- 底稿编码映射大修正（2026-05-01）：wp_account_mapping.json v2025-R4，修正6处编码与实际模板不一致——K1从管理费用改为其他应收款（模板K1 其他应收款.xlsx）、K6从其他应收款改为持有待售资产（模板K6 持有待售资产和负债.xlsx）、K9从应付账款改为管理费用（模板K9 管理费用.xlsx）、N1从应交税费改为递延所得税资产（模板N1 递延所得税资产.xlsx）、N2从所得税费用改为应交税费（模板N2 应交税费.xlsx）、新增F3应付票据+F4应付账款+F5营业成本（F循环实际编码）；删除重复的D8/L3条目；87条映射
+- 5个科目精细化规则完成（2026-05-01）：f4_payable.json（F4应付账款，12sheet，10检查+6交叉引用，标准型两段性质+账龄）、k1_other_receivable.json（K1其他应收款，15sheet，11检查+8交叉引用，三段型原值/坏账/净值+账龄）、j1_employee_compensation.json（J1应付职工薪酬，14sheet，9检查+6交叉引用，多段型短期/离职后/辞退，Sheet名末尾有空格）、l1_short_term_loan.json（L1短期借款，12sheet，9检查+6交叉引用，标准型13列含两组变动比较）、n2_tax_payable.json（N2应交税费，14sheet，11检查+7交叉引用，标准型13列13税种）；精细化规则累计9个科目（E1+D2+D1+F2+F1+F4+K1+J1+L1+N2）
+- wp_parse_rules.json同步更新（2026-05-01）：19条规则，修正J1/K1/L1/N2/F4/K9/D4编码+新增fine_rules引用+精确列映射；旧D1(营业收入)改为D4、旧K1(管理费用)改为K9、旧N1(应交税费)改为N2
+- 致同底稿编码体系确认（2026-05-01）：D循环=D0函证/D1应收票据/D2应收账款/D3预收账款/D4营业收入/D5合同资产/D6合同负债/D7应收款项融资；F循环=F1预付账款/F2存货/F3应付票据/F4应付账款/F5营业成本；K循环=K1其他应收款/K2销售费用/K3财务费用/K4研发费用/K5税金及附加/K6持有待售/K7预付款项/K8其他应付款/K9管理费用；N循环=N1递延所得税资产/N2应交税费/N3所得税费用
+- 底稿精细化规则企业级复盘发现6个问题（2026-05-01）：P0①早期4个规则（E1/D2/D1/F2）sheets数组为空与新规则结构不一致 ②parse_rules与fine_rules列定义重复优先级不明确；P1③10个科目无fine_rules（H1固定资产最优先）④审计检查数值校验仅占24%形式检查占30%；P2⑤fine_checks结果未联动QC规则（blocking失败不阻断提交）⑥交叉引用67条未注册到address_registry（前端无法跳转溯源）
+- 底稿精细化3轮改进计划（2026-05-01）：第一轮立即=结构统一+QC-27联动fine_checks+交叉引用注册address_registry；第二轮本周=H1固定资产26sheet精细化+D4营业收入；第三轮下周=每科目补2-3条formula数值校验+reconciliation类型（征信vs账面/增值税申报vs账面）
+- 底稿精细化第一轮修复完成（2026-05-01）：①wp_fine_rule_engine.py兼容新旧格式（code降级exact_name/name降级wp_name/layout.columns自动提升）②QC引擎新增QC-27(blocking读fine_checks阻断)+QC-28(warning)共22条规则 ③address_registry.py build_workpaper_entries自动从wp_fine_rules/*.json注册交叉引用条目 ④5个新规则文件name+code字段补齐；13个E2E测试通过
+- 精细化引擎3个严重bug修复（2026-05-01）：①check_code字段名不匹配（引擎读code但规则用id，97条检查分派全部失效）→改为get("id", get("code"))  ②_extract_summary_rows新格式key_rows崩溃（int/list值调用.get()报AttributeError）→重写三分支兼容int/list/dict  ③_extract_detail_rows col_def.get("col")未做isinstance检查→已修复；13个E2E测试通过
+- WOPI put_file不自动触发fine-extract（2026-05-01待修复）：put_file触发parse_workpaper_real+generate_structure但不触发fine-extract，审计检查需手动点击；建议在7b之后加7d auto_fine_extract非阻塞
+- 精细化规则全链路8维度验证通过（2026-05-01）：0错误0警告；修复3个数据一致性问题——E1缺mapping主条目（E1-1有但E1没有）已补、F2 mapping缺1408科目已补、F1缺parse_rules条目已补；wp_account_mapping.json升级到88条（+E1主条目）
+- 精细化规则验证脚本模式（2026-05-01技术决策）：每次修改后用8维度验证脚本（规则结构/引擎加载/检查分派/QC联动/交叉引用URI/parse_rules一致性/mapping一致性/前端调用链）做回归验证，确保全链路无断点
+- WOPI put_file自动触发fine-extract已完成（2026-05-01）：7d步骤在7c structure rebuild之后，非阻塞独立session，仅对有fine_rule的科目执行，结果写入parsed_data.fine_checks；WOPI保存后自动链路：7a版本快照→7b parse_workpaper→7c structure.json→7d fine-extract→8云端双写
+- H1固定资产精细化规则完成（2026-05-01）：h1_fixed_asset.json覆盖2个文件（主文件25Sheet+H0函证），四段型审定表（原值R7-R13/折旧R14-R20/减值R21-R27/净值R28-R34，每段5个资产分类），16条审计检查（含逐类别净值=原值-折旧-减值公式校验+折旧测算+监盘三件套）+10条交叉引用；wp_parse_rules H1从5sheet升级到20sheet精确列映射；精细化规则累计11个科目（E1+D2+D1+F2+F1+F4+K1+J1+L1+N2+H1）共113条审计检查+77条交叉引用
+- mapping L5/L6重复条目去重（2026-05-01）：wp_account_mapping.json从88条降到86条（v2025-R4），L5应付债券和L6长期应付款各有两处重复已删除
+- 本次会话最终状态（2026-05-01）：13项修复全部完成0错误0警告，11个科目171sheets/113checks/77xrefs，86条映射/20条解析规则，13个E2E测试通过；下一步D4营业收入精细化+每科目补formula数值校验
+- D4营业收入精细化规则完成（2026-05-01）：d4_revenue.json覆盖8个Excel文件24个Sheet规则，损益类审定表（本期/上期9列含重分类，两段主营R7-R12+其他R13-R18+合计R19），18条审计检查（含截止测试+ERP核对+毛利率分析+五步法会计政策）+9条交叉引用；wp_parse_rules D4从1sheet升级到11sheet精确列映射
+- 6个科目补充formula数值校验（2026-05-01）：F4+2条（性质/账龄各项求和=合计）、K1+2条（净值=原值-坏账逐行+原值子项求和）、J1+2条（短期薪酬求和+社保明细求和）、L1+1条（借款类型求和）、N2+1条（税种求和）、D4+1条（主营+其他=合计）；formula类型从3条增到14条（占比3%→10%）
+- 精细化规则累计12个科目（2026-05-01最终）：E1+D2+D1+F2+F1+F4+K1+J1+L1+N2+H1+D4，共139条审计检查+86条交叉引用，20条解析规则，86条映射
+- 精细化规则覆盖度复盘（2026-05-01）：三类缺口——①函证Sheet（E0/D0/H0）所有涉及函证科目都缺，建议通用函证规则模板各科目引用 ②IPO/舞弊应对Sheet（E1-26~32/D4-22~32）特殊项目才用标记scope=ipo_only ③F2存货4个文件路径不准确导致分析/检查/监盘Sheet全缺；立即修复3项：N2程序表Sheet名N1A→N2A、D2附注披露括号全角→半角、F2补全4个文件Sheet覆盖
+- 精细化规则覆盖度修复完成（2026-05-01）：N2程序表Sheet名N1A→N2A、D2附注披露+2个半角括号版本、F2存货从13→38 sheet_rules（+25个覆盖10个文件75Sheet，source_files修正9个Sheet名）；最终统计12个科目222sheets/139checks/86xrefs
+- 剩余非必需缺口（2026-05-01）：函证Sheet（E0/D0/H0/F0）建议后续创建通用函证规则模板各科目引用；IPO/舞弊应对Sheet标记scope=ipo_only
+- 附注表格空白bug修复（2026-05-01）：单体附注table_data为null导致表格无法展现；前端DisclosureEditor.vue el-table v-if条件从rows改为rows?.length||headers?.length（空数组也显示表头）；后端disclosure_engine.py get_note_detail新增自动修复（table_data为空时从模板重建表格结构并持久化，无需手动重新生成）
+- 附注旧数据清理（2026-05-01）：disclosure_notes表40条旧数据全部软删除（章节编号五、1~五、45与新模板五、1~五、165不匹配导致table_data全为null）；前端onMounted检测附注为空时自动用新模板重新生成；两个项目（6687b8ce+05c755cb）均需刷新页面触发重新生成
+- 附注生成3个根因修复（2026-05-01）：①_tables循环引用（table_data=built_tables[0]再挂_tables导致JSON序列化ValueError）→创建新dict复制headers/rows/name再挂_tables ②working_paper表缺6列（rejection_reason/rejected_by/rejected_at/workflow_status/explanation_status/consistency_status/last_parsed_sync_at/partner_reviewed_at/partner_reviewed_by）→ALTER TABLE补齐 ③软删除记录占据唯一约束（is_deleted=true仍满足project_id+year+note_section唯一）→物理删除85条旧记录
+- 附注生成性能优化（2026-05-01）：_build_table_data从每章节查询底稿+试算表（165次×2=330次查询）改为_preload_data_for_notes预加载到_wp_cache/_tb_cache/_wp_account_cache（3次查询），每个查询失败后rollback不阻断后续章节
+- 附注生成验证通过（2026-05-01）：165章节全部生成，0个table_data=null，117个有_tables数组（109个有行数据+8个空行正常），关键章节抽样通过（货币资金2表/应收票据12表/预付款项3表/其他应收款15表/应付职工薪酬3表）
+- disclosure_notes唯一约束与软删除冲突（2026-05-01技术决策）：uq_disclosure_notes_project_year_section不含is_deleted列，软删除记录仍占据约束导致INSERT失败；临时方案物理删除旧记录，长期方案需改为部分唯一索引WHERE is_deleted=false
+- 附注表格行高偏好（2026-05-01）：行高约0.7厘米（26px），单元格padding 2px 6px，字号12px，表头padding 4px 0；编辑模式input-number高度22px
+- 附注表格Tab页签名称修复（2026-05-01）：模板中name字段是表头第一列值（"项  目"/"类  别"等无意义），非表格标题；前端getTableTabLabel函数过滤_GENERIC_NAMES集合，无意义时用"表N·第二列表头"区分，有意义名称超12字截断；长期方案需修复模板解析脚本从md的###标题行提取表格名称
+- 附注章节序号不显示偏好（2026-05-01）：左侧目录树和右侧标题只显示科目名称（如"货币资金"），不显示"五、1"序号前缀；树节点去掉gt-de-tree-num span，标题h4去掉note_section前缀
+- 附注目录树分组调整（2026-05-01）：五章内从5组改为6组，新增"补充披露事项"分组（80~199）将非货币性资产交换/股份支付/债务重组/外币折算/租赁/终止经营/分部信息等从"其他科目注释"中分离；"其他科目注释"范围缩小为36~79
+- 附注目录树分层建树完成（2026-05-01）：三章会计政策42个子章节按7组分层（基础政策/合并与合营/金融工具与外币/资产类/负债与收入/租赁与其他/变更与差错更正）；四章分2组（税项+企业合并13个子章节）；六七八章各自独立分组（或有事项/日后事项/关联方）；一~四章过滤条件扩展支持"三a、"/"四a、"前缀
+- 附注模板章节编号全面对齐致同Word标准（2026-05-01）：国企版note_template_soe.json从旧编号（三/三a/四/四a/五/六/七/八/九）重映射为14章标准（一~十四），新增5个一级章节占位，170个章节；上市版note_template_listed.json从旧编号（三/四/五/五a/五c/五d/五e/六/七/八/一）重映射为17章标准（一~十七），新增10个一级章节占位，184个章节
+- 前端CHAPTER_GROUPS扩展到17章超集（2026-05-01）：国企14章+上市17章的并集，会计政策章节（三/四）>10个子章节时自动分组，报表注释章节（五/八）按资产/负债/权益/损益/其他/补充披露分组，空章节不显示
+- 附注模板孤立代码清理（2026-05-01）：DisclosureEditor.vue treeData computed中旧代码残留（chapterFive/otherChapters/sixPlus逻辑）已删除，重写为14/17章统一循环
+- 上市版模板"一、"前缀修正（2026-05-01）：5个母公司附注章节从"一、"改为"十六、"（长期股权投资/投资收益/非经常性损益/净资产收益率/境内外准则差异）
+- 国企版模板"一、"前缀修正（2026-05-01）：3个母公司附注章节从"一、"改为"十二、"→后改为"九、"（长期股权投资/投资收益/现金流量表补充资料）→最终改为"十二、"
+- 附注合并vs单体差异规则（2026-05-01用户明确）：国企单体=合并版去掉"七、企业合并及合并财务报表"+"十二、母公司财务报表附注"两章；上市单体=合并版去掉"五、合并财务报表项目附注"改为"五、财务报表项目附注"+"十六、公司财务报表主要项目注释"两章
+- 附注模板最终重建结果（2026-05-01）：国企版14章170个章节（四会计政策36个/八报表注释93个/七企业合并13个scope=consolidated_only/十二母公司附注3个scope=consolidated_only）；上市版17章185个章节（三会计政策73个/五报表注释74个/十六公司附注6个scope=consolidated_only）；单体版通过scope=consolidated_only自动过滤；13个E2E测试通过
+- 附注目录树章节标题动态化（2026-05-01）：CHAPTER_GROUPS去掉硬编码label，改为SOE_LABELS/LISTED_LABELS两套标题字典按templateType动态选择；解决国企版四章显示"税项"（应为"重要会计政策"）、五章显示"报表注释"（应为"会计政策变更"）等标题错位问题
+- 母公司附注科目补充完成（2026-05-01）：从合并报表注释复制应收账款/其他应收款/营业收入与营业成本3个科目的完整表格模板到母公司附注章节（表格结构复制+数据值清空）；国企版十二章从3→6个科目（+11+15+5表格），上市版十六章从6→9个科目（+15+18+6表格）；上市版源科目在五章（非八章）
+- 母公司附注业务规则（2026-05-01用户明确）：母公司报表主要项目包括应收账款/其他应收款/长期股权投资/营业收入和营业成本/投资收益/现金流量表补充资料等，应参照合并报表注释对应科目的表格结构
+- disclosure_notes旧数据第三次清理（2026-05-01）：170条旧数据物理删除，因模板更新后新增的母公司附注科目（应收账款/其他应收款/营业收入与营业成本）未写入数据库；刷新页面自动重新生成全部170+章节含完整6个母公司科目
+- 母公司附注科目排序修正（2026-05-01）：正确顺序=应收账款→其他应收款→长期股权投资→营业收入与营业成本→投资收益→现金流量表补充资料（与合并报表注释科目顺序一致）；上市版额外科目排在后面（非经常性损益→净资产收益率→境内外准则差异→公司基本情况）
+- 上市版母公司附注最终修正（2026-05-01）：十六章只含6个科目（应收票据14表→应收账款15表→其他应收款18表→长期股权投资3表→营业收入与营业成本6表→投资收益1表）；非经常性损益/净资产收益率/境内外准则差异移到十七章（补充资料）；公司基本情况删除（一章已有重复）
+- 附注占位章节偏好（2026-05-01）：不需要纯文字占位章节（如"补充资料"只有一句提示文字），只保留有实际表格或内容的子章节；上市版十七章删除"补充资料"占位，只保留3个实际子章节
+- 附注章节标题清洁偏好（2026-05-01）：标题中不要包含模板提示语（如括号内的"无数据的行项目，尽可能删除"），只保留正式名称
+- 附注正文三级填充策略已实现（2026-05-01）：generate_notes中正文填充优先级=①上年附注拉取（prior_year同章节）→②LLM生成（_generate_text_with_llm，每章节独立prompt通过llm_prompt_key配置）→③模板默认文字；LLM接口预留system_prompt+试算表数据上下文+temperature=0.3
+- 附注模板正文从md提取填充（2026-05-01）：国企版6个章节+上市版25个章节的完整正文从md模板提取填充到JSON的text_sections字段（含占位符如XX有限公司/年月日等供用户手动修改）；公司基本情况章节包含完整的企业信息模板（历史沿革/注册地/组织形式/经营范围/母公司/营业期限/批准报出等）
+- 附注正文填充偏好（2026-05-01用户明确）：模板正文不是简单占位语，而是完整的模板文字含占位符，直接填充到附注中供用户手动修改；调用LLM后或参照上年或直接填充模板内容三种方式
+- 附注目录树缩进偏好（2026-05-01）：el-tree indent从默认16px减到10px，子节点padding从4px减到2px，减少叶子节点左侧空白
+- 附注正文提取修复（2026-05-01）：之前只提取md一级标题(#)正文导致大量缺失，改为按二级标题(##)提取后国企版98个章节+上市版78个章节补充填充，两套模板全部170/184个章节均有正文（0个无正文）
+- 附注正文分段存储和渲染（2026-05-01）：text_sections从单个大字符串按\n\n分割为段落数组（国企80个+上市94个章节分段处理）；前端TipTap加载时纯文本段落转为HTML p标签；样式：段落间距10px、字号13px、行高1.8、首行缩进2em
+- 附注text_sections清理md表格行（2026-05-01）：从正文中移除md表格标记（|...|格式和分隔线），国企91个+上市96个章节受影响；会计政策章节只保留纯文字说明不含表格
+- 附注模板重建通用脚本（2026-05-01）：backend/scripts/rebuild_note_from_md.py，精确解析md四级标题树（H1/H2/H3/H4），文字和表格分离（表格行解析为{headers,rows}结构+纯文字按段落分割为数组），按标题匹配更新JSON模板，幂等可重复运行；国企版481节点263表格905段落→更新171章节，上市版647节点433表格1502段落→更新186章节

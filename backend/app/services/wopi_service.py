@@ -114,11 +114,13 @@ class WOPIHostService:
         file_size = 0
         if wp.file_path:
             fp = Path(wp.file_path)
+            if not fp.exists():
+                fp = Path(__file__).resolve().parent.parent.parent / wp.file_path
             if fp.exists():
                 file_size = fp.stat().st_size
 
         info = {
-            "BaseFileName": wp.file_path.split("/")[-1] if wp.file_path else str(file_id),
+            "BaseFileName": Path(wp.file_path).name if wp.file_path else f"{file_id}.xlsx",
             "Size": file_size,
             "OwnerId": str(wp.created_by) if wp.created_by else "",
             "Version": str(wp.file_version),
@@ -129,34 +131,22 @@ class WOPIHostService:
         }
 
         # ── Phase 14: 动态 UserCanWrite 判定（对齐 v2 WP-ENT-03） ──
-        # 场景1: 编制人 + draft/edit_complete → 可写
-        # 场景2: 复核人/合伙人 → 只读
-        # 场景3: 非锁持有者 → 只读
-        # 场景4: 签字窗口(partner_ready/signed_off) → 只读
-        can_write = False
+        can_write = True  # 默认可写，仅特定场景限制为只读
         readonly_reason = ""
 
-        wp_status = getattr(wp, 'file_status', None) or getattr(wp, 'workflow_status', 'draft')
-        preparer_id = getattr(wp, 'preparer_id', None) or getattr(wp, 'created_by', None)
-        reviewer_id = getattr(wp, 'reviewer_id', None)
-        partner_id = getattr(wp, 'partner_reviewed_by', None)
+        wp_status = getattr(wp, 'status', None)
+        wp_status_val = wp_status.value if hasattr(wp_status, 'value') else str(wp_status or 'draft')
 
-        # 签字窗口：全员只读
-        if wp_status in ('partner_ready', 'signed_off', 'archived', 'partner_checked'):
-            readonly_reason = "签字窗口只读"
-        # 复核人/合伙人：只读
-        elif user_id and (user_id == reviewer_id or user_id == partner_id):
-            readonly_reason = "复核模式"
-        # 编制人 + 可编辑状态：可写
-        elif user_id and user_id == preparer_id and wp_status in ('draft', 'edit_complete', 'in_progress', 'revision_required'):
-            # 检查锁持有者
-            lock_holder = self._locks.get(str(file_id))
-            if lock_holder and lock_holder.get("user_id") != str(user_id):
-                readonly_reason = "其他用户正在编辑"
-            else:
-                can_write = True
+        # 签字窗口/归档：全员只读
+        if wp_status_val in ('archived', 'review_passed'):
+            can_write = False
+            readonly_reason = "底稿已归档或复核通过"
         else:
-            readonly_reason = "无编辑权限"
+            # 检查锁持有者（其他用户持锁时只读）
+            lock_holder = _locks.get(str(file_id))
+            if lock_holder and user_id and lock_holder.get("user_id") != str(user_id):
+                can_write = False
+                readonly_reason = "其他用户正在编辑"
 
         info["UserCanWrite"] = can_write
         if not can_write:
@@ -213,7 +203,12 @@ class WOPIHostService:
 
         fp = Path(wp.file_path)
         if not fp.exists():
-            raise FileNotFoundError(f"底稿文件不存在: {wp.file_path}")
+            # 尝试相对于 backend/ 目录查找
+            backend_fp = Path(__file__).resolve().parent.parent.parent / wp.file_path
+            if backend_fp.exists():
+                fp = backend_fp
+            else:
+                raise FileNotFoundError(f"底稿文件不存在: {wp.file_path}")
 
         return fp.read_bytes()
 
@@ -372,6 +367,70 @@ class WOPIHostService:
             _asyncio.create_task(_auto_parse())
         except Exception as e:
             logger.warning("auto parse after online save failed: %s", e)
+
+        # 7c. 自动重建 structure.json（ONLYOFFICE保存后坐标同步）
+        try:
+            from app.services.wp_structure_bridge import generate_structure_for_workpaper
+            from app.models.workpaper_models import WpIndex as _WpIndex
+            idx_r = await db.execute(
+                sa.select(_WpIndex.wp_code).where(_WpIndex.id == wp.wp_index_id)
+            )
+            _wp_code = idx_r.scalar_one_or_none() or ""
+            if _wp_code:
+                # 非阻塞：后台生成
+                def _rebuild_structure():
+                    try:
+                        generate_structure_for_workpaper(
+                            str(fp), _wp_code, str(wp.project_id)
+                        )
+                        logger.info("structure.json rebuilt after WOPI save: wp=%s", file_id)
+                    except Exception as _se:
+                        logger.warning("structure rebuild failed: %s", _se)
+                import threading
+                threading.Thread(target=_rebuild_structure, daemon=True).start()
+        except Exception as e:
+            logger.warning("structure rebuild setup failed: %s", e)
+
+        # 7d. 自动执行精细化审计检查（非阻塞，用独立 session）
+        try:
+            from app.services.wp_fine_rule_engine import load_fine_rule, extract_with_fine_rule
+            # _wp_code 在 7c 中已获取
+            _fine_wp_code = _wp_code if '_wp_code' in dir() else ""
+            if not _fine_wp_code:
+                _idx_r2 = await db.execute(
+                    sa.select(_WpIndex.wp_code).where(_WpIndex.id == wp.wp_index_id)
+                )
+                _fine_wp_code = _idx_r2.scalar_one_or_none() or ""
+            if _fine_wp_code and load_fine_rule(_fine_wp_code):
+                async def _auto_fine_extract():
+                    try:
+                        from app.core.database import async_session
+                        async with async_session() as fine_db:
+                            data = extract_with_fine_rule(
+                                str(fp), _fine_wp_code, str(wp.project_id)
+                            )
+                            if "error" not in data:
+                                from sqlalchemy.orm.attributes import flag_modified
+                                _wp_r = await fine_db.execute(
+                                    sa.select(WorkingPaper).where(WorkingPaper.id == file_id)
+                                )
+                                _wp_obj = _wp_r.scalar_one_or_none()
+                                if _wp_obj:
+                                    pd = _wp_obj.parsed_data or {}
+                                    pd["fine_checks"] = data.get("checks", [])
+                                    pd["fine_summary"] = data.get("summary", {})
+                                    pd["fine_extracted_at"] = datetime.utcnow().isoformat()
+                                    _wp_obj.parsed_data = pd
+                                    flag_modified(_wp_obj, "parsed_data")
+                                    await fine_db.commit()
+                                    logger.info("auto fine-extract after WOPI save: wp=%s checks=%d",
+                                                file_id, len(data.get("checks", [])))
+                    except Exception as _fe:
+                        logger.warning("auto fine-extract failed: %s", _fe)
+
+                _asyncio.create_task(_auto_fine_extract())
+        except Exception as e:
+            logger.warning("auto fine-extract setup failed: %s", e)
 
         # 8. 云端双写（非阻塞）
         try:

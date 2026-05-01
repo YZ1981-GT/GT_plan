@@ -29,7 +29,7 @@
           highlight-current
           @node-click="handleNodeClick"
         >
-          <template #default="{ node, data }">
+          <template #default="{ node: _node, data }">
             <span class="tree-node">
               <span class="node-status" :class="data.status">●</span>
               <span class="node-label">{{ data.label }}</span>
