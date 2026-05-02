@@ -146,6 +146,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "N5-CHK-05",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "有效税率分析（实际税负vs法定税率）"
+    },
+    {
+      "code": "N5-CHK-06",
+      "type": "formula",
+      "severity": "warning",
+      "description": "所得税费用 = 当期所得税 + 递延所得税"
+    },
+    {
+      "code": "N5-CHK-07",
+      "type": "reconciliation",
+      "severity": "info",
+      "description": "税会差异调节表已编制"
     }
   ]
 }

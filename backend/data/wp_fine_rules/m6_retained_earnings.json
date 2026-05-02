@@ -129,6 +129,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "M6-CHK-06",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "期末未分配利润 = 期初 + 本年净利润 - 提取盈余公积 - 分配股利"
+    },
+    {
+      "code": "M6-CHK-07",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "本年净利润与利润表一致"
     }
   ]
 }

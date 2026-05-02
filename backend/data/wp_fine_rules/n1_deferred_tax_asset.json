@@ -129,6 +129,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "N1-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "递延所得税资产测算正确（暂时性差异×税率）"
+    },
+    {
+      "code": "N1-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "可抵扣暂时性差异转回可能性已评估"
     }
   ]
 }

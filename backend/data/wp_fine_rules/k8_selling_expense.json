@@ -96,6 +96,11 @@
       "from": "K8-2.合计",
       "to": "K8-1.total",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K8-1.salary",
+      "to": "J1-1.销售费用分配",
+      "description": "职工薪酬 → 应付职工薪酬分配表"
     }
   ],
   "audit_checks": [
@@ -122,6 +127,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K8-CHK-05",
+      "type": "cutoff",
+      "severity": "warning",
+      "description": "截止测试无跨期事项"
+    },
+    {
+      "code": "K8-CHK-06",
+      "type": "analysis",
+      "severity": "info",
+      "description": "月度/类别分析无异常波动"
+    },
+    {
+      "code": "K8-CHK-07",
+      "type": "check",
+      "severity": "info",
+      "description": "大额合同已检查"
     }
   ]
 }

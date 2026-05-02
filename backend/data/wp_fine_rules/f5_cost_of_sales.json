@@ -104,6 +104,11 @@
       "from": "F5-2.合计",
       "to": "F5-1.total",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "F5-1.材料成本",
+      "to": "F2-1.结转成本",
+      "description": "材料成本 → 存货结转成本"
     }
   ],
   "audit_checks": [
@@ -136,6 +141,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "F5-CHK-06",
+      "type": "analysis",
+      "severity": "warning",
+      "description": "毛利率分析（与上期/同行业对比）"
+    },
+    {
+      "code": "F5-CHK-07",
+      "type": "cutoff",
+      "severity": "warning",
+      "description": "成本截止测试已执行"
+    },
+    {
+      "code": "F5-CHK-08",
+      "type": "cross_ref",
+      "severity": "info",
+      "description": "材料成本与存货结转一致"
     }
   ]
 }

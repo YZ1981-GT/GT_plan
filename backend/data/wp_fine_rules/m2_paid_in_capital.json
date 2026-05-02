@@ -135,6 +135,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "M2-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "股东出资已验资/工商登记一致"
+    },
+    {
+      "code": "M2-CHK-07",
+      "type": "check",
+      "severity": "info",
+      "description": "本期增减变动已检查（增资/减资/转让）"
     }
   ]
 }

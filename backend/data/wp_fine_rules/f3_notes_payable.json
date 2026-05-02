@@ -109,6 +109,11 @@
       "from": "F3-2.合计",
       "to": "F3-1.total",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "F3-2.到期日",
+      "to": "F3-1.一年内到期",
+      "description": "明细表到期日 → 一年内到期重分类"
     }
   ],
   "audit_checks": [
@@ -141,6 +146,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "F3-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "票据到期日与重分类一致"
+    },
+    {
+      "code": "F3-CHK-07",
+      "type": "confirmation",
+      "severity": "warning",
+      "description": "函证结果与明细表一致"
+    },
+    {
+      "code": "F3-CHK-08",
+      "type": "check",
+      "severity": "info",
+      "description": "已贴现/背书未到期票据已检查"
     }
   ]
 }

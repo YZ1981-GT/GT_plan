@@ -153,6 +153,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "L3-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "借款合同/利率/期限/担保已检查"
+    },
+    {
+      "code": "L3-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "一年内到期部分已正确重分类"
+    },
+    {
+      "code": "L3-CHK-08",
+      "type": "confirmation",
+      "severity": "warning",
+      "description": "函证结果与明细表一致"
     }
   ]
 }

@@ -141,6 +141,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "D3-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "大额预收款已检查合同/发货情况"
+    },
+    {
+      "code": "D3-CHK-06",
+      "type": "analysis",
+      "severity": "info",
+      "description": "预收账款余额变动合理性分析"
+    },
+    {
+      "code": "D3-CHK-07",
+      "type": "check",
+      "severity": "info",
+      "description": "关联方预收款已单独检查"
     }
   ]
 }
