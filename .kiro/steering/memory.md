@@ -1874,3 +1874,9 @@ inclusion: always
 - 数据库补齐缺失列（2026-05-02）：disclosure_notes.deleted_at + trial_balance.dataset_id + tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger各补dataset_id+deleted_at
 - datetime.now(timezone.utc)全局批量修复（2026-05-02）：19个服务文件34处→datetime.utcnow()，仅保留security.py 2处（JWT需要timezone-aware）；根因：PG TIMESTAMP WITHOUT TIME ZONE列与timezone-aware datetime不兼容，asyncpg报DataError
 - 系统复盘健康度（2026-05-02最终）：31/31 API端点全部200、0个stub残留、0个stale import、15个TODO（8个ai_plugin外部API+7个前端细节）；待改进P0：E2E全链路测试+disclosure_notes唯一约束改部分索引；P1：报表空数据提示+附注保存反馈+底稿列表自动滚动；P2：API服务层整合17→5+9个空壳页面处理
+- PG不支持min(uuid)聚合修复（2026-05-02）：adjustment_service.py list_entries的GROUP BY查询对UUID列（reviewer_id/created_by）和枚举列（adjustment_type/review_status）做min()报UndefinedFunctionError，改为cast(col, Text)后再min()；同类隐患需全局排查sa.func.min/max对UUID/枚举列的使用
+- adjustments表补齐deleted_at列（2026-05-02）：ALTER TABLE adjustments ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP
+- uvicorn --reload性能问题确认（2026-05-02）：所有端点>2000ms根因是--reload文件监控在347个JSON+大量Python文件中拖慢，生产不用--reload无此问题；开发时可加--reload-dir backend/app限制监控范围
+- start-dev.bat优化（2026-05-02）：uvicorn启动命令加--reload-dir app限制文件监控范围，避免347个JSON+大量文件拖慢开发环境响应（所有端点从>2000ms恢复正常）
+- 项目template_type缺失提示（2026-05-02）：DetailProjectPanel概览区新增el-alert警告"请设置报表模板类型"（template_type为null时显示），引导用户前往编辑设置国企版/上市版
+- 前端直接http调用现状（2026-05-02）：8个Vue文件仍有直接http调用（LedgerPenetration 19个/KnowledgeBase 13个有正当理由保留，ReportConfigEditor 4个/AuditCheckDashboard 2个待迁移到commonApi）

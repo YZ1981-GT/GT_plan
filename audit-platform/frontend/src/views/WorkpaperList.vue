@@ -2,6 +2,7 @@
   <div class="gt-wp-list gt-fade-in">
     <!-- 顶部筛选栏 -->
     <div class="gt-wp-filter-bar">
+      <el-button text size="small" style="margin-right: 6px" @click="$router.push('/projects')">← 返回</el-button>
       <h2 class="gt-page-title">底稿管理</h2>
       <div v-if="treeData.length > 0" class="gt-wp-view-toggle">
         <el-radio-group v-model="viewMode" size="small">
