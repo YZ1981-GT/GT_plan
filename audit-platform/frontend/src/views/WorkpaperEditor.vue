@@ -315,6 +315,8 @@ async function applyOnlineMode(notify: boolean = false) {
     // 等待 DOM 渲染（两次 nextTick 确保 v-else-if 切换后 div 已挂载）
     await nextTick()
     await nextTick()
+    // 额外等待50ms确保浏览器完成布局
+    await new Promise(resolve => setTimeout(resolve, 50))
 
     // 加载 ONLYOFFICE Document Server API 脚本
     const ooUrl = (session.onlyoffice_url || import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080').replace(/\/$/, '')
@@ -326,7 +328,9 @@ async function applyOnlineMode(notify: boolean = false) {
     const config = {
       document: {
         fileType: 'xlsx',
-        key: `${wpId.value}_v${wpDetail.value?.file_version || 1}`,
+        // key规则：相同key用缓存，不同key重新下载
+        // 用版本号+分钟级时间戳，同一分钟内用缓存，跨分钟重新下载
+        key: `${wpId.value}_v${wpDetail.value?.file_version || 1}_${Math.floor(Date.now() / 60000)}`,
         title: wpDetail.value?.wp_name ? `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}.xlsx` : 'workpaper.xlsx',
         url: `${wopiBaseUrl}/wopi/files/${wpId.value}/contents?access_token=${onlineAccessToken.value}`,
       },

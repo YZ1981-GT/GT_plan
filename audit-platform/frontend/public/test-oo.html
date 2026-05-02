@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ONLYOFFICE Test</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    #editor { width: 100%; height: 600px; border: 1px solid #ccc; }
+    .log { background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+    .ok { color: green; } .err { color: red; }
+  </style>
+</head>
+<body>
+  <h2>ONLYOFFICE Editor Test</h2>
+  <div class="log" id="log"></div>
+  <button onclick="initEditor()">Initialize Editor</button>
+  <div id="editor"></div>
+
+  <script>
+    function log(msg, ok) {
+      const el = document.getElementById('log');
+      const cls = ok === true ? 'ok' : ok === false ? 'err' : '';
+      el.innerHTML += `<div class="${cls}">${new Date().toLocaleTimeString()} ${msg}</div>`;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function initEditor() {
+      try {
+        // Step 1: Login
+        log('Step 1: Login...');
+        const loginResp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'admin', password: 'admin123' })
+        });
+        const loginData = await loginResp.json();
+        const token = loginData.data?.access_token || loginData.access_token;
+        log('Token: ...' + token.slice(-20), true);
+
+        // Step 2: Get workpapers
+        log('Step 2: Get workpapers...');
+        const pid = '05c755cb-ed0f-4ea5-9d8a-a6a19927e107';
+        const wpResp = await fetch(`/api/projects/${pid}/working-papers`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const wpData = await wpResp.json();
+        const wps = wpData.data || wpData;
+        if (!wps.length) { log('No workpapers!', false); return; }
+        const wp = wps[0];
+        const wpId = wp.id;
+        log(`Workpaper: ${wp.wp_code} id=${wpId}`, true);
+
+        // Step 3: Get session
+        log('Step 3: Get online session...');
+        const sessResp = await fetch(`/api/projects/${pid}/working-papers/${wpId}/online-session`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const sessData = await sessResp.json();
+        const session = sessData.data || sessData;
+        log(`enabled=${session.enabled} oo_url=${session.onlyoffice_url}`, session.enabled);
+        if (!session.enabled) { log('Not enabled!', false); return; }
+
+        const wopiToken = session.access_token;
+        const ooUrl = session.onlyoffice_url || 'http://localhost:8080';
+
+        // Step 4: Load api.js
+        log('Step 4: Loading api.js from ' + ooUrl + '...');
+        await new Promise((resolve, reject) => {
+          if (window.DocsAPI) { resolve(); return; }
+          const s = document.createElement('script');
+          s.src = ooUrl + '/web-apps/apps/api/documents/api.js';
+          s.onload = () => { log('api.js loaded!', true); resolve(); };
+          s.onerror = (e) => { log('api.js FAILED: ' + e, false); reject(e); };
+          document.head.appendChild(s);
+        });
+
+        // Step 5: Init editor
+        log('Step 5: Initializing DocEditor...');
+        const config = {
+          document: {
+            fileType: 'xlsx',
+            key: wpId + '_v' + (wp.file_version || 1),
+            title: (wp.wp_code || '') + ' ' + (wp.wp_name || '') + '.xlsx',
+            url: 'http://host.docker.internal:9980/wopi/files/' + wpId + '/contents?access_token=' + wopiToken,
+          },
+          editorConfig: {
+            mode: 'edit',
+            lang: 'zh-CN',
+            callbackUrl: 'http://host.docker.internal:9980/wopi/ds-callback/' + wpId,
+            user: { id: 'admin', name: 'Admin' },
+          },
+          type: 'desktop',
+          documentType: 'cell',
+          height: '600px',
+          width: '100%',
+          events: {
+            onError: (e) => log('Editor ERROR: ' + JSON.stringify(e?.data), false),
+            onReady: () => log('Editor READY!', true),
+            onDocumentStateChange: (e) => { if (e?.data) log('Document modified'); },
+            onAppReady: () => log('App READY!', true),
+          },
+        };
+
+        log('Config: ' + JSON.stringify({ key: config.document.key, url: config.document.url.slice(0, 80) }));
+        
+        const editor = new DocsAPI.DocEditor('editor', config);
+        log('DocEditor created!', true);
+
+      } catch (e) {
+        log('ERROR: ' + e.message, false);
+        console.error(e);
+      }
+    }
+  </script>
+</body>
+</html>
