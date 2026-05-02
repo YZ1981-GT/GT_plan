@@ -14,22 +14,30 @@
           </div>
         </div>
       </div>
-      <!-- 集团架构（如有关联项目） -->
-      <div v-if="relatedProjects.length > 0" class="gt-catalog-unit-group">
+      <!-- 用户负责的所有项目（按集团分组） -->
+      <div v-if="relatedProjects.length > 1" class="gt-catalog-unit-group">
         <div class="gt-catalog-unit-group-title" @click="showRelated = !showRelated">
           <span>{{ showRelated ? '−' : '+' }}</span>
-          <span>关联企业 ({{ relatedProjects.length }})</span>
+          <span>我的项目 ({{ relatedProjects.length }})</span>
         </div>
         <div v-if="showRelated" class="gt-catalog-unit-group-items">
-          <div
-            v-for="rp in relatedProjects" :key="rp.id"
-            class="gt-catalog-unit-related"
-            :class="{ 'gt-catalog-unit-related--current': rp.id === project?.id }"
-            @click="onSwitchProject(rp)"
-          >
-            <span class="gt-catalog-unit-related-dot" :style="{ background: rp.id === project?.id ? '#4b2d77' : '#ccc' }"></span>
-            <span>{{ rp.name || rp.client_name }}</span>
-          </div>
+          <!-- 按集团分组：有 parent_project_id 的归到父项目下 -->
+          <template v-for="group in projectGroups" :key="group.parentId || 'standalone'">
+            <div v-if="group.parent" class="gt-catalog-unit-group-parent">
+              <span style="font-size: 11px; color: #999; padding: 2px 6px;">📁 {{ group.parent.name }}</span>
+            </div>
+            <div
+              v-for="rp in group.items" :key="rp.id"
+              class="gt-catalog-unit-related"
+              :class="{ 'gt-catalog-unit-related--current': rp.id === project?.id }"
+              :style="{ paddingLeft: group.parent ? '20px' : '6px' }"
+              @click="onSwitchProject(rp)"
+            >
+              <span class="gt-catalog-unit-related-dot" :style="{ background: rp.id === project?.id ? '#4b2d77' : '#ccc' }"></span>
+              <span>{{ rp.name || rp.client_name }}</span>
+              <el-tag v-if="rp.report_scope === 'consolidated'" size="small" type="warning" style="margin-left: auto; font-size: 10px;">合并</el-tag>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -151,10 +159,45 @@ const showRelated = ref(false)
 
 function onSwitchProject(rp: any) {
   if (rp.id !== props.project?.id) {
-    // 通知父组件切换项目
     emit('select', { type: 'switch_project', project_id: rp.id, name: rp.name })
   }
 }
+
+// 按集团分组项目
+const projectGroups = computed(() => {
+  const groups: Array<{ parentId: string | null; parent: any; items: any[] }> = []
+  const parentMap: Record<string, any[]> = {}
+  const standalone: any[] = []
+  const parentProjects: Record<string, any> = {}
+
+  for (const p of relatedProjects.value) {
+    if (p.parent_project_id) {
+      if (!parentMap[p.parent_project_id]) parentMap[p.parent_project_id] = []
+      parentMap[p.parent_project_id].push(p)
+    }
+  }
+  for (const p of relatedProjects.value) {
+    if (parentMap[p.id]) {
+      parentProjects[p.id] = p
+    }
+  }
+  // 集团项目（父+子）
+  for (const [pid, children] of Object.entries(parentMap)) {
+    const parent = parentProjects[pid] || relatedProjects.value.find((p: any) => p.id === pid)
+    const items = parent ? [parent, ...children.filter((c: any) => c.id !== pid)] : children
+    groups.push({ parentId: pid, parent, items })
+  }
+  // 独立项目（不属于任何集团）
+  for (const p of relatedProjects.value) {
+    if (!p.parent_project_id && !parentMap[p.id]) {
+      standalone.push(p)
+    }
+  }
+  if (standalone.length) {
+    groups.push({ parentId: null, parent: null, items: standalone })
+  }
+  return groups
+})
 
 // tab 切换时通知父组件
 watch(activeTab, (v) => emit('tab-change', v))
@@ -277,27 +320,15 @@ watch(() => props.project?.id, async (pid) => {
   } catch { wpCycles.value = [] }
 }, { immediate: true })
 
-// 加载关联企业（同集团项目）
+// 加载用户负责的所有项目
 watch(() => props.project?.id, async (pid) => {
   if (!pid) { relatedProjects.value = []; return }
   try {
     const data = await api.get('/api/projects', { validateStatus: (s: number) => s < 500 })
     const all = Array.isArray(data) ? data : (data?.items || [])
-    // 同集团：parent_project_id 相同，或当前项目是父项目
-    const parentId = props.project?.parent_project_id
-    if (parentId) {
-      relatedProjects.value = all.filter((p: any) =>
-        p.parent_project_id === parentId || p.id === parentId
-      )
-    } else {
-      // 当前项目可能是父项目，找子项目
-      const children = all.filter((p: any) => p.parent_project_id === pid)
-      if (children.length > 0) {
-        relatedProjects.value = [props.project, ...children]
-      } else {
-        relatedProjects.value = []
-      }
-    }
+    // 显示用户能看到的所有项目（后端已按权限过滤）
+    relatedProjects.value = all
+    showRelated.value = all.length > 1
   } catch { relatedProjects.value = [] }
 }, { immediate: true })
 </script>

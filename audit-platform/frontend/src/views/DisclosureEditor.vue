@@ -47,10 +47,27 @@
     <div class="gt-de-body">
       <!-- 左侧：目录树 -->
       <div class="gt-de-sidebar">
-        <div class="gt-de-sidebar-title">附注目录</div>
+        <!-- 单位切换 -->
+        <div class="gt-de-unit-bar">
+          <span class="gt-de-unit-name">{{ projectName || '—' }}</span>
+          <el-select v-if="projectOptions.length > 1" v-model="selectedProjectIdLocal" size="small" style="width: 100%; margin-top: 4px" @change="onSwitchProjectLocal">
+            <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
+          </el-select>
+        </div>
+        <!-- 视图切换 -->
+        <div class="gt-de-view-toggle">
+          <el-radio-group v-model="treeViewMode" size="small">
+            <el-radio-button value="tree">树形</el-radio-button>
+            <el-radio-button value="flat">平铺</el-radio-button>
+          </el-radio-group>
+          <el-button size="small" text @click="expandAll" title="全部展开">展开</el-button>
+          <el-button size="small" text @click="collapseAll" title="全部收起">收起</el-button>
+        </div>
         <el-input v-model="treeSearch" size="small" placeholder="搜索章节..." clearable class="gt-de-tree-search" />
         <div class="gt-de-tree-wrap">
+          <!-- 树形视图 -->
           <el-tree
+            v-if="treeViewMode === 'tree'"
             :data="filteredTreeData"
             :props="{ label: 'label', children: 'children' }"
             :indent="10"
@@ -69,6 +86,18 @@
               </div>
             </template>
           </el-tree>
+          <!-- 平铺视图 -->
+          <div v-if="treeViewMode === 'flat'" class="gt-de-flat-list">
+            <div
+              v-for="note in flatNoteList" :key="note.note_section"
+              class="gt-de-flat-item"
+              :class="{ 'gt-de-flat-item--active': currentNote?.note_section === note.note_section }"
+              @click="onFlatItemClick(note)"
+            >
+              <span class="gt-de-flat-item-title">{{ note.section_title }}</span>
+              <el-tag v-if="note.scope === 'consolidated_only'" size="small" type="warning" style="font-size: 10px">合并</el-tag>
+            </div>
+          </div>
           <div v-if="!filteredTreeData.length && !treeLoading" class="gt-de-empty-hint">
             暂无附注，点击"生成附注"
           </div>
@@ -370,6 +399,57 @@ interface TreeNode { id: string; label: string; data?: any; children?: TreeNode[
 
 const treeSearch = ref('')
 const noteTreeRef = ref<any>(null)
+const treeViewMode = ref<'tree' | 'flat'>('tree')
+
+// 单位切换
+const selectedProjectIdLocal = ref('')
+const projectOptions = ref<any[]>([])
+
+async function loadProjectOptions() {
+  try {
+    const data = await api.get('/api/projects', { validateStatus: (s: number) => s < 500 })
+    projectOptions.value = Array.isArray(data) ? data.map((p: any) => ({ id: p.id, name: p.name || p.client_name })) : []
+    selectedProjectIdLocal.value = projectId.value
+  } catch { projectOptions.value = [] }
+}
+
+function onSwitchProjectLocal(newId: string) {
+  if (newId && newId !== projectId.value) {
+    router.push(`/projects/${newId}/disclosure-notes`)
+  }
+}
+
+function expandAll() {
+  const tree = noteTreeRef.value
+  if (!tree) return
+  const nodes = tree.store?.nodesMap
+  if (nodes) {
+    Object.values(nodes).forEach((node: any) => { node.expanded = true })
+  }
+}
+
+function collapseAll() {
+  const tree = noteTreeRef.value
+  if (!tree) return
+  const nodes = tree.store?.nodesMap
+  if (nodes) {
+    Object.values(nodes).forEach((node: any) => { node.expanded = false })
+  }
+}
+
+// 平铺视图数据
+const flatNoteList = computed(() => {
+  const kw = treeSearch.value.toLowerCase()
+  let list = noteList.value
+  if (kw) {
+    list = list.filter(n => (n.section_title || '').toLowerCase().includes(kw) || (n.note_section || '').toLowerCase().includes(kw))
+  }
+  return list
+})
+
+function onFlatItemClick(note: any) {
+  currentNote.value = note
+}
 
 // 按大类分组的树形结构
 const CHAPTER_GROUPS = [
@@ -970,6 +1050,34 @@ onMounted(async () => {
   padding: 10px 14px 6px; font-size: 12px; font-weight: 600; color: #666;
   text-transform: uppercase; letter-spacing: 1px;
 }
+
+/* 单位切换栏 */
+.gt-de-unit-bar {
+  padding: 8px 12px; border-bottom: 1px solid #f0f0f0;
+}
+.gt-de-unit-name {
+  font-size: 13px; font-weight: 600; color: var(--gt-color-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;
+}
+
+/* 视图切换 */
+.gt-de-view-toggle {
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+}
+.gt-de-view-toggle .el-radio-group { flex-shrink: 0; }
+.gt-de-view-toggle .el-button { font-size: 11px; padding: 0 4px; }
+
+/* 平铺视图 */
+.gt-de-flat-list { flex: 1; overflow-y: auto; padding: 0 4px 8px; }
+.gt-de-flat-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; font-size: 12px; cursor: pointer;
+  border-radius: 4px; color: var(--gt-color-text);
+  transition: background 0.15s;
+}
+.gt-de-flat-item:hover { background: #f5f0ff; }
+.gt-de-flat-item--active { background: #ece6f5; font-weight: 600; color: var(--gt-color-primary); }
+.gt-de-flat-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-de-tree-search { margin: 0 10px 8px; width: calc(100% - 20px); }
 .gt-de-tree-wrap { flex: 1; overflow-y: auto; padding: 0 4px 8px; }
 .gt-de-tree-wrap :deep(.el-tree) { background: transparent; --el-tree-node-hover-bg-color: #f5f0ff; }
