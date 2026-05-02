@@ -46,6 +46,51 @@
           "is_total": true,
           "report_row": "BS-032"
         }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unadjusted": {
+            "col": 2,
+            "label": "期初未审数"
+          },
+          "opening_adjustment": {
+            "col": 3,
+            "label": "期初账项调整"
+          },
+          "opening_reclass": {
+            "col": 4,
+            "label": "期初重分类调整"
+          },
+          "opening_audited": {
+            "col": 5,
+            "label": "期初审定数"
+          },
+          "closing_unadjusted": {
+            "col": 6,
+            "label": "期末未审数"
+          },
+          "closing_adjustment": {
+            "col": 7,
+            "label": "期末账项调整"
+          },
+          "closing_reclass": {
+            "col": 8,
+            "label": "期末重分类调整"
+          },
+          "closing_audited": {
+            "col": 9,
+            "label": "期末审定数"
+          },
+          "change_amount": {
+            "col": 10,
+            "label": "变动额"
+          },
+          "change_rate": {
+            "col": 11,
+            "label": "变动率"
+          }
+        }
       }
     },
     {

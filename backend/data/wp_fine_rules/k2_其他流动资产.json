@@ -37,7 +37,48 @@
         6
       ],
       "data_start_row": 7,
-      "code": "K2-1"
+      "code": "K2-1",
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unadjusted": {
+            "col": 2,
+            "label": "期初未审数"
+          },
+          "opening_adjustment": {
+            "col": 3,
+            "label": "期初账项调整"
+          },
+          "opening_audited": {
+            "col": 4,
+            "label": "期初审定数"
+          },
+          "closing_unadjusted": {
+            "col": 5,
+            "label": "期末未审数"
+          },
+          "closing_adjustment": {
+            "col": 6,
+            "label": "期末账项调整"
+          },
+          "closing_audited": {
+            "col": 7,
+            "label": "期末审定数"
+          },
+          "change_amount": {
+            "col": 8,
+            "label": "变动额"
+          },
+          "change_rate": {
+            "col": 9,
+            "label": "变动率"
+          },
+          "reason": {
+            "col": 10,
+            "label": "原因分析"
+          }
+        }
+      }
     },
     {
       "exact_name": "附注披露信息（上市公司）",

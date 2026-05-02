@@ -39,7 +39,52 @@
         6
       ],
       "data_start_row": 7,
-      "code": "H4-1"
+      "code": "H4-1",
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_balance": {
+            "col": 2,
+            "label": "期初余额"
+          },
+          "increase_purchase": {
+            "col": 3,
+            "label": "本期增加-购置"
+          },
+          "increase_transfer": {
+            "col": 4,
+            "label": "本期增加-在建转入"
+          },
+          "increase_other": {
+            "col": 5,
+            "label": "本期增加-其他"
+          },
+          "decrease_disposal": {
+            "col": 6,
+            "label": "本期减少-处置"
+          },
+          "decrease_other": {
+            "col": 7,
+            "label": "本期减少-其他"
+          },
+          "closing_balance": {
+            "col": 8,
+            "label": "期末余额"
+          },
+          "audit_adjustment": {
+            "col": 9,
+            "label": "审计调整"
+          },
+          "closing_audited": {
+            "col": 10,
+            "label": "期末审定数"
+          },
+          "index_ref": {
+            "col": 11,
+            "label": "索引"
+          }
+        }
+      }
     },
     {
       "exact_name": "附注披露信息（上市公司）",

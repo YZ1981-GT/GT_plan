@@ -46,6 +46,47 @@
           "is_total": true,
           "report_row": "BS-017"
         }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_balance": {
+            "col": 2,
+            "label": "期初余额"
+          },
+          "increase_purchase": {
+            "col": 3,
+            "label": "本期增加-购置"
+          },
+          "increase_other": {
+            "col": 4,
+            "label": "本期增加-其他"
+          },
+          "decrease_disposal": {
+            "col": 5,
+            "label": "本期减少-处置"
+          },
+          "decrease_other": {
+            "col": 6,
+            "label": "本期减少-其他"
+          },
+          "closing_balance": {
+            "col": 7,
+            "label": "期末余额"
+          },
+          "audit_adjustment": {
+            "col": 8,
+            "label": "审计调整"
+          },
+          "closing_audited": {
+            "col": 9,
+            "label": "期末审定数"
+          },
+          "index_ref": {
+            "col": 10,
+            "label": "索引"
+          }
+        }
       }
     },
     {

@@ -2,29 +2,169 @@
   "wp_code": "L2",
   "name": "长期借款",
   "version": "2025-R1",
-  "account_codes": ["2501"],
-  "source_files": [{"file": "L2 应付利息.xlsx", "sheets": ["底稿目录","应付利息实质性程序表L2A","审定表L2-1","附注披露（国企）信息","附注披露（上市公司）信息","明细表L2-2","应付利息调整分录汇总L2-3","应付利息检查表L2-4"]}],
+  "account_codes": [
+    "2501"
+  ],
+  "source_files": [
+    {
+      "file": "L2 应付利息.xlsx",
+      "sheets": [
+        "底稿目录",
+        "应付利息实质性程序表L2A",
+        "审定表L2-1",
+        "附注披露（国企）信息",
+        "附注披露（上市公司）信息",
+        "明细表L2-2",
+        "应付利息调整分录汇总L2-3",
+        "应付利息检查表L2-4"
+      ]
+    }
+  ],
   "sheet_rules": [
-    {"code": "L2A", "exact_name": "应付利息实质性程序表L2A", "type": "procedure"},
-    {"code": "L2-1", "exact_name": "审定表L2-1", "type": "summary", "header_rows": [5,6], "data_start_row": 7,
-      "key_rows": {"total": {"row": 12, "label": "合计", "is_total": true, "report_row": "BS-041"}}},
-    {"code": "L2-note-soe", "exact_name": "附注披露（国企）信息", "type": "note_disclosure"},
-    {"code": "L2-note-listed", "exact_name": "附注披露（上市公司）信息", "type": "note_disclosure"},
-    {"code": "L2-2", "exact_name": "明细表L2-2", "type": "detail"},
-    {"code": "L2-3", "exact_name": "应付利息调整分录汇总L2-3", "type": "adjustment"},
-    {"code": "L2-4", "exact_name": "应付利息检查表L2-4", "type": "check", "description": "借款合同/利率/期限/担保检查"}
+    {
+      "code": "L2A",
+      "exact_name": "应付利息实质性程序表L2A",
+      "type": "procedure"
+    },
+    {
+      "code": "L2-1",
+      "exact_name": "审定表L2-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-041"
+        }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unadjusted": {
+            "col": 2,
+            "label": "期初未审数"
+          },
+          "opening_adjustment": {
+            "col": 3,
+            "label": "期初账项调整"
+          },
+          "opening_audited": {
+            "col": 4,
+            "label": "期初审定数"
+          },
+          "closing_unadjusted": {
+            "col": 5,
+            "label": "期末未审数"
+          },
+          "closing_adjustment": {
+            "col": 6,
+            "label": "期末账项调整"
+          },
+          "closing_audited": {
+            "col": 7,
+            "label": "期末审定数"
+          },
+          "change_amount": {
+            "col": 8,
+            "label": "变动额"
+          },
+          "change_rate": {
+            "col": 9,
+            "label": "变动率"
+          },
+          "reason": {
+            "col": 10,
+            "label": "原因分析"
+          }
+        }
+      }
+    },
+    {
+      "code": "L2-note-soe",
+      "exact_name": "附注披露（国企）信息",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "L2-note-listed",
+      "exact_name": "附注披露（上市公司）信息",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "L2-2",
+      "exact_name": "明细表L2-2",
+      "type": "detail"
+    },
+    {
+      "code": "L2-3",
+      "exact_name": "应付利息调整分录汇总L2-3",
+      "type": "adjustment"
+    },
+    {
+      "code": "L2-4",
+      "exact_name": "应付利息检查表L2-4",
+      "type": "check",
+      "description": "借款合同/利率/期限/担保检查"
+    }
   ],
   "cross_references": [
-    {"from": "L2-1.total", "to": "report://BS/BS-041#期末", "description": "审定表合计 = 报表长期借款"},
-    {"from": "L2-1.total", "to": "tb://2501#审定数", "description": "审定表合计 = 试算表长期借款审定数"},
-    {"from": "L2-2.合计", "to": "L2-1.total", "description": "明细表合计 = 审定表合计"}
+    {
+      "from": "L2-1.total",
+      "to": "report://BS/BS-041#期末",
+      "description": "审定表合计 = 报表长期借款"
+    },
+    {
+      "from": "L2-1.total",
+      "to": "tb://2501#审定数",
+      "description": "审定表合计 = 试算表长期借款审定数"
+    },
+    {
+      "from": "L2-2.合计",
+      "to": "L2-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
   ],
   "audit_checks": [
-    {"code": "L2-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计 = 试算表长期借款审定数"},
-    {"code": "L2-CHK-02", "type": "balance", "severity": "blocking", "description": "审定表合计 = 报表长期借款行"},
-    {"code": "L2-CHK-03", "type": "cross_ref", "severity": "warning", "description": "明细表合计 = 审定表合计"},
-    {"code": "L2-CHK-04", "type": "check", "severity": "warning", "description": "借款合同/利率/期限/担保已检查（L2-4）"},
-    {"code": "L2-CHK-05", "type": "movement", "severity": "info", "description": "期初+新增-偿还 = 期末"},
-    {"code": "L2-CHK-06", "type": "check", "severity": "warning", "description": "一年内到期部分已正确重分类"}
+    {
+      "code": "L2-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表长期借款审定数"
+    },
+    {
+      "code": "L2-CHK-02",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表长期借款行"
+    },
+    {
+      "code": "L2-CHK-03",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "L2-CHK-04",
+      "type": "check",
+      "severity": "warning",
+      "description": "借款合同/利率/期限/担保已检查（L2-4）"
+    },
+    {
+      "code": "L2-CHK-05",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初+新增-偿还 = 期末"
+    },
+    {
+      "code": "L2-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "一年内到期部分已正确重分类"
+    }
   ]
 }

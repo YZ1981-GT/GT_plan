@@ -44,6 +44,12 @@
       "type": "calculation",
       "severity": "blocking",
       "description": "重要性水平计算正确"
+    },
+    {
+      "id": "B15-CHK-03",
+      "type": "check",
+      "severity": "info",
+      "description": "应对措施已记录"
     }
   ]
 }

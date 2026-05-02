@@ -44,6 +44,12 @@
       "type": "check",
       "severity": "blocking",
       "description": "持续经营假设已评估"
+    },
+    {
+      "id": "A15-CHK-03",
+      "type": "check",
+      "severity": "info",
+      "description": "编制日期在审计期间内"
     }
   ]
 }

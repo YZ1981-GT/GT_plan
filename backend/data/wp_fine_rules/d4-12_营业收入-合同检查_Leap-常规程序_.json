@@ -26,6 +26,12 @@
       "type": "completeness",
       "severity": "warning",
       "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "id": "D4-12-CHK-02",
+      "type": "check",
+      "severity": "info",
+      "description": "编制人已签署"
     }
   ]
 }

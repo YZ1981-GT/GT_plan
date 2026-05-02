@@ -81,6 +81,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "id": "D0-CHK-02",
+      "type": "confirmation",
+      "severity": "warning",
+      "description": "回函率统计已记录"
+    },
+    {
+      "id": "D0-CHK-03",
+      "type": "check",
+      "severity": "warning",
+      "description": "差异事项已跟进处理"
+    },
+    {
+      "id": "D0-CHK-04",
+      "type": "check",
+      "severity": "info",
+      "description": "未回函项目已执行替代程序"
     }
   ]
 }

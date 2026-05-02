@@ -3,49 +3,348 @@
   "name": "应付职工薪酬",
   "wp_name": "应付职工薪酬",
   "cycle": "J",
-  "account_codes": ["2211"],
+  "account_codes": [
+    "2211"
+  ],
   "source_files": [
     {
       "file_pattern": "J1 应付职工薪酬.xlsx",
       "is_primary": true
     }
   ],
-  "sheets": [
+  "cross_references": [
+    {
+      "from": "J1-1:R22:C7",
+      "to": "TB('2211','审定数')",
+      "description": "短期薪酬合计≈试算表审定数（含离职后福利部分）"
+    },
+    {
+      "from": "J1-1:R34:C7",
+      "to": "J1-1:R22:C7",
+      "description": "离职后福利+短期薪酬=应付职工薪酬总额"
+    },
+    {
+      "from": "J1-2",
+      "to": "J1-1:R22:C7",
+      "description": "明细表合计=审定表短期薪酬合计"
+    },
+    {
+      "from": "J1-3",
+      "to": "J1-1:R22:C6",
+      "description": "调整分录汇总=审定表调整列"
+    },
+    {
+      "from": "J1-4",
+      "to": "J1-1",
+      "description": "月度分析引用审定表数据"
+    },
+    {
+      "from": "J1-6",
+      "to": "J1-1",
+      "description": "计提检查引用审定表数据"
+    }
+  ],
+  "audit_checks": [
+    {
+      "id": "J1-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "短期薪酬+离职后福利+辞退福利=试算表审定数"
+    },
+    {
+      "id": "J1-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计与审定表一致"
+    },
+    {
+      "id": "J1-CHK-03",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表已填写"
+    },
+    {
+      "id": "J1-CHK-04",
+      "type": "check",
+      "severity": "warning",
+      "description": "计提情况检查表已填写"
+    },
+    {
+      "id": "J1-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "分配情况检查表已填写"
+    },
+    {
+      "id": "J1-CHK-06",
+      "type": "analysis",
+      "severity": "info",
+      "description": "月度分析已执行"
+    },
+    {
+      "id": "J1-CHK-07",
+      "type": "analysis",
+      "severity": "info",
+      "description": "同行业对比分析已执行"
+    },
+    {
+      "id": "J1-CHK-08",
+      "type": "check",
+      "severity": "info",
+      "description": "非货币性福利检查已填写"
+    },
+    {
+      "id": "J1-CHK-09",
+      "type": "check",
+      "severity": "info",
+      "description": "辞退福利检查已填写（如适用）"
+    },
+    {
+      "id": "J1-CHK-10",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "短期薪酬各项之和=短期合计（R8~R21=R22）"
+    },
+    {
+      "id": "J1-CHK-11",
+      "type": "formula",
+      "severity": "warning",
+      "description": "社会保险费=基本医疗+补充医疗+工伤+生育（R11+R12+R13+R14=R10）"
+    }
+  ],
+  "sheet_rules": [
     {
       "exact_name": "审定表J1-1 ",
       "code": "J1-1",
       "type": "summary",
       "table_type": "multi_section",
       "note": "Sheet名末尾有空格",
-      "header_rows": [6, 7],
+      "header_rows": [
+        6,
+        7
+      ],
       "data_start_row": 8,
       "columns": {
-        "opening_unaudited": {"col": 2, "keywords": ["期初", "未审数"]},
-        "opening_aje": {"col": 3, "keywords": ["期初", "账项调整"]},
-        "opening_audited": {"col": 4, "keywords": ["期初", "审定数"]},
-        "closing_unaudited": {"col": 5, "keywords": ["期末", "未审数"]},
-        "closing_aje": {"col": 6, "keywords": ["期末", "账项调整"]},
-        "closing_audited": {"col": 7, "keywords": ["期末", "审定数"]},
-        "change_unaudited_amount": {"col": 8, "keywords": ["未审", "变动额"]},
-        "change_unaudited_rate": {"col": 9, "keywords": ["未审", "变动率"]},
-        "change_audited_amount": {"col": 10, "keywords": ["审定", "变动额"]},
-        "change_audited_rate": {"col": 11, "keywords": ["审定", "变动率"]}
+        "opening_unaudited": {
+          "col": 2,
+          "keywords": [
+            "期初",
+            "未审数"
+          ]
+        },
+        "opening_aje": {
+          "col": 3,
+          "keywords": [
+            "期初",
+            "账项调整"
+          ]
+        },
+        "opening_audited": {
+          "col": 4,
+          "keywords": [
+            "期初",
+            "审定数"
+          ]
+        },
+        "closing_unaudited": {
+          "col": 5,
+          "keywords": [
+            "期末",
+            "未审数"
+          ]
+        },
+        "closing_aje": {
+          "col": 6,
+          "keywords": [
+            "期末",
+            "账项调整"
+          ]
+        },
+        "closing_audited": {
+          "col": 7,
+          "keywords": [
+            "期末",
+            "审定数"
+          ]
+        },
+        "change_unaudited_amount": {
+          "col": 8,
+          "keywords": [
+            "未审",
+            "变动额"
+          ]
+        },
+        "change_unaudited_rate": {
+          "col": 9,
+          "keywords": [
+            "未审",
+            "变动率"
+          ]
+        },
+        "change_audited_amount": {
+          "col": 10,
+          "keywords": [
+            "审定",
+            "变动额"
+          ]
+        },
+        "change_audited_rate": {
+          "col": 11,
+          "keywords": [
+            "审定",
+            "变动率"
+          ]
+        }
       },
       "key_rows": {
         "section1_title": 5,
-        "section1_items": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
+        "section1_items": [
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21
+        ],
         "section1_total": 22,
         "section2_title": 23,
-        "section2_items": [26, 27, 28, 29, 30, 31, 32, 33],
+        "section2_items": [
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33
+        ],
         "section2_total": 34,
         "section3_title": 35,
-        "section3_items": [38, 39]
+        "section3_items": [
+          38,
+          39
+        ]
       },
       "sections": [
-        {"name": "短期薪酬", "start_row": 5, "end_row": 22, "items": ["工资奖金", "职工福利费", "社会保险费", "住房公积金", "工会经费", "职工教育经费", "短期带薪缺勤", "短期利润分享", "非货币性福利", "其他"]},
-        {"name": "离职后福利-设定提存", "start_row": 23, "end_row": 34, "items": ["离职后福利", "基本养老", "失业保险", "企业年金", "其他", "其他长期职工福利"]},
-        {"name": "辞退福利", "start_row": 35, "end_row": 39}
-      ]
+        {
+          "name": "短期薪酬",
+          "start_row": 5,
+          "end_row": 22,
+          "items": [
+            "工资奖金",
+            "职工福利费",
+            "社会保险费",
+            "住房公积金",
+            "工会经费",
+            "职工教育经费",
+            "短期带薪缺勤",
+            "短期利润分享",
+            "非货币性福利",
+            "其他"
+          ]
+        },
+        {
+          "name": "离职后福利-设定提存",
+          "start_row": 23,
+          "end_row": 34,
+          "items": [
+            "离职后福利",
+            "基本养老",
+            "失业保险",
+            "企业年金",
+            "其他",
+            "其他长期职工福利"
+          ]
+        },
+        {
+          "name": "辞退福利",
+          "start_row": 35,
+          "end_row": 39
+        }
+      ],
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unaudited": {
+            "col": 2,
+            "keywords": [
+              "期初",
+              "未审数"
+            ]
+          },
+          "opening_aje": {
+            "col": 3,
+            "keywords": [
+              "期初",
+              "账项调整"
+            ]
+          },
+          "opening_audited": {
+            "col": 4,
+            "keywords": [
+              "期初",
+              "审定数"
+            ]
+          },
+          "closing_unaudited": {
+            "col": 5,
+            "keywords": [
+              "期末",
+              "未审数"
+            ]
+          },
+          "closing_aje": {
+            "col": 6,
+            "keywords": [
+              "期末",
+              "账项调整"
+            ]
+          },
+          "closing_audited": {
+            "col": 7,
+            "keywords": [
+              "期末",
+              "审定数"
+            ]
+          },
+          "change_unaudited_amount": {
+            "col": 8,
+            "keywords": [
+              "未审",
+              "变动额"
+            ]
+          },
+          "change_unaudited_rate": {
+            "col": 9,
+            "keywords": [
+              "未审",
+              "变动率"
+            ]
+          },
+          "change_audited_amount": {
+            "col": 10,
+            "keywords": [
+              "审定",
+              "变动额"
+            ]
+          },
+          "change_audited_rate": {
+            "col": 11,
+            "keywords": [
+              "审定",
+              "变动率"
+            ]
+          }
+        }
+      }
     },
     {
       "exact_name": "应付职工薪酬实质性程序表 J1A",
@@ -118,26 +417,5 @@
       "type": "reference",
       "description": "IPO薪酬审计提示"
     }
-  ],
-  "cross_references": [
-    {"from": "J1-1:R22:C7", "to": "TB('2211','审定数')", "description": "短期薪酬合计≈试算表审定数（含离职后福利部分）"},
-    {"from": "J1-1:R34:C7", "to": "J1-1:R22:C7", "description": "离职后福利+短期薪酬=应付职工薪酬总额"},
-    {"from": "J1-2", "to": "J1-1:R22:C7", "description": "明细表合计=审定表短期薪酬合计"},
-    {"from": "J1-3", "to": "J1-1:R22:C6", "description": "调整分录汇总=审定表调整列"},
-    {"from": "J1-4", "to": "J1-1", "description": "月度分析引用审定表数据"},
-    {"from": "J1-6", "to": "J1-1", "description": "计提检查引用审定表数据"}
-  ],
-  "audit_checks": [
-    {"id": "J1-CHK-01", "type": "balance", "severity": "blocking", "description": "短期薪酬+离职后福利+辞退福利=试算表审定数"},
-    {"id": "J1-CHK-02", "type": "cross_ref", "severity": "warning", "description": "明细表合计与审定表一致"},
-    {"id": "J1-CHK-03", "type": "completeness", "severity": "warning", "description": "明细表已填写"},
-    {"id": "J1-CHK-04", "type": "check", "severity": "warning", "description": "计提情况检查表已填写"},
-    {"id": "J1-CHK-05", "type": "check", "severity": "warning", "description": "分配情况检查表已填写"},
-    {"id": "J1-CHK-06", "type": "analysis", "severity": "info", "description": "月度分析已执行"},
-    {"id": "J1-CHK-07", "type": "analysis", "severity": "info", "description": "同行业对比分析已执行"},
-    {"id": "J1-CHK-08", "type": "check", "severity": "info", "description": "非货币性福利检查已填写"},
-    {"id": "J1-CHK-09", "type": "check", "severity": "info", "description": "辞退福利检查已填写（如适用）"},
-    {"id": "J1-CHK-10", "type": "formula", "severity": "blocking", "description": "短期薪酬各项之和=短期合计（R8~R21=R22）"},
-    {"id": "J1-CHK-11", "type": "formula", "severity": "warning", "description": "社会保险费=基本医疗+补充医疗+工伤+生育（R11+R12+R13+R14=R10）"}
   ]
 }

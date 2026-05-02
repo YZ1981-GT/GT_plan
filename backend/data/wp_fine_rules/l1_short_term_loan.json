@@ -3,44 +3,319 @@
   "name": "短期借款",
   "wp_name": "短期借款",
   "cycle": "L",
-  "account_codes": ["2001"],
+  "account_codes": [
+    "2001"
+  ],
   "source_files": [
     {
       "file_pattern": "L1 短期借款.xlsx",
       "is_primary": true
     }
   ],
-  "sheets": [
+  "cross_references": [
+    {
+      "from": "L1-1:R11:C9",
+      "to": "TB('2001','审定数')",
+      "description": "审定表合计=试算表审定数"
+    },
+    {
+      "from": "L1-1:R11:C5",
+      "to": "TB('2001','期初余额')",
+      "description": "期初审定=试算表期初"
+    },
+    {
+      "from": "L1-2",
+      "to": "L1-1:R11:C9",
+      "description": "明细表合计=审定表合计"
+    },
+    {
+      "from": "L1-3",
+      "to": "L1-1:R11:C7",
+      "description": "调整分录汇总=审定表调整列"
+    },
+    {
+      "from": "L1-4",
+      "to": "L1-2",
+      "description": "征信报告核对明细表"
+    },
+    {
+      "from": "L1-5",
+      "to": "L1-2",
+      "description": "利息测算基于明细表借款金额"
+    }
+  ],
+  "audit_checks": [
+    {
+      "id": "L1-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计=试算表审定数"
+    },
+    {
+      "id": "L1-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计与审定表一致"
+    },
+    {
+      "id": "L1-CHK-03",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表已填写"
+    },
+    {
+      "id": "L1-CHK-04",
+      "type": "check",
+      "severity": "warning",
+      "description": "征信报告核对已完成"
+    },
+    {
+      "id": "L1-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "利息测算已完成"
+    },
+    {
+      "id": "L1-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "贷款合同检查已完成"
+    },
+    {
+      "id": "L1-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "逾期贷款检查已完成"
+    },
+    {
+      "id": "L1-CHK-08",
+      "type": "check",
+      "severity": "info",
+      "description": "抵质押资产检查已完成"
+    },
+    {
+      "id": "L1-CHK-09",
+      "type": "reconciliation",
+      "severity": "warning",
+      "description": "征信报告余额与账面余额一致"
+    },
+    {
+      "id": "L1-CHK-10",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "各借款类型之和=合计（R7+R8+R9+R10=R11）"
+    }
+  ],
+  "sheet_rules": [
     {
       "exact_name": "审定表L1-1",
       "code": "L1-1",
       "type": "summary",
       "table_type": "standard",
-      "header_rows": [5, 6],
+      "header_rows": [
+        5,
+        6
+      ],
       "data_start_row": 7,
       "columns": {
-        "opening_unaudited": {"col": 2, "keywords": ["期初", "未审数"]},
-        "opening_aje": {"col": 3, "keywords": ["期初", "账项调整"]},
-        "opening_reclass": {"col": 4, "keywords": ["期初", "重分类调整"]},
-        "opening_audited": {"col": 5, "keywords": ["期初", "审定数"]},
-        "closing_unaudited": {"col": 6, "keywords": ["期末", "未审数"]},
-        "closing_aje": {"col": 7, "keywords": ["期末", "账项调整"]},
-        "closing_reclass": {"col": 8, "keywords": ["期末", "重分类调整"]},
-        "closing_audited": {"col": 9, "keywords": ["期末", "审定数"]},
-        "change_unaudited_amount": {"col": 10, "keywords": ["未审", "变动额"]},
-        "change_unaudited_rate": {"col": 11, "keywords": ["未审", "变动率"]},
-        "change_audited_amount": {"col": 12, "keywords": ["审定", "变动额"]},
-        "change_audited_rate": {"col": 13, "keywords": ["审定", "变动率"]}
+        "opening_unaudited": {
+          "col": 2,
+          "keywords": [
+            "期初",
+            "未审数"
+          ]
+        },
+        "opening_aje": {
+          "col": 3,
+          "keywords": [
+            "期初",
+            "账项调整"
+          ]
+        },
+        "opening_reclass": {
+          "col": 4,
+          "keywords": [
+            "期初",
+            "重分类调整"
+          ]
+        },
+        "opening_audited": {
+          "col": 5,
+          "keywords": [
+            "期初",
+            "审定数"
+          ]
+        },
+        "closing_unaudited": {
+          "col": 6,
+          "keywords": [
+            "期末",
+            "未审数"
+          ]
+        },
+        "closing_aje": {
+          "col": 7,
+          "keywords": [
+            "期末",
+            "账项调整"
+          ]
+        },
+        "closing_reclass": {
+          "col": 8,
+          "keywords": [
+            "期末",
+            "重分类调整"
+          ]
+        },
+        "closing_audited": {
+          "col": 9,
+          "keywords": [
+            "期末",
+            "审定数"
+          ]
+        },
+        "change_unaudited_amount": {
+          "col": 10,
+          "keywords": [
+            "未审",
+            "变动额"
+          ]
+        },
+        "change_unaudited_rate": {
+          "col": 11,
+          "keywords": [
+            "未审",
+            "变动率"
+          ]
+        },
+        "change_audited_amount": {
+          "col": 12,
+          "keywords": [
+            "审定",
+            "变动额"
+          ]
+        },
+        "change_audited_rate": {
+          "col": 13,
+          "keywords": [
+            "审定",
+            "变动率"
+          ]
+        }
       },
       "key_rows": {
-        "data_items": [7, 8, 9, 10],
+        "data_items": [
+          7,
+          8,
+          9,
+          10
+        ],
         "total": 11,
         "audit_note": 12,
         "audit_conclusion": 19
       },
       "sections": [
-        {"name": "按担保方式分类", "start_row": 7, "end_row": 11, "items": ["信用借款", "抵押借款", "保证借款", "质押借款"]}
-      ]
+        {
+          "name": "按担保方式分类",
+          "start_row": 7,
+          "end_row": 11,
+          "items": [
+            "信用借款",
+            "抵押借款",
+            "保证借款",
+            "质押借款"
+          ]
+        }
+      ],
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unaudited": {
+            "col": 2,
+            "keywords": [
+              "期初",
+              "未审数"
+            ]
+          },
+          "opening_aje": {
+            "col": 3,
+            "keywords": [
+              "期初",
+              "账项调整"
+            ]
+          },
+          "opening_reclass": {
+            "col": 4,
+            "keywords": [
+              "期初",
+              "重分类调整"
+            ]
+          },
+          "opening_audited": {
+            "col": 5,
+            "keywords": [
+              "期初",
+              "审定数"
+            ]
+          },
+          "closing_unaudited": {
+            "col": 6,
+            "keywords": [
+              "期末",
+              "未审数"
+            ]
+          },
+          "closing_aje": {
+            "col": 7,
+            "keywords": [
+              "期末",
+              "账项调整"
+            ]
+          },
+          "closing_reclass": {
+            "col": 8,
+            "keywords": [
+              "期末",
+              "重分类调整"
+            ]
+          },
+          "closing_audited": {
+            "col": 9,
+            "keywords": [
+              "期末",
+              "审定数"
+            ]
+          },
+          "change_unaudited_amount": {
+            "col": 10,
+            "keywords": [
+              "未审",
+              "变动额"
+            ]
+          },
+          "change_unaudited_rate": {
+            "col": 11,
+            "keywords": [
+              "未审",
+              "变动率"
+            ]
+          },
+          "change_audited_amount": {
+            "col": 12,
+            "keywords": [
+              "审定",
+              "变动额"
+            ]
+          },
+          "change_audited_rate": {
+            "col": 13,
+            "keywords": [
+              "审定",
+              "变动率"
+            ]
+          }
+        }
+      }
     },
     {
       "exact_name": " 短期借款实质性程序表L1A",
@@ -103,25 +378,5 @@
       "type": "check",
       "description": "综合检查"
     }
-  ],
-  "cross_references": [
-    {"from": "L1-1:R11:C9", "to": "TB('2001','审定数')", "description": "审定表合计=试算表审定数"},
-    {"from": "L1-1:R11:C5", "to": "TB('2001','期初余额')", "description": "期初审定=试算表期初"},
-    {"from": "L1-2", "to": "L1-1:R11:C9", "description": "明细表合计=审定表合计"},
-    {"from": "L1-3", "to": "L1-1:R11:C7", "description": "调整分录汇总=审定表调整列"},
-    {"from": "L1-4", "to": "L1-2", "description": "征信报告核对明细表"},
-    {"from": "L1-5", "to": "L1-2", "description": "利息测算基于明细表借款金额"}
-  ],
-  "audit_checks": [
-    {"id": "L1-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计=试算表审定数"},
-    {"id": "L1-CHK-02", "type": "cross_ref", "severity": "warning", "description": "明细表合计与审定表一致"},
-    {"id": "L1-CHK-03", "type": "completeness", "severity": "warning", "description": "明细表已填写"},
-    {"id": "L1-CHK-04", "type": "check", "severity": "warning", "description": "征信报告核对已完成"},
-    {"id": "L1-CHK-05", "type": "check", "severity": "warning", "description": "利息测算已完成"},
-    {"id": "L1-CHK-06", "type": "check", "severity": "warning", "description": "贷款合同检查已完成"},
-    {"id": "L1-CHK-07", "type": "check", "severity": "warning", "description": "逾期贷款检查已完成"},
-    {"id": "L1-CHK-08", "type": "check", "severity": "info", "description": "抵质押资产检查已完成"},
-    {"id": "L1-CHK-09", "type": "reconciliation", "severity": "warning", "description": "征信报告余额与账面余额一致"},
-    {"id": "L1-CHK-10", "type": "formula", "severity": "blocking", "description": "各借款类型之和=合计（R7+R8+R9+R10=R11）"}
   ]
 }

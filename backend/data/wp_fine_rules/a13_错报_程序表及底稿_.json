@@ -69,6 +69,12 @@
       "type": "check",
       "severity": "blocking",
       "description": "未更正错报已汇总并评价"
+    },
+    {
+      "id": "A13-CHK-03",
+      "type": "check",
+      "severity": "info",
+      "description": "编制日期在审计期间内"
     }
   ]
 }

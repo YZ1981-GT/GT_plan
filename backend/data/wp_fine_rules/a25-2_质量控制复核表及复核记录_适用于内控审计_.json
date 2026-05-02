@@ -57,6 +57,12 @@
       "type": "check",
       "severity": "blocking",
       "description": "复核意见已签署"
+    },
+    {
+      "id": "A25-2-CHK-03",
+      "type": "check",
+      "severity": "info",
+      "description": "编制日期在审计期间内"
     }
   ]
 }

@@ -32,6 +32,18 @@
       "type": "check",
       "severity": "warning",
       "description": "控制测试结论已记录"
+    },
+    {
+      "id": "C26-CHK-03",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制偏差已记录并评价"
+    },
+    {
+      "id": "C26-CHK-04",
+      "type": "check",
+      "severity": "info",
+      "description": "控制有效性结论已填写"
     }
   ]
 }

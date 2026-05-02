@@ -3,47 +3,321 @@
   "name": "应付账款",
   "wp_name": "应付账款",
   "cycle": "F",
-  "account_codes": ["2202"],
+  "account_codes": [
+    "2202"
+  ],
   "source_files": [
     {
       "file_pattern": "F4 应付账款.xlsx",
       "is_primary": true
     }
   ],
-  "sheets": [
+  "cross_references": [
+    {
+      "from": "F4-1:R13:C9",
+      "to": "TB('2202','审定数')",
+      "description": "审定表合计=试算表审定数"
+    },
+    {
+      "from": "F4-1:R22:C9",
+      "to": "F4-1:R13:C9",
+      "description": "账龄合计=性质合计"
+    },
+    {
+      "from": "F4-1:R13:C5",
+      "to": "TB('2202','期初余额')",
+      "description": "期初审定=试算表期初"
+    },
+    {
+      "from": "F4-2",
+      "to": "F4-1:R13:C9",
+      "description": "明细表合计=审定表合计"
+    },
+    {
+      "from": "F4-3",
+      "to": "F4-1:R13:C7",
+      "description": "调整分录汇总=审定表调整列"
+    },
+    {
+      "from": "F4-4",
+      "to": "F4-1",
+      "description": "分析程序引用审定表数据"
+    }
+  ],
+  "audit_checks": [
+    {
+      "id": "F4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计=试算表审定数"
+    },
+    {
+      "id": "F4-CHK-02",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "性质分类合计=账龄分类合计"
+    },
+    {
+      "id": "F4-CHK-03",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计与审定表一致"
+    },
+    {
+      "id": "F4-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表已填写"
+    },
+    {
+      "id": "F4-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "长期挂账检查表已填写"
+    },
+    {
+      "id": "F4-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "未入账检查表已填写"
+    },
+    {
+      "id": "F4-CHK-07",
+      "type": "check",
+      "severity": "info",
+      "description": "关联方交易检查表已填写"
+    },
+    {
+      "id": "F4-CHK-08",
+      "type": "analysis",
+      "severity": "info",
+      "description": "实质性分析程序已执行"
+    },
+    {
+      "id": "F4-CHK-09",
+      "type": "aging",
+      "severity": "warning",
+      "description": "账龄分段合理性（1年以上占比）"
+    },
+    {
+      "id": "F4-CHK-10",
+      "type": "check",
+      "severity": "info",
+      "description": "供应商融资安排检查已填写"
+    },
+    {
+      "id": "F4-CHK-11",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "性质分类各项之和=性质合计（R8+R9+R10+R11+R12=R13）"
+    },
+    {
+      "id": "F4-CHK-12",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "账龄分类各项之和=账龄合计（R17+R18+R19+R20=R22）"
+    }
+  ],
+  "sheet_rules": [
     {
       "exact_name": "审定表F4-1",
       "code": "F4-1",
       "type": "summary",
       "table_type": "standard",
-      "header_rows": [6, 7],
+      "header_rows": [
+        6,
+        7
+      ],
       "data_start_row": 8,
       "columns": {
-        "opening_unaudited": {"col": 2, "keywords": ["期初", "未审数"]},
-        "opening_aje": {"col": 3, "keywords": ["期初", "账项调整"]},
-        "opening_reclass": {"col": 4, "keywords": ["期初", "重分类调整"]},
-        "opening_audited": {"col": 5, "keywords": ["期初", "审定数"]},
-        "closing_unaudited": {"col": 6, "keywords": ["期末", "未审数"]},
-        "closing_aje": {"col": 7, "keywords": ["期末", "账项调整"]},
-        "closing_reclass": {"col": 8, "keywords": ["期末", "重分类调整"]},
-        "closing_audited": {"col": 9, "keywords": ["期末", "审定数"]},
-        "change_amount": {"col": 10, "keywords": ["变动额"]},
-        "change_rate": {"col": 11, "keywords": ["变动率"]}
+        "opening_unaudited": {
+          "col": 2,
+          "keywords": [
+            "期初",
+            "未审数"
+          ]
+        },
+        "opening_aje": {
+          "col": 3,
+          "keywords": [
+            "期初",
+            "账项调整"
+          ]
+        },
+        "opening_reclass": {
+          "col": 4,
+          "keywords": [
+            "期初",
+            "重分类调整"
+          ]
+        },
+        "opening_audited": {
+          "col": 5,
+          "keywords": [
+            "期初",
+            "审定数"
+          ]
+        },
+        "closing_unaudited": {
+          "col": 6,
+          "keywords": [
+            "期末",
+            "未审数"
+          ]
+        },
+        "closing_aje": {
+          "col": 7,
+          "keywords": [
+            "期末",
+            "账项调整"
+          ]
+        },
+        "closing_reclass": {
+          "col": 8,
+          "keywords": [
+            "期末",
+            "重分类调整"
+          ]
+        },
+        "closing_audited": {
+          "col": 9,
+          "keywords": [
+            "期末",
+            "审定数"
+          ]
+        },
+        "change_amount": {
+          "col": 10,
+          "keywords": [
+            "变动额"
+          ]
+        },
+        "change_rate": {
+          "col": 11,
+          "keywords": [
+            "变动率"
+          ]
+        }
       },
       "key_rows": {
         "section1_title": 5,
-        "section1_items": [8, 9, 10, 11, 12],
+        "section1_items": [
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
         "section1_total": 13,
         "section2_title": 14,
-        "section2_items": [17, 18, 19, 20],
+        "section2_items": [
+          17,
+          18,
+          19,
+          20
+        ],
         "section2_total": 22,
         "tb_check": 23,
         "diff": 24
       },
       "sections": [
-        {"name": "按性质分类", "start_row": 5, "end_row": 13, "items": ["货款", "工程款", "设备款", "服务费", "其他"]},
-        {"name": "按账龄分类", "start_row": 14, "end_row": 22, "items": ["1年以内", "1至2年", "2至3年", "3年以上"]}
-      ]
+        {
+          "name": "按性质分类",
+          "start_row": 5,
+          "end_row": 13,
+          "items": [
+            "货款",
+            "工程款",
+            "设备款",
+            "服务费",
+            "其他"
+          ]
+        },
+        {
+          "name": "按账龄分类",
+          "start_row": 14,
+          "end_row": 22,
+          "items": [
+            "1年以内",
+            "1至2年",
+            "2至3年",
+            "3年以上"
+          ]
+        }
+      ],
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unaudited": {
+            "col": 2,
+            "keywords": [
+              "期初",
+              "未审数"
+            ]
+          },
+          "opening_aje": {
+            "col": 3,
+            "keywords": [
+              "期初",
+              "账项调整"
+            ]
+          },
+          "opening_reclass": {
+            "col": 4,
+            "keywords": [
+              "期初",
+              "重分类调整"
+            ]
+          },
+          "opening_audited": {
+            "col": 5,
+            "keywords": [
+              "期初",
+              "审定数"
+            ]
+          },
+          "closing_unaudited": {
+            "col": 6,
+            "keywords": [
+              "期末",
+              "未审数"
+            ]
+          },
+          "closing_aje": {
+            "col": 7,
+            "keywords": [
+              "期末",
+              "账项调整"
+            ]
+          },
+          "closing_reclass": {
+            "col": 8,
+            "keywords": [
+              "期末",
+              "重分类调整"
+            ]
+          },
+          "closing_audited": {
+            "col": 9,
+            "keywords": [
+              "期末",
+              "审定数"
+            ]
+          },
+          "change_amount": {
+            "col": 10,
+            "keywords": [
+              "变动额"
+            ]
+          },
+          "change_rate": {
+            "col": 11,
+            "keywords": [
+              "变动率"
+            ]
+          }
+        }
+      }
     },
     {
       "exact_name": "应付账款实质性程序表F4A",
@@ -104,27 +378,5 @@
       "type": "check",
       "description": "供应商融资安排检查"
     }
-  ],
-  "cross_references": [
-    {"from": "F4-1:R13:C9", "to": "TB('2202','审定数')", "description": "审定表合计=试算表审定数"},
-    {"from": "F4-1:R22:C9", "to": "F4-1:R13:C9", "description": "账龄合计=性质合计"},
-    {"from": "F4-1:R13:C5", "to": "TB('2202','期初余额')", "description": "期初审定=试算表期初"},
-    {"from": "F4-2", "to": "F4-1:R13:C9", "description": "明细表合计=审定表合计"},
-    {"from": "F4-3", "to": "F4-1:R13:C7", "description": "调整分录汇总=审定表调整列"},
-    {"from": "F4-4", "to": "F4-1", "description": "分析程序引用审定表数据"}
-  ],
-  "audit_checks": [
-    {"id": "F4-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计=试算表审定数"},
-    {"id": "F4-CHK-02", "type": "balance", "severity": "blocking", "description": "性质分类合计=账龄分类合计"},
-    {"id": "F4-CHK-03", "type": "cross_ref", "severity": "warning", "description": "明细表合计与审定表一致"},
-    {"id": "F4-CHK-04", "type": "completeness", "severity": "warning", "description": "明细表已填写"},
-    {"id": "F4-CHK-05", "type": "check", "severity": "warning", "description": "长期挂账检查表已填写"},
-    {"id": "F4-CHK-06", "type": "check", "severity": "warning", "description": "未入账检查表已填写"},
-    {"id": "F4-CHK-07", "type": "check", "severity": "info", "description": "关联方交易检查表已填写"},
-    {"id": "F4-CHK-08", "type": "analysis", "severity": "info", "description": "实质性分析程序已执行"},
-    {"id": "F4-CHK-09", "type": "aging", "severity": "warning", "description": "账龄分段合理性（1年以上占比）"},
-    {"id": "F4-CHK-10", "type": "check", "severity": "info", "description": "供应商融资安排检查已填写"},
-    {"id": "F4-CHK-11", "type": "formula", "severity": "blocking", "description": "性质分类各项之和=性质合计（R8+R9+R10+R11+R12=R13）"},
-    {"id": "F4-CHK-12", "type": "formula", "severity": "blocking", "description": "账龄分类各项之和=账龄合计（R17+R18+R19+R20=R22）"}
   ]
 }

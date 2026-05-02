@@ -32,6 +32,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "id": "S34-37-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "审计结论已记录"
+    },
+    {
+      "id": "S34-37-CHK-03",
+      "type": "check",
+      "severity": "info",
+      "description": "支持性文档已附"
     }
   ]
 }
