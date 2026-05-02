@@ -1607,6 +1607,7 @@ inclusion: always
 - 剩余TS错误：约120个集中在consolidation/组件（已标记developing不影响核心）+约15个unused variable（TS6133不影响运行）
 - 前端TS实质错误清零（2026-05-01）：非合并模块实质TS错误从18个降到0个（ReportConsistencyCheck类型补全+ReportView模板行字段修正+StepKey扩展6步+LedgerPenetration类型断言+PerformanceMonitor trim修复+DisclosureEditor补watch导入+FormulaBar/StructureEditor/FormulaManagerDialog清理未使用变量+rollbackFileVersion补参数+AccountMappingStep补standard_account_name字段）；剩余23个均为TS6133未使用变量警告（13个文件）；合并模块211个TS错误待专项修复
 - 系统复盘（2026-05-01）：TS错误231=215合并+16未使用(_前缀)+0实质；后端1845测试+E2E 13/13全通过；90个Vue页面12个<50行空壳；路由115个+服务171个+11组业务域；数据配置15个JSON共2.8MB；系统功能完整度95%+，最大价值是用真实项目验证而非加新功能
+- 系统完整性检查（2026-05-02）：前端91页面+130组件+17API服务层；后端117路由+173服务+38模型；底稿347精细化规则+363模板库+86科目映射+362知识库xlsx；四式联动5核心服务全✅；LLM辅助7服务全✅+70个TSJ提示词；报表22配置块1191行；测试88单元+4E2E+4集成；系统四维度全部完整可交付验证
 - 本轮会话完成39项（2026-05-01最终）：P2四项+SharedTemplatePicker5页+6页横幅+TS清零18→0+公式多选+地址坐标库(四维缓存)+三式联动桥接+WorkpaperEditor降级+映射86条+规则45条+操作手册51md+E2E修复13/13+合并6Tab+未使用变量24→16+useProjectSelector6页+空壳6页developing+Pydantic V2+E1精细化27Sheet+精细化引擎多文件+审计检查执行+多Sheet Tab+附注取数优先底稿+多文件structure+WOPI自动重建+多文件底稿生成+审计检查前端展示+BCD依赖联动+TSJ复核接入+审计检查跳转+报表→附注跳转+底稿智能提示；新增6个后端服务+~30个API端点+~25个前端函数
 - 下一步优先级（2026-05-01更新）：本周①BCD依赖关系图ECharts✅②审计检查仪表盘✅③检查失败LLM修复建议；下周④底稿完成度热力图⑤公式依赖网络图⑥全局搜索跳转⑦文件级裁剪粒度；之后⑧合并模块215个TS修复⑨D2/H1精细化规则⑩异常交易识别⑪KAM自动草拟⑫真实项目验证
 - BCD依赖关系图+审计检查仪表盘完成（2026-05-01）：DependencyGraph.vue可复用组件（三列流程图B→C→D+节点状态+控制结论标签+循环切换）+AuditCheckDashboard.vue页面（5汇总卡片+按循环分组折叠+逐条检查展示+底部依赖图）+路由/projects/:id/audit-checks+DetailProjectPanel新增"审计检查"快捷入口
@@ -1619,7 +1620,7 @@ inclusion: always
 - 底稿精细化规则引擎（2026-05-01）：wp_fine_rule_engine.py（load_fine_rule/extract_with_fine_rule按精确行列号提取+list_fine_rules）+wp_fine_rules.py路由3端点（列表/详情/提取）已注册router_registry第5组；规则文件存放在backend/data/wp_fine_rules/{code}.json；与通用解析器互补（通用处理标准审定表，精细化处理每个科目特有的多Sheet结构+交叉引用+审计检查）
 - E1货币资金精细化规则完成（2026-05-01）：e1_cash.json覆盖5个Excel文件27个Sheet（exact_name与模板完全一致），审定表E1-1精确到R7-R21×C1-C10+仅人民币R23起，8条交叉引用+10条审计检查（含severity分级blocking/warning/info）；引擎支持多文件（source_file字段自动打开对应Excel）+精确名称优先匹配降级模式匹配
 - E1精细化规则实际完整（2026-05-02确认）：之前分析sheets为空是字段名看错（实际是sheet_rules有27条），E1规则完整无需补充
-- 精细化规则覆盖现状（2026-05-02最终）：77个科目全覆盖（D-N循环所有主科目）——17个手工精修（完整行列映射+10-18条检查），21个增强精修（7-10条检查），39个基础增强（4-7条检查+金融/租赁/研发特殊检查）；规则文件存放backend/data/wp_fine_rules/共77个JSON
+- 精细化规则覆盖现状（2026-05-02最终）：347个规则文件全量覆盖致同底稿模板库——A类59个(完成阶段)/B类56个(风险评估)/C类50个(控制测试)/D-N类77个(实质性程序,含17个手工精修)/S类87个(特定项目)/函证+其他18个；存放backend/data/wp_fine_rules/
 - E1货币资金8步全链路复盘通过（2026-05-01）：模板生成(5文件)→表头填充→智能提示(TSJ+操作手册+BCD依赖)→数据预填(TB公式)→ONLYOFFICE编辑(16Sheet)→审计检查(10条)→交叉引用(8条)→提交复核(5门禁)→质控互动(意见+对话+SSE)→联动更新(底稿→试算→报表→附注)，无断点；下一步D2应收账款精细化
 - D2应收账款精细化规则完成（2026-05-01）：d2_receivable.json覆盖5个Excel文件19个Sheet规则（D2-1至D2-4常规+D0函证+D2-5分析+D2-6至D2-13检查+ECL参考示例），审定表D2-1三段式（原值R7-R13/坏账R14-R20/净值R21-R25）含重分类列C4/C8，9条交叉引用+14条审计检查（含ECL计量+账龄集中度+迁徙率）；精细化规则累计2个科目（E1+D2）
 - D循环编号映射修正（2026-05-01）：wp_account_mapping.json D1从"营业收入"改为"应收票据"(1121)，D2="应收账款"(1122)，D3="预收账款"(2203)，D4新增"营业收入"(6001/6051)——与实际模板目录一致（D0函证/D1应收票据/D2应收账款/D3预收账款/D4营业收入/D5应收款项融资/D6合同资产/D7合同负债）；D2-4从"账龄分析"改为"调整分录汇总表"
@@ -1860,3 +1861,6 @@ inclusion: always
 - 附注正文分段存储和渲染（2026-05-01）：text_sections从单个大字符串按\n\n分割为段落数组（国企80个+上市94个章节分段处理）；前端TipTap加载时纯文本段落转为HTML p标签；样式：段落间距10px、字号13px、行高1.8、首行缩进2em
 - 附注text_sections清理md表格行（2026-05-01）：从正文中移除md表格标记（|...|格式和分隔线），国企91个+上市96个章节受影响；会计政策章节只保留纯文字说明不含表格
 - 附注模板重建通用脚本（2026-05-01）：backend/scripts/rebuild_note_from_md.py，精确解析md四级标题树（H1/H2/H3/H4），文字和表格分离（表格行解析为{headers,rows}结构+纯文字按段落分割为数组），按标题匹配更新JSON模板，幂等可重复运行；国企版481节点263表格905段落→更新171章节，上市版647节点433表格1502段落→更新186章节
+- 深度复盘9项修复（2026-05-02）：24项API检查18通过/6预期404/0真实失败。修复3个500错误：①dashboard_service.py的get_risk_alerts和_get_overdue_projects使用datetime.now(timezone.utc)与PG TIMESTAMP WITHOUT TIME ZONE不匹配→改为datetime.utcnow()（与import_service同类问题）②recycle_bin.py查询account_chart表时该表无deleted_at列导致500→加try/except降级+ALTER TABLE补齐deleted_at列③dataset_query.py的get_active_filter查询ledger_datasets表可能不存在→加try/except降级到is_deleted过滤
+- asyncpg时区类型不匹配通用规则（2026-05-02确认）：所有与PG TIMESTAMP WITHOUT TIME ZONE列比较的datetime必须用datetime.utcnow()（naive），不能用datetime.now(timezone.utc)（aware），否则asyncpg报DataError；已修复的文件：import_service.py(8处)+report_engine.py(2处)+dashboard_service.py(2处)
+- account_chart表补齐deleted_at列（2026-05-02）：ALTER TABLE account_chart ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP；该表有964条软删除记录但之前无deleted_at列导致回收站查询500
