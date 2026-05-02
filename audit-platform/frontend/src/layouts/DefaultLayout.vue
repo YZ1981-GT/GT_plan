@@ -131,6 +131,18 @@ function onViewChange(mode: 'three' | 'four') {
 }
 
 function onCatalogSelect(item: any) {
+  // 处理项目切换
+  if (item?.type === 'switch_project' && item.project_id) {
+    // 从项目列表中找到目标项目并切换
+    import('@/services/auditPlatformApi').then(({ getProject }) => {
+      getProject(item.project_id).then((proj: any) => {
+        if (proj) {
+          selectedProject.value = proj
+        }
+      }).catch(() => {})
+    })
+    return
+  }
   selectedCatalogItem.value = item
 }
 </script>

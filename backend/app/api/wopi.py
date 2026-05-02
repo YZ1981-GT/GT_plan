@@ -366,3 +366,64 @@ async def wopi_stats(
         stats["redis_available"] = False
 
     return JSONResponse(content=stats)
+
+
+# ---------------------------------------------------------------------------
+# Document Server API Callback（非 WOPI 协议，DS API 保存回调）
+# ---------------------------------------------------------------------------
+
+@router.post("/ds-callback/{file_id}")
+async def ds_callback(
+    file_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Document Server API 保存回调端点。
+
+    ONLYOFFICE Document Server 在用户关闭编辑器或自动保存时，
+    POST JSON: { "status": 2, "url": "http://...", "key": "..." }
+    status=2 表示文档已修改并准备好下载。
+    """
+    import httpx
+    import logging
+    _log = logging.getLogger(__name__)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"error": 0})  # DS 要求返回 {"error": 0}
+
+    status = body.get("status", 0)
+    download_url = body.get("url", "")
+    doc_key = body.get("key", "")
+
+    _log.info(f"[DS Callback] file_id={file_id} status={status} key={doc_key} url={download_url[:80]}")
+
+    # status=2: 文档已修改，需要下载保存
+    # status=6: 文档已修改但强制保存（自动保存）
+    if status in (2, 6) and download_url:
+        try:
+            # 从 DS 下载修改后的文件
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(download_url)
+            if resp.status_code != 200:
+                _log.error(f"[DS Callback] download failed: {resp.status_code}")
+                return JSONResponse(content={"error": 1})
+
+            file_content = resp.content
+
+            # 保存到本地（复用 WOPI put_file 逻辑）
+            if _is_uuid(file_id):
+                svc = WOPIHostService()
+                await svc.put_file(db=db, file_id=UUID(file_id), content=file_content)
+                await db.commit()
+                _log.info(f"[DS Callback] saved {len(file_content)} bytes for {file_id}")
+            else:
+                _log.warning(f"[DS Callback] non-UUID file_id: {file_id}")
+
+        except Exception as e:
+            _log.error(f"[DS Callback] save error: {e}")
+            return JSONResponse(content={"error": 1})
+
+    # DS 要求返回 {"error": 0} 表示成功
+    return JSONResponse(content={"error": 0})

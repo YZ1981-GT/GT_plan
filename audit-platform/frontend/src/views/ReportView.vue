@@ -89,9 +89,11 @@
               <th :colspan="eqTotalCols" class="gt-rv-eq-th-period gt-rv-eq-th-prior">上年金额</th>
             </tr>
             <tr class="gt-rv-eq-hr2">
-              <th colspan="11">归属于母公司所有者权益</th>
+              <th colspan="12">归属于母公司所有者权益</th>
+              <th rowspan="3">少数股东<br/>权益</th>
               <th rowspan="3" class="gt-rv-eq-th-total">所有者<br/>权益<br/>合计</th>
-              <th colspan="11">归属于母公司所有者权益</th>
+              <th colspan="12">归属于母公司所有者权益</th>
+              <th rowspan="3">少数股东<br/>权益</th>
               <th rowspan="3" class="gt-rv-eq-th-total">所有者<br/>权益<br/>合计</th>
             </tr>
             <tr class="gt-rv-eq-hr3">
@@ -104,6 +106,7 @@
               <th rowspan="2">盈余公积</th>
               <th rowspan="2">一般风险准备</th>
               <th rowspan="2">未分配利润</th>
+              <th rowspan="2" class="gt-rv-eq-th-total">小计</th>
               <th rowspan="2">实收资本</th>
               <th colspan="3">其他权益工具</th>
               <th rowspan="2">资本公积</th>
@@ -113,6 +116,7 @@
               <th rowspan="2">盈余公积</th>
               <th rowspan="2">一般风险准备</th>
               <th rowspan="2">未分配利润</th>
+              <th rowspan="2" class="gt-rv-eq-th-total">小计</th>
             </tr>
             <tr class="gt-rv-eq-hr4">
               <th>优先股</th><th>永续债</th><th>其他</th>

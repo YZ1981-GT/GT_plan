@@ -327,7 +327,7 @@ async function applyOnlineMode(notify: boolean = false) {
       editorConfig: {
         mode: 'edit',
         lang: 'zh-CN',
-        callbackUrl: `http://host.docker.internal:9980/wopi/files/${wpId.value}/contents?access_token=${onlineAccessToken.value}`,
+        callbackUrl: `http://host.docker.internal:9980/wopi/ds-callback/${wpId.value}`,
         user: {
           id: 'admin',
           name: 'Admin',
