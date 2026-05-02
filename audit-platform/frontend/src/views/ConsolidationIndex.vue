@@ -1,15 +1,23 @@
 <template>
   <div class="gt-consol gt-fade-in">
-    <!-- 横幅 -->
-    <div class="gt-page-banner gt-page-banner--purple">
-      <div class="gt-page-banner__content">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="$router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-page-banner__title">合并报表</h2>
-        <p class="gt-page-banner__desc">集团架构 · 差额表 · 穿透查询 · 合并报表 · 合并附注</p>
+    <!-- 横幅：单位名称 + 年度 + 准则类型 -->
+    <div class="gt-consol-bar">
+      <el-button text class="gt-consol-bar-back" @click="$router.push('/consolidation')">← 返回</el-button>
+      <div class="gt-consol-bar-info">
+        <span class="gt-consol-bar-name">{{ projectInfo.clientName || '加载中...' }}</span>
+        <el-tag size="small" effect="plain" round style="margin-left:10px">{{ projectInfo.year }} 年度</el-tag>
+        <el-tag size="small" :type="projectInfo.standard === 'listed' ? 'warning' : ''" effect="light" round style="margin-left:6px">
+          {{ projectInfo.standard === 'listed' ? '上市版' : '国企版' }}
+        </el-tag>
       </div>
     </div>
 
     <el-tabs v-model="activeTab" class="gt-consol-tabs">
+      <!-- Tab 0: 合并工作底稿 -->
+      <el-tab-pane label="合并工作底稿" name="worksheets">
+        <ConsolWorksheetTabs />
+      </el-tab-pane>
+
       <!-- Tab 1: 集团架构 -->
       <el-tab-pane label="集团架构" name="structure">
         <div class="gt-tab-content gt-structure-layout">
@@ -288,7 +296,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -299,15 +307,35 @@ import {
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import http from '@/utils/http'
+import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
-const activeTab = ref('structure')
+const activeTab = ref('worksheets')
 const loading = ref(false)
 const recalcLoading = ref(false)
+
+// ─── 项目基本信息 ─────────────────────────────────────────────────────────────
+const projectInfo = reactive({
+  clientName: '',
+  year: new Date().getFullYear() - 1,
+  standard: 'soe' as 'soe' | 'listed',
+})
+
+async function loadProjectInfo() {
+  try {
+    const { data } = await http.get(`/api/projects/${projectId.value}`, { validateStatus: (s: number) => s < 600 })
+    const p = data?.data ?? data
+    if (p) {
+      projectInfo.clientName = p.client_name || p.name || ''
+      projectInfo.year = p.audit_year || year.value
+      projectInfo.standard = (p.applicable_standard || '').includes('listed') ? 'listed' : 'soe'
+    }
+  } catch { /* ignore */ }
+}
 
 // ─── Tab 1: 集团架构 ─────────────────────────────────────────────────────────
 const groupTree = ref<any[]>([])
@@ -648,6 +676,7 @@ watch(noteTreeSearch, (val) => {
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 onMounted(async () => {
+  await loadProjectInfo()
   await loadGroupTree()
   await loadTemplates()
 })
@@ -663,6 +692,21 @@ watch(activeTab, (tab) => {
 <style scoped>
 .gt-consol { padding: var(--gt-space-4); }
 .gt-consol-tabs { margin-top: var(--gt-space-3); }
+
+/* ── 顶部信息栏 ── */
+.gt-consol-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; margin: -16px -16px 12px;
+  background: linear-gradient(135deg, #4b2d77 0%, #7c5caa 60%, #a78bcc 100%);
+  border-radius: 0 0 10px 10px;
+}
+.gt-consol-bar-back {
+  color: rgba(255,255,255,0.85) !important; font-size: 13px; padding: 4px 8px;
+  border-radius: 4px; transition: background 0.15s;
+}
+.gt-consol-bar-back:hover { background: rgba(255,255,255,0.12) !important; color: #fff !important; }
+.gt-consol-bar-info { display: flex; align-items: center; }
+.gt-consol-bar-name { font-size: 16px; font-weight: 600; color: #fff; }
 .gt-tab-content { padding: var(--gt-space-3) 0; }
 .gt-structure-layout { display: flex; gap: 24px; }
 .gt-structure-tree { flex: 1; min-width: 300px; }

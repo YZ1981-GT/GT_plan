@@ -21,6 +21,7 @@ inclusion: always
 - 底稿精细化：每个科目需要单独规则配套，利用 LLM 辅助
 - 底稿体系展示：要体现 B→C→实质性的循环递进关系，可视化、逻辑感强，包括准备和完成阶段
 - 目标并发规模 6000 人，在线编辑考虑混合方案：日常用纯前端表格组件（Luckysheet/Univer）无并发限制 + 少数完整 Excel 场景走 ONLYOFFICE
+- 合并报表等子页面布局要参照项目的三栏布局（左侧导航+右侧内容+可拖拽分隔线），不要用纯 Tab 平铺
 
 ## 环境配置
 
@@ -44,7 +45,12 @@ inclusion: always
 - 报表 4 套 x 6 张，1191 行种子数据
 - 附注模板国企 14 章 170 节 / 上市 17 章 185 节
 - 公式体系完整（三分类 + 跨表引用 + 拓扑排序 + 审计留痕）
+- 公式管理（FormulaManagerDialog）已提升到全局顶部导航栏（ThreeColumnLayout），所有模块共享
+- 公式管理树形导航已增加"合并报表"分类（7张表 CI/CC/CE/CN/CS/CX/CK 编码）+ 表间审核"合并↔报表"规则
+- 各表的"ƒx 公式"按钮与全局公式管理中心必须双向联动同步：任一处修改公式后另一处自动更新，所有模块统一
+- 公式联动机制：CustomEvent('gt-open-formula-manager') 打开 + CustomEvent('gt-formula-changed') 广播变更，各模块监听刷新
 - 企业级治理完整（门禁/留痕/SoD/版本链/一致性复算）
+- 合并工作底稿前端 9 个组件已创建（worksheets/），集成到 ConsolidationIndex 第一个 Tab
 
 ## 活跃待办
 
@@ -52,6 +58,8 @@ inclusion: always
 - ~~上市版校验公式仅 179 条需补全~~ ✅ 已完成：上市版继承国企版全部公式，差异公式替换/排除，特有公式追加
 - ~~上市版五章 29 个无表格章节排查~~ ✅ 已排查：实际仅 3 个第五章空表格（F19/F22/F26 各 1-2 个子表），其余为政策描述型表格无需数据行
 - 合并报表前端 211 个 TS 错误专项修复（2-3 周）
+- 合并工作底稿表样逐表完善（基本信息表→投资明细→净资产表→模拟权益法→抵消分录→资本公积变动）
+- 报表/试算表/附注的公式管理需改为走全局 CustomEvent 联动（当前各自独立实例，未联动）
 - 用真实审计项目端到端验证（最高优先级）
 - ~~D2 应收账款 / H1 固定资产等更多科目精细化规则打磨~~ ✅ 已完成：77 个核心科目精修（全循环 D-N 覆盖），剩余 270 个为函证/控制测试/风险评估等无需 key_rows 精修
 - ~~统一 Excel 导入框架~~ ✅ 已完成：7 种模板 + 7 页面集成 + 14 项加固（数值校验/事务保护/RFC5987文件名/示例行宽松跳过/失败行反馈/覆盖追加模式/重试按钮）
@@ -65,6 +73,7 @@ inclusion: always
 - 在线编辑：Univer 纯前端方案（2026-05-02），完整保存链路：前端 snapshot → POST /univer-save → xlsx 回写（univer_to_xlsx.py）+ structure.json + 版本快照 + 审计留痕 + 事件发布（五环联动）
 - 新增后端服务：xlsx_to_univer.py（xlsx→IWorkbookData）+ univer_to_xlsx.py（IWorkbookData→xlsx 回写）
 - 新增前端依赖：@univerjs/presets + @univerjs/preset-sheets-core + opentype.js
+- 新增前端依赖：xlsx@0.18.5（合并工作底稿导出模板/导入Excel）
 - Vite 配置：需要 alias `opentype.js/dist/opentype.module.js` → `opentype.js/dist/opentype.mjs`
 - ONLYOFFICE 全面替换完成：WOPI/wopi_service 保留向后兼容，所有前端 ONLYOFFICE 引用已清除，WopiPoc/UniverTest 已删除
 - 文件存储三阶段：本地磁盘（进行中）- Paperless（OCR/检索）- 云端（归档）
@@ -75,6 +84,16 @@ inclusion: always
 - 底稿明细行：不硬编码行名，用 detail_discovery 动态发现（企业实际数据决定），key_rows 只定义结构性行
 - 附注表格填充：结构/样式来自模板，明细行数据从底稿 fine_summary 动态提取，降级从试算表取数，合计行自动求和
 - 统一导入架构：import_template_service（模板生成+校验+解析）+ import_templates 路由（4 API）+ UnifiedImportDialog 前端三步弹窗
+- 合并工作底稿：参照致同 Excel 模板（合并模板有关表样.xlsx，10 sheet），前端 7 张表 + 1 弹窗 + 1 入口 Tab 组件，路径 components/consolidation/worksheets/
+- 合并工作底稿用 Element Plus 表格（非 Univer），因为是结构化表单（下拉/日期/联动），不是自由格式 Excel；需要时加"从 Excel 导入"按钮
+- 合并工作底稿小计行要求默认自动合计但支持用户编辑覆盖，用 reactive 数据行实现（非 show-summary）
+- el-table 内嵌 el-select 必须用 `v-model` + `<div @click.stop @mousedown.stop>` 包裹 + watch 防循环（internalUpdate 标志位，prop→rows 用直接赋值不要浅拷贝）
+- el-table 多级表头的 getSummary 中 `col.property` 对嵌套子列可能为 undefined，计算列需用 `col.label` + `col.parent?.label` 匹配后手动计算
+- 合并工作底稿五步流程：基本信息→投资明细→净资产归集→权益法模拟→抵消分录+资本公积核查
+- 合并股比变动弹窗：基本信息表变动次数字段驱动，1/2/3 次对应不同列数的 ShareChangeDialog
+- 合并净资产表：动态列根据合并范围树形结构生成（当前层级直接下级），列头显示企业名称+期末持股比例
+- 合并净资产表预设公式：表内公式（SUM/期初+增加-减少）+ 提取公式 TB({company_code},'科目','期初余额') 从子企业试算表按企业代码提取 + 3条校验公式
+- 合并资本公积变动（差额表）：从抵消分录按科目自动提取，与合并报表期末数比对差异
 
 ## 底稿编码体系（致同 2025 修订版）
 

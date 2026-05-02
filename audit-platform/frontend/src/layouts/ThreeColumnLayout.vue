@@ -43,6 +43,11 @@
             <el-icon :size="18"><ChatDotSquare /></el-icon>
           </div>
         </el-tooltip>
+        <el-tooltip content="公式管理" placement="bottom">
+          <div class="gt-topbar-btn" @click="showFormulaManager = true">
+            <span style="font-size:16px;font-weight:700;font-style:italic;line-height:18px">ƒx</span>
+          </div>
+        </el-tooltip>
 
         <div class="gt-topbar-divider" />
 
@@ -197,6 +202,16 @@
         </slot>
       </section>
     </div>
+
+    <!-- 全局公式管理弹窗 -->
+    <FormulaManagerDialog
+      v-model="showFormulaManager"
+      :rows="[]"
+      :project-id="currentProjectId"
+      :year="currentYear"
+      @saved="onFormulaSaved"
+      @applied="onFormulaApplied"
+    />
   </div>
 </template>
 
@@ -212,6 +227,7 @@ import {
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
 } from '@element-plus/icons-vue'
+import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -276,6 +292,9 @@ const catalogWidth = ref(280)
 const catalogCollapsed = ref(false)
 const fourColumnMode = ref(false)
 const fullscreen = ref(false)
+const showFormulaManager = ref(false)
+const currentProjectId = computed(() => (route.params.projectId as string) || '')
+const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
 // 四栏模式由 props 或用户切换控制
 watch(() => props.fourColumn, (v) => {
@@ -443,9 +462,29 @@ async function handleLogout() {
   router.push('/login')
 }
 
+// 监听子组件打开公式管理的自定义事件
+function onOpenFormulaEvent(e: Event) {
+  const detail = (e as CustomEvent).detail
+  showFormulaManager.value = true
+  // 如果有 nodeKey，后续 FormulaManagerDialog 可以通过 props 或 watch 定位到对应节点
+  if (detail?.nodeKey) {
+    // 存储到 sessionStorage 供 FormulaManagerDialog 读取
+    sessionStorage.setItem('gt-formula-target-node', detail.nodeKey)
+  }
+}
+
+// 公式保存/应用后广播通知所有表刷新
+function onFormulaSaved() {
+  document.dispatchEvent(new CustomEvent('gt-formula-changed', { detail: { action: 'saved' } }))
+}
+function onFormulaApplied() {
+  document.dispatchEvent(new CustomEvent('gt-formula-changed', { detail: { action: 'applied' } }))
+}
+
 onMounted(() => {
   loadPrefs()
   document.addEventListener('keydown', onKeydown)
+  document.addEventListener('gt-open-formula-manager', onOpenFormulaEvent)
   // 移动端手势
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -454,6 +493,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
+  document.removeEventListener('gt-open-formula-manager', onOpenFormulaEvent)
   document.removeEventListener('touchend', onTouchEnd)
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
 })

@@ -539,10 +539,26 @@ const treeData = computed(() => [
     ],
   },
   {
+    key: 'consolidation', label: '合并报表', icon: '🏢', children: [
+      { key: 'consol_info', label: '基本信息表', icon: '', _consolSheet: 'info' },
+      { key: 'consol_cost', label: '投资明细-成本法和公允值', icon: '', _consolSheet: 'cost' },
+      { key: 'consol_equity_inv', label: '投资明细-权益法', icon: '', _consolSheet: 'equity_inv' },
+      { key: 'consol_net_asset', label: '净资产表', icon: '', _consolSheet: 'net_asset' },
+      { key: 'consol_equity_sim', label: '模拟权益法', icon: '', _consolSheet: 'equity_sim' },
+      { key: 'consol_elimination', label: '合并抵消分录', icon: '', _consolSheet: 'elimination' },
+      { key: 'consol_capital', label: '资本公积变动', icon: '', _consolSheet: 'capital' },
+    ],
+  },
+  {
     key: 'cross_check', label: '表间审核', icon: '🔗', children: [
       { key: 'cross_report_note', label: '报表 ↔ 附注', icon: '🔄', children: crossCheckItems.value.report_note },
       { key: 'cross_report_wp', label: '报表 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.report_wp },
       { key: 'cross_note_wp', label: '附注 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.note_wp },
+      { key: 'cross_consol', label: '合并 ↔ 报表', icon: '🔄', children: [
+        { key: 'cross_cr_1', label: '合并抵消分录 ↔ 合并试算表', icon: '📌' },
+        { key: 'cross_cr_2', label: '模拟权益法 ↔ 净资产表', icon: '📌' },
+        { key: 'cross_cr_3', label: '资本公积变动 ↔ 合并报表', icon: '📌' },
+      ]},
     ],
   },
 ])
@@ -624,12 +640,13 @@ function onTreeNodeClick(data: any) {
       selectedPath.value = `报表 > ${data.label}`
     } else if (data.key.startsWith('note_')) {
       selectedPath.value = `附注 > ${data._sectionTitle || data.label}`
-      // 自动加载附注预设公式（如果还没加载）
       if (!notePresetFormulas.value.length) {
         onImportPresetFormulas()
       }
     } else if (data.key.startsWith('wp_')) {
       selectedPath.value = `底稿 > ${data.label}`
+    } else if (data.key.startsWith('consol_')) {
+      selectedPath.value = `合并报表 > ${data.label}`
     } else if (data.key.startsWith('cross_')) {
       selectedPath.value = `表间审核 > ${data.label}`
     }
@@ -696,6 +713,10 @@ const currentRows = computed(() => {
       formula_source: f.source,
     }))
   }
+  // 合并报表节点：显示对应表样的行结构
+  if (selectedNodeKey.value.startsWith('consol_')) {
+    return allRowsMap.value[selectedNodeKey.value] || consolSheetRows(selectedNodeKey.value)
+  }
   return []
 })
 
@@ -715,7 +736,163 @@ const crossCheckRulesMap = ref<Record<string, any[]>>({
   cross_note_wp: [
     { label: '附注货币资金 = E1-1审定数', left_ref: "NOTE('货币资金','合计','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
   ],
+  cross_consol: [
+    { label: '合并抵消分录借贷平衡', left_ref: "CONSOL('抵消分录','借方合计')", right_ref: "CONSOL('抵消分录','贷方合计')", _editing: false },
+    { label: '模拟权益法长投 = 净资产×持股比例', left_ref: "CONSOL('模拟权益法','期末长投小计')", right_ref: "CONSOL('净资产表','期末净资产') × 持股比例", _editing: false },
+    { label: '资本公积变动期末 = 合并报表期末', left_ref: "CONSOL('资本公积变动','期末金额')", right_ref: "REPORT('BS-资本公积','期末')", _editing: false },
+  ],
 })
+
+// ── 合并报表表样行结构（供公式配置用） ──
+function consolSheetRows(nodeKey: string): any[] {
+  const sheetMap: Record<string, { rows: { code: string; name: string }[] }> = {
+    consol_info: { rows: [
+      { code: 'CI-001', name: '子企业名称' }, { code: 'CI-002', name: '企业代码' },
+      { code: 'CI-003', name: '核算科目' }, { code: 'CI-004', name: '核算方式' },
+      { code: 'CI-005', name: '持股比例变动' }, { code: 'CI-006', name: '变动次数' },
+    ]},
+    consol_cost: { rows: [
+      { code: 'CC-001', name: '本期现金红利' },
+      { code: 'CC-010', name: '期初-投资比例' }, { code: 'CC-011', name: '期初-金额' },
+      { code: 'CC-012', name: '期初-减值准备' }, { code: 'CC-013', name: '期初-长投净额' },
+      { code: 'CC-020', name: '增加-金额' }, { code: 'CC-021', name: '增加-减值准备' },
+      { code: 'CC-030', name: '减少-金额' }, { code: 'CC-031', name: '减少-减值准备' },
+      { code: 'CC-040', name: '期末-投资成本' }, { code: 'CC-041', name: '期末-减值准备' },
+      { code: 'CC-042', name: '期末-长投净额' }, { code: 'CC-043', name: '期末-公允价值' },
+      { code: 'CC-099', name: '成本法小计' },
+    ]},
+    consol_equity_inv: { rows: [
+      { code: 'CE-010', name: '期初-投资比例' }, { code: 'CE-011', name: '期初-长投金额' },
+      { code: 'CE-012', name: '期初-减值准备' },
+      { code: 'CE-020', name: '增加-投资成本' }, { code: 'CE-021', name: '增加-损益调整' },
+      { code: 'CE-022', name: '增加-其他综合收益' }, { code: 'CE-023', name: '增加-其他权益变动' },
+      { code: 'CE-024', name: '增加-权益增加小计' },
+      { code: 'CE-030', name: '减少-投资成本' }, { code: 'CE-031', name: '减少-分回利润' },
+      { code: 'CE-040', name: '期末-投资比例' }, { code: 'CE-041', name: '期末-长投金额' },
+      { code: 'CE-042', name: '期末-减值准备' },
+      { code: 'CE-099', name: '小计' },
+    ]},
+    consol_net_asset: { rows: [
+      // ── 第1部分：所有者权益变动 ──
+      { code: 'CN-S1', name: '所有者权益/股东权益', formula: '', category: '', desc: '分节标题' },
+      // 期初
+      { code: 'CN-001', name: '期初合计：', formula: 'SUM(CN-002:CN-010)', category: 'auto_calc', desc: '=下方9项之和' },
+      { code: 'CN-002', name: '实收资本（或股本）', formula: "TB({company_code},'实收资本','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-003', name: '其他权益工具', formula: "TB({company_code},'其他权益工具','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-004', name: '资本公积', formula: "TB({company_code},'资本公积','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-005', name: '减：库存股', formula: "TB({company_code},'库存股','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-006', name: '其他综合收益', formula: "TB({company_code},'其他综合收益','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-007', name: '专项储备', formula: "TB({company_code},'专项储备','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-008', name: '盈余公积', formula: "TB({company_code},'盈余公积','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-009', name: '△一般风险准备', formula: "TB({company_code},'一般风险准备','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-010', name: '未分配利润', formula: "TB({company_code},'未分配利润','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      // 本期增加
+      { code: 'CN-011', name: '本期增加', formula: 'SUM(CN-012:CN-020)', category: 'auto_calc', desc: '=下方9项之和' },
+      { code: 'CN-012', name: '实收资本（或股本）', formula: '', category: '', desc: '本期增加-实收资本' },
+      { code: 'CN-013', name: '其他权益工具', formula: '', category: '', desc: '本期增加-其他权益工具' },
+      { code: 'CN-014', name: '资本公积', formula: '', category: '', desc: '本期增加-资本公积' },
+      { code: 'CN-015', name: '减：库存股', formula: '', category: '', desc: '' },
+      { code: 'CN-016', name: '其他综合收益', formula: '', category: '', desc: '' },
+      { code: 'CN-017', name: '专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-018', name: '盈余公积', formula: '', category: '', desc: '' },
+      { code: 'CN-019', name: '△一般风险准备', formula: '', category: '', desc: '' },
+      { code: 'CN-020', name: '未分配利润', formula: '', category: '', desc: '' },
+      // 本期减少
+      { code: 'CN-021', name: '本期减少', formula: 'SUM(CN-022:CN-030)', category: 'auto_calc', desc: '=下方9项之和' },
+      { code: 'CN-022', name: '实收资本（或股本）', formula: '', category: '', desc: '' },
+      { code: 'CN-023', name: '其他权益工具', formula: '', category: '', desc: '' },
+      { code: 'CN-024', name: '资本公积', formula: '', category: '', desc: '' },
+      { code: 'CN-025', name: '减：库存股', formula: '', category: '', desc: '' },
+      { code: 'CN-026', name: '其他综合收益', formula: '', category: '', desc: '' },
+      { code: 'CN-027', name: '专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-028', name: '盈余公积', formula: '', category: '', desc: '' },
+      { code: 'CN-029', name: '△一般风险准备', formula: '', category: '', desc: '' },
+      { code: 'CN-030', name: '未分配利润', formula: '', category: '', desc: '' },
+      // 期末
+      { code: 'CN-031', name: '期末金额', formula: 'CN-001+CN-011-CN-021', category: 'auto_calc', desc: '=期初+增加-减少' },
+      { code: 'CN-032', name: '实收资本（或股本）', formula: 'CN-002+CN-012-CN-022', category: 'auto_calc', desc: '=期初+增加-减少' },
+      { code: 'CN-033', name: '其他权益工具', formula: 'CN-003+CN-013-CN-023', category: 'auto_calc', desc: '' },
+      { code: 'CN-034', name: '资本公积', formula: 'CN-004+CN-014-CN-024', category: 'auto_calc', desc: '' },
+      { code: 'CN-035', name: '减：库存股', formula: 'CN-005+CN-015-CN-025', category: 'auto_calc', desc: '' },
+      { code: 'CN-036', name: '其他综合收益', formula: 'CN-006+CN-016-CN-026', category: 'auto_calc', desc: '' },
+      { code: 'CN-037', name: '专项储备', formula: 'CN-007+CN-017-CN-027', category: 'auto_calc', desc: '' },
+      { code: 'CN-038', name: '盈余公积', formula: 'CN-008+CN-018-CN-028', category: 'auto_calc', desc: '' },
+      { code: 'CN-039', name: '△一般风险准备', formula: 'CN-009+CN-019-CN-029', category: 'auto_calc', desc: '' },
+      { code: 'CN-040', name: '未分配利润', formula: 'CN-010+CN-020-CN-030', category: 'auto_calc', desc: '' },
+      // ── 第2部分：利润及利润分配 ──
+      { code: 'CN-S2', name: '利润及利润分配表', formula: '', category: '', desc: '分节标题' },
+      { code: 'CN-050', name: '一、期初金额', formula: 'CN-010', category: 'auto_calc', desc: '=期初未分配利润' },
+      { code: 'CN-051', name: '二、本年增减变动金额', formula: 'CN-052+CN-056+CN-060+CN-063+CN-072', category: 'auto_calc', desc: '=综合收益+投入减少+专项储备+利润分配+内部结转' },
+      { code: 'CN-052', name: '（一）综合收益总额', formula: "TB({company_code},'净利润','本期发生额')", category: 'auto_calc', desc: '从子企业试算表提取净利润' },
+      { code: 'CN-053', name: '其中：当期归母净利润', formula: '', category: '', desc: '' },
+      { code: 'CN-056', name: '（二）所有者投入和减少资本', formula: 'SUM(CN-057:CN-059)', category: 'auto_calc', desc: '' },
+      { code: 'CN-057', name: '2-1所有者投入的普通股', formula: '', category: '', desc: '' },
+      { code: 'CN-058', name: '2-3股份支付计入所有者权益的金额', formula: '', category: '', desc: '' },
+      { code: 'CN-059', name: '2-4其他', formula: '', category: '', desc: '' },
+      { code: 'CN-060', name: '（三）专项储备提取和使用', formula: 'CN-061+CN-062', category: 'auto_calc', desc: '' },
+      { code: 'CN-061', name: '3-1提取专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-062', name: '3-2使用专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-063', name: '（四）利润分配', formula: 'SUM(CN-064:CN-071)', category: 'auto_calc', desc: '' },
+      { code: 'CN-064', name: '4-1提取盈余公积', formula: 'CN-065+CN-066', category: 'auto_calc', desc: '' },
+      { code: 'CN-065', name: '4-1-1法定公积金', formula: '', category: '', desc: '' },
+      { code: 'CN-066', name: '4-1-2任意公积金', formula: '', category: '', desc: '' },
+      { code: 'CN-067', name: '4-2△提取一般风险准备', formula: '', category: '', desc: '' },
+      { code: 'CN-068', name: '4-3对所有者（或股东）的分配', formula: '', category: '', desc: '' },
+      { code: 'CN-069', name: '4-4其他', formula: '', category: '', desc: '' },
+      { code: 'CN-070', name: '4-1-3#储备基金', formula: '', category: '', desc: '' },
+      { code: 'CN-071', name: '4-1-4#企业发展基金', formula: '', category: '', desc: '' },
+      { code: 'CN-072', name: '（五）所有者权益内部结转', formula: 'SUM(CN-073:CN-078)', category: 'auto_calc', desc: '' },
+      { code: 'CN-073', name: '5-1资本公积转增资本', formula: '', category: '', desc: '' },
+      { code: 'CN-074', name: '5-2盈余公积转增资本', formula: '', category: '', desc: '' },
+      { code: 'CN-075', name: '5-3弥补亏损', formula: '', category: '', desc: '' },
+      { code: 'CN-076', name: '5-5其他综合收益结转留存收益', formula: '', category: '', desc: '' },
+      { code: 'CN-077', name: '5-6其他', formula: '', category: '', desc: '' },
+      { code: 'CN-078', name: '三、本年年末余额', formula: 'CN-050+CN-051', category: 'auto_calc', desc: '=期初+本年增减变动' },
+      // ── 第3部分：资本公积变动 ──
+      { code: 'CN-S3', name: '资本公积变动表', formula: '', category: '', desc: '分节标题' },
+      { code: 'CN-080', name: '期初金额', formula: 'CN-004', category: 'auto_calc', desc: '=期初资本公积' },
+      { code: 'CN-081', name: '本期变动', formula: 'CN-014-CN-024', category: 'auto_calc', desc: '=增加-减少' },
+      { code: 'CN-082', name: '期末金额', formula: 'CN-080+CN-081', category: 'auto_calc', desc: '=期初+变动' },
+      // ── 校验公式 ──
+      { code: 'CN-V01', name: '校验：期末合计=期初+增加-减少', formula: 'CN-031-(CN-001+CN-011-CN-021)', category: 'logic_check', desc: '应为0' },
+      { code: 'CN-V02', name: '校验：期末未分配利润=利润表年末余额', formula: 'CN-040-CN-078', category: 'logic_check', desc: '应为0' },
+      { code: 'CN-V03', name: '校验：资本公积期末=变动表期末', formula: 'CN-034-CN-082', category: 'logic_check', desc: '应为0' },
+    ]},
+    consol_equity_sim: { rows: [
+      { code: 'CS-001', name: '期初长投模拟-损益调整' }, { code: 'CS-002', name: '期初长投模拟-其他权益变动' },
+      { code: 'CS-010', name: '当期模拟-损益调整' }, { code: 'CS-011', name: '当期模拟-投资收益' },
+      { code: 'CS-020', name: '还原分红-投资收益' }, { code: 'CS-021', name: '还原分红-损益调整' },
+      { code: 'CS-030', name: '股比变动影响' },
+      { code: 'CS-040', name: '期末长投-投资成本' }, { code: 'CS-041', name: '期末长投-损益调整' },
+      { code: 'CS-042', name: '期末长投-其他权益变动' }, { code: 'CS-043', name: '期末长投-小计' },
+    ]},
+    consol_elimination: { rows: [
+      { code: 'CX-001', name: '权益抵消-实收资本' }, { code: 'CX-002', name: '权益抵消-资本公积' },
+      { code: 'CX-003', name: '权益抵消-盈余公积' }, { code: 'CX-004', name: '权益抵消-未分配利润' },
+      { code: 'CX-005', name: '权益抵消-商誉' }, { code: 'CX-006', name: '权益抵消-长投' },
+      { code: 'CX-007', name: '权益抵消-少数股东权益' },
+      { code: 'CX-010', name: '损益抵消-年初未分配利润' }, { code: 'CX-011', name: '损益抵消-投资收益' },
+      { code: 'CX-012', name: '损益抵消-少数股权损益' },
+      { code: 'CX-020', name: '抵销后少数股东权益' }, { code: 'CX-021', name: '抵销后少数股东损益' },
+    ]},
+    consol_capital: { rows: [
+      { code: 'CK-001', name: '期初金额' }, { code: 'CK-002', name: '当期变动' },
+      { code: 'CK-003', name: '+权益法模拟' }, { code: 'CK-004', name: '-合并抵消数' },
+      { code: 'CK-005', name: '+自身报表变动' }, { code: 'CK-006', name: '期末金额' },
+      { code: 'CK-007', name: '合并报表期末金额' }, { code: 'CK-008', name: '差异' },
+    ]},
+  }
+  const sheet = sheetMap[nodeKey]
+  if (!sheet) return []
+  return sheet.rows.map((r: any, i: number) => ({
+    id: `${nodeKey}_${i}`,
+    row_code: r.code,
+    row_name: r.name,
+    formula: r.formula || '',
+    formula_category: r.category || '',
+    formula_description: r.desc || '',
+  }))
+}
 
 const crossCheckRulesForCurrent = computed(() => {
   const key = selectedNodeKey.value
