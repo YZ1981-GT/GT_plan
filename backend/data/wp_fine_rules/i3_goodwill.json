@@ -1,0 +1,35 @@
+{
+  "wp_code": "I3",
+  "name": "商誉",
+  "version": "2025-R1",
+  "account_codes": ["1711"],
+  "source_files": [{"file": "I3 商誉.xlsx", "sheets": ["底稿目录","商誉实质性程序 I3A","审定表I3-1","附注披露（上市公司）","附注披露（国有企业）","明细表I3-2","调整分录汇总I3-3","入账价值测算表I3-4","针对性检查表I3-5","商誉减值测试I3-6","可收回金额测试I3-7","复核公司减值测试过程及结论I3-8"]}],
+  "sheet_rules": [
+    {"code": "I3A", "exact_name": "商誉实质性程序 I3A", "type": "procedure"},
+    {"code": "I3-1", "exact_name": "审定表I3-1", "type": "summary", "header_rows": [5,6], "data_start_row": 7,
+      "key_rows": {"total": {"row": 12, "label": "合计", "is_total": true}}},
+    {"code": "I3-note-listed", "exact_name": "附注披露（上市公司）", "type": "note_disclosure"},
+    {"code": "I3-note-soe", "exact_name": "附注披露（国有企业）", "type": "note_disclosure"},
+    {"code": "I3-2", "exact_name": "明细表I3-2", "type": "detail"},
+    {"code": "I3-3", "exact_name": "调整分录汇总I3-3", "type": "adjustment"},
+    {"code": "I3-4", "exact_name": "入账价值测算表I3-4", "type": "calculation", "description": "商誉入账价值测算（合并成本-可辨认净资产公允价值份额）"},
+    {"code": "I3-5", "exact_name": "针对性检查表I3-5", "type": "check"},
+    {"code": "I3-6", "exact_name": "商誉减值测试I3-6", "type": "calculation", "description": "商誉减值测试（资产组/资产组组合）"},
+    {"code": "I3-7", "exact_name": "可收回金额测试I3-7", "type": "calculation", "description": "可收回金额测试"},
+    {"code": "I3-8", "exact_name": "复核公司减值测试过程及结论I3-8", "type": "check", "description": "复核管理层减值测试过程及结论"}
+  ],
+  "cross_references": [
+    {"from": "I3-1.total", "to": "tb://1711#审定数", "description": "审定表合计 = 试算表商誉审定数"},
+    {"from": "I3-2.合计", "to": "I3-1.total", "description": "明细表合计 = 审定表合计"},
+    {"from": "I3-4.入账价值", "to": "I3-1.原值", "description": "入账价值测算 = 审定表商誉原值"},
+    {"from": "I3-6.减值", "to": "I3-1.减值准备", "description": "减值测试结果 = 审定表减值准备"}
+  ],
+  "audit_checks": [
+    {"code": "I3-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计 = 试算表商誉审定数"},
+    {"code": "I3-CHK-02", "type": "cross_ref", "severity": "warning", "description": "明细表合计 = 审定表合计"},
+    {"code": "I3-CHK-03", "type": "calculation", "severity": "blocking", "description": "商誉减值测试已执行（I3-6/I3-7）"},
+    {"code": "I3-CHK-04", "type": "calculation", "severity": "warning", "description": "入账价值测算正确（合并成本-净资产份额，I3-4）"},
+    {"code": "I3-CHK-05", "type": "check", "severity": "warning", "description": "管理层减值测试过程已复核（I3-8）"},
+    {"code": "I3-CHK-06", "type": "movement", "severity": "info", "description": "期初+增加-减值 = 期末"}
+  ]
+}
