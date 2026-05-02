@@ -1,0 +1,132 @@
+{
+  "wp_code": "H9",
+  "name": "租赁负债",
+  "version": "2025-R1",
+  "account_codes": [
+    "2601"
+  ],
+  "source_files": [
+    {
+      "file": "租赁负债.xlsx",
+      "sheets": [
+        "底稿目录",
+        "租赁负债实质性程序表H9A",
+        "审定表H9-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "租赁负债明细表H9-2",
+        "未确认融资费用明细表H9-3",
+        "调整分录汇总H9-4",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "租赁负债实质性程序表H9A",
+      "type": "procedure",
+      "code": "H9"
+    },
+    {
+      "exact_name": "审定表H9-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "H9-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "租赁负债明细表H9-2",
+      "type": "detail",
+      "code": "H9-2"
+    },
+    {
+      "exact_name": "未确认融资费用明细表H9-3",
+      "type": "detail",
+      "code": "H9-3"
+    },
+    {
+      "exact_name": "调整分录汇总H9-4",
+      "type": "adjustment",
+      "code": "H9-4"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "H9-1.total",
+      "to": "tb://2601#审定数",
+      "description": "审定表合计 = 试算表租赁负债审定数"
+    },
+    {
+      "from": "H9-2.合计",
+      "to": "H9-1.total",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "H9-1.total",
+      "to": "report://BS/BS-042#期末",
+      "description": "审定表合计 = 报表租赁负债"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "H9-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表租赁负债审定数"
+    },
+    {
+      "code": "H9-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "H9-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "H9-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "H9-CHK-05",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表租赁负债行"
+    },
+    {
+      "code": "H9-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "租赁合同条款已检查"
+    },
+    {
+      "code": "H9-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "折现率/租赁期判断合理"
+    }
+  ]
+}

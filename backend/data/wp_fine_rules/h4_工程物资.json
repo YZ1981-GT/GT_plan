@@ -1,0 +1,133 @@
+{
+  "wp_code": "H4",
+  "name": "工程物资",
+  "version": "2025-R1",
+  "account_codes": [
+    "1605"
+  ],
+  "source_files": [
+    {
+      "file": "工程物资.xlsx",
+      "sheets": [
+        "底稿目录",
+        "工程物资实质性程序表H4A",
+        "审定表H4-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表H4-2",
+        "调整分录汇总H4-3",
+        "增加检查表H4-4",
+        "减少检查表H4-5",
+        "盘点检查表H4-6",
+        "减值测算表H4-7",
+        "可收回金额测试表H4-8",
+        "关联交易检查表H4-9"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "工程物资实质性程序表H4A",
+      "type": "procedure",
+      "code": "H4"
+    },
+    {
+      "exact_name": "审定表H4-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "H4-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国有企业）"
+    },
+    {
+      "exact_name": "明细表H4-2",
+      "type": "detail",
+      "code": "H4-2"
+    },
+    {
+      "exact_name": "调整分录汇总H4-3",
+      "type": "adjustment",
+      "code": "H4-3"
+    },
+    {
+      "exact_name": "增加检查表H4-4",
+      "type": "check",
+      "code": "H4-4"
+    },
+    {
+      "exact_name": "减少检查表H4-5",
+      "type": "check",
+      "code": "H4-5"
+    },
+    {
+      "exact_name": "盘点检查表H4-6",
+      "type": "check",
+      "code": "H4-6"
+    },
+    {
+      "exact_name": "减值测算表H4-7",
+      "type": "calculation",
+      "code": "H4-7"
+    },
+    {
+      "exact_name": "可收回金额测试表H4-8",
+      "type": "calculation",
+      "code": "H4-8"
+    },
+    {
+      "exact_name": "关联交易检查表H4-9",
+      "type": "check",
+      "code": "H4-9"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "H4-1.total",
+      "to": "tb://1605#审定数",
+      "description": "审定表合计 = 试算表工程物资审定数"
+    },
+    {
+      "from": "H4-2.合计",
+      "to": "H4-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "H4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表工程物资审定数"
+    },
+    {
+      "code": "H4-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "H4-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "H4-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

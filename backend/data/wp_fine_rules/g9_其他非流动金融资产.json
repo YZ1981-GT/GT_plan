@@ -1,0 +1,127 @@
+{
+  "wp_code": "G9",
+  "name": "其他非流动金融资产",
+  "version": "2025-R1",
+  "account_codes": [
+    "1510"
+  ],
+  "source_files": [
+    {
+      "file": "其他非流动金融资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "其他非流动金融资产实质性程序表G9A",
+        "审定表G9-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G9-2",
+        "调整分录汇总G9-3",
+        "公允价值测试表G9-4",
+        "第三层次公允价值计量的调节表G9-5",
+        "凭证检查表G9-6"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "其他非流动金融资产实质性程序表G9A",
+      "type": "procedure",
+      "code": "G9"
+    },
+    {
+      "exact_name": "审定表G9-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G9-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G9-2",
+      "type": "detail",
+      "code": "G9-2"
+    },
+    {
+      "exact_name": "调整分录汇总G9-3",
+      "type": "adjustment",
+      "code": "G9-3"
+    },
+    {
+      "exact_name": "公允价值测试表G9-4",
+      "type": "calculation",
+      "code": "G9-4"
+    },
+    {
+      "exact_name": "第三层次公允价值计量的调节表G9-5",
+      "type": "check",
+      "code": "G9-5"
+    },
+    {
+      "exact_name": "凭证检查表G9-6",
+      "type": "check",
+      "code": "G9-6"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G9-1.total",
+      "to": "tb://1510#审定数",
+      "description": "审定表合计 = 试算表其他非流动金融资产审定数"
+    },
+    {
+      "from": "G9-2.合计",
+      "to": "G9-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G9-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他非流动金融资产审定数"
+    },
+    {
+      "code": "G9-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G9-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G9-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "G9-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值/摊余成本计量正确"
+    },
+    {
+      "code": "G9-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "预期信用损失计提合理"
+    }
+  ]
+}

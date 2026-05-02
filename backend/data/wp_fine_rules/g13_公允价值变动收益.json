@@ -1,0 +1,103 @@
+{
+  "wp_code": "G13",
+  "name": "公允价值变动收益",
+  "version": "2025-R1",
+  "account_codes": [
+    "6101"
+  ],
+  "source_files": [
+    {
+      "file": "公允价值变动收益.xlsx",
+      "sheets": [
+        "底稿目录",
+        "公允价值变动收益审计程序表G13A",
+        "公允价值变动收益审计程序表G13A-修订前",
+        "审定表G13-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G13-2",
+        "调整分录汇总G13-3"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "公允价值变动收益审计程序表G13A",
+      "type": "procedure",
+      "code": "G13"
+    },
+    {
+      "exact_name": "公允价值变动收益审计程序表G13A-修订前",
+      "type": "procedure",
+      "code": "G13"
+    },
+    {
+      "exact_name": "审定表G13-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G13-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G13-2",
+      "type": "detail",
+      "code": "G13-2"
+    },
+    {
+      "exact_name": "调整分录汇总G13-3",
+      "type": "adjustment",
+      "code": "G13-3"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G13-1.total",
+      "to": "tb://6101#审定数",
+      "description": "审定表合计 = 试算表公允价值变动收益审定数"
+    },
+    {
+      "from": "G13-2.合计",
+      "to": "G13-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G13-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表公允价值变动收益审定数"
+    },
+    {
+      "code": "G13-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G13-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G13-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

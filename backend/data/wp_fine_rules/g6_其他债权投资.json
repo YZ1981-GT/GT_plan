@@ -1,0 +1,193 @@
+{
+  "wp_code": "G6",
+  "name": "其他债权投资",
+  "version": "2025-R1",
+  "account_codes": [
+    "1503"
+  ],
+  "source_files": [
+    {
+      "file": "其他债权投资.xlsx",
+      "sheets": [
+        "底稿目录",
+        "其他债权投资实质性程序表G6A",
+        "审定表G6-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G6-2",
+        "坏账准备明细表G6-3",
+        "调整分录汇总G6-4",
+        "公允价值测试表G6-5",
+        "利息测算表G6-6",
+        "业务模式分析G6-7",
+        "合同现金流量特征分析G6-8",
+        "有价证券盘点表G6-9",
+        "盘点倒轧表G6-10",
+        "其他债权投资三阶段划分G6-11",
+        "其他债权投资减值准备测算表G6-12",
+        "预期信用损失的计量测试G6-13",
+        "减值准备转回（收回）、核销检查表G6-14",
+        "凭证检查表G6-15",
+        "参考中证协《证券公司金融工具减值指引》",
+        "参考-根据剩余期限折算PD"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "其他债权投资实质性程序表G6A",
+      "type": "procedure",
+      "code": "G6"
+    },
+    {
+      "exact_name": "审定表G6-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G6-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G6-2",
+      "type": "detail",
+      "code": "G6-2"
+    },
+    {
+      "exact_name": "坏账准备明细表G6-3",
+      "type": "detail",
+      "code": "G6-3"
+    },
+    {
+      "exact_name": "调整分录汇总G6-4",
+      "type": "adjustment",
+      "code": "G6-4"
+    },
+    {
+      "exact_name": "公允价值测试表G6-5",
+      "type": "calculation",
+      "code": "G6-5"
+    },
+    {
+      "exact_name": "利息测算表G6-6",
+      "type": "calculation",
+      "code": "G6-6"
+    },
+    {
+      "exact_name": "业务模式分析G6-7",
+      "type": "analysis",
+      "code": "G6-7"
+    },
+    {
+      "exact_name": "合同现金流量特征分析G6-8",
+      "type": "analysis",
+      "code": "G6-8"
+    },
+    {
+      "exact_name": "有价证券盘点表G6-9",
+      "type": "count",
+      "code": "G6-9"
+    },
+    {
+      "exact_name": "盘点倒轧表G6-10",
+      "type": "count",
+      "code": "G6-10"
+    },
+    {
+      "exact_name": "其他债权投资三阶段划分G6-11",
+      "type": "check",
+      "code": "G6-11"
+    },
+    {
+      "exact_name": "其他债权投资减值准备测算表G6-12",
+      "type": "calculation",
+      "code": "G6-12"
+    },
+    {
+      "exact_name": "预期信用损失的计量测试G6-13",
+      "type": "calculation",
+      "code": "G6-13"
+    },
+    {
+      "exact_name": "减值准备转回（收回）、核销检查表G6-14",
+      "type": "check",
+      "code": "G6-14"
+    },
+    {
+      "exact_name": "凭证检查表G6-15",
+      "type": "check",
+      "code": "G6-15"
+    },
+    {
+      "exact_name": "参考中证协《证券公司金融工具减值指引》",
+      "type": "check",
+      "code": "参考中证协《证券公司金融工具减"
+    },
+    {
+      "exact_name": "参考-根据剩余期限折算PD",
+      "type": "check",
+      "code": "参考-根据剩余期限折算PD"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G6-1.total",
+      "to": "tb://1503#审定数",
+      "description": "审定表合计 = 试算表其他债权投资审定数"
+    },
+    {
+      "from": "G6-2.合计",
+      "to": "G6-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G6-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他债权投资审定数"
+    },
+    {
+      "code": "G6-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G6-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G6-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "G6-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值/摊余成本计量正确"
+    },
+    {
+      "code": "G6-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "预期信用损失计提合理"
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "wp_code": "G4",
+  "name": "债权投资",
+  "version": "2025-R1",
+  "account_codes": [
+    "1504"
+  ],
+  "source_files": [
+    {
+      "file": "债权投资.xlsx",
+      "sheets": [
+        "底稿目录",
+        "债权投资实质性程序表G4A",
+        "审定表G4-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G4-2",
+        "调整分录汇总G4-3",
+        "利息测算表G4-4",
+        "业务模式分析G4-5",
+        "合同现金流量特征分析G4-6",
+        "有价证券盘点表G4-7",
+        "盘点倒轧表G4-8",
+        "债权投资三阶段划分G4-9",
+        "债权投资减值准备测算表G4-10",
+        "预期信用损失的计量测试G4-11",
+        "减值准备转回（收回）、核销检查表G4-12",
+        "凭证检查表G4-13",
+        "参考-中证协《证券公司金融工具减值指引》",
+        "参考-根据剩余期限折算PD"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "债权投资实质性程序表G4A",
+      "type": "procedure",
+      "code": "G4"
+    },
+    {
+      "exact_name": "审定表G4-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G4-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G4-2",
+      "type": "detail",
+      "code": "G4-2"
+    },
+    {
+      "exact_name": "调整分录汇总G4-3",
+      "type": "adjustment",
+      "code": "G4-3"
+    },
+    {
+      "exact_name": "利息测算表G4-4",
+      "type": "calculation",
+      "code": "G4-4"
+    },
+    {
+      "exact_name": "业务模式分析G4-5",
+      "type": "analysis",
+      "code": "G4-5"
+    },
+    {
+      "exact_name": "合同现金流量特征分析G4-6",
+      "type": "analysis",
+      "code": "G4-6"
+    },
+    {
+      "exact_name": "有价证券盘点表G4-7",
+      "type": "count",
+      "code": "G4-7"
+    },
+    {
+      "exact_name": "盘点倒轧表G4-8",
+      "type": "count",
+      "code": "G4-8"
+    },
+    {
+      "exact_name": "债权投资三阶段划分G4-9",
+      "type": "check",
+      "code": "G4-9"
+    },
+    {
+      "exact_name": "债权投资减值准备测算表G4-10",
+      "type": "calculation",
+      "code": "G4-10"
+    },
+    {
+      "exact_name": "预期信用损失的计量测试G4-11",
+      "type": "calculation",
+      "code": "G4-11"
+    },
+    {
+      "exact_name": "减值准备转回（收回）、核销检查表G4-12",
+      "type": "check",
+      "code": "G4-12"
+    },
+    {
+      "exact_name": "凭证检查表G4-13",
+      "type": "check",
+      "code": "G4-13"
+    },
+    {
+      "exact_name": "参考-中证协《证券公司金融工具减值指引》",
+      "type": "check",
+      "code": "参考-中证协《证券公司金融工具"
+    },
+    {
+      "exact_name": "参考-根据剩余期限折算PD",
+      "type": "check",
+      "code": "参考-根据剩余期限折算PD"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G4-1.total",
+      "to": "tb://1504#审定数",
+      "description": "审定表合计 = 试算表债权投资审定数"
+    },
+    {
+      "from": "G4-2.合计",
+      "to": "G4-1.total",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "G4-1.total",
+      "to": "report://BS/BS-011#期末",
+      "description": "审定表合计 = 报表债权投资"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表债权投资审定数"
+    },
+    {
+      "code": "G4-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G4-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G4-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "G4-CHK-05",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表债权投资行"
+    },
+    {
+      "code": "G4-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值/摊余成本计量正确"
+    },
+    {
+      "code": "G4-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "预期信用损失计提合理"
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "wp_code": "M7",
+  "name": "专项储备",
+  "version": "2025-R1",
+  "account_codes": [
+    "4102"
+  ],
+  "source_files": [
+    {
+      "file": "专项储备.xlsx",
+      "sheets": [
+        "底稿目录",
+        " 专项储备实质性程序表 M7A ",
+        "审定表M7-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表M7-2",
+        "调整分录汇总M7-3",
+        "专项储备计提测试表M7-4",
+        "专项储备支出检查表M7-5",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": " 专项储备实质性程序表 M7A ",
+      "type": "procedure",
+      "code": "M7"
+    },
+    {
+      "exact_name": "审定表M7-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "M7-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国有企业）"
+    },
+    {
+      "exact_name": "明细表M7-2",
+      "type": "detail",
+      "code": "M7-2"
+    },
+    {
+      "exact_name": "调整分录汇总M7-3",
+      "type": "adjustment",
+      "code": "M7-3"
+    },
+    {
+      "exact_name": "专项储备计提测试表M7-4",
+      "type": "calculation",
+      "code": "M7-4"
+    },
+    {
+      "exact_name": "专项储备支出检查表M7-5",
+      "type": "check",
+      "code": "M7-5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "M7-1.total",
+      "to": "tb://4102#审定数",
+      "description": "审定表合计 = 试算表专项储备审定数"
+    },
+    {
+      "from": "M7-2.合计",
+      "to": "M7-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "M7-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表专项储备审定数"
+    },
+    {
+      "code": "M7-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "M7-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "M7-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

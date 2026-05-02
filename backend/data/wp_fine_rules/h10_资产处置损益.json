@@ -1,0 +1,109 @@
+{
+  "wp_code": "H10",
+  "name": "资产处置损益",
+  "version": "2025-R1",
+  "account_codes": [
+    "6115"
+  ],
+  "source_files": [
+    {
+      "file": "资产处置损益.xlsx",
+      "sheets": [
+        "底稿目录",
+        "资产处置损益实质性程序表H10A",
+        "审定表H10-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表H10-2",
+        "调整分录汇总H10-3",
+        "检查表H10-4",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "资产处置损益实质性程序表H10A",
+      "type": "procedure",
+      "code": "H10"
+    },
+    {
+      "exact_name": "审定表H10-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "H10-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表H10-2",
+      "type": "detail",
+      "code": "H10-2"
+    },
+    {
+      "exact_name": "调整分录汇总H10-3",
+      "type": "adjustment",
+      "code": "H10-3"
+    },
+    {
+      "exact_name": "检查表H10-4",
+      "type": "check",
+      "code": "H10-4"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "H10-1.total",
+      "to": "tb://6115#审定数",
+      "description": "审定表合计 = 试算表资产处置损益审定数"
+    },
+    {
+      "from": "H10-2.合计",
+      "to": "H10-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "H10-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表资产处置损益审定数"
+    },
+    {
+      "code": "H10-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "H10-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "H10-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

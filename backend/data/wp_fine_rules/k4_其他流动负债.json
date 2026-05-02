@@ -1,0 +1,103 @@
+{
+  "wp_code": "K4",
+  "name": "其他流动负债",
+  "version": "2025-R1",
+  "account_codes": [
+    "2299"
+  ],
+  "source_files": [
+    {
+      "file": "其他流动负债.xlsx",
+      "sheets": [
+        "底稿目录",
+        "实质性程序表 K4A",
+        "审定表 K4-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表 K4-2",
+        "调整分录汇总 K4-3",
+        "其他流动负债检查表 K4-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "实质性程序表 K4A",
+      "type": "procedure",
+      "code": "K4"
+    },
+    {
+      "exact_name": "审定表 K4-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "K4-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表 K4-2",
+      "type": "detail",
+      "code": "K4-2"
+    },
+    {
+      "exact_name": "调整分录汇总 K4-3",
+      "type": "adjustment",
+      "code": "K4-3"
+    },
+    {
+      "exact_name": "其他流动负债检查表 K4-4",
+      "type": "check",
+      "code": "K4-4"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "K4-1.total",
+      "to": "tb://2299#审定数",
+      "description": "审定表合计 = 试算表其他流动负债审定数"
+    },
+    {
+      "from": "K4-2.合计",
+      "to": "K4-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "K4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他流动负债审定数"
+    },
+    {
+      "code": "K4-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "K4-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "K4-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "wp_code": "K6",
+  "name": "持有待售资产和负债",
+  "version": "2025-R1",
+  "account_codes": [
+    "1481"
+  ],
+  "source_files": [
+    {
+      "file": "持有待售资产和负债.xlsx",
+      "sheets": [
+        "底稿目录",
+        "实质性程序表 K6A",
+        "审定表 K6-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息(国企）",
+        "明细表K6-2",
+        "调整分录汇总 K6-3",
+        "初始确认检查表K6-4",
+        "减值准备测试表（后续计量） K6-5",
+        "处置组减值测试表（后续计量） K6-6",
+        "检查表（不再满足持有待售）K6-7"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "实质性程序表 K6A",
+      "type": "procedure",
+      "code": "K6"
+    },
+    {
+      "exact_name": "审定表 K6-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "K6-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息(国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息(国企）"
+    },
+    {
+      "exact_name": "明细表K6-2",
+      "type": "detail",
+      "code": "K6-2"
+    },
+    {
+      "exact_name": "调整分录汇总 K6-3",
+      "type": "adjustment",
+      "code": "K6-3"
+    },
+    {
+      "exact_name": "初始确认检查表K6-4",
+      "type": "check",
+      "code": "K6-4"
+    },
+    {
+      "exact_name": "减值准备测试表（后续计量） K6-5",
+      "type": "calculation",
+      "code": "K6-5"
+    },
+    {
+      "exact_name": "处置组减值测试表（后续计量） K6-6",
+      "type": "calculation",
+      "code": "K6-6"
+    },
+    {
+      "exact_name": "检查表（不再满足持有待售）K6-7",
+      "type": "check",
+      "code": "K6-7"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "K6-1.total",
+      "to": "tb://1481#审定数",
+      "description": "审定表合计 = 试算表持有待售资产和负债审定数"
+    },
+    {
+      "from": "K6-2.合计",
+      "to": "K6-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "K6-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表持有待售资产和负债审定数"
+    },
+    {
+      "code": "K6-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "K6-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "K6-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

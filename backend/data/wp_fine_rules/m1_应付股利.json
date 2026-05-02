@@ -1,0 +1,121 @@
+{
+  "wp_code": "M1",
+  "name": "应付股利",
+  "version": "2025-R1",
+  "account_codes": [
+    "2231"
+  ],
+  "source_files": [
+    {
+      "file": "应付股利（利润）.xlsx",
+      "sheets": [
+        "底稿目录",
+        "应付股利实质性程序表M1",
+        "审定表M1-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表M1-2",
+        "调整分录汇总M1-3",
+        "外币汇率测算表M1-4",
+        "应付股利（利润）测算表M1-5",
+        "应付股利（利润）检查表M1-6",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "应付股利实质性程序表M1",
+      "type": "procedure",
+      "code": "M1"
+    },
+    {
+      "exact_name": "审定表M1-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "M1-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国有企业）"
+    },
+    {
+      "exact_name": "明细表M1-2",
+      "type": "detail",
+      "code": "M1-2"
+    },
+    {
+      "exact_name": "调整分录汇总M1-3",
+      "type": "adjustment",
+      "code": "M1-3"
+    },
+    {
+      "exact_name": "外币汇率测算表M1-4",
+      "type": "calculation",
+      "code": "M1-4"
+    },
+    {
+      "exact_name": "应付股利（利润）测算表M1-5",
+      "type": "calculation",
+      "code": "M1-5"
+    },
+    {
+      "exact_name": "应付股利（利润）检查表M1-6",
+      "type": "check",
+      "code": "M1-6"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "M1-1.total",
+      "to": "tb://2231#审定数",
+      "description": "审定表合计 = 试算表应付股利审定数"
+    },
+    {
+      "from": "M1-2.合计",
+      "to": "M1-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "M1-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表应付股利审定数"
+    },
+    {
+      "code": "M1-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "M1-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "M1-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

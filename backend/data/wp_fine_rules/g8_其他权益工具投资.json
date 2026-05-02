@@ -1,0 +1,133 @@
+{
+  "wp_code": "G8",
+  "name": "其他权益工具投资",
+  "version": "2025-R1",
+  "account_codes": [
+    "1503"
+  ],
+  "source_files": [
+    {
+      "file": "其他权益工具投资.xlsx",
+      "sheets": [
+        "底稿目录",
+        "其他权益工具投资实质性程序表G8A",
+        "审定表G8-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G8-2",
+        "调整分录汇总G8-3",
+        "公允价值测试表G8-4",
+        "指定的适当性检查表G8-5",
+        "凭证检查表G8-6",
+        "参考中证协《非上市公司股权估值指引》"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "其他权益工具投资实质性程序表G8A",
+      "type": "procedure",
+      "code": "G8"
+    },
+    {
+      "exact_name": "审定表G8-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G8-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G8-2",
+      "type": "detail",
+      "code": "G8-2"
+    },
+    {
+      "exact_name": "调整分录汇总G8-3",
+      "type": "adjustment",
+      "code": "G8-3"
+    },
+    {
+      "exact_name": "公允价值测试表G8-4",
+      "type": "calculation",
+      "code": "G8-4"
+    },
+    {
+      "exact_name": "指定的适当性检查表G8-5",
+      "type": "check",
+      "code": "G8-5"
+    },
+    {
+      "exact_name": "凭证检查表G8-6",
+      "type": "check",
+      "code": "G8-6"
+    },
+    {
+      "exact_name": "参考中证协《非上市公司股权估值指引》",
+      "type": "check",
+      "code": "参考中证协《非上市公司股权估值"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G8-1.total",
+      "to": "tb://1503#审定数",
+      "description": "审定表合计 = 试算表其他权益工具投资审定数"
+    },
+    {
+      "from": "G8-2.合计",
+      "to": "G8-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G8-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他权益工具投资审定数"
+    },
+    {
+      "code": "G8-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G8-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G8-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "G8-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值/摊余成本计量正确"
+    },
+    {
+      "code": "G8-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "预期信用损失计提合理"
+    }
+  ]
+}

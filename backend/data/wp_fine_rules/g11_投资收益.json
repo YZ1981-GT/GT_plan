@@ -1,0 +1,115 @@
+{
+  "wp_code": "G11",
+  "name": "投资收益",
+  "version": "2025-R1",
+  "account_codes": [
+    "6111"
+  ],
+  "source_files": [
+    {
+      "file": "投资收益.xlsx",
+      "sheets": [
+        "底稿目录",
+        "投资收益实质性程序表G11A",
+        "投资收益实质性程序表G11A-修订前",
+        "审定表G11-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细分析表G11-2",
+        "调整分录汇总G11-3",
+        "收益率分析表G11-4",
+        "凭证检查表G11-5"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "投资收益实质性程序表G11A",
+      "type": "procedure",
+      "code": "G11"
+    },
+    {
+      "exact_name": "投资收益实质性程序表G11A-修订前",
+      "type": "procedure",
+      "code": "G11"
+    },
+    {
+      "exact_name": "审定表G11-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G11-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细分析表G11-2",
+      "type": "detail",
+      "code": "G11-2"
+    },
+    {
+      "exact_name": "调整分录汇总G11-3",
+      "type": "adjustment",
+      "code": "G11-3"
+    },
+    {
+      "exact_name": "收益率分析表G11-4",
+      "type": "analysis",
+      "code": "G11-4"
+    },
+    {
+      "exact_name": "凭证检查表G11-5",
+      "type": "check",
+      "code": "G11-5"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G11-1.total",
+      "to": "tb://6111#审定数",
+      "description": "审定表合计 = 试算表投资收益审定数"
+    },
+    {
+      "from": "G11-2.合计",
+      "to": "G11-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G11-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表投资收益审定数"
+    },
+    {
+      "code": "G11-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G11-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G11-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

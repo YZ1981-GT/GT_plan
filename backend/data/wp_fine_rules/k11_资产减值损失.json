@@ -1,0 +1,97 @@
+{
+  "wp_code": "K11",
+  "name": "资产减值损失",
+  "version": "2025-R1",
+  "account_codes": [
+    "6702"
+  ],
+  "source_files": [
+    {
+      "file": "资产减值损失.xlsx",
+      "sheets": [
+        "底稿目录",
+        "实质性程序表 K11A",
+        "审定表K11-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表K11-2",
+        "调整分录汇总K11-3"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "实质性程序表 K11A",
+      "type": "procedure",
+      "code": "K11"
+    },
+    {
+      "exact_name": "审定表K11-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "K11-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表K11-2",
+      "type": "detail",
+      "code": "K11-2"
+    },
+    {
+      "exact_name": "调整分录汇总K11-3",
+      "type": "adjustment",
+      "code": "K11-3"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "K11-1.total",
+      "to": "tb://6702#审定数",
+      "description": "审定表合计 = 试算表资产减值损失审定数"
+    },
+    {
+      "from": "K11-2.合计",
+      "to": "K11-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "K11-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表资产减值损失审定数"
+    },
+    {
+      "code": "K11-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "K11-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "K11-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

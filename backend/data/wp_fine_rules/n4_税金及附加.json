@@ -1,0 +1,109 @@
+{
+  "wp_code": "N4",
+  "name": "税金及附加",
+  "version": "2025-R1",
+  "account_codes": [
+    "6403"
+  ],
+  "source_files": [
+    {
+      "file": "税金及附加.xlsx",
+      "sheets": [
+        "底稿目录",
+        "税金及附加审计程序表N4A ",
+        "税金及附加审计程序表O2A（原底稿）",
+        "税金及附加审定表N4-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "税金及附加明细表N4-2",
+        "调整分录汇总表N4-3",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "税金及附加审计程序表N4A ",
+      "type": "procedure",
+      "code": "N4"
+    },
+    {
+      "exact_name": "税金及附加审计程序表O2A（原底稿）",
+      "type": "procedure",
+      "code": "O2"
+    },
+    {
+      "exact_name": "税金及附加审定表N4-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "N4-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "税金及附加明细表N4-2",
+      "type": "detail",
+      "code": "N4-2"
+    },
+    {
+      "exact_name": "调整分录汇总表N4-3",
+      "type": "adjustment",
+      "code": "N4-3"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "N4-1.total",
+      "to": "tb://6403#审定数",
+      "description": "审定表合计 = 试算表税金及附加审定数"
+    },
+    {
+      "from": "N4-2.合计",
+      "to": "N4-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "N4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表税金及附加审定数"
+    },
+    {
+      "code": "N4-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "N4-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "N4-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "wp_code": "N3",
+  "name": "递延所得税负债",
+  "version": "2025-R1",
+  "account_codes": [
+    "2901"
+  ],
+  "source_files": [
+    {
+      "file": "递延所得税负债.xlsx",
+      "sheets": [
+        "底稿目录",
+        "递延所得税负债审计程序表的N3A",
+        "递延所得税负债审定表N3-1",
+        "递延所得税负债明细表N3-2",
+        "调整分录汇总表N3-3",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "递延所得税负债审计程序表的N3A",
+      "type": "procedure",
+      "code": "N3"
+    },
+    {
+      "exact_name": "递延所得税负债审定表N3-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "N3-1"
+    },
+    {
+      "exact_name": "递延所得税负债明细表N3-2",
+      "type": "detail",
+      "code": "N3-2"
+    },
+    {
+      "exact_name": "调整分录汇总表N3-3",
+      "type": "adjustment",
+      "code": "N3-3"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "N3-1.total",
+      "to": "tb://2901#审定数",
+      "description": "审定表合计 = 试算表递延所得税负债审定数"
+    },
+    {
+      "from": "N3-2.合计",
+      "to": "N3-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "N3-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表递延所得税负债审定数"
+    },
+    {
+      "code": "N3-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "N3-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "N3-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

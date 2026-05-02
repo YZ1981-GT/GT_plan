@@ -1,0 +1,138 @@
+{
+  "wp_code": "L5",
+  "name": "长期应付款",
+  "version": "2025-R1",
+  "account_codes": [
+    "2701"
+  ],
+  "source_files": [
+    {
+      "file": "长期应付款.xlsx",
+      "sheets": [
+        "底稿目录",
+        "长期应付款实质性程序表L5A",
+        "审定表L5-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表L5-2",
+        "未确认融资费用明细表L5-3",
+        "调整分录汇总L5-4",
+        "未确认融资费用测算表L5-5",
+        "关联方及交易检查表L5-6",
+        "长期应付款检查表L5-7",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "长期应付款实质性程序表L5A",
+      "type": "procedure",
+      "code": "L5"
+    },
+    {
+      "exact_name": "审定表L5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "L5-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表L5-2",
+      "type": "detail",
+      "code": "L5-2"
+    },
+    {
+      "exact_name": "未确认融资费用明细表L5-3",
+      "type": "detail",
+      "code": "L5-3"
+    },
+    {
+      "exact_name": "调整分录汇总L5-4",
+      "type": "adjustment",
+      "code": "L5-4"
+    },
+    {
+      "exact_name": "未确认融资费用测算表L5-5",
+      "type": "calculation",
+      "code": "L5-5"
+    },
+    {
+      "exact_name": "关联方及交易检查表L5-6",
+      "type": "check",
+      "code": "L5-6"
+    },
+    {
+      "exact_name": "长期应付款检查表L5-7",
+      "type": "check",
+      "code": "L5-7"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "L5-1.total",
+      "to": "tb://2701#审定数",
+      "description": "审定表合计 = 试算表长期应付款审定数"
+    },
+    {
+      "from": "L5-2.合计",
+      "to": "L5-1.total",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "L5-1.total",
+      "to": "report://BS/BS-044#期末",
+      "description": "审定表合计 = 报表长期应付款"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "L5-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表长期应付款审定数"
+    },
+    {
+      "code": "L5-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "L5-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "L5-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "L5-CHK-05",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表长期应付款行"
+    }
+  ]
+}

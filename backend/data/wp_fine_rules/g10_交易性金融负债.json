@@ -1,0 +1,127 @@
+{
+  "wp_code": "G10",
+  "name": "交易性金融负债",
+  "version": "2025-R1",
+  "account_codes": [
+    "2101"
+  ],
+  "source_files": [
+    {
+      "file": "交易性金融负债.xlsx",
+      "sheets": [
+        "底稿目录",
+        "交易性金融负债实质性程序表G10A",
+        "审定表G10-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G10-2",
+        "调整分录汇总G10-3",
+        "分类的适当性检查表G10-4",
+        "公允价值测试表G10-5",
+        "第三层次公允价值计量的调节表G10-6",
+        "凭证检查表G10-7",
+        "衍生金融工具核查表G10-8"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "交易性金融负债实质性程序表G10A",
+      "type": "procedure",
+      "code": "G10"
+    },
+    {
+      "exact_name": "审定表G10-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G10-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G10-2",
+      "type": "detail",
+      "code": "G10-2"
+    },
+    {
+      "exact_name": "调整分录汇总G10-3",
+      "type": "adjustment",
+      "code": "G10-3"
+    },
+    {
+      "exact_name": "分类的适当性检查表G10-4",
+      "type": "check",
+      "code": "G10-4"
+    },
+    {
+      "exact_name": "公允价值测试表G10-5",
+      "type": "calculation",
+      "code": "G10-5"
+    },
+    {
+      "exact_name": "第三层次公允价值计量的调节表G10-6",
+      "type": "check",
+      "code": "G10-6"
+    },
+    {
+      "exact_name": "凭证检查表G10-7",
+      "type": "check",
+      "code": "G10-7"
+    },
+    {
+      "exact_name": "衍生金融工具核查表G10-8",
+      "type": "check",
+      "code": "G10-8"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G10-1.total",
+      "to": "tb://2101#审定数",
+      "description": "审定表合计 = 试算表交易性金融负债审定数"
+    },
+    {
+      "from": "G10-2.合计",
+      "to": "G10-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G10-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表交易性金融负债审定数"
+    },
+    {
+      "code": "G10-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G10-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G10-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

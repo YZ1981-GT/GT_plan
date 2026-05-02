@@ -1,0 +1,121 @@
+{
+  "wp_code": "K10",
+  "name": "其他收益",
+  "version": "2025-R1",
+  "account_codes": [
+    "6117"
+  ],
+  "source_files": [
+    {
+      "file": "其他收益.xlsx",
+      "sheets": [
+        "底稿目录",
+        "实质性程序表K10A",
+        "审定表K10-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表K10-2",
+        "调整分录汇总K10-3",
+        "政府补助核对表K10-4",
+        "应收政府补助检查表K10-5",
+        "其他收益检查表K10-6",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "实质性程序表K10A",
+      "type": "procedure",
+      "code": "K10"
+    },
+    {
+      "exact_name": "审定表K10-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "K10-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表K10-2",
+      "type": "detail",
+      "code": "K10-2"
+    },
+    {
+      "exact_name": "调整分录汇总K10-3",
+      "type": "adjustment",
+      "code": "K10-3"
+    },
+    {
+      "exact_name": "政府补助核对表K10-4",
+      "type": "check",
+      "code": "K10-4"
+    },
+    {
+      "exact_name": "应收政府补助检查表K10-5",
+      "type": "check",
+      "code": "K10-5"
+    },
+    {
+      "exact_name": "其他收益检查表K10-6",
+      "type": "check",
+      "code": "K10-6"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "K10-1.total",
+      "to": "tb://6117#审定数",
+      "description": "审定表合计 = 试算表其他收益审定数"
+    },
+    {
+      "from": "K10-2.合计",
+      "to": "K10-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "K10-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他收益审定数"
+    },
+    {
+      "code": "K10-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "K10-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "K10-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

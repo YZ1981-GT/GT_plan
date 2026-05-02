@@ -1,0 +1,109 @@
+{
+  "wp_code": "J2",
+  "name": "长期应付职工薪酬",
+  "version": "2025-R1",
+  "account_codes": [
+    "2211"
+  ],
+  "source_files": [
+    {
+      "file": "长期应付职工薪酬-设定受益计划净资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "长期应付职工薪酬实质性程序表 J2A",
+        "长期应付职工薪酬实质性程序表 L2A",
+        "审定表J2-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表J2-2",
+        "调整分录汇总表J2-3",
+        "计提情况检查表J2-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "长期应付职工薪酬实质性程序表 J2A",
+      "type": "procedure",
+      "code": "J2"
+    },
+    {
+      "exact_name": "长期应付职工薪酬实质性程序表 L2A",
+      "type": "procedure",
+      "code": "L2"
+    },
+    {
+      "exact_name": "审定表J2-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "J2-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国有企业）"
+    },
+    {
+      "exact_name": "明细表J2-2",
+      "type": "detail",
+      "code": "J2-2"
+    },
+    {
+      "exact_name": "调整分录汇总表J2-3",
+      "type": "adjustment",
+      "code": "J2-3"
+    },
+    {
+      "exact_name": "计提情况检查表J2-4",
+      "type": "check",
+      "code": "J2-4"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "J2-1.total",
+      "to": "tb://2211#审定数",
+      "description": "审定表合计 = 试算表长期应付职工薪酬审定数"
+    },
+    {
+      "from": "J2-2.合计",
+      "to": "J2-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "J2-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表长期应付职工薪酬审定数"
+    },
+    {
+      "code": "J2-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "J2-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "J2-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

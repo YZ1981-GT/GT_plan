@@ -1,0 +1,133 @@
+{
+  "wp_code": "I6",
+  "name": "研发费用",
+  "version": "2025-R1",
+  "account_codes": [
+    "6604"
+  ],
+  "source_files": [
+    {
+      "file": "研发费用.xlsx",
+      "sheets": [
+        "底稿目录",
+        "研发费用实质性程序 I6A",
+        "附注披露（上市公司）",
+        "附注披露（国有企业）",
+        "审定表I6-1",
+        "明细表I6-2",
+        "调整分录汇总I6-3",
+        "其他针对性检查表I6-4",
+        "截止性测试（账到单据）I6-5",
+        "截止性测试（单据到账）I6-6",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "研发费用实质性程序 I6A",
+      "type": "procedure",
+      "code": "I6"
+    },
+    {
+      "exact_name": "附注披露（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露（上市公司）"
+    },
+    {
+      "exact_name": "附注披露（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露（国有企业）"
+    },
+    {
+      "exact_name": "审定表I6-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "I6-1"
+    },
+    {
+      "exact_name": "明细表I6-2",
+      "type": "detail",
+      "code": "I6-2"
+    },
+    {
+      "exact_name": "调整分录汇总I6-3",
+      "type": "adjustment",
+      "code": "I6-3"
+    },
+    {
+      "exact_name": "其他针对性检查表I6-4",
+      "type": "check",
+      "code": "I6-4"
+    },
+    {
+      "exact_name": "截止性测试（账到单据）I6-5",
+      "type": "calculation",
+      "code": "I6-5"
+    },
+    {
+      "exact_name": "截止性测试（单据到账）I6-6",
+      "type": "calculation",
+      "code": "I6-6"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "I6-1.total",
+      "to": "tb://6604#审定数",
+      "description": "审定表合计 = 试算表研发费用审定数"
+    },
+    {
+      "from": "I6-2.合计",
+      "to": "I6-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "I6-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表研发费用审定数"
+    },
+    {
+      "code": "I6-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "I6-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "I6-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "I6-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "研发费用加计扣除计算正确"
+    },
+    {
+      "code": "I6-CHK-07",
+      "type": "analysis",
+      "severity": "info",
+      "description": "研发投入占比分析"
+    }
+  ]
+}

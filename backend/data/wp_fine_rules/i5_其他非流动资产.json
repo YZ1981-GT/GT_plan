@@ -1,0 +1,109 @@
+{
+  "wp_code": "I5",
+  "name": "其他非流动资产",
+  "version": "2025-R1",
+  "account_codes": [
+    "1901"
+  ],
+  "source_files": [
+    {
+      "file": "其他非流动资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "其他非流动资产实质性程序 I5A",
+        "审定表I5-1",
+        "附注披露（上市公司）",
+        "附注披露（国有企业）",
+        "明细表I5-2",
+        "调整分录汇总I5-3",
+        "针对性检查表I5-4",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "其他非流动资产实质性程序 I5A",
+      "type": "procedure",
+      "code": "I5"
+    },
+    {
+      "exact_name": "审定表I5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "I5-1"
+    },
+    {
+      "exact_name": "附注披露（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露（上市公司）"
+    },
+    {
+      "exact_name": "附注披露（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露（国有企业）"
+    },
+    {
+      "exact_name": "明细表I5-2",
+      "type": "detail",
+      "code": "I5-2"
+    },
+    {
+      "exact_name": "调整分录汇总I5-3",
+      "type": "adjustment",
+      "code": "I5-3"
+    },
+    {
+      "exact_name": "针对性检查表I5-4",
+      "type": "check",
+      "code": "I5-4"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "I5-1.total",
+      "to": "tb://1901#审定数",
+      "description": "审定表合计 = 试算表其他非流动资产审定数"
+    },
+    {
+      "from": "I5-2.合计",
+      "to": "I5-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "I5-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他非流动资产审定数"
+    },
+    {
+      "code": "I5-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "I5-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "I5-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

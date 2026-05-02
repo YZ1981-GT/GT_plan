@@ -1,0 +1,103 @@
+{
+  "wp_code": "L7",
+  "name": "其他非流动负债",
+  "version": "2025-R1",
+  "account_codes": [
+    "2901"
+  ],
+  "source_files": [
+    {
+      "file": "其他非流动负债.xlsx",
+      "sheets": [
+        "底稿目录",
+        "其他非流动负债实质性程序表L7A",
+        "审定表L7-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息(国企)",
+        "明细表L7-2",
+        "调整分录汇总L7-3",
+        "其他非流动负债检查表L7-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "其他非流动负债实质性程序表L7A",
+      "type": "procedure",
+      "code": "L7"
+    },
+    {
+      "exact_name": "审定表L7-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "L7-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息(国企)",
+      "type": "note_disclosure",
+      "code": "附注披露信息(国企)"
+    },
+    {
+      "exact_name": "明细表L7-2",
+      "type": "detail",
+      "code": "L7-2"
+    },
+    {
+      "exact_name": "调整分录汇总L7-3",
+      "type": "adjustment",
+      "code": "L7-3"
+    },
+    {
+      "exact_name": "其他非流动负债检查表L7-4",
+      "type": "check",
+      "code": "L7-4"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "L7-1.total",
+      "to": "tb://2901#审定数",
+      "description": "审定表合计 = 试算表其他非流动负债审定数"
+    },
+    {
+      "from": "L7-2.合计",
+      "to": "L7-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "L7-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他非流动负债审定数"
+    },
+    {
+      "code": "L7-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "L7-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "L7-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

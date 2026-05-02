@@ -1,0 +1,120 @@
+{
+  "wp_code": "M9",
+  "name": "其他综合收益",
+  "version": "2025-R1",
+  "account_codes": [
+    "3102"
+  ],
+  "source_files": [
+    {
+      "file": "其他综合收益.xlsx",
+      "sheets": [
+        "底稿目录",
+        "其他综合收益实质性程序表 M9A",
+        "审定表M9-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表M9-2",
+        "调整分录汇总M9-3",
+        "其他综合收益核对表M9-4",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "其他综合收益实质性程序表 M9A",
+      "type": "procedure",
+      "code": "M9"
+    },
+    {
+      "exact_name": "审定表M9-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "M9-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国有企业）"
+    },
+    {
+      "exact_name": "明细表M9-2",
+      "type": "detail",
+      "code": "M9-2"
+    },
+    {
+      "exact_name": "调整分录汇总M9-3",
+      "type": "adjustment",
+      "code": "M9-3"
+    },
+    {
+      "exact_name": "其他综合收益核对表M9-4",
+      "type": "check",
+      "code": "M9-4"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "M9-1.total",
+      "to": "tb://3102#审定数",
+      "description": "审定表合计 = 试算表其他综合收益审定数"
+    },
+    {
+      "from": "M9-2.合计",
+      "to": "M9-1.total",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "M9-1.total",
+      "to": "report://BS/BS-053#期末",
+      "description": "审定表合计 = 报表其他综合收益"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "M9-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他综合收益审定数"
+    },
+    {
+      "code": "M9-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "M9-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "M9-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "M9-CHK-05",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他综合收益行"
+    }
+  ]
+}

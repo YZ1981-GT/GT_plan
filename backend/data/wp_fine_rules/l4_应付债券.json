@@ -1,0 +1,162 @@
+{
+  "wp_code": "L4",
+  "name": "应付债券",
+  "version": "2025-R1",
+  "account_codes": [
+    "2502"
+  ],
+  "source_files": [
+    {
+      "file": "应付债券.xlsx",
+      "sheets": [
+        "底稿目录",
+        "应付债券实质性程序表L4A ",
+        "审定表L4-1",
+        "附注披露信息核对（上市公司）",
+        "附注披露信息核对（国企）",
+        "应付债券明细表L4-2",
+        "划分为金融负债的其他金融工具明细表L4-3",
+        "调整分录汇总L4-4",
+        "权益与负债划分检查表L4-5",
+        "应付债券初始计量L4-6",
+        "应付债券后续计量(到期一次还本付息)L4-7",
+        "应付债券后续计量(分期付息到期一次还本)L4-7",
+        "应付债券账面核对(到期一次还本付息)L4-8",
+        "应付债券账面核对(分期付息到期一次还本) L4-8",
+        "应付债券检查表L4-9",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "应付债券实质性程序表L4A ",
+      "type": "procedure",
+      "code": "L4"
+    },
+    {
+      "exact_name": "审定表L4-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "L4-1"
+    },
+    {
+      "exact_name": "附注披露信息核对（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息核对（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息核对（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息核对（国企）"
+    },
+    {
+      "exact_name": "应付债券明细表L4-2",
+      "type": "detail",
+      "code": "L4-2"
+    },
+    {
+      "exact_name": "划分为金融负债的其他金融工具明细表L4-3",
+      "type": "detail",
+      "code": "L4-3"
+    },
+    {
+      "exact_name": "调整分录汇总L4-4",
+      "type": "adjustment",
+      "code": "L4-4"
+    },
+    {
+      "exact_name": "权益与负债划分检查表L4-5",
+      "type": "check",
+      "code": "L4-5"
+    },
+    {
+      "exact_name": "应付债券初始计量L4-6",
+      "type": "check",
+      "code": "L4-6"
+    },
+    {
+      "exact_name": "应付债券后续计量(到期一次还本付息)L4-7",
+      "type": "check",
+      "code": "L4-7"
+    },
+    {
+      "exact_name": "应付债券后续计量(分期付息到期一次还本)L4-7",
+      "type": "check",
+      "code": "L4-7"
+    },
+    {
+      "exact_name": "应付债券账面核对(到期一次还本付息)L4-8",
+      "type": "check",
+      "code": "L4-8"
+    },
+    {
+      "exact_name": "应付债券账面核对(分期付息到期一次还本) L4-8",
+      "type": "check",
+      "code": "L4-8"
+    },
+    {
+      "exact_name": "应付债券检查表L4-9",
+      "type": "check",
+      "code": "L4-9"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "L4-1.total",
+      "to": "tb://2502#审定数",
+      "description": "审定表合计 = 试算表应付债券审定数"
+    },
+    {
+      "from": "L4-2.合计",
+      "to": "L4-1.total",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "L4-1.total",
+      "to": "report://BS/BS-043#期末",
+      "description": "审定表合计 = 报表应付债券"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "L4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表应付债券审定数"
+    },
+    {
+      "code": "L4-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "L4-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "L4-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "L4-CHK-05",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表应付债券行"
+    }
+  ]
+}

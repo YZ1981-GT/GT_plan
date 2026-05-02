@@ -1,0 +1,198 @@
+{
+  "wp_code": "H8",
+  "name": "使用权资产",
+  "version": "2025-R1",
+  "account_codes": [
+    "1641"
+  ],
+  "source_files": [
+    {
+      "file": "使用权资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "使用权资产实质性程序表H8A",
+        "审定表H8-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表H8-2",
+        "调整分录汇总H8-3",
+        "租赁的识别H8-4",
+        "租赁期的确定H8-5",
+        "使用权资产 租赁负责初始及后续计量（按年）H8-6",
+        "使用权资产 租赁负责初始及后续计量（按月）H8-6",
+        "租赁变更H8-7",
+        "折旧测算表（不含减值）H8-8",
+        "折旧测算表（含减值）H8-8",
+        "折旧分配分析表H8-9",
+        "减值测算表H8-10",
+        "可收回金额测试表H8-11",
+        "减少检查表H8-12",
+        "简化处理的租赁检查表H8-13",
+        "关联交易检查表H8-14"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "使用权资产实质性程序表H8A",
+      "type": "procedure",
+      "code": "H8"
+    },
+    {
+      "exact_name": "审定表H8-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "H8-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表H8-2",
+      "type": "detail",
+      "code": "H8-2"
+    },
+    {
+      "exact_name": "调整分录汇总H8-3",
+      "type": "adjustment",
+      "code": "H8-3"
+    },
+    {
+      "exact_name": "租赁的识别H8-4",
+      "type": "check",
+      "code": "H8-4"
+    },
+    {
+      "exact_name": "租赁期的确定H8-5",
+      "type": "check",
+      "code": "H8-5"
+    },
+    {
+      "exact_name": "使用权资产 租赁负责初始及后续计量（按年）H8-6",
+      "type": "check",
+      "code": "H8-6"
+    },
+    {
+      "exact_name": "使用权资产 租赁负责初始及后续计量（按月）H8-6",
+      "type": "check",
+      "code": "H8-6"
+    },
+    {
+      "exact_name": "租赁变更H8-7",
+      "type": "check",
+      "code": "H8-7"
+    },
+    {
+      "exact_name": "折旧测算表（不含减值）H8-8",
+      "type": "calculation",
+      "code": "H8-8"
+    },
+    {
+      "exact_name": "折旧测算表（含减值）H8-8",
+      "type": "calculation",
+      "code": "H8-8"
+    },
+    {
+      "exact_name": "折旧分配分析表H8-9",
+      "type": "analysis",
+      "code": "H8-9"
+    },
+    {
+      "exact_name": "减值测算表H8-10",
+      "type": "calculation",
+      "code": "H8-10"
+    },
+    {
+      "exact_name": "可收回金额测试表H8-11",
+      "type": "calculation",
+      "code": "H8-11"
+    },
+    {
+      "exact_name": "减少检查表H8-12",
+      "type": "check",
+      "code": "H8-12"
+    },
+    {
+      "exact_name": "简化处理的租赁检查表H8-13",
+      "type": "check",
+      "code": "H8-13"
+    },
+    {
+      "exact_name": "关联交易检查表H8-14",
+      "type": "check",
+      "code": "H8-14"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "H8-1.total",
+      "to": "tb://1641#审定数",
+      "description": "审定表合计 = 试算表使用权资产审定数"
+    },
+    {
+      "from": "H8-2.合计",
+      "to": "H8-1.total",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "H8-1.total",
+      "to": "report://BS/BS-019#期末",
+      "description": "审定表合计 = 报表使用权资产"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "H8-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表使用权资产审定数"
+    },
+    {
+      "code": "H8-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "H8-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "H8-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "H8-CHK-05",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表使用权资产行"
+    },
+    {
+      "code": "H8-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "租赁合同条款已检查"
+    },
+    {
+      "code": "H8-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "折现率/租赁期判断合理"
+    }
+  ]
+}

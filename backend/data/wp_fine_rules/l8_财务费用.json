@@ -1,0 +1,127 @@
+{
+  "wp_code": "L8",
+  "name": "财务费用",
+  "version": "2025-R1",
+  "account_codes": [
+    "6603"
+  ],
+  "source_files": [
+    {
+      "file": "财务费用.xlsx",
+      "sheets": [
+        "底稿目录",
+        "实质性程序表L8A",
+        "审定表L8-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表L8-2",
+        "调整分录汇总L8-3",
+        "非金融机构利息支出测算表L8-4",
+        "截止性测试L8-5",
+        "财务费用检查表L8-6"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "实质性程序表L8A",
+      "type": "procedure",
+      "code": "L8"
+    },
+    {
+      "exact_name": "审定表L8-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "L8-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表L8-2",
+      "type": "detail",
+      "code": "L8-2"
+    },
+    {
+      "exact_name": "调整分录汇总L8-3",
+      "type": "adjustment",
+      "code": "L8-3"
+    },
+    {
+      "exact_name": "非金融机构利息支出测算表L8-4",
+      "type": "calculation",
+      "code": "L8-4"
+    },
+    {
+      "exact_name": "截止性测试L8-5",
+      "type": "calculation",
+      "code": "L8-5"
+    },
+    {
+      "exact_name": "财务费用检查表L8-6",
+      "type": "check",
+      "code": "L8-6"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "L8-1.total",
+      "to": "tb://6603#审定数",
+      "description": "审定表合计 = 试算表财务费用审定数"
+    },
+    {
+      "from": "L8-2.合计",
+      "to": "L8-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "L8-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表财务费用审定数"
+    },
+    {
+      "code": "L8-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "L8-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "L8-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    },
+    {
+      "code": "L8-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "利息费用测算正确"
+    },
+    {
+      "code": "L8-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "利息资本化金额正确"
+    }
+  ]
+}

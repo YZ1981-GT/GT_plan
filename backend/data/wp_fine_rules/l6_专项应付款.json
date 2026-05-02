@@ -1,0 +1,109 @@
+{
+  "wp_code": "L6",
+  "name": "专项应付款",
+  "version": "2025-R1",
+  "account_codes": [
+    "2711"
+  ],
+  "source_files": [
+    {
+      "file": "专项应付款.xlsx",
+      "sheets": [
+        "底稿目录",
+        "专项应付款实质性程序表L6A",
+        "审定表L6-1",
+        "附注披露（上市公司）信息",
+        "附注披露（国企）信息",
+        "明细表L6-2",
+        "调整分录汇总L6-3",
+        "检查表L6-4",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "专项应付款实质性程序表L6A",
+      "type": "procedure",
+      "code": "L6"
+    },
+    {
+      "exact_name": "审定表L6-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "L6-1"
+    },
+    {
+      "exact_name": "附注披露（上市公司）信息",
+      "type": "note_disclosure",
+      "code": "附注披露（上市公司）信息"
+    },
+    {
+      "exact_name": "附注披露（国企）信息",
+      "type": "note_disclosure",
+      "code": "附注披露（国企）信息"
+    },
+    {
+      "exact_name": "明细表L6-2",
+      "type": "detail",
+      "code": "L6-2"
+    },
+    {
+      "exact_name": "调整分录汇总L6-3",
+      "type": "adjustment",
+      "code": "L6-3"
+    },
+    {
+      "exact_name": "检查表L6-4",
+      "type": "check",
+      "code": "L6-4"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "L6-1.total",
+      "to": "tb://2711#审定数",
+      "description": "审定表合计 = 试算表专项应付款审定数"
+    },
+    {
+      "from": "L6-2.合计",
+      "to": "L6-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "L6-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表专项应付款审定数"
+    },
+    {
+      "code": "L6-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "L6-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "L6-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

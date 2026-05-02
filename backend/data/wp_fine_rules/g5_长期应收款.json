@@ -1,0 +1,151 @@
+{
+  "wp_code": "G5",
+  "name": "长期应收款",
+  "version": "2025-R1",
+  "account_codes": [
+    "1531"
+  ],
+  "source_files": [
+    {
+      "file": "长期应收款.xlsx",
+      "sheets": [
+        "底稿目录",
+        "长期应收款实质性程序表G5A",
+        "审定表G5-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "余额明细表G5-2",
+        "坏账准备明细表G5-3",
+        "调整分录汇总G5-4",
+        "未实现融资收益测算表（租赁）G5-5",
+        "未实现融资收益测算表（销售）G5-6",
+        "长期应收款保理核查表G5-7",
+        "信用减值损失会计政策检查G5-8",
+        "长期应收款三阶段划分G5-9",
+        "长期应收款坏账准备测算G5-10",
+        "减值准备转回（收回）、核销检查表G5-11",
+        "凭证检查表G5-12"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "长期应收款实质性程序表G5A",
+      "type": "procedure",
+      "code": "G5"
+    },
+    {
+      "exact_name": "审定表G5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "G5-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "余额明细表G5-2",
+      "type": "detail",
+      "code": "G5-2"
+    },
+    {
+      "exact_name": "坏账准备明细表G5-3",
+      "type": "detail",
+      "code": "G5-3"
+    },
+    {
+      "exact_name": "调整分录汇总G5-4",
+      "type": "adjustment",
+      "code": "G5-4"
+    },
+    {
+      "exact_name": "未实现融资收益测算表（租赁）G5-5",
+      "type": "calculation",
+      "code": "G5-5"
+    },
+    {
+      "exact_name": "未实现融资收益测算表（销售）G5-6",
+      "type": "calculation",
+      "code": "G5-6"
+    },
+    {
+      "exact_name": "长期应收款保理核查表G5-7",
+      "type": "check",
+      "code": "G5-7"
+    },
+    {
+      "exact_name": "信用减值损失会计政策检查G5-8",
+      "type": "check",
+      "code": "G5-8"
+    },
+    {
+      "exact_name": "长期应收款三阶段划分G5-9",
+      "type": "check",
+      "code": "G5-9"
+    },
+    {
+      "exact_name": "长期应收款坏账准备测算G5-10",
+      "type": "calculation",
+      "code": "G5-10"
+    },
+    {
+      "exact_name": "减值准备转回（收回）、核销检查表G5-11",
+      "type": "check",
+      "code": "G5-11"
+    },
+    {
+      "exact_name": "凭证检查表G5-12",
+      "type": "check",
+      "code": "G5-12"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G5-1.total",
+      "to": "tb://1531#审定数",
+      "description": "审定表合计 = 试算表长期应收款审定数"
+    },
+    {
+      "from": "G5-2.合计",
+      "to": "G5-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G5-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表长期应收款审定数"
+    },
+    {
+      "code": "G5-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G5-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G5-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

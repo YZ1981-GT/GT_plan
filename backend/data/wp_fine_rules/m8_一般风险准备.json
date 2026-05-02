@@ -1,0 +1,121 @@
+{
+  "wp_code": "M8",
+  "name": "一般风险准备",
+  "version": "2025-R1",
+  "account_codes": [
+    "4103"
+  ],
+  "source_files": [
+    {
+      "file": "一般风险准备.xlsx",
+      "sheets": [
+        "底稿目录",
+        "一般风险准备实质性程序表 M8A ",
+        "一般风险准备实质性程序表 Q8A  (修订前)",
+        "审定表M8-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表M8-2",
+        "调整分录汇总M8-3",
+        "一般风险准备测试表M8-4",
+        "针对性测试M8-5-删除",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "一般风险准备实质性程序表 M8A ",
+      "type": "procedure",
+      "code": "M8"
+    },
+    {
+      "exact_name": "一般风险准备实质性程序表 Q8A  (修订前)",
+      "type": "procedure",
+      "code": "Q8"
+    },
+    {
+      "exact_name": "审定表M8-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "code": "M8-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国有企业）"
+    },
+    {
+      "exact_name": "明细表M8-2",
+      "type": "detail",
+      "code": "M8-2"
+    },
+    {
+      "exact_name": "调整分录汇总M8-3",
+      "type": "adjustment",
+      "code": "M8-3"
+    },
+    {
+      "exact_name": "一般风险准备测试表M8-4",
+      "type": "calculation",
+      "code": "M8-4"
+    },
+    {
+      "exact_name": "针对性测试M8-5-删除",
+      "type": "calculation",
+      "code": "M8-5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "M8-1.total",
+      "to": "tb://4103#审定数",
+      "description": "审定表合计 = 试算表一般风险准备审定数"
+    },
+    {
+      "from": "M8-2.合计",
+      "to": "M8-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "M8-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表一般风险准备审定数"
+    },
+    {
+      "code": "M8-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "M8-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "M8-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}
