@@ -173,9 +173,29 @@
                   <el-button @click="editor.chain().focus().undo().run()">撤销</el-button>
                   <el-button @click="editor.chain().focus().redo().run()">重做</el-button>
                 </el-button-group>
+                <span class="gt-de-toolbar-divider"></span>
+                <el-button-group size="small">
+                  <el-button @click="onAiContinueWrite" :loading="aiLoading" title="AI续写：在光标位置续写内容">✨ 续写</el-button>
+                  <el-button @click="onAiRewriteOpen" :loading="aiLoading" title="AI改写：选中文本后点击改写">✏️ 改写</el-button>
+                  <el-button @click="onAiGeneratePolicy" :loading="aiLoading" title="生成标准会计政策文本">📋 生成政策</el-button>
+                  <el-button @click="onAiGenerateAnalysis" :loading="aiLoading" title="生成变动分析说明">📊 变动分析</el-button>
+                </el-button-group>
               </div>
               <editor-content :editor="editor" class="gt-de-tiptap-content" />
             </div>
+
+            <!-- AI改写弹窗 -->
+            <el-dialog v-model="aiRewriteDialogVisible" title="AI 改写" width="520px" append-to-body>
+              <div style="margin-bottom: 12px;">
+                <div style="font-size: 12px; color: #999; margin-bottom: 6px;">选中的文本：</div>
+                <div style="background: #f9f7fd; padding: 10px; border-radius: 6px; font-size: 13px; line-height: 1.6; max-height: 120px; overflow-y: auto;">{{ aiSelectedText }}</div>
+              </div>
+              <el-input v-model="aiRewriteInstruction" type="textarea" :rows="2" placeholder="改写指令，如：使其更加专业规范 / 简化表述 / 补充细节" />
+              <template #footer>
+                <el-button @click="aiRewriteDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="onAiRewriteConfirm" :loading="aiLoading">确认改写</el-button>
+              </template>
+            </el-dialog>
 
             <div class="gt-de-editor-footer">
               <el-button v-if="!editMode" @click="editMode = true">编辑</el-button>
@@ -285,7 +305,7 @@ import { ElMessage } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
-import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
+import { refreshDisclosureFromWorkpapers, getProjectWizardState, noteAiRewrite, noteAiContinueWrite, noteAiGeneratePolicy, noteAiGenerateAnalysis } from '@/services/commonApi'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -396,6 +416,115 @@ const editor = useEditor({
 })
 
 onBeforeUnmount(() => { editor.value?.destroy() })
+
+// ── LLM 辅助状态 ──
+const aiLoading = ref(false)
+const aiRewriteDialogVisible = ref(false)
+const aiRewriteInstruction = ref('请改写以下文本，使其更加专业规范')
+const aiSelectedText = ref('')
+
+function getSelectedText(): string {
+  if (!editor.value) return ''
+  const { from, to } = editor.value.state.selection
+  if (from === to) return ''
+  return editor.value.state.doc.textBetween(from, to, ' ')
+}
+
+function getFullText(): string {
+  return editor.value?.getText() || ''
+}
+
+async function onAiContinueWrite() {
+  const text = getFullText()
+  if (!text.trim()) { ElMessage.warning('请先输入一些内容再续写'); return }
+  aiLoading.value = true
+  try {
+    const res = await noteAiContinueWrite(projectId.value, {
+      text,
+      section_number: currentNote.value?.note_section || '',
+      year: year.value,
+    })
+    if (res.error) { ElMessage.warning(res.error); return }
+    if (res.appended) {
+      editor.value?.commands.insertContent(res.appended)
+      ElMessage.success('续写完成')
+    }
+  } catch (e: any) {
+    ElMessage.error('续写失败: ' + (e.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function onAiRewriteOpen() {
+  const sel = getSelectedText()
+  if (!sel.trim()) { ElMessage.warning('请先选中要改写的文本'); return }
+  aiSelectedText.value = sel
+  aiRewriteInstruction.value = '请改写以下文本，使其更加专业规范'
+  aiRewriteDialogVisible.value = true
+}
+
+async function onAiRewriteConfirm() {
+  if (!aiSelectedText.value.trim()) return
+  aiLoading.value = true
+  try {
+    const res = await noteAiRewrite(projectId.value, {
+      text: aiSelectedText.value,
+      instruction: aiRewriteInstruction.value,
+      section_number: currentNote.value?.note_section || '',
+      year: year.value,
+    })
+    if (res.error) { ElMessage.warning(res.error); return }
+    if (res.rewritten && res.rewritten !== res.original) {
+      // 替换选中文本
+      const { from, to } = editor.value!.state.selection
+      editor.value!.chain().focus().deleteRange({ from, to }).insertContent(res.rewritten).run()
+      ElMessage.success('改写完成')
+    }
+  } catch (e: any) {
+    ElMessage.error('改写失败: ' + (e.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+    aiRewriteDialogVisible.value = false
+  }
+}
+
+async function onAiGeneratePolicy() {
+  aiLoading.value = true
+  try {
+    const res = await noteAiGeneratePolicy(projectId.value, {
+      section_number: currentNote.value?.note_section || '',
+      template_type: templateType.value || 'soe',
+      year: year.value,
+    })
+    if (res.generated_text) {
+      editor.value?.commands.setContent(res.generated_text)
+      ElMessage.success(`会计政策已生成（参照${res.reference_count}篇文档）`)
+    }
+  } catch (e: any) {
+    ElMessage.error('生成失败: ' + (e.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+async function onAiGenerateAnalysis() {
+  aiLoading.value = true
+  try {
+    const res = await noteAiGenerateAnalysis(projectId.value, {
+      section_number: currentNote.value?.note_section || '',
+      year: year.value,
+    })
+    if (res.generated_text) {
+      editor.value?.commands.insertContent('\n\n' + res.generated_text)
+      ElMessage.success('变动分析已生成')
+    }
+  } catch (e: any) {
+    ElMessage.error('生成失败: ' + (e.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
+}
 interface TreeNode { id: string; label: string; data?: any; children?: TreeNode[]; isGroup?: boolean }
 
 const treeSearch = ref('')
@@ -1147,7 +1276,8 @@ onMounted(async () => {
 
 /* ── TipTap ── */
 .gt-de-tiptap-wrapper { border: 1px solid #e8e4f0; border-radius: 6px; margin-top: 10px; }
-.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid #e8e4f0; background: #faf8fd; border-radius: 6px 6px 0 0; }
+.gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid #e8e4f0; background: #faf8fd; border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.gt-de-toolbar-divider { width: 1px; height: 20px; background: #d8d0e8; margin: 0 6px; }
 .gt-de-tiptap-content { padding: 12px; min-height: 200px; font-size: 13px; line-height: 1.8; }
 .gt-de-tiptap-content :deep(.ProseMirror) { outline: none; min-height: 180px; }
 .gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }

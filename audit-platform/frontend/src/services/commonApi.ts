@@ -105,6 +105,41 @@ export async function refreshDisclosureFromWorkpapers(projectId: string, year: n
   await http.post(`/api/disclosure-notes/${projectId}/${year}/refresh-from-workpapers`)
 }
 
+// ── 附注 LLM 辅助 ──
+
+export async function noteAiGeneratePolicy(projectId: string, params: {
+  section_number: string; template_type?: string; industry?: string; year?: number
+}): Promise<{ generated_text: string; reference_count: number }> {
+  const { data } = await http.post(`/api/disclosure-notes/${projectId}/ai/generate-policy`, params)
+  return data
+}
+
+export async function noteAiGenerateAnalysis(projectId: string, params: {
+  section_number: string; current_data?: Record<string, any>; prior_data?: Record<string, any>; year?: number
+}): Promise<{ generated_text: string; reference_count: number }> {
+  const { data } = await http.post(`/api/disclosure-notes/${projectId}/ai/generate-analysis`, params)
+  return data
+}
+
+export async function noteAiRewrite(projectId: string, params: {
+  text: string; instruction?: string; section_number?: string; year?: number
+}): Promise<{ original: string; rewritten: string; error?: string }> {
+  const { data } = await http.post(`/api/disclosure-notes/${projectId}/ai/rewrite`, params)
+  return data
+}
+
+export async function noteAiContinueWrite(projectId: string, params: {
+  text: string; section_number?: string; year?: number
+}): Promise<{ result: string; appended: string; error?: string }> {
+  const { data } = await http.post(`/api/disclosure-notes/${projectId}/ai/complete`, params)
+  return data
+}
+
+export async function noteAiCheckCompleteness(projectId: string): Promise<{ suggestions: string[] }> {
+  const { data } = await http.post(`/api/disclosure-notes/${projectId}/ai/check-completeness`)
+  return data
+}
+
 // ── 期后事项 ──
 
 export async function listSubsequentEvents(projectId: string): Promise<any[]> {

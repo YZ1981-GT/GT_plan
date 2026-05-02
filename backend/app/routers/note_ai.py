@@ -21,12 +21,29 @@ class PolicyGenerateRequest(BaseModel):
     section_number: str
     template_type: str = "soe"
     industry: str | None = None
+    year: int = 2025
 
 
 class AnalysisGenerateRequest(BaseModel):
     section_number: str
     current_data: dict | None = None
     prior_data: dict | None = None
+    year: int = 2025
+
+
+class RewriteRequest(BaseModel):
+    """改写请求"""
+    text: str
+    instruction: str = "请改写以下文本，使其更加专业规范"
+    section_number: str = ""
+    year: int = 2025
+
+
+class ContinueWriteRequest(BaseModel):
+    """续写请求"""
+    text: str
+    section_number: str = ""
+    year: int = 2025
 
 
 @router.post("/{project_id}/ai/generate-policy")
@@ -42,7 +59,7 @@ async def generate_policy(
 
     # RAG: 加载上年同章节附注作为参照
     context_docs = await ReferenceDocService.load_context(
-        db, project_id, data.year or 2025,
+        db, project_id, data.year,
         source_type="prior_year_notes",
         section_hint=data.section_number,
     )
@@ -74,7 +91,7 @@ async def generate_analysis(
     from app.services.reference_doc_service import ReferenceDocService
 
     context_docs = await ReferenceDocService.load_context(
-        db, project_id, data.year or 2025,
+        db, project_id, data.year,
         source_type="prior_year_notes",
         section_hint=data.section_number,
     )
@@ -154,3 +171,57 @@ async def ai_complete(
         return {"suggestions": [current_text + text], "reference_count": len(context_docs)}
     except Exception:
         return {"suggestions": [current_text + "...（LLM 服务暂不可用）"], "reference_count": 0}
+
+
+@router.post("/{project_id}/ai/complete")
+async def ai_complete(
+    project_id: UUID,
+    data: ContinueWriteRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """智能续写（POST body，接入 vLLM + RAG）"""
+    from app.services.llm_client import chat_completion
+    from app.services.reference_doc_service import ReferenceDocService
+
+    context_docs = await ReferenceDocService.load_context(
+        db, project_id, data.year,
+        source_type="prior_year_notes",
+        section_hint=data.section_number,
+    )
+
+    try:
+        text = await chat_completion([
+            {"role": "system", "content": "你是审计附注编写助手。请续写以下文本，保持专业风格，语言简洁。参考上年附注的表述风格。只输出续写部分，不要重复已有内容。"},
+            {"role": "user", "content": f"请续写以下内容：\n\n{data.text}"},
+        ], max_tokens=500, context_documents=context_docs if context_docs else None)
+        return {"result": data.text + text, "appended": text, "reference_count": len(context_docs)}
+    except Exception:
+        return {"result": data.text, "appended": "", "error": "LLM 服务暂不可用", "reference_count": 0}
+
+
+@router.post("/{project_id}/ai/rewrite")
+async def ai_rewrite(
+    project_id: UUID,
+    data: RewriteRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """改写选中文本（接入 vLLM + RAG）"""
+    from app.services.llm_client import chat_completion
+    from app.services.reference_doc_service import ReferenceDocService
+
+    context_docs = await ReferenceDocService.load_context(
+        db, project_id, data.year,
+        source_type="prior_year_notes",
+        section_hint=data.section_number,
+    )
+
+    try:
+        text = await chat_completion([
+            {"role": "system", "content": "你是审计附注编写专家。请按照用户指令改写文本，保持专业审计语言风格，符合中国企业会计准则表述规范。只输出改写后的文本，不要解释。"},
+            {"role": "user", "content": f"指令：{data.instruction}\n\n原文：\n{data.text}"},
+        ], max_tokens=1000, context_documents=context_docs if context_docs else None)
+        return {"original": data.text, "rewritten": text, "reference_count": len(context_docs)}
+    except Exception:
+        return {"original": data.text, "rewritten": data.text, "error": "LLM 服务暂不可用", "reference_count": 0}

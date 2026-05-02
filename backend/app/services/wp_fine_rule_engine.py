@@ -46,7 +46,7 @@ def list_fine_rules() -> list[dict]:
             rules.append({
                 "wp_code": rule.get("wp_code"),
                 "name": rule.get("name"),
-                "sheets": len(rule.get("sheets", [])),
+                "sheets": len(rule.get("sheet_rules", rule.get("sheets", []))),
                 "checks": len(rule.get("audit_checks", [])),
                 "cross_refs": len(rule.get("cross_references", [])),
                 "file": fp.name,

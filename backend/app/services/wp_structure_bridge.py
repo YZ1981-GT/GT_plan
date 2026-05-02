@@ -185,11 +185,13 @@ def _auto_bind_formulas(
     account_codes = wp_mapping.get("account_codes", []) if wp_mapping else []
     primary_account = account_codes[0] if account_codes else ""
 
-    sheets = rule.get("sheets", [])
+    sheets = rule.get("sheet_rules", rule.get("sheets", []))
     summary_sheets = [s for s in sheets if s.get("type") == "summary"]
 
     for sheet_rule in summary_sheets:
         columns = sheet_rule.get("columns", {})
+        if not columns and "layout" in sheet_rule:
+            columns = sheet_rule["layout"].get("columns", {})
         if not columns:
             continue
 
