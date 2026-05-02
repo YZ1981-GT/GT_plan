@@ -171,10 +171,8 @@
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
     <el-table v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="rows" v-loading="loading" style="width: 100%"
-      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight"
-      :header-cell-style="{ background: '#f8f6fb', color: '#333', fontWeight: 600, fontSize: '12px', padding: '5px 0' }"
-      :cell-style="{ fontSize: '12px' }">
-      <el-table-column label="序号" width="100" align="center" :resizable="true">
+      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight">
+      <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
           <span style="color: #999;">{{ $index + 1 }}</span>
         </template>
@@ -182,7 +180,7 @@
       <el-table-column label="项目" min-width="300" :resizable="true">
         <template #default="{ row }">
           <span :class="{ 'gt-rv-category': !row.current_period_amount && !row.is_total_row && (row.indent_level || 0) === 0 }"
-                :style="{ paddingLeft: (row.indent_level || 0) * 20 + 'px', fontWeight: row.is_total_row ? 700 : 400 }">
+                :style="{ paddingLeft: (row.indent_level || 0) * 18 + 'px', fontWeight: row.is_total_row ? 700 : 400, fontSize: '13px' }">
             {{ row.row_name }}
             <el-button v-if="getNoteSection(row.row_code)" size="small" text type="primary"
               style="font-size:10px;padding:0 2px;margin-left:4px" title="查看附注"
@@ -206,17 +204,15 @@
 
     <!-- 报表表格 — 对比视图（非权益变动表） -->
     <el-table v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="compareRows" v-loading="loading" style="width: 100%"
-      :row-class-name="compareRowClassName" border size="small" :max-height="tableMaxHeight"
-      :header-cell-style="{ background: '#f8f6fb', color: '#333', fontWeight: 600, fontSize: '12px', padding: '5px 0' }"
-      :cell-style="{ fontSize: '12px' }">
-      <el-table-column label="序号" width="100" align="center" :resizable="true">
+      :row-class-name="compareRowClassName" border size="small" :max-height="tableMaxHeight">
+      <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
           <span style="color: #999;">{{ $index + 1 }}</span>
         </template>
       </el-table-column>
       <el-table-column label="项目" min-width="250" :resizable="true">
         <template #default="{ row }">
-          <span :style="{ paddingLeft: (row.indent_level || 0) * 20 + 'px', fontWeight: row.is_total_row ? 700 : 400 }">{{ row.row_name }}</span>
+          <span :style="{ paddingLeft: (row.indent_level || 0) * 18 + 'px', fontWeight: row.is_total_row ? 700 : 400, fontSize: '13px' }">{{ row.row_name }}</span>
         </template>
       </el-table-column>
       <el-table-column label="未审金额" min-width="130" align="right" header-align="center" :resizable="true">
@@ -295,16 +291,15 @@
         <el-tabs v-model="mappingTab" type="card" size="small">
           <el-tab-pane v-for="rt in mappingReportTypes" :key="rt.key" :label="rt.label" :name="rt.key" />
         </el-tabs>
-        <el-table :data="currentMappingRules" border size="small" max-height="420" style="width: 100%"
-          :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }">
+        <el-table :data="currentMappingRules" border size="small" max-height="420" style="width: 100%">
           <el-table-column label="国企版项目" min-width="200">
             <template #default="{ row }">
-              <span style="font-size: 12px;">{{ row.soe_row_name }}</span>
+              <span>{{ row.soe_row_name }}</span>
             </template>
           </el-table-column>
           <el-table-column label="编码" width="80" align="center">
             <template #default="{ row }">
-              <span style="color: #aaa; font-size: 10px;">{{ row.soe_row_code }}</span>
+              <span style="color: #aaa; font-size: 11px;">{{ row.soe_row_code }}</span>
             </template>
           </el-table-column>
           <el-table-column label="→" width="30" align="center">
@@ -371,8 +366,7 @@
         <!-- 逐条审核明细 -->
         <el-table :data="filteredAuditChecks" border size="small" style="width: 100%;"
           max-height="calc(100vh - 300px)"
-          :row-class-name="({ row }: any) => row.passed ? '' : 'gt-rv-audit-fail-row'"
-          :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }">
+          :row-class-name="({ row }: any) => row.passed ? '' : 'gt-rv-audit-fail-row'">
           <el-table-column label="结果" width="80" align="center">
             <template #default="{ row }">
               <span v-if="row.passed" style="color: #1e8a38; font-size: 16px;">✓</span>
@@ -381,17 +375,17 @@
           </el-table-column>
           <el-table-column label="审核项目" min-width="200">
             <template #default="{ row }">
-              <span style="font-size: 12px; font-weight: 200;">{{ row.name }}</span>
+              <span style="font-weight: 500;">{{ row.name }}</span>
             </template>
           </el-table-column>
           <el-table-column label="期望值" width="120" align="right">
             <template #default="{ row }">
-              <span style="font-size: 12px; font-family: 'Arial Narrow', Arial, sans-serif;">{{ fmtAmt(row.expected) }}</span>
+              <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.expected) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="实际值" width="120" align="right">
             <template #default="{ row }">
-              <span style="font-size: 12px; font-family: 'Arial Narrow', Arial, sans-serif;">{{ fmtAmt(row.actual) }}</span>
+              <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.actual) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="差额" width="110" align="right">
@@ -1269,6 +1263,26 @@ watch(
 :deep(.el-table .el-table__cell .cell) {
   padding: 0 8px;
 }
+/* ═══ 报表表格统一样式 ═══ */
+
+/* 表头统一 */
+:deep(.el-table th.el-table__cell) {
+  background: #f8f6fb !important;
+  color: #333;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 6px 0;
+  white-space: nowrap;
+}
+
+/* 数据行统一 */
+:deep(.el-table td.el-table__cell) {
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* 序号列 */
 :deep(.el-table__column--index .cell) {
   color: #bbb;
   font-size: 11px;
@@ -1278,7 +1292,17 @@ watch(
 .gt-rv-category {
   color: var(--gt-color-primary);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13px;
+}
+
+/* 金额单元格 — 统一数字字体 */
+.gt-rv-amount-cell,
+.gt-rv-amount-cell-readonly,
+.gt-rv-adjustment {
+  font-variant-numeric: tabular-nums;
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  font-size: 13px;
+  padding: 2px 8px;
 }
 
 /* 金额单元格 — 可点击穿透 */
@@ -1286,11 +1310,7 @@ watch(
   cursor: pointer;
   color: #333;
   font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  font-family: 'Arial Narrow', Arial, sans-serif;
-  font-size: 12px;
   transition: all 0.15s ease;
-  padding: 2px 8px;
   border-radius: var(--gt-radius-sm);
 }
 .gt-rv-amount-cell:hover {
@@ -1300,20 +1320,12 @@ watch(
 
 /* 金额单元格 — 只读 */
 .gt-rv-amount-cell-readonly {
-  color: #666;
-  font-variant-numeric: tabular-nums;
-  font-family: 'Arial Narrow', Arial, sans-serif;
-  font-size: 12px;
-  padding: 2px 8px;
+  color: #555;
 }
 
 /* 调整影响列 */
 .gt-rv-adjustment {
   color: #999;
-  font-variant-numeric: tabular-nums;
-  font-family: 'Arial Narrow', Arial, sans-serif;
-  font-size: 12px;
-  padding: 2px 8px;
 }
 .gt-rv-adjustment.has-diff {
   color: #d94840;
@@ -1326,12 +1338,14 @@ watch(
   font-weight: 700;
 }
 :deep(.total-row td) {
-  border-top: 2px solid #d8d0e8 !important;
-  border-bottom: 2px solid #d8d0e8 !important;
+  border-top: 1.5px solid #d8d0e8 !important;
 }
 
 /* 对比视图差异行 */
 :deep(.diff-row) { background: #fffbf5 !important; }
+
+/* 审核失败行 */
+:deep(.gt-rv-audit-fail-row) { background: #fef5f5 !important; }
 
 /* 一致性校验 */
 .gt-rv-check-item {
@@ -1393,21 +1407,21 @@ watch(
   background: #ede8f5 !important;
   color: #5c3d8f !important;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
 }
 .gt-rv-eq-hr3 th {
   top: 58px;
   background: #f3eff8 !important;
   color: #4b2d77 !important;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
 }
 .gt-rv-eq-hr4 th {
   top: 86px;
   background: #f8f6fb !important;
   color: #6b4a9e !important;
   font-weight: 500;
-  font-size: 11px;
+  font-size: 12px;
 }
 /* 资产减值准备表只有2行表头 */
 .gt-rv-eq-header-group th { top: 0; }
@@ -1423,10 +1437,11 @@ watch(
 .gt-rv-eq-table th,
 .gt-rv-eq-table td {
   border: 1px solid #e8e4f0;
-  padding: 5px 8px;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1.5;
   text-align: center;
   white-space: nowrap;
-  font-size: 12px;
   transition: background 0.15s ease;
 }
 /* 表头 */
@@ -1434,13 +1449,13 @@ watch(
   background: #f8f6fb;
   color: #333;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
 }
 .gt-rv-eq-header-cols th {
   background: #f5f2fa;
   color: #555;
   font-weight: 500;
-  font-size: 11px;
+  font-size: 12px;
 }
 .gt-rv-eq-th-period {
   font-size: 13px !important;
@@ -1475,7 +1490,7 @@ watch(
 /* 数据行 */
 .gt-rv-eq-td-project {
   text-align: left !important;
-  font-size: 12px;
+  font-size: 13px;
   position: sticky;
   left: 0;
   z-index: 1;
