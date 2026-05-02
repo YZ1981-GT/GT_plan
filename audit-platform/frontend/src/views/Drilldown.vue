@@ -46,6 +46,17 @@
         <el-button type="primary" @click="onBalanceFilterChange">查询</el-button>
       </div>
 
+      <!-- 空数据引导 -->
+      <el-alert
+        v-if="!store.loading && store.balanceData.length === 0"
+        type="info" show-icon :closable="false" style="margin-bottom: 12px"
+      >
+        <template #title>暂无穿透数据</template>
+        <div style="font-size: 12px; line-height: 1.6">
+          请先在项目中导入账套数据（科目余额表+序时账），导入后此处将自动显示科目余额。
+        </div>
+      </el-alert>
+
       <el-table
         :data="store.balanceData"
         v-loading="store.loading"
@@ -239,6 +250,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useDrilldownStore } from '@/stores/drilldown'
 import type { BalanceRow, AuxBalanceRow } from '@/stores/drilldown'
 
@@ -257,12 +269,16 @@ watch(ledgerDateRange, (val) => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
   const pid = route.params.projectId as string
   const y = Number(route.query.year) || new Date().getFullYear()
   store.setProject(pid, y)
   store.reset()
-  store.fetchBalance()
+  try {
+    await store.fetchBalance()
+  } catch (e: any) {
+    ElMessage.warning('加载余额数据失败，请确认已导入账套数据')
+  }
 })
 
 function fmt(val: number | null | undefined): string {
@@ -272,12 +288,12 @@ function fmt(val: number | null | undefined): string {
 
 function onBalanceFilterChange() {
   store.balanceFilter.page = 1
-  store.fetchBalance()
+  store.fetchBalance().catch(() => ElMessage.warning('查询失败'))
 }
 
 function onBalancePageChange(page: number) {
   store.balanceFilter.page = page
-  store.fetchBalance()
+  store.fetchBalance().catch(() => {})
 }
 
 function onAccountClick(row: BalanceRow) {

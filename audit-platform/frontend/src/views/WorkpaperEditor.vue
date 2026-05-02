@@ -27,8 +27,14 @@
 
     <!-- 主编辑区 -->
     <div class="gt-wp-editor-main">
+      <!-- 底稿加载中 -->
+      <div v-if="!wpDetail && !editorAvailable" class="gt-wp-editor-fallback-panel">
+        <el-icon class="is-loading" style="font-size: 28px; color: var(--gt-color-primary); margin-bottom: 12px"><Loading /></el-icon>
+        <div style="font-size: 14px; color: #999">正在加载底稿...</div>
+      </div>
+
       <!-- ONLYOFFICE 可用：在线编辑 -->
-      <template v-if="editorAvailable">
+      <template v-else-if="editorAvailable">
         <div ref="editorContainer" id="onlyoffice-editor" class="gt-wp-editor-iframe"></div>
       </template>
 
@@ -85,7 +91,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, Download } from '@element-plus/icons-vue'
 import {
   checkOnlineEditingAvailability,
   downloadWorkpaper,

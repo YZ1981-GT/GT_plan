@@ -55,6 +55,7 @@
       <el-table
         v-if="summaryData"
         :data="tableRows"
+        v-loading="loading"
         border
         stripe
         size="small"
