@@ -1,9 +1,13 @@
 """底稿精细化规则 API
 
-GET  /api/wp-fine-rules                              — 列出所有精细化规则
+GET  /api/wp-fine-rules                              — 列出所有精细化规则（支持 cycle/quality 过滤）
+GET  /api/wp-fine-rules/summary                      — 精细化规则汇总统计
+GET  /api/wp-fine-rules/system-map                   — 底稿体系全景图（四阶段递进+11个业务循环）
 GET  /api/wp-fine-rules/{wp_code}                    — 获取指定底稿的精细化规则
 POST /api/projects/{id}/workpapers/{wp_id}/fine-extract — 使用精细化规则提取数据
 """
+import json
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,11 +22,59 @@ from app.services.wp_fine_rule_engine import load_fine_rule, list_fine_rules, ex
 
 router = APIRouter(tags=["底稿精细化"])
 
+_SYSTEM_MAP_PATH = Path(__file__).parent.parent.parent / "data" / "wp_system_map.json"
+
 
 @router.get("/api/wp-fine-rules")
-async def list_rules(_user=Depends(get_current_user)):
-    """列出所有精细化规则"""
-    return {"rules": list_fine_rules()}
+async def list_rules(
+    cycle: str | None = None,
+    quality: str | None = None,
+    _user=Depends(get_current_user),
+):
+    """列出所有精细化规则
+
+    可选过滤：
+    - cycle: 循环前缀（A/B/C/D/E/F/G/H/I/J/K/L/M/N/S/T）
+    - quality: 质量等级（A=精修/B=有layout/C=有checks/D=基础）
+    """
+    rules = list_fine_rules()
+    if cycle:
+        rules = [r for r in rules if r.get("cycle_prefix") == cycle.upper()]
+    if quality:
+        rules = [r for r in rules if r.get("quality") == quality.upper()]
+    return {"rules": rules, "total": len(rules)}
+
+
+@router.get("/api/wp-fine-rules/summary")
+async def rules_summary(_user=Depends(get_current_user)):
+    """精细化规则汇总统计（按循环分组）"""
+    rules = list_fine_rules()
+    by_cycle = {}
+    for r in rules:
+        cycle = r.get("cycle", "其他")
+        entry = by_cycle.setdefault(cycle, {"total": 0, "refined": 0, "checks_total": 0})
+        entry["total"] += 1
+        if r.get("quality") == "A":
+            entry["refined"] += 1
+        entry["checks_total"] += r.get("checks", 0)
+    return {
+        "total": len(rules),
+        "refined": sum(1 for r in rules if r.get("quality") == "A"),
+        "by_cycle": by_cycle,
+    }
+
+
+@router.get("/api/wp-fine-rules/system-map")
+async def get_system_map(_user=Depends(get_current_user)):
+    """底稿体系全景图
+
+    返回四阶段递进关系（准备→控制测试→实质性→完成）和 11 个业务循环的
+    B→C→实质性底稿关联，供前端可视化展示。
+    """
+    if not _SYSTEM_MAP_PATH.exists():
+        raise HTTPException(status_code=404, detail="wp_system_map.json not found")
+    with open(_SYSTEM_MAP_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 @router.get("/api/wp-fine-rules/{wp_code}")

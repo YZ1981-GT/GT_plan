@@ -35,11 +35,6 @@ const router = createRouter({
           component: () => import('@/views/ProjectWizard.vue'),
         },
         {
-          path: 'poc',
-          name: 'WopiPoc',
-          component: () => import('@/views/WopiPoc.vue'),
-        },
-        {
           path: 'projects/:projectId/drilldown',
           name: 'Drilldown',
           component: () => import('@/views/Drilldown.vue'),

@@ -53,6 +53,7 @@
               @applied="onTemplateApplied"
             />
             <el-button size="small" @click="onImportPresetFormulas" :loading="loadingData">📥 导入预设</el-button>
+            <el-button size="small" @click="showFormulaImport = true">📥 Excel导入</el-button>
             <el-button size="small" @click="onAddFormulaRow">+ 新增公式</el-button>
             <el-button size="small" @click="onSaveAllFormulas" :loading="applying">💾 保存</el-button>
             <el-button size="small" type="primary" @click="onApplyFormulas" :loading="applying">⚡ 应用自动运算</el-button>
@@ -299,6 +300,15 @@
       :applicable-standard="`${fmTemplateType}_standalone`"
       @save="onFormulaEditSave"
     />
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showFormulaImport"
+      import-type="formula"
+      :project-id="props.projectId"
+      :year="props.year"
+      @imported="onFormulaFileImported"
+    />
   </el-dialog>
 </template>
 
@@ -308,6 +318,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -559,6 +570,7 @@ const crossCheckItems = ref<Record<string, any[]>>({
 // ── 数据加载 ──
 const allRowsMap = ref<Record<string, any[]>>({})
 const loadingData = ref(false)
+const showFormulaImport = ref(false)
 const notePresetFormulas = ref<any[]>([])
 
 async function loadRowsForNode(nodeKey: string) {
@@ -905,6 +917,11 @@ async function onApplyFormulas() {
   } finally {
     applying.value = false
   }
+}
+
+function onFormulaFileImported() {
+  showFormulaImport.value = false
+  loadFormulas()
 }
 
 async function onImportPresetFormulas() {

@@ -42,6 +42,11 @@
       "from": "L1-5",
       "to": "L1-2",
       "description": "利息测算基于明细表借款金额"
+    },
+    {
+      "from": "L1-1.total",
+      "to": "REPORT('BS-L01','期末')",
+      "description": "审定表合计 = 报表短期借款"
     }
   ],
   "audit_checks": [

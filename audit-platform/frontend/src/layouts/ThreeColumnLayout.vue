@@ -227,15 +227,15 @@ const props = defineProps<{
 // ── 导航项 ──
 const navItems = [
   { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
-  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production' },
-  { key: 'team', label: '人员库', icon: User, path: '/settings/staff', maturity: 'production' },
-  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production' },
-  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
-  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'pilot' },
-  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
-  { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production' },
-  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
-  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production' },
+  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production' },
+  { key: 'team', label: '人员', icon: User, path: '/settings/staff', maturity: 'production' },
+  { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production' },
+  { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
+  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot' },
+  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
+  { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production' },
+  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
+  { key: 'users', label: '用户', icon: UserFilled, path: '/settings/users', maturity: 'production' },
 ]
 
 const activeNav = computed(() => {

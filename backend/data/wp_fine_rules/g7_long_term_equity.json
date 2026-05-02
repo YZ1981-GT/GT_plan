@@ -1,7 +1,7 @@
 {
   "wp_code": "G7",
   "name": "长期股权投资",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1511"
   ],
@@ -197,18 +197,18 @@
   ],
   "cross_references": [
     {
-      "from": "G7-1.total",
+      "from": "G7-1.R12.C7",
       "to": "tb://1511#审定数",
       "description": "审定表合计 = 试算表长期股权投资审定数"
     },
     {
-      "from": "G7-1.total",
+      "from": "G7-1.R12.C7",
       "to": "report://BS/BS-012#期末",
       "description": "审定表合计 = 报表长期股权投资"
     },
     {
       "from": "G7-2.合计",
-      "to": "G7-1.total",
+      "to": "G7-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
     },
     {
@@ -225,6 +225,11 @@
       "from": "G7-17.减值",
       "to": "G7-1.减值准备",
       "description": "减值测试结果 = 审定表减值准备"
+    },
+    {
+      "from": "G7-1.R12.C7",
+      "to": "REPORT('BS-017','期末')",
+      "description": "审定表合计 = 报表长期股权投资"
     }
   ],
   "audit_checks": [

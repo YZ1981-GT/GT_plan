@@ -1,7 +1,7 @@
 {
   "wp_code": "H3",
   "name": "投资性房地产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1521"
   ],
@@ -214,19 +214,24 @@
   ],
   "cross_references": [
     {
-      "from": "H3-1.total",
+      "from": "H3-1.R12.C10",
       "to": "tb://1521#审定数",
       "description": "审定表合计 = 试算表投资性房地产审定数"
     },
     {
-      "from": "H3-1.total",
+      "from": "H3-1.R12.C10",
       "to": "report://BS/BS-013#期末",
       "description": "审定表合计 = 报表投资性房地产"
     },
     {
       "from": "H3-2.合计",
-      "to": "H3-1.total",
+      "to": "H3-1.R12.C10",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "H3-1.R12.C10",
+      "to": "REPORT('BS-016','期末')",
+      "description": "审定表合计 = 报表投资性房地产"
     }
   ],
   "audit_checks": [

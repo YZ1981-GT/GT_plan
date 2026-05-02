@@ -1,7 +1,7 @@
 {
   "wp_code": "H9",
   "name": "租赁负债",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2601"
   ],
@@ -76,6 +76,43 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "subtotal": {
+          "row": 11,
+          "label": "小计"
+        },
+        "less_current": {
+          "row": 12,
+          "label": "减：一年内到期的租赁负债"
+        },
+        "total": {
+          "row": 13,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L11"
+        },
+        "tb": {
+          "row": 15,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 16,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "房屋租赁",
+          "设备租赁",
+          "运输设备租赁",
+          "其他"
+        ]
       }
     },
     {
@@ -111,18 +148,23 @@
   ],
   "cross_references": [
     {
-      "from": "H9-1.total",
+      "from": "H9-1.R13.C7",
       "to": "tb://2601#审定数",
       "description": "审定表合计 = 试算表租赁负债审定数"
     },
     {
       "from": "H9-2.合计",
-      "to": "H9-1.total",
+      "to": "H9-1.R13.C7",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "from": "H9-1.total",
+      "from": "H9-1.R13.C7",
       "to": "report://BS/BS-042#期末",
+      "description": "审定表合计 = 报表租赁负债"
+    },
+    {
+      "from": "H9-1.R13.C7",
+      "to": "REPORT('BS-L11','期末')",
       "description": "审定表合计 = 报表租赁负债"
     }
   ],
@@ -168,6 +210,12 @@
       "type": "calculation",
       "severity": "warning",
       "description": "折现率/租赁期判断合理"
+    },
+    {
+      "code": "H9-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表租赁负债"
     }
   ]
 }

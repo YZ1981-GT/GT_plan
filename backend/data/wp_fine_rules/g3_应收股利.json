@@ -1,7 +1,7 @@
 {
   "wp_code": "G3",
   "name": "应收股利",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "cycle": "G",
   "cycle_name": "G类",
   "source_files": [
@@ -29,7 +29,36 @@
     {
       "exact_name": "审定表G3-1",
       "type": "summary",
-      "code": "G3-1"
+      "code": "G3-1",
+      "key_rows": {
+        "total": {
+          "row": 9,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-008b"
+        },
+        "tb": {
+          "row": 11,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 12,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "应收股利",
+          "其他",
+          "权益法核算的被投资单位股利",
+          "其他股利"
+        ]
+      }
     },
     {
       "exact_name": "附注披露信息（上市公司）",
@@ -62,7 +91,13 @@
       "code": "G3-5"
     }
   ],
-  "cross_references": [],
+  "cross_references": [
+    {
+      "from": "G3-1.total",
+      "to": "REPORT('BS-008b','期末')",
+      "description": "审定表合计 = 报表应收股利"
+    }
+  ],
   "audit_checks": [
     {
       "code": "G3-CHK-01",
@@ -75,6 +110,18 @@
       "type": "check",
       "severity": "info",
       "description": "编制人已签署"
+    },
+    {
+      "code": "G3-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表应收股利"
+    },
+    {
+      "code": "G3-CHK-05",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "股利收入与被投资单位分红决议一致"
     }
   ]
 }

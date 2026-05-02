@@ -59,6 +59,10 @@ class DisclosureEngine:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        self._wp_cache: dict = {}
+        self._wp_account_cache: dict = {}
+        self._tb_cache: dict = {}
+        self._wp_fine_cache: dict = {}  # 底稿精细化明细行缓存
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
         result = await self.db.execute(
@@ -240,7 +244,7 @@ class DisclosureEngine:
         """预加载底稿和试算表数据到缓存，避免 generate_notes 中165次重复查询"""
         from app.models.workpaper_models import WorkingPaper, WpIndex
 
-        # 底稿数据
+        # 底稿数据（汇总 + 精细化明细行）
         try:
             wp_result = await self.db.execute(
                 sa.select(WorkingPaper).where(
@@ -264,6 +268,15 @@ class DisclosureEngine:
                             "unadjusted": float(unadjusted) if unadjusted is not None else None,
                             "opening": None,
                         }
+                # 缓存精细化提取的明细行（fine_summary 中的 detail rows）
+                fine_summary = pd.get("fine_summary", {})
+                if fine_summary:
+                    idx_r2 = await self.db.execute(
+                        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+                    )
+                    idx2 = idx_r2.scalar_one_or_none()
+                    if idx2:
+                        self._wp_fine_cache[idx2] = fine_summary
         except Exception as _wp_err:
             logger.warning("preload wp data failed: %s", _wp_err)
             try:
@@ -315,10 +328,16 @@ class DisclosureEngine:
         year: int,
         table_template: dict,
     ) -> dict | None:
-        """从模板构建 table_data，优先从底稿parsed_data取数，降级从试算表取数。
+        """从模板构建 table_data，动态提取底稿明细行。
 
-        取数优先级：底稿parsed_data > 试算表 > 空值
-        返回格式：{ headers: [...], rows: [{ label, values, is_total, ... }] }
+        设计原则：
+        - 表格结构（表头、合计行位置、列含义）来自模板
+        - 明细行数据从底稿 parsed_data.fine_summary 动态提取
+        - 降级：底稿无数据时从试算表取数，再降级用模板预设行
+        - 合计行自动求和
+        - 单元格模式：auto（自动提数）/ manual（手动锁定）/ locked（公式锁定）
+
+        取数优先级：底稿fine_summary明细行 > 底稿audited_amount > 试算表 > 模板预设行
         """
         if not table_template:
             return None
@@ -328,93 +347,80 @@ class DisclosureEngine:
         if not template_rows:
             return {"headers": headers, "rows": []}
 
-        # 使用预加载缓存（如果有），否则查询数据库
-        wp_data = getattr(self, '_wp_cache', None)
-        wp_account_map = getattr(self, '_wp_account_cache', None)
-        tb_map = getattr(self, '_tb_cache', None)
+        # 使用预加载缓存
+        wp_data = getattr(self, '_wp_cache', None) or {}
+        wp_account_map = getattr(self, '_wp_account_cache', None) or {}
+        tb_map = getattr(self, '_tb_cache', None) or {}
+        # 底稿精细化提取结果缓存（detail rows）
+        wp_fine_cache = getattr(self, '_wp_fine_cache', None) or {}
 
-        if wp_data is None:
-            wp_data = {}
-            try:
-                from app.models.workpaper_models import WorkingPaper, WpIndex
-                wp_result = await self.db.execute(
-                    sa.select(WorkingPaper).where(
-                        WorkingPaper.project_id == project_id,
-                        WorkingPaper.is_deleted == sa.false(),
-                        WorkingPaper.parsed_data.isnot(None),
-                    )
-                )
-                for wp in wp_result.scalars().all():
-                    pd = wp.parsed_data or {}
-                    audited = pd.get("audited_amount")
-                    unadjusted = pd.get("unadjusted_amount")
-                    if audited is not None or unadjusted is not None:
-                        idx_r = await self.db.execute(
-                            sa.select(WpIndex.wp_code, WpIndex.wp_name).where(WpIndex.id == wp.wp_index_id)
-                        )
-                        idx = idx_r.first()
-                        if idx:
-                            wp_data[idx[0]] = {
-                                "audited": float(audited) if audited is not None else None,
-                                "unadjusted": float(unadjusted) if unadjusted is not None else None,
-                                "opening": None,
-                            }
-            except Exception:
-                pass
-
-        if wp_account_map is None:
-            wp_account_map = {}
-            try:
-                mapping_file = Path(__file__).parent.parent.parent / "data" / "wp_account_mapping.json"
-                if mapping_file.exists():
-                    with open(mapping_file, "r", encoding="utf-8-sig") as f:
-                        mappings = json.load(f).get("mappings", [])
-                    for m in mappings:
-                        wp_account_map[m.get("wp_code", "")] = m.get("account_name", "")
-            except Exception:
-                pass
-
-        if tb_map is None:
-            tb_map = {}
-            try:
-                result = await self.db.execute(
-                    sa.select(TrialBalance).where(
-                        TrialBalance.project_id == project_id,
-                        TrialBalance.year == year,
-                        TrialBalance.is_deleted == sa.false(),
-                    )
-                )
-                for tb in result.scalars().all():
-                    code = tb.standard_account_code or tb.account_code or ""
-                    name = tb.account_name or tb.standard_account_name or ""
-                    tb_map[name] = {
-                        "audited": float(tb.audited_amount or 0),
-                        "unadjusted": float(tb.unadjusted_amount or 0),
-                        "opening": float(tb.opening_balance or 0),
-                    }
-                    if code:
-                        tb_map[code] = tb_map[name]
-            except Exception:
-                pass
-
-        # 构建底稿数据按科目名索引（优先级高于试算表）
+        # 构建底稿数据按科目名索引
         wp_by_account: dict[str, dict] = {}
         for wp_code, data in wp_data.items():
             account_name = wp_account_map.get(wp_code, "")
             if account_name:
                 wp_by_account[account_name] = data
 
+        # 检查模板是否有 detail_discovery 标记（表示明细行应动态生成）
+        has_dynamic_detail = table_template.get("detail_discovery") or any(
+            r.get("is_dynamic_detail") for r in template_rows
+        )
+
+        # 查找关联的底稿精细化数据（detail rows）
+        # 通过附注科目名 → wp_account_map 反向查找底稿编码 → fine_cache
+        wp_code_for_note = table_template.get("wp_code", "")
+        if not wp_code_for_note:
+            # 反向查找：从 wp_account_map 中找到科目名对应的 wp_code
+            note_account = table_template.get("account_name", "")
+            for wc, acct_name in (getattr(self, '_wp_account_cache', None) or {}).items():
+                if acct_name == note_account:
+                    wp_code_for_note = wc
+                    break
+        fine_detail_rows = []
+        if wp_code_for_note and wp_code_for_note in wp_fine_cache:
+            fine_data = wp_fine_cache[wp_code_for_note]
+            # fine_data 结构：{"closing_audited": ..., "rows": {"detail_0": {...}, "total": {...}}}
+            fine_rows = fine_data.get("rows", {}) if isinstance(fine_data, dict) else {}
+            fine_detail_rows = [
+                r for r in fine_rows.values()
+                if isinstance(r, dict) and r.get("is_detail")
+            ]
+
+        num_value_cols = len(headers) - 1
         rows = []
+
         for tr in template_rows:
             label = tr.get("label", "")
             is_total = tr.get("is_total", False)
             account_codes = tr.get("account_codes", [])
 
+            # 合计行：延迟计算
+            if is_total:
+                values = [None] * num_value_cols
+                rows.append({"label": label, "values": values, "is_total": True})
+                continue
+
+            # 动态明细占位行：用底稿实际明细替换
+            if tr.get("is_dynamic_detail") and fine_detail_rows:
+                for dr in fine_detail_rows:
+                    dr_label = dr.get("label", "")
+                    dr_values = []
+                    for col_idx in range(num_value_cols):
+                        # 从精细化提取结果中取对应列的值
+                        if col_idx == 0:
+                            dr_values.append(dr.get("closing_audited") or dr.get("current_audited"))
+                        elif col_idx == 1:
+                            dr_values.append(dr.get("opening_audited") or dr.get("prior_audited"))
+                        else:
+                            dr_values.append(None)
+                    rows.append({"label": dr_label, "values": dr_values, "is_detail": True})
+                continue
+
+            # 普通行：按优先级取数
             values = []
-            num_value_cols = len(headers) - 1
             for col_idx in range(num_value_cols):
                 val = None
-                if not is_total and (label or account_codes):
+                if label or account_codes:
                     # 优先从底稿取数
                     wp_entry = wp_by_account.get(label)
                     if wp_entry and wp_entry.get("audited") is not None:
@@ -432,18 +438,23 @@ class DisclosureEngine:
                                 val = tb_entry.get("opening", 0)
                 values.append(val)
 
-            if is_total and rows:
-                for ci in range(num_value_cols):
-                    total = sum(
-                        (r["values"][ci] or 0) for r in rows if not r.get("is_total") and r["values"][ci] is not None
-                    )
-                    values[ci] = total if total != 0 else None
+            rows.append({"label": label, "values": values, "is_total": False})
 
-            rows.append({
-                "label": label,
-                "values": values,
-                "is_total": is_total,
-            })
+        # 回填合计行
+        for i, row in enumerate(rows):
+            if row.get("is_total") and i > 0:
+                for ci in range(num_value_cols):
+                    # 合计行 = 上方所有非合计行之和（到上一个合计行为止）
+                    start = 0
+                    for j in range(i - 1, -1, -1):
+                        if rows[j].get("is_total"):
+                            start = j + 1
+                            break
+                    total = sum(
+                        (r["values"][ci] or 0) for r in rows[start:i]
+                        if not r.get("is_total") and r["values"][ci] is not None
+                    )
+                    row["values"][ci] = total if total != 0 else None
 
         return {"headers": headers, "rows": rows}
 
@@ -468,6 +479,7 @@ class DisclosureEngine:
         self._wp_cache = {}
         self._tb_cache = {}
         self._wp_account_cache = {}
+        self._wp_fine_cache = {}
         try:
             await self._preload_data_for_notes(project_id, year)
         except Exception as _pre_err:

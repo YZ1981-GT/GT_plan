@@ -2,42 +2,33 @@
   <div class="gt-four-catalog">
     <!-- 单位/集团树形结构 -->
     <div class="gt-catalog-unit-tree">
-      <div class="gt-catalog-unit-current">
-        <div class="gt-catalog-unit-icon">🏢</div>
-        <div class="gt-catalog-unit-info">
-          <div class="gt-catalog-unit-name">{{ project?.name || project?.client_name || '—' }}</div>
-          <div class="gt-catalog-unit-meta">
-            <el-tag size="small" type="info">{{ project?.audit_year || '—' }}</el-tag>
-            <el-tag size="small" :type="project?.report_scope === 'consolidated' ? 'warning' : 'success'">
-              {{ project?.report_scope === 'consolidated' ? '合并' : '单体' }}
-            </el-tag>
-          </div>
-        </div>
-      </div>
-      <!-- 用户负责的所有项目（按集团分组） -->
-      <div v-if="relatedProjects.length > 1" class="gt-catalog-unit-group">
-        <div class="gt-catalog-unit-group-title" @click="showRelated = !showRelated">
-          <span>{{ showRelated ? '−' : '+' }}</span>
+      <!-- 用户所有项目（树形结构：合并项目→子项目） -->
+      <div class="gt-catalog-unit-group">
+        <div class="gt-catalog-unit-group-title">
+          <el-icon :size="14"><FolderOpened /></el-icon>
           <span>我的项目 ({{ relatedProjects.length }})</span>
         </div>
-        <div v-if="showRelated" class="gt-catalog-unit-group-items">
-          <!-- 按集团分组：有 parent_project_id 的归到父项目下 -->
+        <div class="gt-catalog-unit-group-items">
           <template v-for="group in projectGroups" :key="group.parentId || 'standalone'">
+            <!-- 集团父项目 -->
             <div v-if="group.parent" class="gt-catalog-unit-group-parent">
-              <span style="font-size: 11px; color: #999; padding: 2px 6px;">📁 {{ group.parent.name }}</span>
+              <el-icon :size="12" style="color: #999"><Connection /></el-icon>
+              <span>{{ group.parent.name || group.parent.client_name }}</span>
             </div>
+            <!-- 项目列表 -->
             <div
               v-for="rp in group.items" :key="rp.id"
               class="gt-catalog-unit-related"
               :class="{ 'gt-catalog-unit-related--current': rp.id === project?.id }"
-              :style="{ paddingLeft: group.parent ? '20px' : '6px' }"
+              :style="{ paddingLeft: group.parent ? '24px' : '8px' }"
               @click="onSwitchProject(rp)"
             >
-              <span class="gt-catalog-unit-related-dot" :style="{ background: rp.id === project?.id ? '#4b2d77' : '#ccc' }"></span>
-              <span>{{ rp.name || rp.client_name }}</span>
+              <span class="gt-catalog-unit-related-dot" :style="{ background: rp.id === project?.id ? 'var(--gt-color-primary)' : '#ccc' }"></span>
+              <span class="gt-catalog-unit-related-name">{{ rp.name || rp.client_name }}</span>
               <el-tag v-if="rp.report_scope === 'consolidated'" size="small" type="warning" style="margin-left: auto; font-size: 10px;">合并</el-tag>
             </div>
           </template>
+          <div v-if="!relatedProjects.length" style="padding: 8px; font-size: 12px; color: #999; text-align: center;">暂无项目</div>
         </div>
       </div>
     </div>
@@ -138,7 +129,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { DataLine, Notebook, Document, TrendCharts } from '@element-plus/icons-vue'
+import { DataLine, Notebook, Document, TrendCharts, FolderOpened, Connection } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
@@ -155,7 +146,6 @@ const activeTab = ref(props.activeCatalog || 'reports')
 
 // 单位/集团树
 const relatedProjects = ref<any[]>([])
-const showRelated = ref(false)
 
 function onSwitchProject(rp: any) {
   if (rp.id !== props.project?.id) {
@@ -328,7 +318,6 @@ watch(() => props.project?.id, async (pid) => {
     const all = Array.isArray(data) ? data : (data?.items || [])
     // 显示用户能看到的所有项目（后端已按权限过滤）
     relatedProjects.value = all
-    showRelated.value = all.length > 1
   } catch { relatedProjects.value = [] }
 }, { immediate: true })
 </script>
@@ -355,7 +344,13 @@ watch(() => props.project?.id, async (pid) => {
   padding: 4px 0; font-size: 11px; color: #999; cursor: pointer;
 }
 .gt-catalog-unit-group-title:hover { color: var(--gt-color-primary); }
-.gt-catalog-unit-group-items { padding-left: 8px; }
+.gt-catalog-unit-group-parent {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 6px; font-size: 11px; color: #999;
+}
+.gt-catalog-unit-related-name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+}
 .gt-catalog-unit-related {
   display: flex; align-items: center; gap: 6px;
   padding: 3px 6px; font-size: 12px; cursor: pointer; border-radius: 4px;

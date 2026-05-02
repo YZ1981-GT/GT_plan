@@ -1,7 +1,7 @@
 {
   "wp_code": "G4",
   "name": "债权投资",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1504"
   ],
@@ -86,6 +86,44 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "subtotal": {
+          "row": 10,
+          "label": "小计"
+        },
+        "less_impairment": {
+          "row": 11,
+          "label": "减：减值准备"
+        },
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-019"
+        },
+        "tb": {
+          "row": 14,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 15,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "持有至到期投资",
+          "以摊余成本计量",
+          "其他",
+          "国债",
+          "企业债券"
+        ]
       }
     },
     {
@@ -171,18 +209,23 @@
   ],
   "cross_references": [
     {
-      "from": "G4-1.total",
+      "from": "G4-1.R12.C7",
       "to": "tb://1504#审定数",
       "description": "审定表合计 = 试算表债权投资审定数"
     },
     {
       "from": "G4-2.合计",
-      "to": "G4-1.total",
+      "to": "G4-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "from": "G4-1.total",
+      "from": "G4-1.R12.C7",
       "to": "report://BS/BS-011#期末",
+      "description": "审定表合计 = 报表债权投资"
+    },
+    {
+      "from": "G4-1.R12.C7",
+      "to": "REPORT('BS-019','期末')",
       "description": "审定表合计 = 报表债权投资"
     }
   ],
@@ -228,6 +271,12 @@
       "type": "calculation",
       "severity": "warning",
       "description": "预期信用损失计提合理"
+    },
+    {
+      "code": "G4-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表债权投资"
     }
   ]
 }

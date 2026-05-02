@@ -1,7 +1,7 @@
 {
   "wp_code": "K7",
   "name": "递延收益",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2401"
   ],
@@ -78,6 +78,36 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 10,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L14"
+        },
+        "tb": {
+          "row": 12,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 13,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "与资产相关的政府补助",
+          "与收益相关的政府补助",
+          "其他",
+          "与资产相关的政府补助",
+          "与收益相关的政府补助"
+        ]
       }
     },
     {
@@ -123,14 +153,19 @@
   ],
   "cross_references": [
     {
-      "from": "K7-1.total",
+      "from": "K7-1.R10.C7",
       "to": "tb://2401#审定数",
       "description": "审定表合计 = 试算表递延收益审定数"
     },
     {
       "from": "K7-2.合计",
-      "to": "K7-1.total",
+      "to": "K7-1.R10.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K7-1.R10.C7",
+      "to": "REPORT('BS-L14','期末')",
+      "description": "审定表合计 = 报表递延收益"
     }
   ],
   "audit_checks": [
@@ -157,6 +192,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K7-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表递延收益"
+    },
+    {
+      "code": "K7-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "政府补助文件已检查"
+    },
+    {
+      "code": "K7-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "摊销计算正确"
     }
   ]
 }

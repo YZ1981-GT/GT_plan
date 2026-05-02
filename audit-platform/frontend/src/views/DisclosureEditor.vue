@@ -37,6 +37,7 @@
       <div class="gt-de-banner-row2">
         <el-button size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
         <el-button size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
+        <el-button size="small" @click="showNoteImport = true">📥 Excel导入</el-button>
         <el-button size="small" @click="onValidate" :loading="validateLoading">✅ 执行校验</el-button>
         <el-button size="small" @click="showNoteFormulaManager = true">⚙️ 公式管理</el-button>
         <el-button size="small" @click="openStructureEditor">📐 表样编辑</el-button>
@@ -186,8 +187,6 @@
                   <el-button @click="onAiGenerateAnalysis" :loading="aiLoading" title="生成变动分析说明">📊 变动分析</el-button>
                 </el-button-group>
                 <span class="gt-de-ai-hint">选中文本可改写，光标处可续写</span>
-                  <el-button @click="onAiGenerateAnalysis" :loading="aiLoading" title="生成变动分析说明">📊 变动分析</el-button>
-                </el-button-group>
               </div>
               <editor-content :editor="editor" class="gt-de-tiptap-content" />
             </div>
@@ -303,6 +302,15 @@
         </el-table-column>
       </el-table>
     </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showNoteImport"
+      import-type="disclosure_note"
+      :project-id="projectId"
+      :year="year"
+      @imported="onNoteImported"
+    />
   </div>
 </template>
 
@@ -313,6 +321,7 @@ import { ElMessage } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { refreshDisclosureFromWorkpapers, getProjectWizardState, noteAiRewrite, noteAiContinueWrite, noteAiGeneratePolicy, noteAiGenerateAnalysis } from '@/services/commonApi'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
@@ -337,6 +346,7 @@ async function loadProjectOptions() {
     const list = await api.get('/api/projects', { validateStatus: (s: number) => s < 600 })
     const items = Array.isArray(list) ? list : (list?.data ?? list?.items ?? [])
     projectOptions.value = items.map((p: any) => ({ id: p.id, name: p.client_name || p.name || p.id }))
+    selectedProjectIdLocal.value = projectId.value
   } catch { projectOptions.value = [] }
 }
 function onProjectChange(newId: string) {
@@ -396,6 +406,7 @@ const currentProjectName = computed(() => {
 const treeLoading = ref(false)
 const detailLoading = ref(false)
 const genLoading = ref(false)
+const showNoteImport = ref(false)
 const validateLoading = ref(false)
 const saveLoading = ref(false)
 const refreshLoading = ref(false)
@@ -540,17 +551,8 @@ const treeSearch = ref('')
 const noteTreeRef = ref<any>(null)
 const treeViewMode = ref<'tree' | 'flat'>('tree')
 
-// 单位切换
+// 单位切换（侧边栏）
 const selectedProjectIdLocal = ref('')
-const projectOptions = ref<any[]>([])
-
-async function loadProjectOptions() {
-  try {
-    const data = await api.get('/api/projects', { validateStatus: (s: number) => s < 500 })
-    projectOptions.value = Array.isArray(data) ? data.map((p: any) => ({ id: p.id, name: p.name || p.client_name })) : []
-    selectedProjectIdLocal.value = projectId.value
-  } catch { projectOptions.value = [] }
-}
 
 function onSwitchProjectLocal(newId: string) {
   if (newId && newId !== projectId.value) {
@@ -1056,6 +1058,11 @@ async function fetchDetail(noteSection: string) {
       `/api/disclosure-notes/${projectId.value}/${year.value}/${noteSection}/prior-year`
     )
   } catch { priorYearNote.value = null }
+}
+
+function onNoteImported() {
+  showNoteImport.value = false
+  fetchTree()
 }
 
 async function onGenerate() {

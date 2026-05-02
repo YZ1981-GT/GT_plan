@@ -1,7 +1,7 @@
 {
   "wp_code": "H5",
   "name": "油气资产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "cycle": "H",
   "cycle_name": "H类",
   "source_files": [
@@ -44,7 +44,37 @@
     {
       "exact_name": "审定表H5-1",
       "type": "summary",
-      "code": "H5-1"
+      "code": "H5-1",
+      "key_rows": {
+        "total": {
+          "row": 10,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-016b"
+        },
+        "tb": {
+          "row": 12,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 13,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "矿区权益",
+          "采矿权",
+          "其他",
+          "井及相关设施",
+          "管道及相关设施"
+        ]
+      }
     },
     {
       "exact_name": "附注披露信息（上市公司）",
@@ -152,7 +182,13 @@
       "code": "H5-19"
     }
   ],
-  "cross_references": [],
+  "cross_references": [
+    {
+      "from": "H5-1.total",
+      "to": "REPORT('BS-016b','期末')",
+      "description": "审定表合计 = 报表油气资产"
+    }
+  ],
   "audit_checks": [
     {
       "code": "H5-CHK-01",

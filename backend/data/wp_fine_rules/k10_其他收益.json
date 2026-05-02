@@ -1,7 +1,7 @@
 {
   "wp_code": "K10",
   "name": "其他收益",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6117"
   ],
@@ -74,6 +74,35 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 10,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-011"
+        },
+        "tb": {
+          "row": 12,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 13,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "政府补助",
+          "增值税加计抵减",
+          "其他",
+          "增值税即征即退"
+        ]
       }
     },
     {
@@ -119,14 +148,19 @@
   ],
   "cross_references": [
     {
-      "from": "K10-1.total",
+      "from": "K10-1.R10.C5",
       "to": "tb://6117#审定数",
       "description": "审定表合计 = 试算表其他收益审定数"
     },
     {
       "from": "K10-2.合计",
-      "to": "K10-1.total",
+      "to": "K10-1.R10.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K10-1.R10.C5",
+      "to": "REPORT('IS-011','本期')",
+      "description": "审定表合计 = 报表其他收益"
     }
   ],
   "audit_checks": [
@@ -153,6 +187,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K10-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他收益"
+    },
+    {
+      "code": "K10-CHK-05",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "政府补助与递延收益摊销一致"
     }
   ]
 }

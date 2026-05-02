@@ -26,7 +26,7 @@ python -m pytest tests/ --ignore=tests/test_collaboration.py -q --tb=short
 ### 2.3 底稿主链路
 - [ ] 进入项目 → 底稿列表 → 选择底稿
 - [ ] 点击"下载编辑" → 文件下载成功
-- [ ] 点击"在线编辑" → ONLYOFFICE 可用时打开编辑器，不可用时显示离线降级提示
+- [ ] 点击"在线编辑" → Univer 编辑器正常加载，显示底稿内容
 - [ ] 上传编辑后的底稿 → 版本号递增
 - [ ] 版本冲突时显示冲突提示
 

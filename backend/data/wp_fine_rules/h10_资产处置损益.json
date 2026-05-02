@@ -1,7 +1,7 @@
 {
   "wp_code": "H10",
   "name": "资产处置损益",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6115"
   ],
@@ -72,6 +72,35 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 11,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-015"
+        },
+        "tb": {
+          "row": 13,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 14,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "固定资产处置收益",
+          "无形资产处置收益",
+          "使用权资产处置收益",
+          "其他"
+        ]
       }
     },
     {
@@ -107,14 +136,19 @@
   ],
   "cross_references": [
     {
-      "from": "H10-1.total",
+      "from": "H10-1.R11.C5",
       "to": "tb://6115#审定数",
       "description": "审定表合计 = 试算表资产处置损益审定数"
     },
     {
       "from": "H10-2.合计",
-      "to": "H10-1.total",
+      "to": "H10-1.R11.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "H10-1.R11.C5",
+      "to": "REPORT('IS-015','本期')",
+      "description": "审定表合计 = 报表资产处置损益"
     }
   ],
   "audit_checks": [
@@ -141,6 +175,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "H10-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表资产处置损益"
+    },
+    {
+      "code": "H10-CHK-05",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "固定资产处置与H1减少检查表一致"
     }
   ]
 }

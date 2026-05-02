@@ -1,7 +1,7 @@
 {
   "wp_code": "M9",
   "name": "其他综合收益",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "3102"
   ],
@@ -76,6 +76,36 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-E06"
+        },
+        "tb": {
+          "row": 14,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 15,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "其他权益工具投资公允价值变动",
+          "其他债权投资公允价值变动",
+          "现金流量套期储备",
+          "外币报表折算差额",
+          "其他"
+        ]
       }
     },
     {
@@ -111,18 +141,23 @@
   ],
   "cross_references": [
     {
-      "from": "M9-1.total",
+      "from": "M9-1.R12.C7",
       "to": "tb://3102#审定数",
       "description": "审定表合计 = 试算表其他综合收益审定数"
     },
     {
       "from": "M9-2.合计",
-      "to": "M9-1.total",
+      "to": "M9-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "from": "M9-1.total",
+      "from": "M9-1.R12.C7",
       "to": "report://BS/BS-053#期末",
+      "description": "审定表合计 = 报表其他综合收益"
+    },
+    {
+      "from": "M9-1.R12.C7",
+      "to": "REPORT('BS-E06','期末')",
       "description": "审定表合计 = 报表其他综合收益"
     }
   ],
@@ -156,6 +191,12 @@
       "type": "balance",
       "severity": "blocking",
       "description": "审定表合计 = 报表其他综合收益行"
+    },
+    {
+      "code": "M9-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他综合收益"
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "wp_code": "N1",
   "name": "递延所得税资产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1811"
   ],
@@ -125,19 +125,24 @@
   ],
   "cross_references": [
     {
-      "from": "N1-1.total",
+      "from": "N1-1.R12.C7",
       "to": "tb://1811#审定数",
       "description": "审定表合计 = 试算表递延所得税资产审定数"
     },
     {
-      "from": "N1-1.total",
+      "from": "N1-1.R12.C7",
       "to": "report://BS/BS-018#期末",
       "description": "审定表合计 = 报表递延所得税资产"
     },
     {
       "from": "N1-2.合计",
-      "to": "N1-1.total",
+      "to": "N1-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "N1-1.R12.C7",
+      "to": "REPORT('BS-030a','期末')",
+      "description": "审定表合计 = 报表递延所得税资产"
     }
   ],
   "audit_checks": [

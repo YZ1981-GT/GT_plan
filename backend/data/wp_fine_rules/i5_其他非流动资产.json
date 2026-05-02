@@ -1,7 +1,7 @@
 {
   "wp_code": "I5",
   "name": "其他非流动资产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1901"
   ],
@@ -76,6 +76,36 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 11,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-031"
+        },
+        "tb": {
+          "row": 13,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 14,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "预缴企业所得税",
+          "待抵扣进项税额",
+          "合同取得成本",
+          "其他",
+          "预付租金（长期）"
+        ]
       }
     },
     {
@@ -111,14 +141,19 @@
   ],
   "cross_references": [
     {
-      "from": "I5-1.total",
+      "from": "I5-1.R11.C7",
       "to": "tb://1901#审定数",
       "description": "审定表合计 = 试算表其他非流动资产审定数"
     },
     {
       "from": "I5-2.合计",
-      "to": "I5-1.total",
+      "to": "I5-1.R11.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "I5-1.R11.C7",
+      "to": "REPORT('BS-031','期末')",
+      "description": "审定表合计 = 报表其他非流动资产"
     }
   ],
   "audit_checks": [
@@ -145,6 +180,12 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "I5-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他非流动资产"
     }
   ]
 }

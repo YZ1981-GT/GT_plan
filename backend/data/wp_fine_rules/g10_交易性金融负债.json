@@ -1,7 +1,7 @@
 {
   "wp_code": "G10",
   "name": "交易性金融负债",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2101"
   ],
@@ -79,6 +79,33 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 9,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L02"
+        },
+        "tb": {
+          "row": 11,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 12,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "衍生金融负债",
+          "指定FVTPL金融负债"
+        ]
       }
     },
     {
@@ -129,14 +156,19 @@
   ],
   "cross_references": [
     {
-      "from": "G10-1.total",
+      "from": "G10-1.R9.C7",
       "to": "tb://2101#审定数",
       "description": "审定表合计 = 试算表交易性金融负债审定数"
     },
     {
       "from": "G10-2.合计",
-      "to": "G10-1.total",
+      "to": "G10-1.R9.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "G10-1.R9.C7",
+      "to": "REPORT('BS-L02','期末')",
+      "description": "审定表合计 = 报表交易性金融负债"
     }
   ],
   "audit_checks": [
@@ -163,6 +195,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "G10-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表交易性金融负债"
+    },
+    {
+      "code": "G10-CHK-05",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值计量正确"
     }
   ]
 }

@@ -42,6 +42,11 @@
       "from": "J1-6",
       "to": "J1-1",
       "description": "计提检查引用审定表数据"
+    },
+    {
+      "from": "J1-1.total",
+      "to": "REPORT('BS-L06','期末')",
+      "description": "审定表合计 = 报表应付职工薪酬"
     }
   ],
   "audit_checks": [

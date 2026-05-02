@@ -955,6 +955,7 @@ export async function confirmExcelAsTemplate(projectId: string, fileStem: string
   return data
 }
 
+/** @deprecated 已迁移至 Univer，保留向后兼容 */
 export async function syncFromOnlyoffice(projectId: string, fileStem: string): Promise<any> {
   const { data } = await http.post(`/api/projects/${projectId}/excel-html/sync-from-onlyoffice/${fileStem}`)
   return data

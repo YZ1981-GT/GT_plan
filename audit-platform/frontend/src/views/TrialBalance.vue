@@ -33,6 +33,7 @@
           <el-button size="small" @click="onRecalc" :loading="recalcLoading">🔄 全量重算</el-button>
         </el-tooltip>
         <el-button size="small" @click="onExport">📤 导出Excel</el-button>
+        <el-button size="small" @click="showTbImport = true">📥 Excel导入</el-button>
         <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
       </div>
     </div>
@@ -172,6 +173,15 @@
       :year="year"
       @applied="fetchData"
     />
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showTbImport"
+      import-type="trial_balance"
+      :project-id="projectId"
+      :year="year"
+      @imported="onTbImported"
+    />
   </div>
 </template>
 
@@ -181,6 +191,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Link } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
   getProjectAuditYear, listAdjustments,
@@ -204,6 +215,7 @@ const projectYear = ref<number | null>(null)
 const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
 
 const loading = ref(false)
+const showTbImport = ref(false)
 const recalcLoading = ref(false)
 const checkLoading = ref(false)
 const showFormulaManager = ref(false)
@@ -374,6 +386,11 @@ async function onConsistencyCheck() {
   } finally {
     checkLoading.value = false
   }
+}
+
+function onTbImported() {
+  showTbImport.value = false
+  fetchData()
 }
 
 function onExport() {

@@ -1,7 +1,7 @@
 {
   "wp_code": "G14",
   "name": "信用减值损失",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6701"
   ],
@@ -76,6 +76,36 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 15,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-010"
+        },
+        "tb": {
+          "row": 17,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 18,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "应收账款坏账损失",
+          "其他应收款坏账损失",
+          "应收票据坏账损失",
+          "债权投资减值",
+          "合同资产减值"
+        ]
       }
     },
     {
@@ -101,14 +131,19 @@
   ],
   "cross_references": [
     {
-      "from": "G14-1.total",
+      "from": "G14-1.R15.C5",
       "to": "tb://6701#审定数",
       "description": "审定表合计 = 试算表信用减值损失审定数"
     },
     {
       "from": "G14-2.合计",
-      "to": "G14-1.total",
+      "to": "G14-1.R15.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "G14-1.R15.C5",
+      "to": "REPORT('IS-010','本期')",
+      "description": "审定表合计 = 报表信用减值损失"
     }
   ],
   "audit_checks": [
@@ -135,6 +170,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "G14-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表信用减值损失"
+    },
+    {
+      "code": "G14-CHK-05",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "应收账款坏账损失与D2坏账准备变动一致"
+    },
+    {
+      "code": "G14-CHK-06",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "其他应收款坏账损失与K1坏账准备变动一致"
     }
   ]
 }

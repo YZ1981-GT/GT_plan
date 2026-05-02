@@ -152,7 +152,7 @@ async def get_online_edit_session(
 ):
     """获取在线编辑会话配置。
 
-    在线编辑是优先方案；当功能开关关闭或服务未部署时，前端再降级到离线模式。
+    在线编辑使用 Univer 纯前端方案；此端点保留向后兼容。
     """
     wp_result = await db.execute(
         sa.select(WorkingPaper.id).where(
@@ -184,7 +184,7 @@ async def get_online_edit_session(
     wopi_base_url = settings.WOPI_BASE_URL.rstrip("/")
     wopi_src = f"{wopi_base_url}/files/{wp_id}?access_token={access_token}"
 
-    # 构造完整的 ONLYOFFICE 编辑器 URL
+    # 构造编辑器 URL（向后兼容，前端已使用 Univer）
     onlyoffice_url = getattr(settings, "ONLYOFFICE_URL", "http://localhost:8080").rstrip("/")
     editor_url = f"{onlyoffice_url}/hosting/wopi/cell/edit?WOPISrc={wopi_src}"
 
@@ -197,6 +197,180 @@ async def get_online_edit_session(
         "editor_url": editor_url,
         "editor_base_url": str(request.base_url).rstrip("/"),
         "onlyoffice_url": onlyoffice_url,
+    }
+
+
+@router.get("/working-papers/{wp_id}/univer-data")
+async def get_univer_data(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取底稿的 Univer IWorkbookData 格式数据（含所有 Sheet、样式、公式）"""
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    wp = result.scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    if not wp.file_path:
+        raise HTTPException(status_code=404, detail="底稿文件不存在")
+
+    from app.services.xlsx_to_univer import xlsx_to_univer_data
+    data = xlsx_to_univer_data(wp.file_path)
+    return data
+
+
+@router.post("/working-papers/{wp_id}/univer-save")
+async def save_univer_data(
+    project_id: UUID,
+    wp_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """Univer 编辑器保存 — 完整保存链路
+
+    接收 Univer IWorkbookData snapshot，执行：
+    1. xlsx 回写（保留样式/公式/多Sheet）
+    2. structure.json 更新（三式联动）
+    3. 版本递增 + 审计留痕
+    4. 事件发布（触发五环联动）
+    5. 自动解析 parsed_data
+    """
+    import hashlib
+    import json
+    import shutil
+    from datetime import datetime
+    from pathlib import Path
+
+    snapshot = body.get("snapshot")
+    if not snapshot or not snapshot.get("sheets"):
+        raise HTTPException(status_code=400, detail="缺少 snapshot 数据")
+
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    wp = result.scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+    if not wp.file_path:
+        raise HTTPException(status_code=400, detail="底稿文件路径为空")
+
+    fp = Path(wp.file_path)
+
+    # 1. 版本快照（保存前备份）
+    if fp.exists():
+        snapshot_dir = fp.parent / ".versions"
+        snapshot_dir.mkdir(exist_ok=True)
+        snapshot_name = f"{fp.stem}_v{wp.file_version}{fp.suffix}"
+        shutil.copy2(fp, snapshot_dir / snapshot_name)
+
+    # 2. xlsx 回写
+    from app.services.univer_to_xlsx import univer_data_to_xlsx
+    write_result = univer_data_to_xlsx(snapshot, str(fp))
+
+    # 3. structure.json 更新
+    from app.services.univer_to_xlsx import univer_snapshot_to_structure
+    structure = univer_snapshot_to_structure(snapshot)
+    structure["metadata"]["version"] = (wp.file_version or 0) + 1
+    structure_path = fp.with_suffix(".structure.json")
+    with open(structure_path, "w", encoding="utf-8") as f:
+        json.dump(structure, f, ensure_ascii=False, indent=2)
+
+    # 4. 哈希校验
+    content_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
+
+    # 5. DB 更新
+    old_version = wp.file_version
+    wp.file_version += 1
+    wp.updated_at = datetime.utcnow()
+    wp.prefill_stale = True
+    await db.flush()
+
+    # 6. 审计留痕
+    try:
+        from app.models.core import Log
+        log = Log(
+            user_id=current_user.id,
+            action_type="workpaper_univer_save",
+            object_type="working_paper",
+            object_id=wp_id,
+            new_value={
+                "old_version": old_version,
+                "new_version": wp.file_version,
+                "content_hash": content_hash,
+                "sheets": write_result.get("sheets", 0),
+                "cells": write_result.get("cells", 0),
+            },
+        )
+        db.add(log)
+        await db.flush()
+    except Exception:
+        pass
+
+    # 7. 事件发布（触发五环联动）
+    try:
+        import asyncio
+        from app.services.event_bus import event_bus
+        payload = {
+            "event_type": "WORKPAPER_SAVED",
+            "project_id": project_id,
+            "extra": {
+                "wp_id": str(wp_id),
+                "file_version": wp.file_version,
+                "trigger": "univer_save",
+                "content_hash": content_hash,
+            },
+        }
+        asyncio.create_task(event_bus.publish(payload))
+    except Exception:
+        pass
+
+    # 8. 自动解析（非阻塞）
+    try:
+        import asyncio
+        from app.services.prefill_engine import parse_workpaper_real
+
+        async def _auto_parse():
+            try:
+                from app.core.database import async_session
+                async with async_session() as parse_db:
+                    await parse_workpaper_real(parse_db, project_id, wp_id)
+                    await parse_db.commit()
+            except Exception:
+                pass
+
+        asyncio.create_task(_auto_parse())
+    except Exception:
+        pass
+
+    await db.commit()
+
+    # 获取索引信息
+    idx_result = await db.execute(
+        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+    )
+    wp_code = idx_result.scalar_one_or_none() or ""
+
+    return {
+        "success": True,
+        "version": wp.file_version,
+        "content_hash": content_hash,
+        "wp_code": wp_code,
+        "sheets": write_result.get("sheets", 0),
+        "cells": write_result.get("cells", 0),
+        "message": f"保存成功 v{wp.file_version}",
     }
 
 

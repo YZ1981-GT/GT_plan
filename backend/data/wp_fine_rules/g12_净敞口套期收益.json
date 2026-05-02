@@ -74,7 +74,13 @@
       "code": "G12-6"
     }
   ],
-  "cross_references": [],
+  "cross_references": [
+    {
+      "from": "G12-1.total",
+      "to": "REPORT('IS-013','本期')",
+      "description": "审定表合计 = 报表净敞口套期收益"
+    }
+  ],
   "audit_checks": [
     {
       "code": "G12-CHK-01",

@@ -158,13 +158,19 @@ async def update_note(
 async def validate_notes(
     project_id: UUID,
     year: int,
+    template_type: str = "soe",
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """执行附注校验"""
+    """执行附注校验
+
+    template_type: soe（国企版）或 listed（上市版），决定使用哪套预设公式
+    """
+    if template_type not in ("soe", "listed"):
+        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
     engine = NoteValidationEngine(db)
     try:
-        result = await engine.validate_all(project_id, year)
+        result = await engine.validate_all(project_id, year, template_type=template_type)
         await db.commit()
         return result
     except Exception as e:

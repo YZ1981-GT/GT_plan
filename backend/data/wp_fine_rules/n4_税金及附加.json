@@ -1,7 +1,7 @@
 {
   "wp_code": "N4",
   "name": "税金及附加",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6403"
   ],
@@ -11,7 +11,6 @@
       "sheets": [
         "底稿目录",
         "税金及附加审计程序表N4A ",
-        "税金及附加审计程序表O2A（原底稿）",
         "税金及附加审定表N4-1",
         "附注披露信息（上市公司）",
         "附注披露信息（国企）",
@@ -25,22 +24,17 @@
     {
       "exact_name": "税金及附加审计程序表N4A ",
       "type": "procedure",
-      "code": "N4"
-    },
-    {
-      "exact_name": "税金及附加审计程序表O2A（原底稿）",
-      "type": "procedure",
-      "code": "O2"
+      "code": "N4A"
     },
     {
       "exact_name": "税金及附加审定表N4-1",
       "type": "summary",
+      "code": "N4-1",
       "header_rows": [
         5,
         6
       ],
       "data_start_row": 7,
-      "code": "N4-1",
       "layout": {
         "label_col": 1,
         "columns": {
@@ -77,44 +71,90 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 19,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-003"
+        },
+        "tb_balance": {
+          "row": 21,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 22,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "消费税",
+          "城市维护建设税",
+          "教育费附加",
+          "地方教育附加",
+          "资源税"
+        ]
       }
     },
     {
       "exact_name": "附注披露信息（上市公司）",
       "type": "note_disclosure",
-      "code": "附注披露信息（上市公司）"
+      "code": "N4-note-listed"
     },
     {
       "exact_name": "附注披露信息（国企）",
       "type": "note_disclosure",
-      "code": "附注披露信息（国企）"
+      "code": "N4-note-soe"
     },
     {
       "exact_name": "税金及附加明细表N4-2",
       "type": "detail",
-      "code": "N4-2"
+      "code": "N4-2",
+      "description": "税金及附加按税种/月份明细"
     },
     {
       "exact_name": "调整分录汇总表N4-3",
       "type": "adjustment",
       "code": "N4-3"
-    },
-    {
-      "exact_name": "GT_Custom",
-      "type": "check",
-      "code": "GT_Custom"
     }
   ],
   "cross_references": [
     {
-      "from": "N4-1.total",
+      "from": "N4-1.R19.C5",
       "to": "tb://6403#审定数",
       "description": "审定表合计 = 试算表税金及附加审定数"
     },
     {
+      "from": "N4-1.R19.C5",
+      "to": "REPORT('IS-003','本期')",
+      "description": "审定表合计 = 利润表税金及附加"
+    },
+    {
       "from": "N4-2.合计",
-      "to": "N4-1.total",
+      "to": "N4-1.R19.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "N4-1.R8.C5",
+      "to": "N2-1.城建税",
+      "description": "城建税 → 应交税费城建税"
+    },
+    {
+      "from": "N4-1.R9.C5",
+      "to": "N2-1.教育费附加",
+      "description": "教育费附加 → 应交税费教育费附加"
+    },
+    {
+      "from": "N4-1.R12.C5",
+      "to": "N2-1.房产税",
+      "description": "房产税 → 应交税费房产税"
     }
   ],
   "audit_checks": [
@@ -126,21 +166,51 @@
     },
     {
       "code": "N4-CHK-02",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 利润表税金及附加"
+    },
+    {
+      "code": "N4-CHK-03",
       "type": "cross_ref",
       "severity": "warning",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "code": "N4-CHK-03",
-      "type": "movement",
-      "severity": "info",
-      "description": "期初 + 变动 = 期末"
+      "code": "N4-CHK-04",
+      "type": "formula",
+      "severity": "warning",
+      "description": "合计 = 各税种之和"
     },
     {
-      "code": "N4-CHK-04",
+      "code": "N4-CHK-05",
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "N4-CHK-06",
+      "type": "analysis",
+      "severity": "warning",
+      "description": "城建税/教育费附加与增值税配比（城建税=增值税×7%或5%）"
+    },
+    {
+      "code": "N4-CHK-07",
+      "type": "cross_ref",
+      "severity": "info",
+      "description": "各税种与应交税费科目交叉核对"
+    },
+    {
+      "code": "N4-CHK-08",
+      "type": "analysis",
+      "severity": "info",
+      "description": "房产税/土地使用税与上年比较（无新增房产应基本持平）"
+    },
+    {
+      "code": "N4-CHK-09",
+      "type": "analysis",
+      "severity": "info",
+      "description": "印花税与合同金额配比合理性"
     }
   ]
 }

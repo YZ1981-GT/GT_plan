@@ -1,7 +1,7 @@
 {
   "wp_code": "M10",
   "name": "其他权益工具",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "3003"
   ],
@@ -83,6 +83,34 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 10,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-E04"
+        },
+        "tb": {
+          "row": 12,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 13,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "永续债",
+          "优先股",
+          "其他"
+        ]
       }
     },
     {
@@ -123,14 +151,19 @@
   ],
   "cross_references": [
     {
-      "from": "M10-1.total",
+      "from": "M10-1.R10.C7",
       "to": "tb://3003#审定数",
       "description": "审定表合计 = 试算表其他权益工具审定数"
     },
     {
       "from": "M10-2.合计",
-      "to": "M10-1.total",
+      "to": "M10-1.R10.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "M10-1.R10.C7",
+      "to": "REPORT('BS-E04','期末')",
+      "description": "审定表合计 = 报表其他权益工具"
     }
   ],
   "audit_checks": [
@@ -157,6 +190,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "M10-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他权益工具"
+    },
+    {
+      "code": "M10-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "权益工具分类条件已检查"
     }
   ]
 }

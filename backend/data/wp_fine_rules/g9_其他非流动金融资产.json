@@ -1,7 +1,7 @@
 {
   "wp_code": "G9",
   "name": "其他非流动金融资产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1510"
   ],
@@ -77,6 +77,35 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 9,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-022"
+        },
+        "tb": {
+          "row": 11,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 12,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "以公允价值计量且变动计入当期损益",
+          "其他",
+          "理财产品",
+          "基金"
+        ]
       }
     },
     {
@@ -117,14 +146,19 @@
   ],
   "cross_references": [
     {
-      "from": "G9-1.total",
+      "from": "G9-1.R9.C7",
       "to": "tb://1510#审定数",
       "description": "审定表合计 = 试算表其他非流动金融资产审定数"
     },
     {
       "from": "G9-2.合计",
-      "to": "G9-1.total",
+      "to": "G9-1.R9.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "G9-1.R9.C7",
+      "to": "REPORT('BS-022','期末')",
+      "description": "审定表合计 = 报表其他非流动金融资产"
     }
   ],
   "audit_checks": [
@@ -163,6 +197,18 @@
       "type": "calculation",
       "severity": "warning",
       "description": "预期信用损失计提合理"
+    },
+    {
+      "code": "G9-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他非流动金融资产"
+    },
+    {
+      "code": "G9-CHK-05",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值计量正确"
     }
   ]
 }

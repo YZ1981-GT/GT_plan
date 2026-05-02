@@ -149,6 +149,7 @@ class ProjectCreateResponse(BaseModel):
     audit_year: int | None = None
     project_type: str | None = None
     status: str
+    template_type: str | None = None
     report_scope: str | None = None
     parent_project_id: UUID | None = None
     consol_level: int = 1

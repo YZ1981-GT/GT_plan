@@ -1,7 +1,7 @@
 {
   "wp_code": "M4",
   "name": "资本公积",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "4002"
   ],
@@ -119,19 +119,24 @@
   ],
   "cross_references": [
     {
-      "from": "M4-1.total",
+      "from": "M4-1.R12.C7",
       "to": "tb://4002#审定数",
       "description": "审定表合计 = 试算表资本公积审定数"
     },
     {
-      "from": "M4-1.total",
+      "from": "M4-1.R12.C7",
       "to": "report://BS/BS-052#期末",
       "description": "审定表合计 = 报表资本公积"
     },
     {
       "from": "M4-2.合计",
-      "to": "M4-1.total",
+      "to": "M4-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "M4-1.R12.C7",
+      "to": "REPORT('BS-E02','期末')",
+      "description": "审定表合计 = 报表资本公积"
     }
   ],
   "audit_checks": [

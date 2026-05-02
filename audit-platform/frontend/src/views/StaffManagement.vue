@@ -11,8 +11,7 @@
           <el-option label="审计三部" value="审计三部" />
         </el-select>
         <el-button type="primary" @click="showCreateDialog = true">新增人员</el-button>
-        <el-button @click="triggerImport">Excel导入</el-button>
-        <input ref="importFileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImportFile" />
+        <el-button @click="showStaffImport = true">Excel导入</el-button>
       </div>
     </div>
 
@@ -84,6 +83,13 @@
         </el-table>
       </div>
     </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showStaffImport"
+      import-type="staff"
+      @imported="onStaffImported"
+    />
   </div>
 </template>
 
@@ -91,6 +97,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listStaff, createStaff, updateStaff, getStaffResume, deleteStaff, type StaffMember } from '@/services/staffApi'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 
 const titles = ['合伙人', '总监', '高级经理', '经理', '高级审计员', '审计员', '实习生']
 
@@ -102,9 +109,9 @@ const pageSize = 50
 const searchQuery = ref('')
 const filterDept = ref('')
 const showCreateDialog = ref(false)
+const showStaffImport = ref(false)
 const showResumeDialog = ref(false)
 const editingStaff = ref<StaffMember | null>(null)
-const importFileInput = ref<HTMLInputElement>()
 const saving = ref(false)
 const resumeData = ref<any>(null)
 
@@ -172,29 +179,9 @@ async function onDeleteStaff(row: StaffMember) {
   } catch { ElMessage.error('删除失败') }
 }
 
-function triggerImport() {
-  importFileInput.value?.click()
-}
-
-async function handleImportFile(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const { data } = await (await import('@/utils/http')).default.post('/api/staff/import-excel', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    const result = data?.data ?? data
-    ElMessage.success(`导入成功：新增 ${result?.imported || 0} 人，跳过 ${result?.skipped || 0} 人`)
-    await loadStaff()
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || err?.message || 'Excel导入失败')
-  } finally {
-    input.value = ''  // 清空文件选择
-  }
+function onStaffImported() {
+  showStaffImport.value = false
+  loadStaff()
 }
 
 onMounted(loadStaff)

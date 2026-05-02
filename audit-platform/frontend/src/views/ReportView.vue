@@ -55,6 +55,7 @@
             <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 审核</el-button>
           </el-tooltip>
           <el-button size="small" @click="onExportExcel">📤 导出Excel</el-button>
+          <el-button size="small" @click="showReportImport = true">📥 Excel导入</el-button>
           <el-button size="small" @click="onEditConfig">📝 编辑结构</el-button>
           <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
           <el-tooltip content="配置国企版↔上市版报表行次映射规则" placement="bottom">
@@ -507,6 +508,16 @@
         </el-button>
       </div>
     </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showReportImport"
+      import-type="report"
+      :project-id="projectId"
+      :year="year"
+      :sub-type="activeTab"
+      @imported="onReportImported"
+    />
   </div>
 </template>
 
@@ -517,6 +528,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -701,6 +713,7 @@ const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().g
 const loading = ref(false)
 const genLoading = ref(false)
 const checkLoading = ref(false)
+const showReportImport = ref(false)
 const syncLoading = ref(false)
 const activeTab = ref('balance_sheet')
 const reportMode = ref('audited')
@@ -1128,7 +1141,14 @@ function onExportAuditExcel() {
   a.click()
   URL.revokeObjectURL(url)
   ElMessage.success('审核报告已导出')
-}function onExportExcel() {
+}
+
+function onReportImported() {
+  showReportImport.value = false
+  loadReport()
+}
+
+function onExportExcel() {
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     const url = getReportExcelUrl(projectId.value, year.value, activeTab.value)
     downloadFileAsBlob(url, `报表_${activeTab.value}_${year.value}.xlsx`)

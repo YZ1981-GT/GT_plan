@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="gt-wp-list gt-fade-in">
     <!-- 顶部筛选栏 -->
     <div class="gt-wp-filter-bar">
@@ -29,6 +29,7 @@
           <el-option label="全部" value="" />
         </el-select>
         <el-button @click="fetchData" :loading="loading">刷新</el-button>
+        <el-button @click="showWpImport = true">📥 Excel导入</el-button>
         <el-button type="primary" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
           批量下载 ({{ selectedWpIds.length }})
         </el-button>
@@ -143,10 +144,7 @@
               <el-button-group>
                 <el-button type="primary" @click="onOnlineEdit">
                   <el-icon style="margin-right:4px"><Monitor /></el-icon>
-                  {{ onlineEditReady ? '在线编辑' : '在线编辑（离线兜底）' }}
-                  <el-tag v-if="onlineEditMaturity !== 'production'" size="small" type="warning" style="margin-left:6px">
-                    {{ onlineEditMaturity === 'experimental' ? '实验' : '试点' }}
-                  </el-tag>
+                  在线编辑
                 </el-button>
                 <el-button @click="onDownload">
                   <el-icon style="margin-right:4px"><Download /></el-icon>下载编辑
@@ -174,9 +172,6 @@
               :policy-code="sodPolicyCode"
               :trace-id="sodTraceId"
             />
-            <el-alert v-if="!onlineEditReady" type="info" :closable="false" style="margin-top:8px" show-icon>
-              {{ onlineEditNotice }}
-            </el-alert>
 
             <!-- QC 结果摘要 -->
             <div v-if="qcResult" class="gt-wp-qc-summary-inline">
@@ -374,6 +369,15 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showWpImport"
+      import-type="workpaper"
+      :project-id="projectId"
+      :year="Number(route.query.year) || new Date().getFullYear()"
+      @imported="onWpImported"
+    />
   </div>
 </template>
 
@@ -385,13 +389,13 @@ import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
   checkFeatureFlag, getFeatureMaturity, submitWorkpaperReview,
   checkUnconfirmedAI,
 } from '@/services/commonApi'
 import {
-  checkOnlineEditingAvailability,
   downloadWorkpaper,
   downloadWorkpaperPack,
   uploadWorkpaperFile,
@@ -405,6 +409,7 @@ const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 
 const loading = ref(false)
+const showWpImport = ref(false)
 const qcLoading = ref(false)
 const downloadLoading = ref(false)
 const submitLoading = ref(false)
@@ -453,15 +458,12 @@ const uploadFile = ref<File | null>(null)
 const uploadConflict = ref<{ server_version: number; uploaded_version: number } | null>(null)
 const uploadRef = ref<any>(null)
 
-// Feature flags & ONLYOFFICE 可用性
-const onlineEditAvailable = ref(true)  // ONLYOFFICE 是否可用（探测结果）
+// Feature flags & Univer 在线编辑（纯前端，始终可用）
+const onlineEditAvailable = ref(true)
 const onlineEditEnabled = ref(true)
-const onlineEditMaturity = ref('pilot')  // 功能成熟度
-const onlineEditReady = computed(() => onlineEditEnabled.value && onlineEditAvailable.value)
-const onlineEditNotice = computed(() => {
-  if (!onlineEditEnabled.value) return '在线编辑当前未启用，点击“在线编辑”将自动降级为下载编辑模式'
-  return 'ONLYOFFICE 尚未部署或服务暂不可用，点击“在线编辑”将自动降级为下载编辑模式'
-})
+const onlineEditMaturity = ref('production')
+const onlineEditReady = computed(() => true)
+const onlineEditNotice = computed(() => '')
 
 // Review annotations
 const annotations = ref<any[]>([])
@@ -694,6 +696,11 @@ function onGuideClick(cycle: string) {
   router.push({ path: `/projects/${projectId.value}/workpaper-bench`, query: { cycle } })
 }
 
+function onWpImported() {
+  showWpImport.value = false
+  fetchData()
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -846,11 +853,6 @@ async function onNodeClick(data: TreeNode) {
 
 function onOnlineEdit() {
   if (!selectedWp.value) return
-  if (!onlineEditReady.value) {
-    ElMessage.info(onlineEditNotice.value)
-    onDownload()
-    return
-  }
   router.push({
     name: 'WorkpaperEditor',
     params: { projectId: projectId.value, wpId: selectedWp.value.id },
@@ -1119,18 +1121,9 @@ async function onReviewPass() {
 }
 
 async function refreshOnlineEditState() {
-  try {
-    onlineEditEnabled.value = await checkFeatureFlag('online_editing', projectId.value)
-  } catch {
-    onlineEditEnabled.value = true
-  }
-
-  if (!onlineEditEnabled.value) {
-    onlineEditAvailable.value = false
-    return
-  }
-
-  onlineEditAvailable.value = await checkOnlineEditingAvailability()
+  // Univer 纯前端，无需探测服务可用性
+  onlineEditEnabled.value = true
+  onlineEditAvailable.value = true
 }
 
 async function handleUploadRedirect() {

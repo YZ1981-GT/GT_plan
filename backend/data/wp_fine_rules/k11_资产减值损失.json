@@ -1,7 +1,7 @@
 {
   "wp_code": "K11",
   "name": "资产减值损失",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6702"
   ],
@@ -70,6 +70,36 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 15,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-016a"
+        },
+        "tb": {
+          "row": 17,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 18,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "固定资产减值",
+          "在建工程减值",
+          "无形资产减值",
+          "商誉减值",
+          "投资性房地产减值"
+        ]
       }
     },
     {
@@ -95,14 +125,19 @@
   ],
   "cross_references": [
     {
-      "from": "K11-1.total",
+      "from": "K11-1.R15.C5",
       "to": "tb://6702#审定数",
       "description": "审定表合计 = 试算表资产减值损失审定数"
     },
     {
       "from": "K11-2.合计",
-      "to": "K11-1.total",
+      "to": "K11-1.R15.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K11-1.R15.C5",
+      "to": "REPORT('IS-016a','本期')",
+      "description": "审定表合计 = 报表资产减值损失"
     }
   ],
   "audit_checks": [
@@ -129,6 +164,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K11-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表资产减值损失"
+    },
+    {
+      "code": "K11-CHK-05",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "各项减值与对应科目减值准备变动一致"
+    },
+    {
+      "code": "K11-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "减值测试报告已取得"
     }
   ]
 }

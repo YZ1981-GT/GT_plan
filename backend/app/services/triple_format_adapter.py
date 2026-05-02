@@ -14,7 +14,7 @@
 - from_structure(): 从 structure.json 更新模块数据
 - to_html(): 生成可编辑 HTML
 - to_excel(): 导出 Excel
-- sync_from_excel(): ONLYOFFICE 编辑后同步
+- sync_from_excel(): 编辑器保存后同步（向后兼容）
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ class WorkpaperAdapter:
 
     底稿 Excel 文件 → structure.json → HTML 在线编辑
     取数公式绑定到 structure.json 单元格
-    ONLYOFFICE 编辑后自动同步
+    Univer 编辑后自动同步
     """
 
     @staticmethod

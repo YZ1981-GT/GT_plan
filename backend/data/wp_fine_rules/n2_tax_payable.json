@@ -47,6 +47,11 @@
       "from": "N2-8",
       "to": "N2-1",
       "description": "其他税费测算引用审定表各行"
+    },
+    {
+      "from": "N2-1.total",
+      "to": "REPORT('BS-L03','期末')",
+      "description": "审定表合计 = 报表应交税费"
     }
   ],
   "audit_checks": [

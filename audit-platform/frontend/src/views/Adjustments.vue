@@ -27,6 +27,7 @@
       </div>
       <div class="gt-adj-banner-row2">
         <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
+        <el-button size="small" @click="showImportDialog = true">📥 Excel导入</el-button>
         <el-button size="small" @click="onExportSummary">📤 导出汇总</el-button>
       </div>
     </div>
@@ -188,6 +189,15 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showImportDialog"
+      import-type="adjustments"
+      :project-id="projectId"
+      :year="year"
+      @imported="onImported"
+    />
   </div>
 </template>
 
@@ -201,6 +211,7 @@ import {
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -217,6 +228,7 @@ const projectYear = ref<number | null>(null)
 const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
 
 const loading = ref(false)
+const showImportDialog = ref(false)
 const submitLoading = ref(false)
 const activeTab = ref('all')
 const entries = ref<any[]>([])
@@ -402,6 +414,11 @@ async function batchReview(status: string) {
   selectedRows.value = []
   fetchEntries()
   fetchSummary()
+}
+
+function onImported() {
+  showImportDialog.value = false
+  fetchData()
 }
 
 function onExportSummary() {

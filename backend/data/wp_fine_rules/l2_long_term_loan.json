@@ -1,7 +1,7 @@
 {
   "wp_code": "L2",
   "name": "长期借款",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2501"
   ],
@@ -114,19 +114,24 @@
   ],
   "cross_references": [
     {
-      "from": "L2-1.total",
+      "from": "L2-1.R12.C7",
       "to": "report://BS/BS-041#期末",
       "description": "审定表合计 = 报表长期借款"
     },
     {
-      "from": "L2-1.total",
+      "from": "L2-1.R12.C7",
       "to": "tb://2501#审定数",
       "description": "审定表合计 = 试算表长期借款审定数"
     },
     {
       "from": "L2-2.合计",
-      "to": "L2-1.total",
+      "to": "L2-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "L2-1.R12.C7",
+      "to": "REPORT('BS-L10a','期末')",
+      "description": "审定表合计 = 报表长期借款"
     }
   ],
   "audit_checks": [

@@ -1,9 +1,13 @@
 {
   "wp_code": "E1",
   "name": "货币资金",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "description": "E1货币资金精细化解析规则 — 基于致同2025年修订版模板精确Sheet名称",
-  "account_codes": ["1001", "1002", "1012"],
+  "account_codes": [
+    "1001",
+    "1002",
+    "1012"
+  ],
   "source_files": [
     {
       "file": "E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
@@ -94,103 +98,251 @@
       "code": "E1-1",
       "exact_name": "货币资金审定表E1-1",
       "type": "summary",
-      "header_rows": [5, 6],
+      "header_rows": [
+        5,
+        6
+      ],
       "data_start_row": 7,
       "layout": {
         "label_col": 1,
         "columns": {
-          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
-          "opening_adjustment": {"col": 3, "label": "期初账项调整"},
-          "opening_audited": {"col": 4, "label": "期初审定数"},
-          "closing_unadjusted": {"col": 5, "label": "期末未审数"},
-          "closing_adjustment": {"col": 6, "label": "期末账项调整"},
-          "closing_audited": {"col": 7, "label": "期末审定数"},
-          "change_amount": {"col": 8, "label": "变动额"},
-          "change_rate": {"col": 9, "label": "变动率"},
-          "reason": {"col": 10, "label": "原因分析"}
+          "opening_unadjusted": {
+            "col": 2,
+            "label": "期初未审数"
+          },
+          "opening_adjustment": {
+            "col": 3,
+            "label": "期初账项调整"
+          },
+          "opening_audited": {
+            "col": 4,
+            "label": "期初审定数"
+          },
+          "closing_unadjusted": {
+            "col": 5,
+            "label": "期末未审数"
+          },
+          "closing_adjustment": {
+            "col": 6,
+            "label": "期末账项调整"
+          },
+          "closing_audited": {
+            "col": 7,
+            "label": "期末审定数"
+          },
+          "change_amount": {
+            "col": 8,
+            "label": "变动额"
+          },
+          "change_rate": {
+            "col": 9,
+            "label": "变动率"
+          },
+          "reason": {
+            "col": 10,
+            "label": "原因分析"
+          }
         }
       },
       "key_rows": {
-        "cash": {"row": 7, "label": "库存现金", "account_code": "1001"},
-        "bank_deposit": {"row": 8, "label": "银行存款（本金）", "account_code": "1002"},
-        "bank_deposit_fc": {"row": 9, "label": "其中：存放财务公司款项", "indent": 1},
-        "bank_deposit_inst": {"row": 10, "label": "银行机构存款", "indent": 1},
-        "other_monetary": {"row": 11, "label": "其他货币资金（本金）", "account_code": "1012"},
-        "digital_currency": {"row": 12, "label": "数字货币（本金）"},
-        "accrued_interest": {"row": 13, "label": "应计利息"},
-        "interest_fc": {"row": 14, "label": "其中：财务公司存款", "indent": 1},
-        "interest_bank": {"row": 15, "label": "银行机构存款", "indent": 1},
-        "interest_other": {"row": 16, "label": "其他货币资金", "indent": 1},
-        "interest_digital": {"row": 17, "label": "数字货币", "indent": 1},
-        "total": {"row": 18, "label": "合计", "is_total": true, "report_row": "BS-002"},
-        "overseas": {"row": 19, "label": "其中：存放在境外的款项总额"},
-        "tb_balance": {"row": 20, "label": "试算平衡表数"},
-        "diff": {"row": 21, "label": "差异数"}
+        "total": {
+          "row": 18,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-002"
+        },
+        "tb_balance": {
+          "row": 20,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 21,
+          "label": "差异数"
+        }
       },
       "rmb_section": {
         "start_row": 23,
         "description": "仅人民币部分（R23起，结构与外币+人民币部分相同）"
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "库存现金",
+          "银行存款（本金）",
+          "其中：存放财务公司款项",
+          "银行机构存款",
+          "其他货币资金（本金）"
+        ]
       }
     },
     {
       "code": "E1-2",
       "exact_name": "现金明细表E1-2",
       "type": "detail",
-      "header_rows": [13, 14],
+      "header_rows": [
+        13,
+        14
+      ],
       "data_start_row": 15,
       "layout": {
         "columns": {
-          "currency": {"col": 1, "label": "币种"},
-          "opening_balance": {"col": 2, "label": "期初余额"},
-          "increase": {"col": 3, "label": "本期增加"},
-          "decrease": {"col": 4, "label": "本期减少"},
-          "closing_fc": {"col": 5, "label": "期末余额（原币）"},
-          "exchange_rate": {"col": 6, "label": "期末折算汇率"},
-          "closing_rmb": {"col": 7, "label": "期末折算人民币金额"},
-          "audit_adjustment": {"col": 8, "label": "审计调整-原币（调减为负数）"},
-          "closing_audited": {"col": 9, "label": "期末审定数（人民币金额）"},
-          "remark": {"col": 10, "label": "备注"}
+          "currency": {
+            "col": 1,
+            "label": "币种"
+          },
+          "opening_balance": {
+            "col": 2,
+            "label": "期初余额"
+          },
+          "increase": {
+            "col": 3,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 4,
+            "label": "本期减少"
+          },
+          "closing_fc": {
+            "col": 5,
+            "label": "期末余额（原币）"
+          },
+          "exchange_rate": {
+            "col": 6,
+            "label": "期末折算汇率"
+          },
+          "closing_rmb": {
+            "col": 7,
+            "label": "期末折算人民币金额"
+          },
+          "audit_adjustment": {
+            "col": 8,
+            "label": "审计调整-原币（调减为负数）"
+          },
+          "closing_audited": {
+            "col": 9,
+            "label": "期末审定数（人民币金额）"
+          },
+          "remark": {
+            "col": 10,
+            "label": "备注"
+          }
         }
       },
-      "link_to_summary": {"target": "E1-1", "target_row": 7, "target_col": 7, "source_col": 9, "description": "现金明细合计→审定表库存现金审定数"}
+      "link_to_summary": {
+        "target": "E1-1",
+        "target_row": 7,
+        "target_col": 7,
+        "source_col": 9,
+        "description": "现金明细合计→审定表库存现金审定数"
+      }
     },
     {
       "code": "E1-3-rmb",
       "exact_name": "银行存款及其他货币资金明细表(仅人民币)E1-3",
       "type": "detail",
-      "header_rows": [9, 10],
+      "header_rows": [
+        9,
+        10
+      ],
       "data_start_row": 11,
       "layout": {
         "columns": {
-          "bank_name": {"col": 1, "label": "开户银行"},
-          "ledger_name": {"col": 2, "label": "总账银行名称"},
-          "account_no": {"col": 3, "label": "银行账号"},
-          "account_type": {"col": 4, "label": "账户性质/主要用途"},
-          "opening_balance": {"col": 5, "label": "期初余额"},
-          "increase": {"col": 6, "label": "本期增加"},
-          "decrease": {"col": 7, "label": "本期减少"},
-          "closing_balance": {"col": 8, "label": "期末余额"},
-          "audit_adjustment": {"col": 9, "label": "账项调整（调减为负数）"},
-          "closing_audited": {"col": 10, "label": "期末审定数（人民币金额）"},
-          "bank_statement": {"col": 11, "label": "期末对账单余额"},
-          "diff_vs_statement": {"col": 12, "label": "期末账面余额与银行对账单余额差异"},
-          "confirmation_amount": {"col": 13, "label": "回函确认金额"},
-          "statement_index": {"col": 14, "label": "银行对账单索引号"},
-          "reconciliation_index": {"col": 15, "label": "银行存款余额调节表索引号"}
+          "bank_name": {
+            "col": 1,
+            "label": "开户银行"
+          },
+          "ledger_name": {
+            "col": 2,
+            "label": "总账银行名称"
+          },
+          "account_no": {
+            "col": 3,
+            "label": "银行账号"
+          },
+          "account_type": {
+            "col": 4,
+            "label": "账户性质/主要用途"
+          },
+          "opening_balance": {
+            "col": 5,
+            "label": "期初余额"
+          },
+          "increase": {
+            "col": 6,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 7,
+            "label": "本期减少"
+          },
+          "closing_balance": {
+            "col": 8,
+            "label": "期末余额"
+          },
+          "audit_adjustment": {
+            "col": 9,
+            "label": "账项调整（调减为负数）"
+          },
+          "closing_audited": {
+            "col": 10,
+            "label": "期末审定数（人民币金额）"
+          },
+          "bank_statement": {
+            "col": 11,
+            "label": "期末对账单余额"
+          },
+          "diff_vs_statement": {
+            "col": 12,
+            "label": "期末账面余额与银行对账单余额差异"
+          },
+          "confirmation_amount": {
+            "col": 13,
+            "label": "回函确认金额"
+          },
+          "statement_index": {
+            "col": 14,
+            "label": "银行对账单索引号"
+          },
+          "reconciliation_index": {
+            "col": 15,
+            "label": "银行存款余额调节表索引号"
+          }
         }
       },
       "sections": [
-        {"label": "（一）存款本金", "keyword": "存款本金"},
-        {"label": "（二）应计利息", "keyword": "应计利息"},
-        {"label": "（三）其他货币资金", "keyword": "其他货币资金"}
+        {
+          "label": "（一）存款本金",
+          "keyword": "存款本金"
+        },
+        {
+          "label": "（二）应计利息",
+          "keyword": "应计利息"
+        },
+        {
+          "label": "（三）其他货币资金",
+          "keyword": "其他货币资金"
+        }
       ],
-      "link_to_summary": {"target": "E1-1", "target_row": 8, "target_col": 7, "source_col": 10, "description": "银行明细合计→审定表银行存款审定数"}
+      "link_to_summary": {
+        "target": "E1-1",
+        "target_row": 8,
+        "target_col": 7,
+        "source_col": 10,
+        "description": "银行明细合计→审定表银行存款审定数"
+      }
     },
     {
       "code": "E1-3-fc",
       "exact_name": "银行存款及其他货币资金明细表(人民币及外币)E1-3",
       "type": "detail",
-      "header_rows": [9, 10],
+      "header_rows": [
+        9,
+        10
+      ],
       "data_start_row": 11,
       "description": "含外币的银行存款明细（列数更多，含原币/汇率/折算）"
     },
@@ -198,27 +350,64 @@
       "code": "E1-4",
       "exact_name": "数字货币明细表E1-4",
       "type": "detail",
-      "header_rows": [9, 10],
+      "header_rows": [
+        9,
+        10
+      ],
       "data_start_row": 11,
-      "link_to_summary": {"target": "E1-1", "target_row": 12, "target_col": 7, "description": "数字货币合计→审定表数字货币审定数"}
+      "link_to_summary": {
+        "target": "E1-1",
+        "target_row": 12,
+        "target_col": 7,
+        "description": "数字货币合计→审定表数字货币审定数"
+      }
     },
     {
       "code": "E1-5",
       "exact_name": "调整分录汇总E1-5",
       "type": "adjustment",
-      "header_rows": [5],
+      "header_rows": [
+        5
+      ],
       "data_start_row": 6,
       "layout": {
         "columns": {
-          "description": {"col": 1, "label": "调整事项说明"},
-          "category": {"col": 2, "label": "类别（报表调整/账项调整/其他）"},
-          "report_item": {"col": 3, "label": "报表项目"},
-          "account_name": {"col": 4, "label": "科目名称"},
-          "note_item": {"col": 5, "label": "附注项目"},
-          "debit": {"col": 7, "label": "借方调整金额"},
-          "credit": {"col": 8, "label": "贷方调整金额"},
-          "index_ref": {"col": 9, "label": "索引"},
-          "remark": {"col": 10, "label": "备注"}
+          "description": {
+            "col": 1,
+            "label": "调整事项说明"
+          },
+          "category": {
+            "col": 2,
+            "label": "类别（报表调整/账项调整/其他）"
+          },
+          "report_item": {
+            "col": 3,
+            "label": "报表项目"
+          },
+          "account_name": {
+            "col": 4,
+            "label": "科目名称"
+          },
+          "note_item": {
+            "col": 5,
+            "label": "附注项目"
+          },
+          "debit": {
+            "col": 7,
+            "label": "借方调整金额"
+          },
+          "credit": {
+            "col": 8,
+            "label": "贷方调整金额"
+          },
+          "index_ref": {
+            "col": 9,
+            "label": "索引"
+          },
+          "remark": {
+            "col": 10,
+            "label": "备注"
+          }
         }
       }
     },
@@ -226,7 +415,10 @@
       "code": "E1-6",
       "exact_name": "银行存款余额调节表E1-6",
       "type": "reconciliation",
-      "header_rows": [14, 15],
+      "header_rows": [
+        14,
+        15
+      ],
       "data_start_row": 16,
       "description": "每个银行账户一张调节表，R13标注开户银行和账号"
     },
@@ -252,21 +444,57 @@
       "code": "E1-10",
       "exact_name": "已开立银行账户清单核对表E1-10",
       "type": "verification",
-      "header_rows": [11, 12],
+      "header_rows": [
+        11,
+        12
+      ],
       "data_start_row": 13,
       "layout": {
         "columns": {
-          "seq": {"col": 1, "label": "序号"},
-          "bank_name": {"col": 2, "label": "开户银行名称"},
-          "account_no": {"col": 3, "label": "账号"},
-          "account_type": {"col": 4, "label": "账户性质"},
-          "account_status": {"col": 5, "label": "账户状态"},
-          "open_date": {"col": 6, "label": "开户日期"},
-          "close_date": {"col": 7, "label": "销户日期"},
-          "open_reason": {"col": 8, "label": "开户原因"},
-          "close_reason": {"col": 9, "label": "销户原因"},
-          "match_result": {"col": 10, "label": "与企业信息核对一致"},
-          "mismatch_reason": {"col": 11, "label": "不一致原因"}
+          "seq": {
+            "col": 1,
+            "label": "序号"
+          },
+          "bank_name": {
+            "col": 2,
+            "label": "开户银行名称"
+          },
+          "account_no": {
+            "col": 3,
+            "label": "账号"
+          },
+          "account_type": {
+            "col": 4,
+            "label": "账户性质"
+          },
+          "account_status": {
+            "col": 5,
+            "label": "账户状态"
+          },
+          "open_date": {
+            "col": 6,
+            "label": "开户日期"
+          },
+          "close_date": {
+            "col": 7,
+            "label": "销户日期"
+          },
+          "open_reason": {
+            "col": 8,
+            "label": "开户原因"
+          },
+          "close_reason": {
+            "col": 9,
+            "label": "销户原因"
+          },
+          "match_result": {
+            "col": 10,
+            "label": "与企业信息核对一致"
+          },
+          "mismatch_reason": {
+            "col": 11,
+            "label": "不一致原因"
+          }
         }
       }
     },
@@ -367,25 +595,112 @@
     }
   ],
   "cross_references": [
-    {"from": "E1-1.R18.C7", "to": "report://BS/BS-002#期末", "description": "审定表合计 = 资产负债表货币资金"},
-    {"from": "E1-1.R7.C7", "to": "E1-2.合计.C9", "description": "库存现金审定数 = 现金明细表审定数合计"},
-    {"from": "E1-1.R8.C7", "to": "E1-3.存款本金合计.C10", "description": "银行存款审定数 = 银行明细表存款本金合计"},
-    {"from": "E1-3.C8", "to": "E1-6.账面余额", "description": "银行明细期末余额 = 余额调节表账面余额"},
-    {"from": "E1-3.C11", "to": "E1-6.对账单余额", "description": "对账单余额 = 余额调节表对账单余额"},
-    {"from": "E1-1.R20.C7", "to": "tb://1001#审定数+tb://1002#审定数+tb://1012#审定数", "description": "试算平衡表数 = 试算表三科目审定数之和"},
-    {"from": "E1-3.银行账户数", "to": "E1-10.正常账户数", "description": "银行明细表账户数 ≥ 已开立账户清单正常账户数"},
-    {"from": "E1-3.C13", "to": "E0-1.回函金额", "description": "银行明细回函确认金额 = 函证结果汇总回函金额"}
+    {
+      "from": "E1-1.R18.C7",
+      "to": "report://BS/BS-002#期末",
+      "description": "审定表合计 = 资产负债表货币资金"
+    },
+    {
+      "from": "E1-1.R7.C7",
+      "to": "E1-2.合计.C9",
+      "description": "库存现金审定数 = 现金明细表审定数合计"
+    },
+    {
+      "from": "E1-1.R8.C7",
+      "to": "E1-3.存款本金合计.C10",
+      "description": "银行存款审定数 = 银行明细表存款本金合计"
+    },
+    {
+      "from": "E1-3.C8",
+      "to": "E1-6.账面余额",
+      "description": "银行明细期末余额 = 余额调节表账面余额"
+    },
+    {
+      "from": "E1-3.C11",
+      "to": "E1-6.对账单余额",
+      "description": "对账单余额 = 余额调节表对账单余额"
+    },
+    {
+      "from": "E1-1.R20.C7",
+      "to": "tb://1001#审定数+tb://1002#审定数+tb://1012#审定数",
+      "description": "试算平衡表数 = 试算表三科目审定数之和"
+    },
+    {
+      "from": "E1-3.银行账户数",
+      "to": "E1-10.正常账户数",
+      "description": "银行明细表账户数 ≥ 已开立账户清单正常账户数"
+    },
+    {
+      "from": "E1-3.C13",
+      "to": "E0-1.回函金额",
+      "description": "银行明细回函确认金额 = 函证结果汇总回函金额"
+    },
+    {
+      "from": "E1-1.R18.C7",
+      "to": "REPORT('BS-001','期末')",
+      "description": "审定表合计 = 报表货币资金"
+    }
   ],
   "audit_checks": [
-    {"code": "E1-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计 = 试算表三科目之和"},
-    {"code": "E1-CHK-02", "type": "balance", "severity": "blocking", "description": "审定表合计 = 报表货币资金行"},
-    {"code": "E1-CHK-03", "type": "cross_ref", "severity": "warning", "description": "库存现金审定数 = 现金明细表合计"},
-    {"code": "E1-CHK-04", "type": "cross_ref", "severity": "warning", "description": "银行存款审定数 = 银行明细表合计"},
-    {"code": "E1-CHK-05", "type": "reconciliation", "severity": "warning", "description": "每个银行账户：账面余额±未达账项 = 对账单余额±未达账项"},
-    {"code": "E1-CHK-06", "type": "completeness", "severity": "warning", "description": "银行明细表账户数 ≥ 已开立账户清单中正常账户数"},
-    {"code": "E1-CHK-07", "type": "movement", "severity": "info", "description": "各行：期初审定 + 变动 = 期末审定"},
-    {"code": "E1-CHK-08", "type": "confirmation", "severity": "warning", "description": "函证回函金额与银行明细回函确认金额一致"},
-    {"code": "E1-CHK-09", "type": "analysis", "severity": "info", "description": "利息收入与存款规模匹配性（E1-15）"},
-    {"code": "E1-CHK-10", "type": "cutoff", "severity": "warning", "description": "截止测试无跨期事项（E1-21/E1-22）"}
+    {
+      "code": "E1-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表三科目之和"
+    },
+    {
+      "code": "E1-CHK-02",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表货币资金行"
+    },
+    {
+      "code": "E1-CHK-03",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "库存现金审定数 = 现金明细表合计"
+    },
+    {
+      "code": "E1-CHK-04",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "银行存款审定数 = 银行明细表合计"
+    },
+    {
+      "code": "E1-CHK-05",
+      "type": "reconciliation",
+      "severity": "warning",
+      "description": "每个银行账户：账面余额±未达账项 = 对账单余额±未达账项"
+    },
+    {
+      "code": "E1-CHK-06",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "银行明细表账户数 ≥ 已开立账户清单中正常账户数"
+    },
+    {
+      "code": "E1-CHK-07",
+      "type": "movement",
+      "severity": "info",
+      "description": "各行：期初审定 + 变动 = 期末审定"
+    },
+    {
+      "code": "E1-CHK-08",
+      "type": "confirmation",
+      "severity": "warning",
+      "description": "函证回函金额与银行明细回函确认金额一致"
+    },
+    {
+      "code": "E1-CHK-09",
+      "type": "analysis",
+      "severity": "info",
+      "description": "利息收入与存款规模匹配性（E1-15）"
+    },
+    {
+      "code": "E1-CHK-10",
+      "type": "cutoff",
+      "severity": "warning",
+      "description": "截止测试无跨期事项（E1-21/E1-22）"
+    }
   ]
 }

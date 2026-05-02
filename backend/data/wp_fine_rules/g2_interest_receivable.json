@@ -1,7 +1,7 @@
 {
   "wp_code": "G2",
   "name": "应收利息",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1132"
   ],
@@ -79,6 +79,36 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 9,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-008a"
+        },
+        "tb": {
+          "row": 11,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 12,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "应收利息",
+          "其他",
+          "定期存款利息",
+          "债券利息",
+          "贷款利息"
+        ]
       }
     },
     {
@@ -129,14 +159,19 @@
   ],
   "cross_references": [
     {
-      "from": "G2-1.total",
+      "from": "G2-1.R9.C7",
       "to": "tb://1132#审定数",
       "description": "审定表合计 = 试算表应收利息审定数"
     },
     {
       "from": "G2-2.合计",
-      "to": "G2-1.total",
+      "to": "G2-1.R9.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "G2-1.R9.C7",
+      "to": "REPORT('BS-008a','期末')",
+      "description": "审定表合计 = 报表应收利息"
     }
   ],
   "audit_checks": [
@@ -181,6 +216,12 @@
       "type": "calculation",
       "severity": "warning",
       "description": "坏账准备计提合理"
+    },
+    {
+      "code": "G2-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表应收利息"
     }
   ]
 }

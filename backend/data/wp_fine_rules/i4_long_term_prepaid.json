@@ -1,7 +1,7 @@
 {
   "wp_code": "I4",
   "name": "长期待摊费用",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1801"
   ],
@@ -137,19 +137,24 @@
   ],
   "cross_references": [
     {
-      "from": "I4-1.total",
+      "from": "I4-1.R12.C9",
       "to": "tb://1801#审定数",
       "description": "审定表合计 = 试算表长期待摊费用审定数"
     },
     {
-      "from": "I4-1.total",
+      "from": "I4-1.R12.C9",
       "to": "report://BS/BS-017#期末",
       "description": "审定表合计 = 报表长期待摊费用"
     },
     {
       "from": "I4-2.合计",
-      "to": "I4-1.total",
+      "to": "I4-1.R12.C9",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "I4-1.R12.C9",
+      "to": "REPORT('BS-029','期末')",
+      "description": "审定表合计 = 报表长期待摊费用"
     }
   ],
   "audit_checks": [

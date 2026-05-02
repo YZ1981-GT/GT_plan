@@ -39,12 +39,9 @@ STEP_DEPENDENCIES: dict[WizardStep, list[WizardStep]] = {
     WizardStep.materiality: [WizardStep.basic_info],
     WizardStep.team_assignment: [WizardStep.basic_info],
     WizardStep.template_set: [WizardStep.basic_info, WizardStep.materiality],
+    # 确认只需要 basic_info 完成（其他步骤在项目创建后独立完成）
     WizardStep.confirmation: [
         WizardStep.basic_info,
-        WizardStep.account_import,
-        WizardStep.account_mapping,
-        WizardStep.materiality,
-        WizardStep.team_assignment,
     ],
 }
 
@@ -246,7 +243,13 @@ async def update_step(
     """
     project = await _get_project_or_404(db, project_id)
 
-    if project.status != ProjectStatus.created:
+    # basic_info 允许在 created / planning 状态下编辑（从项目详情页"编辑"进入）
+    allowed_statuses = (
+        {ProjectStatus.created, ProjectStatus.planning}
+        if step == WizardStep.basic_info
+        else {ProjectStatus.created}
+    )
+    if project.status not in allowed_statuses:
         raise HTTPException(
             status_code=400,
             detail="项目已确认，无法修改向导步骤",
@@ -366,10 +369,10 @@ async def confirm_project(project_id: UUID, db: AsyncSession) -> Project:
     """
     project = await _get_project_or_404(db, project_id)
 
-    if project.status != ProjectStatus.created:
+    if project.status not in (ProjectStatus.created, ProjectStatus.planning):
         raise HTTPException(
             status_code=400,
-            detail=f"项目状态为 {project.status.value}，无法确认（仅 created 状态可确认）",
+            detail=f"项目状态为 {project.status.value}，无法确认（仅 created/planning 状态可确认）",
         )
 
     # 校验确认步骤

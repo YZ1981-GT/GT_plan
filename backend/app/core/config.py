@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # 登录安全
     LOGIN_MAX_ATTEMPTS: int = 5
     LOGIN_LOCK_MINUTES: int = 30
-    # ONLYOFFICE
+    # ONLYOFFICE（向后兼容，底稿编辑已迁移至 Univer）
     ONLYOFFICE_URL: str = "http://onlyoffice:80"
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
     # 文件存储

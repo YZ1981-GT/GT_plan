@@ -1,7 +1,7 @@
 {
   "wp_code": "G8",
   "name": "其他权益工具投资",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1503"
   ],
@@ -78,6 +78,35 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 9,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-021"
+        },
+        "tb": {
+          "row": 11,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 12,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "权益工具投资（FVOCI）",
+          "其他",
+          "XX公司股权",
+          "YY公司股权"
+        ]
       }
     },
     {
@@ -123,14 +152,19 @@
   ],
   "cross_references": [
     {
-      "from": "G8-1.total",
+      "from": "G8-1.R9.C7",
       "to": "tb://1503#审定数",
       "description": "审定表合计 = 试算表其他权益工具投资审定数"
     },
     {
       "from": "G8-2.合计",
-      "to": "G8-1.total",
+      "to": "G8-1.R9.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "G8-1.R9.C7",
+      "to": "REPORT('BS-021','期末')",
+      "description": "审定表合计 = 报表其他权益工具投资"
     }
   ],
   "audit_checks": [
@@ -169,6 +203,18 @@
       "type": "calculation",
       "severity": "warning",
       "description": "预期信用损失计提合理"
+    },
+    {
+      "code": "G8-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他权益工具投资"
+    },
+    {
+      "code": "G8-CHK-05",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值计量正确"
     }
   ]
 }

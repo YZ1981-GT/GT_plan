@@ -1,7 +1,7 @@
 {
   "wp_code": "D6",
   "name": "合同资产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1141"
   ],
@@ -87,6 +87,37 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "less_impairment": {
+          "row": 8,
+          "label": "减：合同资产减值准备"
+        },
+        "total": {
+          "row": 9,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-010"
+        },
+        "tb": {
+          "row": 11,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 12,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "合同资产",
+          "合同资产（总额）"
+        ]
       }
     },
     {
@@ -147,14 +178,19 @@
   ],
   "cross_references": [
     {
-      "from": "D6-1.total",
+      "from": "D6-1.R9.C7",
       "to": "tb://1141#审定数",
       "description": "审定表合计 = 试算表合同资产审定数"
     },
     {
       "from": "D6-2.合计",
-      "to": "D6-1.total",
+      "to": "D6-1.R9.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "D6-1.R9.C7",
+      "to": "REPORT('BS-010','期末')",
+      "description": "审定表合计 = 报表合同资产"
     }
   ],
   "audit_checks": [
@@ -199,6 +235,12 @@
       "type": "check",
       "severity": "info",
       "description": "合同资产转应收账款时点合理"
+    },
+    {
+      "code": "D6-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表合同资产"
     }
   ]
 }

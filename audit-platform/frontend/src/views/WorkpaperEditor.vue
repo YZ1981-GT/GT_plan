@@ -9,52 +9,23 @@
         <el-tag v-if="wpDetail" :type="statusTagType(wpDetail.status)" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
-        <el-tag v-if="editorAvailable" type="success" size="small" style="margin-left: 8px">在线模式</el-tag>
-        <el-tag v-else type="info" size="small" style="margin-left: 8px">离线模式</el-tag>
+        <el-tag type="success" size="small" style="margin-left: 8px">Univer</el-tag>
       </div>
       <div class="gt-wp-editor-toolbar-right">
-        <template v-if="editorAvailable">
-          <el-button size="small" @click="onSyncStructure" :loading="convertLoading" title="同步最新编辑到公式系统（通常自动完成，手动点击可强制刷新）">🔄 同步公式</el-button>
-          <el-button size="small" @click="onDownloadEdit">下载副本</el-button>
-        </template>
-        <template v-else>
-          <el-button size="small" type="primary" @click="retryOnline" :loading="retrying">重试在线</el-button>
-        </template>
-        <el-button size="small" @click="onUploadEdit">上传回传</el-button>
-        <el-button size="small" @click="onDownloadEdit">下载</el-button>
+        <el-button size="small" @click="onSave" :loading="saving">💾 保存</el-button>
+        <el-button size="small" @click="onSyncStructure" :loading="syncLoading">🔄 同步公式</el-button>
+        <el-button size="small" @click="onDownload">📥 下载</el-button>
+        <el-button size="small" @click="onUpload">📤 上传</el-button>
       </div>
     </div>
 
-    <!-- 主编辑区 -->
+    <!-- Univer 编辑区 -->
     <div class="gt-wp-editor-main">
-      <!-- 底稿加载中 -->
-      <div v-if="!wpDetail && !editorAvailable" class="gt-wp-editor-fallback-panel">
-        <el-icon class="is-loading" style="font-size: 28px; color: var(--gt-color-primary); margin-bottom: 12px"><Loading /></el-icon>
-        <div style="font-size: 14px; color: #999">正在加载底稿...</div>
+      <div v-if="loading" class="gt-wp-editor-loading">
+        <el-icon class="is-loading" :size="32" color="var(--gt-color-primary)"><Loading /></el-icon>
+        <p>正在加载底稿...</p>
       </div>
-
-      <!-- ONLYOFFICE 可用：在线编辑 -->
-      <template v-else-if="editorAvailable">
-        <div ref="editorContainer" id="onlyoffice-editor" class="gt-wp-editor-iframe"></div>
-      </template>
-
-      <!-- ONLYOFFICE 不可用：直接提供下载编辑入口 -->
-      <template v-else>
-        <div class="gt-wp-editor-fallback-panel">
-          <div style="font-size: 40px; margin-bottom: 16px; opacity: 0.6">📥</div>
-          <div style="font-size: 16px; font-weight: 600; color: #444; margin-bottom: 8px">在线编辑器暂不可用</div>
-          <div style="font-size: 13px; color: #999; margin-bottom: 24px; max-width: 400px; text-align: center; line-height: 1.6">
-            ONLYOFFICE 服务未启动，请下载底稿到本地 Excel 编辑，完成后上传回传
-          </div>
-          <div class="gt-wp-editor-fallback-actions">
-            <el-button type="primary" size="large" @click="onDownloadEdit">
-              <el-icon style="margin-right: 6px"><Download /></el-icon>下载底稿
-            </el-button>
-            <el-button size="large" @click="onUploadEdit">上传编辑后的底稿</el-button>
-            <el-button size="large" @click="goBack">返回</el-button>
-          </div>
-        </div>
-      </template>
+      <div v-show="!loading" ref="univerContainer" class="gt-wp-editor-univer"></div>
     </div>
 
     <!-- 底部状态栏 -->
@@ -63,12 +34,13 @@
       <span>复核人: {{ wpDetail.reviewer || '未分配' }}</span>
       <span>版本: v{{ wpDetail.file_version || 1 }}</span>
       <span v-if="wpDetail.updated_at">最后修改: {{ wpDetail.updated_at.slice(0, 19) }}</span>
-      <!-- 智能提示 -->
-      <span v-if="smartTip" class="gt-wp-smart-tip" @click="showSmartTipDetail = !showSmartTipDetail" title="点击展开/收起">
+      <span v-if="dirty" style="color: #e6a23c">● 未保存</span>
+      <span v-if="smartTip" class="gt-wp-smart-tip" @click="showSmartTipDetail = !showSmartTipDetail">
         💡 {{ smartTip.summary }}
       </span>
     </div>
-    <!-- 智能提示详情（展开时显示在状态栏上方） -->
+
+    <!-- 智能提示详情 -->
     <div v-if="showSmartTipDetail && smartTip" class="gt-wp-smart-tip-detail">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-weight:600;font-size:13px">💡 审计关注点</span>
@@ -80,29 +52,26 @@
       <div v-if="smartTip.tips?.length">
         <div v-for="(t, i) in smartTip.tips" :key="i" style="font-size:12px;color:#666;padding:1px 0">• {{ t }}</div>
       </div>
-      <div v-if="smartTip.dependency_warnings?.length" style="margin-top:6px;border-top:1px solid #eee;padding-top:6px">
-        <div v-for="(d, i) in smartTip.dependency_warnings" :key="i" style="font-size:11px;color:#909399;padding:1px 0">📋 {{ d }}</div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Loading, Download } from '@element-plus/icons-vue'
+import { Loading } from '@element-plus/icons-vue'
+import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets'
+import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
+import UniverPresetSheetsCoreZhCN from '@univerjs/preset-sheets-core/lib/locales/zh-CN'
+import '@univerjs/preset-sheets-core/lib/index.css'
 import {
-  checkOnlineEditingAvailability,
   downloadWorkpaper,
-  getOnlineEditSession,
   getWorkpaper,
-  getWopiEditorUrl,
   type WorkpaperDetail,
 } from '@/services/workpaperApi'
-import { getWorkpaperStructure, rebuildWorkpaperStructure } from '@/services/commonApi'
-import StructureEditor from '@/components/formula/StructureEditor.vue'
-import http from '@/utils/http' // Needed for WOPI lock refresh with custom headers
+import { rebuildWorkpaperStructure } from '@/services/commonApi'
+import http from '@/utils/http'
 
 const route = useRoute()
 const router = useRouter()
@@ -110,16 +79,23 @@ const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
 
 const wpDetail = ref<WorkpaperDetail | null>(null)
-const editorAvailable = ref(false)
-const editorUrl = ref('')
-const onlineEditEnabled = ref(true)
-const onlineAccessToken = ref('')
+const loading = ref(true)
+const saving = ref(false)
+const syncLoading = ref(false)
+const dirty = ref(false)
+const univerContainer = ref<HTMLElement | null>(null)
+
+let univerInstance: any = null
+let univerAPI: any = null
+
+// 智能提示
+const smartTip = ref<any>(null)
+const showSmartTipDetail = ref(false)
 
 function statusTagType(s: string) {
   const m: Record<string, string> = {
     not_started: 'info', in_progress: 'warning', draft: 'warning',
-    draft_complete: '', edit_complete: '', review_passed: 'success',
-    archived: 'info',
+    draft_complete: '', edit_complete: '', review_passed: 'success', archived: 'info',
   }
   return m[s] || 'info'
 }
@@ -134,294 +110,16 @@ function statusLabel(s: string) {
 }
 
 function goBack() {
+  if (dirty.value) {
+    if (!confirm('有未保存的修改，确定离开？')) return
+  }
   router.push({ name: 'WorkpaperList', params: { projectId: projectId.value } })
 }
 
-async function onDownloadEdit() {
-  try {
-    await downloadWorkpaper(projectId.value, wpId.value)
-  } catch {
-    ElMessage.error('底稿下载失败')
-  }
-}
+async function initUniver() {
+  if (!univerContainer.value) return
 
-function onUploadEdit() {
-  // 跳转到底稿列表页的上传弹窗
-  router.push({
-    name: 'WorkpaperList',
-    params: { projectId: projectId.value },
-    query: { upload: wpId.value },
-  })
-}
-
-const retrying = ref(false)
-let lockRefreshTimer: ReturnType<typeof setInterval> | null = null
-
-// ── 三式联动（StructureEditor 降级模式） ──
-const structureLoading = ref(false)
-const structureData = ref<any>(null)
-const structureFileStem = computed(() => wpDetail.value?.wp_code || '')
-
-async function loadStructure() {
-  if (editorAvailable.value) return
-  structureLoading.value = true
-  try {
-    const result = await getWorkpaperStructure(projectId.value, wpId.value)
-    structureData.value = result?.structure || null
-  } catch {
-    // structure.json 不存在，自动触发生成
-    try {
-      await rebuildWorkpaperStructure(projectId.value, wpId.value)
-      const result = await getWorkpaperStructure(projectId.value, wpId.value)
-      structureData.value = result?.structure || null
-    } catch {
-      structureData.value = null
-    }
-  } finally {
-    structureLoading.value = false
-  }
-}
-
-async function onStructureSave() {
-  ElMessage.success('底稿已保存')
-  // 重新加载详情（版本号可能更新）
-  try {
-    wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
-  } catch { /* ignore */ }
-}
-
-async function onStructureRebuild() {
-  structureLoading.value = true
-  try {
-    await rebuildWorkpaperStructure(projectId.value, wpId.value)
-    const result = await getWorkpaperStructure(projectId.value, wpId.value, true)
-    structureData.value = result.structure
-    ElMessage.success('底稿结构已重新解析')
-  } catch {
-    ElMessage.error('重新解析失败')
-  } finally {
-    structureLoading.value = false
-  }
-}
-
-function onExportWord() {
-  ElMessage.info('Word 导出功能开发中')
-}
-
-// ── 智能提示 ──
-const smartTip = ref<{ summary: string; warnings: string[]; tips: string[]; dependency_warnings: string[] } | null>(null)
-const showSmartTipDetail = ref(false)
-
-async function loadSmartTips() {
-  if (!wpDetail.value) return
-  try {
-    const wpName = wpDetail.value.wp_name || ''
-    const accountName = wpName.replace(/审定表|明细表|程序表|汇总表|盘点表|调节表|核对表/g, '').trim()
-    const tips: string[] = []
-    const warnings: string[] = []
-    const depWarnings: string[] = []
-
-    // 1. 从TSJ加载审计要点
-    if (accountName) {
-      try {
-        const { data } = await import('@/utils/http').then(m =>
-          m.default.get(`/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(accountName)}`, {
-            validateStatus: (s: number) => s < 600,
-          })
-        )
-        if (data?.tips?.length) {
-          tips.push(...data.tips.slice(0, 3))
-        }
-        if (data?.risk_areas?.length) {
-          for (const area of data.risk_areas.slice(0, 2)) {
-            if (area.includes('高风险')) warnings.push(area)
-          }
-        }
-      } catch { /* ignore */ }
-    }
-
-    // 2. 检查B/C/D依赖状态
-    try {
-      const { getWpDependencies } = await import('@/services/commonApi')
-      const deps = await getWpDependencies(projectId.value, wpId.value)
-      if (deps?.warnings?.length) {
-        depWarnings.push(...deps.warnings)
-      }
-      if (deps?.impact?.label) {
-        tips.push(`控制测试结论：${deps.impact.label} — ${deps.impact.suggested_procedures}`)
-      }
-    } catch { /* ignore */ }
-
-    if (tips.length || warnings.length || depWarnings.length) {
-      const summary = warnings.length > 0
-        ? `${warnings.length}项高风险关注点`
-        : tips.length > 0
-          ? tips[0].slice(0, 30) + (tips[0].length > 30 ? '...' : '')
-          : '查看审计关注点'
-      smartTip.value = { summary, warnings, tips, dependency_warnings: depWarnings }
-    }
-  } catch { /* ignore */ }
-}
-
-// ── 确认转换（ONLYOFFICE编辑完成后生成structure.json） ──
-const convertLoading = ref(false)
-
-async function onSyncStructure() {
-  convertLoading.value = true
-  try {
-    await rebuildWorkpaperStructure(projectId.value, wpId.value)
-    wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
-    ElMessage.success('公式坐标已同步（ONLYOFFICE保存时通常自动完成）')
-  } catch {
-    ElMessage.error('同步失败，请稍后重试')
-  } finally {
-    convertLoading.value = false
-  }
-}
-
-function stopLockRefresh() {
-  if (lockRefreshTimer) {
-    clearInterval(lockRefreshTimer)
-    lockRefreshTimer = null
-  }
-}
-
-const editorContainer = ref<HTMLElement | null>(null)
-let docEditor: any = null
-
-async function applyOnlineMode(notify: boolean = false) {
-  stopLockRefresh()
-  editorAvailable.value = false
-  editorUrl.value = ''
-  onlineAccessToken.value = ''
-
-  try {
-    const session = await getOnlineEditSession(projectId.value, wpId.value)
-    onlineEditEnabled.value = session.enabled
-    if (!session.enabled || !session.wopi_src) {
-      if (notify) ElMessage.warning('在线编辑当前未启用，继续使用离线模式')
-      return
-    }
-
-    const available = await checkOnlineEditingAvailability()
-    if (!available) {
-      if (notify) ElMessage.warning('在线编辑服务仍不可用，继续使用离线模式')
-      return
-    }
-
-    onlineAccessToken.value = session.access_token || ''
-    editorAvailable.value = true
-
-    // 等待 DOM 渲染（两次 nextTick 确保 v-else-if 切换后 div 已挂载）
-    await nextTick()
-    await nextTick()
-    // 额外等待50ms确保浏览器完成布局
-    await new Promise(resolve => setTimeout(resolve, 50))
-
-    // 加载 ONLYOFFICE Document Server API 脚本
-    const ooUrl = (session.onlyoffice_url || import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080').replace(/\/$/, '')
-    await loadOOScript(ooUrl)
-
-    // 用 Document Server API 初始化编辑器
-    const wopiBaseUrl = 'http://host.docker.internal:9980'
-
-    const config = {
-      document: {
-        fileType: 'xlsx',
-        // key规则：相同key用缓存，不同key重新下载
-        // 用版本号+分钟级时间戳，同一分钟内用缓存，跨分钟重新下载
-        key: `${wpId.value}_v${wpDetail.value?.file_version || 1}_${Math.floor(Date.now() / 60000)}`,
-        title: wpDetail.value?.wp_name ? `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}.xlsx` : 'workpaper.xlsx',
-        url: `${wopiBaseUrl}/wopi/files/${wpId.value}/contents?access_token=${onlineAccessToken.value}`,
-      },
-      editorConfig: {
-        mode: 'edit',
-        lang: 'zh-CN',
-        callbackUrl: `${wopiBaseUrl}/wopi/ds-callback/${wpId.value}`,
-        user: {
-          id: 'admin',
-          name: 'Admin',
-        },
-      },
-      type: 'desktop',
-      documentType: 'cell',
-      width: '100%',
-      height: '100%',
-      events: {
-        onError: (event: any) => {
-          console.error('[OO] editor error:', event?.data)
-          ElMessage.error('编辑器错误：' + (event?.data?.errorDescription || event?.data?.errorCode || '未知'))
-        },
-        onReady: () => {
-          console.log('[OO] editor ready')
-        },
-        onDocumentStateChange: (event: any) => {
-          if (event?.data) {
-            console.log('[OO] document modified')
-          }
-        },
-      },
-    }
-
-    if (docEditor) {
-      try { docEditor.destroyEditor() } catch { /* ignore */ }
-    }
-
-    // 确保 DOM 元素存在
-    const editorEl = document.getElementById('onlyoffice-editor')
-    if (!editorEl) {
-      console.error('[OO] editor container not found in DOM')
-      editorAvailable.value = false
-      return
-    }
-
-    console.log('[OO] initializing DocEditor with config:', JSON.stringify({
-      fileType: config.document.fileType,
-      key: config.document.key,
-      title: config.document.title,
-      url: config.document.url?.slice(0, 80),
-      callbackUrl: config.editorConfig.callbackUrl?.slice(0, 80),
-    }))
-
-    try {
-      docEditor = new (window as any).DocsAPI.DocEditor('onlyoffice-editor', config)
-    } catch (initErr: any) {
-      console.error('[OO] DocEditor init error:', initErr)
-      editorAvailable.value = false
-      ElMessage.error('ONLYOFFICE 编辑器初始化失败：' + (initErr?.message || ''))
-      return
-    }
-    startLockRefresh()
-    if (notify) ElMessage.success('在线编辑已恢复')
-  } catch (e: any) {
-    editorAvailable.value = false
-    if (notify) {
-      ElMessage.warning('在线编辑初始化失败：' + (e?.message || '未知错误'))
-    }
-  }
-}
-
-function loadOOScript(baseUrl: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if ((window as any).DocsAPI) { resolve(); return }
-    const script = document.createElement('script')
-    script.src = `${baseUrl}/web-apps/apps/api/documents/api.js`
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Failed to load ONLYOFFICE API script'))
-    document.head.appendChild(script)
-  })
-}
-
-async function retryOnline() {
-  retrying.value = true
-  try {
-    await applyOnlineMode(true)
-  } finally {
-    retrying.value = false
-  }
-}
-
-async function loadEditor() {
+  // 1. 加载底稿详情
   try {
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
   } catch {
@@ -430,39 +128,158 @@ async function loadEditor() {
     return
   }
 
-  await applyOnlineMode()
+  // 2. 从后端加载完整的 Univer 数据（含所有 Sheet、样式、公式）
+  let workbookData: any = null
+  try {
+    const { data } = await http.get(
+      `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-data`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    workbookData = data?.data ?? data
+  } catch {
+    workbookData = null
+  }
 
-  // 在线模式不可用时，不再加载 structure（底稿直接下载编辑）
+  if (!workbookData || !workbookData.sheets) {
+    // 兜底：创建空白工作簿
+    workbookData = {
+      id: wpDetail.value.wp_code || 'wp',
+      name: `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}`,
+      sheetOrder: ['sheet0'],
+      sheets: {
+        sheet0: {
+          id: 'sheet0',
+          name: wpDetail.value.wp_name || 'Sheet1',
+          rowCount: 100,
+          columnCount: 20,
+          cellData: {},
+        },
+      },
+    }
+  }
 
-  // 非阻塞加载智能提示
+  // 3. 初始化 Univer
+  const { univerAPI: api, univer } = createUniver({
+    locale: LocaleType.ZH_CN,
+    locales: {
+      [LocaleType.ZH_CN]: mergeLocales(UniverPresetSheetsCoreZhCN),
+    },
+    presets: [
+      UniverSheetsCorePreset({
+        container: univerContainer.value,
+      }),
+    ],
+  })
+
+  univerInstance = univer
+  univerAPI = api
+
+  // 4. 创建工作簿
+  univerAPI.createWorkbook(workbookData)
+
+  // 5. 监听数据变化
+  univerAPI.onCommandExecuted((command: any) => {
+    if (command.id?.includes('set-range-values') || command.id?.includes('set-cell')) {
+      dirty.value = true
+    }
+  })
+
+  loading.value = false
+
+  // 6. 非阻塞加载智能提示
   loadSmartTips()
 }
 
-function startLockRefresh() {
-  stopLockRefresh()
-  lockRefreshTimer = setInterval(async () => {
-    if (!editorAvailable.value || !wpDetail.value || !onlineAccessToken.value) return
-    try {
-      await http.post(`/wopi/files/${wpId.value}?access_token=${encodeURIComponent(onlineAccessToken.value)}`, null, {
-        headers: { 'X-WOPI-Override': 'REFRESH_LOCK', 'X-WOPI-Lock': `lock-${wpId.value}` },
-        timeout: 5000,
-      })
-    } catch (err: any) {
-      if (err?.response?.status === 409) {
-        ElMessage.error('编辑锁已被其他用户获取，请保存后刷新页面')
-        editorAvailable.value = false
-        editorUrl.value = ''
-        stopLockRefresh()
-      }
-    }
-  }, 10 * 60 * 1000) // 10 分钟
+async function onSave() {
+  if (!univerAPI || !wpDetail.value) return
+  saving.value = true
+  try {
+    const workbook = univerAPI.getActiveWorkbook()
+    if (!workbook) throw new Error('无法获取工作簿数据')
+
+    const snapshot = workbook.getSnapshot()
+
+    // 调用完整保存 API（xlsx 回写 + structure.json + 审计留痕 + 事件发布）
+    const { data } = await http.post(
+      `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-save`,
+      { snapshot },
+    )
+    const result = data?.data ?? data
+
+    dirty.value = false
+    ElMessage.success(result?.message || '保存成功')
+
+    // 刷新版本信息
+    wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
+  } catch (err: any) {
+    ElMessage.error('保存失败: ' + (err?.response?.data?.detail || err?.message || ''))
+  } finally {
+    saving.value = false
+  }
 }
 
-onUnmounted(() => {
-  stopLockRefresh()
-})
+async function onSyncStructure() {
+  syncLoading.value = true
+  try {
+    // 先保存当前数据
+    if (dirty.value) await onSave()
+    // 重建 structure
+    await rebuildWorkpaperStructure(projectId.value, wpId.value)
+    wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
+    ElMessage.success('公式坐标已同步')
+  } catch {
+    ElMessage.error('同步失败')
+  } finally {
+    syncLoading.value = false
+  }
+}
 
-onMounted(loadEditor)
+async function onDownload() {
+  try {
+    await downloadWorkpaper(projectId.value, wpId.value)
+  } catch {
+    ElMessage.error('下载失败')
+  }
+}
+
+function onUpload() {
+  router.push({
+    name: 'WorkpaperList',
+    params: { projectId: projectId.value },
+    query: { upload: wpId.value },
+  })
+}
+
+async function loadSmartTips() {
+  if (!wpDetail.value) return
+  try {
+    const wpName = wpDetail.value.wp_name || ''
+    const accountName = wpName.replace(/审定表|明细表|程序表|汇总表|盘点表|调节表|核对表/g, '').trim()
+    if (!accountName) return
+
+    const { data } = await http.get(
+      `/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(accountName)}`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (data?.tips?.length || data?.risk_areas?.length) {
+      smartTip.value = {
+        summary: data.risk_areas?.find((a: string) => a.includes('高风险')) || data.tips?.[0]?.slice(0, 30) || '查看审计关注点',
+        warnings: (data.risk_areas || []).filter((a: string) => a.includes('高风险')),
+        tips: (data.tips || []).slice(0, 3),
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+onMounted(initUniver)
+
+onUnmounted(() => {
+  if (univerInstance) {
+    try { univerInstance.dispose() } catch { /* ignore */ }
+    univerInstance = null
+    univerAPI = null
+  }
+})
 </script>
 
 <style scoped>
@@ -472,30 +289,27 @@ onMounted(loadEditor)
 }
 .gt-wp-editor-toolbar {
   display: flex; justify-content: space-between; align-items: center;
-  padding: var(--gt-space-2) var(--gt-space-4); background: var(--gt-color-bg-white); box-shadow: var(--gt-shadow-sm);
-  z-index: 10;
+  padding: var(--gt-space-2) var(--gt-space-4);
+  background: var(--gt-color-bg-white); box-shadow: var(--gt-shadow-sm); z-index: 10;
 }
 .gt-wp-editor-toolbar-left { display: flex; align-items: center; gap: 10px; }
 .gt-wp-editor-toolbar-right { display: flex; align-items: center; gap: var(--gt-space-2); }
 .gt-wp-editor-code { font-weight: 600; color: var(--gt-color-primary); font-size: var(--gt-font-size-md); }
 .gt-wp-editor-name { color: var(--gt-color-text); font-size: var(--gt-font-size-md); }
-.gt-wp-editor-save-indicator { font-size: var(--gt-font-size-sm); color: var(--gt-color-success); }
-.gt-wp-editor-main { flex: 1; min-height: 0; position: relative; }
-.gt-wp-editor-iframe { width: 100%; height: 100%; border: none; min-height: calc(100vh - 120px); }
-.gt-wp-editor-fallback-panel {
+.gt-wp-editor-main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.gt-wp-editor-univer { width: 100%; height: 100%; }
+.gt-wp-editor-loading {
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 100%; padding: var(--gt-space-10);
+  justify-content: center; height: 100%; gap: 12px; color: #999;
 }
-.gt-wp-editor-fallback-actions { display: flex; gap: var(--gt-space-3); }
 .gt-wp-editor-statusbar {
   display: flex; gap: var(--gt-space-5); padding: 6px var(--gt-space-4);
-  background: var(--gt-color-primary-dark); color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs);
+  background: var(--gt-color-primary-dark); color: var(--gt-color-text-tertiary);
+  font-size: var(--gt-font-size-xs);
 }
 .gt-wp-smart-tip {
   margin-left: auto; cursor: pointer; color: #ffd700; font-weight: 500;
-  transition: opacity 0.2s;
 }
-.gt-wp-smart-tip:hover { opacity: 0.8; }
 .gt-wp-smart-tip-detail {
   position: absolute; bottom: 30px; right: 12px; left: 12px;
   background: #fff; border: 1px solid #e8e4f0; border-radius: 8px;

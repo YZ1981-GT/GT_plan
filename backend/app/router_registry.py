@@ -39,6 +39,10 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.import_intelligence import router as import_intel_router
     app.include_router(import_intel_router, tags=["项目与数据"])
 
+    # 统一导入模板
+    from app.routers.import_templates import router as import_templates_router
+    app.include_router(import_templates_router)
+
     # ═══ 3. 查账与试算（四表穿透/试算表/调整/重要性/错报） ═══
     from app.routers.drilldown import router as drilldown_router
     from app.routers.ledger_penetration import router as ledger_router

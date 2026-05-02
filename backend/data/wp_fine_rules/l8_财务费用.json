@@ -1,7 +1,7 @@
 {
   "wp_code": "L8",
   "name": "财务费用",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6603"
   ],
@@ -26,17 +26,17 @@
     {
       "exact_name": "实质性程序表L8A",
       "type": "procedure",
-      "code": "L8"
+      "code": "L8A"
     },
     {
       "exact_name": "审定表L8-1",
       "type": "summary",
+      "code": "L8-1",
       "header_rows": [
         5,
         6
       ],
       "data_start_row": 7,
-      "code": "L8-1",
       "layout": {
         "label_col": 1,
         "columns": {
@@ -73,22 +73,57 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "interest_income": {
+          "row": 8,
+          "label": "减：利息收入"
+        },
+        "total": {
+          "row": 14,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-009"
+        },
+        "tb_balance": {
+          "row": 16,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 17,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "利息支出",
+          "汇兑损益",
+          "手续费",
+          "现金折扣",
+          "租赁负债利息"
+        ]
       }
     },
     {
       "exact_name": "附注披露信息（上市公司）",
       "type": "note_disclosure",
-      "code": "附注披露信息（上市公司）"
+      "code": "L8-note-listed"
     },
     {
       "exact_name": "附注披露信息（国企）",
       "type": "note_disclosure",
-      "code": "附注披露信息（国企）"
+      "code": "L8-note-soe"
     },
     {
       "exact_name": "明细表L8-2",
       "type": "detail",
-      "code": "L8-2"
+      "code": "L8-2",
+      "description": "财务费用按月/按类别明细"
     },
     {
       "exact_name": "调整分录汇总L8-3",
@@ -98,29 +133,52 @@
     {
       "exact_name": "非金融机构利息支出测算表L8-4",
       "type": "calculation",
-      "code": "L8-4"
+      "code": "L8-4",
+      "description": "非金融机构借款利息支出独立测算（本金×利率×天数/360）"
     },
     {
       "exact_name": "截止性测试L8-5",
       "type": "calculation",
-      "code": "L8-5"
+      "code": "L8-5",
+      "description": "利息费用截止性测试"
     },
     {
       "exact_name": "财务费用检查表L8-6",
       "type": "check",
-      "code": "L8-6"
+      "code": "L8-6",
+      "description": "大额财务费用凭证检查"
     }
   ],
   "cross_references": [
     {
-      "from": "L8-1.total",
+      "from": "L8-1.R14.C5",
       "to": "tb://6603#审定数",
       "description": "审定表合计 = 试算表财务费用审定数"
     },
     {
+      "from": "L8-1.R14.C5",
+      "to": "REPORT('IS-009','本期')",
+      "description": "审定表合计 = 利润表财务费用"
+    },
+    {
       "from": "L8-2.合计",
-      "to": "L8-1.total",
+      "to": "L8-1.R14.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "L8-1.R7.C5",
+      "to": "L1-1.利息支出 + L2-1.利息支出",
+      "description": "利息支出 ≈ 短期借款利息+长期借款利息"
+    },
+    {
+      "from": "L8-1.R12.C5",
+      "to": "H9-1.利息费用",
+      "description": "租赁负债利息 = 租赁负债利息费用"
+    },
+    {
+      "from": "L8-4.测算合计",
+      "to": "L8-1.R7.C5",
+      "description": "利息测算合计 ≈ 审定表利息支出"
     }
   ],
   "audit_checks": [
@@ -132,15 +190,15 @@
     },
     {
       "code": "L8-CHK-02",
-      "type": "cross_ref",
-      "severity": "warning",
-      "description": "明细表合计 = 审定表合计"
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 利润表财务费用"
     },
     {
       "code": "L8-CHK-03",
-      "type": "movement",
-      "severity": "info",
-      "description": "期初 + 变动 = 期末"
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
     },
     {
       "code": "L8-CHK-04",
@@ -149,16 +207,40 @@
       "description": "明细表数据完整"
     },
     {
+      "code": "L8-CHK-05",
+      "type": "formula",
+      "severity": "warning",
+      "description": "合计 = 利息支出 - 利息收入 + 汇兑损益 + 手续费 + 现金折扣 + 租赁负债利息 + 其他"
+    },
+    {
       "code": "L8-CHK-06",
       "type": "calculation",
       "severity": "warning",
-      "description": "利息费用测算正确"
+      "description": "利息费用独立测算与账面一致（偏差<1%）"
     },
     {
       "code": "L8-CHK-07",
-      "type": "check",
+      "type": "cross_ref",
       "severity": "warning",
-      "description": "利息资本化金额正确"
+      "description": "利息资本化金额与在建工程/开发支出一致"
+    },
+    {
+      "code": "L8-CHK-08",
+      "type": "cutoff",
+      "severity": "warning",
+      "description": "截止测试无跨期利息"
+    },
+    {
+      "code": "L8-CHK-09",
+      "type": "analysis",
+      "severity": "info",
+      "description": "利息支出与借款规模匹配（利率合理性）"
+    },
+    {
+      "code": "L8-CHK-10",
+      "type": "analysis",
+      "severity": "info",
+      "description": "汇兑损益与外币业务规模匹配"
     }
   ]
 }

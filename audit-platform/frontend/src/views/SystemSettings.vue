@@ -217,7 +217,7 @@ const friendlyNames: Record<string, string> = {
   OCR_TESSERACT_ENABLED: 'Tesseract',
   OCR_TESSERACT_LANG: 'OCR 语言',
   OCR_CONFIDENCE_THRESHOLD: 'OCR 置信度',
-  ONLYOFFICE_URL: '在线编辑服务',
+  ONLYOFFICE_URL: '在线编辑服务（已迁移至 Univer）',
   WOPI_BASE_URL: 'WOPI 地址',
   PAPERLESS_URL: '文档管理服务',
   PAPERLESS_TOKEN: '文档管理密钥',
@@ -362,9 +362,9 @@ const helpDocs: Record<string, { description: string; recommend?: string; warnin
     recommend: '开启',
   },
   ONLYOFFICE_URL: {
-    description: 'ONLYOFFICE Document Server 地址，用于底稿在线编辑',
+    description: '在线编辑服务地址（已迁移至 Univer 纯前端方案，此配置仅用于向后兼容）',
     recommend: 'http://localhost:8080',
-    warning: '需要 Docker 部署 ONLYOFFICE（约 850MB 镜像）。未部署时自动降级为下载编辑模式',
+    warning: '底稿在线编辑已使用 Univer 纯前端方案，不再依赖 ONLYOFFICE Docker 容器',
   },
   PAPERLESS_URL: {
     description: 'Paperless-ngx 文档管理服务地址',
@@ -390,9 +390,9 @@ const helpDocs: Record<string, { description: string; recommend?: string; warnin
     recommend: 'http://localhost:8000',
   },
   WOPI_BASE_URL: {
-    description: 'WOPI 协议基础 URL，ONLYOFFICE 通过此地址回调读写底稿文件',
+    description: 'WOPI 协议基础 URL（向后兼容，底稿编辑已迁移至 Univer）',
     recommend: 'http://localhost:9980/wopi',
-    warning: '必须是 ONLYOFFICE 容器能访问到的地址（Docker 网络内用服务名，本地开发用 localhost）',
+    warning: 'WOPI 端点保留用于向后兼容，新的底稿编辑通过 Univer API 直接读写',
   },
   ATTACHMENT_FALLBACK_TO_LOCAL: {
     description: 'Paperless 不可用时是否降级到本地磁盘存储',

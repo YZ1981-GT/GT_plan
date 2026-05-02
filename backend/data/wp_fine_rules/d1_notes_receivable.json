@@ -1,9 +1,11 @@
 {
   "wp_code": "D1",
   "name": "应收票据",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "description": "D1应收票据精细化解析规则 — 基于致同2025年修订版模板精确Sheet名称",
-  "account_codes": ["1121"],
+  "account_codes": [
+    "1121"
+  ],
   "source_files": [
     {
       "file": "D1 应收票据.xlsx",
@@ -52,63 +54,177 @@
       "code": "D1-1",
       "exact_name": "审定表D1-1",
       "type": "summary",
-      "header_rows": [5, 6],
+      "header_rows": [
+        5,
+        6
+      ],
       "data_start_row": 7,
       "layout": {
         "label_col": 1,
         "columns": {
-          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
-          "opening_adjustment": {"col": 3, "label": "期初账项调整"},
-          "opening_reclass": {"col": 4, "label": "期初重分类调整"},
-          "opening_audited": {"col": 5, "label": "期初审定数"},
-          "closing_unadjusted": {"col": 6, "label": "期末未审数"},
-          "closing_adjustment": {"col": 7, "label": "期末账项调整"},
-          "closing_reclass": {"col": 8, "label": "期末重分类调整"},
-          "closing_audited": {"col": 9, "label": "期末审定数"},
-          "change_amount": {"col": 10, "label": "变动额"},
-          "change_rate": {"col": 11, "label": "变动率"},
-          "reason": {"col": 12, "label": "原因分析"}
+          "opening_unadjusted": {
+            "col": 2,
+            "label": "期初未审数"
+          },
+          "opening_adjustment": {
+            "col": 3,
+            "label": "期初账项调整"
+          },
+          "opening_reclass": {
+            "col": 4,
+            "label": "期初重分类调整"
+          },
+          "opening_audited": {
+            "col": 5,
+            "label": "期初审定数"
+          },
+          "closing_unadjusted": {
+            "col": 6,
+            "label": "期末未审数"
+          },
+          "closing_adjustment": {
+            "col": 7,
+            "label": "期末账项调整"
+          },
+          "closing_reclass": {
+            "col": 8,
+            "label": "期末重分类调整"
+          },
+          "closing_audited": {
+            "col": 9,
+            "label": "期末审定数"
+          },
+          "change_amount": {
+            "col": 10,
+            "label": "变动额"
+          },
+          "change_rate": {
+            "col": 11,
+            "label": "变动率"
+          },
+          "reason": {
+            "col": 12,
+            "label": "原因分析"
+          }
         }
       },
       "key_rows": {
-        "section1_title": {"row": 7, "label": "一、应收票据原值"},
-        "bank_acceptance": {"row": 8, "label": "银行承兑汇票"},
-        "commercial_acceptance": {"row": 9, "label": "商业承兑汇票"},
-        "gross_subtotal": {"row": 10, "label": "小计", "is_total": true},
-        "section2_title": {"row": 11, "label": "二、应收票据坏账准备"},
-        "bad_debt_bank": {"row": 12, "label": "银行承兑汇票"},
-        "bad_debt_commercial": {"row": 13, "label": "商业承兑汇票"},
-        "bad_debt_subtotal": {"row": 14, "label": "小计", "is_total": true},
-        "section3_title": {"row": 15, "label": "三、应收票据净值"},
-        "net_bank": {"row": 16, "label": "银行承兑汇票"},
-        "net_commercial": {"row": 17, "label": "商业承兑汇票"},
-        "net_total": {"row": 18, "label": "合计", "is_total": true, "report_row": "BS-004"},
-        "tb_balance": {"row": 19, "label": "试算平衡表数"},
-        "diff": {"row": 20, "label": "差异数"}
+        "section1_title": {
+          "row": 7,
+          "label": "一、应收票据原值"
+        },
+        "gross_subtotal": {
+          "row": 10,
+          "label": "小计",
+          "is_total": true,
+          "report_row": "BS-004"
+        },
+        "section2_title": {
+          "row": 11,
+          "label": "二、应收票据坏账准备"
+        },
+        "bad_debt_subtotal": {
+          "row": 14,
+          "label": "小计",
+          "is_total": true,
+          "report_row": "BS-004"
+        },
+        "section3_title": {
+          "row": 15,
+          "label": "三、应收票据净值"
+        },
+        "net_total": {
+          "row": 18,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-004"
+        },
+        "tb_balance": {
+          "row": 19,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 20,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "银行承兑汇票",
+          "商业承兑汇票",
+          "银行承兑汇票",
+          "商业承兑汇票",
+          "银行承兑汇票"
+        ]
       }
     },
     {
       "code": "D1-2",
       "exact_name": "原值明细表（按类别）D1-2",
       "type": "detail",
-      "header_rows": [10],
+      "header_rows": [
+        10
+      ],
       "data_start_row": 11,
       "layout": {
         "columns": {
-          "note_type": {"col": 1, "label": "票据种类"},
-          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
-          "opening_adjustment": {"col": 3, "label": "账项调整"},
-          "opening_reclass": {"col": 4, "label": "重分类调整"},
-          "opening_audited": {"col": 5, "label": "期初审定数"},
-          "increase": {"col": 6, "label": "本期增加"},
-          "decrease": {"col": 7, "label": "本期减少"},
-          "closing_unadjusted": {"col": 8, "label": "期末未审数"},
-          "closing_adjustment": {"col": 9, "label": "账项调整"},
-          "closing_reclass": {"col": 10, "label": "重分类调整"},
-          "closing_audited": {"col": 11, "label": "期末审定数"}
+          "note_type": {
+            "col": 1,
+            "label": "票据种类"
+          },
+          "opening_unadjusted": {
+            "col": 2,
+            "label": "期初未审数"
+          },
+          "opening_adjustment": {
+            "col": 3,
+            "label": "账项调整"
+          },
+          "opening_reclass": {
+            "col": 4,
+            "label": "重分类调整"
+          },
+          "opening_audited": {
+            "col": 5,
+            "label": "期初审定数"
+          },
+          "increase": {
+            "col": 6,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 7,
+            "label": "本期减少"
+          },
+          "closing_unadjusted": {
+            "col": 8,
+            "label": "期末未审数"
+          },
+          "closing_adjustment": {
+            "col": 9,
+            "label": "账项调整"
+          },
+          "closing_reclass": {
+            "col": 10,
+            "label": "重分类调整"
+          },
+          "closing_audited": {
+            "col": 11,
+            "label": "期末审定数"
+          }
         }
       },
-      "link_to_summary": {"target": "D1-1", "target_row": 10, "target_col": 9, "description": "明细合计→审定表原值小计"}
+      "link_to_summary": {
+        "target": "D1-1",
+        "target_row": 10,
+        "target_col": 9,
+        "description": "明细合计→审定表原值小计"
+      }
     },
     {
       "code": "D1-3",
@@ -120,38 +236,100 @@
       "code": "D1-4",
       "exact_name": "坏账准备明细表D1-4",
       "type": "movement",
-      "header_rows": [10, 11],
+      "header_rows": [
+        10,
+        11
+      ],
       "data_start_row": 12,
       "layout": {
         "columns": {
-          "label": {"col": 1, "label": "项目"},
-          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
-          "opening_adjustment": {"col": 3, "label": "期初账项调整"},
-          "opening_reclass": {"col": 4, "label": "期初重分类调整"},
-          "opening_audited": {"col": 5, "label": "期初审定数"},
-          "provision": {"col": 6, "label": "计提"},
-          "other_increase": {"col": 7, "label": "其他增加"},
-          "reversal": {"col": 8, "label": "转回"},
-          "write_off": {"col": 9, "label": "核销"},
-          "other_decrease": {"col": 10, "label": "其他减少"},
-          "closing_unadjusted": {"col": 11, "label": "期末未审数"},
-          "closing_adjustment": {"col": 12, "label": "期末账项调整"},
-          "closing_reclass": {"col": 13, "label": "期末重分类调整"},
-          "closing_audited": {"col": 14, "label": "期末审定数"}
+          "label": {
+            "col": 1,
+            "label": "项目"
+          },
+          "opening_unadjusted": {
+            "col": 2,
+            "label": "期初未审数"
+          },
+          "opening_adjustment": {
+            "col": 3,
+            "label": "期初账项调整"
+          },
+          "opening_reclass": {
+            "col": 4,
+            "label": "期初重分类调整"
+          },
+          "opening_audited": {
+            "col": 5,
+            "label": "期初审定数"
+          },
+          "provision": {
+            "col": 6,
+            "label": "计提"
+          },
+          "other_increase": {
+            "col": 7,
+            "label": "其他增加"
+          },
+          "reversal": {
+            "col": 8,
+            "label": "转回"
+          },
+          "write_off": {
+            "col": 9,
+            "label": "核销"
+          },
+          "other_decrease": {
+            "col": 10,
+            "label": "其他减少"
+          },
+          "closing_unadjusted": {
+            "col": 11,
+            "label": "期末未审数"
+          },
+          "closing_adjustment": {
+            "col": 12,
+            "label": "期末账项调整"
+          },
+          "closing_reclass": {
+            "col": 13,
+            "label": "期末重分类调整"
+          },
+          "closing_audited": {
+            "col": 14,
+            "label": "期末审定数"
+          }
         }
       },
       "key_rows": {
-        "individual": {"row": 12, "label": "按单项计提"},
-        "portfolio": {"row": 17, "label": "按组合计提"},
-        "total": {"row": 22, "label": "合计", "is_total": true}
+        "individual": {
+          "row": 12,
+          "label": "按单项计提"
+        },
+        "portfolio": {
+          "row": 17,
+          "label": "按组合计提"
+        },
+        "total": {
+          "row": 22,
+          "label": "合计",
+          "is_total": true
+        }
       },
-      "link_to_summary": {"target": "D1-1", "target_row": 14, "target_col": 9, "description": "坏账合计→审定表坏账小计"}
+      "link_to_summary": {
+        "target": "D1-1",
+        "target_row": 14,
+        "target_col": 9,
+        "description": "坏账合计→审定表坏账小计"
+      }
     },
     {
       "code": "D1-5",
       "exact_name": "调整分录汇总表D1-5",
       "type": "adjustment",
-      "header_rows": [5],
+      "header_rows": [
+        5
+      ],
       "data_start_row": 6
     },
     {
@@ -229,25 +407,112 @@
     }
   ],
   "cross_references": [
-    {"from": "D1-1.R18.C9", "to": "report://BS/BS-004#期末", "description": "审定表净值合计 = 资产负债表应收票据"},
-    {"from": "D1-1.R10.C9", "to": "D1-2.R14.C11", "description": "审定表原值小计 = 明细表（按类别）合计"},
-    {"from": "D1-1.R14.C9", "to": "D1-4.合计.C14", "description": "审定表坏账小计 = 坏账准备明细合计"},
-    {"from": "D1-1.R18.C9", "to": "D1-1.R10.C9 - D1-1.R14.C9", "description": "净值 = 原值 - 坏账准备"},
-    {"from": "D1-1.R19.C9", "to": "tb://1121#审定数", "description": "试算平衡表数 = 试算表应收票据审定数"},
-    {"from": "D1-4.期初+变动", "to": "D1-4.期末", "description": "期初+计提+其他增加-转回-核销-其他减少 = 期末"},
-    {"from": "D1-8.贴现合计", "to": "附注披露", "description": "贴现/背书未到期金额 → 附注表外披露"},
-    {"from": "D1-3.关联方", "to": "D1-11.关联方检查", "description": "明细表关联方 → 关联方检查表"}
+    {
+      "from": "D1-1.R18.C9",
+      "to": "report://BS/BS-004#期末",
+      "description": "审定表净值合计 = 资产负债表应收票据"
+    },
+    {
+      "from": "D1-1.R10.C9",
+      "to": "D1-2.R14.C11",
+      "description": "审定表原值小计 = 明细表（按类别）合计"
+    },
+    {
+      "from": "D1-1.R14.C9",
+      "to": "D1-4.合计.C14",
+      "description": "审定表坏账小计 = 坏账准备明细合计"
+    },
+    {
+      "from": "D1-1.R18.C9",
+      "to": "D1-1.R10.C9 - D1-1.R14.C9",
+      "description": "净值 = 原值 - 坏账准备"
+    },
+    {
+      "from": "D1-1.R19.C9",
+      "to": "tb://1121#审定数",
+      "description": "试算平衡表数 = 试算表应收票据审定数"
+    },
+    {
+      "from": "D1-4.期初+变动",
+      "to": "D1-4.期末",
+      "description": "期初+计提+其他增加-转回-核销-其他减少 = 期末"
+    },
+    {
+      "from": "D1-8.贴现合计",
+      "to": "附注披露",
+      "description": "贴现/背书未到期金额 → 附注表外披露"
+    },
+    {
+      "from": "D1-3.关联方",
+      "to": "D1-11.关联方检查",
+      "description": "明细表关联方 → 关联方检查表"
+    },
+    {
+      "from": "D1-1.R10.C9",
+      "to": "REPORT('BS-004','期末')",
+      "description": "审定表合计 = 报表应收票据"
+    }
   ],
   "audit_checks": [
-    {"code": "D1-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表净值合计 = 试算表应收票据审定数"},
-    {"code": "D1-CHK-02", "type": "balance", "severity": "blocking", "description": "审定表净值合计 = 报表应收票据行"},
-    {"code": "D1-CHK-03", "type": "cross_ref", "severity": "warning", "description": "审定表原值小计 = 明细表（按类别）合计"},
-    {"code": "D1-CHK-04", "type": "cross_ref", "severity": "warning", "description": "审定表坏账小计 = 坏账准备明细合计"},
-    {"code": "D1-CHK-05", "type": "formula", "severity": "blocking", "description": "净值 = 原值 - 坏账准备（各行）"},
-    {"code": "D1-CHK-06", "type": "movement", "severity": "warning", "description": "坏账准备：期初+计提+其他增加-转回-核销-其他减少 = 期末"},
-    {"code": "D1-CHK-07", "type": "completeness", "severity": "warning", "description": "票据备查簿记录数 ≥ 明细表记录数"},
-    {"code": "D1-CHK-08", "type": "check", "severity": "warning", "description": "贴现/背书未到期票据已在附注中披露"},
-    {"code": "D1-CHK-09", "type": "check", "severity": "info", "description": "银行承兑汇票vs商业承兑汇票占比分析"},
-    {"code": "D1-CHK-10", "type": "check", "severity": "warning", "description": "票据质押情况已检查并披露"}
+    {
+      "code": "D1-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表净值合计 = 试算表应收票据审定数"
+    },
+    {
+      "code": "D1-CHK-02",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表净值合计 = 报表应收票据行"
+    },
+    {
+      "code": "D1-CHK-03",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "审定表原值小计 = 明细表（按类别）合计"
+    },
+    {
+      "code": "D1-CHK-04",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "审定表坏账小计 = 坏账准备明细合计"
+    },
+    {
+      "code": "D1-CHK-05",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "净值 = 原值 - 坏账准备（各行）"
+    },
+    {
+      "code": "D1-CHK-06",
+      "type": "movement",
+      "severity": "warning",
+      "description": "坏账准备：期初+计提+其他增加-转回-核销-其他减少 = 期末"
+    },
+    {
+      "code": "D1-CHK-07",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "票据备查簿记录数 ≥ 明细表记录数"
+    },
+    {
+      "code": "D1-CHK-08",
+      "type": "check",
+      "severity": "warning",
+      "description": "贴现/背书未到期票据已在附注中披露"
+    },
+    {
+      "code": "D1-CHK-09",
+      "type": "check",
+      "severity": "info",
+      "description": "银行承兑汇票vs商业承兑汇票占比分析"
+    },
+    {
+      "code": "D1-CHK-10",
+      "type": "check",
+      "severity": "warning",
+      "description": "票据质押情况已检查并披露"
+    }
   ]
 }

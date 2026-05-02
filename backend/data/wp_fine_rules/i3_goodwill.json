@@ -1,7 +1,7 @@
 {
   "wp_code": "I3",
   "name": "商誉",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1711"
   ],
@@ -43,7 +43,8 @@
         "total": {
           "row": 12,
           "label": "合计",
-          "is_total": true
+          "is_total": true,
+          "report_row": "BS-027"
         }
       },
       "layout": {
@@ -140,13 +141,13 @@
   ],
   "cross_references": [
     {
-      "from": "I3-1.total",
+      "from": "I3-1.R12.C7",
       "to": "tb://1711#审定数",
       "description": "审定表合计 = 试算表商誉审定数"
     },
     {
       "from": "I3-2.合计",
-      "to": "I3-1.total",
+      "to": "I3-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
     },
     {
@@ -158,6 +159,11 @@
       "from": "I3-6.减值",
       "to": "I3-1.减值准备",
       "description": "减值测试结果 = 审定表减值准备"
+    },
+    {
+      "from": "I3-1.R12.C7",
+      "to": "REPORT('BS-027','期末')",
+      "description": "审定表合计 = 报表商誉"
     }
   ],
   "audit_checks": [

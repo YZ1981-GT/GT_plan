@@ -1,7 +1,7 @@
 {
   "wp_code": "L4",
   "name": "应付债券",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2502"
   ],
@@ -83,6 +83,44 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "subtotal": {
+          "row": 12,
+          "label": "小计"
+        },
+        "less_current": {
+          "row": 13,
+          "label": "减：一年内到期的应付债券"
+        },
+        "total": {
+          "row": 14,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L10"
+        },
+        "tb": {
+          "row": 16,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 17,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "公司债券",
+          "中期票据",
+          "短期融资券",
+          "可转换公司债券",
+          "其他"
+        ]
       }
     },
     {
@@ -153,18 +191,23 @@
   ],
   "cross_references": [
     {
-      "from": "L4-1.total",
+      "from": "L4-1.R14.C7",
       "to": "tb://2502#审定数",
       "description": "审定表合计 = 试算表应付债券审定数"
     },
     {
       "from": "L4-2.合计",
-      "to": "L4-1.total",
+      "to": "L4-1.R14.C7",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "from": "L4-1.total",
+      "from": "L4-1.R14.C7",
       "to": "report://BS/BS-043#期末",
+      "description": "审定表合计 = 报表应付债券"
+    },
+    {
+      "from": "L4-1.R14.C7",
+      "to": "REPORT('BS-L10','期末')",
       "description": "审定表合计 = 报表应付债券"
     }
   ],
@@ -198,6 +241,24 @@
       "type": "balance",
       "severity": "blocking",
       "description": "审定表合计 = 报表应付债券行"
+    },
+    {
+      "code": "L4-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表应付债券"
+    },
+    {
+      "code": "L4-CHK-06",
+      "type": "formula",
+      "severity": "warning",
+      "description": "合计=小计-一年内到期"
+    },
+    {
+      "code": "L4-CHK-07",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "一年内到期与一年内到期的非流动负债交叉核对"
     }
   ]
 }

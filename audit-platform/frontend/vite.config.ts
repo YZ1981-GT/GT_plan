@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
+        'opentype.js/dist/opentype.module.js': 'opentype.js/dist/opentype.mjs',
       },
     },
   }

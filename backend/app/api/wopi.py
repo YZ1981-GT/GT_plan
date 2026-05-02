@@ -1,12 +1,9 @@
 """WOPI API 路由 — CheckFileInfo / GetFile / PutFile / Lock/Unlock/RefreshLock
 
+保留向后兼容（底稿编辑已迁移至 Univer 纯前端方案）。
 支持两种模式：
 1. 新版 working_paper 集成模式 (file_id 为 UUID)
 2. 旧版 POC 文件模式 (file_id 为文件名字符串)
-
-通过 X-WOPI-Override 头区分 Lock/Unlock/RefreshLock 操作。
-
-Validates: Requirements 3.1, 3.2, 3.3, 3.7
 """
 
 from __future__ import annotations
@@ -378,9 +375,9 @@ async def ds_callback(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Document Server API 保存回调端点。
+    """Document Server 保存回调端点（向后兼容）。
 
-    ONLYOFFICE Document Server 在用户关闭编辑器或自动保存时，
+    保留用于 WOPI 协议兼容，底稿编辑已迁移至 Univer。
     POST JSON: { "status": 2, "url": "http://...", "key": "..." }
     status=2 表示文档已修改并准备好下载。
     """

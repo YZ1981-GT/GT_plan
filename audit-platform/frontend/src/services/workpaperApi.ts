@@ -79,6 +79,7 @@ export interface OnlineEditSession {
   access_token: string | null
   editor_url: string | null
   editor_base_url: string | null
+  /** @deprecated 已迁移至 Univer，保留向后兼容 */
   onlyoffice_url: string | null
 }
 
@@ -351,26 +352,18 @@ export async function resolveReview(wpId: string, reviewId: string, body: {
 
 // ─── WOPI ───
 
+/** @deprecated 已迁移至 Univer，保留向后兼容 */
 export function getWopiEditorUrl(
   wopiSrc: string,
-  onlyofficeUrl: string = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080',
+  onlyofficeUrl: string = 'http://localhost:8080',
 ): string {
   const normalizedBaseUrl = onlyofficeUrl.replace(/\/$/, '')
   return `${normalizedBaseUrl}/hosting/wopi/cell/edit?WOPISrc=${encodeURIComponent(wopiSrc)}`
 }
 
+/** @deprecated 已迁移至 Univer 纯前端，始终返回 true */
 export async function checkOnlineEditingAvailability(): Promise<boolean> {
-  try {
-    // 通过后端 /wopi/health 统一检查（后端会同时检测 ONLYOFFICE 可达性）
-    // 避免前端直接跨域请求 ONLYOFFICE /healthcheck 被 CORS 拦截
-    const wopiResp = await http.get('/wopi/health', { timeout: 5000, validateStatus: () => true })
-    if (wopiResp.status !== 200) return false
-    const data = wopiResp.data?.data ?? wopiResp.data
-    // 后端返回 onlyoffice_available 字段
-    return data?.onlyoffice_available !== false
-  } catch {
-    return false
-  }
+  return true
 }
 
 

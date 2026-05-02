@@ -1,7 +1,7 @@
 {
   "wp_code": "I6",
   "name": "研发费用",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6604"
   ],
@@ -84,6 +84,36 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 14,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-007"
+        },
+        "tb": {
+          "row": 16,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 17,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "人员人工费用",
+          "直接投入",
+          "折旧费用",
+          "长期待摊费用摊销",
+          "设计费用"
+        ]
       }
     },
     {
@@ -119,14 +149,19 @@
   ],
   "cross_references": [
     {
-      "from": "I6-1.total",
+      "from": "I6-1.R14.C5",
       "to": "tb://6604#审定数",
       "description": "审定表合计 = 试算表研发费用审定数"
     },
     {
       "from": "I6-2.合计",
-      "to": "I6-1.total",
+      "to": "I6-1.R14.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "I6-1.R14.C5",
+      "to": "REPORT('IS-007','本期')",
+      "description": "审定表合计 = 报表研发费用"
     }
   ],
   "audit_checks": [
@@ -165,6 +200,18 @@
       "type": "analysis",
       "severity": "info",
       "description": "研发投入占比分析"
+    },
+    {
+      "code": "I6-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表研发费用"
+    },
+    {
+      "code": "I6-CHK-05",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "职工薪酬与J1分配表一致"
     }
   ]
 }

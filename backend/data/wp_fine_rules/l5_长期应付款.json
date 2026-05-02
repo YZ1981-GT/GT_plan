@@ -1,7 +1,7 @@
 {
   "wp_code": "L5",
   "name": "长期应付款",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2701"
   ],
@@ -79,6 +79,43 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "subtotal": {
+          "row": 10,
+          "label": "小计"
+        },
+        "less_current": {
+          "row": 11,
+          "label": "减：一年内到期的长期应付款"
+        },
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L15"
+        },
+        "tb": {
+          "row": 14,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 15,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "长期应付款",
+          "专项应付款",
+          "其他",
+          "融资租赁款"
+        ]
       }
     },
     {
@@ -129,18 +166,23 @@
   ],
   "cross_references": [
     {
-      "from": "L5-1.total",
+      "from": "L5-1.R12.C7",
       "to": "tb://2701#审定数",
       "description": "审定表合计 = 试算表长期应付款审定数"
     },
     {
       "from": "L5-2.合计",
-      "to": "L5-1.total",
+      "to": "L5-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "from": "L5-1.total",
+      "from": "L5-1.R12.C7",
       "to": "report://BS/BS-044#期末",
+      "description": "审定表合计 = 报表长期应付款"
+    },
+    {
+      "from": "L5-1.R12.C7",
+      "to": "REPORT('BS-L15','期末')",
       "description": "审定表合计 = 报表长期应付款"
     }
   ],
@@ -174,6 +216,12 @@
       "type": "balance",
       "severity": "blocking",
       "description": "审定表合计 = 报表长期应付款行"
+    },
+    {
+      "code": "L5-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表长期应付款"
     }
   ]
 }

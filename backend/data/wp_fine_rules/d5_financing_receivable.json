@@ -1,7 +1,7 @@
 {
   "wp_code": "D5",
   "name": "应收款项融资",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1124"
   ],
@@ -75,22 +75,51 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 10,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-006"
+        },
+        "tb_balance": {
+          "row": 12,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 13,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "银行承兑汇票",
+          "商业承兑汇票",
+          "应收账款融资"
+        ]
       }
     },
     {
       "exact_name": "附注披露信息（上市公司）",
-      "code": "D5-note-listed",
-      "type": "note_disclosure"
+      "type": "note_disclosure",
+      "code": "D5-note-listed"
     },
     {
       "exact_name": "附注披露信息（国企）",
-      "code": "D5-note-soe",
-      "type": "note_disclosure"
+      "type": "note_disclosure",
+      "code": "D5-note-soe"
     },
     {
       "exact_name": "应收款项融资明细表D5-2",
       "code": "D5-2",
-      "type": "detail"
+      "type": "detail",
+      "description": "应收款项融资按票据/融资类型明细"
     },
     {
       "exact_name": "调整分录汇总表D5-3",
@@ -99,20 +128,36 @@
     },
     {
       "exact_name": "应收款项融资公允价值测算表D5-4",
+      "code": "D5-4",
       "type": "calculation",
-      "code": "D5-4"
+      "description": "公允价值测算（FVOCI分类下的公允价值变动）"
     }
   ],
   "cross_references": [
     {
-      "from": "D5-1.total",
+      "from": "D5-1.R10.C7",
       "to": "tb://1124#审定数",
       "description": "审定表合计 = 试算表应收款项融资审定数"
     },
     {
+      "from": "D5-1.R10.C7",
+      "to": "REPORT('BS-006','期末')",
+      "description": "审定表合计 = 报表应收款项融资"
+    },
+    {
       "from": "D5-2.合计",
-      "to": "D5-1.total",
+      "to": "D5-1.R10.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "D5-1.R7.C7",
+      "to": "D1-1.银行承兑.已背书贴现",
+      "description": "银行承兑汇票 → 应收票据已背书贴现部分"
+    },
+    {
+      "from": "D5-4.公允价值变动",
+      "to": "NOTE('五、6','合计','期末')",
+      "description": "公允价值变动 → 附注应收款项融资"
     }
   ],
   "audit_checks": [
@@ -124,15 +169,15 @@
     },
     {
       "code": "D5-CHK-02",
-      "type": "cross_ref",
-      "severity": "warning",
-      "description": "明细表合计 = 审定表合计"
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表应收款项融资"
     },
     {
       "code": "D5-CHK-03",
-      "type": "movement",
-      "severity": "info",
-      "description": "期初 + 变动 = 期末"
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
     },
     {
       "code": "D5-CHK-04",
@@ -144,7 +189,7 @@
       "code": "D5-CHK-05",
       "type": "calculation",
       "severity": "warning",
-      "description": "公允价值计量正确（市场报价/估值模型）"
+      "description": "公允价值计量正确（银行承兑汇票通常面值=公允价值）"
     },
     {
       "code": "D5-CHK-06",
@@ -155,8 +200,20 @@
     {
       "code": "D5-CHK-07",
       "type": "check",
-      "severity": "info",
+      "severity": "warning",
       "description": "信用风险显著增加判断已评估"
+    },
+    {
+      "code": "D5-CHK-08",
+      "type": "cross_ref",
+      "severity": "info",
+      "description": "银行承兑汇票与应收票据科目交叉核对"
+    },
+    {
+      "code": "D5-CHK-09",
+      "type": "analysis",
+      "severity": "info",
+      "description": "应收款项融资余额与销售规模匹配"
     }
   ]
 }
