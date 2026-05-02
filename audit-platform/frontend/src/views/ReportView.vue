@@ -77,6 +77,21 @@
     <!-- 可滚动的表格区域 -->
     <div class="gt-rv-table-area">
 
+    <!-- 空数据引导提示 -->
+    <el-alert
+      v-if="!loading && rows.length === 0 && !isTracing"
+      type="info"
+      show-icon
+      :closable="false"
+      style="margin: 12px 0"
+    >
+      <template #title>报表暂无数据</template>
+      <div style="font-size: 12px; line-height: 1.6; margin-top: 4px">
+        请先完成以下步骤：① 导入账套数据 → ② 科目映射 → ③ 点击上方"🔄 刷新数据"生成报表。
+        当前显示的是预设报表结构（行次和项目名称），金额列为空。
+      </div>
+    </el-alert>
+
     <!-- 溯源返回浮动条 -->
     <div v-if="isTracing" class="gt-rv-trace-bar">
       <span>📍 正在查看溯源数据 — {{ activeTabLabel }}</span>

@@ -817,6 +817,15 @@ async function selectWorkpaperById(wpId: string) {
       }
     }
   }
+  // 自动展开并滚动到选中节点
+  if (treeRef.value && wpId) {
+    try {
+      treeRef.value.setCurrentKey(wpId)
+      // 滚动到可视区域
+      const el = document.querySelector('.el-tree-node.is-current')
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } catch { /* tree node may not exist */ }
+  }
   qcResult.value = null
   annotations.value = []
   unconfirmedAiCount.value = 0

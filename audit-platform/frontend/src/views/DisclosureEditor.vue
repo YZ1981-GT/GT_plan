@@ -110,7 +110,12 @@
         <template v-if="currentNote">
           <div class="gt-de-editor-header">
             <div>
-              <h4 class="gt-de-section-title">{{ currentNote.section_title }}</h4>
+              <h4 class="gt-de-section-title">
+                {{ currentNote.section_title }}
+                <transition name="el-fade-in">
+                  <span v-if="justSaved" class="gt-de-saved-badge">✓ 已保存</span>
+                </transition>
+              </h4>
               <span class="gt-de-section-account">{{ currentNote.account_name }}</span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
@@ -399,6 +404,7 @@ const showNoteFormulaManager = ref(false)
 const showStructureEditor = ref(false)
 const editMode = ref(false)
 const templateType = ref('soe')
+const justSaved = ref(false)
 const customTemplateId = ref('')
 const customTemplateName = ref('')
 const customTemplateVersion = ref('')
@@ -1120,6 +1126,8 @@ async function onSave() {
     ElMessage.success('保存成功')
     editMode.value = false
     currentNote.value.status = 'confirmed'
+    justSaved.value = true
+    setTimeout(() => { justSaved.value = false }, 2500)
   } finally { saveLoading.value = false }
 }
 
@@ -1301,6 +1309,7 @@ onMounted(async () => {
 .gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid #e8e4f0; background: #faf8fd; border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .gt-de-toolbar-divider { width: 1px; height: 20px; background: #d8d0e8; margin: 0 6px; }
 .gt-de-ai-hint { font-size: 11px; color: #b0a4c8; margin-left: 8px; white-space: nowrap; }
+.gt-de-saved-badge { font-size: 11px; color: #67c23a; font-weight: 400; margin-left: 8px; background: #f0f9eb; padding: 1px 8px; border-radius: 10px; }
 .gt-de-tiptap-content { padding: 12px; min-height: 200px; font-size: 13px; line-height: 1.8; }
 .gt-de-tiptap-content :deep(.ProseMirror) { outline: none; min-height: 180px; }
 .gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }

@@ -295,9 +295,10 @@ class DisclosureNote(Base):
 
     __table_args__ = (
         Index(
-            "uq_disclosure_notes_project_year_section",
+            "uq_disclosure_notes_active",
             "project_id", "year", "note_section",
             unique=True,
+            postgresql_where=text("is_deleted = false"),
         ),
     )
 
