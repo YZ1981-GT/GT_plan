@@ -658,3 +658,26 @@ body {
 .el-message--warning { background: linear-gradient(90deg, #fff8e6, #fffdf5) !important; }
 .el-message--error { background: linear-gradient(90deg, #fff0ef, #fff9f8) !important; }
 .el-message--info { background: linear-gradient(90deg, #e6f7fa, #f5fdfe) !important; }
+
+/* ── 工作流引导弹窗 ── */
+.gt-workflow-guide-dialog {
+  border-radius: 12px !important;
+}
+.gt-workflow-guide-dialog .el-message-box__header {
+  background: linear-gradient(135deg, #f5f0ff 0%, #fff 100%);
+  border-bottom: 1px solid #e8e4f0;
+  padding: 16px 20px !important;
+}
+.gt-workflow-guide-dialog .el-message-box__title {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+}
+.gt-workflow-guide-dialog .el-message-box__content {
+  padding: 16px 20px !important;
+}
+.gt-workflow-guide-dialog .el-message-box__input {
+  display: none !important; /* 隐藏默认input，用HTML内容替代 */
+}
+.gt-workflow-guide-dialog .el-message-box__btns {
+  padding: 12px 20px !important;
+}

@@ -1054,6 +1054,25 @@ async function onGenerate() {
     ElMessage.warning('当前项目未绑定自定义附注模板，请先在项目基本信息中选择')
     return
   }
+  const { showGuide } = await import('@/composables/useWorkflowGuide')
+  const tplLabel = templateType.value === 'listed' ? '上市版' : '国企版'
+  const ok = await showGuide(
+    'note_generate',
+    '📝 生成附注',
+    `<div style="line-height:1.8;font-size:13px">
+      <p>将根据 <b>${tplLabel}</b> 模板生成全部附注章节。</p>
+      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下准备工作已完成：</p>
+      <ul style="padding-left:18px;margin:4px 0">
+        <li><span style="color:#e6a23c">⚠</span> 已选择正确的模板类型（当前：${tplLabel}）</li>
+        <li><span style="color:#e6a23c">⚠</span> 建议先完成报表生成，附注表格将自动从试算表取数</li>
+        <li><span style="color:#e6a23c">⚠</span> 如有上年附注，建议先上传到知识库供 AI 参照</li>
+      </ul>
+      <p style="color:#67c23a;font-size:12px;margin-top:6px">✓ 将生成 170+ 个附注章节（含表格和正文），已有数据将被重新生成</p>
+      <p style="color:#909399;font-size:12px">💡 生成后可使用 AI 续写/改写功能辅助编写会计政策等文字内容</p>
+    </div>`,
+    '开始生成',
+  )
+  if (!ok) return
   genLoading.value = true
   try {
     await generateDisclosureNotes(projectId.value, year.value, templateType.value)

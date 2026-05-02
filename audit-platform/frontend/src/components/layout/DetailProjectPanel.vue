@@ -303,8 +303,25 @@ function goTo(page: string) {
   })
 }
 
-function goToLedgerImport() {
+async function goToLedgerImport() {
   if (!props.project) return
+  const { showGuide } = await import('@/composables/useWorkflowGuide')
+  const ok = await showGuide(
+    'ledger_import',
+    '📥 账套数据导入',
+    `<div style="line-height:1.8;font-size:13px">
+      <p>将导入企业财务数据到当前项目。</p>
+      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下准备工作：</p>
+      <ul style="padding-left:18px;margin:4px 0">
+        <li><span style="color:#e6a23c">⚠</span> 已准备好企业导出的 Excel 或 CSV 文件</li>
+        <li><span style="color:#e6a23c">⚠</span> 文件应包含：科目余额表（必需）、序时账（建议）</li>
+        <li><span style="color:#e6a23c">⚠</span> 确认文件中的年度与当前项目年度一致</li>
+      </ul>
+      <p style="color:#909399;font-size:12px;margin-top:6px">💡 支持多 Sheet 的 Excel 文件，系统会自动识别各表类型</p>
+    </div>`,
+    '前往导入',
+  )
+  if (!ok) return
   router.push({ path: `/projects/${props.project.id}/ledger`, query: { import: '1' } })
 }
 

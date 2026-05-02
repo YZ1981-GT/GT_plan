@@ -922,6 +922,23 @@ async function _onSyncUnadjusted() {
 }
 
 async function onGenerate() {
+  const { showGuide } = await import('@/composables/useWorkflowGuide')
+  const ok = await showGuide(
+    'report_generate',
+    '📊 刷新报表数据',
+    `<div style="line-height:1.8;font-size:13px">
+      <p>将根据试算表审定数重新计算生成六张财务报表。</p>
+      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下准备工作已完成：</p>
+      <ul style="padding-left:18px;margin:4px 0">
+        <li><span style="color:#e6a23c">⚠</span> 已完成账套数据导入（科目余额表、序时账）</li>
+        <li><span style="color:#e6a23c">⚠</span> 已完成科目映射（客户科目 → 标准科目）</li>
+        <li><span style="color:#e6a23c">⚠</span> 调整分录已录入并审批（如有）</li>
+      </ul>
+      <p style="color:#909399;font-size:12px;margin-top:6px">💡 如果试算表数据为空，报表金额将全部为零</p>
+    </div>`,
+    '开始生成',
+  )
+  if (!ok) return
   genLoading.value = true
   try {
     await generateReports(projectId.value, year.value)
@@ -942,6 +959,20 @@ const filteredAuditChecks = computed(() => {
 })
 
 async function onConsistencyCheck() {
+  const { showGuide } = await import('@/composables/useWorkflowGuide')
+  const ok = await showGuide(
+    'report_audit',
+    '✅ 报表审核校验',
+    `<div style="line-height:1.8;font-size:13px">
+      <p>将对报表执行逻辑审核和合理性检查。</p>
+      <ul style="padding-left:18px;margin:4px 0">
+        <li><span style="color:#e6a23c">⚠</span> 请先确认报表数据已生成（点击"刷新数据"）</li>
+      </ul>
+      <p style="color:#67c23a;font-size:12px;margin-top:6px">✓ 校验结果将按公式分类展示，可点击溯源跳转到具体位置</p>
+    </div>`,
+    '开始审核',
+  )
+  if (!ok) return
   checkLoading.value = true
   try {
     consistencyResult.value = await getReportConsistencyCheck(projectId.value, year.value)

@@ -82,7 +82,25 @@ async function handleConfirm() {
   if (!ok) return
 
   if (!wizardStore.projectId) {
-    // 新建项目，createProject 已在 validate 中完成
+    // 新建项目引导
+    const { showGuide } = await import('@/composables/useWorkflowGuide')
+    const proceed = await showGuide(
+      'project_create',
+      '🏢 创建审计项目',
+      `<div style="line-height:1.8;font-size:13px">
+        <p>项目创建后，建议按以下顺序开展工作：</p>
+        <ol style="padding-left:18px;margin:6px 0">
+          <li><b>导入账套数据</b> — 上传科目余额表和序时账</li>
+          <li><b>科目映射</b> — 将客户科目对应到标准科目</li>
+          <li><b>生成底稿</b> — 从模板库生成项目底稿</li>
+          <li><b>生成报表</b> — 根据试算表数据生成财务报表</li>
+          <li><b>编写附注</b> — 生成并编辑附注章节</li>
+        </ol>
+        <p style="color:#909399;font-size:12px;margin-top:6px">💡 每个步骤都有详细引导，可随时在项目详情页的快捷操作中进入</p>
+      </div>`,
+      '确认创建',
+    )
+    if (!proceed) return
     ElMessage.success('项目创建成功')
     wizardStore.reset()
     router.push('/projects')

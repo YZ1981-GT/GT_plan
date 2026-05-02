@@ -931,6 +931,25 @@ async function onQCCheck() {
 
 async function onSubmitReview() {
   if (!selectedWp.value) return
+  // 引导提示
+  const { showGuide } = await import('@/composables/useWorkflowGuide')
+  const ok = await showGuide(
+    'submit_review',
+    '📤 提交复核',
+    `<div style="line-height:1.8;font-size:13px">
+      <p>将底稿 <b>${selectedWp.value.wp_code || ''}</b> 提交给复核人审阅。</p>
+      <p style="color:#909399;font-size:12px;margin-top:6px">请确认以下条件已满足：</p>
+      <ul style="padding-left:18px;margin:4px 0">
+        <li><span style="color:#e6a23c">⚠</span> 底稿内容已编制完成</li>
+        <li><span style="color:#e6a23c">⚠</span> 已分配复核人</li>
+        <li><span style="color:#e6a23c">⚠</span> 质量自检（QC）无阻断级问题</li>
+        <li><span style="color:#e6a23c">⚠</span> 所有未解决的复核意见已回复</li>
+      </ul>
+      <p style="color:#909399;font-size:12px;margin-top:6px">💡 不满足条件时系统会自动阻断并提示具体原因</p>
+    </div>`,
+    '提交复核',
+  )
+  if (!ok) return
   submitLoading.value = true
   gateState.value = 'evaluating'
   gateHitRules.value = []

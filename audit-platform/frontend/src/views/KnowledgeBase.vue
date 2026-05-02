@@ -791,7 +791,29 @@ async function onFolderContextMenu(folder: any, event: MouseEvent) {
   } catch { ElMessage.error('重命名失败') }
 }
 
-onMounted(loadTree)
+onMounted(async () => {
+  await loadTree()
+  // 首次使用引导
+  if (folderTree.value.length === 0) {
+    const { showGuide } = await import('@/composables/useWorkflowGuide')
+    await showGuide(
+      'knowledge_first_use',
+      '📚 知识库使用指南',
+      `<div style="line-height:1.8;font-size:13px">
+        <p>知识库用于存储和管理审计参考资料，支持 AI 智能检索。</p>
+        <p style="color:#909399;font-size:12px;margin-top:8px">建议上传以下资料：</p>
+        <ul style="padding-left:18px;margin:4px 0">
+          <li>📄 上年审计报告和附注（供 AI 参照生成当年内容）</li>
+          <li>📋 底稿模板（致同标准模板已预置）</li>
+          <li>📖 会计准则、监管规定等参考文献</li>
+          <li>📝 项目专属的工作记录和备忘</li>
+        </ul>
+        <p style="color:#909399;font-size:12px;margin-top:8px">💡 点击"初始化预设文件夹"可快速创建标准分类目录</p>
+      </div>`,
+      '知道了',
+    )
+  }
+})
 </script>
 
 <style scoped>
