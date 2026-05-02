@@ -1,0 +1,43 @@
+{
+  "wp_code": "A8",
+  "name": "其他信息程序表20170720",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "其他信息程序表20170720.xlsx",
+      "sheets": [
+        "审计程序A8",
+        "GT_Custom",
+        "参考-其他信息中可能包含的金额或其他项目的举例"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "审计程序A8",
+      "type": "check",
+      "code": "A8"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "参考-其他信息中可能包含的金额或其他项目的举例",
+      "type": "check",
+      "code": "参考-其他信息中可能包含的金额"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A8-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

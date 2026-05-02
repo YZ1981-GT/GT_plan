@@ -1,0 +1,38 @@
+{
+  "wp_code": "B19",
+  "name": "识别关联方程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "识别关联方程序表.xlsx",
+      "sheets": [
+        "底稿目录",
+        "B19识别关联方程序表",
+        "B19-1管理层提供的关联方清单"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B19识别关联方程序表",
+      "type": "procedure",
+      "code": "B19"
+    },
+    {
+      "exact_name": "B19-1管理层提供的关联方清单",
+      "type": "check",
+      "code": "B19-1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B19-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "wp_code": "B30-12",
+  "name": "组成部分已识别错报汇总表（2024年3月）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "组成部分已识别错报汇总表（2024年3月）.xlsx",
+      "sheets": [
+        "Sheet5",
+        "GT_Custom",
+        "B30-12 指令—已识别组成部分错报汇总表",
+        "B30-12-1 整体发现",
+        "B30-12-2 已更正错报",
+        "B30-12-3 未更正错报",
+        "B30-12-4 披露错报",
+        "Lists"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "Sheet5",
+      "type": "check",
+      "code": "Sheet5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "B30-12 指令—已识别组成部分错报汇总表",
+      "type": "detail",
+      "code": "B30-12"
+    },
+    {
+      "exact_name": "B30-12-1 整体发现",
+      "type": "check",
+      "code": "B30-12"
+    },
+    {
+      "exact_name": "B30-12-2 已更正错报",
+      "type": "check",
+      "code": "B30-12"
+    },
+    {
+      "exact_name": "B30-12-3 未更正错报",
+      "type": "check",
+      "code": "B30-12"
+    },
+    {
+      "exact_name": "B30-12-4 披露错报",
+      "type": "check",
+      "code": "B30-12"
+    },
+    {
+      "exact_name": "Lists",
+      "type": "check",
+      "code": "Lists"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B30-12-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

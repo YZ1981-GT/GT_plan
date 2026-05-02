@@ -1,0 +1,49 @@
+{
+  "wp_code": "S4",
+  "name": "非货币性资产交换202401",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "非货币性资产交换202401.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "非货币性资产交换审计程序S4",
+        "审定表S4-1",
+        "商业实质的判断S4-2"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "非货币性资产交换审计程序S4",
+      "type": "check",
+      "code": "S4"
+    },
+    {
+      "exact_name": "审定表S4-1",
+      "type": "summary",
+      "code": "S4-1"
+    },
+    {
+      "exact_name": "商业实质的判断S4-2",
+      "type": "check",
+      "code": "S4-2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S4-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

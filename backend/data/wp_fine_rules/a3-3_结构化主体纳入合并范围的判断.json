@@ -1,0 +1,49 @@
+{
+  "wp_code": "A3-3",
+  "name": "结构化主体纳入合并范围的判断",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "结构化主体纳入合并范围的判断.xlsx",
+      "sheets": [
+        "结构化主体纳入合并范围判断F6-10",
+        "合并范围判断流程图（举例）",
+        "单一控制模型判断流程（参考）",
+        "权益与负债的区分的判断框架（参考）"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "结构化主体纳入合并范围判断F6-10",
+      "type": "check",
+      "code": "F6-10"
+    },
+    {
+      "exact_name": "合并范围判断流程图（举例）",
+      "type": "check",
+      "code": "合并范围判断流程图（举例）"
+    },
+    {
+      "exact_name": "单一控制模型判断流程（参考）",
+      "type": "control_test",
+      "code": "单一控制模型判断流程（参考）"
+    },
+    {
+      "exact_name": "权益与负债的区分的判断框架（参考）",
+      "type": "check",
+      "code": "权益与负债的区分的判断框架（参"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A3-3-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

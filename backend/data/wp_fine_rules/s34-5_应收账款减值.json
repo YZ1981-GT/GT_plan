@@ -1,0 +1,37 @@
+{
+  "wp_code": "S34-5",
+  "name": "应收账款减值",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "应收账款减值.xlsx",
+      "sheets": [
+        "S34-5程序表",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S34-5程序表",
+      "type": "procedure",
+      "code": "S34-5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S34-5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

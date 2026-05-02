@@ -1,0 +1,103 @@
+{
+  "wp_code": "C1",
+  "name": "企业层面控制测试",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": "企业层面控制测试.xlsx",
+      "sheets": [
+        "C1 企业层面控制测试程序表",
+        "C1-1 企业层面控制测试示例1",
+        "C1-2 企业层面控制测试示例2",
+        "C1-3企业层面控制测试示例3",
+        "GT_Custom",
+        "C1-4企业层面内控测试示例4-财务报告内部控制",
+        "C1-4-1企业层面内控测试示例4",
+        "C1-4-2企业层面内控测试示例4",
+        "C1-4-3企业层面内控测试示例4",
+        "C1-4-4企业层面内控测试示例4",
+        "C1-4-5企业层面内控测试示例4",
+        "C1-4-6企业层面内控测试示例4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "C1 企业层面控制测试程序表",
+      "type": "procedure",
+      "code": "C1"
+    },
+    {
+      "exact_name": "C1-1 企业层面控制测试示例1",
+      "type": "calculation",
+      "code": "C1-1"
+    },
+    {
+      "exact_name": "C1-2 企业层面控制测试示例2",
+      "type": "calculation",
+      "code": "C1-2"
+    },
+    {
+      "exact_name": "C1-3企业层面控制测试示例3",
+      "type": "calculation",
+      "code": "C1-3"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "C1-4企业层面内控测试示例4-财务报告内部控制",
+      "type": "calculation",
+      "code": "C1-4"
+    },
+    {
+      "exact_name": "C1-4-1企业层面内控测试示例4",
+      "type": "calculation",
+      "code": "C1-4"
+    },
+    {
+      "exact_name": "C1-4-2企业层面内控测试示例4",
+      "type": "calculation",
+      "code": "C1-4"
+    },
+    {
+      "exact_name": "C1-4-3企业层面内控测试示例4",
+      "type": "calculation",
+      "code": "C1-4"
+    },
+    {
+      "exact_name": "C1-4-4企业层面内控测试示例4",
+      "type": "calculation",
+      "code": "C1-4"
+    },
+    {
+      "exact_name": "C1-4-5企业层面内控测试示例4",
+      "type": "calculation",
+      "code": "C1-4"
+    },
+    {
+      "exact_name": "C1-4-6企业层面内控测试示例4",
+      "type": "calculation",
+      "code": "C1-4"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C1-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

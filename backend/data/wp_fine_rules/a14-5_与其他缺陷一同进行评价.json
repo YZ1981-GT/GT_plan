@@ -1,0 +1,49 @@
+{
+  "wp_code": "A14-5",
+  "name": "与其他缺陷一同进行评价",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "与其他缺陷一同进行评价.xlsx",
+      "sheets": [
+        "T3与其他缺陷一同进行评价",
+        "示例1-与其他缺陷一同进行评价",
+        "示例2-与其他缺陷一同进行评价",
+        "示例3-与其他缺陷一同进行评价"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "T3与其他缺陷一同进行评价",
+      "type": "check",
+      "code": "T3"
+    },
+    {
+      "exact_name": "示例1-与其他缺陷一同进行评价",
+      "type": "check",
+      "code": "示例1-与其他缺陷一同进行评价"
+    },
+    {
+      "exact_name": "示例2-与其他缺陷一同进行评价",
+      "type": "check",
+      "code": "示例2-与其他缺陷一同进行评价"
+    },
+    {
+      "exact_name": "示例3-与其他缺陷一同进行评价",
+      "type": "check",
+      "code": "示例3-与其他缺陷一同进行评价"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A14-5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

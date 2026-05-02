@@ -1,0 +1,43 @@
+{
+  "wp_code": "A14-2",
+  "name": "企业层面控制缺陷评价",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "企业层面控制缺陷评价.xlsx",
+      "sheets": [
+        "A14-2企业层面控制缺陷评价   ",
+        "A14-2企业层面控制缺陷评价",
+        "示例1-企业层面控制缺陷评价"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A14-2企业层面控制缺陷评价   ",
+      "type": "control_test",
+      "code": "A14-2"
+    },
+    {
+      "exact_name": "A14-2企业层面控制缺陷评价",
+      "type": "control_test",
+      "code": "A14-2"
+    },
+    {
+      "exact_name": "示例1-企业层面控制缺陷评价",
+      "type": "control_test",
+      "code": "示例1-企业层面控制缺陷评价"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A14-2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

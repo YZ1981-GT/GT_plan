@@ -1,0 +1,31 @@
+{
+  "wp_code": "A4",
+  "name": "经营分部程序表",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "经营分部程序表.xlsx",
+      "sheets": [
+        "A4 经营分部程序表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A4 经营分部程序表",
+      "type": "procedure",
+      "code": "A4"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A4-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

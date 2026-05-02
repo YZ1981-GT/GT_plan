@@ -1,0 +1,37 @@
+{
+  "wp_code": "A1-18",
+  "name": "采用新金融工具准则衔接影响数核对 N",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "采用新金融工具准则衔接影响数核对 N.xlsx",
+      "sheets": [
+        "表头",
+        "采用新金融工具准则衔接影响数核对A1-18"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头",
+      "type": "check",
+      "code": "表头"
+    },
+    {
+      "exact_name": "采用新金融工具准则衔接影响数核对A1-18",
+      "type": "check",
+      "code": "A1-18"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A1-18-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "wp_code": "A14-6",
+  "name": "非财务报告内部控制缺陷评价",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "非财务报告内部控制缺陷评价.xlsx",
+      "sheets": [
+        "T4非财务报告内部控制缺陷评价"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "T4非财务报告内部控制缺陷评价",
+      "type": "control_test",
+      "code": "T4"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A14-6-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

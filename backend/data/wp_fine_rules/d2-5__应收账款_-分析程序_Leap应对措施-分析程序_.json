@@ -1,0 +1,49 @@
+{
+  "wp_code": "D2-5",
+  "name": " 应收账款 -分析程序（Leap应对措施-分析程序）",
+  "version": "2025-R1",
+  "cycle": "D",
+  "cycle_name": "D类",
+  "source_files": [
+    {
+      "file": " 应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+      "sheets": [
+        "附注披露信息(上市公司）D2-1",
+        "附注披露信息（国企）D2-1",
+        "应收账款分析表D2-5",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "附注披露信息(上市公司）D2-1",
+      "type": "note_disclosure",
+      "code": "D2-1"
+    },
+    {
+      "exact_name": "附注披露信息（国企）D2-1",
+      "type": "note_disclosure",
+      "code": "D2-1"
+    },
+    {
+      "exact_name": "应收账款分析表D2-5",
+      "type": "analysis",
+      "code": "D2-5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "D2-5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

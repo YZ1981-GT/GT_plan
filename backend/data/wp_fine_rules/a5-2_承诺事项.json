@@ -1,0 +1,49 @@
+{
+  "wp_code": "A5-2",
+  "name": "承诺事项",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "承诺事项.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "A5-2 财务承诺",
+        "A5-2-1 承诺事项审定表",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "A5-2 财务承诺",
+      "type": "communication",
+      "code": "A5-2"
+    },
+    {
+      "exact_name": "A5-2-1 承诺事项审定表",
+      "type": "summary",
+      "code": "A5-2"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A5-2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

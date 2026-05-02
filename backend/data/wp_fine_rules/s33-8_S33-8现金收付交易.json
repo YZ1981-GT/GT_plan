@@ -1,0 +1,43 @@
+{
+  "wp_code": "S33-8",
+  "name": "S33-8现金收付交易",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S33-8现金收付交易.xlsx",
+      "sheets": [
+        "S33-8程序表",
+        "提示",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S33-8程序表",
+      "type": "procedure",
+      "code": "S33-8"
+    },
+    {
+      "exact_name": "提示",
+      "type": "check",
+      "code": "提示"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S33-8-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

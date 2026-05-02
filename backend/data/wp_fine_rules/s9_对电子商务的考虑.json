@@ -1,0 +1,61 @@
+{
+  "wp_code": "S9",
+  "name": "对电子商务的考虑",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "对电子商务的考虑.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "对电子商务的考虑S9",
+        "审定表S9-1",
+        "内部控制调查表S9-2",
+        "程序说明",
+        "电子商务法律法规"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "对电子商务的考虑S9",
+      "type": "check",
+      "code": "S9"
+    },
+    {
+      "exact_name": "审定表S9-1",
+      "type": "summary",
+      "code": "S9-1"
+    },
+    {
+      "exact_name": "内部控制调查表S9-2",
+      "type": "control_test",
+      "code": "S9-2"
+    },
+    {
+      "exact_name": "程序说明",
+      "type": "check",
+      "code": "程序说明"
+    },
+    {
+      "exact_name": "电子商务法律法规",
+      "type": "check",
+      "code": "电子商务法律法规"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S9-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

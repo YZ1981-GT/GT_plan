@@ -1,0 +1,43 @@
+{
+  "wp_code": "B22A",
+  "name": "了解企业层面控制 - 控制环境",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "了解企业层面控制 - 控制环境.xlsx",
+      "sheets": [
+        "说明",
+        "控制环境（详细法）",
+        "指引 - 控制环境（与PRC对比）"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "说明",
+      "type": "check",
+      "code": "说明"
+    },
+    {
+      "exact_name": "控制环境（详细法）",
+      "type": "control_test",
+      "code": "控制环境（详细法）"
+    },
+    {
+      "exact_name": "指引 - 控制环境（与PRC对比）",
+      "type": "control_test",
+      "code": "指引 - 控制环境（与PRC对"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B22A-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

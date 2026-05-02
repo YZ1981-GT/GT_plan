@@ -1,0 +1,43 @@
+{
+  "wp_code": "S34-35",
+  "name": "收入核查",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "收入核查.xlsx",
+      "sheets": [
+        "S34-35收入核查程序表",
+        "【附】各文件相关要求",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S34-35收入核查程序表",
+      "type": "procedure",
+      "code": "S34-35"
+    },
+    {
+      "exact_name": "【附】各文件相关要求",
+      "type": "check",
+      "code": "【附】各文件相关要求"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S34-35-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

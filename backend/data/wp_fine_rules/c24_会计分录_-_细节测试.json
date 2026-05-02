@@ -1,0 +1,97 @@
+{
+  "wp_code": "C24",
+  "name": "会计分录 - 细节测试",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": "会计分录 - 细节测试.xlsx",
+      "sheets": [
+        "细节测试C24A",
+        "C24-0汇总表",
+        "C24-1完整性-借贷方发生额",
+        "C24-2完整性-分录&余额表对比",
+        "C24-3完整性-跳号测试",
+        "C24-4细节测试-异常账户测试",
+        "C24-5细节测试-异常分录测试",
+        "参考-本福特定律测试",
+        "参考-本福特定律测试-虚拟会计分录",
+        "2025假期清单",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "细节测试C24A",
+      "type": "calculation",
+      "code": "C24"
+    },
+    {
+      "exact_name": "C24-0汇总表",
+      "type": "detail",
+      "code": "C24-0"
+    },
+    {
+      "exact_name": "C24-1完整性-借贷方发生额",
+      "type": "check",
+      "code": "C24-1"
+    },
+    {
+      "exact_name": "C24-2完整性-分录&余额表对比",
+      "type": "check",
+      "code": "C24-2"
+    },
+    {
+      "exact_name": "C24-3完整性-跳号测试",
+      "type": "calculation",
+      "code": "C24-3"
+    },
+    {
+      "exact_name": "C24-4细节测试-异常账户测试",
+      "type": "calculation",
+      "code": "C24-4"
+    },
+    {
+      "exact_name": "C24-5细节测试-异常分录测试",
+      "type": "calculation",
+      "code": "C24-5"
+    },
+    {
+      "exact_name": "参考-本福特定律测试",
+      "type": "calculation",
+      "code": "参考-本福特定律测试"
+    },
+    {
+      "exact_name": "参考-本福特定律测试-虚拟会计分录",
+      "type": "calculation",
+      "code": "参考-本福特定律测试-虚拟会计"
+    },
+    {
+      "exact_name": "2025假期清单",
+      "type": "check",
+      "code": "2025假期清单"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C24-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C24-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

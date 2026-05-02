@@ -1,0 +1,37 @@
+{
+  "wp_code": "S11",
+  "name": "利用服务机构活动",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "利用服务机构活动.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "对被审计单位使用服务机构的考虑S11"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "对被审计单位使用服务机构的考虑S11",
+      "type": "check",
+      "code": "S11"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S11-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

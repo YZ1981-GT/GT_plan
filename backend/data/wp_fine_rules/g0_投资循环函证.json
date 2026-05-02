@@ -1,0 +1,80 @@
+{
+  "wp_code": "G0",
+  "name": "投资循环函证",
+  "version": "2025-R1",
+  "cycle": "G",
+  "cycle_name": "G类",
+  "source_files": [
+    {
+      "file": "投资循环函证.xlsx",
+      "sheets": [
+        "底稿目录",
+        "函证程序表G0A",
+        "函证结果汇总表G0-1",
+        "核实被函证单位信息G0-2",
+        "跟函函证过程控制G0-3",
+        "函证差异核对表G0-3（证券投资）",
+        "函证差异核对表G0-4(非证券投资)",
+        "替代程序检查表G0-6",
+        "邮件传真回函可靠性验证G0-7",
+        "函证程序舞弊风险评价表F0-8"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "函证程序表G0A",
+      "type": "procedure",
+      "code": "G0"
+    },
+    {
+      "exact_name": "函证结果汇总表G0-1",
+      "type": "detail",
+      "code": "G0-1"
+    },
+    {
+      "exact_name": "核实被函证单位信息G0-2",
+      "type": "confirmation_detail",
+      "code": "G0-2"
+    },
+    {
+      "exact_name": "跟函函证过程控制G0-3",
+      "type": "confirmation_detail",
+      "code": "G0-3"
+    },
+    {
+      "exact_name": "函证差异核对表G0-3（证券投资）",
+      "type": "check",
+      "code": "G0-3"
+    },
+    {
+      "exact_name": "函证差异核对表G0-4(非证券投资)",
+      "type": "check",
+      "code": "G0-4"
+    },
+    {
+      "exact_name": "替代程序检查表G0-6",
+      "type": "check",
+      "code": "G0-6"
+    },
+    {
+      "exact_name": "邮件传真回函可靠性验证G0-7",
+      "type": "check",
+      "code": "G0-7"
+    },
+    {
+      "exact_name": "函证程序舞弊风险评价表F0-8",
+      "type": "confirmation_detail",
+      "code": "F0-8"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "G0-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "wp_code": "S1",
+  "name": "对被审计单位违反法规行为的考虑2019",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "对被审计单位违反法规行为的考虑2019.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "违反法规行为S1",
+        "S1-1对法律法规的考虑记录表",
+        "S1-2沟通记录"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "违反法规行为S1",
+      "type": "check",
+      "code": "S1"
+    },
+    {
+      "exact_name": "S1-1对法律法规的考虑记录表",
+      "type": "check",
+      "code": "S1-1"
+    },
+    {
+      "exact_name": "S1-2沟通记录",
+      "type": "communication",
+      "code": "S1-2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

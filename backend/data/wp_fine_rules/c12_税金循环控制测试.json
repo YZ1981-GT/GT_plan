@@ -1,0 +1,56 @@
+{
+  "wp_code": "C12",
+  "name": "税金循环控制测试",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": "税金循环控制测试.xlsx",
+      "sheets": [
+        "税金循环业务层面控制底稿目录",
+        "C12控制测试汇总表",
+        "C12-1-X控制测试",
+        "选项清单列表（不归档）",
+        "选项清单列表（不归档） (2)"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "C12控制测试汇总表",
+      "type": "detail",
+      "code": "C12"
+    },
+    {
+      "exact_name": "C12-1-X控制测试",
+      "type": "calculation",
+      "code": "C12-1"
+    },
+    {
+      "exact_name": "选项清单列表（不归档）",
+      "type": "check",
+      "code": "选项清单列表（不归档）"
+    },
+    {
+      "exact_name": "选项清单列表（不归档） (2)",
+      "type": "check",
+      "code": "选项清单列表（不归档） (2)"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C12-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C12-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

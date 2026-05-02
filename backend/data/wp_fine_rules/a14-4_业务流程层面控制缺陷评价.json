@@ -1,0 +1,73 @@
+{
+  "wp_code": "A14-4",
+  "name": "业务流程层面控制缺陷评价",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "业务流程层面控制缺陷评价.xlsx",
+      "sheets": [
+        "A14-4 业务流程层面控制缺陷评价 (2)",
+        "一般缺陷示例-业务流程层面控制缺陷评价",
+        "重要缺陷示例-业务流程层面控制缺陷评价 ",
+        "重大缺陷示例-业务流程层面控制缺陷评价 ",
+        "A14-4 业务流程层面控制缺陷评价",
+        "示例4-业务流程层面控制缺陷评价",
+        "示例5-业务流程层面控制缺陷评价",
+        "示例6-业务流程层面控制缺陷评价"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A14-4 业务流程层面控制缺陷评价 (2)",
+      "type": "control_test",
+      "code": "A14-4"
+    },
+    {
+      "exact_name": "一般缺陷示例-业务流程层面控制缺陷评价",
+      "type": "control_test",
+      "code": "一般缺陷示例-业务流程层面控制"
+    },
+    {
+      "exact_name": "重要缺陷示例-业务流程层面控制缺陷评价 ",
+      "type": "control_test",
+      "code": "重要缺陷示例-业务流程层面控制"
+    },
+    {
+      "exact_name": "重大缺陷示例-业务流程层面控制缺陷评价 ",
+      "type": "control_test",
+      "code": "重大缺陷示例-业务流程层面控制"
+    },
+    {
+      "exact_name": "A14-4 业务流程层面控制缺陷评价",
+      "type": "control_test",
+      "code": "A14-4"
+    },
+    {
+      "exact_name": "示例4-业务流程层面控制缺陷评价",
+      "type": "control_test",
+      "code": "示例4-业务流程层面控制缺陷评"
+    },
+    {
+      "exact_name": "示例5-业务流程层面控制缺陷评价",
+      "type": "control_test",
+      "code": "示例5-业务流程层面控制缺陷评"
+    },
+    {
+      "exact_name": "示例6-业务流程层面控制缺陷评价",
+      "type": "control_test",
+      "code": "示例6-业务流程层面控制缺陷评"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A14-4-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "wp_code": "B12",
+  "name": "与相关人员访谈程序及记录",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "与相关人员访谈程序及记录.xlsx",
+      "sheets": [
+        "目录",
+        "B12A 与管理层访谈程序",
+        "B12A-1与管理层访谈记录",
+        "B12B 与治理层访谈程序",
+        "B12B-1与治理层访谈记录",
+        "B12C 与其他人员访谈程序",
+        "B12C-1 与其他人员访谈记录"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "目录",
+      "type": "check",
+      "code": "目录"
+    },
+    {
+      "exact_name": "B12A 与管理层访谈程序",
+      "type": "check",
+      "code": "B12"
+    },
+    {
+      "exact_name": "B12A-1与管理层访谈记录",
+      "type": "check",
+      "code": "B12"
+    },
+    {
+      "exact_name": "B12B 与治理层访谈程序",
+      "type": "check",
+      "code": "B12"
+    },
+    {
+      "exact_name": "B12B-1与治理层访谈记录",
+      "type": "check",
+      "code": "B12"
+    },
+    {
+      "exact_name": "B12C 与其他人员访谈程序",
+      "type": "check",
+      "code": "B12"
+    },
+    {
+      "exact_name": "B12C-1 与其他人员访谈记录",
+      "type": "check",
+      "code": "B12"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B12-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

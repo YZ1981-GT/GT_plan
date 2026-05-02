@@ -1,0 +1,37 @@
+{
+  "wp_code": "S34-22",
+  "name": "股权集中企业的公司治理有效性、内控规范性与独立性",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "股权集中企业的公司治理有效性、内控规范性与独立性.xlsx",
+      "sheets": [
+        "S34-22程序表",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S34-22程序表",
+      "type": "procedure",
+      "code": "S34-22"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S34-22-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

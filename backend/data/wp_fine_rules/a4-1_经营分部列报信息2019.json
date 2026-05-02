@@ -1,0 +1,37 @@
+{
+  "wp_code": "A4-1",
+  "name": "经营分部列报信息2019",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "经营分部列报信息2019.xlsx",
+      "sheets": [
+        "A4-1 经营分部审定表",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A4-1 经营分部审定表",
+      "type": "summary",
+      "code": "A4-1"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A4-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

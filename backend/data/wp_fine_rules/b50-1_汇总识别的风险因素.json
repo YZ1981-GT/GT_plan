@@ -1,0 +1,49 @@
+{
+  "wp_code": "B50-1",
+  "name": "汇总识别的风险因素",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "汇总识别的风险因素.xlsx",
+      "sheets": [
+        "B50-1 汇总识别出的风险因素",
+        "相关资源",
+        "相关资源2-固有风险因素"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B50-1 汇总识别出的风险因素",
+      "type": "detail",
+      "code": "B50-1"
+    },
+    {
+      "exact_name": "相关资源",
+      "type": "check",
+      "code": "相关资源"
+    },
+    {
+      "exact_name": "相关资源2-固有风险因素",
+      "type": "risk_assessment",
+      "code": "相关资源2-固有风险因素"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B50-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "B50-1-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "风险评估已完成"
+    }
+  ]
+}

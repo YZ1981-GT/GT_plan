@@ -1,0 +1,140 @@
+{
+  "wp_code": "E0",
+  "name": "货币资金 - 函证（Leap应对措施-函证）",
+  "version": "2025-R1",
+  "cycle": "E",
+  "cycle_name": "E类",
+  "source_files": [
+    {
+      "file": "货币资金 - 函证（Leap应对措施-函证）.xlsx",
+      "sheets": [
+        "底稿目录",
+        "函证程序表-原版本备份",
+        "参考用-往来函证程序",
+        "函证结果汇总表E0-1（原）",
+        "函证程序表E0A",
+        "函证结果汇总表E0-1",
+        "核实被函证单位信息E0-2",
+        "函证结果汇总表E0-1 (备份)",
+        "货币资金发函记录表E0-3",
+        "借款发函记录表E0-4",
+        "应付银行承兑汇票发函记录表E0-5",
+        "理财产品发函记录表E0-6",
+        "跟函函证过程控制E0-7",
+        "函证程序舞弊风险评价表E0-8",
+        "回函情况汇编",
+        "银行函证其他信息核对表E0-5",
+        "邮件传真回函核对记录F1-12",
+        "核实被函证单位信息F1-10-原",
+        "货币资金及借款函证结果汇总表-旧版",
+        "函证结果汇总表-旧版"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "函证程序表-原版本备份",
+      "type": "procedure",
+      "code": "函证程序表-原版本备份"
+    },
+    {
+      "exact_name": "参考用-往来函证程序",
+      "type": "confirmation_detail",
+      "code": "参考用-往来函证程序"
+    },
+    {
+      "exact_name": "函证结果汇总表E0-1（原）",
+      "type": "detail",
+      "code": "E0-1"
+    },
+    {
+      "exact_name": "函证程序表E0A",
+      "type": "procedure",
+      "code": "E0"
+    },
+    {
+      "exact_name": "函证结果汇总表E0-1",
+      "type": "detail",
+      "code": "E0-1"
+    },
+    {
+      "exact_name": "核实被函证单位信息E0-2",
+      "type": "confirmation_detail",
+      "code": "E0-2"
+    },
+    {
+      "exact_name": "函证结果汇总表E0-1 (备份)",
+      "type": "detail",
+      "code": "E0-1"
+    },
+    {
+      "exact_name": "货币资金发函记录表E0-3",
+      "type": "confirmation_detail",
+      "code": "E0-3"
+    },
+    {
+      "exact_name": "借款发函记录表E0-4",
+      "type": "confirmation_detail",
+      "code": "E0-4"
+    },
+    {
+      "exact_name": "应付银行承兑汇票发函记录表E0-5",
+      "type": "confirmation_detail",
+      "code": "E0-5"
+    },
+    {
+      "exact_name": "理财产品发函记录表E0-6",
+      "type": "confirmation_detail",
+      "code": "E0-6"
+    },
+    {
+      "exact_name": "跟函函证过程控制E0-7",
+      "type": "confirmation_detail",
+      "code": "E0-7"
+    },
+    {
+      "exact_name": "函证程序舞弊风险评价表E0-8",
+      "type": "confirmation_detail",
+      "code": "E0-8"
+    },
+    {
+      "exact_name": "回函情况汇编",
+      "type": "check",
+      "code": "回函情况汇编"
+    },
+    {
+      "exact_name": "银行函证其他信息核对表E0-5",
+      "type": "check",
+      "code": "E0-5"
+    },
+    {
+      "exact_name": "邮件传真回函核对记录F1-12",
+      "type": "check",
+      "code": "F1-12"
+    },
+    {
+      "exact_name": "核实被函证单位信息F1-10-原",
+      "type": "confirmation_detail",
+      "code": "F1-10"
+    },
+    {
+      "exact_name": "货币资金及借款函证结果汇总表-旧版",
+      "type": "detail",
+      "code": "货币资金及借款函证结果汇总表-"
+    },
+    {
+      "exact_name": "函证结果汇总表-旧版",
+      "type": "detail",
+      "code": "函证结果汇总表-旧版"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "E0-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

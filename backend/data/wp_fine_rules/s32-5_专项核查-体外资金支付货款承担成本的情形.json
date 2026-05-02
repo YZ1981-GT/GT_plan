@@ -1,0 +1,43 @@
+{
+  "wp_code": "S32-5",
+  "name": "专项核查-体外资金支付货款承担成本的情形",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "专项核查-体外资金支付货款承担成本的情形.xlsx",
+      "sheets": [
+        "S32程序表IC5",
+        "GT_Custom",
+        "提示"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S32程序表IC5",
+      "type": "procedure",
+      "code": "S32"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "提示",
+      "type": "check",
+      "code": "提示"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S32-5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

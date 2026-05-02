@@ -1,0 +1,43 @@
+{
+  "wp_code": "B30-2D",
+  "name": "组成部分注册会计师文档记录（2024年3月）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "组成部分注册会计师文档记录（2024年3月）.xlsx",
+      "sheets": [
+        "Lists",
+        "说明",
+        "文档记录"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "Lists",
+      "type": "check",
+      "code": "Lists"
+    },
+    {
+      "exact_name": "说明",
+      "type": "check",
+      "code": "说明"
+    },
+    {
+      "exact_name": "文档记录",
+      "type": "check",
+      "code": "文档记录"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B30-2D-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

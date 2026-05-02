@@ -1,0 +1,50 @@
+{
+  "wp_code": "B51",
+  "name": "舞弊风险因素（三因素分析）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "舞弊风险因素（三因素分析）.xlsx",
+      "sheets": [
+        "底稿目录",
+        "B51-1 识别舞弊风险因素（虚假报告）",
+        "B51-2 识别舞弊风险因素（侵占资产）",
+        "相关资源"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B51-1 识别舞弊风险因素（虚假报告）",
+      "type": "risk_assessment",
+      "code": "B51-1"
+    },
+    {
+      "exact_name": "B51-2 识别舞弊风险因素（侵占资产）",
+      "type": "risk_assessment",
+      "code": "B51-2"
+    },
+    {
+      "exact_name": "相关资源",
+      "type": "check",
+      "code": "相关资源"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B51-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "B51-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "风险评估已完成"
+    }
+  ]
+}

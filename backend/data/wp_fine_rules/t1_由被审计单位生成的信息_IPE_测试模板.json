@@ -1,0 +1,49 @@
+{
+  "wp_code": "T1",
+  "name": "由被审计单位生成的信息（IPE）测试模板",
+  "version": "2025-R1",
+  "cycle": "T",
+  "cycle_name": "其他",
+  "source_files": [
+    {
+      "file": "由被审计单位生成的信息（IPE）测试模板.xlsx",
+      "sheets": [
+        "GT Custom",
+        "测试IPE",
+        "编制指引",
+        "Sheet1"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "GT Custom",
+      "type": "check",
+      "code": "GT Custom"
+    },
+    {
+      "exact_name": "测试IPE",
+      "type": "calculation",
+      "code": "测试IPE"
+    },
+    {
+      "exact_name": "编制指引",
+      "type": "check",
+      "code": "编制指引"
+    },
+    {
+      "exact_name": "Sheet1",
+      "type": "check",
+      "code": "Sheet1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "T1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

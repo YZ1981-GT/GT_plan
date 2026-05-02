@@ -1,0 +1,31 @@
+{
+  "wp_code": "B1A",
+  "name": "业务承接程序表（适用于首次承接）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "业务承接程序表（适用于首次承接）.xlsx",
+      "sheets": [
+        "B1A 业务承接"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B1A 业务承接",
+      "type": "check",
+      "code": "B1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B1A-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

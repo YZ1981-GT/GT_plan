@@ -1,0 +1,73 @@
+{
+  "wp_code": "S13",
+  "name": "利用管理层的专家编制的信息形成审计证据",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "利用管理层的专家编制的信息形成审计证据.xlsx",
+      "sheets": [
+        "S13 利用管理层的专家形成审计证据程序表",
+        "S13-1 评价胜任能力、专业素质和客观性",
+        "S13-2 了解专家的工作",
+        "S13-3 评价管理层专家工作的适当性",
+        "S13-3-1 管理层专家的报告",
+        "S13-3-2 评价管理层专家工作的适当性",
+        "S13-3-3 评价管理层专家工作的适当性(股份支付)",
+        "S13-3-4 评价管理层专家工作的适当性(金融工具公允价值)"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S13 利用管理层的专家形成审计证据程序表",
+      "type": "procedure",
+      "code": "S13"
+    },
+    {
+      "exact_name": "S13-1 评价胜任能力、专业素质和客观性",
+      "type": "check",
+      "code": "S13-1"
+    },
+    {
+      "exact_name": "S13-2 了解专家的工作",
+      "type": "check",
+      "code": "S13-2"
+    },
+    {
+      "exact_name": "S13-3 评价管理层专家工作的适当性",
+      "type": "check",
+      "code": "S13-3"
+    },
+    {
+      "exact_name": "S13-3-1 管理层专家的报告",
+      "type": "check",
+      "code": "S13-3"
+    },
+    {
+      "exact_name": "S13-3-2 评价管理层专家工作的适当性",
+      "type": "check",
+      "code": "S13-3"
+    },
+    {
+      "exact_name": "S13-3-3 评价管理层专家工作的适当性(股份支付)",
+      "type": "check",
+      "code": "S13-3"
+    },
+    {
+      "exact_name": "S13-3-4 评价管理层专家工作的适当性(金融工具公允价值)",
+      "type": "check",
+      "code": "S13-3"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S13-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "wp_code": "J3",
+  "name": "股份支付",
+  "version": "2025-R1",
+  "cycle": "J",
+  "cycle_name": "J类",
+  "source_files": [
+    {
+      "file": "股份支付.xlsx",
+      "sheets": [
+        "底稿目录",
+        "股份支付实质性程序表 J3A",
+        "股份支付情况表J3-1",
+        "股份支付检查表J3-2",
+        "IPO企业股权激励工具关注的审计重点",
+        "首发业务解答二"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "股份支付实质性程序表 J3A",
+      "type": "procedure",
+      "code": "J3"
+    },
+    {
+      "exact_name": "股份支付情况表J3-1",
+      "type": "check",
+      "code": "J3-1"
+    },
+    {
+      "exact_name": "股份支付检查表J3-2",
+      "type": "check",
+      "code": "J3-2"
+    },
+    {
+      "exact_name": "IPO企业股权激励工具关注的审计重点",
+      "type": "check",
+      "code": "IPO企业股权激励工具关注的审"
+    },
+    {
+      "exact_name": "首发业务解答二",
+      "type": "check",
+      "code": "首发业务解答二"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "J3-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

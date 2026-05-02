@@ -1,0 +1,31 @@
+{
+  "wp_code": "B1-5",
+  "name": "KAA检查程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "KAA检查程序表.xlsx",
+      "sheets": [
+        " B1-5 KAA检查表-业务承接"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": " B1-5 KAA检查表-业务承接",
+      "type": "check",
+      "code": "B1-5"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B1-5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

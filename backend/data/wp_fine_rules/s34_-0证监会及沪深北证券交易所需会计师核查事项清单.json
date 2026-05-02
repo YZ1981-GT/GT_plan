@@ -1,0 +1,43 @@
+{
+  "wp_code": "S34",
+  "name": "-0证监会及沪深北证券交易所需会计师核查事项清单",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "-0证监会及沪深北证券交易所需会计师核查事项清单.xlsx",
+      "sheets": [
+        "核查事项清单",
+        "Sheet1",
+        "Sheet2"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "核查事项清单",
+      "type": "check",
+      "code": "核查事项清单"
+    },
+    {
+      "exact_name": "Sheet1",
+      "type": "check",
+      "code": "Sheet1"
+    },
+    {
+      "exact_name": "Sheet2",
+      "type": "check",
+      "code": "Sheet2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S34-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

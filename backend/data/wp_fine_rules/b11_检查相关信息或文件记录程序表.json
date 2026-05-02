@@ -1,0 +1,56 @@
+{
+  "wp_code": "B11",
+  "name": "检查相关信息或文件记录程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "检查相关信息或文件记录程序表.xlsx",
+      "sheets": [
+        "底稿目录",
+        "B11检查相关信息程序表",
+        "B11-1股东大会、董事会等会议记录的摘录",
+        "B11-2评价企业内部控制评价报告",
+        "自我评价报告参考格式",
+        "B11-3被审计单位的公开信息记录"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B11检查相关信息程序表",
+      "type": "procedure",
+      "code": "B11"
+    },
+    {
+      "exact_name": "B11-1股东大会、董事会等会议记录的摘录",
+      "type": "check",
+      "code": "B11-1"
+    },
+    {
+      "exact_name": "B11-2评价企业内部控制评价报告",
+      "type": "control_test",
+      "code": "B11-2"
+    },
+    {
+      "exact_name": "自我评价报告参考格式",
+      "type": "check",
+      "code": "自我评价报告参考格式"
+    },
+    {
+      "exact_name": "B11-3被审计单位的公开信息记录",
+      "type": "check",
+      "code": "B11-3"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B11-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

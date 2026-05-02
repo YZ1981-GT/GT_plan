@@ -1,0 +1,55 @@
+{
+  "wp_code": "S32-10",
+  "name": "S32-10专项核查-资产减值估计不足的情形",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S32-10专项核查-资产减值估计不足的情形.xlsx",
+      "sheets": [
+        "S32-10程序表",
+        "IC10-0导引表",
+        "GT_Custom",
+        "提示",
+        "资产减值估计不足披露格式参考IC10-X"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S32-10程序表",
+      "type": "procedure",
+      "code": "S32-10"
+    },
+    {
+      "exact_name": "IC10-0导引表",
+      "type": "check",
+      "code": "C10-0"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "提示",
+      "type": "check",
+      "code": "提示"
+    },
+    {
+      "exact_name": "资产减值估计不足披露格式参考IC10-X",
+      "type": "check",
+      "code": "C10-"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S32-10-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

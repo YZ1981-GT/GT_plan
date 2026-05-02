@@ -1,0 +1,61 @@
+{
+  "wp_code": "S14",
+  "name": "会计估计和相关披露",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "会计估计和相关披露.xlsx",
+      "sheets": [
+        "S14程序表",
+        "S14-1了解被审计单位及其环境（会计估计相关）",
+        "S14-2了解与会计估计相关的控制",
+        "S14-3应对评估的重大错报风险（会计估计相关）",
+        "S14-4管理层偏向的迹象",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S14程序表",
+      "type": "procedure",
+      "code": "S14"
+    },
+    {
+      "exact_name": "S14-1了解被审计单位及其环境（会计估计相关）",
+      "type": "check",
+      "code": "S14-1"
+    },
+    {
+      "exact_name": "S14-2了解与会计估计相关的控制",
+      "type": "control_test",
+      "code": "S14-2"
+    },
+    {
+      "exact_name": "S14-3应对评估的重大错报风险（会计估计相关）",
+      "type": "risk_assessment",
+      "code": "S14-3"
+    },
+    {
+      "exact_name": "S14-4管理层偏向的迹象",
+      "type": "check",
+      "code": "S14-4"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S14-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

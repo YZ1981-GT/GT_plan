@@ -1,0 +1,56 @@
+{
+  "wp_code": "A11",
+  "name": "期后事项程序表",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "期后事项程序表.xlsx",
+      "sheets": [
+        "底稿目录",
+        "审计程序A11（财报+内控）",
+        "期后事项审定表A11-1",
+        "期后事项调查问卷A11-2",
+        "期后内控事项调查问卷A11-3",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "审计程序A11（财报+内控）",
+      "type": "check",
+      "code": "A11"
+    },
+    {
+      "exact_name": "期后事项审定表A11-1",
+      "type": "summary",
+      "code": "A11-1"
+    },
+    {
+      "exact_name": "期后事项调查问卷A11-2",
+      "type": "check",
+      "code": "A11-2"
+    },
+    {
+      "exact_name": "期后内控事项调查问卷A11-3",
+      "type": "check",
+      "code": "A11-3"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A11-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

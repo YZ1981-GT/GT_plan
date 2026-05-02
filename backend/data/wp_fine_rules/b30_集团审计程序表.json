@@ -1,0 +1,31 @@
+{
+  "wp_code": "B30",
+  "name": "集团审计程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "集团审计程序表.xlsx",
+      "sheets": [
+        "B30集团审计程序表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B30集团审计程序表",
+      "type": "procedure",
+      "code": "B30"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B30-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

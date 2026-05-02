@@ -1,0 +1,49 @@
+{
+  "wp_code": "S5",
+  "name": "债务重组202401",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "债务重组202401.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "债务重组审计程序S5",
+        "审定表S5-1",
+        "债务重组损益确认时点S5-2"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "债务重组审计程序S5",
+      "type": "check",
+      "code": "S5"
+    },
+    {
+      "exact_name": "审定表S5-1",
+      "type": "summary",
+      "code": "S5-1"
+    },
+    {
+      "exact_name": "债务重组损益确认时点S5-2",
+      "type": "check",
+      "code": "S5-2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

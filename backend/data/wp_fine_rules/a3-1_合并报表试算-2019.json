@@ -1,0 +1,283 @@
+{
+  "wp_code": "A3-1",
+  "name": "合并报表试算-2019",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "合并报表试算-2019.xlsx",
+      "sheets": [
+        "temp_temp__",
+        "说明",
+        "TEST",
+        "报表格式",
+        "年初BS审定",
+        "上年PL审定",
+        "期初核对BS",
+        "期初核对PL",
+        "母公司BS汇总",
+        "母公司PL汇总",
+        "母公司CF汇总",
+        "母公司汇总抵销",
+        "母公司账项调整",
+        "母公司报表调整",
+        "母公司TB资产",
+        "母公司TB负债",
+        "母公司TB损益",
+        "TB母公司CF",
+        "合并BS汇总",
+        "合并PL汇总",
+        "合并CF汇总",
+        "权益抵销",
+        "往来交易抵销",
+        "合并报表调整 ",
+        "合并TB资产",
+        "合并TB负债",
+        "合并TB损益",
+        " ",
+        "TB合并CF",
+        "审定合并BS",
+        "审定合并PL",
+        "审定合并CF",
+        "已审横向BS",
+        "已审纵向BS",
+        "已审横向PL",
+        "已审纵向PL",
+        "已审比率分析",
+        "Q2-4 EPS-ROE(新)",
+        "母已审横向BS",
+        "母已审纵向BS",
+        "母已审横向PL",
+        "母已审纵向PL",
+        "母已审比率分析"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "temp_temp__",
+      "type": "check",
+      "code": "temp_temp__"
+    },
+    {
+      "exact_name": "说明",
+      "type": "check",
+      "code": "说明"
+    },
+    {
+      "exact_name": "TEST",
+      "type": "check",
+      "code": "TEST"
+    },
+    {
+      "exact_name": "报表格式",
+      "type": "check",
+      "code": "报表格式"
+    },
+    {
+      "exact_name": "年初BS审定",
+      "type": "check",
+      "code": "年初BS审定"
+    },
+    {
+      "exact_name": "上年PL审定",
+      "type": "check",
+      "code": "上年PL审定"
+    },
+    {
+      "exact_name": "期初核对BS",
+      "type": "check",
+      "code": "期初核对BS"
+    },
+    {
+      "exact_name": "期初核对PL",
+      "type": "check",
+      "code": "期初核对PL"
+    },
+    {
+      "exact_name": "母公司BS汇总",
+      "type": "detail",
+      "code": "母公司BS汇总"
+    },
+    {
+      "exact_name": "母公司PL汇总",
+      "type": "detail",
+      "code": "母公司PL汇总"
+    },
+    {
+      "exact_name": "母公司CF汇总",
+      "type": "detail",
+      "code": "母公司CF汇总"
+    },
+    {
+      "exact_name": "母公司汇总抵销",
+      "type": "detail",
+      "code": "母公司汇总抵销"
+    },
+    {
+      "exact_name": "母公司账项调整",
+      "type": "check",
+      "code": "母公司账项调整"
+    },
+    {
+      "exact_name": "母公司报表调整",
+      "type": "check",
+      "code": "母公司报表调整"
+    },
+    {
+      "exact_name": "母公司TB资产",
+      "type": "check",
+      "code": "母公司TB资产"
+    },
+    {
+      "exact_name": "母公司TB负债",
+      "type": "check",
+      "code": "母公司TB负债"
+    },
+    {
+      "exact_name": "母公司TB损益",
+      "type": "check",
+      "code": "母公司TB损益"
+    },
+    {
+      "exact_name": "TB母公司CF",
+      "type": "check",
+      "code": "TB母公司CF"
+    },
+    {
+      "exact_name": "合并BS汇总",
+      "type": "detail",
+      "code": "合并BS汇总"
+    },
+    {
+      "exact_name": "合并PL汇总",
+      "type": "detail",
+      "code": "合并PL汇总"
+    },
+    {
+      "exact_name": "合并CF汇总",
+      "type": "detail",
+      "code": "合并CF汇总"
+    },
+    {
+      "exact_name": "权益抵销",
+      "type": "check",
+      "code": "权益抵销"
+    },
+    {
+      "exact_name": "往来交易抵销",
+      "type": "check",
+      "code": "往来交易抵销"
+    },
+    {
+      "exact_name": "合并报表调整 ",
+      "type": "check",
+      "code": "合并报表调整 "
+    },
+    {
+      "exact_name": "合并TB资产",
+      "type": "check",
+      "code": "合并TB资产"
+    },
+    {
+      "exact_name": "合并TB负债",
+      "type": "check",
+      "code": "合并TB负债"
+    },
+    {
+      "exact_name": "合并TB损益",
+      "type": "check",
+      "code": "合并TB损益"
+    },
+    {
+      "exact_name": " ",
+      "type": "check",
+      "code": " "
+    },
+    {
+      "exact_name": "TB合并CF",
+      "type": "check",
+      "code": "TB合并CF"
+    },
+    {
+      "exact_name": "审定合并BS",
+      "type": "check",
+      "code": "审定合并BS"
+    },
+    {
+      "exact_name": "审定合并PL",
+      "type": "check",
+      "code": "审定合并PL"
+    },
+    {
+      "exact_name": "审定合并CF",
+      "type": "check",
+      "code": "审定合并CF"
+    },
+    {
+      "exact_name": "已审横向BS",
+      "type": "check",
+      "code": "已审横向BS"
+    },
+    {
+      "exact_name": "已审纵向BS",
+      "type": "check",
+      "code": "已审纵向BS"
+    },
+    {
+      "exact_name": "已审横向PL",
+      "type": "check",
+      "code": "已审横向PL"
+    },
+    {
+      "exact_name": "已审纵向PL",
+      "type": "check",
+      "code": "已审纵向PL"
+    },
+    {
+      "exact_name": "已审比率分析",
+      "type": "analysis",
+      "code": "已审比率分析"
+    },
+    {
+      "exact_name": "Q2-4 EPS-ROE(新)",
+      "type": "check",
+      "code": "Q2-4"
+    },
+    {
+      "exact_name": "母已审横向BS",
+      "type": "check",
+      "code": "母已审横向BS"
+    },
+    {
+      "exact_name": "母已审纵向BS",
+      "type": "check",
+      "code": "母已审纵向BS"
+    },
+    {
+      "exact_name": "母已审横向PL",
+      "type": "check",
+      "code": "母已审横向PL"
+    },
+    {
+      "exact_name": "母已审纵向PL",
+      "type": "check",
+      "code": "母已审纵向PL"
+    },
+    {
+      "exact_name": "母已审比率分析",
+      "type": "analysis",
+      "code": "母已审比率分析"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A3-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

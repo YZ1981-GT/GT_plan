@@ -1,0 +1,74 @@
+{
+  "wp_code": "H0",
+  "name": "固定资产循环函证",
+  "version": "2025-R1",
+  "cycle": "H",
+  "cycle_name": "H类",
+  "source_files": [
+    {
+      "file": "固定资产循环函证.xlsx",
+      "sheets": [
+        "底稿目录",
+        "函证程序表H0A",
+        "函证结果汇总表H0-1",
+        "核实被函证单位信息H0-2",
+        "跟函函证过程控制H0-3",
+        "差异核对表H0-4",
+        "替代程序H0-5",
+        "邮件传真回函可靠性验证H0-6",
+        "函证程序舞弊风险评价表H0-7"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "函证程序表H0A",
+      "type": "procedure",
+      "code": "H0"
+    },
+    {
+      "exact_name": "函证结果汇总表H0-1",
+      "type": "detail",
+      "code": "H0-1"
+    },
+    {
+      "exact_name": "核实被函证单位信息H0-2",
+      "type": "confirmation_detail",
+      "code": "H0-2"
+    },
+    {
+      "exact_name": "跟函函证过程控制H0-3",
+      "type": "confirmation_detail",
+      "code": "H0-3"
+    },
+    {
+      "exact_name": "差异核对表H0-4",
+      "type": "check",
+      "code": "H0-4"
+    },
+    {
+      "exact_name": "替代程序H0-5",
+      "type": "check",
+      "code": "H0-5"
+    },
+    {
+      "exact_name": "邮件传真回函可靠性验证H0-6",
+      "type": "check",
+      "code": "H0-6"
+    },
+    {
+      "exact_name": "函证程序舞弊风险评价表H0-7",
+      "type": "confirmation_detail",
+      "code": "H0-7"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "H0-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

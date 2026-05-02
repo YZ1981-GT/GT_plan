@@ -1,0 +1,31 @@
+{
+  "wp_code": "B3",
+  "name": "独立性确认程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "独立性确认程序表.xlsx",
+      "sheets": [
+        "B3 独立性确认表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B3 独立性确认表",
+      "type": "check",
+      "code": "B3"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B3-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

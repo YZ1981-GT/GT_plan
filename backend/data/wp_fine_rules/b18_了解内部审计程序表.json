@@ -1,0 +1,44 @@
+{
+  "wp_code": "B18",
+  "name": "了解内部审计程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "了解内部审计程序表.xlsx",
+      "sheets": [
+        "底稿目录",
+        "B18 了解内部审计程序表",
+        "B18-1对内部审计的评价的记录",
+        "B18-2与内部审计人员讨论利用其工作的计划的记录"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B18 了解内部审计程序表",
+      "type": "procedure",
+      "code": "B18"
+    },
+    {
+      "exact_name": "B18-1对内部审计的评价的记录",
+      "type": "check",
+      "code": "B18-1"
+    },
+    {
+      "exact_name": "B18-2与内部审计人员讨论利用其工作的计划的记录",
+      "type": "check",
+      "code": "B18-2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B18-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

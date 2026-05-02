@@ -1,0 +1,79 @@
+{
+  "wp_code": "A5-1",
+  "name": "现金流量表审计",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "现金流量表审计.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "A5-1现金流量审计程序",
+        "A5-1-1列示于现金流量表的现金及现金等价物",
+        "A5-1-3相关报表勾稽关系核对",
+        "A5-1-4现金流量核查",
+        "A5-1-5现金流量核查",
+        "A5-1-6其他现金流量",
+        "会计提示",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "A5-1现金流量审计程序",
+      "type": "check",
+      "code": "A5-1"
+    },
+    {
+      "exact_name": "A5-1-1列示于现金流量表的现金及现金等价物",
+      "type": "check",
+      "code": "A5-1"
+    },
+    {
+      "exact_name": "A5-1-3相关报表勾稽关系核对",
+      "type": "check",
+      "code": "A5-1"
+    },
+    {
+      "exact_name": "A5-1-4现金流量核查",
+      "type": "check",
+      "code": "A5-1"
+    },
+    {
+      "exact_name": "A5-1-5现金流量核查",
+      "type": "check",
+      "code": "A5-1"
+    },
+    {
+      "exact_name": "A5-1-6其他现金流量",
+      "type": "check",
+      "code": "A5-1"
+    },
+    {
+      "exact_name": "会计提示",
+      "type": "check",
+      "code": "会计提示"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A5-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

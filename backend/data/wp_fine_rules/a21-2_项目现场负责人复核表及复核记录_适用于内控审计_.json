@@ -1,0 +1,44 @@
+{
+  "wp_code": "A21-2",
+  "name": "项目现场负责人复核表及复核记录（适用于内控审计）",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "项目现场负责人复核表及复核记录（适用于内控审计）.xlsx",
+      "sheets": [
+        "底稿目录",
+        "项目现场负责人复核（适用于内控审计）",
+        "复核记录参考模板"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "项目现场负责人复核（适用于内控审计）",
+      "type": "check",
+      "code": "项目现场负责人复核（适用于内控"
+    },
+    {
+      "exact_name": "复核记录参考模板",
+      "type": "check",
+      "code": "复核记录参考模板"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A21-2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "A21-2-CHK-02",
+      "type": "check",
+      "severity": "blocking",
+      "description": "复核意见已签署"
+    }
+  ]
+}

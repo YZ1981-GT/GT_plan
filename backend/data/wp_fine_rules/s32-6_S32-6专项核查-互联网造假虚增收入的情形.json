@@ -1,0 +1,55 @@
+{
+  "wp_code": "S32-6",
+  "name": "S32-6专项核查-互联网造假虚增收入的情形",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S32-6专项核查-互联网造假虚增收入的情形.xlsx",
+      "sheets": [
+        "S32程序表IC6",
+        "IC6-0导引表",
+        "GT_Custom",
+        "提示",
+        "互联网造假虚增收入披露格式参考IC6-X"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S32程序表IC6",
+      "type": "procedure",
+      "code": "S32"
+    },
+    {
+      "exact_name": "IC6-0导引表",
+      "type": "check",
+      "code": "C6-0"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "提示",
+      "type": "check",
+      "code": "提示"
+    },
+    {
+      "exact_name": "互联网造假虚增收入披露格式参考IC6-X",
+      "type": "check",
+      "code": "C6-"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S32-6-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

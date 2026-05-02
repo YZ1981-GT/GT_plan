@@ -1,0 +1,92 @@
+{
+  "wp_code": "B10",
+  "name": "了解被审计单位及其环境和适用的财务报告编制基础",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "了解被审计单位及其环境和适用的财务报告编制基础.xlsx",
+      "sheets": [
+        "相关资源",
+        "底稿目录",
+        "B10 了解被审计单位及其所处环境和适用的财务报告编制基程序表",
+        "B10-1被审计单位组织结构、所有权结构和治理结构",
+        "B10-2业务模式（被审计单位筹融资活动） (2)",
+        "B10-2 了解被审计单位的业务模式",
+        "B10-3了解行业形势、法律环境、监管环境和其他外部因素",
+        "B10-3-1 法律监管附表",
+        "B10-4 了解业绩衡量",
+        "B10-4-1 了解薪酬政策",
+        "B10-5 了解会计政策",
+        "B10-5-1 了解收入"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "相关资源",
+      "type": "check",
+      "code": "相关资源"
+    },
+    {
+      "exact_name": "B10 了解被审计单位及其所处环境和适用的财务报告编制基程序表",
+      "type": "procedure",
+      "code": "B10"
+    },
+    {
+      "exact_name": "B10-1被审计单位组织结构、所有权结构和治理结构",
+      "type": "check",
+      "code": "B10-1"
+    },
+    {
+      "exact_name": "B10-2业务模式（被审计单位筹融资活动） (2)",
+      "type": "check",
+      "code": "B10-2"
+    },
+    {
+      "exact_name": "B10-2 了解被审计单位的业务模式",
+      "type": "check",
+      "code": "B10-2"
+    },
+    {
+      "exact_name": "B10-3了解行业形势、法律环境、监管环境和其他外部因素",
+      "type": "check",
+      "code": "B10-3"
+    },
+    {
+      "exact_name": "B10-3-1 法律监管附表",
+      "type": "check",
+      "code": "B10-3"
+    },
+    {
+      "exact_name": "B10-4 了解业绩衡量",
+      "type": "check",
+      "code": "B10-4"
+    },
+    {
+      "exact_name": "B10-4-1 了解薪酬政策",
+      "type": "check",
+      "code": "B10-4"
+    },
+    {
+      "exact_name": "B10-5 了解会计政策",
+      "type": "check",
+      "code": "B10-5"
+    },
+    {
+      "exact_name": "B10-5-1 了解收入",
+      "type": "check",
+      "code": "B10-5"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B10-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

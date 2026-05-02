@@ -1,0 +1,235 @@
+{
+  "wp_code": "C22",
+  "name": "IT一般控制测试",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": "IT一般控制测试.xlsx",
+      "sheets": [
+        "C22 IT一般控制测试",
+        "SA-3",
+        "SA-4c",
+        "SA-5",
+        "SA-7",
+        "SA-9",
+        "SA-10",
+        "SA-12",
+        "SA-11",
+        "SA-13",
+        "SA-14",
+        "PE-3a",
+        "PE-3d",
+        "PE-5",
+        "PE-5.1",
+        "PE-6",
+        "PE-7",
+        "PE-8",
+        "PE-8.1",
+        "PM-3",
+        "PM-4c",
+        "PM-4b",
+        "PM-4e",
+        "PM-5",
+        "PM-6",
+        "NS-1",
+        "NS-3",
+        "NS-4",
+        "NS-5.1",
+        "NS-5.2",
+        "NS-5.3",
+        "NS-5.4",
+        "NS-6.1",
+        "NS-6.2"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "C22 IT一般控制测试",
+      "type": "calculation",
+      "code": "C22"
+    },
+    {
+      "exact_name": "SA-3",
+      "type": "check",
+      "code": "SA-3"
+    },
+    {
+      "exact_name": "SA-4c",
+      "type": "check",
+      "code": "SA-4c"
+    },
+    {
+      "exact_name": "SA-5",
+      "type": "check",
+      "code": "SA-5"
+    },
+    {
+      "exact_name": "SA-7",
+      "type": "check",
+      "code": "SA-7"
+    },
+    {
+      "exact_name": "SA-9",
+      "type": "check",
+      "code": "SA-9"
+    },
+    {
+      "exact_name": "SA-10",
+      "type": "check",
+      "code": "SA-10"
+    },
+    {
+      "exact_name": "SA-12",
+      "type": "check",
+      "code": "SA-12"
+    },
+    {
+      "exact_name": "SA-11",
+      "type": "check",
+      "code": "SA-11"
+    },
+    {
+      "exact_name": "SA-13",
+      "type": "check",
+      "code": "SA-13"
+    },
+    {
+      "exact_name": "SA-14",
+      "type": "check",
+      "code": "SA-14"
+    },
+    {
+      "exact_name": "PE-3a",
+      "type": "check",
+      "code": "PE-3a"
+    },
+    {
+      "exact_name": "PE-3d",
+      "type": "check",
+      "code": "PE-3d"
+    },
+    {
+      "exact_name": "PE-5",
+      "type": "check",
+      "code": "PE-5"
+    },
+    {
+      "exact_name": "PE-5.1",
+      "type": "check",
+      "code": "PE-5.1"
+    },
+    {
+      "exact_name": "PE-6",
+      "type": "check",
+      "code": "PE-6"
+    },
+    {
+      "exact_name": "PE-7",
+      "type": "check",
+      "code": "PE-7"
+    },
+    {
+      "exact_name": "PE-8",
+      "type": "check",
+      "code": "PE-8"
+    },
+    {
+      "exact_name": "PE-8.1",
+      "type": "check",
+      "code": "PE-8.1"
+    },
+    {
+      "exact_name": "PM-3",
+      "type": "check",
+      "code": "PM-3"
+    },
+    {
+      "exact_name": "PM-4c",
+      "type": "check",
+      "code": "PM-4c"
+    },
+    {
+      "exact_name": "PM-4b",
+      "type": "check",
+      "code": "PM-4b"
+    },
+    {
+      "exact_name": "PM-4e",
+      "type": "check",
+      "code": "PM-4e"
+    },
+    {
+      "exact_name": "PM-5",
+      "type": "check",
+      "code": "PM-5"
+    },
+    {
+      "exact_name": "PM-6",
+      "type": "check",
+      "code": "PM-6"
+    },
+    {
+      "exact_name": "NS-1",
+      "type": "check",
+      "code": "NS-1"
+    },
+    {
+      "exact_name": "NS-3",
+      "type": "check",
+      "code": "NS-3"
+    },
+    {
+      "exact_name": "NS-4",
+      "type": "check",
+      "code": "NS-4"
+    },
+    {
+      "exact_name": "NS-5.1",
+      "type": "check",
+      "code": "NS-5.1"
+    },
+    {
+      "exact_name": "NS-5.2",
+      "type": "check",
+      "code": "NS-5.2"
+    },
+    {
+      "exact_name": "NS-5.3",
+      "type": "check",
+      "code": "NS-5.3"
+    },
+    {
+      "exact_name": "NS-5.4",
+      "type": "check",
+      "code": "NS-5.4"
+    },
+    {
+      "exact_name": "NS-6.1",
+      "type": "check",
+      "code": "NS-6.1"
+    },
+    {
+      "exact_name": "NS-6.2",
+      "type": "check",
+      "code": "NS-6.2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C22-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C22-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

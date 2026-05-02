@@ -1,0 +1,68 @@
+{
+  "wp_code": "B13-2",
+  "name": "B13-2~5未审报表初步分析",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "B13-2~5未审报表初步分析.xlsx",
+      "sheets": [
+        "底稿目录",
+        "未审资产负债横向分析B13-2-1",
+        "未审资产负债纵向分析B13-2-2",
+        "未审利润横向分析B13-3-1",
+        "未审利润纵向分析B13-3-2",
+        "未审报表比率分析B13-4",
+        "同行业对比分析B13-5",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "未审资产负债横向分析B13-2-1",
+      "type": "analysis",
+      "code": "B13-2"
+    },
+    {
+      "exact_name": "未审资产负债纵向分析B13-2-2",
+      "type": "analysis",
+      "code": "B13-2"
+    },
+    {
+      "exact_name": "未审利润横向分析B13-3-1",
+      "type": "analysis",
+      "code": "B13-3"
+    },
+    {
+      "exact_name": "未审利润纵向分析B13-3-2",
+      "type": "analysis",
+      "code": "B13-3"
+    },
+    {
+      "exact_name": "未审报表比率分析B13-4",
+      "type": "analysis",
+      "code": "B13-4"
+    },
+    {
+      "exact_name": "同行业对比分析B13-5",
+      "type": "analysis",
+      "code": "B13-5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B13-2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

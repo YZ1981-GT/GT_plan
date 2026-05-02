@@ -1,0 +1,31 @@
+{
+  "wp_code": "D4-12",
+  "name": "营业收入-合同检查（Leap-常规程序）",
+  "version": "2025-R1",
+  "cycle": "D",
+  "cycle_name": "D类",
+  "source_files": [
+    {
+      "file": "营业收入-合同检查（Leap-常规程序）.xlsx",
+      "sheets": [
+        "合同检查表D4-12"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "合同检查表D4-12",
+      "type": "check",
+      "code": "D4-12"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "D4-12-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "wp_code": "D4-21",
+  "name": "D4-21营业收入-关联方检查（Leap-常规程序）",
+  "version": "2025-R1",
+  "cycle": "D",
+  "cycle_name": "D类",
+  "source_files": [
+    {
+      "file": "D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+      "sheets": [
+        "关联方销售情况及价格分析D4-21"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "关联方销售情况及价格分析D4-21",
+      "type": "analysis",
+      "code": "D4-21"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "D4-21-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

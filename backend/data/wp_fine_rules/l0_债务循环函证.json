@@ -1,0 +1,80 @@
+{
+  "wp_code": "L0",
+  "name": "债务循环函证",
+  "version": "2025-R1",
+  "cycle": "L",
+  "cycle_name": "L类",
+  "source_files": [
+    {
+      "file": "债务循环函证.xlsx",
+      "sheets": [
+        "底稿目录",
+        "函证程序表F0A",
+        "函证结果汇总表L0-1",
+        "核实被函证单位信息L0-2",
+        "跟函函证过程控制L0-3",
+        "函证差异调节表L0-4",
+        "函证差异检查表（示例）",
+        "长期应付款替代程序L0-5",
+        "邮件传真回函可靠性验证L0-6",
+        "函证程序舞弊风险评价表L0-7"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "函证程序表F0A",
+      "type": "procedure",
+      "code": "F0"
+    },
+    {
+      "exact_name": "函证结果汇总表L0-1",
+      "type": "detail",
+      "code": "L0-1"
+    },
+    {
+      "exact_name": "核实被函证单位信息L0-2",
+      "type": "confirmation_detail",
+      "code": "L0-2"
+    },
+    {
+      "exact_name": "跟函函证过程控制L0-3",
+      "type": "confirmation_detail",
+      "code": "L0-3"
+    },
+    {
+      "exact_name": "函证差异调节表L0-4",
+      "type": "confirmation_detail",
+      "code": "L0-4"
+    },
+    {
+      "exact_name": "函证差异检查表（示例）",
+      "type": "check",
+      "code": "函证差异检查表（示例）"
+    },
+    {
+      "exact_name": "长期应付款替代程序L0-5",
+      "type": "check",
+      "code": "L0-5"
+    },
+    {
+      "exact_name": "邮件传真回函可靠性验证L0-6",
+      "type": "check",
+      "code": "L0-6"
+    },
+    {
+      "exact_name": "函证程序舞弊风险评价表L0-7",
+      "type": "confirmation_detail",
+      "code": "L0-7"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "L0-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

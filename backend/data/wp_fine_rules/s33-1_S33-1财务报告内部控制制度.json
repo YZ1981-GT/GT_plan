@@ -1,0 +1,31 @@
+{
+  "wp_code": "S33-1",
+  "name": "S33-1财务报告内部控制制度",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S33-1财务报告内部控制制度.xlsx",
+      "sheets": [
+        "S33-1程序表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S33-1程序表",
+      "type": "procedure",
+      "code": "S33-1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S33-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

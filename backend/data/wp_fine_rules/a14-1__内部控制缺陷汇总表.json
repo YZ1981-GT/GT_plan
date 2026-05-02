@@ -1,0 +1,37 @@
+{
+  "wp_code": "A14-1",
+  "name": " 内部控制缺陷汇总表",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": " 内部控制缺陷汇总表.xlsx",
+      "sheets": [
+        "A14-1控制缺陷汇总表",
+        "示例-控制缺陷汇总表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A14-1控制缺陷汇总表",
+      "type": "detail",
+      "code": "A14-1"
+    },
+    {
+      "exact_name": "示例-控制缺陷汇总表",
+      "type": "detail",
+      "code": "示例-控制缺陷汇总表"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A14-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

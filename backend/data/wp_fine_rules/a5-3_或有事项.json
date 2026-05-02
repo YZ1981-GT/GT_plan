@@ -1,0 +1,61 @@
+{
+  "wp_code": "A5-3",
+  "name": "或有事项",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "或有事项.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "A5-3 或有事项审计程序",
+        "A5-3-1 或有事项审定表",
+        "A5-3-2预计负债审定表",
+        "A5-3-3调查问卷",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "A5-3 或有事项审计程序",
+      "type": "check",
+      "code": "A5-3"
+    },
+    {
+      "exact_name": "A5-3-1 或有事项审定表",
+      "type": "summary",
+      "code": "A5-3"
+    },
+    {
+      "exact_name": "A5-3-2预计负债审定表",
+      "type": "summary",
+      "code": "A5-3"
+    },
+    {
+      "exact_name": "A5-3-3调查问卷",
+      "type": "check",
+      "code": "A5-3"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A5-3-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

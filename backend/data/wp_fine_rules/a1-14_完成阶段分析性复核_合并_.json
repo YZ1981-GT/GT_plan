@@ -1,0 +1,91 @@
+{
+  "wp_code": "A1-14",
+  "name": "完成阶段分析性复核（合并）",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "完成阶段分析性复核（合并）.xlsx",
+      "sheets": [
+        "完成阶段的分析性复核A1-14",
+        "已审资产负债横向分析A1-14-1",
+        "已审资产负债纵向分析A1-14-2",
+        "已审利润横向分析A1-14-3",
+        "已审利润纵向分析A1-14-4",
+        "已审报表比率分析A1-14-5",
+        "同行业对比分析A1-14-6",
+        "EPS-ROE(参考)",
+        "GT_Custom",
+        "A1-14-7非财务信息分析"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "完成阶段的分析性复核A1-14",
+      "type": "analysis",
+      "code": "A1-14"
+    },
+    {
+      "exact_name": "已审资产负债横向分析A1-14-1",
+      "type": "analysis",
+      "code": "A1-14"
+    },
+    {
+      "exact_name": "已审资产负债纵向分析A1-14-2",
+      "type": "analysis",
+      "code": "A1-14"
+    },
+    {
+      "exact_name": "已审利润横向分析A1-14-3",
+      "type": "analysis",
+      "code": "A1-14"
+    },
+    {
+      "exact_name": "已审利润纵向分析A1-14-4",
+      "type": "analysis",
+      "code": "A1-14"
+    },
+    {
+      "exact_name": "已审报表比率分析A1-14-5",
+      "type": "analysis",
+      "code": "A1-14"
+    },
+    {
+      "exact_name": "同行业对比分析A1-14-6",
+      "type": "analysis",
+      "code": "A1-14"
+    },
+    {
+      "exact_name": "EPS-ROE(参考)",
+      "type": "check",
+      "code": "EPS-ROE(参考)"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "A1-14-7非财务信息分析",
+      "type": "analysis",
+      "code": "A1-14"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A1-14-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "A1-14-CHK-02",
+      "type": "check",
+      "severity": "blocking",
+      "description": "复核意见已签署"
+    }
+  ]
+}

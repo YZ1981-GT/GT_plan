@@ -1,0 +1,55 @@
+{
+  "wp_code": "S6",
+  "name": "对大股东及关联方资金占用和违规担保情况审核程序",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "对大股东及关联方资金占用和违规担保情况审核程序.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "审定表S6-1",
+        "对大股东及关联方资金占用和违规担保情况审核程序S6 ",
+        "会计监管风险提示第9号——上市公司控股股东资金占用及其审计",
+        "Sheet2"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "审定表S6-1",
+      "type": "summary",
+      "code": "S6-1"
+    },
+    {
+      "exact_name": "对大股东及关联方资金占用和违规担保情况审核程序S6 ",
+      "type": "check",
+      "code": "S6"
+    },
+    {
+      "exact_name": "会计监管风险提示第9号——上市公司控股股东资金占用及其审计",
+      "type": "risk_assessment",
+      "code": "会计监管风险提示第9号——上市"
+    },
+    {
+      "exact_name": "Sheet2",
+      "type": "check",
+      "code": "Sheet2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S6-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

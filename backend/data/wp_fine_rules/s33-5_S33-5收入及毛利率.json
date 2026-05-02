@@ -1,0 +1,31 @@
+{
+  "wp_code": "S33-5",
+  "name": "S33-5收入及毛利率",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S33-5收入及毛利率.xlsx",
+      "sheets": [
+        "S33-5（IB5）核查程序"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S33-5（IB5）核查程序",
+      "type": "check",
+      "code": "S33-5"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S33-5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

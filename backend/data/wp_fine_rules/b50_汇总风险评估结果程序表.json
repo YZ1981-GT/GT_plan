@@ -1,0 +1,37 @@
+{
+  "wp_code": "B50",
+  "name": "汇总风险评估结果程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "汇总风险评估结果程序表.xlsx",
+      "sheets": [
+        "B50 汇总风险评估结果"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B50 汇总风险评估结果",
+      "type": "detail",
+      "code": "B50"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B50-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "B50-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "风险评估已完成"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "wp_code": "C2V",
+  "name": "收入循环内控测试",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": "收入循环内控测试.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "C2V控制测试汇总表",
+        "C2V-1控制测试程序和过程记录表",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "C2V控制测试汇总表",
+      "type": "detail",
+      "code": "C2"
+    },
+    {
+      "exact_name": "C2V-1控制测试程序和过程记录表",
+      "type": "calculation",
+      "code": "C2"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C2V-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C2V-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

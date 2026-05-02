@@ -1,0 +1,55 @@
+{
+  "wp_code": "B30-1",
+  "name": "了解组成部分（2021年6月）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "了解组成部分（2021年6月）.xlsx",
+      "sheets": [
+        "B30-1 指令-了解组成部分注册会计师程序表",
+        "B30-1-1 了解组成部分",
+        "Lists",
+        "GT_Custom",
+        "B30-1-2组成部分应对类型判断表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B30-1 指令-了解组成部分注册会计师程序表",
+      "type": "procedure",
+      "code": "B30-1"
+    },
+    {
+      "exact_name": "B30-1-1 了解组成部分",
+      "type": "check",
+      "code": "B30-1"
+    },
+    {
+      "exact_name": "Lists",
+      "type": "check",
+      "code": "Lists"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "B30-1-2组成部分应对类型判断表",
+      "type": "check",
+      "code": "B30-1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B30-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

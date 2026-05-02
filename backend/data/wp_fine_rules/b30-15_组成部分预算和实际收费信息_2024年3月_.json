@@ -1,0 +1,37 @@
+{
+  "wp_code": "B30-15",
+  "name": "组成部分预算和实际收费信息（2024年3月）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "组成部分预算和实际收费信息（2024年3月）.xlsx",
+      "sheets": [
+        "B30-15 组成部分预算和实际收费信息",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B30-15 组成部分预算和实际收费信息",
+      "type": "check",
+      "code": "B30-15"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B30-15-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

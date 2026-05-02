@@ -1,0 +1,43 @@
+{
+  "wp_code": "B30-2C",
+  "name": "组成部分审计范围 - 非成员所（2024年3月）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "组成部分审计范围 - 非成员所（2024年3月）.xlsx",
+      "sheets": [
+        "说明",
+        "非成员所",
+        "Lists"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "说明",
+      "type": "check",
+      "code": "说明"
+    },
+    {
+      "exact_name": "非成员所",
+      "type": "check",
+      "code": "非成员所"
+    },
+    {
+      "exact_name": "Lists",
+      "type": "check",
+      "code": "Lists"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B30-2C-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "wp_code": "S34-25",
+  "name": "资金流水核查",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "资金流水核查.xlsx",
+      "sheets": [
+        "S34-25程序表",
+        "S34-25-1第三方资金流水核查范围",
+        "S34-25-2银行账户信息完整性承诺（参考格式）",
+        "S34-25-3第三方资金流水核查",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S34-25程序表",
+      "type": "procedure",
+      "code": "S34-25"
+    },
+    {
+      "exact_name": "S34-25-1第三方资金流水核查范围",
+      "type": "check",
+      "code": "S34-25"
+    },
+    {
+      "exact_name": "S34-25-2银行账户信息完整性承诺（参考格式）",
+      "type": "communication",
+      "code": "S34-25"
+    },
+    {
+      "exact_name": "S34-25-3第三方资金流水核查",
+      "type": "check",
+      "code": "S34-25"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S34-25-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

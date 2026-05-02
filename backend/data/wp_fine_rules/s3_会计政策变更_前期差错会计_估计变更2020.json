@@ -1,0 +1,91 @@
+{
+  "wp_code": "S3",
+  "name": "会计政策变更、前期差错会计、估计变更2020",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "会计政策变更、前期差错会计、估计变更2020.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "审定表",
+        "会计政策变更和前期差错更正S3-1",
+        "会计估计变更审计程序S3-2",
+        "首次执行新金融工具准则的调整S3-4",
+        "首次执行新收入准则的调整S3-6",
+        "首次执行新租赁准则的调整S3-8",
+        "简化的追溯调整法（1）S3-9",
+        "简化的追溯调整法（2）S3-10",
+        "简化的追溯调整法（2）S3-10 (2)",
+        "参考-简化的追溯调整法（首次执行日）"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "审定表",
+      "type": "summary",
+      "code": "审定表"
+    },
+    {
+      "exact_name": "会计政策变更和前期差错更正S3-1",
+      "type": "check",
+      "code": "S3-1"
+    },
+    {
+      "exact_name": "会计估计变更审计程序S3-2",
+      "type": "check",
+      "code": "S3-2"
+    },
+    {
+      "exact_name": "首次执行新金融工具准则的调整S3-4",
+      "type": "check",
+      "code": "S3-4"
+    },
+    {
+      "exact_name": "首次执行新收入准则的调整S3-6",
+      "type": "check",
+      "code": "S3-6"
+    },
+    {
+      "exact_name": "首次执行新租赁准则的调整S3-8",
+      "type": "check",
+      "code": "S3-8"
+    },
+    {
+      "exact_name": "简化的追溯调整法（1）S3-9",
+      "type": "check",
+      "code": "S3-9"
+    },
+    {
+      "exact_name": "简化的追溯调整法（2）S3-10",
+      "type": "check",
+      "code": "S3-10"
+    },
+    {
+      "exact_name": "简化的追溯调整法（2）S3-10 (2)",
+      "type": "check",
+      "code": "S3-10"
+    },
+    {
+      "exact_name": "参考-简化的追溯调整法（首次执行日）",
+      "type": "check",
+      "code": "参考-简化的追溯调整法（首次执"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S3-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

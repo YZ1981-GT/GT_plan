@@ -1,0 +1,31 @@
+{
+  "wp_code": "B23-8",
+  "name": "B23-8了解无形资产循环流程和内部控制记录表（参考）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "B23-8了解无形资产循环流程和内部控制记录表（参考）.xlsx",
+      "sheets": [
+        "B23-8了解无形资产及其他长期资产循环流程和内部控制记录表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B23-8了解无形资产及其他长期资产循环流程和内部控制记录表",
+      "type": "control_test",
+      "code": "B23-8"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B23-8-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

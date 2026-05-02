@@ -1,0 +1,703 @@
+{
+  "wp_code": "A6-1",
+  "name": "财务报告文件包（含经审计的财务报表及附注等）",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+      "sheets": [
+        "目录",
+        "基础信息",
+        "RP 001",
+        "RP 002-1",
+        "RP 002-2",
+        "RP 003 ",
+        "RP 004 ",
+        "RP 005",
+        "RP 006",
+        "RP 007",
+        "RP 008",
+        "RP 009",
+        "RP 010",
+        "RP 011",
+        "RP 012",
+        "RP 013",
+        "RP 014",
+        "RP 015",
+        "RP 016",
+        "RP 017",
+        "RP 018",
+        "RP 019",
+        "RP 020",
+        "RP 020-1",
+        "RP 020-2",
+        "RP 020-3",
+        "RP 021",
+        "RP 022",
+        "RP 023",
+        "RP 024",
+        "RP 025",
+        "RP 026",
+        "RP 027",
+        "RP 028",
+        "RP 029",
+        "RP 030",
+        "RP 031",
+        "RP 032",
+        "RP 033",
+        "RP 034",
+        "RP 035",
+        "RP 036",
+        "RP 036-1",
+        "RP 036-2",
+        "RP 037",
+        "RP 037-1",
+        "RP 037-2",
+        "RP 038",
+        "RP 039",
+        "RP 040",
+        "RP 041",
+        "RP 042",
+        "RP 043",
+        "RP 044",
+        "RP 045",
+        "RP 046",
+        "RP 047",
+        "RP 048",
+        "RP 049",
+        "RP 050",
+        "RP 051",
+        "RP 052",
+        "RP 053",
+        "RP 054",
+        "RP 055",
+        "RP 056",
+        "RP 057",
+        "RP 058",
+        "RP 059",
+        "RP 059-1",
+        "RP 059-2",
+        "RP 059-3",
+        "RP 060",
+        "RP 061",
+        "RP 062",
+        "RP 063",
+        "RP 064",
+        "RP 065",
+        "RP 065-1",
+        "RP 065-2",
+        "RP 066",
+        "RP 067",
+        "RP 068",
+        "RP 069",
+        "RP 070",
+        "RP 071",
+        "RP 072",
+        "RP 073",
+        "RP 074",
+        "RP 075",
+        "RP 076",
+        "RP 077",
+        "RP 078",
+        "RP 079",
+        "RP 080",
+        "RP 081",
+        "RP 082",
+        "RP 083",
+        "RP 084",
+        "RP 085",
+        "RP 086",
+        "RP 087",
+        "RP 088",
+        "RP 089",
+        "RP 090",
+        "RP 091",
+        "RP 092",
+        "RP 093",
+        "RP 094",
+        "RP 095",
+        "RP 096",
+        "RP 097",
+        "RP 098"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "目录",
+      "type": "check",
+      "code": "目录"
+    },
+    {
+      "exact_name": "基础信息",
+      "type": "check",
+      "code": "基础信息"
+    },
+    {
+      "exact_name": "RP 001",
+      "type": "check",
+      "code": "RP 001"
+    },
+    {
+      "exact_name": "RP 002-1",
+      "type": "check",
+      "code": "RP 002-1"
+    },
+    {
+      "exact_name": "RP 002-2",
+      "type": "check",
+      "code": "RP 002-2"
+    },
+    {
+      "exact_name": "RP 003 ",
+      "type": "check",
+      "code": "RP 003 "
+    },
+    {
+      "exact_name": "RP 004 ",
+      "type": "check",
+      "code": "RP 004 "
+    },
+    {
+      "exact_name": "RP 005",
+      "type": "check",
+      "code": "RP 005"
+    },
+    {
+      "exact_name": "RP 006",
+      "type": "check",
+      "code": "RP 006"
+    },
+    {
+      "exact_name": "RP 007",
+      "type": "check",
+      "code": "RP 007"
+    },
+    {
+      "exact_name": "RP 008",
+      "type": "check",
+      "code": "RP 008"
+    },
+    {
+      "exact_name": "RP 009",
+      "type": "check",
+      "code": "RP 009"
+    },
+    {
+      "exact_name": "RP 010",
+      "type": "check",
+      "code": "RP 010"
+    },
+    {
+      "exact_name": "RP 011",
+      "type": "check",
+      "code": "RP 011"
+    },
+    {
+      "exact_name": "RP 012",
+      "type": "check",
+      "code": "RP 012"
+    },
+    {
+      "exact_name": "RP 013",
+      "type": "check",
+      "code": "RP 013"
+    },
+    {
+      "exact_name": "RP 014",
+      "type": "check",
+      "code": "RP 014"
+    },
+    {
+      "exact_name": "RP 015",
+      "type": "check",
+      "code": "RP 015"
+    },
+    {
+      "exact_name": "RP 016",
+      "type": "check",
+      "code": "RP 016"
+    },
+    {
+      "exact_name": "RP 017",
+      "type": "check",
+      "code": "RP 017"
+    },
+    {
+      "exact_name": "RP 018",
+      "type": "check",
+      "code": "RP 018"
+    },
+    {
+      "exact_name": "RP 019",
+      "type": "check",
+      "code": "RP 019"
+    },
+    {
+      "exact_name": "RP 020",
+      "type": "check",
+      "code": "RP 020"
+    },
+    {
+      "exact_name": "RP 020-1",
+      "type": "check",
+      "code": "RP 020-1"
+    },
+    {
+      "exact_name": "RP 020-2",
+      "type": "check",
+      "code": "RP 020-2"
+    },
+    {
+      "exact_name": "RP 020-3",
+      "type": "check",
+      "code": "RP 020-3"
+    },
+    {
+      "exact_name": "RP 021",
+      "type": "check",
+      "code": "RP 021"
+    },
+    {
+      "exact_name": "RP 022",
+      "type": "check",
+      "code": "RP 022"
+    },
+    {
+      "exact_name": "RP 023",
+      "type": "check",
+      "code": "RP 023"
+    },
+    {
+      "exact_name": "RP 024",
+      "type": "check",
+      "code": "RP 024"
+    },
+    {
+      "exact_name": "RP 025",
+      "type": "check",
+      "code": "RP 025"
+    },
+    {
+      "exact_name": "RP 026",
+      "type": "check",
+      "code": "RP 026"
+    },
+    {
+      "exact_name": "RP 027",
+      "type": "check",
+      "code": "RP 027"
+    },
+    {
+      "exact_name": "RP 028",
+      "type": "check",
+      "code": "RP 028"
+    },
+    {
+      "exact_name": "RP 029",
+      "type": "check",
+      "code": "RP 029"
+    },
+    {
+      "exact_name": "RP 030",
+      "type": "check",
+      "code": "RP 030"
+    },
+    {
+      "exact_name": "RP 031",
+      "type": "check",
+      "code": "RP 031"
+    },
+    {
+      "exact_name": "RP 032",
+      "type": "check",
+      "code": "RP 032"
+    },
+    {
+      "exact_name": "RP 033",
+      "type": "check",
+      "code": "RP 033"
+    },
+    {
+      "exact_name": "RP 034",
+      "type": "check",
+      "code": "RP 034"
+    },
+    {
+      "exact_name": "RP 035",
+      "type": "check",
+      "code": "RP 035"
+    },
+    {
+      "exact_name": "RP 036",
+      "type": "check",
+      "code": "RP 036"
+    },
+    {
+      "exact_name": "RP 036-1",
+      "type": "check",
+      "code": "RP 036-1"
+    },
+    {
+      "exact_name": "RP 036-2",
+      "type": "check",
+      "code": "RP 036-2"
+    },
+    {
+      "exact_name": "RP 037",
+      "type": "check",
+      "code": "RP 037"
+    },
+    {
+      "exact_name": "RP 037-1",
+      "type": "check",
+      "code": "RP 037-1"
+    },
+    {
+      "exact_name": "RP 037-2",
+      "type": "check",
+      "code": "RP 037-2"
+    },
+    {
+      "exact_name": "RP 038",
+      "type": "check",
+      "code": "RP 038"
+    },
+    {
+      "exact_name": "RP 039",
+      "type": "check",
+      "code": "RP 039"
+    },
+    {
+      "exact_name": "RP 040",
+      "type": "check",
+      "code": "RP 040"
+    },
+    {
+      "exact_name": "RP 041",
+      "type": "check",
+      "code": "RP 041"
+    },
+    {
+      "exact_name": "RP 042",
+      "type": "check",
+      "code": "RP 042"
+    },
+    {
+      "exact_name": "RP 043",
+      "type": "check",
+      "code": "RP 043"
+    },
+    {
+      "exact_name": "RP 044",
+      "type": "check",
+      "code": "RP 044"
+    },
+    {
+      "exact_name": "RP 045",
+      "type": "check",
+      "code": "RP 045"
+    },
+    {
+      "exact_name": "RP 046",
+      "type": "check",
+      "code": "RP 046"
+    },
+    {
+      "exact_name": "RP 047",
+      "type": "check",
+      "code": "RP 047"
+    },
+    {
+      "exact_name": "RP 048",
+      "type": "check",
+      "code": "RP 048"
+    },
+    {
+      "exact_name": "RP 049",
+      "type": "check",
+      "code": "RP 049"
+    },
+    {
+      "exact_name": "RP 050",
+      "type": "check",
+      "code": "RP 050"
+    },
+    {
+      "exact_name": "RP 051",
+      "type": "check",
+      "code": "RP 051"
+    },
+    {
+      "exact_name": "RP 052",
+      "type": "check",
+      "code": "RP 052"
+    },
+    {
+      "exact_name": "RP 053",
+      "type": "check",
+      "code": "RP 053"
+    },
+    {
+      "exact_name": "RP 054",
+      "type": "check",
+      "code": "RP 054"
+    },
+    {
+      "exact_name": "RP 055",
+      "type": "check",
+      "code": "RP 055"
+    },
+    {
+      "exact_name": "RP 056",
+      "type": "check",
+      "code": "RP 056"
+    },
+    {
+      "exact_name": "RP 057",
+      "type": "check",
+      "code": "RP 057"
+    },
+    {
+      "exact_name": "RP 058",
+      "type": "check",
+      "code": "RP 058"
+    },
+    {
+      "exact_name": "RP 059",
+      "type": "check",
+      "code": "RP 059"
+    },
+    {
+      "exact_name": "RP 059-1",
+      "type": "check",
+      "code": "RP 059-1"
+    },
+    {
+      "exact_name": "RP 059-2",
+      "type": "check",
+      "code": "RP 059-2"
+    },
+    {
+      "exact_name": "RP 059-3",
+      "type": "check",
+      "code": "RP 059-3"
+    },
+    {
+      "exact_name": "RP 060",
+      "type": "check",
+      "code": "RP 060"
+    },
+    {
+      "exact_name": "RP 061",
+      "type": "check",
+      "code": "RP 061"
+    },
+    {
+      "exact_name": "RP 062",
+      "type": "check",
+      "code": "RP 062"
+    },
+    {
+      "exact_name": "RP 063",
+      "type": "check",
+      "code": "RP 063"
+    },
+    {
+      "exact_name": "RP 064",
+      "type": "check",
+      "code": "RP 064"
+    },
+    {
+      "exact_name": "RP 065",
+      "type": "check",
+      "code": "RP 065"
+    },
+    {
+      "exact_name": "RP 065-1",
+      "type": "check",
+      "code": "RP 065-1"
+    },
+    {
+      "exact_name": "RP 065-2",
+      "type": "check",
+      "code": "RP 065-2"
+    },
+    {
+      "exact_name": "RP 066",
+      "type": "check",
+      "code": "RP 066"
+    },
+    {
+      "exact_name": "RP 067",
+      "type": "check",
+      "code": "RP 067"
+    },
+    {
+      "exact_name": "RP 068",
+      "type": "check",
+      "code": "RP 068"
+    },
+    {
+      "exact_name": "RP 069",
+      "type": "check",
+      "code": "RP 069"
+    },
+    {
+      "exact_name": "RP 070",
+      "type": "check",
+      "code": "RP 070"
+    },
+    {
+      "exact_name": "RP 071",
+      "type": "check",
+      "code": "RP 071"
+    },
+    {
+      "exact_name": "RP 072",
+      "type": "check",
+      "code": "RP 072"
+    },
+    {
+      "exact_name": "RP 073",
+      "type": "check",
+      "code": "RP 073"
+    },
+    {
+      "exact_name": "RP 074",
+      "type": "check",
+      "code": "RP 074"
+    },
+    {
+      "exact_name": "RP 075",
+      "type": "check",
+      "code": "RP 075"
+    },
+    {
+      "exact_name": "RP 076",
+      "type": "check",
+      "code": "RP 076"
+    },
+    {
+      "exact_name": "RP 077",
+      "type": "check",
+      "code": "RP 077"
+    },
+    {
+      "exact_name": "RP 078",
+      "type": "check",
+      "code": "RP 078"
+    },
+    {
+      "exact_name": "RP 079",
+      "type": "check",
+      "code": "RP 079"
+    },
+    {
+      "exact_name": "RP 080",
+      "type": "check",
+      "code": "RP 080"
+    },
+    {
+      "exact_name": "RP 081",
+      "type": "check",
+      "code": "RP 081"
+    },
+    {
+      "exact_name": "RP 082",
+      "type": "check",
+      "code": "RP 082"
+    },
+    {
+      "exact_name": "RP 083",
+      "type": "check",
+      "code": "RP 083"
+    },
+    {
+      "exact_name": "RP 084",
+      "type": "check",
+      "code": "RP 084"
+    },
+    {
+      "exact_name": "RP 085",
+      "type": "check",
+      "code": "RP 085"
+    },
+    {
+      "exact_name": "RP 086",
+      "type": "check",
+      "code": "RP 086"
+    },
+    {
+      "exact_name": "RP 087",
+      "type": "check",
+      "code": "RP 087"
+    },
+    {
+      "exact_name": "RP 088",
+      "type": "check",
+      "code": "RP 088"
+    },
+    {
+      "exact_name": "RP 089",
+      "type": "check",
+      "code": "RP 089"
+    },
+    {
+      "exact_name": "RP 090",
+      "type": "check",
+      "code": "RP 090"
+    },
+    {
+      "exact_name": "RP 091",
+      "type": "check",
+      "code": "RP 091"
+    },
+    {
+      "exact_name": "RP 092",
+      "type": "check",
+      "code": "RP 092"
+    },
+    {
+      "exact_name": "RP 093",
+      "type": "check",
+      "code": "RP 093"
+    },
+    {
+      "exact_name": "RP 094",
+      "type": "check",
+      "code": "RP 094"
+    },
+    {
+      "exact_name": "RP 095",
+      "type": "check",
+      "code": "RP 095"
+    },
+    {
+      "exact_name": "RP 096",
+      "type": "check",
+      "code": "RP 096"
+    },
+    {
+      "exact_name": "RP 097",
+      "type": "check",
+      "code": "RP 097"
+    },
+    {
+      "exact_name": "RP 098",
+      "type": "check",
+      "code": "RP 098"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A6-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

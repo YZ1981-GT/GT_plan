@@ -1,0 +1,44 @@
+{
+  "wp_code": "S34-11",
+  "name": "业务重组",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "业务重组.xlsx",
+      "sheets": [
+        "底稿目录",
+        "S34-11程序表",
+        "S34-11 -1同一控制合并判断",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S34-11程序表",
+      "type": "procedure",
+      "code": "S34-11"
+    },
+    {
+      "exact_name": "S34-11 -1同一控制合并判断",
+      "type": "control_test",
+      "code": "S34-11"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S34-11-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

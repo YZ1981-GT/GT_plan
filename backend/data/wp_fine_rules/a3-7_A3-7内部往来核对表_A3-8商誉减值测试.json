@@ -1,0 +1,55 @@
+{
+  "wp_code": "A3-7",
+  "name": "A3-7内部往来核对表、A3-8商誉减值测试",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "A3-7内部往来核对表、A3-8商誉减值测试.xlsx",
+      "sheets": [
+        "编制说明",
+        "A3-7内部往来核对表",
+        "A3-8商誉减值测试",
+        "A3-8-1可收回金额测试",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "编制说明",
+      "type": "check",
+      "code": "编制说明"
+    },
+    {
+      "exact_name": "A3-7内部往来核对表",
+      "type": "check",
+      "code": "A3-7"
+    },
+    {
+      "exact_name": "A3-8商誉减值测试",
+      "type": "calculation",
+      "code": "A3-8"
+    },
+    {
+      "exact_name": "A3-8-1可收回金额测试",
+      "type": "calculation",
+      "code": "A3-8"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A3-7-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

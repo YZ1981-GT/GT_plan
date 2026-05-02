@@ -1,0 +1,61 @@
+{
+  "wp_code": "S21",
+  "name": "数据资产",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "数据资产.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "数据资产S21",
+        "数据资产的基本情况S21-1",
+        "开发支出资本化分析表S21-2",
+        "成本归集与分摊检查表S21-3",
+        "摊销政策检查表S21-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "数据资产S21",
+      "type": "check",
+      "code": "S21"
+    },
+    {
+      "exact_name": "数据资产的基本情况S21-1",
+      "type": "check",
+      "code": "S21-1"
+    },
+    {
+      "exact_name": "开发支出资本化分析表S21-2",
+      "type": "analysis",
+      "code": "S21-2"
+    },
+    {
+      "exact_name": "成本归集与分摊检查表S21-3",
+      "type": "check",
+      "code": "S21-3"
+    },
+    {
+      "exact_name": "摊销政策检查表S21-4",
+      "type": "check",
+      "code": "S21-4"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S21-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

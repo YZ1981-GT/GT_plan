@@ -1,0 +1,164 @@
+{
+  "wp_code": "H5",
+  "name": "油气资产",
+  "version": "2025-R1",
+  "cycle": "H",
+  "cycle_name": "H类",
+  "source_files": [
+    {
+      "file": "油气资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "油气资产实质性程序表H5A",
+        "审定表H5-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表H5-2",
+        "调整分录汇总H5-3",
+        "闲置检查表H5-4",
+        "会计政策会计估计检查表H5-5",
+        "分析表H5-6",
+        "增加检查表H5-7",
+        "减少检查表H5-8",
+        "监盘计划H5-9",
+        "盘点检查表H5-10",
+        "监盘小结H5-11",
+        "折耗测算表（不含减值）H5-12",
+        "折耗测算表（含减值）H5-12",
+        "折耗分配分析表H5-13",
+        "减值测算表H5-14",
+        "可收回金额测试表H5-15",
+        "权属检查表H5-16",
+        "关联交易检查表H5-17",
+        "经营租出油气资产检查表H5-18",
+        "融资租出油气资产检查表H5-19"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "油气资产实质性程序表H5A",
+      "type": "procedure",
+      "code": "H5"
+    },
+    {
+      "exact_name": "审定表H5-1",
+      "type": "summary",
+      "code": "H5-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国有企业）"
+    },
+    {
+      "exact_name": "明细表H5-2",
+      "type": "detail",
+      "code": "H5-2"
+    },
+    {
+      "exact_name": "调整分录汇总H5-3",
+      "type": "detail",
+      "code": "H5-3"
+    },
+    {
+      "exact_name": "闲置检查表H5-4",
+      "type": "check",
+      "code": "H5-4"
+    },
+    {
+      "exact_name": "会计政策会计估计检查表H5-5",
+      "type": "check",
+      "code": "H5-5"
+    },
+    {
+      "exact_name": "分析表H5-6",
+      "type": "analysis",
+      "code": "H5-6"
+    },
+    {
+      "exact_name": "增加检查表H5-7",
+      "type": "check",
+      "code": "H5-7"
+    },
+    {
+      "exact_name": "减少检查表H5-8",
+      "type": "check",
+      "code": "H5-8"
+    },
+    {
+      "exact_name": "监盘计划H5-9",
+      "type": "count",
+      "code": "H5-9"
+    },
+    {
+      "exact_name": "盘点检查表H5-10",
+      "type": "check",
+      "code": "H5-10"
+    },
+    {
+      "exact_name": "监盘小结H5-11",
+      "type": "count",
+      "code": "H5-11"
+    },
+    {
+      "exact_name": "折耗测算表（不含减值）H5-12",
+      "type": "calculation",
+      "code": "H5-12"
+    },
+    {
+      "exact_name": "折耗测算表（含减值）H5-12",
+      "type": "calculation",
+      "code": "H5-12"
+    },
+    {
+      "exact_name": "折耗分配分析表H5-13",
+      "type": "analysis",
+      "code": "H5-13"
+    },
+    {
+      "exact_name": "减值测算表H5-14",
+      "type": "calculation",
+      "code": "H5-14"
+    },
+    {
+      "exact_name": "可收回金额测试表H5-15",
+      "type": "calculation",
+      "code": "H5-15"
+    },
+    {
+      "exact_name": "权属检查表H5-16",
+      "type": "check",
+      "code": "H5-16"
+    },
+    {
+      "exact_name": "关联交易检查表H5-17",
+      "type": "check",
+      "code": "H5-17"
+    },
+    {
+      "exact_name": "经营租出油气资产检查表H5-18",
+      "type": "check",
+      "code": "H5-18"
+    },
+    {
+      "exact_name": "融资租出油气资产检查表H5-19",
+      "type": "check",
+      "code": "H5-19"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "H5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

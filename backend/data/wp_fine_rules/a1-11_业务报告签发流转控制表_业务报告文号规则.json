@@ -1,0 +1,55 @@
+{
+  "wp_code": "A1-11",
+  "name": "业务报告签发流转控制表+业务报告文号规则",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "业务报告签发流转控制表+业务报告文号规则.xlsx",
+      "sheets": [
+        "A1-11 报告签发",
+        "1.文号规则",
+        "2.业务约定书和报告文号",
+        "3.对应报告文号规则",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A1-11 报告签发",
+      "type": "check",
+      "code": "A1-11"
+    },
+    {
+      "exact_name": "1.文号规则",
+      "type": "check",
+      "code": "1.文号规则"
+    },
+    {
+      "exact_name": "2.业务约定书和报告文号",
+      "type": "check",
+      "code": "2.业务约定书和报告文号"
+    },
+    {
+      "exact_name": "3.对应报告文号规则",
+      "type": "check",
+      "code": "3.对应报告文号规则"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A1-11-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

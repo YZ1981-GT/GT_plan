@@ -1,0 +1,86 @@
+{
+  "wp_code": "G12",
+  "name": "净敞口套期收益",
+  "version": "2025-R1",
+  "cycle": "G",
+  "cycle_name": "G类",
+  "source_files": [
+    {
+      "file": "净敞口套期收益.xlsx",
+      "sheets": [
+        "底稿目录",
+        "净敞口套期收益审计程序表G12A",
+        "净敞口套期收益审计程序表G12A-修订前",
+        "审定表G12-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G12-2",
+        "调整分录汇总G12-3",
+        "公允价值测试表G12-4",
+        "风险净敞口检查表G12-5",
+        "凭证检查表G12-6"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "净敞口套期收益审计程序表G12A",
+      "type": "procedure",
+      "code": "G12"
+    },
+    {
+      "exact_name": "净敞口套期收益审计程序表G12A-修订前",
+      "type": "procedure",
+      "code": "G12"
+    },
+    {
+      "exact_name": "审定表G12-1",
+      "type": "summary",
+      "code": "G12-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G12-2",
+      "type": "detail",
+      "code": "G12-2"
+    },
+    {
+      "exact_name": "调整分录汇总G12-3",
+      "type": "detail",
+      "code": "G12-3"
+    },
+    {
+      "exact_name": "公允价值测试表G12-4",
+      "type": "calculation",
+      "code": "G12-4"
+    },
+    {
+      "exact_name": "风险净敞口检查表G12-5",
+      "type": "check",
+      "code": "G12-5"
+    },
+    {
+      "exact_name": "凭证检查表G12-6",
+      "type": "check",
+      "code": "G12-6"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "G12-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

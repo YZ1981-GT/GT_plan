@@ -1,0 +1,44 @@
+{
+  "wp_code": "B60-1",
+  "name": "审计项目工时预算与控制表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "审计项目工时预算与控制表.xlsx",
+      "sheets": [
+        "底稿目录",
+        "B61-1工时预算与控制表",
+        "B61-1工时预算与控制板（按阶段）",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B61-1工时预算与控制表",
+      "type": "control_test",
+      "code": "B61-1"
+    },
+    {
+      "exact_name": "B61-1工时预算与控制板（按阶段）",
+      "type": "control_test",
+      "code": "B61-1"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B60-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

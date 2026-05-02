@@ -1,0 +1,43 @@
+{
+  "wp_code": "S32-2",
+  "name": "S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形.xlsx",
+      "sheets": [
+        "S32程序表IC2",
+        "GT_Custom",
+        "提示"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S32程序表IC2",
+      "type": "procedure",
+      "code": "S32"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "提示",
+      "type": "check",
+      "code": "提示"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S32-2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

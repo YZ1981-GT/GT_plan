@@ -1,0 +1,43 @@
+{
+  "wp_code": "S8",
+  "name": "租赁",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "租赁.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "审定表S8-1",
+        "租赁S8"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "审定表S8-1",
+      "type": "summary",
+      "code": "S8-1"
+    },
+    {
+      "exact_name": "租赁S8",
+      "type": "check",
+      "code": "S8"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S8-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

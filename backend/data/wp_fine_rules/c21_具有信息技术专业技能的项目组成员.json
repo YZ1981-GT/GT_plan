@@ -1,0 +1,43 @@
+{
+  "wp_code": "C21",
+  "name": "具有信息技术专业技能的项目组成员",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": "具有信息技术专业技能的项目组成员.xlsx",
+      "sheets": [
+        "C21 具有信息技术专业技能的项目组成员",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "C21 具有信息技术专业技能的项目组成员",
+      "type": "check",
+      "code": "C21"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C21-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C21-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

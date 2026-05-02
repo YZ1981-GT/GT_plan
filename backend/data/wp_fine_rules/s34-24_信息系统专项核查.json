@@ -1,0 +1,43 @@
+{
+  "wp_code": "S34-24",
+  "name": "信息系统专项核查",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "信息系统专项核查.xlsx",
+      "sheets": [
+        "S34-24信息系统专项核查程序表",
+        "【附】 5-14 信息系统专项核查",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S34-24信息系统专项核查程序表",
+      "type": "procedure",
+      "code": "S34-24"
+    },
+    {
+      "exact_name": "【附】 5-14 信息系统专项核查",
+      "type": "check",
+      "code": "【附】 5-14 信息系统专项"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S34-24-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

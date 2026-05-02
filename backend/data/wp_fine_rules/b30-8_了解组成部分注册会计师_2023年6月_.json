@@ -1,0 +1,55 @@
+{
+  "wp_code": "B30-8",
+  "name": "了解组成部分注册会计师（2023年6月）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "了解组成部分注册会计师（2023年6月）.xlsx",
+      "sheets": [
+        "B30-8 指令 —了解组成部分注册会计师",
+        " B30-8-1 组成部分注册会计师 A",
+        "B30-8-2 组成部分注册会计师 B",
+        "List",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B30-8 指令 —了解组成部分注册会计师",
+      "type": "check",
+      "code": "B30-8"
+    },
+    {
+      "exact_name": " B30-8-1 组成部分注册会计师 A",
+      "type": "check",
+      "code": "B30-8"
+    },
+    {
+      "exact_name": "B30-8-2 组成部分注册会计师 B",
+      "type": "check",
+      "code": "B30-8"
+    },
+    {
+      "exact_name": "List",
+      "type": "check",
+      "code": "List"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B30-8-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "wp_code": "B23V",
+  "name": "B23V-10了解管理循环流程和内部控制记录表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "B23V-10了解管理循环流程和内部控制记录表.xlsx",
+      "sheets": [
+        "B23V-10了解管理循环流程和内部控制记录表",
+        "B23V-10-1关键控制点测试方法分配表",
+        "Sheet1"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B23V-10了解管理循环流程和内部控制记录表",
+      "type": "control_test",
+      "code": "B23"
+    },
+    {
+      "exact_name": "B23V-10-1关键控制点测试方法分配表",
+      "type": "calculation",
+      "code": "B23"
+    },
+    {
+      "exact_name": "Sheet1",
+      "type": "check",
+      "code": "Sheet1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B23V-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

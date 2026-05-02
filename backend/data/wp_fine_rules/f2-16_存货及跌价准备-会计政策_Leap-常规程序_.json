@@ -1,0 +1,31 @@
+{
+  "wp_code": "F2-16",
+  "name": "存货及跌价准备-会计政策（Leap-常规程序）",
+  "version": "2025-R1",
+  "cycle": "F",
+  "cycle_name": "F类",
+  "source_files": [
+    {
+      "file": "存货及跌价准备-会计政策（Leap-常规程序）.xlsx",
+      "sheets": [
+        "会计政策、核算流程F2-16"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "会计政策、核算流程F2-16",
+      "type": "check",
+      "code": "F2-16"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "F2-16-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "wp_code": "S15",
+  "name": "每股收益和净资产收益率",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "每股收益和净资产收益率.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "审计程序S15",
+        "审定表S15-1",
+        "基本每股收益计算表S15-2",
+        "稀释每股收益计算表S15-3",
+        "净资产收益率计算S15-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "审计程序S15",
+      "type": "check",
+      "code": "S15"
+    },
+    {
+      "exact_name": "审定表S15-1",
+      "type": "summary",
+      "code": "S15-1"
+    },
+    {
+      "exact_name": "基本每股收益计算表S15-2",
+      "type": "check",
+      "code": "S15-2"
+    },
+    {
+      "exact_name": "稀释每股收益计算表S15-3",
+      "type": "check",
+      "code": "S15-3"
+    },
+    {
+      "exact_name": "净资产收益率计算S15-4",
+      "type": "check",
+      "code": "S15-4"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S15-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

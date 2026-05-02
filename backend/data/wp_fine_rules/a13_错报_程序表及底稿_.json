@@ -1,0 +1,74 @@
+{
+  "wp_code": "A13",
+  "name": "错报（程序表及底稿）",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "错报（程序表及底稿）.xlsx",
+      "sheets": [
+        "底稿目录",
+        "A13错报程序表",
+        "A13-1 未更正错报汇总表",
+        "A13-2 未更正的列报和披露错报",
+        "A13-3 评价识别出的错报",
+        "A13-4 评价错报的性质",
+        "GT_Custom",
+        "A13-5对错报的沟通"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A13错报程序表",
+      "type": "procedure",
+      "code": "A13"
+    },
+    {
+      "exact_name": "A13-1 未更正错报汇总表",
+      "type": "detail",
+      "code": "A13-1"
+    },
+    {
+      "exact_name": "A13-2 未更正的列报和披露错报",
+      "type": "check",
+      "code": "A13-2"
+    },
+    {
+      "exact_name": "A13-3 评价识别出的错报",
+      "type": "check",
+      "code": "A13-3"
+    },
+    {
+      "exact_name": "A13-4 评价错报的性质",
+      "type": "check",
+      "code": "A13-4"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "A13-5对错报的沟通",
+      "type": "communication",
+      "code": "A13-5"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A13-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "A13-CHK-02",
+      "type": "check",
+      "severity": "blocking",
+      "description": "未更正错报已汇总并评价"
+    }
+  ]
+}

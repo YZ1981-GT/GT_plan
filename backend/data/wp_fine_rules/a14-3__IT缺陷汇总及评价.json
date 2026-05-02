@@ -1,0 +1,61 @@
+{
+  "wp_code": "A14-3",
+  "name": " IT缺陷汇总及评价",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": " IT缺陷汇总及评价.xlsx",
+      "sheets": [
+        "A14-3 缺陷汇总",
+        "A14-3-1 IT控制缺陷评价",
+        "IT控制缺陷沟通会议纪要",
+        "【示例1】信息系统一般控制缺陷评价",
+        "【示例2】信息系统一般控制缺陷评价",
+        "【参考】 IT一般控制的值得关注的缺陷"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "A14-3 缺陷汇总",
+      "type": "detail",
+      "code": "A14-3"
+    },
+    {
+      "exact_name": "A14-3-1 IT控制缺陷评价",
+      "type": "control_test",
+      "code": "A14-3"
+    },
+    {
+      "exact_name": "IT控制缺陷沟通会议纪要",
+      "type": "control_test",
+      "code": "IT控制缺陷沟通会议纪要"
+    },
+    {
+      "exact_name": "【示例1】信息系统一般控制缺陷评价",
+      "type": "control_test",
+      "code": "【示例1】信息系统一般控制缺陷"
+    },
+    {
+      "exact_name": "【示例2】信息系统一般控制缺陷评价",
+      "type": "control_test",
+      "code": "【示例2】信息系统一般控制缺陷"
+    },
+    {
+      "exact_name": "【参考】 IT一般控制的值得关注的缺陷",
+      "type": "control_test",
+      "code": "【参考】 IT一般控制的值得关"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A14-3-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

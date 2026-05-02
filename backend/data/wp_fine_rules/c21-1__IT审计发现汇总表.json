@@ -1,0 +1,37 @@
+{
+  "wp_code": "C21-1",
+  "name": " IT审计发现汇总表",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": " IT审计发现汇总表.xlsx",
+      "sheets": [
+        "IT 审计发现汇总表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "IT 审计发现汇总表",
+      "type": "detail",
+      "code": "IT 审计发现汇总表"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C21-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C21-1-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

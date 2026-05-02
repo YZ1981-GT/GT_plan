@@ -1,0 +1,86 @@
+{
+  "wp_code": "F0",
+  "name": "存货循环函证",
+  "version": "2025-R1",
+  "cycle": "F",
+  "cycle_name": "F类",
+  "source_files": [
+    {
+      "file": "存货循环函证.xlsx",
+      "sheets": [
+        "底稿目录",
+        "函证程序表F0A",
+        "函证结果汇总表F0-1",
+        "核实被函证单位信息F0-2",
+        "跟函函证过程控制F0-3",
+        "函证差异调节表F0-4",
+        "函证差异检查表（示例）",
+        "预付及采购替代程序F0-5",
+        "应付及采购替代程序F0-6",
+        "邮件传真回函可靠性验证F0-7",
+        "函证程序舞弊风险评价表F0-8"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "函证程序表F0A",
+      "type": "procedure",
+      "code": "F0"
+    },
+    {
+      "exact_name": "函证结果汇总表F0-1",
+      "type": "detail",
+      "code": "F0-1"
+    },
+    {
+      "exact_name": "核实被函证单位信息F0-2",
+      "type": "confirmation_detail",
+      "code": "F0-2"
+    },
+    {
+      "exact_name": "跟函函证过程控制F0-3",
+      "type": "confirmation_detail",
+      "code": "F0-3"
+    },
+    {
+      "exact_name": "函证差异调节表F0-4",
+      "type": "confirmation_detail",
+      "code": "F0-4"
+    },
+    {
+      "exact_name": "函证差异检查表（示例）",
+      "type": "check",
+      "code": "函证差异检查表（示例）"
+    },
+    {
+      "exact_name": "预付及采购替代程序F0-5",
+      "type": "check",
+      "code": "F0-5"
+    },
+    {
+      "exact_name": "应付及采购替代程序F0-6",
+      "type": "check",
+      "code": "F0-6"
+    },
+    {
+      "exact_name": "邮件传真回函可靠性验证F0-7",
+      "type": "check",
+      "code": "F0-7"
+    },
+    {
+      "exact_name": "函证程序舞弊风险评价表F0-8",
+      "type": "confirmation_detail",
+      "code": "F0-8"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "F0-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

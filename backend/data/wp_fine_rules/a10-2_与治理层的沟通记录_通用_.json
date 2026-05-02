@@ -1,0 +1,37 @@
+{
+  "wp_code": "A10-2",
+  "name": "与治理层的沟通记录（通用）",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "与治理层的沟通记录（通用）.xlsx",
+      "sheets": [
+        "沟通记录模板1",
+        "沟通记录模板2"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "沟通记录模板1",
+      "type": "communication",
+      "code": "沟通记录模板1"
+    },
+    {
+      "exact_name": "沟通记录模板2",
+      "type": "communication",
+      "code": "沟通记录模板2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A10-2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

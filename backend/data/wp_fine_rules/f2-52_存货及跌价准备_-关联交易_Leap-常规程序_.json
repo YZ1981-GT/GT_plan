@@ -1,0 +1,55 @@
+{
+  "wp_code": "F2-52",
+  "name": "存货及跌价准备 -关联交易（Leap-常规程序）",
+  "version": "2025-R1",
+  "cycle": "F",
+  "cycle_name": "F类",
+  "source_files": [
+    {
+      "file": "存货及跌价准备 -关联交易（Leap-常规程序）.xlsx",
+      "sheets": [
+        "GT_Custom",
+        "关联采购分析表F2-52",
+        "采购定价公允性测算（询价函）G2-10-1-删除",
+        "采购定价公允性测算（市场价）G2-10-2-删除",
+        "识别未披露的关联方G2-10-3-删除"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "关联采购分析表F2-52",
+      "type": "analysis",
+      "code": "F2-52"
+    },
+    {
+      "exact_name": "采购定价公允性测算（询价函）G2-10-1-删除",
+      "type": "calculation",
+      "code": "G2-10"
+    },
+    {
+      "exact_name": "采购定价公允性测算（市场价）G2-10-2-删除",
+      "type": "calculation",
+      "code": "G2-10"
+    },
+    {
+      "exact_name": "识别未披露的关联方G2-10-3-删除",
+      "type": "check",
+      "code": "G2-10"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "F2-52-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

@@ -1,0 +1,157 @@
+{
+  "wp_code": "A2-1",
+  "name": "A2-1、A2-2单体报表试算",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "A2-1、A2-2单体报表试算.xlsx",
+      "sheets": [
+        "temp_temp__",
+        "说明",
+        "参数",
+        "报表格式",
+        "试算",
+        "Sheet1",
+        "未审报表",
+        "期初核对",
+        "TB",
+        "TB(期初)",
+        "调整事项汇总表",
+        " ",
+        "CF调整",
+        "审定报表",
+        "CF主表核查",
+        "CF附表核查",
+        "未审BS分析",
+        "未审PL分析",
+        "未审比率分析",
+        "已审BS分析",
+        "已审PL分析",
+        "已审比率分析 "
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "temp_temp__",
+      "type": "check",
+      "code": "temp_temp__"
+    },
+    {
+      "exact_name": "说明",
+      "type": "check",
+      "code": "说明"
+    },
+    {
+      "exact_name": "参数",
+      "type": "check",
+      "code": "参数"
+    },
+    {
+      "exact_name": "报表格式",
+      "type": "check",
+      "code": "报表格式"
+    },
+    {
+      "exact_name": "试算",
+      "type": "summary",
+      "code": "试算"
+    },
+    {
+      "exact_name": "Sheet1",
+      "type": "check",
+      "code": "Sheet1"
+    },
+    {
+      "exact_name": "未审报表",
+      "type": "check",
+      "code": "未审报表"
+    },
+    {
+      "exact_name": "期初核对",
+      "type": "check",
+      "code": "期初核对"
+    },
+    {
+      "exact_name": "TB",
+      "type": "check",
+      "code": "TB"
+    },
+    {
+      "exact_name": "TB(期初)",
+      "type": "check",
+      "code": "TB(期初)"
+    },
+    {
+      "exact_name": "调整事项汇总表",
+      "type": "detail",
+      "code": "调整事项汇总表"
+    },
+    {
+      "exact_name": " ",
+      "type": "check",
+      "code": " "
+    },
+    {
+      "exact_name": "CF调整",
+      "type": "check",
+      "code": "CF调整"
+    },
+    {
+      "exact_name": "审定报表",
+      "type": "check",
+      "code": "审定报表"
+    },
+    {
+      "exact_name": "CF主表核查",
+      "type": "check",
+      "code": "CF主表核查"
+    },
+    {
+      "exact_name": "CF附表核查",
+      "type": "check",
+      "code": "CF附表核查"
+    },
+    {
+      "exact_name": "未审BS分析",
+      "type": "analysis",
+      "code": "未审BS分析"
+    },
+    {
+      "exact_name": "未审PL分析",
+      "type": "analysis",
+      "code": "未审PL分析"
+    },
+    {
+      "exact_name": "未审比率分析",
+      "type": "analysis",
+      "code": "未审比率分析"
+    },
+    {
+      "exact_name": "已审BS分析",
+      "type": "analysis",
+      "code": "已审BS分析"
+    },
+    {
+      "exact_name": "已审PL分析",
+      "type": "analysis",
+      "code": "已审PL分析"
+    },
+    {
+      "exact_name": "已审比率分析 ",
+      "type": "analysis",
+      "code": "已审比率分析 "
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A2-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

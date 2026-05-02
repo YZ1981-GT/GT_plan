@@ -1,0 +1,31 @@
+{
+  "wp_code": "B23-15",
+  "name": "了解信息处理控制",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "了解信息处理控制.xlsx",
+      "sheets": [
+        "B23-15 了解信息处理控制"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B23-15 了解信息处理控制",
+      "type": "control_test",
+      "code": "B23-15"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B23-15-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

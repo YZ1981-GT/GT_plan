@@ -1,0 +1,37 @@
+{
+  "wp_code": "B52",
+  "name": "舞弊 - 管理层凌驾于控制之上的风险",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "舞弊 - 管理层凌驾于控制之上的风险.xlsx",
+      "sheets": [
+        "B52 管理层凌驾"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B52 管理层凌驾",
+      "type": "check",
+      "code": "B52"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B52-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "B52-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "风险评估已完成"
+    }
+  ]
+}

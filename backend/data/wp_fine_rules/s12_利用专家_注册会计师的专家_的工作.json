@@ -1,0 +1,79 @@
+{
+  "wp_code": "S12",
+  "name": "利用专家（注册会计师的专家）的工作",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "利用专家（注册会计师的专家）的工作.xlsx",
+      "sheets": [
+        "S12 利用专家的工作程序表",
+        "S12-1 评价胜任能力、专业素质和客观性",
+        "S12-1-1 评价专家的客观性",
+        "S12-2 了解专家的专长领域",
+        "S12-3 评价专家工作的恰当性",
+        "S12-3-1 注册会计师的专家的报告",
+        "S12-3-2 利用专家评价管理层的工作的适当性",
+        "S12-3-3 利用专家评价管理层的工作(股份支付)",
+        "S12-3-4 利用专家评价管理层的工作(金融工具公允价值）"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S12 利用专家的工作程序表",
+      "type": "procedure",
+      "code": "S12"
+    },
+    {
+      "exact_name": "S12-1 评价胜任能力、专业素质和客观性",
+      "type": "check",
+      "code": "S12-1"
+    },
+    {
+      "exact_name": "S12-1-1 评价专家的客观性",
+      "type": "check",
+      "code": "S12-1"
+    },
+    {
+      "exact_name": "S12-2 了解专家的专长领域",
+      "type": "check",
+      "code": "S12-2"
+    },
+    {
+      "exact_name": "S12-3 评价专家工作的恰当性",
+      "type": "check",
+      "code": "S12-3"
+    },
+    {
+      "exact_name": "S12-3-1 注册会计师的专家的报告",
+      "type": "check",
+      "code": "S12-3"
+    },
+    {
+      "exact_name": "S12-3-2 利用专家评价管理层的工作的适当性",
+      "type": "check",
+      "code": "S12-3"
+    },
+    {
+      "exact_name": "S12-3-3 利用专家评价管理层的工作(股份支付)",
+      "type": "check",
+      "code": "S12-3"
+    },
+    {
+      "exact_name": "S12-3-4 利用专家评价管理层的工作(金融工具公允价值）",
+      "type": "check",
+      "code": "S12-3"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S12-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

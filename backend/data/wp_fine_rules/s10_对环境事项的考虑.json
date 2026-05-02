@@ -1,0 +1,61 @@
+{
+  "wp_code": "S10",
+  "name": "对环境事项的考虑",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "对环境事项的考虑.xlsx",
+      "sheets": [
+        "表头（请先填写）",
+        "对环境事项的考虑S10",
+        "审定表S10-1",
+        "附、内控调查表S10-2",
+        "说明",
+        "环境法规"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头（请先填写）",
+      "type": "check",
+      "code": "表头（请先填写）"
+    },
+    {
+      "exact_name": "对环境事项的考虑S10",
+      "type": "check",
+      "code": "S10"
+    },
+    {
+      "exact_name": "审定表S10-1",
+      "type": "summary",
+      "code": "S10-1"
+    },
+    {
+      "exact_name": "附、内控调查表S10-2",
+      "type": "check",
+      "code": "S10-2"
+    },
+    {
+      "exact_name": "说明",
+      "type": "check",
+      "code": "说明"
+    },
+    {
+      "exact_name": "环境法规",
+      "type": "check",
+      "code": "环境法规"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S10-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

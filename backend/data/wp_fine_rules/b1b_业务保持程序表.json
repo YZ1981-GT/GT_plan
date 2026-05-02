@@ -1,0 +1,31 @@
+{
+  "wp_code": "B1B",
+  "name": "业务保持程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "业务保持程序表.xlsx",
+      "sheets": [
+        "B1B业务保持"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B1B业务保持",
+      "type": "check",
+      "code": "B1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B1B-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

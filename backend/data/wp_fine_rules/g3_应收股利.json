@@ -1,0 +1,74 @@
+{
+  "wp_code": "G3",
+  "name": "应收股利",
+  "version": "2025-R1",
+  "cycle": "G",
+  "cycle_name": "G类",
+  "source_files": [
+    {
+      "file": "应收股利.xlsx",
+      "sheets": [
+        "底稿目录",
+        "应收股利实质性程序表G3A",
+        "审定表G3-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G3-2",
+        "调整分录汇总G3-3",
+        "测算及检查表G3-4",
+        "长期未收回款项检查表G3-5"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "应收股利实质性程序表G3A",
+      "type": "procedure",
+      "code": "G3"
+    },
+    {
+      "exact_name": "审定表G3-1",
+      "type": "summary",
+      "code": "G3-1"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（上市公司）"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure",
+      "code": "附注披露信息（国企）"
+    },
+    {
+      "exact_name": "明细表G3-2",
+      "type": "detail",
+      "code": "G3-2"
+    },
+    {
+      "exact_name": "调整分录汇总G3-3",
+      "type": "detail",
+      "code": "G3-3"
+    },
+    {
+      "exact_name": "测算及检查表G3-4",
+      "type": "check",
+      "code": "G3-4"
+    },
+    {
+      "exact_name": "长期未收回款项检查表G3-5",
+      "type": "check",
+      "code": "G3-5"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "G3-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

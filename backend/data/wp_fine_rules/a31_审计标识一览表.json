@@ -1,0 +1,31 @@
+{
+  "wp_code": "A31",
+  "name": "审计标识一览表",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "审计标识一览表.xlsx",
+      "sheets": [
+        "审计标识A31"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "审计标识A31",
+      "type": "check",
+      "code": "A31"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A31-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

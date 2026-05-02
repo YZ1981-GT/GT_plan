@@ -1,0 +1,31 @@
+{
+  "wp_code": "B2",
+  "name": "与前任注册会计师的沟通程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "与前任注册会计师的沟通程序表.xlsx",
+      "sheets": [
+        "B2 与前任注册会计师的沟通"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B2 与前任注册会计师的沟通",
+      "type": "communication",
+      "code": "B2"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

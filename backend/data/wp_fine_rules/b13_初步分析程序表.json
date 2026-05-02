@@ -1,0 +1,31 @@
+{
+  "wp_code": "B13",
+  "name": "初步分析程序表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "初步分析程序表.xlsx",
+      "sheets": [
+        "B13 初步分析程序表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B13 初步分析程序表",
+      "type": "procedure",
+      "code": "B13"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B13-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

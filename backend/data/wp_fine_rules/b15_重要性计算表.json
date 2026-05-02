@@ -1,0 +1,49 @@
+{
+  "wp_code": "B15",
+  "name": "重要性计算表",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "重要性计算表.xlsx",
+      "sheets": [
+        "准则及应用指南的相关规定",
+        "填表说明",
+        "B15 重要性计算表"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "准则及应用指南的相关规定",
+      "type": "check",
+      "code": "准则及应用指南的相关规定"
+    },
+    {
+      "exact_name": "填表说明",
+      "type": "check",
+      "code": "填表说明"
+    },
+    {
+      "exact_name": "B15 重要性计算表",
+      "type": "check",
+      "code": "B15"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B15-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "B15-CHK-02",
+      "type": "calculation",
+      "severity": "blocking",
+      "description": "重要性水平计算正确"
+    }
+  ]
+}

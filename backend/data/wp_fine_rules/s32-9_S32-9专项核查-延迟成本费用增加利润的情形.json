@@ -1,0 +1,55 @@
+{
+  "wp_code": "S32-9",
+  "name": "S32-9专项核查-延迟成本费用增加利润的情形",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S32-9专项核查-延迟成本费用增加利润的情形.xlsx",
+      "sheets": [
+        "S32-9程序表",
+        "IC9-0导引表",
+        "GT_Custom",
+        "提示",
+        "延迟成本费用增加利润披露格式参考IC9-X"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S32-9程序表",
+      "type": "procedure",
+      "code": "S32-9"
+    },
+    {
+      "exact_name": "IC9-0导引表",
+      "type": "check",
+      "code": "C9-0"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "提示",
+      "type": "check",
+      "code": "提示"
+    },
+    {
+      "exact_name": "延迟成本费用增加利润披露格式参考IC9-X",
+      "type": "check",
+      "code": "C9-"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S32-9-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

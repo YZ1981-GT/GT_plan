@@ -1,0 +1,86 @@
+{
+  "wp_code": "K0",
+  "name": "管理循环函证",
+  "version": "2025-R1",
+  "cycle": "K",
+  "cycle_name": "K类",
+  "source_files": [
+    {
+      "file": "管理循环函证.xlsx",
+      "sheets": [
+        "底稿目录",
+        "函证程序表K0A",
+        "函证结果汇总表K0-1",
+        "核实被函证单位信息K0-2",
+        "跟函函证过程控制K0-3",
+        "函证差异调节表K0-4",
+        "其他应收款替代程序K0-5",
+        "其他应付款替代程序K0-6",
+        "邮件传真回函可靠性验证K0-7",
+        "函证程序舞弊风险评价表K0-8",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "函证程序表K0A",
+      "type": "procedure",
+      "code": "K0"
+    },
+    {
+      "exact_name": "函证结果汇总表K0-1",
+      "type": "detail",
+      "code": "K0-1"
+    },
+    {
+      "exact_name": "核实被函证单位信息K0-2",
+      "type": "confirmation_detail",
+      "code": "K0-2"
+    },
+    {
+      "exact_name": "跟函函证过程控制K0-3",
+      "type": "confirmation_detail",
+      "code": "K0-3"
+    },
+    {
+      "exact_name": "函证差异调节表K0-4",
+      "type": "confirmation_detail",
+      "code": "K0-4"
+    },
+    {
+      "exact_name": "其他应收款替代程序K0-5",
+      "type": "check",
+      "code": "K0-5"
+    },
+    {
+      "exact_name": "其他应付款替代程序K0-6",
+      "type": "check",
+      "code": "K0-6"
+    },
+    {
+      "exact_name": "邮件传真回函可靠性验证K0-7",
+      "type": "check",
+      "code": "K0-7"
+    },
+    {
+      "exact_name": "函证程序舞弊风险评价表K0-8",
+      "type": "confirmation_detail",
+      "code": "K0-8"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "K0-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

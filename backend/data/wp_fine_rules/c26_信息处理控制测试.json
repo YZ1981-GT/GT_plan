@@ -1,0 +1,37 @@
+{
+  "wp_code": "C26",
+  "name": "信息处理控制测试",
+  "version": "2025-R1",
+  "cycle": "C",
+  "cycle_name": "控制测试",
+  "source_files": [
+    {
+      "file": "信息处理控制测试.xlsx",
+      "sheets": [
+        "C26 信息处理控制测试"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "C26 信息处理控制测试",
+      "type": "calculation",
+      "code": "C26"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "C26-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "C26-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "控制测试结论已记录"
+    }
+  ]
+}

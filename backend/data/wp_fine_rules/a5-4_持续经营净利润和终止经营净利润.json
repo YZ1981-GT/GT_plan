@@ -1,0 +1,67 @@
+{
+  "wp_code": "A5-4",
+  "name": "持续经营净利润和终止经营净利润",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "持续经营净利润和终止经营净利润.xlsx",
+      "sheets": [
+        "表头",
+        "审定表A5-4",
+        "附注披露信息（上市公司）A5-4-1",
+        "附注披露信息（国企）A5-4-1",
+        "明细分析表A5-4-2",
+        "检查表A5-4-3"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "表头",
+      "type": "check",
+      "code": "表头"
+    },
+    {
+      "exact_name": "审定表A5-4",
+      "type": "summary",
+      "code": "A5-4"
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）A5-4-1",
+      "type": "note_disclosure",
+      "code": "A5-4"
+    },
+    {
+      "exact_name": "附注披露信息（国企）A5-4-1",
+      "type": "note_disclosure",
+      "code": "A5-4"
+    },
+    {
+      "exact_name": "明细分析表A5-4-2",
+      "type": "detail",
+      "code": "A5-4"
+    },
+    {
+      "exact_name": "检查表A5-4-3",
+      "type": "check",
+      "code": "A5-4"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A5-4-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "A5-4-CHK-02",
+      "type": "check",
+      "severity": "blocking",
+      "description": "持续经营假设已评估"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "wp_code": "A24-1",
+  "name": " 项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": " 项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx",
+      "sheets": [
+        "底稿目录",
+        "项目质量复核合伙人复核表（独立复核）A24-1-1",
+        "项目质量复核合伙人复核记录A24-1-1-1"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "项目质量复核合伙人复核表（独立复核）A24-1-1",
+      "type": "check",
+      "code": "A24-1"
+    },
+    {
+      "exact_name": "项目质量复核合伙人复核记录A24-1-1-1",
+      "type": "check",
+      "code": "A24-1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A24-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "A24-1-CHK-02",
+      "type": "check",
+      "severity": "blocking",
+      "description": "复核意见已签署"
+    }
+  ]
+}

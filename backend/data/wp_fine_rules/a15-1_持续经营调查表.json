@@ -1,0 +1,43 @@
+{
+  "wp_code": "A15-1",
+  "name": "持续经营调查表",
+  "version": "2025-R1",
+  "cycle": "A",
+  "cycle_name": "完成阶段",
+  "source_files": [
+    {
+      "file": "持续经营调查表.xlsx",
+      "sheets": [
+        "GT_Custom",
+        "持续经营调查问卷A15-1"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "持续经营调查问卷A15-1",
+      "type": "check",
+      "code": "A15-1"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "A15-1-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "A15-1-CHK-02",
+      "type": "check",
+      "severity": "blocking",
+      "description": "持续经营假设已评估"
+    }
+  ]
+}

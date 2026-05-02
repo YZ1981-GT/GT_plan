@@ -1,0 +1,31 @@
+{
+  "wp_code": "D4-5",
+  "name": "营业收入-会计政策（Leap-常规程序）",
+  "version": "2025-R1",
+  "cycle": "D",
+  "cycle_name": "D类",
+  "source_files": [
+    {
+      "file": "营业收入-会计政策（Leap-常规程序）.xlsx",
+      "sheets": [
+        "营业收入会计政策检查D4-5"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "营业收入会计政策检查D4-5",
+      "type": "check",
+      "code": "D4-5"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "D4-5-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

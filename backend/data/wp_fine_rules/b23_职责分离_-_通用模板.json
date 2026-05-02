@@ -1,0 +1,61 @@
+{
+  "wp_code": "B23",
+  "name": "职责分离 - 通用模板",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "职责分离 - 通用模板.xlsx",
+      "sheets": [
+        "模板 - 职责分离分析表",
+        "模板 - 职责分离控制测试",
+        "指引及示例 - 职责分离分析",
+        "示例 - 职责分离控制测试",
+        "指引 - 职责分离矩阵",
+        "Data"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "模板 - 职责分离分析表",
+      "type": "analysis",
+      "code": "模板 - 职责分离分析表"
+    },
+    {
+      "exact_name": "模板 - 职责分离控制测试",
+      "type": "calculation",
+      "code": "模板 - 职责分离控制测试"
+    },
+    {
+      "exact_name": "指引及示例 - 职责分离分析",
+      "type": "analysis",
+      "code": "指引及示例 - 职责分离分析"
+    },
+    {
+      "exact_name": "示例 - 职责分离控制测试",
+      "type": "calculation",
+      "code": "示例 - 职责分离控制测试"
+    },
+    {
+      "exact_name": "指引 - 职责分离矩阵",
+      "type": "check",
+      "code": "指引 - 职责分离矩阵"
+    },
+    {
+      "exact_name": "Data",
+      "type": "check",
+      "code": "Data"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B23-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}

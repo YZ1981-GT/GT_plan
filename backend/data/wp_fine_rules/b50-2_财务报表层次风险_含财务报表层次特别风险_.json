@@ -1,0 +1,43 @@
+{
+  "wp_code": "B50-2",
+  "name": "财务报表层次风险（含财务报表层次特别风险）",
+  "version": "2025-R1",
+  "cycle": "B",
+  "cycle_name": "风险评估",
+  "source_files": [
+    {
+      "file": "财务报表层次风险（含财务报表层次特别风险）.xlsx",
+      "sheets": [
+        "B50-2 财务报表层次风险",
+        "相关资源"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "B50-2 财务报表层次风险",
+      "type": "risk_assessment",
+      "code": "B50-2"
+    },
+    {
+      "exact_name": "相关资源",
+      "type": "check",
+      "code": "相关资源"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "B50-2-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    },
+    {
+      "code": "B50-2-CHK-02",
+      "type": "check",
+      "severity": "warning",
+      "description": "风险评估已完成"
+    }
+  ]
+}

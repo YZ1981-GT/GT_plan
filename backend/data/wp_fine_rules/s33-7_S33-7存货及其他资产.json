@@ -1,0 +1,43 @@
+{
+  "wp_code": "S33-7",
+  "name": "S33-7存货及其他资产",
+  "version": "2025-R1",
+  "cycle": "S",
+  "cycle_name": "特定项目",
+  "source_files": [
+    {
+      "file": "S33-7存货及其他资产.xlsx",
+      "sheets": [
+        "S33-7程序表",
+        "GT_Custom",
+        "提示"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "S33-7程序表",
+      "type": "procedure",
+      "code": "S33-7"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    },
+    {
+      "exact_name": "提示",
+      "type": "check",
+      "code": "提示"
+    }
+  ],
+  "cross_references": [],
+  "audit_checks": [
+    {
+      "code": "S33-7-CHK-01",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "底稿已填写完整（关键Sheet有数据）"
+    }
+  ]
+}
