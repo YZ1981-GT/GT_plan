@@ -34,6 +34,7 @@ inclusion: always
 - 报表模板严格对照偏好（2026-04-30）：报表行次必须严格参照审计报告模板目录下的Excel模板sheet页签，国企版和上市版的合并和单体都要一一对应，不能自己编造行次
 - 功能收敛偏好（2026-04-26）：停止加新功能，空壳页面（<100行）从导航中移除或标记"开发中"灰色不可点击；审计员只需6-8个核心页面做到极致，不需要60个页面；按角色裁剪导航（审计员只看查账/调整/底稿/附注，项目经理多看看板/委派，合伙人多看总览/签字）
 - 空状态页面偏好：无数据时不要左右分栏各自显示空状态引导，合并为一个全宽简洁空状态（图标+一句话+一个按钮），不要啰嗦的步骤说明
+- 项目子页面返回偏好：报表/底稿/附注等项目子页面的"返回"按钮应跳转到项目列表页（/projects），不是首页（/），让用户看到当前项目的详情面板
 - 底稿管理空状态偏好：两栏flex:1平均分配——左栏操作入口（前往底稿工作台），右栏简洁列表总览（流程横条+13个循环每行一个徽标/名称/底稿数/›箭头，点击跳转到程序裁剪页查看详情），不要用折叠面板太重
 
 ## 项目上下文
@@ -379,6 +380,7 @@ inclusion: always
 - 前端动态导航已实现（2026-04-26）：ThreeColumnLayout.vue的navItems从硬编码改为computed，优先从roleContextStore.navItems获取（后端按角色动态返回），降级用硬编码；图标字符串→组件映射（_ICON_MAP）
 - ONLYOFFICE编辑器URL后端统一生成（2026-04-26）：get_online_edit_session返回新增editor_url字段（完整的{onlyoffice_url}/hosting/wopi/cell?WOPISrc=...），前端WorkpaperEditor优先使用session.editor_url降级用getWopiEditorUrl；checkOnlineEditingAvailability增强为同时检查后端/wopi/health和ONLYOFFICE /healthcheck
 - ONLYOFFICE集成方式从WOPI hosting改为Document Server API（2026-05-01）：WOPI hosting模式（/hosting/wopi/cell/edit?WOPISrc=...）在8.2版本静态资源全部404，改为动态加载api.js+new DocsAPI.DocEditor()初始化；document.url用WOPI GetFile端点（/wopi/files/{id}/contents?access_token=...），callbackUrl同路径；JWT已禁用（开发阶段）
+- ONLYOFFICE待完善（2026-05-02复盘）：①callbackUrl格式需适配Document Server API的callback协议（当前指向WOPI put_file格式不匹配）②知识库文件夹创建需支持"已存在则返回已有ID"（当前重复创建报错降级到父ID不精确）③知识库大文件夹上传可加3-5并发提速（当前逐个串行）
 - Paperless联调代码补齐（2026-04-26）：attachments.py新增GET /api/attachments/paperless-health（检查Paperless API可达性）+POST /api/attachments/{id}/retry-ocr（重置OCR状态为pending+创建任务中心任务）
 - 备份恢复验证脚本（2026-04-26）：新增backend/scripts/verify_backup.py（检查manifest.json完整性+数据库备份文件可读+抽样20个文件哈希比对+底稿文件计数+输出verification_report.json）
 - 仅剩3项需部署后验证（非代码问题）：①Paperless实机联调（上传→OCR→预览→下载）②归档恢复演练（backup.py→verify_backup.py→抽样核对）③ONLYOFFICE联调（编辑器打开→编辑→保存→版本递增）
