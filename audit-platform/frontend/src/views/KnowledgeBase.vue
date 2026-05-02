@@ -259,7 +259,7 @@ import http from '@/utils/http'
 const router = useRouter()
 
 function goHome() {
-  router.push('/')
+  router.push('/projects')
 }
 
 const folderTree = ref<any[]>([])

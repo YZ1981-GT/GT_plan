@@ -3,6 +3,7 @@
     <!-- 页面横幅 -->
     <div class="gt-adj-banner">
       <div class="gt-adj-banner-row1">
+        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
         <h2 class="gt-adj-title">调整分录</h2>
         <div class="gt-adj-info-bar">
           <div class="gt-adj-info-item">

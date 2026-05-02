@@ -3,6 +3,7 @@
     <!-- 页面横幅 -->
     <div class="gt-cfs-banner">
       <div class="gt-cfs-banner-row1">
+        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
         <h2 class="gt-cfs-title">现金流量表工作底稿</h2>
         <div class="gt-cfs-info-bar">
           <div class="gt-cfs-info-item">
@@ -159,7 +160,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   generateCFSWorksheet, getCFSWorksheet, getCFSReconciliation,
@@ -170,6 +171,7 @@ import {
 import { useProjectSelector } from '@/composables/useProjectSelector'
 
 const route = useRoute()
+const router = useRouter()
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
 
 const {

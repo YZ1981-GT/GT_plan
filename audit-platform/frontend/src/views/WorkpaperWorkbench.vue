@@ -3,8 +3,11 @@
     <!-- 页面横幅 -->
     <div class="gt-wpb-banner">
       <div class="gt-wpb-banner-text">
-        <h2>底稿工作台</h2>
-        <p>{{ mappings.length }} 个底稿映射，覆盖试算表与附注</p>
+        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
+        <div>
+          <h2>底稿工作台</h2>
+          <p>{{ mappings.length }} 个底稿映射，覆盖试算表与附注</p>
+        </div>
       </div>
       <div class="gt-wpb-banner-actions">
         <el-button size="small" @click="refreshAll" :loading="loading" round>刷新</el-button>

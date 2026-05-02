@@ -3,6 +3,7 @@
     <!-- 横幅 -->
     <div class="gt-de-banner">
       <div class="gt-de-banner-row1">
+        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
         <h2 class="gt-de-title">附注编辑</h2>
         <div class="gt-de-info-bar">
           <div class="gt-de-info-item">
