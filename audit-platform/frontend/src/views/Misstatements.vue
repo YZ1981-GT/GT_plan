@@ -82,6 +82,15 @@
     </div>
 
     <!-- 错报列表 -->
+    <el-alert
+      v-if="!loading && items.length === 0"
+      type="info" show-icon :closable="false" style="margin-bottom: 12px"
+    >
+      <template #title>暂无未更正错报</template>
+      <div style="font-size: 12px; line-height: 1.6">
+        点击"新增"手动录入，或在调整分录页面驳回 AJE 时自动生成。累计金额超过重要性水平时系统会预警。
+      </div>
+    </el-alert>
     <el-table :data="items" v-loading="loading" border stripe style="width: 100%">
       <el-table-column prop="misstatement_description" label="错报描述" min-width="200" show-overflow-tooltip />
       <el-table-column label="类型" width="100">

@@ -3,6 +3,7 @@
     <!-- 横幅 -->
     <div class="gt-page-banner gt-page-banner--purple">
       <div class="gt-page-banner__content">
+        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="$router.push('/projects')">← 返回</el-button>
         <h2 class="gt-page-banner__title">合并报表</h2>
         <p class="gt-page-banner__desc">集团架构 · 差额表 · 穿透查询 · 合并报表 · 合并附注</p>
       </div>

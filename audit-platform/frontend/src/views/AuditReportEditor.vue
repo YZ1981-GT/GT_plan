@@ -3,6 +3,7 @@
     <div class="gt-ar-header">
       <div class="gt-ar-banner">
         <div class="gt-ar-banner-text">
+          <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="$router.push('/projects')">← 返回</el-button>
           <h2>审计报告</h2>
           <p v-if="report">{{ opinionLabel(report.opinion_type) }} · {{ report.company_type === 'listed' ? '上市公司' : '非上市' }} · {{ statusLabel(report.status) }}</p>
           <p v-else>选择意见类型生成报告</p>

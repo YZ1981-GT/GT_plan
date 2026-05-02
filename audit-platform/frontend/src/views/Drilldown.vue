@@ -1,6 +1,9 @@
 <template>
   <div class="gt-drilldown gt-fade-in">
-    <!-- 面包屑导航 -->
+    <!-- 返回 + 面包屑导航 -->
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <el-button text size="small" @click="$router.push('/projects')">← 返回</el-button>
+    </div>
     <el-breadcrumb separator=">" class="gt-drilldown-breadcrumb">
       <el-breadcrumb-item
         v-for="(crumb, idx) in store.breadcrumbs"

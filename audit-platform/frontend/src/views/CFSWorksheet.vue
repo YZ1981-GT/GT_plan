@@ -38,6 +38,13 @@
       show-icon style="margin-bottom: 12px" />
 
     <!-- 工作底稿表格 -->
+    <el-alert
+      v-if="!loading && worksheetRows.length === 0"
+      type="info" show-icon :closable="false" style="margin-bottom: 12px"
+    >
+      <template #title>工作底稿暂无数据</template>
+      <div style="font-size: 12px; line-height: 1.6">请先点击"生成工作底稿"按钮，系统将从试算表自动生成现金流量表工作底稿。</div>
+    </el-alert>
     <h3 class="gt-section-title">工作底稿</h3>
     <el-table :data="worksheetRows" v-loading="loading" border stripe size="small" style="width: 100%; margin-bottom: 20px">
       <el-table-column prop="account_code" label="科目编码" width="110" />
