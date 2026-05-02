@@ -1882,3 +1882,6 @@ inclusion: always
 - 前端直接http调用现状（2026-05-02）：8个Vue文件仍有直接http调用（LedgerPenetration 19个/KnowledgeBase 13个有正当理由保留，ReportConfigEditor 4个/AuditCheckDashboard 2个待迁移到commonApi）
 - 前端可用性扫描完成（2026-05-02）：91个Vue页面扫描，核心8个审计员页面全部有返回按钮+空状态引导+loading；新增返回按钮4个（Drilldown/AuditReportEditor/ConsolidationIndex/WorkpaperList）+空数据引导2个（CFSWorksheet/Misstatements）；剩余46个问题集中在合并子页面(developing)+管理看板(导航进入不需返回)，3个待下轮修复（WorkpaperSummary缺loading/Drilldown缺error-handling/WorkpaperEditor缺empty-state）
 - 前端可用性扫描剩余3项已修复（2026-05-02）：WorkpaperSummary加v-loading、Drilldown加try/catch+空数据el-alert、WorkpaperEditor加loading spinner；核心审计员页面可用性问题全部清零
+- ONLYOFFICE容器恢复（2026-05-02）：旧volume损坏（local.json被PowerShell双引号转义破坏导致内置PG配置丢失），修复方式=删除volume+docker compose重建全新容器；首次启动需3分钟（内置PG初始化）；JWT通过docker-compose环境变量JWT_ENABLED=false禁用（不要手动改local.json，会覆盖默认sql配置导致crash）
+- ONLYOFFICE local.json注意事项：不要手动修改local.json的sql部分（会覆盖内置PG默认配置），JWT/WOPI配置通过docker-compose环境变量控制；当前JWT secret=zJe2F5sLtZTmxHDmHVhhcP30cWP376Bi（fresh volume自动生成）
+- WorkpaperEditor前端修复（2026-05-02）：清理死代码callbackUrl变量+统一wopiBaseUrl常量+双重nextTick确保DOM渲染；WOPI链路全部验证通过（CheckFileInfo/GetFile/DSCallback均200）
