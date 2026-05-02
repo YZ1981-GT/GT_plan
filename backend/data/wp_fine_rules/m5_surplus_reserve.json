@@ -129,6 +129,18 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "M5-CHK-06",
+      "type": "formula",
+      "severity": "warning",
+      "description": "法定盈余公积 = 净利润×10%（未达注册资本50%前）"
+    },
+    {
+      "code": "M5-CHK-07",
+      "type": "check",
+      "severity": "info",
+      "description": "任意盈余公积提取有股东会决议"
     }
   ]
 }

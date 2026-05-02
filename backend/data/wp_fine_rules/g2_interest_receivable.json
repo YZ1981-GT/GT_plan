@@ -122,6 +122,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "G2-CHK-05",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "应收利息测算正确（本金×利率×天数）"
+    },
+    {
+      "code": "G2-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "长期未收回利息已检查可收回性"
+    },
+    {
+      "code": "G2-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "坏账准备计提合理"
     }
   ]
 }

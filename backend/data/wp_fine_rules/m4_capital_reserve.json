@@ -123,6 +123,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "M4-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "资本溢价计算正确"
+    },
+    {
+      "code": "M4-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "其他资本公积变动已检查（股份支付/权益法等）"
+    },
+    {
+      "code": "M4-CHK-08",
+      "type": "movement",
+      "severity": "info",
+      "description": "本期增减变动有充分依据"
     }
   ]
 }

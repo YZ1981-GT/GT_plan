@@ -141,6 +141,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "I4-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "摊销方法和年限合理"
+    },
+    {
+      "code": "I4-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "摊销测算正确"
+    },
+    {
+      "code": "I4-CHK-08",
+      "type": "check",
+      "severity": "info",
+      "description": "新增长期待摊费用已检查（合同/发票）"
     }
   ]
 }

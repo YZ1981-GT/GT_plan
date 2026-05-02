@@ -214,6 +214,36 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "H3-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "计量模式判断正确（成本/公允价值）"
+    },
+    {
+      "code": "H3-CHK-07",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值模式下公允价值变动测算正确"
+    },
+    {
+      "code": "H3-CHK-08",
+      "type": "check",
+      "severity": "warning",
+      "description": "转换日判断合理（自用↔投资性）"
+    },
+    {
+      "code": "H3-CHK-09",
+      "type": "calculation",
+      "severity": "info",
+      "description": "成本模式下折旧/摊销测算正确"
+    },
+    {
+      "code": "H3-CHK-10",
+      "type": "check",
+      "severity": "info",
+      "description": "租赁合同已检查"
     }
   ]
 }

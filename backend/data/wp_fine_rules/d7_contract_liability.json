@@ -128,6 +128,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "D7-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "合同负债与履约义务匹配"
+    },
+    {
+      "code": "D7-CHK-06",
+      "type": "movement",
+      "severity": "warning",
+      "description": "期初合同负债本期确认收入金额合理"
+    },
+    {
+      "code": "D7-CHK-07",
+      "type": "check",
+      "severity": "info",
+      "description": "重大融资成分已评估"
     }
   ]
 }

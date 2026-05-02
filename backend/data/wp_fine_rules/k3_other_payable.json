@@ -141,6 +141,30 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K3-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "大额其他应付款已分析（K3-4）"
+    },
+    {
+      "code": "K3-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "长期挂账已检查（K3-5）"
+    },
+    {
+      "code": "K3-CHK-08",
+      "type": "check",
+      "severity": "info",
+      "description": "关联方其他应付款已检查（K3-6）"
+    },
+    {
+      "code": "K3-CHK-09",
+      "type": "confirmation",
+      "severity": "warning",
+      "description": "函证结果与明细表一致"
     }
   ]
 }

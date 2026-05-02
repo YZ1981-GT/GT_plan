@@ -98,6 +98,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "D5-CHK-05",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "公允价值计量正确（市场报价/估值模型）"
+    },
+    {
+      "code": "D5-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "终止确认条件已检查（贴现/背书/保理）"
+    },
+    {
+      "code": "D5-CHK-07",
+      "type": "check",
+      "severity": "info",
+      "description": "信用风险显著增加判断已评估"
     }
   ]
 }

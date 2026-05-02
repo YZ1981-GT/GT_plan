@@ -176,6 +176,36 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "I2-CHK-05",
+      "type": "check",
+      "severity": "blocking",
+      "description": "资本化时点判断正确（5个条件全部满足，I2-6）"
+    },
+    {
+      "code": "I2-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "研发项目构成明细已核实（I2-7）"
+    },
+    {
+      "code": "I2-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "研发人员认定和工时已检查（I2-9/I2-10）"
+    },
+    {
+      "code": "I2-CHK-08",
+      "type": "cutoff",
+      "severity": "warning",
+      "description": "截止测试已执行（I2-13/I2-14）"
+    },
+    {
+      "code": "I2-CHK-09",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "减值测试已执行（I2-15/I2-16）"
     }
   ]
 }
