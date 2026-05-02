@@ -50,14 +50,17 @@ async def get_active_filter(
     )
 
     # 四表已有 dataset_id 列，优先用 active dataset 过滤
-    active_id = await DatasetService.get_active_dataset_id(db, project_id, year)
-    if active_id and hasattr(table.c, 'dataset_id'):
-        return sa.and_(
-            table.c.project_id == project_id,
-            table.c.year == year,
-            table.c.dataset_id == active_id,
-            table.c.is_deleted == sa.false(),
-        )
+    try:
+        active_id = await DatasetService.get_active_dataset_id(db, project_id, year)
+        if active_id and hasattr(table.c, 'dataset_id'):
+            return sa.and_(
+                table.c.project_id == project_id,
+                table.c.year == year,
+                table.c.dataset_id == active_id,
+                table.c.is_deleted == sa.false(),
+            )
+    except Exception:
+        pass  # ledger_datasets 表可能不存在，降级到 is_deleted 过滤
 
     return base_filter
 

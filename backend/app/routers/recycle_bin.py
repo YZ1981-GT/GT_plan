@@ -80,36 +80,47 @@ async def list_recycle_bin(
         if not hasattr(model, "is_deleted"):
             continue
 
-        # 计数
-        count_q = select(func.count()).select_from(model).where(model.is_deleted == True)  # noqa: E712
-        count_result = await db.execute(count_q)
-        tbl_count = count_result.scalar() or 0
-        total += tbl_count
+        try:
+            # 计数
+            count_q = select(func.count()).select_from(model).where(model.is_deleted == True)  # noqa: E712
+            count_result = await db.execute(count_q)
+            tbl_count = count_result.scalar() or 0
+            total += tbl_count
 
-        if tbl_count == 0:
+            if tbl_count == 0:
+                continue
+
+            # 查询记录 — 优先按 deleted_at 排序，无该列则按 id 排序
+            try:
+                order_col = model.deleted_at.desc()
+            except AttributeError:
+                order_col = model.id.desc()
+
+            q = (
+                select(model)
+                .where(model.is_deleted == True)  # noqa: E712
+                .order_by(order_col)
+                .limit(page_size)
+            )
+            result = await db.execute(q)
+            rows = result.scalars().all()
+
+            for row in rows:
+                name_val = getattr(row, name_field, None) if hasattr(row, name_field) else str(row.id)
+                deleted_at = getattr(row, "deleted_at", None) or getattr(row, "updated_at", None)
+                items.append({
+                    "id": str(row.id),
+                    "type": tbl_key,
+                    "type_label": label,
+                    "name": str(name_val) if name_val else str(row.id)[:8],
+                    "deleted_at": deleted_at.isoformat() if deleted_at else None,
+                    "project_id": str(getattr(row, "project_id", "")) if hasattr(row, "project_id") else None,
+                })
+        except Exception as e:
+            # 单个表查询失败不阻断其他表
+            import logging
+            logging.getLogger(__name__).warning(f"回收站查询 {tbl_key} 失败: {e}")
             continue
-
-        # 查询记录
-        q = (
-            select(model)
-            .where(model.is_deleted == True)  # noqa: E712
-            .order_by(model.deleted_at.desc() if hasattr(model, "deleted_at") else model.id.desc())
-            .limit(page_size)
-        )
-        result = await db.execute(q)
-        rows = result.scalars().all()
-
-        for row in rows:
-            name_val = getattr(row, name_field, None) if hasattr(row, name_field) else str(row.id)
-            deleted_at = getattr(row, "deleted_at", None) or getattr(row, "updated_at", None)
-            items.append({
-                "id": str(row.id),
-                "type": tbl_key,
-                "type_label": label,
-                "name": str(name_val) if name_val else str(row.id)[:8],
-                "deleted_at": deleted_at.isoformat() if deleted_at else None,
-                "project_id": str(getattr(row, "project_id", "")) if hasattr(row, "project_id") else None,
-            })
 
     # 按删除时间排序
     items.sort(key=lambda x: x.get("deleted_at") or "", reverse=True)
