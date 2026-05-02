@@ -24,6 +24,21 @@
               </el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(project.created_at) }}</el-descriptions-item>
             </el-descriptions>
+
+            <!-- 配置缺失提示 -->
+            <el-alert
+              v-if="!project.template_type"
+              type="warning"
+              show-icon
+              :closable="false"
+              style="margin-top: 10px"
+            >
+              <template #title>请设置报表模板类型</template>
+              <div style="font-size: 12px; line-height: 1.6">
+                当前项目未设置模板类型（国企版/上市版），报表和附注生成将使用默认配置。
+                <el-button type="primary" text size="small" @click="editProject">前往设置 →</el-button>
+              </div>
+            </el-alert>
           </div>
 
           <!-- 快捷入口 -->
