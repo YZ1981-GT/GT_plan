@@ -97,7 +97,7 @@ class PartnerOverviewService:
 
             # 项目创建超过120天还没完成
             if proj.created_at:
-                age = (datetime.now(timezone.utc) - proj.created_at.replace(tzinfo=timezone.utc)).days
+                age = (datetime.utcnow() - proj.created_at.replace(tzinfo=timezone.utc)).days
                 if age > 120 and proj.status not in ("archived", "reporting"):
                     risk_level = "medium" if risk_level == "low" else risk_level
                     risk_reasons.append(f"项目已进行 {age} 天")

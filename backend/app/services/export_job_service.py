@@ -116,7 +116,7 @@ class ExportJobService:
             ExportJobStatus.succeeded.value,
             ExportJobStatus.failed.value,
         ):
-            item.finished_at = datetime.now(timezone.utc)
+            item.finished_at = datetime.utcnow()
         await self.db.flush()
         return item
 

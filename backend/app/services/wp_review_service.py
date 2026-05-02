@@ -95,8 +95,8 @@ class WpReviewService:
         record.status = ReviewCommentStatus.replied
         record.reply_text = reply_text
         record.replier_id = replier_id
-        record.replied_at = datetime.now(timezone.utc)
-        record.updated_at = datetime.now(timezone.utc)
+        record.replied_at = datetime.utcnow()
+        record.updated_at = datetime.utcnow()
         await db.flush()
         return self._to_dict(record)
 
@@ -122,8 +122,8 @@ class WpReviewService:
 
         record.status = ReviewCommentStatus.resolved
         record.resolved_by = resolved_by
-        record.resolved_at = datetime.now(timezone.utc)
-        record.updated_at = datetime.now(timezone.utc)
+        record.resolved_at = datetime.utcnow()
+        record.updated_at = datetime.utcnow()
         await db.flush()
         return self._to_dict(record)
 

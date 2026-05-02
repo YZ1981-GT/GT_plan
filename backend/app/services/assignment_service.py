@@ -64,7 +64,7 @@ class AssignmentService:
         assigned_by: UUID | None = None,
     ) -> list[ProjectAssignment]:
         """批量保存委派（先软删除旧的，再插入新的）"""
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # 软删除现有委派
         await self.db.execute(

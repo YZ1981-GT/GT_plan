@@ -109,7 +109,7 @@ class ExportTaskService:
 
         task.status = WordExportStatus.confirmed.value
         task.confirmed_by = user_id
-        task.confirmed_at = datetime.now(timezone.utc)
+        task.confirmed_at = datetime.utcnow()
         await self.db.flush()
         logger.info("导出任务已确认: task_id=%s, confirmed_by=%s", task_id, user_id)
         return task

@@ -429,7 +429,7 @@ class PreparationDateRule(QCRule):
             # 如果底稿创建超过90天还在draft状态，提示
             from datetime import timedelta
             if wp.status == WpFileStatus.draft:
-                age = (datetime.now(timezone.utc) - wp.created_at.replace(tzinfo=timezone.utc)).days
+                age = (datetime.utcnow() - wp.created_at.replace(tzinfo=timezone.utc)).days
                 if age > 90:
                     return [QCFindingItem(
                         rule_id=self.rule_id, severity=self.severity,
@@ -680,7 +680,7 @@ class QCEngine:
                 logger.exception("QC rule %s failed", rule.rule_id)
 
         passed = blocking_count == 0
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
 
         # Store result
         qc_result = WpQcResult(

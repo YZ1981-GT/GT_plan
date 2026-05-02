@@ -55,7 +55,7 @@ class SignService:
             signer_id=signer_id,
             signature_level=level,
             signature_data=sig_data,
-            signature_timestamp=datetime.now(timezone.utc),
+            signature_timestamp=datetime.utcnow(),
             ip_address=ip_address,
         )
         db.add(record)

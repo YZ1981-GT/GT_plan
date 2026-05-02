@@ -207,7 +207,7 @@ class WorkingPaperService:
 
         # No conflict — increment version
         wp.file_version += 1
-        wp.updated_at = datetime.now(timezone.utc)
+        wp.updated_at = datetime.utcnow()
         await db.flush()
 
         return {
@@ -270,7 +270,7 @@ class WorkingPaperService:
             )
 
         wp.status = new_enum
-        wp.updated_at = datetime.now(timezone.utc)
+        wp.updated_at = datetime.utcnow()
         await db.flush()
 
         # 同步更新 wp_index 状态
@@ -353,7 +353,7 @@ class WorkingPaperService:
             )
 
         wp.review_status = new_enum
-        wp.updated_at = datetime.now(timezone.utc)
+        wp.updated_at = datetime.utcnow()
 
         # 退回时强制填写退回原因并记录退回信息
         if "rejected" in new_review_status:
@@ -407,7 +407,7 @@ class WorkingPaperService:
             wp.assigned_to = assigned_to
         if reviewer is not None:
             wp.reviewer = reviewer
-        wp.updated_at = datetime.now(timezone.utc)
+        wp.updated_at = datetime.utcnow()
         await db.flush()
 
         # Also update wp_index

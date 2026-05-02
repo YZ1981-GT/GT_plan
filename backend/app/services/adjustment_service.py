@@ -359,7 +359,7 @@ class AdjustmentService:
         if target == ReviewStatus.rejected and not change.reason:
             raise ValueError("驳回时必须填写原因")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         for row in adj_rows:
             row.review_status = target
             if target == ReviewStatus.approved:

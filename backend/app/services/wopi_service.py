@@ -307,7 +307,7 @@ class WOPIHostService:
         # 5. 更新数据库
         old_version = wp.file_version
         wp.file_version += 1
-        wp.updated_at = datetime.now(timezone.utc)
+        wp.updated_at = datetime.utcnow()
         wp.prefill_stale = True
         await db.flush()
 
@@ -577,7 +577,7 @@ class WOPIHostService:
 
         Validates: Requirements 3.2
         """
-        expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+        expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
         payload = {
             "sub": str(user_id),
             "project_id": str(project_id),

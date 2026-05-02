@@ -90,7 +90,7 @@ class SoftDeleteMixin:
     def soft_delete(self) -> None:
         """标记为软删除，自动设置 deleted_at 时间戳。"""
         self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.utcnow()
 
 
 class TimestampMixin:
