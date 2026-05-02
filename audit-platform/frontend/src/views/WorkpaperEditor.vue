@@ -312,7 +312,8 @@ async function applyOnlineMode(notify: boolean = false) {
     onlineAccessToken.value = session.access_token || ''
     editorAvailable.value = true
 
-    // 等待 DOM 渲染
+    // 等待 DOM 渲染（两次 nextTick 确保 v-else-if 切换后 div 已挂载）
+    await nextTick()
     await nextTick()
 
     // 加载 ONLYOFFICE Document Server API 脚本
@@ -320,20 +321,19 @@ async function applyOnlineMode(notify: boolean = false) {
     await loadOOScript(ooUrl)
 
     // 用 Document Server API 初始化编辑器
-    const fileUrl = `${session.editor_base_url || 'http://localhost:9980'}/api/projects/${projectId.value}/working-papers/${wpId.value}/download`
-    const callbackUrl = `${ooUrl.replace('localhost', 'host.docker.internal')}/api/projects/${projectId.value}/working-papers/${wpId.value}/callback`
+    const wopiBaseUrl = 'http://host.docker.internal:9980'
 
     const config = {
       document: {
         fileType: 'xlsx',
         key: `${wpId.value}_v${wpDetail.value?.file_version || 1}`,
         title: wpDetail.value?.wp_name ? `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}.xlsx` : 'workpaper.xlsx',
-        url: `http://host.docker.internal:9980/wopi/files/${wpId.value}/contents?access_token=${onlineAccessToken.value}`,
+        url: `${wopiBaseUrl}/wopi/files/${wpId.value}/contents?access_token=${onlineAccessToken.value}`,
       },
       editorConfig: {
         mode: 'edit',
         lang: 'zh-CN',
-        callbackUrl: `http://host.docker.internal:9980/wopi/ds-callback/${wpId.value}`,
+        callbackUrl: `${wopiBaseUrl}/wopi/ds-callback/${wpId.value}`,
         user: {
           id: 'admin',
           name: 'Admin',

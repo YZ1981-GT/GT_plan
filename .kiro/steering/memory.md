@@ -1880,3 +1880,5 @@ inclusion: always
 - start-dev.bat优化（2026-05-02）：uvicorn启动命令加--reload-dir app限制文件监控范围，避免347个JSON+大量文件拖慢开发环境响应（所有端点从>2000ms恢复正常）
 - 项目template_type缺失提示（2026-05-02）：DetailProjectPanel概览区新增el-alert警告"请设置报表模板类型"（template_type为null时显示），引导用户前往编辑设置国企版/上市版
 - 前端直接http调用现状（2026-05-02）：8个Vue文件仍有直接http调用（LedgerPenetration 19个/KnowledgeBase 13个有正当理由保留，ReportConfigEditor 4个/AuditCheckDashboard 2个待迁移到commonApi）
+- 前端可用性扫描完成（2026-05-02）：91个Vue页面扫描，核心8个审计员页面全部有返回按钮+空状态引导+loading；新增返回按钮4个（Drilldown/AuditReportEditor/ConsolidationIndex/WorkpaperList）+空数据引导2个（CFSWorksheet/Misstatements）；剩余46个问题集中在合并子页面(developing)+管理看板(导航进入不需返回)，3个待下轮修复（WorkpaperSummary缺loading/Drilldown缺error-handling/WorkpaperEditor缺empty-state）
+- 前端可用性扫描剩余3项已修复（2026-05-02）：WorkpaperSummary加v-loading、Drilldown加try/catch+空数据el-alert、WorkpaperEditor加loading spinner；核心审计员页面可用性问题全部清零
