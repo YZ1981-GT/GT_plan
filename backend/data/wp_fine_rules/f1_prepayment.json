@@ -1,25 +1,216 @@
 {
   "wp_code": "F1",
-  "wp_name": "预付账款",
-  "cycle": "F",
+  "name": "预付账款",
+  "version": "2025-R2",
+  "description": "F1预付账款精细化解析规则 — 基于致同2025年修订版模板",
   "account_codes": ["1123"],
   "source_files": [
     {
-      "file_pattern": "F1 预付账款.xlsx",
-      "is_primary": true
+      "file": "F1 预付账款.xlsx",
+      "description": "预付账款常规程序：审定表+明细表+分析+检查",
+      "sheets": [
+        "底稿目录",
+        "预付账款实质性程序表F1A",
+        "审定表F1-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "明细表F1-2",
+        "调整分录汇总F1-3",
+        "实质性分析F1-4",
+        "长期挂款检查表F1-5",
+        "关联方及交易检查表F1-6",
+        "预付账款检查表F1-7"
+      ]
+    },
+    {
+      "file": "F0 存货循环函证.xlsx",
+      "description": "采购循环函证（预付/应付/应付票据共用）",
+      "sheets": [
+        "底稿目录",
+        "函证程序表F0A",
+        "函证结果汇总表F0-1",
+        "核实被函证单位信息F0-2",
+        "跟函函证过程控制F0-3",
+        "函证差异调节表F0-4",
+        "预付及采购替代程序F0-5",
+        "应付及采购替代程序F0-6",
+        "邮件传真回函可靠性验证F0-7",
+        "函证程序舞弊风险评价表F0-8"
+      ]
     }
   ],
-  "sheets": [
+  "sheet_rules": [
     {
+      "code": "F1A",
+      "exact_name": "预付账款实质性程序表F1A",
+      "type": "procedure",
+      "description": "实质性程序表（审计程序清单+执行情况）"
+    },
+    {
+      "code": "F1-1",
       "exact_name": "审定表F1-1",
       "type": "summary",
-      "table_type": "standard"
+      "header_rows": [5, 6],
+      "data_start_row": 7,
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_unadjusted": {"col": 2, "label": "期初未审数"},
+          "opening_adjustment": {"col": 3, "label": "期初调整"},
+          "opening_reclassification": {"col": 4, "label": "期初重分类"},
+          "opening_audited": {"col": 5, "label": "期初审定数"},
+          "closing_unadjusted": {"col": 6, "label": "期末未审数"},
+          "closing_adjustment": {"col": 7, "label": "期末调整"},
+          "closing_reclassification": {"col": 8, "label": "期末重分类"},
+          "closing_audited": {"col": 9, "label": "期末审定数"},
+          "change_amount": {"col": 10, "label": "变动额"}
+        }
+      },
+      "key_rows": {
+        "prepayment_goods": {"row": 7, "label": "预付货款"},
+        "prepayment_service": {"row": 8, "label": "预付服务费"},
+        "prepayment_rent": {"row": 9, "label": "预付租金"},
+        "prepayment_other": {"row": 10, "label": "其他预付款"},
+        "total": {"row": 11, "label": "合计", "is_total": true, "report_row": "BS-006"},
+        "tb_balance": {"row": 12, "label": "试算平衡表数"},
+        "diff": {"row": 13, "label": "差异数"}
+      }
+    },
+    {
+      "code": "F1-note-listed",
+      "exact_name": "附注披露信息(上市公司)",
+      "type": "note_disclosure",
+      "description": "上市公司附注披露检查表"
+    },
+    {
+      "code": "F1-note-soe",
+      "exact_name": "附注披露信息(国企)",
+      "type": "note_disclosure",
+      "description": "国企附注披露检查表"
+    },
+    {
+      "code": "F1-2",
+      "exact_name": "明细表F1-2",
+      "type": "detail",
+      "header_rows": [9, 10],
+      "data_start_row": 11,
+      "layout": {
+        "columns": {
+          "supplier_name": {"col": 1, "label": "供应商名称"},
+          "opening_balance": {"col": 2, "label": "期初余额"},
+          "increase": {"col": 3, "label": "本期增加"},
+          "decrease": {"col": 4, "label": "本期减少"},
+          "closing_balance": {"col": 5, "label": "期末余额"},
+          "aging": {"col": 6, "label": "账龄"},
+          "nature": {"col": 7, "label": "款项性质"},
+          "audit_adjustment": {"col": 8, "label": "审计调整"},
+          "closing_audited": {"col": 9, "label": "期末审定数"},
+          "confirmation_result": {"col": 10, "label": "函证结果"},
+          "remark": {"col": 11, "label": "备注"}
+        }
+      },
+      "link_to_summary": {"target": "F1-1", "target_row": 11, "target_col": 9, "source_col": 9, "description": "明细表合计→审定表合计"}
+    },
+    {
+      "code": "F1-3",
+      "exact_name": "调整分录汇总F1-3",
+      "type": "adjustment",
+      "header_rows": [5],
+      "data_start_row": 6,
+      "layout": {
+        "columns": {
+          "description": {"col": 1, "label": "调整事项说明"},
+          "account_name": {"col": 2, "label": "科目名称"},
+          "debit": {"col": 3, "label": "借方金额"},
+          "credit": {"col": 4, "label": "贷方金额"},
+          "index_ref": {"col": 5, "label": "索引"},
+          "remark": {"col": 6, "label": "备注"}
+        }
+      }
+    },
+    {
+      "code": "F1-4",
+      "exact_name": "实质性分析F1-4",
+      "type": "analysis",
+      "description": "预付账款实质性分析（余额变动/周转率/账龄分布）"
+    },
+    {
+      "code": "F1-5",
+      "exact_name": "长期挂款检查表F1-5",
+      "type": "check",
+      "description": "账龄1年以上的大额预付账款检查（原因/可收回性/减值）"
+    },
+    {
+      "code": "F1-6",
+      "exact_name": "关联方及交易检查表F1-6",
+      "type": "check",
+      "description": "预付账款关联方及交易检查"
+    },
+    {
+      "code": "F1-7",
+      "exact_name": "预付账款检查表F1-7",
+      "type": "check",
+      "description": "预付账款综合检查（合同/发票/入库/付款凭证核对）"
+    },
+    {
+      "code": "F0A",
+      "exact_name": "函证程序表F0A",
+      "type": "procedure",
+      "source_file": "F0 存货循环函证.xlsx",
+      "description": "采购循环函证程序表"
+    },
+    {
+      "code": "F0-1",
+      "exact_name": "函证结果汇总表F0-1",
+      "type": "confirmation_summary",
+      "source_file": "F0 存货循环函证.xlsx",
+      "description": "函证结果汇总（发函数/回函数/差异/替代程序）"
+    },
+    {
+      "code": "F0-2",
+      "exact_name": "核实被函证单位信息F0-2",
+      "type": "verification",
+      "source_file": "F0 存货循环函证.xlsx"
+    },
+    {
+      "code": "F0-3",
+      "exact_name": "跟函函证过程控制F0-3",
+      "type": "confirmation_detail",
+      "source_file": "F0 存货循环函证.xlsx"
+    },
+    {
+      "code": "F0-4",
+      "exact_name": "函证差异调节表F0-4",
+      "type": "reconciliation",
+      "source_file": "F0 存货循环函证.xlsx",
+      "description": "函证差异调节（账面vs回函差异原因）"
+    },
+    {
+      "code": "F0-5",
+      "exact_name": "预付及采购替代程序F0-5",
+      "type": "check",
+      "source_file": "F0 存货循环函证.xlsx",
+      "description": "未回函的预付账款替代程序检查"
     }
   ],
   "cross_references": [
-    {"from": "F1-1:total:C9", "to": "TB('1123','审定数')", "description": "审定表合计=试算表审定数"}
+    {"from": "F1-1.total.C9", "to": "report://BS/BS-006#期末", "description": "审定表合计 = 资产负债表预付款项"},
+    {"from": "F1-1.total.C9", "to": "tb://1123#审定数", "description": "审定表合计 = 试算表预付账款审定数"},
+    {"from": "F1-2.合计.C9", "to": "F1-1.total.C9", "description": "明细表合计 = 审定表合计"},
+    {"from": "F1-2.C10", "to": "F0-1.回函金额", "description": "明细表函证结果 = 函证汇总回函金额"},
+    {"from": "F1-1.tb_balance.C9", "to": "tb://1123#审定数", "description": "试算平衡表数 = 试算表审定数"},
+    {"from": "F1-5.长期挂款", "to": "note://五、4#账龄", "description": "长期挂款检查 → 附注账龄披露"}
   ],
   "audit_checks": [
-    {"id": "F1-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计=试算表审定数"}
+    {"code": "F1-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计 = 试算表预付账款审定数"},
+    {"code": "F1-CHK-02", "type": "balance", "severity": "blocking", "description": "审定表合计 = 报表预付款项行"},
+    {"code": "F1-CHK-03", "type": "cross_ref", "severity": "warning", "description": "明细表合计 = 审定表合计"},
+    {"code": "F1-CHK-04", "type": "movement", "severity": "info", "description": "各行：期初审定 + 变动 = 期末审定"},
+    {"code": "F1-CHK-05", "type": "confirmation", "severity": "warning", "description": "函证回函金额与明细表函证结果一致"},
+    {"code": "F1-CHK-06", "type": "check", "severity": "warning", "description": "账龄1年以上大额预付款已检查可收回性（F1-5）"},
+    {"code": "F1-CHK-07", "type": "check", "severity": "info", "description": "关联方预付款已单独检查（F1-6）"},
+    {"code": "F1-CHK-08", "type": "analysis", "severity": "info", "description": "预付账款余额变动合理性分析（F1-4）"},
+    {"code": "F1-CHK-09", "type": "completeness", "severity": "warning", "description": "明细表数据完整（有供应商名称和金额）"},
+    {"code": "F1-CHK-10", "type": "check", "severity": "warning", "description": "预付账款综合检查已执行（合同/发票/入库核对，F1-7）"}
   ]
 }
