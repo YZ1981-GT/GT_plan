@@ -398,10 +398,6 @@ function onFolderSelected(e: Event) {
   const input = e.target as HTMLInputElement
   if (input.files) {
     folderFiles.value = Array.from(input.files)
-    console.log('[KB] folder selected:', folderFiles.value.length, 'files')
-    if (folderFiles.value.length > 0) {
-      console.log('[KB] first file:', folderFiles.value[0].name, (folderFiles.value[0] as any).webkitRelativePath)
-    }
   }
 }
 
@@ -441,7 +437,6 @@ async function doUpload() {
   if (!selectedFolder.value) return
   const isFolder = uploadMode.value === 'folder'
   const files = isFolder ? folderFiles.value : uploadFiles.value.map((f: any) => f.raw)
-  console.log('[KB] doUpload mode:', uploadMode.value, 'files:', files.length, 'folderFiles:', folderFiles.value.length, 'uploadFiles:', uploadFiles.value.length)
   if (files.length === 0) {
     ElMessage.warning('请先选择要上传的文件')
     return
@@ -467,7 +462,6 @@ const bgUploadError = ref(0)
 const bgUploadJustDone = ref(false)
 
 async function startBackgroundUpload(files: File[], targetFolder: any) {
-  console.log('[KB] startBackgroundUpload:', files.length, 'files to folder:', targetFolder?.id, targetFolder?.name)
   bgUploading.value = true
   bgUploadJustDone.value = false
   bgUploadTotal.value = files.length
