@@ -450,18 +450,19 @@ class AdjustmentService:
         """分录列表（按 entry_group_id 分组）"""
         adj = Adjustment.__table__
 
-        # 用 GROUP BY 获取不重复的 entry_group_id（兼容 SQLite）
+        # 用 GROUP BY 获取不重复的 entry_group_id
+        # 注意：PG 不支持 min(uuid)，UUID 列需要 cast 为 text
         base = (
             sa.select(
                 adj.c.entry_group_id,
                 sa.func.min(adj.c.adjustment_no).label("adjustment_no"),
-                sa.func.min(adj.c.adjustment_type).label("adjustment_type"),
+                sa.func.min(sa.cast(adj.c.adjustment_type, sa.Text)).label("adjustment_type"),
                 sa.func.min(adj.c.description).label("description"),
-                sa.func.min(adj.c.review_status).label("review_status"),
-                sa.func.min(adj.c.reviewer_id).label("reviewer_id"),
+                sa.func.min(sa.cast(adj.c.review_status, sa.Text)).label("review_status"),
+                sa.func.min(sa.cast(adj.c.reviewer_id, sa.Text)).label("reviewer_id"),
                 sa.func.min(adj.c.reviewed_at).label("reviewed_at"),
                 sa.func.min(adj.c.rejection_reason).label("rejection_reason"),
-                sa.func.min(adj.c.created_by).label("created_by"),
+                sa.func.min(sa.cast(adj.c.created_by, sa.Text)).label("created_by"),
                 sa.func.min(adj.c.created_at).label("created_at"),
             )
             .where(
