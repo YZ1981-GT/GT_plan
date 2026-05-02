@@ -1872,3 +1872,5 @@ inclusion: always
 - 用户友好引导偏好（2026-05-02）：关键操作入口需弹窗提示前置条件（知识库配置/审核公司配置等），新增useWorkflowGuide.ts composable+7个页面接入（报表刷新/审核/附注生成/账套导入/提交复核/项目创建/知识库首次使用）；引导不要太多，适度即可，也可用页面内标注提示替代弹窗
 - consistency_check_service修复（2026-05-02）：TrialBalance字段名unadjusted_debit→unadjusted_amount/audited_debit→audited_amount；check_full_chain加try/except降级（单项校验失败不阻断）；DisclosureNote查询补is_deleted过滤
 - 数据库补齐缺失列（2026-05-02）：disclosure_notes.deleted_at + trial_balance.dataset_id + tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger各补dataset_id+deleted_at
+- datetime.now(timezone.utc)全局批量修复（2026-05-02）：19个服务文件34处→datetime.utcnow()，仅保留security.py 2处（JWT需要timezone-aware）；根因：PG TIMESTAMP WITHOUT TIME ZONE列与timezone-aware datetime不兼容，asyncpg报DataError
+- 系统复盘健康度（2026-05-02最终）：31/31 API端点全部200、0个stub残留、0个stale import、15个TODO（8个ai_plugin外部API+7个前端细节）；待改进P0：E2E全链路测试+disclosure_notes唯一约束改部分索引；P1：报表空数据提示+附注保存反馈+底稿列表自动滚动；P2：API服务层整合17→5+9个空壳页面处理
