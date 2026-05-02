@@ -336,13 +336,50 @@ async function applyOnlineMode(notify: boolean = false) {
       type: 'desktop',
       width: '100%',
       height: '100%',
+      events: {
+        onError: (event: any) => {
+          console.error('[OO] editor error:', event?.data)
+          ElMessage.error('编辑器错误：' + (event?.data?.errorDescription || event?.data?.errorCode || '未知'))
+        },
+        onReady: () => {
+          console.log('[OO] editor ready')
+        },
+        onDocumentStateChange: (event: any) => {
+          if (event?.data) {
+            console.log('[OO] document modified')
+          }
+        },
+      },
     }
 
     if (docEditor) {
       try { docEditor.destroyEditor() } catch { /* ignore */ }
     }
 
-    docEditor = new (window as any).DocsAPI.DocEditor('onlyoffice-editor', config)
+    // 确保 DOM 元素存在
+    const editorEl = document.getElementById('onlyoffice-editor')
+    if (!editorEl) {
+      console.error('[OO] editor container not found in DOM')
+      editorAvailable.value = false
+      return
+    }
+
+    console.log('[OO] initializing DocEditor with config:', JSON.stringify({
+      fileType: config.document.fileType,
+      key: config.document.key,
+      title: config.document.title,
+      url: config.document.url?.slice(0, 80),
+      callbackUrl: config.editorConfig.callbackUrl?.slice(0, 80),
+    }))
+
+    try {
+      docEditor = new (window as any).DocsAPI.DocEditor('onlyoffice-editor', config)
+    } catch (initErr: any) {
+      console.error('[OO] DocEditor init error:', initErr)
+      editorAvailable.value = false
+      ElMessage.error('ONLYOFFICE 编辑器初始化失败：' + (initErr?.message || ''))
+      return
+    }
     startLockRefresh()
     if (notify) ElMessage.success('在线编辑已恢复')
   } catch (e: any) {
