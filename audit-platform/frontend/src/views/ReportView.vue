@@ -126,7 +126,7 @@
               <th :colspan="eqTotalCols" class="gt-rv-eq-th-period">本年金额</th>
               <th :colspan="eqTotalCols" class="gt-rv-eq-th-period gt-rv-eq-th-prior">上年金额</th>
             </tr>
-            <tr class="gt-rv-eq-hr3">
+            <tr class="gt-rv-eq-hr3 gt-rv-eq-hr3--standalone">
               <th rowspan="2">实收资本</th>
               <th colspan="3">其他权益工具</th>
               <th rowspan="2">资本公积</th>
@@ -148,7 +148,7 @@
               <th rowspan="2">未分配利润</th>
               <th rowspan="2" class="gt-rv-eq-th-total">所有者<br/>权益合计</th>
             </tr>
-            <tr class="gt-rv-eq-hr4">
+            <tr class="gt-rv-eq-hr4 gt-rv-eq-hr4--standalone">
               <th>优先股</th><th>永续债</th><th>其他</th>
               <th class="gt-rv-eq-th-prior-col">优先股</th><th class="gt-rv-eq-th-prior-col">永续债</th><th class="gt-rv-eq-th-prior-col">其他</th>
             </tr>
@@ -1462,6 +1462,9 @@ watch(
   font-weight: 500;
   font-size: 12px;
 }
+/* 单体模式：少了hr2行，hr3/hr4的top值上移 */
+.gt-rv-eq-hr3--standalone th { top: 30px !important; }
+.gt-rv-eq-hr4--standalone th { top: 58px !important; }
 /* 资产减值准备表只有2行表头 */
 .gt-rv-eq-header-group th { top: 0; }
 .gt-rv-eq-header-cols th { top: 28px; }
