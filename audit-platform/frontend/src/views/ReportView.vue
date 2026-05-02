@@ -555,7 +555,7 @@ function onYearChange(val: number) {
 
 // 模板类型切换
 const selectedTemplateType = ref('soe')
-const currentApplicableStandard = computed(() => `${selectedTemplateType.value}_consolidated`)
+const currentApplicableStandard = computed(() => `${selectedTemplateType.value}_${reportScope.value}`)
 
 async function onTemplateTypeChange(val: string) {
   selectedTemplateType.value = val
