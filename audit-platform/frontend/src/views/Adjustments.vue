@@ -57,6 +57,18 @@
     </el-tabs>
 
     <!-- 分录列表 -->
+    <el-alert
+      v-if="!loading && entries.length === 0"
+      type="info"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 12px"
+    >
+      <template #title>暂无{{ activeTab === 'aje' ? '审计' : '重分类' }}调整分录</template>
+      <div style="font-size: 12px; line-height: 1.6; margin-top: 4px">
+        点击上方"新增"按钮创建调整分录。调整分录将自动更新试算表审定数和报表数据。
+      </div>
+    </el-alert>
     <el-table :data="entries" v-loading="loading" border stripe style="width: 100%"
       @selection-change="onSelectionChange">
       <el-table-column type="selection" width="40" />

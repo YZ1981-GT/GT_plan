@@ -29,43 +29,71 @@
           <!-- 快捷入口 -->
           <div class="gt-detail-section">
             <h4 class="gt-section-label">快捷操作</h4>
+            <div class="gt-workflow-hint">
+              <span class="gt-workflow-hint-label">建议流程：</span>
+              <span class="gt-workflow-step">① 导入</span>
+              <span class="gt-workflow-arrow">→</span>
+              <span class="gt-workflow-step">② 映射</span>
+              <span class="gt-workflow-arrow">→</span>
+              <span class="gt-workflow-step">③ 底稿</span>
+              <span class="gt-workflow-arrow">→</span>
+              <span class="gt-workflow-step">④ 报表</span>
+              <span class="gt-workflow-arrow">→</span>
+              <span class="gt-workflow-step">⑤ 附注</span>
+            </div>
             <div class="gt-quick-grid">
-              <div class="gt-quick-btn" @click="goTo('trial-balance')">
-                <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
-                <span>试算表</span>
-              </div>
-              <div class="gt-quick-btn" @click="goTo('adjustments')">
-                <el-icon :size="20" color="var(--gt-color-teal)"><Edit /></el-icon>
-                <span>调整分录</span>
-              </div>
-              <div class="gt-quick-btn" @click="goTo('workpapers')">
-                <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
-                <span>底稿</span>
-              </div>
-              <div class="gt-quick-btn" @click="goTo('reports')">
-                <el-icon :size="20" color="var(--gt-color-success)"><TrendCharts /></el-icon>
-                <span>报表</span>
-              </div>
-              <div class="gt-quick-btn" @click="goTo('disclosure-notes')">
-                <el-icon :size="20" color="var(--gt-color-wheat)"><Notebook /></el-icon>
-                <span>附注</span>
-              </div>
-              <div class="gt-quick-btn" @click="goTo('materiality')">
-                <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
-                <span>重要性</span>
-              </div>
+              <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
+                <div class="gt-quick-btn" @click="goTo('trial-balance')">
+                  <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
+                  <span>试算表</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="录入审计调整分录（AJE）和重分类调整（RJE）" placement="top">
+                <div class="gt-quick-btn" @click="goTo('adjustments')">
+                  <el-icon :size="20" color="var(--gt-color-teal)"><Edit /></el-icon>
+                  <span>调整分录</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
+                <div class="gt-quick-btn" @click="goTo('workpapers')">
+                  <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
+                  <span>底稿</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="查看财务报表（需先导入数据并生成报表）" placement="top">
+                <div class="gt-quick-btn" @click="goTo('reports')">
+                  <el-icon :size="20" color="var(--gt-color-success)"><TrendCharts /></el-icon>
+                  <span>报表</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="编辑附注章节（需先选择模板并生成附注）" placement="top">
+                <div class="gt-quick-btn" @click="goTo('disclosure-notes')">
+                  <el-icon :size="20" color="var(--gt-color-wheat)"><Notebook /></el-icon>
+                  <span>附注</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="设置整体重要性水平、实际执行重要性和明显微小错报" placement="top">
+                <div class="gt-quick-btn" @click="goTo('materiality')">
+                  <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
+                  <span>重要性</span>
+                </div>
+              </el-tooltip>
               <div class="gt-quick-btn" @click="goTo('audit-checks')">
                 <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
                 <span>审计检查</span>
               </div>
-              <div class="gt-quick-btn" @click="goToLedgerImport()">
-                <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
-                <span>账套导入</span>
-              </div>
-              <div class="gt-quick-btn" @click="goTo('ledger')">
-                <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
-                <span>查账</span>
-              </div>
+              <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
+                <div class="gt-quick-btn" @click="goToLedgerImport()">
+                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
+                  <span>账套导入</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
+                <div class="gt-quick-btn" @click="goTo('ledger')">
+                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
+                  <span>查账</span>
+                </div>
+              </el-tooltip>
               <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport" title="清除卡住的导入任务，释放导入锁">
                 <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
                 <span>重置</span>
@@ -443,6 +471,14 @@ function formatSize(bytes: number) {
 .gt-quick-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gt-space-2);
 }
+.gt-workflow-hint {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 8px;
+  padding: 6px 10px; background: linear-gradient(135deg, #f5f0ff 0%, #faf8fd 100%);
+  border-radius: 6px; font-size: 11px; color: #8b7aab; flex-wrap: wrap;
+}
+.gt-workflow-hint-label { font-weight: 600; color: #6b5b8a; margin-right: 2px; }
+.gt-workflow-step { background: #fff; padding: 1px 6px; border-radius: 4px; border: 1px solid #e8e4f0; white-space: nowrap; }
+.gt-workflow-arrow { color: #c4b8d9; font-size: 10px; }
 .gt-quick-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: var(--gt-space-3); border-radius: var(--gt-radius-sm);

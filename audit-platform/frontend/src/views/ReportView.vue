@@ -48,12 +48,18 @@
         </div>
         <!-- 第二行：操作按钮 -->
         <div class="gt-rv-banner-row2">
-          <el-button size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
-          <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 审核</el-button>
+          <el-tooltip content="根据试算表审定数重新计算报表（需先导入数据+科目映射）" placement="bottom">
+            <el-button size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
+          </el-tooltip>
+          <el-tooltip content="执行逻辑审核和合理性检查（需先生成报表）" placement="bottom">
+            <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 审核</el-button>
+          </el-tooltip>
           <el-button size="small" @click="onExportExcel">📤 导出Excel</el-button>
           <el-button size="small" @click="onEditConfig">📝 编辑结构</el-button>
           <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
-          <el-button size="small" @click="showMappingDialog = true">🔄 转换规则</el-button>
+          <el-tooltip content="配置国企版↔上市版报表行次映射规则" placement="bottom">
+            <el-button size="small" @click="showMappingDialog = true">🔄 转换规则</el-button>
+          </el-tooltip>
         </div>
       </div>
 

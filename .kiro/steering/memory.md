@@ -1864,3 +1864,11 @@ inclusion: always
 - 深度复盘9项修复（2026-05-02）：24项API检查18通过/6预期404/0真实失败。修复3个500错误：①dashboard_service.py的get_risk_alerts和_get_overdue_projects使用datetime.now(timezone.utc)与PG TIMESTAMP WITHOUT TIME ZONE不匹配→改为datetime.utcnow()（与import_service同类问题）②recycle_bin.py查询account_chart表时该表无deleted_at列导致500→加try/except降级+ALTER TABLE补齐deleted_at列③dataset_query.py的get_active_filter查询ledger_datasets表可能不存在→加try/except降级到is_deleted过滤
 - asyncpg时区类型不匹配通用规则（2026-05-02确认）：所有与PG TIMESTAMP WITHOUT TIME ZONE列比较的datetime必须用datetime.utcnow()（naive），不能用datetime.now(timezone.utc)（aware），否则asyncpg报DataError；已修复的文件：import_service.py(8处)+report_engine.py(2处)+dashboard_service.py(2处)
 - account_chart表补齐deleted_at列（2026-05-02）：ALTER TABLE account_chart ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP；该表有964条软删除记录但之前无deleted_at列导致回收站查询500
+- 底稿精细化规则全面升级（2026-05-02）：347文件从10个hand-crafted升级到77个（+67个添加layout列定义，5种模板：标准10列/11列重分类/变动表/损益表/权益表）+270个basic补充通用审计检查（按A/B/C/S循环类型分派3-4条）；5个异常文件修复sheets→sheet_rules键名（F4/J1/K1/L1/N2）；最终统计2406条sheet规则/1390条审计检查/262条交叉引用/0结构错误
+- 一次性脚本清理偏好确认：_fix_fine_rules_key/_upgrade_fine_rules/_upgrade_fine_rules_round2/_enhance_basic_rules 4个脚本用完即删
+- 附注TipTap编辑器LLM集成完成（2026-05-02）：4个AI按钮（✨续写/✏️改写/📋生成政策/📊变动分析），后端note_ai.py新增POST rewrite+改进complete端点（POST body替代Query参数），前端commonApi.ts新增5个noteAi函数；改写弹窗支持自定义指令+选中文本替换；所有调用带RAG参照上年附注+LLM不可用降级
+- 精细化规则引擎3个bug修复（2026-05-02）：①list_fine_rules读sheets键返回0→改为sheet_rules优先 ②wp_structure_bridge读sheets键→改为sheet_rules优先 ③wp_structure_bridge不识别layout.columns→增加layout fallback读取
+- 用户偏好（LLM编辑模式）：附注编辑模式下需支持对LLM模型的调用——续写（光标位置插入）和改写（选中文本替换），是用户明确要求的功能
+- 用户友好引导偏好（2026-05-02）：关键操作入口需弹窗提示前置条件（知识库配置/审核公司配置等），新增useWorkflowGuide.ts composable+7个页面接入（报表刷新/审核/附注生成/账套导入/提交复核/项目创建/知识库首次使用）；引导不要太多，适度即可，也可用页面内标注提示替代弹窗
+- consistency_check_service修复（2026-05-02）：TrialBalance字段名unadjusted_debit→unadjusted_amount/audited_debit→audited_amount；check_full_chain加try/except降级（单项校验失败不阻断）；DisclosureNote查询补is_deleted过滤
+- 数据库补齐缺失列（2026-05-02）：disclosure_notes.deleted_at + trial_balance.dataset_id + tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger各补dataset_id+deleted_at

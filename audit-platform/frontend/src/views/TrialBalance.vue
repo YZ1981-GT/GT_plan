@@ -26,8 +26,12 @@
         </div>
       </div>
       <div class="gt-tb-banner-row2">
-        <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
-        <el-button size="small" @click="onRecalc" :loading="recalcLoading">🔄 全量重算</el-button>
+        <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
+          <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
+        </el-tooltip>
+        <el-tooltip content="从四表数据重新计算未审数、调整数、审定数（需先导入数据）" placement="bottom">
+          <el-button size="small" @click="onRecalc" :loading="recalcLoading">🔄 全量重算</el-button>
+        </el-tooltip>
         <el-button size="small" @click="onExport">📤 导出Excel</el-button>
         <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
       </div>
@@ -42,6 +46,23 @@
       show-icon
       style="margin-bottom: 12px"
     />
+
+    <!-- 空数据引导提示 -->
+    <el-alert
+      v-if="!loading && rows.length === 0"
+      type="info"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 12px"
+    >
+      <template #title>
+        <span>试算表暂无数据</span>
+      </template>
+      <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+        请先完成以下步骤：① 导入账套数据（科目余额表）→ ② 完成科目映射 → ③ 点击"全量重算"生成试算表。
+        <el-button type="primary" text size="small" @click="router.push({ path: `/projects/${projectId}/ledger`, query: { import: '1' } })">前往导入 →</el-button>
+      </div>
+    </el-alert>
 
     <!-- 试算表主表 -->
     <el-table
