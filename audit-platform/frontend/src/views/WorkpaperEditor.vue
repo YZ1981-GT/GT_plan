@@ -320,7 +320,7 @@ async function applyOnlineMode(notify: boolean = false) {
     const config = {
       document: {
         fileType: 'xlsx',
-        key: `${wpId.value}_v${wpDetail.value?.file_version || 1}_${Date.now()}`,
+        key: `${wpId.value}_v${wpDetail.value?.file_version || 1}`,
         title: wpDetail.value?.wp_name ? `${wpDetail.value.wp_code} ${wpDetail.value.wp_name}.xlsx` : 'workpaper.xlsx',
         url: `http://host.docker.internal:9980/wopi/files/${wpId.value}/contents?access_token=${onlineAccessToken.value}`,
       },
@@ -334,6 +334,7 @@ async function applyOnlineMode(notify: boolean = false) {
         },
       },
       type: 'desktop',
+      documentType: 'cell',
       width: '100%',
       height: '100%',
       events: {
@@ -469,8 +470,8 @@ onMounted(loadEditor)
 .gt-wp-editor-code { font-weight: 600; color: var(--gt-color-primary); font-size: var(--gt-font-size-md); }
 .gt-wp-editor-name { color: var(--gt-color-text); font-size: var(--gt-font-size-md); }
 .gt-wp-editor-save-indicator { font-size: var(--gt-font-size-sm); color: var(--gt-color-success); }
-.gt-wp-editor-main { flex: 1; min-height: 0; }
-.gt-wp-editor-iframe { width: 100%; height: 100%; border: none; }
+.gt-wp-editor-main { flex: 1; min-height: 0; position: relative; }
+.gt-wp-editor-iframe { width: 100%; height: 100%; border: none; min-height: calc(100vh - 120px); }
 .gt-wp-editor-fallback-panel {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; height: 100%; padding: var(--gt-space-10);
