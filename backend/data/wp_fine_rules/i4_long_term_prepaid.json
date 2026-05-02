@@ -1,0 +1,146 @@
+{
+  "wp_code": "I4",
+  "name": "长期待摊费用",
+  "version": "2025-R1",
+  "account_codes": [
+    "1801"
+  ],
+  "source_files": [
+    {
+      "file": "长期待摊费用.xlsx",
+      "sheets": [
+        "底稿目录",
+        "长期待摊费用实质性程序 I4A",
+        "审定表I4-1",
+        "附注披露（上市公司）",
+        "附注披露（国有企业）",
+        "明细表I4-2",
+        "调整分录汇总I4-3",
+        "摊销政策检查表I4-4",
+        "针对性检查表I4-5",
+        "摊销测算I4-6",
+        "摊销测算表I4-7（工作量法）",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "长期待摊费用实质性程序 I4A",
+      "code": "I4A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表I4-1",
+      "code": "I4-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-017"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露（上市公司）",
+      "code": "I4-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露（国有企业）",
+      "code": "I4-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表I4-2",
+      "code": "I4-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总I4-3",
+      "code": "I4-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "摊销政策检查表I4-4",
+      "type": "check",
+      "code": "I4-4"
+    },
+    {
+      "exact_name": "针对性检查表I4-5",
+      "type": "check",
+      "code": "I4-5"
+    },
+    {
+      "exact_name": "摊销测算I4-6",
+      "type": "calculation",
+      "code": "I4-6"
+    },
+    {
+      "exact_name": "摊销测算表I4-7（工作量法）",
+      "type": "calculation",
+      "code": "I4-7"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "I4-1.total",
+      "to": "tb://1801#审定数",
+      "description": "审定表合计 = 试算表长期待摊费用审定数"
+    },
+    {
+      "from": "I4-1.total",
+      "to": "report://BS/BS-017#期末",
+      "description": "审定表合计 = 报表长期待摊费用"
+    },
+    {
+      "from": "I4-2.合计",
+      "to": "I4-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "I4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表长期待摊费用审定数"
+    },
+    {
+      "code": "I4-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表长期待摊费用行"
+    },
+    {
+      "code": "I4-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "I4-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "I4-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

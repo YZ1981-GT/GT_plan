@@ -1,0 +1,146 @@
+{
+  "wp_code": "K3",
+  "name": "其他应付款",
+  "version": "2025-R1",
+  "account_codes": [
+    "2241"
+  ],
+  "source_files": [
+    {
+      "file": "其他应付款.xlsx",
+      "sheets": [
+        "底稿目录",
+        "实质性程序表K3A",
+        "审定表K3-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "明细表K3-2",
+        "调整分录汇总K3-3",
+        "大额其他应付款情况分析表K3-4",
+        "长期挂账检查表K3-5",
+        "关联方及交易检查表K3-6",
+        "其他应付款检查表K3-7",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "实质性程序表K3A",
+      "code": "K3A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表K3-1",
+      "code": "K3-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-037"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息(上市公司)",
+      "code": "K3-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息(国企)",
+      "code": "K3-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表K3-2",
+      "code": "K3-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总K3-3",
+      "code": "K3-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "大额其他应付款情况分析表K3-4",
+      "type": "analysis",
+      "code": "K3-4"
+    },
+    {
+      "exact_name": "长期挂账检查表K3-5",
+      "type": "check",
+      "code": "K3-5"
+    },
+    {
+      "exact_name": "关联方及交易检查表K3-6",
+      "type": "check",
+      "code": "K3-6"
+    },
+    {
+      "exact_name": "其他应付款检查表K3-7",
+      "type": "check",
+      "code": "K3-7"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "K3-1.total",
+      "to": "tb://2241#审定数",
+      "description": "审定表合计 = 试算表其他应付款审定数"
+    },
+    {
+      "from": "K3-1.total",
+      "to": "report://BS/BS-037#期末",
+      "description": "审定表合计 = 报表其他应付款"
+    },
+    {
+      "from": "K3-2.合计",
+      "to": "K3-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "K3-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表其他应付款审定数"
+    },
+    {
+      "code": "K3-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他应付款行"
+    },
+    {
+      "code": "K3-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "K3-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "K3-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

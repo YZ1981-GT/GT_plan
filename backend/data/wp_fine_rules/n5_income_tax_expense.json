@@ -1,0 +1,151 @@
+{
+  "wp_code": "N5",
+  "name": "所得税费用",
+  "version": "2025-R1",
+  "account_codes": [
+    "6801"
+  ],
+  "source_files": [
+    {
+      "file": "所得税费用.xlsx",
+      "sheets": [
+        "底稿目录",
+        "所得税审计程序表N5A",
+        "所得税审计程序表N3A (原底稿)",
+        "所得税费用审定表N5-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企",
+        "所得税费用明细表N5-2",
+        "调整分录汇总表N5-3",
+        "当期所得税费用计算表N5-4",
+        "纳税调整明细表N5-5",
+        "税收优惠明细表N5-6",
+        "加计扣除研发费用情况明细表N5-6-1",
+        "高新技术企业认定条件检查表N5-6-2",
+        "财产损失明细表N5-7",
+        "递延所得税费用核对表N5-8",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "所得税审计程序表N5A",
+      "code": "N5A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "所得税审计程序表N3A (原底稿)",
+      "code": "N5A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "所得税费用审定表N5-1",
+      "code": "N5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "N5-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息（国企",
+      "code": "N5-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "所得税费用明细表N5-2",
+      "code": "N5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总表N5-3",
+      "code": "N5-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "当期所得税费用计算表N5-4",
+      "type": "check",
+      "code": "N5-4"
+    },
+    {
+      "exact_name": "纳税调整明细表N5-5",
+      "code": "N5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "税收优惠明细表N5-6",
+      "code": "N5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "加计扣除研发费用情况明细表N5-6-1",
+      "code": "N5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "高新技术企业认定条件检查表N5-6-2",
+      "type": "check",
+      "code": "N5-6"
+    },
+    {
+      "exact_name": "财产损失明细表N5-7",
+      "code": "N5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "递延所得税费用核对表N5-8",
+      "type": "check",
+      "code": "N5-8"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "N5-1.total",
+      "to": "tb://6801#审定数",
+      "description": "审定表合计 = 试算表所得税费用审定数"
+    },
+    {
+      "from": "N5-2.合计",
+      "to": "N5-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "N5-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表所得税费用审定数"
+    },
+    {
+      "code": "N5-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "N5-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "N5-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

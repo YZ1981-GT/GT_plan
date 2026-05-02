@@ -1,0 +1,103 @@
+{
+  "wp_code": "D5",
+  "name": "应收款项融资",
+  "version": "2025-R1",
+  "account_codes": [
+    "1124"
+  ],
+  "source_files": [
+    {
+      "file": "应收款项融资.xlsx",
+      "sheets": [
+        "底稿目录",
+        "应收款项融资审计程序表D5A",
+        "审定表D5",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "应收款项融资明细表D5-2",
+        "调整分录汇总表D5-3",
+        "应收款项融资公允价值测算表D5-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "应收款项融资审计程序表D5A",
+      "code": "D5A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表D5",
+      "code": "D5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "D5-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "code": "D5-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "应收款项融资明细表D5-2",
+      "code": "D5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总表D5-3",
+      "code": "D5-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "应收款项融资公允价值测算表D5-4",
+      "type": "calculation",
+      "code": "D5-4"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "D5-1.total",
+      "to": "tb://1124#审定数",
+      "description": "审定表合计 = 试算表应收款项融资审定数"
+    },
+    {
+      "from": "D5-2.合计",
+      "to": "D5-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "D5-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表应收款项融资审定数"
+    },
+    {
+      "code": "D5-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "D5-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "D5-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

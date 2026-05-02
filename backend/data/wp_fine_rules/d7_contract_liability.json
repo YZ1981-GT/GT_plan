@@ -1,0 +1,133 @@
+{
+  "wp_code": "D7",
+  "name": "合同负债",
+  "version": "2025-R1",
+  "account_codes": [
+    "2205"
+  ],
+  "source_files": [
+    {
+      "file": "合同负债.xlsx",
+      "sheets": [
+        "底稿目录",
+        "合同负债实质性程序表 D7A",
+        "合同负债实质性程序表 D8A（原）",
+        "审定表D7-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "明细表D7-2",
+        "调整分录汇总表D7-3",
+        "合同负债分析表D7-4",
+        "账龄1年以上合同负债检查表D7-5",
+        "关联方关系及交易检查表D7-6",
+        "合同负债检查表D7-7",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "合同负债实质性程序表 D7A",
+      "code": "D7A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "合同负债实质性程序表 D8A（原）",
+      "code": "D7A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表D7-1",
+      "code": "D7-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7
+    },
+    {
+      "exact_name": "附注披露信息(上市公司)",
+      "code": "D7-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息(国企)",
+      "code": "D7-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表D7-2",
+      "code": "D7-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总表D7-3",
+      "code": "D7-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "合同负债分析表D7-4",
+      "type": "analysis",
+      "code": "D7-4"
+    },
+    {
+      "exact_name": "账龄1年以上合同负债检查表D7-5",
+      "type": "check",
+      "code": "D7-5"
+    },
+    {
+      "exact_name": "关联方关系及交易检查表D7-6",
+      "type": "check",
+      "code": "D7-6"
+    },
+    {
+      "exact_name": "合同负债检查表D7-7",
+      "type": "check",
+      "code": "D7-7"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "D7-1.total",
+      "to": "tb://2205#审定数",
+      "description": "审定表合计 = 试算表合同负债审定数"
+    },
+    {
+      "from": "D7-2.合计",
+      "to": "D7-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "D7-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表合同负债审定数"
+    },
+    {
+      "code": "D7-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "D7-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "D7-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "wp_code": "F3",
+  "name": "应付票据",
+  "version": "2025-R1",
+  "account_codes": [
+    "2201"
+  ],
+  "source_files": [
+    {
+      "file": "应付票据.xlsx",
+      "sheets": [
+        "底稿目录",
+        "应付票据实质性程序表F3A ",
+        "审定表F3-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "明细表F3-2",
+        "调整分录汇总F3-3",
+        "应付票据（带息）利息测算表F3-4",
+        "逾期票据检查F3-5",
+        "关联方及交易检查表F3-6",
+        "应付票据检查表F3-7",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "应付票据实质性程序表F3A ",
+      "code": "F3A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表F3-1",
+      "code": "F3-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-032"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息(上市公司)",
+      "code": "F3-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息(国企)",
+      "code": "F3-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表F3-2",
+      "code": "F3-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总F3-3",
+      "code": "F3-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "应付票据（带息）利息测算表F3-4",
+      "type": "calculation",
+      "code": "F3-4"
+    },
+    {
+      "exact_name": "逾期票据检查F3-5",
+      "type": "check",
+      "code": "F3-5"
+    },
+    {
+      "exact_name": "关联方及交易检查表F3-6",
+      "type": "check",
+      "code": "F3-6"
+    },
+    {
+      "exact_name": "应付票据检查表F3-7",
+      "type": "check",
+      "code": "F3-7"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "F3-1.total",
+      "to": "tb://2201#审定数",
+      "description": "审定表合计 = 试算表应付票据审定数"
+    },
+    {
+      "from": "F3-1.total",
+      "to": "report://BS/BS-032#期末",
+      "description": "审定表合计 = 报表应付票据"
+    },
+    {
+      "from": "F3-2.合计",
+      "to": "F3-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "F3-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表应付票据审定数"
+    },
+    {
+      "code": "F3-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表应付票据行"
+    },
+    {
+      "code": "F3-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "F3-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "F3-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

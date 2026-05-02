@@ -1,0 +1,134 @@
+{
+  "wp_code": "M5",
+  "name": "盈余公积",
+  "version": "2025-R1",
+  "account_codes": [
+    "4101"
+  ],
+  "source_files": [
+    {
+      "file": "盈余公积.xlsx",
+      "sheets": [
+        "底稿目录",
+        "盈余公积实质性程序表 M5A",
+        "审定表M5-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表M5-2",
+        "调整分录汇总M5-3",
+        "盈余公积计提检查表M5-4",
+        "盈余公积检查表M5-5",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "盈余公积实质性程序表 M5A",
+      "code": "M5A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表M5-1",
+      "code": "M5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-054"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "M5-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "code": "M5-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表M5-2",
+      "code": "M5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总M5-3",
+      "code": "M5-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "盈余公积计提检查表M5-4",
+      "type": "check",
+      "code": "M5-4"
+    },
+    {
+      "exact_name": "盈余公积检查表M5-5",
+      "type": "check",
+      "code": "M5-5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "M5-1.total",
+      "to": "tb://4101#审定数",
+      "description": "审定表合计 = 试算表盈余公积审定数"
+    },
+    {
+      "from": "M5-1.total",
+      "to": "report://BS/BS-054#期末",
+      "description": "审定表合计 = 报表盈余公积"
+    },
+    {
+      "from": "M5-2.合计",
+      "to": "M5-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "M5-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表盈余公积审定数"
+    },
+    {
+      "code": "M5-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表盈余公积行"
+    },
+    {
+      "code": "M5-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "M5-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "M5-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "wp_code": "D6",
+  "name": "合同资产",
+  "version": "2025-R1",
+  "account_codes": [
+    "1141"
+  ],
+  "source_files": [
+    {
+      "file": "合同资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "合同资产实质性程序表 D6A",
+        "合同资产实质性程序表 D7A（原）",
+        "审定表D6-1",
+        "附注披露信息(上市公司）",
+        "附注披露信息（国企）",
+        "明细表D6-2",
+        "合同资产减值准备明细表D6-3",
+        "调整分录汇总表D6-4",
+        "关联关系及交易检查D6-5",
+        "合同资产检查表D6-6",
+        "合同资产减值准备会计政策检查D6-7",
+        "减值准备测算D6-8",
+        "减值准备转回、核销检查表D6-9",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "合同资产实质性程序表 D6A",
+      "code": "D6A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "合同资产实质性程序表 D7A（原）",
+      "code": "D6A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表D6-1",
+      "code": "D6-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7
+    },
+    {
+      "exact_name": "附注披露信息(上市公司）",
+      "code": "D6-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "code": "D6-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表D6-2",
+      "code": "D6-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "合同资产减值准备明细表D6-3",
+      "code": "D6-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总表D6-4",
+      "code": "D6-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "关联关系及交易检查D6-5",
+      "type": "check",
+      "code": "D6-5"
+    },
+    {
+      "exact_name": "合同资产检查表D6-6",
+      "type": "check",
+      "code": "D6-6"
+    },
+    {
+      "exact_name": "合同资产减值准备会计政策检查D6-7",
+      "type": "check",
+      "code": "D6-7"
+    },
+    {
+      "exact_name": "减值准备测算D6-8",
+      "type": "calculation",
+      "code": "D6-8"
+    },
+    {
+      "exact_name": "减值准备转回、核销检查表D6-9",
+      "type": "check",
+      "code": "D6-9"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "D6-1.total",
+      "to": "tb://1141#审定数",
+      "description": "审定表合计 = 试算表合同资产审定数"
+    },
+    {
+      "from": "D6-2.合计",
+      "to": "D6-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "D6-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表合同资产审定数"
+    },
+    {
+      "code": "D6-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "D6-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "D6-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "wp_code": "F5",
+  "name": "营业成本",
+  "version": "2025-R1",
+  "account_codes": [
+    "6401",
+    "6402"
+  ],
+  "source_files": [
+    {
+      "file": "营业成本.xlsx",
+      "sheets": [
+        "底稿目录",
+        "营业成本实质性程序表F5A",
+        "营业务成本审定表F5-1",
+        "主营业务成本月度明细表F5-2",
+        "其他业务成本明细表F5-3",
+        "调整分录汇总F5-4",
+        "与上年度比较分析表F5-5",
+        "销售数量与结转成本数量核对明细表F5-6",
+        "成本倒轧表F5-7",
+        "重大调整核查表F5-8",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "营业成本实质性程序表F5A",
+      "code": "F5A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "营业务成本审定表F5-1",
+      "code": "F5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-002"
+        }
+      }
+    },
+    {
+      "exact_name": "主营业务成本月度明细表F5-2",
+      "code": "F5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "其他业务成本明细表F5-3",
+      "code": "F5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总F5-4",
+      "code": "F5-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "与上年度比较分析表F5-5",
+      "type": "analysis",
+      "code": "F5-5"
+    },
+    {
+      "exact_name": "销售数量与结转成本数量核对明细表F5-6",
+      "code": "F5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "成本倒轧表F5-7",
+      "type": "check",
+      "code": "F5-7"
+    },
+    {
+      "exact_name": "重大调整核查表F5-8",
+      "type": "check",
+      "code": "F5-8"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "F5-1.total",
+      "to": "tb://6401#审定数",
+      "description": "审定表合计 = 试算表营业成本审定数"
+    },
+    {
+      "from": "F5-1.total",
+      "to": "report://BS/IS-002#期末",
+      "description": "审定表合计 = 报表营业成本"
+    },
+    {
+      "from": "F5-2.合计",
+      "to": "F5-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "F5-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表营业成本审定数"
+    },
+    {
+      "code": "F5-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表营业成本行"
+    },
+    {
+      "code": "F5-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "F5-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "F5-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

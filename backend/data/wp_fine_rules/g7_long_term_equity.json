@@ -1,0 +1,206 @@
+{
+  "wp_code": "G7",
+  "name": "长期股权投资",
+  "version": "2025-R1",
+  "account_codes": [
+    "1511"
+  ],
+  "source_files": [
+    {
+      "file": "长期股权投资.xlsx",
+      "sheets": [
+        "底稿目录",
+        "长期股权投资实质性程序表G7A",
+        "长期股权投资审定表G7-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G7-2",
+        "调整分录汇总G7-3",
+        "被投资单位基本信息G7-4",
+        "被投资单位财务信息（合营、联营）G7-5",
+        "被投资公司会计政策G7-6",
+        "长期股权投资初始判断G7-7",
+        "子公司初始计量测试（同控）G7-8",
+        "子公司初始计量测试（非同控）G7-9",
+        "子公司后续计量测试表G7-10",
+        "处置子公司测试表（不包含一揽子交易）G7-11",
+        "处置子公司测试表（一揽子交易）G7-12",
+        "合营、联营企业投资成本测试表G7-13",
+        "权益法测算表G7-14",
+        "权益法未实现内部交易抵销测算表G7-15",
+        "未确认投资损失测试表G7-16",
+        "减值测试表G7-17",
+        "凭证检查表G7-18"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "长期股权投资实质性程序表G7A",
+      "code": "G7A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "长期股权投资审定表G7-1",
+      "code": "G7-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-012"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "G7-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "code": "G7-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表G7-2",
+      "code": "G7-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总G7-3",
+      "code": "G7-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "被投资单位基本信息G7-4",
+      "type": "check",
+      "code": "G7-4"
+    },
+    {
+      "exact_name": "被投资单位财务信息（合营、联营）G7-5",
+      "type": "check",
+      "code": "G7-5"
+    },
+    {
+      "exact_name": "被投资公司会计政策G7-6",
+      "type": "check",
+      "code": "G7-6"
+    },
+    {
+      "exact_name": "长期股权投资初始判断G7-7",
+      "type": "check",
+      "code": "G7-7"
+    },
+    {
+      "exact_name": "子公司初始计量测试（同控）G7-8",
+      "type": "calculation",
+      "code": "G7-8"
+    },
+    {
+      "exact_name": "子公司初始计量测试（非同控）G7-9",
+      "type": "calculation",
+      "code": "G7-9"
+    },
+    {
+      "exact_name": "子公司后续计量测试表G7-10",
+      "type": "calculation",
+      "code": "G7-10"
+    },
+    {
+      "exact_name": "处置子公司测试表（不包含一揽子交易）G7-11",
+      "type": "calculation",
+      "code": "G7-11"
+    },
+    {
+      "exact_name": "处置子公司测试表（一揽子交易）G7-12",
+      "type": "calculation",
+      "code": "G7-12"
+    },
+    {
+      "exact_name": "合营、联营企业投资成本测试表G7-13",
+      "type": "calculation",
+      "code": "G7-13"
+    },
+    {
+      "exact_name": "权益法测算表G7-14",
+      "type": "calculation",
+      "code": "G7-14"
+    },
+    {
+      "exact_name": "权益法未实现内部交易抵销测算表G7-15",
+      "type": "calculation",
+      "code": "G7-15"
+    },
+    {
+      "exact_name": "未确认投资损失测试表G7-16",
+      "type": "calculation",
+      "code": "G7-16"
+    },
+    {
+      "exact_name": "减值测试表G7-17",
+      "type": "calculation",
+      "code": "G7-17"
+    },
+    {
+      "exact_name": "凭证检查表G7-18",
+      "type": "check",
+      "code": "G7-18"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G7-1.total",
+      "to": "tb://1511#审定数",
+      "description": "审定表合计 = 试算表长期股权投资审定数"
+    },
+    {
+      "from": "G7-1.total",
+      "to": "report://BS/BS-012#期末",
+      "description": "审定表合计 = 报表长期股权投资"
+    },
+    {
+      "from": "G7-2.合计",
+      "to": "G7-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G7-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表长期股权投资审定数"
+    },
+    {
+      "code": "G7-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表长期股权投资行"
+    },
+    {
+      "code": "G7-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G7-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G7-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

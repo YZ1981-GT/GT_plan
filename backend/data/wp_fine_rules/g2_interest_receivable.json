@@ -1,0 +1,127 @@
+{
+  "wp_code": "G2",
+  "name": "应收利息",
+  "version": "2025-R1",
+  "account_codes": [
+    "1132"
+  ],
+  "source_files": [
+    {
+      "file": "应收利息.xlsx",
+      "sheets": [
+        "底稿目录",
+        "应收利息实质性程序表G2A",
+        "审定表G2-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表G2-2",
+        "坏账准备明细表G2-3",
+        "调整分录汇总G2-4",
+        "利息测算表G2-5",
+        "长期未收回款项检查表G2-6",
+        "应收利息坏账准备测算G2-7",
+        "凭证检查表G2-8"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "应收利息实质性程序表G2A",
+      "code": "G2A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表G2-1",
+      "code": "G2-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "G2-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "code": "G2-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表G2-2",
+      "code": "G2-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "坏账准备明细表G2-3",
+      "code": "G2-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总G2-4",
+      "code": "G2-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "利息测算表G2-5",
+      "type": "calculation",
+      "code": "G2-5"
+    },
+    {
+      "exact_name": "长期未收回款项检查表G2-6",
+      "type": "check",
+      "code": "G2-6"
+    },
+    {
+      "exact_name": "应收利息坏账准备测算G2-7",
+      "type": "calculation",
+      "code": "G2-7"
+    },
+    {
+      "exact_name": "凭证检查表G2-8",
+      "type": "check",
+      "code": "G2-8"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "G2-1.total",
+      "to": "tb://1132#审定数",
+      "description": "审定表合计 = 试算表应收利息审定数"
+    },
+    {
+      "from": "G2-2.合计",
+      "to": "G2-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "G2-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表应收利息审定数"
+    },
+    {
+      "code": "G2-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "G2-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "G2-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

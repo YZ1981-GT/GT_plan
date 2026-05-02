@@ -1,0 +1,146 @@
+{
+  "wp_code": "D3",
+  "name": "预收账款",
+  "version": "2025-R1",
+  "account_codes": [
+    "2203"
+  ],
+  "source_files": [
+    {
+      "file": "预收账款.xlsx",
+      "sheets": [
+        "底稿目录",
+        "预收账款实质性程序表D3A",
+        "审定表D3-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "预收账款明细表D3-2",
+        "调整分录汇总表D3-3",
+        "预收账款分析表D3-4",
+        "账龄1年以上的预收账款检查表D3-5",
+        "关联关系及交易检查表D3-6",
+        "预收账款检查表D3-7",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "预收账款实质性程序表D3A",
+      "code": "D3A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表D3-1",
+      "code": "D3-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-034"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息(上市公司)",
+      "code": "D3-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息(国企)",
+      "code": "D3-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "预收账款明细表D3-2",
+      "code": "D3-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总表D3-3",
+      "code": "D3-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "预收账款分析表D3-4",
+      "type": "analysis",
+      "code": "D3-4"
+    },
+    {
+      "exact_name": "账龄1年以上的预收账款检查表D3-5",
+      "type": "check",
+      "code": "D3-5"
+    },
+    {
+      "exact_name": "关联关系及交易检查表D3-6",
+      "type": "check",
+      "code": "D3-6"
+    },
+    {
+      "exact_name": "预收账款检查表D3-7",
+      "type": "check",
+      "code": "D3-7"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "D3-1.total",
+      "to": "tb://2203#审定数",
+      "description": "审定表合计 = 试算表预收账款审定数"
+    },
+    {
+      "from": "D3-1.total",
+      "to": "report://BS/BS-034#期末",
+      "description": "审定表合计 = 报表预收账款"
+    },
+    {
+      "from": "D3-2.合计",
+      "to": "D3-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "D3-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表预收账款审定数"
+    },
+    {
+      "code": "D3-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表预收账款行"
+    },
+    {
+      "code": "D3-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "D3-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "D3-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

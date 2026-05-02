@@ -1,0 +1,158 @@
+{
+  "wp_code": "L3",
+  "name": "长期借款",
+  "version": "2025-R1",
+  "account_codes": [
+    "2501"
+  ],
+  "source_files": [
+    {
+      "file": "长期借款.xlsx",
+      "sheets": [
+        "底稿目录",
+        "长期借款实质性程序表L3A",
+        "审定表L3-1",
+        "附注披露信息核对（上市公司）",
+        "附注披露（国企）信息核对",
+        "明细表L3-2",
+        "调整分录汇总L3-3",
+        "征信报告核对表L3-4",
+        "利息测算表L3-5",
+        "贷款合同检查L3-6",
+        "逾期贷款检查表L3-7",
+        "抵质押资产检查表L3-8",
+        "长期借款检查表L3-9",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "长期借款实质性程序表L3A",
+      "code": "L3A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表L3-1",
+      "code": "L3-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-041"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息核对（上市公司）",
+      "code": "L3-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露（国企）信息核对",
+      "code": "L3-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "明细表L3-2",
+      "code": "L3-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总L3-3",
+      "code": "L3-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "征信报告核对表L3-4",
+      "type": "check",
+      "code": "L3-4"
+    },
+    {
+      "exact_name": "利息测算表L3-5",
+      "type": "calculation",
+      "code": "L3-5"
+    },
+    {
+      "exact_name": "贷款合同检查L3-6",
+      "type": "check",
+      "code": "L3-6"
+    },
+    {
+      "exact_name": "逾期贷款检查表L3-7",
+      "type": "check",
+      "code": "L3-7"
+    },
+    {
+      "exact_name": "抵质押资产检查表L3-8",
+      "type": "check",
+      "code": "L3-8"
+    },
+    {
+      "exact_name": "长期借款检查表L3-9",
+      "type": "check",
+      "code": "L3-9"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "L3-1.total",
+      "to": "tb://2501#审定数",
+      "description": "审定表合计 = 试算表长期借款审定数"
+    },
+    {
+      "from": "L3-1.total",
+      "to": "report://BS/BS-041#期末",
+      "description": "审定表合计 = 报表长期借款"
+    },
+    {
+      "from": "L3-2.合计",
+      "to": "L3-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "L3-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表长期借款审定数"
+    },
+    {
+      "code": "L3-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表长期借款行"
+    },
+    {
+      "code": "L3-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "L3-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "L3-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "wp_code": "N1",
+  "name": "递延所得税资产",
+  "version": "2025-R1",
+  "account_codes": [
+    "1811"
+  ],
+  "source_files": [
+    {
+      "file": "递延所得税资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "递延所得税资产审计程序表的N1A",
+        "递延所得税资产审定表N1-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "递延所得税资产明细表N1-2",
+        "调整分录汇总N1-3",
+        "递延所得税资产（负债）测算表N1-4",
+        "可用以后年度税前利润弥补的亏损检查表的N1-5",
+        "GT_Custom"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "递延所得税资产审计程序表的N1A",
+      "code": "N1A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "递延所得税资产审定表N1-1",
+      "code": "N1-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-018"
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "N1-note-listed",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "附注披露信息（国企）",
+      "code": "N1-note-soe",
+      "type": "note_disclosure"
+    },
+    {
+      "exact_name": "递延所得税资产明细表N1-2",
+      "code": "N1-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总N1-3",
+      "code": "N1-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "递延所得税资产（负债）测算表N1-4",
+      "type": "calculation",
+      "code": "N1-4"
+    },
+    {
+      "exact_name": "可用以后年度税前利润弥补的亏损检查表的N1-5",
+      "type": "check",
+      "code": "N1-5"
+    },
+    {
+      "exact_name": "GT_Custom",
+      "type": "check",
+      "code": "GT_Custom"
+    }
+  ],
+  "cross_references": [
+    {
+      "from": "N1-1.total",
+      "to": "tb://1811#审定数",
+      "description": "审定表合计 = 试算表递延所得税资产审定数"
+    },
+    {
+      "from": "N1-1.total",
+      "to": "report://BS/BS-018#期末",
+      "description": "审定表合计 = 报表递延所得税资产"
+    },
+    {
+      "from": "N1-2.合计",
+      "to": "N1-1.total",
+      "description": "明细表合计 = 审定表合计"
+    }
+  ],
+  "audit_checks": [
+    {
+      "code": "N1-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表递延所得税资产审定数"
+    },
+    {
+      "code": "N1-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表递延所得税资产行"
+    },
+    {
+      "code": "N1-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "N1-CHK-03",
+      "type": "movement",
+      "severity": "info",
+      "description": "期初 + 变动 = 期末"
+    },
+    {
+      "code": "N1-CHK-04",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "明细表数据完整"
+    }
+  ]
+}
