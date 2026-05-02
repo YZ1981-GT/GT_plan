@@ -85,8 +85,8 @@
             <!-- 第1行：项目 | 本年金额 | 上年金额 -->
             <tr class="gt-rv-eq-hr1">
               <th :rowspan="isConsolidated ? 4 : 3" class="gt-rv-eq-th-project">项目</th>
-              <th :colspan="isConsolidated ? 12 : 11" class="gt-rv-eq-th-period">本年金额</th>
-              <th :colspan="isConsolidated ? 12 : 11" class="gt-rv-eq-th-period gt-rv-eq-th-prior">上年金额</th>
+              <th :colspan="eqTotalCols" class="gt-rv-eq-th-period">本年金额</th>
+              <th :colspan="eqTotalCols" class="gt-rv-eq-th-period gt-rv-eq-th-prior">上年金额</th>
             </tr>
             <!-- 第2行：归属于母公司所有者权益（仅合并报表） -->
             <tr v-if="isConsolidated" class="gt-rv-eq-hr2">
@@ -713,6 +713,8 @@ const eqColumns = computed(() => {
   base.push({ key: 'total', label: '所有者权益合计' })
   return base
 })
+// 权益变动表第1行 colspan（本年/上年各自的总列数）
+const eqTotalCols = computed(() => eqColumns.value.length)
 // 归属于母公司的列数（不含少数股东和合计）
 const _eqParentColCount = computed(() => eqColumnsBase.length + (isConsolidated.value ? 1 : 0))
 
