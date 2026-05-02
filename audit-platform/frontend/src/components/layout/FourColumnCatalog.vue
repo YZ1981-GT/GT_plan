@@ -1,5 +1,39 @@
 <template>
   <div class="gt-four-catalog">
+    <!-- 单位/集团树形结构 -->
+    <div class="gt-catalog-unit-tree">
+      <div class="gt-catalog-unit-current">
+        <div class="gt-catalog-unit-icon">🏢</div>
+        <div class="gt-catalog-unit-info">
+          <div class="gt-catalog-unit-name">{{ project?.name || project?.client_name || '—' }}</div>
+          <div class="gt-catalog-unit-meta">
+            <el-tag size="small" type="info">{{ project?.audit_year || '—' }}</el-tag>
+            <el-tag size="small" :type="project?.report_scope === 'consolidated' ? 'warning' : 'success'">
+              {{ project?.report_scope === 'consolidated' ? '合并' : '单体' }}
+            </el-tag>
+          </div>
+        </div>
+      </div>
+      <!-- 集团架构（如有关联项目） -->
+      <div v-if="relatedProjects.length > 0" class="gt-catalog-unit-group">
+        <div class="gt-catalog-unit-group-title" @click="showRelated = !showRelated">
+          <span>{{ showRelated ? '−' : '+' }}</span>
+          <span>关联企业 ({{ relatedProjects.length }})</span>
+        </div>
+        <div v-if="showRelated" class="gt-catalog-unit-group-items">
+          <div
+            v-for="rp in relatedProjects" :key="rp.id"
+            class="gt-catalog-unit-related"
+            :class="{ 'gt-catalog-unit-related--current': rp.id === project?.id }"
+            @click="onSwitchProject(rp)"
+          >
+            <span class="gt-catalog-unit-related-dot" :style="{ background: rp.id === project?.id ? '#4b2d77' : '#ccc' }"></span>
+            <span>{{ rp.name || rp.client_name }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 功能切换 -->
     <div class="gt-catalog-tabs">
       <div
@@ -110,6 +144,17 @@ const emit = defineEmits<{
 }>()
 
 const activeTab = ref(props.activeCatalog || 'reports')
+
+// 单位/集团树
+const relatedProjects = ref<any[]>([])
+const showRelated = ref(false)
+
+function onSwitchProject(rp: any) {
+  if (rp.id !== props.project?.id) {
+    // 通知父组件切换项目
+    emit('select', { type: 'switch_project', project_id: rp.id, name: rp.name })
+  }
+}
 
 // tab 切换时通知父组件
 watch(activeTab, (v) => emit('tab-change', v))
@@ -231,10 +276,66 @@ watch(() => props.project?.id, async (pid) => {
     })).sort((a, b) => a.key.localeCompare(b.key))
   } catch { wpCycles.value = [] }
 }, { immediate: true })
+
+// 加载关联企业（同集团项目）
+watch(() => props.project?.id, async (pid) => {
+  if (!pid) { relatedProjects.value = []; return }
+  try {
+    const data = await api.get('/api/projects', { validateStatus: (s: number) => s < 500 })
+    const all = Array.isArray(data) ? data : (data?.items || [])
+    // 同集团：parent_project_id 相同，或当前项目是父项目
+    const parentId = props.project?.parent_project_id
+    if (parentId) {
+      relatedProjects.value = all.filter((p: any) =>
+        p.parent_project_id === parentId || p.id === parentId
+      )
+    } else {
+      // 当前项目可能是父项目，找子项目
+      const children = all.filter((p: any) => p.parent_project_id === pid)
+      if (children.length > 0) {
+        relatedProjects.value = [props.project, ...children]
+      } else {
+        relatedProjects.value = []
+      }
+    }
+  } catch { relatedProjects.value = [] }
+}, { immediate: true })
 </script>
 
 <style scoped>
 .gt-four-catalog { display: flex; flex-direction: column; height: 100%; }
+
+/* 单位/集团树 */
+.gt-catalog-unit-tree {
+  padding: var(--gt-space-3); border-bottom: 1px solid var(--gt-color-border-light); flex-shrink: 0;
+}
+.gt-catalog-unit-current {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.gt-catalog-unit-icon { font-size: 24px; }
+.gt-catalog-unit-info { flex: 1; min-width: 0; }
+.gt-catalog-unit-name {
+  font-size: 13px; font-weight: 600; color: var(--gt-color-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.gt-catalog-unit-meta { display: flex; gap: 4px; margin-top: 2px; }
+.gt-catalog-unit-group-title {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 0; font-size: 11px; color: #999; cursor: pointer;
+}
+.gt-catalog-unit-group-title:hover { color: var(--gt-color-primary); }
+.gt-catalog-unit-group-items { padding-left: 8px; }
+.gt-catalog-unit-related {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 6px; font-size: 12px; cursor: pointer; border-radius: 4px;
+  color: var(--gt-color-text-secondary);
+}
+.gt-catalog-unit-related:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
+.gt-catalog-unit-related--current { font-weight: 600; color: var(--gt-color-primary); }
+.gt-catalog-unit-related-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+
 .gt-catalog-tabs {
   display: flex; gap: 2px; padding: var(--gt-space-2);
   border-bottom: 1px solid var(--gt-color-border-light); flex-shrink: 0;
