@@ -475,8 +475,18 @@ const indirectCompanyList = computed(() => {
 })
 
 const elimSummaryForCapital = computed(() => {
-  const row = data.elimEquity.find((r: ElimRow) => r.subject === '资本公积')
-  return { elimCapital: row ? (row.values||[]).reduce((s: number, v: number|null) => s + (Number(v)||0), 0) : 0, equitySimCapital: 0 }
+  const nn = (v: any) => Number(v) || 0
+  const elimRow = data.elimEquity.find((r: ElimRow) => r.subject === '资本公积')
+  const elimCapital = elimRow ? (elimRow.values||[]).reduce((s: number, v: number|null) => s + nn(v), 0) : 0
+  // 从模拟权益法提取资本公积贷方合计
+  let equitySimCapital = 0
+  for (const row of data.equitySimDirect) {
+    if (row.isStep) continue
+    if (row.subject === '资本公积' && row.direction === '贷') {
+      equitySimCapital += (row.values || []).reduce((s: number, v: any) => s + nn(v), 0)
+    }
+  }
+  return { elimCapital, equitySimCapital }
 })
 
 // ─── 股比变动（内联表，非弹窗） ─────────────────────────────────────────────
@@ -535,7 +545,52 @@ async function doSave(sheetKey: string, payload: any) {
 const internalEntries = reactive<{ arap: any[]; trade: any[]; cashflow: any[] }>({
   arap: [], trade: [], cashflow: [],
 })
+
+// 从模拟权益法提取权益抵消/损益抵消分录（computed，不修改 reactive 数据）
+const equitySimEntries = computed(() => {
+  const entries: any[] = []
+  const nn = (v: any) => Number(v) || 0
+  const simRows = data.equitySimDirect
+  if (!simRows?.length) return entries
+
+  // 步骤1（期初模拟）的贷方行 → 权益抵消
+  const step1Idx = simRows.findIndex((r: EquitySimRow) => r.step === '期初长投模拟' && r.isStep)
+  if (step1Idx >= 0) {
+    for (let j = step1Idx + 1; j < simRows.length; j++) {
+      const r = simRows[j]
+      if (r.isStep) break
+      const amt = (r.values || []).reduce((s: number, v: any) => s + nn(v), 0)
+      if (amt) entries.push({ source: '权益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '期初模拟' })
+    }
+  }
+
+  // 步骤2（当期变动）→ 损益抵消
+  const step2Idx = simRows.findIndex((r: EquitySimRow) => r.step === '模拟当期长期股权投资' && r.isStep)
+  if (step2Idx >= 0) {
+    for (let j = step2Idx + 1; j < simRows.length; j++) {
+      const r = simRows[j]
+      if (r.isStep) break
+      const amt = (r.values || []).reduce((s: number, v: any) => s + nn(v), 0)
+      if (amt) entries.push({ source: '损益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '当期变动' })
+    }
+  }
+
+  // 步骤3（还原分红）
+  const step3Idx = simRows.findIndex((r: EquitySimRow) => r.step === '还原分红影响' && r.isStep)
+  if (step3Idx >= 0) {
+    for (let j = step3Idx + 1; j < simRows.length; j++) {
+      const r = simRows[j]
+      if (r.isStep) break
+      const amt = (r.values || []).reduce((s: number, v: any) => s + nn(v), 0)
+      if (amt) entries.push({ source: '损益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '还原分红' })
+    }
+  }
+
+  return entries
+})
+
 const allImportedEntries = computed(() => [
+  ...equitySimEntries.value,
   ...internalEntries.arap,
   ...internalEntries.trade,
   ...internalEntries.cashflow,
