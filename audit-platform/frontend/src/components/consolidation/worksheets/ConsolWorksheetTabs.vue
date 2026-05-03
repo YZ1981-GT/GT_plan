@@ -4,18 +4,35 @@
     <aside class="cw-nav" :style="{ width: navWidth + 'px' }">
       <div class="cw-nav-header">
         <span class="cw-nav-title">合并工作底稿</span>
+        <el-tooltip content="合并流程：基础数据→净资产归集→权益法模拟→抵消分录→汇总核查" placement="right">
+          <span style="cursor:help;font-size:12px;color:#999">ⓘ</span>
+        </el-tooltip>
       </div>
       <div class="cw-nav-list">
-        <div v-for="sheet in sheetList" :key="sheet.key"
-          class="cw-nav-item" :class="{ 'cw-nav-item--active': activeSheet === sheet.key }"
-          @click="activeSheet = sheet.key">
-          <el-icon :size="16"><component :is="sheet.icon" /></el-icon>
-          <div class="cw-nav-item-text">
-            <span class="cw-nav-item-label">{{ sheet.label }}</span>
-            <span class="cw-nav-item-desc">{{ sheet.desc }}</span>
+        <template v-for="group in navGroups" :key="group.key">
+          <div class="cw-nav-group" @click="group.collapsed = !group.collapsed">
+            <div class="cw-nav-group-left">
+              <span class="cw-nav-group-num">{{ group.step }}</span>
+              <span class="cw-nav-group-label">{{ group.label }}</span>
+            </div>
+            <div class="cw-nav-group-right">
+              <span class="cw-nav-group-count">{{ group.sheets.length }}表</span>
+              <span class="cw-nav-group-arrow">{{ group.collapsed ? '›' : '‹' }}</span>
+            </div>
           </div>
-          <el-tag v-if="sheet.tag" :type="sheet.tagType" size="small" effect="plain" style="flex-shrink:0">{{ sheet.tag }}</el-tag>
-        </div>
+          <template v-if="!group.collapsed">
+            <div v-for="sheet in group.sheets" :key="sheet.key"
+              class="cw-nav-item" :class="{ 'cw-nav-item--active': activeSheet === sheet.key }"
+              @click="activeSheet = sheet.key">
+              <el-icon :size="14"><component :is="sheet.icon" /></el-icon>
+              <div class="cw-nav-item-text">
+                <span class="cw-nav-item-label">{{ sheet.label }}</span>
+                <span class="cw-nav-item-desc">{{ sheet.desc }}</span>
+              </div>
+              <el-tag v-if="sheet.tag" :type="sheet.tagType" size="small" effect="plain" style="flex-shrink:0">{{ sheet.tag }}</el-tag>
+            </div>
+          </template>
+        </template>
       </div>
     </aside>
     <div class="cw-resizer" @mousedown="startResize" />
@@ -179,11 +196,44 @@ const shareChangeSheets = computed(() => {
 
 const sheetList = computed(() => {
   const list = [...staticSheets]
-  // 在"模拟权益法"之前插入股比变动表
   const simIdx = list.findIndex(s => s.key === 'equity_sim')
   list.splice(simIdx, 0, ...shareChangeSheets.value)
   return list
 })
+
+// ─── 树形分组导航 ─────────────────────────────────────────────────────────────
+const navGroups = reactive([
+  {
+    key: 'g1', label: '基础数据', step: '1',
+    collapsed: false,
+    sheets: computed(() => sheetList.value.filter(s => ['info', 'cost', 'equity_inv'].includes(s.key))),
+  },
+  {
+    key: 'g2', label: '净资产归集', step: '2',
+    collapsed: false,
+    sheets: computed(() => sheetList.value.filter(s => s.key === 'net_asset' || s.key.startsWith('share_change_'))),
+  },
+  {
+    key: 'g3', label: '权益法模拟', step: '3',
+    collapsed: false,
+    sheets: computed(() => sheetList.value.filter(s => s.key === 'equity_sim')),
+  },
+  {
+    key: 'g4', label: '内部抵消', step: '4',
+    collapsed: true,
+    sheets: computed(() => sheetList.value.filter(s => ['internal_arap', 'internal_trade', 'internal_cashflow'].includes(s.key))),
+  },
+  {
+    key: 'g5', label: '合并抵消', step: '5',
+    collapsed: false,
+    sheets: computed(() => sheetList.value.filter(s => ['elimination', 'capital'].includes(s.key))),
+  },
+  {
+    key: 'g6', label: '汇总核查', step: '✓',
+    collapsed: true,
+    sheets: computed(() => sheetList.value.filter(s => ['post_invest', 'post_income', 'minority'].includes(s.key))),
+  },
+])
 
 const activeSheet = ref('info')
 
@@ -440,8 +490,8 @@ function onOpenFormula(sheetKey: string) {
 .cw-nav-title { font-size: 15px; font-weight: 700; color: #333; }
 .cw-nav-list { flex: 1; overflow-y: auto; padding: 8px; }
 .cw-nav-item {
-  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; margin-bottom: 2px;
-  border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px 8px 18px; margin: 1px 6px;
+  border-radius: 6px; cursor: pointer; transition: all 0.15s;
 }
 .cw-nav-item:hover { background: rgba(75,45,119,0.04); }
 .cw-nav-item--active {
@@ -452,6 +502,24 @@ function onOpenFormula(sheetKey: string) {
 .cw-nav-item-text { flex: 1; min-width: 0; }
 .cw-nav-item-label { display: block; font-size: 13px; color: #333; line-height: 1.4; }
 .cw-nav-item-desc { display: block; font-size: 11px; color: #999; margin-top: 2px; }
+.cw-nav-group {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; margin: 6px 6px 2px; cursor: pointer;
+  background: linear-gradient(135deg, #f0edf5, #e8e4f0); border-radius: 6px;
+  user-select: none; transition: background 0.15s;
+}
+.cw-nav-group:hover { background: linear-gradient(135deg, #e8e4f0, #ddd8e8); }
+.cw-nav-group:first-child { margin-top: 2px; }
+.cw-nav-group-left { display: flex; align-items: center; gap: 8px; }
+.cw-nav-group-num {
+  width: 20px; height: 20px; border-radius: 50%; background: #4b2d77; color: #fff;
+  font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cw-nav-group-label { font-size: 12px; font-weight: 600; color: #333; }
+.cw-nav-group-right { display: flex; align-items: center; gap: 6px; }
+.cw-nav-group-count { font-size: 10px; color: #999; }
+.cw-nav-group-arrow { font-size: 14px; color: #999; font-weight: 700; transition: transform 0.15s; }
 .cw-resizer {
   width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0;
   transition: background 0.15s;

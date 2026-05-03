@@ -51,6 +51,7 @@ inclusion: always
 - 公式联动机制：CustomEvent('gt-open-formula-manager') 打开 + CustomEvent('gt-formula-changed') 广播变更，各模块监听刷新
 - 企业级治理完整（门禁/留痕/SoD/版本链/一致性复算）
 - 合并工作底稿前端 9 个组件已创建（worksheets/），集成到 ConsolidationIndex 第一个 Tab
+- 合并工作底稿已扩展到 16 个组件（7基础表+3汇总表+3内部抵消表+股比变动表+入口Tab），左侧导航含动态股比变动项
 
 ## 活跃待办
 

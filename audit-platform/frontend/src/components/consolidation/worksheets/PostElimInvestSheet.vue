@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface InvestRow { company_name: string; company_code: string; open_cost: number|null; open_impairment: number|null; [k: string]: any }
@@ -97,7 +97,9 @@ const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
 const n = (v: any) => Number(v) || 0
 
-// 逐家计算
+// 逐家计算（默认自动，支持用户覆盖编辑）
+const overrides = reactive<Record<string, Record<string, number | null>>>({})
+
 const tableRows = computed(() => {
   return props.companies.map((comp, ci) => {
     // 1. 账面长投（从投资明细表取期末数）
@@ -135,13 +137,24 @@ const tableRows = computed(() => {
     // 4. 抵消后 = 模拟后长投 - 合并抵消
     const postElimTotal = simTotal - elimTotal
 
-    return {
+    // 应用用户覆盖
+    const ov = overrides[comp.name] || {}
+    const result: any = {
       companyName: comp.name, companyCode: comp.code, ratio: comp.ratio,
       bookCost, bookImpairment, bookNet,
       simIncomeAdj, simOtherEquity, simTotal,
       elimCost, elimIncomeAdj, elimOtherEquity, elimTotal,
-      postElimTotal,
+      postElimTotal, _editable: true,
     }
+    // 覆盖：用户编辑的值优先
+    for (const k of Object.keys(ov)) {
+      if (ov[k] != null) result[k] = ov[k]
+    }
+    // 重算抵消后
+    if (ov.simTotal != null || ov.elimTotal != null) {
+      result.postElimTotal = (ov.simTotal ?? result.simTotal) - (ov.elimTotal ?? result.elimTotal)
+    }
+    return result
   })
 })
 

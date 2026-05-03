@@ -67,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -84,6 +84,8 @@ defineEmits<{ (e: 'save', data: any): void }>()
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
 const n = (v: any) => Number(v) || 0
+
+const overrides = reactive<Record<string, Record<string, number | null>>>({})
 
 const tableRows = computed(() => {
   return props.companies.map((comp, ci) => {
@@ -117,12 +119,15 @@ const tableRows = computed(() => {
     // 超额亏损判断
     const isExcessLoss = endNetAsset < 0 && minorityEquity < 0
 
-    return {
+    const ov = overrides[comp.name] || {}
+    const result: any = {
       companyName: comp.name, parentRatio, minorityRatio,
       endNetAsset, minorityEquity, elimMinorityEquity, equityDiff,
       currentProfit, minorityProfit, elimMinorityProfit, profitDiff,
-      isExcessLoss,
+      isExcessLoss, _editable: true,
     }
+    for (const k of Object.keys(ov)) { if (ov[k] != null) result[k] = ov[k] }
+    return result
   })
 })
 
