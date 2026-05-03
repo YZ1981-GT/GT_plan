@@ -20,36 +20,56 @@
 
       <!-- Tab 1: 集团架构 -->
       <el-tab-pane label="集团架构" name="structure">
-        <div class="gt-tab-content gt-structure-layout">
-          <div class="gt-structure-tree">
-            <el-tree
-              :data="groupTree"
-              :props="{ label: 'company_name', children: 'children' }"
-              default-expand-all
-              node-key="company_code"
-              highlight-current
-              @node-click="onTreeNodeClick"
-            >
-              <template #default="{ data }">
-                <span class="gt-tree-node">
-                  <span>{{ data.company_name || data.name }}</span>
-                  <el-tag v-if="data.shareholding" size="small" type="info" style="margin-left:8px">
-                    {{ data.shareholding }}%
-                  </el-tag>
-                </span>
-              </template>
-            </el-tree>
-            <el-empty v-if="!groupTree.length" description="暂无集团架构数据" />
+        <div class="gt-tab-content">
+          <!-- 工具栏 -->
+          <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+            <el-button size="small" :type="orgViewMode === 'chart' ? 'primary' : ''" @click="orgViewMode = 'chart'">📊 组织结构图</el-button>
+            <el-button size="small" :type="orgViewMode === 'tree' ? 'primary' : ''" @click="orgViewMode = 'tree'">🌳 树形列表</el-button>
+            <el-button size="small" @click="orgZoom = Math.min(orgZoom + 0.1, 2)">🔍+</el-button>
+            <el-button size="small" @click="orgZoom = Math.max(orgZoom - 0.1, 0.4)">🔍-</el-button>
+            <el-button size="small" @click="orgZoom = 1">1:1</el-button>
+            <span style="font-size:11px;color:#999;margin-left:auto">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
           </div>
-          <div v-if="selectedNode" class="gt-structure-card">
-            <el-descriptions :column="1" border size="small" title="节点信息">
-              <el-descriptions-item label="企业名称">{{ selectedNode.company_name }}</el-descriptions-item>
-              <el-descriptions-item label="企业代码">{{ selectedNode.company_code }}</el-descriptions-item>
-              <el-descriptions-item label="持股比例" v-if="selectedNode.shareholding">{{ selectedNode.shareholding }}%</el-descriptions-item>
-            </el-descriptions>
-            <el-button type="primary" size="small" style="margin-top:12px" @click="goToProject(selectedNode)">
-              跳转项目
-            </el-button>
+
+          <!-- 组织结构图模式 -->
+          <div v-if="orgViewMode === 'chart'" class="org-chart-wrapper" :style="{ transform: `scale(${orgZoom})`, transformOrigin: 'top left' }">
+            <div v-if="groupTree.length" class="org-chart">
+              <org-node :node="groupTree[0]" :depth="0" @select="onTreeNodeClick" :selected-code="selectedNode?.company_code" />
+            </div>
+            <el-empty v-else description="暂无集团架构数据，请先配置合并范围" />
+          </div>
+
+          <!-- 树形列表模式 -->
+          <div v-else class="gt-structure-layout">
+            <div class="gt-structure-tree">
+              <el-tree :data="groupTree" :props="{ label: 'company_name', children: 'children' }"
+                default-expand-all node-key="company_code" highlight-current @node-click="onTreeNodeClick">
+                <template #default="{ data }">
+                  <span class="gt-tree-node">
+                    <span>{{ data.company_name || data.name }}</span>
+                    <el-tag v-if="data.shareholding" size="small" type="info" style="margin-left:8px">{{ data.shareholding }}%</el-tag>
+                  </span>
+                </template>
+              </el-tree>
+              <el-empty v-if="!groupTree.length" description="暂无集团架构数据" />
+            </div>
+            <div v-if="selectedNode" class="gt-structure-card">
+              <el-descriptions :column="1" border size="small" title="节点信息">
+                <el-descriptions-item label="企业名称">{{ selectedNode.company_name }}</el-descriptions-item>
+                <el-descriptions-item label="企业代码">{{ selectedNode.company_code }}</el-descriptions-item>
+                <el-descriptions-item label="持股比例" v-if="selectedNode.shareholding">{{ selectedNode.shareholding }}%</el-descriptions-item>
+              </el-descriptions>
+              <el-button type="primary" size="small" style="margin-top:12px" @click="goToProject(selectedNode)">跳转项目</el-button>
+            </div>
+          </div>
+
+          <!-- 选中节点信息卡（组织图模式） -->
+          <div v-if="orgViewMode === 'chart' && selectedNode" class="org-detail-card">
+            <h4 style="margin:0 0 8px;color:#4b2d77">{{ selectedNode.company_name }}</h4>
+            <p style="font-size:12px;color:#666;margin:4px 0">代码：{{ selectedNode.company_code || '—' }}</p>
+            <p v-if="selectedNode.shareholding" style="font-size:12px;color:#666;margin:4px 0">持股：{{ selectedNode.shareholding }}%</p>
+            <p v-if="selectedNode.children?.length" style="font-size:12px;color:#999;margin:4px 0">下级：{{ selectedNode.children.length }} 家</p>
+            <el-button type="primary" size="small" style="margin-top:8px" @click="goToProject(selectedNode)">跳转项目</el-button>
           </div>
         </div>
       </el-tab-pane>
@@ -308,6 +328,7 @@ import {
 import { listChildProjects } from '@/services/commonApi'
 import http from '@/utils/http'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
+import OrgNode from '@/components/consolidation/OrgNode.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -340,6 +361,21 @@ async function loadProjectInfo() {
 // ─── Tab 1: 集团架构 ─────────────────────────────────────────────────────────
 const groupTree = ref<any[]>([])
 const selectedNode = ref<any>(null)
+const orgViewMode = ref<'chart' | 'tree'>('chart')
+const orgZoom = ref(0.85)
+
+// 统计节点数和最大深度
+function countNodes(node: any): number {
+  let c = 1
+  if (node.children) for (const ch of node.children) c += countNodes(ch)
+  return c
+}
+function maxDepth(node: any, d = 1): number {
+  if (!node.children?.length) return d
+  return Math.max(...node.children.map((ch: any) => maxDepth(ch, d + 1)))
+}
+const orgNodeCount = computed(() => groupTree.value.length ? countNodes(groupTree.value[0]) : 0)
+const orgMaxDepth = computed(() => groupTree.value.length ? maxDepth(groupTree.value[0]) : 0)
 
 async function loadGroupTree() {
   try {
@@ -712,4 +748,19 @@ watch(activeTab, (tab) => {
 .gt-structure-tree { flex: 1; min-width: 300px; }
 .gt-structure-card { width: 320px; flex-shrink: 0; }
 .gt-tree-node { display: flex; align-items: center; }
+
+/* ── 组织结构图 ── */
+.org-chart-wrapper {
+  overflow: auto; padding: 20px; min-height: 300px;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f3f8 100%);
+  border: 1px solid #e8e4f0; border-radius: 10px;
+  transition: transform 0.2s ease;
+}
+.org-chart { display: flex; justify-content: center; }
+.org-detail-card {
+  position: fixed; bottom: 20px; right: 20px; z-index: 100;
+  background: #fff; border: 1px solid #e8e4f0; border-radius: 10px;
+  padding: 14px 18px; box-shadow: 0 4px 20px rgba(75,45,119,0.12);
+  min-width: 200px; max-width: 280px;
+}
 </style>
