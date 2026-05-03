@@ -67,15 +67,18 @@
       <PostElimInvestSheet v-else-if="activeSheet === 'post_invest'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :investment-equity="data.investmentEquity" :equity-sim-direct="data.equitySimDirect"
-        :elim-equity="data.elimEquity" @save="onSave('抵消后长投', $event)" @open-formula="onOpenFormula" />
+        :elim-equity="data.elimEquity" @save="onSave('抵消后长投', $event)" @open-formula="onOpenFormula"
+        @goto-sheet="(k: string) => activeSheet = k" />
       <PostElimIncomeSheet v-else-if="activeSheet === 'post_income'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :equity-sim-direct="data.equitySimDirect" :elim-income="data.elimIncome"
-        @save="onSave('抵消后投资收益', $event)" />
+        @save="onSave('抵消后投资收益', $event)"
+        @goto-sheet="(k: string) => activeSheet = k" />
       <MinorityInterestSheet v-else-if="activeSheet === 'minority'"
         :companies="companyColumns" :net-asset-data="data.netAsset"
         :equity-sim-direct="data.equitySimDirect" :elim-equity="data.elimEquity"
-        :elim-income="data.elimIncome" @save="onSave('少数股东权益损益', $event)" />
+        :elim-income="data.elimIncome" @save="onSave('少数股东权益损益', $event)"
+        @goto-sheet="(k: string) => activeSheet = k" />
       <!-- 内部抵消表 -->
       <InternalArApSheet v-else-if="activeSheet === 'internal_arap'"
         :companies="companyColumns" @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"

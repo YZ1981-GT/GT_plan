@@ -6,11 +6,20 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDeleteRows">
+          删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
+        </el-button>
         <el-button size="small" @click="$emit('save', tableRows)">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>各家期末净资产 × 少数股东比例(1-母公司持股比例) = 少数股东权益；当期净利润 × 少数股东比例 = 少数股东损益。与合并抵消分录中的少数股东权益/损益交叉校验。<b>可编辑覆盖自动值</b>。</span>
+      <span>取数来源：
+        <a class="ws-link" @click="$emit('goto-sheet', 'net_asset')">净资产表</a>(期末净资产/净利润) →
+        <a class="ws-link" @click="$emit('goto-sheet', 'info')">基本信息表</a>(持股比例) →
+        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>(少数股东权益/损益)。
+        <b>可编辑覆盖，可增删行</b>。
+      </span>
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"
@@ -70,6 +79,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -81,11 +91,28 @@ const props = defineProps<{
   elimIncome: any[]         // 合并抵消-损益
 }>()
 
-defineEmits<{ (e: 'save', data: any): void }>()
+defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void }>()
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
+const manualRows = reactive<any[]>([])
+
+function addRow() {
+  const nr = { companyName: '', parentRatio: 0, minorityRatio: 0, endNetAsset: 0, minorityEquity: 0, elimMinorityEquity: 0, equityDiff: 0, currentProfit: 0, minorityProfit: 0, elimMinorityProfit: 0, profitDiff: 0, isExcessLoss: false, _manual: true, _editable: true }
+  if (selectedRows.value.length > 0) {
+    const last = selectedRows.value[selectedRows.value.length - 1]
+    const idx = manualRows.indexOf(last)
+    if (idx >= 0) { manualRows.splice(idx + 1, 0, nr); return }
+  }
+  manualRows.push(nr)
+}
+async function batchDeleteRows() {
+  if (!selectedRows.value.length) return
+  try { await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedRows.value); const remaining = manualRows.filter(r => !del.has(r)); manualRows.length = 0; manualRows.push(...remaining); selectedRows.value = []
+  } catch {}
+}
 const n = (v: any) => Number(v) || 0
 
 const overrides = reactive<Record<string, Record<string, number | null>>>({})
@@ -166,4 +193,9 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-bold { font-weight: 700; }
 .ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
 .ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
+</style>
+
+<style>
+.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: #7c5caa; }
 </style>

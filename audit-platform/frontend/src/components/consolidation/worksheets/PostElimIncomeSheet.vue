@@ -6,11 +6,20 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDeleteRows">
+          删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
+        </el-button>
         <el-button size="small" @click="$emit('save', tableRows)">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>自动汇总：各家账面投资收益 + 权益法模拟投资收益 - 还原分红 - 合并抵消投资收益 = 抵消后投资收益（合并利润表列示数）。<b>可编辑覆盖自动值</b>。</span>
+      <span>取数来源：
+        <a class="ws-link" @click="$emit('goto-sheet', 'cost')">投资明细-成本法</a>(现金红利) →
+        <a class="ws-link" @click="$emit('goto-sheet', 'equity_sim')">模拟权益法</a>(投资收益/还原分红) →
+        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>(抵消投资收益)。
+        <b>可编辑覆盖，可增删行</b>。
+      </span>
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"
@@ -52,6 +61,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -62,11 +72,28 @@ const props = defineProps<{
   elimIncome: any[]
 }>()
 
-defineEmits<{ (e: 'save', data: any): void }>()
+defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void }>()
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
+const manualRows = reactive<any[]>([])
+
+function addRow() {
+  const nr = { companyName: '', ratio: 0, bookDividend: 0, simInvestIncome: 0, dividendReverse: 0, elimInvestIncome: 0, postElimIncome: 0, _manual: true, _editable: true }
+  if (selectedRows.value.length > 0) {
+    const last = selectedRows.value[selectedRows.value.length - 1]
+    const idx = manualRows.indexOf(last)
+    if (idx >= 0) { manualRows.splice(idx + 1, 0, nr); return }
+  }
+  manualRows.push(nr)
+}
+async function batchDeleteRows() {
+  if (!selectedRows.value.length) return
+  try { await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedRows.value); const remaining = manualRows.filter(r => !del.has(r)); manualRows.length = 0; manualRows.push(...remaining); selectedRows.value = []
+  } catch {}
+}
 const n = (v: any) => Number(v) || 0
 
 const overrides = reactive<Record<string, Record<string, number | null>>>({})
@@ -132,4 +159,9 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-bold { font-weight: 700; }
 .ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
 .ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
+</style>
+
+<style>
+.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: #7c5caa; }
 </style>

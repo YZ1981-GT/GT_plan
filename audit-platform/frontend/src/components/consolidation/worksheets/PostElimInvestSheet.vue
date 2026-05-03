@@ -8,11 +8,21 @@
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_post_invest')">ƒx 公式</el-button>
         <el-button size="small" @click="exportData">📥 导出Excel</el-button>
+        <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDeleteRows">
+          删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
+        </el-button>
         <el-button size="small" @click="$emit('save', tableRows)">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>自动汇总：各家账面长投 + 权益法模拟调整 - 合并抵消 = 抵消后长投（合并报表列示数）。全资子公司抵消后应为0。数据来源于投资明细表、模拟权益法表和合并抵消分录表。<b>可编辑覆盖自动值，导出Excel查看明细</b>。</span>
+      <span>取数来源：
+        <a class="ws-link" @click="$emit('goto-sheet', 'cost')">投资明细-成本法</a> +
+        <a class="ws-link" @click="$emit('goto-sheet', 'equity_inv')">投资明细-权益法</a> →
+        <a class="ws-link" @click="$emit('goto-sheet', 'equity_sim')">模拟权益法</a> →
+        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>。
+        全资子公司抵消后应为0。<b>可编辑覆盖自动值，可增删行</b>。
+      </span>
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"
@@ -80,6 +90,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface InvestRow { company_name: string; company_code: string; open_cost: number|null; open_impairment: number|null; [k: string]: any }
@@ -94,18 +105,49 @@ const props = defineProps<{
   elimEquity: ElimRow[]             // 合并抵消-权益抵消
 }>()
 
-defineEmits<{ (e: 'save', data: any): void; (e: 'open-formula', key: string): void }>()
+defineEmits<{ (e: 'save', data: any): void; (e: 'open-formula', key: string): void; (e: 'goto-sheet', key: string): void }>()
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
+
+// 手动新增行（用于特殊企业）
+const manualRows = reactive<any[]>([])
+
+function addRow() {
+  const newRow = {
+    companyName: '', companyCode: '', ratio: 0, _editable: true, _manual: true,
+    bookCost: 0, bookImpairment: 0, bookNet: 0,
+    simIncomeAdj: 0, simOtherEquity: 0, simTotal: 0,
+    elimCost: 0, elimIncomeAdj: 0, elimOtherEquity: 0, elimTotal: 0,
+    postElimTotal: 0,
+  }
+  if (selectedRows.value.length > 0) {
+    const last = selectedRows.value[selectedRows.value.length - 1]
+    const idx = manualRows.indexOf(last)
+    if (idx >= 0) { manualRows.splice(idx + 1, 0, newRow); return }
+  }
+  manualRows.push(newRow)
+}
+
+async function batchDeleteRows() {
+  if (!selectedRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedRows.value)
+    // 只能删除手动行
+    const remaining = manualRows.filter(r => !del.has(r))
+    manualRows.length = 0; manualRows.push(...remaining)
+    selectedRows.value = []
+  } catch {}
+}
 const n = (v: any) => Number(v) || 0
 
 // 逐家计算（默认自动，支持用户覆盖编辑）
 const overrides = reactive<Record<string, Record<string, number | null>>>({})
 
 const tableRows = computed(() => {
-  return props.companies.map((comp, ci) => {
+  const autoRows = props.companies.map((comp, ci) => {
     // 1. 账面长投（从投资明细表取期末数）
     const costRow = props.investmentCost.find(r => r.company_name === comp.name || r.company_code === comp.code)
     const equityRow = props.investmentEquity.find(r => r.company_name === comp.name || r.company_code === comp.code)
@@ -160,6 +202,8 @@ const tableRows = computed(() => {
     }
     return result
   })
+  // 追加手动新增的行
+  return [...autoRows, ...manualRows]
 })
 
 function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -217,4 +261,6 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-table :deep(.ws-row-warn td) { background: #fdf6ec !important; }
 .ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
 .ws-table :deep(.ws-auto-cell .el-input__inner) { color: #4b2d77; background: #faf8fd; }
+.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: #7c5caa; }
 </style>
