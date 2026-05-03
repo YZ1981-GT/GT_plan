@@ -1,5 +1,6 @@
 """合并工作底稿数据存储 API — 通用 JSON 存储，支持所有 16 张表的保存/加载"""
 
+import json
 import uuid
 from datetime import datetime
 
@@ -29,26 +30,35 @@ class WorksheetDataResponse(BaseModel):
 
 
 # ─── 确保表存在 ──────────────────────────────────────────────────────────────
-CREATE_TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS consol_worksheet_data (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL,
-    year INT NOT NULL,
-    sheet_key VARCHAR(100) NOT NULL,
-    data JSONB NOT NULL DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_by UUID,
-    UNIQUE(project_id, year, sheet_key)
-);
-CREATE INDEX IF NOT EXISTS ix_cwd_project_year ON consol_worksheet_data(project_id, year);
-"""
-
+_table_created = False
 
 async def ensure_table(db: AsyncSession):
     """首次调用时自动建表"""
-    await db.execute(text(CREATE_TABLE_SQL))
-    await db.commit()
+    global _table_created
+    if _table_created:
+        return
+    try:
+        await db.execute(text("""
+            CREATE TABLE IF NOT EXISTS consol_worksheet_data (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                project_id UUID NOT NULL,
+                year INT NOT NULL,
+                sheet_key VARCHAR(100) NOT NULL,
+                data JSONB NOT NULL DEFAULT '{}',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                created_by UUID,
+                UNIQUE(project_id, year, sheet_key)
+            )
+        """))
+        await db.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_cwd_project_year ON consol_worksheet_data(project_id, year)"
+        ))
+        await db.commit()
+        _table_created = True
+    except Exception:
+        await db.rollback()
+        _table_created = True  # 表可能已存在，忽略错误
 
 
 # ─── GET: 加载某张表的数据 ────────────────────────────────────────────────────
@@ -83,21 +93,24 @@ async def save_worksheet_data(
 ):
     await ensure_table(db)
     now = datetime.utcnow()
-    # PostgreSQL upsert
-    await db.execute(
-        text("""
-            INSERT INTO consol_worksheet_data (id, project_id, year, sheet_key, data, created_at, updated_at)
-            VALUES (:id, :pid, :y, :sk, :data::jsonb, :now, :now)
-            ON CONFLICT (project_id, year, sheet_key)
-            DO UPDATE SET data = :data::jsonb, updated_at = :now
-        """),
-        {
-            "id": str(uuid.uuid4()), "pid": project_id, "y": year,
-            "sk": body.sheet_key, "data": __import__("json").dumps(body.data, ensure_ascii=False),
-            "now": now,
-        },
-    )
-    await db.commit()
+    try:
+        await db.execute(
+            text("""
+                INSERT INTO consol_worksheet_data (id, project_id, year, sheet_key, data, created_at, updated_at)
+                VALUES (:id, :pid, :y, :sk, CAST(:data AS jsonb), :now, :now)
+                ON CONFLICT (project_id, year, sheet_key)
+                DO UPDATE SET data = CAST(:data AS jsonb), updated_at = :now
+            """),
+            {
+                "id": str(uuid.uuid4()), "pid": project_id, "y": year,
+                "sk": sheet_key, "data": json.dumps(body.data, ensure_ascii=False),
+                "now": now,
+            },
+        )
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Save failed: {str(e)}")
     return WorksheetDataResponse(
         project_id=project_id, year=year, sheet_key=sheet_key,
         data=body.data, updated_at=str(now),

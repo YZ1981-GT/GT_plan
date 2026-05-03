@@ -33,12 +33,12 @@ export async function saveWorksheetData(
   projectId: string, year: number, sheetKey: string, sheetData: Record<string, any>
 ): Promise<boolean> {
   try {
-    await http.put(
+    const resp = await http.put(
       `/api/consol-worksheet-data/${projectId}/${year}/${sheetKey}`,
       { sheet_key: sheetKey, data: sheetData },
       { validateStatus: (s: number) => s < 600 }
     )
-    return true
+    return resp.status >= 200 && resp.status < 300
   } catch {
     return false
   }
@@ -49,17 +49,20 @@ export async function loadAllWorksheetData(
   projectId: string, year: number
 ): Promise<Record<string, Record<string, any>>> {
   try {
-    const { data } = await http.get(
+    const resp = await http.get(
       `/api/consol-worksheet-data/${projectId}/${year}`,
       { validateStatus: (s: number) => s < 600 }
     )
-    const items = data?.data ?? data ?? []
+    // resp.data 可能是数组（直接返回）或 { data: 数组 }（被拦截器解包）
+    let items = resp.data
+    if (items && !Array.isArray(items) && Array.isArray(items.data)) {
+      items = items.data
+    }
+    if (!Array.isArray(items)) items = []
     const result: Record<string, Record<string, any>> = {}
-    if (Array.isArray(items)) {
-      for (const item of items) {
-        if (item.sheet_key && item.data) {
-          result[item.sheet_key] = item.data
-        }
+    for (const item of items) {
+      if (item?.sheet_key && item?.data) {
+        result[item.sheet_key] = item.data
       }
     }
     return result

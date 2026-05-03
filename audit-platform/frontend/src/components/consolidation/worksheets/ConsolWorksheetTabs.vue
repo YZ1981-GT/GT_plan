@@ -532,12 +532,12 @@ async function doSave(sheetKey: string, payload: any) {
   try {
     const ok = await saveWorksheetData(projectId.value, year.value, sheetKey, { rows: payload })
     if (ok) {
-      ElMessage.success(`${sheetKey} 已保存到服务器`)
+      ElMessage.success(`${sheetKey} 已保存`)
     } else {
-      ElMessage.error('保存失败，请重试')
+      ElMessage.error(`${sheetKey} 保存失败，请检查后端服务`)
     }
   } catch (err: any) {
-    ElMessage.error('保存失败：' + (err.message || ''))
+    ElMessage.error('保存异常：' + (err.message || '网络错误'))
   }
 }
 

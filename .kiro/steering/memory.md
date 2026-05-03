@@ -101,6 +101,7 @@ inclusion: always
 - 附注正文三级填充：上年附注-LLM 生成-模板默认文字
 - RAG：llm_client.chat_completion 支持 context_documents 参数，截断 8000 字符
 - asyncpg 时区：datetime.utcnow()（naive），不能用 timezone.utc（aware）
+- asyncpg 不支持 `::jsonb` 类型转换语法（与命名参数 `:data` 冲突），必须用 `CAST(:data AS jsonb)`
 - Alembic 已放弃，用 create_all + 手动 ALTER TABLE
 - 底稿明细行：不硬编码行名，用 detail_discovery 动态发现（企业实际数据决定），key_rows 只定义结构性行
 - 附注表格填充：结构/样式来自模板，明细行数据从底稿 fine_summary 动态提取，降级从试算表取数，合计行自动求和
@@ -112,6 +113,7 @@ inclusion: always
 - el-table 内嵌 el-select 必须用 `v-model` + `<div @click.stop @mousedown.stop>` 包裹 + watch 防循环（internalUpdate 标志位，prop→rows 用直接赋值不要浅拷贝）
 - el-table 多级表头的 getSummary 中 `col.property` 对嵌套子列可能为 undefined，计算列需用 `col.label` + `col.parent?.label` 匹配后手动计算
 - 模板渲染函数中禁止修改 reactive 数据（如 `row.total = sum`），会触发无限渲染循环崩溃，合计同步放 watch 中
+- 跨表数据提取用 computed 而非 watch 修改源数据，watch 修改 reactive 数组会触发 indexOf 崩溃（已踩坑两次）
 - `<script setup>` 中 reactive 数组初始化必须在 setup 阶段同步完成（不能依赖 watch immediate），否则模板首次渲染时数组为空导致 undefined 崩溃
 - 同一组件不同 props 切换时（如股比变动1/2/3次），必须加 `:key` 强制重建实例，否则 reactive 数据的数组长度不匹配
 - Vue 模板 HTML 属性值中禁止使用中文引号 `""`，会被解析为属性结束符导致编译失败
