@@ -15,30 +15,31 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>内部往来余额抵消。本方金额应等于对方金额，差异需说明。坏账按账龄明细记录，合并时冲回。账龄段从项目设置中统一引用。</span>
+      <span>每行一笔往来：本方↔对方，账龄段横向展开。原值和坏账按账龄段分列填写，合计自动汇总。差异=本方合计-对方合计。</span>
     </div>
 
-    <!-- 账龄段设置 -->
+    <!-- 账龄段选择 -->
     <div class="ws-aging-bar" v-show="!isFullscreen">
       <span style="font-size:12px;color:#666;margin-right:8px">账龄段：</span>
-      <el-radio-group v-model="agingPreset" size="small" @change="onAgingPresetChange">
+      <el-radio-group v-model="agingPreset" size="small">
         <el-radio-button value="3year">3年段</el-radio-button>
         <el-radio-button value="5year">5年段</el-radio-button>
         <el-radio-button value="custom">自定义</el-radio-button>
       </el-radio-group>
+      <el-button v-if="agingPreset === 'custom'" size="small" style="margin-left:8px" @click="showAgingDialog = true">✏️ 编辑账龄段</el-button>
       <span style="font-size:11px;color:#999;margin-left:8px">{{ agingSegments.map(a => a.name).join(' / ') }}</span>
     </div>
 
+    <!-- 主表格 -->
     <el-table :data="rows" border size="small" class="ws-table"
-      :max-height="isFullscreen ? 'calc(100vh - 80px)' : 'calc(100vh - 320px)'"
+      :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 340px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       @selection-change="sel => selectedRows = sel">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
-
-      <!-- 本方 -->
+      <!-- 本方基本信息 -->
       <el-table-column label="本方" align="center">
-        <el-table-column prop="localCompany" label="单位" width="130">
+        <el-table-column prop="localCompany" label="单位" width="120">
           <template #default="{ row }">
             <div @click.stop @mousedown.stop>
               <el-select v-model="row.localCompany" size="small" style="width:100%" placeholder="选择" filterable>
@@ -47,7 +48,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="localSubject" label="科目" width="120">
+        <el-table-column prop="localSubject" label="科目" width="110">
           <template #default="{ row }">
             <div @click.stop @mousedown.stop>
               <el-select v-model="row.localSubject" size="small" style="width:100%" placeholder="科目" filterable allow-create>
@@ -56,29 +57,27 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="localDetail" label="明细" width="110">
+        <el-table-column prop="localDetail" label="明细" width="100">
           <template #default="{ row }"><el-input v-model="row.localDetail" size="small" placeholder="明细" /></template>
         </el-table-column>
-        <el-table-column prop="localAmount" label="金额" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.localAmount" size="small" :precision="2" :controls="false" style="width:100%" /></template>
+        <!-- 本方原值按账龄 -->
+        <el-table-column v-for="(ag, ai) in agingSegments" :key="'la'+ai" :label="ag.name" width="100" align="right">
+          <template #default="{ row }"><el-input-number v-model="row.localAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
-        <el-table-column prop="localImpairment" label="坏账准备" width="100" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.localImpairment" size="small" :precision="2" :controls="false" style="width:100%" /></template>
+        <el-table-column label="原值合计" width="110" align="right">
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.localAmounts)) }}</span></template>
         </el-table-column>
-        <el-table-column prop="localAging" label="账龄" width="100">
-          <template #default="{ row }">
-            <div @click.stop @mousedown.stop>
-              <el-select v-model="row.localAging" size="small" style="width:100%" placeholder="账龄">
-                <el-option v-for="a in agingSegments" :key="a.name" :label="a.name" :value="a.name" />
-              </el-select>
-            </div>
-          </template>
+        <!-- 本方坏账按账龄 -->
+        <el-table-column v-for="(ag, ai) in agingSegments" :key="'li'+ai" :label="'坏账-'+ag.name" width="90" align="right">
+          <template #default="{ row }"><el-input-number v-model="row.localImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
+        </el-table-column>
+        <el-table-column label="坏账合计" width="100" align="right">
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.localImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
-
-      <!-- 对方 -->
+      <!-- 对方基本信息 -->
       <el-table-column label="对方" align="center">
-        <el-table-column prop="remoteCompany" label="单位" width="130">
+        <el-table-column prop="remoteCompany" label="单位" width="120">
           <template #default="{ row }">
             <div @click.stop @mousedown.stop>
               <el-select v-model="row.remoteCompany" size="small" style="width:100%" placeholder="选择" filterable>
@@ -87,7 +86,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="remoteSubject" label="科目" width="120">
+        <el-table-column prop="remoteSubject" label="科目" width="110">
           <template #default="{ row }">
             <div @click.stop @mousedown.stop>
               <el-select v-model="row.remoteSubject" size="small" style="width:100%" placeholder="科目" filterable allow-create>
@@ -96,35 +95,31 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="remoteDetail" label="明细" width="110">
+        <el-table-column prop="remoteDetail" label="明细" width="100">
           <template #default="{ row }"><el-input v-model="row.remoteDetail" size="small" placeholder="明细" /></template>
         </el-table-column>
-        <el-table-column prop="remoteAmount" label="金额" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.remoteAmount" size="small" :precision="2" :controls="false" style="width:100%" /></template>
+        <el-table-column v-for="(ag, ai) in agingSegments" :key="'ra'+ai" :label="ag.name" width="100" align="right">
+          <template #default="{ row }"><el-input-number v-model="row.remoteAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
-        <el-table-column prop="remoteImpairment" label="坏账准备" width="100" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.remoteImpairment" size="small" :precision="2" :controls="false" style="width:100%" /></template>
+        <el-table-column label="原值合计" width="110" align="right">
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.remoteAmounts)) }}</span></template>
         </el-table-column>
-        <el-table-column prop="remoteAging" label="账龄" width="100">
-          <template #default="{ row }">
-            <div @click.stop @mousedown.stop>
-              <el-select v-model="row.remoteAging" size="small" style="width:100%" placeholder="账龄">
-                <el-option v-for="a in agingSegments" :key="a.name" :label="a.name" :value="a.name" />
-              </el-select>
-            </div>
-          </template>
+        <el-table-column v-for="(ag, ai) in agingSegments" :key="'ri'+ai" :label="'坏账-'+ag.name" width="90" align="right">
+          <template #default="{ row }"><el-input-number v-model="row.remoteImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
+        </el-table-column>
+        <el-table-column label="坏账合计" width="100" align="right">
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.remoteImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
-
-      <!-- 差异与核查 -->
+      <!-- 差异 -->
       <el-table-column label="差异" width="110" align="right">
         <template #default="{ row }">
-          <span :class="n(row.localAmount) - n(row.remoteAmount) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
-            {{ fmt(n(row.localAmount) - n(row.remoteAmount)) }}
+          <span :class="sumArr(row.localAmounts) - sumArr(row.remoteAmounts) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
+            {{ fmt(sumArr(row.localAmounts) - sumArr(row.remoteAmounts)) }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column prop="diffReason" label="差异原因" width="140">
+      <el-table-column prop="diffReason" label="差异原因" width="130">
         <template #default="{ row }"><el-input v-model="row.diffReason" size="small" placeholder="原因" /></template>
       </el-table-column>
     </el-table>
@@ -144,18 +139,50 @@
         <el-table-column prop="desc" label="说明" min-width="200" show-overflow-tooltip />
       </el-table>
     </div>
+
+    <!-- 自定义账龄段弹窗 -->
+    <el-dialog v-model="showAgingDialog" title="自定义账龄段" width="500px" append-to-body>
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        <template #title>设置账龄分段，所有使用账龄的底稿将统一引用此设置。</template>
+      </el-alert>
+      <el-table :data="editingAging" border size="small">
+        <el-table-column type="index" label="#" width="40" />
+        <el-table-column label="段名" min-width="120">
+          <template #default="{ row }"><el-input v-model="row.name" size="small" /></template>
+        </el-table-column>
+        <el-table-column label="起始月" width="80">
+          <template #default="{ row }"><el-input-number v-model="row.startMonth" size="small" :min="0" :controls="false" style="width:100%" /></template>
+        </el-table-column>
+        <el-table-column label="结束月" width="80">
+          <template #default="{ row }"><el-input-number v-model="row.endMonth" size="small" :min="0" :controls="false" style="width:100%" /></template>
+        </el-table-column>
+        <el-table-column label="坏账比例%" width="90">
+          <template #default="{ row }"><el-input-number v-model="row.impairmentRate" size="small" :min="0" :max="100" :controls="false" style="width:100%" /></template>
+        </el-table-column>
+        <el-table-column label="操作" width="60" align="center">
+          <template #default="{ $index }"><el-button link type="danger" size="small" @click="editingAging.splice($index, 1)">删</el-button></template>
+        </el-table-column>
+      </el-table>
+      <el-button size="small" style="margin-top:6px" @click="editingAging.push({ name: '', startMonth: 0, endMonth: 12, impairmentRate: 5 })">+ 新增段</el-button>
+      <template #footer>
+        <el-button @click="showAgingDialog = false">取消</el-button>
+        <el-button type="primary" @click="applyCustomAging">确认应用</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface AgingSegment { name: string; startMonth: number; endMonth: number; impairmentRate: number }
 interface ArApRow {
-  localCompany: string; localSubject: string; localDetail: string; localAmount: number|null; localImpairment: number|null; localAging: string
-  remoteCompany: string; remoteSubject: string; remoteDetail: string; remoteAmount: number|null; remoteImpairment: number|null; remoteAging: string
+  localCompany: string; localSubject: string; localDetail: string
+  localAmounts: (number|null)[]; localImpairments: (number|null)[]
+  remoteCompany: string; remoteSubject: string; remoteDetail: string
+  remoteAmounts: (number|null)[]; remoteImpairments: (number|null)[]
   diffReason: string
 }
 
@@ -169,24 +196,23 @@ const emitArap = defineEmits<{
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<ArApRow[]>([])
-const n = (v: any) => Number(v) || 0
+const showAgingDialog = ref(false)
 
 const allCompanyOptions = computed(() => [
   { name: '母公司', code: 'parent' },
   ...props.companies.map(c => ({ name: c.name, code: c.code || '' })),
 ])
-
 const subjectOptions = ['应收账款', '其他应收款', '预付账款', '应收票据', '长期应收款', '应付账款', '其他应付款', '预收账款', '应付票据']
 
 // ─── 账龄段 ───────────────────────────────────────────────────────────────────
 const agingPreset = ref<'3year'|'5year'|'custom'>('3year')
-const AGING_3YEAR: AgingSegment[] = [
+const AGING_3: AgingSegment[] = [
   { name: '1年以内', startMonth: 0, endMonth: 12, impairmentRate: 5 },
   { name: '1-2年', startMonth: 12, endMonth: 24, impairmentRate: 10 },
   { name: '2-3年', startMonth: 24, endMonth: 36, impairmentRate: 30 },
   { name: '3年以上', startMonth: 36, endMonth: 999, impairmentRate: 50 },
 ]
-const AGING_5YEAR: AgingSegment[] = [
+const AGING_5: AgingSegment[] = [
   { name: '1年以内', startMonth: 0, endMonth: 12, impairmentRate: 5 },
   { name: '1-2年', startMonth: 12, endMonth: 24, impairmentRate: 10 },
   { name: '2-3年', startMonth: 24, endMonth: 36, impairmentRate: 20 },
@@ -194,27 +220,64 @@ const AGING_5YEAR: AgingSegment[] = [
   { name: '4-5年', startMonth: 48, endMonth: 60, impairmentRate: 60 },
   { name: '5年以上', startMonth: 60, endMonth: 999, impairmentRate: 80 },
 ]
-const customAging = reactive<AgingSegment[]>([...AGING_3YEAR])
+const customAging = reactive<AgingSegment[]>([...AGING_3])
+const editingAging = reactive<AgingSegment[]>([])
 const agingSegments = computed(() => {
-  if (agingPreset.value === '3year') return AGING_3YEAR
-  if (agingPreset.value === '5year') return AGING_5YEAR
+  if (agingPreset.value === '3year') return AGING_3
+  if (agingPreset.value === '5year') return AGING_5
   return customAging
 })
-function onAgingPresetChange(val: string) {
-  if (val === 'custom') { customAging.length = 0; customAging.push(...AGING_3YEAR) }
+const agingCount = computed(() => agingSegments.value.length)
+
+// 打开自定义弹窗时复制当前段
+watch(showAgingDialog, (v) => {
+  if (v) { editingAging.length = 0; editingAging.push(...customAging.map(a => ({ ...a }))) }
+})
+
+function applyCustomAging() {
+  if (!editingAging.length) { ElMessage.warning('至少需要一个账龄段'); return }
+  customAging.length = 0; customAging.push(...editingAging.map(a => ({ ...a })))
+  agingPreset.value = 'custom'
+  // 调整所有行的数组长度
+  for (const row of rows) {
+    resizeArr(row.localAmounts, agingCount.value)
+    resizeArr(row.localImpairments, agingCount.value)
+    resizeArr(row.remoteAmounts, agingCount.value)
+    resizeArr(row.remoteImpairments, agingCount.value)
+  }
+  showAgingDialog.value = false
+  ElMessage.success('账龄段已更新')
+}
+
+function resizeArr(arr: (number|null)[], len: number) {
+  while (arr.length < len) arr.push(null)
+  arr.length = len
 }
 
 // ─── 数据行 ───────────────────────────────────────────────────────────────────
 const rows = reactive<ArApRow[]>([mkEmpty(), mkEmpty(), mkEmpty()])
 
 function mkEmpty(): ArApRow {
+  const len = agingCount.value
   return {
-    localCompany: '', localSubject: '', localDetail: '', localAmount: null, localImpairment: null, localAging: '',
-    remoteCompany: '', remoteSubject: '', remoteDetail: '', remoteAmount: null, remoteImpairment: null, remoteAging: '',
+    localCompany: '', localSubject: '', localDetail: '',
+    localAmounts: new Array(len).fill(null), localImpairments: new Array(len).fill(null),
+    remoteCompany: '', remoteSubject: '', remoteDetail: '',
+    remoteAmounts: new Array(len).fill(null), remoteImpairments: new Array(len).fill(null),
     diffReason: '',
   }
 }
-function addRow() { rows.push(mkEmpty()) }
+
+function addRow() {
+  const newRow = mkEmpty()
+  if (selectedRows.value.length > 0) {
+    const last = selectedRows.value[selectedRows.value.length - 1]
+    const idx = rows.indexOf(last)
+    if (idx >= 0) { rows.splice(idx + 1, 0, newRow); return }
+  }
+  rows.push(newRow)
+}
+
 async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
@@ -225,33 +288,36 @@ async function batchDelete() {
   } catch {}
 }
 
+// ─── 工具函数 ─────────────────────────────────────────────────────────────────
+const n = (v: any) => Number(v) || 0
+function sumArr(arr: (number|null)[]): number { return arr.reduce((s: number, v) => s + n(v), 0) }
+function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+
 // ─── 自动生成抵消分录 ────────────────────────────────────────────────────────
 const generatedEntries = computed(() => {
-  const entries: { direction: string; subject: string; amount: number; desc: string }[] = []
-  // 按本方科目+对方科目配对汇总
-  const pairMap = new Map<string, { localTotal: number; remoteTotal: number; localImp: number; remoteImp: number }>()
+  const entries: any[] = []
+  const pairMap = new Map<string, { local: number; remote: number; localImp: number; remoteImp: number }>()
   for (const row of rows) {
     if (!row.localSubject && !row.remoteSubject) continue
-    if (!row.localAmount && !row.remoteAmount) continue
     const key = `${row.localSubject}|${row.remoteSubject}`
-    if (!pairMap.has(key)) pairMap.set(key, { localTotal: 0, remoteTotal: 0, localImp: 0, remoteImp: 0 })
+    if (!pairMap.has(key)) pairMap.set(key, { local: 0, remote: 0, localImp: 0, remoteImp: 0 })
     const m = pairMap.get(key)!
-    m.localTotal += n(row.localAmount)
-    m.remoteTotal += n(row.remoteAmount)
-    m.localImp += n(row.localImpairment)
-    m.remoteImp += n(row.remoteImpairment)
+    m.local += sumArr(row.localAmounts)
+    m.remote += sumArr(row.remoteAmounts)
+    m.localImp += sumArr(row.localImpairments)
+    m.remoteImp += sumArr(row.remoteImpairments)
   }
   for (const [key, vals] of pairMap) {
     const [localSubj, remoteSubj] = key.split('|')
-    const amount = Math.min(vals.localTotal, vals.remoteTotal)
+    const amount = Math.min(vals.local, vals.remote)
     if (amount > 0) {
-      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: `内部往来抵消` })
-      entries.push({ direction: '贷', subject: remoteSubj || localSubj, amount, desc: `内部往来抵消` })
+      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: '内部往来抵消' })
+      entries.push({ direction: '贷', subject: remoteSubj || localSubj, amount, desc: '内部往来抵消' })
     }
     const totalImp = vals.localImp + vals.remoteImp
     if (totalImp > 0) {
-      entries.push({ direction: '借', subject: '坏账准备', amount: totalImp, desc: `冲回内部往来坏账` })
-      entries.push({ direction: '贷', subject: '信用减值损失', amount: totalImp, desc: `冲回内部往来坏账` })
+      entries.push({ direction: '借', subject: '坏账准备', amount: totalImp, desc: '冲回内部往来坏账' })
+      entries.push({ direction: '贷', subject: '信用减值损失', amount: totalImp, desc: '冲回内部往来坏账' })
     }
   }
   return entries
@@ -261,9 +327,8 @@ watch(generatedEntries, (entries) => {
   emitArap('entries-changed', entries.map(e => ({ ...e, source: '内部往来' })))
 }, { immediate: true })
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '2px 0' }
-const cellStyle = { padding: '2px 4px', fontSize: '11px' }
+const headerStyle = { background: '#f0edf5', fontSize: '10px', color: '#333', padding: '2px 0' }
+const cellStyle = { padding: '2px 3px', fontSize: '11px' }
 
 function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
 onMounted(() => document.addEventListener('keydown', onEsc))
@@ -283,6 +348,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-computed { color: #4b2d77; font-weight: 500; }
 .ws-bold { font-weight: 700; }
 .ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
+.ws-auto-cell { background: #faf8fd; padding: 2px 4px; border-radius: 2px; }
 .ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 </style>
