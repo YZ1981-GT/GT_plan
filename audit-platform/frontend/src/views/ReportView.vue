@@ -229,7 +229,10 @@
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
     <el-table v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="rows" v-loading="loading" style="width: 100%"
-      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight">
+      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight"
+      :cell-class-name="rvCellClassName"
+      @cell-click="onRvCellClick"
+      @cell-contextmenu="onRvCellContextMenu">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
           <span style="color: #999;">{{ $index + 1 }}</span>
@@ -519,6 +522,26 @@
       @imported="onReportImported"
     />
   </div>
+
+  <!-- 右键菜单 -->
+  <Teleport to="body">
+    <Transition name="rv-ctx-fade">
+      <div v-if="rvContextMenu.visible" class="rv-context-menu"
+        :style="{ left: rvContextMenu.x + 'px', top: rvContextMenu.y + 'px' }"
+        @contextmenu.prevent>
+        <div class="rv-ctx-header">{{ rvContextMenu.itemName }}</div>
+        <div class="rv-ctx-divider" />
+        <div class="rv-ctx-item" @click="rvCtxCopy"><span class="rv-ctx-icon">📋</span> 复制值</div>
+        <div class="rv-ctx-item" @click="rvCtxDrillDown"><span class="rv-ctx-icon">📊</span> 查看穿透</div>
+        <div class="rv-ctx-item" @click="rvCtxFormula"><span class="rv-ctx-icon">ƒx</span> 查看公式</div>
+        <div class="rv-ctx-item" @click="rvCtxGoNote"><span class="rv-ctx-icon">📝</span> 跳转附注</div>
+        <div v-if="rvSelectedCells.length > 1" class="rv-ctx-divider" />
+        <div v-if="rvSelectedCells.length > 1" class="rv-ctx-item" @click="rvCtxSum">
+          <span class="rv-ctx-icon">Σ</span> 求和 <b style="color:#4b2d77;margin-left:4px">{{ rvSelectedCells.length }} 格</b>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -1194,6 +1217,79 @@ watch(
   },
   { immediate: true }
 )
+
+// ─── 单元格选中与右键菜单 ────────────────────────────────────────────────────
+const rvSelectedCells = ref<{ row: number; col: number; value: any }[]>([])
+const rvContextMenu = reactive({ visible: false, x: 0, y: 0, itemName: '', rowData: null as any })
+
+function rvCellClassName({ rowIndex, columnIndex }: any) {
+  if (rvSelectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex)) return 'rv-cell--selected'
+  return ''
+}
+
+function onRvCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+  rvContextMenu.visible = false
+  const rowIdx = rows.value.indexOf(row)
+  const colLabels = ['序号', '项目', '本期金额', '上期金额']
+  const colIdx = colLabels.indexOf(column.label)
+  if (rowIdx < 0 || colIdx < 0) return
+  const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  if (event.ctrlKey || event.metaKey) {
+    const idx = rvSelectedCells.value.findIndex(c => c.row === rowIdx && c.col === colIdx)
+    if (idx >= 0) rvSelectedCells.value.splice(idx, 1)
+    else rvSelectedCells.value.push({ row: rowIdx, col: colIdx, value })
+  } else {
+    rvSelectedCells.value = [{ row: rowIdx, col: colIdx, value }]
+  }
+  rvContextMenu.rowData = row
+  rvContextMenu.itemName = row.row_name || ''
+}
+
+function onRvCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  onRvCellClick(row, column, cell, event)
+  setTimeout(() => {
+    rvContextMenu.x = event.clientX
+    rvContextMenu.y = event.clientY
+    rvContextMenu.visible = true
+  }, 0)
+}
+
+function rvCtxCopy() {
+  rvContextMenu.visible = false
+  const values = rvSelectedCells.value.map(c => c.value ?? '-').join('\t')
+  navigator.clipboard?.writeText(values)
+  ElMessage.success('已复制')
+}
+
+function rvCtxDrillDown() {
+  rvContextMenu.visible = false
+  if (rvContextMenu.rowData) onDrilldown(rvContextMenu.rowData)
+}
+
+function rvCtxFormula() {
+  rvContextMenu.visible = false
+  showFormulaManager.value = true
+}
+
+function rvCtxGoNote() {
+  rvContextMenu.visible = false
+  if (rvContextMenu.rowData?.row_code) goToNote(rvContextMenu.rowData.row_code)
+}
+
+function rvCtxSum() {
+  rvContextMenu.visible = false
+  const sum = rvSelectedCells.value.reduce((s, c) => s + (Number(c.value) || 0), 0)
+  ElMessage.info(`选中 ${rvSelectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+}
+
+// 点击其他地方关闭右键菜单
+function onRvDocClick(e: MouseEvent) {
+  if (!(e.target as HTMLElement)?.closest('.rv-context-menu')) rvContextMenu.visible = false
+}
+onMounted(() => document.addEventListener('click', onRvDocClick))
+onUnmounted(() => document.removeEventListener('click', onRvDocClick))
 </script>
 
 <style scoped>
@@ -1723,4 +1819,36 @@ watch(
   0%, 100% { box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.1); }
   50% { box-shadow: 0 0 8px 2px rgba(230, 81, 0, 0.15); }
 }
+
+/* 单元格选中 */
+:deep(.rv-cell--selected) {
+  background: linear-gradient(135deg, rgba(75,45,119,0.05), rgba(124,92,170,0.08)) !important;
+  box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 8px rgba(75,45,119,0.1);
+  animation: rv-cell-pulse 1.5s ease-in-out infinite alternate;
+}
+@keyframes rv-cell-pulse {
+  0% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 6px rgba(75,45,119,0.08); }
+  100% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.5), 0 0 12px rgba(75,45,119,0.15); }
+}
+</style>
+
+<style>
+/* 右键菜单（非 scoped） */
+.rv-context-menu {
+  position: fixed; z-index: 10001; background: #fff;
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 180px;
+  border: 1px solid #e8e4f0;
+}
+.rv-ctx-header { padding: 6px 14px; font-size: 11px; color: #999; }
+.rv-ctx-divider { height: 1px; background: #f0edf5; margin: 2px 0; }
+.rv-ctx-item {
+  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #333;
+  display: flex; align-items: center; gap: 6px; transition: background 0.1s;
+}
+.rv-ctx-item:hover { background: #f0edf5; color: #4b2d77; }
+.rv-ctx-icon { width: 18px; text-align: center; }
+.rv-ctx-fade-enter-active { transition: opacity 0.1s, transform 0.1s; }
+.rv-ctx-fade-leave-active { transition: opacity 0.08s; }
+.rv-ctx-fade-enter-from { opacity: 0; transform: scale(0.95); }
+.rv-ctx-fade-leave-to { opacity: 0; }
 </style>
