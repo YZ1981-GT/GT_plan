@@ -1,9 +1,13 @@
 <template>
-  <div class="ws-sheet">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>资本公积变动核查表</h3>
       <p class="ws-subtitle">从合并抵消分录按科目提取，核查资本公积勾稽关系</p>
       <div class="ws-sheet-actions">
+        <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
+          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+        </el-tooltip>
+        <el-button size="small" @click="$emit('open-formula', 'consol_capital')">ƒx 公式</el-button>
         <el-button size="small" type="warning" @click="extractFromElimination">🔄 从抵消分录提取</el-button>
         <el-button size="small" @click="$emit('save', tableData)">💾 保存</el-button>
       </div>
@@ -22,7 +26,7 @@
           <el-input-number v-else v-model="row.total" size="small" :precision="2" :controls="false" style="width:100%" />
         </template>
       </el-table-column>
-      <el-table-column prop="elimAdj" label="合并抵消环节" width="120" align="right">
+      <el-table-column prop="elimAdj" label="合并抵消环节" width="140" align="right">
         <template #default="{ row }">
           <span v-if="row.isComputed || row.fromElim" class="ws-computed">{{ fmt(row.elimAdj) }}</span>
           <el-input-number v-else v-model="row.elimAdj" size="small" :precision="2" :controls="false" style="width:100%" />
@@ -35,18 +39,16 @@
         </template>
       </el-table-column>
       <!-- 动态子企业列 -->
-      <el-table-column v-for="(c, ci) in companies" :key="ci" :label="c.name" align="center" min-width="110">
+      <el-table-column v-for="(c, ci) in companies" :key="ci" align="center" min-width="120">
         <template #header>
-          <div>{{ c.name }}<br/><small style="color:#999">{{ c.ratio }}%</small></div>
+          <div style="text-align:center;line-height:1.3">
+            <div style="font-weight:600">{{ c.name }}</div>
+            <div style="color:#4b2d77;font-size:10px">{{ c.ratio }}%</div>
+          </div>
         </template>
         <template #default="{ row }">
           <el-input-number v-if="!row.isComputed && row.values" v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" />
           <span v-else-if="row.isComputed && row.values" class="ws-computed">{{ fmt(row.values?.[ci]) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="备注" width="180">
-        <template #default="{ row }">
-          <span v-if="row.note" style="font-size:11px;color:#999">{{ row.note }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -76,12 +78,12 @@
             <el-input v-model="row.description" size="small" placeholder="输入调整事项" />
           </template>
         </el-table-column>
-        <el-table-column prop="amount" label="金额" width="120" align="right">
+        <el-table-column prop="amount" label="金额" width="150" align="right">
           <template #default="{ row }">
             <el-input-number v-model="row.amount" size="small" :precision="2" :controls="false" style="width:100%" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="60" align="center">
+        <el-table-column label="操作" width="80" align="center">
           <template #default="{ $index }">
             <el-button link type="danger" size="small" @click="adjItems.splice($index, 1)">删</el-button>
           </template>
@@ -93,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 
 interface CompanyCol { name: string; ratio: number }
 
@@ -114,7 +116,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', v: CapitalReserveRow[]): void
   (e: 'save', v: CapitalReserveRow[]): void
+  (e: 'open-formula', sheetKey: string): void
 }>()
+
+const isFullscreen = ref(false)
+const sheetRef = ref<HTMLElement | null>(null)
 
 const companies = ref(props.companies)
 const tableData = ref<CapitalReserveRow[]>([...props.modelValue])
@@ -187,10 +193,15 @@ function rowClassName({ row }: { row: CapitalReserveRow }) {
   if (row.isDiff) return 'ws-row-diff'
   return ''
 }
+
+function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
+onMounted(() => document.addEventListener('keydown', onEsc))
+onUnmounted(() => document.removeEventListener('keydown', onEsc))
 </script>
 
 <style scoped>
-.ws-sheet { padding: 0; }
+.ws-sheet { padding: 0; position: relative; }
+.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-subtitle { font-size: 12px; color: #999; margin: 0; flex-basis: 100%; }

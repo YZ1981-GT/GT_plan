@@ -260,6 +260,8 @@ const activeNav = computed(() => {
   // 顶部栏路由不高亮左侧导航
   const topBarPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum', '/recycle-bin', '/settings']
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
+  // 合并项目详情页（/projects/:id/consolidation）高亮"合并"而非"项目"
+  if (p.match(/^\/projects\/[^/]+\/consolidation/)) return 'consolidation'
   for (const item of navItems) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }

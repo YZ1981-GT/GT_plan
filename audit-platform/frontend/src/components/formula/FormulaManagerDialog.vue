@@ -1,11 +1,12 @@
-<template>
+﻿<template>
   <el-dialog
     v-model="visible"
-    title="公式管理中心"
+    title="ƒx 公式管理中心"
     width="95%"
     top="2vh"
     append-to-body
     destroy-on-close
+    class="gt-fm-dialog"
   >
     <div class="gt-fm-container">
       <!-- 左侧：树形导航 -->
@@ -56,7 +57,7 @@
             <el-button size="small" @click="showFormulaImport = true">📥 Excel导入</el-button>
             <el-button size="small" @click="onAddFormulaRow">+ 新增公式</el-button>
             <el-button size="small" @click="onSaveAllFormulas" :loading="applying">💾 保存</el-button>
-            <el-button size="small" type="primary" @click="onApplyFormulas" :loading="applying">⚡ 应用自动运算</el-button>
+            <el-button size="small" type="primary" class="gt-fm-apply-btn" @click="onApplyFormulas" :loading="applying">⚡ 应用自动运算</el-button>
           </div>
         </div>
 
@@ -91,7 +92,7 @@
 
         <!-- 公式表格（报表/附注/底稿） -->
         <el-table v-if="!isCrossCheckMode" ref="formulaTableRef" :data="filteredRows" size="small" border max-height="calc(100vh - 300px)" style="width: 100%"
-          :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }"
+          :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }"
           :row-class-name="getRowClassName"
           @selection-change="onSelectionChange"
           @row-click="onRowClick"
@@ -132,7 +133,7 @@
           </el-table-column>
           <el-table-column label="来源" width="70" align="center">
             <template #default="{ row }">
-              <span v-if="isPresetFormula(row)" style="font-size: 10px; color: #4b2d77; background: #f0ecf5; padding: 1px 6px; border-radius: 3px;">预设</span>
+              <span v-if="isPresetFormula(row)" style="font-size: 10px; color: #1a3a5c; background: #dce6f0; padding: 1px 6px; border-radius: 3px;">预设</span>
               <span v-else-if="row.formula" style="font-size: 10px; color: #999;">自定义</span>
             </template>
           </el-table-column>
@@ -156,7 +157,7 @@
           </div>
           <el-table :data="crossCheckRulesForCurrent" size="small" border style="width: 100%;"
             max-height="calc(100vh - 300px)"
-            :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }">
+            :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }">
             <el-table-column type="index" label="#" width="50" />
             <el-table-column label="规则名称" min-width="200">
               <template #default="{ row }">
@@ -235,7 +236,7 @@
             <span style="font-size: 10px; color: #999; margin-left: 6px;">{{ group.rows.length }} 条</span>
           </div>
           <el-table v-show="group._open" :data="group.rows" size="small" border style="width: 100%;"
-            :header-cell-style="{ background: '#f8f6fb', fontSize: '11px', whiteSpace: 'nowrap' }">
+            :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
             <el-table-column prop="row_code" label="行次" width="90" />
             <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
             <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
@@ -265,7 +266,7 @@
 
       <!-- 平铺展示 -->
       <el-table v-else :data="dashboardFilteredRows" size="small" border max-height="65vh" style="width: 100%;"
-        :header-cell-style="{ background: '#f8f6fb', fontSize: '11px', whiteSpace: 'nowrap' }">
+        :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
         <el-table-column prop="row_code" label="行次" width="90" />
         <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
         <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
@@ -1349,10 +1350,10 @@ watch(showFormulaDashboard, async (v) => {
 .gt-fm-sidebar {
   width: 220px;
   flex-shrink: 0;
-  border: 1px solid #e8e4f0;
+  border: 1px solid #dce6f0;
   border-radius: 8px;
   overflow-y: auto;
-  background: #faf8fd;
+  background: #f5f8fb;
 }
 .gt-fm-sidebar-title {
   padding: 10px 14px 6px;
@@ -1364,15 +1365,16 @@ watch(showFormulaDashboard, async (v) => {
 }
 .gt-fm-tree {
   background: transparent;
-  --el-tree-node-hover-bg-color: #f0ecf5;
+  --el-tree-node-hover-bg-color: #e8f0f8;
 }
 .gt-fm-tree :deep(.el-tree-node__content) {
   height: 30px;
   font-size: 12px;
 }
 .gt-fm-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
-  background: #ece6f5;
+  background: #d6e6f5;
   font-weight: 600;
+  color: #1a3a5c;
 }
 .gt-fm-tree-node {
   display: flex;
@@ -1402,8 +1404,8 @@ watch(showFormulaDashboard, async (v) => {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: linear-gradient(135deg, #f5f0ff 0%, #ece6f5 100%);
-  border: 1px solid #d8cfe8;
+  background: linear-gradient(135deg, #edf3f9 0%, #d6e6f5 100%);
+  border: 1px solid #c4d8ea;
   border-radius: 6px;
   margin-bottom: 6px;
 }
@@ -1415,15 +1417,15 @@ watch(showFormulaDashboard, async (v) => {
 :deep(.el-table__row:hover .gt-fm-row-auto),
 :deep(.el-table__row:hover .gt-fm-row-logic),
 :deep(.el-table__row:hover .gt-fm-row-reason) {
-  background: #f0ecf5 !important;
+  background: #e8f0f8 !important;
 }
 .gt-fm-dash-group-title {
   font-size: 13px;
   font-weight: 600;
   color: #444;
   padding: 8px 10px;
-  background: #faf8fd;
-  border: 1px solid #e8e4f0;
+  background: #f5f8fb;
+  border: 1px solid #dce6f0;
   border-radius: 6px;
   margin-bottom: 4px;
   cursor: pointer;
@@ -1431,6 +1433,48 @@ watch(showFormulaDashboard, async (v) => {
   transition: background 0.12s;
 }
 .gt-fm-dash-group-title:hover {
-  background: #f0ecf5;
+  background: #e8f0f8;
+}
+</style>
+
+<!-- 公式管理弹窗独立配色（非 scoped，因为 el-dialog 渲染在 body） -->
+<style>
+.gt-fm-dialog .el-dialog__header {
+  background: linear-gradient(135deg, #1a3a5c 0%, #2d5a87 60%, #3a7cb8 100%);
+  padding: 14px 20px;
+  margin: 0;
+  border-radius: 8px 8px 0 0;
+}
+.gt-fm-dialog .el-dialog__title {
+  color: #fff !important;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.gt-fm-dialog .el-dialog__headerbtn .el-dialog__close {
+  color: rgba(255,255,255,0.7);
+}
+.gt-fm-dialog .el-dialog__headerbtn:hover .el-dialog__close {
+  color: #fff;
+}
+.gt-fm-dialog .el-dialog__body {
+  border-top: 3px solid #2d5a87;
+}
+.gt-fm-dialog .el-dialog__footer {
+  background: #f5f8fb;
+  border-top: 1px solid #dce6f0;
+}
+/* 应用自动运算按钮蓝色 */
+.gt-fm-dialog .gt-fm-apply-btn {
+  background: linear-gradient(135deg, #2d5a87, #3a7cb8) !important;
+  border-color: #2d5a87 !important;
+  color: #fff !important;
+}
+.gt-fm-dialog .gt-fm-apply-btn:hover {
+  background: linear-gradient(135deg, #1a3a5c, #2d5a87) !important;
+}
+/* 表头行蓝色系 */
+.gt-fm-dialog :deep(.el-table th.el-table__cell) {
+  background: #edf3f9 !important;
 }
 </style>

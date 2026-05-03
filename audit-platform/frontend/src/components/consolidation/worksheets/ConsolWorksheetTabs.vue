@@ -31,18 +31,44 @@
         @save="onSave('净资产表', $event)" @open-formula="onOpenFormula" />
       <EquitySimSheet v-else-if="activeSheet === 'equity_sim'" :companies="companyColumns"
         :direct-rows="data.equitySimDirect" :indirect-sections="data.equitySimIndirect"
-        @save="onSave('模拟权益法', $event)" />
+        @save="onSave('模拟权益法', $event)" @open-formula="onOpenFormula" />
       <EliminationSheet v-else-if="activeSheet === 'elimination'" :companies="companyColumns"
         :equity-rows="data.elimEquity" :income-rows="data.elimIncome" :cross-rows="data.elimCross"
-        @save="onSave('合并抵消分录', $event)" />
+        :imported-entries="allImportedEntries"
+        @save="onSave('合并抵消分录', $event)" @open-formula="onOpenFormula" />
       <CapitalReserveSheet v-else-if="activeSheet === 'capital'" :companies="companyColumns"
         v-model="data.capitalReserve" :elimination-data="elimSummaryForCapital"
-        @save="onSave('资本公积变动', $event)" />
+        @save="onSave('资本公积变动', $event)" @open-formula="onOpenFormula" />
+      <!-- 动态股比变动表 -->
+      <ShareChangeSheet v-else-if="activeSheet.startsWith('share_change_')"
+        :change-times="activeShareChangeTimes"
+        :companies="activeShareChangeCompanies"
+        :all-companies="companyColumns"
+        @save="onShareChangeSave" />
+      <!-- 汇总计算表 -->
+      <PostElimInvestSheet v-else-if="activeSheet === 'post_invest'"
+        :companies="companyColumns" :investment-cost="data.investmentCost"
+        :investment-equity="data.investmentEquity" :equity-sim-direct="data.equitySimDirect"
+        :elim-equity="data.elimEquity" @save="onSave('抵消后长投', $event)" @open-formula="onOpenFormula" />
+      <PostElimIncomeSheet v-else-if="activeSheet === 'post_income'"
+        :companies="companyColumns" :investment-cost="data.investmentCost"
+        :equity-sim-direct="data.equitySimDirect" :elim-income="data.elimIncome"
+        @save="onSave('抵消后投资收益', $event)" />
+      <MinorityInterestSheet v-else-if="activeSheet === 'minority'"
+        :companies="companyColumns" :net-asset-data="data.netAsset"
+        :equity-sim-direct="data.equitySimDirect" :elim-equity="data.elimEquity"
+        :elim-income="data.elimIncome" @save="onSave('少数股东权益损益', $event)" />
+      <!-- 内部抵消表 -->
+      <InternalArApSheet v-else-if="activeSheet === 'internal_arap'"
+        :companies="companyColumns" @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"
+        @entries-changed="(e: any[]) => internalEntries.arap = e" />
+      <InternalTradeSheet v-else-if="activeSheet === 'internal_trade'"
+        :companies="companyColumns" @save="onSave('内部交易抵消', $event)"
+        @entries-changed="(e: any[]) => internalEntries.trade = e" />
+      <InternalCashFlowSheet v-else-if="activeSheet === 'internal_cashflow'"
+        :companies="companyColumns" @save="onSave('内部现金流抵消', $event)"
+        @entries-changed="(e: any[]) => internalEntries.cashflow = e" />
     </main>
-    <ShareChangeDialog v-model:visible="shareChangeVisible" :company-name="shareChangeCompany"
-      :change-times="shareChangeTimes" :net-asset-rows="shareChangeNetAsset"
-      :direct-equity-rows="shareChangeDirect" :indirect-companies="shareChangeIndirect"
-      @save="onShareChangeSave" />
   </div>
 </template>
 
@@ -59,7 +85,13 @@ import NetAssetSheet from './NetAssetSheet.vue'
 import EquitySimSheet from './EquitySimSheet.vue'
 import EliminationSheet from './EliminationSheet.vue'
 import CapitalReserveSheet from './CapitalReserveSheet.vue'
-import ShareChangeDialog from './ShareChangeDialog.vue'
+import ShareChangeSheet from './ShareChangeSheet.vue'
+import PostElimInvestSheet from './PostElimInvestSheet.vue'
+import PostElimIncomeSheet from './PostElimIncomeSheet.vue'
+import MinorityInterestSheet from './MinorityInterestSheet.vue'
+import InternalArApSheet from './InternalArApSheet.vue'
+import InternalTradeSheet from './InternalTradeSheet.vue'
+import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
 
 interface SubsidiaryInfoRow {
   company_name: string; company_code: string; account_subject: string
@@ -103,7 +135,7 @@ const EQUITY_ITEMS = [
   '其他综合收益', '专项储备', '盈余公积', '△一般风险准备', '未分配利润',
 ]
 
-const sheetList = [
+const staticSheets = [
   { key: 'info', label: '基本信息表', desc: '子企业清单·核算方式·持股变动', icon: markRaw(List), tag: '基础', tagType: '' as const },
   { key: 'cost', label: '投资明细-成本法和公允值', desc: '期初→增加→减少→期末', icon: markRaw(Coin), tag: '基础', tagType: '' as const },
   { key: 'equity_inv', label: '投资明细-权益法', desc: '权益法长投台账', icon: markRaw(TrendCharts), tag: '基础', tagType: '' as const },
@@ -111,7 +143,47 @@ const sheetList = [
   { key: 'equity_sim', label: '模拟权益法', desc: '直接持股+间接持股·9步模拟', icon: markRaw(SetUp), tag: '引擎', tagType: 'danger' as const },
   { key: 'elimination', label: '合并抵消分录', desc: '权益抵消·损益抵消·交叉持股', icon: markRaw(Tickets), tag: '输出', tagType: 'success' as const },
   { key: 'capital', label: '资本公积变动', desc: '从抵消分录提取·差异核查', icon: markRaw(PieChart), tag: '核查', tagType: 'info' as const },
+  { key: 'post_invest', label: '抵消后长投明细', desc: '账面+模拟-抵消=合并列示数', icon: markRaw(DataBoard), tag: '汇总', tagType: 'success' as const },
+  { key: 'post_income', label: '抵消后投资收益', desc: '红利+模拟-还原-抵消', icon: markRaw(Coin), tag: '汇总', tagType: 'success' as const },
+  { key: 'minority', label: '少数股东权益损益', desc: '净资产×少数比例·超额亏损', icon: markRaw(PieChart), tag: '汇总', tagType: 'success' as const },
+  { key: 'internal_arap', label: '内部往来抵消', desc: '债务方×债权方·账龄·坏账', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
+  { key: 'internal_trade', label: '内部交易抵消', desc: '卖方×买方·未实现利润', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
+  { key: 'internal_cashflow', label: '内部现金流抵消', desc: '按现金流量表项目配对', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
 ]
+
+// 从基本信息表提取有股比变动的企业，动态生成导航项
+const shareChangeSheets = computed(() => {
+  const sheets: any[] = []
+  const changedCompanies = data.subsidiaryInfo.filter(
+    (r: SubsidiaryInfoRow) => r.share_changed === '是' && r.change_times > 0 && r.company_name
+  )
+  // 按变动次数分组
+  for (const times of [1, 2, 3] as const) {
+    const companies = changedCompanies.filter((r: SubsidiaryInfoRow) => r.change_times === times)
+    if (companies.length > 0) {
+      const names = companies.map((r: SubsidiaryInfoRow) => r.company_name).join('、')
+      sheets.push({
+        key: `share_change_${times}`,
+        label: `股比变${times}次`,
+        desc: names.length > 16 ? names.slice(0, 16) + '...' : names,
+        icon: markRaw(TrendCharts),
+        tag: `${companies.length}家`,
+        tagType: 'warning' as const,
+        _times: times,
+        _companies: companies,
+      })
+    }
+  }
+  return sheets
+})
+
+const sheetList = computed(() => {
+  const list = [...staticSheets]
+  // 在"模拟权益法"之前插入股比变动表
+  const simIdx = list.findIndex(s => s.key === 'equity_sim')
+  list.splice(simIdx, 0, ...shareChangeSheets.value)
+  return list
+})
 
 const activeSheet = ref('info')
 
@@ -318,37 +390,39 @@ const elimSummaryForCapital = computed(() => {
   return { elimCapital: row ? (row.values||[]).reduce((s: number, v: number|null) => s + (Number(v)||0), 0) : 0, equitySimCapital: 0 }
 })
 
-// ─── 股比变动弹窗 ─────────────────────────────────────────────────────────────
-const shareChangeVisible = ref(false)
-const shareChangeCompany = ref('')
-const shareChangeTimes = ref<1|2|3>(1)
-const shareChangeNetAsset = ref<NetAssetChangeRow[]>([])
-const shareChangeDirect = ref<any[]>([])
-const shareChangeIndirect = ref<any[]>([])
+// ─── 股比变动（内联表，非弹窗） ─────────────────────────────────────────────
+const activeShareChangeTimes = computed(() => {
+  const m = activeSheet.value.match(/share_change_(\d)/)
+  return m ? (Number(m[1]) as 1|2|3) : 1
+})
+const activeShareChangeCompanies = computed(() => {
+  const times = activeShareChangeTimes.value
+  return data.subsidiaryInfo
+    .filter((r: SubsidiaryInfoRow) => r.share_changed === '是' && r.change_times === times && r.company_name)
+    .map((r: SubsidiaryInfoRow) => ({
+      name: r.company_name, code: r.company_code,
+      ratio: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
+      accountSubject: r.account_subject, accountingMethod: r.accounting_method,
+    }))
+})
 
 function onOpenShareChange(row: SubsidiaryInfoRow, times: number) {
-  shareChangeCompany.value = row.company_name
-  shareChangeTimes.value = (times || 1) as 1|2|3
-  const mk = (item: string, o: Partial<NetAssetChangeRow> = {}): NetAssetChangeRow =>
-    ({ item, before: null, after: Array(times).fill(null), ...o })
-  const rows: NetAssetChangeRow[] = []
-  rows.push(mk('所有者权益/股东权益',{isHeader:true,bold:true})); rows.push(mk('期初合计：',{bold:true}))
-  EQUITY_ITEMS.forEach(i => rows.push(mk(i,{indent:1})))
-  rows.push(mk('本期增加',{bold:true})); EQUITY_ITEMS.forEach(i => rows.push(mk(i,{indent:1})))
-  rows.push(mk('本期减少',{bold:true})); EQUITY_ITEMS.forEach(i => rows.push(mk(i,{indent:1})))
-  rows.push(mk('期末金额',{bold:true})); EQUITY_ITEMS.forEach(i => rows.push(mk(i,{indent:1})))
-  shareChangeNetAsset.value = rows
-  const cols = times + 1
-  const mkE = (s: string, d = '') => ({ subject: s, detail: d, debit: Array(cols).fill(null), credit: Array(cols).fill(null) })
-  shareChangeDirect.value = [mkE('持股比例'),mkE('长期股权投资','损益调整'),mkE('长期股权投资','其他权益变动'),
-    mkE('投资收益'),mkE('资本公积'),mkE('其他综合收益'),mkE('专项储备'),mkE('其他权益工具'),mkE('△一般风险准备')]
-  shareChangeIndirect.value = []
-  shareChangeVisible.value = true
+  // 直接切换到对应的股比变动表
+  activeSheet.value = `share_change_${times}`
 }
-function onShareChangeSave(_d: any) { ElMessage.success(`${shareChangeCompany.value} 股比变动数据已保存`); shareChangeVisible.value = false }
+function onShareChangeSave(_d: any) { ElMessage.success('股比变动数据已保存') }
 function onSave(sheet: string, _p: any) { ElMessage.success(`${sheet} 已保存`) }
 
-// 打开全局公式管理，定位到指定的合并表样
+// ─── 内部抵消分录汇总 ────────────────────────────────────────────────────────
+const internalEntries = reactive<{ arap: any[]; trade: any[]; cashflow: any[] }>({
+  arap: [], trade: [], cashflow: [],
+})
+const allImportedEntries = computed(() => [
+  ...internalEntries.arap,
+  ...internalEntries.trade,
+  ...internalEntries.cashflow,
+])
+
 function onOpenFormula(sheetKey: string) {
   document.dispatchEvent(new CustomEvent('gt-open-formula-manager', { detail: { nodeKey: sheetKey } }))
 }
