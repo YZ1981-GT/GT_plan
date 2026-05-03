@@ -6,8 +6,10 @@
     @view-change="onViewChange"
   >
     <template #middle>
+      <!-- 合并模块：独立树形导航 -->
+      <ConsolMiddleNav v-if="isConsolRoute" />
       <!-- 项目浏览模式 -->
-      <MiddleProjectList v-if="activeModule === 'projects' || activeModule === 'dashboard'" @select="onProjectSelect" />
+      <MiddleProjectList v-else-if="activeModule === 'projects' || activeModule === 'dashboard'" @select="onProjectSelect" />
       <!-- 其他模块占位 -->
       <MiddlePlaceholder v-else :module="activeModule" />
     </template>
@@ -56,6 +58,7 @@ import DetailProjectPanel from '@/components/layout/DetailProjectPanel.vue'
 import FourColumnCatalog from '@/components/layout/FourColumnCatalog.vue'
 import FourColumnContent from '@/components/layout/FourColumnContent.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 
 const route = useRoute()
@@ -105,15 +108,21 @@ function isFullWidthPath(p: string): boolean {
   return FULLWIDTH_PREFIXES.some(prefix => p.startsWith(prefix))
 }
 
+// 合并模块路由判断
+const isConsolRoute = computed(() => {
+  return !!route.path.match(/^\/projects\/[^/]+\/consolidation/)
+})
+
 const isBrowseMode = computed(() => {
   const p = route.path
   if (isFullWidthPath(p)) return false
   return p === '/projects' || !p.match(/^\/projects\/[^/]+\//)
 })
 
-// 隐藏中间栏
+// 隐藏中间栏（合并模块除外，它有自己的中间栏）
 const hideMiddle = computed(() => {
   const p = route.path
+  if (isConsolRoute.value) return false  // 合并模块显示中间栏
   if (isFullWidthPath(p)) return true
   return !!p.match(/^\/projects\/[^/]+\//)
 })

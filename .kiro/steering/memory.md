@@ -126,6 +126,7 @@ inclusion: always
 - 合并净资产表预设公式：表内公式（SUM/期初+增加-减少）+ 提取公式 TB({company_code},'科目','期初余额') 从子企业试算表按企业代码提取 + 3条校验公式
 - 合并资本公积变动（差额表）：从抵消分录按科目自动提取，与合并报表期末数比对差异
 - 合并报表左侧导航改为集团架构树+差额表节点，每个合并节点自动生成差额表子节点，合并数=汇总直接下级-差额表，底部6种报表类型切换
+- 合并模块独立中间栏树形导航（ConsolMiddleNav），路由用命名视图（middle+detail），通过 CustomEvent('consol-tree-select') 联动 ConsolidationIndex
 - 合并工作底稿持久化：consol_worksheet_data 表（project_id+year+sheet_key+JSONB），自动建表无需 migration，upsert 保存，onMounted 批量加载回填
 - 当期处置出表企业不单独建表，在模拟权益法中体现（期初模拟→出表日前变动→处置分录→期末长投归零）
 
