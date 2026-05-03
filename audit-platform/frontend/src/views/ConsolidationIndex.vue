@@ -759,6 +759,23 @@ const tbEditMode = ref(false)
 const tbPeriod = ref<'closing' | 'opening'>('closing')
 const tbCache = new Map<string, any[]>()
 
+function recalcTbAudited() {
+  for (const r of consolTbRows.value) {
+    const s = Number(r.summary) || 0
+    const ed = Number(r.equity_dr) || 0
+    const ec = Number(r.equity_cr) || 0
+    const td = Number(r.trade_dr) || 0
+    const tc = Number(r.trade_cr) || 0
+    const ad = Number(r.adj_dr) || 0
+    const ac = Number(r.adj_cr) || 0
+    const result = s + ed - ec + td - tc + ad - ac
+    r.audited = result !== 0 ? Math.round(result * 100) / 100 : null
+  }
+}
+
+// 监听数值变化自动重算审定数
+watch(consolTbRows, recalcTbAudited, { deep: true })
+
 const tbReportTypes = [
   { key: 'balance_sheet', label: '资产负债表' },
   { key: 'income_statement', label: '利润表' },
@@ -798,20 +815,10 @@ async function loadConsolTb(forceRefresh = false) {
       trade_cr: null as number | null,     // 往来抵消-贷
       adj_dr: null as number | null,       // 报表调整-借
       adj_cr: null as number | null,       // 报表调整-贷
-      // 审定数 = 汇总 + 调整借 - 调整贷 + 抵消借 - 抵消贷（computed in getter）
-      get audited(): number | null {
-        const s = Number(this.summary) || 0
-        const ed = Number(this.equity_dr) || 0
-        const ec = Number(this.equity_cr) || 0
-        const td = Number(this.trade_dr) || 0
-        const tc = Number(this.trade_cr) || 0
-        const ad = Number(this.adj_dr) || 0
-        const ac = Number(this.adj_cr) || 0
-        const result = s + ed - ec + td - tc + ad - ac
-        return result !== 0 ? Math.round(result * 100) / 100 : null
-      },
+      audited: null as number | null,      // 审定数（由 watch 计算）
     }))
     tbCache.set(key, consolTbRows.value)
+    recalcTbAudited()
 
     // 尝试加载已保存的数据
     try {

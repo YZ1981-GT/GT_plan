@@ -547,6 +547,20 @@ const tbSummaryType = ref('balance_sheet')
 const tbSummaryLoading = ref(false)
 const tbSummaryRows = ref<any[]>([])
 const selectedTemplateType = ref('soe')
+
+function recalcTbSummaryAudited() {
+  for (const r of tbSummaryRows.value) {
+    const u = Number(r.unadjusted) || 0
+    const ad = Number(r.aje_dr) || 0
+    const ac = Number(r.aje_cr) || 0
+    const rd = Number(r.rcl_dr) || 0
+    const rc = Number(r.rcl_cr) || 0
+    const result = u + ad - ac + rd - rc
+    r.audited = result !== 0 ? Math.round(result * 100) / 100 : null
+  }
+}
+
+watch(tbSummaryRows, recalcTbSummaryAudited, { deep: true })
 const tbFullscreen = ref(false)
 
 function copyTbTable() {
@@ -702,17 +716,10 @@ async function loadTbSummary() {
         aje_cr: aje.cr || null,
         rcl_dr: rcl.dr || null,
         rcl_cr: rcl.cr || null,
-        get audited(): number | null {
-          const u = Number(this.unadjusted) || 0
-          const ad = Number(this.aje_dr) || 0
-          const ac = Number(this.aje_cr) || 0
-          const rd = Number(this.rcl_dr) || 0
-          const rc = Number(this.rcl_cr) || 0
-          const result = u + ad - ac + rd - rc
-          return result !== 0 ? Math.round(result * 100) / 100 : null
-        },
+        audited: null as number | null,
       }
     })
+    recalcTbSummaryAudited()
 
     // 5. 尝试加载已保存的数据覆盖
     try {

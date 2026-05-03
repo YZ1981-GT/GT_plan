@@ -104,7 +104,7 @@ inclusion: always
 - 合并模块 Tab 精简为4个：合并工作底稿、集团架构、合并报表、合并附注（差额表和自定义查询已删除）
 - 自定义查询改为全局功能（待开发）：支持按底稿/报表/附注/调整分录/单位/年度多维度查询，树形地址坐标库选择指标，查询指标库，结果支持导出/转置/复制
 - 公式管理中心左侧数据源树（报表/附注/流动资产/长期资产/负债/损益类/合并报表/表间审核）待统一补充完善，各模块开发完毕后更新
-- P0重构：ConsolidationIndex.vue 拆分为 ConsolTrialBalanceTab/ConsolReportTab/ConsolNoteTab 独立组件
+- P0重构（已完成）：ConsolidationIndex.vue 合并附注已拆分为 ConsolNoteTab.vue 独立组件（2968→1522行，减少49%）
 - P0重构：右键菜单抽取为通用 CellContextMenu.vue + useCellSelection composable（6个模块共用）
 - P1修复：试算平衡表 getter 审定数改为 computed/watch（Vue reactive 不追踪原生 getter）
 - P1重构：consol_note_sections.py 拆分为章节CRUD/审核/试算平衡表三个路由文件
