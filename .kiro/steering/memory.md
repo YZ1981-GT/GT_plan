@@ -104,9 +104,13 @@ inclusion: always
 - 合并模块 Tab 精简为4个：合并工作底稿、集团架构、合并报表、合并附注（差额表和自定义查询已删除）
 - 自定义查询改为全局功能（待开发）：支持按底稿/报表/附注/调整分录/单位/年度多维度查询，树形地址坐标库选择指标，查询指标库，结果支持导出/转置/复制
 - 公式管理中心左侧数据源树（报表/附注/流动资产/长期资产/负债/损益类/合并报表/表间审核）待统一补充完善，各模块开发完毕后更新
+- P0重构：ConsolidationIndex.vue 拆分为 ConsolTrialBalanceTab/ConsolReportTab/ConsolNoteTab 独立组件
+- P0重构：右键菜单抽取为通用 CellContextMenu.vue + useCellSelection composable（6个模块共用）
+- P1修复：试算平衡表 getter 审定数改为 computed/watch（Vue reactive 不追踪原生 getter）
+- P1重构：consol_note_sections.py 拆分为章节CRUD/审核/试算平衡表三个路由文件
+- P2优化：组件间 CustomEvent 通信部分改为 Pinia store
 - 查看/编辑模式切换组件（纯文本可复制↔el-input 编辑）后续推广到报表、底稿、试算表等所有表格模块
-- 全屏/复制整表功能已推广到所有模块：单体报表（ReportView）、单体试算表（TrialBalance）、单体附注（DisclosureEditor）、合并报表、合并附注、合并试算平衡表
-- 单元格选中+右键菜单已推广到：合并报表、合并附注、合并试算平衡表、项目单体报表（ReportView）；待推广：单体试算表、单体附注
+- 全屏/复制整表/单元格选中+右键菜单已推广到所有6个模块：单体报表（ReportView）、单体试算表（TrialBalance）、单体附注（DisclosureEditor）、合并报表、合并附注、合并试算平衡表
 - 合并试算平衡表（已完成前后端）：3张表（资产负债/损益/现金流），列=审定汇总+权益抵消(借贷)+往来交易抵消(借贷)+报表调整(借贷)+合并审定数，行结构以现有报表模板（report_config）为主，审定数用getter自动计算，提取填充API POST /fill-tb 从子企业试算表汇总+工作底稿抵消分录提取，数据存consol_worksheet_data（key: consol_tb_{type}_{period}）
 - 合并试算平衡表支持期初/期末：期初支持导入或自定义编辑，连续审计支持一键提取上年数；期末按模板自动提取填充
 - 项目单体试算平衡表（已完成前端）：列=未审数+审计调整(借贷)+重分类调整(借贷)+审定数，行结构以报表模板为主，未审数从科目明细按科目名汇总，审定数getter自动计算，TrialBalance.vue 新增"科目明细/试算平衡表"视图切换，数据存consol_worksheet_data（key: tb_summary_{type}）
