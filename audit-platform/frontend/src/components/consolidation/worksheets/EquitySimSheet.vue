@@ -125,7 +125,7 @@
           <template #default="{ row }">
             <span v-if="row._isRatioRow"></span>
             <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
-              {{ fmt(indirectRowTotal(row)) }}
+              {{ fmt(rowTotal(row)) }}
             </span>
           </template>
         </el-table-column>
@@ -288,12 +288,6 @@ function calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-
 
 // 合计 = 各子企业列之和（纯计算，不修改 row）
 function rowTotal(row: any): number {
-  if (!row.values || !row.values.length) return n(row.total)
-  return row.values.reduce((s: number, v: any) => s + n(v), 0)
-}
-
-// 间接持股行合计（同样纯计算）
-function indirectRowTotal(row: any): number {
   if (!row.values || !row.values.length) return n(row.total)
   return row.values.reduce((s: number, v: any) => s + n(v), 0)
 }
