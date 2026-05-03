@@ -285,8 +285,11 @@
             class="gt-consol-report-table"
             :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', padding: '4px 0' }"
             :cell-style="{ padding: '2px 8px', fontSize: '12px', lineHeight: '1.4' }"
-            :row-class-name="consolReportRowClass">
-            <el-table-column prop="row_code" label="行次" width="100" align="center">
+            :cell-class-name="reportCellClassName"
+            :row-class-name="consolReportRowClass"
+            @cell-click="onReportCellClick"
+            @cell-contextmenu="onReportCellContextMenu">
+            <el-table-column prop="row_code" label="行次" width="80" align="center">
               <template #default="{ row }">
                 <span style="white-space:nowrap">{{ row.row_code }}</span>
               </template>
@@ -1485,6 +1488,45 @@ function clearEntityCache(companyCode: string, types?: string[]) {
 function consolReportRowClass({ row }: { row: any }) {
   if (row.is_total_row) return 'gt-total-row'
   return ''
+}
+
+function reportCellClassName({ rowIndex, columnIndex }: any) {
+  if (selectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex)) {
+    return 'gt-cell--selected'
+  }
+  return ''
+}
+
+function onReportCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+  closeCellContextMenu()
+  const rowIdx = consolReportRows.value.indexOf(row)
+  const colMap: Record<string, number> = { '行次': 0, '项目': 1, '合并本期': 2, '合并上期': 3 }
+  const colIdx = colMap[column.label] ?? -1
+  if (rowIdx < 0 || colIdx < 0) return
+  const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  if (event.ctrlKey || event.metaKey) {
+    const existing = selectedCells.value.findIndex(c => c.row === rowIdx && c.col === colIdx)
+    if (existing >= 0) selectedCells.value.splice(existing, 1)
+    else selectedCells.value.push({ row: rowIdx, col: colIdx, value })
+  } else {
+    selectedCells.value = [{ row: rowIdx, col: colIdx, value }]
+  }
+  if (selectedCells.value.length === 1) {
+    drillDownCell.itemName = row.row_name || ''
+    drillDownCell.colName = column.label || ''
+    drillDownCell.totalValue = Number(value) || null
+  }
+}
+
+function onReportCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  onReportCellClick(row, column, cell, event)
+  setTimeout(() => {
+    cellContextMenu.x = event.clientX
+    cellContextMenu.y = event.clientY
+    cellContextMenu.visible = true
+  }, 0)
 }
 
 async function loadConsolReport(forceRefresh = false) {
