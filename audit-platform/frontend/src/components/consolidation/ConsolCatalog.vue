@@ -1,46 +1,41 @@
 <template>
   <div class="cc-catalog">
-    <!-- 国企/上市切换 -->
+    <!-- 标题行：报表/附注 tab + 国企/上市切换 -->
     <div class="cc-header">
-      <el-radio-group v-model="standard" size="small" @change="loadData">
-        <el-radio-button value="soe">国企版</el-radio-button>
-        <el-radio-button value="listed">上市版</el-radio-button>
-      </el-radio-group>
+      <el-tabs v-model="activeTab" size="small" class="cc-header-tabs">
+        <el-tab-pane label="报表" name="reports" />
+        <el-tab-pane label="附注" name="notes" />
+      </el-tabs>
     </div>
 
-    <!-- Tab 切换：报表 / 附注 -->
-    <el-tabs v-model="activeTab" size="small" class="cc-tabs">
-      <el-tab-pane label="报表" name="reports">
-        <div class="cc-tree">
-          <el-tree :data="reportTree" :props="{ label: 'label', children: 'children' }"
-            node-key="key" default-expand-all highlight-current
-            @node-click="onReportClick">
-            <template #default="{ data }">
-              <span class="cc-tree-node">
-                <span>{{ data.icon }} {{ data.label }}</span>
-                <el-tag v-if="data.count" size="small" type="info" style="margin-left:4px">{{ data.count }}行</el-tag>
-              </span>
-            </template>
-          </el-tree>
-        </div>
-      </el-tab-pane>
-      <el-tab-pane label="附注" name="notes">
-        <div class="cc-tree">
-          <el-input v-model="noteSearch" size="small" placeholder="搜索附注..." clearable style="margin-bottom:6px" />
-          <el-tree :data="noteTree" :props="{ label: 'label', children: 'children' }"
-            node-key="key" default-expand-all highlight-current
-            :filter-node-method="filterNote" ref="noteTreeRef"
-            @node-click="onNoteClick">
-            <template #default="{ data }">
-              <span class="cc-tree-node">
-                <span>{{ data.label }}</span>
-                <el-tag v-if="data.tableCount" size="small" type="info" style="margin-left:4px">{{ data.tableCount }}表</el-tag>
-              </span>
-            </template>
-          </el-tree>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+    <!-- 内容区 -->
+    <div class="cc-content">
+      <div v-if="activeTab === 'reports'" class="cc-tree">
+        <el-tree :data="reportTree" :props="{ label: 'label', children: 'children' }"
+          node-key="key" default-expand-all highlight-current
+          @node-click="onReportClick">
+          <template #default="{ data }">
+            <span class="cc-tree-node">
+              <span>{{ data.icon }} {{ data.label }}</span>
+            </span>
+          </template>
+        </el-tree>
+      </div>
+      <div v-else class="cc-tree">
+        <el-input v-model="noteSearch" size="small" placeholder="搜索附注..." clearable style="margin-bottom:6px" />
+        <el-tree :data="noteTree" :props="{ label: 'label', children: 'children' }"
+          node-key="key" default-expand-all highlight-current
+          :filter-node-method="filterNote" ref="noteTreeRef"
+          @node-click="onNoteClick">
+          <template #default="{ data }">
+            <span class="cc-tree-node">
+              <span>{{ data.label }}</span>
+              <el-tag v-if="data.tableCount" size="small" type="info" style="margin-left:4px">{{ data.tableCount }}表</el-tag>
+            </span>
+          </template>
+        </el-tree>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -142,11 +137,15 @@ onMounted(() => loadData())
 
 <style scoped>
 .cc-catalog { display: flex; flex-direction: column; height: 100%; }
-.cc-header { padding: 8px 10px; border-bottom: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0; }
-.cc-tabs { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.cc-tabs :deep(.el-tabs__header) { padding: 0 10px; margin-bottom: 0; }
-.cc-tabs :deep(.el-tabs__content) { flex: 1; overflow: hidden; }
-.cc-tabs :deep(.el-tab-pane) { height: 100%; overflow-y: auto; }
+.cc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 8px; border-bottom: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0;
+}
+.cc-header-tabs { flex: 1; }
+.cc-header-tabs :deep(.el-tabs__header) { margin-bottom: 0; }
+.cc-header-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+.cc-standard-switch { flex-shrink: 0; }
+.cc-content { flex: 1; overflow-y: auto; }
 .cc-tree { padding: 6px; }
 .cc-tree-node { display: flex; align-items: center; font-size: 12px; }
 </style>

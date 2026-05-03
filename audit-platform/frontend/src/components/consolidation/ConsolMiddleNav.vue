@@ -1,7 +1,7 @@
 <template>
   <div class="cm-nav">
     <div class="cm-nav-header">
-      <span class="cm-nav-title">合并节点</span>
+      <span class="cm-nav-title">树形</span>
       <div style="display:flex;gap:4px">
         <el-button size="small" type="primary" @click="showAddDialog = true">+ 添加</el-button>
         <el-tooltip content="从项目数据同步合并范围企业" placement="bottom">
@@ -24,13 +24,6 @@
         </template>
       </el-tree>
       <el-empty v-if="!treeData.length" description="暂无合并范围数据" :image-size="40" />
-    </div>
-
-    <!-- 年度切换 -->
-    <div class="cm-nav-footer">
-      <el-select v-model="selectedYear" size="small" style="width:100%" @change="loadTree">
-        <el-option v-for="y in yearOptions" :key="y" :label="`${y} 年度`" :value="y" />
-      </el-select>
     </div>
 
     <!-- 添加企业弹窗 -->

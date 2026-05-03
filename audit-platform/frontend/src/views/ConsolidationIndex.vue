@@ -5,10 +5,15 @@
       <el-button text class="gt-consol-bar-back" @click="$router.push('/consolidation')">← 返回</el-button>
       <div class="gt-consol-bar-info">
         <span class="gt-consol-bar-name">{{ projectInfo.clientName || '加载中...' }}</span>
-        <el-tag size="small" effect="plain" round style="margin-left:10px">{{ projectInfo.year }} 年度</el-tag>
-        <el-tag size="small" :type="projectInfo.standard === 'listed' ? 'warning' : ''" effect="light" round style="margin-left:6px">
-          {{ projectInfo.standard === 'listed' ? '上市版' : '国企版' }}
-        </el-tag>
+        <el-select v-model="projectInfo.year" size="small" style="width:100px;margin-left:10px" @change="onYearChange">
+          <el-option v-for="y in barYearOptions" :key="y" :label="`${y} 年度`" :value="y" />
+        </el-select>
+        <el-select v-model="projectInfo.standard" size="small" style="width:90px;margin-left:6px" @change="onStandardChange">
+          <el-option label="国企版" value="soe" />
+          <el-option label="上市版" value="listed" />
+        </el-select>
+        <el-button size="small" style="margin-left:8px;color:rgba(255,255,255,0.9);border-color:rgba(255,255,255,0.3)" @click="showConsolConversion = true">🔄 转换规则</el-button>
+        <el-button size="small" style="color:rgba(255,255,255,0.9);border-color:rgba(255,255,255,0.3)" @click="onOpenFormula">ƒx 公式</el-button>
       </div>
     </div>
 
@@ -304,6 +309,28 @@ const projectInfo = reactive({
   year: new Date().getFullYear() - 1,
   standard: 'soe' as 'soe' | 'listed',
 })
+
+const currentYear = new Date().getFullYear()
+const barYearOptions = computed(() => {
+  const years = []
+  for (let y = currentYear; y >= currentYear - 5; y--) years.push(y)
+  return years
+})
+
+function onYearChange() {
+  // 年度切换后重新加载数据
+  loadConsolReport()
+}
+
+function onStandardChange() {
+  consolReportTemplateType.value = projectInfo.standard
+  consolNoteTemplateType.value = projectInfo.standard
+  loadConsolReport()
+}
+
+function onOpenFormula() {
+  document.dispatchEvent(new CustomEvent('gt-open-formula-manager', { detail: { nodeKey: 'consolidation' } }))
+}
 
 async function loadProjectInfo() {
   try {
