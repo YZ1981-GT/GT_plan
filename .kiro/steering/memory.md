@@ -121,6 +121,7 @@ inclusion: always
 - 合并工作底稿五步流程：基本信息→投资明细→净资产归集→权益法模拟→抵消分录+资本公积核查
 - 合并股比变动：内联表三栏布局（净资产变动+直接持股模拟+间接持股模拟），左侧导航根据基本信息表动态生成（1/2/3次），:key 强制重建，setup 同步初始化
 - 基本信息表新增 holding_type 字段（直接/间接），间接企业列表由 ConsolWorksheetTabs 通过 indirectCompanies prop 传入 ShareChangeSheet
+- EquitySimSheet 间接持股 sections 通过 computedIndirectSections computed 从基本信息表动态生成（优先已保存数据，否则自动创建）
 - 合并净资产表：动态列根据合并范围树形结构生成（当前层级直接下级），列头显示企业名称+期末持股比例
 - 合并净资产表预设公式：表内公式（SUM/期初+增加-减少）+ 提取公式 TB({company_code},'科目','期初余额') 从子企业试算表按企业代码提取 + 3条校验公式
 - 合并资本公积变动（差额表）：从抵消分录按科目自动提取，与合并报表期末数比对差异

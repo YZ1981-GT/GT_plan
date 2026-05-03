@@ -121,14 +121,38 @@
         </el-table-column>
         <el-table-column prop="subject" label="项目" width="160" show-overflow-tooltip />
         <el-table-column prop="detail" label="二级明细" width="140" show-overflow-tooltip />
-        <el-table-column prop="total" label="金额" width="120" align="right">
+        <el-table-column prop="total" label="合计" width="120" align="right">
           <template #default="{ row }">
-            <span v-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
-              {{ fmt(n(row.total)) }}
+            <span v-if="row._isRatioRow"></span>
+            <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
+              {{ fmt(indirectRowTotal(row)) }}
             </span>
           </template>
         </el-table-column>
+        <!-- 动态子企业列 -->
+        <el-table-column v-for="(c, ci) in companies" :key="'ind_'+si+'_'+ci" align="center" min-width="120">
+          <template #header>
+            <div style="text-align:center;line-height:1.3">
+              <div style="font-weight:600">{{ c.name }}</div>
+              <div style="color:#4b2d77;font-size:10px">{{ c.ratio }}%</div>
+            </div>
+          </template>
+          <template #default="{ row }">
+            <span v-if="row._isRatioRow" style="font-weight:600;color:#4b2d77;font-size:12px">{{ section.ratio }}%</span>
+            <el-input-number v-else-if="!row.isStep && row.values"
+              v-model="row.values[ci]" size="small" :precision="2" :controls="false"
+              style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
+          </template>
+        </el-table-column>
       </el-table>
+      <!-- 间接持股比对区 -->
+      <div class="ws-section" style="margin-top:8px">
+        <div style="font-size:12px;color:#999;padding:4px 8px;background:#f8f6fb;border-radius:4px">
+          模拟后长投小计: <b style="color:#4b2d77">{{ fmt(section.endLongInvest) }}</b>
+          &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#4b2d77">{{ fmt(section.endNetAssetShare) }}</b>
+          &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmt(section.difference) }}</b>
+        </div>
+      </div>
     </div>
 
     <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
@@ -264,6 +288,12 @@ function calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-
 
 // 合计 = 各子企业列之和（纯计算，不修改 row）
 function rowTotal(row: any): number {
+  if (!row.values || !row.values.length) return n(row.total)
+  return row.values.reduce((s: number, v: any) => s + n(v), 0)
+}
+
+// 间接持股行合计（同样纯计算）
+function indirectRowTotal(row: any): number {
   if (!row.values || !row.values.length) return n(row.total)
   return row.values.reduce((s: number, v: any) => s + n(v), 0)
 }
