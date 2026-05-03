@@ -109,7 +109,7 @@
 
     <!-- 2. 间接/交叉持股 -->
     <div v-for="(section, si) in indirectSections" :key="si" class="ws-section">
-      <div class="ws-section-title">2. 间接/交叉持股权益法模拟 — {{ section.companyName }} <small style="color:#999;margin-left:8px">{{ section.ratio }}%</small></div>
+      <div class="ws-section-title">2. 间接/交叉持股权益法模拟 — {{ section.companyName }} <small style="color:#999;margin-left:8px">间接持股 {{ section.ratio }}%</small></div>
       <el-table :data="section.rows" border size="small" class="ws-table" max-height="400"
         :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName">
         <el-table-column prop="seq" label="序号" width="50" align="center" />
@@ -121,37 +121,24 @@
         </el-table-column>
         <el-table-column prop="subject" label="项目" width="160" show-overflow-tooltip />
         <el-table-column prop="detail" label="二级明细" width="140" show-overflow-tooltip />
-        <el-table-column prop="total" label="合计" width="120" align="right">
-          <template #default="{ row }">
-            <span v-if="row._isRatioRow"></span>
-            <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
-              {{ fmt(rowTotal(row)) }}
-            </span>
-          </template>
-        </el-table-column>
-        <!-- 动态子企业列 -->
-        <el-table-column v-for="(c, ci) in companies" :key="'ind_'+si+'_'+ci" align="center" min-width="120">
+        <el-table-column label="金额" width="150" align="right">
           <template #header>
             <div style="text-align:center;line-height:1.3">
-              <div style="font-weight:600">{{ c.name }}</div>
-              <div style="color:#4b2d77;font-size:10px">{{ c.ratio }}%</div>
+              <div style="font-weight:600">{{ section.companyName }}</div>
+              <div style="color:#1a5fb4;font-size:10px">间接 {{ section.ratio }}%</div>
             </div>
           </template>
           <template #default="{ row }">
-            <span v-if="row._isRatioRow" style="font-weight:600;color:#4b2d77;font-size:12px">{{ section.ratio }}%</span>
-            <el-input-number v-else-if="!row.isStep && row.values"
-              v-model="row.values[ci]" size="small" :precision="2" :controls="false"
+            <el-input-number v-if="!row.isStep" v-model="row.total" size="small" :precision="2" :controls="false"
               style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
           </template>
         </el-table-column>
       </el-table>
       <!-- 间接持股比对区 -->
-      <div class="ws-section" style="margin-top:8px">
-        <div style="font-size:12px;color:#999;padding:4px 8px;background:#f8f6fb;border-radius:4px">
-          模拟后长投小计: <b style="color:#4b2d77">{{ fmt(section.endLongInvest) }}</b>
-          &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#4b2d77">{{ fmt(section.endNetAssetShare) }}</b>
-          &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmt(section.difference) }}</b>
-        </div>
+      <div style="margin-top:8px;font-size:12px;color:#999;padding:4px 8px;background:#f0f7ff;border-radius:4px;border:1px solid #d0e3f5">
+        🔗 模拟后长投小计: <b style="color:#1a5fb4">{{ fmt(section.endLongInvest) }}</b>
+        &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#1a5fb4">{{ fmt(section.endNetAssetShare) }}</b>
+        &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmt(section.difference) }}</b>
       </div>
     </div>
 

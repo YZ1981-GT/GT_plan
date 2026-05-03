@@ -94,6 +94,21 @@
         </template>
       </el-table-column>
 
+      <!-- 间接持股方 -->
+      <el-table-column prop="indirect_holder" label="间接持股方" width="130">
+        <template #header>
+          <span>间接持股方<br/><small style="color:#999">（通过谁持有）</small></span>
+        </template>
+        <template #default="{ row }">
+          <div v-if="row.holding_type === '间接'" @click.stop @mousedown.stop>
+            <el-select v-model="row.indirect_holder" size="small" style="width:100%" placeholder="选择持股方" filterable>
+              <el-option v-for="c in getOtherCompanies(row)" :key="c" :label="c" :value="c" />
+            </el-select>
+          </div>
+          <span v-else style="color:#ccc;font-size:11px">—</span>
+        </template>
+      </el-table-column>
+
       <!-- 持股比例变动 -->
       <el-table-column label="持股比例变动情况" align="center">
         <el-table-column prop="share_changed" label="是否变动" width="90" align="center">
@@ -277,6 +292,7 @@
           <el-table-column prop="account_subject" label="核算科目" width="120" />
           <el-table-column prop="accounting_method" label="核算方式" width="90" />
           <el-table-column prop="holding_type" label="持股类型" width="80" />
+          <el-table-column prop="indirect_holder" label="间接持股方" width="100" />
           <el-table-column prop="share_changed" label="是否变动" width="80" />
           <el-table-column prop="change_times" label="变动次数" width="80" />
         </el-table>
@@ -304,6 +320,7 @@ interface SubsidiaryInfoRow {
   account_subject: string
   accounting_method: string
   holding_type: string
+  indirect_holder: string
   share_changed: string
   change_times: number
   acquisition_date: string
@@ -353,10 +370,18 @@ watch(rows, (v) => {
 const accountSubjectOptions = ['长期股权投资', '可供出售金融资产', '交易性金融资产', '其他权益工具投资', '其他非流动金融资产', '其他非流动资产']
 const accountingMethodOptions = ['成本法', '权益法', '公允价值']
 
+// 间接持股方下拉选项：排除当前行自己的企业名
+function getOtherCompanies(currentRow: SubsidiaryInfoRow): string[] {
+  return rows.value
+    .filter(r => r.company_name && r.company_name !== currentRow.company_name)
+    .map(r => r.company_name)
+    .filter((v, i, a) => a.indexOf(v) === i) // 去重
+}
+
 function createEmptyRow(): SubsidiaryInfoRow {
   return {
     company_name: '', company_code: '', account_subject: '',
-    accounting_method: '', holding_type: '直接', share_changed: '否', change_times: 0,
+    accounting_method: '', holding_type: '直接', indirect_holder: '', share_changed: '否', change_times: 0,
     acquisition_date: '', merge_type: '', first_consol_date: '',
     non_common_cost: null, non_common_ratio: null,
     common_cost: null, common_ratio: null,
@@ -415,7 +440,8 @@ const TEMPLATE_COLS = [
   { key: 'account_subject', header: '核算科目', note: '必填，可选值：长期股权投资/可供出售金融资产/交易性金融资产/其他权益工具投资/其他非流动金融资产/其他非流动资产', example: '长期股权投资' },
   { key: 'accounting_method', header: '核算方式', note: '必填，可选值：成本法/权益法/公允价值', example: '成本法' },
   { key: 'holding_type', header: '持股类型', note: '必填，可选值：直接/间接', example: '直接' },
-  { key: 'share_changed', header: '是否变动', note: '必填，填"是"或"否"。选"是"后需填变动次数', example: '否' },
+  { key: 'indirect_holder', header: '间接持股方', note: '间接持股时填写，通过哪家企业间接持有', example: '' },
+  { key: 'share_changed', header: '是否变动', note: '必填，填"是"或"否"', example: '否' },
   { key: 'change_times', header: '变动次数', note: '持股比例变动次数，1/2/3。仅"是否变动"为"是"时填写', example: '' },
   { key: 'acquisition_date', header: '购买日', note: '当期新增时填写，格式 YYYY-MM-DD', example: '' },
   { key: 'merge_type', header: '合并类型', note: '当期新增时填写，可选值：同控/非同控', example: '' },
@@ -464,14 +490,14 @@ async function exportTemplate() {
 
   // ── Sheet 2: 数据填写 ──
   const categoryRow = [
-    '基本信息', '', '', '', '', '持股比例变动', '', '当期新增', '', '',
+    '基本信息', '', '', '', '', '', '持股比例变动', '', '当期新增', '', '',
     '涉及合并-非同控', '', '涉及合并-同控', '', '不涉及合并', '',
     '当期减少', '', '',
   ]
   const noteRow = TEMPLATE_COLS.map(c => c.note)
   const headerRow = TEMPLATE_COLS.map(c => c.header)
-  const exampleRow1 = ['示例公司A', 'A001', '长期股权投资', '成本法', '直接', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
-  const exampleRow2 = ['示例公司B', 'B002', '长期股权投资', '权益法', '间接', '是', 1, '', '非同控', '', 1000000, 51, '', '', '', '', '', '', '']
+  const exampleRow1 = ['示例公司A', 'A001', '长期股权投资', '成本法', '直接', '', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
+  const exampleRow2 = ['示例公司A', 'A001', '长期股权投资', '权益法', '间接', '公司B', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
 
   // 如果有数据就导出数据
   const existingData = rows.value.filter(r => r.company_name).map(r =>
@@ -488,13 +514,13 @@ async function exportTemplate() {
 
   // 合并分类行的单元格
   wsData['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },   // 基本信息 A-E（含持股类型）
-    { s: { r: 0, c: 5 }, e: { r: 0, c: 6 } },   // 持股比例变动 F-G
-    { s: { r: 0, c: 7 }, e: { r: 0, c: 9 } },   // 当期新增 H-J
-    { s: { r: 0, c: 10 }, e: { r: 0, c: 11 } },  // 涉及合并-非同控 K-L
-    { s: { r: 0, c: 12 }, e: { r: 0, c: 13 } }, // 涉及合并-同控 M-N
-    { s: { r: 0, c: 14 }, e: { r: 0, c: 15 } }, // 不涉及合并 O-P
-    { s: { r: 0, c: 16 }, e: { r: 0, c: 18 } }, // 当期减少 Q-S
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },   // 基本信息 A-F（含持股类型+间接持股方）
+    { s: { r: 0, c: 6 }, e: { r: 0, c: 7 } },   // 持股比例变动 G-H
+    { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },   // 当期新增 I-K
+    { s: { r: 0, c: 11 }, e: { r: 0, c: 12 } },  // 涉及合并-非同控 L-M
+    { s: { r: 0, c: 13 }, e: { r: 0, c: 14 } }, // 涉及合并-同控 N-O
+    { s: { r: 0, c: 15 }, e: { r: 0, c: 16 } }, // 不涉及合并 P-Q
+    { s: { r: 0, c: 17 }, e: { r: 0, c: 19 } }, // 当期减少 R-T
   ]
 
   XLSX.utils.book_append_sheet(wb, wsData, '数据填写')
@@ -554,20 +580,21 @@ async function onFileSelected(e: Event) {
         account_subject: String(r[2] || '').trim(),
         accounting_method: String(r[3] || '').trim(),
         holding_type: String(r[4] || '直接').trim(),
-        share_changed: String(r[5] || '否').trim(),
-        change_times: Number(r[6]) || 0,
-        acquisition_date: String(r[7] || '').trim(),
-        merge_type: String(r[8] || '').trim(),
-        first_consol_date: String(r[9] || '').trim(),
-        non_common_cost: r[10] != null && r[10] !== '' ? Number(r[10]) : null,
-        non_common_ratio: r[11] != null && r[11] !== '' ? Number(r[11]) : null,
-        common_cost: r[12] != null && r[12] !== '' ? Number(r[12]) : null,
-        common_ratio: r[13] != null && r[13] !== '' ? Number(r[13]) : null,
-        no_consol_cost: r[14] != null && r[14] !== '' ? Number(r[14]) : null,
-        no_consol_ratio: r[15] != null && r[15] !== '' ? Number(r[15]) : null,
-        disposal_date: String(r[16] || '').trim(),
-        disposal_amount: r[17] != null && r[17] !== '' ? Number(r[17]) : null,
-        disposal_ratio: r[18] != null && r[18] !== '' ? Number(r[18]) : null,
+        indirect_holder: String(r[5] || '').trim(),
+        share_changed: String(r[6] || '否').trim(),
+        change_times: Number(r[7]) || 0,
+        acquisition_date: String(r[8] || '').trim(),
+        merge_type: String(r[9] || '').trim(),
+        first_consol_date: String(r[10] || '').trim(),
+        non_common_cost: r[11] != null && r[11] !== '' ? Number(r[11]) : null,
+        non_common_ratio: r[12] != null && r[12] !== '' ? Number(r[12]) : null,
+        common_cost: r[13] != null && r[13] !== '' ? Number(r[13]) : null,
+        common_ratio: r[14] != null && r[14] !== '' ? Number(r[14]) : null,
+        no_consol_cost: r[15] != null && r[15] !== '' ? Number(r[15]) : null,
+        no_consol_ratio: r[16] != null && r[16] !== '' ? Number(r[16]) : null,
+        disposal_date: String(r[17] || '').trim(),
+        disposal_amount: r[18] != null && r[18] !== '' ? Number(r[18]) : null,
+        disposal_ratio: r[19] != null && r[19] !== '' ? Number(r[19]) : null,
         pre_disposal_reduce: '', pre_disposal_times: null,
         post_disposal_reduce: '', post_disposal_times: null,
       })

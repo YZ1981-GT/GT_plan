@@ -121,7 +121,7 @@ import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
 
 interface SubsidiaryInfoRow {
   company_name: string; company_code: string; account_subject: string
-  accounting_method: string; holding_type: string; share_changed: string; change_times: number
+  accounting_method: string; holding_type: string; indirect_holder: string; share_changed: string; change_times: number
   acquisition_date: string; merge_type: string; first_consol_date: string
   non_common_cost: number | null; non_common_ratio: number | null
   common_cost: number | null; common_ratio: number | null
@@ -334,7 +334,7 @@ function stopResize() {
 // ─── 默认数据构建 ─────────────────────────────────────────────────────────────
 function mkEmptyRow(): SubsidiaryInfoRow {
   return { company_name: '', company_code: '', account_subject: '', accounting_method: '',
-    holding_type: '直接', share_changed: '否', change_times: 0, acquisition_date: '', merge_type: '', first_consol_date: '',
+    holding_type: '直接', indirect_holder: '', share_changed: '否', change_times: 0, acquisition_date: '', merge_type: '', first_consol_date: '',
     non_common_cost: null, non_common_ratio: null, common_cost: null, common_ratio: null,
     no_consol_cost: null, no_consol_ratio: null, disposal_date: '', disposal_amount: null, disposal_ratio: null,
     pre_disposal_reduce: '', pre_disposal_times: null, post_disposal_reduce: '', post_disposal_times: null }
