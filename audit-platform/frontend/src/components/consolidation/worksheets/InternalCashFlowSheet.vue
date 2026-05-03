@@ -6,6 +6,8 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" @click="exportCf">📥 导出模板</el-button>
+        <el-button size="small" @click="cfFileRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
@@ -75,6 +77,8 @@
       </el-table-column>
     </el-table>
 
+    <input ref="cfFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onCfFileSelected" />
+
     <div class="ws-section" style="margin-top:16px">
       <div class="ws-section-title">自动生成的现金流抵消分录</div>
       <el-table :data="generatedEntries" border size="small" class="ws-table" max-height="200"
@@ -93,7 +97,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface CashFlowRow { payerCompany: string; receiverCompany: string; payerItem: string; payerAmount: number|null; receiverItem: string; receiverAmount: number|null }
@@ -104,6 +108,7 @@ const emitCf = defineEmits<{ (e: 'save', data: CashFlowRow[]): void; (e: 'entrie
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<CashFlowRow[]>([])
+const cfFileRef = ref<HTMLInputElement|null>(null)
 const n = (v: any) => Number(v) || 0
 
 const allCompanyOptions = computed(() => [{ name: '母公司', code: 'parent' }, ...props.companies.map(c => ({ name: c.name, code: c.code || '' }))])
@@ -154,6 +159,27 @@ watch(generatedEntries, (entries) => {
 }, { immediate: true })
 
 function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+
+async function exportCf() {
+  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  const headers = ['付款方','收款方','付款方现金流项目','付款方金额','收款方现金流项目','收款方金额']
+  const dataRows = rows.map(r => [r.payerCompany,r.receiverCompany,r.payerItem,r.payerAmount??'',r.receiverItem,r.receiverAmount??''])
+  const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:22}))
+  XLSX.utils.book_append_sheet(wb,ws,'数据填写'); XLSX.writeFile(wb,'内部现金流抵消_模板.xlsx'); ElMessage.success('模板已导出')
+}
+async function onCfFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
+  try {
+    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(),{type:'array'})
+    const sn = wb.SheetNames.find(n=>n==='数据填写')||wb.SheetNames[wb.SheetNames.length-1]
+    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1})
+    let cnt=0; for(let i=1;i<json.length;i++){const r=json[i];if(!r?.[0])continue
+      rows.push({payerCompany:String(r[0]||''),receiverCompany:String(r[1]||''),payerItem:String(r[2]||''),
+        payerAmount:r[3]!=null?Number(r[3]):null,receiverItem:String(r[4]||''),receiverAmount:r[5]!=null?Number(r[5]):null}); cnt++}
+    ElMessage.success(`已导入 ${cnt} 条`)
+  } catch(err:any){ElMessage.error('解析失败：'+(err.message||''))}
+  finally{if(cfFileRef.value)cfFileRef.value.value=''}
+}
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 const cellStyle = { padding: '2px 4px', fontSize: '11px' }
 function getSummary({ columns, data }: any) {

@@ -7,6 +7,7 @@
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_post_invest')">ƒx 公式</el-button>
+        <el-button size="small" @click="exportData">📥 导出Excel</el-button>
         <el-button size="small" @click="$emit('save', tableRows)">💾 保存</el-button>
       </div>
     </div>
@@ -166,6 +167,15 @@ function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return 
 function setOverride(companyName: string, field: string, val: number | null) {
   if (!overrides[companyName]) overrides[companyName] = {}
   overrides[companyName][field] = val
+}
+
+async function exportData() {
+  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  const headers = ['子企业','持股比例','账面投资成本','减值准备','账面净额','模拟损益调整','模拟其他权益','模拟后长投','抵消投资成本','抵消损益调整','抵消其他权益','抵消合计','抵消后长投']
+  const dataRows = tableRows.value.map((r: any) => [r.companyName,r.ratio,r.bookCost,r.bookImpairment,r.bookNet,r.simIncomeAdj,r.simOtherEquity,r.simTotal,r.elimCost,r.elimIncomeAdj,r.elimOtherEquity,r.elimTotal,r.postElimTotal])
+  const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:14}))
+  XLSX.utils.book_append_sheet(wb,ws,'抵消后长投明细'); XLSX.writeFile(wb,'抵消后长投明细.xlsx')
+  ElMessage.success('已导出')
 }
 function calcCls(v: any) { return n(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 

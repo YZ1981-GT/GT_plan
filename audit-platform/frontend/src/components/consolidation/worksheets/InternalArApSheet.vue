@@ -7,6 +7,8 @@
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="emitArap('open-formula', 'consol_internal_arap')">ƒx 公式</el-button>
+        <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
@@ -140,6 +142,8 @@
       </el-table>
     </div>
 
+    <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
+
     <!-- 自定义账龄段弹窗 -->
     <el-dialog v-model="showAgingDialog" title="自定义账龄段" width="500px" append-to-body>
       <el-alert type="info" :closable="false" style="margin-bottom:12px">
@@ -197,6 +201,7 @@ const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<ArApRow[]>([])
 const showAgingDialog = ref(false)
+const fileInputRef = ref<HTMLInputElement|null>(null)
 
 const allCompanyOptions = computed(() => [
   { name: '母公司', code: 'parent' },
@@ -329,6 +334,60 @@ watch(generatedEntries, (entries) => {
 
 const headerStyle = { background: '#f0edf5', fontSize: '10px', color: '#333', padding: '2px 0' }
 const cellStyle = { padding: '2px 3px', fontSize: '11px' }
+
+// ─── 导出模板 / 导入 ──────────────────────────────────────────────────────────
+async function exportTemplate() {
+  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  const agNames = agingSegments.value.map(a => a.name)
+  const headers = ['本方单位','本方科目','本方明细',
+    ...agNames.map(a => '本方-'+a), '本方原值合计', ...agNames.map(a => '本方坏账-'+a), '本方坏账合计',
+    '对方单位','对方科目','对方明细',
+    ...agNames.map(a => '对方-'+a), '对方原值合计', ...agNames.map(a => '对方坏账-'+a), '对方坏账合计',
+    '差异','差异原因']
+  const dataRows = rows.map(r => [
+    r.localCompany, r.localSubject, r.localDetail,
+    ...r.localAmounts.map(v => v ?? ''), sumArr(r.localAmounts) || '',
+    ...r.localImpairments.map(v => v ?? ''), sumArr(r.localImpairments) || '',
+    r.remoteCompany, r.remoteSubject, r.remoteDetail,
+    ...r.remoteAmounts.map(v => v ?? ''), sumArr(r.remoteAmounts) || '',
+    ...r.remoteImpairments.map(v => v ?? ''), sumArr(r.remoteImpairments) || '',
+    sumArr(r.localAmounts) - sumArr(r.remoteAmounts) || '', r.diffReason,
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = headers.map(() => ({ wch: 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '数据填写')
+  XLSX.writeFile(wb, '内部往来抵消_模板.xlsx'); ElMessage.success('模板已导出')
+}
+
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
+  try {
+    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
+    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+    const ac = agingCount.value
+    let imported = 0
+    for (let i = 1; i < json.length; i++) {
+      const r = json[i]; if (!r?.[0]) continue
+      const p = (idx: number) => r[idx] != null && r[idx] !== '' ? Number(r[idx]) : null
+      const localAmts: (number|null)[] = []; for (let k = 0; k < ac; k++) localAmts.push(p(3 + k))
+      const localImps: (number|null)[] = []; for (let k = 0; k < ac; k++) localImps.push(p(3 + ac + 1 + k))
+      const remoteBase = 3 + ac * 2 + 2 + 3
+      const remoteAmts: (number|null)[] = []; for (let k = 0; k < ac; k++) remoteAmts.push(p(remoteBase + k))
+      const remoteImps: (number|null)[] = []; for (let k = 0; k < ac; k++) remoteImps.push(p(remoteBase + ac + 1 + k))
+      rows.push({
+        localCompany: String(r[0] || ''), localSubject: String(r[1] || ''), localDetail: String(r[2] || ''),
+        localAmounts: localAmts, localImpairments: localImps,
+        remoteCompany: String(r[remoteBase - 3] || ''), remoteSubject: String(r[remoteBase - 2] || ''), remoteDetail: String(r[remoteBase - 1] || ''),
+        remoteAmounts: remoteAmts, remoteImpairments: remoteImps,
+        diffReason: String(r[r.length - 1] || ''),
+      })
+      imported++
+    }
+    ElMessage.success(`已导入 ${imported} 条`)
+  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
+  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
+}
 
 function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
 onMounted(() => document.addEventListener('keydown', onEsc))

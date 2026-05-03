@@ -6,6 +6,8 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" @click="exportTrade">📥 导出模板</el-button>
+        <el-button size="small" @click="tradeFileRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
@@ -81,6 +83,8 @@
       </el-table-column>
     </el-table>
 
+    <input ref="tradeFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onTradeFileSelected" />
+
     <!-- 生成的抵消分录 -->
     <div class="ws-section" style="margin-top:16px">
       <div class="ws-section-title">自动生成的抵消分录</div>
@@ -101,7 +105,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface TradeRow {
@@ -116,6 +120,7 @@ const emitTrade = defineEmits<{ (e: 'save', data: TradeRow[]): void; (e: 'entrie
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<TradeRow[]>([])
+const tradeFileRef = ref<HTMLInputElement|null>(null)
 const n = (v: any) => Number(v) || 0
 
 const allCompanyOptions = computed(() => [{ name: '母公司', code: 'parent' }, ...props.companies.map(c => ({ name: c.name, code: c.code || '' }))])
@@ -159,6 +164,29 @@ watch(generatedEntries, (entries) => {
 }, { immediate: true })
 
 function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+
+async function exportTrade() {
+  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  const headers = ['卖方','买方','交易类型','卖方科目','卖方金额','买方科目','买方金额','未实现利润','存货留存率%']
+  const dataRows = rows.map(r => [r.sellerCompany,r.buyerCompany,r.tradeType,r.sellerSubject,r.sellerAmount??'',r.buyerSubject,r.buyerAmount??'',r.unrealizedProfit??'',r.inventoryRatio??''])
+  const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:14}))
+  XLSX.utils.book_append_sheet(wb,ws,'数据填写'); XLSX.writeFile(wb,'内部交易抵消_模板.xlsx'); ElMessage.success('模板已导出')
+}
+async function onTradeFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
+  try {
+    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(),{type:'array'})
+    const sn = wb.SheetNames.find(n=>n==='数据填写')||wb.SheetNames[wb.SheetNames.length-1]
+    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1})
+    let cnt=0; for(let i=1;i<json.length;i++){const r=json[i];if(!r?.[0])continue
+      rows.push({sellerCompany:String(r[0]||''),buyerCompany:String(r[1]||''),tradeType:String(r[2]||''),
+        sellerSubject:String(r[3]||''),sellerAmount:r[4]!=null?Number(r[4]):null,
+        buyerSubject:String(r[5]||''),buyerAmount:r[6]!=null?Number(r[6]):null,
+        unrealizedProfit:r[7]!=null?Number(r[7]):null,inventoryRatio:r[8]!=null?Number(r[8]):null}); cnt++}
+    ElMessage.success(`已导入 ${cnt} 条`)
+  } catch(err:any){ElMessage.error('解析失败：'+(err.message||''))}
+  finally{if(tradeFileRef.value)tradeFileRef.value.value=''}
+}
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 const cellStyle = { padding: '2px 4px', fontSize: '11px' }
 function getSummary({ columns, data }: any) {
