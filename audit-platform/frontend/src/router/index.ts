@@ -164,7 +164,10 @@ const router = createRouter({
         {
           path: 'projects/:projectId/consolidation',
           name: 'Consolidation',
-          component: () => import('@/views/ConsolidationIndex.vue'),
+          components: {
+            middle: () => import('@/components/consolidation/ConsolMiddleNav.vue'),
+            detail: () => import('@/views/ConsolidationIndex.vue'),
+          },
         },
         {
           path: 'projects/:projectId/workpaper-summary',

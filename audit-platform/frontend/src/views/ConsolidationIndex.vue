@@ -146,68 +146,44 @@
 
       <!-- Tab 5: 合并报表 -->
       <el-tab-pane label="合并报表" name="consol_report">
-        <div class="gt-report-layout">
-          <!-- 左侧：集团架构树 + 报表类型 -->
-          <aside class="gt-report-nav">
-            <div class="gt-report-nav-header">
-              <span style="font-size:13px;font-weight:600;color:#333">合并节点</span>
-              <el-select v-model="consolReportTemplateType" size="small" style="width:80px" @change="loadConsolReport">
-                <el-option label="国企版" value="soe" />
-                <el-option label="上市版" value="listed" />
-              </el-select>
-            </div>
-            <!-- 集团架构树 -->
-            <div class="gt-report-tree">
-              <el-tree :data="reportTreeData" :props="{ label: 'label', children: 'children' }"
-                node-key="key" default-expand-all highlight-current
-                @node-click="onReportTreeClick">
-                <template #default="{ data }">
-                  <span class="gt-report-tree-node" :class="{ 'gt-report-tree-node--diff': data.isDiff }">
-                    <span>{{ data.icon }} {{ data.label }}</span>
-                    <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px">{{ data.ratio }}%</el-tag>
-                  </span>
-                </template>
-              </el-tree>
-            </div>
-            <!-- 报表类型切换 -->
-            <div class="gt-report-type-bar">
-              <div v-for="item in reportNavItems" :key="item.key"
-                class="gt-report-type-item" :class="{ 'gt-report-type-item--active': consolReportType === item.key }"
-                @click="consolReportType = item.key; loadConsolReport()">
-                <span>{{ item.icon }}</span>
-                <span style="font-size:11px">{{ item.label }}</span>
-              </div>
-            </div>
-          </aside>
-          <!-- 右侧：报表内容 -->
-          <main class="gt-report-content">
-            <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-              <h3 style="margin:0;font-size:15px;color:#333;flex:1">
-                {{ reportSelectedNode?.label || '合并报表' }} — {{ currentReportLabel }}
-              </h3>
-              <el-tag v-if="reportSelectedNode?.isDiff" type="warning" size="small" effect="plain">差额表</el-tag>
-              <el-button size="small" type="primary" @click="loadConsolReport" :loading="consolReportLoading">🔄 刷新</el-button>
-              <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
-              <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
-            </div>
-            <el-table v-if="consolReportRows.length" :data="consolReportRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
-              :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }"
-              :row-class-name="consolReportRowClass">
-              <el-table-column prop="row_code" label="行次" width="90" />
-              <el-table-column prop="row_name" label="项目" min-width="200" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px', fontWeight: row.is_total_row ? 700 : 400 }">{{ row.row_name }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="合并本期" width="140" align="right">
-                <template #default="{ row }">{{ fmtAmt(row.current_period_amount) }}</template>
-              </el-table-column>
-              <el-table-column label="合并上期" width="140" align="right">
-                <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else-if="!consolReportLoading" description="选择左侧合并节点和报表类型查看" />
-          </main>
+        <div class="gt-tab-content">
+          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+            <h3 style="margin:0;font-size:15px;color:#333;flex:1">
+              {{ projectInfo.clientName }} — {{ currentReportLabel }}
+            </h3>
+            <el-select v-model="consolReportTemplateType" size="small" style="width:100px" @change="loadConsolReport">
+              <el-option label="国企版" value="soe" />
+              <el-option label="上市版" value="listed" />
+            </el-select>
+            <el-button size="small" type="primary" @click="loadConsolReport" :loading="consolReportLoading">🔄 刷新</el-button>
+            <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
+            <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
+          </div>
+          <!-- 报表类型快捷切换 -->
+          <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+            <el-button v-for="item in reportNavItems" :key="item.key" size="small"
+              :type="consolReportType === item.key ? 'primary' : ''"
+              @click="consolReportType = item.key; loadConsolReport()">
+              {{ item.icon }} {{ item.label }}
+            </el-button>
+          </div>
+          <el-table v-if="consolReportRows.length" :data="consolReportRows" border size="small" max-height="calc(100vh - 320px)" style="width:100%"
+            :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }"
+            :row-class-name="consolReportRowClass">
+            <el-table-column prop="row_code" label="行次" width="90" />
+            <el-table-column prop="row_name" label="项目" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px', fontWeight: row.is_total_row ? 700 : 400 }">{{ row.row_name }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="合并本期" width="140" align="right">
+              <template #default="{ row }">{{ fmtAmt(row.current_period_amount) }}</template>
+            </el-table-column>
+            <el-table-column label="合并上期" width="140" align="right">
+              <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-else-if="!consolReportLoading" description="选择报表类型后点击刷新" />
         </div>
       </el-tab-pane>
 
@@ -503,44 +479,6 @@ const reportNavItems = [
 const currentReportLabel = computed(() => {
   return reportNavItems.find(i => i.key === consolReportType.value)?.label || '合并报表'
 })
-
-// 集团架构树 → 报表导航树（每个合并节点下自动加差额表子节点）
-const reportSelectedNode = ref<any>(null)
-
-const reportTreeData = computed(() => {
-  if (!groupTree.value.length) return []
-  function buildNode(node: any): any {
-    const children: any[] = []
-    // 子企业节点
-    if (node.children?.length) {
-      for (const child of node.children) {
-        children.push(buildNode(child))
-      }
-      // 合并节点自动加差额表
-      children.push({
-        key: `diff_${node.company_code || 'root'}`,
-        label: '差额表（抵消调整）',
-        icon: '📝',
-        isDiff: true,
-        companyCode: node.company_code,
-      })
-    }
-    return {
-      key: node.company_code || 'root',
-      label: node.company_name || node.name,
-      icon: children.length ? '🏢' : '🏠',
-      ratio: node.shareholding,
-      companyCode: node.company_code,
-      children: children.length ? children : undefined,
-    }
-  }
-  return [buildNode(groupTree.value[0])]
-})
-
-function onReportTreeClick(data: any) {
-  reportSelectedNode.value = data
-  loadConsolReport()
-}
 const consolReportRows = ref<any[]>([])
 const showConsolConversion = ref(false)
 const consolMappingLoading = ref(false)
@@ -695,10 +633,33 @@ watch(noteTreeSearch, (val) => {
 })
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
+// 监听中间栏树形节点选择事件
+function onConsolTreeSelect(e: Event) {
+  const data = (e as CustomEvent).detail
+  if (!data) return
+  if (data.isReport && data.reportType) {
+    // 点击了报表类型节点 → 切换到合并报表 tab 并加载对应报表
+    activeTab.value = 'consol_report'
+    consolReportType.value = data.reportType
+    loadConsolReport()
+  } else if (data.isDiff) {
+    // 点击了差额表节点 → 切换到差额表 tab
+    activeTab.value = 'worksheet'
+    if (data.companyCode) {
+      selectedNode.value = { company_code: data.companyCode }
+      loadWorksheet()
+    }
+  } else if (data.companyCode) {
+    // 点击了企业节点 → 选中该节点
+    selectedNode.value = { company_code: data.companyCode, company_name: data.label }
+  }
+}
+
 onMounted(async () => {
   await loadProjectInfo()
   await loadGroupTree()
   await loadTemplates()
+  window.addEventListener('consol-tree-select', onConsolTreeSelect)
 })
 
 watch(activeTab, (tab) => {
