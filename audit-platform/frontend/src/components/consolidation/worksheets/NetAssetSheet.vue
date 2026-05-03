@@ -33,15 +33,15 @@
       <!-- 合计 -->
       <el-table-column prop="total" label="合计" width="120" align="right">
         <template #default="{ row }">
-          <span v-if="row.isComputed" :class="calcCls(row.total)">{{ fmt(row.total) }}</span>
-          <el-input-number v-else-if="!row.isHeader" v-model="row.total" size="small" :precision="2" :controls="false" style="width:100%" />
+          <el-input-number v-if="!row.isHeader" v-model="row.total" size="small" :precision="2" :controls="false"
+            style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
         </template>
       </el-table-column>
       <!-- 母公司 -->
       <el-table-column prop="parent" label="母公司" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isHeader && !row.isComputed" v-model="row.parent" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else-if="row.isComputed" :class="calcCls(row.parent)">{{ fmt(row.parent) }}</span>
+          <el-input-number v-if="!row.isHeader" v-model="row.parent" size="small" :precision="2" :controls="false"
+            style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
         </template>
       </el-table-column>
       <!-- 动态子企业列（合并范围直接下级） -->
@@ -53,9 +53,9 @@
           </div>
         </template>
         <template #default="{ row }">
-          <el-input-number v-if="!row.isHeader && !row.isComputed && row.values"
-            v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else-if="row.isComputed && row.values" :class="calcCls(row.values?.[ci])">{{ fmt(row.values?.[ci]) }}</span>
+          <el-input-number v-if="!row.isHeader && row.values"
+            v-model="row.values[ci]" size="small" :precision="2" :controls="false"
+            style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
         </template>
       </el-table-column>
     </el-table>
@@ -305,6 +305,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-computed { color: #4b2d77; font-weight: 500; }
 .ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
 .ws-table :deep(.el-input__inner) { text-align: right; }
+.ws-table :deep(.ws-auto-cell .el-input__inner) { color: #4b2d77; font-weight: 500; background: #faf8fd; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 .ws-table :deep(.ws-row-header td) { background: #f8f6fb !important; font-weight: 600; }
 .ws-table :deep(.ws-row-bold td) { font-weight: 600; }

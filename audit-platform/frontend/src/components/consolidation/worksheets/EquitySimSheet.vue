@@ -41,8 +41,8 @@
         <el-table-column prop="total" label="合计" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row._isRatioRow"></span>
-            <span v-else-if="row.isComputed" :class="calcCls(row.total)">{{ fmt(row.total) }}</span>
-            <el-input-number v-else-if="!row.isStep" v-model="row.total" size="small" :precision="2" :controls="false" style="width:100%" />
+            <el-input-number v-else-if="!row.isStep" v-model="row.total" size="small" :precision="2" :controls="false"
+              style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
           </template>
         </el-table-column>
         <!-- 动态子企业列 -->
@@ -55,9 +55,9 @@
           </template>
           <template #default="{ row }">
             <span v-if="row._isRatioRow" style="font-weight:600;color:#4b2d77;font-size:12px">{{ c.ratio }}%</span>
-            <el-input-number v-else-if="!row.isStep && !row.isComputed && row.values"
-              v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" />
-            <span v-else-if="row.isComputed && row.values" :class="calcCls(row.values?.[ci])">{{ fmt(row.values?.[ci]) }}</span>
+            <el-input-number v-else-if="!row.isStep && row.values"
+              v-model="row.values[ci]" size="small" :precision="2" :controls="false"
+              style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
           </template>
         </el-table-column>
       </el-table>
@@ -108,8 +108,8 @@
         <el-table-column prop="detail" label="二级明细" width="140" show-overflow-tooltip />
         <el-table-column prop="total" label="金额" width="120" align="right">
           <template #default="{ row }">
-            <span v-if="row.isComputed" :class="calcCls(row.total)">{{ fmt(row.total) }}</span>
-            <el-input-number v-else-if="!row.isStep" v-model="row.total" size="small" :precision="2" :controls="false" style="width:100%" />
+            <el-input-number v-if="!row.isStep" v-model="row.total" size="small" :precision="2" :controls="false"
+              style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
           </template>
         </el-table-column>
       </el-table>
@@ -301,6 +301,7 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
 .ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
 .ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
+.ws-table :deep(.ws-auto-cell .el-input__inner) { color: #4b2d77; font-weight: 500; background: #faf8fd; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 .ws-table :deep(.ws-row-step td) { background: #f8f6fb !important; font-weight: 600; }
 .ws-table :deep(.ws-row-ratio td) { background: #f0edf5 !important; font-weight: 600; }
