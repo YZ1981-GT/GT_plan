@@ -53,7 +53,8 @@
       <EliminationSheet v-else-if="activeSheet === 'elimination'" :companies="companyColumns"
         :equity-rows="data.elimEquity" :income-rows="data.elimIncome" :cross-rows="data.elimCross"
         :imported-entries="allImportedEntries"
-        @save="onSave('合并抵消分录', $event)" @open-formula="onOpenFormula" />
+        @save="onSave('合并抵消分录', $event)" @open-formula="onOpenFormula"
+        @goto-sheet="(k: string) => activeSheet = k" />
       <CapitalReserveSheet v-else-if="activeSheet === 'capital'" :companies="companyColumns"
         v-model="data.capitalReserve" :elimination-data="elimSummaryForCapital"
         @save="onSave('资本公积变动', $event)" @open-formula="onOpenFormula" />

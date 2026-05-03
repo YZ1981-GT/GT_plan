@@ -9,160 +9,85 @@
         <el-button size="small" @click="$emit('open-formula', 'consol_elimination')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
-        <el-button size="small" type="primary" @click="addElimRow">+ 新增行</el-button>
-        <el-button size="small" type="danger" :disabled="!selectedElimRows.length" @click="batchDeleteElim">
-          删除{{ selectedElimRows.length ? `(${selectedElimRows.length})` : '' }}
+        <el-button size="small" type="warning" @click="refreshAutoEntries">🔄 刷新</el-button>
+        <el-button size="small" type="primary" @click="addCustomRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedCustomRows.length" @click="batchDeleteCustom">
+          删除{{ selectedCustomRows.length ? `(${selectedCustomRows.length})` : '' }}
         </el-button>
-        <el-button size="small" @click="restoreElimDefaults" title="恢复默认行结构">🔄 还原</el-button>
-        <el-button size="small" @click="$emit('save', { equity: equityRows, income: incomeRows, cross: crossRows })">💾 保存</el-button>
+        <el-button size="small" @click="$emit('save', allEntries)">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>期末权益抵消 + 当期损益抵消 + 交叉持股抵消 + 内部抵消自动导入 + 自定义分录。合计列自动汇总各子企业金额。<b>导出模板按"借贷方向+项目+明细"匹配导入</b>，读取"数据填写"工作表。</span>
+      <span>统一汇总表：自动拉取的分录（灰色背景）来自
+        <a class="ws-link" @click="$emit('goto-sheet', 'equity_sim')">模拟权益法</a>、
+        <a class="ws-link" @click="$emit('goto-sheet', 'internal_arap')">内部往来</a>、
+        <a class="ws-link" @click="$emit('goto-sheet', 'internal_trade')">内部交易</a>、
+        <a class="ws-link" @click="$emit('goto-sheet', 'internal_cashflow')">内部现金流</a>，
+        <b>不可直接编辑，需到源表修改后点"🔄 刷新"</b>。白色行为自定义分录，可自由编辑增删。
+      </span>
     </div>
 
-    <!-- 1. 期末权益抵消 -->
-    <div class="ws-section">
-      <div class="ws-section-title">1. 期末权益抵消</div>
-      <el-table :data="equityRows" border size="small" class="ws-table" :max-height="isFullscreen ? '400' : '350'"
-        :header-cell-style="headerStyle" :cell-style="cellStyle"
-        @selection-change="sel => selectedElimRows = sel">
-        <el-table-column type="selection" width="36" fixed align="center" />
-        <el-table-column prop="direction" label="借贷方向" width="60" fixed align="center">
-          <template #default="{ row }"><el-tag :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag></template>
-        </el-table-column>
-        <el-table-column prop="subject" label="项目" width="180" fixed show-overflow-tooltip />
-        <el-table-column prop="detail" label="二级明细" width="120" show-overflow-tooltip />
-        <el-table-column label="合计" width="120" align="right">
-          <template #default="{ row }"><span :class="calcCls(sumValues(row))">{{ fmt(sumValues(row)) }}</span></template>
-        </el-table-column>
-        <el-table-column v-for="(c, ci) in companies" :key="'eq'+ci" align="right" min-width="120">
-          <template #header><div style="text-align:center;line-height:1.3"><div style="font-weight:600">{{ c.name }}</div><div style="color:#4b2d77;font-size:10px">{{ c.ratio }}%</div></div></template>
-          <template #default="{ row }"><el-input-number v-if="row.values" v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
-        </el-table-column>
-      </el-table>
-    </div>
+    <el-table :data="allEntries" border size="small" class="ws-table"
+      :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
+      :header-cell-style="headerStyle" :cell-style="entryCellStyle"
+      :row-class-name="entryRowClass"
+      @selection-change="onSelChange">
+      <el-table-column type="selection" width="36" fixed align="center" :selectable="(row: any) => row._custom" />
+      <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
+      <el-table-column prop="source" label="来源" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.source" :type="sourceTagType(row.source)" size="small" effect="plain">{{ row.source }}</el-tag>
+          <el-tag v-else type="info" size="small" effect="light">自定义</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="direction" label="借贷方向" width="70" align="center">
+        <template #default="{ row }">
+          <div v-if="row._custom" @click.stop @mousedown.stop>
+            <el-select v-model="row.direction" size="small" style="width:100%">
+              <el-option label="借" value="借" /><el-option label="贷" value="贷" />
+            </el-select>
+          </div>
+          <el-tag v-else :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="subject" label="科目" width="180">
+        <template #default="{ row }">
+          <el-input v-if="row._custom" v-model="row.subject" size="small" placeholder="科目" />
+          <span v-else>{{ row.subject }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="detail" label="二级明细" width="140">
+        <template #default="{ row }">
+          <el-input v-if="row._custom" v-model="row.detail" size="small" placeholder="明细" />
+          <span v-else>{{ row.detail || '' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="amount" label="金额" width="140" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="row._custom" v-model="row.amount" size="small" :precision="2" :controls="false" style="width:100%" />
+          <span v-else class="ws-computed">{{ fmt(row.amount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="desc" label="说明" min-width="180">
+        <template #default="{ row }">
+          <el-input v-if="row._custom" v-model="row.desc" size="small" placeholder="说明" />
+          <span v-else style="font-size:11px;color:#999">{{ row.desc || '' }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
 
-    <!-- 2. 当期损益抵消 -->
-    <div class="ws-section">
-      <div class="ws-section-title">2. 当期损益抵消</div>
-      <el-table :data="incomeRows" border size="small" class="ws-table" :max-height="isFullscreen ? '400' : '350'"
-        :header-cell-style="headerStyle" :cell-style="cellStyle"
-        @selection-change="sel => selectedElimRows = [...selectedElimRows.filter((r: any) => !incomeRows.includes(r)), ...sel]">
-        <el-table-column type="selection" width="36" fixed align="center" />
-        <el-table-column prop="direction" label="借贷方向" width="60" fixed align="center">
-          <template #default="{ row }"><el-tag :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag></template>
-        </el-table-column>
-        <el-table-column prop="subject" label="项目" width="220" fixed show-overflow-tooltip />
-        <el-table-column prop="detail" label="二级明细" width="160" show-overflow-tooltip />
-        <el-table-column label="合计" width="120" align="right">
-          <template #default="{ row }"><span :class="calcCls(sumValues(row))">{{ fmt(sumValues(row)) }}</span></template>
-        </el-table-column>
-        <el-table-column v-for="(c, ci) in companies" :key="'in'+ci" align="right" min-width="120">
-          <template #header><div style="text-align:center;line-height:1.3"><div style="font-weight:600">{{ c.name }}</div><div style="color:#4b2d77;font-size:10px">{{ c.ratio }}%</div></div></template>
-          <template #default="{ row }"><el-input-number v-if="row.values" v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- 3. 交叉持股 -->
-    <div class="ws-section">
-      <div class="ws-section-title">3. 交叉持股的权益和损益抵消</div>
-      <el-table :data="crossRows" border size="small" class="ws-table" :header-cell-style="headerStyle" :cell-style="cellStyle">
-        <el-table-column prop="direction" label="借贷方向" width="60" align="center">
-          <template #default="{ row }"><el-tag :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag></template>
-        </el-table-column>
-        <el-table-column prop="subject" label="项目" width="180" />
-        <el-table-column label="金额" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.total" size="small" :precision="2" :controls="false" style="width:100%" /></template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- 汇总 -->
-    <div class="ws-section">
-      <div class="ws-section-title">抵销后汇总</div>
-      <el-table :data="summaryRows" border size="small" class="ws-table" :header-cell-style="headerStyle" :cell-style="cellStyle">
-        <el-table-column prop="label" label="项目" width="200" fixed />
-        <el-table-column label="合计" width="120" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.total) }}</span></template>
-        </el-table-column>
-        <el-table-column v-for="(c, ci) in companies" :key="'sm'+ci" align="right" min-width="120">
-          <template #header><div style="text-align:center;font-weight:600">{{ c.name }}</div></template>
-          <template #default="{ row }"><span :class="calcCls(row.values?.[ci])">{{ fmt(row.values?.[ci]) }}</span></template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- 4. 从内部抵消表自动导入的分录 -->
-    <div class="ws-section" v-if="importedEntries.length">
-      <div class="ws-section-title">4. 内部抵消分录（自动从往来/交易/现金流表导入）
-        <el-tag size="small" type="info" style="margin-left:8px">{{ importedEntries.length }} 条</el-tag>
-      </div>
-      <el-table :data="importedEntries" border size="small" class="ws-table" max-height="250"
-        :header-cell-style="headerStyle" :cell-style="cellStyle">
-        <el-table-column prop="direction" label="借贷" width="50" align="center">
-          <template #default="{ row }"><el-tag :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag></template>
-        </el-table-column>
-        <el-table-column prop="subject" label="科目" width="180" show-overflow-tooltip />
-        <el-table-column prop="amount" label="金额" width="140" align="right">
-          <template #default="{ row }"><span class="ws-computed">{{ fmt(row.amount) }}</span></template>
-        </el-table-column>
-        <el-table-column prop="source" label="来源" width="120">
-          <template #default="{ row }"><el-tag size="small" type="info" effect="plain">{{ row.source }}</el-tag></template>
-        </el-table-column>
-        <el-table-column prop="desc" label="说明" min-width="200" show-overflow-tooltip />
-      </el-table>
-    </div>
-
-    <!-- 5. 用户自定义抵消分录 -->
-    <div class="ws-section">
-      <div class="ws-section-title">
-        {{ importedEntries.length ? '5' : '4' }}. 自定义抵消分录
-        <el-button size="small" type="primary" style="margin-left:12px" @click="addCustomEntry">+ 新增分录</el-button>
-      </div>
-      <el-table v-if="customEntries.length" :data="customEntries" border size="small" class="ws-table" max-height="300"
-        :header-cell-style="headerStyle" :cell-style="cellStyle">
-        <el-table-column label="借贷" width="70" align="center">
-          <template #default="{ row }">
-            <div @click.stop @mousedown.stop>
-              <el-select v-model="row.direction" size="small" style="width:100%">
-                <el-option label="借" value="借" /><el-option label="贷" value="贷" />
-              </el-select>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="科目" width="160">
-          <template #default="{ row }"><el-input v-model="row.subject" size="small" placeholder="科目名称" /></template>
-        </el-table-column>
-        <el-table-column label="二级明细" width="130">
-          <template #default="{ row }"><el-input v-model="row.detail" size="small" placeholder="明细" /></template>
-        </el-table-column>
-        <el-table-column label="金额" width="140" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.amount" size="small" :precision="2" :controls="false" style="width:100%" /></template>
-        </el-table-column>
-        <el-table-column label="说明" min-width="180">
-          <template #default="{ row }"><el-input v-model="row.desc" size="small" placeholder="抵消原因" /></template>
-        </el-table-column>
-        <el-table-column label="操作" width="60" align="center">
-          <template #default="{ $index }"><el-button link type="danger" size="small" @click="customEntries.splice($index, 1)">删</el-button></template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-else description="暂无自定义分录，点击上方按钮新增" :image-size="40" />
+    <!-- 借贷平衡校验 -->
+    <div class="ws-balance-check">
+      <span>借方合计: <b class="ws-computed">{{ fmt(totalDebit) }}</b></span>
+      <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmt(totalCredit) }}</b></span>
+      <span :class="totalDebit - totalCredit !== 0 ? 'ws-diff-warn' : ''" style="font-weight:600">
+        差额: {{ fmt(totalDebit - totalCredit) }}
+        <span v-if="totalDebit - totalCredit === 0" style="color:#67c23a;margin-left:4px">✓ 平衡</span>
+        <span v-else style="color:#e6a23c;margin-left:4px">⚠ 不平衡</span>
+      </span>
     </div>
 
     <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
-    <el-dialog v-model="importVisible" title="导入抵消分录数据" width="600px" append-to-body>
-      <el-alert type="warning" :closable="false" style="margin-bottom:12px">
-        <template #title><span>按"借贷方向+项目+二级明细"匹配导入，读取<b>"数据填写"</b>工作表。</span></template>
-      </el-alert>
-      <p v-if="importCount > 0" style="font-size:13px;color:#666">匹配到 <b style="color:#4b2d77">{{ importCount }}</b> 行</p>
-      <el-empty v-else description="未解析到有效数据" :image-size="60" />
-      <template #footer>
-        <el-button @click="importVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!importCount" @click="confirmImport">确认导入</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -171,172 +96,145 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
-interface ElimRow { direction: string; subject: string; detail?: string; total?: number | null; values?: (number | null)[]; isComputed?: boolean }
+interface EntryRow {
+  source: string; direction: string; subject: string; detail: string
+  amount: number | null; desc: string; _custom?: boolean
+}
 
-const props = defineProps<{ companies: CompanyCol[]; equityRows: ElimRow[]; incomeRows: ElimRow[]; crossRows: ElimRow[]; importedEntries?: any[] }>()
-defineEmits<{
-  (e: 'save', data: { equity: ElimRow[]; income: ElimRow[]; cross: ElimRow[] }): void
-  (e: 'open-formula', sheetKey: string): void
+const props = defineProps<{
+  companies: CompanyCol[]
+  equityRows: any[]; incomeRows: any[]; crossRows: any[]
+  importedEntries?: any[]
 }>()
 
-const companies = computed(() => props.companies)
-const equityRows = ref([...props.equityRows])
-const incomeRows = ref([...props.incomeRows])
-const crossRows = ref([...props.crossRows])
+defineEmits<{
+  (e: 'save', data: EntryRow[]): void
+  (e: 'open-formula', key: string): void
+  (e: 'goto-sheet', key: string): void
+}>()
+
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const importVisible = ref(false)
-const importCount = ref(0)
-const importMap = ref<Map<string, any>>(new Map())
-
-const selectedElimRows = ref<any[]>([])
-
-function addElimRow() {
-  const newRow: ElimRow = { direction: '借', subject: '', detail: '', values: [] }
-  // 在选中行的下一行插入（优先在权益区，其次损益区）
-  if (selectedElimRows.value.length > 0) {
-    const last = selectedElimRows.value[selectedElimRows.value.length - 1]
-    let idx = equityRows.value.indexOf(last)
-    if (idx >= 0) { equityRows.value.splice(idx + 1, 0, newRow); return }
-    idx = incomeRows.value.indexOf(last)
-    if (idx >= 0) { incomeRows.value.splice(idx + 1, 0, newRow); return }
-  }
-  equityRows.value.push(newRow)
-}
-
-async function batchDeleteElim() {
-  if (!selectedElimRows.value.length) return
-  try {
-    await ElMessageBox.confirm(`确定删除 ${selectedElimRows.value.length} 行？删除后可点击"还原"恢复。`, '删除确认', { type: 'warning' })
-    const del = new Set(selectedElimRows.value)
-    equityRows.value = equityRows.value.filter((r: ElimRow) => !del.has(r))
-    incomeRows.value = incomeRows.value.filter((r: ElimRow) => !del.has(r))
-    selectedElimRows.value = []
-  } catch {}
-}
-
-async function restoreElimDefaults() {
-  try {
-    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
-    const mk = (d: string, s: string, det = ''): ElimRow => ({ direction: d, subject: s, detail: det, values: [] })
-    equityRows.value = [
-      mk('借','实收资本（或股本）'),mk('借','其他权益工具'),mk('借','资本公积'),mk('借','减：库存股'),
-      mk('借','其他综合收益'),mk('借','专项储备'),mk('借','盈余公积'),mk('借','△一般风险准备'),mk('借','未分配利润'),
-      mk('借','商誉'),mk('借','长期股权投资','减值准备'),mk('贷','长期股权投资','投资成本'),
-      mk('贷','长期股权投资','损益调整'),mk('贷','长期股权投资','其他权益变动'),mk('贷','少数股东权益'),
-    ]
-    incomeRows.value = [
-      mk('借','年初未分配利润'),mk('借','投资收益'),mk('借','少数股权损益'),
-      mk('贷','2-3股份支付计入所有者权益的金额','（二）所有者投入和减少资本'),mk('贷','2-4其他','（二）所有者投入和减少资本'),
-      mk('贷','4-1提取盈余公积','（四）利润分配'),mk('贷','4-1-1法定公积金','（四）利润分配'),
-      mk('贷','4-1-2任意公积金','（四）利润分配'),mk('贷','4-1-3#储备基金','（四）利润分配'),
-      mk('贷','4-1-4#企业发展基金','（四）利润分配'),mk('贷','4-1-5#利润归还投资','（四）利润分配'),
-      mk('贷','4-2△提取一般风险准备','（四）利润分配'),mk('贷','4-3对所有者（或股东）的分配','（四）利润分配'),
-      mk('贷','4-4其他','（四）利润分配'),
-    ]
-    ElMessage.success('已恢复默认行结构')
-  } catch {}
-}
-
-// 从内部抵消表导入的分录（通过 props 传入）
-const importedEntries = computed(() => props.importedEntries || [])
-
-// 用户自定义分录
-const customEntries = reactive<{ direction: string; subject: string; detail: string; amount: number|null; desc: string }[]>([])
-
-function addCustomEntry() {
-  customEntries.push({ direction: '借', subject: '', detail: '', amount: null, desc: '' })
-}
-
-watch(() => props.companies, () => {}, { deep: true })
-watch(() => props.equityRows, (v) => { equityRows.value = [...v] }, { deep: true })
-watch(() => props.incomeRows, (v) => { incomeRows.value = [...v] }, { deep: true })
-watch(() => props.crossRows, (v) => { crossRows.value = [...v] }, { deep: true })
-
+const selectedCustomRows = ref<EntryRow[]>([])
 const n = (v: any) => Number(v) || 0
-function sumValues(row: ElimRow): number {
-  if (!row.values) return n(row.total)
-  return row.values.reduce((s: number, v) => s + n(v), 0)
+
+// ─── 自动拉取的分录（只读） ──────────────────────────────────────────────────
+function buildAutoEntries(): EntryRow[] {
+  const entries: EntryRow[] = []
+  // 权益抵消
+  for (const r of props.equityRows) {
+    const amt = r.values ? r.values.reduce((s: number, v: any) => s + n(v), 0) : n(r.total)
+    if (amt) entries.push({ source: '权益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '' })
+  }
+  // 损益抵消
+  for (const r of props.incomeRows) {
+    const amt = r.values ? r.values.reduce((s: number, v: any) => s + n(v), 0) : n(r.total)
+    if (amt) entries.push({ source: '损益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '' })
+  }
+  // 交叉持股
+  for (const r of props.crossRows) {
+    if (n(r.total)) entries.push({ source: '交叉持股', direction: r.direction, subject: r.subject, detail: '', amount: n(r.total), desc: '' })
+  }
+  // 内部抵消（从 importedEntries）
+  for (const r of (props.importedEntries || [])) {
+    if (n(r.amount)) entries.push({ source: r.source || '内部抵消', direction: r.direction, subject: r.subject, detail: '', amount: n(r.amount), desc: r.desc || '' })
+  }
+  return entries
 }
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-function calcCls(v: any) { return n(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
-const summaryRows = computed(() => {
-  const eq = equityRows.value.find((r: ElimRow) => r.subject === '少数股东权益')
-  const inc = incomeRows.value.find((r: ElimRow) => r.subject === '少数股权损益')
-  const eqVals = companies.value.map((_: any, ci: number) => eq?.values?.[ci] ?? null)
-  const incVals = companies.value.map((_: any, ci: number) => inc?.values?.[ci] ?? null)
-  return [
-    { label: '抵销后的少数股东权益', total: eqVals.reduce((s: number, v) => s + n(v), 0), values: eqVals },
-    { label: '抵销后的少数股东损益', total: incVals.reduce((s: number, v) => s + n(v), 0), values: incVals },
-  ]
-})
+const autoEntries = ref<EntryRow[]>(buildAutoEntries())
 
-const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
-const cellStyle = { padding: '2px 4px', fontSize: '11px' }
+function refreshAutoEntries() {
+  autoEntries.value = buildAutoEntries()
+  ElMessage.success(`已刷新，共 ${autoEntries.value.length} 条自动分录`)
+}
 
-// ─── 导出模板 ─────────────────────────────────────────────────────────────────
+// 监听 props 变化自动刷新
+watch([() => props.equityRows, () => props.incomeRows, () => props.crossRows, () => props.importedEntries], () => {
+  autoEntries.value = buildAutoEntries()
+}, { deep: true })
+
+// ─── 自定义分录（可编辑） ────────────────────────────────────────────────────
+const customEntries = reactive<EntryRow[]>([])
+
+function addCustomRow() {
+  const nr: EntryRow = { source: '', direction: '借', subject: '', detail: '', amount: null, desc: '', _custom: true }
+  if (selectedCustomRows.value.length > 0) {
+    const last = selectedCustomRows.value[selectedCustomRows.value.length - 1]
+    const idx = customEntries.indexOf(last)
+    if (idx >= 0) { customEntries.splice(idx + 1, 0, nr); return }
+  }
+  customEntries.push(nr)
+}
+
+async function batchDeleteCustom() {
+  if (!selectedCustomRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定删除 ${selectedCustomRows.value.length} 条自定义分录？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedCustomRows.value)
+    const remaining = customEntries.filter(r => !del.has(r))
+    customEntries.length = 0; customEntries.push(...remaining)
+    selectedCustomRows.value = []
+  } catch {}
+}
+
+function onSelChange(sel: any[]) {
+  selectedCustomRows.value = sel.filter((r: EntryRow) => r._custom)
+}
+
+// ─── 合并所有分录 ────────────────────────────────────────────────────────────
+const allEntries = computed(() => [...autoEntries.value, ...customEntries])
+
+const totalDebit = computed(() => allEntries.value.filter(r => r.direction === '借').reduce((s, r) => s + n(r.amount), 0))
+const totalCredit = computed(() => allEntries.value.filter(r => r.direction === '贷').reduce((s, r) => s + n(r.amount), 0))
+
+// ─── 导出/导入 ───────────────────────────────────────────────────────────────
 async function exportTemplate() {
   const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const instr = [['合并抵消分录明细表 — 填写说明'],[],['⚠ 重要提示：'],
-    ['1. 在"数据填写"工作表填写，不要修改sheet名称'],
-    ['2. 按"借贷方向+项目+二级明细"匹配导入'],
-    ['3. 合计列自动汇总，无需填写'],
-    ['4. 各子企业列填写对应的抵消金额']]
-  const wsI = XLSX.utils.aoa_to_sheet(instr); wsI['!cols']=[{wch:60}]
-  XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
-  const allRows = [
-    { section: '期末权益抵消', rows: equityRows.value },
-    { section: '当期损益抵消', rows: incomeRows.value },
-  ]
-  const headers = ['分类','借贷方向','项目','二级明细',...companies.value.map(c => c.name)]
-  const dataRows: any[][] = []
-  for (const { section, rows } of allRows) {
-    for (const r of rows) {
-      dataRows.push([section, r.direction, r.subject, r.detail || '', ...(r.values || []).map(v => v ?? '')])
-    }
-  }
-  const wsD = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  wsD['!cols'] = [{wch:14},{wch:8},{wch:22},{wch:18},...companies.value.map(()=>({wch:14}))]
-  XLSX.utils.book_append_sheet(wb, wsD, '数据填写')
+  const headers = ['来源','借贷方向','科目','二级明细','金额','说明']
+  const dataRows = allEntries.value.map(r => [r.source || '自定义', r.direction, r.subject, r.detail, r.amount ?? '', r.desc])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 24 }]
+  XLSX.utils.book_append_sheet(wb, ws, '数据填写')
   XLSX.writeFile(wb, '合并抵消分录_模板.xlsx'); ElMessage.success('模板已导出')
 }
 
 async function onFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
   try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), {type:'array'})
+    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
     const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1})
-    const parsed = new Map<string, any>()
+    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+    let cnt = 0
     for (let i = 1; i < json.length; i++) {
       const r = json[i]; if (!r?.[2]) continue
-      const key = `${String(r[1]).trim()}|${String(r[2]).trim()}|${String(r[3]||'').trim()}`
-      parsed.set(key, r.slice(4))
+      customEntries.push({
+        source: '', direction: String(r[1] || '借'), subject: String(r[2] || ''),
+        detail: String(r[3] || ''), amount: r[4] != null ? Number(r[4]) : null,
+        desc: String(r[5] || ''), _custom: true,
+      })
+      cnt++
     }
-    importMap.value = parsed; importCount.value = parsed.size; importVisible.value = true
+    ElMessage.success(`已导入 ${cnt} 条自定义分录`)
   } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
   finally { if (fileInputRef.value) fileInputRef.value.value = '' }
 }
 
-function confirmImport() {
-  let count = 0
-  const applyToRows = (rows: ElimRow[]) => {
-    for (const row of rows) {
-      const key = `${row.direction}|${row.subject}|${row.detail || ''}`
-      const vals = importMap.value.get(key)
-      if (!vals || !row.values) continue
-      for (let k = 0; k < row.values.length; k++) {
-        if (vals[k] != null && vals[k] !== '') row.values[k] = Number(vals[k]) || null
-      }
-      count++
-    }
-  }
-  applyToRows(equityRows.value)
-  applyToRows(incomeRows.value)
-  importVisible.value = false; ElMessage.success(`已导入 ${count} 行`); importMap.value = new Map()
+function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+
+function sourceTagType(source: string) {
+  const map: Record<string, string> = { '权益抵消': '', '损益抵消': 'warning', '交叉持股': 'info', '内部往来': 'success', '内部交易': 'success', '内部现金流': 'success' }
+  return map[source] || 'info'
 }
+
+const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
+function entryCellStyle({ row }: any) {
+  const base: any = { padding: '3px 6px', fontSize: '12px' }
+  if (!row._custom) { base.background = '#f9f9f9'; base.color = '#666' }
+  return base
+}
+function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
 
 function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
 onMounted(() => document.addEventListener('keydown', onEsc))
@@ -346,15 +244,21 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
-.ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
-.ws-sheet-actions { display: flex; gap: 8px; }
+.ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
 .ws-tip b { color: #4b2d77; }
-.ws-section { margin-bottom: 16px; }
-.ws-section-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 6px 10px; background: #f8f6fb; border-radius: 4px; }
+.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: #7c5caa; }
 .ws-computed { color: #4b2d77; font-weight: 500; }
-.ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
 .ws-bold { font-weight: 700; }
+.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
+.ws-balance-check {
+  margin-top: 10px; padding: 8px 14px; background: #fafafa; border-radius: 6px;
+  border: 1px solid #eee; font-size: 13px; display: flex; align-items: center;
+}
 .ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
+.ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
+.ws-table :deep(.ws-row-auto td) { background: #f9f9f9 !important; }
 </style>
