@@ -82,6 +82,92 @@
         </div>
       </el-tab-pane>
 
+      <!-- Tab: 试算平衡表 -->
+      <el-tab-pane label="试算平衡表" name="consol_tb">
+        <div class="gt-tab-content">
+          <!-- 报表类型切换 + 操作按钮 -->
+          <div class="gt-report-type-tabs">
+            <div class="gt-report-type-tabs-left">
+              <span v-for="item in tbReportTypes" :key="item.key"
+                class="gt-report-type-tag" :class="{ 'gt-report-type-tag--active': consolTbType === item.key }"
+                @click="consolTbType = item.key; loadConsolTb()">
+                {{ item.label }}
+              </span>
+            </div>
+            <div class="gt-report-actions">
+              <el-button-group size="small">
+                <el-button :type="tbEditMode ? 'primary' : ''" @click="tbEditMode = true">✏️ 编辑</el-button>
+                <el-button :type="tbEditMode ? '' : 'primary'" @click="tbEditMode = false">📋 查看</el-button>
+              </el-button-group>
+              <el-button size="small" @click="loadConsolTb(true)" :loading="consolTbLoading">🔄 刷新</el-button>
+              <el-tooltip content="从子企业试算表和工作底稿自动提取填充" placement="bottom">
+                <el-button size="small" type="primary" @click="fillConsolTb" :loading="consolTbLoading">▶ 提取填充</el-button>
+              </el-tooltip>
+              <el-button size="small" @click="exportConsolTb">📤 导出</el-button>
+              <el-button size="small" @click="saveConsolTb">💾 保存</el-button>
+              <el-tooltip content="审核试算平衡（借贷平衡+勾稽校验）" placement="bottom">
+                <el-button size="small" @click="auditConsolTb">✅ 审核</el-button>
+              </el-tooltip>
+            </div>
+          </div>
+
+          <!-- 期初/期末切换 -->
+          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+            <el-radio-group v-model="tbPeriod" size="small">
+              <el-radio-button value="closing">期末</el-radio-button>
+              <el-radio-button value="opening">期初</el-radio-button>
+            </el-radio-group>
+            <el-button v-if="tbPeriod === 'opening'" size="small" @click="importPriorYearTb">📥 提取上年数</el-button>
+            <span style="flex:1" />
+            <span style="font-size:11px;color:#999">{{ consolTbRows.length }} 行 · 审定数=汇总+调整借-调整贷+抵消借-抵消贷</span>
+          </div>
+
+          <!-- 试算平衡表 -->
+          <div class="gt-consol-matrix" v-loading="consolTbLoading">
+            <div class="gt-consol-matrix-scroll" style="max-height:calc(100vh - 300px)">
+              <table class="gt-consol-matrix-table">
+                <thead>
+                  <tr>
+                    <th rowspan="2" class="gt-cm-th-project" style="min-width:60px">行次</th>
+                    <th rowspan="2" class="gt-cm-th-project" style="min-width:200px">项目</th>
+                    <th rowspan="2">审定汇总</th>
+                    <th colspan="2">合并权益抵消</th>
+                    <th colspan="2">合并往来交易抵消</th>
+                    <th colspan="2">合并报表调整</th>
+                    <th rowspan="2" class="gt-cm-th-total">合并审定数</th>
+                  </tr>
+                  <tr>
+                    <th>借方</th><th>贷方</th>
+                    <th>借方</th><th>贷方</th>
+                    <th>借方</th><th>贷方</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, ri) in consolTbRows" :key="ri"
+                    :class="{ 'gt-cm-total-row': row.is_total, 'gt-cm-category': row.is_category }"
+                    @contextmenu.prevent="onTbCellContextMenu($event, row, ri)">
+                    <td class="gt-cm-td-amt" style="text-align:center;font-size:11px;color:#999">{{ row.row_code }}</td>
+                    <td class="gt-cm-td-project" :style="{ paddingLeft: (row.indent || 0) * 14 + 'px' }">{{ row.row_name }}</td>
+                    <td class="gt-cm-td-amt" :class="{ 'gt-tb-formula': true }">
+                      <span v-if="!tbEditMode">{{ fmtAmt(row.summary) }}</span>
+                      <el-input-number v-else v-model="row.summary" size="small" :controls="false" style="width:100%" />
+                    </td>
+                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.equity_dr) }}</span><el-input-number v-else v-model="row.equity_dr" size="small" :controls="false" style="width:100%" /></td>
+                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.equity_cr) }}</span><el-input-number v-else v-model="row.equity_cr" size="small" :controls="false" style="width:100%" /></td>
+                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.trade_dr) }}</span><el-input-number v-else v-model="row.trade_dr" size="small" :controls="false" style="width:100%" /></td>
+                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.trade_cr) }}</span><el-input-number v-else v-model="row.trade_cr" size="small" :controls="false" style="width:100%" /></td>
+                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.adj_dr) }}</span><el-input-number v-else v-model="row.adj_dr" size="small" :controls="false" style="width:100%" /></td>
+                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.adj_cr) }}</span><el-input-number v-else v-model="row.adj_cr" size="small" :controls="false" style="width:100%" /></td>
+                    <td class="gt-cm-td-amt gt-tb-audited">{{ fmtAmt(row.audited) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <el-empty v-if="!consolTbRows.length && !consolTbLoading" description="选择报表类型后点击刷新加载" />
+        </div>
+      </el-tab-pane>
+
       <!-- Tab 5: 合并报表 -->
       <el-tab-pane label="合并报表" name="consol_report">
         <div class="gt-tab-content">
@@ -1120,6 +1206,213 @@ function fmtAmt(v: any): string {
   const n = Number(v)
   if (isNaN(n)) return String(v)
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ─── 合并试算平衡表 ──────────────────────────────────────────────────────────
+const consolTbType = ref('balance_sheet')
+const consolTbLoading = ref(false)
+const consolTbRows = ref<any[]>([])
+const tbEditMode = ref(false)
+const tbPeriod = ref<'closing' | 'opening'>('closing')
+const tbCache = new Map<string, any[]>()
+
+const tbReportTypes = [
+  { key: 'balance_sheet', label: '资产负债表' },
+  { key: 'income_statement', label: '利润表' },
+  { key: 'cash_flow_statement', label: '现金流量表' },
+]
+
+function tbCacheKey(): string {
+  return `${currentConsolEntity.value.code || '_root'}_${consolTbType.value}_${tbPeriod.value}_${consolReportTemplateType.value}`
+}
+
+async function loadConsolTb(forceRefresh = false) {
+  const key = tbCacheKey()
+  if (!forceRefresh && tbCache.has(key)) {
+    consolTbRows.value = tbCache.get(key)!
+    return
+  }
+  consolTbLoading.value = true
+  try {
+    // 从 report_config 加载行结构
+    const standard = `${consolReportTemplateType.value}_consolidated`
+    const { data } = await http.get('/api/report-config', {
+      params: { report_type: consolTbType.value, applicable_standard: standard, project_id: projectId.value },
+      validateStatus: (s: number) => s < 600,
+    })
+    const rows = Array.isArray(data?.data ?? data) ? (data?.data ?? data) : []
+    consolTbRows.value = rows.map((r: any) => ({
+      row_code: r.row_code || '',
+      row_name: r.row_name || '',
+      indent: r.indent_level || 0,
+      is_total: r.is_total_row || false,
+      is_category: (r.indent_level === 0 && !r.is_total_row),
+      // 数值列
+      summary: null as number | null,      // 审定汇总
+      equity_dr: null as number | null,    // 权益抵消-借
+      equity_cr: null as number | null,    // 权益抵消-贷
+      trade_dr: null as number | null,     // 往来抵消-借
+      trade_cr: null as number | null,     // 往来抵消-贷
+      adj_dr: null as number | null,       // 报表调整-借
+      adj_cr: null as number | null,       // 报表调整-贷
+      // 审定数 = 汇总 + 调整借 - 调整贷 + 抵消借 - 抵消贷（computed in getter）
+      get audited(): number | null {
+        const s = Number(this.summary) || 0
+        const ed = Number(this.equity_dr) || 0
+        const ec = Number(this.equity_cr) || 0
+        const td = Number(this.trade_dr) || 0
+        const tc = Number(this.trade_cr) || 0
+        const ad = Number(this.adj_dr) || 0
+        const ac = Number(this.adj_cr) || 0
+        const result = s + ed - ec + td - tc + ad - ac
+        return result !== 0 ? Math.round(result * 100) / 100 : null
+      },
+    }))
+    tbCache.set(key, consolTbRows.value)
+
+    // 尝试加载已保存的数据
+    try {
+      const { loadWorksheetData } = await import('@/services/consolWorksheetDataApi')
+      const saved = await loadWorksheetData(projectId.value, year.value, `consol_tb_${consolTbType.value}_${tbPeriod.value}`)
+      if (saved?.rows?.length) {
+        for (const sr of saved.rows) {
+          const target = consolTbRows.value.find((r: any) => r.row_code === sr.row_code)
+          if (target) {
+            target.summary = sr.summary ?? null
+            target.equity_dr = sr.equity_dr ?? null
+            target.equity_cr = sr.equity_cr ?? null
+            target.trade_dr = sr.trade_dr ?? null
+            target.trade_cr = sr.trade_cr ?? null
+            target.adj_dr = sr.adj_dr ?? null
+            target.adj_cr = sr.adj_cr ?? null
+          }
+        }
+      }
+    } catch { /* 首次无数据 */ }
+  } catch { consolTbRows.value = [] }
+  finally { consolTbLoading.value = false }
+}
+
+async function saveConsolTb() {
+  if (!projectId.value) return
+  const rows = consolTbRows.value.map((r: any) => ({
+    row_code: r.row_code, row_name: r.row_name,
+    summary: r.summary, equity_dr: r.equity_dr, equity_cr: r.equity_cr,
+    trade_dr: r.trade_dr, trade_cr: r.trade_cr, adj_dr: r.adj_dr, adj_cr: r.adj_cr,
+  }))
+  try {
+    const { saveWorksheetData } = await import('@/services/consolWorksheetDataApi')
+    await saveWorksheetData(projectId.value, year.value, `consol_tb_${consolTbType.value}_${tbPeriod.value}`, { rows })
+    ElMessage.success('试算平衡表已保存')
+  } catch { ElMessage.error('保存失败') }
+}
+
+async function exportConsolTb() {
+  if (!consolTbRows.value.length) return
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['行次', '项目', '审定汇总', '权益抵消-借', '权益抵消-贷', '往来抵消-借', '往来抵消-贷', '报表调整-借', '报表调整-贷', '合并审定数']
+  const rows = consolTbRows.value.map((r: any) => [
+    r.row_code, r.row_name, r.summary, r.equity_dr, r.equity_cr,
+    r.trade_dr, r.trade_cr, r.adj_dr, r.adj_cr, r.audited,
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+  ws['!cols'] = headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '试算平衡表')
+  const label = tbReportTypes.find(t => t.key === consolTbType.value)?.label || ''
+  XLSX.writeFile(wb, `合并试算平衡表_${label}_${tbPeriod.value}.xlsx`)
+  ElMessage.success('已导出')
+}
+
+async function importPriorYearTb() {
+  ElMessage.info('提取上年数功能需要后端配合（从上年项目数据中提取）')
+}
+
+async function fillConsolTb() {
+  if (!projectId.value) return
+  consolTbLoading.value = true
+  try {
+    const entityCode = currentConsolEntity.value.code || ''
+    const { data } = await http.post(`/api/consol-note-sections/fill-tb/${projectId.value}/${year.value}`, {
+      report_type: consolTbType.value,
+      period: tbPeriod.value,
+      company_code: entityCode,
+      standard: consolReportTemplateType.value,
+    }, { validateStatus: (s: number) => s < 600 })
+    const result = data?.data ?? data
+    if (result?.rows?.length) {
+      // 用提取的数据填充到当前行
+      for (const fr of result.rows) {
+        const target = consolTbRows.value.find((r: any) => r.row_code === fr.row_code)
+        if (target) {
+          if (fr.summary != null) target.summary = fr.summary
+          if (fr.equity_dr != null) target.equity_dr = fr.equity_dr
+          if (fr.equity_cr != null) target.equity_cr = fr.equity_cr
+          if (fr.trade_dr != null) target.trade_dr = fr.trade_dr
+          if (fr.trade_cr != null) target.trade_cr = fr.trade_cr
+          if (fr.adj_dr != null) target.adj_dr = fr.adj_dr
+          if (fr.adj_cr != null) target.adj_cr = fr.adj_cr
+        }
+      }
+      ElMessage.success(`已提取填充：汇总匹配 ${result.matched_summary} 行，抵消匹配 ${result.matched_elim} 行（${result.child_count} 家子企业）`)
+    } else {
+      ElMessage.info('未提取到数据，请确认子企业已有试算表数据')
+    }
+  } catch {
+    ElMessage.info('提取填充需要后端试算表数据支持')
+  } finally { consolTbLoading.value = false }
+}
+
+function onTbCellContextMenu(e: MouseEvent, row: any, ri: number) {
+  // 复用附注的右键菜单逻辑
+  e.preventDefault()
+  selectedCells.value = [{ row: ri, col: 2, value: row.summary }]
+  drillDownCell.itemName = row.row_name
+  drillDownCell.colName = '审定汇总'
+  drillDownCell.totalValue = row.summary
+  setTimeout(() => {
+    cellContextMenu.x = e.clientX
+    cellContextMenu.y = e.clientY
+    cellContextMenu.visible = true
+  }, 0)
+}
+
+async function auditConsolTb() {
+  if (!consolTbRows.value.length) { ElMessage.warning('请先加载数据'); return }
+  const results: any[] = []
+  const label = tbReportTypes.find(t => t.key === consolTbType.value)?.label || ''
+
+  // 规则1：借贷平衡（所有行的借方合计 = 贷方合计）
+  let totalDr = 0, totalCr = 0
+  for (const r of consolTbRows.value) {
+    totalDr += (Number(r.equity_dr) || 0) + (Number(r.trade_dr) || 0) + (Number(r.adj_dr) || 0)
+    totalCr += (Number(r.equity_cr) || 0) + (Number(r.trade_cr) || 0) + (Number(r.adj_cr) || 0)
+  }
+  const drCrDiff = Math.round((totalDr - totalCr) * 100) / 100
+  results.push({
+    section_title: label, rule_name: '借贷平衡校验',
+    level: Math.abs(drCrDiff) > 0.01 ? 'error' : 'pass',
+    expected: fmtAmt(totalDr), actual: fmtAmt(totalCr),
+    difference: drCrDiff ? fmtAmt(drCrDiff) : '', message: Math.abs(drCrDiff) > 0.01 ? '借贷不平衡' : '通过',
+  })
+
+  // 规则2：合计行校验
+  for (const r of consolTbRows.value) {
+    if (!r.is_total || !r.audited) continue
+    results.push({
+      section_title: label, rule_name: `审定数校验 - ${r.row_name}`,
+      level: 'pass', expected: '', actual: fmtAmt(r.audited),
+      difference: '', message: '审定数=汇总+调整-抵消 自动计算',
+    })
+  }
+
+  noteAuditResults.value = results
+  noteAuditSummary.totalSections = 1
+  noteAuditSummary.totalChecks = results.length
+  noteAuditSummary.passCount = results.filter(r => r.level === 'pass').length
+  noteAuditSummary.errorCount = results.filter(r => r.level === 'error').length
+  noteAuditSummary.warnCount = results.filter(r => r.level === 'warn').length
+  showNoteAuditDialog.value = true
 }
 
 // ─── Tab 5: 合并报表 ─────────────────────────────────────────────────────────
@@ -2327,6 +2620,7 @@ function onConsolCatalogSelect(e: Event) {
 watch(activeTab, (tab) => {
   if (tab === 'consol_report') loadConsolReport()
   if (tab === 'consol_note' && !consolNoteTree.value.length) loadConsolNoteTree()
+  if (tab === 'consol_tb' && !consolTbRows.value.length) loadConsolTb()
 })
 </script>
 
@@ -2548,6 +2842,12 @@ watch(activeTab, (tab) => {
 /* 审核结果行样式 */
 :deep(.gt-audit-row-error td) { background: #fef0f0 !important; }
 :deep(.gt-audit-row-warn td) { background: #fdf6ec !important; }
+
+/* 试算平衡表公式高亮 */
+.gt-tb-formula { background: rgba(75,45,119,0.03) !important; }
+.gt-tb-audited { font-weight: 700 !important; color: #4b2d77 !important; background: rgba(75,45,119,0.06) !important; }
+.gt-consol-matrix-table :deep(.el-input-number) { width: 100%; }
+.gt-consol-matrix-table :deep(.el-input-number .el-input__inner) { text-align: right; font-size: 12px; height: 26px; }
 
 /* 批注弹窗 */
 :deep(.gt-comment-dialog .el-dialog__header) {

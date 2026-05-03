@@ -848,3 +848,156 @@ async def aggregate_data(
         "count": count,
         "message": f"已汇总 {count} 家企业",
     }
+
+
+# ─── 合并试算平衡表：自动填充汇总数和抵消调整数 ──────────────────────────────
+
+@router.post("/fill-tb/{project_id}/{year}")
+async def fill_trial_balance(
+    project_id: str, year: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """自动填充合并试算平衡表
+    
+    1. 审定汇总：从各子企业试算表按科目汇总
+    2. 权益抵消/往来抵消/报表调整：从合并工作底稿抵消分录提取
+    """
+    report_type = body.get("report_type", "balance_sheet")
+    period = body.get("period", "closing")  # closing / opening
+    company_code = body.get("company_code", "")
+    standard = body.get("standard", "soe")
+
+    # 1. 获取合并范围内的子企业列表
+    child_codes = []
+    try:
+        result = await db.execute(
+            text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = 'info'"),
+            {"pid": project_id, "y": year},
+        )
+        row = result.fetchone()
+        if row and isinstance(row[0], dict):
+            for r in row[0].get("rows", []):
+                if r.get("company_code"):
+                    child_codes.append(r["company_code"])
+    except Exception:
+        pass
+
+    # 2. 从各子企业试算表汇总
+    summary_map = {}  # account_name -> amount
+    balance_field = "closing_balance" if period == "closing" else "opening_balance"
+    
+    if child_codes:
+        try:
+            for code in child_codes:
+                result = await db.execute(
+                    text(f"SELECT account_name, {balance_field} FROM trial_balance_entries WHERE project_id = :pid AND year = :y AND company_code = :cc"),
+                    {"pid": project_id, "y": year, "cc": code},
+                )
+                for r in result.fetchall():
+                    name = r[0]
+                    val = float(r[1] or 0)
+                    summary_map[name] = summary_map.get(name, 0) + val
+        except Exception:
+            pass
+    else:
+        # 没有子企业代码，尝试不按企业筛选
+        try:
+            result = await db.execute(
+                text(f"SELECT account_name, SUM({balance_field}) FROM trial_balance_entries WHERE project_id = :pid AND year = :y GROUP BY account_name"),
+                {"pid": project_id, "y": year},
+            )
+            for r in result.fetchall():
+                summary_map[r[0]] = float(r[1] or 0)
+        except Exception:
+            pass
+
+    # 3. 从合并工作底稿提取抵消分录
+    elim_map = {}  # account_name -> { equity_dr, equity_cr, trade_dr, trade_cr, adj_dr, adj_cr }
+    try:
+        result = await db.execute(
+            text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = 'elimination'"),
+            {"pid": project_id, "y": year},
+        )
+        row = result.fetchone()
+        if row and isinstance(row[0], dict):
+            rows_data = row[0].get("rows", {})
+            # 权益抵消
+            for r in rows_data.get("equity", []):
+                name = r.get("subject", "")
+                if not name:
+                    continue
+                if name not in elim_map:
+                    elim_map[name] = {"equity_dr": 0, "equity_cr": 0, "trade_dr": 0, "trade_cr": 0, "adj_dr": 0, "adj_cr": 0}
+                direction = r.get("direction", "")
+                total = float(r.get("total", 0) or 0)
+                if direction == "借":
+                    elim_map[name]["equity_dr"] += total
+                elif direction == "贷":
+                    elim_map[name]["equity_cr"] += total
+            # 损益抵消（归入往来交易抵消）
+            for r in rows_data.get("income", []):
+                name = r.get("subject", "")
+                if not name:
+                    continue
+                if name not in elim_map:
+                    elim_map[name] = {"equity_dr": 0, "equity_cr": 0, "trade_dr": 0, "trade_cr": 0, "adj_dr": 0, "adj_cr": 0}
+                direction = r.get("direction", "")
+                total = float(r.get("total", 0) or 0)
+                if direction == "借":
+                    elim_map[name]["trade_dr"] += total
+                elif direction == "贷":
+                    elim_map[name]["trade_cr"] += total
+    except Exception:
+        pass
+
+    # 4. 加载报表行结构
+    try:
+        applicable_standard = f"{standard}_consolidated"
+        from app.models.report_models import ReportConfig, FinancialReportType
+        import sqlalchemy as sa
+        rt = FinancialReportType(report_type)
+        result = await db.execute(
+            sa.select(ReportConfig)
+            .where(
+                ReportConfig.report_type == rt,
+                ReportConfig.applicable_standard == applicable_standard,
+                ReportConfig.is_deleted == sa.false(),
+            )
+            .order_by(ReportConfig.row_number)
+        )
+        report_rows = result.scalars().all()
+    except Exception:
+        report_rows = []
+
+    # 5. 构建填充结果
+    filled = []
+    for r in report_rows:
+        name = r.row_name.strip() if r.row_name else ""
+        clean_name = name.lstrip("△▲*# ").strip()
+        
+        summary_val = summary_map.get(clean_name) or summary_map.get(name) or None
+        elim = elim_map.get(clean_name) or elim_map.get(name) or {}
+        
+        filled.append({
+            "row_code": r.row_code,
+            "row_name": r.row_name,
+            "summary": round(summary_val, 2) if summary_val else None,
+            "equity_dr": round(elim.get("equity_dr", 0), 2) or None,
+            "equity_cr": round(elim.get("equity_cr", 0), 2) or None,
+            "trade_dr": round(elim.get("trade_dr", 0), 2) or None,
+            "trade_cr": round(elim.get("trade_cr", 0), 2) or None,
+            "adj_dr": None,
+            "adj_cr": None,
+        })
+
+    matched_summary = len([f for f in filled if f["summary"]])
+    matched_elim = len([f for f in filled if f["equity_dr"] or f["equity_cr"] or f["trade_dr"] or f["trade_cr"]])
+
+    return {
+        "rows": filled,
+        "matched_summary": matched_summary,
+        "matched_elim": matched_elim,
+        "total_rows": len(filled),
+        "child_count": len(child_codes),
+    }
