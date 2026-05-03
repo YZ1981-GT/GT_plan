@@ -13,6 +13,7 @@
         <el-button size="small" type="danger" :disabled="!selectedDirectRows.length" @click="batchDeleteDirect">
           删除{{ selectedDirectRows.length ? `(${selectedDirectRows.length})` : '' }}
         </el-button>
+        <el-button size="small" @click="restoreDirectDefaults" title="恢复默认行结构">🔄 还原</el-button>
         <el-button size="small" @click="$emit('save', { direct: directRows, indirect: indirectSections })">💾 保存</el-button>
       </div>
     </div>
@@ -190,10 +191,44 @@ function addDirectRow() {
 async function batchDeleteDirect() {
   if (!selectedDirectRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除 ${selectedDirectRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    await ElMessageBox.confirm(`确定删除 ${selectedDirectRows.value.length} 行？删除后可点击"还原"恢复。`, '删除确认', { type: 'warning' })
     const del = new Set(selectedDirectRows.value)
     directRows.value = directRows.value.filter(r => !del.has(r))
     selectedDirectRows.value = []
+  } catch {}
+}
+
+async function restoreDirectDefaults() {
+  try {
+    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
+    // 重建默认行
+    const SIM_STRUCTURE = [
+      { s: '1.基础信息', d: '', sec: true }, { s: '持股比例', d: '', sec: true },
+      { s: '2.权益法模拟', d: '', sec: true }, { s: '2.1 期初模拟', d: '', sec: true },
+      { s: '长期股权投资', d: '损益调整' }, { s: '长期股权投资', d: '其他权益变动' },
+      { s: '年初未分配利润', d: '' }, { s: '资本公积', d: '' }, { s: '其他综合收益', d: '' },
+      { s: '专项储备', d: '' }, { s: '其他权益工具', d: '' }, { s: '△一般风险准备', d: '' },
+      { s: '2.2 当期变动', d: '', sec: true },
+      { s: '长期股权投资', d: '损益调整' }, { s: '长期股权投资', d: '其他权益变动' },
+      { s: '投资收益', d: '' }, { s: '资本公积', d: '' }, { s: '其他综合收益', d: '' },
+      { s: '专项储备', d: '' }, { s: '其他权益工具', d: '' }, { s: '△一般风险准备', d: '' },
+      { s: '2-3股份支付', d: '（二）所有者投入和减少资本' }, { s: '2-4其他', d: '（二）所有者投入和减少资本' },
+      { s: '4-3对所有者的分配', d: '（四）利润分配' }, { s: '4-4其他', d: '（四）利润分配' },
+      { s: '3.分红影响', d: '', sec: true },
+      { s: '投资收益', d: '' }, { s: '长期股权投资', d: '损益调整' },
+      { s: '4.股比变动影响', d: '', sec: true },
+      { s: '长期股权投资', d: '损益调整' }, { s: '长期股权投资', d: '其他权益变动' },
+      { s: '资本公积', d: '' }, { s: '投资收益', d: '' },
+      { s: '模拟后长投', d: '', sec: true },
+      { s: '长期股权投资', d: '投资成本' }, { s: '长期股权投资', d: '损益调整' },
+      { s: '长期股权投资', d: '其他权益变动' }, { s: '长期股权投资', d: '减值准备' },
+      { s: '长期股权投资', d: '小计' },
+    ]
+    directRows.value = SIM_STRUCTURE.map(r => ({
+      seq: '', step: r.sec ? r.s : '', direction: '', subject: r.sec ? '' : r.s, detail: r.d,
+      total: null, values: [], isStep: r.sec, isComputed: r.d === '小计',
+    }))
+    ElMessage.success('已恢复默认行结构')
   } catch {}
 }
 

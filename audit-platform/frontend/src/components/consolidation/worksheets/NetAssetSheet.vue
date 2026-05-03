@@ -13,6 +13,7 @@
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
+        <el-button size="small" @click="restoreDefaults" title="恢复默认行结构">🔄 还原</el-button>
         <el-button size="small" @click="$emit('save', tableData)">💾 保存</el-button>
       </div>
     </div>
@@ -115,6 +116,7 @@ const emit = defineEmits<{
   (e: 'update:modelValue', v: NetAssetRow[]): void
   (e: 'save', v: NetAssetRow[]): void
   (e: 'open-formula', sheetKey: string): void
+  (e: 'restore-defaults'): void
 }>()
 
 const companies = computed(() => props.companies)
@@ -134,13 +136,25 @@ function addRow() {
   tableData.value.push(newRow)
 }
 
+let deletedBackup: NetAssetRow[] = []
+
 async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 行？删除后可点击"还原"恢复默认行。`, '删除确认', { type: 'warning' })
+    deletedBackup = [...tableData.value] // 备份当前状态
     const del = new Set(selectedRows.value)
     tableData.value = tableData.value.filter(r => !del.has(r))
     selectedRows.value = []
+    ElMessage({ message: '已删除。如需恢复，点击"🔄 还原"按钮', type: 'success', duration: 3000 })
+  } catch {}
+}
+
+async function restoreDefaults() {
+  try {
+    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
+    emit('restore-defaults')
+    ElMessage.success('已恢复默认行结构')
   } catch {}
 }
 

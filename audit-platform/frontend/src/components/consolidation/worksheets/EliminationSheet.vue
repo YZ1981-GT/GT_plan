@@ -13,6 +13,7 @@
         <el-button size="small" type="danger" :disabled="!selectedElimRows.length" @click="batchDeleteElim">
           删除{{ selectedElimRows.length ? `(${selectedElimRows.length})` : '' }}
         </el-button>
+        <el-button size="small" @click="restoreElimDefaults" title="恢复默认行结构">🔄 还原</el-button>
         <el-button size="small" @click="$emit('save', { equity: equityRows, income: incomeRows, cross: crossRows })">💾 保存</el-button>
       </div>
     </div>
@@ -207,11 +208,34 @@ function addElimRow() {
 async function batchDeleteElim() {
   if (!selectedElimRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除 ${selectedElimRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    await ElMessageBox.confirm(`确定删除 ${selectedElimRows.value.length} 行？删除后可点击"还原"恢复。`, '删除确认', { type: 'warning' })
     const del = new Set(selectedElimRows.value)
     equityRows.value = equityRows.value.filter((r: ElimRow) => !del.has(r))
     incomeRows.value = incomeRows.value.filter((r: ElimRow) => !del.has(r))
     selectedElimRows.value = []
+  } catch {}
+}
+
+async function restoreElimDefaults() {
+  try {
+    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
+    const mk = (d: string, s: string, det = ''): ElimRow => ({ direction: d, subject: s, detail: det, values: [] })
+    equityRows.value = [
+      mk('借','实收资本（或股本）'),mk('借','其他权益工具'),mk('借','资本公积'),mk('借','减：库存股'),
+      mk('借','其他综合收益'),mk('借','专项储备'),mk('借','盈余公积'),mk('借','△一般风险准备'),mk('借','未分配利润'),
+      mk('借','商誉'),mk('借','长期股权投资','减值准备'),mk('贷','长期股权投资','投资成本'),
+      mk('贷','长期股权投资','损益调整'),mk('贷','长期股权投资','其他权益变动'),mk('贷','少数股东权益'),
+    ]
+    incomeRows.value = [
+      mk('借','年初未分配利润'),mk('借','投资收益'),mk('借','少数股权损益'),
+      mk('贷','2-3股份支付计入所有者权益的金额','（二）所有者投入和减少资本'),mk('贷','2-4其他','（二）所有者投入和减少资本'),
+      mk('贷','4-1提取盈余公积','（四）利润分配'),mk('贷','4-1-1法定公积金','（四）利润分配'),
+      mk('贷','4-1-2任意公积金','（四）利润分配'),mk('贷','4-1-3#储备基金','（四）利润分配'),
+      mk('贷','4-1-4#企业发展基金','（四）利润分配'),mk('贷','4-1-5#利润归还投资','（四）利润分配'),
+      mk('贷','4-2△提取一般风险准备','（四）利润分配'),mk('贷','4-3对所有者（或股东）的分配','（四）利润分配'),
+      mk('贷','4-4其他','（四）利润分配'),
+    ]
+    ElMessage.success('已恢复默认行结构')
   } catch {}
 }
 

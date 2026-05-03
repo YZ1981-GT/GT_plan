@@ -45,7 +45,8 @@
       <InvestmentEquitySheet v-else-if="activeSheet === 'equity_inv'" v-model="data.investmentEquity"
         @save="onSave('投资明细-权益法', $event)" @open-formula="onOpenFormula" />
       <NetAssetSheet v-else-if="activeSheet === 'net_asset'" :companies="companyColumns" v-model="data.netAsset"
-        @save="onSave('净资产表', $event)" @open-formula="onOpenFormula" />
+        @save="onSave('净资产表', $event)" @open-formula="onOpenFormula"
+        @restore-defaults="data.netAsset = buildNetAsset()" />
       <EquitySimSheet v-else-if="activeSheet === 'equity_sim'" :companies="companyColumns"
         :direct-rows="data.equitySimDirect" :indirect-sections="data.equitySimIndirect"
         @save="onSave('模拟权益法', $event)" @open-formula="onOpenFormula" />
