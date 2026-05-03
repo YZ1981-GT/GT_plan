@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-trial-balance gt-fade-in">
+  <div class="gt-trial-balance gt-fade-in" :class="{ 'gt-tb-fullscreen': tbFullscreen }">
     <!-- 页面横幅 -->
     <div class="gt-tb-banner">
       <div class="gt-tb-banner-row1">
@@ -26,6 +26,12 @@
         </div>
       </div>
       <div class="gt-tb-banner-row2">
+        <el-tooltip content="复制整个表格" placement="bottom">
+          <el-button size="small" @click="copyTbTable">📋 复制</el-button>
+        </el-tooltip>
+        <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
+          <el-button size="small" @click="tbFullscreen = !tbFullscreen">{{ tbFullscreen ? '退出全屏' : '全屏' }}</el-button>
+        </el-tooltip>
         <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
           <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
         </el-tooltip>
@@ -242,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Link } from '@element-plus/icons-vue'
@@ -519,6 +525,32 @@ const tbSummaryType = ref('balance_sheet')
 const tbSummaryLoading = ref(false)
 const tbSummaryRows = ref<any[]>([])
 const selectedTemplateType = ref('soe')
+const tbFullscreen = ref(false)
+
+function copyTbTable() {
+  const data = tbViewMode.value === 'summary' ? tbSummaryRows.value : groupedRows.value
+  if (!data?.length) { ElMessage.warning('无数据可复制'); return }
+  let headers: string[], dataRows: any[][]
+  if (tbViewMode.value === 'summary') {
+    headers = ['行次', '项目', '未审数', '审计调整-借', '审计调整-贷', '重分类-借', '重分类-贷', '审定数']
+    dataRows = data.map((r: any) => [r.row_code, r.row_name, r.unadjusted, r.aje_dr, r.aje_cr, r.rcl_dr, r.rcl_cr, r.audited])
+  } else {
+    headers = ['科目编码', '科目名称', '未审数', 'RJE调整', 'AJE调整', '审定数']
+    dataRows = data.map((r: any) => [r.standard_account_code, r.account_name, r.unadjusted_amount, r.rje_adjustment, r.aje_adjustment, r.audited_amount])
+  }
+  const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
+  const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
+  try {
+    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    ElMessage.success(`已复制 ${dataRows.length} 行`)
+  } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
+}
+
+function onTbKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && tbFullscreen.value) tbFullscreen.value = false
+}
+onMounted(() => document.addEventListener('keydown', onTbKeydown))
+onUnmounted(() => document.removeEventListener('keydown', onTbKeydown))
 const tbSummaryTypes = [
   { key: 'balance_sheet', label: '资产负债表' },
   { key: 'income_statement', label: '利润表' },
@@ -755,6 +787,14 @@ async function exportTbSummary() {
   :deep(.el-tabs__item.is-active) { font-weight: 600; }
 
 /* 视图切换标签 */
+.gt-tb-view-tag {
+
+/* 全屏 */
+.gt-tb-fullscreen {
+  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 9999; background: #fff; overflow: auto; padding: 12px;
+}
+
 .gt-tb-view-tag {
   padding: 6px 16px; font-size: 13px; cursor: pointer; color: #999;
   border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; user-select: none;

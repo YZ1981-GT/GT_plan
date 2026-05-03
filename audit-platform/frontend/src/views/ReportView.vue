@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-report-view gt-fade-in">
+  <div class="gt-report-view gt-fade-in" :class="{ 'gt-rv-fullscreen': rvFullscreen }">
     <!-- 固定顶部区域 -->
     <div class="gt-rv-sticky-header">
       <!-- 页面横幅 -->
@@ -48,6 +48,12 @@
         </div>
         <!-- 第二行：操作按钮 -->
         <div class="gt-rv-banner-row2">
+          <el-tooltip content="复制整个表格（可粘贴到 Word/Excel）" placement="bottom">
+            <el-button size="small" @click="copyReportTable">📋 复制</el-button>
+          </el-tooltip>
+          <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
+            <el-button size="small" @click="rvFullscreen = !rvFullscreen">{{ rvFullscreen ? '退出全屏' : '全屏' }}</el-button>
+          </el-tooltip>
           <el-tooltip content="根据试算表审定数重新计算报表（需先导入数据+科目映射）" placement="bottom">
             <el-button size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
           </el-tooltip>
@@ -1288,8 +1294,37 @@ function rvCtxSum() {
 function onRvDocClick(e: MouseEvent) {
   if (!(e.target as HTMLElement)?.closest('.rv-context-menu')) rvContextMenu.visible = false
 }
-onMounted(() => document.addEventListener('click', onRvDocClick))
-onUnmounted(() => document.removeEventListener('click', onRvDocClick))
+
+// ─── 全屏与复制 ──────────────────────────────────────────────────────────────
+const rvFullscreen = ref(false)
+
+function copyReportTable() {
+  if (!rows.value.length) { ElMessage.warning('无数据可复制'); return }
+  const headers = ['行次', '项目', '本期金额', '上期金额']
+  const dataRows = rows.value.map((r: any) => [r.row_code || '', r.row_name || '', r.current_period_amount ?? '', r.prior_period_amount ?? ''])
+  const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
+  const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
+  try {
+    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    ElMessage.success(`已复制 ${dataRows.length} 行，可粘贴到 Word/Excel`)
+  } catch {
+    navigator.clipboard?.writeText(text)
+    ElMessage.success('已复制为文本格式')
+  }
+}
+
+function onRvKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && rvFullscreen.value) rvFullscreen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('click', onRvDocClick)
+  document.addEventListener('keydown', onRvKeydown)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onRvDocClick)
+  document.removeEventListener('keydown', onRvKeydown)
+})
 </script>
 
 <style scoped>
@@ -1821,6 +1856,14 @@ onUnmounted(() => document.removeEventListener('click', onRvDocClick))
 }
 
 /* 单元格选中 */
+:deep(.rv-cell--selected) {
+
+/* 全屏 */
+.gt-rv-fullscreen {
+  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 9999; background: #fff; overflow: auto; padding: 12px;
+}
+
 :deep(.rv-cell--selected) {
   background: linear-gradient(135deg, rgba(75,45,119,0.05), rgba(124,92,170,0.08)) !important;
   box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 8px rgba(75,45,119,0.1);
