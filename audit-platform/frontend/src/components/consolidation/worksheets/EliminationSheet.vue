@@ -53,17 +53,9 @@
       <el-table-column prop="subject" label="科目" width="180">
         <template #default="{ row }">
           <div v-if="row._custom" @click.stop @mousedown.stop>
-            <el-select v-model="row.subject" size="small" style="width:100%" placeholder="选择科目" filterable allow-create>
-              <el-option-group label="权益类">
-                <el-option v-for="s in equitySubjects" :key="s" :label="s" :value="s" />
-              </el-option-group>
-              <el-option-group label="损益类">
-                <el-option v-for="s in incomeSubjects" :key="s" :label="s" :value="s" />
-              </el-option-group>
-              <el-option-group label="资产负债类">
-                <el-option v-for="s in balanceSubjects" :key="s" :label="s" :value="s" />
-              </el-option-group>
-            </el-select>
+            <el-tree-select v-model="row.subject" :data="subjectTree" size="small" style="width:100%"
+              placeholder="选择科目" filterable check-strictly :render-after-expand="false"
+              :props="{ label: 'label', value: 'value', children: 'children' }" />
           </div>
           <span v-else>{{ row.subject }}</span>
         </template>
@@ -131,10 +123,94 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedCustomRows = ref<EntryRow[]>([])
 const n = (v: any) => Number(v) || 0
 
-// 科目下拉选项（分组）
-const equitySubjects = ['实收资本（或股本）', '其他权益工具', '资本公积', '减：库存股', '其他综合收益', '专项储备', '盈余公积', '△一般风险准备', '未分配利润', '商誉', '少数股东权益']
-const incomeSubjects = ['投资收益', '少数股权损益', '年初未分配利润', '营业收入', '营业成本', '信用减值损失', '资产减值损失', '管理费用', '财务费用']
-const balanceSubjects = ['长期股权投资', '应收账款', '应付账款', '其他应收款', '其他应付款', '预付账款', '预收账款', '存货', '坏账准备', '固定资产', '无形资产']
+// 科目树形选项
+const subjectTree = [
+  { label: '资产', value: '_asset', children: [
+    { label: '流动资产', value: '_current_asset', children: [
+      { label: '货币资金', value: '货币资金' },
+      { label: '应收票据', value: '应收票据' },
+      { label: '应收账款', value: '应收账款' },
+      { label: '预付账款', value: '预付账款' },
+      { label: '其他应收款', value: '其他应收款' },
+      { label: '存货', value: '存货' },
+      { label: '合同资产', value: '合同资产' },
+    ]},
+    { label: '非流动资产', value: '_noncurrent_asset', children: [
+      { label: '长期股权投资', value: '长期股权投资' },
+      { label: '固定资产', value: '固定资产' },
+      { label: '在建工程', value: '在建工程' },
+      { label: '无形资产', value: '无形资产' },
+      { label: '商誉', value: '商誉' },
+      { label: '长期待摊费用', value: '长期待摊费用' },
+      { label: '递延所得税资产', value: '递延所得税资产' },
+    ]},
+    { label: '减值准备', value: '_impairment', children: [
+      { label: '坏账准备', value: '坏账准备' },
+      { label: '存货跌价准备', value: '存货跌价准备' },
+      { label: '固定资产减值准备', value: '固定资产减值准备' },
+      { label: '长期股权投资减值准备', value: '长期股权投资减值准备' },
+    ]},
+  ]},
+  { label: '负债', value: '_liability', children: [
+    { label: '流动负债', value: '_current_liability', children: [
+      { label: '应付票据', value: '应付票据' },
+      { label: '应付账款', value: '应付账款' },
+      { label: '预收账款', value: '预收账款' },
+      { label: '合同负债', value: '合同负债' },
+      { label: '其他应付款', value: '其他应付款' },
+      { label: '应付职工薪酬', value: '应付职工薪酬' },
+      { label: '应交税费', value: '应交税费' },
+    ]},
+    { label: '非流动负债', value: '_noncurrent_liability', children: [
+      { label: '长期借款', value: '长期借款' },
+      { label: '递延所得税负债', value: '递延所得税负债' },
+      { label: '递延收益', value: '递延收益' },
+    ]},
+  ]},
+  { label: '权益', value: '_equity', children: [
+    { label: '实收资本（或股本）', value: '实收资本（或股本）' },
+    { label: '其他权益工具', value: '其他权益工具' },
+    { label: '资本公积', value: '资本公积' },
+    { label: '减：库存股', value: '减：库存股' },
+    { label: '其他综合收益', value: '其他综合收益' },
+    { label: '专项储备', value: '专项储备' },
+    { label: '盈余公积', value: '盈余公积' },
+    { label: '△一般风险准备', value: '△一般风险准备' },
+    { label: '未分配利润', value: '未分配利润' },
+    { label: '少数股东权益', value: '少数股东权益' },
+  ]},
+  { label: '损益', value: '_income', children: [
+    { label: '收入', value: '_revenue', children: [
+      { label: '营业收入', value: '营业收入' },
+      { label: '投资收益', value: '投资收益' },
+      { label: '公允价值变动收益', value: '公允价值变动收益' },
+      { label: '资产处置收益', value: '资产处置收益' },
+      { label: '其他收益', value: '其他收益' },
+    ]},
+    { label: '成本费用', value: '_expense', children: [
+      { label: '营业成本', value: '营业成本' },
+      { label: '管理费用', value: '管理费用' },
+      { label: '销售费用', value: '销售费用' },
+      { label: '财务费用', value: '财务费用' },
+      { label: '研发费用', value: '研发费用' },
+      { label: '信用减值损失', value: '信用减值损失' },
+      { label: '资产减值损失', value: '资产减值损失' },
+    ]},
+    { label: '利润分配', value: '_profit_dist', children: [
+      { label: '年初未分配利润', value: '年初未分配利润' },
+      { label: '少数股权损益', value: '少数股权损益' },
+      { label: '提取盈余公积', value: '提取盈余公积' },
+      { label: '对所有者的分配', value: '对所有者的分配' },
+    ]},
+  ]},
+  { label: '现金流', value: '_cashflow', children: [
+    { label: '销售商品收到的现金', value: '销售商品收到的现金' },
+    { label: '购买商品支付的现金', value: '购买商品支付的现金' },
+    { label: '收回投资收到的现金', value: '收回投资收到的现金' },
+    { label: '投资支付的现金', value: '投资支付的现金' },
+    { label: '分配股利支付的现金', value: '分配股利支付的现金' },
+  ]},
+]
 
 // ─── 自动拉取的分录（只读） ──────────────────────────────────────────────────
 function buildAutoEntries(): EntryRow[] {
