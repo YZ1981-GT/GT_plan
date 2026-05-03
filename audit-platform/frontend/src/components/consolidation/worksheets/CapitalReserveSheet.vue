@@ -2,22 +2,33 @@
   <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>资本公积变动核查表</h3>
-      <p class="ws-subtitle">从合并抵消分录按科目提取，核查资本公积勾稽关系</p>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_capital')">ƒx 公式</el-button>
+        <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
+        <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="warning" @click="extractFromElimination">🔄 从抵消分录提取</el-button>
+        <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
+          删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
+        </el-button>
+        <el-button size="small" @click="restoreDefaults">🔄 还原</el-button>
         <el-button size="small" @click="$emit('save', tableData)">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>从合并抵消分录按科目提取资本公积变动，核查勾稽关系。合计=抵消环节+母公司+各子企业。底部与合并报表期末数比对差异。<b>点击"从抵消分录提取"自动填充</b>。</span>
+      <span>📋 <b>资本公积变动核查</b>：从合并抵消分录按科目提取资本公积变动，核查勾稽关系。合计=抵消环节+母公司+各子企业。
+        期末金额=期初+当期变动（自动计算）。底部与合并报表期末数比对差异。
+        点击<b>"🔄 从抵消分录提取"</b>自动填充权益法模拟和合并抵消数。</span>
     </div>
 
     <el-table :data="tableData" border size="small" class="ws-table" max-height="calc(100vh - 300px)"
-      :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName">
+      :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName"
+      @selection-change="sel => selectedRows = sel">
+      <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column prop="item" label="资本公积" width="200" fixed show-overflow-tooltip>
         <template #default="{ row }">
           <span :style="{ fontWeight: row.bold ? 700 : 400, color: row.isDiff ? '#e6a23c' : '' }">{{ row.item }}</span>
@@ -96,11 +107,14 @@
       </el-table>
       <el-button size="small" style="margin-top:6px" @click="adjItems.push({ description: '', amount: null })">+ 新增调整事项</el-button>
     </div>
+
+    <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface CompanyCol { name: string; ratio: number }
 
@@ -127,17 +141,48 @@ const emit = defineEmits<{
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
 
-const companies = ref(props.companies)
-const tableData = ref<CapitalReserveRow[]>([...props.modelValue])
+const companies = computed(() => props.companies)
+const tableData = ref<CapitalReserveRow[]>([])
 const consolReportAmount = ref<number | null>(null)
 const adjItems = ref<AdjItem[]>([
   { description: '', amount: null },
   { description: '', amount: null },
 ])
 
-watch(() => props.companies, (v) => { companies.value = v })
-watch(() => props.modelValue, (v) => { tableData.value = [...v] }, { deep: true })
-watch(tableData, (v) => { emit('update:modelValue', v) }, { deep: true })
+// 确保每行的 values 数组长度与 companies 一致
+function ensureValues(rows: CapitalReserveRow[]) {
+  const len = companies.value.length
+  for (const row of rows) {
+    if (!row.values) row.values = []
+    while (row.values.length < len) row.values.push(null)
+    if (row.values.length > len) row.values.length = len
+  }
+}
+
+// 初始化
+tableData.value = [...props.modelValue]
+ensureValues(tableData.value)
+
+watch(() => props.modelValue, (v) => {
+  tableData.value = [...v]
+  ensureValues(tableData.value)
+}, { deep: true })
+
+watch(() => props.companies.length, () => {
+  ensureValues(tableData.value)
+})
+
+watch(tableData, (v) => {
+  // 同步每行的 total = elimAdj + parentVal + sum(values)
+  const n = (val: any) => Number(val) || 0
+  for (const row of v) {
+    let sum = n(row.elimAdj) + n(row.parentVal)
+    if (row.values) { for (const val of row.values) sum += n(val) }
+    row.total = sum
+  }
+  recalcRows()
+  emit('update:modelValue', v)
+}, { deep: true })
 
 // 期末金额行
 const endRow = computed(() => tableData.value.find(r => r.item === '期末金额'))
@@ -185,14 +230,13 @@ function recalcRows() {
   }
 }
 
-// 合计 = 合并抵消环节 + 母公司 + 各子企业
+// 合计 = 合并抵消环节 + 母公司 + 各子企业（只读计算，不修改 row）
 function calcCapitalTotal(row: CapitalReserveRow): number {
   const n = (v: any) => Number(v) || 0
   let sum = n(row.elimAdj) + n(row.parentVal)
   if (row.values) {
     for (const v of row.values) sum += n(v)
   }
-  row.total = sum
   return sum
 }
 
@@ -204,10 +248,99 @@ function fmt(v: any) {
 
 const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '4px 0' }
 const cellStyle = { padding: '2px 4px', fontSize: '12px' }
+const selectedRows = ref<CapitalReserveRow[]>([])
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
 function rowClassName({ row }: { row: CapitalReserveRow }) {
   if (row.bold) return 'ws-row-bold'
   if (row.isDiff) return 'ws-row-diff'
   return ''
+}
+
+// ─── 新增行 / 删除 / 还原 ────────────────────────────────────────────────────
+function addRow() {
+  const newRow: CapitalReserveRow = { item: '', total: null, elimAdj: null, parentVal: null, values: [] }
+  ensureValues([newRow])
+  if (selectedRows.value.length > 0) {
+    const last = selectedRows.value[selectedRows.value.length - 1]
+    const idx = tableData.value.indexOf(last)
+    if (idx >= 0) { tableData.value.splice(idx + 1, 0, newRow); return }
+  }
+  tableData.value.push(newRow)
+}
+
+async function batchDelete() {
+  if (!selectedRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 行？删除后可点击"还原"恢复。`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedRows.value)
+    tableData.value = tableData.value.filter(r => !del.has(r))
+    selectedRows.value = []
+  } catch {}
+}
+
+async function restoreDefaults() {
+  try {
+    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
+    const mk = (item: string, o: Partial<CapitalReserveRow> = {}): CapitalReserveRow =>
+      ({ item, total: null, elimAdj: null, parentVal: null, values: [], ...o })
+    tableData.value = [mk('期初金额',{bold:true}),mk('当期变动',{isComputed:true}),mk('+权益法模拟',{fromElim:true}),
+      mk('-合并抵消数',{fromElim:true}),mk('+自身报表变动'),mk('其他'),mk('期末金额',{bold:true,isComputed:true})]
+    ensureValues(tableData.value)
+    ElMessage.success('已恢复默认行结构')
+  } catch {}
+}
+
+// ─── 导出模板 / 导入 ──────────────────────────────────────────────────────────
+async function exportTemplate() {
+  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  const headers = ['资本公积', '合计', '合并抵消环节', '母公司', ...companies.value.map(c => `${c.name}\n(${c.ratio}%)`)]
+  const dataRows = tableData.value.map(r => [
+    r.item, r.total ?? '', r.elimAdj ?? '', r.parentVal ?? '',
+    ...(r.values || []).map(v => v ?? ''),
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
+  XLSX.utils.book_append_sheet(wb, ws, '数据填写')
+  XLSX.writeFile(wb, '资本公积变动_模板.xlsx'); ElMessage.success('模板已导出')
+}
+
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['资本公积', '合计', '合并抵消环节', '母公司', ...companies.value.map(c => `${c.name}(${c.ratio}%)`)]
+  const dataRows = tableData.value.map(r => [
+    r.item, r.total ?? '', r.elimAdj ?? '', r.parentVal ?? '',
+    ...(r.values || []).map(v => v ?? ''),
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
+  XLSX.utils.book_append_sheet(wb, ws, '资本公积变动')
+  XLSX.writeFile(wb, '资本公积变动_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
+
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
+  try {
+    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
+    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+    const n = (v: any) => (v != null && v !== '') ? Number(v) : null
+    let count = 0
+    for (let i = 1; i < json.length; i++) {
+      const r = json[i]; const itemName = String(r?.[0] || '').trim(); if (!itemName) continue
+      const target = tableData.value.find(row => row.item === itemName)
+      if (!target || target.isComputed) continue
+      target.elimAdj = n(r[2]); target.parentVal = n(r[3])
+      if (target.values) {
+        for (let k = 0; k < companies.value.length; k++) target.values[k] = n(r[4 + k])
+      }
+      count++
+    }
+    ElMessage.success(`已导入 ${count} 行`)
+  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
+  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
 }
 
 function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
@@ -218,10 +351,9 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
 .ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
-.ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
-.ws-subtitle { font-size: 12px; color: #999; margin: 0; flex-basis: 100%; }
-.ws-sheet-actions { display: flex; gap: 8px; }
+.ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; white-space: nowrap; }
+.ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 8px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
 .ws-tip b { color: #4b2d77; }
 .ws-section-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 6px 10px; background: #f8f6fb; border-radius: 4px; }

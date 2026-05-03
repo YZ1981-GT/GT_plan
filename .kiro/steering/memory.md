@@ -22,6 +22,8 @@ inclusion: always
 - 底稿体系展示：要体现 B→C→实质性的循环递进关系，可视化、逻辑感强，包括准备和完成阶段
 - 目标并发规模 6000 人，在线编辑考虑混合方案：日常用纯前端表格组件（Luckysheet/Univer）无并发限制 + 少数完整 Excel 场景走 ONLYOFFICE
 - 合并报表等子页面布局要参照项目的三栏布局（左侧导航+右侧内容+可拖拽分隔线），不要用纯 Tab 平铺
+- 每个表都要有详细的操作指引（步骤编号引导），让用户知道要干什么、怎么干、数据从哪来到哪去
+- 数据提取填充优先用本地化脚本（按科目名匹配），辅以 LLM 模型（智能填充按钮）
 
 ## 环境配置
 
@@ -60,7 +62,10 @@ inclusion: always
 - ~~上市版五章 29 个无表格章节排查~~ ✅ 已排查：实际仅 3 个第五章空表格（F19/F22/F26 各 1-2 个子表），其余为政策描述型表格无需数据行
 - 合并报表前端 211 个 TS 错误专项修复（2-3 周）
 - 合并工作底稿表样逐表完善（基本信息表→投资明细→净资产表→模拟权益法→抵消分录→资本公积变动）
-- ~~合并工作底稿7张表功能对齐~~ ✅ 已完成：全屏/公式管理/导出模板/导入Excel/多选删除（固定行表除外）
+- ~~合并工作底稿7张表功能对齐~~ ✅ 已完成：全屏/公式管理/导出模板/导出数据/导入Excel/多选删除/增删行/还原（大部分表已统一，部分汇总表仍缺项见下）
+- ~~合并工作底稿复盘缺陷（P0）：EquitySimSheet.rowTotal() + NetAssetSheet.calcRowTotal() 在渲染中修改 reactive 数据，需改为纯计算函数~~ ✅ 已修复
+- ~~合并工作底稿复盘缺陷（P1）：PostElimIncomeSheet/MinorityInterestSheet 缺公式管理按钮；InternalTradeSheet/InternalCashFlowSheet 缺公式管理按钮~~ ✅ 已修复
+- ~~合并工作底稿复盘缺陷（P2）：大部分表 ws-tip 只有一行，需升级为步骤引导面板；智能填充可扩展到净资产表/模拟权益法等~~ ✅ P2 操作指引已升级（8个表），智能填充待扩展
 - ~~合并工作底稿新增3张汇总计算表（待前面表样稳定后实现）：❶抵消后长投明细表 ❷抵消后投资收益明细表 ❸少数股东权益/损益明细表，数据全部从前面表样自动提取计算~~ ✅ 已完成：PostElimInvestSheet/PostElimIncomeSheet/MinorityInterestSheet，纯计算无需用户输入
 - ~~合并工作底稿新增3张内部抵消表（待实现）：❶内部往来抵消表（债务方×债权方矩阵，余额类）❷内部交易抵消表（卖方×买方，发生额类+未实现利润）❸内部现金流抵消表（按现金流量表项目配对），数据从各子企业底稿/附注关联方章节提取~~ ✅ 已完成：InternalArApSheet/InternalTradeSheet/InternalCashFlowSheet，各表自动生成抵消分录预览
 - 内部往来抵消需支持：按科目细分+账龄分布+下级明细逐笔核对+坏账准备抵消还原
@@ -102,10 +107,16 @@ inclusion: always
 - 合并工作底稿：参照致同 Excel 模板（合并模板有关表样.xlsx，10 sheet），前端 7 张表 + 1 弹窗 + 1 入口 Tab 组件，路径 components/consolidation/worksheets/
 - 合并工作底稿用 Element Plus 表格（非 Univer），因为是结构化表单（下拉/日期/联动），不是自由格式 Excel；需要时加"从 Excel 导入"按钮
 - 合并工作底稿小计行要求默认自动合计但支持用户编辑覆盖，用 reactive 数据行实现（非 show-summary）
+- 持股比例字段统一支持最多6位小数（precision=6），输入框宽度≥90px 以完整显示
 - el-table 内嵌 el-select 必须用 `v-model` + `<div @click.stop @mousedown.stop>` 包裹 + watch 防循环（internalUpdate 标志位，prop→rows 用直接赋值不要浅拷贝）
 - el-table 多级表头的 getSummary 中 `col.property` 对嵌套子列可能为 undefined，计算列需用 `col.label` + `col.parent?.label` 匹配后手动计算
+- 模板渲染函数中禁止修改 reactive 数据（如 `row.total = sum`），会触发无限渲染循环崩溃，合计同步放 watch 中
+- `<script setup>` 中 reactive 数组初始化必须在 setup 阶段同步完成（不能依赖 watch immediate），否则模板首次渲染时数组为空导致 undefined 崩溃
+- 同一组件不同 props 切换时（如股比变动1/2/3次），必须加 `:key` 强制重建实例，否则 reactive 数据的数组长度不匹配
+- Vue 模板 HTML 属性值中禁止使用中文引号 `""`，会被解析为属性结束符导致编译失败
 - 合并工作底稿五步流程：基本信息→投资明细→净资产归集→权益法模拟→抵消分录+资本公积核查
-- 合并股比变动：从弹窗改为内联表（ShareChangeSheet），左侧导航根据基本信息表动态生成（1/2/3次），每家企业独立展示左右两栏
+- 合并股比变动：内联表三栏布局（净资产变动+直接持股模拟+间接持股模拟），左侧导航根据基本信息表动态生成（1/2/3次），:key 强制重建，setup 同步初始化
+- 基本信息表新增 holding_type 字段（直接/间接），间接企业列表由 ConsolWorksheetTabs 通过 indirectCompanies prop 传入 ShareChangeSheet
 - 合并净资产表：动态列根据合并范围树形结构生成（当前层级直接下级），列头显示企业名称+期末持股比例
 - 合并净资产表预设公式：表内公式（SUM/期初+增加-减少）+ 提取公式 TB({company_code},'科目','期初余额') 从子企业试算表按企业代码提取 + 3条校验公式
 - 合并资本公积变动（差额表）：从抵消分录按科目自动提取，与合并报表期末数比对差异

@@ -6,6 +6,8 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" @click="$emit('open-formula', 'consol_post_income')">ƒx 公式</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDeleteRows">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
@@ -72,7 +74,7 @@ const props = defineProps<{
   elimIncome: any[]
 }>()
 
-defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void }>()
+defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
@@ -97,6 +99,20 @@ async function batchDeleteRows() {
 const n = (v: any) => Number(v) || 0
 
 const overrides = reactive<Record<string, Record<string, number | null>>>({})
+
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['子企业', '持股比例', '账面现金红利', '模拟投资收益', '还原分红', '抵消投资收益', '抵消后投资收益']
+  const dataRows = tableRows.value.map((r: any) => [
+    r.companyName, r.ratio, r.bookDividend, r.simInvestIncome, r.dividendReverse, r.elimInvestIncome, r.postElimIncome
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = headers.map(() => ({ wch: 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '抵消后投资收益')
+  XLSX.writeFile(wb, '抵消后投资收益_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
 
 const tableRows = computed(() => {
   return props.companies.map((comp, ci) => {

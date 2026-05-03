@@ -8,6 +8,7 @@
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_elimination')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="warning" @click="refreshAutoEntries">🔄 刷新</el-button>
         <el-button size="small" type="primary" @click="addCustomRow">+ 新增行</el-button>
@@ -55,7 +56,8 @@
           <div v-if="row._custom" @click.stop @mousedown.stop>
             <el-tree-select v-model="row.subject" :data="subjectTree" size="small" style="width:100%"
               placeholder="选择科目" filterable check-strictly :render-after-expand="false"
-              :props="{ label: 'label', value: 'value', children: 'children' }" />
+              popper-class="ws-subject-popper"
+              :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }" />
           </div>
           <span v-else>{{ row.subject }}</span>
         </template>
@@ -123,10 +125,10 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedCustomRows = ref<EntryRow[]>([])
 const n = (v: any) => Number(v) || 0
 
-// 科目树形选项
+// 科目树形选项（父节点 disabled 禁止选中，只能选叶子科目）
 const subjectTree = [
-  { label: '资产', value: '_asset', children: [
-    { label: '流动资产', value: '_current_asset', children: [
+  { label: '资产', value: '_asset', disabled: true, children: [
+    { label: '流动资产', value: '_current_asset', disabled: true, children: [
       { label: '货币资金', value: '货币资金' },
       { label: '应收票据', value: '应收票据' },
       { label: '应收账款', value: '应收账款' },
@@ -135,7 +137,7 @@ const subjectTree = [
       { label: '存货', value: '存货' },
       { label: '合同资产', value: '合同资产' },
     ]},
-    { label: '非流动资产', value: '_noncurrent_asset', children: [
+    { label: '非流动资产', value: '_noncurrent_asset', disabled: true, children: [
       { label: '长期股权投资', value: '长期股权投资' },
       { label: '固定资产', value: '固定资产' },
       { label: '在建工程', value: '在建工程' },
@@ -144,15 +146,15 @@ const subjectTree = [
       { label: '长期待摊费用', value: '长期待摊费用' },
       { label: '递延所得税资产', value: '递延所得税资产' },
     ]},
-    { label: '减值准备', value: '_impairment', children: [
+    { label: '减值准备', value: '_impairment', disabled: true, children: [
       { label: '坏账准备', value: '坏账准备' },
       { label: '存货跌价准备', value: '存货跌价准备' },
       { label: '固定资产减值准备', value: '固定资产减值准备' },
       { label: '长期股权投资减值准备', value: '长期股权投资减值准备' },
     ]},
   ]},
-  { label: '负债', value: '_liability', children: [
-    { label: '流动负债', value: '_current_liability', children: [
+  { label: '负债', value: '_liability', disabled: true, children: [
+    { label: '流动负债', value: '_current_liability', disabled: true, children: [
       { label: '应付票据', value: '应付票据' },
       { label: '应付账款', value: '应付账款' },
       { label: '预收账款', value: '预收账款' },
@@ -161,13 +163,13 @@ const subjectTree = [
       { label: '应付职工薪酬', value: '应付职工薪酬' },
       { label: '应交税费', value: '应交税费' },
     ]},
-    { label: '非流动负债', value: '_noncurrent_liability', children: [
+    { label: '非流动负债', value: '_noncurrent_liability', disabled: true, children: [
       { label: '长期借款', value: '长期借款' },
       { label: '递延所得税负债', value: '递延所得税负债' },
       { label: '递延收益', value: '递延收益' },
     ]},
   ]},
-  { label: '权益', value: '_equity', children: [
+  { label: '权益', value: '_equity', disabled: true, children: [
     { label: '实收资本（或股本）', value: '实收资本（或股本）' },
     { label: '其他权益工具', value: '其他权益工具' },
     { label: '资本公积', value: '资本公积' },
@@ -179,15 +181,15 @@ const subjectTree = [
     { label: '未分配利润', value: '未分配利润' },
     { label: '少数股东权益', value: '少数股东权益' },
   ]},
-  { label: '损益', value: '_income', children: [
-    { label: '收入', value: '_revenue', children: [
+  { label: '损益', value: '_income', disabled: true, children: [
+    { label: '收入', value: '_revenue', disabled: true, children: [
       { label: '营业收入', value: '营业收入' },
       { label: '投资收益', value: '投资收益' },
       { label: '公允价值变动收益', value: '公允价值变动收益' },
       { label: '资产处置收益', value: '资产处置收益' },
       { label: '其他收益', value: '其他收益' },
     ]},
-    { label: '成本费用', value: '_expense', children: [
+    { label: '成本费用', value: '_expense', disabled: true, children: [
       { label: '营业成本', value: '营业成本' },
       { label: '管理费用', value: '管理费用' },
       { label: '销售费用', value: '销售费用' },
@@ -196,14 +198,14 @@ const subjectTree = [
       { label: '信用减值损失', value: '信用减值损失' },
       { label: '资产减值损失', value: '资产减值损失' },
     ]},
-    { label: '利润分配', value: '_profit_dist', children: [
+    { label: '利润分配', value: '_profit_dist', disabled: true, children: [
       { label: '年初未分配利润', value: '年初未分配利润' },
       { label: '少数股权损益', value: '少数股权损益' },
       { label: '提取盈余公积', value: '提取盈余公积' },
       { label: '对所有者的分配', value: '对所有者的分配' },
     ]},
   ]},
-  { label: '现金流', value: '_cashflow', children: [
+  { label: '现金流', value: '_cashflow', disabled: true, children: [
     { label: '销售商品收到的现金', value: '销售商品收到的现金' },
     { label: '购买商品支付的现金', value: '购买商品支付的现金' },
     { label: '收回投资收到的现金', value: '收回投资收到的现金' },
@@ -293,6 +295,18 @@ async function exportTemplate() {
   XLSX.writeFile(wb, '合并抵消分录_模板.xlsx'); ElMessage.success('模板已导出')
 }
 
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['来源', '借贷', '科目', '二级明细', '金额', '说明']
+  const dataRows = allEntries.value.map(r => [r.source || '自定义', r.direction, r.subject, r.detail, r.amount ?? '', r.desc])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 24 }]
+  XLSX.utils.book_append_sheet(wb, ws, '合并抵消分录')
+  XLSX.writeFile(wb, '合并抵消分录_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
+
 async function onFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
   try {
@@ -354,4 +368,38 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-table :deep(.el-input__inner) { text-align: right; font-size: 11px; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 .ws-table :deep(.ws-row-auto td) { background: #f9f9f9 !important; }
+</style>
+
+<style>
+/* 科目树形下拉面板样式 */
+.ws-subject-popper {
+  min-width: 240px !important;
+}
+.ws-subject-popper .el-tree-node__content {
+  height: 26px;
+  font-size: 12px;
+}
+.ws-subject-popper .el-tree-node__label {
+  font-size: 12px;
+}
+.ws-subject-popper .el-tree-node__expand-icon {
+  font-size: 11px;
+}
+/* 父节点（disabled）灰色斜体，仅作分类标题 */
+.ws-subject-popper .el-tree-node.is-disabled > .el-tree-node__content {
+  cursor: default;
+  opacity: 1;
+}
+.ws-subject-popper .el-tree-node.is-disabled > .el-tree-node__content .el-tree-node__label {
+  color: #999;
+  font-weight: 600;
+  font-size: 11px;
+}
+/* 叶子节点正常可选 */
+.ws-subject-popper .el-tree-node:not(.is-disabled) > .el-tree-node__content:hover {
+  background: #f0edf5;
+}
+.ws-subject-popper .el-tree-node:not(.is-disabled) > .el-tree-node__content .el-tree-node__label {
+  color: #333;
+}
 </style>

@@ -60,10 +60,12 @@
         @save="onSave('资本公积变动', $event)" @open-formula="onOpenFormula" />
       <!-- 动态股比变动表 -->
       <ShareChangeSheet v-else-if="activeSheet.startsWith('share_change_')"
+        :key="activeSheet"
         :change-times="activeShareChangeTimes"
         :companies="activeShareChangeCompanies"
         :all-companies="companyColumns"
-        @save="onShareChangeSave" />
+        :indirect-companies="indirectCompanyList"
+        @save="onShareChangeSave" @open-formula="onOpenFormula" />
       <!-- 汇总计算表 -->
       <PostElimInvestSheet v-else-if="activeSheet === 'post_invest'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
@@ -74,21 +76,21 @@
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :equity-sim-direct="data.equitySimDirect" :elim-income="data.elimIncome"
         @save="onSave('抵消后投资收益', $event)"
-        @goto-sheet="(k: string) => activeSheet = k" />
+        @goto-sheet="(k: string) => activeSheet = k" @open-formula="onOpenFormula" />
       <MinorityInterestSheet v-else-if="activeSheet === 'minority'"
         :companies="companyColumns" :net-asset-data="data.netAsset"
         :equity-sim-direct="data.equitySimDirect" :elim-equity="data.elimEquity"
         :elim-income="data.elimIncome" @save="onSave('少数股东权益损益', $event)"
-        @goto-sheet="(k: string) => activeSheet = k" />
+        @goto-sheet="(k: string) => activeSheet = k" @open-formula="onOpenFormula" />
       <!-- 内部抵消表 -->
       <InternalArApSheet v-else-if="activeSheet === 'internal_arap'"
         :companies="companyColumns" @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"
         @entries-changed="(e: any[]) => internalEntries.arap = e" />
       <InternalTradeSheet v-else-if="activeSheet === 'internal_trade'"
-        :companies="companyColumns" @save="onSave('内部交易抵消', $event)"
+        :companies="companyColumns" @save="onSave('内部交易抵消', $event)" @open-formula="onOpenFormula"
         @entries-changed="(e: any[]) => internalEntries.trade = e" />
       <InternalCashFlowSheet v-else-if="activeSheet === 'internal_cashflow'"
-        :companies="companyColumns" @save="onSave('内部现金流抵消', $event)"
+        :companies="companyColumns" @save="onSave('内部现金流抵消', $event)" @open-formula="onOpenFormula"
         @entries-changed="(e: any[]) => internalEntries.cashflow = e" />
     </main>
   </div>
@@ -117,7 +119,7 @@ import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
 
 interface SubsidiaryInfoRow {
   company_name: string; company_code: string; account_subject: string
-  accounting_method: string; share_changed: string; change_times: number
+  accounting_method: string; holding_type: string; share_changed: string; change_times: number
   acquisition_date: string; merge_type: string; first_consol_date: string
   non_common_cost: number | null; non_common_ratio: number | null
   common_cost: number | null; common_ratio: number | null
@@ -313,7 +315,7 @@ function stopResize() {
 // ─── 默认数据构建 ─────────────────────────────────────────────────────────────
 function mkEmptyRow(): SubsidiaryInfoRow {
   return { company_name: '', company_code: '', account_subject: '', accounting_method: '',
-    share_changed: '否', change_times: 0, acquisition_date: '', merge_type: '', first_consol_date: '',
+    holding_type: '直接', share_changed: '否', change_times: 0, acquisition_date: '', merge_type: '', first_consol_date: '',
     non_common_cost: null, non_common_ratio: null, common_cost: null, common_ratio: null,
     no_consol_cost: null, no_consol_ratio: null, disposal_date: '', disposal_amount: null, disposal_ratio: null,
     pre_disposal_reduce: '', pre_disposal_times: null, post_disposal_reduce: '', post_disposal_times: null }
@@ -442,6 +444,17 @@ const companyColumns = computed(() => {
       ratio: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
     }))
 })
+
+// 间接持股企业列表
+const indirectCompanyList = computed(() => {
+  return data.subsidiaryInfo
+    .filter((r: SubsidiaryInfoRow) => r.holding_type === '间接' && r.company_name)
+    .map((r: SubsidiaryInfoRow) => ({
+      name: r.company_name, code: r.company_code,
+      ratio: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
+    }))
+})
+
 const elimSummaryForCapital = computed(() => {
   const row = data.elimEquity.find((r: ElimRow) => r.subject === '资本公积')
   return { elimCapital: row ? (row.values||[]).reduce((s: number, v: number|null) => s + (Number(v)||0), 0) : 0, equitySimCapital: 0 }
@@ -460,6 +473,7 @@ const activeShareChangeCompanies = computed(() => {
       name: r.company_name, code: r.company_code,
       ratio: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
       accountSubject: r.account_subject, accountingMethod: r.accounting_method,
+      holdingType: r.holding_type || '直接',
     }))
 })
 

@@ -8,13 +8,18 @@
             {{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}
           </el-button>
         </el-tooltip>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('open-formula', 'consol_info')">ƒx 公式</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" @click="triggerImport">📤 导入Excel</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" type="primary" @click="addRow">+ 新增子企业</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('save', rows)">💾 保存</el-button>
       </div>
     </div>
@@ -69,6 +74,21 @@
           <div @click.stop @mousedown.stop>
             <el-select v-model="row.accounting_method" size="small" style="width:100%" placeholder="请选择">
               <el-option v-for="o in accountingMethodOptions" :key="o" :label="o" :value="o" />
+            </el-select>
+          </div>
+        </template>
+      </el-table-column>
+
+      <!-- 持股类型 -->
+      <el-table-column prop="holding_type" label="持股类型" width="90" align="center">
+        <template #header>
+          <span>持股类型<br/><small style="color:#999">（直接/间接）</small></span>
+        </template>
+        <template #default="{ row }">
+          <div @click.stop @mousedown.stop>
+            <el-select v-model="row.holding_type" size="small" style="width:100%" placeholder="请选择">
+              <el-option label="直接" value="直接" />
+              <el-option label="间接" value="间接" />
             </el-select>
           </div>
         </template>
@@ -256,6 +276,7 @@
           <el-table-column prop="company_code" label="企业代码" width="100" />
           <el-table-column prop="account_subject" label="核算科目" width="120" />
           <el-table-column prop="accounting_method" label="核算方式" width="90" />
+          <el-table-column prop="holding_type" label="持股类型" width="80" />
           <el-table-column prop="share_changed" label="是否变动" width="80" />
           <el-table-column prop="change_times" label="变动次数" width="80" />
         </el-table>
@@ -282,6 +303,7 @@ interface SubsidiaryInfoRow {
   company_code: string
   account_subject: string
   accounting_method: string
+  holding_type: string
   share_changed: string
   change_times: number
   acquisition_date: string
@@ -334,7 +356,7 @@ const accountingMethodOptions = ['成本法', '权益法', '公允价值']
 function createEmptyRow(): SubsidiaryInfoRow {
   return {
     company_name: '', company_code: '', account_subject: '',
-    accounting_method: '', share_changed: '否', change_times: 0,
+    accounting_method: '', holding_type: '直接', share_changed: '否', change_times: 0,
     acquisition_date: '', merge_type: '', first_consol_date: '',
     non_common_cost: null, non_common_ratio: null,
     common_cost: null, common_ratio: null,
@@ -392,6 +414,7 @@ const TEMPLATE_COLS = [
   { key: 'company_code', header: '企业代码', note: '必填，企业唯一编码', example: 'CQ001' },
   { key: 'account_subject', header: '核算科目', note: '必填，可选值：长期股权投资/可供出售金融资产/交易性金融资产/其他权益工具投资/其他非流动金融资产/其他非流动资产', example: '长期股权投资' },
   { key: 'accounting_method', header: '核算方式', note: '必填，可选值：成本法/权益法/公允价值', example: '成本法' },
+  { key: 'holding_type', header: '持股类型', note: '必填，可选值：直接/间接', example: '直接' },
   { key: 'share_changed', header: '是否变动', note: '必填，填"是"或"否"。选"是"后需填变动次数', example: '否' },
   { key: 'change_times', header: '变动次数', note: '持股比例变动次数，1/2/3。仅"是否变动"为"是"时填写', example: '' },
   { key: 'acquisition_date', header: '购买日', note: '当期新增时填写，格式 YYYY-MM-DD', example: '' },
@@ -441,14 +464,14 @@ async function exportTemplate() {
 
   // ── Sheet 2: 数据填写 ──
   const categoryRow = [
-    '基本信息', '', '', '', '持股比例变动', '', '当期新增', '', '',
+    '基本信息', '', '', '', '', '持股比例变动', '', '当期新增', '', '',
     '涉及合并-非同控', '', '涉及合并-同控', '', '不涉及合并', '',
     '当期减少', '', '',
   ]
   const noteRow = TEMPLATE_COLS.map(c => c.note)
   const headerRow = TEMPLATE_COLS.map(c => c.header)
-  const exampleRow1 = ['示例公司A', 'A001', '长期股权投资', '成本法', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
-  const exampleRow2 = ['示例公司B', 'B002', '长期股权投资', '权益法', '是', 1, '', '非同控', '', 1000000, 51, '', '', '', '', '', '', '']
+  const exampleRow1 = ['示例公司A', 'A001', '长期股权投资', '成本法', '直接', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
+  const exampleRow2 = ['示例公司B', 'B002', '长期股权投资', '权益法', '间接', '是', 1, '', '非同控', '', 1000000, 51, '', '', '', '', '', '', '']
 
   // 如果有数据就导出数据
   const existingData = rows.value.filter(r => r.company_name).map(r =>
@@ -465,18 +488,32 @@ async function exportTemplate() {
 
   // 合并分类行的单元格
   wsData['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },   // 基本信息 A-D
-    { s: { r: 0, c: 4 }, e: { r: 0, c: 5 } },   // 持股比例变动 E-F
-    { s: { r: 0, c: 6 }, e: { r: 0, c: 8 } },   // 当期新增 G-I
-    { s: { r: 0, c: 9 }, e: { r: 0, c: 10 } },  // 涉及合并-非同控 J-K
-    { s: { r: 0, c: 11 }, e: { r: 0, c: 12 } }, // 涉及合并-同控 L-M
-    { s: { r: 0, c: 13 }, e: { r: 0, c: 14 } }, // 不涉及合并 N-O
-    { s: { r: 0, c: 15 }, e: { r: 0, c: 17 } }, // 当期减少 P-R
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },   // 基本信息 A-E（含持股类型）
+    { s: { r: 0, c: 5 }, e: { r: 0, c: 6 } },   // 持股比例变动 F-G
+    { s: { r: 0, c: 7 }, e: { r: 0, c: 9 } },   // 当期新增 H-J
+    { s: { r: 0, c: 10 }, e: { r: 0, c: 11 } },  // 涉及合并-非同控 K-L
+    { s: { r: 0, c: 12 }, e: { r: 0, c: 13 } }, // 涉及合并-同控 M-N
+    { s: { r: 0, c: 14 }, e: { r: 0, c: 15 } }, // 不涉及合并 O-P
+    { s: { r: 0, c: 16 }, e: { r: 0, c: 18 } }, // 当期减少 Q-S
   ]
 
   XLSX.utils.book_append_sheet(wb, wsData, '数据填写')
   XLSX.writeFile(wb, '合并范围子企业基本信息表_模板.xlsx')
   ElMessage.success('模板已导出，请查看"填写说明"工作表了解填写要求')
+}
+
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = TEMPLATE_COLS.map(c => c.header)
+  const dataRows = rows.value.filter(r => r.company_name).map(r =>
+    TEMPLATE_COLS.map(c => (r as any)[c.key] ?? '')
+  )
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = TEMPLATE_COLS.map(c => ({ wch: Math.max(c.header.length * 2.5, 14) }))
+  XLSX.utils.book_append_sheet(wb, ws, '基本信息表')
+  XLSX.writeFile(wb, '基本信息表_数据.xlsx')
+  ElMessage.success('数据已导出')
 }
 
 function triggerImport() {
@@ -516,20 +553,21 @@ async function onFileSelected(e: Event) {
         company_code: String(r[1] || '').trim(),
         account_subject: String(r[2] || '').trim(),
         accounting_method: String(r[3] || '').trim(),
-        share_changed: String(r[4] || '否').trim(),
-        change_times: Number(r[5]) || 0,
-        acquisition_date: String(r[6] || '').trim(),
-        merge_type: String(r[7] || '').trim(),
-        first_consol_date: String(r[8] || '').trim(),
-        non_common_cost: r[9] != null && r[9] !== '' ? Number(r[9]) : null,
-        non_common_ratio: r[10] != null && r[10] !== '' ? Number(r[10]) : null,
-        common_cost: r[11] != null && r[11] !== '' ? Number(r[11]) : null,
-        common_ratio: r[12] != null && r[12] !== '' ? Number(r[12]) : null,
-        no_consol_cost: r[13] != null && r[13] !== '' ? Number(r[13]) : null,
-        no_consol_ratio: r[14] != null && r[14] !== '' ? Number(r[14]) : null,
-        disposal_date: String(r[15] || '').trim(),
-        disposal_amount: r[16] != null && r[16] !== '' ? Number(r[16]) : null,
-        disposal_ratio: r[17] != null && r[17] !== '' ? Number(r[17]) : null,
+        holding_type: String(r[4] || '直接').trim(),
+        share_changed: String(r[5] || '否').trim(),
+        change_times: Number(r[6]) || 0,
+        acquisition_date: String(r[7] || '').trim(),
+        merge_type: String(r[8] || '').trim(),
+        first_consol_date: String(r[9] || '').trim(),
+        non_common_cost: r[10] != null && r[10] !== '' ? Number(r[10]) : null,
+        non_common_ratio: r[11] != null && r[11] !== '' ? Number(r[11]) : null,
+        common_cost: r[12] != null && r[12] !== '' ? Number(r[12]) : null,
+        common_ratio: r[13] != null && r[13] !== '' ? Number(r[13]) : null,
+        no_consol_cost: r[14] != null && r[14] !== '' ? Number(r[14]) : null,
+        no_consol_ratio: r[15] != null && r[15] !== '' ? Number(r[15]) : null,
+        disposal_date: String(r[16] || '').trim(),
+        disposal_amount: r[17] != null && r[17] !== '' ? Number(r[17]) : null,
+        disposal_ratio: r[18] != null && r[18] !== '' ? Number(r[18]) : null,
         pre_disposal_reduce: '', pre_disposal_times: null,
         post_disposal_reduce: '', post_disposal_times: null,
       })
@@ -598,4 +636,5 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 .ws-table :deep(.el-input-number) { width: 100%; }
 .ws-table :deep(.el-input-number .el-input__inner) { text-align: right; }
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
+.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
 </style>

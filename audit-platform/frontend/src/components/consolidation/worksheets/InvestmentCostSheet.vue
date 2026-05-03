@@ -6,18 +6,25 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('open-formula', 'consol_cost')">ƒx 公式</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('save', rows)">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>含非长投列报的所有合并范围内的企业，权益法核算的长投见下表。期末余额自动计算（期初+增加-减少）。公允值计量需同步填投资比例、投资成本和公允价值，无需填减值准备。导入时自动读取<b>"数据填写"</b>工作表。</span>
+      <span>📋 <b>成本法/公允值投资明细</b>：含非长投列报的所有合并范围内企业。期末余额=期初+增加-减少（自动计算，紫色显示）。
+        公允值计量需同步填投资比例、投资成本和公允价值。权益法核算的长投请到下一张表填写。
+        支持<b>导出模板→填写→导入</b>，读取"数据填写"工作表。</span>
     </div>
 
     <el-table :data="tableData" border size="small" class="ws-table"
@@ -284,6 +291,28 @@ async function exportTemplate() {
   ElMessage.success('模板已导出')
 }
 
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = COLS.map(c => c.header)
+  const dataRows = rows.value.filter(r => r.company_name).map(r => {
+    const base = COLS.map(c => (r as any)[c.key] ?? '')
+    // Append computed end-period columns
+    const endRatio = n(r.open_ratio) + n(r.add_ratio) - n(r.reduce_ratio)
+    const endCost = n(r.open_cost) + n(r.add_cost) - n(r.reduce_cost)
+    const endImpairment = n(r.open_impairment) + n(r.add_impairment) - n(r.reduce_impairment)
+    const endNet = endCost - endImpairment
+    const endFv = n(r.open_fv) + n(r.add_fv) - n(r.reduce_fv)
+    return [...base, endRatio, endCost, endImpairment, endNet, endFv]
+  })
+  const allHeaders = [...headers, '期末-投资比例', '期末-投资成本', '期末-减值准备', '期末-长投净额', '期末-公允价值']
+  const ws = XLSX.utils.aoa_to_sheet([allHeaders, ...dataRows])
+  ws['!cols'] = allHeaders.map(() => ({ wch: 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '投资明细_成本法')
+  XLSX.writeFile(wb, '投资明细_成本法_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
+
 async function onFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -348,4 +377,5 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 .ws-table :deep(.ws-row-summary td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
 .ws-summary-label { font-weight: 700; color: #4b2d77; font-size: 13px; }
+.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
 </style>

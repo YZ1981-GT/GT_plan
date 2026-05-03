@@ -6,19 +6,26 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('open-formula', 'consol_equity_sim')">ƒx 公式</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" type="primary" @click="addDirectRow">+ 新增行</el-button>
         <el-button size="small" type="danger" :disabled="!selectedDirectRows.length" @click="batchDeleteDirect">
           删除{{ selectedDirectRows.length ? `(${selectedDirectRows.length})` : '' }}
         </el-button>
         <el-button size="small" @click="restoreDirectDefaults" title="恢复默认行结构">🔄 还原</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('save', { direct: directRows, indirect: indirectSections })">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>4步模拟：❶期初长投模拟（从上年底稿或手动输入）→ ❷当期变动模拟 → ❸还原分红影响 → ❹股比变动影响。期末=期初+增加-减少，自动与各家净资产按比例享有比对。</span>
+      <span>📋 <b>模拟权益法</b>：4步模拟流程 ❶期初长投模拟（从上年底稿或手动输入）→ ❷当期变动模拟（从净资产表按比例提取）→ ❸还原分红影响 → ❹股比变动影响。
+        期末=期初+增加-减少。底部比对区自动校验"模拟后长投 vs 按比例享有净资产"差异。
+        有股比变动的企业请先到对应的"股比变动N次"表填写，模拟结果会自动回填。</span>
     </div>
 
     <!-- 1. 直接长期股权投资权益法模拟 -->
@@ -237,17 +244,23 @@ async function restoreDirectDefaults() {
 watch(() => props.directRows, (v) => { directRows.value = [...v] }, { deep: true })
 watch(() => props.indirectSections, (v) => { indirectSections.value = [...v] }, { deep: true })
 
+// 同步 total 字段（在 watch 中而非渲染函数中）
+watch(directRows, (rows) => {
+  for (const row of rows) {
+    if (row.isStep || !row.values || !row.values.length) continue
+    row.total = row.values.reduce((s: number, v: any) => s + n(v), 0)
+  }
+}, { deep: true })
+
 const n = (v: any) => Number(v) || 0
 
 function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
-// 合计 = 各子企业列之和
+// 合计 = 各子企业列之和（纯计算，不修改 row）
 function rowTotal(row: any): number {
   if (!row.values || !row.values.length) return n(row.total)
-  const sum = row.values.reduce((s: number, v: any) => s + n(v), 0)
-  row.total = sum // 同步到 total 字段
-  return sum
+  return row.values.reduce((s: number, v: any) => s + n(v), 0)
 }
 
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
@@ -317,6 +330,21 @@ async function exportTemplate() {
   XLSX.writeFile(wb, '模拟权益法调整表_模板.xlsx'); ElMessage.success('模板已导出')
 }
 
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['序号', '步骤', '借贷', '项目', '二级明细', '合计', ...companies.value.map(c => c.name)]
+  const dataRows = directRows.value.map(r => [
+    r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
+    ...(r.values || []).map(v => v ?? '')
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = [{ wch: 5 }, { wch: 22 }, { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
+  XLSX.utils.book_append_sheet(wb, ws, '模拟权益法')
+  XLSX.writeFile(wb, '模拟权益法_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
+
 // ─── 导入 ─────────────────────────────────────────────────────────────────────
 async function onFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
@@ -381,4 +409,5 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
   padding: 16px 20px; background: #fdf6ec; border: 1px solid #faecd8; border-radius: 6px;
   font-size: 13px; color: #8a6d3b; text-align: center;
 }
+.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
 </style>

@@ -6,19 +6,26 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('open-formula', 'consol_net_asset')">ƒx 公式</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
         <el-button size="small" @click="restoreDefaults" title="恢复默认行结构">🔄 还原</el-button>
+        <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('save', tableData)">💾 保存</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>子企业列根据合并范围树形结构动态生成（当前层级的直接下级）。包含三部分：所有者权益变动 → 利润及利润分配 → 资本公积变动。紫色数值为自动计算，合计列自动汇总。</span>
+      <span>📋 <b>净资产表</b>：子企业列根据合并范围动态生成。三部分：❶所有者权益变动（期初→增加→减少→期末）❷利润及利润分配 ❸资本公积变动。
+        紫色数值为自动计算（合计=母公司+各子企业），合计行自动汇总明细行。
+        数据将被"模拟权益法"和"少数股东权益"表引用。支持<b>导出模板→填写→导入</b>。</span>
     </div>
 
     <el-table :data="tableData" border size="small" class="ws-table"
@@ -162,6 +169,14 @@ async function restoreDefaults() {
 let internalUpdate = false
 watch(() => props.modelValue, (v) => { if (!internalUpdate) tableData.value = v }, { deep: true })
 watch(tableData, (v) => {
+  // 同步每行的 total = parent + sum(values)
+  const nn = (val: any) => Number(val) || 0
+  for (const row of v) {
+    if (row.isHeader) continue
+    let sum = nn(row.parent)
+    if (row.values) { for (const val of row.values) sum += nn(val) }
+    row.total = sum
+  }
   recalcSummaryRows()
   internalUpdate = true; emit('update:modelValue', v); nextTick(() => { internalUpdate = false })
 }, { deep: true, immediate: true })
@@ -204,14 +219,13 @@ function fmt(v: any) {
   return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// 合计 = 母公司 + 各子企业之和
+// 合计 = 母公司 + 各子企业之和（纯计算，不修改 row）
 function calcRowTotal(row: NetAssetRow): number {
   const n = (v: any) => Number(v) || 0
   let sum = n(row.parent)
   if (row.values) {
     for (const v of row.values) sum += n(v)
   }
-  row.total = sum // 同步到 total 字段
   return sum
 }
 
@@ -290,6 +304,28 @@ async function exportTemplate() {
   ElMessage.success('模板已导出')
 }
 
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['序号', '项目', '合计', '母公司', ...companies.value.map(c => `${c.name}(${c.ratio}%)`)]
+  const dataRows = tableData.value.map(row => {
+    const vals: any[] = [row.seq, row.item, row.total ?? '', row.parent ?? '']
+    if (row.values) {
+      for (let i = 0; i < companies.value.length; i++) {
+        vals.push(row.values[i] ?? '')
+      }
+    } else {
+      for (let i = 0; i < companies.value.length; i++) vals.push('')
+    }
+    return vals
+  })
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
+  XLSX.utils.book_append_sheet(wb, ws, '净资产表')
+  XLSX.writeFile(wb, '净资产表_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
+
 async function onFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -365,4 +401,5 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-table :deep(.el-table__body .ws-col-index .cell) { white-space: nowrap; }
 .ws-table :deep(.ws-row-header td) { background: #f8f6fb !important; font-weight: 600; }
 .ws-table :deep(.ws-row-bold td) { font-weight: 600; }
+.ws-btn-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; flex-shrink: 0; }
 </style>

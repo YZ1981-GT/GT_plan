@@ -6,7 +6,9 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" @click="$emit('open-formula', 'consol_internal_trade')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTrade">📥 导出模板</el-button>
+        <el-button size="small" @click="exportTradeData">📤 导出数据</el-button>
         <el-button size="small" @click="tradeFileRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
@@ -16,7 +18,9 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>内部交易抵消（利润表科目）。卖方收入 = 买方成本，差异需说明。存货中未实现内部利润需单独抵消。<b>导出模板后按格式填写，导入时追加到现有数据</b>，读取"数据填写"工作表。</span>
+      <span>📋 <b>内部交易抵消</b>（利润表科目）：卖方收入 = 买方成本，差异需说明。存货中未实现内部利润需单独抵消（应抵消利润=未实现利润×存货留存率）。
+        底部自动生成抵消分录（收入成本抵消+未实现利润抵消），汇总到合并抵消分录表。
+        支持<b>导出模板→填写→导入</b>，读取"数据填写"工作表。</span>
     </div>
 
     <el-table :data="rows" border size="small" class="ws-table"
@@ -115,7 +119,7 @@ interface TradeRow {
 }
 
 const props = defineProps<{ companies: CompanyCol[] }>()
-const emitTrade = defineEmits<{ (e: 'save', data: TradeRow[]): void; (e: 'entries-changed', entries: any[]): void }>()
+const emitTrade = defineEmits<{ (e: 'save', data: TradeRow[]): void; (e: 'entries-changed', entries: any[]): void; (e: 'open-formula', key: string): void }>()
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement|null>(null)
@@ -171,6 +175,22 @@ async function exportTrade() {
   const dataRows = rows.map(r => [r.sellerCompany,r.buyerCompany,r.tradeType,r.sellerSubject,r.sellerAmount??'',r.buyerSubject,r.buyerAmount??'',r.unrealizedProfit??'',r.inventoryRatio??''])
   const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:14}))
   XLSX.utils.book_append_sheet(wb,ws,'数据填写'); XLSX.writeFile(wb,'内部交易抵消_模板.xlsx'); ElMessage.success('模板已导出')
+}
+async function exportTradeData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['卖方', '买方', '交易类型', '卖方科目', '卖方金额', '买方科目', '买方金额', '差异', '未实现利润', '存货留存率%', '应抵消利润']
+  const dataRows = rows.filter(r => r.sellerCompany || r.buyerCompany).map(r => [
+    r.sellerCompany, r.buyerCompany, r.tradeType, r.sellerSubject, r.sellerAmount ?? '',
+    r.buyerSubject, r.buyerAmount ?? '', n(r.sellerAmount) - n(r.buyerAmount),
+    r.unrealizedProfit ?? '', r.inventoryRatio ?? '',
+    n(r.unrealizedProfit) * n(r.inventoryRatio) / 100
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = headers.map(() => ({ wch: 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '内部交易抵消')
+  XLSX.writeFile(wb, '内部交易抵消_数据.xlsx')
+  ElMessage.success('数据已导出')
 }
 async function onTradeFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return

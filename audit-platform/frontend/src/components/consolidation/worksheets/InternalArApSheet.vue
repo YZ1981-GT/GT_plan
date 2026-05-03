@@ -8,6 +8,7 @@
         </el-tooltip>
         <el-button size="small" @click="emitArap('open-formula', 'consol_internal_arap')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
@@ -17,7 +18,8 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>每行一笔往来：本方↔对方，账龄段横向展开。<b>请先确认账龄段设置后再导出模板</b>，导出的列结构与账龄段一致。导入时自动追加到现有数据后面，读取"数据填写"工作表。</span>
+      <span>📋 <b>内部往来抵消</b>：每行一笔往来（本方↔对方），账龄段横向展开。❶先确认账龄段设置（3年段/5年段/自定义）❷导出模板按格式填写 ❸导入后自动追加。
+        <b>请先确认账龄段后再导出模板</b>，列结构与账龄段一致。底部自动生成抵消分录（往来抵消+坏账冲回），汇总到合并抵消分录表。</span>
     </div>
 
     <!-- 账龄段选择 -->
@@ -357,6 +359,31 @@ async function exportTemplate() {
   ws['!cols'] = headers.map(() => ({ wch: 14 }))
   XLSX.utils.book_append_sheet(wb, ws, '数据填写')
   XLSX.writeFile(wb, '内部往来抵消_模板.xlsx'); ElMessage.success('模板已导出')
+}
+
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const agNames = agingSegments.value.map(a => a.name)
+  const headers = ['本方单位', '本方科目', '本方明细',
+    ...agNames.map(a => '本方-' + a), '本方原值合计', ...agNames.map(a => '本方坏账-' + a), '本方坏账合计',
+    '对方单位', '对方科目', '对方明细',
+    ...agNames.map(a => '对方-' + a), '对方原值合计', ...agNames.map(a => '对方坏账-' + a), '对方坏账合计',
+    '差异', '差异原因']
+  const dataRows = rows.filter(r => r.localCompany || r.remoteCompany).map(r => [
+    r.localCompany, r.localSubject, r.localDetail,
+    ...r.localAmounts.map(v => v ?? ''), sumArr(r.localAmounts) || '',
+    ...r.localImpairments.map(v => v ?? ''), sumArr(r.localImpairments) || '',
+    r.remoteCompany, r.remoteSubject, r.remoteDetail,
+    ...r.remoteAmounts.map(v => v ?? ''), sumArr(r.remoteAmounts) || '',
+    ...r.remoteImpairments.map(v => v ?? ''), sumArr(r.remoteImpairments) || '',
+    sumArr(r.localAmounts) - sumArr(r.remoteAmounts) || '', r.diffReason,
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = headers.map(() => ({ wch: 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '内部往来抵消')
+  XLSX.writeFile(wb, '内部往来抵消_数据.xlsx')
+  ElMessage.success('数据已导出')
 }
 
 async function onFileSelected(e: Event) {

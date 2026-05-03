@@ -6,7 +6,9 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" @click="$emit('open-formula', 'consol_internal_cashflow')">ƒx 公式</el-button>
         <el-button size="small" @click="exportCf">📥 导出模板</el-button>
+        <el-button size="small" @click="exportCfData">📤 导出数据</el-button>
         <el-button size="small" @click="cfFileRef?.click()">📤 导入Excel</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
@@ -16,7 +18,9 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>内部现金流抵消（现金流量表项目）。A的"购买商品支付的现金"中对B的部分 = B的"销售商品收到的现金"中对A的部分。<b>导出模板后按格式填写，导入时追加到现有数据</b>。</span>
+      <span>📋 <b>内部现金流抵消</b>（现金流量表项目）：A的"购买商品支付的现金"中对B的部分 = B的"销售商品收到的现金"中对A的部分。
+        付款方和收款方的现金流项目需配对填写，差异需核查。底部自动生成抵消分录，汇总到合并抵消分录表。
+        支持<b>导出模板→填写→导入</b>，读取"数据填写"工作表。</span>
     </div>
 
     <el-table :data="rows" border size="small" class="ws-table"
@@ -103,7 +107,7 @@ interface CompanyCol { name: string; code?: string; ratio: number }
 interface CashFlowRow { payerCompany: string; receiverCompany: string; payerItem: string; payerAmount: number|null; receiverItem: string; receiverAmount: number|null }
 
 const props = defineProps<{ companies: CompanyCol[] }>()
-const emitCf = defineEmits<{ (e: 'save', data: CashFlowRow[]): void; (e: 'entries-changed', entries: any[]): void }>()
+const emitCf = defineEmits<{ (e: 'save', data: CashFlowRow[]): void; (e: 'entries-changed', entries: any[]): void; (e: 'open-formula', key: string): void }>()
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement|null>(null)
@@ -166,6 +170,20 @@ async function exportCf() {
   const dataRows = rows.map(r => [r.payerCompany,r.receiverCompany,r.payerItem,r.payerAmount??'',r.receiverItem,r.receiverAmount??''])
   const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:22}))
   XLSX.utils.book_append_sheet(wb,ws,'数据填写'); XLSX.writeFile(wb,'内部现金流抵消_模板.xlsx'); ElMessage.success('模板已导出')
+}
+async function exportCfData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['付款方', '收款方', '付款方现金流项目', '付款方金额', '收款方现金流项目', '收款方金额', '差异']
+  const dataRows = rows.filter(r => r.payerCompany || r.receiverCompany).map(r => [
+    r.payerCompany, r.receiverCompany, r.payerItem, r.payerAmount ?? '',
+    r.receiverItem, r.receiverAmount ?? '', n(r.payerAmount) - n(r.receiverAmount)
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = headers.map(() => ({ wch: 22 }))
+  XLSX.utils.book_append_sheet(wb, ws, '内部现金流抵消')
+  XLSX.writeFile(wb, '内部现金流抵消_数据.xlsx')
+  ElMessage.success('数据已导出')
 }
 async function onCfFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return

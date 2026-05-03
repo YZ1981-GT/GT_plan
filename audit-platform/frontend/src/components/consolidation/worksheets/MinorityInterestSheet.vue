@@ -6,6 +6,8 @@
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
+        <el-button size="small" @click="$emit('open-formula', 'consol_minority')">ƒx 公式</el-button>
+        <el-button size="small" @click="exportData">📤 导出数据</el-button>
         <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDeleteRows">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
@@ -79,7 +81,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -91,7 +93,7 @@ const props = defineProps<{
   elimIncome: any[]         // 合并抵消-损益
 }>()
 
-defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void }>()
+defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
@@ -116,6 +118,22 @@ async function batchDeleteRows() {
 const n = (v: any) => Number(v) || 0
 
 const overrides = reactive<Record<string, Record<string, number | null>>>({})
+
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['子企业', '母公司持股', '少数股东比例', '期末净资产', '少数股东权益', '抵消分录数(权益)', '权益差异', '当期净利润', '少数股东损益', '抵消分录数(损益)', '损益差异', '超额亏损']
+  const dataRows = tableRows.value.map((r: any) => [
+    r.companyName, r.parentRatio, r.minorityRatio, r.endNetAsset, r.minorityEquity,
+    r.elimMinorityEquity, r.equityDiff, r.currentProfit, r.minorityProfit,
+    r.elimMinorityProfit, r.profitDiff, r.isExcessLoss ? '是' : '否'
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = headers.map(() => ({ wch: 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '少数股东权益损益')
+  XLSX.writeFile(wb, '少数股东权益损益_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
 
 const tableRows = computed(() => {
   return props.companies.map((comp, ci) => {

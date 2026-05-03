@@ -111,7 +111,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="单位简称">
-          <el-input v-model="genForm.entity_short_name" placeholder="如"XX公司"，留空则用全称" />
+          <el-input v-model="genForm.entity_short_name" placeholder="如 XX公司，留空则用全称" />
           <div style="font-size: 12px; color: #999; margin-top: 4px">
             生成后正文中的简称可随时修改
           </div>
