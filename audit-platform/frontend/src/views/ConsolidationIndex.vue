@@ -670,13 +670,13 @@ watch(activeTab, (tab) => {
 </script>
 
 <style scoped>
-.gt-consol { padding: var(--gt-space-4); }
-.gt-consol-tabs { margin-top: var(--gt-space-3); }
+.gt-consol { padding: 12px; overflow: hidden; }
+.gt-consol-tabs { margin-top: 8px; }
 
 /* ── 顶部信息栏 ── */
 .gt-consol-bar {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px; margin: -16px -16px 12px;
+  padding: 8px 12px; margin: -12px -12px 8px;
   background: linear-gradient(135deg, #4b2d77 0%, #7c5caa 60%, #a78bcc 100%);
   border-radius: 0 0 10px 10px;
 }

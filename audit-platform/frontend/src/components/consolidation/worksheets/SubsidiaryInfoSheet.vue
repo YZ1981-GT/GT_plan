@@ -1,7 +1,7 @@
 <template>
   <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
-      <h3>合并范围内的子企业基本信息表</h3>
+      <h3>子企业基本信息表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
           <el-button size="small" @click="toggleFullscreen">
@@ -649,9 +649,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 }
 .ws-sheet-header {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px; padding: 8px 0;
+  margin-bottom: 8px; padding: 4px 0; flex-wrap: wrap; gap: 6px;
 }
-.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-header h3 { margin: 0; font-size: 14px; color: #333; white-space: nowrap; }
 .ws-sheet-actions { display: flex; gap: 8px; }
 .ws-tip {
   display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px;

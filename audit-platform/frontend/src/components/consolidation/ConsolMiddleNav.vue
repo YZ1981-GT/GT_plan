@@ -32,16 +32,30 @@
     </div>
 
     <!-- 添加企业弹窗 -->
-    <el-dialog v-model="showAddDialog" title="添加合并范围企业" width="400px" append-to-body>
-      <el-form label-width="80px" size="small">
-        <el-form-item label="企业名称">
+    <el-dialog v-model="showAddDialog" title="添加合并范围企业" width="500px" append-to-body>
+      <el-form label-width="110px" size="small">
+        <el-form-item label="企业名称" required>
           <el-input v-model="addForm.name" placeholder="输入企业全称" />
         </el-form-item>
-        <el-form-item label="企业代码">
+        <el-form-item label="企业代码" required>
           <el-input v-model="addForm.code" placeholder="如 CQ001" />
         </el-form-item>
+        <el-form-item label="上级单位">
+          <el-select v-model="addForm.parentCode" size="small" style="width:100%" placeholder="选择上级单位" filterable clearable>
+            <el-option v-for="c in existingCompanies" :key="c.code" :label="`${c.name} (${c.code})`" :value="c.code" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="上级单位代码">
+          <el-input v-model="addForm.parentCode" placeholder="自动填充或手动输入" disabled />
+        </el-form-item>
+        <el-form-item label="最终控制方">
+          <el-input v-model="addForm.ultimateController" placeholder="如 重庆医药集团" />
+        </el-form-item>
+        <el-form-item label="最终控制方代码">
+          <el-input v-model="addForm.ultimateControllerCode" placeholder="如 ROOT" />
+        </el-form-item>
         <el-form-item label="持股比例">
-          <el-input-number v-model="addForm.ratio" :precision="2" :min="0" :max="100" style="width:100%" />
+          <el-input-number v-model="addForm.ratio" :precision="6" :min="0" :max="100" style="width:100%" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -63,9 +77,20 @@ const projectId = computed(() => route.params.projectId as string)
 const loading = ref(false)
 const rawTree = ref<any[]>([])
 const showAddDialog = ref(false)
-const addForm = reactive({ name: '', code: '', ratio: 0 })
+const addForm = reactive({ name: '', code: '', parentCode: '', ultimateController: '', ultimateControllerCode: '', ratio: 0 })
 const manualCompanies = ref<any[]>([])
 
+// 已有企业列表（用于上级单位下拉）
+const existingCompanies = computed(() => {
+  const list: { name: string; code: string }[] = []
+  function collect(node: any) {
+    if (node.company_code) list.push({ name: node.company_name || node.name, code: node.company_code })
+    if (node.children) for (const ch of node.children) collect(ch)
+  }
+  for (const root of rawTree.value) collect(root)
+  for (const mc of manualCompanies.value) list.push({ name: mc.name, code: mc.code })
+  return list
+})
 const currentYear = new Date().getFullYear() - 1
 const selectedYear = ref(currentYear)
 const yearOptions = computed(() => {
@@ -109,21 +134,49 @@ const treeData = computed(() => {
 
   if (rawTree.value.length) {
     const root = buildNode(rawTree.value[0])
-    // 追加手动添加的企业
+    // 追加手动添加的企业（按 parentCode 插入到对应父节点下）
     for (const mc of manualCompanies.value) {
-      root.children.unshift({
+      const mcNode: any = {
         key: mc.code, label: mc.name, icon: '🏠',
         ratio: mc.ratio, companyCode: mc.code,
+        parentCode: mc.parentCode,
         children: [
           { key: `${mc.code}_bs`, label: '资产负债表', icon: '📋', isReport: true, reportType: 'balance_sheet', companyCode: mc.code },
           { key: `${mc.code}_is`, label: '利润表', icon: '📈', isReport: true, reportType: 'income_statement', companyCode: mc.code },
+          { key: `${mc.code}_cf`, label: '现金流量表', icon: '💰', isReport: true, reportType: 'cash_flow_statement', companyCode: mc.code },
+          { key: `${mc.code}_eq`, label: '权益变动表', icon: '📊', isReport: true, reportType: 'equity_statement', companyCode: mc.code },
         ],
-      })
+      }
+      // 找到父节点插入
+      const parentNode = mc.parentCode ? findNode(root, mc.parentCode) : null
+      if (parentNode && parentNode.children) {
+        // 插入到差额表之前
+        const diffIdx = parentNode.children.findIndex((c: any) => c.isDiff)
+        if (diffIdx >= 0) parentNode.children.splice(diffIdx, 0, mcNode)
+        else parentNode.children.unshift(mcNode)
+      } else {
+        // 没有父节点，插入到根节点下
+        const diffIdx = root.children?.findIndex((c: any) => c.isDiff) ?? -1
+        if (diffIdx >= 0) root.children.splice(diffIdx, 0, mcNode)
+        else if (root.children) root.children.unshift(mcNode)
+      }
     }
     return [root]
   }
   return []
 })
+
+// 递归查找节点
+function findNode(node: any, code: string): any {
+  if (node.companyCode === code || node.key === code) return node
+  if (node.children) {
+    for (const ch of node.children) {
+      const found = findNode(ch, code)
+      if (found) return found
+    }
+  }
+  return null
+}
 
 async function loadTree() {
   if (!projectId.value) return
@@ -158,8 +211,14 @@ function onNodeClick(data: any) {
 
 function doAddCompany() {
   if (!addForm.name || !addForm.code) { ElMessage.warning('请填写企业名称和代码'); return }
-  manualCompanies.value.push({ ...addForm })
-  addForm.name = ''; addForm.code = ''; addForm.ratio = 0
+  manualCompanies.value.push({
+    name: addForm.name, code: addForm.code, ratio: addForm.ratio,
+    parentCode: addForm.parentCode, ultimateController: addForm.ultimateController,
+    ultimateControllerCode: addForm.ultimateControllerCode,
+  })
+  // 重置表单
+  addForm.name = ''; addForm.code = ''; addForm.parentCode = ''
+  addForm.ultimateController = ''; addForm.ultimateControllerCode = ''; addForm.ratio = 0
   showAddDialog.value = false
   ElMessage.success('已添加到合并范围')
 }
