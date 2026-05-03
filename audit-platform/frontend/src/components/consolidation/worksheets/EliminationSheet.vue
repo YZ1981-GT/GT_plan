@@ -123,17 +123,17 @@ const n = (v: any) => Number(v) || 0
 function buildAutoEntries(): EntryRow[] {
   const entries: EntryRow[] = []
   // 权益抵消
-  for (const r of props.equityRows) {
+  for (const r of (props.equityRows || [])) {
     const amt = r.values ? r.values.reduce((s: number, v: any) => s + n(v), 0) : n(r.total)
     if (amt) entries.push({ source: '权益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '' })
   }
   // 损益抵消
-  for (const r of props.incomeRows) {
+  for (const r of (props.incomeRows || [])) {
     const amt = r.values ? r.values.reduce((s: number, v: any) => s + n(v), 0) : n(r.total)
     if (amt) entries.push({ source: '损益抵消', direction: r.direction, subject: r.subject, detail: r.detail || '', amount: amt, desc: '' })
   }
   // 交叉持股
-  for (const r of props.crossRows) {
+  for (const r of (props.crossRows || [])) {
     if (n(r.total)) entries.push({ source: '交叉持股', direction: r.direction, subject: r.subject, detail: '', amount: n(r.total), desc: '' })
   }
   // 内部抵消（从 importedEntries）

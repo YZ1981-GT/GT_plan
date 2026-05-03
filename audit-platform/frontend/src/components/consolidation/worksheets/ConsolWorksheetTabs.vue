@@ -10,7 +10,7 @@
       </div>
       <div class="cw-nav-list">
         <template v-for="group in navGroups" :key="group.key">
-          <div class="cw-nav-group" @click="group.collapsed = !group.collapsed">
+          <div class="cw-nav-group" @click="groupCollapsed[group.key] = !groupCollapsed[group.key]">
             <div class="cw-nav-group-left">
               <span class="cw-nav-group-num">{{ group.step }}</span>
               <span class="cw-nav-group-label">{{ group.label }}</span>
@@ -207,36 +207,38 @@ const sheetList = computed(() => {
 })
 
 // ─── 树形分组导航 ─────────────────────────────────────────────────────────────
-const navGroups = reactive([
+const groupCollapsed = reactive<Record<string, boolean>>({ g1: false, g2: false, g3: false, g4: true, g5: false, g6: true })
+
+const navGroups = computed(() => [
   {
     key: 'g1', label: '基础数据', step: '1',
-    collapsed: false,
-    sheets: computed(() => sheetList.value.filter(s => ['info', 'cost', 'equity_inv'].includes(s.key))),
+    collapsed: groupCollapsed.g1,
+    sheets: sheetList.value.filter(s => ['info', 'cost', 'equity_inv'].includes(s.key)),
   },
   {
     key: 'g2', label: '净资产归集', step: '2',
-    collapsed: false,
-    sheets: computed(() => sheetList.value.filter(s => s.key === 'net_asset' || s.key.startsWith('share_change_'))),
+    collapsed: groupCollapsed.g2,
+    sheets: sheetList.value.filter(s => s.key === 'net_asset' || s.key.startsWith('share_change_')),
   },
   {
     key: 'g3', label: '权益法模拟', step: '3',
-    collapsed: false,
-    sheets: computed(() => sheetList.value.filter(s => s.key === 'equity_sim')),
+    collapsed: groupCollapsed.g3,
+    sheets: sheetList.value.filter(s => s.key === 'equity_sim'),
   },
   {
     key: 'g4', label: '内部抵消', step: '4',
-    collapsed: true,
-    sheets: computed(() => sheetList.value.filter(s => ['internal_arap', 'internal_trade', 'internal_cashflow'].includes(s.key))),
+    collapsed: groupCollapsed.g4,
+    sheets: sheetList.value.filter(s => ['internal_arap', 'internal_trade', 'internal_cashflow'].includes(s.key)),
   },
   {
     key: 'g5', label: '合并抵消', step: '5',
-    collapsed: false,
-    sheets: computed(() => sheetList.value.filter(s => ['elimination', 'capital'].includes(s.key))),
+    collapsed: groupCollapsed.g5,
+    sheets: sheetList.value.filter(s => ['elimination', 'capital'].includes(s.key)),
   },
   {
     key: 'g6', label: '汇总核查', step: '✓',
-    collapsed: true,
-    sheets: computed(() => sheetList.value.filter(s => ['post_invest', 'post_income', 'minority'].includes(s.key))),
+    collapsed: groupCollapsed.g6,
+    sheets: sheetList.value.filter(s => ['post_invest', 'post_income', 'minority'].includes(s.key)),
   },
 ])
 
