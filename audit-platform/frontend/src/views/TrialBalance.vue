@@ -38,6 +38,12 @@
       </div>
     </div>
 
+    <!-- 视图切换：科目明细 / 试算平衡表 -->
+    <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
+      <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'detail' }" @click="tbViewMode = 'detail'">科目明细</span>
+      <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'summary' }" @click="tbViewMode = 'summary'; loadTbSummary()">试算平衡表</span>
+    </div>
+
     <!-- 一致性校验结果 -->
     <el-alert
       v-if="consistencyResult"
@@ -65,8 +71,9 @@
       </div>
     </el-alert>
 
-    <!-- 试算表主表 -->
+    <!-- 试算表主表（科目明细视图） -->
     <el-table
+      v-if="tbViewMode === 'detail'"
       :data="groupedRows"
       v-loading="loading"
       border
@@ -136,6 +143,55 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 试算平衡表视图（报表行次级别） -->
+    <div v-if="tbViewMode === 'summary'">
+      <!-- 报表类型切换 -->
+      <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
+        <span v-for="rt in tbSummaryTypes" :key="rt.key"
+          class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbSummaryType === rt.key }"
+          @click="tbSummaryType = rt.key; loadTbSummary()">{{ rt.label }}</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+        <el-button size="small" @click="loadTbSummary()" :loading="tbSummaryLoading">🔄 刷新</el-button>
+        <el-button size="small" @click="exportTbSummary">📤 导出</el-button>
+        <el-button size="small" @click="saveTbSummary">💾 保存</el-button>
+        <span style="flex:1" />
+        <span style="font-size:11px;color:#999">{{ tbSummaryRows.length }} 行 · 审定数=未审数+审计调整借-贷+重分类借-贷</span>
+      </div>
+      <div style="overflow-x:auto;max-height:calc(100vh - 300px)">
+        <table class="gt-tb-summary-table">
+          <thead>
+            <tr>
+              <th rowspan="2" style="min-width:60px">行次</th>
+              <th rowspan="2" style="min-width:200px">项目</th>
+              <th rowspan="2" style="min-width:120px">未审数</th>
+              <th colspan="2">审计调整</th>
+              <th colspan="2">重分类调整</th>
+              <th rowspan="2" class="gt-tb-sum-audited-th" style="min-width:120px">审定数</th>
+            </tr>
+            <tr>
+              <th style="min-width:100px">借方</th><th style="min-width:100px">贷方</th>
+              <th style="min-width:100px">借方</th><th style="min-width:100px">贷方</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, ri) in tbSummaryRows" :key="ri"
+              :class="{ 'gt-tb-sum-total': row.is_total, 'gt-tb-sum-category': row.is_category }">
+              <td style="text-align:center;color:#999;font-size:11px">{{ row.row_code }}</td>
+              <td :style="{ paddingLeft: (row.indent || 0) * 14 + 'px' }">{{ row.row_name }}</td>
+              <td class="gt-tb-sum-num gt-tb-sum-unadj">{{ fmtAmt(row.unadjusted) }}</td>
+              <td class="gt-tb-sum-num"><el-input-number v-model="row.aje_dr" size="small" :controls="false" style="width:100%" /></td>
+              <td class="gt-tb-sum-num"><el-input-number v-model="row.aje_cr" size="small" :controls="false" style="width:100%" /></td>
+              <td class="gt-tb-sum-num"><el-input-number v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" /></td>
+              <td class="gt-tb-sum-num"><el-input-number v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" /></td>
+              <td class="gt-tb-sum-num gt-tb-sum-audited">{{ fmtAmt(row.audited) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <el-empty v-if="!tbSummaryRows.length && !tbSummaryLoading" description="点击刷新从科目明细汇总生成" />
+    </div>
 
     <!-- 借贷平衡指示器 -->
     <div class="gt-tb-balance-indicator" v-if="!loading">
@@ -456,6 +512,136 @@ watch(
   },
   { immediate: true }
 )
+
+// ─── 试算平衡表（报表行次级别） ──────────────────────────────────────────────
+const tbViewMode = ref<'detail' | 'summary'>('detail')
+const tbSummaryType = ref('balance_sheet')
+const tbSummaryLoading = ref(false)
+const tbSummaryRows = ref<any[]>([])
+const selectedTemplateType = ref('soe')
+const tbSummaryTypes = [
+  { key: 'balance_sheet', label: '资产负债表' },
+  { key: 'income_statement', label: '利润表' },
+  { key: 'cash_flow_statement', label: '现金流量表' },
+]
+
+async function loadTbSummary() {
+  tbSummaryLoading.value = true
+  try {
+    // 1. 加载报表行结构
+    const standard = `${selectedTemplateType.value}_standalone`
+    const { data: reportData } = await http.get('/api/report-config', {
+      params: { report_type: tbSummaryType.value, applicable_standard: standard, project_id: projectId.value },
+      validateStatus: (s: number) => s < 600,
+    })
+    const reportRows = Array.isArray(reportData?.data ?? reportData) ? (reportData?.data ?? reportData) : []
+
+    // 2. 从科目明细汇总未审数（按报表行次映射）
+    // 用现有的 rows（科目明细）按 account_name 匹配报表行
+    const unadjMap: Record<string, number> = {}
+    for (const r of rows.value) {
+      if (r.account_name && r.unadjusted_amount) {
+        unadjMap[r.account_name.trim()] = (unadjMap[r.account_name.trim()] || 0) + Number(r.unadjusted_amount || 0)
+      }
+    }
+
+    // 3. 从调整分录汇总 AJE/RCL
+    const ajeMap: Record<string, { dr: number; cr: number }> = {}
+    const rclMap: Record<string, { dr: number; cr: number }> = {}
+    for (const r of rows.value) {
+      const name = (r.account_name || '').trim()
+      if (!name) continue
+      const aje = Number(r.aje_adjustment || 0)
+      const rje = Number(r.rje_adjustment || 0)
+      if (aje > 0) { ajeMap[name] = ajeMap[name] || { dr: 0, cr: 0 }; ajeMap[name].dr += aje }
+      else if (aje < 0) { ajeMap[name] = ajeMap[name] || { dr: 0, cr: 0 }; ajeMap[name].cr += Math.abs(aje) }
+      if (rje > 0) { rclMap[name] = rclMap[name] || { dr: 0, cr: 0 }; rclMap[name].dr += rje }
+      else if (rje < 0) { rclMap[name] = rclMap[name] || { dr: 0, cr: 0 }; rclMap[name].cr += Math.abs(rje) }
+    }
+
+    // 4. 构建试算平衡表行
+    tbSummaryRows.value = reportRows.map((r: any) => {
+      const name = (r.row_name || '').trim().replace(/^[△▲*#\s]+/, '')
+      const unadj = unadjMap[name] || Number(r.current_period_amount || 0) || null
+      const aje = ajeMap[name] || { dr: 0, cr: 0 }
+      const rcl = rclMap[name] || { dr: 0, cr: 0 }
+      return {
+        row_code: r.row_code || '',
+        row_name: r.row_name || '',
+        indent: r.indent_level || 0,
+        is_total: r.is_total_row || false,
+        is_category: (r.indent_level === 0 && !r.is_total_row),
+        unadjusted: unadj,
+        aje_dr: aje.dr || null,
+        aje_cr: aje.cr || null,
+        rcl_dr: rcl.dr || null,
+        rcl_cr: rcl.cr || null,
+        get audited(): number | null {
+          const u = Number(this.unadjusted) || 0
+          const ad = Number(this.aje_dr) || 0
+          const ac = Number(this.aje_cr) || 0
+          const rd = Number(this.rcl_dr) || 0
+          const rc = Number(this.rcl_cr) || 0
+          const result = u + ad - ac + rd - rc
+          return result !== 0 ? Math.round(result * 100) / 100 : null
+        },
+      }
+    })
+
+    // 5. 尝试加载已保存的数据覆盖
+    try {
+      const { data: saved } = await http.get(
+        `/api/consol-worksheet-data/${projectId.value}/${selectedYear.value}/tb_summary_${tbSummaryType.value}`,
+        { validateStatus: (s: number) => s < 600 }
+      )
+      const savedData = saved?.data ?? saved
+      if (savedData?.data?.rows) {
+        for (const sr of savedData.data.rows) {
+          const target = tbSummaryRows.value.find((r: any) => r.row_code === sr.row_code)
+          if (target) {
+            if (sr.aje_dr != null) target.aje_dr = sr.aje_dr
+            if (sr.aje_cr != null) target.aje_cr = sr.aje_cr
+            if (sr.rcl_dr != null) target.rcl_dr = sr.rcl_dr
+            if (sr.rcl_cr != null) target.rcl_cr = sr.rcl_cr
+          }
+        }
+      }
+    } catch { /* 首次无数据 */ }
+  } catch { tbSummaryRows.value = [] }
+  finally { tbSummaryLoading.value = false }
+}
+
+async function saveTbSummary() {
+  try {
+    const saveRows = tbSummaryRows.value.map((r: any) => ({
+      row_code: r.row_code, row_name: r.row_name,
+      unadjusted: r.unadjusted, aje_dr: r.aje_dr, aje_cr: r.aje_cr,
+      rcl_dr: r.rcl_dr, rcl_cr: r.rcl_cr,
+    }))
+    await http.put(
+      `/api/consol-worksheet-data/${projectId.value}/${selectedYear.value}/tb_summary_${tbSummaryType.value}`,
+      { sheet_key: `tb_summary_${tbSummaryType.value}`, data: { rows: saveRows } },
+      { validateStatus: (s: number) => s < 600 }
+    )
+    ElMessage.success('试算平衡表已保存')
+  } catch { ElMessage.error('保存失败') }
+}
+
+async function exportTbSummary() {
+  if (!tbSummaryRows.value.length) return
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  const headers = ['行次', '项目', '未审数', '审计调整-借', '审计调整-贷', '重分类-借', '重分类-贷', '审定数']
+  const dataRows = tbSummaryRows.value.map((r: any) => [
+    r.row_code, r.row_name, r.unadjusted, r.aje_dr, r.aje_cr, r.rcl_dr, r.rcl_cr, r.audited,
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+  ws['!cols'] = headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 }))
+  XLSX.utils.book_append_sheet(wb, ws, '试算平衡表')
+  const label = tbSummaryTypes.find(t => t.key === tbSummaryType.value)?.label || ''
+  XLSX.writeFile(wb, `试算平衡表_${label}.xlsx`)
+  ElMessage.success('已导出')
+}
 </script>
 
 <style scoped>
@@ -567,4 +753,25 @@ watch(
   }
 
   :deep(.el-tabs__item.is-active) { font-weight: 600; }
+
+/* 视图切换标签 */
+.gt-tb-view-tag {
+  padding: 6px 16px; font-size: 13px; cursor: pointer; color: #999;
+  border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; user-select: none;
+}
+.gt-tb-view-tag:hover { color: #4b2d77; }
+.gt-tb-view-tag--active { color: #4b2d77; font-weight: 600; border-bottom-color: #4b2d77; }
+
+/* 试算平衡表 */
+.gt-tb-summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.gt-tb-summary-table th, .gt-tb-summary-table td { border: 1px solid #e8e4f0; padding: 4px 8px; }
+.gt-tb-summary-table thead th { background: #f0edf5; font-weight: 600; text-align: center; position: sticky; top: 0; z-index: 2; }
+.gt-tb-sum-num { text-align: right; }
+.gt-tb-sum-unadj { background: rgba(75,45,119,0.03); }
+.gt-tb-sum-audited { font-weight: 700; color: #4b2d77; background: rgba(75,45,119,0.06); }
+.gt-tb-sum-audited-th { background: #e8e0f0 !important; color: #4b2d77; }
+.gt-tb-sum-total td { font-weight: 700; background: #f8f6fb !important; }
+.gt-tb-sum-category td { font-weight: 600; color: #4b2d77; }
+.gt-tb-summary-table :deep(.el-input-number) { width: 100%; }
+.gt-tb-summary-table :deep(.el-input-number .el-input__inner) { text-align: right; font-size: 12px; height: 28px; }
 </style>
