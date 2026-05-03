@@ -9,6 +9,10 @@
         <el-button size="small" @click="$emit('open-formula', 'consol_net_asset')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
+        <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
+          删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
+        </el-button>
         <el-button size="small" @click="$emit('save', tableData)">💾 保存</el-button>
       </div>
     </div>
@@ -19,7 +23,9 @@
     <el-table :data="tableData" border size="small" class="ws-table"
       :max-height="isFullscreen ? 'calc(100vh - 80px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle"
-      :row-class-name="rowClassName" :span-method="spanMethod">
+      :row-class-name="rowClassName" :span-method="spanMethod"
+      @selection-change="sel => selectedRows = sel">
+      <el-table-column type="selection" width="36" fixed align="center" />
       <!-- 序号 -->
       <el-table-column prop="seq" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
       <!-- 项目 -->
@@ -87,7 +93,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface CompanyCol {
   name: string    // 子企业名称
@@ -115,6 +121,23 @@ const companies = computed(() => props.companies)
 const tableData = ref<NetAssetRow[]>([...props.modelValue])
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
+const selectedRows = ref<NetAssetRow[]>([])
+
+function addRow() {
+  // 在最后一个明细行后插入自定义行
+  const newRow: NetAssetRow = { seq: '', item: '自定义行', total: null, parent: null, values: [], indent: 1 }
+  tableData.value.push(newRow)
+}
+
+async function batchDelete() {
+  if (!selectedRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedRows.value)
+    tableData.value = tableData.value.filter(r => !del.has(r))
+    selectedRows.value = []
+  } catch {}
+}
 
 let internalUpdate = false
 watch(() => props.modelValue, (v) => { if (!internalUpdate) tableData.value = v }, { deep: true })
@@ -178,10 +201,11 @@ function rowClassName({ row }: { row: NetAssetRow }) {
 }
 
 function spanMethod({ row, columnIndex }: any) {
-  if (row.isHeader && columnIndex === 1) {
-    return { rowspan: 1, colspan: 2 + companies.value.length + 1 }
+  // columnIndex: 0=selection, 1=seq, 2=item, 3=total, 4=parent, 5+=companies
+  if (row.isHeader && columnIndex === 2) {
+    return { rowspan: 1, colspan: 3 + companies.value.length }
   }
-  if (row.isHeader && columnIndex > 1) return { rowspan: 0, colspan: 0 }
+  if (row.isHeader && columnIndex > 2) return { rowspan: 0, colspan: 0 }
   return { rowspan: 1, colspan: 1 }
 }
 

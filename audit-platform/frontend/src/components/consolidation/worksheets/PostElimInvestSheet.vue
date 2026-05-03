@@ -17,7 +17,9 @@
     <el-table :data="tableRows" border size="small" class="ws-table"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle" :row-class-name="rowClassName"
-      show-summary :summary-method="getSummary">
+      show-summary :summary-method="getSummary"
+      @selection-change="sel => selectedRows = sel">
+      <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column prop="companyName" label="子企业" width="160" fixed show-overflow-tooltip />
       <el-table-column prop="ratio" label="持股比例" width="80" align="right">
         <template #default="{ row }"><span>{{ row.ratio }}%</span></template>
@@ -95,6 +97,7 @@ defineEmits<{ (e: 'save', data: any): void; (e: 'open-formula', key: string): vo
 
 const isFullscreen = ref(false)
 const sheetRef = ref<HTMLElement | null>(null)
+const selectedRows = ref<any[]>([])
 const n = (v: any) => Number(v) || 0
 
 // 逐家计算（默认自动，支持用户覆盖编辑）
