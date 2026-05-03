@@ -9,6 +9,10 @@
         <el-button size="small" @click="$emit('open-formula', 'consol_equity_sim')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
+        <el-button size="small" type="primary" @click="addDirectRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedDirectRows.length" @click="batchDeleteDirect">
+          删除{{ selectedDirectRows.length ? `(${selectedDirectRows.length})` : '' }}
+        </el-button>
         <el-button size="small" @click="$emit('save', { direct: directRows, indirect: indirectSections })">💾 保存</el-button>
       </div>
     </div>
@@ -21,7 +25,9 @@
       <div class="ws-section-title">1. 直接长期股权投资权益法模拟</div>
       <el-table :data="directTableData" border size="small" class="ws-table"
         :max-height="isFullscreen ? 'calc(100vh - 200px)' : '500'"
-        :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName">
+        :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName"
+        @selection-change="sel => selectedDirectRows = sel.filter((r: any) => !r._isRatioRow)">
+        <el-table-column type="selection" width="36" fixed align="center" :selectable="(row: any) => !row._isRatioRow" />
         <el-table-column prop="seq" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
         <el-table-column prop="step" label="步骤" width="160" fixed show-overflow-tooltip>
           <template #default="{ row }"><span :style="{ fontWeight: row.isStep ? 700 : 400 }">{{ row.step }}</span></template>
@@ -132,7 +138,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EquitySimRow {
@@ -169,6 +175,27 @@ const importVisible = ref(false)
 const importCount = ref(0)
 const importMap = ref<Map<string, any>>(new Map())
 const diffReasons = reactive<string[]>([])
+const selectedDirectRows = ref<any[]>([])
+
+function addDirectRow() {
+  const newRow: EquitySimRow = { seq: '', step: '', direction: '', subject: '', detail: '', total: null, values: [] }
+  if (selectedDirectRows.value.length > 0) {
+    const last = selectedDirectRows.value[selectedDirectRows.value.length - 1]
+    const idx = directRows.value.indexOf(last)
+    if (idx >= 0) { directRows.value.splice(idx + 1, 0, newRow); return }
+  }
+  directRows.value.push(newRow)
+}
+
+async function batchDeleteDirect() {
+  if (!selectedDirectRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定删除 ${selectedDirectRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedDirectRows.value)
+    directRows.value = directRows.value.filter(r => !del.has(r))
+    selectedDirectRows.value = []
+  } catch {}
+}
 
 watch(() => props.directRows, (v) => { directRows.value = [...v] }, { deep: true })
 watch(() => props.indirectSections, (v) => { indirectSections.value = [...v] }, { deep: true })

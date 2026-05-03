@@ -9,6 +9,10 @@
         <el-button size="small" @click="$emit('open-formula', 'consol_elimination')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
         <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
+        <el-button size="small" type="primary" @click="addElimRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedElimRows.length" @click="batchDeleteElim">
+          删除{{ selectedElimRows.length ? `(${selectedElimRows.length})` : '' }}
+        </el-button>
         <el-button size="small" @click="$emit('save', { equity: equityRows, income: incomeRows, cross: crossRows })">💾 保存</el-button>
       </div>
     </div>
@@ -20,7 +24,9 @@
     <div class="ws-section">
       <div class="ws-section-title">1. 期末权益抵消</div>
       <el-table :data="equityRows" border size="small" class="ws-table" :max-height="isFullscreen ? '400' : '350'"
-        :header-cell-style="headerStyle" :cell-style="cellStyle">
+        :header-cell-style="headerStyle" :cell-style="cellStyle"
+        @selection-change="sel => selectedElimRows = sel">
+        <el-table-column type="selection" width="36" fixed align="center" />
         <el-table-column prop="direction" label="借贷方向" width="60" fixed align="center">
           <template #default="{ row }"><el-tag :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag></template>
         </el-table-column>
@@ -40,7 +46,9 @@
     <div class="ws-section">
       <div class="ws-section-title">2. 当期损益抵消</div>
       <el-table :data="incomeRows" border size="small" class="ws-table" :max-height="isFullscreen ? '400' : '350'"
-        :header-cell-style="headerStyle" :cell-style="cellStyle">
+        :header-cell-style="headerStyle" :cell-style="cellStyle"
+        @selection-change="sel => selectedElimRows = [...selectedElimRows.filter((r: any) => !incomeRows.includes(r)), ...sel]">
+        <el-table-column type="selection" width="36" fixed align="center" />
         <el-table-column prop="direction" label="借贷方向" width="60" fixed align="center">
           <template #default="{ row }"><el-tag :type="row.direction === '借' ? 'danger' : 'success'" size="small" effect="plain">{{ row.direction }}</el-tag></template>
         </el-table-column>
@@ -159,7 +167,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface ElimRow { direction: string; subject: string; detail?: string; total?: number | null; values?: (number | null)[]; isComputed?: boolean }
@@ -180,6 +188,32 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const importVisible = ref(false)
 const importCount = ref(0)
 const importMap = ref<Map<string, any>>(new Map())
+
+const selectedElimRows = ref<any[]>([])
+
+function addElimRow() {
+  const newRow: ElimRow = { direction: '借', subject: '', detail: '', values: [] }
+  // 在选中行的下一行插入（优先在权益区，其次损益区）
+  if (selectedElimRows.value.length > 0) {
+    const last = selectedElimRows.value[selectedElimRows.value.length - 1]
+    let idx = equityRows.value.indexOf(last)
+    if (idx >= 0) { equityRows.value.splice(idx + 1, 0, newRow); return }
+    idx = incomeRows.value.indexOf(last)
+    if (idx >= 0) { incomeRows.value.splice(idx + 1, 0, newRow); return }
+  }
+  equityRows.value.push(newRow)
+}
+
+async function batchDeleteElim() {
+  if (!selectedElimRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定删除 ${selectedElimRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedElimRows.value)
+    equityRows.value = equityRows.value.filter((r: ElimRow) => !del.has(r))
+    incomeRows.value = incomeRows.value.filter((r: ElimRow) => !del.has(r))
+    selectedElimRows.value = []
+  } catch {}
+}
 
 // 从内部抵消表导入的分录（通过 props 传入）
 const importedEntries = computed(() => props.importedEntries || [])

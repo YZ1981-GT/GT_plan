@@ -124,8 +124,13 @@ const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<NetAssetRow[]>([])
 
 function addRow() {
-  // 在最后一个明细行后插入自定义行
-  const newRow: NetAssetRow = { seq: '', item: '自定义行', total: null, parent: null, values: [], indent: 1 }
+  const newRow: NetAssetRow = { seq: '', item: '', total: null, parent: null, values: [], indent: 1 }
+  // 在选中行的下一行插入，没选中则在末尾追加
+  if (selectedRows.value.length > 0) {
+    const lastSelected = selectedRows.value[selectedRows.value.length - 1]
+    const idx = tableData.value.indexOf(lastSelected)
+    if (idx >= 0) { tableData.value.splice(idx + 1, 0, newRow); return }
+  }
   tableData.value.push(newRow)
 }
 
