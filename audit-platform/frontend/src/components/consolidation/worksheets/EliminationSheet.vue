@@ -40,7 +40,7 @@
           <el-tag v-else type="info" size="small" effect="light">自定义</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="direction" label="借贷方向" width="70" align="center">
+      <el-table-column prop="direction" label="借贷" width="70" align="center">
         <template #default="{ row }">
           <div v-if="row._custom" @click.stop @mousedown.stop>
             <el-select v-model="row.direction" size="small" style="width:100%">
@@ -52,7 +52,19 @@
       </el-table-column>
       <el-table-column prop="subject" label="科目" width="180">
         <template #default="{ row }">
-          <el-input v-if="row._custom" v-model="row.subject" size="small" placeholder="科目" />
+          <div v-if="row._custom" @click.stop @mousedown.stop>
+            <el-select v-model="row.subject" size="small" style="width:100%" placeholder="选择科目" filterable allow-create>
+              <el-option-group label="权益类">
+                <el-option v-for="s in equitySubjects" :key="s" :label="s" :value="s" />
+              </el-option-group>
+              <el-option-group label="损益类">
+                <el-option v-for="s in incomeSubjects" :key="s" :label="s" :value="s" />
+              </el-option-group>
+              <el-option-group label="资产负债类">
+                <el-option v-for="s in balanceSubjects" :key="s" :label="s" :value="s" />
+              </el-option-group>
+            </el-select>
+          </div>
           <span v-else>{{ row.subject }}</span>
         </template>
       </el-table-column>
@@ -118,6 +130,11 @@ const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedCustomRows = ref<EntryRow[]>([])
 const n = (v: any) => Number(v) || 0
+
+// 科目下拉选项（分组）
+const equitySubjects = ['实收资本（或股本）', '其他权益工具', '资本公积', '减：库存股', '其他综合收益', '专项储备', '盈余公积', '△一般风险准备', '未分配利润', '商誉', '少数股东权益']
+const incomeSubjects = ['投资收益', '少数股权损益', '年初未分配利润', '营业收入', '营业成本', '信用减值损失', '资产减值损失', '管理费用', '财务费用']
+const balanceSubjects = ['长期股权投资', '应收账款', '应付账款', '其他应收款', '其他应付款', '预付账款', '预收账款', '存货', '坏账准备', '固定资产', '无形资产']
 
 // ─── 自动拉取的分录（只读） ──────────────────────────────────────────────────
 function buildAutoEntries(): EntryRow[] {
@@ -192,7 +209,7 @@ const totalCredit = computed(() => allEntries.value.filter(r => r.direction === 
 // ─── 导出/导入 ───────────────────────────────────────────────────────────────
 async function exportTemplate() {
   const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const headers = ['来源','借贷方向','科目','二级明细','金额','说明']
+  const headers = ['来源','借贷','科目','二级明细','金额','说明']
   const dataRows = allEntries.value.map(r => [r.source || '自定义', r.direction, r.subject, r.detail, r.amount ?? '', r.desc])
   const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
   ws['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 24 }]
