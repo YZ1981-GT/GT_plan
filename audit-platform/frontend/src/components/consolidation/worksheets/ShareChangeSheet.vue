@@ -124,7 +124,7 @@
           <div class="sc-resizer" @mousedown="startResize($event, ci, ici + 1)"><div class="sc-resizer-bar"></div></div>
           <div class="sc-col" :class="{ 'sc-col--collapsed': colCollapsed[`${ci}_ind_${ici}`] }">
             <div class="sc-col-title sc-col-title--indirect" @click="colCollapsed[`${ci}_ind_${ici}`] = !colCollapsed[`${ci}_ind_${ici}`]" style="cursor:pointer">
-              <span>{{ colCollapsed[`${ci}_ind_${ici}`] ? '▶' : '▼' }} 🔗 {{ indComp.name }} — 间接持股权益法模拟 ({{ indComp.ratio }}%)</span>
+              <span>{{ colCollapsed[`${ci}_ind_${ici}`] ? '▶' : '▼' }} 🔗 {{ indComp.name }} — 间接持股 {{ indComp.ratio }}%{{ indComp.indirectHolder ? '（通过' + indComp.indirectHolder + '）' : '' }}</span>
             </div>
           <el-table v-show="!colCollapsed[`${ci}_ind_${ici}`]" :data="getIndirectSimRows(ci, ici)" border size="small" class="sc-table" max-height="500"
             :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="simRowClass">
@@ -198,7 +198,7 @@ const props = defineProps<{
   changeTimes: 1 | 2 | 3
   companies: CompanyInfo[]
   allCompanies: { name: string; code?: string; ratio: number }[]
-  indirectCompanies?: { name: string; code?: string; ratio: number }[]
+  indirectCompanies?: { name: string; code?: string; ratio: number; indirectHolder?: string }[]
 }>()
 
 const emit = defineEmits<{

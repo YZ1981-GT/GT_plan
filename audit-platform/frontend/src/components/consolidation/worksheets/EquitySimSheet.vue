@@ -109,7 +109,7 @@
 
     <!-- 2. 间接/交叉持股 -->
     <div v-for="(section, si) in indirectSections" :key="si" class="ws-section">
-      <div class="ws-section-title">2. 间接/交叉持股权益法模拟 — {{ section.companyName }} <small style="color:#999;margin-left:8px">间接持股 {{ section.ratio }}%</small></div>
+      <div class="ws-section-title">2. 间接持股权益法模拟 — {{ section.companyName }} <small style="color:#999;margin-left:8px">间接 {{ section.ratio }}%{{ section.indirectHolder ? '（通过' + section.indirectHolder + '）' : '' }}</small></div>
       <el-table :data="section.rows" border size="small" class="ws-table" max-height="400"
         :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName">
         <el-table-column prop="seq" label="序号" width="50" align="center" />

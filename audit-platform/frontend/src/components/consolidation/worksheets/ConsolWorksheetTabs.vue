@@ -471,17 +471,17 @@ const indirectCompanyList = computed(() => {
     .map((r: SubsidiaryInfoRow) => ({
       name: r.company_name, code: r.company_code,
       ratio: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
+      indirectHolder: r.indirect_holder || '',
     }))
 })
 
 // 间接持股模拟 sections（computed，从基本信息表动态生成）
 const computedIndirectSections = computed(() => {
-  // 优先使用已保存的数据
   if (data.equitySimIndirect.length > 0) return data.equitySimIndirect
-  // 否则从间接持股企业列表自动生成
   return indirectCompanyList.value.map(c => ({
     companyName: c.name,
     ratio: c.ratio,
+    indirectHolder: c.indirectHolder || '',
     rows: buildEquitySim(),
     endLongInvest: 0, endNetAssetShare: 0, difference: 0, diffReason: '',
   }))
