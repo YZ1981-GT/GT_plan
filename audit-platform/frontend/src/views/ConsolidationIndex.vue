@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="gt-consol gt-fade-in">
     <!-- 横幅：单位名称 + 年度 + 准则类型 -->
     <div class="gt-consol-bar">
@@ -59,7 +59,7 @@
                 <el-descriptions-item label="企业代码">{{ selectedNode.company_code }}</el-descriptions-item>
                 <el-descriptions-item label="持股比例" v-if="selectedNode.shareholding">{{ selectedNode.shareholding }}%</el-descriptions-item>
               </el-descriptions>
-              <el-button type="primary" size="small" style="margin-top:12px" @click="goToProject(selectedNode)">跳转项目</el-button>
+              <el-button type="primary" size="small" style="margin-top:12px" @click="goToProject(selectedNode)">查看合并</el-button>
             </div>
           </div>
 
@@ -69,7 +69,7 @@
             <p style="font-size:12px;color:#666;margin:4px 0">代码：{{ selectedNode.company_code || '—' }}</p>
             <p v-if="selectedNode.shareholding" style="font-size:12px;color:#666;margin:4px 0">持股：{{ selectedNode.shareholding }}%</p>
             <p v-if="selectedNode.children?.length" style="font-size:12px;color:#999;margin:4px 0">下级：{{ selectedNode.children.length }} 家</p>
-            <el-button type="primary" size="small" style="margin-top:8px" @click="goToProject(selectedNode)">跳转项目</el-button>
+            <el-button type="primary" size="small" style="margin-top:8px" @click="goToProject(selectedNode)">查看合并</el-button>
           </div>
         </div>
       </el-tab-pane>
@@ -102,49 +102,6 @@
               </template>
             </el-table-column>
           </el-table>
-        </div>
-      </el-tab-pane>
-
-      <!-- Tab 3: 穿透 -->
-      <el-tab-pane label="穿透" name="drilldown">
-        <div class="gt-tab-content">
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item v-for="(bc, idx) in drillBreadcrumb" :key="idx">
-              <a v-if="idx < drillBreadcrumb.length - 1" href="#" @click.prevent="drillBack(idx)">{{ bc.label }}</a>
-              <span v-else>{{ bc.label }}</span>
-            </el-breadcrumb-item>
-          </el-breadcrumb>
-
-          <!-- 层1: 企业构成 -->
-          <el-table v-if="drillLevel === 'companies'" :data="drillCompanies" border stripe v-loading="loading"
-            empty-text="请先在集团架构中选择节点" style="margin-top:12px">
-            <el-table-column prop="company_code" label="企业代码" width="120" />
-            <el-table-column prop="company_name" label="企业名称" min-width="200" />
-            <el-table-column prop="amount" label="金额" width="160" align="right" />
-            <el-table-column label="操作" width="100" align="center">
-              <template #default="{ row }">
-                <el-button link type="primary" size="small" @click="drillToElim(row)">抵消分录</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 层2: 抵消分录 -->
-          <el-table v-if="drillLevel === 'eliminations'" :data="drillEliminations" border stripe v-loading="loading"
-            empty-text="暂无抵消分录" style="margin-top:12px">
-            <el-table-column prop="entry_no" label="分录编号" width="140" />
-            <el-table-column prop="description" label="摘要" min-width="200" />
-            <el-table-column prop="debit_amount" label="借方" width="130" align="right" />
-            <el-table-column prop="credit_amount" label="贷方" width="130" align="right" />
-          </el-table>
-
-          <!-- 层3: 试算表跳转 -->
-          <div v-if="drillLevel === 'trial'" style="margin-top:12px">
-            <el-result icon="info" title="跳转到末端企业试算表">
-              <template #extra>
-                <el-button type="primary" @click="goToTrialBalance">查看试算表</el-button>
-              </template>
-            </el-result>
-          </div>
         </div>
       </el-tab-pane>
 
@@ -189,41 +146,54 @@
 
       <!-- Tab 5: 合并报表 -->
       <el-tab-pane label="合并报表" name="consol_report">
-        <div class="gt-tab-content">
-          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-            <el-select v-model="consolReportTemplateType" size="small" style="width:100px" @change="loadConsolReport">
-              <el-option label="国企版" value="soe" />
-              <el-option label="上市版" value="listed" />
-            </el-select>
-            <el-select v-model="consolReportType" size="small" style="width:140px" @change="loadConsolReport">
-              <el-option label="资产负债表" value="balance_sheet" />
-              <el-option label="利润表" value="income_statement" />
-              <el-option label="现金流量表" value="cash_flow_statement" />
-              <el-option label="权益变动表" value="equity_statement" />
-              <el-option label="现金流附表" value="cash_flow_supplement" />
-              <el-option label="资产减值准备表" value="impairment_provision" />
-            </el-select>
-            <el-button size="small" type="primary" @click="loadConsolReport" :loading="consolReportLoading">🔄 刷新</el-button>
-            <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
-            <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
-          </div>
-          <el-table v-if="consolReportRows.length" :data="consolReportRows" border size="small" max-height="calc(100vh - 320px)" style="width:100%"
-            :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }"
-            :row-class-name="consolReportRowClass">
-            <el-table-column prop="row_code" label="行次" width="90" />
-            <el-table-column prop="row_name" label="项目" min-width="200" show-overflow-tooltip>
-              <template #default="{ row }">
-                <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px', fontWeight: row.is_total_row ? 700 : 400 }">{{ row.row_name }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="合并本期" width="140" align="right">
-              <template #default="{ row }">{{ fmtAmt(row.current_period_amount) }}</template>
-            </el-table-column>
-            <el-table-column label="合并上期" width="140" align="right">
-              <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else-if="!consolReportLoading" description="选择报表类型后点击刷新" />
+        <div class="gt-report-layout">
+          <!-- 左侧：报表类型树形导航 -->
+          <aside class="gt-report-nav">
+            <div class="gt-report-nav-header">
+              <span style="font-size:13px;font-weight:600;color:#333">报表导航</span>
+              <el-select v-model="consolReportTemplateType" size="small" style="width:80px" @change="loadConsolReport">
+                <el-option label="国企版" value="soe" />
+                <el-option label="上市版" value="listed" />
+              </el-select>
+            </div>
+            <div class="gt-report-nav-list">
+              <div v-for="item in reportNavItems" :key="item.key"
+                class="gt-report-nav-item" :class="{ 'gt-report-nav-item--active': consolReportType === item.key }"
+                @click="consolReportType = item.key; loadConsolReport()">
+                <span class="gt-report-nav-icon">{{ item.icon }}</span>
+                <div class="gt-report-nav-text">
+                  <span class="gt-report-nav-label">{{ item.label }}</span>
+                  <span class="gt-report-nav-desc">{{ item.desc }}</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+          <!-- 右侧：报表内容 -->
+          <main class="gt-report-content">
+            <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+              <h3 style="margin:0;font-size:15px;color:#333;flex:1">{{ currentReportLabel }}</h3>
+              <el-button size="small" type="primary" @click="loadConsolReport" :loading="consolReportLoading">🔄 刷新</el-button>
+              <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
+              <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
+            </div>
+            <el-table v-if="consolReportRows.length" :data="consolReportRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
+              :header-cell-style="{ background: '#f8f6fb', fontSize: '12px' }"
+              :row-class-name="consolReportRowClass">
+              <el-table-column prop="row_code" label="行次" width="90" />
+              <el-table-column prop="row_name" label="项目" min-width="200" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px', fontWeight: row.is_total_row ? 700 : 400 }">{{ row.row_name }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="合并本期" width="140" align="right">
+                <template #default="{ row }">{{ fmtAmt(row.current_period_amount) }}</template>
+              </el-table-column>
+              <el-table-column label="合并上期" width="140" align="right">
+                <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else-if="!consolReportLoading" description="点击左侧报表类型查看" />
+          </main>
         </div>
       </el-tab-pane>
 
@@ -321,7 +291,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   getWorksheetTree, recalcWorksheet, getWorksheetAggregate,
-  drillToCompanies, drillToEliminations, drillToTrialBalance,
   executePivotQuery, exportPivotExcel, saveQueryTemplate, listQueryTemplates,
   type WorksheetNode, type PivotResult, type QueryTemplate,
 } from '@/services/consolidationApi'
@@ -398,11 +367,7 @@ function onTreeNodeClick(data: any) {
 }
 
 function goToProject(node: any) {
-  if (node.project_id) {
-    router.push(`/projects/${node.project_id}/trial-balance`)
-  } else {
-    ElMessage.info('该节点未关联项目')
-  }
+  router.push('/consolidation')
 }
 
 // ─── Tab 2: 差额表 ──────────────────────────────────────────────────────────
@@ -434,51 +399,6 @@ async function doRecalc() {
 }
 
 watch(aggMode, () => loadWorksheet())
-
-// ─── Tab 3: 穿透 ────────────────────────────────────────────────────────────
-const drillLevel = ref<'companies' | 'eliminations' | 'trial'>('companies')
-const drillCompanies = ref<any[]>([])
-const drillEliminations = ref<any[]>([])
-const drillTrialUrl = ref('')
-const drillBreadcrumb = ref<{ label: string; level: string }[]>([{ label: '合并数', level: 'companies' }])
-
-async function loadDrillCompanies() {
-  if (!selectedNode.value?.company_code) return
-  loading.value = true
-  try {
-    const res = await drillToCompanies(projectId.value, year.value, selectedNode.value.company_code)
-    drillCompanies.value = Array.isArray(res?.data) ? res.data : []
-    drillLevel.value = 'companies'
-    drillBreadcrumb.value = [{ label: '合并数', level: 'companies' }]
-  } catch { drillCompanies.value = [] }
-  finally { loading.value = false }
-}
-
-async function drillToElim(row: any) {
-  loading.value = true
-  try {
-    const res = await drillToEliminations(projectId.value, year.value, row.company_code)
-    drillEliminations.value = Array.isArray(res?.data) ? res.data : []
-    drillLevel.value = 'eliminations'
-    drillBreadcrumb.value = [
-      { label: '合并数', level: 'companies' },
-      { label: row.company_name || row.company_code, level: 'eliminations' },
-    ]
-  } catch { drillEliminations.value = [] }
-  finally { loading.value = false }
-}
-
-function drillBack(idx: number) {
-  const bc = drillBreadcrumb.value[idx]
-  drillLevel.value = bc.level as any
-  drillBreadcrumb.value = drillBreadcrumb.value.slice(0, idx + 1)
-}
-
-function goToTrialBalance() {
-  if (drillTrialUrl.value) {
-    router.push(drillTrialUrl.value)
-  }
-}
 
 // ─── Tab 4: 自定义查询 ──────────────────────────────────────────────────────
 const pivotRowDim = ref('account')
@@ -557,6 +477,18 @@ function fmtAmt(v: any): string {
 const consolReportTemplateType = ref('soe')
 const consolReportType = ref('balance_sheet')
 const consolReportLoading = ref(false)
+
+const reportNavItems = [
+  { key: 'balance_sheet', label: '资产负债表', desc: '合并资产负债表', icon: '📋' },
+  { key: 'income_statement', label: '利润表', desc: '合并利润表', icon: '📈' },
+  { key: 'cash_flow_statement', label: '现金流量表', desc: '合并现金流量表', icon: '💰' },
+  { key: 'equity_statement', label: '权益变动表', desc: '合并所有者权益变动表', icon: '📊' },
+  { key: 'cash_flow_supplement', label: '现金流附表', desc: '现金流量表补充资料', icon: '📑' },
+  { key: 'impairment_provision', label: '资产减值准备表', desc: '合并资产减值准备明细', icon: '⚠️' },
+]
+const currentReportLabel = computed(() => {
+  return reportNavItems.find(i => i.key === consolReportType.value)?.label || '合并报表'
+})
 const consolReportRows = ref<any[]>([])
 const showConsolConversion = ref(false)
 const consolMappingLoading = ref(false)
@@ -719,7 +651,6 @@ onMounted(async () => {
 
 watch(activeTab, (tab) => {
   if (tab === 'worksheet') loadWorksheet()
-  if (tab === 'drilldown') loadDrillCompanies()
   if (tab === 'consol_report') loadConsolReport()
   if (tab === 'consol_note' && !consolNoteTree.value.length) loadConsolNoteTree()
 })
@@ -763,4 +694,31 @@ watch(activeTab, (tab) => {
   padding: 14px 18px; box-shadow: 0 4px 20px rgba(75,45,119,0.12);
   min-width: 200px; max-width: 280px;
 }
+
+/* ── 合并报表左右布局 ── */
+.gt-report-layout { display: flex; gap: 0; height: calc(100vh - 200px); margin: -12px 0; }
+.gt-report-nav {
+  width: 220px; flex-shrink: 0; background: #fafafa; border-right: 1px solid #e8e4f0;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.gt-report-nav-header {
+  padding: 12px; border-bottom: 1px solid #e8e4f0; display: flex;
+  justify-content: space-between; align-items: center;
+}
+.gt-report-nav-list { flex: 1; overflow-y: auto; padding: 8px; }
+.gt-report-nav-item {
+  display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; margin: 2px 0;
+  border-radius: 6px; cursor: pointer; transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.gt-report-nav-item:hover { background: rgba(75,45,119,0.04); }
+.gt-report-nav-item--active {
+  background: #f0edf5 !important; border-left-color: #4b2d77;
+}
+.gt-report-nav-item--active .gt-report-nav-label { color: #4b2d77; font-weight: 600; }
+.gt-report-nav-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.gt-report-nav-text { flex: 1; min-width: 0; }
+.gt-report-nav-label { display: block; font-size: 13px; color: #333; line-height: 1.4; }
+.gt-report-nav-desc { display: block; font-size: 10px; color: #999; margin-top: 1px; }
+.gt-report-content { flex: 1; min-width: 0; padding: 12px 16px; overflow: auto; }
 </style>
