@@ -147,31 +147,45 @@
       <!-- Tab 5: 合并报表 -->
       <el-tab-pane label="合并报表" name="consol_report">
         <div class="gt-report-layout">
-          <!-- 左侧：报表类型树形导航 -->
+          <!-- 左侧：集团架构树 + 报表类型 -->
           <aside class="gt-report-nav">
             <div class="gt-report-nav-header">
-              <span style="font-size:13px;font-weight:600;color:#333">报表导航</span>
+              <span style="font-size:13px;font-weight:600;color:#333">合并节点</span>
               <el-select v-model="consolReportTemplateType" size="small" style="width:80px" @change="loadConsolReport">
                 <el-option label="国企版" value="soe" />
                 <el-option label="上市版" value="listed" />
               </el-select>
             </div>
-            <div class="gt-report-nav-list">
+            <!-- 集团架构树 -->
+            <div class="gt-report-tree">
+              <el-tree :data="reportTreeData" :props="{ label: 'label', children: 'children' }"
+                node-key="key" default-expand-all highlight-current
+                @node-click="onReportTreeClick">
+                <template #default="{ data }">
+                  <span class="gt-report-tree-node" :class="{ 'gt-report-tree-node--diff': data.isDiff }">
+                    <span>{{ data.icon }} {{ data.label }}</span>
+                    <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px">{{ data.ratio }}%</el-tag>
+                  </span>
+                </template>
+              </el-tree>
+            </div>
+            <!-- 报表类型切换 -->
+            <div class="gt-report-type-bar">
               <div v-for="item in reportNavItems" :key="item.key"
-                class="gt-report-nav-item" :class="{ 'gt-report-nav-item--active': consolReportType === item.key }"
+                class="gt-report-type-item" :class="{ 'gt-report-type-item--active': consolReportType === item.key }"
                 @click="consolReportType = item.key; loadConsolReport()">
-                <span class="gt-report-nav-icon">{{ item.icon }}</span>
-                <div class="gt-report-nav-text">
-                  <span class="gt-report-nav-label">{{ item.label }}</span>
-                  <span class="gt-report-nav-desc">{{ item.desc }}</span>
-                </div>
+                <span>{{ item.icon }}</span>
+                <span style="font-size:11px">{{ item.label }}</span>
               </div>
             </div>
           </aside>
           <!-- 右侧：报表内容 -->
           <main class="gt-report-content">
             <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-              <h3 style="margin:0;font-size:15px;color:#333;flex:1">{{ currentReportLabel }}</h3>
+              <h3 style="margin:0;font-size:15px;color:#333;flex:1">
+                {{ reportSelectedNode?.label || '合并报表' }} — {{ currentReportLabel }}
+              </h3>
+              <el-tag v-if="reportSelectedNode?.isDiff" type="warning" size="small" effect="plain">差额表</el-tag>
               <el-button size="small" type="primary" @click="loadConsolReport" :loading="consolReportLoading">🔄 刷新</el-button>
               <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
               <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
@@ -192,7 +206,7 @@
                 <template #default="{ row }">{{ fmtAmt(row.prior_period_amount) }}</template>
               </el-table-column>
             </el-table>
-            <el-empty v-else-if="!consolReportLoading" description="点击左侧报表类型查看" />
+            <el-empty v-else-if="!consolReportLoading" description="选择左侧合并节点和报表类型查看" />
           </main>
         </div>
       </el-tab-pane>
@@ -489,6 +503,44 @@ const reportNavItems = [
 const currentReportLabel = computed(() => {
   return reportNavItems.find(i => i.key === consolReportType.value)?.label || '合并报表'
 })
+
+// 集团架构树 → 报表导航树（每个合并节点下自动加差额表子节点）
+const reportSelectedNode = ref<any>(null)
+
+const reportTreeData = computed(() => {
+  if (!groupTree.value.length) return []
+  function buildNode(node: any): any {
+    const children: any[] = []
+    // 子企业节点
+    if (node.children?.length) {
+      for (const child of node.children) {
+        children.push(buildNode(child))
+      }
+      // 合并节点自动加差额表
+      children.push({
+        key: `diff_${node.company_code || 'root'}`,
+        label: '差额表（抵消调整）',
+        icon: '📝',
+        isDiff: true,
+        companyCode: node.company_code,
+      })
+    }
+    return {
+      key: node.company_code || 'root',
+      label: node.company_name || node.name,
+      icon: children.length ? '🏢' : '🏠',
+      ratio: node.shareholding,
+      companyCode: node.company_code,
+      children: children.length ? children : undefined,
+    }
+  }
+  return [buildNode(groupTree.value[0])]
+})
+
+function onReportTreeClick(data: any) {
+  reportSelectedNode.value = data
+  loadConsolReport()
+}
 const consolReportRows = ref<any[]>([])
 const showConsolConversion = ref(false)
 const consolMappingLoading = ref(false)
@@ -698,27 +750,29 @@ watch(activeTab, (tab) => {
 /* ── 合并报表左右布局 ── */
 .gt-report-layout { display: flex; gap: 0; height: calc(100vh - 200px); margin: -12px 0; }
 .gt-report-nav {
-  width: 220px; flex-shrink: 0; background: #fafafa; border-right: 1px solid #e8e4f0;
+  width: 240px; flex-shrink: 0; background: #fafafa; border-right: 1px solid #e8e4f0;
   display: flex; flex-direction: column; overflow: hidden;
 }
 .gt-report-nav-header {
-  padding: 12px; border-bottom: 1px solid #e8e4f0; display: flex;
-  justify-content: space-between; align-items: center;
+  padding: 10px 12px; border-bottom: 1px solid #e8e4f0; display: flex;
+  justify-content: space-between; align-items: center; flex-shrink: 0;
 }
+.gt-report-tree { flex: 1; overflow-y: auto; padding: 6px; }
+.gt-report-tree-node { display: flex; align-items: center; font-size: 12px; }
+.gt-report-tree-node--diff { color: #e6a23c; font-style: italic; }
+
+/* 报表类型切换栏（底部） */
+.gt-report-type-bar {
+  display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-top: 1px solid #e8e4f0;
+  background: #f5f3f8; flex-shrink: 0;
+}
+.gt-report-type-item {
+  display: flex; align-items: center; gap: 3px; padding: 4px 8px; border-radius: 4px;
+  cursor: pointer; font-size: 11px; color: #666; transition: all 0.15s;
+}
+.gt-report-type-item:hover { background: rgba(75,45,119,0.06); }
+.gt-report-type-item--active { background: #4b2d77; color: #fff; }
+
 .gt-report-nav-list { flex: 1; overflow-y: auto; padding: 8px; }
-.gt-report-nav-item {
-  display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; margin: 2px 0;
-  border-radius: 6px; cursor: pointer; transition: all 0.15s;
-  border-left: 3px solid transparent;
-}
-.gt-report-nav-item:hover { background: rgba(75,45,119,0.04); }
-.gt-report-nav-item--active {
-  background: #f0edf5 !important; border-left-color: #4b2d77;
-}
-.gt-report-nav-item--active .gt-report-nav-label { color: #4b2d77; font-weight: 600; }
-.gt-report-nav-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-.gt-report-nav-text { flex: 1; min-width: 0; }
-.gt-report-nav-label { display: block; font-size: 13px; color: #333; line-height: 1.4; }
-.gt-report-nav-desc { display: block; font-size: 10px; color: #999; margin-top: 1px; }
 .gt-report-content { flex: 1; min-width: 0; padding: 12px 16px; overflow: auto; }
 </style>
