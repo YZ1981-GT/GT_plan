@@ -732,3 +732,119 @@ async def apply_all_formulas(
         await db.commit()
 
     return {"updated_sections": updated, "message": f"已更新 {updated} 个附注表格"}
+
+
+# ─── 数据汇总：按单位汇总附注/报表数据 ───────────────────────────────────────
+
+@router.post("/aggregate/{project_id}/{year}")
+async def aggregate_data(
+    project_id: str, year: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """汇总指定单位的数据到目标单元格
+    
+    mode=direct: 汇总当前节点的直接下级企业
+    mode=custom: 汇总用户选择的企业列表
+    """
+    section_id = body.get("section_id", "")
+    row_idx = body.get("row_idx", 0)
+    col_idx = body.get("col_idx", 1)
+    mode = body.get("mode", "direct")
+    company_code = body.get("company_code", "")
+    company_codes = body.get("company_codes", [])
+    standard = body.get("standard", "soe")
+    source = body.get("source", "same")
+
+    # 获取目标企业列表
+    target_codes = []
+    if mode == "direct":
+        # 从基本信息表获取直接下级
+        try:
+            result = await db.execute(
+                text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = 'info'"),
+                {"pid": project_id, "y": year},
+            )
+            row = result.fetchone()
+            if row and isinstance(row[0], dict):
+                info_rows = row[0].get("rows", [])
+                for r in info_rows:
+                    if r.get("company_code") and r.get("company_name"):
+                        # 直接下级 = parent_code 等于当前节点
+                        if not company_code or r.get("parent_code") == company_code:
+                            target_codes.append(r["company_code"])
+        except Exception:
+            pass
+    else:
+        target_codes = company_codes
+
+    if not target_codes:
+        return {"value": None, "count": 0, "message": "无下级企业"}
+
+    # 从各企业的已保存数据中提取同位置的值并汇总
+    total = 0
+    count = 0
+    for code in target_codes:
+        try:
+            # 查询该企业的附注数据
+            result = await db.execute(
+                text("SELECT data FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),
+                {"pid": project_id, "y": year, "sid": f"{section_id}_{code}"},
+            )
+            row = result.fetchone()
+            if row and isinstance(row[0], dict):
+                rows = row[0].get("rows", [])
+                if row_idx < len(rows) and col_idx < len(rows[row_idx]):
+                    val = rows[row_idx][col_idx]
+                    try:
+                        num = float(str(val).replace(",", "").replace("，", ""))
+                        total += num
+                        count += 1
+                    except (ValueError, TypeError):
+                        pass
+        except Exception:
+            pass
+
+    # 如果没有从附注数据中找到，尝试从试算表提取
+    if count == 0:
+        sections = _load_sections(standard)
+        template = None
+        for sec in sections:
+            if sec["section_id"] == section_id:
+                template = sec
+                break
+
+        if template:
+            item_name = ""
+            if template.get("rows") and row_idx < len(template["rows"]):
+                item_name = template["rows"][row_idx][0] if template["rows"][row_idx] else ""
+
+            if item_name:
+                for code in target_codes:
+                    try:
+                        params = {"pid": project_id, "y": year, "cc": code, "name": item_name.strip()}
+                        result = await db.execute(
+                            text("SELECT closing_balance, opening_balance FROM trial_balance_entries WHERE project_id = :pid AND year = :y AND company_code = :cc AND account_name = :name"),
+                            params,
+                        )
+                        row = result.fetchone()
+                        if row:
+                            headers = template.get("headers", [])
+                            col_header = headers[col_idx] if col_idx < len(headers) else ""
+                            h_clean = col_header.replace(" ", "")
+                            val = 0
+                            if "期末" in h_clean or "本期" in h_clean:
+                                val = float(row[0] or 0)
+                            elif "期初" in h_clean or "年初" in h_clean:
+                                val = float(row[1] or 0)
+                            if val:
+                                total += val
+                                count += 1
+                    except Exception:
+                        pass
+
+    return {
+        "value": round(total, 2) if count > 0 else None,
+        "count": count,
+        "message": f"已汇总 {count} 家企业",
+    }

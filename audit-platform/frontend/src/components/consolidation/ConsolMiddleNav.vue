@@ -14,7 +14,7 @@
     <div class="cm-tree">
       <el-tree :data="treeData" :props="{ label: 'label', children: 'children' }"
         node-key="key" default-expand-all highlight-current
-        @node-click="onNodeClick">
+        @node-click="onNodeClick" @node-contextmenu="onNodeContextMenu">
         <template #default="{ data }">
           <span class="cm-tree-node" :class="{ 'cm-tree-node--diff': data.isDiff, 'cm-tree-node--report': data.isReport }">
             <span class="cm-tree-icon">{{ data.icon }}</span>
@@ -30,6 +30,24 @@
       </el-tree>
       <el-empty v-if="!treeData.length" description="暂无合并范围数据" :image-size="40" />
     </div>
+
+    <!-- 树形右键菜单 -->
+    <Teleport to="body">
+      <Transition name="cm-ctx-fade">
+        <div v-if="treeContextMenu.visible" class="cm-context-menu"
+          :style="{ left: treeContextMenu.x + 'px', top: treeContextMenu.y + 'px' }"
+          @contextmenu.prevent>
+          <div class="cm-ctx-header">{{ treeContextMenu.nodeName }}</div>
+          <div class="cm-ctx-divider" />
+          <div class="cm-ctx-item" @click="treeCtxAggregateDirect"><span class="cm-ctx-icon">Σ</span> 直接下级汇总</div>
+          <div class="cm-ctx-item" @click="treeCtxAggregateCustom"><span class="cm-ctx-icon">📊</span> 自定义汇总</div>
+          <div class="cm-ctx-divider" />
+          <div class="cm-ctx-item" @click="treeCtxRefresh"><span class="cm-ctx-icon">🔄</span> 刷新数据</div>
+          <div class="cm-ctx-item" @click="treeCtxViewReport"><span class="cm-ctx-icon">📋</span> 查看报表</div>
+          <div class="cm-ctx-item" @click="treeCtxViewNote"><span class="cm-ctx-icon">📝</span> 查看附注</div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- 添加企业弹窗 -->
     <el-dialog v-model="showAddDialog" title="添加合并范围企业" width="500px" append-to-body>
@@ -89,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
@@ -281,6 +299,71 @@ function onNodeClick(data: any) {
   window.dispatchEvent(new CustomEvent('consol-tree-select', { detail: data }))
 }
 
+// ─── 树形右键菜单 ────────────────────────────────────────────────────────────
+const treeContextMenu = reactive({ visible: false, x: 0, y: 0, nodeName: '', nodeData: null as any })
+
+function onNodeContextMenu(e: MouseEvent, data: any) {
+  e.preventDefault()
+  e.stopPropagation()
+  if (!data.companyCode || data.isDiff) return
+  treeContextMenu.nodeName = data.label || ''
+  treeContextMenu.nodeData = data
+  setTimeout(() => {
+    treeContextMenu.x = e.clientX
+    treeContextMenu.y = e.clientY
+    treeContextMenu.visible = true
+  }, 0)
+}
+
+function closeTreeCtxMenu() { treeContextMenu.visible = false }
+
+function treeCtxAggregateDirect() {
+  closeTreeCtxMenu()
+  const data = treeContextMenu.nodeData
+  if (!data) return
+  window.dispatchEvent(new CustomEvent('consol-tree-aggregate', {
+    detail: { mode: 'direct', companyCode: data.companyCode, companyName: data.label }
+  }))
+}
+
+function treeCtxAggregateCustom() {
+  closeTreeCtxMenu()
+  const data = treeContextMenu.nodeData
+  if (!data) return
+  window.dispatchEvent(new CustomEvent('consol-tree-aggregate', {
+    detail: { mode: 'custom', companyCode: data.companyCode, companyName: data.label }
+  }))
+}
+
+function treeCtxRefresh() {
+  closeTreeCtxMenu()
+  if (treeContextMenu.nodeData) openRefreshDialog(treeContextMenu.nodeData)
+}
+
+function treeCtxViewReport() {
+  closeTreeCtxMenu()
+  const data = treeContextMenu.nodeData
+  if (!data) return
+  window.dispatchEvent(new CustomEvent('consol-tree-select', {
+    detail: { companyCode: data.companyCode, label: data.label, isReport: true, reportType: 'balance_sheet' }
+  }))
+}
+
+function treeCtxViewNote() {
+  closeTreeCtxMenu()
+  const data = treeContextMenu.nodeData
+  if (!data) return
+  // 切换到该企业 + 切换到附注 tab
+  window.dispatchEvent(new CustomEvent('consol-tree-select', {
+    detail: { companyCode: data.companyCode, label: data.label, switchTab: 'consol_note' }
+  }))
+}
+
+// 点击其他地方关闭
+function onDocClickTree(e: MouseEvent) {
+  if (!(e.target as HTMLElement)?.closest('.cm-context-menu')) closeTreeCtxMenu()
+}
+
 // ─── 刷新功能 ────────────────────────────────────────────────────────────────
 const showRefreshDialog = ref(false)
 const refreshing = ref(false)
@@ -353,7 +436,14 @@ function doAddCompany() {
   ElMessage.success('已添加到合并范围')
 }
 
-onMounted(() => loadTree())
+onMounted(() => {
+  loadTree()
+  document.addEventListener('click', onDocClickTree)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', onDocClickTree)
+})
 </script>
 
 <style scoped>
@@ -374,4 +464,23 @@ onMounted(() => loadTree())
 .cm-refresh-options { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
 .cm-refresh-sub { padding-left: 24px; display: flex; flex-direction: column; gap: 4px; }
 .cm-nav-footer { padding: 8px 12px; border-top: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0; }
+
+/* 树形右键菜单 */
+.cm-context-menu {
+  position: fixed; z-index: 10001; background: #fff;
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 180px;
+  border: 1px solid #e8e4f0;
+}
+.cm-ctx-header { padding: 6px 14px; font-size: 11px; color: #999; }
+.cm-ctx-divider { height: 1px; background: #f0edf5; margin: 2px 0; }
+.cm-ctx-item {
+  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #333;
+  display: flex; align-items: center; gap: 6px; transition: background 0.1s;
+}
+.cm-ctx-item:hover { background: #f0edf5; color: #4b2d77; }
+.cm-ctx-icon { width: 18px; text-align: center; }
+.cm-ctx-fade-enter-active { transition: opacity 0.1s, transform 0.1s; }
+.cm-ctx-fade-leave-active { transition: opacity 0.08s; }
+.cm-ctx-fade-enter-from { opacity: 0; transform: scale(0.95); }
+.cm-ctx-fade-leave-to { opacity: 0; }
 </style>

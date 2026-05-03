@@ -82,76 +82,6 @@
         </div>
       </el-tab-pane>
 
-      <!-- Tab 2: 差额表 -->
-      <el-tab-pane label="差额表" name="worksheet">
-        <div class="gt-tab-content">
-          <div style="display:flex;gap:12px;margin-bottom:12px;align-items:center">
-            <el-radio-group v-model="aggMode" size="small">
-              <el-radio-button value="self">本级</el-radio-button>
-              <el-radio-button value="children">直接下级</el-radio-button>
-              <el-radio-button value="descendants">全部下级</el-radio-button>
-            </el-radio-group>
-            <el-button type="warning" size="small" :loading="recalcLoading" @click="doRecalc">
-              重算差额表
-            </el-button>
-          </div>
-          <el-table :data="worksheetData" border stripe v-loading="loading" empty-text="暂无差额表数据" max-height="600">
-            <el-table-column prop="account_code" label="科目编码" width="120" fixed />
-            <el-table-column prop="account_name" label="科目名称" min-width="180" fixed />
-            <el-table-column prop="children_amount_sum" label="下级汇总" width="130" align="right" />
-            <el-table-column prop="adjustment_debit" label="调整借方" width="120" align="right" />
-            <el-table-column prop="adjustment_credit" label="调整贷方" width="120" align="right" />
-            <el-table-column prop="elimination_debit" label="抵消借方" width="120" align="right" />
-            <el-table-column prop="elimination_credit" label="抵消贷方" width="120" align="right" />
-            <el-table-column prop="net_difference" label="差额净额" width="120" align="right" />
-            <el-table-column prop="consolidated_amount" label="合并数" width="130" align="right">
-              <template #default="{ row }">
-                <span style="font-weight:600">{{ fmtAmt(row.consolidated_amount) }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </el-tab-pane>
-
-      <!-- Tab 4: 自定义查询 -->
-      <el-tab-pane label="自定义查询" name="pivot">
-        <div class="gt-tab-content">
-          <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-            <el-select v-model="pivotRowDim" size="small" style="width:130px" placeholder="行维度">
-              <el-option label="科目" value="account" />
-              <el-option label="企业" value="company" />
-            </el-select>
-            <el-select v-model="pivotColDim" size="small" style="width:130px" placeholder="列维度">
-              <el-option label="企业" value="company" />
-              <el-option label="科目" value="account" />
-            </el-select>
-            <el-select v-model="pivotValueField" size="small" style="width:150px" placeholder="值字段">
-              <el-option label="合并数" value="consolidated_amount" />
-              <el-option label="下级汇总" value="children_amount_sum" />
-              <el-option label="差额净额" value="net_difference" />
-            </el-select>
-            <el-switch v-model="pivotTranspose" active-text="转置" size="small" />
-            <el-button type="primary" size="small" :loading="loading" @click="doPivot">查询</el-button>
-            <el-button size="small" @click="doExportExcel">Excel 导出</el-button>
-          </div>
-
-          <!-- 模板管理 -->
-          <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-            <el-input v-model="templateName" size="small" placeholder="模板名称" style="width:180px" />
-            <el-button size="small" @click="doSaveTemplate" :disabled="!templateName.trim()">保存模板</el-button>
-            <el-select v-model="selectedTemplateId" size="small" style="width:200px" placeholder="加载模板" clearable
-              @change="onLoadTemplate">
-              <el-option v-for="t in templates" :key="t.id" :label="t.name" :value="t.id" />
-            </el-select>
-          </div>
-
-          <el-table v-if="pivotResult" :data="pivotResult.rows" border stripe v-loading="loading" max-height="500">
-            <el-table-column v-for="h in pivotResult.headers" :key="h" :prop="h" :label="h" min-width="120" align="right" />
-          </el-table>
-          <el-empty v-if="!pivotResult && !loading" description="点击查询按钮执行透视分析" />
-        </div>
-      </el-tab-pane>
-
       <!-- Tab 5: 合并报表 -->
       <el-tab-pane label="合并报表" name="consol_report">
         <div class="gt-tab-content">
@@ -483,6 +413,8 @@
           <div class="gt-cell-ctx-item" @click="copyCellFormula"><span class="gt-cell-ctx-icon">ƒx</span> 查看公式</div>
           <div class="gt-cell-ctx-item" @click="addCellComment"><span class="gt-cell-ctx-icon">💬</span> 添加批注</div>
           <div class="gt-cell-ctx-item" @click="markCellReviewed"><span class="gt-cell-ctx-icon">✅</span> 标记已复核</div>
+          <div class="gt-cell-ctx-divider" />
+          <div class="gt-cell-ctx-item" @click="openAggregateDialog"><span class="gt-cell-ctx-icon">Σ</span> 汇总</div>
           <div v-if="selectedCells.length > 1" class="gt-cell-ctx-divider" />
           <div v-if="selectedCells.length > 1" class="gt-cell-ctx-item" @click="sumSelectedCells">
             <span class="gt-cell-ctx-icon">Σ</span> 求和选中 <span style="color:#4b2d77;font-weight:600;margin-left:4px">{{ selectedCells.length }} 格</span>
@@ -740,6 +672,112 @@
       </template>
     </el-dialog>
 
+    <!-- 汇总弹窗 -->
+    <el-dialog v-model="showAggregateDialog" title="数据汇总" width="800px" append-to-body :z-index="10000" class="gt-comment-dialog">
+      <div class="gt-comment-info" style="margin-bottom:16px">
+        <div class="gt-comment-info-item" style="flex:2">
+          <span class="gt-comment-info-label">目标单元格</span>
+          <span class="gt-comment-info-value" style="font-size:14px">{{ aggTarget.itemName }} / {{ aggTarget.colName }}</span>
+        </div>
+        <div class="gt-comment-info-item">
+          <span class="gt-comment-info-label">当前值</span>
+          <span class="gt-comment-info-value gt-comment-info-value--primary">{{ aggTarget.currentValue || '-' }}</span>
+        </div>
+        <div class="gt-comment-info-item">
+          <span class="gt-comment-info-label">当前单位</span>
+          <span class="gt-comment-info-value">{{ currentConsolEntity.name || '集团' }}</span>
+        </div>
+      </div>
+
+      <el-radio-group v-model="aggTarget.mode" style="margin-bottom:14px;width:100%">
+        <el-radio value="direct" style="display:flex;align-items:flex-start;margin-bottom:12px;width:100%">
+          <div>
+            <b>直接下级汇总</b>
+            <p style="margin:2px 0 0;font-size:12px;color:#999">汇总当前合并节点的直接下级企业，取同表同行同列数据求和</p>
+          </div>
+        </el-radio>
+        <el-radio value="custom" style="display:flex;align-items:flex-start;width:100%">
+          <div>
+            <b>自定义汇总</b>
+            <p style="margin:2px 0 0;font-size:12px;color:#999">自由选择单位、数据表、坐标位置</p>
+          </div>
+        </el-radio>
+      </el-radio-group>
+
+      <!-- 自定义汇总详细设置 -->
+      <div v-if="aggTarget.mode === 'custom'" style="border:1px solid #e8e4f0;border-radius:8px;padding:14px;background:#faf9fc">
+        <div style="display:flex;gap:16px">
+          <!-- 左侧：选择单位 -->
+          <div style="flex:1;min-width:0">
+            <p style="font-size:12px;color:#666;margin:0 0 6px;font-weight:600">① 选择汇总单位</p>
+            <div style="border:1px solid #e8e4f0;border-radius:6px;padding:6px;max-height:200px;overflow-y:auto;background:#fff">
+              <el-tree :data="aggTreeData" :props="{ label: 'label', children: 'children' }"
+                show-checkbox node-key="key" ref="aggTreeRef"
+                default-expand-all>
+                <template #default="{ data }">
+                  <span style="font-size:12px">{{ data.icon }} {{ data.label }}
+                    <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px;font-size:10px">{{ data.ratio }}%</el-tag>
+                  </span>
+                </template>
+              </el-tree>
+            </div>
+          </div>
+          <!-- 右侧：选择数据来源和坐标 -->
+          <div style="width:280px;flex-shrink:0">
+            <p style="font-size:12px;color:#666;margin:0 0 6px;font-weight:600">② 数据来源</p>
+            <el-radio-group v-model="aggTarget.source" size="small" style="margin-bottom:10px">
+              <el-radio-button value="same">当前表格</el-radio-button>
+              <el-radio-button value="report">报表</el-radio-button>
+              <el-radio-button value="note">附注</el-radio-button>
+            </el-radio-group>
+
+            <div v-if="aggTarget.source === 'report'" style="margin-bottom:8px">
+              <el-select v-model="aggTarget.reportTypes" size="small" style="width:100%" placeholder="选择报表（可多选）" multiple collapse-tags>
+                <el-option label="全部报表" value="_all" />
+                <el-option label="资产负债表" value="balance_sheet" />
+                <el-option label="利润表" value="income_statement" />
+                <el-option label="现金流量表" value="cash_flow_statement" />
+                <el-option label="权益变动表" value="equity_statement" />
+                <el-option label="现金流附表" value="cash_flow_supplement" />
+                <el-option label="资产减值准备表" value="impairment_provision" />
+              </el-select>
+            </div>
+            <div v-if="aggTarget.source === 'note'" style="margin-bottom:8px">
+              <el-select v-model="aggTarget.noteSections" size="small" style="width:100%" placeholder="选择附注章节（可多选）" multiple collapse-tags filterable>
+                <el-option label="全部附注" value="_all" />
+                <el-option v-for="sec in aggNoteSections" :key="sec.section_id" :label="sec.title" :value="sec.section_id" />
+              </el-select>
+            </div>
+
+            <p style="font-size:12px;color:#666;margin:10px 0 6px;font-weight:600">③ 坐标位置（可选）</p>
+            <div style="display:flex;gap:8px">
+              <div style="flex:1">
+                <div style="font-size:10px;color:#999;margin-bottom:2px">行（项目名）</div>
+                <el-input v-model="aggTarget.rowName" size="small" placeholder="留空=整表" clearable />
+              </div>
+              <div style="flex:1">
+                <div style="font-size:10px;color:#999;margin-bottom:2px">列（表头名）</div>
+                <el-input v-model="aggTarget.colHeader" size="small" placeholder="留空=整表" clearable />
+              </div>
+            </div>
+            <p style="font-size:10px;color:#bbb;margin:4px 0 0">留空则汇总整张表格所有数据，填写则只汇总指定行列交叉位置</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作提示 -->
+      <div style="margin-top:14px;padding:10px 14px;background:#f8f6fb;border-radius:6px;font-size:13px;color:#666;line-height:1.6">
+        <b style="color:#4b2d77">💡 操作提示：</b>
+        <span v-if="aggTarget.mode === 'direct'">点击"执行汇总"后，系统将自动获取直接下级企业的数据并求和，结果填充到当前选中的单元格。执行前会弹出确认框。</span>
+        <span v-else>选择企业和数据来源后点击"执行汇总"，系统会弹出确认框显示汇总范围。坐标留空=汇总整表数据，填写=只汇总指定位置。</span>
+      </div>
+
+      <template #footer>
+        <el-button @click="showAggregateDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmAndExecuteAggregate" :loading="aggLoading">执行汇总</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 附注公式管理弹窗 -->
     <el-dialog v-model="showNoteFormulaDialog" :title="`公式管理 — ${selectedNoteSection?.title || ''}`" width="85%" top="4vh" append-to-body destroy-on-close :z-index="10000">
       <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
@@ -818,9 +856,8 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  getWorksheetTree, recalcWorksheet, getWorksheetAggregate,
-  executePivotQuery, exportPivotExcel, saveQueryTemplate, listQueryTemplates,
-  type WorksheetNode, type PivotResult, type QueryTemplate,
+  getWorksheetTree,
+  type WorksheetNode,
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import http from '@/utils/http'
@@ -834,7 +871,6 @@ const year = computed(() => Number(route.query.year) || new Date().getFullYear()
 
 const activeTab = ref('worksheets')
 const loading = ref(false)
-const recalcLoading = ref(false)
 
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
 const projectInfo = reactive({
@@ -1077,102 +1113,6 @@ function onTreeNodeClick(data: any) {
 
 function goToProject(node: any) {
   router.push('/consolidation')
-}
-
-// ─── Tab 2: 差额表 ──────────────────────────────────────────────────────────
-const worksheetData = ref<any[]>([])
-const aggMode = ref('self')
-
-async function loadWorksheet() {
-  if (!selectedNode.value?.company_code) {
-    worksheetData.value = []
-    return
-  }
-  loading.value = true
-  try {
-    const res = await getWorksheetAggregate(projectId.value, year.value, selectedNode.value.company_code, aggMode.value)
-    worksheetData.value = Array.isArray(res?.data) ? res.data : []
-  } catch { worksheetData.value = [] }
-  finally { loading.value = false }
-}
-
-async function doRecalc() {
-  recalcLoading.value = true
-  try {
-    await recalcWorksheet(projectId.value, year.value)
-    ElMessage.success('差额表重算完成')
-    await loadWorksheet()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '重算失败')
-  } finally { recalcLoading.value = false }
-}
-
-watch(aggMode, () => loadWorksheet())
-
-// ─── Tab 4: 自定义查询 ──────────────────────────────────────────────────────
-const pivotRowDim = ref('account')
-const pivotColDim = ref('company')
-const pivotValueField = ref('consolidated_amount')
-const pivotTranspose = ref(false)
-const pivotResult = ref<PivotResult | null>(null)
-const templates = ref<QueryTemplate[]>([])
-const templateName = ref('')
-const selectedTemplateId = ref('')
-
-async function doPivot() {
-  loading.value = true
-  try {
-    pivotResult.value = await executePivotQuery(projectId.value, year.value, {
-      row_dimension: pivotRowDim.value,
-      col_dimension: pivotColDim.value,
-      value_field: pivotValueField.value,
-      transpose: pivotTranspose.value,
-      node_company_code: selectedNode.value?.company_code,
-      aggregation_mode: aggMode.value,
-    })
-  } catch (e: any) {
-    ElMessage.error(e?.message || '查询失败')
-  } finally { loading.value = false }
-}
-
-function doExportExcel() {
-  exportPivotExcel(projectId.value, year.value, {
-    row_dimension: pivotRowDim.value,
-    col_dimension: pivotColDim.value,
-    value_field: pivotValueField.value,
-    transpose: pivotTranspose.value,
-    aggregation_mode: aggMode.value,
-  })
-}
-
-async function doSaveTemplate() {
-  try {
-    await saveQueryTemplate(projectId.value, templateName.value, {
-      row_dimension: pivotRowDim.value,
-      col_dimension: pivotColDim.value,
-      value_field: pivotValueField.value,
-      transpose: pivotTranspose.value,
-      aggregation_mode: aggMode.value,
-    })
-    ElMessage.success('模板已保存')
-    templateName.value = ''
-    await loadTemplates()
-  } catch { ElMessage.error('保存失败') }
-}
-
-async function loadTemplates() {
-  try { templates.value = await listQueryTemplates(projectId.value) }
-  catch { templates.value = [] }
-}
-
-function onLoadTemplate(id: string) {
-  const t = templates.value.find(x => x.id === id)
-  if (!t) return
-  pivotRowDim.value = t.row_dimension
-  pivotColDim.value = t.col_dimension
-  pivotValueField.value = t.value_field
-  pivotTranspose.value = t.transpose
-  aggMode.value = t.aggregation_mode
 }
 
 function fmtAmt(v: any): string {
@@ -1588,6 +1528,145 @@ function markCellReviewed() {
   closeCellContextMenu()
   const count = selectedCells.value.length
   ElMessage.success(`已标记 ${count} 个单元格为已复核`)
+}
+
+// ─── 汇总功能 ────────────────────────────────────────────────────────────────
+const showAggregateDialog = ref(false)
+const aggLoading = ref(false)
+const aggTreeRef = ref<any>(null)
+const aggTarget = reactive({
+  itemName: '', colName: '', currentValue: '',
+  mode: 'direct' as 'direct' | 'custom',
+  source: 'same' as 'same' | 'report' | 'note',
+  reportTypes: [] as string[],
+  noteSections: [] as string[],
+  rowName: '',
+  colHeader: '',
+})
+
+// 汇总用的树形数据（从 groupTree + 基本信息表获取）
+const aggTreeData = computed(() => {
+  function buildAggNode(node: any): any {
+    return {
+      key: node.company_code || 'root',
+      label: node.company_name || node.name,
+      icon: node.children?.length ? '🏢' : '🏠',
+      ratio: node.shareholding,
+      children: (node.children || []).map(buildAggNode),
+    }
+  }
+  const tree = groupTree.value.map(buildAggNode)
+  // 如果树只有根节点没有子级，从 selectedNoteSection 的 editRows 中提取项目名作为提示
+  if (tree.length === 1 && !tree[0].children?.length) {
+    // 尝试从基本信息表补充
+    // （树形数据由 ConsolMiddleNav 管理，这里只是展示用）
+  }
+  return tree
+})
+
+// 附注章节列表（用于自定义汇总选择数据来源）
+const aggNoteSections = computed(() => {
+  const sections: { section_id: string; title: string }[] = []
+  for (const group of consolNoteTree.value) {
+    for (const child of (group.children || [])) {
+      sections.push({ section_id: child.section_id || child.key, title: child.title || child.label })
+    }
+  }
+  return sections
+})
+
+function openAggregateDialog() {
+  closeCellContextMenu()
+  if (!selectedCells.value.length) { ElMessage.warning('请先选中单元格'); return }
+  const c = selectedCells.value[0]
+  const sec = selectedNoteSection.value
+  aggTarget.itemName = sec?.editRows?.[c.row]?.[0] || ''
+  aggTarget.colName = sec?.headers?.[c.col] || ''
+  aggTarget.currentValue = c.value || ''
+  aggTarget.mode = 'direct'
+  aggTarget.source = 'same'
+  aggTarget.rowName = ''  // 留空=整表汇总
+  aggTarget.colHeader = ''  // 留空=整表汇总
+  showAggregateDialog.value = true
+}
+
+async function confirmAndExecuteAggregate() {
+  // 构建确认信息
+  let confirmMsg = ''
+  if (aggTarget.mode === 'direct') {
+    confirmMsg = `将汇总 "${currentConsolEntity.value.name || '集团'}" 的直接下级企业数据，结果填充到 "${aggTarget.itemName} / ${aggTarget.colName}"。`
+  } else {
+    const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
+    const names = checkedNodes.map((n: any) => n.label).filter((l: string) => l).join('、')
+    const sourceLabel = aggTarget.source === 'same' ? '当前表格' : aggTarget.source === 'report' ? '报表' : '附注'
+    confirmMsg = `将汇总以下 ${checkedNodes.length} 家企业的${sourceLabel}数据：\n${names || '未选择'}\n\n结果填充到 "${aggTarget.itemName} / ${aggTarget.colName}"。`
+  }
+
+  try {
+    const { ElMessageBox } = await import('element-plus')
+    await ElMessageBox.confirm(confirmMsg, '确认执行汇总', {
+      type: 'info',
+      confirmButtonText: '确认汇总',
+      cancelButtonText: '返回修改',
+    })
+    await executeAggregate()
+  } catch { /* cancelled */ }
+}
+
+async function executeAggregate() {
+  aggLoading.value = true
+  try {
+    const sec = selectedNoteSection.value
+    if (!sec) return
+    const c = selectedCells.value[0]
+    if (!c) return
+
+    if (aggTarget.mode === 'direct') {
+      // 直接下级汇总：从基本信息表获取直接下级企业，汇总同位置数据
+      const entityCode = currentConsolEntity.value.code || ''
+      const { data } = await http.post(`/api/consol-note-sections/aggregate/${projectId.value}/${year.value}`, {
+        section_id: sec.section_id,
+        row_idx: c.row,
+        col_idx: c.col,
+        company_code: entityCode,
+        mode: 'direct',
+        standard: consolNoteTemplateType.value,
+      }, { validateStatus: (s: number) => s < 600 })
+      const result = data?.data ?? data
+      if (result?.value != null) {
+        sec.editRows[c.row][c.col] = String(result.value)
+        ElMessage.success(`已汇总 ${result.count || 0} 家直接下级，合计：${fmtAmt(result.value)}`)
+      } else {
+        ElMessage.info('暂无下级数据可汇总')
+      }
+    } else {
+      // 自定义汇总
+      const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
+      if (!checkedNodes.length) { ElMessage.warning('请选择要汇总的单位'); aggLoading.value = false; return }
+      const companyCodes = checkedNodes.map((n: any) => n.key).filter((k: string) => k !== 'root')
+      const { data } = await http.post(`/api/consol-note-sections/aggregate/${projectId.value}/${year.value}`, {
+        section_id: aggTarget.source === 'same' ? sec.section_id : (aggTarget.source === 'note' ? aggTarget.noteSection : sec.section_id),
+        row_idx: c.row,
+        col_idx: c.col,
+        company_codes: companyCodes,
+        mode: 'custom',
+        source: aggTarget.source,
+        report_types: aggTarget.reportTypes,
+        note_sections: aggTarget.noteSections,
+        standard: consolNoteTemplateType.value,
+      }, { validateStatus: (s: number) => s < 600 })
+      const result = data?.data ?? data
+      if (result?.value != null) {
+        sec.editRows[c.row][c.col] = String(result.value)
+        ElMessage.success(`已汇总 ${companyCodes.length} 家企业，合计：${fmtAmt(result.value)}`)
+      } else {
+        ElMessage.info('暂无数据可汇总')
+      }
+    }
+    showAggregateDialog.value = false
+  } catch {
+    ElMessage.info('汇总功能需要后端配合，当前为预留接口')
+  } finally { aggLoading.value = false }
 }
 
 function traceToSource() {
@@ -2108,21 +2187,48 @@ function onConsolTreeSelect(e: Event) {
     consolReportType.value = data.reportType
     loadConsolReport()
   } else if (data.isDiff) {
-    // 点击了差额表节点 → 切换到差额表 tab
-    activeTab.value = 'worksheet'
+    // 差额表节点 → 切换到合并报表 tab
+    activeTab.value = 'consol_report'
     if (data.companyCode) {
       selectedNode.value = { company_code: data.companyCode, company_name: data.label }
-      loadWorksheet()
     }
   } else if (data.companyCode) {
-    // 点击了企业节点 → 选中该节点，刷新报表/附注/差额表
+    // 点击了企业节点 → 选中该节点，刷新报表/附注
     selectedNode.value = { company_code: data.companyCode, company_name: data.label }
     currentConsolEntity.value = { code: data.companyCode, name: data.label }
+    // 如果指定了切换 tab
+    if (data.switchTab) {
+      activeTab.value = data.switchTab
+    }
     // 刷新当前 tab 数据
-    if (activeTab.value === 'worksheet') loadWorksheet()
-    else if (activeTab.value === 'consol_report') loadConsolReport()
+    if (activeTab.value === 'consol_report') loadConsolReport()
     else if (activeTab.value === 'consol_note') loadConsolNoteTree()
   }
+}
+
+// 树形右键汇总事件
+function onTreeAggregate(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (!detail) return
+  currentConsolEntity.value = { code: detail.companyCode, name: detail.companyName }
+  selectedNode.value = { company_code: detail.companyCode, company_name: detail.companyName }
+  const sec = selectedNoteSection.value
+  if (sec) {
+    aggTarget.itemName = sec.editRows?.[0]?.[0] || ''
+    aggTarget.colName = sec.headers?.[1] || ''
+    aggTarget.currentValue = ''
+  } else {
+    aggTarget.itemName = '（请先选择附注表格）'
+    aggTarget.colName = ''
+    aggTarget.currentValue = ''
+  }
+  aggTarget.mode = detail.mode || 'direct'
+  aggTarget.source = 'same'
+  aggTarget.rowName = ''
+  aggTarget.colHeader = ''
+  aggTarget.reportTypes = []
+  aggTarget.noteSections = []
+  showAggregateDialog.value = true
 }
 
 onMounted(async () => {
@@ -2130,11 +2236,11 @@ onMounted(async () => {
   // 默认合并主体为项目本身（集团层面）
   currentConsolEntity.value = { code: '', name: projectInfo.clientName || '' }
   await loadGroupTree()
-  await loadTemplates()
   window.addEventListener('consol-tree-select', onConsolTreeSelect)
   window.addEventListener('consol-catalog-select', onConsolCatalogSelect)
   window.addEventListener('consol-refresh-entity', onConsolRefreshEntity)
   window.addEventListener('consol-note-audit-all', onNoteAuditAll)
+  window.addEventListener('consol-tree-aggregate', onTreeAggregate)
   document.addEventListener('keydown', onGlobalKeydown)
   document.addEventListener('click', onDocClick)
 })
@@ -2144,6 +2250,7 @@ onUnmounted(() => {
   window.removeEventListener('consol-catalog-select', onConsolCatalogSelect)
   window.removeEventListener('consol-refresh-entity', onConsolRefreshEntity)
   window.removeEventListener('consol-note-audit-all', onNoteAuditAll)
+  window.removeEventListener('consol-tree-aggregate', onTreeAggregate)
   document.removeEventListener('keydown', onGlobalKeydown)
   document.removeEventListener('click', onDocClick)
 })
@@ -2185,9 +2292,6 @@ function onConsolRefreshEntity(e: Event) {
   if (types.includes('notes')) {
     loadConsolNoteTree(true)
   }
-  if (types.includes('worksheet')) {
-    loadWorksheet()
-  }
 }
 
 // 监听四栏 catalog 选择事件
@@ -2221,11 +2325,16 @@ function onConsolCatalogSelect(e: Event) {
 }
 
 watch(activeTab, (tab) => {
-  if (tab === 'worksheet') loadWorksheet()
   if (tab === 'consol_report') loadConsolReport()
   if (tab === 'consol_note' && !consolNoteTree.value.length) loadConsolNoteTree()
 })
 </script>
+
+<style>
+/* 全局：确保 MessageBox 和 Select 下拉在所有弹窗之上 */
+.el-overlay.is-message-box { z-index: 10010 !important; }
+.el-select__popper { z-index: 10005 !important; }
+</style>
 
 <style scoped>
 .gt-consol { padding: 12px; overflow: hidden; }
