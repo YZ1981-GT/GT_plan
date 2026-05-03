@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-disclosure-editor gt-fade-in">
+  <div class="gt-disclosure-editor gt-fade-in" :class="{ 'gt-de-fullscreen': deFullscreen }">
     <!-- 横幅 -->
     <div class="gt-de-banner">
       <div class="gt-de-banner-row1">
@@ -35,6 +35,12 @@
         </div>
       </div>
       <div class="gt-de-banner-row2">
+        <el-tooltip content="复制当前表格" placement="bottom">
+          <el-button size="small" @click="copyNoteTable">📋 复制</el-button>
+        </el-tooltip>
+        <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
+          <el-button size="small" @click="deFullscreen = !deFullscreen">{{ deFullscreen ? '退出全屏' : '全屏' }}</el-button>
+        </el-tooltip>
         <el-button size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
         <el-button size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
         <el-button size="small" @click="showNoteImport = true">📥 Excel导入</el-button>
@@ -315,7 +321,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
@@ -1149,10 +1155,38 @@ onMounted(async () => {
     await onGenerate()
   }
 })
+
+// ─── 全屏与复制 ──────────────────────────────────────────────────────────────
+const deFullscreen = ref(false)
+
+function copyNoteTable() {
+  const note = currentNote.value
+  if (!note?.table_data?.rows?.length) { ElMessage.warning('当前章节无表格数据'); return }
+  const headers = note.table_data.headers || []
+  const rows = note.table_data.rows || []
+  const text = [headers.join('\t'), ...rows.map((r: any) => (r.values || []).join('\t'))].join('\n')
+  const html = `<table border="1"><tr>${headers.map((h: string) => `<th>${h}</th>`).join('')}</tr>${rows.map((r: any) => `<tr>${(r.values || []).map((v: any) => `<td>${v ?? ''}</td>`).join('')}</tr>`).join('')}</table>`
+  try {
+    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    ElMessage.success(`已复制 ${rows.length} 行，可粘贴到 Word/Excel`)
+  } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
+}
+
+function onDeKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && deFullscreen.value) deFullscreen.value = false
+}
+onMounted(() => document.addEventListener('keydown', onDeKeydown))
+onUnmounted(() => document.removeEventListener('keydown', onDeKeydown))
 </script>
 
 <style scoped>
 .gt-disclosure-editor { padding: 16px; }
+
+/* 全屏 */
+.gt-de-fullscreen {
+  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 9999; background: #fff; overflow: auto; padding: 12px;
+}
 
 /* ── 横幅 ── */
 .gt-de-banner {
