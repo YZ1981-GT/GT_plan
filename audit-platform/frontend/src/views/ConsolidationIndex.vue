@@ -660,7 +660,36 @@ onMounted(async () => {
   await loadGroupTree()
   await loadTemplates()
   window.addEventListener('consol-tree-select', onConsolTreeSelect)
+  window.addEventListener('consol-catalog-select', onConsolCatalogSelect)
 })
+
+// 监听四栏 catalog 选择事件
+function onConsolCatalogSelect(e: Event) {
+  const data = (e as CustomEvent).detail
+  if (!data) return
+  if (data.type === 'report' && data.reportType) {
+    activeTab.value = 'consol_report'
+    consolReportType.value = data.reportType
+    if (data.standard) consolReportTemplateType.value = data.standard
+    loadConsolReport()
+  } else if (data.type === 'note' && data.sectionId) {
+    activeTab.value = 'consol_note'
+    if (data.standard) consolNoteTemplateType.value = data.standard
+    // 加载附注树后选中对应节点
+    loadConsolNoteTree().then(() => {
+      // 查找并选中对应章节
+      const findSection = (nodes: any[]): any => {
+        for (const n of nodes) {
+          if (n.section_id === data.sectionId || n.key === `note_${data.sectionId}`) return n
+          if (n.children) { const found = findSection(n.children); if (found) return found }
+        }
+        return null
+      }
+      const section = findSection(consolNoteTree.value)
+      if (section) selectedNoteSection.value = section
+    })
+  }
+}
 
 watch(activeTab, (tab) => {
   if (tab === 'worksheet') loadWorksheet()

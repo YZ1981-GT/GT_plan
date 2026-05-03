@@ -4,7 +4,9 @@
       <span class="cm-nav-title">合并节点</span>
       <div style="display:flex;gap:4px">
         <el-button size="small" type="primary" @click="showAddDialog = true">+ 添加</el-button>
-        <el-button size="small" @click="loadTree" :loading="loading">🔄</el-button>
+        <el-tooltip content="从项目数据同步合并范围企业" placement="bottom">
+          <el-button size="small" @click="syncFromProject" :loading="loading">🔄 同步</el-button>
+        </el-tooltip>
       </div>
     </div>
 
@@ -115,20 +117,13 @@ const treeData = computed(() => {
         companyCode: node.company_code,
       })
     }
-    // 每个节点下加报表类型
-    const reportChildren = [
-      { key: `${node.company_code}_bs`, label: '资产负债表', icon: '📋', isReport: true, reportType: 'balance_sheet', companyCode: node.company_code },
-      { key: `${node.company_code}_is`, label: '利润表', icon: '📈', isReport: true, reportType: 'income_statement', companyCode: node.company_code },
-      { key: `${node.company_code}_cf`, label: '现金流量表', icon: '💰', isReport: true, reportType: 'cash_flow_statement', companyCode: node.company_code },
-      { key: `${node.company_code}_eq`, label: '权益变动表', icon: '📊', isReport: true, reportType: 'equity_statement', companyCode: node.company_code },
-    ]
     return {
       key: node.company_code || 'root',
       label: node.company_name || node.name,
       icon: children.length ? '🏢' : '🏠',
       ratio: node.shareholding,
       companyCode: node.company_code,
-      children: [...children, ...reportChildren],
+      children: children.length ? children : undefined,
     }
   }
 
@@ -140,12 +135,6 @@ const treeData = computed(() => {
         key: mc.code, label: mc.name, icon: '🏠',
         ratio: mc.ratio, companyCode: mc.code,
         parentCode: mc.parentCode,
-        children: [
-          { key: `${mc.code}_bs`, label: '资产负债表', icon: '📋', isReport: true, reportType: 'balance_sheet', companyCode: mc.code },
-          { key: `${mc.code}_is`, label: '利润表', icon: '📈', isReport: true, reportType: 'income_statement', companyCode: mc.code },
-          { key: `${mc.code}_cf`, label: '现金流量表', icon: '💰', isReport: true, reportType: 'cash_flow_statement', companyCode: mc.code },
-          { key: `${mc.code}_eq`, label: '权益变动表', icon: '📊', isReport: true, reportType: 'equity_statement', companyCode: mc.code },
-        ],
       }
       // 找到父节点插入
       const parentNode = mc.parentCode ? findNode(root, mc.parentCode) : null
@@ -239,7 +228,5 @@ onMounted(() => loadTree())
 .cm-tree-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cm-tree-node--diff { color: #e6a23c; font-style: italic; }
 .cm-tree-node--diff .cm-tree-label { color: #e6a23c; }
-.cm-tree-node--report { color: #999; font-size: 11px; }
-.cm-tree-node--report .cm-tree-icon { font-size: 12px; }
 .cm-nav-footer { padding: 8px 12px; border-top: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0; }
 </style>

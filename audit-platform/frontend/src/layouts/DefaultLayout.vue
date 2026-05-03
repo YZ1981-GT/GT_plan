@@ -15,9 +15,11 @@
     </template>
 
     <template #catalog>
+      <!-- 合并模块：报表+附注目录 -->
+      <ConsolCatalog v-if="isConsolRoute" />
       <!-- 四栏模式：功能目录 -->
       <FourColumnCatalog
-        v-if="selectedProject"
+        v-else-if="selectedProject"
         :project="selectedProject"
         :active-catalog="activeCatalog"
         @select="onCatalogSelect"
@@ -59,6 +61,7 @@ import FourColumnCatalog from '@/components/layout/FourColumnCatalog.vue'
 import FourColumnContent from '@/components/layout/FourColumnContent.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
+import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 
 const route = useRoute()
