@@ -12,8 +12,8 @@
           <el-option label="国企版" value="soe" />
           <el-option label="上市版" value="listed" />
         </el-select>
-        <el-button size="small" style="margin-left:8px;color:rgba(255,255,255,0.9);border-color:rgba(255,255,255,0.3)" @click="showConsolConversion = true">🔄 转换规则</el-button>
-        <el-button size="small" style="color:rgba(255,255,255,0.9);border-color:rgba(255,255,255,0.3)" @click="onOpenFormula">ƒx 公式</el-button>
+        <el-button size="small" class="gt-bar-btn" @click="showConsolConversion = true">🔄 转换规则</el-button>
+        <el-button size="small" class="gt-bar-btn" @click="onOpenFormula">ƒx 公式</el-button>
       </div>
     </div>
 
@@ -743,6 +743,11 @@ watch(activeTab, (tab) => {
 .gt-consol-bar-back:hover { background: rgba(255,255,255,0.12) !important; color: #fff !important; }
 .gt-consol-bar-info { display: flex; align-items: center; }
 .gt-consol-bar-name { font-size: 16px; font-weight: 600; color: #fff; }
+.gt-bar-btn {
+  margin-left: 6px; background: transparent !important; color: rgba(255,255,255,0.9) !important;
+  border-color: rgba(255,255,255,0.3) !important;
+}
+.gt-bar-btn:hover { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.5) !important; }
 .gt-tab-content { padding: var(--gt-space-3) 0; }
 .gt-structure-layout { display: flex; gap: 24px; }
 .gt-structure-tree { flex: 1; min-width: 300px; }

@@ -1,11 +1,16 @@
 <template>
   <div class="cc-catalog">
-    <!-- 标题行：报表/附注 tab + 国企/上市切换 -->
+    <!-- 标题行：报表/附注 tab + 全部刷新 -->
     <div class="cc-header">
       <el-tabs v-model="activeTab" size="small" class="cc-header-tabs">
         <el-tab-pane label="报表" name="reports" />
         <el-tab-pane label="附注" name="notes" />
       </el-tabs>
+      <el-tooltip content="从项目中提取所有报表和附注数据" placement="bottom">
+        <el-button size="small" circle @click="refreshAll" :loading="refreshing" style="flex-shrink:0">
+          <span style="font-size:12px">🔄</span>
+        </el-button>
+      </el-tooltip>
     </div>
 
     <!-- 内容区 -->
@@ -17,6 +22,7 @@
           <template #default="{ data }">
             <span class="cc-tree-node">
               <span>{{ data.icon }} {{ data.label }}</span>
+              <el-button size="small" link class="cc-refresh-btn" @click.stop="refreshSingle('report', data)" title="从项目提取">🔄</el-button>
             </span>
           </template>
         </el-tree>
@@ -30,6 +36,7 @@
           <template #default="{ data }">
             <span class="cc-tree-node">
               <span>{{ data.label }}</span>
+              <el-button v-if="data.sectionId" size="small" link class="cc-refresh-btn" @click.stop="refreshSingle('note', data)" title="从项目提取">🔄</el-button>
               <el-tag v-if="data.tableCount" size="small" type="info" style="margin-left:4px">{{ data.tableCount }}表</el-tag>
             </span>
           </template>
@@ -42,6 +49,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
 const route = useRoute()
@@ -132,6 +140,33 @@ function onNoteClick(data: any) {
   }
 }
 
+const refreshing = ref(false)
+
+async function refreshAll() {
+  refreshing.value = true
+  try {
+    // 通知右侧刷新所有报表和附注
+    window.dispatchEvent(new CustomEvent('consol-catalog-select', {
+      detail: { type: 'refresh-all', standard: standard.value }
+    }))
+    await loadData()
+    ElMessage.success('已刷新所有报表和附注数据')
+  } finally { refreshing.value = false }
+}
+
+function refreshSingle(type: string, data: any) {
+  window.dispatchEvent(new CustomEvent('consol-catalog-select', {
+    detail: {
+      type: `refresh-${type}`,
+      reportType: data.type,
+      sectionId: data.sectionId,
+      label: data.label || data.fullTitle,
+      standard: standard.value,
+    }
+  }))
+  ElMessage.success(`正在从项目提取: ${data.label || data.fullTitle}`)
+}
+
 onMounted(() => loadData())
 </script>
 
@@ -147,5 +182,7 @@ onMounted(() => loadData())
 .cc-standard-switch { flex-shrink: 0; }
 .cc-content { flex: 1; overflow-y: auto; }
 .cc-tree { padding: 6px; }
-.cc-tree-node { display: flex; align-items: center; font-size: 12px; }
+.cc-tree-node { display: flex; align-items: center; font-size: 12px; width: 100%; }
+.cc-refresh-btn { opacity: 0; transition: opacity 0.15s; margin-left: auto; font-size: 11px; padding: 0 4px; }
+.cc-tree-node:hover .cc-refresh-btn { opacity: 1; }
 </style>

@@ -176,9 +176,14 @@
       >
         <div class="gt-catalog-header">
           <span class="gt-catalog-title">{{ catalogTitle }}</span>
-          <el-icon class="gt-catalog-collapse" @click="catalogCollapsed = true" :size="14" title="收起"><DArrowLeft /></el-icon>
         </div>
         <slot name="catalog" />
+        <div class="gt-catalog-bottom">
+          <div class="gt-nav-item" @click="catalogCollapsed = true" title="收起">
+            <el-icon :size="18"><DArrowLeft /></el-icon>
+            <span class="gt-nav-label">收起</span>
+          </div>
+        </div>
       </section>
       <!-- 第3栏收起态 -->
       <div
@@ -765,12 +770,11 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--gt-color-text);
 }
-.gt-catalog-collapse {
-  cursor: pointer;
-  color: var(--gt-color-text-tertiary);
-  transition: color var(--gt-transition-fast);
+.gt-catalog-bottom {
+  border-top: 1px solid var(--gt-color-border-light);
+  padding: var(--gt-space-1);
+  flex-shrink: 0;
 }
-.gt-catalog-collapse:hover { color: var(--gt-color-primary); }
 
 .gt-catalog-collapsed {
   width: 24px;

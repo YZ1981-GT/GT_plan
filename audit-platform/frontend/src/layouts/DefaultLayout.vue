@@ -90,6 +90,7 @@ watch(() => route.params.projectId, async (pid) => {
 
 const catalogTitle = computed(() => {
   if (!fourCol.value) return ''
+  if (isConsolRoute.value) return '报表附注'
   const titles: Record<string, string> = {
     reports: '报表', notes: '附注', workpapers: '底稿',
     adjustments: '调整分录', trial_balance: '试算表',
