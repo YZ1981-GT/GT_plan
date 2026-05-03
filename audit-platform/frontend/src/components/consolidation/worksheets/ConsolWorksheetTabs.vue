@@ -48,7 +48,7 @@
         @save="onSave('净资产表', $event)" @open-formula="onOpenFormula"
         @restore-defaults="data.netAsset = buildNetAsset()" />
       <EquitySimSheet v-else-if="activeSheet === 'equity_sim'" :companies="companyColumns"
-        :direct-rows="data.equitySimDirect" :indirect-sections="data.equitySimIndirect"
+        :direct-rows="data.equitySimDirect" :indirect-sections="computedIndirectSections"
         :net-asset-data="data.netAsset"
         @save="onSave('模拟权益法', $event)" @open-formula="onOpenFormula" />
       <EliminationSheet v-else-if="activeSheet === 'elimination'" :companies="companyColumns"
@@ -472,6 +472,19 @@ const indirectCompanyList = computed(() => {
       name: r.company_name, code: r.company_code,
       ratio: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
     }))
+})
+
+// 间接持股模拟 sections（computed，从基本信息表动态生成）
+const computedIndirectSections = computed(() => {
+  // 优先使用已保存的数据
+  if (data.equitySimIndirect.length > 0) return data.equitySimIndirect
+  // 否则从间接持股企业列表自动生成
+  return indirectCompanyList.value.map(c => ({
+    companyName: c.name,
+    ratio: c.ratio,
+    rows: buildEquitySim(),
+    endLongInvest: 0, endNetAssetShare: 0, difference: 0, diffReason: '',
+  }))
 })
 
 const elimSummaryForCapital = computed(() => {
