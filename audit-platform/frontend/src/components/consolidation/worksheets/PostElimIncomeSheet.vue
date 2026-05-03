@@ -10,7 +10,7 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>自动汇总：各家账面投资收益 + 权益法模拟投资收益 - 还原分红 - 合并抵消投资收益 = 抵消后投资收益（合并利润表列示数）。</span>
+      <span>自动汇总：各家账面投资收益 + 权益法模拟投资收益 - 还原分红 - 合并抵消投资收益 = 抵消后投资收益（合并利润表列示数）。<b>可编辑覆盖自动值</b>。</span>
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"

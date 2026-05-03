@@ -16,7 +16,7 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>内部交易抵消（利润表科目）。卖方收入 = 买方成本，差异需说明。存货中未实现内部利润需单独抵消。</span>
+      <span>内部交易抵消（利润表科目）。卖方收入 = 买方成本，差异需说明。存货中未实现内部利润需单独抵消。<b>导出模板后按格式填写，导入时追加到现有数据</b>，读取"数据填写"工作表。</span>
     </div>
 
     <el-table :data="rows" border size="small" class="ws-table"

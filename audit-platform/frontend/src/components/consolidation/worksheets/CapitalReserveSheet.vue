@@ -12,6 +12,9 @@
         <el-button size="small" @click="$emit('save', tableData)">💾 保存</el-button>
       </div>
     </div>
+    <div class="ws-tip" v-show="!isFullscreen">
+      <span>从合并抵消分录按科目提取资本公积变动，核查勾稽关系。合计=抵消环节+母公司+各子企业。底部与合并报表期末数比对差异。<b>点击"从抵消分录提取"自动填充</b>。</span>
+    </div>
 
     <el-table :data="tableData" border size="small" class="ws-table" max-height="calc(100vh - 300px)"
       :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName">
@@ -219,6 +222,8 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-subtitle { font-size: 12px; color: #999; margin: 0; flex-basis: 100%; }
 .ws-sheet-actions { display: flex; gap: 8px; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 8px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
+.ws-tip b { color: #4b2d77; }
 .ws-section-title { font-size: 13px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 6px 10px; background: #f8f6fb; border-radius: 4px; }
 .ws-computed { color: #4b2d77; font-weight: 500; }
 .ws-bold { font-weight: 700; }

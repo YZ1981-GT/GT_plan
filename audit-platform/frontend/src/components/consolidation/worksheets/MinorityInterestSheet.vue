@@ -10,7 +10,7 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>各家期末净资产 × 少数股东比例(1-母公司持股比例) = 少数股东权益；当期净利润 × 少数股东比例 = 少数股东损益。与合并抵消分录中的少数股东权益/损益交叉校验。</span>
+      <span>各家期末净资产 × 少数股东比例(1-母公司持股比例) = 少数股东权益；当期净利润 × 少数股东比例 = 少数股东损益。与合并抵消分录中的少数股东权益/损益交叉校验。<b>可编辑覆盖自动值</b>。</span>
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"

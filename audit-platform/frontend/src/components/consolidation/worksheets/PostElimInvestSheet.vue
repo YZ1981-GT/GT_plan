@@ -12,7 +12,7 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>自动汇总：各家账面长投 + 权益法模拟调整 - 合并抵消 = 抵消后长投（合并报表列示数）。全资子公司抵消后应为0。数据来源于投资明细表、模拟权益法表和合并抵消分录表。</span>
+      <span>自动汇总：各家账面长投 + 权益法模拟调整 - 合并抵消 = 抵消后长投（合并报表列示数）。全资子公司抵消后应为0。数据来源于投资明细表、模拟权益法表和合并抵消分录表。<b>可编辑覆盖自动值，导出Excel查看明细</b>。</span>
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"

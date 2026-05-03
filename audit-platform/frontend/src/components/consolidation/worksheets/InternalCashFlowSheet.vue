@@ -16,7 +16,7 @@
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
-      <span>内部现金流抵消（现金流量表项目）。A的"购买商品支付的现金"中对B的部分 = B的"销售商品收到的现金"中对A的部分。按现金流量表项目配对抵消。</span>
+      <span>内部现金流抵消（现金流量表项目）。A的"购买商品支付的现金"中对B的部分 = B的"销售商品收到的现金"中对A的部分。<b>导出模板后按格式填写，导入时追加到现有数据</b>。</span>
     </div>
 
     <el-table :data="rows" border size="small" class="ws-table"
