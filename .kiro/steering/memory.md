@@ -24,6 +24,9 @@ inclusion: always
 - 合并报表等子页面布局要参照项目的三栏布局（左侧导航+右侧内容+可拖拽分隔线），不要用纯 Tab 平铺
 - 每个表都要有详细的操作指引（步骤编号引导），让用户知道要干什么、怎么干、数据从哪来到哪去
 - 数据提取填充优先用本地化脚本（按科目名匹配），辅以 LLM 模型（智能填充按钮）
+- 表格列宽要足够大让内容完整显示，不折行不省略号截断，宁可加宽列也不要 ellipsis
+- 企业代码字段统一使用统一社会信用代码（18位），placeholder 示例用真实格式如 91500000MA5UQXXX0X
+- 表格编辑需支持查看/编辑模式切换：查看模式纯文本可选中复制，编辑模式 el-input 逐单元格编辑
 
 ## 环境配置
 
@@ -46,6 +49,22 @@ inclusion: always
 - 底稿精细化规则 347 个 JSON（77 个 A 级精修 + 270 个 C 级程序表），明细行动态发现（detail_discovery），全部 v2025-R2
 - 报表 4 套 x 6 张，1191 行种子数据
 - 附注模板国企 14 章 170 节 / 上市 17 章 185 节
+- 合并附注种子数据：seed_consol_note_sections.py 解析附注模板 md 生成 JSON（国企 91 父章节 221 表格节点，上市 80 父章节 282 表格节点），每个表格独立节点，标题取表格上方最近的 md 标题
+- 合并附注 API：/api/consol-note-sections/{standard} 返回按父章节分组的树形，叶子节点是单个表格；用户数据存 consol_note_data 表（project_id+year+section_id+JSONB）
+- 合并附注前端：左侧树按父章节折叠，每个叶子点击后右侧只显示一个表格（不分页），支持全屏/导出模板/导出数据/导入Excel/保存/增删行/多选删除
+- 合并附注公式刷新：POST /api/consol-note-sections/refresh/{project_id}/{year}/{section_id}，从试算表按科目名匹配+按表头（期末/期初/借方/贷方）自动填充对应列
+- 合并附注公式管理：工具栏 ƒx 按钮打开全局公式管理器定位到当前章节，批量弹窗支持导出公式模板/导入公式/一键取数计算（apply-formulas API）
+- 合并附注全审和单表审核按钮保留在工具栏（✅），批量弹窗中不重复放审核按钮
+- 合并附注全审：POST /api/consol-note-sections/audit-all/{project_id}/{year}，规则含合计行校验+试算表交叉校验，结果弹窗显示+导出Excel
+- 合并附注单表审核：POST /api/consol-note-sections/audit/{project_id}/{year}/{section_id}，对当前表格执行公式审核，弹窗同全审格式
+- 合并附注多行表头：md 中分隔行后首列为空的行识别为子表头，forward-fill 合并单元格后用 '/' 连接层级（如 期末数/账面余额/金额），multi_header 字段保留原始多行结构
+- 合并附注树形导航移到第3栏 ConsolCatalog（附注 tab），右侧内容区占满宽度；批量操作弹窗支持一键导出全部数据/模板、一键导入（按 Sheet 名匹配章节）
+- 四栏视图切换：子页面可通过 CustomEvent('gt-switch-four-col') 通知 ThreeColumnLayout 激活四栏模式并展开 catalog 栏
+- ThreeColumnLayout catalog 栏去掉 gt-catalog-header 和 gt-catalog-body 包裹层，slot 直接作为 flex 子元素，避免多层 overflow 冲突导致 el-tabs 点击和收起按钮失效
+- ThreeColumnLayout resizer 的 ::after 伪元素（±3px 透明扩展区）会遮挡相邻栏的点击事件，已移除；catalog z-index:1 高于 resizer z-index:5 的默认层
+- ThreeColumnLayout 切换四栏模式时必须强制 catalogCollapsed=false，否则 localStorage 持久化的折叠状态会导致 catalog 不显示
+- gt-switch-four-col 事件重新派发必须加 _redispatched 标记防止 ThreeColumnLayout↔ConsolCatalog 无限循环（曾导致 UI 冻结）
+- 全屏功能用 Teleport to="body" 实现（非 position:fixed），避免被祖先 overflow/transform 裁剪导致全屏失效
 - 公式体系完整（三分类 + 跨表引用 + 拓扑排序 + 审计留痕）
 - 公式管理（FormulaManagerDialog）已提升到全局顶部导航栏（ThreeColumnLayout），所有模块共享
 - 公式管理树形导航已增加"合并报表"分类（7张表 CI/CC/CE/CN/CS/CX/CK 编码）+ 表间审核"合并↔报表"规则
@@ -82,6 +101,7 @@ inclusion: always
 - ~~合并工作底稿跨表联动P0缺陷：❶净资产表期末值未联动到模拟权益法比对区 ❷模拟权益法分录未转换为合并抵消分录 ❸少数股东权益的期末净资产未从净资产表提取~~ ✅ 全部修复
 - ~~合并工作底稿所有表的保存按钮需接后端API持久化（当前仅前端提示），模块间数据提取联动需后端接口配合~~ ✅ 已完成：consol_worksheet_data 表（JSONB）+ 3个API + 前端 onSave/onMounted 联动
 - 用真实审计项目端到端验证（最高优先级）
+- 查看/编辑模式切换组件（纯文本可复制↔el-input 编辑）后续推广到报表、底稿、试算表等所有表格模块
 - ~~D2 应收账款 / H1 固定资产等更多科目精细化规则打磨~~ ✅ 已完成：77 个核心科目精修（全循环 D-N 覆盖），剩余 270 个为函证/控制测试/风险评估等无需 key_rows 精修
 - ~~统一 Excel 导入框架~~ ✅ 已完成：7 种模板 + 7 页面集成 + 14 项加固（数值校验/事务保护/RFC5987文件名/示例行宽松跳过/失败行反馈/覆盖追加模式/重试按钮）
 
@@ -128,6 +148,18 @@ inclusion: always
 - 合并报表左侧导航改为集团架构树+差额表节点，每个合并节点自动生成差额表子节点，合并数=汇总直接下级-差额表，底部6种报表类型切换
 - 合并模块独立中间栏树形导航（ConsolMiddleNav），通过 DefaultLayout slot 条件渲染（非命名视图），hideMiddle 排除合并路由，CustomEvent 联动
 - 合并工作底稿持久化：consol_worksheet_data 表（project_id+year+sheet_key+JSONB），自动建表无需 migration，upsert 保存，onMounted 批量加载回填
+- 基本信息表新增字段：parent_code（上级单位代码）、ultimate_controller（最终控制方）、ultimate_controller_code（控制方代码），用于构建树形层级
+- ConsolMiddleNav syncFromProject 按 parent_code 构建层级树（非扁平列表），selectedYear 改为从 route.query 取值
+- ConsolCatalog 监听 consol-standard-change 事件，顶部栏切换准则后自动刷新附注树
+- 合并报表/附注 Tab 内不重复放置准则选择器和转换规则按钮，统一由顶部紫色栏控制，避免 UI 冗余
+- 报表转换映射 API 路径：`/api/projects/{projectId}/report-mapping/preset`（非 `/api/report-mapping/preset`），scope 合并报表用 `consolidated`，返回字段 soe_row_code/soe_row_name 需映射为 source_code/source_name
+- 合并报表按类型分视图：权益变动表/减值准备表用矩阵 table（多行表头+横向滚动+sticky），其余4张用普通 el-table 四列结构
+- 合并汇总明细查看：顶部栏"📊 查看"按钮，选中单元格后穿透显示该数值的汇总过程（直接下级贡献+末级明细），支持占比、数据来源、导出 Excel
+- 表格单元格选中：查看模式下支持单击选中、Ctrl+多选、右键菜单（汇总穿透/复制值/查看公式/添加批注/标记已复核/追溯来源/求和/对比差异），通过 el-table 的 cell-click + cell-contextmenu 事件实现
+- 合并报表按合并主体隔离：树形每个企业节点是独立合并主体（currentConsolEntity），点击后 loadConsolReport 带 company_code 加载该主体的报表/附注数据
+- 数据刷新策略：保存只入库不触发刷新，前端维持当前状态；用户主动点刷新才从后端拉数据；树形节点支持按单位+按表类型选择性刷新（弹窗勾选）
+- 前端缓存：合并报表/附注数据按 company_code+report_type 缓存，切换单位/报表时优先读缓存，刷新时清除对应缓存重新请求
+- ConsolidationIndex onUnmounted 清理事件监听器，onStandardChange 广播准则变更事件
 - 当期处置出表企业不单独建表，在模拟权益法中体现（期初模拟→出表日前变动→处置分录→期末长投归零）
 
 ## 底稿编码体系（致同 2025 修订版）

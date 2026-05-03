@@ -174,9 +174,6 @@
         class="gt-catalog"
         :style="{ width: catalogWidth + 'px' }"
       >
-        <div class="gt-catalog-header">
-          <span class="gt-catalog-title">{{ catalogTitle }}</span>
-        </div>
         <slot name="catalog" />
         <div class="gt-catalog-bottom">
           <div class="gt-nav-item" @click="catalogCollapsed = true" title="收起">
@@ -310,6 +307,7 @@ watch(() => props.fourColumn, (v) => {
 
 // 视图模式变化时通知父组件
 watch(fourColumnMode, (v) => {
+  if (v) catalogCollapsed.value = false  // 切换到四栏时自动展开 catalog
   emit('view-change', v ? 'four' : 'three')
 })
 
@@ -488,10 +486,25 @@ function onFormulaApplied() {
   document.dispatchEvent(new CustomEvent('gt-formula-changed', { detail: { action: 'applied' } }))
 }
 
+function onSwitchFourCol(e: Event) {
+  const detail = (e as CustomEvent).detail
+  // Only handle the initial dispatch (from ConsolidationIndex), not re-dispatches
+  if (detail?._redispatched) return
+  fourColumnMode.value = true
+  catalogCollapsed.value = false
+  // Re-dispatch once after catalog mounts so it can switch to the right tab
+  if (detail?.tab) {
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('gt-switch-four-col', { detail: { ...detail, _redispatched: true } }))
+    }, 150)
+  }
+}
+
 onMounted(() => {
   loadPrefs()
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('gt-open-formula-manager', onOpenFormulaEvent)
+  window.addEventListener('gt-switch-four-col', onSwitchFourCol)
   // 移动端手势
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -501,6 +514,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
   document.removeEventListener('gt-open-formula-manager', onOpenFormulaEvent)
+  window.removeEventListener('gt-switch-four-col', onSwitchFourCol)
   document.removeEventListener('touchend', onTouchEnd)
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
 })
@@ -683,18 +697,12 @@ onUnmounted(() => {
   background: transparent;
   flex-shrink: 0;
   position: relative;
-  z-index: 10;
+  z-index: 5;
   transition: background var(--gt-transition-fast);
 }
 .gt-resizer:hover,
 .gt-resizer:active {
   background: var(--gt-color-primary-lighter);
-}
-.gt-resizer::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0;
-  left: -3px; right: -3px;
 }
 
 /* ── 中间栏 ── */
@@ -752,23 +760,10 @@ onUnmounted(() => {
   flex-shrink: 0;
   background: var(--gt-color-bg-white);
   border-right: 1px solid var(--gt-color-border-light);
-  overflow-y: auto;
-  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-}
-.gt-catalog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--gt-space-3) var(--gt-space-3);
-  border-bottom: 1px solid var(--gt-color-border-light);
-  flex-shrink: 0;
-}
-.gt-catalog-title {
-  font-size: var(--gt-font-size-sm);
-  font-weight: 600;
-  color: var(--gt-color-text);
+  min-height: 0;
+  overflow: hidden;
 }
 .gt-catalog-bottom {
   border-top: 1px solid var(--gt-color-border-light);

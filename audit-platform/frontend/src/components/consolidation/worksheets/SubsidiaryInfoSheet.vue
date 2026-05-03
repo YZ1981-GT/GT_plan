@@ -51,6 +51,34 @@
         </template>
       </el-table-column>
 
+      <!-- 上级单位代码 -->
+      <el-table-column prop="parent_code" label="上级单位代码" width="120">
+        <template #header>
+          <span>上级单位代码<br/><small style="color:#999">（构建树形）</small></span>
+        </template>
+        <template #default="{ row }">
+          <div @click.stop @mousedown.stop>
+            <el-select v-model="row.parent_code" size="small" style="width:100%" placeholder="选择上级" filterable clearable>
+              <el-option v-for="c in getOtherCompaniesWithCode(row)" :key="c.code" :label="`${c.name} (${c.code})`" :value="c.code" />
+            </el-select>
+          </div>
+        </template>
+      </el-table-column>
+
+      <!-- 最终控制方 -->
+      <el-table-column prop="ultimate_controller" label="最终控制方" width="130">
+        <template #default="{ row }">
+          <el-input v-model="row.ultimate_controller" size="small" placeholder="如 集团公司" />
+        </template>
+      </el-table-column>
+
+      <!-- 最终控制方代码 -->
+      <el-table-column prop="ultimate_controller_code" label="控制方代码" width="100">
+        <template #default="{ row }">
+          <el-input v-model="row.ultimate_controller_code" size="small" placeholder="如 ROOT" />
+        </template>
+      </el-table-column>
+
       <!-- 核算科目 -->
       <el-table-column prop="account_subject" label="核算科目" width="140">
         <template #header>
@@ -289,6 +317,7 @@
         <el-table :data="importPreview.slice(0, 5)" border size="small" max-height="250">
           <el-table-column prop="company_name" label="子企业名称" min-width="140" />
           <el-table-column prop="company_code" label="企业代码" width="100" />
+          <el-table-column prop="parent_code" label="上级代码" width="90" />
           <el-table-column prop="account_subject" label="核算科目" width="120" />
           <el-table-column prop="accounting_method" label="核算方式" width="90" />
           <el-table-column prop="holding_type" label="持股类型" width="80" />
@@ -317,6 +346,9 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 interface SubsidiaryInfoRow {
   company_name: string
   company_code: string
+  parent_code: string
+  ultimate_controller: string
+  ultimate_controller_code: string
   account_subject: string
   accounting_method: string
   holding_type: string
@@ -378,9 +410,19 @@ function getOtherCompanies(currentRow: SubsidiaryInfoRow): string[] {
     .filter((v, i, a) => a.indexOf(v) === i) // 去重
 }
 
+// 上级单位下拉选项：排除当前行自己
+function getOtherCompaniesWithCode(currentRow: SubsidiaryInfoRow): { name: string; code: string }[] {
+  return rows.value
+    .filter(r => r.company_name && r.company_code && r.company_code !== currentRow.company_code)
+    .map(r => ({ name: r.company_name, code: r.company_code }))
+    .filter((v, i, a) => a.findIndex(x => x.code === v.code) === i) // 去重
+}
+
 function createEmptyRow(): SubsidiaryInfoRow {
   return {
-    company_name: '', company_code: '', account_subject: '',
+    company_name: '', company_code: '', parent_code: '',
+    ultimate_controller: '', ultimate_controller_code: '',
+    account_subject: '',
     accounting_method: '', holding_type: '直接', indirect_holder: '', share_changed: '否', change_times: 0,
     acquisition_date: '', merge_type: '', first_consol_date: '',
     non_common_cost: null, non_common_ratio: null,
@@ -437,6 +479,9 @@ const importPreview = ref<SubsidiaryInfoRow[]>([])
 const TEMPLATE_COLS = [
   { key: 'company_name', header: '子企业名称', note: '必填，合并范围内的子企业全称', example: '重庆XX有限公司' },
   { key: 'company_code', header: '企业代码', note: '必填，企业唯一编码', example: 'CQ001' },
+  { key: 'parent_code', header: '上级单位代码', note: '选填，上级单位的企业代码，用于构建树形层级', example: 'ROOT' },
+  { key: 'ultimate_controller', header: '最终控制方', note: '选填，最终控制方名称', example: '重庆医药集团' },
+  { key: 'ultimate_controller_code', header: '控制方代码', note: '选填，最终控制方企业代码', example: 'ROOT' },
   { key: 'account_subject', header: '核算科目', note: '必填，可选值：长期股权投资/可供出售金融资产/交易性金融资产/其他权益工具投资/其他非流动金融资产/其他非流动资产', example: '长期股权投资' },
   { key: 'accounting_method', header: '核算方式', note: '必填，可选值：成本法/权益法/公允价值', example: '成本法' },
   { key: 'holding_type', header: '持股类型', note: '必填，可选值：直接/间接', example: '直接' },
@@ -490,14 +535,14 @@ async function exportTemplate() {
 
   // ── Sheet 2: 数据填写 ──
   const categoryRow = [
-    '基本信息', '', '', '', '', '', '持股比例变动', '', '当期新增', '', '',
+    '基本信息', '', '', '', '', '', '', '', '持股比例变动', '', '当期新增', '', '',
     '涉及合并-非同控', '', '涉及合并-同控', '', '不涉及合并', '',
     '当期减少', '', '',
   ]
   const noteRow = TEMPLATE_COLS.map(c => c.note)
   const headerRow = TEMPLATE_COLS.map(c => c.header)
-  const exampleRow1 = ['示例公司A', 'A001', '长期股权投资', '成本法', '直接', '', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
-  const exampleRow2 = ['示例公司A', 'A001', '长期股权投资', '权益法', '间接', '公司B', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
+  const exampleRow1 = ['示例公司A', 'A001', 'ROOT', '集团公司', 'ROOT', '长期股权投资', '成本法', '直接', '', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
+  const exampleRow2 = ['示例公司A', 'A001', 'ROOT', '集团公司', 'ROOT', '长期股权投资', '权益法', '间接', '公司B', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
 
   // 如果有数据就导出数据
   const existingData = rows.value.filter(r => r.company_name).map(r =>
@@ -514,13 +559,13 @@ async function exportTemplate() {
 
   // 合并分类行的单元格
   wsData['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },   // 基本信息 A-F（含持股类型+间接持股方）
-    { s: { r: 0, c: 6 }, e: { r: 0, c: 7 } },   // 持股比例变动 G-H
-    { s: { r: 0, c: 8 }, e: { r: 0, c: 10 } },   // 当期新增 I-K
-    { s: { r: 0, c: 11 }, e: { r: 0, c: 12 } },  // 涉及合并-非同控 L-M
-    { s: { r: 0, c: 13 }, e: { r: 0, c: 14 } }, // 涉及合并-同控 N-O
-    { s: { r: 0, c: 15 }, e: { r: 0, c: 16 } }, // 不涉及合并 P-Q
-    { s: { r: 0, c: 17 }, e: { r: 0, c: 19 } }, // 当期减少 R-T
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },   // 基本信息 A-I（含上级/控制方/持股类型/间接持股方）
+    { s: { r: 0, c: 9 }, e: { r: 0, c: 10 } },   // 持股比例变动
+    { s: { r: 0, c: 11 }, e: { r: 0, c: 13 } },  // 当期新增
+    { s: { r: 0, c: 14 }, e: { r: 0, c: 15 } },  // 涉及合并-非同控
+    { s: { r: 0, c: 16 }, e: { r: 0, c: 17 } },  // 涉及合并-同控
+    { s: { r: 0, c: 18 }, e: { r: 0, c: 19 } },  // 不涉及合并
+    { s: { r: 0, c: 20 }, e: { r: 0, c: 22 } },  // 当期减少
   ]
 
   XLSX.utils.book_append_sheet(wb, wsData, '数据填写')
@@ -577,24 +622,27 @@ async function onFileSelected(e: Event) {
       parsed.push({
         company_name: name,
         company_code: String(r[1] || '').trim(),
-        account_subject: String(r[2] || '').trim(),
-        accounting_method: String(r[3] || '').trim(),
-        holding_type: String(r[4] || '直接').trim(),
-        indirect_holder: String(r[5] || '').trim(),
-        share_changed: String(r[6] || '否').trim(),
-        change_times: Number(r[7]) || 0,
-        acquisition_date: String(r[8] || '').trim(),
-        merge_type: String(r[9] || '').trim(),
-        first_consol_date: String(r[10] || '').trim(),
-        non_common_cost: r[11] != null && r[11] !== '' ? Number(r[11]) : null,
-        non_common_ratio: r[12] != null && r[12] !== '' ? Number(r[12]) : null,
-        common_cost: r[13] != null && r[13] !== '' ? Number(r[13]) : null,
-        common_ratio: r[14] != null && r[14] !== '' ? Number(r[14]) : null,
-        no_consol_cost: r[15] != null && r[15] !== '' ? Number(r[15]) : null,
-        no_consol_ratio: r[16] != null && r[16] !== '' ? Number(r[16]) : null,
-        disposal_date: String(r[17] || '').trim(),
-        disposal_amount: r[18] != null && r[18] !== '' ? Number(r[18]) : null,
-        disposal_ratio: r[19] != null && r[19] !== '' ? Number(r[19]) : null,
+        parent_code: String(r[2] || '').trim(),
+        ultimate_controller: String(r[3] || '').trim(),
+        ultimate_controller_code: String(r[4] || '').trim(),
+        account_subject: String(r[5] || '').trim(),
+        accounting_method: String(r[6] || '').trim(),
+        holding_type: String(r[7] || '直接').trim(),
+        indirect_holder: String(r[8] || '').trim(),
+        share_changed: String(r[9] || '否').trim(),
+        change_times: Number(r[10]) || 0,
+        acquisition_date: String(r[11] || '').trim(),
+        merge_type: String(r[12] || '').trim(),
+        first_consol_date: String(r[13] || '').trim(),
+        non_common_cost: r[14] != null && r[14] !== '' ? Number(r[14]) : null,
+        non_common_ratio: r[15] != null && r[15] !== '' ? Number(r[15]) : null,
+        common_cost: r[16] != null && r[16] !== '' ? Number(r[16]) : null,
+        common_ratio: r[17] != null && r[17] !== '' ? Number(r[17]) : null,
+        no_consol_cost: r[18] != null && r[18] !== '' ? Number(r[18]) : null,
+        no_consol_ratio: r[19] != null && r[19] !== '' ? Number(r[19]) : null,
+        disposal_date: String(r[20] || '').trim(),
+        disposal_amount: r[21] != null && r[21] !== '' ? Number(r[21]) : null,
+        disposal_ratio: r[22] != null && r[22] !== '' ? Number(r[22]) : null,
         pre_disposal_reduce: '', pre_disposal_times: null,
         post_disposal_reduce: '', post_disposal_times: null,
       })

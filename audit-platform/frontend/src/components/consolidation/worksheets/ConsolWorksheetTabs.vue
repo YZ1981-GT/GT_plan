@@ -120,7 +120,9 @@ import InternalTradeSheet from './InternalTradeSheet.vue'
 import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
 
 interface SubsidiaryInfoRow {
-  company_name: string; company_code: string; account_subject: string
+  company_name: string; company_code: string; parent_code: string
+  ultimate_controller: string; ultimate_controller_code: string
+  account_subject: string
   accounting_method: string; holding_type: string; indirect_holder: string; share_changed: string; change_times: number
   acquisition_date: string; merge_type: string; first_consol_date: string
   non_common_cost: number | null; non_common_ratio: number | null
@@ -300,7 +302,9 @@ onMounted(async () => {
         if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
       }
       if (saved.elimination?.rows) {
-        // elimination 的 rows 可能包含 equity/income/cross
+        if (saved.elimination.rows.equity) data.elimEquity = saved.elimination.rows.equity
+        if (saved.elimination.rows.income) data.elimIncome = saved.elimination.rows.income
+        if (saved.elimination.rows.cross) data.elimCross = saved.elimination.rows.cross
       }
       if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
     } catch { /* 首次使用无数据，忽略 */ }
@@ -333,7 +337,9 @@ function stopResize() {
 
 // ─── 默认数据构建 ─────────────────────────────────────────────────────────────
 function mkEmptyRow(): SubsidiaryInfoRow {
-  return { company_name: '', company_code: '', account_subject: '', accounting_method: '',
+  return { company_name: '', company_code: '', parent_code: '',
+    ultimate_controller: '', ultimate_controller_code: '',
+    account_subject: '', accounting_method: '',
     holding_type: '直接', indirect_holder: '', share_changed: '否', change_times: 0, acquisition_date: '', merge_type: '', first_consol_date: '',
     non_common_cost: null, non_common_ratio: null, common_cost: null, common_ratio: null,
     no_consol_cost: null, no_consol_ratio: null, disposal_date: '', disposal_amount: null, disposal_ratio: null,

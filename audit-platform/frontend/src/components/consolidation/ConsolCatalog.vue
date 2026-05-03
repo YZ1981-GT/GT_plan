@@ -1,12 +1,12 @@
 <template>
   <div class="cc-catalog">
-    <!-- 标题行：报表/附注 tab + 全部刷新 -->
+    <!-- 标题行：报表/附注切换 + 刷新 -->
     <div class="cc-header">
-      <el-tabs v-model="activeTab" size="small" class="cc-header-tabs">
-        <el-tab-pane label="报表" name="reports" />
-        <el-tab-pane label="附注" name="notes" />
-      </el-tabs>
-      <el-tooltip content="从项目中提取所有报表和附注数据" placement="bottom">
+      <div class="cc-tab-btns">
+        <span class="cc-tab-btn" :class="{ 'cc-tab-btn--active': activeTab === 'reports' }" @click="activeTab = 'reports'">报表</span>
+        <span class="cc-tab-btn" :class="{ 'cc-tab-btn--active': activeTab === 'notes' }" @click="activeTab = 'notes'">附注</span>
+      </div>
+      <el-tooltip content="刷新数据" placement="bottom">
         <el-button size="small" circle @click="refreshAll" :loading="refreshing" style="flex-shrink:0">
           <span style="font-size:12px">🔄</span>
         </el-button>
@@ -30,14 +30,13 @@
       <div v-else class="cc-tree">
         <el-input v-model="noteSearch" size="small" placeholder="搜索附注..." clearable style="margin-bottom:6px" />
         <el-tree :data="noteTree" :props="{ label: 'label', children: 'children' }"
-          node-key="key" default-expand-all highlight-current
+          node-key="key" highlight-current
           :filter-node-method="filterNote" ref="noteTreeRef"
           @node-click="onNoteClick">
           <template #default="{ data }">
             <span class="cc-tree-node">
-              <span>{{ data.label }}</span>
-              <el-button v-if="data.sectionId" size="small" link class="cc-refresh-btn" @click.stop="refreshSingle('note', data)" title="从项目提取">🔄</el-button>
-              <el-tag v-if="data.tableCount" size="small" type="info" style="margin-left:4px">{{ data.tableCount }}表</el-tag>
+              <span class="cc-tree-node-label">{{ data.label }}</span>
+              <el-tag v-if="data.table_count" size="small" type="info" style="margin-left:4px;font-size:10px">{{ data.table_count }}表</el-tag>
             </span>
           </template>
         </el-tree>
@@ -47,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
@@ -58,6 +57,34 @@ const standard = ref('soe')
 const activeTab = ref('reports')
 const noteSearch = ref('')
 const noteTreeRef = ref<any>(null)
+
+// 监听顶部栏准则切换事件
+function onStandardChanged(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (detail?.standard) {
+    standard.value = detail.standard
+    loadData()
+  }
+}
+
+// 监听四栏切换事件，自动切到附注 tab
+function onSwitchFourCol(e: Event) {
+  const detail = (e as CustomEvent).detail
+  if (detail?.tab === 'notes') {
+    activeTab.value = 'notes'
+  }
+}
+
+onMounted(() => {
+  loadData()
+  window.addEventListener('consol-standard-change', onStandardChanged)
+  window.addEventListener('gt-switch-four-col', onSwitchFourCol)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('consol-standard-change', onStandardChanged)
+  window.removeEventListener('gt-switch-four-col', onSwitchFourCol)
+})
 
 // ─── 报表树 ──────────────────────────────────────────────────────────────────
 const reportTree = computed(() => [
@@ -74,46 +101,25 @@ const noteTree = ref<any[]>([])
 
 async function loadData() {
   try {
-    const { data } = await http.get(`/api/note-templates/${standard.value}`, {
+    // 从合并附注章节 API 加载（按父章节分组的树形）
+    const { data } = await http.get(`/api/consol-note-sections/${standard.value}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const sections = data?.data ?? data ?? []
-    if (!Array.isArray(sections)) { noteTree.value = []; return }
+    const groups = Array.isArray(data) ? data : (data?.data ?? [])
+    if (!Array.isArray(groups) || !groups.length) { noteTree.value = []; return }
 
-    const chapterMap: Record<string, { label: string; children: any[] }> = {}
-    const chapterOrder = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
-    const chapterLabels: Record<string, string> = {
-      '一': '一、公司概况', '二': '二、编制基础', '三': '三、会计政策',
-      '四': '四、税项', '五': '五、报表科目注释', '六': '六、其他',
-      '七': '七、关联方', '八': '八、或有事项', '九': '九、承诺', '十': '十、日后事项',
-    }
-
-    for (const sec of sections) {
-      const sectionId = sec.section_id || sec.note_section || ''
-      const title = sec.section_title || sec.title || ''
-      const chapterMatch = sectionId.match(/^([一二三四五六七八九十]+)/)
-      const chapter = chapterMatch ? chapterMatch[1] : '其他'
-
-      if (!chapterMap[chapter]) {
-        chapterMap[chapter] = { label: chapterLabels[chapter] || `${chapter}、其他`, children: [] }
-      }
-      chapterMap[chapter].children.push({
-        key: `note_${sectionId}`,
-        label: title.length > 22 ? title.slice(0, 22) + '...' : title,
-        fullTitle: title,
-        sectionId,
-        tableCount: (sec.tables || []).length || (sec.table_template ? 1 : 0),
-      })
-    }
-
-    const tree: any[] = []
-    for (const ch of chapterOrder) {
-      if (chapterMap[ch]) {
-        tree.push({ key: `ch_${ch}`, label: chapterMap[ch].label, children: chapterMap[ch].children })
-      }
-    }
-    if (chapterMap['其他']) tree.push({ key: 'ch_other', label: '其他', children: chapterMap['其他'].children })
-    noteTree.value = tree
+    noteTree.value = groups.map((g: any) => ({
+      key: `grp_${g.parent_seq}`,
+      label: `${g.parent_seq}. ${g.label}`,
+      table_count: g.table_count,
+      children: (g.children || []).map((c: any) => ({
+        key: c.section_id,
+        label: c.title,
+        section_id: c.section_id,
+        title: c.title,
+        table_count: 1,
+      })),
+    }))
   } catch { noteTree.value = [] }
 }
 
@@ -133,9 +139,9 @@ function onReportClick(data: any) {
 }
 
 function onNoteClick(data: any) {
-  if (data.sectionId) {
+  if (data.section_id) {
     window.dispatchEvent(new CustomEvent('consol-catalog-select', {
-      detail: { type: 'note', sectionId: data.sectionId, title: data.fullTitle || data.label, standard: standard.value }
+      detail: { type: 'note', sectionId: data.section_id, title: data.title || data.label, standard: standard.value }
     }))
   }
 }
@@ -167,22 +173,35 @@ function refreshSingle(type: string, data: any) {
   ElMessage.success(`正在从项目提取: ${data.label || data.fullTitle}`)
 }
 
-onMounted(() => loadData())
+// loadData is called in the onMounted above
+
+const auditing = ref(false)
+
+async function auditAllNotes() {
+  auditing.value = true
+  // 通知 ConsolidationIndex 执行全审
+  window.dispatchEvent(new CustomEvent('consol-note-audit-all', { detail: { standard: standard.value } }))
+  auditing.value = false
+}
 </script>
 
 <style scoped>
-.cc-catalog { display: flex; flex-direction: column; height: 100%; }
+.cc-catalog { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .cc-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 8px; border-bottom: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0;
+  padding: 6px 8px; border-bottom: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0;
 }
-.cc-header-tabs { flex: 1; }
-.cc-header-tabs :deep(.el-tabs__header) { margin-bottom: 0; }
-.cc-header-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
-.cc-standard-switch { flex-shrink: 0; }
-.cc-content { flex: 1; overflow-y: auto; }
+.cc-tab-btns { display: flex; gap: 0; }
+.cc-tab-btn {
+  padding: 4px 12px; font-size: 13px; cursor: pointer; color: #999;
+  border-bottom: 2px solid transparent; transition: all 0.15s; user-select: none;
+}
+.cc-tab-btn:hover { color: #4b2d77; }
+.cc-tab-btn--active { color: #4b2d77; font-weight: 600; border-bottom-color: #4b2d77; }
+.cc-content { flex: 1; overflow-y: auto; min-height: 0; }
 .cc-tree { padding: 6px; }
 .cc-tree-node { display: flex; align-items: center; font-size: 12px; width: 100%; }
+.cc-tree-node-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .cc-refresh-btn { opacity: 0; transition: opacity 0.15s; margin-left: auto; font-size: 11px; padding: 0 4px; }
 .cc-tree-node:hover .cc-refresh-btn { opacity: 1; }
 </style>

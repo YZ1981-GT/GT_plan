@@ -20,6 +20,11 @@
             <span class="cm-tree-icon">{{ data.icon }}</span>
             <span class="cm-tree-label">{{ data.label }}</span>
             <el-tag v-if="data.ratio" size="small" type="info" style="margin-left:4px;font-size:10px">{{ data.ratio }}%</el-tag>
+            <!-- 企业节点刷新按钮（hover 显示） -->
+            <el-button v-if="data.companyCode && !data.isDiff" size="small" link class="cm-refresh-btn"
+              @click.stop="openRefreshDialog(data)" title="刷新该单位数据">
+              🔄
+            </el-button>
           </span>
         </template>
       </el-tree>
@@ -33,21 +38,19 @@
           <el-input v-model="addForm.name" placeholder="输入企业全称" />
         </el-form-item>
         <el-form-item label="企业代码" required>
-          <el-input v-model="addForm.code" placeholder="如 CQ001" />
+          <el-input v-model="addForm.code" placeholder="如 91500000MA5UQXXX0X（统一社会信用代码）" />
         </el-form-item>
         <el-form-item label="上级单位">
-          <el-select v-model="addForm.parentCode" size="small" style="width:100%" placeholder="选择上级单位" filterable clearable>
-            <el-option v-for="c in existingCompanies" :key="c.code" :label="`${c.name} (${c.code})`" :value="c.code" />
-          </el-select>
+          <el-input v-model="addForm.parentName" placeholder="输入上级单位名称" />
         </el-form-item>
         <el-form-item label="上级单位代码">
-          <el-input v-model="addForm.parentCode" placeholder="自动填充或手动输入" disabled />
+          <el-input v-model="addForm.parentCode" placeholder="如 91500000MA5UQXXX0X" />
         </el-form-item>
         <el-form-item label="最终控制方">
-          <el-input v-model="addForm.ultimateController" placeholder="如 重庆医药集团" />
+          <el-input v-model="addForm.ultimateController" placeholder="如 重庆医药（集团）股份有限公司" />
         </el-form-item>
         <el-form-item label="最终控制方代码">
-          <el-input v-model="addForm.ultimateControllerCode" placeholder="如 ROOT" />
+          <el-input v-model="addForm.ultimateControllerCode" placeholder="如 91500000203XXXXX0X" />
         </el-form-item>
         <el-form-item label="持股比例">
           <el-input-number v-model="addForm.ratio" :precision="6" :min="0" :max="100" style="width:100%" />
@@ -56,6 +59,30 @@
       <template #footer>
         <el-button @click="showAddDialog = false">取消</el-button>
         <el-button type="primary" @click="doAddCompany">确认添加</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 刷新范围选择弹窗 -->
+    <el-dialog v-model="showRefreshDialog" :title="`刷新 — ${refreshTarget.name}`" width="420px" append-to-body>
+      <p style="font-size:13px;color:#666;margin-bottom:12px">
+        选择要从项目数据中刷新的内容（从子企业单体数据重新汇总）：
+      </p>
+      <div class="cm-refresh-options">
+        <el-checkbox v-model="refreshOptions.allReports" @change="onAllReportsChange">全部报表（6张）</el-checkbox>
+        <div v-show="!refreshOptions.allReports" class="cm-refresh-sub">
+          <el-checkbox v-model="refreshOptions.balance_sheet">资产负债表</el-checkbox>
+          <el-checkbox v-model="refreshOptions.income_statement">利润表</el-checkbox>
+          <el-checkbox v-model="refreshOptions.cash_flow_statement">现金流量表</el-checkbox>
+          <el-checkbox v-model="refreshOptions.equity_statement">权益变动表</el-checkbox>
+          <el-checkbox v-model="refreshOptions.cash_flow_supplement">现金流附表</el-checkbox>
+          <el-checkbox v-model="refreshOptions.impairment_provision">资产减值准备表</el-checkbox>
+        </div>
+        <el-checkbox v-model="refreshOptions.notes">全部附注</el-checkbox>
+        <el-checkbox v-model="refreshOptions.worksheet">差额表</el-checkbox>
+      </div>
+      <template #footer>
+        <el-button @click="showRefreshDialog = false">取消</el-button>
+        <el-button type="primary" @click="doRefresh" :loading="refreshing">开始刷新</el-button>
       </template>
     </el-dialog>
   </div>
@@ -72,7 +99,7 @@ const projectId = computed(() => route.params.projectId as string)
 const loading = ref(false)
 const rawTree = ref<any[]>([])
 const showAddDialog = ref(false)
-const addForm = reactive({ name: '', code: '', parentCode: '', ultimateController: '', ultimateControllerCode: '', ratio: 0 })
+const addForm = reactive({ name: '', code: '', parentName: '', parentCode: '', ultimateController: '', ultimateControllerCode: '', ratio: 0 })
 const manualCompanies = ref<any[]>([])
 
 // 已有企业列表（用于上级单位下拉）
@@ -86,13 +113,7 @@ const existingCompanies = computed(() => {
   for (const mc of manualCompanies.value) list.push({ name: mc.name, code: mc.code })
   return list
 })
-const currentYear = new Date().getFullYear() - 1
-const selectedYear = ref(currentYear)
-const yearOptions = computed(() => {
-  const years = []
-  for (let y = currentYear; y >= currentYear - 5; y--) years.push(y)
-  return years
-})
+const selectedYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
 // 构建树形数据：集团架构 + 差额表 + 报表类型
 const treeData = computed(() => {
@@ -182,13 +203,140 @@ async function loadTree() {
         }]
       }
     }
-  } catch { rawTree.value = [] }
+  } catch { /* ignore */ }
+  finally { loading.value = false }
+  // 如果后端没数据，尝试从基本信息表同步
+  if (!rawTree.value.length || (rawTree.value[0]?.children?.length === 0 && !manualCompanies.value.length)) {
+    await syncFromProject()
+  }
+}
+
+// 从右侧基本信息表同步企业数据到树形
+async function syncFromProject() {
+  loading.value = true
+  try {
+    // 通过 API 获取已保存的基本信息表数据
+    const { loadWorksheetData } = await import('@/services/consolWorksheetDataApi')
+    const saved = await loadWorksheetData(projectId.value, selectedYear.value, 'info')
+    const rows = saved?.rows || []
+    if (Array.isArray(rows) && rows.length) {
+      const companies = rows.filter((r: any) => r.company_name)
+      if (companies.length) {
+        // 获取项目名称作为根节点
+        let rootName = '集团合并'
+        let rootCode = 'root'
+        try {
+          const { data } = await import('@/utils/http').then(m => m.default.get(`/api/projects/${projectId.value}`, { validateStatus: (s: number) => s < 600 }))
+          const p = data?.data ?? data
+          rootName = p?.client_name || p?.name || rootName
+        } catch { /* ignore */ }
+
+        // 尝试从最终控制方信息获取根节点
+        const firstWithController = companies.find((r: any) => r.ultimate_controller)
+        if (firstWithController) {
+          rootName = firstWithController.ultimate_controller || rootName
+          rootCode = firstWithController.ultimate_controller_code || rootCode
+        }
+
+        // 构建层级关系：按 parent_code 分组
+        const codeMap: Record<string, any> = {}
+        const allNodes: any[] = []
+        for (const r of companies) {
+          const node: any = {
+            company_name: r.company_name,
+            company_code: r.company_code,
+            shareholding: r.non_common_ratio || r.common_ratio || r.no_consol_ratio || 0,
+            holding_type: r.holding_type || '直接',
+            indirect_holder: r.indirect_holder || '',
+            parent_code: r.parent_code || '',
+            children: [],
+          }
+          codeMap[r.company_code] = node
+          allNodes.push(node)
+        }
+
+        // 构建树：有 parent_code 的挂到父节点下，否则挂到根节点
+        const rootChildren: any[] = []
+        for (const node of allNodes) {
+          if (node.parent_code && codeMap[node.parent_code]) {
+            codeMap[node.parent_code].children.push(node)
+          } else {
+            rootChildren.push(node)
+          }
+        }
+
+        rawTree.value = [{
+          company_name: rootName, company_code: rootCode,
+          children: rootChildren,
+        }]
+        ElMessage.success(`已从基本信息表同步 ${companies.length} 家企业`)
+      }
+    }
+  } catch { /* ignore */ }
   finally { loading.value = false }
 }
 
 function onNodeClick(data: any) {
   // 通过自定义事件通知父组件（ConsolidationIndex）
   window.dispatchEvent(new CustomEvent('consol-tree-select', { detail: data }))
+}
+
+// ─── 刷新功能 ────────────────────────────────────────────────────────────────
+const showRefreshDialog = ref(false)
+const refreshing = ref(false)
+const refreshTarget = reactive({ code: '', name: '' })
+const refreshOptions = reactive({
+  allReports: true,
+  balance_sheet: true, income_statement: true, cash_flow_statement: true,
+  equity_statement: true, cash_flow_supplement: true, impairment_provision: true,
+  notes: true, worksheet: true,
+})
+
+function openRefreshDialog(data: any) {
+  refreshTarget.code = data.companyCode || ''
+  refreshTarget.name = data.label || ''
+  // 重置选项
+  refreshOptions.allReports = true
+  refreshOptions.balance_sheet = true; refreshOptions.income_statement = true
+  refreshOptions.cash_flow_statement = true; refreshOptions.equity_statement = true
+  refreshOptions.cash_flow_supplement = true; refreshOptions.impairment_provision = true
+  refreshOptions.notes = true; refreshOptions.worksheet = true
+  showRefreshDialog.value = true
+}
+
+function onAllReportsChange(val: boolean) {
+  refreshOptions.balance_sheet = val; refreshOptions.income_statement = val
+  refreshOptions.cash_flow_statement = val; refreshOptions.equity_statement = val
+  refreshOptions.cash_flow_supplement = val; refreshOptions.impairment_provision = val
+}
+
+async function doRefresh() {
+  refreshing.value = true
+  const types: string[] = []
+  if (refreshOptions.allReports) {
+    types.push('all_reports')
+  } else {
+    for (const k of ['balance_sheet','income_statement','cash_flow_statement','equity_statement','cash_flow_supplement','impairment_provision'] as const) {
+      if (refreshOptions[k]) types.push(k)
+    }
+  }
+  if (refreshOptions.notes) types.push('notes')
+  if (refreshOptions.worksheet) types.push('worksheet')
+
+  // 通知 ConsolidationIndex 执行刷新
+  window.dispatchEvent(new CustomEvent('consol-refresh-entity', {
+    detail: {
+      companyCode: refreshTarget.code,
+      companyName: refreshTarget.name,
+      types,
+    }
+  }))
+
+  // 模拟等待（实际由 ConsolidationIndex 处理）
+  await new Promise(r => setTimeout(r, 500))
+  refreshing.value = false
+  showRefreshDialog.value = false
+  ElMessage.success(`已发起刷新：${refreshTarget.name}（${types.length} 项）`)
 }
 
 function doAddCompany() {
@@ -199,7 +347,7 @@ function doAddCompany() {
     ultimateControllerCode: addForm.ultimateControllerCode,
   })
   // 重置表单
-  addForm.name = ''; addForm.code = ''; addForm.parentCode = ''
+  addForm.name = ''; addForm.code = ''; addForm.parentName = ''; addForm.parentCode = ''
   addForm.ultimateController = ''; addForm.ultimateControllerCode = ''; addForm.ratio = 0
   showAddDialog.value = false
   ElMessage.success('已添加到合并范围')
@@ -221,5 +369,9 @@ onMounted(() => loadTree())
 .cm-tree-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cm-tree-node--diff { color: #e6a23c; font-style: italic; }
 .cm-tree-node--diff .cm-tree-label { color: #e6a23c; }
+.cm-refresh-btn { opacity: 0; transition: opacity 0.15s; margin-left: auto; font-size: 11px; padding: 0 2px; }
+.cm-tree-node:hover .cm-refresh-btn { opacity: 1; }
+.cm-refresh-options { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+.cm-refresh-sub { padding-left: 24px; display: flex; flex-direction: column; gap: 4px; }
 .cm-nav-footer { padding: 8px 12px; border-top: 1px solid var(--gt-color-border-light, #e8e4f0); flex-shrink: 0; }
 </style>
