@@ -33,9 +33,11 @@
 
       <div class="sc-three-col">
         <!-- 第1栏：净资产变动 -->
-        <div class="sc-col">
-          <div class="sc-col-title">📊 {{ comp.name }} — 净资产变动</div>
-          <el-table :data="companyData[ci]?.naRows || []" border size="small" class="sc-table" max-height="500"
+        <div class="sc-col" :class="{ 'sc-col--collapsed': colCollapsed[`${ci}_na`] }">
+          <div class="sc-col-title" @click="colCollapsed[`${ci}_na`] = !colCollapsed[`${ci}_na`]" style="cursor:pointer">
+            <span>{{ colCollapsed[`${ci}_na`] ? '▶' : '▼' }} 📊 {{ comp.name }} — 净资产变动</span>
+          </div>
+          <el-table v-show="!colCollapsed[`${ci}_na`]" :data="companyData[ci]?.naRows || []" border size="small" class="sc-table" max-height="500"
             :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="naRowClass">
             <el-table-column prop="item" label="项目" width="180" fixed show-overflow-tooltip>
               <template #default="{ row }">
@@ -58,10 +60,15 @@
           </el-table>
         </div>
 
+        <!-- 拖拽分隔线 1-2 -->
+        <div class="sc-resizer" @mousedown="startResize($event, ci, 0)"><div class="sc-resizer-bar"></div></div>
+
         <!-- 第2栏：直接持股权益法模拟 -->
-        <div class="sc-col">
-          <div class="sc-col-title">🔄 {{ comp.name }} — 直接持股权益法模拟 ({{ comp.ratio }}%)</div>
-          <el-table :data="companyData[ci]?.simRows || []" border size="small" class="sc-table" max-height="500"
+        <div class="sc-col" :class="{ 'sc-col--collapsed': colCollapsed[`${ci}_direct`] }">
+          <div class="sc-col-title" @click="colCollapsed[`${ci}_direct`] = !colCollapsed[`${ci}_direct`]" style="cursor:pointer">
+            <span>{{ colCollapsed[`${ci}_direct`] ? '▶' : '▼' }} 🔄 {{ comp.name }} — 直接持股权益法模拟 ({{ comp.ratio }}%)</span>
+          </div>
+          <el-table v-show="!colCollapsed[`${ci}_direct`]" :data="companyData[ci]?.simRows || []" border size="small" class="sc-table" max-height="500"
             :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="simRowClass">
             <el-table-column prop="subject" label="科目" width="140" fixed show-overflow-tooltip>
               <template #default="{ row }">
@@ -112,9 +119,14 @@
         </div>
 
         <!-- 第3栏：间接持股权益法模拟（动态，可能多个） -->
-        <div v-for="(indComp, ici) in indirectList" :key="'ind'+ici" class="sc-col">
-          <div class="sc-col-title sc-col-title--indirect">🔗 {{ indComp.name }} — 间接持股权益法模拟 ({{ indComp.ratio }}%)</div>
-          <el-table :data="getIndirectSimRows(ci, ici)" border size="small" class="sc-table" max-height="500"
+        <template v-for="(indComp, ici) in indirectList" :key="'ind'+ici">
+          <!-- 拖拽分隔线 2-3 -->
+          <div class="sc-resizer" @mousedown="startResize($event, ci, ici + 1)"><div class="sc-resizer-bar"></div></div>
+          <div class="sc-col" :class="{ 'sc-col--collapsed': colCollapsed[`${ci}_ind_${ici}`] }">
+            <div class="sc-col-title sc-col-title--indirect" @click="colCollapsed[`${ci}_ind_${ici}`] = !colCollapsed[`${ci}_ind_${ici}`]" style="cursor:pointer">
+              <span>{{ colCollapsed[`${ci}_ind_${ici}`] ? '▶' : '▼' }} 🔗 {{ indComp.name }} — 间接持股权益法模拟 ({{ indComp.ratio }}%)</span>
+            </div>
+          <el-table v-show="!colCollapsed[`${ci}_ind_${ici}`]" :data="getIndirectSimRows(ci, ici)" border size="small" class="sc-table" max-height="500"
             :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="simRowClass">
             <el-table-column prop="subject" label="科目" width="140" fixed show-overflow-tooltip>
               <template #default="{ row }">
@@ -162,7 +174,8 @@
               </el-table-column>
             </el-table-column>
           </el-table>
-        </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -199,6 +212,38 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const colCount = computed(() => props.changeTimes + 1)
 const dcCount = computed(() => colCount.value * 2)
 const n = (v: any) => Number(v) || 0
+const colCollapsed = reactive<Record<string, boolean>>({})
+
+// ─── 拖拽分隔线 ─────────────────────────────────────────────────────────────
+let resizeTarget: HTMLElement | null = null
+let resizeStartX = 0
+let resizeStartW = 0
+
+function startResize(e: MouseEvent, _ci: number, _colIdx: number) {
+  const el = (e.target as HTMLElement).closest('.sc-resizer')
+  const prev = el?.previousElementSibling as HTMLElement
+  if (!prev) return
+  resizeTarget = prev
+  resizeStartX = e.clientX
+  resizeStartW = prev.offsetWidth
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onResize)
+  document.addEventListener('mouseup', stopResize)
+}
+function onResize(e: MouseEvent) {
+  if (!resizeTarget) return
+  const w = Math.max(250, resizeStartW + (e.clientX - resizeStartX))
+  resizeTarget.style.width = w + 'px'
+  resizeTarget.style.flexShrink = '0'
+}
+function stopResize() {
+  resizeTarget = null
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  document.removeEventListener('mousemove', onResize)
+  document.removeEventListener('mouseup', stopResize)
+}
 
 // 间接持股企业列表
 const indirectList = computed(() => props.indirectCompanies || [])
@@ -259,9 +304,15 @@ const companyData = reactive<{ naRows: NARow[]; simRows: SimRow[] }[]>([])
 // setup 阶段同步初始化
 for (let ci = 0; ci < props.companies.length; ci++) {
   const cd = { naRows: buildNARows(), simRows: buildSimRows() }
-  // 自动填充持股比例
+  // 自动填充持股比例：变动前=当前比例，变动后默认0
   const ratioRow = cd.simRows.find(r => r.isRatio)
-  if (ratioRow) ratioRow.dc[0] = props.companies[ci].ratio
+  if (ratioRow) {
+    ratioRow.dc[0] = props.companies[ci].ratio
+    // 变动后各列的借方也填0（用户可修改）
+    for (let t = 1; t <= props.changeTimes; t++) {
+      if (ratioRow.dc[t * 2] == null) ratioRow.dc[t * 2] = 0
+    }
+  }
   companyData.push(cd)
 }
 
@@ -270,7 +321,12 @@ watch(() => props.companies, (comps) => {
   while (companyData.length < comps.length) {
     const cd = { naRows: buildNARows(), simRows: buildSimRows() }
     const ratioRow = cd.simRows.find(r => r.isRatio)
-    if (ratioRow) ratioRow.dc[0] = comps[companyData.length]?.ratio ?? null
+    if (ratioRow) {
+      ratioRow.dc[0] = comps[companyData.length]?.ratio ?? 0
+      for (let t = 1; t <= props.changeTimes; t++) {
+        if (ratioRow.dc[t * 2] == null) ratioRow.dc[t * 2] = 0
+      }
+    }
     companyData.push(cd)
   }
   companyData.length = comps.length
@@ -286,7 +342,13 @@ function getIndirectSimRows(ci: number, ici: number): SimRow[] {
     const indComp = indirectList.value[ici]
     if (indComp) {
       const ratioRow = indirectSimData[key].find(r => r.isRatio)
-      if (ratioRow) ratioRow.dc[0] = indComp.ratio
+      if (ratioRow) {
+        ratioRow.dc[0] = indComp.ratio
+        // 变动后各列默认0
+        for (let t = 1; t <= props.changeTimes; t++) {
+          if (ratioRow.dc[t * 2] == null) ratioRow.dc[t * 2] = 0
+        }
+      }
     }
   }
   return indirectSimData[key]
@@ -353,38 +415,75 @@ const allData = computed(() => companyData.map((cd, i) => ({
 // ─── 格式化 ──────────────────────────────────────────────────────────────────
 function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
-// ─── 导出模板/数据 ──────────────────────────────────────────────────────────
-async function exportTemplate() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const instr = [[`股比变动${props.changeTimes}次 — 填写说明`],[],['1. 每家企业有净资产和模拟两个工作表'],['2. 按项目名/科目+明细匹配导入'],['3. 紫色行为自动计算行无需填写']]
-  const wsI = XLSX.utils.aoa_to_sheet(instr); wsI['!cols']=[{wch:60}]
-  XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
-  for (let ci = 0; ci < props.companies.length; ci++) {
-    const comp = props.companies[ci]; const cd = companyData[ci]; if (!cd) continue
-    const naH = ['项目','变动前',...Array.from({length:props.changeTimes},(_,i)=>props.changeTimes===1?'变动后':`第${i+1}次变动后`)]
-    const naD = cd.naRows.map(r => [r.item,...(r.vals||[]).map(v=>v??'')])
-    const wsN = XLSX.utils.aoa_to_sheet([naH,...naD]); wsN['!cols']=naH.map(()=>({wch:16}))
-    XLSX.utils.book_append_sheet(wb, wsN, `${comp.name}-净资产`.substring(0,31))
-    const sH = ['科目','明细','变动前借','变动前贷',...Array.from({length:props.changeTimes},(_,i)=>{const l=props.changeTimes===1?'变动后':`第${i+1}次变动后`;return[l+'借',l+'贷']}).flat()]
-    const sD = cd.simRows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
-    const wsS = XLSX.utils.aoa_to_sheet([sH,...sD]); wsS['!cols']=sH.map(()=>({wch:14}))
-    XLSX.utils.book_append_sheet(wb, wsS, `${comp.name}-模拟`.substring(0,31))
-  }
-  XLSX.writeFile(wb, `股比变动${props.changeTimes}次_模板.xlsx`); ElMessage.success('模板已导出')
+// ─── 导出辅助 ────────────────────────────────────────────────────────────────
+function buildSimHeaders(): string[] {
+  return ['科目','明细','变动前借','变动前贷',...Array.from({length:props.changeTimes},(_,i)=>{
+    const l = props.changeTimes===1?'变动后':`第${i+1}次变动后`; return[l+'借',l+'贷']
+  }).flat()]
+}
+function buildNaHeaders(): string[] {
+  return ['项目','变动前',...Array.from({length:props.changeTimes},(_,i)=>props.changeTimes===1?'变动后':`第${i+1}次变动后`)]
 }
 
-async function exportData() {
+// ─── 导出模板 ────────────────────────────────────────────────────────────────
+async function exportTemplate() {
   const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  const instr = [[`股比变动${props.changeTimes}次 — 填写说明`],[],
+    ['1. 每家企业有三类工作表：净资产、直接持股模拟、间接持股模拟'],
+    ['2. 按项目名/科目+明细匹配导入'],
+    ['3. 紫色行为自动计算行无需填写'],
+    [`4. 共${colCount.value}列：变动前 + ${props.changeTimes}次变动后`],
+    ['5. 间接持股企业需在基本信息表中设置持股类型为间接'],
+  ]
+  const wsI = XLSX.utils.aoa_to_sheet(instr); wsI['!cols']=[{wch:60}]
+  XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
+  const naH = buildNaHeaders(); const sH = buildSimHeaders()
   for (let ci = 0; ci < props.companies.length; ci++) {
     const comp = props.companies[ci]; const cd = companyData[ci]; if (!cd) continue
-    const naH = ['项目','变动前',...Array.from({length:props.changeTimes},(_,i)=>props.changeTimes===1?'变动后':`第${i+1}次变动后`)]
+    // 净资产表
     const naD = cd.naRows.map(r => [r.item,...(r.vals||[]).map(v=>v??'')])
     const wsN = XLSX.utils.aoa_to_sheet([naH,...naD]); wsN['!cols']=naH.map(()=>({wch:16}))
     XLSX.utils.book_append_sheet(wb, wsN, `${comp.name}-净资产`.substring(0,31))
-    const sH = ['科目','明细','变动前借','变动前贷',...Array.from({length:props.changeTimes},(_,i)=>{const l=props.changeTimes===1?'变动后':`第${i+1}次变动后`;return[l+'借',l+'贷']}).flat()]
+    // 直接持股模拟
     const sD = cd.simRows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
     const wsS = XLSX.utils.aoa_to_sheet([sH,...sD]); wsS['!cols']=sH.map(()=>({wch:14}))
-    XLSX.utils.book_append_sheet(wb, wsS, `${comp.name}-模拟`.substring(0,31))
+    XLSX.utils.book_append_sheet(wb, wsS, `${comp.name}-直接模拟`.substring(0,31))
+  }
+  // 间接持股模拟
+  for (let ici = 0; ici < indirectList.value.length; ici++) {
+    const indComp = indirectList.value[ici]
+    for (let ci = 0; ci < props.companies.length; ci++) {
+      const rows = getIndirectSimRows(ci, ici)
+      const iD = rows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
+      const wsI2 = XLSX.utils.aoa_to_sheet([sH,...iD]); wsI2['!cols']=sH.map(()=>({wch:14}))
+      XLSX.utils.book_append_sheet(wb, wsI2, `${indComp.name}-间接模拟`.substring(0,31))
+    }
+  }
+  XLSX.writeFile(wb, `股比变动${props.changeTimes}次_模板.xlsx`)
+  ElMessage.success('模板已导出，含净资产+直接模拟+间接模拟工作表')
+}
+
+// ─── 导出数据 ────────────────────────────────────────────────────────────────
+async function exportData() {
+  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+  const naH = buildNaHeaders(); const sH = buildSimHeaders()
+  for (let ci = 0; ci < props.companies.length; ci++) {
+    const comp = props.companies[ci]; const cd = companyData[ci]; if (!cd) continue
+    const naD = cd.naRows.map(r => [r.item,...(r.vals||[]).map(v=>v??'')])
+    const wsN = XLSX.utils.aoa_to_sheet([naH,...naD]); wsN['!cols']=naH.map(()=>({wch:16}))
+    XLSX.utils.book_append_sheet(wb, wsN, `${comp.name}-净资产`.substring(0,31))
+    const sD = cd.simRows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
+    const wsS = XLSX.utils.aoa_to_sheet([sH,...sD]); wsS['!cols']=sH.map(()=>({wch:14}))
+    XLSX.utils.book_append_sheet(wb, wsS, `${comp.name}-直接模拟`.substring(0,31))
+  }
+  for (let ici = 0; ici < indirectList.value.length; ici++) {
+    const indComp = indirectList.value[ici]
+    for (let ci = 0; ci < props.companies.length; ci++) {
+      const rows = getIndirectSimRows(ci, ici)
+      const iD = rows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
+      const wsI2 = XLSX.utils.aoa_to_sheet([sH,...iD]); wsI2['!cols']=sH.map(()=>({wch:14}))
+      XLSX.utils.book_append_sheet(wb, wsI2, `${indComp.name}-间接模拟`.substring(0,31))
+    }
   }
   XLSX.writeFile(wb, `股比变动${props.changeTimes}次_数据.xlsx`); ElMessage.success('数据已导出')
 }
@@ -407,7 +506,8 @@ async function onFileSelected(e: Event) {
           matched++
         }
       }
-      const simSheet = wb.SheetNames.find(sn => sn.includes(comp.name) && sn.includes('模拟'))
+      // 直接持股模拟
+      const simSheet = wb.SheetNames.find(sn => sn.includes(comp.name) && (sn.includes('直接模拟') || (sn.includes('模拟') && !sn.includes('间接'))))
       if (simSheet) {
         const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[simSheet], { header: 1 })
         for (let i = 1; i < json.length; i++) {
@@ -417,6 +517,25 @@ async function onFileSelected(e: Event) {
           if (!target || target.isSection) continue
           for (let k = 0; k < dcCount.value; k++) { if (r[2+k] != null && r[2+k] !== '') target.dc[k] = Number(r[2+k]) || null }
           matched++
+        }
+      }
+    }
+    // 间接持股模拟导入
+    for (let ici = 0; ici < indirectList.value.length; ici++) {
+      const indComp = indirectList.value[ici]
+      const indSheet = wb.SheetNames.find(sn => sn.includes(indComp.name) && sn.includes('间接模拟'))
+      if (indSheet) {
+        for (let ci = 0; ci < props.companies.length; ci++) {
+          const rows = getIndirectSimRows(ci, ici)
+          const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[indSheet], { header: 1 })
+          for (let i = 1; i < json.length; i++) {
+            const r = json[i]; const subj = String(r?.[0]||'').trim(); if (!subj) continue
+            const det = String(r?.[1]||'').trim()
+            const target = rows.find(row => row.subject === subj && row.detail === det)
+            if (!target || target.isSection) continue
+            for (let k = 0; k < dcCount.value; k++) { if (r[2+k] != null && r[2+k] !== '') target.dc[k] = Number(r[2+k]) || null }
+            matched++
+          }
         }
       }
     }
@@ -459,8 +578,21 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .sc-company-name { font-size: 14px; font-weight: 700; color: #fff; }
 .sc-company-header :deep(.el-tag) { border-color: rgba(255,255,255,0.3); color: #fff; background: rgba(255,255,255,0.15); }
 
-.sc-three-col { display: flex; gap: 12px; overflow-x: auto; padding: 12px; }
-.sc-col { flex-shrink: 0; min-width: 0; }
+.sc-three-col { display: flex; gap: 0; overflow-x: auto; padding: 12px; }
+.sc-col { flex-shrink: 0; min-width: 250px; }
+.sc-col--collapsed { min-width: 0 !important; width: auto !important; }
+.sc-col--collapsed .sc-col-title { margin-bottom: 0; }
+
+/* 拖拽分隔线 */
+.sc-resizer {
+  width: 8px; flex-shrink: 0; cursor: col-resize; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.sc-resizer:hover { background: rgba(75,45,119,0.06); }
+.sc-resizer-bar {
+  width: 3px; height: 40px; background: #d8d0e8; border-radius: 2px; transition: all 0.2s;
+}
+.sc-resizer:hover .sc-resizer-bar { height: 80px; background: #4b2d77; }
 .sc-col-title { font-size: 12px; font-weight: 600; color: #4b2d77; margin-bottom: 6px; padding: 5px 10px; background: #f8f6fb; border-radius: 4px; }
 .sc-col-title--indirect { background: #edf3fb; color: #1a5fb4; }
 

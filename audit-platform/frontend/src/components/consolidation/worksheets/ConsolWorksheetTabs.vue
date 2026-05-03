@@ -49,6 +49,7 @@
         @restore-defaults="data.netAsset = buildNetAsset()" />
       <EquitySimSheet v-else-if="activeSheet === 'equity_sim'" :companies="companyColumns"
         :direct-rows="data.equitySimDirect" :indirect-sections="data.equitySimIndirect"
+        :net-asset-data="data.netAsset"
         @save="onSave('模拟权益法', $event)" @open-formula="onOpenFormula" />
       <EliminationSheet v-else-if="activeSheet === 'elimination'" :companies="companyColumns"
         :equity-rows="data.elimEquity" :income-rows="data.elimIncome" :cross-rows="data.elimCross"
@@ -102,6 +103,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { List, Coin, TrendCharts, DataBoard, SetUp, Tickets, PieChart } from '@element-plus/icons-vue'
 import { getConsolScope } from '@/services/consolidationApi'
+import { loadAllWorksheetData, saveWorksheetData } from '@/services/consolWorksheetDataApi'
 import SubsidiaryInfoSheet from './SubsidiaryInfoSheet.vue'
 import InvestmentCostSheet from './InvestmentCostSheet.vue'
 import InvestmentEquitySheet from './InvestmentEquitySheet.vue'
@@ -282,10 +284,27 @@ async function loadConsolScope() {
   } catch { /* ignore */ }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadConsolScope()
-  // 监听全局公式变更事件，刷新本地数据
   document.addEventListener('gt-formula-changed', onFormulaChanged)
+  // 从后端加载已保存的工作底稿数据
+  if (projectId.value) {
+    try {
+      const saved = await loadAllWorksheetData(projectId.value, year.value)
+      if (saved.info?.rows) data.subsidiaryInfo = saved.info.rows
+      if (saved.cost?.rows) data.investmentCost = saved.cost.rows
+      if (saved.equity_inv?.rows) data.investmentEquity = saved.equity_inv.rows
+      if (saved.net_asset?.rows) data.netAsset = saved.net_asset.rows
+      if (saved.equity_sim?.rows) {
+        if (saved.equity_sim.rows.direct) data.equitySimDirect = saved.equity_sim.rows.direct
+        if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
+      }
+      if (saved.elimination?.rows) {
+        // elimination 的 rows 可能包含 equity/income/cross
+      }
+      if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
+    } catch { /* 首次使用无数据，忽略 */ }
+  }
 })
 onUnmounted(() => {
   document.removeEventListener('gt-formula-changed', onFormulaChanged)
@@ -481,8 +500,36 @@ function onOpenShareChange(row: SubsidiaryInfoRow, times: number) {
   // 直接切换到对应的股比变动表
   activeSheet.value = `share_change_${times}`
 }
-function onShareChangeSave(_d: any) { ElMessage.success('股比变动数据已保存') }
-function onSave(sheet: string, _p: any) { ElMessage.success(`${sheet} 已保存`) }
+function onShareChangeSave(d: any) {
+  const key = `share_change_${activeShareChangeTimes.value}`
+  doSave(key, d)
+}
+async function onSave(sheet: string, payload: any) {
+  const keyMap: Record<string, string> = {
+    '基本信息表': 'info', '投资明细-成本法': 'cost', '投资明细-权益法': 'equity_inv',
+    '净资产表': 'net_asset', '模拟权益法': 'equity_sim', '合并抵消分录': 'elimination',
+    '资本公积变动': 'capital', '抵消后长投': 'post_invest', '抵消后投资收益': 'post_income',
+    '少数股东权益损益': 'minority', '内部往来抵消': 'internal_arap',
+    '内部交易抵消': 'internal_trade', '内部现金流抵消': 'internal_cashflow',
+  }
+  const key = keyMap[sheet] || sheet
+  await doSave(key, payload)
+  // 基本信息表保存后刷新合并范围（影响子企业列）
+  if (key === 'info') loadConsolScope()
+}
+async function doSave(sheetKey: string, payload: any) {
+  if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
+  try {
+    const ok = await saveWorksheetData(projectId.value, year.value, sheetKey, { rows: payload })
+    if (ok) {
+      ElMessage.success(`${sheetKey} 已保存到服务器`)
+    } else {
+      ElMessage.error('保存失败，请重试')
+    }
+  } catch (err: any) {
+    ElMessage.error('保存失败：' + (err.message || ''))
+  }
+}
 
 // ─── 内部抵消分录汇总 ────────────────────────────────────────────────────────
 const internalEntries = reactive<{ arap: any[]; trade: any[]; cashflow: any[] }>({

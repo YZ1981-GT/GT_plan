@@ -160,7 +160,12 @@ interface IndirectSection {
   endLongInvest: number; endNetAssetShare: number; difference: number; diffReason: string
 }
 
-const props = defineProps<{ companies: CompanyCol[]; directRows: EquitySimRow[]; indirectSections: IndirectSection[] }>()
+const props = defineProps<{
+  companies: CompanyCol[]
+  directRows: EquitySimRow[]
+  indirectSections: IndirectSection[]
+  netAssetData?: any[]  // 净资产表数据，用于自动提取期末值
+}>()
 defineEmits<{
   (e: 'save', data: { direct: EquitySimRow[]; indirect: IndirectSection[] }): void
   (e: 'open-formula', sheetKey: string): void
@@ -278,8 +283,19 @@ function rowClassName({ row }: { row: any }) {
 }
 
 // ─── 比对行：模拟后长投 vs 按比例享有净资产 ──────────────────────────────────
-// 各家期末净资产（可编辑，后续从净资产表联动取值）
 const endNetAssets = reactive<(number | null)[]>([])
+
+// 自动从净资产表提取期末值
+watch(() => props.netAssetData, (data) => {
+  if (!data?.length) return
+  // 找到"期末金额"行（bold + isComputed + item 包含"期末"）
+  const endRow = data.find((r: any) => r.item === '期末金额' && r.bold && r.isComputed)
+  if (endRow?.values) {
+    for (let i = 0; i < companies.value.length; i++) {
+      endNetAssets[i] = endRow.values[i] != null ? Number(endRow.values[i]) || 0 : null
+    }
+  }
+}, { deep: true, immediate: true })
 
 const compareRows = computed(() => {
   const compLen = companies.value.length

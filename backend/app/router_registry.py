@@ -151,10 +151,11 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.consol_notes import router as cn_router
     from app.routers.consol_report import router as cr_router
     from app.routers.consol_worksheet import router as cw_router
+    from app.routers.consol_worksheet_data import router as cwd_router
 
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
-              cw_router]:
+              cw_router, cwd_router]:
         app.include_router(r, tags=["合并报表"])
 
     # ═══ 7. 团队与看板 ═══

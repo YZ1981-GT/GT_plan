@@ -164,7 +164,7 @@
                 <el-input-number v-model="row.non_common_cost" size="small" :precision="2" :controls="false" style="width:100%" />
               </template>
             </el-table-column>
-            <el-table-column prop="non_common_ratio" label="持股比例" width="90" align="right">
+            <el-table-column prop="non_common_ratio" label="持股比例" width="110" align="right">
               <template #default="{ row }">
                 <el-input-number v-model="row.non_common_ratio" size="small" :precision="2" :controls="false" style="width:100%">
                   <template #suffix>%</template>
@@ -178,7 +178,7 @@
                 <el-input-number v-model="row.common_cost" size="small" :precision="2" :controls="false" style="width:100%" />
               </template>
             </el-table-column>
-            <el-table-column prop="common_ratio" label="持股比例" width="90" align="right">
+            <el-table-column prop="common_ratio" label="持股比例" width="110" align="right">
               <template #default="{ row }">
                 <el-input-number v-model="row.common_ratio" size="small" :precision="2" :controls="false" style="width:100%" />
               </template>
@@ -193,7 +193,7 @@
               <el-input-number v-model="row.no_consol_cost" size="small" :precision="2" :controls="false" style="width:100%" />
             </template>
           </el-table-column>
-          <el-table-column prop="no_consol_ratio" label="持股比例" width="90" align="right">
+          <el-table-column prop="no_consol_ratio" label="持股比例" width="110" align="right">
             <template #default="{ row }">
               <el-input-number v-model="row.no_consol_ratio" size="small" :precision="2" :controls="false" style="width:100%" />
             </template>
@@ -215,7 +215,7 @@
               <el-input-number v-model="row.disposal_amount" size="small" :precision="2" :controls="false" style="width:100%" />
             </template>
           </el-table-column>
-          <el-table-column prop="disposal_ratio" label="持股比例" width="90" align="right">
+          <el-table-column prop="disposal_ratio" label="持股比例" width="110" align="right">
             <template #default="{ row }">
               <el-input-number v-model="row.disposal_ratio" size="small" :precision="2" :controls="false" style="width:100%" />
             </template>
