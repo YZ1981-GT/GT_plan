@@ -48,8 +48,9 @@
         <el-table-column prop="total" label="合计" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row._isRatioRow"></span>
-            <el-input-number v-else-if="!row.isStep" v-model="row.total" size="small" :precision="2" :controls="false"
-              style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
+            <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
+              {{ fmt(rowTotal(row)) }}
+            </span>
           </template>
         </el-table-column>
         <!-- 动态子企业列 -->
@@ -115,8 +116,9 @@
         <el-table-column prop="detail" label="二级明细" width="140" show-overflow-tooltip />
         <el-table-column prop="total" label="金额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isStep" v-model="row.total" size="small" :precision="2" :controls="false"
-              style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
+            <span v-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
+              {{ fmt(n(row.total)) }}
+            </span>
           </template>
         </el-table-column>
       </el-table>
@@ -239,6 +241,14 @@ const n = (v: any) => Number(v) || 0
 
 function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
+
+// 合计 = 各子企业列之和
+function rowTotal(row: any): number {
+  if (!row.values || !row.values.length) return n(row.total)
+  const sum = row.values.reduce((s: number, v: any) => s + n(v), 0)
+  row.total = sum // 同步到 total 字段
+  return sum
+}
 
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 const cellStyle = { padding: '2px 4px', fontSize: '11px' }
