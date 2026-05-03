@@ -40,8 +40,9 @@
       <!-- 合计 -->
       <el-table-column prop="total" label="合计" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isHeader" v-model="row.total" size="small" :precision="2" :controls="false"
-            style="width:100%" :class="{ 'ws-auto-cell': row.isComputed }" />
+          <span v-if="!row.isHeader" class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px">
+            {{ fmt(calcRowTotal(row)) }}
+          </span>
         </template>
       </el-table-column>
       <!-- 母公司 -->
@@ -202,6 +203,18 @@ function fmt(v: any) {
   const num = Number(v)
   return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// 合计 = 母公司 + 各子企业之和
+function calcRowTotal(row: NetAssetRow): number {
+  const n = (v: any) => Number(v) || 0
+  let sum = n(row.parent)
+  if (row.values) {
+    for (const v of row.values) sum += n(v)
+  }
+  row.total = sum // 同步到 total 字段
+  return sum
+}
+
 function calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
 const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '2px 0' }

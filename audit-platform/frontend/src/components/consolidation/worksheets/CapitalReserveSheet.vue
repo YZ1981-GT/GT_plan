@@ -22,8 +22,10 @@
       </el-table-column>
       <el-table-column prop="total" label="合计" width="120" align="right">
         <template #default="{ row }">
-          <span v-if="row.isComputed" class="ws-computed" :class="{ 'ws-bold': row.bold }">{{ fmt(row.total) }}</span>
-          <el-input-number v-else v-model="row.total" size="small" :precision="2" :controls="false" style="width:100%" />
+          <span class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px"
+            :class="{ 'ws-bold': row.bold }">
+            {{ fmt(calcCapitalTotal(row)) }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column prop="elimAdj" label="合并抵消环节" width="140" align="right">
@@ -180,6 +182,17 @@ function recalcRows() {
   }
 }
 
+// 合计 = 合并抵消环节 + 母公司 + 各子企业
+function calcCapitalTotal(row: CapitalReserveRow): number {
+  const n = (v: any) => Number(v) || 0
+  let sum = n(row.elimAdj) + n(row.parentVal)
+  if (row.values) {
+    for (const v of row.values) sum += n(v)
+  }
+  row.total = sum
+  return sum
+}
+
 function fmt(v: any) {
   if (v == null) return '-'
   const num = Number(v)
@@ -216,4 +229,5 @@ onUnmounted(() => document.removeEventListener('keydown', onEsc))
 .ws-table :deep(.el-input__inner) { text-align: right; }
 .ws-table :deep(.ws-row-bold td) { font-weight: 600; }
 .ws-table :deep(.ws-row-diff td) { background: #fdf6ec !important; }
+.ws-auto-cell { background: #faf8fd; }
 </style>
