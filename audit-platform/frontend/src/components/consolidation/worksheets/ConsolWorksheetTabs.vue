@@ -475,9 +475,112 @@ const indirectCompanyList = computed(() => {
 })
 
 const elimSummaryForCapital = computed(() => {
-  const row = data.elimEquity.find((r: ElimRow) => r.subject === '资本公积')
-  return { elimCapital: row ? (row.values||[]).reduce((s: number, v: number|null) => s + (Number(v)||0), 0) : 0, equitySimCapital: 0 }
+  const nn = (v: any) => Number(v) || 0
+  const elimRow = data.elimEquity.find((r: ElimRow) => r.subject === '资本公积')
+  const elimCapital = elimRow ? (elimRow.values||[]).reduce((s: number, v: number|null) => s + nn(v), 0) : 0
+  // 从模拟权益法提取资本公积（步骤1+步骤2+步骤4的资本公积贷方合计）
+  let equitySimCapital = 0
+  for (const row of data.equitySimDirect) {
+    if (row.isStep) continue
+    if (row.subject === '资本公积' && row.direction === '贷') {
+      equitySimCapital += (row.values || []).reduce((s: number, v: any) => s + nn(v), 0)
+    }
+  }
+  return { elimCapital, equitySimCapital }
 })
+
+// ─── 从模拟权益法+净资产表自动提取抵消分录 ──────────────────────────────────
+watch([() => data.equitySimDirect, () => data.netAsset], () => {
+  const nn = (v: any) => Number(v) || 0
+  const compLen = companyColumns.value.length
+  if (!compLen) return
+
+  // 权益抵消：从净资产表期末金额行提取各权益科目
+  const netEndRow = data.netAsset.find((r: any) => r.item === '期末金额' && r.bold && r.isComputed)
+  // 按科目名匹配净资产表的明细行到权益抵消行
+  const equityItemMap: Record<string, string> = {
+    '实收资本（或股本）': '实收资本（或股本）', '其他权益工具': '其他权益工具',
+    '资本公积': '资本公积', '减：库存股': '减：库存股', '其他综合收益': '其他综合收益',
+    '专项储备': '专项储备', '盈余公积': '盈余公积', '△一般风险准备': '△一般风险准备',
+    '未分配利润': '未分配利润',
+  }
+  // 找净资产表中"期末金额"后面的各明细行
+  const netEndIdx = data.netAsset.findIndex((r: any) => r.item === '期末金额' && r.bold && r.isComputed)
+  if (netEndIdx >= 0) {
+    for (let j = netEndIdx + 1; j < data.netAsset.length; j++) {
+      const naRow = data.netAsset[j]
+      if (naRow.bold || naRow.isHeader || (naRow.indent || 0) === 0) break
+      const elimRow = data.elimEquity.find((r: ElimRow) => equityItemMap[naRow.item] === r.subject)
+      if (elimRow && naRow.values) {
+        if (!elimRow.values) elimRow.values = []
+        for (let k = 0; k < compLen; k++) {
+          elimRow.values[k] = nn(naRow.values[k])
+        }
+      }
+    }
+  }
+
+  // 权益抵消：长期股权投资（贷方）从模拟权益法的"模拟后长投"区域提取
+  const simRows = data.equitySimDirect
+  const simEndIdx = simRows.findIndex((r: EquitySimRow) => r.step === '模拟后期末长期股权投资' && r.isStep)
+  if (simEndIdx >= 0) {
+    for (let j = simEndIdx + 1; j < simRows.length; j++) {
+      const simRow = simRows[j]
+      if (simRow.isStep) break
+      if (simRow.subject === '长期股权投资') {
+        const elimRow = data.elimEquity.find((r: ElimRow) => r.subject === '长期股权投资' && r.detail === simRow.detail)
+        if (elimRow && simRow.values) {
+          if (!elimRow.values) elimRow.values = []
+          for (let k = 0; k < compLen; k++) {
+            elimRow.values[k] = nn(simRow.values[k])
+          }
+        }
+      }
+    }
+  }
+
+  // 损益抵消：从模拟权益法步骤2（当期变动）提取投资收益
+  const step2Idx = simRows.findIndex((r: EquitySimRow) => r.step === '模拟当期长期股权投资' && r.isStep)
+  if (step2Idx >= 0) {
+    for (let j = step2Idx + 1; j < simRows.length; j++) {
+      const simRow = simRows[j]
+      if (simRow.isStep) break
+      if (simRow.subject === '投资收益' && !simRow.detail) {
+        const elimRow = data.elimIncome.find((r: ElimRow) => r.subject === '投资收益')
+        if (elimRow && simRow.values) {
+          if (!elimRow.values) elimRow.values = []
+          for (let k = 0; k < compLen; k++) {
+            elimRow.values[k] = nn(simRow.values[k])
+          }
+        }
+      }
+      // 利润分配相关行
+      if (simRow.detail?.includes('利润分配') || simRow.detail?.includes('所有者投入')) {
+        const elimRow = data.elimIncome.find((r: ElimRow) => r.subject === simRow.subject && r.detail === simRow.detail)
+        if (elimRow && simRow.values) {
+          if (!elimRow.values) elimRow.values = []
+          for (let k = 0; k < compLen; k++) {
+            elimRow.values[k] = nn(simRow.values[k])
+          }
+        }
+      }
+    }
+  }
+
+  // 损益抵消：步骤3（还原分红）的投资收益借方 → 年初未分配利润
+  const step3Idx = simRows.findIndex((r: EquitySimRow) => r.step === '还原分红影响' && r.isStep)
+  if (step3Idx >= 0) {
+    for (let j = step3Idx + 1; j < simRows.length; j++) {
+      const simRow = simRows[j]
+      if (simRow.isStep) break
+      if (simRow.subject === '投资收益' && simRow.direction === '借') {
+        // 还原分红的投资收益借方 → 少数股权损益
+        const elimRow = data.elimIncome.find((r: ElimRow) => r.subject === '少数股权损益')
+        // 这里逻辑较复杂，暂不自动填充，留给用户手动调整
+      }
+    }
+  }
+}, { deep: true })
 
 // ─── 股比变动（内联表，非弹窗） ─────────────────────────────────────────────
 const activeShareChangeTimes = computed(() => {
