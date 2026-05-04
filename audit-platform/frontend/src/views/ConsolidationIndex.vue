@@ -1263,14 +1263,16 @@ watch(activeTab, (tab) => {
   display: flex; gap: 0;
 }
 .gt-report-type-tag {
-  padding: 6px 14px; font-size: 12px; color: #666; cursor: pointer;
+  padding: 8px 20px; font-size: 14px; color: #666; cursor: pointer;
   border-bottom: 2px solid transparent; margin-bottom: -2px;
   transition: all 0.15s; white-space: nowrap; user-select: none;
+  letter-spacing: 0.5px;
 }
-.gt-report-type-tag:hover { color: #4b2d77; background: rgba(75,45,119,0.03); }
+.gt-report-type-tag:hover { color: #4b2d77; background: rgba(75,45,119,0.04); border-radius: 6px 6px 0 0; }
 .gt-report-type-tag--active {
   color: #4b2d77; font-weight: 600;
   border-bottom-color: #4b2d77;
+  background: rgba(75,45,119,0.03); border-radius: 6px 6px 0 0;
 }
 
 /* ── 合并报表表格紧凑样式 ── */
