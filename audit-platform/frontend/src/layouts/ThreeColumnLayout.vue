@@ -130,6 +130,9 @@
           </div>
         </el-tooltip>
 
+        <!-- 同步状态指示器 -->
+        <SyncStatusIndicator />
+
         <el-tooltip content="通知" placement="bottom">
           <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
             <el-icon :size="18"><Bell /></el-icon>
@@ -294,8 +297,11 @@ import {
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
+import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue'
 import { eventBus } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
+import { createSSE, type SSEConnection } from '@/utils/sse'
+import { events as eventPaths } from '@/services/apiPaths'
 
 const route = useRoute()
 const router = useRouter()
@@ -535,6 +541,43 @@ async function handleLogout() {
   router.push('/login')
 }
 
+// ── SSE 全局连接 ──
+let sseConnection: SSEConnection | null = null
+
+function connectSSE(projectId: string) {
+  // 关闭旧连接
+  if (sseConnection) {
+    sseConnection.close()
+    sseConnection = null
+  }
+  if (!projectId) return
+
+  const url = eventPaths.stream(projectId)
+  sseConnection = createSSE(url, { maxRetries: 5, retryInterval: 3000 })
+
+  sseConnection.onOpen(() => {
+    eventBus.emit('sse:connected')
+  })
+
+  sseConnection.onMessage((data, _event) => {
+    if (!data || !data.event_type) return
+    if (data.event_type === 'sync.failed') {
+      eventBus.emit('sse:sync-failed', data)
+    } else {
+      eventBus.emit('sse:sync-event', data)
+    }
+  })
+
+  sseConnection.onError(() => {
+    eventBus.emit('sse:disconnected')
+  })
+}
+
+// 监听项目切换，自动重连 SSE
+watch(() => route.params.projectId, (newId) => {
+  connectSSE(newId as string || '')
+}, { immediate: true })
+
 // 监听子组件打开公式管理的自定义事件
 function onOpenFormulaEvent(payload: { nodeKey?: string }) {
   showFormulaManager.value = true
@@ -588,6 +631,8 @@ onUnmounted(() => {
   eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
+  // 关闭 SSE 连接
+  if (sseConnection) { sseConnection.close(); sseConnection = null }
 })
 </script>
 

@@ -763,6 +763,8 @@ class EventType(str, enum.Enum):
     LEDGER_DATASET_VALIDATED = "ledger.dataset_validated"
     LEDGER_DATASET_ACTIVATED = "ledger.dataset_activated"
     LEDGER_DATASET_ROLLED_BACK = "ledger.dataset_rolled_back"
+    # Phase 18: 事件链路失败通知
+    SYNC_FAILED = "sync.failed"
 
 
 class EventPayload(BaseModel):

@@ -133,6 +133,8 @@ const consolTbType = ref('balance_sheet')
 const consolTbLoading = ref(false)
 const consolTbRows = ref<any[]>([])
 const tbEditMode = ref(false)
+// Note: tbEditMode kept as simple ref for backward compatibility.
+// useEditMode is available via GtEditableTable for new modules.
 const tbPeriod = ref<'closing' | 'opening'>('closing')
 const tbCache = new Map<string, any[]>()
 

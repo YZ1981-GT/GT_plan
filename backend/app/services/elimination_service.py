@@ -196,3 +196,75 @@ async def get_summary(db: AsyncSession, project_id: UUID, year: int) -> list[Eli
         )
         for t, v in type_map.items()
     ]
+
+
+async def get_summary_center(
+    db: AsyncSession, project_id: UUID, year: int,
+) -> dict:
+    """
+    合并抵消分录表汇总中心 [R11.2]
+
+    返回 5 个区域的汇总数据：
+    1. 权益抵消区 — equity 类型分录汇总
+    2. 内部交易区 — internal_trade 类型分录汇总
+    3. 内部往来区 — internal_ar_ap 类型分录汇总
+    4. 未实现利润区 — unrealized_profit 类型分录汇总
+    5. 其他调整区 — other 类型分录汇总
+
+    每个区域包含：分录列表、借方合计、贷方合计、净额、分录数量
+    """
+    entries = await get_entries(db, project_id, year)
+
+    areas: dict[str, dict] = {
+        "equity": {"label": "权益抵消", "entries": [], "total_debit": Decimal("0"), "total_credit": Decimal("0")},
+        "internal_trade": {"label": "内部交易", "entries": [], "total_debit": Decimal("0"), "total_credit": Decimal("0")},
+        "internal_ar_ap": {"label": "内部往来", "entries": [], "total_debit": Decimal("0"), "total_credit": Decimal("0")},
+        "unrealized_profit": {"label": "未实现利润", "entries": [], "total_debit": Decimal("0"), "total_credit": Decimal("0")},
+        "other": {"label": "其他调整", "entries": [], "total_debit": Decimal("0"), "total_credit": Decimal("0")},
+    }
+
+    for e in entries:
+        area_key = e.entry_type.value if e.entry_type.value in areas else "other"
+        area = areas[area_key]
+        entry_debit = Decimal("0")
+        entry_credit = Decimal("0")
+        for line in (e.lines or []):
+            entry_debit += Decimal(str(line.get("debit_amount") or 0))
+            entry_credit += Decimal(str(line.get("credit_amount") or 0))
+
+        area["entries"].append({
+            "id": str(e.id),
+            "entry_no": e.entry_no,
+            "description": e.description,
+            "debit_amount": str(entry_debit),
+            "credit_amount": str(entry_credit),
+            "review_status": e.review_status.value if e.review_status else "draft",
+            "related_companies": e.related_company_codes,
+        })
+        area["total_debit"] += entry_debit
+        area["total_credit"] += entry_credit
+
+    # 转换为可序列化格式
+    result = {}
+    grand_total_debit = Decimal("0")
+    grand_total_credit = Decimal("0")
+    for key, area in areas.items():
+        result[key] = {
+            "label": area["label"],
+            "count": len(area["entries"]),
+            "entries": area["entries"],
+            "total_debit": str(area["total_debit"]),
+            "total_credit": str(area["total_credit"]),
+            "net_amount": str(area["total_debit"] - area["total_credit"]),
+        }
+        grand_total_debit += area["total_debit"]
+        grand_total_credit += area["total_credit"]
+
+    result["grand_total"] = {
+        "total_debit": str(grand_total_debit),
+        "total_credit": str(grand_total_credit),
+        "net_amount": str(grand_total_debit - grand_total_credit),
+        "entry_count": len(entries),
+    }
+
+    return result

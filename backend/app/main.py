@@ -31,6 +31,24 @@ from app.router_registry import register_all_routers
 async def lifespan(app: FastAPI):
     """应用生命周期：启动时注册事件处理器 + Phase 15 SLA 定时检查"""
     setup_logging(level="INFO", json_format=False)
+
+    # 数据库版本化迁移（D6：版本化 SQL 脚本）
+    from app.core.migration_runner import MigrationRunner
+    try:
+        runner = MigrationRunner(database_url=settings.DATABASE_URL)
+        applied = await runner.run_pending()
+        if applied:
+            import logging as _mig_log
+            _mig_log.getLogger("audit_platform").info(
+                "[启动] 数据库迁移完成，执行了版本: %s", applied
+            )
+        await runner.close()
+    except Exception as _mig_err:
+        import logging as _mig_log
+        _mig_log.getLogger("audit_platform").warning(
+            "[启动] 数据库迁移失败（应用仍继续启动）: %s", _mig_err
+        )
+
     register_event_handlers()
 
     # Phase 14: 注册门禁规则

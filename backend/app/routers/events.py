@@ -71,6 +71,7 @@ async def sse_stream(
                     "account_codes": payload.account_codes,
                     "entry_group_id": str(payload.entry_group_id) if payload.entry_group_id else None,
                     "batch_id": str(payload.batch_id) if payload.batch_id else None,
+                    "extra": payload.extra if payload.extra else None,
                 }
                 yield f"event: {payload.event_type.value}\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
 

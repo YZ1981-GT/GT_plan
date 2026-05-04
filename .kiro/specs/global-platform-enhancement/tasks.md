@@ -65,7 +65,7 @@
 - [x] 在 ReportView 本期金额列试点替换
 
 ### Task 1.11 — Sprint 1 收尾
-- [-] git commit + push
+- [x] git commit + push
 - [x] 更新 memory.md 待办状态
 
 ---
@@ -240,74 +240,74 @@
 ## Sprint 4：高阶组件 + 验证 + 优化（~7天）
 
 ### Task 4.1 — GtEditableTable 高阶组件 [R5.2]
-- [ ] 创建 components/common/GtEditableTable.vue
-- [ ] 内置：useCellSelection + setupTableDrag + useLazyEdit + useEditMode
-- [ ] 内置：SelectionBar + CellContextMenu + CommentTooltip
-- [ ] 内置：增删行 + 多选 + 全屏 + displayPrefs
-- [ ] 列配置声明式（prop/label/width/formatter/sortable/fixed）
-- [ ] 迁移 ConsolNoteTab 表格（示范）
-- [ ] 迁移 1-2 个 worksheet 组件验证
+- [x] 创建 components/common/GtEditableTable.vue
+- [x] 内置：useCellSelection + setupTableDrag + useLazyEdit + useEditMode
+- [x] 内置：SelectionBar + CellContextMenu + CommentTooltip
+- [x] 内置：增删行 + 多选 + 全屏 + displayPrefs
+- [x] 列配置声明式（prop/label/width/formatter/sortable/fixed）
+- [x] 迁移 ConsolNoteTab 表格（示范）
+- [x] 迁移 1-2 个 worksheet 组件验证
 
 ### Task 4.2 — 端到端验证 [R1.1]
-- [ ] 准备测试数据（3-5 家子公司的合并审计项目）
-- [ ] 导入科目余额表 + 序时账
-- [ ] 科目映射 + 试算表重算
-- [ ] 录入调整分录 + 验证五环联动
-- [ ] 生成报表 + 审核校验
-- [ ] 生成附注 + AI 续写
-- [ ] 底稿编制 + QC 检查
-- [ ] Word 导出
-- [ ] 记录发现的问题并修复
+- [x] 准备测试数据（3-5 家子公司的合并审计项目）
+- [x] 导入科目余额表 + 序时账
+- [x] 科目映射 + 试算表重算
+- [x] 录入调整分录 + 验证五环联动
+- [x] 生成报表 + 审核校验
+- [x] 生成附注 + AI 续写
+- [x] 底稿编制 + QC 检查
+- [x] Word 导出
+- [x] 记录发现的问题并修复
 
 ### Task 4.3 — 数据库 migration [R1.2]
-- [ ] 创建 backend/migrations/ 目录
-- [ ] 创建 migration_runner.py：扫描+执行+记录版本
-- [ ] 创建 schema_version 表
-- [ ] 将当前 create_all 转为 V001__init.sql
-- [ ] 在 lifespan 中自动执行迁移
-- [ ] 验证新表/新列的迁移流程
+- [x] 创建 backend/migrations/ 目录
+- [x] 创建 migration_runner.py：扫描+执行+记录版本
+- [x] 创建 schema_version 表
+- [x] 将当前 create_all 转为 V001__init.sql
+- [x] 在 lifespan 中自动执行迁移
+- [x] 验证新表/新列的迁移流程
 
 ### Task 4.4 — 合并模块集成测试 [R1.5]
-- [ ] 创建 test_consolidation_chain.py
-- [ ] 测试：创建合并范围 → 导入子公司数据
-- [ ] 测试：合并试算表重算
-- [ ] 测试：抵消分录 CRUD
-- [ ] 测试：差额表计算
-- [ ] 测试：合并报表生成
+- [x] 创建 test_consolidation_chain.py
+- [x] 测试：创建合并范围 → 导入子公司数据
+- [x] 测试：合并试算表重算
+- [x] 测试：抵消分录 CRUD
+- [x] 测试：差额表计算
+- [x] 测试：合并报表生成
 
 ### Task 4.5 — 事件链路失败通知 + SSE 全局接入 [R1.3 + R6.5]
-- [ ] 后端：事件处理失败时发布 EventType.SYNC_FAILED
-- [ ] 后端：SSE 推送失败事件
-- [ ] 前端：ThreeColumnLayout 接入 sse.ts 全局连接
-- [ ] 前端：顶栏显示同步状态指示器（成功/失败/进行中）
-- [ ] 前端：失败时弹出详情面板
+- [x] 后端：事件处理失败时发布 EventType.SYNC_FAILED
+- [x] 后端：SSE 推送失败事件
+- [x] 前端：ThreeColumnLayout 接入 sse.ts 全局连接
+- [x] 前端：顶栏显示同步状态指示器（成功/失败/进行中）
+- [x] 前端：失败时弹出详情面板
 
 ### Task 4.6 — 架构优化 [R8]
-- [ ] Element Plus 按需导入（unplugin-vue-components）
-- [ ] ResponseWrapperMiddleware 跳过 blob/大文件响应
-- [ ] POST 请求防重复提交（pendingMap 扩展到 POST）
-- [ ] 压力测试脚本（locust/k6）
+- [x] Element Plus 按需导入（unplugin-vue-components）
+- [x] ResponseWrapperMiddleware 跳过 blob/大文件响应
+- [x] POST 请求防重复提交（pendingMap 扩展到 POST）
+- [x] 压力测试脚本（locust/k6）
 
 ### Task 4.7 — 用户体验 [R9]
-- [ ] 合并模块向导式步骤条 [R9.1]
-- [ ] 500 重试 loading 提示 [R9.2]
-- [ ] 423 锁定详情（锁定人/时间/解锁方式）[R9.3]
-- [ ] useEditMode 推广到全模块 [R9.4]
-- [ ] 键盘导航（Tab 切换单元格）+ 批量粘贴（配合 useCopyPaste）[R9.5]
+- [x] 合并模块向导式步骤条 [R9.1]
+- [x] 500 重试 loading 提示 [R9.2]
+- [x] 423 锁定详情（锁定人/时间/解锁方式）[R9.3]
+- [x] useEditMode 推广到全模块 [R9.4]
+- [x] 键盘导航（Tab 切换单元格）+ 批量粘贴（配合 useCopyPaste）[R9.5]
 
 ### Task 4.8 — 表格交互 WPS 借鉴 [R10]
-- [ ] GtEditableTable 列配置支持 hidden/validator/_locked [R10.1/R10.2/R10.3]
-- [ ] 分组折叠（groupBy 配置）[R10.4]
-- [ ] 排序筛选默认开启 [R10.5]
-- [ ] 打印预览弹窗 [R10.6]
-- [ ] 批注线程（回复链）[R10.7]
+- [x] GtEditableTable 列配置支持 hidden/validator/_locked [R10.1/R10.2/R10.3]
+- [x] 分组折叠（groupBy 配置）[R10.4]
+- [x] 排序筛选默认开启 [R10.5]
+- [x] 打印预览弹窗 [R10.6]
+- [x] 批注线程（回复链）[R10.7]
 
 ### Task 4.9 — 功能完善 [R11]
-- [ ] 模拟权益法 6 项改进
-- [ ] 合并抵消分录表汇总中心
-- [ ] 内部抵消表自动汇总
+- [x] 模拟权益法 6 项改进
+- [x] 合并抵消分录表汇总中心
+- [x] 内部抵消表自动汇总
 
 ### Task 4.10 — 最终收尾
-- [ ] 全量 vue-tsc + Vite 构建验证
-- [ ] git commit + push + 合并到 master
-- [ ] 更新 memory.md + architecture.md + dev-history.md
+- [-] 全量 vue-tsc + Vite 构建验证
+- [~] git commit + push + 合并到 master
+- [~] 更新 memory.md + architecture.md + dev-history.md

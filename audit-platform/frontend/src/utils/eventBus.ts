@@ -77,6 +77,20 @@ export interface TemplateAppliedPayload {
   projectId?: string
 }
 
+/** SSE 同步状态事件 */
+export interface SyncEventPayload {
+  event_type: string
+  project_id: string
+  year?: number
+  account_codes?: string[]
+  extra?: {
+    source_event?: string
+    handler?: string
+    error?: string
+    [key: string]: any
+  }
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -95,6 +109,12 @@ export type Events = {
 
   // 模板 & 地址注册表
   'template-applied': TemplateAppliedPayload
+
+  // SSE 同步状态
+  'sse:sync-event': SyncEventPayload
+  'sse:sync-failed': SyncEventPayload
+  'sse:connected': void
+  'sse:disconnected': void
 
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void
