@@ -15,6 +15,7 @@
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
         <el-button size="small" @click="emitArap('save', rows)">💾 保存</el-button>
+        <el-button size="small" type="success" @click="runReconcile">🔍 逐笔核对</el-button>
       </div>
     </div>
     <div class="ws-tip" v-show="!isFullscreen">
@@ -126,6 +127,15 @@
       <el-table-column prop="diffReason" label="差异原因" width="130">
         <template #default="{ row }"><el-input v-model="row.diffReason" size="small" placeholder="原因" /></template>
       </el-table-column>
+      <el-table-column label="核对" width="60" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row._reconcileStatus === 'matched'" type="success" size="small" effect="plain">✓</el-tag>
+          <el-tooltip v-else-if="row._reconcileStatus === 'diff'" :content="`差异: ${fmt(row._reconcileDiff)}${row._impairmentDiff ? '，坏账差异: ' + fmt(row._impairmentDiff) : ''}`" placement="left">
+            <el-tag type="warning" size="small" effect="plain">≠</el-tag>
+          </el-tooltip>
+          <span v-else style="color:#ccc">—</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- 抵消分录预览 -->
@@ -145,6 +155,19 @@
     </div>
 
     <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
+
+    <!-- 核对结果摘要 -->
+    <div v-if="showReconcileResult" class="ws-section" style="margin-top:8px">
+      <div class="ws-section-title">🔍 逐笔核对结果</div>
+      <div style="display:flex;gap:16px;padding:8px 12px;font-size:13px;background:#f8f7fc;border-radius:6px">
+        <span>总笔数：<b>{{ reconcileStats.total }}</b></span>
+        <span style="color:#28a745">一致：<b>{{ reconcileStats.matched }}</b></span>
+        <span style="color:#e6a23c">有差异：<b>{{ reconcileStats.diffCount }}</b></span>
+        <span v-if="reconcileStats.total > 0" style="color:#999">
+          核对率：<b>{{ Math.round(reconcileStats.matched / reconcileStats.total * 100) }}%</b>
+        </span>
+      </div>
+    </div>
 
     <!-- 自定义账龄段弹窗 -->
     <el-dialog v-model="showAgingDialog" title="自定义账龄段" width="500px" append-to-body>
@@ -300,31 +323,104 @@ const n = (v: any) => Number(v) || 0
 function sumArr(arr: (number|null)[]): number { return arr.reduce((s: number, v) => s + n(v), 0) }
 function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
+// ─── 逐笔核对 ────────────────────────────────────────────────────────────────
+const showReconcileResult = ref(false)
+const reconcileStats = reactive({ total: 0, matched: 0, diffCount: 0, unmatchedLocal: 0, unmatchedRemote: 0 })
+
+function runReconcile() {
+  // 按 本方单位+对方单位+科目 分组，逐笔比对金额
+  let matched = 0, diffCount = 0, unmatchedLocal = 0, unmatchedRemote = 0
+
+  // 构建对方视角的索引：remoteCompany+remoteSubject → rows[]
+  const remoteIndex = new Map<string, any[]>()
+  for (const row of rows) {
+    if (!row.remoteCompany || !row.remoteSubject) continue
+    const key = `${row.remoteCompany}|${row.remoteSubject}|${row.localCompany}`
+    if (!remoteIndex.has(key)) remoteIndex.set(key, [])
+    remoteIndex.get(key)!.push(row)
+  }
+
+  const usedRemote = new Set<any>()
+
+  for (const row of rows) {
+    if (!row.localCompany || !row.localSubject) {
+      row._reconcileStatus = ''
+      continue
+    }
+    const localTotal = sumArr(row.localAmounts)
+    const remoteTotal = sumArr(row.remoteAmounts)
+
+    if (localTotal === 0 && remoteTotal === 0) {
+      row._reconcileStatus = ''
+      continue
+    }
+
+    // 差异 = 本方 - 对方
+    const diff = Math.round((localTotal - remoteTotal) * 100) / 100
+    if (Math.abs(diff) < 0.01) {
+      row._reconcileStatus = 'matched'
+      matched++
+    } else {
+      row._reconcileStatus = 'diff'
+      row._reconcileDiff = diff
+      diffCount++
+    }
+
+    // 检查坏账差异
+    const localImpTotal = sumArr(row.localImpairments)
+    const remoteImpTotal = sumArr(row.remoteImpairments)
+    row._impairmentDiff = Math.round((localImpTotal - remoteImpTotal) * 100) / 100
+  }
+
+  reconcileStats.total = rows.filter(r => r.localCompany || r.remoteCompany).length
+  reconcileStats.matched = matched
+  reconcileStats.diffCount = diffCount
+  reconcileStats.unmatchedLocal = unmatchedLocal
+  reconcileStats.unmatchedRemote = unmatchedRemote
+  showReconcileResult.value = true
+  ElMessage.success(`核对完成：${matched} 笔一致，${diffCount} 笔有差异`)
+}
+
 // ─── 自动生成抵消分录 ────────────────────────────────────────────────────────
 const generatedEntries = computed(() => {
   const entries: any[] = []
-  const pairMap = new Map<string, { local: number; remote: number; localImp: number; remoteImp: number }>()
+  const pairMap = new Map<string, { local: number; remote: number; localImp: number; remoteImp: number; localByAging: number[]; remoteByAging: number[] }>()
   for (const row of rows) {
     if (!row.localSubject && !row.remoteSubject) continue
     const key = `${row.localSubject}|${row.remoteSubject}`
-    if (!pairMap.has(key)) pairMap.set(key, { local: 0, remote: 0, localImp: 0, remoteImp: 0 })
+    if (!pairMap.has(key)) pairMap.set(key, { local: 0, remote: 0, localImp: 0, remoteImp: 0, localByAging: agingSegments.value.map(() => 0), remoteByAging: agingSegments.value.map(() => 0) })
     const m = pairMap.get(key)!
     m.local += sumArr(row.localAmounts)
     m.remote += sumArr(row.remoteAmounts)
     m.localImp += sumArr(row.localImpairments)
     m.remoteImp += sumArr(row.remoteImpairments)
+    // 按账龄段累加
+    for (let i = 0; i < agingSegments.value.length; i++) {
+      m.localByAging[i] += n(row.localAmounts[i])
+      m.remoteByAging[i] += n(row.remoteAmounts[i])
+    }
   }
   for (const [key, vals] of pairMap) {
     const [localSubj, remoteSubj] = key.split('|')
     const amount = Math.min(vals.local, vals.remote)
     if (amount > 0) {
-      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: '内部往来抵消' })
-      entries.push({ direction: '贷', subject: remoteSubj || localSubj, amount, desc: '内部往来抵消' })
+      // 往来抵消分录
+      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: `内部往来抵消（本方${fmt(vals.local)} / 对方${fmt(vals.remote)}）` })
+      entries.push({ direction: '贷', subject: remoteSubj || localSubj, amount, desc: `内部往来抵消` })
     }
-    const totalImp = vals.localImp + vals.remoteImp
-    if (totalImp > 0) {
-      entries.push({ direction: '借', subject: '坏账准备', amount: totalImp, desc: '冲回内部往来坏账' })
-      entries.push({ direction: '贷', subject: '信用减值损失', amount: totalImp, desc: '冲回内部往来坏账' })
+    // 坏账准备冲回（本方+对方的坏账都要冲回）
+    if (vals.localImp > 0) {
+      entries.push({ direction: '借', subject: '坏账准备', amount: vals.localImp, desc: `冲回本方坏账（${localSubj}）` })
+      entries.push({ direction: '贷', subject: '信用减值损失', amount: vals.localImp, desc: `冲回本方坏账` })
+    }
+    if (vals.remoteImp > 0) {
+      entries.push({ direction: '借', subject: '坏账准备', amount: vals.remoteImp, desc: `冲回对方坏账（${remoteSubj}）` })
+      entries.push({ direction: '贷', subject: '信用减值损失', amount: vals.remoteImp, desc: `冲回对方坏账` })
+    }
+    // 差异提示
+    const diff = Math.round((vals.local - vals.remote) * 100) / 100
+    if (Math.abs(diff) > 0.01) {
+      entries.push({ direction: '—', subject: '⚠️ 差异', amount: diff, desc: `${localSubj}↔${remoteSubj} 未抵消差异` })
     }
   }
   return entries
