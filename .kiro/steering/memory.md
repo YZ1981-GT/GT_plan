@@ -40,10 +40,15 @@ inclusion: always
 - uvicorn --reload-dir app（限制监控范围，避免 347 个 JSON 拖慢）
 - MAX_UPLOAD_SIZE_MB=800 / MAX_REQUEST_BODY_MB=850
 
-## 当前系统状态（2026-05-02）
+## 当前系统状态（2026-05-04）
 
-- 17 个开发阶段中 16 个完成，仅合并报表前端存在 211 个 TS 错误（developing）
+- 17 个开发阶段中 16 个完成，前端非平凡 TS 错误 0 个（仅剩 82 个 unused variable 警告）
+- 旧版合并模块已清除：删除 11 个 views/consolidation/ + 14 个旧组件 + 1 个旧 store（共 26 个文件），当前合并模块统一由 ConsolidationIndex.vue 承载
+- Vite 构建验证通过（清除旧文件后 + 修复 TrialBalance/ReportView 空 CSS 选择器未闭合 bug）
 - 后端约700路由正常加载，0 个 stub 残留
+- PG 143 张表（consol_cell_comments + account_note_mapping），account_note_mapping 路由 4 个 API（GET/PUT/DELETE/auto-generate）
+- 汇总穿透已接真实数据：POST /api/report-config/drill-down 从各子企业 consol_worksheet_data 按 row_code 提取实际金额，降级保留持股比例估算
+- 附注 refresh API 三级匹配：精确科目名 → account_note_mapping 映射表 → 模糊包含匹配（len>=2）
 - 审计员 8 步全流程理论可走通（导入-查账-调整-试算表-底稿-附注-报告-Word导出）
 - 附注 8 种校验器全部做实，预设公式国企 757 条 + 上市 804 条已集成到引擎，QC 28 条规则全部做实
 - 底稿精细化规则 347 个 JSON（77 个 A 级精修 + 270 个 C 级程序表），明细行动态发现（detail_discovery），全部 v2025-R2
@@ -79,7 +84,7 @@ inclusion: always
 - ~~附注校验公式从 md 导入~~ ✅ 已完成：国企 757 条 + 上市 804 条（继承国企版+差异+特有）
 - ~~上市版校验公式仅 179 条需补全~~ ✅ 已完成：上市版继承国企版全部公式，差异公式替换/排除，特有公式追加
 - ~~上市版五章 29 个无表格章节排查~~ ✅ 已排查：实际仅 3 个第五章空表格（F19/F22/F26 各 1-2 个子表），其余为政策描述型表格无需数据行
-- 合并报表前端 211 个 TS 错误专项修复（2-3 周）
+- ~~合并报表前端 211 个 TS 错误专项修复（2-3 周）~~ ✅ 已完成：删除 26 个旧版文件 + 修复类型定义，非平凡 TS 错误归零
 - 合并工作底稿表样逐表完善（基本信息表→投资明细→净资产表→模拟权益法→抵消分录→资本公积变动）
 - ~~合并工作底稿7张表功能对齐~~ ✅ 已完成：全屏/公式管理/导出模板/导出数据/导入Excel/多选删除/增删行/还原（大部分表已统一，部分汇总表仍缺项见下）
 - ~~合并工作底稿复盘缺陷（P0）：EquitySimSheet.rowTotal() + NetAssetSheet.calcRowTotal() 在渲染中修改 reactive 数据，需改为纯计算函数~~ ✅ 已修复
@@ -105,18 +110,21 @@ inclusion: always
 - 自定义查询改为全局功能（待开发）：支持按底稿/报表/附注/调整分录/单位/年度多维度查询，树形地址坐标库选择指标，查询指标库，结果支持导出/转置/复制
 - 公式管理中心左侧数据源树（报表/附注/流动资产/长期资产/负债/损益类/合并报表/表间审核）待统一补充完善，各模块开发完毕后更新
 - P0重构（已完成）：ConsolidationIndex.vue 合并附注已拆分为 ConsolNoteTab.vue 独立组件（2968→1522行，减少49%）
-- P0重构（已完成）：通用 useCellSelection composable + CellContextMenu.vue 组件已创建，各模块逐步迁移
+- ~~P0重构：通用 useCellSelection composable + CellContextMenu.vue 组件已创建，各模块逐步迁移~~ ✅ 全部5模块迁移完成（DisclosureEditor/TrialBalance/ReportView/ConsolidationIndex/ConsolNoteTab），旧的重复样式和类名已清除，模块特有菜单项通过 slot 插入
 - P1修复（已完成）：试算平衡表 getter 审定数改为 watch deep + recalcTbAudited 函数（Vue reactive 不追踪原生 getter）
 - P1重构：consol_note_sections.py 暂不拆分（1003行但内部分隔清晰，拆分风险大于收益）
 - P2优化：组件间 CustomEvent 通信部分改为 Pinia store
-- 短期待办：试算平衡表审定数→合并报表一键生成（回填 report_config current_period_amount）
-- 短期待办：附注数据回显（onNoteNodeClick 加载已保存数据覆盖模板默认值）
-- 短期待办：批注和复核标记持久化（consol_cell_comments 表）
-- 中期待办：科目→附注行映射表（提高 refresh API 匹配率）
+- ~~短期待办：试算平衡表审定数→合并报表一键生成（回填 report_config current_period_amount）~~ ✅ 已完成：generateReportFromTb 调 batch-update API
+- ~~短期待办：附注数据回显（onNoteNodeClick 加载已保存数据覆盖模板默认值）~~ ✅ 已完成
+- ~~短期待办：批注和复核标记持久化（consol_cell_comments 表）~~ ✅ 已完成：consol_cell_comments 表（module+sheet_key+row/col 定位，comment/review 两种类型）+ 4个API + useCellComments composable + 6模块集成 + 视觉标记（批注橙色三角/复核绿色✓）
+- Bug修复：auditConsolTb 空函数导致 generateReportFromTb 被嵌套定义（已修复）
+- Bug修复：6处过时的"预留接口"降级提示改为真正的错误提示（后端API已存在）
+- Bug修复：TrialBalance 缺少 http 导入 + fmtAmt 类型不匹配；ReportView loadReport→fetchReport 引用错误
+- ~~中期待办：科目→附注行映射表（提高 refresh API 匹配率）~~ ✅ 已完成：account_note_mapping 表 + 4 API + refresh 三级匹配 + auto-generate 自动推断
 - 查看/编辑模式切换组件（纯文本可复制↔el-input 编辑）后续推广到报表、底稿、试算表等所有表格模块
 - 全屏/复制整表/单元格选中+右键菜单已推广到所有6个模块：单体报表（ReportView）、单体试算表（TrialBalance）、单体附注（DisclosureEditor）、合并报表、合并附注、合并试算平衡表
 - 合并试算平衡表（已完成前后端）：3张表（资产负债/损益/现金流），列=审定汇总+权益抵消(借贷)+往来交易抵消(借贷)+报表调整(借贷)+合并审定数，行结构以现有报表模板（report_config）为主，审定数用getter自动计算，提取填充API POST /fill-tb 从子企业试算表汇总+工作底稿抵消分录提取，数据存consol_worksheet_data（key: consol_tb_{type}_{period}）
-- 合并试算平衡表支持期初/期末：期初支持导入或自定义编辑，连续审计支持一键提取上年数；期末按模板自动提取填充
+- 合并试算平衡表支持期初/期末：期初支持导入或自定义编辑，连续审计一键提取上年数已实现（GET /prior-year/{sheet_key} 从 year-1 期末数据提取）；期末按模板自动提取填充
 - 项目单体试算平衡表（已完成前端）：列=未审数+审计调整(借贷)+重分类调整(借贷)+审定数，行结构以报表模板为主，未审数从科目明细按科目名汇总，审定数getter自动计算，TrialBalance.vue 新增"科目明细/试算平衡表"视图切换，数据存consol_worksheet_data（key: tb_summary_{type}）
 - ~~D2 应收账款 / H1 固定资产等更多科目精细化规则打磨~~ ✅ 已完成：77 个核心科目精修（全循环 D-N 覆盖），剩余 270 个为函证/控制测试/风险评估等无需 key_rows 精修
 - ~~统一 Excel 导入框架~~ ✅ 已完成：7 种模板 + 7 页面集成 + 14 项加固（数值校验/事务保护/RFC5987文件名/示例行宽松跳过/失败行反馈/覆盖追加模式/重试按钮）
@@ -172,6 +180,7 @@ inclusion: always
 - 合并报表按类型分视图：权益变动表/减值准备表用矩阵 table（多行表头+横向滚动+sticky），其余4张用普通 el-table 四列结构
 - 合并汇总明细查看：顶部栏"📊 查看"按钮，选中单元格后穿透显示该数值的汇总过程（直接下级贡献+末级明细），支持占比、数据来源、导出 Excel
 - 表格单元格选中：查看模式下支持单击选中、Ctrl+多选、右键菜单（汇总穿透/复制值/查看公式/添加批注/标记已复核/汇总/求和/对比差异），通过 el-table 的 cell-click + cell-contextmenu 事件实现
+- 单元格选中样式统一：outline 1.5px solid + 左侧渐变强调条 + 右下角三角标记 + 缓慢 glow 动画，全部使用 CSS 变量（--gt-color-primary-bg 等），CellContextMenu.vue 统一渲染右键菜单
 - 右键汇总功能：直接下级汇总（自动获取下级企业同位置数据合计）+ 自定义汇总（树形多选企业+选择数据来源：同表/报表/附注），POST /api/consol-note-sections/aggregate
 - ConsolMiddleNav 树形节点右键菜单：直接下级汇总/自定义汇总/刷新数据/查看报表/查看附注，通过 consol-tree-aggregate 事件联动 ConsolidationIndex 的汇总弹窗
 - 合并报表按合并主体隔离：树形每个企业节点是独立合并主体（currentConsolEntity），点击后 loadConsolReport 带 company_code 加载该主体的报表/附注数据

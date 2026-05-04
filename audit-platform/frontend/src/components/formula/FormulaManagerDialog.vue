@@ -746,7 +746,7 @@ const crossCheckRulesMap = ref<Record<string, any[]>>({
 
 // ── 合并报表表样行结构（供公式配置用） ──
 function consolSheetRows(nodeKey: string): any[] {
-  const sheetMap: Record<string, { rows: { code: string; name: string }[] }> = {
+  const sheetMap: Record<string, { rows: { code: string; name: string; formula?: string; category?: string; desc?: string }[] }> = {
     consol_info: { rows: [
       { code: 'CI-001', name: '子企业名称' }, { code: 'CI-002', name: '企业代码' },
       { code: 'CI-003', name: '核算科目' }, { code: 'CI-004', name: '核算方式' },
@@ -1099,7 +1099,7 @@ async function onApplyFormulas() {
 
 function onFormulaFileImported() {
   showFormulaImport.value = false
-  loadFormulas()
+  loadRowsForNode(selectedNodeKey.value)
 }
 
 async function onImportPresetFormulas() {

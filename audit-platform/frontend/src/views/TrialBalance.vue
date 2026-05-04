@@ -249,24 +249,22 @@
     />
   </div>
 
-  <!-- 右键菜单 -->
-  <Teleport to="body">
-    <Transition name="tb-ctx-fade">
-      <div v-if="tbCtxMenu.visible" class="tb-context-menu"
-        :style="{ left: tbCtxMenu.x + 'px', top: tbCtxMenu.y + 'px' }" @contextmenu.prevent>
-        <div class="tb-ctx-header">{{ tbCtxMenu.itemName }}</div>
-        <div class="tb-ctx-divider" />
-        <div class="tb-ctx-item" @click="tbCtxCopy"><span class="tb-ctx-icon">📋</span> 复制值</div>
-        <div class="tb-ctx-item" @click="tbCtxDrillDown"><span class="tb-ctx-icon">📊</span> 查看明细</div>
-        <div class="tb-ctx-item" @click="tbCtxFormula"><span class="tb-ctx-icon">ƒx</span> 查看公式</div>
-        <div class="tb-ctx-item" @click="tbCtxOpenWp"><span class="tb-ctx-icon">📝</span> 打开底稿</div>
-        <div v-if="tbSelectedCells.length > 1" class="tb-ctx-divider" />
-        <div v-if="tbSelectedCells.length > 1" class="tb-ctx-item" @click="tbCtxSum">
-          <span class="tb-ctx-icon">Σ</span> 求和 <b style="color:#4b2d77;margin-left:4px">{{ tbSelectedCells.length }} 格</b>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <!-- 右键菜单（统一组件） -->
+  <CellContextMenu
+    :visible="tbCtx.contextMenu.visible"
+    :x="tbCtx.contextMenu.x"
+    :y="tbCtx.contextMenu.y"
+    :item-name="tbCtx.contextMenu.itemName"
+    :value="tbCtx.selectedCells.value.length === 1 ? tbCtx.selectedCells.value[0]?.value : undefined"
+    :multi-count="tbCtx.selectedCells.value.length"
+    @copy="onTbCtxCopy"
+    @formula="onTbCtxFormula"
+    @sum="onTbCtxSum"
+    @compare="onTbCtxCompare"
+  >
+    <div class="gt-ucell-ctx-item" @click="onTbCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看明细</div>
+    <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
+  </CellContextMenu>
 </template>
 
 <script setup lang="ts">
@@ -276,6 +274,10 @@ import { ElMessage } from 'element-plus'
 import { Link } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import { useCellSelection } from '@/composables/useCellSelection'
+import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import { useCellComments } from '@/composables/useCellComments'
+import http from '@/utils/http'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
   getProjectAuditYear, listAdjustments,
@@ -408,8 +410,8 @@ function num(v: string | null | undefined): number {
   return v != null ? parseFloat(v) || 0 : 0
 }
 
-function fmtAmt(v: string | null | undefined): string {
-  const n = num(v)
+function fmtAmt(v: string | number | null | undefined): string {
+  const n = typeof v === 'number' ? v : num(v)
   if (n === 0) return '-'
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -586,78 +588,75 @@ function onTbKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && tbFullscreen.value) tbFullscreen.value = false
 }
 
-// ─── 单元格选中与右键菜单 ────────────────────────────────────────────────────
-const tbSelectedCells = ref<{ row: number; col: number; value: any }[]>([])
-const tbCtxMenu = reactive({ visible: false, x: 0, y: 0, itemName: '', rowData: null as any })
+// ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
+const tbCtx = useCellSelection()
+const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
 
 function tbCellClassName({ rowIndex, columnIndex }: any) {
-  return tbSelectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex) ? 'tb-cell--selected' : ''
+  const classes: string[] = []
+  if (tbCtx.cellClassName({ rowIndex, columnIndex })) classes.push('tb-cell--selected')
+  const ccClass = tbComments.commentCellClass('tb_detail', rowIndex, columnIndex)
+  if (ccClass) classes.push(ccClass)
+  return classes.join(' ')
 }
 
 function onTbCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  tbCtxMenu.visible = false
+  tbCtx.closeContextMenu()
   const rowIdx = groupedRows.value.indexOf(row)
   const colLabels: Record<string, number> = { '科目编码': 0, '科目名称': 1, '未审数': 2, 'RJE调整': 3, 'AJE调整': 4, '审定数': 5 }
   const colIdx = colLabels[column.label] ?? -1
   if (rowIdx < 0 || colIdx < 0) return
   const value = colIdx === 2 ? row.unadjusted_amount : colIdx === 3 ? row.rje_adjustment : colIdx === 4 ? row.aje_adjustment : colIdx === 5 ? row.audited_amount : row.account_name
-  if (event.ctrlKey || event.metaKey) {
-    const idx = tbSelectedCells.value.findIndex(c => c.row === rowIdx && c.col === colIdx)
-    if (idx >= 0) tbSelectedCells.value.splice(idx, 1)
-    else tbSelectedCells.value.push({ row: rowIdx, col: colIdx, value })
-  } else {
-    tbSelectedCells.value = [{ row: rowIdx, col: colIdx, value }]
-  }
-  tbCtxMenu.rowData = row
-  tbCtxMenu.itemName = row.account_name || ''
+  tbCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  tbCtx.contextMenu.rowData = row
+  tbCtx.contextMenu.itemName = row.account_name || ''
 }
 
 function onTbCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  event.preventDefault()
-  event.stopPropagation()
   onTbCellClick(row, column, cell, event)
-  setTimeout(() => { tbCtxMenu.x = event.clientX; tbCtxMenu.y = event.clientY; tbCtxMenu.visible = true }, 0)
+  tbCtx.openContextMenu(event, tbCtx.contextMenu.itemName, row)
 }
 
-function tbCtxCopy() {
-  tbCtxMenu.visible = false
-  const values = tbSelectedCells.value.map(c => c.value ?? '-').join('\t')
-  navigator.clipboard?.writeText(values)
+function onTbCtxCopy() {
+  tbCtx.closeContextMenu()
+  tbCtx.copySelectedValues()
   ElMessage.success('已复制')
 }
 
-function tbCtxDrillDown() {
-  tbCtxMenu.visible = false
-  if (tbCtxMenu.rowData) onUnadjustedClick(tbCtxMenu.rowData)
+function onTbCtxDrillDown() {
+  tbCtx.closeContextMenu()
+  if (tbCtx.contextMenu.rowData) onUnadjustedClick(tbCtx.contextMenu.rowData)
 }
 
-function tbCtxFormula() {
-  tbCtxMenu.visible = false
+function onTbCtxFormula() {
+  tbCtx.closeContextMenu()
   showFormulaManager.value = true
 }
 
-function tbCtxOpenWp() {
-  tbCtxMenu.visible = false
-  if (tbCtxMenu.rowData?.standard_account_code) onOpenWorkpaper(tbCtxMenu.rowData.standard_account_code)
+function onTbCtxOpenWp() {
+  tbCtx.closeContextMenu()
+  if (tbCtx.contextMenu.rowData?.standard_account_code) onOpenWorkpaper(tbCtx.contextMenu.rowData.standard_account_code)
 }
 
-function tbCtxSum() {
-  tbCtxMenu.visible = false
-  const sum = tbSelectedCells.value.reduce((s, c) => s + (Number(c.value) || 0), 0)
-  ElMessage.info(`选中 ${tbSelectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+function onTbCtxSum() {
+  tbCtx.closeContextMenu()
+  const sum = tbCtx.sumSelectedValues()
+  ElMessage.info(`选中 ${tbCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
 }
 
-function onTbDocClick(e: MouseEvent) {
-  if (!(e.target as HTMLElement)?.closest('.tb-context-menu')) tbCtxMenu.visible = false
+function onTbCtxCompare() {
+  tbCtx.closeContextMenu()
+  if (tbCtx.selectedCells.value.length < 2) return
+  const vals = tbCtx.selectedCells.value.map(c => Number(c.value) || 0)
+  const diff = vals[0] - vals[1]
+  ElMessage.info(`差异：${fmtAmt(diff)}`)
 }
 
 onMounted(() => {
   document.addEventListener('keydown', onTbKeydown)
-  document.addEventListener('click', onTbDocClick)
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onTbKeydown)
-  document.removeEventListener('click', onTbDocClick)
 })
 const tbSummaryTypes = [
   { key: 'balance_sheet', label: '资产负债表' },
@@ -888,7 +887,6 @@ async function exportTbSummary() {
   :deep(.el-tabs__item.is-active) { font-weight: 600; }
 
 /* 视图切换标签 */
-.gt-tb-view-tag {
 
 /* 全屏 */
 .gt-tb-fullscreen {
@@ -918,33 +916,32 @@ async function exportTbSummary() {
 
 /* 单元格选中 */
 :deep(.tb-cell--selected) {
-  background: linear-gradient(135deg, rgba(75,45,119,0.05), rgba(124,92,170,0.08)) !important;
-  box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 8px rgba(75,45,119,0.1);
-  animation: tb-cell-pulse 1.5s ease-in-out infinite alternate;
+  position: relative;
+  background: var(--gt-color-primary-bg, #f4f0fa) !important;
+  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -1.5px;
+  z-index: 1;
+  animation: tb-cell-glow 2s ease-in-out infinite alternate;
 }
-@keyframes tb-cell-pulse {
-  0% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 6px rgba(75,45,119,0.08); }
-  100% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.5), 0 0 12px rgba(75,45,119,0.15); }
+:deep(.tb-cell--selected)::before {
+  content: '';
+  position: absolute; left: 0; top: 2px; bottom: 2px;
+  width: 2.5px;
+  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
+  border-radius: 0 2px 2px 0; opacity: 0.85;
+}
+:deep(.tb-cell--selected)::after {
+  content: '';
+  position: absolute; right: 0; bottom: 0;
+  width: 0; height: 0;
+  border-style: solid; border-width: 0 0 6px 6px;
+  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
+  opacity: 0.6;
+}
+@keyframes tb-cell-glow {
+  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
+  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
 }
 </style>
 
-<style>
-/* 右键菜单（非 scoped） */
-.tb-context-menu {
-  position: fixed; z-index: 10001; background: #fff;
-  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 180px;
-  border: 1px solid #e8e4f0;
-}
-.tb-ctx-header { padding: 6px 14px; font-size: 11px; color: #999; }
-.tb-ctx-divider { height: 1px; background: #f0edf5; margin: 2px 0; }
-.tb-ctx-item {
-  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #333;
-  display: flex; align-items: center; gap: 6px; transition: background 0.1s;
-}
-.tb-ctx-item:hover { background: #f0edf5; color: #4b2d77; }
-.tb-ctx-icon { width: 18px; text-align: center; }
-.tb-ctx-fade-enter-active { transition: opacity 0.1s, transform 0.1s; }
-.tb-ctx-fade-leave-active { transition: opacity 0.08s; }
-.tb-ctx-fade-enter-from { opacity: 0; transform: scale(0.95); }
-.tb-ctx-fade-leave-to { opacity: 0; }
-</style>
+

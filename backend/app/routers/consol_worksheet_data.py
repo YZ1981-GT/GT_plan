@@ -137,3 +137,40 @@ async def get_all_worksheet_data(
         )
         for r in rows
     ]
+
+
+# ─── GET: 提取上年数（从上一年度的期末试算平衡表作为本年期初） ─────────────────
+@router.get("/{project_id}/{year}/prior-year/{sheet_key}")
+async def get_prior_year_data(
+    project_id: str, year: int, sheet_key: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """提取上年数：从 year-1 的期末数据中提取，作为本年期初
+
+    例如：请求 /proj/2025/prior-year/consol_tb_balance_sheet_opening
+    → 查找 year=2024, sheet_key=consol_tb_balance_sheet_closing 的数据
+    """
+    await ensure_table(db)
+
+    # 将 opening 替换为 closing，查上一年度的期末数据
+    prior_year = year - 1
+    prior_key = sheet_key.replace('_opening', '_closing')
+
+    result = await db.execute(
+        text("SELECT data, updated_at FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
+        {"pid": project_id, "y": prior_year, "sk": prior_key},
+    )
+    row = result.fetchone()
+    if not row:
+        return {
+            "found": False,
+            "message": f"未找到 {prior_year} 年度的期末数据（{prior_key}）",
+            "data": {},
+        }
+    return {
+        "found": True,
+        "source_year": prior_year,
+        "source_key": prior_key,
+        "data": row[0] if isinstance(row[0], dict) else {},
+        "updated_at": str(row[1]) if row[1] else None,
+    }

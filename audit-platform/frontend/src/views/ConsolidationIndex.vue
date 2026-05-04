@@ -469,6 +469,22 @@
       <el-empty v-if="!drillDownDirectRows.length && !drillDownLoading" description="请先在表格中选中一个单元格，再点击查看" />
     </el-dialog>
 
+    <!-- 右键菜单（统一组件） -->
+    <CellContextMenu
+      :visible="consolCtx.contextMenu.visible"
+      :x="consolCtx.contextMenu.x"
+      :y="consolCtx.contextMenu.y"
+      :item-name="consolCtx.contextMenu.itemName"
+      :value="consolCtx.selectedCells.value.length === 1 ? consolCtx.selectedCells.value[0]?.value : undefined"
+      :multi-count="consolCtx.selectedCells.value.length"
+      @copy="onConsolCtxCopy"
+      @formula="onConsolCtxFormula"
+      @sum="onConsolCtxSum"
+      @compare="onConsolCtxCompare"
+    >
+      <div class="gt-ucell-ctx-item" @click="onConsolCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 汇总穿透</div>
+    </CellContextMenu>
+
   </div>
 </template>
 
@@ -478,21 +494,25 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   getWorksheetTree,
-  type WorksheetNode,
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import http from '@/utils/http'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import OrgNode from '@/components/consolidation/OrgNode.vue'
+import { useCellSelection } from '@/composables/useCellSelection'
+import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import { useCellComments } from '@/composables/useCellComments'
 
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
+// ─── 批注与复核持久化（合并报表/试算表共用） ─────────────────────────────────
+const consolComments = useCellComments(() => projectId.value, () => year.value, 'consol_report')
+
 const activeTab = ref('worksheets')
-const loading = ref(false)
 const consolNoteTabRef = ref<InstanceType<typeof ConsolNoteTab> | null>(null)
 
 // ─── 项目基本信息 ─────────────────────────────────────────────────────────────
@@ -537,13 +557,11 @@ const drillDownLeafRows = ref<any[]>([])
 const drillDownTransposed = ref(false)
 const drillDownTableRef = ref<any>(null)
 
-// ─── 单元格选中与右键菜单（报表/试算表共用） ──────────────────────────────
-const selectedCells = ref<{ row: number; col: number; value: any }[]>([])
-const cellContextMenu = reactive({ visible: false, x: 0, y: 0 })
+// ─── 单元格选中与右键菜单（统一 composable） ──────────────────────────────
+const consolCtx = useCellSelection()
 
-function closeCellContextMenu() {
-  cellContextMenu.visible = false
-}
+// 兼容别名（供 drillDown 等已有逻辑使用）
+const selectedCells = consolCtx.selectedCells
 
 const currentDrillDownRows = computed(() => {
   return drillDownLevel.value === 'direct' ? drillDownDirectRows.value : drillDownLeafRows.value
@@ -599,38 +617,66 @@ async function loadDrillDownData() {
   }
   drillDownLoading.value = true
   try {
-    // 从基本信息表获取企业列表
-    const { loadAllWorksheetData } = await import('@/services/consolWorksheetDataApi')
-    const saved = await loadAllWorksheetData(projectId.value, year.value)
-    const infoRows = saved?.info?.rows || []
-    const companies = Array.isArray(infoRows) ? infoRows.filter((r: any) => r.company_name) : []
+    // 确定当前查看的报表类型和行次
+    const reportType = activeTab.value === 'consol_tb' ? consolTbType.value : consolReportType.value
+    const rowCode = selectedCells.value.length ? (() => {
+      const cell = selectedCells.value[0]
+      // 从试算表或报表行中提取 row_code
+      const sourceRows = activeTab.value === 'consol_tb' ? consolTbRows.value : consolReportRows.value
+      return sourceRows[cell.row]?.row_code || ''
+    })() : ''
+    const colField = drillDownCell.colName?.includes('上期') ? 'prior_period_amount' : 'current_period_amount'
 
-    const totalVal = Number(drillDownCell.totalValue) || 0
+    // 调用后端真实穿透 API
+    const { data } = await http.post('/api/report-config/drill-down', {
+      project_id: projectId.value,
+      year: year.value,
+      report_type: reportType,
+      row_code: rowCode,
+      col_field: colField,
+    }, { validateStatus: (s: number) => s < 600 })
 
-    // 直接下级：每个子企业贡献的金额
-    const directRows: any[] = []
-    for (const comp of companies) {
-      // 实际应从各企业的试算表/附注数据中提取
-      // 这里模拟：按持股比例分配（实际需要后端 API 支持）
-      const ratio = comp.non_common_ratio || comp.common_ratio || comp.no_consol_ratio || 0
-      const amount = totalVal ? Math.round(totalVal * (ratio / 100) * 100) / 100 : null
-      directRows.push({
-        company_name: comp.company_name,
-        company_code: comp.company_code,
-        amount,
-        ratio: totalVal && amount ? Math.round(((amount / totalVal) * 100) * 100) / 100 : 0,
-        source: comp.holding_type === '间接' ? '间接持股' : '直接持股',
-        parent_name: comp.indirect_holder || '母公司',
-      })
+    const result = data?.data ?? data
+    if (result?.rows?.length) {
+      drillDownDirectRows.value = result.rows.map((r: any) => ({
+        company_name: r.company_name,
+        company_code: r.company_code,
+        amount: r.amount,
+        ratio: r.pct || 0,
+        source: r.source,
+        parent_name: r.parent_name || '母公司',
+      }))
+      // 末级明细：无下级的企业
+      drillDownLeafRows.value = result.rows.filter((r: any) => {
+        return !result.rows.some((c: any) => c.parent_name === r.company_name)
+      }).map((r: any) => ({
+        company_name: r.company_name,
+        company_code: r.company_code,
+        amount: r.amount,
+        ratio: r.pct || 0,
+        source: r.source,
+        parent_name: r.parent_name || '母公司',
+      }))
+    } else {
+      // 降级：从基本信息表按持股比例估算
+      const { loadAllWorksheetData } = await import('@/services/consolWorksheetDataApi')
+      const saved = await loadAllWorksheetData(projectId.value, year.value)
+      const infoRows = saved?.info?.rows || []
+      const companies = Array.isArray(infoRows) ? infoRows.filter((r: any) => r.company_name) : []
+      const totalVal = Number(drillDownCell.totalValue) || 0
+      const directRows: any[] = []
+      for (const comp of companies) {
+        const ratio = comp.non_common_ratio || comp.common_ratio || comp.no_consol_ratio || 0
+        const amount = totalVal ? Math.round(totalVal * (ratio / 100) * 100) / 100 : null
+        directRows.push({
+          company_name: comp.company_name, company_code: comp.company_code,
+          amount, ratio: totalVal && amount ? Math.round(((amount / totalVal) * 100) * 100) / 100 : 0,
+          source: '按持股比例估算', parent_name: comp.indirect_holder || '母公司',
+        })
+      }
+      drillDownDirectRows.value = directRows
+      drillDownLeafRows.value = directRows.filter(r => !companies.some((c: any) => c.indirect_holder === r.company_name))
     }
-    drillDownDirectRows.value = directRows
-
-    // 末级明细：展开到最底层（无子企业的企业）
-    const leafRows = directRows.filter(r => {
-      // 没有下级的就是末级
-      return !companies.some((c: any) => c.indirect_holder === r.company_name)
-    })
-    drillDownLeafRows.value = leafRows
   } catch { drillDownDirectRows.value = []; drillDownLeafRows.value = [] }
   finally { drillDownLoading.value = false }
 }
@@ -878,7 +924,43 @@ async function exportConsolTb() {
 }
 
 async function importPriorYearTb() {
-  ElMessage.info('提取上年数功能需要后端配合（从上年项目数据中提取）')
+  if (!projectId.value) return
+  consolTbLoading.value = true
+  try {
+    const sheetKey = `consol_tb_${consolTbType.value}_opening`
+    const { data } = await http.get(
+      `/api/consol-worksheet-data/${projectId.value}/${year.value}/prior-year/${sheetKey}`,
+      { validateStatus: (s: number) => s < 600 }
+    )
+    const result = data?.data ?? data
+    if (!result?.found) {
+      ElMessage.warning(result?.message || `未找到 ${year.value - 1} 年度的期末数据`)
+      return
+    }
+    const priorRows = result.data?.rows
+    if (!priorRows?.length) {
+      ElMessage.warning(`${year.value - 1} 年度期末数据为空`)
+      return
+    }
+    // 用上年期末数据填充本年期初
+    let matched = 0
+    for (const sr of priorRows) {
+      const target = consolTbRows.value.find((r: any) => r.row_code === sr.row_code)
+      if (target) {
+        target.summary = sr.summary ?? null
+        target.equity_dr = sr.equity_dr ?? null
+        target.equity_cr = sr.equity_cr ?? null
+        target.trade_dr = sr.trade_dr ?? null
+        target.trade_cr = sr.trade_cr ?? null
+        target.adj_dr = sr.adj_dr ?? null
+        target.adj_cr = sr.adj_cr ?? null
+        matched++
+      }
+    }
+    ElMessage.success(`已从 ${result.source_year} 年度期末数据提取 ${matched} 行作为本年期初`)
+  } catch (err: any) {
+    ElMessage.error(`提取上年数失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+  } finally { consolTbLoading.value = false }
 }
 
 async function fillConsolTb() {
@@ -911,26 +993,18 @@ async function fillConsolTb() {
     } else {
       ElMessage.info('未提取到数据，请确认子企业已有试算表数据')
     }
-  } catch {
-    ElMessage.info('提取填充需要后端试算表数据支持')
+  } catch (err: any) {
+    ElMessage.error(`提取填充失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { consolTbLoading.value = false }
 }
 
 function onTbCellContextMenu(e: MouseEvent, row: any, ri: number) {
-  // 复用附注的右键菜单逻辑
-  e.preventDefault()
   selectedCells.value = [{ row: ri, col: 2, value: row.summary }]
   drillDownCell.itemName = row.row_name
   drillDownCell.colName = '审定汇总'
   drillDownCell.totalValue = row.summary
-  setTimeout(() => {
-    cellContextMenu.x = e.clientX
-    cellContextMenu.y = e.clientY
-    cellContextMenu.visible = true
-  }, 0)
+  consolCtx.openContextMenu(e, row.row_name, row)
 }
-
-async function auditConsolTb() {
 
 async function generateReportFromTb() {
   if (!consolTbRows.value.length) { ElMessage.warning('请先加载试算平衡表数据'); return }
@@ -960,9 +1034,8 @@ async function generateReportFromTb() {
 
     // 清除报表缓存，下次切换到报表 tab 时重新加载
     clearEntityCache(currentConsolEntity.value.code || '', ['all_reports'])
-  } catch {
-    // 后端 API 可能不存在，降级提示
-    ElMessage.info('报表生成需要后端 batch-update API 支持，当前为预留功能')
+  } catch (err: any) {
+    ElMessage.error(`报表生成失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { consolTbLoading.value = false }
 }
 
@@ -1077,27 +1150,23 @@ function consolReportRowClass({ row }: { row: any }) {
 }
 
 function reportCellClassName({ rowIndex, columnIndex }: any) {
-  if (selectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex)) {
-    return 'gt-cell--selected'
-  }
-  return ''
+  const classes: string[] = []
+  if (consolCtx.cellClassName({ rowIndex, columnIndex })) classes.push('gt-cell--selected')
+  const sheetKey = `report_${consolReportType.value}`
+  const ccClass = consolComments.commentCellClass(sheetKey, rowIndex, columnIndex)
+  if (ccClass) classes.push(ccClass)
+  return classes.join(' ')
 }
 
 function onReportCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  closeCellContextMenu()
+  consolCtx.closeContextMenu()
   const rowIdx = consolReportRows.value.indexOf(row)
   const colMap: Record<string, number> = { '行次': 0, '项目': 1, '合并本期': 2, '合并上期': 3 }
   const colIdx = colMap[column.label] ?? -1
   if (rowIdx < 0 || colIdx < 0) return
   const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
-  if (event.ctrlKey || event.metaKey) {
-    const existing = selectedCells.value.findIndex(c => c.row === rowIdx && c.col === colIdx)
-    if (existing >= 0) selectedCells.value.splice(existing, 1)
-    else selectedCells.value.push({ row: rowIdx, col: colIdx, value })
-  } else {
-    selectedCells.value = [{ row: rowIdx, col: colIdx, value }]
-  }
-  if (selectedCells.value.length === 1) {
+  consolCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  if (consolCtx.selectedCells.value.length === 1) {
     drillDownCell.itemName = row.row_name || ''
     drillDownCell.colName = column.label || ''
     drillDownCell.totalValue = Number(value) || null
@@ -1105,14 +1174,38 @@ function onReportCellClick(row: any, column: any, cell: HTMLElement, event: Mous
 }
 
 function onReportCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  event.preventDefault()
-  event.stopPropagation()
   onReportCellClick(row, column, cell, event)
-  setTimeout(() => {
-    cellContextMenu.x = event.clientX
-    cellContextMenu.y = event.clientY
-    cellContextMenu.visible = true
-  }, 0)
+  consolCtx.openContextMenu(event, drillDownCell.itemName || row.row_name, row)
+}
+
+function onConsolCtxCopy() {
+  consolCtx.closeContextMenu()
+  consolCtx.copySelectedValues()
+  ElMessage.success('已复制')
+}
+
+function onConsolCtxDrillDown() {
+  consolCtx.closeContextMenu()
+  openCellDrillDown()
+}
+
+function onConsolCtxFormula() {
+  consolCtx.closeContextMenu()
+  window.dispatchEvent(new CustomEvent('gt-open-formula-manager'))
+}
+
+function onConsolCtxSum() {
+  consolCtx.closeContextMenu()
+  const sum = consolCtx.sumSelectedValues()
+  ElMessage.info(`选中 ${consolCtx.selectedCells.value.length} 格，合计：${sum.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+}
+
+function onConsolCtxCompare() {
+  consolCtx.closeContextMenu()
+  if (consolCtx.selectedCells.value.length < 2) return
+  const vals = consolCtx.selectedCells.value.map(c => Number(c.value) || 0)
+  const diff = vals[0] - vals[1]
+  ElMessage.info(`差异：${diff.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
 }
 
 async function loadConsolReport(forceRefresh = false) {
@@ -1142,6 +1235,8 @@ async function loadConsolReport(forceRefresh = false) {
     consolReportRows.value = result
     // 写入缓存
     reportCache.set(cacheKey, result)
+    // 加载批注/复核标记
+    consolComments.loadComments(`report_${consolReportType.value}`)
   } catch { consolReportRows.value = [] }
   finally { consolReportLoading.value = false }
 }
@@ -1218,12 +1313,6 @@ function auditRowClass({ row }: { row: any }) {
   if (row.level === 'error') return 'gt-audit-row-error'
   if (row.level === 'warn') return 'gt-audit-row-warn'
   return ''
-}
-
-// ─── 附注缓存 ────────────────────────────────────────────────────────────────
-const noteCache = new Map<string, any[]>()
-function noteCacheKey(): string {
-  return `${currentConsolEntity.value.code || '_root'}_${consolNoteTemplateType.value}`
 }
 
 async function loadConsolNoteTree(forceRefresh = false) {
@@ -1556,13 +1645,30 @@ watch(activeTab, (tab) => {
 
 /* 单元格选中高亮（报表/试算表共用） */
 :deep(.gt-cell--selected) {
-  background: linear-gradient(135deg, rgba(75,45,119,0.05), rgba(124,92,170,0.08)) !important;
-  box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 8px rgba(75,45,119,0.1);
-  border-radius: 3px;
-  animation: gt-cell-pulse 1.5s ease-in-out infinite alternate;
+  position: relative;
+  background: var(--gt-color-primary-bg, #f4f0fa) !important;
+  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -1.5px;
+  z-index: 1;
+  animation: gt-cell-glow 2s ease-in-out infinite alternate;
 }
-@keyframes gt-cell-pulse {
-  0% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 6px rgba(75,45,119,0.08); }
-  100% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.5), 0 0 12px rgba(75,45,119,0.15); }
+:deep(.gt-cell--selected)::before {
+  content: '';
+  position: absolute; left: 0; top: 2px; bottom: 2px;
+  width: 2.5px;
+  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
+  border-radius: 0 2px 2px 0; opacity: 0.85;
+}
+:deep(.gt-cell--selected)::after {
+  content: '';
+  position: absolute; right: 0; bottom: 0;
+  width: 0; height: 0;
+  border-style: solid; border-width: 0 0 6px 6px;
+  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
+  opacity: 0.6;
+}
+@keyframes gt-cell-glow {
+  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
+  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
 }
 </style>

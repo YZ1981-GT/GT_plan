@@ -166,34 +166,25 @@
     </div>
   </Teleport>
 
-  <!-- 右键菜单（Teleport 到 body 避免被裁剪） -->
-  <Teleport to="body">
-    <Transition name="gt-ctx-fade">
-      <div v-if="cellContextMenu.visible" class="gt-cell-context-menu"
-        :style="{ left: cellContextMenu.x + 'px', top: cellContextMenu.y + 'px' }"
-        @contextmenu.prevent>
-        <div class="gt-cell-ctx-header">
-          <span>{{ drillDownCell.itemName }}</span>
-          <span v-if="drillDownCell.totalValue != null" style="color:#4b2d77;font-weight:600">{{ fmtAmt(drillDownCell.totalValue) }}</span>
-        </div>
-        <div class="gt-cell-ctx-divider" />
-        <div class="gt-cell-ctx-item" @click="drillDownFromCell"><span class="gt-cell-ctx-icon">📊</span> 查看汇总穿透</div>
-        <div class="gt-cell-ctx-item" @click="copyCellValue"><span class="gt-cell-ctx-icon">📋</span> 复制值</div>
-        <div class="gt-cell-ctx-item" @click="copyCellFormula"><span class="gt-cell-ctx-icon">ƒx</span> 查看公式</div>
-        <div class="gt-cell-ctx-item" @click="addCellComment"><span class="gt-cell-ctx-icon">💬</span> 添加批注</div>
-        <div class="gt-cell-ctx-item" @click="markCellReviewed"><span class="gt-cell-ctx-icon">✅</span> 标记已复核</div>
-        <div class="gt-cell-ctx-divider" />
-        <div class="gt-cell-ctx-item" @click="openAggregateDialog"><span class="gt-cell-ctx-icon">Σ</span> 汇总</div>
-        <div v-if="selectedCells.length > 1" class="gt-cell-ctx-divider" />
-        <div v-if="selectedCells.length > 1" class="gt-cell-ctx-item" @click="sumSelectedCells">
-          <span class="gt-cell-ctx-icon">Σ</span> 求和选中 <span style="color:#4b2d77;font-weight:600;margin-left:4px">{{ selectedCells.length }} 格</span>
-        </div>
-        <div v-if="selectedCells.length > 1" class="gt-cell-ctx-item" @click="compareSelectedCells">
-          <span class="gt-cell-ctx-icon">⇄</span> 对比差异
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <!-- 右键菜单（统一组件 + 模块特有项） -->
+  <CellContextMenu
+    :visible="noteCtx.contextMenu.visible"
+    :x="noteCtx.contextMenu.x"
+    :y="noteCtx.contextMenu.y"
+    :item-name="drillDownCell.itemName"
+    :value="drillDownCell.totalValue"
+    :multi-count="noteCtx.selectedCells.value.length"
+    @copy="onNoteCtxCopy"
+    @formula="onNoteCtxFormula"
+    @sum="onNoteCtxSum"
+    @compare="onNoteCtxCompare"
+  >
+    <div class="gt-ucell-ctx-item" @click="drillDownFromCell"><span class="gt-ucell-ctx-icon">📊</span> 查看汇总穿透</div>
+    <div class="gt-ucell-ctx-item" @click="addCellComment"><span class="gt-ucell-ctx-icon">💬</span> 添加批注</div>
+    <div class="gt-ucell-ctx-item" @click="markCellReviewed"><span class="gt-ucell-ctx-icon">✅</span> 标记已复核</div>
+    <div class="gt-ucell-ctx-divider" />
+    <div class="gt-ucell-ctx-item" @click="openAggregateDialog"><span class="gt-ucell-ctx-icon">Σ</span> 汇总</div>
+  </CellContextMenu>
 
   <!-- 批量导入导出弹窗 -->
   <el-dialog v-model="showNoteBatchDialog" title="附注导入导出与批量操作" width="520px" append-to-body>
@@ -279,7 +270,7 @@
   </el-dialog>
 
   <!-- 批注弹窗 -->
-  <el-dialog v-model="showCommentDialog" title="添加审计批注" width="650px" append-to-body :z-index="10000" class="gt-comment-dialog">
+  <el-dialog v-model="showCommentDialog" :title="editingCommentId ? '编辑审计批注' : '添加审计批注'" width="650px" append-to-body :z-index="10000" class="gt-comment-dialog">
     <div class="gt-comment-info">
       <div class="gt-comment-info-item">
         <span class="gt-comment-info-label">项目</span>
@@ -299,6 +290,7 @@
       maxlength="500" show-word-limit
       class="gt-comment-textarea" />
     <template #footer>
+      <el-button v-if="editingCommentId" type="danger" plain @click="deleteCurrentComment" style="float:left">删除批注</el-button>
       <el-button @click="showCommentDialog = false">取消</el-button>
       <el-button type="primary" @click="saveComment">保存批注</el-button>
     </template>
@@ -474,7 +466,7 @@
     </div>
     <template #footer>
       <el-button @click="showNoteFormulaDialog = false">关闭</el-button>
-      <el-button @click="() => { document.dispatchEvent(new CustomEvent('gt-open-formula-manager', { detail: { nodeKey: 'consol_note' } })); showNoteFormulaDialog = false }">
+      <el-button @click="openGlobalFormulaManager">
         打开全局公式管理器
       </el-button>
       <el-button type="primary" @click="applyNoteFormulaRules" :loading="noteRefreshing">▶ 执行取数</el-button>
@@ -486,6 +478,9 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useCellSelection } from '@/composables/useCellSelection'
+import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import { useCellComments } from '@/composables/useCellComments'
 
 const props = defineProps<{
   projectId: string
@@ -516,6 +511,9 @@ const noteFormulaFileRef = ref<HTMLInputElement | null>(null)
 const showNoteBatchDialog = ref(false)
 const noteBatchLoading = ref(false)
 
+// ─── 批注与复核持久化 ────────────────────────────────────────────────────────
+const cellComments = useCellComments(() => props.projectId, () => props.year, 'consol_note')
+
 // ─── 附注全审 ────────────────────────────────────────────────────────────────
 const showNoteAuditDialog = ref(false)
 const noteAuditLoading = ref(false)
@@ -526,14 +524,16 @@ const noteAuditSummary = reactive({ totalSections: 0, totalChecks: 0, passCount:
 const showNoteFormulaDialog = ref(false)
 const noteFormulaRules = ref<any[]>([])
 
-// ─── 单元格选中与右键菜单 ──────────────────────────────────────────────────
-const selectedCells = ref<{ row: number; col: number; value: any }[]>([])
-const cellContextMenu = reactive({ visible: false, x: 0, y: 0 })
+// ─── 单元格选中与右键菜单（统一 composable） ──────────────────────────────
+const noteCtx = useCellSelection()
+// 兼容别名
+const selectedCells = noteCtx.selectedCells
 const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
 
 // ─── 批注 ────────────────────────────────────────────────────────────────────
 const showCommentDialog = ref(false)
 const commentTarget = reactive({ itemName: '', colName: '', value: '', text: '' })
+const editingCommentId = ref('')
 
 // ─── 汇总 ────────────────────────────────────────────────────────────────────
 const showAggregateDialog = ref(false)
@@ -584,14 +584,18 @@ function onNoteSelectionChange(rows: any[]) { noteSelectedRows.value = rows }
 
 // ─── 单元格选中与右键菜单 ──────────────────────────────────────────────────
 function noteCellClassName({ rowIndex, columnIndex }: any) {
-  if (selectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex)) {
-    return 'gt-cell--selected'
-  }
-  return ''
+  const sec = selectedNoteSection.value
+  const sheetKey = sec?.section_id || ''
+  const classes: string[] = []
+  if (noteCtx.cellClassName({ rowIndex, columnIndex })) classes.push('gt-cell--selected')
+  // 批注/复核标记
+  const ccClass = cellComments.commentCellClass(sheetKey, rowIndex, columnIndex)
+  if (ccClass) classes.push(ccClass)
+  return classes.join(' ')
 }
 
 function onNoteCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  closeCellContextMenu()
+  noteCtx.closeContextMenu()
   const sec = selectedNoteSection.value
   if (!sec || noteEditMode.value) return
   const colIdx = sec.headers.indexOf(column.label)
@@ -599,19 +603,10 @@ function onNoteCellClick(row: any, column: any, cell: HTMLElement, event: MouseE
   const rowIdx = sec.editRows.indexOf(row)
   if (rowIdx < 0) return
 
-  if (event.ctrlKey || event.metaKey) {
-    const existing = selectedCells.value.findIndex(c => c.row === rowIdx && c.col === colIdx)
-    if (existing >= 0) {
-      selectedCells.value.splice(existing, 1)
-    } else {
-      selectedCells.value.push({ row: rowIdx, col: colIdx, value: row[colIdx] })
-    }
-  } else {
-    selectedCells.value = [{ row: rowIdx, col: colIdx, value: row[colIdx] }]
-  }
+  noteCtx.selectCell(rowIdx, colIdx, row[colIdx], event.ctrlKey || event.metaKey)
 
-  if (selectedCells.value.length === 1) {
-    const c = selectedCells.value[0]
+  if (noteCtx.selectedCells.value.length === 1) {
+    const c = noteCtx.selectedCells.value[0]
     drillDownCell.itemName = sec.editRows[c.row]?.[0] || ''
     drillDownCell.colName = sec.headers[c.col] || ''
     drillDownCell.totalValue = Number(c.value) || null
@@ -621,98 +616,135 @@ function onNoteCellClick(row: any, column: any, cell: HTMLElement, event: MouseE
 }
 
 function onNoteCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  event.preventDefault()
-  event.stopPropagation()
   const sec = selectedNoteSection.value
   if (!sec || noteEditMode.value) return
   const colIdx = sec.headers.indexOf(column.label)
   if (colIdx < 0) return
   const rowIdx = sec.editRows.indexOf(row)
   if (rowIdx < 0) return
-  if (!selectedCells.value.some(c => c.row === rowIdx && c.col === colIdx)) {
-    selectedCells.value = [{ row: rowIdx, col: colIdx, value: row[colIdx] }]
+  if (!noteCtx.selectedCells.value.some(c => c.row === rowIdx && c.col === colIdx)) {
+    noteCtx.selectedCells.value = [{ row: rowIdx, col: colIdx, value: row[colIdx] }]
     drillDownCell.itemName = row[0] || ''
     drillDownCell.colName = sec.headers[colIdx] || ''
     drillDownCell.totalValue = Number(row[colIdx]) || null
     drillDownCell.rowIdx = rowIdx
     drillDownCell.colIdx = colIdx
   }
-  setTimeout(() => {
-    cellContextMenu.x = event.clientX
-    cellContextMenu.y = event.clientY
-    cellContextMenu.visible = true
-  }, 0)
-}
-
-function closeCellContextMenu() {
-  cellContextMenu.visible = false
+  noteCtx.openContextMenu(event, drillDownCell.itemName)
 }
 
 // ─── 右键菜单操作 ────────────────────────────────────────────────────────────
-function drillDownFromCell() {
-  closeCellContextMenu()
-  if (selectedCells.value.length) {
-    emit('note-node-click', { section_id: '__drill_down__' })
-    // Parent handles drill-down dialog; we just emit
-  }
-}
-
-function copyCellValue() {
-  closeCellContextMenu()
-  const values = selectedCells.value.map(c => c.value || '-').join('\t')
-  navigator.clipboard?.writeText(values)
+function onNoteCtxCopy() {
+  noteCtx.closeContextMenu()
+  noteCtx.copySelectedValues()
   ElMessage.success('已复制到剪贴板')
 }
 
-function copyCellFormula() {
-  closeCellContextMenu()
+function onNoteCtxFormula() {
+  noteCtx.closeContextMenu()
   openNoteFormula()
 }
 
-function sumSelectedCells() {
-  closeCellContextMenu()
-  const sum = selectedCells.value.reduce((s, c) => s + (Number(c.value) || 0), 0)
-  ElMessage.info(`选中 ${selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+function onNoteCtxSum() {
+  noteCtx.closeContextMenu()
+  const sum = noteCtx.sumSelectedValues()
+  ElMessage.info(`选中 ${noteCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
 }
 
-function compareSelectedCells() {
-  closeCellContextMenu()
-  if (selectedCells.value.length < 2) return
-  const vals = selectedCells.value.map(c => Number(c.value) || 0)
+function onNoteCtxCompare() {
+  noteCtx.closeContextMenu()
+  if (noteCtx.selectedCells.value.length < 2) return
+  const vals = noteCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
   const pct = vals[1] !== 0 ? ((diff / Math.abs(vals[1])) * 100).toFixed(2) : '—'
   ElMessage.info(`差异：${fmtAmt(diff)}（${pct}%）| 值1=${fmtAmt(vals[0])} 值2=${fmtAmt(vals[1])}`)
 }
 
+function drillDownFromCell() {
+  noteCtx.closeContextMenu()
+  if (noteCtx.selectedCells.value.length) {
+    emit('note-node-click', { section_id: '__drill_down__' })
+  }
+}
+
 function addCellComment() {
-  closeCellContextMenu()
-  if (!selectedCells.value.length) return
-  const c = selectedCells.value[0]
+  noteCtx.closeContextMenu()
+  if (!noteCtx.selectedCells.value.length) return
+  const c = noteCtx.selectedCells.value[0]
   const sec = selectedNoteSection.value
   commentTarget.itemName = sec?.editRows?.[c.row]?.[0] || ''
   commentTarget.colName = sec?.headers?.[c.col] || ''
   commentTarget.value = c.value || ''
-  commentTarget.text = ''
+  // 预填已有批注
+  const existing = cellComments.getComment(sec?.section_id || '', c.row, c.col)
+  commentTarget.text = existing?.comment || ''
+  editingCommentId.value = existing?.id || ''
   showCommentDialog.value = true
 }
 
-function saveComment() {
+async function saveComment() {
   if (!commentTarget.text.trim()) { ElMessage.warning('请输入批注内容'); return }
-  ElMessage.success('批注已保存')
-  showCommentDialog.value = false
+  const c = noteCtx.selectedCells.value[0]
+  const sec = selectedNoteSection.value
+  if (!c || !sec) return
+  const result = await cellComments.saveComment({
+    sheetKey: sec.section_id,
+    rowIdx: c.row,
+    colIdx: c.col,
+    comment: commentTarget.text.trim(),
+    rowName: commentTarget.itemName,
+    colName: commentTarget.colName,
+  })
+  if (result) {
+    ElMessage.success('批注已保存')
+    showCommentDialog.value = false
+  } else {
+    ElMessage.error('批注保存失败')
+  }
 }
 
-function markCellReviewed() {
-  closeCellContextMenu()
-  const count = selectedCells.value.length
-  ElMessage.success(`已标记 ${count} 个单元格为已复核`)
+async function deleteCurrentComment() {
+  if (!editingCommentId.value) return
+  const ok = await cellComments.deleteComment(editingCommentId.value)
+  if (ok) {
+    ElMessage.success('批注已删除')
+    editingCommentId.value = ''
+    showCommentDialog.value = false
+  } else {
+    ElMessage.error('删除失败')
+  }
+}
+
+async function markCellReviewed() {
+  noteCtx.closeContextMenu()
+  const cells = noteCtx.selectedCells.value
+  if (!cells.length) return
+  const sec = selectedNoteSection.value
+  if (!sec) return
+  let successCount = 0
+  for (const c of cells) {
+    const alreadyReviewed = cellComments.isReviewed(sec.section_id, c.row, c.col)
+    const result = await cellComments.toggleReview({
+      sheetKey: sec.section_id,
+      rowIdx: c.row,
+      colIdx: c.col,
+      status: alreadyReviewed ? 'pending' : 'reviewed',
+      rowName: sec.editRows?.[c.row]?.[0] || '',
+      colName: sec.headers?.[c.col] || '',
+    })
+    if (result) successCount++
+  }
+  if (successCount > 0) {
+    const action = cellComments.isReviewed(sec.section_id, cells[0].row, cells[0].col) ? '标记' : '取消标记'
+    ElMessage.success(`已${action} ${successCount} 个单元格复核状态`)
+  }
 }
 
 // ─── 汇总功能 ────────────────────────────────────────────────────────────────
 function openAggregateDialog() {
-  closeCellContextMenu()
-  if (!selectedCells.value.length) { ElMessage.warning('请先选中单元格'); return }
-  const c = selectedCells.value[0]
+  noteCtx.closeContextMenu()
+  if (!noteCtx.selectedCells.value.length) { ElMessage.warning('请先选中单元格'); return }
+  const c = noteCtx.selectedCells.value[0]
   const sec = selectedNoteSection.value
   aggTarget.itemName = sec?.editRows?.[c.row]?.[0] || ''
   aggTarget.colName = sec?.headers?.[c.col] || ''
@@ -795,8 +827,8 @@ async function executeAggregate() {
       }
     }
     showAggregateDialog.value = false
-  } catch {
-    ElMessage.info('汇总功能需要后端配合，当前为预留接口')
+  } catch (err: any) {
+    ElMessage.error(`汇总失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { aggLoading.value = false }
 }
 
@@ -842,8 +874,8 @@ async function refreshNoteByFormula() {
     } else {
       ElMessage.info('暂无可计算的公式数据，请确认项目中已有对应科目的试算表数据')
     }
-  } catch {
-    ElMessage.info('公式刷新功能需要后端配合，当前为预留接口')
+  } catch (err: any) {
+    ElMessage.error(`公式刷新失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { noteRefreshing.value = false }
 }
 
@@ -1054,6 +1086,11 @@ async function onNoteBatchImport(e: Event) {
 }
 
 // ─── 公式管理 ────────────────────────────────────────────────────────────────
+function openGlobalFormulaManager() {
+  window.dispatchEvent(new CustomEvent('gt-open-formula-manager', { detail: { nodeKey: 'consol_note' } }))
+  showNoteFormulaDialog.value = false
+}
+
 function openNoteFormula() {
   const sec = selectedNoteSection.value
   if (!sec) { ElMessage.warning('请先选择章节'); return }
@@ -1179,8 +1216,8 @@ async function applyAllNoteFormulas() {
     if (selectedNoteSection.value) {
       onNoteNodeClick({ section_id: selectedNoteSection.value.section_id })
     }
-  } catch {
-    ElMessage.info('一键取数计算功能需要后端公式引擎配合')
+  } catch (err: any) {
+    ElMessage.error(`一键取数计算失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
 }
 
@@ -1202,8 +1239,8 @@ async function onNoteAuditAll(_e?: Event) {
     noteAuditSummary.passCount = noteAuditResults.value.filter((r: any) => r.level === 'pass').length
     noteAuditSummary.errorCount = noteAuditResults.value.filter((r: any) => r.level === 'error').length
     noteAuditSummary.warnCount = noteAuditResults.value.filter((r: any) => r.level === 'warn').length
-  } catch {
-    ElMessage.info('全审功能需要后端配合，当前为预留接口')
+  } catch (err: any) {
+    ElMessage.error(`全审失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { noteAuditLoading.value = false }
 }
 
@@ -1251,8 +1288,8 @@ async function auditCurrentNote() {
     noteAuditSummary.errorCount = noteAuditResults.value.filter((r: any) => r.level === 'error').length
     noteAuditSummary.warnCount = noteAuditResults.value.filter((r: any) => r.level === 'warn').length
     showNoteAuditDialog.value = true
-  } catch {
-    ElMessage.info('单表审核功能需要后端配合，当前为预留接口')
+  } catch (err: any) {
+    ElMessage.error(`单表审核失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { noteSingleAuditLoading.value = false }
 }
 
@@ -1298,6 +1335,8 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
         headers,
         editRows,
       }
+      // 加载该章节的批注和复核标记
+      cellComments.loadComments(sec.section_id)
     }
   }).catch(() => {})
 }
@@ -1309,8 +1348,8 @@ function switchToFourCol() {
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 function onDocClick(e: MouseEvent) {
   const target = e.target as HTMLElement
-  if (target.closest('.gt-cell-context-menu')) return
-  closeCellContextMenu()
+  if (target.closest('.gt-ucell-context-menu')) return
+  noteCtx.closeContextMenu()
 }
 
 function onGlobalKeydown(e: KeyboardEvent) {
@@ -1446,40 +1485,35 @@ defineExpose({
 }
 /* 单元格选中高亮 */
 :deep(.gt-cell--selected) {
-  background: linear-gradient(135deg, rgba(75,45,119,0.05), rgba(124,92,170,0.08)) !important;
-  box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 8px rgba(75,45,119,0.1);
-  border-radius: 3px;
-  animation: gt-cell-pulse 1.5s ease-in-out infinite alternate;
+  position: relative;
+  background: var(--gt-color-primary-bg, #f4f0fa) !important;
+  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -1.5px;
+  z-index: 1;
+  animation: gt-cell-glow 2s ease-in-out infinite alternate;
+}
+:deep(.gt-cell--selected)::before {
+  content: '';
+  position: absolute; left: 0; top: 2px; bottom: 2px;
+  width: 2.5px;
+  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
+  border-radius: 0 2px 2px 0; opacity: 0.85;
+}
+:deep(.gt-cell--selected)::after {
+  content: '';
+  position: absolute; right: 0; bottom: 0;
+  width: 0; height: 0;
+  border-style: solid; border-width: 0 0 6px 6px;
+  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
+  opacity: 0.6;
 }
 :deep(.gt-cell--selected .gt-note-cell-text) {
-  color: #4b2d77; font-weight: 500;
+  color: var(--gt-color-primary, #4b2d77); font-weight: 500;
 }
-@keyframes gt-cell-pulse {
-  0% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 6px rgba(75,45,119,0.08); }
-  100% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.5), 0 0 12px rgba(75,45,119,0.15); }
+@keyframes gt-cell-glow {
+  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
+  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
 }
-/* 右键菜单 */
-.gt-cell-context-menu {
-  position: fixed; z-index: 10001; background: #fff;
-  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 200px;
-  border: 1px solid #e8e4f0;
-}
-.gt-cell-ctx-header {
-  padding: 6px 14px; font-size: 11px; color: #999;
-  display: flex; justify-content: space-between; gap: 8px;
-}
-.gt-cell-ctx-divider { height: 1px; background: #f0edf5; margin: 2px 0; }
-.gt-cell-ctx-item {
-  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #333;
-  display: flex; align-items: center; gap: 6px; transition: background 0.1s;
-}
-.gt-cell-ctx-item:hover { background: #f0edf5; color: #4b2d77; }
-.gt-cell-ctx-icon { width: 18px; text-align: center; font-size: 13px; }
-.gt-ctx-fade-enter-active { transition: opacity 0.1s, transform 0.1s; }
-.gt-ctx-fade-leave-active { transition: opacity 0.08s; }
-.gt-ctx-fade-enter-from { opacity: 0; transform: scale(0.95); }
-.gt-ctx-fade-leave-to { opacity: 0; }
-
 /* 批注弹窗 */
 :deep(.gt-comment-dialog .el-dialog__header) {
   background: linear-gradient(135deg, #4b2d77, #7c5caa); padding: 14px 20px;

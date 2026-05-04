@@ -169,6 +169,7 @@ interface EquitySimRow {
 interface IndirectSection {
   companyName: string; ratio: number; rows: EquitySimRow[]
   endLongInvest: number; endNetAssetShare: number; difference: number; diffReason: string
+  indirectHolder?: string
 }
 
 const props = defineProps<{

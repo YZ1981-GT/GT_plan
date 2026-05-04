@@ -232,6 +232,27 @@ async def refresh_note_by_formula(
             clean_name = item_name.strip().lstrip("△▲*#").strip()
             
             matched = tb_map.get(clean_name) or tb_map.get(item_name.strip())
+            
+            # 如果精确匹配失败，尝试从映射表查找
+            if not matched:
+                try:
+                    map_result = await db.execute(
+                        text("SELECT account_name, mapping_type FROM account_note_mapping WHERE project_id = :pid AND section_id = :sid AND row_name = :rn LIMIT 1"),
+                        {"pid": project_id, "sid": section_id, "rn": clean_name},
+                    )
+                    map_row = map_result.fetchone()
+                    if map_row:
+                        mapped_account = map_row[0]
+                        matched = tb_map.get(mapped_account)
+                except Exception:
+                    pass
+            
+            # 如果映射表也没有，尝试模糊匹配（包含关系）
+            if not matched and len(clean_name) >= 2:
+                for acc_name, acc_data in tb_map.items():
+                    if clean_name in acc_name or acc_name in clean_name:
+                        matched = acc_data
+                        break
             if matched:
                 new_row = list(row)
                 # 按表头匹配填充：期末余额、期初余额、本期发生额等

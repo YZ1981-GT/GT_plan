@@ -57,7 +57,7 @@
       <div class="gt-de-sidebar">
         <!-- 单位切换 -->
         <div class="gt-de-unit-bar">
-          <span class="gt-de-unit-name">{{ projectName || '—' }}</span>
+          <span class="gt-de-unit-name">{{ currentProjectName || '—' }}</span>
           <el-select v-if="projectOptions.length > 1" v-model="selectedProjectIdLocal" size="small" style="width: 100%; margin-top: 4px" @change="onSwitchProjectLocal">
             <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
           </el-select>
@@ -103,7 +103,7 @@
               @click="onFlatItemClick(note)"
             >
               <span class="gt-de-flat-item-title">{{ note.section_title }}</span>
-              <el-tag v-if="note.scope === 'consolidated_only'" size="small" type="warning" style="font-size: 10px">合并</el-tag>
+              <el-tag v-if="(note as any).scope === 'consolidated_only'" size="small" type="warning" style="font-size: 10px">合并</el-tag>
             </div>
           </div>
           <div v-if="!filteredTreeData.length && !treeLoading" class="gt-de-empty-hint">
@@ -322,27 +322,27 @@
     />
   </div>
 
-  <!-- 右键菜单 -->
-  <Teleport to="body">
-    <Transition name="de-ctx-fade">
-      <div v-if="deCtxMenu.visible" class="de-context-menu"
-        :style="{ left: deCtxMenu.x + 'px', top: deCtxMenu.y + 'px' }" @contextmenu.prevent>
-        <div class="de-ctx-header">{{ deCtxMenu.itemName }}</div>
-        <div class="de-ctx-divider" />
-        <div class="de-ctx-item" @click="deCtxCopy"><span class="de-ctx-icon">📋</span> 复制值</div>
-        <div class="de-ctx-item" @click="deCtxFormula"><span class="de-ctx-icon">ƒx</span> 查看公式</div>
-        <div v-if="deSelectedCells.length > 1" class="de-ctx-divider" />
-        <div v-if="deSelectedCells.length > 1" class="de-ctx-item" @click="deCtxSum">
-          <span class="de-ctx-icon">Σ</span> 求和 <b style="color:#4b2d77;margin-left:4px">{{ deSelectedCells.length }} 格</b>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <!-- 右键菜单（统一组件） -->
+  <CellContextMenu
+    :visible="deCtx.contextMenu.visible"
+    :x="deCtx.contextMenu.x"
+    :y="deCtx.contextMenu.y"
+    :item-name="deCtx.contextMenu.itemName"
+    :value="deCtx.selectedCells.value.length === 1 ? deCtx.selectedCells.value[0]?.value : undefined"
+    :multi-count="deCtx.selectedCells.value.length"
+    @copy="onDeCtxCopy"
+    @formula="onDeCtxFormula"
+    @sum="onDeCtxSum"
+    @compare="onDeCtxCompare"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useCellSelection } from '@/composables/useCellSelection'
+import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import { useCellComments } from '@/composables/useCellComments'
 import { ElMessage } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
@@ -1196,16 +1196,22 @@ function onDeKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && deFullscreen.value) deFullscreen.value = false
 }
 
-// ─── 单元格选中与右键菜单 ────────────────────────────────────────────────────
-const deSelectedCells = ref<{ row: number; col: number; value: any }[]>([])
-const deCtxMenu = reactive({ visible: false, x: 0, y: 0, itemName: '' })
+// ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
+const deCtx = useCellSelection()
+const deComments = useCellComments(() => projectId.value, () => year.value, 'disclosure')
 
 function deCellClassName({ rowIndex, columnIndex }: any) {
-  return deSelectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex) ? 'de-cell--selected' : ''
+  const classes: string[] = []
+  if (deCtx.cellClassName({ rowIndex, columnIndex })) classes.push('de-cell--selected')
+  const sec = activeTableData.value
+  const sheetKey = sec?.section_id || currentNote.value?.note_section || 'default'
+  const ccClass = deComments.commentCellClass(sheetKey, rowIndex, columnIndex)
+  if (ccClass) classes.push(ccClass)
+  return classes.join(' ')
 }
 
 function onDeCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  deCtxMenu.visible = false
+  deCtx.closeContextMenu()
   const tableRows = activeTableData.value?.rows || []
   const rowIdx = tableRows.indexOf(row)
   const headers = activeTableData.value?.headers || []
@@ -1213,52 +1219,45 @@ function onDeCellClick(row: any, column: any, cell: HTMLElement, event: MouseEve
   if (rowIdx < 0 || colIdx < 0) return
   const values = row.values || row.cells || []
   const value = values[colIdx] ?? ''
-  if (event.ctrlKey || event.metaKey) {
-    const idx = deSelectedCells.value.findIndex(c => c.row === rowIdx && c.col === colIdx)
-    if (idx >= 0) deSelectedCells.value.splice(idx, 1)
-    else deSelectedCells.value.push({ row: rowIdx, col: colIdx, value })
-  } else {
-    deSelectedCells.value = [{ row: rowIdx, col: colIdx, value }]
-  }
-  deCtxMenu.itemName = values[0] || `行${rowIdx + 1}`
+  deCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
 }
 
 function onDeCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  event.preventDefault()
-  event.stopPropagation()
   onDeCellClick(row, column, cell, event)
-  setTimeout(() => { deCtxMenu.x = event.clientX; deCtxMenu.y = event.clientY; deCtxMenu.visible = true }, 0)
+  deCtx.openContextMenu(event, deCtx.contextMenu.itemName)
 }
 
-function deCtxCopy() {
-  deCtxMenu.visible = false
-  const values = deSelectedCells.value.map(c => c.value ?? '-').join('\t')
-  navigator.clipboard?.writeText(values)
+function onDeCtxCopy() {
+  deCtx.closeContextMenu()
+  deCtx.copySelectedValues()
   ElMessage.success('已复制')
 }
 
-function deCtxFormula() {
-  deCtxMenu.visible = false
+function onDeCtxFormula() {
+  deCtx.closeContextMenu()
   showNoteFormulaManager.value = true
 }
 
-function deCtxSum() {
-  deCtxMenu.visible = false
-  const sum = deSelectedCells.value.reduce((s, c) => s + (Number(c.value) || 0), 0)
-  ElMessage.info(`选中 ${deSelectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+function onDeCtxSum() {
+  deCtx.closeContextMenu()
+  const sum = deCtx.sumSelectedValues()
+  ElMessage.info(`选中 ${deCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
 }
 
-function onDeDocClick(e: MouseEvent) {
-  if (!(e.target as HTMLElement)?.closest('.de-context-menu')) deCtxMenu.visible = false
+function onDeCtxCompare() {
+  deCtx.closeContextMenu()
+  if (deCtx.selectedCells.value.length < 2) return
+  const vals = deCtx.selectedCells.value.map(c => Number(c.value) || 0)
+  const diff = vals[0] - vals[1]
+  ElMessage.info(`差异：${fmtAmt(diff)}`)
 }
 
 onMounted(() => {
   document.addEventListener('keydown', onDeKeydown)
-  document.addEventListener('click', onDeDocClick)
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onDeKeydown)
-  document.removeEventListener('click', onDeDocClick)
 })
 </script>
 
@@ -1441,33 +1440,32 @@ onUnmounted(() => {
 
 /* 单元格选中 */
 :deep(.de-cell--selected) {
-  background: linear-gradient(135deg, rgba(75,45,119,0.05), rgba(124,92,170,0.08)) !important;
-  box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 8px rgba(75,45,119,0.1);
-  animation: de-cell-pulse 1.5s ease-in-out infinite alternate;
+  position: relative;
+  background: var(--gt-color-primary-bg, #f4f0fa) !important;
+  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -1.5px;
+  z-index: 1;
+  animation: de-cell-glow 2s ease-in-out infinite alternate;
 }
-@keyframes de-cell-pulse {
-  0% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 6px rgba(75,45,119,0.08); }
-  100% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.5), 0 0 12px rgba(75,45,119,0.15); }
+:deep(.de-cell--selected)::before {
+  content: '';
+  position: absolute; left: 0; top: 2px; bottom: 2px;
+  width: 2.5px;
+  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
+  border-radius: 0 2px 2px 0; opacity: 0.85;
+}
+:deep(.de-cell--selected)::after {
+  content: '';
+  position: absolute; right: 0; bottom: 0;
+  width: 0; height: 0;
+  border-style: solid; border-width: 0 0 6px 6px;
+  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
+  opacity: 0.6;
+}
+@keyframes de-cell-glow {
+  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
+  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
 }
 </style>
 
-<style>
-/* 右键菜单（非 scoped） */
-.de-context-menu {
-  position: fixed; z-index: 10001; background: #fff;
-  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 180px;
-  border: 1px solid #e8e4f0;
-}
-.de-ctx-header { padding: 6px 14px; font-size: 11px; color: #999; }
-.de-ctx-divider { height: 1px; background: #f0edf5; margin: 2px 0; }
-.de-ctx-item {
-  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #333;
-  display: flex; align-items: center; gap: 6px; transition: background 0.1s;
-}
-.de-ctx-item:hover { background: #f0edf5; color: #4b2d77; }
-.de-ctx-icon { width: 18px; text-align: center; }
-.de-ctx-fade-enter-active { transition: opacity 0.1s, transform 0.1s; }
-.de-ctx-fade-leave-active { transition: opacity 0.08s; }
-.de-ctx-fade-enter-from { opacity: 0; transform: scale(0.95); }
-.de-ctx-fade-leave-to { opacity: 0; }
-</style>
+

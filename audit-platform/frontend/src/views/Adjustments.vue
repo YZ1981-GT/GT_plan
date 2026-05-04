@@ -418,7 +418,7 @@ async function batchReview(status: string) {
 
 function onImported() {
   showImportDialog.value = false
-  fetchData()
+  fetchEntries()
 }
 
 function onExportSummary() {

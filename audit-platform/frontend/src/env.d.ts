@@ -14,3 +14,8 @@ declare module '*.vue' {
   const component: DefineComponent<{}, {}, any>
   export default component
 }
+
+declare module '@univerjs/preset-sheets-core/lib/locales/zh-CN' {
+  const locale: Record<string, any>
+  export default locale
+}

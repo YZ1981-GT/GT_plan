@@ -1182,8 +1182,8 @@ function confirmTargetCell() {
   background: #f0ecf5;
 }
 .gt-fe-target-cell-selected {
-  background: #ece6f5 !important;
-  outline: 2px solid #4b2d77;
-  outline-offset: -2px;
+  background: var(--gt-color-primary-bg, #f4f0fa) !important;
+  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -1.5px;
 }
 </style>

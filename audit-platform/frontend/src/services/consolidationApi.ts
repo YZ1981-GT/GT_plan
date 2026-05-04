@@ -187,7 +187,7 @@ export interface YoYAnalysis {
 
 export interface ConsolScopeNote { section_code: string; section_title: string; content_type: string }
 export interface SubsidiaryNote { company_code: string; company_name: string }
-export interface GoodwillNote { subsidiary_company_code: string; goodwill_amount: number }
+export interface GoodwillNote { subsidiary_company_code: string; goodwill_amount: number; opening_balance?: number; current_increase?: number; current_decrease?: number; current_impairment?: number; closing_balance?: number }
 export interface MinorityInterestNote { subsidiary_company_code: string; minority_equity: number }
 export interface InternalTradeNote { seller: string; buyer: string; amount: number }
 export interface InternalArApNote { debtor: string; creditor: string; amount: number }
@@ -378,7 +378,7 @@ export async function createConsolNotes(projectId: string, year: number): Promis
   return api.post(`/api/consolidation/notes/${projectId}/${year}`)
 }
 
-export async function saveConsolNotes(projectId: string, period: string, data: any): Promise<any> {
+export async function saveConsolNotes(_projectId: string, _period: string, _data: any): Promise<any> {
   const year = parseInt(period) || new Date().getFullYear() - 1
   return api.post(`/api/consolidation/notes/${projectId}/${year}/save`)
 }
@@ -434,11 +434,11 @@ export async function getConsolReport(projectId: string, reportType: string, per
   return { rows: Array.isArray(rows) ? rows : [], report_type: reportType }
 }
 
-export async function saveConsolReport(projectId: string, reportType: string, period: string, data: ConsolReportData): Promise<ConsolReportData> {
+export async function saveConsolReport(_projectId: string, _reportType: string, _period: string, data: ConsolReportData): Promise<ConsolReportData> {
   return data // 报表数据由后端生成，前端只读
 }
 
-export async function getYoYAnalysis(projectId: string, reportType: string, period: string): Promise<YoYAnalysis[]> {
+export async function getYoYAnalysis(_projectId: string, _reportType: string, _period: string): Promise<YoYAnalysis[]> {
   return [] // 同比分析待后端实现
 }
 

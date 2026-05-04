@@ -529,25 +529,22 @@
     />
   </div>
 
-  <!-- 右键菜单 -->
-  <Teleport to="body">
-    <Transition name="rv-ctx-fade">
-      <div v-if="rvContextMenu.visible" class="rv-context-menu"
-        :style="{ left: rvContextMenu.x + 'px', top: rvContextMenu.y + 'px' }"
-        @contextmenu.prevent>
-        <div class="rv-ctx-header">{{ rvContextMenu.itemName }}</div>
-        <div class="rv-ctx-divider" />
-        <div class="rv-ctx-item" @click="rvCtxCopy"><span class="rv-ctx-icon">📋</span> 复制值</div>
-        <div class="rv-ctx-item" @click="rvCtxDrillDown"><span class="rv-ctx-icon">📊</span> 查看穿透</div>
-        <div class="rv-ctx-item" @click="rvCtxFormula"><span class="rv-ctx-icon">ƒx</span> 查看公式</div>
-        <div class="rv-ctx-item" @click="rvCtxGoNote"><span class="rv-ctx-icon">📝</span> 跳转附注</div>
-        <div v-if="rvSelectedCells.length > 1" class="rv-ctx-divider" />
-        <div v-if="rvSelectedCells.length > 1" class="rv-ctx-item" @click="rvCtxSum">
-          <span class="rv-ctx-icon">Σ</span> 求和 <b style="color:#4b2d77;margin-left:4px">{{ rvSelectedCells.length }} 格</b>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <!-- 右键菜单（统一组件） -->
+  <CellContextMenu
+    :visible="rvCtx.contextMenu.visible"
+    :x="rvCtx.contextMenu.x"
+    :y="rvCtx.contextMenu.y"
+    :item-name="rvCtx.contextMenu.itemName"
+    :value="rvCtx.selectedCells.value.length === 1 ? rvCtx.selectedCells.value[0]?.value : undefined"
+    :multi-count="rvCtx.selectedCells.value.length"
+    @copy="onRvCtxCopy"
+    @formula="onRvCtxFormula"
+    @sum="onRvCtxSum"
+    @compare="onRvCtxCompare"
+  >
+    <div class="gt-ucell-ctx-item" @click="onRvCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看穿透</div>
+    <div class="gt-ucell-ctx-item" @click="onRvCtxGoNote"><span class="gt-ucell-ctx-icon">📝</span> 跳转附注</div>
+  </CellContextMenu>
 </template>
 
 <script setup lang="ts">
@@ -558,6 +555,9 @@ import http from '@/utils/http'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import { useCellSelection } from '@/composables/useCellSelection'
+import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import { useCellComments } from '@/composables/useCellComments'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -1174,7 +1174,7 @@ function onExportAuditExcel() {
 
 function onReportImported() {
   showReportImport.value = false
-  loadReport()
+  fetchReport()
 }
 
 function onExportExcel() {
@@ -1224,75 +1224,68 @@ watch(
   { immediate: true }
 )
 
-// ─── 单元格选中与右键菜单 ────────────────────────────────────────────────────
-const rvSelectedCells = ref<{ row: number; col: number; value: any }[]>([])
-const rvContextMenu = reactive({ visible: false, x: 0, y: 0, itemName: '', rowData: null as any })
+// ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
+const rvCtx = useCellSelection()
+const rvComments = useCellComments(() => projectId.value, () => year.value, 'report')
 
 function rvCellClassName({ rowIndex, columnIndex }: any) {
-  if (rvSelectedCells.value.some(c => c.row === rowIndex && c.col === columnIndex)) return 'rv-cell--selected'
-  return ''
+  const classes: string[] = []
+  if (rvCtx.cellClassName({ rowIndex, columnIndex })) classes.push('rv-cell--selected')
+  const ccClass = rvComments.commentCellClass(`report_${activeTab.value}`, rowIndex, columnIndex)
+  if (ccClass) classes.push(ccClass)
+  return classes.join(' ')
 }
 
 function onRvCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  rvContextMenu.visible = false
+  rvCtx.closeContextMenu()
   const rowIdx = rows.value.indexOf(row)
   const colLabels = ['序号', '项目', '本期金额', '上期金额']
   const colIdx = colLabels.indexOf(column.label)
   if (rowIdx < 0 || colIdx < 0) return
   const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
-  if (event.ctrlKey || event.metaKey) {
-    const idx = rvSelectedCells.value.findIndex(c => c.row === rowIdx && c.col === colIdx)
-    if (idx >= 0) rvSelectedCells.value.splice(idx, 1)
-    else rvSelectedCells.value.push({ row: rowIdx, col: colIdx, value })
-  } else {
-    rvSelectedCells.value = [{ row: rowIdx, col: colIdx, value }]
-  }
-  rvContextMenu.rowData = row
-  rvContextMenu.itemName = row.row_name || ''
+  rvCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  rvCtx.contextMenu.rowData = row
+  rvCtx.contextMenu.itemName = row.row_name || ''
 }
 
 function onRvCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  event.preventDefault()
-  event.stopPropagation()
   onRvCellClick(row, column, cell, event)
-  setTimeout(() => {
-    rvContextMenu.x = event.clientX
-    rvContextMenu.y = event.clientY
-    rvContextMenu.visible = true
-  }, 0)
+  rvCtx.openContextMenu(event, rvCtx.contextMenu.itemName, row)
 }
 
-function rvCtxCopy() {
-  rvContextMenu.visible = false
-  const values = rvSelectedCells.value.map(c => c.value ?? '-').join('\t')
-  navigator.clipboard?.writeText(values)
+function onRvCtxCopy() {
+  rvCtx.closeContextMenu()
+  rvCtx.copySelectedValues()
   ElMessage.success('已复制')
 }
 
-function rvCtxDrillDown() {
-  rvContextMenu.visible = false
-  if (rvContextMenu.rowData) onDrilldown(rvContextMenu.rowData)
+function onRvCtxDrillDown() {
+  rvCtx.closeContextMenu()
+  if (rvCtx.contextMenu.rowData) onDrilldown(rvCtx.contextMenu.rowData)
 }
 
-function rvCtxFormula() {
-  rvContextMenu.visible = false
+function onRvCtxFormula() {
+  rvCtx.closeContextMenu()
   showFormulaManager.value = true
 }
 
-function rvCtxGoNote() {
-  rvContextMenu.visible = false
-  if (rvContextMenu.rowData?.row_code) goToNote(rvContextMenu.rowData.row_code)
+function onRvCtxGoNote() {
+  rvCtx.closeContextMenu()
+  if (rvCtx.contextMenu.rowData?.row_code) goToNote(rvCtx.contextMenu.rowData.row_code)
 }
 
-function rvCtxSum() {
-  rvContextMenu.visible = false
-  const sum = rvSelectedCells.value.reduce((s, c) => s + (Number(c.value) || 0), 0)
-  ElMessage.info(`选中 ${rvSelectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+function onRvCtxSum() {
+  rvCtx.closeContextMenu()
+  const sum = rvCtx.sumSelectedValues()
+  ElMessage.info(`选中 ${rvCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
 }
 
-// 点击其他地方关闭右键菜单
-function onRvDocClick(e: MouseEvent) {
-  if (!(e.target as HTMLElement)?.closest('.rv-context-menu')) rvContextMenu.visible = false
+function onRvCtxCompare() {
+  rvCtx.closeContextMenu()
+  if (rvCtx.selectedCells.value.length < 2) return
+  const vals = rvCtx.selectedCells.value.map(c => Number(c.value) || 0)
+  const diff = vals[0] - vals[1]
+  ElMessage.info(`差异：${fmtAmt(diff)}`)
 }
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
@@ -1318,11 +1311,9 @@ function onRvKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
-  document.addEventListener('click', onRvDocClick)
   document.addEventListener('keydown', onRvKeydown)
 })
 onUnmounted(() => {
-  document.removeEventListener('click', onRvDocClick)
   document.removeEventListener('keydown', onRvKeydown)
 })
 </script>
@@ -1856,7 +1847,6 @@ onUnmounted(() => {
 }
 
 /* 单元格选中 */
-:deep(.rv-cell--selected) {
 
 /* 全屏 */
 .gt-rv-fullscreen {
@@ -1865,33 +1855,32 @@ onUnmounted(() => {
 }
 
 :deep(.rv-cell--selected) {
-  background: linear-gradient(135deg, rgba(75,45,119,0.05), rgba(124,92,170,0.08)) !important;
-  box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 8px rgba(75,45,119,0.1);
-  animation: rv-cell-pulse 1.5s ease-in-out infinite alternate;
+  position: relative;
+  background: var(--gt-color-primary-bg, #f4f0fa) !important;
+  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -1.5px;
+  z-index: 1;
+  animation: rv-cell-glow 2s ease-in-out infinite alternate;
 }
-@keyframes rv-cell-pulse {
-  0% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.35), 0 0 6px rgba(75,45,119,0.08); }
-  100% { box-shadow: inset 0 0 0 1.5px rgba(75,45,119,0.5), 0 0 12px rgba(75,45,119,0.15); }
+:deep(.rv-cell--selected)::before {
+  content: '';
+  position: absolute; left: 0; top: 2px; bottom: 2px;
+  width: 2.5px;
+  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
+  border-radius: 0 2px 2px 0; opacity: 0.85;
+}
+:deep(.rv-cell--selected)::after {
+  content: '';
+  position: absolute; right: 0; bottom: 0;
+  width: 0; height: 0;
+  border-style: solid; border-width: 0 0 6px 6px;
+  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
+  opacity: 0.6;
+}
+@keyframes rv-cell-glow {
+  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
+  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
 }
 </style>
 
-<style>
-/* 右键菜单（非 scoped） */
-.rv-context-menu {
-  position: fixed; z-index: 10001; background: #fff;
-  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); padding: 6px 0; min-width: 180px;
-  border: 1px solid #e8e4f0;
-}
-.rv-ctx-header { padding: 6px 14px; font-size: 11px; color: #999; }
-.rv-ctx-divider { height: 1px; background: #f0edf5; margin: 2px 0; }
-.rv-ctx-item {
-  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #333;
-  display: flex; align-items: center; gap: 6px; transition: background 0.1s;
-}
-.rv-ctx-item:hover { background: #f0edf5; color: #4b2d77; }
-.rv-ctx-icon { width: 18px; text-align: center; }
-.rv-ctx-fade-enter-active { transition: opacity 0.1s, transform 0.1s; }
-.rv-ctx-fade-leave-active { transition: opacity 0.08s; }
-.rv-ctx-fade-enter-from { opacity: 0; transform: scale(0.95); }
-.rv-ctx-fade-leave-to { opacity: 0; }
-</style>
+
