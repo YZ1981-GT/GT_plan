@@ -49,10 +49,13 @@
             <el-table-column v-if="noteEditMode" type="selection" width="36" />
             <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :min-width="hi === 0 ? 200 : 130">
               <template #default="{ row, $index }">
-                <el-input v-if="noteEditMode" v-model="row[hi]" size="small" :placeholder="h"
-                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }" />
+                <el-input v-if="noteEditMode && lazyEdit.isEditing($index, hi)" v-model="row[hi]" size="small" :placeholder="h"
+                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
+                  @blur="lazyEdit.stopEdit()" autofocus />
                 <span v-else class="gt-note-cell-text"
-                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }">{{ row[hi] || '-' }}</span>
+                  :class="{ 'gt-note-cell-editable': noteEditMode }"
+                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
+                  @click="noteEditMode && lazyEdit.startEdit($index, hi)">{{ row[hi] || '-' }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -144,10 +147,14 @@
             @selection-change="onNoteSelectionChange">
             <el-table-column v-if="noteEditMode" type="selection" width="36" />
             <el-table-column v-for="(h, hi) in selectedNoteSection.headers" :key="hi" :label="h" :min-width="hi === 0 ? 200 : 130">
-              <template #default="{ row }">
-                <el-input v-if="noteEditMode" v-model="row[hi]" size="small" :placeholder="h"
-                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }" />
-                <span v-else class="gt-note-cell-text" :style="{ textAlign: hi === 0 ? 'left' : 'right' }">{{ row[hi] || '-' }}</span>
+              <template #default="{ row, $index }">
+                <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, hi)" v-model="row[hi]" size="small" :placeholder="h"
+                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
+                  @blur="lazyEdit.stopEdit()" autofocus />
+                <span v-else class="gt-note-cell-text"
+                  :class="{ 'gt-note-cell-editable': noteEditMode }"
+                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
+                  @click="noteEditMode && lazyEdit.startEdit($index + 10000, hi)">{{ row[hi] || '-' }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -481,6 +488,7 @@ import http from '@/utils/http'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { useLazyEdit } from '@/composables/useLazyEdit'
 
 const props = defineProps<{
   projectId: string
@@ -513,6 +521,9 @@ const noteBatchLoading = ref(false)
 
 // ─── 批注与复核持久化 ────────────────────────────────────────────────────────
 const cellComments = useCellComments(() => props.projectId, () => props.year, 'consol_note')
+
+// ─── 按需渲染编辑控件（大表格性能优化） ──────────────────────────────────────
+const lazyEdit = useLazyEdit()
 
 // ─── 附注全审 ────────────────────────────────────────────────────────────────
 const showNoteAuditDialog = ref(false)
@@ -1482,6 +1493,13 @@ defineExpose({
 .gt-note-cell-text {
   display: block; padding: 2px 2px; font-size: 13px; min-height: 20px;
   user-select: text; cursor: pointer; white-space: nowrap;
+}
+.gt-note-cell-editable {
+  cursor: text; border-bottom: 1px dashed var(--gt-color-border, #e5e5ea);
+  border-radius: 2px; transition: background 0.1s;
+}
+.gt-note-cell-editable:hover {
+  background: var(--gt-color-primary-bg, #f4f0fa);
 }
 /* 单元格选中高亮 */
 :deep(.gt-cell--selected) {
