@@ -26,7 +26,7 @@ inclusion: manual
 - 底稿精细化规则：347 个 JSON
 - 测试：~1800 个用例（单元 + E2E + 集成）
 
-## 前端全局组件库（2026-05-04 建立）
+## 前端全局组件库（2026-05-05 完成）
 
 ### Composables（composables/）
 | 文件 | 功能 | 接入模块数 |
@@ -38,6 +38,15 @@ inclusion: manual
 | useProjectSelector | 项目/年度选择器 | 6 页面 |
 | useWorkflowGuide | 工作流引导提示 | 8 个预定义引导 |
 | useTableSearch | 表格内搜索替换(Ctrl+F) | 3 模块 |
+| useEditMode | 查看/编辑模式切换+未保存提示+路由拦截 | 全模块 |
+| useExcelIO | 统一 Excel 导入导出 | 14 worksheet |
+| useTableToolbar | 通用表格工具栏逻辑 | 多模块 |
+| useCopyPaste | 表格复制粘贴 | TrialBalance + ReportView |
+| useKnowledge | 全局知识库调用 | DisclosureEditor + AuditReportEditor |
+| useAutoSave | 自动保存/草稿恢复 | 3 模块 |
+| useLoading | withLoading 包装 + NProgress | 全局 |
+| usePermission | 按钮级权限控制 | 全局 |
+| useKeyboardNav | Tab 键盘导航+批量粘贴 | GtEditableTable |
 
 ### Stores（stores/）
 | 文件 | 功能 | 状态 |
@@ -48,6 +57,9 @@ inclusion: manual
 | drilldown | 穿透导航 | 穿透页面 |
 | wizard | 项目向导 | 向导页面 |
 | collaboration | 协作 | 协作模块 |
+| project | 项目上下文（projectId/year/standard） | 全局（路由自动同步） |
+| dict | 枚举字典（后端 /api/system/dicts） | 全局（sessionStorage 缓存） |
+| addressRegistry | 地址坐标全局注册表 | CellSelector/FormulaRefPicker |
 
 ### Common Components（components/common/）
 | 文件 | 功能 |
@@ -56,19 +68,45 @@ inclusion: manual
 | SelectionBar | 选中区域求和状态栏 |
 | TableSearchBar | 搜索栏UI(致同品牌紫色) |
 | CommentTooltip | 批注hover气泡 |
+| CommentThread | 批注线程（回复链） |
 | LoadingState | 骨架屏+空状态+错误 |
 | VirtualScrollTable | 虚拟滚动表格 |
 | ValidationList | 校验结果展示 |
 | OperationFeedback | 进度+通知 |
+| GtToolbar | 标准工具栏（导出/导入/全屏/公式/模板/编辑切换） |
+| GtPageHeader | 通用页面横幅（紫色渐变） |
+| GtInfoBar | 信息栏（单位/年度/模板选择+徽章） |
+| GtAmountCell | 金额单元格（displayPrefs+可点击+hover高亮） |
+| GtStatusTag | 状态标签（配合statusMaps.ts） |
+| GtEditableTable | 高阶可编辑表格（内置选中/拖拽/右键/批注/增删行/全屏/懒加载/小计） |
+| GtPrintPreview | 打印预览弹窗 |
+| GtConsolWizard | 合并模块向导式步骤条 |
+| SyncStatusIndicator | SSE 同步状态指示器 |
+| ExcelImportPreviewDialog | 通用导入预览弹窗 |
+| KnowledgePickerDialog | 知识库文档选择器 |
+| SharedTemplatePicker | 共享模板选择器（8 configType） |
 
 ### Utils（utils/）
 | 文件 | 功能 | 状态 |
 |------|------|------|
 | formatters.ts | 金额/日期/百分比格式化+单位换算 | 5核心+14worksheet |
-| http.ts | HTTP客户端+401刷新+去重+重试 | 全局 |
-| sse.ts | SSE封装+自动重连 | 已有未接入 |
-| shortcuts.ts | 快捷键管理(13个) | 已有未接入 |
-| operationHistory.ts | 撤销功能 | 已有未接入 |
+| http.ts | HTTP客户端+401刷新+去重+重试+POST防重复 | 全局 |
+| sse.ts | SSE封装+自动重连 | 全局接入（ThreeColumnLayout） |
+| shortcuts.ts | 快捷键管理(13个) | 全模块接入 |
+| operationHistory.ts | 撤销功能 | Adjustments + RecycleBin |
+| eventBus.ts | mitt 类型安全事件总线 | 全局 |
+| apiPaths.ts | API 路径集中管理（500+路径） | 全局 |
+| statusMaps.ts | 状态标签映射 | 全局 |
+| confirm.ts | 语义化确认弹窗 | 全局 |
+
+### 后端基础设施
+| 文件 | 功能 | 状态 |
+|------|------|------|
+| core/pagination.py | PaginationParams/SortParams 统一分页排序 | 5 高频 API |
+| core/bulk_operations.py | BulkOperationMixin 批量操作 | RecycleBin/Adjustments/ReviewInbox |
+| core/audit_decorator.py | @audit_log 审计日志装饰器 | 删除/审批/状态变更 |
+| core/migration_runner.py | 数据库版本化迁移 | 启动时自动执行 |
+| services/equity_method_service.py | 模拟权益法（6 项改进） | 合并模块 |
 
 ## 11 个业务域（router_registry.py）
 

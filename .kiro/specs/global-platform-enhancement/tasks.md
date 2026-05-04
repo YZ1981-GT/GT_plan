@@ -308,6 +308,6 @@
 - [x] 内部抵消表自动汇总
 
 ### Task 4.10 — 最终收尾
-- [-] 全量 vue-tsc + Vite 构建验证
-- [~] git commit + push + 合并到 master
-- [~] 更新 memory.md + architecture.md + dev-history.md
+- [ ] 全量 vue-tsc + Vite 构建验证
+- [ ] git commit + push + 合并到 master
+- [ ] 更新 memory.md + architecture.md + dev-history.md
