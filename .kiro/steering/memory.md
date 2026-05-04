@@ -43,6 +43,7 @@ inclusion: always
 - 全局组件库已建立：7 个新工具 + 24 个组件修改（详见 #architecture "前端全局组件库"章节）
 - 5 核心模块全部接入：displayPrefs/拖拽框选/SelectionBar/搜索/条件格式/右键保持选区
 - 14 个 worksheet 组件完成 useFullscreen + fmtAmount 迁移
+- **Sprint 1 已完成**（10 Task，65 文件，+1856/-697 行）— 全局化收尾+快速见效
 
 ## 活跃待办
 
@@ -59,48 +60,52 @@ inclusion: always
 - 合并抵消分录表汇总中心（5 个区域）
 - 3 张内部抵消表→合并抵消分录表自动汇总
 
-### 全局化改造 — 进行中
-- formatters.ts 剩余替换：20+ 组件的 formatAmount/fmtDate 替换为全局函数
-- displayPrefs 接入 13 个 worksheet 组件
-- CommentTooltip 接入剩余 4 个核心模块
+### 全局化改造 — Sprint 1 已完成 ✅
+- ✅ formatters.ts 剩余替换：22 组件批量替换为 fmtAmount（Task 1.1）
+- ✅ displayPrefs 接入 13 个 worksheet 组件（Task 1.2）
+- ✅ CommentTooltip 接入 4 个核心模块（Task 1.3）
+- ✅ VirtualScrollTable 接入 formatters（Task 1.4）
+- ✅ confirm.ts 语义化确认弹窗（Task 1.5）
+- ✅ statusMaps.ts + GtStatusTag 组件（Task 1.6）
+- ✅ useEditMode composable（Task 1.7）
+- ✅ ExcelImportPreviewDialog 通用导入预览（Task 1.8）
+- ✅ operationHistory 接入（Task 1.9）
+- ✅ GtAmountCell 金额单元格组件（Task 1.10）
 
-### 全局化改造 — 待开始
+### 全局化改造 — Sprint 2 待开始（核心基础设施）
 - ❷ mitt 事件总线替代 CustomEvent（1天）
 - ❸ useProjectStore Pinia（1天）
-- ❹ useTableToolbar composable（1天）
-- ❺ useEditMode composable（半天）
 - ❻ apiPaths.ts API 路径集中管理（1天）
-- ❼ useDictStore 枚举字典（2天含后端）
 - ❽ 后端响应格式彻底统一（1天）
+- ⑲ usePermission + v-permission 指令（1天）
+- ㉕ 路由守卫统一 router beforeEach（1天）
+- API 调用统一收口（1天）
+- 批量操作场景优化（1天）
+- ㉗ shortcuts.ts 接入各模块（1天）
+
+### 全局化改造 — Sprint 3+ 待开始
+- ❹ useTableToolbar composable（1天）
+- ❼ useDictStore 枚举字典（2天含后端）
 - ❾ useAddressRegistry 地址坐标 Store（1天）
 - ⑩ useExcelIO composable（1天）
 - ⑪ SharedTemplatePicker 扩展到 8 个 configType（1天）
 - ⑫ useKnowledge + KnowledgePickerDialog（1.5天）
 - ⑬ GtToolbar 标准工具栏组件（1天）
 - ⑭ GtEditableTable 高阶组件（3-5天，中期）
-- ⑮ ExcelImportPreviewDialog 通用导入预览（半天）
 - ⑯ useCopyPaste composable（1天）
 - ⑰ 模板市场全局入口（半天）
-- ⑲ usePermission + v-permission 指令（1天）
 - ⑳ useLoading + NProgress 全局进度条（1天）
 - ㉑ 表格列配置声明式管理（中期）
 - ㉒ 后端 PaginationParams/SortParams 统一（1天）
 - ㉓ 后端批量操作 BulkOperationMixin（1天）
 - ㉔ 后端审计日志装饰器 before/after diff（1.5天）
-- ㉕ 路由守卫统一 router beforeEach（1天）
-- ㉖ statusMaps.ts + GtStatusTag 组件（半天）
-- ㉗ shortcuts.ts 接入各模块（1天）
 - ㉘ useAutoSave 自动保存/草稿恢复（1天）
 - ㉙ TanStack Query 接入高频 API（2天）
-- ㉚ confirm.ts 语义化确认弹窗（半天）
 - ㉛ sse.ts 全局连接接入（1天）
 - ㉜ ErrorBoundary 细粒度错误隔离（半天）
 - ㉝ useExport 统一导出服务（1.5天）
 - ㉞ GtPageHeader 通用页面横幅（1天）
 - ㉟ GtInfoBar 信息栏组件（半天）
-- ㊱ GtAmountCell 金额单元格组件（半天）
-- ㊲ operationHistory.ts 接入（半天）
-- ㊳ VirtualScrollTable 接入 formatters（10分钟）
 
 ### 架构优化（低优先级）
 - 前端主 bundle 优化（Element Plus 按需导入）
