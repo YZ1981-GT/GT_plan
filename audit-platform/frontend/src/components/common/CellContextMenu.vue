@@ -8,8 +8,10 @@
           <span v-if="value != null" style="color:#4b2d77;font-weight:600">{{ formattedValue }}</span>
         </div>
         <div class="gt-ucell-ctx-divider" />
-        <!-- 通用项 -->
-        <div class="gt-ucell-ctx-item" @click="$emit('copy')"><span class="gt-ucell-ctx-icon">📋</span> 复制值</div>
+        <!-- 复制操作 -->
+        <div class="gt-ucell-ctx-item" @click="$emit('copy')">
+          <span class="gt-ucell-ctx-icon">📋</span> {{ multiCount > 1 ? `复制选中区域 (${multiCount}格)` : '复制值' }}
+        </div>
         <div class="gt-ucell-ctx-item" @click="$emit('formula')"><span class="gt-ucell-ctx-icon">ƒx</span> 查看公式</div>
         <!-- 自定义插槽：模块特有的菜单项 -->
         <slot />
@@ -58,42 +60,43 @@ const formattedValue = computed(() => {
 
 <style>
 /* ══ 通用单元格选中高亮（GT品牌紫色系） ══ */
+
+/* 选中单元格：淡紫色背景，无独立边框（连续区域看起来是一个整体） */
 .gt-ucell--selected {
   position: relative;
-  background: var(--gt-color-primary-bg, #f4f0fa) !important;
-  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
-  outline-offset: -1.5px;
+  background: rgba(75, 45, 119, 0.08) !important;
   z-index: 1;
-  animation: gt-ucell-glow 2s ease-in-out infinite alternate;
 }
-/* 左侧强调条 */
-.gt-ucell--selected::before {
+
+/* 选中区域的外边框：只在区域边缘显示（通过相邻选择器判断） */
+/* 上边框：如果上方没有选中单元格 */
+.gt-ucell--selected {
+  border-top: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
+  border-bottom: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
+  border-left: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
+  border-right: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
+}
+
+/* 相邻选中单元格之间去掉内部边框 */
+.gt-ucell--selected + .gt-ucell--selected {
+  border-left: none !important;
+}
+
+/* 单选时（只有一个单元格）：加强调样式 */
+.gt-ucell--single-selected {
+  background: rgba(75, 45, 119, 0.1) !important;
+  outline: 2px solid var(--gt-color-primary, #4b2d77);
+  outline-offset: -2px;
+}
+/* 单选右下角小方块（Excel 风格的填充柄） */
+.gt-ucell--single-selected::after {
   content: '';
   position: absolute;
-  left: 0; top: 2px; bottom: 2px;
-  width: 2.5px;
-  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
-  border-radius: 0 2px 2px 0;
-  opacity: 0.85;
-}
-/* 右下角小三角标记 */
-.gt-ucell--selected::after {
-  content: '';
-  position: absolute;
-  right: 0; bottom: 0;
-  width: 0; height: 0;
-  border-style: solid;
-  border-width: 0 0 6px 6px;
-  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
-  opacity: 0.6;
-}
-@keyframes gt-ucell-glow {
-  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
-  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
-}
-/* 多选时第二个及以后的单元格用虚线区分 */
-.el-table__body .gt-ucell--selected ~ .gt-ucell--selected {
-  outline-style: dashed;
+  right: -2px; bottom: -2px;
+  width: 6px; height: 6px;
+  background: var(--gt-color-primary, #4b2d77);
+  border: 1px solid #fff;
+  z-index: 3;
 }
 
 /* ══ 右键菜单（GT品牌风格） ══ */

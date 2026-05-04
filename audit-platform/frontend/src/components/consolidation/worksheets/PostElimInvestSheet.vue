@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>抵消后长期股权投资明细表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_post_invest')">ƒx 公式</el-button>
         <el-button size="small" @click="exportData">📥 导出Excel</el-button>
@@ -43,7 +43,7 @@
           <template #default="{ row }"><el-input-number :model-value="row.bookImpairment" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'bookImpairment', v)" /></template>
         </el-table-column>
         <el-table-column prop="bookNet" label="账面净额" width="110" align="right">
-          <template #default="{ row }"><span class="ws-computed">{{ fmt(row.bookNet) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed">{{ fmtAmount(row.bookNet) }}</span></template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="权益法模拟调整" align="center">
@@ -54,7 +54,7 @@
           <template #default="{ row }"><el-input-number :model-value="row.simOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'simOtherEquity', v)" /></template>
         </el-table-column>
         <el-table-column prop="simTotal" label="模拟后长投" width="110" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.simTotal) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.simTotal) }}</span></template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="合并抵消" align="center">
@@ -68,13 +68,13 @@
           <template #default="{ row }"><el-input-number :model-value="row.elimOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimOtherEquity', v)" /></template>
         </el-table-column>
         <el-table-column prop="elimTotal" label="抵消合计" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c;font-weight:600">{{ fmt(row.elimTotal) }}</span></template>
+          <template #default="{ row }"><span style="color:#e6a23c;font-weight:600">{{ fmtAmount(row.elimTotal) }}</span></template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="抵消后" align="center">
         <el-table-column prop="postElimTotal" label="抵消后长投" width="120" align="right">
           <template #default="{ row }">
-            <span :class="n(row.postElimTotal) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmt(row.postElimTotal) }}</span>
+            <span :class="n(row.postElimTotal) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmtAmount(row.postElimTotal) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="checkResult" label="校验" width="60" align="center">
@@ -89,8 +89,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface InvestRow { company_name: string; company_code: string; open_cost: number|null; open_impairment: number|null; [k: string]: any }
@@ -107,7 +109,7 @@ const props = defineProps<{
 
 defineEmits<{ (e: 'save', data: any): void; (e: 'open-formula', key: string): void; (e: 'goto-sheet', key: string): void }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 
@@ -206,8 +208,6 @@ const tableRows = computed(() => {
   return [...autoRows, ...manualRows]
 })
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-
 function setOverride(companyName: string, field: string, val: number | null) {
   if (!overrides[companyName]) overrides[companyName] = {}
   overrides[companyName][field] = val
@@ -236,20 +236,17 @@ function getSummary({ columns, data }: any) {
     const prop = col.property
     if (prop && sumFields.has(prop)) {
       const total = data.reduce((s: number, r: any) => s + n(r[prop]), 0)
-      sums[idx] = fmt(total)
+      sums[idx] = fmtAmount(total)
     } else { sums[idx] = '' }
   })
   return sums
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

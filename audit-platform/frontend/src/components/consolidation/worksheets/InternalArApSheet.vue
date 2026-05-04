@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>内部往来抵消表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="emitArap('open-formula', 'consol_internal_arap')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
@@ -70,14 +70,14 @@
           <template #default="{ row }"><el-input-number v-model="row.localAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="原值合计" width="110" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.localAmounts)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmtAmount(sumArr(row.localAmounts)) }}</span></template>
         </el-table-column>
         <!-- 本方坏账按账龄 -->
         <el-table-column v-for="(ag, ai) in agingSegments" :key="'li'+ai" :label="'坏账-'+ag.name" width="90" align="right">
           <template #default="{ row }"><el-input-number v-model="row.localImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="坏账合计" width="100" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.localImpairments)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmtAmount(sumArr(row.localImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
       <!-- 对方基本信息 -->
@@ -107,20 +107,20 @@
           <template #default="{ row }"><el-input-number v-model="row.remoteAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="原值合计" width="110" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.remoteAmounts)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmtAmount(sumArr(row.remoteAmounts)) }}</span></template>
         </el-table-column>
         <el-table-column v-for="(ag, ai) in agingSegments" :key="'ri'+ai" :label="'坏账-'+ag.name" width="90" align="right">
           <template #default="{ row }"><el-input-number v-model="row.remoteImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="坏账合计" width="100" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.remoteImpairments)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmtAmount(sumArr(row.remoteImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
       <!-- 差异 -->
       <el-table-column label="差异" width="110" align="right">
         <template #default="{ row }">
           <span :class="sumArr(row.localAmounts) - sumArr(row.remoteAmounts) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
-            {{ fmt(sumArr(row.localAmounts) - sumArr(row.remoteAmounts)) }}
+            {{ fmtAmount(sumArr(row.localAmounts) - sumArr(row.remoteAmounts)) }}
           </span>
         </template>
       </el-table-column>
@@ -130,7 +130,7 @@
       <el-table-column label="核对" width="60" align="center">
         <template #default="{ row }">
           <el-tag v-if="row._reconcileStatus === 'matched'" type="success" size="small" effect="plain">✓</el-tag>
-          <el-tooltip v-else-if="row._reconcileStatus === 'diff'" :content="`差异: ${fmt(row._reconcileDiff)}${row._impairmentDiff ? '，坏账差异: ' + fmt(row._impairmentDiff) : ''}`" placement="left">
+          <el-tooltip v-else-if="row._reconcileStatus === 'diff'" :content="`差异: ${fmtAmount(row._reconcileDiff)}${row._impairmentDiff ? '，坏账差异: ' + fmtAmount(row._impairmentDiff) : ''}`" placement="left">
             <el-tag type="warning" size="small" effect="plain">≠</el-tag>
           </el-tooltip>
           <span v-else style="color:#ccc">—</span>
@@ -148,7 +148,7 @@
         </el-table-column>
         <el-table-column prop="subject" label="科目" width="160" />
         <el-table-column prop="amount" label="金额" width="140" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.amount) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.amount) }}</span></template>
         </el-table-column>
         <el-table-column prop="desc" label="说明" min-width="200" show-overflow-tooltip />
       </el-table>
@@ -202,8 +202,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface AgingSegment { name: string; startMonth: number; endMonth: number; impairmentRate: number }
@@ -223,7 +225,7 @@ const emitArap = defineEmits<{
   (e: 'entries-changed', entries: any[]): void
 }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<ArApRow[]>([])
 const showAgingDialog = ref(false)
@@ -322,7 +324,6 @@ async function batchDelete() {
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 const n = (v: any) => Number(v) || 0
 function sumArr(arr: (number|null)[]): number { return arr.reduce((s: number, v) => s + n(v), 0) }
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 // ─── 逐笔核对 ────────────────────────────────────────────────────────────────
 const showReconcileResult = ref(false)
@@ -406,7 +407,7 @@ const generatedEntries = computed(() => {
     const amount = Math.min(vals.local, vals.remote)
     if (amount > 0) {
       // 往来抵消分录
-      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: `内部往来抵消（本方${fmt(vals.local)} / 对方${fmt(vals.remote)}）` })
+      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: `内部往来抵消（本方${fmtAmount(vals.local)} / 对方${fmtAmount(vals.remote)}）` })
       entries.push({ direction: '贷', subject: remoteSubj || localSubj, amount, desc: `内部往来抵消` })
     }
     // 坏账准备冲回（本方+对方的坏账都要冲回）
@@ -513,14 +514,11 @@ async function onFileSelected(e: Event) {
   finally { if (fileInputRef.value) fileInputRef.value.value = '' }
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

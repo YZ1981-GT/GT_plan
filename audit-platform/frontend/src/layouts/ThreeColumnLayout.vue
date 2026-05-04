@@ -54,6 +54,56 @@
           </div>
         </el-tooltip>
 
+        <!-- 显示设置（金额单位 / 字号） -->
+        <el-popover placement="bottom" :width="240" trigger="click">
+          <template #reference>
+            <el-tooltip content="显示设置（单位/字号）" placement="bottom">
+              <div class="gt-topbar-btn">
+                <span style="font-size:15px;line-height:18px">Aa</span>
+              </div>
+            </el-tooltip>
+          </template>
+          <div class="gt-display-prefs-panel">
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">金额单位</span>
+              <el-radio-group v-model="displayPrefs.amountUnit" size="small" @change="(v: any) => displayPrefs.setUnit(v)">
+                <el-radio-button v-for="opt in displayPrefs.unitOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">表格字号</span>
+              <el-radio-group v-model="displayPrefs.fontSize" size="small" @change="(v: any) => displayPrefs.setFontSize(v)">
+                <el-radio-button v-for="opt in displayPrefs.fontOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">小数位数</span>
+              <el-radio-group v-model="displayPrefs.decimals" size="small" @change="(v: any) => displayPrefs.setDecimals(v)">
+                <el-radio-button :value="0">整数</el-radio-button>
+                <el-radio-button :value="2">2位</el-radio-button>
+                <el-radio-button :value="4">4位</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">零值显示</span>
+              <el-switch v-model="displayPrefs.showZero" size="small" active-text="0.00" inactive-text="—" @change="(v: any) => displayPrefs.setShowZero(v)" />
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">负数红色</span>
+              <el-switch v-model="displayPrefs.negativeRed" size="small" @change="(v: any) => displayPrefs.setNegativeRed(v)" />
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">变动高亮</span>
+              <el-radio-group v-model="displayPrefs.highlightThreshold" size="small" @change="(v: any) => displayPrefs.setHighlightThreshold(v)">
+                <el-radio-button :value="0">关</el-radio-button>
+                <el-radio-button :value="0.1">10%</el-radio-button>
+                <el-radio-button :value="0.2">20%</el-radio-button>
+                <el-radio-button :value="0.5">50%</el-radio-button>
+              </el-radio-group>
+            </div>
+          </div>
+        </el-popover>
+
         <div class="gt-topbar-divider" />
 
         <!-- 视图切换按钮（三栏/四栏） -->
@@ -233,6 +283,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import {
@@ -247,6 +298,7 @@ import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const displayPrefs = useDisplayPrefsStore()
 
 // ── Props ──
 const props = defineProps<{
@@ -896,5 +948,27 @@ onUnmounted(() => {
 .gt-fade-enter-from, .gt-fade-leave-to {
   opacity: 0;
   transform: translateX(-4px);
+}
+
+/* ── 显示设置面板 ── */
+.gt-display-prefs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gt-dp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-dp-label {
+  font-size: 12px;
+  color: #666;
+  min-width: 56px;
+  flex-shrink: 0;
+}
+.gt-dp-row :deep(.el-radio-button__inner) {
+  padding: 4px 10px;
+  font-size: 11px;
 }
 </style>

@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>模拟权益法调整表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('open-formula', 'consol_equity_sim')">ƒx 公式</el-button>
@@ -56,7 +56,7 @@
           <template #default="{ row }">
             <span v-if="row._isRatioRow"></span>
             <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
-              {{ fmt(rowTotal(row)) }}
+              {{ fmtAmount(rowTotal(row)) }}
             </span>
           </template>
         </el-table-column>
@@ -96,12 +96,12 @@
           </template>
           <template #default="{ row }">
             <span v-if="row.key === 'ratio'" style="font-weight:600;color:#4b2d77">{{ c.ratio }}%</span>
-            <span v-else-if="row.key === 'diff'" :class="n(row.values?.[ci]) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmt(row.values?.[ci]) }}</span>
+            <span v-else-if="row.key === 'diff'" :class="n(row.values?.[ci]) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmtAmount(row.values?.[ci]) }}</span>
             <span v-else-if="row.key === 'reason'">
               <el-input v-model="diffReasons[ci]" size="small" placeholder="差异原因" />
             </span>
             <el-input-number v-else-if="row.editable" v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" />
-            <span v-else :class="calcCls(row.values?.[ci])">{{ fmt(row.values?.[ci]) }}</span>
+            <span v-else :class="calcCls(row.values?.[ci])">{{ fmtAmount(row.values?.[ci]) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -136,9 +136,9 @@
       </el-table>
       <!-- 间接持股比对区 -->
       <div style="margin-top:8px;font-size:12px;color:#999;padding:4px 8px;background:#f0f7ff;border-radius:4px;border:1px solid #d0e3f5">
-        🔗 模拟后长投小计: <b style="color:#1a5fb4">{{ fmt(section.endLongInvest) }}</b>
-        &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#1a5fb4">{{ fmt(section.endNetAssetShare) }}</b>
-        &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmt(section.difference) }}</b>
+        🔗 模拟后长投小计: <b style="color:#1a5fb4">{{ fmtAmount(section.endLongInvest) }}</b>
+        &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#1a5fb4">{{ fmtAmount(section.endNetAssetShare) }}</b>
+        &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmtAmount(section.difference) }}</b>
       </div>
     </div>
 
@@ -158,8 +158,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EquitySimRow {
@@ -195,7 +197,7 @@ const directTableData = computed(() => {
   }
   return [ratioRow, ...directRows.value]
 })
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const importVisible = ref(false)
@@ -271,7 +273,6 @@ watch(directRows, (rows) => {
 
 const n = (v: any) => Number(v) || 0
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
 // 合计 = 各子企业列之和（纯计算，不修改 row）
@@ -410,14 +411,11 @@ function confirmImport() {
   importVisible.value = false; ElMessage.success(`已导入 ${count} 行`); importMap.value = new Map()
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

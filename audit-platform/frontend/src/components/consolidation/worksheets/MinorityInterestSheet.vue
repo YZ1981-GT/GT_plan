@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>少数股东权益及损益明细表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_minority')">ƒx 公式</el-button>
         <el-button size="small" @click="exportData">📤 导出数据</el-button>
@@ -39,33 +39,33 @@
       </el-table-column>
       <el-table-column label="少数股东权益" align="center">
         <el-table-column prop="endNetAsset" label="期末净资产" width="120" align="right">
-          <template #default="{ row }"><span>{{ fmt(row.endNetAsset) }}</span></template>
+          <template #default="{ row }"><span>{{ fmtAmount(row.endNetAsset) }}</span></template>
         </el-table-column>
         <el-table-column prop="minorityEquity" label="少数股东权益" width="120" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.minorityEquity) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.minorityEquity) }}</span></template>
         </el-table-column>
         <el-table-column prop="elimMinorityEquity" label="抵消分录数" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimMinorityEquity) }}</span></template>
+          <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.elimMinorityEquity) }}</span></template>
         </el-table-column>
         <el-table-column prop="equityDiff" label="差异" width="90" align="right">
           <template #default="{ row }">
-            <span :class="n(row.equityDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmt(row.equityDiff) }}</span>
+            <span :class="n(row.equityDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmtAmount(row.equityDiff) }}</span>
           </template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="少数股东损益" align="center">
         <el-table-column prop="currentProfit" label="当期净利润" width="120" align="right">
-          <template #default="{ row }"><span>{{ fmt(row.currentProfit) }}</span></template>
+          <template #default="{ row }"><span>{{ fmtAmount(row.currentProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="minorityProfit" label="少数股东损益" width="120" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.minorityProfit) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.minorityProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="elimMinorityProfit" label="抵消分录数" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimMinorityProfit) }}</span></template>
+          <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.elimMinorityProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="profitDiff" label="差异" width="90" align="right">
           <template #default="{ row }">
-            <span :class="n(row.profitDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmt(row.profitDiff) }}</span>
+            <span :class="n(row.profitDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmtAmount(row.profitDiff) }}</span>
           </template>
         </el-table-column>
       </el-table-column>
@@ -80,8 +80,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -95,7 +97,7 @@ const props = defineProps<{
 
 defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 const manualRows = reactive<any[]>([])
@@ -179,7 +181,6 @@ const tableRows = computed(() => {
   })
 })
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 const cellStyle = { padding: '4px 8px', fontSize: '12px' }
 
@@ -189,20 +190,17 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx === 0) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
     else { sums[idx] = '' }
   })
   return sums
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

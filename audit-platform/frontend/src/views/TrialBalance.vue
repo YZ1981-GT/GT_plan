@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-trial-balance gt-fade-in" :class="{ 'gt-tb-fullscreen': tbFullscreen }">
+  <div class="gt-trial-balance gt-fade-in" :class="{ 'gt-fullscreen': tbFullscreen }">
     <!-- 页面横幅 -->
     <div class="gt-tb-banner">
       <div class="gt-tb-banner-row1">
@@ -23,14 +23,19 @@
           <div class="gt-tb-info-item">
             <span class="gt-tb-info-badge">{{ rows.length }} 个科目</span>
           </div>
+          <div class="gt-tb-info-sep" />
+          <div class="gt-tb-info-item">
+            <span class="gt-tb-info-label">单位</span>
+            <span class="gt-tb-info-badge">{{ displayPrefs.unitSuffix }}</span>
+          </div>
         </div>
       </div>
       <div class="gt-tb-banner-row2">
-        <el-tooltip content="复制整个表格" placement="bottom">
-          <el-button size="small" @click="copyTbTable">📋 复制</el-button>
+        <el-tooltip content="复制整个表格（可粘贴到 Word/Excel）" placement="bottom">
+          <el-button size="small" @click="copyTbTable">📋 复制整表</el-button>
         </el-tooltip>
         <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
-          <el-button size="small" @click="tbFullscreen = !tbFullscreen">{{ tbFullscreen ? '退出全屏' : '全屏' }}</el-button>
+          <el-button size="small" @click="toggleTbFullscreen()">{{ tbFullscreen ? '退出全屏' : '全屏' }}</el-button>
         </el-tooltip>
         <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
           <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
@@ -77,14 +82,32 @@
       </div>
     </el-alert>
 
+    <!-- 搜索栏（Ctrl+F 触发，表格上方） -->
+    <TableSearchBar
+      :is-visible="tbSearch.isVisible.value"
+      :keyword="tbSearch.keyword.value"
+      :match-info="tbSearch.matchInfo.value"
+      :has-matches="tbSearch.matches.value.length > 0"
+      :case-sensitive="tbSearch.caseSensitive.value"
+      :show-replace="false"
+      @update:keyword="tbSearch.keyword.value = $event"
+      @update:case-sensitive="tbSearch.caseSensitive.value = $event"
+      @search="tbSearch.search()"
+      @next="tbSearch.nextMatch()"
+      @prev="tbSearch.prevMatch()"
+      @close="tbSearch.close()"
+    />
+
     <!-- 试算表主表（科目明细视图） -->
     <el-table
+      ref="tbTableRef"
       v-if="tbViewMode === 'detail'"
       :data="groupedRows"
       v-loading="loading"
       border
       stripe
       style="width: 100%"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="rowClassName"
       :cell-class-name="tbCellClassName"
       @cell-click="onTbCellClick"
@@ -105,20 +128,21 @@
       <el-table-column label="未审数" width="150" align="right">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal"
-            class="clickable" @click="onUnadjustedClick(row)">
-            {{ fmtAmt(row.unadjusted_amount) }}
+            class="clickable" @click="onUnadjustedClick(row)"
+            :class="displayPrefs.amountClass(row.unadjusted_amount)">
+            {{ fmt(row.unadjusted_amount) }}
           </span>
-          <span v-else class="subtotal-val">{{ fmtAmt(row.unadjusted_amount) }}</span>
+          <span v-else class="subtotal-val" :class="displayPrefs.amountClass(row.unadjusted_amount)">{{ fmt(row.unadjusted_amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="RJE调整" width="140" align="right">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && row.rje_adjustment !== '0'"
             class="clickable" @click="onAdjClick(row, 'rje')">
-            {{ fmtAmt(row.rje_adjustment) }}
+            {{ fmt(row.rje_adjustment) }}
           </span>
           <span v-else :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
-            {{ fmtAmt(row.rje_adjustment) }}
+            {{ fmt(row.rje_adjustment) }}
           </span>
         </template>
       </el-table-column>
@@ -126,17 +150,20 @@
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && row.aje_adjustment !== '0'"
             class="clickable" @click="onAdjClick(row, 'aje')">
-            {{ fmtAmt(row.aje_adjustment) }}
+            {{ fmt(row.aje_adjustment) }}
           </span>
           <span v-else :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
-            {{ fmtAmt(row.aje_adjustment) }}
+            {{ fmt(row.aje_adjustment) }}
           </span>
         </template>
       </el-table-column>
       <el-table-column label="审定数" width="150" align="right">
         <template #default="{ row }">
-          <span :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
-            {{ fmtAmt(row.audited_amount) }}
+          <span :class="['subtotal-val', displayPrefs.amountClass(row.audited_amount)]" v-if="row._isSubtotal || row._isTotal">
+            {{ fmt(row.audited_amount) }}
+          </span>
+          <span v-else :class="displayPrefs.amountClass(row.audited_amount)">
+            {{ fmt(row.audited_amount) }}
           </span>
         </template>
       </el-table-column>
@@ -169,7 +196,7 @@
         <span style="font-size:11px;color:#999">{{ tbSummaryRows.length }} 行 · 审定数=未审数+审计调整借-贷+重分类借-贷</span>
       </div>
       <div style="overflow-x:auto;max-height:calc(100vh - 300px)">
-        <table class="gt-tb-summary-table">
+        <table class="gt-tb-summary-table" :style="{ fontSize: displayPrefs.fontConfig.tableFont }">
           <thead>
             <tr>
               <th rowspan="2" style="min-width:60px">行次</th>
@@ -189,18 +216,21 @@
               :class="{ 'gt-tb-sum-total': row.is_total, 'gt-tb-sum-category': row.is_category }">
               <td style="text-align:center;color:#999;font-size:11px">{{ row.row_code }}</td>
               <td :style="{ paddingLeft: (row.indent || 0) * 14 + 'px' }">{{ row.row_name }}</td>
-              <td class="gt-tb-sum-num gt-tb-sum-unadj">{{ fmtAmt(row.unadjusted) }}</td>
-              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 0)" v-model="row.aje_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 0)">{{ fmtAmt(row.aje_dr) }}</span></td>
-              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 1)" v-model="row.aje_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 1)">{{ fmtAmt(row.aje_cr) }}</span></td>
-              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 2)" v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 2)">{{ fmtAmt(row.rcl_dr) }}</span></td>
-              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 3)" v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 3)">{{ fmtAmt(row.rcl_cr) }}</span></td>
-              <td class="gt-tb-sum-num gt-tb-sum-audited">{{ fmtAmt(row.audited) }}</td>
+              <td class="gt-tb-sum-num gt-tb-sum-unadj">{{ fmt(row.unadjusted) }}</td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 0)" v-model="row.aje_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 0)">{{ fmt(row.aje_dr) }}</span></td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 1)" v-model="row.aje_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 1)">{{ fmt(row.aje_cr) }}</span></td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 2)" v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 2)">{{ fmt(row.rcl_dr) }}</span></td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 3)" v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 3)">{{ fmt(row.rcl_cr) }}</span></td>
+              <td class="gt-tb-sum-num gt-tb-sum-audited">{{ fmt(row.audited) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <el-empty v-if="!tbSummaryRows.length && !tbSummaryLoading" description="点击刷新从科目明细汇总生成" />
     </div>
+
+    <!-- 选中区域状态栏 -->
+    <SelectionBar :stats="tbCtx.selectionStats()" />
 
     <!-- 借贷平衡指示器 -->
     <div class="gt-tb-balance-indicator" v-if="!loading">
@@ -215,10 +245,10 @@
         <el-table-column prop="adjustment_no" label="编号" width="120" />
         <el-table-column prop="description" label="摘要" min-width="180" />
         <el-table-column prop="total_debit" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.total_debit) }}</template>
+          <template #default="{ row }">{{ fmt(row.total_debit) }}</template>
         </el-table-column>
         <el-table-column prop="total_credit" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.total_credit) }}</template>
+          <template #default="{ row }">{{ fmt(row.total_credit) }}</template>
         </el-table-column>
         <el-table-column prop="review_status" label="状态" width="100">
           <template #default="{ row }">
@@ -276,8 +306,14 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import SelectionBar from '@/components/common/SelectionBar.vue'
+import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useLazyEdit } from '@/composables/useLazyEdit'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useTableSearch } from '@/composables/useTableSearch'
+import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import http from '@/utils/http'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
@@ -293,6 +329,10 @@ const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
   onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
 } = useProjectSelector('trial-balance')
+
+const displayPrefs = useDisplayPrefsStore()
+/** 格式化金额（跟随全局单位设置） */
+const fmt = (v: any) => displayPrefs.fmt(v)
 
 const routeYear = computed(() => {
   const value = Number(route.query.year)
@@ -409,12 +449,6 @@ const isBalanced = computed(() => {
 
 function num(v: string | null | undefined): number {
   return v != null ? parseFloat(v) || 0 : 0
-}
-
-function fmtAmt(v: string | number | null | undefined): string {
-  const n = typeof v === 'number' ? v : num(v)
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function rowClassName({ row }: { row: DisplayRow }) {
@@ -544,6 +578,10 @@ watch(
   { immediate: true }
 )
 
+// ─── Ctrl+F 快捷键注册 ──────────────────────────────────────────────────────
+onMounted(() => document.addEventListener('keydown', onKeydown))
+onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+
 // ─── 试算平衡表（报表行次级别） ──────────────────────────────────────────────
 const tbViewMode = ref<'detail' | 'summary'>('detail')
 const tbSummaryType = ref('balance_sheet')
@@ -564,7 +602,7 @@ function recalcTbSummaryAudited() {
 }
 
 watch(tbSummaryRows, recalcTbSummaryAudited, { deep: true })
-const tbFullscreen = ref(false)
+const { isFullscreen: tbFullscreen, toggleFullscreen: toggleTbFullscreen } = useFullscreen()
 
 function copyTbTable() {
   const data = tbViewMode.value === 'summary' ? tbSummaryRows.value : groupedRows.value
@@ -585,18 +623,45 @@ function copyTbTable() {
   } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
 }
 
-function onTbKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && tbFullscreen.value) tbFullscreen.value = false
-}
-
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const tbCtx = useCellSelection()
 const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
 const tbSumLazyEdit = useLazyEdit()
 
+// ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
+const tbTableRef = ref<any>(null)
+
+tbCtx.setupTableDrag(tbTableRef, (rowIdx: number, colIdx: number) => {
+  const row = groupedRows.value[rowIdx]
+  if (!row) return null
+  if (colIdx === 0) return row.standard_account_code
+  if (colIdx === 1) return row.account_name
+  if (colIdx === 2) return row.unadjusted_amount
+  if (colIdx === 3) return row.rje_adjustment
+  if (colIdx === 4) return row.aje_adjustment
+  if (colIdx === 5) return row.audited_amount
+  return null
+})
+
+// ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
+const tbSearch = useTableSearch(
+  computed(() => tbViewMode.value === 'detail' ? groupedRows.value : tbSummaryRows.value),
+  ['standard_account_code', 'account_name'],
+)
+
+/** Ctrl+F 快捷键触发搜索栏（拦截浏览器默认搜索） */
+function onKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault()
+    e.stopPropagation()
+    tbSearch.toggle()
+  }
+}
+
 function tbCellClassName({ rowIndex, columnIndex }: any) {
   const classes: string[] = []
-  if (tbCtx.cellClassName({ rowIndex, columnIndex })) classes.push('tb-cell--selected')
+  const selClass = tbCtx.cellClassName({ rowIndex, columnIndex })
+  if (selClass) classes.push(selClass)
   const ccClass = tbComments.commentCellClass('tb_detail', rowIndex, columnIndex)
   if (ccClass) classes.push(ccClass)
   return classes.join(' ')
@@ -614,8 +679,17 @@ function onTbCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   tbCtx.contextMenu.itemName = row.account_name || ''
 }
 
-function onTbCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  onTbCellClick(row, column, cell, event)
+function onTbCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  const rowIdx = groupedRows.value.indexOf(row)
+  const colLabels: Record<string, number> = { '科目编码': 0, '科目名称': 1, '未审数': 2, 'RJE调整': 3, 'AJE调整': 4, '审定数': 5 }
+  const colIdx = colLabels[column.label] ?? -1
+  // 如果右键点击的单元格已在选区内，保持选区不变
+  if (rowIdx >= 0 && colIdx >= 0 && !tbCtx.isCellSelected(rowIdx, colIdx)) {
+    const value = colIdx === 2 ? row.unadjusted_amount : colIdx === 3 ? row.rje_adjustment : colIdx === 4 ? row.aje_adjustment : colIdx === 5 ? row.audited_amount : row.account_name
+    tbCtx.selectCell(rowIdx, colIdx, value, false)
+  }
+  tbCtx.contextMenu.rowData = row
+  tbCtx.contextMenu.itemName = row.account_name || ''
   tbCtx.openContextMenu(event, tbCtx.contextMenu.itemName, row)
 }
 
@@ -643,7 +717,7 @@ function onTbCtxOpenWp() {
 function onTbCtxSum() {
   tbCtx.closeContextMenu()
   const sum = tbCtx.sumSelectedValues()
-  ElMessage.info(`选中 ${tbCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+  ElMessage.info(`选中 ${tbCtx.selectedCells.value.length} 格，合计：${fmtAmount(sum)}`)
 }
 
 function onTbCtxCompare() {
@@ -651,15 +725,9 @@ function onTbCtxCompare() {
   if (tbCtx.selectedCells.value.length < 2) return
   const vals = tbCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
-  ElMessage.info(`差异：${fmtAmt(diff)}`)
+  ElMessage.info(`差异：${fmtAmount(diff)}`)
 }
 
-onMounted(() => {
-  document.addEventListener('keydown', onTbKeydown)
-})
-onUnmounted(() => {
-  document.removeEventListener('keydown', onTbKeydown)
-})
 const tbSummaryTypes = [
   { key: 'balance_sheet', label: '资产负债表' },
   { key: 'income_statement', label: '利润表' },
@@ -890,12 +958,6 @@ async function exportTbSummary() {
 
 /* 视图切换标签 */
 
-/* 全屏 */
-.gt-tb-fullscreen {
-  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 9999; background: #fff; overflow: auto; padding: 12px;
-}
-
 .gt-tb-view-tag {
   padding: 6px 16px; font-size: 13px; cursor: pointer; color: #999;
   border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; user-select: none;
@@ -918,34 +980,7 @@ async function exportTbSummary() {
 .gt-tb-summary-table :deep(.el-input-number) { width: 100%; }
 .gt-tb-summary-table :deep(.el-input-number .el-input__inner) { text-align: right; font-size: 12px; height: 28px; }
 
-/* 单元格选中 */
-:deep(.tb-cell--selected) {
-  position: relative;
-  background: var(--gt-color-primary-bg, #f4f0fa) !important;
-  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
-  outline-offset: -1.5px;
-  z-index: 1;
-  animation: tb-cell-glow 2s ease-in-out infinite alternate;
-}
-:deep(.tb-cell--selected)::before {
-  content: '';
-  position: absolute; left: 0; top: 2px; bottom: 2px;
-  width: 2.5px;
-  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
-  border-radius: 0 2px 2px 0; opacity: 0.85;
-}
-:deep(.tb-cell--selected)::after {
-  content: '';
-  position: absolute; right: 0; bottom: 0;
-  width: 0; height: 0;
-  border-style: solid; border-width: 0 0 6px 6px;
-  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
-  opacity: 0.6;
-}
-@keyframes tb-cell-glow {
-  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
-  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
-}
+
 </style>
 
 

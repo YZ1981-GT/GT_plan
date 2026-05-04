@@ -7,15 +7,15 @@
         <div class="gt-note-toolbar">
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
           <div class="gt-note-actions">
-            <el-tooltip content="复制整个表格（可粘贴到 Word/Excel）" placement="bottom">
-              <el-button size="small" @click="copyEntireNoteTable">📋</el-button>
+            <el-tooltip content="复制整表（可粘贴到 Word/Excel）" placement="bottom">
+              <el-button size="small" @click="copyEntireNoteTable">📋 整表</el-button>
             </el-tooltip>
             <el-button-group size="small">
               <el-button :type="noteEditMode ? '' : 'primary'" @click="noteEditMode = false">📋 查看</el-button>
               <el-button :type="noteEditMode ? 'primary' : ''" @click="noteEditMode = true">✏️ 编辑</el-button>
             </el-button-group>
             <el-tooltip content="全屏编辑（ESC 退出）" placement="bottom">
-              <el-button size="small" @click="noteFullscreen = !noteFullscreen">{{ noteFullscreen ? '退出' : '全屏' }}</el-button>
+              <el-button size="small" @click="toggleNoteFullscreen">{{ noteFullscreen ? '退出' : '全屏' }}</el-button>
             </el-tooltip>
             <el-tooltip content="保存当前表格数据" placement="bottom">
               <el-button size="small" @click="saveNoteData">💾</el-button>
@@ -40,6 +40,7 @@
           <el-table ref="noteTableRef" :data="selectedNoteSection.editRows" border size="small"
             :max-height="noteFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 260px)'"
             style="width:100%" class="gt-note-compact-table"
+            :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
             :header-cell-style="{ background: '#f0edf5', fontSize: '13px', padding: '4px 0' }"
             :cell-style="{ padding: '2px 6px', fontSize: '13px', lineHeight: '1.4' }"
             :cell-class-name="noteCellClassName"
@@ -71,6 +72,9 @@
             <span style="flex:1" />
             <span style="font-size:11px;color:#999">共 {{ selectedNoteSection.editRows?.length || 0 }} 行</span>
           </div>
+
+          <!-- 选中区域状态栏 -->
+          <SelectionBar :stats="noteCtx.selectionStats()" />
         </div>
         <el-empty v-else description="该章节暂无表格" :image-size="60" />
       </div>
@@ -124,7 +128,7 @@
 
   <!-- 附注全屏覆盖层（Teleport 到 body 避免被裁剪） -->
   <Teleport to="body">
-    <div v-if="noteFullscreen" class="gt-note-fullscreen-overlay">
+    <div v-if="noteFullscreen" class="gt-fullscreen">
       <div v-if="selectedNoteSection" class="gt-note-detail">
         <div class="gt-note-toolbar">
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
@@ -136,12 +140,13 @@
             <el-tooltip content="公式管理" placement="bottom">
               <el-button size="small" @click="openNoteFormula">ƒx</el-button>
             </el-tooltip>
-            <el-button size="small" type="danger" @click="noteFullscreen = false">✕ 退出全屏</el-button>
+            <el-button size="small" type="danger" @click="toggleNoteFullscreen">✕ 退出全屏</el-button>
           </div>
         </div>
         <div v-if="selectedNoteSection.headers?.length" style="flex:1;min-height:0">
           <el-table :data="selectedNoteSection.editRows" border size="small"
             max-height="calc(100vh - 100px)" style="width:100%" class="gt-note-compact-table"
+            :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
             :header-cell-style="{ background: '#f0edf5', fontSize: '11px', padding: '2px 0' }"
             :cell-style="{ padding: '0 4px', fontSize: '11px', lineHeight: '1.2' }"
             @selection-change="onNoteSelectionChange">
@@ -487,8 +492,13 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import SelectionBar from '@/components/common/SelectionBar.vue'
+import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useLazyEdit } from '@/composables/useLazyEdit'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useTableSearch } from '@/composables/useTableSearch'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   projectId: string
@@ -508,7 +518,7 @@ const emit = defineEmits<{
 // ─── 附注状态 ─────────────────────────────────────────────────────────────────
 const selectedNoteSection = ref<any>(null)
 const noteEditMode = ref(false)
-const noteFullscreen = ref(false)
+const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } = useFullscreen()
 const noteRefreshing = ref(false)
 const noteSingleAuditLoading = ref(false)
 const noteFileRef = ref<HTMLInputElement | null>(null)
@@ -537,6 +547,21 @@ const noteFormulaRules = ref<any[]>([])
 
 // ─── 单元格选中与右键菜单（统一 composable） ──────────────────────────────
 const noteCtx = useCellSelection()
+noteCtx.setupTableDrag(noteTableRef, (rowIdx: number, colIdx: number) => {
+  const sec = selectedNoteSection.value
+  if (!sec?.editRows) return null
+  const row = sec.editRows[rowIdx]
+  if (!row) return null
+  return row[colIdx] ?? null
+})
+
+// ─── 显示偏好（全局单位/字号） ──────────────────────────────────────────────
+const displayPrefs = useDisplayPrefsStore()
+/** 格式化金额（跟随全局单位设置） */
+const fmt = (v: any) => displayPrefs.fmt(v)
+
+// ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
+const noteSearch = useTableSearch(computed(() => []), ['row_name'])
 // 兼容别名
 const selectedCells = noteCtx.selectedCells
 const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
@@ -585,10 +610,7 @@ const aggNoteSections = computed(() => {
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
 function fmtAmt(v: any): string {
-  if (v == null) return '-'
-  const n = Number(v)
-  if (isNaN(n)) return String(v)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmt(v)
 }
 
 function onNoteSelectionChange(rows: any[]) { noteSelectedRows.value = rows }
@@ -598,7 +620,8 @@ function noteCellClassName({ rowIndex, columnIndex }: any) {
   const sec = selectedNoteSection.value
   const sheetKey = sec?.section_id || ''
   const classes: string[] = []
-  if (noteCtx.cellClassName({ rowIndex, columnIndex })) classes.push('gt-cell--selected')
+  const selClass = noteCtx.cellClassName({ rowIndex, columnIndex })
+  if (selClass) classes.push(selClass)
   // 批注/复核标记
   const ccClass = cellComments.commentCellClass(sheetKey, rowIndex, columnIndex)
   if (ccClass) classes.push(ccClass)
@@ -1363,12 +1386,6 @@ function onDocClick(e: MouseEvent) {
   noteCtx.closeContextMenu()
 }
 
-function onGlobalKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && noteFullscreen.value) {
-    noteFullscreen.value = false
-  }
-}
-
 // Listen for catalog select events to load note sections
 function onConsolCatalogSelect(e: Event) {
   const data = (e as CustomEvent).detail
@@ -1407,7 +1424,6 @@ function onNoteAuditAllEvent(e: Event) {
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', onGlobalKeydown)
   document.addEventListener('click', onDocClick)
   window.addEventListener('consol-catalog-select', onConsolCatalogSelect)
   window.addEventListener('consol-tree-aggregate', onTreeAggregate)
@@ -1415,7 +1431,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', onGlobalKeydown)
   document.removeEventListener('click', onDocClick)
   window.removeEventListener('consol-catalog-select', onConsolCatalogSelect)
   window.removeEventListener('consol-tree-aggregate', onTreeAggregate)
@@ -1442,11 +1457,6 @@ defineExpose({
 <style scoped>
 /* ── 合并附注布局 ── */
 .gt-note-layout { display: flex; gap: 0; min-height: 400px; }
-.gt-note-fullscreen-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 9999; background: #fff; padding: 16px;
-  display: flex; flex-direction: column;
-}
 .gt-note-content { flex: 1; min-width: 0; overflow: auto; padding: 0; }
 .gt-note-detail { height: 100%; display: flex; flex-direction: column; }
 .gt-note-toolbar {
@@ -1501,37 +1511,7 @@ defineExpose({
 .gt-note-cell-editable:hover {
   background: var(--gt-color-primary-bg, #f4f0fa);
 }
-/* 单元格选中高亮 */
-:deep(.gt-cell--selected) {
-  position: relative;
-  background: var(--gt-color-primary-bg, #f4f0fa) !important;
-  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
-  outline-offset: -1.5px;
-  z-index: 1;
-  animation: gt-cell-glow 2s ease-in-out infinite alternate;
-}
-:deep(.gt-cell--selected)::before {
-  content: '';
-  position: absolute; left: 0; top: 2px; bottom: 2px;
-  width: 2.5px;
-  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
-  border-radius: 0 2px 2px 0; opacity: 0.85;
-}
-:deep(.gt-cell--selected)::after {
-  content: '';
-  position: absolute; right: 0; bottom: 0;
-  width: 0; height: 0;
-  border-style: solid; border-width: 0 0 6px 6px;
-  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
-  opacity: 0.6;
-}
-:deep(.gt-cell--selected .gt-note-cell-text) {
-  color: var(--gt-color-primary, #4b2d77); font-weight: 500;
-}
-@keyframes gt-cell-glow {
-  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
-  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
-}
+
 /* 批注弹窗 */
 :deep(.gt-comment-dialog .el-dialog__header) {
   background: linear-gradient(135deg, #4b2d77, #7c5caa); padding: 14px 20px;

@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>投资明细-权益法</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('open-formula', 'consol_equity_inv')">ƒx 公式</el-button>
@@ -77,7 +77,7 @@
             <template #default="{ row }"><el-input-number v-model="row.add_other_equity" size="small" :precision="2" :controls="false" style="width:100%" /></template>
           </el-table-column>
           <el-table-column label="权益增加小计" width="100" align="right">
-            <template #default="{ row }"><span :class="calcCls(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity))">{{ fmt(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity)) }}</span></template>
+            <template #default="{ row }"><span :class="calcCls(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity))">{{ fmtAmount(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity)) }}</span></template>
           </el-table-column>
         </el-table-column>
         <el-table-column prop="add_other" label="其他" width="90" align="right">
@@ -111,10 +111,10 @@
           <template #default="{ row }"><span :class="calcCls(n(row.open_ratio)+n(row.add_ratio)-n(row.reduce_ratio))">{{ fmtR(n(row.open_ratio)+n(row.add_ratio)-n(row.reduce_ratio)) }}</span></template>
         </el-table-column>
         <el-table-column label="长投金额" width="110" align="right">
-          <template #default="{ row }"><span :class="[calcCls(calcEnd(row)), 'ws-bold']">{{ fmt(calcEnd(row)) }}</span></template>
+          <template #default="{ row }"><span :class="[calcCls(calcEnd(row)), 'ws-bold']">{{ fmtAmount(calcEnd(row)) }}</span></template>
         </el-table-column>
         <el-table-column label="减值准备" width="100" align="right">
-          <template #default="{ row }"><span :class="calcCls(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))">{{ fmt(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment)) }}</span></template>
+          <template #default="{ row }"><span :class="calcCls(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))">{{ fmtAmount(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment)) }}</span></template>
         </el-table-column>
       </el-table-column>
     </el-table>
@@ -140,8 +140,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface Row {
   company_name: string; company_code: string
@@ -159,7 +161,7 @@ watch(() => props.modelValue, (v) => { if (!internalUpdate) rows.value = v }, { 
 watch(rows, (v) => { internalUpdate = true; emit('update:modelValue', v); nextTick(() => { internalUpdate = false }) }, { deep: true })
 
 const selectedRows = ref<Row[]>([])
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement|null>(null)
 const fileInputRef = ref<HTMLInputElement|null>(null)
 const importVisible = ref(false)
@@ -182,7 +184,7 @@ async function batchDelete() {
 
 const n = (v: any) => Number(v) || 0
 const calcEnd = (r: Row) => n(r.open_amount)+n(r.add_cost)+n(r.add_income_adj)+n(r.add_oci)+n(r.add_other_equity)+n(r.add_other)-n(r.reduce_cost)-n(r.reduce_dividend)-n(r.reduce_other)
-function fmt(v: number) { if (v == null) return '-'; return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+
 function fmtR(v: number) { return v ? `${v.toFixed(2)}%` : '--' }
 function calcCls(v: number) { return v === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
@@ -296,14 +298,11 @@ function confirmImport() {
   ElMessage.success(`已导入 ${importPreview.value.length} 条`); importPreview.value = []
 }
 
-function onEsc(e: KeyboardEvent) { if(e.key==='Escape'&&isFullscreen.value) isFullscreen.value=false }
-onMounted(()=>document.addEventListener('keydown',onEsc))
-onUnmounted(()=>document.removeEventListener('keydown',onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>内部交易抵消表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_internal_trade')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTrade">📥 导出模板</el-button>
@@ -72,7 +72,7 @@
       <el-table-column label="差异" width="100" align="right">
         <template #default="{ row }">
           <span :class="n(row.sellerAmount) - n(row.buyerAmount) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
-            {{ fmt(n(row.sellerAmount) - n(row.buyerAmount)) }}
+            {{ fmtAmount(n(row.sellerAmount) - n(row.buyerAmount)) }}
           </span>
         </template>
       </el-table-column>
@@ -83,7 +83,7 @@
         <template #default="{ row }"><el-input-number v-model="row.inventoryRatio" size="small" :precision="2" :controls="false" style="width:100%" /></template>
       </el-table-column>
       <el-table-column label="应抵消利润" width="110" align="right">
-        <template #default="{ row }"><span class="ws-computed">{{ fmt(n(row.unrealizedProfit) * n(row.inventoryRatio) / 100) }}</span></template>
+        <template #default="{ row }"><span class="ws-computed">{{ fmtAmount(n(row.unrealizedProfit) * n(row.inventoryRatio) / 100) }}</span></template>
       </el-table-column>
     </el-table>
 
@@ -99,7 +99,7 @@
         </el-table-column>
         <el-table-column prop="subject" label="科目" width="160" />
         <el-table-column prop="amount" label="金额" width="140" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.amount) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.amount) }}</span></template>
         </el-table-column>
         <el-table-column prop="desc" label="说明" min-width="200" show-overflow-tooltip />
       </el-table>
@@ -108,8 +108,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface TradeRow {
@@ -121,7 +123,7 @@ interface TradeRow {
 const props = defineProps<{ companies: CompanyCol[] }>()
 const emitTrade = defineEmits<{ (e: 'save', data: TradeRow[]): void; (e: 'entries-changed', entries: any[]): void; (e: 'open-formula', key: string): void }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<TradeRow[]>([])
 const tradeFileRef = ref<HTMLInputElement|null>(null)
@@ -167,7 +169,6 @@ watch(generatedEntries, (entries) => {
   emitTrade('entries-changed', entries.map(e => ({ ...e, source: '内部交易' })))
 }, { immediate: true })
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 async function exportTrade() {
   const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
@@ -214,20 +215,17 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx <= 1) { sums[idx] = ''; return }; if (idx === 2) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
-    else if (col.label === '差异') { sums[idx] = fmt(data.reduce((s: number, r: any) => s + (n(r.sellerAmount) - n(r.buyerAmount)), 0)) }
-    else if (col.label === '应抵消利润') { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r.unrealizedProfit) * n(r.inventoryRatio) / 100, 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    else if (col.label === '差异') { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + (n(r.sellerAmount) - n(r.buyerAmount)), 0)) }
+    else if (col.label === '应抵消利润') { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r.unrealizedProfit) * n(r.inventoryRatio) / 100, 0)) }
     else { sums[idx] = '' }
   }); return sums
 }
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-disclosure-editor gt-fade-in" :class="{ 'gt-de-fullscreen': deFullscreen }">
+  <div class="gt-disclosure-editor gt-fade-in" :class="{ 'gt-fullscreen': deFullscreen }">
     <!-- 横幅 -->
     <div class="gt-de-banner">
       <div class="gt-de-banner-row1">
@@ -32,14 +32,19 @@
           <div class="gt-de-info-item">
             <span class="gt-de-info-badge">{{ noteList.length }} 个章节</span>
           </div>
+          <div class="gt-de-info-sep" />
+          <div class="gt-de-info-item">
+            <span class="gt-de-info-label">金额单位</span>
+            <span class="gt-de-info-badge">{{ displayPrefs.unitSuffix }}</span>
+          </div>
         </div>
       </div>
       <div class="gt-de-banner-row2">
-        <el-tooltip content="复制当前表格" placement="bottom">
-          <el-button size="small" @click="copyNoteTable">📋 复制</el-button>
+        <el-tooltip content="复制整表（可粘贴到 Word/Excel）" placement="bottom">
+          <el-button size="small" @click="copyNoteTable">📋 复制整表</el-button>
         </el-tooltip>
         <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
-          <el-button size="small" @click="deFullscreen = !deFullscreen">{{ deFullscreen ? '退出全屏' : '全屏' }}</el-button>
+          <el-button size="small" @click="toggleDeFullscreen()">{{ deFullscreen ? '退出全屏' : '全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
         <el-button size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
@@ -139,8 +144,9 @@
                 <el-tab-pane v-for="(tbl, ti) in currentNoteTables" :key="ti" :name="String(ti)" :label="getTableTabLabel(tbl, ti)" />
               </el-tabs>
               <!-- 当前表格 -->
-              <el-table v-if="activeTableData?.rows?.length || activeTableData?.headers?.length" :data="activeTableData.rows || []"
+              <el-table ref="deTableRef" v-if="activeTableData?.rows?.length || activeTableData?.headers?.length" :data="activeTableData.rows || []"
                 border size="small" style="margin-bottom: 12px"
+                :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
                 :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap', padding: '4px 0' }"
                 :row-style="{ height: '26px' }"
                 :cell-style="{ padding: '2px 6px', fontSize: '12px', lineHeight: '20px' }"
@@ -159,11 +165,11 @@
                           v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
                           size="small" style="width: 100%; height: 22px"
                           @change="onCellValueChange($index, Number(hiRaw) - 1, $event)" />
-                        <span v-else-if="row.is_total" :class="{ 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }">
-                          {{ fmtAmt(getCellValue(row, Number(hiRaw) - 1)) }}
+                        <span v-else-if="row.is_total" :class="[{ 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }, displayPrefs.amountClass(getCellValue(row, Number(hiRaw) - 1))]">
+                          {{ fmt(getCellValue(row, Number(hiRaw) - 1)) }}
                         </span>
-                        <span v-else :class="{ 'total-val': row.is_total }">
-                          {{ fmtAmt(getCellValue(row, Number(hiRaw) - 1)) }}
+                        <span v-else :class="[{ 'total-val': row.is_total }, displayPrefs.amountClass(getCellValue(row, Number(hiRaw) - 1))]">
+                          {{ fmt(getCellValue(row, Number(hiRaw) - 1)) }}
                         </span>
                         <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source" title="自动提数">📊</span>
                         <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
@@ -212,6 +218,25 @@
                 <el-button type="primary" @click="onAiRewriteConfirm" :loading="aiLoading">确认改写</el-button>
               </template>
             </el-dialog>
+
+            <!-- 搜索栏（Ctrl+F） -->
+            <TableSearchBar
+              :is-visible="deSearch.isVisible.value"
+              :keyword="deSearch.keyword.value"
+              :match-info="deSearch.matchInfo.value"
+              :has-matches="deSearch.matches.value.length > 0"
+              :case-sensitive="deSearch.caseSensitive.value"
+              :show-replace="false"
+              @update:keyword="deSearch.keyword.value = $event"
+              @update:case-sensitive="deSearch.caseSensitive.value = $event"
+              @search="deSearch.search()"
+              @next="deSearch.nextMatch()"
+              @prev="deSearch.prevMatch()"
+              @close="deSearch.close()"
+            />
+
+            <!-- 选中区域状态栏 -->
+            <SelectionBar :stats="deCtx.selectionStats()" />
 
             <div class="gt-de-editor-footer">
               <el-button v-if="!editMode" @click="editMode = true">编辑</el-button>
@@ -343,6 +368,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useTableSearch } from '@/composables/useTableSearch'
+import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import SelectionBar from '@/components/common/SelectionBar.vue'
+import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { ElMessage } from 'element-plus'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
@@ -844,13 +875,6 @@ function getTableTabLabel(tbl: any, idx: number): string {
   return name.length > 12 ? name.slice(0, 12) + '…' : name
 }
 
-function fmtAmt(v: any): string {
-  if (v === null || v === undefined) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : v
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 function getCellValue(row: any, colIdx: number): any {
   const cells = row.cells || row.values || []
   const cell = cells[colIdx]
@@ -1177,7 +1201,7 @@ onMounted(async () => {
 })
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
-const deFullscreen = ref(false)
+const { isFullscreen: deFullscreen, toggleFullscreen: toggleDeFullscreen } = useFullscreen()
 
 function copyNoteTable() {
   const note = currentNote.value
@@ -1192,17 +1216,33 @@ function copyNoteTable() {
   } catch { navigator.clipboard?.writeText(text); ElMessage.success('已复制') }
 }
 
-function onDeKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && deFullscreen.value) deFullscreen.value = false
-}
-
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const deCtx = useCellSelection()
+const deTableRef = ref<any>(null)
+deCtx.setupTableDrag(deTableRef, (rowIdx: number, colIdx: number) => {
+  const tableRows = activeTableData.value?.rows || []
+  const row = tableRows[rowIdx]
+  if (!row) return null
+  if (colIdx === 0) return row.label || row[0]
+  const values = row.values || row.cells || []
+  return values[colIdx - 1] ?? null
+})
 const deComments = useCellComments(() => projectId.value, () => year.value, 'disclosure')
+
+const displayPrefs = useDisplayPrefsStore()
+/** 格式化金额（跟随全局单位设置） */
+const fmt = (v: any) => displayPrefs.fmt(v)
+
+// ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
+const deSearch = useTableSearch(
+  computed(() => (activeTableData.value?.rows || []) as any[]),
+  ['label']
+)
 
 function deCellClassName({ rowIndex, columnIndex }: any) {
   const classes: string[] = []
-  if (deCtx.cellClassName({ rowIndex, columnIndex })) classes.push('de-cell--selected')
+  const selClass = deCtx.cellClassName({ rowIndex, columnIndex })
+  if (selClass) classes.push(selClass)
   const sec = activeTableData.value
   const sheetKey = sec?.section_id || currentNote.value?.note_section || 'default'
   const ccClass = deComments.commentCellClass(sheetKey, rowIndex, columnIndex)
@@ -1223,8 +1263,18 @@ function onDeCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
 }
 
-function onDeCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  onDeCellClick(row, column, cell, event)
+function onDeCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  const tableRows = activeTableData.value?.rows || []
+  const rowIdx = tableRows.indexOf(row)
+  const headers = activeTableData.value?.headers || []
+  const colIdx = headers.indexOf(column.label)
+  // 如果右键点击的单元格已在选区内，保持选区不变
+  if (rowIdx >= 0 && colIdx >= 0 && !deCtx.isCellSelected(rowIdx, colIdx)) {
+    const values = row.values || row.cells || []
+    const value = values[colIdx] ?? ''
+    deCtx.selectCell(rowIdx, colIdx, value, false)
+    deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
+  }
   deCtx.openContextMenu(event, deCtx.contextMenu.itemName)
 }
 
@@ -1242,7 +1292,7 @@ function onDeCtxFormula() {
 function onDeCtxSum() {
   deCtx.closeContextMenu()
   const sum = deCtx.sumSelectedValues()
-  ElMessage.info(`选中 ${deCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+  ElMessage.info(`选中 ${deCtx.selectedCells.value.length} 格，合计：${fmtAmount(sum)}`)
 }
 
 function onDeCtxCompare() {
@@ -1250,25 +1300,12 @@ function onDeCtxCompare() {
   if (deCtx.selectedCells.value.length < 2) return
   const vals = deCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
-  ElMessage.info(`差异：${fmtAmt(diff)}`)
+  ElMessage.info(`差异：${fmtAmount(diff)}`)
 }
-
-onMounted(() => {
-  document.addEventListener('keydown', onDeKeydown)
-})
-onUnmounted(() => {
-  document.removeEventListener('keydown', onDeKeydown)
-})
 </script>
 
 <style scoped>
 .gt-disclosure-editor { padding: 16px; }
-
-/* 全屏 */
-.gt-de-fullscreen {
-  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 9999; background: #fff; overflow: auto; padding: 12px;
-}
 
 /* ── 横幅 ── */
 .gt-de-banner {
@@ -1438,34 +1475,7 @@ onUnmounted(() => {
 .gt-de-tiptap-content :deep(.ProseMirror p) { margin-bottom: 10px; text-indent: 2em; }
 .gt-de-tiptap-content :deep(.ProseMirror p.is-editor-empty:first-child::before) { color: #adb5bd; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; text-indent: 0; }
 
-/* 单元格选中 */
-:deep(.de-cell--selected) {
-  position: relative;
-  background: var(--gt-color-primary-bg, #f4f0fa) !important;
-  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
-  outline-offset: -1.5px;
-  z-index: 1;
-  animation: de-cell-glow 2s ease-in-out infinite alternate;
-}
-:deep(.de-cell--selected)::before {
-  content: '';
-  position: absolute; left: 0; top: 2px; bottom: 2px;
-  width: 2.5px;
-  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
-  border-radius: 0 2px 2px 0; opacity: 0.85;
-}
-:deep(.de-cell--selected)::after {
-  content: '';
-  position: absolute; right: 0; bottom: 0;
-  width: 0; height: 0;
-  border-style: solid; border-width: 0 0 6px 6px;
-  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
-  opacity: 0.6;
-}
-@keyframes de-cell-glow {
-  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
-  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
-}
+
 </style>
 
 

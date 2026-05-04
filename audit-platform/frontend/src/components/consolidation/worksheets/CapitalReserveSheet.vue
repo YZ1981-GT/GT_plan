@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>资本公积变动核查表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_capital')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
@@ -38,20 +38,20 @@
         <template #default="{ row }">
           <span class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px"
             :class="{ 'ws-bold': row.bold }">
-            {{ fmt(calcCapitalTotal(row)) }}
+            {{ fmtAmount(calcCapitalTotal(row)) }}
           </span>
         </template>
       </el-table-column>
       <el-table-column prop="elimAdj" label="合并抵消环节" width="140" align="right">
         <template #default="{ row }">
-          <span v-if="row.isComputed || row.fromElim" class="ws-computed">{{ fmt(row.elimAdj) }}</span>
+          <span v-if="row.isComputed || row.fromElim" class="ws-computed">{{ fmtAmount(row.elimAdj) }}</span>
           <el-input-number v-else v-model="row.elimAdj" size="small" :precision="2" :controls="false" style="width:100%" />
         </template>
       </el-table-column>
       <el-table-column prop="parentVal" label="母公司" width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!row.isComputed" v-model="row.parentVal" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else class="ws-computed">{{ fmt(row.parentVal) }}</span>
+          <span v-else class="ws-computed">{{ fmtAmount(row.parentVal) }}</span>
         </template>
       </el-table-column>
       <!-- 动态子企业列 -->
@@ -64,7 +64,7 @@
         </template>
         <template #default="{ row }">
           <el-input-number v-if="!row.isComputed && row.values" v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else-if="row.isComputed && row.values" class="ws-computed">{{ fmt(row.values?.[ci]) }}</span>
+          <span v-else-if="row.isComputed && row.values" class="ws-computed">{{ fmtAmount(row.values?.[ci]) }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -78,7 +78,7 @@
       </div>
       <div class="ws-check-row" :class="{ 'ws-diff-warn': diffAmount !== 0 }">
         <span>差异:</span>
-        <span class="ws-computed ws-bold">{{ fmt(diffAmount) }}</span>
+        <span class="ws-computed ws-bold">{{ fmtAmount(diffAmount) }}</span>
         <span v-if="diffAmount === 0" style="color:#67c23a">✓ 无差异</span>
         <span v-else style="color:#e6a23c">⚠ 存在差异，请核查</span>
       </div>
@@ -113,8 +113,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; ratio: number }
 
@@ -138,7 +140,7 @@ const emit = defineEmits<{
   (e: 'open-formula', sheetKey: string): void
 }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 
 const companies = computed(() => props.companies)
@@ -240,11 +242,6 @@ function calcCapitalTotal(row: CapitalReserveRow): number {
   return sum
 }
 
-function fmt(v: any) {
-  if (v == null) return '-'
-  const num = Number(v)
-  return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '4px 0' }
 const cellStyle = { padding: '2px 4px', fontSize: '12px' }
@@ -343,14 +340,11 @@ async function onFileSelected(e: Event) {
   finally { if (fileInputRef.value) fileInputRef.value.value = '' }
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; white-space: nowrap; }
 .ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>内部现金流抵消表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_internal_cashflow')">ƒx 公式</el-button>
         <el-button size="small" @click="exportCf">📥 导出模板</el-button>
@@ -75,7 +75,7 @@
       <el-table-column label="差异" width="100" align="right">
         <template #default="{ row }">
           <span :class="n(row.payerAmount) - n(row.receiverAmount) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
-            {{ fmt(n(row.payerAmount) - n(row.receiverAmount)) }}
+            {{ fmtAmount(n(row.payerAmount) - n(row.receiverAmount)) }}
           </span>
         </template>
       </el-table-column>
@@ -92,7 +92,7 @@
         </el-table-column>
         <el-table-column prop="subject" label="现金流项目" width="200" />
         <el-table-column prop="amount" label="金额" width="140" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.amount) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.amount) }}</span></template>
         </el-table-column>
       </el-table>
     </div>
@@ -100,8 +100,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface CashFlowRow { payerCompany: string; receiverCompany: string; payerItem: string; payerAmount: number|null; receiverItem: string; receiverAmount: number|null }
@@ -109,7 +111,7 @@ interface CashFlowRow { payerCompany: string; receiverCompany: string; payerItem
 const props = defineProps<{ companies: CompanyCol[] }>()
 const emitCf = defineEmits<{ (e: 'save', data: CashFlowRow[]): void; (e: 'entries-changed', entries: any[]): void; (e: 'open-formula', key: string): void }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<CashFlowRow[]>([])
 const cfFileRef = ref<HTMLInputElement|null>(null)
@@ -162,7 +164,6 @@ watch(generatedEntries, (entries) => {
   emitCf('entries-changed', entries.map(e => ({ ...e, source: '内部现金流' })))
 }, { immediate: true })
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 async function exportCf() {
   const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
@@ -205,19 +206,16 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx <= 1) { sums[idx] = ''; return }; if (idx === 2) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
-    else if (col.label === '差异') { sums[idx] = fmt(data.reduce((s: number, r: any) => s + (n(r.payerAmount) - n(r.receiverAmount)), 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    else if (col.label === '差异') { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + (n(r.payerAmount) - n(r.receiverAmount)), 0)) }
     else { sums[idx] = '' }
   }); return sums
 }
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

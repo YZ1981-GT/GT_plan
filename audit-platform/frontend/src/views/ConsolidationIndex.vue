@@ -17,6 +17,7 @@
         <el-tooltip content="选中单元格后点击，查看该数值的汇总明细过程" placement="bottom">
           <el-button size="small" class="gt-bar-btn" @click="openCellDrillDown">📊 查看</el-button>
         </el-tooltip>
+        <span style="margin-left:8px;font-size:12px;color:rgba(255,255,255,0.7)">单位：{{ displayPrefs.unitSuffix }}</span>
       </div>
     </div>
 
@@ -220,8 +221,9 @@
           </div>
 
           <!-- 普通报表（资产负债表/利润表/现金流量表/现金流附表） -->
-          <el-table v-else-if="consolReportRows.length" :data="consolReportRows" border size="small" max-height="calc(100vh - 260px)" style="width:100%"
+          <el-table ref="consolTableRef" v-else-if="consolReportRows.length" :data="consolReportRows" border size="small" max-height="calc(100vh - 260px)" style="width:100%"
             class="gt-consol-report-table"
+            :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
             :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', padding: '4px 0' }"
             :cell-style="{ padding: '2px 8px', fontSize: '12px', lineHeight: '1.4' }"
             :cell-class-name="reportCellClassName"
@@ -421,6 +423,9 @@
       <div class="gt-ucell-ctx-item" @click="onConsolCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 汇总穿透</div>
     </CellContextMenu>
 
+    <!-- 选中区域状态栏 -->
+    <SelectionBar :stats="consolCtx.selectionStats()" />
+
   </div>
 </template>
 
@@ -439,7 +444,11 @@ import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalance
 import OrgNode from '@/components/consolidation/OrgNode.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import SelectionBar from '@/components/common/SelectionBar.vue'
+import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { useTableSearch } from '@/composables/useTableSearch'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const route = useRoute()
 const router = useRouter()
@@ -497,6 +506,24 @@ const drillDownTableRef = ref<any>(null)
 
 // ─── 单元格选中与右键菜单（统一 composable） ──────────────────────────────
 const consolCtx = useCellSelection()
+const consolTableRef = ref<any>(null)
+consolCtx.setupTableDrag(consolTableRef, (rowIdx: number, colIdx: number) => {
+  const row = consolReportRows.value[rowIdx]
+  if (!row) return null
+  if (colIdx === 0) return row.row_code
+  if (colIdx === 1) return row.row_name
+  if (colIdx === 2) return row.current_period_amount
+  if (colIdx === 3) return row.prior_period_amount
+  return null
+})
+
+// ─── 显示偏好（全局单位/字号） ──────────────────────────────────────────────
+const displayPrefs = useDisplayPrefsStore()
+/** 格式化金额（跟随全局单位设置） */
+const fmt = (v: any) => displayPrefs.fmt(v)
+
+// ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
+const consolSearch = useTableSearch(computed(() => []), ['row_name'])
 
 // 兼容别名（供 drillDown 等已有逻辑使用）
 const selectedCells = consolCtx.selectedCells
@@ -732,10 +759,7 @@ function goToProject(_node: any) {
 }
 
 function fmtAmt(v: any): string {
-  if (v == null) return '-'
-  const n = Number(v)
-  if (isNaN(n)) return String(v)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmt(v)
 }
 
 // ─── 合并试算平衡表（已拆分为 ConsolTrialBalanceTab 组件） ──────────────────
@@ -844,7 +868,8 @@ function consolReportRowClass({ row }: { row: any }) {
 
 function reportCellClassName({ rowIndex, columnIndex }: any) {
   const classes: string[] = []
-  if (consolCtx.cellClassName({ rowIndex, columnIndex })) classes.push('gt-cell--selected')
+  const selClass = consolCtx.cellClassName({ rowIndex, columnIndex })
+  if (selClass) classes.push(selClass)
   const sheetKey = `report_${consolReportType.value}`
   const ccClass = consolComments.commentCellClass(sheetKey, rowIndex, columnIndex)
   if (ccClass) classes.push(ccClass)
@@ -866,8 +891,18 @@ function onReportCellClick(row: any, column: any, _cell: HTMLElement, event: Mou
   }
 }
 
-function onReportCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  onReportCellClick(row, column, cell, event)
+function onReportCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  const rowIdx = consolReportRows.value.indexOf(row)
+  const colMap: Record<string, number> = { '行次': 0, '项目': 1, '合并本期': 2, '合并上期': 3 }
+  const colIdx = colMap[column.label] ?? -1
+  // 如果右键点击的单元格已在选区内，保持选区不变
+  if (rowIdx >= 0 && colIdx >= 0 && !consolCtx.isCellSelected(rowIdx, colIdx)) {
+    const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+    consolCtx.selectCell(rowIdx, colIdx, value, false)
+    drillDownCell.itemName = row.row_name || ''
+    drillDownCell.colName = column.label || ''
+    drillDownCell.totalValue = Number(value) || null
+  }
   consolCtx.openContextMenu(event, drillDownCell.itemName || row.row_name, row)
 }
 
@@ -1362,32 +1397,5 @@ watch(activeTab, (tab) => {
 :deep(.gt-audit-row-error td) { background: #fef0f0 !important; }
 :deep(.gt-audit-row-warn td) { background: #fdf6ec !important; }
 
-/* 单元格选中高亮（报表/试算表共用） */
-:deep(.gt-cell--selected) {
-  position: relative;
-  background: var(--gt-color-primary-bg, #f4f0fa) !important;
-  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
-  outline-offset: -1.5px;
-  z-index: 1;
-  animation: gt-cell-glow 2s ease-in-out infinite alternate;
-}
-:deep(.gt-cell--selected)::before {
-  content: '';
-  position: absolute; left: 0; top: 2px; bottom: 2px;
-  width: 2.5px;
-  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
-  border-radius: 0 2px 2px 0; opacity: 0.85;
-}
-:deep(.gt-cell--selected)::after {
-  content: '';
-  position: absolute; right: 0; bottom: 0;
-  width: 0; height: 0;
-  border-style: solid; border-width: 0 0 6px 6px;
-  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
-  opacity: 0.6;
-}
-@keyframes gt-cell-glow {
-  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
-  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
-}
+
 </style>

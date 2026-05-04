@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>股比变动{{ changeTimes }}次 — 净资产变动与权益法模拟</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', `consol_share_change_${changeTimes}`)">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
@@ -28,7 +28,7 @@
         <el-tag v-if="comp.accountSubject" size="small" type="info" effect="plain" round>{{ comp.accountSubject }}</el-tag>
         <span style="flex:1" />
         <span style="font-size:11px;color:#999">模拟后长投小计：</span>
-        <span style="font-size:14px;font-weight:700;color:#4b2d77">{{ fmt(getEndInvest(ci)) }}</span>
+        <span style="font-size:14px;font-weight:700;color:#4b2d77">{{ fmtAmount(getEndInvest(ci)) }}</span>
       </div>
 
       <div class="sc-three-col">
@@ -46,14 +46,14 @@
             </el-table-column>
             <el-table-column label="变动前" width="110" align="right">
               <template #default="{ row }">
-                <span v-if="row.isComputed" class="sc-computed">{{ fmt(row.vals[0]) }}</span>
+                <span v-if="row.isComputed" class="sc-computed">{{ fmtAmount(row.vals[0]) }}</span>
                 <el-input-number v-else-if="!row.isHeader" v-model="row.vals[0]" size="small" :precision="2" :controls="false" style="width:100%" />
               </template>
             </el-table-column>
             <el-table-column v-for="t in changeTimes" :key="'na'+t"
               :label="changeTimes === 1 ? '变动后' : `第${t}次变动后`" width="110" align="right">
               <template #default="{ row }">
-                <span v-if="row.isComputed" class="sc-computed">{{ fmt(row.vals[t]) }}</span>
+                <span v-if="row.isComputed" class="sc-computed">{{ fmtAmount(row.vals[t]) }}</span>
                 <el-input-number v-else-if="!row.isHeader" v-model="row.vals[t]" size="small" :precision="2" :controls="false" style="width:100%" />
               </template>
             </el-table-column>
@@ -83,14 +83,14 @@
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
                     <el-input-number v-model="row.dc[0]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
                   </span>
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[0]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[0]) }}</span>
                   <el-input-number v-else v-model="row.dc[0]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
               <el-table-column label="贷" width="100" align="right">
                 <template #default="{ row }">
                   <span v-if="row.isSection || row.isRatio" />
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[1]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[1]) }}</span>
                   <el-input-number v-else v-model="row.dc[1]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
@@ -103,14 +103,14 @@
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
                     <el-input-number v-model="row.dc[t * 2]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
                   </span>
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[t * 2]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[t * 2]) }}</span>
                   <el-input-number v-else v-model="row.dc[t * 2]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
               <el-table-column label="贷" width="100" align="right">
                 <template #default="{ row }">
                   <span v-if="row.isSection || row.isRatio" />
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[t * 2 + 1]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[t * 2 + 1]) }}</span>
                   <el-input-number v-else v-model="row.dc[t * 2 + 1]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
@@ -141,14 +141,14 @@
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
                     <el-input-number v-model="row.dc[0]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
                   </span>
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[0]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[0]) }}</span>
                   <el-input-number v-else v-model="row.dc[0]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
               <el-table-column label="贷" width="100" align="right">
                 <template #default="{ row }">
                   <span v-if="row.isSection || row.isRatio" />
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[1]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[1]) }}</span>
                   <el-input-number v-else v-model="row.dc[1]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
@@ -161,14 +161,14 @@
                   <span v-else-if="row.isRatio" class="sc-ratio-val">
                     <el-input-number v-model="row.dc[t * 2]" size="small" :precision="6" :controls="false" style="width:80px" /><span style="color:#999;font-size:10px">%</span>
                   </span>
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[t * 2]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[t * 2]) }}</span>
                   <el-input-number v-else v-model="row.dc[t * 2]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
               <el-table-column label="贷" width="100" align="right">
                 <template #default="{ row }">
                   <span v-if="row.isSection || row.isRatio" />
-                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmt(row.dc[t * 2 + 1]) }}</span>
+                  <span v-else-if="row.isSubtotal" class="sc-auto-val">{{ fmtAmount(row.dc[t * 2 + 1]) }}</span>
                   <el-input-number v-else v-model="row.dc[t * 2 + 1]" size="small" :precision="2" :controls="false" style="width:100%" />
                 </template>
               </el-table-column>
@@ -185,8 +185,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 const EQUITY_ITEMS = ['实收资本（或股本）','其他权益工具','资本公积','减：库存股','其他综合收益','专项储备','盈余公积','△一般风险准备','未分配利润']
 
@@ -206,7 +208,7 @@ const _emit = defineEmits<{
   (e: 'open-formula', key: string): void
 }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const colCount = computed(() => props.changeTimes + 1)
@@ -413,7 +415,6 @@ const allData = computed(() => companyData.map((cd, i) => ({
 })))
 
 // ─── 格式化 ──────────────────────────────────────────────────────────────────
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 // ─── 导出辅助 ────────────────────────────────────────────────────────────────
 function buildSimHeaders(): string[] {
@@ -555,14 +556,11 @@ function simRowClass({ row }: any) {
   return ''
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; white-space: nowrap; }
 .ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>抵消后投资收益明细表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_post_income')">ƒx 公式</el-button>
         <el-button size="small" @click="exportData">📤 导出数据</el-button>
@@ -35,20 +35,20 @@
         <template #default="{ row }"><span>{{ row.ratio }}%</span></template>
       </el-table-column>
       <el-table-column prop="bookDividend" label="账面现金红利" width="110" align="right">
-        <template #default="{ row }"><span>{{ fmt(row.bookDividend) }}</span></template>
+        <template #default="{ row }"><span>{{ fmtAmount(row.bookDividend) }}</span></template>
       </el-table-column>
       <el-table-column prop="simInvestIncome" label="模拟投资收益" width="110" align="right">
-        <template #default="{ row }"><span class="ws-computed">{{ fmt(row.simInvestIncome) }}</span></template>
+        <template #default="{ row }"><span class="ws-computed">{{ fmtAmount(row.simInvestIncome) }}</span></template>
       </el-table-column>
       <el-table-column prop="dividendReverse" label="还原分红" width="100" align="right">
-        <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.dividendReverse) }}</span></template>
+        <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.dividendReverse) }}</span></template>
       </el-table-column>
       <el-table-column prop="elimInvestIncome" label="抵消投资收益" width="110" align="right">
-        <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimInvestIncome) }}</span></template>
+        <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.elimInvestIncome) }}</span></template>
       </el-table-column>
       <el-table-column prop="postElimIncome" label="抵消后投资收益" width="130" align="right">
         <template #default="{ row }">
-          <span :class="n(row.postElimIncome) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmt(row.postElimIncome) }}</span>
+          <span :class="n(row.postElimIncome) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmtAmount(row.postElimIncome) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="checkResult" label="校验" width="50" align="center">
@@ -62,8 +62,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -76,7 +78,7 @@ const props = defineProps<{
 
 defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 const manualRows = reactive<any[]>([])
@@ -143,7 +145,6 @@ const tableRows = computed(() => {
   })
 })
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 const cellStyle = { padding: '4px 8px', fontSize: '12px' }
 
@@ -153,20 +154,17 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx === 0) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
     else { sums[idx] = '' }
   })
   return sums
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }

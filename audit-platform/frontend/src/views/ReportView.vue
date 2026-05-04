@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-report-view gt-fade-in" :class="{ 'gt-rv-fullscreen': rvFullscreen }">
+  <div class="gt-report-view gt-fade-in" :class="{ 'gt-fullscreen': rvFullscreen }">
     <!-- 固定顶部区域 -->
     <div class="gt-rv-sticky-header">
       <!-- 页面横幅 -->
@@ -37,6 +37,11 @@
             </div>
             <div class="gt-rv-info-sep" />
             <div class="gt-rv-info-item">
+              <span class="gt-rv-info-label">单位</span>
+              <span class="gt-rv-info-badge">{{ displayPrefs.unitSuffix }}</span>
+            </div>
+            <div class="gt-rv-info-sep" />
+            <div class="gt-rv-info-item">
               <span class="gt-rv-info-label">模式</span>
               <el-radio-group v-model="reportMode" size="small" @change="fetchReport" class="gt-rv-mode-radio">
                 <el-radio-button value="audited">已审</el-radio-button>
@@ -49,10 +54,10 @@
         <!-- 第二行：操作按钮 -->
         <div class="gt-rv-banner-row2">
           <el-tooltip content="复制整个表格（可粘贴到 Word/Excel）" placement="bottom">
-            <el-button size="small" @click="copyReportTable">📋 复制</el-button>
+            <el-button size="small" @click="copyReportTable">📋 复制整表</el-button>
           </el-tooltip>
           <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
-            <el-button size="small" @click="rvFullscreen = !rvFullscreen">{{ rvFullscreen ? '退出全屏' : '全屏' }}</el-button>
+            <el-button size="small" @click="toggleRvFullscreen()">{{ rvFullscreen ? '退出全屏' : '全屏' }}</el-button>
           </el-tooltip>
           <el-tooltip content="根据试算表审定数重新计算报表（需先导入数据+科目映射）" placement="bottom">
             <el-button size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
@@ -104,6 +109,22 @@
       <span>📍 正在查看溯源数据 — {{ activeTabLabel }}</span>
       <el-button size="small" type="primary" round @click="onTraceReturn">↩ 返回审核</el-button>
     </div>
+
+    <!-- 搜索栏（Ctrl+F 触发，表格上方） -->
+    <TableSearchBar
+      :is-visible="rvSearch.isVisible.value"
+      :keyword="rvSearch.keyword.value"
+      :match-info="rvSearch.matchInfo.value"
+      :has-matches="rvSearch.matches.value.length > 0"
+      :case-sensitive="rvSearch.caseSensitive.value"
+      :show-replace="false"
+      @update:keyword="rvSearch.keyword.value = $event"
+      @update:case-sensitive="rvSearch.caseSensitive.value = $event"
+      @search="rvSearch.search()"
+      @next="rvSearch.nextMatch()"
+      @prev="rvSearch.prevMatch()"
+      @close="rvSearch.close()"
+    />
 
     <!-- 所有者权益变动表 — 矩阵视图 -->
     <div v-if="activeTab === 'equity_statement'" class="gt-rv-equity-matrix" v-loading="loading">
@@ -234,7 +255,8 @@
     </div>
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
-    <el-table v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="rows" v-loading="loading" style="width: 100%"
+    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="rows" v-loading="loading" style="width: 100%"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight"
       :cell-class-name="rvCellClassName"
       @cell-click="onRvCellClick"
@@ -244,7 +266,7 @@
           <span style="color: #999;">{{ $index + 1 }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="项目" min-width="300" :resizable="true">
+      <el-table-column label="项目" min-width="300" :resizable="true" fixed>
         <template #default="{ row }">
           <span :class="{ 'gt-rv-category': !row.current_period_amount && !row.is_total_row && (row.indent_level || 0) === 0 }"
                 :style="{ paddingLeft: (row.indent_level || 0) * 18 + 'px', fontWeight: row.is_total_row ? 700 : 400, fontSize: '13px' }">
@@ -255,22 +277,28 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="本期金额" min-width="140" align="right" header-align="center" :resizable="true">
-        <template #default="{ row }">
-          <span class="gt-rv-amount-cell" @click="onDrilldown(row)">
-            {{ fmtAmt(row.current_period_amount) }}
-          </span>
+      <el-table-column label="本期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.current_period_amount) || 0) - (Number(b.current_period_amount) || 0)">
+        <template #default="{ row, $index }">
+          <CommentTooltip :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)">
+            <span class="gt-rv-amount-cell" @click="onDrilldown(row)"
+                  :class="displayPrefs.amountClass(row.current_period_amount, row.prior_period_amount)">
+              {{ fmt(row.current_period_amount) }}
+            </span>
+          </CommentTooltip>
         </template>
       </el-table-column>
-      <el-table-column label="上期金额" min-width="140" align="right" header-align="center" :resizable="true">
-        <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.prior_period_amount) }}</span>
+      <el-table-column label="上期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.prior_period_amount) || 0) - (Number(b.prior_period_amount) || 0)">
+        <template #default="{ row, $index }">
+          <CommentTooltip :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)">
+            <span class="gt-rv-amount-cell-readonly" :class="displayPrefs.amountClass(row.prior_period_amount)">{{ fmt(row.prior_period_amount) }}</span>
+          </CommentTooltip>
         </template>
       </el-table-column>
     </el-table>
 
     <!-- 报表表格 — 对比视图（非权益变动表） -->
     <el-table v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="compareRows" v-loading="loading" style="width: 100%"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="compareRowClassName" border size="small" :max-height="tableMaxHeight">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
@@ -284,20 +312,23 @@
       </el-table-column>
       <el-table-column label="未审金额" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.unadjusted_amount) }}</span>
+          <span class="gt-rv-amount-cell-readonly">{{ fmt(row.unadjusted_amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="调整影响" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span :class="['gt-rv-adjustment', { 'has-diff': row.adjustment && row.adjustment !== 0 }]">{{ fmtAmt(row.adjustment) }}</span>
+          <span :class="['gt-rv-adjustment', { 'has-diff': row.adjustment && row.adjustment !== 0 }]">{{ fmt(row.adjustment) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="已审金额" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly" style="font-weight: 600;">{{ fmtAmt(row.audited_amount) }}</span>
+          <span class="gt-rv-amount-cell-readonly" style="font-weight: 600;">{{ fmt(row.audited_amount) }}</span>
         </template>
       </el-table-column>
     </el-table>
+    <!-- 选中区域状态栏 -->
+    <SelectionBar :stats="rvCtx.selectionStats()" />
+
     </div><!-- /gt-rv-table-area -->
 
     <!-- 穿透弹窗 -->
@@ -311,7 +342,7 @@
           <el-table-column prop="code" label="科目编码" width="120" />
           <el-table-column prop="name" label="科目名称" min-width="200" />
           <el-table-column label="金额" width="150" align="right">
-            <template #default="{ row }">{{ fmtAmt(row.amount) }}</template>
+            <template #default="{ row }">{{ fmt(row.amount) }}</template>
           </el-table-column>
           <el-table-column label="底稿" width="100" align="center">
             <template #default="{ row }">
@@ -447,18 +478,18 @@
           </el-table-column>
           <el-table-column label="期望值" width="120" align="right">
             <template #default="{ row }">
-              <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.expected) }}</span>
+              <span class="gt-rv-amount-cell-readonly">{{ fmt(row.expected) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="实际值" width="120" align="right">
             <template #default="{ row }">
-              <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.actual) }}</span>
+              <span class="gt-rv-amount-cell-readonly">{{ fmt(row.actual) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="差额" width="110" align="right">
             <template #default="{ row }">
               <span :style="{ color: row.diff && row.diff !== '0' && row.diff !== '0.00' ? '#d94840' : '#999', fontSize: '12px', fontWeight: row.diff && row.diff !== '0' ? 600 : 400 }">
-                {{ fmtAmt(row.diff) }}
+                {{ fmt(row.diff) }}
               </span>
             </template>
           </el-table-column>
@@ -557,7 +588,14 @@ import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import SelectionBar from '@/components/common/SelectionBar.vue'
+import TableSearchBar from '@/components/common/TableSearchBar.vue'
+import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useTableSearch } from '@/composables/useTableSearch'
+import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -757,11 +795,13 @@ function updateTableHeight() {
 onMounted(() => {
   updateTableHeight()
   window.addEventListener('resize', updateTableHeight)
+  document.addEventListener('keydown', onKeydown)
   loadProjectOptions()
   selectedProjectId.value = projectId.value
 })
 onUnmounted(() => {
   window.removeEventListener('resize', updateTableHeight)
+  document.removeEventListener('keydown', onKeydown)
 })
 const rows = ref<ReportRow[]>([])
 
@@ -828,13 +868,6 @@ const impDecCols = [
   { key: 'other_dec', label: '其他原因减少额' },
   { key: 'dec_total', label: '合计' },
 ]
-
-function fmtAmt(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : v
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 // 报表行→附注跳转
 const _ROW_NOTE_MAP: Record<string, string> = {
@@ -1228,9 +1261,38 @@ watch(
 const rvCtx = useCellSelection()
 const rvComments = useCellComments(() => projectId.value, () => year.value, 'report')
 
+const displayPrefs = useDisplayPrefsStore()
+/** 格式化金额（跟随全局单位设置） */
+const fmt = (v: any) => displayPrefs.fmt(v)
+
+// ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
+const rvSearch = useTableSearch(rows, ['row_name', 'row_code'])
+
+// ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
+const rvTableRef = ref<any>(null)
+
+rvCtx.setupTableDrag(rvTableRef, (rowIdx: number, colIdx: number) => {
+  const row = rows.value[rowIdx]
+  if (!row) return null
+  if (colIdx === 2) return row.current_period_amount
+  if (colIdx === 3) return row.prior_period_amount
+  if (colIdx === 1) return row.row_name
+  return row.row_code
+})
+
+/** Ctrl+F 快捷键触发搜索栏（拦截浏览器默认搜索） */
+function onKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault()
+    e.stopPropagation()
+    rvSearch.toggle()
+  }
+}
+
 function rvCellClassName({ rowIndex, columnIndex }: any) {
   const classes: string[] = []
-  if (rvCtx.cellClassName({ rowIndex, columnIndex })) classes.push('rv-cell--selected')
+  const selClass = rvCtx.cellClassName({ rowIndex, columnIndex })
+  if (selClass) classes.push(selClass)
   const ccClass = rvComments.commentCellClass(`report_${activeTab.value}`, rowIndex, columnIndex)
   if (ccClass) classes.push(ccClass)
   return classes.join(' ')
@@ -1248,8 +1310,17 @@ function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   rvCtx.contextMenu.itemName = row.row_name || ''
 }
 
-function onRvCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
-  onRvCellClick(row, column, cell, event)
+function onRvCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  const rowIdx = rows.value.indexOf(row)
+  const colLabels = ['序号', '项目', '本期金额', '上期金额']
+  const colIdx = colLabels.indexOf(column.label)
+  // 如果右键点击的单元格已在选区内，保持选区不变
+  if (rowIdx >= 0 && colIdx >= 0 && !rvCtx.isCellSelected(rowIdx, colIdx)) {
+    const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+    rvCtx.selectCell(rowIdx, colIdx, value, false)
+  }
+  rvCtx.contextMenu.rowData = row
+  rvCtx.contextMenu.itemName = row.row_name || ''
   rvCtx.openContextMenu(event, rvCtx.contextMenu.itemName, row)
 }
 
@@ -1277,7 +1348,7 @@ function onRvCtxGoNote() {
 function onRvCtxSum() {
   rvCtx.closeContextMenu()
   const sum = rvCtx.sumSelectedValues()
-  ElMessage.info(`选中 ${rvCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
+  ElMessage.info(`选中 ${rvCtx.selectedCells.value.length} 格，合计：${fmtAmount(sum)}`)
 }
 
 function onRvCtxCompare() {
@@ -1285,11 +1356,11 @@ function onRvCtxCompare() {
   if (rvCtx.selectedCells.value.length < 2) return
   const vals = rvCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
-  ElMessage.info(`差异：${fmtAmt(diff)}`)
+  ElMessage.info(`差异：${fmtAmount(diff)}`)
 }
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
-const rvFullscreen = ref(false)
+const { isFullscreen: rvFullscreen, toggleFullscreen: toggleRvFullscreen } = useFullscreen()
 
 function copyReportTable() {
   if (!rows.value.length) { ElMessage.warning('无数据可复制'); return }
@@ -1305,17 +1376,6 @@ function copyReportTable() {
     ElMessage.success('已复制为文本格式')
   }
 }
-
-function onRvKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && rvFullscreen.value) rvFullscreen.value = false
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', onRvKeydown)
-})
-onUnmounted(() => {
-  document.removeEventListener('keydown', onRvKeydown)
-})
 </script>
 
 <style scoped>
@@ -1846,41 +1906,7 @@ onUnmounted(() => {
   50% { box-shadow: 0 0 8px 2px rgba(230, 81, 0, 0.15); }
 }
 
-/* 单元格选中 */
 
-/* 全屏 */
-.gt-rv-fullscreen {
-  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 9999; background: #fff; overflow: auto; padding: 12px;
-}
-
-:deep(.rv-cell--selected) {
-  position: relative;
-  background: var(--gt-color-primary-bg, #f4f0fa) !important;
-  outline: 1.5px solid var(--gt-color-primary, #4b2d77);
-  outline-offset: -1.5px;
-  z-index: 1;
-  animation: rv-cell-glow 2s ease-in-out infinite alternate;
-}
-:deep(.rv-cell--selected)::before {
-  content: '';
-  position: absolute; left: 0; top: 2px; bottom: 2px;
-  width: 2.5px;
-  background: var(--gt-gradient-primary, linear-gradient(180deg, #4b2d77, #A06DFF));
-  border-radius: 0 2px 2px 0; opacity: 0.85;
-}
-:deep(.rv-cell--selected)::after {
-  content: '';
-  position: absolute; right: 0; bottom: 0;
-  width: 0; height: 0;
-  border-style: solid; border-width: 0 0 6px 6px;
-  border-color: transparent transparent var(--gt-color-primary-light, #A06DFF) transparent;
-  opacity: 0.6;
-}
-@keyframes rv-cell-glow {
-  0% { outline-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa) !important; }
-  100% { outline-color: var(--gt-color-primary-light, #A06DFF); background: rgba(160, 109, 255, 0.06) !important; }
-}
 </style>
 
 

@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>合并抵消分录明细表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <el-button size="small" @click="$emit('open-formula', 'consol_elimination')">ƒx 公式</el-button>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
@@ -71,7 +71,7 @@
       <el-table-column prop="amount" label="金额" width="140" align="right">
         <template #default="{ row }">
           <el-input-number v-if="row._custom" v-model="row.amount" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else class="ws-computed">{{ fmt(row.amount) }}</span>
+          <span v-else class="ws-computed">{{ fmtAmount(row.amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="desc" label="说明" min-width="180">
@@ -84,10 +84,10 @@
 
     <!-- 借贷平衡校验 -->
     <div class="ws-balance-check">
-      <span>借方合计: <b class="ws-computed">{{ fmt(totalDebit) }}</b></span>
-      <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmt(totalCredit) }}</b></span>
+      <span>借方合计: <b class="ws-computed">{{ fmtAmount(totalDebit) }}</b></span>
+      <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmtAmount(totalCredit) }}</b></span>
       <span :class="totalDebit - totalCredit !== 0 ? 'ws-diff-warn' : ''" style="font-weight:600">
-        差额: {{ fmt(totalDebit - totalCredit) }}
+        差额: {{ fmtAmount(totalDebit - totalCredit) }}
         <span v-if="totalDebit - totalCredit === 0" style="color:#67c23a;margin-left:4px">✓ 平衡</span>
         <span v-else style="color:#e6a23c;margin-left:4px">⚠ 不平衡</span>
       </span>
@@ -98,8 +98,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EntryRow {
@@ -119,7 +121,7 @@ defineEmits<{
   (e: 'goto-sheet', key: string): void
 }>()
 
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedCustomRows = ref<EntryRow[]>([])
@@ -328,7 +330,6 @@ async function onFileSelected(e: Event) {
   finally { if (fileInputRef.value) fileInputRef.value.value = '' }
 }
 
-function fmt(v: any) { if (v == null) return '-'; const num = Number(v); return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 function sourceTagType(source: string) {
   const map: Record<string, string> = { '权益抵消': '', '损益抵消': 'warning', '交叉持股': 'info', '内部往来': 'success', '内部交易': 'success', '内部现金流': 'success' }
@@ -343,14 +344,11 @@ function entryCellStyle({ row }: any) {
 }
 function entryRowClass({ row }: any) { return row._custom ? '' : 'ws-row-auto' }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
+
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 6px; flex-wrap: wrap; }

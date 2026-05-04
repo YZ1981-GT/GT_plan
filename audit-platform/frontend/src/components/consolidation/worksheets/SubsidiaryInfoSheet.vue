@@ -1,5 +1,5 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>子企业基本信息表</h3>
       <div class="ws-sheet-actions">
@@ -342,6 +342,8 @@
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount, fmtPercent } from '@/utils/formatters'
 
 interface SubsidiaryInfoRow {
   company_name: string
@@ -672,29 +674,11 @@ const cellStyle = { padding: '2px 4px', fontSize: '12px' }
 
 // ─── 全屏 ─────────────────────────────────────────────────────────────────────
 const sheetRef = ref<HTMLElement | null>(null)
-const isFullscreen = ref(false)
-
-function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
-}
-
-// ESC 退出全屏
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && isFullscreen.value) {
-    isFullscreen.value = false
-  }
-}
-
-onMounted(() => document.addEventListener('keydown', onKeydown))
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen {
-  position: fixed !important; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 2000; background: #fff; padding: 16px; overflow: auto;
-}
 .ws-sheet-header {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 8px; padding: 4px 0; flex-wrap: wrap; gap: 6px;

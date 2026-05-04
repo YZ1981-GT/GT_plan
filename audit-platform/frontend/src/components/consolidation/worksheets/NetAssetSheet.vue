@@ -1,10 +1,10 @@
 <template>
-  <div ref="sheetRef" class="ws-sheet" :class="{ 'ws-sheet--fullscreen': isFullscreen }">
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
     <div class="ws-sheet-header">
       <h3>净资产表</h3>
       <div class="ws-sheet-actions">
         <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
-          <el-button size="small" @click="isFullscreen = !isFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
         </el-tooltip>
         <span class="ws-btn-sep"></span>
         <el-button size="small" @click="$emit('open-formula', 'consol_net_asset')">ƒx 公式</el-button>
@@ -48,7 +48,7 @@
       <el-table-column prop="total" label="合计" width="120" align="right">
         <template #default="{ row }">
           <span v-if="!row.isHeader" class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px">
-            {{ fmt(calcRowTotal(row)) }}
+            {{ fmtAmount(calcRowTotal(row)) }}
           </span>
         </template>
       </el-table-column>
@@ -101,8 +101,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { fmtAmount } from '@/utils/formatters'
 
 interface CompanyCol {
   name: string    // 子企业名称
@@ -129,7 +131,7 @@ const emit = defineEmits<{
 
 const companies = computed(() => props.companies)
 const tableData = ref<NetAssetRow[]>([...props.modelValue])
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<NetAssetRow[]>([])
 
@@ -213,11 +215,6 @@ function recalcSummaryRows() {
   }
 }
 
-function fmt(v: any) {
-  if (v == null) return '-'
-  const num = Number(v)
-  return isNaN(num) ? '-' : num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 // 合计 = 母公司 + 各子企业之和（纯计算，不修改 row）
 function calcRowTotal(row: NetAssetRow): number {
@@ -255,9 +252,7 @@ function spanMethod({ row, columnIndex }: any) {
   return { rowspan: 1, colspan: 1 }
 }
 
-function onEsc(e: KeyboardEvent) { if (e.key === 'Escape' && isFullscreen.value) isFullscreen.value = false }
 
-// ─── 导出模板 / 导入 Excel ────────────────────────────────────────────────────
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const importVisible = ref(false)
 const importStats = ref<{ matched: number; skipped: number } | null>(null)
@@ -383,13 +378,10 @@ function confirmImport() {
   importParsedMap.value = new Map()
   ElMessage.success(`已导入 ${count} 行数据`)
 }
-onMounted(() => document.addEventListener('keydown', onEsc))
-onUnmounted(() => document.removeEventListener('keydown', onEsc))
 </script>
 
 <style scoped>
 .ws-sheet { padding: 0; position: relative; }
-.ws-sheet--fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; padding: 16px; overflow: auto; }
 .ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
 .ws-sheet-actions { display: flex; gap: 8px; }
