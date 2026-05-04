@@ -73,6 +73,8 @@ inclusion: always
 - 全屏功能用 Teleport to="body" 实现（非 position:fixed），避免被祖先 overflow/transform 裁剪导致全屏失效
 - 公式体系完整（三分类 + 跨表引用 + 拓扑排序 + 审计留痕）
 - 公式执行引擎 Phase1-3 全部完成：Phase1 解析器+求值器，Phase2 前端对接，Phase3 跨模块引用(REPORT/NOTE/CONSOL)+审计日志(formula_audit_log)+并行执行(asyncio.gather)
+- 公式解析器踩坑：NUMBER 正则禁止含负号前缀（`-?\d+` 会把 `100-50` 解析为 `100` 和 `-50`），负号由 MINUS token + UnaryNode 处理
+- 公式跨模块查询：REPORT 必须带 project_id 过滤；NOTE 列匹配用精确优先+组合降级；CONSOL 支持 2 参数汇总和 3 参数单行取值
 - 公式 API：execute-formula + execute-formulas-batch + formula-audit-log(GET/POST)，共 8 种函数（TB/WP/AUX/PREV/SUM_TB/REPORT/NOTE/CONSOL）
 - 公式管理（FormulaManagerDialog）已提升到全局顶部导航栏（ThreeColumnLayout），所有模块共享
 - 公式管理树形导航已增加"合并报表"分类（7张表 CI/CC/CE/CN/CS/CX/CK 编码）+ 表间审核"合并↔报表"规则

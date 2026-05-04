@@ -133,17 +133,17 @@
           </el-table-column>
           <el-table-column label="计算值" width="110" align="right">
             <template #default="{ row }">
-              <el-tooltip v-if="row._trace?.length" placement="left" :show-after="300">
+              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length" placement="left" :show-after="300">
                 <template #content>
                   <div style="max-width:400px;font-size:11px;line-height:1.6">
-                    <div v-for="(t, ti) in row._trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
+                    <div v-for="(t, ti) in formulaResults[row.row_code || row.id]?.trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
                       <span v-if="t.type">{{ t.type }}({{ t.name || t.code || t.range || '' }}) = {{ t.value || t.error }}</span>
                       <span v-else-if="t.op">{{ t.left }} {{ t.op }} {{ t.right }} = {{ t.result }}</span>
                     </div>
                   </div>
                 </template>
                 <span style="font-size:12px;color:#4b2d77;font-weight:600;cursor:help">
-                  {{ typeof row._computedValue === 'number' ? row._computedValue.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-' }}
+                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? formulaResults[row.row_code || row.id].value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-' }}
                 </span>
               </el-tooltip>
               <span v-else style="font-size:12px;color:#ccc">—</span>
@@ -164,7 +164,7 @@
         </el-table>
 
         <div class="gt-fm-footer">
-          <span style="font-size: 11px; color: #999;">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ currentRows.filter(r => r._computedValue != null).length ? `，${currentRows.filter(r => r._computedValue != null).length} 个已计算` : '' }}</span>
+          <span style="font-size: 11px; color: #999;">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
         </div>
 
         <!-- 表间审核模式 -->
@@ -606,6 +606,10 @@ const crossCheckItems = ref<Record<string, any[]>>({
 const allRowsMap = ref<Record<string, any[]>>({})
 const loadingData = ref(false)
 const showFormulaImport = ref(false)
+
+// 公式执行结果缓存（独立于行数据，确保响应式）
+const formulaResults = ref<Record<string, { value: number | null; trace: any[] }>>({})
+
 const notePresetFormulas = ref<any[]>([])
 
 async function loadRowsForNode(nodeKey: string) {
@@ -1132,13 +1136,12 @@ async function onApplyFormulas() {
     const successCount = results.filter((r: any) => r.value != null && !r.error).length
     const errorCount = results.filter((r: any) => r.error).length
 
-    // 将计算结果回写到当前行数据
+    // 将计算结果写入响应式缓存
     for (const r of results) {
-      if (r.value != null && !r.error) {
-        const targetRow = currentRows.value.find((row: any) => (row.row_code || row.id) === r.row_code)
-        if (targetRow) {
-          targetRow._computedValue = r.value
-          targetRow._trace = r.trace
+      if (r.row_code) {
+        formulaResults.value[r.row_code] = {
+          value: r.value != null && !r.error ? r.value : null,
+          trace: r.trace || [],
         }
       }
     }
