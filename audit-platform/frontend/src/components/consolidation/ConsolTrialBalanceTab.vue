@@ -2,50 +2,48 @@
   合并试算平衡表 Tab 组件（从 ConsolidationIndex.vue 拆分）
 -->
 <template>
-  <div class="gt-tab-content">
-    <!-- 报表类型切换 -->
-    <div class="gt-report-type-tabs" style="margin-bottom:0">
-      <div class="gt-report-type-tabs-left">
-        <span v-for="item in tbReportTypes" :key="item.key"
-          class="gt-report-type-tag" :class="{ 'gt-report-type-tag--active': consolTbType === item.key }"
-          @click="consolTbType = item.key; loadConsolTb()">
-          {{ item.label }}
-        </span>
+  <div class="gt-ctb">
+    <!-- 报表类型切换标签 -->
+    <div class="gt-ctb-type-bar">
+      <span v-for="item in tbReportTypes" :key="item.key"
+        class="gt-report-type-tag" :class="{ 'gt-report-type-tag--active': consolTbType === item.key }"
+        @click="consolTbType = item.key; loadConsolTb()">
+        {{ item.label }}
+      </span>
+    </div>
+
+    <!-- 工具栏卡片 -->
+    <div class="gt-ctb-toolbar">
+      <div class="gt-ctb-toolbar-left">
+        <el-button-group size="small">
+          <el-button :type="tbEditMode ? 'primary' : ''" @click="tbEditMode = true">✏️ 编辑</el-button>
+          <el-button :type="tbEditMode ? '' : 'primary'" @click="tbEditMode = false">📋 查看</el-button>
+        </el-button-group>
+        <span class="gt-ctb-sep" />
+        <el-radio-group v-model="tbPeriod" size="small">
+          <el-radio-button value="closing">期末</el-radio-button>
+          <el-radio-button value="opening">期初</el-radio-button>
+        </el-radio-group>
+        <el-button v-if="tbPeriod === 'opening'" size="small" @click="importPriorYearTb">📥 提取上年数</el-button>
+      </div>
+      <div class="gt-ctb-toolbar-right">
+        <el-button size="small" @click="loadConsolTb(true)" :loading="consolTbLoading">🔄 刷新</el-button>
+        <el-tooltip content="从子企业试算表和工作底稿自动提取填充" placement="bottom">
+          <el-button size="small" type="primary" @click="fillConsolTb" :loading="consolTbLoading">▶ 提取填充</el-button>
+        </el-tooltip>
+        <span class="gt-ctb-sep" />
+        <el-button size="small" @click="exportConsolTb">📤 导出</el-button>
+        <el-button size="small" @click="saveConsolTb">💾 保存</el-button>
+        <span class="gt-ctb-sep" />
+        <el-button size="small" @click="auditConsolTb">✅ 审核</el-button>
+        <el-button size="small" type="warning" @click="generateReportFromTb" :loading="consolTbLoading">📋 生成报表</el-button>
       </div>
     </div>
 
-    <!-- 操作按钮栏（独立一行） -->
-    <div style="display:flex;gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap">
-      <el-button-group size="small">
-        <el-button :type="tbEditMode ? 'primary' : ''" @click="tbEditMode = true">✏️ 编辑</el-button>
-        <el-button :type="tbEditMode ? '' : 'primary'" @click="tbEditMode = false">📋 查看</el-button>
-      </el-button-group>
-      <div style="width:1px;height:20px;background:#e5e5ea;margin:0 4px" />
-      <el-button size="small" @click="loadConsolTb(true)" :loading="consolTbLoading">🔄 刷新</el-button>
-      <el-tooltip content="从子企业试算表和工作底稿自动提取填充" placement="bottom">
-        <el-button size="small" type="primary" @click="fillConsolTb" :loading="consolTbLoading">▶ 提取填充</el-button>
-      </el-tooltip>
-      <div style="width:1px;height:20px;background:#e5e5ea;margin:0 4px" />
-      <el-button size="small" @click="exportConsolTb">📤 导出</el-button>
-      <el-button size="small" @click="saveConsolTb">💾 保存</el-button>
-      <div style="width:1px;height:20px;background:#e5e5ea;margin:0 4px" />
-      <el-tooltip content="审核试算平衡（借贷平衡+勾稽校验）" placement="bottom">
-        <el-button size="small" @click="auditConsolTb">✅ 审核</el-button>
-      </el-tooltip>
-      <el-tooltip content="将审定数回填到合并报表" placement="bottom">
-        <el-button size="small" type="warning" @click="generateReportFromTb" :loading="consolTbLoading">📋 生成报表</el-button>
-      </el-tooltip>
-    </div>
-
-    <!-- 期初/期末切换 -->
-    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-      <el-radio-group v-model="tbPeriod" size="small">
-        <el-radio-button value="closing">期末</el-radio-button>
-        <el-radio-button value="opening">期初</el-radio-button>
-      </el-radio-group>
-      <el-button v-if="tbPeriod === 'opening'" size="small" @click="importPriorYearTb">📥 提取上年数</el-button>
-      <span style="flex:1" />
-      <span style="font-size:12px;color:#666">{{ consolTbRows.length }} 行 · 审定数 = 汇总 + 抵消借 - 抵消贷 + 调整借 - 调整贷</span>
+    <!-- 信息栏 -->
+    <div class="gt-ctb-info">
+      <span>{{ consolTbRows.length }} 行</span>
+      <span class="gt-ctb-info-formula">审定数 = 汇总 + 抵消借 - 抵消贷 + 调整借 - 调整贷</span>
     </div>
 
     <!-- 试算平衡表 -->
@@ -396,3 +394,39 @@ async function auditConsolTb() {
 
 defineExpose({ loadConsolTb, consolTbRows, consolTbType, consolTbLoading })
 </script>
+
+<style scoped>
+.gt-ctb { padding: 0; }
+
+/* 报表类型标签栏 */
+.gt-ctb-type-bar {
+  display: flex; gap: 0; border-bottom: 2px solid var(--gt-color-border-light, #f0f0f5);
+  margin-bottom: 10px;
+}
+
+/* 工具栏 */
+.gt-ctb-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; margin-bottom: 8px;
+  background: var(--gt-color-bg-elevated, #faf9fd);
+  border: 1px solid var(--gt-color-border-light, #f0f0f5);
+  border-radius: var(--gt-radius-md, 8px);
+}
+.gt-ctb-toolbar-left, .gt-ctb-toolbar-right {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.gt-ctb-sep {
+  display: inline-block; width: 1px; height: 20px;
+  background: var(--gt-color-border, #e5e5ea); margin: 0 4px;
+}
+
+/* 信息栏 */
+.gt-ctb-info {
+  display: flex; align-items: center; gap: 12px;
+  padding: 4px 0 8px; font-size: 12px; color: var(--gt-color-text-secondary, #6e6e73);
+}
+.gt-ctb-info-formula {
+  padding: 2px 8px; background: var(--gt-color-primary-bg, #f4f0fa);
+  border-radius: var(--gt-radius-sm, 4px); font-size: 11px; color: var(--gt-color-primary, #4b2d77);
+}
+</style>
