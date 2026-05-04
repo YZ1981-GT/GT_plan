@@ -90,8 +90,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useLazyEdit } from '@/composables/useLazyEdit'
 
@@ -315,13 +315,7 @@ async function fillConsolTb() {
   } finally { consolTbLoading.value = false }
 }
 
-function onTbCellContextMenu(e: MouseEvent, row: any, ri: number) {
-  selectedCells.value = [{ row: ri, col: 2, value: row.summary }]
-  drillDownCell.itemName = row.row_name
-  drillDownCell.colName = '审定汇总'
-  drillDownCell.totalValue = row.summary
-  consolCtx.openContextMenu(e, row.row_name, row)
-}
+// onTbCellContextMenu 由父组件通过 @cell-context-menu 事件处理
 
 async function generateReportFromTb() {
   if (!consolTbRows.value.length) { ElMessage.warning('请先加载试算平衡表数据'); return }
@@ -349,8 +343,8 @@ async function generateReportFromTb() {
     const updated = result?.updated || updates.length
     ElMessage.success(`已将 ${updated} 行审定数回填到合并报表（${tbReportTypes.find(t => t.key === consolTbType.value)?.label}）`)
 
-    // 清除报表缓存，下次切换到报表 tab 时重新加载
-    clearEntityCache(props.entityCode || '', ['all_reports'])
+    // 通知父组件清除报表缓存
+    emit('generate-report-done')
   } catch (err: any) {
     ElMessage.error(`报表生成失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
   } finally { consolTbLoading.value = false }
