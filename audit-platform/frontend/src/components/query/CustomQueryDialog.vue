@@ -118,9 +118,13 @@ function isNumeric(v: any) { return v != null && !isNaN(Number(v)) }
 function formatCell(v: any) {
   if (v == null) return '-'
   if (Array.isArray(v)) return v.join(', ')
+  if (typeof v === 'boolean') return v ? '是' : '否'
+  const s = String(v)
+  // 不格式化长字符串（如信用代码、编码等）
+  if (s.length > 12 || /[a-zA-Z\u4e00-\u9fff]/.test(s)) return s
   const n = Number(v)
-  if (!isNaN(n) && typeof v !== 'boolean') return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return String(v)
+  if (!isNaN(n) && s.trim() !== '') return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return s
 }
 
 function onIndicatorClick(data: any) {

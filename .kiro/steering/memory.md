@@ -112,7 +112,7 @@ inclusion: always
 - ~~合并工作底稿所有表的保存按钮需接后端API持久化（当前仅前端提示），模块间数据提取联动需后端接口配合~~ ✅ 已完成：consol_worksheet_data 表（JSONB）+ 3个API + 前端 onSave/onMounted 联动
 - 用真实审计项目端到端验证（最高优先级）
 - 合并模块 Tab 精简为4个：合并工作底稿、集团架构、合并报表、合并附注（差额表和自定义查询已删除）
-- 自定义查询改为全局功能（待开发）：支持按底稿/报表/附注/调整分录/单位/年度多维度查询，树形地址坐标库选择指标，查询指标库，结果支持导出/转置/复制
+- ~~自定义查询改为全局功能（待开发）：支持按底稿/报表/附注/调整分录/单位/年度多维度查询，树形地址坐标库选择指标，查询指标库，结果支持导出/转置/复制~~ ✅ 已完成：custom_query.py（6 种数据源）+ CustomQueryDialog.vue（树形指标+过滤+转置+复制+导出Excel），集成到 ThreeColumnLayout 顶部🔍按钮
 - 公式管理中心左侧数据源树（报表/附注/流动资产/长期资产/负债/损益类/合并报表/表间审核）待统一补充完善，各模块开发完毕后更新
 - P0重构（已完成）：ConsolidationIndex.vue 合并附注已拆分为 ConsolNoteTab.vue 独立组件（2968→1522行，减少49%）
 - ~~P0重构：通用 useCellSelection composable + CellContextMenu.vue 组件已创建，各模块逐步迁移~~ ✅ 全部5模块迁移完成（DisclosureEditor/TrialBalance/ReportView/ConsolidationIndex/ConsolNoteTab），旧的重复样式和类名已清除，模块特有菜单项通过 slot 插入

@@ -121,10 +121,14 @@ async def execute_query(
 async def _query_report(db, pid, year, filters, limit):
     report_type = filters.get("report_type", "balance_sheet")
     standard = filters.get("standard", "soe_standalone")
-    result = await db.execute(
-        text("SELECT row_code, row_name, current_period_amount, prior_period_amount, indent_level, is_total_row FROM report_config WHERE report_type = :rt AND applicable_standard = :std AND is_deleted = false ORDER BY row_number LIMIT :lim"),
-        {"rt": report_type, "std": standard, "lim": limit},
-    )
+    # 优先查项目级数据，降级查全局模板
+    query = "SELECT row_code, row_name, current_period_amount, prior_period_amount, indent_level, is_total_row FROM report_config WHERE report_type = :rt AND applicable_standard = :std AND is_deleted = false"
+    params: dict = {"rt": report_type, "std": standard, "lim": limit}
+    if pid:
+        query += " AND (project_id = :pid OR project_id IS NULL)"
+        params["pid"] = pid
+    query += " ORDER BY row_number LIMIT :lim"
+    result = await db.execute(text(query), params)
     rows = [{"row_code": r[0], "row_name": r[1], "current_period_amount": float(r[2]) if r[2] else None, "prior_period_amount": float(r[3]) if r[3] else None, "indent": r[4], "is_total": r[5]} for r in result.fetchall()]
     return {"rows": rows, "columns": ["row_code", "row_name", "current_period_amount", "prior_period_amount"], "total": len(rows)}
 
@@ -169,11 +173,22 @@ async def _query_disclosure(db, pid, year, filters, limit):
             text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y LIMIT :lim"),
             {"pid": pid, "y": year, "lim": limit},
         )
-    sections = []
+    # 将附注数据展平为表格行（每个章节的每行数据变成一条记录）
+    flat_rows = []
+    all_headers: list[str] = []
     for r in result.fetchall():
         data = r[1] if isinstance(r[1], dict) else {}
-        sections.append({"section_id": r[0], "headers": data.get("headers", []), "row_count": len(data.get("rows", [])), "rows": data.get("rows", [])[:50]})
-    return {"rows": sections, "columns": ["section_id", "headers", "row_count"], "total": len(sections)}
+        headers = data.get("headers", [])
+        rows = data.get("rows", [])
+        if headers and not all_headers:
+            all_headers = ["section_id"] + headers
+        for row_data in rows[:100]:  # 每章节最多100行
+            obj: dict = {"section_id": r[0]}
+            for hi, h in enumerate(headers):
+                obj[h] = row_data[hi] if hi < len(row_data) else ''
+            flat_rows.append(obj)
+    columns = all_headers if all_headers else ["section_id"]
+    return {"rows": flat_rows[:limit], "columns": columns, "total": len(flat_rows)}
 
 
 async def _query_adjustments(db, pid, year, filters, limit):
