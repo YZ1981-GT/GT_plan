@@ -105,7 +105,7 @@ inclusion: always
 - 自定义查询改为全局功能（待开发）：支持按底稿/报表/附注/调整分录/单位/年度多维度查询，树形地址坐标库选择指标，查询指标库，结果支持导出/转置/复制
 - 公式管理中心左侧数据源树（报表/附注/流动资产/长期资产/负债/损益类/合并报表/表间审核）待统一补充完善，各模块开发完毕后更新
 - P0重构（已完成）：ConsolidationIndex.vue 合并附注已拆分为 ConsolNoteTab.vue 独立组件（2968→1522行，减少49%）
-- P0重构：右键菜单抽取为通用 CellContextMenu.vue + useCellSelection composable（6个模块共用）
+- P0重构（已完成）：通用 useCellSelection composable + CellContextMenu.vue 组件已创建，各模块逐步迁移
 - P1修复（已完成）：试算平衡表 getter 审定数改为 watch deep + recalcTbAudited 函数（Vue reactive 不追踪原生 getter）
 - P1重构：consol_note_sections.py 拆分为章节CRUD/审核/试算平衡表三个路由文件
 - P2优化：组件间 CustomEvent 通信部分改为 Pinia store
