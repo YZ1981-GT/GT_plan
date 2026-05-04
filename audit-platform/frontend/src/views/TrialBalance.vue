@@ -1,53 +1,44 @@
 <template>
   <div class="gt-trial-balance gt-fade-in" :class="{ 'gt-fullscreen': tbFullscreen }">
     <!-- 页面横幅 -->
-    <div class="gt-tb-banner">
-      <div class="gt-tb-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-tb-title">试算表</h2>
-        <div class="gt-tb-info-bar">
-          <div class="gt-tb-info-item">
-            <span class="gt-tb-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-tb-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-tb-info-sep" />
-          <div class="gt-tb-info-item">
-            <span class="gt-tb-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-tb-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-tb-info-sep" />
-          <div class="gt-tb-info-item">
-            <span class="gt-tb-info-badge">{{ rows.length }} 个科目</span>
-          </div>
-          <div class="gt-tb-info-sep" />
-          <div class="gt-tb-info-item">
-            <span class="gt-tb-info-label">单位</span>
-            <span class="gt-tb-info-badge">{{ displayPrefs.unitSuffix }}</span>
-          </div>
-        </div>
-      </div>
-      <div class="gt-tb-banner-row2">
-        <el-tooltip content="复制整个表格（可粘贴到 Word/Excel）" placement="bottom">
-          <el-button size="small" @click="copyTbTable">📋 复制整表</el-button>
-        </el-tooltip>
-        <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
-          <el-button size="small" @click="toggleTbFullscreen()">{{ tbFullscreen ? '退出全屏' : '全屏' }}</el-button>
-        </el-tooltip>
-        <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
-          <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
-        </el-tooltip>
-        <el-tooltip content="从四表数据重新计算未审数、调整数、审定数（需先导入数据）" placement="bottom">
-          <el-button size="small" @click="onRecalc" :loading="recalcLoading">🔄 全量重算</el-button>
-        </el-tooltip>
-        <el-button size="small" @click="onExport">📤 导出Excel</el-button>
-        <el-button size="small" @click="showTbImport = true">📥 Excel导入</el-button>
-        <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
-      </div>
-    </div>
+    <GtPageHeader title="试算表" @back="router.push('/projects')">
+      <GtInfoBar
+        :show-unit="true"
+        :show-year="true"
+        :unit-value="selectedProjectId"
+        :year-value="selectedYear"
+        :badges="[
+          { value: rows.length + ' 个科目' },
+          { label: '单位', value: displayPrefs.unitSuffix },
+        ]"
+        @unit-change="onProjectChange"
+        @year-change="onYearChange"
+      />
+      <template #actions>
+        <GtToolbar
+          :show-copy="true"
+          :show-fullscreen="true"
+          :is-fullscreen="tbFullscreen"
+          :show-export="true"
+          :show-import="true"
+          :show-formula="true"
+          @copy="copyTbTable"
+          @fullscreen="toggleTbFullscreen()"
+          @export="onExport"
+          @import="showTbImport = true"
+          @formula="showFormulaManager = true"
+        >
+          <template #left>
+            <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
+              <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
+            </el-tooltip>
+            <el-tooltip content="从四表数据重新计算未审数、调整数、审定数（需先导入数据）" placement="bottom">
+              <el-button size="small" @click="onRecalc" :loading="recalcLoading">🔄 全量重算</el-button>
+            </el-tooltip>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <!-- 视图切换：科目明细 / 试算平衡表 -->
     <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
@@ -326,6 +317,11 @@ import {
 } from '@/services/auditPlatformApi'
 import { getAllWpMappings, type WpAccountMapping } from '@/services/workpaperApi'
 import { useProjectStore } from '@/stores/project'
+import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
+import { withLoading } from '@/composables/useLoading'
+import GtToolbar from '@/components/common/GtToolbar.vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { ADJUSTMENT_STATUS } from '@/utils/statusMaps'
 
@@ -497,34 +493,19 @@ async function ensureProjectYear() {
   }
 }
 
-async function fetchData() {
-  loading.value = true
-  try {
-    rows.value = await getTrialBalance(projectId.value, year.value)
-  } finally {
-    loading.value = false
-  }
-}
+const fetchData = withLoading(loading, async () => {
+  rows.value = await getTrialBalance(projectId.value, year.value)
+})
 
-async function onRecalc() {
-  recalcLoading.value = true
-  try {
-    await recalcTrialBalance(projectId.value, year.value)
-    ElMessage.success('重算完成')
-    await fetchData()
-  } finally {
-    recalcLoading.value = false
-  }
-}
+const onRecalc = withLoading(recalcLoading, async () => {
+  await recalcTrialBalance(projectId.value, year.value)
+  ElMessage.success('重算完成')
+  await fetchData()
+})
 
-async function onConsistencyCheck() {
-  checkLoading.value = true
-  try {
-    consistencyResult.value = await checkConsistency(projectId.value, year.value)
-  } finally {
-    checkLoading.value = false
-  }
-}
+const onConsistencyCheck = withLoading(checkLoading, async () => {
+  consistencyResult.value = await checkConsistency(projectId.value, year.value)
+})
 
 function onTbImported() {
   showTbImport.value = false
@@ -673,6 +654,21 @@ tbCtx.setupTableDrag(tbTableRef, (rowIdx: number, colIdx: number) => {
   if (colIdx === 4) return row.aje_adjustment
   if (colIdx === 5) return row.audited_amount
   return null
+})
+
+// ─── 粘贴监听（Ctrl+V 粘贴 Excel 数据到选中区域） ──────────────────────────
+const tbColumns = [
+  { key: 'standard_account_code', label: '科目编码' },
+  { key: 'account_name', label: '科目名称' },
+  { key: 'unadjusted_amount', label: '未审数' },
+  { key: 'rje_adjustment', label: 'RJE调整' },
+  { key: 'aje_adjustment', label: 'AJE调整' },
+  { key: 'audited_amount', label: '审定数' },
+]
+
+setupPasteListener(tbTableRef, (event: ClipboardEvent) => {
+  if (!tbCtx.selectedCells.value.length) return
+  pasteToSelection(event, tbCtx.selectedCells.value, groupedRows.value, tbColumns)
 })
 
 // ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
@@ -881,72 +877,7 @@ async function exportTbSummary() {
 <style scoped>
   .gt-trial-balance { padding: var(--gt-space-5); }
 
-  /* ── 页面横幅 ── */
-  .gt-tb-banner {
-    display: flex; flex-direction: column; gap: 10px;
-    background: var(--gt-gradient-primary);
-    border-radius: var(--gt-radius-lg);
-    padding: 18px 28px;
-    margin-bottom: var(--gt-space-5);
-    color: #fff;
-    position: relative; overflow: hidden;
-    box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
-    background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-    background-size: 100% 100%, 20px 20px, 20px 20px;
-  }
-  .gt-tb-banner::before {
-    content: '';
-    position: absolute; top: -40%; right: -10%;
-    width: 45%; height: 180%;
-    background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
-    pointer-events: none;
-  }
-  .gt-tb-banner-row1 {
-    display: flex; align-items: center; gap: 16px;
-    position: relative; z-index: 1;
-  }
-  .gt-tb-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
-  .gt-tb-info-bar {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  }
-  .gt-tb-info-item {
-    display: flex; align-items: center; gap: 4px;
-  }
-  .gt-tb-info-label {
-    font-size: 11px; opacity: 0.8; white-space: nowrap;
-  }
-  .gt-tb-info-badge {
-    font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px;
-    border-radius: 10px; white-space: nowrap;
-  }
-  .gt-tb-info-sep {
-    width: 1px; height: 16px; background: rgba(255,255,255,0.25);
-  }
-  .gt-tb-unit-select, .gt-tb-year-select {
-    width: 160px;
-  }
-  .gt-tb-unit-select :deep(.el-input__wrapper),
-  .gt-tb-year-select :deep(.el-input__wrapper) {
-    background: rgba(255,255,255,0.15) !important;
-    border: 1px solid rgba(255,255,255,0.25) !important;
-    box-shadow: none !important;
-  }
-  .gt-tb-unit-select :deep(.el-input__inner),
-  .gt-tb-year-select :deep(.el-input__inner) {
-    color: #fff !important; font-size: 12px;
-  }
-  .gt-tb-unit-select :deep(.el-input__suffix),
-  .gt-tb-year-select :deep(.el-input__suffix) {
-    color: rgba(255,255,255,0.7) !important;
-  }
-  .gt-tb-banner-row2 {
-    display: flex; gap: 8px; align-items: center;
-    position: relative; z-index: 1;
-  }
-  .gt-tb-banner-row2 .el-button {
-    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff;
-  }
-  .gt-tb-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
+  /* ── GtPageHeader 已替换横幅样式 ── */
 
   .clickable {
     cursor: pointer; color: var(--gt-color-primary); font-weight: 500;

@@ -185,9 +185,10 @@ export function useCellSelection() {
   }
 
   /**
-   * 复制选中值
+   * 复制选中值（HTML 表格 + 制表符纯文本双格式）
    * - 单行：制表符分隔
    * - 多行矩形：按行列排列，行间换行，列间制表符
+   * - HTML 格式兼容 Excel/Word 粘贴
    */
   function copySelectedValues() {
     const cells = selectedCells.value
@@ -197,17 +198,32 @@ export function useCellSelection() {
     if (!bounds) return
 
     // 按行列排列
-    const lines: string[] = []
+    const lines: string[][] = []
     for (let r = bounds.minRow; r <= bounds.maxRow; r++) {
       const rowCells: string[] = []
       for (let c = bounds.minCol; c <= bounds.maxCol; c++) {
         const cell = cells.find(cc => cc.row === r && cc.col === c)
         rowCells.push(cell?.value != null ? String(cell.value) : '')
       }
-      lines.push(rowCells.join('\t'))
+      lines.push(rowCells)
     }
-    const text = lines.join('\n')
-    navigator.clipboard?.writeText(text)
+
+    const text = lines.map(row => row.join('\t')).join('\n')
+    const htmlRows = lines.map(row =>
+      `<tr>${row.map(c => `<td>${c.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`).join('')}</tr>`,
+    ).join('')
+    const html = `<table border="1">${htmlRows}</table>`
+
+    try {
+      navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        }),
+      ])
+    } catch {
+      navigator.clipboard?.writeText(text)
+    }
   }
 
   function sumSelectedValues(): number {

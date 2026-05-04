@@ -129,7 +129,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useAddressRegistry } from '@/stores/addressRegistry'
+
+const addrStore = useAddressRegistry()
 
 const props = defineProps<{
   modelValue: boolean
@@ -148,14 +151,33 @@ const visible = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
+// 弹窗打开时，如果 store 已加载则优先使用 store 数据
+watch(visible, (v) => {
+  if (v && addrStore.loaded) {
+    // store 数据可用，无需额外操作
+  }
+})
+
 const activeSource = ref('trial_balance')
 const selectedCells = ref<any[]>([])
 const transform = ref('direct')
 const description = ref('')
 
+// ─── 数据源：优先 store，回退 props ───
+
 // 试算表
 const tbSearch = ref('')
 const filteredTbData = computed(() => {
+  // 优先使用 store 中的试算表地址
+  if (addrStore.loaded && addrStore.tbAddresses.length > 0) {
+    const entries = addrStore.tbAddresses
+    if (!tbSearch.value) return entries.slice(0, 50)
+    const kw = tbSearch.value.toLowerCase()
+    return entries.filter(e =>
+      (e.account_code || '').includes(kw) || (e.label || '').toLowerCase().includes(kw)
+    ).slice(0, 50)
+  }
+  // 回退到 props
   const data = props.trialBalanceData || []
   if (!tbSearch.value) return data.slice(0, 50)
   const kw = tbSearch.value.toLowerCase()
@@ -167,6 +189,16 @@ const filteredTbData = computed(() => {
 // 报表
 const reportSearch = ref('')
 const filteredReportData = computed(() => {
+  // 优先使用 store 中的报表地址
+  if (addrStore.loaded && addrStore.reportAddresses.length > 0) {
+    const entries = addrStore.reportAddresses
+    if (!reportSearch.value) return entries
+    const kw = reportSearch.value.toLowerCase()
+    return entries.filter(e =>
+      (e.row_code || '').includes(kw) || (e.label || '').toLowerCase().includes(kw)
+    )
+  }
+  // 回退到 props
   const data = props.reportData || []
   if (!reportSearch.value) return data
   const kw = reportSearch.value.toLowerCase()
@@ -177,7 +209,14 @@ const filteredReportData = computed(() => {
 
 // 附注
 const noteSection = ref('')
-const noteSections = computed(() => props.noteSections || [])
+const noteSections = computed(() => {
+  // 优先使用 store 中的附注地址提取章节列表
+  if (addrStore.loaded && addrStore.noteAddresses.length > 0) {
+    const sections = [...new Set(addrStore.noteAddresses.map(e => e.note_section).filter(Boolean))]
+    return sections.length > 0 ? sections as string[] : props.noteSections || []
+  }
+  return props.noteSections || []
+})
 
 // 辅助余额
 const auxSearch = ref('')
@@ -189,20 +228,25 @@ const wpCode = ref('')
 const wpDataKey = ref('audited_amount')
 
 function selectTbCell(row: any, field: string) {
+  // 兼容 store AddressEntry 和 legacy row 格式
+  const code = row.account_code || row.standard_account_code || ''
+  const name = row.account_name || row.label || ''
   selectedCells.value.push({
     type: 'trial_balance',
-    account_code: row.account_code,
+    account_code: code,
     field,
-    _label: `${row.account_code} ${row.account_name || ''} · ${fieldLabel(field)}`,
+    _label: `${code} ${name} · ${fieldLabel(field)}`,
   })
 }
 
 function selectReportCell(row: any, field: string) {
+  const code = row.row_code || ''
+  const name = row.row_name || row.label || ''
   selectedCells.value.push({
     type: 'report',
-    row_code: row.row_code,
+    row_code: code,
     field,
-    _label: `[${row.row_code}] ${row.row_name || ''} · ${field === 'amount' ? '期末' : '期初'}`,
+    _label: `[${code}] ${name} · ${field === 'amount' ? '期末' : '期初'}`,
   })
 }
 

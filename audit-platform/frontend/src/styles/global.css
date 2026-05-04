@@ -10,6 +10,18 @@
 @import './gt-polish.css';
 
 /* ═══════════════════════════════════════════════════════════════
+   NProgress 主题覆盖 — GT 紫色
+   ═══════════════════════════════════════════════════════════════ */
+#nprogress .bar {
+  background: var(--gt-color-primary, #4b2d77) !important;
+  height: 3px !important;
+}
+#nprogress .peg {
+  box-shadow: 0 0 10px var(--gt-color-primary-light, #A06DFF),
+              0 0 5px var(--gt-color-primary-light, #A06DFF) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    Element Plus 主题覆盖
    ═══════════════════════════════════════════════════════════════ */
 :root {

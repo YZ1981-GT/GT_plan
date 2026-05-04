@@ -118,6 +118,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO } from '@/composables/useExcelIO'
 
 interface CompanyCol { name: string; ratio: number }
 
@@ -292,55 +293,65 @@ async function restoreDefaults() {
 }
 
 // ─── 导出模板 / 导入 ──────────────────────────────────────────────────────────
+const { exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
+
 async function exportTemplate() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const headers = ['资本公积', '合计', '合并抵消环节', '母公司', ...companies.value.map(c => `${c.name}\n(${c.ratio}%)`)]
-  const dataRows = tableData.value.map(r => [
-    r.item, r.total ?? '', r.elimAdj ?? '', r.parentVal ?? '',
-    ...(r.values || []).map(v => v ?? ''),
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
-  XLSX.utils.book_append_sheet(wb, ws, '数据填写')
-  XLSX.writeFile(wb, '资本公积变动_模板.xlsx'); ElMessage.success('模板已导出')
+  // 资本公积表的模板就是当前数据结构，直接导出
+  await _exportData({
+    data: tableData.value.map(r => ({
+      item: r.item, total: r.total ?? '', elimAdj: r.elimAdj ?? '', parentVal: r.parentVal ?? '',
+      ...Object.fromEntries((r.values || []).map((v, i) => [`_v${i}`, v ?? ''])),
+    })),
+    columns: [
+      { key: 'item', header: '资本公积' },
+      { key: 'total', header: '合计' },
+      { key: 'elimAdj', header: '合并抵消环节' },
+      { key: 'parentVal', header: '母公司' },
+      ...companies.value.map((c, i) => ({ key: `_v${i}`, header: `${c.name}\n(${c.ratio}%)` })),
+    ],
+    sheetName: '数据填写',
+    fileName: '资本公积变动_模板.xlsx',
+  })
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = ['资本公积', '合计', '合并抵消环节', '母公司', ...companies.value.map(c => `${c.name}(${c.ratio}%)`)]
-  const dataRows = tableData.value.map(r => [
-    r.item, r.total ?? '', r.elimAdj ?? '', r.parentVal ?? '',
-    ...(r.values || []).map(v => v ?? ''),
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
-  XLSX.utils.book_append_sheet(wb, ws, '资本公积变动')
-  XLSX.writeFile(wb, '资本公积变动_数据.xlsx')
-  ElMessage.success('数据已导出')
+  await _exportData({
+    data: tableData.value.map(r => ({
+      item: r.item, total: r.total ?? '', elimAdj: r.elimAdj ?? '', parentVal: r.parentVal ?? '',
+      ...Object.fromEntries((r.values || []).map((v, i) => [`_v${i}`, v ?? ''])),
+    })),
+    columns: [
+      { key: 'item', header: '资本公积' },
+      { key: 'total', header: '合计' },
+      { key: 'elimAdj', header: '合并抵消环节' },
+      { key: 'parentVal', header: '母公司' },
+      ...companies.value.map((c, i) => ({ key: `_v${i}`, header: `${c.name}(${c.ratio}%)` })),
+    ],
+    sheetName: '资本公积变动',
+    fileName: '资本公积变动_数据.xlsx',
+  })
 }
 
 async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-  try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-    const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+  await _onFileSelected(e, (result) => {
     const n = (v: any) => (v != null && v !== '') ? Number(v) : null
     let count = 0
-    for (let i = 1; i < json.length; i++) {
-      const r = json[i]; const itemName = String(r?.[0] || '').trim(); if (!itemName) continue
+    for (const r of result.rows) {
+      const itemName = String(r[result.headers[0]] || '').trim()
+      if (!itemName) continue
       const target = tableData.value.find(row => row.item === itemName)
       if (!target || target.isComputed) continue
-      target.elimAdj = n(r[2]); target.parentVal = n(r[3])
+      target.elimAdj = n(r[result.headers[2]])
+      target.parentVal = n(r[result.headers[3]])
       if (target.values) {
-        for (let k = 0; k < companies.value.length; k++) target.values[k] = n(r[4 + k])
+        for (let k = 0; k < companies.value.length; k++) {
+          target.values[k] = n(r[result.headers[4 + k]])
+        }
       }
       count++
     }
     ElMessage.success(`已导入 ${count} 行`)
-  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
-  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
+  }, { skipRows: 1 })
 }
 
 

@@ -222,6 +222,10 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.address_registry import router as addr_router
     app.include_router(addr_router, tags=["系统管理"])
 
+    # 系统字典（枚举字典集中管理）
+    from app.routers.system_dicts import router as sdict_router
+    app.include_router(sdict_router, tags=["系统管理"])
+
     # ═══ 9. Phase 14: 门禁引擎与治理 ═══
     from app.routers.gate import router as gate_router
     from app.routers.trace import router as trace_router

@@ -106,6 +106,7 @@ import { ref, watch, nextTick, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO } from '@/composables/useExcelIO'
 
 interface CompanyCol {
   name: string    // 子企业名称
@@ -262,91 +263,54 @@ const importStats = ref<{ matched: number; skipped: number } | null>(null)
 const importPreviewRows = ref<any[]>([])
 const importParsedMap = ref<Map<string, any>>(new Map())
 
-async function exportTemplate() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
+const { exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
 
-  // 说明 sheet
+async function exportTemplate() {
+  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
   const instrRows = [['净资产表 — 填写说明'], [],
     ['⚠ 重要提示：'],
     ['1. 在"数据填写"工作表填写，不要修改sheet名称'],
-    ['2. 第1行为表头（序号/项目/合计/母公司/各子企业名称），不要修改'],
-    ['3. "项目"列的文字不要修改，系统按项目名匹配导入'],
-    ['4. 紫色背景行（期初合计/本期增加/本期减少/期末金额等）为自动计算行，无需填写'],
-    ['5. 只需填写明细行的数值（如实收资本、资本公积等）'],
-    ['6. 金额填数字，不要带逗号或货币符号'],
+    ['2. "项目"列的文字不要修改，系统按项目名匹配导入'],
+    ['3. 紫色背景行为自动计算行，无需填写'],
+    ['4. 金额填数字，不要带逗号或货币符号'],
   ]
-  const wsI = XLSX.utils.aoa_to_sheet(instrRows)
-  wsI['!cols'] = [{ wch: 80 }]
-  wsI['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 0 } }]
+  const wsI = XLSX.utils.aoa_to_sheet(instrRows); wsI['!cols'] = [{ wch: 80 }]
   XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
-
-  // 数据 sheet
   const headers = ['序号', '项目', '合计', '母公司', ...companies.value.map(c => `${c.name}\n(${c.ratio}%)`)]
   const dataRows = tableData.value.map(row => {
     const vals = [row.seq, row.item, row.total ?? '', row.parent ?? '']
-    if (row.values) {
-      for (let i = 0; i < companies.value.length; i++) {
-        vals.push(row.values[i] ?? '')
-      }
-    } else {
-      for (let i = 0; i < companies.value.length; i++) vals.push('')
-    }
+    for (let i = 0; i < companies.value.length; i++) vals.push(row.values?.[i] ?? '')
     return vals
   })
   const wsD = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  wsD['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 14 },
-    ...companies.value.map(() => ({ wch: 14 }))]
+  wsD['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
   XLSX.utils.book_append_sheet(wb, wsD, '数据填写')
-  XLSX.writeFile(wb, '净资产表_模板.xlsx')
-  ElMessage.success('模板已导出')
+  XLSX.writeFile(wb, '净资产表_模板.xlsx'); ElMessage.success('模板已导出')
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const headers = ['序号', '项目', '合计', '母公司', ...companies.value.map(c => `${c.name}(${c.ratio}%)`)]
-  const dataRows = tableData.value.map(row => {
+  const cols = headers.map((h, i) => ({ key: String(i), header: h, width: i === 1 ? 28 : 14 }))
+  const data = tableData.value.map(row => {
     const vals: any[] = [row.seq, row.item, row.total ?? '', row.parent ?? '']
-    if (row.values) {
-      for (let i = 0; i < companies.value.length; i++) {
-        vals.push(row.values[i] ?? '')
-      }
-    } else {
-      for (let i = 0; i < companies.value.length; i++) vals.push('')
-    }
-    return vals
+    for (let i = 0; i < companies.value.length; i++) vals.push(row.values?.[i] ?? '')
+    return Object.fromEntries(vals.map((v, i) => [String(i), v]))
   })
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = [{ wch: 6 }, { wch: 28 }, { wch: 14 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
-  XLSX.utils.book_append_sheet(wb, ws, '净资产表')
-  XLSX.writeFile(wb, '净资产表_数据.xlsx')
-  ElMessage.success('数据已导出')
+  await _exportData({ data, columns: cols, sheetName: '净资产表', fileName: '净资产表_数据.xlsx' })
 }
 
 async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  try {
-    const XLSX = await import('xlsx')
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-    const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
-    if (json.length < 2) { ElMessage.warning('文件中没有数据'); return }
-
-    // 按项目名匹配
+  await _onFileSelected(e, (result) => {
     const parsed = new Map<string, any>()
     let matched = 0, skipped = 0
-    for (let i = 1; i < json.length; i++) {
-      const r = json[i]
-      const itemName = String(r?.[1] || '').trim()
+    for (const r of result.rows) {
+      const itemName = String(r[result.headers[1]] || '').trim()
       if (!itemName) { skipped++; continue }
-      // 在 tableData 中找到匹配的行
       const target = tableData.value.find(row => row.item === itemName)
       if (!target || target.isHeader || target.isComputed) { skipped++; continue }
-      const entry: any = { item: itemName, total: r[2], parent: r[3], values: [] }
+      const entry: any = { item: itemName, total: r[result.headers[2]], parent: r[result.headers[3]], values: [] }
       for (let k = 0; k < companies.value.length; k++) {
-        entry.values.push(r[4 + k] ?? null)
+        entry.values.push(r[result.headers[4 + k]] ?? null)
       }
       parsed.set(itemName, entry)
       matched++
@@ -355,8 +319,7 @@ async function onFileSelected(e: Event) {
     importStats.value = { matched, skipped }
     importPreviewRows.value = Array.from(parsed.values()).slice(0, 10)
     importVisible.value = true
-  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '格式错误')) }
-  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
+  }, { skipRows: 1 })
 }
 
 function confirmImport() {

@@ -18,6 +18,7 @@
           />
           <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
           <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
+          <el-button size="small" @click="onPickKnowledge" round title="选择知识库文档作为参考上下文">📚 知识库</el-button>
         </div>
       </div>
     </div>
@@ -55,6 +56,10 @@
           </div>
           <div class="gt-ar-edit-hint" v-if="report.status !== 'final'">
             直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
+          </div>
+          <div v-if="knowledgeContextText" class="gt-ar-edit-hint" style="background: #e8f5e9; color: #2e7d32; margin-bottom: 8px;">
+            📎 已加载 {{ knowledgeDocCount }} 篇知识库参考文档
+            <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 8px; color: #2e7d32;">清除</el-button>
           </div>
           <el-input v-model="sectionContent" type="textarea" :rows="20"
             :disabled="report.status === 'final'" placeholder="段落内容"
@@ -122,6 +127,9 @@
         <el-button type="primary" @click="onGenerate" :loading="genLoading">生成</el-button>
       </template>
     </el-dialog>
+
+    <!-- 知识库文档选择弹窗 [R3.7] -->
+    <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
   </div>
 </template>
 
@@ -135,8 +143,12 @@ import {
 } from '@/services/auditPlatformApi'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import { fmtAmount } from '@/utils/formatters'
+import { useDictStore } from '@/stores/dict'
+import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
+import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
 
 const route = useRoute()
+const dictStore = useDictStore()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
 
@@ -154,6 +166,25 @@ const genForm = ref({
   report_scope: 'standalone',
   entity_short_name: '',
 })
+
+// ── 知识库上下文 [R3.7] ──
+const { pickDocuments, buildContext } = useKnowledge()
+const knowledgeContextText = ref('')
+const knowledgeDocCount = ref(0)
+
+async function onPickKnowledge() {
+  const docs = await pickDocuments({ title: '选择参考文档（审计报告编辑时使用）', maxSelect: 5 })
+  if (docs.length) {
+    knowledgeContextText.value = await buildContext(docs)
+    knowledgeDocCount.value = docs.length
+    ElMessage.success(`已加载 ${docs.length} 篇参考文档`)
+  }
+}
+
+function clearKnowledgeContext() {
+  knowledgeContextText.value = ''
+  knowledgeDocCount.value = 0
+}
 
 const sectionNames = computed(() => {
   if (!report.value?.paragraphs) return []
@@ -174,13 +205,11 @@ function opinionLabel(t: string) {
 }
 
 function statusLabel(s: string) {
-  const m: Record<string, string> = { draft: '草稿', review: '复核中', final: '已定稿' }
-  return m[s] || s
+  return dictStore.label('report_status', s)
 }
 
 function statusTagType(s: string) {
-  const m: Record<string, string> = { draft: 'info', review: 'warning', final: 'success' }
-  return m[s] || 'info'
+  return dictStore.type('report_status', s)
 }
 
 function onSectionSelect(s: string) { activeSection.value = s }

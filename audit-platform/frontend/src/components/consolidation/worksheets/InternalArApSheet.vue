@@ -40,7 +40,7 @@
       :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 340px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
-      @selection-change="(_sel: any[]) => selectedRows = _sel">
+      @selection-change="onSelectionChange">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
       <!-- 本方基本信息 -->
@@ -204,9 +204,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO } from '@/composables/useExcelIO'
+import { useTableToolbar } from '@/composables/useTableToolbar'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface AgingSegment { name: string; startMonth: number; endMonth: number; impairmentRate: number }
@@ -230,7 +232,6 @@ const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
 const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement|null>(null)
-const selectedRows = ref<ArApRow[]>([])
 const showAgingDialog = ref(false)
 const fileInputRef = ref<HTMLInputElement|null>(null)
 
@@ -304,24 +305,20 @@ function mkEmpty(): ArApRow {
   }
 }
 
-function addRow() {
-  const newRow = mkEmpty()
-  if (selectedRows.value.length > 0) {
-    const last = selectedRows.value[selectedRows.value.length - 1]
-    const idx = rows.indexOf(last)
-    if (idx >= 0) { rows.splice(idx + 1, 0, newRow); return }
-  }
-  rows.push(newRow)
-}
+// useTableToolbar 管理选中行和批量删除（rows 是 reactive，用 computed 桥接）
+const rowsRef = computed({
+  get: () => rows,
+  set: (v) => { rows.length = 0; rows.push(...v) },
+})
+const {
+  selectedRows,
+  onSelectionChange,
+  addRow: _tbAddRow,
+  deleteSelectedRows: batchDelete,
+} = useTableToolbar(rowsRef)
 
-async function batchDelete() {
-  if (!selectedRows.value.length) return
-  try {
-    await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 条？`, '删除确认', { type: 'warning' })
-    const del = new Set(selectedRows.value)
-    const remaining = rows.filter(r => !del.has(r))
-    rows.length = 0; rows.push(...remaining); selectedRows.value = []
-  } catch {}
+function addRow() {
+  _tbAddRow(mkEmpty, true)
 }
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
@@ -439,15 +436,19 @@ const headerStyle = { background: '#f0edf5', fontSize: '10px', color: '#333', pa
 const cellStyle = { padding: '2px 3px', fontSize: '11px' }
 
 // ─── 导出模板 / 导入 ──────────────────────────────────────────────────────────
-async function exportTemplate() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
+const { exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
+
+function buildArApHeaders() {
   const agNames = agingSegments.value.map(a => a.name)
-  const headers = ['本方单位','本方科目','本方明细',
+  return ['本方单位','本方科目','本方明细',
     ...agNames.map(a => '本方-'+a), '本方原值合计', ...agNames.map(a => '本方坏账-'+a), '本方坏账合计',
     '对方单位','对方科目','对方明细',
     ...agNames.map(a => '对方-'+a), '对方原值合计', ...agNames.map(a => '对方坏账-'+a), '对方坏账合计',
     '差异','差异原因']
-  const dataRows = rows.map(r => [
+}
+
+function buildArApRow(r: ArApRow) {
+  return [
     r.localCompany, r.localSubject, r.localDetail,
     ...r.localAmounts.map(v => v ?? ''), sumArr(r.localAmounts) || '',
     ...r.localImpairments.map(v => v ?? ''), sumArr(r.localImpairments) || '',
@@ -455,66 +456,48 @@ async function exportTemplate() {
     ...r.remoteAmounts.map(v => v ?? ''), sumArr(r.remoteAmounts) || '',
     ...r.remoteImpairments.map(v => v ?? ''), sumArr(r.remoteImpairments) || '',
     sumArr(r.localAmounts) - sumArr(r.remoteAmounts) || '', r.diffReason,
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '数据填写')
-  XLSX.writeFile(wb, '内部往来抵消_模板.xlsx'); ElMessage.success('模板已导出')
+  ]
+}
+
+async function exportTemplate() {
+  const headers = buildArApHeaders()
+  const cols = headers.map((h, i) => ({ key: String(i), header: h }))
+  const data = rows.map(r => Object.fromEntries(buildArApRow(r).map((v, i) => [String(i), v])))
+  await _exportData({ data, columns: cols, sheetName: '数据填写', fileName: '内部往来抵消_模板.xlsx' })
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const agNames = agingSegments.value.map(a => a.name)
-  const headers = ['本方单位', '本方科目', '本方明细',
-    ...agNames.map(a => '本方-' + a), '本方原值合计', ...agNames.map(a => '本方坏账-' + a), '本方坏账合计',
-    '对方单位', '对方科目', '对方明细',
-    ...agNames.map(a => '对方-' + a), '对方原值合计', ...agNames.map(a => '对方坏账-' + a), '对方坏账合计',
-    '差异', '差异原因']
-  const dataRows = rows.filter(r => r.localCompany || r.remoteCompany).map(r => [
-    r.localCompany, r.localSubject, r.localDetail,
-    ...r.localAmounts.map(v => v ?? ''), sumArr(r.localAmounts) || '',
-    ...r.localImpairments.map(v => v ?? ''), sumArr(r.localImpairments) || '',
-    r.remoteCompany, r.remoteSubject, r.remoteDetail,
-    ...r.remoteAmounts.map(v => v ?? ''), sumArr(r.remoteAmounts) || '',
-    ...r.remoteImpairments.map(v => v ?? ''), sumArr(r.remoteImpairments) || '',
-    sumArr(r.localAmounts) - sumArr(r.remoteAmounts) || '', r.diffReason,
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '内部往来抵消')
-  XLSX.writeFile(wb, '内部往来抵消_数据.xlsx')
-  ElMessage.success('数据已导出')
+  const headers = buildArApHeaders()
+  const cols = headers.map((h, i) => ({ key: String(i), header: h }))
+  const data = rows.filter(r => r.localCompany || r.remoteCompany)
+    .map(r => Object.fromEntries(buildArApRow(r).map((v, i) => [String(i), v])))
+  await _exportData({ data, columns: cols, sheetName: '内部往来抵消', fileName: '内部往来抵消_数据.xlsx' })
 }
 
 async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-  try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-    const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+  await _onFileSelected(e, (result) => {
     const ac = agingCount.value
     let imported = 0
-    for (let i = 1; i < json.length; i++) {
-      const r = json[i]; if (!r?.[0]) continue
-      const p = (idx: number) => r[idx] != null && r[idx] !== '' ? Number(r[idx]) : null
-      const localAmts: (number|null)[] = []; for (let k = 0; k < ac; k++) localAmts.push(p(3 + k))
-      const localImps: (number|null)[] = []; for (let k = 0; k < ac; k++) localImps.push(p(3 + ac + 1 + k))
+    for (const r of result.rows) {
+      const headers = result.headers
+      if (!r[headers[0]]) continue
+      const p = (key: string) => r[key] != null && r[key] !== '' ? Number(r[key]) : null
+      const localAmts: (number|null)[] = []; for (let k = 0; k < ac; k++) localAmts.push(p(headers[3 + k]))
+      const localImps: (number|null)[] = []; for (let k = 0; k < ac; k++) localImps.push(p(headers[3 + ac + 1 + k]))
       const remoteBase = 3 + ac * 2 + 2 + 3
-      const remoteAmts: (number|null)[] = []; for (let k = 0; k < ac; k++) remoteAmts.push(p(remoteBase + k))
-      const remoteImps: (number|null)[] = []; for (let k = 0; k < ac; k++) remoteImps.push(p(remoteBase + ac + 1 + k))
+      const remoteAmts: (number|null)[] = []; for (let k = 0; k < ac; k++) remoteAmts.push(p(headers[remoteBase + k]))
+      const remoteImps: (number|null)[] = []; for (let k = 0; k < ac; k++) remoteImps.push(p(headers[remoteBase + ac + 1 + k]))
       rows.push({
-        localCompany: String(r[0] || ''), localSubject: String(r[1] || ''), localDetail: String(r[2] || ''),
+        localCompany: String(r[headers[0]] || ''), localSubject: String(r[headers[1]] || ''), localDetail: String(r[headers[2]] || ''),
         localAmounts: localAmts, localImpairments: localImps,
-        remoteCompany: String(r[remoteBase - 3] || ''), remoteSubject: String(r[remoteBase - 2] || ''), remoteDetail: String(r[remoteBase - 1] || ''),
+        remoteCompany: String(r[headers[remoteBase - 3]] || ''), remoteSubject: String(r[headers[remoteBase - 2]] || ''), remoteDetail: String(r[headers[remoteBase - 1]] || ''),
         remoteAmounts: remoteAmts, remoteImpairments: remoteImps,
-        diffReason: String(r[r.length - 1] || ''),
+        diffReason: String(r[headers[headers.length - 1]] || ''),
       })
       imported++
     }
     ElMessage.success(`已导入 ${imported} 条`)
-  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
-  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
+  }, { skipRows: 1 })
 }
 
 

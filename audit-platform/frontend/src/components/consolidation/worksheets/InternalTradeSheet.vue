@@ -10,7 +10,7 @@
         <el-button size="small" @click="exportTrade">📥 导出模板</el-button>
         <el-button size="small" @click="exportTradeData">📤 导出数据</el-button>
         <el-button size="small" @click="tradeFileRef?.click()">📤 导入Excel</el-button>
-        <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
+        <el-button size="small" type="primary" @click="_addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
@@ -28,7 +28,7 @@
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       show-summary :summary-method="getSummary"
-      @selection-change="(_sel: any[]) => selectedRows = _sel">
+      @selection-change="onSelectionChange">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
       <el-table-column prop="sellerCompany" label="卖方" width="130" fixed>
@@ -109,10 +109,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ref, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { useTableToolbar } from '@/composables/useTableToolbar'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface TradeRow {
@@ -128,30 +130,31 @@ const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
 const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement|null>(null)
-const selectedRows = ref<TradeRow[]>([])
 const tradeFileRef = ref<HTMLInputElement|null>(null)
 const n = (v: any) => Number(v) || 0
 
 const allCompanyOptions = computed(() => [{ name: '母公司', code: 'parent' }, ...props.companies.map(c => ({ name: c.name, code: c.code || '' }))])
 const tradeTypes = ['商品销售', '提供劳务', '资产转让', '资金往来', '管理费分摊', '其他']
 
-const rows = reactive<TradeRow[]>([mkEmpty(), mkEmpty(), mkEmpty()])
+const rows = ref<TradeRow[]>([mkEmpty(), mkEmpty(), mkEmpty()])
 
 function mkEmpty(): TradeRow {
   return { sellerCompany: '', buyerCompany: '', tradeType: '', sellerSubject: '', sellerAmount: null, buyerSubject: '', buyerAmount: null, unrealizedProfit: null, inventoryRatio: null }
 }
-function addRow() { rows.push(mkEmpty()) }
-async function batchDelete() {
-  if (!selectedRows.value.length) return
-  try { await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 条？`, '删除确认', { type: 'warning' })
-    const del = new Set(selectedRows.value); const remaining = rows.filter(r => !del.has(r)); rows.length = 0; rows.push(...remaining); selectedRows.value = []
-  } catch {}
-}
+
+const {
+  selectedRows,
+  onSelectionChange,
+  addRow,
+  deleteSelectedRows: batchDelete,
+} = useTableToolbar(rows)
+
+function _addRow() { addRow(mkEmpty) }
 
 const generatedEntries = computed(() => {
   const entries: any[] = []
   let totalRevenue = 0, totalCost = 0, totalUnrealized = 0
-  for (const row of rows) {
+  for (const row of rows.value) {
     if (!row.sellerCompany || !row.buyerCompany) continue
     totalRevenue += n(row.sellerAmount); totalCost += n(row.buyerAmount)
     totalUnrealized += n(row.unrealizedProfit) * n(row.inventoryRatio) / 100
@@ -173,43 +176,54 @@ watch(generatedEntries, (entries) => {
 }, { immediate: true })
 
 
+const { exportTemplate: _exportTemplate, exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
+
+const TRADE_COLS: ExcelColumn[] = [
+  { key: 'sellerCompany', header: '卖方' }, { key: 'buyerCompany', header: '买方' },
+  { key: 'tradeType', header: '交易类型' }, { key: 'sellerSubject', header: '卖方科目' },
+  { key: 'sellerAmount', header: '卖方金额' }, { key: 'buyerSubject', header: '买方科目' },
+  { key: 'buyerAmount', header: '买方金额' }, { key: 'unrealizedProfit', header: '未实现利润' },
+  { key: 'inventoryRatio', header: '存货留存率%' },
+]
+
 async function exportTrade() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const headers = ['卖方','买方','交易类型','卖方科目','卖方金额','买方科目','买方金额','未实现利润','存货留存率%']
-  const dataRows = rows.map(r => [r.sellerCompany,r.buyerCompany,r.tradeType,r.sellerSubject,r.sellerAmount??'',r.buyerSubject,r.buyerAmount??'',r.unrealizedProfit??'',r.inventoryRatio??''])
-  const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:14}))
-  XLSX.utils.book_append_sheet(wb,ws,'数据填写'); XLSX.writeFile(wb,'内部交易抵消_模板.xlsx'); ElMessage.success('模板已导出')
+  await _exportTemplate({
+    columns: TRADE_COLS,
+    fileName: '内部交易抵消_模板.xlsx',
+    includeNoteRow: false,
+    existingData: rows.value.map(r => [r.sellerCompany, r.buyerCompany, r.tradeType, r.sellerSubject, r.sellerAmount ?? '', r.buyerSubject, r.buyerAmount ?? '', r.unrealizedProfit ?? '', r.inventoryRatio ?? '']),
+  })
 }
 async function exportTradeData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = ['卖方', '买方', '交易类型', '卖方科目', '卖方金额', '买方科目', '买方金额', '差异', '未实现利润', '存货留存率%', '应抵消利润']
-  const dataRows = rows.filter(r => r.sellerCompany || r.buyerCompany).map(r => [
-    r.sellerCompany, r.buyerCompany, r.tradeType, r.sellerSubject, r.sellerAmount ?? '',
-    r.buyerSubject, r.buyerAmount ?? '', n(r.sellerAmount) - n(r.buyerAmount),
-    r.unrealizedProfit ?? '', r.inventoryRatio ?? '',
-    n(r.unrealizedProfit) * n(r.inventoryRatio) / 100
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '内部交易抵消')
-  XLSX.writeFile(wb, '内部交易抵消_数据.xlsx')
-  ElMessage.success('数据已导出')
+  await _exportData({
+    data: rows.value.filter(r => r.sellerCompany || r.buyerCompany),
+    columns: TRADE_COLS,
+    sheetName: '内部交易抵消',
+    fileName: '内部交易抵消_数据.xlsx',
+    extraHeaders: ['差异', '应抵消利润'],
+    extraDataFn: (r) => [
+      n(r.sellerAmount) - n(r.buyerAmount),
+      n(r.unrealizedProfit) * n(r.inventoryRatio) / 100,
+    ],
+  })
 }
 async function onTradeFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-  try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(),{type:'array'})
-    const sn = wb.SheetNames.find(n=>n==='数据填写')||wb.SheetNames[wb.SheetNames.length-1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1})
-    let cnt=0; for(let i=1;i<json.length;i++){const r=json[i];if(!r?.[0])continue
-      rows.push({sellerCompany:String(r[0]||''),buyerCompany:String(r[1]||''),tradeType:String(r[2]||''),
-        sellerSubject:String(r[3]||''),sellerAmount:r[4]!=null?Number(r[4]):null,
-        buyerSubject:String(r[5]||''),buyerAmount:r[6]!=null?Number(r[6]):null,
-        unrealizedProfit:r[7]!=null?Number(r[7]):null,inventoryRatio:r[8]!=null?Number(r[8]):null}); cnt++}
+  await _onFileSelected(e, (result) => {
+    let cnt = 0
+    for (const r of result.rows) {
+      if (!r['卖方']) continue
+      rows.value.push({
+        sellerCompany: String(r['卖方'] || ''), buyerCompany: String(r['买方'] || ''),
+        tradeType: String(r['交易类型'] || ''), sellerSubject: String(r['卖方科目'] || ''),
+        sellerAmount: r['卖方金额'] != null ? Number(r['卖方金额']) : null,
+        buyerSubject: String(r['买方科目'] || ''), buyerAmount: r['买方金额'] != null ? Number(r['买方金额']) : null,
+        unrealizedProfit: r['未实现利润'] != null ? Number(r['未实现利润']) : null,
+        inventoryRatio: r['存货留存率%'] != null ? Number(r['存货留存率%']) : null,
+      })
+      cnt++
+    }
     ElMessage.success(`已导入 ${cnt} 条`)
-  } catch(err:any){ElMessage.error('解析失败：'+(err.message||''))}
-  finally{if(tradeFileRef.value)tradeFileRef.value.value=''}
+  }, { skipRows: 1 })
 }
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 const cellStyle = { padding: '2px 4px', fontSize: '11px' }

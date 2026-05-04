@@ -27,6 +27,7 @@ inclusion: always
 ## 环境配置
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
+- 前端新增依赖：mitt@3.0.1（事件总线）
 - PG 144 张表，Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
@@ -45,6 +46,9 @@ inclusion: always
 - 14 个 worksheet 组件完成 useFullscreen + fmtAmount 迁移
 - **Sprint 1 已完成**（10 Task，65 文件，+1856/-697 行）— 全局化收尾+快速见效
 - **Sprint 2 已完成**（9 Task，70 文件，+2569/-983 行）— 核心基础设施
+- Sprint 2 新增基础设施：eventBus.ts（mitt 类型安全事件总线）、stores/project.ts、apiPaths.ts（500+ 路径）、usePermission + v-permission 指令、路由守卫统一（认证+权限+项目上下文）、batch_mode 批量提交
+- 后端 5 个路由文件修复双重包装（"data"字段名→"rows"/"content"），前端 30+ 文件清理 data?.data 兼容代码
+- 前端 21 个 view/component 文件从 http 直接导入迁移到 apiProxy
 
 ## 活跃待办
 

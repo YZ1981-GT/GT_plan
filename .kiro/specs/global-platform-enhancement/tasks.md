@@ -144,92 +144,92 @@
 ## Sprint 3：组件层 + 后端统一（~7天）
 
 ### Task 3.1 — GtToolbar 标准工具栏 [R5.1]
-- [ ] 创建 components/common/GtToolbar.vue
-- [ ] slot：left（模块特有）/ right（通用：导出/导入/全屏/公式/模板/编辑切换）
-- [ ] 接入 TrialBalance（示范）
-- [ ] 接入 ReportView
-- [ ] 接入 DisclosureEditor
+- [x] 创建 components/common/GtToolbar.vue
+- [x] slot：left（模块特有）/ right（通用：导出/导入/全屏/公式/模板/编辑切换）
+- [x] 接入 TrialBalance（示范）
+- [x] 接入 ReportView
+- [x] 接入 DisclosureEditor
 
 ### Task 3.2 — GtPageHeader + GtInfoBar [R5.4 + R5.5]
-- [ ] 创建 components/common/GtPageHeader.vue：紫色渐变横幅
-- [ ] 创建 components/common/GtInfoBar.vue：单位/年度/模板选择+徽章
-- [ ] 替换 TrialBalance 的 gt-tb-banner
-- [ ] 替换 ReportView 的 gt-rv-banner
-- [ ] 替换 DisclosureEditor 的 gt-de-banner
-- [ ] 删除各模块的重复横幅 CSS
+- [x] 创建 components/common/GtPageHeader.vue：紫色渐变横幅
+- [x] 创建 components/common/GtInfoBar.vue：单位/年度/模板选择+徽章
+- [x] 替换 TrialBalance 的 gt-tb-banner
+- [x] 替换 ReportView 的 gt-rv-banner
+- [x] 替换 DisclosureEditor 的 gt-de-banner
+- [x] 删除各模块的重复横幅 CSS
 
 ### Task 3.3 — useExcelIO composable [R3.5]
-- [ ] 创建 composables/useExcelIO.ts
-- [ ] exportTemplate/exportData/parseFile/onFileSelected
-- [ ] 替换 SubsidiaryInfoSheet 的导出导入逻辑
-- [ ] 替换 InvestmentCostSheet
-- [ ] 逐步替换其余 12 个 worksheet
+- [x] 创建 composables/useExcelIO.ts
+- [x] exportTemplate/exportData/parseFile/onFileSelected
+- [x] 替换 SubsidiaryInfoSheet 的导出导入逻辑
+- [x] 替换 InvestmentCostSheet
+- [x] 逐步替换其余 12 个 worksheet
 
 ### Task 3.4 — useTableToolbar [R3.3]
-- [ ] 创建 composables/useTableToolbar.ts
-- [ ] addRow/deleteSelectedRows/onSelectionChange/exportExcel/importExcel/copyTable
-- [ ] 接入 ConsolNoteTab（示范）
-- [ ] 接入 worksheet 组件
+- [x] 创建 composables/useTableToolbar.ts
+- [x] addRow/deleteSelectedRows/onSelectionChange/exportExcel/importExcel/copyTable
+- [x] 接入 ConsolNoteTab（示范）
+- [x] 接入 worksheet 组件
 
 ### Task 3.5 — useDictStore [R4.1]
-- [ ] 后端创建 GET /api/system/dicts 接口
-- [ ] 创建 stores/dict.ts
-- [ ] 启动时加载，sessionStorage 缓存
-- [ ] 替换 WorkpaperList 的 statusTagType/statusLabel
-- [ ] 替换 Adjustments/AuditReportEditor
+- [x] 后端创建 GET /api/system/dicts 接口
+- [x] 创建 stores/dict.ts
+- [x] 启动时加载，sessionStorage 缓存
+- [x] 替换 WorkpaperList 的 statusTagType/statusLabel
+- [x] 替换 Adjustments/AuditReportEditor
 
 ### Task 3.6 — 后端 PaginationParams/SortParams [R7.3]
-- [ ] 创建 app/core/pagination.py：PaginationParams/SortParams
-- [ ] 替换 5 个高频列表 API
-- [ ] 验证分页排序
+- [x] 创建 app/core/pagination.py：PaginationParams/SortParams
+- [x] 替换 5 个高频列表 API
+- [x] 验证分页排序
 
 ### Task 3.7 — 后端批量操作 [R7.4]
-- [ ] 创建 app/core/bulk_operations.py
-- [ ] 接入批量删除（RecycleBin/Adjustments）
-- [ ] 接入批量审批（ReviewInbox）
+- [x] 创建 app/core/bulk_operations.py
+- [x] 接入批量删除（RecycleBin/Adjustments）
+- [x] 接入批量审批（ReviewInbox）
 
 ### Task 3.8 — 后端审计日志装饰器 [R7.5]
-- [ ] 创建 app/core/audit_decorator.py：@audit_log
-- [ ] 接入删除操作（before/after diff）
-- [ ] 接入审批操作
-- [ ] 接入状态变更
+- [x] 创建 app/core/audit_decorator.py：@audit_log
+- [x] 接入删除操作（before/after diff）
+- [x] 接入审批操作
+- [x] 接入状态变更
 
 ### Task 3.9 — SharedTemplatePicker 扩展 [R5.8]
-- [ ] 在公式管理页面接入 configType="formula_config"
-- [ ] 在附注编辑器接入 configType="note_template"
-- [ ] 在合并范围接入 configType="consol_scope"
-- [ ] 在科目映射接入 configType="account_mapping"
+- [x] 在公式管理页面接入 configType="formula_config"
+- [x] 在附注编辑器接入 configType="note_template"
+- [x] 在合并范围接入 configType="consol_scope"
+- [x] 在科目映射接入 configType="account_mapping"
 
 ### Task 3.10 — useCopyPaste composable [R3.6]
-- [ ] 创建 composables/useCopyPaste.ts
-- [ ] 复制：选中区域→制表符分隔文本（已有 copySelectedValues，增强为 HTML+纯文本双格式）
-- [ ] 粘贴：监听 paste 事件，解析制表符文本写入选中区域
-- [ ] 接入 TrialBalance + ReportView
+- [x] 创建 composables/useCopyPaste.ts
+- [x] 复制：选中区域→制表符分隔文本（已有 copySelectedValues，增强为 HTML+纯文本双格式）
+- [x] 粘贴：监听 paste 事件，解析制表符文本写入选中区域
+- [x] 接入 TrialBalance + ReportView
 
 ### Task 3.11 — useKnowledge + KnowledgePickerDialog [R3.7]
-- [ ] 创建 composables/useKnowledge.ts：search/getDocContent/pickDocuments/buildContext
-- [ ] 创建 components/common/KnowledgePickerDialog.vue
-- [ ] 接入 DisclosureEditor AI 续写（提供上下文）
-- [ ] 接入 AuditReportEditor
+- [x] 创建 composables/useKnowledge.ts：search/getDocContent/pickDocuments/buildContext
+- [x] 创建 components/common/KnowledgePickerDialog.vue
+- [x] 接入 DisclosureEditor AI 续写（提供上下文）
+- [x] 接入 AuditReportEditor
 
 ### Task 3.12 — useAutoSave 草稿恢复 [R3.8]
-- [ ] 创建 composables/useAutoSave.ts：定时 localStorage 保存 + 恢复提示
-- [ ] 接入 DisclosureEditor（附注编辑）
-- [ ] 接入 ConsolNoteTab（合并附注）
-- [ ] 接入 Adjustments（调整分录）
+- [x] 创建 composables/useAutoSave.ts：定时 localStorage 保存 + 恢复提示
+- [x] 接入 DisclosureEditor（附注编辑）
+- [x] 接入 ConsolNoteTab（合并附注）
+- [x] 接入 Adjustments（调整分录）
 
 ### Task 3.13 — useLoading + NProgress [R3.9]
-- [ ] 安装 nprogress
-- [ ] 创建 composables/useLoading.ts：withLoading 包装函数
-- [ ] router beforeEach/afterEach 触发 NProgress
-- [ ] http.ts 拦截器触发 NProgress
-- [ ] 替换 3 个高频模块的手动 loading.value
+- [x] 安装 nprogress
+- [x] 创建 composables/useLoading.ts：withLoading 包装函数
+- [x] router beforeEach/afterEach 触发 NProgress
+- [x] http.ts 拦截器触发 NProgress
+- [x] 替换 3 个高频模块的手动 loading.value
 
 ### Task 3.14 — useAddressRegistry Store [R4.2]
-- [ ] 创建 stores/addressRegistry.ts
-- [ ] 对接后端 address_registry API
-- [ ] CellSelector/FormulaRefPicker 改用 store 数据源
-- [ ] 新增表样后自动刷新
+- [x] 创建 stores/addressRegistry.ts
+- [x] 对接后端 address_registry API
+- [x] CellSelector/FormulaRefPicker 改用 store 数据源
+- [x] 新增表样后自动刷新
 
 ### Task 3.15 — Sprint 3 收尾
 - [ ] git commit + push

@@ -94,6 +94,7 @@ import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface InvestRow { company_name: string; company_code: string; open_cost: number|null; open_impairment: number|null; [k: string]: any }
@@ -216,13 +217,25 @@ function setOverride(companyName: string, field: string, val: number | null) {
   overrides[companyName][field] = val
 }
 
+const { exportData: _exportData } = useExcelIO()
+
+const INVEST_COLS: ExcelColumn[] = [
+  { key: 'companyName', header: '子企业' }, { key: 'ratio', header: '持股比例' },
+  { key: 'bookCost', header: '账面投资成本' }, { key: 'bookImpairment', header: '减值准备' },
+  { key: 'bookNet', header: '账面净额' }, { key: 'simIncomeAdj', header: '模拟损益调整' },
+  { key: 'simOtherEquity', header: '模拟其他权益' }, { key: 'simTotal', header: '模拟后长投' },
+  { key: 'elimCost', header: '抵消投资成本' }, { key: 'elimIncomeAdj', header: '抵消损益调整' },
+  { key: 'elimOtherEquity', header: '抵消其他权益' }, { key: 'elimTotal', header: '抵消合计' },
+  { key: 'postElimTotal', header: '抵消后长投' },
+]
+
 async function exportData() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const headers = ['子企业','持股比例','账面投资成本','减值准备','账面净额','模拟损益调整','模拟其他权益','模拟后长投','抵消投资成本','抵消损益调整','抵消其他权益','抵消合计','抵消后长投']
-  const dataRows = tableRows.value.map((r: any) => [r.companyName,r.ratio,r.bookCost,r.bookImpairment,r.bookNet,r.simIncomeAdj,r.simOtherEquity,r.simTotal,r.elimCost,r.elimIncomeAdj,r.elimOtherEquity,r.elimTotal,r.postElimTotal])
-  const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:14}))
-  XLSX.utils.book_append_sheet(wb,ws,'抵消后长投明细'); XLSX.writeFile(wb,'抵消后长投明细.xlsx')
-  ElMessage.success('已导出')
+  await _exportData({
+    data: tableRows.value,
+    columns: INVEST_COLS,
+    sheetName: '抵消后长投明细',
+    fileName: '抵消后长投明细.xlsx',
+  })
 }
 function _calcCls(v: any) { return n(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 

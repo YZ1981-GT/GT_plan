@@ -11,7 +11,7 @@
         <span class="ws-btn-sep"></span>
         <el-button size="small" @click="exportTemplate">📥 导出模板</el-button>
         <el-button size="small" @click="exportData">📤 导出数据</el-button>
-        <el-button size="small" @click="fileInputRef?.click()">📤 导入Excel</el-button>
+        <el-button size="small" @click="importDialogRef?.selectFile()">📤 导入Excel</el-button>
         <span class="ws-btn-sep"></span>
         <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
@@ -129,24 +129,18 @@
         </el-table-column>
       </el-table-column>
     </el-table>
-    <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
-    <el-dialog v-model="importVisible" title="导入Excel数据" width="600px" append-to-body>
-      <el-alert type="warning" :closable="false" style="margin-bottom:12px">
-        <template #title><span>请使用"导出模板"下载的模板填写。系统自动读取<b>"数据填写"</b>工作表，请勿修改sheet名称。导入将<b>追加</b>到现有数据。</span></template>
-      </el-alert>
-      <el-table v-if="importPreview.length" :data="importPreview.slice(0,5)" border size="small" max-height="250">
-        <el-table-column prop="company_name" label="子企业名称" min-width="140" />
-        <el-table-column prop="company_code" label="企业代码" width="90" />
-        <el-table-column prop="open_cost" label="期初金额" width="100" />
-        <el-table-column prop="current_dividend" label="现金红利" width="100" />
-      </el-table>
-      <p v-if="importPreview.length" style="font-size:12px;color:#999;margin-top:8px">共 {{ importPreview.length }} 条</p>
-      <el-empty v-else description="未解析到有效数据" :image-size="60" />
-      <template #footer>
-        <el-button @click="importVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!importPreview.length" @click="confirmImport">确认导入</el-button>
-      </template>
-    </el-dialog>
+    <ExcelImportPreviewDialog
+      ref="importDialogRef"
+      v-model:visible="importDialogVisible"
+      title="导入投资明细数据"
+      :expected-columns="COLS.map(c => c.header)"
+      sheet-name="数据填写"
+      :skip-rows="3"
+      skip-example-prefix="示例"
+      :alert-text="'请使用\u201c导出模板\u201d下载的模板填写。系统自动读取<b>\u201c数据填写\u201d</b>工作表，请勿修改sheet名称。导入将<b>追加</b>到现有数据。'"
+      :allow-error-rows="true"
+      @confirm="onImportConfirm"
+    />
   </div>
 </template>
 
@@ -155,6 +149,8 @@ import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import ExcelImportPreviewDialog from '@/components/common/ExcelImportPreviewDialog.vue'
 
 interface InvestmentCostRow {
   company_name: string; company_code: string; current_dividend: number | null
@@ -178,11 +174,11 @@ watch(rows, (v) => { internalUpdate = true; emit('update:modelValue', v); nextTi
 const selectedRows = ref<InvestmentCostRow[]>([])
 const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
+const { exportTemplate: _exportTemplate, exportData: _exportData } = useExcelIO()
 const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const importVisible = ref(false)
-const importPreview = ref<InvestmentCostRow[]>([])
+const importDialogRef = ref<InstanceType<typeof ExcelImportPreviewDialog> | null>(null)
+const importDialogVisible = ref(false)
 
 function mkEmpty(): InvestmentCostRow {
   return { company_name:'',company_code:'',current_dividend:null,
@@ -247,7 +243,7 @@ function rowCellStyle({ row }: any) {
 }
 
 // ─── 导出模板 ─────────────────────────────────────────────────────────────────
-const COLS = [
+const COLS: ExcelColumn[] = [
   { key:'company_name', header:'子企业名称', note:'必填' },
   { key:'company_code', header:'企业代码', note:'必填' },
   { key:'current_dividend', header:'本期现金红利', note:'金额' },
@@ -266,100 +262,67 @@ const COLS = [
 ]
 
 async function exportTemplate() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  // 说明sheet
-  const instrRows = [['投资明细-成本法和公允值 — 填写说明'],[],['⚠ 重要提示：'],
-    ['1. 在"数据填写"工作表填写，不要修改sheet名称和表头'],
-    ['2. 第1行分类，第2行说明，第3行表头，第4行起为数据'],
-    ['3. 金额填数字，比例填数字（51表示51%）'],
-    ['4. 公允值计量需同步填投资比例、投资成本和公允价值，无需填减值准备'],
-    ['5. 示例行导入时自动跳过'],[],['字段说明：'],['列号','字段名','说明']]
-  COLS.forEach((c,i) => instrRows.push([String(i+1), c.header, c.note]))
-  const wsI = XLSX.utils.aoa_to_sheet(instrRows)
-  wsI['!cols'] = [{wch:6},{wch:20},{wch:40}]
-  wsI['!merges'] = [{s:{r:0,c:0},e:{r:0,c:2}}]
-  XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
-  // 数据sheet
-  const catRow = ['基本信息','','','期初余额','','','','本期增加','','','','本期减少','','','']
-  const noteRow = COLS.map(c => c.note)
-  const hdrRow = COLS.map(c => c.header)
   const existing = rows.value.filter(r => r.company_name).map(r => COLS.map(c => (r as any)[c.key] ?? ''))
-  const dataRows = existing.length ? [catRow,noteRow,hdrRow,...existing] : [catRow,noteRow,hdrRow,
-    ['示例公司A','A001','',51,1000000,50000,'','','','','','','','',''],
-    ['示例公司B','B002',100000,'',2000000,'',3000000,'','','','','','','','']]
-  const wsD = XLSX.utils.aoa_to_sheet(dataRows)
-  wsD['!cols'] = COLS.map(c => ({wch: Math.max(c.header.length*2.5, 12)}))
-  wsD['!merges'] = [{s:{r:0,c:0},e:{r:0,c:2}},{s:{r:0,c:3},e:{r:0,c:6}},{s:{r:0,c:7},e:{r:0,c:10}},{s:{r:0,c:11},e:{r:0,c:14}}]
-  XLSX.utils.book_append_sheet(wb, wsD, '数据填写')
-  XLSX.writeFile(wb, '投资明细_成本法和公允值_模板.xlsx')
-  ElMessage.success('模板已导出')
+  await _exportTemplate({
+    columns: COLS,
+    fileName: '投资明细_成本法和公允值_模板.xlsx',
+    includeInstructions: true,
+    instructionTitle: '投资明细-成本法和公允值 — 填写说明',
+    instructionRows: [
+      ['金额填数字，比例填数字（51表示51%）'],
+      ['公允值计量需同步填投资比例、投资成本和公允价值，无需填减值准备'],
+    ],
+    categoryRow: ['基本信息','','','期初余额','','','','本期增加','','','','本期减少','','',''],
+    categoryMerges: [
+      {s:{r:0,c:0},e:{r:0,c:2}},{s:{r:0,c:3},e:{r:0,c:6}},
+      {s:{r:0,c:7},e:{r:0,c:10}},{s:{r:0,c:11},e:{r:0,c:14}},
+    ],
+    existingData: existing.length > 0 ? existing : undefined,
+    exampleRows: [
+      ['示例公司A','A001','',51,1000000,50000,'','','','','','','','',''],
+      ['示例公司B','B002',100000,'',2000000,'',3000000,'','','','','','','',''],
+    ],
+  })
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = COLS.map(c => c.header)
-  const dataRows = rows.value.filter(r => r.company_name).map(r => {
-    const base = COLS.map(c => (r as any)[c.key] ?? '')
-    // Append computed end-period columns
-    const endRatio = n(r.open_ratio) + n(r.add_ratio) - n(r.reduce_ratio)
-    const endCost = n(r.open_cost) + n(r.add_cost) - n(r.reduce_cost)
-    const endImpairment = n(r.open_impairment) + n(r.add_impairment) - n(r.reduce_impairment)
-    const endNet = endCost - endImpairment
-    const endFv = n(r.open_fv) + n(r.add_fv) - n(r.reduce_fv)
-    return [...base, endRatio, endCost, endImpairment, endNet, endFv]
+  await _exportData({
+    data: rows.value.filter(r => r.company_name),
+    columns: COLS,
+    sheetName: '投资明细_成本法',
+    fileName: '投资明细_成本法_数据.xlsx',
+    extraHeaders: ['期末-投资比例', '期末-投资成本', '期末-减值准备', '期末-长投净额', '期末-公允价值'],
+    extraDataFn: (r) => {
+      const endRatio = n(r.open_ratio) + n(r.add_ratio) - n(r.reduce_ratio)
+      const endCost = n(r.open_cost) + n(r.add_cost) - n(r.reduce_cost)
+      const endImpairment = n(r.open_impairment) + n(r.add_impairment) - n(r.reduce_impairment)
+      return [endRatio, endCost, endImpairment, endCost - endImpairment, n(r.open_fv) + n(r.add_fv) - n(r.reduce_fv)]
+    },
   })
-  const allHeaders = [...headers, '期末-投资比例', '期末-投资成本', '期末-减值准备', '期末-长投净额', '期末-公允价值']
-  const ws = XLSX.utils.aoa_to_sheet([allHeaders, ...dataRows])
-  ws['!cols'] = allHeaders.map(() => ({ wch: 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '投资明细_成本法')
-  XLSX.writeFile(wb, '投资明细_成本法_数据.xlsx')
-  ElMessage.success('数据已导出')
 }
 
-async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  try {
-    const XLSX = await import('xlsx')
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-    const sheetName = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const ws = wb.Sheets[sheetName]
-    const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
-    const parsed: InvestmentCostRow[] = []
-    for (let i = 3; i < json.length; i++) {
-      const r = json[i]
-      if (!r?.[0] || String(r[0]).startsWith('示例')) continue
-      parsed.push({
-        company_name: String(r[0]||''), company_code: String(r[1]||''),
-        current_dividend: r[2]!=null&&r[2]!=='' ? Number(r[2]) : null,
-        open_ratio: r[3]!=null&&r[3]!=='' ? Number(r[3]) : null,
-        open_cost: r[4]!=null&&r[4]!=='' ? Number(r[4]) : null,
-        open_impairment: r[5]!=null&&r[5]!=='' ? Number(r[5]) : null,
-        open_fv: r[6]!=null&&r[6]!=='' ? Number(r[6]) : null,
-        add_ratio: r[7]!=null&&r[7]!=='' ? Number(r[7]) : null,
-        add_cost: r[8]!=null&&r[8]!=='' ? Number(r[8]) : null,
-        add_impairment: r[9]!=null&&r[9]!=='' ? Number(r[9]) : null,
-        add_fv: r[10]!=null&&r[10]!=='' ? Number(r[10]) : null,
-        reduce_ratio: r[11]!=null&&r[11]!=='' ? Number(r[11]) : null,
-        reduce_cost: r[12]!=null&&r[12]!=='' ? Number(r[12]) : null,
-        reduce_impairment: r[13]!=null&&r[13]!=='' ? Number(r[13]) : null,
-        reduce_fv: r[14]!=null&&r[14]!=='' ? Number(r[14]) : null,
-      })
-    }
-    importPreview.value = parsed
-    importVisible.value = true
-  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '格式错误')) }
-  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
-}
-
-function confirmImport() {
+/** 导入确认回调 */
+function onImportConfirm(data: Record<string, any>[]) {
+  const parsed: InvestmentCostRow[] = data.map(r => ({
+    company_name: String(r['子企业名称'] ?? '').trim(),
+    company_code: String(r['企业代码'] ?? '').trim(),
+    current_dividend: r['本期现金红利'] != null ? Number(r['本期现金红利']) : null,
+    open_ratio: r['期初-投资比例'] != null ? Number(r['期初-投资比例']) : null,
+    open_cost: r['期初-金额'] != null ? Number(r['期初-金额']) : null,
+    open_impairment: r['期初-减值准备'] != null ? Number(r['期初-减值准备']) : null,
+    open_fv: r['期初-公允价值'] != null ? Number(r['期初-公允价值']) : null,
+    add_ratio: r['增加-投资比例'] != null ? Number(r['增加-投资比例']) : null,
+    add_cost: r['增加-金额'] != null ? Number(r['增加-金额']) : null,
+    add_impairment: r['增加-减值准备'] != null ? Number(r['增加-减值准备']) : null,
+    add_fv: r['增加-公允价值'] != null ? Number(r['增加-公允价值']) : null,
+    reduce_ratio: r['减少-投资比例'] != null ? Number(r['减少-投资比例']) : null,
+    reduce_cost: r['减少-金额'] != null ? Number(r['减少-金额']) : null,
+    reduce_impairment: r['减少-减值准备'] != null ? Number(r['减少-减值准备']) : null,
+    reduce_fv: r['减少-公允价值'] != null ? Number(r['减少-公允价值']) : null,
+  }))
   const nonEmpty = rows.value.filter(r => r.company_name)
-  rows.value = [...nonEmpty, ...importPreview.value]
-  importVisible.value = false
-  ElMessage.success(`已导入 ${importPreview.value.length} 条`)
-  importPreview.value = []
+  rows.value = [...nonEmpty, ...parsed]
+  ElMessage.success(`已导入 ${parsed.length} 条`)
 }
 
 

@@ -86,6 +86,7 @@ import {
   listSharedTemplates, saveAsTemplate, applyTemplate, getTemplateDetail,
   type SharedConfigTemplate, getOwnerTypeLabel,
 } from '@/services/sharedConfigApi'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   configType: string          // report_mapping / account_mapping / formula_config / report_template / workpaper_template
@@ -176,6 +177,11 @@ async function onApply() {
     await applyTemplate(selectedTemplate.value.id, props.projectId)
     ElMessage.success(`已引用模板「${selectedTemplate.value.name}」`)
     emit('applied', detail.config_data || {})
+    // 通知地址注册表刷新（新增表样可能改变可引用地址）
+    eventBus.emit('template-applied', {
+      configType: props.configType,
+      projectId: props.projectId,
+    })
     showPickDialog.value = false
   } catch (e: any) {
     ElMessage.error('引用失败: ' + (e?.message || ''))

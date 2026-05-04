@@ -165,6 +165,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO } from '@/composables/useExcelIO'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EquitySimRow {
@@ -343,7 +344,17 @@ const compareRows = computed(() => {
 })
 
 // ─── 导出模板 ─────────────────────────────────────────────────────────────────
+const { exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
+
 async function exportTemplate() {
+  const headers = ['序号','步骤','借贷','项目','二级明细','合计',...companies.value.map(c => c.name)]
+  const cols = headers.map((h, i) => ({ key: String(i), header: h }))
+  const ratioRow = Object.fromEntries(['','','','期末持股比例','', '', ...companies.value.map(c => `${c.ratio}%`)].map((v, i) => [String(i), v]))
+  const dataRows = directRows.value.map(r =>
+    Object.fromEntries([r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
+      ...(r.values || []).map(v => v ?? '')].map((v, i) => [String(i), v]))
+  )
+  // Use raw XLSX for the instruction sheet + data sheet combo
   const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
   const instr = [['模拟权益法调整表 — 填写说明'],[],['⚠ 重要提示：'],
     ['1. 在"数据填写"工作表填写，不要修改sheet名称'],
@@ -353,49 +364,43 @@ async function exportTemplate() {
     ['5. 期末=期初+增加-减少，系统自动计算']]
   const wsI = XLSX.utils.aoa_to_sheet(instr); wsI['!cols']=[{wch:60}]
   XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
-  // 持股比例行 + 表头 + 数据
-  const ratioRow = ['','','','期末持股比例','', '', ...companies.value.map(c => `${c.ratio}%`)]
-  const headers = ['序号','步骤','借贷','项目','二级明细','合计',...companies.value.map(c => c.name)]
-  const dataRows = directRows.value.map(r => [r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
+  const ratioArr = ['','','','期末持股比例','', '', ...companies.value.map(c => `${c.ratio}%`)]
+  const hdrArr = headers
+  const dataArr = directRows.value.map(r => [r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
     ...(r.values || []).map(v => v ?? '')])
-  const wsD = XLSX.utils.aoa_to_sheet([ratioRow, headers, ...dataRows])
+  const wsD = XLSX.utils.aoa_to_sheet([ratioArr, hdrArr, ...dataArr])
   wsD['!cols'] = [{wch:5},{wch:22},{wch:8},{wch:18},{wch:18},{wch:14},...companies.value.map(()=>({wch:14}))]
   XLSX.utils.book_append_sheet(wb, wsD, '数据填写')
   XLSX.writeFile(wb, '模拟权益法调整表_模板.xlsx'); ElMessage.success('模板已导出')
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const headers = ['序号', '步骤', '借贷', '项目', '二级明细', '合计', ...companies.value.map(c => c.name)]
-  const dataRows = directRows.value.map(r => [
-    r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
-    ...(r.values || []).map(v => v ?? '')
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = [{ wch: 5 }, { wch: 22 }, { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, ...companies.value.map(() => ({ wch: 14 }))]
-  XLSX.utils.book_append_sheet(wb, ws, '模拟权益法')
-  XLSX.writeFile(wb, '模拟权益法_数据.xlsx')
-  ElMessage.success('数据已导出')
+  const cols = headers.map((h, i) => ({ key: String(i), header: h, width: i <= 1 ? (i === 0 ? 5 : 22) : 14 }))
+  const data = directRows.value.map(r =>
+    Object.fromEntries([r.seq, r.step, r.direction, r.subject, r.detail, r.total ?? '',
+      ...(r.values || []).map(v => v ?? '')].map((v, i) => [String(i), v]))
+  )
+  await _exportData({ data, columns: cols, sheetName: '模拟权益法', fileName: '模拟权益法_数据.xlsx' })
 }
 
 // ─── 导入 ─────────────────────────────────────────────────────────────────────
 async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-  try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), {type:'array'})
-    const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1})
+  await _onFileSelected(e, (result) => {
+    // result.rows are parsed with headers from row index 1 (skipRows=2 means header at row 1)
+    // But EquitySimSheet has ratio row + header row, so we need custom parsing
     const parsed = new Map<string, any>()
-    // 跳过持股比例行和表头行（前2行）
-    for (let i = 2; i < json.length; i++) {
-      const r = json[i]; if (!r?.[3]) continue
-      const key = `${String(r[3]).trim()}|${String(r[4]||'').trim()}`
-      parsed.set(key, { total: r[5], values: r.slice(6) })
+    for (const r of result.rows) {
+      const subject = r[result.headers[3]]
+      if (!subject) continue
+      const key = `${String(subject).trim()}|${String(r[result.headers[4]] || '').trim()}`
+      parsed.set(key, {
+        total: r[result.headers[5]],
+        values: result.headers.slice(6).map(h => r[h]),
+      })
     }
     importMap.value = parsed; importCount.value = parsed.size; importVisible.value = true
-  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
-  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
+  }, { skipRows: 2 })
 }
 
 function confirmImport() {

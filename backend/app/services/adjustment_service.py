@@ -44,6 +44,7 @@ from app.models.audit_platform_schemas import (
     WPAdjustmentDetail,
     WPAdjustmentSummary,
 )
+from app.core.audit_decorator import audit_log
 from app.services.event_bus import event_bus
 
 
@@ -338,6 +339,7 @@ class AdjustmentService:
             adj_rows[0].created_by,
         )
 
+    @audit_log(action="delete", object_type="adjustment")
     async def delete_entry(
         self,
         project_id: UUID,
@@ -372,6 +374,7 @@ class AdjustmentService:
     # ------------------------------------------------------------------
     # 13.3 change_review_status
     # ------------------------------------------------------------------
+    @audit_log(action="review", object_type="adjustment")
     async def change_review_status(
         self,
         project_id: UUID,

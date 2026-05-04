@@ -93,7 +93,6 @@
         <span v-else style="color:#e6a23c;margin-left:4px">⚠ 不平衡</span>
       </span>
     </div>
-
     <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
   </div>
 </template>
@@ -103,6 +102,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EntryRow {
@@ -290,47 +290,49 @@ const totalDebit = computed(() => allEntries.value.filter(r => r.direction === '
 const totalCredit = computed(() => allEntries.value.filter(r => r.direction === '贷').reduce((s, r) => s + n(r.amount), 0))
 
 // ─── 导出/导入 ───────────────────────────────────────────────────────────────
+const { exportTemplate: _exportTemplate, exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
+
+const ELIM_COLS: ExcelColumn[] = [
+  { key: 'source', header: '来源', width: 10 },
+  { key: 'direction', header: '借贷', width: 8 },
+  { key: 'subject', header: '科目', width: 20 },
+  { key: 'detail', header: '二级明细', width: 16 },
+  { key: 'amount', header: '金额', width: 16 },
+  { key: 'desc', header: '说明', width: 24 },
+]
+
 async function exportTemplate() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const headers = ['来源','借贷','科目','二级明细','金额','说明']
-  const dataRows = allEntries.value.map(r => [r.source || '自定义', r.direction, r.subject, r.detail, r.amount ?? '', r.desc])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 24 }]
-  XLSX.utils.book_append_sheet(wb, ws, '数据填写')
-  XLSX.writeFile(wb, '合并抵消分录_模板.xlsx'); ElMessage.success('模板已导出')
+  await _exportTemplate({
+    columns: ELIM_COLS,
+    fileName: '合并抵消分录_模板.xlsx',
+    includeNoteRow: false,
+    existingData: allEntries.value.map(r => [r.source || '自定义', r.direction, r.subject, r.detail, r.amount ?? '', r.desc]),
+  })
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = ['来源', '借贷', '科目', '二级明细', '金额', '说明']
-  const dataRows = allEntries.value.map(r => [r.source || '自定义', r.direction, r.subject, r.detail, r.amount ?? '', r.desc])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 24 }]
-  XLSX.utils.book_append_sheet(wb, ws, '合并抵消分录')
-  XLSX.writeFile(wb, '合并抵消分录_数据.xlsx')
-  ElMessage.success('数据已导出')
+  await _exportData({
+    data: allEntries.value.map(r => ({ ...r, source: r.source || '自定义' })),
+    columns: ELIM_COLS,
+    sheetName: '合并抵消分录',
+    fileName: '合并抵消分录_数据.xlsx',
+  })
 }
 
 async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-  try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-    const sn = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1 })
+  await _onFileSelected(e, (result) => {
     let cnt = 0
-    for (let i = 1; i < json.length; i++) {
-      const r = json[i]; if (!r?.[2]) continue
+    for (const r of result.rows) {
+      if (!r['科目']) continue
       customEntries.push({
-        source: '', direction: String(r[1] || '借'), subject: String(r[2] || ''),
-        detail: String(r[3] || ''), amount: r[4] != null ? Number(r[4]) : null,
-        desc: String(r[5] || ''), _custom: true,
+        source: '', direction: String(r['借贷'] || '借'), subject: String(r['科目'] || ''),
+        detail: String(r['二级明细'] || ''), amount: r['金额'] != null ? Number(r['金额']) : null,
+        desc: String(r['说明'] || ''), _custom: true,
       })
       cnt++
     }
     ElMessage.success(`已导入 ${cnt} 条自定义分录`)
-  } catch (err: any) { ElMessage.error('解析失败：' + (err.message || '')) }
-  finally { if (fileInputRef.value) fileInputRef.value.value = '' }
+  }, { skipRows: 1 })
 }
 
 

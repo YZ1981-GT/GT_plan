@@ -19,9 +19,9 @@
         <el-table :data="filteredReportRows" size="small" max-height="300" highlight-current-row
           @row-click="onSelectReport" style="cursor: pointer">
           <el-table-column prop="row_code" label="编码" width="90" />
-          <el-table-column prop="row_name" label="项目名称" min-width="200">
+          <el-table-column label="项目名称" min-width="200">
             <template #default="{ row }">
-              <span :style="{ paddingLeft: (row.indent_level || 0) * 12 + 'px' }">{{ row.row_name }}</span>
+              <span :style="{ paddingLeft: (row.indent_level || 0) * 12 + 'px' }">{{ row.row_name || row.label }}</span>
             </template>
           </el-table-column>
           <el-table-column label="金额" width="120" align="right">
@@ -44,8 +44,16 @@
         </div>
         <el-table :data="filteredTbRows" size="small" max-height="300" highlight-current-row
           @row-click="onSelectTb" style="cursor: pointer">
-          <el-table-column prop="standard_account_code" label="编码" width="100" />
-          <el-table-column prop="account_name" label="科目名称" min-width="180" />
+          <el-table-column label="编码" width="100">
+            <template #default="{ row }">
+              {{ row.standard_account_code || row.account_code }}
+            </template>
+          </el-table-column>
+          <el-table-column label="科目名称" min-width="180">
+            <template #default="{ row }">
+              {{ row.account_name || row.label }}
+            </template>
+          </el-table-column>
           <el-table-column label="金额" width="120" align="right">
             <template #default="{ row }">
               {{ tbColumn === '审定数' ? fmtAmt(row.audited_amount) : tbColumn === '未审数' ? fmtAmt(row.unadjusted_amount) : fmtAmt(row.opening_balance) }}
@@ -66,7 +74,11 @@
         <el-table :data="filteredNoteRows" size="small" max-height="300" highlight-current-row
           @row-click="onSelectNote" style="cursor: pointer">
           <el-table-column prop="note_section" label="章节" width="80" />
-          <el-table-column prop="section_title" label="标题" min-width="180" />
+          <el-table-column label="标题" min-width="180">
+            <template #default="{ row }">
+              {{ row.section_title || row.label }}
+            </template>
+          </el-table-column>
           <el-table-column label="合计值" width="120" align="right">
             <template #default="{ row }">
               {{ fmtAmt(notePeriod === '期末' ? row.total_closing : row.total_opening) }}
@@ -95,6 +107,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
+import { useAddressRegistry } from '@/stores/addressRegistry'
+
+const addrStore = useAddressRegistry()
 
 const props = defineProps<{
   modelValue: boolean
@@ -124,9 +139,16 @@ const notePeriod = ref('期末')
 const selectedFormula = ref('')
 const selectedLabel = ref('')
 
-// 过滤
+// ─── 数据源：优先 store，回退 props ───
+
 const filteredReportRows = computed(() => {
   const kw = reportSearch.value.toLowerCase()
+  // 优先使用 store 中的报表地址
+  if (addrStore.loaded && addrStore.reportAddresses.length > 0) {
+    return addrStore.reportAddresses.filter(e =>
+      !kw || (e.row_code || '').toLowerCase().includes(kw) || (e.label || '').toLowerCase().includes(kw)
+    )
+  }
   return (props.reportRows || []).filter(r =>
     !kw || (r.row_code || '').toLowerCase().includes(kw) || (r.row_name || '').toLowerCase().includes(kw)
   )
@@ -134,6 +156,12 @@ const filteredReportRows = computed(() => {
 
 const filteredTbRows = computed(() => {
   const kw = tbSearch.value.toLowerCase()
+  // 优先使用 store 中的试算表地址
+  if (addrStore.loaded && addrStore.tbAddresses.length > 0) {
+    return addrStore.tbAddresses.filter(e =>
+      !kw || (e.account_code || '').includes(kw) || (e.label || '').toLowerCase().includes(kw)
+    )
+  }
   return (props.tbRows || []).filter(r =>
     !kw || (r.standard_account_code || '').includes(kw) || (r.account_name || '').toLowerCase().includes(kw)
   )
@@ -141,6 +169,12 @@ const filteredTbRows = computed(() => {
 
 const filteredNoteRows = computed(() => {
   const kw = noteSearch.value.toLowerCase()
+  // 优先使用 store 中的附注地址
+  if (addrStore.loaded && addrStore.noteAddresses.length > 0) {
+    return addrStore.noteAddresses.filter(e =>
+      !kw || (e.note_section || '').includes(kw) || (e.label || '').toLowerCase().includes(kw)
+    )
+  }
   return (props.noteRows || []).filter(r =>
     !kw || (r.note_section || '').includes(kw) || (r.section_title || '').toLowerCase().includes(kw)
   )
@@ -149,24 +183,27 @@ const filteredNoteRows = computed(() => {
 const fmtAmt = fmtAmount
 
 function onSelectReport(row: any) {
-  const code = row.row_code
+  const code = row.row_code || ''
+  const name = row.row_name || row.label || ''
   const period = reportPeriod.value
   selectedFormula.value = `REPORT('${code}','${period}')`
-  selectedLabel.value = `[${code}] ${row.row_name} · ${period}`
+  selectedLabel.value = `[${code}] ${name} · ${period}`
 }
 
 function onSelectTb(row: any) {
-  const code = row.standard_account_code
+  const code = row.standard_account_code || row.account_code || ''
+  const name = row.account_name || row.label || ''
   const col = tbColumn.value
   selectedFormula.value = `TB('${code}','${col}')`
-  selectedLabel.value = `[${code}] ${row.account_name} · ${col}`
+  selectedLabel.value = `[${code}] ${name} · ${col}`
 }
 
 function onSelectNote(row: any) {
-  const section = row.note_section
+  const section = row.note_section || ''
+  const title = row.section_title || row.label || ''
   const period = notePeriod.value
   selectedFormula.value = `NOTE('${section}','合计','${period}')`
-  selectedLabel.value = `[${section}] ${row.section_title} · 合计 · ${period}`
+  selectedLabel.value = `[${section}] ${title} · 合计 · ${period}`
 }
 
 function onConfirm() {

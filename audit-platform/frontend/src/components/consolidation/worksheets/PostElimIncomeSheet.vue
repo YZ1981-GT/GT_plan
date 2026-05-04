@@ -67,6 +67,7 @@ import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -105,18 +106,25 @@ const n = (v: any) => Number(v) || 0
 
 const overrides = reactive<Record<string, Record<string, number | null>>>({})
 
+const { exportData: _exportData } = useExcelIO()
+
+const INCOME_COLS: ExcelColumn[] = [
+  { key: 'companyName', header: '子企业' },
+  { key: 'ratio', header: '持股比例' },
+  { key: 'bookDividend', header: '账面现金红利' },
+  { key: 'simInvestIncome', header: '模拟投资收益' },
+  { key: 'dividendReverse', header: '还原分红' },
+  { key: 'elimInvestIncome', header: '抵消投资收益' },
+  { key: 'postElimIncome', header: '抵消后投资收益' },
+]
+
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = ['子企业', '持股比例', '账面现金红利', '模拟投资收益', '还原分红', '抵消投资收益', '抵消后投资收益']
-  const dataRows = tableRows.value.map((r: any) => [
-    r.companyName, r.ratio, r.bookDividend, r.simInvestIncome, r.dividendReverse, r.elimInvestIncome, r.postElimIncome
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '抵消后投资收益')
-  XLSX.writeFile(wb, '抵消后投资收益_数据.xlsx')
-  ElMessage.success('数据已导出')
+  await _exportData({
+    data: tableRows.value,
+    columns: INCOME_COLS,
+    sheetName: '抵消后投资收益',
+    fileName: '抵消后投资收益_数据.xlsx',
+  })
 }
 
 const tableRows = computed(() => {

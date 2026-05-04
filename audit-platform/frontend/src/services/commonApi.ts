@@ -137,14 +137,14 @@ export async function noteAiGenerateAnalysis(projectId: string, params: {
 }
 
 export async function noteAiRewrite(projectId: string, params: {
-  text: string; instruction?: string; section_number?: string; year?: number
+  text: string; instruction?: string; section_number?: string; year?: number; knowledge_context?: string
 }): Promise<{ original: string; rewritten: string; error?: string }> {
   const { data } = await http.post(P_dn.ai.rewrite(projectId), params)
   return data
 }
 
 export async function noteAiContinueWrite(projectId: string, params: {
-  text: string; section_number?: string; year?: number
+  text: string; section_number?: string; year?: number; knowledge_context?: string
 }): Promise<{ result: string; appended: string; error?: string }> {
   const { data } = await http.post(P_dn.ai.complete(projectId), params)
   return data

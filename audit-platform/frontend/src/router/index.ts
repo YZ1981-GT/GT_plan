@@ -1,7 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import NProgress from 'nprogress'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
 import { usePermission } from '@/composables/usePermission'
+
+// NProgress 配置：不显示旋转图标，与 GT 紫色主题一致
+NProgress.configure({ showSpinner: false })
 
 const router = createRouter({
   history: createWebHistory(),
@@ -414,6 +418,7 @@ const router = createRouter({
 // 注意：未保存变更拦截由 useEditMode 的 onBeforeRouteLeave 在组件级处理，
 //       router 级 beforeEach 不重复拦截，也不会干扰组件级守卫。
 router.beforeEach(async (to) => {
+  NProgress.start()
   const authStore = useAuthStore()
 
   // ① 开发中页面 → 提示并阻止导航
@@ -421,6 +426,7 @@ router.beforeEach(async (to) => {
     import('element-plus').then(({ ElMessage }) => {
       ElMessage.info('该功能正在开发中，敬请期待')
     })
+    NProgress.done()
     return false
   }
 
@@ -442,6 +448,7 @@ router.beforeEach(async (to) => {
       import('element-plus').then(({ ElMessage }) => {
         ElMessage.warning('您没有访问该页面的权限')
       })
+      NProgress.done()
       return { path: '/' }
     }
   }
@@ -453,6 +460,11 @@ router.beforeEach(async (to) => {
     // 使用 await 确保项目信息在页面渲染前就绪
     await projectStore.syncFromRoute(to as any)
   }
+})
+
+// ─── afterEach：结束进度条 ───
+router.afterEach(() => {
+  NProgress.done()
 })
 
 export default router

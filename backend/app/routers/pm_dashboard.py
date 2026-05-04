@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bulk_operations import BulkResult
 from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
 from app.models.core import User
@@ -77,12 +78,12 @@ async def batch_review(
     body: BatchReviewRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
-):
-    """批量通过/退回底稿"""
+) -> BulkResult:
+    """批量通过/退回底稿 — 返回统一 BulkResult 格式"""
     if body.action not in ("approve", "reject"):
         raise HTTPException(400, "action 必须是 approve 或 reject")
     svc = BatchReviewService(db)
-    result = await svc.batch_review(
+    raw = await svc.batch_review(
         project_id,
         [UUID(wid) for wid in body.wp_ids],
         body.action,
@@ -90,7 +91,19 @@ async def batch_review(
         body.comment,
     )
     await db.commit()
-    return result
+
+    # 将旧格式 succeeded/skipped 转为统一 BulkResult
+    succeeded = raw.get("succeeded", [])
+    skipped = raw.get("skipped", [])
+    failed = [{"id": sid, "error": "状态不允许此操作"} for sid in skipped]
+    total = len(succeeded) + len(skipped)
+    return BulkResult(
+        succeeded=succeeded,
+        failed=failed,
+        total=total,
+        success_count=len(succeeded),
+        fail_count=len(skipped),
+    )
 
 
 # ── 3. 项目进度看板 ──

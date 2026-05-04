@@ -85,6 +85,7 @@ import { ref, reactive, computed } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -124,20 +125,33 @@ const n = (v: any) => Number(v) || 0
 
 const overrides = reactive<Record<string, Record<string, number | null>>>({})
 
+const { exportData: _exportData } = useExcelIO()
+
+const MINORITY_COLS: ExcelColumn[] = [
+  { key: 'companyName', header: '子企业' },
+  { key: 'parentRatio', header: '母公司持股' },
+  { key: 'minorityRatio', header: '少数股东比例' },
+  { key: 'endNetAsset', header: '期末净资产' },
+  { key: 'minorityEquity', header: '少数股东权益' },
+  { key: 'elimMinorityEquity', header: '抵消分录数(权益)' },
+  { key: 'equityDiff', header: '权益差异' },
+  { key: 'currentProfit', header: '当期净利润' },
+  { key: 'minorityProfit', header: '少数股东损益' },
+  { key: 'elimMinorityProfit', header: '抵消分录数(损益)' },
+  { key: 'profitDiff', header: '损益差异' },
+]
+
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = ['子企业', '母公司持股', '少数股东比例', '期末净资产', '少数股东权益', '抵消分录数(权益)', '权益差异', '当期净利润', '少数股东损益', '抵消分录数(损益)', '损益差异', '超额亏损']
-  const dataRows = tableRows.value.map((r: any) => [
-    r.companyName, r.parentRatio, r.minorityRatio, r.endNetAsset, r.minorityEquity,
-    r.elimMinorityEquity, r.equityDiff, r.currentProfit, r.minorityProfit,
-    r.elimMinorityProfit, r.profitDiff, r.isExcessLoss ? '是' : '否'
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '少数股东权益损益')
-  XLSX.writeFile(wb, '少数股东权益损益_数据.xlsx')
-  ElMessage.success('数据已导出')
+  const data = tableRows.value.map((r: any) => ({
+    ...r,
+    isExcessLoss: r.isExcessLoss ? '是' : '否',
+  }))
+  await _exportData({
+    data,
+    columns: [...MINORITY_COLS, { key: 'isExcessLoss', header: '超额亏损' }],
+    sheetName: '少数股东权益损益',
+    fileName: '少数股东权益损益_数据.xlsx',
+  })
 }
 
 const tableRows = computed(() => {

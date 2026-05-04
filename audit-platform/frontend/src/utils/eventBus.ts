@@ -71,6 +71,12 @@ export interface ConsolNoteAuditAllPayload {
   standard: string
 }
 
+/** 模板应用（新增表样后触发地址注册表刷新） */
+export interface TemplateAppliedPayload {
+  configType: string
+  projectId?: string
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -86,6 +92,9 @@ export type Events = {
   'consol-refresh-entity': ConsolRefreshEntityPayload
   'consol-tree-aggregate': ConsolTreeAggregatePayload
   'consol-note-audit-all': ConsolNoteAuditAllPayload
+
+  // 模板 & 地址注册表
+  'template-applied': TemplateAppliedPayload
 
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void

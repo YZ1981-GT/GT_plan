@@ -1,61 +1,56 @@
 <template>
   <div class="gt-disclosure-editor gt-fade-in" :class="{ 'gt-fullscreen': deFullscreen }">
     <!-- 横幅 -->
-    <div class="gt-de-banner">
-      <div class="gt-de-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-de-title">附注编辑</h2>
-        <div class="gt-de-info-bar">
-          <div class="gt-de-info-item">
-            <span class="gt-de-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-de-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-de-info-sep" />
-          <div class="gt-de-info-item">
-            <span class="gt-de-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-de-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-de-info-sep" />
-          <div class="gt-de-info-item">
-            <span class="gt-de-info-label">模板</span>
-            <el-select v-model="templateType" size="small" class="gt-de-tpl-select" @change="handleTemplateChange">
-              <el-option label="国企版" value="soe" />
-              <el-option label="上市版" value="listed" />
-              <el-option v-if="customTemplateId" :label="customTemplateName || '自定义'" value="custom" />
-            </el-select>
-          </div>
-          <div class="gt-de-info-sep" />
-          <div class="gt-de-info-item">
-            <span class="gt-de-info-badge">{{ noteList.length }} 个章节</span>
-          </div>
-          <div class="gt-de-info-sep" />
-          <div class="gt-de-info-item">
-            <span class="gt-de-info-label">金额单位</span>
-            <span class="gt-de-info-badge">{{ displayPrefs.unitSuffix }}</span>
-          </div>
-        </div>
-      </div>
-      <div class="gt-de-banner-row2">
-        <el-tooltip content="复制整表（可粘贴到 Word/Excel）" placement="bottom">
-          <el-button size="small" @click="copyNoteTable">📋 复制整表</el-button>
-        </el-tooltip>
-        <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
-          <el-button size="small" @click="toggleDeFullscreen()">{{ deFullscreen ? '退出全屏' : '全屏' }}</el-button>
-        </el-tooltip>
-        <el-button size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
-        <el-button size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
-        <el-button size="small" @click="showNoteImport = true">📥 Excel导入</el-button>
-        <el-button size="small" @click="onValidate" :loading="validateLoading">✅ 执行校验</el-button>
-        <el-button size="small" @click="showNoteFormulaManager = true">⚙️ 公式管理</el-button>
-        <el-button size="small" @click="openStructureEditor">📐 表样编辑</el-button>
-        <el-button size="small" @click="showNoteMappingDialog = true">🔄 转换规则</el-button>
-        <el-button size="small" @click="onExportWord" :loading="exportLoading">📤 导出Word</el-button>
-      </div>
-    </div>
+    <GtPageHeader title="附注编辑" @back="router.push('/projects')">
+      <GtInfoBar
+        :show-unit="true"
+        :show-year="true"
+        :show-template="true"
+        :unit-value="selectedProjectId"
+        :year-value="selectedYear"
+        :template-value="templateType"
+        :template-options="deTemplateOptions"
+        :badges="[
+          { value: noteList.length + ' 个章节' },
+          { label: '金额单位', value: displayPrefs.unitSuffix },
+        ]"
+        @unit-change="onProjectChange"
+        @year-change="(v: number) => { selectedYear = v; onYearChange() }"
+        @template-change="handleTemplateChange"
+      />
+      <template #actions>
+        <GtToolbar
+          :show-copy="true"
+          :show-fullscreen="true"
+          :is-fullscreen="deFullscreen"
+          :show-export="true"
+          export-label="导出Word"
+          :show-import="true"
+          :show-formula="true"
+          @copy="copyNoteTable"
+          @fullscreen="toggleDeFullscreen()"
+          @export="onExportWord"
+          @import="showNoteImport = true"
+          @formula="showNoteFormulaManager = true"
+        >
+          <template #left>
+            <el-button size="small" @click="onRefreshFromWP" :loading="refreshLoading">🔄 从底稿刷新</el-button>
+            <el-button size="small" @click="onGenerate" :loading="genLoading">📝 生成附注</el-button>
+            <el-button size="small" @click="onValidate" :loading="validateLoading">✅ 执行校验</el-button>
+          </template>
+          <template #right-extra>
+            <SharedTemplatePicker
+              config-type="note_template"
+              :project-id="projectId"
+              :get-config-data="getNoteTemplateConfigData"
+              @applied="onNoteTemplateApplied"
+            />
+            <el-button size="small" @click="openStructureEditor">📐 表样编辑</el-button>
+            <el-button size="small" @click="showNoteMappingDialog = true">🔄 转换规则</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <div class="gt-de-body">
       <!-- 左侧：目录树 -->
@@ -202,7 +197,12 @@
                   <el-button @click="onAiRewriteOpen" :loading="aiLoading" title="AI改写：选中文本后点击改写">✏️ 改写</el-button>
                   <el-button @click="onAiGeneratePolicy" :loading="aiLoading" title="生成标准会计政策文本">📋 生成政策</el-button>
                   <el-button @click="onAiGenerateAnalysis" :loading="aiLoading" title="生成变动分析说明">📊 变动分析</el-button>
+                  <el-button @click="onPickKnowledge" title="选择知识库文档作为AI参考上下文">📚 知识库</el-button>
                 </el-button-group>
+                <span v-if="knowledgeContextText" class="gt-de-ai-hint" style="color: var(--gt-color-teal, #36b37e)">
+                  📎 已加载 {{ knowledgeDocCount }} 篇参考文档
+                  <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 4px; font-size: 11px">清除</el-button>
+                </span>
                 <span class="gt-de-ai-hint">选中文本可改写，光标处可续写</span>
               </div>
               <editor-content :editor="editor" class="gt-de-tiptap-content" />
@@ -362,6 +362,9 @@
     @sum="onDeCtxSum"
     @compare="onDeCtxCompare"
   />
+
+  <!-- 知识库文档选择弹窗 [R3.7] -->
+  <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
 </template>
 
 <script setup lang="ts">
@@ -371,6 +374,9 @@ import { useCellSelection } from '@/composables/useCellSelection'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
@@ -395,6 +401,10 @@ import {
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
+import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
+import { useAutoSave } from '@/composables/useAutoSave'
+import { withLoading } from '@/composables/useLoading'
+import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -455,6 +465,26 @@ function onNoteMappingApplied(data: Record<string, any>) {
   }
 }
 
+// ── 附注模板保存/引用 ──
+function getNoteTemplateConfigData(): Record<string, any> {
+  return {
+    template_type: templateType.value,
+    note_sections: noteList.value.map(n => ({
+      note_section: n.note_section,
+      section_title: n.section_title,
+    })),
+  }
+}
+
+function onNoteTemplateApplied(data: Record<string, any>) {
+  if (data?.template_type) {
+    templateType.value = data.template_type
+  }
+  // 重新加载附注树以应用模板
+  fetchTree()
+  ElMessage.success('附注模板已应用')
+}
+
 // 当前项目名称
 const currentProjectName = computed(() => {
   if (projectStore.clientName) return projectStore.clientName
@@ -479,6 +509,18 @@ const customTemplateId = ref('')
 const customTemplateName = ref('')
 const customTemplateVersion = ref('')
 
+/** 附注模板选项（含自定义模板） */
+const deTemplateOptions = computed(() => {
+  const opts = [
+    { label: '国企版', value: 'soe' },
+    { label: '上市版', value: 'listed' },
+  ]
+  if (customTemplateId.value) {
+    opts.push({ label: customTemplateName.value || '自定义', value: 'custom' })
+  }
+  return opts
+})
+
 const noteList = ref<DisclosureNoteTreeItem[]>([])
 const currentNote = ref<DisclosureNoteDetail | null>(null)
 const textContent = ref('')
@@ -496,11 +538,55 @@ const editor = useEditor({
 
 onBeforeUnmount(() => { editor.value?.destroy() })
 
+// ── 自动保存/草稿恢复 [R3.8] ──
+const autoSaveKey = computed(() => `disclosure_note_${projectId.value}_${currentNote.value?.note_section || 'none'}`)
+const { clearDraft: clearAutoSaveDraft } = useAutoSave(
+  autoSaveKey.value,
+  () => {
+    if (!currentNote.value) return null
+    return {
+      text_content: textContent.value,
+      table_data: currentNote.value.table_data,
+      note_section: currentNote.value.note_section,
+    }
+  },
+  (data) => {
+    if (!currentNote.value || !data) return
+    if (data.text_content != null) {
+      textContent.value = data.text_content
+      editor.value?.commands.setContent(data.text_content)
+    }
+    if (data.table_data != null) {
+      currentNote.value.table_data = data.table_data
+    }
+  },
+  { enabled: editMode },
+)
+
 // ── LLM 辅助状态 ──
 const aiLoading = ref(false)
 const aiRewriteDialogVisible = ref(false)
 const aiRewriteInstruction = ref('请改写以下文本，使其更加专业规范')
 const aiSelectedText = ref('')
+
+// ── 知识库上下文 [R3.7] ──
+const { pickDocuments, buildContext } = useKnowledge()
+const knowledgeContextText = ref('')
+const knowledgeDocCount = ref(0)
+
+async function onPickKnowledge() {
+  const docs = await pickDocuments({ title: '选择参考文档（AI续写/改写时使用）', maxSelect: 5 })
+  if (docs.length) {
+    knowledgeContextText.value = await buildContext(docs)
+    knowledgeDocCount.value = docs.length
+    ElMessage.success(`已加载 ${docs.length} 篇参考文档`)
+  }
+}
+
+function clearKnowledgeContext() {
+  knowledgeContextText.value = ''
+  knowledgeDocCount.value = 0
+}
 
 function getSelectedText(): string {
   if (!editor.value) return ''
@@ -522,6 +608,7 @@ async function onAiContinueWrite() {
       text,
       section_number: currentNote.value?.note_section || '',
       year: year.value,
+      knowledge_context: knowledgeContextText.value || undefined,
     })
     if (res.error) { ElMessage.warning(res.error); return }
     if (res.appended) {
@@ -552,6 +639,7 @@ async function onAiRewriteConfirm() {
       instruction: aiRewriteInstruction.value,
       section_number: currentNote.value?.note_section || '',
       year: year.value,
+      knowledge_context: knowledgeContextText.value || undefined,
     })
     if (res.error) { ElMessage.warning(res.error); return }
     if (res.rewritten && res.rewritten !== res.original) {
@@ -1055,12 +1143,10 @@ function severityTagType(s: string) {
   return m[s] || 'info'
 }
 
-async function fetchTree() {
-  treeLoading.value = true
+const fetchTree = withLoading(treeLoading, async () => {
   try { noteList.value = await getDisclosureNoteTree(projectId.value, year.value) }
   catch { noteList.value = [] }
-  finally { treeLoading.value = false }
-}
+})
 
 async function loadProjectTemplateConfig() {
   try {
@@ -1084,13 +1170,13 @@ async function loadProjectTemplateConfig() {
 async function onNodeClick(node: TreeNode) {
   // 分组节点不加载详情
   if (node.isGroup || !node.data?.note_section) return
-  detailLoading.value = true
-  editMode.value = false
-  editDirty.value = false
-  try {
-    await fetchDetail(node.data.note_section)
-  } catch { currentNote.value = null }
-  finally { detailLoading.value = false }
+  await withLoading(detailLoading, async () => {
+    editMode.value = false
+    editDirty.value = false
+    try {
+      await fetchDetail(node.data.note_section)
+    } catch { currentNote.value = null }
+  })()
 }
 
 async function fetchDetail(noteSection: string) {
@@ -1143,15 +1229,16 @@ async function onGenerate() {
     '开始生成',
   )
   if (!ok) return
-  genLoading.value = true
-  try {
-    await generateDisclosureNotes(projectId.value, year.value, templateType.value)
-    ElMessage.success('附注生成完成')
-    await fetchTree()
-  } catch (e: any) {
-    const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || ''
-    if (msg) ElMessage.warning('附注生成：' + msg)
-  } finally { genLoading.value = false }
+  await withLoading(genLoading, async () => {
+    try {
+      await generateDisclosureNotes(projectId.value, year.value, templateType.value)
+      ElMessage.success('附注生成完成')
+      await fetchTree()
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || ''
+      if (msg) ElMessage.warning('附注生成：' + msg)
+    }
+  })()
 }
 
 async function handleTemplateChange(value: string) {
@@ -1163,34 +1250,31 @@ async function handleTemplateChange(value: string) {
   await onGenerate()
 }
 
-async function onValidate() {
-  validateLoading.value = true
-  try {
-    await validateDisclosureNotes(projectId.value, year.value)
-    validationFindings.value = await getValidationResults(projectId.value, year.value)
-    ElMessage.success(`校验完成，发现 ${validationFindings.value.length} 项`)
-  } finally { validateLoading.value = false }
-}
+const onValidate = withLoading(validateLoading, async () => {
+  await validateDisclosureNotes(projectId.value, year.value)
+  validationFindings.value = await getValidationResults(projectId.value, year.value)
+  ElMessage.success(`校验完成，发现 ${validationFindings.value.length} 项`)
+})
 
 async function onSave() {
   if (!currentNote.value) return
-  saveLoading.value = true
-  try {
+  await withLoading(saveLoading, async () => {
     const body: Record<string, any> = {}
-    if (currentNote.value.content_type === 'text' || currentNote.value.content_type === 'mixed') {
+    if (currentNote.value!.content_type === 'text' || currentNote.value!.content_type === 'mixed') {
       body.text_content = textContent.value
     }
-    if (currentNote.value.content_type === 'table' || currentNote.value.content_type === 'mixed') {
-      body.table_data = currentNote.value.table_data
+    if (currentNote.value!.content_type === 'table' || currentNote.value!.content_type === 'mixed') {
+      body.table_data = currentNote.value!.table_data
     }
-    await updateDisclosureNote(currentNote.value.id, body)
+    await updateDisclosureNote(currentNote.value!.id, body)
     ElMessage.success('保存成功')
     editMode.value = false
     clearEditDirty()
-    currentNote.value.status = 'confirmed'
+    clearAutoSaveDraft()
+    currentNote.value!.status = 'confirmed'
     justSaved.value = true
     setTimeout(() => { justSaved.value = false }, 2500)
-  } finally { saveLoading.value = false }
+  })()
 }
 
 /** 快捷键保存：保存当前附注 */
@@ -1325,55 +1409,7 @@ function onDeCtxCompare() {
 <style scoped>
 .gt-disclosure-editor { padding: 16px; }
 
-/* ── 横幅 ── */
-.gt-de-banner {
-  display: flex; flex-direction: column; gap: 8px;
-  background: var(--gt-gradient-primary);
-  border-radius: var(--gt-radius-lg);
-  padding: 14px 22px;
-  margin-bottom: 14px;
-  color: #fff;
-  position: relative; overflow: hidden;
-  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
-}
-.gt-de-banner::before {
-  content: ''; position: absolute; top: -40%; right: -10%;
-  width: 45%; height: 180%;
-  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
-  pointer-events: none;
-}
-.gt-de-banner-row1 {
-  display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; flex-wrap: wrap;
-}
-.gt-de-title { margin: 0; font-size: 16px; font-weight: 700; white-space: nowrap; }
-.gt-de-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.gt-de-info-item { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.gt-de-info-label { font-size: 10px; color: rgba(255,255,255,0.55); text-transform: uppercase; }
-.gt-de-info-badge { font-size: 11px; background: rgba(255,255,255,0.15); padding: 1px 8px; border-radius: 10px; }
-.gt-de-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.18); }
-.gt-de-tpl-select { width: 100px; }
-.gt-de-unit-select { width: 200px; }
-.gt-de-year-select { width: 85px; }
-.gt-de-tpl-select :deep(.el-input__wrapper),
-.gt-de-unit-select :deep(.el-input__wrapper),
-.gt-de-year-select :deep(.el-input__wrapper) {
-  background: rgba(255,255,255,0.12) !important; border: 1px solid rgba(255,255,255,0.2) !important;
-  box-shadow: none !important; border-radius: 12px !important; padding: 0 8px !important; height: 24px !important;
-}
-.gt-de-tpl-select :deep(.el-input__inner),
-.gt-de-unit-select :deep(.el-input__inner),
-.gt-de-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px !important; font-weight: 600 !important; }
-.gt-de-tpl-select :deep(.el-select__caret),
-.gt-de-unit-select :deep(.el-select__caret),
-.gt-de-year-select :deep(.el-select__caret) { color: rgba(255,255,255,0.5) !important; }
-.gt-de-banner-row2 {
-  display: flex; gap: 6px; align-items: center; flex-wrap: wrap; position: relative; z-index: 1;
-}
-.gt-de-banner-row2 .el-button {
-  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
-  color: #fff; font-size: 12px; border-radius: 14px; padding: 4px 12px; height: 28px;
-}
-.gt-de-banner-row2 .el-button:hover { background: rgba(255,255,255,0.22); }
+/* ── GtPageHeader 已替换横幅样式 ── */
 
 /* ── 三栏布局 ── */
 .gt-de-body {

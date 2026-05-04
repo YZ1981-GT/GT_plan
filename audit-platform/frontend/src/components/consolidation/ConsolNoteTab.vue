@@ -507,6 +507,8 @@ import { useEditMode } from '@/composables/useEditMode'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useTableToolbar } from '@/composables/useTableToolbar'
+import { useAutoSave } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
 
@@ -533,7 +535,17 @@ const noteRefreshing = ref(false)
 const noteSingleAuditLoading = ref(false)
 const noteFileRef = ref<HTMLInputElement | null>(null)
 const noteTableRef = ref<any>(null)
-const noteSelectedRows = ref<any[]>([])
+// useTableToolbar 管理选中行状态（editRows 是动态嵌套属性，用 computed 桥接）
+const noteEditRows = computed({
+  get: () => selectedNoteSection.value?.editRows ?? [],
+  set: (v) => { if (selectedNoteSection.value) selectedNoteSection.value.editRows = v },
+})
+const {
+  selectedRows: noteSelectedRows,
+  selectedCount: noteSelectedCount,
+  onSelectionChange: onNoteSelectionChange,
+  deleteSelectedRows: deleteNoteRows,
+} = useTableToolbar(noteEditRows)
 const noteBatchFileRef = ref<HTMLInputElement | null>(null)
 const noteFormulaFileRef = ref<HTMLInputElement | null>(null)
 const showNoteBatchDialog = ref(false)
@@ -544,6 +556,27 @@ const cellComments = useCellComments(() => props.projectId, () => props.year, 'c
 
 // ─── 按需渲染编辑控件（大表格性能优化） ──────────────────────────────────────
 const lazyEdit = useLazyEdit()
+
+// ─── 自动保存/草稿恢复 [R3.8] ──────────────────────────────────────────────
+const { clearDraft: clearAutoSaveDraft } = useAutoSave(
+  `consol_note_${props.projectId}_${props.year}`,
+  () => {
+    const sec = selectedNoteSection.value
+    if (!sec) return null
+    return {
+      section_id: sec.section_id,
+      title: sec.title,
+      headers: sec.headers,
+      editRows: sec.editRows,
+    }
+  },
+  (data) => {
+    if (!selectedNoteSection.value || !data) return
+    if (data.headers) selectedNoteSection.value.headers = data.headers
+    if (data.editRows) selectedNoteSection.value.editRows = data.editRows
+  },
+  { enabled: noteEditMode },
+)
 
 // ─── 附注全审 ────────────────────────────────────────────────────────────────
 const showNoteAuditDialog = ref(false)
@@ -623,7 +656,7 @@ function fmtAmt(v: any): string {
   return fmt(v)
 }
 
-function onNoteSelectionChange(rows: any[]) { noteSelectedRows.value = rows }
+// onNoteSelectionChange 和 deleteNoteRows 已由 useTableToolbar 提供
 
 // ─── 单元格选中与右键菜单 ──────────────────────────────────────────────────
 function noteCellClassName({ rowIndex, columnIndex }: any) {
@@ -928,21 +961,11 @@ function addNoteRow() {
   if (!sec?.headers) return
   const obj: any = {}
   for (let j = 0; j < sec.headers.length; j++) obj[j] = ''
+  // 直接 push 到 editRows（useTableToolbar 的 noteEditRows 会同步）
   sec.editRows.push(obj)
 }
 
-async function deleteNoteRows() {
-  if (!noteSelectedRows.value.length) return
-  const { ElMessageBox } = await import('element-plus')
-  try {
-    await ElMessageBox.confirm(`确定删除选中的 ${noteSelectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
-    const sec = selectedNoteSection.value
-    if (!sec) return
-    const toDelete = new Set(noteSelectedRows.value)
-    sec.editRows = sec.editRows.filter((r: any) => !toDelete.has(r))
-    noteSelectedRows.value = []
-  } catch { /* cancelled */ }
-}
+// deleteNoteRows 已由 useTableToolbar.deleteSelectedRows 提供（含 confirmBatch 确认弹窗）
 
 async function saveNoteData() {
   const sec = selectedNoteSection.value
@@ -956,6 +979,7 @@ async function saveNoteData() {
     )
     ElMessage.success('附注数据已保存')
     clearNoteDirty()
+    clearAutoSaveDraft()
   } catch { ElMessage.error('保存失败') }
 }
 

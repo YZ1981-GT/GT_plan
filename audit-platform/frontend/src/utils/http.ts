@@ -5,8 +5,12 @@
  *       分级错误处理、请求取消（AbortController）、请求去重、自动重试
  */
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig, type AxiosError } from 'axios'
+import NProgress from 'nprogress'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+
+// ── NProgress 活跃请求计数器 ──────────────────────────────
+let activeRequests = 0
 
 const http = axios.create({
   baseURL: '/',
@@ -69,6 +73,13 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
   addPending(config)
+  // NProgress：首个请求启动进度条，后续请求递增
+  activeRequests++
+  if (activeRequests === 1) {
+    NProgress.start()
+  } else {
+    NProgress.inc()
+  }
   // 记录请求开始时间
   ;(config as any)._startTime = Date.now()
   return config
@@ -85,6 +96,9 @@ let refreshQueue: Array<{
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     removePending(response.config as InternalAxiosRequestConfig)
+    // NProgress：所有请求完成后结束进度条
+    activeRequests = Math.max(0, activeRequests - 1)
+    if (activeRequests === 0) NProgress.done()
     // 记录请求日志
     const startTime = (response.config as any)._startTime
     if (startTime) {
@@ -111,6 +125,9 @@ http.interceptors.response.use(
   },
   async (error: AxiosError) => {
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
+    // NProgress：错误时也递减计数
+    activeRequests = Math.max(0, activeRequests - 1)
+    if (activeRequests === 0) NProgress.done()
 
     // 记录错误请求日志
     if (error.config) {

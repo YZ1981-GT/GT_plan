@@ -14,6 +14,12 @@
         </el-select>
         <el-button size="small" class="gt-bar-btn" @click="showConsolConversion = true">🔄 转换规则</el-button>
         <el-button size="small" class="gt-bar-btn" @click="onOpenFormula">ƒx 公式</el-button>
+        <SharedTemplatePicker
+          config-type="consol_scope"
+          :project-id="projectId"
+          :get-config-data="getConsolScopeConfigData"
+          @applied="onConsolScopeTemplateApplied"
+        />
         <el-tooltip content="选中单元格后点击，查看该数值的汇总明细过程" placement="bottom">
           <el-button size="small" class="gt-bar-btn" @click="openCellDrillDown">📊 查看</el-button>
         </el-tooltip>
@@ -446,6 +452,7 @@ import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWor
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
 import OrgNode from '@/components/consolidation/OrgNode.vue'
+import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -759,6 +766,23 @@ async function loadGroupTree() {
 
 function onTreeNodeClick(data: any) {
   selectedNode.value = data
+}
+
+// ── 合并范围模板保存/引用 ──
+function getConsolScopeConfigData(): Record<string, any> {
+  return {
+    group_tree: groupTree.value,
+    standard: projectInfo.standard,
+  }
+}
+
+function onConsolScopeTemplateApplied(data: Record<string, any>) {
+  if (data?.group_tree) {
+    groupTree.value = data.group_tree
+  }
+  // 重新加载合并范围数据
+  loadGroupTree()
+  ElMessage.success('合并范围模板已应用')
 }
 
 function goToProject(_node: any) {

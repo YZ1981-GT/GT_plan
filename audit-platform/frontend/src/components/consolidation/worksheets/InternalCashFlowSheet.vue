@@ -10,7 +10,7 @@
         <el-button size="small" @click="exportCf">📥 导出模板</el-button>
         <el-button size="small" @click="exportCfData">📤 导出数据</el-button>
         <el-button size="small" @click="cfFileRef?.click()">📤 导入Excel</el-button>
-        <el-button size="small" type="primary" @click="addRow">+ 新增</el-button>
+        <el-button size="small" type="primary" @click="_addRow">+ 新增</el-button>
         <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDelete">
           删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
         </el-button>
@@ -28,7 +28,7 @@
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       show-summary :summary-method="getSummary"
-      @selection-change="(_sel: any[]) => selectedRows = _sel">
+      @selection-change="onSelectionChange">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
       <el-table-column prop="payerCompany" label="付款方" width="130" fixed>
@@ -101,10 +101,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ref, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { useTableToolbar } from '@/composables/useTableToolbar'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface CashFlowRow { payerCompany: string; receiverCompany: string; payerItem: string; payerAmount: number|null; receiverItem: string; receiverAmount: number|null }
@@ -116,7 +118,6 @@ const { isFullscreen, toggleFullscreen } = useFullscreen()
 const displayPrefs = useDisplayPrefsStore()
 const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement|null>(null)
-const selectedRows = ref<CashFlowRow[]>([])
 const cfFileRef = ref<HTMLInputElement|null>(null)
 const n = (v: any) => Number(v) || 0
 
@@ -129,19 +130,21 @@ const cashFlowItems = [
   '分配股利、利润或偿付利息支付的现金', '收到的其他与筹资活动有关的现金',
 ]
 
-const rows = reactive<CashFlowRow[]>([mkEmpty(), mkEmpty()])
+const rows = ref<CashFlowRow[]>([mkEmpty(), mkEmpty()])
 function mkEmpty(): CashFlowRow { return { payerCompany: '', receiverCompany: '', payerItem: '', payerAmount: null, receiverItem: '', receiverAmount: null } }
-function addRow() { rows.push(mkEmpty()) }
-async function batchDelete() {
-  if (!selectedRows.value.length) return
-  try { await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 条？`, '删除确认', { type: 'warning' })
-    const del = new Set(selectedRows.value); const remaining = rows.filter(r => !del.has(r)); rows.length = 0; rows.push(...remaining); selectedRows.value = []
-  } catch {}
-}
+
+const {
+  selectedRows,
+  onSelectionChange,
+  addRow,
+  deleteSelectedRows: batchDelete,
+} = useTableToolbar(rows)
+
+function _addRow() { addRow(mkEmpty) }
 
 const generatedEntries = computed(() => {
   const map = new Map<string, number>()
-  for (const row of rows) {
+  for (const row of rows.value) {
     if (!row.payerItem || !row.receiverItem) continue
     const amount = Math.min(n(row.payerAmount), n(row.receiverAmount))
     if (amount <= 0) continue
@@ -150,7 +153,7 @@ const generatedEntries = computed(() => {
   }
   const entries: any[] = []
   const processed = new Set<string>()
-  for (const row of rows) {
+  for (const row of rows.value) {
     if (!row.payerItem || !row.receiverItem) continue
     const key = `${row.payerItem}|${row.receiverItem}`
     if (processed.has(key)) continue; processed.add(key)
@@ -168,39 +171,49 @@ watch(generatedEntries, (entries) => {
 }, { immediate: true })
 
 
+const { exportTemplate: _exportTemplate, exportData: _exportData, onFileSelected: _onFileSelected } = useExcelIO()
+
+const CF_COLS: ExcelColumn[] = [
+  { key: 'payerCompany', header: '付款方', width: 22 },
+  { key: 'receiverCompany', header: '收款方', width: 22 },
+  { key: 'payerItem', header: '付款方现金流项目', width: 22 },
+  { key: 'payerAmount', header: '付款方金额', width: 22 },
+  { key: 'receiverItem', header: '收款方现金流项目', width: 22 },
+  { key: 'receiverAmount', header: '收款方金额', width: 22 },
+]
+
 async function exportCf() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const headers = ['付款方','收款方','付款方现金流项目','付款方金额','收款方现金流项目','收款方金额']
-  const dataRows = rows.map(r => [r.payerCompany,r.receiverCompany,r.payerItem,r.payerAmount??'',r.receiverItem,r.receiverAmount??''])
-  const ws = XLSX.utils.aoa_to_sheet([headers,...dataRows]); ws['!cols']=headers.map(()=>({wch:22}))
-  XLSX.utils.book_append_sheet(wb,ws,'数据填写'); XLSX.writeFile(wb,'内部现金流抵消_模板.xlsx'); ElMessage.success('模板已导出')
+  await _exportTemplate({
+    columns: CF_COLS,
+    fileName: '内部现金流抵消_模板.xlsx',
+    includeNoteRow: false,
+    existingData: rows.value.map(r => [r.payerCompany, r.receiverCompany, r.payerItem, r.payerAmount ?? '', r.receiverItem, r.receiverAmount ?? '']),
+  })
 }
 async function exportCfData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = ['付款方', '收款方', '付款方现金流项目', '付款方金额', '收款方现金流项目', '收款方金额', '差异']
-  const dataRows = rows.filter(r => r.payerCompany || r.receiverCompany).map(r => [
-    r.payerCompany, r.receiverCompany, r.payerItem, r.payerAmount ?? '',
-    r.receiverItem, r.receiverAmount ?? '', n(r.payerAmount) - n(r.receiverAmount)
-  ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 22 }))
-  XLSX.utils.book_append_sheet(wb, ws, '内部现金流抵消')
-  XLSX.writeFile(wb, '内部现金流抵消_数据.xlsx')
-  ElMessage.success('数据已导出')
+  await _exportData({
+    data: rows.value.filter(r => r.payerCompany || r.receiverCompany),
+    columns: CF_COLS,
+    sheetName: '内部现金流抵消',
+    fileName: '内部现金流抵消_数据.xlsx',
+    extraHeaders: ['差异'],
+    extraDataFn: (r) => [n(r.payerAmount) - n(r.receiverAmount)],
+  })
 }
 async function onCfFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-  try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(),{type:'array'})
-    const sn = wb.SheetNames.find(n=>n==='数据填写')||wb.SheetNames[wb.SheetNames.length-1]
-    const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1})
-    let cnt=0; for(let i=1;i<json.length;i++){const r=json[i];if(!r?.[0])continue
-      rows.push({payerCompany:String(r[0]||''),receiverCompany:String(r[1]||''),payerItem:String(r[2]||''),
-        payerAmount:r[3]!=null?Number(r[3]):null,receiverItem:String(r[4]||''),receiverAmount:r[5]!=null?Number(r[5]):null}); cnt++}
+  await _onFileSelected(e, (result) => {
+    let cnt = 0
+    for (const r of result.rows) {
+      if (!r['付款方']) continue
+      rows.value.push({
+        payerCompany: String(r['付款方'] || ''), receiverCompany: String(r['收款方'] || ''),
+        payerItem: String(r['付款方现金流项目'] || ''), payerAmount: r['付款方金额'] != null ? Number(r['付款方金额']) : null,
+        receiverItem: String(r['收款方现金流项目'] || ''), receiverAmount: r['收款方金额'] != null ? Number(r['收款方金额']) : null,
+      })
+      cnt++
+    }
     ElMessage.success(`已导入 ${cnt} 条`)
-  } catch(err:any){ElMessage.error('解析失败：'+(err.message||''))}
-  finally{if(cfFileRef.value)cfFileRef.value.value=''}
+  }, { skipRows: 1 })
 }
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 const cellStyle = { padding: '2px 4px', fontSize: '11px' }

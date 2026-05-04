@@ -324,6 +324,7 @@ import { WarningFilled } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { fmtAmount, fmtPercent } from '@/utils/formatters'
+import { useExcelIO } from '@/composables/useExcelIO'
 import ExcelImportPreviewDialog from '@/components/common/ExcelImportPreviewDialog.vue'
 
 interface SubsidiaryInfoRow {
@@ -490,89 +491,51 @@ const EXPECTED_IMPORT_COLS = TEMPLATE_COLS.map(c => c.header)
 // 导入提示文字
 const importAlertText = '请使用\u201c导出模板\u201d下载的模板填写数据。系统将自动读取<b>\u201c数据填写\u201d</b>工作表（请勿修改sheet名称），数据从第4行开始。导入将<b>追加</b>到现有数据后面，示例行自动跳过。'
 
+const { exportTemplate: _exportTemplate, exportData: _exportData } = useExcelIO()
+
 async function exportTemplate() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-
-  // ── Sheet 1: 填写说明 ──
-  const instrRows = [
-    ['合并范围内的子企业基本信息表 — 填写说明'],
-    [],
-    ['⚠ 重要提示：'],
-    ['1. 请在"数据填写"工作表中填写数据，不要修改表头行（第3行）'],
-    ['2. 不要修改工作表名称（"填写说明"和"数据填写"），系统按名称识别'],
-    ['3. 第1行为分类标题，第2行为字段说明，第3行为表头，第4行起为数据'],
-    ['4. 核算科目、核算方式、是否变动、合并类型等字段请严格按可选值填写'],
-    ['5. 日期格式统一为 YYYY-MM-DD（如 2025-06-30）'],
-    ['6. 金额字段填数字，不要带逗号或货币符号'],
-    ['7. 持股比例填数字（如51表示51%），不要带%号'],
-    ['8. 示例行（以"示例"开头）导入时会自动跳过，可删除或保留'],
-    [],
-    ['字段说明：'],
-    ['列号', '字段名', '是否必填', '说明', '可选值/格式'],
-  ]
-  TEMPLATE_COLS.forEach((c, i) => {
-    const required = ['company_name', 'company_code', 'account_subject', 'accounting_method', 'share_changed'].includes(c.key) ? '必填' : '选填'
-    instrRows.push([String(i + 1), c.header, required, c.note, c.example || '-'])
-  })
-  const wsInstr = XLSX.utils.aoa_to_sheet(instrRows)
-  wsInstr['!cols'] = [{ wch: 6 }, { wch: 20 }, { wch: 8 }, { wch: 60 }, { wch: 20 }]
-  // 合并标题行
-  wsInstr['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }]
-  XLSX.utils.book_append_sheet(wb, wsInstr, '填写说明')
-
-  // ── Sheet 2: 数据填写 ──
-  const categoryRow = [
-    '基本信息', '', '', '', '', '', '', '', '持股比例变动', '', '当期新增', '', '',
-    '涉及合并-非同控', '', '涉及合并-同控', '', '不涉及合并', '',
-    '当期减少', '', '',
-  ]
-  const noteRow = TEMPLATE_COLS.map(c => c.note)
-  const headerRow = TEMPLATE_COLS.map(c => c.header)
-  const exampleRow1 = ['示例公司A', 'A001', 'ROOT', '集团公司', 'ROOT', '长期股权投资', '成本法', '直接', '', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
-  const exampleRow2 = ['示例公司A', 'A001', 'ROOT', '集团公司', 'ROOT', '长期股权投资', '权益法', '间接', '公司B', '否', '', '', '', '', '', '', '', '', '', '', '', '', '']
-
-  // 如果有数据就导出数据
-  const existingData = rows.value.filter(r => r.company_name).map(r =>
+  const existing = rows.value.filter(r => r.company_name).map(r =>
     TEMPLATE_COLS.map(c => (r as any)[c.key] ?? '')
   )
-  const allDataRows = existingData.length > 0
-    ? [categoryRow, noteRow, headerRow, ...existingData]
-    : [categoryRow, noteRow, headerRow, exampleRow1, exampleRow2]
-
-  const wsData = XLSX.utils.aoa_to_sheet(allDataRows)
-
-  // 列宽
-  wsData['!cols'] = TEMPLATE_COLS.map(c => ({ wch: Math.max(c.header.length * 2.5, 14) }))
-
-  // 合并分类行的单元格
-  wsData['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },   // 基本信息 A-I（含上级/控制方/持股类型/间接持股方）
-    { s: { r: 0, c: 9 }, e: { r: 0, c: 10 } },   // 持股比例变动
-    { s: { r: 0, c: 11 }, e: { r: 0, c: 13 } },  // 当期新增
-    { s: { r: 0, c: 14 }, e: { r: 0, c: 15 } },  // 涉及合并-非同控
-    { s: { r: 0, c: 16 }, e: { r: 0, c: 17 } },  // 涉及合并-同控
-    { s: { r: 0, c: 18 }, e: { r: 0, c: 19 } },  // 不涉及合并
-    { s: { r: 0, c: 20 }, e: { r: 0, c: 22 } },  // 当期减少
-  ]
-
-  XLSX.utils.book_append_sheet(wb, wsData, '数据填写')
-  XLSX.writeFile(wb, '合并范围子企业基本信息表_模板.xlsx')
-  ElMessage.success('模板已导出，请查看"填写说明"工作表了解填写要求')
+  await _exportTemplate({
+    columns: TEMPLATE_COLS,
+    fileName: '合并范围子企业基本信息表_模板.xlsx',
+    includeInstructions: true,
+    instructionTitle: '合并范围内的子企业基本信息表 — 填写说明',
+    instructionRows: [
+      ['核算科目、核算方式、是否变动、合并类型等字段请严格按可选值填写'],
+      ['日期格式统一为 YYYY-MM-DD（如 2025-06-30）'],
+      ['持股比例填数字（如51表示51%），不要带%号'],
+    ],
+    categoryRow: [
+      '基本信息', '', '', '', '', '', '', '', '持股比例变动', '', '当期新增', '', '',
+      '涉及合并-非同控', '', '涉及合并-同控', '', '不涉及合并', '',
+      '当期减少', '', '',
+    ],
+    categoryMerges: [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+      { s: { r: 0, c: 9 }, e: { r: 0, c: 10 } },
+      { s: { r: 0, c: 11 }, e: { r: 0, c: 13 } },
+      { s: { r: 0, c: 14 }, e: { r: 0, c: 15 } },
+      { s: { r: 0, c: 16 }, e: { r: 0, c: 17 } },
+      { s: { r: 0, c: 18 }, e: { r: 0, c: 19 } },
+      { s: { r: 0, c: 20 }, e: { r: 0, c: 22 } },
+    ],
+    existingData: existing.length > 0 ? existing : undefined,
+    exampleRows: [
+      ['示例公司A', 'A001', 'ROOT', '集团公司', 'ROOT', '长期股权投资', '成本法', '直接', '', '否', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['示例公司A', 'A001', 'ROOT', '集团公司', 'ROOT', '长期股权投资', '权益法', '间接', '公司B', '否', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ],
+  })
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = TEMPLATE_COLS.map(c => c.header)
-  const dataRows = rows.value.filter(r => r.company_name).map(r =>
-    TEMPLATE_COLS.map(c => (r as any)[c.key] ?? '')
-  )
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = TEMPLATE_COLS.map(c => ({ wch: Math.max(c.header.length * 2.5, 14) }))
-  XLSX.utils.book_append_sheet(wb, ws, '基本信息表')
-  XLSX.writeFile(wb, '基本信息表_数据.xlsx')
-  ElMessage.success('数据已导出')
+  await _exportData({
+    data: rows.value.filter(r => r.company_name),
+    columns: TEMPLATE_COLS,
+    sheetName: '基本信息表',
+    fileName: '基本信息表_数据.xlsx',
+  })
 }
 
 function triggerImport() {

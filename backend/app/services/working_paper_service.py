@@ -20,6 +20,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.audit_decorator import audit_log
 from app.models.workpaper_models import (
     WpFileStatus,
     WpIndex,
@@ -221,6 +222,7 @@ class WorkingPaperService:
     # 10.4  update_status / assign_workpaper
     # ------------------------------------------------------------------
 
+    @audit_log(action="status_change", object_type="working_paper")
     async def update_status(
         self,
         db: AsyncSession,
@@ -301,6 +303,7 @@ class WorkingPaperService:
             "message": "状态已更新",
         }
 
+    @audit_log(action="review", object_type="working_paper")
     async def update_review_status(
         self,
         db: AsyncSession,

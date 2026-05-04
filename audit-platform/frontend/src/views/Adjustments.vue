@@ -53,7 +53,7 @@
         <span class="gt-summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
       </div>
       <div class="gt-summary-card" v-for="(cnt, st) in summary.status_counts" :key="st">
-        <span class="gt-summary-label">{{ getStatusLabel(ADJUSTMENT_STATUS, st as string) }}</span>
+        <span class="gt-summary-label">{{ dictStore.label('adjustment_status', st as string) }}</span>
         <span class="gt-summary-value">{{ cnt }}</span>
       </div>
     </div>
@@ -101,7 +101,7 @@
       </el-table-column>
       <el-table-column prop="review_status" label="状态" width="100">
         <template #default="{ row }">
-          <GtStatusTag :status-map="ADJUSTMENT_STATUS" :value="row.review_status" />
+          <el-tag size="small" :type="dictStore.type('adjustment_status', row.review_status)">{{ dictStore.label('adjustment_status', row.review_status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
@@ -224,10 +224,13 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { fmtAmount } from '@/utils/formatters'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
+import { useDictStore } from '@/stores/dict'
 import { operationHistory } from '@/utils/operationHistory'
+import { useAutoSave } from '@/composables/useAutoSave'
 
 const route = useRoute()
 const router = useRouter()
+const dictStore = useDictStore()
 const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
   onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
@@ -270,6 +273,31 @@ const totalCredit = computed(() => form.value.line_items.reduce((s, l) => s + (l
 const balanceDiff = computed(() => Math.round((totalDebit.value - totalCredit.value) * 100) / 100)
 
 const fmtAmt = fmtAmount
+
+// ── 自动保存/草稿恢复 [R3.8] ──
+const { clearDraft: clearAutoSaveDraft } = useAutoSave(
+  `adjustment_form_${projectId.value}`,
+  () => {
+    if (!formDialogVisible.value) return null
+    return {
+      adjustment_type: form.value.adjustment_type,
+      description: form.value.description,
+      line_items: form.value.line_items,
+      isEditing: isEditing.value,
+      editingGroupId: editingGroupId.value,
+    }
+  },
+  (data) => {
+    if (!data) return
+    form.value.adjustment_type = data.adjustment_type || 'aje'
+    form.value.description = data.description || ''
+    form.value.line_items = data.line_items || [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }]
+    if (data.isEditing != null) isEditing.value = data.isEditing
+    if (data.editingGroupId) editingGroupId.value = data.editingGroupId
+    formDialogVisible.value = true
+  },
+  { enabled: formDialogVisible },
+)
 
 
 
@@ -388,6 +416,7 @@ async function onSubmit() {
       }
     }
     formDialogVisible.value = false
+    clearAutoSaveDraft()
     fetchEntries()
     fetchSummary()
   } finally {

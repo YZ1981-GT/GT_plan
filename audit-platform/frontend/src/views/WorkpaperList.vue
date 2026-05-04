@@ -122,10 +122,10 @@
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
               <el-descriptions-item label="审计循环">{{ selectedWp.audit_cycle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="编制状态">
-                <GtStatusTag :status-map="WP_STATUS" :value="selectedWp.status" />
+                <el-tag size="small" :type="dictStore.type('wp_status', selectedWp.status)">{{ dictStore.label('wp_status', selectedWp.status) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="复核状态">
-                <GtStatusTag :status-map="WP_REVIEW_STATUS" :value="selectedWp.review_status" />
+                <el-tag size="small" :type="dictStore.type('wp_review_status', selectedWp.review_status)">{{ dictStore.label('wp_review_status', selectedWp.review_status) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="编制人">{{ selectedWp.assigned_to || '未分配' }}</el-descriptions-item>
               <el-descriptions-item label="复核人">{{ selectedWp.reviewer || '未分配' }}</el-descriptions-item>
@@ -386,6 +386,7 @@ import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { WP_STATUS, WP_REVIEW_STATUS } from '@/utils/statusMaps'
+import { useDictStore } from '@/stores/dict'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
   getFeatureMaturity, submitWorkpaperReview,
@@ -402,6 +403,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const dictStore = useDictStore()
 const projectId = computed(() => route.params.projectId as string)
 
 const loading = ref(false)

@@ -18,7 +18,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bulk_operations import BulkRequest, bulk_execute
 from app.core.database import get_db
+from app.core.pagination import PaginationParams
 from app.deps import get_current_user, check_consol_lock, require_project_access, get_user_scope_cycles
 from app.models.core import User
 from app.models.audit_platform_models import AdjustmentType, ReviewStatus
@@ -45,8 +47,7 @@ async def list_adjustments(
     year: int = Query(...),
     adjustment_type: AdjustmentType | None = Query(None),
     review_status: ReviewStatus | None = Query(None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
@@ -56,7 +57,7 @@ async def list_adjustments(
         project_id, year,
         adjustment_type=adjustment_type,
         review_status=review_status,
-        page=page, page_size=page_size,
+        page=pagination.page, page_size=pagination.page_size,
     )
 
     # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
@@ -146,6 +147,27 @@ async def delete_adjustment(
         return {"message": "删除成功"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/batch-delete")
+async def batch_delete_adjustments(
+    project_id: UUID,
+    body: BulkRequest,
+    db: AsyncSession = Depends(get_db),
+    _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """批量软删除调整分录（合并锁定期间禁止，需编辑权限）"""
+    svc = AdjustmentService(db)
+
+    async def _delete_one(_db, _row):
+        # 复用 service 层的删除逻辑（含状态校验+事件发布）
+        await svc.delete_entry(project_id, _row.id)
+
+    from app.models.audit_platform_models import Adjustment
+    result = await bulk_execute(db, Adjustment, body.ids, _delete_one)
+    await db.commit()
+    return result
 
 
 @router.post("/{entry_group_id}/review")
