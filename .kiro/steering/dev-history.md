@@ -201,3 +201,60 @@ inclusion: manual
 - 搜索栏必须在表格上方（用户看不到下方的）
 
 **构建验证：** vue-tsc 零错误，Vite 构建通过（31文件 +1997/-583行），git 推送 feature/global-component-library 分支
+
+### 2026-05-05：全局化增强项目完成（4 Sprint，46 Task）
+
+**Sprint 1（10 Task）— 全局化收尾+快速见效：**
+- formatters.ts 替换 22 个组件的本地格式化函数
+- displayPrefs 接入 13 个 worksheet 组件（单位/字号跟随全局设置）
+- CommentTooltip 接入 4 个核心模块（DisclosureEditor/ConsolidationIndex/ConsolNoteTab/TrialBalance）
+- confirm.ts 语义化确认弹窗（confirmDelete/confirmBatch/confirmDangerous）
+- statusMaps.ts + GtStatusTag 状态标签集中管理
+- useEditMode composable（查看/编辑切换+未保存提示+路由拦截）
+- ExcelImportPreviewDialog 通用导入预览弹窗
+- operationHistory 接入 Adjustments + RecycleBin
+- GtAmountCell 金额单元格组件（displayPrefs+可点击+hover高亮）
+
+**Sprint 2（9 Task）— 核心基础设施：**
+- mitt 事件总线替代 CustomEvent（类型安全，删除 _redispatched 补丁）
+- useProjectStore Pinia（路由自动同步 projectId/year/standard）
+- apiPaths.ts 集中管理 500+ API 路径（40+ 业务域）
+- 后端响应格式统一（修复 5 个双重包装路由，清理前端 30+ 处 data?.data 兼容代码）
+- usePermission + v-permission 指令（角色权限体系）
+- 路由守卫统一（认证+权限+项目上下文+developing 拦截）
+- API 调用统一收口（21 个 view/component 文件迁移到 apiProxy）
+- 批量操作场景优化（batch_mode + batch-commit 端点）
+- shortcuts.ts 接入各模块（Ctrl+S/Ctrl+Z 全模块生效）
+
+**Sprint 3（14 Task）— 组件层+后端统一：**
+- GtToolbar/GtPageHeader/GtInfoBar 标准化页面头部（替换 3 个模块的重复横幅 CSS）
+- useExcelIO composable（14 个 worksheet 统一导入导出）
+- useTableToolbar composable（增删行/多选/导入导出/复制）
+- useDictStore + 后端 /api/system/dicts（枚举字典 sessionStorage 缓存）
+- 后端 PaginationParams/SortParams 统一（5 个高频列表 API）
+- 后端 BulkOperationMixin（批量删除/审批）
+- 后端 @audit_log 装饰器（before/after diff，接入删除/审批/状态变更）
+- SharedTemplatePicker 扩展到 4 个 configType
+- useCopyPaste composable（HTML+纯文本双格式，TrialBalance+ReportView）
+- useKnowledge + KnowledgePickerDialog（AI 续写知识库上下文）
+- useAutoSave 草稿恢复（30s 定时 localStorage，3 个模块）
+- useLoading + NProgress（全局进度条，路由+HTTP 拦截器）
+- useAddressRegistry Store（CellSelector/FormulaRefPicker 数据源统一）
+
+**Sprint 4（10 Task）— 高阶组件+验证+优化：**
+- GtEditableTable 高阶可编辑表格（360行，内置 useCellSelection/useLazyEdit/useEditMode/useFullscreen/useTableToolbar/useCopyPaste/SelectionBar/CellContextMenu/CommentTooltip，列配置声明式，支持 hidden/validator/locked/groupBy/filterable）
+- 端到端验证脚本（test_e2e_audit_flow.py，11 步全流程 API 测试）
+- 数据库 migration 机制（migration_runner.py，V*.sql 版本化脚本，启动时自动执行）
+- 合并模块集成测试（test_consolidation_chain.py，合并范围→试算→抵消→差额→报表）
+- 事件链路失败通知 + SSE 全局接入（SYNC_FAILED 事件，SyncStatusIndicator 顶栏指示器，失败详情抽屉）
+- 架构优化：Element Plus unplugin 按需导入、ResponseWrapperMiddleware 大响应跳过、POST 防重复提交、Locust 压力测试脚本
+- 用户体验：GtConsolWizard 合并向导步骤条、500 重试 loading 提示、423 锁定详情、useKeyboardNav 键盘导航
+- 表格交互增强：GtPrintPreview 打印预览、CommentThread 批注线程（回复链）
+- 功能完善：equity_method_service.py 模拟权益法（6 项改进）、elimination_service 汇总中心（5 区域）、内部抵消表自动汇总
+
+**构建验证：** vue-tsc 零错误，Vite 构建通过（32.77s），git 推送 feature/global-component-library 分支
+
+**已知遗留问题（Sprint 4 后）：**
+- WorkpaperEditor.vue 有 1 个预存的 Univer locale 类型声明问题（@univerjs 包问题，非本项目代码）
+- Element Plus 按需导入后 bundle 仍有大文件（WorkpaperEditor 5.7MB，AttachmentManagement 4.8MB），主要是 Univer 和 xlsx 库
+- 合并报表前端 TS 错误（Phase 2 遗留，标记 developing）

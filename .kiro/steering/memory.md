@@ -34,7 +34,7 @@ inclusion: always
 - Paperless-ngx 端口 8010（admin/admin）
 - 测试用户：admin/admin123（role=admin）
 
-## 当前系统状态（2026-05-05）
+## 当前系统状态（2026-05-05，全局化增强完成）
 
 - 17 个开发阶段中 16 个完成，vue-tsc 零错误，Vite 构建通过
 - 后端约 700 路由，0 个 stub 残留
