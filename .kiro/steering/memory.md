@@ -50,6 +50,7 @@ inclusion: always
 - 汇总穿透已接真实数据：POST /api/report-config/drill-down 从各子企业 consol_worksheet_data 按 row_code 提取实际金额，降级保留持股比例估算
 - 附注 refresh API 三级匹配：精确科目名 → account_note_mapping 映射表 → 模糊包含匹配（len>=2）
 - 审计员 8 步全流程理论可走通（导入-查账-调整-试算表-底稿-附注-报告-Word导出）
+- 测试：公式解析器单元测试 28 个全部通过（test_formula_parser.py），端到端冒烟测试 14 个 API（test_smoke_e2e.py，需后端在线）
 - 附注 8 种校验器全部做实，预设公式国企 757 条 + 上市 804 条已集成到引擎，QC 28 条规则全部做实
 - 底稿精细化规则 347 个 JSON（77 个 A 级精修 + 270 个 C 级程序表），明细行动态发现（detail_discovery），全部 v2025-R2
 - 报表 4 套 x 6 张，1191 行种子数据
