@@ -47,8 +47,8 @@
     </div>
 
     <!-- 试算平衡表 -->
-    <div class="gt-consol-matrix" v-loading="consolTbLoading">
-      <div class="gt-consol-matrix-scroll" style="max-height:calc(100vh - 300px)">
+    <div class="gt-consol-matrix gt-ctb-table-wrap" v-loading="consolTbLoading">
+      <div class="gt-consol-matrix-scroll">
         <table class="gt-consol-matrix-table">
           <thead>
             <tr>
@@ -396,18 +396,20 @@ defineExpose({ loadConsolTb, consolTbRows, consolTbType, consolTbLoading })
 </script>
 
 <style scoped>
-.gt-ctb { padding: 0; }
+.gt-ctb {
+  display: flex; flex-direction: column; height: calc(100vh - 160px); padding: 0;
+}
 
 /* 报表类型标签栏 */
 .gt-ctb-type-bar {
   display: flex; gap: 0; border-bottom: 2px solid var(--gt-color-border-light, #f0f0f5);
-  margin-bottom: 10px;
+  margin-bottom: 8px; flex-shrink: 0;
 }
 
 /* 工具栏 */
 .gt-ctb-toolbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; margin-bottom: 8px;
+  padding: 8px 12px; margin-bottom: 6px; flex-shrink: 0;
   background: var(--gt-color-bg-elevated, #faf9fd);
   border: 1px solid var(--gt-color-border-light, #f0f0f5);
   border-radius: var(--gt-radius-md, 8px);
@@ -423,10 +425,19 @@ defineExpose({ loadConsolTb, consolTbRows, consolTbType, consolTbLoading })
 /* 信息栏 */
 .gt-ctb-info {
   display: flex; align-items: center; gap: 12px;
-  padding: 4px 0 8px; font-size: 12px; color: var(--gt-color-text-secondary, #6e6e73);
+  padding: 2px 0 6px; font-size: 12px; color: var(--gt-color-text-secondary, #6e6e73);
+  flex-shrink: 0;
 }
 .gt-ctb-info-formula {
   padding: 2px 8px; background: var(--gt-color-primary-bg, #f4f0fa);
   border-radius: var(--gt-radius-sm, 4px); font-size: 11px; color: var(--gt-color-primary, #4b2d77);
+}
+
+/* 表格区域填满剩余空间 */
+.gt-ctb-table-wrap {
+  flex: 1; min-height: 0; overflow: hidden;
+}
+.gt-ctb-table-wrap .gt-consol-matrix-scroll {
+  max-height: 100%; height: 100%;
 }
 </style>
