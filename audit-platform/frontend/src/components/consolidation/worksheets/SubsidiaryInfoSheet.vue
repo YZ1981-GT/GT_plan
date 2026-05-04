@@ -435,7 +435,7 @@ function createEmptyRow(): SubsidiaryInfoRow {
 }
 
 function addRow() { rows.value.push(createEmptyRow()) }
-function removeRow(idx: number) { rows.value.splice(idx, 1) }
+function _removeRow(idx: number) { rows.value.splice(idx, 1) }
 
 const tableRef = ref<any>(null)
 const selectedRows = ref<SubsidiaryInfoRow[]>([])

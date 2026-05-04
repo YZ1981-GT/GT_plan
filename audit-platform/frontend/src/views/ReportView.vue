@@ -1236,7 +1236,7 @@ function rvCellClassName({ rowIndex, columnIndex }: any) {
   return classes.join(' ')
 }
 
-function onRvCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   rvCtx.closeContextMenu()
   const rowIdx = rows.value.indexOf(row)
   const colLabels = ['序号', '项目', '本期金额', '上期金额']

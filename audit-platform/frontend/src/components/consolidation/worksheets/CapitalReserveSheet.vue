@@ -27,7 +27,7 @@
 
     <el-table :data="tableData" border size="small" class="ws-table" max-height="calc(100vh - 300px)"
       :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName"
-      @selection-change="sel => selectedRows = sel">
+      @selection-change="(_sel: any[]) => selectedRows = _sel">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column prop="item" label="资本公积" width="200" fixed show-overflow-tooltip>
         <template #default="{ row }">

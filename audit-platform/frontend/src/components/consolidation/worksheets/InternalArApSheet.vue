@@ -38,7 +38,7 @@
     <el-table :data="rows" border size="small" class="ws-table"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 340px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
-      @selection-change="sel => selectedRows = sel">
+      @selection-change="(_sel: any[]) => selectedRows = _sel">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
       <!-- 本方基本信息 -->

@@ -31,7 +31,7 @@
           <span class="gt-dep-node-icon">{{ nodeStatus[n.id] === 'done' ? '✅' : nodeStatus[n.id] === 'wip' ? '📝' : '⬜' }}</span>
           <span class="gt-dep-node-label">{{ n.label }}</span>
           <el-tag v-if="n.effectiveness" size="small" :type="n.effectiveness === 'effective' ? 'success' : n.effectiveness === 'ineffective' ? 'danger' : 'warning'" style="margin-left:4px">
-            {{ { effective: '有效', partially_effective: '部分', ineffective: '无效', not_tested: '未测' }[n.effectiveness] || '' }}
+            {{ ({ effective: '有效', partially_effective: '部分', ineffective: '无效', not_tested: '未测' } as Record<string, string>)[n.effectiveness] || '' }}
           </el-tag>
         </div>
         <div v-if="!cNodes.length" class="gt-dep-empty">无独立控制测试</div>
@@ -136,7 +136,7 @@ async function loadNodeStatuses() {
 
     // 加载控制测试结论影响
     try {
-      const { data: depData } = await http.get(`/api/wp-dependencies/cycle/${selectedCycle.value}`, {
+      const { data: _depData } = await http.get(`/api/wp-dependencies/cycle/${selectedCycle.value}`, {
         validateStatus: (s: number) => s < 600,
       })
       // 从依赖检查获取impact

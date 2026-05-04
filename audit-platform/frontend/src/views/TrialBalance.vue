@@ -600,7 +600,7 @@ function tbCellClassName({ rowIndex, columnIndex }: any) {
   return classes.join(' ')
 }
 
-function onTbCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+function onTbCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   tbCtx.closeContextMenu()
   const rowIdx = groupedRows.value.indexOf(row)
   const colLabels: Record<string, number> = { '科目编码': 0, '科目名称': 1, '未审数': 2, 'RJE调整': 3, 'AJE调整': 4, '审定数': 5 }

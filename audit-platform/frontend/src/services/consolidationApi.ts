@@ -379,8 +379,8 @@ export async function createConsolNotes(projectId: string, year: number): Promis
 }
 
 export async function saveConsolNotes(_projectId: string, _period: string, _data: any): Promise<any> {
-  const year = parseInt(period) || new Date().getFullYear() - 1
-  return api.post(`/api/consolidation/notes/${projectId}/${year}/save`)
+  const year = parseInt(_period) || new Date().getFullYear() - 1
+  return api.post(`/api/consolidation/notes/${_projectId}/${year}/save`)
 }
 
 export async function getConsolScopeNotes(projectId: string, period: string): Promise<ConsolScopeNote[]> {

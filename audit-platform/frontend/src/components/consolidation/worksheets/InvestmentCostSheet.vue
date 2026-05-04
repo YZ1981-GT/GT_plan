@@ -225,7 +225,7 @@ watch(rows, () => {
   }
 }, { deep: true, immediate: true })
 
-function onSummaryEdit(field: string, val: number | null) {
+function _onSummaryEdit(field: string, val: number | null) {
   summaryRow[field] = val
   overriddenFields.add(field)
 }

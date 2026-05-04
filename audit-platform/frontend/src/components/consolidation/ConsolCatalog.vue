@@ -52,7 +52,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
 const route = useRoute()
-const projectId = computed(() => route.params.projectId as string)
+const _projectId = computed(() => route.params.projectId as string)
 const standard = ref('soe')
 const activeTab = ref('reports')
 const noteSearch = ref('')
@@ -177,7 +177,7 @@ function refreshSingle(type: string, data: any) {
 
 const auditing = ref(false)
 
-async function auditAllNotes() {
+async function _auditAllNotes() {
   auditing.value = true
   // 通知 ConsolidationIndex 执行全审
   window.dispatchEvent(new CustomEvent('consol-note-audit-all', { detail: { standard: standard.value } }))

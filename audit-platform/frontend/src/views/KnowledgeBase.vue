@@ -758,7 +758,7 @@ async function onDownloadDoc(doc: any) {
 }
 
 // 移动文档
-async function onMoveDoc(doc: any) {
+async function _onMoveDoc(doc: any) {
   const { value } = await ElMessageBox.prompt('输入目标文件夹名称（从列表中选择）', '移动文档', {
     inputPlaceholder: '目标文件夹ID',
   })
@@ -778,7 +778,7 @@ async function onMoveDoc(doc: any) {
 }
 
 // 文件夹右键重命名
-async function onFolderContextMenu(folder: any, event: MouseEvent) {
+async function _onFolderContextMenu(folder: any, event: MouseEvent) {
   event.preventDefault()
   const { value } = await ElMessageBox.prompt(`重命名文件夹「${folder.name}」`, '重命名', {
     inputValue: folder.name,

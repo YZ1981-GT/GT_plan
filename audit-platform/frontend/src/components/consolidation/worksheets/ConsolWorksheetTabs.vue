@@ -153,10 +153,6 @@ interface CapitalReserveRow {
   item: string; total: number | null; elimAdj: number | null; parentVal: number | null
   values?: (number | null)[]; bold?: boolean; isComputed?: boolean; fromElim?: boolean; isDiff?: boolean; note?: string
 }
-interface NetAssetChangeRow {
-  item: string; before: number | null; after: (number | null)[]
-  indent?: number; bold?: boolean; isHeader?: boolean
-}
 
 const EQUITY_ITEMS = [
   '实收资本（或股本）', '其他权益工具', '资本公积', '减：库存股',
@@ -525,7 +521,7 @@ const activeShareChangeCompanies = computed(() => {
     }))
 })
 
-function onOpenShareChange(row: SubsidiaryInfoRow, times: number) {
+function onOpenShareChange(_row: SubsidiaryInfoRow, times: number) {
   // 直接切换到对应的股比变动表
   activeSheet.value = `share_change_${times}`
 }

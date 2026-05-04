@@ -475,7 +475,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useCellSelection } from '@/composables/useCellSelection'
@@ -594,7 +594,7 @@ function noteCellClassName({ rowIndex, columnIndex }: any) {
   return classes.join(' ')
 }
 
-function onNoteCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+function onNoteCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   noteCtx.closeContextMenu()
   const sec = selectedNoteSection.value
   if (!sec || noteEditMode.value) return
@@ -615,7 +615,7 @@ function onNoteCellClick(row: any, column: any, cell: HTMLElement, event: MouseE
   }
 }
 
-function onNoteCellContextMenu(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+function onNoteCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   const sec = selectedNoteSection.value
   if (!sec || noteEditMode.value) return
   const colIdx = sec.headers.indexOf(column.label)

@@ -29,7 +29,7 @@
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle" :row-class-name="rowClassName"
       show-summary :summary-method="getSummary"
-      @selection-change="sel => selectedRows = sel">
+      @selection-change="(_sel: any[]) => selectedRows = _sel">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column prop="companyName" label="子企业" width="160" fixed show-overflow-tooltip />
       <el-table-column prop="ratio" label="持股比例" width="80" align="right">
@@ -37,10 +37,10 @@
       </el-table-column>
       <el-table-column label="账面长投" align="center">
         <el-table-column prop="bookCost" label="投资成本" width="110" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.bookCost" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="v => setOverride(row.companyName, 'bookCost', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.bookCost" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'bookCost', v)" /></template>
         </el-table-column>
         <el-table-column prop="bookImpairment" label="减值准备" width="100" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.bookImpairment" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="v => setOverride(row.companyName, 'bookImpairment', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.bookImpairment" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'bookImpairment', v)" /></template>
         </el-table-column>
         <el-table-column prop="bookNet" label="账面净额" width="110" align="right">
           <template #default="{ row }"><span class="ws-computed">{{ fmt(row.bookNet) }}</span></template>
@@ -48,10 +48,10 @@
       </el-table-column>
       <el-table-column label="权益法模拟调整" align="center">
         <el-table-column prop="simIncomeAdj" label="损益调整" width="100" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.simIncomeAdj" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="v => setOverride(row.companyName, 'simIncomeAdj', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.simIncomeAdj" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'simIncomeAdj', v)" /></template>
         </el-table-column>
         <el-table-column prop="simOtherEquity" label="其他权益变动" width="100" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.simOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="v => setOverride(row.companyName, 'simOtherEquity', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.simOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'simOtherEquity', v)" /></template>
         </el-table-column>
         <el-table-column prop="simTotal" label="模拟后长投" width="110" align="right">
           <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.simTotal) }}</span></template>
@@ -59,13 +59,13 @@
       </el-table-column>
       <el-table-column label="合并抵消" align="center">
         <el-table-column prop="elimCost" label="投资成本" width="110" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.elimCost" size="small" :precision="2" :controls="false" style="width:100%;color:#e6a23c" class="ws-auto-cell" @update:model-value="v => setOverride(row.companyName, 'elimCost', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.elimCost" size="small" :precision="2" :controls="false" style="width:100%;color:#e6a23c" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimCost', v)" /></template>
         </el-table-column>
         <el-table-column prop="elimIncomeAdj" label="损益调整" width="100" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.elimIncomeAdj" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="v => setOverride(row.companyName, 'elimIncomeAdj', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.elimIncomeAdj" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimIncomeAdj', v)" /></template>
         </el-table-column>
         <el-table-column prop="elimOtherEquity" label="其他权益变动" width="100" align="right">
-          <template #default="{ row }"><el-input-number :model-value="row.elimOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="v => setOverride(row.companyName, 'elimOtherEquity', v)" /></template>
+          <template #default="{ row }"><el-input-number :model-value="row.elimOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimOtherEquity', v)" /></template>
         </el-table-column>
         <el-table-column prop="elimTotal" label="抵消合计" width="110" align="right">
           <template #default="{ row }"><span style="color:#e6a23c;font-weight:600">{{ fmt(row.elimTotal) }}</span></template>
@@ -221,7 +221,7 @@ async function exportData() {
   XLSX.utils.book_append_sheet(wb,ws,'抵消后长投明细'); XLSX.writeFile(wb,'抵消后长投明细.xlsx')
   ElMessage.success('已导出')
 }
-function calcCls(v: any) { return n(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
+function _calcCls(v: any) { return n(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
 const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
 function rowCellStyle() { return { padding: '4px 8px', fontSize: '12px' } }

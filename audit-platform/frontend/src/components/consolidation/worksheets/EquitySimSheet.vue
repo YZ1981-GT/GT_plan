@@ -34,7 +34,7 @@
       <el-table :data="directTableData" border size="small" class="ws-table"
         :max-height="isFullscreen ? 'calc(100vh - 200px)' : '500'"
         :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName"
-        @selection-change="sel => selectedDirectRows = sel.filter((r: any) => !r._isRatioRow)">
+        @selection-change="(_sel: any[]) => selectedDirectRows = _sel.filter((r: any) => !r._isRatioRow)">
         <el-table-column type="selection" width="36" fixed align="center" :selectable="(row: any) => !row._isRatioRow" />
         <el-table-column prop="seq" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
         <el-table-column prop="step" label="步骤" width="160" fixed show-overflow-tooltip>
@@ -191,7 +191,7 @@ const indirectSections = ref([...props.indirectSections])
 const directTableData = computed(() => {
   const ratioRow: any = {
     _isRatioRow: true, seq: '', step: '', direction: '', subject: '期末持股比例', detail: '',
-    total: null, values: companies.value.map(c => null), isStep: false, isComputed: false,
+    total: null, values: companies.value.map(_c => null), isStep: false, isComputed: false,
   }
   return [ratioRow, ...directRows.value]
 })

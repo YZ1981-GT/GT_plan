@@ -28,7 +28,7 @@
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       show-summary :summary-method="getSummary"
-      @selection-change="sel => selectedRows = sel">
+      @selection-change="(_sel: any[]) => selectedRows = _sel">
       <el-table-column type="selection" width="36" fixed align="center" />
       <el-table-column prop="companyName" label="子企业" width="160" fixed show-overflow-tooltip />
       <el-table-column prop="parentRatio" label="母公司持股" width="90" align="right">

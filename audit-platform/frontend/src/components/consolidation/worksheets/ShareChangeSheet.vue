@@ -186,7 +186,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 const EQUITY_ITEMS = ['实收资本（或股本）','其他权益工具','资本公积','减：库存股','其他综合收益','专项储备','盈余公积','△一般风险准备','未分配利润']
 
@@ -201,7 +201,7 @@ const props = defineProps<{
   indirectCompanies?: { name: string; code?: string; ratio: number; indirectHolder?: string }[]
 }>()
 
-const emit = defineEmits<{
+const _emit = defineEmits<{
   (e: 'save', data: any): void
   (e: 'open-formula', key: string): void
 }>()

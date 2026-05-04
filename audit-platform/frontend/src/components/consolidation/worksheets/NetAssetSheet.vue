@@ -32,7 +32,7 @@
       :max-height="isFullscreen ? 'calc(100vh - 80px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle"
       :row-class-name="rowClassName" :span-method="spanMethod"
-      @selection-change="sel => selectedRows = sel">
+      @selection-change="(_sel: any[]) => selectedRows = _sel">
       <el-table-column type="selection" width="36" fixed align="center" />
       <!-- 序号 -->
       <el-table-column prop="seq" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
@@ -144,13 +144,13 @@ function addRow() {
   tableData.value.push(newRow)
 }
 
-let deletedBackup: NetAssetRow[] = []
+let _deletedBackup: NetAssetRow[] = []
 
 async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
     await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 行？删除后可点击"还原"恢复默认行。`, '删除确认', { type: 'warning' })
-    deletedBackup = [...tableData.value] // 备份当前状态
+    _deletedBackup = [...tableData.value] // 备份当前状态
     const del = new Set(selectedRows.value)
     tableData.value = tableData.value.filter(r => !del.has(r))
     selectedRows.value = []
@@ -229,7 +229,7 @@ function calcRowTotal(row: NetAssetRow): number {
   return sum
 }
 
-function calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
+function _calcCls(v: any) { return Number(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
 
 const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '2px 0' }
 

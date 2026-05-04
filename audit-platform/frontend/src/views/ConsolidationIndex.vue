@@ -789,7 +789,7 @@ function onTreeNodeClick(data: any) {
   selectedNode.value = data
 }
 
-function goToProject(node: any) {
+function goToProject(_node: any) {
   router.push('/consolidation')
 }
 
@@ -1093,7 +1093,7 @@ const reportNavItems = [
   { key: 'cash_flow_supplement', label: '现金流附表', desc: '现金流量表补充资料', icon: '📑' },
   { key: 'impairment_provision', label: '资产减值准备表', desc: '合并资产减值准备明细', icon: '⚠️' },
 ]
-const currentReportLabel = computed(() => {
+const _currentReportLabel = computed(() => {
   return reportNavItems.find(i => i.key === consolReportType.value)?.label || '合并报表'
 })
 const consolReportRows = ref<any[]>([])
@@ -1158,7 +1158,7 @@ function reportCellClassName({ rowIndex, columnIndex }: any) {
   return classes.join(' ')
 }
 
-function onReportCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+function onReportCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   consolCtx.closeContextMenu()
   const rowIdx = consolReportRows.value.indexOf(row)
   const colMap: Record<string, number> = { '行次': 0, '项目': 1, '合并本期': 2, '合并上期': 3 }
@@ -1289,11 +1289,11 @@ function exportConsolReport() {
   window.open(`/api/reports/${projectId.value}/${year.value}/export?report_type=${consolReportType.value}&applicable_standard=${standard}`, '_blank')
 }
 
-function getConsolReportConfigData(): Record<string, any> {
+function _getConsolReportConfigData(): Record<string, any> {
   return { rows: consolReportRows.value, template_type: consolReportTemplateType.value, report_type: consolReportType.value }
 }
 
-function onConsolReportTemplateApplied(_data: Record<string, any>) {
+function _onConsolReportTemplateApplied(_data: Record<string, any>) {
   loadConsolReport()
 }
 
@@ -1307,9 +1307,9 @@ const showConsolNoteConversion = ref(false)
 const noteAuditResults = ref<any[]>([])
 const noteAuditSummary = reactive({ totalSections: 0, totalChecks: 0, passCount: 0, errorCount: 0, warnCount: 0 })
 const showNoteAuditDialog = ref(false)
-const noteAuditLoading = ref(false)
+const _noteAuditLoading = ref(false)
 
-function auditRowClass({ row }: { row: any }) {
+function _auditRowClass({ row }: { row: any }) {
   if (row.level === 'error') return 'gt-audit-row-error'
   if (row.level === 'warn') return 'gt-audit-row-warn'
   return ''
@@ -1349,18 +1349,18 @@ async function loadConsolNoteTree(forceRefresh = false) {
   finally { consolNoteLoading.value = false }
 }
 
-function switchNoteTemplate() {
+function _switchNoteTemplate() {
   consolNoteTemplateType.value = consolNoteTemplateType.value === 'soe' ? 'listed' : 'soe'
   loadConsolNoteTree()
   showConsolNoteConversion.value = false
   ElMessage.success('已切换为' + (consolNoteTemplateType.value === 'soe' ? '国企版' : '上市版'))
 }
 
-function getConsolNoteConfigData(): Record<string, any> {
+function _getConsolNoteConfigData(): Record<string, any> {
   return { template_type: consolNoteTemplateType.value }
 }
 
-function onConsolNoteTemplateApplied(_data: Record<string, any>) {
+function _onConsolNoteTemplateApplied(_data: Record<string, any>) {
   loadConsolNoteTree()
 }
 

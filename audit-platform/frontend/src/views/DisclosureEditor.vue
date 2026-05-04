@@ -1210,7 +1210,7 @@ function deCellClassName({ rowIndex, columnIndex }: any) {
   return classes.join(' ')
 }
 
-function onDeCellClick(row: any, column: any, cell: HTMLElement, event: MouseEvent) {
+function onDeCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   deCtx.closeContextMenu()
   const tableRows = activeTableData.value?.rows || []
   const rowIdx = tableRows.indexOf(row)

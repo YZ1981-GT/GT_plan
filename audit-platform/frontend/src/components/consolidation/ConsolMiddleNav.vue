@@ -121,7 +121,7 @@ const addForm = reactive({ name: '', code: '', parentName: '', parentCode: '', u
 const manualCompanies = ref<any[]>([])
 
 // 已有企业列表（用于上级单位下拉）
-const existingCompanies = computed(() => {
+const _existingCompanies = computed(() => {
   const list: { name: string; code: string }[] = []
   function collect(node: any) {
     if (node.company_code) list.push({ name: node.company_name || node.name, code: node.company_code })

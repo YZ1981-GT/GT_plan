@@ -392,7 +392,7 @@ import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
-  checkFeatureFlag, getFeatureMaturity, submitWorkpaperReview,
+  getFeatureMaturity, submitWorkpaperReview,
   checkUnconfirmedAI,
 } from '@/services/commonApi'
 import {
@@ -462,8 +462,8 @@ const uploadRef = ref<any>(null)
 const onlineEditAvailable = ref(true)
 const onlineEditEnabled = ref(true)
 const onlineEditMaturity = ref('production')
-const onlineEditReady = computed(() => true)
-const onlineEditNotice = computed(() => '')
+const _onlineEditReady = computed(() => true)
+const _onlineEditNotice = computed(() => '')
 
 // Review annotations
 const annotations = ref<any[]>([])
@@ -666,12 +666,12 @@ function goToWorkbench() {
   router.push(`/projects/${projectId.value}/workpaper-bench`)
 }
 
-function goToTemplates() {
+function _goToTemplates() {
   router.push(`/projects/${projectId.value}/templates`)
 }
 
 // ── 审计程序指南数据（右栏） ──
-const guideExpanded = ref('')
+const _guideExpanded = ref('')
 
 const auditCycleGuide = [
   { cycle: 'B', name: '初步业务活动/风险评估', color: '#7c5cbf', count: 56 },
