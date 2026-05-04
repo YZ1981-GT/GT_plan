@@ -321,3 +321,147 @@ async def report_drill_down(
             r["pct"] = 0
 
     return {"rows": rows, "total": total, "row_code": row_code, "col_field": col_field}
+
+
+@router.post("/execute-formula")
+async def execute_formula(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """执行公式表达式，返回计算结果和执行追踪
+
+    请求体:
+      project_id: 项目ID
+      year: 年度
+      formula: 公式字符串（如 "TB('1001','期末余额') + 100"）
+      row_values: 可选，行引用值映射（如 {"BS-002": 50000, "BS-003": 30000}）
+    """
+    from app.services.formula_parser import evaluate_formula
+    from app.services.formula_engine import FormulaEngine
+
+    project_id_str = body.get("project_id", "")
+    year_val = body.get("year", 2024)
+    formula = body.get("formula", "")
+    row_values_raw = body.get("row_values", {})
+
+    if not formula:
+        return {"value": None, "trace": [], "error": "公式不能为空"}
+
+    from decimal import Decimal
+    from uuid import UUID
+    try:
+        pid = UUID(project_id_str) if project_id_str else None
+    except ValueError:
+        pid = None
+
+    row_values = {k: Decimal(str(v)) for k, v in row_values_raw.items()} if row_values_raw else None
+
+    engine = FormulaEngine()
+    result = await evaluate_formula(
+        formula=formula,
+        db=db,
+        project_id=pid,
+        year=year_val,
+        engine=engine,
+        row_values=row_values,
+    )
+    return result
+
+
+@router.post("/execute-formulas-batch")
+async def execute_formulas_batch(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """批量执行公式（带依赖排序）
+
+    请求体:
+      project_id: 项目ID
+      year: 年度
+      formulas: [{ row_code: "BS-002", formula: "TB('1001','期末余额')" }, ...]
+    """
+    from app.services.formula_parser import evaluate_formula, parse_formula, RowRefNode, RangeSumNode, BinOpNode, FuncCallNode
+    from app.services.formula_engine import FormulaEngine
+    from decimal import Decimal
+    from uuid import UUID
+
+    project_id_str = body.get("project_id", "")
+    year_val = body.get("year", 2024)
+    formulas = body.get("formulas", [])
+
+    try:
+        pid = UUID(project_id_str) if project_id_str else None
+    except ValueError:
+        pid = None
+
+    engine = FormulaEngine()
+    row_values: dict[str, Decimal] = {}
+    results = []
+
+    # 简单拓扑排序：先执行无依赖的，再执行有依赖的
+    # 第一轮：收集所有行引用依赖
+    def collect_deps(node) -> set[str]:
+        deps = set()
+        if isinstance(node, RowRefNode):
+            deps.add(node.row_code)
+        elif isinstance(node, RangeSumNode):
+            deps.add(f"RANGE:{node.start_code}:{node.end_code}")
+        elif isinstance(node, BinOpNode):
+            deps |= collect_deps(node.left)
+            deps |= collect_deps(node.right)
+        elif isinstance(node, FuncCallNode):
+            for arg in node.args:
+                deps |= collect_deps(arg)
+        return deps
+
+    parsed = []
+    for f in formulas:
+        code = f.get("row_code", "")
+        formula_str = f.get("formula", "")
+        if not formula_str:
+            parsed.append((code, formula_str, None, set()))
+            continue
+        try:
+            ast = parse_formula(formula_str)
+            deps = collect_deps(ast)
+            parsed.append((code, formula_str, ast, deps))
+        except Exception as e:
+            parsed.append((code, formula_str, None, set()))
+            results.append({"row_code": code, "value": None, "error": str(e)})
+
+    # 拓扑排序执行
+    executed = set()
+    max_rounds = len(parsed) + 1
+    for _round in range(max_rounds):
+        progress = False
+        for code, formula_str, ast, deps in parsed:
+            if code in executed:
+                continue
+            # 检查依赖是否已执行
+            unmet = {d for d in deps if not d.startswith("RANGE:") and d not in executed}
+            if unmet:
+                continue
+            # 执行
+            if ast is None:
+                executed.add(code)
+                continue
+            result = await evaluate_formula(
+                formula=formula_str, db=db, project_id=pid, year=year_val,
+                engine=engine, row_values=row_values,
+            )
+            if result.get("value") is not None:
+                row_values[code] = Decimal(str(result["value"]))
+            results.append({"row_code": code, **result})
+            executed.add(code)
+            progress = True
+        if not progress:
+            break
+
+    # 未执行的（循环依赖）
+    for code, formula_str, ast, deps in parsed:
+        if code not in executed:
+            results.append({"row_code": code, "value": None, "error": f"循环依赖: {deps - executed}"})
+
+    return {"results": results, "row_values": {k: float(v) for k, v in row_values.items()}}

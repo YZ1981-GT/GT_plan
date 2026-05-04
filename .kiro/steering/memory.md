@@ -164,6 +164,7 @@ inclusion: always
 - Vue 模板 HTML 属性值中禁止使用中文引号 `""`，会被解析为属性结束符导致编译失败
 - 禁止用 PowerShell `-replace` 修改含中文的 Vue 文件，会破坏 UTF-8 编码导致中文乱码，必须用 strReplace 工具逐个替换
 - tsconfig.json 关闭 noUnusedLocals/noUnusedParameters（大型项目噪音过多，unused 检查交给 ESLint）
+- 大表格编辑性能：useLazyEdit composable 按需渲染，只有点击的单元格渲染 el-input（其他纯文本），200行×10列从 2000 个 el-input 降为 1 个，已集成到 ConsolNoteTab
 - 合并工作底稿五步流程：基本信息→投资明细→净资产归集→权益法模拟→抵消分录+资本公积核查
 - 合并股比变动：内联表三栏布局（净资产变动+直接持股模拟+间接持股模拟），左侧导航根据基本信息表动态生成（1/2/3次），:key 强制重建，setup 同步初始化
 - 基本信息表 holding_type（直接/间接）+ indirect_holder（间接持股方）字段，同一企业可出现两行（直接51%+间接49%通过公司B），模拟权益法按持股路径分别模拟
