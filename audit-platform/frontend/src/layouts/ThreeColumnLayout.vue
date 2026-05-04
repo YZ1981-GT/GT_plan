@@ -48,6 +48,11 @@
             <span style="font-size:16px;font-weight:700;font-style:italic;line-height:18px">ƒx</span>
           </div>
         </el-tooltip>
+        <el-tooltip content="自定义查询" placement="bottom">
+          <div class="gt-topbar-btn" @click="showCustomQuery = true">
+            <span style="font-size:15px;line-height:18px">🔍</span>
+          </div>
+        </el-tooltip>
 
         <div class="gt-topbar-divider" />
 
@@ -214,6 +219,13 @@
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
     />
+
+    <!-- 全局自定义查询弹窗 -->
+    <CustomQueryDialog
+      v-model="showCustomQuery"
+      :project-id="currentProjectId"
+      :year="currentYear"
+    />
   </div>
 </template>
 
@@ -230,6 +242,7 @@ import {
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -297,6 +310,7 @@ const catalogCollapsed = ref(false)
 const fourColumnMode = ref(false)
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
+const showCustomQuery = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
