@@ -477,16 +477,18 @@ async def execute_formulas_batch(
         from app.routers.formula_audit_log import ensure_table as ensure_fal_table
         await ensure_fal_table(db)
         import json as _json
+        import uuid as _uuid
+        from datetime import datetime as _dt
         for r in results:
             if r.get("value") is not None:
                 formula_str_log = next((f.get("formula", "") for f in formulas if f.get("row_code") == r["row_code"]), "")
                 await db.execute(
                     text("""INSERT INTO formula_audit_log (id, project_id, year, module, row_code, action, new_formula, result_value, trace, created_at)
                         VALUES (:id, :pid, :y, 'report', :rc, 'execute', :nf, :rv, CAST(:tr AS jsonb), :now)"""),
-                    {"id": str(UUID(int=0).hex[:8] + str(UUID(int=hash(r["row_code"])))[8:]), "pid": project_id_str, "y": year_val,
+                    {"id": str(_uuid.uuid4()), "pid": project_id_str, "y": year_val,
                      "rc": r["row_code"], "nf": formula_str_log, "rv": r["value"],
                      "tr": _json.dumps(r.get("trace", []), ensure_ascii=False),
-                     "now": __import__('datetime').datetime.utcnow()},
+                     "now": _dt.utcnow()},
                 )
         await db.commit()
     except Exception:

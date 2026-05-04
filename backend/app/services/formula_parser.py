@@ -72,7 +72,7 @@ class RangeSumNode:
 # ─── 词法分析 ────────────────────────────────────────────────────────────────
 
 TOKEN_PATTERNS = [
-    ('NUMBER',   r'-?\d+\.?\d*'),
+    ('NUMBER',   r'\d+\.?\d*'),       # 不含负号，负号由 MINUS + factor 处理
     ('STRING',   r"'[^']*'"),
     ('FUNC',     r'[A-Z_][A-Z_0-9]*(?=\s*\()'),
     ('IDENT',    r'[A-Za-z_][A-Za-z_0-9\-]*'),
@@ -360,10 +360,14 @@ class FormulaEvaluator:
         col = args[1] if len(args) > 1 else '期末'
         field = 'current_period_amount' if '期末' in col or '本期' in col else 'prior_period_amount'
         try:
-            result = await self.db.execute(
-                sa_text(f"SELECT {field} FROM report_config WHERE row_code = :rc AND is_deleted = false LIMIT 1"),
-                {"rc": row_code},
-            )
+            # 优先按 project_id 查，降级查全局
+            query = f"SELECT {field} FROM report_config WHERE row_code = :rc AND is_deleted = false"
+            params: dict = {"rc": row_code}
+            if self.project_id:
+                query += " AND (project_id = :pid OR project_id IS NULL)"
+                params["pid"] = str(self.project_id)
+            query += " ORDER BY project_id DESC NULLS LAST LIMIT 1"
+            result = await self.db.execute(sa_text(query), params)
             row = result.fetchone()
             val = Decimal(str(row[0])) if row and row[0] is not None else Decimal(0)
             self.trace.append({'type': 'REPORT', 'code': row_code, 'col': col, 'value': str(val)})
@@ -375,12 +379,10 @@ class FormulaEvaluator:
     async def _exec_note(self, args: list[str]) -> Decimal:
         """NOTE('货币资金','合计','期末') — 从附注数据取值（按行名+列名匹配）"""
         from sqlalchemy import text as sa_text
-        import json as _json
         row_name = args[0] if args else ''
         col_name = args[1] if len(args) > 1 else '合计'
-        period = args[2] if len(args) > 2 else '期末'
+        period = args[2] if len(args) > 2 else ''
         try:
-            # 查所有附注数据，按行名模糊匹配
             result = await self.db.execute(
                 sa_text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y"),
                 {"pid": str(self.project_id), "y": self.year},
@@ -389,23 +391,38 @@ class FormulaEvaluator:
                 sec_data = sec_row[1] if isinstance(sec_row[1], dict) else {}
                 headers = sec_data.get('headers', [])
                 rows = sec_data.get('rows', [])
-                # 找目标列
+                # 找目标列：优先精确匹配 col_name，其次 col_name+period 组合
                 col_idx = -1
                 for hi, h in enumerate(headers):
-                    if col_name in str(h) or (period and period in str(h)):
+                    h_str = str(h)
+                    if col_name == h_str:
+                        col_idx = hi
+                        break
+                    if col_name in h_str and (not period or period in h_str):
                         col_idx = hi
                         break
                 if col_idx < 0:
                     continue
-                # 找目标行
+                # 找目标行：精确匹配优先，降级包含匹配
+                best_val = None
                 for r in rows:
-                    if r and len(r) > col_idx and row_name in str(r[0]):
+                    if not r or len(r) <= col_idx:
+                        continue
+                    r0 = str(r[0]).strip()
+                    if r0 == row_name:
                         try:
-                            val = Decimal(str(r[col_idx]))
-                            self.trace.append({'type': 'NOTE', 'row': row_name, 'col': col_name, 'value': str(val)})
-                            return val
+                            best_val = Decimal(str(r[col_idx]))
+                            break  # 精确匹配直接返回
                         except (ValueError, TypeError):
                             continue
+                    elif row_name in r0 and best_val is None:
+                        try:
+                            best_val = Decimal(str(r[col_idx]))
+                        except (ValueError, TypeError):
+                            continue
+                if best_val is not None:
+                    self.trace.append({'type': 'NOTE', 'row': row_name, 'col': col_name, 'value': str(best_val)})
+                    return best_val
             self.trace.append({'type': 'NOTE', 'row': row_name, 'col': col_name, 'value': '0', 'msg': '未匹配'})
             return Decimal(0)
         except Exception as e:
@@ -413,10 +430,15 @@ class FormulaEvaluator:
             return Decimal(0)
 
     async def _exec_consol(self, args: list[str]) -> Decimal:
-        """CONSOL('sheet_key','field') — 从合并工作底稿取值"""
+        """CONSOL('sheet_key','field','row_code') — 从合并工作底稿取值
+
+        2 参数：CONSOL('elimination','equity_dr') → 汇总所有行的 equity_dr
+        3 参数：CONSOL('elimination','equity_dr','E001') → 取 row_code=E001 的 equity_dr
+        """
         from sqlalchemy import text as sa_text
         sheet_key = args[0] if args else ''
         field_name = args[1] if len(args) > 1 else ''
+        row_code_filter = args[2] if len(args) > 2 else ''
         try:
             result = await self.db.execute(
                 sa_text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
@@ -425,16 +447,22 @@ class FormulaEvaluator:
             row = result.fetchone()
             if row and isinstance(row[0], dict):
                 data = row[0]
-                # 支持 rows 数组中按字段名汇总
                 if 'rows' in data and field_name:
                     total = Decimal(0)
                     for r in data['rows']:
+                        # 如果指定了 row_code，只取匹配行
+                        if row_code_filter and r.get('row_code') != row_code_filter:
+                            continue
                         v = r.get(field_name)
                         if v is not None:
                             try:
                                 total += Decimal(str(v))
                             except (ValueError, TypeError):
                                 pass
+                        # 单行模式直接返回
+                        if row_code_filter:
+                            self.trace.append({'type': 'CONSOL', 'sheet': sheet_key, 'field': field_name, 'row': row_code_filter, 'value': str(total)})
+                            return total
                     self.trace.append({'type': 'CONSOL', 'sheet': sheet_key, 'field': field_name, 'value': str(total)})
                     return total
             self.trace.append({'type': 'CONSOL', 'sheet': sheet_key, 'field': field_name, 'value': '0'})

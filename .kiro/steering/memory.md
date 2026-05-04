@@ -46,7 +46,7 @@ inclusion: always
 - 旧版合并模块已清除：删除 11 个 views/consolidation/ + 14 个旧组件 + 1 个旧 store（共 26 个文件），当前合并模块统一由 ConsolidationIndex.vue 承载
 - Vite 构建验证通过（35s），git 已推送 feature/cell-selection-comments-cleanup 分支（2 commits）
 - 后端约700路由正常加载，0 个 stub 残留
-- PG 143 张表（consol_cell_comments + account_note_mapping），account_note_mapping 路由 4 个 API（GET/PUT/DELETE/auto-generate）
+- PG 144 张表（consol_cell_comments + account_note_mapping + formula_audit_log），formula_audit_log 路由 2 个 API（GET 查询+POST 记录）
 - 汇总穿透已接真实数据：POST /api/report-config/drill-down 从各子企业 consol_worksheet_data 按 row_code 提取实际金额，降级保留持股比例估算
 - 附注 refresh API 三级匹配：精确科目名 → account_note_mapping 映射表 → 模糊包含匹配（len>=2）
 - 审计员 8 步全流程理论可走通（导入-查账-调整-试算表-底稿-附注-报告-Word导出）
@@ -72,8 +72,8 @@ inclusion: always
 - 事件通信仍使用 CustomEvent（Pinia store 迁移已回退：deep watch + 自动解包导致渲染崩溃，需要更完善的测试环境配合后再尝试）
 - 全屏功能用 Teleport to="body" 实现（非 position:fixed），避免被祖先 overflow/transform 裁剪导致全屏失效
 - 公式体系完整（三分类 + 跨表引用 + 拓扑排序 + 审计留痕）
-- 公式执行引擎 Phase1+2 已完成：Phase1 后端解析器+求值器+API，Phase2 前端 FormulaManagerDialog 对接 execute-formulas-batch（auto_calc 公式批量执行→结果回写 report_config→计算值列+trace tooltip）
-- 公式 API：execute-formula（单公式）+ execute-formulas-batch（批量+拓扑排序），挂在 /api/report-config/ 下
+- 公式执行引擎 Phase1-3 全部完成：Phase1 解析器+求值器，Phase2 前端对接，Phase3 跨模块引用(REPORT/NOTE/CONSOL)+审计日志(formula_audit_log)+并行执行(asyncio.gather)
+- 公式 API：execute-formula + execute-formulas-batch + formula-audit-log(GET/POST)，共 8 种函数（TB/WP/AUX/PREV/SUM_TB/REPORT/NOTE/CONSOL）
 - 公式管理（FormulaManagerDialog）已提升到全局顶部导航栏（ThreeColumnLayout），所有模块共享
 - 公式管理树形导航已增加"合并报表"分类（7张表 CI/CC/CE/CN/CS/CX/CK 编码）+ 表间审核"合并↔报表"规则
 - 各表的"ƒx 公式"按钮与全局公式管理中心必须双向联动同步：任一处修改公式后另一处自动更新，所有模块统一
