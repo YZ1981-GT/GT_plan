@@ -431,37 +431,65 @@ async def execute_formulas_batch(
             parsed.append((code, formula_str, None, set()))
             results.append({"row_code": code, "value": None, "error": str(e)})
 
-    # 拓扑排序执行
+    # 拓扑排序执行（支持并行：同一轮次内无依赖的公式并行执行）
     executed = set()
     max_rounds = len(parsed) + 1
     for _round in range(max_rounds):
-        progress = False
+        # 收集本轮可执行的公式
+        batch = []
         for code, formula_str, ast, deps in parsed:
             if code in executed:
                 continue
-            # 检查依赖是否已执行
             unmet = {d for d in deps if not d.startswith("RANGE:") and d not in executed}
             if unmet:
                 continue
-            # 执行
             if ast is None:
                 executed.add(code)
                 continue
-            result = await evaluate_formula(
+            batch.append((code, formula_str))
+
+        if not batch:
+            break
+
+        # 并行执行本轮所有公式
+        import asyncio
+        async def _exec_one(code: str, formula_str: str):
+            return code, await evaluate_formula(
                 formula=formula_str, db=db, project_id=pid, year=year_val,
                 engine=engine, row_values=row_values,
             )
+
+        batch_results = await asyncio.gather(*[_exec_one(c, f) for c, f in batch])
+
+        for code, result in batch_results:
             if result.get("value") is not None:
                 row_values[code] = Decimal(str(result["value"]))
             results.append({"row_code": code, **result})
             executed.add(code)
-            progress = True
-        if not progress:
-            break
 
     # 未执行的（循环依赖）
     for code, formula_str, ast, deps in parsed:
         if code not in executed:
             results.append({"row_code": code, "value": None, "error": f"循环依赖: {deps - executed}"})
+
+    # 记录审计日志
+    try:
+        from app.routers.formula_audit_log import ensure_table as ensure_fal_table
+        await ensure_fal_table(db)
+        import json as _json
+        for r in results:
+            if r.get("value") is not None:
+                formula_str_log = next((f.get("formula", "") for f in formulas if f.get("row_code") == r["row_code"]), "")
+                await db.execute(
+                    text("""INSERT INTO formula_audit_log (id, project_id, year, module, row_code, action, new_formula, result_value, trace, created_at)
+                        VALUES (:id, :pid, :y, 'report', :rc, 'execute', :nf, :rv, CAST(:tr AS jsonb), :now)"""),
+                    {"id": str(UUID(int=0).hex[:8] + str(UUID(int=hash(r["row_code"])))[8:]), "pid": project_id_str, "y": year_val,
+                     "rc": r["row_code"], "nf": formula_str_log, "rv": r["value"],
+                     "tr": _json.dumps(r.get("trace", []), ensure_ascii=False),
+                     "now": __import__('datetime').datetime.utcnow()},
+                )
+        await db.commit()
+    except Exception:
+        pass  # 日志记录失败不影响主流程
 
     return {"results": results, "row_values": {k: float(v) for k, v in row_values.items()}}

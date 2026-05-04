@@ -72,7 +72,7 @@ inclusion: always
 - 事件通信仍使用 CustomEvent（Pinia store 迁移已回退：deep watch + 自动解包导致渲染崩溃，需要更完善的测试环境配合后再尝试）
 - 全屏功能用 Teleport to="body" 实现（非 position:fixed），避免被祖先 overflow/transform 裁剪导致全屏失效
 - 公式体系完整（三分类 + 跨表引用 + 拓扑排序 + 审计留痕）
-- 公式执行引擎 Phase1 已完成：formula_parser.py 递归下降解析器（AST 7 种节点）+ FormulaEvaluator 连接 FormulaEngine 5 种执行器 + 执行追踪 trace + 行引用缓存 + 拓扑排序批量执行 + 循环依赖检测
+- 公式执行引擎 Phase1+2 已完成：Phase1 后端解析器+求值器+API，Phase2 前端 FormulaManagerDialog 对接 execute-formulas-batch（auto_calc 公式批量执行→结果回写 report_config→计算值列+trace tooltip）
 - 公式 API：execute-formula（单公式）+ execute-formulas-batch（批量+拓扑排序），挂在 /api/report-config/ 下
 - 公式管理（FormulaManagerDialog）已提升到全局顶部导航栏（ThreeColumnLayout），所有模块共享
 - 公式管理树形导航已增加"合并报表"分类（7张表 CI/CC/CE/CN/CS/CX/CK 编码）+ 表间审核"合并↔报表"规则

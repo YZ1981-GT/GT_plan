@@ -319,11 +319,18 @@ class FormulaEvaluator:
             elif isinstance(a, RowRefNode):
                 str_args.append(a.row_code)
             else:
-                # 递归求值复杂参数
                 val = await self.evaluate(a)
                 str_args.append(str(val))
 
-        # 映射到 FormulaEngine 执行器
+        # ── 跨模块引用函数（直接查数据库） ──
+        if name == 'REPORT':
+            return await self._exec_report(str_args)
+        if name == 'NOTE':
+            return await self._exec_note(str_args)
+        if name == 'CONSOL':
+            return await self._exec_consol(str_args)
+
+        # ── 内置函数（通过 FormulaEngine） ──
         if self.engine:
             params = self._build_params(name, str_args)
             result = await self.engine.execute(
@@ -345,6 +352,96 @@ class FormulaEvaluator:
 
         self.trace.append({'type': 'FUNC', 'name': name, 'args': str_args, 'error': 'No engine'})
         return Decimal(0)
+
+    async def _exec_report(self, args: list[str]) -> Decimal:
+        """REPORT('BS-002','期末') — 从 report_config 取报表行金额"""
+        from sqlalchemy import text as sa_text
+        row_code = args[0] if args else ''
+        col = args[1] if len(args) > 1 else '期末'
+        field = 'current_period_amount' if '期末' in col or '本期' in col else 'prior_period_amount'
+        try:
+            result = await self.db.execute(
+                sa_text(f"SELECT {field} FROM report_config WHERE row_code = :rc AND is_deleted = false LIMIT 1"),
+                {"rc": row_code},
+            )
+            row = result.fetchone()
+            val = Decimal(str(row[0])) if row and row[0] is not None else Decimal(0)
+            self.trace.append({'type': 'REPORT', 'code': row_code, 'col': col, 'value': str(val)})
+            return val
+        except Exception as e:
+            self.trace.append({'type': 'REPORT', 'code': row_code, 'error': str(e)})
+            return Decimal(0)
+
+    async def _exec_note(self, args: list[str]) -> Decimal:
+        """NOTE('货币资金','合计','期末') — 从附注数据取值（按行名+列名匹配）"""
+        from sqlalchemy import text as sa_text
+        import json as _json
+        row_name = args[0] if args else ''
+        col_name = args[1] if len(args) > 1 else '合计'
+        period = args[2] if len(args) > 2 else '期末'
+        try:
+            # 查所有附注数据，按行名模糊匹配
+            result = await self.db.execute(
+                sa_text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y"),
+                {"pid": str(self.project_id), "y": self.year},
+            )
+            for sec_row in result.fetchall():
+                sec_data = sec_row[1] if isinstance(sec_row[1], dict) else {}
+                headers = sec_data.get('headers', [])
+                rows = sec_data.get('rows', [])
+                # 找目标列
+                col_idx = -1
+                for hi, h in enumerate(headers):
+                    if col_name in str(h) or (period and period in str(h)):
+                        col_idx = hi
+                        break
+                if col_idx < 0:
+                    continue
+                # 找目标行
+                for r in rows:
+                    if r and len(r) > col_idx and row_name in str(r[0]):
+                        try:
+                            val = Decimal(str(r[col_idx]))
+                            self.trace.append({'type': 'NOTE', 'row': row_name, 'col': col_name, 'value': str(val)})
+                            return val
+                        except (ValueError, TypeError):
+                            continue
+            self.trace.append({'type': 'NOTE', 'row': row_name, 'col': col_name, 'value': '0', 'msg': '未匹配'})
+            return Decimal(0)
+        except Exception as e:
+            self.trace.append({'type': 'NOTE', 'row': row_name, 'error': str(e)})
+            return Decimal(0)
+
+    async def _exec_consol(self, args: list[str]) -> Decimal:
+        """CONSOL('sheet_key','field') — 从合并工作底稿取值"""
+        from sqlalchemy import text as sa_text
+        sheet_key = args[0] if args else ''
+        field_name = args[1] if len(args) > 1 else ''
+        try:
+            result = await self.db.execute(
+                sa_text("SELECT data FROM consol_worksheet_data WHERE project_id = :pid AND year = :y AND sheet_key = :sk"),
+                {"pid": str(self.project_id), "y": self.year, "sk": sheet_key},
+            )
+            row = result.fetchone()
+            if row and isinstance(row[0], dict):
+                data = row[0]
+                # 支持 rows 数组中按字段名汇总
+                if 'rows' in data and field_name:
+                    total = Decimal(0)
+                    for r in data['rows']:
+                        v = r.get(field_name)
+                        if v is not None:
+                            try:
+                                total += Decimal(str(v))
+                            except (ValueError, TypeError):
+                                pass
+                    self.trace.append({'type': 'CONSOL', 'sheet': sheet_key, 'field': field_name, 'value': str(total)})
+                    return total
+            self.trace.append({'type': 'CONSOL', 'sheet': sheet_key, 'field': field_name, 'value': '0'})
+            return Decimal(0)
+        except Exception as e:
+            self.trace.append({'type': 'CONSOL', 'sheet': sheet_key, 'error': str(e)})
+            return Decimal(0)
 
     @staticmethod
     def _build_params(func_name: str, args: list[str]) -> dict:
