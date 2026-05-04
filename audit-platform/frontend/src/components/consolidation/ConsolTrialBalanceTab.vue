@@ -3,45 +3,45 @@
 -->
 <template>
   <div class="gt-tab-content">
-          <!-- 报表类型切换 + 操作按钮 -->
-          <div class="gt-report-type-tabs">
-            <div class="gt-report-type-tabs-left">
-              <span v-for="item in tbReportTypes" :key="item.key"
-                class="gt-report-type-tag" :class="{ 'gt-report-type-tag--active': consolTbType === item.key }"
-                @click="consolTbType = item.key; loadConsolTb()">
-                {{ item.label }}
-              </span>
-            </div>
-            <div class="gt-report-actions">
-              <el-button-group size="small">
-                <el-button :type="tbEditMode ? 'primary' : ''" @click="tbEditMode = true">✏️ 编辑</el-button>
-                <el-button :type="tbEditMode ? '' : 'primary'" @click="tbEditMode = false">📋 查看</el-button>
-              </el-button-group>
-              <el-button size="small" @click="loadConsolTb(true)" :loading="consolTbLoading">🔄 刷新</el-button>
-              <el-tooltip content="从子企业试算表和工作底稿自动提取填充" placement="bottom">
-                <el-button size="small" type="primary" @click="fillConsolTb" :loading="consolTbLoading">▶ 提取填充</el-button>
-              </el-tooltip>
-              <el-button size="small" @click="exportConsolTb">📤 导出</el-button>
-              <el-button size="small" @click="saveConsolTb">💾 保存</el-button>
-              <el-tooltip content="审核试算平衡（借贷平衡+勾稽校验）" placement="bottom">
-                <el-button size="small" @click="auditConsolTb">✅ 审核</el-button>
-              </el-tooltip>
-              <el-tooltip content="将审定数回填到合并报表" placement="bottom">
-                <el-button size="small" type="warning" @click="generateReportFromTb" :loading="consolTbLoading">📋 生成报表</el-button>
-              </el-tooltip>
-            </div>
-          </div>
+    <!-- 报表类型切换 + 操作按钮 -->
+    <div class="gt-report-type-tabs">
+      <div class="gt-report-type-tabs-left">
+        <span v-for="item in tbReportTypes" :key="item.key"
+          class="gt-report-type-tag" :class="{ 'gt-report-type-tag--active': consolTbType === item.key }"
+          @click="consolTbType = item.key; loadConsolTb()">
+          {{ item.label }}
+        </span>
+      </div>
+      <div class="gt-report-actions">
+        <el-button-group size="small">
+          <el-button :type="tbEditMode ? 'primary' : ''" @click="tbEditMode = true">✏️ 编辑</el-button>
+          <el-button :type="tbEditMode ? '' : 'primary'" @click="tbEditMode = false">📋 查看</el-button>
+        </el-button-group>
+        <el-button size="small" @click="loadConsolTb(true)" :loading="consolTbLoading">🔄 刷新</el-button>
+        <el-tooltip content="从子企业试算表和工作底稿自动提取填充" placement="bottom">
+          <el-button size="small" type="primary" @click="fillConsolTb" :loading="consolTbLoading">▶ 提取填充</el-button>
+        </el-tooltip>
+        <el-button size="small" @click="exportConsolTb">📤 导出</el-button>
+        <el-button size="small" @click="saveConsolTb">💾 保存</el-button>
+        <el-tooltip content="审核试算平衡（借贷平衡+勾稽校验）" placement="bottom">
+          <el-button size="small" @click="auditConsolTb">✅ 审核</el-button>
+        </el-tooltip>
+        <el-tooltip content="将审定数回填到合并报表" placement="bottom">
+          <el-button size="small" type="warning" @click="generateReportFromTb" :loading="consolTbLoading">📋 生成报表</el-button>
+        </el-tooltip>
+      </div>
+    </div>
 
-          <!-- 期初/期末切换 -->
-          <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
-            <el-radio-group v-model="tbPeriod" size="small">
-              <el-radio-button value="closing">期末</el-radio-button>
-              <el-radio-button value="opening">期初</el-radio-button>
-            </el-radio-group>
-            <el-button v-if="tbPeriod === 'opening'" size="small" @click="importPriorYearTb">📥 提取上年数</el-button>
-            <span style="flex:1" />
-            <span style="font-size:11px;color:#999">{{ consolTbRows.length }} 行 · 审定数=汇总+调整借-调整贷+抵消借-抵消贷</span>
-          </div>
+    <!-- 期初/期末切换 -->
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <el-radio-group v-model="tbPeriod" size="small">
+        <el-radio-button value="closing">期末</el-radio-button>
+        <el-radio-button value="opening">期初</el-radio-button>
+      </el-radio-group>
+      <el-button v-if="tbPeriod === 'opening'" size="small" @click="importPriorYearTb">📥 提取上年数</el-button>
+      <span style="flex:1" />
+      <span style="font-size:12px;color:#666">{{ consolTbRows.length }} 行 · 审定数 = 汇总 + 抵消借 - 抵消贷 + 调整借 - 调整贷</span>
+    </div>
 
           <!-- 试算平衡表 -->
           <div class="gt-consol-matrix" v-loading="consolTbLoading">
@@ -49,18 +49,18 @@
               <table class="gt-consol-matrix-table">
                 <thead>
                   <tr>
-                    <th rowspan="2" class="gt-cm-th-project" style="min-width:60px">行次</th>
-                    <th rowspan="2" class="gt-cm-th-project" style="min-width:200px">项目</th>
-                    <th rowspan="2">审定汇总</th>
-                    <th colspan="2">合并权益抵消</th>
-                    <th colspan="2">合并往来交易抵消</th>
-                    <th colspan="2">合并报表调整</th>
-                    <th rowspan="2" class="gt-cm-th-total">合并审定数</th>
+                    <th rowspan="2" class="gt-cm-th-project" style="min-width:70px">行次</th>
+                    <th rowspan="2" class="gt-cm-th-project" style="min-width:220px">项目</th>
+                    <th rowspan="2" style="min-width:110px">审定汇总</th>
+                    <th colspan="2" style="background:#e8e0f0 !important;color:#4b2d77">权益抵消</th>
+                    <th colspan="2" style="background:#dce6f0 !important;color:#1a3a5c">往来交易抵消</th>
+                    <th colspan="2" style="background:#e6f0e6 !important;color:#1e6e1e">报表调整</th>
+                    <th rowspan="2" class="gt-cm-th-total" style="min-width:120px">合并审定数</th>
                   </tr>
                   <tr>
-                    <th>借方</th><th>贷方</th>
-                    <th>借方</th><th>贷方</th>
-                    <th>借方</th><th>贷方</th>
+                    <th style="background:#f0eaf8 !important;min-width:100px">借方</th><th style="background:#f0eaf8 !important;min-width:100px">贷方</th>
+                    <th style="background:#eaf0f8 !important;min-width:100px">借方</th><th style="background:#eaf0f8 !important;min-width:100px">贷方</th>
+                    <th style="background:#eaf8ea !important;min-width:100px">借方</th><th style="background:#eaf8ea !important;min-width:100px">贷方</th>
                   </tr>
                 </thead>
                 <tbody>

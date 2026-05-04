@@ -1289,18 +1289,21 @@ watch(activeTab, (tab) => {
   overflow-x: auto; max-height: calc(100vh - 280px);
 }
 .gt-consol-matrix-table {
-  width: max-content; min-width: 100%; border-collapse: collapse; font-size: 12px;
+  width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px;
 }
 .gt-consol-matrix-table th,
 .gt-consol-matrix-table td {
-  border: 1px solid #e8e4f0; padding: 4px 8px; white-space: nowrap; text-align: center;
+  border: 1px solid #e8e4f0; padding: 6px 10px; white-space: nowrap; text-align: center;
 }
 .gt-consol-matrix-table thead th {
-  background: #f0edf5; color: #333; font-weight: 600; position: sticky; top: 0; z-index: 2;
+  background: linear-gradient(180deg, #f4f0fa, #ece6f5); color: #333; font-weight: 600; position: sticky; top: 0; z-index: 2; font-size: 12px;
 }
+/* 斑马纹 */
+.gt-consol-matrix-table tbody tr:nth-child(even) td { background: #faf9fd; }
+.gt-consol-matrix-table tbody tr:hover td { background: var(--gt-color-primary-bg, #f4f0fa); }
 .gt-cm-th-project {
   min-width: 200px; text-align: left !important; position: sticky; left: 0; z-index: 3;
-  background: #f0edf5 !important;
+  background: linear-gradient(180deg, #f4f0fa, #ece6f5) !important;
 }
 .gt-cm-th-prior { background: #f5f3f8 !important; }
 .gt-cm-th-total { font-weight: 700 !important; background: #ebe7f2 !important; }
@@ -1308,12 +1311,14 @@ watch(activeTab, (tab) => {
   text-align: left !important; font-size: 12px; position: sticky; left: 0; z-index: 1;
   background: #fff; white-space: nowrap;
 }
-.gt-cm-td-amt { text-align: right !important; font-size: 12px; min-width: 80px; font-variant-numeric: tabular-nums; }
-.gt-tb-editable { cursor: text; border-bottom: 1px dashed var(--gt-color-border, #e5e5ea); padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; }
+.gt-cm-td-amt { text-align: right !important; font-size: 13px; min-width: 90px; font-variant-numeric: tabular-nums; }
+.gt-tb-editable { cursor: text; border-bottom: 1px dashed var(--gt-color-border, #e5e5ea); padding: 2px 6px; border-radius: 2px; display: inline-block; min-width: 70px; text-align: right; }
 .gt-tb-editable:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
 .gt-cm-td-prior { background: #faf9fc; }
-.gt-cm-total-row td { font-weight: 700; background: #f8f6fb !important; }
+.gt-cm-total-row td { font-weight: 700; background: #f0edf5 !important; }
 .gt-cm-category td { font-weight: 600; color: #4b2d77; }
+.gt-cm-th-total { background: #e8e0f0 !important; color: #4b2d77; font-weight: 700; }
+.gt-tb-audited { font-weight: 700; color: #4b2d77; background: rgba(75,45,119,0.06); }
 
 /* 审核结果行样式 */
 :deep(.gt-audit-row-error td) { background: #fef0f0 !important; }
