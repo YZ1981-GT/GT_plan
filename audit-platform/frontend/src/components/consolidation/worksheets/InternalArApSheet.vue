@@ -213,6 +213,7 @@ interface ArApRow {
   remoteCompany: string; remoteSubject: string; remoteDetail: string
   remoteAmounts: (number|null)[]; remoteImpairments: (number|null)[]
   diffReason: string
+  _reconcileStatus?: string; _reconcileDiff?: number; _impairmentDiff?: number
 }
 
 const props = defineProps<{ companies: CompanyCol[] }>()

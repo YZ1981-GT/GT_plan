@@ -762,6 +762,14 @@ function onTbGenerateReportDone() {
   clearEntityCache(currentConsolEntity.value.code || '', ['all_reports'])
 }
 
+function onTbCellContextMenu(e: MouseEvent, row: any, ri: number) {
+  selectedCells.value = [{ row: ri, col: 2, value: row.summary }]
+  drillDownCell.itemName = row.row_name
+  drillDownCell.colName = '审定汇总'
+  drillDownCell.totalValue = row.summary
+  consolCtx.openContextMenu(e, row.row_name, row)
+}
+
 // ─── Tab 5: 合并报表 ─────────────────────────────────────────────────────────
 const consolReportTemplateType = ref('soe')
 const consolReportType = ref('balance_sheet')
