@@ -44,6 +44,7 @@ inclusion: always
 - 5 核心模块全部接入：displayPrefs/拖拽框选/SelectionBar/搜索/条件格式/右键保持选区
 - 14 个 worksheet 组件完成 useFullscreen + fmtAmount 迁移
 - **Sprint 1 已完成**（10 Task，65 文件，+1856/-697 行）— 全局化收尾+快速见效
+- **Sprint 2 已完成**（9 Task，70 文件，+2569/-983 行）— 核心基础设施
 
 ## 活跃待办
 
@@ -51,9 +52,7 @@ inclusion: always
 - 用真实审计项目端到端验证（全流程）
 - 引入数据库 migration 机制（版本化 SQL 脚本管理）
 - 事件链路失败通知机制（前端可见的同步状态面板）
-- API 调用方式统一收口到 apiProxy.ts
 - 合并模块集成测试
-- 批量操作场景优化（批量提交模式）
 
 ### 功能完善（中期）
 - 模拟权益法改进（6 项子任务）
@@ -72,16 +71,16 @@ inclusion: always
 - ✅ operationHistory 接入（Task 1.9）
 - ✅ GtAmountCell 金额单元格组件（Task 1.10）
 
-### 全局化改造 — Sprint 2 待开始（核心基础设施）
-- ❷ mitt 事件总线替代 CustomEvent（1天）
-- ❸ useProjectStore Pinia（1天）
-- ❻ apiPaths.ts API 路径集中管理（1天）
-- ❽ 后端响应格式彻底统一（1天）
-- ⑲ usePermission + v-permission 指令（1天）
-- ㉕ 路由守卫统一 router beforeEach（1天）
-- API 调用统一收口（1天）
-- 批量操作场景优化（1天）
-- ㉗ shortcuts.ts 接入各模块（1天）
+### 全局化改造 — Sprint 2 已完成 ✅
+- ✅ mitt 事件总线替代 CustomEvent（Task 2.1）
+- ✅ useProjectStore Pinia store（Task 2.2）
+- ✅ apiPaths.ts API 路径集中管理（Task 2.3）
+- ✅ 后端响应格式统一（Task 2.4）
+- ✅ usePermission + v-permission 指令（Task 2.5）
+- ✅ 路由守卫统一 router beforeEach（Task 2.6）
+- ✅ API 调用统一收口（Task 2.7）
+- ✅ 批量操作场景优化（Task 2.8）
+- ✅ shortcuts.ts 接入各模块（Task 2.9）
 
 ### 全局化改造 — Sprint 3+ 待开始
 - ❹ useTableToolbar composable（1天）

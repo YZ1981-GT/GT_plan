@@ -136,8 +136,8 @@
 - [x] 验证快捷键不与 Ctrl+F 冲突
 
 ### Task 2.10 — Sprint 2 收尾
-- [ ] git commit + push
-- [ ] 更新 memory.md
+- [x] git commit + push
+- [x] 更新 memory.md
 
 ---
 
