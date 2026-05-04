@@ -191,7 +191,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, UploadFilled, Loading, CircleClose, Warning } from '@element-plus/icons-vue'
 import type { UploadInstance } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   modelValue: boolean
@@ -263,13 +263,13 @@ function onFileRemove() {
 async function downloadTemplate() {
   downloading.value = true
   try {
-    const resp = await http.get(`/api/import-templates/${props.importType}/download`, {
+    const blob = await api.get(`/api/import-templates/${props.importType}/download`, {
       responseType: 'blob',
-    })
-    const blob = new Blob([resp.data], {
+    }) as unknown as Blob
+    const blobObj = new Blob([blob], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     })
-    const url = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(blobObj)
     const a = document.createElement('a')
     a.href = url
     a.download = `${typeLabel.value}导入模板.xlsx`
@@ -289,12 +289,12 @@ async function doValidate() {
   try {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
-    const { data } = await http.post(
+    const data = await api.post(
       `/api/import-templates/${props.importType}/validate`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     )
-    validationResult.value = data?.data ?? data
+    validationResult.value = data
   } catch (err: any) {
     validationResult.value = {
       valid: false,
@@ -323,10 +323,10 @@ async function doImport() {
 
     const qs = params.toString()
     const url = `/api/import-templates/${props.importType}/import${qs ? '?' + qs : ''}`
-    const { data } = await http.post(url, formData, {
+    const data = await api.post(url, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
-    importResult.value = data?.data ?? data
+    importResult.value = data
     if (importResult.value?.success) {
       ElMessage.success(importResult.value.message)
       emit('imported', importResult.value)

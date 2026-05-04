@@ -29,6 +29,14 @@
         <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
         <el-button size="small" @click="showImportDialog = true">📥 Excel导入</el-button>
         <el-button size="small" @click="onExportSummary">📤 导出汇总</el-button>
+        <div class="gt-adj-batch-toggle">
+          <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
+          <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
+            <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
+              📦 批量提交
+            </el-button>
+          </el-badge>
+        </div>
       </div>
     </div>
 
@@ -103,6 +111,7 @@
             编辑
           </el-button>
           <el-button size="small" type="danger" @click="onDelete(row)"
+            v-permission="'adjustment:delete'"
             :disabled="row.review_status === 'approved' || row.review_status === 'pending_review'">
             删除
           </el-button>
@@ -207,6 +216,7 @@ import { confirmDelete } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
+  batchCommitAdjustments,
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
@@ -241,6 +251,10 @@ const showRejectDialog = ref(false)
 const rejectReason = ref('')
 const accountOptions = ref<AccountOption[]>([])
 
+// Batch mode state
+const batchMode = ref(false)
+const batchPendingCount = ref(0)
+const batchCommitting = ref(false)
 // Form state
 const formDialogVisible = ref(false)
 const isEditing = ref(false)
@@ -365,14 +379,35 @@ async function onSubmit() {
         year: year.value,
         description: form.value.description,
         line_items: form.value.line_items,
-      })
-      ElMessage.success('创建成功')
+      }, { batch_mode: batchMode.value })
+      if (batchMode.value) {
+        batchPendingCount.value++
+        ElMessage.success(`创建成功（批量模式，待提交 ${batchPendingCount.value} 笔）`)
+      } else {
+        ElMessage.success('创建成功')
+      }
     }
     formDialogVisible.value = false
     fetchEntries()
     fetchSummary()
   } finally {
     submitLoading.value = false
+  }
+}
+
+async function onBatchCommit() {
+  batchCommitting.value = true
+  try {
+    await batchCommitAdjustments(projectId.value, year.value)
+    ElMessage.success(`批量提交成功，${batchPendingCount.value} 笔分录已触发重算`)
+    batchPendingCount.value = 0
+    batchMode.value = false
+    fetchEntries()
+    fetchSummary()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '批量提交失败')
+  } finally {
+    batchCommitting.value = false
   }
 }
 
@@ -507,6 +542,15 @@ watch(
 }
 .gt-adj-banner-row2 .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
 .gt-adj-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
+
+/* 批量模式 */
+.gt-adj-batch-toggle {
+  display: flex; align-items: center; gap: 10px; margin-left: auto;
+}
+.gt-adj-batch-toggle :deep(.el-switch__label) { color: rgba(255,255,255,0.85); font-size: 12px; }
+.gt-adj-batch-toggle :deep(.el-switch.is-checked .el-switch__core) { background-color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }
+.gt-adj-batch-badge :deep(.el-badge__content) { z-index: 2; }
+.gt-adj-batch-toggle .el-button--success { background: rgba(103, 194, 58, 0.85); border-color: rgba(103, 194, 58, 0.6); color: #fff; }
 
 /* 汇总面板 */
 .gt-summary-panel { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-5); flex-wrap: wrap; }

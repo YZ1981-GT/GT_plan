@@ -495,7 +495,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -507,6 +507,8 @@ import { useEditMode } from '@/composables/useEditMode'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { eventBus } from '@/utils/eventBus'
+import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
 
 const props = defineProps<{
   projectId: string
@@ -830,7 +832,7 @@ async function executeAggregate() {
 
     if (aggTarget.mode === 'direct') {
       const entityCode = props.currentEntity.code || ''
-      const { data } = await http.post(`/api/consol-note-sections/aggregate/${props.projectId}/${props.year}`, {
+      const data = await api.post(`/api/consol-note-sections/aggregate/${props.projectId}/${props.year}`, {
         section_id: sec.section_id,
         row_idx: c.row,
         col_idx: c.col,
@@ -838,7 +840,7 @@ async function executeAggregate() {
         mode: 'direct',
         standard: props.standard,
       }, { validateStatus: (s: number) => s < 600 })
-      const result = data?.data ?? data
+      const result = data
       if (result?.value != null) {
         sec.editRows[c.row][c.col] = String(result.value)
         ElMessage.success(`已汇总 ${result.count || 0} 家直接下级，合计：${fmtAmt(result.value)}`)
@@ -849,7 +851,7 @@ async function executeAggregate() {
       const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
       if (!checkedNodes.length) { ElMessage.warning('请选择要汇总的单位'); aggLoading.value = false; return }
       const companyCodes = checkedNodes.map((n: any) => n.key).filter((k: string) => k !== 'root')
-      const { data } = await http.post(`/api/consol-note-sections/aggregate/${props.projectId}/${props.year}`, {
+      const data = await api.post(`/api/consol-note-sections/aggregate/${props.projectId}/${props.year}`, {
         section_id: aggTarget.source === 'same' ? sec.section_id : (aggTarget.source === 'note' ? (aggTarget as any).noteSection : sec.section_id),
         row_idx: c.row,
         col_idx: c.col,
@@ -860,7 +862,7 @@ async function executeAggregate() {
         note_sections: aggTarget.noteSections,
         standard: props.standard,
       }, { validateStatus: (s: number) => s < 600 })
-      const result = data?.data ?? data
+      const result = data
       if (result?.value != null) {
         sec.editRows[c.row][c.col] = String(result.value)
         ElMessage.success(`已汇总 ${companyCodes.length} 家企业，合计：${fmtAmt(result.value)}`)
@@ -900,11 +902,11 @@ async function refreshNoteByFormula() {
   noteRefreshing.value = true
   try {
     const entityCode = props.currentEntity.code || ''
-    const { data } = await http.post(`/api/consol-note-sections/refresh/${props.projectId}/${props.year}/${sec.section_id}`, {
+    const data = await api.post(`/api/consol-note-sections/refresh/${props.projectId}/${props.year}/${sec.section_id}`, {
       standard: props.standard,
       company_code: entityCode,
     }, { validateStatus: (s: number) => s < 600 })
-    const result = data?.data ?? data
+    const result = data
     if (result?.rows?.length) {
       const headers = sec.headers
       sec.editRows = result.rows.map((r: string[]) => {
@@ -947,7 +949,7 @@ async function saveNoteData() {
   if (!sec || !props.projectId) return
   const rows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
   try {
-    await http.put(
+    await api.put(
       `/api/consol-note-sections/data/${props.projectId}/${props.year}/${sec.section_id}`,
       { data: { headers: sec.headers, rows } },
       { validateStatus: (s: number) => s < 600 },
@@ -1029,14 +1031,14 @@ async function batchExportAllData() {
     const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
     const usedNames = new Set<string>()
-    const { data } = await http.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const groups = Array.isArray(data) ? data : (data?.data ?? [])
+    const groups = Array.isArray(data) ? data : (data ?? [])
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
-        const { data: detail } = await http.get(`/api/consol-note-sections/${props.standard}/${c.section_id}`, {
+        const detail = await api.get(`/api/consol-note-sections/${props.standard}/${c.section_id}`, {
           validateStatus: (s: number) => s < 600,
         })
         const sec = detail?.data ?? detail
@@ -1061,14 +1063,14 @@ async function batchExportAllTemplates() {
     const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
     const usedNames = new Set<string>()
-    const { data } = await http.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const groups = Array.isArray(data) ? data : (data?.data ?? [])
+    const groups = Array.isArray(data) ? data : (data ?? [])
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
-        const { data: detail } = await http.get(`/api/consol-note-sections/${props.standard}/${c.section_id}`, {
+        const detail = await api.get(`/api/consol-note-sections/${props.standard}/${c.section_id}`, {
           validateStatus: (s: number) => s < 600,
         })
         const sec = detail?.data ?? detail
@@ -1094,10 +1096,10 @@ async function onNoteBatchImport(e: Event) {
     const XLSX = await import('xlsx')
     const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
     let matched = 0
-    const { data } = await http.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const groups = Array.isArray(data) ? data : (data?.data ?? [])
+    const groups = Array.isArray(data) ? data : (data ?? [])
     const sectionMap: Record<string, string> = {}
     for (const g of groups) {
       for (const c of (g.children || [])) {
@@ -1112,7 +1114,7 @@ async function onNoteBatchImport(e: Event) {
       if (json.length < 2) continue
       const headers = json[0].map((c: any) => String(c || ''))
       const rows = json.slice(1).filter((r: any[]) => r.some(c => c != null && c !== '')).map((r: any[]) => r.map(c => String(c ?? '')))
-      await http.put(
+      await api.put(
         `/api/consol-note-sections/data/${props.projectId}/${props.year}/${sectionId}`,
         { data: { headers, rows } },
         { validateStatus: (s: number) => s < 600 },
@@ -1130,7 +1132,7 @@ async function onNoteBatchImport(e: Event) {
 
 // ─── 公式管理 ────────────────────────────────────────────────────────────────
 function openGlobalFormulaManager() {
-  window.dispatchEvent(new CustomEvent('gt-open-formula-manager', { detail: { nodeKey: 'consol_note' } }))
+  eventBus.emit('open-formula-manager', { nodeKey: 'consol_note' })
   showNoteFormulaDialog.value = false
 }
 
@@ -1200,10 +1202,10 @@ async function exportNoteFormulas() {
     const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
     const headers = ['章节ID', '章节标题', '行号', '列号', '公式类型', '公式表达式', '数据来源', '说明']
-    const { data } = await http.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const groups = Array.isArray(data) ? data : (data?.data ?? [])
+    const groups = Array.isArray(data) ? data : (data ?? [])
     const rows: string[][] = []
     for (const g of groups) {
       for (const c of (g.children || [])) {
@@ -1249,11 +1251,11 @@ async function applyAllNoteFormulas() {
   noteBatchLoading.value = true
   try {
     const entityCode = props.currentEntity.code || ''
-    const { data } = await http.post(`/api/consol-note-sections/apply-formulas/${props.projectId}/${props.year}`, {
+    const data = await api.post(`/api/consol-note-sections/apply-formulas/${props.projectId}/${props.year}`, {
       standard: props.standard,
       company_code: entityCode,
     }, { validateStatus: (s: number) => s < 600 })
-    const result = data?.data ?? data
+    const result = data
     const updated = result?.updated_sections || 0
     ElMessage.success(`已对 ${updated} 个附注表格执行公式取数计算`)
     if (selectedNoteSection.value) {
@@ -1271,11 +1273,11 @@ async function onNoteAuditAll(_e?: Event) {
   noteAuditResults.value = []
   try {
     const entityCode = props.currentEntity.code || ''
-    const { data } = await http.post(`/api/consol-note-sections/audit-all/${props.projectId}/${props.year}`, {
+    const data = await api.post(`/api/consol-note-sections/audit-all/${props.projectId}/${props.year}`, {
       standard: props.standard,
       company_code: entityCode,
     }, { validateStatus: (s: number) => s < 600 })
-    const result = data?.data ?? data
+    const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
     noteAuditSummary.totalSections = result?.total_sections || 0
     noteAuditSummary.totalChecks = noteAuditResults.value.length
@@ -1317,13 +1319,13 @@ async function auditCurrentNote() {
   try {
     const entityCode = props.currentEntity.code || ''
     const currentRows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
-    const { data } = await http.post(`/api/consol-note-sections/audit/${props.projectId}/${props.year}/${sec.section_id}`, {
+    const data = await api.post(`/api/consol-note-sections/audit/${props.projectId}/${props.year}/${sec.section_id}`, {
       standard: props.standard,
       company_code: entityCode,
       headers: sec.headers,
       rows: currentRows,
     }, { validateStatus: (s: number) => s < 600 })
-    const result = data?.data ?? data
+    const result = data
     noteAuditResults.value = Array.isArray(result?.results) ? result.results : []
     noteAuditSummary.totalSections = 1
     noteAuditSummary.totalChecks = noteAuditResults.value.length
@@ -1341,9 +1343,9 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
   if (!data.section_id) return
   noteSelectedRows.value = []
   selectedCells.value = []
-  http.get(`/api/consol-note-sections/${props.standard}/${data.section_id}`, {
+  api.get(`/api/consol-note-sections/${props.standard}/${data.section_id}`, {
     validateStatus: (s: number) => s < 600,
-  }).then(async ({ data: detail }) => {
+  }).then(async (detail: any) => {
     const sec = detail?.data ?? detail
     if (sec && !sec.error) {
       const headers = sec.headers || []
@@ -1351,13 +1353,13 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
 
       // 尝试加载用户已保存的数据覆盖模板
       try {
-        const { data: saved } = await http.get(
+        const saved = await api.get(
           `/api/consol-note-sections/data/${props.projectId}/${props.year}/${data.section_id}`,
           { validateStatus: (s: number) => s < 600 }
         )
-        const savedData = saved?.data ?? saved
-        if (savedData?.data?.rows?.length) {
-          rows = savedData.data.rows
+        const savedData = saved
+        if (savedData?.content?.rows?.length) {
+          rows = savedData.content.rows
         }
       } catch { /* 无已保存数据，用模板默认 */ }
 
@@ -1385,7 +1387,7 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
 }
 
 function switchToFourCol() {
-  window.dispatchEvent(new CustomEvent('gt-switch-four-col', { detail: { tab: 'notes' } }))
+  eventBus.emit('four-col-switch', { tab: 'notes' })
 }
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
@@ -1396,8 +1398,7 @@ function onDocClick(e: MouseEvent) {
 }
 
 // Listen for catalog select events to load note sections
-function onConsolCatalogSelect(e: Event) {
-  const data = (e as CustomEvent).detail
+function onConsolCatalogSelect(data: ConsolCatalogSelectPayload) {
   if (!data) return
   if (data.type === 'note' && data.sectionId) {
     onNoteNodeClick({ section_id: data.sectionId, title: data.title })
@@ -1405,8 +1406,7 @@ function onConsolCatalogSelect(e: Event) {
 }
 
 // Listen for tree aggregate events
-function onTreeAggregate(e: Event) {
-  const detail = (e as CustomEvent).detail
+function onTreeAggregate(detail: ConsolTreeAggregatePayload) {
   if (!detail) return
   const sec = selectedNoteSection.value
   if (sec) {
@@ -1428,22 +1428,31 @@ function onTreeAggregate(e: Event) {
 }
 
 // Listen for audit-all events
-function onNoteAuditAllEvent(e: Event) {
-  onNoteAuditAll(e)
+function onNoteAuditAllEvent(_payload: ConsolNoteAuditAllPayload) {
+  onNoteAuditAll()
+}
+
+/** 快捷键保存：保存当前附注数据 */
+function onShortcutSave() {
+  if (selectedNoteSection.value) {
+    saveNoteData()
+  }
 }
 
 onMounted(() => {
   document.addEventListener('click', onDocClick)
-  window.addEventListener('consol-catalog-select', onConsolCatalogSelect)
-  window.addEventListener('consol-tree-aggregate', onTreeAggregate)
-  window.addEventListener('consol-note-audit-all', onNoteAuditAllEvent)
+  eventBus.on('consol-catalog-select', onConsolCatalogSelect)
+  eventBus.on('consol-tree-aggregate', onTreeAggregate)
+  eventBus.on('consol-note-audit-all', onNoteAuditAllEvent)
+  eventBus.on('shortcut:save', onShortcutSave)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
-  window.removeEventListener('consol-catalog-select', onConsolCatalogSelect)
-  window.removeEventListener('consol-tree-aggregate', onTreeAggregate)
-  window.removeEventListener('consol-note-audit-all', onNoteAuditAllEvent)
+  eventBus.off('consol-catalog-select', onConsolCatalogSelect)
+  eventBus.off('consol-tree-aggregate', onTreeAggregate)
+  eventBus.off('consol-note-audit-all', onNoteAuditAllEvent)
+  eventBus.off('shortcut:save', onShortcutSave)
 })
 
 // Expose for parent to call

@@ -441,7 +441,7 @@ import {
   getWorksheetTree,
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
@@ -454,6 +454,8 @@ import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { eventBus } from '@/utils/eventBus'
+import type { ConsolTreeSelectPayload, ConsolCatalogSelectPayload, ConsolRefreshEntityPayload } from '@/utils/eventBus'
 
 const route = useRoute()
 const router = useRouter()
@@ -492,11 +494,11 @@ function onStandardChange() {
   loadConsolReport()
   loadConsolNoteTree()
   // 通知 ConsolCatalog 更新准则
-  window.dispatchEvent(new CustomEvent('consol-standard-change', { detail: { standard: projectInfo.standard } }))
+  eventBus.emit('standard-change', { standard: projectInfo.standard })
 }
 
 function onOpenFormula() {
-  document.dispatchEvent(new CustomEvent('gt-open-formula-manager', { detail: { nodeKey: 'consolidation' } }))
+  eventBus.emit('open-formula-manager', { nodeKey: 'consolidation' })
 }
 
 // ─── 单元格汇总穿透查看 ──────────────────────────────────────────────────────
@@ -598,7 +600,7 @@ async function loadDrillDownData() {
     const colField = drillDownCell.colName?.includes('上期') ? 'prior_period_amount' : 'current_period_amount'
 
     // 调用后端真实穿透 API
-    const { data } = await http.post('/api/report-config/drill-down', {
+    const data = await api.post('/api/report-config/drill-down', {
       project_id: projectId.value,
       year: year.value,
       report_type: reportType,
@@ -606,7 +608,7 @@ async function loadDrillDownData() {
       col_field: colField,
     }, { validateStatus: (s: number) => s < 600 })
 
-    const result = data?.data ?? data
+    const result = data
     if (result?.rows?.length) {
       drillDownDirectRows.value = result.rows.map((r: any) => ({
         company_name: r.company_name,
@@ -706,8 +708,8 @@ async function exportDrillDown() {
 
 async function loadProjectInfo() {
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}`, { validateStatus: (s: number) => s < 600 })
-    const p = data?.data ?? data
+    const data = await api.get(`/api/projects/${projectId.value}`, { validateStatus: (s: number) => s < 600 })
+    const p = data
     if (p) {
       projectInfo.clientName = p.client_name || p.name || ''
       projectInfo.year = p.audit_year || year.value
@@ -924,7 +926,7 @@ function onConsolCtxDrillDown() {
 
 function onConsolCtxFormula() {
   consolCtx.closeContextMenu()
-  window.dispatchEvent(new CustomEvent('gt-open-formula-manager'))
+  eventBus.emit('open-formula-manager', {})
 }
 
 function onConsolCtxSum() {
@@ -959,11 +961,11 @@ async function loadConsolReport(forceRefresh = false) {
     if (currentConsolEntity.value.code && currentConsolEntity.value.code !== 'root') {
       params.company_code = currentConsolEntity.value.code
     }
-    const { data } = await http.get('/api/report-config', {
+    const data = await api.get('/api/report-config', {
       params,
       validateStatus: (s: number) => s < 600,
     })
-    const rows = data?.data ?? data ?? []
+    const rows = data ?? []
     const result = Array.isArray(rows) ? rows : []
     consolReportRows.value = result
     // 写入缓存
@@ -978,11 +980,11 @@ async function loadConsolMappingPreset() {
   consolMappingLoading.value = true
   try {
     const scope = 'consolidated'
-    const { data } = await http.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
+    const data = await api.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
       params: { report_type: consolReportType.value, scope },
       validateStatus: (s: number) => s < 600,
     })
-    const rules = Array.isArray(data) ? data : (data?.data ?? [])
+    const rules = Array.isArray(data) ? data : (data ?? [])
     // 转换字段名适配前端表格
     consolMappingRules.value = rules.map((r: any) => ({
       source_code: r.soe_row_code ?? r.source_code ?? '',
@@ -1011,7 +1013,7 @@ async function applyConsolConversion() {
     showConsolConversion.value = false
     ElMessage.success('已切换为' + (newType === 'soe' ? '国企版' : '上市版'))
     // 通知其他组件
-    window.dispatchEvent(new CustomEvent('consol-standard-change', { detail: { standard: newType } }))
+    eventBus.emit('standard-change', { standard: newType as 'soe' | 'listed' })
   } catch (e: any) {
     ElMessage.error('转换失败：' + (e?.message || '未知错误'))
   } finally { consolMappingLoading.value = false }
@@ -1056,10 +1058,10 @@ async function loadConsolNoteTree(forceRefresh = false) {
   }
   consolNoteLoading.value = true
   try {
-    const { data } = await http.get(`/api/consol-note-sections/${consolNoteTemplateType.value}`, {
+    const data = await api.get(`/api/consol-note-sections/${consolNoteTemplateType.value}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const groups = Array.isArray(data) ? data : (data?.data ?? [])
+    const groups = Array.isArray(data) ? data : (data ?? [])
     if (!Array.isArray(groups) || !groups.length) {
       consolNoteTree.value = []
       noteCache.set(cacheKey, [])
@@ -1106,8 +1108,7 @@ function onNoteNodeClick(data: any) {
 
 
 // 监听中间栏树形节点选择事件
-function onConsolTreeSelect(e: Event) {
-  const data = (e as CustomEvent).detail
+function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
   if (!data) return
   if (data.isReport && data.reportType) {
     // 点击了报表类型节点 → 切换到合并报表 tab 并加载对应报表
@@ -1118,12 +1119,12 @@ function onConsolTreeSelect(e: Event) {
     // 差额表节点 → 切换到合并报表 tab
     activeTab.value = 'consol_report'
     if (data.companyCode) {
-      selectedNode.value = { company_code: data.companyCode, company_name: data.label }
+      selectedNode.value = { company_code: data.companyCode, company_name: data.label || '' }
     }
   } else if (data.companyCode) {
     // 点击了企业节点 → 选中该节点，刷新报表/附注
-    selectedNode.value = { company_code: data.companyCode, company_name: data.label }
-    currentConsolEntity.value = { code: data.companyCode, name: data.label }
+    selectedNode.value = { company_code: data.companyCode, company_name: data.label || '' }
+    currentConsolEntity.value = { code: data.companyCode, name: data.label || '' }
     // 如果指定了切换 tab
     if (data.switchTab) {
       activeTab.value = data.switchTab
@@ -1139,22 +1140,21 @@ onMounted(async () => {
   // 默认合并主体为项目本身（集团层面）
   currentConsolEntity.value = { code: '', name: projectInfo.clientName || '' }
   await loadGroupTree()
-  window.addEventListener('consol-tree-select', onConsolTreeSelect)
-  window.addEventListener('consol-catalog-select', onConsolCatalogSelect)
-  window.addEventListener('consol-refresh-entity', onConsolRefreshEntity)
+  eventBus.on('consol-tree-select', onConsolTreeSelect)
+  eventBus.on('consol-catalog-select', onConsolCatalogSelect)
+  eventBus.on('consol-refresh-entity', onConsolRefreshEntity)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('consol-tree-select', onConsolTreeSelect)
-  window.removeEventListener('consol-catalog-select', onConsolCatalogSelect)
-  window.removeEventListener('consol-refresh-entity', onConsolRefreshEntity)
+  eventBus.off('consol-tree-select', onConsolTreeSelect)
+  eventBus.off('consol-catalog-select', onConsolCatalogSelect)
+  eventBus.off('consol-refresh-entity', onConsolRefreshEntity)
 })
 
 // 监听树形节点刷新事件
-function onConsolRefreshEntity(e: Event) {
-  const detail = (e as CustomEvent).detail
+function onConsolRefreshEntity(detail: ConsolRefreshEntityPayload) {
   if (!detail) return
-  const { companyCode, companyName, types } = detail as { companyCode: string; companyName: string; types: string[] }
+  const { companyCode, companyName, types } = detail
 
   // 切换到该合并主体
   currentConsolEntity.value = { code: companyCode, name: companyName }
@@ -1179,8 +1179,7 @@ function onConsolRefreshEntity(e: Event) {
 }
 
 // 监听四栏 catalog 选择事件
-function onConsolCatalogSelect(e: Event) {
-  const data = (e as CustomEvent).detail
+function onConsolCatalogSelect(data: ConsolCatalogSelectPayload) {
   if (!data) return
   if (data.type === 'report' && data.reportType) {
     activeTab.value = 'consol_report'

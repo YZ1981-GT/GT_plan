@@ -7,7 +7,7 @@
  * - http.get(url) 返回 AxiosResponse，需要 `const { data } = await http.get(url)`
  * - api.get(url) 直接返回业务数据，`const data = await api.get(url)`
  * 
- * 这样页面不再需要 `data.data ?? data` 双层解包
+ * 这样页面不再需要双层解包
  */
 import http from '@/utils/http'
 import type { AxiosRequestConfig } from 'axios'

@@ -83,6 +83,7 @@ async def list_adjustments(
 async def create_adjustment(
     project_id: UUID,
     data: AdjustmentCreate,
+    batch_mode: bool = Query(False, description="批量模式：暂不触发重算事件"),
     db: AsyncSession = Depends(get_db),
     user=Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
@@ -90,11 +91,24 @@ async def create_adjustment(
     """创建调整分录（合并锁定期间禁止，需编辑权限）"""
     svc = AdjustmentService(db)
     try:
-        result = await svc.create_entry(project_id, data, user.id)
+        result = await svc.create_entry(project_id, data, user.id, batch_mode=batch_mode)
         await db.commit()
         return result.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/batch-commit")
+async def batch_commit(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    """批量提交：统一触发一次重算事件（配合 batch_mode=true 使用）"""
+    svc = AdjustmentService(db)
+    result = await svc.batch_commit(project_id, year)
+    return result
 
 
 @router.put("/{entry_group_id}")

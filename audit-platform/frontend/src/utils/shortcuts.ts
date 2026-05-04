@@ -2,6 +2,7 @@
  * ShortcutManager — 快捷键管理
  * Phase 8 Task 9.3
  */
+import { eventBus } from '@/utils/eventBus'
 
 export interface ShortcutEntry {
   key: string
@@ -63,55 +64,54 @@ export const shortcutManager = new ShortcutManager()
 // Default shortcuts from design doc
 export function registerDefaultShortcuts(_router: any) {
   shortcutManager.register('Ctrl+S', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:save'))
+    eventBus.emit('shortcut:save')
   }, '保存当前编辑内容', '底稿编辑/附注编辑/报告编辑')
 
   shortcutManager.register('Ctrl+Z', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:undo'))
+    eventBus.emit('shortcut:undo')
   }, '撤销上一步操作', '全局')
 
   shortcutManager.register('Ctrl+Shift+Z', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:redo'))
+    eventBus.emit('shortcut:redo')
   }, '重做', '全局')
 
-  shortcutManager.register('Ctrl+F', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:search'))
-  }, '搜索', '全局')
+  // 注意：不注册 Ctrl+F，避免阻止浏览器原生搜索。
+  // 各模块（TrialBalance/DisclosureEditor）自行监听 keydown 实现表内搜索。
 
   shortcutManager.register('Ctrl+G', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:goto'))
+    eventBus.emit('shortcut:goto')
   }, '跳转到指定科目', '试算表/穿透查询')
 
   shortcutManager.register('Ctrl+E', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:export'))
+    eventBus.emit('shortcut:export')
   }, '导出当前页面', '报表/附注/底稿')
 
   shortcutManager.register('Ctrl+ENTER', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:submit'))
+    eventBus.emit('shortcut:submit')
   }, '提交/确认', '表单/弹窗')
 
   shortcutManager.register('ESCAPE', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:escape'))
+    eventBus.emit('shortcut:escape')
   }, '关闭弹窗/退出全屏', '全局')
 
   shortcutManager.register('F5', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:refresh'))
+    eventBus.emit('shortcut:refresh')
   }, '刷新当前数据', '全局')
 
   shortcutManager.register('Ctrl+/', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:help'))
+    eventBus.emit('shortcut:help')
   }, '显示快捷键帮助面板', '全局')
 
   shortcutManager.register('Ctrl+TAB', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:tab-focus'))
+    eventBus.emit('shortcut:tab-focus')
   }, '切换栏目焦点', '三栏/四栏布局')
 
   shortcutManager.register('Ctrl+ARROWUP', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:list-up'))
+    eventBus.emit('shortcut:list-up')
   }, '列表项上移', '列表页')
 
   shortcutManager.register('Ctrl+ARROWDOWN', () => {
-    document.dispatchEvent(new CustomEvent('shortcut:list-down'))
+    eventBus.emit('shortcut:list-down')
   }, '列表项下移', '列表页')
 
   shortcutManager.install()

@@ -2,6 +2,7 @@
  * 质控复核人员视角 API
  */
 import http from '@/utils/http'
+import { qcDashboard as P } from '@/services/apiPaths'
 
 export interface QCOverview {
   total: number
@@ -57,21 +58,21 @@ export interface ArchiveReadiness {
 }
 
 export async function getQCOverview(projectId: string): Promise<QCOverview> {
-  const { data } = await http.get(`/api/projects/${projectId}/qc-dashboard/overview`)
+  const { data } = await http.get(P.overview(projectId))
   return data
 }
 
 export async function getStaffProgress(projectId: string): Promise<{ staff_progress: StaffProgressItem[]; staff_count: number }> {
-  const { data } = await http.get(`/api/projects/${projectId}/qc-dashboard/staff-progress`)
+  const { data } = await http.get(P.staffProgress(projectId))
   return data
 }
 
 export async function getOpenIssues(projectId: string): Promise<{ total_open: number; issues: OpenIssue[]; by_workpaper: Record<string, number> }> {
-  const { data } = await http.get(`/api/projects/${projectId}/qc-dashboard/open-issues`)
+  const { data } = await http.get(P.openIssues(projectId))
   return data
 }
 
 export async function getArchiveReadiness(projectId: string): Promise<ArchiveReadiness> {
-  const { data } = await http.get(`/api/projects/${projectId}/qc-dashboard/archive-readiness`)
+  const { data } = await http.get(P.archiveReadiness(projectId))
   return data
 }

@@ -2,6 +2,7 @@
  * 合伙人视角 API
  */
 import http from '@/utils/http'
+import { partner as P, projects as P_proj } from '@/services/apiPaths'
 
 export interface PartnerProject {
   id: string
@@ -62,16 +63,16 @@ export interface TeamEfficiency {
 }
 
 export async function getPartnerOverview(): Promise<PartnerOverview> {
-  const { data } = await http.get('/api/partner/overview')
+  const { data } = await http.get(P.overview)
   return data
 }
 
 export async function getSignReadiness(projectId: string): Promise<SignReadiness> {
-  const { data } = await http.get(`/api/projects/${projectId}/sign-readiness`)
+  const { data } = await http.get(P_proj.signReadiness(projectId))
   return data
 }
 
 export async function getTeamEfficiency(days = 30): Promise<TeamEfficiency> {
-  const { data } = await http.get('/api/partner/team-efficiency', { params: { days } })
+  const { data } = await http.get(P.teamEfficiency, { params: { days } })
   return data
 }

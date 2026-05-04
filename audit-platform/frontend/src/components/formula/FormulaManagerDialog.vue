@@ -334,7 +334,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
@@ -383,10 +383,10 @@ const noteTreeLoaded = ref(false)
 async function loadNoteTree() {
   if (noteTreeLoaded.value) return
   try {
-    const { data } = await http.get(`/api/note-templates/${fmTemplateType.value}`, {
+    const data = await api.get(`/api/note-templates/${fmTemplateType.value}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const sections = data?.data ?? data ?? []
+    const sections = data ?? []
     if (!Array.isArray(sections) || !sections.length) return
 
     // 按章节分组构建树
@@ -624,11 +624,11 @@ async function loadRowsForNode(nodeKey: string) {
     loadingData.value = true
     try {
       const standard = `${fmTemplateType.value}_standalone`
-      const { data } = await http.get('/api/report-config', {
+      const data = await api.get('/api/report-config', {
         params: { report_type: reportType, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data?.data ?? data ?? []
+      const rows = data ?? []
       allRowsMap.value[reportType] = rows
       allRowsMap.value[cacheKey] = rows
     } catch { /* ignore */ }
@@ -1031,7 +1031,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
       if (selectedNodeKey.value.startsWith('report_')) {
         const reportType = selectedNodeKey.value.replace('report_', '')
         try {
-          const { data: saved } = await http.post('/api/report-config', {
+          const saved = await api.post('/api/report-config', {
             report_type: reportType,
             applicable_standard: `${fmTemplateType.value}_standalone`,
             row_number: row.row_number,
@@ -1056,7 +1056,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
   // 已有行——更新到后端
   if (row.id) {
     try {
-      await http.put(`/api/report-config/${row.id}`, {
+      await api.put(`/api/report-config/${row.id}`, {
         formula: data.formula || null,
         formula_category: data.category,
         formula_description: data.description,
@@ -1073,7 +1073,7 @@ async function saveEdit(row: any) {
   // 兼容行内编辑（保留）
   if (!row.id) return
   try {
-    await http.put(`/api/report-config/${row.id}`, {
+    await api.put(`/api/report-config/${row.id}`, {
       formula: editFormula.value || null,
       formula_category: editCategory.value,
       formula_description: editDescription.value,
@@ -1123,13 +1123,13 @@ async function onApplyFormulas() {
       formula: r.formula,
     }))
 
-    const { data } = await http.post('/api/report-config/execute-formulas-batch', {
+    const data = await api.post('/api/report-config/execute-formulas-batch', {
       project_id: props.projectId,
       year: props.year,
       formulas,
     }, { validateStatus: (s: number) => s < 600 })
 
-    const result = data?.data ?? data
+    const result = data
     const results = result?.results || []
     const rowValues = result?.row_values || {}
 
@@ -1155,7 +1155,7 @@ async function onApplyFormulas() {
           row_code: code,
           current_period_amount: val,
         }))
-        await http.post('/api/report-config/batch-update', {
+        await api.post('/api/report-config/batch-update', {
           project_id: props.projectId,
           report_type: reportType,
           applicable_standard: `soe_standalone`,
@@ -1190,11 +1190,11 @@ async function onImportPresetFormulas() {
     const reportType = selectedNodeKey.value.replace('report_', '')
     try {
       const standard = `${fmTemplateType.value}_standalone`
-      const { data } = await http.get('/api/report-config', {
+      const data = await api.get('/api/report-config', {
         params: { report_type: reportType, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data?.data ?? data ?? []
+      const rows = data ?? []
       allRowsMap.value[reportType] = rows
       const formulaCount = rows.filter((r: any) => r.formula).length
       ElMessage.success(`已导入 ${rows.length} 行，其中 ${formulaCount} 个预设公式`)
@@ -1206,10 +1206,10 @@ async function onImportPresetFormulas() {
   // 附注类 / 表间审核：从附注校验预设公式加载
   if (selectedNodeKey.value.startsWith('note_') || selectedNodeKey.value.startsWith('cross_')) {
     try {
-      const { data } = await http.get(`/api/note-templates/preset-formulas/${fmTemplateType.value}`, {
+      const data = await api.get(`/api/note-templates/preset-formulas/${fmTemplateType.value}`, {
         validateStatus: (s: number) => s < 600,
       })
-      const presets = data?.data ?? data ?? []
+      const presets = data ?? []
       notePresetFormulas.value = presets
       ElMessage.success(`已加载 ${presets.length} 条附注校验预设公式（${fmTemplateType.value === 'soe' ? '国企版' : '上市版'}）`)
     } catch { ElMessage.error('加载附注预设公式失败') }
@@ -1293,7 +1293,7 @@ async function onSaveAllFormulas() {
       if (row._isNew && row.formula) {
         // 新增
         const reportType = selectedNodeKey.value.replace('report_', '')
-        await http.post('/api/report-config', {
+        await api.post('/api/report-config', {
           report_type: reportType,
           applicable_standard: `${fmTemplateType.value}_standalone`,
           row_number: row.row_number || 0,
@@ -1307,7 +1307,7 @@ async function onSaveAllFormulas() {
         saved++
       } else if (row.id) {
         // 更新
-        await http.put(`/api/report-config/${row.id}`, {
+        await api.put(`/api/report-config/${row.id}`, {
           formula: row.formula,
           formula_category: row.formula_category,
           formula_description: row.formula_description,
@@ -1410,11 +1410,11 @@ watch(showFormulaDashboard, async (v) => {
   for (const rt of types) {
     if (allRowsMap.value[rt]?.length) continue
     try {
-      const { data } = await http.get('/api/report-config', {
+      const data = await api.get('/api/report-config', {
         params: { report_type: rt, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
-      allRowsMap.value[rt] = data?.data ?? data ?? []
+      allRowsMap.value[rt] = data ?? []
     } catch { /* skip */ }
   }
 })

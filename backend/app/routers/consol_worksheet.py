@@ -115,7 +115,7 @@ async def aggregate_node(
     if mode not in ("self", "children", "descendants"):
         raise HTTPException(status_code=400, detail="mode 必须是 self/children/descendants")
     data = await query_node(db, project_id, year, node_code, mode)
-    return {"data": data, "mode": mode, "node_code": node_code}
+    return {"rows": data, "mode": mode, "node_code": node_code}
 
 
 @router.get("/drill/companies")
@@ -131,7 +131,7 @@ async def drill_companies(
     from app.services.consol_drilldown_service import drill_to_companies
 
     data = await drill_to_companies(db, project_id, year, node_code, account_code)
-    return {"data": data}
+    return {"rows": data}
 
 
 @router.get("/drill/eliminations")
@@ -147,7 +147,7 @@ async def drill_eliminations(
     from app.services.consol_drilldown_service import drill_to_eliminations
 
     data = await drill_to_eliminations(db, project_id, year, company_code, account_code)
-    return {"data": data}
+    return {"rows": data}
 
 
 @router.get("/drill/trial-balance")

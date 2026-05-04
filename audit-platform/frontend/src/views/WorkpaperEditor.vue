@@ -71,7 +71,7 @@ import {
   type WorkpaperDetail,
 } from '@/services/workpaperApi'
 import { rebuildWorkpaperStructure } from '@/services/commonApi'
-import http from '@/utils/http'
+import { api as httpApi } from '@/services/apiProxy'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,11 +131,11 @@ async function initUniver() {
   // 2. 从后端加载完整的 Univer 数据（含所有 Sheet、样式、公式）
   let workbookData: any = null
   try {
-    const { data } = await http.get(
+    const data = await httpApi.get(
       `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-data`,
       { validateStatus: (s: number) => s < 600 },
     )
-    workbookData = data?.data ?? data
+    workbookData = data
   } catch {
     workbookData = null
   }
@@ -200,11 +200,11 @@ async function onSave() {
     const snapshot = workbook.getSnapshot()
 
     // 调用完整保存 API（xlsx 回写 + structure.json + 审计留痕 + 事件发布）
-    const { data } = await http.post(
+    const data = await httpApi.post(
       `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-save`,
       { snapshot },
     )
-    const result = data?.data ?? data
+    const result = data
 
     dirty.value = false
     ElMessage.success(result?.message || '保存成功')
@@ -257,7 +257,7 @@ async function loadSmartTips() {
     const accountName = wpName.replace(/审定表|明细表|程序表|汇总表|盘点表|调节表|核对表/g, '').trim()
     if (!accountName) return
 
-    const { data } = await http.get(
+    const data = await httpApi.get(
       `/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(accountName)}`,
       { validateStatus: (s: number) => s < 600 },
     )

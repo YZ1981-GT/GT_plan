@@ -66,74 +66,74 @@
 
 ### Task 1.11 — Sprint 1 收尾
 - [-] git commit + push
-- [~] 更新 memory.md 待办状态
+- [x] 更新 memory.md 待办状态
 
 ---
 
 ## Sprint 2：核心基础设施（~5天）
 
 ### Task 2.1 — mitt 事件总线 [R3.1]
-- [ ] 安装 mitt：`npm i mitt`
-- [ ] 创建 utils/eventBus.ts：定义 Events 类型映射
-- [ ] 替换 ThreeColumnLayout 的 gt-switch-four-col CustomEvent
-- [ ] 替换 ConsolidationIndex 的 consol-standard-change
-- [ ] 替换 gt-open-formula-manager / gt-formula-changed
-- [ ] 删除 _redispatched 补丁逻辑
-- [ ] 验证所有事件通道正常
+- [x] 安装 mitt：`npm i mitt`
+- [x] 创建 utils/eventBus.ts：定义 Events 类型映射
+- [x] 替换 ThreeColumnLayout 的 gt-switch-four-col CustomEvent
+- [x] 替换 ConsolidationIndex 的 consol-standard-change
+- [x] 替换 gt-open-formula-manager / gt-formula-changed
+- [x] 删除 _redispatched 补丁逻辑
+- [x] 验证所有事件通道正常
 
 ### Task 2.2 — useProjectStore [R3.2]
-- [ ] 创建 stores/project.ts
-- [ ] DefaultLayout watch route 自动同步
-- [ ] 替换 TrialBalance 的 useProjectSelector
-- [ ] 替换 ReportView 的手动 projectId/year 解析
-- [ ] 替换 DisclosureEditor 的手动解析
-- [ ] 验证路由切换数据同步
+- [x] 创建 stores/project.ts
+- [x] DefaultLayout watch route 自动同步
+- [x] 替换 TrialBalance 的 useProjectSelector
+- [x] 替换 ReportView 的手动 projectId/year 解析
+- [x] 替换 DisclosureEditor 的手动解析
+- [x] 验证路由切换数据同步
 
 ### Task 2.3 — apiPaths.ts [R6.1]
-- [ ] 创建 services/apiPaths.ts：按业务域分组定义所有 API 路径
-- [ ] 替换 consolidationApi.ts 的硬编码路径
-- [ ] 替换 auditPlatformApi.ts
-- [ ] 替换 commonApi.ts
-- [ ] 逐步替换其余 15 个 service 文件
+- [x] 创建 services/apiPaths.ts：按业务域分组定义所有 API 路径
+- [x] 替换 consolidationApi.ts 的硬编码路径
+- [x] 替换 auditPlatformApi.ts
+- [x] 替换 commonApi.ts
+- [x] 逐步替换其余 15 个 service 文件
 
 ### Task 2.4 — 后端响应格式统一 [R7.2]
-- [ ] 审查所有路由：确保只返回业务数据，不自己包装 {code,message,data}
-- [ ] 修复双重包装的路由
-- [ ] 前端删除所有 `data?.data ?? data` 兼容代码
-- [ ] 验证全链路
+- [x] 审查所有路由：确保只返回业务数据，不自己包装 {code,message,data}
+- [x] 修复双重包装的路由
+- [x] 前端删除所有 `data?.data ?? data` 兼容代码
+- [x] 验证全链路
 
 ### Task 2.5 — usePermission + v-permission [R3.10]
-- [ ] 创建 composables/usePermission.ts：can(permission)/canAny()
-- [ ] 创建 directives/permission.ts：v-permission="'project:edit'"
-- [ ] main.ts 注册指令
-- [ ] 在 Adjustments 删除按钮加 v-permission
-- [ ] 在 UserManagement 加 v-permission="'admin'"
-- [ ] 验证权限隐藏/禁用
+- [x] 创建 composables/usePermission.ts：can(permission)/canAny()
+- [x] 创建 directives/permission.ts：v-permission="'project:edit'"
+- [x] main.ts 注册指令
+- [x] 在 Adjustments 删除按钮加 v-permission
+- [x] 在 UserManagement 加 v-permission="'admin'"
+- [x] 验证权限隐藏/禁用
 
 ### Task 2.6 — 路由守卫统一 [R7.1]
-- [ ] router/index.ts beforeEach：权限守卫
-- [ ] 项目上下文自动加载（配合 useProjectStore）
-- [ ] 未保存变更拦截（配合 useEditMode）
-- [ ] 验证路由切换
+- [x] router/index.ts beforeEach：权限守卫
+- [x] 项目上下文自动加载（配合 useProjectStore）
+- [x] 未保存变更拦截（配合 useEditMode）
+- [x] 验证路由切换
 
 ### Task 2.7 — API 调用统一收口 [R1.4]
-- [ ] 审查所有直接 import http 的文件
-- [ ] 迁移到 apiProxy.ts 或对应 service 文件
-- [ ] 保留 authHttp（auth store 专用）
+- [x] 审查所有直接 import http 的文件
+- [x] 迁移到 apiProxy.ts 或对应 service 文件
+- [x] 保留 authHttp（auth store 专用）
 - [ ] 验证全链路
 
 ### Task 2.8 — 批量操作场景优化 [R1.6]
-- [ ] 后端：调整分录 API 支持 batch_mode 参数
-- [ ] 后端：batch_mode=true 时暂不触发事件，提交时统一触发一次
-- [ ] 前端：调整分录页面加"批量提交"按钮
-- [ ] 验证：批量录入 20 笔后一次性重算
+- [x] 后端：调整分录 API 支持 batch_mode 参数
+- [x] 后端：batch_mode=true 时暂不触发事件，提交时统一触发一次
+- [x] 前端：调整分录页面加"批量提交"按钮
+- [x] 验证：批量录入 20 笔后一次性重算
 
 ### Task 2.9 — shortcuts.ts 接入各模块 [R6.4]
-- [ ] TrialBalance 监听 shortcut:save → 保存试算平衡表
-- [ ] DisclosureEditor 监听 shortcut:save → 保存附注
-- [ ] ConsolNoteTab 监听 shortcut:save → 保存附注数据
-- [ ] 全局 shortcut:undo → operationHistory.undo()
-- [ ] 验证快捷键不与 Ctrl+F 冲突
+- [x] TrialBalance 监听 shortcut:save → 保存试算平衡表
+- [x] DisclosureEditor 监听 shortcut:save → 保存附注
+- [x] ConsolNoteTab 监听 shortcut:save → 保存附注数据
+- [x] 全局 shortcut:undo → operationHistory.undo()
+- [x] 验证快捷键不与 Ctrl+F 冲突
 
 ### Task 2.10 — Sprint 2 收尾
 - [ ] git commit + push

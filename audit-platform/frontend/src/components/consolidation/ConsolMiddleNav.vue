@@ -111,6 +111,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
+import { eventBus } from '@/utils/eventBus'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -245,7 +246,7 @@ async function syncFromProject() {
         let rootCode = 'root'
         try {
           const { data } = await import('@/utils/http').then(m => m.default.get(`/api/projects/${projectId.value}`, { validateStatus: (s: number) => s < 600 }))
-          const p = data?.data ?? data
+          const p = data
           rootName = p?.client_name || p?.name || rootName
         } catch { /* ignore */ }
 
@@ -295,8 +296,8 @@ async function syncFromProject() {
 }
 
 function onNodeClick(data: any) {
-  // 通过自定义事件通知父组件（ConsolidationIndex）
-  window.dispatchEvent(new CustomEvent('consol-tree-select', { detail: data }))
+  // 通过事件总线通知父组件（ConsolidationIndex）
+  eventBus.emit('consol-tree-select', data)
 }
 
 // ─── 树形右键菜单 ────────────────────────────────────────────────────────────
@@ -321,18 +322,18 @@ function treeCtxAggregateDirect() {
   closeTreeCtxMenu()
   const data = treeContextMenu.nodeData
   if (!data) return
-  window.dispatchEvent(new CustomEvent('consol-tree-aggregate', {
-    detail: { mode: 'direct', companyCode: data.companyCode, companyName: data.label }
-  }))
+  eventBus.emit('consol-tree-aggregate', {
+    mode: 'direct', companyCode: data.companyCode, companyName: data.label
+  })
 }
 
 function treeCtxAggregateCustom() {
   closeTreeCtxMenu()
   const data = treeContextMenu.nodeData
   if (!data) return
-  window.dispatchEvent(new CustomEvent('consol-tree-aggregate', {
-    detail: { mode: 'custom', companyCode: data.companyCode, companyName: data.label }
-  }))
+  eventBus.emit('consol-tree-aggregate', {
+    mode: 'custom', companyCode: data.companyCode, companyName: data.label
+  })
 }
 
 function treeCtxRefresh() {
@@ -344,9 +345,9 @@ function treeCtxViewReport() {
   closeTreeCtxMenu()
   const data = treeContextMenu.nodeData
   if (!data) return
-  window.dispatchEvent(new CustomEvent('consol-tree-select', {
-    detail: { companyCode: data.companyCode, label: data.label, isReport: true, reportType: 'balance_sheet' }
-  }))
+  eventBus.emit('consol-tree-select', {
+    companyCode: data.companyCode, label: data.label, isReport: true, reportType: 'balance_sheet'
+  })
 }
 
 function treeCtxViewNote() {
@@ -354,9 +355,9 @@ function treeCtxViewNote() {
   const data = treeContextMenu.nodeData
   if (!data) return
   // 切换到该企业 + 切换到附注 tab
-  window.dispatchEvent(new CustomEvent('consol-tree-select', {
-    detail: { companyCode: data.companyCode, label: data.label, switchTab: 'consol_note' }
-  }))
+  eventBus.emit('consol-tree-select', {
+    companyCode: data.companyCode, label: data.label, switchTab: 'consol_note'
+  })
 }
 
 // 点击其他地方关闭
@@ -407,13 +408,11 @@ async function doRefresh() {
   if (refreshOptions.worksheet) types.push('worksheet')
 
   // 通知 ConsolidationIndex 执行刷新
-  window.dispatchEvent(new CustomEvent('consol-refresh-entity', {
-    detail: {
-      companyCode: refreshTarget.code,
-      companyName: refreshTarget.name,
-      types,
-    }
-  }))
+  eventBus.emit('consol-refresh-entity', {
+    companyCode: refreshTarget.code,
+    companyName: refreshTarget.name,
+    types,
+  })
 
   // 模拟等待（实际由 ConsolidationIndex 处理）
   await new Promise(r => setTimeout(r, 500))

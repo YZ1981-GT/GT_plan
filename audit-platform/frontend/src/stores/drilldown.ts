@@ -139,7 +139,7 @@ export const useDrilldownStore = defineStore('drilldown', () => {
       const { data } = await http.get(
         `/api/projects/${projectId.value}/drilldown/balance`, { params },
       )
-      const res = data.data ?? data
+      const res = data
       balanceData.value = res.items
       balanceTotal.value = res.total
     } finally {
@@ -182,7 +182,7 @@ export const useDrilldownStore = defineStore('drilldown', () => {
         `/api/projects/${projectId.value}/drilldown/ledger/${selectedAccountCode.value}`,
         { params },
       )
-      const res = data.data ?? data
+      const res = data
       ledgerData.value = res.items
       ledgerTotal.value = res.total
     } finally {
@@ -208,7 +208,7 @@ export const useDrilldownStore = defineStore('drilldown', () => {
         `/api/projects/${projectId.value}/drilldown/aux-balance/${selectedAccountCode.value}`,
         { params: { year: year.value } },
       )
-      auxBalanceData.value = data.data ?? data
+      auxBalanceData.value = data
     } finally {
       loading.value = false
     }
@@ -243,7 +243,7 @@ export const useDrilldownStore = defineStore('drilldown', () => {
           },
         },
       )
-      const res = data.data ?? data
+      const res = data
       auxLedgerData.value = res.items
       auxLedgerTotal.value = res.total
     } finally {

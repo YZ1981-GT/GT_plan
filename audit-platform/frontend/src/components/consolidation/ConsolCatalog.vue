@@ -49,7 +49,9 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import type { StandardChangePayload, FourColSwitchPayload } from '@/utils/eventBus'
 
 const route = useRoute()
 const _projectId = computed(() => route.params.projectId as string)
@@ -59,31 +61,29 @@ const noteSearch = ref('')
 const noteTreeRef = ref<any>(null)
 
 // 监听顶部栏准则切换事件
-function onStandardChanged(e: Event) {
-  const detail = (e as CustomEvent).detail
-  if (detail?.standard) {
-    standard.value = detail.standard
+function onStandardChanged(payload: StandardChangePayload) {
+  if (payload?.standard) {
+    standard.value = payload.standard
     loadData()
   }
 }
 
 // 监听四栏切换事件，自动切到附注 tab
-function onSwitchFourCol(e: Event) {
-  const detail = (e as CustomEvent).detail
-  if (detail?.tab === 'notes') {
+function onSwitchFourCol(payload: FourColSwitchPayload) {
+  if (payload?.tab === 'notes') {
     activeTab.value = 'notes'
   }
 }
 
 onMounted(() => {
   loadData()
-  window.addEventListener('consol-standard-change', onStandardChanged)
-  window.addEventListener('gt-switch-four-col', onSwitchFourCol)
+  eventBus.on('standard-change', onStandardChanged)
+  eventBus.on('four-col-switch', onSwitchFourCol)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('consol-standard-change', onStandardChanged)
-  window.removeEventListener('gt-switch-four-col', onSwitchFourCol)
+  eventBus.off('standard-change', onStandardChanged)
+  eventBus.off('four-col-switch', onSwitchFourCol)
 })
 
 // ─── 报表树 ──────────────────────────────────────────────────────────────────
@@ -102,10 +102,10 @@ const noteTree = ref<any[]>([])
 async function loadData() {
   try {
     // 从合并附注章节 API 加载（按父章节分组的树形）
-    const { data } = await http.get(`/api/consol-note-sections/${standard.value}`, {
+    const data = await api.get(`/api/consol-note-sections/${standard.value}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const groups = Array.isArray(data) ? data : (data?.data ?? [])
+    const groups = Array.isArray(data) ? data : (data ?? [])
     if (!Array.isArray(groups) || !groups.length) { noteTree.value = []; return }
 
     noteTree.value = groups.map((g: any) => ({
@@ -132,17 +132,17 @@ watch(noteSearch, (val) => { noteTreeRef.value?.filter(val) })
 
 function onReportClick(data: any) {
   if (data.type) {
-    window.dispatchEvent(new CustomEvent('consol-catalog-select', {
-      detail: { type: 'report', reportType: data.type, standard: standard.value }
-    }))
+    eventBus.emit('consol-catalog-select', {
+      type: 'report', reportType: data.type, standard: standard.value
+    })
   }
 }
 
 function onNoteClick(data: any) {
   if (data.section_id) {
-    window.dispatchEvent(new CustomEvent('consol-catalog-select', {
-      detail: { type: 'note', sectionId: data.section_id, title: data.title || data.label, standard: standard.value }
-    }))
+    eventBus.emit('consol-catalog-select', {
+      type: 'note', sectionId: data.section_id, title: data.title || data.label, standard: standard.value
+    })
   }
 }
 
@@ -152,24 +152,22 @@ async function refreshAll() {
   refreshing.value = true
   try {
     // 通知右侧刷新所有报表和附注
-    window.dispatchEvent(new CustomEvent('consol-catalog-select', {
-      detail: { type: 'refresh-all', standard: standard.value }
-    }))
+    eventBus.emit('consol-catalog-select', {
+      type: 'refresh-all', standard: standard.value
+    })
     await loadData()
     ElMessage.success('已刷新所有报表和附注数据')
   } finally { refreshing.value = false }
 }
 
 function refreshSingle(type: string, data: any) {
-  window.dispatchEvent(new CustomEvent('consol-catalog-select', {
-    detail: {
-      type: `refresh-${type}`,
-      reportType: data.type,
-      sectionId: data.sectionId,
-      label: data.label || data.fullTitle,
-      standard: standard.value,
-    }
-  }))
+  eventBus.emit('consol-catalog-select', {
+    type: `refresh-${type}`,
+    reportType: data.type,
+    sectionId: data.sectionId,
+    label: data.label || data.fullTitle,
+    standard: standard.value,
+  })
   ElMessage.success(`正在从项目提取: ${data.label || data.fullTitle}`)
 }
 
@@ -180,7 +178,7 @@ const auditing = ref(false)
 async function _auditAllNotes() {
   auditing.value = true
   // 通知 ConsolidationIndex 执行全审
-  window.dispatchEvent(new CustomEvent('consol-note-audit-all', { detail: { standard: standard.value } }))
+  eventBus.emit('consol-note-audit-all', { standard: standard.value })
   auditing.value = false
 }
 </script>

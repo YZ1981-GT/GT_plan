@@ -91,6 +91,7 @@ class AdjustmentService:
         project_id: UUID,
         data: AdjustmentCreate,
         user_id: UUID,
+        batch_mode: bool = False,
     ) -> AdjustmentGroupResponse:
         """创建调整分录组：借贷平衡校验→自动编号→科目校验→写入→发布事件"""
         # 1. 借贷平衡校验
@@ -158,14 +159,49 @@ class AdjustmentService:
             user_id,
         )
 
-        # 发布事件
-        affected_codes = list({li.standard_account_code for li in data.line_items})
-        await self._publish_adjustment_event(
-            EventType.ADJUSTMENT_CREATED,
-            project_id, data.year, affected_codes, entry_group_id,
-        )
+        # batch_mode 时跳过事件发布，由 batch_commit 统一触发
+        if not batch_mode:
+            affected_codes = list({li.standard_account_code for li in data.line_items})
+            await self._publish_adjustment_event(
+                EventType.ADJUSTMENT_CREATED,
+                project_id, data.year, affected_codes, entry_group_id,
+            )
 
         return resp
+
+    # ------------------------------------------------------------------
+    # batch_commit — 批量提交后统一触发一次重算事件
+    # ------------------------------------------------------------------
+    async def batch_commit(
+        self,
+        project_id: UUID,
+        year: int,
+    ) -> dict:
+        """批量提交：收集所有 draft 分录涉及的科目，统一发布一次事件触发重算"""
+        adj = Adjustment.__table__
+        q = (
+            sa.select(sa.func.array_agg(sa.distinct(adj.c.account_code)))
+            .where(
+                adj.c.project_id == project_id,
+                adj.c.year == year,
+                adj.c.is_deleted == sa.false(),
+            )
+        )
+        result = await self.db.execute(q)
+        all_codes = result.scalar() or []
+        # 过滤 None
+        all_codes = [c for c in all_codes if c]
+
+        if all_codes:
+            await self._publish_adjustment_event(
+                EventType.ADJUSTMENT_CREATED,
+                project_id, year, all_codes,
+            )
+
+        return {
+            "message": "批量提交成功，已触发重算",
+            "affected_accounts": len(all_codes),
+        }
 
     # ------------------------------------------------------------------
     # 13.2 update_entry / delete_entry

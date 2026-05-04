@@ -426,7 +426,7 @@ watch(selectedMapping, async (m) => {
       `/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(m.account_name)}`,
       { validateStatus: () => true }
     )
-    const result = data?.data ?? data
+    const result = data
     if (result?.tips?.length || result?.checklist?.length) {
       tsjData.value = result
     }

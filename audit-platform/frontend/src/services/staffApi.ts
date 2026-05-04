@@ -6,6 +6,9 @@
  * 所以 { data } = await http.get() 拿到的就是最终数据。
  */
 import http from '@/utils/http'
+import {
+  staff as P, projects as P_proj, workHours as P_wh,
+} from '@/services/apiPaths'
 
 // ── Types ──
 
@@ -64,80 +67,80 @@ export interface WorkHourRecord {
 export async function listStaff(params?: {
   search?: string; department?: string; partner_name?: string; offset?: number; limit?: number
 }): Promise<StaffListResponse> {
-  const { data } = await http.get('/api/staff', { params })
+  const { data } = await http.get(P.list, { params })
   return data as StaffListResponse
 }
 
 export async function createStaff(payload: Partial<StaffMember>): Promise<StaffMember> {
-  const { data } = await http.post('/api/staff', payload)
+  const { data } = await http.post(P.create, payload)
   return data as StaffMember
 }
 
 export async function updateStaff(id: string, payload: Partial<StaffMember>): Promise<StaffMember> {
-  const { data } = await http.put(`/api/staff/${id}`, payload)
+  const { data } = await http.put(P.detail(id), payload)
   return data as StaffMember
 }
 
 export async function getStaffResume(id: string) {
-  const { data } = await http.get(`/api/staff/${id}/resume`)
+  const { data } = await http.get(P.resume(id))
   return data
 }
 
 export async function deleteStaff(id: string) {
-  const { data } = await http.delete(`/api/staff/${id}`)
+  const { data } = await http.delete(P.detail(id))
   return data
 }
 
 export async function getStaffProjects(id: string) {
-  const { data } = await http.get(`/api/staff/${id}/projects`)
+  const { data } = await http.get(P.projects(id))
   return data
 }
 
 export async function getMyStaffId(): Promise<{ staff_id: string; name: string }> {
-  const { data } = await http.get('/api/staff/me/staff-id')
+  const { data } = await http.get(P.meStaffId)
   return data as { staff_id: string; name: string }
 }
 
 // ── Assignment API ──
 
 export async function listAssignments(projectId: string): Promise<Assignment[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/assignments`)
+  const { data } = await http.get(P_proj.assignments(projectId))
   return (Array.isArray(data) ? data : data?.items || []) as Assignment[]
 }
 
 export async function saveAssignments(projectId: string, assignments: { staff_id: string; role: string; assigned_cycles?: string[] }[]) {
-  const { data } = await http.post(`/api/projects/${projectId}/assignments`, { assignments })
+  const { data } = await http.post(P_proj.assignments(projectId), { assignments })
   return data
 }
 
 export async function getMyAssignments(): Promise<Assignment[]> {
-  const { data } = await http.get('/api/projects/my/assignments')
+  const { data } = await http.get(P_proj.myAssignments)
   return (Array.isArray(data) ? data : data?.items || []) as Assignment[]
 }
 
 // ── WorkHour API ──
 
 export async function listWorkHours(staffId: string, params?: { start_date?: string; end_date?: string }): Promise<WorkHourRecord[]> {
-  const { data } = await http.get(`/api/staff/${staffId}/work-hours`, { params })
+  const { data } = await http.get(P.workHours(staffId), { params })
   return (Array.isArray(data) ? data : data?.items || []) as WorkHourRecord[]
 }
 
 export async function createWorkHour(staffId: string, payload: { project_id: string; work_date: string; hours: number; description?: string }) {
-  const { data } = await http.post(`/api/staff/${staffId}/work-hours`, payload)
+  const { data } = await http.post(P.workHours(staffId), payload)
   return data
 }
 
 export async function updateWorkHour(hourId: string, payload: { hours?: number; description?: string; status?: string }) {
-  const { data } = await http.put(`/api/work-hours/${hourId}`, payload)
+  const { data } = await http.put(P_wh.detail(hourId), payload)
   return data
 }
 
 export async function getAISuggestions(staffId: string, targetDate: string) {
-  const { data } = await http.post('/api/work-hours/ai-suggest', null, { params: { staff_id: staffId, target_date: targetDate } })
+  const { data } = await http.post(P_wh.aiSuggest, null, { params: { staff_id: staffId, target_date: targetDate } })
   return data
 }
 
 export async function getProjectWorkHours(projectId: string) {
-  const { data } = await http.get(`/api/projects/${projectId}/work-hours`)
+  const { data } = await http.get(P_proj.workHours(projectId))
   return data
 }

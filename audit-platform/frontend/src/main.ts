@@ -10,6 +10,7 @@ import App from './App.vue'
 import router from './router'
 import { initWebVitals } from './utils/monitor'
 import { queryClient } from './utils/queryClient'
+import { vPermission } from './directives/permission'
 
 const app = createApp(App)
 
@@ -17,6 +18,9 @@ app.use(createPinia())
 app.use(VueQueryPlugin, { queryClient })
 app.use(router)
 app.use(ElementPlus)
+
+// 注册全局指令
+app.directive('permission', vPermission)
 
 // Register all Element Plus icons
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

@@ -40,7 +40,7 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async login(username: string, password: string) {
       const { data } = await authHttp.post('/api/auth/login', { username, password })
-      const payload = data.data ?? data
+      const payload = data
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token
       this.user = payload.user ?? null
@@ -69,7 +69,7 @@ export const useAuthStore = defineStore('auth', {
       const { data } = await authHttp.post('/api/auth/refresh', {
         refresh_token: this.refreshToken,
       })
-      const payload = data.data ?? data
+      const payload = data
       // Token Rotation: 后端每次刷新都签发新的 refresh_token
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token ?? this.refreshToken
@@ -80,7 +80,7 @@ export const useAuthStore = defineStore('auth', {
     async fetchUserProfile() {
       // 使用带拦截器的 http 实例，自动附加 token + 401 刷新
       const { data } = await http.get('/api/users/me')
-      this.user = data.data ?? data
+      this.user = data
     },
   },
 })

@@ -102,7 +102,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { useLazyEdit } from '@/composables/useLazyEdit'
 import { fmtAmount } from '@/utils/formatters'
 
@@ -173,11 +173,11 @@ async function loadConsolTb(forceRefresh = false) {
   try {
     // 从 report_config 加载行结构
     const standard = `${props.templateType}_consolidated`
-    const { data } = await http.get('/api/report-config', {
+    const data = await api.get('/api/report-config', {
       params: { report_type: consolTbType.value, applicable_standard: standard, project_id: props.projectId },
       validateStatus: (s: number) => s < 600,
     })
-    const rows = Array.isArray(data?.data ?? data) ? (data?.data ?? data) : []
+    const rows = Array.isArray(data) ? (data) : []
     consolTbRows.value = rows.map((r: any) => ({
       row_code: r.row_code || '',
       row_name: r.row_name || '',
@@ -256,16 +256,16 @@ async function importPriorYearTb() {
   consolTbLoading.value = true
   try {
     const sheetKey = `consol_tb_${consolTbType.value}_opening`
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/consol-worksheet-data/${props.projectId}/${props.year}/prior-year/${sheetKey}`,
       { validateStatus: (s: number) => s < 600 }
     )
-    const result = data?.data ?? data
+    const result = data
     if (!result?.found) {
       ElMessage.warning(result?.message || `未找到 ${props.year - 1} 年度的期末数据`)
       return
     }
-    const priorRows = result.data?.rows
+    const priorRows = result.content?.rows
     if (!priorRows?.length) {
       ElMessage.warning(`${props.year - 1} 年度期末数据为空`)
       return
@@ -296,13 +296,13 @@ async function fillConsolTb() {
   consolTbLoading.value = true
   try {
     const entityCode = props.entityCode || ''
-    const { data } = await http.post(`/api/consol-note-sections/fill-tb/${props.projectId}/${props.year}`, {
+    const data = await api.post(`/api/consol-note-sections/fill-tb/${props.projectId}/${props.year}`, {
       report_type: consolTbType.value,
       period: tbPeriod.value,
       company_code: entityCode,
       standard: props.templateType,
     }, { validateStatus: (s: number) => s < 600 })
-    const result = data?.data ?? data
+    const result = data
     if (result?.rows?.length) {
       // 用提取的数据填充到当前行
       for (const fr of result.rows) {
@@ -343,14 +343,14 @@ async function generateReportFromTb() {
     if (!updates.length) { ElMessage.warning('无审定数可回填'); consolTbLoading.value = false; return }
 
     // 调用后端批量更新报表数据
-    const { data } = await http.post(`/api/report-config/batch-update`, {
+    const data = await api.post(`/api/report-config/batch-update`, {
       project_id: props.projectId,
       report_type: consolTbType.value,
       applicable_standard: standard,
       updates,
     }, { validateStatus: (s: number) => s < 600 })
 
-    const result = data?.data ?? data
+    const result = data
     const updated = result?.updated || updates.length
     ElMessage.success(`已将 ${updated} 行审定数回填到合并报表（${tbReportTypes.find(t => t.key === consolTbType.value)?.label}）`)
 

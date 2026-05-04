@@ -94,7 +94,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 interface CellInfo {
   cell: string
@@ -240,38 +240,38 @@ async function pickSource(fn: string) {
 
   try {
     if (fn === 'TB') {
-      const { data } = await http.get('/api/trial-balance', {
+      const data = await api.get('/api/trial-balance', {
         params: { project_id: props.projectId },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data?.data ?? data ?? []
+      const rows = data ?? []
       sourceRows.value = rows.map((r: any) => ({
         code: r.standard_account_code || r.account_code || '',
         name: r.account_name || r.standard_account_name || '',
         _ref: `TB('${r.standard_account_code || r.account_code || ''}','期末余额')`,
       }))
     } else if (fn === 'ROW' || fn === 'SUM_ROW' || fn === 'REPORT') {
-      const { data } = await http.get('/api/report-config', {
+      const data = await api.get('/api/report-config', {
         params: { report_type: 'balance_sheet', project_id: props.projectId },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data?.data ?? data ?? []
+      const rows = data ?? []
       sourceRows.value = rows.map((r: any) => ({
         code: r.row_code || '',
         name: r.row_name || '',
         _ref: fn === 'REPORT' ? `REPORT('${r.row_code}','期末')` : `ROW('${r.row_code}')`,
       }))
     } else if (fn === 'NOTE') {
-      const { data } = await http.get('/api/disclosure-notes/tree', { validateStatus: (s: number) => s < 600 })
-      const items = data?.data ?? data ?? []
+      const data = await api.get('/api/disclosure-notes/tree', { validateStatus: (s: number) => s < 600 })
+      const items = data ?? []
       sourceRows.value = items.map((r: any) => ({
         code: r.note_number || r.section_number || r.note_section || '',
         name: r.title || r.section_title || '',
         _ref: `NOTE('${r.title || r.section_title || ''}','合计','期末')`,
       }))
     } else if (fn === 'WP') {
-      const { data } = await http.get('/api/working-papers', { validateStatus: (s: number) => s < 600 })
-      const items = data?.data ?? data ?? []
+      const data = await api.get('/api/working-papers', { validateStatus: (s: number) => s < 600 })
+      const items = data ?? []
       sourceRows.value = items.map((r: any) => ({
         code: r.wp_code || '',
         name: r.wp_name || r.name || '',

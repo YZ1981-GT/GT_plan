@@ -285,7 +285,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
@@ -294,6 +294,8 @@ import {
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
+import { eventBus } from '@/utils/eventBus'
+import { operationHistory } from '@/utils/operationHistory'
 
 const route = useRoute()
 const router = useRouter()
@@ -488,10 +490,10 @@ async function pollImportQueue() {
     return
   }
   try {
-    const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${projectId}`, {
+    const statusData = await api.get(`/api/data-lifecycle/import-queue/${projectId}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const status = statusData.data ?? statusData
+    const status = statusData
     if (status && status.status === 'processing') {
       bgImportStatus.value = {
         projectId,
@@ -534,43 +536,45 @@ async function handleLogout() {
 }
 
 // 监听子组件打开公式管理的自定义事件
-function onOpenFormulaEvent(e: Event) {
-  const detail = (e as CustomEvent).detail
+function onOpenFormulaEvent(payload: { nodeKey?: string }) {
   showFormulaManager.value = true
   // 如果有 nodeKey，后续 FormulaManagerDialog 可以通过 props 或 watch 定位到对应节点
-  if (detail?.nodeKey) {
+  if (payload?.nodeKey) {
     // 存储到 sessionStorage 供 FormulaManagerDialog 读取
-    sessionStorage.setItem('gt-formula-target-node', detail.nodeKey)
+    sessionStorage.setItem('gt-formula-target-node', payload.nodeKey)
   }
 }
 
 // 公式保存/应用后广播通知所有表刷新
 function onFormulaSaved() {
-  document.dispatchEvent(new CustomEvent('gt-formula-changed', { detail: { action: 'saved' } }))
+  eventBus.emit('formula-changed', { action: 'saved' })
 }
 function onFormulaApplied() {
-  document.dispatchEvent(new CustomEvent('gt-formula-changed', { detail: { action: 'applied' } }))
+  eventBus.emit('formula-changed', { action: 'applied' })
 }
 
-function onSwitchFourCol(e: Event) {
-  const detail = (e as CustomEvent).detail
-  // Only handle the initial dispatch (from ConsolidationIndex), not re-dispatches
-  if (detail?._redispatched) return
+function onSwitchFourCol(payload: { tab?: string }) {
   fourColumnMode.value = true
   catalogCollapsed.value = false
-  // Re-dispatch once after catalog mounts so it can switch to the right tab
-  if (detail?.tab) {
+  // mitt 不需要 _redispatched 补丁：直接延迟通知 catalog 切换 tab
+  if (payload?.tab) {
     setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('gt-switch-four-col', { detail: { ...detail, _redispatched: true } }))
+      eventBus.emit('four-col-switch', payload)
     }, 150)
   }
+}
+
+/** 全局快捷键撤销 */
+function onShortcutUndo() {
+  operationHistory.undo()
 }
 
 onMounted(() => {
   loadPrefs()
   document.addEventListener('keydown', onKeydown)
-  document.addEventListener('gt-open-formula-manager', onOpenFormulaEvent)
-  window.addEventListener('gt-switch-four-col', onSwitchFourCol)
+  eventBus.on('open-formula-manager', onOpenFormulaEvent)
+  eventBus.on('four-col-switch', onSwitchFourCol)
+  eventBus.on('shortcut:undo', onShortcutUndo)
   // 移动端手势
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -579,8 +583,9 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
-  document.removeEventListener('gt-open-formula-manager', onOpenFormulaEvent)
-  window.removeEventListener('gt-switch-four-col', onSwitchFourCol)
+  eventBus.off('open-formula-manager', onOpenFormulaEvent)
+  eventBus.off('four-col-switch', onSwitchFourCol)
+  eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
 })

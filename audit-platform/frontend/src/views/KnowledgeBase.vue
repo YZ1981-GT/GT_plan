@@ -255,7 +255,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete, confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { Upload, FolderOpened } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
+import { downloadFile } from '@/utils/http'
 
 const router = useRouter()
 
@@ -310,8 +311,8 @@ const flatFolders = computed(() => {
 async function loadTree() {
   treeLoading.value = true
   try {
-    const { data } = await http.get('/api/knowledge-library/tree')
-    folderTree.value = Array.isArray(data) ? data : (data?.data || [])
+    const data = await api.get('/api/knowledge-library/tree')
+    folderTree.value = Array.isArray(data) ? data : (data || [])
   } catch {
     folderTree.value = []
   } finally {
@@ -323,8 +324,8 @@ async function onFolderClick(node: any) {
   selectedFolder.value = node
   docLoading.value = true
   try {
-    const { data } = await http.get(`/api/knowledge-library/folders/${node.id}/documents`)
-    documents.value = Array.isArray(data) ? data : (data?.data || [])
+    const data = await api.get(`/api/knowledge-library/folders/${node.id}/documents`)
+    documents.value = Array.isArray(data) ? data : (data || [])
   } catch {
     documents.value = []
   } finally {
@@ -341,7 +342,7 @@ function onCreateFolder() {
 
 async function doCreateFolder() {
   try {
-    await http.post('/api/knowledge-library/folders', {
+    await api.post('/api/knowledge-library/folders', {
       name: newFolderName.value,
       parent_id: newFolderParent.value,
       access_level: newFolderAccess.value,
@@ -600,11 +601,11 @@ async function doRename() {
   renameLoading.value = true
   try {
     if (renameType.value === 'folder') {
-      await http.put(`/api/knowledge-library/folders/${renameTargetId.value}/rename`, {
+      await api.put(`/api/knowledge-library/folders/${renameTargetId.value}/rename`, {
         name: renameNewName.value.trim(),
       })
     } else {
-      await http.put(`/api/knowledge-library/documents/${renameTargetId.value}`, {
+      await api.put(`/api/knowledge-library/documents/${renameTargetId.value}`, {
         name: renameNewName.value.trim(),
       })
     }
@@ -623,7 +624,7 @@ async function onDeleteFolder(folder: any) {
     '删除确认',
   )
   try {
-    await http.delete(`/api/knowledge-library/folders/${folder.id}`)
+    await api.delete(`/api/knowledge-library/folders/${folder.id}`)
     ElMessage.success('文件夹已删除')
     if (selectedFolder.value?.id === folder.id) {
       selectedFolder.value = null
@@ -637,7 +638,7 @@ async function onDeleteFolder(folder: any) {
 async function onDeleteDoc(doc: any) {
   await confirmDelete(`文档「${doc.name}」`)
   try {
-    await http.delete(`/api/knowledge-library/documents/${doc.id}`)
+    await api.delete(`/api/knowledge-library/documents/${doc.id}`)
     ElMessage.success('已删除')
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
     await loadTree()
@@ -656,8 +657,8 @@ async function onSearch() {
   if (!searchKeyword.value.trim()) return
   searchLoading.value = true
   try {
-    const { data } = await http.get('/api/knowledge-library/search', { params: { q: searchKeyword.value } })
-    const results = Array.isArray(data) ? data : (data?.data || [])
+    const data = await api.get('/api/knowledge-library/search', { params: { q: searchKeyword.value } })
+    const results = Array.isArray(data) ? data : (data || [])
     documents.value = results
     selectedFolder.value = { name: `搜索结果: "${searchKeyword.value}" (${results.length} 条)` }
   } catch { ElMessage.error('搜索失败') }
@@ -676,7 +677,7 @@ async function onBatchDelete() {
   let deleted = 0
   for (const id of selectedDocIds.value) {
     try {
-      await http.delete(`/api/knowledge-library/documents/${id}`)
+      await api.delete(`/api/knowledge-library/documents/${id}`)
       deleted++
     } catch { /* 单个失败不阻断 */ }
   }
@@ -734,8 +735,8 @@ async function onPreviewDoc(doc: any) {
   } else if (isTextFile(doc)) {
     // 文本文件加载内容
     try {
-      const { data } = await http.get(`/api/knowledge-library/documents/${doc.id}/preview`)
-      const result = data?.data ?? data
+      const data = await api.get(`/api/knowledge-library/documents/${doc.id}/preview`)
+      const result = data
       previewText.value = result?.content || '（空文件）'
     } catch {
       previewText.value = '加载失败'
@@ -746,14 +747,7 @@ async function onPreviewDoc(doc: any) {
 
 async function onDownloadDoc(doc: any) {
   try {
-    const resp = await http.get(`/api/knowledge-library/documents/${doc.id}/download`, { responseType: 'blob' })
-    const blob = new Blob([resp.data])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = doc.name
-    a.click()
-    URL.revokeObjectURL(url)
+    await downloadFile(`/api/knowledge-library/documents/${doc.id}/download`, { fileName: doc.name })
   } catch { ElMessage.error('下载失败') }
 }
 
@@ -770,7 +764,7 @@ async function _onMoveDoc(doc: any) {
     return
   }
   try {
-    await http.put(`/api/knowledge-library/documents/${doc.id}/move`, { target_folder_id: target.id })
+    await api.put(`/api/knowledge-library/documents/${doc.id}/move`, { target_folder_id: target.id })
     ElMessage.success(`已移动到「${target.name}」`)
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
     await loadTree()
@@ -785,7 +779,7 @@ async function _onFolderContextMenu(folder: any, event: MouseEvent) {
   })
   if (!value || value === folder.name) return
   try {
-    await http.put(`/api/knowledge-library/folders/${folder.id}/rename`, { name: value })
+    await api.put(`/api/knowledge-library/folders/${folder.id}/rename`, { name: value })
     ElMessage.success('重命名成功')
     await loadTree()
   } catch { ElMessage.error('重命名失败') }

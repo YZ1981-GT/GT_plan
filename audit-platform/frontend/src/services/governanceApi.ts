@@ -2,6 +2,7 @@
  * Phase 14/15/16: 门禁引擎 + 任务树 + 取证版本链 API 服务层
  */
 import { api } from './apiProxy'
+import { governance as P } from './apiPaths'
 
 // ── Phase 14: Gate Engine ──────────────────────────────────────
 
@@ -40,7 +41,7 @@ export async function evaluateGate(params: {
   actor_id: string
   context?: Record<string, any>
 }): Promise<GateEvaluateResponse> {
-  const { data } = await api.post('/api/gate/evaluate', params)
+  const { data } = await api.post(P.gate.evaluate, params)
   return data
 }
 
@@ -50,7 +51,7 @@ export async function checkSoD(params: {
   actor_id: string
   target_role: string
 }): Promise<SoDCheckResponse> {
-  const { data } = await api.post('/api/sod/check', params)
+  const { data } = await api.post(P.sod.check, params)
   return data
 }
 
@@ -58,7 +59,7 @@ export async function replayTrace(
   traceId: string,
   level: 'L1' | 'L2' | 'L3' = 'L1'
 ): Promise<TraceReplayResponse> {
-  const { data } = await api.get(`/api/trace/${traceId}/replay`, { params: { level } })
+  const { data } = await api.get(P.trace.replay(traceId), { params: { level } })
   return data
 }
 
@@ -69,7 +70,7 @@ export async function queryTraces(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get('/api/trace', { params })
+  const { data } = await api.get(P.trace.query, { params })
   return data
 }
 
@@ -110,17 +111,17 @@ export async function listTaskTree(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get('/api/task-tree', { params })
+  const { data } = await api.get(P.taskTree.list, { params })
   return data
 }
 
 export async function getTreeStats(projectId: string) {
-  const { data } = await api.get('/api/task-tree/stats', { params: { project_id: projectId } })
+  const { data } = await api.get(P.taskTree.stats, { params: { project_id: projectId } })
   return data
 }
 
 export async function transitNodeStatus(nodeId: string, nextStatus: string, operatorId: string) {
-  const { data } = await api.put(`/api/task-tree/${nodeId}/status`, {
+  const { data } = await api.put(P.taskTree.status(nodeId), {
     next_status: nextStatus,
     operator_id: operatorId,
   })
@@ -133,7 +134,7 @@ export async function reassignNode(params: {
   operator_id: string
   reason_code: string
 }) {
-  const { data } = await api.post('/api/task-tree/reassign', params)
+  const { data } = await api.post(P.taskTree.reassign, params)
   return data
 }
 
@@ -142,7 +143,7 @@ export async function replayEvent(params: {
   operator_id: string
   reason_code: string
 }) {
-  const { data } = await api.post('/api/task-events/replay', params)
+  const { data } = await api.post(P.taskEvents.replay, params)
   return data
 }
 
@@ -152,7 +153,7 @@ export async function listEvents(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get('/api/task-events', { params })
+  const { data } = await api.get(P.taskEvents.list, { params })
   return data
 }
 
@@ -162,7 +163,7 @@ export async function createIssueFromConversation(params: {
   operator_id: string
   sla_level: 'P0' | 'P1' | 'P2'
 }) {
-  const { data } = await api.post('/api/issues/from-conversation', params)
+  const { data } = await api.post(P.issues.fromConversation, params)
   return data
 }
 
@@ -175,7 +176,7 @@ export async function listIssues(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get('/api/issues', { params })
+  const { data } = await api.get(P.issues.list, { params })
   return data
 }
 
@@ -185,7 +186,7 @@ export async function updateIssueStatus(issueId: string, params: {
   reason_code: string
   evidence_refs?: any[]
 }) {
-  const { data } = await api.put(`/api/issues/${issueId}/status`, params)
+  const { data } = await api.put(P.issues.status(issueId), params)
   return data
 }
 
@@ -194,26 +195,26 @@ export async function escalateIssue(issueId: string, params: {
   to_level: string
   reason_code: string
 }) {
-  const { data } = await api.post(`/api/issues/${issueId}/escalate`, params)
+  const { data } = await api.post(P.issues.escalate(issueId), params)
   return data
 }
 
 // ── Phase 16: Version Line + Integrity + Conflicts ─────────────
 
 export async function queryVersionLine(projectId: string, objectType?: string, objectId?: string) {
-  const { data } = await api.get(`/api/version-line/${projectId}`, {
+  const { data } = await api.get(P.versionLine(projectId), {
     params: { object_type: objectType, object_id: objectId },
   })
   return data
 }
 
 export async function checkExportIntegrity(exportId: string) {
-  const { data } = await api.get(`/api/exports/${exportId}/integrity`)
+  const { data } = await api.get(P.exportIntegrity(exportId))
   return data
 }
 
 export async function detectConflicts(projectId: string, wpId: string) {
-  const { data } = await api.post('/api/offline/conflicts/detect', {
+  const { data } = await api.post(P.offline.detectConflicts, {
     project_id: projectId,
     wp_id: wpId,
   })
@@ -227,7 +228,7 @@ export async function resolveConflict(params: {
   resolver_id: string
   reason_code: string
 }) {
-  const { data } = await api.post('/api/offline/conflicts/resolve', params)
+  const { data } = await api.post(P.offline.resolveConflict, params)
   return data
 }
 
@@ -237,12 +238,12 @@ export async function listConflicts(params: {
   page?: number
   page_size?: number
 }) {
-  const { data } = await api.get('/api/offline/conflicts', { params })
+  const { data } = await api.get(P.offline.listConflicts, { params })
   return data
 }
 
 export async function replayConsistency(projectId: string, snapshotId?: string) {
-  const { data } = await api.post('/api/consistency/replay', {
+  const { data } = await api.post(P.consistency.replay, {
     project_id: projectId,
     snapshot_id: snapshotId,
   })
@@ -250,6 +251,6 @@ export async function replayConsistency(projectId: string, snapshotId?: string) 
 }
 
 export async function getConsistencyReport(projectId: string) {
-  const { data } = await api.get(`/api/consistency/report/${projectId}`)
+  const { data } = await api.get(P.consistency.report(projectId))
   return data
 }

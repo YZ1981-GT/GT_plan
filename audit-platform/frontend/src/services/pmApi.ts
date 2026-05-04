@@ -3,6 +3,7 @@
  * 待复核收件箱 / 批量复核 / 进度看板 / 进度简报 / 交叉引用 / 客户沟通 / 调整汇总导出
  */
 import http from '@/utils/http'
+import { reviews as P_rev, adjustments as P_adj, projects as P_proj } from '@/services/apiPaths'
 
 // ── Types ──
 
@@ -111,60 +112,60 @@ export interface CommunicationRecord {
 
 /** 全局待复核收件箱 */
 export async function getGlobalReviewInbox(page = 1, pageSize = 50): Promise<ReviewInboxResult> {
-  const { data } = await http.get('/api/review-inbox', { params: { page, page_size: pageSize } })
+  const { data } = await http.get(P_rev.inbox.global, { params: { page, page_size: pageSize } })
   return data
 }
 
 /** 项目级待复核收件箱 */
 export async function getProjectReviewInbox(projectId: string, page = 1, pageSize = 50): Promise<ReviewInboxResult> {
-  const { data } = await http.get(`/api/projects/${projectId}/review-inbox`, { params: { page, page_size: pageSize } })
+  const { data } = await http.get(P_rev.inbox.project(projectId), { params: { page, page_size: pageSize } })
   return data
 }
 
 /** 批量复核 */
 export async function batchReview(projectId: string, wpIds: string[], action: 'approve' | 'reject', comment = ''): Promise<BatchReviewResult> {
-  const { data } = await http.post(`/api/projects/${projectId}/batch-review`, { wp_ids: wpIds, action, comment })
+  const { data } = await http.post(P_rev.batchReview(projectId), { wp_ids: wpIds, action, comment })
   return data
 }
 
 /** 项目进度看板 */
 export async function getProgressBoard(projectId: string): Promise<ProgressBoardResult> {
-  const { data } = await http.get(`/api/projects/${projectId}/progress-board`)
+  const { data } = await http.get(P_rev.progressBoard(projectId))
   return data
 }
 
 /** 项目进度简报 */
 export async function getProgressBrief(projectId: string, polish = false): Promise<ProgressBrief> {
-  const { data } = await http.get(`/api/projects/${projectId}/progress-brief`, { params: { polish } })
+  const { data } = await http.get(P_rev.progressBrief(projectId), { params: { polish } })
   return data
 }
 
 /** 交叉引用检查 */
 export async function checkCrossRefs(projectId: string): Promise<CrossRefCheckResult> {
-  const { data } = await http.get(`/api/projects/${projectId}/cross-ref-check`)
+  const { data } = await http.get(P_rev.crossRefCheck(projectId))
   return data
 }
 
 /** 客户沟通记录列表 */
 export async function listCommunications(projectId: string): Promise<CommunicationRecord[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/communications`)
+  const { data } = await http.get(P_proj.communications.list(projectId))
   return Array.isArray(data) ? data : []
 }
 
 /** 新增客户沟通记录 */
 export async function addCommunication(projectId: string, body: Partial<CommunicationRecord>): Promise<CommunicationRecord> {
-  const { data } = await http.post(`/api/projects/${projectId}/communications`, body)
+  const { data } = await http.post(P_proj.communications.list(projectId), body)
   return data
 }
 
 /** 删除客户沟通记录 */
 export async function deleteCommunication(projectId: string, commId: string): Promise<void> {
-  await http.delete(`/api/projects/${projectId}/communications/${commId}`)
+  await http.delete(P_proj.communications.detail(projectId, commId))
 }
 
 /** 导出审计调整汇总 Excel */
 export async function exportAdjustmentSummary(projectId: string, year: number): Promise<void> {
-  const response = await http.get(`/api/projects/${projectId}/adjustments/export-summary`, {
+  const response = await http.get(P_adj.exportSummary(projectId), {
     params: { year, format: 'excel' },
     responseType: 'blob',
   })

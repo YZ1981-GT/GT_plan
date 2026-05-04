@@ -131,8 +131,8 @@ async def get_note_data(
     )
     row = result.fetchone()
     if not row:
-        return {"data": {}, "updated_at": None}
-    return {"data": row[0] if isinstance(row[0], dict) else {}, "updated_at": str(row[1]) if row[1] else None}
+        return {"content": {}, "updated_at": None}
+    return {"content": row[0] if isinstance(row[0], dict) else {}, "updated_at": str(row[1]) if row[1] else None}
 
 
 @router.put("/data/{project_id}/{year}/{section_id}")

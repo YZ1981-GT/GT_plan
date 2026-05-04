@@ -67,7 +67,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{ modelValue: boolean; projectId: string; year: number }>()
@@ -151,10 +151,10 @@ async function executeQuery() {
     if (source.startsWith('ws_')) filters.sheet_key = source.replace('ws_', '')
     if (filterText.value && (source === 'tb_detail')) filters.account_name = filterText.value
 
-    const { data } = await http.post('/api/custom-query/execute', {
+    const data = await api.post('/api/custom-query/execute', {
       project_id: props.projectId, year: props.year, source, filters,
     }, { validateStatus: (s: number) => s < 600 })
-    const result = data?.data ?? data
+    const result = data
     resultRows.value = result?.rows || []
     resultColumns.value = result?.columns || (resultRows.value.length ? Object.keys(resultRows.value[0]) : [])
     if (!resultRows.value.length) ElMessage.info('查询无结果')
@@ -191,8 +191,8 @@ async function exportResult() {
 // 加载指标树
 async function loadIndicators() {
   try {
-    const { data } = await http.get('/api/custom-query/indicators')
-    indicatorTree.value = Array.isArray(data) ? data : (data?.data ?? [])
+    const data = await api.get('/api/custom-query/indicators')
+    indicatorTree.value = Array.isArray(data) ? data : (data ?? [])
   } catch { indicatorTree.value = sourceOptions.map(s => ({ key: s.key, label: s.label })) }
 }
 loadIndicators()

@@ -63,9 +63,11 @@ import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
+import { useProjectStore } from '@/stores/project'
 
 const route = useRoute()
 const roleStore = useRoleContextStore()
+const projectStore = useProjectStore()
 const selectedProject = ref<any>(null)
 const activeModule = ref('projects')
 const fourCol = ref(false)
@@ -87,6 +89,13 @@ watch(() => route.params.projectId, async (pid) => {
     roleStore.currentProjectRole = null
   }
 }, { immediate: true })
+
+// 路由变化时自动同步项目上下文到 projectStore
+watch(
+  () => [route.params.projectId, route.query.year],
+  () => { projectStore.syncFromRoute(route) },
+  { immediate: true }
+)
 
 const catalogTitle = computed(() => {
   if (!fourCol.value) return ''

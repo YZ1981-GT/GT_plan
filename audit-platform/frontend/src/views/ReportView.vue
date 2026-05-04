@@ -583,7 +583,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
@@ -598,6 +598,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useProjectStore } from '@/stores/project'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -606,7 +607,9 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const projectId = computed(() => route.params.projectId as string)
+const projectStore = useProjectStore()
+
+const projectId = computed(() => projectStore.projectId)
 
 function goBack() {
   router.push(`/projects`)
@@ -624,20 +627,9 @@ const isConsolidated = computed(() => reportScope.value === 'consolidated')
 const _templateTypeLabel = computed(() => templateType.value === 'listed' ? '上市版' : '国企版')
 const scopeLabel = computed(() => reportScope.value === 'consolidated' ? '合并' : '单体')
 
-// 单位（项目）选择器
+// 单位（项目）选择器 — 使用 projectStore
 const selectedProjectId = ref('')
-const projectOptions = ref<Array<{ id: string; name: string }>>([])
-
-async function loadProjectOptions() {
-  try {
-    const { data: raw } = await http.get('/api/projects', { validateStatus: (s: number) => s < 600 })
-    const list = raw?.data ?? raw ?? []
-    projectOptions.value = (Array.isArray(list) ? list : []).map((p: any) => ({
-      id: p.id,
-      name: p.client_name || p.name || p.id,
-    }))
-  } catch { /* ignore */ }
-}
+const projectOptions = computed(() => projectStore.projectOptions)
 
 function onProjectChange(newId: string) {
   router.push({ path: `/projects/${newId}/reports`, query: route.query })
@@ -645,13 +637,10 @@ function onProjectChange(newId: string) {
 
 // 年度选择器
 const selectedYear = ref(new Date().getFullYear())
-const yearOptions = computed(() => {
-  const cur = new Date().getFullYear()
-  return Array.from({ length: 5 }, (_, i) => cur - i)
-})
+const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange(val: number) {
   selectedYear.value = val
-  projectYear.value = val
+  projectStore.changeYear(val)
   fetchReport()
 }
 
@@ -689,18 +678,18 @@ const totalRuleCount = computed(() => Object.values(allMappingRules.value).flat(
 
 async function loadPresetForType(rt: string) {
   // 用后端 preset API（含同义词表+模糊匹配）
-  const { data: presetData } = await http.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
+  const presetData = await api.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
     params: { report_type: rt, scope: reportScope.value },
     validateStatus: (s: number) => s < 600,
   })
-  const preset = presetData?.data ?? presetData ?? []
+  const preset = presetData ?? []
 
   // 同时加载上市版行次作为下拉选项
-  const { data: listedData } = await http.get('/api/report-config', {
+  const listedData = await api.get('/api/report-config', {
     params: { applicable_standard: `listed_${reportScope.value}`, report_type: rt },
     validateStatus: (s: number) => s < 600,
   })
-  const listedRows = listedData?.data ?? listedData ?? []
+  const listedRows = listedData ?? []
   allListedOptions.value[rt] = listedRows.map((r: any) => ({ code: r.row_code, name: r.row_name }))
 
   allMappingRules.value[rt] = preset.map((p: any) => ({
@@ -731,7 +720,7 @@ async function saveMappingRulesAll() {
       const rules = allMappingRules.value[rt.key] || []
       const mapped = rules.filter(r => r.listed_row_code)
       if (mapped.length > 0) {
-        await http.post(`/api/projects/${projectId.value}/report-mapping`, {
+        await api.post(`/api/projects/${projectId.value}/report-mapping`, {
           report_type: rt.key,
           scope: reportScope.value,
           rules: mapped.map(r => ({ soe_row_code: r.soe_row_code, listed_row_code: r.listed_row_code })),
@@ -798,7 +787,7 @@ onMounted(() => {
   updateTableHeight()
   window.addEventListener('resize', updateTableHeight)
   document.addEventListener('keydown', onKeydown)
-  loadProjectOptions()
+  projectStore.loadProjectOptions()
   selectedProjectId.value = projectId.value
 })
 onUnmounted(() => {
@@ -906,7 +895,7 @@ async function ensureProjectYear() {
   }
   try {
     // 直接调用项目详情 + wizard 获取完整信息
-    const { data: projRaw } = await http.get(`/api/projects/${projectId.value}`, {
+    const projRaw = await api.get(`/api/projects/${projectId.value}`, {
       validateStatus: (s: number) => s < 600,
     })
     const proj = projRaw?.data ?? projRaw ?? projRaw
@@ -917,7 +906,7 @@ async function ensureProjectYear() {
     templateType.value = proj?.template_type || ''
 
     // 从 wizard_state 补充 template_type
-    const { data: wizRaw } = await http.get(`/api/projects/${projectId.value}/wizard`, {
+    const wizRaw = await api.get(`/api/projects/${projectId.value}/wizard`, {
       validateStatus: (s: number) => s < 600,
     })
     const ws = wizRaw?.data ?? wizRaw
@@ -976,10 +965,10 @@ async function fetchReport() {
 async function loadTemplateRows() {
   // 从报表配置加载预设行次（显示空值的模板框架）
   try {
-    const { data } = await http.get('/api/report-config', {
+    const data = await api.get('/api/report-config', {
       params: { report_type: activeTab.value, project_id: projectId.value, applicable_standard: currentApplicableStandard.value }
     })
-    const configs = data?.data ?? data
+    const configs = data
     if (Array.isArray(configs) && configs.length > 0) {
       rows.value = configs.map((r: any) => ({
         row_code: r.row_code || '',

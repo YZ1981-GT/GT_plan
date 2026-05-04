@@ -25,7 +25,7 @@ class WorksheetDataResponse(BaseModel):
     project_id: str
     year: int
     sheet_key: str
-    data: dict
+    content: dict
     updated_at: str | None = None
 
 
@@ -75,11 +75,11 @@ async def get_worksheet_data(
     row = result.fetchone()
     if not row:
         return WorksheetDataResponse(
-            project_id=project_id, year=year, sheet_key=sheet_key, data={},
+            project_id=project_id, year=year, sheet_key=sheet_key, content={},
         )
     return WorksheetDataResponse(
         project_id=project_id, year=year, sheet_key=sheet_key,
-        data=row[0] if isinstance(row[0], dict) else {},
+        content=row[0] if isinstance(row[0], dict) else {},
         updated_at=str(row[1]) if row[1] else None,
     )
 
@@ -113,7 +113,7 @@ async def save_worksheet_data(
         raise HTTPException(status_code=500, detail=f"Save failed: {str(e)}")
     return WorksheetDataResponse(
         project_id=project_id, year=year, sheet_key=sheet_key,
-        data=body.data, updated_at=str(now),
+        content=body.data, updated_at=str(now),
     )
 
 
@@ -132,7 +132,7 @@ async def get_all_worksheet_data(
     return [
         WorksheetDataResponse(
             project_id=project_id, year=year, sheet_key=r[0],
-            data=r[1] if isinstance(r[1], dict) else {},
+            content=r[1] if isinstance(r[1], dict) else {},
             updated_at=str(r[2]) if r[2] else None,
         )
         for r in rows
@@ -165,12 +165,12 @@ async def get_prior_year_data(
         return {
             "found": False,
             "message": f"未找到 {prior_year} 年度的期末数据（{prior_key}）",
-            "data": {},
+            "content": {},
         }
     return {
         "found": True,
         "source_year": prior_year,
         "source_key": prior_key,
-        "data": row[0] if isinstance(row[0], dict) else {},
+        "content": row[0] if isinstance(row[0], dict) else {},
         "updated_at": str(row[1]) if row[1] else None,
     }

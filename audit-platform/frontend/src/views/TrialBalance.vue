@@ -317,23 +317,43 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
   getProjectAuditYear, listAdjustments,
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
 import { getAllWpMappings, type WpAccountMapping } from '@/services/workpaperApi'
-import { useProjectSelector } from '@/composables/useProjectSelector'
+import { useProjectStore } from '@/stores/project'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { ADJUSTMENT_STATUS } from '@/utils/statusMaps'
 
 const route = useRoute()
 const router = useRouter()
-const {
-  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
-  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
-} = useProjectSelector('trial-balance')
+const projectStore = useProjectStore()
+
+const projectId = computed(() => projectStore.projectId)
+const selectedProjectId = ref(projectStore.projectId)
+const projectOptions = computed(() => projectStore.projectOptions)
+const selectedYear = ref(projectStore.year)
+const yearOptions = computed(() => projectStore.yearOptions)
+
+function onProjectChange(pid: string) {
+  router.push({
+    path: `/projects/${pid}/trial-balance`,
+    query: { year: String(selectedYear.value) },
+  })
+}
+
+function onYearChange(y: number) {
+  selectedYear.value = y
+  projectStore.changeYear(y)
+  router.push({
+    path: `/projects/${projectId.value}/trial-balance`,
+    query: { year: String(y) },
+  })
+}
 
 const displayPrefs = useDisplayPrefsStore()
 /** 格式化金额（跟随全局单位设置） */
@@ -556,10 +576,10 @@ watch(
   () => [projectId.value, routeYear.value],
   async () => {
     await ensureProjectYear()
-    syncFromRoute()
+    selectedProjectId.value = projectId.value
     selectedYear.value = year.value
     await fetchData()
-    if (!projectOptions.value.length) loadProjectOptions()
+    if (!projectStore.projectOptions.length) projectStore.loadProjectOptions()
     // 加载底稿-科目映射
     try {
       wpMappings.value = await getAllWpMappings(projectId.value)
@@ -575,9 +595,24 @@ watch(
   { immediate: true }
 )
 
-// ─── Ctrl+F 快捷键注册 ──────────────────────────────────────────────────────
-onMounted(() => document.addEventListener('keydown', onKeydown))
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+// ─── Ctrl+F 快捷键注册 + shortcut:save 监听 ─────────────────────────────────
+onMounted(() => {
+  document.addEventListener('keydown', onKeydown)
+  eventBus.on('shortcut:save', onShortcutSave)
+})
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown)
+  eventBus.off('shortcut:save', onShortcutSave)
+})
+
+/** 快捷键保存：根据当前视图保存试算平衡表 */
+function onShortcutSave() {
+  if (tbViewMode.value === 'summary') {
+    saveTbSummary()
+  } else {
+    onRecalc()
+  }
+}
 
 // ─── 试算平衡表（报表行次级别） ──────────────────────────────────────────────
 const tbViewMode = ref<'detail' | 'summary'>('detail')
@@ -736,11 +771,11 @@ async function loadTbSummary() {
   try {
     // 1. 加载报表行结构
     const standard = `${selectedTemplateType.value}_standalone`
-    const { data: reportData } = await http.get('/api/report-config', {
+    const reportData = await api.get('/api/report-config', {
       params: { report_type: tbSummaryType.value, applicable_standard: standard, project_id: projectId.value },
       validateStatus: (s: number) => s < 600,
     })
-    const reportRows = Array.isArray(reportData?.data ?? reportData) ? (reportData?.data ?? reportData) : []
+    const reportRows = Array.isArray(reportData) ? reportData : []
 
     // 2. 从科目明细汇总未审数（按报表行次映射）
     // 用现有的 rows（科目明细）按 account_name 匹配报表行
@@ -789,13 +824,13 @@ async function loadTbSummary() {
 
     // 5. 尝试加载已保存的数据覆盖
     try {
-      const { data: saved } = await http.get(
+      const saved = await api.get(
         `/api/consol-worksheet-data/${projectId.value}/${selectedYear.value}/tb_summary_${tbSummaryType.value}`,
         { validateStatus: (s: number) => s < 600 }
       )
-      const savedData = saved?.data ?? saved
-      if (savedData?.data?.rows) {
-        for (const sr of savedData.data.rows) {
+      const savedData = saved
+      if (savedData?.content?.rows) {
+        for (const sr of savedData.content.rows) {
           const target = tbSummaryRows.value.find((r: any) => r.row_code === sr.row_code)
           if (target) {
             if (sr.aje_dr != null) target.aje_dr = sr.aje_dr
@@ -817,7 +852,7 @@ async function saveTbSummary() {
       unadjusted: r.unadjusted, aje_dr: r.aje_dr, aje_cr: r.aje_cr,
       rcl_dr: r.rcl_dr, rcl_cr: r.rcl_cr,
     }))
-    await http.put(
+    await api.put(
       `/api/consol-worksheet-data/${projectId.value}/${selectedYear.value}/tb_summary_${tbSummaryType.value}`,
       { sheet_key: `tb_summary_${tbSummaryType.value}`, data: { rows: saveRows } },
       { validateStatus: (s: number) => s < 600 }

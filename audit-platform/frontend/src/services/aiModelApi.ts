@@ -2,6 +2,7 @@
  * AI 模型配置 API 服务层
  */
 import http from '@/utils/http'
+import { aiModels as P } from '@/services/apiPaths'
 
 // ─── Types ───
 
@@ -52,34 +53,34 @@ export interface AIHealthStatus {
 
 export async function getAIModels(modelType?: AIModelType): Promise<AIModel[]> {
   const params = modelType ? { model_type: modelType } : {}
-  const { data } = await http.get('/api/ai-models', { params })
-  return data.data ?? data ?? []
+  const { data } = await http.get(P.list, { params })
+  return data ?? []
 }
 
 export async function createAIModel(payload: AIModelCreate): Promise<AIModel> {
-  const { data } = await http.post('/api/ai-models', payload)
-  return data.data ?? data
+  const { data } = await http.post(P.list, payload)
+  return data
 }
 
 export async function updateAIModel(id: string, payload: AIModelUpdate): Promise<AIModel> {
-  const { data } = await http.put(`/api/ai-models/${id}`, payload)
-  return data.data ?? data
+  const { data } = await http.put(P.detail(id), payload)
+  return data
 }
 
 export async function deleteAIModel(id: string): Promise<void> {
-  await http.delete(`/api/ai-models/${id}`)
+  await http.delete(P.detail(id))
 }
 
 export async function activateAIModel(id: string): Promise<{ message: string; model_name: string }> {
-  const { data } = await http.post(`/api/ai-models/${id}/activate`)
-  return data.data ?? data
+  const { data } = await http.post(P.activate(id))
+  return data
 }
 
 export async function getAIHealth(): Promise<AIHealthStatus> {
-  const { data } = await http.get('/api/ai-models/health')
-  return data.data ?? data
+  const { data } = await http.get(P.health)
+  return data
 }
 
 export async function seedDefaultModels(): Promise<void> {
-  await http.post('/api/ai-models/seed')
+  await http.post(P.seed)
 }

@@ -3,6 +3,12 @@
   * 封装所有后端 API 调用
   */
  import http from '@/utils/http'
+ import {
+   projects as P_proj, trialBalance as P_tb, adjustments as P_adj,
+   materiality as P_mat, misstatements as P_mis, reports as P_rpt,
+   cfsWorksheet as P_cfs, disclosureNotes as P_dn, auditReport as P_ar,
+   exportTask as P_exp, workpaperSummary as P_ws, events as P_evt,
+ } from '@/services/apiPaths'
 
  export interface ProjectListItem {
    id: string
@@ -12,14 +18,13 @@
  }
 
  export async function listProjects(): Promise<ProjectListItem[]> {
-   const { data } = await http.get('/api/projects')
-   const raw = data.data ?? data
-   return Array.isArray(raw) ? raw : (raw?.items ?? [])
+   const { data } = await http.get(P_proj.list)
+   return Array.isArray(data) ? data : (data?.items ?? [])
  }
 
  export async function getProject(projectId: string): Promise<ProjectListItem> {
-  const { data } = await http.get(`/api/projects/${projectId}`)
-  return data.data ?? data
+  const { data } = await http.get(P_proj.detail(projectId))
+  return data
 }
 
 export async function getProjectAuditYear(projectId: string): Promise<number | null> {
@@ -44,13 +49,13 @@ export interface TrialBalanceRow {
 }
 
 export async function getTrialBalance(projectId: string, year: number): Promise<TrialBalanceRow[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/trial-balance`, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.get(P_tb.get(projectId), { params: { year } })
+  return data
 }
 
 export async function recalcTrialBalance(projectId: string, year: number) {
-  const { data } = await http.post(`/api/projects/${projectId}/trial-balance/recalc`, null, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.post(P_tb.recalc(projectId), null, { params: { year } })
+  return data
 }
 
 export interface ConsistencyResult {
@@ -59,8 +64,8 @@ export interface ConsistencyResult {
 }
 
 export async function checkConsistency(projectId: string, year: number): Promise<ConsistencyResult> {
-  const { data } = await http.get(`/api/projects/${projectId}/trial-balance/consistency-check`, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.get(P_tb.consistencyCheck(projectId), { params: { year } })
+  return data
 }
 
 // ─── Adjustments ───
@@ -107,10 +112,10 @@ export async function listAdjustments(
   projectId: string, year: number,
   opts?: { adjustment_type?: string; review_status?: string; page?: number; page_size?: number }
 ) {
-  const { data } = await http.get(`/api/projects/${projectId}/adjustments`, {
+  const { data } = await http.get(P_adj.list(projectId), {
     params: { year, ...opts },
   })
-  return data.data ?? data
+  return data
 }
 
 export async function createAdjustment(projectId: string, body: {
@@ -119,9 +124,16 @@ export async function createAdjustment(projectId: string, body: {
     standard_account_code: string; account_name?: string;
     debit_amount: number; credit_amount: number
   }>
-}) {
-  const { data } = await http.post(`/api/projects/${projectId}/adjustments`, body)
-  return data.data ?? data
+}, opts?: { batch_mode?: boolean }) {
+  const params: Record<string, any> = {}
+  if (opts?.batch_mode) params.batch_mode = true
+  const { data } = await http.post(P_adj.create(projectId), body, { params })
+  return data
+}
+
+export async function batchCommitAdjustments(projectId: string, year: number) {
+  const { data } = await http.post(P_adj.batchCommit(projectId), null, { params: { year } })
+  return data
 }
 
 export async function updateAdjustment(projectId: string, groupId: string, body: {
@@ -130,32 +142,32 @@ export async function updateAdjustment(projectId: string, groupId: string, body:
     debit_amount: number; credit_amount: number
   }>
 }) {
-  const { data } = await http.put(`/api/projects/${projectId}/adjustments/${groupId}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_adj.detail(projectId, groupId), body)
+  return data
 }
 
 export async function deleteAdjustment(projectId: string, groupId: string) {
-  const { data } = await http.delete(`/api/projects/${projectId}/adjustments/${groupId}`)
-  return data.data ?? data
+  const { data } = await http.delete(P_adj.detail(projectId, groupId))
+  return data
 }
 
 export async function reviewAdjustment(projectId: string, groupId: string, body: {
   status: string; reason?: string
 }) {
-  const { data } = await http.post(`/api/projects/${projectId}/adjustments/${groupId}/review`, body)
-  return data.data ?? data
+  const { data } = await http.post(P_adj.review(projectId, groupId), body)
+  return data
 }
 
 export async function getAdjustmentSummary(projectId: string, year: number): Promise<AdjustmentSummary> {
-  const { data } = await http.get(`/api/projects/${projectId}/adjustments/summary`, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.get(P_adj.summary(projectId), { params: { year } })
+  return data
 }
 
 export async function getAccountDropdown(projectId: string, reportLineCode?: string): Promise<AccountOption[]> {
   const params: Record<string, string> = {}
   if (reportLineCode) params.report_line_code = reportLineCode
-  const { data } = await http.get(`/api/projects/${projectId}/adjustments/account-dropdown`, { params })
-  return data.data ?? data
+  const { data } = await http.get(P_adj.accountDropdown(projectId), { params })
+  return data
 }
 
 // ─── Materiality ───
@@ -174,42 +186,42 @@ export interface MaterialityData {
 }
 
 export async function getMateriality(projectId: string, year: number): Promise<MaterialityData | null> {
-  const { data } = await http.get(`/api/projects/${projectId}/materiality`, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.get(P_mat.get(projectId), { params: { year } })
+  return data
 }
 
 export async function calculateMateriality(projectId: string, year: number, body: {
   benchmark_type: string; benchmark_amount: string;
   overall_percentage: string; performance_ratio: string; trivial_ratio: string
 }): Promise<MaterialityData> {
-  const { data } = await http.post(`/api/projects/${projectId}/materiality/calculate`, body, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.post(P_mat.calculate(projectId), body, { params: { year } })
+  return data
 }
 
 export async function overrideMateriality(projectId: string, year: number, body: {
   overall_materiality?: string; performance_materiality?: string;
   trivial_threshold?: string; override_reason: string
 }): Promise<MaterialityData> {
-  const { data } = await http.put(`/api/projects/${projectId}/materiality/override`, body, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.put(P_mat.override(projectId), body, { params: { year } })
+  return data
 }
 
 export async function getMaterialityHistory(projectId: string, year: number) {
-  const { data } = await http.get(`/api/projects/${projectId}/materiality/history`, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.get(P_mat.history(projectId), { params: { year } })
+  return data
 }
 
 export async function getMaterialityBenchmark(projectId: string, year: number, benchmarkType: string) {
-  const { data } = await http.get(`/api/projects/${projectId}/materiality/benchmark`, {
+  const { data } = await http.get(P_mat.benchmark(projectId), {
     params: { year, benchmark_type: benchmarkType },
   })
-  return data.data ?? data
+  return data
 }
 
 // ─── Events SSE ───
 
 export function createEventSource(projectId: string): EventSource {
-  return new EventSource(`/api/projects/${projectId}/events/stream`)
+  return new EventSource(P_evt.stream(projectId))
 }
 
 
@@ -244,33 +256,33 @@ export interface MisstatementSummaryData {
 }
 
 export async function listMisstatements(projectId: string, year: number): Promise<MisstatementItem[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/misstatements`, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.get(P_mis.list(projectId), { params: { year } })
+  return data
 }
 
 export async function createMisstatement(projectId: string, body: Record<string, any>) {
-  const { data } = await http.post(`/api/projects/${projectId}/misstatements`, body)
-  return data.data ?? data
+  const { data } = await http.post(P_mis.create(projectId), body)
+  return data
 }
 
 export async function createMisstatementFromAje(projectId: string, groupId: string, year: number) {
-  const { data } = await http.post(`/api/projects/${projectId}/misstatements/from-aje/${groupId}`, null, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.post(P_mis.fromAje(projectId, groupId), null, { params: { year } })
+  return data
 }
 
 export async function updateMisstatement(projectId: string, misstatementId: string, body: Record<string, any>) {
-  const { data } = await http.put(`/api/projects/${projectId}/misstatements/${misstatementId}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_mis.detail(projectId, misstatementId), body)
+  return data
 }
 
 export async function deleteMisstatement(projectId: string, misstatementId: string) {
-  const { data } = await http.delete(`/api/projects/${projectId}/misstatements/${misstatementId}`)
-  return data.data ?? data
+  const { data } = await http.delete(P_mis.detail(projectId, misstatementId))
+  return data
 }
 
 export async function getMisstatementSummary(projectId: string, year: number): Promise<MisstatementSummaryData> {
-  const { data } = await http.get(`/api/projects/${projectId}/misstatements/summary`, { params: { year } })
-  return data.data ?? data
+  const { data } = await http.get(P_mis.summary(projectId), { params: { year } })
+  return data
 }
 
 
@@ -312,21 +324,20 @@ export interface ReportConsistencyCheck {
 }
 
 export async function generateReports(projectId: string, year: number) {
-  const { data } = await http.post('/api/reports/generate', { project_id: projectId, year })
-  return data.data ?? data
+  const { data } = await http.post(P_rpt.generate, { project_id: projectId, year })
+  return data
 }
 
 export async function getReport(projectId: string, year: number, reportType: string, unadjusted: boolean = false, applicableStandard?: string): Promise<ReportRow[]> {
   const params: any = {}
   if (unadjusted) params.unadjusted = true
   if (applicableStandard) params.applicable_standard = applicableStandard
-  const { data } = await http.get(`/api/reports/${projectId}/${year}/${reportType}`, { params })
-  return data.data ?? data
+  const { data } = await http.get(P_rpt.get(projectId, year, reportType), { params })
+  return data
 }
 
 export async function getReportDrilldown(projectId: string, year: number, reportType: string, rowCode: string): Promise<ReportDrilldownData> {
-  const { data } = await http.get(`/api/reports/${projectId}/${year}/${reportType}/drilldown/${rowCode}`)
-  const raw = data.data ?? data
+  const { data: raw } = await http.get(P_rpt.drilldown(projectId, year, reportType, rowCode))
   return {
     row_code: raw.row_code,
     row_name: raw.row_name,
@@ -343,8 +354,7 @@ export async function getReportDrilldown(projectId: string, year: number, report
 }
 
 export async function getReportConsistencyCheck(projectId: string, year: number): Promise<ReportConsistencyCheck> {
-  const { data } = await http.get(`/api/reports/${projectId}/${year}/consistency-check`)
-  const raw = data.data ?? data
+  const { data: raw } = await http.get(P_rpt.consistencyCheck(projectId, year))
   return {
     consistent: raw.consistent ?? raw.all_passed ?? false,
     checks: (raw.checks || []).map((item: any) => ({
@@ -358,7 +368,7 @@ export async function getReportConsistencyCheck(projectId: string, year: number)
 }
 
 export function getReportExcelUrl(projectId: string, year: number, reportType: string): string {
-  return `/api/reports/${projectId}/${year}/${reportType}/export-excel`
+  return P_rpt.exportExcel(projectId, year, reportType)
 }
 
 // ─── CFS Worksheet (现金流量表工作底稿) ───
@@ -397,48 +407,48 @@ export interface CFSIndirectMethod {
 }
 
 export async function generateCFSWorksheet(projectId: string, year: number) {
-  const { data } = await http.post('/api/cfs-worksheet/generate', { project_id: projectId, year })
-  return data.data ?? data
+  const { data } = await http.post(P_cfs.generate, { project_id: projectId, year })
+  return data
 }
 
 export async function getCFSWorksheet(projectId: string, year: number): Promise<CFSWorksheetRow[]> {
-  const { data } = await http.get(`/api/cfs-worksheet/${projectId}/${year}`)
-  return data.data ?? data
+  const { data } = await http.get(P_cfs.get(projectId, year))
+  return data
 }
 
 export async function createCFSAdjustment(body: Record<string, any>) {
-  const { data } = await http.post('/api/cfs-worksheet/adjustments', body)
-  return data.data ?? data
+  const { data } = await http.post(P_cfs.adjustments.create, body)
+  return data
 }
 
 export async function updateCFSAdjustment(id: string, body: Record<string, any>) {
-  const { data } = await http.put(`/api/cfs-worksheet/adjustments/${id}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_cfs.adjustments.detail(id), body)
+  return data
 }
 
 export async function deleteCFSAdjustment(id: string) {
-  const { data } = await http.delete(`/api/cfs-worksheet/adjustments/${id}`)
-  return data.data ?? data
+  const { data } = await http.delete(P_cfs.adjustments.detail(id))
+  return data
 }
 
 export async function getCFSReconciliation(projectId: string, year: number): Promise<CFSReconciliation> {
-  const { data } = await http.get(`/api/cfs-worksheet/${projectId}/${year}/reconciliation`)
-  return data.data ?? data
+  const { data } = await http.get(P_cfs.reconciliation(projectId, year))
+  return data
 }
 
 export async function autoGenerateCFSAdjustments(projectId: string, year: number) {
-  const { data } = await http.post('/api/cfs-worksheet/auto-generate', { project_id: projectId, year })
-  return data.data ?? data
+  const { data } = await http.post(P_cfs.autoGenerate, { project_id: projectId, year })
+  return data
 }
 
 export async function getCFSIndirectMethod(projectId: string, year: number): Promise<CFSIndirectMethod> {
-  const { data } = await http.get(`/api/cfs-worksheet/${projectId}/${year}/indirect-method`)
-  return data.data ?? data
+  const { data } = await http.get(P_cfs.indirectMethod(projectId, year))
+  return data
 }
 
 export async function getCFSVerify(projectId: string, year: number) {
-  const { data } = await http.get(`/api/cfs-worksheet/${projectId}/${year}/verify`)
-  return data.data ?? data
+  const { data } = await http.get(P_cfs.verify(projectId, year))
+  return data
 }
 
 // ─── Disclosure Notes (附注) ───
@@ -475,33 +485,33 @@ export interface NoteValidationFinding {
 }
 
 export async function generateDisclosureNotes(projectId: string, year: number, templateType: string = 'soe') {
-  const { data } = await http.post('/api/disclosure-notes/generate', { project_id: projectId, year, template_type: templateType })
-  return data.data ?? data
+  const { data } = await http.post(P_dn.generate, { project_id: projectId, year, template_type: templateType })
+  return data
 }
 
 export async function getDisclosureNoteTree(projectId: string, year: number): Promise<DisclosureNoteTreeItem[]> {
-  const { data } = await http.get(`/api/disclosure-notes/${projectId}/${year}`)
-  return data.data ?? data
+  const { data } = await http.get(P_dn.tree(projectId, year))
+  return data
 }
 
 export async function getDisclosureNoteDetail(projectId: string, year: number, noteSection: string): Promise<DisclosureNoteDetail> {
-  const { data } = await http.get(`/api/disclosure-notes/${projectId}/${year}/${noteSection}`)
-  return data.data ?? data
+  const { data } = await http.get(P_dn.detail(projectId, year, noteSection))
+  return data
 }
 
 export async function updateDisclosureNote(noteId: string, body: Record<string, any>) {
-  const { data } = await http.put(`/api/disclosure-notes/${noteId}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_dn.update(noteId), body)
+  return data
 }
 
 export async function validateDisclosureNotes(projectId: string, year: number) {
-  const { data } = await http.post(`/api/disclosure-notes/${projectId}/${year}/validate`)
-  return data.data ?? data
+  const { data } = await http.post(P_dn.validate(projectId, year))
+  return data
 }
 
 export async function getValidationResults(projectId: string, year: number): Promise<NoteValidationFinding[]> {
-  const { data } = await http.get(`/api/disclosure-notes/${projectId}/${year}/validation-results`)
-  return data.data ?? data
+  const { data } = await http.get(P_dn.validationResults(projectId, year))
+  return data
 }
 
 // ─── Audit Report (审计报告) ───
@@ -528,33 +538,33 @@ export interface AuditReportTemplate {
 }
 
 export async function generateAuditReport(projectId: string, year: number, opinionType: string, companyType: string = 'non_listed') {
-  const { data } = await http.post('/api/audit-report/generate', { project_id: projectId, year, opinion_type: opinionType, company_type: companyType })
-  return data.data ?? data
+  const { data } = await http.post(P_ar.generate, { project_id: projectId, year, opinion_type: opinionType, company_type: companyType })
+  return data
 }
 
 export async function getAuditReport(projectId: string, year: number): Promise<AuditReportData> {
-  const { data } = await http.get(`/api/audit-report/${projectId}/${year}`)
-  return data.data ?? data
+  const { data } = await http.get(P_ar.get(projectId, year))
+  return data
 }
 
 export async function updateAuditReportParagraph(reportId: string, section: string, body: { content: string }) {
-  const { data } = await http.put(`/api/audit-report/${reportId}/paragraphs/${section}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_ar.paragraph(reportId, section), body)
+  return data
 }
 
 export async function getAuditReportTemplates(): Promise<AuditReportTemplate[]> {
-  const { data } = await http.get('/api/audit-report/templates')
-  return data.data ?? data
+  const { data } = await http.get(P_ar.templates)
+  return data
 }
 
 export async function updateAuditReportStatus(reportId: string, status: string) {
-  const { data } = await http.put(`/api/audit-report/${reportId}/status`, { status })
-  return data.data ?? data
+  const { data } = await http.put(P_ar.status(reportId), { status })
+  return data
 }
 
 export async function refreshAuditReportFinancialData(projectId: string, year: number) {
-  const { data } = await http.post(`/api/audit-report/${projectId}/${year}/refresh-financial-data`)
-  return data.data ?? data
+  const { data } = await http.post(P_ar.refreshFinancialData(projectId, year))
+  return data
 }
 
 // ─── PDF Export (PDF导出) ───
@@ -573,49 +583,49 @@ export interface ExportTaskData {
 }
 
 export async function createExportTask(projectId: string, taskType: string, documentTypes: string[], passwordProtected: boolean = false, password?: string) {
-  const { data } = await http.post('/api/export/create', {
+  const { data } = await http.post(P_exp.create, {
     project_id: projectId,
     task_type: taskType,
     document_types: documentTypes,
     password_protected: passwordProtected,
     password,
   })
-  return data.data ?? data
+  return data
 }
 
 export async function getExportTaskStatus(taskId: string): Promise<ExportTaskData> {
-  const { data } = await http.get(`/api/export/${taskId}/status`)
-  return data.data ?? data
+  const { data } = await http.get(P_exp.status(taskId))
+  return data
 }
 
 export function getExportDownloadUrl(taskId: string): string {
-  return `/api/export/${taskId}/download`
+  return P_exp.download(taskId)
 }
 
 export async function getExportHistory(projectId: string): Promise<ExportTaskData[]> {
-  const { data } = await http.get(`/api/export/${projectId}/history`)
-  return data.data ?? data
+  const { data } = await http.get(P_exp.history(projectId))
+  return data
 }
 
 
 // ─── Workpaper Summary (底稿跨企业汇总) ───
 
 export async function getChildCompanies(projectId: string) {
-  const { data } = await http.get(`/api/projects/${projectId}/child-companies`)
-  return data.data ?? data
+  const { data } = await http.get(P_proj.childCompanies(projectId))
+  return data
 }
 
 export async function generateWorkpaperSummary(projectId: string, params: {
   year: number; account_codes: string[]; company_codes: string[]
 }) {
-  const { data } = await http.post(`/api/projects/${projectId}/workpaper-summary`, params)
-  return data.data ?? data
+  const { data } = await http.post(P_ws.generate(projectId), params)
+  return data
 }
 
 export async function exportWorkpaperSummary(projectId: string, params: {
   year: number; account_codes: string[]; company_codes: string[]
 }): Promise<Blob> {
-  const { data } = await http.post(`/api/projects/${projectId}/workpaper-summary/export`, params, {
+  const { data } = await http.post(P_ws.export(projectId), params, {
     responseType: 'blob',
   })
   return data

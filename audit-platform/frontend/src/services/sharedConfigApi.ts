@@ -3,6 +3,7 @@
  * 支持5类配置的三层共享：system/group/personal
  */
 import http from '@/utils/http'
+import { sharedConfig as P } from '@/services/apiPaths'
 
 export interface SharedConfigTemplate {
   id: string
@@ -56,8 +57,8 @@ export function getConfigTypeLabel(type: string): string {
 export async function listSharedTemplates(configType: string, projectId?: string) {
   const params: any = { config_type: configType }
   if (projectId) params.project_id = projectId
-  const { data } = await http.get('/api/shared-config/templates', { params })
-  return (data?.data ?? data ?? []) as SharedConfigTemplate[]
+  const { data } = await http.get(P.templates, { params })
+  return (data ?? []) as SharedConfigTemplate[]
 }
 
 /** 保存为模板 */
@@ -71,31 +72,31 @@ export async function saveAsTemplate(body: {
   applicable_standard?: string
   is_public?: boolean
 }) {
-  const { data } = await http.post('/api/shared-config/templates', body)
+  const { data } = await http.post(P.templates, body)
   return data as SharedConfigTemplate
 }
 
 /** 获取模板详情 */
 export async function getTemplateDetail(templateId: string) {
-  const { data } = await http.get(`/api/shared-config/templates/${templateId}`)
+  const { data } = await http.get(P.detail(templateId))
   return data as SharedConfigTemplate
 }
 
 /** 更新模板 */
 export async function updateTemplate(templateId: string, body: Record<string, any>) {
-  const { data } = await http.put(`/api/shared-config/templates/${templateId}`, body)
+  const { data } = await http.put(P.detail(templateId), body)
   return data as SharedConfigTemplate
 }
 
 /** 删除模板 */
 export async function deleteTemplate(templateId: string) {
-  const { data } = await http.delete(`/api/shared-config/templates/${templateId}`)
+  const { data } = await http.delete(P.detail(templateId))
   return data
 }
 
 /** 引用模板到项目 */
 export async function applyTemplate(templateId: string, projectId: string) {
-  const { data } = await http.post('/api/shared-config/apply', {
+  const { data } = await http.post(P.apply, {
     template_id: templateId,
     project_id: projectId,
   })
@@ -104,6 +105,6 @@ export async function applyTemplate(templateId: string, projectId: string) {
 
 /** 查询项目引用历史 */
 export async function listReferences(projectId: string) {
-  const { data } = await http.get(`/api/shared-config/references/${projectId}`)
-  return (data?.data ?? data ?? []) as ConfigReference[]
+  const { data } = await http.get(P.references(projectId))
+  return (data ?? []) as ConfigReference[]
 }

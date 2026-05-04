@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
+import { usePermission } from '@/composables/usePermission'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -267,6 +269,7 @@ const router = createRouter({
           path: 'settings/users',
           name: 'UserManagement',
           component: () => import('@/views/UserManagement.vue'),
+          meta: { permission: 'admin' },
         },
         {
           path: 'projects/:projectId/subsequent-events',
@@ -379,6 +382,7 @@ const router = createRouter({
           path: 'admin/performance',
           name: 'PerformanceMonitor',
           component: () => import('@/views/PerformanceMonitor.vue'),
+          meta: { permission: 'admin' },
         },
         // ── Mobile Routes ──
         {
@@ -405,10 +409,14 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+// ─── 统一路由守卫 [R7.1] ───
+// 职责：① 开发中页面拦截 ② 认证守卫 ③ 权限守卫 ④ 项目上下文自动加载
+// 注意：未保存变更拦截由 useEditMode 的 onBeforeRouteLeave 在组件级处理，
+//       router 级 beforeEach 不重复拦截，也不会干扰组件级守卫。
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
 
-  // Developing pages → show toast and redirect back
+  // ① 开发中页面 → 提示并阻止导航
   if (to.meta.developing) {
     import('element-plus').then(({ ElMessage }) => {
       ElMessage.info('该功能正在开发中，敬请期待')
@@ -416,14 +424,34 @@ router.beforeEach((to) => {
     return false
   }
 
-  // Already logged in → redirect away from login
+  // ② 已登录用户访问 /login → 重定向到首页
   if (to.path === '/login' && authStore.isAuthenticated) {
     return { path: '/' }
   }
 
-  // Requires auth but not logged in → redirect to login
+  // ③ 认证守卫：需要登录但未认证 → 重定向到登录页
   if (to.matched.some((r) => r.meta.requireAuth) && !authStore.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  // ④ 权限守卫：检查路由级 meta.permission
+  const permissionRequired = to.meta.permission
+  if (permissionRequired && authStore.isAuthenticated) {
+    const { can } = usePermission()
+    if (!can(permissionRequired)) {
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('您没有访问该页面的权限')
+      })
+      return { path: '/' }
+    }
+  }
+
+  // ⑤ 项目上下文自动加载：路由含 :projectId 时同步到 projectStore
+  //    DefaultLayout 的 watch 仍保留作为备份，此处提前触发确保数据就绪
+  if (to.params.projectId && authStore.isAuthenticated) {
+    const projectStore = useProjectStore()
+    // 使用 await 确保项目信息在页面渲染前就绪
+    await projectStore.syncFromRoute(to as any)
   }
 })
 

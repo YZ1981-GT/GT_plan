@@ -118,6 +118,8 @@ import MinorityInterestSheet from './MinorityInterestSheet.vue'
 import InternalArApSheet from './InternalArApSheet.vue'
 import InternalTradeSheet from './InternalTradeSheet.vue'
 import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
+import { eventBus } from '@/utils/eventBus'
+import type { FormulaChangedPayload } from '@/utils/eventBus'
 
 interface SubsidiaryInfoRow {
   company_name: string; company_code: string; parent_code: string
@@ -284,7 +286,7 @@ async function loadConsolScope() {
 
 onMounted(async () => {
   loadConsolScope()
-  document.addEventListener('gt-formula-changed', onFormulaChanged)
+  eventBus.on('formula-changed', onFormulaChanged)
   // 从后端加载已保存的工作底稿数据
   if (projectId.value) {
     try {
@@ -307,10 +309,10 @@ onMounted(async () => {
   }
 })
 onUnmounted(() => {
-  document.removeEventListener('gt-formula-changed', onFormulaChanged)
+  eventBus.off('formula-changed', onFormulaChanged)
 })
 
-function onFormulaChanged(_e: Event) {
+function onFormulaChanged(_payload: FormulaChangedPayload) {
   // 公式保存/应用后，重新加载合并范围数据（公式可能影响计算结果）
   ElMessage.info('公式已更新，数据同步中...')
   loadConsolScope()
@@ -612,7 +614,7 @@ const allImportedEntries = computed(() => [
 ])
 
 function onOpenFormula(sheetKey: string) {
-  document.dispatchEvent(new CustomEvent('gt-open-formula-manager', { detail: { nodeKey: sheetKey } }))
+  eventBus.emit('open-formula-manager', { nodeKey: sheetKey })
 }
 </script>
 

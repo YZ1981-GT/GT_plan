@@ -85,7 +85,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import DependencyGraph from '@/components/workpaper/DependencyGraph.vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -133,7 +133,7 @@ async function loadDashboard() {
   loading.value = true
   try {
     // 获取项目所有底稿
-    const { data: wps } = await http.get(`/api/projects/${projectId.value}/working-papers`, {
+    const wps = await api.get(`/api/projects/${projectId.value}/working-papers`, {
       validateStatus: (s: number) => s < 600,
     })
     const wpList = Array.isArray(wps) ? wps : wps?.data || []
@@ -152,7 +152,7 @@ async function loadDashboard() {
 
       // 尝试获取精细化检查结果
       try {
-        const { data: extractResult } = await http.post(
+        const extractResult = await api.post(
           `/api/projects/${projectId.value}/workpapers/${wp.id}/fine-extract`,
           null,
           { validateStatus: (s: number) => s < 600, timeout: 5000 },

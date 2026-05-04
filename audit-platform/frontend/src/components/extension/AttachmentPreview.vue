@@ -68,8 +68,8 @@ import VueOfficeExcel from '@vue-office/excel'
 import VueOfficePdf from '@vue-office/pdf'
 import '@vue-office/docx/lib/index.css'
 import '@vue-office/excel/lib/index.css'
-import http, { downloadFile } from '@/utils/http'
-const api = http  // alias for backward compatibility
+import { api } from '@/services/apiProxy'
+import { downloadFile } from '@/utils/http'
 
 const props = defineProps<{
   modelValue: boolean
@@ -125,8 +125,8 @@ async function loadPreview() {
   loading.value = true
   revokePreviewSrc()
   try {
-    const response = await api.get(props.fileUrl, { responseType: 'blob' })
-    previewSrc.value = window.URL.createObjectURL(response.data as Blob)
+    const blob = await api.get(props.fileUrl, { responseType: 'blob' })
+    previewSrc.value = window.URL.createObjectURL(blob as Blob)
   } catch {
     loading.value = false
   }

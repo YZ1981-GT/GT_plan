@@ -642,7 +642,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, Loading, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { fmtAmount } from '@/utils/formatters'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import { buildImportFormData } from '@/utils/importFormData'
@@ -683,8 +683,8 @@ const availableYears = ref<number[]>([])
 async function loadAvailableYears() {
   if (!projectId.value) return
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/ledger/years`)
-    const result = data?.data ?? data
+    const data = await api.get(`/api/projects/${projectId.value}/ledger/years`)
+    const result = data
     availableYears.value = result?.years ?? []
   } catch {
     availableYears.value = []
@@ -693,8 +693,8 @@ async function loadAvailableYears() {
 
 async function loadProjectList() {
   try {
-    const { data } = await http.get('/api/projects')
-    const list = data?.data ?? data ?? []
+    const data = await api.get('/api/projects')
+    const list = data ?? []
     projectList.value = Array.isArray(list) ? list : []
   } catch {
     projectList.value = []
@@ -704,8 +704,8 @@ async function loadProjectList() {
 async function loadCurrentProject() {
   if (!projectId.value) return
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/wizard`)
-    const ws = data?.data ?? data
+    const data = await api.get(`/api/projects/${projectId.value}/wizard`)
+    const ws = data
     const basicInfo = ws?.steps?.basic_info?.data || {}
     currentProject.value = {
       id: projectId.value,
@@ -756,10 +756,10 @@ async function runValidation() {
   validateDialogVisible.value = true
   validateResult.value = null
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/validate?year=${selectedYear.value}`
     )
-    validateResult.value = data.data ?? data
+    validateResult.value = data
   } catch {
     ElMessage.error('校验失败')
   } finally {
@@ -1403,10 +1403,10 @@ async function loadBalance() {
   }
   loading.value = true
   try {
-    const { data } = await http.get(`/api/projects/${projectId.value}/ledger/balance`, {
+    const data = await api.get(`/api/projects/${projectId.value}/ledger/balance`, {
       params: { year: year.value },
     })
-    balanceData.value = data.data ?? data ?? []
+    balanceData.value = data ?? []
     // debug log removed for production
   } catch (e) {
     console.error('[Ledger] loadBalance failed:', e)
@@ -1424,12 +1424,12 @@ async function loadLedger() {
       params.date_to = dateRange.value[1]
     }
     // 首次加载时从后端获取期初余额（确保 running_balance 准确）
-    const [{ data }, { data: obData }] = await Promise.all([
-      http.get(`/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }),
-      http.get(`/api/projects/${projectId.value}/ledger/opening-balance/${encodeURIComponent(currentAccount.value)}`, { params: { year: year.value } }),
+    const [data, obData] = await Promise.all([
+      api.get(`/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }),
+      api.get(`/api/projects/${projectId.value}/ledger/opening-balance/${encodeURIComponent(currentAccount.value)}`, { params: { year: year.value } }),
     ])
-    const result = data.data ?? data
-    const obResult = obData.data ?? obData
+    const result = data
+    const obResult = obData
     currentAccountOpening.value = num(obResult?.opening_balance)
     ledgerItems.value = result.items ?? result ?? []
     ledgerTotal.value = result.total ?? ledgerItems.value.length
@@ -1448,10 +1448,10 @@ async function loadMoreLedger() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
     )
-    const result = data.data ?? data
+    const result = data
     const newItems = result.items ?? result ?? []
     ledgerItems.value = [...ledgerItems.value, ...newItems]
     ledgerCursor.value = result.next_cursor ?? null
@@ -1463,11 +1463,11 @@ async function loadMoreLedger() {
 async function loadVoucher() {
   loading.value = true
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/voucher/${encodeURIComponent(currentVoucher.value)}`,
       { params: { year: year.value } }
     )
-    voucherItems.value = data.data ?? data ?? []
+    voucherItems.value = data ?? []
   } catch { voucherItems.value = [] }
   finally { loading.value = false }
 }
@@ -1475,11 +1475,11 @@ async function loadVoucher() {
 async function loadAuxBalance() {
   loading.value = true
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance/${currentAccount.value}`,
       { params: { year: year.value } }
     )
-    auxBalanceItems.value = data.data ?? data ?? []
+    auxBalanceItems.value = data ?? []
   } catch { auxBalanceItems.value = [] }
   finally { loading.value = false }
 }
@@ -1679,10 +1679,10 @@ function loadAuxTreeChildren(row: any, _treeNode: any, resolve: (data: any[]) =>
     // 第二级展开辅助编码：从后端按需查询明细
     const code = row._parentCode
     const auxCode = row._auxKey
-    http.get(`/api/projects/${projectId.value}/ledger/aux-balance-detail`, {
+    api.get(`/api/projects/${projectId.value}/ledger/aux-balance-detail`, {
       params: { year: year.value, account_code: code, dim_type: dimType, aux_code: auxCode }
-    }).then(({ data }) => {
-      const items = (data.data ?? data ?? []).map((item: any, idx: number) => ({
+    }).then((data: any) => {
+      const items = (data ?? []).map((item: any, idx: number) => ({
         ...item, _tree_key: `${code}_${auxCode}_${idx}`, _isGroup: false,
       }))
       resolve(items)
@@ -1775,11 +1775,11 @@ async function toggleAuxExpand(row: any) {
     // 从后端加载明细
     if (!_auxExpandedDetails.value.has(key)) {
       try {
-        const { data } = await http.get(
+        const data = await api.get(
           `/api/projects/${projectId.value}/ledger/aux-balance-detail`,
           { params: { year: year.value, account_code: row.account_code, dim_type: auxSelectedDimType.value, aux_code: row.aux_code } }
         )
-        _auxExpandedDetails.value.set(key, (data.data ?? data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
+        _auxExpandedDetails.value.set(key, (data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
       } catch { _auxExpandedDetails.value.set(key, []) }
     }
     newSet.add(key)
@@ -1845,11 +1845,11 @@ async function loadAllAuxBalance() {
   loading.value = true
   try {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
-    const { data: summaryData } = await http.get(
+    const summaryData = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
       { params: { year: year.value, dim_type: '__types_only__' } }
     )
-    const summary = summaryData.data ?? summaryData
+    const summary = summaryData
     auxDimTypesFromServer.value = summary.dim_types || []
 
     // 设置默认选中维度
@@ -1881,11 +1881,11 @@ async function loadAuxSummaryForDim() {
   }
   try {
     loading.value = true
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
       { params }
     )
-    const result = data.data ?? data
+    const result = data
     auxSummaryData.value = result.rows || []
     // 同时更新维度类型列表
     if (result.dim_types) {
@@ -1912,11 +1912,11 @@ async function loadAuxBalancePage() {
     if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-balance-paged`,
       { params }
     )
-    const result = data.data ?? data
+    const result = data
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0
   } catch { auxPagedRows.value = [] }
@@ -1943,12 +1943,12 @@ async function exportAuxBalanceExcel() {
     if (auxSearchKeyword.value) params.search = auxSearchKeyword.value
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
-    const response = await http.get(
+    const blobResult = await api.get(
       `/api/projects/${projectId.value}/ledger/export-aux-balance`,
       { params, responseType: 'blob' }
     )
-    // http.ts 拦截器可能解包了，兼容两种情况
-    const blobData = response.data instanceof Blob ? response.data : new Blob([response.data])
+    // apiProxy 直接返回 data，对 blob 响应即为 Blob 本身
+    const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
     const url = URL.createObjectURL(blobData)
     const a = document.createElement('a')
     a.href = url
@@ -1966,11 +1966,11 @@ async function exportAuxBalanceExcel() {
 /** 导出科目余额表为 Excel */
 async function exportBalanceExcel() {
   try {
-    const response = await http.get(
+    const blobResult = await api.get(
       `/api/projects/${projectId.value}/ledger/export-balance`,
       { params: { year: year.value }, responseType: 'blob' }
     )
-    const blobData = response.data instanceof Blob ? response.data : new Blob([response.data])
+    const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
     const url = URL.createObjectURL(blobData)
     const a = document.createElement('a')
     a.href = url
@@ -1993,11 +1993,11 @@ async function exportLedgerExcel() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    const response = await http.get(
+    const blobResult = await api.get(
       `/api/projects/${projectId.value}/ledger/export-ledger/${encodeURIComponent(currentAccount.value)}`,
       { params, responseType: 'blob' }
     )
-    const blobData = response.data instanceof Blob ? response.data : new Blob([response.data])
+    const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
     const url = URL.createObjectURL(blobData)
     const a = document.createElement('a')
     a.href = url
@@ -2036,11 +2036,11 @@ function drillToAuxLedgerFromBalance(row: any) {
 async function loadAuxLedger() {
   loading.value = true
   try {
-    const { data } = await http.get(
+    const data = await api.get(
       `/api/projects/${projectId.value}/ledger/aux-entries/${currentAccount.value}`,
       { params: { year: year.value, aux_type: currentAuxType.value, aux_code: currentAuxCode.value, page: auxLedgerPage.value, page_size: 100 } }
     )
-    const result = data.data ?? data
+    const result = data
     auxLedgerItems.value = result.items ?? result ?? []
     auxLedgerTotal.value = result.total ?? 0
   } catch { auxLedgerItems.value = [] }

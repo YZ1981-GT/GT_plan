@@ -393,34 +393,31 @@ import {
   type DisclosureNoteTreeItem, type DisclosureNoteDetail, type NoteValidationFinding,
 } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import { useProjectStore } from '@/stores/project'
 
 const route = useRoute()
 const router = useRouter()
-const projectId = computed(() => route.params.projectId as string)
-const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const projectStore = useProjectStore()
 
-// 单位切换
+const projectId = computed(() => projectStore.projectId)
+const year = computed(() => {
+  const qy = Number(route.query.year)
+  return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
+})
+
+// 单位切换 — 使用 projectStore
 const selectedProjectId = ref('')
-const projectOptions = ref<{ id: string; name: string }[]>([])
-async function loadProjectOptions() {
-  try {
-    const list = await api.get('/api/projects', { validateStatus: (s: number) => s < 600 })
-    const items = Array.isArray(list) ? list : (list?.data ?? list?.items ?? [])
-    projectOptions.value = items.map((p: any) => ({ id: p.id, name: p.client_name || p.name || p.id }))
-    selectedProjectIdLocal.value = projectId.value
-  } catch { projectOptions.value = [] }
-}
+const projectOptions = computed(() => projectStore.projectOptions)
 function onProjectChange(newId: string) {
   router.push({ path: `/projects/${newId}/disclosure-notes`, query: route.query })
 }
 
 // 年度切换
 const selectedYear = ref(new Date().getFullYear() - 1)
-const yearOptions = computed(() => {
-  const cur = new Date().getFullYear()
-  return Array.from({ length: 5 }, (_, i) => cur - i)
-})
+const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange() {
+  projectStore.changeYear(selectedYear.value)
   fetchTree().then(() => {
     if (noteList.value.length === 0) onGenerate()
   })
@@ -460,6 +457,7 @@ function onNoteMappingApplied(data: Record<string, any>) {
 
 // 当前项目名称
 const currentProjectName = computed(() => {
+  if (projectStore.clientName) return projectStore.clientName
   const p = projectOptions.value.find(o => o.id === projectId.value)
   return p?.name || ''
 })
@@ -1195,16 +1193,29 @@ async function onSave() {
   } finally { saveLoading.value = false }
 }
 
+/** 快捷键保存：保存当前附注 */
+function onShortcutSave() {
+  if (currentNote.value && editMode.value) {
+    onSave()
+  }
+}
+
 onMounted(async () => {
   selectedProjectId.value = projectId.value
+  selectedProjectIdLocal.value = projectId.value
   selectedYear.value = year.value
-  loadProjectOptions()
+  projectStore.loadProjectOptions()
+  eventBus.on('shortcut:save', onShortcutSave)
   await loadProjectTemplateConfig()
   await fetchTree()
   // 如果没有附注数据，自动从模板生成
   if (noteList.value.length === 0) {
     await onGenerate()
   }
+})
+
+onUnmounted(() => {
+  eventBus.off('shortcut:save', onShortcutSave)
 })
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────

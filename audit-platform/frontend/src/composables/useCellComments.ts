@@ -3,7 +3,7 @@
  * 对接 /api/cell-comments API，提供批注/复核的 CRUD 和状态管理
  */
 import { ref } from 'vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 export interface CellComment {
   id: string
@@ -36,7 +36,7 @@ export function useCellComments(projectId: () => string, year: () => number, mod
       const url = sheetKey
         ? `/api/cell-comments/${pid}/${y}/${module}/${sheetKey}`
         : `/api/cell-comments/${pid}/${y}/${module}`
-      const { data } = await http.get(url)
+      const data = await api.get(url)
       comments.value = Array.isArray(data) ? data : []
     } catch {
       comments.value = []
@@ -58,7 +58,7 @@ export function useCellComments(projectId: () => string, year: () => number, mod
     const y = year()
     if (!pid || !y) return null
     try {
-      const { data } = await http.put(`/api/cell-comments/${pid}/${y}`, {
+      const data = await api.put(`/api/cell-comments/${pid}/${y}`, {
         module,
         sheet_key: params.sheetKey,
         row_idx: params.rowIdx,
@@ -95,7 +95,7 @@ export function useCellComments(projectId: () => string, year: () => number, mod
     const y = year()
     if (!pid || !y) return null
     try {
-      const { data } = await http.put(`/api/cell-comments/${pid}/${y}`, {
+      const data = await api.put(`/api/cell-comments/${pid}/${y}`, {
         module,
         sheet_key: params.sheetKey,
         row_idx: params.rowIdx,
@@ -124,7 +124,7 @@ export function useCellComments(projectId: () => string, year: () => number, mod
     const y = year()
     if (!pid || !y) return false
     try {
-      await http.delete(`/api/cell-comments/${pid}/${y}/${commentId}`)
+      await api.delete(`/api/cell-comments/${pid}/${y}/${commentId}`)
       comments.value = comments.value.filter(c => c.id !== commentId)
       return true
     } catch {

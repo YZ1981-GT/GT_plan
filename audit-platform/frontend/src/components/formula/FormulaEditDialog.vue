@@ -432,7 +432,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 interface FormulaItem {
   expression: string
@@ -671,7 +671,7 @@ async function openSourceBrowserForReport(reportType: string, label: string) {
   }
   try {
     const standard = props.applicableStandard || 'soe_consolidated'
-    const { data: resp } = await http.get('/api/report-config', {
+    const resp = await api.get('/api/report-config', {
       params: { report_type: reportType, applicable_standard: standard },
       validateStatus: (s: number) => s < 600,
     })
@@ -701,7 +701,7 @@ async function openSourceBrowserForTB(fn: string) {
     return `TB('${code}','期末余额')`
   }
   try {
-    const { data: resp } = await http.get('/api/trial-balance', {
+    const resp = await api.get('/api/trial-balance', {
       validateStatus: (s: number) => s < 600,
     })
     const rows = resp?.data ?? resp ?? []
@@ -730,7 +730,7 @@ async function openSourceBrowserForNote() {
     return `NOTE('${name}','合计','期末')`
   }
   try {
-    const { data: resp } = await http.get('/api/disclosure-notes/tree', {
+    const resp = await api.get('/api/disclosure-notes/tree', {
       validateStatus: (s: number) => s < 600,
     })
     const items = resp?.data ?? resp ?? []
@@ -759,7 +759,7 @@ async function openSourceBrowserForWP() {
     return `WP('${code}','审定数')`
   }
   try {
-    const { data: resp } = await http.get('/api/working-papers', {
+    const resp = await api.get('/api/working-papers', {
       validateStatus: (s: number) => s < 600,
     })
     const items = resp?.data ?? resp ?? []
@@ -885,7 +885,7 @@ async function loadTargetRows() {
   targetPickerLoading.value = true
   try {
     const standard = props.applicableStandard || 'soe_consolidated'
-    const { data: resp } = await http.get('/api/report-config', {
+    const resp = await api.get('/api/report-config', {
       params: { report_type: 'balance_sheet', applicable_standard: standard },
       validateStatus: (s: number) => s < 600,
     })
