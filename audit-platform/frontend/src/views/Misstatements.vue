@@ -170,6 +170,7 @@ import {
   type MisstatementItem, type MisstatementSummaryData,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -198,12 +199,7 @@ const form = ref({
   auditor_evaluation: '',
 })
 
-function fmtAmt(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : v
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function typeLabel(t: string) {
   const m: Record<string, string> = { factual: '事实错报', judgmental: '判断错报', projected: '推断错报' }

@@ -134,6 +134,7 @@ import {
   updateAuditReportStatus, type AuditReportData,
 } from '@/services/auditPlatformApi'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -165,12 +166,7 @@ watch(activeSection, (s) => {
   }
 })
 
-function fmtAmt(v: any): string {
-  if (v === null || v === undefined) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : v
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function opinionLabel(t: string) {
   const m: Record<string, string> = { unqualified: '无保留', qualified: '保留', adverse: '否定', disclaimer: '无法表示' }

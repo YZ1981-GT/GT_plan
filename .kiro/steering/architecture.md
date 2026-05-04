@@ -19,11 +19,56 @@ inclusion: manual
 
 - 后端路由：115 个文件，按 11 个业务域分组（router_registry.py）
 - 后端服务：~170 个文件
-- 后端模型：38 个文件，~140 张数据库表
+- 后端模型：38 个文件，~144 张数据库表
 - 前端页面+组件：~200 个 Vue 文件
 - 前端 API 服务层：17 个文件
+- 前端全局组件库：7 个 composable + 6 个 store + 8 个 common 组件 + 7 个 utils
 - 底稿精细化规则：347 个 JSON
 - 测试：~1800 个用例（单元 + E2E + 集成）
+
+## 前端全局组件库（2026-05-04 建立）
+
+### Composables（composables/）
+| 文件 | 功能 | 接入模块数 |
+|------|------|-----------|
+| useFullscreen | 全屏切换+ESC退出 | 17（13 worksheet + 4 views） |
+| useCellSelection | 单击/Ctrl多选/Shift范围选/鼠标拖拽框选/右键保持选区/selectionStats | 5 核心模块 |
+| useCellComments | 单元格批注/复核标记 CRUD | 6 模块 |
+| useLazyEdit | 按需渲染编辑控件（大表格性能） | 3 模块 |
+| useProjectSelector | 项目/年度选择器 | 6 页面 |
+| useWorkflowGuide | 工作流引导提示 | 8 个预定义引导 |
+| useTableSearch | 表格内搜索替换(Ctrl+F) | 3 模块 |
+
+### Stores（stores/）
+| 文件 | 功能 | 状态 |
+|------|------|------|
+| auth | JWT认证+刷新 | 全局 |
+| displayPrefs | 金额单位/字号/小数位/零值/负数红色/变动高亮 | 5 核心模块接入 |
+| roleContext | 角色上下文 | 全局 |
+| drilldown | 穿透导航 | 穿透页面 |
+| wizard | 项目向导 | 向导页面 |
+| collaboration | 协作 | 协作模块 |
+
+### Common Components（components/common/）
+| 文件 | 功能 |
+|------|------|
+| CellContextMenu | 右键菜单+全局选中样式 |
+| SelectionBar | 选中区域求和状态栏 |
+| TableSearchBar | 搜索栏UI(致同品牌紫色) |
+| CommentTooltip | 批注hover气泡 |
+| LoadingState | 骨架屏+空状态+错误 |
+| VirtualScrollTable | 虚拟滚动表格 |
+| ValidationList | 校验结果展示 |
+| OperationFeedback | 进度+通知 |
+
+### Utils（utils/）
+| 文件 | 功能 | 状态 |
+|------|------|------|
+| formatters.ts | 金额/日期/百分比格式化+单位换算 | 5核心+14worksheet |
+| http.ts | HTTP客户端+401刷新+去重+重试 | 全局 |
+| sse.ts | SSE封装+自动重连 | 已有未接入 |
+| shortcuts.ts | 快捷键管理(13个) | 已有未接入 |
+| operationHistory.ts | 撤销功能 | 已有未接入 |
 
 ## 11 个业务域（router_registry.py）
 

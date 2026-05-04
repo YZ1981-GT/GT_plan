@@ -37,6 +37,7 @@
 
     <!-- 主表格 -->
     <el-table :data="rows" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 340px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       @selection-change="(_sel: any[]) => selectedRows = _sel">
@@ -70,14 +71,14 @@
           <template #default="{ row }"><el-input-number v-model="row.localAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="原值合计" width="110" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmtAmount(sumArr(row.localAmounts)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.localAmounts)) }}</span></template>
         </el-table-column>
         <!-- 本方坏账按账龄 -->
         <el-table-column v-for="(ag, ai) in agingSegments" :key="'li'+ai" :label="'坏账-'+ag.name" width="90" align="right">
           <template #default="{ row }"><el-input-number v-model="row.localImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="坏账合计" width="100" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmtAmount(sumArr(row.localImpairments)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.localImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
       <!-- 对方基本信息 -->
@@ -107,20 +108,20 @@
           <template #default="{ row }"><el-input-number v-model="row.remoteAmounts[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="原值合计" width="110" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmtAmount(sumArr(row.remoteAmounts)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#4b2d77;font-weight:600">{{ fmt(sumArr(row.remoteAmounts)) }}</span></template>
         </el-table-column>
         <el-table-column v-for="(ag, ai) in agingSegments" :key="'ri'+ai" :label="'坏账-'+ag.name" width="90" align="right">
           <template #default="{ row }"><el-input-number v-model="row.remoteImpairments[ai]" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="坏账合计" width="100" align="right">
-          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmtAmount(sumArr(row.remoteImpairments)) }}</span></template>
+          <template #default="{ row }"><span class="ws-auto-cell" style="color:#e6a23c;font-weight:600">{{ fmt(sumArr(row.remoteImpairments)) }}</span></template>
         </el-table-column>
       </el-table-column>
       <!-- 差异 -->
       <el-table-column label="差异" width="110" align="right">
         <template #default="{ row }">
           <span :class="sumArr(row.localAmounts) - sumArr(row.remoteAmounts) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
-            {{ fmtAmount(sumArr(row.localAmounts) - sumArr(row.remoteAmounts)) }}
+            {{ fmt(sumArr(row.localAmounts) - sumArr(row.remoteAmounts)) }}
           </span>
         </template>
       </el-table-column>
@@ -130,7 +131,7 @@
       <el-table-column label="核对" width="60" align="center">
         <template #default="{ row }">
           <el-tag v-if="row._reconcileStatus === 'matched'" type="success" size="small" effect="plain">✓</el-tag>
-          <el-tooltip v-else-if="row._reconcileStatus === 'diff'" :content="`差异: ${fmtAmount(row._reconcileDiff)}${row._impairmentDiff ? '，坏账差异: ' + fmtAmount(row._impairmentDiff) : ''}`" placement="left">
+          <el-tooltip v-else-if="row._reconcileStatus === 'diff'" :content="`差异: ${fmt(row._reconcileDiff)}${row._impairmentDiff ? '，坏账差异: ' + fmt(row._impairmentDiff) : ''}`" placement="left">
             <el-tag type="warning" size="small" effect="plain">≠</el-tag>
           </el-tooltip>
           <span v-else style="color:#ccc">—</span>
@@ -148,7 +149,7 @@
         </el-table-column>
         <el-table-column prop="subject" label="科目" width="160" />
         <el-table-column prop="amount" label="金额" width="140" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.amount) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.amount) }}</span></template>
         </el-table-column>
         <el-table-column prop="desc" label="说明" min-width="200" show-overflow-tooltip />
       </el-table>
@@ -205,7 +206,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface AgingSegment { name: string; startMonth: number; endMonth: number; impairmentRate: number }
@@ -226,6 +227,8 @@ const emitArap = defineEmits<{
 }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<ArApRow[]>([])
 const showAgingDialog = ref(false)
@@ -407,7 +410,7 @@ const generatedEntries = computed(() => {
     const amount = Math.min(vals.local, vals.remote)
     if (amount > 0) {
       // 往来抵消分录
-      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: `内部往来抵消（本方${fmtAmount(vals.local)} / 对方${fmtAmount(vals.remote)}）` })
+      entries.push({ direction: '借', subject: localSubj || remoteSubj, amount, desc: `内部往来抵消（本方${fmt(vals.local)} / 对方${fmt(vals.remote)}）` })
       entries.push({ direction: '贷', subject: remoteSubj || localSubj, amount, desc: `内部往来抵消` })
     }
     // 坏账准备冲回（本方+对方的坏账都要冲回）

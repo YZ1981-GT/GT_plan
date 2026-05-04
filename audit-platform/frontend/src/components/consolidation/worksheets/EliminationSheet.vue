@@ -29,6 +29,7 @@
     </div>
 
     <el-table :data="allEntries" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="entryCellStyle"
       :row-class-name="entryRowClass"
@@ -71,7 +72,7 @@
       <el-table-column prop="amount" label="金额" width="140" align="right">
         <template #default="{ row }">
           <el-input-number v-if="row._custom" v-model="row.amount" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else class="ws-computed">{{ fmtAmount(row.amount) }}</span>
+          <span v-else class="ws-computed">{{ fmt(row.amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="desc" label="说明" min-width="180">
@@ -84,10 +85,10 @@
 
     <!-- 借贷平衡校验 -->
     <div class="ws-balance-check">
-      <span>借方合计: <b class="ws-computed">{{ fmtAmount(totalDebit) }}</b></span>
-      <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmtAmount(totalCredit) }}</b></span>
+      <span>借方合计: <b class="ws-computed">{{ fmt(totalDebit) }}</b></span>
+      <span style="margin:0 12px">贷方合计: <b class="ws-computed">{{ fmt(totalCredit) }}</b></span>
       <span :class="totalDebit - totalCredit !== 0 ? 'ws-diff-warn' : ''" style="font-weight:600">
-        差额: {{ fmtAmount(totalDebit - totalCredit) }}
+        差额: {{ fmt(totalDebit - totalCredit) }}
         <span v-if="totalDebit - totalCredit === 0" style="color:#67c23a;margin-left:4px">✓ 平衡</span>
         <span v-else style="color:#e6a23c;margin-left:4px">⚠ 不平衡</span>
       </span>
@@ -101,7 +102,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EntryRow {
@@ -122,6 +123,8 @@ defineEmits<{
 }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedCustomRows = ref<EntryRow[]>([])

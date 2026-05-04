@@ -24,6 +24,7 @@
     </div>
 
     <el-table :data="rows" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       show-summary :summary-method="getSummary"
@@ -75,7 +76,7 @@
       <el-table-column label="差异" width="100" align="right">
         <template #default="{ row }">
           <span :class="n(row.payerAmount) - n(row.receiverAmount) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
-            {{ fmtAmount(n(row.payerAmount) - n(row.receiverAmount)) }}
+            {{ fmt(n(row.payerAmount) - n(row.receiverAmount)) }}
           </span>
         </template>
       </el-table-column>
@@ -92,7 +93,7 @@
         </el-table-column>
         <el-table-column prop="subject" label="现金流项目" width="200" />
         <el-table-column prop="amount" label="金额" width="140" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.amount) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.amount) }}</span></template>
         </el-table-column>
       </el-table>
     </div>
@@ -103,7 +104,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface CashFlowRow { payerCompany: string; receiverCompany: string; payerItem: string; payerAmount: number|null; receiverItem: string; receiverAmount: number|null }
@@ -112,6 +113,8 @@ const props = defineProps<{ companies: CompanyCol[] }>()
 const emitCf = defineEmits<{ (e: 'save', data: CashFlowRow[]): void; (e: 'entries-changed', entries: any[]): void; (e: 'open-formula', key: string): void }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<CashFlowRow[]>([])
 const cfFileRef = ref<HTMLInputElement|null>(null)
@@ -206,8 +209,8 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx <= 1) { sums[idx] = ''; return }; if (idx === 2) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
-    else if (col.label === '差异') { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + (n(r.payerAmount) - n(r.receiverAmount)), 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    else if (col.label === '差异') { sums[idx] = fmt(data.reduce((s: number, r: any) => s + (n(r.payerAmount) - n(r.receiverAmount)), 0)) }
     else { sums[idx] = '' }
   }); return sums
 }

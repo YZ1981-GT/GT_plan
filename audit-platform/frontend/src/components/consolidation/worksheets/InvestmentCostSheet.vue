@@ -28,6 +28,7 @@
     </div>
 
     <el-table :data="tableData" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 80px)' : 'calc(100vh - 300px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle"
       :row-class-name="rowClassName" @selection-change="onSelChange">
@@ -61,7 +62,7 @@
           <template #default="{ row }"><el-input-number v-model="row.open_impairment" size="small" :precision="2" :controls="false" style="width:100%" /></template>
         </el-table-column>
         <el-table-column label="长投净额" width="100" align="right">
-          <template #default="{ row }"><span :class="calcCls(n(row.open_cost) - n(row.open_impairment))">{{ fmtAmount(n(row.open_cost) - n(row.open_impairment)) }}</span></template>
+          <template #default="{ row }"><span :class="calcCls(n(row.open_cost) - n(row.open_impairment))">{{ fmt(n(row.open_cost) - n(row.open_impairment)) }}</span></template>
         </el-table-column>
         <el-table-column prop="open_fv" label="公允价值" width="100" align="right">
           <template #default="{ row }"><el-input-number v-model="row.open_fv" size="small" :precision="2" :controls="false" style="width:100%" /></template>
@@ -106,24 +107,24 @@
         </el-table-column>
         <el-table-column label="投资成本" width="110" align="right">
           <template #default="{ row }">
-            <span :class="calcCls(n(row.open_cost)+n(row.add_cost)-n(row.reduce_cost))">{{ fmtAmount(n(row.open_cost)+n(row.add_cost)-n(row.reduce_cost)) }}</span>
+            <span :class="calcCls(n(row.open_cost)+n(row.add_cost)-n(row.reduce_cost))">{{ fmt(n(row.open_cost)+n(row.add_cost)-n(row.reduce_cost)) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="减值准备" width="100" align="right">
           <template #default="{ row }">
-            <span :class="calcCls(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))">{{ fmtAmount(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment)) }}</span>
+            <span :class="calcCls(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))">{{ fmt(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment)) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="长投净额" width="100" align="right">
           <template #default="{ row }">
             <span :class="[calcCls((n(row.open_cost)+n(row.add_cost)-n(row.reduce_cost))-(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))), 'ws-bold']">
-              {{ fmtAmount((n(row.open_cost)+n(row.add_cost)-n(row.reduce_cost))-(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))) }}
+              {{ fmt((n(row.open_cost)+n(row.add_cost)-n(row.reduce_cost))-(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))) }}
             </span>
           </template>
         </el-table-column>
         <el-table-column label="公允价值" width="100" align="right">
           <template #default="{ row }">
-            <span :class="calcCls(n(row.open_fv)+n(row.add_fv)-n(row.reduce_fv))">{{ fmtAmount(n(row.open_fv)+n(row.add_fv)-n(row.reduce_fv)) }}</span>
+            <span :class="calcCls(n(row.open_fv)+n(row.add_fv)-n(row.reduce_fv))">{{ fmt(n(row.open_fv)+n(row.add_fv)-n(row.reduce_fv)) }}</span>
           </template>
         </el-table-column>
       </el-table-column>
@@ -153,7 +154,7 @@
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface InvestmentCostRow {
   company_name: string; company_code: string; current_dividend: number | null
@@ -176,6 +177,8 @@ watch(rows, (v) => { internalUpdate = true; emit('update:modelValue', v); nextTi
 
 const selectedRows = ref<InvestmentCostRow[]>([])
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const importVisible = ref(false)

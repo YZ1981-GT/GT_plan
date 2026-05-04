@@ -104,6 +104,7 @@ import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useLazyEdit } from '@/composables/useLazyEdit'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
   projectId: string
@@ -124,7 +125,7 @@ function fmtAmt(v: any): string {
   if (v == null) return '-'
   const n = Number(v)
   if (isNaN(n)) return String(v)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(n)
 }
 
 // ─── 合并试算平衡表 ──────────────────────────────────────────────────────────

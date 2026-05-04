@@ -68,6 +68,7 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{ modelValue: boolean; projectId: string; year: number }>()
 const emit = defineEmits<{ 'update:modelValue': [val: boolean] }>()
@@ -123,7 +124,7 @@ function formatCell(v: any) {
   // 不格式化长字符串（如信用代码、编码等）
   if (s.length > 12 || /[a-zA-Z\u4e00-\u9fff]/.test(s)) return s
   const n = Number(v)
-  if (!isNaN(n) && s.trim() !== '') return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (!isNaN(n) && s.trim() !== '') return fmtAmount(n)
   return s
 }
 

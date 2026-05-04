@@ -106,9 +106,7 @@
           <template #default="{ data }">
             <div class="gt-wp-tree-node">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
-              <el-tag v-if="data.status" :type="statusTagType(data.status)" size="small" class="gt-wp-tree-node-tag">
-                {{ statusLabel(data.status) }}
-              </el-tag>
+              <GtStatusTag v-if="data.status" :status-map="WP_STATUS" :value="data.status" class="gt-wp-tree-node-tag" />
             </div>
           </template>
         </el-tree>
@@ -124,14 +122,10 @@
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
               <el-descriptions-item label="审计循环">{{ selectedWp.audit_cycle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="编制状态">
-                <el-tag :type="statusTagType(selectedWp.status)" size="small">
-                  {{ statusLabel(selectedWp.status) }}
-                </el-tag>
+                <GtStatusTag :status-map="WP_STATUS" :value="selectedWp.status" />
               </el-descriptions-item>
               <el-descriptions-item label="复核状态">
-                <el-tag :type="reviewStatusTagType(selectedWp.review_status)" size="small">
-                  {{ reviewStatusLabel(selectedWp.review_status) }}
-                </el-tag>
+                <GtStatusTag :status-map="WP_REVIEW_STATUS" :value="selectedWp.review_status" />
               </el-descriptions-item>
               <el-descriptions-item label="编制人">{{ selectedWp.assigned_to || '未分配' }}</el-descriptions-item>
               <el-descriptions-item label="复核人">{{ selectedWp.reviewer || '未分配' }}</el-descriptions-item>
@@ -390,6 +384,8 @@ import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { WP_STATUS, WP_REVIEW_STATUS } from '@/utils/statusMaps'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
   getFeatureMaturity, submitWorkpaperReview,
@@ -603,51 +599,7 @@ const treeData = computed<TreeNode[]>(() => {
   return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label))
 })
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = {
-    not_started: 'info', in_progress: 'warning', draft: 'warning',
-    draft_complete: '', edit_complete: '', under_review: '',
-    revision_required: 'danger', review_passed: 'success',
-    review_level1_passed: 'success', review_level2_passed: 'success',
-    archived: 'info',
-  }
-  return m[s] || 'info'
-}
 
-function statusLabel(s: string) {
-  const m: Record<string, string> = {
-    not_started: '未开始', in_progress: '编制中', draft: '草稿',
-    draft_complete: '初稿完成', edit_complete: '编制完成',
-    under_review: '复核中', revision_required: '退回修改',
-    review_passed: '复核通过', review_level1_passed: '一级复核通过',
-    review_level2_passed: '二级复核通过', archived: '已归档',
-  }
-  return m[s] || s
-}
-
-function reviewStatusTagType(s: string | undefined) {
-  if (!s) return 'info'
-  const m: Record<string, string> = {
-    not_submitted: 'info',
-    pending_level1: 'warning', level1_in_progress: 'warning',
-    level1_passed: 'success', level1_rejected: 'danger',
-    pending_level2: 'warning', level2_in_progress: 'warning',
-    level2_passed: 'success', level2_rejected: 'danger',
-  }
-  return m[s] || 'info'
-}
-
-function reviewStatusLabel(s: string | undefined) {
-  if (!s) return '未提交'
-  const m: Record<string, string> = {
-    not_submitted: '未提交',
-    pending_level1: '待一级复核', level1_in_progress: '一级复核中',
-    level1_passed: '一级通过', level1_rejected: '一级退回',
-    pending_level2: '待二级复核', level2_in_progress: '二级复核中',
-    level2_passed: '二级通过', level2_rejected: '二级退回',
-  }
-  return m[s] || s
-}
 
 function onKanbanSelect(item: any) {
   if (item.wp_id) {

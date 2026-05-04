@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{ items: Array<{
   wp_id: string; wp_code: string; wp_name: string;
@@ -48,7 +49,7 @@ const props = defineProps<{ items: Array<{
 defineEmits<{ (e: 'refresh', wpId: string): void }>()
 
 const inconsistentCount = computed(() => props.items.filter(i => !i.consistent).length)
-function fmt(v: number | null) { return v != null ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '—' }
+const fmt = fmtAmount
 </script>
 
 <style scoped>

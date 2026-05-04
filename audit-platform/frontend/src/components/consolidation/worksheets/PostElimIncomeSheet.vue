@@ -25,6 +25,7 @@
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       show-summary :summary-method="getSummary"
@@ -35,20 +36,20 @@
         <template #default="{ row }"><span>{{ row.ratio }}%</span></template>
       </el-table-column>
       <el-table-column prop="bookDividend" label="账面现金红利" width="110" align="right">
-        <template #default="{ row }"><span>{{ fmtAmount(row.bookDividend) }}</span></template>
+        <template #default="{ row }"><span>{{ fmt(row.bookDividend) }}</span></template>
       </el-table-column>
       <el-table-column prop="simInvestIncome" label="模拟投资收益" width="110" align="right">
-        <template #default="{ row }"><span class="ws-computed">{{ fmtAmount(row.simInvestIncome) }}</span></template>
+        <template #default="{ row }"><span class="ws-computed">{{ fmt(row.simInvestIncome) }}</span></template>
       </el-table-column>
       <el-table-column prop="dividendReverse" label="还原分红" width="100" align="right">
-        <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.dividendReverse) }}</span></template>
+        <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.dividendReverse) }}</span></template>
       </el-table-column>
       <el-table-column prop="elimInvestIncome" label="抵消投资收益" width="110" align="right">
-        <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.elimInvestIncome) }}</span></template>
+        <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimInvestIncome) }}</span></template>
       </el-table-column>
       <el-table-column prop="postElimIncome" label="抵消后投资收益" width="130" align="right">
         <template #default="{ row }">
-          <span :class="n(row.postElimIncome) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmtAmount(row.postElimIncome) }}</span>
+          <span :class="n(row.postElimIncome) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmt(row.postElimIncome) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="checkResult" label="校验" width="50" align="center">
@@ -65,7 +66,7 @@
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -79,6 +80,8 @@ const props = defineProps<{
 defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 const manualRows = reactive<any[]>([])
@@ -154,7 +157,7 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx === 0) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
     else { sums[idx] = '' }
   })
   return sums

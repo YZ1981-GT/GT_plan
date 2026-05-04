@@ -160,6 +160,7 @@
                       <span :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
                     </template>
                     <template v-else>
+                      <CommentTooltip :comment="deComments.getComment(activeTableData?.section_id || currentNote?.note_section || 'default', $index, Number(hiRaw))">
                       <div class="gt-cell-wrapper">
                         <el-input-number v-if="editMode && !row.is_total"
                           v-model="row.values[Number(hiRaw) - 1]" :controls="false" :precision="2"
@@ -174,6 +175,7 @@
                         <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source" title="自动提数">📊</span>
                         <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
                       </div>
+                      </CommentTooltip>
                     </template>
                   </template>
                 </el-table-column>
@@ -239,9 +241,9 @@
             <SelectionBar :stats="deCtx.selectionStats()" />
 
             <div class="gt-de-editor-footer">
-              <el-button v-if="!editMode" @click="editMode = true">编辑</el-button>
+              <el-button v-if="!editMode" @click="enterEdit()">编辑</el-button>
               <template v-else>
-                <el-button @click="editMode = false">取消</el-button>
+                <el-button @click="exitEdit(true)">取消</el-button>
                 <el-button type="primary" @click="onSave" :loading="saveLoading">保存</el-button>
                 <el-button type="warning" @click="onClearAllFormulas">一键清除公式</el-button>
                 <el-button @click="onRestoreAutoMode">恢复自动提数</el-button>
@@ -366,7 +368,9 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
+import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
@@ -470,7 +474,7 @@ const refreshLoading = ref(false)
 const exportLoading = ref(false)
 const showNoteFormulaManager = ref(false)
 const showStructureEditor = ref(false)
-const editMode = ref(false)
+const { isEditing: editMode, isDirty: editDirty, enterEdit, exitEdit, markDirty: markEditDirty, clearDirty: clearEditDirty } = useEditMode()
 const templateType = ref('soe')
 const justSaved = ref(false)
 const customTemplateId = ref('')
@@ -489,7 +493,7 @@ const editor = useEditor({
     Placeholder.configure({ placeholder: '请输入附注文字内容...' }),
   ],
   content: '',
-  onUpdate: ({ editor: e }) => { textContent.value = e.getHTML() },
+  onUpdate: ({ editor: e }) => { textContent.value = e.getHTML(); if (editMode.value) markEditDirty() },
 })
 
 onBeforeUnmount(() => { editor.value?.destroy() })
@@ -898,6 +902,7 @@ function _getPriorYearValue(_row: any, rowIndex: number): any {
 }
 
 function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number) {
+  markEditDirty()
   if (!currentNote.value?.table_data?.rows) return
   const rows = currentNote.value.table_data.rows
   const totalRowIndex = rows.findIndex((r: any) => r.is_total)
@@ -1083,6 +1088,7 @@ async function onNodeClick(node: TreeNode) {
   if (node.isGroup || !node.data?.note_section) return
   detailLoading.value = true
   editMode.value = false
+  editDirty.value = false
   try {
     await fetchDetail(node.data.note_section)
   } catch { currentNote.value = null }
@@ -1182,6 +1188,7 @@ async function onSave() {
     await updateDisclosureNote(currentNote.value.id, body)
     ElMessage.success('保存成功')
     editMode.value = false
+    clearEditDirty()
     currentNote.value.status = 'confirmed'
     justSaved.value = true
     setTimeout(() => { justSaved.value = false }, 2500)

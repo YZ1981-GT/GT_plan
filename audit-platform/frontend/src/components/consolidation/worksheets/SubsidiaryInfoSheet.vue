@@ -302,39 +302,19 @@
 
     </el-table>
 
-    <!-- 隐藏的文件输入 -->
-    <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
-
-    <!-- 导入预览弹窗 -->
-    <el-dialog v-model="importDialogVisible" title="导入Excel数据" width="600px" append-to-body>
-      <el-alert type="warning" :closable="false" style="margin-bottom:12px">
-        <template #title>
-          <span>请使用"导出模板"下载的模板填写数据。系统将自动读取<b>"数据填写"</b>工作表（请勿修改sheet名称），数据从第4行开始。导入将<b>追加</b>到现有数据后面，示例行自动跳过。</span>
-        </template>
-      </el-alert>
-      <div v-if="importPreview.length > 0">
-        <p style="font-size:13px;color:#666;margin-bottom:8px">预览（前5条）：</p>
-        <el-table :data="importPreview.slice(0, 5)" border size="small" max-height="250">
-          <el-table-column prop="company_name" label="子企业名称" min-width="140" />
-          <el-table-column prop="company_code" label="企业代码" width="100" />
-          <el-table-column prop="parent_code" label="上级代码" width="90" />
-          <el-table-column prop="account_subject" label="核算科目" width="120" />
-          <el-table-column prop="accounting_method" label="核算方式" width="90" />
-          <el-table-column prop="holding_type" label="持股类型" width="80" />
-          <el-table-column prop="indirect_holder" label="间接持股方" width="100" />
-          <el-table-column prop="share_changed" label="是否变动" width="80" />
-          <el-table-column prop="change_times" label="变动次数" width="80" />
-        </el-table>
-        <p style="font-size:12px;color:#999;margin-top:8px">共 {{ importPreview.length }} 条数据待导入</p>
-      </div>
-      <el-empty v-else description="未解析到有效数据，请检查模板格式" :image-size="60" />
-      <template #footer>
-        <el-button @click="importDialogVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="importPreview.length === 0" @click="confirmImport">
-          确认导入 ({{ importPreview.length }} 条)
-        </el-button>
-      </template>
-    </el-dialog>
+    <!-- 通用导入预览弹窗 -->
+    <ExcelImportPreviewDialog
+      ref="importDialogRef"
+      v-model:visible="importDialogVisible"
+      title="导入子企业信息"
+      :expected-columns="EXPECTED_IMPORT_COLS"
+      sheet-name="数据填写"
+      :skip-rows="3"
+      skip-example-prefix="示例"
+      :alert-text="importAlertText"
+      :allow-error-rows="true"
+      @confirm="onImportConfirm"
+    />
   </div>
 </template>
 
@@ -344,6 +324,7 @@ import { WarningFilled } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { fmtAmount, fmtPercent } from '@/utils/formatters'
+import ExcelImportPreviewDialog from '@/components/common/ExcelImportPreviewDialog.vue'
 
 interface SubsidiaryInfoRow {
   company_name: string
@@ -473,9 +454,8 @@ function onShareChangedUpdate(row: SubsidiaryInfoRow) {
 }
 
 // ─── 导出模板 / 导入 Excel ────────────────────────────────────────────────────
-const fileInputRef = ref<HTMLInputElement | null>(null)
+const importDialogRef = ref<InstanceType<typeof ExcelImportPreviewDialog> | null>(null)
 const importDialogVisible = ref(false)
-const importPreview = ref<SubsidiaryInfoRow[]>([])
 
 // 模板列定义 — 简短表头 + 说明分开
 const TEMPLATE_COLS = [
@@ -503,6 +483,12 @@ const TEMPLATE_COLS = [
   { key: 'disposal_amount', header: '投资减少金额', note: '当期减少的投资金额', example: '' },
   { key: 'disposal_ratio', header: '处置-持股比例', note: '处置后的持股比例（%）', example: '' },
 ]
+
+// 导入时期望的列名（用于列映射校验）
+const EXPECTED_IMPORT_COLS = TEMPLATE_COLS.map(c => c.header)
+
+// 导入提示文字
+const importAlertText = '请使用\u201c导出模板\u201d下载的模板填写数据。系统将自动读取<b>\u201c数据填写\u201d</b>工作表（请勿修改sheet名称），数据从第4行开始。导入将<b>追加</b>到现有数据后面，示例行自动跳过。'
 
 async function exportTemplate() {
   const XLSX = await import('xlsx')
@@ -590,83 +576,45 @@ async function exportData() {
 }
 
 function triggerImport() {
-  fileInputRef.value?.click()
+  importDialogRef.value?.selectFile()
 }
 
-async function onFileSelected(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  try {
-    const XLSX = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array' })
-    // 优先找"数据填写"sheet，找不到就取最后一个sheet（跳过"填写说明"）
-    const dataSheetName = wb.SheetNames.find(n => n === '数据填写') || wb.SheetNames[wb.SheetNames.length - 1]
-    const ws = wb.Sheets[dataSheetName]
-    if (!ws) {
-      ElMessage.error('未找到"数据填写"工作表')
-      return
-    }
-    const jsonData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+/** 导入确认回调：将通用弹窗返回的 Record 数组转为 SubsidiaryInfoRow 并追加 */
+function onImportConfirm(data: Record<string, any>[]) {
+  const parsed: SubsidiaryInfoRow[] = data.map(r => ({
+    company_name: String(r['子企业名称'] ?? '').trim(),
+    company_code: String(r['企业代码'] ?? '').trim(),
+    parent_code: String(r['上级单位代码'] ?? '').trim(),
+    ultimate_controller: String(r['最终控制方'] ?? '').trim(),
+    ultimate_controller_code: String(r['控制方代码'] ?? '').trim(),
+    account_subject: String(r['核算科目'] ?? '').trim(),
+    accounting_method: String(r['核算方式'] ?? '').trim(),
+    holding_type: String(r['持股类型'] ?? '直接').trim(),
+    indirect_holder: String(r['间接持股方'] ?? '').trim(),
+    share_changed: String(r['是否变动'] ?? '否').trim(),
+    change_times: Number(r['变动次数']) || 0,
+    acquisition_date: String(r['购买日'] ?? '').trim(),
+    merge_type: String(r['合并类型'] ?? '').trim(),
+    first_consol_date: String(r['首次合并日'] ?? '').trim(),
+    non_common_cost: r['非同控-投资成本'] != null ? Number(r['非同控-投资成本']) : null,
+    non_common_ratio: r['非同控-持股比例'] != null ? Number(r['非同控-持股比例']) : null,
+    common_cost: r['同控-投资成本'] != null ? Number(r['同控-投资成本']) : null,
+    common_ratio: r['同控-持股比例'] != null ? Number(r['同控-持股比例']) : null,
+    no_consol_cost: r['不涉及合并-投资成本'] != null ? Number(r['不涉及合并-投资成本']) : null,
+    no_consol_ratio: r['不涉及合并-持股比例'] != null ? Number(r['不涉及合并-持股比例']) : null,
+    disposal_date: String(r['首次出表日'] ?? '').trim(),
+    disposal_amount: r['投资减少金额'] != null ? Number(r['投资减少金额']) : null,
+    disposal_ratio: r['处置-持股比例'] != null ? Number(r['处置-持股比例']) : null,
+    pre_disposal_reduce: '',
+    pre_disposal_times: null,
+    post_disposal_reduce: '',
+    post_disposal_times: null,
+  }))
 
-    if (jsonData.length < 4) {
-      ElMessage.warning('文件中没有数据行（数据从第4行开始）')
-      return
-    }
-
-    // 跳过前3行（分类行+说明行+表头行），从第4行开始解析
-    const parsed: SubsidiaryInfoRow[] = []
-    for (let i = 3; i < jsonData.length; i++) {
-      const r = jsonData[i]
-      if (!r || !r[0]) continue
-      const name = String(r[0] || '').trim()
-      if (!name || name.startsWith('示例')) continue
-      parsed.push({
-        company_name: name,
-        company_code: String(r[1] || '').trim(),
-        parent_code: String(r[2] || '').trim(),
-        ultimate_controller: String(r[3] || '').trim(),
-        ultimate_controller_code: String(r[4] || '').trim(),
-        account_subject: String(r[5] || '').trim(),
-        accounting_method: String(r[6] || '').trim(),
-        holding_type: String(r[7] || '直接').trim(),
-        indirect_holder: String(r[8] || '').trim(),
-        share_changed: String(r[9] || '否').trim(),
-        change_times: Number(r[10]) || 0,
-        acquisition_date: String(r[11] || '').trim(),
-        merge_type: String(r[12] || '').trim(),
-        first_consol_date: String(r[13] || '').trim(),
-        non_common_cost: r[14] != null && r[14] !== '' ? Number(r[14]) : null,
-        non_common_ratio: r[15] != null && r[15] !== '' ? Number(r[15]) : null,
-        common_cost: r[16] != null && r[16] !== '' ? Number(r[16]) : null,
-        common_ratio: r[17] != null && r[17] !== '' ? Number(r[17]) : null,
-        no_consol_cost: r[18] != null && r[18] !== '' ? Number(r[18]) : null,
-        no_consol_ratio: r[19] != null && r[19] !== '' ? Number(r[19]) : null,
-        disposal_date: String(r[20] || '').trim(),
-        disposal_amount: r[21] != null && r[21] !== '' ? Number(r[21]) : null,
-        disposal_ratio: r[22] != null && r[22] !== '' ? Number(r[22]) : null,
-        pre_disposal_reduce: '', pre_disposal_times: null,
-        post_disposal_reduce: '', post_disposal_times: null,
-      })
-    }
-    importPreview.value = parsed
-    importDialogVisible.value = true
-  } catch (err: any) {
-    ElMessage.error('文件解析失败：' + (err.message || '格式错误'))
-  } finally {
-    // 重置 input 以便重复选择同一文件
-    if (fileInputRef.value) fileInputRef.value.value = ''
-  }
-}
-
-function confirmImport() {
-  if (importPreview.value.length === 0) return
   // 追加到现有数据（去掉空行）
   const nonEmpty = rows.value.filter(r => r.company_name)
-  rows.value = [...nonEmpty, ...importPreview.value]
-  importDialogVisible.value = false
-  importPreview.value = []
-  ElMessage.success(`已导入 ${rows.value.length - nonEmpty.length} 条数据`)
+  rows.value = [...nonEmpty, ...parsed]
+  ElMessage.success(`已导入 ${parsed.length} 条数据`)
 }
 
 const headerStyle = { background: '#f0edf5', fontSize: '12px', color: '#333', padding: '2px 0' }

@@ -94,6 +94,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
   modelValue: boolean
@@ -145,11 +146,7 @@ const filteredNoteRows = computed(() => {
   )
 })
 
-function fmtAmt(v: any): string {
-  const num = Number(v)
-  if (!Number.isFinite(num) || num === 0) return '—'
-  return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function onSelectReport(row: any) {
   const code = row.row_code

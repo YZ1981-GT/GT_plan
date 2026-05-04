@@ -28,6 +28,7 @@
     </div>
 
     <el-table :data="tableData" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 80px)' : 'calc(100vh - 300px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle"
       :row-class-name="rowClassName" @selection-change="onSelChange">
@@ -77,7 +78,7 @@
             <template #default="{ row }"><el-input-number v-model="row.add_other_equity" size="small" :precision="2" :controls="false" style="width:100%" /></template>
           </el-table-column>
           <el-table-column label="权益增加小计" width="100" align="right">
-            <template #default="{ row }"><span :class="calcCls(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity))">{{ fmtAmount(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity)) }}</span></template>
+            <template #default="{ row }"><span :class="calcCls(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity))">{{ fmt(n(row.add_income_adj)+n(row.add_oci)+n(row.add_other_equity)) }}</span></template>
           </el-table-column>
         </el-table-column>
         <el-table-column prop="add_other" label="其他" width="90" align="right">
@@ -111,10 +112,10 @@
           <template #default="{ row }"><span :class="calcCls(n(row.open_ratio)+n(row.add_ratio)-n(row.reduce_ratio))">{{ fmtR(n(row.open_ratio)+n(row.add_ratio)-n(row.reduce_ratio)) }}</span></template>
         </el-table-column>
         <el-table-column label="长投金额" width="110" align="right">
-          <template #default="{ row }"><span :class="[calcCls(calcEnd(row)), 'ws-bold']">{{ fmtAmount(calcEnd(row)) }}</span></template>
+          <template #default="{ row }"><span :class="[calcCls(calcEnd(row)), 'ws-bold']">{{ fmt(calcEnd(row)) }}</span></template>
         </el-table-column>
         <el-table-column label="减值准备" width="100" align="right">
-          <template #default="{ row }"><span :class="calcCls(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))">{{ fmtAmount(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment)) }}</span></template>
+          <template #default="{ row }"><span :class="calcCls(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment))">{{ fmt(n(row.open_impairment)+n(row.add_impairment)-n(row.reduce_impairment)) }}</span></template>
         </el-table-column>
       </el-table-column>
     </el-table>
@@ -143,7 +144,7 @@
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Row {
   company_name: string; company_code: string
@@ -162,6 +163,8 @@ watch(rows, (v) => { internalUpdate = true; emit('update:modelValue', v); nextTi
 
 const selectedRows = ref<Row[]>([])
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement|null>(null)
 const fileInputRef = ref<HTMLInputElement|null>(null)
 const importVisible = ref(false)

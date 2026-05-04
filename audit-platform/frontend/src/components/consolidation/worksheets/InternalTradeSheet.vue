@@ -24,6 +24,7 @@
     </div>
 
     <el-table :data="rows" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       show-summary :summary-method="getSummary"
@@ -72,7 +73,7 @@
       <el-table-column label="差异" width="100" align="right">
         <template #default="{ row }">
           <span :class="n(row.sellerAmount) - n(row.buyerAmount) !== 0 ? 'ws-diff-warn' : 'ws-computed'">
-            {{ fmtAmount(n(row.sellerAmount) - n(row.buyerAmount)) }}
+            {{ fmt(n(row.sellerAmount) - n(row.buyerAmount)) }}
           </span>
         </template>
       </el-table-column>
@@ -83,7 +84,7 @@
         <template #default="{ row }"><el-input-number v-model="row.inventoryRatio" size="small" :precision="2" :controls="false" style="width:100%" /></template>
       </el-table-column>
       <el-table-column label="应抵消利润" width="110" align="right">
-        <template #default="{ row }"><span class="ws-computed">{{ fmtAmount(n(row.unrealizedProfit) * n(row.inventoryRatio) / 100) }}</span></template>
+        <template #default="{ row }"><span class="ws-computed">{{ fmt(n(row.unrealizedProfit) * n(row.inventoryRatio) / 100) }}</span></template>
       </el-table-column>
     </el-table>
 
@@ -99,7 +100,7 @@
         </el-table-column>
         <el-table-column prop="subject" label="科目" width="160" />
         <el-table-column prop="amount" label="金额" width="140" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.amount) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.amount) }}</span></template>
         </el-table-column>
         <el-table-column prop="desc" label="说明" min-width="200" show-overflow-tooltip />
       </el-table>
@@ -111,7 +112,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface TradeRow {
@@ -124,6 +125,8 @@ const props = defineProps<{ companies: CompanyCol[] }>()
 const emitTrade = defineEmits<{ (e: 'save', data: TradeRow[]): void; (e: 'entries-changed', entries: any[]): void; (e: 'open-formula', key: string): void }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement|null>(null)
 const selectedRows = ref<TradeRow[]>([])
 const tradeFileRef = ref<HTMLInputElement|null>(null)
@@ -215,9 +218,9 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx <= 1) { sums[idx] = ''; return }; if (idx === 2) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
-    else if (col.label === '差异') { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + (n(r.sellerAmount) - n(r.buyerAmount)), 0)) }
-    else if (col.label === '应抵消利润') { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r.unrealizedProfit) * n(r.inventoryRatio) / 100, 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    else if (col.label === '差异') { sums[idx] = fmt(data.reduce((s: number, r: any) => s + (n(r.sellerAmount) - n(r.buyerAmount)), 0)) }
+    else if (col.label === '应抵消利润') { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r.unrealizedProfit) * n(r.inventoryRatio) / 100, 0)) }
     else { sums[idx] = '' }
   }); return sums
 }

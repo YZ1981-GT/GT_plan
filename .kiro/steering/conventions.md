@@ -27,6 +27,17 @@ inclusion: manual
 - 报表表头冻结：el-table 用 max-height，矩阵表格用 thead sticky
 - 行高约 0.7cm（26px），单元格 padding 2px 6px，字号 12px
 - 选中行浅蓝 #e8f4fd，hover 行 #f5f8fc
+- 金额单位：数据库以"元"存储，前端 displayPrefs Store 控制显示（元/万元/千元），顶栏"Aa"面板切换
+- 金额格式化：统一用 formatters.ts 的 fmtAmount/fmtAmountUnit，禁止各组件自定义 fmt 函数
+- 条件格式：负数红色(.gt-amount--negative) + 变动超阈值黄色(.gt-amount--highlight)，displayPrefs.amountClass() 返回 CSS 类
+- 表格字号：通过 `:style="{ fontSize: displayPrefs.fontConfig.tableFont }"` 绑定，4档预设（11/12/13/14px）
+- 单元格选中样式：统一使用 CellContextMenu.vue 全局 gt-ucell--selected（淡紫色半透明背景+边缘边框），禁止各模块自定义 scoped 选中样式
+- 单选时加 gt-ucell--single-selected（outline + 右下角填充柄小方块，Excel 风格）
+- 拖拽框选：setupTableDrag(tableRef, getCellVal) 一行代码启用，拖拽期间 body 加 .gt-dragging 禁止文本选中
+- 复制按钮命名：工具栏"复制整表"（复制整个表格）vs 右键菜单"复制选中区域(N格)"/"复制值"（复制选中单元格）
+- 搜索栏位置：必须在表格上方（横幅/提示区下方），致同品牌紫色渐变背景
+- Ctrl+F：各组件内 document.addEventListener('keydown') + e.preventDefault() 拦截浏览器默认搜索
+- 项目列建议 fixed，金额列建议 sortable
 
 ## 附注编辑器规范
 

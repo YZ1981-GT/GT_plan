@@ -143,6 +143,7 @@ import {
   type MaterialityData,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -174,11 +175,7 @@ const overrideForm = reactive({
   reason: '',
 })
 
-function formatAmt(val: any): string {
-  const n = Number(val)
-  if (isNaN(n)) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const formatAmt = fmtAmount
 
 async function onBenchmarkTypeChange() {
   if (form.benchmark_type && form.benchmark_type !== 'custom') {

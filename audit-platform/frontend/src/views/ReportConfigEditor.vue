@@ -75,7 +75,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch } from '@/utils/confirm'
 import http from '@/utils/http'
 
 const router = useRouter()
@@ -176,7 +177,7 @@ function onInsertAbove() {
 
 async function onDeleteSelected() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确认删除选中的 ${selectedRows.value.length} 行？`, '批量删除确认')
+  await confirmBatch('删除', selectedRows.value.length)
   for (const row of selectedRows.value) {
     if (row.id && !row._isNew) {
       try {

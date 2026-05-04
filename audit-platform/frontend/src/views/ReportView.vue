@@ -279,12 +279,13 @@
       </el-table-column>
       <el-table-column label="本期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.current_period_amount) || 0) - (Number(b.current_period_amount) || 0)">
         <template #default="{ row, $index }">
-          <CommentTooltip :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)">
-            <span class="gt-rv-amount-cell" @click="onDrilldown(row)"
-                  :class="displayPrefs.amountClass(row.current_period_amount, row.prior_period_amount)">
-              {{ fmt(row.current_period_amount) }}
-            </span>
-          </CommentTooltip>
+          <GtAmountCell
+            :value="row.current_period_amount"
+            :prior-value="row.prior_period_amount"
+            :clickable="true"
+            :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
+            @click="onDrilldown(row)"
+          />
         </template>
       </el-table-column>
       <el-table-column label="上期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.prior_period_amount) || 0) - (Number(b.prior_period_amount) || 0)">
@@ -591,6 +592,7 @@ import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'

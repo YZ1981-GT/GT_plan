@@ -176,6 +176,7 @@ import {
   type CFSWorksheetRow, type CFSReconciliation, type CFSIndirectMethod,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -206,12 +207,7 @@ const adjForm = ref({
   amount: 0, cash_flow_category: 'operating', cash_flow_line_item: '',
 })
 
-function fmtAmt(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : v
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function categoryLabel(c: string) {
   const m: Record<string, string> = { operating: '经营', investing: '投资', financing: '筹资', supplementary: '补充' }

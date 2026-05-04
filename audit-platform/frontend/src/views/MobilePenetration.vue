@@ -60,6 +60,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowRight } from '@element-plus/icons-vue'
 import { getLedgerBalance, getLedgerEntries } from '@/services/commonApi'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -81,11 +82,7 @@ const filteredItems = computed(() => {
   )
 })
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (!n) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 async function loadBalance() {
   if (!projectId.value) return

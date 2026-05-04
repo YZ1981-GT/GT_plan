@@ -57,6 +57,7 @@ import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import DetailProjectPanel from './DetailProjectPanel.vue'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
   project: any | null
@@ -70,11 +71,7 @@ const noteContent = ref('')
 const tbDetail = ref<any>(null)
 const selectedYear = computed(() => Number(props.catalogItem?.year || props.project?.audit_year) || new Date().getFullYear())
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (!n && n !== 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function goToWp() {
   if (!props.project || !props.catalogItem) return

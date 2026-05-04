@@ -284,6 +284,7 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
+import { fmtAmount } from '@/utils/formatters'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 
 const props = defineProps<{ project: any | null }>()
@@ -417,11 +418,7 @@ async function onCreateNextYear() {
   }
 }
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (!n) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function typeLabel(t: string) {
   const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }

@@ -93,6 +93,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getChildCompanies, generateWorkpaperSummary, exportWorkpaperSummary } from '@/services/auditPlatformApi'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -286,12 +287,7 @@ function getSummaries({ columns }: any) {
   })
 }
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (!n && n !== 0) return '-'
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 </script>
 
 <style scoped>

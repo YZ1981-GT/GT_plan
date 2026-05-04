@@ -32,6 +32,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
   visible: boolean
@@ -54,7 +55,7 @@ const formattedValue = computed(() => {
   if (v == null) return ''
   const n = Number(v)
   if (isNaN(n)) return String(v)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(n)
 })
 </script>
 

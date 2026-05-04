@@ -241,13 +241,17 @@
               </template>
             </el-table-column>
             <el-table-column label="合并本期" min-width="130" align="right">
-              <template #default="{ row }">
+              <template #default="{ row, $index }">
+                <CommentTooltip :comment="consolComments.getComment(`consol_report_${consolReportType}`, $index, 2)">
                 <span style="white-space:nowrap">{{ fmtAmt(row.current_period_amount) }}</span>
+                </CommentTooltip>
               </template>
             </el-table-column>
             <el-table-column label="合并上期" min-width="130" align="right">
-              <template #default="{ row }">
+              <template #default="{ row, $index }">
+                <CommentTooltip :comment="consolComments.getComment(`consol_report_${consolReportType}`, $index, 3)">
                 <span style="white-space:nowrap">{{ fmtAmt(row.prior_period_amount) }}</span>
+                </CommentTooltip>
               </template>
             </el-table-column>
           </el-table>
@@ -444,6 +448,7 @@ import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalance
 import OrgNode from '@/components/consolidation/OrgNode.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
@@ -925,7 +930,7 @@ function onConsolCtxFormula() {
 function onConsolCtxSum() {
   consolCtx.closeContextMenu()
   const sum = consolCtx.sumSelectedValues()
-  ElMessage.info(`选中 ${consolCtx.selectedCells.value.length} 格，合计：${sum.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+  ElMessage.info(`选中 ${consolCtx.selectedCells.value.length} 格，合计：${fmtAmt(sum)}`)
 }
 
 function onConsolCtxCompare() {
@@ -933,7 +938,7 @@ function onConsolCtxCompare() {
   if (consolCtx.selectedCells.value.length < 2) return
   const vals = consolCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
-  ElMessage.info(`差异：${diff.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+  ElMessage.info(`差异：${fmtAmt(diff)}`)
 }
 
 async function loadConsolReport(forceRefresh = false) {

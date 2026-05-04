@@ -26,6 +26,7 @@
     </div>
 
     <el-table :data="tableData" border size="small" class="ws-table" max-height="calc(100vh - 300px)"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName"
       @selection-change="(_sel: any[]) => selectedRows = _sel">
       <el-table-column type="selection" width="36" fixed align="center" />
@@ -38,20 +39,20 @@
         <template #default="{ row }">
           <span class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px"
             :class="{ 'ws-bold': row.bold }">
-            {{ fmtAmount(calcCapitalTotal(row)) }}
+            {{ fmt(calcCapitalTotal(row)) }}
           </span>
         </template>
       </el-table-column>
       <el-table-column prop="elimAdj" label="合并抵消环节" width="140" align="right">
         <template #default="{ row }">
-          <span v-if="row.isComputed || row.fromElim" class="ws-computed">{{ fmtAmount(row.elimAdj) }}</span>
+          <span v-if="row.isComputed || row.fromElim" class="ws-computed">{{ fmt(row.elimAdj) }}</span>
           <el-input-number v-else v-model="row.elimAdj" size="small" :precision="2" :controls="false" style="width:100%" />
         </template>
       </el-table-column>
       <el-table-column prop="parentVal" label="母公司" width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!row.isComputed" v-model="row.parentVal" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else class="ws-computed">{{ fmtAmount(row.parentVal) }}</span>
+          <span v-else class="ws-computed">{{ fmt(row.parentVal) }}</span>
         </template>
       </el-table-column>
       <!-- 动态子企业列 -->
@@ -64,7 +65,7 @@
         </template>
         <template #default="{ row }">
           <el-input-number v-if="!row.isComputed && row.values" v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" />
-          <span v-else-if="row.isComputed && row.values" class="ws-computed">{{ fmtAmount(row.values?.[ci]) }}</span>
+          <span v-else-if="row.isComputed && row.values" class="ws-computed">{{ fmt(row.values?.[ci]) }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -78,7 +79,7 @@
       </div>
       <div class="ws-check-row" :class="{ 'ws-diff-warn': diffAmount !== 0 }">
         <span>差异:</span>
-        <span class="ws-computed ws-bold">{{ fmtAmount(diffAmount) }}</span>
+        <span class="ws-computed ws-bold">{{ fmt(diffAmount) }}</span>
         <span v-if="diffAmount === 0" style="color:#67c23a">✓ 无差异</span>
         <span v-else style="color:#e6a23c">⚠ 存在差异，请核查</span>
       </div>
@@ -116,7 +117,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; ratio: number }
 
@@ -141,6 +142,8 @@ const emit = defineEmits<{
 }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 
 const companies = computed(() => props.companies)

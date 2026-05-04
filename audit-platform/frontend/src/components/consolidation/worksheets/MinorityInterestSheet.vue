@@ -25,6 +25,7 @@
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="cellStyle"
       show-summary :summary-method="getSummary"
@@ -39,33 +40,33 @@
       </el-table-column>
       <el-table-column label="少数股东权益" align="center">
         <el-table-column prop="endNetAsset" label="期末净资产" width="120" align="right">
-          <template #default="{ row }"><span>{{ fmtAmount(row.endNetAsset) }}</span></template>
+          <template #default="{ row }"><span>{{ fmt(row.endNetAsset) }}</span></template>
         </el-table-column>
         <el-table-column prop="minorityEquity" label="少数股东权益" width="120" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.minorityEquity) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.minorityEquity) }}</span></template>
         </el-table-column>
         <el-table-column prop="elimMinorityEquity" label="抵消分录数" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.elimMinorityEquity) }}</span></template>
+          <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimMinorityEquity) }}</span></template>
         </el-table-column>
         <el-table-column prop="equityDiff" label="差异" width="90" align="right">
           <template #default="{ row }">
-            <span :class="n(row.equityDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmtAmount(row.equityDiff) }}</span>
+            <span :class="n(row.equityDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmt(row.equityDiff) }}</span>
           </template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="少数股东损益" align="center">
         <el-table-column prop="currentProfit" label="当期净利润" width="120" align="right">
-          <template #default="{ row }"><span>{{ fmtAmount(row.currentProfit) }}</span></template>
+          <template #default="{ row }"><span>{{ fmt(row.currentProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="minorityProfit" label="少数股东损益" width="120" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.minorityProfit) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.minorityProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="elimMinorityProfit" label="抵消分录数" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c">{{ fmtAmount(row.elimMinorityProfit) }}</span></template>
+          <template #default="{ row }"><span style="color:#e6a23c">{{ fmt(row.elimMinorityProfit) }}</span></template>
         </el-table-column>
         <el-table-column prop="profitDiff" label="差异" width="90" align="right">
           <template #default="{ row }">
-            <span :class="n(row.profitDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmtAmount(row.profitDiff) }}</span>
+            <span :class="n(row.profitDiff) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmt(row.profitDiff) }}</span>
           </template>
         </el-table-column>
       </el-table-column>
@@ -83,7 +84,7 @@
 import { ref, reactive, computed } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 
@@ -98,6 +99,8 @@ const props = defineProps<{
 defineEmits<{ (e: 'save', data: any): void; (e: 'goto-sheet', key: string): void; (e: 'open-formula', key: string): void }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 const manualRows = reactive<any[]>([])
@@ -190,7 +193,7 @@ function getSummary({ columns, data }: any) {
   columns.forEach((col: any, idx: number) => {
     if (idx === 0) { sums[idx] = '合计'; return }
     const prop = col.property
-    if (prop && sumFields.has(prop)) { sums[idx] = fmtAmount(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
+    if (prop && sumFields.has(prop)) { sums[idx] = fmt(data.reduce((s: number, r: any) => s + n(r[prop]), 0)) }
     else { sums[idx] = '' }
   })
   return sums

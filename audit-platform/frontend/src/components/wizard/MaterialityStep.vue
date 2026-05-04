@@ -169,6 +169,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
 import { api } from '@/services/apiProxy'
+import { fmtAmount } from '@/utils/formatters'
 
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
@@ -204,11 +205,7 @@ const overrideForm = reactive({
   reason: '',
 })
 
-function formatAmount(val: any): string {
-  const n = Number(val)
-  if (isNaN(n)) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const formatAmount = fmtAmount
 
 function getYear(): number {
   const basic = wizardStore.stepData.basic_info as any

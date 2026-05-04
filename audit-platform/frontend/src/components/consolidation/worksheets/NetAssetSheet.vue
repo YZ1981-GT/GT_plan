@@ -29,6 +29,7 @@
     </div>
 
     <el-table :data="tableData" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 80px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle"
       :row-class-name="rowClassName" :span-method="spanMethod"
@@ -48,7 +49,7 @@
       <el-table-column prop="total" label="合计" width="120" align="right">
         <template #default="{ row }">
           <span v-if="!row.isHeader" class="ws-auto-cell" style="display:block;text-align:right;padding:2px 8px;color:#4b2d77;font-weight:500;font-size:12px">
-            {{ fmtAmount(calcRowTotal(row)) }}
+            {{ fmt(calcRowTotal(row)) }}
           </span>
         </template>
       </el-table-column>
@@ -104,7 +105,7 @@
 import { ref, watch, nextTick, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol {
   name: string    // 子企业名称
@@ -132,6 +133,8 @@ const emit = defineEmits<{
 const companies = computed(() => props.companies)
 const tableData = ref<NetAssetRow[]>([...props.modelValue])
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<NetAssetRow[]>([])
 

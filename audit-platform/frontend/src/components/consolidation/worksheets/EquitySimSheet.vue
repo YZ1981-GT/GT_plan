@@ -32,6 +32,7 @@
     <div class="ws-section">
       <div class="ws-section-title">1. 直接长期股权投资权益法模拟</div>
       <el-table :data="directTableData" border size="small" class="ws-table"
+        :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
         :max-height="isFullscreen ? 'calc(100vh - 200px)' : '500'"
         :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName"
         @selection-change="(_sel: any[]) => selectedDirectRows = _sel.filter((r: any) => !r._isRatioRow)">
@@ -56,7 +57,7 @@
           <template #default="{ row }">
             <span v-if="row._isRatioRow"></span>
             <span v-else-if="!row.isStep" class="ws-auto-cell" style="display:block;text-align:right;padding:0 4px;font-size:11px;color:#4b2d77;font-weight:500">
-              {{ fmtAmount(rowTotal(row)) }}
+              {{ fmt(rowTotal(row)) }}
             </span>
           </template>
         </el-table-column>
@@ -85,6 +86,7 @@
         请先在"基本信息表"中填写子企业名称，或确保合并范围已配置，子企业列将自动生成。
       </div>
       <el-table v-else :data="compareRows" border size="small" class="ws-table"
+        :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
         :header-cell-style="headerStyle" :cell-style="compareCellStyle">
         <el-table-column prop="label" label="项目" width="260" fixed show-overflow-tooltip />
         <el-table-column v-for="(c, ci) in companies" :key="'cmp'+ci" align="right" min-width="130">
@@ -96,12 +98,12 @@
           </template>
           <template #default="{ row }">
             <span v-if="row.key === 'ratio'" style="font-weight:600;color:#4b2d77">{{ c.ratio }}%</span>
-            <span v-else-if="row.key === 'diff'" :class="n(row.values?.[ci]) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmtAmount(row.values?.[ci]) }}</span>
+            <span v-else-if="row.key === 'diff'" :class="n(row.values?.[ci]) !== 0 ? 'ws-diff-warn' : 'ws-computed'">{{ fmt(row.values?.[ci]) }}</span>
             <span v-else-if="row.key === 'reason'">
               <el-input v-model="diffReasons[ci]" size="small" placeholder="差异原因" />
             </span>
             <el-input-number v-else-if="row.editable" v-model="row.values[ci]" size="small" :precision="2" :controls="false" style="width:100%" />
-            <span v-else :class="calcCls(row.values?.[ci])">{{ fmtAmount(row.values?.[ci]) }}</span>
+            <span v-else :class="calcCls(row.values?.[ci])">{{ fmt(row.values?.[ci]) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -111,6 +113,7 @@
     <div v-for="(section, si) in indirectSections" :key="si" class="ws-section">
       <div class="ws-section-title">2. 间接持股权益法模拟 — {{ section.companyName }} <small style="color:#999;margin-left:8px">间接 {{ section.ratio }}%{{ section.indirectHolder ? '（通过' + section.indirectHolder + '）' : '' }}</small></div>
       <el-table :data="section.rows" border size="small" class="ws-table" max-height="400"
+        :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
         :header-cell-style="headerStyle" :cell-style="cellStyle" :row-class-name="rowClassName">
         <el-table-column prop="seq" label="序号" width="50" align="center" />
         <el-table-column prop="step" label="步骤" width="160" show-overflow-tooltip>
@@ -136,9 +139,9 @@
       </el-table>
       <!-- 间接持股比对区 -->
       <div style="margin-top:8px;font-size:12px;color:#999;padding:4px 8px;background:#f0f7ff;border-radius:4px;border:1px solid #d0e3f5">
-        🔗 模拟后长投小计: <b style="color:#1a5fb4">{{ fmtAmount(section.endLongInvest) }}</b>
-        &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#1a5fb4">{{ fmtAmount(section.endNetAssetShare) }}</b>
-        &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmtAmount(section.difference) }}</b>
+        🔗 模拟后长投小计: <b style="color:#1a5fb4">{{ fmt(section.endLongInvest) }}</b>
+        &nbsp;|&nbsp; 按比例享有净资产: <b style="color:#1a5fb4">{{ fmt(section.endNetAssetShare) }}</b>
+        &nbsp;|&nbsp; 差异: <b :style="{ color: section.difference !== 0 ? '#e6a23c' : '#67c23a' }">{{ fmt(section.difference) }}</b>
       </div>
     </div>
 
@@ -161,7 +164,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EquitySimRow {
@@ -198,6 +201,8 @@ const directTableData = computed(() => {
   return [ratioRow, ...directRows.value]
 })
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const importVisible = ref(false)

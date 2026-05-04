@@ -50,7 +50,7 @@
           <el-table-column prop="deviations_found" label="偏差数" width="70" />
           <el-table-column label="错报金额" width="100">
             <template #default="{ row }">
-              {{ row.misstatements_found != null ? Number(row.misstatements_found).toLocaleString() : '-' }}
+              {{ row.misstatements_found != null ? fmtAmount(row.misstatements_found) : '-' }}
             </template>
           </el-table-column>
           <el-table-column prop="conclusion" label="结论" min-width="120" />
@@ -67,10 +67,10 @@
           <el-divider content-position="left">MUS评价结果</el-divider>
           <el-descriptions :column="2" border size="small">
             <el-descriptions-item label="推断错报">
-              {{ Number(musResult.projected_misstatement).toLocaleString() }}
+              {{ fmtAmount(musResult.projected_misstatement) }}
             </el-descriptions-item>
             <el-descriptions-item label="错报上限">
-              {{ Number(musResult.upper_misstatement_limit).toLocaleString() }}
+              {{ fmtAmount(musResult.upper_misstatement_limit) }}
             </el-descriptions-item>
           </el-descriptions>
           <el-table v-if="musResult.details?.length" :data="musResult.details" size="small" style="margin-top: 8px">
@@ -193,6 +193,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { fmtAmount } from '@/utils/formatters'
 import {
   listSamplingConfigs,
   createSamplingConfig,

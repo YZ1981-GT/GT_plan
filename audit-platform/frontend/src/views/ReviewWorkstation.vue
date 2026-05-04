@@ -77,6 +77,7 @@ import { useRoute } from 'vue-router'
 import { Loading, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as workpaperApi from '@/services/workpaperApi'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -97,7 +98,7 @@ const filteredQueue = computed(() => {
 
 const hasBlocking = computed(() => aiIssues.value.some(i => i.severity === 'blocking'))
 
-function formatAmount(v: any) { return v != null ? Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '—' }
+const formatAmount = fmtAmount
 
 async function loadQueue() {
   try {

@@ -320,6 +320,7 @@ import {
   executeFormulas,
 } from '@/services/commonApi'
 import http from '@/utils/http'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
   projectId: string
@@ -502,7 +503,7 @@ function formatValue(val: any): string {
   if (val === null || val === undefined) return ''
   if (typeof val === 'number') {
     if (val === 0) return '-'
-    return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+    return fmtAmount(val)
   }
   return String(val)
 }

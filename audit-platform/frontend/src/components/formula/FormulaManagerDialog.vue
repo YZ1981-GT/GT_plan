@@ -143,7 +143,7 @@
                   </div>
                 </template>
                 <span style="font-size:12px;color:#4b2d77;font-weight:600;cursor:help">
-                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? formulaResults[row.row_code || row.id]!.value!.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-' }}
+                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? fmtAmount(formulaResults[row.row_code || row.id]!.value!) : '-' }}
                 </span>
               </el-tooltip>
               <span v-else style="font-size:12px;color:#ccc">—</span>
@@ -335,6 +335,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'

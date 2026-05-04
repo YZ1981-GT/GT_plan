@@ -45,7 +45,7 @@
         <span class="gt-summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
       </div>
       <div class="gt-summary-card" v-for="(cnt, st) in summary.status_counts" :key="st">
-        <span class="gt-summary-label">{{ statusLabel(st) }}</span>
+        <span class="gt-summary-label">{{ getStatusLabel(ADJUSTMENT_STATUS, st as string) }}</span>
         <span class="gt-summary-value">{{ cnt }}</span>
       </div>
     </div>
@@ -93,9 +93,7 @@
       </el-table-column>
       <el-table-column prop="review_status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="statusTagType(row.review_status)" size="small">
-            {{ statusLabel(row.review_status) }}
-          </el-tag>
+          <GtStatusTag :status-map="ADJUSTMENT_STATUS" :value="row.review_status" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
@@ -204,7 +202,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
@@ -212,6 +211,10 @@ import {
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import { fmtAmount } from '@/utils/formatters'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
+import { operationHistory } from '@/utils/operationHistory'
 
 const route = useRoute()
 const router = useRouter()
@@ -252,21 +255,9 @@ const totalDebit = computed(() => form.value.line_items.reduce((s, l) => s + (l.
 const totalCredit = computed(() => form.value.line_items.reduce((s, l) => s + (l.credit_amount || 0), 0))
 const balanceDiff = computed(() => Math.round((totalDebit.value - totalCredit.value) * 100) / 100)
 
-function fmtAmt(v: string | number | null | undefined): string {
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : (v ?? 0)
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = { draft: 'info', pending_review: 'warning', approved: 'success', rejected: 'danger' }
-  return m[s] || 'info'
-}
 
-function statusLabel(s: string) {
-  const m: Record<string, string> = { draft: '草稿', pending_review: '待复核', approved: '已批准', rejected: '已驳回' }
-  return m[s] || s
-}
 
 function normalizeAdjustmentType(type: string) {
   return String(type || '').toLowerCase()
@@ -386,11 +377,32 @@ async function onSubmit() {
 }
 
 async function onDelete(row: any) {
-  await ElMessageBox.confirm('确定删除该分录？', '确认')
-  await deleteAdjustment(projectId.value, row.entry_group_id)
-  ElMessage.success('删除成功')
-  fetchEntries()
-  fetchSummary()
+  await confirmDelete('该分录')
+  // 缓存分录数据用于撤销恢复
+  const cachedRow = JSON.parse(JSON.stringify(row))
+  await operationHistory.execute({
+    description: `删除分录 ${row.adjustment_no}`,
+    execute: async () => {
+      await deleteAdjustment(projectId.value, row.entry_group_id)
+      fetchEntries()
+      fetchSummary()
+    },
+    undo: async () => {
+      await createAdjustment(projectId.value, {
+        adjustment_type: normalizeAdjustmentType(cachedRow.adjustment_type),
+        year: year.value,
+        description: cachedRow.description || '',
+        line_items: (cachedRow.line_items || []).map((li: any) => ({
+          standard_account_code: li.standard_account_code,
+          account_name: li.account_name || '',
+          debit_amount: parseFloat(li.debit_amount) || 0,
+          credit_amount: parseFloat(li.credit_amount) || 0,
+        })),
+      })
+      fetchEntries()
+      fetchSummary()
+    },
+  })
 }
 
 async function batchReview(status: string) {

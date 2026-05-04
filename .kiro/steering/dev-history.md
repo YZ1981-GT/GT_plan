@@ -166,3 +166,38 @@ inclusion: manual
 - MiddleProjectList 自动恢复上次选中项目
 - DisclosureEditor 重复代码块（projectOptions/loadProjectOptions）
 - FourColumnCatalog 项目树始终显示（去掉 >1 限制）
+
+### 2026-05-04：全局组件库建设（feature/global-component-library 分支）
+
+**新建全局工具（7 个文件）：**
+- `utils/formatters.ts`：fmtAmount/fmtAmountUnit/fmtDate/fmtDateTime/fmtPercent/toNum + 金额单位换算(yuan/wan/qian) + FontSize 预设(xs/sm/md/lg)
+- `composables/useFullscreen.ts`：全屏切换+ESC退出，替代17个组件各自实现
+- `composables/useTableSearch.ts`：表格内搜索替换(Ctrl+F)，keyword/search/next/prev/replace/cellMatchClass
+- `composables/useCellSelection.ts`：增强拖拽框选(setupTableDrag DOM事件委托)+Shift范围选+selectionStats+isCellSelected+右键保持选区+_skipNextCellClick防重复
+- `stores/displayPrefs.ts`：金额单位/字号/小数位/零值/负数红色/变动高亮，localStorage持久化
+- `components/common/SelectionBar.vue`：选中区域求和状态栏(count/sum/avg/max/min)+操作提示
+- `components/common/TableSearchBar.vue`：搜索栏UI(致同品牌紫色风格)+Ctrl+F拦截浏览器默认搜索
+- `components/common/CommentTooltip.vue`：批注hover气泡(el-tooltip包裹，300ms显示)
+
+**全局集成（24 个文件修改）：**
+- ThreeColumnLayout 顶栏：Aa 显示设置面板（单位/字号/小数位/零值/负数红色/变动高亮 6项）
+- 5 核心模块全部接入：TrialBalance/ReportView/DisclosureEditor/ConsolidationIndex/ConsolNoteTab
+  - displayPrefs（fmt+字号+单位标注+条件格式）
+  - useCellSelection setupTableDrag（鼠标拖拽框选+Shift范围选+右键保持选区）
+  - SelectionBar（选中区域求和状态栏）
+  - TableSearchBar + Ctrl+F（TrialBalance/ReportView/DisclosureEditor）
+  - CommentTooltip（ReportView 本期/上期金额列）
+  - 项目列 fixed + 金额列 sortable（ReportView）
+- 14 个 worksheet 组件：useFullscreen + fmtAmount 迁移
+- CellContextMenu：选中样式升级（Excel风格连续区域淡紫色半透明+边缘边框+单选填充柄）+ 复制选中区域/复制整表区分
+- global.css：.gt-fullscreen/.gt-amount--negative/.gt-amount--highlight/.gt-selection-bar/.gt-search-match/.gt-dragging
+- 5 模块 scoped 选中样式（tb/rv/de/gt-cell--selected）全部删除，统一使用全局 gt-ucell--selected
+
+**踩坑记录：**
+- Vue 3 子组件 prop 不能 v-model 绑定（Vite 生产构建报错），需 :model-value + @update:model-value
+- el-table setupTableDrag mousedown 和 cell-click 重复触发，需 _skipNextCellClick 标志位
+- Shift+点击必须在 setupTableDrag(mousedown) 和 onXxxCellClick(cell-click) 两处传递 range=true
+- Ctrl+F 不能用 shortcuts.ts CustomEvent（浏览器默认搜索抢先），需各组件内 addEventListener + preventDefault
+- 搜索栏必须在表格上方（用户看不到下方的）
+
+**构建验证：** vue-tsc 零错误，Vite 构建通过（31文件 +1997/-583行），git 推送 feature/global-component-library 分支

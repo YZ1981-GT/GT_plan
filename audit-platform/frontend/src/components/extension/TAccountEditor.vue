@@ -55,6 +55,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 
 interface TEntry {
   side: 'debit' | 'credit'
@@ -79,10 +80,7 @@ const debitTotal = computed(() => debitEntries.value.reduce((s, e) => s + (e.amo
 const creditTotal = computed(() => creditEntries.value.reduce((s, e) => s + (e.amount || 0), 0))
 const netChange = computed(() => debitTotal.value - creditTotal.value)
 
-function fmtAmt(v: number | undefined): string {
-  if (v === undefined || v === null) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 </script>
 
 <style scoped>

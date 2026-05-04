@@ -26,6 +26,7 @@
     </div>
 
     <el-table :data="tableRows" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
       :header-cell-style="headerStyle" :cell-style="rowCellStyle" :row-class-name="rowClassName"
       show-summary :summary-method="getSummary"
@@ -43,7 +44,7 @@
           <template #default="{ row }"><el-input-number :model-value="row.bookImpairment" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'bookImpairment', v)" /></template>
         </el-table-column>
         <el-table-column prop="bookNet" label="账面净额" width="110" align="right">
-          <template #default="{ row }"><span class="ws-computed">{{ fmtAmount(row.bookNet) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed">{{ fmt(row.bookNet) }}</span></template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="权益法模拟调整" align="center">
@@ -54,7 +55,7 @@
           <template #default="{ row }"><el-input-number :model-value="row.simOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'simOtherEquity', v)" /></template>
         </el-table-column>
         <el-table-column prop="simTotal" label="模拟后长投" width="110" align="right">
-          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmtAmount(row.simTotal) }}</span></template>
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.simTotal) }}</span></template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="合并抵消" align="center">
@@ -68,13 +69,13 @@
           <template #default="{ row }"><el-input-number :model-value="row.elimOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimOtherEquity', v)" /></template>
         </el-table-column>
         <el-table-column prop="elimTotal" label="抵消合计" width="110" align="right">
-          <template #default="{ row }"><span style="color:#e6a23c;font-weight:600">{{ fmtAmount(row.elimTotal) }}</span></template>
+          <template #default="{ row }"><span style="color:#e6a23c;font-weight:600">{{ fmt(row.elimTotal) }}</span></template>
         </el-table-column>
       </el-table-column>
       <el-table-column label="抵消后" align="center">
         <el-table-column prop="postElimTotal" label="抵消后长投" width="120" align="right">
           <template #default="{ row }">
-            <span :class="n(row.postElimTotal) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmtAmount(row.postElimTotal) }}</span>
+            <span :class="n(row.postElimTotal) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmt(row.postElimTotal) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="checkResult" label="校验" width="60" align="center">
@@ -92,7 +93,7 @@
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
-import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface InvestRow { company_name: string; company_code: string; open_cost: number|null; open_impairment: number|null; [k: string]: any }
@@ -110,6 +111,8 @@ const props = defineProps<{
 defineEmits<{ (e: 'save', data: any): void; (e: 'open-formula', key: string): void; (e: 'goto-sheet', key: string): void }>()
 
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
 const sheetRef = ref<HTMLElement | null>(null)
 const selectedRows = ref<any[]>([])
 
@@ -236,7 +239,7 @@ function getSummary({ columns, data }: any) {
     const prop = col.property
     if (prop && sumFields.has(prop)) {
       const total = data.reduce((s: number, r: any) => s + n(r[prop]), 0)
-      sums[idx] = fmtAmount(total)
+      sums[idx] = fmt(total)
     } else { sums[idx] = '' }
   })
   return sums

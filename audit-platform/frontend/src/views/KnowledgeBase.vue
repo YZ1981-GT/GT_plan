@@ -253,6 +253,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirmDelete, confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { Upload, FolderOpened } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 
@@ -617,10 +618,9 @@ async function doRename() {
 
 // ── 删除文件夹 ──
 async function onDeleteFolder(folder: any) {
-  await ElMessageBox.confirm(
+  await confirmDangerous(
     `确认删除文件夹「${folder.name}」及其所有内容？此操作不可恢复。`,
     '删除确认',
-    { type: 'warning' },
   )
   try {
     await http.delete(`/api/knowledge-library/folders/${folder.id}`)
@@ -635,7 +635,7 @@ async function onDeleteFolder(folder: any) {
 
 // ── 删除文档 ──
 async function onDeleteDoc(doc: any) {
-  await ElMessageBox.confirm(`确认删除文档「${doc.name}」？`, '删除确认')
+  await confirmDelete(`文档「${doc.name}」`)
   try {
     await http.delete(`/api/knowledge-library/documents/${doc.id}`)
     ElMessage.success('已删除')
@@ -672,7 +672,7 @@ function onDocSelectionChange(rows: any[]) {
 }
 
 async function onBatchDelete() {
-  await ElMessageBox.confirm(`确认删除选中的 ${selectedDocIds.value.length} 个文档？`, '批量删除', { type: 'warning' })
+  await confirmBatch('删除', selectedDocIds.value.length)
   let deleted = 0
   for (const id of selectedDocIds.value) {
     try {

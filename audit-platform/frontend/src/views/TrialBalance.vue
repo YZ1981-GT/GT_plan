@@ -126,13 +126,15 @@
       </el-table-column>
       <el-table-column prop="account_name" label="科目名称" min-width="180" />
       <el-table-column label="未审数" width="150" align="right">
-        <template #default="{ row }">
+        <template #default="{ row, $index }">
+          <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 2)">
           <span v-if="!row._isSubtotal && !row._isTotal"
             class="clickable" @click="onUnadjustedClick(row)"
             :class="displayPrefs.amountClass(row.unadjusted_amount)">
             {{ fmt(row.unadjusted_amount) }}
           </span>
           <span v-else class="subtotal-val" :class="displayPrefs.amountClass(row.unadjusted_amount)">{{ fmt(row.unadjusted_amount) }}</span>
+          </CommentTooltip>
         </template>
       </el-table-column>
       <el-table-column label="RJE调整" width="140" align="right">
@@ -158,13 +160,15 @@
         </template>
       </el-table-column>
       <el-table-column label="审定数" width="150" align="right">
-        <template #default="{ row }">
+        <template #default="{ row, $index }">
+          <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 5)">
           <span :class="['subtotal-val', displayPrefs.amountClass(row.audited_amount)]" v-if="row._isSubtotal || row._isTotal">
             {{ fmt(row.audited_amount) }}
           </span>
           <span v-else :class="displayPrefs.amountClass(row.audited_amount)">
             {{ fmt(row.audited_amount) }}
           </span>
+          </CommentTooltip>
         </template>
       </el-table-column>
       <el-table-column label="底稿状态" width="100" align="center">
@@ -252,9 +256,7 @@
         </el-table-column>
         <el-table-column prop="review_status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.review_status)" size="small">
-              {{ statusLabel(row.review_status) }}
-            </el-tag>
+            <GtStatusTag :status-map="ADJUSTMENT_STATUS" :value="row.review_status" />
           </template>
         </el-table-column>
       </el-table>
@@ -306,6 +308,7 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
@@ -322,6 +325,8 @@ import {
 } from '@/services/auditPlatformApi'
 import { getAllWpMappings, type WpAccountMapping } from '@/services/workpaperApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { ADJUSTMENT_STATUS } from '@/utils/statusMaps'
 
 const route = useRoute()
 const router = useRouter()
@@ -458,15 +463,7 @@ function rowClassName({ row }: { row: DisplayRow }) {
   return ''
 }
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = { draft: 'info', pending_review: 'warning', approved: 'success', rejected: 'danger' }
-  return m[s] || 'info'
-}
 
-function statusLabel(s: string) {
-  const m: Record<string, string> = { draft: '草稿', pending_review: '待复核', approved: '已批准', rejected: '已驳回' }
-  return m[s] || s
-}
 
 async function ensureProjectYear() {
   if (routeYear.value !== null) {

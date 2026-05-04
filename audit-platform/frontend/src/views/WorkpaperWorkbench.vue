@@ -325,6 +325,7 @@ import { MagicStick, EditPen, Paperclip, WarningFilled } from '@element-plus/ico
 import { getAllWpMappings, getWpPrefillData, getWpRecommendations, type WpAccountMapping, type WpPrefillData, type WpRecommendation } from '@/services/workpaperApi'
 import { getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -502,11 +503,7 @@ function onNodeClick(data: TreeNode) {
   }
 }
 
-function fmtAmt(v: any): string {
-  const n = parseFloat(v)
-  if (isNaN(n) || n === 0) return '—'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function getFileIcon(type?: string): string {
   if (!type) return '📄'

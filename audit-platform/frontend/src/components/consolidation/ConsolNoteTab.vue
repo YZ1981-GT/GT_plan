@@ -11,8 +11,8 @@
               <el-button size="small" @click="copyEntireNoteTable">📋 整表</el-button>
             </el-tooltip>
             <el-button-group size="small">
-              <el-button :type="noteEditMode ? '' : 'primary'" @click="noteEditMode = false">📋 查看</el-button>
-              <el-button :type="noteEditMode ? 'primary' : ''" @click="noteEditMode = true">✏️ 编辑</el-button>
+              <el-button :type="noteEditMode ? '' : 'primary'" @click="exitNoteEdit(true)">📋 查看</el-button>
+              <el-button :type="noteEditMode ? 'primary' : ''" @click="enterNoteEdit()">✏️ 编辑</el-button>
             </el-button-group>
             <el-tooltip content="全屏编辑（ESC 退出）" placement="bottom">
               <el-button size="small" @click="toggleNoteFullscreen">{{ noteFullscreen ? '退出' : '全屏' }}</el-button>
@@ -52,10 +52,16 @@
               <template #default="{ row, $index }">
                 <el-input v-if="noteEditMode && lazyEdit.isEditing($index, hi)" v-model="row[hi]" size="small" :placeholder="h"
                   :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
-                  @blur="lazyEdit.stopEdit()" autofocus />
+                  @blur="lazyEdit.stopEdit()" @input="markNoteDirty()" autofocus />
+                <CommentTooltip v-else-if="hi > 0" :comment="cellComments.getComment(selectedNoteSection?.section_id || 'default', $index, hi)">
+                <span class="gt-note-cell-text"
+                  :class="{ 'gt-note-cell-editable': noteEditMode }"
+                  :style="{ textAlign: 'right' }"
+                  @click="noteEditMode && lazyEdit.startEdit($index, hi)">{{ row[hi] || '-' }}</span>
+                </CommentTooltip>
                 <span v-else class="gt-note-cell-text"
                   :class="{ 'gt-note-cell-editable': noteEditMode }"
-                  :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
+                  :style="{ textAlign: 'left' }"
                   @click="noteEditMode && lazyEdit.startEdit($index, hi)">{{ row[hi] || '-' }}</span>
               </template>
             </el-table-column>
@@ -134,8 +140,8 @@
           <h4 class="gt-note-section-title">{{ selectedNoteSection.title }}</h4>
           <div class="gt-note-actions">
             <el-button-group size="small">
-              <el-button :type="noteEditMode ? '' : 'primary'" @click="noteEditMode = false">📋 查看</el-button>
-              <el-button :type="noteEditMode ? 'primary' : ''" @click="noteEditMode = true">✏️ 编辑</el-button>
+              <el-button :type="noteEditMode ? '' : 'primary'" @click="exitNoteEdit(true)">📋 查看</el-button>
+              <el-button :type="noteEditMode ? 'primary' : ''" @click="enterNoteEdit()">✏️ 编辑</el-button>
             </el-button-group>
             <el-tooltip content="公式管理" placement="bottom">
               <el-button size="small" @click="openNoteFormula">ƒx</el-button>
@@ -155,7 +161,7 @@
               <template #default="{ row, $index }">
                 <el-input v-if="noteEditMode && lazyEdit.isEditing($index + 10000, hi)" v-model="row[hi]" size="small" :placeholder="h"
                   :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
-                  @blur="lazyEdit.stopEdit()" autofocus />
+                  @blur="lazyEdit.stopEdit()" @input="markNoteDirty()" autofocus />
                 <span v-else class="gt-note-cell-text"
                   :class="{ 'gt-note-cell-editable': noteEditMode }"
                   :style="{ textAlign: hi === 0 ? 'left' : 'right' }"
@@ -492,10 +498,12 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { useLazyEdit } from '@/composables/useLazyEdit'
+import { useEditMode } from '@/composables/useEditMode'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -517,7 +525,7 @@ const emit = defineEmits<{
 
 // ─── 附注状态 ─────────────────────────────────────────────────────────────────
 const selectedNoteSection = ref<any>(null)
-const noteEditMode = ref(false)
+const { isEditing: noteEditMode, isDirty: noteDirty, enterEdit: enterNoteEdit, exitEdit: exitNoteEdit, markDirty: markNoteDirty, clearDirty: clearNoteDirty } = useEditMode()
 const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } = useFullscreen()
 const noteRefreshing = ref(false)
 const noteSingleAuditLoading = ref(false)
@@ -945,6 +953,7 @@ async function saveNoteData() {
       { validateStatus: (s: number) => s < 600 },
     )
     ElMessage.success('附注数据已保存')
+    clearNoteDirty()
   } catch { ElMessage.error('保存失败') }
 }
 

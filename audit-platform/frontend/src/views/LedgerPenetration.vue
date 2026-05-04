@@ -643,6 +643,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, Loading, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { fmtAmount } from '@/utils/formatters'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import { buildImportFormData } from '@/utils/importFormData'
 import { applyImportPreviewSuccess, buildImportPreviewFormData, buildImportPreviewUrl, resolveImportPreviewSuccess } from '@/utils/importPreview'
@@ -1352,11 +1353,7 @@ const treeBalance = computed(() => {
 
 function num(v: any): number { return Number(v) || 0 }
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (!n) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 /** 从原始维度字符串中提取当前维度以外的其他维度信息 */
 function formatOtherDims(raw: string, currentDimType: string): string {
