@@ -27,7 +27,7 @@ inclusion: always
 ## 环境配置
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
-- 前端新增依赖：mitt@3.0.1（事件总线）
+- 前端新增依赖：mitt@3.0.1（事件总线）、nprogress@0.2.0（全局进度条）
 - PG 144 张表，Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
@@ -49,6 +49,9 @@ inclusion: always
 - Sprint 2 新增基础设施：eventBus.ts（mitt 类型安全事件总线）、stores/project.ts、apiPaths.ts（500+ 路径）、usePermission + v-permission 指令、路由守卫统一（认证+权限+项目上下文）、batch_mode 批量提交
 - 后端 5 个路由文件修复双重包装（"data"字段名→"rows"/"content"），前端 30+ 文件清理 data?.data 兼容代码
 - 前端 21 个 view/component 文件从 http 直接导入迁移到 apiProxy
+- **Sprint 3 已完成**（14 Task，63 文件，+4720/-1224 行）— 组件层+后端统一
+- Sprint 3 新增前端：GtToolbar/GtPageHeader/GtInfoBar 组件、useExcelIO/useTableToolbar/useCopyPaste/useKnowledge/useAutoSave/useLoading composable、useDictStore/useAddressRegistry store、KnowledgePickerDialog、SharedTemplatePicker 扩展 4 configType、nprogress 全局进度条
+- Sprint 3 新增后端：PaginationParams/SortParams 分页排序、BulkOperationMixin 批量操作、@audit_log 审计日志装饰器、/api/system/dicts 字典接口
 
 ## 活跃待办
 
@@ -86,29 +89,32 @@ inclusion: always
 - ✅ 批量操作场景优化（Task 2.8）
 - ✅ shortcuts.ts 接入各模块（Task 2.9）
 
-### 全局化改造 — Sprint 3+ 待开始
-- ❹ useTableToolbar composable（1天）
-- ❼ useDictStore 枚举字典（2天含后端）
-- ❾ useAddressRegistry 地址坐标 Store（1天）
-- ⑩ useExcelIO composable（1天）
-- ⑪ SharedTemplatePicker 扩展到 8 个 configType（1天）
-- ⑫ useKnowledge + KnowledgePickerDialog（1.5天）
-- ⑬ GtToolbar 标准工具栏组件（1天）
-- ⑭ GtEditableTable 高阶组件（3-5天，中期）
-- ⑯ useCopyPaste composable（1天）
-- ⑰ 模板市场全局入口（半天）
-- ⑳ useLoading + NProgress 全局进度条（1天）
-- ㉑ 表格列配置声明式管理（中期）
-- ㉒ 后端 PaginationParams/SortParams 统一（1天）
-- ㉓ 后端批量操作 BulkOperationMixin（1天）
-- ㉔ 后端审计日志装饰器 before/after diff（1.5天）
-- ㉘ useAutoSave 自动保存/草稿恢复（1天）
-- ㉙ TanStack Query 接入高频 API（2天）
-- ㉛ sse.ts 全局连接接入（1天）
-- ㉜ ErrorBoundary 细粒度错误隔离（半天）
-- ㉝ useExport 统一导出服务（1.5天）
-- ㉞ GtPageHeader 通用页面横幅（1天）
-- ㉟ GtInfoBar 信息栏组件（半天）
+### 全局化改造 — Sprint 3 已完成 ✅
+- ✅ GtToolbar 标准工具栏组件（Task 3.1）
+- ✅ GtPageHeader + GtInfoBar 组件（Task 3.2）
+- ✅ useExcelIO composable — 14 worksheet 替换（Task 3.3）
+- ✅ useTableToolbar composable（Task 3.4）
+- ✅ useDictStore 含后端 /api/system/dicts（Task 3.5）
+- ✅ 后端 PaginationParams/SortParams 统一（Task 3.6）
+- ✅ 后端批量操作 BulkOperationMixin（Task 3.7）
+- ✅ 后端审计日志装饰器 @audit_log（Task 3.8）
+- ✅ SharedTemplatePicker 扩展到 4 configType（Task 3.9）
+- ✅ useCopyPaste composable（Task 3.10）
+- ✅ useKnowledge + KnowledgePickerDialog（Task 3.11）
+- ✅ useAutoSave 草稿恢复（Task 3.12）
+- ✅ useLoading + NProgress 全局进度条（Task 3.13）
+- ✅ useAddressRegistry Store（Task 3.14）
+
+### 全局化改造 — Sprint 4 待开始
+- GtEditableTable 高阶组件（3-5天）
+- 端到端验证（全流程）
+- 数据库 migration 机制
+- 合并模块集成测试
+- 事件链路失败通知 + SSE 全局接入
+- 架构优化（Element Plus 按需导入等）
+- 用户体验改进（向导步骤条、重试提示等）
+- 表格交互增强（WPS 借鉴）
+- 功能完善（模拟权益法等）
 
 ### 架构优化（低优先级）
 - 前端主 bundle 优化（Element Plus 按需导入）
