@@ -1305,7 +1305,7 @@ function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   const colIdx = colLabels.indexOf(column.label)
   if (rowIdx < 0 || colIdx < 0) return
   const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
-  rvCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  rvCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   rvCtx.contextMenu.rowData = row
   rvCtx.contextMenu.itemName = row.row_name || ''
 }

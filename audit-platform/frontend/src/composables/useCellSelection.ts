@@ -37,6 +37,8 @@ export function useCellSelection() {
 
   // ── 拖拽状态 ──
   let isDragging = false
+  /** 防止 setupTableDrag 的 mousedown 和 el-table 的 cell-click 重复处理 */
+  let _skipNextCellClick = false
   /** 外部提供的取值函数（拖拽框选时需要获取单元格值） */
   let _getCellValue: ((row: number, col: number) => any) | null = null
 
@@ -70,6 +72,12 @@ export function useCellSelection() {
    * @param range Shift 键按下（范围选中）
    */
   function selectCell(rowIdx: number, colIdx: number, value: any, multi: boolean, range = false) {
+    // 如果 setupTableDrag 已经处理了这次点击（Shift/拖拽），跳过
+    if (_skipNextCellClick) {
+      _skipNextCellClick = false
+      return
+    }
+
     if (range && anchorRow >= 0 && anchorCol >= 0) {
       // Shift+点击：选中锚点到目标的矩形区域
       selectRange(anchorRow, anchorCol, rowIdx, colIdx)
@@ -293,13 +301,15 @@ export function useCellSelection() {
         // Shift+点击：范围选
         e.preventDefault()
         selectCell(pos.row, pos.col, value, false, true)
+        _skipNextCellClick = true  // 阻止后续 cell-click 重复处理
       } else if (e.ctrlKey || e.metaKey) {
-        // Ctrl+点击：多选（已由 cell-click 处理，这里不重复）
+        // Ctrl+点击：多选（由 cell-click 处理）
         return
       } else {
         // 普通左键按下：开始拖拽
         e.preventDefault()
         startDrag(pos.row, pos.col, value)
+        _skipNextCellClick = true  // 阻止后续 cell-click 重复处理
       }
     }
 

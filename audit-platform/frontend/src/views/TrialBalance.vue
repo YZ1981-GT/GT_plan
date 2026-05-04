@@ -674,7 +674,7 @@ function onTbCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   const colIdx = colLabels[column.label] ?? -1
   if (rowIdx < 0 || colIdx < 0) return
   const value = colIdx === 2 ? row.unadjusted_amount : colIdx === 3 ? row.rje_adjustment : colIdx === 4 ? row.aje_adjustment : colIdx === 5 ? row.audited_amount : row.account_name
-  tbCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  tbCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   tbCtx.contextMenu.rowData = row
   tbCtx.contextMenu.itemName = row.account_name || ''
 }

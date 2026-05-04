@@ -44,8 +44,9 @@ inclusion: always
 
 - 17 个开发阶段中 16 个完成，前端 vue-tsc 零错误（tsconfig 关闭 noUnusedLocals/noUnusedParameters，从 366 降到 0）
 - 旧版合并模块已清除：删除 11 个 views/consolidation/ + 14 个旧组件 + 1 个旧 store（共 26 个文件），当前合并模块统一由 ConsolidationIndex.vue 承载
-- Vite 构建验证通过（34.90s），vue-tsc 零错误
-- 全局化改造启动：useFullscreen + formatters.ts + displayPrefs Store(含条件格式) + useCellSelection(拖拽+统计) + useTableSearch + SelectionBar + TableSearchBar + CommentTooltip 已创建，ThreeColumnLayout 顶栏显示设置面板已集成（6项设置），5个核心模块全部接入（TrialBalance/ReportView/DisclosureEditor/ConsolidationIndex/ConsolNoteTab）
+- Vite 构建验证通过（44.97s），vue-tsc 零错误
+- git 已推送 feature/global-component-library 分支（31文件 +1997/-583行）：7个新建全局工具 + 24个组件修改
+- 全局组件库已接入：useFullscreen(17组件) + formatters/displayPrefs(5核心+14worksheet) + useCellSelection拖拽框选(5核心) + useTableSearch(3模块) + SelectionBar(5模块) + TableSearchBar(3模块) + CommentTooltip(ReportView) + 条件格式(3模块) + 右键保持选区(5模块) + 选中样式统一(5模块)
 - 后端约700路由正常加载，0 个 stub 残留
 - PG 144 张表（consol_cell_comments + account_note_mapping + formula_audit_log），formula_audit_log 路由 2 个 API（GET 查询+POST 记录）
 - 汇总穿透已接真实数据：POST /api/report-config/drill-down 从各子企业 consol_worksheet_data 按 row_code 提取实际金额，降级保留持股比例估算

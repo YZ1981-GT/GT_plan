@@ -883,7 +883,7 @@ function onReportCellClick(row: any, column: any, _cell: HTMLElement, event: Mou
   const colIdx = colMap[column.label] ?? -1
   if (rowIdx < 0 || colIdx < 0) return
   const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
-  consolCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  consolCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   if (consolCtx.selectedCells.value.length === 1) {
     drillDownCell.itemName = row.row_name || ''
     drillDownCell.colName = column.label || ''

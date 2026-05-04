@@ -1259,7 +1259,7 @@ function onDeCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   if (rowIdx < 0 || colIdx < 0) return
   const values = row.values || row.cells || []
   const value = values[colIdx] ?? ''
-  deCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey)
+  deCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   deCtx.contextMenu.itemName = values[0] || `行${rowIdx + 1}`
 }
 

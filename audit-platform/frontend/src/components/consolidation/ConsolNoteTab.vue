@@ -637,7 +637,7 @@ function onNoteCellClick(row: any, column: any, _cell: HTMLElement, event: Mouse
   const rowIdx = sec.editRows.indexOf(row)
   if (rowIdx < 0) return
 
-  noteCtx.selectCell(rowIdx, colIdx, row[colIdx], event.ctrlKey || event.metaKey)
+  noteCtx.selectCell(rowIdx, colIdx, row[colIdx], event.ctrlKey || event.metaKey, event.shiftKey)
 
   if (noteCtx.selectedCells.value.length === 1) {
     const c = noteCtx.selectedCells.value[0]
