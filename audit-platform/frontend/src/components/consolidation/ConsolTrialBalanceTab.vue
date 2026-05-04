@@ -397,32 +397,12 @@ defineExpose({ loadConsolTb, consolTbRows, consolTbType, consolTbLoading })
 
 <style scoped>
 .gt-ctb {
-  display: flex; flex-direction: column; height: calc(100vh - 160px); padding: 0;
+  display: flex; flex-direction: column; height: calc(100vh - 120px); padding: 0 16px;
 }
-
-/* 报表类型标签栏 */
 .gt-ctb-type-bar {
   display: flex; gap: 0; border-bottom: 2px solid var(--gt-color-border-light, #f0f0f5);
   margin-bottom: 8px; flex-shrink: 0;
 }
-
-/* 工具栏 */
-.gt-ctb-toolbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; margin-bottom: 6px; flex-shrink: 0;
-  background: var(--gt-color-bg-elevated, #faf9fd);
-  border: 1px solid var(--gt-color-border-light, #f0f0f5);
-  border-radius: var(--gt-radius-md, 8px);
-}
-.gt-ctb-toolbar-left, .gt-ctb-toolbar-right {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-}
-.gt-ctb-sep {
-  display: inline-block; width: 1px; height: 20px;
-  background: var(--gt-color-border, #e5e5ea); margin: 0 4px;
-}
-
-/* 信息栏 */
 .gt-ctb-info {
   display: flex; align-items: center; gap: 12px;
   padding: 2px 0 6px; font-size: 12px; color: var(--gt-color-text-secondary, #6e6e73);
@@ -432,12 +412,8 @@ defineExpose({ loadConsolTb, consolTbRows, consolTbType, consolTbLoading })
   padding: 2px 8px; background: var(--gt-color-primary-bg, #f4f0fa);
   border-radius: var(--gt-radius-sm, 4px); font-size: 11px; color: var(--gt-color-primary, #4b2d77);
 }
-
-/* 表格区域填满剩余空间 */
-.gt-ctb-table-wrap {
-  flex: 1; min-height: 0; overflow: hidden;
-}
-.gt-ctb-table-wrap .gt-consol-matrix-scroll {
-  max-height: 100%; height: 100%;
-}
+.gt-ctb-table-wrap { flex: 1; min-height: 0; overflow: hidden; }
+.gt-ctb-table-wrap .gt-consol-matrix-scroll { max-height: 100%; height: 100%; }
+/* 工具栏在此组件中 flex-shrink: 0 */
+.gt-ctb :deep(.gt-ctb-toolbar) { flex-shrink: 0; }
 </style>

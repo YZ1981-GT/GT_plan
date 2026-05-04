@@ -30,13 +30,18 @@
       <el-tab-pane label="集团架构" name="structure">
         <div class="gt-tab-content">
           <!-- 工具栏 -->
-          <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
-            <el-button size="small" :type="orgViewMode === 'chart' ? 'primary' : ''" @click="orgViewMode = 'chart'">📊 组织结构图</el-button>
-            <el-button size="small" :type="orgViewMode === 'tree' ? 'primary' : ''" @click="orgViewMode = 'tree'">🌳 树形列表</el-button>
-            <el-button size="small" @click="orgZoom = Math.min(orgZoom + 0.1, 2)">🔍+</el-button>
-            <el-button size="small" @click="orgZoom = Math.max(orgZoom - 0.1, 0.4)">🔍-</el-button>
-            <el-button size="small" @click="orgZoom = 1">1:1</el-button>
-            <span style="font-size:11px;color:#999;margin-left:auto">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
+          <div class="gt-ctb-toolbar" style="margin-bottom:12px">
+            <div class="gt-ctb-toolbar-left">
+              <el-button size="small" :type="orgViewMode === 'chart' ? 'primary' : ''" @click="orgViewMode = 'chart'">📊 组织结构图</el-button>
+              <el-button size="small" :type="orgViewMode === 'tree' ? 'primary' : ''" @click="orgViewMode = 'tree'">🌳 树形列表</el-button>
+              <span class="gt-ctb-sep" />
+              <el-button size="small" @click="orgZoom = Math.min(orgZoom + 0.1, 2)">🔍+</el-button>
+              <el-button size="small" @click="orgZoom = Math.max(orgZoom - 0.1, 0.4)">🔍-</el-button>
+              <el-button size="small" @click="orgZoom = 1">1:1</el-button>
+            </div>
+            <div class="gt-ctb-toolbar-right">
+              <span style="font-size:12px;color:#666">{{ orgNodeCount }} 个节点 · 最大 {{ orgMaxDepth }} 层</span>
+            </div>
           </div>
 
           <!-- 组织结构图模式 -->
@@ -99,8 +104,8 @@
       <!-- Tab 5: 合并报表 -->
       <el-tab-pane label="合并报表" name="consol_report">
         <div class="gt-tab-content">
-          <!-- 报表类型快捷切换（紧凑标签式） + 操作按钮 -->
-          <div class="gt-report-type-tabs">
+          <!-- 报表类型标签 -->
+          <div class="gt-report-type-tabs" style="margin-bottom:0">
             <div class="gt-report-type-tabs-left">
               <span v-for="item in reportNavItems" :key="item.key"
                 class="gt-report-type-tag" :class="{ 'gt-report-type-tag--active': consolReportType === item.key }"
@@ -108,7 +113,13 @@
                 {{ item.label }}
               </span>
             </div>
-            <div class="gt-report-actions">
+          </div>
+          <!-- 工具栏 -->
+          <div class="gt-ctb-toolbar" style="margin-top:8px">
+            <div class="gt-ctb-toolbar-left">
+              <span style="font-size:12px;color:#666">{{ consolReportRows.length }} 行 · {{ currentReportLabel }}</span>
+            </div>
+            <div class="gt-ctb-toolbar-right">
               <el-button size="small" type="primary" @click="loadConsolReport(true)" :loading="consolReportLoading">🔄 刷新</el-button>
               <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
             </div>
@@ -767,7 +778,7 @@ const reportNavItems = [
   { key: 'cash_flow_supplement', label: '现金流附表', desc: '现金流量表补充资料', icon: '📑' },
   { key: 'impairment_provision', label: '资产减值准备表', desc: '合并资产减值准备明细', icon: '⚠️' },
 ]
-const _currentReportLabel = computed(() => {
+const currentReportLabel = computed(() => {
   return reportNavItems.find(i => i.key === consolReportType.value)?.label || '合并报表'
 })
 const consolReportRows = ref<any[]>([])
@@ -1186,6 +1197,23 @@ watch(activeTab, (tab) => {
 }
 .gt-bar-btn:hover { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.5) !important; }
 .gt-tab-content { padding: var(--gt-space-3) 0; }
+
+/* 共享工具栏样式（试算表/报表/集团架构通用） */
+.gt-ctb-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; margin-bottom: 8px;
+  background: var(--gt-color-bg-elevated, #faf9fd);
+  border: 1px solid var(--gt-color-border-light, #f0f0f5);
+  border-radius: var(--gt-radius-md, 8px);
+}
+.gt-ctb-toolbar-left, .gt-ctb-toolbar-right {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.gt-ctb-sep {
+  display: inline-block; width: 1px; height: 20px;
+  background: var(--gt-color-border, #e5e5ea); margin: 0 4px;
+}
+
 .gt-structure-layout { display: flex; gap: 24px; }
 .gt-structure-tree { flex: 1; min-width: 300px; }
 .gt-structure-card { width: 320px; flex-shrink: 0; }
