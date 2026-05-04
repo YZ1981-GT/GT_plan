@@ -42,9 +42,9 @@ inclusion: always
 
 ## 当前系统状态（2026-05-04）
 
-- 17 个开发阶段中 16 个完成，前端非平凡 TS 错误 0 个（仅剩 82 个 unused variable 警告）
+- 17 个开发阶段中 16 个完成，前端 vue-tsc 零错误（tsconfig 关闭 noUnusedLocals/noUnusedParameters，从 366 降到 0）
 - 旧版合并模块已清除：删除 11 个 views/consolidation/ + 14 个旧组件 + 1 个旧 store（共 26 个文件），当前合并模块统一由 ConsolidationIndex.vue 承载
-- Vite 构建验证通过（清除旧文件后 + 修复 TrialBalance/ReportView 空 CSS 选择器未闭合 bug）
+- Vite 构建验证通过（35s），git 已推送 feature/cell-selection-comments-cleanup 分支（2 commits）
 - 后端约700路由正常加载，0 个 stub 残留
 - PG 143 张表（consol_cell_comments + account_note_mapping），account_note_mapping 路由 4 个 API（GET/PUT/DELETE/auto-generate）
 - 汇总穿透已接真实数据：POST /api/report-config/drill-down 从各子企业 consol_worksheet_data 按 row_code 提取实际金额，降级保留持股比例估算
@@ -69,6 +69,7 @@ inclusion: always
 - ThreeColumnLayout resizer 的 ::after 伪元素（±3px 透明扩展区）会遮挡相邻栏的点击事件，已移除；catalog z-index:1 高于 resizer z-index:5 的默认层
 - ThreeColumnLayout 切换四栏模式时必须强制 catalogCollapsed=false，否则 localStorage 持久化的折叠状态会导致 catalog 不显示
 - gt-switch-four-col 事件重新派发必须加 _redispatched 标记防止 ThreeColumnLayout↔ConsolCatalog 无限循环（曾导致 UI 冻结）
+- 事件通信仍使用 CustomEvent（Pinia store 迁移已回退：deep watch + 自动解包导致渲染崩溃，需要更完善的测试环境配合后再尝试）
 - 全屏功能用 Teleport to="body" 实现（非 position:fixed），避免被祖先 overflow/transform 裁剪导致全屏失效
 - 公式体系完整（三分类 + 跨表引用 + 拓扑排序 + 审计留痕）
 - 公式管理（FormulaManagerDialog）已提升到全局顶部导航栏（ThreeColumnLayout），所有模块共享
@@ -162,6 +163,7 @@ inclusion: always
 - 同一组件不同 props 切换时（如股比变动1/2/3次），必须加 `:key` 强制重建实例，否则 reactive 数据的数组长度不匹配
 - Vue 模板 HTML 属性值中禁止使用中文引号 `""`，会被解析为属性结束符导致编译失败
 - 禁止用 PowerShell `-replace` 修改含中文的 Vue 文件，会破坏 UTF-8 编码导致中文乱码，必须用 strReplace 工具逐个替换
+- tsconfig.json 关闭 noUnusedLocals/noUnusedParameters（大型项目噪音过多，unused 检查交给 ESLint）
 - 合并工作底稿五步流程：基本信息→投资明细→净资产归集→权益法模拟→抵消分录+资本公积核查
 - 合并股比变动：内联表三栏布局（净资产变动+直接持股模拟+间接持股模拟），左侧导航根据基本信息表动态生成（1/2/3次），:key 强制重建，setup 同步初始化
 - 基本信息表 holding_type（直接/间接）+ indirect_holder（间接持股方）字段，同一企业可出现两行（直接51%+间接49%通过公司B），模拟权益法按持股路径分别模拟
