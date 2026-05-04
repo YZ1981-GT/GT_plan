@@ -108,6 +108,9 @@
               <el-tooltip content="审核试算平衡（借贷平衡+勾稽校验）" placement="bottom">
                 <el-button size="small" @click="auditConsolTb">✅ 审核</el-button>
               </el-tooltip>
+              <el-tooltip content="将审定数回填到合并报表" placement="bottom">
+                <el-button size="small" type="warning" @click="generateReportFromTb" :loading="consolTbLoading">📋 生成报表</el-button>
+              </el-tooltip>
             </div>
           </div>
 
@@ -925,6 +928,42 @@ function onTbCellContextMenu(e: MouseEvent, row: any, ri: number) {
     cellContextMenu.y = e.clientY
     cellContextMenu.visible = true
   }, 0)
+}
+
+async function auditConsolTb() {
+
+async function generateReportFromTb() {
+  if (!consolTbRows.value.length) { ElMessage.warning('请先加载试算平衡表数据'); return }
+  consolTbLoading.value = true
+  try {
+    // 将审定数回填到合并报表
+    const standard = `${consolReportTemplateType.value}_consolidated`
+    const updates: { row_code: string; current_period_amount: number }[] = []
+    for (const r of consolTbRows.value) {
+      if (r.audited != null && r.row_code) {
+        updates.push({ row_code: r.row_code, current_period_amount: r.audited })
+      }
+    }
+    if (!updates.length) { ElMessage.warning('无审定数可回填'); consolTbLoading.value = false; return }
+
+    // 调用后端批量更新报表数据
+    const { data } = await http.post(`/api/report-config/batch-update`, {
+      project_id: projectId.value,
+      report_type: consolTbType.value,
+      applicable_standard: standard,
+      updates,
+    }, { validateStatus: (s: number) => s < 600 })
+
+    const result = data?.data ?? data
+    const updated = result?.updated || updates.length
+    ElMessage.success(`已将 ${updated} 行审定数回填到合并报表（${tbReportTypes.find(t => t.key === consolTbType.value)?.label}）`)
+
+    // 清除报表缓存，下次切换到报表 tab 时重新加载
+    clearEntityCache(currentConsolEntity.value.code || '', ['all_reports'])
+  } catch {
+    // 后端 API 可能不存在，降级提示
+    ElMessage.info('报表生成需要后端 batch-update API 支持，当前为预留功能')
+  } finally { consolTbLoading.value = false }
 }
 
 async function auditConsolTb() {

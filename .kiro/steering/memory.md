@@ -107,8 +107,12 @@ inclusion: always
 - P0重构（已完成）：ConsolidationIndex.vue 合并附注已拆分为 ConsolNoteTab.vue 独立组件（2968→1522行，减少49%）
 - P0重构（已完成）：通用 useCellSelection composable + CellContextMenu.vue 组件已创建，各模块逐步迁移
 - P1修复（已完成）：试算平衡表 getter 审定数改为 watch deep + recalcTbAudited 函数（Vue reactive 不追踪原生 getter）
-- P1重构：consol_note_sections.py 拆分为章节CRUD/审核/试算平衡表三个路由文件
+- P1重构：consol_note_sections.py 暂不拆分（1003行但内部分隔清晰，拆分风险大于收益）
 - P2优化：组件间 CustomEvent 通信部分改为 Pinia store
+- 短期待办：试算平衡表审定数→合并报表一键生成（回填 report_config current_period_amount）
+- 短期待办：附注数据回显（onNoteNodeClick 加载已保存数据覆盖模板默认值）
+- 短期待办：批注和复核标记持久化（consol_cell_comments 表）
+- 中期待办：科目→附注行映射表（提高 refresh API 匹配率）
 - 查看/编辑模式切换组件（纯文本可复制↔el-input 编辑）后续推广到报表、底稿、试算表等所有表格模块
 - 全屏/复制整表/单元格选中+右键菜单已推广到所有6个模块：单体报表（ReportView）、单体试算表（TrialBalance）、单体附注（DisclosureEditor）、合并报表、合并附注、合并试算平衡表
 - 合并试算平衡表（已完成前后端）：3张表（资产负债/损益/现金流），列=审定汇总+权益抵消(借贷)+往来交易抵消(借贷)+报表调整(借贷)+合并审定数，行结构以现有报表模板（report_config）为主，审定数用getter自动计算，提取填充API POST /fill-tb 从子企业试算表汇总+工作底稿抵消分录提取，数据存consol_worksheet_data（key: consol_tb_{type}_{period}）

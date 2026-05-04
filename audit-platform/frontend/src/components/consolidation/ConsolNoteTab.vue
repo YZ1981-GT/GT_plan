@@ -1260,16 +1260,30 @@ async function auditCurrentNote() {
 function onNoteNodeClick(data: { section_id: string; title?: string }) {
   if (!data.section_id) return
   noteSelectedRows.value = []
+  selectedCells.value = []
   http.get(`/api/consol-note-sections/${props.standard}/${data.section_id}`, {
     validateStatus: (s: number) => s < 600,
-  }).then(({ data: detail }) => {
+  }).then(async ({ data: detail }) => {
     const sec = detail?.data ?? detail
     if (sec && !sec.error) {
       const headers = sec.headers || []
-      const rows = sec.rows || []
+      let rows = sec.rows || []
+
+      // 尝试加载用户已保存的数据覆盖模板
+      try {
+        const { data: saved } = await http.get(
+          `/api/consol-note-sections/data/${props.projectId}/${props.year}/${data.section_id}`,
+          { validateStatus: (s: number) => s < 600 }
+        )
+        const savedData = saved?.data ?? saved
+        if (savedData?.data?.rows?.length) {
+          rows = savedData.data.rows
+        }
+      } catch { /* 无已保存数据，用模板默认 */ }
+
       const editRows = rows.map((r: string[]) => {
         const obj: any = {}
-        for (let j = 0; j < headers.length; j++) obj[j] = r[j] || ''
+        for (let j = 0; j < headers.length; j++) obj[j] = (Array.isArray(r) ? r[j] : '') || ''
         return obj
       })
       while (editRows.length < 5) {

@@ -155,3 +155,51 @@ async def load_seed_data(
     count = await svc.load_seed_data()
     await db.commit()
     return {"message": f"成功加载 {count} 行种子数据", "count": count}
+
+
+@router.post("/batch-update")
+async def batch_update_report_config(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """批量更新报表行的金额（从试算平衡表审定数回填）"""
+    import sqlalchemy as sa
+
+    project_id = body.get("project_id")
+    report_type_str = body.get("report_type", "balance_sheet")
+    applicable_standard = body.get("applicable_standard", "soe_consolidated")
+    updates = body.get("updates", [])
+
+    if not project_id or not updates:
+        return {"updated": 0, "message": "无数据"}
+
+    try:
+        report_type = FinancialReportType(report_type_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效的报表类型: {report_type_str}")
+
+    updated = 0
+    for upd in updates:
+        row_code = upd.get("row_code")
+        amount = upd.get("current_period_amount")
+        if not row_code or amount is None:
+            continue
+
+        result = await db.execute(
+            sa.select(ReportConfig).where(
+                ReportConfig.report_type == report_type,
+                ReportConfig.applicable_standard == applicable_standard,
+                ReportConfig.row_code == row_code,
+                ReportConfig.is_deleted == sa.false(),
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            row.current_period_amount = float(amount)
+            updated += 1
+
+    if updated:
+        await db.commit()
+
+    return {"updated": updated, "message": f"已更新 {updated} 行"}
