@@ -131,6 +131,24 @@
               <span v-else style="font-size: 12px; color: #888">{{ row.formula_description || '' }}</span>
             </template>
           </el-table-column>
+          <el-table-column label="计算值" width="110" align="right">
+            <template #default="{ row }">
+              <el-tooltip v-if="row._trace?.length" placement="left" :show-after="300">
+                <template #content>
+                  <div style="max-width:400px;font-size:11px;line-height:1.6">
+                    <div v-for="(t, ti) in row._trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
+                      <span v-if="t.type">{{ t.type }}({{ t.name || t.code || t.range || '' }}) = {{ t.value || t.error }}</span>
+                      <span v-else-if="t.op">{{ t.left }} {{ t.op }} {{ t.right }} = {{ t.result }}</span>
+                    </div>
+                  </div>
+                </template>
+                <span style="font-size:12px;color:#4b2d77;font-weight:600;cursor:help">
+                  {{ typeof row._computedValue === 'number' ? row._computedValue.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-' }}
+                </span>
+              </el-tooltip>
+              <span v-else style="font-size:12px;color:#ccc">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="来源" width="70" align="center">
             <template #default="{ row }">
               <span v-if="isPresetFormula(row)" style="font-size: 10px; color: #1a3a5c; background: #dce6f0; padding: 1px 6px; border-radius: 3px;">预设</span>
@@ -146,7 +164,7 @@
         </el-table>
 
         <div class="gt-fm-footer">
-          <span style="font-size: 11px; color: #999;">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式</span>
+          <span style="font-size: 11px; color: #999;">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ currentRows.filter(r => r._computedValue != null).length ? `，${currentRows.filter(r => r._computedValue != null).length} 个已计算` : '' }}</span>
         </div>
 
         <!-- 表间审核模式 -->
@@ -1085,13 +1103,71 @@ async function onApplyFormulas() {
     ElMessage.warning('缺少项目信息')
     return
   }
+
+  // 收集当前节点所有带公式的行
+  const formulaRows = currentRows.value.filter((r: any) => r.formula && r.formula_category === 'auto_calc')
+  if (!formulaRows.length) {
+    ElMessage.info('当前节点没有自动运算公式')
+    return
+  }
+
   applying.value = true
   try {
-    await http.post('/api/reports/generate', { project_id: props.projectId, year: props.year })
-    ElMessage.success('自动运算公式已应用，报表数据已刷新')
+    const formulas = formulaRows.map((r: any) => ({
+      row_code: r.row_code || r.id,
+      formula: r.formula,
+    }))
+
+    const { data } = await http.post('/api/report-config/execute-formulas-batch', {
+      project_id: props.projectId,
+      year: props.year,
+      formulas,
+    }, { validateStatus: (s: number) => s < 600 })
+
+    const result = data?.data ?? data
+    const results = result?.results || []
+    const rowValues = result?.row_values || {}
+
+    // 统计执行结果
+    const successCount = results.filter((r: any) => r.value != null && !r.error).length
+    const errorCount = results.filter((r: any) => r.error).length
+
+    // 将计算结果回写到当前行数据
+    for (const r of results) {
+      if (r.value != null && !r.error) {
+        const targetRow = currentRows.value.find((row: any) => (row.row_code || row.id) === r.row_code)
+        if (targetRow) {
+          targetRow._computedValue = r.value
+          targetRow._trace = r.trace
+        }
+      }
+    }
+
+    // 如果是报表节点，将结果回写到 report_config
+    if (selectedNodeKey.value.startsWith('report_') && Object.keys(rowValues).length) {
+      try {
+        const reportType = selectedNodeKey.value.replace('report_', '')
+        const updates = Object.entries(rowValues).map(([code, val]) => ({
+          row_code: code,
+          current_period_amount: val,
+        }))
+        await http.post('/api/report-config/batch-update', {
+          project_id: props.projectId,
+          report_type: reportType,
+          applicable_standard: `soe_standalone`,
+          updates,
+        }, { validateStatus: (s: number) => s < 600 })
+      } catch { /* 回写失败不影响主流程 */ }
+    }
+
+    if (errorCount > 0) {
+      ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败`)
+    } else {
+      ElMessage.success(`已执行 ${successCount} 条自动运算公式`)
+    }
     emit('applied')
-  } catch (e: any) {
-    ElMessage.error('应用失败: ' + (e?.message || ''))
+  } catch (err: any) {
+    ElMessage.error('公式执行失败: ' + (err?.response?.data?.error || err?.message || '未知错误'))
   } finally {
     applying.value = false
   }
