@@ -190,10 +190,10 @@
               <td style="text-align:center;color:#999;font-size:11px">{{ row.row_code }}</td>
               <td :style="{ paddingLeft: (row.indent || 0) * 14 + 'px' }">{{ row.row_name }}</td>
               <td class="gt-tb-sum-num gt-tb-sum-unadj">{{ fmtAmt(row.unadjusted) }}</td>
-              <td class="gt-tb-sum-num"><el-input-number v-model="row.aje_dr" size="small" :controls="false" style="width:100%" /></td>
-              <td class="gt-tb-sum-num"><el-input-number v-model="row.aje_cr" size="small" :controls="false" style="width:100%" /></td>
-              <td class="gt-tb-sum-num"><el-input-number v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" /></td>
-              <td class="gt-tb-sum-num"><el-input-number v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" /></td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 0)" v-model="row.aje_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 0)">{{ fmtAmt(row.aje_dr) }}</span></td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 1)" v-model="row.aje_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 1)">{{ fmtAmt(row.aje_cr) }}</span></td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 2)" v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 2)">{{ fmtAmt(row.rcl_dr) }}</span></td>
+              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 3)" v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 3)">{{ fmtAmt(row.rcl_cr) }}</span></td>
               <td class="gt-tb-sum-num gt-tb-sum-audited">{{ fmtAmt(row.audited) }}</td>
             </tr>
           </tbody>
@@ -277,6 +277,7 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { useLazyEdit } from '@/composables/useLazyEdit'
 import http from '@/utils/http'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
@@ -591,6 +592,7 @@ function onTbKeydown(e: KeyboardEvent) {
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const tbCtx = useCellSelection()
 const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
+const tbSumLazyEdit = useLazyEdit()
 
 function tbCellClassName({ rowIndex, columnIndex }: any) {
   const classes: string[] = []
@@ -906,6 +908,8 @@ async function exportTbSummary() {
 .gt-tb-summary-table th, .gt-tb-summary-table td { border: 1px solid #e8e4f0; padding: 4px 8px; }
 .gt-tb-summary-table thead th { background: #f0edf5; font-weight: 600; text-align: center; position: sticky; top: 0; z-index: 2; }
 .gt-tb-sum-num { text-align: right; }
+.gt-tb-editable { cursor: text; border-bottom: 1px dashed #e5e5ea; padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; text-align: right; }
+.gt-tb-editable:hover { background: #f4f0fa; }
 .gt-tb-sum-unadj { background: rgba(75,45,119,0.03); }
 .gt-tb-sum-audited { font-weight: 700; color: #4b2d77; background: rgba(75,45,119,0.06); }
 .gt-tb-sum-audited-th { background: #e8e0f0 !important; color: #4b2d77; }

@@ -163,6 +163,7 @@ inclusion: always
 - el-table 多级表头的 getSummary 中 `col.property` 对嵌套子列可能为 undefined，计算列需用 `col.label` + `col.parent?.label` 匹配后手动计算
 - 模板渲染函数中禁止修改 reactive 数据（如 `row.total = sum`），会触发无限渲染循环崩溃，合计同步放 watch 中
 - 跨表数据提取用 computed 而非 watch 修改源数据，watch 修改 reactive 数组会触发 indexOf 崩溃（已踩坑两次）
+- Vue 3 reactive 不追踪运行时新增属性：对 computed 返回的对象设置 `row._newProp = val` 不触发模板更新，需用独立 ref Map 存储动态数据
 - `<script setup>` 中 reactive 数组初始化必须在 setup 阶段同步完成（不能依赖 watch immediate），否则模板首次渲染时数组为空导致 undefined 崩溃
 - 同一组件不同 props 切换时（如股比变动1/2/3次），必须加 `:key` 强制重建实例，否则 reactive 数据的数组长度不匹配
 - Vue 模板 HTML 属性值中禁止使用中文引号 `""`，会被解析为属性结束符导致编译失败

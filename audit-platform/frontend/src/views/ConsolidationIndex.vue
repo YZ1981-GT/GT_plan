@@ -152,15 +152,15 @@
                     <td class="gt-cm-td-amt" style="text-align:center;font-size:11px;color:#999">{{ row.row_code }}</td>
                     <td class="gt-cm-td-project" :style="{ paddingLeft: (row.indent || 0) * 14 + 'px' }">{{ row.row_name }}</td>
                     <td class="gt-cm-td-amt" :class="{ 'gt-tb-formula': true }">
-                      <span v-if="!tbEditMode">{{ fmtAmt(row.summary) }}</span>
-                      <el-input-number v-else v-model="row.summary" size="small" :controls="false" style="width:100%" />
+                      <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 0)" v-model="row.summary" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+                      <span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 0)">{{ fmtAmt(row.summary) }}</span>
                     </td>
-                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.equity_dr) }}</span><el-input-number v-else v-model="row.equity_dr" size="small" :controls="false" style="width:100%" /></td>
-                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.equity_cr) }}</span><el-input-number v-else v-model="row.equity_cr" size="small" :controls="false" style="width:100%" /></td>
-                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.trade_dr) }}</span><el-input-number v-else v-model="row.trade_dr" size="small" :controls="false" style="width:100%" /></td>
-                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.trade_cr) }}</span><el-input-number v-else v-model="row.trade_cr" size="small" :controls="false" style="width:100%" /></td>
-                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.adj_dr) }}</span><el-input-number v-else v-model="row.adj_dr" size="small" :controls="false" style="width:100%" /></td>
-                    <td class="gt-cm-td-amt"><span v-if="!tbEditMode">{{ fmtAmt(row.adj_cr) }}</span><el-input-number v-else v-model="row.adj_cr" size="small" :controls="false" style="width:100%" /></td>
+                    <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 1)" v-model="row.equity_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 1)">{{ fmtAmt(row.equity_dr) }}</span></td>
+                    <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 2)" v-model="row.equity_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 2)">{{ fmtAmt(row.equity_cr) }}</span></td>
+                    <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 3)" v-model="row.trade_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 3)">{{ fmtAmt(row.trade_dr) }}</span></td>
+                    <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 4)" v-model="row.trade_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 4)">{{ fmtAmt(row.trade_cr) }}</span></td>
+                    <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 5)" v-model="row.adj_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 5)">{{ fmtAmt(row.adj_dr) }}</span></td>
+                    <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 6)" v-model="row.adj_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 6)">{{ fmtAmt(row.adj_cr) }}</span></td>
                     <td class="gt-cm-td-amt gt-tb-audited">{{ fmtAmt(row.audited) }}</td>
                   </tr>
                 </tbody>
@@ -503,6 +503,7 @@ import OrgNode from '@/components/consolidation/OrgNode.vue'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { useLazyEdit } from '@/composables/useLazyEdit'
 
 const route = useRoute()
 const router = useRouter()
@@ -511,6 +512,7 @@ const year = computed(() => Number(route.query.year) || new Date().getFullYear()
 
 // ─── 批注与复核持久化（合并报表/试算表共用） ─────────────────────────────────
 const consolComments = useCellComments(() => projectId.value, () => year.value, 'consol_report')
+const tbLazyEdit = useLazyEdit()
 
 const activeTab = ref('worksheets')
 const consolNoteTabRef = ref<InstanceType<typeof ConsolNoteTab> | null>(null)
@@ -1635,6 +1637,8 @@ watch(activeTab, (tab) => {
   background: #fff; white-space: nowrap;
 }
 .gt-cm-td-amt { text-align: right !important; font-size: 12px; min-width: 80px; font-variant-numeric: tabular-nums; }
+.gt-tb-editable { cursor: text; border-bottom: 1px dashed var(--gt-color-border, #e5e5ea); padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; }
+.gt-tb-editable:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
 .gt-cm-td-prior { background: #faf9fc; }
 .gt-cm-total-row td { font-weight: 700; background: #f8f6fb !important; }
 .gt-cm-category td { font-weight: 600; color: #4b2d77; }
