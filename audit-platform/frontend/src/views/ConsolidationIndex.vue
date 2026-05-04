@@ -1,31 +1,38 @@
 <template>
   <div class="gt-consol gt-fade-in">
     <!-- 横幅：单位名称 + 年度 + 准则类型 -->
-    <div class="gt-consol-bar">
-      <el-button text class="gt-consol-bar-back" @click="$router.push('/consolidation')">← 返回</el-button>
-      <div class="gt-consol-bar-info">
-        <span class="gt-consol-bar-name">{{ projectInfo.clientName || '加载中...' }}</span>
-        <el-select v-model="projectInfo.year" size="small" style="width:100px;margin-left:10px" @change="onYearChange">
-          <el-option v-for="y in barYearOptions" :key="y" :label="`${y} 年度`" :value="y" />
-        </el-select>
-        <el-select v-model="projectInfo.standard" size="small" style="width:90px;margin-left:6px" @change="onStandardChange">
-          <el-option label="国企版" value="soe" />
-          <el-option label="上市版" value="listed" />
-        </el-select>
-        <el-button size="small" class="gt-bar-btn" @click="showConsolConversion = true">🔄 转换规则</el-button>
-        <el-button size="small" class="gt-bar-btn" @click="onOpenFormula">ƒx 公式</el-button>
-        <SharedTemplatePicker
-          config-type="consol_scope"
-          :project-id="projectId"
-          :get-config-data="getConsolScopeConfigData"
-          @applied="onConsolScopeTemplateApplied"
-        />
-        <el-tooltip content="选中单元格后点击，查看该数值的汇总明细过程" placement="bottom">
-          <el-button size="small" class="gt-bar-btn" @click="openCellDrillDown">📊 查看</el-button>
-        </el-tooltip>
-        <span style="margin-left:8px;font-size:12px;color:rgba(255,255,255,0.7)">单位：{{ displayPrefs.unitSuffix }}</span>
-      </div>
-    </div>
+    <GtPageHeader title="合并报表" @back="$router.push('/consolidation')">
+      <GtInfoBar
+        :show-year="true"
+        :show-template="true"
+        :year-value="projectInfo.year"
+        :template-value="projectInfo.standard"
+        :badges="[{ label: '单位', value: displayPrefs.unitSuffix }]"
+        @year-change="(y: number) => { projectInfo.year = y; onYearChange() }"
+        @template-change="(s: string) => { projectInfo.standard = s; onStandardChange() }"
+      />
+      <template #actions>
+        <GtToolbar
+          :show-formula="true"
+          @formula="onOpenFormula"
+        >
+          <template #left>
+            <SharedTemplatePicker
+              config-type="consol_scope"
+              :project-id="projectId"
+              :get-config-data="getConsolScopeConfigData"
+              @applied="onConsolScopeTemplateApplied"
+            />
+            <el-tooltip content="选中单元格后点击，查看该数值的汇总明细过程" placement="bottom">
+              <el-button size="small" @click="openCellDrillDown">📊 查看</el-button>
+            </el-tooltip>
+          </template>
+          <template #right-extra>
+            <el-button size="small" @click="showConsolConversion = true">🔄 转换规则</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <el-tabs v-model="activeTab" class="gt-consol-tabs">
       <!-- Tab 0: 合并工作底稿 -->
@@ -463,6 +470,9 @@ import { useTableSearch } from '@/composables/useTableSearch'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolTreeSelectPayload, ConsolCatalogSelectPayload, ConsolRefreshEntityPayload } from '@/utils/eventBus'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1248,25 +1258,6 @@ watch(activeTab, (tab) => {
 .gt-consol { padding: 12px; overflow: hidden; }
 .gt-consol-tabs { margin-top: 8px; }
 
-/* ── 顶部信息栏 ── */
-.gt-consol-bar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 12px; margin: -12px -12px 8px;
-  background: linear-gradient(135deg, #4b2d77 0%, #7c5caa 60%, #a78bcc 100%);
-  border-radius: 0 0 10px 10px;
-}
-.gt-consol-bar-back {
-  color: rgba(255,255,255,0.85) !important; font-size: 13px; padding: 4px 8px;
-  border-radius: 4px; transition: background 0.15s;
-}
-.gt-consol-bar-back:hover { background: rgba(255,255,255,0.12) !important; color: #fff !important; }
-.gt-consol-bar-info { display: flex; align-items: center; }
-.gt-consol-bar-name { font-size: 16px; font-weight: 600; color: #fff; }
-.gt-bar-btn {
-  margin-left: 6px; background: transparent !important; color: rgba(255,255,255,0.9) !important;
-  border-color: rgba(255,255,255,0.3) !important;
-}
-.gt-bar-btn:hover { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.5) !important; }
 .gt-tab-content { padding: var(--gt-space-3) 0; }
 
 /* 共享工具栏样式（试算表/报表/集团架构通用） */

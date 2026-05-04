@@ -1,44 +1,38 @@
 <template>
   <div class="gt-adjustments gt-fade-in">
     <!-- 页面横幅 -->
-    <div class="gt-adj-banner">
-      <div class="gt-adj-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-adj-title">调整分录</h2>
-        <div class="gt-adj-info-bar">
-          <div class="gt-adj-info-item">
-            <span class="gt-adj-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-adj-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-adj-info-sep" />
-          <div class="gt-adj-info-item">
-            <span class="gt-adj-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-adj-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-adj-info-sep" />
-          <div class="gt-adj-info-item">
-            <span class="gt-adj-info-badge">AJE {{ summary?.aje_count || 0 }} 笔 · RJE {{ summary?.rje_count || 0 }} 笔</span>
-          </div>
-        </div>
-      </div>
-      <div class="gt-adj-banner-row2">
-        <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
-        <el-button size="small" @click="showImportDialog = true">📥 Excel导入</el-button>
-        <el-button size="small" @click="onExportSummary">📤 导出汇总</el-button>
-        <div class="gt-adj-batch-toggle">
-          <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
-          <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
-            <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
-              📦 批量提交
-            </el-button>
-          </el-badge>
-        </div>
-      </div>
-    </div>
+    <GtPageHeader title="调整分录" @back="router.push('/projects')">
+      <GtInfoBar
+        :show-unit="true"
+        :show-year="true"
+        :unit-value="selectedProjectId"
+        :year-value="selectedYear"
+        :badges="[{ value: `AJE ${summary?.aje_count || 0} 笔 · RJE ${summary?.rje_count || 0} 笔` }]"
+        @unit-change="onProjectChange"
+        @year-change="onYearChange"
+      />
+      <template #actions>
+        <GtToolbar
+          :show-export="true"
+          :show-import="true"
+          export-label="导出汇总"
+          @export="onExportSummary"
+          @import="showImportDialog = true"
+        >
+          <template #left>
+            <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
+            <div class="gt-adj-batch-toggle">
+              <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
+              <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
+                <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
+                  📦 批量提交
+                </el-button>
+              </el-badge>
+            </div>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <!-- 汇总面板 -->
     <div class="gt-summary-panel" v-if="summary">
@@ -219,22 +213,37 @@ import {
   batchCommitAdjustments,
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
-import { useProjectSelector } from '@/composables/useProjectSelector'
+import { useProjectStore } from '@/stores/project'
+import { useDictStore } from '@/stores/dict'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { fmtAmount } from '@/utils/formatters'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
-import { useDictStore } from '@/stores/dict'
 import { operationHistory } from '@/utils/operationHistory'
 import { useAutoSave } from '@/composables/useAutoSave'
 
 const route = useRoute()
 const router = useRouter()
 const dictStore = useDictStore()
-const {
-  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
-  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
-} = useProjectSelector('adjustments')
+const projectStore = useProjectStore()
+
+const projectId = computed(() => projectStore.projectId)
+const selectedProjectId = ref(projectStore.projectId)
+const projectOptions = computed(() => projectStore.projectOptions)
+const yearOptions = computed(() => projectStore.yearOptions)
+const selectedYear = ref(projectStore.year)
+
+function onProjectChange(pid: string) {
+  router.push({ path: `/projects/${pid}/adjustments`, query: route.query })
+}
+function onYearChange(y: number) {
+  selectedYear.value = y
+  projectStore.changeYear(y)
+  router.push({ path: route.path, query: { year: String(y) } })
+}
 
 const routeYear = computed(() => {
   const value = Number(route.query.year)
@@ -524,57 +533,9 @@ watch(
 <style scoped>
 .gt-adjustments { padding: var(--gt-space-5); }
 
-/* ── 页面横幅 ── */
-.gt-adj-banner {
-  display: flex; flex-direction: column; gap: 10px;
-  background: var(--gt-gradient-primary);
-  border-radius: var(--gt-radius-lg);
-  padding: 18px 28px;
-  margin-bottom: var(--gt-space-5);
-  color: #fff;
-  position: relative; overflow: hidden;
-  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
-  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
-}
-.gt-adj-banner::before {
-  content: '';
-  position: absolute; top: -40%; right: -10%;
-  width: 45%; height: 180%;
-  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
-  pointer-events: none;
-}
-.gt-adj-banner-row1 {
-  display: flex; align-items: center; gap: 16px;
-  position: relative; z-index: 1;
-}
-.gt-adj-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
-.gt-adj-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.gt-adj-info-item { display: flex; align-items: center; gap: 4px; }
-.gt-adj-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
-.gt-adj-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
-.gt-adj-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
-.gt-adj-unit-select, .gt-adj-year-select { width: 160px; }
-.gt-adj-unit-select :deep(.el-input__wrapper),
-.gt-adj-year-select :deep(.el-input__wrapper) {
-  background: rgba(255,255,255,0.15) !important;
-  border: 1px solid rgba(255,255,255,0.25) !important;
-  box-shadow: none !important;
-}
-.gt-adj-unit-select :deep(.el-input__inner),
-.gt-adj-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
-.gt-adj-unit-select :deep(.el-input__suffix),
-.gt-adj-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
-.gt-adj-banner-row2 {
-  display: flex; gap: 8px; align-items: center;
-  position: relative; z-index: 1;
-}
-.gt-adj-banner-row2 .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
-.gt-adj-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
-
 /* 批量模式 */
 .gt-adj-batch-toggle {
-  display: flex; align-items: center; gap: 10px; margin-left: auto;
+  display: flex; align-items: center; gap: 10px;
 }
 .gt-adj-batch-toggle :deep(.el-switch__label) { color: rgba(255,255,255,0.85); font-size: 12px; }
 .gt-adj-batch-toggle :deep(.el-switch.is-checked .el-switch__core) { background-color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }

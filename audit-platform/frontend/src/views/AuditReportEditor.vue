@@ -1,27 +1,23 @@
 <template>
   <div class="gt-audit-report gt-fade-in">
-    <div class="gt-ar-header">
-      <div class="gt-ar-banner">
-        <div class="gt-ar-banner-text">
-          <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="$router.push('/projects')">← 返回</el-button>
-          <h2>审计报告</h2>
-          <p v-if="report">{{ opinionLabel(report.opinion_type) }} · {{ report.company_type === 'listed' ? '上市公司' : '非上市' }} · {{ statusLabel(report.status) }}</p>
-          <p v-else>选择意见类型生成报告</p>
-        </div>
-        <div class="gt-ar-banner-actions">
-          <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
-          <SharedTemplatePicker
-            config-type="report_template"
-            :project-id="projectId"
-            :get-config-data="getReportConfigData"
-            @applied="onReportTemplateApplied"
-          />
-          <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
-          <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
-          <el-button size="small" @click="onPickKnowledge" round title="选择知识库文档作为参考上下文">📚 知识库</el-button>
-        </div>
-      </div>
-    </div>
+    <GtPageHeader title="审计报告" @back="router.push('/projects')">
+      <template #actions>
+        <GtToolbar @formula="() => {}">
+          <template #left>
+            <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
+            <SharedTemplatePicker
+              config-type="report_template"
+              :project-id="projectId"
+              :get-config-data="getReportConfigData"
+              @applied="onReportTemplateApplied"
+            />
+            <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
+            <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
+            <el-button size="small" @click="onPickKnowledge" round title="选择知识库文档作为参考上下文">📚 知识库</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <div v-if="!report && !loading" class="gt-ar-empty-state">
       <p>暂无审计报告，请先生成</p>
@@ -135,7 +131,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   generateAuditReport, getAuditReport, updateAuditReportParagraph,
@@ -146,8 +142,11 @@ import { fmtAmount } from '@/utils/formatters'
 import { useDictStore } from '@/stores/dict'
 import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 
 const route = useRoute()
+const router = useRouter()
 const dictStore = useDictStore()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
@@ -321,35 +320,6 @@ function onReportTemplateApplied(data: Record<string, any>) {
 <style scoped>
 .gt-audit-report { padding: var(--gt-space-5); }
 
-.gt-ar-header {
-  margin-bottom: var(--gt-space-4);
-}
-.gt-ar-banner {
-  display: flex; justify-content: space-between; align-items: center;
-  background: var(--gt-gradient-primary);
-  border-radius: var(--gt-radius-lg);
-  padding: 18px 28px;
-  color: #fff;
-  position: relative; overflow: hidden;
-  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
-  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
-}
-.gt-ar-banner::before {
-  content: '';
-  position: absolute; top: -40%; right: -10%;
-  width: 45%; height: 180%;
-  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
-  pointer-events: none;
-}
-.gt-ar-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-.gt-ar-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
-.gt-ar-banner-actions {
-  display: flex; gap: 8px; align-items: center;
-  position: relative; z-index: 1;
-}
-.gt-ar-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
-.gt-ar-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
 .gt-ar-actions { display: flex; gap: var(--gt-space-2); align-items: center; flex-wrap: wrap; }
 .gt-ar-body { height: calc(100vh - 180px); }
 

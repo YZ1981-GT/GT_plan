@@ -71,12 +71,11 @@ inclusion: manual
 
 ## 已知遗留问题
 
-- 合并报表前端 211 个 TS 错误（标记 developing，需 2-3 周专项开发）
-- Alembic 迁移链已放弃，用 create_all + 手动 ALTER TABLE（生产升级无回滚能力）
 - ai_plugin_service 8 个外部 API 为 stub（设计如此，需外部服务）
 - sign_service level3 CA 证书 / regulatory_service 监管格式转换（需外部对接）
 - Phase 8 性能测试待真实 PG + 大数据量环境执行
-- 前端 8 个文件仍直接 import http（LedgerPenetration/KnowledgeBase 有正当理由）
+- WorkpaperEditor.vue 有 1 个预存的 Univer locale 类型声明问题（@univerjs 包问题，非本项目代码）
+- Element Plus 按需导入后 bundle 仍有大文件（WorkpaperEditor 5.7MB，AttachmentManagement 4.8MB），主要是 Univer 和 xlsx 库
 
 ### 2026-05-02：附注校验公式导入 + 底稿精细化规则打磨
 
@@ -257,4 +256,3 @@ inclusion: manual
 **已知遗留问题（Sprint 4 后）：**
 - WorkpaperEditor.vue 有 1 个预存的 Univer locale 类型声明问题（@univerjs 包问题，非本项目代码）
 - Element Plus 按需导入后 bundle 仍有大文件（WorkpaperEditor 5.7MB，AttachmentManagement 4.8MB），主要是 Univer 和 xlsx 库
-- 合并报表前端 TS 错误（Phase 2 遗留，标记 developing）

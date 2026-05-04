@@ -310,4 +310,4 @@
 ### Task 4.10 — 最终收尾
 - [x] 全量 vue-tsc + Vite 构建验证
 - [x] git commit + push + 合并到 master
-- [-] 更新 memory.md + architecture.md + dev-history.md
+- [x] 更新 memory.md + architecture.md + dev-history.md

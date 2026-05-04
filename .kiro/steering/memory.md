@@ -17,6 +17,7 @@ inclusion: always
 - 前后端联动：不能只开发后端不管前端
 - 删除必须二次确认，所有删除先进回收站
 - 一次性脚本用完即删
+- 提建议前先验证（不要引用过时记录，vue-tsc exit 0 = 零错误，不要再提已修复的问题）
 - 文档同步：功能变更后同步更新需求文档
 - 记忆拆分：memory.md 只放精简状态+待办，技术决策→architecture.md，规范→conventions.md，修复记录→dev-history.md
 - 目标并发规模 6000 人
@@ -27,7 +28,7 @@ inclusion: always
 ## 环境配置
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
-- 前端新增依赖：mitt@3.0.1（事件总线）、nprogress@0.2.0（全局进度条）
+- 前端新增依赖：mitt@3.0.1（事件总线）、nprogress@0.2.0（全局进度条）、unplugin-auto-import@21.0.0 + unplugin-vue-components@32.0.0（Element Plus 按需导入）
 - PG 144 张表，Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
@@ -36,12 +37,14 @@ inclusion: always
 
 ## 当前系统状态（2026-05-05，全局化增强完成）
 
-- 17 个开发阶段中 16 个完成，vue-tsc 零错误，Vite 构建通过
+- 17 个开发阶段全部完成，vue-tsc 零错误，Vite 构建通过（32.77s）
+- 后端 119 个路由文件，172 个服务文件，42 个模型文件，~144 张表
+- 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
 - 后端约 700 路由，0 个 stub 残留
 - 审计员 8 步全流程端到端验证通过
 - git 分支：feature/global-component-library（已推送，待合并 master）
-- 开发任务 spec：.kiro/specs/global-platform-enhancement/（4 Sprint 46 Task 全部完成）
-- **全局化增强项目完成**：4 Sprint，46 Task，~235 文件，+14422/-3164 行
+- 开发任务 spec：.kiro/specs/global-platform-enhancement/（4 Sprint 40 Task 全部完成）
+- **全局化增强项目完成**：4 Sprint，40 Task，~235 文件，+14422/-3164 行
 - **Sprint 1 已完成**（10 Task，65 文件，+1856/-697 行）— 全局化收尾+快速见效
 - **Sprint 2 已完成**（9 Task，70 文件，+2569/-983 行）— 核心基础设施
 - **Sprint 3 已完成**（14 Task，63 文件，+4720/-1224 行）— 组件层+后端统一
@@ -58,8 +61,10 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像、环境变量、数据库迁移）
 
 ### 功能完善（中期）
-- 合并报表前端 TS 错误清理（Phase 2 遗留，标记 developing）
 - 性能测试（真实 PG + 大数据量环境）
+- GtPageHeader + GtInfoBar 推广到 Adjustments/ConsolidationIndex/WorkpaperList/AuditReportEditor（可删约 200 行重复 CSS）
+- GtToolbar 加 variant prop（banner|default），非横幅场景按钮样式异常
+- GtInfoBar 的 templateOptions 默认值迁移到 dictStore 统一管理
 
 ### 全局化改造 — Sprint 1 已完成 ✅
 ### 全局化改造 — Sprint 2 已完成 ✅

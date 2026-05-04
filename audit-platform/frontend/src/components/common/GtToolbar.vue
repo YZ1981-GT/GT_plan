@@ -3,25 +3,18 @@
   统一各模块工具栏的通用操作按钮（导出/导入/全屏/公式/模板/编辑切换/显示设置），
   同时保留 left slot 供模块放置特有按钮。
 
-  用法：
-    <GtToolbar
-      :show-export="true"
-      :show-import="true"
-      :show-fullscreen="true"
-      :show-formula="true"
-      :is-fullscreen="isFullscreen"
-      @export="onExport"
-      @import="showImport = true"
-      @fullscreen="toggleFullscreen()"
-      @formula="showFormulaManager = true"
-    >
+  用法（横幅内，白色半透明按钮）：
+    <GtToolbar variant="banner" :show-export="true" @export="onExport">
       <template #left>
         <el-button size="small" @click="onRecalc">🔄 全量重算</el-button>
       </template>
     </GtToolbar>
+
+  用法（普通白色背景工具栏）：
+    <GtToolbar variant="default" :show-export="true" @export="onExport" />
 -->
 <template>
-  <div class="gt-toolbar">
+  <div class="gt-toolbar" :class="`gt-toolbar--${variant}`">
     <!-- 左侧：模块特有按钮 -->
     <div class="gt-toolbar__left">
       <slot name="left" />
@@ -83,6 +76,12 @@
 
 <script setup lang="ts">
 withDefaults(defineProps<{
+  /**
+   * 外观变体
+   * - 'banner'：用于紫色横幅内，按钮为白色半透明风格
+   * - 'default'：用于普通白色背景，按钮为标准 Element Plus 风格
+   */
+  variant?: 'banner' | 'default'
   /** 显示复制整表按钮 */
   showCopy?: boolean
   /** 显示全屏按钮 */
@@ -108,6 +107,7 @@ withDefaults(defineProps<{
   /** 显示显示设置按钮 */
   showDisplaySettings?: boolean
 }>(), {
+  variant: 'banner',
   showCopy: false,
   showFullscreen: false,
   isFullscreen: false,
@@ -159,17 +159,22 @@ defineEmits<{
   margin-left: auto;
 }
 
-/* 在紫色横幅内使用时，按钮样式继承父级 */
-.gt-toolbar .el-button {
+/* banner 模式：紫色横幅内白色半透明按钮 */
+.gt-toolbar--banner .el-button {
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #fff;
 }
-.gt-toolbar .el-button:hover {
+.gt-toolbar--banner .el-button:hover {
   background: rgba(255, 255, 255, 0.25);
 }
-.gt-toolbar .el-button--primary {
+.gt-toolbar--banner .el-button--primary {
   background: rgba(255, 255, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* default 模式：普通背景，使用 Element Plus 默认按钮样式（不覆盖） */
+.gt-toolbar--default .el-button {
+  /* 继承 Element Plus 默认样式，不做覆盖 */
 }
 </style>
