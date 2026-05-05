@@ -34,25 +34,25 @@
   - `IssueTicketList` source 筛选 UI 增加"复核意见"
   - _需求_ 2
 
-- [ ] 5. 前端：底稿编辑器单元格红点
+- [x] 5. 前端：底稿编辑器单元格红点
   - `WorkpaperEditor.vue` 拉取 `ReviewRecord where status='open' and cell_reference is not null`
   - Univer 自定义装饰在对应单元格显示红点
   - 点击红点弹 popover 显示意见全文 + 关联工单链接
   - _需求_ 2
 
-- [ ] 6. 后端：工单→ReviewRecord 状态反向同步
+- [x] 6. 后端：工单→ReviewRecord 状态反向同步
   - 工单切 `pending_recheck` 时，关联 `ReviewRecord.reply_text` 追加"已整改"
   - 工单切 `closed` 时 `ReviewRecord.status='resolved'`，底稿 `review_status` 回退 `level1_rejected → pending_level1`
   - _需求_ 2
 
-- [ ] 7. 后端：Readiness 门面化改造
+- [x] 7. 后端：Readiness 门面化改造
   - `SignReadinessService.check_sign_readiness` 内部调 `gate_engine.evaluate('sign_off')`，保留 8 项类目映射
   - `ArchiveReadinessService.check_readiness` 内部调 `gate_engine.evaluate('export_package')`
   - 统一响应 schema：`{ready, groups, gate_eval_id, expires_at}`
   - `gate_eval_id` 5 分钟 TTL（Redis 缓存）
   - _需求_ 3
 
-- [ ] 8. 后端：新增两个 gate 规则
+- [-] 8. 后端：新增两个 gate 规则
   - `UnconvertedRejectedAJERule`：扫描 rejected 但未转错报的 AJE 组（warning 级）
   - `EventCascadeHealthRule`：检查 1 小时内 `WORKPAPER_SAVED` 事件全部消费（首次部署 warning 不阻断，满月后升 blocking）
   - 注册到 `gate_rules_phase14.register_phase14_rules()`

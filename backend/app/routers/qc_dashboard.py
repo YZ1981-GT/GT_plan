@@ -62,9 +62,11 @@ async def check_archive_readiness(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """归档前检查清单（加载上次结果）"""
+    """归档前 readiness 门面（R1 Task 7）：
+    内部调 ``gate_engine.evaluate('export_package')``，按 12 项类目分组返回。
+    """
     svc = ArchiveReadinessService(db)
-    return await svc.check_readiness(project_id)
+    return await svc.check_readiness(project_id, actor_id=current_user.id)
 
 
 @router.post("/archive-readiness")
@@ -73,6 +75,6 @@ async def run_archive_readiness_check(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """重新执行归档前检查"""
+    """重新执行归档前检查（同 GET 但语义为"立即重跑并生成新 gate_eval_id"）"""
     svc = ArchiveReadinessService(db)
-    return await svc.check_readiness(project_id)
+    return await svc.check_readiness(project_id, actor_id=current_user.id)

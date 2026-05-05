@@ -64,11 +64,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listIssues, type IssueTicket } from '@/services/governanceApi'
 
 const route = useRoute()
+const router = useRouter()
 const projectId = route.params.projectId as string
 
 const filters = reactive({ status: '', severity: '', source: '' })
@@ -96,8 +97,23 @@ async function loadData() {
 }
 
 function handlePageChange(p: number) { page.value = p; loadData() }
-function handleRowClick(_row: IssueTicket) {
-  // TODO: 打开问题单详情弹窗
+
+function handleRowClick(row: IssueTicket) {
+  // R1 需求 2 验收 6：点击行跳转到底稿对应 cell
+  // IssueTicket 本身无 cell_ref 字段；cell_reference 存在关联 ReviewRecord.cell_reference 上。
+  // 决策：传 review_id=<source_ref_id>，WorkpaperEditor 查到对应 cell 再滚过去，
+  // 比手工同步 cell_ref 更准确，也不需要后端改 schema。
+  if (row.wp_id) {
+    const query: Record<string, string> = {}
+    if (row.source === 'review_comment' && row.source_ref_id) {
+      query.review_id = row.source_ref_id
+    }
+    router.push({
+      name: 'WorkpaperEditor',
+      params: { projectId, wpId: row.wp_id },
+      query: Object.keys(query).length ? query : undefined,
+    })
+  }
 }
 
 function sourceTagType(s: string) {

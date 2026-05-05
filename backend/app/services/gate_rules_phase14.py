@@ -5,12 +5,13 @@
 """
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.gate_engine import GateRule, GateRuleHit, rule_registry
+from app.services.gate_engine import GateRule, GateRuleHit, gate_engine, rule_registry
 from app.models.phase14_enums import GateType, GateSeverity
 
 logger = logging.getLogger(__name__)
@@ -471,6 +472,222 @@ class MisstatementExceedsMaterialityRule(GateRule):
             return None
 
 
+# ── R1-AJE-UNCONVERTED: rejected AJE 未转为错报（warning） ─────
+
+class UnconvertedRejectedAJERule(GateRule):
+    """扫描 review_status=rejected 且未关联到 UnadjustedMisstatement 的 AJE 组。
+
+    对齐 R1 需求 3 验收 7：findings 为 warning 级（建议转错报），阻断级由质控合伙人评估。
+    粒度：按 Adjustment.entry_group_id 聚合（一组调整分录视为一个 AJE 组）。
+    判定"已转错报"：存在任一 UnadjustedMisstatement.source_adjustment_id
+    指向该组内任一 Adjustment.id。
+    """
+    rule_code = "R1-AJE-UNCONVERTED"
+    error_code = "AJE_REJECTED_NOT_CONVERTED"
+    severity = GateSeverity.warning
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            from app.models.audit_platform_models import (
+                Adjustment,
+                AdjustmentType,
+                ReviewStatus,
+                UnadjustedMisstatement,
+            )
+
+            # 1) 查出所有 rejected AJE 组（group_id + 每组 adjustment_ids）
+            rejected_rows = (
+                await db.execute(
+                    select(Adjustment.entry_group_id, Adjustment.id)
+                    .where(
+                        Adjustment.project_id == project_id,
+                        Adjustment.is_deleted.is_(False),
+                        Adjustment.review_status == ReviewStatus.rejected,
+                        Adjustment.adjustment_type == AdjustmentType.aje,
+                    )
+                )
+            ).all()
+            if not rejected_rows:
+                return None
+
+            group_to_adj_ids: dict[uuid.UUID, set[uuid.UUID]] = {}
+            for group_id, adj_id in rejected_rows:
+                group_to_adj_ids.setdefault(group_id, set()).add(adj_id)
+
+            # 2) 查出该项目内已转为错报的 adjustment_id 集合
+            converted_rows = (
+                await db.execute(
+                    select(UnadjustedMisstatement.source_adjustment_id).where(
+                        UnadjustedMisstatement.project_id == project_id,
+                        UnadjustedMisstatement.is_deleted.is_(False),
+                        UnadjustedMisstatement.source_adjustment_id.isnot(None),
+                    )
+                )
+            ).all()
+            converted_ids = {r[0] for r in converted_rows if r[0] is not None}
+
+            # 3) 统计未转换的组：该组所有 rejected AJE 均未出现在 converted_ids
+            unconverted_groups = [
+                gid
+                for gid, adj_ids in group_to_adj_ids.items()
+                if not (adj_ids & converted_ids)
+            ]
+            if not unconverted_groups:
+                return None
+
+            count = len(unconverted_groups)
+            sample = [str(g) for g in unconverted_groups[:5]]
+            return GateRuleHit(
+                rule_code=self.rule_code,
+                error_code=self.error_code,
+                severity=self.severity,
+                message=f"{count} 个被驳回的 AJE 组未转为错报，建议评估是否汇入错报汇总表",
+                location={
+                    "project_id": str(project_id),
+                    "section": "adjustments",
+                    "unconverted_group_count": count,
+                    "sample_entry_group_ids": sample,
+                },
+                suggested_action=(
+                    "打开《调整分录》页，对 rejected 行点击『转为错报』，"
+                    "或在此处直接通过 /api/adjustments/{group_id}/convert-to-misstatement 一键转换"
+                ),
+            )
+        except Exception as e:
+            logger.debug(f"[R1-AJE-UNCONVERTED] check skipped: {e}")
+            return None
+
+
+# ── R1-EVENT-CASCADE: 事件级联消费健康（首次部署 warning，满月后 blocking） ─────
+
+class EventCascadeHealthRule(GateRule):
+    """检查最近 1 小时内 WORKPAPER_SAVED/REPORTS_UPDATED 事件的消费健康。
+
+    对齐 R1 需求 3 验收 8：
+    - 检查窗口：最近 1 小时
+    - 事件源：ImportEventOutbox 中 status in (pending, failed) 的对应事件类型
+    - severity 动态：
+        * 未到 enforcement_start_date 时为 warning（首次部署宽容期）
+        * 已到或超过 enforcement_start_date 时升为 blocking
+      通过 GateRuleConfig(rule_code='R1-EVENT-CASCADE', threshold_key='enforcement_start_date')
+      配置，未配置时默认 '2026-06-05'（R1 上线起约 1 个月）。
+
+    说明：事件发布路径并非全部经 outbox（部分 WORKPAPER_SAVED 是 in-memory publish），
+    本规则只对 outbox 已记录的事件做健康探测，对未经 outbox 覆盖的事件做最佳努力。
+    """
+    rule_code = "R1-EVENT-CASCADE"
+    error_code = "EVENT_CASCADE_UNHEALTHY"
+    severity = GateSeverity.warning  # 类属性为默认，实际返回时动态覆盖
+
+    WINDOW_HOURS = 1
+    DEFAULT_ENFORCEMENT_START_DATE = "2026-06-05"
+    WATCHED_EVENT_TYPES = ("workpaper.saved", "reports.updated")
+
+    async def _resolve_severity(self, db: AsyncSession) -> str:
+        """读取 enforcement_start_date 决定 severity。"""
+        try:
+            raw = await gate_engine.load_rule_config(
+                db=db,
+                rule_code=self.rule_code,
+                threshold_key="enforcement_start_date",
+            )
+        except Exception:
+            raw = None
+        start_str = (raw or self.DEFAULT_ENFORCEMENT_START_DATE).strip()
+        try:
+            # 允许 'YYYY-MM-DD' 或 ISO8601
+            if len(start_str) == 10:
+                start_dt = datetime.strptime(start_str, "%Y-%m-%d").replace(
+                    tzinfo=timezone.utc
+                )
+            else:
+                start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            start_dt = datetime.strptime(
+                self.DEFAULT_ENFORCEMENT_START_DATE, "%Y-%m-%d"
+            ).replace(tzinfo=timezone.utc)
+
+        now = datetime.now(tz=timezone.utc)
+        return (
+            GateSeverity.blocking
+            if now >= start_dt
+            else GateSeverity.warning
+        )
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            from app.models.dataset_models import ImportEventOutbox, OutboxStatus
+
+            since = datetime.utcnow() - timedelta(hours=self.WINDOW_HOURS)
+            stmt = (
+                select(
+                    ImportEventOutbox.event_type,
+                    ImportEventOutbox.status,
+                    func.count(ImportEventOutbox.id),
+                )
+                .where(
+                    ImportEventOutbox.project_id == project_id,
+                    ImportEventOutbox.event_type.in_(self.WATCHED_EVENT_TYPES),
+                    ImportEventOutbox.status.in_(
+                        [OutboxStatus.pending, OutboxStatus.failed]
+                    ),
+                    ImportEventOutbox.created_at >= since,
+                )
+                .group_by(ImportEventOutbox.event_type, ImportEventOutbox.status)
+            )
+            rows = (await db.execute(stmt)).all()
+            if not rows:
+                return None
+
+            by_status: dict[str, int] = {"pending": 0, "failed": 0}
+            by_event: dict[str, int] = {}
+            for event_type, status, cnt in rows:
+                status_val = status.value if hasattr(status, "value") else str(status)
+                by_status[status_val] = by_status.get(status_val, 0) + int(cnt)
+                by_event[event_type] = by_event.get(event_type, 0) + int(cnt)
+
+            total = sum(by_status.values())
+            if total <= 0:
+                return None
+
+            severity = await self._resolve_severity(db)
+            retry_hint_sec = max(30, min(300, total * 10))  # 粗略估计等待时长
+
+            return GateRuleHit(
+                rule_code=self.rule_code,
+                error_code=self.error_code,
+                severity=severity,
+                message=(
+                    f"下游更新未同步：近 {self.WINDOW_HOURS} 小时内仍有 {total} 条事件未完成消费"
+                    f"（pending={by_status.get('pending', 0)}，failed={by_status.get('failed', 0)}）"
+                ),
+                location={
+                    "project_id": str(project_id),
+                    "section": "event_cascade",
+                    "window_hours": self.WINDOW_HOURS,
+                    "by_status": by_status,
+                    "by_event_type": by_event,
+                    "watched_event_types": list(self.WATCHED_EVENT_TYPES),
+                },
+                suggested_action=(
+                    f"下游更新未同步，请等待约 {retry_hint_sec} 秒后重试；"
+                    "若持续不消散，请在『事件 Outbox 监控』面板检查 failed 事件"
+                ),
+            )
+        except Exception as e:
+            # 表不存在或 schema 差异时静默降级，避免把 gate 评估打爆
+            logger.debug(f"[R1-EVENT-CASCADE] check skipped: {e}")
+            return None
+
+
 def register_phase14_rules():
     """注册 QC-19~26 到 rule_registry"""
     all_gates = [GateType.submit_review, GateType.sign_off, GateType.export_package]
@@ -495,5 +712,13 @@ def register_phase14_rules():
 
     # 需求 20.1: 未更正错报超过重要性水平阻断提交复核 + 签字
     rule_registry.register_all(submit_sign, MisstatementExceedsMaterialityRule())
+
+    # R1 需求 3 验收 7/8：新增两条规则
+    # - UnconvertedRejectedAJERule: sign_off（warning 级，建议转错报）
+    # - EventCascadeHealthRule: sign_off + export_package（首次部署 warning，满月后 blocking）
+    rule_registry.register_all([GateType.sign_off], UnconvertedRejectedAJERule())
+    rule_registry.register_all(
+        [GateType.sign_off, GateType.export_package], EventCascadeHealthRule()
+    )
 
     logger.info("[GATE] Phase 14 rules QC-19~26 + consistency + misstatement registered")

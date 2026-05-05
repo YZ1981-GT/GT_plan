@@ -31,11 +31,53 @@ class SignRequest(BaseModel):
     signature_level: str
     signature_data: dict | None = None
     ip_address: str | None = None
+    # R1 Task 7 需求 3.5：合伙人签字/归档签字提交 readiness 弹窗发放的
+    # gate_eval_id，后端校验"5 分钟内未过期且对应 ready=True"，否则拒签。
+    # 为向后兼容保留为可选；``project_id`` 同样可选，仅用于校验令牌绑定，
+    # 不传则跳过令牌校验（老入口不破坏）。
+    gate_eval_id: UUID | None = None
+    project_id: UUID | None = None
+    gate_type: str | None = None  # 'sign_off' | 'export_package'
 
 
 @router.post("/api/signatures/sign")
 async def sign_document(body: SignRequest, db: AsyncSession = Depends(get_db)):
-    """签署文档"""
+    """签署文档。
+
+    R1 Task 7：若请求携带 ``gate_eval_id`` 与 ``project_id``/``gate_type``，
+    则在签字前调用 ``gate_eval_store.validate_gate_eval`` 校验；失败返回
+    ``403 GATE_STALE``。
+    """
+    if body.gate_eval_id is not None:
+        if body.project_id is None or body.gate_type is None:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "GATE_EVAL_REQUEST_INCOMPLETE",
+                    "message": "gate_eval_id 必须与 project_id 和 gate_type 同时提交",
+                },
+            )
+        from app.services.gate_eval_store import validate_gate_eval
+
+        ok, reason = await validate_gate_eval(
+            str(body.gate_eval_id),
+            project_id=body.project_id,
+            gate_type=body.gate_type,
+            require_ready=True,
+        )
+        if not ok:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error_code": "GATE_STALE",
+                    "message": (
+                        "gate_eval_id 无效、已过期或对应评估结果不为 PASS，"
+                        "请刷新 readiness 检查后重试"
+                    ),
+                    "reason": reason,
+                },
+            )
+
     svc = SignService()
     try:
         result = await svc.sign_document(
