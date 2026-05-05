@@ -444,3 +444,85 @@ class TestRegistryIntegration:
 
         result = await generate_signature_ledger_pdf(FAKE_PROJECT_ID, AsyncMock())
         assert result == b"%PDF-ledger"
+
+
+
+# ---------------------------------------------------------------------------
+# Batch 2-11: weasyprint degradation path tests (R1 Bug Fix 9)
+# ---------------------------------------------------------------------------
+
+
+class TestHtmlToPdfWeasyprintDegradation:
+    """Fix 9: 验证 weasyprint 优先 + LibreOffice 降级路径。"""
+
+    @patch("app.services.archive_pdf_generators._find_libreoffice")
+    @patch("app.services.archive_pdf_generators._html_to_pdf_weasyprint")
+    def test_html_to_pdf_prefers_weasyprint_when_available(
+        self, mock_weasyprint, mock_find_lo
+    ):
+        """weasyprint 可用时不调用 LibreOffice（即使 LibreOffice 也可用）。"""
+        mock_weasyprint.return_value = b"%PDF-weasy"
+        mock_find_lo.return_value = "/usr/bin/libreoffice"
+
+        result = _html_to_pdf_bytes("<html><body>test</body></html>")
+
+        assert result == b"%PDF-weasy"
+        mock_weasyprint.assert_called_once()
+        # _find_libreoffice 不应被调用（weasyprint 成功后直接返回）
+        mock_find_lo.assert_not_called()
+
+    @patch("app.services.archive_pdf_generators.subprocess.run")
+    @patch("app.services.archive_pdf_generators._find_libreoffice")
+    @patch("app.services.archive_pdf_generators._html_to_pdf_weasyprint")
+    def test_html_to_pdf_fallback_to_libreoffice_when_weasyprint_unavailable(
+        self, mock_weasyprint, mock_find_lo, mock_run
+    ):
+        """weasyprint 返回 None 时降级到 LibreOffice。"""
+        import tempfile
+        from pathlib import Path
+
+        mock_weasyprint.return_value = None
+        mock_find_lo.return_value = "/usr/bin/libreoffice"
+
+        # mock subprocess.run 成功，同时让 tmp 目录下的 input.pdf 存在
+        # 由于 subprocess.run 被 mock，我们需要拦截 tempdir 并手动写 PDF
+        original_tempdir = tempfile.TemporaryDirectory
+
+        class _FakeTempDir:
+            def __init__(self):
+                self._td = original_tempdir()
+                self.name = self._td.name
+                # 创建一个 input.pdf 文件让 LibreOffice 路径能读取到
+                (Path(self.name) / "input.pdf").write_bytes(b"%PDF-libre")
+
+            def __enter__(self):
+                return self.name
+
+            def __exit__(self, *args):
+                self._td.__exit__(*args)
+
+        with patch(
+            "app.services.archive_pdf_generators.tempfile.TemporaryDirectory",
+            _FakeTempDir,
+        ):
+            result = _html_to_pdf_bytes("<html><body>test</body></html>")
+
+        assert result == b"%PDF-libre"
+        mock_weasyprint.assert_called_once()
+        mock_find_lo.assert_called_once()
+        mock_run.assert_called_once()
+
+    @patch("app.services.archive_pdf_generators._find_libreoffice")
+    @patch("app.services.archive_pdf_generators._html_to_pdf_weasyprint")
+    def test_html_to_pdf_returns_none_when_both_unavailable(
+        self, mock_weasyprint, mock_find_lo
+    ):
+        """weasyprint 和 LibreOffice 都不可用时返回 None。"""
+        mock_weasyprint.return_value = None
+        mock_find_lo.return_value = None
+
+        result = _html_to_pdf_bytes("<html><body>test</body></html>")
+
+        assert result is None
+        mock_weasyprint.assert_called_once()
+        mock_find_lo.assert_called_once()

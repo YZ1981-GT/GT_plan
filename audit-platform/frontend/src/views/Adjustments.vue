@@ -300,6 +300,7 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
 import { operationHistory } from '@/utils/operationHistory'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { parseApiError } from '@/composables/useApiError'
 
 const route = useRoute()
 const router = useRouter()
@@ -598,9 +599,9 @@ async function onConvertToMisstatement(row: any) {
       /* 用户选择稍后，不跳转 */
     }
   } catch (err: any) {
-    const status = err?.response?.status
-    const detail = err?.response?.data?.detail
-    if (status === 409 && detail && typeof detail === 'object' && detail.error_code === 'ALREADY_CONVERTED') {
+    // R1 Bug Fix 8: 使用 parseApiError 统一解析
+    const parsed = parseApiError(err)
+    if (parsed.code === 'ALREADY_CONVERTED') {
       try {
         await ElMessageBox.confirm(
           '该分录已转为未更正错报，是否跳转查看？',
@@ -612,8 +613,7 @@ async function onConvertToMisstatement(row: any) {
         /* 用户选择关闭 */
       }
     } else {
-      const msg = typeof detail === 'string' ? detail : (detail?.message || err?.message || '转换失败')
-      ElMessage.error(msg)
+      ElMessage.error(parsed.message || '转换失败')
     }
   } finally {
     convertingGroupId.value = ''

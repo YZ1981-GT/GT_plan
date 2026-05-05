@@ -111,6 +111,10 @@ class Settings(BaseSettings):
     # bcrypt cost factor（OWASP 推荐 12，可通过环境变量调整）
     BCRYPT_ROUNDS: int = 12
 
+    # R1 上线日期：早于此日期创建的项目进入独立性声明 legacy 宽容期
+    # 空字符串表示"无 legacy 宽容期"，所有项目都严格检查
+    INDEPENDENCE_LEGACY_CUTOFF_DATE: str = "2026-05-05"
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
     @property

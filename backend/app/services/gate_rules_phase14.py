@@ -814,13 +814,52 @@ class IndependenceDeclarationCompleteRule(GateRule):
 
     @classmethod
     def _is_legacy_project(cls, created_at: Optional[datetime]) -> bool:
-        """project.created_at 早于 R1 上线日期则视为 legacy。"""
+        """project.created_at 早于配置的 legacy cutoff 则视为 legacy。
+
+        Batch 2-9: cutoff 从 settings.INDEPENDENCE_LEGACY_CUTOFF_DATE 读取，
+        空字符串表示"无 legacy 宽容期"，所有项目严格检查。
+        解析失败时回退到类常量 LEGACY_CUTOFF_DATE。
+        """
         if created_at is None:
             return False
+
+        cutoff = cls._resolve_legacy_cutoff()
+        if cutoff is None:
+            # 配置为空字符串 → 无宽容期
+            return False
+
         # 统一成 tz-aware UTC 再比较，避免 naive/aware 混比异常
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
-        return created_at < cls.LEGACY_CUTOFF_DATE
+        return created_at < cutoff
+
+    @classmethod
+    def _resolve_legacy_cutoff(cls) -> Optional[datetime]:
+        """从 settings 读取 INDEPENDENCE_LEGACY_CUTOFF_DATE，解析为 tz-aware datetime。
+
+        返回 None 表示"无宽容期"（配置为空字符串）。
+        """
+        try:
+            from app.core.config import settings
+            raw = (settings.INDEPENDENCE_LEGACY_CUTOFF_DATE or "").strip()
+        except Exception:
+            raw = ""
+
+        if not raw:
+            # 空字符串 = 关闭宽容期
+            # 但调用 _is_legacy_project 时，我们仍保留类常量兜底的语义：
+            # 如果调用方显式设置空串，表示关闭；未设置时默认类常量值。
+            # 由于 config 默认值是 "2026-05-05"，空串就是运维主动关闭。
+            return None
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except Exception:
+            logger.warning(
+                "[R1-INDEPENDENCE] invalid INDEPENDENCE_LEGACY_CUTOFF_DATE=%r, "
+                "falling back to class default",
+                raw,
+            )
+            return cls.LEGACY_CUTOFF_DATE
 
     async def _load_project_meta(
         self, db: AsyncSession, project_id

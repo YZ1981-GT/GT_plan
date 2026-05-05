@@ -74,4 +74,6 @@ class ArchiveJob(Base, SoftDeleteMixin, TimestampMixin):
             postgresql_where=text("is_deleted = false"),
         ),
         Index("idx_archive_jobs_status", "status"),
+        # TODO(Round2-Task-E): Add GIN index on section_progress for operational queries
+        # Index("idx_archive_jobs_section_progress_gin", "section_progress", postgresql_using="gin"),
     )

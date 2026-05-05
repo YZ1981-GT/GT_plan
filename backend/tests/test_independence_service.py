@@ -332,3 +332,122 @@ class TestDeclarationToDict:
         assert result["status"] == "draft"
         assert result["declaration_year"] == 2025
         assert result["answers"] == {"IND-01": {"answer": "no"}}
+
+
+
+# ---------------------------------------------------------------------------
+# Batch 2-3: legacy 宽容期 tests (R1 Bug Fix 4 retrospective)
+# ---------------------------------------------------------------------------
+
+
+class TestIndependenceLegacyGracePeriod:
+    """Fix 4: 验证 archived/legacy 项目与 R1 上线后新项目的检查差异。"""
+
+    @pytest.mark.asyncio
+    async def test_archived_project_skipped(self, db_session: AsyncSession):
+        """归档项目（archived_at IS NOT NULL）直接跳过检查，即使核心角色缺声明。"""
+        from app.models.core import Project
+        from app.models.staff_models import ProjectAssignment
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        # 新项目（created_at 晚于 LEGACY_CUTOFF_DATE）但已归档
+        project = Project(
+            id=FAKE_PROJECT_ID,
+            name="归档新项目",
+            client_name="测试客户",
+            archived_at=datetime(2026, 12, 1, tzinfo=timezone.utc),
+            created_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        )
+        db_session.add(project)
+        # 核心角色分配但无声明
+        assignment = ProjectAssignment(
+            id=uuid.uuid4(),
+            project_id=FAKE_PROJECT_ID,
+            staff_id=FAKE_USER_ID,
+            role="signing_partner",
+            is_deleted=False,
+        )
+        db_session.add(assignment)
+        await db_session.flush()
+
+        rule = IndependenceDeclarationCompleteRule()
+        result = await rule.check(db_session, {"project_id": FAKE_PROJECT_ID})
+        # 归档项目跳过
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_legacy_project_grace_returns_none_with_warning(
+        self, db_session: AsyncSession, caplog
+    ):
+        """早于 LEGACY_CUTOFF_DATE 的老项目缺声明 → 返回 None，日志记 warning。"""
+        import logging as _log
+        from app.models.core import Project
+        from app.models.staff_models import ProjectAssignment
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        # Legacy 项目（created_at=2025-12-01 早于 LEGACY_CUTOFF_DATE 2026-05-05）
+        project = Project(
+            id=FAKE_PROJECT_ID,
+            name="Legacy 项目",
+            client_name="老客户",
+            created_at=datetime(2025, 12, 1, tzinfo=timezone.utc),
+        )
+        db_session.add(project)
+        # 核心角色分配但无声明
+        assignment = ProjectAssignment(
+            id=uuid.uuid4(),
+            project_id=FAKE_PROJECT_ID,
+            staff_id=FAKE_USER_ID,
+            role="signing_partner",
+            is_deleted=False,
+        )
+        db_session.add(assignment)
+        await db_session.flush()
+
+        rule = IndependenceDeclarationCompleteRule()
+        with caplog.at_level(_log.WARNING, logger="app.services.gate_rules_phase14"):
+            result = await rule.check(db_session, {"project_id": FAKE_PROJECT_ID})
+
+        # legacy 宽容期：不阻断
+        assert result is None
+        # warning 日志中包含 "legacy"
+        has_legacy_warning = any(
+            "legacy" in rec.getMessage().lower() for rec in caplog.records
+        )
+        assert has_legacy_warning, (
+            f"expected legacy warning log, got: {[r.getMessage() for r in caplog.records]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_new_project_strict_blocks(self, db_session: AsyncSession):
+        """晚于 LEGACY_CUTOFF_DATE 的新项目缺声明 → 返回 blocking GateRuleHit。"""
+        from app.models.core import Project
+        from app.models.staff_models import ProjectAssignment
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        # 新项目（created_at=2026-06-01 晚于 LEGACY_CUTOFF_DATE 2026-05-05）
+        project = Project(
+            id=FAKE_PROJECT_ID,
+            name="新项目",
+            client_name="新客户",
+            created_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        )
+        db_session.add(project)
+        assignment = ProjectAssignment(
+            id=uuid.uuid4(),
+            project_id=FAKE_PROJECT_ID,
+            staff_id=FAKE_USER_ID,
+            role="signing_partner",
+            is_deleted=False,
+        )
+        db_session.add(assignment)
+        await db_session.flush()
+
+        rule = IndependenceDeclarationCompleteRule()
+        result = await rule.check(db_session, {"project_id": FAKE_PROJECT_ID})
+
+        # 严格阻断
+        assert result is not None
+        assert result.rule_code == "R1-INDEPENDENCE"
+        assert result.error_code == "INDEPENDENCE_DECLARATION_INCOMPLETE"
+        assert result.severity.value == "blocking" if hasattr(result.severity, "value") else str(result.severity) == "blocking"

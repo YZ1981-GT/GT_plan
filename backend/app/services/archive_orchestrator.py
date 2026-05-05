@@ -133,11 +133,9 @@ class ArchiveOrchestrator:
         job.finished_at = None
         await self.db.flush()
 
-        # 构建步骤并跳过已完成的（R1 Bug Fix 5: 同时检查 section_progress）
+        # 构建步骤并跳过已完成的（R1 Bug Fix 5 + Batch 2-6：section_progress 为权威来源）
         steps = self._build_steps(job.push_to_cloud, job.purge_local)
-        start_from = self._get_next_section_index(
-            steps, job.last_succeeded_section, job.section_progress
-        )
+        start_from = self._get_next_section_index(steps, job.section_progress)
 
         for section_name, step_func in steps[start_from:]:
             try:
@@ -415,28 +413,31 @@ class ArchiveOrchestrator:
     def _get_next_section_index(
         self,
         steps: list[tuple[str, Any]],
-        last_succeeded: str | None,
-        section_progress: dict | None = None,
+        section_progress: dict | None,
     ) -> int:
-        """找到 last_succeeded_section 之后的下一个步骤索引。
+        """找到 section_progress 中第一个未 succeeded 的步骤索引。
 
-        R1 Bug Fix 5: 同时检查 section_progress dict，跳过已 succeeded 的步骤。
+        Batch 2-6: section_progress 为权威路由来源；last_succeeded_section
+        字段仍保留写入（向后兼容 + 日志用），但不参与路由判断。
+
+        Args:
+            steps: 待执行步骤列表
+            section_progress: 每步执行状态的 dict，形如
+                {"gate": {"status": "succeeded", "finished_at": "..."}}
+
+        Returns:
+            下一个待执行步骤的索引；section_progress 为 None/空时返回 0（从头开始）。
         """
-        if section_progress:
-            # 找到第一个未 succeeded 的步骤
-            for i, (name, _) in enumerate(steps):
-                sp = section_progress.get(name)
-                if not sp or sp.get("status") != "succeeded":
-                    return i
-            # 全部已完成
-            return len(steps)
-
-        if last_succeeded is None:
+        if not section_progress:
             return 0
+
+        # 找到第一个未 succeeded 的步骤
         for i, (name, _) in enumerate(steps):
-            if name == last_succeeded:
-                return i + 1
-        return 0
+            sp = section_progress.get(name)
+            if not sp or sp.get("status") != "succeeded":
+                return i
+        # 全部已完成
+        return len(steps)
 
     async def _step_gate(
         self, project_id: uuid.UUID, gate_eval_id: uuid.UUID | None

@@ -284,6 +284,7 @@ import { api } from '@/services/apiProxy'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
 import SignatureWorkflowLine from '@/components/signature/SignatureWorkflowLine.vue'
+import { parseApiError } from '@/composables/useApiError'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -469,16 +470,15 @@ async function handleSign() {
     // 刷新待签字列表
     loadAll()
   } catch (err: any) {
-    const detail = err?.response?.data?.detail
-    const errorCode = detail?.error_code || detail?.code || ''
-
-    if (errorCode === 'PREREQUISITE_NOT_MET') {
+    // R1 Bug Fix 8: 使用 parseApiError 统一解析错误
+    const parsed = parseApiError(err)
+    if (parsed.code === 'PREREQUISITE_NOT_MET') {
       ElMessage.error('前置签字未完成')
-    } else if (errorCode === 'GATE_STALE') {
+    } else if (parsed.code === 'GATE_STALE') {
       ElMessage.warning('检查已过期，请刷新')
       refreshReadiness()
     } else {
-      ElMessage.error(detail?.message || '签字失败')
+      ElMessage.error(parsed.message || '签字失败')
     }
   } finally {
     signing.value = false
@@ -513,13 +513,18 @@ async function loadAll() {
 
 /**
  * 检查独立性待声明项目：调用批量端点（R1 Bug Fix 7）
+ *
+ * Batch 2-5: 失败不再静默降级，给用户提示。
+ * Batch 2-10: 显式传 limit=50 避免后端默认值变更破坏前端假设。
  */
 async function loadPendingIndependence() {
   try {
-    const res = await api.get<{ projects: any[]; total: number }>('/api/my/pending-independence')
+    const res = await api.get<{ projects: any[]; total: number; has_more?: boolean }>(
+      '/api/my/pending-independence?limit=50',
+    )
     pendingIndependenceProjects.value = res.projects || []
   } catch {
-    // 静默失败，不阻断
+    ElMessage.warning('独立性待声明检查失败，请刷新')
     pendingIndependenceProjects.value = []
   }
 }

@@ -555,3 +555,150 @@ async def test_manifest_hash_deterministic(db_session: AsyncSession):
         await db_session.commit()
 
     assert job.manifest_hash == expected_manifest
+
+
+# ---------------------------------------------------------------------------
+# Batch 2-1: section_progress tests (R1 Bug Fix 5 retrospective)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_orchestrate_writes_section_progress_on_each_step(db_session: AsyncSession):
+    """Fix 5: orchestrate 成功后 section_progress 每个 section 都有 succeeded/finished_at。"""
+    with (
+        patch(
+            "app.services.gate_engine.gate_engine.evaluate",
+            new=_mock_gate_allow(),
+        ),
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+        patch(
+            "app.services.private_storage_service.ProjectArchiveService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"pushed": True},
+        ),
+        patch(
+            "app.services.data_lifecycle_service.DataLifecycleService.archive_project_data",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+    ):
+        orchestrator = ArchiveOrchestrator(db_session)
+        job = await orchestrator.orchestrate(
+            project_id=FAKE_PROJECT_ID,
+            scope="final",
+            push_to_cloud=True,
+            purge_local=True,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    assert job.status == "succeeded"
+    assert job.section_progress is not None
+    # 应包含 4 个 section
+    for section in ["gate", "wp_storage", "push_to_cloud", "purge_local"]:
+        assert section in job.section_progress, f"section_progress missing {section}"
+        sp = job.section_progress[section]
+        assert sp.get("status") == "succeeded"
+        assert sp.get("finished_at") is not None
+
+
+@pytest.mark.asyncio
+async def test_retry_skips_succeeded_sections_via_section_progress(db_session: AsyncSession):
+    """Fix 5: retry 对已 succeeded 的 section 不再重跑（以 section_progress 为权威）。"""
+    # 构造一个 failed job：section_progress 显示 gate 已成功，wp_storage 未 succeeded
+    now_iso = datetime.now(timezone.utc).isoformat()
+    job = ArchiveJob(
+        id=uuid.uuid4(),
+        project_id=FAKE_PROJECT_ID,
+        scope="final",
+        status="failed",
+        push_to_cloud=False,
+        purge_local=False,
+        last_succeeded_section="gate",
+        failed_section="wp_storage",
+        failed_reason="old failure",
+        section_progress={
+            "gate": {"status": "succeeded", "finished_at": now_iso},
+        },
+        started_at=datetime.now(timezone.utc),
+        initiated_by=FAKE_USER_ID,
+    )
+    db_session.add(job)
+    await db_session.flush()
+    await db_session.commit()
+
+    # retry：gate 若被错误重跑则 mock_gate 会被调用
+    mock_gate = _mock_gate_allow()
+    with (
+        patch(
+            "app.services.gate_engine.gate_engine.evaluate",
+            new=mock_gate,
+        ),
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+        patch(
+            "app.services.archive_orchestrator.ArchiveOrchestrator._persist_integrity_hashes",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.services.archive_orchestrator.ArchiveOrchestrator._set_project_retention",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.services.archive_orchestrator.ArchiveOrchestrator._notify_project_members",
+            new_callable=AsyncMock,
+        ),
+    ):
+        orchestrator = ArchiveOrchestrator(db_session)
+        retried_job = await orchestrator.retry(
+            job_id=job.id,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    # 断言 gate step 的 mock 未被调用（已跳过）
+    assert mock_gate.call_count == 0, (
+        f"gate step should have been skipped but was called {mock_gate.call_count} times"
+    )
+    assert retried_job.status == "succeeded"
+    assert retried_job.section_progress.get("wp_storage", {}).get("status") == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_section_progress_and_last_succeeded_consistent(db_session: AsyncSession):
+    """Fix 5: orchestrate 成功后 section_progress 和 last_succeeded_section 都更新，一致。"""
+    with (
+        patch(
+            "app.services.gate_engine.gate_engine.evaluate",
+            new=_mock_gate_allow(),
+        ),
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+    ):
+        orchestrator = ArchiveOrchestrator(db_session)
+        job = await orchestrator.orchestrate(
+            project_id=FAKE_PROJECT_ID,
+            scope="final",
+            push_to_cloud=False,
+            purge_local=False,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    assert job.status == "succeeded"
+    # section_progress 包含所有执行的 step
+    assert set(job.section_progress.keys()) == {"gate", "wp_storage"}
+    # last_succeeded_section 等于最后一个 section
+    assert job.last_succeeded_section == "wp_storage"
+    # 最后一个 section 在 section_progress 中也为 succeeded
+    assert job.section_progress[job.last_succeeded_section]["status"] == "succeeded"

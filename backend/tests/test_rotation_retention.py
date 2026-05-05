@@ -339,3 +339,58 @@ class TestArchiveRetentionWriting:
         # retention_until 应约为 archived_at + 10 年
         diff = updated_project.retention_until - updated_project.archived_at
         assert 3650 <= diff.days <= 3653  # ~10 years
+
+
+
+# ---------------------------------------------------------------------------
+# Batch 2-2: rotation_limit listed/unlisted tests (R1 Bug Fix 6 retrospective)
+# ---------------------------------------------------------------------------
+
+
+class TestRotationLimitListedUnlisted:
+    """Fix 6: 验证 is_listed_company / system_settings 对 rotation_limit 的影响。"""
+
+    @pytest.mark.asyncio
+    async def test_check_rotation_listed_company_default_5y(self, db_session: AsyncSession):
+        """默认 is_listed_company=True 返回 rotation_limit=5。"""
+        svc = RotationCheckService(db_session)
+        result = await svc.check_rotation(FAKE_STAFF_ID, CLIENT_NAME)
+        # 默认上市公司 5 年
+        assert result["rotation_limit"] == 5
+
+    @pytest.mark.asyncio
+    async def test_check_rotation_unlisted_company_7y(self, db_session: AsyncSession):
+        """is_listed_company=False 返回 rotation_limit=7。"""
+        svc = RotationCheckService(db_session)
+        result = await svc.check_rotation(
+            FAKE_STAFF_ID, CLIENT_NAME, is_listed_company=False
+        )
+        assert result["rotation_limit"] == 7
+
+    @pytest.mark.asyncio
+    async def test_rotation_limit_reads_system_settings(self, db_session: AsyncSession):
+        """有 system_settings 配置时使用配置值（上市覆盖默认 5）。"""
+        # 创建 system_settings 表并插入配置（_get_rotation_limit 用 sqlalchemy.text）
+        from sqlalchemy import text as sa_text
+
+        # 建表（SQLite 测试环境）
+        await db_session.execute(
+            sa_text(
+                "CREATE TABLE IF NOT EXISTS system_settings "
+                "(key VARCHAR(100) PRIMARY KEY, value TEXT)"
+            )
+        )
+        await db_session.execute(
+            sa_text(
+                "INSERT INTO system_settings (key, value) VALUES "
+                "('rotation_limit_listed', '4')"
+            )
+        )
+        await db_session.flush()
+
+        svc = RotationCheckService(db_session)
+        result = await svc.check_rotation(
+            FAKE_STAFF_ID, CLIENT_NAME, is_listed_company=True
+        )
+        # 应读取到配置的 4 年（覆盖默认 5）
+        assert result["rotation_limit"] == 4

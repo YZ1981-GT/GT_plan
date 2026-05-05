@@ -53,8 +53,8 @@ inclusion: always
 - 后端 121 个路由文件（新增 pbc.py、confirmations.py），172 个服务文件，42 个模型文件，~152 张表
 - 后端新增 `backend/app/workers/` 模块：sla_worker、import_recover_worker、outbox_replay_worker（每个导出 `async def run(stop_event)`）
 - 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
-- git 分支：feature/global-component-library（已推送至 4b172d5，待合并 master）
-- 最新提交 4b172d5：Round 1 Sprint 3 完成（tasks 23-26 独立性表单/轮换/哈希链 PBT）
+- git 分支：feature/global-component-library（已推送至 02e3731，待合并 master）
+- 最新提交 02e3731：Round 1 复盘 14 项修复（bug fix + 改进 + 文档）
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
   - Sprint 1（P0 数据正确性）：底稿保存事件→附注同步、Dashboard 趋势图真实 API、Dirty 标记完整覆盖、QC 项目汇总 N+1 优化、审计报告 final 保护、QC-16 字段修正、ReviewInbox 跳转修正、报表两张表数据驱动、AuditCheckDashboard 批量接口、PBC/函证路由注册、看板卡片跳转、个人工作台待办工时
@@ -169,7 +169,15 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
-- Round 1 已全部完成（Sprint 1-3 共 26 任务 + 3 验收，157 测试全绿）；下一步启动 Round 2 前先修复上述 4 个 bug
+- Round 1 已全部完成（Sprint 1-3 共 26 任务 + 3 验收，157 测试全绿）+ 14 项复盘修复（Batch 1）已推送（02e3731）；Round 1 关闭
+- **复盘 Batch 1 遗留问题（14 项 Batch 2 修复中）**：Fix 5 section_progress 零测试、Fix 6 非上市 7 年零测试、Fix 4 legacy 宽容期零测试、useApiError 孤儿未被任何页面消费、/api/my/pending-independence 无测试且前端静默降级、_get_next_section_index 新老双路径并存 tech debt、ADR-003 无索引、legacy 日期硬编码、batch 端点无 limit、weasyprint 降级未测、审计日志告警只是 logger.critical 非 NotificationService
+- 复盘纪律约束：子代理报告"Fix X 已在位"时必须 grep 验证 + 核查测试覆盖，不信子代理报告（本轮发现 Fix 5/6 代码加了但零测试，Fix 8 创建了文件零消费者）
+- Round 1 复盘新增：`composables/useApiError.ts`、`docs/adr/003-review-issue-transaction-strategy.md`、`tests/README.md`（测试盲点）、`workers/README.md`（单实例约束）
+- PDF 生成优先 weasyprint（可选 `pip install weasyprint`），不可用降级 LibreOffice（Fix 9）
+- `GET /api/my/pending-independence` 批量端点替代前端 N+1（Fix 7）
+- `useApiError.ts`：`parseApiError(err)→{code,message,detail}` + `showApiError(err)` 统一前端错误处理（Fix 8）
+- ArchiveOrchestrator `_get_next_section_index` 同时检查 `section_progress` dict（Fix 5）
+- `RotationCheckService.check_rotation` 新增 `is_listed_company` 参数，上市 5 年/非上市 7 年（Fix 6）
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

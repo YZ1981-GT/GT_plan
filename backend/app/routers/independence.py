@@ -152,6 +152,7 @@ async def submit_declaration(
 
 @router.get("/api/my/pending-independence")
 async def get_my_pending_independence(
+    limit: int = Query(50, ge=1, le=500, description="返回条数上限"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -163,6 +164,7 @@ async def get_my_pending_independence(
     3. 排除当前年度已有 submitted/approved 声明的项目
 
     R1 Bug Fix 7: 替代前端 N+1 循环调用。
+    Batch 2-10: 新增 limit 参数（默认 50，上限 500）+ has_more 字段。
     """
     year = datetime.now(timezone.utc).year
     user_id = current_user.id
@@ -189,7 +191,7 @@ async def get_my_pending_independence(
     projects = result.scalars().all()
 
     if not projects:
-        return {"projects": [], "total": 0}
+        return {"projects": [], "total": 0, "has_more": False}
 
     project_ids = [p.id for p in projects]
 
@@ -210,7 +212,7 @@ async def get_my_pending_independence(
     completed_project_ids = {row[0] for row in completed_result.all()}
 
     # 3) 过滤出未完成的项目
-    pending = [
+    pending_all = [
         {
             "id": str(p.id),
             "name": p.name,
@@ -221,4 +223,11 @@ async def get_my_pending_independence(
         if p.id not in completed_project_ids
     ]
 
-    return {"projects": pending, "total": len(pending)}
+    total = len(pending_all)
+    pending = pending_all[:limit]
+
+    return {
+        "projects": pending,
+        "total": total,
+        "has_more": total > limit,
+    }

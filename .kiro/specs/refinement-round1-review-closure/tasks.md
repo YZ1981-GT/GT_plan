@@ -231,6 +231,16 @@
 - [ ] UAT-6: PBC/函证入口已从导航移除
 
 
+## Round 2 补充任务候选（Round 1 复盘遗留）
+
+- [ ] Round2-Task-A：补测试盲点（见 backend/tests/README.md "测试盲点清单"）
+  - 并发/竞态 3 项 + Worker 故障恢复 3 项 + PBT 扩展 5 项
+- [ ] Round2-Task-B：legacy 日期配置化（LEGACY_CUTOFF_DATE → system_settings.independence_legacy_cutoff）
+- [ ] Round2-Task-C：/api/my/pending-independence 加 limit query 参数（默认 50）
+- [ ] Round2-Task-D：AuditLogWriterWorker 启动时 WARNING log 单实例约束
+- [ ] Round2-Task-E：section_progress 加 GIN 索引（PG 迁移脚本）
+- [ ] Round2-Task-F：weasyprint 降级路径补测试（test_archive_pdf_generators.py）
+
 ## 已知妥协（Round 2+ 补丁）
 
 - [ ] ReviewWorkbench 中栏嵌入只读版 WorkpaperEditor（当前为元信息卡+跳转）

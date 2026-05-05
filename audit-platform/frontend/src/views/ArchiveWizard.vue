@@ -220,6 +220,7 @@ import {
   retryArchiveJob,
 } from '@/services/archiveApi'
 import type { ArchiveJob } from '@/services/archiveApi'
+import { showApiError } from '@/composables/useApiError'
 
 const route = useRoute()
 const router = useRouter()
@@ -296,9 +297,8 @@ async function handleStartArchive() {
     startPolling(resp.archive_job_id)
   } catch (err: any) {
     isExecuting.value = false
-    const detail = err?.response?.data?.detail
-    const msg = typeof detail === 'string' ? detail : detail?.message || err?.message || '启动归档失败'
-    ElMessage.error(msg)
+    // R1 Bug Fix 8: 使用 showApiError 统一处理
+    showApiError(err)
   } finally {
     startingArchive.value = false
   }
