@@ -696,8 +696,13 @@ class IndependenceDeclarationCompleteRule(GateRule):
     对齐 R1 需求 10 验收 3：项目组核心成员（signing_partner / manager / qc / eqcr）
     均需单独提交声明，缺一个都阻断 sign_off gate。
 
-    兼容逻辑：旧 wizard_state.independence_confirmed=true 视为 legacy 通过，
-    但附带升级提醒（warning 级 finding）。
+    兼容逻辑：
+    - 旧 wizard_state.independence_confirmed=true 视为 legacy 通过，
+      但附带升级提醒（warning 级 finding）。
+    - R1 Bug Fix 4：已归档项目（archived_at IS NOT NULL）直接跳过检查。
+    - R1 Bug Fix 4：创建时间早于 R1 上线日（LEGACY_CUTOFF_DATE）的老项目，
+      缺声明时返回 None 并记 warning 日志（宽容期），避免上线瞬间全部阻断。
+    - 新项目（created_at >= LEGACY_CUTOFF_DATE）严格阻断。
     """
     rule_code = "R1-INDEPENDENCE"
     error_code = "INDEPENDENCE_DECLARATION_INCOMPLETE"
@@ -707,14 +712,41 @@ class IndependenceDeclarationCompleteRule(GateRule):
     REQUIRED_ROLES = ("signing_partner", "manager", "qc", "eqcr")
     # 视为"已完成"的声明状态
     COMPLETED_STATUSES = ("submitted", "pending_conflict_review", "approved")
+    # R1 Bug Fix 4: R1 上线日期（此日期之前创建的项目视为 legacy）
+    LEGACY_CUTOFF_DATE = datetime(2026, 5, 5, tzinfo=timezone.utc)
 
     async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
         project_id = context.get("project_id")
         if not project_id:
             return None
         try:
+            from app.models.core import Project
             from app.models.staff_models import ProjectAssignment
             from app.models.independence_models import IndependenceDeclaration
+
+            # --- R1 Bug Fix 4: 归档项目 + legacy 项目跳过 ---
+            project_meta = await self._load_project_meta(db, project_id)
+            if project_meta is not None:
+                archived_at, created_at = project_meta
+                if archived_at is not None:
+                    logger.debug(
+                        "[R1-INDEPENDENCE] project %s archived, skip check",
+                        project_id,
+                    )
+                    return None
+
+                if self._is_legacy_project(created_at):
+                    # legacy 项目：预检查声明状态，缺了就记 warning 并放行
+                    if not await self._all_core_roles_declared(db, project_id):
+                        logger.warning(
+                            "[R1-INDEPENDENCE] legacy project %s "
+                            "(created_at=%s) missing independence declaration, "
+                            "grace period applied — please backfill manually",
+                            project_id,
+                            created_at,
+                        )
+                        return None
+                    # legacy 但已补录完 → 继续走正常流程
 
             # 1) 检查旧 legacy 兼容：wizard_state.independence_confirmed
             legacy_pass = await self._check_legacy(db, project_id)
@@ -779,6 +811,71 @@ class IndependenceDeclarationCompleteRule(GateRule):
         except Exception as e:
             logger.debug(f"[R1-INDEPENDENCE] check skipped: {e}")
             return None
+
+    @classmethod
+    def _is_legacy_project(cls, created_at: Optional[datetime]) -> bool:
+        """project.created_at 早于 R1 上线日期则视为 legacy。"""
+        if created_at is None:
+            return False
+        # 统一成 tz-aware UTC 再比较，避免 naive/aware 混比异常
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        return created_at < cls.LEGACY_CUTOFF_DATE
+
+    async def _load_project_meta(
+        self, db: AsyncSession, project_id
+    ) -> Optional[tuple[Optional[datetime], Optional[datetime]]]:
+        """返回 (archived_at, created_at)；查询失败返回 None。"""
+        try:
+            from app.models.core import Project
+
+            stmt = select(Project.archived_at, Project.created_at).where(
+                Project.id == project_id,
+            )
+            row = (await db.execute(stmt)).first()
+            if row is None:
+                return None
+            return (row[0], row[1])
+        except Exception as e:
+            logger.debug(f"[R1-INDEPENDENCE] _load_project_meta failed: {e}")
+            return None
+
+    async def _all_core_roles_declared(
+        self, db: AsyncSession, project_id
+    ) -> bool:
+        """legacy 项目检查是否已补录完所有核心角色声明（辅助方法）。"""
+        try:
+            from app.models.staff_models import ProjectAssignment
+            from app.models.independence_models import IndependenceDeclaration
+
+            assignment_rows = (await db.execute(
+                select(ProjectAssignment.staff_id).where(
+                    ProjectAssignment.project_id == project_id,
+                    ProjectAssignment.is_deleted.is_(False),
+                    ProjectAssignment.role.in_(self.REQUIRED_ROLES),
+                )
+            )).all()
+            if not assignment_rows:
+                # 无核心角色分配 → 视为"无需声明"
+                return True
+
+            completed = {
+                r[0] for r in (await db.execute(
+                    select(IndependenceDeclaration.declarant_id).where(
+                        IndependenceDeclaration.project_id == project_id,
+                        IndependenceDeclaration.status.in_(self.COMPLETED_STATUSES),
+                    )
+                )).all()
+            }
+
+            for (staff_id,) in assignment_rows:
+                if staff_id not in completed:
+                    return False
+            return True
+        except Exception as e:
+            logger.debug(f"[R1-INDEPENDENCE] _all_core_roles_declared failed: {e}")
+            # 查询失败视为"已补录"（不阻断 legacy 宽容期路径）
+            return True
 
     async def _check_legacy(self, db: AsyncSession, project_id) -> bool:
         """检查旧版 wizard_state.independence_confirmed 是否为 true。"""

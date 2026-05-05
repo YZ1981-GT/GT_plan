@@ -442,9 +442,9 @@ async function handleSign() {
   const prerequisiteIds: string[] = []
   for (const s of workflowData.value) {
     if (s.order < step.order && s.status === 'signed') {
-      // 如果 workflow 返回了 id 字段则用，否则不传
-      if ((s as any).id) {
-        prerequisiteIds.push((s as any).id)
+      // 后端 SignService.get_workflow 返回 id 字段，读取用于前置依赖校验
+      if (s.id) {
+        prerequisiteIds.push(s.id)
       }
     }
   }
@@ -512,33 +512,16 @@ async function loadAll() {
 }
 
 /**
- * 检查独立性待声明项目：遍历活跃项目，查询当前用户是否已提交声明
+ * 检查独立性待声明项目：调用批量端点（R1 Bug Fix 7）
  */
 async function loadPendingIndependence() {
-  if (!overview.value?.projects?.length) return
-  const year = new Date().getFullYear()
-  const userId = authStore.userId
-  const pending: any[] = []
-
-  // 只检查非归档项目
-  const activeProjects = overview.value.projects.filter(p => p.status !== 'archived')
-  for (const p of activeProjects.slice(0, 10)) {
-    try {
-      const res = await api.get<{ declarations: any[] }>(
-        `/api/projects/${p.id}/independence-declarations`,
-        { params: { year } },
-      )
-      const myDecl = res.declarations?.find(
-        (d: any) => d.declarant_id === userId && (d.status === 'submitted' || d.status === 'approved'),
-      )
-      if (!myDecl) {
-        pending.push(p)
-      }
-    } catch {
-      // 静默失败，不阻断
-    }
+  try {
+    const res = await api.get<{ projects: any[]; total: number }>('/api/my/pending-independence')
+    pendingIndependenceProjects.value = res.projects || []
+  } catch {
+    // 静默失败，不阻断
+    pendingIndependenceProjects.value = []
   }
-  pendingIndependenceProjects.value = pending
 }
 
 /**

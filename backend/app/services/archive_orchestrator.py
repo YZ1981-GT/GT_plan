@@ -75,6 +75,13 @@ class ArchiveOrchestrator:
             try:
                 await step_func(project_id, gate_eval_id)
                 job.last_succeeded_section = section_name
+                # R1 Bug Fix 5: 断点续传改用 section_progress 记录每步状态
+                if job.section_progress is None:
+                    job.section_progress = {}
+                job.section_progress[section_name] = {
+                    "status": "succeeded",
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                }
                 await self.db.flush()
             except Exception as exc:
                 logger.error(
@@ -126,16 +133,23 @@ class ArchiveOrchestrator:
         job.finished_at = None
         await self.db.flush()
 
-        # 构建步骤并跳过已完成的
+        # 构建步骤并跳过已完成的（R1 Bug Fix 5: 同时检查 section_progress）
         steps = self._build_steps(job.push_to_cloud, job.purge_local)
         start_from = self._get_next_section_index(
-            steps, job.last_succeeded_section
+            steps, job.last_succeeded_section, job.section_progress
         )
 
         for section_name, step_func in steps[start_from:]:
             try:
                 await step_func(job.project_id, job.gate_eval_id)
                 job.last_succeeded_section = section_name
+                # R1 Bug Fix 5: 断点续传改用 section_progress 记录每步状态
+                if job.section_progress is None:
+                    job.section_progress = {}
+                job.section_progress[section_name] = {
+                    "status": "succeeded",
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                }
                 await self.db.flush()
             except Exception as exc:
                 logger.error(
@@ -402,8 +416,21 @@ class ArchiveOrchestrator:
         self,
         steps: list[tuple[str, Any]],
         last_succeeded: str | None,
+        section_progress: dict | None = None,
     ) -> int:
-        """找到 last_succeeded_section 之后的下一个步骤索引。"""
+        """找到 last_succeeded_section 之后的下一个步骤索引。
+
+        R1 Bug Fix 5: 同时检查 section_progress dict，跳过已 succeeded 的步骤。
+        """
+        if section_progress:
+            # 找到第一个未 succeeded 的步骤
+            for i, (name, _) in enumerate(steps):
+                sp = section_progress.get(name)
+                if not sp or sp.get("status") != "succeeded":
+                    return i
+            # 全部已完成
+            return len(steps)
+
         if last_succeeded is None:
             return 0
         for i, (name, _) in enumerate(steps):

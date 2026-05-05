@@ -217,3 +217,23 @@
     - 某项目 sign 后立即调 `purge` 返回 403，"合规+风控"双签后可 purge
     - 连续 5 年签字同客户时创建新项目被阻断，override 后放行并留痕
     - 手动 UPDATE 改某条 audit_log 的 payload，`verify-chain` 能检出断链点
+
+
+## UAT 待执行（手动浏览器验证）
+
+以下 6 项必须在合并 master 前由真人在浏览器走一遍：
+
+- [ ] UAT-1: 连续复核 10 张底稿流畅度（队列自动切换、快捷键响应）
+- [ ] UAT-2: 退回 3 张底稿验证红点 + 工单 + source 筛选
+- [ ] UAT-3: 合伙人签字前检查三种路径（全绿签字/阻断跳转/GATE_STALE）
+- [ ] UAT-4: 三级签字顺序验证（跳级被拒 PREREQUISITE_NOT_MET）
+- [ ] UAT-5: 归档向导完整流程 + ZIP 包验证封面/签字流水/水印
+- [ ] UAT-6: PBC/函证入口已从导航移除
+
+
+## 已知妥协（Round 2+ 补丁）
+
+- [ ] ReviewWorkbench 中栏嵌入只读版 WorkpaperEditor（当前为元信息卡+跳转）
+- [ ] Archive PDF 水印 SHA-256 hash 回填（当前为占位符"待归档完成后填入"）
+- [ ] archive_section_registry 04 章节（独立性声明）实现真实 PDF generator
+- [ ] loadPendingIndependence 改为 batch 端点（Fix 7 已加后端，前端已切换）

@@ -6,6 +6,7 @@ import { signatures, projects as P_proj } from '@/services/apiPaths'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 
 export interface WorkflowStep {
+  id?: string
   order: number
   role: string
   required_user_id?: string | null

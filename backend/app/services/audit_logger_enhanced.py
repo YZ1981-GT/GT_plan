@@ -199,7 +199,12 @@ class AuditLoggerEnhanced:
         project_id: str | None = None,
         limit: int = 100,
     ) -> list[dict]:
-        """查询内存缓存日志（快速查询，非权威来源）。"""
+        """查询内存缓存（非权威来源，仅用于实时监控面板；合规审计查询请使用
+        GET /api/audit-logs/verify-chain 或直接查 audit_log_entries 表）。
+
+        R1 Bug Fix 10: 明确语义——此方法仅返回进程内最近 1000 条缓存记录，
+        不保证完整性和持久性。正式审计取证必须走数据库查询。
+        """
         results = self._recent_actions
         if user_id:
             results = [r for r in results if r.get("user_id") == user_id]

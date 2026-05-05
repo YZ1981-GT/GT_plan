@@ -6,19 +6,24 @@
   PATCH /api/projects/{project_id}/independence-declarations/{declaration_id}
   POST /api/projects/{project_id}/independence-declarations/{declaration_id}/submit
   GET  /api/independence/questions
+  GET  /api/my/pending-independence  (R1 Bug Fix 7: 批量查询待声明项目)
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
-from app.models.core import User
+from app.models.core import User, Project
+from app.models.staff_models import ProjectAssignment
+from app.models.independence_models import IndependenceDeclaration
 from app.services.independence_service import IndependenceService
 
 router = APIRouter(tags=["独立性声明"])
@@ -137,3 +142,83 @@ async def submit_declaration(
         raise HTTPException(status_code=400, detail=str(e))
     await db.commit()
     return IndependenceService.declaration_to_dict(decl)
+
+
+
+# ------------------------------------------------------------------
+# R1 Bug Fix 7: 批量查询当前用户待声明项目（避免 N+1 HTTP）
+# ------------------------------------------------------------------
+
+
+@router.get("/api/my/pending-independence")
+async def get_my_pending_independence(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回当前用户尚未提交独立性声明的项目列表。
+
+    查询逻辑：
+    1. 找到当前用户被分配为核心角色（signing_partner/manager/qc/eqcr）的活跃项目
+    2. 排除已归档项目（archived_at IS NOT NULL）
+    3. 排除当前年度已有 submitted/approved 声明的项目
+
+    R1 Bug Fix 7: 替代前端 N+1 循环调用。
+    """
+    year = datetime.now(timezone.utc).year
+    user_id = current_user.id
+
+    # 核心角色
+    core_roles = ["signing_partner", "manager", "qc", "eqcr"]
+
+    # 1) 查询用户被分配为核心角色的活跃项目
+    assigned_stmt = (
+        select(Project)
+        .join(ProjectAssignment, ProjectAssignment.project_id == Project.id)
+        .where(
+            and_(
+                ProjectAssignment.staff_id == user_id,
+                ProjectAssignment.role.in_(core_roles),
+                ProjectAssignment.is_deleted == False,  # noqa: E712
+                Project.is_deleted == False,  # noqa: E712
+                Project.archived_at.is_(None),
+            )
+        )
+        .distinct()
+    )
+    result = await db.execute(assigned_stmt)
+    projects = result.scalars().all()
+
+    if not projects:
+        return {"projects": [], "total": 0}
+
+    project_ids = [p.id for p in projects]
+
+    # 2) 查询当前年度已完成声明的项目 ID
+    completed_stmt = (
+        select(IndependenceDeclaration.project_id)
+        .where(
+            and_(
+                IndependenceDeclaration.declarant_id == user_id,
+                IndependenceDeclaration.project_id.in_(project_ids),
+                IndependenceDeclaration.declaration_year == year,
+                IndependenceDeclaration.status.in_(["submitted", "approved"]),
+            )
+        )
+        .distinct()
+    )
+    completed_result = await db.execute(completed_stmt)
+    completed_project_ids = {row[0] for row in completed_result.all()}
+
+    # 3) 过滤出未完成的项目
+    pending = [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "client_name": getattr(p, "client_name", None),
+            "status": p.status.value if hasattr(p.status, "value") else str(p.status) if p.status else None,
+        }
+        for p in projects
+        if p.id not in completed_project_ids
+    ]
+
+    return {"projects": pending, "total": len(pending)}

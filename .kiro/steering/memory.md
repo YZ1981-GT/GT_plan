@@ -53,8 +53,8 @@ inclusion: always
 - 后端 121 个路由文件（新增 pbc.py、confirmations.py），172 个服务文件，42 个模型文件，~152 张表
 - 后端新增 `backend/app/workers/` 模块：sla_worker、import_recover_worker、outbox_replay_worker（每个导出 `async def run(stop_event)`）
 - 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
-- git 分支：feature/global-component-library（已推送至 8157960，待合并 master）
-- 最新提交 8157960：Sprint 2 完成（tasks 16-19 归档完整性/向导/PBC 隐藏/通知字典）
+- git 分支：feature/global-component-library（已推送至 4b172d5，待合并 master）
+- 最新提交 4b172d5：Round 1 Sprint 3 完成（tasks 23-26 独立性表单/轮换/哈希链 PBT）
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
   - Sprint 1（P0 数据正确性）：底稿保存事件→附注同步、Dashboard 趋势图真实 API、Dirty 标记完整覆盖、QC 项目汇总 N+1 优化、审计报告 final 保护、QC-16 字段修正、ReviewInbox 跳转修正、报表两张表数据驱动、AuditCheckDashboard 批量接口、PBC/函证路由注册、看板卡片跳转、个人工作台待办工时
@@ -147,17 +147,29 @@ inclusion: always
 - Task 16 归档完整性：orchestrate/retry 成功后调 `archive_section_registry.generate_all` 计算各章节 SHA-256 → `export_integrity_service.persist_checks` 持久化 → 拼接所有 hash 再 SHA-256 得 manifest_hash 写入 ArchiveJob；失败不阻断
 - Task 19 notification_types.py 常量：ARCHIVE_DONE/SIGNATURE_READY/GATE_ALERT/REPORT_FINALIZED + NOTIFICATION_META 模板字典；前端 notificationTypes.ts 同步 + getNotificationJumpRoute 工具函数
 - Task 19 NotificationService 支持两种用法：`NotificationService()` 调用时传 db 或 `NotificationService(db)` 实例化时传；`send_notification_to_many` 批量发送
+- Task 22 IndependenceDeclarationCompleteRule (R1-INDEPENDENCE, blocking)：检查项目核心四角色（signing_partner/manager/qc/eqcr）是否都有 submitted/approved 声明；兼容旧 `wizard_state.independence_confirmed=true` 视为 legacy 通过
+- Task 24 RotationCheckService：按 `ProjectAssignment WHERE role IN (signing_partner, eqcr)` JOIN `Project WHERE client_name` 聚合连续年数；默认轮换上限上市 5 年/非上市 7 年（当前硬编码 5）
+- Task 24 保留期：归档成功后 `Project.archived_at=now + retention_until=archived_at+3652d`；`purge_project_data` 入口硬校验 `now<retention_until` → 403 RETENTION_LOCKED
+- Task 26 哈希链属性测试：4 个 hypothesis 属性（正确链通过/篡改 payload 检出/篡改 hash 检出/交换顺序检出），纯算法不依赖 DB
+- Round 1 新增后端文件清单（Sprint 3）：audit_log_models.py / independence_models.py / rotation_models.py / audit_logger_enhanced.py(重写) / audit_log_writer_worker.py / audit_logs.py(router) / independence_service.py / independence.py(router) / rotation_check_service.py / rotation.py(router) / independence_questions.json / round1_long_term_compliance_20260508.py(migration)
+- Round 1 新增前端文件清单（Sprint 3）：IndependenceDeclarationForm.vue / rotationApi.ts
 
 ## 活跃待办
 
 ### 最高优先级
 - 合并 feature/global-component-library 到 master（用户手动操作）
+- **R1 上线前必须修复的 4 个 bug**（Round 1 复盘发现，详见下条）：
+  1. 前端 PartnerDashboard 传 `prerequisite_signature_ids` 用 `(s as any).id` 但后端 `get_workflow` 未返回 id 字段 → 前置校验永不触发；修复：`SignService.get_workflow` 返回加 `id: str(r.id)` + 前端读 `s.id`
+  2. `GET /api/audit-logs/verify-chain` 缺 `get_current_user` 权限校验，任何登录用户可查任意项目哈希链；修复：限 admin/qc/signing_partner
+  3. `audit_log_writer_worker` 多副本场景 prev_hash race → 链断；修复：`_write_batch` 加 PG advisory lock（hash(project_id)）或 README 硬约束单实例
+  4. `IndependenceDeclarationCompleteRule` legacy 兼容对老项目未生效，上线瞬间全部老项目 sign_off 阻断；修复：规则加"archived_at IS NOT NULL 跳过"或批量注入 wizard_state.independence_confirmed=true
 - 0.3 公式计算浏览器手动验证（启动前端输入 `=SUM(A1:A3)` 看结果）
+- R1 UAT 6 条清单从未真人浏览器跑过（连续复核 10 张 / 红点 / 三级签字顺序 / 归档包验证 / PBC 入口移除）——PDCA 闭环硬缺口
 - 用真实审计项目进行用户验收测试（UAT）
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
-- Round 1 实施进度：Sprint 1（Task 1-12）+ Sprint 2（Task 13-19）全部完成并推送（8157960），105 个新测试全绿；剩余 Sprint 3（Task 20-26 长期运营合规：审计日志落库/独立性声明/保留期轮换/属性测试）
+- Round 1 已全部完成（Sprint 1-3 共 26 任务 + 3 验收，157 测试全绿）；下一步启动 Round 2 前先修复上述 4 个 bug
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

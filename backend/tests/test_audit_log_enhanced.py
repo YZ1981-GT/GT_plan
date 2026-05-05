@@ -62,6 +62,9 @@ async def client(db_session: AsyncSession):
     from app.main import app
     from app.core.database import get_db
     from app.core.redis import get_redis
+    from app.deps import get_current_user
+    from app.models.base import UserRole
+    from app.models.core import User
 
     async def override_get_db():
         yield db_session
@@ -71,8 +74,23 @@ async def client(db_session: AsyncSession):
     async def override_get_redis():
         yield fake_redis
 
+    # R1 Bug Fix 2: verify-chain 端点加了 get_current_user 依赖，
+    # 测试用 admin 用户跳过项目权限校验
+    _admin_user = User(
+        id=uuid.uuid4(),
+        username="test_admin",
+        email="admin@test.com",
+        hashed_password="x",
+        role=UserRole.admin,
+        is_active=True,
+    )
+
+    async def override_get_current_user():
+        return _admin_user
+
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_redis] = override_get_redis
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
@@ -466,3 +484,234 @@ class TestWriteBatchAndVerifyChain:
             data = data["data"]
         assert data["valid"] is True
         assert data["entries_checked"] == 0
+
+
+# --- R1 Bug Fix 2: verify-chain 权限校验 ---
+
+
+class TestVerifyChainAuth:
+    """R1 Bug Fix 2: verify-chain 端点必须校验登录 + 角色。
+
+    - 未登录 → 401
+    - 非 admin 且未传 project_id → 403
+    - 非 admin 且项目内角色为 auditor/readonly → 403
+    - 非 admin 但在项目中是 signing_partner/qc/eqcr/manager/partner → 200
+    - admin 无条件放行 → 200
+    """
+
+    @pytest.mark.asyncio
+    async def test_unauthenticated_returns_401(self, db_session):
+        """未登录时应返回 401（不传 Authorization header）。"""
+        from app.main import app
+        from app.core.database import get_db
+        from app.core.redis import get_redis
+
+        async def override_get_db():
+            yield db_session
+
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+
+        async def override_get_redis():
+            yield fake_redis
+
+        app.dependency_overrides[get_db] = override_get_db
+        app.dependency_overrides[get_redis] = override_get_redis
+        # 关键：不覆盖 get_current_user，让真实的 HTTPBearer 检查生效
+
+        transport = ASGITransport(app=app)
+        try:
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get(
+                    "/api/audit-logs/verify-chain",
+                    params={"project_id": str(uuid.uuid4())},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        # FastAPI HTTPBearer 未提供凭据时返回 403（无 credentials）
+        # 或 401（credentials 无效）；任一都应该拒绝访问
+        assert resp.status_code in (401, 403)
+
+    @pytest.mark.asyncio
+    async def test_non_admin_without_project_id_forbidden(self, db_session):
+        """非 admin 不传 project_id 应返回 403 FORBIDDEN_AUDIT_CHAIN。"""
+        from app.main import app
+        from app.core.database import get_db
+        from app.core.redis import get_redis
+        from app.deps import get_current_user
+        from app.models.base import UserRole
+        from app.models.core import User
+
+        async def override_get_db():
+            yield db_session
+
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+
+        async def override_get_redis():
+            yield fake_redis
+
+        non_admin = User(
+            id=uuid.uuid4(),
+            username="auditor1",
+            email="auditor@test.com",
+            hashed_password="x",
+            role=UserRole.auditor,
+            is_active=True,
+        )
+
+        async def override_get_current_user():
+            return non_admin
+
+        app.dependency_overrides[get_db] = override_get_db
+        app.dependency_overrides[get_redis] = override_get_redis
+        app.dependency_overrides[get_current_user] = override_get_current_user
+
+        transport = ASGITransport(app=app)
+        try:
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get("/api/audit-logs/verify-chain")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 403
+        body = resp.json()
+        # error_handler wraps as {"code": ..., "message": ...} where message = exc.detail
+        error_detail = body.get("detail") or body.get("message")
+        assert error_detail["error_code"] == "FORBIDDEN_AUDIT_CHAIN"
+
+    @pytest.mark.asyncio
+    async def test_non_admin_no_project_role_forbidden(self, db_session):
+        """非 admin 且在项目中无 review/sign_off 能力应返回 403。"""
+        from app.main import app
+        from app.core.database import get_db
+        from app.core.redis import get_redis
+        from app.deps import get_current_user
+        from app.models.base import UserRole
+        from app.models.core import User
+
+        async def override_get_db():
+            yield db_session
+
+        fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+
+        async def override_get_redis():
+            yield fake_redis
+
+        non_admin = User(
+            id=uuid.uuid4(),
+            username="readonly1",
+            email="readonly@test.com",
+            hashed_password="x",
+            role=UserRole.auditor,  # 系统角色 auditor，但项目无分配 → 降级 readonly
+            is_active=True,
+        )
+
+        async def override_get_current_user():
+            return non_admin
+
+        app.dependency_overrides[get_db] = override_get_db
+        app.dependency_overrides[get_redis] = override_get_redis
+        app.dependency_overrides[get_current_user] = override_get_current_user
+
+        transport = ASGITransport(app=app)
+        try:
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                resp = await c.get(
+                    "/api/audit-logs/verify-chain",
+                    params={"project_id": str(uuid.uuid4())},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert resp.status_code == 403
+        body = resp.json()
+        # error_handler wraps as {"code": ..., "message": ...} where message = exc.detail
+        error_detail = body.get("detail") or body.get("message")
+        assert error_detail["error_code"] == "FORBIDDEN_AUDIT_CHAIN"
+
+    @pytest.mark.asyncio
+    async def test_admin_can_query_without_project_id(self, client):
+        """admin 可以不传 project_id 查询全局链。"""
+        resp = await client.get("/api/audit-logs/verify-chain")
+        assert resp.status_code == 200
+        data = resp.json()
+        if "data" in data:
+            data = data["data"]
+        assert data["valid"] is True
+
+
+# --- R1 Bug Fix 3: 多 worker 并发写入的哈希链正确性 ---
+
+
+class TestConcurrentWriteHashChain:
+    """R1 Bug Fix 3: 多 worker 并发写同一 project_id 时哈希链保持连续。
+
+    在 SQLite 下不真测 pg_advisory_xact_lock，用两个独立 sessionmaker + 串行
+    driver 验证 _write_batch 主体逻辑：每次调用都能读到最新 prev_hash 并追加。
+    """
+
+    @pytest.mark.asyncio
+    async def test_audit_log_concurrent_write(self, db_session):
+        """连续两次 _write_batch 调用（模拟两个 worker 串行处理）后链仍连续。"""
+        from app.models.audit_log_models import AuditLogEntry
+        from sqlalchemy import select, asc
+
+        project_id = str(uuid.uuid4())
+
+        test_session_factory = async_sessionmaker(
+            test_engine, class_=AsyncSession, expire_on_commit=False
+        )
+
+        async def mock_session_factory():
+            return test_session_factory
+
+        def make_entries(label: str, n: int, base_day: int):
+            entries = []
+            for i in range(n):
+                entries.append({
+                    "user_id": str(uuid.uuid4()),
+                    "action_type": f"{label}_action_{i}",
+                    "object_type": "test",
+                    "object_id": str(uuid.uuid4()),
+                    "project_id": project_id,
+                    "payload": {"project_id": project_id, "label": label, "index": i},
+                    "ip": "127.0.0.1",
+                    "ts": datetime(2024, 4, base_day + i, tzinfo=timezone.utc).isoformat(),
+                })
+            return entries
+
+        with patch(
+            "app.workers.audit_log_writer_worker._get_session_factory",
+            mock_session_factory,
+        ):
+            with patch("app.core.config.settings") as mock_settings:
+                mock_settings.DATABASE_URL = TEST_DATABASE_URL
+                # 两个"worker"先后处理各自的批次
+                written_a = await _write_batch(make_entries("A", 3, 1))
+                written_b = await _write_batch(make_entries("B", 3, 10))
+
+        assert written_a == 3
+        assert written_b == 3
+
+        # 验证全链连续
+        stmt = select(AuditLogEntry).order_by(asc(AuditLogEntry.ts))
+        result = await db_session.execute(stmt)
+        rows = result.scalars().all()
+
+        scoped = [
+            r for r in rows
+            if r.payload and r.payload.get("project_id") == project_id
+        ]
+        assert len(scoped) == 6
+
+        # 每一条的 prev_hash == 上一条的 entry_hash
+        prev = GENESIS_HASH
+        for row in scoped:
+            assert row.prev_hash == prev, (
+                f"链断裂：期望 prev_hash={prev}, 实际={row.prev_hash}"
+            )
+            prev = row.entry_hash
+
+        # 所有 hash 唯一
+        hashes = [r.entry_hash for r in scoped]
+        assert len(set(hashes)) == 6

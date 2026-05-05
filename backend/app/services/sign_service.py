@@ -328,6 +328,7 @@ class SignService:
                 status = "ready" if (not prereqs or all_prereqs_signed) else "waiting"
 
             workflow.append({
+                "id": str(r.id),
                 "order": r.required_order,
                 "role": r.required_role,
                 "required_user_id": str(r.signer_id),

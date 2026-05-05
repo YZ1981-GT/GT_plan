@@ -41,6 +41,7 @@ class RotationCheckService:
         self,
         staff_id: UUID,
         client_name: str,
+        is_listed_company: bool = True,
     ) -> dict[str, Any]:
         """检查指定人员对指定客户的连续审计年数。
 
@@ -48,6 +49,11 @@ class RotationCheckService:
         1. 从 project_assignments 中找 staff_id 担任 signing_partner/eqcr 的项目
         2. JOIN projects 按 client_name 精确匹配
         3. 按 audit_period_end 的年份聚合，计算连续年数（从当前年份往回数）
+
+        Args:
+            staff_id: 人员 ID
+            client_name: 客户名称
+            is_listed_company: 是否上市公司（默认 True），影响轮换上限
 
         Returns:
             {
@@ -92,8 +98,9 @@ class RotationCheckService:
         # 查询当前有效的 override
         current_override_id = await self._get_active_override(staff_id, client_name)
 
-        # 默认轮换上限（可从 system_settings 读取，此处用默认值）
-        rotation_limit = DEFAULT_ROTATION_LIMIT_LISTED
+        # R1 Bug Fix 6: 轮换上限可配置（上市/非上市区分）
+        # TODO: read from system_settings.rotation_policy when admin UI is built
+        rotation_limit = await self._get_rotation_limit(client_name, is_listed_company)
 
         # 计算下次轮换到期年份
         next_rotation_due_year = None
@@ -115,6 +122,47 @@ class RotationCheckService:
             "current_override_id": str(current_override_id) if current_override_id else None,
             "rotation_limit": rotation_limit,
         }
+
+    async def _get_rotation_limit(
+        self, client_name: str, is_listed_company: bool = True
+    ) -> int:
+        """获取轮换上限年数。
+
+        R1 Bug Fix 6: 轮换上限可配置。
+        尝试从 system_settings 表读取（如果存在），否则使用默认值。
+        上市公司默认 5 年，非上市公司默认 7 年。
+
+        # TODO: read from system_settings.rotation_policy when admin UI is built
+        """
+        try:
+            from sqlalchemy import text as sa_text
+
+            result = await self.db.execute(
+                sa_text(
+                    "SELECT value FROM system_settings "
+                    "WHERE key = 'rotation_limit_listed' LIMIT 1"
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is not None:
+                if is_listed_company:
+                    return int(row)
+                # 尝试读非上市的配置
+                result2 = await self.db.execute(
+                    sa_text(
+                        "SELECT value FROM system_settings "
+                        "WHERE key = 'rotation_limit_unlisted' LIMIT 1"
+                    )
+                )
+                row2 = result2.scalar_one_or_none()
+                if row2 is not None:
+                    return int(row2)
+                return DEFAULT_ROTATION_LIMIT_UNLISTED
+        except Exception:
+            # system_settings 表不存在或查询失败，使用默认值
+            pass
+
+        return DEFAULT_ROTATION_LIMIT_LISTED if is_listed_company else DEFAULT_ROTATION_LIMIT_UNLISTED
 
     def _calc_continuous_years(self, years_desc: list[int]) -> int:
         """计算从最近年份开始的连续年数。

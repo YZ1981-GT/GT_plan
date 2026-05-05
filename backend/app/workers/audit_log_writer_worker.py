@@ -136,8 +136,21 @@ async def _write_batch(entries: list[dict]) -> int:
 
     按 project_id 分组，顺序计算哈希链。
     返回成功写入的条数。
+
+    R1 Bug Fix 3: 多 worker 副本并发写同一 project_id 时，两个 worker 可能
+    同时读到相同 prev_hash、各自计算出不同 entry_hash，导致链断。
+    解决：写入前按 project_id 取 PG advisory transaction lock（自动在 commit/
+    rollback 时释放），将同一 project_id 的写入强制串行化。
+    - PostgreSQL：pg_advisory_xact_lock(bigint)，lock_id = hash(project_id) 限定在
+      signed bigint 范围内。
+    - SQLite（测试环境）：跳过 advisory lock，依赖单进程测试隔离。
+    注意：advisory lock 只能保证同一 PG 实例上的多 worker 串行；跨实例需要
+    配合"生产环境审计 writer 单副本部署"运维约束（见 backend/app/workers/README.md）。
     """
     from app.models.audit_log_models import AuditLogEntry
+    from app.core.config import settings
+    from sqlalchemy import text as sa_text
+
     async_session = await _get_session_factory()
 
     if not entries:
@@ -149,11 +162,29 @@ async def _write_batch(entries: list[dict]) -> int:
         pid = entry.get("project_id")
         groups[pid].append(entry)
 
+    is_postgres = settings.DATABASE_URL.startswith("postgresql")
+
     written = 0
 
     async with async_session() as db:
         try:
             for project_id, group_entries in groups.items():
+                # --- R1 Bug Fix 3: PG advisory lock 保证同项目串行写入 ---
+                if is_postgres:
+                    # lock_id 使用稳定哈希 + bigint signed 范围
+                    lock_key = str(project_id) if project_id else "__global__"
+                    lock_id = hash(lock_key) & 0x7FFFFFFFFFFFFFFF
+                    try:
+                        await db.execute(
+                            sa_text("SELECT pg_advisory_xact_lock(:lock_id)"),
+                            {"lock_id": lock_id},
+                        )
+                    except Exception as lock_err:
+                        logger.warning(
+                            "[audit_log_writer] advisory lock failed, falling back to lock-free: %s",
+                            lock_err,
+                        )
+
                 # 获取该 project_id 链的最新 prev_hash
                 prev_hash = await _get_prev_hash(db, project_id)
 

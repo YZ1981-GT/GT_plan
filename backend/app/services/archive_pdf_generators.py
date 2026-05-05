@@ -65,14 +65,37 @@ def _find_libreoffice() -> str | None:
     return None
 
 
-def _html_to_pdf_bytes(html_content: str) -> bytes | None:
-    """将 HTML 内容通过 LibreOffice headless 转换为 PDF bytes。
+def _html_to_pdf_weasyprint(html_content: str) -> bytes | None:
+    """尝试使用 weasyprint 将 HTML 转为 PDF（比 LibreOffice 快）。
 
-    如果 LibreOffice 不可用，返回 None。
+    weasyprint is optional dependency; install with: pip install weasyprint
+    返回 PDF bytes，weasyprint 未安装或转换失败返回 None。
     """
+    try:
+        import weasyprint
+        return weasyprint.HTML(string=html_content).write_pdf()
+    except ImportError:
+        return None
+    except Exception as exc:
+        logger.warning("[ARCHIVE_PDF] weasyprint conversion failed: %s", exc)
+        return None
+
+
+def _html_to_pdf_bytes(html_content: str) -> bytes | None:
+    """将 HTML 内容转换为 PDF bytes。
+
+    R1 Bug Fix 9: 优先尝试 weasyprint（更快），不可用时降级到 LibreOffice headless。
+    # weasyprint is optional dependency; install with: pip install weasyprint
+    """
+    # 优先尝试 weasyprint（纯 Python，无需外部进程，速度更快）
+    pdf = _html_to_pdf_weasyprint(html_content)
+    if pdf is not None:
+        return pdf
+
+    # 降级到 LibreOffice headless
     lo_path = _find_libreoffice()
     if not lo_path:
-        logger.warning("[ARCHIVE_PDF] LibreOffice not found, cannot convert to PDF")
+        logger.warning("[ARCHIVE_PDF] Neither weasyprint nor LibreOffice available, cannot convert to PDF")
         return None
 
     with tempfile.TemporaryDirectory() as tmpdir:

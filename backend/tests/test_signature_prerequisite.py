@@ -520,3 +520,45 @@ async def test_eqcr_order5_transitions_to_final(client, db_session):
     )
     report = result.scalar_one()
     assert report.status == ReportStatus.final
+
+
+# ============================================================================
+# 测试：workflow 返回 id 字段（R1 Bug Fix 1 — PartnerDashboard 前置依赖可用）
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_workflow_returns_id_field(client, db_session):
+    """GET /api/signatures/workflow/{project_id} 每个 step 必须包含 id 字段。
+
+    R1 Bug Fix 1: 前端 PartnerDashboard.handleSign 依赖 s.id 计算
+    prerequisite_signature_ids，若后端不返回 id 则前置校验永不触发。
+    """
+    project_id = await _make_project(db_session)
+    report_id = await _make_audit_report(db_session, project_id)
+
+    sig1_id = await _make_signature_record(
+        db_session, report_id, uuid.uuid4(), 1, "auditor", signed=True
+    )
+    sig2_id = await _make_signature_record(
+        db_session, report_id, uuid.uuid4(), 2, "manager", signed=True,
+        prerequisite_ids=[str(sig1_id)],
+    )
+    await db_session.commit()
+
+    resp = await client.get(f"/api/signatures/workflow/{project_id}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+
+    # 每个 step 必须有 id 字段，且是有效 UUID
+    for step in data:
+        assert "id" in step, f"workflow step 缺少 id 字段: {step}"
+        assert step["id"], "id 字段不能为空"
+        # 应为合法 UUID
+        uuid.UUID(step["id"])
+
+    # id 与创建时的 SignatureRecord.id 一致
+    ids_returned = {s["id"] for s in data}
+    assert str(sig1_id) in ids_returned
+    assert str(sig2_id) in ids_returned
