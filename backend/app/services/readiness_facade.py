@@ -133,6 +133,8 @@ _SIGN_OFF_RULE_CATEGORY: dict[str, str] = {
     # R1 需求 3 验收 7/8 新增
     "R1-AJE-UNCONVERTED": "misstatement_eval",
     "R1-EVENT-CASCADE": "misc",
+    # R1 需求 10：独立性声明完整性
+    "R1-INDEPENDENCE": "independence",
 }
 
 _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
@@ -148,6 +150,8 @@ _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
     "GATE-MISSTATEMENT": "misstatement_evaluated",
     # R1 需求 3 验收 8 新增（sign_off + export_package 双注册）
     "R1-EVENT-CASCADE": "misc",
+    # R1 需求 10：独立性声明完整性
+    "R1-INDEPENDENCE": "independence",
 }
 
 

@@ -176,7 +176,7 @@
   - 写失败触发告警 `AUDIT_LOG_WRITE_FAILED`
   - _需求_ 9
 
-- [-] 22. 后端：独立性声明端点 + gate 规则
+- [x] 22. 后端：独立性声明端点 + gate 规则
   - `backend/app/services/independence_service.py`
   - `GET/POST/PATCH /api/projects/{id}/independence-declarations`
   - `POST .../submit` 触发 SignatureRecord + audit log

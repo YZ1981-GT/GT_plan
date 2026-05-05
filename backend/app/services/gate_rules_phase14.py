@@ -688,6 +688,115 @@ class EventCascadeHealthRule(GateRule):
             return None
 
 
+# ── R1-INDEPENDENCE: 独立性声明完整性检查（blocking） ─────────
+
+class IndependenceDeclarationCompleteRule(GateRule):
+    """sign_off gate 要求项目核心四角色均已 submitted 或 approved 独立性声明。
+
+    对齐 R1 需求 10 验收 3：项目组核心成员（signing_partner / manager / qc / eqcr）
+    均需单独提交声明，缺一个都阻断 sign_off gate。
+
+    兼容逻辑：旧 wizard_state.independence_confirmed=true 视为 legacy 通过，
+    但附带升级提醒（warning 级 finding）。
+    """
+    rule_code = "R1-INDEPENDENCE"
+    error_code = "INDEPENDENCE_DECLARATION_INCOMPLETE"
+    severity = GateSeverity.blocking
+
+    # 核心角色列表（需要提交独立性声明的角色）
+    REQUIRED_ROLES = ("signing_partner", "manager", "qc", "eqcr")
+    # 视为"已完成"的声明状态
+    COMPLETED_STATUSES = ("submitted", "pending_conflict_review", "approved")
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            from app.models.staff_models import ProjectAssignment
+            from app.models.independence_models import IndependenceDeclaration
+
+            # 1) 检查旧 legacy 兼容：wizard_state.independence_confirmed
+            legacy_pass = await self._check_legacy(db, project_id)
+            if legacy_pass:
+                # legacy 通过但附带升级提醒（不阻断）
+                return GateRuleHit(
+                    rule_code=self.rule_code,
+                    error_code="INDEPENDENCE_LEGACY_UPGRADE",
+                    severity=GateSeverity.warning,
+                    message="独立性确认使用旧版布尔标记（legacy），建议升级为结构化声明",
+                    location={"project_id": str(project_id), "section": "independence"},
+                    suggested_action="请项目核心成员分别填写独立性声明表单，替代旧版勾选确认",
+                )
+
+            # 2) 查询项目核心角色的 staff_id
+            assignment_stmt = select(
+                ProjectAssignment.role, ProjectAssignment.staff_id
+            ).where(
+                ProjectAssignment.project_id == project_id,
+                ProjectAssignment.is_deleted.is_(False),
+                ProjectAssignment.role.in_(self.REQUIRED_ROLES),
+            )
+            assignment_rows = (await db.execute(assignment_stmt)).all()
+
+            if not assignment_rows:
+                # 无核心角色分配时不阻断（可能是项目初始化阶段）
+                return None
+
+            # 3) 查询已完成的声明
+            decl_stmt = select(
+                IndependenceDeclaration.declarant_id
+            ).where(
+                IndependenceDeclaration.project_id == project_id,
+                IndependenceDeclaration.status.in_(self.COMPLETED_STATUSES),
+            )
+            completed_declarants = {
+                row[0] for row in (await db.execute(decl_stmt)).all()
+            }
+
+            # 4) 检查哪些角色缺少声明
+            missing_roles = []
+            for role, staff_id in assignment_rows:
+                if staff_id not in completed_declarants:
+                    missing_roles.append(role)
+
+            if not missing_roles:
+                return None
+
+            unique_missing = sorted(set(missing_roles))
+            return GateRuleHit(
+                rule_code=self.rule_code,
+                error_code=self.error_code,
+                severity=self.severity,
+                message=f"独立性声明未完成：{', '.join(unique_missing)} 角色尚未提交",
+                location={
+                    "project_id": str(project_id),
+                    "section": "independence",
+                    "missing_roles": unique_missing,
+                },
+                suggested_action="请相关人员前往『独立性声明』页面填写并提交声明",
+            )
+        except Exception as e:
+            logger.debug(f"[R1-INDEPENDENCE] check skipped: {e}")
+            return None
+
+    async def _check_legacy(self, db: AsyncSession, project_id) -> bool:
+        """检查旧版 wizard_state.independence_confirmed 是否为 true。"""
+        try:
+            stmt = text("""
+                SELECT wizard_state FROM projects
+                WHERE id = :project_id
+            """)
+            result = await db.execute(stmt, {"project_id": str(project_id)})
+            row = result.fetchone()
+            if row and row[0]:
+                ws = row[0] if isinstance(row[0], dict) else {}
+                return ws.get("independence_confirmed", False) is True
+        except Exception:
+            pass
+        return False
+
+
 def register_phase14_rules():
     """注册 QC-19~26 到 rule_registry"""
     all_gates = [GateType.submit_review, GateType.sign_off, GateType.export_package]
@@ -720,5 +829,8 @@ def register_phase14_rules():
     rule_registry.register_all(
         [GateType.sign_off, GateType.export_package], EventCascadeHealthRule()
     )
+
+    # R1 需求 10：独立性声明完整性检查（sign_off blocking）
+    rule_registry.register_all([GateType.sign_off], IndependenceDeclarationCompleteRule())
 
     logger.info("[GATE] Phase 14 rules QC-19~26 + consistency + misstatement registered")
