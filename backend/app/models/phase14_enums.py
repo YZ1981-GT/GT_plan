@@ -17,6 +17,7 @@ class GateType(str, Enum):
     """门禁入口类型"""
     submit_review = "submit_review"
     sign_off = "sign_off"
+    eqcr_approval = "eqcr_approval"  # R5：EQCR 审批门禁，位于 sign_off 与 export_package 之间
     export_package = "export_package"
 
 
