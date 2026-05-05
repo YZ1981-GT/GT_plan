@@ -158,6 +158,33 @@ async def generate_audit_log_export(
     return None
 
 
+async def generate_independence_declarations_pdf(
+    project_id: UUID, db: AsyncSession
+) -> bytes | Path | None:
+    """生成独立性声明 PDF（R1 需求 10，Task 23）。
+
+    按项目成员拆分独立 PDF，汇总为单文件。
+    当前为 stub 实现，后续可接入 pdf_export_engine。
+    """
+    try:
+        from app.services.independence_service import IndependenceService
+
+        declarations = await IndependenceService.list_declarations(db, project_id)
+        if not declarations:
+            return None
+
+        # Stub: 返回简单文本标识，后续替换为真实 PDF 生成
+        content_lines = [f"独立性声明汇总 - 项目 {project_id}\n"]
+        for decl in declarations:
+            content_lines.append(
+                f"  声明人: {decl.declarant_id} | 年度: {decl.declaration_year} | 状态: {decl.status}\n"
+            )
+        return "".join(content_lines).encode("utf-8")
+    except Exception as exc:
+        logger.error("[ARCHIVE] independence PDF generation failed: %s", exc)
+        return None
+
+
 def register_r1_sections() -> None:
     """注册 Round 1 本轮的归档章节。"""
     register(
@@ -171,6 +198,12 @@ def register_r1_sections() -> None:
         "01-签字流水.pdf",
         generate_signature_ledger_pdf,
         "签字流水（R1）",
+    )
+    register(
+        "04",
+        "04-独立性声明.pdf",
+        generate_independence_declarations_pdf,
+        "独立性声明（R1 需求 10）",
     )
     register(
         "99",

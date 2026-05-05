@@ -983,6 +983,13 @@ export const governance = {
   },
 } as const
 
+// ─── 轮换检查 ─────────────────────────────────────────────────────────────────
+
+export const rotation = {
+  check: '/api/rotation/check',
+  overrides: '/api/rotation/overrides',
+} as const
+
 // ─── 签字 ───────────────────────────────────────────────────────────────────
 
 export const signatures = {
@@ -1006,7 +1013,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  admin, partner, qcDashboard, jobs, governance, signatures,
+  admin, partner, qcDashboard, jobs, governance, signatures, rotation,
 } as const
 
 export default API

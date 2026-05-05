@@ -22,6 +22,69 @@
       </div>
     </el-alert>
 
+    <!-- 独立性待声明提醒卡 -->
+    <el-card v-if="pendingIndependenceProjects.length" class="independence-reminder-card" shadow="hover" style="margin-bottom: 16px">
+      <template #header>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 16px">📋</span>
+          <span style="font-weight: 600">独立性待声明</span>
+          <el-badge :value="pendingIndependenceProjects.length" type="warning" />
+        </div>
+      </template>
+      <div class="independence-reminder-list">
+        <div v-for="p in pendingIndependenceProjects" :key="p.id" class="independence-reminder-item">
+          <span class="independence-reminder-name">{{ p.client_name || p.name }}</span>
+          <el-button size="small" type="warning" plain @click="goToIndependence(p.id)">
+            去声明 →
+          </el-button>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 轮换预警卡片 -->
+    <el-card v-if="rotationWarnings.length" class="rotation-warning-card" shadow="hover" style="margin-bottom: 16px">
+      <template #header>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 16px">🔄</span>
+          <span style="font-weight: 600">轮换预警</span>
+          <el-badge :value="rotationWarnings.length" type="danger" />
+        </div>
+      </template>
+      <div class="rotation-warning-list">
+        <div v-for="item in rotationWarnings" :key="item.staff_id + item.client_name" class="rotation-warning-item">
+          <div class="rotation-warning-info">
+            <span class="rotation-warning-name">{{ item.staff_name || item.staff_id }}</span>
+            <span class="rotation-warning-sep">→</span>
+            <span class="rotation-warning-client">{{ item.client_name }}</span>
+            <el-tag
+              :type="item.continuous_years >= item.rotation_limit ? 'danger' : 'warning'"
+              size="small"
+              style="margin-left: 8px"
+            >
+              连续 {{ item.continuous_years }} 年
+            </el-tag>
+            <el-tag v-if="item.current_override_id" type="success" size="small" style="margin-left: 4px">
+              已 Override
+            </el-tag>
+          </div>
+          <div class="rotation-warning-actions">
+            <el-button
+              v-if="item.continuous_years >= item.rotation_limit && !item.current_override_id"
+              size="small"
+              type="danger"
+              plain
+              @click="openOverrideDialog(item)"
+            >
+              申请 Override
+            </el-button>
+            <span v-else-if="item.continuous_years >= (item.rotation_limit - 1)" class="rotation-warning-hint">
+              下年需轮换
+            </span>
+          </div>
+        </div>
+      </div>
+    </el-card>
+
     <el-tabs v-model="activeTab">
       <!-- Tab 1: 项目总览 -->
       <el-tab-pane label="项目总览" name="projects">
@@ -151,6 +214,52 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- 轮换 Override 申请弹窗 -->
+    <el-dialog v-model="showOverrideDialog" title="🔄 申请轮换 Override" width="520" append-to-body destroy-on-close>
+      <div v-if="overrideTarget" style="margin-bottom: 16px">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="人员">{{ overrideTarget.staff_name || overrideTarget.staff_id }}</el-descriptions-item>
+          <el-descriptions-item label="客户">{{ overrideTarget.client_name }}</el-descriptions-item>
+          <el-descriptions-item label="连续年数">{{ overrideTarget.continuous_years }} 年</el-descriptions-item>
+          <el-descriptions-item label="轮换上限">{{ overrideTarget.rotation_limit }} 年</el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <el-form label-position="top">
+        <el-form-item label="Override 原因" required>
+          <el-input
+            v-model="overrideReason"
+            type="textarea"
+            :rows="4"
+            placeholder="请说明需要继续委派的原因（如客户特殊性、无合适替代人选等）"
+          />
+        </el-form-item>
+      </el-form>
+      <div class="override-sign-status">
+        <div class="override-sign-title">审批状态（需双签）</div>
+        <div class="override-sign-item">
+          <span>合规合伙人签字</span>
+          <el-tag v-if="overrideResult?.approved_by_compliance_partner" type="success" size="small">已签</el-tag>
+          <el-tag v-else type="info" size="small">待签</el-tag>
+        </div>
+        <div class="override-sign-item">
+          <span>首席风控合伙人签字</span>
+          <el-tag v-if="overrideResult?.approved_by_chief_risk_partner" type="success" size="small">已签</el-tag>
+          <el-tag v-else type="info" size="small">待签</el-tag>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showOverrideDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="overrideSubmitting"
+          :disabled="!overrideReason.trim() || !!overrideResult"
+          @click="submitOverride"
+        >
+          {{ overrideResult ? '已提交' : '提交申请' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -167,6 +276,11 @@ import {
   getSignatureWorkflow, signDocument, getSignReadinessV2,
   type WorkflowStep,
 } from '@/services/signatureApi'
+import {
+  checkRotation, createRotationOverride,
+  type RotationCheckResult, type RotationOverrideResult,
+} from '@/services/rotationApi'
+import { api } from '@/services/apiProxy'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
 import SignatureWorkflowLine from '@/components/signature/SignatureWorkflowLine.vue'
@@ -192,6 +306,18 @@ const workflowData = ref<WorkflowStep[]>([])
 // 缓存每个项目的 workflow 用于 sign-list 卡片文案
 const projectWorkflowCache = ref<Record<string, WorkflowStep[]>>({})
 
+// 轮换预警
+interface RotationWarningItem extends RotationCheckResult {
+  staff_name?: string
+}
+const rotationWarnings = ref<RotationWarningItem[]>([])
+
+// Override 弹窗状态
+const showOverrideDialog = ref(false)
+const overrideTarget = ref<RotationWarningItem | null>(null)
+const overrideReason = ref('')
+const overrideSubmitting = ref(false)
+const overrideResult = ref<RotationOverrideResult | null>(null)
 const teamStats = computed(() => {
   const s = teamData.value?.summary
   if (!s) return []
@@ -203,6 +329,13 @@ const teamStats = computed(() => {
     { label: '人均底稿', value: s.avg_per_person },
   ]
 })
+
+// 独立性待声明项目（从 overview 中筛选未归档的项目作为提醒）
+const pendingIndependenceProjects = ref<any[]>([])
+
+function goToIndependence(pid: string) {
+  router.push(`/projects/${pid}/independence`)
+}
 
 // 当前用户 ready 的 step
 const myReadyStep = computed(() => {
@@ -370,6 +503,110 @@ async function loadAll() {
       }
     }
   }
+
+  // 检查独立性待声明项目
+  loadPendingIndependence()
+
+  // 加载轮换预警
+  loadRotationWarnings()
+}
+
+/**
+ * 检查独立性待声明项目：遍历活跃项目，查询当前用户是否已提交声明
+ */
+async function loadPendingIndependence() {
+  if (!overview.value?.projects?.length) return
+  const year = new Date().getFullYear()
+  const userId = authStore.userId
+  const pending: any[] = []
+
+  // 只检查非归档项目
+  const activeProjects = overview.value.projects.filter(p => p.status !== 'archived')
+  for (const p of activeProjects.slice(0, 10)) {
+    try {
+      const res = await api.get<{ declarations: any[] }>(
+        `/api/projects/${p.id}/independence-declarations`,
+        { params: { year } },
+      )
+      const myDecl = res.declarations?.find(
+        (d: any) => d.declarant_id === userId && (d.status === 'submitted' || d.status === 'approved'),
+      )
+      if (!myDecl) {
+        pending.push(p)
+      }
+    } catch {
+      // 静默失败，不阻断
+    }
+  }
+  pendingIndependenceProjects.value = pending
+}
+
+/**
+ * 加载轮换预警：遍历 overview.projects 的 signing_partner 调 rotation/check
+ * 显示连续年数 ≥ 4 的合伙人+客户组合
+ */
+async function loadRotationWarnings() {
+  if (!overview.value?.projects?.length) return
+  const warnings: RotationWarningItem[] = []
+  const checked = new Set<string>()
+
+  const activeProjects = overview.value.projects.filter(p => p.status !== 'archived')
+  for (const p of activeProjects.slice(0, 20)) {
+    // 从项目中获取 signing_partner 信息
+    const staffId = (p as any).signing_partner_id || (p as any).signing_partner
+    const clientName = p.client_name
+    if (!staffId || !clientName) continue
+
+    const key = `${staffId}|${clientName}`
+    if (checked.has(key)) continue
+    checked.add(key)
+
+    try {
+      const result = await checkRotation(staffId, clientName)
+      if (result.continuous_years >= 4) {
+        warnings.push({
+          ...result,
+          staff_name: (p as any).signing_partner_name || undefined,
+        })
+      }
+    } catch {
+      // 静默失败
+    }
+  }
+  rotationWarnings.value = warnings
+}
+
+/**
+ * 打开 Override 申请弹窗
+ */
+function openOverrideDialog(item: RotationWarningItem) {
+  overrideTarget.value = item
+  overrideReason.value = ''
+  overrideResult.value = null
+  showOverrideDialog.value = true
+}
+
+/**
+ * 提交 Override 申请
+ */
+async function submitOverride() {
+  if (!overrideTarget.value || !overrideReason.value.trim()) return
+  overrideSubmitting.value = true
+  try {
+    const result = await createRotationOverride({
+      staff_id: overrideTarget.value.staff_id,
+      client_name: overrideTarget.value.client_name,
+      original_years: overrideTarget.value.continuous_years,
+      override_reason: overrideReason.value.trim(),
+    })
+    overrideResult.value = result
+    ElMessage.success('Override 申请已提交，待合规合伙人 + 首席风控合伙人双签')
+  } catch (err: any) {
+    const msg = err?.response?.data?.detail?.message || err?.response?.data?.detail || 'Override 申请失败'
+    ElMessage.error(typeof msg === 'string' ? msg : 'Override 申请失败')
+  } finally {
+    overrideSubmitting.value = false
+  }
 }
 
 onMounted(loadAll)
@@ -401,5 +638,95 @@ onMounted(loadAll)
 .gt-sign-hint {
   font-size: 12px;
   color: var(--gt-color-text-tertiary, #909399);
+}
+
+/* 独立性待声明提醒卡 */
+.independence-reminder-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fdf6ec;
+}
+.independence-reminder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.independence-reminder-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+.independence-reminder-name {
+  font-size: 14px;
+  color: var(--gt-color-text, #303133);
+}
+
+/* 轮换预警卡片 */
+.rotation-warning-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fef0f0;
+}
+.rotation-warning-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rotation-warning-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+.rotation-warning-item:last-child {
+  border-bottom: none;
+}
+.rotation-warning-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.rotation-warning-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-text, #303133);
+}
+.rotation-warning-sep {
+  color: var(--gt-color-text-tertiary, #909399);
+  margin: 0 4px;
+}
+.rotation-warning-client {
+  font-size: 14px;
+  color: var(--gt-color-text, #303133);
+}
+.rotation-warning-actions {
+  flex-shrink: 0;
+}
+.rotation-warning-hint {
+  font-size: 12px;
+  color: var(--el-color-warning, #e6a23c);
+}
+
+/* Override 弹窗 */
+.override-sign-status {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--el-fill-color-lighter, #f5f7fa);
+  border-radius: 6px;
+}
+.override-sign-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gt-color-text, #303133);
+  margin-bottom: 8px;
+}
+.override-sign-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--gt-color-text-secondary, #606266);
 }
 </style>

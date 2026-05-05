@@ -93,6 +93,9 @@ class ArchiveOrchestrator:
         # 全部成功 — 记录归档完整性哈希
         await self._persist_integrity_hashes(job)
 
+        # 归档成功 — 写入 Project.archived_at + retention_until（需求 11）
+        await self._set_project_retention(project_id)
+
         job.status = "succeeded"
         job.finished_at = datetime.now(timezone.utc)
         await self.db.flush()
@@ -151,6 +154,9 @@ class ArchiveOrchestrator:
         # 全部成功 — 记录归档完整性哈希
         await self._persist_integrity_hashes(job)
 
+        # 归档成功 — 写入 Project.archived_at + retention_until（需求 11）
+        await self._set_project_retention(job.project_id)
+
         job.status = "succeeded"
         job.finished_at = datetime.now(timezone.utc)
         await self.db.flush()
@@ -168,6 +174,50 @@ class ArchiveOrchestrator:
         if not job:
             return None
         return self._job_to_dict(job)
+
+    # ── 归档保留期设置（需求 11）──────────────────────────────────
+
+    async def _set_project_retention(self, project_id: uuid.UUID) -> None:
+        """归档成功后写入 Project.archived_at + retention_until。
+
+        retention_until = archived_at + 10 years (3652 days)。
+        失败不阻断归档流程。
+        """
+        try:
+            from datetime import timedelta
+
+            from app.models.core import Project
+
+            stmt = select(Project).where(Project.id == project_id)
+            result = await self.db.execute(stmt)
+            project = result.scalar_one_or_none()
+            if project is None:
+                logger.warning(
+                    "[ARCHIVE_ORCHESTRATOR] _set_project_retention: project not found: %s",
+                    project_id,
+                )
+                return
+
+            now = datetime.now(timezone.utc)
+            project.archived_at = now
+            # 10 years ≈ 3652 days (accounts for ~2.5 leap years in a decade)
+            project.retention_until = now + timedelta(days=3652)
+            await self.db.flush()
+
+            logger.info(
+                "[ARCHIVE_ORCHESTRATOR] retention set: project=%s archived_at=%s retention_until=%s",
+                project_id,
+                project.archived_at.isoformat(),
+                project.retention_until.isoformat(),
+            )
+        except Exception as exc:
+            # 保留期设置失败不阻断归档
+            logger.warning(
+                "[ARCHIVE_ORCHESTRATOR] _set_project_retention failed "
+                "(non-blocking): project=%s error=%s",
+                project_id,
+                exc,
+            )
 
     # ── 归档完成通知 ──────────────────────────────────────────────
 

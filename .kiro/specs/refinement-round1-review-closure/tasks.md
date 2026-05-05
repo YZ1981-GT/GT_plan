@@ -185,14 +185,14 @@
   - 兼容逻辑：旧 `independence_confirmed: true` 视为 legacy 通过 + 升级提醒
   - _需求_ 10
 
-- [ ] 23. 前端：独立性声明表单
+- [x] 23. 前端：独立性声明表单
   - `src/views/independence/IndependenceDeclarationForm.vue`
   - 按问题模板渲染，yes/no/多选/文本/附件上传
   - 合伙人 Dashboard 新增"独立性待声明"提醒卡
   - 归档章节 04 注册：`archive_section_registry.register('04', 'independence_declarations/', independence_pdf_generator)`
   - _需求_ 10
 
-- [ ] 24. 后端：保留期 + 轮换检查
+- [x] 24. 后端：保留期 + 轮换检查
   - `data_lifecycle.purge_project_data` 硬校验 `retention_until`，违反 403 `RETENTION_LOCKED`
   - 归档成功时自动写 `Project.archived_at = now()` + `retention_until = archived_at + 10 years`
   - 新建 `backend/app/services/rotation_check_service.py`
@@ -200,16 +200,16 @@
   - `project_wizard` 创建项目选人时前端调用检查，阻断/警告
   - _需求_ 11
 
-- [ ] 25. 前端：轮换预警 + override 流程
+- [x] 25. 前端：轮换预警 + override 流程
   - Dashboard admin 视角新增"轮换预警"卡片
   - 超限时 override 需合规合伙人 + 首席风控合伙人双签（复用 R1 签字流水机制，`SignatureRecord.object_type='rotation_override'`）
   - _需求_ 11
 
-- [ ] 26. 属性测试：哈希链防篡改
+- [x] 26. 属性测试：哈希链防篡改
   - `test_audit_log_hash_chain_property.py`（hypothesis）：随机生成日志序列，任意位置修改一条 → verify-chain 必定检出
   - _需求_ 9
 
-- [ ] Sprint 3 验收
+- [x] Sprint 3 验收
   - 集成测试：`test_long_term_compliance_e2e.py`（声明→签字→归档→验证保留锁→哈希链校验）
   - 性能测试：`log_action` 6000 并发 P95 < 50ms
   - UAT 新增条目：

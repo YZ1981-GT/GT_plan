@@ -126,6 +126,11 @@ const router = createRouter({
           component: () => import('@/views/ReviewWorkbench.vue'),
         },
         {
+          path: 'projects/:projectId/independence',
+          name: 'IndependenceDeclaration',
+          component: () => import('@/views/independence/IndependenceDeclarationForm.vue'),
+        },
+        {
           path: 'projects/:projectId/archive',
           name: 'ArchiveWizard',
           component: () => import('@/views/ArchiveWizard.vue'),
