@@ -983,6 +983,13 @@ export const governance = {
   },
 } as const
 
+// ─── 签字 ───────────────────────────────────────────────────────────────────
+
+export const signatures = {
+  workflow: (projectId: string) => `/api/signatures/workflow/${projectId}`,
+  sign: '/api/signatures/sign',
+} as const
+
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
 
 export const API = {
@@ -999,7 +1006,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  admin, partner, qcDashboard, jobs, governance,
+  admin, partner, qcDashboard, jobs, governance, signatures,
 } as const
 
 export default API

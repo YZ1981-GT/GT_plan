@@ -76,7 +76,7 @@
           <div v-for="p in overview.pending_sign" :key="p.id" class="sign-card" @click="checkSign(p.id)">
             <div class="sign-card-left">
               <div class="sign-card-name">{{ p.client_name || p.name }}</div>
-              <div class="sign-card-meta">完成率 {{ p.completion_rate }}% · {{ p.wp_passed }}/{{ p.wp_total }} 底稿通过</div>
+              <div class="sign-card-meta">{{ signCardText(p) }}</div>
             </div>
             <el-button type="primary" size="small" round>签字前检查 →</el-button>
           </div>
@@ -116,24 +116,40 @@
       </el-tab-pane>
     </el-tabs>
 
-    <!-- 签字前检查弹窗 -->
-    <el-dialog v-model="showSignDialog" title="🖊️ 签字前检查" width="600" append-to-body>
-      <div v-if="signResult">
-        <div class="gt-check-status" :class="signResult.ready_to_sign ? 'gt-check-status--pass' : 'gt-check-status--fail'">
-          {{ signResult.ready_to_sign ? '✅ 满足签字条件' : '⚠️ 尚未满足签字条件' }}
-          <span class="gt-check-score">{{ signResult.passed_count }}/{{ signResult.total_checks }}</span>
+    <!-- 签字前检查弹窗（改造版） -->
+    <el-dialog v-model="showSignDialog" title="🖊️ 签字前检查" width="700" append-to-body destroy-on-close>
+      <div v-loading="signLoading" style="min-height: 120px">
+        <!-- 顶部：GateReadinessPanel -->
+        <GateReadinessPanel
+          v-if="readinessData"
+          :data="readinessData"
+          :loading="readinessLoading"
+          :project-id="currentSignProjectId"
+          :on-refresh="refreshReadiness"
+        />
+
+        <!-- 中部：签字流水线 -->
+        <div v-if="workflowData && workflowData.length" style="margin-top: 16px">
+          <SignatureWorkflowLine :workflow="workflowData" />
         </div>
-        <div class="gt-check-list">
-          <div v-for="c in signResult.checks" :key="c.id" class="gt-check-item">
-            <span class="gt-check-icon">{{ c.passed ? '✅' : '❌' }}</span>
-            <div>
-              <div class="gt-check-label">{{ c.label }}</div>
-              <div class="gt-check-detail">{{ c.detail }}</div>
-            </div>
+
+        <!-- 底部：立即签字按钮 -->
+        <div v-if="readinessData" class="gt-sign-action-bar">
+          <el-button
+            type="primary"
+            size="large"
+            :disabled="!canSign"
+            :loading="signing"
+            @click="handleSign"
+          >
+            立即签字
+          </el-button>
+          <div v-if="!canSign && readinessData" class="gt-sign-hint">
+            <template v-if="!readinessData.ready">就绪检查未通过，无法签字</template>
+            <template v-else-if="!myReadyStep">当前未轮到你签字</template>
           </div>
         </div>
       </div>
-      <div v-else v-loading="signLoading" style="min-height: 100px" />
     </el-dialog>
   </div>
 </template>
@@ -142,21 +158,39 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '@/stores/auth'
 import {
-  getPartnerOverview, getSignReadiness, getTeamEfficiency,
-  type PartnerOverview, type SignReadiness, type TeamEfficiency,
+  getPartnerOverview, getTeamEfficiency,
+  type PartnerOverview, type TeamEfficiency,
 } from '@/services/partnerApi'
+import {
+  getSignatureWorkflow, signDocument, getSignReadinessV2,
+  type WorkflowStep,
+} from '@/services/signatureApi'
+import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
+import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
+import SignatureWorkflowLine from '@/components/signature/SignatureWorkflowLine.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const loading = ref(false)
 const activeTab = ref('projects')
 
 const overview = ref<PartnerOverview | null>(null)
 const teamData = ref<TeamEfficiency | null>(null)
 const teamLoading = ref(false)
-const signResult = ref<SignReadiness | null>(null)
-const signLoading = ref(false)
+
+// 签字弹窗状态
 const showSignDialog = ref(false)
+const signLoading = ref(false)
+const signing = ref(false)
+const currentSignProjectId = ref('')
+const readinessData = ref<GateReadinessData | null>(null)
+const readinessLoading = ref(false)
+const workflowData = ref<WorkflowStep[]>([])
+
+// 缓存每个项目的 workflow 用于 sign-list 卡片文案
+const projectWorkflowCache = ref<Record<string, WorkflowStep[]>>({})
 
 const teamStats = computed(() => {
   const s = teamData.value?.summary
@@ -168,6 +202,21 @@ const teamStats = computed(() => {
     { label: '平均退回率', value: s.avg_reject_rate + '%' },
     { label: '人均底稿', value: s.avg_per_person },
   ]
+})
+
+// 当前用户 ready 的 step
+const myReadyStep = computed(() => {
+  if (!workflowData.value || !workflowData.value.length) return null
+  const userId = authStore.userId
+  // 找到 status=ready 且 required_user_id 匹配当前用户（或无指定用户）的 step
+  return workflowData.value.find(
+    s => s.status === 'ready' && (!s.required_user_id || s.required_user_id === userId)
+  ) || null
+})
+
+// 是否可签字
+const canSign = computed(() => {
+  return !!(readinessData.value?.ready && myReadyStep.value)
 })
 
 function statusLabel(s: string) {
@@ -188,13 +237,119 @@ function onProjectClick(row: any) {
   goToProject(row.id)
 }
 
+/**
+ * sign-list 卡片文案：从 workflow 推算"已 X/Y 级，待你签"
+ */
+function signCardText(project: any): string {
+  const wf = projectWorkflowCache.value[project.id]
+  if (wf && wf.length) {
+    const signed = wf.filter(s => s.status === 'signed').length
+    const total = wf.length
+    return `已 ${signed}/${total} 级，待你签`
+  }
+  // 降级：无 workflow 数据时显示旧文案
+  return `完成率 ${project.completion_rate}% · ${project.wp_passed}/${project.wp_total} 底稿通过`
+}
+
+/**
+ * 打开签字弹窗：并行拉 sign-readiness + workflow
+ */
 async function checkSign(pid: string) {
   showSignDialog.value = true
-  signResult.value = null
+  currentSignProjectId.value = pid
+  readinessData.value = null
+  workflowData.value = []
   signLoading.value = true
-  try { signResult.value = await getSignReadiness(pid) }
-  catch { ElMessage.error('检查失败') }
-  finally { signLoading.value = false }
+
+  try {
+    const [readiness, workflow] = await Promise.allSettled([
+      getSignReadinessV2(pid),
+      getSignatureWorkflow(pid),
+    ])
+
+    if (readiness.status === 'fulfilled') {
+      readinessData.value = readiness.value
+    } else {
+      ElMessage.error('就绪检查加载失败')
+    }
+
+    if (workflow.status === 'fulfilled') {
+      workflowData.value = workflow.value
+      // 缓存到 projectWorkflowCache
+      projectWorkflowCache.value[pid] = workflow.value
+    }
+  } finally {
+    signLoading.value = false
+  }
+}
+
+/**
+ * 刷新 readiness 数据
+ */
+async function refreshReadiness() {
+  if (!currentSignProjectId.value) return
+  readinessLoading.value = true
+  try {
+    readinessData.value = await getSignReadinessV2(currentSignProjectId.value)
+  } catch {
+    ElMessage.error('刷新失败')
+  } finally {
+    readinessLoading.value = false
+  }
+}
+
+/**
+ * 执行签字
+ */
+async function handleSign() {
+  if (!canSign.value || !myReadyStep.value || !readinessData.value) return
+
+  const step = myReadyStep.value
+  // 计算 prerequisite_signature_ids：当前 step 之前所有 signed 的 step
+  const prerequisiteIds: string[] = []
+  for (const s of workflowData.value) {
+    if (s.order < step.order && s.status === 'signed') {
+      // 如果 workflow 返回了 id 字段则用，否则不传
+      if ((s as any).id) {
+        prerequisiteIds.push((s as any).id)
+      }
+    }
+  }
+
+  signing.value = true
+  try {
+    await signDocument({
+      object_type: 'audit_report',
+      object_id: currentSignProjectId.value,
+      signer_id: authStore.userId,
+      signature_level: `level${step.order}`,
+      gate_eval_id: readinessData.value.gate_eval_id || undefined,
+      project_id: currentSignProjectId.value,
+      gate_type: 'sign_off',
+      required_order: step.order,
+      required_role: step.role,
+      prerequisite_signature_ids: prerequisiteIds.length ? prerequisiteIds : undefined,
+    })
+
+    ElMessage.success('签字成功')
+    showSignDialog.value = false
+    // 刷新待签字列表
+    loadAll()
+  } catch (err: any) {
+    const detail = err?.response?.data?.detail
+    const errorCode = detail?.error_code || detail?.code || ''
+
+    if (errorCode === 'PREREQUISITE_NOT_MET') {
+      ElMessage.error('前置签字未完成')
+    } else if (errorCode === 'GATE_STALE') {
+      ElMessage.warning('检查已过期，请刷新')
+      refreshReadiness()
+    } else {
+      ElMessage.error(detail?.message || '签字失败')
+    }
+  } finally {
+    signing.value = false
+  }
 }
 
 async function loadAll() {
@@ -204,6 +359,17 @@ async function loadAll() {
   teamLoading.value = true
   try { teamData.value = await getTeamEfficiency() } catch {}
   finally { teamLoading.value = false }
+
+  // 预加载待签字项目的 workflow 数据（用于卡片文案）
+  if (overview.value?.pending_sign?.length) {
+    for (const p of overview.value.pending_sign) {
+      if (!projectWorkflowCache.value[p.id]) {
+        getSignatureWorkflow(p.id)
+          .then(wf => { projectWorkflowCache.value[p.id] = wf })
+          .catch(() => { /* 静默失败 */ })
+      }
+    }
+  }
 }
 
 onMounted(loadAll)
@@ -222,4 +388,18 @@ onMounted(loadAll)
 .sign-card:hover { box-shadow: var(--gt-shadow-md); border-color: rgba(75,45,119,0.08); }
 .sign-card-name { font-size: var(--gt-font-size-md); font-weight: 600; color: var(--gt-color-text); }
 .sign-card-meta { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 4px; }
+
+/* 签字操作栏 */
+.gt-sign-action-bar {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--el-border-color-lighter, #ebeef5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.gt-sign-hint {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+}
 </style>

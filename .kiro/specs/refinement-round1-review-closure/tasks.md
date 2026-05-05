@@ -77,7 +77,7 @@
   - `GET /api/signatures/workflow/{project_id}` 新增
   - _需求_ 4
 
-- [ ] 12. 前端：签字流水线 UI
+- [x] 12. 前端：签字流水线 UI
   - `src/components/signature/SignatureWorkflowLine.vue` 显示 order/role/status 时间线
   - `PartnerDashboard.vue` 签字弹窗内嵌 `GateReadinessPanel` + `SignatureWorkflowLine` + "立即签字"按钮
   - 签字后 toast + 刷新待签字列表
