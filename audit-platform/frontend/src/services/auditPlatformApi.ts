@@ -171,6 +171,47 @@ export async function getAccountDropdown(projectId: string, reportLineCode?: str
   return data
 }
 
+// ─── AJE → 错报 一键转换（R1 需求 3 / Task 9） ───
+
+export interface ConvertAjeToMisstatementResult {
+  misstatement_id: string
+  source_entry_group_id: string
+  source_adjustment_id: string | null
+  net_amount: string
+  misstatement_type: string
+  year: number
+  adjustment_count: number
+  created_at: string | null
+}
+
+export interface ConvertAjeAlreadyConverted {
+  error_code: 'ALREADY_CONVERTED'
+  message: string
+  existing_misstatement_id: string
+}
+
+/**
+ * 把被驳回的 AJE 组一键转为未更正错报。
+ *
+ * 后端：`POST /api/projects/{project_id}/adjustments/{entry_group_id}/convert-to-misstatement`
+ *
+ * 返回值：
+ *   - 成功：`ConvertAjeToMisstatementResult`
+ *   - 409 `ALREADY_CONVERTED`：axios 会抛错；调用方需捕获 `err.response?.status === 409`
+ *     并读取 `err.response?.data?.detail` 获取 `existing_misstatement_id`。
+ */
+export async function convertAjeToMisstatement(
+  projectId: string,
+  entryGroupId: string,
+  opts?: { force?: boolean },
+): Promise<ConvertAjeToMisstatementResult> {
+  const { data } = await http.post(
+    P_adj.convertToMisstatement(projectId, entryGroupId),
+    { force: !!opts?.force },
+  )
+  return data
+}
+
 // ─── Materiality ───
 
 export interface MaterialityData {

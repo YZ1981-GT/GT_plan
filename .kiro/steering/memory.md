@@ -53,8 +53,9 @@ inclusion: always
 - 后端 121 个路由文件（新增 pbc.py、confirmations.py），172 个服务文件，42 个模型文件，~152 张表
 - 后端新增 `backend/app/workers/` 模块：sla_worker、import_recover_worker、outbox_replay_worker（每个导出 `async def run(stop_event)`）
 - 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
-- git 分支：feature/global-component-library（已推送至 73204cf，待合并 master）
-- 最新提交 73204cf：R1 Task 1 数据模型迁移 + R1~R5 spec 三件套 + production-readiness 产物归档（83 文件 +11706/-503）
+- git 分支：feature/global-component-library（已推送至 8548260，待合并 master）
+- 最新提交 8548260：R1 Task 5-8（红点/反向同步/readiness 门面/新 gate 规则）
+- 前两个提交：73204cf（数据模型迁移+R1-R5 spec）、5c5ac56（Task 2-4）
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
   - Sprint 1（P0 数据正确性）：底稿保存事件→附注同步、Dashboard 趋势图真实 API、Dirty 标记完整覆盖、QC 项目汇总 N+1 优化、审计报告 final 保护、QC-16 字段修正、ReviewInbox 跳转修正、报表两张表数据驱动、AuditCheckDashboard 批量接口、PBC/函证路由注册、看板卡片跳转、个人工作台待办工时
@@ -122,6 +123,25 @@ inclusion: always
 - R5 EQCR 独立性边界：不直接对外联络客户（维持项目组作为对外单一入口），只做内部独立笔记，可选择分享给项目组
 - 签字状态机联动分两情形：无 EQCR 项目 order=3 partner 签完直接切 review→final；启用 EQCR 则 order=3 不切、order=4 EQCR 签完切 review→eqcr_approved、order=5 归档签字完切 eqcr_approved→final
 - notification_types.py 由 R1 tasks 19 唯一创建，R2+ 只向其追加常量不重复新建；前端 notificationTypes.ts 同理
+- Task 2 后端 ReviewInbox 合并无需改代码：`pm_dashboard.get_global_review_inbox` 与 `get_project_review_inbox` 本就共用 `ReviewInboxService.get_inbox`，增补 test 覆盖即可
+- Task 3 ReviewWorkbench 中栏未嵌入 Univer 只读版（WorkpaperEditor 无 readonly prop/defineProps），采用元信息卡 + "打开完整编辑器"跳转；ReviewInbox.vue 保留不删（Round 1 回归后清理），ReviewWorkstation.vue 已删
+- Task 4 正向联动（review→issue 创建）用 `db.begin_nested()` SAVEPOINT 隔离，工单创建失败不阻断 ReviewRecord，发 REVIEW_RECORD_CREATED 事件走补偿；与 Task 6 反向同步的强一致语义（整体回滚）对立
+- Task 4 EventType 新增 `REVIEW_RECORD_CREATED = "review_record.created"`；extra 含 ticket_created 标识，补偿订阅以 source_ref_id 幂等
+- Task 5 Univer 红点方案：`FRange.attachPopup({componentKey, isVue3, direction})` + `univerAPI.registerComponent(name, comp, {framework:'vue3'})` 公开 API，canvas-pop-manager 自动跟踪视口；不调 setCellValue 故不污染 dirty；`FWorksheet.scrollToCell(row,col)` 做路由 query 定位
+- Task 5 IssueTicket 无 cell_ref 字段，IssueTicketList→WorkpaperEditor 跳转传 `?review_id=<source_ref_id>`，WorkpaperEditor 查到 cell_reference 再滚过去（比手工同步 cell_ref 更准）
+- Task 6 反向同步（issue→review/WP）强一致：与工单状态变更同事务，`_sync_review_record_on_status_change` 失败整体回滚；幂等通过"令牌串 `[系统] 已整改，请复验` 探测 + ReviewRecord.status 探测 + WP review_status 非 rejected 不回退"三重保障
+- Task 6 reply_text 追加而非覆盖：已有文本换行追加令牌串 `[系统] 已整改，请复验`，保留编制人原回复；审计日志 `review_record.replied_by_ticket / resolved_by_ticket` 记录
+- Task 7 gate_eval_id vs trace_id 职责分离：trace_id 是 gate_engine 内部执行链追踪（5s 内部幂等缓存），gate_eval_id 是面向客户端的 5 分钟签字幂等令牌，由 `services/gate_eval_store.py` 独立生成（Redis + 本地字典降级）
+- Task 7 readiness 统一响应 schema：`{ready, groups, gate_eval_id, expires_at, checks(legacy), ready_to_sign(legacy)}`；ready 语义 = `gate_decision != 'block' AND 无 blocking finding`（warn 不阻断）；legacy checks/ready_to_sign 保留至 Round 2 前端切 GateReadinessPanel 后移除
+- Task 7 readiness_facade `_SIGN_OFF_RULE_CATEGORY` / `_EXPORT_PACKAGE_RULE_CATEGORY` 映射表：未映射的 rule_code 归入 MISC_CATEGORY（id='misc'），保证新规则 UI 不消失
+- Task 7 actor_id 兜底顺序：传入 → project.created_by → 随机 UUID（仅用于 trace_events，不影响决策）；新增 service 签名 `check_sign_readiness(project_id, actor_id=None)` 保持向后兼容
+- Task 7 签字接口 `POST /api/signatures/sign` 新增可选 `gate_eval_id/project_id/gate_type`；传入则调 `validate_gate_eval` 失败返回 403 `GATE_STALE`，未传走原流程（R1 渐进迁移）
+- Task 8 `R1-AJE-UNCONVERTED` rule 按 `Adjustment.entry_group_id` 聚合 rejected AJE 组，用 `UnadjustedMisstatement.source_adjustment_id` 精准判定"已转错报"（字段已存在无需粗粒度回退）；severity=warning，sign_off 注册
+- Task 8 `R1-EVENT-CASCADE` rule 查 `ImportEventOutbox` 近 1h 的 pending/failed（覆盖 `workpaper.saved/reports.updated`，**不覆盖 in-memory event_bus.publish** 的事件）；severity 动态：`now<start_date→warning / 已到→blocking`，默认 `start_date=2026-06-05`（R1 上线约 1 个月后，宽容期）；通过 `GateRuleConfig(rule_code, 'enforcement_start_date')` 可配置
+- `gate_engine.load_rule_config(db, rule_code, threshold_key, tenant_id=None)` 读平台级/租户级阈值配置，用于规则动态参数（Task 8 使用）
+- Task 10 `GateReadinessPanel.vue` 组件 props：`data(必传)/loading/projectId/onRefresh/onFindingJump/defaultOpenGroupIds`；**不自己拉数据**，调用方（Task 12 PartnerDashboard / Task 17 ArchiveWizard）负责拉取；过期自动调 onRefresh 一次（按 gate_eval_id 幂等）
+- Task 10 内置跳转映射：`location.wp_id` → WorkpaperEditor / `section=adjustments` 或 `sample_entry_group_ids` → Adjustments / `section=misstatements` → Misstatements / `section=notes/disclosure` → DisclosureNotes / `section=report` → AuditReport / `section=issues/review_comment` → IssueTicketList；其他触发 `@no-target` 事件
+- Task 10 Adjustments 转错报按钮只在 `review_status='rejected' AND adjustment_type='aje'` 显示；409 ALREADY_CONVERTED 返回 `err.response.data.detail` 需走 axios `err.response` 而非 apiProxy 解包
 
 ## 活跃待办
 
@@ -132,7 +152,7 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
-- Round 1 实施进度：Task 1 已完成（数据模型迁移已推 73204cf），进行中 Task 2（前端合并 ReviewInbox 入口）；剩余 27 个任务按 tasks.md 顺序推进
+- Round 1 实施进度：Task 1-8 已完成并推送（数据模型/ReviewInbox 验证/ReviewWorkbench/工单联动/红点/反向同步/readiness 门面/新规则），进行中 Task 9（AJE 一键转错报）；剩余 20 个任务按 tasks.md 顺序推进
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

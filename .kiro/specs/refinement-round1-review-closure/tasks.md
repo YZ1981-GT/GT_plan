@@ -52,25 +52,25 @@
   - `gate_eval_id` 5 分钟 TTL（Redis 缓存）
   - _需求_ 3
 
-- [-] 8. 后端：新增两个 gate 规则
+- [x] 8. 后端：新增两个 gate 规则
   - `UnconvertedRejectedAJERule`：扫描 rejected 但未转错报的 AJE 组（warning 级）
   - `EventCascadeHealthRule`：检查 1 小时内 `WORKPAPER_SAVED` 事件全部消费（首次部署 warning 不阻断，满月后升 blocking）
   - 注册到 `gate_rules_phase14.register_phase14_rules()`
   - _需求_ 3
 
-- [ ] 9. 后端：AJE 一键转错报
+- [x] 9. 后端：AJE 一键转错报
   - `POST /api/adjustments/{group_id}/convert-to-misstatement` 封装现有 `misstatement_service.create_from_rejected_aje`
   - 响应包含新建 `misstatement_id`，审计日志记动作
   - _需求_ 3
 
-- [ ] 10. 前端：GateReadinessPanel 公共组件
+- [x] 10. 前端：GateReadinessPanel 公共组件
   - `src/components/gate/GateReadinessPanel.vue`
   - 按 groups 折叠展开，findings 带跳转（底稿/错报/附注）
   - "剩余 Ns"倒计时 + 过期自动刷新
   - `Adjustments.vue` 新增"转错报"按钮列（仅 rejected 行）
   - _需求_ 3
 
-- [ ] 11. 后端：签字前置依赖校验
+- [x] 11. 后端：签字前置依赖校验
   - `POST /api/signatures/sign` 校验 `prerequisite_signature_ids` 全部 signed，否则 403 `PREREQUISITE_NOT_MET`
   - 校验 `gate_eval_id` 存在 + 未过期 + 对应 ready=true，否则 403 `GATE_STALE`
   - **最高级签完后同事务切 `AuditReport.status`**（review/eqcr_approved → final）

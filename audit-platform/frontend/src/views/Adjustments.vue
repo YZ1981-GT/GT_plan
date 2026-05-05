@@ -126,6 +126,20 @@
           </el-button>
         </template>
       </el-table-column>
+      <el-table-column label="转错报" width="110" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.review_status === 'rejected' && normalizeAdjustmentType(row.adjustment_type) === 'aje'"
+            size="small"
+            type="warning"
+            :loading="convertingGroupId === row.entry_group_id"
+            @click="onConvertToMisstatement(row)"
+          >
+            转错报
+          </el-button>
+          <span v-else class="gt-adj-col-placeholder">—</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- 批量复核操作 -->
@@ -266,12 +280,13 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
   batchCommitAdjustments,
+  convertAjeToMisstatement,
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
 import { useProjectStore } from '@/stores/project'
@@ -333,6 +348,8 @@ const filterAccount = ref(typeof route.query.account === 'string' ? route.query.
 const batchMode = ref(false)
 const batchPendingCount = ref(0)
 const batchCommitting = ref(false)
+// R1 需求 3 — AJE 一键转错报：正在转换的 entry_group_id（避免重复点击）
+const convertingGroupId = ref<string>('')
 // Form state
 const formDialogVisible = ref(false)
 const isEditing = ref(false)
@@ -551,6 +568,58 @@ async function onDelete(row: any) {
   })
 }
 
+// R1 需求 3 / Task 10 — 将被驳回的 AJE 一键转为未更正错报
+async function onConvertToMisstatement(row: any) {
+  if (row.review_status !== 'rejected' || normalizeAdjustmentType(row.adjustment_type) !== 'aje') {
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将该分录（${row.adjustment_no || row.entry_group_id?.slice(0, 8)}）转为未更正错报？转换后该条目将出现在《未更正错报汇总表》中。`,
+      '确认转错报',
+      { confirmButtonText: '确认转换', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+
+  convertingGroupId.value = row.entry_group_id
+  try {
+    const res = await convertAjeToMisstatement(projectId.value, row.entry_group_id)
+    ElMessage.success(`已转为错报（净额 ${res.net_amount}）`)
+    try {
+      await ElMessageBox.confirm(
+        '是否立即查看《未更正错报汇总表》？',
+        '转换成功',
+        { confirmButtonText: '立即查看', cancelButtonText: '稍后', type: 'success' },
+      )
+      router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
+    } catch {
+      /* 用户选择稍后，不跳转 */
+    }
+  } catch (err: any) {
+    const status = err?.response?.status
+    const detail = err?.response?.data?.detail
+    if (status === 409 && detail && typeof detail === 'object' && detail.error_code === 'ALREADY_CONVERTED') {
+      try {
+        await ElMessageBox.confirm(
+          '该分录已转为未更正错报，是否跳转查看？',
+          '已转换',
+          { confirmButtonText: '跳转查看', cancelButtonText: '关闭', type: 'info' },
+        )
+        router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
+      } catch {
+        /* 用户选择关闭 */
+      }
+    } else {
+      const msg = typeof detail === 'string' ? detail : (detail?.message || err?.message || '转换失败')
+      ElMessage.error(msg)
+    }
+  } finally {
+    convertingGroupId.value = ''
+  }
+}
+
 async function batchReview(status: string) {
   const eligible = selectedRows.value.filter(r => r.review_status === 'pending_review')
   const skipped = selectedRows.value.length - eligible.length
@@ -692,6 +761,10 @@ watch(
 .gt-adj-balance-diff.gt-adj-unbalanced {
   background: var(--gt-color-coral-light);
   color: var(--gt-color-coral);
+}
+
+.gt-adj-col-placeholder {
+  color: var(--gt-color-text-tertiary, #909399);
 }
 
 :deep(.el-tabs__item.is-active) { font-weight: 600; }

@@ -51,7 +51,7 @@ class SignatureRecord(Base):
     required_role: Mapped[str | None] = mapped_column(String(30), nullable=True)
     prerequisite_signature_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     signature_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    signature_timestamp: Mapped[datetime] = mapped_column(nullable=False)
+    signature_timestamp: Mapped[datetime | None] = mapped_column(nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

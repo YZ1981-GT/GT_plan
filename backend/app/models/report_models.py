@@ -79,6 +79,7 @@ class ReportStatus(str, enum.Enum):
     """审计报告状态"""
     draft = "draft"
     review = "review"
+    eqcr_approved = "eqcr_approved"
     final = "final"
 
 

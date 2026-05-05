@@ -51,6 +51,8 @@ export const adjustments = {
   summary: (pid: string) => `/api/projects/${pid}/adjustments/summary`,
   accountDropdown: (pid: string) => `/api/projects/${pid}/adjustments/account-dropdown`,
   exportSummary: (pid: string) => `/api/projects/${pid}/adjustments/export-summary`,
+  convertToMisstatement: (pid: string, groupId: string) =>
+    `/api/projects/${pid}/adjustments/${groupId}/convert-to-misstatement`,
 } as const
 
 // ─── 重要性 ─────────────────────────────────────────────────────────────────
