@@ -252,7 +252,7 @@
         </el-table-column>
         <el-table-column prop="review_status" label="状态" width="100">
           <template #default="{ row }">
-            <GtStatusTag :status-map="ADJUSTMENT_STATUS" :value="row.review_status" />
+            <GtStatusTag :status-map="ADJUSTMENT_STATUS" status-map-name="ADJUSTMENT_STATUS" :value="row.review_status" />
           </template>
         </el-table-column>
       </el-table>

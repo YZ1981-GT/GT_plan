@@ -107,7 +107,7 @@
           <template #default="{ data }">
             <div class="gt-wp-tree-node">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
-              <GtStatusTag v-if="data.status" :status-map="WP_STATUS" :value="data.status" class="gt-wp-tree-node-tag" />
+              <GtStatusTag v-if="data.status" :status-map="WP_STATUS" status-map-name="WP_STATUS" :value="data.status" class="gt-wp-tree-node-tag" />
             </div>
           </template>
         </el-tree>

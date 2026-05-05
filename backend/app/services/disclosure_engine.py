@@ -246,9 +246,14 @@ class DisclosureEngine:
 
         # 底稿数据（汇总 + 精细化明细行）
         # 使用 JOIN 一次查完 WorkingPaper + WpIndex，消除原来的 N+1 查询
+        # 只 SELECT 需要的字段，减少数据传输量
         try:
             wp_result = await self.db.execute(
-                sa.select(WorkingPaper, WpIndex.wp_code, WpIndex.wp_name)
+                sa.select(
+                    WorkingPaper.parsed_data,
+                    WpIndex.wp_code,
+                    WpIndex.wp_name,
+                )
                 .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
                 .where(
                     WorkingPaper.project_id == project_id,
@@ -256,10 +261,10 @@ class DisclosureEngine:
                     WorkingPaper.parsed_data.isnot(None),
                 )
             )
-            for wp, wp_code, _wp_name in wp_result.all():
+            for parsed_data, wp_code, _wp_name in wp_result.all():
                 if not wp_code:
                     continue
-                pd = wp.parsed_data or {}
+                pd = parsed_data or {}
                 audited = pd.get("audited_amount")
                 unadjusted = pd.get("unadjusted_amount")
                 if audited is not None or unadjusted is not None:

@@ -9,7 +9,7 @@
  *
  * 用法：
  *   const { hasDraft, clearDraft, saveDraft, restoreDraft } = useAutoSave(
- *     'disclosure_note_123_five',
+ *     `disclosure_note_${projectId}_${noteSection}`,  // key 中应包含 projectId，防止多项目草稿互相覆盖
  *     () => currentNote.value,
  *     (data) => { currentNote.value = data },
  *   )
@@ -19,7 +19,6 @@
  */
 import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { useProjectStore } from '@/stores/project'
 
 export interface UseAutoSaveOptions {
   /** 自动保存间隔（毫秒），默认 30000（30秒） */
@@ -46,11 +45,14 @@ export function useAutoSave<T = any>(
     return enabledRef.value
   }
 
-  /** 构建完整的 sessionStorage key（含 projectId 前缀，防止多项目间草稿互相覆盖） */
+  /** 构建完整的 sessionStorage key
+   *
+   * 调用方应在 key 中自行包含 projectId（如 `adjustment_form_${projectId}`），
+   * 以防止多项目间草稿互相覆盖。此处不再内部读 store，避免挂载时 projectId 为空
+   * 导致 key 变成 `autosave_global_xxx` 的边界情况。
+   */
   function storageKey(): string {
-    const projectStore = useProjectStore()
-    const pid = projectStore.projectId || 'global'
-    return `autosave_${pid}_${key}`
+    return `autosave_${key}`
   }
 
   /** 手动保存草稿到 sessionStorage */

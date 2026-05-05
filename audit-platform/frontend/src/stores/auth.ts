@@ -28,13 +28,23 @@ export interface AuthState {
 }
 
 export const useAuthStore = defineStore('auth', {
-  state: (): AuthState => ({
+  state: (): AuthState => {
     // 安全改进：改用 sessionStorage（关闭标签页自动清除，防止 XSS 窃取 token）
-    // localStorage 在 XSS 攻击下可被任意 JS 读取，审计平台数据敏感，需更高安全级别
-    token: sessionStorage.getItem('token'),
-    refreshToken: sessionStorage.getItem('refreshToken'),
-    user: null,
-  }),
+    // 一次性迁移：将旧 localStorage token 迁移到 sessionStorage，避免已登录用户被强制登出
+    const oldToken = localStorage.getItem('token')
+    const oldRefresh = localStorage.getItem('refreshToken')
+    if (oldToken) {
+      sessionStorage.setItem('token', oldToken)
+      if (oldRefresh) sessionStorage.setItem('refreshToken', oldRefresh)
+      localStorage.removeItem('token')
+      localStorage.removeItem('refreshToken')
+    }
+    return {
+      token: sessionStorage.getItem('token'),
+      refreshToken: sessionStorage.getItem('refreshToken'),
+      user: null,
+    }
+  },
 
   getters: {
     isAuthenticated: (state) => !!state.token,

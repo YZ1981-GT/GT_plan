@@ -61,9 +61,8 @@ def _is_comment_only(stmt: str) -> bool:
     bool
         True 表示该片段只含注释/空行，可以跳过执行
     """
-    # 先去掉所有 /* ... */ 块注释，再检查剩余内容
-    import re as _re
-    stripped = _re.sub(r'/\*.*?\*/', '', stmt, flags=_re.DOTALL)
+    # 先去掉所有 /* ... */ 块注释（使用顶部已导入的 re 模块），再检查剩余内容
+    stripped = re.sub(r'/\*.*?\*/', '', stmt, flags=re.DOTALL)
     for line in stripped.splitlines():
         line = line.strip()
         if line and not line.startswith("--"):
