@@ -229,6 +229,38 @@ export interface EqcrOpinionUpdateInput {
   extra_payload?: Record<string, any> | null
 }
 
+/** 关联方注册创建请求体（任务 7） */
+export interface RelatedPartyCreateInput {
+  name: string
+  relation_type: string
+  is_controlled_by_same_party?: boolean
+}
+
+/** 关联方注册更新请求体（任务 7） */
+export interface RelatedPartyUpdateInput {
+  name?: string
+  relation_type?: string
+  is_controlled_by_same_party?: boolean
+}
+
+/** 关联方交易创建请求体（任务 7） */
+export interface RelatedPartyTransactionCreateInput {
+  related_party_id: string
+  amount?: number | string | null
+  transaction_type: string
+  is_arms_length?: boolean | null
+  evidence_refs?: any
+}
+
+/** 关联方交易更新请求体（任务 7） */
+export interface RelatedPartyTransactionUpdateInput {
+  related_party_id?: string
+  amount?: number | string | null
+  transaction_type?: string
+  is_arms_length?: boolean | null
+  evidence_refs?: any
+}
+
 // ─── API 调用 ────────────────────────────────────────────────────────────────
 
 export const eqcrApi = {
@@ -295,6 +327,61 @@ export const eqcrApi = {
     patch: EqcrOpinionUpdateInput,
   ): Promise<EqcrOpinion> {
     return api.patch<EqcrOpinion>(P.opinionDetail(opinionId), patch)
+  },
+
+  // ─── 任务 7：关联方 CRUD ──────────────────────────────────────────────────
+
+  /** 新建关联方注册 */
+  async createRelatedParty(
+    projectId: string,
+    data: RelatedPartyCreateInput,
+  ): Promise<EqcrRelatedPartyRegistry> {
+    return api.post<EqcrRelatedPartyRegistry>(P.relatedParties(projectId), data)
+  },
+
+  /** 更新关联方注册 */
+  async updateRelatedParty(
+    projectId: string,
+    partyId: string,
+    data: RelatedPartyUpdateInput,
+  ): Promise<EqcrRelatedPartyRegistry> {
+    return api.patch<EqcrRelatedPartyRegistry>(
+      P.relatedPartyDetail(projectId, partyId),
+      data,
+    )
+  },
+
+  /** 删除关联方注册（软删除） */
+  async deleteRelatedParty(projectId: string, partyId: string): Promise<void> {
+    await api.delete(P.relatedPartyDetail(projectId, partyId))
+  },
+
+  /** 新建关联方交易 */
+  async createTransaction(
+    projectId: string,
+    data: RelatedPartyTransactionCreateInput,
+  ): Promise<EqcrRelatedPartyTransaction> {
+    return api.post<EqcrRelatedPartyTransaction>(
+      P.relatedPartyTransactions(projectId),
+      data,
+    )
+  },
+
+  /** 更新关联方交易 */
+  async updateTransaction(
+    projectId: string,
+    txnId: string,
+    data: RelatedPartyTransactionUpdateInput,
+  ): Promise<EqcrRelatedPartyTransaction> {
+    return api.patch<EqcrRelatedPartyTransaction>(
+      P.relatedPartyTransactionDetail(projectId, txnId),
+      data,
+    )
+  },
+
+  /** 删除关联方交易（软删除） */
+  async deleteTransaction(projectId: string, txnId: string): Promise<void> {
+    await api.delete(P.relatedPartyTransactionDetail(projectId, txnId))
   },
 }
 

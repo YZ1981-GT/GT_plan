@@ -116,6 +116,7 @@
         <EqcrRelatedParties
           v-if="activeTab === 'related_party'"
           :project-id="projectId"
+          :can-write="canWriteRelatedParties"
         />
       </el-tab-pane>
       <el-tab-pane label="持续经营" name="going_concern">
@@ -171,6 +172,14 @@ const opinionFormDisabled = computed<boolean>(
   () => !(overview.value?.my_role_confirmed ?? false),
 )
 provide('eqcrOpinionFormDisabled', opinionFormDisabled)
+
+/**
+ * 关联方 CRUD 写入权限：非 EQCR 角色（经理/合伙人/admin）可写。
+ * 后端已做 403 兜底，前端仅控制 UI 显隐。
+ */
+const canWriteRelatedParties = computed<boolean>(
+  () => !(overview.value?.my_role_confirmed ?? true),
+)
 
 const daysToSigning = computed<number | null>(() => {
   const sd = project.value?.signing_date

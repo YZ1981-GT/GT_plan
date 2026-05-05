@@ -993,6 +993,13 @@ export const eqcr = {
   opinionType: (pid: string) => `/api/eqcr/projects/${pid}/opinion-type`,
   opinions: '/api/eqcr/opinions',
   opinionDetail: (opinionId: string) => `/api/eqcr/opinions/${opinionId}`,
+  // 任务 7：关联方 CRUD
+  relatedPartyDetail: (pid: string, partyId: string) =>
+    `/api/eqcr/projects/${pid}/related-parties/${partyId}`,
+  relatedPartyTransactions: (pid: string) =>
+    `/api/eqcr/projects/${pid}/related-party-transactions`,
+  relatedPartyTransactionDetail: (pid: string, txnId: string) =>
+    `/api/eqcr/projects/${pid}/related-party-transactions/${txnId}`,
 } as const
 
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
