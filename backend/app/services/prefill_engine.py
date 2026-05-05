@@ -204,10 +204,15 @@ async def parse_workpaper_real(
     db: AsyncSession,
     project_id: UUID,
     wp_id: UUID,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     """
     真正的解析回写：打开 .xlsx → 提取关键数据 → 写入 parsed_data
-    
+
+    参数：
+      dry_run=True  — 仅返回解析预览，不写入 parsed_data（用于两步确认流程的步骤1）
+      dry_run=False — 解析并写入 parsed_data（默认，用于步骤2确认后）
+
     提取内容：
     1. 审定数（审定表中的审定数合计）
     2. 未审数
@@ -347,31 +352,34 @@ async def parse_workpaper_real(
 
     wb.close()
 
-    # 写入 parsed_data
+    # 写入 parsed_data（dry_run=True 时跳过写入，仅返回预览）
     from datetime import datetime, timezone
     parsed["extracted_at"] = datetime.utcnow().isoformat()
-    wp_write = (await db.execute(
-        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
-    )).scalar_one_or_none()
-    if wp_write:
-        wp_write.parsed_data = parsed
-        wp_write.last_parsed_at = datetime.utcnow()
-        await db.flush()
+    if not dry_run:
+        wp_write = (await db.execute(
+            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        )).scalar_one_or_none()
+        if wp_write:
+            wp_write.parsed_data = parsed
+            wp_write.last_parsed_at = datetime.utcnow()
+            await db.flush()
 
     _logger.info(
-        "parse_real: wp=%s audited=%s unadj=%s conclusion=%s refs=%d",
+        "parse_real: wp=%s audited=%s unadj=%s conclusion=%s refs=%d dry_run=%s",
         wp_id, parsed["audited_amount"], parsed["unadjusted_amount"],
-        "yes" if parsed["conclusion"] else "no", len(parsed["cross_refs"]),
+        "yes" if parsed["conclusion"] else "no", len(parsed["cross_refs"]), dry_run,
     )
 
     return {
         "wp_id": str(wp_id),
         "status": "ok",
+        "dry_run": dry_run,
         "audited_amount": parsed["audited_amount"],
         "unadjusted_amount": parsed["unadjusted_amount"],
         "has_conclusion": parsed["conclusion"] is not None,
         "cross_ref_count": len(parsed["cross_refs"]),
-        "message": "解析完成",
+        "parsed_data": parsed,
+        "message": "解析预览（未写入）" if dry_run else "解析完成",
     }
 
 

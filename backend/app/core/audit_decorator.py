@@ -383,24 +383,58 @@ async def _default_snapshot(
     return None
 
 
+
+# ---------------------------------------------------------------------------
+# 模型注册表（注册表模式，替代 if/elif 链）
+# ---------------------------------------------------------------------------
+
+# 格式：{ object_type_lower: (module_path, class_name) }
+# 新增模型时只需在此处添加一行，无需修改 _resolve_model 函数
+_MODEL_REGISTRY: dict[str, tuple[str, str]] = {
+    "adjustment":        ("app.models.audit_platform_models", "Adjustment"),
+    "adjustmentservice": ("app.models.audit_platform_models", "Adjustment"),
+    "workingpaper":      ("app.models.workpaper_models",      "WorkingPaper"),
+    "working_paper":     ("app.models.workpaper_models",      "WorkingPaper"),
+    "wp":                ("app.models.workpaper_models",      "WorkingPaper"),
+    "workpaper":         ("app.models.workpaper_models",      "WorkingPaper"),
+}
+
+
+def register_audit_model(object_type: str, module_path: str, class_name: str) -> None:
+    """向注册表动态注册新的模型映射。
+
+    供插件或扩展模块在启动时调用，无需修改本文件。
+
+    Parameters
+    ----------
+    object_type : str
+        object_type 字符串（不区分大小写）
+    module_path : str
+        模型所在模块路径，如 "app.models.my_models"
+    class_name : str
+        模型类名，如 "MyModel"
+    """
+    _MODEL_REGISTRY[object_type.lower()] = (module_path, class_name)
+
+
 def _resolve_model(object_type: str | None):
-    """根据 object_type 字符串解析对应的 SQLAlchemy 模型类。"""
+    """根据 object_type 字符串解析对应的 SQLAlchemy 模型类。
+
+    使用注册表模式（_MODEL_REGISTRY），新增模型只需在注册表中添加一行，
+    无需修改本函数。
+    """
     if object_type is None:
         return None
 
-    _type_lower = object_type.lower()
+    entry = _MODEL_REGISTRY.get(object_type.lower())
+    if entry is None:
+        return None
 
+    module_path, class_name = entry
     try:
-        if _type_lower in ("adjustment", "adjustmentservice"):
-            from app.models.audit_platform_models import Adjustment
-            return Adjustment
-        if _type_lower in ("workingpaper", "working_paper"):
-            from app.models.workpaper_models import WorkingPaper
-            return WorkingPaper
-        if _type_lower in ("wp", "workpaper"):
-            from app.models.workpaper_models import WorkingPaper
-            return WorkingPaper
+        import importlib
+        module = importlib.import_module(module_path)
+        return getattr(module, class_name, None)
     except ImportError:
-        logger.warning("audit_log: cannot import model for type=%s", object_type)
-
-    return None
+        logger.warning("audit_log: cannot import model for type=%s (module=%s)", object_type, module_path)
+        return None

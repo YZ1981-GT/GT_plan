@@ -1004,7 +1004,7 @@ function onUploadCancel() {
   pendingWpId.value = ''
 }
 
-/** 步骤1：上传文件并触发解析，获取预览数据 */
+/** 步骤1：上传文件并触发解析预览（dry_run=true，不写入 parsed_data） */
 async function doUploadStep1(forceOverwrite: boolean) {
   if (!selectedWp.value || !uploadFile.value) return
   uploadLoading.value = true
@@ -1022,11 +1022,12 @@ async function doUploadStep1(forceOverwrite: boolean) {
     pendingWpId.value = selectedWp.value.id
     pendingNewVersion.value = result?.new_version || version + 1
 
-    // 触发解析，获取预览数据
+    // 触发 dry_run 解析，仅获取预览数据，不写入 parsed_data
     parseLoading.value = true
     uploadStep.value = 2
     try {
-      const parseResult = await parseWorkpaper(projectId.value, pendingWpId.value)
+      const parseResult = await parseWorkpaper(projectId.value, pendingWpId.value, true)
+      // 后端返回 parsed_data 字段（完整预览）或直接返回顶层字段
       parsedPreview.value = parseResult?.parsed_data || parseResult || null
     } catch {
       parsedPreview.value = null
@@ -1045,11 +1046,13 @@ async function doUploadStep1(forceOverwrite: boolean) {
   }
 }
 
-/** 步骤2：用户确认识别数据，写入 parsed_data */
+/** 步骤2：用户确认识别数据，正式调用 parse（dry_run=false）写入 parsed_data */
 async function doConfirmParsed() {
   if (!pendingWpId.value) return
   parseLoading.value = true
   try {
+    // 正式解析写入（dry_run=false）
+    await parseWorkpaper(projectId.value, pendingWpId.value, false)
     uploadDialogVisible.value = false
     uploadStep.value = 1
     parsedPreview.value = null
@@ -1060,6 +1063,8 @@ async function doConfirmParsed() {
     eventBus.emit('workpaper:parsed', { projectId: projectId.value, wpId: pendingWpId.value })
     ElMessage.success(`底稿已上传（v${pendingNewVersion.value}），识别数据已写入`)
     pendingWpId.value = ''
+  } catch {
+    ElMessage.error('写入识别数据失败，请重试')
   } finally {
     parseLoading.value = false
   }

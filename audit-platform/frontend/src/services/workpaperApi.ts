@@ -293,8 +293,10 @@ export async function prefillWorkpaper(projectId: string, wpId: string, year: nu
   return data
 }
 
-export async function parseWorkpaper(projectId: string, wpId: string) {
-  const { data } = await http.post(P_wp.parse(projectId, wpId))
+export async function parseWorkpaper(projectId: string, wpId: string, dryRun: boolean = false) {
+  const { data } = await http.post(
+    `${P_wp.parse(projectId, wpId)}${dryRun ? '?dry_run=true' : ''}`,
+  )
   return data
 }
 

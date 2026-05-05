@@ -749,13 +749,19 @@ async def prefill_workpaper(
 async def parse_workpaper(
     project_id: UUID,
     wp_id: UUID,
+    dry_run: bool = Query(False, description="仅预览解析结果，不写入 parsed_data"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """手动触发解析回写（需编辑权限）— 真正打开 .xlsx 提取关键数据"""
+    """手动触发解析回写（需编辑权限）— 真正打开 .xlsx 提取关键数据
+
+    dry_run=true：仅返回解析预览，不写入 parsed_data（用于两步确认流程步骤1）
+    dry_run=false（默认）：解析并写入 parsed_data（用于步骤2用户确认后）
+    """
     from app.services.prefill_engine import parse_workpaper_real
-    result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id)
-    await db.commit()
+    result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id, dry_run=dry_run)
+    if not dry_run:
+        await db.commit()
     return result
 
 

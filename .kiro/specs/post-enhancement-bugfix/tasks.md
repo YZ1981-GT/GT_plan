@@ -55,7 +55,7 @@
 
 ### Task 1.10 — Sprint 1 收尾
 - [-] vue-tsc 零错误 + Vite 构建通过
-- [x] git commit + push
+- [~] git commit + push
 
 ---
 
@@ -143,75 +143,75 @@
 
 ### Task 3.1 — 数据同步状态可视化 [P2.1]
 - [x] `GtPageHeader` 加 `showSyncStatus` prop 和同步状态指示器
-- [ ] 通过 `eventBus.on('sse:sync-event')` 更新为"同步中"
-- [ ] 通过 `eventBus.on('sse:sync-failed')` 更新为"数据可能过时"
-- [ ] 同步完成后显示"最后更新：X分钟前"
-- [ ] 接入 TrialBalance、ReportView、DisclosureEditor
+- [x] 通过 `eventBus.on('sse:sync-event')` 更新为"同步中"
+- [x] 通过 `eventBus.on('sse:sync-failed')` 更新为"数据可能过时"
+- [x] 同步完成后显示"最后更新：X分钟前"
+- [x] 接入 TrialBalance、ReportView、DisclosureEditor
 
 ### Task 3.2 — 试算表双向导航 [P2.2]
-- [ ] 试算表右键菜单加"查看相关分录"选项
-- [ ] 跳转到调整分录页面并按科目过滤
-- [ ] 调整分录页面接收 `account` query 参数自动过滤
+- [x] 试算表右键菜单加"查看相关分录"选项
+- [x] 跳转到调整分录页面并按科目过滤
+- [x] 调整分录页面接收 `account` query 参数自动过滤
 - [ ] 验证构建
 
 ### Task 3.3 — 底稿识别确认步骤 [P2.3]
-- [ ] 上传弹窗改为两步：上传文件 → 确认识别数据
-- [ ] 步骤2 显示系统识别出的关键数字（审定数、未审数）
-- [ ] 用户确认后才写入 parsed_data
+- [x] 上传弹窗改为两步：上传文件 → 确认识别数据
+- [x] 步骤2 显示系统识别出的关键数字（审定数、未审数）
+- [x] 用户确认后才写入 parsed_data
 - [ ] 验证构建
 
 ### Task 3.4 — list_entries N+1 优化 [P2.4]
 - [x] 先获取所有 entry_group_id
-- [ ] 一次性批量查询所有 Adjustment 和 AdjustmentEntry
-- [ ] 内存里按 entry_group_id 分组
-- [ ] 验证查询次数从 100 次降到 3 次
+- [x] 一次性批量查询所有 Adjustment 和 AdjustmentEntry
+- [x] 内存里按 entry_group_id 分组
+- [x] 验证查询次数从 100 次降到 3 次
 
 ### Task 3.5 — disclosure_engine 预加载优化 [P2.5]
-- [ ] `_preload_data_for_notes` 里一次性加载上年所有附注到 `_prior_notes_cache`
-- [ ] `generate_notes` 循环里从缓存取，不再逐章节查询
-- [ ] 验证生成 165 个附注的查询次数减少
+- [x] `_preload_data_for_notes` 里一次性加载上年所有附注到 `_prior_notes_cache`
+- [x] `generate_notes` 循环里从缓存取，不再逐章节查询
+- [x] 验证生成 165 个附注的查询次数减少
 
 ### Task 3.6 — _build_table_data 合计为 0 修复 [P2.6]
-- [ ] 移除 `row["values"][ci] = total if total != 0 else None` 的条件
-- [ ] 改为 `row["values"][ci] = total`
-- [ ] 验证合计为 0 的行正确显示 0
+- [x] 移除 `row["values"][ci] = total if total != 0 else None` 的条件
+- [x] 改为 `row["values"][ci] = total`
+- [x] 验证合计为 0 的行正确显示 0
 
 ### Task 3.7 — syncFromRoute 非阻塞 [P2.7]
-- [ ] 移除 `router/index.ts` beforeEach 里的 `await projectStore.syncFromRoute(to)`
-- [ ] 改为 `projectStore.syncFromRoute(to)` 不等待（后台更新）
-- [ ] 验证路由切换速度提升，数据仍然正确加载
+- [x] 移除 `router/index.ts` beforeEach 里的 `await projectStore.syncFromRoute(to)`
+- [x] 改为 `projectStore.syncFromRoute(to)` 不等待（后台更新）
+- [x] 验证路由切换速度提升，数据仍然正确加载
 
 ### Task 3.8 — router_registry.py 重复调用清理 [P2.8]
-- [ ] 删除 `router_registry.py` 末尾的 `register_phase14_rules()` 调用
-- [ ] 保留 `main.py` lifespan 里的调用
-- [ ] 验证门禁规则正常注册
+- [x] 删除 `router_registry.py` 末尾的 `register_phase14_rules()` 调用
+- [x] 保留 `main.py` lifespan 里的调用
+- [x] 验证门禁规则正常注册
 
 ### Task 3.9 — GtPageHeader backMode prop [P2.9]
-- [ ] 加 `backMode: 'route' | 'history'` prop（默认 'route'）
-- [ ] `history` 模式调用 `router.back()`
-- [ ] 更新 TrialBalance/ReportView/DisclosureEditor 等使用 GtPageHeader 的页面
+- [x] 加 `backMode: 'route' | 'history'` prop（默认 'route'）
+- [x] `history` 模式调用 `router.back()`
+- [x] 更新 TrialBalance/ReportView/DisclosureEditor 等使用 GtPageHeader 的页面
 
 ### Task 3.10 — useDictStore 缓存 TTL [P2.10]
-- [ ] sessionStorage 缓存加 24 小时过期时间戳
-- [ ] 过期时强制重新加载
-- [ ] 验证字典更新后前端能感知
+- [x] sessionStorage 缓存加 24 小时过期时间戳
+- [x] 过期时强制重新加载
+- [x] 验证字典更新后前端能感知
 
 ### Task 3.11 — statusMaps.ts 和 dictStore 统一 [P2.11]
-- [ ] `GtStatusTag` 优先使用 dictStore 数据，dictStore 未加载时回退到 statusMaps.ts
-- [ ] 确保两套数据的 key/label/type 一致
+- [x] `GtStatusTag` 优先使用 dictStore 数据，dictStore 未加载时回退到 statusMaps.ts
+- [x] 确保两套数据的 key/label/type 一致
 - [ ] 验证构建
 
 ### Task 3.12 — 其余 P2 优化
-- [ ] `useCellSelection` 多实例监听器：加引用计数，最后一个实例卸载时才移除 document 监听
-- [ ] `useAddressRegistry` 加 `dispose()` 方法，清理 eventBus 监听器
-- [ ] `AuditLogMiddleware` 注释说明与 `audit_decorator` 的分工
-- [ ] `X-Response-Time` header：在 `ResponseWrapperMiddleware` 里保留原始 header
-- [ ] `GtInfoBar` templateOptions 从 dictStore 取
-- [ ] `pagination.build_paginated_response` 加 `skip_count` 选项
-- [ ] `audit_decorator._resolve_model` 改为注册表模式
-- [ ] `event_handlers.py` 加 `subscribe_many` 辅助函数
-- [ ] `auth.ts` fetchUserProfile 改用 `API.users.me`
-- [ ] 验证构建
+- [x] `useCellSelection` 多实例监听器：加引用计数，最后一个实例卸载时才移除 document 监听
+- [x] `useAddressRegistry` 加 `dispose()` 方法，清理 eventBus 监听器
+- [x] `AuditLogMiddleware` 注释说明与 `audit_decorator` 的分工
+- [x] `X-Response-Time` header：在 `ResponseWrapperMiddleware` 里保留原始 header
+- [x] `GtInfoBar` templateOptions 从 dictStore 取
+- [x] `pagination.build_paginated_response` 加 `skip_count` 选项
+- [x] `audit_decorator._resolve_model` 改为注册表模式
+- [x] `event_handlers.py` 加 `subscribe_many` 辅助函数
+- [x] `auth.ts` fetchUserProfile 改用 `API.users.me`
+- [x] 验证构建
 
 ### Task 3.13 — Sprint 3 收尾
 - [ ] vue-tsc 零错误 + Vite 构建通过

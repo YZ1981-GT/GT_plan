@@ -239,8 +239,24 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
     }, delay)
   }
 
-  eventBus.on('template-applied', () => _debouncedRefresh(500))
-  eventBus.on('formula-changed', () => _debouncedRefresh(300))
+  const _onTemplateApplied = () => _debouncedRefresh(500)
+  const _onFormulaChanged = () => _debouncedRefresh(300)
+
+  eventBus.on('template-applied', _onTemplateApplied)
+  eventBus.on('formula-changed', _onFormulaChanged)
+
+  /**
+   * 清理 eventBus 监听器，防止 Store 被销毁后仍持有引用。
+   * 在组件 onUnmounted 或 Store 不再需要时调用。
+   */
+  function dispose() {
+    if (_refreshDebounceTimer) {
+      clearTimeout(_refreshDebounceTimer)
+      _refreshDebounceTimer = null
+    }
+    eventBus.off('template-applied', _onTemplateApplied)
+    eventBus.off('formula-changed', _onFormulaChanged)
+  }
 
   return {
     // 状态
@@ -261,5 +277,6 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
     jump,
     invalidate,
     $reset,
+    dispose,
   }
 })
