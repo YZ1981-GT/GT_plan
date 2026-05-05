@@ -67,6 +67,16 @@ class ExportIntegrityService:
             db.add(check)
         await db.flush()
 
+    # 别名：需求文档中引用为 persist_hash_checks
+    async def persist_hash_checks(
+        self,
+        db: AsyncSession,
+        export_id: str,
+        file_checks: list[dict],
+    ) -> None:
+        """persist_checks 的别名，对齐需求文档命名。"""
+        await self.persist_checks(db, export_id, file_checks)
+
     async def verify_package(self, db, export_id: str) -> dict:
         """校验导出包完整性：逐文件比对 hash"""
         from sqlalchemy import select

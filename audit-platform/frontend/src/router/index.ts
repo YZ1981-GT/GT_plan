@@ -126,6 +126,16 @@ const router = createRouter({
           component: () => import('@/views/ReviewWorkbench.vue'),
         },
         {
+          path: 'projects/:projectId/archive',
+          name: 'ArchiveWizard',
+          component: () => import('@/views/ArchiveWizard.vue'),
+        },
+        {
+          path: 'projects/:projectId/archive/jobs/:jobId',
+          name: 'ArchiveWizardJob',
+          component: () => import('@/views/ArchiveWizard.vue'),
+        },
+        {
           path: 'projects/:projectId/qc-dashboard',
           name: 'QCDashboard',
           component: () => import('@/views/QCDashboard.vue'),

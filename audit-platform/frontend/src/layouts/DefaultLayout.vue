@@ -150,7 +150,7 @@ const catalogTitle = computed(() => {
 // 全宽模式路径（不显示中间栏项目列表）
 const FULLWIDTH_PATHS = [
   '/', '/projects/new', '/recycle-bin', '/forum', '/private-storage',
-  '/knowledge', '/consolidation', '/attachments', '/confirmation',
+  '/knowledge', '/consolidation', '/attachments',
   '/archive', '/work-hours',
 ]
 const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/']

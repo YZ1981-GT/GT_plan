@@ -109,6 +109,12 @@ ProjectAssignment.role: 'signing_partner' | 'manager' | 'auditor' | 'qc' | 'eqcr
 - Round 4（审计助理）：`../refinement-round4-audit-assistant/requirements.md`
 - Round 5（独立复核 EQCR）：`../refinement-round5-independent-review/requirements.md`
 
+## Round 2 待办（由 Round 1 登记）
+
+以下事项在 Round 1 实施中确认需要 Round 2 补全，不在本轮范围：
+
+- [ ] **PBC/函证 MVP**：`pbc.py` / `confirmations.py` 当前为空壳（返回 `[]`），已加 `include_in_schema=False` 隐藏 OpenAPI。Round 2 需补全最小 CRUD + 前端页面，完成后恢复 schema 暴露并重新添加侧边栏入口。（来源：需求 7 方案 A）
+
 ## 变更日志
 
 - v2.2 (2026-05-05) 交叉核验后新增"跨轮依赖矩阵"、"数据库迁移约定"、"跨轮约束"三节；5 份 requirements 对应做硬错修正（见各自 v1.1 日志）

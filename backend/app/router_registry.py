@@ -267,11 +267,13 @@ def register_all_routers(app: FastAPI) -> None:
         app.include_router(r, prefix="/api", tags=["取证与版本链"])
 
     # ═══ 12. 协作管理（PBC 清单 / 函证管理） ═══
+    # Round 1 需求 7 方案 A：隐藏 OpenAPI 暴露，保留路由向后兼容
+    # TODO(Round 2): 补全 PBC/函证 MVP 后移除 include_in_schema=False
     from app.routers.pbc import router as pbc_router
     from app.routers.confirmations import router as confirmations_router
 
-    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
-    app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
+    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"], include_in_schema=False)
+    app.include_router(confirmations_router, prefix="/api", tags=["函证管理"], include_in_schema=False)
 
     # ═══ 13. 归档编排（Round 1 需求 5） ═══
     from app.routers.archive import router as archive_router

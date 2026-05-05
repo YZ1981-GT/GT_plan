@@ -294,7 +294,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
-  Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
+  Box, Setting, Bell, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
 } from '@element-plus/icons-vue'
@@ -326,7 +326,7 @@ const navItems = [
   { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production' },
   { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
   { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot' },
-  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
+  // PBC/函证入口已移除（Round 1 需求 7 方案 A），Round 2 补全 MVP 后恢复
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production' },
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
   { key: 'users', label: '用户', icon: UserFilled, path: '/settings/users', maturity: 'production' },

@@ -347,3 +347,211 @@ async def test_get_job_not_found(db_session: AsyncSession):
     orchestrator = ArchiveOrchestrator(db_session)
     result = await orchestrator.get_job(uuid.uuid4())
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Task 16: 归档完整性记录 tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_orchestrate_success_persists_manifest_hash(db_session: AsyncSession):
+    """Task 16: orchestrate 成功后 manifest_hash 非空（各章节 SHA-256 拼接再哈希）。"""
+    fake_section_content = [
+        ("00-项目封面.pdf", b"fake cover pdf content"),
+        ("01-签字流水.pdf", b"fake signature ledger content"),
+        ("99-审计日志.jsonl", None),  # None 应被跳过
+    ]
+
+    with (
+        patch(
+            "app.services.gate_engine.gate_engine.evaluate",
+            new=_mock_gate_allow(),
+        ),
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+        patch(
+            "app.services.archive_section_registry.generate_all",
+            new_callable=AsyncMock,
+            return_value=fake_section_content,
+        ),
+        patch(
+            "app.services.export_integrity_service.export_integrity_service.persist_checks",
+            new_callable=AsyncMock,
+        ) as mock_persist,
+    ):
+        orchestrator = ArchiveOrchestrator(db_session)
+        job = await orchestrator.orchestrate(
+            project_id=FAKE_PROJECT_ID,
+            scope="final",
+            push_to_cloud=False,
+            purge_local=False,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    assert job.status == "succeeded"
+    assert job.manifest_hash is not None
+    assert len(job.manifest_hash) == 64  # SHA-256 hex digest
+
+    # persist_checks 应被调用一次
+    mock_persist.assert_called_once()
+    call_args = mock_persist.call_args
+    # export_id 应为 job.id 的字符串
+    assert call_args.kwargs["export_id"] == str(job.id)
+    # file_checks 应包含 2 个条目（None 被跳过）
+    assert len(call_args.kwargs["file_checks"]) == 2
+    assert call_args.kwargs["file_checks"][0]["file_path"] == "00-项目封面.pdf"
+    assert call_args.kwargs["file_checks"][1]["file_path"] == "01-签字流水.pdf"
+
+
+@pytest.mark.asyncio
+async def test_orchestrate_integrity_failure_does_not_block(db_session: AsyncSession):
+    """Task 16: persist_hash_checks 失败不阻断归档（status 仍为 succeeded）。"""
+    with (
+        patch(
+            "app.services.gate_engine.gate_engine.evaluate",
+            new=_mock_gate_allow(),
+        ),
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+        patch(
+            "app.services.archive_section_registry.generate_all",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("Section generation failed"),
+        ),
+    ):
+        orchestrator = ArchiveOrchestrator(db_session)
+        job = await orchestrator.orchestrate(
+            project_id=FAKE_PROJECT_ID,
+            scope="final",
+            push_to_cloud=False,
+            purge_local=False,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    # 归档仍然成功（integrity 失败不阻断）
+    assert job.status == "succeeded"
+    # manifest_hash 为 None（因为 integrity 步骤失败了）
+    assert job.manifest_hash is None
+
+
+@pytest.mark.asyncio
+async def test_retry_success_persists_manifest_hash(db_session: AsyncSession):
+    """Task 16: retry 成功后也调 persist_hash_checks，manifest_hash 非空。"""
+    # 先创建一个失败的 job
+    with (
+        patch(
+            "app.services.gate_engine.gate_engine.evaluate",
+            new=_mock_gate_allow(),
+        ),
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("Temporary failure"),
+        ),
+    ):
+        orchestrator = ArchiveOrchestrator(db_session)
+        job = await orchestrator.orchestrate(
+            project_id=FAKE_PROJECT_ID,
+            scope="final",
+            push_to_cloud=False,
+            purge_local=False,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    assert job.status == "failed"
+    assert job.manifest_hash is None
+
+    # 重试成功
+    fake_section_content = [
+        ("00-项目封面.pdf", b"cover content"),
+        ("01-签字流水.pdf", b"ledger content"),
+    ]
+
+    with (
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+        patch(
+            "app.services.archive_section_registry.generate_all",
+            new_callable=AsyncMock,
+            return_value=fake_section_content,
+        ),
+        patch(
+            "app.services.export_integrity_service.export_integrity_service.persist_checks",
+            new_callable=AsyncMock,
+        ) as mock_persist,
+    ):
+        orchestrator2 = ArchiveOrchestrator(db_session)
+        retried_job = await orchestrator2.retry(
+            job_id=job.id,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    assert retried_job.status == "succeeded"
+    assert retried_job.manifest_hash is not None
+    assert len(retried_job.manifest_hash) == 64
+    mock_persist.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_manifest_hash_deterministic(db_session: AsyncSession):
+    """Task 16: 相同内容产生相同 manifest_hash（确定性）。"""
+    import hashlib
+
+    content_a = b"cover pdf bytes"
+    content_b = b"ledger pdf bytes"
+
+    fake_sections = [
+        ("00-项目封面.pdf", content_a),
+        ("01-签字流水.pdf", content_b),
+    ]
+
+    # 手动计算期望的 manifest_hash
+    hash_a = hashlib.sha256(content_a).hexdigest()
+    hash_b = hashlib.sha256(content_b).hexdigest()
+    expected_manifest = hashlib.sha256((hash_a + hash_b).encode("utf-8")).hexdigest()
+
+    with (
+        patch(
+            "app.services.gate_engine.gate_engine.evaluate",
+            new=_mock_gate_allow(),
+        ),
+        patch(
+            "app.services.wp_storage_service.WpStorageService.archive_project",
+            new_callable=AsyncMock,
+            return_value={"archived": True},
+        ),
+        patch(
+            "app.services.archive_section_registry.generate_all",
+            new_callable=AsyncMock,
+            return_value=fake_sections,
+        ),
+        patch(
+            "app.services.export_integrity_service.export_integrity_service.persist_checks",
+            new_callable=AsyncMock,
+        ),
+    ):
+        orchestrator = ArchiveOrchestrator(db_session)
+        job = await orchestrator.orchestrate(
+            project_id=FAKE_PROJECT_ID,
+            scope="final",
+            push_to_cloud=False,
+            purge_local=False,
+            initiated_by=FAKE_USER_ID,
+        )
+        await db_session.commit()
+
+    assert job.manifest_hash == expected_manifest

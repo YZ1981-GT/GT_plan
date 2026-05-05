@@ -114,13 +114,13 @@
   - 水印"本归档包由审计平台 v{ver} 于 {time} 自动生成，SHA-256: {hash}"
   - _需求_ 6
 
-- [ ] 16. 后端：归档完整性记录
+- [x] 16. 后端：归档完整性记录
   - `ArchiveOrchestrator` 完成后调 `ExportIntegrityService.persist_hash_checks`
   - 章节级断点续传：重试从 `last_succeeded_section` 下一个章节开始，已完成章节的 hash 保留
   - 下载时不重算，后台每日调 `verify_package` 校验归档包可选
   - _需求_ 5, 6
 
-- [ ] 17. 前端：ArchiveWizard 3 步向导
+- [x] 17. 前端：ArchiveWizard 3 步向导
   - `src/views/ArchiveWizard.vue`
   - 步骤 1 就绪检查（嵌 `GateReadinessPanel`）→ 步骤 2 选项（推云/清本地）→ 步骤 3 确认
   - 执行中显示章节级进度条（轮询 jobs/{id} 每 3s）
@@ -128,20 +128,20 @@
   - 路由 `/projects/:projectId/archive` + `/projects/:projectId/archive/jobs/:jobId`
   - _需求_ 5
 
-- [ ] 18. 前端：移除 PBC/函证空壳入口（方案 A）
+- [x] 18. 前端：移除 PBC/函证空壳入口（方案 A）
   - DefaultLayout 与侧边栏移除 PBC/函证链接
   - `pbc.py` / `confirmations.py` 路由加 `include_in_schema=False`
   - OpenAPI 不暴露
   - README 中登记 Round 2 的 TODO
   - _需求_ 7
 
-- [ ] 19. 通知字典 + 归档完成通知
+- [x] 19. 通知字典 + 归档完成通知
   - 新建 `backend/app/services/notification_types.py` 常量集（本轮仅收口 Round 1 用到的类型：`archive_done / signature_ready / gate_alert`）
   - 前端 `src/services/notificationTypes.ts` 同步字典与跳转规则
   - `ArchiveOrchestrator` 成功时发通知给项目成员
   - _依赖_ README 跨轮约束第 1 条；_需求_ 5
 
-- [ ] Sprint 2 验收
+- [x] Sprint 2 验收
   - 集成测试：`test_archive_orchestrate_e2e.py` happy path + 断点续传 + SHA256 校验
   - 回归测试：旧 3 个归档端点仍可用（标 deprecated）
   - UAT：README UAT 清单第 5/6 条走完（归档包打开验证封面+签字流水+水印，PBC/函证入口移除）
