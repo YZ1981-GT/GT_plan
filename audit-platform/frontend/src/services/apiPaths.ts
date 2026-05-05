@@ -981,6 +981,20 @@ export const governance = {
   },
 } as const
 
+// ─── EQCR 独立复核（Round 5） ───────────────────────────────────────────────
+
+export const eqcr = {
+  projects: '/api/eqcr/projects',
+  projectOverview: (pid: string) => `/api/eqcr/projects/${pid}/overview`,
+  materiality: (pid: string) => `/api/eqcr/projects/${pid}/materiality`,
+  estimates: (pid: string) => `/api/eqcr/projects/${pid}/estimates`,
+  relatedParties: (pid: string) => `/api/eqcr/projects/${pid}/related-parties`,
+  goingConcern: (pid: string) => `/api/eqcr/projects/${pid}/going-concern`,
+  opinionType: (pid: string) => `/api/eqcr/projects/${pid}/opinion-type`,
+  opinions: '/api/eqcr/opinions',
+  opinionDetail: (opinionId: string) => `/api/eqcr/opinions/${opinionId}`,
+} as const
+
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
 
 export const API = {
@@ -997,7 +1011,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  admin, partner, qcDashboard, jobs, governance,
+  admin, partner, qcDashboard, jobs, governance, eqcr,
 } as const
 
 export default API

@@ -408,6 +408,27 @@ const router = createRouter({
           meta: { developing: true },
           props: (route: any) => ({ projectId: route.params.projectId }),
         },
+        // ── Round 5：EQCR 独立复核工作台 ──
+        // 访问控制说明：
+        //   页面本身只有 requireAuth（走父路由 meta），不设 meta.permission；
+        //   后端 `GET /api/eqcr/projects` 按 `ProjectAssignment.role='eqcr'` 过滤，
+        //   非 EQCR 用户返回 []，UI 走 `el-empty` 提示"未被委派为 EQCR"。
+        //   这样既满足"partner/admin 且 project_assignment.role='eqcr'"的业务权限，
+        //   又避免与 R5 Task 2 的 ROLE_PERMISSIONS 前端字典耦合（admin 默认全开）。
+        {
+          path: 'eqcr/workbench',
+          name: 'EqcrWorkbench',
+          component: () => import('@/views/eqcr/EqcrWorkbench.vue'),
+        },
+        {
+          // Round 5 Task 6：EQCR 项目详情视图（5 判断 Tab）
+          // 访问控制同 EqcrWorkbench：仅 requireAuth；后端按
+          // ProjectAssignment.role='eqcr' 过滤，非 EQCR 用户 overview 返回
+          // my_role_confirmed=false，UI 走"只读模式"提示并禁用意见录入。
+          path: 'eqcr/projects/:projectId',
+          name: 'EqcrProjectView',
+          component: () => import('@/views/eqcr/EqcrProjectView.vue'),
+        },
       ],
     },
     {

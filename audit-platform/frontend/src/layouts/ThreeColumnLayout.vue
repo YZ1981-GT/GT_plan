@@ -136,6 +136,9 @@
         <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
         <slot name="nav-review-inbox" />
 
+        <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
+        <slot name="nav-eqcr" />
+
         <el-tooltip content="通知" placement="bottom">
           <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
             <el-icon :size="18"><Bell /></el-icon>

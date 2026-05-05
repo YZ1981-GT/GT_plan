@@ -18,6 +18,17 @@
       </router-link>
     </template>
 
+    <template #nav-eqcr>
+      <router-link
+        v-if="isEqcrEligible"
+        to="/eqcr/workbench"
+        class="gt-nav-eqcr"
+        style="text-decoration: none;"
+      >
+        <el-button size="small" text>🛡️ 独立复核</el-button>
+      </router-link>
+    </template>
+
     <template #middle>
       <!-- 合并模块：独立树形导航 -->
       <ConsolMiddleNav v-if="isConsolRoute" />
@@ -99,6 +110,15 @@ const isReviewRole = computed(() => {
   return ['reviewer', 'partner', 'admin', 'manager'].includes(role) || roleStore.isPartner || roleStore.isManager
 })
 
+// EQCR 独立复核入口可见性：
+//   业务约束为 role in ('partner','admin')，具体项目级 EQCR 资格由
+//   后端 `GET /api/eqcr/projects` 按 ProjectAssignment.role='eqcr' 过滤；
+//   非 EQCR 用户进入工作台会看到空态，不影响合伙人/管理员的巡视能力。
+const isEqcrEligible = computed(() => {
+  const role = roleStore.effectiveRole
+  return role === 'partner' || role === 'admin' || roleStore.isPartner
+})
+
 async function loadPendingReviewCount() {
   if (!isReviewRole.value) return
   try {
@@ -153,7 +173,7 @@ const FULLWIDTH_PATHS = [
   '/knowledge', '/consolidation', '/attachments', '/confirmation',
   '/archive', '/work-hours',
 ]
-const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/']
+const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/']
 
 function isFullWidthPath(p: string): boolean {
   if (FULLWIDTH_PATHS.includes(p)) return true
