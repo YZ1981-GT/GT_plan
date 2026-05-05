@@ -108,6 +108,8 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
     # LLM 限流配置
     LLM_RATE_LIMIT_PER_MINUTE: int = 10  # 每用户每分钟最大 LLM 调用次数
+    # bcrypt cost factor（OWASP 推荐 12，可通过环境变量调整）
+    BCRYPT_ROUNDS: int = 12
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

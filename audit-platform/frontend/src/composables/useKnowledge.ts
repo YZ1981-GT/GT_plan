@@ -50,6 +50,11 @@ export interface PickDocumentsOptions {
 type PickerResolve = (docs: KnowledgeDoc[]) => void
 type PickerReject = (reason?: any) => void
 
+/**
+ * 单例 Promise 回调：同一时刻只能有一个 pickDocuments() 调用处于等待状态。
+ * 如果同一页面有两处同时调用 pickDocuments()，后一次会覆盖前一次的 resolve/reject，
+ * 导致前一次调用永远不会 resolve。使用时应确保同一时刻只有一个弹窗实例。
+ */
 let _pickerResolve: PickerResolve | null = null
 let _pickerReject: PickerReject | null = null
 

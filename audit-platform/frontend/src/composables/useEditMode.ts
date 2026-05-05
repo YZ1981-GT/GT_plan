@@ -23,6 +23,8 @@ import { ElMessageBox } from 'element-plus'
 export interface UseEditModeOptions {
   /** 初始编辑状态，默认 false */
   initialEditing?: boolean
+  /** 是否注册路由离开守卫，默认 true；子组件调用时传 false 跳过，避免控制台警告 */
+  guardRoute?: boolean
 }
 
 export function useEditMode(options?: UseEditModeOptions) {
@@ -71,26 +73,28 @@ export function useEditMode(options?: UseEditModeOptions) {
     isDirty.value = false
   }
 
-  // 路由离开守卫：有未保存变更时提示用户
-  onBeforeRouteLeave(async () => {
-    if (isEditing.value && isDirty.value) {
-      try {
-        await ElMessageBox.confirm(
-          '当前有未保存的修改，离开将丢失所有更改。确定离开吗？',
-          '未保存提示',
-          {
-            confirmButtonText: '确定离开',
-            cancelButtonText: '留在此页',
-            type: 'warning',
-          }
-        )
-        return true
-      } catch {
-        return false
+  // 路由离开守卫：有未保存变更时提示用户（子组件传 guardRoute: false 跳过）
+  if (options?.guardRoute !== false) {
+    onBeforeRouteLeave(async () => {
+      if (isEditing.value && isDirty.value) {
+        try {
+          await ElMessageBox.confirm(
+            '当前有未保存的修改，离开将丢失所有更改。确定离开吗？',
+            '未保存提示',
+            {
+              confirmButtonText: '确定离开',
+              cancelButtonText: '留在此页',
+              type: 'warning',
+            }
+          )
+          return true
+        } catch {
+          return false
+        }
       }
-    }
-    return true
-  })
+      return true
+    })
+  }
 
   return {
     isEditing,

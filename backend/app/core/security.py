@@ -56,10 +56,11 @@ def decode_token(token: str) -> dict:
 
 
 def hash_password(password: str) -> str:
-    """使用 bcrypt 哈希密码（cost factor = 14）。"""
+    """使用 bcrypt 哈希密码（cost factor 从配置读取，默认 12，OWASP 推荐）。"""
     # bcrypt 限制密码长度为 72 字节
     password_bytes = password.encode('utf-8')[:72]
-    salt = bcrypt.gensalt(rounds=14)
+    rounds = getattr(settings, 'BCRYPT_ROUNDS', 12)
+    salt = bcrypt.gensalt(rounds=rounds)
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
 

@@ -44,6 +44,28 @@ CREATE TABLE IF NOT EXISTS schema_version (
 """
 
 
+def _is_comment_only(stmt: str) -> bool:
+    """判断一段 SQL 文本是否全部为注释或空白。
+
+    逐行检查：非空行必须以 ``--`` 开头（单行注释），否则认为包含实际语句。
+
+    Parameters
+    ----------
+    stmt : str
+        已去除首尾空白的 SQL 片段
+
+    Returns
+    -------
+    bool
+        True 表示该片段只含注释/空行，可以跳过执行
+    """
+    for line in stmt.splitlines():
+        stripped = line.strip()
+        if stripped and not stripped.startswith("--"):
+            return False
+    return True
+
+
 @dataclass
 class MigrationFile:
     """一个待执行的迁移脚本。"""
@@ -184,16 +206,98 @@ class MigrationRunner:
     # 内部方法
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _split_sql_statements(sql_content: str) -> list[str]:
+        """将 SQL 文件内容分割为独立语句列表。
+
+        处理规则：
+        1. 识别 ``$tag$ ... $tag$`` 美元引号块（PL/pgSQL DO 块等），整体保留不按分号分割
+        2. 按分号分割普通语句
+        3. 过滤空语句和纯注释语句（以 ``--`` 开头的行）
+
+        Parameters
+        ----------
+        sql_content : str
+            SQL 文件的完整文本内容
+
+        Returns
+        -------
+        list[str]
+            可逐条执行的 SQL 语句列表（已去除首尾空白）
+        """
+        statements: list[str] = []
+        current: list[str] = []   # 当前语句的字符缓冲
+        in_dollar_quote = False    # 是否在 $tag$ 块内
+        dollar_tag = ""            # 当前美元引号标签，如 $$ 或 $body$
+        i = 0
+        n = len(sql_content)
+
+        while i < n:
+            # 检测美元引号开始（$tag$ 格式，tag 可为空字符串）
+            if not in_dollar_quote and sql_content[i] == '$':
+                j = i + 1
+                # tag 只能包含字母、数字、下划线
+                while j < n and (sql_content[j].isalnum() or sql_content[j] == '_'):
+                    j += 1
+                if j < n and sql_content[j] == '$':
+                    # 找到合法的美元引号标签
+                    tag = sql_content[i:j + 1]  # 包含两端的 $
+                    in_dollar_quote = True
+                    dollar_tag = tag
+                    current.append(sql_content[i:j + 1])
+                    i = j + 1
+                    continue
+                # 不是合法标签，当作普通字符处理
+                current.append(sql_content[i])
+                i += 1
+                continue
+
+            # 在美元引号块内，检测结束标签
+            if in_dollar_quote:
+                tag_len = len(dollar_tag)
+                if sql_content[i:i + tag_len] == dollar_tag:
+                    current.append(dollar_tag)
+                    i += tag_len
+                    in_dollar_quote = False
+                    dollar_tag = ""
+                else:
+                    current.append(sql_content[i])
+                    i += 1
+                continue
+
+            # 普通模式：遇到分号则结束当前语句
+            if sql_content[i] == ';':
+                stmt = "".join(current).strip()
+                if stmt and not _is_comment_only(stmt):
+                    statements.append(stmt)
+                current = []
+                i += 1
+                continue
+
+            current.append(sql_content[i])
+            i += 1
+
+        # 处理末尾没有分号的语句
+        remaining = "".join(current).strip()
+        if remaining and not _is_comment_only(remaining):
+            statements.append(remaining)
+
+        return statements
+
     async def _apply_migration(self, mig: MigrationFile) -> None:
-        """执行单个迁移脚本并记录到 schema_version。"""
+        """执行单个迁移脚本并记录到 schema_version。
+
+        按分号分割 SQL 语句逐条执行，正确处理 ``DO $$ ... END $$;`` 块。
+        """
         sql_content = mig.path.read_text(encoding="utf-8")
         logger.info("[Migration] 执行 %s (version=%s) ...", mig.filename, mig.version)
 
+        statements = self._split_sql_statements(sql_content)
+        logger.debug("[Migration] %s 共 %d 条语句", mig.filename, len(statements))
+
         async with self._engine.begin() as conn:
-            # 执行迁移 SQL（可能包含多条语句）
-            # 使用 connection.execute(text(...)) 逐条执行
-            # 对于包含 DO $$ ... END $$; 等 PL/pgSQL 块，需要整体执行
-            await conn.execute(text(sql_content))
+            for stmt in statements:
+                await conn.execute(text(stmt))
 
             # 记录版本
             await conn.execute(
@@ -204,7 +308,7 @@ class MigrationRunner:
                 {"version": mig.version, "filename": mig.filename, "checksum": mig.checksum},
             )
 
-        logger.info("[Migration] ✅ %s 执行成功", mig.filename)
+        logger.info("[Migration] ✅ %s 执行成功（%d 条语句）", mig.filename, len(statements))
 
     def _find_v001(self) -> MigrationFile | None:
         """在迁移列表中查找 V001。"""

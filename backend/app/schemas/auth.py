@@ -61,6 +61,7 @@ class UserResponse(BaseModel):
     office_code: str | None = None
     is_active: bool
     created_at: datetime
+    permissions: list[str] = []  # 角色对应的权限列表，供前端权限检查使用
 
 
 class TokenResponse(BaseModel):

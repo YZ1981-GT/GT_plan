@@ -12,19 +12,31 @@
  */
 import { ElMessageBox } from 'element-plus'
 
+/** 对 HTML 特殊字符转义，防止含 < > & 的文件名在弹窗中显示异常 */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 /**
  * 删除确认弹窗（红色确认按钮）
  * @param itemName 被删除项名称，如 "该分录"、"文档「xxx」"
  */
 export async function confirmDelete(itemName?: string): Promise<void> {
-  const msg = itemName
-    ? `确定删除${itemName}？`
+  const safeName = itemName ? escapeHtml(itemName) : ''
+  const msg = safeName
+    ? `确定删除${safeName}？`
     : '确定删除该记录？'
   await ElMessageBox.confirm(msg, '删除确认', {
     confirmButtonText: '确定删除',
     cancelButtonText: '取消',
     type: 'warning',
     confirmButtonClass: 'el-button--danger',
+    dangerouslyUseHTMLString: false,
   })
 }
 

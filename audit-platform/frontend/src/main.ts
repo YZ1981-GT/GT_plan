@@ -1,7 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 // Element Plus 样式：按需导入由 unplugin-vue-components 自动处理，
 // 但仍需全局引入 base 样式（CSS 变量、字体等）
@@ -23,10 +22,7 @@ app.use(router)
 // 注册全局指令
 app.directive('permission', vPermission)
 
-// Register all Element Plus icons
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
-}
+// 图标由 unplugin-vue-components 自动按需注册，无需全量注册（P1.3 修复）
 
 // 全局错误处理 — 防止组件错误导致白屏
 app.config.errorHandler = (err, _instance, info) => {

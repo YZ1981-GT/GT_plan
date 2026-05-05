@@ -229,19 +229,18 @@ export const useAddressRegistry = defineStore('addressRegistry', () => {
   }
 
   // ─── 监听模板应用事件，自动刷新地址注册表 ───
-  eventBus.on('template-applied', () => {
-    if (_projectId.value && loaded.value) {
-      // 延迟刷新，等后端处理完模板应用
-      setTimeout(() => refresh(), 500)
-    }
-  })
+  // 使用防抖避免 template-applied / formula-changed 连续触发时重复请求
+  let _refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  function _debouncedRefresh(delay = 300) {
+    if (_refreshDebounceTimer) clearTimeout(_refreshDebounceTimer)
+    _refreshDebounceTimer = setTimeout(() => {
+      _refreshDebounceTimer = null
+      if (_projectId.value && loaded.value) refresh()
+    }, delay)
+  }
 
-  // 监听公式变更事件，可能影响地址有效性
-  eventBus.on('formula-changed', () => {
-    if (_projectId.value && loaded.value) {
-      setTimeout(() => refresh(), 300)
-    }
-  })
+  eventBus.on('template-applied', () => _debouncedRefresh(500))
+  eventBus.on('formula-changed', () => _debouncedRefresh(300))
 
   return {
     // 状态

@@ -91,6 +91,12 @@ export interface SyncEventPayload {
   }
 }
 
+/** 底稿解析完成（上传→解析→试算表联动） */
+export interface WorkpaperParsedPayload {
+  projectId: string
+  wpId: string
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -115,6 +121,9 @@ export type Events = {
   'sse:sync-failed': SyncEventPayload
   'sse:connected': void
   'sse:disconnected': void
+
+  // 底稿生命周期
+  'workpaper:parsed': WorkpaperParsedPayload
 
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void

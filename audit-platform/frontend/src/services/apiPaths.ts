@@ -377,6 +377,7 @@ export const staff = {
 
 export const users = {
   list: '/api/users',
+  me: '/api/users/me',
   detail: (id: string) => `/api/users/${id}`,
   privateStorage: {
     list: (uid: string) => `/api/users/${uid}/private-storage`,

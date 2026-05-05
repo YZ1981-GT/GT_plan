@@ -106,6 +106,7 @@ export interface AccountOption {
   code: string
   name: string
   level: number
+  report_line?: string  // 对应报表行次名称
 }
 
 export async function listAdjustments(
@@ -219,9 +220,11 @@ export async function getMaterialityBenchmark(projectId: string, year: number, b
 }
 
 // ─── Events SSE ───
+// createSSE（fetch+ReadableStream）在 ThreeColumnLayout.vue 中直接使用，token 通过 Authorization header 传输
+// createEventSource 保留为兼容接口（当前无调用方）
 
-export function createEventSource(projectId: string): EventSource {
-  return new EventSource(P_evt.stream(projectId))
+export function createEventSource(projectId: string) {
+  return import('@/utils/sse').then(({ createSSE }) => createSSE(P_evt.stream(projectId)))
 }
 
 

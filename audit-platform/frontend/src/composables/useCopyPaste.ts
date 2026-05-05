@@ -92,7 +92,7 @@ export async function copySelection(
  *
  * @param event - 原生 paste 事件
  * @param selectedCells - 当前选中的单元格数组
- * @param tableData - 表格数据（行数组）
+ * @param tableData - 表格数据（行数组，必须是响应式数组 ref 的 .value，否则 UI 不更新）
  * @param columns - 列定义，每项包含 { key, label }
  * @param onCellChange - 单元格值变更回调，用于通知外部更新
  * @returns 写入的单元格数量

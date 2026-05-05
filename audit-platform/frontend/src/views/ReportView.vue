@@ -3,7 +3,7 @@
     <!-- 固定顶部区域 -->
     <div class="gt-rv-sticky-header">
       <!-- 页面横幅 -->
-      <GtPageHeader title="财务报表" @back="goBack">
+      <GtPageHeader title="财务报表" :show-sync-status="true" @back="goBack">
         <GtInfoBar
           :show-unit="true"
           :show-year="true"

@@ -299,3 +299,240 @@ class TestMigrationRunnerInit:
     def test_accepts_url(self):
         runner = MigrationRunner(database_url="sqlite+aiosqlite:///:memory:")
         assert runner._owns_engine is True
+
+
+class TestSplitSqlStatements:
+    """_split_sql_statements() 单元测试 — 纯逻辑，无需数据库。"""
+
+    # ------------------------------------------------------------------
+    # 基础分割
+    # ------------------------------------------------------------------
+
+    def test_single_statement(self):
+        sql = "CREATE TABLE foo (id INTEGER PRIMARY KEY);"
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 1
+        assert stmts[0] == "CREATE TABLE foo (id INTEGER PRIMARY KEY)"
+
+    def test_multiple_statements(self):
+        sql = textwrap.dedent("""\
+            CREATE TABLE foo (id INTEGER PRIMARY KEY);
+            CREATE TABLE bar (id INTEGER PRIMARY KEY);
+            CREATE TABLE baz (id INTEGER PRIMARY KEY);
+        """)
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 3
+        assert stmts[0].startswith("CREATE TABLE foo")
+        assert stmts[1].startswith("CREATE TABLE bar")
+        assert stmts[2].startswith("CREATE TABLE baz")
+
+    def test_no_trailing_semicolon(self):
+        """末尾没有分号的语句也应被收集。"""
+        sql = "SELECT 1"
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 1
+        assert stmts[0] == "SELECT 1"
+
+    # ------------------------------------------------------------------
+    # 过滤空语句和注释
+    # ------------------------------------------------------------------
+
+    def test_filters_empty_statements(self):
+        """连续分号之间的空内容应被过滤。"""
+        sql = "CREATE TABLE foo (id INTEGER);;; CREATE TABLE bar (id INTEGER);"
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 2
+
+    def test_filters_comment_only_statements(self):
+        """纯注释片段应被过滤。"""
+        sql = textwrap.dedent("""\
+            -- 这是注释
+            CREATE TABLE foo (id INTEGER PRIMARY KEY);
+            -- 另一条注释
+            CREATE TABLE bar (id INTEGER PRIMARY KEY);
+        """)
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 2
+        assert all("CREATE TABLE" in s for s in stmts)
+
+    def test_filters_whitespace_only(self):
+        """纯空白内容应被过滤。"""
+        sql = "   \n\t  "
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert stmts == []
+
+    def test_comment_only_file(self):
+        """全注释文件（如 V001__init.sql）应返回空列表。"""
+        sql = "-- baseline, no-op\n"
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert stmts == []
+
+    def test_inline_comment_preserved_in_statement(self):
+        """语句内的行内注释应保留（不影响执行）。"""
+        sql = textwrap.dedent("""\
+            CREATE TABLE foo (
+                id INTEGER PRIMARY KEY, -- 主键
+                name TEXT               -- 名称
+            );
+        """)
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 1
+        assert "CREATE TABLE foo" in stmts[0]
+
+    # ------------------------------------------------------------------
+    # 美元引号块（DO $$ ... END $$;）
+    # ------------------------------------------------------------------
+
+    def test_dollar_quote_block_not_split(self):
+        """DO $$ ... END $$; 块内的分号不应触发分割。"""
+        sql = textwrap.dedent("""\
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'my_enum') THEN
+                    CREATE TYPE my_enum AS ENUM ('a', 'b', 'c');
+                END IF;
+            END
+            $$;
+        """)
+        stmts = MigrationRunner._split_sql_statements(sql)
+        # 整个 DO 块应作为一条语句
+        assert len(stmts) == 1
+        assert "DO $$" in stmts[0]
+        assert "END IF;" in stmts[0]
+
+    def test_dollar_quote_followed_by_normal_statement(self):
+        """DO $$ 块后面跟普通语句，应正确分割为两条。"""
+        sql = textwrap.dedent("""\
+            DO $$
+            BEGIN
+                RAISE NOTICE 'hello; world';
+            END
+            $$;
+            CREATE TABLE after_block (id INTEGER PRIMARY KEY);
+        """)
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 2
+        assert "DO $$" in stmts[0]
+        assert "CREATE TABLE after_block" in stmts[1]
+
+    def test_named_dollar_quote_tag(self):
+        """$body$ 等命名标签也应正确处理。"""
+        sql = textwrap.dedent("""\
+            DO $body$
+            BEGIN
+                UPDATE foo SET x = 1 WHERE y = 2;
+            END
+            $body$;
+        """)
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 1
+        assert "$body$" in stmts[0]
+
+    def test_multiple_statements_with_dollar_block(self):
+        """多条普通语句 + DO 块的混合文件。"""
+        sql = textwrap.dedent("""\
+            CREATE TABLE t1 (id INTEGER PRIMARY KEY);
+            CREATE TABLE t2 (id INTEGER PRIMARY KEY);
+            DO $$
+            BEGIN
+                INSERT INTO t1 VALUES (1);
+                INSERT INTO t2 VALUES (1);
+            END
+            $$;
+            CREATE INDEX idx_t1 ON t1 (id);
+        """)
+        stmts = MigrationRunner._split_sql_statements(sql)
+        assert len(stmts) == 4
+        assert stmts[0].startswith("CREATE TABLE t1")
+        assert stmts[1].startswith("CREATE TABLE t2")
+        assert "DO $$" in stmts[2]
+        assert stmts[3].startswith("CREATE INDEX")
+
+    # ------------------------------------------------------------------
+    # 多语句迁移文件集成（SQLite 兼容）
+    # ------------------------------------------------------------------
+
+    async def test_multi_statement_migration_executes_all(
+        self, sqlite_engine, tmp_path: Path
+    ):
+        """多语句 SQL 文件应逐条执行，所有表都被创建。"""
+        import app.core.migration_runner as mod
+        original_ddl = mod._SCHEMA_VERSION_DDL
+        mod._SCHEMA_VERSION_DDL = textwrap.dedent("""\
+            CREATE TABLE IF NOT EXISTS schema_version (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                version   VARCHAR(20)  NOT NULL UNIQUE,
+                filename  VARCHAR(255) NOT NULL,
+                applied_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                checksum  VARCHAR(64)  NOT NULL
+            );
+        """)
+        mig_dir = tmp_path / "migrations"
+        mig_dir.mkdir()
+
+        # V001: 基线（纯注释，无实际语句）
+        (mig_dir / "V001__init.sql").write_text("-- baseline\n", encoding="utf-8")
+
+        # V002: 多语句迁移（SQLite 兼容）
+        (mig_dir / "V002__multi_stmt.sql").write_text(textwrap.dedent("""\
+            -- 创建两张表
+            CREATE TABLE IF NOT EXISTS alpha (id INTEGER PRIMARY KEY, val TEXT);
+            CREATE TABLE IF NOT EXISTS beta (id INTEGER PRIMARY KEY, val TEXT);
+            -- 插入初始数据
+            INSERT INTO alpha (id, val) VALUES (1, 'hello');
+            INSERT INTO beta (id, val) VALUES (1, 'world');
+        """), encoding="utf-8")
+
+        try:
+            runner = MigrationRunner(engine=sqlite_engine, migrations_dir=mig_dir)
+            executed = await runner.run_pending()
+
+            assert "002" in executed
+
+            async with sqlite_engine.begin() as conn:
+                # 验证两张表都已创建
+                for table in ("alpha", "beta"):
+                    result = await conn.execute(text(
+                        f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'"
+                    ))
+                    assert result.fetchone() is not None, f"表 {table} 未创建"
+
+                # 验证数据已插入
+                r = await conn.execute(text("SELECT val FROM alpha WHERE id=1"))
+                assert r.scalar() == "hello"
+
+                r = await conn.execute(text("SELECT val FROM beta WHERE id=1"))
+                assert r.scalar() == "world"
+        finally:
+            mod._SCHEMA_VERSION_DDL = original_ddl
+
+    async def test_comment_only_migration_executes_without_error(
+        self, sqlite_engine, tmp_path: Path
+    ):
+        """纯注释迁移文件（如 V001）应正常执行，不报错。"""
+        import app.core.migration_runner as mod
+        original_ddl = mod._SCHEMA_VERSION_DDL
+        mod._SCHEMA_VERSION_DDL = textwrap.dedent("""\
+            CREATE TABLE IF NOT EXISTS schema_version (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                version   VARCHAR(20)  NOT NULL UNIQUE,
+                filename  VARCHAR(255) NOT NULL,
+                applied_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                checksum  VARCHAR(64)  NOT NULL
+            );
+        """)
+        mig_dir = tmp_path / "migrations"
+        mig_dir.mkdir()
+
+        (mig_dir / "V001__init.sql").write_text("-- baseline, no-op\n", encoding="utf-8")
+        (mig_dir / "V002__comment_only.sql").write_text(
+            "-- 这个文件只有注释\n-- 没有实际 SQL\n", encoding="utf-8"
+        )
+
+        try:
+            runner = MigrationRunner(engine=sqlite_engine, migrations_dir=mig_dir)
+            # 不应抛出异常
+            executed = await runner.run_pending()
+            assert "002" in executed
+        finally:
+            mod._SCHEMA_VERSION_DDL = original_ddl

@@ -3,16 +3,15 @@
     GtAmountCell — 通用金额单元格组件
     跟随 displayPrefs 格式化 + amountClass 条件格式
     可点击穿透 + hover 高亮 + CommentTooltip 包裹
+    CommentTooltip 支持 null/undefined comment，直接渲染 slot，无需 v-if 分支。
     Validates: Requirements R5.6
   -->
-  <CommentTooltip v-if="comment" :comment="comment">
+  <CommentTooltip :comment="comment">
     <span
       class="gt-amount-cell"
       :class="[
         displayPrefs.amountClass(value, priorValue),
-        {
-          'gt-amount-cell--clickable': clickable,
-        },
+        { 'gt-amount-cell--clickable': clickable },
       ]"
       style="white-space: nowrap"
       @click="handleClick"
@@ -20,20 +19,6 @@
       {{ displayPrefs.fmt(value) }}
     </span>
   </CommentTooltip>
-  <span
-    v-else
-    class="gt-amount-cell"
-    :class="[
-      displayPrefs.amountClass(value, priorValue),
-      {
-        'gt-amount-cell--clickable': clickable,
-      },
-    ]"
-    style="white-space: nowrap"
-    @click="handleClick"
-  >
-    {{ displayPrefs.fmt(value) }}
-  </span>
 </template>
 
 <script setup lang="ts">
@@ -47,7 +32,7 @@ const props = withDefaults(
     value: number | string | null | undefined
     /** 是否可点击（穿透查询等） */
     clickable?: boolean
-    /** 批注对象（传入则包裹 CommentTooltip） */
+    /** 批注对象（传入则包裹 CommentTooltip，null/undefined 时直接渲染） */
     comment?: CellComment | null
     /** 上期金额（用于变动高亮对比） */
     priorValue?: number | string | null
@@ -73,7 +58,6 @@ function handleClick() {
 </script>
 
 <style scoped>
-/* 基础金额单元格样式 */
 .gt-amount-cell {
   font-variant-numeric: tabular-nums;
   font-family: 'Arial Narrow', Arial, sans-serif;
@@ -85,7 +69,6 @@ function handleClick() {
   transition: all 0.15s ease;
 }
 
-/* 可点击状态 */
 .gt-amount-cell--clickable {
   cursor: pointer;
   color: #333;

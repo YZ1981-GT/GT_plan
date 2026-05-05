@@ -1,7 +1,7 @@
 <template>
   <div class="gt-trial-balance gt-fade-in" :class="{ 'gt-fullscreen': tbFullscreen }">
     <!-- 页面横幅 -->
-    <GtPageHeader title="试算表" @back="router.push('/projects')">
+    <GtPageHeader title="试算表" :show-sync-status="true" @back="router.push('/projects')">
       <GtInfoBar
         :show-unit="true"
         :show-year="true"
@@ -188,7 +188,7 @@
         <el-button size="small" @click="exportTbSummary">📤 导出</el-button>
         <el-button size="small" @click="saveTbSummary">💾 保存</el-button>
         <span style="flex:1" />
-        <span style="font-size:11px;color:#999">{{ tbSummaryRows.length }} 行 · 审定数=未审数+审计调整借-贷+重分类借-贷</span>
+        <span style="font-size:11px;color:#999">{{ tbSummaryRows.length }} 行 · 审计调整借贷从调整分录自动汇总 · 审定数=未审数+审计调整借-贷+重分类借-贷</span>
       </div>
       <div style="overflow-x:auto;max-height:calc(100vh - 300px)">
         <table class="gt-tb-summary-table" :style="{ fontSize: displayPrefs.fontConfig.tableFont }">
@@ -212,8 +212,8 @@
               <td style="text-align:center;color:#999;font-size:11px">{{ row.row_code }}</td>
               <td :style="{ paddingLeft: (row.indent || 0) * 14 + 'px' }">{{ row.row_name }}</td>
               <td class="gt-tb-sum-num gt-tb-sum-unadj">{{ fmt(row.unadjusted) }}</td>
-              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 0)" v-model="row.aje_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 0)">{{ fmt(row.aje_dr) }}</span></td>
-              <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 1)" v-model="row.aje_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 1)">{{ fmt(row.aje_cr) }}</span></td>
+              <td class="gt-tb-sum-num"><span class="gt-tb-readonly">{{ fmt(row.aje_dr) }}</span></td>
+              <td class="gt-tb-sum-num"><span class="gt-tb-readonly">{{ fmt(row.aje_cr) }}</span></td>
               <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 2)" v-model="row.rcl_dr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 2)">{{ fmt(row.rcl_dr) }}</span></td>
               <td class="gt-tb-sum-num"><el-input-number v-if="tbSumLazyEdit.isEditing(ri, 3)" v-model="row.rcl_cr" size="small" :controls="false" style="width:100%" @blur="tbSumLazyEdit.stopEdit()" autofocus /><span v-else class="gt-tb-editable" @click="tbSumLazyEdit.startEdit(ri, 3)">{{ fmt(row.rcl_cr) }}</span></td>
               <td class="gt-tb-sum-num gt-tb-sum-audited">{{ fmt(row.audited) }}</td>
@@ -229,9 +229,14 @@
 
     <!-- 借贷平衡指示器 -->
     <div class="gt-tb-balance-indicator" v-if="!loading">
-      <span :class="isBalanced ? 'gt-tb-balanced' : 'gt-tb-unbalanced'">
-        {{ isBalanced ? '✓ 借贷平衡' : '✗ 借贷不平衡' }}
-      </span>
+      <el-tooltip
+        :content="isBalanced ? '资产类合计 = 负债类合计 + 权益类合计' : `差额：${fmt(Math.abs(balanceDiff))} 元`"
+        placement="top"
+      >
+        <span :class="isBalanced ? 'gt-tb-balanced' : 'gt-tb-unbalanced'">
+          {{ isBalanced ? '✓ 借贷平衡' : '✗ 借贷不平衡' }}
+        </span>
+      </el-tooltip>
     </div>
 
     <!-- 调整分录明细弹窗 -->
@@ -287,6 +292,7 @@
   >
     <div class="gt-ucell-ctx-item" @click="onTbCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看明细</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
+    <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看相关分录</div>
   </CellContextMenu>
 </template>
 
@@ -309,13 +315,13 @@ import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
+import { eventBus, type WorkpaperParsedPayload } from '@/utils/eventBus'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
   getProjectAuditYear, listAdjustments,
   type TrialBalanceRow, type ConsistencyResult,
 } from '@/services/auditPlatformApi'
-import { getAllWpMappings, type WpAccountMapping } from '@/services/workpaperApi'
+import { getAllWpMappings, listWorkpapers, type WpAccountMapping, type WorkpaperDetail } from '@/services/workpaperApi'
 import { useProjectStore } from '@/stores/project'
 import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
 import { withLoading } from '@/composables/useLoading'
@@ -379,6 +385,8 @@ const adjDialogList = ref<any[]>([])
 // 底稿-科目映射
 const wpMappings = ref<WpAccountMapping[]>([])
 const wpMappingIndex = ref<Record<string, WpAccountMapping>>({})
+// 已生成的底稿列表（用于直接跳转编辑器）
+const wpList = ref<WorkpaperDetail[]>([])
 
 function getLinkedWp(accountCode: string): WpAccountMapping | undefined {
   return wpMappingIndex.value[accountCode]
@@ -387,11 +395,14 @@ function getLinkedWp(accountCode: string): WpAccountMapping | undefined {
 function onOpenWorkpaper(accountCode: string) {
   const mapping = getLinkedWp(accountCode)
   if (!mapping) return
-  // 跳转到底稿列表页，高亮对应底稿
-  router.push({
-    path: `/projects/${projectId.value}/workpapers`,
-    query: { highlight: mapping.wp_code },
-  })
+  // 直接跳转到底稿编辑器
+  const wp = wpList.value.find(w => w.wp_code === mapping.wp_code)
+  if (wp) {
+    router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: wp.id } })
+  } else {
+    // 底稿未生成时，跳到列表页并高亮
+    router.push({ path: `/projects/${projectId.value}/workpapers`, query: { highlight: mapping.wp_code } })
+  }
 }
 
 const CATEGORY_ORDER = ['asset', 'liability', 'equity', 'revenue', 'cost', 'expense']
@@ -461,11 +472,25 @@ const groupedRows = computed<DisplayRow[]>(() => {
   return result
 })
 
+// 资产类合计
+const assetTotal = computed(() =>
+  rows.value
+    .filter(r => r.account_category === 'asset')
+    .reduce((s, r) => s + num(r.audited_amount), 0)
+)
+// 负债+权益类合计
+const liabEquityTotal = computed(() =>
+  rows.value
+    .filter(r => ['liability', 'equity'].includes(r.account_category || ''))
+    .reduce((s, r) => s + num(r.audited_amount), 0)
+)
+// 差额（资产 - 负债权益），用于 tooltip 显示
+const balanceDiff = computed(() => assetTotal.value - liabEquityTotal.value)
+
 const isBalanced = computed(() => {
-  // 简化：检查合计行借贷是否平衡（审定数合计接近0）
-  const totalRow = groupedRows.value.find(r => (r as DisplayRow)._isTotal)
-  if (!totalRow) return true
-  return Math.abs(num(totalRow.audited_amount)) < 0.01
+  // 正确逻辑：资产类合计 = 负债类合计 + 权益类合计，允许 1 元浮点误差
+  if (!rows.value.length) return true
+  return Math.abs(balanceDiff.value) < 1
 })
 
 function num(v: string | null | undefined): number {
@@ -572,6 +597,10 @@ watch(
       }
       wpMappingIndex.value = idx
     } catch { /* ignore */ }
+    // 加载已生成的底稿列表（用于直接跳转编辑器）
+    try {
+      wpList.value = await listWorkpapers(projectId.value)
+    } catch { /* ignore */ }
   },
   { immediate: true }
 )
@@ -580,10 +609,13 @@ watch(
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   eventBus.on('shortcut:save', onShortcutSave)
+  // 底稿解析完成后自动刷新试算表（五环联动）
+  eventBus.on('workpaper:parsed', onWorkpaperParsed)
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   eventBus.off('shortcut:save', onShortcutSave)
+  eventBus.off('workpaper:parsed', onWorkpaperParsed)
 })
 
 /** 快捷键保存：根据当前视图保存试算平衡表 */
@@ -593,6 +625,11 @@ function onShortcutSave() {
   } else {
     onRecalc()
   }
+}
+
+/** 底稿解析完成后刷新试算表数据（五环联动） */
+function onWorkpaperParsed(_payload: WorkpaperParsedPayload) {
+  fetchData()
 }
 
 // ─── 试算平衡表（报表行次级别） ──────────────────────────────────────────────
@@ -756,6 +793,19 @@ function onTbCtxCompare() {
   ElMessage.info(`差异：${fmtAmount(diff)}`)
 }
 
+function onTbCtxViewAdj() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  if (!row?.standard_account_code) {
+    ElMessage.info('请先选中一个科目行')
+    return
+  }
+  router.push({
+    path: `/projects/${projectId.value}/adjustments`,
+    query: { year: String(year.value), account: row.standard_account_code },
+  })
+}
+
 const tbSummaryTypes = [
   { key: 'balance_sheet', label: '资产负债表' },
   { key: 'income_statement', label: '利润表' },
@@ -765,78 +815,83 @@ const tbSummaryTypes = [
 async function loadTbSummary() {
   tbSummaryLoading.value = true
   try {
-    // 1. 加载报表行结构
-    const standard = `${selectedTemplateType.value}_standalone`
-    const reportData = await api.get('/api/report-config', {
-      params: { report_type: tbSummaryType.value, applicable_standard: standard, project_id: projectId.value },
-      validateStatus: (s: number) => s < 600,
-    })
-    const reportRows = Array.isArray(reportData) ? reportData : []
-
-    // 2. 从科目明细汇总未审数（按报表行次映射）
-    // 用现有的 rows（科目明细）按 account_name 匹配报表行
-    const unadjMap: Record<string, number> = {}
-    for (const r of rows.value) {
-      if (r.account_name && r.unadjusted_amount) {
-        unadjMap[r.account_name.trim()] = (unadjMap[r.account_name.trim()] || 0) + Number(r.unadjusted_amount || 0)
+    // 调用新接口：从 adjustments 表自动汇总 AJE/RJE
+    const result = await api.get(
+      `/api/projects/${projectId.value}/trial-balance/summary-with-adjustments`,
+      {
+        params: { year: year.value, report_type: tbSummaryType.value },
+        validateStatus: (s: number) => s < 600,
       }
-    }
+    )
+    const apiRows = result?.rows ?? []
 
-    // 3. 从调整分录汇总 AJE/RCL
-    const ajeMap: Record<string, { dr: number; cr: number }> = {}
-    const rclMap: Record<string, { dr: number; cr: number }> = {}
-    for (const r of rows.value) {
-      const name = (r.account_name || '').trim()
-      if (!name) continue
-      const aje = Number(r.aje_adjustment || 0)
-      const rje = Number(r.rje_adjustment || 0)
-      if (aje > 0) { ajeMap[name] = ajeMap[name] || { dr: 0, cr: 0 }; ajeMap[name].dr += aje }
-      else if (aje < 0) { ajeMap[name] = ajeMap[name] || { dr: 0, cr: 0 }; ajeMap[name].cr += Math.abs(aje) }
-      if (rje > 0) { rclMap[name] = rclMap[name] || { dr: 0, cr: 0 }; rclMap[name].dr += rje }
-      else if (rje < 0) { rclMap[name] = rclMap[name] || { dr: 0, cr: 0 }; rclMap[name].cr += Math.abs(rje) }
-    }
-
-    // 4. 构建试算平衡表行
-    tbSummaryRows.value = reportRows.map((r: any) => {
-      const name = (r.row_name || '').trim().replace(/^[△▲*#\s]+/, '')
-      const unadj = unadjMap[name] || Number(r.current_period_amount || 0) || null
-      const aje = ajeMap[name] || { dr: 0, cr: 0 }
-      const rcl = rclMap[name] || { dr: 0, cr: 0 }
-      return {
+    if (apiRows.length > 0) {
+      // 新接口返回完整数据（含 AJE/RJE 自动汇总）
+      tbSummaryRows.value = apiRows.map((r: any) => ({
         row_code: r.row_code || '',
         row_name: r.row_name || '',
-        indent: r.indent_level || 0,
-        is_total: r.is_total_row || false,
-        is_category: (r.indent_level === 0 && !r.is_total_row),
-        unadjusted: unadj,
-        aje_dr: aje.dr || null,
-        aje_cr: aje.cr || null,
-        rcl_dr: rcl.dr || null,
-        rcl_cr: rcl.cr || null,
-        audited: null as number | null,
-      }
-    })
-    recalcTbSummaryAudited()
+        indent: r.indent || 0,
+        is_total: r.is_total || false,
+        is_category: r.is_category || false,
+        unadjusted: r.unadjusted ?? null,
+        aje_dr: r.aje_dr ?? null,
+        aje_cr: r.aje_cr ?? null,
+        rcl_dr: r.rcl_dr ?? null,
+        rcl_cr: r.rcl_cr ?? null,
+        audited: r.audited ?? null,
+      }))
+    } else {
+      // 新接口无数据（报表行次未配置），降级：从报表配置+科目明细构建
+      const standard = `${selectedTemplateType.value}_standalone`
+      const reportData = await api.get('/api/report-config', {
+        params: { report_type: tbSummaryType.value, applicable_standard: standard, project_id: projectId.value },
+        validateStatus: (s: number) => s < 600,
+      })
+      const reportRows = Array.isArray(reportData) ? reportData : []
 
-    // 5. 尝试加载已保存的数据覆盖
-    try {
-      const saved = await api.get(
-        `/api/consol-worksheet-data/${projectId.value}/${selectedYear.value}/tb_summary_${tbSummaryType.value}`,
-        { validateStatus: (s: number) => s < 600 }
-      )
-      const savedData = saved
-      if (savedData?.content?.rows) {
-        for (const sr of savedData.content.rows) {
-          const target = tbSummaryRows.value.find((r: any) => r.row_code === sr.row_code)
-          if (target) {
-            if (sr.aje_dr != null) target.aje_dr = sr.aje_dr
-            if (sr.aje_cr != null) target.aje_cr = sr.aje_cr
-            if (sr.rcl_dr != null) target.rcl_dr = sr.rcl_dr
-            if (sr.rcl_cr != null) target.rcl_cr = sr.rcl_cr
-          }
+      // 从科目明细汇总未审数
+      const unadjMap: Record<string, number> = {}
+      for (const r of rows.value) {
+        if (r.account_name && r.unadjusted_amount) {
+          unadjMap[r.account_name.trim()] = (unadjMap[r.account_name.trim()] || 0) + Number(r.unadjusted_amount || 0)
         }
       }
-    } catch { /* 首次无数据 */ }
+
+      // 从科目明细汇总 AJE/RCL（只读，不可手动编辑）
+      const ajeMap: Record<string, { dr: number; cr: number }> = {}
+      const rclMap: Record<string, { dr: number; cr: number }> = {}
+      for (const r of rows.value) {
+        const name = (r.account_name || '').trim()
+        if (!name) continue
+        const aje = Number(r.aje_adjustment || 0)
+        const rje = Number(r.rje_adjustment || 0)
+        if (aje > 0) { ajeMap[name] = ajeMap[name] || { dr: 0, cr: 0 }; ajeMap[name].dr += aje }
+        else if (aje < 0) { ajeMap[name] = ajeMap[name] || { dr: 0, cr: 0 }; ajeMap[name].cr += Math.abs(aje) }
+        if (rje > 0) { rclMap[name] = rclMap[name] || { dr: 0, cr: 0 }; rclMap[name].dr += rje }
+        else if (rje < 0) { rclMap[name] = rclMap[name] || { dr: 0, cr: 0 }; rclMap[name].cr += Math.abs(rje) }
+      }
+
+      tbSummaryRows.value = reportRows.map((r: any) => {
+        const name = (r.row_name || '').trim().replace(/^[△▲*#\s]+/, '')
+        const unadj = unadjMap[name] || Number(r.current_period_amount || 0) || null
+        const aje = ajeMap[name] || { dr: 0, cr: 0 }
+        const rcl = rclMap[name] || { dr: 0, cr: 0 }
+        return {
+          row_code: r.row_code || '',
+          row_name: r.row_name || '',
+          indent: r.indent_level || 0,
+          is_total: r.is_total_row || false,
+          is_category: (r.indent_level === 0 && !r.is_total_row),
+          unadjusted: unadj,
+          aje_dr: aje.dr || null,
+          aje_cr: aje.cr || null,
+          rcl_dr: rcl.dr || null,
+          rcl_cr: rcl.cr || null,
+          audited: null as number | null,
+        }
+      })
+      recalcTbSummaryAudited()
+    }
   } catch { tbSummaryRows.value = [] }
   finally { tbSummaryLoading.value = false }
 }
@@ -935,6 +990,7 @@ async function exportTbSummary() {
 .gt-tb-sum-num { text-align: right; }
 .gt-tb-editable { cursor: text; border-bottom: 1px dashed #e5e5ea; padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; text-align: right; }
 .gt-tb-editable:hover { background: #f4f0fa; }
+.gt-tb-readonly { display: inline-block; min-width: 60px; text-align: right; padding: 2px 4px; color: #606266; }
 .gt-tb-sum-unadj { background: rgba(75,45,119,0.03); }
 .gt-tb-sum-audited { font-weight: 700; color: #4b2d77; background: rgba(75,45,119,0.06); }
 .gt-tb-sum-audited-th { background: #e8e0f0 !important; color: #4b2d77; }

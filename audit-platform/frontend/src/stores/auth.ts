@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import http from '@/utils/http'
+import { API } from '@/services/apiPaths'
 
 /**
  * 认证专用 axios 实例（不带 auth 拦截器，避免循环依赖）。
@@ -16,6 +17,8 @@ export interface UserProfile {
   office_code: string | null
   is_active: boolean
   created_at: string
+  /** 后端下发的权限列表（从 /api/users/me 获取），供 usePermission 使用 */
+  permissions?: string[]
 }
 
 export interface AuthState {
@@ -79,7 +82,7 @@ export const useAuthStore = defineStore('auth', {
 
     async fetchUserProfile() {
       // 使用带拦截器的 http 实例，自动附加 token + 401 刷新
-      const { data } = await http.get('/api/users/me')
+      const { data } = await http.get(API.users.me)
       this.user = data
     },
   },

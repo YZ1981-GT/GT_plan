@@ -59,6 +59,10 @@ export function useTableToolbar<T extends Record<string, any>>(tableData: Ref<T[
   /**
    * 删除所有选中行（带确认弹窗）
    *
+   * 注意：使用对象引用比较（`Set.has(r)`）来过滤行。
+   * 如果在选中行后刷新了 tableData（重新赋值数组），旧引用会失效，
+   * 导致删除无效。应确保在用户选中后、删除前不重新加载数据。
+   *
    * @returns 是否执行了删除（用户取消返回 false）
    */
   async function deleteSelectedRows(): Promise<boolean> {

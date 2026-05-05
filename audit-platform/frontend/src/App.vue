@@ -23,6 +23,7 @@ onMounted(async () => {
   }
 
   // 加载枚举字典（sessionStorage 缓存，不阻塞页面渲染）
+  // 在 fetchUserProfile 之后检查认证状态，防止 token 失效后仍尝试加载字典
   if (authStore.isAuthenticated) {
     dictStore.load()
   }

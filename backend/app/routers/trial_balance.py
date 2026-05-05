@@ -88,6 +88,24 @@ async def recalc_trial_balance(
     return {"message": "重算完成"}
 
 
+@router.get("/summary-with-adjustments")
+async def get_summary_with_adjustments(
+    project_id: UUID,
+    year: int = Query(...),
+    report_type: str = Query("balance_sheet", description="报表类型: balance_sheet / income_statement / cash_flow_statement"),
+    company_code: str = Query("001"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """
+    试算平衡表汇总（按报表行次），AJE/RJE 从 adjustments 表自动汇总。
+    替代前端手动输入 AJE/RJE 的方案，确保数据与调整分录页面一致。
+    """
+    svc = TrialBalanceService(db)
+    rows = await svc.get_summary_with_adjustments(project_id, year, report_type, company_code)
+    return {"rows": rows}
+
+
 @router.get("/consistency-check")
 async def consistency_check(
     project_id: UUID,

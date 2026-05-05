@@ -1,6 +1,9 @@
 /**
  * SSE 统一封装 — 自动重连、错误处理、生命周期管理
  *
+ * 实现方式：fetch + ReadableStream（替代 EventSource），
+ * 支持在 Authorization header 传 token，避免 token 暴露在 URL query string。
+ *
  * 用法：
  *   const sse = createSSE('/api/events/stream?project_id=xxx')
  *   sse.onMessage((data) => { ... })
@@ -16,8 +19,6 @@ export interface SSEOptions {
   maxRetries?: number
   /** 重连间隔（毫秒），默认 3000，每次翻倍 */
   retryInterval?: number
-  /** 自定义请求头 */
-  headers?: Record<string, string>
 }
 
 export interface SSEConnection {
@@ -30,44 +31,80 @@ export interface SSEConnection {
 
 export function createSSE(url: string, options: SSEOptions = {}): SSEConnection {
   const { maxRetries = 5, retryInterval = 3000 } = options
-  let eventSource: EventSource | null = null
   let retryCount = 0
   let closed = false
+  let connected = false
+  let abortController: AbortController | null = null
   let messageHandler: ((data: any, event?: string) => void) | null = null
   let errorHandler: ((error: Event | Error) => void) | null = null
   let openHandler: (() => void) | null = null
 
-  function connect() {
+  async function connect() {
     if (closed) return
 
-    // 附加 token 到 URL（EventSource 不支持自定义 header）
+    abortController = new AbortController()
     const authStore = useAuthStore()
-    const separator = url.includes('?') ? '&' : '?'
-    const fullUrl = authStore.token
-      ? `${url}${separator}token=${authStore.token}`
-      : url
 
-    eventSource = new EventSource(fullUrl)
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          // token 通过 Authorization header 传输，不放 URL query string
+          ...(authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}),
+        },
+        signal: abortController.signal,
+      })
 
-    eventSource.onopen = () => {
+      if (!response.ok) {
+        throw new Error(`SSE connection failed: ${response.status}`)
+      }
+
+      connected = true
       retryCount = 0
       openHandler?.()
-    }
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        messageHandler?.(data, event.type)
-      } catch {
-        messageHandler?.(event.data, event.type)
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response body')
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let currentEvent = ''
+
+      while (!closed) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            currentEvent = line.slice(6).trim()
+          } else if (line.startsWith('data:')) {
+            const rawData = line.slice(5).trim()
+            try {
+              const parsed = JSON.parse(rawData)
+              messageHandler?.(parsed, currentEvent || undefined)
+            } catch {
+              messageHandler?.(rawData, currentEvent || undefined)
+            }
+            currentEvent = ''
+          } else if (line === '') {
+            // 空行：事件结束，重置 event 字段
+            currentEvent = ''
+          }
+        }
       }
-    }
+    } catch (err: any) {
+      connected = false
+      if (closed || err?.name === 'AbortError') return
 
-    eventSource.onerror = (event) => {
-      eventSource?.close()
-      errorHandler?.(event)
+      errorHandler?.(err instanceof Error ? err : new Error(String(err)))
 
-      if (!closed && retryCount < maxRetries) {
+      if (retryCount < maxRetries) {
         retryCount++
         const delay = retryInterval * Math.pow(2, retryCount - 1)
         setTimeout(connect, delay)
@@ -83,11 +120,12 @@ export function createSSE(url: string, options: SSEOptions = {}): SSEConnection 
     onOpen(handler) { openHandler = handler },
     close() {
       closed = true
-      eventSource?.close()
-      eventSource = null
+      connected = false
+      abortController?.abort()
+      abortController = null
     },
     get isConnected() {
-      return eventSource?.readyState === EventSource.OPEN
+      return connected
     },
   }
 }

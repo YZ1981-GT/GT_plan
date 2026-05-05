@@ -234,9 +234,7 @@ def register_all_routers(app: FastAPI) -> None:
     for r in [gate_router, trace_router, sod_router]:
         app.include_router(r, prefix="/api" if not hasattr(r, 'prefix') or not r.prefix.startswith('/api') else "", tags=["门禁与治理"])
 
-    # Phase 14: 注册门禁规则
-    from app.services.gate_rules_phase14 import register_phase14_rules
-    register_phase14_rules()
+    # Phase 14: 门禁规则在 main.py lifespan 中注册，此处不重复调用
 
     # ═══ 10. Phase 15: 任务树与事件编排 ═══
     from app.routers.task_tree import router as task_tree_router

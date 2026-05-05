@@ -107,6 +107,7 @@
 import { computed } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useDictStore } from '@/stores/dict'
 
 export interface InfoBadge {
   label?: string
@@ -136,7 +137,7 @@ const props = withDefaults(defineProps<{
   yearValue?: number
   /** 当前选中的模板 */
   templateValue?: string
-  /** 模板选项列表 */
+  /** 模板选项列表（覆盖 dictStore 默认值） */
   templateOptions?: TemplateOption[]
   /** 单位选项列表（覆盖 projectStore 默认值） */
   unitOptions?: Array<{ id: string; name: string }>
@@ -153,10 +154,7 @@ const props = withDefaults(defineProps<{
   unitValue: '',
   yearValue: undefined,
   templateValue: '',
-  templateOptions: () => [
-    { label: '国企版', value: 'soe' },
-    { label: '上市版', value: 'listed' },
-  ],
+  templateOptions: undefined,
   unitOptions: undefined,
   yearOptionsList: undefined,
   badges: () => [],
@@ -171,10 +169,25 @@ defineEmits<{
 
 const projectStore = useProjectStore()
 const displayPrefs = useDisplayPrefsStore()
+const dictStore = useDictStore()
 
 // 如果没有传入 unitOptions，使用 projectStore 的
 const unitOptions = computed(() => props.unitOptions ?? projectStore.projectOptions)
 const yearOptionsList = computed(() => props.yearOptionsList ?? projectStore.yearOptions)
+
+/** 模板选项：优先 props 传入 → 其次 dictStore（applicable_standard 字典）→ 最后硬编码默认值 */
+const templateOptions = computed((): TemplateOption[] => {
+  if (props.templateOptions) return props.templateOptions
+  const dictOpts = dictStore.options('applicable_standard')
+  if (dictOpts.length > 0) {
+    return dictOpts.map(e => ({ label: e.label, value: e.value }))
+  }
+  // 硬编码兜底（dictStore 未加载时）
+  return [
+    { label: '国企版', value: 'soe' },
+    { label: '上市版', value: 'listed' },
+  ]
+})
 </script>
 
 <style scoped>

@@ -97,8 +97,8 @@ export const useProjectStore = defineStore('project', () => {
   async function loadProjectOptions() {
     if (projectOptions.value.length > 0) return // 已加载
     try {
-      const { default: http } = await import('@/utils/http')
-      const { data } = await http.get('/api/projects', {
+      const { api } = await import('@/services/apiProxy')
+      const data = await api.get('/api/projects', {
         params: { page_size: 200 },
         validateStatus: (s: number) => s < 600,
       })

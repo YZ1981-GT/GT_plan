@@ -20,7 +20,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 export interface DictEntry {
   value: string
@@ -33,8 +33,11 @@ export type DictData = Record<string, DictEntry[]>
 
 const CACHE_KEY = 'gt_dict_cache'
 const CACHE_VERSION_KEY = 'gt_dict_cache_v'
+const CACHE_SAVED_AT_KEY = 'gt_dict_cache_ts'
 /** 缓存版本号，修改字典结构时递增 */
 const CACHE_VERSION = '1'
+/** 缓存 TTL：24 小时，过期后强制重新加载 */
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 export const useDictStore = defineStore('dict', () => {
   // ─── 状态 ───
@@ -49,6 +52,15 @@ export const useDictStore = defineStore('dict', () => {
       if (ver !== CACHE_VERSION) return false
       const raw = sessionStorage.getItem(CACHE_KEY)
       if (!raw) return false
+      // 检查 TTL
+      const savedAt = Number(sessionStorage.getItem(CACHE_SAVED_AT_KEY) || '0')
+      if (savedAt && Date.now() - savedAt > CACHE_TTL_MS) {
+        // 缓存已过期，清除并返回 false
+        sessionStorage.removeItem(CACHE_KEY)
+        sessionStorage.removeItem(CACHE_VERSION_KEY)
+        sessionStorage.removeItem(CACHE_SAVED_AT_KEY)
+        return false
+      }
       const parsed = JSON.parse(raw)
       if (parsed && typeof parsed === 'object') {
         data.value = parsed
@@ -64,6 +76,7 @@ export const useDictStore = defineStore('dict', () => {
     try {
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.value))
       sessionStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION)
+      sessionStorage.setItem(CACHE_SAVED_AT_KEY, String(Date.now()))
     } catch { /* sessionStorage full or disabled */ }
   }
 
@@ -79,8 +92,7 @@ export const useDictStore = defineStore('dict', () => {
     if (loading.value) return
     loading.value = true
     try {
-      const resp = await http.get('/api/system/dicts')
-      const raw = resp.data?.data ?? resp.data ?? {}
+      const raw = await api.get('/api/system/dicts')
       if (raw && typeof raw === 'object') {
         data.value = raw as DictData
         loaded.value = true
@@ -120,6 +132,7 @@ export const useDictStore = defineStore('dict', () => {
   function clearCache() {
     sessionStorage.removeItem(CACHE_KEY)
     sessionStorage.removeItem(CACHE_VERSION_KEY)
+    sessionStorage.removeItem(CACHE_SAVED_AT_KEY)
     data.value = {}
     loaded.value = false
   }

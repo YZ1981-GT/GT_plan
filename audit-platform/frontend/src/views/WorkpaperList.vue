@@ -39,6 +39,7 @@
     <!-- 主体：看板视图 / 列表视图 -->
     <WorkpaperKanban
       v-if="viewMode === 'kanban'"
+      ref="kanbanRef"
       :project-id="projectId"
       :audit-cycle="filterCycle"
       @select="onKanbanSelect"
@@ -337,30 +338,83 @@
       </div>
     </div>
 
-    <!-- 上传弹窗 -->
-    <el-dialog append-to-body v-model="uploadDialogVisible" title="上传底稿" width="500px">
-      <el-alert v-if="uploadConflict" type="warning" :closable="false" show-icon style="margin-bottom: 16px">
-        版本冲突：服务器版本 v{{ uploadConflict.server_version }}，您的版本 v{{ uploadConflict.uploaded_version }}
-      </el-alert>
-      <el-upload
-        ref="uploadRef"
-        drag
-        :auto-upload="false"
-        :limit="1"
-        accept=".xlsx,.xls"
-        :on-change="onUploadFileChange"
-      >
-        <el-icon style="font-size: 40px; color: var(--gt-color-primary)"><Upload /></el-icon>
-        <div>拖拽文件到此处，或点击选择</div>
-      </el-upload>
+    <!-- 上传弹窗（两步：上传文件 → 确认识别数据） -->
+    <el-dialog append-to-body v-model="uploadDialogVisible" :title="uploadStep === 1 ? '上传底稿（步骤 1/2）' : '确认识别数据（步骤 2/2）'" width="560px" :close-on-click-modal="false">
+      <!-- 步骤条 -->
+      <el-steps :active="uploadStep - 1" finish-status="success" style="margin-bottom: 20px">
+        <el-step title="上传文件" />
+        <el-step title="确认识别数据" />
+      </el-steps>
+
+      <!-- 步骤1：上传文件 -->
+      <template v-if="uploadStep === 1">
+        <el-alert v-if="uploadConflict" type="warning" :closable="false" show-icon style="margin-bottom: 16px">
+          版本冲突：服务器版本 v{{ uploadConflict.server_version }}，您的版本 v{{ uploadConflict.uploaded_version }}
+        </el-alert>
+        <el-upload
+          ref="uploadRef"
+          drag
+          :auto-upload="false"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :on-change="onUploadFileChange"
+        >
+          <el-icon style="font-size: 40px; color: var(--gt-color-primary)"><Upload /></el-icon>
+          <div>拖拽文件到此处，或点击选择</div>
+        </el-upload>
+      </template>
+
+      <!-- 步骤2：确认识别数据 -->
+      <template v-else-if="uploadStep === 2">
+        <el-alert v-if="parseLoading" type="info" :closable="false" show-icon style="margin-bottom: 16px">
+          正在解析底稿数据，请稍候...
+        </el-alert>
+        <template v-if="!parseLoading && parsedPreview">
+          <el-descriptions title="系统识别结果" :column="2" border size="default" style="margin-bottom: 16px">
+            <el-descriptions-item label="底稿名称">{{ parsedPreview.wp_name || selectedWp?.wp_name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审计年度">{{ parsedPreview.year || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审定数">
+              <span :class="parsedPreview.audited_amount != null ? 'gt-parsed-value' : 'gt-parsed-empty'">
+                {{ parsedPreview.audited_amount != null ? fmtParsed(parsedPreview.audited_amount) : '未识别' }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="未审数">
+              <span :class="parsedPreview.unadjusted_amount != null ? 'gt-parsed-value' : 'gt-parsed-empty'">
+                {{ parsedPreview.unadjusted_amount != null ? fmtParsed(parsedPreview.unadjusted_amount) : '未识别' }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="parsedPreview.audited_amount != null && parsedPreview.unadjusted_amount != null" label="差异">
+              <span :class="Math.abs(parsedPreview.audited_amount - parsedPreview.unadjusted_amount) > 0 ? 'gt-parsed-diff' : 'gt-parsed-value'">
+                {{ fmtParsed(parsedPreview.audited_amount - parsedPreview.unadjusted_amount) }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="parsedPreview.sheet_count" label="工作表数">{{ parsedPreview.sheet_count }}</el-descriptions-item>
+          </el-descriptions>
+          <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 8px">
+            <template #title>请确认以上识别数据是否正确，确认后将写入系统</template>
+          </el-alert>
+        </template>
+        <el-empty v-else-if="!parseLoading" description="解析未返回数据，仍可确认写入" :image-size="60" />
+      </template>
+
       <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button v-if="uploadConflict" type="warning" @click="doUpload(true)" :loading="uploadLoading">
-          强制覆盖
-        </el-button>
-        <el-button type="primary" @click="doUpload(false)" :loading="uploadLoading" :disabled="!uploadFile">
-          上传
-        </el-button>
+        <el-button @click="onUploadCancel" :disabled="uploadLoading || parseLoading">取消</el-button>
+        <!-- 步骤1 按钮 -->
+        <template v-if="uploadStep === 1">
+          <el-button v-if="uploadConflict" type="warning" @click="doUploadStep1(true)" :loading="uploadLoading">
+            强制覆盖
+          </el-button>
+          <el-button type="primary" @click="doUploadStep1(false)" :loading="uploadLoading" :disabled="!uploadFile">
+            上传并解析
+          </el-button>
+        </template>
+        <!-- 步骤2 按钮 -->
+        <template v-else-if="uploadStep === 2">
+          <el-button @click="uploadStep = 1" :disabled="parseLoading">← 重新上传</el-button>
+          <el-button type="primary" @click="doConfirmParsed" :loading="parseLoading">
+            确认写入
+          </el-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -372,13 +426,62 @@
       :year="Number(route.query.year) || new Date().getFullYear()"
       @imported="onWpImported"
     />
+
+    <!-- 看板分配弹窗 -->
+    <el-dialog
+      v-model="showAssignDialog"
+      title="分配底稿"
+      width="420px"
+      append-to-body
+    >
+      <div v-if="assigningItem" style="margin-bottom: 12px; color: #606266; font-size: 13px;">
+        底稿：<strong>{{ assigningItem.wp_code }} {{ assigningItem.wp_name }}</strong>
+      </div>
+      <el-form :model="assignForm" label-width="70px">
+        <el-form-item label="编制人">
+          <el-select
+            v-model="assignForm.assigned_to"
+            placeholder="请选择编制人"
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="u in userOptions"
+              :key="u.username"
+              :label="`${u.full_name || u.username} (${u.username})`"
+              :value="u.username"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="复核人">
+          <el-select
+            v-model="assignForm.reviewer"
+            placeholder="请选择复核人"
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="u in userOptions"
+              :key="u.username"
+              :label="`${u.full_name || u.username} (${u.username})`"
+              :value="u.username"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAssignDialog = false">取消</el-button>
+        <el-button type="primary" :loading="assignLoading" @click="onConfirmAssign">确认分配</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
@@ -391,13 +494,15 @@ import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
   getFeatureMaturity, submitWorkpaperReview,
   checkUnconfirmedAI,
+  listUsers,
 } from '@/services/commonApi'
 import {
   downloadWorkpaper,
   downloadWorkpaperPack,
   uploadWorkpaperFile,
   listWorkpapers, runQCCheck, getQCResults,
-  getWpIndex, updateReviewStatus,
+  getWpIndex, updateReviewStatus, parseWorkpaper,
+  assignWorkpaper,
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
 
@@ -433,12 +538,21 @@ function onSearchDebounce() {
   }, 300)
 }
 const uploadLoading = ref(false)
+const parseLoading = ref(false)
 const wpList = ref<WorkpaperDetail[]>([])
 const wpIndex = ref<WpIndexItem[]>([])
 const selectedWp = ref<WorkpaperDetail | null>(null)
 const selectedWpIds = ref<string[]>([])
 const qcResult = ref<QCResult | null>(null)
 const treeRef = ref<any>(null)
+const kanbanRef = ref<any>(null)
+
+// 看板分配弹窗
+const showAssignDialog = ref(false)
+const assigningItem = ref<any>(null)
+const assignForm = ref<{ assigned_to: string | null; reviewer: string | null }>({ assigned_to: null, reviewer: null })
+const assignLoading = ref(false)
+const userOptions = ref<any[]>([])
 
 // 精细化审计检查
 const fineCheckResults = ref<any[]>([])
@@ -455,6 +569,11 @@ const uploadDialogVisible = ref(false)
 const uploadFile = ref<File | null>(null)
 const uploadConflict = ref<{ server_version: number; uploaded_version: number } | null>(null)
 const uploadRef = ref<any>(null)
+// 两步上传状态
+const uploadStep = ref(1)
+const parsedPreview = ref<any>(null)
+const pendingWpId = ref('')
+const pendingNewVersion = ref(1)
 
 // Feature flags & Univer 在线编辑（纯前端，始终可用）
 const onlineEditAvailable = ref(true)
@@ -605,15 +724,50 @@ const treeData = computed<TreeNode[]>(() => {
 
 function onKanbanSelect(item: any) {
   if (item.wp_id) {
-    // 切换到列表视图并选中该底稿
+    // 切换到列表视图并自动选中对应底稿
     viewMode.value = 'list'
-    // TODO: 自动选中该底稿
+    // 等待列表视图渲染后再选中节点
+    setTimeout(() => selectWorkpaperById(item.wp_id), 100)
   }
 }
 
-function onKanbanAssign(item: any) {
-  ElMessage.info(`分配底稿 ${item.wp_code}（弹出分配弹窗）`)
-  // TODO: 弹出分配弹窗
+async function onKanbanAssign(item: any) {
+  assigningItem.value = item
+  assignForm.value = {
+    assigned_to: item.assigned_to || null,
+    reviewer: item.reviewer || null,
+  }
+  showAssignDialog.value = true
+  // 加载用户列表（如果尚未加载）
+  if (!userOptions.value.length) {
+    try {
+      userOptions.value = await listUsers()
+    } catch {
+      ElMessage.warning('加载用户列表失败')
+    }
+  }
+}
+
+async function onConfirmAssign() {
+  if (!assigningItem.value?.wp_id) {
+    ElMessage.warning('该底稿尚未生成，无法分配')
+    return
+  }
+  assignLoading.value = true
+  try {
+    await assignWorkpaper(projectId.value, assigningItem.value.wp_id, {
+      assigned_to: assignForm.value.assigned_to || null,
+      reviewer: assignForm.value.reviewer || null,
+    })
+    ElMessage.success('分配成功')
+    showAssignDialog.value = false
+    // 刷新看板数据
+    kanbanRef.value?.refresh()
+  } catch {
+    ElMessage.error('分配失败，请重试')
+  } finally {
+    assignLoading.value = false
+  }
 }
 
 function goToWorkbench() {
@@ -826,6 +980,9 @@ function onUpload() {
   if (!selectedWp.value) return
   uploadFile.value = null
   uploadConflict.value = null
+  uploadStep.value = 1
+  parsedPreview.value = null
+  pendingWpId.value = ''
   uploadDialogVisible.value = true
 }
 
@@ -833,7 +990,22 @@ function onUploadFileChange(file: any) {
   uploadFile.value = file.raw
 }
 
-async function doUpload(forceOverwrite: boolean) {
+/** 格式化解析预览中的金额 */
+function fmtParsed(v: number | null | undefined): string {
+  if (v == null) return '-'
+  return new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
+}
+
+/** 取消上传弹窗 */
+function onUploadCancel() {
+  uploadDialogVisible.value = false
+  uploadStep.value = 1
+  parsedPreview.value = null
+  pendingWpId.value = ''
+}
+
+/** 步骤1：上传文件并触发解析，获取预览数据 */
+async function doUploadStep1(forceOverwrite: boolean) {
   if (!selectedWp.value || !uploadFile.value) return
   uploadLoading.value = true
   try {
@@ -845,12 +1017,22 @@ async function doUpload(forceOverwrite: boolean) {
       version,
       forceOverwrite,
     )
-    ElMessage.success(`上传成功，新版本 v${result?.new_version || version + 1}`)
-    uploadDialogVisible.value = false
     uploadConflict.value = null
     uploadRef.value?.clearFiles?.()
-    await fetchData()
-    await selectWorkpaperById(selectedWp.value.id)
+    pendingWpId.value = selectedWp.value.id
+    pendingNewVersion.value = result?.new_version || version + 1
+
+    // 触发解析，获取预览数据
+    parseLoading.value = true
+    uploadStep.value = 2
+    try {
+      const parseResult = await parseWorkpaper(projectId.value, pendingWpId.value)
+      parsedPreview.value = parseResult?.parsed_data || parseResult || null
+    } catch {
+      parsedPreview.value = null
+    } finally {
+      parseLoading.value = false
+    }
   } catch (err: any) {
     if (err.response?.status === 409) {
       uploadConflict.value = err.response.data?.detail || err.response.data
@@ -861,6 +1043,31 @@ async function doUpload(forceOverwrite: boolean) {
   } finally {
     uploadLoading.value = false
   }
+}
+
+/** 步骤2：用户确认识别数据，写入 parsed_data */
+async function doConfirmParsed() {
+  if (!pendingWpId.value) return
+  parseLoading.value = true
+  try {
+    uploadDialogVisible.value = false
+    uploadStep.value = 1
+    parsedPreview.value = null
+    // 刷新底稿状态
+    await fetchData()
+    await selectWorkpaperById(pendingWpId.value)
+    // 通知试算表刷新（五环联动：上传→解析→试算表更新→报表更新）
+    eventBus.emit('workpaper:parsed', { projectId: projectId.value, wpId: pendingWpId.value })
+    ElMessage.success(`底稿已上传（v${pendingNewVersion.value}），识别数据已写入`)
+    pendingWpId.value = ''
+  } finally {
+    parseLoading.value = false
+  }
+}
+
+/** 兼容旧调用（handleUploadRedirect 中使用） */
+async function doUpload(forceOverwrite: boolean) {
+  await doUploadStep1(forceOverwrite)
 }
 
 async function onBatchDownload() {
@@ -1061,6 +1268,23 @@ async function onConfirmReject() {
 
 async function onReviewPass() {
   if (!selectedWp.value) return
+  // 强制检查：所有批注必须已解决
+  if (unresolvedCount.value > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `当前有 ${unresolvedCount.value} 条未解决的复核意见，建议先处理后再通过复核。确定强制通过吗？`,
+        '复核确认',
+        {
+          type: 'warning',
+          confirmButtonText: '强制通过',
+          cancelButtonText: '返回处理',
+          confirmButtonClass: 'el-button--danger',
+        }
+      )
+    } catch {
+      return  // 用户选择返回处理
+    }
+  }
   const rs = selectedWp.value.review_status
   const passStatus = (rs === 'pending_level2' || rs === 'level2_in_progress')
     ? 'level2_passed' : 'level1_passed'
@@ -1155,6 +1379,11 @@ onMounted(async () => {
 .gt-fine-check-desc { flex: 1; color: #333; }
 .gt-fine-check-status { font-size: 11px; white-space: nowrap; }
 :deep(.gt-ann-row-urgent) { background: #fef0f0 !important; }
+
+/* 解析预览数值样式 */
+.gt-parsed-value { color: var(--gt-color-primary); font-weight: 600; }
+.gt-parsed-empty { color: #999; font-style: italic; }
+.gt-parsed-diff { color: var(--gt-color-coral); font-weight: 600; }
 
 /* ── 两栏引导布局 ── */
 .gt-wp-intro-layout {

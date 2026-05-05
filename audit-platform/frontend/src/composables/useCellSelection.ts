@@ -25,6 +25,33 @@ export interface CellContextMenuState {
   rowData: any
 }
 
+// ── 全局引用计数（多实例共享 document 监听器）──
+let _instanceCount = 0
+let _docClickHandler: ((e: MouseEvent) => void) | null = null
+let _docMouseUpHandler: (() => void) | null = null
+const _docClickCallbacks: Set<(e: MouseEvent) => void> = new Set()
+const _docMouseUpCallbacks: Set<() => void> = new Set()
+
+function _ensureDocListeners() {
+  if (_instanceCount === 0) {
+    _docClickHandler = (e: MouseEvent) => _docClickCallbacks.forEach(cb => cb(e))
+    _docMouseUpHandler = () => _docMouseUpCallbacks.forEach(cb => cb())
+    document.addEventListener('click', _docClickHandler)
+    document.addEventListener('mouseup', _docMouseUpHandler)
+  }
+  _instanceCount++
+}
+
+function _releaseDocListeners() {
+  _instanceCount--
+  if (_instanceCount === 0 && _docClickHandler && _docMouseUpHandler) {
+    document.removeEventListener('click', _docClickHandler)
+    document.removeEventListener('mouseup', _docMouseUpHandler)
+    _docClickHandler = null
+    _docMouseUpHandler = null
+  }
+}
+
 export function useCellSelection() {
   const selectedCells = ref<SelectedCell[]>([])
   const contextMenu = reactive<CellContextMenuState>({
@@ -362,12 +389,14 @@ export function useCellSelection() {
   }
 
   onMounted(() => {
-    document.addEventListener('click', onDocClick)
-    document.addEventListener('mouseup', onDocMouseUp)
+    _ensureDocListeners()
+    _docClickCallbacks.add(onDocClick)
+    _docMouseUpCallbacks.add(onDocMouseUp)
   })
   onUnmounted(() => {
-    document.removeEventListener('click', onDocClick)
-    document.removeEventListener('mouseup', onDocMouseUp)
+    _docClickCallbacks.delete(onDocClick)
+    _docMouseUpCallbacks.delete(onDocMouseUp)
+    _releaseDocListeners()
   })
 
   return {

@@ -2,7 +2,7 @@
  * useAutoSave — 自动保存/草稿恢复 composable
  *
  * 提供统一的自动保存与草稿恢复能力：
- * - 定时将数据保存到 localStorage
+ * - 定时将数据保存到 sessionStorage（关闭标签页后自动清除，防止多标签页 key 冲突）
  * - 挂载时检测草稿并提示恢复
  * - 保存成功后清除草稿
  * - 卸载时清除定时器
@@ -50,7 +50,7 @@ export function useAutoSave<T = any>(
     return `autosave_${key}`
   }
 
-  /** 手动保存草稿到 localStorage */
+  /** 手动保存草稿到 sessionStorage */
   function saveDraft(): boolean {
     try {
       const data = getData()
@@ -59,7 +59,7 @@ export function useAutoSave<T = any>(
         data,
         savedAt: Date.now(),
       }
-      localStorage.setItem(storageKey(), JSON.stringify(payload))
+      sessionStorage.setItem(storageKey(), JSON.stringify(payload))
       hasDraft.value = true
       return true
     } catch {
@@ -67,10 +67,10 @@ export function useAutoSave<T = any>(
     }
   }
 
-  /** 从 localStorage 恢复草稿 */
+  /** 从 sessionStorage 恢复草稿 */
   function restoreDraft(): boolean {
     try {
-      const raw = localStorage.getItem(storageKey())
+      const raw = sessionStorage.getItem(storageKey())
       if (!raw) return false
       const payload = JSON.parse(raw)
       if (payload?.data != null) {
@@ -85,14 +85,14 @@ export function useAutoSave<T = any>(
 
   /** 清除草稿（保存成功后调用） */
   function clearDraft() {
-    localStorage.removeItem(storageKey())
+    sessionStorage.removeItem(storageKey())
     hasDraft.value = false
   }
 
   /** 检查是否存在草稿 */
   function checkDraft(): boolean {
     try {
-      const raw = localStorage.getItem(storageKey())
+      const raw = sessionStorage.getItem(storageKey())
       if (!raw) return false
       const payload = JSON.parse(raw)
       return payload?.data != null
@@ -104,7 +104,7 @@ export function useAutoSave<T = any>(
   /** 获取草稿保存时间的可读字符串 */
   function getDraftTime(): string {
     try {
-      const raw = localStorage.getItem(storageKey())
+      const raw = sessionStorage.getItem(storageKey())
       if (!raw) return ''
       const payload = JSON.parse(raw)
       if (!payload?.savedAt) return ''

@@ -55,6 +55,18 @@
               <span class="gt-sync-label">影响科目</span>
               <span class="gt-sync-value">{{ evt.account_codes.join(', ') }}</span>
             </div>
+            <!-- 重试按钮（extra.retry_endpoint 存在时显示） -->
+            <div v-if="evt.extra?.retry_endpoint" class="gt-sync-detail-row" style="margin-top:4px">
+              <el-button
+                size="small"
+                type="warning"
+                plain
+                :loading="retryingIdx === idx"
+                @click="onRetry(evt, idx)"
+              >
+                🔄 重试
+              </el-button>
+            </div>
           </div>
         </div>
       </div>
@@ -76,6 +88,7 @@ import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 type SyncStatus = 'synced' | 'syncing' | 'failed'
 const status = ref<SyncStatus>('synced')
 const drawerVisible = ref(false)
+const retryingIdx = ref<number | null>(null)
 
 interface FailedEvent extends SyncEventPayload {
   timestamp: string
@@ -135,6 +148,25 @@ function clearFailed() {
   failedEvents.value = []
   status.value = syncingCount > 0 ? 'syncing' : 'synced'
   drawerVisible.value = false
+}
+
+async function onRetry(evt: FailedEvent, idx: number) {
+  const endpoint = evt.extra?.retry_endpoint
+  if (!endpoint) return
+  retryingIdx.value = idx
+  try {
+    const { api } = await import('@/services/apiProxy')
+    await api.post(endpoint, {}, { validateStatus: (s: number) => s < 600 })
+    // 重试成功，移除该条失败记录
+    failedEvents.value.splice(idx, 1)
+    if (failedEvents.value.length === 0) {
+      status.value = syncingCount > 0 ? 'syncing' : 'synced'
+    }
+  } catch {
+    // 重试失败，保留记录
+  } finally {
+    retryingIdx.value = null
+  }
 }
 
 function formatEventType(eventType?: string): string {

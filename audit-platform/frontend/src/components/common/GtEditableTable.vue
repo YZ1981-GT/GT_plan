@@ -1,8 +1,8 @@
 <template>
   <div ref="containerRef" class="gt-editable-table" :class="{ 'gt-fullscreen': fullscreen.isFullscreen.value }">
     <!-- 工具栏 -->
-    <div v-if="showToolbar" class="gt-et-toolbar">
-      <div class="gt-et-toolbar-left">
+    <GtToolbar v-if="showToolbar" variant="default">
+      <template #left>
         <slot name="toolbar-left" />
         <template v-if="editable && editMode.isEditing.value">
           <el-button size="small" @click="handleAddRow">+ 新增行</el-button>
@@ -11,8 +11,8 @@
             删除{{ toolbar.selectedCount.value ? `(${toolbar.selectedCount.value})` : '' }}
           </el-button>
         </template>
-      </div>
-      <div class="gt-et-toolbar-right">
+      </template>
+      <template #right>
         <slot name="toolbar-right" />
         <el-button-group v-if="editable" size="small">
           <el-button :type="editMode.isEditing.value ? '' : 'primary'" @click="handleExitEdit">
@@ -27,8 +27,8 @@
             {{ fullscreen.isFullscreen.value ? '退出全屏' : '⛶ 全屏' }}
           </el-button>
         </el-tooltip>
-      </div>
-    </div>
+      </template>
+    </GtToolbar>
 
     <!-- 主表格 -->
     <el-table
@@ -77,12 +77,15 @@
 
         <!-- 单元格内容 -->
         <template #default="{ row, $index }">
-          <!-- 优先使用外部自定义插槽 -->
+          <!-- 优先使用外部自定义插槽
+               slot props: { row, index($index in displayData), dataIndex(index in modelValue), editing, col }
+               分组模式下 $index 包含分组头行，dataIndex 才是 modelValue 中的真实索引 -->
           <slot
             v-if="$slots[`col-${col.prop}`]"
             :name="`col-${col.prop}`"
             :row="row"
             :index="$index"
+            :data-index="groupBy ? modelValue.indexOf(row) : $index"
             :editing="editMode.isEditing.value"
             :col="col"
           />
@@ -185,6 +188,7 @@ import { useKeyboardNav } from '@/composables/useKeyboardNav'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────────
 export interface GtColumn {
@@ -475,22 +479,6 @@ defineExpose({ editMode, fullscreen, cellSelection, toolbar, lazyEditState, tabl
 <style scoped>
 .gt-editable-table {
   position: relative;
-}
-
-.gt-et-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.gt-et-toolbar-left,
-.gt-et-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .gt-et-cell-text {

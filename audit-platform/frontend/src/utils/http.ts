@@ -19,6 +19,8 @@ const http = axios.create({
 
 // ── 请求去重：相同 GET 请求在飞行中不重复发送 ──────────────
 const pendingMap = new Map<string, AbortController>()
+// POST/PUT/PATCH 防重复提交的自动清理定时器（防止超时/取消时 key 泄漏）
+const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 function getRequestKey(config: InternalAxiosRequestConfig): string {
   const base = `${config.method}:${config.url}:${JSON.stringify(config.params || '')}`
@@ -51,11 +53,27 @@ function addPending(config: InternalAxiosRequestConfig) {
   const controller = new AbortController()
   config.signal = controller.signal
   pendingMap.set(key, controller)
+  // POST/PUT/PATCH 设置 5 分钟自动清理，防止超时/取消时 key 泄漏导致后续请求永久被拒
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+    const existingTimer = pendingTimers.get(key)
+    if (existingTimer) clearTimeout(existingTimer)
+    const cleanupTimer = setTimeout(() => {
+      pendingMap.delete(key)
+      pendingTimers.delete(key)
+    }, 5 * 60 * 1000)
+    pendingTimers.set(key, cleanupTimer)
+  }
 }
 
 function removePending(config: InternalAxiosRequestConfig) {
   const key = getRequestKey(config)
   pendingMap.delete(key)
+  // 清除对应的自动清理定时器
+  const timer = pendingTimers.get(key)
+  if (timer) {
+    clearTimeout(timer)
+    pendingTimers.delete(key)
+  }
 }
 
 async function extractErrorDetail(responseData: unknown): Promise<string> {

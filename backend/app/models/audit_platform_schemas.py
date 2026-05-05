@@ -656,6 +656,7 @@ class AccountOption(BaseModel):
     code: str
     name: str
     level: int = 1
+    report_line: str | None = None  # 对应报表行次名称，用于下拉显示
 
 
 class WPAdjustmentDetail(BaseModel):

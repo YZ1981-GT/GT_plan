@@ -101,18 +101,16 @@ async def bulk_execute(
         if uid not in rows:
             failed.append({"id": str(uid), "error": "记录不存在"})
 
-    # 3. 逐条执行 action_fn，捕获单条失败
+    # 3. 逐条执行 action_fn，每条用 savepoint 隔离，捕获单条失败
     for uid, row in rows.items():
         try:
-            await action_fn(db, row)
+            async with db.begin_nested() as sp:  # savepoint 隔离
+                await action_fn(db, row)
             succeeded.append(str(uid))
         except Exception as exc:
+            # savepoint 已在 async with 退出时自动 rollback，此处仅记录
             logger.warning("bulk_execute 单条失败: id=%s error=%s", uid, exc)
             failed.append({"id": str(uid), "error": str(exc)})
-
-    # 4. flush 成功的变更（调用方负责 commit）
-    if succeeded:
-        await db.flush()
 
     return BulkResult(
         succeeded=succeeded,

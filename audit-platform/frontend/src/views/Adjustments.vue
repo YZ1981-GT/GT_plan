@@ -59,6 +59,21 @@
       <el-tab-pane label="RJE" name="rje" />
     </el-tabs>
 
+    <!-- 科目过滤提示（从试算表跳转时显示） -->
+    <el-alert
+      v-if="filterAccount"
+      type="info"
+      show-icon
+      :closable="true"
+      style="margin-bottom: 12px"
+      @close="filterAccount = ''; fetchEntries()"
+    >
+      <template #title>
+        <span>当前仅显示科目 <strong>{{ filterAccount }}</strong> 的相关分录</span>
+        <el-button size="small" text type="primary" style="margin-left: 8px" @click="filterAccount = ''; fetchEntries()">查看全部</el-button>
+      </template>
+    </el-alert>
+
     <!-- 分录列表 -->
     <el-alert
       v-if="!loading && entries.length === 0"
@@ -153,7 +168,12 @@
               <el-select v-model="row.standard_account_code" filterable placeholder="选择科目"
                 style="width: 100%" @change="onAccountSelect($index)">
                 <el-option v-for="opt in accountOptions" :key="opt.code"
-                  :label="`${opt.code} ${opt.name}`" :value="opt.code" />
+                  :label="`${opt.code} ${opt.name}`" :value="opt.code">
+                  <span>{{ opt.code }} {{ opt.name }}</span>
+                  <span v-if="opt.report_line" style="float:right;color:#999;font-size:11px;margin-left:8px">
+                    → {{ opt.report_line }}
+                  </span>
+                </el-option>
               </el-select>
             </template>
           </el-table-column>
@@ -263,6 +283,9 @@ const showRejectDialog = ref(false)
 const rejectReason = ref('')
 const accountOptions = ref<AccountOption[]>([])
 
+// 科目过滤（来自 route.query.account，支持从试算表跳转过来）
+const filterAccount = ref(typeof route.query.account === 'string' ? route.query.account : '')
+
 // Batch mode state
 const batchMode = ref(false)
 const batchPendingCount = ref(0)
@@ -336,7 +359,14 @@ async function fetchEntries() {
     const opts: any = { page_size: 200 }
     if (activeTab.value !== 'all') opts.adjustment_type = activeTab.value
     const result = await listAdjustments(projectId.value, year.value, opts)
-    entries.value = Array.isArray(result) ? result : (result.items || [])
+    let items = Array.isArray(result) ? result : (result.items || [])
+    // 按科目过滤（来自试算表跳转的 account query 参数）
+    if (filterAccount.value) {
+      items = items.filter((e: any) =>
+        e.line_items?.some((li: any) => li.standard_account_code === filterAccount.value)
+      )
+    }
+    entries.value = items
   } finally {
     loading.value = false
   }
@@ -479,10 +509,12 @@ async function onDelete(row: any) {
 }
 
 async function batchReview(status: string) {
-  const rows = selectedRows.value.filter(r =>
-    status === 'approved' ? r.review_status === 'pending_review' :
-    status === 'rejected' ? r.review_status === 'pending_review' : true
-  )
+  const eligible = selectedRows.value.filter(r => r.review_status === 'pending_review')
+  const skipped = selectedRows.value.length - eligible.length
+  if (skipped > 0) {
+    ElMessage.warning(`已跳过 ${skipped} 条非待复核状态的分录`)
+  }
+  const rows = eligible
   if (!rows.length) {
     ElMessage.warning('没有可操作的分录')
     return
@@ -519,12 +551,14 @@ watch(
   () => [projectId.value, routeYear.value],
   async () => {
     await ensureProjectYear()
-    syncFromRoute()
+    projectStore.syncFromRoute(route)
     selectedYear.value = year.value
+    // 同步科目过滤参数
+    filterAccount.value = typeof route.query.account === 'string' ? route.query.account : ''
     await fetchEntries()
     await fetchSummary()
     await fetchAccountOptions()
-    if (!projectOptions.value.length) loadProjectOptions()
+    if (!projectOptions.value.length) projectStore.loadProjectOptions()
   },
   { immediate: true }
 )

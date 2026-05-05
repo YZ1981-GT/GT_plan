@@ -35,23 +35,19 @@ inclusion: always
 - Paperless-ngx 端口 8010（admin/admin）
 - 测试用户：admin/admin123（role=admin）
 
-## 当前系统状态（2026-05-05，全局化增强完成）
+## 当前系统状态（2026-05-05，post-enhancement-bugfix 完成）
 
-- 17 个开发阶段全部完成，vue-tsc 零错误，Vite 构建通过（32.77s）
+- vue-tsc 零错误，Vite 构建通过（37.19s）
 - 后端 119 个路由文件，172 个服务文件，42 个模型文件，~144 张表
 - 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
 - 后端约 700 路由，0 个 stub 残留
-- 审计员 8 步全流程端到端验证通过
 - git 分支：feature/global-component-library（已推送，待合并 master）
-- 开发任务 spec：.kiro/specs/global-platform-enhancement/（4 Sprint 40 Task 全部完成）
 - **全局化增强项目完成**：4 Sprint，40 Task，~235 文件，+14422/-3164 行
-- **Sprint 1 已完成**（10 Task，65 文件，+1856/-697 行）— 全局化收尾+快速见效
-- **Sprint 2 已完成**（9 Task，70 文件，+2569/-983 行）— 核心基础设施
-- **Sprint 3 已完成**（14 Task，63 文件，+4720/-1224 行）— 组件层+后端统一
-- **Sprint 4 已完成**（10 Task，37 文件，+5277/-260 行）— 高阶组件+验证+优化
-- Sprint 4 新增前端：GtEditableTable 高阶可编辑表格、GtPrintPreview 打印预览、GtConsolWizard 合并向导、CommentThread 批注线程、SyncStatusIndicator 同步状态、useKeyboardNav 键盘导航
-- Sprint 4 新增后端：migration_runner.py 数据库迁移、equity_method_service.py 模拟权益法、elimination_service 增强、load_test.py 压力测试、test_consolidation_chain.py 合并集成测试、test_e2e_audit_flow.py 端到端测试
-- Sprint 4 架构优化：Element Plus unplugin 按需导入、ResponseWrapperMiddleware 大响应跳过、POST 防重复提交、SSE 全局接入
+- **post-enhancement-bugfix 项目完成**：4 Sprint，修复 B1-B9 业务缺陷 + P0-P3 技术 Bug
+  - Sprint 1：试算平衡表 AJE/RJE 自动汇总、底稿上传两步确认、借贷平衡指示器修正、看板交互实现
+  - Sprint 2：escapeRegex 修复、migration_runner 多语句分割、bulk_execute savepoint 隔离、v-permission 内存泄漏、router 权限检查、main.ts 图标注册、并发编号锁、pendingMap 泄漏、SSE 僵尸队列、shortcuts 输入框检查、apiProxy 统一、sessionStorage 替换、guardRoute 选项、amountClass 修复
+  - Sprint 3：数据同步状态可视化（GtPageHeader showSyncStatus）、试算表双向导航、底稿识别确认步骤、N+1 优化（100→3次）、附注预加载（165→1次）、合计为0修复、syncFromRoute 非阻塞、router_registry 重复调用清理、GtPageHeader backMode、dictStore TTL、statusMaps+dictStore 统一、useCellSelection 引用计数、subscribe_many、auth.ts API.users.me
+  - Sprint 4：operationHistory 超时保护、confirm.ts HTML 转义、bcrypt rounds 配置化（12）、DefaultLayout watch await、deps.py 死代码清理、parseFile 降级第一个 sheet、useKnowledge 单例注释
 
 ## 活跃待办
 
@@ -62,24 +58,10 @@ inclusion: always
 
 ### 功能完善（中期）
 - 性能测试（真实 PG + 大数据量环境）
-- GtPageHeader + GtInfoBar 推广到 Adjustments/ConsolidationIndex/WorkpaperList/AuditReportEditor（可删约 200 行重复 CSS）
-- GtToolbar 加 variant prop（banner|default），非横幅场景按钮样式异常
-- GtInfoBar 的 templateOptions 默认值迁移到 dictStore 统一管理
-
-### 全局化改造 — Sprint 1 已完成 ✅
-### 全局化改造 — Sprint 2 已完成 ✅
-### 全局化改造 — Sprint 3 已完成 ✅
-### 全局化改造 — Sprint 4 已完成 ✅
-- ✅ GtEditableTable 高阶可编辑表格组件（Task 4.1）
-- ✅ 端到端验证全流程（Task 4.2）
-- ✅ 数据库 migration 机制（Task 4.3）
-- ✅ 合并模块集成测试（Task 4.4）
-- ✅ 事件链路失败通知 + SSE 全局接入（Task 4.5）
-- ✅ 架构优化 — Element Plus 按需导入等（Task 4.6）
-- ✅ 用户体验改进 — 向导步骤条、重试提示等（Task 4.7）
-- ✅ 表格交互增强 — WPS 借鉴（Task 4.8）
-- ✅ 功能完善 — 模拟权益法等（Task 4.9）
-- ✅ 最终收尾 — 构建验证+推送（Task 4.10）
+- token 存 localStorage 有 XSS 风险（考虑 sessionStorage 或 httpOnly cookie）[P3]
+- working_paper_service 状态机 draft→edit_complete 是否符合业务流程（需确认）[P3]
+- 合并模块需找真实项目做业务测试（技术完成度85%，业务完成度60%）[P1]
+- 系统当前是"工程师视角"而非"审计员视角"，下一步重点是 UAT 而非加功能
 
 ## 底稿编码体系（致同 2025 修订版）
 

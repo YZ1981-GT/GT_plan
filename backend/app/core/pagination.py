@@ -94,6 +94,7 @@ async def build_paginated_response(
     pagination: PaginationParams,
     *,
     row_mapper: Any | None = None,
+    skip_count: bool = False,
 ) -> PaginatedResponse:
     """执行查询并构建标准分页响应
 
@@ -107,15 +108,21 @@ async def build_paginated_response(
         分页参数
     row_mapper : callable, optional
         将 ORM 对象转为 dict 的函数。默认直接放入 items。
+    skip_count : bool, optional
+        True 时跳过 COUNT 查询（大表翻页时可提升性能），total 返回 -1。
+        默认 False。
 
     Returns
     -------
     PaginatedResponse
         包含 items, total, page, page_size, total_pages
     """
-    # 计算总数
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total: int = (await db.execute(count_stmt)).scalar() or 0
+    # 计算总数（skip_count=True 时跳过，适合大表翻页）
+    if skip_count:
+        total = -1
+    else:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
 
     # 分页查询
     paged_stmt = paginate(stmt, pagination)

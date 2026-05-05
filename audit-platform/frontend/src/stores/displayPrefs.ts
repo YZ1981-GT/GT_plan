@@ -116,9 +116,14 @@ export const useDisplayPrefsStore = defineStore('displayPrefs', () => {
       if (negativeRed.value && n < 0) classes.push('gt-amount--negative')
       if (highlightThreshold.value > 0 && priorValue != null) {
         const prior = Number(priorValue)
-        if (!isNaN(prior) && prior !== 0) {
-          const changeRate = Math.abs((n - prior) / prior)
-          if (changeRate >= highlightThreshold.value) classes.push('gt-amount--highlight')
+        if (!isNaN(prior)) {
+          if (prior === 0 && n !== 0) {
+            // 新增科目：上期为 0，本期有值，直接高亮
+            classes.push('gt-amount--highlight')
+          } else if (prior !== 0) {
+            const changeRate = Math.abs((n - prior) / prior)
+            if (changeRate >= highlightThreshold.value) classes.push('gt-amount--highlight')
+          }
         }
       }
     }

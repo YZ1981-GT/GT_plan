@@ -25,7 +25,12 @@ class ShortcutManager {
 
   handleKeydown(event: KeyboardEvent) {
     if (!this.enabled) return
+    // 在输入框/文本域/可编辑元素里忽略快捷键（Escape 除外）
+    const target = event.target as HTMLElement
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
+      target.contentEditable === 'true'
     const key = this.getShortcutKey(event)
+    if (isInput && key !== 'ESCAPE') return
     const entry = this.shortcuts.get(key)
     if (entry) {
       entry.handler()

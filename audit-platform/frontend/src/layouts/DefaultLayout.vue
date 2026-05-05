@@ -64,6 +64,7 @@ import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
+import { getProject } from '@/services/auditPlatformApi'
 
 const route = useRoute()
 const roleStore = useRoleContextStore()
@@ -93,7 +94,7 @@ watch(() => route.params.projectId, async (pid) => {
 // 路由变化时自动同步项目上下文到 projectStore
 watch(
   () => [route.params.projectId, route.query.year],
-  () => { projectStore.syncFromRoute(route) },
+  async () => { await projectStore.syncFromRoute(route) },
   { immediate: true }
 )
 
@@ -155,14 +156,12 @@ function onViewChange(mode: 'three' | 'four') {
 function onCatalogSelect(item: any) {
   // 处理项目切换
   if (item?.type === 'switch_project' && item.project_id) {
-    // 从项目列表中找到目标项目并切换
-    import('@/services/auditPlatformApi').then(({ getProject }) => {
-      getProject(item.project_id).then((proj: any) => {
-        if (proj) {
-          selectedProject.value = proj
-        }
-      }).catch(() => {})
-    })
+    // 从项目列表中找到目标项目并切换（静态导入，避免动态 import 无意义开销）
+    getProject(item.project_id).then((proj: any) => {
+      if (proj) {
+        selectedProject.value = proj
+      }
+    }).catch(() => {})
     return
   }
   selectedCatalogItem.value = item

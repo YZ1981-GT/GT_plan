@@ -286,11 +286,12 @@ class EventBus:
 
     async def _notify_sse(self, payload: EventPayload) -> None:
         """将事件推送到所有 SSE 队列"""
-        for queue in self._sse_queues:
+        for queue in list(self._sse_queues):
             try:
                 queue.put_nowait(payload)
             except asyncio.QueueFull:
-                logger.warning("EventBus: SSE queue full, dropping event")
+                logger.warning("EventBus: SSE queue full, removing zombie queue")
+                self.remove_sse_queue(queue)
 
 
 # ---------------------------------------------------------------------------

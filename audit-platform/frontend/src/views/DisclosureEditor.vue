@@ -1,7 +1,7 @@
 <template>
   <div class="gt-disclosure-editor gt-fade-in" :class="{ 'gt-fullscreen': deFullscreen }">
     <!-- 横幅 -->
-    <GtPageHeader title="附注编辑" @back="router.push('/projects')">
+    <GtPageHeader title="附注编辑" :show-sync-status="true" @back="router.push('/projects')">
       <GtInfoBar
         :show-unit="true"
         :show-year="true"

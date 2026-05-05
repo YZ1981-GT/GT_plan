@@ -238,7 +238,8 @@ export async function parseFile(
     targetSheet = wb.SheetNames.find(n => n === sheetName) || ''
   }
   if (!targetSheet) {
-    targetSheet = wb.SheetNames[wb.SheetNames.length - 1]
+    // 降级：取第一个 sheet（而非最后一个），多 sheet 文件时更符合预期
+    targetSheet = wb.SheetNames[0]
   }
 
   const ws = wb.Sheets[targetSheet]

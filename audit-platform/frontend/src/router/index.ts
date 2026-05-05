@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import NProgress from 'nprogress'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectStore } from '@/stores/project'
-import { usePermission } from '@/composables/usePermission'
+import { ROLE_PERMISSIONS } from '@/composables/usePermission'
 
 // NProgress 配置：不显示旋转图标，与 GT 紫色主题一致
 NProgress.configure({ showSpinner: false })
@@ -441,10 +441,17 @@ router.beforeEach(async (to) => {
   }
 
   // ④ 权限守卫：检查路由级 meta.permission
+  // 修复 P1.2：不再调用 usePermission()（在 beforeEach 里调用会创建游离 computed）
+  // 改为直接访问 authStore.user?.role，使用 ROLE_PERMISSIONS 常量做权限判断
   const permissionRequired = to.meta.permission
   if (permissionRequired && authStore.isAuthenticated) {
-    const { can } = usePermission()
-    if (!can(permissionRequired)) {
+    const role = authStore.user?.role ?? ''
+    const hasPermission =
+      role === 'admin' ||
+      (role !== '' &&
+        permissionRequired !== 'admin' &&
+        (ROLE_PERMISSIONS[role]?.includes(permissionRequired as string) ?? false))
+    if (!hasPermission) {
       import('element-plus').then(({ ElMessage }) => {
         ElMessage.warning('您没有访问该页面的权限')
       })
@@ -453,12 +460,12 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // ⑤ 项目上下文自动加载：路由含 :projectId 时同步到 projectStore
+    // ⑤ 项目上下文自动加载：路由含 :projectId 时同步到 projectStore
   //    DefaultLayout 的 watch 仍保留作为备份，此处提前触发确保数据就绪
   if (to.params.projectId && authStore.isAuthenticated) {
     const projectStore = useProjectStore()
-    // 使用 await 确保项目信息在页面渲染前就绪
-    await projectStore.syncFromRoute(to as any)
+    // 非阻塞：先渲染页面，数据异步更新，避免路由切换等待 API
+    projectStore.syncFromRoute(to as any)
   }
 })
 

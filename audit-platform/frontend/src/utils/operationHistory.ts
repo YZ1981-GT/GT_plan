@@ -50,14 +50,20 @@ class OperationHistory {
   }
 
   /**
-   * 撤销最近一次操作
+   * 撤销最近一次操作（带 10 秒超时保护）
    */
   async undo(): Promise<boolean> {
     const entry = this.history.pop()
     if (!entry) return false
 
     try {
-      await entry.operation.undo()
+      // 10 秒超时保护，防止网络请求无限 pending
+      await Promise.race([
+        entry.operation.undo(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('撤销操作超时（10秒）')), 10000)
+        ),
+      ])
       ElNotification({
         title: '已撤销',
         message: entry.operation.description,

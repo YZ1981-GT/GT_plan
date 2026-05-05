@@ -18,6 +18,8 @@ class RequestBodyLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         # 只检查有 body 的方法
+        # DELETE 跳过：RFC 7231 允许 DELETE 携带 body，但实践中极少使用，
+        # 且 DELETE 请求通常只传 ID（路径参数），无需限制 body 大小。
         if request.method in ("GET", "HEAD", "OPTIONS", "DELETE"):
             return await call_next(request)
 

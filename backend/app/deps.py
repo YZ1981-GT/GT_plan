@@ -66,6 +66,8 @@ async def get_current_user(
 
     # Phase 14: SoD 角色变更黑名单检查
     # 角色变更后旧 token 在 5 秒内失效（Redis key: sod_revoke:{user_id}:{project_id}）
+    # 注意：当前实现只检查全局撤销（sod_revoke:{user_id}），不检查项目级撤销
+    # （sod_revoke:{user_id}:{project_id}）。如需项目级 SoD 检查，需在此处扩展。
     try:
         from app.core.redis import redis_client as _redis
         if _redis:
@@ -148,8 +150,7 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
     - Redis 不可用时降级为直接查库
     - 权限不足返回 403
     """
-
-    PERM_CACHE_TTL = 300  # 5 minutes
+    # PERM_CACHE_TTL 使用模块级常量（见下方），此处不重复定义
 
     async def dependency(
         project_id: UUID,

@@ -322,6 +322,25 @@ class DisclosureEngine:
             except Exception:
                 pass
 
+        # 预加载上年附注（避免 generate_notes 循环中 165 次逐章节查询）
+        try:
+            prior_notes_result = await self.db.execute(
+                sa.select(DisclosureNote.note_section, DisclosureNote.text_content).where(
+                    DisclosureNote.project_id == project_id,
+                    DisclosureNote.year == year - 1,
+                    DisclosureNote.is_deleted == sa.false(),
+                    DisclosureNote.text_content.isnot(None),
+                )
+            )
+            self._prior_notes_cache = {
+                row.note_section: row.text_content
+                for row in prior_notes_result.fetchall()
+                if row.text_content and len(row.text_content) > 20
+            }
+        except Exception as _pn_err:
+            logger.warning("preload prior notes failed: %s", _pn_err)
+            self._prior_notes_cache = {}
+
     async def _build_table_data(
         self,
         project_id: UUID,
@@ -454,7 +473,7 @@ class DisclosureEngine:
                         (r["values"][ci] or 0) for r in rows[start:i]
                         if not r.get("is_total") and r["values"][ci] is not None
                     )
-                    row["values"][ci] = total if total != 0 else None
+                    row["values"][ci] = total
 
         return {"headers": headers, "rows": rows}
 
@@ -480,6 +499,7 @@ class DisclosureEngine:
         self._tb_cache = {}
         self._wp_account_cache = {}
         self._wp_fine_cache = {}
+        self._prior_notes_cache = {}
         try:
             await self._preload_data_for_notes(project_id, year)
         except Exception as _pre_err:
@@ -501,23 +521,12 @@ class DisclosureEngine:
             text_sections = tmpl.get("text_sections", [])
             text_content = None
 
-            # 优先级1：从上年附注拉取（连续审计场景）
-            try:
-                prior_note = await self.db.execute(
-                    sa.select(DisclosureNote.text_content).where(
-                        DisclosureNote.project_id == project_id,
-                        DisclosureNote.year == year - 1,
-                        DisclosureNote.note_section == note_section,
-                        DisclosureNote.is_deleted == sa.false(),
-                        DisclosureNote.text_content.isnot(None),
-                    )
-                )
-                prior_text = prior_note.scalar_one_or_none()
-                if prior_text and len(prior_text) > 20:
-                    text_content = prior_text
-                    logger.info("note %s: filled from prior year", note_section)
-            except Exception:
-                pass
+            # 优先级1：从上年附注拉取（连续审计场景）- 从预加载缓存取，避免逐章节查询
+            prior_notes_cache = getattr(self, '_prior_notes_cache', {})
+            prior_text = prior_notes_cache.get(note_section)
+            if prior_text and len(prior_text) > 20:
+                text_content = prior_text
+                logger.info("note %s: filled from prior year (cache)", note_section)
 
             # 优先级2：LLM生成（预留接口，通过 note_prompts 配置每章节独立提示词）
             if not text_content:
