@@ -29,8 +29,10 @@ export interface AuthState {
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
-    token: localStorage.getItem('token'),
-    refreshToken: localStorage.getItem('refreshToken'),
+    // 安全改进：改用 sessionStorage（关闭标签页自动清除，防止 XSS 窃取 token）
+    // localStorage 在 XSS 攻击下可被任意 JS 读取，审计平台数据敏感，需更高安全级别
+    token: sessionStorage.getItem('token'),
+    refreshToken: sessionStorage.getItem('refreshToken'),
     user: null,
   }),
 
@@ -47,8 +49,8 @@ export const useAuthStore = defineStore('auth', {
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token
       this.user = payload.user ?? null
-      localStorage.setItem('token', this.token!)
-      localStorage.setItem('refreshToken', this.refreshToken!)
+      sessionStorage.setItem('token', this.token!)
+      sessionStorage.setItem('refreshToken', this.refreshToken!)
     },
 
     async logout() {
@@ -64,8 +66,8 @@ export const useAuthStore = defineStore('auth', {
       this.token = null
       this.refreshToken = null
       this.user = null
-      localStorage.removeItem('token')
-      localStorage.removeItem('refreshToken')
+      sessionStorage.removeItem('token')
+      sessionStorage.removeItem('refreshToken')
     },
 
     async refreshAccessToken() {
@@ -76,8 +78,8 @@ export const useAuthStore = defineStore('auth', {
       // Token Rotation: 后端每次刷新都签发新的 refresh_token
       this.token = payload.access_token
       this.refreshToken = payload.refresh_token ?? this.refreshToken
-      localStorage.setItem('token', this.token!)
-      localStorage.setItem('refreshToken', this.refreshToken!)
+      sessionStorage.setItem('token', this.token!)
+      sessionStorage.setItem('refreshToken', this.refreshToken!)
     },
 
     async fetchUserProfile() {

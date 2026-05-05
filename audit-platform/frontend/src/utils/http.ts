@@ -24,10 +24,12 @@ const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 function getRequestKey(config: InternalAxiosRequestConfig): string {
   const base = `${config.method}:${config.url}:${JSON.stringify(config.params || '')}`
-  // POST/PUT/PATCH 请求：加入 body hash 用于去重
+  // POST/PUT/PATCH 请求：对 body 做轻量 hash（取前100字符+总长度），避免大 body 时 JSON.stringify 性能差
   if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
     try {
-      return `${base}:${JSON.stringify(config.data)}`
+      const bodyStr = JSON.stringify(config.data)
+      const bodyHash = `${bodyStr.slice(0, 100)}|len:${bodyStr.length}`
+      return `${base}:${bodyHash}`
     } catch {
       return base
     }

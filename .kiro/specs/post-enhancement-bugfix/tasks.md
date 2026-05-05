@@ -62,13 +62,13 @@
 ## Sprint 2：P0/P1 技术 Bug 修复（~3天）
 
 ### Task 2.1 — escapeRegex 修复 [P0.1]
-- [ ] `utils/useTableSearch.ts` 中 `escapeRegex` 替换字符串改为正确写法：`str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')`
+- [x] `utils/useTableSearch.ts` 中 `escapeRegex` 替换字符串改为正确写法：`str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')`
 - [x] 验证含特殊字符（`.`、`*`、`(`、`)`）的搜索替换正常工作
 
 ### Task 2.2 — migration_runner 多语句分割 [P0.2]
 - [x] `_apply_migration` 按分号分割 SQL 语句
 - [x] 过滤空语句和纯注释语句
-- [ ] 处理 `DO $$ ... END $$;` 块（不按分号分割，整体执行）
+- [x] 处理 `DO $$ ... END $$;` 块（不按分号分割，整体执行）
 - [x] 更新 `test_migration_runner.py` 测试用例
 - [x] 验证 V003 迁移文件正常执行
 
@@ -241,6 +241,6 @@
 
 ### Task 4.2 — 最终收尾
 - [x] 全量 vue-tsc + Vite 构建验证
-- [-] Python 全量语法检查
-- [~] git commit + push + 合并到 master
+- [x] Python 全量语法检查
+- [x] git commit + push + 合并到 master
 - [x] 更新 memory.md + dev-history.md

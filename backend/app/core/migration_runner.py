@@ -47,7 +47,9 @@ CREATE TABLE IF NOT EXISTS schema_version (
 def _is_comment_only(stmt: str) -> bool:
     """判断一段 SQL 文本是否全部为注释或空白。
 
-    逐行检查：非空行必须以 ``--`` 开头（单行注释），否则认为包含实际语句。
+    支持两种注释格式：
+    - ``--`` 单行注释
+    - ``/* ... */`` 块注释（可跨行）
 
     Parameters
     ----------
@@ -59,9 +61,12 @@ def _is_comment_only(stmt: str) -> bool:
     bool
         True 表示该片段只含注释/空行，可以跳过执行
     """
-    for line in stmt.splitlines():
-        stripped = line.strip()
-        if stripped and not stripped.startswith("--"):
+    # 先去掉所有 /* ... */ 块注释，再检查剩余内容
+    import re as _re
+    stripped = _re.sub(r'/\*.*?\*/', '', stmt, flags=_re.DOTALL)
+    for line in stripped.splitlines():
+        line = line.strip()
+        if line and not line.startswith("--"):
             return False
     return True
 
@@ -212,8 +217,9 @@ class MigrationRunner:
 
         处理规则：
         1. 识别 ``$tag$ ... $tag$`` 美元引号块（PL/pgSQL DO 块等），整体保留不按分号分割
-        2. 按分号分割普通语句
-        3. 过滤空语句和纯注释语句（以 ``--`` 开头的行）
+        2. 识别 ``/* ... */`` 块注释，整体保留（由 _is_comment_only 过滤）
+        3. 按分号分割普通语句
+        4. 过滤空语句和纯注释语句（``--`` 单行注释 + ``/* */`` 块注释）
 
         Parameters
         ----------
@@ -229,10 +235,29 @@ class MigrationRunner:
         current: list[str] = []   # 当前语句的字符缓冲
         in_dollar_quote = False    # 是否在 $tag$ 块内
         dollar_tag = ""            # 当前美元引号标签，如 $$ 或 $body$
+        in_block_comment = False   # 是否在 /* */ 块注释内
         i = 0
         n = len(sql_content)
 
         while i < n:
+            # 检测 /* 块注释开始（不在美元引号块内）
+            if not in_dollar_quote and not in_block_comment and sql_content[i:i+2] == '/*':
+                in_block_comment = True
+                current.append('/*')
+                i += 2
+                continue
+
+            # 在块注释内，检测 */ 结束
+            if in_block_comment:
+                if sql_content[i:i+2] == '*/':
+                    in_block_comment = False
+                    current.append('*/')
+                    i += 2
+                else:
+                    current.append(sql_content[i])
+                    i += 1
+                continue
+
             # 检测美元引号开始（$tag$ 格式，tag 可为空字符串）
             if not in_dollar_quote and sql_content[i] == '$':
                 j = i + 1

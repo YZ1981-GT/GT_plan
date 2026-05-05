@@ -19,6 +19,7 @@
  */
 import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { useProjectStore } from '@/stores/project'
 
 export interface UseAutoSaveOptions {
   /** 自动保存间隔（毫秒），默认 30000（30秒） */
@@ -45,9 +46,11 @@ export function useAutoSave<T = any>(
     return enabledRef.value
   }
 
-  /** 构建完整的 localStorage key */
+  /** 构建完整的 sessionStorage key（含 projectId 前缀，防止多项目间草稿互相覆盖） */
   function storageKey(): string {
-    return `autosave_${key}`
+    const projectStore = useProjectStore()
+    const pid = projectStore.projectId || 'global'
+    return `autosave_${pid}_${key}`
   }
 
   /** 手动保存草稿到 sessionStorage */

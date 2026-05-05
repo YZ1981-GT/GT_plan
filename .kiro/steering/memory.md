@@ -47,7 +47,7 @@ inclusion: always
   - Sprint 1：试算平衡表 AJE/RJE 自动汇总、底稿上传两步确认、借贷平衡指示器修正、看板交互实现
   - Sprint 2：escapeRegex 修复、migration_runner 多语句分割、bulk_execute savepoint 隔离、v-permission 内存泄漏、router 权限检查、main.ts 图标注册、并发编号锁、pendingMap 泄漏、SSE 僵尸队列、shortcuts 输入框检查、apiProxy 统一、sessionStorage 替换、guardRoute 选项、amountClass 修复
   - Sprint 3：数据同步状态可视化（GtPageHeader showSyncStatus）、试算表双向导航、底稿识别确认步骤、N+1 优化（100→3次）、附注预加载（165→1次）、合计为0修复、syncFromRoute 非阻塞、router_registry 重复调用清理、GtPageHeader backMode、dictStore TTL、statusMaps+dictStore 统一、useCellSelection 引用计数、subscribe_many、auth.ts API.users.me
-  - Sprint 4：operationHistory 超时保护、confirm.ts HTML 转义、bcrypt rounds 配置化（12）、DefaultLayout watch await、deps.py 死代码清理、parseFile 降级第一个 sheet、useKnowledge 单例注释
+  - Sprint 4：operationHistory 超时保护、confirm.ts HTML 转义、bcrypt rounds 配置化（12）、DefaultLayout watch await、deps.py 死代码清理、parseFile 降级第一个 sheet、useKnowledge 单例注释、GtEditableTable lazyEdit 条件初始化（editable=false 时跳过）、developing 路由改为跳转 DevelopingPage.vue 专页（新增）
 
 ## 活跃待办
 
@@ -58,10 +58,16 @@ inclusion: always
 
 ### 功能完善（中期）
 - 性能测试（真实 PG + 大数据量环境）
-- token 存 localStorage 有 XSS 风险（考虑 sessionStorage 或 httpOnly cookie）[P3]
+- token 存 localStorage 有 XSS 风险（考虑 sessionStorage 或 httpOnly cookie）[P2，安全]
 - working_paper_service 状态机 draft→edit_complete 是否符合业务流程（需确认）[P3]
 - 合并模块需找真实项目做业务测试（技术完成度85%，业务完成度60%）[P1]
 - 系统当前是"工程师视角"而非"审计员视角"，下一步重点是 UAT 而非加功能
+- `useAutoSave` key 应加 projectId 前缀，防止多项目间草稿互相覆盖 [P2，数据正确性]
+- `_preload_data_for_notes` 仍有 N+1：每个 wp 单独查 WpIndex，应改为 JOIN 一次查完 [P2，性能]
+- `GtStatusTag` 传 statusMap 时未走 dictStore，需加 statusMap key → dictStore key 自动推断逻辑 [P3]
+- `pendingMap` key 对大 body 做 JSON.stringify 性能差，建议改为取前100字符+长度的轻量 hash [P3]
+- `GtPageHeader` syncTooltip "X分钟前"不随时间更新，需加定时器或改为实时计算 [P3]
+- `migration_runner._split_sql_statements` 未处理 `/* */` 块注释，未来迁移文件若含块注释会误分割 [P3]
 
 ## 底稿编码体系（致同 2025 修订版）
 

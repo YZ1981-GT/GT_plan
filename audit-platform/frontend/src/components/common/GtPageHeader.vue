@@ -77,13 +77,16 @@ function onBack() {
 type SyncStatus = 'ok' | 'syncing' | 'stale'
 const syncStatus = ref<SyncStatus>('ok')
 const lastSyncTime = ref<Date | null>(null)
+// 用于驱动 syncTooltip 实时更新的时钟（每分钟 tick 一次）
+const _now = ref(Date.now())
+let _clockTimer: ReturnType<typeof setInterval> | null = null
 
-/** 格式化"最后更新：X分钟前" */
+/** 格式化"最后更新：X分钟前"（依赖 _now 实现实时更新） */
 const syncTooltip = computed(() => {
   if (syncStatus.value === 'syncing') return '正在同步数据...'
   if (syncStatus.value === 'stale') return '数据可能过时，请刷新页面'
   if (!lastSyncTime.value) return '数据已是最新'
-  const diffMs = Date.now() - lastSyncTime.value.getTime()
+  const diffMs = _now.value - lastSyncTime.value.getTime()
   const diffMin = Math.floor(diffMs / 60000)
   if (diffMin < 1) return '最后更新：刚刚'
   if (diffMin < 60) return `最后更新：${diffMin} 分钟前`
@@ -114,6 +117,8 @@ onMounted(() => {
   if (props.showSyncStatus) {
     eventBus.on('sse:sync-event', onSyncEvent)
     eventBus.on('sse:sync-failed', onSyncFailed)
+    // 每分钟更新一次时钟，驱动 syncTooltip 实时显示"X分钟前"
+    _clockTimer = setInterval(() => { _now.value = Date.now() }, 60000)
   }
 })
 
@@ -121,6 +126,7 @@ onUnmounted(() => {
   eventBus.off('sse:sync-event', onSyncEvent)
   eventBus.off('sse:sync-failed', onSyncFailed)
   if (syncTimer) clearTimeout(syncTimer)
+  if (_clockTimer) clearInterval(_clockTimer)
 })
 </script>
 

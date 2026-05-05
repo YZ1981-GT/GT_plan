@@ -245,38 +245,33 @@ class DisclosureEngine:
         from app.models.workpaper_models import WorkingPaper, WpIndex
 
         # 底稿数据（汇总 + 精细化明细行）
+        # 使用 JOIN 一次查完 WorkingPaper + WpIndex，消除原来的 N+1 查询
         try:
             wp_result = await self.db.execute(
-                sa.select(WorkingPaper).where(
+                sa.select(WorkingPaper, WpIndex.wp_code, WpIndex.wp_name)
+                .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+                .where(
                     WorkingPaper.project_id == project_id,
                     WorkingPaper.is_deleted == sa.false(),
                     WorkingPaper.parsed_data.isnot(None),
                 )
             )
-            for wp in wp_result.scalars().all():
+            for wp, wp_code, _wp_name in wp_result.all():
+                if not wp_code:
+                    continue
                 pd = wp.parsed_data or {}
                 audited = pd.get("audited_amount")
                 unadjusted = pd.get("unadjusted_amount")
                 if audited is not None or unadjusted is not None:
-                    idx_r = await self.db.execute(
-                        sa.select(WpIndex.wp_code, WpIndex.wp_name).where(WpIndex.id == wp.wp_index_id)
-                    )
-                    idx = idx_r.first()
-                    if idx:
-                        self._wp_cache[idx[0]] = {
-                            "audited": float(audited) if audited is not None else None,
-                            "unadjusted": float(unadjusted) if unadjusted is not None else None,
-                            "opening": None,
-                        }
+                    self._wp_cache[wp_code] = {
+                        "audited": float(audited) if audited is not None else None,
+                        "unadjusted": float(unadjusted) if unadjusted is not None else None,
+                        "opening": None,
+                    }
                 # 缓存精细化提取的明细行（fine_summary 中的 detail rows）
                 fine_summary = pd.get("fine_summary", {})
                 if fine_summary:
-                    idx_r2 = await self.db.execute(
-                        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
-                    )
-                    idx2 = idx_r2.scalar_one_or_none()
-                    if idx2:
-                        self._wp_fine_cache[idx2] = fine_summary
+                    self._wp_fine_cache[wp_code] = fine_summary
         except Exception as _wp_err:
             logger.warning("preload wp data failed: %s", _wp_err)
             try:
