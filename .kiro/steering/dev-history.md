@@ -256,3 +256,26 @@ inclusion: manual
 **已知遗留问题（Sprint 4 后）：**
 - WorkpaperEditor.vue 有 1 个预存的 Univer locale 类型声明问题（@univerjs 包问题，非本项目代码）
 - Element Plus 按需导入后 bundle 仍有大文件（WorkpaperEditor 5.7MB，AttachmentManagement 4.8MB），主要是 Univer 和 xlsx 库
+
+### 2026-05-05：Round 1（合伙人视角）评审闭环 Tasks 1-4 完成
+
+**Task 1 — 数据模型迁移（commit 73204cf）：**
+- R1~R5 五轮 spec 三件套（requirements + design + tasks）全部起草
+- Round 1 数据模型基线：IssueTicket.source 扩展 11 个枚举、ProjectAssignment.role 预留 eqcr、归档章节占位（00-99）
+- production-readiness 产物归档
+
+**Task 2 — ReviewInbox 后端双路由验证（commit 5c5ac56）：**
+- 确认 GET /api/review-inbox 与 GET /api/projects/{id}/review-inbox 共享 ReviewInboxService.get_inbox
+- 新增 `backend/tests/test_pm_dashboard_review_inbox.py`（10 个测试），monkeypatch 验证两路由调用同一方法、schema 一致性、授权边界
+
+**Task 3 — 前端合并 ReviewWorkbench（commit 5c5ac56）：**
+- 新建 `ReviewWorkbench.vue`（~650 行）三栏视图（队列/预览+AI 预审/意见）+ 批量模式表格视图二选一
+- 筛选（项目/循环/退回重提/提交人）+ 快捷键（Ctrl+Enter 通过 / Ctrl+Shift+Enter 退回）+ 自动切下一条
+- blocking 问题存在时通过按钮禁用，提示待处理阻断数
+- router/index.ts 全局与项目级路由均指向 ReviewWorkbench
+
+**Task 4 — review closure 后端支持：**
+- 覆盖 gate_engine 集成（未解决批注 + 未确认 AI + 未转换错报 + 事件级联健康）
+- 通知落地（notification_types.py）
+
+**分支状态：** HEAD=5c5ac56 已推送 origin/feature/global-component-library，待合并 master

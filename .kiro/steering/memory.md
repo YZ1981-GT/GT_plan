@@ -40,21 +40,23 @@ inclusion: always
 ## 环境配置
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
-- 前端依赖：mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0 + unplugin-vue-components@32.0.0、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）
+- 前端依赖共 22 生产 + 7 开发：关键新增 mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0、unplugin-vue-components@32.0.0、@univerjs/presets@0.21.1、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）、@univerjs/sheets-formula@0.21.1、opentype.js@1.3.5、xlsx@0.18.5
 - PG ~152 张表（实测 Base.metadata，≥ 需求 9.2 要求的 144），Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
 - Paperless-ngx 端口 8010（admin/admin）
 - 测试用户：admin/admin123（role=admin）
 
-## 当前系统状态（2026-05-05）
+## 当前系统状态（2026-05-05 实测核对）
 
 - vue-tsc 90 个预存错误（非本 spec 引入，el-tag 类型联合/checkbox 值扩宽/tree filter-method 签名），Vite 构建通过
-- 后端 121 个路由文件（新增 pbc.py、confirmations.py），172 个服务文件，42 个模型文件，~152 张表
-- 后端新增 `backend/app/workers/` 模块：sla_worker、import_recover_worker、outbox_replay_worker（每个导出 `async def run(stop_event)`）
-- 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
-- git 分支：feature/global-component-library（已推送至 73204cf，待合并 master）
-- 最新提交 73204cf：R1 Task 1 数据模型迁移 + R1~R5 spec 三件套 + production-readiness 产物归档（83 文件 +11706/-503）
+- 后端 127 个路由文件，181 个服务文件（含子目录 import_engine/、wp_scripts/），39 个模型文件，11 个 core 模块，9 个 middleware，~152 张表
+- 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
+- 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
+- 后端测试：98 个根目录测试 + 4 个 e2e + 4 个 integration（Sprint 4 后 Hypothesis 属性测试 16 个合在根目录里）
+- git 分支：feature/global-component-library（本地已创建并追踪远端，HEAD=5c5ac56，待合并 master；master 未提交的 steering 改动已 stash，标签 master-pending-202605051735）
+- 最新提交 5c5ac56：Round 1 Tasks 2-4 review closure 后端 + 前端合并（在 73204cf R1 数据模型迁移 + R1~R5 spec 三件套之上）
+- 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
   - Sprint 1（P0 数据正确性）：底稿保存事件→附注同步、Dashboard 趋势图真实 API、Dirty 标记完整覆盖、QC 项目汇总 N+1 优化、审计报告 final 保护、QC-16 字段修正、ReviewInbox 跳转修正、报表两张表数据驱动、AuditCheckDashboard 批量接口、PBC/函证路由注册、看板卡片跳转、个人工作台待办工时
@@ -132,7 +134,7 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
-- Round 1 实施进度：Task 1 已完成（数据模型迁移已推 73204cf），进行中 Task 2（前端合并 ReviewInbox 入口）；剩余 27 个任务按 tasks.md 顺序推进
+- Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

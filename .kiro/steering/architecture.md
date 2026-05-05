@@ -17,13 +17,14 @@ inclusion: manual
 
 ## 系统规模（2026-05-05 实测）
 
-- 后端路由：119 个文件，按 11 个业务域分组（router_registry.py）
-- 后端服务：172 个文件（含子目录 import_engine/、wp_scripts/）
-- 后端模型：42 个文件，~144 张数据库表
-- 后端中间件：10 个（CORS/BodyLimit/GZip/Observability/ResponseWrapper/RequestID/LLMRateLimit/AuditLog/ErrorHandler/AuthMiddleware）
-- 后端核心模块：12 个（core/）
-- 后端测试：87 个单元/集成测试文件 + 6 个 E2E + 5 个集成测试
-- 前端页面：75+ 个 Vue 页面（views/）
+- 后端路由：127 个文件，按 11 个业务域分组（router_registry.py）
+- 后端服务：181 个文件（含子目录 import_engine/、wp_scripts/）
+- 后端模型：39 个文件，~152 张数据库表
+- 后端中间件：9 个（audit_log/audit_log_middleware/auth_middleware/body_limit/error_handler/observability/rate_limiter/request_id/response）
+- 后端核心模块：11 个（core/）
+- 后端 Worker：4 个（workers/）— sla_worker、import_recover_worker、outbox_replay_worker、import_worker
+- 后端测试：98 个单元/集成测试文件 + 4 个 E2E + 4 个集成测试
+- 前端页面：80 个 Vue 页面（views/）
 - 前端组件：20 个 common 组件 + 150+ 个业务组件
 - 前端 Pinia store：9 个（auth/project/collaboration/roleContext/wizard/dict/displayPrefs/drilldown/addressRegistry）
 - 前端 composables：16 个
@@ -31,7 +32,7 @@ inclusion: manual
 - 前端 utils：19 个文件
 - 数据库迁移脚本：3 个（V001__init / V002__add_schema_version / V003__example_add_comment）
 - 底稿精细化规则：347 个 JSON
-- 前端依赖：20 个 dependencies + 7 个 devDependencies
+- 前端依赖：22 dependencies + 7 devDependencies
 
 ## 前端全局组件库（2026-05-05 完成）
 
