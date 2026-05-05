@@ -17,6 +17,7 @@
             <el-option label="项目经理" value="manager" />
             <el-option label="审计员" value="auditor" />
             <el-option label="质控人员" value="qc" />
+            <el-option label="独立复核合伙人" value="eqcr" />
           </el-select>
         </template>
       </el-table-column>

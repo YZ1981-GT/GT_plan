@@ -28,6 +28,19 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'report:view',
     'workpaper:view', 'workpaper:edit',
   ],
+  // R5 任务 2：EQCR 独立复核合伙人
+  // 只读项目/底稿 + EQCR 专属动作（查看工作台、录意见、影子计算、审批）
+  // 动作命名对齐 tasks.md 任务 2：view_eqcr / record_opinion / shadow_compute / approve_eqcr
+  eqcr: [
+    'project:view',
+    'workpaper:view',
+    'report:view',
+    'adjustment:view',
+    'view_eqcr',
+    'record_opinion',
+    'shadow_compute',
+    'approve_eqcr',
+  ],
 }
 
 /**

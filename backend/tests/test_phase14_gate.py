@@ -324,8 +324,8 @@ def test_reason_code_enum_count():
 
 
 def test_gate_type_enum():
-    """GateType 枚举包含 3 个值"""
-    assert len(GateType) == 3
+    """GateType 枚举包含 4 个值（R5 新增 eqcr_approval）"""
+    assert len(GateType) == 4
 
 
 def test_sod_role_enum():

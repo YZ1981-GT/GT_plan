@@ -12,10 +12,42 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.base import PermissionLevel, ProjectUserRole
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.models.core import Notification, Project
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# ROLE_MAP — 委派角色 → (ProjectUserRole, PermissionLevel) 的单一真源
+# ---------------------------------------------------------------------------
+# R5 任务 2：将字典抽到模块级，满足跨轮约束 2 的"权限四点同步"显式验证脚本：
+#
+#     from app.services.assignment_service import ROLE_MAP
+#     assert 'eqcr' in ROLE_MAP
+#
+# 同时保留原有 ``_sync_project_users`` 中的用法，内部直接引用本常量。
+# ``ProjectUserRole`` 不新增 ``eqcr`` 枚举（与 design.md "架构决策一览"
+# "EQCR 角色挂载复用 ProjectAssignment.role='eqcr'" 对齐），
+# 因此 eqcr 在 project_users 层面映射为 partner+review；
+# 独立性仍由 ``project_assignments.role='eqcr'`` 在业务层区分。
+ROLE_MAP: dict[str, tuple[ProjectUserRole, PermissionLevel]] = {
+    "signing_partner": (ProjectUserRole.partner, PermissionLevel.review),
+    "partner": (ProjectUserRole.partner, PermissionLevel.review),
+    "合伙人": (ProjectUserRole.partner, PermissionLevel.review),
+    "manager": (ProjectUserRole.manager, PermissionLevel.review),
+    "项目经理": (ProjectUserRole.manager, PermissionLevel.review),
+    "qc": (ProjectUserRole.qc, PermissionLevel.review),
+    "质控": (ProjectUserRole.qc, PermissionLevel.review),
+    "auditor": (ProjectUserRole.auditor, PermissionLevel.edit),
+    "审计员": (ProjectUserRole.auditor, PermissionLevel.edit),
+    "assistant": (ProjectUserRole.auditor, PermissionLevel.edit),
+    "助理": (ProjectUserRole.auditor, PermissionLevel.edit),
+    # R5 任务 2：EQCR 独立复核合伙人
+    "eqcr": (ProjectUserRole.partner, PermissionLevel.review),
+    "独立复核合伙人": (ProjectUserRole.partner, PermissionLevel.review),
+}
 
 
 class AssignmentService:
@@ -63,8 +95,37 @@ class AssignmentService:
         assignments: list[dict],
         assigned_by: UUID | None = None,
     ) -> list[ProjectAssignment]:
-        """批量保存委派（先软删除旧的，再插入新的）"""
+        """批量保存委派（先软删除旧的，再插入新的）
+
+        R5 任务 2：在落库前对每一条委派执行 SOD 校验（EQCR 独立性规则），
+        任一条冲突则整批拒绝，避免部分落库的一致性问题。
+        """
         now = datetime.utcnow()
+
+        # ---- R5: SOD 前置校验（EQCR 独立性） ----
+        # 同批次中 staff_id+role 的组合用来模拟"本次将形成的终态"，
+        # 避免先删后插的瞬时窗口让规则误判。
+        from app.services.sod_guard_service import (
+            EqcrIndependenceRule,
+            SodViolation,
+        )
+
+        rule = EqcrIndependenceRule()
+        proposed_roles: list[tuple[UUID, str]] = [
+            (a["staff_id"], a["role"]) for a in assignments
+        ]
+        for staff_id, role in proposed_roles:
+            try:
+                await rule.check(
+                    self.db,
+                    project_id=project_id,
+                    staff_id=staff_id,
+                    new_role=role,
+                    proposed_roles=proposed_roles,
+                )
+            except SodViolation as exc:
+                # 冒泡给 router 层转成 403/409
+                raise exc
 
         # 软删除现有委派
         await self.db.execute(
@@ -134,6 +195,7 @@ class AssignmentService:
                     "manager": "项目经理",
                     "auditor": "审计员",
                     "qc": "质控人员",
+                    "eqcr": "独立复核合伙人",  # R5 任务 2
                 }
                 role_cn = role_map.get(pa.role, pa.role)
                 cycles = ", ".join(pa.assigned_cycles) if pa.assigned_cycles else "全部"
@@ -151,22 +213,12 @@ class AssignmentService:
     async def _sync_project_users(
         self, project_id: UUID, assignments: list[ProjectAssignment]
     ) -> None:
-        """委派时自动同步 project_users 表，确保 require_project_access 不会 403"""
-        from app.models.core import ProjectUser, ProjectUserRole, PermissionLevel
+        """委派时自动同步 project_users 表，确保 require_project_access 不会 403。
 
-        ROLE_MAP = {
-            "signing_partner": (ProjectUserRole.partner, PermissionLevel.review),
-            "partner": (ProjectUserRole.partner, PermissionLevel.review),
-            "合伙人": (ProjectUserRole.partner, PermissionLevel.review),
-            "manager": (ProjectUserRole.manager, PermissionLevel.review),
-            "项目经理": (ProjectUserRole.manager, PermissionLevel.review),
-            "qc": (ProjectUserRole.qc, PermissionLevel.review),
-            "质控": (ProjectUserRole.qc, PermissionLevel.review),
-            "auditor": (ProjectUserRole.auditor, PermissionLevel.edit),
-            "审计员": (ProjectUserRole.auditor, PermissionLevel.edit),
-            "assistant": (ProjectUserRole.auditor, PermissionLevel.edit),
-            "助理": (ProjectUserRole.auditor, PermissionLevel.edit),
-        }
+        R5 任务 2：映射表升级到模块级 :data:`ROLE_MAP`（单一真源），
+        这里直接引用，不再本地重复定义。
+        """
+        from app.models.core import ProjectUser
 
         for pa in assignments:
             staff = (await self.db.execute(

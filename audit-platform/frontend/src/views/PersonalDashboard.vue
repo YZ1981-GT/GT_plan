@@ -53,7 +53,7 @@ const myProjects = ref<any[]>([])
 const todos = ref<any[]>([])
 const weekHours = ref<any[]>([])
 
-const ROLE_MAP: Record<string, string> = { signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员' }
+const ROLE_MAP: Record<string, string> = { signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员', eqcr: '独立复核合伙人' }
 function roleLabel(role: string) { return ROLE_MAP[role] || role }
 function isNewAssignment(assignedAt: string | null) {
   if (!assignedAt) return false

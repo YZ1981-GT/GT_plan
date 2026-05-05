@@ -247,6 +247,7 @@ const teamMembers = computed(() => {
 
 const ROLE_LABEL_MAP: Record<string, string> = {
   signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员',
+  eqcr: '独立复核合伙人',
 }
 function roleLabel(role: string) { return ROLE_LABEL_MAP[role] || role }
 function isStepCompleted(step: string): boolean {
