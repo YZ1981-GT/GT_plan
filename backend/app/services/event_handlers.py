@@ -173,6 +173,104 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved)
 
     # ------------------------------------------------------------------
+    # R1 需求 2：复核退回 → IssueTicket 工单创建补偿（幂等）
+    # ------------------------------------------------------------------
+    async def _on_review_record_created(payload: EventPayload) -> None:
+        """订阅 ``REVIEW_RECORD_CREATED`` 事件做工单补偿。
+
+        调用方（``wp_review_service.add_comment`` 的守卫逻辑）在复核退回时
+        无论 IssueTicket 同步创建成功与否都会发此事件：
+
+        - 成功路径：此 handler 发现对应 ``source_ref_id`` 的工单已存在 → 跳过；
+        - 失败路径：对应工单缺失 → 补偿重建一条 ``source='review_comment'``
+          的工单，防止漏单。
+
+        幂等依据 ``IssueTicket.source_ref_id = review_record.id`` 唯一匹配。
+        """
+        extra = payload.extra or {}
+        review_record_id_str = extra.get("review_record_id")
+        if not review_record_id_str:
+            return
+
+        from uuid import UUID as _UUID
+
+        try:
+            review_record_id = _UUID(str(review_record_id_str))
+        except (TypeError, ValueError):
+            logger.warning(
+                "[REVIEW_COMPENSATE] invalid review_record_id=%s",
+                review_record_id_str,
+            )
+            return
+
+        async with async_session_factory() as session:
+            try:
+                # 幂等：检查同一 ReviewRecord 是否已有工单
+                from sqlalchemy import select as _select
+
+                from app.models.phase15_enums import IssueSource
+                from app.models.phase15_models import IssueTicket
+                from app.models.workpaper_models import ReviewRecord
+                from app.services.wp_review_service import (
+                    _build_and_persist_issue_ticket,
+                )
+
+                existing = (
+                    await session.execute(
+                        _select(IssueTicket).where(
+                            IssueTicket.source_ref_id == review_record_id,
+                            IssueTicket.source == IssueSource.review_comment.value,
+                        )
+                    )
+                ).scalar_one_or_none()
+
+                if existing is not None:
+                    logger.debug(
+                        "[REVIEW_COMPENSATE] ticket already exists for review=%s (id=%s)",
+                        review_record_id,
+                        existing.id,
+                    )
+                    return
+
+                review = await session.get(ReviewRecord, review_record_id)
+                if review is None:
+                    logger.warning(
+                        "[REVIEW_COMPENSATE] review record not found: %s",
+                        review_record_id,
+                    )
+                    return
+
+                commenter_id_raw = extra.get("commenter_id")
+                try:
+                    commenter_id = (
+                        _UUID(str(commenter_id_raw))
+                        if commenter_id_raw
+                        else review.commenter_id
+                    )
+                except (TypeError, ValueError):
+                    commenter_id = review.commenter_id
+
+                await _build_and_persist_issue_ticket(
+                    session,
+                    review_record=review,
+                    commenter_id=commenter_id,
+                )
+                await session.commit()
+                logger.info(
+                    "[REVIEW_COMPENSATE] IssueTicket compensated for review=%s",
+                    review_record_id,
+                )
+            except Exception as exc:  # noqa: BLE001
+                await session.rollback()
+                logger.warning(
+                    "[REVIEW_COMPENSATE] failed for review=%s: %s",
+                    review_record_id,
+                    exc,
+                )
+
+    event_bus.subscribe(EventType.REVIEW_RECORD_CREATED, _on_review_record_created)
+
+    # ------------------------------------------------------------------
     # 数据变更 → 公式缓存失效 (Task 15.1)
     # ------------------------------------------------------------------
     from app.services.formula_engine import FormulaEngine

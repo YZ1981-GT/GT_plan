@@ -14,12 +14,12 @@
   - Alembic 脚本 `round1_review_closure_signature_20260508.py`
   - _依赖_ README v2.2 数据库迁移约定；_需求_ 1~6
 
-- [ ] 2. 后端：合并 ReviewInbox 入口（不改后端，仅前端消费）
+- [x] 2. 后端：合并 ReviewInbox 入口（不改后端，仅前端消费）
   - 确认 `ReviewInboxService.get_inbox` 全局/单项目都可用，补 API 测试覆盖
   - 路由 `pm_dashboard.py` 确认 `GET /api/review-inbox` 和 `GET /api/projects/{id}/review-inbox` 均走同一 service
   - _需求_ 1
 
-- [ ] 3. 前端：新建 `ReviewWorkbench.vue` 三栏视图
+- [x] 3. 前端：新建 `ReviewWorkbench.vue` 三栏视图
   - 左栏队列（含筛选）+ 中栏只读底稿预览 + 右栏 AI 预审 + 意见输入
   - 快捷键 `Ctrl+Enter / Ctrl+Shift+Enter / ↑↓`
   - "批量模式"切换表格视图（复用 `ReviewInbox` 现有批量能力）
@@ -28,7 +28,7 @@
   - 删除 `ReviewWorkstation.vue`
   - _需求_ 1
 
-- [ ] 4. 后端：复核意见→工单联动
+- [x] 4. 后端：复核意见→工单联动
   - `wp_review_service.add_comment` 里"退回"时创建 `IssueTicket(source='review_comment', source_ref_id=review_record.id)`
   - 订阅 `REVIEW_RECORD_CREATED` 事件做补偿（工单创建失败不阻断复核动作）
   - `IssueTicketList` source 筛选 UI 增加"复核意见"

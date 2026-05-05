@@ -758,6 +758,8 @@ class EventType(str, enum.Enum):
     REPORTS_UPDATED = "reports.updated"
     WORKPAPER_SAVED = "workpaper.saved"
     NOTE_UPDATED = "note.updated"
+    # R1 需求 2：复核意见 → 工单补偿联动
+    REVIEW_RECORD_CREATED = "review_record.created"
     # Phase 17: 细化导入事件语义
     LEDGER_IMPORT_SUBMITTED = "ledger.import_submitted"
     LEDGER_IMPORT_FAILED = "ledger.import_failed"

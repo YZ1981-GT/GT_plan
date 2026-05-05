@@ -376,6 +376,27 @@ class WorkingPaperService:
 
         await db.flush()
 
+        # R1 需求 2：退回时同步创建 ReviewRecord + 关联 IssueTicket
+        # （失败不阻断本方法，见 WpReviewService.add_comment 守卫逻辑）。
+        if "rejected" in new_review_status and rejected_by_id is not None:
+            try:
+                from app.services.wp_review_service import WpReviewService
+
+                await WpReviewService().add_comment(
+                    db=db,
+                    working_paper_id=wp.id,
+                    commenter_id=rejected_by_id,
+                    comment_text=reason or "",
+                    cell_reference=None,
+                    is_reject=True,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "[WORKING_PAPER] reject→ReviewRecord link failed wp=%s: %s",
+                    wp.id,
+                    exc,
+                )
+
         return {
             "wp_id": str(wp.id),
             "status": wp.status.value,

@@ -118,7 +118,12 @@ const router = createRouter({
         {
           path: 'projects/:projectId/review-inbox',
           name: 'ReviewInbox',
-          component: () => import('@/views/ReviewInbox.vue'),
+          component: () => import('@/views/ReviewWorkbench.vue'),
+        },
+        {
+          path: 'review-inbox',
+          name: 'ReviewInboxGlobal',
+          component: () => import('@/views/ReviewWorkbench.vue'),
         },
         {
           path: 'projects/:projectId/qc-dashboard',

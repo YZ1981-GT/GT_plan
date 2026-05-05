@@ -14,19 +14,20 @@
         <el-option label="一般" value="minor" />
         <el-option label="建议" value="suggestion" />
       </el-select>
-      <el-select v-model="filters.source" placeholder="来源" clearable size="small" style="width:100px">
+      <el-select v-model="filters.source" placeholder="来源" clearable size="small" style="width:140px">
         <el-option label="L2" value="L2" />
         <el-option label="L3" value="L3" />
         <el-option label="Q" value="Q" />
+        <el-option label="复核意见" value="review_comment" />
       </el-select>
       <el-button size="small" @click="loadData">刷新</el-button>
     </div>
 
     <el-table :data="issues" border size="small" stripe @row-click="handleRowClick">
       <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="source" label="来源" width="60" align="center">
+      <el-table-column prop="source" label="来源" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="sourceTagType(row.source)" size="small">{{ row.source }}</el-tag>
+          <el-tag :type="sourceTagType(row.source)" size="small">{{ sourceLabel(row.source) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="severity" label="严重度" width="80" align="center">
@@ -99,7 +100,28 @@ function handleRowClick(_row: IssueTicket) {
   // TODO: 打开问题单详情弹窗
 }
 
-function sourceTagType(s: string) { return s === 'Q' ? 'danger' : s === 'L3' ? 'warning' : '' }
+function sourceTagType(s: string) {
+  if (s === 'Q') return 'danger'
+  if (s === 'L3') return 'warning'
+  if (s === 'review_comment') return 'info'
+  return ''
+}
+function sourceLabel(s: string): string {
+  const m: Record<string, string> = {
+    L2: 'L2',
+    L3: 'L3',
+    Q: 'Q',
+    review_comment: '复核意见',
+    consistency: '一致性',
+    ai: 'AI',
+    reminder: '催办',
+    client_commitment: '客户承诺',
+    pbc: 'PBC',
+    confirmation: '函证',
+    qc_inspection: '质控抽查',
+  }
+  return m[s] || s
+}
 function severityTagType(s: string) {
   if (s === 'blocker') return 'danger'
   if (s === 'major') return 'warning'
