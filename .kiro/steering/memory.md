@@ -18,55 +18,128 @@ inclusion: always
 - 删除必须二次确认，所有删除先进回收站
 - 一次性脚本用完即删
 - 提建议前先验证（不要引用过时记录，vue-tsc exit 0 = 零错误，不要再提已修复的问题）
+- 给出建议时必须反复论证，提供最仔细的可落地方案，不能泛泛而谈或停留在表面描述
+- 判断前端模块是否存在，必须同时检查 views/ 根目录 + components/ 子目录
 - 文档同步：功能变更后同步更新需求文档
 - 记忆拆分：memory.md 只放精简状态+待办，技术决策→architecture.md，规范→conventions.md，修复记录→dev-history.md
 - 目标并发规模 6000 人
 - 表格列宽要足够大，不折行不省略号截断
 - 表格编辑需支持查看/编辑模式切换
 - 复制按钮命名：工具栏"复制整表" vs 右键"复制选中区域"
+- 系统打磨采用 PDCA 迭代模式：提建议→成 spec 三件套→实施→复盘→下一轮新需求，直到可改进项穷尽
+- 打磨迭代具体化为"5 角色轮转"：合伙人/项目经理/质控/审计助理/EQCR 独立复核，每轮只站单一角色视角找断层，规则见 `.kiro/specs/refinement-round1-review-closure/README.md`
+- 每轮 requirements.md 起草后必须做"代码锚定交叉核验"（grep 所有假设的字段/表/端点/枚举），发现硬错立刻回补到文档，避免错误带到 design 阶段
+
+## Spec 工作流规范（production-readiness 复盘沉淀）
+
+- design.md 起草必须做"代码锚定"：每个修改点列文件+行号/函数名，npm 包要 `npm view` 验证存在，字段/枚举/端点路径 grep 核对，避免事后大量校正备忘
+- tasks.md 只放可被自动化工具推进的编码任务；手动浏览器验证（如"输入公式看结果"）应放 spec 末尾"UAT 验收清单"，不占 taskStatus 工作流
+- Sprint 粒度按"验证边界"切分：每个 Sprint ≤10 个任务，强制回归测试+UAT 才进下一 Sprint（反例：production-readiness Sprint 2 塞 20+ 小改）
+- 任务描述中引用的依赖包、类名、API 路径，变化后要回填更新（如 0.1/0.2 的 `@univerjs/preset-sheets-formula` 实际不存在）
 
 ## 环境配置
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
-- 前端新增依赖：mitt@3.0.1（事件总线）、nprogress@0.2.0（全局进度条）、unplugin-auto-import@21.0.0 + unplugin-vue-components@32.0.0（Element Plus 按需导入）
-- PG 144 张表，Redis 6379，后端 9980，前端 3030
+- 前端依赖：mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0 + unplugin-vue-components@32.0.0、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）
+- PG ~152 张表（实测 Base.metadata，≥ 需求 9.2 要求的 144），Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
 - Paperless-ngx 端口 8010（admin/admin）
 - 测试用户：admin/admin123（role=admin）
 
-## 当前系统状态（2026-05-05，post-enhancement-bugfix 完成）
+## 当前系统状态（2026-05-05）
 
-- vue-tsc 零错误，Vite 构建通过（37.19s）
-- 后端 119 个路由文件，172 个服务文件，42 个模型文件，~144 张表
+- vue-tsc 90 个预存错误（非本 spec 引入，el-tag 类型联合/checkbox 值扩宽/tree filter-method 签名），Vite 构建通过
+- 后端 121 个路由文件（新增 pbc.py、confirmations.py），172 个服务文件，42 个模型文件，~152 张表
+- 后端新增 `backend/app/workers/` 模块：sla_worker、import_recover_worker、outbox_replay_worker（每个导出 `async def run(stop_event)`）
 - 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
-- 后端约 700 路由，0 个 stub 残留
 - git 分支：feature/global-component-library（已推送，待合并 master）
-- **全局化增强项目完成**：4 Sprint，40 Task，~235 文件，+14422/-3164 行
-- **post-enhancement-bugfix 项目完成**：4 Sprint，修复 B1-B9 业务缺陷 + P0-P3 技术 Bug
-  - Sprint 1：试算平衡表 AJE/RJE 自动汇总、底稿上传两步确认、借贷平衡指示器修正、看板交互实现
-  - Sprint 2：escapeRegex 修复、migration_runner 多语句分割、bulk_execute savepoint 隔离、v-permission 内存泄漏、router 权限检查、main.ts 图标注册、并发编号锁、pendingMap 泄漏、SSE 僵尸队列、shortcuts 输入框检查、apiProxy 统一、sessionStorage 替换、guardRoute 选项、amountClass 修复
-  - Sprint 3：数据同步状态可视化（GtPageHeader showSyncStatus）、试算表双向导航、底稿识别确认步骤、N+1 优化（100→3次）、附注预加载（165→1次）、合计为0修复、syncFromRoute 非阻塞、router_registry 重复调用清理、GtPageHeader backMode、dictStore TTL、statusMaps+dictStore 统一、useCellSelection 引用计数、subscribe_many、auth.ts API.users.me
-  - Sprint 4：operationHistory 超时保护、confirm.ts HTML 转义、bcrypt rounds 配置化（12）、DefaultLayout watch await、deps.py 死代码清理、parseFile 降级第一个 sheet、useKnowledge 单例注释、GtEditableTable lazyEdit 条件初始化（editable=false 时跳过）、developing 路由改为跳转 DevelopingPage.vue 专页（新增）
-- **P2/P3 优化修复完成**（commit 8a5f2c7）：token 改 sessionStorage（安全）、useAutoSave 加 projectId 前缀、disclosure_engine N+1 消除（JOIN 一次查完）、GtStatusTag 新增 statusMapName 自动推断 dictKey、pendingMap 轻量 hash、syncTooltip 实时更新（每分钟定时器）、migration_runner 支持 `/* */` 块注释
+- 未提交变更 48 个文件（+2267/-480），主要是 production-readiness spec 46 个需求的实现
+- **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
+  - Sprint 1（P0 数据正确性）：底稿保存事件→附注同步、Dashboard 趋势图真实 API、Dirty 标记完整覆盖、QC 项目汇总 N+1 优化、审计报告 final 保护、QC-16 字段修正、ReviewInbox 跳转修正、报表两张表数据驱动、AuditCheckDashboard 批量接口、PBC/函证路由注册、看板卡片跳转、个人工作台待办工时
+  - Sprint 2（P1+P2 核心体验）：复核收件箱导航+badge、UUID→姓名映射、进度百分比、借贷平衡含损益、错报超限门禁、重要性变更联动、账套导入通知、抽样/汇总年度从上下文、导出 Word 入口、QC-17 改 ORM、批量驳回逐条原因、工时编辑修正、知识库预览认证、QC 归档缓存、编制人筛选下拉、版本历史抽屉、自动保存、并发冲突检测、预填充保留公式
+  - Sprint 3（P2+P3 前置）：项目启动步骤引导、xlsx 公式值预加载、底稿导出 PDF、路由前缀规范（删除 hasattr 补丁）、Worker 拆分（3 模块）、AI 分析缓存、对比视图上年列、序时账异常标记
+  - Sprint 4（P3 核心）：PostgreSQL 连接池配置、.env.example 迁移示例、Alembic 迁移完整性验证、load_test.py 压测完善（Locust + asyncio 双模式）
+  - 属性测试：16 个 Hypothesis 测试覆盖全部 14 条属性（`backend/tests/test_production_readiness_properties.py`）
+  - 剩余：0.3 公式计算手动浏览器验证（代码已确认 UniverSheetsCorePreset 未禁用公式，功能正确）
+
+## 关键技术事实（查阅/排查专用）
+
+- Univer 公式引擎：@univerjs/preset-sheets-formula **不存在于 npm**，公式引擎内置在 preset-sheets-core（UniverSheetsFormulaPlugin + UniverSheetsFormulaUIPlugin 自动注册），只需 UniverSheetsCorePreset 未传 workerURL（否则 notExecuteFormula=true 禁用计算）
+- ThreeColumnLayout.vue 无 #header/#nav-icons slot（顶部导航硬编码）；新入口需先添加自定义 slot（已加 #nav-review-inbox），再在 DefaultLayout 通过 `<template #nav-review-inbox>` 注入
+- eventBus 新增事件：`workpaper:saved`（WorkpaperSavedPayload: projectId/wpId/year?）、`materiality:changed`（MaterialityChangedPayload: projectId/year?）
+- 后端 AccountCategory 枚举实际值：asset/liability/equity/revenue/expense（无 income/cost）；前端借贷平衡 liabEquityTotal 过滤时需兼容 `['revenue','income','cost','expense']`
+- 后端错报模型：`UnadjustedMisstatement`（表名 unadjusted_misstatements），不是 Misstatement
+- GateRule 注册模式：继承 GateRule + `rule_registry.register_all([GateType.submit_review, GateType.sign_off], Rule())`；错报超限规则必须注册到 submit_review（仅 sign_off 不够）
+- 账套导入状态端点：`GET /api/projects/{project_id}/ledger-import/jobs/{job_id}`（通过 getImportJob service）；作业状态枚举 completed/failed/timed_out/canceled（轮询四个都要判断）
+- apiProxy：api.get/post 返回 unwrapped data；validateStatus=s<600 放行 4xx/5xx 时返回 FastAPI `{detail: {...}}`；409 冲突判断 `data?.detail?.error_code === 'VERSION_CONFLICT'`
+- apiProxy 不导出 http 原始客户端；blob 下载需 `import http from '@/utils/http'` 直接用 axios（已用于 onExportPdf）
+- PDF 导出依赖 LibreOffice headless（libreoffice/soffice which 检测 + subprocess --headless --convert-to pdf --outdir），超时 60s；Windows 需装 LibreOffice，Docker 镜像需打包 libreoffice-core
+- Worker 拆分架构：每模块导出 `async def run(stop_event: asyncio.Event)`，用 `asyncio.wait_for(stop_event.wait(), timeout=interval)` 实现可中断 sleep；lifespan 中由 `_run_migrations / _register_phase_handlers / _replay_startup_events / _start_workers` 四个私有函数编排
+- database.py 按 DATABASE_URL.startswith("postgresql") 分支：PG 生产 pool_size≥20 / max_overflow≥80 / pool_timeout=30 / pool_recycle=1800；SQLite 开发保留 pool_recycle=3600
+- DB_POOL_SIZE/DB_MAX_OVERFLOW 默认 10/20（config.py），database.py 用 max() 确保 PG 分支至少 20/80（向下兼容旧 env）
+- Schema bootstrap ADR：不走 Alembic 全量 autogenerate，baseline=create_all（`_init_tables.py` 一次建所有表），增量=autogenerate 补丁；MIGRATION_GUIDE.md 记录
+- 属性测试策略：backend Python hypothesis 复刻前端 TS 算法（setTimeout 防抖、COMPLETED_STATUSES、resolveUserName、_DIRTY_PATTERNS 等），因前端未装 vitest/fast-check
+- load_test.py 双模式：Locust UI（探索式）+ 独立 asyncio/httpx 批量压测（CI/CD，输出 JSON 报告含 TPS/P95/P99/error_rate/bottlenecks/slow_queries，未达标退出码 1）
+- useAutoSave composable 保存到 sessionStorage 用于草稿恢复，不适合 Univer 大型 snapshot 后端自动保存；底稿编辑器自动保存需独立 setInterval 调用 onSave
+- 项目未安装 @vueuse/core，防抖用原生 setTimeout/clearTimeout 实现
+- Project 模型无 audit_type 字段，不可依赖做期中/期末判断
+- commonApi.getMyStaffId 直接返回 `string | null`；staffApi.getMyStaffId 返回对象，两者不同
+- router_registry.py 路由前缀规范：路由器内部只声明业务路径（如 /gate），注册时统一加 prefix="/api"；例外：dashboard.py 内部带 /api/dashboard 注册时不加、/wopi 不加、/api/version 直接在 main.py
+- 预存 backend 测试失败（与本 spec 无关，不要误判为回归）：test_adjustments.py 23 个测试因 SQLite 不支持 pg_advisory_xact_lock 失败；test_misstatements.py 2 个测试因 UnadjustedMisstatement 缺 soft_delete mixin；test_e2e_chain* 同样 pg_advisory_xact_lock 问题
+- NotificationCenter.vue 组件+store+API 完整，但 DefaultLayout.vue 顶部未挂铃铛入口，通知实际不可见（Round 2 重点修复）
+- ReviewWorkstation.vue 存在三栏+AI 预审+快捷键，但 router/index.ts 未注册，是死代码；实际入口 ReviewInbox.vue 无 AI 预审（Round 1 需合并）
+- backend/app/routers/pbc.py 和 confirmations.py 是占位空壳（各 15 行返回 []），不是真实功能，前端无对应页面
+- 归档端点三重并存语义不同：wp_storage.archive_project（锁底稿）/ private_storage.archive_project（锁+推云+清本地）/ data_lifecycle.archive_project（软删除可恢复），前端只有一个按钮入口
+- 三套就绪检查逻辑分散可能矛盾：gate_engine（submit_review/sign_off/export_package）/ partner_dashboard.sign-readiness（8 项）/ qc_dashboard.archive-readiness，需统一为 gate_engine 门面
+- SignatureRecord.signature_level 仅 String(20) 无顺序强制，三级签字无前置依赖校验
+- qc_engine.py 14 条 QC-01~14 规则 + gate_rules_phase14.py QC-19~26 全是硬编码 Python，无 qc_rule_definitions 表支持自定义
+- WorkpaperEditor.vue 工具栏仅保存/同步公式/版本/下载/PDF/上传，无 AI 侧栏、无程序要求侧栏、无右键序时账穿透、无对比上年按钮
+- 系统无 EQCR（独立复核合伙人）专属角色与工作台，ProjectAssignment.role 缺 eqcr 枚举，gate_engine 缺 eqcr_approval 阶段
+- Communication/ClientCommunication 模型不存在（grep 零命中），ProjectProgressBoard 沟通记录前端组件存在但后端未独立建模，可能塞在 JSON 字段或散落表里
+- WorkingPaper 无 due_date 字段，wp_progress_service overdue_days 用 created_at 估算"已创建天数"，语义弱
+- ledger/penetrate 端点参数为 account_code + drill_level + date，不支持按 amount 容差匹配；按金额穿透需新增端点
+- assignment_service.ROLE_MAP 和 role_context_service._ROLE_PRIORITY 两个字典是角色体系单一真源，新增 role='eqcr' 必须同时更新；_ROLE_PRIORITY 当前 partner(5)/qc(4)/manager(3)/auditor(2)/readonly(1)
+- GoingConcernEvaluation 模型已存在（collaboration_models.py），Round 5 EQCR 持续经营 Tab 可直接复用，不要重复建模
+- 归档包设计决策：采用"插件化章节"模式（00/01/02/.../99 顺序），各 Round 各自插入章节，Round 1 需求 6 只预留机制
+- 归档包章节号分配：00 项目封面 / 01 签字流水（R1）/ 02 EQCR 备忘录（R5）/ 03 质控抽查报告（R3）/ 10 底稿/ / 20 报表/ / 30 附注/ / 40 附件/ / 99 审计日志
+- 审计意见锁定架构决策：不新增 opinion_locked_at 平行字段，改为扩展 ReportStatus 状态机 draft→review→eqcr_approved→final（R5 需求 6 + README 跨轮约束第 3 条）
+- 枚举扩展硬约定：IssueTicket.source 在 R1 一次性预留 11 个值（L2/L3/Q/review_comment/consistency/ai/reminder/client_commitment/pbc/confirmation/qc_inspection），ProjectAssignment.role 预留 eqcr，避免多轮迁移
+- 权限矩阵四点同步约定：新增 role/动作需同时更新 assignment_service.ROLE_MAP + role_context_service._ROLE_PRIORITY + 前端 ROLE_MAP + composables/usePermission.ROLE_PERMISSIONS
+- 焦点时长隐私决策：R4 需求 10 焦点追踪只写 localStorage（按周归档键），不落库不发后端，消除监控隐患
+- 跨轮 SLA 统一按自然日计，不引入节假日日历服务，跨长假由人工 override（README 跨轮约束第 5 条）
+- ClientCommunicationService 已存在于 `pm_service.py:481`，沟通记录存 `Project.wizard_state.communications` JSONB，`commitments` 当前是字符串；R2 需求 5 无需"调研"，直接升级为结构化数组
+- ReviewInboxService.get_inbox(user_id, project_id=None) 已支持全局+单项目双模式（`pm_service.py:26`），R1 需求 1 不新增后端端点
+- 复核批注并存两套：ReviewRecord（单行绑定 wp_id+cell_reference）与 review_conversations（跨对象多轮）；R1 需求 2 选定 ReviewRecord 为工单转换真源，conversations 只用于后续讨论
+- AuditEvidence 模型不存在（grep 零命中），附件与底稿关联统一用 attachment_service + workpaper_attachment_link
+- AJE 被拒→错报联动：后端 misstatement_service.create_from_rejected_aje 已实现，但 Adjustments.vue 前端入口缺失；R1 需求 3 新增 UnconvertedRejectedAJERule 到 sign_off gate
+- event_handlers.py:173 订阅 WORKPAPER_SAVED 级联更新试算表/报表/附注，但无补偿机制；R1 需求 3 新增 EventCascadeHealthRule gate 规则
+- ExportIntegrityService 语义：导出时 persist_hash_checks 记哈希（`export_integrity_service.py:53`），下载不重算，可疑时显式 verify_package；R1 需求 6 措辞对齐
+- 签字状态机联动决策：最高级签字完成后由 SignService.sign 内部同事务自动切 AuditReport.status 到 final（R1 需求 4），避免"签完字但报告停在 review"困惑
+- 归档断点续传：archive_jobs 表记 last_succeeded_section，重试从下一章节开始（R1 需求 5）
+- R3 规则 DSL 本轮范围收窄：只实现 expression_type='python'+'jsonpath'，SQL/regex 枚举保留但执行器 NotImplementedError，留 Round 6+
+- R5 EQCR 独立性边界：不直接对外联络客户（维持项目组作为对外单一入口），只做内部独立笔记，可选择分享给项目组
+- 签字状态机联动分两情形：无 EQCR 项目 order=3 partner 签完直接切 review→final；启用 EQCR 则 order=3 不切、order=4 EQCR 签完切 review→eqcr_approved、order=5 归档签字完切 eqcr_approved→final
+- notification_types.py 由 R1 tasks 19 唯一创建，R2+ 只向其追加常量不重复新建；前端 notificationTypes.ts 同理
 
 ## 活跃待办
 
 ### 最高优先级
 - 合并 feature/global-component-library 到 master（用户手动操作）
+- 0.3 公式计算浏览器手动验证（启动前端输入 `=SUM(A1:A3)` 看结果）
+- 提交当前 48 个文件变更（production-readiness spec 完成产物）
 - 用真实审计项目进行用户验收测试（UAT）
-- 生产环境部署准备（Docker 镜像、环境变量、数据库迁移）
-- **[BUG] auth.ts token 迁移兼容**：改 sessionStorage 后未处理旧 localStorage token 迁移，下次部署所有已登录用户会被强制登出，需加一次性迁移逻辑
-- **[BUG] migration_runner `_is_comment_only` 里有 `import re as _re`**：应移到文件顶部（文件顶部已有 `import re`，函数内重复 import 是多余的）
+- 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
+- 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
+- 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
+- 下一步启动 Round 1 实施（Sprint 1 复核闭环 12 任务 + Sprint 2 归档合规 7 任务）
 
-### 功能完善（中期）
-- 性能测试（真实 PG + 大数据量环境）
+### 中期功能完善
+- 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）
 - working_paper_service 状态机 draft→edit_complete 是否符合业务流程（需确认）[P3]
-- 合并模块需找真实项目做业务测试（技术完成度85%，业务完成度60%）[P1]
+- 合并模块需找真实项目做业务测试（技术完成度 85%，业务完成度 60%）[P1]
 - 系统当前是"工程师视角"而非"审计员视角"，下一步重点是 UAT 而非加功能
-- `GtStatusTag` 新增的 `statusMapName` prop 需批量更新现有调用方才能生效（grep 找出所有 `:status-map="WP_STATUS"` 等，加上对应 `status-map-name`）[P3]
-- `useAutoSave` projectId 建议改为参数传入而非内部读 store，避免挂载时 projectId 为空导致草稿存到 global key [P3]
-- `_preload_data_for_notes` JOIN 查询可进一步只 SELECT 需要的字段（parsed_data/wp_code/wp_name），减少数据传输 [P3]
+- `GtStatusTag.STATUS_MAP_TO_DICT_KEY` 是硬编码映射表，新增 StatusMap 时需手动维护 [P3]
 
 ## 底稿编码体系（致同 2025 修订版）
 

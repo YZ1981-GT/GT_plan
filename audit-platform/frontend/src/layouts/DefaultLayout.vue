@@ -5,6 +5,19 @@
     @nav-change="onNavChange"
     @view-change="onViewChange"
   >
+    <template #nav-review-inbox>
+      <router-link
+        v-if="isReviewRole"
+        to="/review-inbox"
+        class="gt-nav-review-inbox"
+        style="text-decoration: none;"
+      >
+        <el-badge :value="pendingReviewCount" :hidden="pendingReviewCount === 0" type="danger">
+          <el-button size="small" text>📋 复核收件箱</el-button>
+        </el-badge>
+      </router-link>
+    </template>
+
     <template #middle>
       <!-- 合并模块：独立树形导航 -->
       <ConsolMiddleNav v-if="isConsolRoute" />
@@ -51,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ThreeColumnLayout from './ThreeColumnLayout.vue'
 import MiddleProjectList from '@/components/layout/MiddleProjectList.vue'
@@ -65,6 +78,7 @@ import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { getProject } from '@/services/auditPlatformApi'
+import { getGlobalReviewInbox } from '@/services/pmApi'
 
 const route = useRoute()
 const roleStore = useRoleContextStore()
@@ -75,11 +89,35 @@ const fourCol = ref(false)
 const activeCatalog = ref('reports')
 const selectedCatalogItem = ref<any>(null)
 
+// 复核收件箱 badge
+const pendingReviewCount = ref(0)
+let badgeTimer: ReturnType<typeof setInterval> | null = null
+
+// 是否有复核权限（reviewer/partner/admin）
+const isReviewRole = computed(() => {
+  const role = roleStore.effectiveRole
+  return ['reviewer', 'partner', 'admin', 'manager'].includes(role) || roleStore.isPartner || roleStore.isManager
+})
+
+async function loadPendingReviewCount() {
+  if (!isReviewRole.value) return
+  try {
+    const res = await getGlobalReviewInbox(1, 1)
+    pendingReviewCount.value = res.total || 0
+  } catch { /* 静默失败 */ }
+}
+
 // 初始化角色上下文
 onMounted(async () => {
   if (!roleStore.loaded) {
     await roleStore.initialize()
   }
+  loadPendingReviewCount()
+  badgeTimer = setInterval(loadPendingReviewCount, 5 * 60 * 1000)
+})
+
+onBeforeUnmount(() => {
+  if (badgeTimer) clearInterval(badgeTimer)
 })
 
 // 进入项目子页面时加载项目角色

@@ -127,6 +127,13 @@
             <span>{{ archiveResult.ready ? '项目满足归档条件' : '项目尚未满足归档条件' }}</span>
             <span class="gt-check-score">{{ archiveResult.passed_count }}/{{ archiveResult.total_checks }} 通过</span>
           </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin: 8px 0 12px">
+            <span v-if="archiveResult.checked_at" style="font-size: 12px; color: #909399">
+              上次检查时间：{{ new Date(archiveResult.checked_at).toLocaleString('zh-CN') }}
+            </span>
+            <span v-else style="font-size: 12px; color: #909399">上次检查时间：未知</span>
+            <el-button size="small" type="primary" @click="loadArchive" :loading="archiveLoading">重新检查</el-button>
+          </div>
           <div class="gt-check-list">
             <div v-for="check in archiveResult.checks" :key="check.id" class="gt-check-item">
               <span class="gt-check-icon">{{ check.passed ? '✅' : '❌' }}</span>
@@ -146,11 +153,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
-  getQCOverview, getStaffProgress, getOpenIssues, getArchiveReadiness,
+  getQCOverview, getStaffProgress, getOpenIssues, getArchiveReadiness, runArchiveReadinessCheck,
   type QCOverview, type StaffProgressItem, type OpenIssue, type ArchiveReadiness,
 } from '@/services/qcDashboardApi'
 
@@ -220,10 +227,26 @@ async function loadIssues() {
 
 async function loadArchive() {
   archiveLoading.value = true
-  try { archiveResult.value = await getArchiveReadiness(projectId.value) }
+  try { archiveResult.value = await runArchiveReadinessCheck(projectId.value) }
   catch { ElMessage.error('归档检查失败') }
   finally { archiveLoading.value = false }
 }
+
+async function tryLoadArchiveCache() {
+  // 切换到归档 Tab 时，先尝试加载上次结果，失败时静默处理（不自动执行检查）
+  if (archiveResult.value) return
+  try {
+    archiveResult.value = await getArchiveReadiness(projectId.value)
+  } catch {
+    // 静默处理，不自动执行检查
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'archive') {
+    tryLoadArchiveCache()
+  }
+})
 
 async function loadAll() {
   await Promise.all([loadOverview(), loadStaff(), loadIssues()])

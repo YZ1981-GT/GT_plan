@@ -4,6 +4,7 @@
 所有规则注册到 gate_engine.rule_registry
 """
 import logging
+import uuid
 from typing import Optional
 
 from sqlalchemy import select, func, text
@@ -386,6 +387,90 @@ class ConsistencyBlockingDiffRule(GateRule):
             return None
 
 
+async def check_misstatement_exceeds_materiality(
+    project_id: str | uuid.UUID, db: AsyncSession
+) -> dict | None:
+    """检查未更正错报是否超过整体重要性水平
+
+    需求 20.1：WHEN 未更正错报累计金额超过整体重要性水平，THE 底稿提交复核门禁
+    SHALL 阻断提交，并显示"未更正错报超过重要性水平"的阻断原因
+
+    返回 dict（命中规则时）或 None（未命中或无法比较时）
+    """
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import UnadjustedMisstatement, Materiality
+
+    pid = project_id if isinstance(project_id, uuid.UUID) else uuid.UUID(str(project_id))
+
+    # 查询累计错报金额（所有未删除、未跨年结转到后续年度的错报之和）
+    total_q = sa.select(
+        sa.func.coalesce(sa.func.sum(UnadjustedMisstatement.misstatement_amount), 0)
+    ).where(
+        UnadjustedMisstatement.project_id == pid,
+        UnadjustedMisstatement.is_deleted == sa.false(),
+    )
+    total_amount = float((await db.execute(total_q)).scalar() or 0)
+
+    # 查询整体重要性水平（取最新设置的一条）
+    mat_q = (
+        sa.select(Materiality.overall_materiality)
+        .where(
+            Materiality.project_id == pid,
+            Materiality.is_deleted == sa.false(),
+        )
+        .order_by(Materiality.created_at.desc())
+        .limit(1)
+    )
+    overall_materiality = float((await db.execute(mat_q)).scalar() or 0)
+
+    # 无重要性水平记录时不做比较（避免误阻断，由项目启动阶段的校验去提醒）
+    if overall_materiality <= 0:
+        return None
+
+    if total_amount > overall_materiality:
+        return {
+            "rule_code": "GATE-MISSTATEMENT",
+            "error_code": "MISSTATEMENT_EXCEEDS_MATERIALITY",
+            "severity": "blocking",
+            "message": (
+                f"未更正错报超过重要性水平（累计 {total_amount:,.2f} > 整体重要性 "
+                f"{overall_materiality:,.2f}）"
+            ),
+            "total_amount": total_amount,
+            "overall_materiality": overall_materiality,
+        }
+    return None
+
+
+# ── GATE-MISSTATEMENT: 未更正错报超过重要性水平 ────────────────
+
+class MisstatementExceedsMaterialityRule(GateRule):
+    """未更正错报累计金额超过整体重要性水平时阻断提交复核/签字（需求 20.1）"""
+    rule_code = "GATE-MISSTATEMENT"
+    error_code = "MISSTATEMENT_EXCEEDS_MATERIALITY"
+    severity = GateSeverity.blocking
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            result = await check_misstatement_exceeds_materiality(str(project_id), db)
+            if result:
+                return GateRuleHit(
+                    rule_code=self.rule_code,
+                    error_code=self.error_code,
+                    severity=self.severity,
+                    message=result["message"],
+                    location={"section": "misstatements"},
+                    suggested_action="请更正错报或在错报汇总表中说明不更正原因，确保累计金额不超过整体重要性水平",
+                )
+            return None
+        except Exception as e:
+            logger.error(f"[GATE-MISSTATEMENT] check error: {e}")
+            return None
+
+
 def register_phase14_rules():
     """注册 QC-19~26 到 rule_registry"""
     all_gates = [GateType.submit_review, GateType.sign_off, GateType.export_package]
@@ -408,4 +493,7 @@ def register_phase14_rules():
     # Phase 16: 一致性阻断联动签字门禁
     rule_registry.register(GateType.sign_off, ConsistencyBlockingDiffRule())
 
-    logger.info("[GATE] Phase 14 rules QC-19~26 + consistency registered")
+    # 需求 20.1: 未更正错报超过重要性水平阻断提交复核 + 签字
+    rule_registry.register_all(submit_sign, MisstatementExceedsMaterialityRule())
+
+    logger.info("[GATE] Phase 14 rules QC-19~26 + consistency + misstatement registered")

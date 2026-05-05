@@ -29,48 +29,78 @@ from app.router_registry import register_all_routers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时注册事件处理器 + Phase 15 SLA 定时检查"""
+    """应用生命周期：启动时运行迁移 + 注册事件处理器 + 启动后台 Worker"""
+    import asyncio
     setup_logging(level="INFO", json_format=False)
 
-    # 数据库版本化迁移（D6：版本化 SQL 脚本）
+    await _run_migrations()
+    register_event_handlers()
+    _register_phase_handlers()
+    await _replay_startup_events()
+
+    stop_event = asyncio.Event()
+    tasks = _start_workers(stop_event)
+
+    yield
+
+    # 优雅关闭：通知 worker + 取消 + 等待 + 释放 DB 连接池
+    stop_event.set()
+    for t in tasks:
+        t.cancel()
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
+
+    from app.core.database import dispose_engine
+    await dispose_engine()
+
+
+async def _run_migrations() -> None:
+    """数据库版本化迁移（D6：版本化 SQL 脚本）。失败时记录 warning 但不阻断启动。"""
+    import logging as _mig_log
     from app.core.migration_runner import MigrationRunner
     try:
         runner = MigrationRunner(database_url=settings.DATABASE_URL)
         applied = await runner.run_pending()
         if applied:
-            import logging as _mig_log
             _mig_log.getLogger("audit_platform").info(
                 "[启动] 数据库迁移完成，执行了版本: %s", applied
             )
         await runner.close()
     except Exception as _mig_err:
-        import logging as _mig_log
         _mig_log.getLogger("audit_platform").warning(
             "[启动] 数据库迁移失败（应用仍继续启动）: %s", _mig_err
         )
 
-    register_event_handlers()
 
-    # Phase 14: 注册门禁规则
+def _register_phase_handlers() -> None:
+    """Phase 14/15 事件处理器与门禁规则注册。"""
     from app.services.gate_rules_phase14 import register_phase14_rules
+    from app.services.task_event_handlers import (
+        register_event_handlers as register_task_handlers,
+    )
     register_phase14_rules()
-
-    # Phase 15: 注册任务事件处理器（统一在 lifespan 中注册）
-    from app.services.task_event_handlers import register_event_handlers as register_task_handlers
     register_task_handlers()
 
-    # 恢复 Redis Stream 中未处理的事件（服务重启后自动补偿）
+
+async def _replay_startup_events() -> None:
+    """启动时补偿：Redis Stream 未处理事件 + DB outbox 未发布事件。"""
+    import logging as _log
+    import asyncio as _aio
     from app.services.event_bus import event_bus
+
+    # Redis Stream 补偿
     try:
-        import asyncio as _aio
         replayed = await _aio.wait_for(event_bus.replay_pending_events(), timeout=5.0)
         if replayed:
-            import logging
-            logging.getLogger("audit_platform").info(f"[启动] 恢复了 {replayed} 个未处理事件")
+            _log.getLogger("audit_platform").info(
+                f"[启动] 恢复了 {replayed} 个未处理事件"
+            )
     except Exception:
         pass  # Redis 不可用或超时时静默跳过
 
-    # 补偿 DB outbox 中“已提交但未成功发布”的导入激活/回滚事件
+    # DB outbox 补偿（已提交但未成功发布的导入激活/回滚事件）
     try:
         from app.core.database import async_session
         from app.services.import_event_outbox_service import ImportEventOutboxService
@@ -82,150 +112,22 @@ async def lifespan(app: FastAPI):
             outbox_report = await ImportEventOutboxService.replay_pending(db, **replay_kwargs)
             await db.commit()
         if outbox_report.get("published_count"):
-            import logging
-            logging.getLogger("audit_platform").info("[启动] 重放导入事件 outbox: %s", outbox_report)
+            _log.getLogger("audit_platform").info(
+                "[启动] 重放导入事件 outbox: %s", outbox_report
+            )
     except Exception:
         pass
 
-    # Phase 15: SLA 超时定时检查（每 15 分钟）
+
+def _start_workers(stop_event):
+    """启动所有后台 Worker，返回 task 列表。"""
     import asyncio
-    _sla_task = None
-    _import_recover_task = None
-    _outbox_replay_task = None
-
-    async def _sla_check_loop():
-        """使用独立会话避免与请求连接池竞争"""
-        while True:
-            try:
-                await asyncio.sleep(900)  # 15 分钟
-                from app.core.database import async_session
-                from app.services.issue_ticket_service import issue_ticket_service
-                async with async_session() as db:
-                    escalated = await issue_ticket_service.check_sla_timeout(db)
-                    if escalated:
-                        await db.commit()
-                        import logging
-                        logging.getLogger("sla_check").info(f"[SLA] auto-escalated {len(escalated)} issues")
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                import logging
-                logging.getLogger("sla_check").warning(f"[SLA] check loop error: {e}")
-
-    _sla_task = asyncio.create_task(_sla_check_loop())
-
-    async def _import_recover_loop():
-        while True:
-            try:
-                from app.services.import_job_runner import ImportJobRunner
-                await ImportJobRunner.recover_jobs()
-                await asyncio.sleep(30)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                import logging
-                logging.getLogger("import_recover").warning(f"[ImportRecover] loop error: {e}")
-
-    if settings.LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED:
-        _import_recover_task = asyncio.create_task(_import_recover_loop())
-
-    async def _outbox_replay_loop():
-        import random
-        import time as _time
-
-        base_interval = max(5, int(settings.LEDGER_IMPORT_OUTBOX_REPLAY_INTERVAL_SECONDS))
-        max_backoff = max(base_interval, int(settings.LEDGER_IMPORT_OUTBOX_REPLAY_MAX_BACKOFF_SECONDS))
-        jitter_ratio = min(max(float(settings.LEDGER_IMPORT_OUTBOX_REPLAY_JITTER_RATIO), 0.0), 0.5)
-        limit = max(1, int(settings.LEDGER_IMPORT_OUTBOX_REPLAY_LIMIT))
-        max_attempts = int(settings.LEDGER_IMPORT_OUTBOX_MAX_RETRY_ATTEMPTS or 0)
-        cleanup_enabled = bool(settings.LEDGER_IMPORT_EVENT_CONSUMPTION_CLEANUP_ENABLED)
-        cleanup_retention_days = max(1, int(settings.LEDGER_IMPORT_EVENT_CONSUMPTION_RETENTION_DAYS))
-        cleanup_interval_seconds = max(60, int(settings.LEDGER_IMPORT_EVENT_CONSUMPTION_CLEANUP_INTERVAL_SECONDS))
-        cleanup_batch_size = max(1, int(settings.LEDGER_IMPORT_EVENT_CONSUMPTION_CLEANUP_BATCH_SIZE))
-        last_cleanup_monotonic = 0.0
-        consecutive_failures = 0
-        while True:
-            try:
-                from app.core.database import async_session
-                from app.services.import_event_consumption_service import ImportEventConsumptionService
-                from app.services.import_event_outbox_service import ImportEventOutboxService
-
-                async with async_session() as db:
-                    replay_kwargs = {"limit": limit}
-                    if max_attempts > 0:
-                        replay_kwargs["max_attempts"] = max_attempts
-                    report = await ImportEventOutboxService.replay_pending(db, **replay_kwargs)
-                    cleanup_report = {"deleted_count": 0}
-                    if cleanup_enabled and (_time.monotonic() - last_cleanup_monotonic) >= cleanup_interval_seconds:
-                        cleanup_report = await ImportEventConsumptionService.cleanup_older_than_days(
-                            db,
-                            retention_days=cleanup_retention_days,
-                            batch_size=cleanup_batch_size,
-                        )
-                        last_cleanup_monotonic = _time.monotonic()
-                    await db.commit()
-
-                if report.get("failed_count"):
-                    import logging
-                    logging.getLogger("import_outbox").warning("[OutboxReplay] failed_count=%s report=%s", report.get("failed_count"), report)
-                if report.get("exhausted_total_count", 0):
-                    import logging
-                    logging.getLogger("import_outbox").warning(
-                        "[OutboxReplay] exhausted_total_count=%s, manual intervention required",
-                        report.get("exhausted_total_count"),
-                    )
-                if cleanup_report.get("deleted_count", 0) > 0:
-                    import logging
-                    logging.getLogger("import_outbox").info(
-                        "[OutboxReplay] cleaned up %s import event consumption rows",
-                        cleanup_report.get("deleted_count"),
-                    )
-
-                if report.get("failed_count", 0) > 0:
-                    consecutive_failures += 1
-                else:
-                    consecutive_failures = 0
-
-                effective_interval = min(max_backoff, base_interval * (2 ** min(consecutive_failures, 5)))
-                jitter = effective_interval * jitter_ratio * random.random()
-                await asyncio.sleep(effective_interval + jitter)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                import logging
-                logging.getLogger("import_outbox").warning(f"[OutboxReplay] loop error: {e}")
-                consecutive_failures += 1
-                effective_interval = min(max_backoff, base_interval * (2 ** min(consecutive_failures, 5)))
-                await asyncio.sleep(effective_interval)
-
-    if settings.LEDGER_IMPORT_OUTBOX_REPLAY_ENABLED:
-        _outbox_replay_task = asyncio.create_task(_outbox_replay_loop())
-
-    yield
-
-    # 优雅关闭
-    if _sla_task:
-        _sla_task.cancel()
-        try:
-            await _sla_task
-        except asyncio.CancelledError:
-            pass
-    if _import_recover_task:
-        _import_recover_task.cancel()
-        try:
-            await _import_recover_task
-        except asyncio.CancelledError:
-            pass
-    if _outbox_replay_task:
-        _outbox_replay_task.cancel()
-        try:
-            await _outbox_replay_task
-        except asyncio.CancelledError:
-            pass
-
-    # 关闭数据库连接池
-    from app.core.database import dispose_engine
-    await dispose_engine()
+    from app.workers import sla_worker, import_recover_worker, outbox_replay_worker
+    return [
+        asyncio.create_task(sla_worker.run(stop_event)),
+        asyncio.create_task(import_recover_worker.run(stop_event)),
+        asyncio.create_task(outbox_replay_worker.run(stop_event)),
+    ]
 
 
 app = FastAPI(

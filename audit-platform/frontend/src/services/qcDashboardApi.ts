@@ -55,6 +55,7 @@ export interface ArchiveReadiness {
   checks: ArchiveCheck[]
   passed_count: number
   total_checks: number
+  checked_at?: string
 }
 
 export async function getQCOverview(projectId: string): Promise<QCOverview> {
@@ -74,5 +75,10 @@ export async function getOpenIssues(projectId: string): Promise<{ total_open: nu
 
 export async function getArchiveReadiness(projectId: string): Promise<ArchiveReadiness> {
   const { data } = await http.get(P.archiveReadiness(projectId))
+  return data
+}
+
+export async function runArchiveReadinessCheck(projectId: string): Promise<ArchiveReadiness> {
+  const { data } = await http.post(P.archiveReadiness(projectId))
   return data
 }

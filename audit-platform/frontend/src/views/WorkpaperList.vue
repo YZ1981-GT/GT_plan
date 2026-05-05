@@ -27,6 +27,7 @@
         </el-select>
         <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 130px">
           <el-option label="全部" value="" />
+          <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
         </el-select>
         <el-button @click="fetchData" :loading="loading">刷新</el-button>
         <el-button @click="showWpImport = true">📥 Excel导入</el-button>
@@ -34,6 +35,17 @@
           批量下载 ({{ selectedWpIds.length }})
         </el-button>
       </div>
+    </div>
+
+    <!-- 进度指示器（任务 7.2） -->
+    <div v-if="wpList.length > 0 && viewMode === 'list'" class="gt-wp-progress-bar">
+      <span>总体进度：{{ totalProgress.completed }}/{{ totalProgress.total }}</span>
+      <el-progress :percentage="totalProgress.percent" :stroke-width="10" style="width: 200px; display: inline-block" />
+      <span>{{ totalProgress.percent }}%</span>
+      <template v-if="hasFilter">
+        <el-divider direction="vertical" />
+        <span>筛选结果：{{ filteredProgress.percent }}%（{{ filteredProgress.completed }}/{{ filteredProgress.total }}）</span>
+      </template>
     </div>
 
     <!-- 主体：看板视图 / 列表视图 -->
@@ -128,8 +140,8 @@
               <el-descriptions-item label="复核状态">
                 <el-tag size="small" :type="dictStore.type('wp_review_status', selectedWp.review_status)">{{ dictStore.label('wp_review_status', selectedWp.review_status) }}</el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="编制人">{{ selectedWp.assigned_to || '未分配' }}</el-descriptions-item>
-              <el-descriptions-item label="复核人">{{ selectedWp.reviewer || '未分配' }}</el-descriptions-item>
+              <el-descriptions-item label="编制人">{{ resolveUserName(selectedWp.assigned_to) }}</el-descriptions-item>
+              <el-descriptions-item label="复核人">{{ resolveUserName(selectedWp.reviewer) }}</el-descriptions-item>
               <el-descriptions-item label="文件版本">v{{ selectedWp.file_version || 1 }}</el-descriptions-item>
               <el-descriptions-item label="最后解析">{{ selectedWp.last_parsed_at?.slice(0, 19) || '-' }}</el-descriptions-item>
             </el-descriptions>
@@ -553,6 +565,49 @@ const assigningItem = ref<any>(null)
 const assignForm = ref<{ assigned_to: string | null; reviewer: string | null }>({ assigned_to: null, reviewer: null })
 const assignLoading = ref(false)
 const userOptions = ref<any[]>([])
+
+// 任务 6.1：用户名映射
+const userNameMap = ref<Map<string, string>>(new Map())
+
+function resolveUserName(uuid: string | null | undefined): string {
+  if (!uuid) return '未分配'
+  return userNameMap.value.get(uuid) ?? '未知用户'
+}
+
+// 任务 7.1：进度计算
+const COMPLETED_STATUSES = new Set(['review_passed', 'archived'])
+
+const totalProgress = computed(() => {
+  const total = wpList.value.length
+  const completed = wpList.value.filter((w: WorkpaperDetail) => COMPLETED_STATUSES.has(w.status)).length
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+  return { total, completed, percent }
+})
+
+const filteredWpList = computed<WorkpaperDetail[]>(() => {
+  return wpList.value.filter((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    if (filterCycle.value && !idx?.wp_code?.startsWith(filterCycle.value)) return false
+    if (filterStatus.value && w.status !== filterStatus.value) return false
+    if (filterAssignee.value && w.assigned_to !== filterAssignee.value) return false
+    if (searchKeyword.value) {
+      const kw = searchKeyword.value.toLowerCase()
+      if (!w.wp_code?.toLowerCase().includes(kw) && !w.wp_name?.toLowerCase().includes(kw)) return false
+    }
+    return true
+  })
+})
+
+const filteredProgress = computed(() => {
+  const total = filteredWpList.value.length
+  const completed = filteredWpList.value.filter((w: WorkpaperDetail) => COMPLETED_STATUSES.has(w.status)).length
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+  return { total, completed, percent }
+})
+
+const hasFilter = computed(() => {
+  return !!(filterCycle.value || filterStatus.value || filterAssignee.value || searchKeyword.value)
+})
 
 // 精细化审计检查
 const fineCheckResults = ref<any[]>([])
@@ -1324,6 +1379,16 @@ async function handleUploadRedirect() {
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
   await fetchData()
+  // 任务 8.17.1：加载用户列表，同时赋值 userOptions 和 userNameMap
+  try {
+    const users = await listUsers()
+    userOptions.value = users
+    userNameMap.value = new Map(
+      users.map((u: any) => [u.id, u.full_name || u.username || u.id])
+    )
+  } catch {
+    ElMessage.warning('加载用户列表失败')
+  }
   try {
     const maturity = await getFeatureMaturity()
     onlineEditMaturity.value = maturity?.online_editing || 'pilot'
@@ -1438,4 +1503,12 @@ onMounted(async () => {
 .gt-wp-guide-name { flex: 1; font-size: 13px; color: #333; }
 .gt-wp-guide-count { font-size: 12px; color: #aaa; white-space: nowrap; }
 .gt-wp-guide-arrow { font-size: 16px; color: #ccc; font-weight: 300; }
+
+/* 进度条区域 */
+.gt-wp-progress-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 12px; margin-bottom: var(--gt-space-3);
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); font-size: 13px; color: var(--gt-color-text-secondary);
+}
 </style>

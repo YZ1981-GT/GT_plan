@@ -133,6 +133,9 @@
         <!-- 同步状态指示器 -->
         <SyncStatusIndicator />
 
+        <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
+        <slot name="nav-review-inbox" />
+
         <el-tooltip content="通知" placement="bottom">
           <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
             <el-icon :size="18"><Bell /></el-icon>

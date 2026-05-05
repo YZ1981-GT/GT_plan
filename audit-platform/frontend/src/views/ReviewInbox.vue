@@ -124,7 +124,13 @@ async function loadData() {
 }
 
 function goToWorkpaper(row: ReviewInboxItem) {
-  router.push(`/projects/${row.project_id}/workpapers`)
+  router.push({
+    name: 'WorkpaperEditor',
+    params: {
+      projectId: row.project_id,
+      wpId: row.id,
+    },
+  })
 }
 
 async function handleSingleApprove(row: ReviewInboxItem) {

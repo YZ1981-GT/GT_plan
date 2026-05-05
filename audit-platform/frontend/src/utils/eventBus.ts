@@ -97,6 +97,19 @@ export interface WorkpaperParsedPayload {
   wpId: string
 }
 
+/** 底稿保存完成（触发附注自动同步） */
+export interface WorkpaperSavedPayload {
+  projectId: string
+  wpId: string
+  year?: number
+}
+
+/** 重要性水平变更（触发试算表 exceeds_materiality 刷新） */
+export interface MaterialityChangedPayload {
+  projectId: string
+  year?: number
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -124,6 +137,10 @@ export type Events = {
 
   // 底稿生命周期
   'workpaper:parsed': WorkpaperParsedPayload
+  'workpaper:saved': WorkpaperSavedPayload
+
+  // 重要性水平
+  'materiality:changed': MaterialityChangedPayload
 
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void

@@ -60,7 +60,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { api } from '@/services/apiProxy'
 
+const route = useRoute()
 const activeTab = ref('timeline')
 const loading = ref(false)
 const timeline = ref<any[]>([])
@@ -68,13 +71,29 @@ const pbcList = ref<any[]>([])
 const confirmations = ref<any[]>([])
 
 onMounted(async () => {
+  const projectId = route.params.projectId as string
+
   // 加载时间线（简化：从项目状态推断）
   timeline.value = [
     { id: '1', date: '项目创建', description: '项目已创建', type: 'primary' },
     { id: '2', date: '计划阶段', description: '审计计划编制中', type: 'info' },
   ]
 
-  // PBC 和函证暂时为空（后端同步路由需要先注册到 main.py）
+  // 加载 PBC 清单
+  try {
+    const res = await api.get(`/api/projects/${projectId}/pbc`)
+    pbcList.value = Array.isArray(res) ? res : (res?.data ?? [])
+  } catch {
+    pbcList.value = []
+  }
+
+  // 加载函证列表
+  try {
+    const res = await api.get(`/api/projects/${projectId}/confirmations`)
+    confirmations.value = Array.isArray(res) ? res : (res?.data ?? [])
+  } catch {
+    confirmations.value = []
+  }
 })
 </script>
 

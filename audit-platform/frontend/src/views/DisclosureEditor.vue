@@ -114,6 +114,20 @@
 
       <!-- 中间：编辑区 -->
       <div class="gt-de-main" v-loading="detailLoading">
+        <!-- 底稿同步失败提示 -->
+        <el-alert
+          v-if="syncError"
+          type="error"
+          title="底稿数据同步失败"
+          description="无法自动从底稿刷新附注数据"
+          show-icon
+          :closable="false"
+          style="margin-bottom: 12px"
+        >
+          <template #default>
+            <el-button size="small" @click="onManualRefresh">手动重试</el-button>
+          </template>
+        </el-alert>
         <template v-if="currentNote">
           <div class="gt-de-editor-header">
             <div>
@@ -399,7 +413,7 @@ import {
   type DisclosureNoteTreeItem, type DisclosureNoteDetail, type NoteValidationFinding,
 } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
+import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
 import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
 import { useAutoSave } from '@/composables/useAutoSave'
@@ -502,6 +516,10 @@ const refreshLoading = ref(false)
 const exportLoading = ref(false)
 const showNoteFormulaManager = ref(false)
 const showStructureEditor = ref(false)
+
+// 底稿保存事件防抖同步
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const syncError = ref(false)
 const { isEditing: editMode, isDirty: editDirty, enterEdit, exitEdit, markDirty: markEditDirty, clearDirty: clearEditDirty } = useEditMode()
 const templateType = ref('soe')
 const justSaved = ref(false)
@@ -1043,6 +1061,33 @@ async function onRefreshFromWP() {
   finally { refreshLoading.value = false }
 }
 
+// ── 底稿保存事件监听（自动同步附注数据） ──────────────────────────────────────
+function onWorkpaperSaved(payload: WorkpaperSavedPayload) {
+  if (payload.projectId !== projectId.value) return
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
+  syncDebounceTimer = setTimeout(async () => {
+    syncError.value = false
+    try {
+      await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+      if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+    } catch {
+      syncError.value = true
+    }
+  }, 1000)
+}
+
+async function onManualRefresh() {
+  syncError.value = false
+  try {
+    await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+    if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+    ElMessage.success('手动刷新成功')
+  } catch {
+    syncError.value = true
+    ElMessage.error('刷新失败，请稍后重试')
+  }
+}
+
 async function onFormulaApplied() {
   // 公式应用后刷新当前附注数据
   if (currentNote.value) await fetchDetail(currentNote.value.note_section)
@@ -1290,6 +1335,7 @@ onMounted(async () => {
   selectedYear.value = year.value
   projectStore.loadProjectOptions()
   eventBus.on('shortcut:save', onShortcutSave)
+  eventBus.on('workpaper:saved', onWorkpaperSaved)
   await loadProjectTemplateConfig()
   await fetchTree()
   // 如果没有附注数据，自动从模板生成
@@ -1300,6 +1346,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   eventBus.off('shortcut:save', onShortcutSave)
+  eventBus.off('workpaper:saved', onWorkpaperSaved)
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
 })
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────

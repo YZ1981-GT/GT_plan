@@ -570,6 +570,11 @@ export async function refreshAuditReportFinancialData(projectId: string, year: n
   return data
 }
 
+export async function exportAuditReportWord(projectId: string, year: number): Promise<Blob> {
+  const { data } = await http.get(P_ar.exportWord(projectId, year), { responseType: 'blob' })
+  return data
+}
+
 // ─── PDF Export (PDF导出) ───
 
 export interface ExportTaskData {

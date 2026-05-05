@@ -567,7 +567,18 @@ async function loadAttachments(wpCode: string) {
   } catch { attachments.value = [] }
 }
 
+// 任务 12.6.1：AI 分析结果会话级缓存（切换底稿时命中缓存，避免重复请求 vLLM）
+const aiAnalysisCache = ref<Map<string, any>>(new Map())
+
 async function loadAiAnalysis(m: WpAccountMapping) {
+  const cacheKey = `${m.wp_code}|${m.account_name}|${year.value}`
+  const cached = aiAnalysisCache.value.get(cacheKey)
+  if (cached) {
+    aiAnalysis.value = cached
+    aiLoading.value = false
+    return
+  }
+
   aiLoading.value = true
   aiAnalysis.value = null
   try {
@@ -577,8 +588,10 @@ async function loadAiAnalysis(m: WpAccountMapping) {
     })
     if (data && !data.error) {
       aiAnalysis.value = data
+      aiAnalysisCache.value.set(cacheKey, data)
     } else {
       aiAnalysis.value = { unavailable: true, message: 'AI 分析服务未启动，请检查 vLLM 是否运行' }
+      // 不缓存 unavailable，下次重试
     }
   } catch {
     aiAnalysis.value = { unavailable: true, message: 'AI 分析服务未启动，请检查 vLLM 是否运行' }

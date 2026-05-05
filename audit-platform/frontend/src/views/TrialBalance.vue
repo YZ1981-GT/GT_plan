@@ -73,6 +73,26 @@
       </div>
     </el-alert>
 
+    <!-- 步骤引导（空数据时显示） -->
+    <div v-if="showSetupGuide" class="gt-setup-guide">
+      <el-steps :active="setupCurrentStep" finish-status="success" align-center>
+        <el-step title="数据导入" description="上传账套 Excel/CSV" :status="setupStepStatus[0]" />
+        <el-step title="科目映射" description="确认科目分类映射" :status="setupStepStatus[1]" />
+        <el-step title="重新计算" description="触发试算表重算" :status="setupStepStatus[2]" />
+      </el-steps>
+      <div style="margin-top: 16px; text-align: center">
+        <el-button v-if="setupCurrentStep === 0" type="primary" @click="router.push(`/projects/${projectId}/ledger`)">
+          前往导入数据
+        </el-button>
+        <el-button v-else-if="setupCurrentStep === 1" type="primary" @click="router.push(`/projects/${projectId}/ledger?tab=mapping`)">
+          前往科目映射
+        </el-button>
+        <el-button v-else-if="setupCurrentStep === 2" type="primary" @click="onRecalc">
+          立即重新计算
+        </el-button>
+      </div>
+    </div>
+
     <!-- 搜索栏（Ctrl+F 触发，表格上方） -->
     <TableSearchBar
       :is-visible="tbSearch.isVisible.value"
@@ -230,7 +250,7 @@
     <!-- 借贷平衡指示器 -->
     <div class="gt-tb-balance-indicator" v-if="!loading">
       <el-tooltip
-        :content="isBalanced ? '资产类合计 = 负债类合计 + 权益类合计' : `差额：${fmt(Math.abs(balanceDiff))} 元`"
+        :content="isBalanced ? '资产 = 负债 + 权益 + 损益净额' : `差额：${fmt(Math.abs(balanceDiff))} 元`"
         placement="top"
       >
         <span :class="isBalanced ? 'gt-tb-balanced' : 'gt-tb-unbalanced'">
@@ -297,7 +317,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Link } from '@element-plus/icons-vue'
@@ -315,7 +335,7 @@ import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { api } from '@/services/apiProxy'
-import { eventBus, type WorkpaperParsedPayload } from '@/utils/eventBus'
+import { eventBus, type WorkpaperParsedPayload, type MaterialityChangedPayload } from '@/utils/eventBus'
 import {
   getTrialBalance, recalcTrialBalance, checkConsistency,
   getProjectAuditYear, listAdjustments,
@@ -478,12 +498,17 @@ const assetTotal = computed(() =>
     .filter(r => r.account_category === 'asset')
     .reduce((s, r) => s + num(r.audited_amount), 0)
 )
-// 负债+权益类合计
-const liabEquityTotal = computed(() =>
-  rows.value
+// 负债+权益+损益净额合计（用于借贷平衡校验）
+const liabEquityTotal = computed(() => {
+  const liabEquity = rows.value
     .filter(r => ['liability', 'equity'].includes(r.account_category || ''))
     .reduce((s, r) => s + num(r.audited_amount), 0)
-)
+  // 损益净额：后端枚举实际使用 'revenue'/'expense'，兼容 'income'/'cost' 旧值
+  const incomeNet = rows.value
+    .filter(r => ['revenue', 'income', 'cost', 'expense'].includes(r.account_category || ''))
+    .reduce((s, r) => s + num(r.audited_amount), 0)
+  return liabEquity + incomeNet
+})
 // 差额（资产 - 负债权益），用于 tooltip 显示
 const balanceDiff = computed(() => assetTotal.value - liabEquityTotal.value)
 
@@ -495,6 +520,32 @@ const isBalanced = computed(() => {
 
 function num(v: string | null | undefined): number {
   return v != null ? parseFloat(v) || 0 : 0
+}
+
+// ─── 步骤引导（空数据时显示） ─────────────────────────────────────────────────
+const setupCurrentStep = computed({
+  get: () => {
+    const saved = localStorage.getItem(`setup_step_${projectId.value}`)
+    return saved ? parseInt(saved) : 0
+  },
+  set: (val: number) => {
+    localStorage.setItem(`setup_step_${projectId.value}`, String(val))
+  }
+})
+
+const setupStepStatus = computed(() =>
+  [0, 1, 2].map(i =>
+    i < setupCurrentStep.value ? 'finish' :
+    i === setupCurrentStep.value ? 'process' : 'wait'
+  ) as ('wait' | 'process' | 'finish')[]
+)
+
+const showSetupGuide = computed(() => rows.value.length === 0)
+
+function advanceSetupStep() {
+  if (setupCurrentStep.value < 3) {
+    setupCurrentStep.value = setupCurrentStep.value + 1
+  }
 }
 
 function rowClassName({ row }: { row: DisplayRow }) {
@@ -611,11 +662,16 @@ onMounted(() => {
   eventBus.on('shortcut:save', onShortcutSave)
   // 底稿解析完成后自动刷新试算表（五环联动）
   eventBus.on('workpaper:parsed', onWorkpaperParsed)
+  // 重要性水平变更后刷新试算表（exceeds_materiality 标记更新）
+  eventBus.on('materiality:changed', onMaterialityChanged)
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:parsed', onWorkpaperParsed)
+})
+onBeforeUnmount(() => {
+  eventBus.off('materiality:changed', onMaterialityChanged)
 })
 
 /** 快捷键保存：根据当前视图保存试算平衡表 */
@@ -629,6 +685,12 @@ function onShortcutSave() {
 
 /** 底稿解析完成后刷新试算表数据（五环联动） */
 function onWorkpaperParsed(_payload: WorkpaperParsedPayload) {
+  fetchData()
+}
+
+/** 重要性水平变更后刷新试算表（exceeds_materiality 标记更新） */
+function onMaterialityChanged(payload: MaterialityChangedPayload) {
+  if (payload.projectId !== projectId.value) return
   fetchData()
 }
 
@@ -999,7 +1061,14 @@ async function exportTbSummary() {
 .gt-tb-summary-table :deep(.el-input-number) { width: 100%; }
 .gt-tb-summary-table :deep(.el-input-number .el-input__inner) { text-align: right; font-size: 12px; height: 28px; }
 
-
+/* 步骤引导 */
+.gt-setup-guide {
+  padding: 24px 32px;
+  background: #faf8fd;
+  border: 1px solid #e8e0f0;
+  border-radius: var(--gt-radius-lg, 8px);
+  margin-bottom: 16px;
+}
 </style>
 
 

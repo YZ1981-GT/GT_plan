@@ -46,7 +46,9 @@
 </template>
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getMyAssignments } from '@/services/staffApi'
+import { getMyAssignments, listWorkHours } from '@/services/staffApi'
+import { getMyTodos, getMyStaffId } from '@/services/commonApi'
+
 const myProjects = ref<any[]>([])
 const todos = ref<any[]>([])
 const weekHours = ref<any[]>([])
@@ -58,8 +60,34 @@ function isNewAssignment(assignedAt: string | null) {
   const diff = Date.now() - new Date(assignedAt).getTime()
   return diff < 7 * 24 * 60 * 60 * 1000 // 7天内
 }
+
 onMounted(async () => {
   try { myProjects.value = await getMyAssignments() } catch { myProjects.value = [] }
+
+  // 加载待办事项
+  try {
+    const todosRes = await getMyTodos()
+    todos.value = Array.isArray(todosRes) ? todosRes : ((todosRes as any)?.items ?? [])
+  } catch {
+    todos.value = []
+  }
+
+  // 加载本周工时
+  try {
+    const today = new Date()
+    const weekStart = new Date(today)
+    weekStart.setDate(today.getDate() - today.getDay() + 1)
+    const startDate = weekStart.toISOString().slice(0, 10)
+    const endDate = today.toISOString().slice(0, 10)
+
+    const staffId = await getMyStaffId()
+    if (staffId) {
+      const hoursRes = await listWorkHours(staffId, { start_date: startDate, end_date: endDate })
+      weekHours.value = Array.isArray(hoursRes) ? hoursRes : ((hoursRes as any)?.items ?? [])
+    }
+  } catch {
+    weekHours.value = []
+  }
 })
 </script>
 <style scoped>

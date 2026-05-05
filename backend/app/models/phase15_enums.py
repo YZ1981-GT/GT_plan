@@ -52,10 +52,23 @@ class IssueStatus(str, Enum):
 
 
 class IssueSource(str, Enum):
-    """问题单来源"""
+    """问题单来源
+
+    R1 一次性扩展为 5 轮共享的全量值集（参见 ``phase15_models.IssueTicket``
+    docstring）。R1 本轮实际消费 ``review_comment``；其余来源由各自轮次补 UI
+    与业务逻辑，但枚举值已在 R1 预留，不再进行后续迁移。
+    """
     L2 = "L2"
     L3 = "L3"
     Q = "Q"
+    review_comment = "review_comment"
+    consistency = "consistency"
+    ai = "ai"
+    reminder = "reminder"
+    client_commitment = "client_commitment"
+    pbc = "pbc"
+    confirmation = "confirmation"
+    qc_inspection = "qc_inspection"
 
 
 class IssueCategory(str, Enum):

@@ -304,3 +304,45 @@ class DashboardService:
             {"project_id": str(r.id), "name": r.client_name or r.name, "status": r.status, "progress": status_pct.get(r.status, 0)}
             for r in rows
         ]
+
+    async def get_stats_trend(self, project_id: str | None, days: int = 7) -> dict:
+        """近 N 天各状态底稿数量趋势（单次 SQL 聚合，避免 N 次查询）"""
+        from app.models.workpaper_models import WorkingPaper
+        from datetime import date, timedelta
+        import sqlalchemy as sa
+
+        start_date = date.today() - timedelta(days=days - 1)
+
+        q = (
+            sa.select(
+                sa.func.date(WorkingPaper.updated_at).label("day"),
+                WorkingPaper.status,
+                sa.func.count(WorkingPaper.id).label("cnt"),
+            )
+            .where(
+                WorkingPaper.is_deleted == sa.false(),
+                sa.func.date(WorkingPaper.updated_at) >= start_date,
+            )
+            .group_by(sa.func.date(WorkingPaper.updated_at), WorkingPaper.status)
+            .order_by(sa.func.date(WorkingPaper.updated_at))
+        )
+        if project_id:
+            from uuid import UUID
+            try:
+                q = q.where(WorkingPaper.project_id == UUID(project_id))
+            except ValueError:
+                pass
+
+        rows = (await self.db.execute(q)).all()
+
+        # 预填所有日期（补全无数据的日期）
+        trend: dict[str, dict[str, int]] = {}
+        for i in range(days):
+            d = (date.today() - timedelta(days=days - 1 - i)).isoformat()
+            trend[d] = {}
+        for r in rows:
+            day_str = str(r.day)
+            if day_str in trend:
+                trend[day_str][r.status] = r.cnt
+
+        return {"days": days, "trend": trend}

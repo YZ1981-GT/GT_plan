@@ -193,19 +193,32 @@
               <th class="gt-rv-eq-th-prior-col">优先股</th><th class="gt-rv-eq-th-prior-col">永续债</th><th class="gt-rv-eq-th-prior-col">其他</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="rows.length">
             <tr v-for="row in rows" :key="row.row_code"
                 :class="{ 'gt-rv-eq-total-row': row.is_total_row, 'gt-rv-eq-category': row.indent_level === 0 && !row.is_total_row }">
               <td class="gt-rv-eq-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">
                 {{ row.row_name }}
               </td>
-              <td v-for="col in eqColumns" :key="'cv-' + col.key" class="gt-rv-eq-td-amount">-</td>
-              <td v-for="col in eqColumns" :key="'pv-' + col.key" class="gt-rv-eq-td-amount gt-rv-eq-td-prior">-</td>
+              <!-- 本年各列：仅合计列显示 current_period_amount，其余列显示 0 -->
+              <td v-for="col in eqColumns" :key="'cv-' + col.key" class="gt-rv-eq-td-amount">
+                <template v-if="col.key === 'total'">{{ fmt(row.current_period_amount) }}</template>
+                <template v-else>{{ fmt(0) }}</template>
+              </td>
+              <!-- 上年各列：仅合计列显示 prior_period_amount，其余列显示 0 -->
+              <td v-for="col in eqColumns" :key="'pv-' + col.key" class="gt-rv-eq-td-amount gt-rv-eq-td-prior">
+                <template v-if="col.key === 'total'">{{ fmt(row.prior_period_amount) }}</template>
+                <template v-else>{{ fmt(0) }}</template>
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else>
+            <tr>
+              <td :colspan="1 + eqTotalCols * 2" class="gt-rv-eq-td-empty">暂无数据</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="gt-rv-eq-hint">提示：权益变动表为矩阵结构，各列金额需在项目导入数据后自动填充或手动编辑。</p>
+      <p v-if="rows.length === 0" class="gt-rv-eq-hint">提示：权益变动表为矩阵结构，各列金额需在项目导入数据后自动填充。</p>
     </div>
 
     <!-- 资产减值准备表 — 矩阵视图 -->
@@ -225,16 +238,25 @@
               <th v-for="col in impDecCols" :key="'dec-' + col.key" class="gt-rv-eq-th-col">{{ col.label }}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="rows.length">
             <tr v-for="row in rows" :key="row.row_code"
                 :class="{ 'gt-rv-eq-total-row': row.is_total_row }">
               <td class="gt-rv-eq-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">
                 {{ row.row_name }}
               </td>
-              <td class="gt-rv-eq-td-amount">-</td>
-              <td v-for="col in impIncCols" :key="'iv-' + col.key" class="gt-rv-eq-td-amount">-</td>
-              <td v-for="col in impDecCols" :key="'dv-' + col.key" class="gt-rv-eq-td-amount">-</td>
-              <td class="gt-rv-eq-td-amount" style="font-weight: 600;">-</td>
+              <!-- 年初账面余额：用 prior_period_amount 表示 -->
+              <td class="gt-rv-eq-td-amount">{{ fmt(row.prior_period_amount) }}</td>
+              <!-- 本期增加各列：显示 0（矩阵细列暂无独立字段） -->
+              <td v-for="col in impIncCols" :key="'iv-' + col.key" class="gt-rv-eq-td-amount">{{ fmt(0) }}</td>
+              <!-- 本期减少各列：显示 0 -->
+              <td v-for="col in impDecCols" :key="'dv-' + col.key" class="gt-rv-eq-td-amount">{{ fmt(0) }}</td>
+              <!-- 期末账面余额：用 current_period_amount 表示 -->
+              <td class="gt-rv-eq-td-amount" style="font-weight: 600;">{{ fmt(row.current_period_amount) }}</td>
+            </tr>
+          </tbody>
+          <tbody v-else>
+            <tr>
+              <td :colspan="2 + impIncCols.length + impDecCols.length + 1" class="gt-rv-eq-td-empty">暂无数据</td>
             </tr>
           </tbody>
         </table>
@@ -311,6 +333,12 @@
       <el-table-column label="已审金额" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
           <span class="gt-rv-amount-cell-readonly" style="font-weight: 600;">{{ fmt(row.audited_amount) }}</span>
+        </template>
+      </el-table-column>
+      <!-- 任务 12.7.1：对比视图新增"上年审定数"列（需求 24.1/24.2） -->
+      <el-table-column label="上年审定数" min-width="130" align="right" header-align="center" :resizable="true">
+        <template #default="{ row }">
+          <span class="gt-rv-amount-cell-readonly" style="color: #666;">{{ fmt(row.prior_period_amount) }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -1701,6 +1729,13 @@ function copyReportTable() {
   font-size: 11px;
   color: #bbb;
   text-align: center;
+}
+/* 空数据行 */
+.gt-rv-eq-td-empty {
+  text-align: center;
+  color: #bbb;
+  font-size: 13px;
+  padding: 24px 0 !important;
 }
 
 /* ── 审核结果弹窗 ── */

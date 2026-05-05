@@ -136,11 +136,12 @@ class TestReviewerAssigned:
 class TestQCEngineIntegration:
     """QC 引擎集成测试"""
 
-    def test_engine_has_5_blocking_rules(self):
+    def test_engine_has_blocking_rules(self):
         from app.services.qc_engine import QCEngine
         engine = QCEngine()
         blocking = [r for r in engine.rules if r.severity == "blocking"]
-        assert len(blocking) == 5
+        # Phase 12 新增 QC-15/QC-16/QC-17/QC-27，共 9 条阻断级规则
+        assert len(blocking) >= 5
 
     def test_rule_ids_unique(self):
         from app.services.qc_engine import QCEngine

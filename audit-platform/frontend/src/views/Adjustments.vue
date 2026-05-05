@@ -136,11 +136,52 @@
     </div>
 
     <!-- 驳回原因弹窗 -->
-    <el-dialog append-to-body v-model="showRejectDialog" title="驳回原因" width="400px">
-      <el-input v-model="rejectReason" type="textarea" :rows="3" placeholder="请输入驳回原因" />
+    <el-dialog append-to-body v-model="showRejectDialog" title="驳回原因" width="520px" @open="onRejectDialogOpen">
+      <!-- 模式切换 -->
+      <div style="margin-bottom: 16px">
+        <el-radio-group v-model="rejectMode" size="small">
+          <el-radio-button value="unified">统一原因</el-radio-button>
+          <el-radio-button value="individual">逐条原因</el-radio-button>
+        </el-radio-group>
+      </div>
+
+      <!-- 统一原因模式 -->
+      <template v-if="rejectMode === 'unified'">
+        <el-input v-model="rejectReason" type="textarea" :rows="3" placeholder="请输入统一驳回原因" />
+      </template>
+
+      <!-- 逐条原因模式 -->
+      <template v-else>
+        <div style="font-size: 12px; color: #909399; margin-bottom: 8px">
+          为每条分录填写独立驳回原因（留空时使用统一原因）
+        </div>
+        <el-input
+          v-model="rejectReason"
+          type="textarea"
+          :rows="2"
+          placeholder="统一原因（逐条留空时使用）"
+          style="margin-bottom: 12px"
+        />
+        <div
+          v-for="row in selectedRows"
+          :key="row.entry_group_id"
+          style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px"
+        >
+          <span style="min-width: 120px; font-size: 13px; color: #303133; flex-shrink: 0">
+            {{ row.adjustment_no || row.entry_group_id?.slice(0, 8) }}
+          </span>
+          <el-input
+            v-model="individualReasons[row.entry_group_id]"
+            size="small"
+            placeholder="此条驳回原因（可留空）"
+            style="flex: 1"
+          />
+        </div>
+      </template>
+
       <template #footer>
         <el-button @click="showRejectDialog = false">取消</el-button>
-        <el-button type="primary" @click="batchReview('rejected')" :disabled="!rejectReason">确认驳回</el-button>
+        <el-button type="primary" @click="batchReview('rejected')" :disabled="!rejectReason && rejectMode === 'unified'">确认驳回</el-button>
       </template>
     </el-dialog>
 
@@ -281,6 +322,8 @@ const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
 const showRejectDialog = ref(false)
 const rejectReason = ref('')
+const rejectMode = ref<'unified' | 'individual'>('unified')
+const individualReasons = ref<Record<string, string>>({})
 const accountOptions = ref<AccountOption[]>([])
 
 // 科目过滤（来自 route.query.account，支持从试算表跳转过来）
@@ -520,17 +563,37 @@ async function batchReview(status: string) {
     return
   }
   for (const row of rows) {
+    let reason: string | undefined
+    if (status === 'rejected') {
+      if (rejectMode.value === 'individual') {
+        const individual = individualReasons.value[row.entry_group_id]?.trim()
+        reason = individual || rejectReason.value || undefined
+      } else {
+        reason = rejectReason.value || undefined
+      }
+    }
     await reviewAdjustment(projectId.value, row.entry_group_id, {
       status,
-      reason: status === 'rejected' ? rejectReason.value : undefined,
+      reason,
     })
   }
   ElMessage.success(`已${status === 'approved' ? '批准' : '驳回'} ${rows.length} 条`)
   showRejectDialog.value = false
   rejectReason.value = ''
+  individualReasons.value = {}
+  rejectMode.value = 'unified'
   selectedRows.value = []
   fetchEntries()
   fetchSummary()
+}
+
+function onRejectDialogOpen() {
+  // 初始化逐条原因（每条分录 id 对应空字符串）
+  const reasons: Record<string, string> = {}
+  for (const row of selectedRows.value) {
+    reasons[row.entry_group_id] = ''
+  }
+  individualReasons.value = reasons
 }
 
 function onImported() {

@@ -62,6 +62,17 @@ async def check_archive_readiness(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """归档前检查清单"""
+    """归档前检查清单（加载上次结果）"""
+    svc = ArchiveReadinessService(db)
+    return await svc.check_readiness(project_id)
+
+
+@router.post("/archive-readiness")
+async def run_archive_readiness_check(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("review")),
+):
+    """重新执行归档前检查"""
     svc = ArchiveReadinessService(db)
     return await svc.check_readiness(project_id)

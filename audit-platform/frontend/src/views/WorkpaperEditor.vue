@@ -12,12 +12,43 @@
         <el-tag type="success" size="small" style="margin-left: 8px">Univer</el-tag>
       </div>
       <div class="gt-wp-editor-toolbar-right">
+        <span v-if="dirty" class="gt-dirty-indicator">● 有未保存的变更</span>
         <el-button size="small" @click="onSave" :loading="saving">💾 保存</el-button>
         <el-button size="small" @click="onSyncStructure" :loading="syncLoading">🔄 同步公式</el-button>
+        <el-button size="small" @click="onShowVersions">📋 版本历史</el-button>
         <el-button size="small" @click="onDownload">📥 下载</el-button>
+        <el-button size="small" @click="onExportPdf" :loading="exportingPdf">📄 导出 PDF</el-button>
         <el-button size="small" @click="onUpload">📤 上传</el-button>
       </div>
     </div>
+
+    <!-- 版本历史抽屉（任务 8.19.1） -->
+    <el-drawer
+      v-model="showVersionDrawer"
+      title="版本历史"
+      direction="rtl"
+      size="360px"
+    >
+      <div v-loading="versionLoading">
+        <el-empty v-if="!versionLoading && versionList.length === 0" description="暂无历史版本" />
+        <el-timeline v-else>
+          <el-timeline-item
+            v-for="v in versionList"
+            :key="v.version || v.id"
+            :timestamp="v.created_at ? v.created_at.slice(0, 19) : ''"
+            placement="top"
+          >
+            <div style="font-weight: 600">v{{ v.version ?? v.file_version ?? '—' }}</div>
+            <div v-if="v.note || v.description" style="font-size: 12px; color: #666; margin-top: 4px">
+              {{ v.note || v.description }}
+            </div>
+            <div v-if="v.created_by_name || v.created_by" style="font-size: 12px; color: #999; margin-top: 2px">
+              {{ v.created_by_name || v.created_by }}
+            </div>
+          </el-timeline-item>
+        </el-timeline>
+      </div>
+    </el-drawer>
 
     <!-- Univer 编辑区 -->
     <div class="gt-wp-editor-main">
@@ -30,10 +61,11 @@
 
     <!-- 底部状态栏 -->
     <div class="gt-wp-editor-statusbar" v-if="wpDetail">
-      <span>编制人: {{ wpDetail.assigned_to || '未分配' }}</span>
-      <span>复核人: {{ wpDetail.reviewer || '未分配' }}</span>
+      <span>编制人: {{ resolveUserName(wpDetail.assigned_to) }}</span>
+      <span>复核人: {{ resolveUserName(wpDetail.reviewer) }}</span>
       <span>版本: v{{ wpDetail.file_version || 1 }}</span>
       <span v-if="wpDetail.updated_at">最后修改: {{ wpDetail.updated_at.slice(0, 19) }}</span>
+      <span v-if="autoSaveMsg" style="color: #67c23a">✓ {{ autoSaveMsg }}</span>
       <span v-if="dirty" style="color: #e6a23c">● 未保存</span>
       <span v-if="smartTip" class="gt-wp-smart-tip" @click="showSmartTipDetail = !showSmartTipDetail">
         💡 {{ smartTip.summary }}
@@ -57,9 +89,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { onBeforeRouteLeave } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets'
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
@@ -71,8 +104,18 @@ import {
   getWorkpaper,
   type WorkpaperDetail,
 } from '@/services/workpaperApi'
-import { rebuildWorkpaperStructure } from '@/services/commonApi'
+import { rebuildWorkpaperStructure, listUsers } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
+import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
+
+const DIRTY_COMMAND_PATTERNS = [
+  'set-range-values', 'set-cell',
+  'set-formula', 'formula.', 'array-formula',
+  'set-style', 'set-border', 'set-number-format', 'set-font',
+  'clear-selection', 'delete-range',
+  'insert-row', 'insert-col', 'remove-row', 'remove-col',
+  'merge-cells', 'unmerge-cells',
+]
 
 const route = useRoute()
 const router = useRouter()
@@ -85,6 +128,70 @@ const saving = ref(false)
 const syncLoading = ref(false)
 const dirty = ref(false)
 const univerContainer = ref<HTMLElement | null>(null)
+
+// 任务 8.18.1：用户名映射（UUID → 显示名）
+const userNameMap = ref<Map<string, string>>(new Map())
+
+function resolveUserName(uuid: string | null | undefined): string {
+  if (!uuid) return '未分配'
+  return userNameMap.value.get(uuid) ?? '未知用户'
+}
+
+async function loadUserMap() {
+  try {
+    const users = await listUsers()
+    userNameMap.value = new Map(
+      (users || []).map((u: any) => [u.id, u.full_name || u.username || u.id])
+    )
+  } catch { /* 静默：状态栏降级显示 UUID */ }
+}
+
+// 任务 8.19.1：版本历史
+const showVersionDrawer = ref(false)
+const versionList = ref<any[]>([])
+const versionLoading = ref(false)
+
+async function onShowVersions() {
+  showVersionDrawer.value = true
+  versionLoading.value = true
+  try {
+    const data = await httpApi.get(`/api/workpapers/${wpId.value}/versions`, {
+      validateStatus: (s: number) => s < 600,
+    })
+    versionList.value = Array.isArray(data) ? data : (data?.versions || data?.items || [])
+  } catch {
+    versionList.value = []
+    ElMessage.error('加载版本历史失败')
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+// 任务 8.20.1：自动保存（dirty=true 且距上次编辑 30s 后静默触发 onSave）
+const autoSaveMsg = ref('')
+let autoSaveTimer: ReturnType<typeof setInterval> | null = null
+
+function startAutoSave() {
+  stopAutoSave()
+  autoSaveTimer = setInterval(async () => {
+    if (!dirty.value || saving.value) return
+    const ok = await onSave()
+    if (ok) {
+      autoSaveMsg.value = '已自动保存'
+      setTimeout(() => { autoSaveMsg.value = '' }, 3000)
+    }
+    // 失败静默：保留 dirty，等待下次触发（需求 44.3）
+  }, 30000)
+}
+
+function stopAutoSave() {
+  if (autoSaveTimer) {
+    clearInterval(autoSaveTimer)
+    autoSaveTimer = null
+  }
+}
+
+watch(loading, (v) => { if (!v) startAutoSave() })
 
 let univerInstance: any = null
 let univerAPI: any = null
@@ -180,19 +287,20 @@ async function initUniver() {
 
   // 5. 监听数据变化
   univerAPI.onCommandExecuted((command: any) => {
-    if (command.id?.includes('set-range-values') || command.id?.includes('set-cell')) {
+    if (DIRTY_COMMAND_PATTERNS.some(p => command.id?.includes(p))) {
       dirty.value = true
     }
   })
 
   loading.value = false
 
-  // 6. 非阻塞加载智能提示
+  // 6. 非阻塞加载智能提示和用户名映射
   loadSmartTips()
+  loadUserMap()
 }
 
-async function onSave() {
-  if (!univerAPI || !wpDetail.value) return
+async function onSave(): Promise<boolean> {
+  if (!univerAPI || !wpDetail.value) return false
   saving.value = true
   try {
     const workbook = univerAPI.getActiveWorkbook()
@@ -201,19 +309,66 @@ async function onSave() {
     const snapshot = workbook.getSnapshot()
 
     // 调用完整保存 API（xlsx 回写 + structure.json + 审计留痕 + 事件发布）
+    // 需求 45.1：携带 expected_version 触发后端并发冲突检测
     const data = await httpApi.post(
       `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-save`,
-      { snapshot },
+      { snapshot, expected_version: wpDetail.value.file_version },
+      { validateStatus: (s: number) => s < 600 },
     )
-    const result = data
 
+    // 需求 45.2：处理 409 版本冲突（axios 在 validateStatus 放行后，409 不会抛错，需手动判断）
+    if (data?.detail?.error_code === 'VERSION_CONFLICT' || data?.error_code === 'VERSION_CONFLICT') {
+      const detail = data.detail || data
+      try {
+        await ElMessageBox.confirm(
+          `底稿已被他人修改（服务器版本 v${detail.server_version}，您的版本 v${detail.expected_version}）。刷新放弃本地修改？或强制覆盖？`,
+          '版本冲突',
+          {
+            confirmButtonText: '刷新放弃',
+            cancelButtonText: '强制覆盖',
+            type: 'warning',
+            distinguishCancelAndClose: true,
+          },
+        )
+        // 刷新放弃：重新加载最新数据
+        await initUniver()
+        return false
+      } catch (action) {
+        if (action === 'cancel') {
+          // 强制覆盖：不带 expected_version 重发
+          const retryData = await httpApi.post(
+            `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-save`,
+            { snapshot },
+          )
+          dirty.value = false
+          ElMessage.success(retryData?.message || '已强制覆盖保存')
+          eventBus.emit('workpaper:saved', {
+            projectId: projectId.value,
+            wpId: wpId.value,
+          } as WorkpaperSavedPayload)
+          wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
+          return true
+        }
+        return false
+      }
+    }
+
+    const result = data
     dirty.value = false
     ElMessage.success(result?.message || '保存成功')
 
+    // 发布底稿保存事件，触发附注自动同步
+    eventBus.emit('workpaper:saved', {
+      projectId: projectId.value,
+      wpId: wpId.value,
+    } as WorkpaperSavedPayload)
+
     // 刷新版本信息
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
+    return true
   } catch (err: any) {
     ElMessage.error('保存失败: ' + (err?.response?.data?.detail || err?.message || ''))
+    return false
   } finally {
     saving.value = false
   }
@@ -223,7 +378,10 @@ async function onSyncStructure() {
   syncLoading.value = true
   try {
     // 先保存当前数据
-    if (dirty.value) await onSave()
+    if (dirty.value) {
+      const saveOk = await onSave()
+      if (!saveOk) return
+    }
     // 重建 structure
     await rebuildWorkpaperStructure(projectId.value, wpId.value)
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
@@ -240,6 +398,42 @@ async function onDownload() {
     await downloadWorkpaper(projectId.value, wpId.value)
   } catch {
     ElMessage.error('下载失败')
+  }
+}
+
+// 任务 10.6.2：导出 PDF
+const exportingPdf = ref(false)
+async function onExportPdf() {
+  if (!wpDetail.value) return
+  exportingPdf.value = true
+  try {
+    // 使用 axios http 客户端直接获取 blob（apiProxy.api 会 unwrap data 不适合 blob）
+    const http = (await import('@/utils/http')).default
+    const response = await http.get(
+      `/api/projects/${projectId.value}/working-papers/${wpId.value}/export-pdf`,
+      { responseType: 'blob', validateStatus: (s: number) => s < 600 },
+    )
+    const blob: Blob = response.data
+    // 后端出错时返回 JSON（blob），需检测
+    if (blob.type && blob.type.includes('application/json')) {
+      const txt = await blob.text()
+      let msg = 'PDF 导出失败'
+      try { msg = JSON.parse(txt)?.detail || msg } catch { /* ignore */ }
+      ElMessage.error(msg)
+      return
+    }
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${wpDetail.value.wp_code || 'workpaper'}_${wpDetail.value.wp_name || ''}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (err: any) {
+    ElMessage.error('PDF 导出失败: ' + (err?.message || ''))
+  } finally {
+    exportingPdf.value = false
   }
 }
 
@@ -272,9 +466,24 @@ async function loadSmartTips() {
   } catch { /* ignore */ }
 }
 
+onBeforeRouteLeave(async (_to, _from, next) => {
+  if (!dirty.value) { next(); return }
+  try {
+    await ElMessageBox.confirm(
+      '当前底稿有未保存的变更，离开将丢失这些变更。',
+      '确认离开',
+      { confirmButtonText: '放弃变更', cancelButtonText: '继续编辑', type: 'warning' }
+    )
+    next()
+  } catch {
+    next(false)
+  }
+})
+
 onMounted(initUniver)
 
 onUnmounted(() => {
+  stopAutoSave()
   if (univerInstance) {
     try { univerInstance.dispose() } catch { /* ignore */ }
     univerInstance = null
@@ -316,5 +525,10 @@ onUnmounted(() => {
   background: #fff; border: 1px solid #e8e4f0; border-radius: 8px;
   padding: 12px 16px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
   z-index: 20; max-height: 300px; overflow-y: auto;
+}
+.gt-dirty-indicator {
+  color: #e6a23c;
+  font-size: 12px;
+  font-weight: 500;
 }
 </style>

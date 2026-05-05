@@ -132,3 +132,49 @@ async def fine_extract(
         pass  # 持久化失败不阻断返回
 
     return data
+
+
+@router.get("/api/projects/{project_id}/fine-checks/summary")
+async def get_fine_checks_summary(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    """批量获取项目所有底稿的精细化检查结果（避免前端 N+1 请求）
+
+    直接从 WorkingPaper.parsed_data 中读取已缓存的 fine_checks 和 fine_summary，
+    无需重新执行提取，性能远优于逐条调用 fine-extract。
+    """
+    from uuid import UUID as _UUID
+
+    # 批量查询项目所有底稿（含 parsed_data）
+    wp_q = (
+        sa.select(
+            WorkingPaper.id,
+            WorkingPaper.parsed_data,
+        )
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .add_columns(WpIndex.wp_code, WpIndex.wp_name, WpIndex.audit_cycle)
+        .where(
+            WorkingPaper.project_id == _UUID(project_id),
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    rows = (await db.execute(wp_q)).all()
+
+    results: dict[str, dict] = {}
+    for row in rows:
+        wp_id, parsed_data, wp_code, wp_name, audit_cycle = row
+        pd = parsed_data or {}
+        checks = pd.get("fine_checks", [])
+        summary = pd.get("fine_summary", {})
+        results[str(wp_id)] = {
+            "wp_id": str(wp_id),
+            "wp_code": wp_code,
+            "wp_name": wp_name,
+            "audit_cycle": audit_cycle,
+            "checks": checks,
+            "summary": summary,
+        }
+
+    return results

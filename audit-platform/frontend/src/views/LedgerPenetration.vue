@@ -638,10 +638,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, Loading, Warning } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { fmtAmount } from '@/utils/formatters'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
@@ -719,6 +719,32 @@ async function loadCurrentProject() {
     if (found) currentProject.value = found
   }
   selectedProjectId.value = projectId.value
+  // 需求 25.1~25.3：加载执行重要性水平和审计期末用于序时账视觉标记
+  loadProjectMaterialityAndPeriod()
+}
+
+// ── 序时账视觉标记所需数据（需求 25.1~25.3） ──
+const performanceMateriality = ref<number>(0)
+const auditPeriodEnd = ref<string>('')  // "YYYY-MM-DD"
+
+async function loadProjectMaterialityAndPeriod() {
+  if (!projectId.value) return
+  try {
+    // 获取项目基本信息（含 audit_period_end）
+    const proj = await api.get(`/api/projects/${projectId.value}`)
+    if (proj?.audit_period_end) {
+      auditPeriodEnd.value = proj.audit_period_end
+    }
+  } catch { /* ignore */ }
+  try {
+    // 获取重要性水平（含 performance_materiality）
+    const mat = await api.get(
+      `/api/projects/${projectId.value}/materiality?year=${selectedYear.value}`
+    )
+    if (mat?.performance_materiality) {
+      performanceMateriality.value = Number(mat.performance_materiality) || 0
+    }
+  } catch { /* ignore */ }
 }
 
 function onProjectChange(newId: string) {
@@ -872,6 +898,68 @@ function initColumnMapping() {
 const bgImportPolling = ref(false)
 const bgImportMessage = ref('')
 
+// ── 导入状态后台轮询（需求 22.1、22.2） ──
+let _importStatusTimer: ReturnType<typeof setInterval> | null = null
+let _importStatusPollCount = 0
+const MAX_IMPORT_POLL_COUNT = 200  // 200 × 3s = 10 分钟
+
+function startImportStatusPolling(jobId: string) {
+  stopImportStatusPolling()
+  _importStatusPollCount = 0
+  _importStatusTimer = setInterval(async () => {
+    _importStatusPollCount++
+    if (_importStatusPollCount > MAX_IMPORT_POLL_COUNT) {
+      stopImportStatusPolling()
+      ElNotification({
+        title: '导入超时',
+        message: '导入任务超过 10 分钟未完成，请稍后在导入历史中查看结果',
+        type: 'warning',
+        duration: 6000,
+      })
+      return
+    }
+    try {
+      // 实际后端路由：GET /api/projects/{project_id}/ledger-import/jobs/{job_id}
+      const status = await getImportJob(projectId.value, jobId)
+      const jobStatus = status?.status
+      if (jobStatus === 'completed') {
+        stopImportStatusPolling()
+        ElNotification({
+          title: '导入完成',
+          message: status?.message || status?.progress_message || '账套数据已成功导入',
+          type: 'success',
+          duration: 5000,
+        })
+        // 需求 22.2：自动刷新余额表
+        _auxBalanceLoadedKey.value = ''
+        loadAvailableYears()
+        loadBalance()
+        if (balanceTab.value === 'aux') {
+          loadAllAuxBalance()
+        }
+      } else if (jobStatus === 'failed' || jobStatus === 'timed_out' || jobStatus === 'canceled') {
+        stopImportStatusPolling()
+        ElNotification({
+          title: '导入失败',
+          message: status?.message || status?.error_message || '账套数据导入失败，请检查文件格式',
+          type: 'error',
+          duration: 8000,
+        })
+      }
+    } catch {
+      // 网络错误时继续轮询，不中断
+    }
+  }, 3000)
+}
+
+function stopImportStatusPolling() {
+  if (_importStatusTimer !== null) {
+    clearInterval(_importStatusTimer)
+    _importStatusTimer = null
+  }
+  _importStatusPollCount = 0
+}
+
 function openImportDialog() {
   importDialogVisible.value = true
   importStep.value = 'upload'
@@ -970,6 +1058,9 @@ async function doImport() {
       throw new Error('导入任务提交成功但未返回 job_id，请刷新后在导入历史查看任务状态')
     }
 
+    // 需求 22.1：启动后台状态轮询（用户关闭弹窗后继续通知）
+    startImportStatusPolling(importJobId)
+
     await runImportPollingFlow({
       maxPolls: 400,
       timeoutMessage: '导入任务仍在后台运行，请稍后刷新页面查看结果',
@@ -1008,6 +1099,8 @@ async function doImport() {
           applyResult: (result: any) => { importedResult.value = result },
           enterStage: (stage) => { importStep.value = stage },
           afterEnterStage: async () => {
+            // 导入已在前台完成，停止后台轮询避免重复通知
+            stopImportStatusPolling()
             _auxBalanceLoadedKey.value = ''
             await getActiveLedgerDataset(projectId.value, yr)
             loadAvailableYears()
@@ -1026,6 +1119,7 @@ async function doImport() {
       e?.response?.data?.detail || e?.message || '导入失败',
     )
     ElMessage.error(errMsg)
+    stopImportStatusPolling()
     importStep.value = 'preview'
   } finally {
     importing.value = false
@@ -1377,7 +1471,36 @@ function formatOtherDims(raw: string, currentDimType: string): string {
 function ledgerRowClass({ row }: { row: any }): string {
   if (row._type === 'opening') return 'gt-ledger-opening'
   if (row._type === 'subtotal') return 'gt-ledger-subtotal'
-  return ''
+  if (row._type !== 'normal') return ''
+
+  const classes: string[] = []
+
+  // 需求 25.3：借方或贷方金额为负数 → 红色文字（红字冲销）
+  const debit = Number(row.debit_amount) || 0
+  const credit = Number(row.credit_amount) || 0
+  if (debit < 0 || credit < 0) {
+    classes.push('gt-ledger-row--red-reversal')
+  }
+
+  // 需求 25.1：借方或贷方金额绝对值超过执行重要性水平 → 橙色背景
+  if (performanceMateriality.value > 0) {
+    if (Math.abs(debit) > performanceMateriality.value || Math.abs(credit) > performanceMateriality.value) {
+      classes.push('gt-ledger-row--over-materiality')
+    }
+  }
+
+  // 需求 25.2：凭证日期在审计期末最后 6 天内 → 截止标记
+  if (auditPeriodEnd.value && row.voucher_date) {
+    const periodEnd = new Date(auditPeriodEnd.value)
+    const voucherDate = new Date(row.voucher_date)
+    const sixDaysBefore = new Date(periodEnd)
+    sixDaysBefore.setDate(sixDaysBefore.getDate() - 6)
+    if (voucherDate >= sixDaysBefore && voucherDate <= periodEnd) {
+      classes.push('gt-ledger-row--period-end')
+    }
+  }
+
+  return classes.join(' ')
 }
 
 function balanceRowStyle({ row }: { row: any }) {
@@ -2154,6 +2277,10 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
 })
+onBeforeUnmount(() => {
+  // 需求 22.1：组件卸载时清理导入状态轮询定时器
+  stopImportStatusPolling()
+})
 </script>
 
 <style scoped>
@@ -2226,6 +2353,28 @@ onUnmounted(() => {
   background: #fef6e6 !important;
   font-weight: 600;
   border-top: 1px solid #e6a23c;
+}
+
+/* 任务 12.8.1：异常凭证视觉标记（需求 25） */
+:deep(.gt-ledger-row--over-materiality) {
+  background: #fef0e6 !important;
+}
+:deep(.gt-ledger-row--over-materiality) td:first-child::before {
+  content: '⚠️';
+  margin-right: 4px;
+}
+:deep(.gt-ledger-row--period-end) {
+  background: #fff8e8 !important;
+}
+:deep(.gt-ledger-row--period-end) td:first-child::after {
+  content: '  截止';
+  color: #e6a23c;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+:deep(.gt-ledger-row--red-reversal) td {
+  color: #f56c6c !important;
 }
 
 /* 辅助余额表维度标签 */

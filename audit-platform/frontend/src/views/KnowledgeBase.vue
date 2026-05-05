@@ -250,7 +250,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete, confirmBatch, confirmDangerous } from '@/utils/confirm'
@@ -726,12 +726,23 @@ function onDocRowClick(row: any) {
 
 async function onPreviewDoc(doc: any) {
   previewDoc.value = doc
+  // 清理旧的 blob URL
+  if (previewUrl.value?.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
   previewUrl.value = ''
   previewText.value = null
 
   if (isImageFile(doc) || isPdfFile(doc)) {
-    // 图片和 PDF 直接用下载 URL 预览
-    previewUrl.value = `/api/knowledge-library/documents/${doc.id}/download`
+    // 图片和 PDF 通过携带认证头的请求获取 blob，再生成 object URL
+    try {
+      const mimeType = isPdfFile(doc) ? 'application/pdf' : `image/${(doc.name || '').split('.').pop()?.toLowerCase() || 'jpeg'}`
+      const response = await api.get(`/api/knowledge-library/documents/${doc.id}/download`, { responseType: 'blob' })
+      const blob = new Blob([response], { type: mimeType })
+      previewUrl.value = URL.createObjectURL(blob)
+    } catch {
+      ElMessage.error('预览加载失败')
+    }
   } else if (isTextFile(doc)) {
     // 文本文件加载内容
     try {
@@ -806,6 +817,13 @@ onMounted(async () => {
       </div>`,
       '知道了',
     )
+  }
+})
+
+onBeforeUnmount(() => {
+  // 清理 blob URL，防止内存泄漏
+  if (previewUrl.value?.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value)
   }
 })
 </script>

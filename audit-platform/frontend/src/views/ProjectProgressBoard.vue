@@ -222,8 +222,12 @@ function bucketTagType(b: string) {
   return m[b] || ''
 }
 
-function goToWorkpaper(_item: BoardItem) {
-  router.push(`/projects/${projectId.value}/workpapers`)
+function goToWorkpaper(item: BoardItem) {
+  if (item.id) {
+    router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: item.id } })
+  } else {
+    router.push(`/projects/${projectId.value}/workpapers`)
+  }
 }
 
 // 简报

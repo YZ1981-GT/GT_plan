@@ -264,6 +264,20 @@ async def save_univer_data(
     wp = result.scalar_one_or_none()
     if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # 需求 45.1/45.2：并发编辑版本冲突检测
+    expected_version = body.get("expected_version")
+    if expected_version is not None and wp.file_version != expected_version:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "VERSION_CONFLICT",
+                "message": "底稿已被他人修改，请刷新后重试",
+                "server_version": wp.file_version,
+                "expected_version": expected_version,
+            },
+        )
+
     if not wp.file_path:
         raise HTTPException(status_code=400, detail="底稿文件路径为空")
 
@@ -405,6 +419,80 @@ async def download_workpaper(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/working-papers/{wp_id}/export-pdf")
+async def export_workpaper_pdf(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """导出底稿为 PDF（使用 LibreOffice headless 转换）— 需求 16"""
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    from urllib.parse import quote
+    from fastapi import Response
+
+    # 1. 查底稿 + 校验文件存在
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    wp = result.scalar_one_or_none()
+    if not wp or not wp.file_path:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    fp = Path(wp.file_path)
+    if not fp.exists():
+        raise HTTPException(status_code=404, detail=f"底稿文件不存在: {fp}")
+
+    # 2. LibreOffice 可用性检查
+    soffice = shutil.which("libreoffice") or shutil.which("soffice")
+    if soffice is None:
+        raise HTTPException(
+            status_code=500,
+            detail="LibreOffice 不可用，无法转换为 PDF。请在服务器安装 libreoffice 或 soffice。",
+        )
+
+    # 3. 使用临时目录作为输出目录（LibreOffice 不支持指定输出文件名，只支持 --outdir）
+    with tempfile.TemporaryDirectory(prefix="wp_pdf_") as tmpdir:
+        try:
+            proc = subprocess.run(
+                [soffice, "--headless", "--convert-to", "pdf", "--outdir", tmpdir, str(fp)],
+                capture_output=True,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            raise HTTPException(status_code=500, detail="PDF 转换超时（60s）")
+        if proc.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"PDF 转换失败: {proc.stderr.decode('utf-8', errors='ignore')[:500]}",
+            )
+
+        pdf_path = Path(tmpdir) / f"{fp.stem}.pdf"
+        if not pdf_path.exists():
+            raise HTTPException(status_code=500, detail="LibreOffice 未生成 PDF 文件")
+
+        pdf_bytes = pdf_path.read_bytes()
+
+    # 4. 构造文件名（中文用 RFC 5987 编码）
+    display_name = f"{wp.wp_code or 'workpaper'}_{wp.wp_name or ''}.pdf".strip()
+    ascii_name = display_name.encode("ascii", "ignore").decode() or "workpaper.pdf"
+    utf8_name = quote(display_name, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": disposition},
+    )
 
 
 @router.post("/working-papers/{wp_id}/upload")

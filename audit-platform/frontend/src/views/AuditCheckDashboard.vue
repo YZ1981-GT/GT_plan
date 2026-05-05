@@ -132,17 +132,23 @@ const CYCLE_NAMES: Record<string, string> = {
 async function loadDashboard() {
   loading.value = true
   try {
-    // 获取项目所有底稿
-    const wps = await api.get(`/api/projects/${projectId.value}/working-papers`, {
-      validateStatus: (s: number) => s < 600,
-    })
-    const wpList = Array.isArray(wps) ? wps : wps?.data || []
+    // 单次批量请求获取所有底稿的精细化检查结果（避免 N+1 请求）
+    const summaryMap: Record<string, {
+      wp_id: string; wp_code: string; wp_name: string;
+      audit_cycle: string | null; checks: CheckItem[]; summary: Record<string, unknown>
+    }> = await api.get(
+      `/api/projects/${projectId.value}/fine-checks/summary`,
+      { validateStatus: (s: number) => s < 600 },
+    )
 
     // 按循环分组
     const groupMap: Record<string, CycleGroup> = {}
 
-    for (const wp of wpList) {
-      const cycle = wp.audit_cycle || 'OTHER'
+    for (const item of Object.values(summaryMap)) {
+      const checks: CheckItem[] = item.checks || []
+      if (checks.length === 0) continue  // 无精细化规则的底稿跳过
+
+      const cycle = item.audit_cycle || 'OTHER'
       if (!groupMap[cycle]) {
         groupMap[cycle] = {
           cycle, cycleName: CYCLE_NAMES[cycle] || cycle,
@@ -150,24 +156,13 @@ async function loadDashboard() {
         }
       }
 
-      // 尝试获取精细化检查结果
-      try {
-        const extractResult = await api.post(
-          `/api/projects/${projectId.value}/workpapers/${wp.id}/fine-extract`,
-          null,
-          { validateStatus: (s: number) => s < 600, timeout: 5000 },
-        )
-        const checks: CheckItem[] = extractResult?.checks || []
-        if (checks.length > 0) {
-          const passedCount = checks.filter(c => c.passed === true).length
-          groupMap[cycle].workpapers.push({
-            wp_code: wp.wp_code, wp_name: wp.wp_name,
-            checks, passedCount, allPassed: passedCount === checks.length,
-          })
-          groupMap[cycle].total += checks.length
-          groupMap[cycle].passed += passedCount
-        }
-      } catch { /* 无精细化规则的底稿跳过 */ }
+      const passedCount = checks.filter(c => c.passed === true).length
+      groupMap[cycle].workpapers.push({
+        wp_code: item.wp_code, wp_name: item.wp_name,
+        checks, passedCount, allPassed: passedCount === checks.length,
+      })
+      groupMap[cycle].total += checks.length
+      groupMap[cycle].passed += passedCount
     }
 
     // 计算通过率

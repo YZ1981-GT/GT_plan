@@ -473,26 +473,60 @@ class DataReferenceConsistencyRule(QCRule):
     rule_id = "QC-16"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        import json
+        from pathlib import Path
+
         wp = context.working_paper
         pd = wp.parsed_data or {}
         wp_amount = pd.get("audited_amount")
         if wp_amount is None:
             return []
+
+        # 通过 wp_index 获取底稿编码
+        idx = context.wp_index
+        if not idx:
+            return []
+        wp_code = idx.wp_code
+        if not wp_code:
+            return []
+
+        # 通过 wp_account_mapping.json 查找关联科目代码
+        mapping_file = Path(__file__).parent.parent.parent / "data" / "wp_account_mapping.json"
+        if not mapping_file.exists():
+            return []
+        try:
+            with open(mapping_file, "r", encoding="utf-8-sig") as f:
+                mappings = json.load(f).get("mappings", [])
+        except Exception:
+            return []
+        mapping = next((m for m in mappings if m.get("wp_code") == wp_code), None)
+        if not mapping:
+            return []
+        account_codes = mapping.get("account_codes", [])
+        if not account_codes:
+            return []
+
+        # 通过 standard_account_code 精确匹配，汇总试算表审定数
         from app.models.audit_platform_models import TrialBalance
-        tbs = (await context.db.execute(
-            sa.select(TrialBalance).where(
+        tb_result = await context.db.execute(
+            sa.select(
+                sa.func.coalesce(sa.func.sum(TrialBalance.audited_amount), 0)
+            ).where(
                 TrialBalance.project_id == context.project_id,
-                TrialBalance.year == context.year,
-                TrialBalance.is_deleted == False,
+                TrialBalance.standard_account_code.in_(account_codes),
+                TrialBalance.is_deleted == sa.false(),
             )
-        )).scalars().all()
-        for tb in tbs[:1]:
-            tb_amt = float(tb.audited_debit or 0) - float(tb.audited_credit or 0)
-            diff = abs(float(wp_amount) - tb_amt)
-            if diff > 0.01:
-                return [QCFindingItem(rule_id=self.rule_id, severity=self.severity,
-                                      message=f"底稿审定数({wp_amount:,.2f})与试算表({tb_amt:,.2f})差异{diff:,.2f}元",
-                                      expected_value=tb_amt, actual_value=wp_amount)]
+        )
+        tb_amount = float(tb_result.scalar() or 0)
+        diff = abs(float(wp_amount) - tb_amount)
+        if diff > 0.01:
+            return [QCFindingItem(
+                rule_id=self.rule_id,
+                severity=self.severity,
+                message=f"底稿审定数({float(wp_amount):,.2f})与试算表({tb_amount:,.2f})差异{diff:,.2f}元",
+                expected_value=tb_amount,
+                actual_value=wp_amount,
+            )]
         return []
 
 
@@ -502,13 +536,21 @@ class AttachmentSufficiencyRule(QCRule):
     rule_id = "QC-17"
 
     async def check(self, context: QCContext) -> list[QCFindingItem]:
+        from app.models.attachment_models import AttachmentWorkingPaper
         try:
             result = await context.db.execute(
-                sa.text("SELECT COUNT(*) FROM attachment_working_paper WHERE working_paper_id = :wid"),
-                {"wid": str(context.working_paper.id)})
+                sa.select(sa.func.count()).select_from(AttachmentWorkingPaper).where(
+                    AttachmentWorkingPaper.wp_id == context.working_paper.id,
+                )
+            )
             count = result.scalar() or 0
         except Exception:
-            count = 0
+            logger.warning(
+                "QC-17 AttachmentSufficiencyRule: 查询附件关联失败，底稿 id=%s",
+                context.working_paper.id,
+                exc_info=True,
+            )
+            return []
         if count == 0:
             return [QCFindingItem(rule_id=self.rule_id, severity=self.severity,
                                   message="底稿未关联任何附件证据", actual_value=0, expected_value=1)]
@@ -743,7 +785,7 @@ class QCEngine:
         )
         not_started = not_started_result.scalar() or 0
 
-        # Get all working papers with their latest QC results
+        # 获取项目所有底稿 ID（一次查询）
         wp_result = await db.execute(
             sa.select(WorkingPaper.id)
             .where(
@@ -757,20 +799,42 @@ class QCEngine:
         has_blocking = 0
         not_checked = 0
 
-        for wp_id in wp_ids:
-            qc_result = await db.execute(
-                sa.select(WpQcResult)
-                .where(WpQcResult.working_paper_id == wp_id)
-                .order_by(WpQcResult.check_timestamp.desc())
-                .limit(1)
+        if wp_ids:
+            # 子查询：每份底稿最新的 check_timestamp（批量，消除 N+1）
+            latest_subq = (
+                sa.select(
+                    WpQcResult.working_paper_id,
+                    sa.func.max(WpQcResult.check_timestamp).label("max_ts"),
+                )
+                .where(WpQcResult.working_paper_id.in_(wp_ids))
+                .group_by(WpQcResult.working_paper_id)
+                .subquery()
             )
-            qc = qc_result.scalar_one_or_none()
-            if qc is None:
-                not_checked += 1
-            elif qc.passed:
-                passed_qc += 1
-            else:
-                has_blocking += 1
+
+            # JOIN 取完整记录（一次查询获取所有底稿的最新 QC 结果）
+            q = (
+                sa.select(WpQcResult)
+                .join(
+                    latest_subq,
+                    sa.and_(
+                        WpQcResult.working_paper_id == latest_subq.c.working_paper_id,
+                        WpQcResult.check_timestamp == latest_subq.c.max_ts,
+                    ),
+                )
+            )
+            qc_results = (await db.execute(q)).scalars().all()
+
+            # 构建 wp_id → 最新 QC 结果映射
+            qc_map = {str(r.working_paper_id): r for r in qc_results}
+
+            for wp_id in wp_ids:
+                qc = qc_map.get(str(wp_id))
+                if qc is None:
+                    not_checked += 1
+                elif qc.passed:
+                    passed_qc += 1
+                else:
+                    has_blocking += 1
 
         pass_rate = 0.0
         denominator = total_workpapers - not_started

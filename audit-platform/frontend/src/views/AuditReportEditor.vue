@@ -13,11 +13,26 @@
             />
             <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
             <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
+            <el-button size="small" @click="onExportWord" :loading="exportingWord" round>导出 Word</el-button>
             <el-button size="small" @click="onPickKnowledge" round title="选择知识库文档作为参考上下文">📚 知识库</el-button>
           </template>
         </GtToolbar>
       </template>
     </GtPageHeader>
+
+    <!-- 错报超限警告横幅（需求 20.2） -->
+    <el-alert
+      v-if="misstatementWarning"
+      type="error"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 12px"
+    >
+      <template #title>⚠️ 未更正错报累计金额已超过整体重要性水平</template>
+      <div style="font-size: 12px; margin-top: 4px">
+        请在未更正错报汇总表中更正错报或说明不更正原因，否则无法签字定稿
+      </div>
+    </el-alert>
 
     <div v-if="!report && !loading" class="gt-ar-empty-state">
       <p>暂无审计报告，请先生成</p>
@@ -135,7 +150,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   generateAuditReport, getAuditReport, updateAuditReportParagraph,
-  updateAuditReportStatus, type AuditReportData,
+  updateAuditReportStatus, refreshAuditReportFinancialData, exportAuditReportWord,
+  getMisstatementSummary,
+  type AuditReportData,
 } from '@/services/auditPlatformApi'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import { fmtAmount } from '@/utils/formatters'
@@ -155,10 +172,12 @@ const loading = ref(false)
 const genLoading = ref(false)
 const saveLoading = ref(false)
 const refreshLoading = ref(false)
+const exportingWord = ref(false)
 const report = ref<AuditReportData | null>(null)
 const activeSection = ref('')
 const sectionContent = ref('')
 const showGenerateDialog = ref(false)
+const misstatementWarning = ref(false)
 const genForm = ref({
   opinion_type: 'unqualified',
   company_type: 'non_listed',
@@ -253,11 +272,28 @@ async function onStatusChange(status: string) {
   } catch { /* error handled by http interceptor */ }
 }
 
+async function onExportWord() {
+  exportingWord.value = true
+  try {
+    const blob = await exportAuditReportWord(projectId.value, year.value)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `审计报告_${year.value}.docx`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('Word 导出成功')
+  } catch {
+    ElMessage.error('Word 导出失败')
+  } finally {
+    exportingWord.value = false
+  }
+}
+
 async function onRefreshFinancialData() {
   if (!report.value) return
   refreshLoading.value = true
   try {
-    const { refreshAuditReportFinancialData } = await import('@/services/auditPlatformApi')
     const result = await refreshAuditReportFinancialData(projectId.value, year.value)
     if (result?.financial_data) {
       report.value.financial_data = result.financial_data
@@ -275,7 +311,16 @@ async function onRefreshFinancialData() {
   } finally { refreshLoading.value = false }
 }
 
-onMounted(fetchReport)
+onMounted(async () => {
+  await fetchReport()
+  // 需求 20.2：检查未更正错报是否超过重要性水平
+  try {
+    const summary = await getMisstatementSummary(projectId.value, year.value)
+    if (summary?.exceeds_materiality === true) {
+      misstatementWarning.value = true
+    }
+  } catch { /* 静默失败，不影响主流程 */ }
+})
 
 // ── 共享模板 ──
 function getReportConfigData(): Record<string, any> {

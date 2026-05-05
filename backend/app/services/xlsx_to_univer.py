@@ -29,11 +29,19 @@ def xlsx_to_univer_data(file_path: str, max_rows: int = 5000) -> dict[str, Any]:
         logger.warning("无法解析 xlsx: %s", e)
         return _empty_workbook("Sheet1")
 
+    # 需求 15.1：双次加载 xlsx，保留公式文本（data_only=False）和计算值（data_only=True）
+    try:
+        wb_value = load_workbook(str(path), data_only=True)
+    except Exception as e:
+        logger.debug("value workbook load failed (可能 xlsx 无缓存值): %s", e)
+        wb_value = None
+
     sheets: dict[str, Any] = {}
     sheet_order: list[str] = []
 
     for idx, ws_name in enumerate(wb.sheetnames):
         ws = wb[ws_name]
+        ws_value = wb_value[ws_name] if (wb_value is not None and ws_name in wb_value.sheetnames) else None
         sheet_id = f"sheet{idx}"
         sheet_order.append(sheet_id)
 
@@ -74,7 +82,9 @@ def xlsx_to_univer_data(file_path: str, max_rows: int = 5000) -> dict[str, Any]:
                 c = cell.column - 1
                 if r not in cell_data:
                     cell_data[r] = {}
-                cell_data[r][c] = _convert_cell(cell)
+                # 需求 15.2：公式单元格的 v 字段取自 data_only=True 的 workbook
+                value_cell = ws_value.cell(row=cell.row, column=cell.column) if ws_value is not None else None
+                cell_data[r][c] = _convert_cell(cell, value_cell)
 
         actual_rows = max(row_count, ws.max_row or 1)
         actual_cols = ws.max_column or 10
@@ -118,6 +128,11 @@ def xlsx_to_univer_data(file_path: str, max_rows: int = 5000) -> dict[str, Any]:
         sheets[sheet_id] = sheet_data
 
     wb.close()
+    if wb_value is not None:
+        try:
+            wb_value.close()
+        except Exception:
+            pass
 
     return {
         "id": path.stem,
@@ -127,19 +142,24 @@ def xlsx_to_univer_data(file_path: str, max_rows: int = 5000) -> dict[str, Any]:
     }
 
 
-def _convert_cell(cell: Cell) -> dict[str, Any]:
-    """将 openpyxl Cell 转换为 Univer 单元格格式"""
+def _convert_cell(cell: Cell, value_cell: Cell | None = None) -> dict[str, Any]:
+    """将 openpyxl Cell 转换为 Univer 单元格格式
+
+    参数：
+      cell       — 来自 data_only=False workbook 的 cell（含公式文本）
+      value_cell — 来自 data_only=True workbook 的同坐标 cell（含公式计算值），可选
+    """
     result: dict[str, Any] = {}
 
     # 值
     val = cell.value
     if val is not None:
-        if isinstance(val, (int, float)):
-            result["v"] = val
-            result["t"] = 2  # CellValueType.NUMBER
-        elif isinstance(val, bool):
+        if isinstance(val, bool):
             result["v"] = 1 if val else 0
             result["t"] = 4  # CellValueType.BOOLEAN
+        elif isinstance(val, (int, float)):
+            result["v"] = val
+            result["t"] = 2  # CellValueType.NUMBER
         else:
             result["v"] = str(val)
             result["t"] = 1  # CellValueType.STRING
@@ -147,7 +167,20 @@ def _convert_cell(cell: Cell) -> dict[str, Any]:
     # 公式（openpyxl 用 cell.value 存公式字符串，以 = 开头）
     if isinstance(cell.value, str) and cell.value.startswith("="):
         result["f"] = cell.value  # 保留完整公式
-        result["v"] = ""  # 公式单元格的显示值由 Univer 计算
+        # 需求 15.1/15.2：公式单元格的 v 字段使用 data_only=True 缓存值，避免显示空白
+        if value_cell is not None and value_cell.value is not None:
+            vv = value_cell.value
+            if isinstance(vv, bool):
+                result["v"] = 1 if vv else 0
+                result["t"] = 4
+            elif isinstance(vv, (int, float)):
+                result["v"] = vv
+                result["t"] = 2
+            else:
+                result["v"] = str(vv)
+                result["t"] = 1
+        else:
+            result["v"] = ""
 
     # 样式
     style = _convert_style(cell)

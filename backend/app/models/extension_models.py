@@ -46,6 +46,10 @@ class SignatureRecord(Base):
     object_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     signer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     signature_level: Mapped[str] = mapped_column(String(20), nullable=False)  # level1/level2/level3
+    # Round 1: 三级/多级签字顺序与前置依赖（R5 扩至 order=4/5 EQCR + 归档签字）
+    required_order: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    required_role: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    prerequisite_signature_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     signature_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     signature_timestamp: Mapped[datetime] = mapped_column(nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -55,6 +59,7 @@ class SignatureRecord(Base):
     __table_args__ = (
         Index("idx_signature_records_object", "object_type", "object_id"),
         Index("idx_signature_records_signer", "signer_id"),
+        Index("idx_signature_records_order", "object_type", "object_id", "required_order"),
     )
 
 

@@ -2,6 +2,16 @@
 
 将 main.py 中 90+ 个平铺的 include_router 收口到此模块，
 按 7 个业务域分组注册，便于维护和查找。
+
+路由前缀规范（IMPORTANT）：
+  - 标准做法：路由器内部 prefix 只声明业务路径（如 prefix="/gate"），
+    本文件在 include_router 时统一添加 prefix="/api"
+  - 最终路径 = /api + 路由器内部路径 + 端点路径
+
+已知例外（不要修改）：
+  - dashboard.py：内部 prefix="/api/dashboard"，注册时不加额外前缀
+  - /wopi 路由：不加 /api 前缀（WOPI 协议要求）
+  - /api/version：直接定义在 main.py（版本探针）
 """
 from fastapi import APIRouter, FastAPI
 
@@ -232,7 +242,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.sod import router as sod_router
 
     for r in [gate_router, trace_router, sod_router]:
-        app.include_router(r, prefix="/api" if not hasattr(r, 'prefix') or not r.prefix.startswith('/api') else "", tags=["门禁与治理"])
+        app.include_router(r, prefix="/api", tags=["门禁与治理"])
 
     # Phase 14: 门禁规则在 main.py lifespan 中注册，此处不重复调用
 
@@ -255,3 +265,17 @@ def register_all_routers(app: FastAPI) -> None:
     for r in [version_line_router, conflict_router, consistency_replay_router,
               export_integrity_router]:
         app.include_router(r, prefix="/api", tags=["取证与版本链"])
+
+    # ═══ 12. 协作管理（PBC 清单 / 函证管理） ═══
+    from app.routers.pbc import router as pbc_router
+    from app.routers.confirmations import router as confirmations_router
+
+    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
+    app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
+
+    # ═══ 12. 协作管理（PBC 清单 / 函证管理） ═══
+    from app.routers.pbc import router as pbc_router
+    from app.routers.confirmations import router as confirmations_router
+
+    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
+    app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])

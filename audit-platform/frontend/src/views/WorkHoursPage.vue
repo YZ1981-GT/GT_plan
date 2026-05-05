@@ -7,8 +7,7 @@
           start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD"
           style="width: 280px" @change="loadHours" />
         <el-button @click="showAISuggest">LLM 预填</el-button>
-        <el-button type="primary" @click="showCreateDialog = true">填报工时</el-button>
-      </div>
+        <el-button type="primary" @click="openCreateDialog">填报工时</el-button>      </div>
     </div>
 
     <!-- 工时列表 -->
@@ -33,7 +32,7 @@
     </el-table>
 
     <!-- 填报弹窗 -->
-    <el-dialog append-to-body v-model="showCreateDialog" title="填报工时" width="450px">
+    <el-dialog append-to-body v-model="showCreateDialog" :title="editingHourId ? '编辑工时' : '填报工时'" width="450px">
       <el-form :model="form" label-width="80px">
         <el-form-item label="日期" required>
           <el-date-picker v-model="form.work_date" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -56,7 +55,7 @@
       </div>
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="submitHour" :loading="submitting">保存</el-button>
+        <el-button type="primary" @click="submitHour" :loading="submitting">{{ editingHourId ? '更新' : '保存' }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -75,6 +74,7 @@ const submitting = ref(false)
 const warnings = ref<{ message: string }[]>([])
 const myProjects = ref<any[]>([])
 const currentStaffId = ref('')
+const editingHourId = ref<string | null>(null)
 
 const form = ref({ work_date: '', project_id: '', hours: 8, description: '' })
 
@@ -92,11 +92,17 @@ async function submitHour() {
   if (!form.value.work_date || !form.value.project_id) { ElMessage.warning('请填写日期和项目'); return }
   submitting.value = true
   try {
-    const res = await createWorkHour(currentStaffId.value, form.value)
+    let res: any
+    if (editingHourId.value) {
+      res = await updateWorkHour(editingHourId.value, form.value)
+    } else {
+      res = await createWorkHour(currentStaffId.value, form.value)
+    }
     warnings.value = res.warnings || []
     if (warnings.value.length === 0) {
-      ElMessage.success('工时已保存')
+      ElMessage.success(editingHourId.value ? '工时已更新' : '工时已保存')
       showCreateDialog.value = false
+      editingHourId.value = null
       form.value = { work_date: '', project_id: '', hours: 8, description: '' }
       await loadHours()
     }
@@ -110,6 +116,7 @@ async function confirmHour(row: WorkHourRecord) {
 }
 
 function editHour(row: WorkHourRecord) {
+  editingHourId.value = row.id
   form.value = { work_date: row.work_date, project_id: row.project_id, hours: row.hours, description: row.description || '' }
   showCreateDialog.value = true
 }

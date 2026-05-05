@@ -127,6 +127,7 @@ export const auditReport = {
   templates: '/api/audit-report/templates',
   status: (reportId: string) => `/api/audit-report/${reportId}/status`,
   refreshFinancialData: (pid: string, year: number) => `/api/audit-report/${pid}/${year}/refresh-financial-data`,
+  exportWord: (pid: string, year: number) => `/api/audit-report/${pid}/${year}/export-word`,
 } as const
 
 // ─── 导出 ───────────────────────────────────────────────────────────────────

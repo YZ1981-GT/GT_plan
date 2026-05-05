@@ -119,4 +119,10 @@ def test_issue_status_enum():
 
 
 def test_issue_source_enum():
-    assert len(IssueSource) == 3
+    # Round 1 一次性扩展为 5 轮共享 11 值（参见 phase15_enums.IssueSource）
+    assert len(IssueSource) == 11
+    for value in (
+        "L2", "L3", "Q", "review_comment", "consistency", "ai", "reminder",
+        "client_commitment", "pbc", "confirmation", "qc_inspection",
+    ):
+        assert IssueSource(value).value == value

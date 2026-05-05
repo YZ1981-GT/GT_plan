@@ -73,11 +73,13 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { cutoffTest, agingAnalysis, monthlyDetail } from '@/services/commonApi'
+import { useProjectStore } from '@/stores/project'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
+const projectStore = useProjectStore()
 const activeTab = ref('cutoff')
 const loading = ref(false)
-const cutoffForm = ref({ codes: '6001', year: 2025, days_before: 5, days_after: 5, threshold: 10000 })
+const cutoffForm = ref({ codes: '6001', year: projectStore.year || new Date().getFullYear() - 1, days_before: 5, days_after: 5, threshold: 10000 })
 const cutoffResult = ref<any>(null)
 const agingForm = ref({
   account_code: '1122', base_date: '2025-12-31',

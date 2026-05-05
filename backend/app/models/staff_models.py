@@ -32,11 +32,16 @@ class StaffTitle(str, enum.Enum):
 
 
 class AssignmentRole(str, enum.Enum):
-    """委派角色"""
+    """委派角色
+
+    R1 一次性预留 ``eqcr``（EQCR 独立复核合伙人）以供 R5 使用，
+    避免后续轮次再做枚举迁移。
+    """
     signing_partner = "signing_partner"
     manager = "manager"
     auditor = "auditor"
     qc = "qc"
+    eqcr = "eqcr"  # 预留 R5，本轮仅模型层承载
 
 
 class WorkHourStatus(str, enum.Enum):
