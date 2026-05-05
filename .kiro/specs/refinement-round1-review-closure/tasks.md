@@ -84,7 +84,7 @@
   - `sign-list` 卡片文案改为"已 X/Y 级，待你签"
   - _需求_ 4
 
-- [ ] Sprint 1 验收
+- [x] Sprint 1 验收
   - 单元测试：新规则 6 条用例全过
   - 集成测试：`test_review_closure_e2e.py` 走完退回→工单→整改→复验→通过
   - 回归测试：原批量通过/退回、原签字接口、旧 readiness schema 兼容
@@ -92,7 +92,7 @@
 
 ## Sprint 2：归档 + 合规文档（需求 5~7）
 
-- [ ] 13. 后端：ArchiveOrchestrator 服务
+- [x] 13. 后端：ArchiveOrchestrator 服务
   - 新建 `backend/app/services/archive_orchestrator.py`
   - 串行执行 `gate_engine → wp_storage.archive → private_storage.push_to_cloud(若请求) → data_lifecycle.archive_project_data`
   - 失败时记 `archive_jobs.failed_section / failed_reason`
@@ -100,14 +100,14 @@
   - 旧 3 个 archive 端点加 `X-Deprecated: true` 响应头
   - _需求_ 5
 
-- [ ] 14. 后端：归档章节化 registry
+- [x] 14. 后端：归档章节化 registry
   - 新建 `backend/app/services/archive_section_registry.py`
   - 提供 `register(order_prefix, filename, generator_func)` / `list_all()` API
   - R1 本轮注册：`00-项目封面` / `01-签字流水` / `99-审计日志`
   - 预留 R3/R5 章节位（文档说明，不注册）
   - _需求_ 6
 
-- [ ] 15. 后端：封面与签字流水 PDF 生成
+- [x] 15. 后端：封面与签字流水 PDF 生成
   - `generate_project_cover_pdf(project_id)` → 填模板 `backend/data/archive_templates/project_cover.docx`
   - `generate_signature_ledger_pdf(project_id)` → 填模板 `signature_ledger.docx`，支持 N 级签字（预留 EQCR 扩展）
   - 走 `pdf_export_engine`（LibreOffice）

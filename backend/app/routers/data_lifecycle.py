@@ -2,7 +2,7 @@
 """数据生命周期管理 API"""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -35,13 +35,22 @@ async def get_project_stats(
     return await svc.get_project_data_stats(project_id)
 
 
-@router.post("/projects/{project_id}/archive")
+@router.post("/projects/{project_id}/archive", deprecated=True)
 async def archive_project(
     project_id: UUID,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """归档项目数据（软删除，可恢复）"""
+    """[Deprecated] 归档项目数据：请使用 POST /api/projects/{id}/archive/orchestrate"""
+    import logging as _logging
+
+    _logging.getLogger(__name__).warning(
+        "[DEPRECATED] data_lifecycle.archive_project called for project=%s, "
+        "use /api/projects/{id}/archive/orchestrate instead",
+        project_id,
+    )
+    response.headers["X-Deprecated"] = "true"
     svc = DataLifecycleService(db)
     return await svc.archive_project_data(project_id)
 

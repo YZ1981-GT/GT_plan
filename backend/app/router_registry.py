@@ -273,9 +273,7 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
     app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
 
-    # ═══ 12. 协作管理（PBC 清单 / 函证管理） ═══
-    from app.routers.pbc import router as pbc_router
-    from app.routers.confirmations import router as confirmations_router
+    # ═══ 13. 归档编排（Round 1 需求 5） ═══
+    from app.routers.archive import router as archive_router
 
-    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
-    app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
+    app.include_router(archive_router, tags=["归档编排"])
