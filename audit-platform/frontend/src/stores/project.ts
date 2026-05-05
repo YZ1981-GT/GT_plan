@@ -21,6 +21,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { getProject, getProjectAuditYear } from '@/services/auditPlatformApi'
+import { api } from '@/services/apiProxy'
 
 const currentYear = new Date().getFullYear()
 
@@ -97,7 +98,6 @@ export const useProjectStore = defineStore('project', () => {
   async function loadProjectOptions() {
     if (projectOptions.value.length > 0) return // 已加载
     try {
-      const { api } = await import('@/services/apiProxy')
       const data = await api.get('/api/projects', {
         params: { page_size: 200 },
         validateStatus: (s: number) => s < 600,

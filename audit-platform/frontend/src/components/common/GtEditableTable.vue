@@ -242,7 +242,7 @@ const emit = defineEmits<{
 // ── Composables ───────────────────────────────────────────────────────────────
 const displayPrefs = useDisplayPrefsStore()
 const cellSelection = useCellSelection()
-const editMode = useEditMode()
+const editMode = useEditMode({ guardRoute: false })
 const fullscreen = useFullscreen()
 const lazyEditState = props.lazyEdit ? useLazyEdit() : null
 const tableDataRef = computed({

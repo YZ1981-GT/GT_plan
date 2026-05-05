@@ -185,5 +185,5 @@ export function useTableSearch(
 }
 
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')  // 标准正则转义
 }

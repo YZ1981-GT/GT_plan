@@ -103,12 +103,13 @@ async def bulk_execute(
 
     # 3. 逐条执行 action_fn，每条用 savepoint 隔离，捕获单条失败
     for uid, row in rows.items():
+        sp = await db.begin_nested()  # 创建 savepoint
         try:
-            async with db.begin_nested() as sp:  # savepoint 隔离
-                await action_fn(db, row)
+            await action_fn(db, row)
+            await sp.commit()  # 释放 savepoint
             succeeded.append(str(uid))
         except Exception as exc:
-            # savepoint 已在 async with 退出时自动 rollback，此处仅记录
+            await sp.rollback()  # 显式回滚 savepoint，不影响其他操作
             logger.warning("bulk_execute 单条失败: id=%s error=%s", uid, exc)
             failed.append({"id": str(uid), "error": str(exc)})
 

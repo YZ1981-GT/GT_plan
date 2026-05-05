@@ -11,6 +11,19 @@ export interface ShortcutEntry {
   scope?: string
 }
 
+/**
+ * 检查当前焦点是否在输入框/文本域/可编辑元素内
+ * 用于在输入框中忽略全局快捷键（Escape 除外）
+ */
+export function isInputFocused(event: KeyboardEvent): boolean {
+  const target = event.target as HTMLElement
+  return (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.contentEditable === 'true'
+  )
+}
+
 class ShortcutManager {
   private shortcuts: Map<string, ShortcutEntry> = new Map()
   private enabled = true
@@ -26,11 +39,8 @@ class ShortcutManager {
   handleKeydown(event: KeyboardEvent) {
     if (!this.enabled) return
     // 在输入框/文本域/可编辑元素里忽略快捷键（Escape 除外）
-    const target = event.target as HTMLElement
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' ||
-      target.contentEditable === 'true'
+    if (isInputFocused(event) && event.key !== 'Escape') return
     const key = this.getShortcutKey(event)
-    if (isInput && key !== 'ESCAPE') return
     const entry = this.shortcuts.get(key)
     if (entry) {
       entry.handler()

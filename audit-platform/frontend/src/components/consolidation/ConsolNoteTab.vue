@@ -529,7 +529,7 @@ const emit = defineEmits<{
 
 // ─── 附注状态 ─────────────────────────────────────────────────────────────────
 const selectedNoteSection = ref<any>(null)
-const { isEditing: noteEditMode, isDirty: noteDirty, enterEdit: enterNoteEdit, exitEdit: exitNoteEdit, markDirty: markNoteDirty, clearDirty: clearNoteDirty } = useEditMode()
+const { isEditing: noteEditMode, isDirty: noteDirty, enterEdit: enterNoteEdit, exitEdit: exitNoteEdit, markDirty: markNoteDirty, clearDirty: clearNoteDirty } = useEditMode({ guardRoute: false })
 const { isFullscreen: noteFullscreen, toggleFullscreen: toggleNoteFullscreen } = useFullscreen()
 const noteRefreshing = ref(false)
 const noteSingleAuditLoading = ref(false)
