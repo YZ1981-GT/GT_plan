@@ -244,7 +244,8 @@ const displayPrefs = useDisplayPrefsStore()
 const cellSelection = useCellSelection()
 const editMode = useEditMode({ guardRoute: false })
 const fullscreen = useFullscreen()
-const lazyEditState = props.lazyEdit ? useLazyEdit() : null
+// lazyEdit 仅在 editable=true 时初始化，editable=false 时无需创建编辑状态
+const lazyEditState = (props.lazyEdit && props.editable) ? useLazyEdit() : null
 const tableDataRef = computed({
   get: () => props.modelValue, set: (v) => emit('update:modelValue', v),
 })

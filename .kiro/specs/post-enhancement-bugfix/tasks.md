@@ -54,8 +54,8 @@
 - [x] 验证复核通过流程
 
 ### Task 1.10 — Sprint 1 收尾
-- [-] vue-tsc 零错误 + Vite 构建通过
-- [~] git commit + push
+- [x] vue-tsc 零错误 + Vite 构建通过
+- [x] git commit + push
 
 ---
 
@@ -134,7 +134,7 @@
 
 ### Task 2.16 — Sprint 2 收尾
 - [ ] vue-tsc 零错误 + Vite 构建通过
-- [~] Python 语法检查通过
+- [x] Python 语法检查通过
 - [ ] git commit + push
 
 ---
@@ -224,23 +224,23 @@
 
 ### Task 4.1 — P3 小优化批量处理
 - [x] `GtStatusTag` 加 size prop（默认 small）
-- [ ] `GtEditableTable` lazyEdit 在 editable=false 时不初始化
-- [ ] `operationHistory.undo()` 加 10 秒超时保护
-- [ ] `confirm.ts` 对 itemName 做 HTML 转义
-- [ ] `yearOptions` 改为动态计算当前年份
-- [ ] `developing` 路由改为跳转专门的"开发中"页面
-- [ ] `bcrypt rounds=14` 改为 12（或加配置项）
-- [ ] `DefaultLayout.vue` watch 里 syncFromRoute 加 await
-- [ ] `deps.py` 删除死代码 PERM_CACHE_TTL
-- [ ] `useExcelIO.parseFile` 降级取第一个 sheet 而非最后一个
-- [ ] `config.py` 加 EVENT_DEBOUNCE_MS 配置项
-- [ ] `useKnowledge` 注释说明 _pickerResolve 单例限制
-- [ ] `TrialBalanceService.recalc_unadjusted` 注释"需清零"改为"已清零"
-- [ ] `body_limit.py` DELETE 跳过原因注释说明
-- [ ] `deps.py` SoD 检查注释说明只检查全局撤销的限制
+- [x] `GtEditableTable` lazyEdit 在 editable=false 时不初始化
+- [x] `operationHistory.undo()` 加 10 秒超时保护
+- [x] `confirm.ts` 对 itemName 做 HTML 转义
+- [x] `yearOptions` 改为动态计算当前年份
+- [x] `developing` 路由改为跳转专门的"开发中"页面
+- [x] `bcrypt rounds=14` 改为 12（或加配置项）
+- [x] `DefaultLayout.vue` watch 里 syncFromRoute 加 await
+- [x] `deps.py` 删除死代码 PERM_CACHE_TTL
+- [x] `useExcelIO.parseFile` 降级取第一个 sheet 而非最后一个
+- [x] `config.py` 加 EVENT_DEBOUNCE_MS 配置项
+- [x] `useKnowledge` 注释说明 _pickerResolve 单例限制
+- [x] `TrialBalanceService.recalc_unadjusted` 注释"需清零"改为"已清零"
+- [x] `body_limit.py` DELETE 跳过原因注释说明
+- [x] `deps.py` SoD 检查注释说明只检查全局撤销的限制
 
 ### Task 4.2 — 最终收尾
 - [x] 全量 vue-tsc + Vite 构建验证
-- [ ] Python 全量语法检查
-- [ ] git commit + push + 合并到 master
+- [-] Python 全量语法检查
+- [~] git commit + push + 合并到 master
 - [x] 更新 memory.md + dev-history.md

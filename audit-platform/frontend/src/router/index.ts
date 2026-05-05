@@ -410,6 +410,11 @@ const router = createRouter({
       name: 'NotFound',
       component: () => import('@/views/NotFound.vue'),
     },
+    {
+      path: '/developing',
+      name: 'DevelopingPage',
+      component: () => import('@/views/DevelopingPage.vue'),
+    },
   ],
 })
 
@@ -421,13 +426,10 @@ router.beforeEach(async (to) => {
   NProgress.start()
   const authStore = useAuthStore()
 
-  // ① 开发中页面 → 提示并阻止导航
+  // ① 开发中页面 → 跳转到专门的"开发中"页面
   if (to.meta.developing) {
-    import('element-plus').then(({ ElMessage }) => {
-      ElMessage.info('该功能正在开发中，敬请期待')
-    })
     NProgress.done()
-    return false
+    return { name: 'DevelopingPage' }
   }
 
   // ② 已登录用户访问 /login → 重定向到首页
