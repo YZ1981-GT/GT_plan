@@ -41,7 +41,7 @@ inclusion: always
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
 - 前端依赖共 22 生产 + 7 开发：关键新增 mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0、unplugin-vue-components@32.0.0、@univerjs/presets@0.21.1、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）、@univerjs/sheets-formula@0.21.1、opentype.js@1.3.5、xlsx@0.18.5
-- PG ~152 张表（实测 Base.metadata，≥ 需求 9.2 要求的 144），Redis 6379，后端 9980，前端 3030
+- PG ~158 张表（152 基线 + R5 新增 6 张：eqcr_opinions/eqcr_review_notes/eqcr_shadow_computations/eqcr_disagreement_resolutions/related_party_registry/related_party_transactions），Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
 - Paperless-ngx 端口 8010（admin/admin）
@@ -54,8 +54,7 @@ inclusion: always
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
 - 后端测试：98 个根目录测试 + 4 个 e2e + 4 个 integration（Sprint 4 后 Hypothesis 属性测试 16 个合在根目录里）
-- git 分支：feature/global-component-library（本地已创建并追踪远端，HEAD=5c5ac56，待合并 master；master 未提交的 steering 改动已 stash，标签 master-pending-202605051735）
-- 最新提交 5c5ac56：Round 1 Tasks 2-4 review closure 后端 + 前端合并（在 73204cf R1 数据模型迁移 + R1~R5 spec 三件套之上）
+- git 分支：feature/global-component-library（HEAD=8d69fa4，R5 Sprint 1 Tasks 1-7 完成）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -98,11 +97,12 @@ inclusion: always
 - SignatureRecord.signature_level 仅 String(20) 无顺序强制，三级签字无前置依赖校验
 - qc_engine.py 14 条 QC-01~14 规则 + gate_rules_phase14.py QC-19~26 全是硬编码 Python，无 qc_rule_definitions 表支持自定义
 - WorkpaperEditor.vue 工具栏仅保存/同步公式/版本/下载/PDF/上传，无 AI 侧栏、无程序要求侧栏、无右键序时账穿透、无对比上年按钮
-- 系统无 EQCR（独立复核合伙人）专属角色与工作台，ProjectAssignment.role 缺 eqcr 枚举，gate_engine 缺 eqcr_approval 阶段
+- EQCR 角色与工作台已落地（R5 Tasks 1-7）：ProjectAssignment.role='eqcr' 已启用、GateType.eqcr_approval 已注册、ReportStatus.eqcr_approved 已扩展、EqcrService + /api/eqcr/* 路由 + 前端 EqcrWorkbench/EqcrProjectView 页面 + 5 Tab 组件 + 关联方 CRUD 全部就绪
+- ThreeColumnLayout.vue 新增 #nav-eqcr slot（R5 Task 4），DefaultLayout 注入"🛡️ 独立复核"导航按钮（partner/admin 可见）
 - Communication/ClientCommunication 模型不存在（grep 零命中），ProjectProgressBoard 沟通记录前端组件存在但后端未独立建模，可能塞在 JSON 字段或散落表里
 - WorkingPaper 无 due_date 字段，wp_progress_service overdue_days 用 created_at 估算"已创建天数"，语义弱
 - ledger/penetrate 端点参数为 account_code + drill_level + date，不支持按 amount 容差匹配；按金额穿透需新增端点
-- assignment_service.ROLE_MAP 和 role_context_service._ROLE_PRIORITY 两个字典是角色体系单一真源，新增 role='eqcr' 必须同时更新；_ROLE_PRIORITY 当前 partner(5)/qc(4)/manager(3)/auditor(2)/readonly(1)
+- assignment_service.ROLE_MAP 和 role_context_service._ROLE_PRIORITY 两个字典是角色体系单一真源，新增 role='eqcr' 已同时更新；_ROLE_PRIORITY 当前 partner(5)/eqcr(5)/qc(4)/manager(3)/auditor(2)/readonly(1)
 - GoingConcernEvaluation 模型已存在（collaboration_models.py），Round 5 EQCR 持续经营 Tab 可直接复用，不要重复建模
 - 归档包设计决策：采用"插件化章节"模式（00/01/02/.../99 顺序），各 Round 各自插入章节，Round 1 需求 6 只预留机制
 - 归档包章节号分配：00 项目封面 / 01 签字流水（R1）/ 02 EQCR 备忘录（R5）/ 03 质控抽查报告（R3）/ 10 底稿/ / 20 报表/ / 30 附注/ / 40 附件/ / 99 审计日志
@@ -135,6 +135,7 @@ inclusion: always
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
 - Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
+- Round 5 实施进度：Sprint 1 Tasks 1-7 已完成（8d69fa4），下一个 Task 8（影子计算）；git HEAD=8d69fa4
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

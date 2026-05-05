@@ -44,6 +44,10 @@ from app.models.core import User
 from app.models.related_party_models import RelatedPartyRegistry, RelatedPartyTransaction
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.services.eqcr_service import EqcrService
+from app.services.eqcr_shadow_compute_service import (
+    ALLOWED_COMPUTATION_TYPES,
+    EqcrShadowComputeService,
+)
 
 
 router = APIRouter(prefix="/api/eqcr", tags=["eqcr"])
@@ -82,6 +86,25 @@ class EqcrOpinionUpdate(BaseModel):
     verdict: str | None = Field(None)
     comment: str | None = Field(None)
     extra_payload: dict[str, Any] | None = Field(None)
+
+
+# ---------------------------------------------------------------------------
+# 任务 8：影子计算 Pydantic 模型
+# ---------------------------------------------------------------------------
+
+
+class ShadowComputeRequest(BaseModel):
+    """POST /api/eqcr/shadow-compute 请求体。"""
+
+    project_id: UUID = Field(..., description="项目 ID")
+    computation: str = Field(
+        ...,
+        description=(
+            "计算类型；允许值 cfs_supplementary / debit_credit_balance / "
+            "tb_vs_report / intercompany_elimination"
+        ),
+    )
+    params: dict[str, Any] | None = Field(None, description="计算参数")
 
 
 # ---------------------------------------------------------------------------
@@ -565,6 +588,77 @@ async def delete_related_party_transaction(
     record.is_deleted = True
     await db.commit()
     return {"detail": "已删除"}
+
+
+# ---------------------------------------------------------------------------
+# 任务 8：影子计算端点
+# ---------------------------------------------------------------------------
+
+
+@router.post("/shadow-compute")
+async def eqcr_shadow_compute(
+    payload: ShadowComputeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """EQCR 影子计算：独立跑一遍勾稽，不依赖项目组结果。
+
+    需求 4：
+    - 限流每项目每天 20 次（Redis）
+    - 调用 consistency_replay_engine（caller_context='eqcr'）
+    - 结果存 eqcr_shadow_computations 表
+    - 与项目组结果对比 has_diff 字段
+    """
+    # 验证 computation_type
+    if payload.computation not in ALLOWED_COMPUTATION_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"computation 不合法，允许值：{sorted(ALLOWED_COMPUTATION_TYPES)}",
+        )
+
+    # 限流检查（Redis）
+    redis_client = None
+    try:
+        from app.core.redis import redis_client as _redis
+        await _redis.ping()
+        redis_client = _redis
+    except Exception:
+        pass  # Redis 不可用，降级放行
+
+    svc = EqcrShadowComputeService(db)
+    allowed, remaining = await svc.check_rate_limit(payload.project_id, redis_client)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": "影子计算限流：每项目每天最多 20 次",
+                "project_id": str(payload.project_id),
+                "daily_limit": 20,
+                "remaining": 0,
+            },
+            headers={"Retry-After": "86400"},
+        )
+
+    # 执行影子计算
+    result = await svc.execute_shadow_compute(
+        project_id=payload.project_id,
+        computation_type=payload.computation,
+        params=payload.params,
+        user_id=current_user.id,
+    )
+    await db.commit()
+    return result
+
+
+@router.get("/projects/{project_id}/shadow-computations")
+async def list_shadow_computations(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回该项目所有影子计算记录列表。"""
+    svc = EqcrShadowComputeService(db)
+    return await svc.list_shadow_computations(project_id)
 
 
 # ---------------------------------------------------------------------------

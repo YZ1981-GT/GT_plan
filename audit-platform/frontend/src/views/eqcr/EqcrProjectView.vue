@@ -131,7 +131,13 @@
           :project-id="projectId"
         />
       </el-tab-pane>
-      <!-- 预留 Tab 6：组成部分审计师 → Task 22 实装，本任务不渲染 -->
+      <el-tab-pane label="影子计算" name="shadow_compute">
+        <EqcrShadowCompute
+          v-if="activeTab === 'shadow_compute'"
+          :project-id="projectId"
+        />
+      </el-tab-pane>
+      <!-- 预留 Tab 7：组成部分审计师 → Task 22 实装，本任务不渲染 -->
     </el-tabs>
   </div>
 </template>
@@ -150,6 +156,7 @@ import EqcrEstimates from '@/components/eqcr/EqcrEstimates.vue'
 import EqcrRelatedParties from '@/components/eqcr/EqcrRelatedParties.vue'
 import EqcrGoingConcern from '@/components/eqcr/EqcrGoingConcern.vue'
 import EqcrOpinionType from '@/components/eqcr/EqcrOpinionType.vue'
+import EqcrShadowCompute from '@/components/eqcr/EqcrShadowCompute.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -159,7 +166,7 @@ const projectId = computed(() => String(route.params.projectId ?? ''))
 const loading = ref(false)
 const overview = ref<EqcrProjectOverview | null>(null)
 const activeTab = ref<
-  'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type'
+  'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute'
 >('materiality')
 
 const project = computed(() => overview.value?.project ?? null)

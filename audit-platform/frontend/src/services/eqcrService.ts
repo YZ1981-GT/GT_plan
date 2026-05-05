@@ -261,6 +261,33 @@ export interface RelatedPartyTransactionUpdateInput {
   evidence_refs?: any
 }
 
+/** 影子计算类型（任务 8/9） */
+export type ShadowComputationType =
+  | 'cfs_supplementary'
+  | 'debit_credit_balance'
+  | 'tb_vs_report'
+  | 'intercompany_elimination'
+
+/** 影子计算请求体 */
+export interface ShadowComputeInput {
+  project_id: string
+  computation_type: ShadowComputationType
+  params?: Record<string, any>
+}
+
+/** 影子计算结果 */
+export interface ShadowComputeResult {
+  id: string
+  project_id: string
+  computation_type: ShadowComputationType
+  params: Record<string, any> | null
+  result: Record<string, any> | null
+  team_result_snapshot: Record<string, any> | null
+  has_diff: boolean
+  created_by: string | null
+  created_at: string | null
+}
+
 // ─── API 调用 ────────────────────────────────────────────────────────────────
 
 export const eqcrApi = {
@@ -382,6 +409,19 @@ export const eqcrApi = {
   /** 删除关联方交易（软删除） */
   async deleteTransaction(projectId: string, txnId: string): Promise<void> {
     await api.delete(P.relatedPartyTransactionDetail(projectId, txnId))
+  },
+
+  // ─── 任务 8/9：影子计算 ──────────────────────────────────────────────────
+
+  /** 执行影子计算（POST /api/eqcr/shadow-compute） */
+  async executeShadowCompute(data: ShadowComputeInput): Promise<ShadowComputeResult> {
+    return api.post<ShadowComputeResult>(P.shadowCompute, data)
+  },
+
+  /** 获取项目影子计算历史记录 */
+  async listShadowComputations(projectId: string): Promise<ShadowComputeResult[]> {
+    const data = await api.get<ShadowComputeResult[]>(P.shadowComputations(projectId))
+    return Array.isArray(data) ? data : []
   },
 }
 

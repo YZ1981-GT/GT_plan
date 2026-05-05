@@ -1000,6 +1000,9 @@ export const eqcr = {
     `/api/eqcr/projects/${pid}/related-party-transactions`,
   relatedPartyTransactionDetail: (pid: string, txnId: string) =>
     `/api/eqcr/projects/${pid}/related-party-transactions/${txnId}`,
+  // 任务 8/9：影子计算
+  shadowCompute: '/api/eqcr/shadow-compute',
+  shadowComputations: (pid: string) => `/api/eqcr/projects/${pid}/shadow-computations`,
 } as const
 
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────

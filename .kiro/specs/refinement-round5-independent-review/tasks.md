@@ -51,19 +51,19 @@
   - 权限：EQCR 只读 + 经理级可写
   - _需求_ 2
 
-- [~] 8. 后端：影子计算复用一致性引擎
+- [x] 8. 后端：影子计算复用一致性引擎
   - `POST /api/eqcr/shadow-compute` 调 `consistency_replay_engine` with `caller_context='eqcr'`
   - 结果存 `eqcr_shadow_computations` 表
   - 与项目组结果对比 `has_diff` 字段
   - 限流：每项目每天 20 次（Redis）
   - _需求_ 4
 
-- [~] 9. 前端：EqcrShadowCompute 组件
+- [x] 9. 前端：EqcrShadowCompute 组件
   - 选择计算类型 + 参数 + 执行
   - 差异红标展示
   - _需求_ 4
 
-- [~] Sprint 1 验收
+- [x] Sprint 1 验收
   - 单元测试：SOD `EqcrIndependenceRule` 4 场景
   - 集成测试：`test_eqcr_workbench.py`（委派 EQCR → 录意见 → 影子计算）
   - 数据扫描：上线前扫描现有 ProjectAssignment，标记潜在 SOD 冲突由 admin 确认
