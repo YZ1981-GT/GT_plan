@@ -160,7 +160,7 @@
 
 本 Sprint 为 v1.5 合伙人第三轮复盘新增，7 个任务。建议在 Sprint 1/2 完成后单独跑，不并入 Sprint 1/2 避免超限。
 
-- [ ] 20. 数据模型：审计日志 + 独立性声明 + 保留期 + 轮换 override
+- [x] 20. 数据模型：审计日志 + 独立性声明 + 保留期 + 轮换 override
   - 新建 `backend/app/models/audit_log_models.py` (`AuditLogEntry`)
   - 新建 `backend/app/models/independence_models.py` (`IndependenceDeclaration`)
   - 新建 `backend/app/models/rotation_models.py` (`PartnerRotationOverride`)
@@ -168,7 +168,7 @@
   - Alembic 脚本 `round1_long_term_compliance_{date}.py`
   - _需求_ 9, 10, 11
 
-- [ ] 21. 后端：audit_logger_enhanced 真实落库 + 哈希链
+- [x] 21. 后端：audit_logger_enhanced 真实落库 + 哈希链
   - 重写 `audit_logger_enhanced.log_action` 走 Redis 队列 + batch writer
   - 新建 worker `backend/app/workers/audit_log_writer_worker.py`（参考 sla_worker 模式）
   - `GET /api/audit-logs/verify-chain?project_id=&from=&to=`
@@ -176,7 +176,7 @@
   - 写失败触发告警 `AUDIT_LOG_WRITE_FAILED`
   - _需求_ 9
 
-- [ ] 22. 后端：独立性声明端点 + gate 规则
+- [-] 22. 后端：独立性声明端点 + gate 规则
   - `backend/app/services/independence_service.py`
   - `GET/POST/PATCH /api/projects/{id}/independence-declarations`
   - `POST .../submit` 触发 SignatureRecord + audit log

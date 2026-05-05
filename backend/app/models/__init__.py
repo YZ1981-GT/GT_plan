@@ -89,6 +89,9 @@ from app.models.workpaper_models import (
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
 from app.models.archive_models import ArchiveJob
+from app.models.audit_log_models import AuditLogEntry
+from app.models.independence_models import IndependenceDeclaration
+from app.models.rotation_models import PartnerRotationOverride
 
 __all__ = [
     # --- base ---
@@ -182,4 +185,10 @@ __all__ = [
     "ReviewRecord",
     # --- archive models ---
     "ArchiveJob",
+    # --- audit log models ---
+    "AuditLogEntry",
+    # --- independence models ---
+    "IndependenceDeclaration",
+    # --- rotation models ---
+    "PartnerRotationOverride",
 ]

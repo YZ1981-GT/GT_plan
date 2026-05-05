@@ -85,6 +85,10 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     )
     consol_level: Mapped[int] = mapped_column(default=1)
 
+    # Round 1 需求 11：归档保留期
+    archived_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    retention_until: Mapped[datetime | None] = mapped_column(nullable=True)
+
     __table_args__ = (
         Index(
             "idx_projects_status",

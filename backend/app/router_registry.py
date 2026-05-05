@@ -279,3 +279,8 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.archive import router as archive_router
 
     app.include_router(archive_router, tags=["归档编排"])
+
+    # ═══ 14. 审计日志（Round 1 需求 9） ═══
+    from app.routers.audit_logs import router as audit_logs_router
+
+    app.include_router(audit_logs_router, prefix="/api", tags=["审计日志"])
