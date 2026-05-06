@@ -643,6 +643,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, Loading, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import { buildImportFormData } from '@/utils/importFormData'
@@ -683,7 +684,7 @@ const availableYears = ref<number[]>([])
 async function loadAvailableYears() {
   if (!projectId.value) return
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/ledger/years`)
+    const data = await api.get(P_ledger.years(projectId.value))
     const result = data
     availableYears.value = result?.years ?? []
   } catch {
@@ -693,7 +694,7 @@ async function loadAvailableYears() {
 
 async function loadProjectList() {
   try {
-    const data = await api.get('/api/projects')
+    const data = await api.get(P_proj.list)
     const list = data ?? []
     projectList.value = Array.isArray(list) ? list : []
   } catch {
@@ -704,7 +705,7 @@ async function loadProjectList() {
 async function loadCurrentProject() {
   if (!projectId.value) return
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/wizard`)
+    const data = await api.get(P_proj.wizard(projectId.value))
     const ws = data
     const basicInfo = ws?.steps?.basic_info?.data || {}
     currentProject.value = {
@@ -731,7 +732,7 @@ async function loadProjectMaterialityAndPeriod() {
   if (!projectId.value) return
   try {
     // 获取项目基本信息（含 audit_period_end）
-    const proj = await api.get(`/api/projects/${projectId.value}`)
+    const proj = await api.get(P_proj.detail(projectId.value))
     if (proj?.audit_period_end) {
       auditPeriodEnd.value = proj.audit_period_end
     }
@@ -739,7 +740,7 @@ async function loadProjectMaterialityAndPeriod() {
   try {
     // 获取重要性水平（含 performance_materiality）
     const mat = await api.get(
-      `/api/projects/${projectId.value}/materiality?year=${selectedYear.value}`
+      `${P_mat.get(projectId.value)}?year=${selectedYear.value}`
     )
     if (mat?.performance_materiality) {
       performanceMateriality.value = Number(mat.performance_materiality) || 0
@@ -783,7 +784,7 @@ async function runValidation() {
   validateResult.value = null
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/validate?year=${selectedYear.value}`
+      `${P_ledger.validate(projectId.value)}?year=${selectedYear.value}`
     )
     validateResult.value = data
   } catch {
@@ -995,7 +996,7 @@ async function doPreview() {
   try {
     const formData = buildImportPreviewFormData(importFiles.value)
     const url = buildImportPreviewUrl({
-      basePath: `/api/projects/${projectId.value}/ledger/smart-preview`,
+      basePath: P_ledger.smartPreview(projectId.value),
       year: importYear.value,
       previewRows: 50,
     })
@@ -1047,7 +1048,7 @@ async function doImport() {
       mappingPayload: mappingParam,
     })
     const url = buildImportJobUrl({
-      basePath: `/api/projects/${projectId.value}/ledger/smart-import`,
+      basePath: P_ledger.smartImport(projectId.value),
       year: yr,
       uploadToken: uploadToken.value,
     })
@@ -1526,7 +1527,7 @@ async function loadBalance() {
   }
   loading.value = true
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/ledger/balance`, {
+    const data = await api.get(P_ledger.balance(projectId.value), {
       params: { year: year.value },
     })
     balanceData.value = data ?? []
@@ -1548,8 +1549,8 @@ async function loadLedger() {
     }
     // 首次加载时从后端获取期初余额（确保 running_balance 准确）
     const [data, obData] = await Promise.all([
-      api.get(`/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }),
-      api.get(`/api/projects/${projectId.value}/ledger/opening-balance/${encodeURIComponent(currentAccount.value)}`, { params: { year: year.value } }),
+      api.get(P_ledger.entries(projectId.value, currentAccount.value), { params }),
+      api.get(P_ledger.openingBalance(projectId.value, currentAccount.value), { params: { year: year.value } }),
     ])
     const result = data
     const obResult = obData
@@ -1572,7 +1573,7 @@ async function loadMoreLedger() {
       params.date_to = dateRange.value[1]
     }
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
+      P_ledger.entries(projectId.value, currentAccount.value), { params }
     )
     const result = data
     const newItems = result.items ?? result ?? []
@@ -1587,7 +1588,7 @@ async function loadVoucher() {
   loading.value = true
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/voucher/${encodeURIComponent(currentVoucher.value)}`,
+      P_ledger.voucher(projectId.value, currentVoucher.value),
       { params: { year: year.value } }
     )
     voucherItems.value = data ?? []
@@ -1599,7 +1600,7 @@ async function loadAuxBalance() {
   loading.value = true
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance/${currentAccount.value}`,
+      P_ledger.auxBalance(projectId.value, currentAccount.value),
       { params: { year: year.value } }
     )
     auxBalanceItems.value = data ?? []
@@ -1802,7 +1803,7 @@ function loadAuxTreeChildren(row: any, _treeNode: any, resolve: (data: any[]) =>
     // 第二级展开辅助编码：从后端按需查询明细
     const code = row._parentCode
     const auxCode = row._auxKey
-    api.get(`/api/projects/${projectId.value}/ledger/aux-balance-detail`, {
+    api.get(P_ledger.auxBalanceDetail(projectId.value), {
       params: { year: year.value, account_code: code, dim_type: dimType, aux_code: auxCode }
     }).then((data: any) => {
       const items = (data ?? []).map((item: any, idx: number) => ({
@@ -1899,7 +1900,7 @@ async function toggleAuxExpand(row: any) {
     if (!_auxExpandedDetails.value.has(key)) {
       try {
         const data = await api.get(
-          `/api/projects/${projectId.value}/ledger/aux-balance-detail`,
+          P_ledger.auxBalanceDetail(projectId.value),
           { params: { year: year.value, account_code: row.account_code, dim_type: auxSelectedDimType.value, aux_code: row.aux_code } }
         )
         _auxExpandedDetails.value.set(key, (data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
@@ -1969,7 +1970,7 @@ async function loadAllAuxBalance() {
   try {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
     const summaryData = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
+      P_ledger.auxBalanceSummary(projectId.value),
       { params: { year: year.value, dim_type: '__types_only__' } }
     )
     const summary = summaryData
@@ -2005,7 +2006,7 @@ async function loadAuxSummaryForDim() {
   try {
     loading.value = true
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
+      P_ledger.auxBalanceSummary(projectId.value),
       { params }
     )
     const result = data
@@ -2036,7 +2037,7 @@ async function loadAuxBalancePage() {
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance-paged`,
+      P_ledger.auxBalancePaged(projectId.value),
       { params }
     )
     const result = data
@@ -2067,7 +2068,7 @@ async function exportAuxBalanceExcel() {
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
     const blobResult = await api.get(
-      `/api/projects/${projectId.value}/ledger/export-aux-balance`,
+      P_ledger.exportAuxBalance(projectId.value),
       { params, responseType: 'blob' }
     )
     // apiProxy 直接返回 data，对 blob 响应即为 Blob 本身
@@ -2090,7 +2091,7 @@ async function exportAuxBalanceExcel() {
 async function exportBalanceExcel() {
   try {
     const blobResult = await api.get(
-      `/api/projects/${projectId.value}/ledger/export-balance`,
+      P_ledger.exportBalance(projectId.value),
       { params: { year: year.value }, responseType: 'blob' }
     )
     const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
@@ -2117,7 +2118,7 @@ async function exportLedgerExcel() {
       params.date_to = dateRange.value[1]
     }
     const blobResult = await api.get(
-      `/api/projects/${projectId.value}/ledger/export-ledger/${encodeURIComponent(currentAccount.value)}`,
+      P_ledger.exportLedger(projectId.value, currentAccount.value),
       { params, responseType: 'blob' }
     )
     const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
@@ -2160,7 +2161,7 @@ async function loadAuxLedger() {
   loading.value = true
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-entries/${currentAccount.value}`,
+      P_ledger.auxEntries(projectId.value, currentAccount.value),
       { params: { year: year.value, aux_type: currentAuxType.value, aux_code: currentAuxCode.value, page: auxLedgerPage.value, page_size: 100 } }
     )
     const result = data

@@ -325,6 +325,7 @@ import { MagicStick, EditPen, Paperclip, WarningFilled } from '@element-plus/ico
 import { getAllWpMappings, getWpPrefillData, getWpRecommendations, type WpAccountMapping, type WpPrefillData, type WpRecommendation } from '@/services/workpaperApi'
 import { getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
@@ -423,7 +424,7 @@ watch(selectedMapping, async (m) => {
   tsjData.value = null
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(m.account_name)}`,
+      P_wp.wpMappingTsj(projectId.value, m.account_name),
       { validateStatus: () => true }
     )
     const result = data
@@ -532,7 +533,7 @@ async function refreshAll() {
   }
   // 加载底稿状态（非关键，静默）
   try {
-    const wps = await api.get(`/api/projects/${projectId.value}/working-papers`, { validateStatus: (s: number) => s < 500 })
+    const wps = await api.get(P_wp.list(projectId.value), { validateStatus: (s: number) => s < 500 })
     const list = Array.isArray(wps) ? wps : (wps?.items || [])
     const map: Record<string, any> = {}
     for (const w of list) {
@@ -559,7 +560,7 @@ async function loadPrefillData(m: WpAccountMapping) {
 
 async function loadAttachments(wpCode: string) {
   try {
-    const data = await api.get(`/api/attachments`, {
+    const data = await api.get(P_att.search, {
       params: { wp_code: wpCode, project_id: projectId.value },
       validateStatus: (s: number) => s < 500,
     })
@@ -582,7 +583,7 @@ async function loadAiAnalysis(m: WpAccountMapping) {
   aiLoading.value = true
   aiAnalysis.value = null
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/wp-ai/analytical-review`, {
+    const data = await api.get(P_wpai.generateExplanation(projectId.value, ''), {
       params: { account_name: m.account_name, year: year.value },
       validateStatus: (s: number) => s < 500,
     })
@@ -609,7 +610,7 @@ async function loadPriorYear(m: WpAccountMapping) {
 async function onBatchPrefill() {
   prefillLoading.value = true
   try {
-    await api.post(`/api/projects/${projectId.value}/working-papers/batch-prefill`)
+    await api.post(P_wp.batchPrefill(projectId.value))
     ElMessage.success('批量预填充已提交')
   } catch (e: any) {
     ElMessage.warning(e?.message || '预填充失败')
@@ -631,7 +632,7 @@ async function onGenerateRecommended() {
   generatingWps.value = true
   try {
     const codes = recommendations.value.map(r => r.wp_code)
-    await api.post(`/api/projects/${projectId.value}/working-papers/generate-from-codes`, { wp_codes: codes, year: year.value })
+    await api.post(P_wp.generateFromCodes(projectId.value), { wp_codes: codes, year: year.value })
     ElMessage.success('底稿生成完成')
     recommendations.value = []
     await refreshAll()
@@ -646,7 +647,7 @@ async function onAskAI() {
   aiAsking.value = true
   aiAnswer.value = ''
   try {
-    const data = await api.post(`/api/chat/stream`, {
+    const data = await api.post('/api/chat/stream', {
       message: aiQuestion.value,
       context: `当前底稿：${selectedMapping.value.wp_code} ${selectedMapping.value.wp_name}，科目：${selectedMapping.value.account_name}`,
     })
@@ -672,7 +673,7 @@ function onOpenWorkpaper() {
 
 async function generateSingleWorkpaper(wpCode: string) {
   try {
-    await api.post(`/api/projects/${projectId.value}/working-papers/generate-from-codes`, {
+    await api.post(P_wp.generateFromCodes(projectId.value), {
       wp_codes: [wpCode],
       year: year.value,
     })
@@ -723,7 +724,7 @@ async function onAttachFileSelect(file: any) {
 }
 
 function onPreviewAttachment(id: string) {
-  window.open(`/api/attachments/${id}/preview`, '_blank')
+  window.open(`${P_att.search}/${id}/preview`, '_blank')
 }
 
 function onManageAttachments() {
@@ -734,7 +735,7 @@ async function onConfirmAssign() {
   if (!selectedMapping.value) return
   assignLoading.value = true
   try {
-    await api.put(`/api/projects/${projectId.value}/working-papers/${selectedMapping.value.wp_code}/assign`, assignForm)
+    await api.put(`${P_wp.list(projectId.value)}/${selectedMapping.value.wp_code}/assign`, assignForm)
     ElMessage.success('委派成功')
     showAssignDialog.value = false
     await refreshAll()

@@ -301,6 +301,9 @@ export const workpapers = {
   wpIndex: (pid: string) => `/api/projects/${pid}/wp-index`,
   wpCrossRefs: (pid: string) => `/api/projects/${pid}/wp-cross-refs`,
   qcSummary: (pid: string) => `/api/projects/${pid}/qc-summary`,
+  batchPrefill: (pid: string) => `/api/projects/${pid}/working-papers/batch-prefill`,
+  generateFromCodes: (pid: string) => `/api/projects/${pid}/working-papers/generate-from-codes`,
+  wpMappingTsj: (pid: string, accountName: string) => `/api/projects/${pid}/wp-mapping/tsj/${encodeURIComponent(accountName)}`,
 } as const
 
 // ─── 底稿复核批注 ───────────────────────────────────────────────────────────
@@ -834,7 +837,21 @@ export const attachments = {
 export const ledger = {
   balance: (pid: string) => `/api/projects/${pid}/ledger/balance`,
   entries: (pid: string, code: string) => `/api/projects/${pid}/ledger/entries/${encodeURIComponent(code)}`,
+  openingBalance: (pid: string, code: string) => `/api/projects/${pid}/ledger/opening-balance/${encodeURIComponent(code)}`,
+  voucher: (pid: string, voucherNo: string) => `/api/projects/${pid}/ledger/voucher/${encodeURIComponent(voucherNo)}`,
+  years: (pid: string) => `/api/projects/${pid}/ledger/years`,
+  validate: (pid: string) => `/api/projects/${pid}/ledger/validate`,
+  smartPreview: (pid: string) => `/api/projects/${pid}/ledger/smart-preview`,
+  smartImport: (pid: string) => `/api/projects/${pid}/ledger/smart-import`,
+  auxBalance: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-balance/${code}`,
+  auxBalanceDetail: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-detail`,
+  auxBalanceSummary: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-summary`,
+  auxBalancePaged: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-paged`,
+  auxEntries: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-entries/${code}`,
   auxSummary: (pid: string) => `/api/projects/${pid}/ledger/aux-summary`,
+  exportBalance: (pid: string) => `/api/projects/${pid}/ledger/export-balance`,
+  exportAuxBalance: (pid: string) => `/api/projects/${pid}/ledger/export-aux-balance`,
+  exportLedger: (pid: string, code: string) => `/api/projects/${pid}/ledger/export-ledger/${encodeURIComponent(code)}`,
   import: {
     base: (pid: string) => `/api/projects/${pid}/ledger-import`,
     datasets: (pid: string) => `/api/projects/${pid}/ledger-import/datasets`,
