@@ -73,14 +73,21 @@ async def get_prior_year_comparison(
                 "created_at": op.created_at.isoformat() if op.created_at else None,
             }
 
-    # 获取历年项目的 EQCR 意见
-    prior_data = []
-    for pp in prior_projects:
-        pp_opinions_q = select(EqcrOpinion).where(
-            EqcrOpinion.project_id == pp.id,
+    # 获取历年项目的 EQCR 意见（批量查询避免 N+1）
+    prior_project_ids = [pp.id for pp in prior_projects]
+    prior_opinions_by_project: dict = {}
+    if prior_project_ids:
+        all_prior_opinions_q = select(EqcrOpinion).where(
+            EqcrOpinion.project_id.in_(prior_project_ids),
             EqcrOpinion.is_deleted == False,  # noqa: E712
         )
-        pp_opinions = list((await db.execute(pp_opinions_q)).scalars().all())
+        all_prior_opinions = list((await db.execute(all_prior_opinions_q)).scalars().all())
+        for op in all_prior_opinions:
+            prior_opinions_by_project.setdefault(op.project_id, []).append(op)
+
+    prior_data = []
+    for pp in prior_projects:
+        pp_opinions = prior_opinions_by_project.get(pp.id, [])
         pp_by_domain: dict = {}
         for op in pp_opinions:
             if op.domain not in pp_by_domain:

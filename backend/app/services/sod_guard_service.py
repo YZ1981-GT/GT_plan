@@ -136,6 +136,16 @@ class SoDGuardService:
 
         return SoDCheckResult(allowed=True, trace_id=trace_id)
 
+    async def check_assignment_independence(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        staff_id: uuid.UUID,
+        new_role: str,
+    ) -> None:
+        """DB 级 EQCR 独立性校验（委托给 EqcrIndependenceRule）。"""
+        await eqcr_independence_rule.check(db, project_id, staff_id, new_role)
+
 
 # 全局单例
 sod_guard_service = SoDGuardService()
@@ -311,16 +321,4 @@ def validate_eqcr_sod_in_batch(assignments: list[dict]) -> None:
             )
 
 
-# 给 SoDGuardService 挂载 check_assignment_independence 方法（DB 级单次校验）
-async def _check_assignment_independence(
-    self,
-    db: AsyncSession,
-    project_id: uuid.UUID,
-    staff_id: uuid.UUID,
-    new_role: str,
-) -> None:
-    """DB 级 EQCR 独立性校验（委托给 EqcrIndependenceRule）。"""
-    await eqcr_independence_rule.check(db, project_id, staff_id, new_role)
 
-
-SoDGuardService.check_assignment_independence = _check_assignment_independence

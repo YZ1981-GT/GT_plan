@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.services.eqcr_service import EqcrService
+from app.services.eqcr_domain_service import EqcrDomainService
 
 from .schemas import EqcrOpinionCreate, EqcrOpinionUpdate
 
@@ -28,7 +28,7 @@ async def get_eqcr_materiality(
     current_user: User = Depends(get_current_user),
 ):
     """需求 2.2：重要性 Tab 数据聚合 + 本域意见历史。"""
-    svc = EqcrService(db)
+    svc = EqcrDomainService(db)
     return await svc.get_materiality(project_id)
 
 
@@ -39,7 +39,7 @@ async def get_eqcr_estimates(
     current_user: User = Depends(get_current_user),
 ):
     """需求 2.3：会计估计 Tab 数据（底稿维度聚合）。"""
-    svc = EqcrService(db)
+    svc = EqcrDomainService(db)
     return await svc.get_estimates(project_id)
 
 
@@ -50,7 +50,7 @@ async def get_eqcr_related_parties(
     current_user: User = Depends(get_current_user),
 ):
     """需求 2.4：关联方 Tab 数据（注册表 + 交易明细）。"""
-    svc = EqcrService(db)
+    svc = EqcrDomainService(db)
     return await svc.get_related_parties(project_id)
 
 
@@ -61,7 +61,7 @@ async def get_eqcr_going_concern(
     current_user: User = Depends(get_current_user),
 ):
     """需求 2.5：持续经营 Tab 数据（复用 GoingConcernEvaluation 模型）。"""
-    svc = EqcrService(db)
+    svc = EqcrDomainService(db)
     return await svc.get_going_concern(project_id)
 
 
@@ -72,7 +72,7 @@ async def get_eqcr_opinion_type(
     current_user: User = Depends(get_current_user),
 ):
     """需求 2.6：审计意见类型 Tab 数据（AuditReport 视角 + 本域意见历史）。"""
-    svc = EqcrService(db)
+    svc = EqcrDomainService(db)
     return await svc.get_opinion_type(project_id)
 
 
@@ -88,7 +88,7 @@ async def create_eqcr_opinion(
     current_user: User = Depends(get_current_user),
 ):
     """新建一条 EQCR 判断域意见（对应需求 2.7）。"""
-    svc = EqcrService(db)
+    svc = EqcrDomainService(db)
     try:
         result = await svc.create_opinion(
             project_id=payload.project_id,
@@ -112,7 +112,7 @@ async def update_eqcr_opinion(
     current_user: User = Depends(get_current_user),
 ):
     """更新一条 EQCR 意见。只有创建人（或 admin）可改。"""
-    svc = EqcrService(db)
+    svc = EqcrDomainService(db)
     from app.models.eqcr_models import EqcrOpinion
 
     existing = (

@@ -31,7 +31,6 @@ inclusion: always
 - 每轮 requirements.md 起草后必须做"代码锚定交叉核验"（grep 所有假设的字段/表/端点/枚举），发现硬错立刻回补到文档，避免错误带到 design 阶段
 - 标任务 [x] 前必须跑 pytest 或对应测试通过，而非仅因"代码文件存在"就标完成；用户明确要求做完整复盘时要诚实暴露问题而非粉饰
 - 审查/分析类任务必须给出明确结论和改进建议（分优先级 P0/P1/P2），不能只堆文件大小/端点数量等细节就停
-- 候选下一轮 spec："R5 技术债清理"：路由拆分 eqcr.py (71KB/38端点→按域拆子模块) / 消除 monkey-patch (EqcrService 5 域方法 + SoDGuardService.check_assignment_independence) / list_my_projects N+1 合并 / client_aliases 表取代启发式匹配 / 批量替换 datetime.utcnow()
 
 ## Spec 工作流规范（production-readiness 复盘沉淀）
 
@@ -112,7 +111,11 @@ inclusion: always
 - assignment_service.ROLE_MAP 和 role_context_service._ROLE_PRIORITY 两个字典是角色体系单一真源，新增 role='eqcr' 已同时更新；_ROLE_PRIORITY 当前 partner(5)/eqcr(5)/qc(4)/manager(3)/auditor(2)/readonly(1)
 - GoingConcernEvaluation 模型已存在（collaboration_models.py），Round 5 EQCR 持续经营 Tab 可直接复用，不要重复建模
 - 归档包设计决策：采用"插件化章节"模式（00/01/02/.../99 顺序），各 Round 各自插入章节，Round 1 需求 6 只预留机制
-- 归档包章节号分配：00 项目封面 / 01 签字流水（R1）/ 02 EQCR 备忘录（R5）/ 03 质控抽查报告（R3）/ 10 底稿/ / 20 报表/ / 30 附注/ / 40 附件/ / 99 审计日志
+- EQCR 路由架构（f333788 重构后）：`backend/app/routers/eqcr/` 包含 12 子模块（workbench/opinions/notes/related_parties/shadow_compute/gate/memo/time_tracking/independence/prior_year/metrics/constants），`__init__.py` 聚合导出 router + 所有端点函数（向后兼容测试）
+- EQCR 枚举端点：`GET /api/eqcr/constants` 返回 domains/verdicts/progress_states，前端启动时拉取避免硬编码漂移
+- R5 Alembic 迁移链：round5_eqcr_20260505 → round5_independence_20260506 → round5_eqcr_check_constraints_20260506（PG CHECK domain+verdict）
+- datetime.utcnow() 已全局清理（81 文件），统一 `datetime.now(timezone.utc)`；后续新代码禁止使用 utcnow()
+- 归档包章节号分配：00 项目封面 / 01 签字流水（R1）/ 02 EQCR 备忘录（R5，已注册）/ 03 质控抽查报告（R3）/ 04 独立性声明（R1）/ 10 底稿/ / 20 报表/ / 30 附注/ / 40 附件/ / 99 审计日志
 - 审计意见锁定架构决策：不新增 opinion_locked_at 平行字段，改为扩展 ReportStatus 状态机 draft→review→eqcr_approved→final（R5 需求 6 + README 跨轮约束第 3 条）
 - 枚举扩展硬约定：IssueTicket.source 在 R1 一次性预留 11 个值（L2/L3/Q/review_comment/consistency/ai/reminder/client_commitment/pbc/confirmation/qc_inspection），ProjectAssignment.role 预留 eqcr，避免多轮迁移
 - 权限矩阵四点同步约定：新增 role/动作需同时更新 assignment_service.ROLE_MAP + role_context_service._ROLE_PRIORITY + 前端 ROLE_MAP + composables/usePermission.ROLE_PERMISSIONS
@@ -166,7 +169,8 @@ inclusion: always
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
 - **Round 4 已全部完成**（Sprint 1-3 共 23 任务）：三栏编辑器（程序要求侧栏+AI侧栏）/SmartTipList可点击定位/上年对比/按金额穿透/预填充provenance/移动端只读/附件拖拽/焦点追踪时间线/编辑软锁/OCR字段提取；已提交推送 03e125d
 - Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
-- Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，133 个 EQCR 测试全通过（14 个测试文件）；`test_eqcr_sod.py` import 错误已修复（e22cff0，添加 `validate_eqcr_sod_in_batch` + `check_assignment_independence` 兼容 API 薄包装）
+- Round 5 实施进度：**全部完成 + 14 项技术债清理**（f333788），147 个 EQCR 测试全通过；R5 关闭，无需再开新轮
+- R5 残留 P3（顺手修）：sod_guard_service 仍有 1 处 monkey-patch / prior_year.py 历年对比小 N+1（max 3 项目可忽略）/ SQLAlchemy 内部 utcnow warning（等上游修）/ EqcrRelatedParties 拆分需确认原文件是否引用子组件 / eqcr_service.py 850 行未来可拆 Workbench+Domain 两个 service
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）
