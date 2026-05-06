@@ -99,7 +99,7 @@ inclusion: always
 - ReviewWorkstation.vue 已确认删除（R6 Task 8 验证 fileSearch 零命中）
 - backend/app/routers/pbc.py 和 confirmations.py 返回 `{"status": "developing", "items": [], "note": "..."}`，maturity 标记为 developing（R6 Task 8）
 - apiPaths.ts 当前 **244** 个 API 端点（2026-05-07），dead-link-check.js 验证零死链；新增 qcRules/qcInspections/qcCases/qcAnnualReports/qcAuditLogCompliance/qcArchiveReadiness 6 个路径对象
-- 前端 service 硬编码路径迁移进度：6 个小文件已完成（qcRuleApi/qcInspectionApi/qcCaseApi/qcAnnualReportApi/qcAuditLogComplianceApi/archiveApi），3 个大文件待做（commonApi 105处/collaborationApi 90处/aiApi 62处）
+- 前端 service 硬编码路径迁移 **全部完成**（2026-05-07）：9 个文件共 257 处硬编码→0，全部使用 apiPaths 常量。最新 commit 6723fd9
 - CI 新增 vue-tsc --noEmit 步骤到 frontend-build job（.github/workflows/ci.yml）
 - docs/API_CHANGELOG.md 记录 R4-R6 端点变更；docs/templates/NEW_API_ENDPOINT.md 三件套模板
 - archive 对象已重构：`archive`→`orchestrate`，新增 `job(pid,jobId)` 和 `retry(pid,jobId)`
@@ -234,7 +234,8 @@ inclusion: always
 - `GtStatusTag.STATUS_MAP_TO_DICT_KEY` 是硬编码映射表，新增 StatusMap 时需手动维护 [P3]
 - PBC 清单真实实现（R7+ 计划，后端当前 stub）[P2]
 - 函证管理真实实现（R7+ 计划，后端当前 stub）[P2]
-- 统一 commonApi.ts / collaborationApi.ts / aiApi.ts 硬编码路径到 apiPaths 常量（257 处，大工作量）[P3]
+- Vue 文件绕过 service 层直接调用 API：86 个文件 / 322 处（复盘发现），策略"触碰即修"+CI 卡点防恶化 [P3]
+- 函证管理真实实现（R7+ 计划，后端当前 stub）[P2]
 
 ## 底稿编码体系（致同 2025 修订版）
 

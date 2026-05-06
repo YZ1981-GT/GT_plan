@@ -145,7 +145,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
+import { getCases, getCaseDetail } from '@/services/qcCaseApi'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -240,17 +240,13 @@ async function loadCases() {
     if (filters.value.severity) params.set('severity', filters.value.severity)
     if (filters.value.search) params.set('search', filters.value.search)
 
-    const data = await api.get<any>(`/api/qc/cases?${params.toString()}`)
-    if (Array.isArray(data)) {
-      cases.value = data
-      total.value = data.length
-    } else if (data && Array.isArray(data.items)) {
-      cases.value = data.items
-      total.value = data.total || data.items.length
-    } else {
-      cases.value = []
-      total.value = 0
-    }
+    const data = await getCases({
+      category: filters.value.category || undefined,
+      severity: filters.value.severity || undefined,
+      search: filters.value.search || undefined,
+    })
+    cases.value = (data.items || []) as any
+    total.value = data.total || 0
   } catch {
     cases.value = []
     total.value = 0
@@ -273,8 +269,8 @@ async function onRowClick(row: CaseItem) {
   detailVisible.value = true
   loadingDetail.value = true
   try {
-    const data = await api.get<CaseDetail>(`/api/qc/cases/${row.id}`)
-    detailData.value = data
+    const data = await getCaseDetail(row.id)
+    detailData.value = data as any
   } catch {
     ElMessage.error('加载案例详情失败')
     detailData.value = { ...row, description: '', lessons_learned: '', related_standards: [] }

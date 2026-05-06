@@ -64,7 +64,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { api } from '@/services/apiProxy'
+import { getQcRules } from '@/services/qcRuleApi'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -121,15 +121,8 @@ function scopeLabel(scope: string): string {
 async function loadRules() {
   loading.value = true
   try {
-    const data = await api.get<any>('/api/qc/rules')
-    // 后端可能返回 {items, total} 或直接数组
-    if (Array.isArray(data)) {
-      rules.value = data
-    } else if (data && Array.isArray(data.items)) {
-      rules.value = data.items
-    } else {
-      rules.value = []
-    }
+    const data = await getQcRules()
+    rules.value = (data.items || []) as any
   } catch {
     rules.value = []
   } finally {

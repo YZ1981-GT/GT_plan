@@ -225,7 +225,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
+import { getInspections, getInspectionDetail, submitVerdict as apiSubmitVerdict, generateReport as genReport } from '@/services/qcInspectionApi'
+import { getAuditLogFindings, runAuditLogCompliance, updateFindingStatus } from '@/services/qcAuditLogComplianceApi'
+import http from '@/utils/http'
+import { qcInspections as P_insp } from '@/services/apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -385,9 +388,9 @@ function formatDate(dateStr: string): string {
 async function loadBatches() {
   loadingBatches.value = true
   try {
-    const data = await api.get<any>('/api/qc/inspections')
-    if (Array.isArray(data)) {
-      batches.value = data
+    const data = await getInspections()
+    if (Array.isArray(data.items)) {
+      batches.value = data.items as any
     } else if (data && Array.isArray(data.items)) {
       batches.value = data.items
     } else {
@@ -408,8 +411,8 @@ async function onBatchSelect(batch: InspectionBatch | null) {
   }
   loadingItems.value = true
   try {
-    const data = await api.get<any>(`/api/qc/inspections/${batch.id}`)
-    items.value = data.items || data || []
+    const data = await getInspectionDetail(batch.id)
+    items.value = (data.items || []) as any
   } catch {
     items.value = []
   } finally {
@@ -432,10 +435,11 @@ async function submitVerdict() {
   if (!selectedBatch.value) return
   submittingVerdict.value = true
   try {
-    await api.post(
-      `/api/qc/inspections/${selectedBatch.value.id}/items/${verdictForm.value.item_id}/verdict`,
+    await apiSubmitVerdict(
+      selectedBatch.value.id,
+      verdictForm.value.item_id,
       {
-        verdict: verdictForm.value.verdict,
+        verdict: verdictForm.value.verdict as 'pass' | 'conditional_pass' | 'fail',
         findings: verdictForm.value.findings,
       }
     )
@@ -453,7 +457,7 @@ async function submitVerdict() {
 async function createInspection() {
   creating.value = true
   try {
-    await api.post('/api/qc/inspections', {
+    await http.post(P_insp.list, {
       project_name: newForm.value.project_name,
       strategy: newForm.value.strategy,
       reviewer: newForm.value.reviewer,
@@ -474,13 +478,10 @@ async function createInspection() {
 async function loadAuditLogFindings() {
   auditLogLoading.value = true
   try {
-    const data = await api.get<any>('/api/qc/audit-log-compliance/findings')
+    const data = await getAuditLogFindings()
     if (data && Array.isArray(data.items)) {
-      auditLogFindings.value = data.items
+      auditLogFindings.value = data.items as any
       auditLogTotal.value = data.total || data.items.length
-    } else if (Array.isArray(data)) {
-      auditLogFindings.value = data
-      auditLogTotal.value = data.length
     } else {
       auditLogFindings.value = []
       auditLogTotal.value = 0
@@ -496,9 +497,7 @@ async function loadAuditLogFindings() {
 async function runAuditLogScan() {
   scanLoading.value = true
   try {
-    const result = await api.post<any>('/api/qc/audit-log-compliance/run', {
-      time_window_hours: 720,
-    })
+    const result = await runAuditLogCompliance({ time_window_hours: 720 })
     ElMessage.success(result.message || '扫描完成')
     // 刷新列表
     await loadAuditLogFindings()
@@ -511,9 +510,7 @@ async function runAuditLogScan() {
 
 async function markAsReviewed(finding: AuditLogFinding) {
   try {
-    await api.patch(`/api/qc/audit-log-compliance/findings/${finding.id}/status`, {
-      status: 'reviewed',
-    })
+    await updateFindingStatus(finding.id, 'reviewed')
     finding.review_status = 'reviewed'
     ElMessage.success('已标记为已处理')
   } catch {
@@ -525,9 +522,7 @@ async function generateReport() {
   if (!selectedBatch.value) return
   generatingReport.value = true
   try {
-    const response = await import('@/utils/http').then(m =>
-      m.default.get(`/api/qc/inspections/${selectedBatch.value!.id}/report`, { responseType: 'blob' })
-    )
+    const response = await http.get(P_insp.report(selectedBatch.value!.id), { responseType: 'blob' })
     const blob = new Blob([response.data])
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')

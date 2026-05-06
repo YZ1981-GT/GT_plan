@@ -138,7 +138,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
+import { getQcRule, updateQcRule, dryRunQcRule } from '@/services/qcRuleApi'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -223,7 +223,7 @@ function addTag() {
 async function loadRule() {
   loading.value = true
   try {
-    const data = await api.get<any>(`/api/qc/rules/${ruleId}`)
+    const data = await getQcRule(ruleId)
     form.value = {
       rule_code: data.rule_code || '',
       title: data.title || '',
@@ -233,7 +233,7 @@ async function loadRule() {
       expression_type: data.expression_type || 'python',
       expression: data.expression || '',
       enabled: data.enabled ?? true,
-      standard_ref: data.standard_ref || [],
+      standard_ref: (data.standard_ref || []) as any,
       version: data.version || 1,
     }
     // Build version history from current version
@@ -251,14 +251,14 @@ async function loadRule() {
 async function saveRule() {
   saving.value = true
   try {
-    await api.patch(`/api/qc/rules/${ruleId}`, {
+    await updateQcRule(ruleId, {
       title: form.value.title,
       description: form.value.description,
-      severity: form.value.severity,
-      scope: form.value.scope,
+      severity: form.value.severity as any,
+      scope: form.value.scope as any,
       expression: form.value.expression,
       enabled: form.value.enabled,
-      standard_ref: form.value.standard_ref,
+      standard_ref: form.value.standard_ref as any,
     })
     ElMessage.success('保存成功')
     await loadRule()
@@ -272,8 +272,8 @@ async function saveRule() {
 async function dryRun() {
   dryRunning.value = true
   try {
-    const result = await api.post<DryRunResult>(`/api/qc/rules/${ruleId}/dry-run`)
-    dryRunResult.value = result
+    const result = await dryRunQcRule(ruleId, { scope: 'all' })
+    dryRunResult.value = result as any
     dryRunDialogVisible.value = true
     hasRunDryRun.value = true
   } catch {

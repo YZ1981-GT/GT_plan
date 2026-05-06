@@ -82,8 +82,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
+import { listAnnualReports, generateAnnualReport, downloadAnnualReport } from '@/services/qcAnnualReportApi'
 import http from '@/utils/http'
+import { qcAnnualReports as P_ar } from '@/services/apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -146,9 +147,9 @@ function hasRunningReport(): boolean {
 async function loadReports() {
   loading.value = true
   try {
-    const data = await api.get<any>('/api/qc/annual-reports')
-    if (Array.isArray(data)) {
-      reports.value = data
+    const data = await listAnnualReports()
+    if (Array.isArray(data.items)) {
+      reports.value = data.items
     } else if (data && Array.isArray(data.items)) {
       reports.value = data.items
     } else {
@@ -166,7 +167,7 @@ async function loadReports() {
 async function generateReport() {
   generating.value = true
   try {
-    await api.post(`/api/qc/annual-reports?year=${generateForm.value.year}`)
+    await generateAnnualReport(generateForm.value.year)
     ElMessage.success('年报生成任务已提交')
     showGenerateDialog.value = false
     await loadReports()
@@ -180,7 +181,7 @@ async function generateReport() {
 async function downloadReport(row: ReportItem) {
   row._downloading = true
   try {
-    const response = await http.get(`/api/qc/annual-reports/${row.id}/download`, {
+    const response = await http.get(P_ar.download(row.id), {
       responseType: 'blob',
     })
     const blob = new Blob([response.data])
@@ -206,9 +207,9 @@ function managePoll() {
     if (!pollTimer) {
       pollTimer = setInterval(async () => {
         try {
-          const data = await api.get<any>('/api/qc/annual-reports')
-          if (Array.isArray(data)) {
-            reports.value = data
+          const data = await listAnnualReports()
+          if (Array.isArray(data.items)) {
+            reports.value = data.items
           } else if (data && Array.isArray(data.items)) {
             reports.value = data.items
           }
