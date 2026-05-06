@@ -270,3 +270,57 @@ class EqcrIndependenceRule:
 
 # 规则单例（对齐 ``sod_guard_service`` 命名风格）
 eqcr_independence_rule = EqcrIndependenceRule()
+
+
+# ---------------------------------------------------------------------------
+# 兼容 API：供 test_eqcr_sod.py 和 assignment_service 调用
+# ---------------------------------------------------------------------------
+
+
+def validate_eqcr_sod_in_batch(assignments: list[dict]) -> None:
+    """批内 EQCR 独立性预检（纯函数，不访问 DB）。
+
+    遍历 assignments 列表，检查同一 staff_id 是否同时持有 eqcr 与
+    signing_partner/manager/auditor/qc 角色。违规抛 :class:`SodViolation`。
+
+    Args:
+        assignments: [{"staff_id": str, "role": str}, ...]
+    """
+    if not assignments:
+        return
+
+    # 按 staff_id 分组收集角色
+    staff_roles: dict[str, set[str]] = {}
+    for item in assignments:
+        sid = item.get("staff_id", "")
+        role = item.get("role", "")
+        if not sid or not role:
+            continue
+        staff_roles.setdefault(sid, set()).add(role)
+
+    conflict_roles = EqcrIndependenceRule.CONFLICT_ROLES | {"qc"}
+
+    for staff_id, roles in staff_roles.items():
+        if "eqcr" not in roles:
+            continue
+        conflicts = roles & conflict_roles
+        if conflicts:
+            raise SodViolation(
+                f"人员 {staff_id} 在同批次中同时持有 eqcr 与 {sorted(conflicts)} 角色，违反独立性",
+                policy_code=EqcrIndependenceRule.POLICY_CODE,
+            )
+
+
+# 给 SoDGuardService 挂载 check_assignment_independence 方法（DB 级单次校验）
+async def _check_assignment_independence(
+    self,
+    db: AsyncSession,
+    project_id: uuid.UUID,
+    staff_id: uuid.UUID,
+    new_role: str,
+) -> None:
+    """DB 级 EQCR 独立性校验（委托给 EqcrIndependenceRule）。"""
+    await eqcr_independence_rule.check(db, project_id, staff_id, new_role)
+
+
+SoDGuardService.check_assignment_independence = _check_assignment_independence
