@@ -17,6 +17,7 @@ import {
   wpDependencies as P_wdep, reportFormatTemplates as P_rft,
   sampling as P_samp, processRecord as P_pr, wpAI as P_wpai,
   projects as P_projects, jobs as P_jobs,
+  aiPlugins as P_aip, gtCoding as P_gtc,
 } from '@/services/apiPaths'
 
 // ── 项目 ──
@@ -105,12 +106,12 @@ export async function getDashboardAvailableStaff(maxHours: number): Promise<any>
 // ── 一致性检查 ──
 
 export async function runConsistencyCheck(projectId: string, year = 2025): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/consistency-check/run`, null, { params: { year } })
+  const { data } = await http.post(P_proj.consistencyCheck.run(projectId), null, { params: { year } })
   return data
 }
 
 export async function getConsistencyCheck(projectId: string, year = 2025): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/consistency-check`, { params: { year } })
+  const { data } = await http.get(P_proj.consistencyCheck.get(projectId), { params: { year } })
   return data
 }
 
@@ -344,17 +345,17 @@ export async function uploadAttachment(projectId: string, formData: FormData): P
 // ── 审计程序裁剪 ──
 
 export async function initProcedures(projectId: string, cycle: string): Promise<any[]> {
-  const { data } = await http.post(`/api/projects/${projectId}/procedures/${cycle}/init`)
+  const { data } = await http.post(P_proc.init(projectId, cycle))
   return data?.procedures || (Array.isArray(data) ? data : [])
 }
 
 export async function addCustomProcedure(projectId: string, cycle: string, body: any): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/procedures/${cycle}/custom`, body)
+  const { data } = await http.post(P_proc.custom(projectId, cycle), body)
   return data
 }
 
 export async function applyProcedureScheme(projectId: string, cycle: string, sourceProjectId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/procedures/${cycle}/apply-scheme`, null, {
+  const { data } = await http.post(P_proc.applyScheme(projectId, cycle), null, {
     params: { source_project_id: sourceProjectId },
   })
   return data
@@ -393,17 +394,17 @@ export async function deleteKnowledgeDoc(apiBase: string, name: string): Promise
 // ── 项目看板 ──
 
 export async function getWorkpaperProgress(projectId: string): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/workpapers/progress`)
+  const { data } = await http.get(P_wp.progress(projectId))
   return data
 }
 
 export async function getOverdueWorkpapers(projectId: string, days = 7): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/workpapers/overdue`, { params: { days } })
+  const { data } = await http.get(P_wp.overdue(projectId), { params: { days } })
   return Array.isArray(data) ? data : []
 }
 
 export async function getProjectWorkHours(projectId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/work-hours`)
+  const { data } = await http.get(P_proj.workHours(projectId))
   return Array.isArray(data) ? data : []
 }
 
@@ -411,27 +412,27 @@ export async function getProjectWorkHours(projectId: string): Promise<any[]> {
 // ── T型账户 ──
 
 export async function listTAccounts(projectId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/t-accounts`)
+  const { data } = await http.get(P_ta.list(projectId))
   return Array.isArray(data) ? data : []
 }
 
 export async function getTAccount(projectId: string, id: string): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/t-accounts/${id}`)
+  const { data } = await http.get(P_ta.detail(projectId, id))
   return data
 }
 
 export async function createTAccount(projectId: string, body: any): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/t-accounts`, body)
+  const { data } = await http.post(P_ta.list(projectId), body)
   return data
 }
 
 export async function addTAccountEntry(projectId: string, accountId: string, entry: any): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/t-accounts/${accountId}/entries`, entry)
+  const { data } = await http.post(P_ta.entries(projectId, accountId), entry)
   return data
 }
 
 export async function calculateTAccount(projectId: string, accountId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/t-accounts/${accountId}/calculate`)
+  const { data } = await http.post(P_ta.calculate(projectId, accountId))
   return data
 }
 
@@ -488,34 +489,34 @@ export async function retryFiling(id: string): Promise<void> {
 // ── AI插件 ──
 
 export async function listAIPlugins(): Promise<any[]> {
-  const { data } = await http.get('/api/ai-plugins')
+  const { data } = await http.get(P_aip.list)
   return Array.isArray(data) ? data : []
 }
 
 // ── GT编码 ──
 
 export async function listGTCoding(): Promise<any[]> {
-  const { data } = await http.get('/api/gt-coding')
+  const { data } = await http.get(P_gtc.list)
   return Array.isArray(data) ? data : []
 }
 
 // ── 复核对话 ──
 
 export async function listReviewConversations(projectId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/review-conversations`)
+  const { data } = await http.get(P_rc.projectList(projectId))
   return Array.isArray(data) ? data : []
 }
 
 // ── 穿透查询（移动端） ──
 
 export async function getLedgerBalance(projectId: string, year: number): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/ledger/balance`, { params: { year } })
+  const { data } = await http.get(P_ledger.balance(projectId), { params: { year } })
   return Array.isArray(data) ? data : []
 }
 
 export async function getLedgerEntries(projectId: string, code: string, year: number, page = 1, pageSize = 50): Promise<any> {
   const { data } = await http.get(
-    `/api/projects/${projectId}/ledger/entries/${encodeURIComponent(code)}`,
+    P_ledger.entries(projectId, code),
     { params: { year, page, page_size: pageSize } },
   )
   return data
@@ -565,24 +566,24 @@ export async function getDashboardHoursHeatmap(): Promise<any[]> {
 // ── 批注 ──
 
 export async function listWorkpaperAnnotations(projectId: string, objectType: string, objectId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/annotations`, {
+  const { data } = await http.get(P_ann.list(projectId), {
     params: { object_type: objectType, object_id: objectId },
   })
   return Array.isArray(data) ? data : []
 }
 
 export async function createAnnotation(projectId: string, body: any): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/annotations`, body)
+  const { data } = await http.post(P_ann.list(projectId), body)
   return data
 }
 
 export async function updateAnnotation(id: string, body: any): Promise<any> {
-  const { data } = await http.put(`/api/annotations/${id}`, body)
+  const { data } = await http.put(P_ann.update(id), body)
   return data
 }
 
 export async function listAnnotations(projectId: string, filters?: { status?: string; priority?: string }): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/annotations`, { params: filters })
+  const { data } = await http.get(P_ann.list(projectId), { params: filters })
   return Array.isArray(data) ? data : (data || [])
 }
 
@@ -604,7 +605,7 @@ export async function getFeatureMaturity(): Promise<Record<string, string>> {
 // ── 底稿提交复核 ──
 
 export async function submitWorkpaperReview(projectId: string, wpId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/submit-review`)
+  const { data } = await http.post(P_wp.submitReview(projectId, wpId))
   return data
 }
 
@@ -616,17 +617,17 @@ export async function submitWorkpaperReview(projectId: string, wpId: string): Pr
 // ── 过程记录 ──
 
 export async function getEditHistory(projectId: string, wpId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/process-record/projects/${projectId}/workpapers/${wpId}/edit-history`)
+  const { data } = await http.get(P_pr.editHistory(projectId, wpId))
   return Array.isArray(data) ? data : []
 }
 
 export async function getWpAttachments(projectId: string, wpId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/process-record/projects/${projectId}/workpapers/${wpId}/attachments`)
+  const { data } = await http.get(P_pr.attachments(projectId, wpId))
   return Array.isArray(data) ? data : []
 }
 
 export async function getAttachmentWorkpapers(attachmentId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/process-record/attachments/${attachmentId}/workpapers`)
+  const { data } = await http.get(P_pr.attachmentWorkpapers(attachmentId))
   return Array.isArray(data) ? data : []
 }
 
@@ -637,27 +638,27 @@ export async function linkAttachment(attachmentId: string, wpId: string): Promis
 export async function getPendingAIContent(projectId: string, workpaperId?: string): Promise<any[]> {
   const params: Record<string, string> = {}
   if (workpaperId) params.workpaper_id = workpaperId
-  const { data } = await http.get(`/api/process-record/projects/${projectId}/ai-content/pending`, { params })
+  const { data } = await http.get(P_pr.pendingAIContent(projectId), { params })
   return Array.isArray(data) ? data : []
 }
 
 export async function confirmAIContent(contentId: string, status: string): Promise<void> {
-  await http.put(`/api/process-record/ai-content/${contentId}/confirm`, { status })
+  await http.put(P_pr.confirmAIContent(contentId), { status })
 }
 
 export async function checkUnconfirmedAI(projectId: string, wpId: string): Promise<any> {
-  const { data } = await http.get(`/api/process-record/projects/${projectId}/workpapers/${wpId}/ai-check`)
+  const { data } = await http.get(P_pr.aiCheck(projectId, wpId))
   return data
 }
 
 // ── LLM 底稿对话 ──
 
 export function wpChatSSE(wpId: string, message: string, context?: Record<string, any>) {
-  return http.post(`/api/workpapers/${wpId}/ai/chat`, { message, context }, { responseType: 'stream' })
+  return http.post(P_wpai.chat(wpId), { message, context }, { responseType: 'stream' })
 }
 
 export async function generateLedgerAnalysis(projectId: string, body: { account_codes?: string[]; year?: number }): Promise<any> {
-  const { data } = await http.post(`/api/workpapers/projects/${projectId}/ai/generate-ledger-analysis`, body)
+  const { data } = await http.post(P_wpai.generateLedgerAnalysis(projectId), body)
   return data
 }
 
@@ -668,19 +669,19 @@ export interface AgingBracket { label: string; min_days: number; max_days: numbe
 export async function cutoffTest(projectId: string, body: {
   account_codes: string[]; year: number; days_before?: number; days_after?: number; amount_threshold?: number
 }): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/sampling/cutoff-test`, body)
+  const { data } = await http.post(P_samp.cutoffTest(projectId), body)
   return data
 }
 
 export async function agingAnalysis(projectId: string, body: {
   account_code: string; aging_brackets: AgingBracket[]; base_date: string; year?: number
 }): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/sampling/aging-analysis`, body)
+  const { data } = await http.post(P_samp.agingAnalysis(projectId), body)
   return data
 }
 
 export async function monthlyDetail(projectId: string, body: { account_code: string; year: number }): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/sampling/monthly-detail`, body)
+  const { data } = await http.post(P_samp.monthlyDetail(projectId), body)
   return data
 }
 
@@ -695,7 +696,7 @@ export interface ConversationItem {
 export async function createConversation(projectId: string, body: {
   target_id: string; related_object_type: string; related_object_id?: string; cell_ref?: string; title: string
 }): Promise<any> {
-  const { data } = await http.post(`/api/review-conversations?project_id=${projectId}`, body)
+  const { data } = await http.post(`${P_rc.list}?project_id=${projectId}`, body)
   return data
 }
 
@@ -707,23 +708,23 @@ export async function listConversations(projectId: string, status?: string): Pro
 }
 
 export async function getMessages(conversationId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/review-conversations/${conversationId}/messages`)
+  const { data } = await http.get(P_rc.messages(conversationId))
   return Array.isArray(data) ? data : []
 }
 
 export async function sendMessage(conversationId: string, body: {
   content: string; message_type?: string; attachment_path?: string
 }): Promise<any> {
-  const { data } = await http.post(`/api/review-conversations/${conversationId}/messages`, body)
+  const { data } = await http.post(P_rc.messages(conversationId), body)
   return data
 }
 
 export async function closeConversation(conversationId: string): Promise<void> {
-  await http.put(`/api/review-conversations/${conversationId}/close`)
+  await http.put(P_rc.close(conversationId))
 }
 
 export async function exportConversation(conversationId: string): Promise<any> {
-  const { data } = await http.post(`/api/review-conversations/${conversationId}/export`)
+  const { data } = await http.post(P_rc.export(conversationId))
   return data
 }
 
@@ -747,27 +748,27 @@ export async function createPost(body: { title: string; content: string; categor
 }
 
 export async function getComments(postId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/forum/posts/${postId}/comments`)
+  const { data } = await http.get(P_forum.comments(postId))
   return Array.isArray(data) ? data : data?.items || data?.comments || []
 }
 
 export async function createComment(postId: string, content: string): Promise<void> {
-  await http.post(`/api/forum/posts/${postId}/comments`, { content })
+  await http.post(P_forum.comments(postId), { content })
 }
 
 export async function likePost(postId: string): Promise<void> {
-  await http.post(`/api/forum/posts/${postId}/like`)
+  await http.post(P_forum.like(postId))
 }
 
 // ── 溯源 ──
 
 export async function traceSection(projectId: string, sectionNumber: string): Promise<any> {
-  const { data } = await http.get(`/api/report-review/${projectId}/trace/${encodeURIComponent(sectionNumber)}`)
+  const { data } = await http.get(P_rr.trace(projectId, sectionNumber))
   return data
 }
 
 export async function findingsSummary(projectId: string): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/findings-summary`)
+  const { data } = await http.get(P_proj.findingsSummary(projectId))
   return data
 }
 
@@ -776,11 +777,11 @@ export async function findingsSummary(projectId: string): Promise<any> {
 export async function checkIn(staffId: string, body: {
   latitude?: number; longitude?: number; location_name?: string; check_type?: string
 }): Promise<void> {
-  await http.post(`/api/staff/${staffId}/check-in`, body)
+  await http.post(P_staff.checkIn(staffId), body)
 }
 
 export async function listCheckIns(staffId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/staff/${staffId}/check-ins`)
+  const { data } = await http.get(P_staff.checkIns(staffId))
   return Array.isArray(data) ? data : []
 }
 
@@ -789,54 +790,54 @@ export async function listCheckIns(staffId: string): Promise<any[]> {
 export async function auxSummary(projectId: string, year?: number): Promise<any[]> {
   const params: Record<string, any> = {}
   if (year) params.year = year
-  const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-summary`, { params })
+  const { data } = await http.get(P_ledger.auxSummary(projectId), { params })
   return Array.isArray(data) ? data : []
 }
 
 // ── 合并锁定 ──
 
 export async function lockProject(projectId: string): Promise<void> {
-  await http.post(`/api/consolidation/${projectId}/lock`)
+  await http.post(P_consol.lock(projectId))
 }
 
 export async function unlockProject(projectId: string): Promise<void> {
-  await http.post(`/api/consolidation/${projectId}/unlock`)
+  await http.post(P_consol.unlock(projectId))
 }
 
 export async function checkLockStatus(projectId: string): Promise<any> {
-  const { data } = await http.get(`/api/consolidation/${projectId}/lock-status`)
+  const { data } = await http.get(P_consol.lockStatus(projectId))
   return data
 }
 
 // ── 快照 ──
 
 export async function listSnapshots(projectId: string): Promise<any[]> {
-  const { data } = await http.get(`/api/consolidation/${projectId}/snapshots`)
+  const { data } = await http.get(P_consol.snapshots(projectId))
   return Array.isArray(data) ? data : []
 }
 
 export async function createSnapshot(projectId: string, year: number = 2025): Promise<void> {
-  await http.post(`/api/consolidation/${projectId}/snapshots?year=${year}`)
+  await http.post(`${P_consol.snapshots(projectId)}?year=${year}`)
 }
 
 // ── 推荐 ──
 
 export async function recommendWorkpapers(projectId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/ai/recommend-workpapers`)
+  const { data } = await http.post(P_wpai.recommendWorkpapers(projectId))
   return data
 }
 
 // ── 差异报告 ──
 
 export async function annualDiffReport(projectId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/ai/annual-diff-report`)
+  const { data } = await http.post(P_wpai.annualDiffReport(projectId))
   return data
 }
 
 // ── 附件分类 ──
 
 export async function classifyAttachment(projectId: string, attachmentId: string, fileName: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/attachments/classify`, {
+  const { data } = await http.post(P_att.classify(projectId), {
     attachment_id: attachmentId, file_name: fileName,
   })
   return data
@@ -940,7 +941,7 @@ export async function createCustomWorkpaper(projectId: string, body: {
   audit_cycle?: string
   year?: number
 }): Promise<{ wp_id: string; wp_code: string; message: string }> {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/create-custom`, body)
+  const { data } = await http.post(P_wp.createCustom(projectId), body)
   return data
 }
 
@@ -949,47 +950,47 @@ export async function createCustomWorkpaper(projectId: string, body: {
 export async function uploadExcelForParse(projectId: string, file: File): Promise<any> {
   const fd = new FormData()
   fd.append('file', file)
-  const { data } = await http.post(`/api/projects/${projectId}/excel-html/upload-parse`, fd)
+  const { data } = await http.post(P_eh.uploadParse(projectId), fd)
   return data
 }
 
 export async function getExcelHtmlPreview(projectId: string, fileStem: string, sheetIndex = 0): Promise<{ html: string; version: number }> {
-  const { data } = await http.get(`/api/projects/${projectId}/excel-html/preview/${fileStem}`, { params: { sheet_index: sheetIndex, editable: true } })
+  const { data } = await http.get(P_eh.preview(projectId, fileStem), { params: { sheet_index: sheetIndex, editable: true } })
   return data
 }
 
 export async function saveExcelHtmlEdits(projectId: string, fileStem: string, edits: any[], sheetIndex = 0): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/excel-html/save-edits/${fileStem}`, { edits, sheet_index: sheetIndex })
+  const { data } = await http.post(P_eh.saveEdits(projectId, fileStem), { edits, sheet_index: sheetIndex })
   return data
 }
 
 export async function confirmExcelAsTemplate(projectId: string, fileStem: string, body: {
   template_name: string; template_type?: string; wp_code?: string; audit_cycle?: string
 }): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/excel-html/confirm-template/${fileStem}`, body)
+  const { data } = await http.post(P_eh.confirmTemplate(projectId, fileStem), body)
   return data
 }
 
 /** @deprecated 已迁移至 Univer，保留向后兼容 */
 export async function syncFromOnlyoffice(projectId: string, fileStem: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/excel-html/sync-from-onlyoffice/${fileStem}`)
+  const { data } = await http.post(P_eh.syncFromOnlyoffice(projectId, fileStem))
   return data
 }
 
 // ── 三形式联动统一模块接口 ──
 
 export async function getModuleStructure(projectId: string, module: string, params?: Record<string, any>): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/excel-html/module/${module}/structure`, { params })
+  const { data } = await http.get(P_eh.module.structure(projectId, module), { params })
   return data
 }
 
 export async function getModuleHtml(projectId: string, module: string, params?: Record<string, any>): Promise<{ module: string; html: string }> {
-  const { data } = await http.get(`/api/projects/${projectId}/excel-html/module/${module}/html`, { params })
+  const { data } = await http.get(P_eh.module.html(projectId, module), { params })
   return data
 }
 
 export async function exportModuleExcel(projectId: string, module: string, params?: Record<string, any>): Promise<Blob> {
-  const response = await http.post(`/api/projects/${projectId}/excel-html/module/${module}/export-excel`, null, {
+  const response = await http.post(P_eh.module.exportExcel(projectId, module), null, {
     params,
     responseType: 'blob',
   })
@@ -997,7 +998,7 @@ export async function exportModuleExcel(projectId: string, module: string, param
 }
 
 export async function exportModuleWord(projectId: string, module: string, params?: Record<string, any>): Promise<Blob> {
-  const response = await http.post(`/api/projects/${projectId}/excel-html/module/${module}/export-word`, null, {
+  const response = await http.post(P_eh.module.exportWord(projectId, module), null, {
     params,
     responseType: 'blob',
   })
@@ -1007,32 +1008,32 @@ export async function exportModuleWord(projectId: string, module: string, params
 // ── 四式联动：编辑锁 ──
 
 export async function acquireEditLock(projectId: string, fileStem: string): Promise<{ locked: boolean }> {
-  const { data } = await http.post(`/api/projects/${projectId}/excel-html/lock/${fileStem}`)
+  const { data } = await http.post(P_eh.lock.acquire(projectId, fileStem))
   return data
 }
 
 export async function releaseEditLock(projectId: string, fileStem: string): Promise<void> {
-  await http.delete(`/api/projects/${projectId}/excel-html/lock/${fileStem}`)
+  await http.delete(P_eh.lock.release(projectId, fileStem))
 }
 
 export async function refreshEditLock(projectId: string, fileStem: string): Promise<void> {
-  await http.put(`/api/projects/${projectId}/excel-html/lock/${fileStem}/refresh`)
+  await http.put(P_eh.lock.refresh(projectId, fileStem))
 }
 
 // ── 四式联动：版本管理 ──
 
 export async function listFileVersions(projectId: string, fileStem: string): Promise<any[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/excel-html/versions/${fileStem}`)
+  const { data } = await http.get(P_eh.versions.list(projectId, fileStem))
   return Array.isArray(data) ? data : []
 }
 
 export async function diffFileVersions(projectId: string, fileStem: string, v1: number, v2: number): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/excel-html/versions/${fileStem}/diff`, { params: { v1, v2 } })
+  const { data } = await http.get(P_eh.versions.diff(projectId, fileStem), { params: { v1, v2 } })
   return data
 }
 
 export async function rollbackFileVersion(projectId: string, fileStem: string, version: number): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/excel-html/versions/${fileStem}/rollback/${version}`)
+  const { data } = await http.post(P_eh.versions.rollback(projectId, fileStem, version))
   return data
 }
 
@@ -1041,14 +1042,14 @@ export async function rollbackFileVersion(projectId: string, fileStem: string, v
 export async function executeFormulas(projectId: string, fileStem: string, params?: { sheet_index?: number; year?: number }): Promise<{
   executed: number; total_formulas: number; errors: any[]; version: number
 }> {
-  const { data } = await http.post(`/api/projects/${projectId}/excel-html/execute-formulas/${fileStem}`, null, { params })
+  const { data } = await http.post(P_eh.executeFormulas(projectId, fileStem), null, { params })
   return data
 }
 
 // ── 四式联动：单元格信息 ──
 
 export async function getCellInfo(projectId: string, fileStem: string, cell: string): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/excel-html/cell-info/${fileStem}`, { params: { cell } })
+  const { data } = await http.get(P_eh.cellInfo(projectId, fileStem), { params: { cell } })
   return data
 }
 
@@ -1059,61 +1060,61 @@ export async function enhanceColumnMapping(projectId: string, headers: string[],
   suggestions: Array<{ header: string; suggested_field: string; confidence: number }>
   unmatched: string[]
 }> {
-  const { data } = await http.post(`/api/projects/${projectId}/import-intelligence/enhance-mapping`, { headers, existing_mapping: existingMapping })
+  const { data } = await http.post(P_ii.enhanceMapping(projectId), { headers, existing_mapping: existingMapping })
   return data
 }
 
 export async function getImportQualityCheck(projectId: string, year = 2025): Promise<{
   score: number; grade: string; findings: any[]; summary: string
 }> {
-  const { data } = await http.get(`/api/projects/${projectId}/import-intelligence/quality-check`, { params: { year } })
+  const { data } = await http.get(P_ii.qualityCheck(projectId), { params: { year } })
   return data
 }
 
 export async function prepareIncrementalImport(projectId: string, mode: string, period?: string, year = 2025): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/import-intelligence/prepare-incremental`, { mode, period }, { params: { year } })
+  const { data } = await http.post(P_ii.prepareIncremental(projectId), { mode, period }, { params: { year } })
   return data
 }
 
 export async function getImportOverview(projectId: string, year = 2025): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/import-intelligence/overview`, { params: { year } })
+  const { data } = await http.get(P_ii.overview(projectId), { params: { year } })
   return data
 }
 
 // ── 底稿看板+批量操作+穿透链接 ──
 
 export async function getWorkpapersKanban(projectId: string, auditCycle?: string): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers-kanban`, { params: auditCycle ? { audit_cycle: auditCycle } : undefined })
+  const { data } = await http.get(P_wp.kanban(projectId), { params: auditCycle ? { audit_cycle: auditCycle } : undefined })
   return data
 }
 
 export async function batchAssignWorkpapers(projectId: string, wpIds: string[], assignedTo?: string, reviewer?: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/batch-assign`, { wp_ids: wpIds, assigned_to: assignedTo, reviewer })
+  const { data } = await http.post(P_wp.batchAssign(projectId), { wp_ids: wpIds, assigned_to: assignedTo, reviewer })
   return data
 }
 
 export async function batchSubmitReview(projectId: string, wpIds: string[]): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/batch-submit`, { wp_ids: wpIds })
+  const { data } = await http.post(P_wp.batchSubmit(projectId), { wp_ids: wpIds })
   return data
 }
 
 export async function batchExportWorkpapers(projectId: string, wpIds: string[]): Promise<Blob> {
-  const response = await http.post(`/api/projects/${projectId}/working-papers/batch-export`, { wp_ids: wpIds }, { responseType: 'blob' })
+  const response = await http.post(P_wp.batchExport(projectId), { wp_ids: wpIds }, { responseType: 'blob' })
   return response.data
 }
 
 export async function getWorkpaperEditTime(projectId: string, wpId: string): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/edit-time`)
+  const { data } = await http.get(P_wp.editTime(projectId, wpId))
   return data
 }
 
 export async function getWorkpaperCrossLinks(projectId: string, wpId: string): Promise<any> {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/cross-links`)
+  const { data } = await http.get(P_wp.crossLinks(projectId, wpId))
   return data
 }
 
 export async function syncWorkpaperProcedure(projectId: string, wpId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/sync-procedure`)
+  const { data } = await http.post(P_wp.syncProcedure(projectId, wpId))
   return data
 }
 
@@ -1202,7 +1203,7 @@ export async function invalidateAddressCache(projectId: string, params?: {
 export async function getWorkpaperStructure(projectId: string, wpId: string, forceRebuild = false): Promise<{
   wp_id: string; wp_code: string; structure: any; row_count: number; has_formulas: boolean
 }> {
-  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/structure`, {
+  const { data } = await http.get(P_wp.structure.get(projectId, wpId), {
     params: forceRebuild ? { force_rebuild: true } : undefined,
   })
   return data
@@ -1211,21 +1212,21 @@ export async function getWorkpaperStructure(projectId: string, wpId: string, for
 export async function saveWorkpaperStructure(projectId: string, wpId: string, structure: any, syncExcel = true): Promise<{
   wp_id: string; version: number; excel_synced: boolean
 }> {
-  const { data } = await http.post(`/api/projects/${projectId}/workpapers/${wpId}/structure`, {
+  const { data } = await http.post(P_wp.structure.get(projectId, wpId), {
     structure, sync_excel: syncExcel,
   })
   return data
 }
 
 export async function rebuildWorkpaperStructure(projectId: string, wpId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/workpapers/${wpId}/structure/rebuild`)
+  const { data } = await http.post(P_wp.structure.rebuild(projectId, wpId))
   return data
 }
 
 export async function getWorkpaperStructureHtml(projectId: string, wpId: string, page = 1, pageSize = 200): Promise<{
   html: string; total_rows: number; page: number; is_large: boolean
 }> {
-  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/structure/html`, {
+  const { data } = await http.get(P_wp.structure.html(projectId, wpId), {
     params: { page, page_size: pageSize },
   })
   return data
@@ -1234,41 +1235,41 @@ export async function getWorkpaperStructureHtml(projectId: string, wpId: string,
 export async function batchGenerateStructures(projectId: string): Promise<{
   total: number; generated: number; skipped: number; errors: any[]
 }> {
-  const { data } = await http.post(`/api/projects/${projectId}/workpapers/batch-structure`)
+  const { data } = await http.post(P_wp.batchStructure(projectId))
   return data
 }
 
 export async function getWorkpaperAddresses(projectId: string, wpId: string): Promise<{
   wp_code: string; addresses: any[]; count: number
 }> {
-  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/structure/addresses`)
+  const { data } = await http.get(P_wp.structure.addresses(projectId, wpId))
   return data
 }
 
 // ── 底稿操作手册 ──
 
 export async function listWpManuals(): Promise<{ cycles: Record<string, any[]>; total: number }> {
-  const { data } = await http.get('/api/wp-manuals')
+  const { data } = await http.get(P_wpm.list)
   return data
 }
 
 export async function getWpManualStats(): Promise<any> {
-  const { data } = await http.get('/api/wp-manuals/stats')
+  const { data } = await http.get(P_wpm.stats)
   return data
 }
 
 export async function getCycleManuals(cycle: string): Promise<{ cycle: string; files: any[]; count: number }> {
-  const { data } = await http.get(`/api/wp-manuals/${cycle}`)
+  const { data } = await http.get(P_wpm.cycle(cycle))
   return data
 }
 
 export async function getCycleManualContent(cycle: string): Promise<{ content: string }> {
-  const { data } = await http.get(`/api/wp-manuals/${cycle}/manual`)
+  const { data } = await http.get(P_wpm.manual(cycle))
   return data
 }
 
 export async function getCycleLlmContext(cycle: string, wpCode?: string): Promise<{ context: string; char_count: number }> {
-  const { data } = await http.get(`/api/wp-manuals/${cycle}/context`, {
+  const { data } = await http.get(P_wpm.context(cycle), {
     params: wpCode ? { wp_code: wpCode } : undefined,
   })
   return data
@@ -1277,17 +1278,17 @@ export async function getCycleLlmContext(cycle: string, wpCode?: string): Promis
 // ── 底稿精细化规则 ──
 
 export async function listWpFineRules(): Promise<{ rules: Array<{ wp_code: string; name: string; sheets: number; checks: number }> }> {
-  const { data } = await http.get('/api/wp-fine-rules')
+  const { data } = await http.get(P_wfr.list)
   return data
 }
 
 export async function getWpFineRule(wpCode: string): Promise<any> {
-  const { data } = await http.get(`/api/wp-fine-rules/${wpCode}`)
+  const { data } = await http.get(P_wfr.detail(wpCode))
   return data
 }
 
 export async function fineExtractWorkpaper(projectId: string, wpId: string): Promise<any> {
-  const { data } = await http.post(`/api/projects/${projectId}/workpapers/${wpId}/fine-extract`)
+  const { data } = await http.post(P_wfr.fineExtract(projectId, wpId))
   return data
 }
 
@@ -1297,40 +1298,40 @@ export async function getWpDependencies(projectId: string, wpId: string): Promis
   wp_code: string; cycle: string; dependencies: any[]; all_satisfied: boolean;
   warnings: string[]; control_effectiveness: string | null; impact: any
 }> {
-  const { data } = await http.get(`/api/projects/${projectId}/workpapers/${wpId}/dependencies`)
+  const { data } = await http.get(P_wp.dependencies(projectId, wpId))
   return data
 }
 
 export async function getCycleDependencyGraph(cycle: string): Promise<{
   cycle: string; nodes: any[]; edges: any[]
 }> {
-  const { data } = await http.get(`/api/wp-dependencies/cycle/${cycle}`)
+  const { data } = await http.get(P_wdep.cycleGraph(cycle))
   return data
 }
 
 export async function listCycleDependencies(): Promise<Record<string, any>> {
-  const { data } = await http.get('/api/wp-dependencies/cycles')
+  const { data } = await http.get(P_wdep.cycles)
   return data
 }
 
 // ── 账龄分析 ──
 
 export async function getAgingPresets(): Promise<any> {
-  const { data } = await http.get('/api/aging/presets')
+  const { data } = await http.get(P_aging.presets)
   return data
 }
 
 export async function getProjectAgingConfig(projectId: string): Promise<{
   preset: string; custom_segments: any[]; custom_rates: Record<string, number>; effective_segments: any[]
 }> {
-  const { data } = await http.get(`/api/projects/${projectId}/aging/config`)
+  const { data } = await http.get(P_aging.config(projectId))
   return data
 }
 
 export async function saveProjectAgingConfig(projectId: string, config: {
   preset: string; custom_segments?: any[]; custom_rates?: Record<string, number>
 }): Promise<any> {
-  const { data } = await http.put(`/api/projects/${projectId}/aging/config`, config)
+  const { data } = await http.put(P_aging.config(projectId), config)
   return data
 }
 
@@ -1340,6 +1341,6 @@ export async function calculateAgingProvision(projectId: string, params: {
   preset: string; segments: Array<{ key: string; label: string; balance: number; rate: number; provision: number }>;
   total_balance: number; total_provision: number; provision_rate: number
 }> {
-  const { data } = await http.post(`/api/projects/${projectId}/aging/calculate`, params)
+  const { data } = await http.post(P_aging.calculate(projectId), params)
   return data
 }

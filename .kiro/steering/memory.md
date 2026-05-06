@@ -58,9 +58,9 @@ inclusion: always
 - 后端 **151** 个路由文件，**226** 个服务文件（含子目录 import_engine/、wp_scripts/ 等），**51** 个模型文件，11 个 core 模块，9 个 middleware，~152 张表（此前 memory 记录 127/181/39 已过时）
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 **93** 个 Vue 页面（views/），**186** 个组件（components/ 含所有子目录），16 个 composables，9 个 stores，19 个 services，19 个 utils（此前 memory 记录 80/20 已过时，components 统计之前只数 common/ 子目录）
-- pytest collection 2741 tests / 7 errors（2026-05-07 实测）：7 个测试模块因 3 个符号漂移 ImportError：`wrap_ai_output` 不存在（真实名 `wrap_ai_content`，影响 test_ai_content_structured.py + test_ai_content_confirm_flow.py）、`build_ai_contribution_statement` 不存在于 pdf_export_engine（真实位置 ai_contribution_watermark.generate_short_statement，影响 test_ai_contribution_statement.py）、`IndependenceDeclaration` 不存在（真实名 `AnnualIndependenceDeclaration`，影响 test_independence_service.py + test_my_pending_independence.py + test_handover_e2e.py + test_handover_service.py）
+- pytest collection **2830 tests / 0 errors**（2026-05-07 修复后）：之前 7 个 collection error 已通过添加 `wrap_ai_output` 函数、`IndependenceDeclaration` 别名、`build_ai_contribution_statement` 等 4 函数到 pdf_export_engine、`AIContentMustBeConfirmedRule` re-export 到 gate_rules_phase14 全部解决
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（R6 实施 + 复盘修复已推送，最新 commit 4194e88）
+- git 分支：feature/global-component-library（最新 commit 26f67a0，前后端联动质量提升）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -98,6 +98,14 @@ inclusion: always
 - NotificationCenter.vue 已挂载到 DefaultLayout.vue 顶部导航（R6 Task 7），通知铃铛可见；导航顺序：复核收件箱→🔔通知→🛡️独立复核→📊EQCR指标
 - ReviewWorkstation.vue 已确认删除（R6 Task 8 验证 fileSearch 零命中）
 - backend/app/routers/pbc.py 和 confirmations.py 返回 `{"status": "developing", "items": [], "note": "..."}`，maturity 标记为 developing（R6 Task 8）
+- apiPaths.ts 当前 **244** 个 API 端点（2026-05-07），dead-link-check.js 验证零死链；新增 qcRules/qcInspections/qcCases/qcAnnualReports/qcAuditLogCompliance/qcArchiveReadiness 6 个路径对象
+- 前端 service 硬编码路径迁移进度：6 个小文件已完成（qcRuleApi/qcInspectionApi/qcCaseApi/qcAnnualReportApi/qcAuditLogComplianceApi/archiveApi），3 个大文件待做（commonApi 105处/collaborationApi 90处/aiApi 62处）
+- CI 新增 vue-tsc --noEmit 步骤到 frontend-build job（.github/workflows/ci.yml）
+- docs/API_CHANGELOG.md 记录 R4-R6 端点变更；docs/templates/NEW_API_ENDPOINT.md 三件套模板
+- archive 对象已重构：`archive`→`orchestrate`，新增 `job(pid,jobId)` 和 `retry(pid,jobId)`
+- AnnualIndependenceDeclaration 模型已扩展：新增 project_id(nullable)/status/attachments/signed_at/signature_record_id/reviewed_by_qc_id/reviewed_at 字段（R1 需求 10 合并）
+- wrap_ai_output 函数已实现于 wp_ai_service.py（与 wrap_ai_content 并存，面向前端确认流程，含 id/generated_at/confirm_action/revised_content 字段）
+- pdf_export_engine.py 新增 4 函数：build_ai_contribution_statement/get_ai_statement_css/get_ai_statement_html/render_with_ai_statement
 - 归档编排已统一：ArchiveOrchestrator（R1 落地）+ 幂等逻辑（R6 Task 16，24h 内 succeeded/running 不重复打包）；前端 apiPaths.ts archive 对象已重写指向 /api/projects/${pid}/archive/...；旧端点 A/B/C 加 `Deprecation: version="R6"` 头
 - 三套就绪检查已统一：gate_engine 为唯一真源，SignReadinessService + ArchiveReadinessService 均调 readiness_facade（R1 落地），R6 补充 KamConfirmedRule + IndependenceConfirmedRule 注册到 sign_off + export_package
 - SignatureRecord.signature_level 控制流已解耦（R6 Task 6）：CA 验证走 required_role='signing_partner' + required_order=3，字段保留兼容但禁止用于控制流；scripts/check_signature_level_usage.py 静态检查纳入 CI
