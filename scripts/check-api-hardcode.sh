@@ -3,7 +3,7 @@
 # 用法: bash scripts/check-api-hardcode.sh
 # 基线只允许减少不允许增加
 
-BASELINE=173
+BASELINE=115
 DIR="audit-platform/frontend/src"
 
 COUNT=$(grep -r --include="*.vue" -E "['\`\"/]/api/" "$DIR/views" "$DIR/components" \
