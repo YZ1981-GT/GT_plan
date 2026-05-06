@@ -154,6 +154,7 @@ import {
 } from '@/services/eqcrService'
 import EqcrAnnualDeclarationDialog from '@/components/eqcr/EqcrAnnualDeclarationDialog.vue'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 
 const router = useRouter()
 
@@ -168,7 +169,7 @@ const declarationOk = ref(false)
 
 async function checkAnnualDeclaration(): Promise<boolean> {
   try {
-    const data = await api.get('/api/eqcr/independence/annual/check')
+    const data = await api.get(P_eqcr.independence.check)
     declarationOk.value = !!data?.has_declaration
     if (!declarationOk.value) {
       showDeclarationDialog.value = true

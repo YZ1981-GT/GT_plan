@@ -61,6 +61,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -89,7 +90,7 @@ const statusTagType = computed(() => {
 async function loadMemo() {
   loading.value = true
   try {
-    const data = await api.get(`/api/eqcr/projects/${props.projectId}/memo/preview`)
+    const data = await api.get(P_eqcr.memoPreview(props.projectId))
     memo.value = data
     memoStatus.value = data.status || 'draft'
     // 填充可编辑内容
@@ -113,7 +114,7 @@ async function loadMemo() {
 async function onGenerate() {
   generating.value = true
   try {
-    const data = await api.post(`/api/eqcr/projects/${props.projectId}/memo`)
+    const data = await api.post(P_eqcr.memoGenerate(props.projectId))
     memo.value = data
     memoStatus.value = data.status || 'draft'
     sectionOrder.value = data.section_order || Object.keys(data.sections || {})
@@ -132,7 +133,7 @@ async function onGenerate() {
 async function onSave() {
   saving.value = true
   try {
-    await api.put(`/api/eqcr/projects/${props.projectId}/memo`, {
+    await api.put(P_eqcr.memoSave(props.projectId), {
       sections: { ...editableSections },
     })
     ElMessage.success('备忘录已保存')
@@ -150,7 +151,7 @@ function onFinalize() {
 async function doFinalize() {
   finalizing.value = true
   try {
-    await api.post(`/api/eqcr/projects/${props.projectId}/memo/finalize`)
+    await api.post(P_eqcr.memoFinalize(props.projectId))
     memoStatus.value = 'finalized'
     showFinalizeConfirm.value = false
     ElMessage.success('备忘录已定稿，PDF 将在归档时自动生成')

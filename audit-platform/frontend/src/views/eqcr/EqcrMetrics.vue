@@ -63,6 +63,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 
 const router = useRouter()
@@ -84,7 +85,7 @@ function rateTagType(rate: number): ElTagType {
 async function fetchMetrics() {
   loading.value = true
   try {
-    const data = await api.get(`/api/eqcr/metrics?year=${selectedYear.value}`)
+    const data = await api.get(`${P_eqcr.metrics}?year=${selectedYear.value}`)
     metrics.value = data.metrics || []
   } catch {
     ElMessage.error('获取 EQCR 指标失败')

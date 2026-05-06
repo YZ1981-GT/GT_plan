@@ -1067,6 +1067,28 @@ export const eqcr = {
   notes: (pid: string) => `/api/eqcr/projects/${pid}/notes`,
   noteDetail: (pid: string, noteId: string) => `/api/eqcr/projects/${pid}/notes/${noteId}`,
   noteShare: (noteId: string) => `/api/eqcr/notes/${noteId}/share-to-team`,
+  // 任务 12：备忘录
+  memoPreview: (pid: string) => `/api/eqcr/projects/${pid}/memo/preview`,
+  memoGenerate: (pid: string) => `/api/eqcr/projects/${pid}/memo`,
+  memoSave: (pid: string) => `/api/eqcr/projects/${pid}/memo`,
+  memoFinalize: (pid: string) => `/api/eqcr/projects/${pid}/memo/finalize`,
+  // 任务 13：工时/审批/解锁
+  timeSummary: (pid: string) => `/api/eqcr/projects/${pid}/time-summary`,
+  approve: (pid: string) => `/api/eqcr/projects/${pid}/approve`,
+  unlockOpinion: (pid: string) => `/api/eqcr/projects/${pid}/unlock-opinion`,
+  // 独立性声明
+  independence: {
+    check: '/api/eqcr/independence/annual/check',
+    questions: '/api/eqcr/independence/annual/questions',
+    submit: '/api/eqcr/independence/annual/submit',
+  },
+  // 组件审计师
+  componentAuditors: (pid: string) => `/api/eqcr/projects/${pid}/component-auditors`,
+  // 历年对比
+  priorYearComparison: (pid: string) => `/api/eqcr/projects/${pid}/prior-year-comparison`,
+  linkPriorYear: (pid: string) => `/api/eqcr/projects/${pid}/link-prior-year`,
+  // 指标
+  metrics: '/api/eqcr/metrics',
 } as const
 
 // ─── 签字流水线（Round 1 需求 4） ────────────────────────────────────────────

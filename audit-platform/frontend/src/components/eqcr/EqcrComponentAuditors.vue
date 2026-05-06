@@ -78,6 +78,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -141,7 +142,7 @@ async function submitOpinion() {
   if (!selectedAuditor.value) return
   submitting.value = true
   try {
-    await api.post('/api/eqcr/opinions', {
+    await api.post(P_eqcr.opinions, {
       project_id: props.projectId,
       domain: 'component_auditor',
       verdict: opinionForm.value.verdict,
@@ -164,7 +165,7 @@ async function submitOpinion() {
 async function fetchData() {
   loading.value = true
   try {
-    const data = await api.get(`/api/eqcr/projects/${props.projectId}/component-auditors`)
+    const data = await api.get(P_eqcr.componentAuditors(props.projectId))
     auditors.value = data.auditors || []
   } catch {
     ElMessage.error('获取组成部分审计师数据失败')

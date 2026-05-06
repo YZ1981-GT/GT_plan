@@ -202,6 +202,7 @@ import {
   type EqcrProjectOverview,
   type ReportStatusValue,
 } from '@/services/eqcrService'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 import EqcrMateriality from '@/components/eqcr/EqcrMateriality.vue'
 import EqcrEstimates from '@/components/eqcr/EqcrEstimates.vue'
 import EqcrRelatedParties from '@/components/eqcr/EqcrRelatedParties.vue'
@@ -270,7 +271,7 @@ async function loadOverview() {
     // Fetch time summary in parallel
     try {
       const api = (await import('@/services/apiProxy')).default
-      timeSummary.value = await api.get(`/api/eqcr/projects/${projectId.value}/time-summary`)
+      timeSummary.value = await api.get(P_eqcr.timeSummary(projectId.value))
     } catch { timeSummary.value = null }
   } catch (err: any) {
     if (err?.response?.status === 404) {
@@ -336,7 +337,7 @@ async function onApproveClick() {
   try {
     const diffReasons = priorYearRef.value?.getDiffReasons?.() ?? {}
     const api = (await import('@/services/apiProxy')).default
-    await api.post(`/api/eqcr/projects/${projectId.value}/approve`, {
+    await api.post(P_eqcr.approve(projectId.value), {
       verdict: 'approve',
       comment,
       // 差异原因附加到审批记录（后端 extra_payload 可扩展）
@@ -375,7 +376,7 @@ async function onUnlockClick() {
   unlocking.value = true
   try {
     const api = (await import('@/services/apiProxy')).default
-    await api.post(`/api/eqcr/projects/${projectId.value}/unlock-opinion`, {
+    await api.post(P_eqcr.unlockOpinion(projectId.value), {
       reason,
     })
     ElMessage.success('EQCR 意见已解锁')
