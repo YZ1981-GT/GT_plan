@@ -3,7 +3,10 @@
   "name": "营业收入",
   "wp_name": "营业收入",
   "cycle": "D",
-  "account_codes": ["6001", "6051"],
+  "account_codes": [
+    "6001",
+    "6051"
+  ],
   "source_files": [
     {
       "file_pattern": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
@@ -49,34 +52,108 @@
       "exact_name": "营业收入审定表D4-1",
       "type": "summary",
       "table_type": "income_statement",
-      "header_rows": [5, 6],
+      "header_rows": [
+        5,
+        6
+      ],
       "data_start_row": 7,
       "layout": {
         "columns": {
-          "label": {"col": 1, "label": "项目"},
-          "current_unadjusted": {"col": 2, "label": "本期未审数"},
-          "current_adjustment": {"col": 3, "label": "本期账项调整"},
-          "current_reclass": {"col": 4, "label": "本期重分类调整"},
-          "closing_audited": {"col": 5, "label": "本期审定数"},
-          "prior_unadjusted": {"col": 6, "label": "上期未审数"},
-          "prior_adjustment": {"col": 7, "label": "上期账项调整"},
-          "prior_reclass": {"col": 8, "label": "上期重分类调整"},
-          "prior_audited": {"col": 9, "label": "上期审定数"}
+          "label": {
+            "col": 1,
+            "label": "项目"
+          },
+          "current_unadjusted": {
+            "col": 2,
+            "label": "本期未审数"
+          },
+          "current_adjustment": {
+            "col": 3,
+            "label": "本期账项调整"
+          },
+          "current_reclass": {
+            "col": 4,
+            "label": "本期重分类调整"
+          },
+          "closing_audited": {
+            "col": 5,
+            "label": "本期审定数"
+          },
+          "prior_unadjusted": {
+            "col": 6,
+            "label": "上期未审数"
+          },
+          "prior_adjustment": {
+            "col": 7,
+            "label": "上期账项调整"
+          },
+          "prior_reclass": {
+            "col": 8,
+            "label": "上期重分类调整"
+          },
+          "prior_audited": {
+            "col": 9,
+            "label": "上期审定数"
+          }
         }
       },
       "key_rows": {
-        "main_revenue_title": {"row": 7, "label": "主营业务收入："},
-        "main_revenue_subtotal": {"row": 12, "label": "小计", "is_total": true},
-        "other_revenue_title": {"row": 13, "label": "其他业务收入："},
-        "other_revenue_subtotal": {"row": 18, "label": "小计", "is_total": true},
-        "total": {"row": 19, "label": "合计", "is_total": true, "report_row": "IS-001"},
-        "tb_balance": {"row": 20, "label": "试算平衡表数"},
-        "diff": {"row": 21, "label": "差异数"}
+        "main_revenue_subtotal": {
+          "row": 12,
+          "label": "小计",
+          "is_total": true,
+          "report_row": "IS-001"
+        },
+        "other_revenue_subtotal": {
+          "row": 18,
+          "label": "小计",
+          "is_total": true,
+          "report_row": "IS-001"
+        },
+        "total": {
+          "row": 19,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-001"
+        },
+        "tb_balance": {
+          "row": 20,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 21,
+          "label": "差异数"
+        }
       },
       "sections": [
-        {"name": "主营业务收入", "start_row": 7, "end_row": 12, "items": ["产品/服务类别（动态）"]},
-        {"name": "其他业务收入", "start_row": 13, "end_row": 18, "items": ["其他业务类别（动态）"]}
-      ]
+        {
+          "name": "主营业务收入",
+          "start_row": 7,
+          "end_row": 12,
+          "items": [
+            "产品/服务类别（动态）"
+          ]
+        },
+        {
+          "name": "其他业务收入",
+          "start_row": 13,
+          "end_row": 18,
+          "items": [
+            "其他业务类别（动态）"
+          ]
+        }
+      ],
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "主营业务收入：",
+          "其他业务收入："
+        ]
+      }
     },
     {
       "code": "D4-listed",
@@ -224,34 +301,160 @@
     }
   ],
   "cross_references": [
-    {"from": "D4-1:R19:C5", "to": "TB('6001','审定数') + TB('6051','审定数')", "description": "审定表合计=试算表主营+其他收入"},
-    {"from": "D4-1:R12:C5", "to": "TB('6001','审定数')", "description": "主营小计=试算表主营业务收入"},
-    {"from": "D4-1:R18:C5", "to": "TB('6051','审定数')", "description": "其他小计=试算表其他业务收入"},
-    {"from": "D4-1:R19:C5", "to": "REPORT('IS-001','本期')", "description": "审定表合计=利润表营业收入"},
-    {"from": "D4-2", "to": "D4-1:R12:C5", "description": "主营明细合计=审定表主营小计"},
-    {"from": "D4-3", "to": "D4-1:R18:C5", "description": "其他明细合计=审定表其他小计"},
-    {"from": "D4-4", "to": "D4-1:R19:C3", "description": "调整分录汇总=审定表调整列"},
-    {"from": "D4-7", "to": "D4-1", "description": "毛利率分析引用审定表收入数据"},
-    {"from": "D4-1:R19:C5", "to": "D4-1:R12:C5 + D4-1:R18:C5", "description": "合计=主营小计+其他小计"}
+    {
+      "from": "D4-1:R19:C5",
+      "to": "TB('6001','审定数') + TB('6051','审定数')",
+      "description": "审定表合计=试算表主营+其他收入"
+    },
+    {
+      "from": "D4-1:R12:C5",
+      "to": "TB('6001','审定数')",
+      "description": "主营小计=试算表主营业务收入"
+    },
+    {
+      "from": "D4-1:R18:C5",
+      "to": "TB('6051','审定数')",
+      "description": "其他小计=试算表其他业务收入"
+    },
+    {
+      "from": "D4-1:R19:C5",
+      "to": "REPORT('IS-001','本期')",
+      "description": "审定表合计=利润表营业收入"
+    },
+    {
+      "from": "D4-2",
+      "to": "D4-1:R12:C5",
+      "description": "主营明细合计=审定表主营小计"
+    },
+    {
+      "from": "D4-3",
+      "to": "D4-1:R18:C5",
+      "description": "其他明细合计=审定表其他小计"
+    },
+    {
+      "from": "D4-4",
+      "to": "D4-1:R19:C3",
+      "description": "调整分录汇总=审定表调整列"
+    },
+    {
+      "from": "D4-7",
+      "to": "D4-1",
+      "description": "毛利率分析引用审定表收入数据"
+    },
+    {
+      "from": "D4-1:R19:C5",
+      "to": "D4-1:R12:C5 + D4-1:R18:C5",
+      "description": "合计=主营小计+其他小计"
+    }
   ],
   "audit_checks": [
-    {"id": "D4-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计=试算表主营+其他收入"},
-    {"id": "D4-CHK-02", "type": "formula", "severity": "blocking", "description": "合计=主营小计+其他小计"},
-    {"id": "D4-CHK-03", "type": "cross_ref", "severity": "warning", "description": "审定表合计=利润表营业收入"},
-    {"id": "D4-CHK-04", "type": "cross_ref", "severity": "warning", "description": "主营明细合计与审定表一致"},
-    {"id": "D4-CHK-05", "type": "completeness", "severity": "warning", "description": "主营明细表已填写"},
-    {"id": "D4-CHK-06", "type": "completeness", "severity": "warning", "description": "其他业务明细表已填写"},
-    {"id": "D4-CHK-07", "type": "check", "severity": "warning", "description": "收入确认会计政策检查已完成"},
-    {"id": "D4-CHK-08", "type": "analysis", "severity": "warning", "description": "毛利率分析已执行"},
-    {"id": "D4-CHK-09", "type": "cutoff", "severity": "warning", "description": "截止测试已执行（账到单据+单据到账）"},
-    {"id": "D4-CHK-10", "type": "check", "severity": "warning", "description": "收入发生认定检查已完成"},
-    {"id": "D4-CHK-11", "type": "check", "severity": "warning", "description": "收入完整性检查已完成"},
-    {"id": "D4-CHK-12", "type": "check", "severity": "warning", "description": "合同检查已完成"},
-    {"id": "D4-CHK-13", "type": "reconciliation", "severity": "warning", "description": "ERP系统核对已完成"},
-    {"id": "D4-CHK-14", "type": "check", "severity": "info", "description": "关联方销售检查已完成"},
-    {"id": "D4-CHK-15", "type": "check", "severity": "info", "description": "折扣折让检查已完成"},
-    {"id": "D4-CHK-16", "type": "check", "severity": "info", "description": "销售退货检查已完成"},
-    {"id": "D4-CHK-17", "type": "analysis", "severity": "info", "description": "客户结构分析已执行"},
-    {"id": "D4-CHK-18", "type": "formula", "severity": "blocking", "description": "主营小计+其他小计=合计（R12+R18=R19）"}
+    {
+      "id": "D4-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计=试算表主营+其他收入"
+    },
+    {
+      "id": "D4-CHK-02",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "合计=主营小计+其他小计"
+    },
+    {
+      "id": "D4-CHK-03",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "审定表合计=利润表营业收入"
+    },
+    {
+      "id": "D4-CHK-04",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "主营明细合计与审定表一致"
+    },
+    {
+      "id": "D4-CHK-05",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "主营明细表已填写"
+    },
+    {
+      "id": "D4-CHK-06",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "其他业务明细表已填写"
+    },
+    {
+      "id": "D4-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "收入确认会计政策检查已完成"
+    },
+    {
+      "id": "D4-CHK-08",
+      "type": "analysis",
+      "severity": "warning",
+      "description": "毛利率分析已执行"
+    },
+    {
+      "id": "D4-CHK-09",
+      "type": "cutoff",
+      "severity": "warning",
+      "description": "截止测试已执行（账到单据+单据到账）"
+    },
+    {
+      "id": "D4-CHK-10",
+      "type": "check",
+      "severity": "warning",
+      "description": "收入发生认定检查已完成"
+    },
+    {
+      "id": "D4-CHK-11",
+      "type": "check",
+      "severity": "warning",
+      "description": "收入完整性检查已完成"
+    },
+    {
+      "id": "D4-CHK-12",
+      "type": "check",
+      "severity": "warning",
+      "description": "合同检查已完成"
+    },
+    {
+      "id": "D4-CHK-13",
+      "type": "reconciliation",
+      "severity": "warning",
+      "description": "ERP系统核对已完成"
+    },
+    {
+      "id": "D4-CHK-14",
+      "type": "check",
+      "severity": "info",
+      "description": "关联方销售检查已完成"
+    },
+    {
+      "id": "D4-CHK-15",
+      "type": "check",
+      "severity": "info",
+      "description": "折扣折让检查已完成"
+    },
+    {
+      "id": "D4-CHK-16",
+      "type": "check",
+      "severity": "info",
+      "description": "销售退货检查已完成"
+    },
+    {
+      "id": "D4-CHK-17",
+      "type": "analysis",
+      "severity": "info",
+      "description": "客户结构分析已执行"
+    },
+    {
+      "id": "D4-CHK-18",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "主营小计+其他小计=合计（R12+R18=R19）"
+    }
   ]
 }

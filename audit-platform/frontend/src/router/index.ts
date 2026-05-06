@@ -1,5 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import NProgress from 'nprogress'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
+import { ROLE_PERMISSIONS } from '@/composables/usePermission'
+
+// NProgress 配置：不显示旋转图标，与 GT 紫色主题一致
+NProgress.configure({ showSpinner: false })
 
 const router = createRouter({
   history: createWebHistory(),
@@ -33,11 +39,6 @@ const router = createRouter({
           path: 'projects/new',
           name: 'ProjectWizard',
           component: () => import('@/views/ProjectWizard.vue'),
-        },
-        {
-          path: 'poc',
-          name: 'WopiPoc',
-          component: () => import('@/views/WopiPoc.vue'),
         },
         {
           path: 'projects/:projectId/drilldown',
@@ -117,7 +118,27 @@ const router = createRouter({
         {
           path: 'projects/:projectId/review-inbox',
           name: 'ReviewInbox',
-          component: () => import('@/views/ReviewInbox.vue'),
+          component: () => import('@/views/ReviewWorkbench.vue'),
+        },
+        {
+          path: 'review-inbox',
+          name: 'ReviewInboxGlobal',
+          component: () => import('@/views/ReviewWorkbench.vue'),
+        },
+        {
+          path: 'projects/:projectId/independence',
+          name: 'IndependenceDeclaration',
+          component: () => import('@/views/independence/IndependenceDeclarationForm.vue'),
+        },
+        {
+          path: 'projects/:projectId/archive',
+          name: 'ArchiveWizard',
+          component: () => import('@/views/ArchiveWizard.vue'),
+        },
+        {
+          path: 'projects/:projectId/archive/jobs/:jobId',
+          name: 'ArchiveWizardJob',
+          component: () => import('@/views/ArchiveWizard.vue'),
         },
         {
           path: 'projects/:projectId/qc-dashboard',
@@ -249,9 +270,21 @@ const router = createRouter({
           component: () => import('@/views/WorkHoursPage.vue'),
         },
         {
+          path: 'work-hours/approve',
+          name: 'WorkHoursApproval',
+          component: () => import('@/views/WorkHoursApproval.vue'),
+          meta: { permission: 'approve_workhours' },
+        },
+        {
           path: 'dashboard/management',
           name: 'ManagementDashboard',
           component: () => import('@/views/ManagementDashboard.vue'),
+        },
+        {
+          path: 'dashboard/manager',
+          name: 'ManagerDashboard',
+          component: () => import('@/views/ManagerDashboard.vue'),
+          meta: { permission: 'view_dashboard_manager' },
         },
         {
           path: 'dashboard/partner',
@@ -272,6 +305,7 @@ const router = createRouter({
           path: 'settings/users',
           name: 'UserManagement',
           component: () => import('@/views/UserManagement.vue'),
+          meta: { permission: 'admin' },
         },
         {
           path: 'projects/:projectId/subsequent-events',
@@ -384,6 +418,7 @@ const router = createRouter({
           path: 'admin/performance',
           name: 'PerformanceMonitor',
           component: () => import('@/views/PerformanceMonitor.vue'),
+          meta: { permission: 'admin' },
         },
         // ── Mobile Routes ──
         {
@@ -400,6 +435,38 @@ const router = createRouter({
           meta: { developing: true },
           props: (route: any) => ({ projectId: route.params.projectId }),
         },
+        // ── Round 5：EQCR 独立复核工作台 ──
+        // 访问控制说明：
+        //   页面本身只有 requireAuth（走父路由 meta），不设 meta.permission；
+        //   后端 `GET /api/eqcr/projects` 按 `ProjectAssignment.role='eqcr'` 过滤，
+        //   非 EQCR 用户返回 []，UI 走 `el-empty` 提示"未被委派为 EQCR"。
+        //   这样既满足"partner/admin 且 project_assignment.role='eqcr'"的业务权限，
+        //   又避免与 R5 Task 2 的 ROLE_PERMISSIONS 前端字典耦合（admin 默认全开）。
+        {
+          path: 'eqcr/workbench',
+          name: 'EqcrWorkbench',
+          component: () => import('@/views/eqcr/EqcrWorkbench.vue'),
+          meta: { requiresAnnualDeclaration: true },
+        },
+        {
+          // Round 5 Task 6：EQCR 项目详情视图（5 判断 Tab）
+          // 访问控制同 EqcrWorkbench：仅 requireAuth；后端按
+          // ProjectAssignment.role='eqcr' 过滤，非 EQCR 用户 overview 返回
+          // my_role_confirmed=false，UI 走"只读模式"提示并禁用意见录入。
+          path: 'eqcr/projects/:projectId',
+          name: 'EqcrProjectView',
+          component: () => import('@/views/eqcr/EqcrProjectView.vue'),
+          meta: { requiresAnnualDeclaration: true },
+        },
+        {
+          // Round 5 Task 20：EQCR 指标仪表盘
+          // 权限：admin 或 role='partner' 且被分配为某项目的 qc；
+          // 前端路由守卫只做粗筛 admin/partner，真实数据由后端端点进一步控制
+          path: 'eqcr/metrics',
+          name: 'EqcrMetrics',
+          component: () => import('@/views/eqcr/EqcrMetrics.vue'),
+          meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner'] },
+        },
       ],
     },
     {
@@ -407,29 +474,104 @@ const router = createRouter({
       name: 'NotFound',
       component: () => import('@/views/NotFound.vue'),
     },
+    {
+      path: '/developing',
+      name: 'DevelopingPage',
+      component: () => import('@/views/DevelopingPage.vue'),
+    },
   ],
 })
 
-router.beforeEach((to) => {
+// ─── 统一路由守卫 [R7.1] ───
+// 职责：① 开发中页面拦截 ② 认证守卫 ③ 权限守卫 ④ 项目上下文自动加载
+// 注意：未保存变更拦截由 useEditMode 的 onBeforeRouteLeave 在组件级处理，
+//       router 级 beforeEach 不重复拦截，也不会干扰组件级守卫。
+router.beforeEach(async (to) => {
+  NProgress.start()
   const authStore = useAuthStore()
 
-  // Developing pages → show toast and redirect back
+  // ① 开发中页面 → 跳转到专门的"开发中"页面
   if (to.meta.developing) {
-    import('element-plus').then(({ ElMessage }) => {
-      ElMessage.info('该功能正在开发中，敬请期待')
-    })
-    return false
+    NProgress.done()
+    return { name: 'DevelopingPage' }
   }
 
-  // Already logged in → redirect away from login
+  // ② 已登录用户访问 /login → 重定向到首页
   if (to.path === '/login' && authStore.isAuthenticated) {
     return { path: '/' }
   }
 
-  // Requires auth but not logged in → redirect to login
+  // ③ 认证守卫：需要登录但未认证 → 重定向到登录页
   if (to.matched.some((r) => r.meta.requireAuth) && !authStore.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
+
+  // ④ 权限守卫：检查路由级 meta.permission
+  // 修复 P1.2：不再调用 usePermission()（在 beforeEach 里调用会创建游离 computed）
+  // 改为直接访问 authStore.user?.role，使用 ROLE_PERMISSIONS 常量做权限判断
+  const permissionRequired = to.meta.permission
+  if (permissionRequired && authStore.isAuthenticated) {
+    const role = authStore.user?.role ?? ''
+    const hasPermission =
+      role === 'admin' ||
+      (role !== '' &&
+        permissionRequired !== 'admin' &&
+        (ROLE_PERMISSIONS[role]?.includes(permissionRequired as string) ?? false))
+    if (!hasPermission) {
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('您没有访问该页面的权限')
+      })
+      NProgress.done()
+      return { path: '/' }
+    }
+  }
+
+    // ⑤ EQCR 路由：角色粗筛 + 年度独立性声明阻断（R5 需求 12）
+  if (to.matched.some((r) => r.meta.requiresAnnualDeclaration)) {
+    // 5a 角色粗筛（仅 EqcrMetrics 有 roles 限制；EqcrWorkbench/ProjectView 不限角色，非 EQCR 用户看空态）
+    const allowedRoles = to.meta.roles as string[] | undefined
+    if (allowedRoles && !allowedRoles.includes(authStore.user?.role ?? '')) {
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('您没有访问该页面的权限')
+      })
+      NProgress.done()
+      return { path: '/' }
+    }
+
+    // 5b 年度独立性声明阻断
+    try {
+      const http = (await import('@/utils/http')).default
+      const resp = await http.get('/api/eqcr/independence/annual/check', {
+        validateStatus: (s: number) => s < 600,
+      })
+      if (resp?.data && resp.data.has_declaration === false) {
+        // 未提交：重定向到工作台（工作台会弹出声明对话框并阻止加载数据）
+        if (to.name !== 'EqcrWorkbench') {
+          NProgress.done()
+          return { name: 'EqcrWorkbench' }
+        }
+      }
+    } catch {
+      // 端点异常时放行到工作台（工作台内二次检查会阻断数据加载）
+      if (to.name !== 'EqcrWorkbench') {
+        NProgress.done()
+        return { name: 'EqcrWorkbench' }
+      }
+    }
+  }
+
+    // ⑥ 项目上下文自动加载：路由含 :projectId 时同步到 projectStore
+  //    DefaultLayout 的 watch 仍保留作为备份，此处提前触发确保数据就绪
+  if (to.params.projectId && authStore.isAuthenticated) {
+    const projectStore = useProjectStore()
+    // 非阻塞：先渲染页面，数据异步更新，避免路由切换等待 API
+    projectStore.syncFromRoute(to as any)
+  }
+})
+
+// ─── afterEach：结束进度条 ───
+router.afterEach(() => {
+  NProgress.done()
 })
 
 export default router

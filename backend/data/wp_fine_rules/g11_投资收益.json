@@ -1,7 +1,7 @@
 {
   "wp_code": "G11",
   "name": "投资收益",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6111"
   ],
@@ -78,6 +78,36 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 13,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-012"
+        },
+        "tb": {
+          "row": 15,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 16,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "长期股权投资收益",
+          "处置长期股权投资收益",
+          "股利收入",
+          "债权投资利息收入",
+          "交易性金融资产收益"
+        ]
       }
     },
     {
@@ -113,14 +143,19 @@
   ],
   "cross_references": [
     {
-      "from": "G11-1.total",
+      "from": "G11-1.R13.C5",
       "to": "tb://6111#审定数",
       "description": "审定表合计 = 试算表投资收益审定数"
     },
     {
       "from": "G11-2.合计",
-      "to": "G11-1.total",
+      "to": "G11-1.R13.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "G11-1.R13.C5",
+      "to": "REPORT('IS-012','本期')",
+      "description": "审定表合计 = 报表投资收益"
     }
   ],
   "audit_checks": [
@@ -147,6 +182,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "G11-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表投资收益"
+    },
+    {
+      "code": "G11-CHK-05",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "长期股权投资收益与G7权益法确认一致"
+    },
+    {
+      "code": "G11-CHK-06",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "处置收益与资产处置台账一致"
     }
   ]
 }

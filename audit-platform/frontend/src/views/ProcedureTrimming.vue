@@ -70,7 +70,19 @@
     <el-dialog append-to-body v-model="showRefDialog" title="参照其他单位程序" width="450px">
       <el-form label-width="80px">
         <el-form-item label="参照项目">
-          <el-input v-model="refProjectId" placeholder="输入项目ID" />
+          <el-select
+            v-model="refProjectId"
+            filterable
+            placeholder="选择参照项目"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in projectOptions"
+              :key="p.id"
+              :label="p.name || p.client_name || p.id"
+              :value="p.id"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -87,7 +99,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   getProcedures, updateProcedureTrim, initProcedures,
-  addCustomProcedure, applyProcedureScheme,
+  addCustomProcedure, applyProcedureScheme, listProjects,
 } from '@/services/commonApi'
 
 const route = useRoute()
@@ -109,6 +121,7 @@ const loading = ref(false)
 const saving = ref(false)
 const showRefDialog = ref(false)
 const refProjectId = ref('')
+const projectOptions = ref<any[]>([])
 
 const progressStats = computed(() => {
   const procs = procedures.value
@@ -164,7 +177,14 @@ async function applyRef() {
   } catch { ElMessage.error('应用失败') }
 }
 
-onMounted(loadProcedures)
+onMounted(async () => {
+  await loadProcedures()
+  // 需求 37.1：加载项目列表供"参照其他单位"下拉选择
+  try {
+    const list = await listProjects()
+    projectOptions.value = Array.isArray(list) ? list : []
+  } catch { /* 静默处理，下拉为空但不影响主流程 */ }
+})
 </script>
 
 <style scoped>

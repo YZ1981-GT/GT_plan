@@ -72,11 +72,13 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDangerous } from '@/utils/confirm'
 import {
   getRecycleBinStats, listRecycleBinItems,
   restoreRecycleBinItem, permanentDeleteItem, emptyRecycleBin,
 } from '@/services/commonApi'
+import { operationHistory } from '@/utils/operationHistory'
 
 const loading = ref(false)
 const items = ref<any[]>([])
@@ -126,29 +128,44 @@ async function restoreItem(row: any) {
 
 async function confirmDelete(row: any) {
   try {
-    await ElMessageBox.confirm(
+    await confirmDangerous(
       `确定要永久删除${row.type_label}「${row.name}」吗？此操作不可恢复。`,
       '永久删除',
-      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
     )
-    await permanentDeleteItem(`${row.type}/${row.id}`)
-    ElMessage.success('已永久删除')
-    await loadItems()
-    await loadStats()
+    const cachedRow = JSON.parse(JSON.stringify(row))
+    await operationHistory.execute({
+      description: `永久删除${cachedRow.type_label}「${cachedRow.name}」`,
+      execute: async () => {
+        await permanentDeleteItem(`${row.type}/${row.id}`)
+        await loadItems()
+        await loadStats()
+      },
+      undo: async () => {
+        // 永久删除后数据已从后端移除，无法撤销
+        throw new Error('永久删除操作不可撤销')
+      },
+    })
   } catch { /* cancelled */ }
 }
 
 async function confirmEmptyAll() {
   try {
-    await ElMessageBox.confirm(
+    await confirmDangerous(
       `确定要清空回收站中的所有 ${stats.total} 条记录吗？此操作不可恢复。`,
       '清空回收站',
-      { confirmButtonText: '确定清空', cancelButtonText: '取消', type: 'warning' }
     )
-    await emptyRecycleBin()
-    ElMessage.success('已清空')
-    await loadItems()
-    await loadStats()
+    await operationHistory.execute({
+      description: `清空回收站（${stats.total} 条记录）`,
+      execute: async () => {
+        await emptyRecycleBin()
+        await loadItems()
+        await loadStats()
+      },
+      undo: async () => {
+        // 清空回收站后数据已全部移除，无法撤销
+        throw new Error('清空回收站操作不可撤销')
+      },
+    })
   } catch { /* cancelled */ }
 }
 

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="gt-wp-list gt-fade-in">
     <!-- 顶部筛选栏 -->
     <div class="gt-wp-filter-bar">
@@ -27,17 +27,34 @@
         </el-select>
         <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 130px">
           <el-option label="全部" value="" />
+          <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
         </el-select>
         <el-button @click="fetchData" :loading="loading">刷新</el-button>
+        <el-button @click="showWpImport = true">📥 Excel导入</el-button>
         <el-button type="primary" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
           批量下载 ({{ selectedWpIds.length }})
         </el-button>
+        <el-button type="warning" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
+          批量委派 ({{ selectedWpIds.length }})
+        </el-button>
       </div>
+    </div>
+
+    <!-- 进度指示器（任务 7.2） -->
+    <div v-if="wpList.length > 0 && viewMode === 'list'" class="gt-wp-progress-bar">
+      <span>总体进度：{{ totalProgress.completed }}/{{ totalProgress.total }}</span>
+      <el-progress :percentage="totalProgress.percent" :stroke-width="10" style="width: 200px; display: inline-block" />
+      <span>{{ totalProgress.percent }}%</span>
+      <template v-if="hasFilter">
+        <el-divider direction="vertical" />
+        <span>筛选结果：{{ filteredProgress.percent }}%（{{ filteredProgress.completed }}/{{ filteredProgress.total }}）</span>
+      </template>
     </div>
 
     <!-- 主体：看板视图 / 列表视图 -->
     <WorkpaperKanban
       v-if="viewMode === 'kanban'"
+      ref="kanbanRef"
       :project-id="projectId"
       :audit-cycle="filterCycle"
       @select="onKanbanSelect"
@@ -105,9 +122,7 @@
           <template #default="{ data }">
             <div class="gt-wp-tree-node">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
-              <el-tag v-if="data.status" :type="statusTagType(data.status)" size="small" class="gt-wp-tree-node-tag">
-                {{ statusLabel(data.status) }}
-              </el-tag>
+              <GtStatusTag v-if="data.status" :status-map="WP_STATUS" status-map-name="WP_STATUS" :value="data.status" class="gt-wp-tree-node-tag" />
             </div>
           </template>
         </el-tree>
@@ -123,17 +138,13 @@
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
               <el-descriptions-item label="审计循环">{{ selectedWp.audit_cycle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="编制状态">
-                <el-tag :type="statusTagType(selectedWp.status)" size="small">
-                  {{ statusLabel(selectedWp.status) }}
-                </el-tag>
+                <el-tag size="small" :type="dictStore.type('wp_status', selectedWp.status)">{{ dictStore.label('wp_status', selectedWp.status) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="复核状态">
-                <el-tag :type="reviewStatusTagType(selectedWp.review_status)" size="small">
-                  {{ reviewStatusLabel(selectedWp.review_status) }}
-                </el-tag>
+                <el-tag size="small" :type="dictStore.type('wp_review_status', selectedWp.review_status)">{{ dictStore.label('wp_review_status', selectedWp.review_status) }}</el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="编制人">{{ selectedWp.assigned_to || '未分配' }}</el-descriptions-item>
-              <el-descriptions-item label="复核人">{{ selectedWp.reviewer || '未分配' }}</el-descriptions-item>
+              <el-descriptions-item label="编制人">{{ resolveUserName(selectedWp.assigned_to) }}</el-descriptions-item>
+              <el-descriptions-item label="复核人">{{ resolveUserName(selectedWp.reviewer) }}</el-descriptions-item>
               <el-descriptions-item label="文件版本">v{{ selectedWp.file_version || 1 }}</el-descriptions-item>
               <el-descriptions-item label="最后解析">{{ selectedWp.last_parsed_at?.slice(0, 19) || '-' }}</el-descriptions-item>
             </el-descriptions>
@@ -143,10 +154,7 @@
               <el-button-group>
                 <el-button type="primary" @click="onOnlineEdit">
                   <el-icon style="margin-right:4px"><Monitor /></el-icon>
-                  {{ onlineEditReady ? '在线编辑' : '在线编辑（离线兜底）' }}
-                  <el-tag v-if="onlineEditMaturity !== 'production'" size="small" type="warning" style="margin-left:6px">
-                    {{ onlineEditMaturity === 'experimental' ? '实验' : '试点' }}
-                  </el-tag>
+                  在线编辑
                 </el-button>
                 <el-button @click="onDownload">
                   <el-icon style="margin-right:4px"><Download /></el-icon>下载编辑
@@ -174,9 +182,6 @@
               :policy-code="sodPolicyCode"
               :trace-id="sodTraceId"
             />
-            <el-alert v-if="!onlineEditReady" type="info" :closable="false" style="margin-top:8px" show-icon>
-              {{ onlineEditNotice }}
-            </el-alert>
 
             <!-- QC 结果摘要 -->
             <div v-if="qcResult" class="gt-wp-qc-summary-inline">
@@ -348,30 +353,149 @@
       </div>
     </div>
 
-    <!-- 上传弹窗 -->
-    <el-dialog append-to-body v-model="uploadDialogVisible" title="上传底稿" width="500px">
-      <el-alert v-if="uploadConflict" type="warning" :closable="false" show-icon style="margin-bottom: 16px">
-        版本冲突：服务器版本 v{{ uploadConflict.server_version }}，您的版本 v{{ uploadConflict.uploaded_version }}
-      </el-alert>
-      <el-upload
-        ref="uploadRef"
-        drag
-        :auto-upload="false"
-        :limit="1"
-        accept=".xlsx,.xls"
-        :on-change="onUploadFileChange"
-      >
-        <el-icon style="font-size: 40px; color: var(--gt-color-primary)"><Upload /></el-icon>
-        <div>拖拽文件到此处，或点击选择</div>
-      </el-upload>
+    <!-- 上传弹窗（两步：上传文件 → 确认识别数据） -->
+    <el-dialog append-to-body v-model="uploadDialogVisible" :title="uploadStep === 1 ? '上传底稿（步骤 1/2）' : '确认识别数据（步骤 2/2）'" width="560px" :close-on-click-modal="false">
+      <!-- 步骤条 -->
+      <el-steps :active="uploadStep - 1" finish-status="success" style="margin-bottom: 20px">
+        <el-step title="上传文件" />
+        <el-step title="确认识别数据" />
+      </el-steps>
+
+      <!-- 步骤1：上传文件 -->
+      <template v-if="uploadStep === 1">
+        <el-alert v-if="uploadConflict" type="warning" :closable="false" show-icon style="margin-bottom: 16px">
+          版本冲突：服务器版本 v{{ uploadConflict.server_version }}，您的版本 v{{ uploadConflict.uploaded_version }}
+        </el-alert>
+        <el-upload
+          ref="uploadRef"
+          drag
+          :auto-upload="false"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :on-change="onUploadFileChange"
+        >
+          <el-icon style="font-size: 40px; color: var(--gt-color-primary)"><Upload /></el-icon>
+          <div>拖拽文件到此处，或点击选择</div>
+        </el-upload>
+      </template>
+
+      <!-- 步骤2：确认识别数据 -->
+      <template v-else-if="uploadStep === 2">
+        <el-alert v-if="parseLoading" type="info" :closable="false" show-icon style="margin-bottom: 16px">
+          正在解析底稿数据，请稍候...
+        </el-alert>
+        <template v-if="!parseLoading && parsedPreview">
+          <el-descriptions title="系统识别结果" :column="2" border size="default" style="margin-bottom: 16px">
+            <el-descriptions-item label="底稿名称">{{ parsedPreview.wp_name || selectedWp?.wp_name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审计年度">{{ parsedPreview.year || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审定数">
+              <span :class="parsedPreview.audited_amount != null ? 'gt-parsed-value' : 'gt-parsed-empty'">
+                {{ parsedPreview.audited_amount != null ? fmtParsed(parsedPreview.audited_amount) : '未识别' }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="未审数">
+              <span :class="parsedPreview.unadjusted_amount != null ? 'gt-parsed-value' : 'gt-parsed-empty'">
+                {{ parsedPreview.unadjusted_amount != null ? fmtParsed(parsedPreview.unadjusted_amount) : '未识别' }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="parsedPreview.audited_amount != null && parsedPreview.unadjusted_amount != null" label="差异">
+              <span :class="Math.abs(parsedPreview.audited_amount - parsedPreview.unadjusted_amount) > 0 ? 'gt-parsed-diff' : 'gt-parsed-value'">
+                {{ fmtParsed(parsedPreview.audited_amount - parsedPreview.unadjusted_amount) }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="parsedPreview.sheet_count" label="工作表数">{{ parsedPreview.sheet_count }}</el-descriptions-item>
+          </el-descriptions>
+          <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 8px">
+            <template #title>请确认以上识别数据是否正确，确认后将写入系统</template>
+          </el-alert>
+        </template>
+        <el-empty v-else-if="!parseLoading" description="解析未返回数据，仍可确认写入" :image-size="60" />
+      </template>
+
       <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button v-if="uploadConflict" type="warning" @click="doUpload(true)" :loading="uploadLoading">
-          强制覆盖
-        </el-button>
-        <el-button type="primary" @click="doUpload(false)" :loading="uploadLoading" :disabled="!uploadFile">
-          上传
-        </el-button>
+        <el-button @click="onUploadCancel" :disabled="uploadLoading || parseLoading">取消</el-button>
+        <!-- 步骤1 按钮 -->
+        <template v-if="uploadStep === 1">
+          <el-button v-if="uploadConflict" type="warning" @click="doUploadStep1(true)" :loading="uploadLoading">
+            强制覆盖
+          </el-button>
+          <el-button type="primary" @click="doUploadStep1(false)" :loading="uploadLoading" :disabled="!uploadFile">
+            上传并解析
+          </el-button>
+        </template>
+        <!-- 步骤2 按钮 -->
+        <template v-else-if="uploadStep === 2">
+          <el-button @click="uploadStep = 1" :disabled="parseLoading">← 重新上传</el-button>
+          <el-button type="primary" @click="doConfirmParsed" :loading="parseLoading">
+            确认写入
+          </el-button>
+        </template>
+      </template>
+    </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showWpImport"
+      import-type="workpaper"
+      :project-id="projectId"
+      :year="Number(route.query.year) || new Date().getFullYear()"
+      @imported="onWpImported"
+    />
+
+    <!-- 批量委派弹窗 -->
+    <BatchAssignDialog
+      v-model="showBatchAssign"
+      :project-id="projectId"
+      :wp-ids="selectedWpIds"
+      :wp-list="batchAssignWpList"
+      @assigned="onBatchAssigned"
+    />
+
+    <!-- 看板分配弹窗 -->
+    <el-dialog
+      v-model="showAssignDialog"
+      title="分配底稿"
+      width="420px"
+      append-to-body
+    >
+      <div v-if="assigningItem" style="margin-bottom: 12px; color: #606266; font-size: 13px;">
+        底稿：<strong>{{ assigningItem.wp_code }} {{ assigningItem.wp_name }}</strong>
+      </div>
+      <el-form :model="assignForm" label-width="70px">
+        <el-form-item label="编制人">
+          <el-select
+            v-model="assignForm.assigned_to"
+            placeholder="请选择编制人"
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="u in userOptions"
+              :key="u.username"
+              :label="`${u.full_name || u.username} (${u.username})`"
+              :value="u.username"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="复核人">
+          <el-select
+            v-model="assignForm.reviewer"
+            placeholder="请选择复核人"
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="u in userOptions"
+              :key="u.username"
+              :label="`${u.full_name || u.username} (${u.username})`"
+              :value="u.username"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAssignDialog = false">取消</el-button>
+        <el-button type="primary" :loading="assignLoading" @click="onConfirmAssign">确认分配</el-button>
       </template>
     </el-dialog>
   </div>
@@ -380,31 +504,40 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import { WP_STATUS, WP_REVIEW_STATUS } from '@/utils/statusMaps'
+import { useDictStore } from '@/stores/dict'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
-  checkFeatureFlag, getFeatureMaturity, submitWorkpaperReview,
+  getFeatureMaturity, submitWorkpaperReview,
   checkUnconfirmedAI,
+  listUsers,
 } from '@/services/commonApi'
 import {
-  checkOnlineEditingAvailability,
   downloadWorkpaper,
   downloadWorkpaperPack,
   uploadWorkpaperFile,
   listWorkpapers, runQCCheck, getQCResults,
-  getWpIndex, updateReviewStatus,
+  getWpIndex, updateReviewStatus, parseWorkpaper,
+  assignWorkpaper,
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
 
 const route = useRoute()
 const router = useRouter()
+const dictStore = useDictStore()
 const projectId = computed(() => route.params.projectId as string)
 
 const loading = ref(false)
+const showWpImport = ref(false)
 const qcLoading = ref(false)
 const downloadLoading = ref(false)
 const submitLoading = ref(false)
@@ -430,12 +563,84 @@ function onSearchDebounce() {
   }, 300)
 }
 const uploadLoading = ref(false)
+const parseLoading = ref(false)
 const wpList = ref<WorkpaperDetail[]>([])
 const wpIndex = ref<WpIndexItem[]>([])
 const selectedWp = ref<WorkpaperDetail | null>(null)
 const selectedWpIds = ref<string[]>([])
 const qcResult = ref<QCResult | null>(null)
 const treeRef = ref<any>(null)
+const kanbanRef = ref<any>(null)
+
+// 看板分配弹窗
+const showAssignDialog = ref(false)
+const assigningItem = ref<any>(null)
+const assignForm = ref<{ assigned_to: string | null; reviewer: string | null }>({ assigned_to: null, reviewer: null })
+const assignLoading = ref(false)
+const userOptions = ref<any[]>([])
+
+// 批量委派弹窗
+const showBatchAssign = ref(false)
+const batchAssignWpList = computed(() => {
+  // 合并 wpList 和 wpIndex 信息，提供给 BatchAssignDialog
+  return wpList.value.map((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    return {
+      id: w.id,
+      wp_code: w.wp_code || idx?.wp_code || '',
+      wp_name: w.wp_name || idx?.wp_name || '',
+      audit_cycle: w.audit_cycle || idx?.audit_cycle || '',
+    }
+  })
+})
+
+function onBatchAssigned(_result: { updated: number; notifications_sent: number; message: string }) {
+  // 刷新数据
+  fetchData()
+}
+
+// 任务 6.1：用户名映射
+const userNameMap = ref<Map<string, string>>(new Map())
+
+function resolveUserName(uuid: string | null | undefined): string {
+  if (!uuid) return '未分配'
+  return userNameMap.value.get(uuid) ?? '未知用户'
+}
+
+// 任务 7.1：进度计算
+const COMPLETED_STATUSES = new Set(['review_passed', 'archived'])
+
+const totalProgress = computed(() => {
+  const total = wpList.value.length
+  const completed = wpList.value.filter((w: WorkpaperDetail) => COMPLETED_STATUSES.has(w.status)).length
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+  return { total, completed, percent }
+})
+
+const filteredWpList = computed<WorkpaperDetail[]>(() => {
+  return wpList.value.filter((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    if (filterCycle.value && !idx?.wp_code?.startsWith(filterCycle.value)) return false
+    if (filterStatus.value && w.status !== filterStatus.value) return false
+    if (filterAssignee.value && w.assigned_to !== filterAssignee.value) return false
+    if (searchKeyword.value) {
+      const kw = searchKeyword.value.toLowerCase()
+      if (!w.wp_code?.toLowerCase().includes(kw) && !w.wp_name?.toLowerCase().includes(kw)) return false
+    }
+    return true
+  })
+})
+
+const filteredProgress = computed(() => {
+  const total = filteredWpList.value.length
+  const completed = filteredWpList.value.filter((w: WorkpaperDetail) => COMPLETED_STATUSES.has(w.status)).length
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+  return { total, completed, percent }
+})
+
+const hasFilter = computed(() => {
+  return !!(filterCycle.value || filterStatus.value || filterAssignee.value || searchKeyword.value)
+})
 
 // 精细化审计检查
 const fineCheckResults = ref<any[]>([])
@@ -452,16 +657,18 @@ const uploadDialogVisible = ref(false)
 const uploadFile = ref<File | null>(null)
 const uploadConflict = ref<{ server_version: number; uploaded_version: number } | null>(null)
 const uploadRef = ref<any>(null)
+// 两步上传状态
+const uploadStep = ref(1)
+const parsedPreview = ref<any>(null)
+const pendingWpId = ref('')
+const pendingNewVersion = ref(1)
 
-// Feature flags & ONLYOFFICE 可用性
-const onlineEditAvailable = ref(true)  // ONLYOFFICE 是否可用（探测结果）
+// Feature flags & Univer 在线编辑（纯前端，始终可用）
+const onlineEditAvailable = ref(true)
 const onlineEditEnabled = ref(true)
-const onlineEditMaturity = ref('pilot')  // 功能成熟度
-const onlineEditReady = computed(() => onlineEditEnabled.value && onlineEditAvailable.value)
-const onlineEditNotice = computed(() => {
-  if (!onlineEditEnabled.value) return '在线编辑当前未启用，点击“在线编辑”将自动降级为下载编辑模式'
-  return 'ONLYOFFICE 尚未部署或服务暂不可用，点击“在线编辑”将自动降级为下载编辑模式'
-})
+const onlineEditMaturity = ref('production')
+const _onlineEditReady = computed(() => true)
+const _onlineEditNotice = computed(() => '')
 
 // Review annotations
 const annotations = ref<any[]>([])
@@ -601,75 +808,66 @@ const treeData = computed<TreeNode[]>(() => {
   return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label))
 })
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = {
-    not_started: 'info', in_progress: 'warning', draft: 'warning',
-    draft_complete: '', edit_complete: '', under_review: '',
-    revision_required: 'danger', review_passed: 'success',
-    review_level1_passed: 'success', review_level2_passed: 'success',
-    archived: 'info',
-  }
-  return m[s] || 'info'
-}
 
-function statusLabel(s: string) {
-  const m: Record<string, string> = {
-    not_started: '未开始', in_progress: '编制中', draft: '草稿',
-    draft_complete: '初稿完成', edit_complete: '编制完成',
-    under_review: '复核中', revision_required: '退回修改',
-    review_passed: '复核通过', review_level1_passed: '一级复核通过',
-    review_level2_passed: '二级复核通过', archived: '已归档',
-  }
-  return m[s] || s
-}
-
-function reviewStatusTagType(s: string | undefined) {
-  if (!s) return 'info'
-  const m: Record<string, string> = {
-    not_submitted: 'info',
-    pending_level1: 'warning', level1_in_progress: 'warning',
-    level1_passed: 'success', level1_rejected: 'danger',
-    pending_level2: 'warning', level2_in_progress: 'warning',
-    level2_passed: 'success', level2_rejected: 'danger',
-  }
-  return m[s] || 'info'
-}
-
-function reviewStatusLabel(s: string | undefined) {
-  if (!s) return '未提交'
-  const m: Record<string, string> = {
-    not_submitted: '未提交',
-    pending_level1: '待一级复核', level1_in_progress: '一级复核中',
-    level1_passed: '一级通过', level1_rejected: '一级退回',
-    pending_level2: '待二级复核', level2_in_progress: '二级复核中',
-    level2_passed: '二级通过', level2_rejected: '二级退回',
-  }
-  return m[s] || s
-}
 
 function onKanbanSelect(item: any) {
   if (item.wp_id) {
-    // 切换到列表视图并选中该底稿
+    // 切换到列表视图并自动选中对应底稿
     viewMode.value = 'list'
-    // TODO: 自动选中该底稿
+    // 等待列表视图渲染后再选中节点
+    setTimeout(() => selectWorkpaperById(item.wp_id), 100)
   }
 }
 
-function onKanbanAssign(item: any) {
-  ElMessage.info(`分配底稿 ${item.wp_code}（弹出分配弹窗）`)
-  // TODO: 弹出分配弹窗
+async function onKanbanAssign(item: any) {
+  assigningItem.value = item
+  assignForm.value = {
+    assigned_to: item.assigned_to || null,
+    reviewer: item.reviewer || null,
+  }
+  showAssignDialog.value = true
+  // 加载用户列表（如果尚未加载）
+  if (!userOptions.value.length) {
+    try {
+      userOptions.value = await listUsers()
+    } catch {
+      ElMessage.warning('加载用户列表失败')
+    }
+  }
+}
+
+async function onConfirmAssign() {
+  if (!assigningItem.value?.wp_id) {
+    ElMessage.warning('该底稿尚未生成，无法分配')
+    return
+  }
+  assignLoading.value = true
+  try {
+    await assignWorkpaper(projectId.value, assigningItem.value.wp_id, {
+      assigned_to: assignForm.value.assigned_to || null,
+      reviewer: assignForm.value.reviewer || null,
+    })
+    ElMessage.success('分配成功')
+    showAssignDialog.value = false
+    // 刷新看板数据
+    kanbanRef.value?.refresh()
+  } catch {
+    ElMessage.error('分配失败，请重试')
+  } finally {
+    assignLoading.value = false
+  }
 }
 
 function goToWorkbench() {
   router.push(`/projects/${projectId.value}/workpaper-bench`)
 }
 
-function goToTemplates() {
+function _goToTemplates() {
   router.push(`/projects/${projectId.value}/templates`)
 }
 
 // ── 审计程序指南数据（右栏） ──
-const guideExpanded = ref('')
+const _guideExpanded = ref('')
 
 const auditCycleGuide = [
   { cycle: 'B', name: '初步业务活动/风险评估', color: '#7c5cbf', count: 56 },
@@ -692,6 +890,11 @@ const auditCycleGuide = [
 function onGuideClick(cycle: string) {
   // 跳转到底稿工作台，按循环筛选
   router.push({ path: `/projects/${projectId.value}/workpaper-bench`, query: { cycle } })
+}
+
+function onWpImported() {
+  showWpImport.value = false
+  fetchData()
 }
 
 async function fetchData() {
@@ -846,11 +1049,6 @@ async function onNodeClick(data: TreeNode) {
 
 function onOnlineEdit() {
   if (!selectedWp.value) return
-  if (!onlineEditReady.value) {
-    ElMessage.info(onlineEditNotice.value)
-    onDownload()
-    return
-  }
   router.push({
     name: 'WorkpaperEditor',
     params: { projectId: projectId.value, wpId: selectedWp.value.id },
@@ -870,6 +1068,9 @@ function onUpload() {
   if (!selectedWp.value) return
   uploadFile.value = null
   uploadConflict.value = null
+  uploadStep.value = 1
+  parsedPreview.value = null
+  pendingWpId.value = ''
   uploadDialogVisible.value = true
 }
 
@@ -877,7 +1078,22 @@ function onUploadFileChange(file: any) {
   uploadFile.value = file.raw
 }
 
-async function doUpload(forceOverwrite: boolean) {
+/** 格式化解析预览中的金额 */
+function fmtParsed(v: number | null | undefined): string {
+  if (v == null) return '-'
+  return new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v)
+}
+
+/** 取消上传弹窗 */
+function onUploadCancel() {
+  uploadDialogVisible.value = false
+  uploadStep.value = 1
+  parsedPreview.value = null
+  pendingWpId.value = ''
+}
+
+/** 步骤1：上传文件并触发解析预览（dry_run=true，不写入 parsed_data） */
+async function doUploadStep1(forceOverwrite: boolean) {
   if (!selectedWp.value || !uploadFile.value) return
   uploadLoading.value = true
   try {
@@ -889,12 +1105,23 @@ async function doUpload(forceOverwrite: boolean) {
       version,
       forceOverwrite,
     )
-    ElMessage.success(`上传成功，新版本 v${result?.new_version || version + 1}`)
-    uploadDialogVisible.value = false
     uploadConflict.value = null
     uploadRef.value?.clearFiles?.()
-    await fetchData()
-    await selectWorkpaperById(selectedWp.value.id)
+    pendingWpId.value = selectedWp.value.id
+    pendingNewVersion.value = result?.new_version || version + 1
+
+    // 触发 dry_run 解析，仅获取预览数据，不写入 parsed_data
+    parseLoading.value = true
+    uploadStep.value = 2
+    try {
+      const parseResult = await parseWorkpaper(projectId.value, pendingWpId.value, true)
+      // 后端返回 parsed_data 字段（完整预览）或直接返回顶层字段
+      parsedPreview.value = parseResult?.parsed_data || parseResult || null
+    } catch {
+      parsedPreview.value = null
+    } finally {
+      parseLoading.value = false
+    }
   } catch (err: any) {
     if (err.response?.status === 409) {
       uploadConflict.value = err.response.data?.detail || err.response.data
@@ -905,6 +1132,35 @@ async function doUpload(forceOverwrite: boolean) {
   } finally {
     uploadLoading.value = false
   }
+}
+
+/** 步骤2：用户确认识别数据，正式调用 parse（dry_run=false）写入 parsed_data */
+async function doConfirmParsed() {
+  if (!pendingWpId.value) return
+  parseLoading.value = true
+  try {
+    // 正式解析写入（dry_run=false）
+    await parseWorkpaper(projectId.value, pendingWpId.value, false)
+    uploadDialogVisible.value = false
+    uploadStep.value = 1
+    parsedPreview.value = null
+    // 刷新底稿状态
+    await fetchData()
+    await selectWorkpaperById(pendingWpId.value)
+    // 通知试算表刷新（五环联动：上传→解析→试算表更新→报表更新）
+    eventBus.emit('workpaper:parsed', { projectId: projectId.value, wpId: pendingWpId.value })
+    ElMessage.success(`底稿已上传（v${pendingNewVersion.value}），识别数据已写入`)
+    pendingWpId.value = ''
+  } catch {
+    ElMessage.error('写入识别数据失败，请重试')
+  } finally {
+    parseLoading.value = false
+  }
+}
+
+/** 兼容旧调用（handleUploadRedirect 中使用） */
+async function doUpload(forceOverwrite: boolean) {
+  await doUploadStep1(forceOverwrite)
 }
 
 async function onBatchDownload() {
@@ -1105,6 +1361,23 @@ async function onConfirmReject() {
 
 async function onReviewPass() {
   if (!selectedWp.value) return
+  // 强制检查：所有批注必须已解决
+  if (unresolvedCount.value > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `当前有 ${unresolvedCount.value} 条未解决的复核意见，建议先处理后再通过复核。确定强制通过吗？`,
+        '复核确认',
+        {
+          type: 'warning',
+          confirmButtonText: '强制通过',
+          cancelButtonText: '返回处理',
+          confirmButtonClass: 'el-button--danger',
+        }
+      )
+    } catch {
+      return  // 用户选择返回处理
+    }
+  }
   const rs = selectedWp.value.review_status
   const passStatus = (rs === 'pending_level2' || rs === 'level2_in_progress')
     ? 'level2_passed' : 'level1_passed'
@@ -1119,18 +1392,9 @@ async function onReviewPass() {
 }
 
 async function refreshOnlineEditState() {
-  try {
-    onlineEditEnabled.value = await checkFeatureFlag('online_editing', projectId.value)
-  } catch {
-    onlineEditEnabled.value = true
-  }
-
-  if (!onlineEditEnabled.value) {
-    onlineEditAvailable.value = false
-    return
-  }
-
-  onlineEditAvailable.value = await checkOnlineEditingAvailability()
+  // Univer 纯前端，无需探测服务可用性
+  onlineEditEnabled.value = true
+  onlineEditAvailable.value = true
 }
 
 async function handleUploadRedirect() {
@@ -1148,6 +1412,16 @@ async function handleUploadRedirect() {
 watch([filterCycle, filterStatus, filterAssignee], () => fetchData())
 onMounted(async () => {
   await fetchData()
+  // 任务 8.17.1：加载用户列表，同时赋值 userOptions 和 userNameMap
+  try {
+    const users = await listUsers()
+    userOptions.value = users
+    userNameMap.value = new Map(
+      users.map((u: any) => [u.id, u.full_name || u.username || u.id])
+    )
+  } catch {
+    ElMessage.warning('加载用户列表失败')
+  }
   try {
     const maturity = await getFeatureMaturity()
     onlineEditMaturity.value = maturity?.online_editing || 'pilot'
@@ -1209,6 +1483,11 @@ onMounted(async () => {
 .gt-fine-check-status { font-size: 11px; white-space: nowrap; }
 :deep(.gt-ann-row-urgent) { background: #fef0f0 !important; }
 
+/* 解析预览数值样式 */
+.gt-parsed-value { color: var(--gt-color-primary); font-weight: 600; }
+.gt-parsed-empty { color: #999; font-style: italic; }
+.gt-parsed-diff { color: var(--gt-color-coral); font-weight: 600; }
+
 /* ── 两栏引导布局 ── */
 .gt-wp-intro-layout {
   flex: 1; display: flex; gap: var(--gt-space-4); min-height: 0;
@@ -1257,4 +1536,12 @@ onMounted(async () => {
 .gt-wp-guide-name { flex: 1; font-size: 13px; color: #333; }
 .gt-wp-guide-count { font-size: 12px; color: #aaa; white-space: nowrap; }
 .gt-wp-guide-arrow { font-size: 16px; color: #ccc; font-weight: 300; }
+
+/* 进度条区域 */
+.gt-wp-progress-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 12px; margin-bottom: var(--gt-space-3);
+  background: var(--gt-color-bg-white); border-radius: var(--gt-radius-md);
+  box-shadow: var(--gt-shadow-sm); font-size: 13px; color: var(--gt-color-text-secondary);
+}
 </style>

@@ -200,3 +200,86 @@ class ConsistencyCheckService:
             })
 
         return results
+
+    async def update_workpaper_consistency(self, wp_id: str, project_id: UUID) -> dict | None:
+        """底稿保存后：比对审定数与试算表，写入 wp_consistency 状态到 parsed_data。
+
+        从 event_handlers._on_workpaper_saved 提取，便于独立测试。
+
+        Returns
+        -------
+        dict | None
+            写入的 wp_consistency 字典，或 None（无需更新时）
+        """
+        from app.models.audit_platform_models import TrialBalance
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+        import json
+
+        # 1. 查找底稿及其 parsed_data
+        wp_result = await self.db.execute(
+            sa.select(WorkingPaper).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )
+        wp = wp_result.scalar_one_or_none()
+        if not wp or not wp.parsed_data:
+            return None
+
+        # 2. 从 parsed_data 提取审定数
+        wp_audited = wp.parsed_data.get("audited_amount")
+        if wp_audited is None:
+            return None
+
+        # 3. 查找底稿编码
+        idx_result = await self.db.execute(
+            sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+        )
+        wp_code = idx_result.scalar_one_or_none()
+        if not wp_code:
+            return None
+
+        # 4. 通过 wp_account_mapping.json 查找关联科目
+        from pathlib import Path
+        mapping_file = Path(__file__).parent.parent.parent / "data" / "wp_account_mapping.json"
+        if not mapping_file.exists():
+            return None
+        with open(mapping_file, "r", encoding="utf-8-sig") as f:
+            mappings = json.load(f).get("mappings", [])
+        mapping = next((m for m in mappings if m.get("wp_code") == wp_code), None)
+        if not mapping:
+            return None
+
+        codes = mapping.get("account_codes", [])
+        if not codes:
+            return None
+
+        # 5. 从试算表取审定数比对
+        tb_result = await self.db.execute(
+            sa.select(
+                sa.func.coalesce(sa.func.sum(TrialBalance.audited_amount), 0)
+            ).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.standard_account_code.in_(codes),
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )
+        tb_total = Decimal(str(tb_result.scalar() or 0))
+        wp_val = Decimal(str(wp_audited))
+        diff = abs(tb_total - wp_val)
+
+        # 6. 写入一致性状态
+        consistency = {
+            "status": "consistent" if diff < Decimal("0.01") else "inconsistent",
+            "tb_amount": str(tb_total),
+            "wp_amount": str(wp_val),
+            "diff_amount": str(diff),
+        }
+        wp.parsed_data = {**wp.parsed_data, "wp_consistency": consistency}
+        await self.db.flush()
+
+        logger.info(
+            "wp_consistency updated: wp=%s status=%s diff=%s",
+            wp_id, consistency["status"], diff,
+        )
+        return consistency

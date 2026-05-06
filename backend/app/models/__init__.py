@@ -88,6 +88,18 @@ from app.models.workpaper_models import (
 )
 from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
+from app.models.archive_models import ArchiveJob
+from app.models.eqcr_models import (
+    EqcrDisagreementResolution,
+    EqcrOpinion,
+    EqcrReviewNote,
+    EqcrShadowComputation,
+)
+from app.models.related_party_models import (
+    RelatedPartyRegistry,
+    RelatedPartyTransaction,
+)
+from app.models.independence_models import AnnualIndependenceDeclaration
 
 __all__ = [
     # --- base ---
@@ -179,4 +191,16 @@ __all__ = [
     "WpCrossRef",
     "WpQcResult",
     "ReviewRecord",
+    # --- archive models ---
+    "ArchiveJob",
+    # --- EQCR models (R5) ---
+    "EqcrOpinion",
+    "EqcrReviewNote",
+    "EqcrShadowComputation",
+    "EqcrDisagreementResolution",
+    # --- related party models (R5) ---
+    "RelatedPartyRegistry",
+    "RelatedPartyTransaction",
+    # --- independence declaration (R5) ---
+    "AnnualIndependenceDeclaration",
 ]

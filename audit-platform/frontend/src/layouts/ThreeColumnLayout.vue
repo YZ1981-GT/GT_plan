@@ -43,6 +43,66 @@
             <el-icon :size="18"><ChatDotSquare /></el-icon>
           </div>
         </el-tooltip>
+        <el-tooltip content="公式管理" placement="bottom">
+          <div class="gt-topbar-btn" @click="showFormulaManager = true">
+            <span style="font-size:16px;font-weight:700;font-style:italic;line-height:18px">ƒx</span>
+          </div>
+        </el-tooltip>
+        <el-tooltip content="自定义查询" placement="bottom">
+          <div class="gt-topbar-btn" @click="showCustomQuery = true">
+            <span style="font-size:15px;line-height:18px">🔍</span>
+          </div>
+        </el-tooltip>
+
+        <!-- 显示设置（金额单位 / 字号） -->
+        <el-popover placement="bottom" :width="240" trigger="click">
+          <template #reference>
+            <el-tooltip content="显示设置（单位/字号）" placement="bottom">
+              <div class="gt-topbar-btn">
+                <span style="font-size:15px;line-height:18px">Aa</span>
+              </div>
+            </el-tooltip>
+          </template>
+          <div class="gt-display-prefs-panel">
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">金额单位</span>
+              <el-radio-group v-model="displayPrefs.amountUnit" size="small" @change="(v: any) => displayPrefs.setUnit(v)">
+                <el-radio-button v-for="opt in displayPrefs.unitOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">表格字号</span>
+              <el-radio-group v-model="displayPrefs.fontSize" size="small" @change="(v: any) => displayPrefs.setFontSize(v)">
+                <el-radio-button v-for="opt in displayPrefs.fontOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">小数位数</span>
+              <el-radio-group v-model="displayPrefs.decimals" size="small" @change="(v: any) => displayPrefs.setDecimals(v)">
+                <el-radio-button :value="0">整数</el-radio-button>
+                <el-radio-button :value="2">2位</el-radio-button>
+                <el-radio-button :value="4">4位</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">零值显示</span>
+              <el-switch v-model="displayPrefs.showZero" size="small" active-text="0.00" inactive-text="—" @change="(v: any) => displayPrefs.setShowZero(v)" />
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">负数红色</span>
+              <el-switch v-model="displayPrefs.negativeRed" size="small" @change="(v: any) => displayPrefs.setNegativeRed(v)" />
+            </div>
+            <div class="gt-dp-row">
+              <span class="gt-dp-label">变动高亮</span>
+              <el-radio-group v-model="displayPrefs.highlightThreshold" size="small" @change="(v: any) => displayPrefs.setHighlightThreshold(v)">
+                <el-radio-button :value="0">关</el-radio-button>
+                <el-radio-button :value="0.1">10%</el-radio-button>
+                <el-radio-button :value="0.2">20%</el-radio-button>
+                <el-radio-button :value="0.5">50%</el-radio-button>
+              </el-radio-group>
+            </div>
+          </div>
+        </el-popover>
 
         <div class="gt-topbar-divider" />
 
@@ -69,6 +129,15 @@
             <span class="gt-import-label">导入中</span>
           </div>
         </el-tooltip>
+
+        <!-- 同步状态指示器 -->
+        <SyncStatusIndicator />
+
+        <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
+        <slot name="nav-review-inbox" />
+
+        <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
+        <slot name="nav-eqcr" />
 
         <el-tooltip content="通知" placement="bottom">
           <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
@@ -169,11 +238,13 @@
         class="gt-catalog"
         :style="{ width: catalogWidth + 'px' }"
       >
-        <div class="gt-catalog-header">
-          <span class="gt-catalog-title">{{ catalogTitle }}</span>
-          <el-icon class="gt-catalog-collapse" @click="catalogCollapsed = true" :size="14" title="收起"><DArrowLeft /></el-icon>
-        </div>
         <slot name="catalog" />
+        <div class="gt-catalog-bottom">
+          <div class="gt-nav-item" @click="catalogCollapsed = true" title="收起">
+            <el-icon :size="18"><DArrowLeft /></el-icon>
+            <span class="gt-nav-label">收起</span>
+          </div>
+        </div>
       </section>
       <!-- 第3栏收起态 -->
       <div
@@ -197,6 +268,23 @@
         </slot>
       </section>
     </div>
+
+    <!-- 全局公式管理弹窗 -->
+    <FormulaManagerDialog
+      v-model="showFormulaManager"
+      :rows="[]"
+      :project-id="currentProjectId"
+      :year="currentYear"
+      @saved="onFormulaSaved"
+      @applied="onFormulaApplied"
+    />
+
+    <!-- 全局自定义查询弹窗 -->
+    <CustomQueryDialog
+      v-model="showCustomQuery"
+      :project-id="currentProjectId"
+      :year="currentYear"
+    />
   </div>
 </template>
 
@@ -204,18 +292,27 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
   Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
 } from '@element-plus/icons-vue'
+import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
+import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue'
+import { eventBus } from '@/utils/eventBus'
+import { operationHistory } from '@/utils/operationHistory'
+import { createSSE, type SSEConnection } from '@/utils/sse'
+import { events as eventPaths } from '@/services/apiPaths'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const displayPrefs = useDisplayPrefsStore()
 
 // ── Props ──
 const props = defineProps<{
@@ -227,15 +324,15 @@ const props = defineProps<{
 // ── 导航项 ──
 const navItems = [
   { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
-  { key: 'projects', label: '项目情况', icon: FolderOpened, path: '/projects', maturity: 'production' },
-  { key: 'team', label: '人员库', icon: User, path: '/settings/staff', maturity: 'production' },
-  { key: 'workhours', label: '工时管理', icon: Timer, path: '/work-hours', maturity: 'production' },
-  { key: 'mgmt-dashboard', label: '管理看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
-  { key: 'consolidation', label: '合并项目', icon: Connection, path: '/consolidation', maturity: 'pilot' },
-  { key: 'confirmation', label: '函证管理', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
-  { key: 'archive', label: '归档管理', icon: Box, path: '/archive', maturity: 'production' },
-  { key: 'attachments', label: '附件管理', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
-  { key: 'users', label: '用户管理', icon: UserFilled, path: '/settings/users', maturity: 'production' },
+  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production' },
+  { key: 'team', label: '人员', icon: User, path: '/settings/staff', maturity: 'production' },
+  { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production' },
+  { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
+  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot' },
+  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
+  { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production' },
+  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
+  { key: 'users', label: '用户', icon: UserFilled, path: '/settings/users', maturity: 'production' },
 ]
 
 const activeNav = computed(() => {
@@ -244,6 +341,8 @@ const activeNav = computed(() => {
   // 顶部栏路由不高亮左侧导航
   const topBarPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum', '/recycle-bin', '/settings']
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
+  // 合并项目详情页（/projects/:id/consolidation）高亮"合并"而非"项目"
+  if (p.match(/^\/projects\/[^/]+\/consolidation/)) return 'consolidation'
   for (const item of navItems) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }
@@ -276,6 +375,10 @@ const catalogWidth = ref(280)
 const catalogCollapsed = ref(false)
 const fourColumnMode = ref(false)
 const fullscreen = ref(false)
+const showFormulaManager = ref(false)
+const showCustomQuery = ref(false)
+const currentProjectId = computed(() => (route.params.projectId as string) || '')
+const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
 // 四栏模式由 props 或用户切换控制
 watch(() => props.fourColumn, (v) => {
@@ -284,6 +387,7 @@ watch(() => props.fourColumn, (v) => {
 
 // 视图模式变化时通知父组件
 watch(fourColumnMode, (v) => {
+  if (v) catalogCollapsed.value = false  // 切换到四栏时自动展开 catalog
   emit('view-change', v ? 'four' : 'three')
 })
 
@@ -398,10 +502,10 @@ async function pollImportQueue() {
     return
   }
   try {
-    const { data: statusData } = await http.get(`/api/data-lifecycle/import-queue/${projectId}`, {
+    const statusData = await api.get(`/api/data-lifecycle/import-queue/${projectId}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const status = statusData.data ?? statusData
+    const status = statusData
     if (status && status.status === 'processing') {
       bgImportStatus.value = {
         projectId,
@@ -443,9 +547,83 @@ async function handleLogout() {
   router.push('/login')
 }
 
+// ── SSE 全局连接 ──
+let sseConnection: SSEConnection | null = null
+
+function connectSSE(projectId: string) {
+  // 关闭旧连接
+  if (sseConnection) {
+    sseConnection.close()
+    sseConnection = null
+  }
+  if (!projectId) return
+
+  const url = eventPaths.stream(projectId)
+  sseConnection = createSSE(url, { maxRetries: 5, retryInterval: 3000 })
+
+  sseConnection.onOpen(() => {
+    eventBus.emit('sse:connected')
+  })
+
+  sseConnection.onMessage((data, _event) => {
+    if (!data || !data.event_type) return
+    if (data.event_type === 'sync.failed') {
+      eventBus.emit('sse:sync-failed', data)
+    } else {
+      eventBus.emit('sse:sync-event', data)
+    }
+  })
+
+  sseConnection.onError(() => {
+    eventBus.emit('sse:disconnected')
+  })
+}
+
+// 监听项目切换，自动重连 SSE
+watch(() => route.params.projectId, (newId) => {
+  connectSSE(newId as string || '')
+}, { immediate: true })
+
+// 监听子组件打开公式管理的自定义事件
+function onOpenFormulaEvent(payload: { nodeKey?: string }) {
+  showFormulaManager.value = true
+  // 如果有 nodeKey，后续 FormulaManagerDialog 可以通过 props 或 watch 定位到对应节点
+  if (payload?.nodeKey) {
+    // 存储到 sessionStorage 供 FormulaManagerDialog 读取
+    sessionStorage.setItem('gt-formula-target-node', payload.nodeKey)
+  }
+}
+
+// 公式保存/应用后广播通知所有表刷新
+function onFormulaSaved() {
+  eventBus.emit('formula-changed', { action: 'saved' })
+}
+function onFormulaApplied() {
+  eventBus.emit('formula-changed', { action: 'applied' })
+}
+
+function onSwitchFourCol(payload: { tab?: string }) {
+  fourColumnMode.value = true
+  catalogCollapsed.value = false
+  // mitt 不需要 _redispatched 补丁：直接延迟通知 catalog 切换 tab
+  if (payload?.tab) {
+    setTimeout(() => {
+      eventBus.emit('four-col-switch', payload)
+    }, 150)
+  }
+}
+
+/** 全局快捷键撤销 */
+function onShortcutUndo() {
+  operationHistory.undo()
+}
+
 onMounted(() => {
   loadPrefs()
   document.addEventListener('keydown', onKeydown)
+  eventBus.on('open-formula-manager', onOpenFormulaEvent)
+  eventBus.on('four-col-switch', onSwitchFourCol)
+  eventBus.on('shortcut:undo', onShortcutUndo)
   // 移动端手势
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -454,8 +632,13 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
+  eventBus.off('open-formula-manager', onOpenFormulaEvent)
+  eventBus.off('four-col-switch', onSwitchFourCol)
+  eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
+  // 关闭 SSE 连接
+  if (sseConnection) { sseConnection.close(); sseConnection = null }
 })
 </script>
 
@@ -636,18 +819,12 @@ onUnmounted(() => {
   background: transparent;
   flex-shrink: 0;
   position: relative;
-  z-index: 10;
+  z-index: 5;
   transition: background var(--gt-transition-fast);
 }
 .gt-resizer:hover,
 .gt-resizer:active {
   background: var(--gt-color-primary-lighter);
-}
-.gt-resizer::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0;
-  left: -3px; right: -3px;
 }
 
 /* ── 中间栏 ── */
@@ -705,30 +882,16 @@ onUnmounted(() => {
   flex-shrink: 0;
   background: var(--gt-color-bg-white);
   border-right: 1px solid var(--gt-color-border-light);
-  overflow-y: auto;
-  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
-.gt-catalog-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--gt-space-3) var(--gt-space-3);
-  border-bottom: 1px solid var(--gt-color-border-light);
+.gt-catalog-bottom {
+  border-top: 1px solid var(--gt-color-border-light);
+  padding: var(--gt-space-1);
   flex-shrink: 0;
 }
-.gt-catalog-title {
-  font-size: var(--gt-font-size-sm);
-  font-weight: 600;
-  color: var(--gt-color-text);
-}
-.gt-catalog-collapse {
-  cursor: pointer;
-  color: var(--gt-color-text-tertiary);
-  transition: color var(--gt-transition-fast);
-}
-.gt-catalog-collapse:hover { color: var(--gt-color-primary); }
 
 .gt-catalog-collapsed {
   width: 24px;
@@ -841,5 +1004,27 @@ onUnmounted(() => {
 .gt-fade-enter-from, .gt-fade-leave-to {
   opacity: 0;
   transform: translateX(-4px);
+}
+
+/* ── 显示设置面板 ── */
+.gt-display-prefs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gt-dp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-dp-label {
+  font-size: 12px;
+  color: #666;
+  min-width: 56px;
+  flex-shrink: 0;
+}
+.gt-dp-row :deep(.el-radio-button__inner) {
+  padding: 4px 10px;
+  font-size: 11px;
 }
 </style>

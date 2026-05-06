@@ -76,9 +76,15 @@ class CompanyType(str, enum.Enum):
 
 
 class ReportStatus(str, enum.Enum):
-    """审计报告状态"""
+    """审计报告状态
+
+    Round 5 新增 ``eqcr_approved``：项目组完成 ``sign_off`` gate 后，
+    EQCR 审批通过时切入此态；``opinion_type`` 与段落锁定。
+    归档签字完成后切至 ``final``。
+    """
     draft = "draft"
     review = "review"
+    eqcr_approved = "eqcr_approved"
     final = "final"
 
 

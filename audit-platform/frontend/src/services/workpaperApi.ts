@@ -3,6 +3,11 @@
  * 封装模板管理、取数公式、WOPI、底稿管理、质量自检、复核批注全部 API
  */
 import http, { downloadFile } from '@/utils/http'
+import {
+  templates as P_tpl, formula as P_fm, workpapers as P_wp,
+  wpReviews as P_wr, wpMapping as P_wm, sampling as P_samp,
+  wpAI as P_wpai, partner as P_partner, jobs as P_jobs,
+} from '@/services/apiPaths'
 
 // ─── Types ───
 
@@ -79,6 +84,7 @@ export interface OnlineEditSession {
   access_token: string | null
   editor_url: string | null
   editor_base_url: string | null
+  /** @deprecated 已迁移至 Univer，保留向后兼容 */
   onlyoffice_url: string | null
 }
 
@@ -138,8 +144,8 @@ export async function listTemplates(auditCycle?: string, standard?: string): Pro
   const params: Record<string, string> = {}
   if (auditCycle) params.audit_cycle = auditCycle
   if (standard) params.applicable_standard = standard
-  const { data } = await http.get('/api/templates', { params })
-  return data.data ?? data
+  const { data } = await http.get(P_tpl.list, { params })
+  return data
 }
 
 export async function uploadTemplate(body: {
@@ -147,53 +153,53 @@ export async function uploadTemplate(body: {
   audit_cycle?: string; applicable_standard?: string;
   description?: string; named_ranges?: any[]
 }): Promise<TemplateItem> {
-  const { data } = await http.post('/api/templates', body)
-  return data.data ?? data
+  const { data } = await http.post(P_tpl.create, body)
+  return data
 }
 
 export async function createTemplateVersion(code: string, changeType: string = 'minor'): Promise<TemplateItem> {
-  const { data } = await http.post(`/api/templates/${code}/versions`, { change_type: changeType })
-  return data.data ?? data
+  const { data } = await http.post(P_tpl.versions(code), { change_type: changeType })
+  return data
 }
 
 export async function deleteTemplate(templateId: string) {
-  const { data } = await http.delete(`/api/templates/${templateId}`)
-  return data.data ?? data
+  const { data } = await http.delete(P_tpl.delete(templateId))
+  return data
 }
 
 export async function listTemplateSets(): Promise<TemplateSetItem[]> {
-  const { data } = await http.get('/api/template-sets')
-  return data.data ?? data
+  const { data } = await http.get(P_tpl.sets.list)
+  return data
 }
 
 export async function getTemplateSet(setId: string): Promise<TemplateSetItem> {
-  const { data } = await http.get(`/api/template-sets/${setId}`)
-  return data.data ?? data
+  const { data } = await http.get(P_tpl.sets.detail(setId))
+  return data
 }
 
 export async function createTemplateSet(body: {
   set_name: string; template_codes?: string[];
   applicable_audit_type?: string; description?: string
 }): Promise<TemplateSetItem> {
-  const { data } = await http.post('/api/template-sets', body)
-  return data.data ?? data
+  const { data } = await http.post(P_tpl.sets.list, body)
+  return data
 }
 
 export async function updateTemplateSet(setId: string, body: Record<string, any>): Promise<TemplateSetItem> {
-  const { data } = await http.put(`/api/template-sets/${setId}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_tpl.sets.detail(setId), body)
+  return data
 }
 
 // ─── Formula ───
 
 export async function executeFormula(req: FormulaRequest): Promise<FormulaResult> {
-  const { data } = await http.post('/api/formula/execute', req)
-  return data.data ?? data
+  const { data } = await http.post(P_fm.execute, req)
+  return data
 }
 
 export async function batchExecuteFormulas(reqs: FormulaRequest[]): Promise<FormulaResult[]> {
-  const { data } = await http.post('/api/formula/batch-execute', reqs)
-  return data.data ?? data
+  const { data } = await http.post(P_fm.batchExecute, reqs)
+  return data
 }
 
 // ─── Working Papers ───
@@ -209,22 +215,22 @@ export async function listWorkpapers(
   projectId: string,
   opts?: { audit_cycle?: string; status?: string; assigned_to?: string }
 ): Promise<WorkpaperDetail[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers`, { params: opts })
-  const items = data.data ?? data ?? []
+  const { data } = await http.get(P_wp.list(projectId), { params: opts })
+  const items = data ?? []
   return Array.isArray(items) ? items.map(normalizeWorkpaper) : []
 }
 
 export async function getWorkpaper(projectId: string, wpId: string): Promise<WorkpaperDetail> {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}`)
-  return normalizeWorkpaper(data.data ?? data)
+  const { data } = await http.get(P_wp.detail(projectId, wpId))
+  return normalizeWorkpaper(data)
 }
 
 export async function downloadWorkpaper(projectId: string, wpId: string) {
-  return downloadFile(`/api/projects/${projectId}/working-papers/${wpId}/download`)
+  return downloadFile(P_wp.download(projectId, wpId))
 }
 
 export async function downloadWorkpaperPack(projectId: string, wpIds: string[], includePrefill: boolean = true) {
-  return downloadFile(`/api/projects/${projectId}/working-papers/download-pack`, {
+  return downloadFile(P_wp.downloadPack(projectId), {
     method: 'post',
     data: { wp_ids: wpIds, include_prefill: includePrefill },
     fileName: 'workpapers.zip',
@@ -232,10 +238,10 @@ export async function downloadWorkpaperPack(projectId: string, wpIds: string[], 
 }
 
 export async function uploadWorkpaper(projectId: string, wpId: string, recordedVersion: number) {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/upload`, {
+  const { data } = await http.post(P_wp.upload(projectId, wpId), {
     recorded_version: recordedVersion,
   })
-  return data.data ?? data
+  return data
 }
 
 export async function uploadWorkpaperFile(
@@ -248,75 +254,77 @@ export async function uploadWorkpaperFile(
   const formData = new FormData()
   formData.append('file', file)
   const { data } = await http.post(
-    `/api/projects/${projectId}/working-papers/${wpId}/upload-file?uploaded_version=${uploadedVersion}&force_overwrite=${forceOverwrite}`,
+    `${P_wp.uploadFile(projectId, wpId)}?uploaded_version=${uploadedVersion}&force_overwrite=${forceOverwrite}`,
     formData,
   )
-  return data.data ?? data
+  return data
 }
 
 export async function getOnlineEditSession(projectId: string, wpId: string): Promise<OnlineEditSession> {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/online-session`)
-  return data.data ?? data
+  const { data } = await http.get(P_wp.onlineSession(projectId, wpId))
+  return data
 }
 
 export async function updateWorkpaperStatus(projectId: string, wpId: string, status: string) {
-  const { data } = await http.put(`/api/projects/${projectId}/working-papers/${wpId}/status`, { status })
-  return data.data ?? data
+  const { data } = await http.put(P_wp.status(projectId, wpId), { status })
+  return data
 }
 
 export async function updateReviewStatus(projectId: string, wpId: string, reviewStatus: string, reason?: string) {
   const body: Record<string, any> = { review_status: reviewStatus }
   if (reason) body.reason = reason
-  const { data } = await http.put(`/api/projects/${projectId}/working-papers/${wpId}/review-status`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_wp.reviewStatus(projectId, wpId), body)
+  return data
 }
 
 export async function assignWorkpaper(projectId: string, wpId: string, body: {
   assigned_to?: string | null; reviewer?: string | null
 }) {
-  const { data } = await http.put(`/api/projects/${projectId}/working-papers/${wpId}/assign`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_wp.assign(projectId, wpId), body)
+  return data
 }
 
 export async function prefillWorkpaper(projectId: string, wpId: string, year: number = 2025) {
   const { data } = await http.post(
-    `/api/projects/${projectId}/working-papers/${wpId}/prefill`,
+    P_wp.prefill(projectId, wpId),
     null,
     { params: { year } },
   )
-  return data.data ?? data
+  return data
 }
 
-export async function parseWorkpaper(projectId: string, wpId: string) {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/parse`)
-  return data.data ?? data
+export async function parseWorkpaper(projectId: string, wpId: string, dryRun: boolean = false) {
+  const { data } = await http.post(
+    `${P_wp.parse(projectId, wpId)}${dryRun ? '?dry_run=true' : ''}`,
+  )
+  return data
 }
 
 export async function getWpIndex(projectId: string): Promise<WpIndexItem[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/wp-index`)
-  return data.data ?? data
+  const { data } = await http.get(P_wp.wpIndex(projectId))
+  return data
 }
 
 export async function getWpCrossRefs(projectId: string): Promise<CrossRefItem[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/wp-cross-refs`)
-  return data.data ?? data
+  const { data } = await http.get(P_wp.wpCrossRefs(projectId))
+  return data
 }
 
 // ─── QC ───
 
 export async function runQCCheck(projectId: string, wpId: string): Promise<QCResult> {
-  const { data } = await http.post(`/api/projects/${projectId}/working-papers/${wpId}/qc-check`)
-  return data.data ?? data
+  const { data } = await http.post(P_wp.qcCheck(projectId, wpId))
+  return data
 }
 
 export async function getQCResults(projectId: string, wpId: string): Promise<QCResult> {
-  const { data } = await http.get(`/api/projects/${projectId}/working-papers/${wpId}/qc-results`)
-  return data.data ?? data
+  const { data } = await http.get(P_wp.qcResults(projectId, wpId))
+  return data
 }
 
 export async function getQCSummary(projectId: string): Promise<QCSummary> {
-  const { data } = await http.get(`/api/projects/${projectId}/qc-summary`)
-  return data.data ?? data
+  const { data } = await http.get(P_wp.qcSummary(projectId))
+  return data
 }
 
 // ─── Reviews ───
@@ -324,53 +332,45 @@ export async function getQCSummary(projectId: string): Promise<QCSummary> {
 export async function listReviews(wpId: string, status?: string): Promise<ReviewComment[]> {
   const params: Record<string, string> = {}
   if (status) params.status = status
-  const { data } = await http.get(`/api/working-papers/${wpId}/reviews`, { params })
-  return data.data ?? data
+  const { data } = await http.get(P_wr.list(wpId), { params })
+  return data
 }
 
 export async function addReview(wpId: string, body: {
   commenter_id: string; comment_text: string; cell_reference?: string
 }): Promise<ReviewComment> {
-  const { data } = await http.post(`/api/working-papers/${wpId}/reviews`, body)
-  return data.data ?? data
+  const { data } = await http.post(P_wr.list(wpId), body)
+  return data
 }
 
 export async function replyReview(wpId: string, reviewId: string, body: {
   replier_id: string; reply_text: string
 }): Promise<ReviewComment> {
-  const { data } = await http.put(`/api/working-papers/${wpId}/reviews/${reviewId}/reply`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_wr.reply(wpId, reviewId), body)
+  return data
 }
 
 export async function resolveReview(wpId: string, reviewId: string, body: {
   resolved_by: string
 }): Promise<ReviewComment> {
-  const { data } = await http.put(`/api/working-papers/${wpId}/reviews/${reviewId}/resolve`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_wr.resolve(wpId, reviewId), body)
+  return data
 }
 
 // ─── WOPI ───
 
+/** @deprecated 已迁移至 Univer，保留向后兼容 */
 export function getWopiEditorUrl(
   wopiSrc: string,
-  onlyofficeUrl: string = import.meta.env.VITE_ONLYOFFICE_URL || 'http://localhost:8080',
+  onlyofficeUrl: string = 'http://localhost:8080',
 ): string {
   const normalizedBaseUrl = onlyofficeUrl.replace(/\/$/, '')
   return `${normalizedBaseUrl}/hosting/wopi/cell/edit?WOPISrc=${encodeURIComponent(wopiSrc)}`
 }
 
+/** @deprecated 已迁移至 Univer 纯前端，始终返回 true */
 export async function checkOnlineEditingAvailability(): Promise<boolean> {
-  try {
-    // 通过后端 /wopi/health 统一检查（后端会同时检测 ONLYOFFICE 可达性）
-    // 避免前端直接跨域请求 ONLYOFFICE /healthcheck 被 CORS 拦截
-    const wopiResp = await http.get('/wopi/health', { timeout: 5000, validateStatus: () => true })
-    if (wopiResp.status !== 200) return false
-    const data = wopiResp.data?.data ?? wopiResp.data
-    // 后端返回 onlyoffice_available 字段
-    return data?.onlyoffice_available !== false
-  } catch {
-    return false
-  }
+  return true
 }
 
 
@@ -406,19 +406,18 @@ export interface WpPrefillData {
 }
 
 export async function getWpMappingByAccount(projectId: string, accountCode: string): Promise<WpAccountMapping[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/by-account/${accountCode}`)
-  return data.data ?? data ?? []
+  const { data } = await http.get(P_wm.byAccount(projectId, accountCode))
+  return data ?? []
 }
 
 export async function getWpPrefillData(projectId: string, wpCode: string, year: number): Promise<WpPrefillData | null> {
-  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/prefill/${wpCode}`, { params: { year } })
-  const result = data.data ?? data
-  return result?.accounts ? result : null
+  const { data } = await http.get(P_wm.prefill(projectId, wpCode), { params: { year } })
+  return data?.accounts ? data : null
 }
 
 export async function getAllWpMappings(projectId: string): Promise<WpAccountMapping[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/all`)
-  return data.data ?? data ?? []
+  const { data } = await http.get(P_wm.all(projectId))
+  return data ?? []
 }
 
 export interface WpRecommendation extends WpAccountMapping {
@@ -427,8 +426,8 @@ export interface WpRecommendation extends WpAccountMapping {
 }
 
 export async function getWpRecommendations(projectId: string, year: number, reportScope: string = 'standalone'): Promise<WpRecommendation[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/wp-mapping/recommend`, { params: { year, report_scope: reportScope } })
-  return data.data ?? data ?? []
+  const { data } = await http.get(P_wm.recommend(projectId), { params: { year, report_scope: reportScope } })
+  return data ?? []
 }
 
 // ─── Sampling ───
@@ -481,47 +480,47 @@ export interface MUSEvaluationResult {
 }
 
 export async function listSamplingConfigs(projectId: string): Promise<SamplingConfigItem[]> {
-  const { data } = await http.get(`/api/projects/${projectId}/sampling-configs`)
-  return data.data ?? data
+  const { data } = await http.get(P_samp.configs.list(projectId))
+  return data
 }
 
 export async function createSamplingConfig(projectId: string, body: Record<string, any>): Promise<SamplingConfigItem> {
-  const { data } = await http.post(`/api/projects/${projectId}/sampling-configs`, body)
-  return data.data ?? data
+  const { data } = await http.post(P_samp.configs.list(projectId), body)
+  return data
 }
 
 export async function updateSamplingConfig(projectId: string, configId: string, body: Record<string, any>): Promise<SamplingConfigItem> {
-  const { data } = await http.put(`/api/projects/${projectId}/sampling-configs/${configId}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_samp.configs.detail(projectId, configId), body)
+  return data
 }
 
 export async function calculateSampleSize(projectId: string, body: Record<string, any>): Promise<{ method: string; params: Record<string, any>; calculated_size: number }> {
-  const { data } = await http.post(`/api/projects/${projectId}/sampling-configs/calculate`, body)
-  return data.data ?? data
+  const { data } = await http.post(P_samp.configs.calculate(projectId), body)
+  return data
 }
 
 export async function listSamplingRecords(projectId: string, workingPaperId?: string): Promise<SamplingRecordItem[]> {
   const params: Record<string, string> = {}
   if (workingPaperId) params.working_paper_id = workingPaperId
-  const { data } = await http.get(`/api/projects/${projectId}/sampling-records`, { params })
-  return data.data ?? data
+  const { data } = await http.get(P_samp.records.list(projectId), { params })
+  return data
 }
 
 export async function createSamplingRecord(projectId: string, body: Record<string, any>): Promise<SamplingRecordItem> {
-  const { data } = await http.post(`/api/projects/${projectId}/sampling-records`, body)
-  return data.data ?? data
+  const { data } = await http.post(P_samp.records.list(projectId), body)
+  return data
 }
 
 export async function updateSamplingRecord(projectId: string, recordId: string, body: Record<string, any>): Promise<SamplingRecordItem> {
-  const { data } = await http.put(`/api/projects/${projectId}/sampling-records/${recordId}`, body)
-  return data.data ?? data
+  const { data } = await http.put(P_samp.records.detail(projectId, recordId), body)
+  return data
 }
 
 export async function musSamplingEvaluate(projectId: string, recordId: string, misstatementDetails: Array<{ book_value: number; misstatement_amount: number }>): Promise<MUSEvaluationResult> {
-  const { data } = await http.post(`/api/projects/${projectId}/sampling-records/${recordId}/mus-evaluate`, {
+  const { data } = await http.post(P_samp.records.musEvaluate(projectId, recordId), {
     misstatement_details: misstatementDetails,
   })
-  return data.data ?? data
+  return data
 }
 
 // ─── Phase 12: 审计说明智能生成 ───
@@ -572,40 +571,40 @@ export interface JobStatusResponse {
 }
 
 export async function generateExplanation(projectId: string, wpId: string): Promise<GenerateDraftResponse> {
-  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/generate-explanation`)
-  return data.data ?? data
+  const { data } = await http.post(P_wpai.generateExplanation(projectId, wpId))
+  return data
 }
 
 export async function confirmExplanation(projectId: string, wpId: string, generationId: string, finalText: string): Promise<ConfirmDraftResponse> {
-  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/confirm-explanation`, {
+  const { data } = await http.post(P_wpai.confirmExplanation(projectId, wpId), {
     generation_id: generationId, final_text: finalText,
   })
-  return data.data ?? data
+  return data
 }
 
 export async function refineExplanation(projectId: string, wpId: string, generationId: string, userEdits: string, feedback?: string) {
-  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/refine-explanation`, {
+  const { data } = await http.post(P_wpai.refineExplanation(projectId, wpId), {
     generation_id: generationId, user_edits: userEdits, feedback,
   })
-  return data.data ?? data
+  return data
 }
 
 export async function reviewContent(projectId: string, wpId: string): Promise<{ issues: ReviewIssue[] }> {
-  const { data } = await http.post(`/api/projects/${projectId}/wp-ai/${wpId}/review-content`)
-  return data.data ?? data
+  const { data } = await http.post(P_wpai.reviewContent(projectId, wpId))
+  return data
 }
 
 export async function checkWorkpaperReadiness(projectId: string): Promise<WorkpaperReadinessResponse> {
-  const { data } = await http.post(`/api/projects/${projectId}/partner/workpaper-readiness`)
-  return data.data ?? data
+  const { data } = await http.post(P_partner.workpaperReadiness(projectId))
+  return data
 }
 
 export async function getJobStatus(projectId: string, jobId: string): Promise<JobStatusResponse> {
-  const { data } = await http.get(`/api/projects/${projectId}/jobs/${jobId}`)
-  return data.data ?? data
+  const { data } = await http.get(P_jobs.status(projectId, jobId))
+  return data
 }
 
 export async function retryJob(projectId: string, jobId: string) {
-  const { data } = await http.post(`/api/projects/${projectId}/jobs/${jobId}/retry`)
-  return data.data ?? data
+  const { data } = await http.post(P_jobs.retry(projectId, jobId))
+  return data
 }

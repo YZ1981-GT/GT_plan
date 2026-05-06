@@ -152,7 +152,7 @@ async def get_online_edit_session(
 ):
     """获取在线编辑会话配置。
 
-    在线编辑是优先方案；当功能开关关闭或服务未部署时，前端再降级到离线模式。
+    在线编辑使用 Univer 纯前端方案；此端点保留向后兼容。
     """
     wp_result = await db.execute(
         sa.select(WorkingPaper.id).where(
@@ -184,7 +184,7 @@ async def get_online_edit_session(
     wopi_base_url = settings.WOPI_BASE_URL.rstrip("/")
     wopi_src = f"{wopi_base_url}/files/{wp_id}?access_token={access_token}"
 
-    # 构造完整的 ONLYOFFICE 编辑器 URL
+    # 构造编辑器 URL（向后兼容，前端已使用 Univer）
     onlyoffice_url = getattr(settings, "ONLYOFFICE_URL", "http://localhost:8080").rstrip("/")
     editor_url = f"{onlyoffice_url}/hosting/wopi/cell/edit?WOPISrc={wopi_src}"
 
@@ -197,6 +197,194 @@ async def get_online_edit_session(
         "editor_url": editor_url,
         "editor_base_url": str(request.base_url).rstrip("/"),
         "onlyoffice_url": onlyoffice_url,
+    }
+
+
+@router.get("/working-papers/{wp_id}/univer-data")
+async def get_univer_data(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """获取底稿的 Univer IWorkbookData 格式数据（含所有 Sheet、样式、公式）"""
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    wp = result.scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    if not wp.file_path:
+        raise HTTPException(status_code=404, detail="底稿文件不存在")
+
+    from app.services.xlsx_to_univer import xlsx_to_univer_data
+    data = xlsx_to_univer_data(wp.file_path)
+    return data
+
+
+@router.post("/working-papers/{wp_id}/univer-save")
+async def save_univer_data(
+    project_id: UUID,
+    wp_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """Univer 编辑器保存 — 完整保存链路
+
+    接收 Univer IWorkbookData snapshot，执行：
+    1. xlsx 回写（保留样式/公式/多Sheet）
+    2. structure.json 更新（三式联动）
+    3. 版本递增 + 审计留痕
+    4. 事件发布（触发五环联动）
+    5. 自动解析 parsed_data
+    """
+    import hashlib
+    import json
+    import shutil
+    from datetime import datetime
+    from pathlib import Path
+
+    snapshot = body.get("snapshot")
+    if not snapshot or not snapshot.get("sheets"):
+        raise HTTPException(status_code=400, detail="缺少 snapshot 数据")
+
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    wp = result.scalar_one_or_none()
+    if not wp:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # 需求 45.1/45.2：并发编辑版本冲突检测
+    expected_version = body.get("expected_version")
+    if expected_version is not None and wp.file_version != expected_version:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "VERSION_CONFLICT",
+                "message": "底稿已被他人修改，请刷新后重试",
+                "server_version": wp.file_version,
+                "expected_version": expected_version,
+            },
+        )
+
+    if not wp.file_path:
+        raise HTTPException(status_code=400, detail="底稿文件路径为空")
+
+    fp = Path(wp.file_path)
+
+    # 1. 版本快照（保存前备份）
+    if fp.exists():
+        snapshot_dir = fp.parent / ".versions"
+        snapshot_dir.mkdir(exist_ok=True)
+        snapshot_name = f"{fp.stem}_v{wp.file_version}{fp.suffix}"
+        shutil.copy2(fp, snapshot_dir / snapshot_name)
+
+    # 2. xlsx 回写
+    from app.services.univer_to_xlsx import univer_data_to_xlsx
+    write_result = univer_data_to_xlsx(snapshot, str(fp))
+
+    # 3. structure.json 更新
+    from app.services.univer_to_xlsx import univer_snapshot_to_structure
+    structure = univer_snapshot_to_structure(snapshot)
+    structure["metadata"]["version"] = (wp.file_version or 0) + 1
+    structure_path = fp.with_suffix(".structure.json")
+    with open(structure_path, "w", encoding="utf-8") as f:
+        json.dump(structure, f, ensure_ascii=False, indent=2)
+
+    # 4. 哈希校验
+    content_hash = hashlib.sha256(fp.read_bytes()).hexdigest()
+
+    # 5. DB 更新
+    old_version = wp.file_version
+    wp.file_version += 1
+    wp.updated_at = datetime.utcnow()
+    wp.prefill_stale = True
+    await db.flush()
+
+    # 6. 审计留痕
+    try:
+        from app.models.core import Log
+        log = Log(
+            user_id=current_user.id,
+            action_type="workpaper_univer_save",
+            object_type="working_paper",
+            object_id=wp_id,
+            new_value={
+                "old_version": old_version,
+                "new_version": wp.file_version,
+                "content_hash": content_hash,
+                "sheets": write_result.get("sheets", 0),
+                "cells": write_result.get("cells", 0),
+            },
+        )
+        db.add(log)
+        await db.flush()
+    except Exception:
+        pass
+
+    # 7. 事件发布（触发五环联动）
+    try:
+        import asyncio
+        from app.services.event_bus import event_bus
+        payload = {
+            "event_type": "WORKPAPER_SAVED",
+            "project_id": project_id,
+            "extra": {
+                "wp_id": str(wp_id),
+                "file_version": wp.file_version,
+                "trigger": "univer_save",
+                "content_hash": content_hash,
+            },
+        }
+        asyncio.create_task(event_bus.publish(payload))
+    except Exception:
+        pass
+
+    # 8. 自动解析（非阻塞）
+    try:
+        import asyncio
+        from app.services.prefill_engine import parse_workpaper_real
+
+        async def _auto_parse():
+            try:
+                from app.core.database import async_session
+                async with async_session() as parse_db:
+                    await parse_workpaper_real(parse_db, project_id, wp_id)
+                    await parse_db.commit()
+            except Exception:
+                pass
+
+        asyncio.create_task(_auto_parse())
+    except Exception:
+        pass
+
+    await db.commit()
+
+    # 获取索引信息
+    idx_result = await db.execute(
+        sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+    )
+    wp_code = idx_result.scalar_one_or_none() or ""
+
+    return {
+        "success": True,
+        "version": wp.file_version,
+        "content_hash": content_hash,
+        "wp_code": wp_code,
+        "sheets": write_result.get("sheets", 0),
+        "cells": write_result.get("cells", 0),
+        "message": f"保存成功 v{wp.file_version}",
     }
 
 
@@ -231,6 +419,80 @@ async def download_workpaper(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/working-papers/{wp_id}/export-pdf")
+async def export_workpaper_pdf(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """导出底稿为 PDF（使用 LibreOffice headless 转换）— 需求 16"""
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    from urllib.parse import quote
+    from fastapi import Response
+
+    # 1. 查底稿 + 校验文件存在
+    result = await db.execute(
+        sa.select(WorkingPaper).where(
+            WorkingPaper.id == wp_id,
+            WorkingPaper.project_id == project_id,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    wp = result.scalar_one_or_none()
+    if not wp or not wp.file_path:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    fp = Path(wp.file_path)
+    if not fp.exists():
+        raise HTTPException(status_code=404, detail=f"底稿文件不存在: {fp}")
+
+    # 2. LibreOffice 可用性检查
+    soffice = shutil.which("libreoffice") or shutil.which("soffice")
+    if soffice is None:
+        raise HTTPException(
+            status_code=500,
+            detail="LibreOffice 不可用，无法转换为 PDF。请在服务器安装 libreoffice 或 soffice。",
+        )
+
+    # 3. 使用临时目录作为输出目录（LibreOffice 不支持指定输出文件名，只支持 --outdir）
+    with tempfile.TemporaryDirectory(prefix="wp_pdf_") as tmpdir:
+        try:
+            proc = subprocess.run(
+                [soffice, "--headless", "--convert-to", "pdf", "--outdir", tmpdir, str(fp)],
+                capture_output=True,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            raise HTTPException(status_code=500, detail="PDF 转换超时（60s）")
+        if proc.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"PDF 转换失败: {proc.stderr.decode('utf-8', errors='ignore')[:500]}",
+            )
+
+        pdf_path = Path(tmpdir) / f"{fp.stem}.pdf"
+        if not pdf_path.exists():
+            raise HTTPException(status_code=500, detail="LibreOffice 未生成 PDF 文件")
+
+        pdf_bytes = pdf_path.read_bytes()
+
+    # 4. 构造文件名（中文用 RFC 5987 编码）
+    display_name = f"{wp.wp_code or 'workpaper'}_{wp.wp_name or ''}.pdf".strip()
+    ascii_name = display_name.encode("ascii", "ignore").decode() or "workpaper.pdf"
+    utf8_name = quote(display_name, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": disposition},
+    )
 
 
 @router.post("/working-papers/{wp_id}/upload")
@@ -305,6 +567,81 @@ async def update_status(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ---------------------------------------------------------------------------
+# 重新分配通知辅助函数
+# ---------------------------------------------------------------------------
+
+
+async def _send_reassignment_notifications(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_id: UUID,
+    old_assignee_id: UUID,
+    new_assignee_id: UUID,
+) -> None:
+    """重新分配底稿后，通知原编制人和新编制人。
+
+    - 原编制人收到"底稿 {wp_code} 已被重新分配"
+    - 新编制人收到"项目「{project_name}」的底稿 {wp_code} 已转交给您"
+    """
+    import logging
+    from app.services.notification_service import NotificationService
+    from app.services.notification_types import ASSIGNMENT_CREATED, WORKPAPER_REMINDER
+    from app.models.core import Project
+
+    logger = logging.getLogger(__name__)
+    notif_svc = NotificationService(db)
+
+    # 获取底稿编号（wp_code）
+    wp_row = (await db.execute(
+        sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id)
+    )).scalar_one_or_none()
+
+    wp_code = "未知底稿"
+    if wp_row:
+        idx_row = (await db.execute(
+            sa.select(WpIndex.wp_code).where(WpIndex.id == wp_row)
+        )).scalar_one_or_none()
+        if idx_row:
+            wp_code = idx_row
+
+    # 获取项目名称
+    project_name = (await db.execute(
+        sa.select(Project.name).where(Project.id == project_id)
+    )).scalar_one_or_none() or "未知项目"
+
+    # 通知原编制人："底稿 {wp_code} 已被重新分配"
+    await notif_svc.send_notification(
+        user_id=old_assignee_id,
+        notification_type=WORKPAPER_REMINDER,
+        title="底稿已被重新分配",
+        content=f"底稿 {wp_code} 已被重新分配给其他人员",
+        metadata={
+            "object_type": "working_paper",
+            "object_id": str(wp_id),
+            "project_id": str(project_id),
+        },
+    )
+
+    # 通知新编制人："项目「{project_name}」的底稿 {wp_code} 已转交给您"
+    await notif_svc.send_notification(
+        user_id=new_assignee_id,
+        notification_type=ASSIGNMENT_CREATED,
+        title="底稿已转交给您",
+        content=f"项目「{project_name}」的底稿 {wp_code} 已转交给您，请及时处理",
+        metadata={
+            "object_type": "working_paper",
+            "object_id": str(wp_id),
+            "project_id": str(project_id),
+        },
+    )
+
+    logger.info(
+        "[REASSIGN] wp=%s old=%s new=%s project=%s",
+        wp_id, old_assignee_id, new_assignee_id, project_id,
+    )
+
+
 @router.put("/working-papers/{wp_id}/assign")
 async def assign_workpaper(
     project_id: UUID,
@@ -313,8 +650,26 @@ async def assign_workpaper(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """分配编制人/复核人（需 review 权限）"""
+    """分配编制人/复核人（需 review 权限）
+
+    重新分配时发送通知：
+    - 原编制人收到"底稿已被重新分配"
+    - 新编制人收到"项目 X 底稿 Y 已转交给您"
+    """
     svc = WorkingPaperService()
+
+    # ── 记录原编制人（用于重新分配通知） ──
+    old_assigned_to: UUID | None = None
+    if data.assigned_to is not None:
+        wp_row = (await db.execute(
+            sa.select(WorkingPaper.assigned_to).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )).scalar_one_or_none()
+        old_assigned_to = wp_row  # 可能为 None（首次分配）
+
     try:
         result = await svc.assign_workpaper(
             db=db, wp_id=wp_id, project_id=project_id,
@@ -322,9 +677,29 @@ async def assign_workpaper(
             reviewer=data.reviewer,
         )
         await db.commit()
-        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # ── 重新分配通知（仅当 assigned_to 变更且原编制人存在时） ──
+    if (
+        data.assigned_to is not None
+        and old_assigned_to is not None
+        and old_assigned_to != data.assigned_to
+    ):
+        try:
+            await _send_reassignment_notifications(
+                db=db,
+                project_id=project_id,
+                wp_id=wp_id,
+                old_assignee_id=old_assigned_to,
+                new_assignee_id=data.assigned_to,
+            )
+            await db.commit()
+        except Exception:
+            # 通知发送失败不阻断主流程
+            pass
+
+    return result
 
 
 @router.post("/working-papers/{wp_id}/submit-review")
@@ -575,13 +950,19 @@ async def prefill_workpaper(
 async def parse_workpaper(
     project_id: UUID,
     wp_id: UUID,
+    dry_run: bool = Query(False, description="仅预览解析结果，不写入 parsed_data"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """手动触发解析回写（需编辑权限）— 真正打开 .xlsx 提取关键数据"""
+    """手动触发解析回写（需编辑权限）— 真正打开 .xlsx 提取关键数据
+
+    dry_run=true：仅返回解析预览，不写入 parsed_data（用于两步确认流程步骤1）
+    dry_run=false（默认）：解析并写入 parsed_data（用于步骤2用户确认后）
+    """
     from app.services.prefill_engine import parse_workpaper_real
-    result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id)
-    await db.commit()
+    result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id, dry_run=dry_run)
+    if not dry_run:
+        await db.commit()
     return result
 
 

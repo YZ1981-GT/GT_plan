@@ -1,0 +1,439 @@
+{
+  "description": "致同审计底稿体系全景图 — B→C→实质性→A 四阶段递进关系",
+  "version": "2025-R2",
+  "stages": [
+    {
+      "id": "prepare",
+      "name": "准备阶段",
+      "icon": "📋",
+      "description": "业务承接、风险评估、了解被审计单位",
+      "groups": [
+        {
+          "id": "B1_accept",
+          "name": "业务承接与保持",
+          "codes": ["B1-1", "B1-2", "B1-5", "B1a", "B1b", "B2", "B2-5", "B3"],
+          "description": "风险评估→独立性确认→前任沟通"
+        },
+        {
+          "id": "B10_understand",
+          "name": "了解被审计单位",
+          "codes": ["B10", "B11", "B12", "B13", "B13-2", "B15", "B18", "B19", "B19-1"],
+          "description": "环境了解→检查文件→访谈→初步分析→重要性→内审→关联方"
+        },
+        {
+          "id": "B22_entity_control",
+          "name": "企业层面控制",
+          "codes": ["B22a", "B22b", "B22c", "B23"],
+          "description": "控制环境→控制矩阵→设计有效性→职责分离"
+        },
+        {
+          "id": "B40_discuss",
+          "name": "项目组讨论与风险汇总",
+          "codes": ["B40", "B50", "B50-1", "B50-2", "B50-3", "B50-4", "B51", "B51-3", "B51-5", "B52"],
+          "description": "项目组讨论→风险因素汇总→舞弊风险→管理层凌驾"
+        },
+        {
+          "id": "B30_group",
+          "name": "集团审计",
+          "codes": ["B30", "B30-1", "B30-2c", "B30-2d", "B30-8", "B30-12", "B30-13", "B30-15"],
+          "description": "了解组成部分→审计范围→组成部分注册会计师"
+        },
+        {
+          "id": "B60_budget",
+          "name": "工时预算",
+          "codes": ["B60-1"],
+          "description": "审计项目工时预算与控制"
+        }
+      ]
+    },
+    {
+      "id": "control_test",
+      "name": "控制测试阶段",
+      "icon": "🔍",
+      "description": "各业务循环内部控制测试",
+      "groups": [
+        {
+          "id": "C1_entity",
+          "name": "企业层面控制测试",
+          "codes": ["C1"],
+          "description": "企业层面控制测试"
+        },
+        {
+          "id": "C_it",
+          "name": "IT控制",
+          "codes": ["C21", "C21-1", "C22", "C23", "C24", "C25", "C26"],
+          "description": "IT专业人员→IT一般控制→会计分录→信息处理控制"
+        }
+      ]
+    },
+    {
+      "id": "substantive",
+      "name": "实质性程序阶段",
+      "icon": "📊",
+      "description": "各业务循环实质性审计程序",
+      "groups": []
+    },
+    {
+      "id": "completion",
+      "name": "完成阶段",
+      "icon": "✅",
+      "description": "汇总、复核、报告出具",
+      "groups": [
+        {
+          "id": "A1_report",
+          "name": "财务报告程序",
+          "codes": ["A1", "A1-11", "A1-13", "A1-14", "A1-17", "A1-18"],
+          "description": "财务报告程序→分析性复核→对应数据"
+        },
+        {
+          "id": "A2_adjust",
+          "name": "调整分录与试算",
+          "codes": ["A2", "A2-1"],
+          "description": "调整分录程序→单体报表试算"
+        },
+        {
+          "id": "A3_consolidation",
+          "name": "合并流程",
+          "codes": ["A3", "A3-1", "A3-3", "A3-4", "A3-5", "A3-6", "A3-7"],
+          "description": "合并程序→合并试算→内部往来→附注汇总"
+        },
+        {
+          "id": "A4_segment",
+          "name": "经营分部与报表支持",
+          "codes": ["A4", "A4-1", "A5", "A5-1", "A5-2", "A5-3", "A5-4"],
+          "description": "经营分部→现金流量表→承诺/或有事项"
+        },
+        {
+          "id": "A6_component",
+          "name": "组成部分",
+          "codes": ["A6", "A6-1"],
+          "description": "组成部分会计师报告→文件包"
+        },
+        {
+          "id": "A7_related",
+          "name": "关联交易",
+          "codes": ["A7", "A7-1", "A7-2"],
+          "description": "关联交易程序→汇总→附注披露"
+        },
+        {
+          "id": "A10_governance",
+          "name": "治理层沟通与期后事项",
+          "codes": ["A8", "A9", "A10", "A10-2", "A11", "A12"],
+          "description": "其他信息→内控建议→治理层沟通→期后事项→律师回复"
+        },
+        {
+          "id": "A13_deficiency",
+          "name": "错报与内控缺陷",
+          "codes": ["A13", "A14", "A14-1", "A14-2", "A14-3", "A14-4", "A14-5", "A14-6"],
+          "description": "错报汇总→内控缺陷评价（企业/IT/业务流程）"
+        },
+        {
+          "id": "A15_conclusion",
+          "name": "持续经营与声明书",
+          "codes": ["A15", "A15-1", "A16", "A17", "A17-5"],
+          "description": "持续经营→管理层声明书→重大事项概要→完成核对表"
+        },
+        {
+          "id": "A20_review",
+          "name": "多级复核",
+          "codes": ["A21-1", "A21-2", "A22-1", "A22-2", "A23-1", "A23-2", "A24-1", "A24-2", "A25-1", "A25-2", "A28"],
+          "description": "现场负责人→经理→合伙人→质量复核→税务专家"
+        },
+        {
+          "id": "A30_archive",
+          "name": "归档",
+          "codes": ["A30", "A31"],
+          "description": "电子底稿归档检查→审计标识一览"
+        }
+      ]
+    },
+    {
+      "id": "special",
+      "name": "特定项目",
+      "icon": "🔧",
+      "description": "特殊事项专项核查",
+      "groups": [
+        {
+          "id": "S_general",
+          "name": "通用特定项目",
+          "codes": ["S1", "S2", "S3", "S4", "S5", "S6", "S8", "S9", "S10", "S11", "S12", "S13", "S14", "S15", "S16", "S17", "S20", "S21"],
+          "description": "违法行为→期初余额→会计政策变更→非货币交换→债务重组→资金占用→租赁→环境→专家→会计估计→每股收益→套期→营收扣除→数据资产"
+        },
+        {
+          "id": "S32_fraud",
+          "name": "专项核查（舞弊风险）",
+          "codes": ["S32-1", "S32-2", "S32-3", "S32-4", "S32-5", "S32-6", "S32-7", "S32-8", "S32-9", "S32-10", "S32-11", "S32-12", "S32-13"],
+          "description": "自我交易→串通→关联方代付→利益输送→体外资金→互联网造假→资本化→压缩薪金→延迟费用→减值不足→延迟转固→其他造假→期后下滑"
+        },
+        {
+          "id": "S33_indicator",
+          "name": "财务异常指标核查",
+          "codes": ["S33-1", "S33-2", "S33-3", "S33-4", "S33-5", "S33-6", "S33-7", "S33-8", "S33-9"],
+          "description": "内控制度→财务非财务印证→异常增长→关联方→收入毛利率→客户供应商→存货资产→现金收付→财务异常"
+        },
+        {
+          "id": "S34_csrc",
+          "name": "证监会核查事项",
+          "codes": ["S34-0", "S34-1", "S34-2", "S34-3", "S34-4", "S34-5", "S34-6", "S34-7", "S34-8", "S34-9", "S34-10", "S34-11", "S34-12", "S34-13", "S34-14", "S34-15", "S34-16", "S34-17", "S34-18", "S34-19", "S34-20", "S34-21", "S34-22", "S34-23", "S34-24", "S34-25", "S34-26", "S34-27", "S34-28", "S34-29", "S34-30", "S34-31", "S34-32", "S34-33", "S34-34", "S34-35", "S34-36", "S34-37", "S34-38", "S34-39", "S34-40", "S34-41"],
+          "description": "涉秘豁免→期权→股份支付→关联交易→应收减值→固定资产→税收优惠→合并无形资产→共同投资→财务性投资→业务重组→经营下滑→持续经营→财务内控→现金交易→第三方回款→会计政策变更→第三方数据→经销商→劳务外包→委外加工→公司治理→互联网系统→信息系统→资金流水→未盈利→研发认定→研发资本化→科研补助→对赌→存货→期间费用→商誉减值→涉农→收入→投资收益→现金流异常→估值调整→应收票据→在建工程→客户供应商"
+        },
+        {
+          "id": "S35_fundraise",
+          "name": "募集资金核查",
+          "codes": ["S35-1", "S35-2", "S35-3", "S35-4", "S35-5"],
+          "description": "关联交易→财务性投资→现金分红→商誉减值→收购核查"
+        }
+      ]
+    }
+  ],
+  "business_cycles": [
+    {
+      "id": "revenue",
+      "name": "收入循环",
+      "icon": "💰",
+      "accounts": "应收票据/应收账款/预收账款/营业收入/应收款项融资/合同资产/合同负债",
+      "risk_assessment": {
+        "understand": ["B23-1"],
+        "description": "了解收入循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C2", "C2-2"],
+        "internal_control": ["C2v"],
+        "description": "销售循环控制测试 + 偏差评价 + 内控测试"
+      },
+      "substantive": {
+        "confirmation": ["D0"],
+        "procedures": ["D1", "D2", "D3", "D4", "D5", "D6", "D7"],
+        "sub_workpapers": ["D2-5", "D4-5", "D4-12", "D4-21"],
+        "description": "函证→应收票据→应收账款→预收账款→营业收入→应收款项融资→合同资产→合同负债"
+      }
+    },
+    {
+      "id": "cash",
+      "name": "货币资金",
+      "icon": "🏦",
+      "accounts": "库存现金/银行存款/其他货币资金",
+      "risk_assessment": {
+        "understand": ["B23-3"],
+        "description": "了解货币资金循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C3", "C3-2"],
+        "internal_control": ["C3v"],
+        "description": "货币资金循环控制测试"
+      },
+      "substantive": {
+        "confirmation": ["E0"],
+        "procedures": ["E1"],
+        "description": "函证→货币资金审定/明细/盘点/对账"
+      }
+    },
+    {
+      "id": "inventory",
+      "name": "存货循环",
+      "icon": "📦",
+      "accounts": "预付账款/存货/应付票据/应付账款/营业成本",
+      "risk_assessment": {
+        "understand": ["B23-4"],
+        "description": "了解存货循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C4", "C4-2"],
+        "internal_control": ["C4v", "C5v"],
+        "description": "存货循环控制测试"
+      },
+      "substantive": {
+        "confirmation": ["F0"],
+        "procedures": ["F1", "F2", "F3", "F4", "F5"],
+        "sub_workpapers": ["F2-16", "F2-52"],
+        "description": "函证→预付账款→存货→应付票据→应付账款→营业成本"
+      }
+    },
+    {
+      "id": "investment",
+      "name": "投资循环",
+      "icon": "📈",
+      "accounts": "交易性金融资产/应收利息/应收股利/债权投资/长期应收款/其他债权投资/长期股权投资/其他权益工具投资/其他非流动金融资产/交易性金融负债/投资收益/净敞口套期收益/公允价值变动收益/信用减值损失",
+      "risk_assessment": {
+        "understand": ["B23-5", "B23-6"],
+        "description": "了解长期股权投资/金融资产循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C5", "C5-2"],
+        "internal_control": ["C5v", "C6v", "C7v"],
+        "description": "投资循环控制测试"
+      },
+      "substantive": {
+        "confirmation": ["G0"],
+        "procedures": ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9", "G10", "G11", "G12", "G13", "G14"],
+        "description": "函证→交易性金融资产→应收利息→应收股利→债权投资→长期应收款→其他债权投资→长期股权投资→其他权益工具→其他非流动金融资产→交易性金融负债→投资收益→套期收益→公允价值变动→信用减值"
+      }
+    },
+    {
+      "id": "fixed_asset",
+      "name": "固定资产循环",
+      "icon": "🏗️",
+      "accounts": "固定资产/在建工程/投资性房地产/工程物资/油气资产/固定资产清理/生产性生物资产/使用权资产/租赁负债/资产处置损益",
+      "risk_assessment": {
+        "understand": ["B23-7"],
+        "description": "了解固定资产循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C6", "C6-2", "C7", "C7-2"],
+        "internal_control": ["C8v"],
+        "description": "固定资产+在建工程循环控制测试"
+      },
+      "substantive": {
+        "confirmation": ["H0"],
+        "procedures": ["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10"],
+        "description": "函证→固定资产→在建工程→投资性房地产→工程物资→油气资产→固定资产清理→生产性生物资产→使用权资产→租赁负债→资产处置损益"
+      }
+    },
+    {
+      "id": "intangible",
+      "name": "无形资产循环",
+      "icon": "💡",
+      "accounts": "无形资产/开发支出/商誉/长期待摊费用/其他非流动资产/研发费用",
+      "risk_assessment": {
+        "understand": ["B23-8"],
+        "description": "了解无形资产循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C8", "C8-2", "C9", "C9-2"],
+        "internal_control": ["C9v"],
+        "description": "无形资产+研发循环控制测试"
+      },
+      "substantive": {
+        "procedures": ["I1", "I2", "I3", "I4", "I5", "I6"],
+        "description": "无形资产→开发支出→商誉→长期待摊费用→其他非流动资产→研发费用"
+      }
+    },
+    {
+      "id": "compensation",
+      "name": "薪酬循环",
+      "icon": "👥",
+      "accounts": "应付职工薪酬/长期应付职工薪酬/股份支付",
+      "risk_assessment": {
+        "understand": ["B23-9"],
+        "description": "了解职工薪酬循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C10", "C10-2"],
+        "internal_control": ["C10v"],
+        "description": "职工薪酬循环控制测试"
+      },
+      "substantive": {
+        "procedures": ["J1", "J2", "J3"],
+        "description": "应付职工薪酬→长期应付职工薪酬→股份支付"
+      }
+    },
+    {
+      "id": "management",
+      "name": "管理循环",
+      "icon": "⚙️",
+      "accounts": "其他应收款/其他流动资产/其他应付款/其他流动负债/预计负债/持有待售/递延收益/销售费用/管理费用/其他收益/资产减值损失/营业外收入/营业外支出",
+      "risk_assessment": {
+        "understand": ["B23-10"],
+        "description": "了解管理循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C11", "C11-2"],
+        "internal_control": ["C11v"],
+        "description": "管理循环控制测试"
+      },
+      "substantive": {
+        "confirmation": ["K0"],
+        "procedures": ["K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "K11", "K12", "K13"],
+        "description": "函证→其他应收款→其他流动资产→其他应付款→其他流动负债→预计负债→持有待售→递延收益→销售费用→管理费用→其他收益→资产减值→营业外收入→营业外支出"
+      }
+    },
+    {
+      "id": "tax",
+      "name": "税金循环",
+      "icon": "🏛️",
+      "accounts": "递延所得税资产/应交税费/递延所得税负债/税金及附加/所得税费用",
+      "risk_assessment": {
+        "understand": ["B23-11", "B23-12"],
+        "description": "了解所得税/流转税循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C12", "C12-2"],
+        "internal_control": ["C12v", "C13v"],
+        "description": "税金循环控制测试"
+      },
+      "substantive": {
+        "procedures": ["N1", "N2", "N3", "N4", "N5"],
+        "description": "递延所得税资产→应交税费→递延所得税负债→税金及附加→所得税费用"
+      }
+    },
+    {
+      "id": "debt",
+      "name": "债务循环",
+      "icon": "🏦",
+      "accounts": "短期借款/长期借款/应付债券/长期应付款/专项应付款/其他非流动负债/财务费用",
+      "risk_assessment": {
+        "understand": ["B23-13"],
+        "description": "了解债务循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C13", "C13-2"],
+        "internal_control": ["C14v"],
+        "description": "债务循环控制测试"
+      },
+      "substantive": {
+        "confirmation": ["L0"],
+        "procedures": ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"],
+        "description": "函证→短期借款→长期借款→应付债券→长期应付款→专项应付款→其他非流动负债→财务费用"
+      }
+    },
+    {
+      "id": "equity",
+      "name": "权益循环",
+      "icon": "📜",
+      "accounts": "应付股利/实收资本/库存股/资本公积/盈余公积/未分配利润/专项储备/一般风险准备/其他综合收益/其他权益工具",
+      "risk_assessment": {
+        "understand": ["B23-14"],
+        "description": "了解权益循环流程和内部控制"
+      },
+      "control_test": {
+        "financial": ["C15", "C15-2"],
+        "internal_control": ["C15v"],
+        "description": "关联方/权益循环控制测试"
+      },
+      "substantive": {
+        "procedures": ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10"],
+        "description": "应付股利→实收资本→库存股→资本公积→盈余公积→未分配利润→专项储备→一般风险准备→其他综合收益→其他权益工具"
+      }
+    }
+  ],
+  "flow": {
+    "description": "审计底稿四阶段递进流程",
+    "steps": [
+      {"from": "prepare", "to": "control_test", "label": "风险评估结果驱动控制测试范围"},
+      {"from": "control_test", "to": "substantive", "label": "控制测试结果决定实质性程序性质/范围/时间"},
+      {"from": "substantive", "to": "completion", "label": "实质性程序结果汇总到完成阶段"},
+      {"from": "completion", "to": "report", "label": "完成阶段出具审计报告"}
+    ],
+    "cross_stage_links": [
+      {"from": "B50_risk", "to": "substantive", "label": "认定层次风险→实质性程序应对"},
+      {"from": "B51_fraud", "to": "C24_journal", "label": "舞弊风险→会计分录测试"},
+      {"from": "A13_misstatement", "to": "B15_materiality", "label": "错报汇总→重新评估重要性"},
+      {"from": "A11_subsequent", "to": "substantive", "label": "期后事项→追加实质性程序"}
+    ]
+  },
+  "statistics": {
+    "total_workpapers": 347,
+    "by_stage": {
+      "prepare": 56,
+      "control_test": 50,
+      "substantive": 95,
+      "completion": 59,
+      "special": 87
+    },
+    "by_quality": {
+      "A_refined": 77,
+      "C_standard": 270
+    },
+    "business_cycles": 11
+  }
+}

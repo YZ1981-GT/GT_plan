@@ -253,6 +253,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useDrilldownStore } from '@/stores/drilldown'
 import type { BalanceRow, AuxBalanceRow } from '@/stores/drilldown'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const store = useDrilldownStore()
@@ -281,10 +282,7 @@ onMounted(async () => {
   }
 })
 
-function fmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmt = fmtAmount
 
 function onBalanceFilterChange() {
   store.balanceFilter.page = 1

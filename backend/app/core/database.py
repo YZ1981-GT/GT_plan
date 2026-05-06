@@ -7,13 +7,29 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_pre_ping=True,  # 自动检测断开的连接
-    pool_recycle=3600,    # 1小时回收连接（防止数据库端超时断开）
-)
+# 任务 14.1：根据数据库类型配置不同的连接池参数
+# - PostgreSQL 生产：pool_size=20 / max_overflow=80（总计 100 连接），recycle 30 分钟
+# - SQLite 开发：轻量配置，recycle 1 小时
+_is_postgres = settings.DATABASE_URL.startswith("postgresql")
+
+if _is_postgres:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        pool_size=max(settings.DB_POOL_SIZE, 20),
+        max_overflow=max(settings.DB_MAX_OVERFLOW, 80),
+        pool_timeout=30,
+        pool_pre_ping=True,
+        pool_recycle=1800,  # 30 分钟，与 PG idle_in_transaction_session_timeout 协调
+        echo=False,
+    )
+else:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+    )
 
 async_session = async_sessionmaker(
     engine,

@@ -9,10 +9,14 @@ Validates: Requirements 10.1-10.6, 2.4, 8.1
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.dataset_models import ImportEventConsumption
+
+if TYPE_CHECKING:
+    from app.services.event_bus import EventBus
 from app.services.event_bus import event_bus
 from app.services.trial_balance_service import TrialBalanceService
 from sqlalchemy.exc import IntegrityError
@@ -77,27 +81,29 @@ def _make_tb_handler(method_name: str):
     )
 
 
+def subscribe_many(bus: "EventBus", subscriptions: list[tuple]) -> None:
+    """批量注册事件处理器，减少重复的 bus.subscribe() 调用。
+
+    Parameters
+    ----------
+    bus : EventBus
+        事件总线实例
+    subscriptions : list of (EventType, handler) tuples
+        要注册的事件类型和处理器列表
+    """
+    for event_type, handler in subscriptions:
+        bus.subscribe(event_type, handler)
+
+
 def register_event_handlers() -> None:
     """注册所有事件处理器到全局 EventBus"""
-    # 调整分录 CRUD → 增量重算
-    event_bus.subscribe(
-        EventType.ADJUSTMENT_CREATED,
-        _make_tb_handler("on_adjustment_changed"),
-    )
-    event_bus.subscribe(
-        EventType.ADJUSTMENT_UPDATED,
-        _make_tb_handler("on_adjustment_changed"),
-    )
-    event_bus.subscribe(
-        EventType.ADJUSTMENT_DELETED,
-        _make_tb_handler("on_adjustment_changed"),
-    )
-
-    # 科目映射变更 → 重算未审数
-    event_bus.subscribe(
-        EventType.MAPPING_CHANGED,
-        _make_tb_handler("on_mapping_changed"),
-    )
+    # 使用 subscribe_many 批量注册，减少重复代码
+    subscribe_many(event_bus, [
+        (EventType.ADJUSTMENT_CREATED, _make_tb_handler("on_adjustment_changed")),
+        (EventType.ADJUSTMENT_UPDATED, _make_tb_handler("on_adjustment_changed")),
+        (EventType.ADJUSTMENT_DELETED, _make_tb_handler("on_adjustment_changed")),
+        (EventType.MAPPING_CHANGED, _make_tb_handler("on_mapping_changed")),
+    ])
 
     # 数据导入完成 → 全量重算
     event_bus.subscribe(
@@ -148,88 +154,121 @@ def register_event_handlers() -> None:
     # 底稿保存 → 审定数比对 + 预填充过期标记 (阶段三)
     # ------------------------------------------------------------------
     async def _on_workpaper_saved(payload: EventPayload) -> None:
-        """底稿保存后：比对审定数与试算表，标记一致性状态"""
+        """底稿保存后：比对审定数与试算表，标记一致性状态。
+        具体逻辑委托给 ConsistencyCheckService.update_workpaper_consistency()。
+        """
         wp_id = payload.extra.get("wp_id") if payload.extra else None
         if not wp_id:
             return
         async with async_session_factory() as session:
             try:
-                from app.services.wp_mapping_service import WpMappingService
-                from app.models.audit_platform_models import TrialBalance
-                from app.models.workpaper_models import WorkingPaper
-                import sqlalchemy as _sa
-
-                # 1. 查找底稿及其 parsed_data
-                wp_result = await session.execute(
-                    _sa.select(WorkingPaper).where(
-                        WorkingPaper.id == wp_id,
-                        WorkingPaper.is_deleted == _sa.false(),
-                    )
-                )
-                wp = wp_result.scalar_one_or_none()
-                if not wp or not wp.parsed_data:
-                    return
-
-                # 2. 从 parsed_data 提取审定数
-                wp_audited = wp.parsed_data.get("audited_amount")
-                if wp_audited is None:
-                    return
-
-                # 3. 查找映射关系
-                from app.models.workpaper_models import WpIndex
-                idx_result = await session.execute(
-                    _sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
-                )
-                wp_code = idx_result.scalar_one_or_none()
-                if not wp_code:
-                    return
-
-                svc = WpMappingService(session)
-                mapping = svc.find_by_wp_code(wp_code)
-                if not mapping:
-                    return
-
-                # 4. 从试算表取审定数比对
-                from decimal import Decimal
-                codes = mapping.get("account_codes", [])
-                if not codes:
-                    return
-
-                tb_result = await session.execute(
-                    _sa.select(
-                        _sa.func.coalesce(_sa.func.sum(TrialBalance.audited_amount), 0)
-                    ).where(
-                        TrialBalance.project_id == payload.project_id,
-                        TrialBalance.standard_account_code.in_(codes),
-                        TrialBalance.is_deleted == _sa.false(),
-                    )
-                )
-                tb_total = Decimal(str(tb_result.scalar() or 0))
-                wp_val = Decimal(str(wp_audited))
-                diff = abs(tb_total - wp_val)
-
-                # 5. 写入一致性状态到 parsed_data
-                wp.parsed_data = {
-                    **wp.parsed_data,
-                    "wp_consistency": {
-                        "status": "consistent" if diff < Decimal("0.01") else "inconsistent",
-                        "tb_amount": str(tb_total),
-                        "wp_amount": str(wp_val),
-                        "diff_amount": str(diff),
-                    },
-                }
+                from app.services.consistency_check_service import ConsistencyCheckService
+                svc = ConsistencyCheckService(session)
+                await svc.update_workpaper_consistency(wp_id, payload.project_id)
                 await session.commit()
-                logger.info(
-                    "wp_consistency: wp=%s status=%s diff=%s",
-                    wp_id,
-                    wp.parsed_data["wp_consistency"]["status"],
-                    diff,
-                )
             except Exception as e:
                 await session.rollback()
                 logger.warning("on_workpaper_saved consistency check failed: %s", e)
 
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_workpaper_saved)
+
+    # ------------------------------------------------------------------
+    # R1 需求 2：复核退回 → IssueTicket 工单创建补偿（幂等）
+    # ------------------------------------------------------------------
+    async def _on_review_record_created(payload: EventPayload) -> None:
+        """订阅 ``REVIEW_RECORD_CREATED`` 事件做工单补偿。
+
+        调用方（``wp_review_service.add_comment`` 的守卫逻辑）在复核退回时
+        无论 IssueTicket 同步创建成功与否都会发此事件：
+
+        - 成功路径：此 handler 发现对应 ``source_ref_id`` 的工单已存在 → 跳过；
+        - 失败路径：对应工单缺失 → 补偿重建一条 ``source='review_comment'``
+          的工单，防止漏单。
+
+        幂等依据 ``IssueTicket.source_ref_id = review_record.id`` 唯一匹配。
+        """
+        extra = payload.extra or {}
+        review_record_id_str = extra.get("review_record_id")
+        if not review_record_id_str:
+            return
+
+        from uuid import UUID as _UUID
+
+        try:
+            review_record_id = _UUID(str(review_record_id_str))
+        except (TypeError, ValueError):
+            logger.warning(
+                "[REVIEW_COMPENSATE] invalid review_record_id=%s",
+                review_record_id_str,
+            )
+            return
+
+        async with async_session_factory() as session:
+            try:
+                # 幂等：检查同一 ReviewRecord 是否已有工单
+                from sqlalchemy import select as _select
+
+                from app.models.phase15_enums import IssueSource
+                from app.models.phase15_models import IssueTicket
+                from app.models.workpaper_models import ReviewRecord
+                from app.services.wp_review_service import (
+                    _build_and_persist_issue_ticket,
+                )
+
+                existing = (
+                    await session.execute(
+                        _select(IssueTicket).where(
+                            IssueTicket.source_ref_id == review_record_id,
+                            IssueTicket.source == IssueSource.review_comment.value,
+                        )
+                    )
+                ).scalar_one_or_none()
+
+                if existing is not None:
+                    logger.debug(
+                        "[REVIEW_COMPENSATE] ticket already exists for review=%s (id=%s)",
+                        review_record_id,
+                        existing.id,
+                    )
+                    return
+
+                review = await session.get(ReviewRecord, review_record_id)
+                if review is None:
+                    logger.warning(
+                        "[REVIEW_COMPENSATE] review record not found: %s",
+                        review_record_id,
+                    )
+                    return
+
+                commenter_id_raw = extra.get("commenter_id")
+                try:
+                    commenter_id = (
+                        _UUID(str(commenter_id_raw))
+                        if commenter_id_raw
+                        else review.commenter_id
+                    )
+                except (TypeError, ValueError):
+                    commenter_id = review.commenter_id
+
+                await _build_and_persist_issue_ticket(
+                    session,
+                    review_record=review,
+                    commenter_id=commenter_id,
+                )
+                await session.commit()
+                logger.info(
+                    "[REVIEW_COMPENSATE] IssueTicket compensated for review=%s",
+                    review_record_id,
+                )
+            except Exception as exc:  # noqa: BLE001
+                await session.rollback()
+                logger.warning(
+                    "[REVIEW_COMPENSATE] failed for review=%s: %s",
+                    review_record_id,
+                    exc,
+                )
+
+    event_bus.subscribe(EventType.REVIEW_RECORD_CREATED, _on_review_record_created)
 
     # ------------------------------------------------------------------
     # 数据变更 → 公式缓存失效 (Task 15.1)
@@ -338,19 +377,19 @@ def register_event_handlers() -> None:
 
     async def _invalidate_addr_tb(payload):
         """调整/导入变更 → 失效试算表域缓存"""
-        pid = getattr(payload, 'project_id', '') or (payload.data or {}).get('project_id', '')
+        pid = getattr(payload, 'project_id', '')
         if pid:
             address_registry.invalidate(pid, domain='tb')
 
     async def _invalidate_addr_report(payload):
         """报表更新 → 失效报表域缓存"""
-        pid = getattr(payload, 'project_id', '') or (payload.data or {}).get('project_id', '')
+        pid = getattr(payload, 'project_id', '')
         if pid:
             address_registry.invalidate(pid, domain='report')
 
     async def _invalidate_addr_all(payload):
         """数据导入 → 失效该项目全部缓存"""
-        pid = getattr(payload, 'project_id', '') or (payload.data or {}).get('project_id', '')
+        pid = getattr(payload, 'project_id', '')
         if pid:
             address_registry.invalidate(pid)
 

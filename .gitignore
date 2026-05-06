@@ -28,6 +28,16 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime storage (wp_storage project UUID dirs, logs, uploads)
+backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/
+backend/logs/
+backend/uploads/
+backend/storage/
+*.xlsx
+!2025浜哄憳鎯呭喌.xlsx
+!backend/data/**/*.xlsx
+!audit-platform/frontend/public/**/*.xlsx
 desktop.ini
 
 # Environment
@@ -66,5 +76,5 @@ ts_errors.txt
 瀹¤鎶ュ憡妯℃澘/
 
 GT_word/
-合并模板有关表样.xlsx
+锟较诧拷模锟斤拷锟叫关憋拷锟斤拷.xlsx
 backend/data/exports/

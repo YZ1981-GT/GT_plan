@@ -31,11 +31,45 @@ from app.models.report_models import (
 logger = logging.getLogger(__name__)
 
 SEED_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_templates_seed.json"
+PRESET_FORMULAS_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_check_preset_formulas.json"
 
 
 def _load_seed_data() -> dict:
     with open(SEED_DATA_PATH, encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+def _load_preset_formulas(template_type: str = "soe") -> dict[str, list[dict]]:
+    """加载预设校验公式，按科目名称分组返回。
+
+    Returns: {"货币资金": [{"id": "F1-1", "check_type": "余额", ...}, ...], ...}
+    """
+    if not PRESET_FORMULAS_PATH.exists():
+        return {}
+    with open(PRESET_FORMULAS_PATH, encoding="utf-8") as f:
+        all_presets = json.load(f)
+    formulas = all_presets.get(template_type, [])
+    grouped: dict[str, list[dict]] = {}
+    for f in formulas:
+        key = f.get("section_title", "")
+        if key:
+            grouped.setdefault(key, []).append(f)
+    return grouped
+
+
+# 预设公式 check_type → validator 映射
+_PRESET_TYPE_TO_VALIDATOR = {
+    "余额": "balance",
+    "其中项": "sub_item",
+    "宽表": "wide_table",
+    "纵向": "vertical",
+    "交叉": "cross_table",
+    "跨科目": "cross_table",
+    "二级明细": "balance",
+    "账龄衔接": "aging",
+    "完整性": "completeness",
+    "LLM审核": "llm_review",
+}
 
 
 # ------------------------------------------------------------------
@@ -546,14 +580,20 @@ class NoteValidationEngine:
         self,
         project_id: UUID,
         year: int,
+        template_type: str = "soe",
     ) -> dict:
         """执行全部校验规则，返回校验结果。
+
+        优先使用预设公式（从 md 解析的 757/186 条），兜底使用 seed check_presets。
 
         Validates: Requirements 5.2, 5.3
         """
         seed = _load_seed_data()
         templates = seed.get("account_mapping_template", [])
-        check_presets = seed.get("check_presets", {})
+        legacy_presets = seed.get("check_presets", {})
+
+        # 加载预设公式（按科目分组）
+        preset_by_account = _load_preset_formulas(template_type)
 
         # Load all notes
         result = await self.db.execute(
@@ -569,20 +609,47 @@ class NoteValidationEngine:
 
         for note in notes:
             account_name = note.account_name or ""
-            applicable_checks = check_presets.get(account_name, [])
 
-            for check_type in applicable_checks:
-                validator_fn = VALIDATORS.get(check_type)
-                if validator_fn is None:
-                    continue
-                try:
-                    findings = await validator_fn(self.db, note, templates)
-                    all_findings.extend(findings)
-                except Exception as e:
-                    logger.warning(
-                        "Validator %s failed for note %s: %s",
-                        check_type, note.note_section, e,
-                    )
+            # 1. 优先使用预设公式
+            preset_formulas = preset_by_account.get(account_name, [])
+            if preset_formulas:
+                # 收集需要执行的 validator 类型（去重）
+                validator_types: set[str] = set()
+                for pf in preset_formulas:
+                    vtype = _PRESET_TYPE_TO_VALIDATOR.get(pf.get("check_type", ""))
+                    if vtype:
+                        validator_types.add(vtype)
+
+                for check_type in validator_types:
+                    validator_fn = VALIDATORS.get(check_type)
+                    if validator_fn is None:
+                        continue
+                    try:
+                        findings = await validator_fn(self.db, note, templates)
+                        # 标记来源为预设公式
+                        for f in findings:
+                            f["preset_source"] = template_type
+                        all_findings.extend(findings)
+                    except Exception as e:
+                        logger.warning(
+                            "Preset validator %s failed for note %s: %s",
+                            check_type, note.note_section, e,
+                        )
+            else:
+                # 2. 兜底：使用 legacy seed check_presets
+                applicable_checks = legacy_presets.get(account_name, [])
+                for check_type in applicable_checks:
+                    validator_fn = VALIDATORS.get(check_type)
+                    if validator_fn is None:
+                        continue
+                    try:
+                        findings = await validator_fn(self.db, note, templates)
+                        all_findings.extend(findings)
+                    except Exception as e:
+                        logger.warning(
+                            "Validator %s failed for note %s: %s",
+                            check_type, note.note_section, e,
+                        )
 
         # Count by severity
         error_count = sum(1 for f in all_findings if f.get("severity") == "error")
@@ -607,11 +674,13 @@ class NoteValidationEngine:
             "id": str(validation_result.id),
             "project_id": str(project_id),
             "year": year,
+            "template_type": template_type,
             "validation_timestamp": now.isoformat(),
             "findings": all_findings,
             "error_count": error_count,
             "warning_count": warning_count,
             "info_count": info_count,
+            "preset_coverage": len(preset_by_account),
         }
 
     async def get_latest_results(

@@ -319,7 +319,8 @@ import {
   rollbackFileVersion,
   executeFormulas,
 } from '@/services/commonApi'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
+import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
   projectId: string
@@ -428,7 +429,7 @@ async function onPageChange(page: number) {
   if (!props.fileStem) return
   currentPage.value = page
   try {
-    const { data } = await (await import('@/utils/http')).default.get(
+    const data = await api.get(
       `/api/projects/${props.projectId}/excel-html/preview/${props.fileStem}`,
       { params: { page, page_size: pageSize.value, editable: true } }
     )
@@ -502,7 +503,7 @@ function formatValue(val: any): string {
   if (val === null || val === undefined) return ''
   if (typeof val === 'number') {
     if (val === 0) return '-'
-    return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+    return fmtAmount(val)
   }
   return String(val)
 }
@@ -922,19 +923,19 @@ async function applyLocalFormulas() {
 async function loadSelectorData() {
   const yr = props.moduleParams?.year || props.year || 2025
   try {
-    const { data: tbData } = await http.get('/api/trial-balance', {
+    const tbData = await api.get('/api/trial-balance', {
       params: { project_id: props.projectId, year: yr },
       validateStatus: (s: number) => s < 600,
     })
-    trialBalanceData.value = Array.isArray(tbData) ? tbData : (tbData?.data || [])
+    trialBalanceData.value = Array.isArray(tbData) ? tbData : (tbData || [])
   } catch { trialBalanceData.value = [] }
 
   try {
-    const { data: rptData } = await http.get(`/api/report-config`, {
+    const rptData = await api.get(`/api/report-config`, {
       params: { project_id: props.projectId },
       validateStatus: (s: number) => s < 600,
     })
-    reportData.value = Array.isArray(rptData) ? rptData : (rptData?.data || [])
+    reportData.value = Array.isArray(rptData) ? rptData : (rptData || [])
   } catch { reportData.value = [] }
 
   noteSections.value = [

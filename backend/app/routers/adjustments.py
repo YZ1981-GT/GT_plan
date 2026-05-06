@@ -13,15 +13,25 @@
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bulk_operations import BulkRequest, bulk_execute
 from app.core.database import get_db
+from app.core.pagination import PaginationParams
 from app.deps import get_current_user, check_consol_lock, require_project_access, get_user_scope_cycles
 from app.models.core import User
-from app.models.audit_platform_models import AdjustmentType, ReviewStatus
+from app.models.audit_platform_models import (
+    Adjustment,
+    AdjustmentType,
+    ReviewStatus,
+    UnadjustedMisstatement,
+)
 from app.models.audit_platform_schemas import (
     AccountOption,
     AdjustmentCreate,
@@ -32,6 +42,9 @@ from app.models.audit_platform_schemas import (
 )
 from app.services.adjustment_service import AdjustmentService
 from app.services.mapping_service import get_codes_by_cycles
+from app.services.misstatement_service import UnadjustedMisstatementService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/adjustments",
@@ -45,8 +58,7 @@ async def list_adjustments(
     year: int = Query(...),
     adjustment_type: AdjustmentType | None = Query(None),
     review_status: ReviewStatus | None = Query(None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
@@ -56,7 +68,7 @@ async def list_adjustments(
         project_id, year,
         adjustment_type=adjustment_type,
         review_status=review_status,
-        page=page, page_size=page_size,
+        page=pagination.page, page_size=pagination.page_size,
     )
 
     # scope_cycles 过滤：非 admin/partner 用户只能看到被分配循环对应的科目
@@ -83,6 +95,7 @@ async def list_adjustments(
 async def create_adjustment(
     project_id: UUID,
     data: AdjustmentCreate,
+    batch_mode: bool = Query(False, description="批量模式：暂不触发重算事件"),
     db: AsyncSession = Depends(get_db),
     user=Depends(require_project_access("edit")),
     _lock_check=Depends(check_consol_lock),
@@ -90,11 +103,24 @@ async def create_adjustment(
     """创建调整分录（合并锁定期间禁止，需编辑权限）"""
     svc = AdjustmentService(db)
     try:
-        result = await svc.create_entry(project_id, data, user.id)
+        result = await svc.create_entry(project_id, data, user.id, batch_mode=batch_mode)
         await db.commit()
         return result.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/batch-commit")
+async def batch_commit(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    """批量提交：统一触发一次重算事件（配合 batch_mode=true 使用）"""
+    svc = AdjustmentService(db)
+    result = await svc.batch_commit(project_id, year)
+    return result
 
 
 @router.put("/{entry_group_id}")
@@ -134,6 +160,27 @@ async def delete_adjustment(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/batch-delete")
+async def batch_delete_adjustments(
+    project_id: UUID,
+    body: BulkRequest,
+    db: AsyncSession = Depends(get_db),
+    _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """批量软删除调整分录（合并锁定期间禁止，需编辑权限）"""
+    svc = AdjustmentService(db)
+
+    async def _delete_one(_db, _row):
+        # 复用 service 层的删除逻辑（含状态校验+事件发布）
+        await svc.delete_entry(project_id, _row.id)
+
+    from app.models.audit_platform_models import Adjustment
+    result = await bulk_execute(db, Adjustment, body.ids, _delete_one)
+    await db.commit()
+    return result
+
+
 @router.post("/{entry_group_id}/review")
 async def review_adjustment(
     project_id: UUID,
@@ -152,6 +199,149 @@ async def review_adjustment(
         return {"message": "状态变更成功"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# R1 需求 3 — AJE 一键转错报
+# ---------------------------------------------------------------------------
+
+
+class ConvertToMisstatementRequest(BaseModel):
+    """将 rejected AJE 组转为未更正错报的请求体。"""
+
+    force: bool = Field(
+        default=False,
+        description="当该 AJE 组已存在对应错报时是否强制再建一条（默认否，返回 409）",
+    )
+
+
+@router.post("/{entry_group_id}/convert-to-misstatement")
+async def convert_adjustment_to_misstatement(
+    project_id: UUID,
+    entry_group_id: UUID,
+    body: ConvertToMisstatementRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """将被驳回的 AJE 组一键转为《未更正错报汇总表》的一条记录。
+
+    对齐 R1 需求 3 验收 7 与 gate 规则 `R1-AJE-UNCONVERTED` 的 suggested_action。
+    封装 `UnadjustedMisstatementService.create_from_rejected_aje`，并补：
+      - 组存在性 / 项目归属校验（400）
+      - 幂等：已转过则返回 409 `ALREADY_CONVERTED`（可通过 force=true 强制再建）
+      - year 从 group 内实际分录推断（不信任请求）
+      - 审计日志 `adjustment.converted_to_misstatement`（失败仅 warning）
+    """
+    force = bool(body.force) if body else False
+
+    # 1) 校验 group 存在且属于该项目
+    group_rows = (
+        await db.execute(
+            sa.select(Adjustment.id, Adjustment.year, Adjustment.adjustment_type)
+            .where(
+                Adjustment.project_id == project_id,
+                Adjustment.entry_group_id == entry_group_id,
+                Adjustment.is_deleted.is_(False),
+            )
+        )
+    ).all()
+    if not group_rows:
+        raise HTTPException(
+            status_code=400,
+            detail="AJE 组不存在或不属于该项目",
+        )
+
+    adj_ids = [r.id for r in group_rows]
+    # year 取该组所有行 year 的一致值；如不一致打 warning 并取第一行
+    years = {r.year for r in group_rows}
+    if len(years) > 1:
+        logger.warning(
+            "[convert_to_misstatement] group=%s has inconsistent years %s, using first row",
+            entry_group_id, sorted(years),
+        )
+    year = group_rows[0].year
+
+    # 2) 幂等检查：查该组内任一 adjustment_id 是否已被错报引用
+    existing_ms_row = (
+        await db.execute(
+            sa.select(UnadjustedMisstatement.id)
+            .where(
+                UnadjustedMisstatement.project_id == project_id,
+                UnadjustedMisstatement.source_adjustment_id.in_(adj_ids),
+                UnadjustedMisstatement.is_deleted.is_(False),
+            )
+            .limit(1)
+        )
+    ).first()
+
+    if existing_ms_row and not force:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "ALREADY_CONVERTED",
+                "message": "该 AJE 组已转为未更正错报，如需再次转换请传入 force=true",
+                "existing_misstatement_id": str(existing_ms_row.id),
+            },
+        )
+
+    # 3) 调 service 落库
+    svc = UnadjustedMisstatementService(db)
+    try:
+        result = await svc.create_from_rejected_aje(
+            project_id=project_id,
+            entry_group_id=entry_group_id,
+            year=year,
+            created_by=current_user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 4) 审计日志（失败仅 warning 不阻断）
+    try:
+        from app.services.audit_logger_enhanced import audit_logger
+
+        await audit_logger.log_action(
+            user_id=current_user.id,
+            action="adjustment.converted_to_misstatement",
+            object_type="adjustment_group",
+            object_id=entry_group_id,
+            project_id=project_id,
+            details={
+                "misstatement_id": str(result.id),
+                "source_adjustment_id": str(result.source_adjustment_id)
+                if result.source_adjustment_id
+                else None,
+                "adjustment_count": len(adj_ids),
+                "net_amount": str(result.misstatement_amount),
+                "misstatement_type": result.misstatement_type.value
+                if hasattr(result.misstatement_type, "value")
+                else str(result.misstatement_type),
+                "force": force,
+                "year": year,
+            },
+        )
+    except Exception as log_err:  # noqa: BLE001
+        logger.warning(
+            "[convert_to_misstatement] audit log failed (non-blocking): %s",
+            log_err,
+        )
+
+    await db.commit()
+
+    return {
+        "misstatement_id": str(result.id),
+        "source_entry_group_id": str(entry_group_id),
+        "source_adjustment_id": str(result.source_adjustment_id)
+        if result.source_adjustment_id
+        else None,
+        "net_amount": str(result.misstatement_amount),
+        "misstatement_type": result.misstatement_type.value
+        if hasattr(result.misstatement_type, "value")
+        else str(result.misstatement_type),
+        "year": year,
+        "adjustment_count": len(adj_ids),
+        "created_at": result.created_at.isoformat() if result.created_at else None,
+    }
 
 
 @router.get("/summary")

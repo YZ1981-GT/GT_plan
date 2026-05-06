@@ -3,6 +3,18 @@
 拦截 POST/PUT/PATCH/DELETE 请求，自动记录操作日志。
 日志写入失败不影响业务响应。
 
+## 与 audit_decorator 的分工
+
+| 维度 | AuditLogMiddleware（本文件） | audit_decorator |
+|------|------------------------------|-----------------|
+| 层次 | HTTP 中间件（传输层） | 服务层装饰器（业务层） |
+| 触发 | 所有写请求（POST/PUT/PATCH/DELETE） | 仅被 @audit_log 装饰的方法 |
+| 粒度 | 粗粒度：记录 HTTP 请求体 + 响应状态 | 细粒度：记录 before/after diff |
+| 上下文 | 无业务上下文（只有 URL + body） | 有完整业务上下文（project_id、user_id、ORM 快照） |
+| 适用场景 | 通用操作审计（谁在什么时间做了什么） | 关键业务操作（调整分录审批、底稿状态变更等） |
+
+两者可共存：中间件提供全量覆盖，装饰器提供精细 diff。
+
 Validates: Requirements 1.5
 """
 

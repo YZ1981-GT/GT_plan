@@ -8,14 +8,14 @@
       <el-table-column prop="account_code" label="科目编码" width="120" />
       <el-table-column prop="account_name" label="科目名称" />
       <el-table-column prop="tb_balance" label="科目余额" width="140" align="right">
-        <template #default="{ row }">{{ row.tb_balance?.toLocaleString() }}</template>
+        <template #default="{ row }">{{ fmtAmount(row.tb_balance) }}</template>
       </el-table-column>
       <el-table-column prop="aux_summary" label="辅助汇总" width="140" align="right">
-        <template #default="{ row }">{{ row.aux_summary?.toLocaleString() }}</template>
+        <template #default="{ row }">{{ fmtAmount(row.aux_summary) }}</template>
       </el-table-column>
       <el-table-column prop="diff" label="差异" width="120" align="right">
         <template #default="{ row }">
-          <span :style="{ color: row.is_matched ? 'inherit' : 'var(--el-color-danger)' }">{{ row.diff?.toLocaleString() }}</span>
+          <span :style="{ color: row.is_matched ? 'inherit' : 'var(--el-color-danger)' }">{{ fmtAmount(row.diff) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="80" align="center">
@@ -33,6 +33,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { auxSummary } from '@/services/commonApi'
+import { fmtAmount } from '@/utils/formatters'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
 const year = ref(2025)

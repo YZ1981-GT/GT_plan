@@ -1,7 +1,7 @@
 {
   "wp_code": "H8",
   "name": "使用权资产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1641"
   ],
@@ -91,6 +91,70 @@
             "label": "索引"
           }
         }
+      },
+      "key_rows": {
+        "s1": {
+          "row": 7,
+          "label": "一、使用权资产原值"
+        },
+        "g_total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-025"
+        },
+        "s2": {
+          "row": 13,
+          "label": "二、累计折旧"
+        },
+        "d_total": {
+          "row": 18,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-025"
+        },
+        "s3": {
+          "row": 19,
+          "label": "三、减值准备"
+        },
+        "i_total": {
+          "row": 22,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-025"
+        },
+        "s4": {
+          "row": 23,
+          "label": "四、净值"
+        },
+        "total": {
+          "row": 28,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-025"
+        },
+        "tb": {
+          "row": 30,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 31,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "房屋及建筑物",
+          "机器设备",
+          "运输设备",
+          "其他",
+          "房屋及建筑物"
+        ]
       }
     },
     {
@@ -181,18 +245,23 @@
   ],
   "cross_references": [
     {
-      "from": "H8-1.total",
+      "from": "H8-1.R12.C10",
       "to": "tb://1641#审定数",
       "description": "审定表合计 = 试算表使用权资产审定数"
     },
     {
       "from": "H8-2.合计",
-      "to": "H8-1.total",
+      "to": "H8-1.R12.C10",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "from": "H8-1.total",
+      "from": "H8-1.R12.C10",
       "to": "report://BS/BS-019#期末",
+      "description": "审定表合计 = 报表使用权资产"
+    },
+    {
+      "from": "H8-1.R12.C10",
+      "to": "REPORT('BS-025','期末')",
       "description": "审定表合计 = 报表使用权资产"
     }
   ],
@@ -238,6 +307,12 @@
       "type": "calculation",
       "severity": "warning",
       "description": "折现率/租赁期判断合理"
+    },
+    {
+      "code": "H8-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表使用权资产"
     }
   ]
 }

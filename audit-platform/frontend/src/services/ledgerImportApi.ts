@@ -1,4 +1,5 @@
 import http from '@/utils/http'
+import { ledger as P } from '@/services/apiPaths'
 
 export interface LedgerDataset {
   id: string
@@ -57,44 +58,44 @@ export interface ImportArtifact {
 }
 
 function base(projectId: string) {
-  return `/api/projects/${projectId}/ledger-import`
+  return P.import.base(projectId)
 }
 
 export async function listLedgerDatasets(projectId: string, year: number): Promise<LedgerDataset[]> {
   const { data } = await http.get(`${base(projectId)}/datasets`, { params: { year } })
-  return data?.data ?? data ?? []
+  return data ?? []
 }
 
 export async function getActiveLedgerDataset(projectId: string, year: number): Promise<{ active_dataset_id: string | null }> {
   const { data } = await http.get(`${base(projectId)}/datasets/active`, { params: { year } })
-  return data?.data ?? data ?? { active_dataset_id: null }
+  return data ?? { active_dataset_id: null }
 }
 
 export async function rollbackLedgerDataset(projectId: string, datasetId: string, year: number, reason?: string) {
   const { data } = await http.post(`${base(projectId)}/datasets/${datasetId}/rollback`, null, {
     params: { year, reason },
   })
-  return data?.data ?? data
+  return data
 }
 
 export async function listImportJobs(projectId: string, year?: number): Promise<ImportJob[]> {
   const { data } = await http.get(`${base(projectId)}/jobs`, { params: year ? { year } : {} })
-  return data?.data ?? data ?? []
+  return data ?? []
 }
 
 export async function retryImportJob(projectId: string, jobId: string) {
   const { data } = await http.post(`${base(projectId)}/jobs/${jobId}/retry`)
-  return data?.data ?? data
+  return data
 }
 
 export async function cancelImportJob(projectId: string, jobId: string) {
   const { data } = await http.post(`${base(projectId)}/jobs/${jobId}/cancel`)
-  return data?.data ?? data
+  return data
 }
 
 export async function getImportJob(projectId: string, jobId: string): Promise<ImportJobStatus> {
   const { data } = await http.get(`${base(projectId)}/jobs/${jobId}`)
-  return data?.data ?? data
+  return data
 }
 
 export async function smartPreviewLedgerImport(projectId: string, url: string, formData: FormData) {
@@ -103,21 +104,21 @@ export async function smartPreviewLedgerImport(projectId: string, url: string, f
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 600000,  // 10分钟（大文件上传需要时间）
   })
-  return data?.data ?? data
+  return data
 }
 
 export async function submitSmartLedgerImport(projectId: string, url: string, formData: FormData) {
   void projectId
   const { data } = await http.post(url, formData, { timeout: 60000 })
-  return data?.data ?? data
+  return data
 }
 
 export async function listActivationRecords(projectId: string, year: number): Promise<ActivationRecord[]> {
   const { data } = await http.get(`${base(projectId)}/activation-records`, { params: { year } })
-  return data?.data ?? data ?? []
+  return data ?? []
 }
 
 export async function listImportArtifacts(projectId: string): Promise<ImportArtifact[]> {
   const { data } = await http.get(`${base(projectId)}/artifacts`)
-  return data?.data ?? data ?? []
+  return data ?? []
 }

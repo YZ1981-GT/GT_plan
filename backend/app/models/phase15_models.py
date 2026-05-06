@@ -66,6 +66,12 @@ class IssueTicket(Base):
     """统一问题单（对齐 v2 4.5.15A）
 
     L2/L3/Q 问题统一管理，支持 SLA 升级。
+
+    R1 一次性扩展 ``source`` 枚举为 5 轮共享的全量 11 值，避免后续轮次多次迁移
+    （依据 ``refinement-round1-review-closure`` 需求 2.2 与 README v2.2
+    "数据库迁移约定" 第 4 条）。可选值：``L2 / L3 / Q / review_comment /
+    consistency / ai / reminder / client_commitment / pbc / confirmation /
+    qc_inspection``。
     """
     __tablename__ = "issue_tickets"
 
@@ -74,7 +80,16 @@ class IssueTicket(Base):
     wp_id = Column(UUID(as_uuid=True), nullable=True)
     task_node_id = Column(UUID(as_uuid=True), nullable=True)
     conversation_id = Column(UUID(as_uuid=True), nullable=True)
-    source = Column(String(16), nullable=False, comment="L2/L3/Q")
+    source = Column(
+        String(32),
+        nullable=False,
+        comment=(
+            "L2/L3/Q/review_comment/consistency/ai/reminder/client_commitment/"
+            "pbc/confirmation/qc_inspection"
+        ),
+    )
+    # R1: 源对象 ID，用于双向追溯（如对应 ReviewRecord.id）
+    source_ref_id = Column(UUID(as_uuid=True), nullable=True)
     severity = Column(String(16), nullable=False, comment="blocker/major/minor/suggestion")
     category = Column(String(64), nullable=False, comment="data_mismatch/evidence_missing/...")
     title = Column(String(200), nullable=False)

@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # 登录安全
     LOGIN_MAX_ATTEMPTS: int = 5
     LOGIN_LOCK_MINUTES: int = 30
-    # ONLYOFFICE
+    # ONLYOFFICE（向后兼容，底稿编辑已迁移至 Univer）
     ONLYOFFICE_URL: str = "http://onlyoffice:80"
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
     # 文件存储
@@ -108,6 +108,15 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
     # LLM 限流配置
     LLM_RATE_LIMIT_PER_MINUTE: int = 10  # 每用户每分钟最大 LLM 调用次数
+    # bcrypt cost factor（OWASP 推荐 12，可通过环境变量调整）
+    BCRYPT_ROUNDS: int = 12
+
+    # R1 上线日期：早于此日期创建的项目进入独立性声明 legacy 宽容期
+    # 空字符串表示"无 legacy 宽容期"，所有项目都严格检查
+    INDEPENDENCE_LEGACY_CUTOFF_DATE: str = "2026-05-05"
+    # Batch 3-7: 全局宽容期总开关；R6+ 老项目升级完毕后可关闭此开关彻底下线宽容期
+    # False = 关闭，即使项目早于 CUTOFF_DATE 也严格检查（不走 legacy 路径）
+    INDEPENDENCE_LEGACY_GRACE_ENABLED: bool = True
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

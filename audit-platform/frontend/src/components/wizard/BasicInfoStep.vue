@@ -140,6 +140,32 @@
       <el-form-item label="项目经理">
         <el-input v-model="form.manager_id" placeholder="请输入项目经理" />
       </el-form-item>
+
+      <el-divider content-position="left">预算与合同</el-divider>
+
+      <el-form-item label="预算工时（小时）" prop="budget_hours">
+        <el-input-number
+          v-model="form.budget_hours"
+          :min="0"
+          :max="99999"
+          :precision="0"
+          placeholder="预算工时"
+          style="width: 100%"
+          controls-position="right"
+        />
+      </el-form-item>
+
+      <el-form-item label="合同金额（元）" prop="contract_amount">
+        <el-input-number
+          v-model="form.contract_amount"
+          :min="0"
+          :max="999999999"
+          :precision="2"
+          placeholder="合同金额"
+          style="width: 100%"
+          controls-position="right"
+        />
+      </el-form-item>
     </el-form>
   </div>
 </template>
@@ -174,6 +200,8 @@ const form = reactive<BasicInfo>({
   ultimate_company_code: '',
   signing_partner_id: null,
   manager_id: null,
+  budget_hours: null,
+  contract_amount: null,
 })
 
 const rules: FormRules = {

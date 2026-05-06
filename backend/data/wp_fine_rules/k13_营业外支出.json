@@ -1,7 +1,7 @@
 {
   "wp_code": "K13",
   "name": "营业外支出",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6711"
   ],
@@ -72,6 +72,36 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 11,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-019"
+        },
+        "tb": {
+          "row": 13,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 14,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "捐赠支出",
+          "罚款支出",
+          "非流动资产毁损报废损失",
+          "其他",
+          "对外捐赠"
+        ]
       }
     },
     {
@@ -107,14 +137,19 @@
   ],
   "cross_references": [
     {
-      "from": "K13-1.total",
+      "from": "K13-1.R11.C5",
       "to": "tb://6711#审定数",
       "description": "审定表合计 = 试算表营业外支出审定数"
     },
     {
       "from": "K13-2.合计",
-      "to": "K13-1.total",
+      "to": "K13-1.R11.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K13-1.R11.C5",
+      "to": "REPORT('IS-019','本期')",
+      "description": "审定表合计 = 报表营业外支出"
     }
   ],
   "audit_checks": [
@@ -147,6 +182,18 @@
       "type": "check",
       "severity": "warning",
       "description": "非经常性损益分类正确"
+    },
+    {
+      "code": "K13-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表营业外支出"
+    },
+    {
+      "code": "K13-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "大额营业外支出凭证已检查"
     }
   ]
 }

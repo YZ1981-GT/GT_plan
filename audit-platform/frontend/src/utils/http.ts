@@ -5,8 +5,12 @@
  *       分级错误处理、请求取消（AbortController）、请求去重、自动重试
  */
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig, type AxiosError } from 'axios'
+import NProgress from 'nprogress'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+
+// ── NProgress 活跃请求计数器 ──────────────────────────────
+let activeRequests = 0
 
 const http = axios.create({
   baseURL: '/',
@@ -15,27 +19,63 @@ const http = axios.create({
 
 // ── 请求去重：相同 GET 请求在飞行中不重复发送 ──────────────
 const pendingMap = new Map<string, AbortController>()
+// POST/PUT/PATCH 防重复提交的自动清理定时器（防止超时/取消时 key 泄漏）
+const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 function getRequestKey(config: InternalAxiosRequestConfig): string {
-  return `${config.method}:${config.url}:${JSON.stringify(config.params || '')}`
+  const base = `${config.method}:${config.url}:${JSON.stringify(config.params || '')}`
+  // POST/PUT/PATCH 请求：对 body 做轻量 hash（取前100字符+总长度），避免大 body 时 JSON.stringify 性能差
+  if (config.data && typeof config.data === 'object' && !(config.data instanceof FormData)) {
+    try {
+      const bodyStr = JSON.stringify(config.data)
+      const bodyHash = `${bodyStr.slice(0, 100)}|len:${bodyStr.length}`
+      return `${base}:${bodyHash}`
+    } catch {
+      return base
+    }
+  }
+  return base
 }
 
 function addPending(config: InternalAxiosRequestConfig) {
   const key = getRequestKey(config)
   // 跳过 FormData 上传请求（文件上传不参与去重）
   if (config.data instanceof FormData) return
-  if (config.method?.toUpperCase() === 'GET' && pendingMap.has(key)) {
-    // 取消前一个相同请求
+  const method = config.method?.toUpperCase()
+  if (method === 'GET' && pendingMap.has(key)) {
+    // GET 去重：取消前一个相同请求
     pendingMap.get(key)!.abort()
+  } else if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && pendingMap.has(key)) {
+    // POST/PUT/PATCH 防重复提交：取消当前请求（保留先发的）
+    const controller = new AbortController()
+    controller.abort()
+    config.signal = controller.signal
+    return
   }
   const controller = new AbortController()
   config.signal = controller.signal
   pendingMap.set(key, controller)
+  // POST/PUT/PATCH 设置 5 分钟自动清理，防止超时/取消时 key 泄漏导致后续请求永久被拒
+  if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+    const existingTimer = pendingTimers.get(key)
+    if (existingTimer) clearTimeout(existingTimer)
+    const cleanupTimer = setTimeout(() => {
+      pendingMap.delete(key)
+      pendingTimers.delete(key)
+    }, 5 * 60 * 1000)
+    pendingTimers.set(key, cleanupTimer)
+  }
 }
 
 function removePending(config: InternalAxiosRequestConfig) {
   const key = getRequestKey(config)
   pendingMap.delete(key)
+  // 清除对应的自动清理定时器
+  const timer = pendingTimers.get(key)
+  if (timer) {
+    clearTimeout(timer)
+    pendingTimers.delete(key)
+  }
 }
 
 async function extractErrorDetail(responseData: unknown): Promise<string> {
@@ -69,6 +109,13 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers.Authorization = `Bearer ${authStore.token}`
   }
   addPending(config)
+  // NProgress：首个请求启动进度条，后续请求递增
+  activeRequests++
+  if (activeRequests === 1) {
+    NProgress.start()
+  } else {
+    NProgress.inc()
+  }
   // 记录请求开始时间
   ;(config as any)._startTime = Date.now()
   return config
@@ -85,6 +132,9 @@ let refreshQueue: Array<{
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     removePending(response.config as InternalAxiosRequestConfig)
+    // NProgress：所有请求完成后结束进度条
+    activeRequests = Math.max(0, activeRequests - 1)
+    if (activeRequests === 0) NProgress.done()
     // 记录请求日志
     const startTime = (response.config as any)._startTime
     if (startTime) {
@@ -111,6 +161,9 @@ http.interceptors.response.use(
   },
   async (error: AxiosError) => {
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
+    // NProgress：错误时也递减计数
+    activeRequests = Math.max(0, activeRequests - 1)
+    if (activeRequests === 0) NProgress.done()
 
     // 记录错误请求日志
     if (error.config) {
@@ -175,10 +228,16 @@ http.interceptors.response.use(
       }
     }
 
-    // 500/502/503 自动重试（最多 2 次）
+    // 500/502/503 自动重试（最多 2 次）+ loading 提示
     if (status && status >= 500 && (originalRequest._retryCount ?? 0) < 2) {
       originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
+      const retryMsg = ElMessage.info({
+        message: `服务器暂时异常，正在第 ${originalRequest._retryCount} 次重试...`,
+        duration: 0,
+        showClose: true,
+      })
       await new Promise((r) => setTimeout(r, 1000 * originalRequest._retryCount!))
+      retryMsg.close()
       return http(originalRequest)
     }
 
@@ -193,12 +252,34 @@ http.interceptors.response.use(
       409: detail || '数据冲突，请刷新后重试',
       413: detail || '文件过大，超出限制',
       422: detail || '数据校验失败',
-      423: detail || '资源已锁定（合并锁定中）',
+      423: '',  // 423 锁定详情由下方专门处理
       500: '服务器内部错误，请稍后重试',
       502: '网关错误，请稍后重试',
       503: '服务暂时不可用',
     }
     const msg = (status && msgMap[status]) || detail || fallback
+
+    // 423 锁定详情：显示锁定人/时间/解锁方式
+    if (status === 423) {
+      let lockInfo = detail || '资源已锁定'
+      try {
+        const lockData = error.response?.data as any
+        const payload = lockData?.data ?? lockData
+        if (payload && typeof payload === 'object') {
+          const lockedBy = payload.locked_by || payload.lockedBy || ''
+          const lockedAt = payload.locked_at || payload.lockedAt || ''
+          const unlockHint = payload.unlock_hint || payload.unlockHint || '请联系锁定人或等待自动释放'
+          if (lockedBy) {
+            lockInfo = `资源已被 ${lockedBy} 锁定`
+            if (lockedAt) lockInfo += `（${lockedAt}）`
+            lockInfo += `\n解锁方式：${unlockHint}`
+          }
+        }
+      } catch { /* ignore parse errors */ }
+      ElMessage.warning({ message: lockInfo, duration: 5000, showClose: true })
+      return Promise.reject(error)
+    }
+
     const displayMsg = requestId ? `${msg}（ID: ${requestId}）` : msg
     if (status && status >= 500) {
       ElMessage.error(displayMsg)

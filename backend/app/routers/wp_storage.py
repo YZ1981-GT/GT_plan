@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -39,11 +39,21 @@ async def save_version(
     return result
 
 
-@router.post("/projects/{project_id}/archive")
+@router.post("/projects/{project_id}/archive", deprecated=True)
 async def archive_project(
     project_id: UUID,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    """[Deprecated] 请使用 POST /api/projects/{id}/archive/orchestrate"""
+    import logging as _logging
+
+    _logging.getLogger(__name__).warning(
+        "[DEPRECATED] wp_storage.archive_project called for project=%s, "
+        "use /api/projects/{id}/archive/orchestrate instead",
+        project_id,
+    )
+    response.headers["X-Deprecated"] = "true"
     svc = WpStorageService(db)
     return await svc.archive_project(project_id)

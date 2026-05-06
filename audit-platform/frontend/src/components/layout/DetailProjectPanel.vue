@@ -283,7 +283,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import http from '@/utils/http'
+import { fmtAmount } from '@/utils/formatters'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 
 const props = defineProps<{ project: any | null }>()
@@ -304,7 +304,7 @@ watch(() => props.project?.id, async (newId) => {
   if (!newId) { wpTree.value = []; trialBalanceRows.value = []; return }
   // 加载底稿索引树（致同编码体系，静默失败）
   try {
-    const { data: raw } = await http.get('/api/gt-coding/tree', { validateStatus: (s: number) => s < 600 })
+    const raw = await api.get('/api/gt-coding/tree', { validateStatus: (s: number) => s < 600 })
     const tree = raw?.data ?? raw ?? []
     wpTree.value = Array.isArray(tree) ? tree.map((group: any) => ({
       label: group.label,
@@ -316,7 +316,7 @@ watch(() => props.project?.id, async (newId) => {
   } catch { wpTree.value = [] }
   // 加载试算表预览（前20行，静默失败）
   try {
-    const { data: raw } = await http.get(`/api/projects/${newId}/trial-balance`, {
+    const raw = await api.get(`/api/projects/${newId}/trial-balance`, {
       params: { year: projectYear.value },
       validateStatus: (s: number) => s < 600,
     })
@@ -325,7 +325,7 @@ watch(() => props.project?.id, async (newId) => {
   } catch { trialBalanceRows.value = [] }
   // 加载附件列表（前10条，静默失败）
   try {
-    const { data: raw } = await http.get(`/api/projects/${newId}/attachments`, {
+    const raw = await api.get(`/api/projects/${newId}/attachments`, {
       params: { page_size: 10 },
       validateStatus: (s: number) => s < 600,
     })
@@ -417,11 +417,7 @@ async function onCreateNextYear() {
   }
 }
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (!n) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function typeLabel(t: string) {
   const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }

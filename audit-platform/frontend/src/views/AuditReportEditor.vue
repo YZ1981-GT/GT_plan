@@ -1,26 +1,38 @@
 <template>
   <div class="gt-audit-report gt-fade-in">
-    <div class="gt-ar-header">
-      <div class="gt-ar-banner">
-        <div class="gt-ar-banner-text">
-          <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="$router.push('/projects')">← 返回</el-button>
-          <h2>审计报告</h2>
-          <p v-if="report">{{ opinionLabel(report.opinion_type) }} · {{ report.company_type === 'listed' ? '上市公司' : '非上市' }} · {{ statusLabel(report.status) }}</p>
-          <p v-else>选择意见类型生成报告</p>
-        </div>
-        <div class="gt-ar-banner-actions">
-          <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
-          <SharedTemplatePicker
-            config-type="report_template"
-            :project-id="projectId"
-            :get-config-data="getReportConfigData"
-            @applied="onReportTemplateApplied"
-          />
-          <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
-          <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
-        </div>
+    <GtPageHeader title="审计报告" @back="router.push('/projects')">
+      <template #actions>
+        <GtToolbar @formula="() => {}">
+          <template #left>
+            <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
+            <SharedTemplatePicker
+              config-type="report_template"
+              :project-id="projectId"
+              :get-config-data="getReportConfigData"
+              @applied="onReportTemplateApplied"
+            />
+            <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="isLocked" round>提交复核</el-button>
+            <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="isLocked" round>定稿</el-button>
+            <el-button size="small" @click="onExportWord" :loading="exportingWord" round>导出 Word</el-button>
+            <el-button size="small" @click="onPickKnowledge" round title="选择知识库文档作为参考上下文">📚 知识库</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
+
+    <!-- 错报超限警告横幅（需求 20.2） -->
+    <el-alert
+      v-if="misstatementWarning"
+      type="error"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 12px"
+    >
+      <template #title>⚠️ 未更正错报累计金额已超过整体重要性水平</template>
+      <div style="font-size: 12px; margin-top: 4px">
+        请在未更正错报汇总表中更正错报或说明不更正原因，否则无法签字定稿
       </div>
-    </div>
+    </el-alert>
 
     <div v-if="!report && !loading" class="gt-ar-empty-state">
       <p>暂无审计报告，请先生成</p>
@@ -50,20 +62,29 @@
         <div class="gt-ar-panel gt-ar-editor-panel">
           <div class="gt-ar-editor-header">
             <h4>{{ activeSection }}</h4>
-            <el-tag v-if="report.status !== 'final'" size="small" type="info">可编辑</el-tag>
-            <el-tag v-else size="small" type="success">已定稿</el-tag>
+            <el-tag v-if="report.status === 'draft'" size="small" type="info">可编辑</el-tag>
+            <el-tag v-else-if="report.status === 'review'" size="small" type="warning">⚠ 审阅中</el-tag>
+            <el-tag v-else-if="report.status === 'eqcr_approved'" size="small" type="danger">🔒 EQCR 已锁定</el-tag>
+            <el-tag v-else-if="report.status === 'final'" size="small" type="success">🔒 已定稿</el-tag>
           </div>
-          <div class="gt-ar-edit-hint" v-if="report.status !== 'final'">
+          <div class="gt-ar-edit-hint" v-if="!isLocked">
             直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
           </div>
+          <div class="gt-ar-edit-hint" v-else-if="report.status === 'eqcr_approved'" style="background: #fff3e0; color: #e65100;">
+            🔒 EQCR 已锁定审计意见，如需修改请联系独立复核合伙人解锁
+          </div>
+          <div v-if="knowledgeContextText" class="gt-ar-edit-hint" style="background: #e8f5e9; color: #2e7d32; margin-bottom: 8px;">
+            📎 已加载 {{ knowledgeDocCount }} 篇知识库参考文档
+            <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 8px; color: #2e7d32;">清除</el-button>
+          </div>
           <el-input v-model="sectionContent" type="textarea" :rows="20"
-            :disabled="report.status === 'final'" placeholder="段落内容"
+            :disabled="isLocked" placeholder="段落内容"
             class="gt-ar-textarea" />
           <div class="gt-ar-editor-footer">
             <el-button type="primary" @click="onSaveParagraph" :loading="saveLoading"
-              :disabled="report.status === 'final'">保存段落</el-button>
+              :disabled="isLocked">保存段落</el-button>
             <el-button @click="onRefreshFinancialData" :loading="refreshLoading"
-              :disabled="report.status === 'final'">刷新财务数据</el-button>
+              :disabled="isLocked">刷新财务数据</el-button>
           </div>
         </div>
       </el-col>
@@ -91,12 +112,15 @@
     <el-dialog append-to-body v-model="showGenerateDialog" title="生成审计报告" width="500px">
       <el-form label-width="100px">
         <el-form-item label="意见类型">
-          <el-select v-model="genForm.opinion_type" style="width: 100%">
+          <el-select v-model="genForm.opinion_type" style="width: 100%" :disabled="isLocked">
             <el-option label="标准无保留意见" value="unqualified" />
             <el-option label="保留意见" value="qualified" />
             <el-option label="否定意见" value="adverse" />
             <el-option label="无法表示意见" value="disclaimer" />
           </el-select>
+          <div v-if="report?.status === 'eqcr_approved'" style="font-size: 12px; color: #e65100; margin-top: 4px">
+            🔒 EQCR 已锁定，意见类型不可修改
+          </div>
         </el-form-item>
         <el-form-item label="公司类型">
           <el-select v-model="genForm.company_type" style="width: 100%">
@@ -111,7 +135,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="单位简称">
-          <el-input v-model="genForm.entity_short_name" placeholder="如"XX公司"，留空则用全称" />
+          <el-input v-model="genForm.entity_short_name" placeholder="如 XX公司，留空则用全称" />
           <div style="font-size: 12px; color: #999; margin-top: 4px">
             生成后正文中的简称可随时修改
           </div>
@@ -119,23 +143,36 @@
       </el-form>
       <template #footer>
         <el-button @click="showGenerateDialog = false">取消</el-button>
-        <el-button type="primary" @click="onGenerate" :loading="genLoading">生成</el-button>
+        <el-button type="primary" @click="onGenerate" :loading="genLoading" :disabled="isLocked">生成</el-button>
       </template>
     </el-dialog>
+
+    <!-- 知识库文档选择弹窗 [R3.7] -->
+    <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   generateAuditReport, getAuditReport, updateAuditReportParagraph,
-  updateAuditReportStatus, type AuditReportData,
+  updateAuditReportStatus, refreshAuditReportFinancialData, exportAuditReportWord,
+  getMisstatementSummary,
+  type AuditReportData,
 } from '@/services/auditPlatformApi'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import { fmtAmount } from '@/utils/formatters'
+import { useDictStore } from '@/stores/dict'
+import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
+import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 
 const route = useRoute()
+const router = useRouter()
+const dictStore = useDictStore()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
 
@@ -143,10 +180,12 @@ const loading = ref(false)
 const genLoading = ref(false)
 const saveLoading = ref(false)
 const refreshLoading = ref(false)
+const exportingWord = ref(false)
 const report = ref<AuditReportData | null>(null)
 const activeSection = ref('')
 const sectionContent = ref('')
 const showGenerateDialog = ref(false)
+const misstatementWarning = ref(false)
 const genForm = ref({
   opinion_type: 'unqualified',
   company_type: 'non_listed',
@@ -154,9 +193,33 @@ const genForm = ref({
   entity_short_name: '',
 })
 
+// ── 知识库上下文 [R3.7] ──
+const { pickDocuments, buildContext } = useKnowledge()
+const knowledgeContextText = ref('')
+const knowledgeDocCount = ref(0)
+
+async function onPickKnowledge() {
+  const docs = await pickDocuments({ title: '选择参考文档（审计报告编辑时使用）', maxSelect: 5 })
+  if (docs.length) {
+    knowledgeContextText.value = await buildContext(docs)
+    knowledgeDocCount.value = docs.length
+    ElMessage.success(`已加载 ${docs.length} 篇参考文档`)
+  }
+}
+
+function clearKnowledgeContext() {
+  knowledgeContextText.value = ''
+  knowledgeDocCount.value = 0
+}
+
 const sectionNames = computed(() => {
   if (!report.value?.paragraphs) return []
   return Object.keys(report.value.paragraphs)
+})
+
+const isLocked = computed(() => {
+  const s = report.value?.status
+  return s === 'eqcr_approved' || s === 'final'
 })
 
 watch(activeSection, (s) => {
@@ -165,12 +228,7 @@ watch(activeSection, (s) => {
   }
 })
 
-function fmtAmt(v: any): string {
-  if (v === null || v === undefined) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : v
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function opinionLabel(t: string) {
   const m: Record<string, string> = { unqualified: '无保留', qualified: '保留', adverse: '否定', disclaimer: '无法表示' }
@@ -178,13 +236,11 @@ function opinionLabel(t: string) {
 }
 
 function statusLabel(s: string) {
-  const m: Record<string, string> = { draft: '草稿', review: '复核中', final: '已定稿' }
-  return m[s] || s
+  return dictStore.label('report_status', s)
 }
 
 function statusTagType(s: string) {
-  const m: Record<string, string> = { draft: 'info', review: 'warning', final: 'success' }
-  return m[s] || 'info'
+  return dictStore.type('report_status', s)
 }
 
 function onSectionSelect(s: string) { activeSection.value = s }
@@ -229,11 +285,28 @@ async function onStatusChange(status: string) {
   } catch { /* error handled by http interceptor */ }
 }
 
+async function onExportWord() {
+  exportingWord.value = true
+  try {
+    const blob = await exportAuditReportWord(projectId.value, year.value)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `审计报告_${year.value}.docx`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('Word 导出成功')
+  } catch {
+    ElMessage.error('Word 导出失败')
+  } finally {
+    exportingWord.value = false
+  }
+}
+
 async function onRefreshFinancialData() {
   if (!report.value) return
   refreshLoading.value = true
   try {
-    const { refreshAuditReportFinancialData } = await import('@/services/auditPlatformApi')
     const result = await refreshAuditReportFinancialData(projectId.value, year.value)
     if (result?.financial_data) {
       report.value.financial_data = result.financial_data
@@ -251,7 +324,16 @@ async function onRefreshFinancialData() {
   } finally { refreshLoading.value = false }
 }
 
-onMounted(fetchReport)
+onMounted(async () => {
+  await fetchReport()
+  // 需求 20.2：检查未更正错报是否超过重要性水平
+  try {
+    const summary = await getMisstatementSummary(projectId.value, year.value)
+    if (summary?.exceeds_materiality === true) {
+      misstatementWarning.value = true
+    }
+  } catch { /* 静默失败，不影响主流程 */ }
+})
 
 // ── 共享模板 ──
 function getReportConfigData(): Record<string, any> {
@@ -296,35 +378,6 @@ function onReportTemplateApplied(data: Record<string, any>) {
 <style scoped>
 .gt-audit-report { padding: var(--gt-space-5); }
 
-.gt-ar-header {
-  margin-bottom: var(--gt-space-4);
-}
-.gt-ar-banner {
-  display: flex; justify-content: space-between; align-items: center;
-  background: var(--gt-gradient-primary);
-  border-radius: var(--gt-radius-lg);
-  padding: 18px 28px;
-  color: #fff;
-  position: relative; overflow: hidden;
-  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
-  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
-}
-.gt-ar-banner::before {
-  content: '';
-  position: absolute; top: -40%; right: -10%;
-  width: 45%; height: 180%;
-  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
-  pointer-events: none;
-}
-.gt-ar-banner-text h2 { margin: 0 0 2px; font-size: 18px; font-weight: 700; }
-.gt-ar-banner-text p { margin: 0; font-size: 12px; opacity: 0.75; }
-.gt-ar-banner-actions {
-  display: flex; gap: 8px; align-items: center;
-  position: relative; z-index: 1;
-}
-.gt-ar-banner-actions .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
-.gt-ar-banner-actions .el-button:hover { background: rgba(255,255,255,0.25); }
 .gt-ar-actions { display: flex; gap: var(--gt-space-2); align-items: center; flex-wrap: wrap; }
 .gt-ar-body { height: calc(100vh - 180px); }
 

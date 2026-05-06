@@ -1,7 +1,7 @@
 {
   "wp_code": "K2",
   "name": "其他流动资产",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1901"
   ],
@@ -78,6 +78,36 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 11,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-013"
+        },
+        "tb": {
+          "row": 13,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 14,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "待认证进项税额",
+          "预缴税款",
+          "合同取得成本",
+          "其他",
+          "预缴企业所得税"
+        ]
       }
     },
     {
@@ -123,14 +153,19 @@
   ],
   "cross_references": [
     {
-      "from": "K2-1.total",
+      "from": "K2-1.R11.C7",
       "to": "tb://1901#审定数",
       "description": "审定表合计 = 试算表其他流动资产审定数"
     },
     {
       "from": "K2-2.合计",
-      "to": "K2-1.total",
+      "to": "K2-1.R11.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K2-1.R11.C7",
+      "to": "REPORT('BS-013','期末')",
+      "description": "审定表合计 = 报表其他流动资产"
     }
   ],
   "audit_checks": [
@@ -157,6 +192,12 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K2-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他流动资产"
     }
   ]
 }

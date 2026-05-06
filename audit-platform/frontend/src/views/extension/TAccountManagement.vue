@@ -85,6 +85,7 @@ import {
   listTAccounts, getTAccount, createTAccount,
   addTAccountEntry, calculateTAccount,
 } from '@/services/commonApi'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
@@ -157,11 +158,7 @@ async function createAccount() {
   finally { creating.value = false }
 }
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (isNaN(n)) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 onMounted(loadAccounts)
 </script>

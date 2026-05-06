@@ -355,3 +355,14 @@ async def available_staff(
         }
         for r in rows
     ]
+
+
+@router.get("/stats/trend")
+async def stats_trend(
+    project_id: str | None = None,
+    days: int = 7,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    svc = DashboardService(db)
+    return await svc.get_stats_trend(project_id=project_id, days=days)

@@ -1,7 +1,7 @@
 {
   "wp_code": "D3",
   "name": "预收账款",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2203"
   ],
@@ -137,19 +137,24 @@
   ],
   "cross_references": [
     {
-      "from": "D3-1.total",
+      "from": "D3-1.R12.C7",
       "to": "tb://2203#审定数",
       "description": "审定表合计 = 试算表预收账款审定数"
     },
     {
-      "from": "D3-1.total",
+      "from": "D3-1.R12.C7",
       "to": "report://BS/BS-034#期末",
       "description": "审定表合计 = 报表预收账款"
     },
     {
       "from": "D3-2.合计",
-      "to": "D3-1.total",
+      "to": "D3-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "D3-1.R12.C7",
+      "to": "REPORT('BS-L07','期末')",
+      "description": "审定表合计 = 报表预收账款"
     }
   ],
   "audit_checks": [

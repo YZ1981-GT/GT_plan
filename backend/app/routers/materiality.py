@@ -22,6 +22,7 @@ from app.models.audit_platform_schemas import (
     MaterialityOverride,
 )
 from app.services.materiality_service import MaterialityService
+from app.services.trial_balance_service import TrialBalanceService
 
 router = APIRouter(
     prefix="/api/projects/{project_id}/materiality",
@@ -56,6 +57,13 @@ async def calculate_materiality(
     svc = MaterialityService(db)
     result = await svc.calculate(project_id, year, params, user.id)
     await db.commit()
+    # 需求 21.1：保存后触发试算表 exceeds_materiality 标记更新（全量重算审定数）
+    try:
+        tb_svc = TrialBalanceService(db)
+        await tb_svc.recalc_audited(project_id, year)
+        await db.commit()
+    except Exception:
+        pass  # 不影响主流程
     return result.model_dump()
 
 
@@ -72,6 +80,13 @@ async def override_materiality(
     try:
         result = await svc.override(project_id, year, overrides, user.id)
         await db.commit()
+        # 需求 21.1：覆盖后触发试算表 exceeds_materiality 标记更新
+        try:
+            tb_svc = TrialBalanceService(db)
+            await tb_svc.recalc_audited(project_id, year)
+            await db.commit()
+        except Exception:
+            pass  # 不影响主流程
         return result.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

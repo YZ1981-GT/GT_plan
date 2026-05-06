@@ -54,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 
 export interface VTColumn {
   key: string
@@ -106,7 +107,7 @@ function formatCell(val: any, col: VTColumn): string {
   if (col.formatter) return col.formatter(val)
   if (typeof val === 'number') {
     if (val === 0) return '-'
-    return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return fmtAmount(val)
   }
   return String(val)
 }

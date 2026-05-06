@@ -1,7 +1,7 @@
 {
   "wp_code": "K3",
   "name": "其他应付款",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2241"
   ],
@@ -141,19 +141,24 @@
   ],
   "cross_references": [
     {
-      "from": "K3-1.total",
+      "from": "K3-1.R12.C9",
       "to": "tb://2241#审定数",
       "description": "审定表合计 = 试算表其他应付款审定数"
     },
     {
-      "from": "K3-1.total",
+      "from": "K3-1.R12.C9",
       "to": "report://BS/BS-037#期末",
       "description": "审定表合计 = 报表其他应付款"
     },
     {
       "from": "K3-2.合计",
-      "to": "K3-1.total",
+      "to": "K3-1.R12.C9",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K3-1.R12.C9",
+      "to": "REPORT('BS-L07a','期末')",
+      "description": "审定表合计 = 报表其他应付款"
     }
   ],
   "audit_checks": [

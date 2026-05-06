@@ -1,7 +1,7 @@
 {
   "wp_code": "F5",
   "name": "营业成本",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6401",
     "6402"
@@ -128,24 +128,29 @@
   ],
   "cross_references": [
     {
-      "from": "F5-1.total",
+      "from": "F5-1.R12.C5",
       "to": "tb://6401#审定数",
       "description": "审定表合计 = 试算表营业成本审定数"
     },
     {
-      "from": "F5-1.total",
+      "from": "F5-1.R12.C5",
       "to": "report://BS/IS-002#期末",
       "description": "审定表合计 = 报表营业成本"
     },
     {
       "from": "F5-2.合计",
-      "to": "F5-1.total",
+      "to": "F5-1.R12.C5",
       "description": "明细表合计 = 审定表合计"
     },
     {
       "from": "F5-1.材料成本",
       "to": "F2-1.结转成本",
       "description": "材料成本 → 存货结转成本"
+    },
+    {
+      "from": "F5-1.R12.C5",
+      "to": "REPORT('IS-002','本期')",
+      "description": "审定表合计 = 报表营业成本"
     }
   ],
   "audit_checks": [

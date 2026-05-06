@@ -55,7 +55,19 @@ class WpProgressService:
         """超期底稿预警"""
         cutoff = date.today() - timedelta(days=days)
         q = (
-            sa.select(WpIndex.wp_code, WpIndex.wp_name, WpIndex.audit_cycle, WpIndex.assigned_to, WpIndex.created_at)
+            sa.select(
+                WpIndex.id.label("wp_index_id"),
+                WpIndex.wp_code,
+                WpIndex.wp_name,
+                WpIndex.audit_cycle,
+                WpIndex.assigned_to,
+                WpIndex.created_at,
+                WorkingPaper.id.label("wp_id"),
+            )
+            .outerjoin(WorkingPaper, sa.and_(
+                WorkingPaper.wp_index_id == WpIndex.id,
+                WorkingPaper.is_deleted == False,  # noqa
+            ))
             .where(
                 WpIndex.project_id == project_id,
                 WpIndex.is_deleted == False,  # noqa
@@ -67,6 +79,8 @@ class WpProgressService:
         rows = (await self.db.execute(q)).all()
         return [
             {
+                "wp_index_id": str(r.wp_index_id),
+                "wp_id": str(r.wp_id) if r.wp_id else None,
                 "wp_code": r.wp_code,
                 "wp_name": r.wp_name,
                 "audit_cycle": r.audit_cycle,

@@ -2,7 +2,7 @@
   <div class="gt-users gt-fade-in">
     <div class="gt-users-header">
       <h2 class="gt-page-title">用户管理</h2>
-      <el-button type="primary" @click="showCreate = true">新增用户</el-button>
+      <el-button type="primary" @click="showCreate = true" v-permission="'admin'">新增用户</el-button>
     </div>
     <el-table :data="users" border stripe v-loading="loading">
       <el-table-column prop="username" label="用户名" width="150" />
@@ -15,7 +15,7 @@
       </el-table-column>
       <el-table-column label="操作" width="100" align="center">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="editUser(row)">编辑</el-button>
+          <el-button link type="primary" size="small" @click="editUser(row)" v-permission="'admin'">编辑</el-button>
         </template>
       </el-table-column>
     </el-table>

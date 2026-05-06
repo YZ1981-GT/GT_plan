@@ -27,6 +27,7 @@
 
 <script setup lang="ts">
 import { CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+import { fmtAmount } from '@/utils/formatters'
 
 defineProps<{
   result: {
@@ -39,10 +40,7 @@ defineProps<{
   }
 }>()
 
-function fmtAmt(v: number | undefined): string {
-  if (v === undefined || v === null) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 </script>
 
 <style scoped>

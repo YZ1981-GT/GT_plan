@@ -42,6 +42,11 @@
       "from": "F4-4",
       "to": "F4-1",
       "description": "分析程序引用审定表数据"
+    },
+    {
+      "from": "F4-1.total",
+      "to": "REPORT('BS-L05','期末')",
+      "description": "审定表合计 = 报表应付账款"
     }
   ],
   "audit_checks": [

@@ -1,7 +1,7 @@
 {
   "wp_code": "F3",
   "name": "应付票据",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2201"
   ],
@@ -141,24 +141,29 @@
   ],
   "cross_references": [
     {
-      "from": "F3-1.total",
+      "from": "F3-1.R12.C9",
       "to": "tb://2201#审定数",
       "description": "审定表合计 = 试算表应付票据审定数"
     },
     {
-      "from": "F3-1.total",
+      "from": "F3-1.R12.C9",
       "to": "report://BS/BS-032#期末",
       "description": "审定表合计 = 报表应付票据"
     },
     {
       "from": "F3-2.合计",
-      "to": "F3-1.total",
+      "to": "F3-1.R12.C9",
       "description": "明细表合计 = 审定表合计"
     },
     {
       "from": "F3-2.到期日",
       "to": "F3-1.一年内到期",
       "description": "明细表到期日 → 一年内到期重分类"
+    },
+    {
+      "from": "F3-1.R12.C9",
+      "to": "REPORT('BS-L04','期末')",
+      "description": "审定表合计 = 报表应付票据"
     }
   ],
   "audit_checks": [

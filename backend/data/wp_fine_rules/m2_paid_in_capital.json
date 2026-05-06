@@ -1,7 +1,7 @@
 {
   "wp_code": "M2",
   "name": "实收资本",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "4001"
   ],
@@ -131,19 +131,24 @@
   ],
   "cross_references": [
     {
-      "from": "M2-1.total",
+      "from": "M2-1.R12.C7",
       "to": "tb://4001#审定数",
       "description": "审定表合计 = 试算表实收资本审定数"
     },
     {
-      "from": "M2-1.total",
+      "from": "M2-1.R12.C7",
       "to": "report://BS/BS-051#期末",
       "description": "审定表合计 = 报表实收资本"
     },
     {
       "from": "M2-2.合计",
-      "to": "M2-1.total",
+      "to": "M2-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "M2-1.R12.C7",
+      "to": "REPORT('BS-E01','期末')",
+      "description": "审定表合计 = 报表实收资本"
     }
   ],
   "audit_checks": [

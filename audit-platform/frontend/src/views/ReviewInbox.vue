@@ -77,6 +77,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirmBatch, confirmDangerous } from '@/utils/confirm'
 import {
   getGlobalReviewInbox,
   getProjectReviewInbox,
@@ -123,11 +124,17 @@ async function loadData() {
 }
 
 function goToWorkpaper(row: ReviewInboxItem) {
-  router.push(`/projects/${row.project_id}/workpapers`)
+  router.push({
+    name: 'WorkpaperEditor',
+    params: {
+      projectId: row.project_id,
+      wpId: row.id,
+    },
+  })
 }
 
 async function handleSingleApprove(row: ReviewInboxItem) {
-  await ElMessageBox.confirm(`确认通过底稿 ${row.wp_code} ${row.wp_name}？`, '确认')
+  await confirmDangerous(`确认通过底稿 ${row.wp_code} ${row.wp_name}？`, '通过确认')
   await doBatchReview([row.id], 'approve', row.project_id)
 }
 
@@ -138,7 +145,7 @@ async function handleSingleReject(row: ReviewInboxItem) {
 
 async function handleBatchApprove() {
   if (!selectedIds.value.length) return
-  await ElMessageBox.confirm(`确认批量通过 ${selectedIds.value.length} 个底稿？`, '批量通过')
+  await confirmBatch('通过', selectedIds.value.length)
   const pid = projectId.value || items.value[0]?.project_id
   if (!pid) return
   await doBatchReview(selectedIds.value, 'approve', pid)

@@ -32,11 +32,16 @@ class StaffTitle(str, enum.Enum):
 
 
 class AssignmentRole(str, enum.Enum):
-    """委派角色"""
+    """委派角色
+
+    R1 一次性预留 ``eqcr``（EQCR 独立复核合伙人）以供 R5 使用，
+    避免后续轮次再做枚举迁移。
+    """
     signing_partner = "signing_partner"
     manager = "manager"
     auditor = "auditor"
     qc = "qc"
+    eqcr = "eqcr"  # 预留 R5，本轮仅模型层承载
 
 
 class WorkHourStatus(str, enum.Enum):
@@ -74,6 +79,9 @@ class StaffMember(Base, SoftDeleteMixin, TimestampMixin):
     join_date: Mapped[date | None] = mapped_column(nullable=True)
     resume_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     source: Mapped[str] = mapped_column(String(20), server_default=text("'custom'"), nullable=False)  # seed / custom
+
+    # Batch 3 Fix 1: 费率计算用枚举，不依赖 title 自由文本
+    role_level: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="费率等级: partner/manager/senior/auditor/intern")
 
     __table_args__ = (
         Index("idx_staff_department", "department", postgresql_where=text("is_deleted = false")),
@@ -145,3 +153,6 @@ class WorkHour(Base, SoftDeleteMixin, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft")
     ai_suggested: Mapped[bool] = mapped_column(default=False)
+    # R5 需求 8：工时用途分类（允许值：preparation|review|eqcr|training|admin）
+    # 为向后兼容，保持 nullable；前后端约定枚举值，不建 DB enum。
+    purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)

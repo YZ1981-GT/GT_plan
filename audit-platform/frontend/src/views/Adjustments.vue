@@ -1,35 +1,38 @@
 <template>
   <div class="gt-adjustments gt-fade-in">
     <!-- 页面横幅 -->
-    <div class="gt-adj-banner">
-      <div class="gt-adj-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-adj-title">调整分录</h2>
-        <div class="gt-adj-info-bar">
-          <div class="gt-adj-info-item">
-            <span class="gt-adj-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-adj-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-adj-info-sep" />
-          <div class="gt-adj-info-item">
-            <span class="gt-adj-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-adj-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-adj-info-sep" />
-          <div class="gt-adj-info-item">
-            <span class="gt-adj-info-badge">AJE {{ summary?.aje_count || 0 }} 笔 · RJE {{ summary?.rje_count || 0 }} 笔</span>
-          </div>
-        </div>
-      </div>
-      <div class="gt-adj-banner-row2">
-        <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
-        <el-button size="small" @click="onExportSummary">📤 导出汇总</el-button>
-      </div>
-    </div>
+    <GtPageHeader title="调整分录" @back="router.push('/projects')">
+      <GtInfoBar
+        :show-unit="true"
+        :show-year="true"
+        :unit-value="selectedProjectId"
+        :year-value="selectedYear"
+        :badges="[{ value: `AJE ${summary?.aje_count || 0} 笔 · RJE ${summary?.rje_count || 0} 笔` }]"
+        @unit-change="onProjectChange"
+        @year-change="onYearChange"
+      />
+      <template #actions>
+        <GtToolbar
+          :show-export="true"
+          :show-import="true"
+          export-label="导出汇总"
+          @export="onExportSummary"
+          @import="showImportDialog = true"
+        >
+          <template #left>
+            <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
+            <div class="gt-adj-batch-toggle">
+              <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
+              <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
+                <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
+                  📦 批量提交
+                </el-button>
+              </el-badge>
+            </div>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <!-- 汇总面板 -->
     <div class="gt-summary-panel" v-if="summary">
@@ -44,7 +47,7 @@
         <span class="gt-summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
       </div>
       <div class="gt-summary-card" v-for="(cnt, st) in summary.status_counts" :key="st">
-        <span class="gt-summary-label">{{ statusLabel(st) }}</span>
+        <span class="gt-summary-label">{{ dictStore.label('adjustment_status', st as string) }}</span>
         <span class="gt-summary-value">{{ cnt }}</span>
       </div>
     </div>
@@ -55,6 +58,21 @@
       <el-tab-pane label="AJE" name="aje" />
       <el-tab-pane label="RJE" name="rje" />
     </el-tabs>
+
+    <!-- 科目过滤提示（从试算表跳转时显示） -->
+    <el-alert
+      v-if="filterAccount"
+      type="info"
+      show-icon
+      :closable="true"
+      style="margin-bottom: 12px"
+      @close="filterAccount = ''; fetchEntries()"
+    >
+      <template #title>
+        <span>当前仅显示科目 <strong>{{ filterAccount }}</strong> 的相关分录</span>
+        <el-button size="small" text type="primary" style="margin-left: 8px" @click="filterAccount = ''; fetchEntries()">查看全部</el-button>
+      </template>
+    </el-alert>
 
     <!-- 分录列表 -->
     <el-alert
@@ -92,9 +110,7 @@
       </el-table-column>
       <el-table-column prop="review_status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="statusTagType(row.review_status)" size="small">
-            {{ statusLabel(row.review_status) }}
-          </el-tag>
+          <el-tag size="small" :type="dictStore.type('adjustment_status', row.review_status)">{{ dictStore.label('adjustment_status', row.review_status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
@@ -104,9 +120,24 @@
             编辑
           </el-button>
           <el-button size="small" type="danger" @click="onDelete(row)"
+            v-permission="'adjustment:delete'"
             :disabled="row.review_status === 'approved' || row.review_status === 'pending_review'">
             删除
           </el-button>
+        </template>
+      </el-table-column>
+      <el-table-column label="转错报" width="110" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.review_status === 'rejected' && normalizeAdjustmentType(row.adjustment_type) === 'aje'"
+            size="small"
+            type="warning"
+            :loading="convertingGroupId === row.entry_group_id"
+            @click="onConvertToMisstatement(row)"
+          >
+            转错报
+          </el-button>
+          <span v-else class="gt-adj-col-placeholder">—</span>
         </template>
       </el-table-column>
     </el-table>
@@ -119,11 +150,52 @@
     </div>
 
     <!-- 驳回原因弹窗 -->
-    <el-dialog append-to-body v-model="showRejectDialog" title="驳回原因" width="400px">
-      <el-input v-model="rejectReason" type="textarea" :rows="3" placeholder="请输入驳回原因" />
+    <el-dialog append-to-body v-model="showRejectDialog" title="驳回原因" width="520px" @open="onRejectDialogOpen">
+      <!-- 模式切换 -->
+      <div style="margin-bottom: 16px">
+        <el-radio-group v-model="rejectMode" size="small">
+          <el-radio-button value="unified">统一原因</el-radio-button>
+          <el-radio-button value="individual">逐条原因</el-radio-button>
+        </el-radio-group>
+      </div>
+
+      <!-- 统一原因模式 -->
+      <template v-if="rejectMode === 'unified'">
+        <el-input v-model="rejectReason" type="textarea" :rows="3" placeholder="请输入统一驳回原因" />
+      </template>
+
+      <!-- 逐条原因模式 -->
+      <template v-else>
+        <div style="font-size: 12px; color: #909399; margin-bottom: 8px">
+          为每条分录填写独立驳回原因（留空时使用统一原因）
+        </div>
+        <el-input
+          v-model="rejectReason"
+          type="textarea"
+          :rows="2"
+          placeholder="统一原因（逐条留空时使用）"
+          style="margin-bottom: 12px"
+        />
+        <div
+          v-for="row in selectedRows"
+          :key="row.entry_group_id"
+          style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px"
+        >
+          <span style="min-width: 120px; font-size: 13px; color: #303133; flex-shrink: 0">
+            {{ row.adjustment_no || row.entry_group_id?.slice(0, 8) }}
+          </span>
+          <el-input
+            v-model="individualReasons[row.entry_group_id]"
+            size="small"
+            placeholder="此条驳回原因（可留空）"
+            style="flex: 1"
+          />
+        </div>
+      </template>
+
       <template #footer>
         <el-button @click="showRejectDialog = false">取消</el-button>
-        <el-button type="primary" @click="batchReview('rejected')" :disabled="!rejectReason">确认驳回</el-button>
+        <el-button type="primary" @click="batchReview('rejected')" :disabled="!rejectReason && rejectMode === 'unified'">确认驳回</el-button>
       </template>
     </el-dialog>
 
@@ -151,7 +223,12 @@
               <el-select v-model="row.standard_account_code" filterable placeholder="选择科目"
                 style="width: 100%" @change="onAccountSelect($index)">
                 <el-option v-for="opt in accountOptions" :key="opt.code"
-                  :label="`${opt.code} ${opt.name}`" :value="opt.code" />
+                  :label="`${opt.code} ${opt.name}`" :value="opt.code">
+                  <span>{{ opt.code }} {{ opt.name }}</span>
+                  <span v-if="opt.report_line" style="float:right;color:#999;font-size:11px;margin-left:8px">
+                    → {{ opt.report_line }}
+                  </span>
+                </el-option>
               </el-select>
             </template>
           </el-table-column>
@@ -188,6 +265,15 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showImportDialog"
+      import-type="adjustments"
+      :project-id="projectId"
+      :year="year"
+      @imported="onImported"
+    />
   </div>
 </template>
 
@@ -195,19 +281,46 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
+  batchCommitAdjustments,
+  convertAjeToMisstatement,
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
-import { useProjectSelector } from '@/composables/useProjectSelector'
+import { useProjectStore } from '@/stores/project'
+import { useDictStore } from '@/stores/dict'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import { fmtAmount } from '@/utils/formatters'
+import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
+import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
+import { operationHistory } from '@/utils/operationHistory'
+import { useAutoSave } from '@/composables/useAutoSave'
+import { parseApiError } from '@/composables/useApiError'
 
 const route = useRoute()
 const router = useRouter()
-const {
-  projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
-  onProjectChange, onYearChange, loadProjectOptions, syncFromRoute,
-} = useProjectSelector('adjustments')
+const dictStore = useDictStore()
+const projectStore = useProjectStore()
+
+const projectId = computed(() => projectStore.projectId)
+const selectedProjectId = ref(projectStore.projectId)
+const projectOptions = computed(() => projectStore.projectOptions)
+const yearOptions = computed(() => projectStore.yearOptions)
+const selectedYear = ref(projectStore.year)
+
+function onProjectChange(pid: string) {
+  router.push({ path: `/projects/${pid}/adjustments`, query: route.query })
+}
+function onYearChange(y: number) {
+  selectedYear.value = y
+  projectStore.changeYear(y)
+  router.push({ path: route.path, query: { year: String(y) } })
+}
 
 const routeYear = computed(() => {
   const value = Number(route.query.year)
@@ -217,6 +330,7 @@ const projectYear = ref<number | null>(null)
 const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().getFullYear())
 
 const loading = ref(false)
+const showImportDialog = ref(false)
 const submitLoading = ref(false)
 const activeTab = ref('all')
 const entries = ref<any[]>([])
@@ -224,8 +338,19 @@ const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
 const showRejectDialog = ref(false)
 const rejectReason = ref('')
+const rejectMode = ref<'unified' | 'individual'>('unified')
+const individualReasons = ref<Record<string, string>>({})
 const accountOptions = ref<AccountOption[]>([])
 
+// 科目过滤（来自 route.query.account，支持从试算表跳转过来）
+const filterAccount = ref(typeof route.query.account === 'string' ? route.query.account : '')
+
+// Batch mode state
+const batchMode = ref(false)
+const batchPendingCount = ref(0)
+const batchCommitting = ref(false)
+// R1 需求 3 — AJE 一键转错报：正在转换的 entry_group_id（避免重复点击）
+const convertingGroupId = ref<string>('')
 // Form state
 const formDialogVisible = ref(false)
 const isEditing = ref(false)
@@ -240,21 +365,34 @@ const totalDebit = computed(() => form.value.line_items.reduce((s, l) => s + (l.
 const totalCredit = computed(() => form.value.line_items.reduce((s, l) => s + (l.credit_amount || 0), 0))
 const balanceDiff = computed(() => Math.round((totalDebit.value - totalCredit.value) * 100) / 100)
 
-function fmtAmt(v: string | number | null | undefined): string {
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : (v ?? 0)
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = { draft: 'info', pending_review: 'warning', approved: 'success', rejected: 'danger' }
-  return m[s] || 'info'
-}
+// ── 自动保存/草稿恢复 [R3.8] ──
+const { clearDraft: clearAutoSaveDraft } = useAutoSave(
+  `adjustment_form_${projectId.value}`,
+  () => {
+    if (!formDialogVisible.value) return null
+    return {
+      adjustment_type: form.value.adjustment_type,
+      description: form.value.description,
+      line_items: form.value.line_items,
+      isEditing: isEditing.value,
+      editingGroupId: editingGroupId.value,
+    }
+  },
+  (data) => {
+    if (!data) return
+    form.value.adjustment_type = data.adjustment_type || 'aje'
+    form.value.description = data.description || ''
+    form.value.line_items = data.line_items || [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }]
+    if (data.isEditing != null) isEditing.value = data.isEditing
+    if (data.editingGroupId) editingGroupId.value = data.editingGroupId
+    formDialogVisible.value = true
+  },
+  { enabled: formDialogVisible },
+)
 
-function statusLabel(s: string) {
-  const m: Record<string, string> = { draft: '草稿', pending_review: '待复核', approved: '已批准', rejected: '已驳回' }
-  return m[s] || s
-}
+
 
 function normalizeAdjustmentType(type: string) {
   return String(type || '').toLowerCase()
@@ -282,7 +420,14 @@ async function fetchEntries() {
     const opts: any = { page_size: 200 }
     if (activeTab.value !== 'all') opts.adjustment_type = activeTab.value
     const result = await listAdjustments(projectId.value, year.value, opts)
-    entries.value = Array.isArray(result) ? result : (result.items || [])
+    let items = Array.isArray(result) ? result : (result.items || [])
+    // 按科目过滤（来自试算表跳转的 account query 参数）
+    if (filterAccount.value) {
+      items = items.filter((e: any) =>
+        e.line_items?.some((li: any) => li.standard_account_code === filterAccount.value)
+      )
+    }
+    entries.value = items
   } finally {
     loading.value = false
   }
@@ -362,10 +507,16 @@ async function onSubmit() {
         year: year.value,
         description: form.value.description,
         line_items: form.value.line_items,
-      })
-      ElMessage.success('创建成功')
+      }, { batch_mode: batchMode.value })
+      if (batchMode.value) {
+        batchPendingCount.value++
+        ElMessage.success(`创建成功（批量模式，待提交 ${batchPendingCount.value} 笔）`)
+      } else {
+        ElMessage.success('创建成功')
+      }
     }
     formDialogVisible.value = false
+    clearAutoSaveDraft()
     fetchEntries()
     fetchSummary()
   } finally {
@@ -373,35 +524,150 @@ async function onSubmit() {
   }
 }
 
+async function onBatchCommit() {
+  batchCommitting.value = true
+  try {
+    await batchCommitAdjustments(projectId.value, year.value)
+    ElMessage.success(`批量提交成功，${batchPendingCount.value} 笔分录已触发重算`)
+    batchPendingCount.value = 0
+    batchMode.value = false
+    fetchEntries()
+    fetchSummary()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '批量提交失败')
+  } finally {
+    batchCommitting.value = false
+  }
+}
+
 async function onDelete(row: any) {
-  await ElMessageBox.confirm('确定删除该分录？', '确认')
-  await deleteAdjustment(projectId.value, row.entry_group_id)
-  ElMessage.success('删除成功')
-  fetchEntries()
-  fetchSummary()
+  await confirmDelete('该分录')
+  // 缓存分录数据用于撤销恢复
+  const cachedRow = JSON.parse(JSON.stringify(row))
+  await operationHistory.execute({
+    description: `删除分录 ${row.adjustment_no}`,
+    execute: async () => {
+      await deleteAdjustment(projectId.value, row.entry_group_id)
+      fetchEntries()
+      fetchSummary()
+    },
+    undo: async () => {
+      await createAdjustment(projectId.value, {
+        adjustment_type: normalizeAdjustmentType(cachedRow.adjustment_type),
+        year: year.value,
+        description: cachedRow.description || '',
+        line_items: (cachedRow.line_items || []).map((li: any) => ({
+          standard_account_code: li.standard_account_code,
+          account_name: li.account_name || '',
+          debit_amount: parseFloat(li.debit_amount) || 0,
+          credit_amount: parseFloat(li.credit_amount) || 0,
+        })),
+      })
+      fetchEntries()
+      fetchSummary()
+    },
+  })
+}
+
+// R1 需求 3 / Task 10 — 将被驳回的 AJE 一键转为未更正错报
+async function onConvertToMisstatement(row: any) {
+  if (row.review_status !== 'rejected' || normalizeAdjustmentType(row.adjustment_type) !== 'aje') {
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将该分录（${row.adjustment_no || row.entry_group_id?.slice(0, 8)}）转为未更正错报？转换后该条目将出现在《未更正错报汇总表》中。`,
+      '确认转错报',
+      { confirmButtonText: '确认转换', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+
+  convertingGroupId.value = row.entry_group_id
+  try {
+    const res = await convertAjeToMisstatement(projectId.value, row.entry_group_id)
+    ElMessage.success(`已转为错报（净额 ${res.net_amount}）`)
+    try {
+      await ElMessageBox.confirm(
+        '是否立即查看《未更正错报汇总表》？',
+        '转换成功',
+        { confirmButtonText: '立即查看', cancelButtonText: '稍后', type: 'success' },
+      )
+      router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
+    } catch {
+      /* 用户选择稍后，不跳转 */
+    }
+  } catch (err: any) {
+    // R1 Bug Fix 8: 使用 parseApiError 统一解析
+    const parsed = parseApiError(err)
+    if (parsed.code === 'ALREADY_CONVERTED') {
+      try {
+        await ElMessageBox.confirm(
+          '该分录已转为未更正错报，是否跳转查看？',
+          '已转换',
+          { confirmButtonText: '跳转查看', cancelButtonText: '关闭', type: 'info' },
+        )
+        router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
+      } catch {
+        /* 用户选择关闭 */
+      }
+    } else {
+      ElMessage.error(parsed.message || '转换失败')
+    }
+  } finally {
+    convertingGroupId.value = ''
+  }
 }
 
 async function batchReview(status: string) {
-  const rows = selectedRows.value.filter(r =>
-    status === 'approved' ? r.review_status === 'pending_review' :
-    status === 'rejected' ? r.review_status === 'pending_review' : true
-  )
+  const eligible = selectedRows.value.filter(r => r.review_status === 'pending_review')
+  const skipped = selectedRows.value.length - eligible.length
+  if (skipped > 0) {
+    ElMessage.warning(`已跳过 ${skipped} 条非待复核状态的分录`)
+  }
+  const rows = eligible
   if (!rows.length) {
     ElMessage.warning('没有可操作的分录')
     return
   }
   for (const row of rows) {
+    let reason: string | undefined
+    if (status === 'rejected') {
+      if (rejectMode.value === 'individual') {
+        const individual = individualReasons.value[row.entry_group_id]?.trim()
+        reason = individual || rejectReason.value || undefined
+      } else {
+        reason = rejectReason.value || undefined
+      }
+    }
     await reviewAdjustment(projectId.value, row.entry_group_id, {
       status,
-      reason: status === 'rejected' ? rejectReason.value : undefined,
+      reason,
     })
   }
   ElMessage.success(`已${status === 'approved' ? '批准' : '驳回'} ${rows.length} 条`)
   showRejectDialog.value = false
   rejectReason.value = ''
+  individualReasons.value = {}
+  rejectMode.value = 'unified'
   selectedRows.value = []
   fetchEntries()
   fetchSummary()
+}
+
+function onRejectDialogOpen() {
+  // 初始化逐条原因（每条分录 id 对应空字符串）
+  const reasons: Record<string, string> = {}
+  for (const row of selectedRows.value) {
+    reasons[row.entry_group_id] = ''
+  }
+  individualReasons.value = reasons
+}
+
+function onImported() {
+  showImportDialog.value = false
+  fetchEntries()
 }
 
 function onExportSummary() {
@@ -417,12 +683,14 @@ watch(
   () => [projectId.value, routeYear.value],
   async () => {
     await ensureProjectYear()
-    syncFromRoute()
+    projectStore.syncFromRoute(route)
     selectedYear.value = year.value
+    // 同步科目过滤参数
+    filterAccount.value = typeof route.query.account === 'string' ? route.query.account : ''
     await fetchEntries()
     await fetchSummary()
     await fetchAccountOptions()
-    if (!projectOptions.value.length) loadProjectOptions()
+    if (!projectOptions.value.length) projectStore.loadProjectOptions()
   },
   { immediate: true }
 )
@@ -431,53 +699,14 @@ watch(
 <style scoped>
 .gt-adjustments { padding: var(--gt-space-5); }
 
-/* ── 页面横幅 ── */
-.gt-adj-banner {
-  display: flex; flex-direction: column; gap: 10px;
-  background: var(--gt-gradient-primary);
-  border-radius: var(--gt-radius-lg);
-  padding: 18px 28px;
-  margin-bottom: var(--gt-space-5);
-  color: #fff;
-  position: relative; overflow: hidden;
-  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
-  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
+/* 批量模式 */
+.gt-adj-batch-toggle {
+  display: flex; align-items: center; gap: 10px;
 }
-.gt-adj-banner::before {
-  content: '';
-  position: absolute; top: -40%; right: -10%;
-  width: 45%; height: 180%;
-  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
-  pointer-events: none;
-}
-.gt-adj-banner-row1 {
-  display: flex; align-items: center; gap: 16px;
-  position: relative; z-index: 1;
-}
-.gt-adj-title { margin: 0; font-size: 18px; font-weight: 700; white-space: nowrap; }
-.gt-adj-info-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.gt-adj-info-item { display: flex; align-items: center; gap: 4px; }
-.gt-adj-info-label { font-size: 11px; opacity: 0.8; white-space: nowrap; }
-.gt-adj-info-badge { font-size: 11px; background: rgba(255,255,255,0.18); padding: 2px 10px; border-radius: 10px; white-space: nowrap; }
-.gt-adj-info-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.25); }
-.gt-adj-unit-select, .gt-adj-year-select { width: 160px; }
-.gt-adj-unit-select :deep(.el-input__wrapper),
-.gt-adj-year-select :deep(.el-input__wrapper) {
-  background: rgba(255,255,255,0.15) !important;
-  border: 1px solid rgba(255,255,255,0.25) !important;
-  box-shadow: none !important;
-}
-.gt-adj-unit-select :deep(.el-input__inner),
-.gt-adj-year-select :deep(.el-input__inner) { color: #fff !important; font-size: 12px; }
-.gt-adj-unit-select :deep(.el-input__suffix),
-.gt-adj-year-select :deep(.el-input__suffix) { color: rgba(255,255,255,0.7) !important; }
-.gt-adj-banner-row2 {
-  display: flex; gap: 8px; align-items: center;
-  position: relative; z-index: 1;
-}
-.gt-adj-banner-row2 .el-button { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
-.gt-adj-banner-row2 .el-button:hover { background: rgba(255,255,255,0.25); }
+.gt-adj-batch-toggle :deep(.el-switch__label) { color: rgba(255,255,255,0.85); font-size: 12px; }
+.gt-adj-batch-toggle :deep(.el-switch.is-checked .el-switch__core) { background-color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.5); }
+.gt-adj-batch-badge :deep(.el-badge__content) { z-index: 2; }
+.gt-adj-batch-toggle .el-button--success { background: rgba(103, 194, 58, 0.85); border-color: rgba(103, 194, 58, 0.6); color: #fff; }
 
 /* 汇总面板 */
 .gt-summary-panel { display: flex; gap: var(--gt-space-3); margin-bottom: var(--gt-space-5); flex-wrap: wrap; }
@@ -532,6 +761,10 @@ watch(
 .gt-adj-balance-diff.gt-adj-unbalanced {
   background: var(--gt-color-coral-light);
   color: var(--gt-color-coral);
+}
+
+.gt-adj-col-placeholder {
+  color: var(--gt-color-text-tertiary, #909399);
 }
 
 :deep(.el-tabs__item.is-active) { font-weight: 600; }

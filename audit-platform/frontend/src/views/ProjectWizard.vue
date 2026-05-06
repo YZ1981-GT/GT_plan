@@ -9,13 +9,6 @@
     <div class="gt-wizard-footer">
       <div class="gt-wizard-footer-spacer" />
       <el-button
-        v-if="wizardStore.projectId"
-        :loading="wizardStore.loading"
-        @click="handleSave"
-      >
-        保存
-      </el-button>
-      <el-button
         type="primary"
         :loading="wizardStore.loading"
         @click="handleConfirm"
@@ -65,16 +58,6 @@ async function validateAndPersistCurrentStep(): Promise<boolean> {
     await wizardStore.saveStep('basic_info', data)
   }
   return true
-}
-
-async function handleSave() {
-  if (!wizardStore.projectId) {
-    ElMessage.warning('请先创建项目')
-    return
-  }
-  const ok = await validateAndPersistCurrentStep()
-  if (!ok) return
-  ElMessage.success('保存成功')
 }
 
 async function handleConfirm() {

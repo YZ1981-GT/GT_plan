@@ -23,7 +23,8 @@ from app.models.workpaper_models import WorkingPaper, WpFileStatus, WpReviewStat
 _logger = logging.getLogger(__name__)
 
 # 角色优先级（高→低）
-_ROLE_PRIORITY = {"partner": 5, "qc": 4, "manager": 3, "auditor": 2, "readonly": 1}
+# R5 任务 2：eqcr 与 partner 同级（5），与 design.md "架构决策一览" 对齐。
+_ROLE_PRIORITY = {"partner": 5, "eqcr": 5, "qc": 4, "manager": 3, "auditor": 2, "readonly": 1}
 
 # 委派角色 → 项目角色映射
 _ASSIGNMENT_ROLE_MAP = {
@@ -39,6 +40,10 @@ _ASSIGNMENT_ROLE_MAP = {
     "助理": ("auditor", "edit"),
     "readonly": ("readonly", "readonly"),
     "观察员": ("readonly", "readonly"),
+    # R5 任务 2：EQCR 在 project_users 层面映射为 partner+review
+    # （ProjectUserRole 枚举不新增 eqcr，独立性靠 project_assignments.role='eqcr' 区分）
+    "eqcr": ("partner", "review"),
+    "独立复核合伙人": ("partner", "review"),
 }
 
 

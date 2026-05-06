@@ -1,7 +1,7 @@
 {
   "wp_code": "K12",
   "name": "营业外收入",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6301"
   ],
@@ -72,6 +72,36 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 11,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-018"
+        },
+        "tb": {
+          "row": 13,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 14,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "政府补助",
+          "罚没收入",
+          "接受捐赠利得",
+          "其他",
+          "罚没利得"
+        ]
       }
     },
     {
@@ -107,14 +137,19 @@
   ],
   "cross_references": [
     {
-      "from": "K12-1.total",
+      "from": "K12-1.R11.C5",
       "to": "tb://6301#审定数",
       "description": "审定表合计 = 试算表营业外收入审定数"
     },
     {
       "from": "K12-2.合计",
-      "to": "K12-1.total",
+      "to": "K12-1.R11.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K12-1.R11.C5",
+      "to": "REPORT('IS-018','本期')",
+      "description": "审定表合计 = 报表营业外收入"
     }
   ],
   "audit_checks": [
@@ -147,6 +182,18 @@
       "type": "check",
       "severity": "warning",
       "description": "非经常性损益分类正确"
+    },
+    {
+      "code": "K12-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表营业外收入"
+    },
+    {
+      "code": "K12-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "大额营业外收入凭证已检查"
     }
   ]
 }

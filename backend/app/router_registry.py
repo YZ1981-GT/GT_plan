@@ -2,6 +2,16 @@
 
 将 main.py 中 90+ 个平铺的 include_router 收口到此模块，
 按 7 个业务域分组注册，便于维护和查找。
+
+路由前缀规范（IMPORTANT）：
+  - 标准做法：路由器内部 prefix 只声明业务路径（如 prefix="/gate"），
+    本文件在 include_router 时统一添加 prefix="/api"
+  - 最终路径 = /api + 路由器内部路径 + 端点路径
+
+已知例外（不要修改）：
+  - dashboard.py：内部 prefix="/api/dashboard"，注册时不加额外前缀
+  - /wopi 路由：不加 /api 前缀（WOPI 协议要求）
+  - /api/version：直接定义在 main.py（版本探针）
 """
 from fastapi import APIRouter, FastAPI
 
@@ -38,6 +48,10 @@ def register_all_routers(app: FastAPI) -> None:
     # 导入智能增强
     from app.routers.import_intelligence import router as import_intel_router
     app.include_router(import_intel_router, tags=["项目与数据"])
+
+    # 统一导入模板
+    from app.routers.import_templates import router as import_templates_router
+    app.include_router(import_templates_router)
 
     # ═══ 3. 查账与试算（四表穿透/试算表/调整/重要性/错报） ═══
     from app.routers.drilldown import router as drilldown_router
@@ -147,10 +161,16 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.consol_notes import router as cn_router
     from app.routers.consol_report import router as cr_router
     from app.routers.consol_worksheet import router as cw_router
+    from app.routers.consol_worksheet_data import router as cwd_router
+    from app.routers.consol_note_sections import router as cns_router
+    from app.routers.consol_cell_comments import router as ccc_router
+    from app.routers.account_note_mapping import router as anm_router
+    from app.routers.formula_audit_log import router as fal_router
+    from app.routers.custom_query import router as cq_router
 
     for r in [consol_router, cs_router, ct_router, it_router, ca_router,
               gw_router, fx_router, mi_router, cn_router, cr_router,
-              cw_router]:
+              cw_router, cwd_router, cns_router, ccc_router, anm_router, fal_router, cq_router]:
         app.include_router(r, tags=["合并报表"])
 
     # ═══ 7. 团队与看板 ═══
@@ -212,17 +232,19 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.address_registry import router as addr_router
     app.include_router(addr_router, tags=["系统管理"])
 
+    # 系统字典（枚举字典集中管理）
+    from app.routers.system_dicts import router as sdict_router
+    app.include_router(sdict_router, tags=["系统管理"])
+
     # ═══ 9. Phase 14: 门禁引擎与治理 ═══
     from app.routers.gate import router as gate_router
     from app.routers.trace import router as trace_router
     from app.routers.sod import router as sod_router
 
     for r in [gate_router, trace_router, sod_router]:
-        app.include_router(r, prefix="/api" if not hasattr(r, 'prefix') or not r.prefix.startswith('/api') else "", tags=["门禁与治理"])
+        app.include_router(r, prefix="/api", tags=["门禁与治理"])
 
-    # Phase 14: 注册门禁规则
-    from app.services.gate_rules_phase14 import register_phase14_rules
-    register_phase14_rules()
+    # Phase 14: 门禁规则在 main.py lifespan 中注册，此处不重复调用
 
     # ═══ 10. Phase 15: 任务树与事件编排 ═══
     from app.routers.task_tree import router as task_tree_router
@@ -243,3 +265,22 @@ def register_all_routers(app: FastAPI) -> None:
     for r in [version_line_router, conflict_router, consistency_replay_router,
               export_integrity_router]:
         app.include_router(r, prefix="/api", tags=["取证与版本链"])
+
+    # ═══ 12. 协作管理（PBC 清单 / 函证管理） ═══
+    from app.routers.pbc import router as pbc_router
+    from app.routers.confirmations import router as confirmations_router
+
+    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
+    app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
+
+    # ═══ 12. 协作管理（PBC 清单 / 函证管理） ═══
+    from app.routers.pbc import router as pbc_router
+    from app.routers.confirmations import router as confirmations_router
+
+    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
+    app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
+
+    # ═══ 13. Round 5：EQCR 工作台 ═══
+    # EQCR 路由器内部已声明 prefix="/api/eqcr"，注册时不加额外前缀。
+    from app.routers.eqcr import router as eqcr_router
+    app.include_router(eqcr_router, tags=["eqcr"])

@@ -100,9 +100,14 @@ class WordExportTask(Base):
         server_default=func.now(), onupdate=func.now()
     )
 
+    # Batch 3 Fix 2: 专用缓存键字段，不再复用 template_type
+    cache_key: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="批量简报缓存键 MD5")
+
     __table_args__ = (
         Index("idx_word_export_task_project", "project_id", "doc_type"),
         Index("idx_word_export_task_status", "project_id", "status"),
+        Index("idx_word_export_task_template_type", "template_type"),
+        Index("idx_word_export_task_cache_key", "cache_key"),
     )
 
 

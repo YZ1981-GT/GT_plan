@@ -35,7 +35,15 @@ def load_fine_rule(wp_code: str) -> Optional[dict]:
 
 
 def list_fine_rules() -> list[dict]:
-    """列出所有精细化规则"""
+    """列出所有精细化规则（含分类和质量等级）"""
+    # 循环前缀 → 循环名称
+    cycle_names = {
+        "A": "完成阶段", "B": "风险评估", "C": "控制测试",
+        "D": "收入循环", "E": "货币资金", "F": "存货循环",
+        "G": "投资循环", "H": "固定资产", "I": "无形资产",
+        "J": "薪酬", "K": "管理循环", "L": "债务循环",
+        "M": "权益循环", "N": "所得税", "S": "特定项目", "T": "IPE测试",
+    }
     rules = []
     if not _FINE_RULES_DIR.exists():
         return rules
@@ -43,12 +51,30 @@ def list_fine_rules() -> list[dict]:
         try:
             with open(fp, "r", encoding="utf-8-sig") as f:
                 rule = json.load(f)
+            code = rule.get("wp_code", "")
+            prefix = code[0] if code else "?"
+            has_layout = any(s.get("layout") for s in rule.get("sheet_rules", []))
+            has_key_rows = any(s.get("key_rows") for s in rule.get("sheet_rules", []))
+            # 质量等级：A=精修 B=有layout C=有checks D=基础
+            if has_layout and has_key_rows:
+                quality = "A"
+            elif has_layout:
+                quality = "B"
+            elif rule.get("audit_checks"):
+                quality = "C"
+            else:
+                quality = "D"
             rules.append({
-                "wp_code": rule.get("wp_code"),
+                "wp_code": code,
                 "name": rule.get("name"),
+                "cycle": cycle_names.get(prefix, "其他"),
+                "cycle_prefix": prefix,
+                "version": rule.get("version", ""),
+                "quality": quality,
                 "sheets": len(rule.get("sheet_rules", rule.get("sheets", []))),
                 "checks": len(rule.get("audit_checks", [])),
                 "cross_refs": len(rule.get("cross_references", [])),
+                "account_codes": rule.get("account_codes", []),
                 "file": fp.name,
             })
         except Exception:
@@ -181,6 +207,8 @@ def extract_with_fine_rule(
         "closing_audited": total_row.get("closing_audited") or total_row.get("closing_balance"),
         "opening_audited": total_row.get("opening_audited"),
         "change_amount": total_row.get("change_amount"),
+        # 保留所有提取的行数据（含动态发现的明细行），供附注填充使用
+        "rows": summary_rows,
     }
 
     # 执行审计检查（实际校验）
@@ -229,14 +257,17 @@ def _safe_num(val) -> Optional[float]:
 def _extract_summary_rows(ws, sheet_rule: dict) -> dict[str, dict]:
     """从审定表提取关键行数据
 
-    兼容两种 key_rows 格式：
-    - 旧格式: {"cash": {"row": 7, "label": "库存现金"}}
-    - 新格式: {"section1_total": 13} 或 {"data_items": [8, 9, 10]}
+    支持三种模式：
+    1. key_rows 固定行（结构性行：合计/小计/减：/试算/差异）
+    2. detail_discovery 动态发现（从 start_row 到合计行之间自动识别明细行）
+    3. 兼容旧格式（整数行号、数组行号）
     """
     key_rows = sheet_rule.get("key_rows", {})
     columns = sheet_rule.get("layout", {}).get("columns", sheet_rule.get("columns", {}))
+    detail_discovery = sheet_rule.get("detail_discovery", {})
     result = {}
 
+    # ── 1. 提取结构性行（key_rows 中定义的固定行）──
     for key, row_def in key_rows.items():
         # 兼容新格式：值为整数（单行号）
         if isinstance(row_def, int):
@@ -255,7 +286,7 @@ def _extract_summary_rows(ws, sheet_rule: dict) -> dict[str, dict]:
             result[key] = row_data
             continue
 
-        # 兼容新格式：值为数组（多行号）— 逐行提取
+        # 兼容新格式：值为数组（多行号）
         if isinstance(row_def, list):
             for i, rn in enumerate(row_def):
                 if not isinstance(rn, int):
@@ -287,8 +318,9 @@ def _extract_summary_rows(ws, sheet_rule: dict) -> dict[str, dict]:
             "is_total": row_def.get("is_total", False),
             "account_code": row_def.get("account_code", ""),
         }
+        if row_def.get("report_row"):
+            row_data["report_row"] = row_def["report_row"]
 
-        # 按列定义提取值
         for col_key, col_def in columns.items():
             if col_key == "label":
                 continue
@@ -297,6 +329,40 @@ def _extract_summary_rows(ws, sheet_rule: dict) -> dict[str, dict]:
                 row_data[col_key] = _safe_num(ws.cell(row_num, col_num).value)
 
         result[key] = row_data
+
+    # ── 2. 动态发现明细行（detail_discovery）──
+    if detail_discovery.get("mode") == "auto":
+        start_row = detail_discovery.get("start_row", 7)
+        # 找到第一个合计行的行号作为结束边界
+        total_row = None
+        for val in result.values():
+            if isinstance(val, dict) and val.get("is_total"):
+                total_row = val.get("row")
+                break
+        end_row = (total_row - 1) if total_row else start_row + 50  # 安全上限
+
+        detail_idx = 0
+        for row_num in range(start_row, end_row + 1):
+            # 跳过已在 key_rows 中定义的行
+            if any(isinstance(v, dict) and v.get("row") == row_num for v in result.values()):
+                continue
+            label = str(ws.cell(row_num, 1).value or "").strip()
+            if not label or detail_discovery.get("skip_empty", True) and not label:
+                continue
+            # 提取该行数据
+            detail_data: dict[str, Any] = {
+                "label": label,
+                "row": row_num,
+                "is_detail": True,
+            }
+            for col_key, col_def in columns.items():
+                if col_key == "label":
+                    continue
+                col_num = col_def.get("col", 0) if isinstance(col_def, dict) else 0
+                if col_num > 0:
+                    detail_data[col_key] = _safe_num(ws.cell(row_num, col_num).value)
+            result[f"detail_{detail_idx}"] = detail_data
+            detail_idx += 1
 
     return result
 

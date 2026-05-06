@@ -46,20 +46,48 @@
 </template>
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getMyAssignments } from '@/services/staffApi'
+import { getMyAssignments, listWorkHours } from '@/services/staffApi'
+import { getMyTodos, getMyStaffId } from '@/services/commonApi'
+
 const myProjects = ref<any[]>([])
 const todos = ref<any[]>([])
 const weekHours = ref<any[]>([])
 
-const ROLE_MAP: Record<string, string> = { signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员' }
+const ROLE_MAP: Record<string, string> = { signing_partner: '签字合伙人', manager: '项目经理', auditor: '审计员', qc: '质控人员', eqcr: '独立复核合伙人' }
 function roleLabel(role: string) { return ROLE_MAP[role] || role }
 function isNewAssignment(assignedAt: string | null) {
   if (!assignedAt) return false
   const diff = Date.now() - new Date(assignedAt).getTime()
   return diff < 7 * 24 * 60 * 60 * 1000 // 7天内
 }
+
 onMounted(async () => {
   try { myProjects.value = await getMyAssignments() } catch { myProjects.value = [] }
+
+  // 加载待办事项
+  try {
+    const todosRes = await getMyTodos()
+    todos.value = Array.isArray(todosRes) ? todosRes : ((todosRes as any)?.items ?? [])
+  } catch {
+    todos.value = []
+  }
+
+  // 加载本周工时
+  try {
+    const today = new Date()
+    const weekStart = new Date(today)
+    weekStart.setDate(today.getDate() - today.getDay() + 1)
+    const startDate = weekStart.toISOString().slice(0, 10)
+    const endDate = today.toISOString().slice(0, 10)
+
+    const staffId = await getMyStaffId()
+    if (staffId) {
+      const hoursRes = await listWorkHours(staffId, { start_date: startDate, end_date: endDate })
+      weekHours.value = Array.isArray(hoursRes) ? hoursRes : ((hoursRes as any)?.items ?? [])
+    }
+  } catch {
+    weekHours.value = []
+  }
 })
 </script>
 <style scoped>

@@ -31,7 +31,7 @@
           <span class="gt-dep-node-icon">{{ nodeStatus[n.id] === 'done' ? '✅' : nodeStatus[n.id] === 'wip' ? '📝' : '⬜' }}</span>
           <span class="gt-dep-node-label">{{ n.label }}</span>
           <el-tag v-if="n.effectiveness" size="small" :type="n.effectiveness === 'effective' ? 'success' : n.effectiveness === 'ineffective' ? 'danger' : 'warning'" style="margin-left:4px">
-            {{ { effective: '有效', partially_effective: '部分', ineffective: '无效', not_tested: '未测' }[n.effectiveness] || '' }}
+            {{ ({ effective: '有效', partially_effective: '部分', ineffective: '无效', not_tested: '未测' } as Record<string, string>)[n.effectiveness] || '' }}
           </el-tag>
         </div>
         <div v-if="!cNodes.length" class="gt-dep-empty">无独立控制测试</div>
@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   projectId: string
@@ -89,7 +89,7 @@ const impactSuggestion = ref('')
 
 async function loadGraph() {
   try {
-    const { data } = await http.get(`/api/wp-dependencies/cycle/${selectedCycle.value}`, {
+    const data = await api.get(`/api/wp-dependencies/cycle/${selectedCycle.value}`, {
       validateStatus: (s: number) => s < 600,
     })
     nodes.value = data?.nodes || []
@@ -108,11 +108,11 @@ async function loadGraph() {
 async function loadNodeStatuses() {
   // 简化：从底稿列表获取B/C类底稿状态
   try {
-    const { data } = await http.get(`/api/projects/${props.projectId}/working-papers`, {
+    const data = await api.get(`/api/projects/${props.projectId}/working-papers`, {
       params: { audit_cycle: selectedCycle.value },
       validateStatus: (s: number) => s < 600,
     })
-    const wps = Array.isArray(data) ? data : data?.data || []
+    const wps = Array.isArray(data) ? data : data || []
     const statusMap: Record<string, string> = {}
     for (const wp of wps) {
       const code = wp.wp_code || ''
@@ -136,11 +136,11 @@ async function loadNodeStatuses() {
 
     // 加载控制测试结论影响
     try {
-      const { data: depData } = await http.get(`/api/wp-dependencies/cycle/${selectedCycle.value}`, {
+      const _depData = await api.get(`/api/wp-dependencies/cycle/${selectedCycle.value}`, {
         validateStatus: (s: number) => s < 600,
       })
       // 从依赖检查获取impact
-      const { data: effData } = await http.get('/api/wp-dependencies/effectiveness-impact', {
+      const effData = await api.get('/api/wp-dependencies/effectiveness-impact', {
         validateStatus: (s: number) => s < 600,
       })
       // 简化：取第一个C类节点的结论

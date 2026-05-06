@@ -75,8 +75,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
+import { ElMessage } from 'element-plus'
+import { confirmBatch } from '@/utils/confirm'
+import { api } from '@/services/apiProxy'
 
 const router = useRouter()
 
@@ -115,13 +116,13 @@ function rowClassName({ row }: { row: any }) {
 async function loadConfig() {
   loading.value = true
   try {
-    const { data } = await http.get('/api/report-config', {
+    const data = await api.get('/api/report-config', {
       params: {
         report_type: selectedReportType.value,
         applicable_standard: selectedStandard.value,
       },
     })
-    const items = Array.isArray(data) ? data : (data?.data || [])
+    const items = Array.isArray(data) ? data : (data || [])
     rows.value = items.map((r: any) => ({ ...r, _editing: false }))
   } catch {
     rows.value = []
@@ -176,11 +177,11 @@ function onInsertAbove() {
 
 async function onDeleteSelected() {
   if (selectedRows.value.length === 0) return
-  await ElMessageBox.confirm(`确认删除选中的 ${selectedRows.value.length} 行？`, '批量删除确认')
+  await confirmBatch('删除', selectedRows.value.length)
   for (const row of selectedRows.value) {
     if (row.id && !row._isNew) {
       try {
-        await http.delete(`/api/report-config/${row.id}`)
+        await api.delete(`/api/report-config/${row.id}`)
       } catch { /* ignore */ }
     }
     const idx = rows.value.indexOf(row)
@@ -198,7 +199,7 @@ async function onSaveAll() {
     for (const row of rows.value) {
       if (row._isNew) {
         // 新增行 — POST 创建
-        const { data: created } = await http.post('/api/report-config', {
+        const created = await api.post('/api/report-config', {
           report_type: selectedReportType.value,
           applicable_standard: selectedStandard.value,
           row_number: row.row_number,
@@ -215,7 +216,7 @@ async function onSaveAll() {
         }
         savedCount++
       } else if (row.id) {
-        await http.put(`/api/report-config/${row.id}`, {
+        await api.put(`/api/report-config/${row.id}`, {
           row_name: row.row_name,
           formula: row.formula,
           indent_level: row.indent_level,

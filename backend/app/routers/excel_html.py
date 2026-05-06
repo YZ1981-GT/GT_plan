@@ -1,9 +1,9 @@
-"""Excel ↔ HTML 互转 API — 双格式保存 + ONLYOFFICE 联动
+"""Excel ↔ HTML 互转 API — 双格式保存 + Univer 联动
 
 提供：
 - 上传 Excel → 解析为 structure.json + 渲染 HTML 预览
 - 编辑保存 → 更新 structure.json + 回写 Excel
-- ONLYOFFICE 保存后同步 structure.json
+- Univer 保存后同步 structure.json
 - 双格式下载（.xlsx / .html）
 """
 
@@ -286,10 +286,11 @@ async def sync_from_onlyoffice(
     file_stem: str,
     current_user: User = Depends(get_current_user),
 ):
-    """ONLYOFFICE 保存后同步 structure.json
+    """编辑器保存后同步 structure.json（向后兼容端点）
 
-    当用户通过 ONLYOFFICE 编辑 Excel 后（WOPI put_file），
+    当用户通过在线编辑器编辑 Excel 后，
     调用此接口重新解析 Excel 更新 structure.json（保留取数规则绑定）。
+    注：底稿编辑已迁移至 Univer，此端点保留向后兼容。
     """
     project_dir = Path("storage") / "projects" / str(project_id) / "excel_html"
     excel_path = project_dir / f"{file_stem}.xlsx"
@@ -310,8 +311,8 @@ async def sync_from_onlyoffice(
 
     return {
         "version": new_structure["metadata"]["version"],
-        "synced_from": "onlyoffice",
-        "message": "已从 ONLYOFFICE 同步更新",
+        "synced_from": "editor",
+        "message": "已从编辑器同步更新",
     }
 
 

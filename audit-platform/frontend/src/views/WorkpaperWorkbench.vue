@@ -325,6 +325,7 @@ import { MagicStick, EditPen, Paperclip, WarningFilled } from '@element-plus/ico
 import { getAllWpMappings, getWpPrefillData, getWpRecommendations, type WpAccountMapping, type WpPrefillData, type WpRecommendation } from '@/services/workpaperApi'
 import { getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
 const router = useRouter()
@@ -425,7 +426,7 @@ watch(selectedMapping, async (m) => {
       `/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(m.account_name)}`,
       { validateStatus: () => true }
     )
-    const result = data?.data ?? data
+    const result = data
     if (result?.tips?.length || result?.checklist?.length) {
       tsjData.value = result
     }
@@ -502,11 +503,7 @@ function onNodeClick(data: TreeNode) {
   }
 }
 
-function fmtAmt(v: any): string {
-  const n = parseFloat(v)
-  if (isNaN(n) || n === 0) return '—'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 
 function getFileIcon(type?: string): string {
   if (!type) return '📄'
@@ -570,7 +567,18 @@ async function loadAttachments(wpCode: string) {
   } catch { attachments.value = [] }
 }
 
+// 任务 12.6.1：AI 分析结果会话级缓存（切换底稿时命中缓存，避免重复请求 vLLM）
+const aiAnalysisCache = ref<Map<string, any>>(new Map())
+
 async function loadAiAnalysis(m: WpAccountMapping) {
+  const cacheKey = `${m.wp_code}|${m.account_name}|${year.value}`
+  const cached = aiAnalysisCache.value.get(cacheKey)
+  if (cached) {
+    aiAnalysis.value = cached
+    aiLoading.value = false
+    return
+  }
+
   aiLoading.value = true
   aiAnalysis.value = null
   try {
@@ -580,8 +588,10 @@ async function loadAiAnalysis(m: WpAccountMapping) {
     })
     if (data && !data.error) {
       aiAnalysis.value = data
+      aiAnalysisCache.value.set(cacheKey, data)
     } else {
       aiAnalysis.value = { unavailable: true, message: 'AI 分析服务未启动，请检查 vLLM 是否运行' }
+      // 不缓存 unavailable，下次重试
     }
   } catch {
     aiAnalysis.value = { unavailable: true, message: 'AI 分析服务未启动，请检查 vLLM 是否运行' }

@@ -149,7 +149,7 @@ async function searchWorkpapers(query: string) {
   wpSearchLoading.value = true
   try {
     const data = await api.get(`/api/projects/${projectId.value}/wp-index`)
-    const items = Array.isArray(data) ? data : data?.data ?? []
+    const items = Array.isArray(data) ? data : data ?? []
     // 按编号或名称模糊过滤
     const q = query.toLowerCase()
     wpSearchResults.value = items.filter((w: any) =>

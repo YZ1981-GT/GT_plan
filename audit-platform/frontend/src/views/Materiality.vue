@@ -143,6 +143,8 @@ import {
   type MaterialityData,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import { fmtAmount } from '@/utils/formatters'
+import { eventBus, type MaterialityChangedPayload } from '@/utils/eventBus'
 
 const route = useRoute()
 const router = useRouter()
@@ -174,11 +176,7 @@ const overrideForm = reactive({
   reason: '',
 })
 
-function formatAmt(val: any): string {
-  const n = Number(val)
-  if (isNaN(n)) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const formatAmt = fmtAmount
 
 async function onBenchmarkTypeChange() {
   if (form.benchmark_type && form.benchmark_type !== 'custom') {
@@ -209,6 +207,8 @@ async function onParamChange() {
       performance_ratio: String(perfRatio.value),
       trivial_ratio: String(trivialRatio.value),
     })
+    // 需求 21.1：保存成功后发布事件，触发试算表 exceeds_materiality 刷新
+    eventBus.emit('materiality:changed', { projectId: projectId.value, year: year.value } as MaterialityChangedPayload)
   } catch { /* silent */ }
 }
 
@@ -222,6 +222,8 @@ async function submitOverride() {
     if (overrideForm.trivial_threshold != null) body.trivial_threshold = String(overrideForm.trivial_threshold)
     result.value = await overrideMateriality(projectId.value, year.value, body)
     ElMessage.success('覆盖成功')
+    // 需求 21.1：覆盖成功后发布事件，触发试算表 exceeds_materiality 刷新
+    eventBus.emit('materiality:changed', { projectId: projectId.value, year: year.value } as MaterialityChangedPayload)
     fetchHistory()
   } catch { /* interceptor handles */ }
   finally { overrideLoading.value = false }

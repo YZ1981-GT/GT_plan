@@ -149,6 +149,7 @@ class ProjectCreateResponse(BaseModel):
     audit_year: int | None = None
     project_type: str | None = None
     status: str
+    template_type: str | None = None
     report_scope: str | None = None
     parent_project_id: UUID | None = None
     consol_level: int = 1
@@ -655,6 +656,7 @@ class AccountOption(BaseModel):
     code: str
     name: str
     level: int = 1
+    report_line: str | None = None  # 对应报表行次名称，用于下拉显示
 
 
 class WPAdjustmentDetail(BaseModel):
@@ -756,12 +758,18 @@ class EventType(str, enum.Enum):
     REPORTS_UPDATED = "reports.updated"
     WORKPAPER_SAVED = "workpaper.saved"
     NOTE_UPDATED = "note.updated"
+    # R1 需求 2：复核意见 → 工单补偿联动
+    REVIEW_RECORD_CREATED = "review_record.created"
     # Phase 17: 细化导入事件语义
     LEDGER_IMPORT_SUBMITTED = "ledger.import_submitted"
     LEDGER_IMPORT_FAILED = "ledger.import_failed"
     LEDGER_DATASET_VALIDATED = "ledger.dataset_validated"
     LEDGER_DATASET_ACTIVATED = "ledger.dataset_activated"
     LEDGER_DATASET_ROLLED_BACK = "ledger.dataset_rolled_back"
+    # Phase 18: 事件链路失败通知
+    SYNC_FAILED = "sync.failed"
+    # Batch 3 Fix 3: 批量委派事件供 event_handlers 级联
+    WORKPAPER_ASSIGNED = "workpaper.assigned"
 
 
 class EventPayload(BaseModel):

@@ -39,13 +39,44 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
         if "text/event-stream" in content_type:
             return response
 
-        # 读取原始响应体
+        # 跳过 blob / 大文件下载响应（二进制流、文件下载等）
+        if any(t in content_type for t in (
+            "application/octet-stream",
+            "application/vnd.",
+            "application/pdf",
+            "application/zip",
+            "image/",
+            "audio/",
+            "video/",
+        )):
+            return response
+
+        # 跳过带 Content-Disposition attachment 的文件下载
+        content_disposition = response.headers.get("content-disposition", "")
+        if "attachment" in content_disposition:
+            return response
+
+        # 跳过大响应体（> 5MB），避免内存压力
+        content_length = response.headers.get("content-length")
+        if content_length and int(content_length) > 5 * 1024 * 1024:
+            return response
+
+        # 读取原始响应体，同时累积大小检查（处理无 content-length 的 chunked 响应）
+        _MAX_WRAP_BYTES = 5 * 1024 * 1024  # 5MB
         body_bytes = b""
         async for chunk in response.body_iterator:  # type: ignore[union-attr]
             if isinstance(chunk, str):
                 body_bytes += chunk.encode("utf-8")
             else:
                 body_bytes += chunk
+            # 累积超限时直接返回原始响应（无法回退，只能放弃包装）
+            if len(body_bytes) > _MAX_WRAP_BYTES:
+                return Response(
+                    content=body_bytes,
+                    status_code=response.status_code,
+                    headers={k: v for k, v in response.headers.items() if k.lower() != "content-length"},
+                    media_type=response.media_type,
+                )
 
         # 尝试解析 JSON
         try:
@@ -77,6 +108,7 @@ class ResponseWrapperMiddleware(BaseHTTPMiddleware):
         wrapped_bytes = json.dumps(wrapped, ensure_ascii=False).encode("utf-8")
 
         # 去掉原始 Content-Length，Response 会自动根据新 body 计算
+        # 保留 X-Response-Time 等性能监控 header（中间件顺序可能导致其被覆盖）
         headers = {k: v for k, v in response.headers.items() if k.lower() != "content-length"}
 
         return Response(

@@ -1,11 +1,12 @@
-<template>
+﻿<template>
   <el-dialog
     v-model="visible"
-    title="公式管理中心"
+    title="ƒx 公式管理中心"
     width="95%"
     top="2vh"
     append-to-body
     destroy-on-close
+    class="gt-fm-dialog"
   >
     <div class="gt-fm-container">
       <!-- 左侧：树形导航 -->
@@ -53,9 +54,10 @@
               @applied="onTemplateApplied"
             />
             <el-button size="small" @click="onImportPresetFormulas" :loading="loadingData">📥 导入预设</el-button>
+            <el-button size="small" @click="showFormulaImport = true">📥 Excel导入</el-button>
             <el-button size="small" @click="onAddFormulaRow">+ 新增公式</el-button>
             <el-button size="small" @click="onSaveAllFormulas" :loading="applying">💾 保存</el-button>
-            <el-button size="small" type="primary" @click="onApplyFormulas" :loading="applying">⚡ 应用自动运算</el-button>
+            <el-button size="small" type="primary" class="gt-fm-apply-btn" @click="onApplyFormulas" :loading="applying">⚡ 应用自动运算</el-button>
           </div>
         </div>
 
@@ -90,7 +92,7 @@
 
         <!-- 公式表格（报表/附注/底稿） -->
         <el-table v-if="!isCrossCheckMode" ref="formulaTableRef" :data="filteredRows" size="small" border max-height="calc(100vh - 300px)" style="width: 100%"
-          :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }"
+          :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }"
           :row-class-name="getRowClassName"
           @selection-change="onSelectionChange"
           @row-click="onRowClick"
@@ -129,9 +131,27 @@
               <span v-else style="font-size: 12px; color: #888">{{ row.formula_description || '' }}</span>
             </template>
           </el-table-column>
+          <el-table-column label="计算值" width="110" align="right">
+            <template #default="{ row }">
+              <el-tooltip v-if="formulaResults[row.row_code || row.id]?.trace?.length" placement="left" :show-after="300">
+                <template #content>
+                  <div style="max-width:400px;font-size:11px;line-height:1.6">
+                    <div v-for="(t, ti) in formulaResults[row.row_code || row.id]?.trace" :key="ti" style="border-bottom:1px solid rgba(255,255,255,0.1);padding:2px 0">
+                      <span v-if="t.type">{{ t.type }}({{ t.name || t.code || t.range || '' }}) = {{ t.value || t.error }}</span>
+                      <span v-else-if="t.op">{{ t.left }} {{ t.op }} {{ t.right }} = {{ t.result }}</span>
+                    </div>
+                  </div>
+                </template>
+                <span style="font-size:12px;color:#4b2d77;font-weight:600;cursor:help">
+                  {{ typeof formulaResults[row.row_code || row.id]?.value === 'number' ? fmtAmount(formulaResults[row.row_code || row.id]!.value!) : '-' }}
+                </span>
+              </el-tooltip>
+              <span v-else style="font-size:12px;color:#ccc">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="来源" width="70" align="center">
             <template #default="{ row }">
-              <span v-if="isPresetFormula(row)" style="font-size: 10px; color: #4b2d77; background: #f0ecf5; padding: 1px 6px; border-radius: 3px;">预设</span>
+              <span v-if="isPresetFormula(row)" style="font-size: 10px; color: #1a3a5c; background: #dce6f0; padding: 1px 6px; border-radius: 3px;">预设</span>
               <span v-else-if="row.formula" style="font-size: 10px; color: #999;">自定义</span>
             </template>
           </el-table-column>
@@ -144,7 +164,7 @@
         </el-table>
 
         <div class="gt-fm-footer">
-          <span style="font-size: 11px; color: #999;">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式</span>
+          <span style="font-size: 11px; color: #999;">共 {{ currentRows.length }} 行，{{ currentRows.filter(r => r.formula).length }} 个公式{{ Object.values(formulaResults).filter(r => r.value != null).length ? `，${Object.values(formulaResults).filter(r => r.value != null).length} 个已计算` : '' }}</span>
         </div>
 
         <!-- 表间审核模式 -->
@@ -155,7 +175,7 @@
           </div>
           <el-table :data="crossCheckRulesForCurrent" size="small" border style="width: 100%;"
             max-height="calc(100vh - 300px)"
-            :header-cell-style="{ background: '#f8f6fb', fontSize: '12px', whiteSpace: 'nowrap' }">
+            :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }">
             <el-table-column type="index" label="#" width="50" />
             <el-table-column label="规则名称" min-width="200">
               <template #default="{ row }">
@@ -234,7 +254,7 @@
             <span style="font-size: 10px; color: #999; margin-left: 6px;">{{ group.rows.length }} 条</span>
           </div>
           <el-table v-show="group._open" :data="group.rows" size="small" border style="width: 100%;"
-            :header-cell-style="{ background: '#f8f6fb', fontSize: '11px', whiteSpace: 'nowrap' }">
+            :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
             <el-table-column prop="row_code" label="行次" width="90" />
             <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
             <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
@@ -264,7 +284,7 @@
 
       <!-- 平铺展示 -->
       <el-table v-else :data="dashboardFilteredRows" size="small" border max-height="65vh" style="width: 100%;"
-        :header-cell-style="{ background: '#f8f6fb', fontSize: '11px', whiteSpace: 'nowrap' }">
+        :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
         <el-table-column prop="row_code" label="行次" width="90" />
         <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
         <el-table-column prop="formula" label="公式" min-width="240" show-overflow-tooltip>
@@ -299,15 +319,26 @@
       :applicable-standard="`${fmTemplateType}_standalone`"
       @save="onFormulaEditSave"
     />
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showFormulaImport"
+      import-type="formula"
+      :project-id="props.projectId"
+      :year="props.year"
+      @imported="onFormulaFileImported"
+    />
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
+import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -352,10 +383,10 @@ const noteTreeLoaded = ref(false)
 async function loadNoteTree() {
   if (noteTreeLoaded.value) return
   try {
-    const { data } = await http.get(`/api/note-templates/${fmTemplateType.value}`, {
+    const data = await api.get(`/api/note-templates/${fmTemplateType.value}`, {
       validateStatus: (s: number) => s < 600,
     })
-    const sections = data?.data ?? data ?? []
+    const sections = data ?? []
     if (!Array.isArray(sections) || !sections.length) return
 
     // 按章节分组构建树
@@ -528,10 +559,26 @@ const treeData = computed(() => [
     ],
   },
   {
+    key: 'consolidation', label: '合并报表', icon: '🏢', children: [
+      { key: 'consol_info', label: '基本信息表', icon: '', _consolSheet: 'info' },
+      { key: 'consol_cost', label: '投资明细-成本法和公允值', icon: '', _consolSheet: 'cost' },
+      { key: 'consol_equity_inv', label: '投资明细-权益法', icon: '', _consolSheet: 'equity_inv' },
+      { key: 'consol_net_asset', label: '净资产表', icon: '', _consolSheet: 'net_asset' },
+      { key: 'consol_equity_sim', label: '模拟权益法', icon: '', _consolSheet: 'equity_sim' },
+      { key: 'consol_elimination', label: '合并抵消分录', icon: '', _consolSheet: 'elimination' },
+      { key: 'consol_capital', label: '资本公积变动', icon: '', _consolSheet: 'capital' },
+    ],
+  },
+  {
     key: 'cross_check', label: '表间审核', icon: '🔗', children: [
       { key: 'cross_report_note', label: '报表 ↔ 附注', icon: '🔄', children: crossCheckItems.value.report_note },
       { key: 'cross_report_wp', label: '报表 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.report_wp },
       { key: 'cross_note_wp', label: '附注 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.note_wp },
+      { key: 'cross_consol', label: '合并 ↔ 报表', icon: '🔄', children: [
+        { key: 'cross_cr_1', label: '合并抵消分录 ↔ 合并试算表', icon: '📌' },
+        { key: 'cross_cr_2', label: '模拟权益法 ↔ 净资产表', icon: '📌' },
+        { key: 'cross_cr_3', label: '资本公积变动 ↔ 合并报表', icon: '📌' },
+      ]},
     ],
   },
 ])
@@ -559,6 +606,11 @@ const crossCheckItems = ref<Record<string, any[]>>({
 // ── 数据加载 ──
 const allRowsMap = ref<Record<string, any[]>>({})
 const loadingData = ref(false)
+const showFormulaImport = ref(false)
+
+// 公式执行结果缓存（独立于行数据，确保响应式）
+const formulaResults = ref<Record<string, { value: number | null; trace: any[] }>>({})
+
 const notePresetFormulas = ref<any[]>([])
 
 async function loadRowsForNode(nodeKey: string) {
@@ -572,11 +624,11 @@ async function loadRowsForNode(nodeKey: string) {
     loadingData.value = true
     try {
       const standard = `${fmTemplateType.value}_standalone`
-      const { data } = await http.get('/api/report-config', {
+      const data = await api.get('/api/report-config', {
         params: { report_type: reportType, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data?.data ?? data ?? []
+      const rows = data ?? []
       allRowsMap.value[reportType] = rows
       allRowsMap.value[cacheKey] = rows
     } catch { /* ignore */ }
@@ -612,12 +664,13 @@ function onTreeNodeClick(data: any) {
       selectedPath.value = `报表 > ${data.label}`
     } else if (data.key.startsWith('note_')) {
       selectedPath.value = `附注 > ${data._sectionTitle || data.label}`
-      // 自动加载附注预设公式（如果还没加载）
       if (!notePresetFormulas.value.length) {
         onImportPresetFormulas()
       }
     } else if (data.key.startsWith('wp_')) {
       selectedPath.value = `底稿 > ${data.label}`
+    } else if (data.key.startsWith('consol_')) {
+      selectedPath.value = `合并报表 > ${data.label}`
     } else if (data.key.startsWith('cross_')) {
       selectedPath.value = `表间审核 > ${data.label}`
     }
@@ -684,6 +737,10 @@ const currentRows = computed(() => {
       formula_source: f.source,
     }))
   }
+  // 合并报表节点：显示对应表样的行结构
+  if (selectedNodeKey.value.startsWith('consol_')) {
+    return allRowsMap.value[selectedNodeKey.value] || consolSheetRows(selectedNodeKey.value)
+  }
   return []
 })
 
@@ -703,7 +760,163 @@ const crossCheckRulesMap = ref<Record<string, any[]>>({
   cross_note_wp: [
     { label: '附注货币资金 = E1-1审定数', left_ref: "NOTE('货币资金','合计','期末')", right_ref: "WP('E1-1','审定数')", _editing: false },
   ],
+  cross_consol: [
+    { label: '合并抵消分录借贷平衡', left_ref: "CONSOL('抵消分录','借方合计')", right_ref: "CONSOL('抵消分录','贷方合计')", _editing: false },
+    { label: '模拟权益法长投 = 净资产×持股比例', left_ref: "CONSOL('模拟权益法','期末长投小计')", right_ref: "CONSOL('净资产表','期末净资产') × 持股比例", _editing: false },
+    { label: '资本公积变动期末 = 合并报表期末', left_ref: "CONSOL('资本公积变动','期末金额')", right_ref: "REPORT('BS-资本公积','期末')", _editing: false },
+  ],
 })
+
+// ── 合并报表表样行结构（供公式配置用） ──
+function consolSheetRows(nodeKey: string): any[] {
+  const sheetMap: Record<string, { rows: { code: string; name: string; formula?: string; category?: string; desc?: string }[] }> = {
+    consol_info: { rows: [
+      { code: 'CI-001', name: '子企业名称' }, { code: 'CI-002', name: '企业代码' },
+      { code: 'CI-003', name: '核算科目' }, { code: 'CI-004', name: '核算方式' },
+      { code: 'CI-005', name: '持股比例变动' }, { code: 'CI-006', name: '变动次数' },
+    ]},
+    consol_cost: { rows: [
+      { code: 'CC-001', name: '本期现金红利' },
+      { code: 'CC-010', name: '期初-投资比例' }, { code: 'CC-011', name: '期初-金额' },
+      { code: 'CC-012', name: '期初-减值准备' }, { code: 'CC-013', name: '期初-长投净额' },
+      { code: 'CC-020', name: '增加-金额' }, { code: 'CC-021', name: '增加-减值准备' },
+      { code: 'CC-030', name: '减少-金额' }, { code: 'CC-031', name: '减少-减值准备' },
+      { code: 'CC-040', name: '期末-投资成本' }, { code: 'CC-041', name: '期末-减值准备' },
+      { code: 'CC-042', name: '期末-长投净额' }, { code: 'CC-043', name: '期末-公允价值' },
+      { code: 'CC-099', name: '成本法小计' },
+    ]},
+    consol_equity_inv: { rows: [
+      { code: 'CE-010', name: '期初-投资比例' }, { code: 'CE-011', name: '期初-长投金额' },
+      { code: 'CE-012', name: '期初-减值准备' },
+      { code: 'CE-020', name: '增加-投资成本' }, { code: 'CE-021', name: '增加-损益调整' },
+      { code: 'CE-022', name: '增加-其他综合收益' }, { code: 'CE-023', name: '增加-其他权益变动' },
+      { code: 'CE-024', name: '增加-权益增加小计' },
+      { code: 'CE-030', name: '减少-投资成本' }, { code: 'CE-031', name: '减少-分回利润' },
+      { code: 'CE-040', name: '期末-投资比例' }, { code: 'CE-041', name: '期末-长投金额' },
+      { code: 'CE-042', name: '期末-减值准备' },
+      { code: 'CE-099', name: '小计' },
+    ]},
+    consol_net_asset: { rows: [
+      // ── 第1部分：所有者权益变动 ──
+      { code: 'CN-S1', name: '所有者权益/股东权益', formula: '', category: '', desc: '分节标题' },
+      // 期初
+      { code: 'CN-001', name: '期初合计：', formula: 'SUM(CN-002:CN-010)', category: 'auto_calc', desc: '=下方9项之和' },
+      { code: 'CN-002', name: '实收资本（或股本）', formula: "TB({company_code},'实收资本','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-003', name: '其他权益工具', formula: "TB({company_code},'其他权益工具','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-004', name: '资本公积', formula: "TB({company_code},'资本公积','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-005', name: '减：库存股', formula: "TB({company_code},'库存股','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-006', name: '其他综合收益', formula: "TB({company_code},'其他综合收益','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-007', name: '专项储备', formula: "TB({company_code},'专项储备','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-008', name: '盈余公积', formula: "TB({company_code},'盈余公积','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-009', name: '△一般风险准备', formula: "TB({company_code},'一般风险准备','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      { code: 'CN-010', name: '未分配利润', formula: "TB({company_code},'未分配利润','期初余额')", category: 'auto_calc', desc: '从子企业试算表提取' },
+      // 本期增加
+      { code: 'CN-011', name: '本期增加', formula: 'SUM(CN-012:CN-020)', category: 'auto_calc', desc: '=下方9项之和' },
+      { code: 'CN-012', name: '实收资本（或股本）', formula: '', category: '', desc: '本期增加-实收资本' },
+      { code: 'CN-013', name: '其他权益工具', formula: '', category: '', desc: '本期增加-其他权益工具' },
+      { code: 'CN-014', name: '资本公积', formula: '', category: '', desc: '本期增加-资本公积' },
+      { code: 'CN-015', name: '减：库存股', formula: '', category: '', desc: '' },
+      { code: 'CN-016', name: '其他综合收益', formula: '', category: '', desc: '' },
+      { code: 'CN-017', name: '专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-018', name: '盈余公积', formula: '', category: '', desc: '' },
+      { code: 'CN-019', name: '△一般风险准备', formula: '', category: '', desc: '' },
+      { code: 'CN-020', name: '未分配利润', formula: '', category: '', desc: '' },
+      // 本期减少
+      { code: 'CN-021', name: '本期减少', formula: 'SUM(CN-022:CN-030)', category: 'auto_calc', desc: '=下方9项之和' },
+      { code: 'CN-022', name: '实收资本（或股本）', formula: '', category: '', desc: '' },
+      { code: 'CN-023', name: '其他权益工具', formula: '', category: '', desc: '' },
+      { code: 'CN-024', name: '资本公积', formula: '', category: '', desc: '' },
+      { code: 'CN-025', name: '减：库存股', formula: '', category: '', desc: '' },
+      { code: 'CN-026', name: '其他综合收益', formula: '', category: '', desc: '' },
+      { code: 'CN-027', name: '专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-028', name: '盈余公积', formula: '', category: '', desc: '' },
+      { code: 'CN-029', name: '△一般风险准备', formula: '', category: '', desc: '' },
+      { code: 'CN-030', name: '未分配利润', formula: '', category: '', desc: '' },
+      // 期末
+      { code: 'CN-031', name: '期末金额', formula: 'CN-001+CN-011-CN-021', category: 'auto_calc', desc: '=期初+增加-减少' },
+      { code: 'CN-032', name: '实收资本（或股本）', formula: 'CN-002+CN-012-CN-022', category: 'auto_calc', desc: '=期初+增加-减少' },
+      { code: 'CN-033', name: '其他权益工具', formula: 'CN-003+CN-013-CN-023', category: 'auto_calc', desc: '' },
+      { code: 'CN-034', name: '资本公积', formula: 'CN-004+CN-014-CN-024', category: 'auto_calc', desc: '' },
+      { code: 'CN-035', name: '减：库存股', formula: 'CN-005+CN-015-CN-025', category: 'auto_calc', desc: '' },
+      { code: 'CN-036', name: '其他综合收益', formula: 'CN-006+CN-016-CN-026', category: 'auto_calc', desc: '' },
+      { code: 'CN-037', name: '专项储备', formula: 'CN-007+CN-017-CN-027', category: 'auto_calc', desc: '' },
+      { code: 'CN-038', name: '盈余公积', formula: 'CN-008+CN-018-CN-028', category: 'auto_calc', desc: '' },
+      { code: 'CN-039', name: '△一般风险准备', formula: 'CN-009+CN-019-CN-029', category: 'auto_calc', desc: '' },
+      { code: 'CN-040', name: '未分配利润', formula: 'CN-010+CN-020-CN-030', category: 'auto_calc', desc: '' },
+      // ── 第2部分：利润及利润分配 ──
+      { code: 'CN-S2', name: '利润及利润分配表', formula: '', category: '', desc: '分节标题' },
+      { code: 'CN-050', name: '一、期初金额', formula: 'CN-010', category: 'auto_calc', desc: '=期初未分配利润' },
+      { code: 'CN-051', name: '二、本年增减变动金额', formula: 'CN-052+CN-056+CN-060+CN-063+CN-072', category: 'auto_calc', desc: '=综合收益+投入减少+专项储备+利润分配+内部结转' },
+      { code: 'CN-052', name: '（一）综合收益总额', formula: "TB({company_code},'净利润','本期发生额')", category: 'auto_calc', desc: '从子企业试算表提取净利润' },
+      { code: 'CN-053', name: '其中：当期归母净利润', formula: '', category: '', desc: '' },
+      { code: 'CN-056', name: '（二）所有者投入和减少资本', formula: 'SUM(CN-057:CN-059)', category: 'auto_calc', desc: '' },
+      { code: 'CN-057', name: '2-1所有者投入的普通股', formula: '', category: '', desc: '' },
+      { code: 'CN-058', name: '2-3股份支付计入所有者权益的金额', formula: '', category: '', desc: '' },
+      { code: 'CN-059', name: '2-4其他', formula: '', category: '', desc: '' },
+      { code: 'CN-060', name: '（三）专项储备提取和使用', formula: 'CN-061+CN-062', category: 'auto_calc', desc: '' },
+      { code: 'CN-061', name: '3-1提取专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-062', name: '3-2使用专项储备', formula: '', category: '', desc: '' },
+      { code: 'CN-063', name: '（四）利润分配', formula: 'SUM(CN-064:CN-071)', category: 'auto_calc', desc: '' },
+      { code: 'CN-064', name: '4-1提取盈余公积', formula: 'CN-065+CN-066', category: 'auto_calc', desc: '' },
+      { code: 'CN-065', name: '4-1-1法定公积金', formula: '', category: '', desc: '' },
+      { code: 'CN-066', name: '4-1-2任意公积金', formula: '', category: '', desc: '' },
+      { code: 'CN-067', name: '4-2△提取一般风险准备', formula: '', category: '', desc: '' },
+      { code: 'CN-068', name: '4-3对所有者（或股东）的分配', formula: '', category: '', desc: '' },
+      { code: 'CN-069', name: '4-4其他', formula: '', category: '', desc: '' },
+      { code: 'CN-070', name: '4-1-3#储备基金', formula: '', category: '', desc: '' },
+      { code: 'CN-071', name: '4-1-4#企业发展基金', formula: '', category: '', desc: '' },
+      { code: 'CN-072', name: '（五）所有者权益内部结转', formula: 'SUM(CN-073:CN-078)', category: 'auto_calc', desc: '' },
+      { code: 'CN-073', name: '5-1资本公积转增资本', formula: '', category: '', desc: '' },
+      { code: 'CN-074', name: '5-2盈余公积转增资本', formula: '', category: '', desc: '' },
+      { code: 'CN-075', name: '5-3弥补亏损', formula: '', category: '', desc: '' },
+      { code: 'CN-076', name: '5-5其他综合收益结转留存收益', formula: '', category: '', desc: '' },
+      { code: 'CN-077', name: '5-6其他', formula: '', category: '', desc: '' },
+      { code: 'CN-078', name: '三、本年年末余额', formula: 'CN-050+CN-051', category: 'auto_calc', desc: '=期初+本年增减变动' },
+      // ── 第3部分：资本公积变动 ──
+      { code: 'CN-S3', name: '资本公积变动表', formula: '', category: '', desc: '分节标题' },
+      { code: 'CN-080', name: '期初金额', formula: 'CN-004', category: 'auto_calc', desc: '=期初资本公积' },
+      { code: 'CN-081', name: '本期变动', formula: 'CN-014-CN-024', category: 'auto_calc', desc: '=增加-减少' },
+      { code: 'CN-082', name: '期末金额', formula: 'CN-080+CN-081', category: 'auto_calc', desc: '=期初+变动' },
+      // ── 校验公式 ──
+      { code: 'CN-V01', name: '校验：期末合计=期初+增加-减少', formula: 'CN-031-(CN-001+CN-011-CN-021)', category: 'logic_check', desc: '应为0' },
+      { code: 'CN-V02', name: '校验：期末未分配利润=利润表年末余额', formula: 'CN-040-CN-078', category: 'logic_check', desc: '应为0' },
+      { code: 'CN-V03', name: '校验：资本公积期末=变动表期末', formula: 'CN-034-CN-082', category: 'logic_check', desc: '应为0' },
+    ]},
+    consol_equity_sim: { rows: [
+      { code: 'CS-001', name: '期初长投模拟-损益调整' }, { code: 'CS-002', name: '期初长投模拟-其他权益变动' },
+      { code: 'CS-010', name: '当期模拟-损益调整' }, { code: 'CS-011', name: '当期模拟-投资收益' },
+      { code: 'CS-020', name: '还原分红-投资收益' }, { code: 'CS-021', name: '还原分红-损益调整' },
+      { code: 'CS-030', name: '股比变动影响' },
+      { code: 'CS-040', name: '期末长投-投资成本' }, { code: 'CS-041', name: '期末长投-损益调整' },
+      { code: 'CS-042', name: '期末长投-其他权益变动' }, { code: 'CS-043', name: '期末长投-小计' },
+    ]},
+    consol_elimination: { rows: [
+      { code: 'CX-001', name: '权益抵消-实收资本' }, { code: 'CX-002', name: '权益抵消-资本公积' },
+      { code: 'CX-003', name: '权益抵消-盈余公积' }, { code: 'CX-004', name: '权益抵消-未分配利润' },
+      { code: 'CX-005', name: '权益抵消-商誉' }, { code: 'CX-006', name: '权益抵消-长投' },
+      { code: 'CX-007', name: '权益抵消-少数股东权益' },
+      { code: 'CX-010', name: '损益抵消-年初未分配利润' }, { code: 'CX-011', name: '损益抵消-投资收益' },
+      { code: 'CX-012', name: '损益抵消-少数股权损益' },
+      { code: 'CX-020', name: '抵销后少数股东权益' }, { code: 'CX-021', name: '抵销后少数股东损益' },
+    ]},
+    consol_capital: { rows: [
+      { code: 'CK-001', name: '期初金额' }, { code: 'CK-002', name: '当期变动' },
+      { code: 'CK-003', name: '+权益法模拟' }, { code: 'CK-004', name: '-合并抵消数' },
+      { code: 'CK-005', name: '+自身报表变动' }, { code: 'CK-006', name: '期末金额' },
+      { code: 'CK-007', name: '合并报表期末金额' }, { code: 'CK-008', name: '差异' },
+    ]},
+  }
+  const sheet = sheetMap[nodeKey]
+  if (!sheet) return []
+  return sheet.rows.map((r: any, i: number) => ({
+    id: `${nodeKey}_${i}`,
+    row_code: r.code,
+    row_name: r.name,
+    formula: r.formula || '',
+    formula_category: r.category || '',
+    formula_description: r.desc || '',
+  }))
+}
 
 const crossCheckRulesForCurrent = computed(() => {
   const key = selectedNodeKey.value
@@ -818,7 +1031,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
       if (selectedNodeKey.value.startsWith('report_')) {
         const reportType = selectedNodeKey.value.replace('report_', '')
         try {
-          const { data: saved } = await http.post('/api/report-config', {
+          const saved = await api.post('/api/report-config', {
             report_type: reportType,
             applicable_standard: `${fmTemplateType.value}_standalone`,
             row_number: row.row_number,
@@ -843,7 +1056,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
   // 已有行——更新到后端
   if (row.id) {
     try {
-      await http.put(`/api/report-config/${row.id}`, {
+      await api.put(`/api/report-config/${row.id}`, {
         formula: data.formula || null,
         formula_category: data.category,
         formula_description: data.description,
@@ -860,7 +1073,7 @@ async function saveEdit(row: any) {
   // 兼容行内编辑（保留）
   if (!row.id) return
   try {
-    await http.put(`/api/report-config/${row.id}`, {
+    await api.put(`/api/report-config/${row.id}`, {
       formula: editFormula.value || null,
       formula_category: editCategory.value,
       formula_description: editDescription.value,
@@ -895,16 +1108,78 @@ async function onApplyFormulas() {
     ElMessage.warning('缺少项目信息')
     return
   }
+
+  // 收集当前节点所有带公式的行
+  const formulaRows = currentRows.value.filter((r: any) => r.formula && r.formula_category === 'auto_calc')
+  if (!formulaRows.length) {
+    ElMessage.info('当前节点没有自动运算公式')
+    return
+  }
+
   applying.value = true
   try {
-    await http.post('/api/reports/generate', { project_id: props.projectId, year: props.year })
-    ElMessage.success('自动运算公式已应用，报表数据已刷新')
+    const formulas = formulaRows.map((r: any) => ({
+      row_code: r.row_code || r.id,
+      formula: r.formula,
+    }))
+
+    const data = await api.post('/api/report-config/execute-formulas-batch', {
+      project_id: props.projectId,
+      year: props.year,
+      formulas,
+    }, { validateStatus: (s: number) => s < 600 })
+
+    const result = data
+    const results = result?.results || []
+    const rowValues = result?.row_values || {}
+
+    // 统计执行结果
+    const successCount = results.filter((r: any) => r.value != null && !r.error).length
+    const errorCount = results.filter((r: any) => r.error).length
+
+    // 将计算结果写入响应式缓存
+    for (const r of results) {
+      if (r.row_code) {
+        formulaResults.value[r.row_code] = {
+          value: r.value != null && !r.error ? r.value : null,
+          trace: r.trace || [],
+        }
+      }
+    }
+
+    // 如果是报表节点，将结果回写到 report_config
+    if (selectedNodeKey.value.startsWith('report_') && Object.keys(rowValues).length) {
+      try {
+        const reportType = selectedNodeKey.value.replace('report_', '')
+        const updates = Object.entries(rowValues).map(([code, val]) => ({
+          row_code: code,
+          current_period_amount: val,
+        }))
+        await api.post('/api/report-config/batch-update', {
+          project_id: props.projectId,
+          report_type: reportType,
+          applicable_standard: `soe_standalone`,
+          updates,
+        }, { validateStatus: (s: number) => s < 600 })
+      } catch { /* 回写失败不影响主流程 */ }
+    }
+
+    if (errorCount > 0) {
+      ElMessage.warning(`执行完成：${successCount} 条成功，${errorCount} 条失败`)
+    } else {
+      ElMessage.success(`已执行 ${successCount} 条自动运算公式`)
+    }
     emit('applied')
-  } catch (e: any) {
-    ElMessage.error('应用失败: ' + (e?.message || ''))
+  } catch (err: any) {
+    ElMessage.error('公式执行失败: ' + (err?.response?.data?.error || err?.message || '未知错误'))
   } finally {
     applying.value = false
   }
+}
+
+function onFormulaFileImported() {
+  showFormulaImport.value = false
+  loadRowsForNode(selectedNodeKey.value)
 }
 
 async function onImportPresetFormulas() {
@@ -915,11 +1190,11 @@ async function onImportPresetFormulas() {
     const reportType = selectedNodeKey.value.replace('report_', '')
     try {
       const standard = `${fmTemplateType.value}_standalone`
-      const { data } = await http.get('/api/report-config', {
+      const data = await api.get('/api/report-config', {
         params: { report_type: reportType, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data?.data ?? data ?? []
+      const rows = data ?? []
       allRowsMap.value[reportType] = rows
       const formulaCount = rows.filter((r: any) => r.formula).length
       ElMessage.success(`已导入 ${rows.length} 行，其中 ${formulaCount} 个预设公式`)
@@ -931,10 +1206,10 @@ async function onImportPresetFormulas() {
   // 附注类 / 表间审核：从附注校验预设公式加载
   if (selectedNodeKey.value.startsWith('note_') || selectedNodeKey.value.startsWith('cross_')) {
     try {
-      const { data } = await http.get(`/api/note-templates/preset-formulas/${fmTemplateType.value}`, {
+      const data = await api.get(`/api/note-templates/preset-formulas/${fmTemplateType.value}`, {
         validateStatus: (s: number) => s < 600,
       })
-      const presets = data?.data ?? data ?? []
+      const presets = data ?? []
       notePresetFormulas.value = presets
       ElMessage.success(`已加载 ${presets.length} 条附注校验预设公式（${fmTemplateType.value === 'soe' ? '国企版' : '上市版'}）`)
     } catch { ElMessage.error('加载附注预设公式失败') }
@@ -1018,7 +1293,7 @@ async function onSaveAllFormulas() {
       if (row._isNew && row.formula) {
         // 新增
         const reportType = selectedNodeKey.value.replace('report_', '')
-        await http.post('/api/report-config', {
+        await api.post('/api/report-config', {
           report_type: reportType,
           applicable_standard: `${fmTemplateType.value}_standalone`,
           row_number: row.row_number || 0,
@@ -1032,7 +1307,7 @@ async function onSaveAllFormulas() {
         saved++
       } else if (row.id) {
         // 更新
-        await http.put(`/api/report-config/${row.id}`, {
+        await api.put(`/api/report-config/${row.id}`, {
           formula: row.formula,
           formula_category: row.formula_category,
           formula_description: row.formula_description,
@@ -1135,11 +1410,11 @@ watch(showFormulaDashboard, async (v) => {
   for (const rt of types) {
     if (allRowsMap.value[rt]?.length) continue
     try {
-      const { data } = await http.get('/api/report-config', {
+      const data = await api.get('/api/report-config', {
         params: { report_type: rt, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
-      allRowsMap.value[rt] = data?.data ?? data ?? []
+      allRowsMap.value[rt] = data ?? []
     } catch { /* skip */ }
   }
 })
@@ -1155,10 +1430,10 @@ watch(showFormulaDashboard, async (v) => {
 .gt-fm-sidebar {
   width: 220px;
   flex-shrink: 0;
-  border: 1px solid #e8e4f0;
+  border: 1px solid #dce6f0;
   border-radius: 8px;
   overflow-y: auto;
-  background: #faf8fd;
+  background: #f5f8fb;
 }
 .gt-fm-sidebar-title {
   padding: 10px 14px 6px;
@@ -1170,15 +1445,16 @@ watch(showFormulaDashboard, async (v) => {
 }
 .gt-fm-tree {
   background: transparent;
-  --el-tree-node-hover-bg-color: #f0ecf5;
+  --el-tree-node-hover-bg-color: #e8f0f8;
 }
 .gt-fm-tree :deep(.el-tree-node__content) {
   height: 30px;
   font-size: 12px;
 }
 .gt-fm-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
-  background: #ece6f5;
+  background: #d6e6f5;
   font-weight: 600;
+  color: #1a3a5c;
 }
 .gt-fm-tree-node {
   display: flex;
@@ -1208,8 +1484,8 @@ watch(showFormulaDashboard, async (v) => {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: linear-gradient(135deg, #f5f0ff 0%, #ece6f5 100%);
-  border: 1px solid #d8cfe8;
+  background: linear-gradient(135deg, #edf3f9 0%, #d6e6f5 100%);
+  border: 1px solid #c4d8ea;
   border-radius: 6px;
   margin-bottom: 6px;
 }
@@ -1221,15 +1497,15 @@ watch(showFormulaDashboard, async (v) => {
 :deep(.el-table__row:hover .gt-fm-row-auto),
 :deep(.el-table__row:hover .gt-fm-row-logic),
 :deep(.el-table__row:hover .gt-fm-row-reason) {
-  background: #f0ecf5 !important;
+  background: #e8f0f8 !important;
 }
 .gt-fm-dash-group-title {
   font-size: 13px;
   font-weight: 600;
   color: #444;
   padding: 8px 10px;
-  background: #faf8fd;
-  border: 1px solid #e8e4f0;
+  background: #f5f8fb;
+  border: 1px solid #dce6f0;
   border-radius: 6px;
   margin-bottom: 4px;
   cursor: pointer;
@@ -1237,6 +1513,48 @@ watch(showFormulaDashboard, async (v) => {
   transition: background 0.12s;
 }
 .gt-fm-dash-group-title:hover {
-  background: #f0ecf5;
+  background: #e8f0f8;
+}
+</style>
+
+<!-- 公式管理弹窗独立配色（非 scoped，因为 el-dialog 渲染在 body） -->
+<style>
+.gt-fm-dialog .el-dialog__header {
+  background: linear-gradient(135deg, #1a3a5c 0%, #2d5a87 60%, #3a7cb8 100%);
+  padding: 14px 20px;
+  margin: 0;
+  border-radius: 8px 8px 0 0;
+}
+.gt-fm-dialog .el-dialog__title {
+  color: #fff !important;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.gt-fm-dialog .el-dialog__headerbtn .el-dialog__close {
+  color: rgba(255,255,255,0.7);
+}
+.gt-fm-dialog .el-dialog__headerbtn:hover .el-dialog__close {
+  color: #fff;
+}
+.gt-fm-dialog .el-dialog__body {
+  border-top: 3px solid #2d5a87;
+}
+.gt-fm-dialog .el-dialog__footer {
+  background: #f5f8fb;
+  border-top: 1px solid #dce6f0;
+}
+/* 应用自动运算按钮蓝色 */
+.gt-fm-dialog .gt-fm-apply-btn {
+  background: linear-gradient(135deg, #2d5a87, #3a7cb8) !important;
+  border-color: #2d5a87 !important;
+  color: #fff !important;
+}
+.gt-fm-dialog .gt-fm-apply-btn:hover {
+  background: linear-gradient(135deg, #1a3a5c, #2d5a87) !important;
+}
+/* 表头行蓝色系 */
+.gt-fm-dialog :deep(.el-table th.el-table__cell) {
+  background: #edf3f9 !important;
 }
 </style>

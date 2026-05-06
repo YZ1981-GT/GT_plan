@@ -35,6 +35,9 @@ class AddCommentRequest(BaseModel):
     commenter_id: UUID
     comment_text: str
     cell_reference: str | None = None
+    # R1 需求 2：复核人退回底稿并附意见时传 true，会同步创建
+    # IssueTicket(source='review_comment', source_ref_id=review_record.id)。
+    is_reject: bool = False
 
 
 class ReplyRequest(BaseModel):
@@ -77,6 +80,7 @@ async def add_comment(
         commenter_id=data.commenter_id,
         comment_text=data.comment_text,
         cell_reference=data.cell_reference,
+        is_reject=data.is_reject,
     )
     await db.commit()
     return result

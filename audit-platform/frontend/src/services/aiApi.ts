@@ -155,7 +155,7 @@ export const ocrApi = {
     formData.append('file', file)
     formData.append('project_id', projectId)
     const { data } = await http.post(`/api/projects/${projectId}/documents/upload`, formData)
-    return data.data ?? data
+    return data
   },
 
   async batchUploadDocuments(
@@ -176,19 +176,19 @@ export const ocrApi = {
         }
       },
     })
-    return data.data ?? data
+    return data
   },
 
   async getDocumentList(projectId: string, documentType?: string): Promise<DocumentScan[]> {
     const params: Record<string, string> = {}
     if (documentType) params.document_type = documentType
     const { data } = await http.get(`/api/projects/${projectId}/documents`, { params })
-    return data.data ?? data
+    return data
   },
 
   async getExtractedFields(projectId: string, docId: string): Promise<ExtractedField[]> {
     const { data } = await http.get(`/api/projects/${projectId}/documents/${docId}/extracted`)
-    return data.data ?? data
+    return data
   },
 
   async updateExtractedField(
@@ -202,12 +202,12 @@ export const ocrApi = {
 
   async matchWithLedger(projectId: string, docId: string): Promise<DocumentMatch> {
     const { data } = await http.post(`/api/projects/${projectId}/documents/${docId}/match`)
-    return data.data ?? data
+    return data
   },
 
   async getTaskStatus(taskId: string): Promise<{ status: string; progress: number }> {
     const { data } = await http.get(`/api/ai/ocr/task/${taskId}`)
-    return data.data ?? data
+    return data
   },
 }
 
@@ -220,7 +220,7 @@ export const workpaperAI = {
     body: { template_type?: string; year?: number }
   ): Promise<AIContent[]> {
     const { data } = await http.post(`/api/projects/${projectId}/workpapers/${workpaperId}/ai-fill`, body)
-    return data.data ?? data
+    return data
   },
 
   async generateAnalyticalReview(
@@ -228,7 +228,7 @@ export const workpaperAI = {
     body: { account_code?: string; year?: number }
   ): Promise<AIContent> {
     const { data } = await http.post('/api/ai/analytical-review', { project_id: projectId, ...body })
-    return data.data ?? data
+    return data
   },
 
   async generateNoteDraft(
@@ -236,7 +236,7 @@ export const workpaperAI = {
     body: { note_section: string; year?: number }
   ): Promise<AIContent> {
     const { data } = await http.post('/api/ai/note-draft', { project_id: projectId, ...body })
-    return data.data ?? data
+    return data
   },
 
   async workpaperReview(projectId: string, workpaperId: string): Promise<AIContent[]> {
@@ -244,7 +244,7 @@ export const workpaperAI = {
       project_id: projectId,
       workpaper_id: workpaperId,
     })
-    return data.data ?? data
+    return data
   },
 
   async getAIContentList(projectId: string, params?: {
@@ -272,12 +272,12 @@ export const workpaperAI = {
     modification_rate: number
   }> {
     const { data } = await http.get(`/api/projects/${projectId}/ai-content/summary`)
-    return data.data ?? data
+    return data
   },
 
   async getPendingCount(projectId: string): Promise<number> {
     const { data } = await http.get(`/api/projects/${projectId}/ai-content/pending-count`)
-    return data.data ?? data
+    return data
   },
 }
 
@@ -289,7 +289,7 @@ export const contractAI = {
     formData.append('file', file)
     formData.append('project_id', projectId)
     const { data } = await http.post(`/api/projects/${projectId}/contracts/upload`, formData)
-    return data.data ?? data
+    return data
   },
 
   async batchUpload(
@@ -304,7 +304,7 @@ export const contractAI = {
         }
       },
     })
-    return data.data ?? data
+    return data
   },
 
   async getContractList(projectId: string): Promise<{ data: Contract[] }> {
@@ -336,7 +336,7 @@ export const contractAI = {
       workpaper_id: workpaperId,
       link_type: linkType,
     })
-    return data.data ?? data
+    return data
   },
 
   async getLinkedWorkpapers(contractId: string): Promise<{ data: ContractWPLink[] }> {
@@ -350,12 +350,12 @@ export const contractAI = {
 
   async getContractSummary(projectId: string): Promise<any> {
     const { data } = await http.get(`/api/projects/${projectId}/contracts/summary`)
-    return data.data ?? data
+    return data
   },
 
   async getTaskStatus(taskId: string): Promise<{ status: string; summary?: any }> {
     const { data } = await http.get(`/api/projects/contracts/task/${taskId}`)
-    return data.data ?? data
+    return data
   },
 }
 
@@ -393,7 +393,7 @@ export const evidenceChain = {
 
   async getChainSummary(projectId: string, chainType: string): Promise<EvidenceChainSummary> {
     const { data } = await http.get(`/api/projects/${projectId}/evidence-chain/summary/${chainType}`)
-    return data.data ?? data
+    return data
   },
 }
 
@@ -410,7 +410,7 @@ export const chatApi = {
       message,
       use_rag: useRag,
     })
-    return data.data?.content ?? data.content ?? ''
+    return data?.content ?? ''
   },
 
   async sendMessageStream(
@@ -450,7 +450,7 @@ export const chatApi = {
     const params: Record<string, string> = {}
     if (sessionId) params.session_id = sessionId
     const { data } = await http.get(`/api/projects/${projectId}/chat/history`, { params })
-    return data.data ?? data
+    return data
   },
 
   async createSession(projectId: string, sessionType: string = 'general'): Promise<{ session_id: string }> {
@@ -458,7 +458,7 @@ export const chatApi = {
       project_id: projectId,
       session_type: sessionType,
     })
-    return data.data ?? data
+    return data
   },
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -470,7 +470,7 @@ export const chatApi = {
     formData.append('file', file)
     formData.append('project_id', projectId)
     const { data } = await http.post('/api/ai/chat/file-analysis', formData)
-    return data.data ?? data
+    return data
   },
 
   async analyzeFolder(projectId: string, folderPath: string): Promise<{ task_id: string }> {
@@ -478,7 +478,7 @@ export const chatApi = {
       project_id: projectId,
       folder_path: folderPath,
     })
-    return data.data ?? data
+    return data
   },
 }
 
@@ -538,7 +538,7 @@ export const confirmationAI = {
 export const nlCommand = {
   async parseIntent(userInput: string): Promise<NLIntent> {
     const { data } = await http.post('/api/ai/nl/parse', { user_input: userInput })
-    return data.data ?? data
+    return data
   },
 
   async executeCommand(intent: NLIntent, projectId: string): Promise<any> {
@@ -546,7 +546,7 @@ export const nlCommand = {
       intent,
       project_id: projectId,
     })
-    return data.data ?? data
+    return data
   },
 
   async analyzeFile(projectId: string, filePath: string): Promise<any> {
@@ -554,7 +554,7 @@ export const nlCommand = {
       file_path: filePath,
       project_id: projectId,
     })
-    return data.data ?? data
+    return data
   },
 
   async analyzeFolder(projectId: string, folderPath: string): Promise<{ task_id: string }> {
@@ -562,17 +562,17 @@ export const nlCommand = {
       folder_path: folderPath,
       project_id: projectId,
     })
-    return data.data ?? data
+    return data
   },
 
   async getFolderAnalysisStatus(taskId: string): Promise<{ status: string; result?: any }> {
     const { data } = await http.get(`/api/ai/nl/analyze-folder/${taskId}`)
-    return data.data ?? data
+    return data
   },
 
   async comparePBCList(projectId: string): Promise<{ comparison: any }> {
     const { data } = await http.post('/api/ai/nl/compare-pbc', { project_id: projectId })
-    return data.data ?? data
+    return data
   },
 }
 
@@ -581,12 +581,12 @@ export const nlCommand = {
 export const aiAdmin = {
   async getHealth(): Promise<AIHealthResponse> {
     const { data } = await http.get('/api/ai/health')
-    return data.data ?? data
+    return data
   },
 
   async getModels(): Promise<AIModelConfig[]> {
     const { data } = await http.get('/api/ai/models')
-    return data.data ?? data
+    return data
   },
 
   async activateModel(modelId: string): Promise<void> {
@@ -595,7 +595,7 @@ export const aiAdmin = {
 
   async createModel(body: Partial<AIModelConfig>): Promise<AIModelConfig> {
     const { data } = await http.post('/api/ai/models', body)
-    return data.data ?? data
+    return data
   },
 
   async evaluateLLM(questions: string[], expectedAnswers?: string[]): Promise<any> {
@@ -603,7 +603,7 @@ export const aiAdmin = {
       questions,
       expected_answers: expectedAnswers,
     })
-    return data.data ?? data
+    return data
   },
 }
 
@@ -618,7 +618,7 @@ export const knowledgeBase = {
     const { data } = await http.get(`/api/ai/chat/knowledge/search`, {
       params: { project_id: projectId, query, top_k: topK },
     })
-    return data.data ?? data
+    return data
   },
 
   async addDocument(
@@ -639,7 +639,7 @@ export const knowledgeBase = {
     const { data } = await http.get(`/api/ai/chat/knowledge`, {
       params: { project_id: projectId },
     })
-    return data.data ?? data
+    return data
   },
 
   async deleteDocument(knowledgeId: string): Promise<void> {
@@ -648,12 +648,12 @@ export const knowledgeBase = {
 
   async buildIndex(projectId: string): Promise<{ task_id: string }> {
     const { data } = await http.post(`/api/projects/${projectId}/knowledge/index/build`)
-    return data.data ?? data
+    return data
   },
 
   async getIndexStatus(projectId: string): Promise<{ status: string; document_count: number }> {
     const { data } = await http.get(`/api/projects/${projectId}/knowledge/index/status`)
-    return data.data ?? data
+    return data
   },
 }
 

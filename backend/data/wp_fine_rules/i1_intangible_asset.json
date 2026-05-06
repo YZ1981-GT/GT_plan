@@ -1,47 +1,305 @@
 {
   "wp_code": "I1",
   "name": "无形资产",
-  "version": "2025-R1",
-  "account_codes": ["1701", "1702"],
-  "source_files": [{"file": "I1 无形资产、累计摊销及减值准备.xlsx", "sheets": ["底稿目录","无形资产实质性程序 I1A","审定表I1","附注披露信息（上市公司）","附注披露信息（国有企业）","明细表I1-2","调整分录汇总I1-3","无形资产摊销减值政策检查表I1-4","无形资产增加检查表I1-5","无形资产减少明细表I1-6","使用寿命检查表I1-7","无形资产权属检查表I1-8","摊销分配分析表I1-9","摊销测算表（不含减值）I1-10（剩余年限法）","摊销测算表（含减值）I1-11","减值准备测试表I1-12","可收回金额测试I1-13"]}],
+  "version": "2025-R2",
+  "account_codes": [
+    "1701",
+    "1702"
+  ],
+  "source_files": [
+    {
+      "file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "sheets": [
+        "底稿目录",
+        "无形资产实质性程序 I1A",
+        "审定表I1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表I1-2",
+        "调整分录汇总I1-3",
+        "无形资产摊销减值政策检查表I1-4",
+        "无形资产增加检查表I1-5",
+        "无形资产减少明细表I1-6",
+        "使用寿命检查表I1-7",
+        "无形资产权属检查表I1-8",
+        "摊销分配分析表I1-9",
+        "摊销测算表（不含减值）I1-10（剩余年限法）",
+        "摊销测算表（含减值）I1-11",
+        "减值准备测试表I1-12",
+        "可收回金额测试I1-13"
+      ]
+    }
+  ],
   "sheet_rules": [
-    {"code": "I1A", "exact_name": "无形资产实质性程序 I1A", "type": "procedure"},
-    {"code": "I1-1", "exact_name": "审定表I1", "type": "summary", "header_rows": [5,6], "data_start_row": 7,
-      "layout": {"label_col": 1, "columns": {"opening_cost": {"col": 2, "label": "期初原值"}, "increase": {"col": 3, "label": "本期增加"}, "decrease": {"col": 4, "label": "本期减少"}, "closing_cost": {"col": 5, "label": "期末原值"}, "opening_amort": {"col": 6, "label": "期初累计摊销"}, "amort_increase": {"col": 7, "label": "本期摊销"}, "amort_decrease": {"col": 8, "label": "摊销减少"}, "closing_amort": {"col": 9, "label": "期末累计摊销"}, "opening_impairment": {"col": 10, "label": "期初减值"}, "closing_impairment": {"col": 11, "label": "期末减值"}, "closing_book_value": {"col": 12, "label": "期末账面价值"}}},
-      "key_rows": {"land_use": {"row": 7, "label": "土地使用权"}, "patent": {"row": 8, "label": "专利权"}, "software": {"row": 9, "label": "软件"}, "trademark": {"row": 10, "label": "商标权"}, "other": {"row": 11, "label": "其他"}, "total": {"row": 12, "label": "合计", "is_total": true, "report_row": "BS-016"}}},
-    {"code": "I1-note-listed", "exact_name": "附注披露信息（上市公司）", "type": "note_disclosure"},
-    {"code": "I1-note-soe", "exact_name": "附注披露信息（国有企业）", "type": "note_disclosure"},
-    {"code": "I1-2", "exact_name": "明细表I1-2", "type": "detail", "header_rows": [9,10], "data_start_row": 11},
-    {"code": "I1-3", "exact_name": "调整分录汇总I1-3", "type": "adjustment"},
-    {"code": "I1-4", "exact_name": "无形资产摊销减值政策检查表I1-4", "type": "check", "description": "摊销方法/年限/减值政策检查"},
-    {"code": "I1-5", "exact_name": "无形资产增加检查表I1-5", "type": "check", "description": "本期新增无形资产检查（合同/发票/验收）"},
-    {"code": "I1-6", "exact_name": "无形资产减少明细表I1-6", "type": "detail", "description": "本期处置/报废无形资产明细"},
-    {"code": "I1-7", "exact_name": "使用寿命检查表I1-7", "type": "check", "description": "使用寿命合理性评估"},
-    {"code": "I1-8", "exact_name": "无形资产权属检查表I1-8", "type": "check", "description": "权属证书/登记检查"},
-    {"code": "I1-9", "exact_name": "摊销分配分析表I1-9", "type": "analysis", "description": "摊销费用分配到各部门/产品"},
-    {"code": "I1-10", "exact_name": "摊销测算表（不含减值）I1-10（剩余年限法）", "type": "calculation", "description": "摊销独立测算（剩余年限法）"},
-    {"code": "I1-11", "exact_name": "摊销测算表（含减值）I1-11", "type": "calculation", "description": "摊销测算（含减值后调整）"},
-    {"code": "I1-12", "exact_name": "减值准备测试表I1-12", "type": "calculation", "description": "减值迹象判断+减值测试"},
-    {"code": "I1-13", "exact_name": "可收回金额测试I1-13", "type": "calculation", "description": "可收回金额测试（公允价值-处置费用 vs 未来现金流现值）"}
+    {
+      "code": "I1A",
+      "exact_name": "无形资产实质性程序 I1A",
+      "type": "procedure"
+    },
+    {
+      "code": "I1-1",
+      "exact_name": "审定表I1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_cost": {
+            "col": 2,
+            "label": "期初原值"
+          },
+          "increase": {
+            "col": 3,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 4,
+            "label": "本期减少"
+          },
+          "closing_cost": {
+            "col": 5,
+            "label": "期末原值"
+          },
+          "opening_amort": {
+            "col": 6,
+            "label": "期初累计摊销"
+          },
+          "amort_increase": {
+            "col": 7,
+            "label": "本期摊销"
+          },
+          "amort_decrease": {
+            "col": 8,
+            "label": "摊销减少"
+          },
+          "closing_amort": {
+            "col": 9,
+            "label": "期末累计摊销"
+          },
+          "opening_impairment": {
+            "col": 10,
+            "label": "期初减值"
+          },
+          "closing_impairment": {
+            "col": 11,
+            "label": "期末减值"
+          },
+          "closing_book_value": {
+            "col": 12,
+            "label": "期末账面价值"
+          }
+        }
+      },
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-016"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "土地使用权",
+          "专利权",
+          "软件",
+          "商标权",
+          "其他"
+        ]
+      }
+    },
+    {
+      "code": "I1-note-listed",
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "I1-note-soe",
+      "exact_name": "附注披露信息（国有企业）",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "I1-2",
+      "exact_name": "明细表I1-2",
+      "type": "detail",
+      "header_rows": [
+        9,
+        10
+      ],
+      "data_start_row": 11
+    },
+    {
+      "code": "I1-3",
+      "exact_name": "调整分录汇总I1-3",
+      "type": "adjustment"
+    },
+    {
+      "code": "I1-4",
+      "exact_name": "无形资产摊销减值政策检查表I1-4",
+      "type": "check",
+      "description": "摊销方法/年限/减值政策检查"
+    },
+    {
+      "code": "I1-5",
+      "exact_name": "无形资产增加检查表I1-5",
+      "type": "check",
+      "description": "本期新增无形资产检查（合同/发票/验收）"
+    },
+    {
+      "code": "I1-6",
+      "exact_name": "无形资产减少明细表I1-6",
+      "type": "detail",
+      "description": "本期处置/报废无形资产明细"
+    },
+    {
+      "code": "I1-7",
+      "exact_name": "使用寿命检查表I1-7",
+      "type": "check",
+      "description": "使用寿命合理性评估"
+    },
+    {
+      "code": "I1-8",
+      "exact_name": "无形资产权属检查表I1-8",
+      "type": "check",
+      "description": "权属证书/登记检查"
+    },
+    {
+      "code": "I1-9",
+      "exact_name": "摊销分配分析表I1-9",
+      "type": "analysis",
+      "description": "摊销费用分配到各部门/产品"
+    },
+    {
+      "code": "I1-10",
+      "exact_name": "摊销测算表（不含减值）I1-10（剩余年限法）",
+      "type": "calculation",
+      "description": "摊销独立测算（剩余年限法）"
+    },
+    {
+      "code": "I1-11",
+      "exact_name": "摊销测算表（含减值）I1-11",
+      "type": "calculation",
+      "description": "摊销测算（含减值后调整）"
+    },
+    {
+      "code": "I1-12",
+      "exact_name": "减值准备测试表I1-12",
+      "type": "calculation",
+      "description": "减值迹象判断+减值测试"
+    },
+    {
+      "code": "I1-13",
+      "exact_name": "可收回金额测试I1-13",
+      "type": "calculation",
+      "description": "可收回金额测试（公允价值-处置费用 vs 未来现金流现值）"
+    }
   ],
   "cross_references": [
-    {"from": "I1-1.total.C12", "to": "report://BS/BS-016#期末", "description": "审定表账面价值合计 = 报表无形资产"},
-    {"from": "I1-1.total.C12", "to": "tb://1701#审定数", "description": "审定表合计 = 试算表无形资产审定数"},
-    {"from": "I1-2.合计", "to": "I1-1.total.C5", "description": "明细表原值合计 = 审定表期末原值合计"},
-    {"from": "I1-10.摊销合计", "to": "I1-1.total.C7", "description": "摊销测算合计 = 审定表本期摊销合计"},
-    {"from": "I1-1.total.C12", "to": "note://五、12#账面价值", "description": "审定表账面价值 → 附注无形资产"},
-    {"from": "I1-12.减值", "to": "I1-1.total.C11", "description": "减值测试结果 = 审定表期末减值"}
+    {
+      "from": "I1-1.total.C12",
+      "to": "report://BS/BS-016#期末",
+      "description": "审定表账面价值合计 = 报表无形资产"
+    },
+    {
+      "from": "I1-1.total.C12",
+      "to": "tb://1701#审定数",
+      "description": "审定表合计 = 试算表无形资产审定数"
+    },
+    {
+      "from": "I1-2.合计",
+      "to": "I1-1.total.C5",
+      "description": "明细表原值合计 = 审定表期末原值合计"
+    },
+    {
+      "from": "I1-10.摊销合计",
+      "to": "I1-1.total.C7",
+      "description": "摊销测算合计 = 审定表本期摊销合计"
+    },
+    {
+      "from": "I1-1.total.C12",
+      "to": "note://五、12#账面价值",
+      "description": "审定表账面价值 → 附注无形资产"
+    },
+    {
+      "from": "I1-12.减值",
+      "to": "I1-1.total.C11",
+      "description": "减值测试结果 = 审定表期末减值"
+    },
+    {
+      "from": "I1-1.total",
+      "to": "REPORT('BS-026','期末')",
+      "description": "审定表合计 = 报表无形资产"
+    }
   ],
   "audit_checks": [
-    {"code": "I1-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表账面价值合计 = 试算表无形资产审定数"},
-    {"code": "I1-CHK-02", "type": "balance", "severity": "blocking", "description": "审定表账面价值合计 = 报表无形资产行"},
-    {"code": "I1-CHK-03", "type": "formula", "severity": "blocking", "description": "账面价值 = 原值 - 累计摊销 - 减值准备（逐行）"},
-    {"code": "I1-CHK-04", "type": "cross_ref", "severity": "warning", "description": "明细表原值合计 = 审定表期末原值"},
-    {"code": "I1-CHK-05", "type": "movement", "severity": "warning", "description": "期初原值 + 增加 - 减少 = 期末原值"},
-    {"code": "I1-CHK-06", "type": "calculation", "severity": "warning", "description": "摊销独立测算与账面一致（I1-10）"},
-    {"code": "I1-CHK-07", "type": "check", "severity": "warning", "description": "新增无形资产已检查（合同/发票/验收，I1-5）"},
-    {"code": "I1-CHK-08", "type": "check", "severity": "warning", "description": "权属证书已检查（I1-8）"},
-    {"code": "I1-CHK-09", "type": "check", "severity": "info", "description": "使用寿命合理性已评估（I1-7）"},
-    {"code": "I1-CHK-10", "type": "calculation", "severity": "warning", "description": "减值测试已执行（有减值迹象时，I1-12/I1-13）"}
+    {
+      "code": "I1-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表账面价值合计 = 试算表无形资产审定数"
+    },
+    {
+      "code": "I1-CHK-02",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表账面价值合计 = 报表无形资产行"
+    },
+    {
+      "code": "I1-CHK-03",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "账面价值 = 原值 - 累计摊销 - 减值准备（逐行）"
+    },
+    {
+      "code": "I1-CHK-04",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表原值合计 = 审定表期末原值"
+    },
+    {
+      "code": "I1-CHK-05",
+      "type": "movement",
+      "severity": "warning",
+      "description": "期初原值 + 增加 - 减少 = 期末原值"
+    },
+    {
+      "code": "I1-CHK-06",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "摊销独立测算与账面一致（I1-10）"
+    },
+    {
+      "code": "I1-CHK-07",
+      "type": "check",
+      "severity": "warning",
+      "description": "新增无形资产已检查（合同/发票/验收，I1-5）"
+    },
+    {
+      "code": "I1-CHK-08",
+      "type": "check",
+      "severity": "warning",
+      "description": "权属证书已检查（I1-8）"
+    },
+    {
+      "code": "I1-CHK-09",
+      "type": "check",
+      "severity": "info",
+      "description": "使用寿命合理性已评估（I1-7）"
+    },
+    {
+      "code": "I1-CHK-10",
+      "type": "calculation",
+      "severity": "warning",
+      "description": "减值测试已执行（有减值迹象时，I1-12/I1-13）"
+    }
   ]
 }

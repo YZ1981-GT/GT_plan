@@ -1,38 +1,224 @@
 {
   "wp_code": "K9",
   "name": "管理费用",
-  "version": "2025-R1",
-  "account_codes": ["6602"],
-  "source_files": [{"file": "K9 管理费用.xlsx", "sheets": ["底稿目录","实质性程序表K9A","审定表K9-1","附注披露信息（上市公司）","附注披露信息（国企）","明细表K9-2","调整分录汇总K9-3","实质性分析K9-4","合同检查表K9-5","截止性测试(从记账凭证至原始凭证）K9-6","截止性测试（从原始凭证至记账凭证）K9-7","管理费用检查表K9-8"]}],
+  "version": "2025-R2",
+  "account_codes": [
+    "6602"
+  ],
+  "source_files": [
+    {
+      "file": "K9 管理费用.xlsx",
+      "sheets": [
+        "底稿目录",
+        "实质性程序表K9A",
+        "审定表K9-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国企）",
+        "明细表K9-2",
+        "调整分录汇总K9-3",
+        "实质性分析K9-4",
+        "合同检查表K9-5",
+        "截止性测试(从记账凭证至原始凭证）K9-6",
+        "截止性测试（从原始凭证至记账凭证）K9-7",
+        "管理费用检查表K9-8"
+      ]
+    }
+  ],
   "sheet_rules": [
-    {"code": "K9A", "exact_name": "实质性程序表K9A", "type": "procedure"},
-    {"code": "K9-1", "exact_name": "审定表K9-1", "type": "summary", "header_rows": [5,6], "data_start_row": 7,
-      "layout": {"label_col": 1, "columns": {"current_unadjusted": {"col": 2, "label": "本期未审数"}, "current_adjustment": {"col": 3, "label": "本期调整"}, "current_audited": {"col": 4, "label": "本期审定数"}, "prior_unadjusted": {"col": 5, "label": "上期未审数"}, "prior_audited": {"col": 6, "label": "上期审定数"}, "change_amount": {"col": 7, "label": "变动额"}, "change_rate": {"col": 8, "label": "变动率"}}},
-      "key_rows": {"salary": {"row": 7, "label": "职工薪酬"}, "depreciation": {"row": 8, "label": "折旧费"}, "amortization": {"row": 9, "label": "摊销费"}, "office": {"row": 10, "label": "办公费"}, "travel": {"row": 11, "label": "差旅费"}, "consulting": {"row": 12, "label": "咨询费"}, "other": {"row": 13, "label": "其他"}, "total": {"row": 14, "label": "合计", "is_total": true}}},
-    {"code": "K9-note-listed", "exact_name": "附注披露信息（上市公司）", "type": "note_disclosure"},
-    {"code": "K9-note-soe", "exact_name": "附注披露信息（国企）", "type": "note_disclosure"},
-    {"code": "K9-2", "exact_name": "明细表K9-2", "type": "detail"},
-    {"code": "K9-3", "exact_name": "调整分录汇总K9-3", "type": "adjustment"},
-    {"code": "K9-4", "exact_name": "实质性分析K9-4", "type": "analysis", "description": "管理费用月度/类别分析（异常波动识别）"},
-    {"code": "K9-5", "exact_name": "合同检查表K9-5", "type": "check", "description": "大额管理费用合同检查"},
-    {"code": "K9-6", "exact_name": "截止性测试(从记账凭证至原始凭证）K9-6", "type": "cutoff"},
-    {"code": "K9-7", "exact_name": "截止性测试（从原始凭证至记账凭证）K9-7", "type": "cutoff"},
-    {"code": "K9-8", "exact_name": "管理费用检查表K9-8", "type": "check", "description": "管理费用综合检查"}
+    {
+      "code": "K9A",
+      "exact_name": "实质性程序表K9A",
+      "type": "procedure"
+    },
+    {
+      "code": "K9-1",
+      "exact_name": "审定表K9-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "current_unadjusted": {
+            "col": 2,
+            "label": "本期未审数"
+          },
+          "current_adjustment": {
+            "col": 3,
+            "label": "本期调整"
+          },
+          "current_audited": {
+            "col": 4,
+            "label": "本期审定数"
+          },
+          "prior_unadjusted": {
+            "col": 5,
+            "label": "上期未审数"
+          },
+          "prior_audited": {
+            "col": 6,
+            "label": "上期审定数"
+          },
+          "change_amount": {
+            "col": 7,
+            "label": "变动额"
+          },
+          "change_rate": {
+            "col": 8,
+            "label": "变动率"
+          }
+        }
+      },
+      "key_rows": {
+        "total": {
+          "row": 14,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-005"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "职工薪酬",
+          "折旧费",
+          "摊销费",
+          "办公费",
+          "差旅费"
+        ]
+      }
+    },
+    {
+      "code": "K9-note-listed",
+      "exact_name": "附注披露信息（上市公司）",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "K9-note-soe",
+      "exact_name": "附注披露信息（国企）",
+      "type": "note_disclosure"
+    },
+    {
+      "code": "K9-2",
+      "exact_name": "明细表K9-2",
+      "type": "detail"
+    },
+    {
+      "code": "K9-3",
+      "exact_name": "调整分录汇总K9-3",
+      "type": "adjustment"
+    },
+    {
+      "code": "K9-4",
+      "exact_name": "实质性分析K9-4",
+      "type": "analysis",
+      "description": "管理费用月度/类别分析（异常波动识别）"
+    },
+    {
+      "code": "K9-5",
+      "exact_name": "合同检查表K9-5",
+      "type": "check",
+      "description": "大额管理费用合同检查"
+    },
+    {
+      "code": "K9-6",
+      "exact_name": "截止性测试(从记账凭证至原始凭证）K9-6",
+      "type": "cutoff"
+    },
+    {
+      "code": "K9-7",
+      "exact_name": "截止性测试（从原始凭证至记账凭证）K9-7",
+      "type": "cutoff"
+    },
+    {
+      "code": "K9-8",
+      "exact_name": "管理费用检查表K9-8",
+      "type": "check",
+      "description": "管理费用综合检查"
+    }
   ],
   "cross_references": [
-    {"from": "K9-1.total.C4", "to": "tb://6602#审定数", "description": "审定表合计 = 试算表管理费用审定数"},
-    {"from": "K9-2.合计", "to": "K9-1.total.C4", "description": "明细表合计 = 审定表合计"},
-    {"from": "K9-1.salary", "to": "J1-1.管理费用分配", "description": "职工薪酬 → 应付职工薪酬分配表"},
-    {"from": "K9-1.depreciation", "to": "H1-1.折旧分配", "description": "折旧费 → 固定资产折旧分配表"}
+    {
+      "from": "K9-1.R14.C4.C4",
+      "to": "tb://6602#审定数",
+      "description": "审定表合计 = 试算表管理费用审定数"
+    },
+    {
+      "from": "K9-2.合计",
+      "to": "K9-1.R14.C4.C4",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K9-1.salary",
+      "to": "J1-1.管理费用分配",
+      "description": "职工薪酬 → 应付职工薪酬分配表"
+    },
+    {
+      "from": "K9-1.depreciation",
+      "to": "H1-1.折旧分配",
+      "description": "折旧费 → 固定资产折旧分配表"
+    },
+    {
+      "from": "K9-1.R14.C4",
+      "to": "REPORT('IS-005','本期')",
+      "description": "审定表合计 = 报表管理费用"
+    }
   ],
   "audit_checks": [
-    {"code": "K9-CHK-01", "type": "balance", "severity": "blocking", "description": "审定表合计 = 试算表管理费用审定数"},
-    {"code": "K9-CHK-02", "type": "cross_ref", "severity": "warning", "description": "明细表合计 = 审定表合计"},
-    {"code": "K9-CHK-03", "type": "formula", "severity": "warning", "description": "各费用项目求和 = 合计"},
-    {"code": "K9-CHK-04", "type": "analysis", "severity": "info", "description": "月度/类别分析无异常波动（K9-4）"},
-    {"code": "K9-CHK-05", "type": "cutoff", "severity": "warning", "description": "截止测试无跨期事项（K9-6/K9-7）"},
-    {"code": "K9-CHK-06", "type": "check", "severity": "info", "description": "大额合同已检查（K9-5）"},
-    {"code": "K9-CHK-07", "type": "movement", "severity": "info", "description": "本期vs上期变动率合理"},
-    {"code": "K9-CHK-08", "type": "cross_ref", "severity": "info", "description": "职工薪酬与J1薪酬分配表一致"}
+    {
+      "code": "K9-CHK-01",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 试算表管理费用审定数"
+    },
+    {
+      "code": "K9-CHK-02",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "code": "K9-CHK-03",
+      "type": "formula",
+      "severity": "warning",
+      "description": "各费用项目求和 = 合计"
+    },
+    {
+      "code": "K9-CHK-04",
+      "type": "analysis",
+      "severity": "info",
+      "description": "月度/类别分析无异常波动（K9-4）"
+    },
+    {
+      "code": "K9-CHK-05",
+      "type": "cutoff",
+      "severity": "warning",
+      "description": "截止测试无跨期事项（K9-6/K9-7）"
+    },
+    {
+      "code": "K9-CHK-06",
+      "type": "check",
+      "severity": "info",
+      "description": "大额合同已检查（K9-5）"
+    },
+    {
+      "code": "K9-CHK-07",
+      "type": "movement",
+      "severity": "info",
+      "description": "本期vs上期变动率合理"
+    },
+    {
+      "code": "K9-CHK-08",
+      "type": "cross_ref",
+      "severity": "info",
+      "description": "职工薪酬与J1薪酬分配表一致"
+    }
   ]
 }

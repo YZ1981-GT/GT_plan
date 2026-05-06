@@ -46,6 +46,7 @@ def _to_project_response(project: Project) -> ProjectCreateResponse:
         audit_year=_extract_project_audit_year(project),
         project_type=project.project_type.value if project.project_type else None,
         status=project.status.value,
+        template_type=project.template_type,
         report_scope=project.report_scope,
         parent_project_id=project.parent_project_id,
         consol_level=project.consol_level or 1,

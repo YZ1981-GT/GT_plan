@@ -1,67 +1,66 @@
 <template>
-  <div class="gt-report-view gt-fade-in">
+  <div class="gt-report-view gt-fade-in" :class="{ 'gt-fullscreen': rvFullscreen }">
     <!-- 固定顶部区域 -->
     <div class="gt-rv-sticky-header">
       <!-- 页面横幅 -->
-      <div class="gt-rv-banner">
-        <!-- 第一行：标题 + 信息选择器 -->
-        <div class="gt-rv-banner-row1">
-          <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="goBack">← 返回</el-button>
-          <h2 class="gt-rv-title">财务报表</h2>
-          <div class="gt-rv-info-bar">
-            <div class="gt-rv-info-item">
-              <span class="gt-rv-info-label">单位</span>
-              <el-select v-model="selectedProjectId" size="small" class="gt-rv-unit-select" filterable @change="onProjectChange">
-                <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-              </el-select>
-            </div>
-            <div class="gt-rv-info-sep" />
-            <div class="gt-rv-info-item">
-              <span class="gt-rv-info-label">年度</span>
-              <el-select v-model="selectedYear" size="small" class="gt-rv-year-select" @change="onYearChange">
-                <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-              </el-select>
-            </div>
-            <div class="gt-rv-info-sep" />
-            <div class="gt-rv-info-item">
-              <span class="gt-rv-info-label">模板</span>
-              <el-select v-model="selectedTemplateType" size="small" class="gt-rv-type-select" @change="onTemplateTypeChange">
-                <el-option label="国企版" value="soe" />
-                <el-option label="上市版" value="listed" />
-              </el-select>
-            </div>
-            <div class="gt-rv-info-sep" />
-            <div class="gt-rv-info-item">
-              <span class="gt-rv-info-label">口径</span>
-              <span class="gt-rv-info-badge">{{ scopeLabel }}</span>
-            </div>
-            <div class="gt-rv-info-sep" />
-            <div class="gt-rv-info-item">
-              <span class="gt-rv-info-label">模式</span>
-              <el-radio-group v-model="reportMode" size="small" @change="fetchReport" class="gt-rv-mode-radio">
-                <el-radio-button value="audited">已审</el-radio-button>
-                <el-radio-button value="unadjusted">未审</el-radio-button>
-                <el-radio-button value="compare">对比</el-radio-button>
-              </el-radio-group>
-            </div>
+      <GtPageHeader title="财务报表" :show-sync-status="true" @back="goBack">
+        <GtInfoBar
+          :show-unit="true"
+          :show-year="true"
+          :show-template="true"
+          :show-scope="true"
+          :unit-value="selectedProjectId"
+          :year-value="selectedYear"
+          :template-value="selectedTemplateType"
+          :scope-label="scopeLabel"
+          :badges="[
+            { label: '单位', value: displayPrefs.unitSuffix },
+          ]"
+          @unit-change="onProjectChange"
+          @year-change="onYearChange"
+          @template-change="onTemplateTypeChange"
+        >
+          <div class="gt-info-bar__sep" />
+          <div class="gt-info-bar__item">
+            <span class="gt-info-bar__label" style="font-size:10px;color:rgba(255,255,255,0.55)">模式</span>
+            <el-radio-group v-model="reportMode" size="small" @change="fetchReport" class="gt-rv-mode-radio">
+              <el-radio-button value="audited">已审</el-radio-button>
+              <el-radio-button value="unadjusted">未审</el-radio-button>
+              <el-radio-button value="compare">对比</el-radio-button>
+            </el-radio-group>
           </div>
-        </div>
-        <!-- 第二行：操作按钮 -->
-        <div class="gt-rv-banner-row2">
-          <el-tooltip content="根据试算表审定数重新计算报表（需先导入数据+科目映射）" placement="bottom">
-            <el-button size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
-          </el-tooltip>
-          <el-tooltip content="执行逻辑审核和合理性检查（需先生成报表）" placement="bottom">
-            <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 审核</el-button>
-          </el-tooltip>
-          <el-button size="small" @click="onExportExcel">📤 导出Excel</el-button>
-          <el-button size="small" @click="onEditConfig">📝 编辑结构</el-button>
-          <el-button size="small" @click="showFormulaManager = true">⚙️ 公式管理</el-button>
-          <el-tooltip content="配置国企版↔上市版报表行次映射规则" placement="bottom">
-            <el-button size="small" @click="showMappingDialog = true">🔄 转换规则</el-button>
-          </el-tooltip>
-        </div>
-      </div>
+        </GtInfoBar>
+        <template #actions>
+          <GtToolbar
+            :show-copy="true"
+            :show-fullscreen="true"
+            :is-fullscreen="rvFullscreen"
+            :show-export="true"
+            :show-import="true"
+            :show-formula="true"
+            @copy="copyReportTable"
+            @fullscreen="toggleRvFullscreen()"
+            @export="onExportExcel"
+            @import="showReportImport = true"
+            @formula="showFormulaManager = true"
+          >
+            <template #left>
+              <el-tooltip content="根据试算表审定数重新计算报表（需先导入数据+科目映射）" placement="bottom">
+                <el-button size="small" @click="onGenerate" :loading="genLoading">🔄 刷新数据</el-button>
+              </el-tooltip>
+              <el-tooltip content="执行逻辑审核和合理性检查（需先生成报表）" placement="bottom">
+                <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 审核</el-button>
+              </el-tooltip>
+            </template>
+            <template #right-extra>
+              <el-button size="small" @click="onEditConfig">📝 编辑结构</el-button>
+              <el-tooltip content="配置国企版↔上市版报表行次映射规则" placement="bottom">
+                <el-button size="small" @click="showMappingDialog = true">🔄 转换规则</el-button>
+              </el-tooltip>
+            </template>
+          </GtToolbar>
+        </template>
+      </GtPageHeader>
 
       <!-- Tab 切换 -->
       <el-tabs v-model="activeTab" @tab-change="onTabChange">
@@ -97,6 +96,22 @@
       <span>📍 正在查看溯源数据 — {{ activeTabLabel }}</span>
       <el-button size="small" type="primary" round @click="onTraceReturn">↩ 返回审核</el-button>
     </div>
+
+    <!-- 搜索栏（Ctrl+F 触发，表格上方） -->
+    <TableSearchBar
+      :is-visible="rvSearch.isVisible.value"
+      :keyword="rvSearch.keyword.value"
+      :match-info="rvSearch.matchInfo.value"
+      :has-matches="rvSearch.matches.value.length > 0"
+      :case-sensitive="rvSearch.caseSensitive.value"
+      :show-replace="false"
+      @update:keyword="rvSearch.keyword.value = $event"
+      @update:case-sensitive="rvSearch.caseSensitive.value = $event"
+      @search="rvSearch.search()"
+      @next="rvSearch.nextMatch()"
+      @prev="rvSearch.prevMatch()"
+      @close="rvSearch.close()"
+    />
 
     <!-- 所有者权益变动表 — 矩阵视图 -->
     <div v-if="activeTab === 'equity_statement'" class="gt-rv-equity-matrix" v-loading="loading">
@@ -178,19 +193,32 @@
               <th class="gt-rv-eq-th-prior-col">优先股</th><th class="gt-rv-eq-th-prior-col">永续债</th><th class="gt-rv-eq-th-prior-col">其他</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="rows.length">
             <tr v-for="row in rows" :key="row.row_code"
                 :class="{ 'gt-rv-eq-total-row': row.is_total_row, 'gt-rv-eq-category': row.indent_level === 0 && !row.is_total_row }">
               <td class="gt-rv-eq-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">
                 {{ row.row_name }}
               </td>
-              <td v-for="col in eqColumns" :key="'cv-' + col.key" class="gt-rv-eq-td-amount">-</td>
-              <td v-for="col in eqColumns" :key="'pv-' + col.key" class="gt-rv-eq-td-amount gt-rv-eq-td-prior">-</td>
+              <!-- 本年各列：仅合计列显示 current_period_amount，其余列显示 0 -->
+              <td v-for="col in eqColumns" :key="'cv-' + col.key" class="gt-rv-eq-td-amount">
+                <template v-if="col.key === 'total'">{{ fmt(row.current_period_amount) }}</template>
+                <template v-else>{{ fmt(0) }}</template>
+              </td>
+              <!-- 上年各列：仅合计列显示 prior_period_amount，其余列显示 0 -->
+              <td v-for="col in eqColumns" :key="'pv-' + col.key" class="gt-rv-eq-td-amount gt-rv-eq-td-prior">
+                <template v-if="col.key === 'total'">{{ fmt(row.prior_period_amount) }}</template>
+                <template v-else>{{ fmt(0) }}</template>
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else>
+            <tr>
+              <td :colspan="1 + eqTotalCols * 2" class="gt-rv-eq-td-empty">暂无数据</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="gt-rv-eq-hint">提示：权益变动表为矩阵结构，各列金额需在项目导入数据后自动填充或手动编辑。</p>
+      <p v-if="rows.length === 0" class="gt-rv-eq-hint">提示：权益变动表为矩阵结构，各列金额需在项目导入数据后自动填充。</p>
     </div>
 
     <!-- 资产减值准备表 — 矩阵视图 -->
@@ -210,16 +238,25 @@
               <th v-for="col in impDecCols" :key="'dec-' + col.key" class="gt-rv-eq-th-col">{{ col.label }}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="rows.length">
             <tr v-for="row in rows" :key="row.row_code"
                 :class="{ 'gt-rv-eq-total-row': row.is_total_row }">
               <td class="gt-rv-eq-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">
                 {{ row.row_name }}
               </td>
-              <td class="gt-rv-eq-td-amount">-</td>
-              <td v-for="col in impIncCols" :key="'iv-' + col.key" class="gt-rv-eq-td-amount">-</td>
-              <td v-for="col in impDecCols" :key="'dv-' + col.key" class="gt-rv-eq-td-amount">-</td>
-              <td class="gt-rv-eq-td-amount" style="font-weight: 600;">-</td>
+              <!-- 年初账面余额：用 prior_period_amount 表示 -->
+              <td class="gt-rv-eq-td-amount">{{ fmt(row.prior_period_amount) }}</td>
+              <!-- 本期增加各列：显示 0（矩阵细列暂无独立字段） -->
+              <td v-for="col in impIncCols" :key="'iv-' + col.key" class="gt-rv-eq-td-amount">{{ fmt(0) }}</td>
+              <!-- 本期减少各列：显示 0 -->
+              <td v-for="col in impDecCols" :key="'dv-' + col.key" class="gt-rv-eq-td-amount">{{ fmt(0) }}</td>
+              <!-- 期末账面余额：用 current_period_amount 表示 -->
+              <td class="gt-rv-eq-td-amount" style="font-weight: 600;">{{ fmt(row.current_period_amount) }}</td>
+            </tr>
+          </tbody>
+          <tbody v-else>
+            <tr>
+              <td :colspan="2 + impIncCols.length + impDecCols.length + 1" class="gt-rv-eq-td-empty">暂无数据</td>
             </tr>
           </tbody>
         </table>
@@ -227,14 +264,18 @@
     </div>
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
-    <el-table v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="rows" v-loading="loading" style="width: 100%"
-      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight">
+    <el-table ref="rvTableRef" v-if="reportMode !== 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="rows" v-loading="loading" style="width: 100%"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
+      :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight"
+      :cell-class-name="rvCellClassName"
+      @cell-click="onRvCellClick"
+      @cell-contextmenu="onRvCellContextMenu">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
           <span style="color: #999;">{{ $index + 1 }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="项目" min-width="300" :resizable="true">
+      <el-table-column label="项目" min-width="300" :resizable="true" fixed>
         <template #default="{ row }">
           <span :class="{ 'gt-rv-category': !row.current_period_amount && !row.is_total_row && (row.indent_level || 0) === 0 }"
                 :style="{ paddingLeft: (row.indent_level || 0) * 18 + 'px', fontWeight: row.is_total_row ? 700 : 400, fontSize: '13px' }">
@@ -245,22 +286,29 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="本期金额" min-width="140" align="right" header-align="center" :resizable="true">
-        <template #default="{ row }">
-          <span class="gt-rv-amount-cell" @click="onDrilldown(row)">
-            {{ fmtAmt(row.current_period_amount) }}
-          </span>
+      <el-table-column label="本期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.current_period_amount) || 0) - (Number(b.current_period_amount) || 0)">
+        <template #default="{ row, $index }">
+          <GtAmountCell
+            :value="row.current_period_amount"
+            :prior-value="row.prior_period_amount"
+            :clickable="true"
+            :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
+            @click="onDrilldown(row)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="上期金额" min-width="140" align="right" header-align="center" :resizable="true">
-        <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.prior_period_amount) }}</span>
+      <el-table-column label="上期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.prior_period_amount) || 0) - (Number(b.prior_period_amount) || 0)">
+        <template #default="{ row, $index }">
+          <CommentTooltip :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)">
+            <span class="gt-rv-amount-cell-readonly" :class="displayPrefs.amountClass(row.prior_period_amount)">{{ fmt(row.prior_period_amount) }}</span>
+          </CommentTooltip>
         </template>
       </el-table-column>
     </el-table>
 
     <!-- 报表表格 — 对比视图（非权益变动表） -->
     <el-table v-if="reportMode === 'compare' && activeTab !== 'equity_statement' && activeTab !== 'impairment_provision'" :data="compareRows" v-loading="loading" style="width: 100%"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
       :row-class-name="compareRowClassName" border size="small" :max-height="tableMaxHeight">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
@@ -274,20 +322,29 @@
       </el-table-column>
       <el-table-column label="未审金额" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.unadjusted_amount) }}</span>
+          <span class="gt-rv-amount-cell-readonly">{{ fmt(row.unadjusted_amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="调整影响" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span :class="['gt-rv-adjustment', { 'has-diff': row.adjustment && row.adjustment !== 0 }]">{{ fmtAmt(row.adjustment) }}</span>
+          <span :class="['gt-rv-adjustment', { 'has-diff': row.adjustment && row.adjustment !== 0 }]">{{ fmt(row.adjustment) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="已审金额" min-width="130" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span class="gt-rv-amount-cell-readonly" style="font-weight: 600;">{{ fmtAmt(row.audited_amount) }}</span>
+          <span class="gt-rv-amount-cell-readonly" style="font-weight: 600;">{{ fmt(row.audited_amount) }}</span>
+        </template>
+      </el-table-column>
+      <!-- 任务 12.7.1：对比视图新增"上年审定数"列（需求 24.1/24.2） -->
+      <el-table-column label="上年审定数" min-width="130" align="right" header-align="center" :resizable="true">
+        <template #default="{ row }">
+          <span class="gt-rv-amount-cell-readonly" style="color: #666;">{{ fmt(row.prior_period_amount) }}</span>
         </template>
       </el-table-column>
     </el-table>
+    <!-- 选中区域状态栏 -->
+    <SelectionBar :stats="rvCtx.selectionStats()" />
+
     </div><!-- /gt-rv-table-area -->
 
     <!-- 穿透弹窗 -->
@@ -301,7 +358,7 @@
           <el-table-column prop="code" label="科目编码" width="120" />
           <el-table-column prop="name" label="科目名称" min-width="200" />
           <el-table-column label="金额" width="150" align="right">
-            <template #default="{ row }">{{ fmtAmt(row.amount) }}</template>
+            <template #default="{ row }">{{ fmt(row.amount) }}</template>
           </el-table-column>
           <el-table-column label="底稿" width="100" align="center">
             <template #default="{ row }">
@@ -437,18 +494,18 @@
           </el-table-column>
           <el-table-column label="期望值" width="120" align="right">
             <template #default="{ row }">
-              <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.expected) }}</span>
+              <span class="gt-rv-amount-cell-readonly">{{ fmt(row.expected) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="实际值" width="120" align="right">
             <template #default="{ row }">
-              <span class="gt-rv-amount-cell-readonly">{{ fmtAmt(row.actual) }}</span>
+              <span class="gt-rv-amount-cell-readonly">{{ fmt(row.actual) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="差额" width="110" align="right">
             <template #default="{ row }">
               <span :style="{ color: row.diff && row.diff !== '0' && row.diff !== '0.00' ? '#d94840' : '#999', fontSize: '12px', fontWeight: row.diff && row.diff !== '0' ? 600 : 400 }">
-                {{ fmtAmt(row.diff) }}
+                {{ fmt(row.diff) }}
               </span>
             </template>
           </el-table-column>
@@ -507,16 +564,61 @@
         </el-button>
       </div>
     </el-dialog>
+
+    <!-- 统一导入弹窗 -->
+    <UnifiedImportDialog
+      v-model="showReportImport"
+      import-type="report"
+      :project-id="projectId"
+      :year="year"
+      :sub-type="activeTab"
+      @imported="onReportImported"
+    />
   </div>
+
+  <!-- 右键菜单（统一组件） -->
+  <CellContextMenu
+    :visible="rvCtx.contextMenu.visible"
+    :x="rvCtx.contextMenu.x"
+    :y="rvCtx.contextMenu.y"
+    :item-name="rvCtx.contextMenu.itemName"
+    :value="rvCtx.selectedCells.value.length === 1 ? rvCtx.selectedCells.value[0]?.value : undefined"
+    :multi-count="rvCtx.selectedCells.value.length"
+    @copy="onRvCtxCopy"
+    @formula="onRvCtxFormula"
+    @sum="onRvCtxSum"
+    @compare="onRvCtxCompare"
+  >
+    <div class="gt-ucell-ctx-item" @click="onRvCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看穿透</div>
+    <div class="gt-ucell-ctx-item" @click="onRvCtxGoNote"><span class="gt-ucell-ctx-icon">📝</span> 跳转附注</div>
+  </CellContextMenu>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import { useCellSelection } from '@/composables/useCellSelection'
+import CellContextMenu from '@/components/common/CellContextMenu.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
+import SelectionBar from '@/components/common/SelectionBar.vue'
+import TableSearchBar from '@/components/common/TableSearchBar.vue'
+import CommentTooltip from '@/components/common/CommentTooltip.vue'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import { useCellComments } from '@/composables/useCellComments'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useTableSearch } from '@/composables/useTableSearch'
+import { fmtAmount } from '@/utils/formatters'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useProjectStore } from '@/stores/project'
+import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
+import { withLoading } from '@/composables/useLoading'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -525,7 +627,9 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const projectId = computed(() => route.params.projectId as string)
+const projectStore = useProjectStore()
+
+const projectId = computed(() => projectStore.projectId)
 
 function goBack() {
   router.push(`/projects`)
@@ -543,20 +647,9 @@ const isConsolidated = computed(() => reportScope.value === 'consolidated')
 const _templateTypeLabel = computed(() => templateType.value === 'listed' ? '上市版' : '国企版')
 const scopeLabel = computed(() => reportScope.value === 'consolidated' ? '合并' : '单体')
 
-// 单位（项目）选择器
+// 单位（项目）选择器 — 使用 projectStore
 const selectedProjectId = ref('')
-const projectOptions = ref<Array<{ id: string; name: string }>>([])
-
-async function loadProjectOptions() {
-  try {
-    const { data: raw } = await http.get('/api/projects', { validateStatus: (s: number) => s < 600 })
-    const list = raw?.data ?? raw ?? []
-    projectOptions.value = (Array.isArray(list) ? list : []).map((p: any) => ({
-      id: p.id,
-      name: p.client_name || p.name || p.id,
-    }))
-  } catch { /* ignore */ }
-}
+const projectOptions = computed(() => projectStore.projectOptions)
 
 function onProjectChange(newId: string) {
   router.push({ path: `/projects/${newId}/reports`, query: route.query })
@@ -564,13 +657,10 @@ function onProjectChange(newId: string) {
 
 // 年度选择器
 const selectedYear = ref(new Date().getFullYear())
-const yearOptions = computed(() => {
-  const cur = new Date().getFullYear()
-  return Array.from({ length: 5 }, (_, i) => cur - i)
-})
+const yearOptions = computed(() => projectStore.yearOptions)
 function onYearChange(val: number) {
   selectedYear.value = val
-  projectYear.value = val
+  projectStore.changeYear(val)
   fetchReport()
 }
 
@@ -608,18 +698,18 @@ const totalRuleCount = computed(() => Object.values(allMappingRules.value).flat(
 
 async function loadPresetForType(rt: string) {
   // 用后端 preset API（含同义词表+模糊匹配）
-  const { data: presetData } = await http.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
+  const presetData = await api.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
     params: { report_type: rt, scope: reportScope.value },
     validateStatus: (s: number) => s < 600,
   })
-  const preset = presetData?.data ?? presetData ?? []
+  const preset = presetData ?? []
 
   // 同时加载上市版行次作为下拉选项
-  const { data: listedData } = await http.get('/api/report-config', {
+  const listedData = await api.get('/api/report-config', {
     params: { applicable_standard: `listed_${reportScope.value}`, report_type: rt },
     validateStatus: (s: number) => s < 600,
   })
-  const listedRows = listedData?.data ?? listedData ?? []
+  const listedRows = listedData ?? []
   allListedOptions.value[rt] = listedRows.map((r: any) => ({ code: r.row_code, name: r.row_name }))
 
   allMappingRules.value[rt] = preset.map((p: any) => ({
@@ -650,7 +740,7 @@ async function saveMappingRulesAll() {
       const rules = allMappingRules.value[rt.key] || []
       const mapped = rules.filter(r => r.listed_row_code)
       if (mapped.length > 0) {
-        await http.post(`/api/projects/${projectId.value}/report-mapping`, {
+        await api.post(`/api/projects/${projectId.value}/report-mapping`, {
           report_type: rt.key,
           scope: reportScope.value,
           rules: mapped.map(r => ({ soe_row_code: r.soe_row_code, listed_row_code: r.listed_row_code })),
@@ -701,6 +791,7 @@ const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().g
 const loading = ref(false)
 const genLoading = ref(false)
 const checkLoading = ref(false)
+const showReportImport = ref(false)
 const syncLoading = ref(false)
 const activeTab = ref('balance_sheet')
 const reportMode = ref('audited')
@@ -715,11 +806,13 @@ function updateTableHeight() {
 onMounted(() => {
   updateTableHeight()
   window.addEventListener('resize', updateTableHeight)
-  loadProjectOptions()
+  document.addEventListener('keydown', onKeydown)
+  projectStore.loadProjectOptions()
   selectedProjectId.value = projectId.value
 })
 onUnmounted(() => {
   window.removeEventListener('resize', updateTableHeight)
+  document.removeEventListener('keydown', onKeydown)
 })
 const rows = ref<ReportRow[]>([])
 
@@ -787,13 +880,6 @@ const impDecCols = [
   { key: 'dec_total', label: '合计' },
 ]
 
-function fmtAmt(v: string | number | null | undefined): string {
-  if (v === null || v === undefined) return '-'
-  const n = typeof v === 'string' ? parseFloat(v) || 0 : v
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 // 报表行→附注跳转
 const _ROW_NOTE_MAP: Record<string, string> = {
   'BS-002': '五、1', 'BS-003': '五、2', 'BS-004': '五、2', 'BS-005': '五、3',
@@ -829,7 +915,7 @@ async function ensureProjectYear() {
   }
   try {
     // 直接调用项目详情 + wizard 获取完整信息
-    const { data: projRaw } = await http.get(`/api/projects/${projectId.value}`, {
+    const projRaw = await api.get(`/api/projects/${projectId.value}`, {
       validateStatus: (s: number) => s < 600,
     })
     const proj = projRaw?.data ?? projRaw ?? projRaw
@@ -840,7 +926,7 @@ async function ensureProjectYear() {
     templateType.value = proj?.template_type || ''
 
     // 从 wizard_state 补充 template_type
-    const { data: wizRaw } = await http.get(`/api/projects/${projectId.value}/wizard`, {
+    const wizRaw = await api.get(`/api/projects/${projectId.value}/wizard`, {
       validateStatus: (s: number) => s < 600,
     })
     const ws = wizRaw?.data ?? wizRaw
@@ -856,8 +942,7 @@ async function ensureProjectYear() {
   }
 }
 
-async function fetchReport() {
-  loading.value = true
+const fetchReport = withLoading(loading, async () => {
   const std = currentApplicableStandard.value
   try {
     if (reportMode.value === 'compare') {
@@ -891,18 +976,16 @@ async function fetchReport() {
       rows.value = []
     }
     compareRows.value = []
-  } finally {
-    loading.value = false
   }
-}
+})
 
 async function loadTemplateRows() {
   // 从报表配置加载预设行次（显示空值的模板框架）
   try {
-    const { data } = await http.get('/api/report-config', {
+    const data = await api.get('/api/report-config', {
       params: { report_type: activeTab.value, project_id: projectId.value, applicable_standard: currentApplicableStandard.value }
     })
-    const configs = data?.data ?? data
+    const configs = data
     if (Array.isArray(configs) && configs.length > 0) {
       rows.value = configs.map((r: any) => ({
         row_code: r.row_code || '',
@@ -931,16 +1014,11 @@ function compareRowClassName({ row }: { row: any }) {
 
 function onTabChange() { fetchReport() }
 
-async function _onSyncUnadjusted() {
-  syncLoading.value = true
-  try {
-    await recalcTrialBalance(projectId.value, year.value)
-    await fetchReport()
-    ElMessage.success('未审数已按四表账套科目重新同步')
-  } finally {
-    syncLoading.value = false
-  }
-}
+const _onSyncUnadjusted = withLoading(syncLoading, async () => {
+  await recalcTrialBalance(projectId.value, year.value)
+  await fetchReport()
+  ElMessage.success('未审数已按四表账套科目重新同步')
+})
 
 async function onGenerate() {
   const { showGuide } = await import('@/composables/useWorkflowGuide')
@@ -960,14 +1038,11 @@ async function onGenerate() {
     '开始生成',
   )
   if (!ok) return
-  genLoading.value = true
-  try {
+  await withLoading(genLoading, async () => {
     await generateReports(projectId.value, year.value)
     ElMessage.success('报表生成完成')
     await fetchReport()
-  } finally {
-    genLoading.value = false
-  }
+  })()
 }
 
 const showAuditDialog = ref(false)
@@ -994,13 +1069,10 @@ async function onConsistencyCheck() {
     '开始审核',
   )
   if (!ok) return
-  checkLoading.value = true
-  try {
+  await withLoading(checkLoading, async () => {
     consistencyResult.value = await getReportConsistencyCheck(projectId.value, year.value)
     showAuditDialog.value = true
-  } finally {
-    checkLoading.value = false
-  }
+  })()
 }
 
 function _onAuditDrilldown(check: any) {
@@ -1128,7 +1200,14 @@ function onExportAuditExcel() {
   a.click()
   URL.revokeObjectURL(url)
   ElMessage.success('审核报告已导出')
-}function onExportExcel() {
+}
+
+function onReportImported() {
+  showReportImport.value = false
+  fetchReport()
+}
+
+function onExportExcel() {
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     const url = getReportExcelUrl(projectId.value, year.value, activeTab.value)
     downloadFileAsBlob(url, `报表_${activeTab.value}_${year.value}.xlsx`)
@@ -1174,6 +1253,139 @@ watch(
   },
   { immediate: true }
 )
+
+// ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
+const rvCtx = useCellSelection()
+const rvComments = useCellComments(() => projectId.value, () => year.value, 'report')
+
+const displayPrefs = useDisplayPrefsStore()
+/** 格式化金额（跟随全局单位设置） */
+const fmt = (v: any) => displayPrefs.fmt(v)
+
+// ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
+const rvSearch = useTableSearch(rows, ['row_name', 'row_code'])
+
+// ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
+const rvTableRef = ref<any>(null)
+
+rvCtx.setupTableDrag(rvTableRef, (rowIdx: number, colIdx: number) => {
+  const row = rows.value[rowIdx]
+  if (!row) return null
+  if (colIdx === 2) return row.current_period_amount
+  if (colIdx === 3) return row.prior_period_amount
+  if (colIdx === 1) return row.row_name
+  return row.row_code
+})
+
+// ─── 粘贴监听（Ctrl+V 粘贴 Excel 数据到选中区域） ──────────────────────────
+const rvColumns = [
+  { key: 'row_code', label: '行次' },
+  { key: 'row_name', label: '项目' },
+  { key: 'current_period_amount', label: '本期金额' },
+  { key: 'prior_period_amount', label: '上期金额' },
+]
+
+setupPasteListener(rvTableRef, (event: ClipboardEvent) => {
+  if (!rvCtx.selectedCells.value.length) return
+  pasteToSelection(event, rvCtx.selectedCells.value, rows.value, rvColumns)
+})
+
+/** Ctrl+F 快捷键触发搜索栏（拦截浏览器默认搜索） */
+function onKeydown(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault()
+    e.stopPropagation()
+    rvSearch.toggle()
+  }
+}
+
+function rvCellClassName({ rowIndex, columnIndex }: any) {
+  const classes: string[] = []
+  const selClass = rvCtx.cellClassName({ rowIndex, columnIndex })
+  if (selClass) classes.push(selClass)
+  const ccClass = rvComments.commentCellClass(`report_${activeTab.value}`, rowIndex, columnIndex)
+  if (ccClass) classes.push(ccClass)
+  return classes.join(' ')
+}
+
+function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  rvCtx.closeContextMenu()
+  const rowIdx = rows.value.indexOf(row)
+  const colLabels = ['序号', '项目', '本期金额', '上期金额']
+  const colIdx = colLabels.indexOf(column.label)
+  if (rowIdx < 0 || colIdx < 0) return
+  const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+  rvCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
+  rvCtx.contextMenu.rowData = row
+  rvCtx.contextMenu.itemName = row.row_name || ''
+}
+
+function onRvCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
+  const rowIdx = rows.value.indexOf(row)
+  const colLabels = ['序号', '项目', '本期金额', '上期金额']
+  const colIdx = colLabels.indexOf(column.label)
+  // 如果右键点击的单元格已在选区内，保持选区不变
+  if (rowIdx >= 0 && colIdx >= 0 && !rvCtx.isCellSelected(rowIdx, colIdx)) {
+    const value = colIdx === 2 ? row.current_period_amount : colIdx === 3 ? row.prior_period_amount : row.row_name
+    rvCtx.selectCell(rowIdx, colIdx, value, false)
+  }
+  rvCtx.contextMenu.rowData = row
+  rvCtx.contextMenu.itemName = row.row_name || ''
+  rvCtx.openContextMenu(event, rvCtx.contextMenu.itemName, row)
+}
+
+function onRvCtxCopy() {
+  rvCtx.closeContextMenu()
+  rvCtx.copySelectedValues()
+  ElMessage.success('已复制')
+}
+
+function onRvCtxDrillDown() {
+  rvCtx.closeContextMenu()
+  if (rvCtx.contextMenu.rowData) onDrilldown(rvCtx.contextMenu.rowData)
+}
+
+function onRvCtxFormula() {
+  rvCtx.closeContextMenu()
+  showFormulaManager.value = true
+}
+
+function onRvCtxGoNote() {
+  rvCtx.closeContextMenu()
+  if (rvCtx.contextMenu.rowData?.row_code) goToNote(rvCtx.contextMenu.rowData.row_code)
+}
+
+function onRvCtxSum() {
+  rvCtx.closeContextMenu()
+  const sum = rvCtx.sumSelectedValues()
+  ElMessage.info(`选中 ${rvCtx.selectedCells.value.length} 格，合计：${fmtAmount(sum)}`)
+}
+
+function onRvCtxCompare() {
+  rvCtx.closeContextMenu()
+  if (rvCtx.selectedCells.value.length < 2) return
+  const vals = rvCtx.selectedCells.value.map(c => Number(c.value) || 0)
+  const diff = vals[0] - vals[1]
+  ElMessage.info(`差异：${fmtAmount(diff)}`)
+}
+
+// ─── 全屏与复制 ──────────────────────────────────────────────────────────────
+const { isFullscreen: rvFullscreen, toggleFullscreen: toggleRvFullscreen } = useFullscreen()
+
+function copyReportTable() {
+  if (!rows.value.length) { ElMessage.warning('无数据可复制'); return }
+  const headers = ['行次', '项目', '本期金额', '上期金额']
+  const dataRows = rows.value.map((r: any) => [r.row_code || '', r.row_name || '', r.current_period_amount ?? '', r.prior_period_amount ?? ''])
+  const text = [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n')
+  const html = `<table border="1"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>${dataRows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>`
+  try {
+    navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })])
+    ElMessage.success(`已复制 ${dataRows.length} 行，可粘贴到 Word/Excel`)
+  } catch {
+    navigator.clipboard?.writeText(text)
+    ElMessage.success('已复制为文本格式')
+  }
+}
 </script>
 
 <style scoped>
@@ -1199,126 +1411,7 @@ watch(
   flex-direction: column;
 }
 
-/* ── 页面横幅 ── */
-.gt-rv-banner {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: var(--gt-gradient-primary);
-  border-radius: var(--gt-radius-lg);
-  padding: 16px 24px;
-  margin-bottom: var(--gt-space-5);
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(75, 45, 119, 0.2);
-  background-image: var(--gt-gradient-primary), linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
-}
-.gt-rv-banner::before {
-  content: '';
-  position: absolute; top: -40%; right: -10%;
-  width: 45%; height: 180%;
-  background: radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 65%);
-  pointer-events: none;
-}
-/* 第一行：标题 + 信息选择器 */
-.gt-rv-banner-row1 {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  position: relative;
-  z-index: 1;
-  flex-wrap: wrap;
-}
-.gt-rv-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.gt-rv-info-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  flex: 1;
-}
-.gt-rv-info-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-.gt-rv-info-label {
-  font-size: 10px;
-  color: rgba(255,255,255,0.55);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.gt-rv-info-badge {
-  display: inline-block;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-}
-.gt-rv-info-sep {
-  width: 1px;
-  height: 16px;
-  background: rgba(255,255,255,0.18);
-  flex-shrink: 0;
-}
-/* 第二行：操作按钮 */
-.gt-rv-banner-row2 {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
-}
-.gt-rv-banner-row2 .el-button {
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: #fff;
-  font-size: 12px;
-  border-radius: 14px;
-  padding: 4px 12px;
-  height: 28px;
-}
-.gt-rv-banner-row2 .el-button:hover {
-  background: rgba(255,255,255,0.22);
-}
-/* 下拉框白色风格 */
-.gt-rv-year-select { width: 85px; }
-.gt-rv-type-select { width: 85px; }
-.gt-rv-unit-select { width: 200px; }
-.gt-rv-year-select :deep(.el-input__wrapper),
-.gt-rv-type-select :deep(.el-input__wrapper),
-.gt-rv-unit-select :deep(.el-input__wrapper) {
-  background: rgba(255,255,255,0.12) !important;
-  border: 1px solid rgba(255,255,255,0.2) !important;
-  box-shadow: none !important;
-  border-radius: 12px !important;
-  padding: 0 8px !important;
-  height: 24px !important;
-}
-.gt-rv-year-select :deep(.el-input__inner),
-.gt-rv-type-select :deep(.el-input__inner),
-.gt-rv-unit-select :deep(.el-input__inner) {
-  color: #fff !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-}
-.gt-rv-year-select :deep(.el-select__caret),
-.gt-rv-type-select :deep(.el-select__caret),
-.gt-rv-unit-select :deep(.el-select__caret) {
-  color: rgba(255,255,255,0.5) !important;
-}
+/* ── GtPageHeader 已替换横幅样式 ── */
 /* 模式切换 radio */
 .gt-rv-mode-radio :deep(.el-radio-button__inner) {
   background: rgba(255,255,255,0.1);
@@ -1637,6 +1730,13 @@ watch(
   color: #bbb;
   text-align: center;
 }
+/* 空数据行 */
+.gt-rv-eq-td-empty {
+  text-align: center;
+  color: #bbb;
+  font-size: 13px;
+  padding: 24px 0 !important;
+}
 
 /* ── 审核结果弹窗 ── */
 .gt-rv-audit-summary {
@@ -1703,4 +1803,8 @@ watch(
   0%, 100% { box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.1); }
   50% { box-shadow: 0 0 8px 2px rgba(230, 81, 0, 0.15); }
 }
+
+
 </style>
+
+

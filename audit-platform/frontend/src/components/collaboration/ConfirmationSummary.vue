@@ -89,6 +89,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { confirmationApi } from '@/services/collaborationApi'
+import { fmtAmount } from '@/utils/formatters'
 
 const projectId = 'current-project-id'
 
@@ -175,10 +176,7 @@ const pieStyle = computed(() => {
   return { background: `conic-gradient(${parts.join(', ')})` }
 })
 
-function formatAmount(val: number) {
-  if (!val && val !== 0) return '-'
-  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(val)
-}
+const formatAmount = fmtAmount
 
 onMounted(async () => {
   try {

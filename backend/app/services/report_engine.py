@@ -296,6 +296,7 @@ class ReportFormulaParser:
             return _safe_eval_expr(expression)
         except Exception as e:
             logger.warning("Formula eval error: %s (expr: %s, formula: %s)", e, expression, formula)
+            return Decimal("0")
 
     def extract_account_codes(self, formula: str | None) -> list[str]:
         """从公式中提取所有引用的科目代码"""

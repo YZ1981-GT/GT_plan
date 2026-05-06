@@ -1,7 +1,7 @@
 {
   "wp_code": "M8",
   "name": "一般风险准备",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "4103"
   ],
@@ -83,6 +83,33 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 9,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-E09"
+        },
+        "tb": {
+          "row": 11,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 12,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "一般风险准备",
+          "其他"
+        ]
       }
     },
     {
@@ -123,14 +150,19 @@
   ],
   "cross_references": [
     {
-      "from": "M8-1.total",
+      "from": "M8-1.R9.C7",
       "to": "tb://4103#审定数",
       "description": "审定表合计 = 试算表一般风险准备审定数"
     },
     {
       "from": "M8-2.合计",
-      "to": "M8-1.total",
+      "to": "M8-1.R9.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "M8-1.R9.C7",
+      "to": "REPORT('BS-E09','期末')",
+      "description": "审定表合计 = 报表一般风险准备"
     }
   ],
   "audit_checks": [
@@ -157,6 +189,12 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "M8-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表一般风险准备"
     }
   ]
 }

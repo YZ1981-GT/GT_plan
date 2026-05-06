@@ -25,7 +25,7 @@
 - **附件管理**：集成 Paperless-ngx 进行文档管理和 OCR 识别
 - **数据可视化**：集成 Metabase 提供项目级数据可视化看板
 - **致同底稿编码**：内置致同标准的底稿编码体系（B/C/D-N/A/S/Q/Z 类）
-- **在线编辑**：集成 ONLYOFFICE Document Server 支持在线文档编辑
+- **在线编辑**：集成 Univer 纯前端表格编辑器，支持在线文档编辑（已从 ONLYOFFICE 迁移）
 - **连续审计**：支持跨年数据对比和审计项目连续管理
 - **深度协作**：复核对话系统、过程记录、工时打卡、足迹记录
 - **智能推荐**：底稿智能推荐、知识库上下文感知、年度差异分析报告
@@ -40,7 +40,7 @@
 - **ORM**: SQLAlchemy (async)
 - **迁移**: Alembic（001-034 版本）
 - **AI**: PaddleOCR、Tesseract、MinerU（可选）
-- **文档服务**: ONLYOFFICE Document Server
+- **文档编辑**: Univer 纯前端表格编辑器（原 ONLYOFFICE 已迁移）
 - **附件管理**: Paperless-ngx
 - **性能监控**: Prometheus + prometheus-client
 - **数据校验**: pandas
@@ -96,7 +96,7 @@ docker-compose up -d
 - 前端开发服务器: http://localhost:3030
 - Metabase: http://localhost:3000
 - Paperless-ngx: http://localhost:8010
-- ONLYOFFICE: http://localhost:8080
+- ONLYOFFICE: http://localhost:8080（向后兼容，底稿编辑已迁移至 Univer）
 
 > 说明：`docker-compose.yml` 默认不包含前端容器，前端请按下文“前端开发”单独启动。
 
@@ -263,7 +263,7 @@ npm run dev
 - `MINERU_ENABLED`: 是否启用 MinerU（需要 GPU）
 - `CLOUD_STORAGE_TYPE`: 云端存储类型（sftp/s3/smb/local）
 - `ENCRYPTION_KEY`: 数据加密密钥
-- `ONLYOFFICE_URL`: ONLYOFFICE Document Server 地址
+- `ONLYOFFICE_URL`: 在线编辑服务地址（向后兼容，底稿编辑已迁移至 Univer 纯前端方案）
 
 ### OCR 引擎配置
 

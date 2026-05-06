@@ -1,7 +1,7 @@
 {
   "wp_code": "D7",
   "name": "合同负债",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2205"
   ],
@@ -85,6 +85,35 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 10,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L08"
+        },
+        "tb": {
+          "row": 12,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 13,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "预收货款",
+          "合同负债",
+          "其他",
+          "已收款未履约"
+        ]
       }
     },
     {
@@ -135,14 +164,19 @@
   ],
   "cross_references": [
     {
-      "from": "D7-1.total",
+      "from": "D7-1.R10.C7",
       "to": "tb://2205#审定数",
       "description": "审定表合计 = 试算表合同负债审定数"
     },
     {
       "from": "D7-2.合计",
-      "to": "D7-1.total",
+      "to": "D7-1.R10.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "D7-1.R10.C7",
+      "to": "REPORT('BS-L08','期末')",
+      "description": "审定表合计 = 报表合同负债"
     }
   ],
   "audit_checks": [
@@ -187,6 +221,12 @@
       "type": "check",
       "severity": "info",
       "description": "重大融资成分已评估"
+    },
+    {
+      "code": "D7-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表合同负债"
     }
   ]
 }

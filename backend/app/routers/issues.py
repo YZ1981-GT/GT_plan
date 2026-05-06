@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.pagination import PaginationParams
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.issue_ticket_service import issue_ticket_service
@@ -52,13 +53,13 @@ async def list_issues(
     severity: Optional[str] = Query(None),
     source: Optional[str] = Query(None),
     owner_id: Optional[uuid.UUID] = Query(None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     return await issue_ticket_service.list_issues(
-        db, project_id, status, severity, source, owner_id, page, page_size
+        db, project_id, status, severity, source, owner_id,
+        page=pagination.page, page_size=pagination.page_size,
     )
 
 

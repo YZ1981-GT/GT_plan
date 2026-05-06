@@ -14,7 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.bulk_operations import BulkRequest, bulk_hard_delete
 from app.core.database import get_db
+from app.core.pagination import PaginationParams
 from app.deps import get_current_user
 from app.models.core import Project, User
 
@@ -64,8 +66,7 @@ def _get_recyclable_tables() -> dict:
 @router.get("")
 async def list_recycle_bin(
     item_type: str | None = Query(None, description="筛选类型：project/adjustment/working_paper/attachment 等"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
@@ -100,7 +101,7 @@ async def list_recycle_bin(
                 select(model)
                 .where(model.is_deleted == True)  # noqa: E712
                 .order_by(order_col)
-                .limit(page_size)
+                .limit(pagination.limit)
             )
             result = await db.execute(q)
             rows = result.scalars().all()
@@ -126,14 +127,14 @@ async def list_recycle_bin(
     items.sort(key=lambda x: x.get("deleted_at") or "", reverse=True)
 
     # 分页
-    start = (page - 1) * page_size
-    paged_items = items[start:start + page_size]
+    start = pagination.offset
+    paged_items = items[start:start + pagination.page_size]
 
     return {
         "items": paged_items,
         "total": total,
-        "page": page,
-        "page_size": page_size,
+        "page": pagination.page,
+        "page_size": pagination.page_size,
         "limit": RECYCLE_BIN_LIMIT,
         "is_over_limit": total > RECYCLE_BIN_LIMIT,
     }
@@ -191,6 +192,24 @@ async def permanently_delete(
     await db.commit()
 
     return {"message": f"{label}已永久删除", "id": str(item_id)}
+
+
+@router.post("/batch-delete")
+async def batch_permanently_delete(
+    body: BulkRequest,
+    item_type: str = Query(..., description="记录类型：project/adjustment/working_paper 等"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """批量永久删除回收站中的记录（不可恢复）"""
+    tables = _get_recyclable_tables()
+    if item_type not in tables:
+        raise HTTPException(status_code=400, detail=f"不支持的类型: {item_type}")
+
+    model, label, _ = tables[item_type]
+    result = await bulk_hard_delete(db, model, body.ids, filter_deleted=True)
+    await db.commit()
+    return result
 
 
 @router.post("/empty")

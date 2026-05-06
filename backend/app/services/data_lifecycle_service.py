@@ -137,7 +137,43 @@ class DataLifecycleService:
 
         只删除已归档（is_deleted=true）的数据。
         活跃数据需要先归档再清理。
+
+        硬校验 retention_until：若 now < retention_until，拒绝删除并返回 403。
         """
+        # ── 保留期校验（需求 11）──
+        from fastapi import HTTPException
+
+        from app.models.core import Project
+
+        stmt = sa.select(Project.retention_until).where(Project.id == project_id)
+        result = await self.db.execute(stmt)
+        retention_until = result.scalar_one_or_none()
+
+        if retention_until is not None:
+            # 统一为 naive UTC 比较（兼容 SQLite 测试和 PG 生产）
+            now_utc = datetime.utcnow()
+            retention_naive = (
+                retention_until.replace(tzinfo=None)
+                if retention_until.tzinfo is not None
+                else retention_until
+            )
+            if now_utc < retention_naive:
+                remaining = retention_naive - now_utc
+                years = remaining.days // 365
+                days = remaining.days % 365
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error_code": "RETENTION_LOCKED",
+                        "message": (
+                            f"项目数据处于保留期内，不允许物理删除。"
+                            f"还需保留 {years} 年 {days} 天。"
+                        ),
+                        "retention_until": retention_until.isoformat(),
+                        "remaining_days": remaining.days,
+                    },
+                )
+
         counts = {}
         for tbl in _TABLE_NAMES:
             r = await self.db.execute(sa.text(

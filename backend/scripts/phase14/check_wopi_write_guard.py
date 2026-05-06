@@ -3,7 +3,7 @@
 模拟复核人/合伙人/签字窗口调 check_file_info，断言 UserCanWrite=False。
 用法: python -m scripts.phase14.check_wopi_write_guard
 """
-print("[INFO] WOPI write guard check requires running server + ONLYOFFICE.")
+print("[INFO] WOPI write guard check（向后兼容，底稿编辑已迁移至 Univer）.")
 print("[INFO] Manual verification steps:")
 print("  1. Login as reviewer, open workpaper → UserCanWrite should be False")
 print("  2. Login as partner, open workpaper → UserCanWrite should be False")

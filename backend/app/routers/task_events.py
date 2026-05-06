@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.pagination import PaginationParams
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.task_event_bus import task_event_bus
@@ -33,8 +34,7 @@ async def replay_event(
 async def list_events(
     project_id: uuid.UUID = Query(...),
     status: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -49,9 +49,12 @@ async def list_events(
     total = (await db.execute(count_stmt)).scalar() or 0
 
     stmt = stmt.order_by(TaskEvent.created_at.desc())
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    stmt = stmt.offset(pagination.offset).limit(pagination.limit)
     result = await db.execute(stmt)
     events = result.scalars().all()
+
+    import math
+    total_pages = math.ceil(total / pagination.page_size) if total > 0 else 0
 
     return {
         "items": [
@@ -68,6 +71,7 @@ async def list_events(
             for e in events
         ],
         "total": total,
-        "page": page,
-        "page_size": page_size,
+        "page": pagination.page,
+        "page_size": pagination.page_size,
+        "total_pages": total_pages,
     }

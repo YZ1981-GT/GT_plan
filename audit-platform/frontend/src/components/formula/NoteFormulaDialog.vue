@@ -78,7 +78,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import FormulaRefPicker from './FormulaRefPicker.vue'
 
 const props = defineProps<{
@@ -113,12 +113,12 @@ async function openRefPicker(row: any) {
   // 加载引用数据
   try {
     if (!refPickerData.value.reportRows.length) {
-      const [reportResp, tbResp] = await Promise.all([
-        http.get(`/api/reports/${props.projectId}/${props.year}/balance_sheet`).catch(() => ({ data: [] })),
-        http.get(`/api/trial-balance/`, { params: { project_id: props.projectId, year: props.year } }).catch(() => ({ data: [] })),
+      const [reportData, tbData] = await Promise.all([
+        api.get(`/api/reports/${props.projectId}/${props.year}/balance_sheet`).catch(() => []),
+        api.get(`/api/trial-balance/`, { params: { project_id: props.projectId, year: props.year } }).catch(() => []),
       ])
-      refPickerData.value.reportRows = Array.isArray(reportResp.data) ? reportResp.data : (reportResp.data?.data || [])
-      refPickerData.value.tbRows = Array.isArray(tbResp.data) ? tbResp.data : (tbResp.data?.data || [])
+      refPickerData.value.reportRows = Array.isArray(reportData) ? reportData : (reportData || [])
+      refPickerData.value.tbRows = Array.isArray(tbData) ? tbData : (tbData || [])
     }
   } catch { /* 静默 */ }
   showRefPicker.value = true
@@ -158,10 +158,10 @@ async function onApply() {
   try {
     // 调用后端执行附注公式（从 check_presets 自动生成并计算）
     const noteSection = props.currentNote.note_section
-    const { data } = await http.post(
+    const data = await api.post(
       `/api/disclosure-notes/${props.projectId}/${props.year}/${noteSection}/apply-formulas`
     )
-    const result = data?.data ?? data
+    const result = data
     ElMessage.success(`公式已应用：执行 ${result?.executed || 0} 个，更新 ${result?.updated || 0} 个单元格`)
     emit('applied')
   } catch (e: any) {

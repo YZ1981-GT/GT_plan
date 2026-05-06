@@ -44,6 +44,7 @@ from app.models.audit_platform_schemas import (
     WPAdjustmentDetail,
     WPAdjustmentSummary,
 )
+from app.core.audit_decorator import audit_log
 from app.services.event_bus import event_bus
 
 
@@ -91,6 +92,7 @@ class AdjustmentService:
         project_id: UUID,
         data: AdjustmentCreate,
         user_id: UUID,
+        batch_mode: bool = False,
     ) -> AdjustmentGroupResponse:
         """创建调整分录组：借贷平衡校验→自动编号→科目校验→写入→发布事件"""
         # 1. 借贷平衡校验
@@ -158,14 +160,49 @@ class AdjustmentService:
             user_id,
         )
 
-        # 发布事件
-        affected_codes = list({li.standard_account_code for li in data.line_items})
-        await self._publish_adjustment_event(
-            EventType.ADJUSTMENT_CREATED,
-            project_id, data.year, affected_codes, entry_group_id,
-        )
+        # batch_mode 时跳过事件发布，由 batch_commit 统一触发
+        if not batch_mode:
+            affected_codes = list({li.standard_account_code for li in data.line_items})
+            await self._publish_adjustment_event(
+                EventType.ADJUSTMENT_CREATED,
+                project_id, data.year, affected_codes, entry_group_id,
+            )
 
         return resp
+
+    # ------------------------------------------------------------------
+    # batch_commit — 批量提交后统一触发一次重算事件
+    # ------------------------------------------------------------------
+    async def batch_commit(
+        self,
+        project_id: UUID,
+        year: int,
+    ) -> dict:
+        """批量提交：收集所有 draft 分录涉及的科目，统一发布一次事件触发重算"""
+        adj = Adjustment.__table__
+        q = (
+            sa.select(sa.func.array_agg(sa.distinct(adj.c.account_code)))
+            .where(
+                adj.c.project_id == project_id,
+                adj.c.year == year,
+                adj.c.is_deleted == sa.false(),
+            )
+        )
+        result = await self.db.execute(q)
+        all_codes = result.scalar() or []
+        # 过滤 None
+        all_codes = [c for c in all_codes if c]
+
+        if all_codes:
+            await self._publish_adjustment_event(
+                EventType.ADJUSTMENT_CREATED,
+                project_id, year, all_codes,
+            )
+
+        return {
+            "message": "批量提交成功，已触发重算",
+            "affected_accounts": len(all_codes),
+        }
 
     # ------------------------------------------------------------------
     # 13.2 update_entry / delete_entry
@@ -302,6 +339,7 @@ class AdjustmentService:
             adj_rows[0].created_by,
         )
 
+    @audit_log(action="delete", object_type="adjustment")
     async def delete_entry(
         self,
         project_id: UUID,
@@ -336,6 +374,7 @@ class AdjustmentService:
     # ------------------------------------------------------------------
     # 13.3 change_review_status
     # ------------------------------------------------------------------
+    @audit_log(action="review", object_type="adjustment")
     async def change_review_status(
         self,
         project_id: UUID,
@@ -491,23 +530,40 @@ class AdjustmentService:
             .limit(page_size)
         )
         groups = (await self.db.execute(groups_q)).fetchall()
+        group_ids = [g.entry_group_id for g in groups]
+
+        if not group_ids:
+            return {"items": [], "total": total, "page": page, "page_size": page_size}
+
+        # 批量查询所有 Adjustment 行（替代 N 次单独查询，解决 N+1 问题）
+        all_adj_q = sa.select(Adjustment).where(
+            Adjustment.project_id == project_id,
+            Adjustment.entry_group_id.in_(group_ids),
+            Adjustment.is_deleted == sa.false(),
+        )
+        all_adj_result = await self.db.execute(all_adj_q)
+        adj_by_group: dict = {}
+        for row in all_adj_result.scalars().all():
+            adj_by_group.setdefault(row.entry_group_id, []).append(row)
+
+        # 批量查询所有 AdjustmentEntry 行（替代 N 次单独查询）
+        all_entry_q = (
+            sa.select(AdjustmentEntry)
+            .where(
+                AdjustmentEntry.entry_group_id.in_(group_ids),
+                AdjustmentEntry.is_deleted == sa.false(),
+            )
+            .order_by(AdjustmentEntry.line_no)
+        )
+        all_entry_result = await self.db.execute(all_entry_q)
+        entry_by_group: dict = {}
+        for row in all_entry_result.scalars().all():
+            entry_by_group.setdefault(row.entry_group_id, []).append(row)
 
         items = []
         for g in groups:
-            # 获取该组的所有行
-            rows_q = (
-                sa.select(Adjustment)
-                .where(
-                    Adjustment.project_id == project_id,
-                    Adjustment.entry_group_id == g.entry_group_id,
-                    Adjustment.is_deleted == sa.false(),
-                )
-            )
-            rows_result = await self.db.execute(rows_q)
-            adj_rows = list(rows_result.scalars().all())
-
-            entries = await self._get_entry_rows(g.entry_group_id)
-
+            adj_rows = adj_by_group.get(g.entry_group_id, [])
+            entries = entry_by_group.get(g.entry_group_id, [])
             items.append(
                 self._build_group_response(
                     g.entry_group_id, g.adjustment_no, g.adjustment_type,
@@ -534,35 +590,47 @@ class AdjustmentService:
     ) -> list[AccountOption]:
         """
         科目下拉选项：
-        - report_line_code=None → 返回报表一级行次列表
+        - report_line_code=None → 返回所有已映射的标准科目（含 report_line 字段）
         - report_line_code=指定值 → 返回该行次下的标准科目列表
         """
         rlm = ReportLineMapping.__table__
         ac = AccountChart.__table__
 
         if report_line_code is None:
-            # 返回一级报表行次
+            # 返回所有已映射且已确认的标准科目，附带报表行次名称
             q = (
                 sa.select(
-                    rlm.c.report_line_code,
+                    rlm.c.standard_account_code,
                     rlm.c.report_line_name,
-                    rlm.c.report_line_level,
+                    ac.c.account_name,
+                    ac.c.level,
+                )
+                .select_from(
+                    rlm.join(
+                        ac,
+                        sa.and_(
+                            ac.c.project_id == rlm.c.project_id,
+                            ac.c.account_code == rlm.c.standard_account_code,
+                            ac.c.source == AccountSource.standard.value,
+                            ac.c.is_deleted == sa.false(),
+                        ),
+                    )
                 )
                 .where(
                     rlm.c.project_id == project_id,
                     rlm.c.is_deleted == sa.false(),
                     rlm.c.is_confirmed == sa.true(),
-                    rlm.c.report_line_level == 1,
                 )
-                .group_by(rlm.c.report_line_code, rlm.c.report_line_name, rlm.c.report_line_level)
-                .order_by(rlm.c.report_line_code)
+                .distinct()
+                .order_by(rlm.c.standard_account_code)
             )
             result = await self.db.execute(q)
             return [
                 AccountOption(
-                    code=r.report_line_code,
-                    name=r.report_line_name,
-                    level=r.report_line_level,
+                    code=r.standard_account_code,
+                    name=r.account_name or "",
+                    level=r.level if r.level else 1,
+                    report_line=r.report_line_name,
                 )
                 for r in result.fetchall()
             ]
@@ -571,6 +639,7 @@ class AdjustmentService:
             q = (
                 sa.select(
                     rlm.c.standard_account_code,
+                    rlm.c.report_line_name,
                     ac.c.account_name,
                     ac.c.level,
                 )
@@ -599,6 +668,7 @@ class AdjustmentService:
                     code=r.standard_account_code,
                     name=r.account_name or "",
                     level=r.level if r.level else 1,
+                    report_line=r.report_line_name,
                 )
                 for r in result.fetchall()
             ]
@@ -744,8 +814,12 @@ class AdjustmentService:
         year: int,
         adj_type: AdjustmentType,
     ) -> str:
-        """生成下一个编号 AJE-001 / RJE-001"""
+        """生成下一个编号 AJE-001 / RJE-001（使用 pg_advisory_xact_lock 防并发竞争）"""
+        from sqlalchemy import text as sa_text
         prefix = "AJE" if adj_type == AdjustmentType.aje else "RJE"
+        # 使用 advisory lock 防止并发竞争产生重复编号
+        lock_key = hash(f"{project_id}:{year}:{prefix}") % (2**31)
+        await self.db.execute(sa_text(f"SELECT pg_advisory_xact_lock({lock_key})"))
         adj = Adjustment.__table__
         q = (
             sa.select(sa.func.count(sa.distinct(adj.c.entry_group_id)))

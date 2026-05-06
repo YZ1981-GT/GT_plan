@@ -139,3 +139,134 @@ class SoDGuardService:
 
 # 全局单例
 sod_guard_service = SoDGuardService()
+
+
+
+# ---------------------------------------------------------------------------
+# R5 任务 2：EQCR 独立性规则
+# ---------------------------------------------------------------------------
+
+
+class SodViolation(Exception):
+    """SOD 违规异常，由规则在检出冲突时抛出。
+
+    上层 router 捕获后返回 409 或 403，并在消息中带上违规描述。
+    ``policy_code`` 用于前端做错误分类映射。
+    """
+
+    def __init__(self, message: str, *, policy_code: str = "SOD_VIOLATION") -> None:
+        super().__init__(message)
+        self.policy_code = policy_code
+        self.message = message
+
+
+class EqcrIndependenceRule:
+    """EQCR 独立性规则 — 同项目内 EQCR 不得同时担任 signing_partner / manager / auditor。
+
+    设计文档 ``.kiro/specs/refinement-round5-independent-review/design.md``
+    "SOD 规则细节" 原文：
+
+    - 若当前委派目标是 ``eqcr``：同项目内该人若已是 signing_partner / manager /
+      auditor 中任一角色 → 拒绝。
+    - 若当前委派目标是 signing_partner / manager / auditor：同项目内该人若
+      已是 ``eqcr`` → 拒绝。
+    - 其他 role（如 qc）与 EQCR 无冲突。
+    - 跨项目不做限制：A 项目 EQCR，B 项目 manager 是合法场景。
+
+    两种调用模式：
+
+    - **DB 模式**（默认，单次新增/单次更新）：传入 ``proposed_roles=None``，
+      规则去查 ``project_assignments`` 表中 ``is_deleted=False`` 的现存委派。
+    - **批量模式**（``assignment_service.save_assignments``）：传入
+      ``proposed_roles=[(staff_id, role), ...]`` 作为"本次将形成的终态"，
+      规则只在该 list 内做冲突检查（原有数据会被批次软删除，不计入）。
+    """
+
+    CONFLICT_ROLES: frozenset[str] = frozenset(
+        {"signing_partner", "manager", "auditor"}
+    )
+    POLICY_CODE = "SOD_EQCR_INDEPENDENCE_CONFLICT"
+
+    async def check(
+        self,
+        db: AsyncSession,
+        project_id: uuid.UUID,
+        staff_id: uuid.UUID,
+        new_role: str,
+        *,
+        proposed_roles: Optional[list[tuple[uuid.UUID, str]]] = None,
+    ) -> None:
+        """校验一次委派是否违反 EQCR 独立性。
+
+        无违规时无返回值；违规抛 :class:`SodViolation`。
+        """
+        # 非相关角色直接放行（例如 qc / 自定义 role）
+        if new_role != "eqcr" and new_role not in self.CONFLICT_ROLES:
+            return
+
+        existing_roles = await self._collect_existing_roles(
+            db,
+            project_id=project_id,
+            staff_id=staff_id,
+            new_role=new_role,
+            proposed_roles=proposed_roles,
+        )
+
+        if new_role == "eqcr":
+            conflict = next(
+                (r for r in existing_roles if r in self.CONFLICT_ROLES), None
+            )
+            if conflict is not None:
+                raise SodViolation(
+                    (
+                        f"同项目内该人员已是 {conflict} 角色，"
+                        "不能再担任 EQCR（独立复核合伙人）"
+                    ),
+                    policy_code=self.POLICY_CODE,
+                )
+        else:  # new_role in CONFLICT_ROLES
+            if "eqcr" in existing_roles:
+                raise SodViolation(
+                    (
+                        "同项目内该人员已是 EQCR（独立复核合伙人），"
+                        f"不能再担任 {new_role}"
+                    ),
+                    policy_code=self.POLICY_CODE,
+                )
+
+    # ------------------------------------------------------------------
+    # 内部工具
+    # ------------------------------------------------------------------
+
+    async def _collect_existing_roles(
+        self,
+        db: AsyncSession,
+        *,
+        project_id: uuid.UUID,
+        staff_id: uuid.UUID,
+        new_role: str,
+        proposed_roles: Optional[list[tuple[uuid.UUID, str]]],
+    ) -> list[str]:
+        """收集同项目下同 staff 的已有角色（排除本次正在处理的 new_role）。"""
+        if proposed_roles is not None:
+            return [
+                r
+                for (sid, r) in proposed_roles
+                if sid == staff_id and r != new_role
+            ]
+
+        # 延迟导入避免循环依赖
+        from app.models.staff_models import ProjectAssignment
+
+        stmt = select(ProjectAssignment.role).where(
+            ProjectAssignment.project_id == project_id,
+            ProjectAssignment.staff_id == staff_id,
+            ProjectAssignment.is_deleted == False,  # noqa: E712
+            ProjectAssignment.role != new_role,
+        )
+        result = await db.execute(stmt)
+        return [row[0] for row in result.all()]
+
+
+# 规则单例（对齐 ``sod_guard_service`` 命名风格）
+eqcr_independence_rule = EqcrIndependenceRule()

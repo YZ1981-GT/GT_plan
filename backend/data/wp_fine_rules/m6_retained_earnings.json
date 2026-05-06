@@ -1,7 +1,7 @@
 {
   "wp_code": "M6",
   "name": "未分配利润",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "4104"
   ],
@@ -125,19 +125,24 @@
   ],
   "cross_references": [
     {
-      "from": "M6-1.total",
+      "from": "M6-1.R12.C7",
       "to": "tb://4104#审定数",
       "description": "审定表合计 = 试算表未分配利润审定数"
     },
     {
-      "from": "M6-1.total",
+      "from": "M6-1.R12.C7",
       "to": "report://BS/BS-055#期末",
       "description": "审定表合计 = 报表未分配利润"
     },
     {
       "from": "M6-2.合计",
-      "to": "M6-1.total",
+      "to": "M6-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "M6-1.R12.C7",
+      "to": "REPORT('BS-E10','期末')",
+      "description": "审定表合计 = 报表未分配利润"
     }
   ],
   "audit_checks": [

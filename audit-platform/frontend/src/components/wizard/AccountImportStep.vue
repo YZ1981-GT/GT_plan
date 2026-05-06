@@ -1250,7 +1250,7 @@ async function smartEnhanceMapping() {
       `/api/projects/${wizardStore.projectId}/import-intelligence/enhance-mapping`,
       { headers: sheet.headers, existing_mapping: existingMapping }
     )
-    const result = data?.data ?? data
+    const result = data
 
     let applied = 0
     // 应用高置信度匹配

@@ -156,7 +156,15 @@ async def _write_log(
 
 
 class AuditLogMiddleware(BaseHTTPMiddleware):
-    """操作日志中间件 — 对写操作自动记录审计日志。"""
+    """操作日志中间件 — 对写操作自动记录审计日志。
+
+    与 audit_decorator 的分工：
+    - AuditLogMiddleware（本类）：HTTP 层面的粗粒度审计，记录所有写操作（POST/PUT/PATCH/DELETE）
+      的请求路径、用户、IP、状态码。适合合规审计和安全监控。
+    - audit_decorator（@audit_log）：业务层面的细粒度审计，记录具体业务对象的变更内容
+      （old_value/new_value diff）。适合业务审计和数据追溯。
+    两者互补，不重复：中间件记录"谁在什么时间做了什么操作"，装饰器记录"操作改变了什么数据"。
+    """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # 仅拦截写方法

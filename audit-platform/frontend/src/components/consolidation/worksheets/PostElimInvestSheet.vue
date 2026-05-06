@@ -1,0 +1,279 @@
+<template>
+  <div ref="sheetRef" class="ws-sheet" :class="{ 'gt-fullscreen': isFullscreen }">
+    <div class="ws-sheet-header">
+      <h3>抵消后长期股权投资明细表</h3>
+      <div class="ws-sheet-actions">
+        <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏编辑'" placement="top">
+          <el-button size="small" @click="toggleFullscreen">{{ isFullscreen ? '⬜ 退出全屏' : '⛶ 全屏' }}</el-button>
+        </el-tooltip>
+        <el-button size="small" @click="$emit('open-formula', 'consol_post_invest')">ƒx 公式</el-button>
+        <el-button size="small" @click="exportData">📥 导出Excel</el-button>
+        <el-button size="small" type="primary" @click="addRow">+ 新增行</el-button>
+        <el-button size="small" type="danger" :disabled="!selectedRows.length" @click="batchDeleteRows">
+          删除{{ selectedRows.length ? `(${selectedRows.length})` : '' }}
+        </el-button>
+        <el-button size="small" @click="$emit('save', tableRows)">💾 保存</el-button>
+      </div>
+    </div>
+    <div class="ws-tip" v-show="!isFullscreen">
+      <span>取数来源：
+        <a class="ws-link" @click="$emit('goto-sheet', 'cost')">投资明细-成本法</a> +
+        <a class="ws-link" @click="$emit('goto-sheet', 'equity_inv')">投资明细-权益法</a> →
+        <a class="ws-link" @click="$emit('goto-sheet', 'equity_sim')">模拟权益法</a> →
+        <a class="ws-link" @click="$emit('goto-sheet', 'elimination')">合并抵消分录</a>。
+        全资子公司抵消后应为0。<b>可编辑覆盖自动值，可增删行</b>。
+      </span>
+    </div>
+
+    <el-table :data="tableRows" border size="small" class="ws-table"
+      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
+      :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 280px)'"
+      :header-cell-style="headerStyle" :cell-style="rowCellStyle" :row-class-name="rowClassName"
+      show-summary :summary-method="getSummary"
+      @selection-change="(_sel: any[]) => selectedRows = _sel">
+      <el-table-column type="selection" width="36" fixed align="center" />
+      <el-table-column prop="companyName" label="子企业" width="160" fixed show-overflow-tooltip />
+      <el-table-column prop="ratio" label="持股比例" width="80" align="right">
+        <template #default="{ row }"><span>{{ row.ratio }}%</span></template>
+      </el-table-column>
+      <el-table-column label="账面长投" align="center">
+        <el-table-column prop="bookCost" label="投资成本" width="110" align="right">
+          <template #default="{ row }"><el-input-number :model-value="row.bookCost" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'bookCost', v)" /></template>
+        </el-table-column>
+        <el-table-column prop="bookImpairment" label="减值准备" width="100" align="right">
+          <template #default="{ row }"><el-input-number :model-value="row.bookImpairment" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'bookImpairment', v)" /></template>
+        </el-table-column>
+        <el-table-column prop="bookNet" label="账面净额" width="110" align="right">
+          <template #default="{ row }"><span class="ws-computed">{{ fmt(row.bookNet) }}</span></template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="权益法模拟调整" align="center">
+        <el-table-column prop="simIncomeAdj" label="损益调整" width="100" align="right">
+          <template #default="{ row }"><el-input-number :model-value="row.simIncomeAdj" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'simIncomeAdj', v)" /></template>
+        </el-table-column>
+        <el-table-column prop="simOtherEquity" label="其他权益变动" width="100" align="right">
+          <template #default="{ row }"><el-input-number :model-value="row.simOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'simOtherEquity', v)" /></template>
+        </el-table-column>
+        <el-table-column prop="simTotal" label="模拟后长投" width="110" align="right">
+          <template #default="{ row }"><span class="ws-computed ws-bold">{{ fmt(row.simTotal) }}</span></template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="合并抵消" align="center">
+        <el-table-column prop="elimCost" label="投资成本" width="110" align="right">
+          <template #default="{ row }"><el-input-number :model-value="row.elimCost" size="small" :precision="2" :controls="false" style="width:100%;color:#e6a23c" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimCost', v)" /></template>
+        </el-table-column>
+        <el-table-column prop="elimIncomeAdj" label="损益调整" width="100" align="right">
+          <template #default="{ row }"><el-input-number :model-value="row.elimIncomeAdj" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimIncomeAdj', v)" /></template>
+        </el-table-column>
+        <el-table-column prop="elimOtherEquity" label="其他权益变动" width="100" align="right">
+          <template #default="{ row }"><el-input-number :model-value="row.elimOtherEquity" size="small" :precision="2" :controls="false" style="width:100%" class="ws-auto-cell" @update:model-value="(v: any) => setOverride(row.companyName, 'elimOtherEquity', v)" /></template>
+        </el-table-column>
+        <el-table-column prop="elimTotal" label="抵消合计" width="110" align="right">
+          <template #default="{ row }"><span style="color:#e6a23c;font-weight:600">{{ fmt(row.elimTotal) }}</span></template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="抵消后" align="center">
+        <el-table-column prop="postElimTotal" label="抵消后长投" width="120" align="right">
+          <template #default="{ row }">
+            <span :class="n(row.postElimTotal) !== 0 ? 'ws-diff-warn ws-bold' : 'ws-computed'">{{ fmt(row.postElimTotal) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="checkResult" label="校验" width="60" align="center">
+          <template #default="{ row }">
+            <span v-if="n(row.postElimTotal) === 0" style="color:#67c23a">✓</span>
+            <span v-else style="color:#e6a23c">⚠</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+    </el-table>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+
+interface CompanyCol { name: string; code?: string; ratio: number }
+interface InvestRow { company_name: string; company_code: string; open_cost: number|null; open_impairment: number|null; [k: string]: any }
+interface EquitySimRow { seq: string; subject: string; detail: string; total: number|null; values?: (number|null)[]; isStep?: boolean; isComputed?: boolean }
+interface ElimRow { direction: string; subject: string; detail?: string; values?: (number|null)[] }
+
+const props = defineProps<{
+  companies: CompanyCol[]
+  investmentCost: InvestRow[]       // 成本法投资明细
+  investmentEquity: InvestRow[]     // 权益法投资明细
+  equitySimDirect: EquitySimRow[]   // 模拟权益法直接持股
+  elimEquity: ElimRow[]             // 合并抵消-权益抵消
+}>()
+
+defineEmits<{ (e: 'save', data: any): void; (e: 'open-formula', key: string): void; (e: 'goto-sheet', key: string): void }>()
+
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+const displayPrefs = useDisplayPrefsStore()
+const fmt = (v: any) => displayPrefs.fmt(v)
+const sheetRef = ref<HTMLElement | null>(null)
+const selectedRows = ref<any[]>([])
+
+// 手动新增行（用于特殊企业）
+const manualRows = reactive<any[]>([])
+
+function addRow() {
+  const newRow = {
+    companyName: '', companyCode: '', ratio: 0, _editable: true, _manual: true,
+    bookCost: 0, bookImpairment: 0, bookNet: 0,
+    simIncomeAdj: 0, simOtherEquity: 0, simTotal: 0,
+    elimCost: 0, elimIncomeAdj: 0, elimOtherEquity: 0, elimTotal: 0,
+    postElimTotal: 0,
+  }
+  if (selectedRows.value.length > 0) {
+    const last = selectedRows.value[selectedRows.value.length - 1]
+    const idx = manualRows.indexOf(last)
+    if (idx >= 0) { manualRows.splice(idx + 1, 0, newRow); return }
+  }
+  manualRows.push(newRow)
+}
+
+async function batchDeleteRows() {
+  if (!selectedRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
+    const del = new Set(selectedRows.value)
+    // 只能删除手动行
+    const remaining = manualRows.filter(r => !del.has(r))
+    manualRows.length = 0; manualRows.push(...remaining)
+    selectedRows.value = []
+  } catch {}
+}
+const n = (v: any) => Number(v) || 0
+
+// 逐家计算（默认自动，支持用户覆盖编辑）
+const overrides = reactive<Record<string, Record<string, number | null>>>({})
+
+const tableRows = computed(() => {
+  const autoRows = props.companies.map((comp, ci) => {
+    // 1. 账面长投（从投资明细表取期末数）
+    const costRow = props.investmentCost.find(r => r.company_name === comp.name || r.company_code === comp.code)
+    const equityRow = props.investmentEquity.find(r => r.company_name === comp.name || r.company_code === comp.code)
+    const bookCost = n(costRow?.open_cost) + n(costRow?.add_cost) - n(costRow?.reduce_cost)
+      + n(equityRow?.open_amount) + n(equityRow?.add_cost) - n(equityRow?.reduce_cost)
+    const bookImpairment = n(costRow?.open_impairment) + n(costRow?.add_impairment) - n(costRow?.reduce_impairment)
+      + n(equityRow?.open_impairment) + n(equityRow?.add_impairment) - n(equityRow?.reduce_impairment)
+    const bookNet = bookCost - bookImpairment
+
+    // 2. 权益法模拟调整（从模拟权益法表取该企业列的损益调整和其他权益变动）
+    const findSimVal = (detail: string) => {
+      // 找"模拟后长投"区域的对应行
+      const startIdx = props.equitySimDirect.findIndex(r => r.subject === '长期股权投资' && r.detail === '投资成本' &&
+        props.equitySimDirect.indexOf(r) > (props.equitySimDirect.length - 10))
+      if (startIdx < 0) return 0
+      const row = props.equitySimDirect.find((r, idx) => idx >= startIdx && r.detail === detail)
+      return row?.values?.[ci] != null ? n(row.values[ci]) : n(row?.total)
+    }
+    const simIncomeAdj = findSimVal('损益调整')
+    const simOtherEquity = findSimVal('其他权益变动')
+    const simTotal = bookNet + simIncomeAdj + simOtherEquity
+
+    // 3. 合并抵消（从抵消分录表取该企业列）
+    const findElimVal = (subject: string, detail?: string) => {
+      const row = props.elimEquity.find(r => r.subject === subject && (!detail || r.detail === detail))
+      return row?.values?.[ci] != null ? n(row.values[ci]) : 0
+    }
+    const elimCost = findElimVal('长期股权投资', '投资成本')
+    const elimIncomeAdj = findElimVal('长期股权投资', '损益调整')
+    const elimOtherEquity = findElimVal('长期股权投资', '其他权益变动')
+    const elimTotal = elimCost + elimIncomeAdj + elimOtherEquity
+
+    // 4. 抵消后 = 模拟后长投 - 合并抵消
+    const postElimTotal = simTotal - elimTotal
+
+    // 应用用户覆盖
+    const ov = overrides[comp.name] || {}
+    const result: any = {
+      companyName: comp.name, companyCode: comp.code, ratio: comp.ratio,
+      bookCost, bookImpairment, bookNet,
+      simIncomeAdj, simOtherEquity, simTotal,
+      elimCost, elimIncomeAdj, elimOtherEquity, elimTotal,
+      postElimTotal, _editable: true,
+    }
+    // 覆盖：用户编辑的值优先
+    for (const k of Object.keys(ov)) {
+      if (ov[k] != null) result[k] = ov[k]
+    }
+    // 重算抵消后
+    if (ov.simTotal != null || ov.elimTotal != null) {
+      result.postElimTotal = (ov.simTotal ?? result.simTotal) - (ov.elimTotal ?? result.elimTotal)
+    }
+    return result
+  })
+  // 追加手动新增的行
+  return [...autoRows, ...manualRows]
+})
+
+function setOverride(companyName: string, field: string, val: number | null) {
+  if (!overrides[companyName]) overrides[companyName] = {}
+  overrides[companyName][field] = val
+}
+
+const { exportData: _exportData } = useExcelIO()
+
+const INVEST_COLS: ExcelColumn[] = [
+  { key: 'companyName', header: '子企业' }, { key: 'ratio', header: '持股比例' },
+  { key: 'bookCost', header: '账面投资成本' }, { key: 'bookImpairment', header: '减值准备' },
+  { key: 'bookNet', header: '账面净额' }, { key: 'simIncomeAdj', header: '模拟损益调整' },
+  { key: 'simOtherEquity', header: '模拟其他权益' }, { key: 'simTotal', header: '模拟后长投' },
+  { key: 'elimCost', header: '抵消投资成本' }, { key: 'elimIncomeAdj', header: '抵消损益调整' },
+  { key: 'elimOtherEquity', header: '抵消其他权益' }, { key: 'elimTotal', header: '抵消合计' },
+  { key: 'postElimTotal', header: '抵消后长投' },
+]
+
+async function exportData() {
+  await _exportData({
+    data: tableRows.value,
+    columns: INVEST_COLS,
+    sheetName: '抵消后长投明细',
+    fileName: '抵消后长投明细.xlsx',
+  })
+}
+function _calcCls(v: any) { return n(v) === 0 ? 'ws-computed ws-zero' : 'ws-computed' }
+
+const headerStyle = { background: '#f0edf5', fontSize: '11px', color: '#333', padding: '3px 0' }
+function rowCellStyle() { return { padding: '4px 8px', fontSize: '12px' } }
+function rowClassName({ row }: any) { return n(row.postElimTotal) !== 0 ? 'ws-row-warn' : '' }
+
+function getSummary({ columns, data }: any) {
+  const sums: string[] = []
+  const sumFields = new Set(['bookCost','bookImpairment','bookNet','simIncomeAdj','simOtherEquity','simTotal',
+    'elimCost','elimIncomeAdj','elimOtherEquity','elimTotal','postElimTotal'])
+  columns.forEach((col: any, idx: number) => {
+    if (idx === 0) { sums[idx] = '合计'; return }
+    const prop = col.property
+    if (prop && sumFields.has(prop)) {
+      const total = data.reduce((s: number, r: any) => s + n(r[prop]), 0)
+      sums[idx] = fmt(total)
+    } else { sums[idx] = '' }
+  })
+  return sums
+}
+
+
+</script>
+
+<style scoped>
+.ws-sheet { padding: 0; position: relative; }
+.ws-sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.ws-sheet-header h3 { margin: 0; font-size: 15px; color: #333; }
+.ws-sheet-actions { display: flex; gap: 8px; }
+.ws-tip { display: flex; align-items: flex-start; gap: 6px; padding: 6px 10px; margin-bottom: 10px; background: #f4f4f5; border-radius: 6px; font-size: 12px; color: #666; line-height: 1.5; }
+.ws-computed { color: #4b2d77; font-weight: 500; }
+.ws-zero { color: #c0c4cc !important; font-weight: 400 !important; }
+.ws-bold { font-weight: 700; }
+.ws-diff-warn { color: #e6a23c !important; font-weight: 700 !important; }
+.ws-table :deep(.ws-row-warn td) { background: #fdf6ec !important; }
+.ws-table :deep(.el-table__footer-wrapper td) { background: #f8f6fb !important; font-weight: 700; color: #4b2d77; }
+.ws-table :deep(.ws-auto-cell .el-input__inner) { color: #4b2d77; background: #faf8fd; }
+.ws-link { color: #4b2d77; cursor: pointer; text-decoration: underline; font-weight: 500; }
+.ws-link:hover { color: #7c5caa; }
+</style>

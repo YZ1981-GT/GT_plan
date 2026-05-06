@@ -18,6 +18,8 @@ export interface BasicInfo {
   ultimate_company_code: string
   signing_partner_id: string | null
   manager_id: string | null
+  budget_hours: number | null
+  contract_amount: number | null
 }
 
 export interface WizardStepData {
@@ -150,9 +152,15 @@ export const useWizardStore = defineStore('wizard', {
         if (basicInfo.manager_id) {
           payload.manager_id = basicInfo.manager_id
         }
+        if (basicInfo.budget_hours != null) {
+          payload.budget_hours = basicInfo.budget_hours
+        }
+        if (basicInfo.contract_amount != null) {
+          payload.contract_amount = basicInfo.contract_amount
+        }
         
         const { data } = await http.post('/api/projects', payload)
-        const project = data.data ?? data
+        const project = data
         this.projectId = project.id
         this.stepData.basic_info = { ...basicInfo }
         this.completedSteps.basic_info = true
@@ -167,7 +175,7 @@ export const useWizardStore = defineStore('wizard', {
       this.loading = true
       try {
         const { data } = await http.get(`/api/projects/${projectId}/wizard`)
-        const state: WizardState = data.data ?? data
+        const state: WizardState = data
         this.applyWizardState(state)
       } finally {
         this.loading = false
@@ -180,7 +188,7 @@ export const useWizardStore = defineStore('wizard', {
       this.loading = true
       try {
         const { data } = await http.put(`/api/projects/${this.projectId}/wizard/${step}`, stepData)
-        const state: WizardState = data.data ?? data
+        const state: WizardState = data
         this.applyWizardState(state)
       } finally {
         this.loading = false
@@ -198,7 +206,7 @@ export const useWizardStore = defineStore('wizard', {
       this.loading = true
       try {
         const { data } = await http.post(`/api/projects/${this.projectId}/wizard/validate/${step}`)
-        return (data.data ?? data) as ValidationResult
+        return (data) as ValidationResult
       } finally {
         this.loading = false
       }
@@ -212,7 +220,7 @@ export const useWizardStore = defineStore('wizard', {
         const { data } = await http.post(
           `/api/projects/${this.projectId}/wizard/confirm`,
         )
-        return data.data ?? data
+        return data
       } finally {
         this.loading = false
       }

@@ -1,7 +1,7 @@
 {
   "wp_code": "K4",
   "name": "其他流动负债",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2299"
   ],
@@ -75,6 +75,36 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 10,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L09"
+        },
+        "tb": {
+          "row": 12,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 13,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "待转销项税额",
+          "短期应付债券",
+          "其他",
+          "待转销项税额",
+          "短期应付债券"
+        ]
       }
     },
     {
@@ -105,14 +135,19 @@
   ],
   "cross_references": [
     {
-      "from": "K4-1.total",
+      "from": "K4-1.R10.C7",
       "to": "tb://2299#审定数",
       "description": "审定表合计 = 试算表其他流动负债审定数"
     },
     {
       "from": "K4-2.合计",
-      "to": "K4-1.total",
+      "to": "K4-1.R10.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K4-1.R10.C7",
+      "to": "REPORT('BS-L09','期末')",
+      "description": "审定表合计 = 报表其他流动负债"
     }
   ],
   "audit_checks": [
@@ -139,6 +174,12 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K4-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表其他流动负债"
     }
   ]
 }

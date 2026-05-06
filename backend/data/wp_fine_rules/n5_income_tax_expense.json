@@ -1,7 +1,7 @@
 {
   "wp_code": "N5",
   "name": "所得税费用",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "6801"
   ],
@@ -31,11 +31,6 @@
   "sheet_rules": [
     {
       "exact_name": "所得税审计程序表N5A",
-      "code": "N5A",
-      "type": "procedure"
-    },
-    {
-      "exact_name": "所得税审计程序表N3A (原底稿)",
       "code": "N5A",
       "type": "procedure"
     },
@@ -84,6 +79,35 @@
             "label": "变动率"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 11,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-017"
+        },
+        "tb_balance": {
+          "row": 13,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 14,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "当期所得税费用",
+          "递延所得税费用",
+          "其中：递延所得税资产减少（增加以“-”号）",
+          "递延所得税负债增加（减少以“-”号）"
+        ]
       }
     },
     {
@@ -99,7 +123,8 @@
     {
       "exact_name": "所得税费用明细表N5-2",
       "code": "N5-2",
-      "type": "detail"
+      "type": "detail",
+      "description": "所得税费用按子公司/纳税主体明细"
     },
     {
       "exact_name": "调整分录汇总表N5-3",
@@ -108,55 +133,92 @@
     },
     {
       "exact_name": "当期所得税费用计算表N5-4",
-      "type": "check",
-      "code": "N5-4"
+      "code": "N5-4",
+      "type": "calculation",
+      "description": "利润总额→纳税调整→应纳税所得额→当期所得税"
     },
     {
       "exact_name": "纳税调整明细表N5-5",
-      "code": "N5-2",
-      "type": "detail"
+      "code": "N5-5",
+      "type": "detail",
+      "description": "纳税调增/调减明细（永久性+暂时性差异）"
     },
     {
       "exact_name": "税收优惠明细表N5-6",
-      "code": "N5-2",
-      "type": "detail"
+      "code": "N5-6",
+      "type": "detail",
+      "description": "税收优惠政策及减免金额"
     },
     {
       "exact_name": "加计扣除研发费用情况明细表N5-6-1",
-      "code": "N5-2",
-      "type": "detail"
+      "code": "N5-6-1",
+      "type": "detail",
+      "description": "研发费用加计扣除明细"
     },
     {
       "exact_name": "高新技术企业认定条件检查表N5-6-2",
+      "code": "N5-6-2",
       "type": "check",
-      "code": "N5-6"
+      "description": "高新技术企业资质及条件检查"
     },
     {
       "exact_name": "财产损失明细表N5-7",
-      "code": "N5-2",
-      "type": "detail"
+      "code": "N5-7",
+      "type": "detail",
+      "description": "资产损失税前扣除明细"
     },
     {
       "exact_name": "递延所得税费用核对表N5-8",
-      "type": "check",
-      "code": "N5-8"
-    },
-    {
-      "exact_name": "GT_Custom",
-      "type": "check",
-      "code": "GT_Custom"
+      "code": "N5-8",
+      "type": "reconciliation",
+      "description": "递延所得税资产/负债变动 → 递延所得税费用核对"
     }
   ],
   "cross_references": [
     {
-      "from": "N5-1.total",
+      "from": "N5-1.R11.C5",
       "to": "tb://6801#审定数",
       "description": "审定表合计 = 试算表所得税费用审定数"
     },
     {
+      "from": "N5-1.R11.C5",
+      "to": "REPORT('IS-017','本期')",
+      "description": "审定表合计 = 利润表所得税费用"
+    },
+    {
+      "from": "N5-1.R11.C5",
+      "to": "N5-1.R7.C5 + N5-1.R8.C5",
+      "description": "合计 = 当期所得税 + 递延所得税"
+    },
+    {
+      "from": "N5-1.R8.C5",
+      "to": "N5-1.R9.C5 + N5-1.R10.C5",
+      "description": "递延所得税 = 递延资产变动 + 递延负债变动"
+    },
+    {
       "from": "N5-2.合计",
-      "to": "N5-1.total",
+      "to": "N5-1.R11.C5",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "N5-4.当期所得税",
+      "to": "N5-1.R7.C5",
+      "description": "计算表当期所得税 = 审定表当期所得税"
+    },
+    {
+      "from": "N5-8.递延所得税费用",
+      "to": "N5-1.R8.C5",
+      "description": "核对表递延所得税 = 审定表递延所得税"
+    },
+    {
+      "from": "N5-8.递延资产变动",
+      "to": "N1-1.期末-期初",
+      "description": "递延所得税资产变动 = N1审定表期末-期初"
+    },
+    {
+      "from": "N5-4.利润总额",
+      "to": "REPORT('IS-016','本期')",
+      "description": "计算表利润总额 = 利润表利润总额"
     }
   ],
   "audit_checks": [
@@ -168,39 +230,69 @@
     },
     {
       "code": "N5-CHK-02",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 利润表所得税费用"
+    },
+    {
+      "code": "N5-CHK-03",
+      "type": "formula",
+      "severity": "blocking",
+      "description": "合计 = 当期所得税 + 递延所得税"
+    },
+    {
+      "code": "N5-CHK-04",
       "type": "cross_ref",
       "severity": "warning",
       "description": "明细表合计 = 审定表合计"
     },
     {
-      "code": "N5-CHK-03",
-      "type": "movement",
-      "severity": "info",
-      "description": "期初 + 变动 = 期末"
-    },
-    {
-      "code": "N5-CHK-04",
-      "type": "completeness",
-      "severity": "warning",
-      "description": "明细表数据完整"
-    },
-    {
       "code": "N5-CHK-05",
       "type": "calculation",
       "severity": "warning",
-      "description": "有效税率分析（实际税负vs法定税率）"
+      "description": "当期所得税计算表结果与审定表一致"
     },
     {
       "code": "N5-CHK-06",
-      "type": "formula",
+      "type": "reconciliation",
       "severity": "warning",
-      "description": "所得税费用 = 当期所得税 + 递延所得税"
+      "description": "递延所得税核对表与审定表一致"
     },
     {
       "code": "N5-CHK-07",
-      "type": "reconciliation",
+      "type": "analysis",
+      "severity": "warning",
+      "description": "有效税率分析（实际税负 vs 法定25%，偏差需解释）"
+    },
+    {
+      "code": "N5-CHK-08",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "纳税调整明细表已编制"
+    },
+    {
+      "code": "N5-CHK-09",
+      "type": "check",
+      "severity": "warning",
+      "description": "税收优惠政策合规性检查"
+    },
+    {
+      "code": "N5-CHK-10",
+      "type": "check",
       "severity": "info",
-      "description": "税会差异调节表已编制"
+      "description": "高新技术企业资质有效期检查"
+    },
+    {
+      "code": "N5-CHK-11",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "递延所得税资产变动与N1审定表一致"
+    },
+    {
+      "code": "N5-CHK-12",
+      "type": "cross_ref",
+      "severity": "info",
+      "description": "计算表利润总额与利润表一致"
     }
   ]
 }

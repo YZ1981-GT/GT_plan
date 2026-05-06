@@ -225,7 +225,7 @@ export const GUIDE_WORKPAPER_GENERATE = {
   ],
   tips: [
     '生成后可在底稿列表中查看和编辑',
-    '支持 ONLYOFFICE 在线编辑或下载后本地编辑',
+    '支持 Univer 在线编辑或下载后本地编辑',
   ],
 }
 

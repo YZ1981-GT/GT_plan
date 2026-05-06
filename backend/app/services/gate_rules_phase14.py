@@ -4,12 +4,14 @@
 所有规则注册到 gate_engine.rule_registry
 """
 import logging
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.gate_engine import GateRule, GateRuleHit, rule_registry
+from app.services.gate_engine import GateRule, GateRuleHit, gate_engine, rule_registry
 from app.models.phase14_enums import GateType, GateSeverity
 
 logger = logging.getLogger(__name__)
@@ -386,6 +388,574 @@ class ConsistencyBlockingDiffRule(GateRule):
             return None
 
 
+async def check_misstatement_exceeds_materiality(
+    project_id: str | uuid.UUID, db: AsyncSession
+) -> dict | None:
+    """检查未更正错报是否超过整体重要性水平
+
+    需求 20.1：WHEN 未更正错报累计金额超过整体重要性水平，THE 底稿提交复核门禁
+    SHALL 阻断提交，并显示"未更正错报超过重要性水平"的阻断原因
+
+    返回 dict（命中规则时）或 None（未命中或无法比较时）
+    """
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import UnadjustedMisstatement, Materiality
+
+    pid = project_id if isinstance(project_id, uuid.UUID) else uuid.UUID(str(project_id))
+
+    # 查询累计错报金额（所有未删除、未跨年结转到后续年度的错报之和）
+    total_q = sa.select(
+        sa.func.coalesce(sa.func.sum(UnadjustedMisstatement.misstatement_amount), 0)
+    ).where(
+        UnadjustedMisstatement.project_id == pid,
+        UnadjustedMisstatement.is_deleted == sa.false(),
+    )
+    total_amount = float((await db.execute(total_q)).scalar() or 0)
+
+    # 查询整体重要性水平（取最新设置的一条）
+    mat_q = (
+        sa.select(Materiality.overall_materiality)
+        .where(
+            Materiality.project_id == pid,
+            Materiality.is_deleted == sa.false(),
+        )
+        .order_by(Materiality.created_at.desc())
+        .limit(1)
+    )
+    overall_materiality = float((await db.execute(mat_q)).scalar() or 0)
+
+    # 无重要性水平记录时不做比较（避免误阻断，由项目启动阶段的校验去提醒）
+    if overall_materiality <= 0:
+        return None
+
+    if total_amount > overall_materiality:
+        return {
+            "rule_code": "GATE-MISSTATEMENT",
+            "error_code": "MISSTATEMENT_EXCEEDS_MATERIALITY",
+            "severity": "blocking",
+            "message": (
+                f"未更正错报超过重要性水平（累计 {total_amount:,.2f} > 整体重要性 "
+                f"{overall_materiality:,.2f}）"
+            ),
+            "total_amount": total_amount,
+            "overall_materiality": overall_materiality,
+        }
+    return None
+
+
+# ── GATE-MISSTATEMENT: 未更正错报超过重要性水平 ────────────────
+
+class MisstatementExceedsMaterialityRule(GateRule):
+    """未更正错报累计金额超过整体重要性水平时阻断提交复核/签字（需求 20.1）"""
+    rule_code = "GATE-MISSTATEMENT"
+    error_code = "MISSTATEMENT_EXCEEDS_MATERIALITY"
+    severity = GateSeverity.blocking
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            result = await check_misstatement_exceeds_materiality(str(project_id), db)
+            if result:
+                return GateRuleHit(
+                    rule_code=self.rule_code,
+                    error_code=self.error_code,
+                    severity=self.severity,
+                    message=result["message"],
+                    location={"section": "misstatements"},
+                    suggested_action="请更正错报或在错报汇总表中说明不更正原因，确保累计金额不超过整体重要性水平",
+                )
+            return None
+        except Exception as e:
+            logger.error(f"[GATE-MISSTATEMENT] check error: {e}")
+            return None
+
+
+# ── R1-AJE-UNCONVERTED: rejected AJE 未转为错报（warning） ─────
+
+class UnconvertedRejectedAJERule(GateRule):
+    """扫描 review_status=rejected 且未关联到 UnadjustedMisstatement 的 AJE 组。
+
+    对齐 R1 需求 3 验收 7：findings 为 warning 级（建议转错报），阻断级由质控合伙人评估。
+    粒度：按 Adjustment.entry_group_id 聚合（一组调整分录视为一个 AJE 组）。
+    判定"已转错报"：存在任一 UnadjustedMisstatement.source_adjustment_id
+    指向该组内任一 Adjustment.id。
+    """
+    rule_code = "R1-AJE-UNCONVERTED"
+    error_code = "AJE_REJECTED_NOT_CONVERTED"
+    severity = GateSeverity.warning
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            from app.models.audit_platform_models import (
+                Adjustment,
+                AdjustmentType,
+                ReviewStatus,
+                UnadjustedMisstatement,
+            )
+
+            # 1) 查出所有 rejected AJE 组（group_id + 每组 adjustment_ids）
+            rejected_rows = (
+                await db.execute(
+                    select(Adjustment.entry_group_id, Adjustment.id)
+                    .where(
+                        Adjustment.project_id == project_id,
+                        Adjustment.is_deleted.is_(False),
+                        Adjustment.review_status == ReviewStatus.rejected,
+                        Adjustment.adjustment_type == AdjustmentType.aje,
+                    )
+                )
+            ).all()
+            if not rejected_rows:
+                return None
+
+            group_to_adj_ids: dict[uuid.UUID, set[uuid.UUID]] = {}
+            for group_id, adj_id in rejected_rows:
+                group_to_adj_ids.setdefault(group_id, set()).add(adj_id)
+
+            # 2) 查出该项目内已转为错报的 adjustment_id 集合
+            converted_rows = (
+                await db.execute(
+                    select(UnadjustedMisstatement.source_adjustment_id).where(
+                        UnadjustedMisstatement.project_id == project_id,
+                        UnadjustedMisstatement.is_deleted.is_(False),
+                        UnadjustedMisstatement.source_adjustment_id.isnot(None),
+                    )
+                )
+            ).all()
+            converted_ids = {r[0] for r in converted_rows if r[0] is not None}
+
+            # 3) 统计未转换的组：该组所有 rejected AJE 均未出现在 converted_ids
+            unconverted_groups = [
+                gid
+                for gid, adj_ids in group_to_adj_ids.items()
+                if not (adj_ids & converted_ids)
+            ]
+            if not unconverted_groups:
+                return None
+
+            count = len(unconverted_groups)
+            sample = [str(g) for g in unconverted_groups[:5]]
+            return GateRuleHit(
+                rule_code=self.rule_code,
+                error_code=self.error_code,
+                severity=self.severity,
+                message=f"{count} 个被驳回的 AJE 组未转为错报，建议评估是否汇入错报汇总表",
+                location={
+                    "project_id": str(project_id),
+                    "section": "adjustments",
+                    "unconverted_group_count": count,
+                    "sample_entry_group_ids": sample,
+                },
+                suggested_action=(
+                    "打开《调整分录》页，对 rejected 行点击『转为错报』，"
+                    "或在此处直接通过 /api/adjustments/{group_id}/convert-to-misstatement 一键转换"
+                ),
+            )
+        except Exception as e:
+            logger.debug(f"[R1-AJE-UNCONVERTED] check skipped: {e}")
+            return None
+
+
+# ── R1-EVENT-CASCADE: 事件级联消费健康（首次部署 warning，满月后 blocking） ─────
+
+class EventCascadeHealthRule(GateRule):
+    """检查最近 1 小时内 WORKPAPER_SAVED/REPORTS_UPDATED 事件的消费健康。
+
+    对齐 R1 需求 3 验收 8：
+    - 检查窗口：最近 1 小时
+    - 事件源：ImportEventOutbox 中 status in (pending, failed) 的对应事件类型
+    - severity 动态：
+        * 未到 enforcement_start_date 时为 warning（首次部署宽容期）
+        * 已到或超过 enforcement_start_date 时升为 blocking
+      通过 GateRuleConfig(rule_code='R1-EVENT-CASCADE', threshold_key='enforcement_start_date')
+      配置，未配置时默认 '2026-06-05'（R1 上线起约 1 个月）。
+
+    说明：事件发布路径并非全部经 outbox（部分 WORKPAPER_SAVED 是 in-memory publish），
+    本规则只对 outbox 已记录的事件做健康探测，对未经 outbox 覆盖的事件做最佳努力。
+    """
+    rule_code = "R1-EVENT-CASCADE"
+    error_code = "EVENT_CASCADE_UNHEALTHY"
+    severity = GateSeverity.warning  # 类属性为默认，实际返回时动态覆盖
+
+    WINDOW_HOURS = 1
+    DEFAULT_ENFORCEMENT_START_DATE = "2026-06-05"
+    WATCHED_EVENT_TYPES = ("workpaper.saved", "reports.updated")
+
+    async def _resolve_severity(self, db: AsyncSession) -> str:
+        """读取 enforcement_start_date 决定 severity。"""
+        try:
+            raw = await gate_engine.load_rule_config(
+                db=db,
+                rule_code=self.rule_code,
+                threshold_key="enforcement_start_date",
+            )
+        except Exception:
+            raw = None
+        start_str = (raw or self.DEFAULT_ENFORCEMENT_START_DATE).strip()
+        try:
+            # 允许 'YYYY-MM-DD' 或 ISO8601
+            if len(start_str) == 10:
+                start_dt = datetime.strptime(start_str, "%Y-%m-%d").replace(
+                    tzinfo=timezone.utc
+                )
+            else:
+                start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            start_dt = datetime.strptime(
+                self.DEFAULT_ENFORCEMENT_START_DATE, "%Y-%m-%d"
+            ).replace(tzinfo=timezone.utc)
+
+        now = datetime.now(tz=timezone.utc)
+        return (
+            GateSeverity.blocking
+            if now >= start_dt
+            else GateSeverity.warning
+        )
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            from app.models.dataset_models import ImportEventOutbox, OutboxStatus
+
+            since = datetime.utcnow() - timedelta(hours=self.WINDOW_HOURS)
+            stmt = (
+                select(
+                    ImportEventOutbox.event_type,
+                    ImportEventOutbox.status,
+                    func.count(ImportEventOutbox.id),
+                )
+                .where(
+                    ImportEventOutbox.project_id == project_id,
+                    ImportEventOutbox.event_type.in_(self.WATCHED_EVENT_TYPES),
+                    ImportEventOutbox.status.in_(
+                        [OutboxStatus.pending, OutboxStatus.failed]
+                    ),
+                    ImportEventOutbox.created_at >= since,
+                )
+                .group_by(ImportEventOutbox.event_type, ImportEventOutbox.status)
+            )
+            rows = (await db.execute(stmt)).all()
+            if not rows:
+                return None
+
+            by_status: dict[str, int] = {"pending": 0, "failed": 0}
+            by_event: dict[str, int] = {}
+            for event_type, status, cnt in rows:
+                status_val = status.value if hasattr(status, "value") else str(status)
+                by_status[status_val] = by_status.get(status_val, 0) + int(cnt)
+                by_event[event_type] = by_event.get(event_type, 0) + int(cnt)
+
+            total = sum(by_status.values())
+            if total <= 0:
+                return None
+
+            severity = await self._resolve_severity(db)
+            retry_hint_sec = max(30, min(300, total * 10))  # 粗略估计等待时长
+
+            return GateRuleHit(
+                rule_code=self.rule_code,
+                error_code=self.error_code,
+                severity=severity,
+                message=(
+                    f"下游更新未同步：近 {self.WINDOW_HOURS} 小时内仍有 {total} 条事件未完成消费"
+                    f"（pending={by_status.get('pending', 0)}，failed={by_status.get('failed', 0)}）"
+                ),
+                location={
+                    "project_id": str(project_id),
+                    "section": "event_cascade",
+                    "window_hours": self.WINDOW_HOURS,
+                    "by_status": by_status,
+                    "by_event_type": by_event,
+                    "watched_event_types": list(self.WATCHED_EVENT_TYPES),
+                },
+                suggested_action=(
+                    f"下游更新未同步，请等待约 {retry_hint_sec} 秒后重试；"
+                    "若持续不消散，请在『事件 Outbox 监控』面板检查 failed 事件"
+                ),
+            )
+        except Exception as e:
+            # 表不存在或 schema 差异时静默降级，避免把 gate 评估打爆
+            logger.debug(f"[R1-EVENT-CASCADE] check skipped: {e}")
+            return None
+
+
+# ── R1-INDEPENDENCE: 独立性声明完整性检查（blocking） ─────────
+
+class IndependenceDeclarationCompleteRule(GateRule):
+    """sign_off gate 要求项目核心四角色均已 submitted 或 approved 独立性声明。
+
+    对齐 R1 需求 10 验收 3：项目组核心成员（signing_partner / manager / qc / eqcr）
+    均需单独提交声明，缺一个都阻断 sign_off gate。
+
+    兼容逻辑：
+    - 旧 wizard_state.independence_confirmed=true 视为 legacy 通过，
+      但附带升级提醒（warning 级 finding）。
+    - R1 Bug Fix 4：已归档项目（archived_at IS NOT NULL）直接跳过检查。
+    - R1 Bug Fix 4：创建时间早于 R1 上线日（LEGACY_CUTOFF_DATE）的老项目，
+      缺声明时返回 None 并记 warning 日志（宽容期），避免上线瞬间全部阻断。
+    - 新项目（created_at >= LEGACY_CUTOFF_DATE）严格阻断。
+    """
+    rule_code = "R1-INDEPENDENCE"
+    error_code = "INDEPENDENCE_DECLARATION_INCOMPLETE"
+    severity = GateSeverity.blocking
+
+    # 核心角色列表（需要提交独立性声明的角色）
+    REQUIRED_ROLES = ("signing_partner", "manager", "qc", "eqcr")
+    # 视为"已完成"的声明状态
+    COMPLETED_STATUSES = ("submitted", "pending_conflict_review", "approved")
+    # R1 Bug Fix 4: R1 上线日期（此日期之前创建的项目视为 legacy）
+    #
+    # Batch 3-14 下线时机说明：
+    # 此常量在 R6+ 老项目全部升级完毕后，应配合环境变量
+    # `INDEPENDENCE_LEGACY_GRACE_ENABLED=False`（见 Batch 3-7）关闭宽容期。
+    # 此常量本身可保留作"历史纪念"供追溯，也可在确认再无 legacy 项目后
+    # 连同 _is_legacy_project / _all_core_roles_declared 一并删除。
+    LEGACY_CUTOFF_DATE = datetime(2026, 5, 5, tzinfo=timezone.utc)
+
+    async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
+        project_id = context.get("project_id")
+        if not project_id:
+            return None
+        try:
+            from app.models.core import Project
+            from app.models.staff_models import ProjectAssignment
+            from app.models.independence_models import IndependenceDeclaration
+
+            # --- R1 Bug Fix 4: 归档项目 + legacy 项目跳过 ---
+            project_meta = await self._load_project_meta(db, project_id)
+            if project_meta is not None:
+                archived_at, created_at = project_meta
+                if archived_at is not None:
+                    logger.debug(
+                        "[R1-INDEPENDENCE] project %s archived, skip check",
+                        project_id,
+                    )
+                    return None
+
+                if self._is_legacy_project(created_at):
+                    # legacy 项目：预检查声明状态，缺了就记 warning 并放行
+                    if not await self._all_core_roles_declared(db, project_id):
+                        logger.warning(
+                            "[R1-INDEPENDENCE] legacy project %s "
+                            "(created_at=%s) missing independence declaration, "
+                            "grace period applied — please backfill manually",
+                            project_id,
+                            created_at,
+                        )
+                        return None
+                    # legacy 但已补录完 → 继续走正常流程
+
+            # 1) 检查旧 legacy 兼容：wizard_state.independence_confirmed
+            legacy_pass = await self._check_legacy(db, project_id)
+            if legacy_pass:
+                # legacy 通过但附带升级提醒（不阻断）
+                return GateRuleHit(
+                    rule_code=self.rule_code,
+                    error_code="INDEPENDENCE_LEGACY_UPGRADE",
+                    severity=GateSeverity.warning,
+                    message="独立性确认使用旧版布尔标记（legacy），建议升级为结构化声明",
+                    location={"project_id": str(project_id), "section": "independence"},
+                    suggested_action="请项目核心成员分别填写独立性声明表单，替代旧版勾选确认",
+                )
+
+            # 2) 查询项目核心角色的 staff_id
+            assignment_stmt = select(
+                ProjectAssignment.role, ProjectAssignment.staff_id
+            ).where(
+                ProjectAssignment.project_id == project_id,
+                ProjectAssignment.is_deleted.is_(False),
+                ProjectAssignment.role.in_(self.REQUIRED_ROLES),
+            )
+            assignment_rows = (await db.execute(assignment_stmt)).all()
+
+            if not assignment_rows:
+                # 无核心角色分配时不阻断（可能是项目初始化阶段）
+                return None
+
+            # 3) 查询已完成的声明
+            decl_stmt = select(
+                IndependenceDeclaration.declarant_id
+            ).where(
+                IndependenceDeclaration.project_id == project_id,
+                IndependenceDeclaration.status.in_(self.COMPLETED_STATUSES),
+            )
+            completed_declarants = {
+                row[0] for row in (await db.execute(decl_stmt)).all()
+            }
+
+            # 4) 检查哪些角色缺少声明
+            missing_roles = []
+            for role, staff_id in assignment_rows:
+                if staff_id not in completed_declarants:
+                    missing_roles.append(role)
+
+            if not missing_roles:
+                return None
+
+            unique_missing = sorted(set(missing_roles))
+            return GateRuleHit(
+                rule_code=self.rule_code,
+                error_code=self.error_code,
+                severity=self.severity,
+                message=f"独立性声明未完成：{', '.join(unique_missing)} 角色尚未提交",
+                location={
+                    "project_id": str(project_id),
+                    "section": "independence",
+                    "missing_roles": unique_missing,
+                },
+                suggested_action="请相关人员前往『独立性声明』页面填写并提交声明",
+            )
+        except Exception as e:
+            logger.debug(f"[R1-INDEPENDENCE] check skipped: {e}")
+            return None
+
+    @classmethod
+    def _is_legacy_project(cls, created_at: Optional[datetime]) -> bool:
+        """project.created_at 早于配置的 legacy cutoff 则视为 legacy。
+
+        Batch 2-9: cutoff 从 settings.INDEPENDENCE_LEGACY_CUTOFF_DATE 读取，
+        空字符串表示"无 legacy 宽容期"，所有项目严格检查。
+        解析失败 → None（Batch 3-1：统一关闭宽容期 + WARNING 日志）。
+
+        Batch 3-7: GRACE_ENABLED=False 直接返回 False，用于 R6+ 老项目
+        全部升级完毕后全局关闭宽容期（无需改 CUTOFF_DATE 字符串）。
+        """
+        if created_at is None:
+            return False
+
+        # Batch 3-7: 全局关闭开关
+        try:
+            from app.core.config import settings
+            if getattr(settings, "INDEPENDENCE_LEGACY_GRACE_ENABLED", True) is False:
+                return False
+        except Exception:
+            pass
+
+        cutoff = cls._resolve_legacy_cutoff()
+        if cutoff is None:
+            # 配置为空字符串或非法 → 无宽容期
+            return False
+
+        # 统一成 tz-aware UTC 再比较，避免 naive/aware 混比异常
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        return created_at < cutoff
+
+    @classmethod
+    def _resolve_legacy_cutoff(cls) -> Optional[datetime]:
+        """从 settings 读取 INDEPENDENCE_LEGACY_CUTOFF_DATE，解析为 tz-aware datetime。
+
+        语义（Batch 3-1 统一）：
+        - 空字符串 → None（关闭宽容期，所有项目严格检查）
+        - 无效配置（如 "abc"）→ None（关闭宽容期）+ 记 WARNING 日志
+        - 有效日期字符串（YYYY-MM-DD）→ 对应的 tz-aware datetime
+
+        改动原因：
+        以前解析失败会静默回退到硬编码 LEGACY_CUTOFF_DATE，导致运维配错反而
+        激活宽容期——与"空串关闭"语义矛盾。现在统一为：任何非合法值都视为
+        关闭宽容期，只是空串静默、非法值记 WARNING 便于排查。
+        """
+        try:
+            from app.core.config import settings
+            raw = (settings.INDEPENDENCE_LEGACY_CUTOFF_DATE or "").strip()
+        except Exception:
+            raw = ""
+
+        if not raw:
+            # 空字符串 = 关闭宽容期（静默）
+            return None
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except Exception:
+            logger.warning(
+                "[R1-INDEPENDENCE] invalid INDEPENDENCE_LEGACY_CUTOFF_DATE=%r, "
+                "grace period DISABLED (treating all projects as strict). "
+                "If this was unintended, fix the config to 'YYYY-MM-DD' or empty string.",
+                raw,
+            )
+            return None
+
+    async def _load_project_meta(
+        self, db: AsyncSession, project_id
+    ) -> Optional[tuple[Optional[datetime], Optional[datetime]]]:
+        """返回 (archived_at, created_at)；查询失败返回 None。"""
+        try:
+            from app.models.core import Project
+
+            stmt = select(Project.archived_at, Project.created_at).where(
+                Project.id == project_id,
+            )
+            row = (await db.execute(stmt)).first()
+            if row is None:
+                return None
+            return (row[0], row[1])
+        except Exception as e:
+            logger.debug(f"[R1-INDEPENDENCE] _load_project_meta failed: {e}")
+            return None
+
+    async def _all_core_roles_declared(
+        self, db: AsyncSession, project_id
+    ) -> bool:
+        """legacy 项目检查是否已补录完所有核心角色声明（辅助方法）。"""
+        try:
+            from app.models.staff_models import ProjectAssignment
+            from app.models.independence_models import IndependenceDeclaration
+
+            assignment_rows = (await db.execute(
+                select(ProjectAssignment.staff_id).where(
+                    ProjectAssignment.project_id == project_id,
+                    ProjectAssignment.is_deleted.is_(False),
+                    ProjectAssignment.role.in_(self.REQUIRED_ROLES),
+                )
+            )).all()
+            if not assignment_rows:
+                # 无核心角色分配 → 视为"无需声明"
+                return True
+
+            completed = {
+                r[0] for r in (await db.execute(
+                    select(IndependenceDeclaration.declarant_id).where(
+                        IndependenceDeclaration.project_id == project_id,
+                        IndependenceDeclaration.status.in_(self.COMPLETED_STATUSES),
+                    )
+                )).all()
+            }
+
+            for (staff_id,) in assignment_rows:
+                if staff_id not in completed:
+                    return False
+            return True
+        except Exception as e:
+            logger.debug(f"[R1-INDEPENDENCE] _all_core_roles_declared failed: {e}")
+            # 查询失败视为"已补录"（不阻断 legacy 宽容期路径）
+            return True
+
+    async def _check_legacy(self, db: AsyncSession, project_id) -> bool:
+        """检查旧版 wizard_state.independence_confirmed 是否为 true。"""
+        try:
+            stmt = text("""
+                SELECT wizard_state FROM projects
+                WHERE id = :project_id
+            """)
+            result = await db.execute(stmt, {"project_id": str(project_id)})
+            row = result.fetchone()
+            if row and row[0]:
+                ws = row[0] if isinstance(row[0], dict) else {}
+                return ws.get("independence_confirmed", False) is True
+        except Exception:
+            pass
+        return False
+
+
 def register_phase14_rules():
     """注册 QC-19~26 到 rule_registry"""
     all_gates = [GateType.submit_review, GateType.sign_off, GateType.export_package]
@@ -408,4 +978,18 @@ def register_phase14_rules():
     # Phase 16: 一致性阻断联动签字门禁
     rule_registry.register(GateType.sign_off, ConsistencyBlockingDiffRule())
 
-    logger.info("[GATE] Phase 14 rules QC-19~26 + consistency registered")
+    # 需求 20.1: 未更正错报超过重要性水平阻断提交复核 + 签字
+    rule_registry.register_all(submit_sign, MisstatementExceedsMaterialityRule())
+
+    # R1 需求 3 验收 7/8：新增两条规则
+    # - UnconvertedRejectedAJERule: sign_off（warning 级，建议转错报）
+    # - EventCascadeHealthRule: sign_off + export_package（首次部署 warning，满月后 blocking）
+    rule_registry.register_all([GateType.sign_off], UnconvertedRejectedAJERule())
+    rule_registry.register_all(
+        [GateType.sign_off, GateType.export_package], EventCascadeHealthRule()
+    )
+
+    # R1 需求 10：独立性声明完整性检查（sign_off blocking）
+    rule_registry.register_all([GateType.sign_off], IndependenceDeclarationCompleteRule())
+
+    logger.info("[GATE] Phase 14 rules QC-19~26 + consistency + misstatement registered")

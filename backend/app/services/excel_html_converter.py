@@ -1,9 +1,9 @@
-"""Excel ↔ HTML 互转引擎 — 双格式保存 + ONLYOFFICE 联动
+"""Excel ↔ HTML 互转引擎 — 双格式保存 + Univer 联动
 
 核心流程：
 1. Excel → structure.json → HTML（在线编辑）
 2. HTML 编辑 → structure.json 更新 → Excel 回写
-3. ONLYOFFICE 编辑 → WOPI put_file → 自动同步 structure.json
+3. Univer 编辑 → univer-save API → 自动同步 structure.json
 
 structure.json 是权威数据源，HTML 和 Excel 都从它生成。
 取数公式绑定在 structure.json 的单元格上，与格式无关。
@@ -671,10 +671,10 @@ def structure_to_excel(structure: dict, output_path: str, sheet_index: int | Non
     return output_path
 
 
-# ═══ ONLYOFFICE 联动：WOPI put_file 后同步 structure.json ═══
+# ═══ 编辑器联动：编辑保存后同步 structure.json ═══
 
 def sync_structure_from_excel(excel_path: str, structure_path: str) -> dict:
-    """ONLYOFFICE 保存后，从 Excel 重新解析更新 structure.json
+    """编辑器保存后，从 Excel 重新解析更新 structure.json
 
     保留用户自定义的 fetch_rule_id 绑定（Excel 中没有这个信息）。
     """
@@ -703,7 +703,7 @@ def sync_structure_from_excel(excel_path: str, structure_path: str) -> dict:
     # 保留版本号递增
     old_version = old_structure.get("metadata", {}).get("version", 0)
     new_structure["metadata"]["version"] = old_version + 1
-    new_structure["metadata"]["synced_from"] = "onlyoffice"
+    new_structure["metadata"]["synced_from"] = "editor"
     new_structure["metadata"]["synced_at"] = datetime.utcnow().isoformat()
 
     # 保存

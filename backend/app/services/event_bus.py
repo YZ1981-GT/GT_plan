@@ -125,13 +125,31 @@ class EventBus:
         for handler in handlers:
             try:
                 await handler(payload)
-            except Exception:
+            except Exception as exc:
                 handler_name = getattr(handler, "__qualname__", repr(handler))
                 logger.exception(
                     "EventBus: handler %s failed for event %s",
                     handler_name,
                     event_type.value,
                 )
+                # 发布 SYNC_FAILED 事件通知前端（避免递归：SYNC_FAILED 自身失败不再发布）
+                if event_type != EventType.SYNC_FAILED:
+                    try:
+                        fail_payload = EventPayload(
+                            event_type=EventType.SYNC_FAILED,
+                            project_id=payload.project_id,
+                            year=payload.year,
+                            account_codes=payload.account_codes,
+                            extra={
+                                "source_event": event_type.value,
+                                "handler": handler_name,
+                                "error": str(exc),
+                            },
+                        )
+                        await self._notify_sse(fail_payload)
+                        asyncio.ensure_future(self._persist_to_stream(fail_payload))
+                    except Exception:
+                        logger.warning("EventBus: failed to publish SYNC_FAILED notification")
 
         # Push to SSE queues for frontend notification
         await self._notify_sse(payload)
@@ -268,11 +286,12 @@ class EventBus:
 
     async def _notify_sse(self, payload: EventPayload) -> None:
         """将事件推送到所有 SSE 队列"""
-        for queue in self._sse_queues:
+        for queue in list(self._sse_queues):
             try:
                 queue.put_nowait(payload)
             except asyncio.QueueFull:
-                logger.warning("EventBus: SSE queue full, dropping event")
+                logger.warning("EventBus: SSE queue full, removing zombie queue")
+                self.remove_sse_queue(queue)
 
 
 # ---------------------------------------------------------------------------

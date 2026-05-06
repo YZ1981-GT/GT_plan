@@ -1,7 +1,7 @@
 {
   "wp_code": "H2",
   "name": "在建工程",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "1604"
   ],
@@ -195,18 +195,18 @@
   ],
   "cross_references": [
     {
-      "from": "H2-1.total",
+      "from": "H2-1.R12.C10",
       "to": "tb://1604#审定数",
       "description": "审定表合计 = 试算表在建工程审定数"
     },
     {
-      "from": "H2-1.total",
+      "from": "H2-1.R12.C10",
       "to": "report://BS/BS-015#期末",
       "description": "审定表合计 = 报表在建工程"
     },
     {
       "from": "H2-2.合计",
-      "to": "H2-1.total",
+      "to": "H2-1.R12.C10",
       "description": "明细表合计 = 审定表合计"
     },
     {
@@ -223,6 +223,11 @@
       "from": "H2-15.减值",
       "to": "H2-1.减值准备",
       "description": "减值测试结果 = 审定表减值准备"
+    },
+    {
+      "from": "H2-1.R12.C10",
+      "to": "REPORT('BS-015','期末')",
+      "description": "审定表合计 = 报表在建工程"
     }
   ],
   "audit_checks": [

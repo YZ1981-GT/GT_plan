@@ -12,7 +12,7 @@
  */
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 export interface ProjectOption {
   id: string
@@ -39,11 +39,11 @@ export function useProjectSelector(pagePath: string) {
 
   async function loadProjectOptions() {
     try {
-      const { data } = await http.get('/api/projects', {
+      const data = await api.get('/api/projects', {
         params: { page_size: 200 },
         validateStatus: (s: number) => s < 600,
       })
-      const items = data?.data?.items ?? data?.items ?? data?.data ?? data ?? []
+      const items = data?.data?.items ?? data?.items ?? data ?? []
       projectOptions.value = (Array.isArray(items) ? items : []).map((p: any) => ({
         id: p.id,
         name: p.client_name || p.name || p.id,

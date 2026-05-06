@@ -89,13 +89,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getChildCompanies, generateWorkpaperSummary, exportWorkpaperSummary } from '@/services/auditPlatformApi'
+import { fmtAmount } from '@/utils/formatters'
+import { useProjectStore } from '@/stores/project'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
+const projectStore = useProjectStore()
+const year = computed(() => projectStore.year || new Date().getFullYear())
 
 // ── 科目树 ──
 const accountFilter = ref('')
@@ -231,9 +235,8 @@ async function doGenerate() {
 
   loading.value = true
   try {
-    const year = new Date().getFullYear()
     const result = await generateWorkpaperSummary(projectId, {
-      year,
+      year: year.value,
       account_codes: checkedAccounts,
       company_codes: checkedCompanies,
     })
@@ -258,7 +261,7 @@ async function doExport() {
 
   try {
     const blob = await exportWorkpaperSummary(projectId, {
-      year: new Date().getFullYear(),
+      year: year.value,
       account_codes: checkedAccounts,
       company_codes: checkedCompanies,
     })
@@ -286,12 +289,7 @@ function getSummaries({ columns }: any) {
   })
 }
 
-function fmtAmt(v: any): string {
-  const n = Number(v)
-  if (!n && n !== 0) return '-'
-  if (n === 0) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtAmt = fmtAmount
 </script>
 
 <style scoped>

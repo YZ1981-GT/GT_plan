@@ -55,10 +55,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Bell, Warning, CircleCheckFilled, InfoFilled } from '@element-plus/icons-vue'
 import { notificationApi } from '@/services/collaborationApi'
+import { useCollaborationStore } from '@/stores/collaboration'
+
+const collaborationStore = useCollaborationStore()
 
 const popoverVisible = ref(false)
 const notifications = ref<any[]>([])
@@ -77,6 +80,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
+})
+
+// 监听 collaboration store 的 unreadCount 变化（SSE 触发时实时刷新）
+watch(() => collaborationStore.unreadCount, (newCount) => {
+  unreadCount.value = newCount
 })
 
 async function fetchNotifications() {

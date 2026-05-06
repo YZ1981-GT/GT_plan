@@ -63,7 +63,7 @@ async def get_prior_year_data(
     )
     row = result.first()
     if not row or not row[0]:
-        return {"has_prior_year": False, "data": []}
+        return {"has_prior_year": False, "rows": []}
 
     prior_pid = row[0]
 
@@ -82,7 +82,7 @@ async def get_prior_year_data(
     return {
         "has_prior_year": True,
         "prior_project_id": str(prior_pid),
-        "data": [
+        "rows": [
             {
                 "account_code": r.standard_account_code,
                 "account_name": r.account_name,

@@ -1,13 +1,12 @@
 """WOPI Host 服务 — 文件元信息查询、读取、写入、锁管理、访问令牌
 
+保留向后兼容（底稿编辑已迁移至 Univer 纯前端方案）。
 企业级实现：
-- check_file_info: 从 working_paper 表获取元数据 + 动态 UserCanWrite（编制/复核/只读/签字窗口四场景）+ trace 写入
+- check_file_info: 从 working_paper 表获取元数据
 - get_file: 从本地磁盘读取底稿文件
-- put_file: 企业级 8 步保存（锁校验→版本快照→写入→哈希校验→DB更新→审计留痕→事件发布→云端双写）+ 版本链写入
-- lock/unlock/refresh_lock: Redis 优先 + 内存降级，TTL=30min
+- put_file: 企业级保存（锁校验→版本快照→写入→哈希校验→DB更新→审计留痕→事件发布）
+- lock/unlock/refresh_lock: Redis 优先 + 内存降级
 - generate_access_token / validate_access_token: 复用 JWT 模块
-
-Validates: Requirements 3.1, 3.2, 3.3, 3.7
 """
 
 from __future__ import annotations
@@ -368,7 +367,7 @@ class WOPIHostService:
         except Exception as e:
             logger.warning("auto parse after online save failed: %s", e)
 
-        # 7c. 自动重建 structure.json（ONLYOFFICE保存后坐标同步）
+        # 7c. 自动重建 structure.json（编辑保存后坐标同步）
         try:
             from app.services.wp_structure_bridge import generate_structure_for_workpaper
             from app.models.workpaper_models import WpIndex as _WpIndex

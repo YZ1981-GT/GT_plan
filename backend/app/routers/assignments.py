@@ -47,11 +47,24 @@ async def save_assignments(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    # R5 任务 2：捕获 EQCR 独立性等 SOD 违规，转 409 返回
+    from app.services.sod_guard_service import SodViolation
+
     svc = AssignmentService(db)
     assignments = [a.model_dump() for a in data.assignments]
-    created = await svc.save_assignments(
-        project_id, assignments, assigned_by=user.id if user else None
-    )
+    try:
+        created = await svc.save_assignments(
+            project_id, assignments, assigned_by=user.id if user else None
+        )
+    except SodViolation as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": exc.policy_code,
+                "message": exc.message,
+            },
+        )
     await db.commit()
     return {
         "message": f"已委派 {len(created)} 名成员",

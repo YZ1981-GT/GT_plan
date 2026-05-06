@@ -32,7 +32,8 @@
           <span class="stat-label">{{ card.label }}</span>
         </div>
         <div class="stat-sparkline">
-          <GTChart :option="card.sparkOpt" :height="36" />
+          <el-empty v-if="trendLoadError" description="趋势数据加载失败" :image-size="60" />
+          <GTChart v-else :option="card.sparkOpt" :height="36" />
         </div>
       </div>
     </div>
@@ -104,6 +105,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { listProjects, getMyAssignments } from '@/services/commonApi'
+import { api as httpApi } from '@/services/apiProxy'
 import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
@@ -153,34 +155,51 @@ function makeSparkline(data: number[], color: string) {
   }
 }
 
-// Mock sparkline data (7 days trend)
-const sparkData = {
-  total: [8, 9, 9, 10, 10, 11, 12],
-  inProgress: [3, 4, 3, 5, 4, 5, 5],
-  pendingReview: [2, 1, 2, 2, 3, 2, 3],
-  completed: [3, 4, 4, 3, 3, 4, 4],
+// 趋势数据（接入真实 API）
+const trendData = ref<Record<string, Record<string, number>>>({})
+const trendLoadError = ref(false)
+
+async function loadTrendData() {
+  trendLoadError.value = false
+  try {
+    const res = await httpApi.get('/api/dashboard/stats/trend', {
+      params: { days: 7 }
+    })
+    trendData.value = res.trend || {}
+  } catch {
+    trendLoadError.value = true
+  }
 }
+
+const sparkSeries = computed(() => {
+  const days = Object.keys(trendData.value).sort()
+  return {
+    review_passed: days.map(d => trendData.value[d]?.review_passed ?? 0),
+    in_progress: days.map(d => trendData.value[d]?.in_progress ?? 0),
+    edit_complete: days.map(d => trendData.value[d]?.edit_complete ?? 0),
+  }
+})
 
 const statCards = computed(() => [
   {
     label: '项目总数', value: stats.total, icon: FolderOpened,
     cls: 'stat-card--primary', trend: 8,
-    sparkOpt: makeSparkline(sparkData.total, '#4b2d77'),
+    sparkOpt: makeSparkline(sparkSeries.value.review_passed, '#4b2d77'),
   },
   {
     label: '进行中', value: stats.inProgress, icon: Loading,
     cls: 'stat-card--teal', trend: 12,
-    sparkOpt: makeSparkline(sparkData.inProgress, '#0094B3'),
+    sparkOpt: makeSparkline(sparkSeries.value.in_progress, '#0094B3'),
   },
   {
     label: '待复核', value: stats.pendingReview, icon: Warning,
     cls: 'stat-card--coral', trend: -5,
-    sparkOpt: makeSparkline(sparkData.pendingReview, '#FF5149'),
+    sparkOpt: makeSparkline(sparkSeries.value.edit_complete, '#FF5149'),
   },
   {
     label: '已完成', value: stats.completed, icon: CircleCheck,
     cls: 'stat-card--success', trend: 15,
-    sparkOpt: makeSparkline(sparkData.completed, '#28A745'),
+    sparkOpt: makeSparkline(sparkSeries.value.review_passed, '#28A745'),
   },
 ])
 
@@ -212,6 +231,9 @@ onMounted(async () => {
   if (!authStore.user && authStore.token) {
     try { await authStore.fetchUserProfile() } catch { /* ignore */ }
   }
+
+  // 加载趋势数据
+  loadTrendData()
 
   // 加载项目统计
   try {

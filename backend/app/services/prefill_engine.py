@@ -100,7 +100,7 @@ async def prefill_workpaper_real(
 
     # 扫描所有公式
     formulas_found = []
-    for ws in wb.worksheets:
+    for sheet_idx, ws in enumerate(wb.worksheets):
         for row in ws.iter_rows():
             for cell in row:
                 if cell.value and isinstance(cell.value, str) and cell.value.startswith('='):
@@ -108,7 +108,10 @@ async def prefill_workpaper_real(
                     if match:
                         formulas_found.append({
                             "sheet": ws.title,
+                            "sheet_idx": sheet_idx,
                             "cell": cell.coordinate,
+                            "row": cell.row - 1,       # 0-based row index
+                            "col": cell.column - 1,    # 0-based column index
                             "formula_type": match.group(1).upper(),
                             "raw_args": match.group(2).strip(),
                             "original": cell.value,
@@ -123,9 +126,23 @@ async def prefill_workpaper_real(
             "message": "未发现取数公式",
         }
 
-    # 批量执行公式
+    # 批量执行公式（需求 46：只更新 structure.json 的 v 字段，保留 xlsx 公式）
     from app.services.formula_engine import FormulaEngine
+    import json as _json
     engine = FormulaEngine()
+
+    # 读取 structure.json（供填入 v 字段）
+    structure_path = fp.with_suffix(".structure.json")
+    structure_data: dict | None = None
+    if structure_path.exists():
+        try:
+            with open(structure_path, "r", encoding="utf-8") as sf:
+                structure_data = _json.load(sf)
+        except Exception as e:
+            _logger.warning("prefill_real: structure.json 读取失败 wp=%s err=%s", wp_id, e)
+            structure_data = None
+    else:
+        _logger.warning("prefill_real: structure.json 不存在 wp=%s path=%s，预填充将跳过值写入", wp_id, structure_path)
 
     filled = 0
     errors = []
@@ -163,30 +180,52 @@ async def prefill_workpaper_real(
                 errors.append({"cell": f["cell"], "error": result.message})
                 continue
 
-            # 写入单元格
-            cell_obj = f["cell_obj"]
             value = float(result) if isinstance(result, Decimal) else result
 
-            # 保留原始公式到 comment
-            try:
-                from openpyxl.comments import Comment
-                cell_obj.comment = Comment(f"公式: {f['original']}", "审计平台预填充")
-            except Exception:
-                pass
+            # 需求 46.1/46.2：只更新 structure.json 的 v 字段，保留 xlsx 中的公式
+            # 不再写 cell_obj.value（避免覆盖公式），不再将公式移入 comment
+            if structure_data is not None:
+                # structure.json 的 rows 是跨 sheet 扁平化的，需累加前序 sheet 的行数
+                row_offset = 0
+                sheets_meta = structure_data.get("sheets", [])
+                snapshot_sheets = wb.worksheets
+                for prior_idx in range(f["sheet_idx"]):
+                    if prior_idx < len(snapshot_sheets):
+                        row_offset += snapshot_sheets[prior_idx].max_row or 0
 
-            cell_obj.value = value
-            filled += 1
+                target_row_idx = row_offset + f["row"]
+                rows_arr = structure_data.get("rows", [])
+                if 0 <= target_row_idx < len(rows_arr):
+                    cells_arr = rows_arr[target_row_idx].get("cells", [])
+                    # 补齐列（若 structure.json 之前是稀疏写入）
+                    while len(cells_arr) <= f["col"]:
+                        cells_arr.append({"value": "", "formula": None})
+                    # 保留 formula 字段不变，仅更新 value
+                    cells_arr[f["col"]]["value"] = value
+                    if cells_arr[f["col"]].get("formula") is None:
+                        cells_arr[f["col"]]["formula"] = f["original"]
+                    rows_arr[target_row_idx]["cells"] = cells_arr
+                    filled += 1
+                else:
+                    errors.append({"cell": f["cell"], "error": f"structure.json 行越界: {target_row_idx}"})
+            else:
+                # 无 structure.json：跳过本单元格（避免破坏公式），但不算错误
+                # 上面已记录 warning 日志
+                pass
 
         except Exception as e:
             errors.append({"cell": f["cell"], "error": str(e)})
 
-    # 保存文件
-    try:
-        wb.save(str(fp))
-    except Exception as e:
-        return {"wp_id": str(wp_id), "status": "error", "message": f"保存失败: {e}"}
-    finally:
-        wb.close()
+    # 保存 structure.json（需求 46.1：不再修改 xlsx）
+    if structure_data is not None and filled > 0:
+        try:
+            with open(structure_path, "w", encoding="utf-8") as sf:
+                _json.dump(structure_data, sf, ensure_ascii=False, indent=2)
+        except Exception as e:
+            wb.close()
+            return {"wp_id": str(wp_id), "status": "error", "message": f"structure.json 保存失败: {e}"}
+
+    wb.close()
 
     _logger.info("prefill_real: wp=%s found=%d filled=%d errors=%d", wp_id, len(formulas_found), filled, len(errors))
 
@@ -204,10 +243,15 @@ async def parse_workpaper_real(
     db: AsyncSession,
     project_id: UUID,
     wp_id: UUID,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     """
     真正的解析回写：打开 .xlsx → 提取关键数据 → 写入 parsed_data
-    
+
+    参数：
+      dry_run=True  — 仅返回解析预览，不写入 parsed_data（用于两步确认流程的步骤1）
+      dry_run=False — 解析并写入 parsed_data（默认，用于步骤2确认后）
+
     提取内容：
     1. 审定数（审定表中的审定数合计）
     2. 未审数
@@ -347,31 +391,34 @@ async def parse_workpaper_real(
 
     wb.close()
 
-    # 写入 parsed_data
+    # 写入 parsed_data（dry_run=True 时跳过写入，仅返回预览）
     from datetime import datetime, timezone
     parsed["extracted_at"] = datetime.utcnow().isoformat()
-    wp_write = (await db.execute(
-        sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
-    )).scalar_one_or_none()
-    if wp_write:
-        wp_write.parsed_data = parsed
-        wp_write.last_parsed_at = datetime.utcnow()
-        await db.flush()
+    if not dry_run:
+        wp_write = (await db.execute(
+            sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+        )).scalar_one_or_none()
+        if wp_write:
+            wp_write.parsed_data = parsed
+            wp_write.last_parsed_at = datetime.utcnow()
+            await db.flush()
 
     _logger.info(
-        "parse_real: wp=%s audited=%s unadj=%s conclusion=%s refs=%d",
+        "parse_real: wp=%s audited=%s unadj=%s conclusion=%s refs=%d dry_run=%s",
         wp_id, parsed["audited_amount"], parsed["unadjusted_amount"],
-        "yes" if parsed["conclusion"] else "no", len(parsed["cross_refs"]),
+        "yes" if parsed["conclusion"] else "no", len(parsed["cross_refs"]), dry_run,
     )
 
     return {
         "wp_id": str(wp_id),
         "status": "ok",
+        "dry_run": dry_run,
         "audited_amount": parsed["audited_amount"],
         "unadjusted_amount": parsed["unadjusted_amount"],
         "has_conclusion": parsed["conclusion"] is not None,
         "cross_ref_count": len(parsed["cross_refs"]),
-        "message": "解析完成",
+        "parsed_data": parsed,
+        "message": "解析预览（未写入）" if dry_run else "解析完成",
     }
 
 

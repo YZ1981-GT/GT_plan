@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.pagination import PaginationParams
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.trace_event_service import trace_event_service
@@ -46,12 +47,12 @@ async def query_traces(
     object_type: Optional[str] = Query(None),
     object_id: Optional[uuid.UUID] = Query(None),
     actor_id: Optional[uuid.UUID] = Query(None),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """按项目/对象/时间/角色检索 trace 事件"""
     return await trace_event_service.query(
-        db, project_id, event_type, object_type, object_id, actor_id, page, page_size
+        db, project_id, event_type, object_type, object_id, actor_id,
+        page=pagination.page, page_size=pagination.page_size,
     )

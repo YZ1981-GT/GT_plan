@@ -1,7 +1,7 @@
 {
   "wp_code": "K5",
   "name": "预计负债",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "account_codes": [
     "2801"
   ],
@@ -78,6 +78,36 @@
             "label": "原因分析"
           }
         }
+      },
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-L13"
+        },
+        "tb": {
+          "row": 14,
+          "label": "试算平衡表数"
+        },
+        "diff": {
+          "row": 15,
+          "label": "差异数"
+        }
+      },
+      "detail_discovery": {
+        "mode": "auto",
+        "start_row": 7,
+        "end_rule": "before_first_total",
+        "skip_empty": true,
+        "description": "自动识别第7行到合计行之间的所有非空明细行",
+        "example_labels": [
+          "未决诉讼或仲裁",
+          "对外担保",
+          "重组义务",
+          "亏损合同",
+          "其他"
+        ]
       }
     },
     {
@@ -123,14 +153,19 @@
   ],
   "cross_references": [
     {
-      "from": "K5-1.total",
+      "from": "K5-1.R12.C7",
       "to": "tb://2801#审定数",
       "description": "审定表合计 = 试算表预计负债审定数"
     },
     {
       "from": "K5-2.合计",
-      "to": "K5-1.total",
+      "to": "K5-1.R12.C7",
       "description": "明细表合计 = 审定表合计"
+    },
+    {
+      "from": "K5-1.R12.C7",
+      "to": "REPORT('BS-L13','期末')",
+      "description": "审定表合计 = 报表预计负债"
     }
   ],
   "audit_checks": [
@@ -157,6 +192,24 @@
       "type": "completeness",
       "severity": "warning",
       "description": "明细表数据完整"
+    },
+    {
+      "code": "K5-CHK-02a",
+      "type": "balance",
+      "severity": "blocking",
+      "description": "审定表合计 = 报表预计负债"
+    },
+    {
+      "code": "K5-CHK-05",
+      "type": "check",
+      "severity": "warning",
+      "description": "律师确认函已取得"
+    },
+    {
+      "code": "K5-CHK-06",
+      "type": "check",
+      "severity": "warning",
+      "description": "预计负债计量合理性已评估"
     }
   ]
 }
