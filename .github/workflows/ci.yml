@@ -88,6 +88,19 @@ jobs:
       - name: Type check (vue-tsc)
         run: npx vue-tsc --noEmit
         working-directory: audit-platform/frontend
+      - name: API hardcode guard (Vue files)
+        run: |
+          # 统计 Vue 文件中绕过 service 层的硬编码 API 路径数量
+          # 基线：173（2026-05-07），只允许减少不允许增加
+          BASELINE=173
+          COUNT=$(grep -r --include="*.vue" -E "['\`\"/]/api/" src/views src/components \
+            | grep -v "apiPaths" | grep -v "^\s*//" | grep -v "^\s*\*" | wc -l)
+          echo "Hardcoded API paths in Vue files: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Hardcoded API paths increased from $BASELINE to $COUNT. Use apiPaths constants instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
       - name: Build
         run: npm run build
         working-directory: audit-platform/frontend
