@@ -100,8 +100,8 @@ inclusion: always
 - backend/app/routers/pbc.py 和 confirmations.py 返回 `{"status": "developing", "items": [], "note": "..."}`，maturity 标记为 developing（R6 Task 8）
 - apiPaths.ts 当前 **260+** 个 API 端点（2026-05-07），新增 reportConfig/reportMapping/consolNoteSections + eqcr 扩展（memo/independence/componentAuditors/priorYear/metrics）+ admin 扩展（importEventHealth/importEventReplay）+ reports.export
 - 前端 service 硬编码路径迁移 **全部完成**（2026-05-07）：9 个文件共 257 处硬编码→0，全部使用 apiPaths 常量
-- Vue 文件硬编码迁移进度：322→~173（已消除 149 处 / 46%），最新 commit fb8a3b9；Top 6 大文件全部完成：LedgerPenetration(23)/KnowledgeBase(16)/ConsolNoteTab(16)/AccountImportStep(15)/FormulaManagerDialog(12)/WorkpaperWorkbench(12)；剩余 ~65 文件多为 1-8 处中小文件
-- apiPaths.ts 新增路径对象（本轮）：knowledgeLibrary(11方法)/noteTemplates/accountChart/columnMappings/dataLifecycle/consolNoteSections(8方法)/reportConfig扩展/reportMapping/reports.export；ledger 从 3 方法扩展到 17 方法；workpapers 新增 batchPrefill/generateFromCodes/wpMappingTsj
+- Vue 文件硬编码迁移进度：322→115（已消除 207 处 / 64%），最新 commit 137e113；CI 基线已更新到 115；剩余 58 文件为零散专用端点（disclosure-notes 8/workhours 7/projects子路径 31 等），触碰即修
+- apiPaths.ts 新增路径对象（本轮）：knowledgeLibrary(11方法)/noteTemplates/accountChart(含standard)/accountMapping/reportLineMapping/columnMappings/dataLifecycle/consolNoteSections(8方法)/reportConfig扩展(detail/create/executeFormulasBatch/batchUpdate)/reportMapping/reports.export/independenceDeclarations；ledger 从 3 方法扩展到 17 方法；workpapers 新增 batchPrefill/generateFromCodes/wpMappingTsj/versions/univerData/univerSave/exportPdf；attachments 新增 preview/download/associate/ocrStatus
 - CI 新增 vue-tsc --noEmit 步骤到 frontend-build job（.github/workflows/ci.yml）
 - CI 新增 'API hardcode guard' 卡点（基线 173，grep 统计 Vue 文件 /api/ 硬编码，超基线则 fail）；本地自查脚本 scripts/check-api-hardcode.sh；策略"触碰即修+基线只减不增"
 - Vue 硬编码迁移决策：剩余 65 文件 / 173 处不再批量修，采用触碰即修策略自然收敛；下一步优先级转向 UAT 验收 + 性能压测

@@ -170,6 +170,7 @@ import { ElMessage } from 'element-plus'
 import { useWizardStore } from '@/stores/wizard'
 import { api } from '@/services/apiProxy'
 import { fmtAmount } from '@/utils/formatters'
+import * as P from '@/services/apiPaths'
 
 const wizardStore = useWizardStore()
 const formRef = ref<FormInstance>()
@@ -224,7 +225,7 @@ async function autoPopulate() {
   try {
     const year = getYear()
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/materiality/benchmark`,
+      P.materiality.benchmark(wizardStore.projectId),
       { params: { year, benchmark_type: form.benchmark_type } }
     )
     const resp = data
@@ -253,7 +254,7 @@ async function onParamChange() {
   try {
     const year = getYear()
     const data = await api.post(
-      `/api/projects/${wizardStore.projectId}/materiality/calculate`,
+      P.materiality.calculate(wizardStore.projectId),
       {
         benchmark_type: form.benchmark_type,
         benchmark_amount: form.benchmark_amount,
@@ -280,7 +281,7 @@ async function submitOverride() {
     if (overrideForm.trivial_threshold != null) body.trivial_threshold = String(overrideForm.trivial_threshold)
 
     const data = await api.put(
-      `/api/projects/${wizardStore.projectId}/materiality/override`,
+      P.materiality.override(wizardStore.projectId),
       body,
       { params: { year } }
     )
@@ -312,7 +313,7 @@ onMounted(async () => {
     try {
       const year = getYear()
       const data = await api.get(
-        `/api/projects/${wizardStore.projectId}/materiality`,
+        P.materiality.get(wizardStore.projectId),
         { params: { year } }
       )
       const existing = data

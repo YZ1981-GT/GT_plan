@@ -301,6 +301,7 @@ import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
 import { operationHistory } from '@/utils/operationHistory'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { parseApiError } from '@/composables/useApiError'
+import * as P from '@/services/apiPaths'
 
 const route = useRoute()
 const router = useRouter()
@@ -673,7 +674,7 @@ function onImported() {
 function onExportSummary() {
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     downloadFileAsBlob(
-      `/api/projects/${projectId.value}/adjustments/export-summary?year=${year.value}&format=excel`,
+      `${P.adjustments.exportSummary(projectId.value)}?year=${year.value}&format=excel`,
       `审计调整汇总_${year.value}.xlsx`
     )
   })

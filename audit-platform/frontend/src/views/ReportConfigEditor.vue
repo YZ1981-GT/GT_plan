@@ -182,7 +182,7 @@ async function onDeleteSelected() {
   for (const row of selectedRows.value) {
     if (row.id && !row._isNew) {
       try {
-        await api.delete(`/api/report-config/${row.id}`)
+        await api.delete(P.reportConfig.detail(row.id))
       } catch { /* ignore */ }
     }
     const idx = rows.value.indexOf(row)
@@ -217,7 +217,7 @@ async function onSaveAll() {
         }
         savedCount++
       } else if (row.id) {
-        await api.put(`/api/report-config/${row.id}`, {
+        await api.put(P.reportConfig.detail(row.id), {
           row_name: row.row_name,
           formula: row.formula,
           indent_level: row.indent_level,
