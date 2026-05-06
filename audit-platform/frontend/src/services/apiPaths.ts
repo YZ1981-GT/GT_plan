@@ -928,6 +928,8 @@ export const admin = {
   performanceStats: '/api/admin/performance-stats',
   slowQueries: '/api/admin/slow-queries',
   performanceMetrics: '/api/admin/performance-metrics',
+  importEventHealth: '/api/admin/import-event-health',
+  importEventReplay: '/api/admin/import-event-replay',
 } as const
 
 // ─── 合伙人 ─────────────────────────────────────────────────────────────────

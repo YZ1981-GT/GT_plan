@@ -224,9 +224,10 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import {
   getDashboardOverview, getDashboardProjectProgress, getDashboardStaffWorkload,
   getDashboardRiskAlerts, getDashboardGroupProgress, getDashboardHoursHeatmap,
-  // @ts-ignore unused for future
-getDashboardProjectStaffHours, getDashboardStaffDetail, getDashboardAvailableStaff,
+  getDashboardProjectStaffHours, getDashboardStaffDetail, getDashboardAvailableStaff,
+  listProjects, searchStaff,
 } from '@/services/commonApi'
+import { projects as P_proj, staff as P_staff, dashboard as P_dash } from '@/services/apiPaths'
 import api from '@/services/apiProxy'
 import GTChart from '@/components/GTChart.vue'
 import {
@@ -468,8 +469,8 @@ const staffSearching = ref(false)
 
 async function loadAllProjects() {
   try {
-    const data = await api.get('/api/projects')
-    allProjects.value = Array.isArray(data) ? data : data?.items || []
+    const data = await listProjects()
+    allProjects.value = Array.isArray(data) ? data : []
   } catch { allProjects.value = [] }
 }
 
@@ -477,9 +478,7 @@ async function loadProjectStaff() {
   if (!queryProjectId.value) { projectStaffData.value = []; return }
   queryLoading.value = true
   try {
-    const data = await api.get('/api/dashboard/project-staff-hours', {
-      params: { project_id: queryProjectId.value },
-    })
+    const data = await getDashboardProjectStaffHours(queryProjectId.value)
     projectStaffData.value = Array.isArray(data) ? data : []
   } catch { projectStaffData.value = [] }
   finally { queryLoading.value = false }
@@ -489,8 +488,8 @@ async function searchStaffForQuery(query: string) {
   if (!query || query.length < 1) { staffSearchResults.value = []; return }
   staffSearching.value = true
   try {
-    const data = await api.get('/api/staff', { params: { search: query, limit: 20 } })
-    staffSearchResults.value = data?.items || (Array.isArray(data) ? data : [])
+    const data = await searchStaff(query, 20)
+    staffSearchResults.value = Array.isArray(data) ? data : []
   } catch { staffSearchResults.value = [] }
   finally { staffSearching.value = false }
 }
@@ -499,9 +498,7 @@ async function loadStaffDetail() {
   if (!queryStaffId.value) { staffDetail.value = null; return }
   queryLoading.value = true
   try {
-    const data = await api.get('/api/dashboard/staff-detail', {
-      params: { staff_id: queryStaffId.value },
-    })
+    const data = await getDashboardStaffDetail(queryStaffId.value)
     staffDetail.value = data
   } catch { staffDetail.value = null }
   finally { queryLoading.value = false }
@@ -510,9 +507,7 @@ async function loadStaffDetail() {
 async function loadAvailableStaff() {
   queryLoading.value = true
   try {
-    const data = await api.get('/api/dashboard/available-staff', {
-      params: { max_hours: maxHoursThreshold.value },
-    })
+    const data = await getDashboardAvailableStaff(maxHoursThreshold.value)
     availableStaffData.value = Array.isArray(data) ? data : []
   } catch { availableStaffData.value = [] }
   finally { queryLoading.value = false }
