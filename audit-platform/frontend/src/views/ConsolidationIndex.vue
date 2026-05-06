@@ -455,6 +455,7 @@ import {
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports } from '@/services/apiPaths'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
@@ -617,7 +618,7 @@ async function loadDrillDownData() {
     const colField = drillDownCell.colName?.includes('上期') ? 'prior_period_amount' : 'current_period_amount'
 
     // 调用后端真实穿透 API
-    const data = await api.post('/api/report-config/drill-down', {
+    const data = await api.post(P_rc.drillDown, {
       project_id: projectId.value,
       year: year.value,
       report_type: reportType,
@@ -725,7 +726,7 @@ async function exportDrillDown() {
 
 async function loadProjectInfo() {
   try {
-    const data = await api.get(`/api/projects/${projectId.value}`, { validateStatus: (s: number) => s < 600 })
+    const data = await api.get(P_proj.detail(projectId.value), { validateStatus: (s: number) => s < 600 })
     const p = data
     if (p) {
       projectInfo.clientName = p.client_name || p.name || ''
@@ -995,7 +996,7 @@ async function loadConsolReport(forceRefresh = false) {
     if (currentConsolEntity.value.code && currentConsolEntity.value.code !== 'root') {
       params.company_code = currentConsolEntity.value.code
     }
-    const data = await api.get('/api/report-config', {
+    const data = await api.get(P_rc.list, {
       params,
       validateStatus: (s: number) => s < 600,
     })
@@ -1014,7 +1015,7 @@ async function loadConsolMappingPreset() {
   consolMappingLoading.value = true
   try {
     const scope = 'consolidated'
-    const data = await api.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
+    const data = await api.get(P_rm.preset(projectId.value), {
       params: { report_type: consolReportType.value, scope },
       validateStatus: (s: number) => s < 600,
     })
@@ -1055,7 +1056,7 @@ async function applyConsolConversion() {
 
 function exportConsolReport() {
   const standard = `${consolReportTemplateType.value}_consolidated`
-  window.open(`/api/reports/${projectId.value}/${year.value}/export?report_type=${consolReportType.value}&applicable_standard=${standard}`, '_blank')
+  window.open(`${reports.export(projectId.value, year.value)}?report_type=${consolReportType.value}&applicable_standard=${standard}`, '_blank')
 }
 
 function _getConsolReportConfigData(): Record<string, any> {
@@ -1092,7 +1093,7 @@ async function loadConsolNoteTree(forceRefresh = false) {
   }
   consolNoteLoading.value = true
   try {
-    const data = await api.get(`/api/consol-note-sections/${consolNoteTemplateType.value}`, {
+    const data = await api.get(P_cn.list(consolNoteTemplateType.value), {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])

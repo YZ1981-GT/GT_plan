@@ -599,6 +599,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm } from '@/services/apiPaths'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
@@ -698,14 +699,14 @@ const totalRuleCount = computed(() => Object.values(allMappingRules.value).flat(
 
 async function loadPresetForType(rt: string) {
   // 用后端 preset API（含同义词表+模糊匹配）
-  const presetData = await api.get(`/api/projects/${projectId.value}/report-mapping/preset`, {
+  const presetData = await api.get(P_rm.preset(projectId.value), {
     params: { report_type: rt, scope: reportScope.value },
     validateStatus: (s: number) => s < 600,
   })
   const preset = presetData ?? []
 
   // 同时加载上市版行次作为下拉选项
-  const listedData = await api.get('/api/report-config', {
+  const listedData = await api.get(P_rc.list, {
     params: { applicable_standard: `listed_${reportScope.value}`, report_type: rt },
     validateStatus: (s: number) => s < 600,
   })
@@ -740,7 +741,7 @@ async function saveMappingRulesAll() {
       const rules = allMappingRules.value[rt.key] || []
       const mapped = rules.filter(r => r.listed_row_code)
       if (mapped.length > 0) {
-        await api.post(`/api/projects/${projectId.value}/report-mapping`, {
+        await api.post(P_rm.save(projectId.value), {
           report_type: rt.key,
           scope: reportScope.value,
           rules: mapped.map(r => ({ soe_row_code: r.soe_row_code, listed_row_code: r.listed_row_code })),
@@ -915,7 +916,7 @@ async function ensureProjectYear() {
   }
   try {
     // 直接调用项目详情 + wizard 获取完整信息
-    const projRaw = await api.get(`/api/projects/${projectId.value}`, {
+    const projRaw = await api.get(P_proj.detail(projectId.value), {
       validateStatus: (s: number) => s < 600,
     })
     const proj = projRaw?.data ?? projRaw ?? projRaw
@@ -926,7 +927,7 @@ async function ensureProjectYear() {
     templateType.value = proj?.template_type || ''
 
     // 从 wizard_state 补充 template_type
-    const wizRaw = await api.get(`/api/projects/${projectId.value}/wizard`, {
+    const wizRaw = await api.get(P_proj.wizard(projectId.value), {
       validateStatus: (s: number) => s < 600,
     })
     const ws = wizRaw?.data ?? wizRaw
@@ -982,7 +983,7 @@ const fetchReport = withLoading(loading, async () => {
 async function loadTemplateRows() {
   // 从报表配置加载预设行次（显示空值的模板框架）
   try {
-    const data = await api.get('/api/report-config', {
+    const data = await api.get(P_rc.list, {
       params: { report_type: activeTab.value, project_id: projectId.value, applicable_standard: currentApplicableStandard.value }
     })
     const configs = data

@@ -83,6 +83,34 @@ export const reports = {
     `/api/reports/${pid}/${year}/${type}/drilldown/${rowCode}`,
   consistencyCheck: (pid: string, year: number) => `/api/reports/${pid}/${year}/consistency-check`,
   exportExcel: (pid: string, year: number, type: string) => `/api/reports/${pid}/${year}/${type}/export-excel`,
+  export: (pid: string, year: number) => `/api/reports/${pid}/${year}/export`,
+} as const
+
+// ─── 报表配置 ───────────────────────────────────────────────────────────────
+
+export const reportConfig = {
+  list: '/api/report-config',
+  drillDown: '/api/report-config/drill-down',
+} as const
+
+// ─── 报表映射 ───────────────────────────────────────────────────────────────
+
+export const reportMapping = {
+  preset: (pid: string) => `/api/projects/${pid}/report-mapping/preset`,
+  save: (pid: string) => `/api/projects/${pid}/report-mapping`,
+} as const
+
+// ─── 合并附注 ───────────────────────────────────────────────────────────────
+
+export const consolNoteSections = {
+  list: (templateType: string) => `/api/consol-note-sections/${templateType}`,
+  detail: (templateType: string, sectionId: string) => `/api/consol-note-sections/${templateType}/${sectionId}`,
+  aggregate: (pid: string, year: number) => `/api/consol-note-sections/aggregate/${pid}/${year}`,
+  refresh: (pid: string, year: number, sectionId: string) => `/api/consol-note-sections/refresh/${pid}/${year}/${sectionId}`,
+  data: (pid: string, year: number, sectionId: string) => `/api/consol-note-sections/data/${pid}/${year}/${sectionId}`,
+  applyFormulas: (pid: string, year: number) => `/api/consol-note-sections/apply-formulas/${pid}/${year}`,
+  auditAll: (pid: string, year: number) => `/api/consol-note-sections/audit-all/${pid}/${year}`,
+  audit: (pid: string, year: number, sectionId: string) => `/api/consol-note-sections/audit/${pid}/${year}/${sectionId}`,
 } as const
 
 // ─── 现金流量表工作底稿 ─────────────────────────────────────────────────────
@@ -1114,7 +1142,8 @@ export const rotation = {
 
 export const API = {
   projects, trialBalance, adjustments, materiality, misstatements,
-  reports, cfsWorksheet, disclosureNotes, auditReport, exportTask,
+  reports, reportConfig, reportMapping, consolNoteSections,
+  cfsWorksheet, disclosureNotes, auditReport, exportTask,
   workpaperSummary, events, consolidation, consolWorksheetData,
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
   wpDependencies, templates, formula, sampling, staff, users, auth,

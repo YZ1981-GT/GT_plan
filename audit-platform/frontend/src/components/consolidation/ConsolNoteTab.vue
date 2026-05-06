@@ -496,6 +496,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { consolNoteSections as P_cn } from '@/services/apiPaths'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -865,7 +866,7 @@ async function executeAggregate() {
 
     if (aggTarget.mode === 'direct') {
       const entityCode = props.currentEntity.code || ''
-      const data = await api.post(`/api/consol-note-sections/aggregate/${props.projectId}/${props.year}`, {
+      const data = await api.post(`P_cn.list(props.standard)aggregate/${props.projectId}/${props.year}`, {
         section_id: sec.section_id,
         row_idx: c.row,
         col_idx: c.col,
@@ -884,7 +885,7 @@ async function executeAggregate() {
       const checkedNodes = aggTreeRef.value?.getCheckedNodes() || []
       if (!checkedNodes.length) { ElMessage.warning('请选择要汇总的单位'); aggLoading.value = false; return }
       const companyCodes = checkedNodes.map((n: any) => n.key).filter((k: string) => k !== 'root')
-      const data = await api.post(`/api/consol-note-sections/aggregate/${props.projectId}/${props.year}`, {
+      const data = await api.post(`P_cn.list(props.standard)aggregate/${props.projectId}/${props.year}`, {
         section_id: aggTarget.source === 'same' ? sec.section_id : (aggTarget.source === 'note' ? (aggTarget as any).noteSection : sec.section_id),
         row_idx: c.row,
         col_idx: c.col,
@@ -935,7 +936,7 @@ async function refreshNoteByFormula() {
   noteRefreshing.value = true
   try {
     const entityCode = props.currentEntity.code || ''
-    const data = await api.post(`/api/consol-note-sections/refresh/${props.projectId}/${props.year}/${sec.section_id}`, {
+    const data = await api.post(`P_cn.list(props.standard)refresh/${props.projectId}/${props.year}/${sec.section_id}`, {
       standard: props.standard,
       company_code: entityCode,
     }, { validateStatus: (s: number) => s < 600 })
@@ -973,7 +974,7 @@ async function saveNoteData() {
   const rows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
   try {
     await api.put(
-      `/api/consol-note-sections/data/${props.projectId}/${props.year}/${sec.section_id}`,
+      `P_cn.list(props.standard)data/${props.projectId}/${props.year}/${sec.section_id}`,
       { data: { headers: sec.headers, rows } },
       { validateStatus: (s: number) => s < 600 },
     )
@@ -1055,14 +1056,14 @@ async function batchExportAllData() {
     const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
     const usedNames = new Set<string>()
-    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
-        const detail = await api.get(`/api/consol-note-sections/${props.standard}/${c.section_id}`, {
+        const detail = await api.get(`P_cn.list(props.standard)${props.standard}/${c.section_id}`, {
           validateStatus: (s: number) => s < 600,
         })
         const sec = detail?.data ?? detail
@@ -1087,14 +1088,14 @@ async function batchExportAllTemplates() {
     const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
     const usedNames = new Set<string>()
-    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
-        const detail = await api.get(`/api/consol-note-sections/${props.standard}/${c.section_id}`, {
+        const detail = await api.get(`P_cn.list(props.standard)${props.standard}/${c.section_id}`, {
           validateStatus: (s: number) => s < 600,
         })
         const sec = detail?.data ?? detail
@@ -1120,7 +1121,7 @@ async function onNoteBatchImport(e: Event) {
     const XLSX = await import('xlsx')
     const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
     let matched = 0
-    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
@@ -1139,7 +1140,7 @@ async function onNoteBatchImport(e: Event) {
       const headers = json[0].map((c: any) => String(c || ''))
       const rows = json.slice(1).filter((r: any[]) => r.some(c => c != null && c !== '')).map((r: any[]) => r.map(c => String(c ?? '')))
       await api.put(
-        `/api/consol-note-sections/data/${props.projectId}/${props.year}/${sectionId}`,
+        `P_cn.list(props.standard)data/${props.projectId}/${props.year}/${sectionId}`,
         { data: { headers, rows } },
         { validateStatus: (s: number) => s < 600 },
       )
@@ -1226,7 +1227,7 @@ async function exportNoteFormulas() {
     const XLSX = await import('xlsx')
     const wb = XLSX.utils.book_new()
     const headers = ['章节ID', '章节标题', '行号', '列号', '公式类型', '公式表达式', '数据来源', '说明']
-    const data = await api.get(`/api/consol-note-sections/${props.standard}`, {
+    const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
@@ -1275,7 +1276,7 @@ async function applyAllNoteFormulas() {
   noteBatchLoading.value = true
   try {
     const entityCode = props.currentEntity.code || ''
-    const data = await api.post(`/api/consol-note-sections/apply-formulas/${props.projectId}/${props.year}`, {
+    const data = await api.post(`P_cn.list(props.standard)apply-formulas/${props.projectId}/${props.year}`, {
       standard: props.standard,
       company_code: entityCode,
     }, { validateStatus: (s: number) => s < 600 })
@@ -1297,7 +1298,7 @@ async function onNoteAuditAll(_e?: Event) {
   noteAuditResults.value = []
   try {
     const entityCode = props.currentEntity.code || ''
-    const data = await api.post(`/api/consol-note-sections/audit-all/${props.projectId}/${props.year}`, {
+    const data = await api.post(`P_cn.list(props.standard)audit-all/${props.projectId}/${props.year}`, {
       standard: props.standard,
       company_code: entityCode,
     }, { validateStatus: (s: number) => s < 600 })
@@ -1343,7 +1344,7 @@ async function auditCurrentNote() {
   try {
     const entityCode = props.currentEntity.code || ''
     const currentRows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
-    const data = await api.post(`/api/consol-note-sections/audit/${props.projectId}/${props.year}/${sec.section_id}`, {
+    const data = await api.post(`P_cn.list(props.standard)audit/${props.projectId}/${props.year}/${sec.section_id}`, {
       standard: props.standard,
       company_code: entityCode,
       headers: sec.headers,
@@ -1367,7 +1368,7 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
   if (!data.section_id) return
   noteSelectedRows.value = []
   selectedCells.value = []
-  api.get(`/api/consol-note-sections/${props.standard}/${data.section_id}`, {
+  api.get(`P_cn.list(props.standard)${props.standard}/${data.section_id}`, {
     validateStatus: (s: number) => s < 600,
   }).then(async (detail: any) => {
     const sec = detail?.data ?? detail
@@ -1378,7 +1379,7 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
       // 尝试加载用户已保存的数据覆盖模板
       try {
         const saved = await api.get(
-          `/api/consol-note-sections/data/${props.projectId}/${props.year}/${data.section_id}`,
+          `P_cn.list(props.standard)data/${props.projectId}/${props.year}/${data.section_id}`,
           { validateStatus: (s: number) => s < 600 }
         )
         const savedData = saved
