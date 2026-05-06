@@ -439,6 +439,19 @@ class ManagerDashboardService:
         risk_order = {"high": 0, "medium": 1, "low": 2}
         cards.sort(key=lambda c: risk_order.get(c["risk_level"], 3))
 
+        # Batch 3 Fix 4: 回写 risk_level 到 Project（非阻塞，失败不影响响应）
+        try:
+            for card in cards:
+                await self.db.execute(
+                    sa.update(Project).where(Project.id == uuid.UUID(card["id"])).values(
+                        risk_level=card["risk_level"],
+                        risk_level_updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    )
+                )
+            await self.db.flush()
+        except Exception:
+            logger.warning("[MANAGER_DASHBOARD] risk_level writeback failed, non-blocking")
+
         return cards
 
     # ------------------------------------------------------------------

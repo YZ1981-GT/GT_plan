@@ -58,8 +58,8 @@ class BatchBriefService:
                 WordExportTask.doc_type == "batch_brief",
                 WordExportTask.status == "generated",
                 WordExportTask.created_at >= cutoff,
-                # 用 template_type 字段存 cache_key
-                WordExportTask.template_type == cache_key,
+                # Batch 3 Fix 2: 用专用 cache_key 字段查找
+                WordExportTask.cache_key == cache_key,
             ).order_by(WordExportTask.created_at.desc()).limit(1)
         )
         return result.scalar_one_or_none()
@@ -189,7 +189,8 @@ class BatchBriefService:
             project_id=project_ids[0],
             doc_type="batch_brief",
             status="generated",
-            template_type=cache_key,  # 存 cache_key 用于后续查找
+            template_type="batch_brief",  # Batch 3 Fix 2: 恢复 template_type 原始语义
+            cache_key=cache_key,  # Batch 3 Fix 2: 专用缓存键字段
             file_path=json.dumps(result, ensure_ascii=False, default=str),
             created_by=user_id,
         )

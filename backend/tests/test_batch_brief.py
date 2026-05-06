@@ -173,7 +173,8 @@ class TestBatchBriefService:
             project_id=project_ids[0],
             doc_type="batch_brief",
             status="generated",
-            template_type=cache_key,
+            template_type="batch_brief",
+            cache_key=cache_key,
             file_path=json.dumps({"final_text": "cached result"}),
             created_by=test_user.id,
         )

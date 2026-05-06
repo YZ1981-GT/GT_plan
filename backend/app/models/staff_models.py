@@ -80,6 +80,9 @@ class StaffMember(Base, SoftDeleteMixin, TimestampMixin):
     resume_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     source: Mapped[str] = mapped_column(String(20), server_default=text("'custom'"), nullable=False)  # seed / custom
 
+    # Batch 3 Fix 1: 费率计算用枚举，不依赖 title 自由文本
+    role_level: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="费率等级: partner/manager/senior/auditor/intern")
+
     __table_args__ = (
         Index("idx_staff_department", "department", postgresql_where=text("is_deleted = false")),
         Index("idx_staff_partner", "partner_id", postgresql_where=text("is_deleted = false")),

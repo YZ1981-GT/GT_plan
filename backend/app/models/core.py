@@ -100,6 +100,10 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     )
     budgeted_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # Batch 3 Fix 4: 风险等级持久化（manager_dashboard 计算后回写）
+    risk_level: Mapped[str | None] = mapped_column(String(10), nullable=True, comment="风险等级: high/medium/low")
+    risk_level_updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
     __table_args__ = (
         Index(
             "idx_projects_status",

@@ -78,11 +78,16 @@ async def _get_hourly_rates(db: AsyncSession) -> dict[str, int]:
     return DEFAULT_HOURLY_RATES.copy()
 
 
-def _resolve_rate_key(title: str | None) -> str:
+def _resolve_rate_key(title: str | None, role_level: str | None = None) -> str:
     """将 StaffMember.title 映射到费率 key。
 
+    Batch 3 Fix 1: 优先使用 role_level 枚举字段（如果有效），否则回退 title 匹配。
     Batch 1 Fix 1.9: 精确匹配失败时走模糊关键词匹配，仍失败则 warning + 兜底 auditor。
     """
+    # Batch 3 Fix 1: role_level 优先
+    if role_level and role_level in DEFAULT_HOURLY_RATES:
+        return role_level
+
     if not title:
         return "auditor"
     # 精确匹配
@@ -144,10 +149,12 @@ async def compute(
     hourly_rates = await _get_hourly_rates(db)
 
     # 3. 查询已批准工时，按 staff 分组
-    # 联合 StaffMember 获取 title 以确定 role
+    # 联合 StaffMember 获取 title + role_level 以确定 role
+    # Batch 3 Fix 1: 同时 select role_level 用于优先匹配
     stmt = (
         select(
             StaffMember.title,
+            StaffMember.role_level,
             func.sum(WorkHour.hours).label("total_hours"),
         )
         .join(StaffMember, StaffMember.id == WorkHour.staff_id)
@@ -156,7 +163,7 @@ async def compute(
             WorkHour.status == "approved",
             WorkHour.is_deleted == False,  # noqa: E712
         )
-        .group_by(StaffMember.title)
+        .group_by(StaffMember.title, StaffMember.role_level)
     )
     result = await db.execute(stmt)
     rows = result.all()
@@ -166,7 +173,8 @@ async def compute(
     total_hours = Decimal("0")
 
     for row in rows:
-        rate_key = _resolve_rate_key(row.title)
+        role_level_val = getattr(row, 'role_level', None)
+        rate_key = _resolve_rate_key(row.title, role_level=role_level_val)
         hours = Decimal(str(row.total_hours)) if row.total_hours else Decimal("0")
         total_hours += hours
 

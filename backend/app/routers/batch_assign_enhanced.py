@@ -277,6 +277,23 @@ async def batch_assign_enhanced(
 
     await db.commit()
 
+    # Batch 3 Fix 3: 发 WP_ASSIGNED 事件供 event_handlers 级联
+    try:
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+        for assignment in assignments:
+            meta = wp_meta.get(assignment.wp_id, {})
+            await event_bus.publish(EventPayload(
+                event_type=EventType.WORKPAPER_ASSIGNED,
+                project_id=meta.get("project_id", target_project_id),
+                extra={
+                    "wp_id": str(assignment.wp_id),
+                    "assigned_to": str(assignment.user_id),
+                },
+            ))
+    except Exception:
+        logger.warning("[BAE] event publish failed, non-blocking")
+
     # Batch 2 P2: 审计日志记录批量委派操作
     try:
         from app.services.audit_logger_enhanced import audit_logger
