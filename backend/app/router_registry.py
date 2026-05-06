@@ -280,7 +280,19 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
     app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
 
-    # ═══ 13. Round 5：EQCR 工作台 ═══
+    # ═══ 13. Round 4：审计助理增强 ═══
+    # R4 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.workpaper_requirements import router as wpreq_router
+    from app.routers.workpaper_prior_year import router as wppy_router
+    from app.routers.workpaper_html_preview import router as wphp_router
+    from app.routers.editing_lock import router as editlock_router
+    from app.routers.ocr_fields import router as ocrf_router
+    from app.routers.penetrate_by_amount import router as pba_router
+
+    for r in [wpreq_router, wppy_router, wphp_router, editlock_router, ocrf_router, pba_router]:
+        app.include_router(r, tags=["审计助理(R4)"])
+
+    # ═══ 14. Round 5：EQCR 工作台 ═══
     # EQCR 路由包内部已声明 prefix="/api/eqcr"，注册时不加额外前缀。
     from app.routers.eqcr import router as eqcr_router
     app.include_router(eqcr_router, tags=["eqcr"])

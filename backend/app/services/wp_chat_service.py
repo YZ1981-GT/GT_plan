@@ -30,6 +30,13 @@ class WpChatService:
         context: dict[str, Any] | None = None,
     ) -> AsyncGenerator[str, None]:
         """SSE 流式对话 — 注入底稿上下文 + 四表数据 + 知识库"""
+        # 0. AI 脱敏前置过滤（R4 需求 2 验收 7）
+        from app.services.export_mask_service import export_mask_service
+        if context and "cell_context" in context:
+            context["cell_context"], _mapping = export_mask_service.mask_context(context["cell_context"])
+        elif context:
+            context, _mapping = export_mask_service.mask_context(context)
+
         # 1. 加载底稿信息
         wp_info = await self._load_wp_context(db, wp_id)
         # 2. 构建 system prompt

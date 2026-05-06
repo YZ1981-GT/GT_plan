@@ -110,11 +110,22 @@ inclusion: always
 - assignment_service.ROLE_MAP 和 role_context_service._ROLE_PRIORITY 两个字典是角色体系单一真源，新增 role='eqcr' 已同时更新；_ROLE_PRIORITY 当前 partner(5)/eqcr(5)/qc(4)/manager(3)/auditor(2)/readonly(1)
 - GoingConcernEvaluation 模型已存在（collaboration_models.py），Round 5 EQCR 持续经营 Tab 可直接复用，不要重复建模
 - 归档包设计决策：采用"插件化章节"模式（00/01/02/.../99 顺序），各 Round 各自插入章节，Round 1 需求 6 只预留机制
-- 归档包章节号分配：00 项目封面 / 01 签字流水（R1）/ 02 EQCR 备忘录（R5）/ 03 质控抽查报告（R3）/ 10 底稿/ / 20 报表/ / 30 附注/ / 40 附件/ / 99 审计日志
+- EQCR 路由架构（f333788 重构后）：`backend/app/routers/eqcr/` 包含 12 子模块（workbench/opinions/notes/related_parties/shadow_compute/gate/memo/time_tracking/independence/prior_year/metrics/constants），`__init__.py` 聚合导出 router + 所有端点函数（向后兼容测试）
+- EQCR 服务拆分（50b034f）：`eqcr_workbench_service.py`（EqcrWorkbenchService: list_my_projects/get_project_overview）+ `eqcr_domain_service.py`（EqcrDomainService: 5 域聚合 + opinion CRUD）+ `eqcr_service.py` 薄组合类（MRO 继承向后兼容）
+- EQCR 枚举端点：`GET /api/eqcr/constants` 返回 domains/verdicts/progress_states，前端启动时拉取避免硬编码漂移
+- R5 Alembic 迁移链：round5_eqcr_20260505 → round5_independence_20260506 → round5_eqcr_check_constraints_20260506（PG CHECK domain+verdict）
+- datetime.utcnow() 已全局清理（81 文件），统一 `datetime.now(timezone.utc)`；后续新代码禁止使用 utcnow()
+- 归档包章节号分配：00 项目封面 / 01 签字流水（R1）/ 02 EQCR 备忘录（R5，已注册）/ 03 质控抽查报告（R3）/ 04 独立性声明（R1）/ 10 底稿/ / 20 报表/ / 30 附注/ / 40 附件/ / 99 审计日志
 - 审计意见锁定架构决策：不新增 opinion_locked_at 平行字段，改为扩展 ReportStatus 状态机 draft→review→eqcr_approved→final（R5 需求 6 + README 跨轮约束第 3 条）
 - 枚举扩展硬约定：IssueTicket.source 在 R1 一次性预留 11 个值（L2/L3/Q/review_comment/consistency/ai/reminder/client_commitment/pbc/confirmation/qc_inspection），ProjectAssignment.role 预留 eqcr，避免多轮迁移
 - 权限矩阵四点同步约定：新增 role/动作需同时更新 assignment_service.ROLE_MAP + role_context_service._ROLE_PRIORITY + 前端 ROLE_MAP + composables/usePermission.ROLE_PERMISSIONS
-- 焦点时长隐私决策：R4 需求 10 焦点追踪只写 localStorage（按周归档键），不落库不发后端，消除监控隐患
+- 焦点时长隐私决策：R4 需求 10 焦点追踪只写 localStorage（按周归档键 `focus_tracker_YYYY-MM-DD`），不落库不发后端，消除监控隐患
+- R4 编辑软锁：`workpaper_editing_locks` 表，有效锁 = `released_at IS NULL AND heartbeat_at > now - 5min`，惰性清理（acquire 时过期锁设 released_at=now），前端 heartbeat 每 2 分钟，beforeUnload 释放
+- R4 AI 脱敏：`export_mask_service.mask_context(cell_context)` 在 LLM 调用前替换金额/客户名/身份证为 `[amount_N]/[client_N]/[id_number_N]` 占位符，映射表仅当前会话有效不回填；脱敏阈值 >= 100000（非 10000）；人名匹配需"联系人：/客户："等前缀标记，公司名匹配后缀"公司/集团/有限/科技"等
+- R4 预填充 provenance：`parsed_data.cell_provenance` JSONB，supersede 策略（重填覆盖旧值，`_prev` 保留最多 1 次历史），source 类型 trial_balance/prior_year/formula/ledger/manual/ocr；实现位于 `prefill_engine.py` 末尾四个函数
+- R4 按金额穿透：`backend/app/routers/penetrate_by_amount.py`（本次新建），prefix="/api/projects/{project_id}/ledger"，MAX_RESULTS=200 截断
+- R4 router 注册：router_registry.py §13 "审计助理(R4)" tag，6 个 router 内部已含完整 /api prefix 不加额外前缀
+- R4 Alembic 迁移 2 个：`round4_editing_lock_20260506`（workpaper_editing_locks 表）+ `round4_ocr_fields_cache_20260506`（attachments.ocr_fields_cache JSONB 列）
 - 跨轮 SLA 统一按自然日计，不引入节假日日历服务，跨长假由人工 override（README 跨轮约束第 5 条）
 - ClientCommunicationService 已存在于 `pm_service.py:481`，沟通记录存 `Project.wizard_state.communications` JSONB，`commitments` 当前是字符串；R2 需求 5 无需"调研"，直接升级为结构化数组
 - ReviewInboxService.get_inbox(user_id, project_id=None) 已支持全局+单项目双模式（`pm_service.py:26`），R1 需求 1 不新增后端端点
@@ -162,10 +173,11 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5 → R6，依据 README v2.2 "跨轮依赖矩阵"
+- **Round 4 已修复并验证通过（2026-05-06）**：修复 4+2 个真实缺口后 128 个测试全绿，app 870 路由正常启动。修复内容：(a) `get_prior_year_workpaper` 函数新增到 continuous_audit_service（通过 WpIndex join 获取 wp_code）；(b) prefill provenance 四函数追加到 prefill_engine.py；(c) 6 个 R4 router 注册到 router_registry.py §13；(d) 3 个 Sprint 集成测试创建；(e) ExportMaskService 新增 mask_context/mask_text/_is_sensitive_amount；(f) Attachment 模型新增 ocr_fields_cache；(g) wp_chat_service 脱敏集成
 - Round 6 三件套已完成（requirements+design+tasks），主题"跨角色系统级优化"，7 需求 / 18 任务 / 2 Sprint；设计阶段发现 R1 已落地 readiness_facade + ArchiveOrchestrator，需求 1/2 工作量大幅缩减
 - R6 一致性复核发现：(1) 旧归档端点 A/B/C 的 deprecated 标记已由 R1 实装（`deprecated=True` + `X-Deprecated` 头），R6 仅需改为标准 `Deprecation` 头；(2) `apiPaths.ts` 整个 `archive` 对象（不仅 `archive.archive`）全指向不存在的 `/api/archive/...`，需整体重写为 `/api/projects/.../archive/...`；(3) ThreeColumnLayout 无 `developing` maturity badge 样式，需新增；(4) `ruff` 未安装需加入 requirements.txt
 - Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
-- Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，122 个 EQCR 测试全通过；关键修复：(1) gate_engine.evaluate 加 `await db.flush()` 修复 gate_decision.id NULL 导致 trace_events 插入失败；(2) sign_service._transition_report_status 加 `await db.flush()` 让状态变更对 refresh 可见；(3) Task 23 年度独立性声明改为独立表 `annual_independence_declarations`（R1 通用表未落地前的过渡方案，migration round5_independence_20260506）；(4) Task 18 备忘录接入 python-docx + LibreOffice PDF 管线，`build_memo_docx_bytes` 纯函数生成 docx，`eqcr_memo_pdf_generator` 归档章节生成器预留；(5) Task 24 年度声明变成真实阻断（router 守卫 + 工作台 load 阻塞）；(6) Task 15 客户名归一化 `client_lookup.normalize_client_name` 兼容"XX集团"vs"XX集团有限公司"；(7) Task 22 CompetenceRating 枚举值修正为 reliable/unreliable（原先误用 A/D）；(8) Task 20 metrics 端点加 admin/partner 角色守卫；(9) EqcrProjectView 加 EQCR 审批/解锁按钮，approve 前强制检查历年对比差异原因；(10) 新增 test_eqcr_full_flow / test_eqcr_state_machine_properties / test_eqcr_component_auditor_review / test_eqcr_memo_docx / test_client_lookup 五个测试文件；(11) 归档章节 '02-EQCR备忘录.pdf' 待 R1 archive_section_registry 落地后通过 `register('02', 'eqcr_memo.pdf', eqcr_memo_pdf_generator)` 注册
+- Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，122 个 EQCR 测试全通过；R5 关闭
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

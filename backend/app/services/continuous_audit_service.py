@@ -256,3 +256,69 @@ class ContinuousAuditService:
             "new_year": new_year,
             "items_copied": items_copied,
         }
+
+
+# ---------------------------------------------------------------------------
+# Round 4 需求 4: 上年底稿对比 — 独立函数（非类方法，供 router 直接调用）
+# ---------------------------------------------------------------------------
+
+
+async def get_prior_year_workpaper(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_id: UUID,
+) -> dict[str, Any] | None:
+    """获取上年同 wp_code 的底稿元数据
+
+    流程：
+    1. 通过 wp_id 获取当前底稿关联的 WpIndex.wp_code
+    2. 通过 project_id 获取 prior_year_project_id
+    3. 在上年项目中查找同 wp_code 的底稿（通过 WpIndex join）
+    4. 返回 {wp_id, wp_code, file_url, conclusion, audited_amount} 或 None
+    """
+    from app.models.workpaper_models import WorkingPaper, WpIndex
+
+    # 1. 获取当前底稿的 wp_code（通过 WpIndex）
+    result = await db.execute(
+        sa.select(WpIndex.wp_code)
+        .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(WorkingPaper.id == wp_id)
+    )
+    row = result.first()
+    if not row:
+        return None
+    wp_code = row[0]
+
+    # 2. 获取 prior_year_project_id
+    result = await db.execute(
+        sa.text("SELECT prior_year_project_id FROM projects WHERE id = :pid"),
+        {"pid": str(project_id)},
+    )
+    row = result.first()
+    if not row or not row[0]:
+        return None
+    prior_project_id = row[0]
+
+    # 3. 在上年项目中查找同 wp_code 的底稿（通过 WpIndex join）
+    result = await db.execute(
+        sa.select(WorkingPaper)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(
+            WorkingPaper.project_id == prior_project_id,
+            WpIndex.wp_code == wp_code,
+            WorkingPaper.is_deleted == sa.false(),
+        )
+    )
+    prior_wp = result.first()
+    if not prior_wp:
+        return None
+
+    # 4. 构建返回数据
+    parsed = prior_wp.parsed_data or {}
+    return {
+        "wp_id": str(prior_wp.id),
+        "wp_code": wp_code,
+        "file_url": f"/api/projects/{prior_project_id}/workpapers/{prior_wp.id}/download-file",
+        "conclusion": parsed.get("conclusion"),
+        "audited_amount": parsed.get("audited_amount"),
+    }

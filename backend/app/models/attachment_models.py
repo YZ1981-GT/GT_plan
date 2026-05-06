@@ -32,6 +32,7 @@ class Attachment(Base):
     paperless_document_id: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     ocr_status: Mapped[str] = mapped_column(String(20), server_default=text("'pending'"), nullable=False)
     ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_fields_cache: Mapped[dict | None] = mapped_column(sa.JSON, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(server_default=text("false"), nullable=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
