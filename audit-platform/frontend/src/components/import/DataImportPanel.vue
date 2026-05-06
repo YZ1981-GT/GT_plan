@@ -158,6 +158,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj } from '@/services/apiPaths'
 
 const props = defineProps<{
   projectId: string
@@ -189,7 +190,7 @@ async function startImport() {
   // 1. 先检查是否有重复数据
   try {
     const dup = await api.get(
-      `/api/projects/${props.projectId}/import/check-duplicates`,
+      `${P_proj.detail(props.projectId)}/import/check-duplicates`,
       { params: { data_type: form.dataType, year: form.year } }
     )
 
@@ -241,7 +242,7 @@ async function doImport(onDuplicate: string) {
     formData.append('on_duplicate', onDuplicate)
 
     const batch = await api.post(
-      `/api/projects/${props.projectId}/import`,
+      `${P_proj.detail(props.projectId)}/import`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
@@ -271,7 +272,7 @@ async function doImport(onDuplicate: string) {
 async function loadProgress(batchId: string) {
   try {
     currentProgress.value = await api.get(
-      `/api/projects/${props.projectId}/import/${batchId}/progress`
+      `${P_proj.detail(props.projectId)}/import/${batchId}/progress`
     )
   } catch {
     // ignore
@@ -281,7 +282,7 @@ async function loadProgress(batchId: string) {
 async function loadBatches() {
   try {
     batches.value = await api.get(
-      `/api/projects/${props.projectId}/import/batches`
+      `${P_proj.detail(props.projectId)}/import/batches`
     ) || []
   } catch {
     batches.value = []
@@ -293,7 +294,7 @@ async function handleRollback(batchId: string) {
     await ElMessageBox.confirm('确定要回滚此批次导入吗？所有导入的记录将被删除。', '确认回滚', {
       type: 'warning',
     })
-    await api.post(`/api/projects/${props.projectId}/import/${batchId}/rollback`)
+    await api.post(`${P_proj.detail(props.projectId)}/import/${batchId}/rollback`)
     ElMessage.success('回滚成功')
     await loadBatches()
   } catch {

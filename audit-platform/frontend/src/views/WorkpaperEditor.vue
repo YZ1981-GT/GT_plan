@@ -106,6 +106,7 @@ import {
 } from '@/services/workpaperApi'
 import { rebuildWorkpaperStructure, listUsers } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
+import { workpapers as P_wp } from '@/services/apiPaths'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
 
@@ -170,7 +171,7 @@ async function onShowVersions() {
   showVersionDrawer.value = true
   versionLoading.value = true
   try {
-    const data = await httpApi.get(`/api/workpapers/${wpId.value}/versions`, {
+    const data = await httpApi.get(P_wp.versions(wpId.value), {
       validateStatus: (s: number) => s < 600,
     })
     versionList.value = Array.isArray(data) ? data : (data?.versions || data?.items || [])
@@ -255,7 +256,7 @@ async function initUniver() {
   let workbookData: any = null
   try {
     const data = await httpApi.get(
-      `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-data`,
+      P_wp.univerData(projectId.value, wpId.value),
       { validateStatus: (s: number) => s < 600 },
     )
     workbookData = data
@@ -359,7 +360,7 @@ async function onSave(): Promise<boolean> {
     // 调用完整保存 API（xlsx 回写 + structure.json + 审计留痕 + 事件发布）
     // 需求 45.1：携带 expected_version 触发后端并发冲突检测
     const data = await httpApi.post(
-      `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-save`,
+      P_wp.univerSave(projectId.value, wpId.value),
       { snapshot, expected_version: wpDetail.value.file_version },
       { validateStatus: (s: number) => s < 600 },
     )
@@ -385,7 +386,7 @@ async function onSave(): Promise<boolean> {
         if (action === 'cancel') {
           // 强制覆盖：不带 expected_version 重发
           const retryData = await httpApi.post(
-            `/api/projects/${projectId.value}/working-papers/${wpId.value}/univer-save`,
+            P_wp.univerSave(projectId.value, wpId.value),
             { snapshot },
           )
           dirty.value = false
@@ -458,7 +459,7 @@ async function onExportPdf() {
     // 使用 axios http 客户端直接获取 blob（apiProxy.api 会 unwrap data 不适合 blob）
     const http = (await import('@/utils/http')).default
     const response = await http.get(
-      `/api/projects/${projectId.value}/working-papers/${wpId.value}/export-pdf`,
+      P_wp.exportPdf(projectId.value, wpId.value),
       { responseType: 'blob', validateStatus: (s: number) => s < 600 },
     )
     const blob: Blob = response.data
@@ -501,7 +502,7 @@ async function loadSmartTips() {
     if (!accountName) return
 
     const data = await httpApi.get(
-      `/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(accountName)}`,
+      P_wp.wpMappingTsj(projectId.value, accountName),
       { validateStatus: (s: number) => s < 600 },
     )
     if (data?.tips?.length || data?.risk_areas?.length) {

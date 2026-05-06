@@ -304,6 +304,10 @@ export const workpapers = {
   batchPrefill: (pid: string) => `/api/projects/${pid}/working-papers/batch-prefill`,
   generateFromCodes: (pid: string) => `/api/projects/${pid}/working-papers/generate-from-codes`,
   wpMappingTsj: (pid: string, accountName: string) => `/api/projects/${pid}/wp-mapping/tsj/${encodeURIComponent(accountName)}`,
+  versions: (wpId: string) => `/api/workpapers/${wpId}/versions`,
+  univerData: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-data`,
+  univerSave: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-save`,
+  exportPdf: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/export-pdf`,
 } as const
 
 // ─── 底稿复核批注 ───────────────────────────────────────────────────────────

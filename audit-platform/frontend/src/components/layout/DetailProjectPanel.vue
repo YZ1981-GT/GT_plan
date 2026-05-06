@@ -283,6 +283,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 
@@ -316,7 +317,7 @@ watch(() => props.project?.id, async (newId) => {
   } catch { wpTree.value = [] }
   // 加载试算表预览（前20行，静默失败）
   try {
-    const raw = await api.get(`/api/projects/${newId}/trial-balance`, {
+    const raw = await api.get(P_tb.get(newId), {
       params: { year: projectYear.value },
       validateStatus: (s: number) => s < 600,
     })
@@ -325,7 +326,7 @@ watch(() => props.project?.id, async (newId) => {
   } catch { trialBalanceRows.value = [] }
   // 加载附件列表（前10条，静默失败）
   try {
-    const raw = await api.get(`/api/projects/${newId}/attachments`, {
+    const raw = await api.get(P_att.list(newId), {
       params: { page_size: 10 },
       validateStatus: (s: number) => s < 600,
     })
@@ -376,7 +377,7 @@ async function handleResetImport() {
       '确认重置',
       { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
     )
-    await api.post(`/api/projects/${props.project.id}/account-chart/import-reset`, null, {
+    await api.post(P_ac.importReset(props.project.id), null, {
       params: { force: true },
     })
     window.location.reload()
@@ -406,7 +407,7 @@ async function onCreateNextYear() {
       '创建下年项目',
       { confirmButtonText: '确定创建', cancelButtonText: '取消', type: 'info' },
     )
-    const data = await api.post(`/api/projects/${props.project.id}/create-next-year`)
+    const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`)
     const result = data
     ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)
     router.push(`/projects/new?projectId=${result.new_project_id}`)
