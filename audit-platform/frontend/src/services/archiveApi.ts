@@ -8,6 +8,7 @@
  * - POST /api/projects/{pid}/archive/jobs/{jobId}/retry → 重试归档作业
  */
 import { api } from '@/services/apiProxy'
+import { archive as archivePaths, qcArchiveReadiness } from './apiPaths'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────
@@ -58,7 +59,7 @@ export interface ArchiveJob {
 
 /** 获取归档就绪检查数据（统一 GateReadinessData schema） */
 export async function getArchiveReadiness(projectId: string): Promise<GateReadinessData> {
-  return api.get<GateReadinessData>('/api/qc/archive-readiness', {
+  return api.get<GateReadinessData>(qcArchiveReadiness.check, {
     params: { project_id: projectId },
   })
 }
@@ -69,7 +70,7 @@ export async function startArchiveOrchestrate(
   body: ArchiveOrchestrateBody,
 ): Promise<ArchiveOrchestrateResponse> {
   return api.post<ArchiveOrchestrateResponse>(
-    `/api/projects/${projectId}/archive/orchestrate`,
+    archivePaths.orchestrate(projectId),
     body,
   )
 }
@@ -79,9 +80,7 @@ export async function getArchiveJob(
   projectId: string,
   jobId: string,
 ): Promise<ArchiveJob> {
-  return api.get<ArchiveJob>(
-    `/api/projects/${projectId}/archive/jobs/${jobId}`,
-  )
+  return api.get<ArchiveJob>(archivePaths.job(projectId, jobId))
 }
 
 /** 重试归档作业（从断点续传） */
@@ -89,7 +88,5 @@ export async function retryArchiveJob(
   projectId: string,
   jobId: string,
 ): Promise<ArchiveJob> {
-  return api.post<ArchiveJob>(
-    `/api/projects/${projectId}/archive/jobs/${jobId}/retry`,
-  )
+  return api.post<ArchiveJob>(archivePaths.retry(projectId, jobId))
 }

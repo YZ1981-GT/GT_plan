@@ -2,6 +2,7 @@
  * 质控抽查工作台 API
  */
 import http from '@/utils/http'
+import { qcInspections as P } from './apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -55,13 +56,11 @@ export interface ReportGenerationResult {
 
 // ─── API Paths ──────────────────────────────────────────────────────────────
 
-const BASE = '/api/qc/inspections'
-
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 /** 获取抽查批次列表 */
 export async function getInspections(): Promise<QcInspectionListResponse> {
-  const { data } = await http.get(BASE)
+  const { data } = await http.get(P.list)
   if (Array.isArray(data)) {
     return { items: data, total: data.length }
   }
@@ -70,7 +69,7 @@ export async function getInspections(): Promise<QcInspectionListResponse> {
 
 /** 获取抽查批次详情（含 items） */
 export async function getInspectionDetail(id: string): Promise<QcInspectionDetail> {
-  const { data } = await http.get(`${BASE}/${id}`)
+  const { data } = await http.get(P.detail(id))
   return data
 }
 
@@ -80,15 +79,12 @@ export async function submitVerdict(
   itemId: string,
   payload: VerdictPayload,
 ): Promise<QcInspectionItem> {
-  const { data } = await http.post(
-    `${BASE}/${inspectionId}/items/${itemId}/verdict`,
-    payload,
-  )
+  const { data } = await http.post(P.verdict(inspectionId, itemId), payload)
   return data
 }
 
 /** 生成质控报告 Word（异步） */
 export async function generateReport(inspectionId: string): Promise<ReportGenerationResult> {
-  const { data } = await http.post(`${BASE}/${inspectionId}/report`)
+  const { data } = await http.post(P.report(inspectionId))
   return data
 }

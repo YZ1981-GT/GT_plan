@@ -529,7 +529,9 @@ export const archive = {
     get: (pid: string) => `/api/projects/${pid}/archive/checklist`,
     complete: (pid: string, itemId: string) => `/api/projects/${pid}/archive/checklist/${itemId}/complete`,
   },
-  archive: (pid: string) => `/api/projects/${pid}/archive/orchestrate`,
+  orchestrate: (pid: string) => `/api/projects/${pid}/archive/orchestrate`,
+  job: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}`,
+  retry: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}/retry`,
   exportPdf: (pid: string) => `/api/projects/${pid}/archive/export-pdf`,
   modifications: {
     request: (pid: string) => `/api/projects/${pid}/archive/modifications`,
@@ -551,6 +553,10 @@ export const subsequentEvents = {
 
 // ─── PBC ────────────────────────────────────────────────────────────────────
 
+/**
+ * @deprecated R7+ 计划 — 后端当前为 stub 实现（返回 status: "developing"）。
+ * 前端暂无对应页面，待 R7 正式开发时补充真实实现。
+ */
 export const pbc = {
   items: (pid: string) => `/api/pbc/${pid}/items`,
   itemStatus: (pid: string, itemId: string) => `/api/pbc/${pid}/items/${itemId}/status`,
@@ -559,6 +565,10 @@ export const pbc = {
 
 // ─── 函证 ───────────────────────────────────────────────────────────────────
 
+/**
+ * @deprecated R7+ 计划 — 后端当前为 stub 实现（返回 status: "developing"）。
+ * 前端暂无对应页面，待 R7 正式开发时补充真实实现。
+ */
 export const confirmations = {
   list: (pid: string) => `/api/confirmations/${pid}/confirmations`,
   detail: (pid: string, confId: string) => `/api/confirmations/${pid}/confirmations/${confId}`,
@@ -937,6 +947,55 @@ export const qcDashboard = {
   archiveReadiness: (pid: string) => `/api/projects/${pid}/qc-dashboard/archive-readiness`,
 } as const
 
+// ─── 质控规则管理 ───────────────────────────────────────────────────────────
+
+export const qcRules = {
+  list: '/api/qc/rules',
+  detail: (ruleId: string) => `/api/qc/rules/${ruleId}`,
+  dryRun: (ruleId: string) => `/api/qc/rules/${ruleId}/dry-run`,
+  versions: (ruleId: string) => `/api/qc/rules/${ruleId}/versions`,
+} as const
+
+// ─── 质控抽查 ───────────────────────────────────────────────────────────────
+
+export const qcInspections = {
+  list: '/api/qc/inspections',
+  detail: (id: string) => `/api/qc/inspections/${id}`,
+  verdict: (inspId: string, itemId: string) => `/api/qc/inspections/${inspId}/items/${itemId}/verdict`,
+  report: (inspId: string) => `/api/qc/inspections/${inspId}/report`,
+  publishAsCase: (inspId: string, itemId: string) => `/api/qc/inspections/${inspId}/items/${itemId}/publish-as-case`,
+} as const
+
+// ─── 质控案例库 ─────────────────────────────────────────────────────────────
+
+export const qcCases = {
+  list: '/api/qc/cases',
+  detail: (caseId: string) => `/api/qc/cases/${caseId}`,
+} as const
+
+// ─── 质控年报 ───────────────────────────────────────────────────────────────
+
+export const qcAnnualReports = {
+  list: '/api/qc/annual-reports',
+  generate: '/api/qc/annual-reports',
+  download: (reportId: string) => `/api/qc/annual-reports/${reportId}/download`,
+} as const
+
+// ─── 质控日志合规 ───────────────────────────────────────────────────────────
+
+export const qcAuditLogCompliance = {
+  findings: '/api/qc/audit-log-compliance/findings',
+  run: '/api/qc/audit-log-compliance/run',
+  findingStatus: (findingId: string) => `/api/qc/audit-log-compliance/findings/${findingId}/status`,
+  summary: '/api/qc/audit-log-compliance/summary',
+} as const
+
+// ─── 归档就绪 ───────────────────────────────────────────────────────────────
+
+export const qcArchiveReadiness = {
+  check: '/api/qc/archive-readiness',
+} as const
+
 // ─── 底稿 Job ───────────────────────────────────────────────────────────────
 
 export const jobs = {
@@ -1043,7 +1102,9 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  admin, partner, qcDashboard, jobs, governance, eqcr, signatures, rotation,
+  admin, partner, qcDashboard, qcRules, qcInspections, qcCases,
+  qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
+  jobs, governance, eqcr, signatures, rotation,
 } as const
 
 export default API

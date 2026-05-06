@@ -2,6 +2,7 @@
  * QC 审计日志合规抽查 API — Round 3 需求 12
  */
 import http from '@/utils/http'
+import { qcAuditLogCompliance as P } from './apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -50,8 +51,6 @@ export interface ComplianceSummary {
 
 // ─── API Paths ──────────────────────────────────────────────────────────────
 
-const BASE = '/api/qc/audit-log-compliance'
-
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 /** 获取日志合规命中条目列表 */
@@ -61,7 +60,7 @@ export async function getAuditLogFindings(params?: {
   page?: number
   page_size?: number
 }): Promise<AuditLogComplianceResponse> {
-  const { data } = await http.get(`${BASE}/findings`, { params })
+  const { data } = await http.get(P.findings, { params })
   return data
 }
 
@@ -69,7 +68,7 @@ export async function getAuditLogFindings(params?: {
 export async function runAuditLogCompliance(
   payload: RunComplianceParams,
 ): Promise<RunComplianceResult> {
-  const { data } = await http.post(`${BASE}/run`, payload)
+  const { data } = await http.post(P.run, payload)
   return data
 }
 
@@ -78,9 +77,7 @@ export async function updateFindingStatus(
   findingId: string,
   status: 'reviewed' | 'escalated',
 ): Promise<AuditLogFinding> {
-  const { data } = await http.patch(`${BASE}/findings/${findingId}/status`, {
-    status,
-  })
+  const { data } = await http.patch(P.findingStatus(findingId), { status })
   return data
 }
 
@@ -88,6 +85,6 @@ export async function updateFindingStatus(
 export async function getComplianceSummary(params?: {
   project_id?: string
 }): Promise<ComplianceSummary> {
-  const { data } = await http.get(`${BASE}/summary`, { params })
+  const { data } = await http.get(P.summary, { params })
   return data
 }

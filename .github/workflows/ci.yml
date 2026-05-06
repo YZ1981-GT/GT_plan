@@ -85,6 +85,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
         working-directory: audit-platform/frontend
+      - name: Type check (vue-tsc)
+        run: npx vue-tsc --noEmit
+        working-directory: audit-platform/frontend
       - name: Build
         run: npm run build
         working-directory: audit-platform/frontend

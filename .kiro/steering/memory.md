@@ -224,6 +224,9 @@ inclusion: always
 - 合并模块需找真实项目做业务测试（技术完成度 85%，业务完成度 60%）[P1]
 - 系统当前是"工程师视角"而非"审计员视角"，下一步重点是 UAT 而非加功能
 - `GtStatusTag.STATUS_MAP_TO_DICT_KEY` 是硬编码映射表，新增 StatusMap 时需手动维护 [P3]
+- PBC 清单真实实现（R7+ 计划，后端当前 stub）[P2]
+- 函证管理真实实现（R7+ 计划，后端当前 stub）[P2]
+- 统一 commonApi.ts / collaborationApi.ts / aiApi.ts 硬编码路径到 apiPaths 常量（257 处，大工作量）[P3]
 
 ## 底稿编码体系（致同 2025 修订版）
 

@@ -2,6 +2,7 @@
  * 质控案例库 API
  */
 import http from '@/utils/http'
+import { qcCases as P, qcInspections as PI } from './apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -41,13 +42,11 @@ export interface PublishAsCasePayload {
 
 // ─── API Paths ──────────────────────────────────────────────────────────────
 
-const BASE = '/api/qc/cases'
-
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 /** 获取案例列表（支持筛选和分页） */
 export async function getCases(params?: QcCaseListParams): Promise<QcCaseListResponse> {
-  const { data } = await http.get(BASE, { params })
+  const { data } = await http.get(P.list, { params })
   if (Array.isArray(data)) {
     return { items: data, total: data.length }
   }
@@ -56,7 +55,7 @@ export async function getCases(params?: QcCaseListParams): Promise<QcCaseListRes
 
 /** 获取案例详情 */
 export async function getCaseDetail(caseId: string): Promise<QcCase> {
-  const { data } = await http.get(`${BASE}/${caseId}`)
+  const { data } = await http.get(P.detail(caseId))
   return data
 }
 
@@ -66,9 +65,6 @@ export async function publishAsCase(
   itemId: string,
   payload: PublishAsCasePayload,
 ): Promise<QcCase> {
-  const { data } = await http.post(
-    `/api/qc/inspections/${inspectionId}/items/${itemId}/publish-as-case`,
-    payload,
-  )
+  const { data } = await http.post(PI.publishAsCase(inspectionId, itemId), payload)
   return data
 }

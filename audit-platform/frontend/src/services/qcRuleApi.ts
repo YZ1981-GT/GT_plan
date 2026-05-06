@@ -2,6 +2,7 @@
  * 质控规则管理 API
  */
 import http from '@/utils/http'
+import { qcRules as P } from './apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -45,12 +46,10 @@ export interface QcRuleListResponse {
 
 // ─── API Paths ──────────────────────────────────────────────────────────────
 
-const BASE = '/api/qc/rules'
-
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 export async function getQcRules(params?: QcRuleListParams): Promise<QcRuleListResponse> {
-  const { data } = await http.get(BASE, { params })
+  const { data } = await http.get(P.list, { params })
   // 后端可能直接返回数组或 {items, total} 结构
   if (Array.isArray(data)) {
     return { items: data, total: data.length }
@@ -59,26 +58,26 @@ export async function getQcRules(params?: QcRuleListParams): Promise<QcRuleListR
 }
 
 export async function getQcRule(ruleId: string): Promise<QcRuleDefinition> {
-  const { data } = await http.get(`${BASE}/${ruleId}`)
+  const { data } = await http.get(P.detail(ruleId))
   return data
 }
 
 export async function createQcRule(payload: Partial<QcRuleDefinition>): Promise<QcRuleDefinition> {
-  const { data } = await http.post(BASE, payload)
+  const { data } = await http.post(P.list, payload)
   return data
 }
 
 export async function updateQcRule(ruleId: string, payload: Partial<QcRuleDefinition>): Promise<QcRuleDefinition> {
-  const { data } = await http.patch(`${BASE}/${ruleId}`, payload)
+  const { data } = await http.patch(P.detail(ruleId), payload)
   return data
 }
 
 export async function deleteQcRule(ruleId: string): Promise<void> {
-  await http.delete(`${BASE}/${ruleId}`)
+  await http.delete(P.detail(ruleId))
 }
 
 export async function toggleQcRule(ruleId: string, enabled: boolean): Promise<QcRuleDefinition> {
-  const { data } = await http.patch(`${BASE}/${ruleId}`, { enabled })
+  const { data } = await http.patch(P.detail(ruleId), { enabled })
   return data
 }
 
@@ -105,7 +104,7 @@ export interface DryRunResult {
 }
 
 export async function dryRunQcRule(ruleId: string, payload: DryRunRequest): Promise<DryRunResult> {
-  const { data } = await http.post(`${BASE}/${ruleId}/dry-run`, payload)
+  const { data } = await http.post(P.dryRun(ruleId), payload)
   return data
 }
 
@@ -122,7 +121,7 @@ export interface QcRuleVersion {
 }
 
 export async function getQcRuleVersions(ruleId: string): Promise<QcRuleVersion[]> {
-  const { data } = await http.get(`${BASE}/${ruleId}/versions`)
+  const { data } = await http.get(P.versions(ruleId))
   // 后端可能返回数组或 {items} 结构
   if (Array.isArray(data)) return data
   return data.items ?? []

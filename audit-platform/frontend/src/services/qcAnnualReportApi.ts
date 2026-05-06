@@ -6,6 +6,7 @@
  * GET  /api/qc/annual-reports/{id}/download — 下载年报
  */
 import http from '@/utils/http'
+import { qcAnnualReports as P } from './apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -32,8 +33,6 @@ export interface GenerateReportResult {
 
 // ─── API Paths ──────────────────────────────────────────────────────────────
 
-const BASE = '/api/qc/annual-reports'
-
 // ─── API Functions ──────────────────────────────────────────────────────────
 
 /** 列出历史年报 */
@@ -41,7 +40,7 @@ export async function listAnnualReports(
   page = 1,
   pageSize = 20,
 ): Promise<AnnualReportListResponse> {
-  const { data } = await http.get(BASE, { params: { page, page_size: pageSize } })
+  const { data } = await http.get(P.list, { params: { page, page_size: pageSize } })
   if (Array.isArray(data)) {
     return { items: data, total: data.length }
   }
@@ -50,18 +49,18 @@ export async function listAnnualReports(
 
 /** 触发年报生成 */
 export async function generateAnnualReport(year: number): Promise<GenerateReportResult> {
-  const { data } = await http.post(`${BASE}?year=${year}`)
+  const { data } = await http.post(`${P.generate}?year=${year}`)
   return data
 }
 
 /** 下载年报 */
 export function getAnnualReportDownloadUrl(reportId: string): string {
-  return `${BASE}/${reportId}/download`
+  return P.download(reportId)
 }
 
 /** 下载年报（blob） */
 export async function downloadAnnualReport(reportId: string, year: number): Promise<void> {
-  const response = await http.get(`${BASE}/${reportId}/download`, {
+  const response = await http.get(P.download(reportId), {
     responseType: 'blob',
   })
   const blob = new Blob([response.data])
