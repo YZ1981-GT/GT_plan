@@ -107,6 +107,7 @@ import {
 import { rebuildWorkpaperStructure, listUsers } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
+import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
 
 const DIRTY_COMMAND_PATTERNS = [
   'set-range-values', 'set-cell',
@@ -121,6 +122,20 @@ const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+
+// R1 需求 2：底稿复核红点（任务 5）
+const reviewMarkers = useWorkpaperReviewMarkers({
+  projectId: () => projectId.value,
+  wpId: () => wpId.value,
+  onJumpToIssue: (ticket: ReviewMarkerTicket) => {
+    // 跳转到项目问题单列表，高亮该工单
+    router.push({
+      name: 'IssueTicketList',
+      params: { projectId: projectId.value },
+      query: { highlight_id: ticket.id },
+    })
+  },
+})
 
 const wpDetail = ref<WorkpaperDetail | null>(null)
 const loading = ref(true)
@@ -297,6 +312,39 @@ async function initUniver() {
   // 6. 非阻塞加载智能提示和用户名映射
   loadSmartTips()
   loadUserMap()
+
+  // 7. R1 需求 2：加载复核意见红点（失败不阻断底稿）
+  loadReviewMarkers()
+}
+
+/**
+ * R1 需求 2：拉取 ReviewRecord 并在 Univer 单元格挂红点。
+ * - 任何错误都被 composable 内部吞掉，不影响底稿编辑；
+ * - 路由 query.cell 或 query.review_id 存在时，红点挂载完成后滚动到对应单元格。
+ */
+async function loadReviewMarkers() {
+  try {
+    await reviewMarkers.loadData()
+    // Univer API 已在 initUniver 中就绪（univerAPI 变量）
+    reviewMarkers.attachMarkers(univerAPI)
+
+    // 路由跳转支持：?cell=B5 直接定位；?review_id=<uuid> 查出 cell 再定位
+    const q = route.query
+    let targetCell: string | null = null
+    if (typeof q.cell === 'string' && q.cell.trim()) {
+      targetCell = q.cell.trim()
+    } else if (typeof q.review_id === 'string' && q.review_id.trim()) {
+      targetCell = reviewMarkers.findCellRefByReviewId(q.review_id.trim())
+    }
+    if (targetCell) {
+      // 下一帧滚动，避免 Univer 内部异步布局未完成
+      requestAnimationFrame(() => {
+        reviewMarkers.scrollToCell(univerAPI, targetCell as string)
+      })
+    }
+  } catch {
+    /* ignore — 红点仅为辅助功能 */
+  }
 }
 
 async function onSave(): Promise<boolean> {
@@ -530,5 +578,24 @@ onUnmounted(() => {
   color: #e6a23c;
   font-size: 12px;
   font-weight: 500;
+}
+</style>
+
+<!-- R1 需求 2：复核红点样式需全局生效（Univer overlay 在 Vue scope 外渲染） -->
+<style>
+.gt-review-marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e6443e;
+  box-shadow: 0 0 0 2px rgba(230, 68, 62, 0.18), 0 1px 3px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.gt-review-marker-dot:hover {
+  transform: scale(1.2);
+}
+.gt-review-marker-popover {
+  padding: 12px !important;
 }
 </style>

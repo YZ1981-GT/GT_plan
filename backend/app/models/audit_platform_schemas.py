@@ -768,6 +768,8 @@ class EventType(str, enum.Enum):
     LEDGER_DATASET_ROLLED_BACK = "ledger.dataset_rolled_back"
     # Phase 18: 事件链路失败通知
     SYNC_FAILED = "sync.failed"
+    # Batch 3 Fix 3: 批量委派事件供 event_handlers 级联
+    WORKPAPER_ASSIGNED = "workpaper.assigned"
 
 
 class EventPayload(BaseModel):

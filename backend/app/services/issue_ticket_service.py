@@ -1,6 +1,22 @@
 """Phase 15: 统一问题单服务
 
 对齐 v2 4.5.15A: L2/L3/Q 问题统一管理 + SLA 升级
+
+R1 需求 2（refinement-round1-review-closure）扩展：工单状态变更时
+**反向同步**到关联 ``ReviewRecord`` 与底稿 ``review_status``：
+
+- 目标状态 ``pending_recheck`` + ``source='review_comment'``
+  + ``source_ref_id`` 非空 → ``ReviewRecord.reply_text`` 追加
+  ``[系统] 已整改，请复验``（首次填写时则直接写 ``已整改，请复验``），
+  ``replied_by/replied_at`` 同步记录。
+- 目标状态 ``closed`` + 同条件 → ``ReviewRecord.status = resolved``，
+  ``resolved_by/resolved_at`` 记录；并回退关联底稿 ``review_status``：
+  ``level1_rejected → pending_level1`` / ``level2_rejected → pending_level2``，
+  其余 review_status 不动（避免打乱流程）。
+
+事务边界：与 ``update_status`` 同一 session 提交；任一步骤失败整体回滚。
+幂等性：重复写入通过"令牌探测 + 状态探测"保证不重复追加 reply_text /
+不重复切 resolved / 不重复回退 review_status。
 """
 import uuid
 import logging
@@ -31,6 +47,10 @@ VALID_TRANSITIONS = {
 
 # 升级链路
 ESCALATION_ORDER = [IssueSource.L2, IssueSource.L3, IssueSource.Q]
+
+# R1 需求 2：反向同步 reply_text 常量
+_RECHECK_REPLY_TOKEN = "[系统] 已整改，请复验"
+_RECHECK_REPLY_FIRST = "已整改，请复验"
 
 
 class IssueTicketService:
@@ -124,6 +144,24 @@ class IssueTicketService:
         if status in (IssueStatus.closed, IssueStatus.rejected):
             ticket.closed_at = datetime.utcnow()
         await db.flush()
+
+        # R1 需求 2：反向同步到关联 ReviewRecord + WorkingPaper.review_status
+        # 仅处理 source='review_comment' 且 source_ref_id 指向 ReviewRecord 的工单；
+        # 与工单状态变更共享同一事务，任一环节抛异常由外层回滚保持一致性。
+        try:
+            await self._sync_review_record_on_status_change(
+                db,
+                ticket=ticket,
+                new_status=status,
+                operator_id=operator_id,
+            )
+        except Exception:
+            # 反向同步失败必须整体回滚（需求 2.4 / 2.5 强一致语义），
+            # 先在这里记一次告警日志便于排查再抛出。
+            logger.exception(
+                "[ISSUE_REVERSE_SYNC] failed issue=%s new_status=%s", ticket.id, status
+            )
+            raise
 
         trace_id = generate_trace_id()
         await trace_event_service.write(
@@ -266,6 +304,181 @@ class IssueTicketService:
             "page": page,
             "page_size": page_size,
         }
+
+    # ------------------------------------------------------------------
+    # R1 需求 2：反向同步 工单 → ReviewRecord / WorkingPaper.review_status
+    # ------------------------------------------------------------------
+    async def _sync_review_record_on_status_change(
+        self,
+        db: AsyncSession,
+        *,
+        ticket: IssueTicket,
+        new_status: str,
+        operator_id: uuid.UUID,
+    ) -> None:
+        """工单状态流转时反向刷新关联复核批注与底稿复核状态。
+
+        仅对"来源为复核意见（``source='review_comment'``）"且 ``source_ref_id``
+        非空的工单生效；其他来源（L2/L3/Q 等）直接 no-op。
+
+        目标状态:
+          - ``pending_recheck`` → ReviewRecord.reply_text 追加 "已整改，请复验"
+          - ``closed``          → ReviewRecord.status=resolved +
+                                  底稿 review_status 回退 (level1_rejected →
+                                  pending_level1 / level2_rejected →
+                                  pending_level2；其他 review_status 不动)
+
+        幂等:
+          - reply_text 已含令牌串则不重复追加；
+          - ReviewRecord 已 resolved 则不重复切；
+          - 底稿 review_status 已非 rejected 则不回退。
+        """
+        if new_status not in (
+            IssueStatus.pending_recheck,
+            IssueStatus.closed,
+        ):
+            return
+        if ticket.source != IssueSource.review_comment.value:
+            return
+        if ticket.source_ref_id is None:
+            return
+
+        # 延迟导入避免循环依赖
+        from app.models.workpaper_models import (
+            ReviewCommentStatus,
+            ReviewRecord,
+            WorkingPaper,
+            WpReviewStatus,
+        )
+
+        review = await db.get(ReviewRecord, ticket.source_ref_id)
+        if review is None:
+            # 关联 ReviewRecord 已被软删除或 ID 失效：不阻断工单状态变更，
+            # 仅记 warning 便于排查。
+            logger.warning(
+                "[ISSUE_REVERSE_SYNC] ReviewRecord not found: ticket=%s source_ref_id=%s",
+                ticket.id,
+                ticket.source_ref_id,
+            )
+            return
+
+        now = datetime.utcnow()
+
+        if new_status == IssueStatus.pending_recheck:
+            existing_reply = (review.reply_text or "").strip()
+            if _RECHECK_REPLY_TOKEN in existing_reply or (
+                existing_reply == _RECHECK_REPLY_FIRST
+            ):
+                # 幂等：已追加过则不再重复写
+                logger.debug(
+                    "[ISSUE_REVERSE_SYNC] reply_text already contains recheck token "
+                    "(ticket=%s review=%s)",
+                    ticket.id,
+                    review.id,
+                )
+            else:
+                if existing_reply:
+                    review.reply_text = f"{existing_reply}\n{_RECHECK_REPLY_TOKEN}"
+                else:
+                    review.reply_text = _RECHECK_REPLY_FIRST
+                # 编制人的回复动作：替换 replier_id/replied_at 为当前操作者
+                review.replier_id = operator_id
+                review.replied_at = now
+                # open → replied 状态切换（resolved 时不回退）
+                if review.status == ReviewCommentStatus.open:
+                    review.status = ReviewCommentStatus.replied
+                review.updated_at = now
+                await db.flush()
+
+                # 审计日志：记录反向同步动作
+                try:
+                    from app.services.audit_logger_enhanced import audit_logger
+
+                    await audit_logger.log_action(
+                        user_id=operator_id,
+                        action="review_record.replied_by_ticket",
+                        object_type="review_record",
+                        object_id=review.id,
+                        project_id=ticket.project_id,
+                        details={
+                            "ticket_id": str(ticket.id),
+                            "wp_id": str(ticket.wp_id) if ticket.wp_id else None,
+                            "trigger": "issue.pending_recheck",
+                        },
+                    )
+                except Exception as log_err:  # noqa: BLE001
+                    # 审计日志失败仅 warning，不阻断业务（审计记录非强一致）
+                    logger.warning(
+                        "[ISSUE_REVERSE_SYNC] audit log failed (non-blocking): %s",
+                        log_err,
+                    )
+
+        elif new_status == IssueStatus.closed:
+            # 1) ReviewRecord resolved（幂等：已 resolved 跳过）
+            if review.status != ReviewCommentStatus.resolved:
+                review.status = ReviewCommentStatus.resolved
+                review.resolved_by = operator_id
+                review.resolved_at = now
+                review.updated_at = now
+                await db.flush()
+
+                try:
+                    from app.services.audit_logger_enhanced import audit_logger
+
+                    await audit_logger.log_action(
+                        user_id=operator_id,
+                        action="review_record.resolved_by_ticket",
+                        object_type="review_record",
+                        object_id=review.id,
+                        project_id=ticket.project_id,
+                        details={
+                            "ticket_id": str(ticket.id),
+                            "wp_id": str(ticket.wp_id) if ticket.wp_id else None,
+                            "trigger": "issue.closed",
+                        },
+                    )
+                except Exception as log_err:  # noqa: BLE001
+                    logger.warning(
+                        "[ISSUE_REVERSE_SYNC] audit log failed (non-blocking): %s",
+                        log_err,
+                    )
+
+            # 2) 底稿 review_status 回退（仅 rejected 两态）
+            wp_id = ticket.wp_id or review.working_paper_id
+            if wp_id is None:
+                return
+            wp = await db.get(WorkingPaper, wp_id)
+            if wp is None:
+                logger.warning(
+                    "[ISSUE_REVERSE_SYNC] WorkingPaper not found: ticket=%s wp_id=%s",
+                    ticket.id,
+                    wp_id,
+                )
+                return
+
+            current_rv = wp.review_status.value if wp.review_status else None
+            revert_map = {
+                WpReviewStatus.level1_rejected.value: WpReviewStatus.pending_level1,
+                WpReviewStatus.level2_rejected.value: WpReviewStatus.pending_level2,
+            }
+            next_rv = revert_map.get(current_rv)
+            if next_rv is not None:
+                wp.review_status = next_rv
+                wp.updated_at = now
+                await db.flush()
+                logger.info(
+                    "[ISSUE_REVERSE_SYNC] wp=%s review_status %s → %s (by ticket=%s)",
+                    wp.id,
+                    current_rv,
+                    next_rv.value,
+                    ticket.id,
+                )
+            else:
+                logger.debug(
+                    "[ISSUE_REVERSE_SYNC] wp=%s review_status=%s not a rejected state, skip revert",
+                    wp.id,
+                    current_rv,
+                )
 
     def _to_dict(self, ticket: IssueTicket) -> dict:
         return {

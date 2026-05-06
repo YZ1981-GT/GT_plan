@@ -142,122 +142,298 @@ class SignReadinessService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def check_sign_readiness(self, project_id: uuid.UUID) -> dict[str, Any]:
+    async def check_sign_readiness(
+        self,
+        project_id: uuid.UUID,
+        actor_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
+        """R1 Task 7 门面化：内部调 gate_engine.evaluate('sign_off')，
+        hit_rules 按 rule_code 映射到原有 8 项 UI 类目；gate 尚未覆盖的
+        类目（复核通过率/KAM/独立性等）通过 ``extra_findings`` 补齐。
+
+        返回统一 schema（见 :mod:`app.services.readiness_facade`）：
+        ``{ready, groups, gate_eval_id, expires_at, checks(legacy), ...}``
+
+        Parameters
+        ----------
+        project_id : 项目 UUID
+        actor_id : 可选调用人（用于 trace_event 留痕）；未传时尝试
+            回落到 ``Project.created_by``，若项目也不存在则用 system
+            placeholder UUID（不会阻断 gate 评估）。
         """
-        签字前 8 项检查：
-        1. 所有底稿二级复核通过
-        2. QC 全部通过
-        3. 无未解决复核意见
-        4. 调整分录全部审批
-        5. 未更正错报已评价且未超重要性
-        6. 审计报告已生成
-        7. 关键审计事项已确认
-        8. 独立性确认
+        from app.services.gate_engine import gate_engine
+        from app.services.gate_eval_store import store_gate_eval
+        from app.services.readiness_facade import build_readiness_response
+
+        # 若调用方未给 actor，兜底走 project.created_by
+        resolved_actor = actor_id
+        proj = (
+            await self.db.execute(select(Project).where(Project.id == project_id))
+        ).scalar_one_or_none()
+        if resolved_actor is None and proj is not None:
+            resolved_actor = proj.created_by
+        if resolved_actor is None:
+            # 不应发生，但兜底：随机 UUID 仅用于 trace，不代表任何人
+            resolved_actor = uuid.uuid4()
+            _logger.warning(
+                "[sign_readiness] actor_id 缺失，已生成占位符 actor=%s project=%s",
+                resolved_actor,
+                project_id,
+            )
+
+        # 1) 执行 sign_off gate
+        gate_result = await gate_engine.evaluate(
+            db=self.db,
+            gate_type="sign_off",
+            project_id=project_id,
+            wp_id=None,
+            actor_id=resolved_actor,
+            context={},
+        )
+
+        # 2) 计算 gate 未覆盖的"业务类目"信号，作为 extra_findings
+        extra = await self._compute_sign_extra_findings(project_id, proj)
+
+        # 3) 生成 gate_eval_id（5 分钟 TTL）
+        gate_decision = str(gate_result.decision)
+        has_blocking = any(
+            f["severity"] == "blocking"
+            for items in extra.values()
+            for f in items
+        ) or any(
+            str(getattr(h, "severity", "")) == "blocking"
+            for h in (gate_result.hit_rules or [])
+        )
+        ready_flag = (gate_decision != "block") and (not has_blocking)
+
+        eval_id, expires_at = await store_gate_eval(
+            project_id=project_id,
+            gate_type="sign_off",
+            ready=ready_flag,
+            decision=gate_decision,
+        )
+
+        # 4) 聚合为统一响应
+        response = build_readiness_response(
+            gate_type="sign_off",
+            gate_result=gate_result,
+            extra_findings=extra,
+            gate_eval_id=eval_id,
+            expires_at_iso=expires_at.isoformat(),
+        )
+        _logger.info(
+            "[sign_readiness][DEPRECATED_FIELDS] legacy checks/ready_to_sign 仍返回供旧 UI 兼容，"
+            "Round 2 前端切换 GateReadinessPanel 后可移除 project=%s",
+            project_id,
+        )
+        return response
+
+    async def _compute_sign_extra_findings(
+        self,
+        project_id: uuid.UUID,
+        proj: "Project | None",
+    ) -> dict[str, list[dict[str, Any]]]:
+        """gate 暂未覆盖的业务类目检查，按类目 id 返回 findings 列表。
+
+        规则：每项业务信号若未通过，产出 severity='blocking' 的 finding
+        并归到对应类目 id，与 legacy 8 项检查语义完全等价，确保现有
+        PartnerDashboard"检查全绿"门槛不降级。
         """
-        checks = []
-        all_pass = True
+        extra: dict[str, list[dict[str, Any]]] = {}
         base = [WorkingPaper.project_id == project_id, WorkingPaper.is_deleted == False]
 
-        # 1. 二级复核通过
-        not_l2_q = select(func.count()).select_from(WorkingPaper).where(
-            *base,
-            WorkingPaper.review_status != WpReviewStatus.not_submitted,
-            WorkingPaper.review_status != WpReviewStatus.level2_passed,
-        )
-        not_l2 = (await self.db.execute(not_l2_q)).scalar() or 0
-        checks.append({"id": "l2_review", "label": "所有底稿二级复核通过", "passed": not_l2 == 0,
-                        "detail": f"还有 {not_l2} 个未通过二级复核" if not_l2 > 0 else "全部通过"})
-        if not_l2 > 0: all_pass = False
+        # l2_review — 所有底稿二级复核通过
+        not_l2 = (
+            await self.db.execute(
+                select(func.count())
+                .select_from(WorkingPaper)
+                .where(
+                    *base,
+                    WorkingPaper.review_status != WpReviewStatus.not_submitted,
+                    WorkingPaper.review_status != WpReviewStatus.level2_passed,
+                )
+            )
+        ).scalar() or 0
+        if not_l2 > 0:
+            extra.setdefault("l2_review", []).append(
+                {
+                    "rule_code": "READINESS-L2",
+                    "error_code": "L2_REVIEW_INCOMPLETE",
+                    "severity": "blocking",
+                    "message": f"还有 {not_l2} 个底稿未通过二级复核",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请在复核工作台完成剩余底稿的二级复核",
+                }
+            )
 
-        # 2. QC 全部通过
-        wp_ids = [r[0] for r in (await self.db.execute(select(WorkingPaper.id).where(*base))).all()]
+        # qc_all_pass — 逐底稿最新 QC 结果
+        wp_ids = [
+            r[0]
+            for r in (await self.db.execute(select(WorkingPaper.id).where(*base))).all()
+        ]
         qc_fail = 0
         for wp_id in wp_ids:
-            qc = (await self.db.execute(
-                select(WpQcResult).where(WpQcResult.working_paper_id == wp_id)
-                .order_by(WpQcResult.check_timestamp.desc()).limit(1)
-            )).scalar_one_or_none()
+            qc = (
+                await self.db.execute(
+                    select(WpQcResult)
+                    .where(WpQcResult.working_paper_id == wp_id)
+                    .order_by(WpQcResult.check_timestamp.desc())
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
             if qc and not qc.passed:
                 qc_fail += 1
-        checks.append({"id": "qc_all_pass", "label": "QC 自检全部通过", "passed": qc_fail == 0,
-                        "detail": f"{qc_fail} 个未通过" if qc_fail > 0 else "全部通过"})
-        if qc_fail > 0: all_pass = False
+        if qc_fail > 0:
+            extra.setdefault("qc_all_pass", []).append(
+                {
+                    "rule_code": "READINESS-QC",
+                    "error_code": "QC_SELF_CHECK_FAILED",
+                    "severity": "blocking",
+                    "message": f"{qc_fail} 个底稿 QC 自检未通过",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请修复底稿 QC 阻断项后重跑 QC",
+                }
+            )
 
-        # 3. 无未解决复核意见
+        # no_open_issues — 复核意见
         try:
             from app.models.phase10_models import CellAnnotation
-            open_q = select(func.count()).select_from(CellAnnotation).where(
-                CellAnnotation.project_id == project_id,
-                CellAnnotation.is_deleted == False,
-                CellAnnotation.status != "resolved",
-            )
-            open_count = (await self.db.execute(open_q)).scalar() or 0
+
+            open_count = (
+                await self.db.execute(
+                    select(func.count())
+                    .select_from(CellAnnotation)
+                    .where(
+                        CellAnnotation.project_id == project_id,
+                        CellAnnotation.is_deleted == False,
+                        CellAnnotation.status != "resolved",
+                    )
+                )
+            ).scalar() or 0
         except Exception:
             open_count = 0
-        checks.append({"id": "no_open_issues", "label": "无未解决复核意见", "passed": open_count == 0,
-                        "detail": f"还有 {open_count} 条" if open_count > 0 else "全部已解决"})
-        if open_count > 0: all_pass = False
+        if open_count > 0:
+            extra.setdefault("no_open_issues", []).append(
+                {
+                    "rule_code": "READINESS-ISSUE",
+                    "error_code": "OPEN_REVIEW_COMMENTS",
+                    "severity": "blocking",
+                    "message": f"还有 {open_count} 条复核意见未解决",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请在复核收件箱逐条关闭",
+                }
+            )
 
-        # 4. 调整分录全部审批
+        # adj_approved — 调整分录
         try:
             from app.models.audit_platform_models import Adjustment, ReviewStatus
-            unapproved = (await self.db.execute(select(func.count()).select_from(Adjustment).where(
-                Adjustment.project_id == project_id, Adjustment.is_deleted == False,
-                Adjustment.review_status != ReviewStatus.approved,
-            ))).scalar() or 0
+
+            unapproved = (
+                await self.db.execute(
+                    select(func.count())
+                    .select_from(Adjustment)
+                    .where(
+                        Adjustment.project_id == project_id,
+                        Adjustment.is_deleted == False,
+                        Adjustment.review_status != ReviewStatus.approved,
+                    )
+                )
+            ).scalar() or 0
         except Exception:
             unapproved = 0
-        checks.append({"id": "adj_approved", "label": "调整分录全部审批", "passed": unapproved == 0,
-                        "detail": f"{unapproved} 条未审批" if unapproved > 0 else "全部已审批"})
-        if unapproved > 0: all_pass = False
+        if unapproved > 0:
+            extra.setdefault("adj_approved", []).append(
+                {
+                    "rule_code": "READINESS-ADJ",
+                    "error_code": "ADJUSTMENTS_UNAPPROVED",
+                    "severity": "blocking",
+                    "message": f"{unapproved} 条调整分录未审批",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请审批剩余调整分录",
+                }
+            )
 
-        # 5. 未更正错报
+        # misstatement_eval — 未更正错报
         try:
-            from app.models.audit_platform_models import UnadjustedMisstatement, Materiality
-            uneval = (await self.db.execute(select(func.count()).select_from(UnadjustedMisstatement).where(
-                UnadjustedMisstatement.project_id == project_id,
-                UnadjustedMisstatement.is_deleted == False,
-                UnadjustedMisstatement.auditor_evaluation == None,
-            ))).scalar() or 0
+            from app.models.audit_platform_models import UnadjustedMisstatement
+
+            uneval = (
+                await self.db.execute(
+                    select(func.count())
+                    .select_from(UnadjustedMisstatement)
+                    .where(
+                        UnadjustedMisstatement.project_id == project_id,
+                        UnadjustedMisstatement.is_deleted == False,
+                        UnadjustedMisstatement.auditor_evaluation == None,
+                    )
+                )
+            ).scalar() or 0
         except Exception:
             uneval = 0
-        checks.append({"id": "misstatement_eval", "label": "未更正错报已评价", "passed": uneval == 0,
-                        "detail": f"{uneval} 条未评价" if uneval > 0 else "全部已评价"})
-        if uneval > 0: all_pass = False
+        if uneval > 0:
+            extra.setdefault("misstatement_eval", []).append(
+                {
+                    "rule_code": "READINESS-MISSTATE",
+                    "error_code": "MISSTATEMENTS_UNEVALUATED",
+                    "severity": "blocking",
+                    "message": f"{uneval} 条未更正错报尚未评价",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请在错报汇总表中逐条评价",
+                }
+            )
 
-        # 6. 审计报告已生成
+        # report_generated — 审计报告
         try:
             from app.models.report_models import AuditReport
-            report = (await self.db.execute(
-                select(AuditReport).where(AuditReport.project_id == project_id).limit(1)
-            )).scalar_one_or_none()
+
+            report = (
+                await self.db.execute(
+                    select(AuditReport)
+                    .where(AuditReport.project_id == project_id)
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
             has_report = report is not None
         except Exception:
             has_report = False
-        checks.append({"id": "report_generated", "label": "审计报告已生成", "passed": has_report,
-                        "detail": "已生成" if has_report else "未生成"})
-        if not has_report: all_pass = False
+        if not has_report:
+            extra.setdefault("report_generated", []).append(
+                {
+                    "rule_code": "READINESS-REPORT",
+                    "error_code": "REPORT_NOT_GENERATED",
+                    "severity": "blocking",
+                    "message": "审计报告尚未生成",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请在审计报告模块生成报告",
+                }
+            )
 
-        # 7. KAM 已确认（从 wizard_state 检查）
-        proj = (await self.db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
-        ws = proj.wizard_state or {} if proj else {}
-        kam_confirmed = ws.get("kam_confirmed", False)
-        checks.append({"id": "kam_confirmed", "label": "关键审计事项已确认", "passed": kam_confirmed,
-                        "detail": "已确认" if kam_confirmed else "未确认"})
-        if not kam_confirmed: all_pass = False
+        # KAM + independence — wizard_state
+        ws = (proj.wizard_state or {}) if proj is not None else {}
+        if not ws.get("kam_confirmed", False):
+            extra.setdefault("kam_confirmed", []).append(
+                {
+                    "rule_code": "READINESS-KAM",
+                    "error_code": "KAM_NOT_CONFIRMED",
+                    "severity": "blocking",
+                    "message": "关键审计事项尚未确认",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请在项目向导确认关键审计事项",
+                }
+            )
+        if not ws.get("independence_confirmed", False):
+            extra.setdefault("independence", []).append(
+                {
+                    "rule_code": "READINESS-INDEP",
+                    "error_code": "INDEPENDENCE_NOT_CONFIRMED",
+                    "severity": "blocking",
+                    "message": "独立性确认未完成",
+                    "location": {"project_id": str(project_id)},
+                    "action_hint": "请完成独立性声明（R1 v1.5 将升级为结构化声明）",
+                }
+            )
 
-        # 8. 独立性确认
-        independence_confirmed = ws.get("independence_confirmed", False)
-        checks.append({"id": "independence", "label": "独立性确认", "passed": independence_confirmed,
-                        "detail": "已确认" if independence_confirmed else "未确认"})
-        if not independence_confirmed: all_pass = False
-
-        return {
-            "ready_to_sign": all_pass,
-            "checks": checks,
-            "passed_count": sum(1 for c in checks if c["passed"]),
-            "total_checks": len(checks),
-        }
+        return extra
 
     async def check_workpaper_readiness(self, project_id: uuid.UUID) -> dict[str, Any]:
         """Phase 12 P1-7: 签字前底稿专项检查（5项）。"""

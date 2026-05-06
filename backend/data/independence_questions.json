@@ -1,0 +1,162 @@
+[
+  {
+    "id": "IND-01",
+    "category": "financial_interest",
+    "question": "您或您的直系亲属是否持有被审计单位的股票、债券或其他金融工具？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明持有的金融工具类型、金额及处置计划"
+  },
+  {
+    "id": "IND-02",
+    "category": "financial_interest",
+    "question": "您或您的直系亲属是否在被审计单位有存款、贷款或其他金融往来（超出正常银行业务范围）？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明金融往来的性质和金额"
+  },
+  {
+    "id": "IND-03",
+    "category": "financial_interest",
+    "question": "您或您的直系亲属是否与被审计单位存在重大商业交易或商业利益关系？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明商业关系的性质和规模"
+  },
+  {
+    "id": "IND-04",
+    "category": "employment_relationship",
+    "question": "您或您的直系亲属是否曾在被审计单位任职（含董事、高管、关键管理人员）？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明任职时间、职位及离职日期"
+  },
+  {
+    "id": "IND-05",
+    "category": "employment_relationship",
+    "question": "您是否正在与被审计单位洽谈雇佣事宜？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明洽谈的职位和进展"
+  },
+  {
+    "id": "IND-06",
+    "category": "employment_relationship",
+    "question": "被审计单位的董事、高管或关键管理人员是否曾在本事务所任职（近两年内）？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明该人员姓名、原职位及离所日期"
+  },
+  {
+    "id": "IND-07",
+    "category": "family_relationship",
+    "question": "您的直系亲属或近亲属是否在被审计单位担任董事、高管或对财务报告有重大影响的职位？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明亲属关系、姓名及其在被审计单位的职位"
+  },
+  {
+    "id": "IND-08",
+    "category": "family_relationship",
+    "question": "您的直系亲属或近亲属是否在被审计单位的关联方担任关键管理职位？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明亲属关系及关联方名称"
+  },
+  {
+    "id": "IND-09",
+    "category": "non_audit_service",
+    "question": "本事务所是否在本审计期间为被审计单位提供了簿记或会计服务？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明服务内容、时间范围及防护措施"
+  },
+  {
+    "id": "IND-10",
+    "category": "non_audit_service",
+    "question": "本事务所是否在本审计期间为被审计单位提供了内部审计服务？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明服务范围及与外部审计的隔离措施"
+  },
+  {
+    "id": "IND-11",
+    "category": "non_audit_service",
+    "question": "本事务所是否在本审计期间为被审计单位提供了税务服务（超出常规合规申报）？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明税务服务的具体内容"
+  },
+  {
+    "id": "IND-12",
+    "category": "non_audit_service",
+    "question": "本事务所是否在本审计期间为被审计单位提供了管理咨询、IT系统设计或实施服务？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明服务内容及对财务报告的潜在影响"
+  },
+  {
+    "id": "IND-13",
+    "category": "non_audit_service",
+    "question": "本事务所是否在本审计期间为被审计单位提供了资产评估或估值服务？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明评估对象及金额重要性"
+  },
+  {
+    "id": "IND-14",
+    "category": "fee_dependency",
+    "question": "来自被审计单位及其关联方的审计费用是否超过本事务所年度总收入的15%？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明费用占比及拟采取的防护措施"
+  },
+  {
+    "id": "IND-15",
+    "category": "fee_dependency",
+    "question": "本项目审计费用是否存在或有收费安排（与审计结论挂钩）？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明收费安排的具体条款"
+  },
+  {
+    "id": "IND-16",
+    "category": "long_term_relationship",
+    "question": "您作为签字合伙人/项目质量控制复核人是否已连续服务该客户超过规定年限？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明连续服务年数及轮换计划"
+  },
+  {
+    "id": "IND-17",
+    "category": "gift_hospitality",
+    "question": "您或项目组成员是否在近12个月内接受过被审计单位的礼品或招待（超出正常商务礼仪）？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明礼品/招待的性质和价值"
+  },
+  {
+    "id": "IND-18",
+    "category": "litigation",
+    "question": "本事务所与被审计单位之间是否存在实际或潜在的诉讼或争议？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明诉讼/争议的性质和当前状态"
+  },
+  {
+    "id": "IND-19",
+    "category": "management_decision",
+    "question": "项目组成员是否在审计过程中代替管理层做出了经营决策或判断？",
+    "answer_type": "yes_no",
+    "requires_detail_if": "yes",
+    "detail_prompt": "请说明决策内容及补救措施"
+  },
+  {
+    "id": "IND-20",
+    "category": "overall_assessment",
+    "question": "综合以上各项，您是否认为存在任何其他可能影响独立性的情形未在上述问题中涵盖？",
+    "answer_type": "text",
+    "requires_detail_if": "non_empty",
+    "detail_prompt": "请详细描述该情形及拟采取的防护措施"
+  }
+]

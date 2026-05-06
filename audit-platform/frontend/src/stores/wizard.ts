@@ -18,6 +18,8 @@ export interface BasicInfo {
   ultimate_company_code: string
   signing_partner_id: string | null
   manager_id: string | null
+  budget_hours: number | null
+  contract_amount: number | null
 }
 
 export interface WizardStepData {
@@ -149,6 +151,12 @@ export const useWizardStore = defineStore('wizard', {
         }
         if (basicInfo.manager_id) {
           payload.manager_id = basicInfo.manager_id
+        }
+        if (basicInfo.budget_hours != null) {
+          payload.budget_hours = basicInfo.budget_hours
+        }
+        if (basicInfo.contract_amount != null) {
+          payload.contract_amount = basicInfo.contract_amount
         }
         
         const { data } = await http.post('/api/projects', payload)

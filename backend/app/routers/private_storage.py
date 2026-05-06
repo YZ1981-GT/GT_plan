@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -60,15 +60,24 @@ async def get_quota(user_id: UUID):
 
 # ── 归档 ──────────────────────────────────────────────────
 
-@router.post("/api/projects/{project_id}/archive")
+@router.post("/api/projects/{project_id}/archive", deprecated=True)
 async def archive_project(
     project_id: UUID,
+    response: Response,
     push_to_cloud: bool = True,
     cleanup_local: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """项目归档：锁定底稿 → 推送云端 → 可选清理本地"""
+    """[Deprecated] 项目归档：请使用 POST /api/projects/{id}/archive/orchestrate"""
+    import logging as _logging
+
+    _logging.getLogger(__name__).warning(
+        "[DEPRECATED] private_storage.archive_project called for project=%s, "
+        "use /api/projects/{id}/archive/orchestrate instead",
+        project_id,
+    )
+    response.headers["X-Deprecated"] = "true"
     svc = ProjectArchiveService()
     result = await svc.archive_project(
         db, project_id,

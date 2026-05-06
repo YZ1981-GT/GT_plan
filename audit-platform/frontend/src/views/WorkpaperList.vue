@@ -34,6 +34,9 @@
         <el-button type="primary" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
           批量下载 ({{ selectedWpIds.length }})
         </el-button>
+        <el-button type="warning" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
+          批量委派 ({{ selectedWpIds.length }})
+        </el-button>
       </div>
     </div>
 
@@ -439,6 +442,15 @@
       @imported="onWpImported"
     />
 
+    <!-- 批量委派弹窗 -->
+    <BatchAssignDialog
+      v-model="showBatchAssign"
+      :project-id="projectId"
+      :wp-ids="selectedWpIds"
+      :wp-list="batchAssignWpList"
+      @assigned="onBatchAssigned"
+    />
+
     <!-- 看板分配弹窗 -->
     <el-dialog
       v-model="showAssignDialog"
@@ -499,6 +511,7 @@ import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { WP_STATUS, WP_REVIEW_STATUS } from '@/utils/statusMaps'
 import { useDictStore } from '@/stores/dict'
@@ -565,6 +578,26 @@ const assigningItem = ref<any>(null)
 const assignForm = ref<{ assigned_to: string | null; reviewer: string | null }>({ assigned_to: null, reviewer: null })
 const assignLoading = ref(false)
 const userOptions = ref<any[]>([])
+
+// 批量委派弹窗
+const showBatchAssign = ref(false)
+const batchAssignWpList = computed(() => {
+  // 合并 wpList 和 wpIndex 信息，提供给 BatchAssignDialog
+  return wpList.value.map((w: WorkpaperDetail) => {
+    const idx = wpIndex.value.find((i: WpIndexItem) => i.id === w.wp_index_id)
+    return {
+      id: w.id,
+      wp_code: w.wp_code || idx?.wp_code || '',
+      wp_name: w.wp_name || idx?.wp_name || '',
+      audit_cycle: w.audit_cycle || idx?.audit_cycle || '',
+    }
+  })
+})
+
+function onBatchAssigned(_result: { updated: number; notifications_sent: number; message: string }) {
+  // 刷新数据
+  fetchData()
+}
 
 // 任务 6.1：用户名映射
 const userNameMap = ref<Map<string, string>>(new Map())

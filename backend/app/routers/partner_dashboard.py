@@ -35,9 +35,12 @@ async def check_sign_readiness(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """签字前 8 项检查"""
+    """签字前 readiness 门面（R1 Task 7）：
+    内部调 ``gate_engine.evaluate('sign_off')``，按 8 项类目分组返回，
+    附 5 分钟 TTL ``gate_eval_id`` 供签字端点校验幂等。
+    """
     svc = SignReadinessService(db)
-    return await svc.check_sign_readiness(project_id)
+    return await svc.check_sign_readiness(project_id, actor_id=current_user.id)
 
 
 @router.post("/api/projects/{project_id}/partner/workpaper-readiness")

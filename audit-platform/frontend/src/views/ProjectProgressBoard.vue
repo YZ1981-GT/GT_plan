@@ -119,7 +119,26 @@
         <el-table-column label="联系人" prop="contact_person" width="100" />
         <el-table-column label="主题" prop="topic" width="160" />
         <el-table-column label="内容" prop="content" min-width="200" show-overflow-tooltip />
-        <el-table-column label="承诺事项" prop="commitments" width="160" show-overflow-tooltip />
+        <el-table-column label="承诺事项" min-width="200">
+          <template #default="{ row }">
+            <template v-if="Array.isArray(row.commitments) && row.commitments.length">
+              <div v-for="(c, idx) in row.commitments" :key="idx" class="commitment-cell">
+                <span>{{ c.content }}</span>
+                <el-tag v-if="c.due_date" size="small" type="info" style="margin-left: 4px">
+                  {{ c.due_date }}
+                </el-tag>
+                <el-tag v-if="c.status === 'done'" size="small" type="success" style="margin-left: 4px">
+                  已完成
+                </el-tag>
+                <el-tag v-else-if="c.status === 'overdue'" size="small" type="danger" style="margin-left: 4px">
+                  逾期
+                </el-tag>
+              </div>
+            </template>
+            <span v-else-if="typeof row.commitments === 'string' && row.commitments">{{ row.commitments }}</span>
+            <span v-else style="color: #999">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="关联底稿" width="120">
           <template #default="{ row }">
             <span v-if="row.related_wp_codes?.length">{{ row.related_wp_codes.join(', ') }}</span>
@@ -151,7 +170,7 @@
           <el-input v-model="commForm.content" type="textarea" :rows="3" placeholder="沟通内容" />
         </el-form-item>
         <el-form-item label="承诺事项">
-          <el-input v-model="commForm.commitments" type="textarea" :rows="2" placeholder="双方承诺事项" />
+          <CommunicationCommitmentsEditor v-model="commForm.commitments" />
         </el-form-item>
         <el-form-item label="关联底稿">
           <el-input v-model="commForm.related_wp_codes_str" placeholder="底稿编号，逗号分隔，如 E1-1,E2-1" />
@@ -174,8 +193,10 @@ import {
   listCommunications, addCommunication, deleteCommunication,
   exportAdjustmentSummary,
   type ProgressBoardResult, type ProgressBrief, type CrossRefCheckResult,
-  type BoardItem, type CommunicationRecord,
+  type BoardItem, type CommunicationRecord, type CommitmentEntry,
 } from '@/services/pmApi'
+import CommunicationCommitmentsEditor from '@/components/pm/CommunicationCommitmentsEditor.vue'
+import type { CommitmentItem } from '@/components/pm/CommunicationCommitmentsEditor.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -291,12 +312,19 @@ async function handleCrossRefCheck() {
 // 客户沟通记录
 const communications = ref<CommunicationRecord[]>([])
 const showCommDialog = ref(false)
-const commForm = reactive({
+const commForm = reactive<{
+  date: string
+  contact_person: string
+  topic: string
+  content: string
+  commitments: CommitmentItem[]
+  related_wp_codes_str: string
+}>({
   date: new Date().toISOString().slice(0, 10),
   contact_person: '',
   topic: '',
   content: '',
-  commitments: '',
+  commitments: [],
   related_wp_codes_str: '',
 })
 
@@ -310,11 +338,12 @@ async function handleAddComm() {
   try {
     await addCommunication(projectId.value, {
       ...commForm,
+      commitments: commForm.commitments,
       related_wp_codes: commForm.related_wp_codes_str.split(',').map(s => s.trim()).filter(Boolean),
     })
     ElMessage.success('保存成功')
     showCommDialog.value = false
-    Object.assign(commForm, { contact_person: '', topic: '', content: '', commitments: '', related_wp_codes_str: '' })
+    Object.assign(commForm, { contact_person: '', topic: '', content: '', commitments: [], related_wp_codes_str: '' })
     await loadComms()
   } catch {
     ElMessage.error('保存失败')
@@ -414,4 +443,13 @@ onMounted(async () => {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
 }
 .comm-header h3 { margin: 0; font-size: 15px; }
+
+.commitment-cell {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
 </style>

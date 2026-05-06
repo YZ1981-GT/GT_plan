@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.base import PermissionLevel, ProjectUserRole
 from app.models.staff_models import ProjectAssignment, StaffMember
 from app.models.core import Notification, Project
+from app.services.notification_types import ASSIGNMENT_CREATED
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,7 @@ class AssignmentService:
 
                 notif = Notification(
                     recipient_id=staff.user_id,
-                    message_type="ASSIGNMENT_CREATED",
+                    message_type=ASSIGNMENT_CREATED,
                     title=f"您已被委派到项目「{project_name}」",
                     content=f"角色：{role_cn}，负责循环：{cycles}。点击前往填报工时：/work-hours",
                     related_object_type="project",

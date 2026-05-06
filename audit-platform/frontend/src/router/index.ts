@@ -126,6 +126,21 @@ const router = createRouter({
           component: () => import('@/views/ReviewWorkbench.vue'),
         },
         {
+          path: 'projects/:projectId/independence',
+          name: 'IndependenceDeclaration',
+          component: () => import('@/views/independence/IndependenceDeclarationForm.vue'),
+        },
+        {
+          path: 'projects/:projectId/archive',
+          name: 'ArchiveWizard',
+          component: () => import('@/views/ArchiveWizard.vue'),
+        },
+        {
+          path: 'projects/:projectId/archive/jobs/:jobId',
+          name: 'ArchiveWizardJob',
+          component: () => import('@/views/ArchiveWizard.vue'),
+        },
+        {
           path: 'projects/:projectId/qc-dashboard',
           name: 'QCDashboard',
           component: () => import('@/views/QCDashboard.vue'),
@@ -255,9 +270,21 @@ const router = createRouter({
           component: () => import('@/views/WorkHoursPage.vue'),
         },
         {
+          path: 'work-hours/approve',
+          name: 'WorkHoursApproval',
+          component: () => import('@/views/WorkHoursApproval.vue'),
+          meta: { permission: 'approve_workhours' },
+        },
+        {
           path: 'dashboard/management',
           name: 'ManagementDashboard',
           component: () => import('@/views/ManagementDashboard.vue'),
+        },
+        {
+          path: 'dashboard/manager',
+          name: 'ManagerDashboard',
+          component: () => import('@/views/ManagerDashboard.vue'),
+          meta: { permission: 'view_dashboard_manager' },
         },
         {
           path: 'dashboard/partner',

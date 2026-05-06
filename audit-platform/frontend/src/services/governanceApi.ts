@@ -91,7 +91,20 @@ export interface TaskNode {
 export interface IssueTicket {
   id: string
   project_id: string
-  source: 'L2' | 'L3' | 'Q'
+  wp_id?: string | null
+  source:
+    | 'L2'
+    | 'L3'
+    | 'Q'
+    | 'review_comment'
+    | 'consistency'
+    | 'ai'
+    | 'reminder'
+    | 'client_commitment'
+    | 'pbc'
+    | 'confirmation'
+    | 'qc_inspection'
+  source_ref_id?: string | null
   severity: 'blocker' | 'major' | 'minor' | 'suggestion'
   category: string
   title: string

@@ -6,13 +6,15 @@ Phase 9 Task 1.2
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.models.staff_schemas import (
     StaffCreate,
     StaffListResponse,
@@ -238,3 +240,155 @@ async def import_staff_from_excel(
 
     await db.commit()
     return {"imported": imported, "skipped": skipped, "total_rows": len(rows)}
+
+
+# ═══ 人员交接（Round 2 需求 10） ═══
+
+
+class HandoverRequest(BaseModel):
+    """交接请求体"""
+    scope: str = Field(..., pattern="^(all|by_project)$", description="交接范围")
+    project_ids: list[UUID] | None = Field(None, description="scope=by_project 时指定项目")
+    target_staff_id: UUID = Field(..., description="接收人 ID")
+    reason_code: str = Field(
+        ...,
+        pattern="^(resignation|long_leave|rotation|other)$",
+        description="原因码",
+    )
+    reason_detail: str | None = Field(None, description="原因详情")
+    effective_date: date = Field(..., description="生效日期")
+
+
+class HandoverPreviewResponse(BaseModel):
+    """交接预览响应"""
+    workpapers: int
+    issues: int
+    assignments: int
+
+
+class HandoverResponse(BaseModel):
+    """交接执行响应"""
+    handover_record_id: str
+    workpapers_moved: int
+    issues_moved: int
+    assignments_moved: int
+    independence_superseded: int
+
+
+@router.post("/{staff_id}/handover", response_model=HandoverResponse)
+async def execute_handover(
+    staff_id: UUID,
+    body: HandoverRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(["admin", "partner", "manager"])),
+):
+    """执行人员交接 — 批量转移底稿/工单/项目委派。
+
+    - scope='all': 转移该人员名下所有项目的工作
+    - scope='by_project': 仅转移指定项目的工作
+    - reason_code='resignation' 时自动标记独立性声明为 superseded_by_handover
+
+    权限（Batch 1 P0.2）：
+    - admin / partner：可交接任意人员
+    - manager：只能交接自己项目（manager/signing_partner）内的人员
+    - 其他角色：403
+    """
+    from app.services.handover_service import HandoverService
+    from app.services.manager_dashboard_service import ManagerDashboardService
+
+    if staff_id == body.target_staff_id:
+        raise HTTPException(
+            status_code=400,
+            detail="交接人和接收人不能是同一人",
+        )
+
+    # Batch 1 Fix 2.4: effective_date 合理范围校验
+    from datetime import timedelta
+    today = date.today()
+    if body.effective_date < today - timedelta(days=30):
+        raise HTTPException(status_code=400, detail="生效日期不能早于 30 天前")
+    if body.effective_date > today + timedelta(days=30):
+        raise HTTPException(status_code=400, detail="生效日期不能晚于 30 天后")
+
+    # manager 级权限：限制 by_project 范围在自己的项目里
+    if user.role.value == "manager":
+        if body.scope != "by_project" or not body.project_ids:
+            raise HTTPException(
+                status_code=403,
+                detail="项目经理只能进行 by_project 范围的交接，且必须指定 project_ids",
+            )
+        # 查询当前 manager 可见项目
+        mgr_svc = ManagerDashboardService(db)
+        allowed_project_ids = set(await mgr_svc._get_manager_project_ids(user))
+        requested_ids = set(body.project_ids)
+        if not requested_ids.issubset(allowed_project_ids):
+            raise HTTPException(
+                status_code=403,
+                detail="项目经理只能交接自己管理的项目",
+            )
+
+    service = HandoverService(db)
+
+    try:
+        result = await service.execute(
+            from_staff_id=staff_id,
+            to_staff_id=body.target_staff_id,
+            scope=body.scope,
+            project_ids=body.project_ids,
+            reason_code=body.reason_code,
+            reason_detail=body.reason_detail,
+            effective_date=body.effective_date,
+            executed_by=user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await db.commit()
+    return HandoverResponse(**result)
+
+
+@router.get("/{staff_id}/handover/preview", response_model=HandoverPreviewResponse)
+async def preview_handover(
+    staff_id: UUID,
+    scope: str = Query(..., pattern="^(all|by_project)$"),
+    project_ids: str | None = Query(None, description="逗号分隔的项目 ID"),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(["admin", "partner", "manager"])),
+):
+    """预览交接将影响的数据量（不执行实际变更）。
+
+    权限（Batch 1 P0.2）：同 execute_handover，仅 admin/partner/manager 可访问。
+    manager 对 scope='all' 的预览返回 403（避免泄露跨项目信息）。
+    """
+    from app.services.handover_service import HandoverService
+    from app.services.manager_dashboard_service import ManagerDashboardService
+
+    parsed_project_ids: list[UUID] | None = None
+    if project_ids:
+        try:
+            parsed_project_ids = [UUID(pid.strip()) for pid in project_ids.split(",")]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="project_ids 格式错误")
+
+    # manager 不能查看全局预览（避免信息泄露）
+    if user.role.value == "manager":
+        if scope != "by_project" or not parsed_project_ids:
+            raise HTTPException(
+                status_code=403,
+                detail="项目经理只能预览 by_project 范围，且必须指定 project_ids",
+            )
+        mgr_svc = ManagerDashboardService(db)
+        allowed_project_ids = set(await mgr_svc._get_manager_project_ids(user))
+        if not set(parsed_project_ids).issubset(allowed_project_ids):
+            raise HTTPException(
+                status_code=403,
+                detail="项目经理只能预览自己管理的项目",
+            )
+
+    service = HandoverService(db)
+    preview = await service.get_handover_preview(
+        from_staff_id=staff_id,
+        scope=scope,
+        project_ids=parsed_project_ids,
+    )
+    return HandoverPreviewResponse(**preview)
