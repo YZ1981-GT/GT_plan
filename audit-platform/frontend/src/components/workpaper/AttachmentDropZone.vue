@@ -38,6 +38,7 @@ import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { uploadAttachment } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
+import { attachments as P_att } from '@/services/apiPaths'
 
 export interface AttachmentLinkResult {
   attachment_id: string
@@ -171,7 +172,7 @@ async function createAttachmentLink(attachmentId: string) {
   const notes = cellRef ? `cell_ref:${cellRef}` : null
 
   const result = await httpApi.post(
-    `/api/attachments/${attachmentId}/associate`,
+    P_att.associate(attachmentId),
     {
       wp_id: props.wpId,
       association_type: 'evidence',

@@ -27,6 +27,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { api } from '@/services/apiProxy'
+import { signatures as P_sig } from '@/services/apiPaths'
 
 const props = defineProps<{
   objectType: string
@@ -38,7 +39,7 @@ const records = ref<any[]>([])
 async function loadRecords() {
   if (!props.objectType || !props.objectId) return
   try {
-    const data = await api.get(`/api/signatures/${props.objectType}/${props.objectId}`)
+    const data = await api.get(P_sig.list(props.objectType, props.objectId))
     records.value = data ?? []
   } catch { records.value = [] }
 }

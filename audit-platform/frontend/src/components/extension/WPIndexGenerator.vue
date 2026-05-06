@@ -25,6 +25,7 @@ import { ref } from 'vue'
 import { DocumentAdd } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj } from '@/services/apiPaths'
 
 const props = defineProps<{
   projectId: string
@@ -37,7 +38,7 @@ async function generateIndex() {
   if (!props.projectId) return
   generating.value = true
   try {
-    const data = await api.post(`/api/projects/${props.projectId}/generate-index`)
+    const data = await api.post(`${P_proj.detail(props.projectId)}/generate-index`)
     indexData.value = data ?? []
     ElMessage.success(`已生成 ${indexData.value.length} 项底稿索引`)
   } catch { ElMessage.error('生成失败') }

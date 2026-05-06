@@ -29,6 +29,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { aiPlugins as P_aip } from '@/services/apiPaths'
 
 const props = defineProps<{
   modelValue: boolean
@@ -70,7 +71,7 @@ async function onSave() {
   }
   saving.value = true
   try {
-    await api.put(`/api/ai-plugins/${props.plugin.id}/config`, { config: parsed })
+    await api.put(`${P_aip.list}/${props.plugin.id}/config`, { config: parsed })
     ElMessage.success('配置已保存')
     emit('saved')
     visible.value = false

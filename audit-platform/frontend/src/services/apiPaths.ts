@@ -1042,6 +1042,8 @@ export const aging = {
 export const regulatory = {
   filings: '/api/regulatory/filings',
   retry: (id: string) => `/api/regulatory/filings/${id}/retry`,
+  archivalStandard: '/api/regulatory/archival-standard',
+  cicpaReport: '/api/regulatory/cicpa-report',
 } as const
 
 // ─── 其他 ───────────────────────────────────────────────────────────────────
