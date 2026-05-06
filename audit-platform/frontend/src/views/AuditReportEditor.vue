@@ -11,8 +11,8 @@
               :get-config-data="getReportConfigData"
               @applied="onReportTemplateApplied"
             />
-            <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="report.status === 'final'" round>提交复核</el-button>
-            <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="report.status === 'final'" round>定稿</el-button>
+            <el-button v-if="report" size="small" @click="onStatusChange('review')" :disabled="isLocked" round>提交复核</el-button>
+            <el-button v-if="report" size="small" @click="onStatusChange('final')" :disabled="isLocked" round>定稿</el-button>
             <el-button size="small" @click="onExportWord" :loading="exportingWord" round>导出 Word</el-button>
             <el-button size="small" @click="onPickKnowledge" round title="选择知识库文档作为参考上下文">📚 知识库</el-button>
           </template>
@@ -62,24 +62,29 @@
         <div class="gt-ar-panel gt-ar-editor-panel">
           <div class="gt-ar-editor-header">
             <h4>{{ activeSection }}</h4>
-            <el-tag v-if="report.status !== 'final'" size="small" type="info">可编辑</el-tag>
-            <el-tag v-else size="small" type="success">已定稿</el-tag>
+            <el-tag v-if="report.status === 'draft'" size="small" type="info">可编辑</el-tag>
+            <el-tag v-else-if="report.status === 'review'" size="small" type="warning">⚠ 审阅中</el-tag>
+            <el-tag v-else-if="report.status === 'eqcr_approved'" size="small" type="danger">🔒 EQCR 已锁定</el-tag>
+            <el-tag v-else-if="report.status === 'final'" size="small" type="success">🔒 已定稿</el-tag>
           </div>
-          <div class="gt-ar-edit-hint" v-if="report.status !== 'final'">
+          <div class="gt-ar-edit-hint" v-if="!isLocked">
             直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
+          </div>
+          <div class="gt-ar-edit-hint" v-else-if="report.status === 'eqcr_approved'" style="background: #fff3e0; color: #e65100;">
+            🔒 EQCR 已锁定审计意见，如需修改请联系独立复核合伙人解锁
           </div>
           <div v-if="knowledgeContextText" class="gt-ar-edit-hint" style="background: #e8f5e9; color: #2e7d32; margin-bottom: 8px;">
             📎 已加载 {{ knowledgeDocCount }} 篇知识库参考文档
             <el-button size="small" link @click="clearKnowledgeContext" style="margin-left: 8px; color: #2e7d32;">清除</el-button>
           </div>
           <el-input v-model="sectionContent" type="textarea" :rows="20"
-            :disabled="report.status === 'final'" placeholder="段落内容"
+            :disabled="isLocked" placeholder="段落内容"
             class="gt-ar-textarea" />
           <div class="gt-ar-editor-footer">
             <el-button type="primary" @click="onSaveParagraph" :loading="saveLoading"
-              :disabled="report.status === 'final'">保存段落</el-button>
+              :disabled="isLocked">保存段落</el-button>
             <el-button @click="onRefreshFinancialData" :loading="refreshLoading"
-              :disabled="report.status === 'final'">刷新财务数据</el-button>
+              :disabled="isLocked">刷新财务数据</el-button>
           </div>
         </div>
       </el-col>
@@ -107,12 +112,15 @@
     <el-dialog append-to-body v-model="showGenerateDialog" title="生成审计报告" width="500px">
       <el-form label-width="100px">
         <el-form-item label="意见类型">
-          <el-select v-model="genForm.opinion_type" style="width: 100%">
+          <el-select v-model="genForm.opinion_type" style="width: 100%" :disabled="isLocked">
             <el-option label="标准无保留意见" value="unqualified" />
             <el-option label="保留意见" value="qualified" />
             <el-option label="否定意见" value="adverse" />
             <el-option label="无法表示意见" value="disclaimer" />
           </el-select>
+          <div v-if="report?.status === 'eqcr_approved'" style="font-size: 12px; color: #e65100; margin-top: 4px">
+            🔒 EQCR 已锁定，意见类型不可修改
+          </div>
         </el-form-item>
         <el-form-item label="公司类型">
           <el-select v-model="genForm.company_type" style="width: 100%">
@@ -135,7 +143,7 @@
       </el-form>
       <template #footer>
         <el-button @click="showGenerateDialog = false">取消</el-button>
-        <el-button type="primary" @click="onGenerate" :loading="genLoading">生成</el-button>
+        <el-button type="primary" @click="onGenerate" :loading="genLoading" :disabled="isLocked">生成</el-button>
       </template>
     </el-dialog>
 
@@ -207,6 +215,11 @@ function clearKnowledgeContext() {
 const sectionNames = computed(() => {
   if (!report.value?.paragraphs) return []
   return Object.keys(report.value.paragraphs)
+})
+
+const isLocked = computed(() => {
+  const s = report.value?.status
+  return s === 'eqcr_approved' || s === 'final'
 })
 
 watch(activeSection, (s) => {

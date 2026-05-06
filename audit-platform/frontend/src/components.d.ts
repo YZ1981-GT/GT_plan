@@ -125,6 +125,8 @@ declare module 'vue' {
     EqcrOpinionForm: typeof import('./components/eqcr/EqcrOpinionForm.vue')['default']
     EqcrOpinionType: typeof import('./components/eqcr/EqcrOpinionType.vue')['default']
     EqcrRelatedParties: typeof import('./components/eqcr/EqcrRelatedParties.vue')['default']
+    EqcrReviewNotesPanel: typeof import('./components/eqcr/EqcrReviewNotesPanel.vue')['default']
+    EqcrShadowCompute: typeof import('./components/eqcr/EqcrShadowCompute.vue')['default']
     EquitySimSheet: typeof import('./components/consolidation/worksheets/EquitySimSheet.vue')['default']
     ErrorBoundary: typeof import('./components/ErrorBoundary.vue')['default']
     EvidenceChainPanel: typeof import('./components/ai/EvidenceChainPanel.vue')['default']

@@ -27,6 +27,15 @@
       >
         <el-button size="small" text>🛡️ 独立复核</el-button>
       </router-link>
+      <router-link
+        v-if="isEqcrEligible"
+        to="/eqcr/metrics"
+        class="gt-nav-eqcr-metrics"
+        style="text-decoration: none; margin-left: 4px;"
+        title="EQCR 指标仪表盘（admin/partner 可见）"
+      >
+        <el-button size="small" text>📊 EQCR 指标</el-button>
+      </router-link>
     </template>
 
     <template #middle>

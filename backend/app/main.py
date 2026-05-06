@@ -77,10 +77,12 @@ async def _run_migrations() -> None:
 def _register_phase_handlers() -> None:
     """Phase 14/15 事件处理器与门禁规则注册。"""
     from app.services.gate_rules_phase14 import register_phase14_rules
+    from app.services.gate_rules_eqcr import register_eqcr_gate_rules
     from app.services.task_event_handlers import (
         register_event_handlers as register_task_handlers,
     )
     register_phase14_rules()
+    register_eqcr_gate_rules()
     register_task_handlers()
 
 

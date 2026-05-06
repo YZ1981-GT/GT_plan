@@ -42,6 +42,24 @@
           {{ reportStatusLabel(reportStatus) }}
         </el-tag>
         <el-button
+          v-if="canApprove"
+          size="small"
+          type="primary"
+          :loading="approving"
+          @click="onApproveClick"
+        >
+          EQCR 审批
+        </el-button>
+        <el-button
+          v-if="canUnlock"
+          size="small"
+          type="warning"
+          :loading="unlocking"
+          @click="onUnlockClick"
+        >
+          解锁意见
+        </el-button>
+        <el-button
           size="small"
           :loading="loading"
           @click="loadOverview"
@@ -137,7 +155,32 @@
           :project-id="projectId"
         />
       </el-tab-pane>
-      <!-- 预留 Tab 7：组成部分审计师 → Task 22 实装，本任务不渲染 -->
+      <el-tab-pane label="独立复核笔记" name="review_notes">
+        <EqcrReviewNotesPanel
+          v-if="activeTab === 'review_notes'"
+          :project-id="projectId"
+        />
+      </el-tab-pane>
+      <el-tab-pane label="历年对比" name="prior_year">
+        <EqcrPriorYearCompare
+          v-if="activeTab === 'prior_year'"
+          ref="priorYearRef"
+          :project-id="projectId"
+        />
+      </el-tab-pane>
+      <el-tab-pane label="备忘录" name="memo">
+        <EqcrMemoEditor
+          v-if="activeTab === 'memo'"
+          :project-id="projectId"
+        />
+      </el-tab-pane>
+      <el-tab-pane v-if="isConsolidated" label="组成部分审计师" name="component_auditor">
+        <EqcrComponentAuditors
+          v-if="activeTab === 'component_auditor'"
+          :project-id="projectId"
+        />
+      </el-tab-pane>
+      <!-- 预留 Tab：组成部分审计师 → Task 22 实装，本任务不渲染 -->
     </el-tabs>
   </div>
 </template>
@@ -145,7 +188,7 @@
 <script setup lang="ts">
 import { computed, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   eqcrApi,
   type EqcrProjectOverview,
@@ -157,6 +200,10 @@ import EqcrRelatedParties from '@/components/eqcr/EqcrRelatedParties.vue'
 import EqcrGoingConcern from '@/components/eqcr/EqcrGoingConcern.vue'
 import EqcrOpinionType from '@/components/eqcr/EqcrOpinionType.vue'
 import EqcrShadowCompute from '@/components/eqcr/EqcrShadowCompute.vue'
+import EqcrReviewNotesPanel from '@/components/eqcr/EqcrReviewNotesPanel.vue'
+import EqcrPriorYearCompare from '@/components/eqcr/EqcrPriorYearCompare.vue'
+import EqcrMemoEditor from '@/components/eqcr/EqcrMemoEditor.vue'
+import EqcrComponentAuditors from '@/components/eqcr/EqcrComponentAuditors.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -166,12 +213,15 @@ const projectId = computed(() => String(route.params.projectId ?? ''))
 const loading = ref(false)
 const overview = ref<EqcrProjectOverview | null>(null)
 const activeTab = ref<
-  'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute'
+  'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute' | 'review_notes' | 'prior_year' | 'memo' | 'component_auditor'
 >('materiality')
 
 const project = computed(() => overview.value?.project ?? null)
 const reportStatus = computed<ReportStatusValue | null>(
   () => overview.value?.report_status ?? null,
+)
+const isConsolidated = computed<boolean>(
+  () => project.value?.report_scope === 'consolidated',
 )
 
 /** 当前用户是否为本项目 EQCR。非 EQCR 用户进入只读模式，禁用意见录入。 */
@@ -223,6 +273,104 @@ async function loadOverview() {
 
 function goBack() {
   router.push({ name: 'EqcrWorkbench' })
+}
+
+// ─── EQCR 审批/解锁（需求 5、6、7） ────────────────────────────────────────
+
+const priorYearRef = ref<any>(null)
+const approving = ref(false)
+const unlocking = ref(false)
+
+const canApprove = computed<boolean>(() => {
+  if (!overview.value?.my_role_confirmed) return false
+  return reportStatus.value === 'review'
+})
+
+const canUnlock = computed<boolean>(() => {
+  if (!overview.value?.my_role_confirmed) return false
+  return reportStatus.value === 'eqcr_approved'
+})
+
+async function onApproveClick() {
+  // 需求 7.3：若历年对比有差异，必须先填写所有差异原因
+  if (priorYearRef.value) {
+    const allProvided = priorYearRef.value.allDiffReasonsProvided?.()
+    if (allProvided === false) {
+      ElMessage.warning(
+        '历年 EQCR 意见存在差异，请先在"历年对比" Tab 填写所有差异原因后再审批',
+      )
+      activeTab.value = 'prior_year'
+      return
+    }
+  }
+
+  const { value: comment } = await ElMessageBox.prompt(
+    'EQCR 审批意见（将记录到签字流水）',
+    '确认 EQCR 审批',
+    {
+      confirmButtonText: '确认审批',
+      cancelButtonText: '取消',
+      inputType: 'textarea',
+      inputPlaceholder: '请输入审批评论...',
+      inputValidator: (v) => (v && v.trim() ? true : '审批评论不能为空'),
+    },
+  ).catch(() => ({ value: null }))
+
+  if (!comment) return
+
+  approving.value = true
+  try {
+    const diffReasons = priorYearRef.value?.getDiffReasons?.() ?? {}
+    const api = (await import('@/services/apiProxy')).default
+    await api.post(`/api/eqcr/projects/${projectId.value}/approve`, {
+      verdict: 'approve',
+      comment,
+      // 差异原因附加到审批记录（后端 extra_payload 可扩展）
+      ...(Object.keys(diffReasons).length ? { prior_year_diff_reasons: diffReasons } : {}),
+    })
+    ElMessage.success('EQCR 审批完成，审计报告已锁定')
+    await loadOverview()
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail
+    if (detail?.error_code === 'EQCR_GATE_BLOCKED') {
+      const rules = detail.blocking_rules || []
+      const msg = rules.map((r: any) => `[${r.rule_code}] ${r.message}`).join('\n')
+      ElMessage.error(`EQCR 门禁阻断：\n${msg}`)
+    } else {
+      ElMessage.error(typeof detail === 'string' ? detail : '审批失败')
+    }
+  } finally {
+    approving.value = false
+  }
+}
+
+async function onUnlockClick() {
+  const { value: reason } = await ElMessageBox.prompt(
+    '解锁后审计报告回到 review 状态，意见类型可修改。请说明解锁原因：',
+    '确认解锁 EQCR 意见',
+    {
+      confirmButtonText: '确认解锁',
+      cancelButtonText: '取消',
+      inputType: 'textarea',
+      inputValidator: (v) => (v && v.trim() ? true : '解锁原因不能为空'),
+    },
+  ).catch(() => ({ value: null }))
+
+  if (!reason) return
+
+  unlocking.value = true
+  try {
+    const api = (await import('@/services/apiProxy')).default
+    await api.post(`/api/eqcr/projects/${projectId.value}/unlock-opinion`, {
+      reason,
+    })
+    ElMessage.success('EQCR 意见已解锁')
+    await loadOverview()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '解锁失败')
+  } finally {
+    unlocking.value = false
+  }
 }
 
 onMounted(loadOverview)

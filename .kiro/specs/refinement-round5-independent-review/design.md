@@ -292,3 +292,71 @@ async def get_component_auditor_review_data(project_id: UUID):
 抽查：复用 R3 需求 4 的 `QcInspection` 框架，strategy='annual_independence'，params={sample_rate: 10%}，items 指向 `IndependenceDeclaration`。
 
 备忘录章节追加：`eqcr_memo_generator` 模板新增 `component_auditors_section` 子模板，动态渲染组成部分评估结果。
+
+## 实施变更日志（v1.2，代码落地后追溯）
+
+本节记录设计到实施过程中的 **偏差、发现的问题、最终落地方案**，作为 "实装对设计稿的修正"。如未来再做同类设计，这些偏差应回灌到初版 design.md。
+
+### 架构决策微调（与初版差异）
+
+| 初版设计 | 实际落地 | 原因 |
+|---------|---------|------|
+| 年度独立性声明扩展 R1 `independence_declarations.declaration_scope` | 新建独立表 `annual_independence_declarations` + migration `round5_independence_20260506` | R1 原表尚未建成；等 R1 落地后一次性迁入合并 |
+| 归档章节 `register('02', 'eqcr_memo.pdf', ...)` | 章节注册机制在 R1 未就绪；`eqcr_memo_pdf_generator` 作为预留函数接口暴露 | R5 先解耦产出 Word+PDF 文件路径到 `wizard_state.eqcr_memo.files`，等 R1 registry 落地后再接入 |
+| "组成部分审计师能力 C/D 评级行高亮" | 代码枚举实际值为 `reliable / additional_procedures_needed / unreliable`，设计稿 A/B/C/D 是业务语义描述 | 前端改按真实枚举高亮（unreliable / additional_procedures_needed 触发红/黄标） |
+| "客户名精确匹配" 跨年对比 | 引入 `app/services/client_lookup.normalize_client_name`：去空白、全角→半角、去"有限公司/股份/集团/Co.,Ltd/Inc." 后缀 | 真实审计项目客户名有"XX集团"vs"XX集团有限公司"变体；R6+ 升级模糊匹配 |
+
+### 修复实装发现的 Bug（都不是设计问题，是实施时的错误）
+
+P0 — 阻断性：
+1. `gate_engine.evaluate()` 对 `gate_decision.id` 引用在 `db.add` 之后但 `db.flush` 之前，导致 `trace_events.object_id` NOT NULL 违反。**修复**：`db.add(gate_decision)` 后立即 `await db.flush()` 再建 trace_event。
+2. `sign_service._transition_report_status()` 改 `report.status` 后未 flush，`await db.refresh(report)` 从 DB 重读时丢失修改。**修复**：状态变更后立即 `await db.flush()`。
+3. Task 14 AuditReportEditor.vue 锁定判断只查 `status === 'final'`，漏掉新的 `eqcr_approved` 态。**修复**：提取 `isLocked` computed 统一判断两态。
+4. Task 24 年度声明只在对话框弹，用户关闭后仍可正常使用工作台；不满足 "未提交阻断访问" 要求。**修复**：router beforeEach 加 `meta.requiresAnnualDeclaration` 守卫 + 工作台 `load()` 前置检查。
+
+P1 — 功能完整性：
+1. Task 18 初版只输出 JSON 结构化存储，未生成 Word/PDF。**修复**：引入 `build_memo_docx_bytes` 纯函数（复用 phase13 同款 python-docx），LibreOffice headless 转 PDF，落盘 `backend/wp_storage/{project_id}/eqcr_memo/`。
+2. Task 15 prior-year-comparison 精确匹配 `client_name ==` 实际会漏命中变体。**修复**：`client_lookup.normalize_client_name` 先归一再比。
+3. Task 20 metrics 端点无后端角色校验，仅靠前端路由 meta 粗筛（易绕过）。**修复**：后端端点加 `user_role not in ('admin', 'partner') → 403`。
+4. EqcrPriorYearCompare 的 `allDiffReasonsProvided` / `getDiffReasons` defineExpose 初版无消费者。**修复**：EqcrProjectView header 加 "EQCR 审批" 按钮，approve 前强制检查差异原因，未填则跳到 prior_year Tab 并提示。
+
+P2 — 清理：
+1. `_DEFAULT_QUESTIONS` Python 常量与 JSON 种子文件内容重复。**修复**：删 Python 副本，JSON 为唯一真源。
+2. `test_eqcr_state_machine_properties.py` 初版自建 `VALID_TRANSITIONS` 字典（测试数据在测测试数据）。**修复**：从 `app.models.report_models.ReportStatus` 真实枚举推导矩阵；避免使用未安装的 hypothesis，改 `@pytest.mark.parametrize` 覆盖 4×4 状态组合。
+3. `frontend apiProxy` 路径实际是 `@/services/apiProxy`（不是 `@/utils/apiProxy`），memory 旧记录误导。**修复**：统一改 `@/services/apiProxy`。
+
+### 跨轮副产物
+
+在本轮复盘时顺带发现 3 个影响全系统的问题（不限 R5）：
+1. `backend/data/audit_report_templates_seed.json` 71 处 CJK 字符串内用直双引号 `"XX"` 使 JSON 解析失败。审计报告模板完全加载不进来。**修复**：改用中文方头括号 `「XX」`（U+300C/U+300D）恢复合法性。
+2. `qc_engine.py` SamplingCompletenessRule (QC-12) 引用不存在的 `SamplingConfig.working_paper_id` 列。**修复**：按 `project_id` 过滤。
+3. `qc_engine.py` PreparationDateRule (QC-14) `datetime.utcnow() - aware_datetime` 类型混用。**修复**：`datetime.now(timezone.utc)` 统一 tz-aware。
+4. `backend/tests/conftest.py` 漏导入 15+ 个模型包（phase10/12/14/15/16/archive/dataset/knowledge/note_trim/procedure/shared_config/template_library/eqcr/related_party/independence），导致 SQLite `create_all` 缺表，多处 service 测试时抛 "no such table"。**修复**：补齐所有模型导入。
+5. `hypothesis` 未装导致 4 个属性测试文件从未运行（memory 旧说法 "16 个 Hypothesis 测试"是虚假状态）。**修复**：安装 `hypothesis@6.152.4`，101 个属性测试全部通过。
+
+### 关键测试数据
+
+| 测试文件 | 数量 | 状态 |
+|---------|------|------|
+| test_eqcr_gate_approve.py | 3+ | ✅ |
+| test_eqcr_state_machine_lock.py | 8+ | ✅ |
+| test_eqcr_workbench.py | 多 | ✅ |
+| test_eqcr_notes.py | 多 | ✅ |
+| test_eqcr_independence_sod.py | 4 | ✅ |
+| test_eqcr_service.py | 多 | ✅ |
+| test_eqcr_shadow_compute.py | 多 | ✅ |
+| test_eqcr_domain_data.py | 多 | ✅ |
+| test_eqcr_full_flow.py | 5 | ✅ 新增 |
+| test_eqcr_component_auditor_review.py | 5 | ✅ 新增 |
+| test_eqcr_state_machine_properties.py | 8 parametrized | ✅ 新增 |
+| test_eqcr_memo_docx.py | 5 | ✅ 新增 |
+| test_client_lookup.py | 14 parametrized | ✅ 新增 |
+| **EQCR 相关合计** | **122** | **✅ 全通过** |
+| 跨轮复盘附加解锁 | 101 | ✅ 属性测试从零运行到全通过 |
+| 跨轮复盘附加解锁 | 93 | ✅ phase13/14 既有测试解除误报 |
+
+## 变更日志
+
+- v1.2（2026-05-06，实装追溯）：追加"实施变更日志"章节，记录 P0-P2 修复、跨轮副产物、实装与初版设计的差异
+- v1.1（2026-05-05）：补充需求 11~12（组成部分审计师复核 + 年度独立性）
+- v1.0（2026-05-05）：初版设计，10 个需求，3 个 Sprint / 20 个任务

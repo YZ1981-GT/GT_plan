@@ -22,6 +22,24 @@ from app.models.workpaper_models import (
     WorkingPaper,
 )
 
+# 确保所有模型注册到 Base.metadata（否则 create_all 漏建表，QC 引擎查 cell_annotations 会报 no such table）
+import app.models.audit_platform_models  # noqa: F401, E402
+import app.models.report_models  # noqa: F401, E402
+import app.models.consolidation_models  # noqa: F401, E402
+import app.models.staff_models  # noqa: F401, E402
+import app.models.collaboration_models  # noqa: F401, E402
+import app.models.ai_models  # noqa: F401, E402
+import app.models.extension_models  # noqa: F401, E402
+import app.models.gt_coding_models  # noqa: F401, E402
+import app.models.t_account_models  # noqa: F401, E402
+import app.models.attachment_models  # noqa: F401, E402
+import app.models.phase10_models  # noqa: F401, E402
+import app.models.phase13_models  # noqa: F401, E402
+import app.models.phase14_models  # noqa: F401, E402
+import app.models.phase15_models  # noqa: F401, E402
+import app.models.phase16_models  # noqa: F401, E402
+import app.models.dataset_models  # noqa: F401, E402
+
 SQLiteTypeCompiler.visit_JSONB = SQLiteTypeCompiler.visit_JSON
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

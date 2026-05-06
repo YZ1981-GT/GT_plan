@@ -372,7 +372,11 @@ class AuditProcedureStatusRule(QCRule):
 
 
 class SamplingCompletenessRule(QCRule):
-    """Rule 12: 抽样记录完整（有抽样配置则必须有记录）。"""
+    """Rule 12: 抽样记录完整（项目级有抽样配置则必须有记录）。
+
+    注：SamplingConfig 是项目级模型，不与单个 working_paper 绑定，
+    因此按 project_id 匹配；适用于"项目整体抽样配置是否有对应记录"检查。
+    """
     severity = "warning"
     rule_id = "QC-12"
 
@@ -380,7 +384,8 @@ class SamplingCompletenessRule(QCRule):
         from app.models.workpaper_models import SamplingConfig, SamplingRecord
         configs = (await context.db.execute(
             sa.select(SamplingConfig).where(
-                SamplingConfig.working_paper_id == context.working_paper.id,
+                SamplingConfig.project_id == context.working_paper.project_id,
+                SamplingConfig.is_deleted == sa.false(),
             )
         )).scalars().all()
         findings = []
@@ -429,7 +434,12 @@ class PreparationDateRule(QCRule):
             # 如果底稿创建超过90天还在draft状态，提示
             from datetime import timedelta
             if wp.status == WpFileStatus.draft:
-                age = (datetime.utcnow() - wp.created_at.replace(tzinfo=timezone.utc)).days
+                # 统一转为 UTC 感知类型后比较，避免 naive/aware 混用导致 TypeError
+                created = wp.created_at
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                now = datetime.now(timezone.utc)
+                age = (now - created).days
                 if age > 90:
                     return [QCFindingItem(
                         rule_id=self.rule_id, severity=self.severity,

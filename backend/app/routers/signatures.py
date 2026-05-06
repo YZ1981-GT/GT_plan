@@ -31,6 +31,8 @@ class SignRequest(BaseModel):
     signature_level: str
     signature_data: dict | None = None
     ip_address: str | None = None
+    required_order: int | None = None
+    required_role: str | None = None
 
 
 @router.post("/api/signatures/sign")
@@ -46,6 +48,8 @@ async def sign_document(body: SignRequest, db: AsyncSession = Depends(get_db)):
             level=body.signature_level,
             signature_data=body.signature_data,
             ip_address=body.ip_address,
+            required_order=body.required_order,
+            required_role=body.required_role,
         )
         await db.commit()
         return result

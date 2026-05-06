@@ -1003,6 +1003,10 @@ export const eqcr = {
   // 任务 8/9：影子计算
   shadowCompute: '/api/eqcr/shadow-compute',
   shadowComputations: (pid: string) => `/api/eqcr/projects/${pid}/shadow-computations`,
+  // 任务 10/11：独立复核笔记
+  notes: (pid: string) => `/api/eqcr/projects/${pid}/notes`,
+  noteDetail: (pid: string, noteId: string) => `/api/eqcr/projects/${pid}/notes/${noteId}`,
+  noteShare: (noteId: string) => `/api/eqcr/notes/${noteId}/share-to-team`,
 } as const
 
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────

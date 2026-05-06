@@ -419,6 +419,7 @@ const router = createRouter({
           path: 'eqcr/workbench',
           name: 'EqcrWorkbench',
           component: () => import('@/views/eqcr/EqcrWorkbench.vue'),
+          meta: { requiresAnnualDeclaration: true },
         },
         {
           // Round 5 Task 6：EQCR 项目详情视图（5 判断 Tab）
@@ -428,6 +429,16 @@ const router = createRouter({
           path: 'eqcr/projects/:projectId',
           name: 'EqcrProjectView',
           component: () => import('@/views/eqcr/EqcrProjectView.vue'),
+          meta: { requiresAnnualDeclaration: true },
+        },
+        {
+          // Round 5 Task 20：EQCR 指标仪表盘
+          // 权限：admin 或 role='partner' 且被分配为某项目的 qc；
+          // 前端路由守卫只做粗筛 admin/partner，真实数据由后端端点进一步控制
+          path: 'eqcr/metrics',
+          name: 'EqcrMetrics',
+          component: () => import('@/views/eqcr/EqcrMetrics.vue'),
+          meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner'] },
         },
       ],
     },
@@ -488,7 +499,41 @@ router.beforeEach(async (to) => {
     }
   }
 
-    // ⑤ 项目上下文自动加载：路由含 :projectId 时同步到 projectStore
+    // ⑤ EQCR 路由：角色粗筛 + 年度独立性声明阻断（R5 需求 12）
+  if (to.matched.some((r) => r.meta.requiresAnnualDeclaration)) {
+    // 5a 角色粗筛（仅 EqcrMetrics 有 roles 限制；EqcrWorkbench/ProjectView 不限角色，非 EQCR 用户看空态）
+    const allowedRoles = to.meta.roles as string[] | undefined
+    if (allowedRoles && !allowedRoles.includes(authStore.user?.role ?? '')) {
+      import('element-plus').then(({ ElMessage }) => {
+        ElMessage.warning('您没有访问该页面的权限')
+      })
+      NProgress.done()
+      return { path: '/' }
+    }
+
+    // 5b 年度独立性声明阻断
+    try {
+      const http = (await import('@/utils/http')).default
+      const resp = await http.get('/api/eqcr/independence/annual/check', {
+        validateStatus: (s: number) => s < 600,
+      })
+      if (resp?.data && resp.data.has_declaration === false) {
+        // 未提交：重定向到工作台（工作台会弹出声明对话框并阻止加载数据）
+        if (to.name !== 'EqcrWorkbench') {
+          NProgress.done()
+          return { name: 'EqcrWorkbench' }
+        }
+      }
+    } catch {
+      // 端点异常时放行到工作台（工作台内二次检查会阻断数据加载）
+      if (to.name !== 'EqcrWorkbench') {
+        NProgress.done()
+        return { name: 'EqcrWorkbench' }
+      }
+    }
+  }
+
+    // ⑥ 项目上下文自动加载：路由含 :projectId 时同步到 projectStore
   //    DefaultLayout 的 watch 仍保留作为备份，此处提前触发确保数据就绪
   if (to.params.projectId && authStore.isAuthenticated) {
     const projectStore = useProjectStore()

@@ -133,6 +133,12 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 年度独立性声明弹窗（需求 12） -->
+    <EqcrAnnualDeclarationDialog
+      v-model="showDeclarationDialog"
+      @submitted="onDeclarationSubmitted"
+    />
   </div>
 </template>
 
@@ -146,16 +152,51 @@ import {
   type EqcrProjectCard,
   type ReportStatusValue,
 } from '@/services/eqcrService'
+import EqcrAnnualDeclarationDialog from '@/components/eqcr/EqcrAnnualDeclarationDialog.vue'
+import api from '@/services/apiProxy'
 
 const router = useRouter()
 
 const loading = ref(false)
 const cards = ref<EqcrProjectCard[]>([])
 const progressFilter = ref<'all' | EqcrProgress>('all')
+const showDeclarationDialog = ref(false)
+/** 本年度声明完成前禁止展示项目数据（真实阻断，非仅弹窗） */
+const declarationOk = ref(false)
+
+// ─── 年度独立性声明检查（需求 12） ─────────────────────────────────────────
+
+async function checkAnnualDeclaration(): Promise<boolean> {
+  try {
+    const data = await api.get('/api/eqcr/independence/annual/check')
+    declarationOk.value = !!data?.has_declaration
+    if (!declarationOk.value) {
+      showDeclarationDialog.value = true
+    }
+    return declarationOk.value
+  } catch {
+    // 端点异常时按"未声明"处理，阻断访问（防止前端降级绕过声明要求）
+    declarationOk.value = false
+    showDeclarationDialog.value = true
+    return false
+  }
+}
+
+function onDeclarationSubmitted() {
+  declarationOk.value = true
+  showDeclarationDialog.value = false
+  // 声明完成后再加载工作台数据
+  load()
+}
 
 // ─── 载入 ─────────────────────────────────────────────────────────────────
 
 async function load() {
+  if (!declarationOk.value) {
+    // 声明未完成：不拉取项目数据
+    cards.value = []
+    return
+  }
   loading.value = true
   try {
     cards.value = await eqcrApi.listMyProjects()
@@ -167,7 +208,10 @@ async function load() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  const ok = await checkAnnualDeclaration()
+  if (ok) await load()
+})
 
 // ─── 筛选 + 汇总 ──────────────────────────────────────────────────────────
 

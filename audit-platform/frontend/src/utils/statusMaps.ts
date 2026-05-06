@@ -54,6 +54,7 @@ export const ADJUSTMENT_STATUS: StatusMap = {
 export const REPORT_STATUS: StatusMap = {
   draft:  { label: '草稿',   type: 'info' },
   review: { label: '复核中', type: 'warning' },
+  eqcr_approved: { label: 'EQCR已锁定', type: 'danger' },
   final:  { label: '已定稿', type: 'success' },
 }
 

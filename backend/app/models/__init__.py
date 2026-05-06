@@ -99,6 +99,7 @@ from app.models.related_party_models import (
     RelatedPartyRegistry,
     RelatedPartyTransaction,
 )
+from app.models.independence_models import AnnualIndependenceDeclaration
 
 __all__ = [
     # --- base ---
@@ -200,4 +201,6 @@ __all__ = [
     # --- related party models (R5) ---
     "RelatedPartyRegistry",
     "RelatedPartyTransaction",
+    # --- independence declaration (R5) ---
+    "AnnualIndependenceDeclaration",
 ]

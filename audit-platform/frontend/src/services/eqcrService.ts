@@ -261,6 +261,31 @@ export interface RelatedPartyTransactionUpdateInput {
   evidence_refs?: any
 }
 
+/** 独立复核笔记（任务 10/11） */
+export interface EqcrReviewNote {
+  id: string
+  project_id: string
+  title: string
+  content: string | null
+  shared_to_team: boolean
+  shared_at: string | null
+  created_by: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+/** 创建笔记请求体 */
+export interface EqcrNoteCreateInput {
+  title: string
+  content?: string | null
+}
+
+/** 更新笔记请求体 */
+export interface EqcrNoteUpdateInput {
+  title?: string
+  content?: string | null
+}
+
 /** 影子计算类型（任务 8/9） */
 export type ShadowComputationType =
   | 'cfs_supplementary'
@@ -422,6 +447,38 @@ export const eqcrApi = {
   async listShadowComputations(projectId: string): Promise<ShadowComputeResult[]> {
     const data = await api.get<ShadowComputeResult[]>(P.shadowComputations(projectId))
     return Array.isArray(data) ? data : []
+  },
+
+  // ─── 任务 10/11：独立复核笔记 ─────────────────────────────────────────────
+
+  /** 获取项目独立复核笔记列表 */
+  async listNotes(projectId: string): Promise<EqcrReviewNote[]> {
+    const data = await api.get<EqcrReviewNote[]>(P.notes(projectId))
+    return Array.isArray(data) ? data : []
+  },
+
+  /** 创建独立复核笔记 */
+  async createNote(projectId: string, payload: EqcrNoteCreateInput): Promise<EqcrReviewNote> {
+    return api.post<EqcrReviewNote>(P.notes(projectId), payload)
+  },
+
+  /** 更新独立复核笔记 */
+  async updateNote(
+    projectId: string,
+    noteId: string,
+    payload: EqcrNoteUpdateInput,
+  ): Promise<EqcrReviewNote> {
+    return api.patch<EqcrReviewNote>(P.noteDetail(projectId, noteId), payload)
+  },
+
+  /** 删除独立复核笔记（软删除） */
+  async deleteNote(projectId: string, noteId: string): Promise<void> {
+    await api.delete(P.noteDetail(projectId, noteId))
+  },
+
+  /** 分享笔记给项目组 */
+  async shareNoteToTeam(noteId: string): Promise<EqcrReviewNote> {
+    return api.post<EqcrReviewNote>(P.noteShare(noteId), {})
   },
 }
 

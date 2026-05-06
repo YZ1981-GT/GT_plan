@@ -77,6 +77,35 @@ async def generate_report(
     """从模板生成审计报告"""
     svc = AuditReportService(db)
     try:
+        # R5 需求 6：eqcr_approved / final 态下禁止重新生成（会改 opinion_type）
+        existing_result = await db.execute(
+            sa.select(AuditReportModel).where(
+                AuditReportModel.project_id == data.project_id,
+                AuditReportModel.year == data.year,
+                AuditReportModel.is_deleted == sa.false(),
+            )
+        )
+        existing_report = existing_result.scalar_one_or_none()
+        if existing_report is not None:
+            existing_status = (
+                existing_report.status.value
+                if hasattr(existing_report.status, "value")
+                else str(existing_report.status)
+            )
+            if existing_status == ReportStatus.eqcr_approved.value:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error_code": "OPINION_LOCKED_BY_EQCR",
+                        "message": "EQCR 已锁定审计意见，不允许重新生成报告",
+                    },
+                )
+            if existing_status == ReportStatus.final.value:
+                raise HTTPException(
+                    status_code=403,
+                    detail="报告已定稿，不允许重新生成",
+                )
+
         report = await svc.generate_report(
             data.project_id,
             data.year,
@@ -85,6 +114,8 @@ async def generate_report(
         )
         await db.commit()
         return AuditReportResponse.model_validate(report)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -119,6 +150,7 @@ async def update_paragraph(
     svc = AuditReportService(db)
 
     # 需求 27.1：定稿后禁止修改段落内容
+    # R5 需求 6：eqcr_approved 态下禁止修改 opinion_type 和段落
     status_result = await db.execute(
         sa.select(AuditReportModel.status).where(
             AuditReportModel.id == report_id,
@@ -126,6 +158,14 @@ async def update_paragraph(
         )
     )
     current_status = status_result.scalar_one_or_none()
+    if current_status == ReportStatus.eqcr_approved:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error_code": "OPINION_LOCKED_BY_EQCR",
+                "message": "EQCR 已锁定审计意见，不允许修改段落内容",
+            },
+        )
     if current_status == ReportStatus.final:
         raise HTTPException(status_code=403, detail="报告已定稿，不允许修改段落内容")
 
@@ -143,7 +183,7 @@ async def update_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """更新审计报告状态（draft→review→final）"""
+    """更新审计报告状态（draft→review→eqcr_approved→final）"""
     svc = AuditReportService(db)
     try:
         # 需求 27.2：禁止从 final 回退至 review
@@ -156,6 +196,19 @@ async def update_status(
         current_status = status_result.scalar_one_or_none()
         if current_status == ReportStatus.final and data.status == ReportStatus.review:
             raise HTTPException(status_code=403, detail="报告已定稿，不允许回退至审阅状态")
+
+        # R5 需求 6：eqcr_approved 态下禁止通过此端点直接修改状态
+        # （只能通过 EQCR unlock-opinion 回退，或 order=5 签字切 final）
+        if current_status == ReportStatus.eqcr_approved and data.status not in (
+            ReportStatus.final,
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error_code": "OPINION_LOCKED_BY_EQCR",
+                    "message": "EQCR 已锁定审计意见，状态变更需通过 EQCR 解锁或归档签字完成",
+                },
+            )
 
         report = await svc.update_status(report_id, data.status)
         if report is None:

@@ -59,6 +59,7 @@ class RuleRegistry:
         self._rules: dict[str, list[GateRule]] = {
             GateType.submit_review: [],
             GateType.sign_off: [],
+            GateType.eqcr_approval: [],
             GateType.export_package: [],
         }
 
@@ -226,6 +227,8 @@ class GateEngine:
                 trace_id=trace_id,
             )
             db.add(gate_decision)
+            # flush 以生成 gate_decision.id（trace_event 需要引用）
+            await db.flush()
 
             # 写 trace_events
             await trace_event_service.write(

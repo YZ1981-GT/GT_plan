@@ -26,6 +26,23 @@ import app.models.gt_coding_models  # noqa: E402, F401
 import app.models.t_account_models  # noqa: E402, F401
 import app.models.attachment_models  # noqa: E402, F401
 import app.models.phase13_models  # noqa: E402, F401  — Phase 13: Word导出
+import app.models.phase10_models  # noqa: E402, F401  — Phase 10: 批注/报告溯源（R1 QC 依赖）
+import app.models.phase12_models  # noqa: E402, F401  — Phase 12: AI generation 等
+import app.models.phase14_enums  # noqa: E402, F401  — Phase 14: Gate 引擎枚举
+import app.models.phase14_models  # noqa: E402, F401  — Phase 14: Gate 引擎模型
+import app.models.phase15_enums  # noqa: E402, F401  — Phase 15: 任务树枚举
+import app.models.phase15_models  # noqa: E402, F401  — Phase 15: 任务树模型
+import app.models.phase16_enums  # noqa: E402, F401  — Phase 16: 证据包枚举
+import app.models.phase16_models  # noqa: E402, F401  — Phase 16: 证据包模型
+import app.models.archive_models  # noqa: E402, F401  — R1 归档作业
+import app.models.knowledge_models  # noqa: E402, F401
+import app.models.note_trim_models  # noqa: E402, F401
+import app.models.procedure_models  # noqa: E402, F401
+import app.models.shared_config_models  # noqa: E402, F401
+import app.models.template_library_models  # noqa: E402, F401
+import app.models.eqcr_models  # noqa: E402, F401  — Round 5
+import app.models.related_party_models  # noqa: E402, F401  — Round 5
+import app.models.independence_models  # noqa: E402, F401  — Round 5
 
 # Stub for 'workpapers' table referenced by AI models FK
 import sqlalchemy as _sa
