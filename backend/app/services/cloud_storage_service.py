@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -196,7 +196,7 @@ class CloudStorageService:
             "file_count": len(file_list),
             "total_size": total_size,
             "storage_type": CLOUD_STORAGE_TYPE,
-            "uploaded_at": datetime.utcnow().isoformat(),
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
         })
         return result
 

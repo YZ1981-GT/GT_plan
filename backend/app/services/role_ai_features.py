@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -33,7 +33,7 @@ async def get_stale_workpapers(
 
     规则：状态为 draft/edit_complete 且最后修改超过 stale_days 天
     """
-    cutoff = datetime.utcnow() - timedelta(days=stale_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=stale_days)
 
     query = (
         sa.select(WpIndex, WorkingPaper)
@@ -58,7 +58,7 @@ async def get_stale_workpapers(
             "wp_name": idx.wp_name,
             "status": wp.status.value,
             "last_updated": wp.updated_at.isoformat() if wp.updated_at else None,
-            "days_stale": (datetime.utcnow() - wp.updated_at).days if wp.updated_at else stale_days,
+            "days_stale": (datetime.now(timezone.utc) - wp.updated_at).days if wp.updated_at else stale_days,
             "assigned_to": str(wp.assigned_to) if wp.assigned_to else None,
         }
         for idx, wp in rows

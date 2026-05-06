@@ -14,7 +14,7 @@ import io
 import logging
 import re
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterator, Optional
@@ -2024,7 +2024,7 @@ async def write_four_tables(
         batch = ImportBatch(
             project_id=project_id, year=year, source_type="smart_import",
             file_name=f"smart_{data_type}", data_type=data_type,
-            status=ImportStatus.processing, started_at=datetime.utcnow(),
+            status=ImportStatus.processing, started_at=datetime.now(timezone.utc),
         )
         db.add(batch)
         await db.flush()
@@ -2056,7 +2056,7 @@ async def write_four_tables(
             batch.record_count = record_count
 
         batch.status = ImportStatus.completed
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
         result[data_type] = record_count
 
     # ── 序时账 + 辅助明细账（流式拆分，不在内存中保留全部辅助明细行） ──
@@ -2065,14 +2065,14 @@ async def write_four_tables(
         led_batch = ImportBatch(
             project_id=project_id, year=year, source_type="smart_import",
             file_name="smart_tb_ledger", data_type="tb_ledger",
-            status=ImportStatus.processing, started_at=datetime.utcnow(),
+            status=ImportStatus.processing, started_at=datetime.now(timezone.utc),
         )
         db.add(led_batch)
         # 辅助明细账批次
         aux_batch = ImportBatch(
             project_id=project_id, year=year, source_type="smart_import",
             file_name="smart_tb_aux_ledger", data_type="tb_aux_ledger",
-            status=ImportStatus.processing, started_at=datetime.utcnow(),
+            status=ImportStatus.processing, started_at=datetime.now(timezone.utc),
         )
         db.add(aux_batch)
         await db.flush()
@@ -2148,10 +2148,10 @@ async def write_four_tables(
 
         led_batch.record_count = led_count
         led_batch.status = ImportStatus.completed
-        led_batch.completed_at = datetime.utcnow()
+        led_batch.completed_at = datetime.now(timezone.utc)
         aux_batch.record_count = aux_count
         aux_batch.status = ImportStatus.completed
-        aux_batch.completed_at = datetime.utcnow()
+        aux_batch.completed_at = datetime.now(timezone.utc)
         result["tb_ledger"] = led_count
         result["tb_aux_ledger"] = aux_count
 
@@ -2576,7 +2576,7 @@ async def smart_import_streaming(
             file_name=f"multi_{dt_key}",
             data_type=dt_key,
             status=ImportStatus.processing,
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
         )
         db.add(batch)
         batches[dt_key] = batch
@@ -2898,7 +2898,7 @@ async def smart_import_streaming(
         for dt_key, batch in batches.items():
             batch.record_count = counts[dt_key]
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc)
         # Phase 17: 标记数据集失败
         if _dataset_id:
             try:
@@ -2919,7 +2919,7 @@ async def smart_import_streaming(
         for dt_key, batch in batches.items():
             batch.record_count = counts[dt_key]
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc)
         # Phase 17: 标记数据集失败
         if _dataset_id:
             try:
@@ -2982,7 +2982,7 @@ async def smart_import_streaming(
     for dt_key, batch in batches.items():
         batch.record_count = counts[dt_key]
         batch.status = ImportStatus.completed
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
 
     # Phase 17: 激活数据集版本
     _activated_dataset = None

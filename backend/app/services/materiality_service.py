@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -82,7 +82,7 @@ class MaterialityService:
         trivial_ratio = params.trivial_ratio / Decimal("100")
         trivial = (overall * trivial_ratio).quantize(Decimal("0.01"))
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # 查找已有记录
         existing = await self._get_current(project_id, year)
@@ -274,7 +274,7 @@ class MaterialityService:
 
         existing.is_override = True
         existing.override_reason = overrides.override_reason
-        existing.calculated_at = datetime.utcnow()
+        existing.calculated_at = datetime.now(timezone.utc)
         existing.calculated_by = overridden_by
 
         self._append_history(existing, old_snapshot, overrides.override_reason, overridden_by)
@@ -416,7 +416,7 @@ class MaterialityService:
             return
 
         entry = {
-            "changed_at": datetime.utcnow().isoformat(),
+            "changed_at": datetime.now(timezone.utc).isoformat(),
             "changed_by": str(changed_by) if changed_by else None,
             "reason": reason,
             "changes": changes,

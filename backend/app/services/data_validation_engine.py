@@ -6,7 +6,7 @@ Phase 8 Task 7: 数据校验增强
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -30,7 +30,7 @@ class ValidationFinding:
         self.message = message
         self.details = details or {}
         self.fix_suggestion = fix_suggestion
-        self.created_at = datetime.utcnow().isoformat()
+        self.created_at = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> dict:
         return {

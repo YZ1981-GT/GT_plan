@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import shutil
 import tarfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -49,7 +49,7 @@ class WpStorageService:
         version_dir.mkdir(parents=True, exist_ok=True)
 
         # 复制当前文件为版本快照
-        version_name = f"v{wp.file_version}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{file_path.suffix}"
+        version_name = f"v{wp.file_version}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}{file_path.suffix}"
         version_path = version_dir / version_name
         shutil.copy2(str(file_path), str(version_path))
 

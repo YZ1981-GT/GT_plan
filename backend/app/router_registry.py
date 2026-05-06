@@ -281,6 +281,6 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
 
     # ═══ 13. Round 5：EQCR 工作台 ═══
-    # EQCR 路由器内部已声明 prefix="/api/eqcr"，注册时不加额外前缀。
+    # EQCR 路由包内部已声明 prefix="/api/eqcr"，注册时不加额外前缀。
     from app.routers.eqcr import router as eqcr_router
     app.include_router(eqcr_router, tags=["eqcr"])

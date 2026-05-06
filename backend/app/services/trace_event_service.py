@@ -6,7 +6,7 @@ Phase 15/16 事件也通过此服务写入。
 """
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select, func
@@ -24,7 +24,7 @@ def generate_trace_id() -> str:
     格式: trc_{yyyyMMddHHmmss}_{uuid_short_12}
     示例: trc_20260428143500_a1b2c3d4e5f6
     """
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     short_uuid = uuid.uuid4().hex[:12]
     return f"trc_{ts}_{short_uuid}"
 

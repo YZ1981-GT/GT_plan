@@ -626,7 +626,7 @@ class EventCascadeHealthRule(GateRule):
         try:
             from app.models.dataset_models import ImportEventOutbox, OutboxStatus
 
-            since = datetime.utcnow() - timedelta(hours=self.WINDOW_HOURS)
+            since = datetime.now(timezone.utc) - timedelta(hours=self.WINDOW_HOURS)
             stmt = (
                 select(
                     ImportEventOutbox.event_type,

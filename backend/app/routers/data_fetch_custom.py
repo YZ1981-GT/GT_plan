@@ -1,3 +1,4 @@
+from datetime import timezone
 """自定义取数 API — 跳行跳列、任选单元格、溯源跳转
 
 提供：
@@ -127,7 +128,7 @@ async def save_custom_rules(
     fetch_rules[key] = {
         "rules": data.rules,
         "updated_by": str(current_user.id),
-        "updated_at": __import__("datetime").datetime.utcnow().isoformat(),
+        "updated_at": __import__("datetime").datetime.now(timezone.utc).isoformat(),
     }
 
     ws["custom_fetch_rules"] = fetch_rules

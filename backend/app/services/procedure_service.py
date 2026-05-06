@@ -180,7 +180,7 @@ class ProcedureService:
 
     async def assign_procedures(self, project_id: UUID, assignments: list[dict]) -> int:
         """批量委派"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         updated = 0
         for a in assignments:
             await self.db.execute(

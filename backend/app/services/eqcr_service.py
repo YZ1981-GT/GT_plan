@@ -228,18 +228,7 @@ class EqcrService:
     async def list_my_projects(self, user_id: uuid.UUID) -> list[dict[str, Any]]:
         """返回本人作为 EQCR 的项目列表（排序按签字日升序，无签字日的排后面）。
 
-        Shape（每个元素）::
-
-            {
-                "project_id": str,
-                "project_name": str,
-                "client_name": str,
-                "signing_date": "YYYY-MM-DD" | None,
-                "days_to_signing": int | None,
-                "my_progress": "not_started|in_progress|approved|disagree",
-                "judgment_counts": {"unreviewed": int, "reviewed": int},
-                "report_status": "draft|review|eqcr_approved|final" | None,
-            }
+        优化：批量查询 AuditReport 和 EqcrOpinion，避免 N+1。
         """
         staff_ids = await self._resolve_staff_ids(user_id)
         if not staff_ids:
@@ -263,12 +252,73 @@ class EqcrService:
         if not projects:
             return []
 
+        project_ids = [p.id for p in projects]
+
+        # Batch fetch: AuditReport (signing_date + status) for all projects
+        ar_q = (
+            select(AuditReport)
+            .where(
+                AuditReport.project_id.in_(project_ids),
+                AuditReport.is_deleted == False,  # noqa: E712
+            )
+            .order_by(AuditReport.year.desc())
+        )
+        all_reports = list((await self.db.execute(ar_q)).scalars().all())
+        # Group by project_id, keep only latest per project
+        report_by_project: dict[uuid.UUID, AuditReport] = {}
+        for ar in all_reports:
+            if ar.project_id not in report_by_project:
+                report_by_project[ar.project_id] = ar
+
+        # Batch fetch: EqcrOpinion for all projects
+        op_q = (
+            select(EqcrOpinion)
+            .where(
+                EqcrOpinion.project_id.in_(project_ids),
+                EqcrOpinion.is_deleted == False,  # noqa: E712
+            )
+            .order_by(EqcrOpinion.created_at.asc())
+        )
+        all_opinions = list((await self.db.execute(op_q)).scalars().all())
+        # Group by project_id
+        opinions_by_project: dict[uuid.UUID, list[EqcrOpinion]] = {}
+        for op in all_opinions:
+            opinions_by_project.setdefault(op.project_id, []).append(op)
+
+        # Batch fetch: ProjectTimeline REPORT milestones
+        tl_q = (
+            select(ProjectTimeline)
+            .where(
+                ProjectTimeline.project_id.in_(project_ids),
+                ProjectTimeline.milestone_type == MilestoneType.REPORT,
+                ProjectTimeline.is_deleted == False,  # noqa: E712
+            )
+            .order_by(ProjectTimeline.planned_date.asc())
+        )
+        all_timelines = list((await self.db.execute(tl_q)).scalars().all())
+        timeline_by_project: dict[uuid.UUID, date] = {}
+        for tl in all_timelines:
+            if tl.project_id not in timeline_by_project and tl.planned_date:
+                timeline_by_project[tl.project_id] = tl.planned_date
+
         cards: list[dict[str, Any]] = []
         for proj in projects:
-            signing_date = await self._resolve_signing_date(proj)
-            report_status = await self._get_report_status(proj.id)
-            opinions = await self._get_core_opinions(proj.id)
+            # Resolve signing date from batch data
+            ar = report_by_project.get(proj.id)
+            signing_date: date | None = None
+            if ar and ar.report_date:
+                signing_date = ar.report_date
+            elif proj.id in timeline_by_project:
+                signing_date = timeline_by_project[proj.id]
+            else:
+                signing_date = proj.audit_period_end
 
+            # Report status from batch data
+            report_status: str | None = None
+            if ar:
+                report_status = ar.status.value if hasattr(ar.status, "value") else str(ar.status)
+
+            opinions = opinions_by_project.get(proj.id, [])
             reviewed_domains = {
                 op.domain for op in opinions if op.domain in EQCR_CORE_DOMAINS
             }
@@ -288,7 +338,7 @@ class EqcrService:
                 }
             )
 
-        # 按签字日升序，None 排最后（用 date.max 兜底比较）
+        # 按签字日升序，None 排最后
         cards.sort(
             key=lambda c: (
                 c["signing_date"] is None,
@@ -297,6 +347,375 @@ class EqcrService:
             )
         )
         return cards
+
+    # ------------------------------------------------------------------
+    # 5 判断域聚合方法（原 monkey-patch，现为正式类方法）
+    # ------------------------------------------------------------------
+
+    async def get_materiality(self, project_id: uuid.UUID) -> dict[str, Any]:
+        """需求 2.2：重要性 Tab 数据 + 本域意见历史。"""
+        from app.models.audit_platform_models import Materiality
+
+        q = (
+            select(Materiality)
+            .where(
+                Materiality.project_id == project_id,
+                Materiality.is_deleted == False,  # noqa: E712
+            )
+            .order_by(Materiality.year.desc(), Materiality.created_at.desc())
+        )
+        rows = list((await self.db.execute(q)).scalars().all())
+
+        current_year: dict[str, Any] | None = None
+        history_years: list[dict[str, Any]] = []
+        for idx, row in enumerate(rows):
+            payload = {
+                "year": row.year,
+                "benchmark_type": row.benchmark_type,
+                "benchmark_amount": _decimal_str(row.benchmark_amount),
+                "overall_percentage": _decimal_str(row.overall_percentage),
+                "overall_materiality": _decimal_str(row.overall_materiality),
+                "performance_ratio": _decimal_str(row.performance_ratio),
+                "performance_materiality": _decimal_str(row.performance_materiality),
+                "trivial_ratio": _decimal_str(row.trivial_ratio),
+                "trivial_threshold": _decimal_str(row.trivial_threshold),
+                "is_override": bool(row.is_override),
+                "override_reason": row.override_reason,
+            }
+            if idx == 0:
+                current_year = payload
+            else:
+                history_years.append(payload)
+
+        opinions = await _load_domain_opinions(self.db, project_id, "materiality")
+        current_opinion, history_opinions = _split_current_history(opinions)
+
+        return {
+            "project_id": str(project_id),
+            "domain": "materiality",
+            "data": {
+                "current": current_year,
+                "prior_years": history_years,
+            },
+            "current_opinion": current_opinion,
+            "history_opinions": history_opinions,
+        }
+
+    async def get_estimates(self, project_id: uuid.UUID) -> dict[str, Any]:
+        """需求 2.3：会计估计 Tab 数据。"""
+        from app.models.workpaper_models import WorkingPaper, WpIndex
+
+        name_filter = None
+        for kw in _ESTIMATE_KEYWORDS:
+            cond = WpIndex.wp_name.like(f"%{kw}%")
+            name_filter = cond if name_filter is None else (name_filter | cond)
+
+        has_category = hasattr(WpIndex, "category")
+        if has_category:
+            category_cond = getattr(WpIndex, "category") == "estimate"
+            name_filter = category_cond if name_filter is None else (name_filter | category_cond)
+
+        q = (
+            select(WpIndex, WorkingPaper)
+            .outerjoin(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+            .where(
+                WpIndex.project_id == project_id,
+                WpIndex.is_deleted == False,  # noqa: E712
+                name_filter,
+            )
+            .order_by(WpIndex.wp_code.asc())
+        )
+        rows = (await self.db.execute(q)).all()
+
+        items: list[dict[str, Any]] = []
+        seen_wp_index_ids: set[uuid.UUID] = set()
+        for idx_row, wp_row in rows:
+            if idx_row.id in seen_wp_index_ids:
+                continue
+            seen_wp_index_ids.add(idx_row.id)
+            items.append(
+                {
+                    "wp_index_id": str(idx_row.id),
+                    "wp_code": idx_row.wp_code,
+                    "wp_name": idx_row.wp_name,
+                    "audit_cycle": idx_row.audit_cycle,
+                    "index_status": idx_row.status.value if idx_row.status else None,
+                    "file_status": wp_row.status.value if wp_row and wp_row.status else None,
+                    "review_status": wp_row.review_status.value
+                    if wp_row and wp_row.review_status
+                    else None,
+                    "working_paper_id": str(wp_row.id) if wp_row else None,
+                }
+            )
+
+        opinions = await _load_domain_opinions(self.db, project_id, "estimate")
+        current_opinion, history_opinions = _split_current_history(opinions)
+
+        return {
+            "project_id": str(project_id),
+            "domain": "estimate",
+            "data": {
+                "items": items,
+                "match_strategy": "wp_name_keyword",
+                "keywords": list(_ESTIMATE_KEYWORDS),
+            },
+            "current_opinion": current_opinion,
+            "history_opinions": history_opinions,
+        }
+
+    async def get_related_parties(self, project_id: uuid.UUID) -> dict[str, Any]:
+        """需求 2.4：关联方 Tab 数据（注册表 + 交易明细）。"""
+        from app.models.related_party_models import (
+            RelatedPartyRegistry,
+            RelatedPartyTransaction,
+        )
+
+        reg_q = (
+            select(RelatedPartyRegistry)
+            .where(
+                RelatedPartyRegistry.project_id == project_id,
+                RelatedPartyRegistry.is_deleted == False,  # noqa: E712
+            )
+            .order_by(RelatedPartyRegistry.created_at.asc())
+        )
+        registries = list((await self.db.execute(reg_q)).scalars().all())
+
+        txn_q = (
+            select(RelatedPartyTransaction)
+            .where(
+                RelatedPartyTransaction.project_id == project_id,
+                RelatedPartyTransaction.is_deleted == False,  # noqa: E712
+            )
+            .order_by(RelatedPartyTransaction.created_at.asc())
+        )
+        transactions = list((await self.db.execute(txn_q)).scalars().all())
+
+        registries_payload = [
+            {
+                "id": str(r.id),
+                "name": r.name,
+                "relation_type": r.relation_type,
+                "is_controlled_by_same_party": bool(r.is_controlled_by_same_party),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in registries
+        ]
+        transactions_payload = [
+            {
+                "id": str(t.id),
+                "related_party_id": str(t.related_party_id),
+                "amount": _decimal_str(t.amount),
+                "transaction_type": t.transaction_type,
+                "is_arms_length": t.is_arms_length,
+                "evidence_refs": t.evidence_refs,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+            }
+            for t in transactions
+        ]
+
+        opinions = await _load_domain_opinions(self.db, project_id, "related_party")
+        current_opinion, history_opinions = _split_current_history(opinions)
+
+        return {
+            "project_id": str(project_id),
+            "domain": "related_party",
+            "data": {
+                "registries": registries_payload,
+                "transactions": transactions_payload,
+                "summary": {
+                    "registry_count": len(registries_payload),
+                    "transaction_count": len(transactions_payload),
+                },
+            },
+            "current_opinion": current_opinion,
+            "history_opinions": history_opinions,
+        }
+
+    async def get_going_concern(self, project_id: uuid.UUID) -> dict[str, Any]:
+        """需求 2.5：持续经营 Tab 数据（复用 GoingConcernEvaluation）。"""
+        from app.models.collaboration_models import (
+            GoingConcernEvaluation,
+            GoingConcernIndicator,
+        )
+
+        eval_q = (
+            select(GoingConcernEvaluation)
+            .where(
+                GoingConcernEvaluation.project_id == project_id,
+                GoingConcernEvaluation.is_deleted == False,  # noqa: E712
+            )
+            .order_by(GoingConcernEvaluation.evaluation_date.desc())
+        )
+        evaluations = list((await self.db.execute(eval_q)).scalars().all())
+
+        current_eval: dict[str, Any] | None = None
+        prior_evals: list[dict[str, Any]] = []
+        latest_indicators: list[dict[str, Any]] = []
+
+        for idx, ev in enumerate(evaluations):
+            payload = {
+                "id": str(ev.id),
+                "evaluation_date": ev.evaluation_date.isoformat()
+                if ev.evaluation_date
+                else None,
+                "conclusion": ev.conclusion.value if ev.conclusion else None,
+                "key_indicators": ev.key_indicators,
+                "management_plan": ev.management_plan,
+                "auditor_conclusion": ev.auditor_conclusion,
+            }
+            if idx == 0:
+                current_eval = payload
+
+                ind_q = (
+                    select(GoingConcernIndicator)
+                    .where(
+                        GoingConcernIndicator.evaluation_id == ev.id,
+                        GoingConcernIndicator.is_deleted == False,  # noqa: E712
+                    )
+                    .order_by(GoingConcernIndicator.created_at.asc())
+                )
+                indicators = list((await self.db.execute(ind_q)).scalars().all())
+                latest_indicators = [
+                    {
+                        "id": str(ind.id),
+                        "indicator_type": ind.indicator_type,
+                        "indicator_value": ind.indicator_value,
+                        "threshold": ind.threshold,
+                        "is_triggered": bool(ind.is_triggered),
+                        "severity": ind.severity.value if ind.severity else None,
+                        "notes": ind.notes,
+                    }
+                    for ind in indicators
+                ]
+            else:
+                prior_evals.append(payload)
+
+        opinions = await _load_domain_opinions(self.db, project_id, "going_concern")
+        current_opinion, history_opinions = _split_current_history(opinions)
+
+        return {
+            "project_id": str(project_id),
+            "domain": "going_concern",
+            "data": {
+                "current_evaluation": current_eval,
+                "prior_evaluations": prior_evals,
+                "indicators": latest_indicators,
+            },
+            "current_opinion": current_opinion,
+            "history_opinions": history_opinions,
+        }
+
+    async def get_opinion_type(self, project_id: uuid.UUID) -> dict[str, Any]:
+        """需求 2.6：审计意见类型 Tab 数据。"""
+        ar_q = (
+            select(AuditReport)
+            .where(
+                AuditReport.project_id == project_id,
+                AuditReport.is_deleted == False,  # noqa: E712
+            )
+            .order_by(AuditReport.year.desc())
+        )
+        reports = list((await self.db.execute(ar_q)).scalars().all())
+
+        current_report: dict[str, Any] | None = None
+        prior_reports: list[dict[str, Any]] = []
+        for idx, ar in enumerate(reports):
+            payload = {
+                "id": str(ar.id),
+                "year": ar.year,
+                "opinion_type": ar.opinion_type.value if ar.opinion_type else None,
+                "company_type": ar.company_type.value if ar.company_type else None,
+                "status": ar.status.value if ar.status else None,
+                "report_date": ar.report_date.isoformat() if ar.report_date else None,
+                "signing_partner": ar.signing_partner,
+                "paragraphs": ar.paragraphs,
+            }
+            if idx == 0:
+                current_report = payload
+            else:
+                prior_reports.append(payload)
+
+        opinions = await _load_domain_opinions(self.db, project_id, "opinion_type")
+        current_opinion, history_opinions = _split_current_history(opinions)
+
+        return {
+            "project_id": str(project_id),
+            "domain": "opinion_type",
+            "data": {
+                "current_report": current_report,
+                "prior_reports": prior_reports,
+            },
+            "current_opinion": current_opinion,
+            "history_opinions": history_opinions,
+        }
+
+    # ------------------------------------------------------------------
+    # 意见 CRUD（POST / PATCH）
+    # ------------------------------------------------------------------
+
+    async def create_opinion(
+        self,
+        *,
+        project_id: uuid.UUID,
+        domain: str,
+        verdict: str,
+        comment: str | None,
+        extra_payload: dict | None,
+        user_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        """新建一条 EQCR 意见。调用方负责 ``db.commit()``。"""
+        if domain not in _ALLOWED_DOMAINS:
+            raise ValueError(f"非法 domain: {domain}；允许值 {sorted(_ALLOWED_DOMAINS)}")
+        if verdict not in _ALLOWED_VERDICTS:
+            raise ValueError(
+                f"非法 verdict: {verdict}；允许值 {sorted(_ALLOWED_VERDICTS)}"
+            )
+
+        op = EqcrOpinion(
+            project_id=project_id,
+            domain=domain,
+            verdict=verdict,
+            comment=comment,
+            extra_payload=extra_payload,
+            created_by=user_id,
+        )
+        self.db.add(op)
+        await self.db.flush()
+        await self.db.refresh(op)
+        return _serialize_opinion(op)
+
+    async def update_opinion(
+        self,
+        *,
+        opinion_id: uuid.UUID,
+        user_id: uuid.UUID,
+        verdict: str | None = None,
+        comment: str | None = None,
+        extra_payload: dict | None = None,
+    ) -> dict[str, Any] | None:
+        """更新一条 EQCR 意见。返回 None 表示不存在。"""
+        q = select(EqcrOpinion).where(
+            EqcrOpinion.id == opinion_id,
+            EqcrOpinion.is_deleted == False,  # noqa: E712
+        )
+        op = (await self.db.execute(q)).scalar_one_or_none()
+        if op is None:
+            return None
+
+        if verdict is not None:
+            if verdict not in _ALLOWED_VERDICTS:
+                raise ValueError(
+                    f"非法 verdict: {verdict}；允许值 {sorted(_ALLOWED_VERDICTS)}"
+                )
+            op.verdict = verdict
+        if comment is not None:
+            op.comment = comment
+        if extra_payload is not None:
+            op.extra_payload = extra_payload
+
+        await self.db.flush()
+        await self.db.refresh(op)
+        return _serialize_opinion(op)
 
     # ------------------------------------------------------------------
     # 公开接口 2：项目 EQCR 总览
@@ -365,20 +784,24 @@ class EqcrService:
         )
         shadow_count = (await self.db.execute(shadow_q)).scalar() or 0
 
-        # 未解决的异议：同一 opinion_id 无 disagreement resolution 的 disagree opinion
-        disagree_ops = [op.id for op in all_opinions if op.verdict == "disagree"]
-        if disagree_ops:
-            resolved_q = (
-                select(EqcrDisagreementResolution.eqcr_opinion_id)
-                .where(
-                    EqcrDisagreementResolution.eqcr_opinion_id.in_(disagree_ops),
+        # 未解决的异议：使用 LEFT JOIN 单查询
+        disagree_count_q = (
+            select(func.count(EqcrOpinion.id))
+            .outerjoin(
+                EqcrDisagreementResolution,
+                and_(
+                    EqcrDisagreementResolution.eqcr_opinion_id == EqcrOpinion.id,
                     EqcrDisagreementResolution.resolved_at.isnot(None),
                 )
             )
-            resolved_ids = set((await self.db.execute(resolved_q)).scalars().all())
-            disagreement_count = sum(1 for op_id in disagree_ops if op_id not in resolved_ids)
-        else:
-            disagreement_count = 0
+            .where(
+                EqcrOpinion.project_id == project_id,
+                EqcrOpinion.verdict == "disagree",
+                EqcrOpinion.is_deleted == False,  # noqa: E712
+                EqcrDisagreementResolution.id.is_(None),  # no resolution
+            )
+        )
+        disagreement_count = (await self.db.execute(disagree_count_q)).scalar() or 0
 
         return {
             "project": {
@@ -412,10 +835,10 @@ class EqcrService:
 
 
 # ---------------------------------------------------------------------------
-# 5 判断域聚合 + 意见 CRUD（Round 5 任务 5）
+# 5 判断域聚合 + 意见 CRUD 辅助（Round 5 任务 5）
 # ---------------------------------------------------------------------------
 
-from decimal import Decimal  # noqa: E402 — 局部便于新方法中 Decimal → str 序列化
+from decimal import Decimal  # noqa: E402
 
 # 会计估计关键词（用于 WorkingPaper.name/wp_index.wp_name 兜底匹配）
 _ESTIMATE_KEYWORDS: tuple[str, ...] = (
@@ -424,6 +847,13 @@ _ESTIMATE_KEYWORDS: tuple[str, ...] = (
     "跌价",
     "折旧",
     "摊销",
+)
+
+_ALLOWED_DOMAINS: frozenset[str] = frozenset(
+    list(EQCR_CORE_DOMAINS) + ["component_auditor"]
+)
+_ALLOWED_VERDICTS: frozenset[str] = frozenset(
+    ["agree", "disagree", "need_more_evidence"]
 )
 
 
@@ -480,423 +910,3 @@ async def _load_domain_opinions(
     )
     return list((await db.execute(q)).scalars().all())
 
-
-# 复用/扩展 EqcrService（附加方法放到类定义之外 → 通过 monkey-patch 方式挂到类上，
-# 但为保持代码清晰，改为 "setattr" 风格）。
-# 这里直接在模块末尾定义独立函数再绑定到类，避免修改类定义顶部的结构。
-
-
-async def _get_materiality_method(
-    self: "EqcrService", project_id: uuid.UUID
-) -> dict[str, Any]:
-    """需求 2.2：重要性 Tab 数据 + 本域意见历史。"""
-    from app.models.audit_platform_models import Materiality
-
-    q = (
-        select(Materiality)
-        .where(
-            Materiality.project_id == project_id,
-            Materiality.is_deleted == False,  # noqa: E712
-        )
-        .order_by(Materiality.year.desc(), Materiality.created_at.desc())
-    )
-    rows = list((await self.db.execute(q)).scalars().all())
-
-    current_year: dict[str, Any] | None = None
-    history_years: list[dict[str, Any]] = []
-    for idx, row in enumerate(rows):
-        payload = {
-            "year": row.year,
-            "benchmark_type": row.benchmark_type,
-            "benchmark_amount": _decimal_str(row.benchmark_amount),
-            "overall_percentage": _decimal_str(row.overall_percentage),
-            "overall_materiality": _decimal_str(row.overall_materiality),
-            "performance_ratio": _decimal_str(row.performance_ratio),
-            "performance_materiality": _decimal_str(row.performance_materiality),
-            "trivial_ratio": _decimal_str(row.trivial_ratio),
-            "trivial_threshold": _decimal_str(row.trivial_threshold),
-            "is_override": bool(row.is_override),
-            "override_reason": row.override_reason,
-        }
-        if idx == 0:
-            current_year = payload
-        else:
-            history_years.append(payload)
-
-    opinions = await _load_domain_opinions(self.db, project_id, "materiality")
-    current_opinion, history_opinions = _split_current_history(opinions)
-
-    return {
-        "project_id": str(project_id),
-        "domain": "materiality",
-        "data": {
-            "current": current_year,
-            "prior_years": history_years,
-        },
-        "current_opinion": current_opinion,
-        "history_opinions": history_opinions,
-    }
-
-
-async def _get_estimates_method(
-    self: "EqcrService", project_id: uuid.UUID
-) -> dict[str, Any]:
-    """需求 2.3：会计估计 Tab 数据。
-
-    策略：
-    - 若 WpIndex 存在 ``category`` 列（PG 生产）且值为 ``'estimate'`` → 命中
-      *（当前代码库无 category 列，该分支留作兼容扩展点）*
-    - 兜底：WpIndex.wp_name / WorkingPaper 的底稿名称含任一估计关键词
-    """
-    from app.models.workpaper_models import WorkingPaper, WpIndex
-
-    # 兜底关键词匹配（兼容 PG 与 SQLite）
-    name_filter = None
-    for kw in _ESTIMATE_KEYWORDS:
-        cond = WpIndex.wp_name.like(f"%{kw}%")
-        name_filter = cond if name_filter is None else (name_filter | cond)
-
-    # 如果 WpIndex 未来新增 category 列，这里自动 OR 进去
-    has_category = hasattr(WpIndex, "category")
-    if has_category:
-        category_cond = getattr(WpIndex, "category") == "estimate"
-        name_filter = category_cond if name_filter is None else (name_filter | category_cond)
-
-    q = (
-        select(WpIndex, WorkingPaper)
-        .outerjoin(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
-        .where(
-            WpIndex.project_id == project_id,
-            WpIndex.is_deleted == False,  # noqa: E712
-            name_filter,
-        )
-        .order_by(WpIndex.wp_code.asc())
-    )
-    rows = (await self.db.execute(q)).all()
-
-    items: list[dict[str, Any]] = []
-    seen_wp_index_ids: set[uuid.UUID] = set()
-    for idx_row, wp_row in rows:
-        if idx_row.id in seen_wp_index_ids:
-            continue
-        seen_wp_index_ids.add(idx_row.id)
-        items.append(
-            {
-                "wp_index_id": str(idx_row.id),
-                "wp_code": idx_row.wp_code,
-                "wp_name": idx_row.wp_name,
-                "audit_cycle": idx_row.audit_cycle,
-                "index_status": idx_row.status.value if idx_row.status else None,
-                "file_status": wp_row.status.value if wp_row and wp_row.status else None,
-                "review_status": wp_row.review_status.value
-                if wp_row and wp_row.review_status
-                else None,
-                "working_paper_id": str(wp_row.id) if wp_row else None,
-            }
-        )
-
-    opinions = await _load_domain_opinions(self.db, project_id, "estimate")
-    current_opinion, history_opinions = _split_current_history(opinions)
-
-    return {
-        "project_id": str(project_id),
-        "domain": "estimate",
-        "data": {
-            "items": items,
-            "match_strategy": "wp_name_keyword",
-            "keywords": list(_ESTIMATE_KEYWORDS),
-        },
-        "current_opinion": current_opinion,
-        "history_opinions": history_opinions,
-    }
-
-
-async def _get_related_parties_method(
-    self: "EqcrService", project_id: uuid.UUID
-) -> dict[str, Any]:
-    """需求 2.4：关联方 Tab 数据（注册表 + 交易明细）。"""
-    from app.models.related_party_models import (
-        RelatedPartyRegistry,
-        RelatedPartyTransaction,
-    )
-
-    reg_q = (
-        select(RelatedPartyRegistry)
-        .where(
-            RelatedPartyRegistry.project_id == project_id,
-            RelatedPartyRegistry.is_deleted == False,  # noqa: E712
-        )
-        .order_by(RelatedPartyRegistry.created_at.asc())
-    )
-    registries = list((await self.db.execute(reg_q)).scalars().all())
-
-    txn_q = (
-        select(RelatedPartyTransaction)
-        .where(
-            RelatedPartyTransaction.project_id == project_id,
-            RelatedPartyTransaction.is_deleted == False,  # noqa: E712
-        )
-        .order_by(RelatedPartyTransaction.created_at.asc())
-    )
-    transactions = list((await self.db.execute(txn_q)).scalars().all())
-
-    registries_payload = [
-        {
-            "id": str(r.id),
-            "name": r.name,
-            "relation_type": r.relation_type,
-            "is_controlled_by_same_party": bool(r.is_controlled_by_same_party),
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
-        for r in registries
-    ]
-    transactions_payload = [
-        {
-            "id": str(t.id),
-            "related_party_id": str(t.related_party_id),
-            "amount": _decimal_str(t.amount),
-            "transaction_type": t.transaction_type,
-            "is_arms_length": t.is_arms_length,
-            "evidence_refs": t.evidence_refs,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-        }
-        for t in transactions
-    ]
-
-    opinions = await _load_domain_opinions(self.db, project_id, "related_party")
-    current_opinion, history_opinions = _split_current_history(opinions)
-
-    return {
-        "project_id": str(project_id),
-        "domain": "related_party",
-        "data": {
-            "registries": registries_payload,
-            "transactions": transactions_payload,
-            "summary": {
-                "registry_count": len(registries_payload),
-                "transaction_count": len(transactions_payload),
-            },
-        },
-        "current_opinion": current_opinion,
-        "history_opinions": history_opinions,
-    }
-
-
-async def _get_going_concern_method(
-    self: "EqcrService", project_id: uuid.UUID
-) -> dict[str, Any]:
-    """需求 2.5：持续经营 Tab 数据（**复用** ``GoingConcernEvaluation``）。"""
-    from app.models.collaboration_models import (
-        GoingConcernEvaluation,
-        GoingConcernIndicator,
-    )
-
-    eval_q = (
-        select(GoingConcernEvaluation)
-        .where(
-            GoingConcernEvaluation.project_id == project_id,
-            GoingConcernEvaluation.is_deleted == False,  # noqa: E712
-        )
-        .order_by(GoingConcernEvaluation.evaluation_date.desc())
-    )
-    evaluations = list((await self.db.execute(eval_q)).scalars().all())
-
-    current_eval: dict[str, Any] | None = None
-    prior_evals: list[dict[str, Any]] = []
-    latest_indicators: list[dict[str, Any]] = []
-
-    for idx, ev in enumerate(evaluations):
-        payload = {
-            "id": str(ev.id),
-            "evaluation_date": ev.evaluation_date.isoformat()
-            if ev.evaluation_date
-            else None,
-            "conclusion": ev.conclusion.value if ev.conclusion else None,
-            "key_indicators": ev.key_indicators,
-            "management_plan": ev.management_plan,
-            "auditor_conclusion": ev.auditor_conclusion,
-        }
-        if idx == 0:
-            current_eval = payload
-
-            ind_q = (
-                select(GoingConcernIndicator)
-                .where(
-                    GoingConcernIndicator.evaluation_id == ev.id,
-                    GoingConcernIndicator.is_deleted == False,  # noqa: E712
-                )
-                .order_by(GoingConcernIndicator.created_at.asc())
-            )
-            indicators = list((await self.db.execute(ind_q)).scalars().all())
-            latest_indicators = [
-                {
-                    "id": str(ind.id),
-                    "indicator_type": ind.indicator_type,
-                    "indicator_value": ind.indicator_value,
-                    "threshold": ind.threshold,
-                    "is_triggered": bool(ind.is_triggered),
-                    "severity": ind.severity.value if ind.severity else None,
-                    "notes": ind.notes,
-                }
-                for ind in indicators
-            ]
-        else:
-            prior_evals.append(payload)
-
-    opinions = await _load_domain_opinions(self.db, project_id, "going_concern")
-    current_opinion, history_opinions = _split_current_history(opinions)
-
-    return {
-        "project_id": str(project_id),
-        "domain": "going_concern",
-        "data": {
-            "current_evaluation": current_eval,
-            "prior_evaluations": prior_evals,
-            "indicators": latest_indicators,
-        },
-        "current_opinion": current_opinion,
-        "history_opinions": history_opinions,
-    }
-
-
-async def _get_opinion_type_method(
-    self: "EqcrService", project_id: uuid.UUID
-) -> dict[str, Any]:
-    """需求 2.6：审计意见类型 Tab 数据。"""
-    ar_q = (
-        select(AuditReport)
-        .where(
-            AuditReport.project_id == project_id,
-            AuditReport.is_deleted == False,  # noqa: E712
-        )
-        .order_by(AuditReport.year.desc())
-    )
-    reports = list((await self.db.execute(ar_q)).scalars().all())
-
-    current_report: dict[str, Any] | None = None
-    prior_reports: list[dict[str, Any]] = []
-    for idx, ar in enumerate(reports):
-        payload = {
-            "id": str(ar.id),
-            "year": ar.year,
-            "opinion_type": ar.opinion_type.value if ar.opinion_type else None,
-            "company_type": ar.company_type.value if ar.company_type else None,
-            "status": ar.status.value if ar.status else None,
-            "report_date": ar.report_date.isoformat() if ar.report_date else None,
-            "signing_partner": ar.signing_partner,
-            "paragraphs": ar.paragraphs,
-        }
-        if idx == 0:
-            current_report = payload
-        else:
-            prior_reports.append(payload)
-
-    opinions = await _load_domain_opinions(self.db, project_id, "opinion_type")
-    current_opinion, history_opinions = _split_current_history(opinions)
-
-    return {
-        "project_id": str(project_id),
-        "domain": "opinion_type",
-        "data": {
-            "current_report": current_report,
-            "prior_reports": prior_reports,
-        },
-        "current_opinion": current_opinion,
-        "history_opinions": history_opinions,
-    }
-
-
-# ------------------------------------------------------------------------
-# 意见 CRUD（POST / PATCH）
-# ------------------------------------------------------------------------
-
-
-_ALLOWED_DOMAINS: frozenset[str] = frozenset(
-    list(EQCR_CORE_DOMAINS) + ["component_auditor"]
-)
-_ALLOWED_VERDICTS: frozenset[str] = frozenset(
-    ["agree", "disagree", "need_more_evidence"]
-)
-
-
-async def _create_opinion_method(
-    self: "EqcrService",
-    *,
-    project_id: uuid.UUID,
-    domain: str,
-    verdict: str,
-    comment: str | None,
-    extra_payload: dict | None,
-    user_id: uuid.UUID,
-) -> dict[str, Any]:
-    """新建一条 EQCR 意见。调用方负责 ``db.commit()``。"""
-    if domain not in _ALLOWED_DOMAINS:
-        raise ValueError(f"非法 domain: {domain}；允许值 {sorted(_ALLOWED_DOMAINS)}")
-    if verdict not in _ALLOWED_VERDICTS:
-        raise ValueError(
-            f"非法 verdict: {verdict}；允许值 {sorted(_ALLOWED_VERDICTS)}"
-        )
-
-    op = EqcrOpinion(
-        project_id=project_id,
-        domain=domain,
-        verdict=verdict,
-        comment=comment,
-        extra_payload=extra_payload,
-        created_by=user_id,
-    )
-    self.db.add(op)
-    await self.db.flush()
-    # 让 server_default 字段（created_at/updated_at）在当前 session 可读，
-    # 避免后续属性访问触发同步 IO。
-    await self.db.refresh(op)
-    return _serialize_opinion(op)
-
-
-async def _update_opinion_method(
-    self: "EqcrService",
-    *,
-    opinion_id: uuid.UUID,
-    user_id: uuid.UUID,
-    verdict: str | None = None,
-    comment: str | None = None,
-    extra_payload: dict | None = None,
-) -> dict[str, Any] | None:
-    """更新一条 EQCR 意见。只有创建人（或 admin）可改，调用方负责权限判断。
-
-    返回 None 表示 opinion 不存在或已软删除。
-    """
-    q = select(EqcrOpinion).where(
-        EqcrOpinion.id == opinion_id,
-        EqcrOpinion.is_deleted == False,  # noqa: E712
-    )
-    op = (await self.db.execute(q)).scalar_one_or_none()
-    if op is None:
-        return None
-
-    if verdict is not None:
-        if verdict not in _ALLOWED_VERDICTS:
-            raise ValueError(
-                f"非法 verdict: {verdict}；允许值 {sorted(_ALLOWED_VERDICTS)}"
-            )
-        op.verdict = verdict
-    if comment is not None:
-        op.comment = comment
-    if extra_payload is not None:
-        op.extra_payload = extra_payload
-
-    await self.db.flush()
-    # UPDATE 后 server_onupdate 字段（updated_at）在 async session 下需显式 refresh，
-    # 否则访问属性会触发同步 IO 导致 MissingGreenlet。
-    await self.db.refresh(op)
-    return _serialize_opinion(op)
-
-
-# 绑定到 EqcrService 类，保持"可读的方法调用形式"
-EqcrService.get_materiality = _get_materiality_method  # type: ignore[attr-defined]
-EqcrService.get_estimates = _get_estimates_method  # type: ignore[attr-defined]
-EqcrService.get_related_parties = _get_related_parties_method  # type: ignore[attr-defined]
-EqcrService.get_going_concern = _get_going_concern_method  # type: ignore[attr-defined]
-EqcrService.get_opinion_type = _get_opinion_type_method  # type: ignore[attr-defined]
-EqcrService.create_opinion = _create_opinion_method  # type: ignore[attr-defined]
-EqcrService.update_opinion = _update_opinion_method  # type: ignore[attr-defined]

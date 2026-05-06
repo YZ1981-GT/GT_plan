@@ -1,3 +1,4 @@
+from datetime import timezone
 """Excel ↔ HTML 互转 API — 双格式保存 + Univer 联动
 
 提供：
@@ -745,7 +746,7 @@ async def execute_formulas(
     # 保存更新后的 structure
     sheet["cells"] = cells
     structure["metadata"]["version"] = structure["metadata"].get("version", 0) + 1
-    structure["metadata"]["last_calc_at"] = __import__("datetime").datetime.utcnow().isoformat()
+    structure["metadata"]["last_calc_at"] = __import__("datetime").datetime.now(timezone.utc).isoformat()
     structure_path.write_text(json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8")
 
     # 版本快照

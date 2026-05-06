@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -92,7 +92,7 @@ async def save_worksheet_data(
     db: AsyncSession = Depends(get_db),
 ):
     await ensure_table(db)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     try:
         await db.execute(
             text("""

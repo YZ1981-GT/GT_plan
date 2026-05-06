@@ -215,3 +215,33 @@ def register_r1_sections() -> None:
 
 # 模块加载时自动注册 R1 章节
 register_r1_sections()
+
+
+# ---------------------------------------------------------------------------
+# R5 章节注册：EQCR 备忘录
+# ---------------------------------------------------------------------------
+
+
+async def _eqcr_memo_pdf_generator(
+    project_id: UUID, db: AsyncSession
+) -> bytes | Path | None:
+    """归档引擎调用：返回 EQCR 备忘录 PDF 字节。"""
+    from app.services.eqcr_memo_service import eqcr_memo_pdf_generator
+    from app.models.core import Project
+    from sqlalchemy import select as _select
+
+    proj = (await db.execute(
+        _select(Project).where(Project.id == project_id)
+    )).scalar_one_or_none()
+    if proj is None:
+        return None
+    wizard_state = proj.wizard_state or {}
+    return eqcr_memo_pdf_generator(project_id, wizard_state)
+
+
+register(
+    "02",
+    "02-EQCR备忘录.pdf",
+    _eqcr_memo_pdf_generator,
+    "EQCR 备忘录（R5 需求 9）",
+)

@@ -247,7 +247,7 @@ async def save_univer_data(
     import hashlib
     import json
     import shutil
-    from datetime import datetime
+    from datetime import datetime, timezone
     from pathlib import Path
 
     snapshot = body.get("snapshot")
@@ -308,7 +308,7 @@ async def save_univer_data(
     # 5. DB 更新
     old_version = wp.file_version
     wp.file_version += 1
-    wp.updated_at = datetime.utcnow()
+    wp.updated_at = datetime.now(timezone.utc)
     wp.prefill_stale = True
     await db.flush()
 

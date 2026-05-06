@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Optional
 from uuid import UUID
@@ -100,7 +100,7 @@ class WorkpaperFillService:
 
         # 更新状态为运行中
         task.status = "running"
-        task.started_at = datetime.utcnow()
+        task.started_at = datetime.now(timezone.utc)
         await self.db.commit()
 
         try:
@@ -124,7 +124,7 @@ class WorkpaperFillService:
 
             # 更新任务状态
             task.status = "completed"
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             task.result_summary = fill_result.get("summary")
             await self.db.commit()
             await self.db.refresh(fill)
@@ -135,7 +135,7 @@ class WorkpaperFillService:
             logger.exception(f"Fill task {task_id} failed")
             task.status = "failed"
             task.error_message = str(e)
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             await self.db.commit()
             raise
 
@@ -537,7 +537,7 @@ class WorkpaperFillService:
                 "aux_balances_count": len(aux_balances),
             },
             generation_model=ai_service.get_active_model.__name__ if hasattr(ai_service, "get_active_model") else "unknown",
-            generation_time=datetime.utcnow(),
+            generation_time=datetime.now(timezone.utc),
             confidence_level=confidence,
             confirmation_status=AIConfirmationStatus.pending,
         )
@@ -922,7 +922,7 @@ class WorkpaperFillService:
                 "summary": data_summary,
             },
             generation_model="unknown",
-            generation_time=datetime.utcnow(),
+            generation_time=datetime.now(timezone.utc),
             confidence_level=ConfidenceLevel.medium,
             confirmation_status=AIConfirmationStatus.pending,
         )
@@ -993,7 +993,7 @@ class WorkpaperFillService:
                 "year": year,
             },
             generation_model="unknown",
-            generation_time=datetime.utcnow(),
+            generation_time=datetime.now(timezone.utc),
             confidence_level=ConfidenceLevel.low,
             confirmation_status=AIConfirmationStatus.pending,
         )
@@ -1105,7 +1105,7 @@ class WorkpaperFillService:
                 "balances": confirm_balances[:20],  # 限制数量
             },
             generation_model="unknown",
-            generation_time=datetime.utcnow(),
+            generation_time=datetime.now(timezone.utc),
             confidence_level=ConfidenceLevel.medium,
             confirmation_status=AIConfirmationStatus.pending,
         )
@@ -1163,7 +1163,7 @@ class WorkpaperFillService:
                 "year": year,
             },
             generation_model="unknown",
-            generation_time=datetime.utcnow(),
+            generation_time=datetime.now(timezone.utc),
             confidence_level=ConfidenceLevel.low,
             confirmation_status=AIConfirmationStatus.pending,
         )
@@ -1282,7 +1282,7 @@ class WorkpaperFillService:
                 "report_items": len(report_data),
             },
             generation_model="unknown",
-            generation_time=datetime.utcnow(),
+            generation_time=datetime.now(timezone.utc),
             confidence_level=ConfidenceLevel.medium,
             confirmation_status=AIConfirmationStatus.pending,
         )
@@ -1645,7 +1645,7 @@ class WorkpaperFillService:
                 "review_type": "prompt_driven",
             },
             generation_model="unknown",
-            generation_time=datetime.utcnow(),
+            generation_time=datetime.now(timezone.utc),
             confidence_level=ConfidenceLevel.medium,
             confirmation_status=AIConfirmationStatus.pending,
         )

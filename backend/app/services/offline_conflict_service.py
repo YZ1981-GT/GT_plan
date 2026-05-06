@@ -5,7 +5,7 @@
 """
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -130,7 +130,7 @@ class OfflineConflictService:
         conflict.status = ConflictStatus.resolved
         conflict.resolver_id = resolver_id
         conflict.reason_code = reason_code
-        conflict.resolved_at = datetime.utcnow()
+        conflict.resolved_at = datetime.now(timezone.utc)
 
         # 触发 QC 重跑
         qc_job_id = uuid.uuid4()

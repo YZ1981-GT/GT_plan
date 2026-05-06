@@ -657,7 +657,7 @@ class NoteValidationEngine:
         info_count = sum(1 for f in all_findings if f.get("severity") == "info")
 
         # Save to note_validation_results
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         validation_result = NoteValidationResult(
             project_id=project_id,
             year=year,

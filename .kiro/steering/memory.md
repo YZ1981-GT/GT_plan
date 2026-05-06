@@ -30,6 +30,8 @@ inclusion: always
 - 打磨迭代具体化为"5 角色轮转"：合伙人/项目经理/质控/审计助理/EQCR 独立复核，每轮只站单一角色视角找断层，规则见 `.kiro/specs/refinement-round1-review-closure/README.md`
 - 每轮 requirements.md 起草后必须做"代码锚定交叉核验"（grep 所有假设的字段/表/端点/枚举），发现硬错立刻回补到文档，避免错误带到 design 阶段
 - 标任务 [x] 前必须跑 pytest 或对应测试通过，而非仅因"代码文件存在"就标完成；用户明确要求做完整复盘时要诚实暴露问题而非粉饰
+- 审查/分析类任务必须给出明确结论和改进建议（分优先级 P0/P1/P2），不能只堆文件大小/端点数量等细节就停
+- 候选下一轮 spec："R5 技术债清理"：路由拆分 eqcr.py (71KB/38端点→按域拆子模块) / 消除 monkey-patch (EqcrService 5 域方法 + SoDGuardService.check_assignment_independence) / list_my_projects N+1 合并 / client_aliases 表取代启发式匹配 / 批量替换 datetime.utcnow()
 
 ## Spec 工作流规范（production-readiness 复盘沉淀）
 
@@ -59,7 +61,7 @@ inclusion: always
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（R5 全部完成 87b0f38，R4 本地新文件待提交）
+- git 分支：feature/global-component-library（R3+R4+R5 全部完成，最新 commit 03e125d 已推送远程）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -162,9 +164,9 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
-- **Round 4 已全部完成**（Sprint 1-3 共 23 任务）：三栏编辑器（程序要求侧栏+AI侧栏）/SmartTipList可点击定位/上年对比/按金额穿透/预填充provenance/移动端只读/附件拖拽/焦点追踪时间线/编辑软锁/OCR字段提取；本地 ~70 个 untracked 新文件待 git add + commit
+- **Round 4 已全部完成**（Sprint 1-3 共 23 任务）：三栏编辑器（程序要求侧栏+AI侧栏）/SmartTipList可点击定位/上年对比/按金额穿透/预填充provenance/移动端只读/附件拖拽/焦点追踪时间线/编辑软锁/OCR字段提取；已提交推送 03e125d
 - Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
-- Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，122 个 EQCR 测试全通过；关键修复：(1) gate_engine.evaluate 加 `await db.flush()` 修复 gate_decision.id NULL 导致 trace_events 插入失败；(2) sign_service._transition_report_status 加 `await db.flush()` 让状态变更对 refresh 可见；(3) Task 23 年度独立性声明改为独立表 `annual_independence_declarations`（R1 通用表未落地前的过渡方案，migration round5_independence_20260506）；(4) Task 18 备忘录接入 python-docx + LibreOffice PDF 管线，`build_memo_docx_bytes` 纯函数生成 docx，`eqcr_memo_pdf_generator` 归档章节生成器预留；(5) Task 24 年度声明变成真实阻断（router 守卫 + 工作台 load 阻塞）；(6) Task 15 客户名归一化 `client_lookup.normalize_client_name` 兼容"XX集团"vs"XX集团有限公司"；(7) Task 22 CompetenceRating 枚举值修正为 reliable/unreliable（原先误用 A/D）；(8) Task 20 metrics 端点加 admin/partner 角色守卫；(9) EqcrProjectView 加 EQCR 审批/解锁按钮，approve 前强制检查历年对比差异原因；(10) 新增 test_eqcr_full_flow / test_eqcr_state_machine_properties / test_eqcr_component_auditor_review / test_eqcr_memo_docx / test_client_lookup 五个测试文件；(11) 归档章节 '02-EQCR备忘录.pdf' 待 R1 archive_section_registry 落地后通过 `register('02', 'eqcr_memo.pdf', eqcr_memo_pdf_generator)` 注册
+- Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，133 个 EQCR 测试全通过（14 个测试文件）；`test_eqcr_sod.py` import 错误已修复（e22cff0，添加 `validate_eqcr_sod_in_batch` + `check_assignment_independence` 兼容 API 薄包装）
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

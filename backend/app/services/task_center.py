@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from enum import Enum
 
@@ -59,8 +59,8 @@ def create_task(
         "result": None,
         "error": None,
         "retry_count": 0,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     # 清理超限任务
     if len(_tasks) > MAX_TASKS:
@@ -76,7 +76,7 @@ def update_task(task_id: str, status: TaskStatus, result: Any = None, error: str
     if task_id not in _tasks:
         return
     _tasks[task_id]["status"] = status.value
-    _tasks[task_id]["updated_at"] = datetime.utcnow().isoformat()
+    _tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
     if result is not None:
         _tasks[task_id]["result"] = result
     if error is not None:
@@ -136,6 +136,6 @@ def retry_task(task_id: str) -> dict | None:
     task["status"] = TaskStatus.retrying.value
     task["retry_count"] += 1
     task["error"] = None
-    task["updated_at"] = datetime.utcnow().isoformat()
+    task["updated_at"] = datetime.now(timezone.utc).isoformat()
     logger.info("task_center: retry %s type=%s retry_count=%d", task_id, task["type"], task["retry_count"])
     return task

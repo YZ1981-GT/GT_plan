@@ -6,7 +6,7 @@ Phase 9 Task 9.16/9.20: 四表→试算表→报表→附注→底稿 五环校�
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -50,7 +50,7 @@ class ConsistencyCheckService:
             "year": year,
             "all_consistent": all(c["passed"] for c in checks),
             "checks": checks,
-            "checked_at": datetime.utcnow().isoformat(),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
         }
 
     async def _check_tb_vs_balance(self, project_id: UUID, year: int) -> dict:

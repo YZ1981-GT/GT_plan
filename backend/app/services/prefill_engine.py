@@ -393,14 +393,14 @@ async def parse_workpaper_real(
 
     # 写入 parsed_data（dry_run=True 时跳过写入，仅返回预览）
     from datetime import datetime, timezone
-    parsed["extracted_at"] = datetime.utcnow().isoformat()
+    parsed["extracted_at"] = datetime.now(timezone.utc).isoformat()
     if not dry_run:
         wp_write = (await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
         )).scalar_one_or_none()
         if wp_write:
             wp_write.parsed_data = parsed
-            wp_write.last_parsed_at = datetime.utcnow()
+            wp_write.last_parsed_at = datetime.now(timezone.utc)
             await db.flush()
 
     _logger.info(

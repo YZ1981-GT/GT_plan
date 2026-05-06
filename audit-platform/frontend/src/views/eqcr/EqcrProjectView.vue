@@ -82,7 +82,15 @@
 
     <!-- 关键指标摘要 -->
     <el-row v-if="overview" :gutter="12" class="eqcr-summary-row">
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
+        <el-card shadow="hover" class="eqcr-summary-card">
+          <div class="eqcr-summary-card__label">本项目 EQCR 工时</div>
+          <div class="eqcr-summary-card__value">
+            {{ timeSummary?.total_hours ?? '—' }}<span class="eqcr-summary-card__unit">h</span>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card shadow="hover" class="eqcr-summary-card">
           <div class="eqcr-summary-card__label">已录 EQCR 意见</div>
           <div class="eqcr-summary-card__value">
@@ -90,7 +98,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card shadow="hover" class="eqcr-summary-card">
           <div class="eqcr-summary-card__label">独立笔记</div>
           <div class="eqcr-summary-card__value">
@@ -98,7 +106,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card shadow="hover" class="eqcr-summary-card">
           <div class="eqcr-summary-card__label">影子计算</div>
           <div class="eqcr-summary-card__value">
@@ -106,7 +114,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card
           shadow="hover"
           class="eqcr-summary-card"
@@ -212,6 +220,7 @@ const projectId = computed(() => String(route.params.projectId ?? ''))
 
 const loading = ref(false)
 const overview = ref<EqcrProjectOverview | null>(null)
+const timeSummary = ref<{ total_hours: number; record_count: number } | null>(null)
 const activeTab = ref<
   'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute' | 'review_notes' | 'prior_year' | 'memo' | 'component_auditor'
 >('materiality')
@@ -258,6 +267,11 @@ async function loadOverview() {
   loading.value = true
   try {
     overview.value = await eqcrApi.getProjectOverview(projectId.value)
+    // Fetch time summary in parallel
+    try {
+      const api = (await import('@/services/apiProxy')).default
+      timeSummary.value = await api.get(`/api/eqcr/projects/${projectId.value}/time-summary`)
+    } catch { timeSummary.value = null }
   } catch (err: any) {
     if (err?.response?.status === 404) {
       ElMessage.error('项目不存在')
@@ -464,6 +478,12 @@ function reportStatusType(
   font-size: var(--gt-font-size-xl, 22px);
   font-weight: 600;
   color: var(--gt-color-text, #303133);
+}
+.eqcr-summary-card__unit {
+  font-size: var(--gt-font-size-sm, 13px);
+  font-weight: 400;
+  color: var(--gt-color-text-tertiary, #909399);
+  margin-left: 2px;
 }
 .eqcr-summary-card--danger {
   border-left: 4px solid var(--el-color-danger, #f56c6c);

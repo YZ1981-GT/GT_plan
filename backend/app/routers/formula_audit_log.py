@@ -13,7 +13,7 @@ API:
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -106,7 +106,7 @@ async def add_audit_log(
 ):
     await ensure_table(db)
     import json
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     trace_json = json.dumps(body.trace, ensure_ascii=False) if body.trace else None
     await db.execute(text("""
         INSERT INTO formula_audit_log (id, project_id, year, module, row_code, action, old_formula, new_formula, result_value, trace, created_at)

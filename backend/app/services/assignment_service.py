@@ -101,7 +101,7 @@ class AssignmentService:
         R5 任务 2：在落库前对每一条委派执行 SOD 校验（EQCR 独立性规则），
         任一条冲突则整批拒绝，避免部分落库的一致性问题。
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # ---- R5: SOD 前置校验（EQCR 独立性） ----
         # 同批次中 staff_id+role 的组合用来模拟"本次将形成的终态"，

@@ -475,7 +475,7 @@ class ReportEngine:
             FinancialReportType.impairment_provision,
         ]
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for report_type in type_order:
             config_rows = configs.get(report_type, [])
@@ -617,7 +617,7 @@ class ReportEngine:
         configs = await self._load_report_configs(applicable_standard)
         global_row_cache: dict[str, Decimal] = {}
         regenerated = 0
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # First pass: identify affected row_codes
         affected_codes: set[str] = set()

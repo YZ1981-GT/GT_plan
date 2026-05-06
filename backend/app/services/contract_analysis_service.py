@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
@@ -581,8 +581,8 @@ class ContractAnalysisService:
         expiring_soon = 0
         high_risk_count = 0
 
-        now = datetime.utcnow().date() if True else datetime.utcnow().date()
-        thirty_days_later = datetime.utcnow().date() if True else (datetime.utcnow() + timedelta(days=30)).date()
+        now = datetime.now(timezone.utc).date() if True else datetime.now(timezone.utc).date()
+        thirty_days_later = datetime.now(timezone.utc).date() if True else (datetime.now(timezone.utc) + timedelta(days=30)).date()
 
         for contract in contracts:
             # 按类型统计

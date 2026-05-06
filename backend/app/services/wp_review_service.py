@@ -202,8 +202,8 @@ class WpReviewService:
         record.status = ReviewCommentStatus.replied
         record.reply_text = reply_text
         record.replier_id = replier_id
-        record.replied_at = datetime.utcnow()
-        record.updated_at = datetime.utcnow()
+        record.replied_at = datetime.now(timezone.utc)
+        record.updated_at = datetime.now(timezone.utc)
         await db.flush()
         return self._to_dict(record)
 
@@ -229,8 +229,8 @@ class WpReviewService:
 
         record.status = ReviewCommentStatus.resolved
         record.resolved_by = resolved_by
-        record.resolved_at = datetime.utcnow()
-        record.updated_at = datetime.utcnow()
+        record.resolved_at = datetime.now(timezone.utc)
+        record.updated_at = datetime.now(timezone.utc)
         await db.flush()
         return self._to_dict(record)
 
@@ -294,7 +294,7 @@ async def _build_and_persist_issue_ticket(
         title=title[:200],
         description=review_record.comment_text,
         owner_id=owner_id,
-        due_at=datetime.utcnow() + timedelta(hours=_REVIEW_COMMENT_SLA_HOURS),
+        due_at=datetime.now(timezone.utc) + timedelta(hours=_REVIEW_COMMENT_SLA_HOURS),
         status=IssueStatus.open.value,
         trace_id=trace_id,
         evidence_refs=[],
@@ -318,4 +318,4 @@ def _generate_trace_id() -> str:
     except Exception:  # noqa: BLE001
         import uuid as _uuid
 
-        return f"trc_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{_uuid.uuid4().hex[:12]}"
+        return f"trc_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{_uuid.uuid4().hex[:12]}"

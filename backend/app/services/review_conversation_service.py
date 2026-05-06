@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -100,7 +100,7 @@ class ReviewConversationService:
         if conv.initiator_id != user_id:
             raise PermissionError("仅发起人可关闭对话")
         conv.status = "closed"
-        conv.closed_at = datetime.utcnow()
+        conv.closed_at = datetime.now(timezone.utc)
         await db.flush()
         return self._conv_to_dict(conv)
 

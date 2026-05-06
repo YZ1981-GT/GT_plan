@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -171,7 +171,7 @@ class DatasetService:
         # 激活新数据集
         dataset.status = DatasetStatus.active
         dataset.activated_by = activated_by
-        dataset.activated_at = datetime.utcnow()
+        dataset.activated_at = datetime.now(timezone.utc)
         if record_summary:
             dataset.record_summary = record_summary
         if validation_summary:
@@ -261,7 +261,7 @@ class DatasetService:
         # 上一版本 → active
         previous.status = DatasetStatus.active
         previous.activated_by = performed_by
-        previous.activated_at = datetime.utcnow()
+        previous.activated_at = datetime.now(timezone.utc)
         await DatasetService._set_dataset_visibility(
             db,
             project_id=project_id,

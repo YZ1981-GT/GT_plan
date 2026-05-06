@@ -16,7 +16,7 @@ API:
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -166,7 +166,7 @@ async def save_cell_comment(
     db: AsyncSession = Depends(get_db),
 ):
     await ensure_table(db)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     new_id = str(uuid.uuid4())
     try:
         await db.execute(
