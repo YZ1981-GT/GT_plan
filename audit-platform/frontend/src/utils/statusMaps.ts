@@ -5,7 +5,7 @@
  * 配合 GtStatusTag 组件使用，消除各模块重复的 statusTagType/statusLabel 函数
  */
 
-export type ElTagType = 'success' | 'warning' | 'danger' | 'info' | ''
+export type ElTagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
 
 export interface StatusEntry {
   label: string
@@ -19,9 +19,9 @@ export const WP_STATUS: StatusMap = {
   not_started:           { label: '未开始',     type: 'info' },
   in_progress:           { label: '编制中',     type: 'warning' },
   draft:                 { label: '草稿',       type: 'warning' },
-  draft_complete:        { label: '初稿完成',   type: '' },
-  edit_complete:         { label: '编制完成',   type: '' },
-  under_review:          { label: '复核中',     type: '' },
+  draft_complete:        { label: '初稿完成',   type: 'primary' },
+  edit_complete:         { label: '编制完成',   type: 'primary' },
+  under_review:          { label: '复核中',     type: 'primary' },
   revision_required:     { label: '退回修改',   type: 'danger' },
   review_passed:         { label: '复核通过',   type: 'success' },
   review_level1_passed:  { label: '一级复核通过', type: 'success' },
@@ -69,9 +69,9 @@ export const TEMPLATE_STATUS: StatusMap = {
 export const PROJECT_STATUS: StatusMap = {
   created:    { label: '已创建', type: 'info' },
   planning:   { label: '计划中', type: 'warning' },
-  execution:  { label: '执行中', type: '' },
+  execution:  { label: '执行中', type: 'primary' },
   completion: { label: '已完成', type: 'success' },
-  reporting:  { label: '报告',   type: '' },
+  reporting:  { label: '报告',   type: 'primary' },
   archived:   { label: '已归档', type: 'info' },
 }
 

@@ -74,7 +74,7 @@
 
       <!-- File type detection -->
       <div v-if="activeSheet" class="file-type-bar">
-        <el-tag :type="fileTypeTagType" size="large">
+        <el-tag :type="(fileTypeTagType) || undefined" size="large">
           检测到：{{ fileTypeLabel }}
         </el-tag>
         <span class="row-count">
@@ -237,7 +237,7 @@
               <el-icon v-else-if="d.missing_cols.length" style="color: #f56c6c"><CircleClose /></el-icon>
               <el-icon v-else style="color: #909399"><InfoFilled /></el-icon>
               <span>{{ d.sheet_name }}</span>
-              <el-tag :type="sheetTagType(d.guessed_type)" size="small">{{ typeLabel(d.guessed_type) }}</el-tag>
+              <el-tag :type="(sheetTagType(d.guessed_type)) || undefined" size="small">{{ typeLabel(d.guessed_type) }}</el-tag>
               <span style="color: #999">{{ d.row_count }} 行</span>
               <span v-if="d.missing_cols.length" style="color: #f56c6c; font-size: 12px">
                 缺少必需列：{{ d.missing_cols.map(colLabel).join('、') }}
@@ -320,7 +320,7 @@
         >
           <template #label>
             <span>
-              <el-tag :type="categoryTagType(cat)" size="small" style="margin-right: 4px">{{ categoryLabel(cat) }}</el-tag>
+              <el-tag :type="(categoryTagType(cat)) || undefined" size="small" style="margin-right: 4px">{{ categoryLabel(cat) }}</el-tag>
               {{ countNodes(nodes) }}
             </span>
           </template>
@@ -358,7 +358,7 @@
                   <span class="node-name" :class="{ 'node-name--edited': editedCodes.has(data.account_code) }">
                     {{ data.account_name }}
                   </span>
-                  <el-tag size="small" :type="data.direction === 'debit' ? '' : 'warning'">
+                  <el-tag size="small" :type="(data.direction === 'debit' ? '' : 'warning') || undefined">
                     {{ data.direction === 'debit' ? '借' : '贷' }}
                   </el-tag>
                   <span class="node-level">L{{ data.level }}</span>
@@ -584,7 +584,9 @@ const FILE_TYPE_LABELS: Record<string, string> = {
   unknown: '未识别类型',
 }
 
-const FILE_TYPE_TAG: Record<string, string> = {
+type _TagType = '' | 'success' | 'warning' | 'info' | 'primary' | 'danger'
+
+const FILE_TYPE_TAG: Record<string, _TagType> = {
   account_chart: 'success',
   ledger: 'primary',
   balance: 'warning',
@@ -597,13 +599,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   revenue: '收入类', expense: '费用类',
 }
 
-const CATEGORY_TAG_TYPES: Record<string, string> = {
+const CATEGORY_TAG_TYPES: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
   asset: '', liability: 'warning', equity: 'success',
   revenue: 'primary', expense: 'danger',
 }
 
 const fileTypeLabel = ref('')
-const fileTypeTagType = ref('')
+const fileTypeTagType = ref<_TagType>('')
 
 // Computed: current active sheet data
 const activeSheet = computed(() => previewSheets.value[activeSheetIdx.value] || null)
@@ -665,7 +667,7 @@ async function onSheetChange(idx: number) {
 }
 
 function categoryLabel(cat: string): string { return CATEGORY_LABELS[cat] || cat }
-function categoryTagType(cat: string): string { return CATEGORY_TAG_TYPES[cat] || '' }
+function categoryTagType(cat: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined { return CATEGORY_TAG_TYPES[cat] || undefined }
 
 function dataTypeLabel(dt: string): string {
   const m: Record<string, string> = {
@@ -695,9 +697,9 @@ function isSheetOk(d: SheetDiagnostic): boolean {
   return d.guessed_type !== 'unknown' && d.guessed_type !== 'empty' && d.missing_cols.length === 0 && d.row_count > 0
 }
 
-function sheetTagType(t: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+function sheetTagType(t: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
   if (t === 'balance' || t === 'ledger' || t === 'aux_balance' || t === 'aux_ledger') return 'success'
-  if (t === 'account_chart') return ''
+  if (t === 'account_chart') return undefined
   if (t === 'empty') return 'info'
   return 'warning'
 }

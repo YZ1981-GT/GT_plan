@@ -28,7 +28,7 @@
       </el-table-column>
       <el-table-column prop="status" label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'pending' ? 'warning' : row.status === 'replied' ? '' : 'success'" size="small">
+          <el-tag :type="(row.status === 'pending' ? 'warning' : row.status === 'replied' ? '' : 'success') || undefined" size="small">
             {{ row.status === 'pending' ? '待处理' : row.status === 'replied' ? '已回复' : '已解决' }}
           </el-tag>
         </template>

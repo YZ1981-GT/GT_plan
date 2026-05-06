@@ -82,7 +82,7 @@
       </el-table-column>
       <el-table-column label="类别" width="100">
         <template #default="{ row }">
-          <el-tag size="small" :type="categoryTagType(row.cash_flow_category)">
+          <el-tag size="small" :type="(categoryTagType(row.cash_flow_category)) || undefined">
             {{ categoryLabel(row.cash_flow_category) }}
           </el-tag>
         </template>
@@ -214,8 +214,8 @@ function categoryLabel(c: string) {
   return m[c] || c
 }
 
-function categoryTagType(c: string) {
-  const m: Record<string, string> = { operating: '', investing: 'success', financing: 'warning', supplementary: 'info' }
+function categoryTagType(c: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { operating: '', investing: 'success', financing: 'warning', supplementary: 'info' }
   return m[c] || 'info'
 }
 

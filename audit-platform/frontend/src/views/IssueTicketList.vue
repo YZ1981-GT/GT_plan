@@ -27,17 +27,17 @@
       <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
       <el-table-column prop="source" label="来源" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="sourceTagType(row.source)" size="small">{{ sourceLabel(row.source) }}</el-tag>
+          <el-tag :type="(sourceTagType(row.source)) || undefined" size="small">{{ sourceLabel(row.source) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="severity" label="严重度" width="80" align="center">
         <template #default="{ row }">
-          <el-tag :type="severityTagType(row.severity)" size="small">{{ severityLabel(row.severity) }}</el-tag>
+          <el-tag :type="(severityTagType(row.severity)) || undefined" size="small">{{ severityLabel(row.severity) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="status" label="状态" width="90" align="center">
         <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+          <el-tag :type="(statusTagType(row.status)) || undefined" size="small">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="SLA 倒计时" width="120" align="center">
@@ -116,7 +116,7 @@ function handleRowClick(row: IssueTicket) {
   }
 }
 
-function sourceTagType(s: string) {
+function sourceTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (s === 'Q') return 'danger'
   if (s === 'L3') return 'warning'
   if (s === 'review_comment') return 'info'
@@ -138,7 +138,7 @@ function sourceLabel(s: string): string {
   }
   return m[s] || s
 }
-function severityTagType(s: string) {
+function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (s === 'blocker') return 'danger'
   if (s === 'major') return 'warning'
   return 'info'
@@ -147,7 +147,7 @@ function severityLabel(s: string) {
   const m: Record<string, string> = { blocker: '阻断', major: '重大', minor: '一般', suggestion: '建议' }
   return m[s] || s
 }
-function statusTagType(s: string) {
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (s === 'closed') return 'success'
   if (s === 'rejected') return 'danger'
   if (s === 'open') return 'warning'

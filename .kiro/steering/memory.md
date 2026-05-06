@@ -54,7 +54,7 @@ inclusion: always
 
 ## 当前系统状态（2026-05-05 实测核对）
 
-- vue-tsc 90 个预存错误（非本 spec 引入，el-tag 类型联合/checkbox 值扩宽/tree filter-method 签名），Vite 构建通过
+- vue-tsc 0 错误（2026-05-06 全部修复：el-tag type 联合类型标注 + dictStore.type() 返回类型收窄 + 模板 `:type` 绑定加 `|| undefined`），Vite 构建通过
 - 后端 127 个路由文件，181 个服务文件（含子目录 import_engine/、wp_scripts/），39 个模型文件，11 个 core 模块，9 个 middleware，~152 张表
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
@@ -136,6 +136,10 @@ inclusion: always
 - 年度独立性声明：独立表 `annual_independence_declarations`（R1 通用表落地前的过渡方案），唯一约束 `(declarant_id, declaration_year)`；问题集 backend/data/independence_questions_annual.json（32 题）是唯一真源，Python 侧不再维护副本
 - EqcrMetrics.vue 路由 /eqcr/metrics 已注册，后端加 admin/partner 角色守卫；DefaultLayout #nav-eqcr 插槽内挂两个按钮（独立复核工作台 + EQCR 指标）
 - apiProxy 实际路径 `@/services/apiProxy`（不是 `@/utils/apiProxy`）；默认导出和命名导出 `{ api }` 都可用；memory 此前记录有误已更正
+- `stores/auth.ts` login 方法：后端返回 `{code, message, data: {access_token, refresh_token, user}}`，authHttp（原始 axios）不经过 apiProxy 解包，需 `data.data ?? data` 取 payload
+- `apiPaths.ts` 新增 `signatures`（/api/signatures/*）和 `rotation`（/api/rotation/*）导出（R1 需求 4/11 前端 service 依赖）
+- 新 PG 库初始化流程：`python scripts/_init_tables.py`（需先 `pip install psycopg2-binary`）→ 手动建 admin 用户（INSERT 需含 email 字段 NOT NULL）
+- `backend/migrations/V003__example_add_comment.sql` 已修复 `DO $` → `DO $$`（PG dollar-quoting 语法）
 - User 模型无 metadata_ JSONB 字段；需要"用户级元数据"时应建独立表（如 annual_independence_declarations），不污染 User 表
 - StaffMember 用 `employee_no`（不是 `employee_id`）作为工号字段
 - WorkHour.status 是 String(20) 非 enum，可自由塞业务值（R5 用 'tracking' 表示计时中）
@@ -157,7 +161,9 @@ inclusion: always
 - 用真实审计项目进行用户验收测试（UAT）
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
-- 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
+- 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5 → R6，依据 README v2.2 "跨轮依赖矩阵"
+- Round 6 三件套已完成（requirements+design+tasks），主题"跨角色系统级优化"，7 需求 / 18 任务 / 2 Sprint；设计阶段发现 R1 已落地 readiness_facade + ArchiveOrchestrator，需求 1/2 工作量大幅缩减
+- R6 一致性复核发现：(1) 旧归档端点 A/B/C 的 deprecated 标记已由 R1 实装（`deprecated=True` + `X-Deprecated` 头），R6 仅需改为标准 `Deprecation` 头；(2) `apiPaths.ts` 整个 `archive` 对象（不仅 `archive.archive`）全指向不存在的 `/api/archive/...`，需整体重写为 `/api/projects/.../archive/...`；(3) ThreeColumnLayout 无 `developing` maturity badge 样式，需新增；(4) `ruff` 未安装需加入 requirements.txt
 - Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
 - Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，122 个 EQCR 测试全通过；关键修复：(1) gate_engine.evaluate 加 `await db.flush()` 修复 gate_decision.id NULL 导致 trace_events 插入失败；(2) sign_service._transition_report_status 加 `await db.flush()` 让状态变更对 refresh 可见；(3) Task 23 年度独立性声明改为独立表 `annual_independence_declarations`（R1 通用表未落地前的过渡方案，migration round5_independence_20260506）；(4) Task 18 备忘录接入 python-docx + LibreOffice PDF 管线，`build_memo_docx_bytes` 纯函数生成 docx，`eqcr_memo_pdf_generator` 归档章节生成器预留；(5) Task 24 年度声明变成真实阻断（router 守卫 + 工作台 load 阻塞）；(6) Task 15 客户名归一化 `client_lookup.normalize_client_name` 兼容"XX集团"vs"XX集团有限公司"；(7) Task 22 CompetenceRating 枚举值修正为 reliable/unreliable（原先误用 A/D）；(8) Task 20 metrics 端点加 admin/partner 角色守卫；(9) EqcrProjectView 加 EQCR 审批/解锁按钮，approve 前强制检查历年对比差异原因；(10) 新增 test_eqcr_full_flow / test_eqcr_state_machine_properties / test_eqcr_component_auditor_review / test_eqcr_memo_docx / test_client_lookup 五个测试文件；(11) 归档章节 '02-EQCR备忘录.pdf' 待 R1 archive_section_registry 落地后通过 `register('02', 'eqcr_memo.pdf', eqcr_memo_pdf_generator)` 注册
 

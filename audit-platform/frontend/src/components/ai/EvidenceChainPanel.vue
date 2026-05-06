@@ -167,8 +167,8 @@ const nodeDefinitions: Record<string, Array<{ icon: string; label: string; statu
   ],
 }
 
-async function handleTabChange(tab: string) {
-  currentTab.value = tab
+async function handleTabChange(tab: string | number | boolean | undefined) {
+  currentTab.value = String(tab)
   await loadData()
 }
 

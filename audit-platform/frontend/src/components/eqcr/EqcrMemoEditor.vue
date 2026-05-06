@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <el-empty v-if="!memo && !loading" description="备忘录尚未生成，请点击"生成备忘录"">
+    <el-empty v-if="!memo && !loading" description="备忘录尚未生成，请点击「生成备忘录」">
     </el-empty>
 
     <div v-if="loading" v-loading="true" style="min-height: 200px"></div>

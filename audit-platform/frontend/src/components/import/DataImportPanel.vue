@@ -71,7 +71,7 @@
       </template>
 
       <div class="progress-info">
-        <el-tag :type="statusTagType(currentProgress.status)" size="large">
+        <el-tag :type="(statusTagType(currentProgress.status)) || undefined" size="large">
           {{ statusLabel(currentProgress.status) }}
         </el-tag>
         <span style="margin-left: 12px">
@@ -125,7 +125,7 @@
         <el-table-column prop="record_count" label="记录数" width="80" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="small">
+            <el-tag :type="(statusTagType(row.status)) || undefined" size="small">
               {{ statusLabel(row.status) }}
             </el-tag>
           </template>
@@ -301,8 +301,8 @@ async function handleRollback(batchId: string) {
   }
 }
 
-function statusTagType(status: string) {
-  const map: Record<string, string> = {
+function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     pending: 'info',
     processing: 'warning',
     completed: 'success',

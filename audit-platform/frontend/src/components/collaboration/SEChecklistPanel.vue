@@ -14,7 +14,7 @@
       </el-table-column>
       <el-table-column prop="check_status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="statusColor(row.check_status)" size="small">{{ statusLabel(row.check_status) }}</el-tag>
+          <el-tag :type="(statusColor(row.check_status)) || undefined" size="small">{{ statusLabel(row.check_status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="checked_by_username" label="检查人" width="100" />
@@ -106,9 +106,9 @@ const statusLabel = (s: string) => ({
   pending: '待检查', pass: '通过', fail: '未通过', na: '不适用',
 }[s] || s)
 
-const statusColor = (s: string) => ({
+const statusColor = (s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' => ({
   pending: 'info', pass: 'success', fail: 'danger', na: 'warning',
-}[s] || 'info')
+} as Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'>)[s] || 'info'
 
 const loadItems = async () => {
   if (!props.projectId) return

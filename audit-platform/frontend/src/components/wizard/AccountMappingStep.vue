@@ -109,7 +109,7 @@
         <template #default="{ row }">
           <el-tag
             v-if="row.match_method"
-            :type="matchTagType(row.match_method)"
+            :type="(matchTagType(row.match_method)) || undefined"
             size="small"
           >
             {{ matchMethodLabel(row.match_method) }}

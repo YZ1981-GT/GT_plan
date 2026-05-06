@@ -11,7 +11,7 @@
         <el-card shadow="never" class="gt-sig-card">
           <div class="gt-sig-info">
             <span class="gt-sig-signer">{{ r.signer_name || r.signer_id }}</span>
-            <el-tag size="small" :type="levelType(r.signature_level)">{{ levelLabel(r.signature_level) }}</el-tag>
+            <el-tag size="small" :type="(levelType(r.signature_level)) || undefined">{{ levelLabel(r.signature_level) }}</el-tag>
           </div>
           <div class="gt-sig-meta">
             <span v-if="r.ip_address">IP: {{ r.ip_address }}</span>
@@ -43,8 +43,8 @@ async function loadRecords() {
   } catch { records.value = [] }
 }
 
-function levelType(l: string) {
-  const m: Record<string, string> = { level1: 'primary', level2: 'success', level3: 'warning' }
+function levelType(l: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { level1: 'primary', level2: 'success', level3: 'warning' }
   return m[l] || 'info'
 }
 function levelLabel(l: string) {

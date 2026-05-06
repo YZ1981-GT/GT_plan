@@ -16,7 +16,7 @@
         <template #header>
           <div class="gt-card-head">
             <span class="gt-card-name">{{ t.template_name }}</span>
-            <el-tag size="small" :type="categoryTag(t.category)">{{ categoryLabel(t.category) }}</el-tag>
+            <el-tag size="small" :type="(categoryTag(t.category)) || undefined">{{ categoryLabel(t.category) }}</el-tag>
           </div>
         </template>
         <p class="gt-card-desc">{{ t.description || '暂无描述' }}</p>
@@ -69,8 +69,8 @@ function previewTemplate(_t: any) {
   ElMessage.info('模板预览功能开发中')
 }
 
-function categoryTag(c: string) {
-  const m: Record<string, string> = { industry: '', client: 'success', personal: 'warning' }
+function categoryTag(c: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const m: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = { industry: undefined, client: 'success', personal: 'warning' }
   return m[c] || 'info'
 }
 function categoryLabel(c: string) {

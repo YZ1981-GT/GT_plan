@@ -47,7 +47,7 @@
           <div class="gt-ar-nav-info">
             <el-tag size="small">{{ opinionLabel(report.opinion_type) }}</el-tag>
             <el-tag size="small" type="info">{{ report.company_type === 'listed' ? '上市公司' : '非上市' }}</el-tag>
-            <el-tag size="small" :type="statusTagType(report.status)">{{ statusLabel(report.status) }}</el-tag>
+            <el-tag size="small" :type="(statusTagType(report.status)) || undefined">{{ statusLabel(report.status) }}</el-tag>
           </div>
           <el-menu :default-active="activeSection" @select="onSectionSelect" class="gt-ar-section-menu">
             <el-menu-item v-for="s in sectionNames" :key="s" :index="s">
@@ -239,8 +239,8 @@ function statusLabel(s: string) {
   return dictStore.label('report_status', s)
 }
 
-function statusTagType(s: string) {
-  return dictStore.type('report_status', s)
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  return dictStore.type('report_status', s) as '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'
 }
 
 function onSectionSelect(s: string) { activeSection.value = s }

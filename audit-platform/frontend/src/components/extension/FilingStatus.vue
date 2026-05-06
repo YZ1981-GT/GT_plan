@@ -1,6 +1,6 @@
 <template>
   <div class="gt-filing-status">
-    <el-tag :type="tagType" size="small">{{ label }}</el-tag>
+    <el-tag :type="(tagType) || undefined" size="small">{{ label }}</el-tag>
     <div class="gt-filing-times" v-if="submittedAt || respondedAt">
       <span v-if="submittedAt" class="gt-time">提交: {{ fmtTime(submittedAt) }}</span>
       <span v-if="respondedAt" class="gt-time">响应: {{ fmtTime(respondedAt) }}</span>
@@ -17,8 +17,8 @@ const props = defineProps<{
   respondedAt?: string
 }>()
 
-const tagType = computed(() => {
-  const m: Record<string, string> = {
+const tagType = computed((): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' => {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     submitted: '',
     pending: 'warning',
     approved: 'success',

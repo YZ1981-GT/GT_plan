@@ -6,7 +6,7 @@
         <el-button text @click="goBack">← 返回</el-button>
         <span class="gt-wp-editor-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name" v-if="wpDetail">{{ wpDetail.wp_name }}</span>
-        <el-tag v-if="wpDetail" :type="statusTagType(wpDetail.status)" size="small">
+        <el-tag v-if="wpDetail" :type="(statusTagType(wpDetail.status)) || undefined" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
         <el-tag type="success" size="small" style="margin-left: 8px">Univer</el-tag>
@@ -215,8 +215,8 @@ let univerAPI: any = null
 const smartTip = ref<any>(null)
 const showSmartTipDetail = ref(false)
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = {
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     not_started: 'info', in_progress: 'warning', draft: 'warning',
     draft_complete: '', edit_complete: '', review_passed: 'success', archived: 'info',
   }

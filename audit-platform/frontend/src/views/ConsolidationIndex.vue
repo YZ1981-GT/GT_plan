@@ -9,7 +9,7 @@
         :template-value="projectInfo.standard"
         :badges="[{ label: '单位', value: displayPrefs.unitSuffix }]"
         @year-change="(y: number) => { projectInfo.year = y; onYearChange() }"
-        @template-change="(s: string) => { projectInfo.standard = s; onStandardChange() }"
+        @template-change="(s: string) => { projectInfo.standard = s as 'soe' | 'listed'; onStandardChange() }"
       />
       <template #actions>
         <GtToolbar

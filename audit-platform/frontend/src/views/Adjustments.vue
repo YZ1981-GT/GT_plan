@@ -110,7 +110,7 @@
       </el-table-column>
       <el-table-column prop="review_status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag size="small" :type="dictStore.type('adjustment_status', row.review_status)">{{ dictStore.label('adjustment_status', row.review_status) }}</el-tag>
+          <el-tag size="small" :type="(dictStore.type('adjustment_status', row.review_status)) || undefined">{{ dictStore.label('adjustment_status', row.review_status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">

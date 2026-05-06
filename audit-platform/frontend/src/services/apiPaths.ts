@@ -51,6 +51,7 @@ export const adjustments = {
   summary: (pid: string) => `/api/projects/${pid}/adjustments/summary`,
   accountDropdown: (pid: string) => `/api/projects/${pid}/adjustments/account-dropdown`,
   exportSummary: (pid: string) => `/api/projects/${pid}/adjustments/export-summary`,
+  convertToMisstatement: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/convert-to-misstatement`,
 } as const
 
 // ─── 重要性 ─────────────────────────────────────────────────────────────────
@@ -1009,6 +1010,23 @@ export const eqcr = {
   noteShare: (noteId: string) => `/api/eqcr/notes/${noteId}/share-to-team`,
 } as const
 
+// ─── 签字流水线（Round 1 需求 4） ────────────────────────────────────────────
+
+export const signatures = {
+  sign: '/api/signatures/sign',
+  workflow: (pid: string) => `/api/projects/${pid}/signature-workflow`,
+  list: (objectType: string, objectId: string) => `/api/signatures/${objectType}/${objectId}`,
+  verify: (sigId: string) => `/api/signatures/${sigId}/verify`,
+  revoke: (sigId: string) => `/api/signatures/${sigId}/revoke`,
+} as const
+
+// ─── 合伙人轮换检查（Round 1 需求 11） ──────────────────────────────────────
+
+export const rotation = {
+  check: '/api/rotation/check',
+  overrides: '/api/rotation/overrides',
+} as const
+
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
 
 export const API = {
@@ -1025,7 +1043,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  admin, partner, qcDashboard, jobs, governance, eqcr,
+  admin, partner, qcDashboard, jobs, governance, eqcr, signatures, rotation,
 } as const
 
 export default API

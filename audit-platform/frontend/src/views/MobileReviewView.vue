@@ -22,7 +22,7 @@
         @click="toggleExpand(op.id)"
       >
         <div class="gt-mr-card-header">
-          <el-tag :type="statusType(op.status)" size="small">{{ statusLabel(op.status) }}</el-tag>
+          <el-tag :type="(statusType(op.status)) || undefined" size="small">{{ statusLabel(op.status) }}</el-tag>
           <span class="gt-mr-card-title">{{ op.title || op.message?.substring(0, 30) || '复核意见' }}</span>
           <el-icon :size="14" style="margin-left: auto">
             <ArrowDown v-if="expandedId !== op.id" />
@@ -66,8 +66,8 @@ function toggleExpand(id: string) {
   expandedId.value = expandedId.value === id ? null : id
 }
 
-function statusType(s: string) {
-  return { open: 'danger', replied: 'warning', resolved: 'success' }[s] || 'info'
+function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  return ({ open: 'danger', replied: 'warning', resolved: 'success' } as Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'>)[s] || 'info'
 }
 
 function statusLabel(s: string) {

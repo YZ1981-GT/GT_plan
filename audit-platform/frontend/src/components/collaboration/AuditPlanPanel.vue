@@ -3,7 +3,7 @@
     <div class="panel-header">
       <span class="panel-title">审计计划</span>
       <div class="header-actions">
-        <el-tag v-if="plan?.status" :type="statusTagType(plan.status)" size="small">
+        <el-tag v-if="plan?.status" :type="(statusTagType(plan.status)) || undefined" size="small">
           {{ statusLabel(plan.status) }}
         </el-tag>
         <el-button
@@ -237,8 +237,8 @@ function statusLabel(status: string): string {
   return labels[status] || status
 }
 
-function statusTagType(status: string): string {
-  const types: Record<string, string> = {
+function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const types: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     draft: 'info',
     submitted: 'warning',
     approved: 'success',

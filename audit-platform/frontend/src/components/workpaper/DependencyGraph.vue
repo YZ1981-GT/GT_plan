@@ -48,7 +48,7 @@
           <span class="gt-dep-node-label">{{ cycleName }}实质性程序</span>
         </div>
         <div v-if="impactLabel" class="gt-dep-impact">
-          <el-tag :type="impactType" size="small">{{ impactLabel }}</el-tag>
+          <el-tag :type="(impactType) || undefined" size="small">{{ impactLabel }}</el-tag>
           <span class="gt-dep-impact-text">{{ impactSuggestion }}</span>
         </div>
       </div>

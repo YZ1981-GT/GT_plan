@@ -18,7 +18,7 @@
       <el-table-column prop="template_name" label="模板名称" min-width="200" show-overflow-tooltip />
       <el-table-column prop="category" label="分类" width="100" align="center">
         <template #default="{ row }">
-          <el-tag size="small" :type="categoryTag(row.category)">{{ categoryLabel(row.category) }}</el-tag>
+          <el-tag size="small" :type="(categoryTag(row.category)) || undefined">{{ categoryLabel(row.category) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="version" label="版本" width="80" align="center" />
@@ -101,8 +101,8 @@ async function deleteTemplate(row: any) {
   } catch { /* cancelled */ }
 }
 
-function categoryTag(c: string) {
-  const m: Record<string, string> = { industry: '', client: 'success', personal: 'warning' }
+function categoryTag(c: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const m: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = { industry: undefined, client: 'success', personal: 'warning' }
   return m[c] || 'info'
 }
 function categoryLabel(c: string) {

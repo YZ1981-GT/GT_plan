@@ -24,7 +24,7 @@
             <span style="font-size:12px">▼</span>
           </el-button>
         </el-button-group>
-        <el-checkbox :model-value="caseSensitive" @update:model-value="$emit('update:caseSensitive', $event); $emit('search')" size="small" class="gt-search-case">Aa</el-checkbox>
+        <el-checkbox :model-value="caseSensitive" @update:model-value="$emit('update:caseSensitive', !!$event); $emit('search')" size="small" class="gt-search-case">Aa</el-checkbox>
         <el-button v-if="showReplace" size="small" class="gt-search-replace-btn" @click="replaceVisible = !replaceVisible">
           {{ replaceVisible ? '收起' : '替换' }}
         </el-button>

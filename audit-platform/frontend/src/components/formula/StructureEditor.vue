@@ -347,8 +347,8 @@ const saving = ref(false)
 const sheetNames = ref<string[]>([])
 const activeSheetIndex = ref('0')
 
-async function onSheetChange(idx: string) {
-  activeSheetIndex.value = idx
+async function onSheetChange(idx: string | number) {
+  activeSheetIndex.value = String(idx)
   await loadContent()
 }
 

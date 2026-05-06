@@ -394,6 +394,7 @@ class TbAuxBalance(Base):
     company_code: Mapped[str] = mapped_column(String, nullable=False)
     account_code: Mapped[str] = mapped_column(String, nullable=False)
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    level: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     aux_type: Mapped[str] = mapped_column(String, nullable=False)
     aux_type_name: Mapped[str | None] = mapped_column(String, nullable=True)  # 核算项目类型名称
     aux_code: Mapped[str | None] = mapped_column(String, nullable=True)

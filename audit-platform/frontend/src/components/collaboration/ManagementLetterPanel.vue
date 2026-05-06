@@ -17,7 +17,7 @@
       <el-table-column prop="item_code" label="事项编号" width="160" />
       <el-table-column prop="deficiency_type" label="缺陷类型" width="140">
         <template #default="{ row }">
-          <el-tag :type="deficiencyTag(row.deficiency_type)" size="small">
+          <el-tag :type="(deficiencyTag(row.deficiency_type)) || undefined" size="small">
             {{ formatDeficiencyType(row.deficiency_type) }}
           </el-tag>
         </template>
@@ -32,7 +32,7 @@
       </el-table-column>
       <el-table-column prop="follow_up_status" label="跟踪状态" width="110">
         <template #default="{ row }">
-          <el-tag :type="followUpTag(row.follow_up_status)" size="small">
+          <el-tag :type="(followUpTag(row.follow_up_status)) || undefined" size="small">
             {{ followUpLabel(row.follow_up_status) }}
           </el-tag>
         </template>
@@ -117,7 +117,7 @@
     <el-dialog append-to-body v-model="showFollowUpDialog" title="更新跟踪状态" width="500px">
       <el-form label-width="120px">
         <el-form-item label="当前状态">
-          <el-tag :type="followUpTag(selectedItem?.follow_up_status)" size="small">
+          <el-tag :type="(followUpTag(selectedItem?.follow_up_status)) || undefined" size="small">
             {{ followUpLabel(selectedItem?.follow_up_status) }}
           </el-tag>
         </el-form-item>
@@ -226,8 +226,8 @@ const unresolvedCount = computed(() => items.value.filter(i => i.follow_up_statu
 const inProgressCount = computed(() => items.value.filter(i => i.follow_up_status === 'in_progress').length)
 const resolvedCount = computed(() => items.value.filter(i => i.follow_up_status === 'resolved').length)
 
-function deficiencyTag(type: string): string {
-  const map: Record<string, string> = {
+function deficiencyTag(type: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     material_weakness: 'danger',
     significant_deficiency: 'warning',
     other_deficiency: 'info',
@@ -244,8 +244,8 @@ function formatDeficiencyType(type: string): string {
   return map[type] || type
 }
 
-function followUpTag(status: string | undefined): string {
-  const map: Record<string, string> = {
+function followUpTag(status: string | undefined): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     new: 'info',
     in_progress: 'warning',
     resolved: 'success',

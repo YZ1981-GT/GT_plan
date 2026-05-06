@@ -62,7 +62,7 @@
         <el-table-column label="审计循环" prop="audit_cycle" width="100" />
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="bucketTagType(row.bucket)" size="small">{{ bucketLabel(row.bucket) }}</el-tag>
+            <el-tag :type="(bucketTagType(row.bucket)) || undefined" size="small">{{ bucketLabel(row.bucket) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="80">
@@ -238,8 +238,8 @@ function bucketLabel(b: string) {
   const m: Record<string, string> = { not_started: '未开始', in_progress: '编制中', pending_review: '待复核', passed: '已通过' }
   return m[b] || b
 }
-function bucketTagType(b: string) {
-  const m: Record<string, string> = { not_started: 'info', in_progress: '', pending_review: 'warning', passed: 'success' }
+function bucketTagType(b: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { not_started: 'info', in_progress: '', pending_review: 'warning', passed: 'success' }
   return m[b] || ''
 }
 

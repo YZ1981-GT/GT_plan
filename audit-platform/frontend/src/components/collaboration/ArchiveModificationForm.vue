@@ -52,7 +52,7 @@
         <el-table-column prop="modification_reason" label="修改原因" min-width="200" show-overflow-tooltip />
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="approvalTagType(row.approval_status)">
+            <el-tag :type="(approvalTagType(row.approval_status)) || undefined">
               {{ approvalStatusText(row.approval_status) }}
             </el-tag>
           </template>
@@ -110,8 +110,8 @@ const approvalResultLabel = computed(() => {
     form.value.approval_status === 'REJECTED' ? '已拒绝' : ''
 })
 
-function approvalTagType(s: string) {
-  const map: Record<string, string> = {
+function approvalTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     PENDING: 'info',
     UNDER_REVIEW: 'warning',
     APPROVED: 'success',

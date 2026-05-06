@@ -186,7 +186,7 @@ watch(accountFilter, (val) => {
   accountTreeRef.value?.filter(val)
 })
 
-function filterAccountNode(value: string, data: TreeNode) {
+function filterAccountNode(value: string, data: any, node: any) {
   if (!value) return true
   return data.label.toLowerCase().includes(value.toLowerCase())
 }

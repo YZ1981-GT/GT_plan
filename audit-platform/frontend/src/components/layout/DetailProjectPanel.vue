@@ -18,7 +18,7 @@
                 <el-tag size="small">{{ typeLabel(project.project_type) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="当前状态">
-                <el-tag :type="statusTagType(project.status)" size="small">
+                <el-tag :type="(statusTagType(project.status)) || undefined" size="small">
                   {{ statusLabel(project.status) }}
                 </el-tag>
               </el-descriptions-item>
@@ -423,8 +423,8 @@ function typeLabel(t: string) {
   const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }
   return m[t] || t || '-'
 }
-function statusTagType(s: string) {
-  const m: Record<string, string> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
   return m[s] || 'info'
 }
 function statusLabel(s: string) {

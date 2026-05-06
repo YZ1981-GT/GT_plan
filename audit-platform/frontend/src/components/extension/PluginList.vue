@@ -12,7 +12,7 @@
       <template #default="{ row }">
         <el-switch
           :model-value="row.is_enabled"
-          @change="(v: boolean) => togglePlugin(row, v)"
+          @change="(v: string | number | boolean) => togglePlugin(row, !!v)"
           :loading="row._toggling"
           active-text="启用"
           inactive-text="禁用"

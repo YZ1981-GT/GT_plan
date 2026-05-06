@@ -35,7 +35,7 @@
       <el-table-column prop="procedure_name" label="程序名称" min-width="180" show-overflow-tooltip />
       <el-table-column prop="procedure_type" label="类型" width="110">
         <template #default="{ row }">
-          <el-tag size="small" :type="procedureTypeTag(row.procedure_type)">
+          <el-tag size="small" :type="(procedureTypeTag(row.procedure_type)) || undefined">
             {{ formatProcedureType(row.procedure_type) }}
           </el-tag>
         </template>
@@ -249,8 +249,8 @@ const completionRate = computed(() => {
   return Math.round((completedCount.value / procedures.value.length) * 100)
 })
 
-function procedureTypeTag(type: string): string {
-  const map: Record<string, string> = {
+function procedureTypeTag(type: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     risk_assessment: 'info',
     control_test: 'warning',
     substantive: 'success',

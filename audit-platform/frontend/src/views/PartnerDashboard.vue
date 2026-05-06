@@ -109,7 +109,7 @@
           <el-table-column label="项目" prop="name" min-width="180" />
           <el-table-column label="状态" width="80">
             <template #default="{ row }">
-              <el-tag size="small" :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+              <el-tag size="small" :type="(statusType(row.status)) || undefined">{{ statusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="完成率" width="130">
@@ -379,7 +379,7 @@ function statusLabel(s: string) {
   const m: Record<string, string> = { created: '已创建', planning: '计划中', execution: '执行中', completion: '完成中', reporting: '报告中', archived: '已归档' }
   return m[s] || s
 }
-function statusType(s: string) {
+function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (s === 'archived') return 'success'
   if (s === 'execution') return ''
   if (s === 'reporting' || s === 'completion') return 'warning'

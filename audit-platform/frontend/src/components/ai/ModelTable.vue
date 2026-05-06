@@ -8,7 +8,7 @@
     </el-table-column>
     <el-table-column label="供应商" prop="provider" width="130">
       <template #default="{ row }">
-        <el-tag :type="providerTag(row.provider)" size="small" effect="plain">
+        <el-tag :type="(providerTag(row.provider)) || undefined" size="small" effect="plain">
           {{ providerLabel(row.provider) }}
         </el-tag>
       </template>
@@ -69,8 +69,8 @@ function providerLabel(p: AIProvider): string {
   return map[p] ?? p
 }
 
-function providerTag(p: AIProvider): string {
-  const map: Record<string, string> = {
+function providerTag(p: AIProvider): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     ollama: '',
     openai_compatible: 'warning',
     paddleocr: 'info',

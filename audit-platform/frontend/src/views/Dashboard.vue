@@ -56,7 +56,7 @@
             <el-table-column prop="client_name" label="客户" min-width="120" />
             <el-table-column prop="status" label="状态" width="100" align="center">
               <template #default="{ row }">
-                <el-tag :type="statusType(row.status)" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
+                <el-tag :type="(statusType(row.status)) || undefined" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
               </template>
             </el-table-column>
           </el-table>

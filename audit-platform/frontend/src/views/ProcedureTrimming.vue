@@ -57,7 +57,7 @@
       <el-table-column prop="wp_code" label="关联底稿" width="100" />
       <el-table-column label="执行状态" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="execTagType(row.execution_status)" size="small">
+          <el-tag :type="(execTagType(row.execution_status)) || undefined" size="small">
             {{ execLabel(row.execution_status) }}
           </el-tag>
         </template>
@@ -133,8 +133,8 @@ const progressStats = computed(() => {
   return { total, completed, in_progress, skipped, pending }
 })
 
-function execTagType(s: string) {
-  return { not_started: 'info', in_progress: 'warning', completed: 'success', reviewed: '' }[s] || 'info'
+function execTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  return ({ not_started: 'info', in_progress: 'warning', completed: 'success', reviewed: '' } as Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'>)[s] || 'info'
 }
 function execLabel(s: string) {
   return { not_started: '未开始', in_progress: '进行中', completed: '已完成', reviewed: '已复核' }[s] || s

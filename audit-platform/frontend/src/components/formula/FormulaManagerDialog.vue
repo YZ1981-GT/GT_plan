@@ -120,7 +120,7 @@
                 <el-option label="逻辑审核" value="logic_check" />
                 <el-option label="合理性" value="reasonability" />
               </el-select>
-              <el-tag v-else :type="categoryTagType(row.formula_category)" size="small">
+              <el-tag v-else :type="(categoryTagType(row.formula_category)) || undefined" size="small">
                 {{ categoryLabel(row.formula_category) }}
               </el-tag>
             </template>
@@ -264,7 +264,7 @@
             </el-table-column>
             <el-table-column label="分类" width="90" align="center">
               <template #default="{ row }">
-                <el-tag :type="categoryTagType(row.formula_category)" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
+                <el-tag :type="(categoryTagType(row.formula_category)) || undefined" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
@@ -294,7 +294,7 @@
         </el-table-column>
         <el-table-column label="分类" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="categoryTagType(row.formula_category)" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
+            <el-tag :type="(categoryTagType(row.formula_category)) || undefined" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
@@ -1089,7 +1089,7 @@ async function saveEdit(row: any) {
   }
 }
 
-function categoryTagType(cat: string | null) {
+function categoryTagType(cat: string | null): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (cat === 'auto_calc') return 'primary'
   if (cat === 'logic_check') return 'warning'
   if (cat === 'reasonability') return 'info'

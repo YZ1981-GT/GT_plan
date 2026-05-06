@@ -70,7 +70,7 @@
 
     <!-- 状态标签 -->
     <div class="formula-meta" v-if="hasFormula || isMerged || hasFetchRule">
-      <el-tag v-if="hasFormula" size="small" :type="formulaTypeColor" effect="plain" title="公式类型">{{ formulaTypeLabel || '公式' }}</el-tag>
+      <el-tag v-if="hasFormula" size="small" :type="(formulaTypeColor) || undefined" effect="plain" title="公式类型">{{ formulaTypeLabel || '公式' }}</el-tag>
       <el-tag v-if="isMerged" size="small" type="warning" effect="plain">合并{{ mergeRange }}</el-tag>
       <el-tag v-if="hasFetchRule" size="small" type="info" effect="plain">🔗取数</el-tag>
     </div>
@@ -149,7 +149,7 @@ const formulaTypeLabel = computed(() => {
   return map[formulaType.value] || formulaType.value
 })
 
-const formulaTypeColor = computed(() => {
+const formulaTypeColor = computed((): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' => {
   if (formulaType.value === 'cross_table') return 'warning'
   if (formulaType.value === 'vertical_sum') return ''
   return 'info'

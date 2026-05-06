@@ -82,7 +82,7 @@
             </el-table-column>
             <el-table-column label="状态" width="90">
               <template #default="{ row }">
-                <el-tag :type="statusTagType(row.status)" size="small">{{ taskStatusLabel(row.status) }}</el-tag>
+                <el-tag :type="(statusTagType(row.status)) || undefined" size="small">{{ taskStatusLabel(row.status) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="大小" width="100">
@@ -131,8 +131,8 @@ function taskStatusLabel(s: string) {
   return m[s] || s
 }
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = { queued: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { queued: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
   return m[s] || 'info'
 }
 

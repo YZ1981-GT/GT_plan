@@ -45,7 +45,7 @@
       <el-table-column prop="standard_account_code" label="标准科目编码" width="150" />
       <el-table-column label="报表类型" width="130">
         <template #default="{ row }">
-          <el-tag :type="reportTypeTag(row.report_type)" size="small">
+          <el-tag :type="(reportTypeTag(row.report_type)) || undefined" size="small">
             {{ reportTypeLabel(row.report_type) }}
           </el-tag>
         </template>
@@ -62,7 +62,7 @@
       </el-table-column>
       <el-table-column label="映射类型" width="120">
         <template #default="{ row }">
-          <el-tag :type="mappingTypeTag(row.mapping_type)" size="small">
+          <el-tag :type="(mappingTypeTag(row.mapping_type)) || undefined" size="small">
             {{ mappingTypeLabel(row.mapping_type) }}
           </el-tag>
         </template>
@@ -239,9 +239,9 @@ function reportTypeLabel(type: string): string {
   return labels[type] || type
 }
 
-function reportTypeTag(type: string): string {
-  const tags: Record<string, string> = {
-    balance_sheet: '',
+function reportTypeTag(type: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const tags: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = {
+    balance_sheet: undefined,
     income_statement: 'success',
     cash_flow: 'warning',
   }
@@ -257,10 +257,10 @@ function mappingTypeLabel(type: string): string {
   return labels[type] || type
 }
 
-function mappingTypeTag(type: string): string {
-  const tags: Record<string, string> = {
+function mappingTypeTag(type: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const tags: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = {
     ai_suggested: 'info',
-    manual: '',
+    manual: undefined,
     reference_copied: 'warning',
   }
   return tags[type] || 'info'

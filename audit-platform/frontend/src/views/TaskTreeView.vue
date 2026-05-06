@@ -46,7 +46,7 @@
         <el-descriptions :column="1" border size="small">
           <el-descriptions-item label="层级">{{ selectedNode.node_level }}</el-descriptions-item>
           <el-descriptions-item label="状态">
-            <el-tag :type="statusTagType(selectedNode.status)" size="small">{{ selectedNode.status }}</el-tag>
+            <el-tag :type="(statusTagType(selectedNode.status)) || undefined" size="small">{{ selectedNode.status }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="负责人">{{ selectedNode.assignee_id || '未分配' }}</el-descriptions-item>
           <el-descriptions-item label="截止时间">{{ selectedNode.due_at || '无' }}</el-descriptions-item>
@@ -125,7 +125,7 @@ function handleNodeClick(data: TreeItem) {
   selectedNode.value = data
 }
 
-function statusTagType(status: string) {
+function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (status === 'blocked') return 'danger'
   if (status === 'done') return 'success'
   if (status === 'in_progress') return 'primary'

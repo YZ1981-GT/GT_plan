@@ -41,7 +41,7 @@
           <h3>复核状态分布</h3>
           <div class="review-dist">
             <div v-for="(count, status) in overview.review_distribution" :key="status" class="dist-item">
-              <el-tag :type="reviewTagType(status)" size="small">{{ reviewLabel(status) }}</el-tag>
+              <el-tag :type="(reviewTagType(status)) || undefined" size="small">{{ reviewLabel(status) }}</el-tag>
               <span class="dist-count">{{ count }}</span>
             </div>
           </div>
@@ -193,7 +193,7 @@ function reviewLabel(s: string): string {
   return m[s] || s
 }
 
-function reviewTagType(s: string): string {
+function reviewTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (s.includes('passed')) return 'success'
   if (s.includes('rejected')) return 'danger'
   if (s.includes('pending')) return 'warning'

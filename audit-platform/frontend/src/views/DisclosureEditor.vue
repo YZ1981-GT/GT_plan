@@ -274,7 +274,7 @@
         <div v-for="(f, fi) in validationFindings" :key="fi" class="gt-de-finding-item"
           :class="'gt-de-severity-' + f.severity">
           <div class="gt-de-finding-header">
-            <el-tag :type="severityTagType(f.severity)" size="small">{{ f.severity }}</el-tag>
+            <el-tag :type="(severityTagType(f.severity)) || undefined" size="small">{{ f.severity }}</el-tag>
             <span class="gt-de-finding-type">{{ f.check_type }}</span>
           </div>
           <div class="gt-de-finding-section">{{ f.note_section }} {{ f.table_name }}</div>
@@ -1005,7 +1005,7 @@ function _getPriorYearValue(_row: any, rowIndex: number): any {
   return values[0] ?? null
 }
 
-function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number) {
+function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number | undefined) {
   markEditDirty()
   if (!currentNote.value?.table_data?.rows) return
   const rows = currentNote.value.table_data.rows
@@ -1183,8 +1183,8 @@ async function onExportWord() {
   } finally { exportLoading.value = false }
 }
 
-function severityTagType(s: string) {
-  const m: Record<string, string> = { error: 'danger', warning: 'warning', info: 'info' }
+function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { error: 'danger', warning: 'warning', info: 'info' }
   return m[s] || 'info'
 }
 

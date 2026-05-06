@@ -69,7 +69,7 @@
       <el-table :data="summary.by_type" border size="small" style="margin-bottom: 16px">
         <el-table-column label="错报类型" width="150">
           <template #default="{ row }">
-            <el-tag :type="typeTagType(row.misstatement_type)" size="small">
+            <el-tag :type="(typeTagType(row.misstatement_type)) || undefined" size="small">
               {{ typeLabel(row.misstatement_type) }}
             </el-tag>
           </template>
@@ -95,7 +95,7 @@
       <el-table-column prop="misstatement_description" label="错报描述" min-width="200" show-overflow-tooltip />
       <el-table-column label="类型" width="100">
         <template #default="{ row }">
-          <el-tag :type="typeTagType(row.misstatement_type)" size="small">
+          <el-tag :type="(typeTagType(row.misstatement_type)) || undefined" size="small">
             {{ typeLabel(row.misstatement_type) }}
           </el-tag>
         </template>
@@ -206,8 +206,8 @@ function typeLabel(t: string) {
   return m[t] || t
 }
 
-function typeTagType(t: string) {
-  const m: Record<string, string> = { factual: 'danger', judgmental: 'warning', projected: 'info' }
+function typeTagType(t: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { factual: 'danger', judgmental: 'warning', projected: 'info' }
   return m[t] || 'info'
 }
 

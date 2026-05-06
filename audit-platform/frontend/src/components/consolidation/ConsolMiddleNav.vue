@@ -303,15 +303,16 @@ function onNodeClick(data: any) {
 // ─── 树形右键菜单 ────────────────────────────────────────────────────────────
 const treeContextMenu = reactive({ visible: false, x: 0, y: 0, nodeName: '', nodeData: null as any })
 
-function onNodeContextMenu(e: MouseEvent, data: any) {
-  e.preventDefault()
-  e.stopPropagation()
+function onNodeContextMenu(e: Event, data: any) {
+  const me = e as MouseEvent
+  me.preventDefault()
+  me.stopPropagation()
   if (!data.companyCode || data.isDiff) return
   treeContextMenu.nodeName = data.label || ''
   treeContextMenu.nodeData = data
   setTimeout(() => {
-    treeContextMenu.x = e.clientX
-    treeContextMenu.y = e.clientY
+    treeContextMenu.x = me.clientX
+    treeContextMenu.y = me.clientY
     treeContextMenu.visible = true
   }, 0)
 }
@@ -388,10 +389,11 @@ function openRefreshDialog(data: any) {
   showRefreshDialog.value = true
 }
 
-function onAllReportsChange(val: boolean) {
-  refreshOptions.balance_sheet = val; refreshOptions.income_statement = val
-  refreshOptions.cash_flow_statement = val; refreshOptions.equity_statement = val
-  refreshOptions.cash_flow_supplement = val; refreshOptions.impairment_provision = val
+function onAllReportsChange(val: string | number | boolean) {
+  const v = !!val
+  refreshOptions.balance_sheet = v; refreshOptions.income_statement = v
+  refreshOptions.cash_flow_statement = v; refreshOptions.equity_statement = v
+  refreshOptions.cash_flow_supplement = v; refreshOptions.impairment_provision = v
 }
 
 async function doRefresh() {

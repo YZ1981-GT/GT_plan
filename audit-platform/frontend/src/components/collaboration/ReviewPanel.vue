@@ -16,7 +16,7 @@
     >
       <el-table-column label="复核级别" width="120">
         <template #default="{ row }">
-          <el-tag :type="levelTagType(row.review_level)" size="small">
+          <el-tag :type="(levelTagType(row.review_level)) || undefined" size="small">
             {{ levelName(row.review_level) }}
           </el-tag>
         </template>
@@ -24,7 +24,7 @@
       <el-table-column label="状态" width="110">
         <template #default="{ row }">
           <el-tag
-            :type="statusTagType(row.review_status)"
+            :type="(statusTagType(row.review_status)) || undefined"
             size="small"
           >
             {{ statusName(row.review_status) }}
@@ -181,8 +181,8 @@ function levelName(level: number): string {
   return names[level] || `L${level}`
 }
 
-function levelTagType(level: number): string {
-  const types: Record<number, string> = {
+function levelTagType(level: number): 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const types: Record<number, 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     1: 'info',
     2: 'warning',
     3: 'danger',
@@ -201,8 +201,8 @@ function statusName(status: string): string {
   return names[status] || status
 }
 
-function statusTagType(status: string): string {
-  const types: Record<string, string> = {
+function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const types: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     draft: 'info',
     pending_review: 'warning',
     approved: 'success',

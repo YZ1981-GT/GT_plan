@@ -161,7 +161,7 @@
                         <template #default="{ row }"><el-tag size="small" effect="plain" round>{{ row.role }}</el-tag></template>
                       </el-table-column>
                       <el-table-column prop="status" label="状态" width="80">
-                        <template #default="{ row }"><el-tag size="small" :type="row.status === 'execution' ? '' : 'info'" effect="light" round>{{ row.status }}</el-tag></template>
+                        <template #default="{ row }"><el-tag size="small" :type="(row.status === 'execution' ? '' : 'info') || undefined" effect="light" round>{{ row.status }}</el-tag></template>
                       </el-table-column>
                     </el-table>
                   </div>
@@ -200,7 +200,7 @@
               <el-table-column prop="department" label="部门" width="120" />
               <el-table-column prop="project_count" label="在手项目" width="100" align="center">
                 <template #default="{ row }">
-                  <el-tag :type="row.project_count > 3 ? 'warning' : ''" size="small" round>{{ row.project_count }}</el-tag>
+                  <el-tag :type="(row.project_count > 3 ? 'warning' : '') || undefined" size="small" round>{{ row.project_count }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column prop="week_hours" label="本周工时" width="120" align="right">

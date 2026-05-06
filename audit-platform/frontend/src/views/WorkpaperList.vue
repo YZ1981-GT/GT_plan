@@ -138,10 +138,10 @@
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
               <el-descriptions-item label="审计循环">{{ selectedWp.audit_cycle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="编制状态">
-                <el-tag size="small" :type="dictStore.type('wp_status', selectedWp.status)">{{ dictStore.label('wp_status', selectedWp.status) }}</el-tag>
+                <el-tag size="small" :type="(dictStore.type('wp_status', selectedWp.status)) || undefined">{{ dictStore.label('wp_status', selectedWp.status) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="复核状态">
-                <el-tag size="small" :type="dictStore.type('wp_review_status', selectedWp.review_status)">{{ dictStore.label('wp_review_status', selectedWp.review_status) }}</el-tag>
+                <el-tag size="small" :type="(dictStore.type('wp_review_status', selectedWp.review_status)) || undefined">{{ dictStore.label('wp_review_status', selectedWp.review_status) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="编制人">{{ resolveUserName(selectedWp.assigned_to) }}</el-descriptions-item>
               <el-descriptions-item label="复核人">{{ resolveUserName(selectedWp.reviewer) }}</el-descriptions-item>

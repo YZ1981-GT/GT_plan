@@ -149,7 +149,7 @@ const allVisibleIds = computed(() => getAllIds(filteredTree.value))
 const isAllChecked = computed(() => allVisibleIds.value.length > 0 && checkedIds.value.length === allVisibleIds.value.length)
 const isIndeterminate = computed(() => checkedIds.value.length > 0 && checkedIds.value.length < allVisibleIds.value.length)
 
-function toggleSelectAll(val: boolean) {
+function toggleSelectAll(val: string | number | boolean) {
   checkedIds.value = val ? [...allVisibleIds.value] : []
 }
 

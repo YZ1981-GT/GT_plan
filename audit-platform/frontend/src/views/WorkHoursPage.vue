@@ -7,7 +7,7 @@
           start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD"
           style="width: 280px" @change="loadHours" />
         <el-button @click="showAISuggest">LLM 预填</el-button>
-        <el-button type="primary" @click="openCreateDialog">填报工时</el-button>      </div>
+        <el-button type="primary" @click="showCreateDialog = true">填报工时</el-button>      </div>
     </div>
 
     <!-- 工时列表 -->
@@ -18,7 +18,7 @@
       <el-table-column prop="description" label="工作内容" min-width="200" />
       <el-table-column prop="status" label="状态" width="80" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'confirmed' ? 'success' : row.status === 'approved' ? '' : 'info'" size="small">
+          <el-tag :type="(row.status === 'confirmed' ? 'success' : row.status === 'approved' ? '' : 'info') || undefined" size="small">
             {{ ({ draft: '草稿', confirmed: '已确认', approved: '已审批' } as Record<string, string>)[row.status] || row.status }}
           </el-tag>
         </template>

@@ -270,7 +270,7 @@ function onYearChange(val: string) {
   form.audit_year = val ? parseInt(val, 10) : null
 }
 
-function onReportScopeChange(val: string) {
+function onReportScopeChange(val: string | number | boolean | undefined) {
   if (val === 'consolidated') {
     groupPanelOpen.value = ['group']
   }

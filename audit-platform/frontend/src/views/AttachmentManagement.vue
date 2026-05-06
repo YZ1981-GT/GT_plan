@@ -33,7 +33,7 @@
       </el-table-column>
       <el-table-column prop="file_type" label="类型" width="80" align="center">
         <template #default="{ row }">
-          <el-tag size="small" :type="typeTagType(row.file_type)">{{ row.file_type }}</el-tag>
+          <el-tag size="small" :type="(typeTagType(row.file_type)) || undefined">{{ row.file_type }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="大小" width="100" align="right">
@@ -41,7 +41,7 @@
       </el-table-column>
       <el-table-column prop="ocr_status" label="OCR" width="120" align="center">
         <template #default="{ row }">
-          <el-tag size="small" :type="ocrTagType(row.ocr_status)">{{ ocrLabel(row.ocr_status) }}</el-tag>
+          <el-tag size="small" :type="(ocrTagType(row.ocr_status)) || undefined">{{ ocrLabel(row.ocr_status) }}</el-tag>
           <el-button v-if="row.ocr_status === 'failed'" link type="warning" size="small" @click="retryOCR(row)" style="margin-left:4px">重试</el-button>
         </template>
       </el-table-column>
@@ -269,13 +269,13 @@ function formatDate(d: string): string {
   return new Date(d).toLocaleDateString('zh-CN')
 }
 
-function typeTagType(t: string): string {
-  const m: Record<string, string> = { pdf: 'danger', docx: '', xlsx: 'success', image: 'warning' }
+function typeTagType(t: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { pdf: 'danger', docx: '', xlsx: 'success', image: 'warning' }
   return m[t] || 'info'
 }
 
-function ocrTagType(s: string): string {
-  const m: Record<string, string> = { pending: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
+function ocrTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { pending: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
   return m[s] || 'info'
 }
 

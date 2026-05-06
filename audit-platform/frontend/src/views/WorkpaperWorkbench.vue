@@ -481,7 +481,7 @@ const treeData = computed<TreeNode[]>(() => {
   return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label))
 })
 
-function filterNode(value: string, data: TreeNode) {
+function filterNode(value: string, data: any, node: any) {
   if (!value) return true
   const v = value.toLowerCase()
   return (data.label || '').toLowerCase().includes(v)

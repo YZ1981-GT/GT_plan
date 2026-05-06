@@ -33,7 +33,7 @@
         <el-table :data="datasets" v-loading="loading" border>
           <el-table-column prop="status" label="状态" width="120">
             <template #default="{ row }">
-              <el-tag :type="datasetTagType(row.status)">{{ row.status }}</el-tag>
+              <el-tag :type="(datasetTagType(row.status)) || undefined">{{ row.status }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="id" label="Dataset ID" min-width="260" show-overflow-tooltip />
@@ -63,7 +63,7 @@
         <el-table :data="jobs" v-loading="loading" border>
           <el-table-column prop="status" label="状态" width="120">
             <template #default="{ row }">
-              <el-tag :type="jobTagType(row.status)">{{ row.status }}</el-tag>
+              <el-tag :type="(jobTagType(row.status)) || undefined">{{ row.status }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="id" label="Job ID" min-width="260" show-overflow-tooltip />
@@ -153,14 +153,14 @@ function formatBytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`
 }
 
-function datasetTagType(status: string) {
+function datasetTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (status === 'active') return 'success'
   if (status === 'failed' || status === 'rolled_back') return 'danger'
   if (status === 'staged') return 'warning'
   return 'info'
 }
 
-function jobTagType(status: string) {
+function jobTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (status === 'completed') return 'success'
   if (status === 'failed' || status === 'timed_out' || status === 'canceled') return 'danger'
   if (status === 'running' || status === 'writing' || status === 'activating') return 'warning'

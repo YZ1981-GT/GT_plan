@@ -17,7 +17,7 @@
         >
           <div class="gt-hub-card-top">
             <el-icon :size="24" style="color: #e6a23c"><Paperclip /></el-icon>
-            <el-tag :type="statusType(p.status)" size="small">{{ statusLabel(p.status) }}</el-tag>
+            <el-tag :type="(statusType(p.status)) || undefined" size="small">{{ statusLabel(p.status) }}</el-tag>
           </div>
           <div class="gt-hub-card-name">{{ p.client_name || p.name }}</div>
           <div class="gt-hub-card-meta">
@@ -38,8 +38,8 @@ import { listProjects } from '@/services/commonApi'
 const loading = ref(false)
 const projects = ref<any[]>([])
 
-function statusType(s: string) {
-  return { created: 'info', planning: '', execution: 'warning', completion: 'success', archived: 'info' }[s] || 'info'
+function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  return ({ created: 'info', planning: '', execution: 'warning', completion: 'success', archived: 'info' } as Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'>)[s] || 'info'
 }
 function statusLabel(s: string) {
   return { created: '已创建', planning: '计划中', execution: '执行中', completion: '完成', archived: '已归档' }[s] || s
