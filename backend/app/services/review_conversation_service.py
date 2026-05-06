@@ -93,12 +93,39 @@ class ReviewConversationService:
         conversation_id: UUID,
         user_id: UUID,
     ) -> dict[str, Any]:
-        """关闭对话（仅发起人可关闭）"""
+        """关闭对话（仅发起人可关闭）
+
+        R6 需求 3 AC2：关闭前校验是否有未解决的 ReviewRecord 绑定到此对话，
+        有则拒绝并返回 CONVERSATION_HAS_OPEN_RECORDS。
+        """
         conv = await db.get(ReviewConversation, conversation_id)
         if not conv:
             raise ValueError("对话不存在")
         if conv.initiator_id != user_id:
             raise PermissionError("仅发起人可关闭对话")
+
+        # R6: 校验是否有未解决的 ReviewRecord 绑定到此对话
+        from app.models.workpaper_models import ReviewCommentStatus, ReviewRecord
+
+        open_count_stmt = (
+            sa.select(sa.func.count())
+            .select_from(ReviewRecord)
+            .where(
+                ReviewRecord.conversation_id == conversation_id,
+                ReviewRecord.status != ReviewCommentStatus.resolved,
+                ReviewRecord.is_deleted == sa.false(),
+            )
+        )
+        open_count_result = await db.execute(open_count_stmt)
+        open_count = open_count_result.scalar() or 0
+
+        if open_count > 0:
+            return {
+                "error_code": "CONVERSATION_HAS_OPEN_RECORDS",
+                "message": f"对话下有 {open_count} 条未解决的复核批注，无法关闭",
+                "open_record_count": open_count,
+            }
+
         conv.status = "closed"
         conv.closed_at = datetime.now(timezone.utc)
         await db.flush()

@@ -457,58 +457,9 @@ class ArchiveReadinessService:
                 "action_hint": "请在审计报告模块生成报告",
             })
 
-        # 7-11. wizard_state 项
-        ws = (proj.wizard_state or {}) if proj is not None else {}
-
-        if not ws.get("kam_confirmed", False):
-            extra.setdefault("kam_confirmed", []).append({
-                "rule_code": "READINESS-KAM",
-                "error_code": "KAM_NOT_CONFIRMED",
-                "severity": "blocking",
-                "message": "关键审计事项尚未确认",
-                "location": {"project_id": str(project_id)},
-                "action_hint": "请在项目向导确认 KAM",
-            })
-
-        if not ws.get("independence_confirmed", False):
-            extra.setdefault("independence", []).append({
-                "rule_code": "READINESS-INDEP",
-                "error_code": "INDEPENDENCE_NOT_CONFIRMED",
-                "severity": "blocking",
-                "message": "独立性确认未签署",
-                "location": {"project_id": str(project_id)},
-                "action_hint": "请签署独立性确认",
-            })
-
-        if not ws.get("subsequent_events_reviewed", False):
-            extra.setdefault("subsequent_events", []).append({
-                "rule_code": "READINESS-SUBSEQ",
-                "error_code": "SUBSEQUENT_EVENTS_NOT_REVIEWED",
-                "severity": "blocking",
-                "message": "期后事项审阅尚未完成",
-                "location": {"project_id": str(project_id)},
-                "action_hint": "请完成期后事项审阅",
-            })
-
-        if not ws.get("going_concern_evaluated", False):
-            extra.setdefault("going_concern", []).append({
-                "rule_code": "READINESS-GC",
-                "error_code": "GOING_CONCERN_NOT_EVALUATED",
-                "severity": "blocking",
-                "message": "持续经营评价尚未完成",
-                "location": {"project_id": str(project_id)},
-                "action_hint": "请完成持续经营评价",
-            })
-
-        if not ws.get("management_representation_obtained", False):
-            extra.setdefault("mgmt_representation", []).append({
-                "rule_code": "READINESS-MGMT",
-                "error_code": "MGMT_REP_NOT_OBTAINED",
-                "severity": "blocking",
-                "message": "管理层声明书尚未获取",
-                "location": {"project_id": str(project_id)},
-                "action_hint": "请获取管理层声明书",
-            })
+        # 7-11. wizard_state 项（KAM + independence + subsequent_events +
+        # going_concern + mgmt_representation 已由 R6/R7 GateRule 覆盖）
+        # 不再在 extra_findings 中重复检查
 
         # 12. index_complete — 底稿索引完整性
         no_code_q = select(func.count()).select_from(WorkingPaper).where(

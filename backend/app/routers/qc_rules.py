@@ -7,7 +7,7 @@ PATCH  /api/qc/rules/{id}     — 更新规则（version+1，保留历史）
 DELETE /api/qc/rules/{id}     — 软删除规则
 POST   /api/qc/rules/{id}/dry-run — 规则试运行（不写 DB，返回命中率）
 
-权限：role='qc' | 'admin'
+权限：role='qc' | 'admin' | 'partner'
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ async def list_rules(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(50, ge=1, le=200, description="每页条数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role(["qc", "admin"])),
+    current_user: User = Depends(require_role(["qc", "admin", "partner"])),
 ):
     """列出 QC 规则定义，支持过滤与分页。"""
     result = await qc_rule_definition_service.list_rules(

@@ -23,8 +23,13 @@
       <el-button size="small" @click="loadData">刷新</el-button>
     </div>
 
-    <el-table :data="issues" border size="small" stripe @row-click="handleRowClick">
-      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+    <el-table :data="issues" border size="small" stripe @row-click="handleRowClick" :row-class-name="rowClassName">
+      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.source === 'Q'" class="q-icon">🛡️</span>
+          {{ row.title }}
+        </template>
+      </el-table-column>
       <el-table-column prop="source" label="来源" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="(sourceTagType(row.source)) || undefined" size="small">{{ sourceLabel(row.source) }}</el-tag>
@@ -179,6 +184,11 @@ function formatTime(t: string | undefined) {
   return new Date(t).toLocaleString('zh-CN')
 }
 
+function rowClassName({ row }: { row: any }): string {
+  if (row.source === 'Q') return 'q-source-row'
+  return ''
+}
+
 onMounted(() => {
   loadData()
   // SLA 倒计时每分钟刷新
@@ -193,4 +203,13 @@ onUnmounted(() => { if (slaTimer) clearInterval(slaTimer) })
 .sla-expired { color: var(--el-color-danger); font-weight: 600; }
 .sla-urgent { color: var(--el-color-danger); }
 .sla-warning { color: var(--el-color-warning); }
+.q-icon { margin-right: 4px; }
+
+/* Q 整改单红左边框 */
+:deep(.q-source-row) {
+  border-left: 3px solid #f56c6c !important;
+}
+:deep(.q-source-row td:first-child) {
+  border-left: 3px solid #f56c6c;
+}
 </style>

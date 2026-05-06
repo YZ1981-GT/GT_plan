@@ -100,6 +100,7 @@ from app.models.related_party_models import (
     RelatedPartyTransaction,
 )
 from app.models.independence_models import AnnualIndependenceDeclaration
+from app.models.qc_rule_models import QcRuleDefinition
 
 __all__ = [
     # --- base ---
@@ -203,4 +204,6 @@ __all__ = [
     "RelatedPartyTransaction",
     # --- independence declaration (R5) ---
     "AnnualIndependenceDeclaration",
+    # --- QC rule definitions (R6) ---
+    "QcRuleDefinition",
 ]

@@ -78,6 +78,8 @@ def _register_phase_handlers() -> None:
     """Phase 14/15 事件处理器与门禁规则注册。"""
     from app.services.gate_rules_phase14 import register_phase14_rules
     from app.services.gate_rules_eqcr import register_eqcr_gate_rules
+    import app.services.gate_rules_round6  # noqa: F401 — 模块级自动注册
+    import app.services.gate_rules_ai_content  # noqa: F401 — R3 AI 内容确认规则自动注册
     from app.services.task_event_handlers import (
         register_event_handlers as register_task_handlers,
     )

@@ -525,16 +525,16 @@ export const projectMgmt = {
 
 export const archive = {
   checklist: {
-    init: (pid: string) => `/api/archive/${pid}/checklist/init`,
-    get: (pid: string) => `/api/archive/${pid}/checklist`,
-    complete: (pid: string, itemId: string) => `/api/archive/${pid}/checklist/${itemId}/complete`,
+    init: (pid: string) => `/api/projects/${pid}/archive/checklist/init`,
+    get: (pid: string) => `/api/projects/${pid}/archive/checklist`,
+    complete: (pid: string, itemId: string) => `/api/projects/${pid}/archive/checklist/${itemId}/complete`,
   },
-  archive: (pid: string) => `/api/archive/${pid}/archive`,
-  exportPdf: (pid: string) => `/api/archive/${pid}/export-pdf`,
+  archive: (pid: string) => `/api/projects/${pid}/archive/orchestrate`,
+  exportPdf: (pid: string) => `/api/projects/${pid}/archive/export-pdf`,
   modifications: {
-    request: (pid: string) => `/api/archive/${pid}/modifications`,
-    approve: (pid: string, modId: string) => `/api/archive/${pid}/modifications/${modId}/approve`,
-    reject: (pid: string, modId: string) => `/api/archive/${pid}/modifications/${modId}/reject`,
+    request: (pid: string) => `/api/projects/${pid}/archive/modifications`,
+    approve: (pid: string, modId: string) => `/api/projects/${pid}/archive/modifications/${modId}/approve`,
+    reject: (pid: string, modId: string) => `/api/projects/${pid}/archive/modifications/${modId}/reject`,
   },
 } as const
 

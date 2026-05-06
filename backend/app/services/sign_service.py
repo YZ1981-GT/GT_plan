@@ -167,7 +167,7 @@ class SignService:
         if not record:
             raise ValueError("签名记录不存在")
 
-        if record.signature_level == "level3":
+        if record.required_role == 'signing_partner' and record.required_order == 3:
             raise NotImplementedError("CA证书验证尚未实现")
 
         # level1/level2 始终验证通过

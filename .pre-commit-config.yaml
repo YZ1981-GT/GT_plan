@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-json
+        files: ^backend/data/.*\.json$
+
+  - repo: local
+    hooks:
+      - id: json-template-lint
+        name: json-template-lint
+        entry: python scripts/validate_seed_files.py
+        language: system
+        pass_filenames: false
+        files: ^backend/data/.*\.json$

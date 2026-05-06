@@ -679,6 +679,34 @@ class QCEngine:
             FineCheckWarningRule(),
         ]
 
+    async def _get_enabled_rule_codes(self, db: AsyncSession) -> set[str]:
+        """读取 qc_rule_definitions 表中 enabled=true 的 rule_code 集合。
+
+        非 python 类型规则记 warning 日志并跳过。
+        """
+        from app.models.qc_rule_models import QcRuleDefinition
+
+        try:
+            result = await db.execute(
+                sa.select(
+                    QcRuleDefinition.rule_code,
+                    QcRuleDefinition.expression_type,
+                ).where(QcRuleDefinition.enabled == sa.true())
+            )
+            rows = result.all()
+        except Exception as e:
+            # 表不存在或查询失败时降级：不过滤，全部执行
+            logger.warning("[QCEngine] Failed to load qc_rule_definitions, running all rules: %s", e)
+            return {rule.rule_id for rule in self.rules}
+
+        enabled_codes: set[str] = set()
+        for rule_code, expression_type in rows:
+            if expression_type != "python":
+                logger.warning("R6 stub: non-python rule ignored: %s (type=%s)", rule_code, expression_type)
+                continue
+            enabled_codes.add(rule_code)
+        return enabled_codes
+
     async def check(
         self,
         db: AsyncSession,
@@ -689,6 +717,10 @@ class QCEngine:
 
         Validates: Requirements 8.1, 8.2, 8.4
         """
+        # R6: 按 enabled 过滤规则
+        enabled_codes = await self._get_enabled_rule_codes(db)
+        active_rules = [r for r in self.rules if r.rule_id in enabled_codes]
+
         # Load working paper
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
@@ -711,13 +743,13 @@ class QCEngine:
             project_id=wp.project_id,
         )
 
-        # Execute all rules
+        # Execute all rules (filtered by enabled)
         all_findings: list[dict] = []
         blocking_count = 0
         warning_count = 0
         info_count = 0
 
-        for rule in self.rules:
+        for rule in active_rules:
             try:
                 findings = await rule.check(context)
                 for f in findings:

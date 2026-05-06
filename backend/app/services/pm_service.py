@@ -14,6 +14,7 @@ from app.models.workpaper_models import (
     WorkingPaper, WpFileStatus, WpReviewStatus, WpIndex, WpCrossRef, ReviewRecord,
 )
 from app.models.core import User, Project
+from app.models.phase10_models import ReviewMessage
 
 _logger = logging.getLogger(__name__)
 
@@ -66,10 +67,42 @@ class ReviewInboxService:
         )
         rows = (await self.db.execute(q)).all()
 
+        # 收集所有 wp_id 用于批量查询 conversation 消息数
+        wp_ids = [row[0].id for row in rows]
+
+        # 批量查询每个 wp 关联的 conversation 消息数
+        # ReviewRecord.conversation_id → ReviewMessage.conversation_id 计数
+        conversation_stats: dict[str, dict] = {}
+        if wp_ids:
+            conv_q = (
+                select(
+                    ReviewRecord.working_paper_id,
+                    ReviewRecord.conversation_id,
+                    func.count(ReviewMessage.id).label("message_count"),
+                )
+                .join(ReviewMessage, ReviewMessage.conversation_id == ReviewRecord.conversation_id)
+                .where(
+                    ReviewRecord.working_paper_id.in_(wp_ids),
+                    ReviewRecord.conversation_id.isnot(None),
+                    ReviewRecord.is_deleted == False,
+                )
+                .group_by(ReviewRecord.working_paper_id, ReviewRecord.conversation_id)
+            )
+            conv_rows = (await self.db.execute(conv_q)).all()
+            for wp_id, conv_id, msg_count in conv_rows:
+                wp_key = str(wp_id)
+                if wp_key not in conversation_stats:
+                    conversation_stats[wp_key] = {"conversation_id": str(conv_id), "message_count": 0}
+                conversation_stats[wp_key]["message_count"] += msg_count
+                # 保留第一个 conversation_id（最近的）
+                conversation_stats[wp_key]["conversation_id"] = str(conv_id)
+
         items = []
         for wp, wp_code, wp_name, audit_cycle, project_name in rows:
+            wp_key = str(wp.id)
+            conv_info = conversation_stats.get(wp_key)
             items.append({
-                "id": str(wp.id),
+                "id": wp_key,
                 "project_id": str(wp.project_id),
                 "project_name": project_name,
                 "wp_code": wp_code,
@@ -80,6 +113,8 @@ class ReviewInboxService:
                 "assigned_to": str(wp.assigned_to) if wp.assigned_to else None,
                 "submitted_at": wp.updated_at.isoformat() if wp.updated_at else None,
                 "file_version": wp.file_version,
+                "conversation_id": conv_info["conversation_id"] if conv_info else None,
+                "conversation_message_count": conv_info["message_count"] if conv_info else 0,
             })
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}

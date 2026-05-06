@@ -45,7 +45,7 @@ class SignatureRecord(Base):
     object_type: Mapped[str] = mapped_column(String(50), nullable=False)  # working_paper/adjustment/audit_report
     object_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     signer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    signature_level: Mapped[str] = mapped_column(String(20), nullable=False)  # level1/level2/level3
+    signature_level: Mapped[str] = mapped_column(String(20), nullable=False)  # Legacy: 历史兼容字段（level1/level2/level3/eqcr），新代码禁止用于控制流；实际签字顺序见 required_order，角色见 required_role
     # Round 1: 三级/多级签字顺序与前置依赖（R5 扩至 order=4/5 EQCR + 归档签字）
     required_order: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     required_role: Mapped[str | None] = mapped_column(String(30), nullable=True)

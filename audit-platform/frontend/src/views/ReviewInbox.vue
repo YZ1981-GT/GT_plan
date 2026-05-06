@@ -42,6 +42,19 @@
           {{ row.submitted_at ? new Date(row.submitted_at).toLocaleString('zh-CN') : '-' }}
         </template>
       </el-table-column>
+      <el-table-column label="讨论" width="80" align="center">
+        <template #default="{ row }">
+          <span
+            v-if="row.conversation_id"
+            class="conversation-badge"
+            @click.stop="goToConversation(row)"
+            :title="`${row.conversation_message_count} 条讨论消息，点击查看`"
+          >
+            💬{{ row.conversation_message_count || '' }}
+          </span>
+          <span v-else class="conversation-badge-empty">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <el-button size="small" type="primary" link @click="goToWorkpaper(row)">查看</el-button>
@@ -133,6 +146,16 @@ function goToWorkpaper(row: ReviewInboxItem) {
   })
 }
 
+function goToConversation(row: ReviewInboxItem) {
+  if (row.conversation_id) {
+    router.push({
+      name: 'ReviewConversations',
+      params: { projectId: row.project_id },
+      query: { highlight: row.conversation_id },
+    })
+  }
+}
+
 async function handleSingleApprove(row: ReviewInboxItem) {
   await confirmDangerous(`确认通过底稿 ${row.wp_code} ${row.wp_name}？`, '通过确认')
   await doBatchReview([row.id], 'approve', row.project_id)
@@ -175,4 +198,24 @@ onMounted(loadData)
 
 <style scoped>
 .review-inbox { padding: 0; }
+
+.conversation-badge {
+  display: inline-block;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #ecf5ff;
+  color: #409eff;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.conversation-badge:hover {
+  background: #d9ecff;
+  text-decoration: underline;
+}
+.conversation-badge-empty {
+  color: #c0c4cc;
+  font-size: 13px;
+}
 </style>

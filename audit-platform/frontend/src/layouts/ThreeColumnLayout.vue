@@ -136,14 +136,11 @@
         <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
         <slot name="nav-review-inbox" />
 
+        <!-- 通知中心入口 -->
+        <slot name="nav-notifications" />
+
         <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
         <slot name="nav-eqcr" />
-
-        <el-tooltip content="通知" placement="bottom">
-          <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
-            <el-icon :size="18"><Bell /></el-icon>
-          </el-badge>
-        </el-tooltip>
         <el-dropdown trigger="click">
           <div class="gt-user-info">
             <el-avatar :size="30" class="gt-avatar">
@@ -182,6 +179,7 @@
                 {{ item.label }}
                 <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
                 <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
+                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">开发中</span>
               </span>
             </transition>
           </div>
@@ -297,7 +295,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
-  Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
+  Stamp, Box, Setting, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
 } from '@element-plus/icons-vue'
@@ -329,7 +327,7 @@ const navItems = [
   { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production' },
   { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
   { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot' },
-  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
+  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing' },
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production' },
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
   { key: 'users', label: '用户', icon: UserFilled, path: '/settings/users', maturity: 'production' },
@@ -800,6 +798,7 @@ onUnmounted(() => {
 }
 .gt-maturity-pilot { background: #fef0e6; color: #e6a23c; }
 .gt-maturity-exp { background: #fde2e2; color: #f56c6c; }
+.gt-maturity-dev { background: #e8eaed; color: #909399; }
 
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);

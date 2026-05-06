@@ -148,6 +148,52 @@
           <el-button type="primary" @click="loadArchive" :loading="archiveLoading">执行归档前检查</el-button>
         </div>
       </el-tab-pane>
+
+      <!-- Tab 5: 项目评级 (R3 需求 3) -->
+      <el-tab-pane label="项目评级" name="rating">
+        <div v-loading="ratingLoading">
+          <div v-if="ratingData" class="rating-panel">
+            <div class="rating-badge" :class="`rating-badge--${(ratingData.rating || 'N').toLowerCase()}`">
+              {{ ratingData.rating || 'N/A' }}
+            </div>
+            <div class="rating-details">
+              <p>年度：{{ ratingData.year }}</p>
+              <p>综合得分：{{ ratingData.total_score ?? '—' }}</p>
+              <p v-if="ratingData.override_rating">
+                人工覆盖：{{ ratingData.override_rating }}（{{ ratingData.override_reason }}）
+              </p>
+            </div>
+          </div>
+          <el-empty v-else description="暂无评级数据，请先执行评级计算" />
+        </div>
+      </el-tab-pane>
+
+      <!-- Tab 6: 复核人画像 (R3 需求 6) -->
+      <el-tab-pane label="复核人画像" name="reviewer">
+        <el-table :data="reviewerMetrics" stripe v-loading="reviewerLoading" style="width: 100%;">
+          <el-table-column label="复核人" prop="reviewer_name" width="120" />
+          <el-table-column label="平均复核时长(min)" prop="avg_review_time_min" width="160" align="center" />
+          <el-table-column label="平均批注数/底稿" prop="avg_comments_per_wp" width="160" align="center" />
+          <el-table-column label="退回率" prop="rejection_rate" width="100" align="center">
+            <template #default="{ row }">
+              <span :style="{ color: row.rejection_rate > 0.3 ? '#f56c6c' : '#67c23a' }">
+                {{ (row.rejection_rate * 100).toFixed(1) }}%
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="QC规则捕获率" prop="qc_rule_catch_rate" width="140" align="center">
+            <template #default="{ row }">
+              {{ (row.qc_rule_catch_rate * 100).toFixed(1) }}%
+            </template>
+          </el-table-column>
+          <el-table-column label="返工率" prop="sampled_rework_rate" width="100" align="center">
+            <template #default="{ row }">
+              {{ (row.sampled_rework_rate * 100).toFixed(1) }}%
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="!reviewerLoading && reviewerMetrics.length === 0" description="暂无复核人指标数据" />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -182,6 +228,14 @@ const issuesLoading = ref(false)
 // Archive
 const archiveResult = ref<ArchiveReadiness | null>(null)
 const archiveLoading = ref(false)
+
+// Rating (R3 需求 3)
+const ratingData = ref<any>(null)
+const ratingLoading = ref(false)
+
+// Reviewer metrics (R3 需求 6)
+const reviewerMetrics = ref<any[]>([])
+const reviewerLoading = ref(false)
 
 function reviewLabel(s: string): string {
   const m: Record<string, string> = {
@@ -245,8 +299,33 @@ async function tryLoadArchiveCache() {
 watch(activeTab, (tab) => {
   if (tab === 'archive') {
     tryLoadArchiveCache()
+  } else if (tab === 'rating') {
+    loadRating()
+  } else if (tab === 'reviewer') {
+    loadReviewerMetrics()
   }
 })
+
+async function loadRating() {
+  if (ratingData.value) return
+  ratingLoading.value = true
+  try {
+    const year = new Date().getFullYear()
+    const data = await import('@/services/apiProxy').then(m => m.api.get(`/api/qc/projects/${projectId.value}/rating/${year}`))
+    ratingData.value = data
+  } catch { /* 无评级数据 */ }
+  finally { ratingLoading.value = false }
+}
+
+async function loadReviewerMetrics() {
+  if (reviewerMetrics.value.length) return
+  reviewerLoading.value = true
+  try {
+    const data = await import('@/services/apiProxy').then(m => m.api.get<any>('/api/qc/reviewer-metrics'))
+    reviewerMetrics.value = data?.items || []
+  } catch { /* ignore */ }
+  finally { reviewerLoading.value = false }
+}
 
 async function loadAll() {
   await Promise.all([loadOverview(), loadStaff(), loadIssues()])
@@ -264,4 +343,14 @@ onMounted(loadAll)
 .dist-count { font-weight: 600; font-size: var(--gt-font-size-lg); color: var(--gt-color-text); }
 .archive-panel { padding: var(--gt-space-4); }
 .archive-empty { text-align: center; padding: var(--gt-space-10); }
+
+/* Rating badge */
+.rating-panel { display: flex; align-items: center; gap: 24px; padding: 24px; }
+.rating-badge { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 700; color: #fff; }
+.rating-badge--a { background: #67c23a; }
+.rating-badge--b { background: #409eff; }
+.rating-badge--c { background: #e6a23c; }
+.rating-badge--d { background: #f56c6c; }
+.rating-badge--n { background: #c0c4cc; }
+.rating-details { font-size: 14px; color: #606266; line-height: 2; }
 </style>

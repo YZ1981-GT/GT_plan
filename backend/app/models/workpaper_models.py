@@ -432,6 +432,13 @@ class ReviewRecord(Base):
         ForeignKey("users.id"), nullable=True
     )
     resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # R6: 关联多轮讨论链
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("review_conversations.id"),
+        nullable=True,
+        comment="关联的多轮讨论链（可选）",
+    )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

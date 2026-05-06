@@ -1,303 +1,275 @@
 <template>
   <div class="qc-annual-reports">
     <!-- 顶部横幅 -->
-    <div class="gt-page-banner">
+    <div class="gt-page-banner gt-page-banner--teal">
       <div class="gt-banner-content">
         <h2>📊 年度质量报告</h2>
-        <span class="gt-banner-sub">
-          共 {{ total }} 份年报
-        </span>
+        <span class="gt-banner-sub">共 {{ reports.length }} 份报告</span>
       </div>
       <div class="gt-banner-actions">
-        <el-button type="primary" @click="showGenerateDialog = true">
-          <el-icon><Plus /></el-icon>
-          生成年报
-        </el-button>
+        <el-button size="small" type="primary" @click="showGenerateDialog = true">生成年报</el-button>
+        <el-button size="small" @click="loadReports" :loading="loading">刷新</el-button>
       </div>
     </div>
 
-    <!-- 年报列表 -->
-    <div class="report-list" v-loading="loading">
-      <el-table :data="reports" border stripe style="width: 100%">
-        <el-table-column prop="year" label="年度" width="120" align="center">
-          <template #default="{ row }">
-            <span class="year-text">{{ row.year }}</span>
-          </template>
-        </el-table-column>
+    <!-- 报告表格 -->
+    <el-table
+      :data="reports"
+      v-loading="loading"
+      stripe
+      style="width: 100%;"
+    >
+      <el-table-column label="年度" prop="year" width="100" align="center">
+        <template #default="{ row }">
+          <span style="font-weight: 600;">{{ row.year }}</span>
+        </template>
+      </el-table-column>
 
-        <el-table-column prop="status" label="状态" width="140" align="center">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="default">
-              {{ statusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
+      <el-table-column label="状态" prop="status" width="140" align="center">
+        <template #default="{ row }">
+          <el-tag :type="statusTagType(row.status)" size="small" effect="dark">
+            {{ statusLabel(row.status) }}
+          </el-tag>
+          <span v-if="row.status === 'running'" class="running-indicator" />
+        </template>
+      </el-table-column>
 
-        <el-table-column prop="created_at" label="创建时间" width="200">
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
+      <el-table-column label="创建时间" prop="created_at" min-width="180">
+        <template #default="{ row }">
+          {{ formatDate(row.created_at) }}
+        </template>
+      </el-table-column>
 
-        <el-table-column label="备注" min-width="200">
-          <template #default="{ row }">
-            <span class="report-message">{{ row.message || '-' }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="160" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.status === 'succeeded'"
-              type="primary"
-              size="small"
-              link
-              @click="handleDownload(row)"
-            >
-              <el-icon><Download /></el-icon>
-              下载
-            </el-button>
-            <el-tag v-else-if="row.status === 'running' || row.status === 'queued'" type="warning" size="small">
-              生成中...
-            </el-tag>
-            <el-tag v-else-if="row.status === 'failed'" type="danger" size="small">
-              生成失败
-            </el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <el-empty v-if="!loading && reports.length === 0" description="暂无年报数据" />
-    </div>
-
-    <!-- 分页 -->
-    <div class="pagination-bar" v-if="total > pageSize">
-      <el-pagination
-        v-model:current-page="currentPage"
-        :page-size="pageSize"
-        :total="total"
-        layout="prev, pager, next, total"
-        @current-change="handlePageChange"
-      />
-    </div>
+      <el-table-column label="操作" width="140" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.status === 'completed'"
+            size="small"
+            type="primary"
+            link
+            @click="downloadReport(row)"
+            :loading="row._downloading"
+          >
+            下载
+          </el-button>
+          <span v-else-if="row.status === 'running'" class="status-hint">生成中...</span>
+          <span v-else-if="row.status === 'failed'" class="status-hint status-hint--error">生成失败</span>
+          <span v-else class="status-hint">排队中</span>
+        </template>
+      </el-table-column>
+    </el-table>
 
     <!-- 生成年报对话框 -->
-    <el-dialog
-      v-model="showGenerateDialog"
-      title="生成年度质量报告"
-      width="420px"
-      destroy-on-close
-    >
-      <el-form label-width="80px">
-        <el-form-item label="报告年度">
-          <el-date-picker
-            v-model="selectedYear"
-            type="year"
-            placeholder="选择年度"
-            format="YYYY"
-            value-format="YYYY"
-            style="width: 100%"
+    <el-dialog v-model="showGenerateDialog" title="生成年度质量报告" width="400px">
+      <el-form :model="generateForm" label-width="80px">
+        <el-form-item label="年度">
+          <el-input-number
+            v-model="generateForm.year"
+            :min="2000"
+            :max="2099"
+            style="width: 100%;"
           />
-        </el-form-item>
-        <el-form-item>
-          <p class="generate-hint">
-            系统将异步生成该年度的质量报告，包含项目规模分布、评级分布、
-            典型问题 Top10、复核人表现等章节。每年至多一个生成任务。
-          </p>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showGenerateDialog = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="generating"
-          :disabled="!selectedYear"
-          @click="handleGenerate"
-        >
-          开始生成
-        </el-button>
+        <el-button type="primary" @click="generateReport" :loading="generating">生成</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Plus, Download } from '@element-plus/icons-vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import {
-  listAnnualReports,
-  generateAnnualReport,
-  downloadAnnualReport,
-  type AnnualReport,
-} from '@/services/qcAnnualReportApi'
+import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
 
-// ── 状态 ──
+// ─── Types ──────────────────────────────────────────────────────────────────
 
+interface ReportItem {
+  id: string
+  year: number
+  status: string
+  created_at: string
+  _downloading?: boolean
+}
+
+// ─── State ──────────────────────────────────────────────────────────────────
+
+const reports = ref<ReportItem[]>([])
 const loading = ref(false)
-const generating = ref(false)
+
+// Generate dialog
 const showGenerateDialog = ref(false)
+const generating = ref(false)
+const generateForm = ref({
+  year: new Date().getFullYear(),
+})
 
-const reports = ref<AnnualReport[]>([])
-const total = ref(0)
-const currentPage = ref(1)
-const pageSize = 20
+// Polling
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
-const selectedYear = ref<string>('')
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
-// ── 数据加载 ──
-
-async function loadReports() {
-  loading.value = true
-  try {
-    const res = await listAnnualReports(currentPage.value, pageSize)
-    reports.value = res.items
-    total.value = res.total
-  } catch (e: any) {
-    ElMessage.error('加载年报列表失败: ' + (e.message || '未知错误'))
-  } finally {
-    loading.value = false
+function statusTagType(status: string): 'success' | 'warning' | 'info' | 'danger' {
+  switch (status) {
+    case 'completed': return 'success'
+    case 'running': return 'warning'
+    case 'queued': return 'info'
+    case 'failed': return 'danger'
+    default: return 'info'
   }
 }
-
-function handlePageChange(page: number) {
-  currentPage.value = page
-  loadReports()
-}
-
-// ── 生成年报 ──
-
-async function handleGenerate() {
-  if (!selectedYear.value) {
-    ElMessage.warning('请选择报告年度')
-    return
-  }
-
-  generating.value = true
-  try {
-    const year = parseInt(selectedYear.value, 10)
-    const result = await generateAnnualReport(year)
-    if (result.job_id) {
-      ElMessage.success(result.message || `${year} 年度报告已开始生成`)
-    } else {
-      ElMessage.info(result.message || '生成任务已存在')
-    }
-    showGenerateDialog.value = false
-    selectedYear.value = ''
-    // 刷新列表
-    await loadReports()
-  } catch (e: any) {
-    ElMessage.error('生成年报失败: ' + (e.message || '未知错误'))
-  } finally {
-    generating.value = false
-  }
-}
-
-// ── 下载 ──
-
-async function handleDownload(report: AnnualReport) {
-  try {
-    await downloadAnnualReport(report.id, report.year)
-    ElMessage.success('下载已开始')
-  } catch (e: any) {
-    ElMessage.error('下载失败: ' + (e.message || '未知错误'))
-  }
-}
-
-// ── 辅助函数 ──
 
 function statusLabel(status: string): string {
   const map: Record<string, string> = {
-    queued: '排队中',
+    completed: '已完成',
     running: '生成中',
-    succeeded: '已完成',
+    queued: '排队中',
     failed: '失败',
   }
   return map[status] || status
 }
 
-function statusTagType(status: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' {
-  const map: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'primary'> = {
-    queued: 'info',
-    running: 'warning',
-    succeeded: 'success',
-    failed: 'danger',
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '—'
+  return dateStr.replace('T', ' ').slice(0, 16)
+}
+
+function hasRunningReport(): boolean {
+  return reports.value.some((r) => r.status === 'running' || r.status === 'queued')
+}
+
+// ─── Data Loading ───────────────────────────────────────────────────────────
+
+async function loadReports() {
+  loading.value = true
+  try {
+    const data = await api.get<any>('/api/qc/annual-reports')
+    if (Array.isArray(data)) {
+      reports.value = data
+    } else if (data && Array.isArray(data.items)) {
+      reports.value = data.items
+    } else {
+      reports.value = []
+    }
+    // Start/stop polling based on status
+    managePoll()
+  } catch {
+    reports.value = []
+  } finally {
+    loading.value = false
   }
-  return map[status] || 'info'
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+async function generateReport() {
+  generating.value = true
+  try {
+    await api.post(`/api/qc/annual-reports?year=${generateForm.value.year}`)
+    ElMessage.success('年报生成任务已提交')
+    showGenerateDialog.value = false
+    await loadReports()
+  } catch {
+    ElMessage.error('提交失败')
+  } finally {
+    generating.value = false
+  }
 }
 
-// ── 生命周期 ──
+async function downloadReport(row: ReportItem) {
+  row._downloading = true
+  try {
+    const response = await http.get(`/api/qc/annual-reports/${row.id}/download`, {
+      responseType: 'blob',
+    })
+    const blob = new Blob([response.data])
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `质量年报_${row.year}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error('下载失败')
+  } finally {
+    row._downloading = false
+  }
+}
+
+// ─── Polling ────────────────────────────────────────────────────────────────
+
+function managePoll() {
+  if (hasRunningReport()) {
+    if (!pollTimer) {
+      pollTimer = setInterval(async () => {
+        try {
+          const data = await api.get<any>('/api/qc/annual-reports')
+          if (Array.isArray(data)) {
+            reports.value = data
+          } else if (data && Array.isArray(data.items)) {
+            reports.value = data.items
+          }
+          if (!hasRunningReport()) {
+            stopPoll()
+            ElMessage.success('年报生成完成')
+          }
+        } catch {
+          // Ignore poll errors
+        }
+      }, 5000)
+    }
+  } else {
+    stopPoll()
+  }
+}
+
+function stopPoll() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+// ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 onMounted(() => {
   loadReports()
+})
+
+onUnmounted(() => {
+  stopPoll()
 })
 </script>
 
 <style scoped>
 .qc-annual-reports {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
   padding: 0;
 }
 
-.gt-page-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+.running-indicator {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #e6a23c;
+  margin-left: 6px;
+  animation: pulse 1.2s infinite;
 }
 
-.gt-banner-content h2 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 600;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
-.gt-banner-sub {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
+.status-hint {
+  font-size: 12px;
+  color: #909399;
 }
 
-.report-list {
-  flex: 1;
-  padding: 20px 24px;
-  overflow-y: auto;
-}
-
-.year-text {
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.report-message {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-.pagination-bar {
-  display: flex;
-  justify-content: center;
-  padding: 12px 20px;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
-
-.generate-hint {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-  line-height: 1.6;
-  margin: 0;
+.status-hint--error {
+  color: #f56c6c;
 }
 </style>

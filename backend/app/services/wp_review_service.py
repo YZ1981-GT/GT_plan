@@ -266,9 +266,28 @@ async def _build_and_persist_issue_ticket(
 ) -> IssueTicket:
     """按 R1 需求 2 的字段契约创建 IssueTicket 并 flush 到 DB。
 
+    R6 需求 3 AC5：去重校验 — 若已存在 IssueTicket(source='review_comment',
+    source_ref_id=record.id) 则直接返回已有工单，不重复创建。
+
     抛出的任何异常由调用方决定是否吞掉（主流程吞掉 + 发补偿事件，补偿
     handler 按幂等跳过即可）。
     """
+    # R6: 去重校验
+    import sqlalchemy as sa
+    existing_stmt = sa.select(IssueTicket).where(
+        IssueTicket.source == IssueSource.review_comment.value,
+        IssueTicket.source_ref_id == review_record.id,
+    )
+    existing_result = await db.execute(existing_stmt)
+    existing_ticket = existing_result.scalar_one_or_none()
+    if existing_ticket is not None:
+        logger.info(
+            "[WP_REVIEW] IssueTicket already exists for ReviewRecord=%s ticket=%s (dedup)",
+            review_record.id,
+            existing_ticket.id,
+        )
+        return existing_ticket
+
     wp = await db.get(WorkingPaper, review_record.working_paper_id)
     if wp is None:
         raise ValueError(f"WorkingPaper {review_record.working_paper_id} not found")

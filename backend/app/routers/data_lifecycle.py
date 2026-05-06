@@ -50,7 +50,7 @@ async def archive_project(
         "use /api/projects/{id}/archive/orchestrate instead",
         project_id,
     )
-    response.headers["X-Deprecated"] = "true"
+    response.headers["Deprecation"] = 'version="R6"'
     svc = DataLifecycleService(db)
     return await svc.archive_project_data(project_id)
 

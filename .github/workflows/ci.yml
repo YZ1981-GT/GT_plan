@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: audit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/audit_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run tests (exclude integration/e2e)
+        run: |
+          python -m pytest backend/tests/ \
+            --ignore=backend/tests/integration \
+            --ignore=backend/tests/e2e \
+            -x --tb=short
+
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Ruff check
+        run: python -m ruff check backend/
+      - name: Check signature_level usage
+        run: python scripts/check_signature_level_usage.py
+
+  seed-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Validate seed files
+        run: python scripts/validate_seed_files.py
+      - name: Dead link check (apiPaths ↔ router_registry)
+        run: node scripts/dead-link-check.js
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Build
+        run: npm run build
+        working-directory: audit-platform/frontend

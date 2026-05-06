@@ -45,8 +45,8 @@ inclusion: always
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
 - 前端依赖共 22 生产 + 7 开发：关键新增 mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0、unplugin-vue-components@32.0.0、@univerjs/presets@0.21.1、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）、@univerjs/sheets-formula@0.21.1、opentype.js@1.3.5、xlsx@0.18.5
-- 后端新增测试依赖 hypothesis@6.152.4（跨轮复盘发现此前未装，4 个属性测试文件含 60+ 测试从未运行）
-- PG ~158 张表（152 基线 + R5 新增 6 张：eqcr_opinions/eqcr_review_notes/eqcr_shadow_computations/eqcr_disagreement_resolutions/related_party_registry/related_party_transactions），Redis 6379，后端 9980，前端 3030
+- 后端新增测试依赖 hypothesis@6.152.4 + ruff@0.11.12（R6 Task 2 写入 requirements.txt）
+- PG ~160 张表（152 基线 + R5 新增 6 张 + R6 新增 qc_rule_definitions + review_records.conversation_id 列），Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
 - Paperless-ngx 端口 8010（admin/admin）
@@ -59,7 +59,7 @@ inclusion: always
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（R5 全部完成，已推送远程 8aff1c0）
+- git 分支：feature/global-component-library（R4 修复 + R6 spec 已推送，最新 commit 2a0358f）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -94,13 +94,13 @@ inclusion: always
 - commonApi.getMyStaffId 直接返回 `string | null`；staffApi.getMyStaffId 返回对象，两者不同
 - router_registry.py 路由前缀规范：路由器内部只声明业务路径（如 /gate），注册时统一加 prefix="/api"；例外：dashboard.py 内部带 /api/dashboard 注册时不加、/wopi 不加、/api/version 直接在 main.py
 - 预存 backend 测试失败（与本 spec 无关，不要误判为回归）：test_adjustments.py 23 个测试因 SQLite 不支持 pg_advisory_xact_lock 失败；test_misstatements.py 2 个测试因 UnadjustedMisstatement 缺 soft_delete mixin；test_e2e_chain* 同样 pg_advisory_xact_lock 问题；test_audit_report.py 12 个 API endpoint 测试 401 Unauthorized（test client 未配置 auth override，与 JSON 种子修复无关）
-- NotificationCenter.vue 组件+store+API 完整，但 DefaultLayout.vue 顶部未挂铃铛入口，通知实际不可见（Round 2 重点修复）
-- ReviewWorkstation.vue 存在三栏+AI 预审+快捷键，但 router/index.ts 未注册，是死代码；实际入口 ReviewInbox.vue 无 AI 预审（Round 1 需合并）
-- backend/app/routers/pbc.py 和 confirmations.py 是占位空壳（各 15 行返回 []），不是真实功能，前端无对应页面
-- 归档端点三重并存语义不同：wp_storage.archive_project（锁底稿）/ private_storage.archive_project（锁+推云+清本地）/ data_lifecycle.archive_project（软删除可恢复），前端只有一个按钮入口
-- 三套就绪检查逻辑分散可能矛盾：gate_engine（submit_review/sign_off/export_package）/ partner_dashboard.sign-readiness（8 项）/ qc_dashboard.archive-readiness，需统一为 gate_engine 门面
-- SignatureRecord.signature_level 仅 String(20) 无顺序强制，三级签字无前置依赖校验
-- qc_engine.py 14 条 QC-01~14 规则 + gate_rules_phase14.py QC-19~26 全是硬编码 Python，无 qc_rule_definitions 表支持自定义
+- NotificationCenter.vue 已挂载到 DefaultLayout.vue 顶部导航（R6 Task 7），通知铃铛可见；导航顺序：复核收件箱→🔔通知→🛡️独立复核→📊EQCR指标
+- ReviewWorkstation.vue 已确认删除（R6 Task 8 验证 fileSearch 零命中）
+- backend/app/routers/pbc.py 和 confirmations.py 返回 `{"status": "developing", "items": [], "note": "..."}`，maturity 标记为 developing（R6 Task 8）
+- 归档编排已统一：ArchiveOrchestrator（R1 落地）+ 幂等逻辑（R6 Task 16，24h 内 succeeded/running 不重复打包）；前端 apiPaths.ts archive 对象已重写指向 /api/projects/${pid}/archive/...；旧端点 A/B/C 加 `Deprecation: version="R6"` 头
+- 三套就绪检查已统一：gate_engine 为唯一真源，SignReadinessService + ArchiveReadinessService 均调 readiness_facade（R1 落地），R6 补充 KamConfirmedRule + IndependenceConfirmedRule 注册到 sign_off + export_package
+- SignatureRecord.signature_level 控制流已解耦（R6 Task 6）：CA 验证走 required_role='signing_partner' + required_order=3，字段保留兼容但禁止用于控制流；scripts/check_signature_level_usage.py 静态检查纳入 CI
+- qc_rule_definitions 表已建（R6 Task 9），22 条 seed 规则（QC-01~14 + QC-19~26），QCEngine.check 启动前按 enabled 过滤；前端 /qc/rules 只读页面已就绪
 - WorkpaperEditor.vue 工具栏仅保存/同步公式/版本/下载/PDF/上传，无 AI 侧栏、无程序要求侧栏、无右键序时账穿透、无对比上年按钮
 - EQCR 角色与工作台已落地（R5 Tasks 1-7）：ProjectAssignment.role='eqcr' 已启用、GateType.eqcr_approval 已注册、ReportStatus.eqcr_approved 已扩展、EqcrService + /api/eqcr/* 路由 + 前端 EqcrWorkbench/EqcrProjectView 页面 + 5 Tab 组件 + 关联方 CRUD 全部就绪
 - ThreeColumnLayout.vue 新增 #nav-eqcr slot（R5 Task 4），DefaultLayout 注入"🛡️ 独立复核"导航按钮（partner/admin 可见）
@@ -114,6 +114,23 @@ inclusion: always
 - EQCR 服务拆分（50b034f）：`eqcr_workbench_service.py`（EqcrWorkbenchService: list_my_projects/get_project_overview）+ `eqcr_domain_service.py`（EqcrDomainService: 5 域聚合 + opinion CRUD）+ `eqcr_service.py` 薄组合类（MRO 继承向后兼容）
 - EQCR 枚举端点：`GET /api/eqcr/constants` 返回 domains/verdicts/progress_states，前端启动时拉取避免硬编码漂移
 - R5 Alembic 迁移链：round5_eqcr_20260505 → round5_independence_20260506 → round5_eqcr_check_constraints_20260506（PG CHECK domain+verdict）
+- R6 Alembic 迁移链：round6_qc_rule_definitions_20260507 → round6_review_binding_20260507（conversation_id 列）
+- R6 CI 骨架：`.github/workflows/ci.yml`（4 job: backend-tests/backend-lint/seed-validate/frontend-build）+ `.pre-commit-config.yaml`（check-json + json-template-lint）
+- R6 seed schema 校验：`scripts/validate_seed_files.py` + `backend/data/_seed_schemas.py`（6 个 seed 文件 Pydantic v2 校验）
+- R6 死链检查：`scripts/dead-link-check.js`（Node 脚本，扫描 apiPaths.ts 231 端点 vs router_registry 130 前缀，纳入 CI seed-validate job）
+- R6 gate_rules_round6.py：KamConfirmedRule（R6-KAM）+ IndependenceConfirmedRule（R6-INDEPENDENCE）+ SubsequentEventsReviewedRule（R7-SUBSEQUENT）+ GoingConcernEvaluatedRule（R7-GOING-CONCERN）+ MgmtRepresentationRule（R7-MGMT-REP），模块导入时自动注册到 sign_off + export_package
+- R6 复核批注边界：ReviewRecord.conversation_id FK → review_conversations.id；close_conversation 前校验未解决记录；IssueTicket 去重（source='review_comment' + source_ref_id）
+- ThreeColumnLayout.vue 新增 #nav-notifications slot（R6 Task 7）+ developing maturity badge 样式 .gt-maturity-dev（蓝灰 #909399）
+- router_registry.py §15 注册 qc_rules_router（内部 prefix="/api/qc/rules"）；前端路由 /qc/rules → QcRuleList.vue（权限 qc/admin/partner）
+- conftest.py test_all_models_registered：AST 遍历 backend/app/models/*.py 断言所有 __tablename__ 已注册到 Base.metadata.tables
+- R3 Sprint 4 AI 溯源：gate_rules_ai_content.py（AIContentMustBeConfirmedRule rule_code="R3-AI-UNCONFIRMED" 注册到 sign_off）+ wp_ai_confirm.py 端点（PATCH /ai-confirm 确认/拒绝/修订）+ ai_contribution_watermark.py 工具函数 + audit_log_rules_seed.json（AL-01~05）
+- R3 前端 QC 6 页面已就绪：QcRuleList（R6 创建）+ QcRuleEditor + QcInspectionWorkbench（含日志合规 Tab）+ ClientQualityTrend + QcCaseLibrary + QcAnnualReports，路由均在 /qc/* 下注册
+- 归档章节完整性：00 封面 ✓ / 01 签字流水 ✓ / 02 EQCR 备忘录 ✓ / 03 质控抽查报告 ✓ / 04 独立性声明 ✓ / 99 审计日志 ✓（全部有真实 generator）
+- Alembic 迁移链（14 个 round* 文件）：round1_review_closure → round1_long_term_compliance → round2_budget_handover → round2_batch3_arch_fixes → round3_qc_governance → round5_eqcr_20260506 → round4_editing_lock → round4_ocr_fields_cache（分支终点）；主链 round5_eqcr_20260505 → round5_independence → round5_eqcr_check_constraints → round6_qc_rule_definitions → round6_review_binding → round7_section_progress_gin
+- jsonpath-ng 已写入 requirements.txt，qc_rule_executor.py 的 jsonpath 分支已实装（execute_jsonpath_rule 函数）
+- qc_annual_report_service.py 导入修正：`build_ai_contribution_statement` 来自 `ai_contribution_watermark.generate_short_statement`（非 pdf_export_engine）
+- router_registry.py §17 注册 4 个 QC router（qc_inspections/qc_ratings/qc_cases/qc_annual_reports），内部已含完整 prefix 不加额外前缀
+- IssueTicket Q 整改单 SLA：Q_SLA_RESPONSE_HOURS=48 / Q_SLA_COMPLETE_HOURS=168，逾期走 _handle_q_sla_timeout 通知签字合伙人
 - datetime.utcnow() 已全局清理（81 文件），统一 `datetime.now(timezone.utc)`；后续新代码禁止使用 utcnow()
 - 归档包章节号分配：00 项目封面 / 01 签字流水（R1）/ 02 EQCR 备忘录（R5，已注册）/ 03 质控抽查报告（R3）/ 04 独立性声明（R1）/ 10 底稿/ / 20 报表/ / 30 附注/ / 40 附件/ / 99 审计日志
 - 审计意见锁定架构决策：不新增 opinion_locked_at 平行字段，改为扩展 ReportStatus 状态机 draft→review→eqcr_approved→final（R5 需求 6 + README 跨轮约束第 3 条）
@@ -157,7 +174,7 @@ inclusion: always
 - ProjectStatus 枚举值：created/planning/execution/completion/reporting/archived（没有 in_progress，测试 fixture 常用 execution）
 - CompetenceRating 枚举实际值：reliable/additional_procedures_needed/unreliable（设计 doc 中的"A/B/C/D"是业务语义而非代码枚举，前端标签映射需对齐实际枚举）
 - ReportStatus 枚举：draft/review/eqcr_approved/final；VALID_TRANSITIONS 矩阵定义在 `test_eqcr_state_machine_properties.py`（draft→review；review→{eqcr_approved,draft}；eqcr_approved→{review,final}；final→∅）
-- hypothesis 包**未**安装于后端 requirements.txt（与 memory 之前"16 Hypothesis 测试"描述不一致，那些测试实际因 import 错误无法运行）；新属性测试改用 pytest.mark.parametrize 覆盖状态组合
+- hypothesis 包已写入 requirements.txt（R6 Task 2），ruff@0.11.12 同步写入；CI 可正常运行属性测试
 - SQLAlchemy 异步模式下 `db.add(obj)` 不立即生成 PK，引用 obj.id 前必须 `await db.flush()`；gate_engine 此前因缺 flush 导致 trace_events.object_id NOT NULL 违反
 - SQLAlchemy `session.refresh(obj)` 会从 DB 重读覆盖内存中的未 flush 修改；业务代码变更字段后希望 refresh 可见时必须先 flush
 - python-docx 已装可用（phase13 note_word_exporter.py 同款），Word 生成遵循 `build_*_docx_bytes(...)→bytes` 纯函数模式便于单测；PDF 转换走 LibreOffice headless `soffice --headless --convert-to pdf`（memory 之前关于 LibreOffice 路径检测记录正确）
@@ -174,8 +191,29 @@ inclusion: always
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5 → R6，依据 README v2.2 "跨轮依赖矩阵"
 - **Round 4 已修复并验证通过（2026-05-06）**：修复 4+2 个真实缺口后 128 个测试全绿，app 870 路由正常启动。修复内容：(a) `get_prior_year_workpaper` 函数新增到 continuous_audit_service（通过 WpIndex join 获取 wp_code）；(b) prefill provenance 四函数追加到 prefill_engine.py；(c) 6 个 R4 router 注册到 router_registry.py §13；(d) 3 个 Sprint 集成测试创建；(e) ExportMaskService 新增 mask_context/mask_text/_is_sensitive_amount；(f) Attachment 模型新增 ocr_fields_cache；(g) wp_chat_service 脱敏集成
-- Round 6 三件套已完成（requirements+design+tasks），主题"跨角色系统级优化"，7 需求 / 18 任务 / 2 Sprint；设计阶段发现 R1 已落地 readiness_facade + ArchiveOrchestrator，需求 1/2 工作量大幅缩减
-- R6 一致性复核发现：(1) 旧归档端点 A/B/C 的 deprecated 标记已由 R1 实装（`deprecated=True` + `X-Deprecated` 头），R6 仅需改为标准 `Deprecation` 头；(2) `apiPaths.ts` 整个 `archive` 对象（不仅 `archive.archive`）全指向不存在的 `/api/archive/...`，需整体重写为 `/api/projects/.../archive/...`；(3) ThreeColumnLayout 无 `developing` maturity badge 样式，需新增；(4) `ruff` 未安装需加入 requirements.txt
+- **Round 6 实施完成（2026-05-07）**：18 任务 / 2 Sprint 全部完成，主题"跨角色系统级优化"。Sprint 1（CI骨架+签字解耦+铃铛挂载+死代码清理）+ Sprint 2（QC规则表+复核批注边界+归档幂等+GateRule补充+死链检查）
+- **R1-R6 复盘断点清单（2026-05-07 发现，P0-P3 已修复）**：
+  - ✅ R3 前端 5 页面补完（QcRuleEditor/QcInspectionWorkbench/ClientQualityTrend/QcCaseLibrary/QcAnnualReports）+ 路由注册 + 编译通过
+  - ✅ R3 Sprint 4 AI 溯源 5 任务实装（gate_rules_ai_content + AiContentConfirmDialog + wp_ai_confirm 端点 + ai_contribution_watermark + audit_log_rules_seed + 日志合规 Tab）
+  - ✅ 归档章节 03（质控抽查报告）+ 04（独立性声明）真实 generator 落地
+  - ✅ Archive PDF SHA-256 水印修正（占位符改为引用 manifest_hash）
+  - ✅ section_progress GIN 索引迁移（round7_section_progress_gin_20260507）
+  - ✅ 就绪检查 extra_findings 完全消灭（subsequent_events/going_concern/mgmt_representation 升级为 GateRule R7-*）
+  - ✅ jsonpath-ng 写入 requirements.txt，jsonpath 执行器已确认实装
+  - ✅ Alembic 迁移链核验通过（14 个 round* 迁移，无分叉冲突）
+  - 🔲 R3 tasks.md 状态回填（后端已就绪+前端已补，需批量标 [x]）
+  - 🔲 R1 UAT-1~6 浏览器手动验证（需真人执行）
+  - 🔲 Round2-Task-A 测试盲点 11 项（并发/Worker/PBT）需真实 PG 环境
+  - 🔲 性能压测真实环境跑（6000 并发验收）
+  - 🔲 ReviewWorkbench 中栏只读 Editor（R1 已知妥协，低优先级）
+- **R3 深度复盘（2026-05-07）新发现的断点 — 已全部修复**：
+  - ✅ 4 个 QC router 注册到 router_registry.py §17（qc_inspections/qc_ratings/qc_cases/qc_annual_reports）
+  - ✅ sla_worker Q 整改单 SLA 分支（_handle_q_sla_timeout：标记 sla_breached + 通知签字合伙人）
+  - ✅ QCDashboard.vue 新增"项目评级"Tab（A/B/C/D badge）+ "复核人画像"Tab（5 维度指标表）
+  - ✅ IssueTicketList source='Q' 特殊 UI（🛡️图标 + .q-source-row 红左边框）
+  - ✅ QcRuleEditor 强制试运行（hasRunDryRun flag，保存按钮 disabled 直到试运行完成）
+  - ✅ 年报 Word 模板真实渲染（python-docx 5 章节填充，不可用时降级文本）
+  - ✅ QcInspectionWorkbench "生成质控报告"按钮（选中批次后下载 Word）
 - Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
 - Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，122 个 EQCR 测试全通过；R5 关闭
 

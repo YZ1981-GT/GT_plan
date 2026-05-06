@@ -957,23 +957,61 @@ class IndependenceDeclarationCompleteRule(GateRule):
 
 
 def register_phase14_rules():
-    """注册 QC-19~26 到 rule_registry"""
+    """注册 QC-19~26 到 rule_registry
+
+    R6: 注册前检查 qc_rule_definitions 表中的 enabled 状态，
+    disabled 的规则不注册。非 python 类型规则记 warning 跳过。
+    由于注册发生在启动时（同步上下文），使用同步查询或降级策略。
+    """
+    import asyncio
+
+    # 尝试从 DB 加载 enabled 规则集
+    enabled_rule_codes: set[str] | None = None
+    try:
+        enabled_rule_codes = _load_enabled_rule_codes_sync()
+    except Exception as e:
+        logger.warning("[GATE] Failed to load qc_rule_definitions for phase14 registration, "
+                       "registering all rules: %s", e)
+
+    def _should_register(rule_instance) -> bool:
+        """检查规则是否应该注册（enabled 且为 python 类型）"""
+        if enabled_rule_codes is None:
+            # DB 不可用时降级：全部注册
+            return True
+        return rule_instance.rule_code in enabled_rule_codes
+
     all_gates = [GateType.submit_review, GateType.sign_off, GateType.export_package]
     submit_sign = [GateType.submit_review, GateType.sign_off]
 
     # QC-19/20 程序裁剪：提交+签字
-    rule_registry.register_all(submit_sign, QC19MandatoryTrimRule())
-    rule_registry.register_all(submit_sign, QC20ConditionalNoEvidenceRule())
+    rule = QC19MandatoryTrimRule()
+    if _should_register(rule):
+        rule_registry.register_all(submit_sign, rule)
+    rule = QC20ConditionalNoEvidenceRule()
+    if _should_register(rule):
+        rule_registry.register_all(submit_sign, rule)
 
     # QC-21~24 LLM/证据链：提交+签字
-    rule_registry.register_all(submit_sign, QC21ConclusionWithoutEvidenceRule())
-    rule_registry.register_all(submit_sign, QC22LowConfidenceSingleSourceRule())
-    rule_registry.register_all(submit_sign, QC23LLMPendingConfirmationRule())
-    rule_registry.register_all(submit_sign, QC24LLMTrimConflictRule())
+    rule = QC21ConclusionWithoutEvidenceRule()
+    if _should_register(rule):
+        rule_registry.register_all(submit_sign, rule)
+    rule = QC22LowConfidenceSingleSourceRule()
+    if _should_register(rule):
+        rule_registry.register_all(submit_sign, rule)
+    rule = QC23LLMPendingConfirmationRule()
+    if _should_register(rule):
+        rule_registry.register_all(submit_sign, rule)
+    rule = QC24LLMTrimConflictRule()
+    if _should_register(rule):
+        rule_registry.register_all(submit_sign, rule)
 
     # QC-25/26 版本/映射：三入口
-    rule_registry.register_all(all_gates, QC25ReportNoteVersionStaleRule())
-    rule_registry.register_all(all_gates, QC26NoteSourceMappingMissingRule())
+    rule = QC25ReportNoteVersionStaleRule()
+    if _should_register(rule):
+        rule_registry.register_all(all_gates, rule)
+    rule = QC26NoteSourceMappingMissingRule()
+    if _should_register(rule):
+        rule_registry.register_all(all_gates, rule)
 
     # Phase 16: 一致性阻断联动签字门禁
     rule_registry.register(GateType.sign_off, ConsistencyBlockingDiffRule())
@@ -993,3 +1031,47 @@ def register_phase14_rules():
     rule_registry.register_all([GateType.sign_off], IndependenceDeclarationCompleteRule())
 
     logger.info("[GATE] Phase 14 rules QC-19~26 + consistency + misstatement registered")
+
+
+def _load_enabled_rule_codes_sync() -> set[str]:
+    """同步加载 qc_rule_definitions 中 enabled=true 且 expression_type='python' 的 rule_code 集合。
+
+    用于启动时 register_phase14_rules 的同步上下文。
+    非 python 类型规则记 warning 并跳过。
+    """
+    from sqlalchemy import create_engine as create_sync_engine, select as sync_select, text as sync_text
+    from app.core.config import settings
+
+    # 尝试用同步引擎快速查询
+    try:
+        from app.models.qc_rule_models import QcRuleDefinition
+        from app.models.base import Base
+        import sqlalchemy as sa_sync
+
+        db_url = str(settings.DATABASE_URL)
+        # 转换 async URL 为 sync URL
+        if "aiosqlite" in db_url:
+            db_url = db_url.replace("sqlite+aiosqlite", "sqlite")
+        elif "asyncpg" in db_url:
+            db_url = db_url.replace("postgresql+asyncpg", "postgresql")
+
+        sync_engine = create_sync_engine(db_url, echo=False)
+        with sync_engine.connect() as conn:
+            result = conn.execute(
+                sa_sync.select(
+                    QcRuleDefinition.rule_code,
+                    QcRuleDefinition.expression_type,
+                ).where(QcRuleDefinition.enabled == sa_sync.true())
+            )
+            rows = result.all()
+
+        enabled_codes: set[str] = set()
+        for rule_code, expression_type in rows:
+            if expression_type != "python":
+                logger.warning("R6 stub: non-python rule ignored: %s (type=%s)", rule_code, expression_type)
+                continue
+            enabled_codes.add(rule_code)
+        sync_engine.dispose()
+        return enabled_codes
+    except Exception:
+        raise

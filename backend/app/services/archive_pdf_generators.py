@@ -349,13 +349,18 @@ async def _get_user_display_name(user_id: UUID, db: AsyncSession) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _build_watermark(hash_placeholder: str = "待归档完成后填入") -> str:
-    """生成水印文本。"""
+def _build_watermark(hash_value: str | None = None) -> str:
+    """生成水印文本。
+
+    Args:
+        hash_value: 归档包 SHA-256 哈希值。若为 None 则使用占位符
+                    （首次生成时哈希尚未计算，归档完成后由 manifest_hash 字段记录真实值）。
+    """
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     return _WATERMARK_TEXT.format(
         version=APP_VERSION,
         time=now_str,
-        hash=hash_placeholder,
+        hash=hash_value or "见 manifest_hash",
     )
 
 

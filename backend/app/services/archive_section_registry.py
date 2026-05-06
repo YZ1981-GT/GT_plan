@@ -245,3 +245,45 @@ register(
     _eqcr_memo_pdf_generator,
     "EQCR 备忘录（R5 需求 9）",
 )
+
+
+# ---------------------------------------------------------------------------
+# R7 章节注册：质控抽查报告 + 独立性声明（P1 补完）
+# ---------------------------------------------------------------------------
+
+
+async def _qc_inspection_generator(
+    project_id: UUID, db: AsyncSession
+) -> bytes | Path | None:
+    """归档引擎调用：返回质控抽查报告文本字节。"""
+    from app.services.archive_generators.qc_inspection_generator import (
+        generate_qc_inspection_report,
+    )
+
+    return await generate_qc_inspection_report(project_id, db)
+
+
+async def _independence_generator(
+    project_id: UUID, db: AsyncSession
+) -> bytes | Path | None:
+    """归档引擎调用：返回独立性声明汇总文本字节。"""
+    from app.services.archive_generators.independence_generator import (
+        generate_independence_declarations,
+    )
+
+    return await generate_independence_declarations(project_id, db)
+
+
+register(
+    "03",
+    "qc_inspection_report.txt",
+    _qc_inspection_generator,
+    "质控抽查报告（R3 需求 4，R7 补完）",
+)
+
+register(
+    "04",
+    "independence_declarations.txt",
+    _independence_generator,
+    "独立性声明（R1 需求 10，R7 补完）",
+)

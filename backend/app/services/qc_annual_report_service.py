@@ -25,7 +25,7 @@ from app.models.phase13_models import ExportJob, ExportJobStatus
 from app.models.phase15_models import IssueTicket
 from app.models.qc_rating_models import ProjectQualityRating, ReviewerMetricsSnapshot
 from app.services.export_job_service import ExportJobService
-from app.services.pdf_export_engine import build_ai_contribution_statement
+from app.services.ai_contribution_watermark import generate_short_statement as build_ai_contribution_statement
 
 logger = logging.getLogger(__name__)
 
@@ -216,10 +216,10 @@ class QcAnnualReportService:
         job: ExportJob,
         year: int,
     ) -> None:
-        """执行报告生成（简化实现：生成占位文件并标记完成）。
+        """执行报告生成 — 使用 python-docx 填充模板。
 
-        实际生产中应使用 python-docx 或 HTML→PDF 方案填充模板。
-        当前实现生成一个包含各章节数据摘要的文本文件作为占位。
+        从 qc_annual_report.docx 模板加载，填充各章节数据后输出 .docx 文件。
+        若 python-docx 不可用则降级为文本文件。
         """
         try:
             # 更新状态为 running
@@ -232,13 +232,102 @@ class QcAnnualReportService:
             # 确保输出目录存在
             ANNUAL_REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
-            # 生成占位文件（实际应为 .docx）
-            output_filename = f"qc_annual_report_{year}.txt"
-            output_path = ANNUAL_REPORT_DIR / output_filename
+            # 尝试使用 python-docx 生成真实 Word 文件
+            try:
+                from docx import Document
+                from docx.shared import Pt, Inches
+                from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-            # 写入报告内容（文本占位）
-            content = self._render_report_text(year, report_data)
-            output_path.write_text(content, encoding="utf-8")
+                # 加载模板或新建文档
+                if TEMPLATE_PATH.exists():
+                    doc = Document(str(TEMPLATE_PATH))
+                else:
+                    doc = Document()
+
+                # 标题页
+                title_para = doc.add_paragraph()
+                title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = title_para.add_run(f"{year} 年度质量控制报告")
+                run.font.size = Pt(22)
+                run.bold = True
+                doc.add_paragraph()
+
+                # 第一章：项目规模分布
+                doc.add_heading("一、项目规模与分布", level=1)
+                scale = report_data.get("project_scale", {})
+                doc.add_paragraph(f"本年度共执行审计项目 {scale.get('total_projects', 0)} 个。")
+                if scale.get("by_type"):
+                    for ptype, count in scale["by_type"].items():
+                        doc.add_paragraph(f"  • {ptype}：{count} 个", style="List Bullet")
+
+                # 第二章：评级分布
+                doc.add_heading("二、项目质量评级分布", level=1)
+                rating_dist = report_data.get("rating_distribution", {})
+                for grade in ["A", "B", "C", "D"]:
+                    count = rating_dist.get(grade, 0)
+                    doc.add_paragraph(f"  • {grade} 级：{count} 个项目", style="List Bullet")
+
+                # 第三章：Top10 问题
+                doc.add_heading("三、年度典型问题 Top10", level=1)
+                top10 = report_data.get("top10_issues", [])
+                if top10:
+                    table = doc.add_table(rows=1, cols=3)
+                    table.style = "Table Grid"
+                    hdr = table.rows[0].cells
+                    hdr[0].text = "序号"
+                    hdr[1].text = "问题描述"
+                    hdr[2].text = "出现次数"
+                    for idx, issue in enumerate(top10[:10], 1):
+                        row = table.add_row().cells
+                        row[0].text = str(idx)
+                        row[1].text = issue.get("description", "")[:100]
+                        row[2].text = str(issue.get("count", 0))
+                else:
+                    doc.add_paragraph("本年度无典型问题记录。")
+
+                # 第四章：复核人表现
+                doc.add_heading("四、复核人表现", level=1)
+                reviewers = report_data.get("reviewer_performance", [])
+                if reviewers:
+                    table = doc.add_table(rows=1, cols=4)
+                    table.style = "Table Grid"
+                    hdr = table.rows[0].cells
+                    hdr[0].text = "复核人"
+                    hdr[1].text = "复核底稿数"
+                    hdr[2].text = "平均时长(min)"
+                    hdr[3].text = "退回率"
+                    for r in reviewers[:20]:
+                        row = table.add_row().cells
+                        row[0].text = r.get("reviewer_name", "")
+                        row[1].text = str(r.get("wp_count", 0))
+                        row[2].text = str(r.get("avg_time_min", 0))
+                        row[3].text = f"{r.get('rejection_rate', 0) * 100:.1f}%"
+                else:
+                    doc.add_paragraph("暂无复核人数据。")
+
+                # 第五章：附录
+                doc.add_heading("五、附录", level=1)
+                appendix = report_data.get("appendix", {})
+                doc.add_paragraph(f"抽查批次数：{appendix.get('inspection_count', 0)}")
+                doc.add_paragraph(f"规则变更次数：{appendix.get('rule_change_count', 0)}")
+
+                # AI 贡献声明
+                doc.add_paragraph()
+                from app.services.ai_contribution_watermark import generate_short_statement
+                doc.add_paragraph(generate_short_statement())
+
+                # 保存 .docx
+                output_filename = f"qc_annual_report_{year}.docx"
+                output_path = ANNUAL_REPORT_DIR / output_filename
+                doc.save(str(output_path))
+
+            except ImportError:
+                # python-docx 不可用，降级为文本文件
+                logger.warning("python-docx 不可用，降级为文本年报")
+                output_filename = f"qc_annual_report_{year}.txt"
+                output_path = ANNUAL_REPORT_DIR / output_filename
+                content = self._render_report_text(year, report_data)
+                output_path.write_text(content, encoding="utf-8")
 
             # 更新 job payload 记录文件路径
             if job.payload is None:

@@ -129,6 +129,10 @@ def register_all_routers(app: FastAPI) -> None:
               dfc_router, exhtml_router]:
         app.include_router(r, tags=["底稿管理"])
 
+    # 底稿 AI 内容确认
+    from app.routers.wp_ai_confirm import router as wp_ai_confirm_router
+    app.include_router(wp_ai_confirm_router, tags=["底稿管理"])
+
     # 底稿三式联动
     from app.routers.wp_structure import router as wpstruct_router
     app.include_router(wpstruct_router, tags=["底稿管理"])
@@ -296,3 +300,25 @@ def register_all_routers(app: FastAPI) -> None:
     # EQCR 路由包内部已声明 prefix="/api/eqcr"，注册时不加额外前缀。
     from app.routers.eqcr import router as eqcr_router
     app.include_router(eqcr_router, tags=["eqcr"])
+
+    # ═══ 15. Round 6：QC 规则定义管理 ═══
+    # qc_rules 路由内部已声明 prefix="/api/qc/rules"，注册时不加额外前缀。
+    from app.routers.qc_rules import router as qc_rules_router
+    app.include_router(qc_rules_router, tags=["qc-rules"])
+
+    # ═══ 16. Round 3：QC 审计日志合规抽查 ═══
+    # qc_audit_log_compliance 路由内部已声明 prefix="/api/qc/audit-log-compliance"
+    from app.routers.qc_audit_log_compliance import router as qc_alc_router
+    app.include_router(qc_alc_router, tags=["qc-audit-log-compliance"])
+
+    # ═══ 17. Round 3：QC 抽查 + 评级 + 案例库 + 年报 ═══
+    # 以下 4 个路由内部已声明完整 prefix，注册时不加额外前缀。
+    from app.routers.qc_inspections import router as qc_insp_router
+    from app.routers.qc_ratings import router as qc_rat_router
+    from app.routers.qc_cases import router as qc_case_router
+    from app.routers.qc_annual_reports import router as qc_ar_router
+
+    app.include_router(qc_insp_router, tags=["qc-inspections"])
+    app.include_router(qc_rat_router, tags=["qc-ratings"])
+    app.include_router(qc_case_router, tags=["qc-cases"])
+    app.include_router(qc_ar_router, tags=["qc-annual-reports"])

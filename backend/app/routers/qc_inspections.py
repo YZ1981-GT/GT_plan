@@ -126,3 +126,106 @@ async def record_verdict(
     )
     await db.commit()
     return result
+
+
+@router.get("/{inspection_id}/report")
+async def generate_inspection_report(
+    inspection_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(["qc", "admin"])),
+):
+    """生成质控抽查报告 Word 文件并返回下载流。
+
+    使用 python-docx 生成结构化报告，包含批次信息、抽查子项及结论。
+    若 python-docx 不可用则降级为纯文本。
+    """
+    from fastapi.responses import Response
+
+    # 获取抽查详情
+    detail = await qc_inspection_service.get_inspection(db, inspection_id)
+    if not detail:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="抽查批次不存在")
+
+    try:
+        from docx import Document
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        import io
+
+        doc = Document()
+
+        # 标题
+        title = doc.add_paragraph()
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = title.add_run("质控抽查报告")
+        run.font.size = Pt(18)
+        run.bold = True
+
+        # 基本信息
+        doc.add_heading("一、抽查批次信息", level=1)
+        doc.add_paragraph(f"项目：{detail.get('project_name', '未知')}")
+        doc.add_paragraph(f"策略：{detail.get('strategy', '未知')}")
+        doc.add_paragraph(f"状态：{detail.get('status', '未知')}")
+        doc.add_paragraph(f"创建时间：{detail.get('created_at', '未知')}")
+
+        # 抽查子项
+        items = detail.get("items", [])
+        doc.add_heading("二、抽查结果明细", level=1)
+        if items:
+            table = doc.add_table(rows=1, cols=4)
+            table.style = "Table Grid"
+            hdr = table.rows[0].cells
+            hdr[0].text = "序号"
+            hdr[1].text = "底稿"
+            hdr[2].text = "结论"
+            hdr[3].text = "发现"
+            for idx, item in enumerate(items, 1):
+                row = table.add_row().cells
+                row[0].text = str(idx)
+                row[1].text = str(item.get("wp_id", ""))[:12]
+                row[2].text = item.get("qc_verdict", item.get("verdict", "待评定"))
+                findings = item.get("findings", {})
+                row[3].text = str(findings) if findings else "无"
+        else:
+            doc.add_paragraph("暂无抽查子项。")
+
+        # 汇总
+        doc.add_heading("三、汇总", level=1)
+        total = len(items)
+        passed = sum(1 for i in items if i.get("qc_verdict") == "pass" or i.get("verdict") == "pass")
+        failed = sum(1 for i in items if i.get("qc_verdict") == "fail" or i.get("verdict") == "fail")
+        doc.add_paragraph(f"总计：{total} 项 | 通过：{passed} | 不通过：{failed} | 有条件通过：{total - passed - failed}")
+
+        # 输出
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        content = buffer.getvalue()
+
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f'attachment; filename="inspection_report_{inspection_id}.docx"'},
+        )
+
+    except ImportError:
+        # python-docx 不可用，降级为文本
+        lines = [
+            "质控抽查报告",
+            f"批次ID: {inspection_id}",
+            f"项目: {detail.get('project_name', '未知')}",
+            f"策略: {detail.get('strategy', '未知')}",
+            f"状态: {detail.get('status', '未知')}",
+            "",
+            "抽查子项:",
+        ]
+        for idx, item in enumerate(detail.get("items", []), 1):
+            lines.append(f"  {idx}. {item.get('wp_id', '')} - {item.get('qc_verdict', '待评定')}")
+
+        content = "\n".join(lines).encode("utf-8")
+        return Response(
+            content=content,
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="inspection_report_{inspection_id}.txt"'},
+        )

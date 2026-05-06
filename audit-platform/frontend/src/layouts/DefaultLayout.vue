@@ -18,6 +18,10 @@
       </router-link>
     </template>
 
+    <template #nav-notifications>
+      <NotificationCenter />
+    </template>
+
     <template #nav-eqcr>
       <router-link
         v-if="isEqcrEligible"
@@ -95,6 +99,7 @@ import FourColumnContent from '@/components/layout/FourColumnContent.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
+import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { getProject } from '@/services/auditPlatformApi'

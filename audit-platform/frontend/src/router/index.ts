@@ -467,6 +467,43 @@ const router = createRouter({
           component: () => import('@/views/eqcr/EqcrMetrics.vue'),
           meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner'] },
         },
+        // ── Round 6：QC 规则定义只读列表 ──
+        {
+          path: 'qc/rules',
+          name: 'QcRuleList',
+          component: () => import('@/views/qc/QcRuleList.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/rules/:ruleId/edit',
+          name: 'QcRuleEditor',
+          component: () => import('@/views/qc/QcRuleEditor.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/inspections',
+          name: 'QcInspectionWorkbench',
+          component: () => import('@/views/qc/QcInspectionWorkbench.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/clients/:clientName/trend',
+          name: 'ClientQualityTrend',
+          component: () => import('@/views/qc/ClientQualityTrend.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/cases',
+          name: 'QcCaseLibrary',
+          component: () => import('@/views/qc/QcCaseLibrary.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/annual-reports',
+          name: 'QcAnnualReports',
+          component: () => import('@/views/qc/QcAnnualReports.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
       ],
     },
     {

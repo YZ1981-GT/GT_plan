@@ -105,21 +105,21 @@ export const projectMgmtApi = {
 // Archive
 export const archiveApi = {
   initChecklist: (projectId: string) =>
-    http.post(`/api/archive/${projectId}/checklist/init`),
+    http.post(`/api/projects/${projectId}/archive/checklist/init`),
   getChecklist: (projectId: string) =>
-    http.get(`/api/archive/${projectId}/checklist`),
+    http.get(`/api/projects/${projectId}/archive/checklist`),
   completeItem: (projectId: string, itemId: string, notes?: string) =>
-    http.post(`/api/archive/${projectId}/checklist/${itemId}/complete`, null, { params: { notes } }),
+    http.post(`/api/projects/${projectId}/archive/checklist/${itemId}/complete`, null, { params: { notes } }),
   archive: (projectId: string) =>
-    http.post(`/api/archive/${projectId}/archive`),
+    http.post(`/api/projects/${projectId}/archive/orchestrate`),
   exportPdf: (projectId: string, data?: { password?: string }) =>
-    http.post(`/api/archive/${projectId}/export-pdf`, data),
+    http.post(`/api/projects/${projectId}/archive/export-pdf`, data),
   requestModification: (projectId: string, data: any) =>
-    http.post(`/api/archive/${projectId}/modifications`, data),
+    http.post(`/api/projects/${projectId}/archive/modifications`, data),
   approveModification: (projectId: string, modId: string, comments?: string) =>
-    http.post(`/api/archive/${projectId}/modifications/${modId}/approve`, null, { params: { comments } }),
+    http.post(`/api/projects/${projectId}/archive/modifications/${modId}/approve`, null, { params: { comments } }),
   rejectModification: (projectId: string, modId: string, comments?: string) =>
-    http.post(`/api/archive/${projectId}/modifications/${modId}/reject`, null, { params: { comments } }),
+    http.post(`/api/projects/${projectId}/archive/modifications/${modId}/reject`, null, { params: { comments } }),
 }
 
 // Subsequent Events

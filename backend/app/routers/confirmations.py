@@ -13,4 +13,8 @@ async def list_confirmations(
     user=Depends(get_current_user),
 ):
     """获取项目函证列表"""
-    return []
+    return {
+        "status": "developing",
+        "items": [],
+        "note": "Feature not implemented; scheduled for R7+",
+    }

@@ -36,6 +36,10 @@ logger = logging.getLogger(__name__)
 # SLA 时限（小时）
 SLA_HOURS = {"P0": 4, "P1": 24, "P2": 72}
 
+# R3 需求 5：Q 整改单专属 SLA（小时）
+Q_SLA_RESPONSE_HOURS = 48   # 48h 内必须响应（open → in_fix）
+Q_SLA_COMPLETE_HOURS = 168  # 7d 内必须完成（in_fix → closed）
+
 # 合法状态迁移
 VALID_TRANSITIONS = {
     (IssueStatus.open, IssueStatus.in_fix),
@@ -62,8 +66,26 @@ class IssueTicketService:
         operator_id: uuid.UUID,
         sla_level: str,
         task_node_id: Optional[uuid.UUID] = None,
+        source_ref_id: Optional[uuid.UUID] = None,
     ) -> dict:
-        """从复核对话创建问题单"""
+        """从复核对话创建问题单
+
+        R6 需求 3 AC5：去重校验 — 若已存在 IssueTicket(source='review_comment',
+        source_ref_id=record.id) 则直接返回已有工单，不重复创建。
+        """
+        # R6: 去重校验 — 按 source_ref_id 或 conversation_id 查重
+        if source_ref_id is not None:
+            existing_stmt = select(IssueTicket).where(
+                IssueTicket.source == IssueSource.review_comment.value,
+                IssueTicket.source_ref_id == source_ref_id,
+            )
+            existing_result = await db.execute(existing_stmt)
+            existing_ticket = existing_result.scalar_one_or_none()
+            if existing_ticket is not None:
+                result_dict = self._to_dict(existing_ticket)
+                result_dict["deduplicated"] = True
+                return result_dict
+
         # 从 review_conversations 提取上下文
         from sqlalchemy import text as sa_text
         stmt = sa_text("""
@@ -90,6 +112,7 @@ class IssueTicketService:
             task_node_id=task_node_id,
             conversation_id=conversation_id,
             source=source,
+            source_ref_id=source_ref_id,
             severity="major",
             category="data_mismatch",
             title=title or "从对话创建的问题单",
@@ -252,6 +275,12 @@ class IssueTicketService:
 
         escalated = []
         for ticket in tickets:
+            # R3 需求 5：Q 整改单专属 SLA 处理
+            if ticket.source == IssueSource.Q.value:
+                await self._handle_q_sla_timeout(db, ticket)
+                escalated.append(self._to_dict(ticket))
+                continue
+
             current_idx = -1
             for i, level in enumerate(ESCALATION_ORDER):
                 if ticket.source == level.value:
@@ -268,6 +297,44 @@ class IssueTicketService:
                     logger.error(f"[SLA_TIMEOUT] escalate failed: issue={ticket.id} error={e}")
 
         return escalated
+
+    async def _handle_q_sla_timeout(self, db: AsyncSession, ticket: IssueTicket) -> None:
+        """R3 需求 5：Q 整改单专属 SLA 处理
+
+        - 48h 响应 SLA：open 状态超 48h 未转 in_fix → 升级通知到签字合伙人
+        - 7d 完成 SLA：in_fix 状态超 7d 未关闭 → 升级通知到签字合伙人
+        - 使用 reason_code 标记逾期状态（'Q_SLA_BREACHED'）
+        """
+        now = datetime.now(timezone.utc)
+        hours_overdue = (now - ticket.due_at).total_seconds() / 3600 if ticket.due_at else 0
+
+        # 标记逾期（用 reason_code 字段，避免新增列）
+        if ticket.reason_code != "Q_SLA_BREACHED":
+            ticket.reason_code = "Q_SLA_BREACHED"
+
+        # 发送升级通知到签字合伙人
+        try:
+            from app.models.core import Project
+            from app.services.notification_service import notification_service
+
+            project = (await db.execute(
+                select(Project).where(Project.id == ticket.project_id)
+            )).scalar_one_or_none()
+
+            if project and project.created_by:
+                await notification_service.create_notification(
+                    db,
+                    user_id=project.created_by,
+                    notification_type="qc_sla_breach",
+                    title=f"质控整改单逾期：{ticket.title[:50]}",
+                    content=f"工单已逾期 {int(hours_overdue)} 小时，请督促整改",
+                    related_object_type="issue_ticket",
+                    related_object_id=str(ticket.id),
+                )
+        except Exception as e:
+            logger.warning("[Q-SLA] notification failed: %s", e)
+
+        await db.flush()
 
     async def list_issues(
         self,

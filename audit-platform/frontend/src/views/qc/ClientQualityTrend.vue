@@ -3,86 +3,90 @@
     <!-- 顶部横幅 -->
     <div class="gt-page-banner gt-page-banner--teal">
       <div class="gt-banner-content">
-        <h2>📈 客户质量趋势 — {{ clientName }}</h2>
-        <span class="gt-banner-sub">
-          近 {{ selectedYears }} 年审计质量变化
-        </span>
+        <h2>📈 客户质量趋势</h2>
+        <span class="gt-banner-sub">客户：{{ clientName }}</span>
       </div>
       <div class="gt-banner-actions">
-        <el-select
-          v-model="selectedYears"
-          size="small"
-          style="width: 100px"
-          @change="loadTrend"
-        >
-          <el-option :value="3" label="近 3 年" />
-          <el-option :value="5" label="近 5 年" />
-          <el-option :value="10" label="近 10 年" />
+        <span style="margin-right: 8px; font-size: 13px; color: #fff;">年数：</span>
+        <el-select v-model="years" size="small" style="width: 80px;" @change="loadTrend">
+          <el-option v-for="y in 10" :key="y" :label="`${y}`" :value="y" />
         </el-select>
-        <el-button size="small" @click="loadTrend" :loading="loading">刷新</el-button>
-        <el-button size="small" @click="$router.back()">返回</el-button>
+        <el-button size="small" @click="loadTrend" :loading="loading" style="margin-left: 8px;">
+          刷新
+        </el-button>
       </div>
     </div>
 
-    <!-- 折线图 -->
-    <div class="chart-section">
-      <h3 class="section-title">质量评分趋势</h3>
-      <GTChart :option="chartOption" :height="320" :loading="loading" empty-text="暂无趋势数据" />
-    </div>
+    <!-- 趋势表格 -->
+    <el-table
+      :data="trendData"
+      v-loading="loading"
+      stripe
+      style="width: 100%; margin-top: 16px;"
+    >
+      <el-table-column label="年度" prop="year" width="100" align="center" />
 
-    <!-- 年度对比表 -->
-    <div class="table-section">
-      <h3 class="section-title">年度对比明细</h3>
-      <el-table
-        :data="tableData"
-        v-loading="loading"
-        stripe
-        style="width: 100%"
-        row-key="year"
-      >
-        <el-table-column label="年度" prop="year" width="100" align="center" />
-        <el-table-column label="评级" width="100" align="center">
-          <template #default="{ row }">
-            <template v-if="row.hasData">
-              <el-tag
-                :type="ratingTagType(row.rating)"
-                size="default"
-                effect="dark"
-              >
-                {{ row.rating || '—' }}
-              </el-tag>
-            </template>
-            <span v-else class="no-data-text">该年份无审计项目</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="评分" width="100" align="center">
-          <template #default="{ row }">
-            <span v-if="row.hasData">{{ row.score != null ? row.score : '—' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="问题数" width="100" align="center">
-          <template #default="{ row }">
-            <span v-if="row.hasData">{{ row.issue_count }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="错报金额" min-width="140" align="right">
-          <template #default="{ row }">
-            <span v-if="row.hasData">{{ formatAmount(row.misstatement_amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="重要性水平" min-width="140" align="right">
-          <template #default="{ row }">
-            <span v-if="row.hasData">
-              {{ row.materiality_level != null ? formatAmount(row.materiality_level) : '—' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="项目数" width="100" align="center">
-          <template #default="{ row }">
-            <span v-if="row.hasData">{{ row.project_count }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <el-table-column label="评级" prop="rating" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.rating" :type="ratingTagType(row.rating)" size="small" effect="dark">
+            {{ row.rating }}
+          </el-tag>
+          <span v-else class="no-data">—</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="问题数量" prop="issue_count" width="120" align="center">
+        <template #default="{ row }">
+          <span v-if="row.issue_count != null">{{ row.issue_count }}</span>
+          <span v-else class="no-data">—</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="错报金额" prop="misstatement_amount" min-width="180">
+        <template #default="{ row }">
+          <div v-if="row.misstatement_amount != null" class="amount-bar">
+            <el-progress
+              :percentage="calcPercentage(row.misstatement_amount)"
+              :color="amountColor(row.misstatement_amount)"
+              :stroke-width="14"
+              :show-text="false"
+              style="flex: 1;"
+            />
+            <span class="amount-value">{{ formatAmount(row.misstatement_amount) }}</span>
+          </div>
+          <span v-else class="no-data">—</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="重要性水平" prop="materiality_level" min-width="160">
+        <template #default="{ row }">
+          <span v-if="row.materiality_level != null">{{ formatAmount(row.materiality_level) }}</span>
+          <span v-else class="no-data">—</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 简易趋势可视化 -->
+    <div v-if="trendData.length" class="trend-visual">
+      <h4>问题数量趋势</h4>
+      <div class="bar-chart">
+        <div
+          v-for="item in trendData"
+          :key="item.year"
+          class="bar-item"
+        >
+          <el-progress
+            :percentage="calcIssuePercentage(item.issue_count)"
+            :color="issueBarColor(item.issue_count)"
+            :stroke-width="20"
+            :show-text="false"
+            style="width: 100%;"
+            direction="vertical"
+          />
+          <div class="bar-label">{{ item.year }}</div>
+          <div class="bar-value">{{ item.issue_count ?? '—' }}</div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -91,143 +95,80 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import GTChart from '@/components/GTChart.vue'
-import {
-  getClientQualityTrend,
-  type ClientQualityTrendItem,
-} from '@/services/qcDashboardApi'
+import { api } from '@/services/apiProxy'
 
-const route = useRoute()
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface TrendItem {
+  year: number
+  rating: string | null
+  issue_count: number | null
+  misstatement_amount: number | null
+  materiality_level: number | null
+}
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
-const clientName = computed(() => decodeURIComponent(route.params.clientName as string))
-const selectedYears = ref(3)
+const route = useRoute()
+const clientName = computed(() => (route.params.clientName as string) || '未知客户')
+const years = ref(3)
 const loading = ref(false)
-const trendData = ref<ClientQualityTrendItem[]>([])
-
-// ─── Chart Option ───────────────────────────────────────────────────────────
-
-const chartOption = computed(() => {
-  const years = trendData.value.map((t) => String(t.year))
-  const scores = trendData.value.map((t) => (t.data?.score != null ? t.data.score : null))
-
-  if (years.length === 0 || scores.every((s) => s === null)) {
-    return { series: [] }
-  }
-
-  return {
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: any) => {
-        const p = Array.isArray(params) ? params[0] : params
-        const idx = p.dataIndex
-        const item = trendData.value[idx]
-        if (!item?.data) return `${item?.year}：该年份无审计项目`
-        return `
-          <strong>${item.year}</strong><br/>
-          评级：${item.data.rating || '—'}<br/>
-          评分：${item.data.score != null ? item.data.score : '—'}<br/>
-          问题数：${item.data.issue_count}<br/>
-          错报金额：${formatAmount(item.data.misstatement_amount)}
-        `
-      },
-    },
-    grid: { left: 60, right: 30, top: 40, bottom: 40 },
-    xAxis: {
-      type: 'category',
-      data: years,
-      name: '年度',
-    },
-    yAxis: {
-      type: 'value',
-      name: '评分',
-      min: 0,
-      max: 100,
-    },
-    series: [
-      {
-        name: '质量评分',
-        type: 'line',
-        data: scores,
-        smooth: true,
-        connectNulls: false,
-        symbol: 'circle',
-        symbolSize: 8,
-        lineStyle: { width: 3 },
-        areaStyle: {
-          opacity: 0.15,
-        },
-        markLine: {
-          silent: true,
-          data: [
-            { yAxis: 90, name: 'A', lineStyle: { color: '#67c23a', type: 'dashed' } },
-            { yAxis: 75, name: 'B', lineStyle: { color: '#409eff', type: 'dashed' } },
-            { yAxis: 60, name: 'C', lineStyle: { color: '#e6a23c', type: 'dashed' } },
-          ],
-          label: { position: 'end', formatter: '{b}≥{c}' },
-        },
-      },
-    ],
-  }
-})
-
-// ─── Table Data ─────────────────────────────────────────────────────────────
-
-interface TableRow {
-  year: number
-  hasData: boolean
-  rating: string | null
-  score: number | null
-  issue_count: number
-  misstatement_amount: number
-  materiality_level: number | null
-  project_count: number
-}
-
-const tableData = computed<TableRow[]>(() => {
-  return trendData.value.map((item) => {
-    if (item.data) {
-      return {
-        year: item.year,
-        hasData: true,
-        rating: item.data.rating,
-        score: item.data.score,
-        issue_count: item.data.issue_count,
-        misstatement_amount: item.data.misstatement_amount,
-        materiality_level: item.data.materiality_level,
-        project_count: item.data.project_count,
-      }
-    }
-    return {
-      year: item.year,
-      hasData: false,
-      rating: null,
-      score: null,
-      issue_count: 0,
-      misstatement_amount: 0,
-      materiality_level: null,
-      project_count: 0,
-    }
-  })
-})
+const trendData = ref<TrendItem[]>([])
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function ratingTagType(rating: string | null): 'success' | 'primary' | 'warning' | 'danger' | 'info' {
+function ratingTagType(rating: string): 'success' | '' | 'warning' | 'danger' {
   switch (rating) {
     case 'A': return 'success'
-    case 'B': return 'primary'
+    case 'B': return ''
     case 'C': return 'warning'
     case 'D': return 'danger'
-    default: return 'info'
+    default: return ''
   }
 }
 
-function formatAmount(val: number | null | undefined): string {
-  if (val == null) return '—'
-  if (val === 0) return '0'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+function formatAmount(amount: number | null): string {
+  if (amount == null) return '—'
+  return amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })
+}
+
+const maxAmount = computed(() => {
+  const amounts = trendData.value
+    .map((d) => d.misstatement_amount)
+    .filter((a): a is number => a != null)
+  return amounts.length ? Math.max(...amounts) : 1
+})
+
+const maxIssueCount = computed(() => {
+  const counts = trendData.value
+    .map((d) => d.issue_count)
+    .filter((c): c is number => c != null)
+  return counts.length ? Math.max(...counts) : 1
+})
+
+function calcPercentage(amount: number): number {
+  if (!maxAmount.value) return 0
+  return Math.round((amount / maxAmount.value) * 100)
+}
+
+function calcIssuePercentage(count: number | null): number {
+  if (count == null || !maxIssueCount.value) return 0
+  return Math.round((count / maxIssueCount.value) * 100)
+}
+
+function amountColor(amount: number): string {
+  const pct = calcPercentage(amount)
+  if (pct > 75) return '#f56c6c'
+  if (pct > 50) return '#e6a23c'
+  return '#67c23a'
+}
+
+function issueBarColor(count: number | null): string {
+  if (count == null) return '#c0c4cc'
+  const pct = calcIssuePercentage(count)
+  if (pct > 75) return '#f56c6c'
+  if (pct > 50) return '#e6a23c'
+  return '#409eff'
 }
 
 // ─── Data Loading ───────────────────────────────────────────────────────────
@@ -235,11 +176,19 @@ function formatAmount(val: number | null | undefined): string {
 async function loadTrend() {
   loading.value = true
   try {
-    const res = await getClientQualityTrend(clientName.value, selectedYears.value)
-    trendData.value = res.trend
-  } catch (e: any) {
-    ElMessage.error('加载客户质量趋势失败')
+    const data = await api.get<any>(
+      `/api/qc/clients/${encodeURIComponent(clientName.value)}/quality-trend?years=${years.value}`
+    )
+    if (Array.isArray(data)) {
+      trendData.value = data
+    } else if (data && Array.isArray(data.items)) {
+      trendData.value = data.items
+    } else {
+      trendData.value = []
+    }
+  } catch {
     trendData.value = []
+    ElMessage.error('加载质量趋势失败')
   } finally {
     loading.value = false
   }
@@ -257,21 +206,54 @@ onMounted(() => {
   padding: 0;
 }
 
-.chart-section,
-.table-section {
-  padding: 20px;
+.no-data {
+  color: #c0c4cc;
 }
 
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1d1d1f;
-  margin: 0 0 12px 0;
+.amount-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.no-data-text {
-  color: #909399;
+.amount-value {
   font-size: 12px;
-  font-style: italic;
+  white-space: nowrap;
+  color: #606266;
+}
+
+.trend-visual {
+  margin-top: 24px;
+  padding: 16px;
+}
+
+.trend-visual h4 {
+  margin: 0 0 12px 0;
+  color: #303133;
+}
+
+.bar-chart {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+}
+
+.bar-label {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.bar-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
 }
 </style>

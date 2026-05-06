@@ -13,4 +13,8 @@ async def list_pbc(
     user=Depends(get_current_user),
 ):
     """获取项目 PBC 清单"""
-    return []
+    return {
+        "status": "developing",
+        "items": [],
+        "note": "Feature not implemented; scheduled for R7+",
+    }

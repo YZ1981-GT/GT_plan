@@ -1,18 +1,53 @@
 """AI 辅助底稿编制服务
 
 Phase 9 Task 9.8: 分析性复核 + 函证对象提取 + 审定表核对
+R3 Sprint 4 Task 21: AI 内容统一结构化
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+def wrap_ai_content(
+    value: str | dict,
+    source_model: str,
+    confidence: float,
+    confirmed_by: UUID | None = None,
+    confirmed_at: datetime | None = None,
+) -> dict:
+    """将 AI 输出包装为统一结构化格式。
+
+    R3 Sprint 4 Task 21: 所有 AI 输出必须包装为此结构，
+    以便门禁规则 AIContentMustBeConfirmedRule 检查确认状态。
+
+    Args:
+        value: AI 生成的原始内容（文本或结构化数据）
+        source_model: 生成该内容的模型标识（如 'qwen3.5-27b'）
+        confidence: 模型置信度 [0.0, 1.0]
+        confirmed_by: 确认人 UUID（未确认时为 None）
+        confirmed_at: 确认时间（未确认时为 None）
+
+    Returns:
+        统一结构化 dict
+    """
+    return {
+        "type": "ai_generated",
+        "source_model": source_model,
+        "confidence": confidence,
+        "confirmed_by": str(confirmed_by) if confirmed_by else None,
+        "confirmed_at": confirmed_at.isoformat() if confirmed_at else None,
+        "value": value,
+    }
 
 
 class WpAIService:
@@ -68,8 +103,17 @@ class WpAIService:
                     {"role": "system", "content": "你是审计分析师，请简洁分析科目余额变动原因。如有上年分析参照请对比。"},
                     {"role": "user", "content": prompt},
                 ], context_documents=context_docs if context_docs else None)
+                source_model = "qwen3.5-27b"
             except Exception:
                 ai_text = f"该科目余额变动 {change:,.2f}，变动率 {rate}%。"
+                source_model = "fallback"
+
+            # R3 Sprint 4: AI 输出统一结构化
+            ai_analysis_wrapped = wrap_ai_content(
+                value=ai_text,
+                source_model=source_model,
+                confidence=0.8 if source_model != "fallback" else 0.0,
+            )
 
             update_task(task_id, TaskStatus.success)
             return {
@@ -79,7 +123,7 @@ class WpAIService:
                 "change_amount": change,
                 "change_rate": rate,
                 "is_significant": is_significant,
-                "ai_analysis": ai_text,
+                "ai_analysis": ai_analysis_wrapped,
                 "recommended_procedures": [],
                 "task_id": task_id,
             }
