@@ -206,6 +206,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.staff import router as staff_router
     from app.routers.assignments import router as assign_router
     from app.routers.workhours import router as wh_router
+    from app.routers.workhour_list import router as wh_list_router
     from app.routers.dashboard import router as dash_router
     from app.routers.pm_dashboard import router as pmd_router
     from app.routers.qc_dashboard import router as qcd_router
@@ -215,7 +216,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.subsequent_events import router as se_router
     from app.routers.forum import router as forum_router
 
-    for r in [staff_router, assign_router, wh_router, dash_router,
+    for r in [staff_router, assign_router, wh_router, wh_list_router, dash_router,
               pmd_router, qcd_router, pd_router, rc2_router, proc_router,
               se_router, forum_router]:
         app.include_router(r, tags=["团队与看板"])

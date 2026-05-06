@@ -140,6 +140,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
+import { workHours as P_wh, projects as P_proj } from '@/services/apiPaths'
 
 // ── 类型 ──
 interface WorkHourApprovalRecord {
@@ -215,7 +216,7 @@ async function loadData() {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
-    const data = await api.get('/api/workhours', { params })
+    const data = await api.get(P_wh.list, { params })
     records.value = (Array.isArray(data) ? data : data?.items || []) as WorkHourApprovalRecord[]
   } catch (err: any) {
     const msg = err?.detail?.message || err?.message || '加载失败'
@@ -225,46 +226,14 @@ async function loadData() {
   }
 }
 
-// ── 加载统计 ──
-// TODO [Batch 3]: loadData + loadStats 共发 3 次 /api/workhours（主列表 + 本周已审批 + 本周待审批）。
-// 应合并为单个 GET /api/workhours/summary?week=current 端点一次返回
-// { items, approved_hours, pending_hours }，减少网络往返和后端负载。
+// ── 加载统计（使用 summary 端点，一次请求替代 N+1）──
 async function loadStats() {
   try {
-    // 本周范围
-    const today = new Date()
-    const dayOfWeek = today.getDay()
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-    const thisMonday = new Date(today)
-    thisMonday.setDate(today.getDate() - daysToMonday)
-    const thisSunday = new Date(thisMonday)
-    thisSunday.setDate(thisMonday.getDate() + 6)
-
-    const fmt = (d: Date) => {
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${y}-${m}-${day}`
+    const data = await api.get(P_wh.summary, { params: { week: 'current' } })
+    stats.value = {
+      approvedHours: data?.approved_hours ?? 0,
+      pendingHours: data?.pending_hours ?? 0,
     }
-
-    const weekFrom = fmt(thisMonday)
-    const weekTo = fmt(thisSunday)
-
-    // 获取本周已审批
-    const approvedData = await api.get('/api/workhours', {
-      params: { status: 'approved', date_from: weekFrom, date_to: weekTo },
-    })
-    const approvedList = (Array.isArray(approvedData) ? approvedData : approvedData?.items || []) as WorkHourApprovalRecord[]
-    const approvedHours = approvedList.reduce((sum: number, r: WorkHourApprovalRecord) => sum + r.hours, 0)
-
-    // 获取本周待审批
-    const pendingData = await api.get('/api/workhours', {
-      params: { status: 'confirmed', date_from: weekFrom, date_to: weekTo },
-    })
-    const pendingList = (Array.isArray(pendingData) ? pendingData : pendingData?.items || []) as WorkHourApprovalRecord[]
-    const pendingHours = pendingList.reduce((sum: number, r: WorkHourApprovalRecord) => sum + r.hours, 0)
-
-    stats.value = { approvedHours, pendingHours }
   } catch {
     // 统计加载失败不阻断主流程
   }
@@ -311,7 +280,7 @@ async function checkBudgetOverrun(): Promise<BudgetOverrunWarning[]> {
   const results = await Promise.allSettled(
     Array.from(projectHoursMap.entries()).map(async ([projectId, info]) => {
       try {
-        const costData = await api.get(`/api/projects/${projectId}/cost-overview`) as any
+        const costData = await api.get(P_proj.costOverview(projectId)) as any
         if (costData && costData.budget_hours && costData.budget_hours > 0) {
           const afterApprove = (costData.actual_hours ?? 0) + info.hours
           if (afterApprove > costData.budget_hours) {
@@ -366,7 +335,7 @@ async function batchApprove() {
   batchLoading.value = true
   try {
     const hourIds = selectedRows.value.map(r => r.id)
-    const { data } = await http.post('/api/workhours/batch-approve', {
+    const { data } = await http.post(P_wh.batchApprove, {
       hour_ids: hourIds,
       action: 'approve',
     }, {
@@ -394,7 +363,7 @@ async function batchReject() {
   batchLoading.value = true
   try {
     const hourIds = selectedRows.value.map(r => r.id)
-    const { data } = await http.post('/api/workhours/batch-approve', {
+    const { data } = await http.post(P_wh.batchApprove, {
       hour_ids: hourIds,
       action: 'reject',
       reason: rejectReason.value.trim(),
@@ -420,7 +389,7 @@ async function batchReject() {
 async function approveOne(row: WorkHourApprovalRecord) {
   batchLoading.value = true
   try {
-    const { data } = await http.post('/api/workhours/batch-approve', {
+    const { data } = await http.post(P_wh.batchApprove, {
       hour_ids: [row.id],
       action: 'approve',
     }, {
@@ -452,7 +421,7 @@ async function confirmSingleReject() {
   if (!singleRejectRow.value) return
   batchLoading.value = true
   try {
-    const { data } = await http.post('/api/workhours/batch-approve', {
+    const { data } = await http.post(P_wh.batchApprove, {
       hour_ids: [singleRejectRow.value.id],
       action: 'reject',
       reason: singleRejectReason.value.trim(),

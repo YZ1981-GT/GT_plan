@@ -30,6 +30,7 @@ export const projects = {
     detail: (id: string, commId: string) => `/api/projects/${id}/communications/${commId}`,
   },
   findingsSummary: (id: string) => `/api/projects/${id}/findings-summary`,
+  costOverview: (id: string) => `/api/projects/${id}/cost-overview`,
 } as const
 
 // ─── 试算表 ─────────────────────────────────────────────────────────────────
@@ -515,6 +516,11 @@ export const dashboard = {
   projectStaffHours: '/api/dashboard/project-staff-hours',
   staffDetail: '/api/dashboard/staff-detail',
   availableStaff: '/api/dashboard/available-staff',
+  statsTrend: '/api/dashboard/stats/trend',
+  manager: {
+    overview: '/api/dashboard/manager/overview',
+    assignmentStatus: '/api/dashboard/manager/assignment-status',
+  },
 } as const
 
 // ─── 批注 ───────────────────────────────────────────────────────────────────
@@ -1024,6 +1030,9 @@ export const addressRegistry = {
 // ─── 工时 ───────────────────────────────────────────────────────────────────
 
 export const workHours = {
+  list: '/api/workhours',
+  summary: '/api/workhours/summary',
+  batchApprove: '/api/workhours/batch-approve',
   detail: (hourId: string) => `/api/work-hours/${hourId}`,
   aiSuggest: '/api/work-hours/ai-suggest',
   editTimeSuggest: '/api/work-hours/edit-time-suggest',

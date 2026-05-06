@@ -106,6 +106,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { listProjects, getMyAssignments } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
+import { dashboard as P_dash } from '@/services/apiPaths'
 import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
@@ -162,7 +163,7 @@ const trendLoadError = ref(false)
 async function loadTrendData() {
   trendLoadError.value = false
   try {
-    const res = await httpApi.get('/api/dashboard/stats/trend', {
+    const res = await httpApi.get(P_dash.statsTrend, {
       params: { days: 7 }
     })
     trendData.value = res.trend || {}

@@ -257,7 +257,7 @@ async function sendMessage() {
   streamingMessage.value = ''
 
   try {
-    const response = await fetch(`/api/workpapers/${props.wpId}/chat`, {
+    const response = await fetch(`/api/workpapers/${props.wpId}/ai/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

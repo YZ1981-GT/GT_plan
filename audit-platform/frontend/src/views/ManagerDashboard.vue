@@ -282,6 +282,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
+import { dashboard as P_dash } from '@/services/apiPaths'
 import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
 import { listCommunications } from '@/services/pmApi'
@@ -476,7 +477,7 @@ function onUserActivity() {
 async function loadOverview() {
   loading.value = true
   try {
-    const data = await api.get('/api/dashboard/manager/overview')
+    const data = await api.get(P_dash.manager.overview)
     overview.value = data as ManagerOverview
     lastUpdateTime.value = new Date()
     updateElapsed()
@@ -493,7 +494,7 @@ async function loadOverview() {
 async function loadAssignmentStatus() {
   assignmentStatusLoading.value = true
   try {
-    const data = await api.get('/api/dashboard/manager/assignment-status?days=7')
+    const data = await api.get(P_dash.manager.assignmentStatus, { params: { days: 7 } })
     assignmentStatusList.value = (data as AssignmentStatusItem[]) || []
   } catch (err: any) {
     const msg = err?.detail?.message || err?.message || '加载失败'

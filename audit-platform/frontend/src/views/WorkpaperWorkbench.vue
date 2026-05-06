@@ -647,7 +647,15 @@ async function onAskAI() {
   aiAsking.value = true
   aiAnswer.value = ''
   try {
-    const data = await api.post('/api/chat/stream', {
+    // 获取底稿 ID（如果已生成）
+    const wpStatus = wpStatusMap.value[selectedMapping.value.wp_code]
+    const wpId = (wpStatus as any)?.id
+    if (!wpId) {
+      aiAnswer.value = '请先生成底稿后再使用 AI 助手'
+      aiAsking.value = false
+      return
+    }
+    const data = await api.post(`/api/workpapers/${wpId}/ai/chat`, {
       message: aiQuestion.value,
       context: `当前底稿：${selectedMapping.value.wp_code} ${selectedMapping.value.wp_name}，科目：${selectedMapping.value.account_name}`,
     })
@@ -713,9 +721,9 @@ async function onAttachFileSelect(file: any) {
   const formData = new FormData()
   formData.append('file', file.raw)
   formData.append('wp_code', selectedMapping.value.wp_code)
-  formData.append('project_id', projectId.value)
+  formData.append('attachment_type', 'workpaper')
   try {
-    await api.post('/api/attachments/upload', formData)
+    await api.post(`/api/projects/${projectId.value}/attachments/upload`, formData)
     ElMessage.success('附件上传成功')
     loadAttachments(selectedMapping.value.wp_code)
   } catch (e: any) {
