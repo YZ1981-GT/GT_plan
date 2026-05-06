@@ -38,6 +38,28 @@
       </div>
     </div>
 
+    <!-- ── 我的待办底稿（快速入口） ── -->
+    <div v-if="myWorkpapers.length > 0" class="my-wp-section gt-stagger">
+      <div class="section-header" style="margin-bottom: 8px">
+        <h2 class="section-title">📋 我的待办底稿</h2>
+        <el-tag size="small" type="warning">{{ myWorkpapers.length }} 项</el-tag>
+      </div>
+      <div class="my-wp-grid">
+        <div
+          v-for="wp in myWorkpapers.slice(0, 6)"
+          :key="wp.id"
+          class="my-wp-card"
+          @click="$router.push(`/projects/${wp.project_id}/workpapers/${wp.id}/edit`)"
+        >
+          <div class="my-wp-code">{{ wp.wp_code }}</div>
+          <div class="my-wp-name">{{ wp.wp_name }}</div>
+          <el-tag :type="wp.status === 'draft' ? 'info' : 'warning'" size="small">
+            {{ wp.status === 'draft' ? '编制中' : '待修改' }}
+          </el-tag>
+        </div>
+      </div>
+    </div>
+
     <!-- ── 中间区域：最近项目 + 今日日程 ── -->
     <el-row :gutter="16" class="mid-row">
       <el-col :span="14">
@@ -227,6 +249,9 @@ const timelineColors = ['#4b2d77', '#0094B3', '#FF5149', '#F5A623', '#28a745']
 function timelineColor(i: number) { return timelineColors[i % timelineColors.length] }
 
 // ── 数据加载 ──
+// ── 我的待办底稿 ──
+const myWorkpapers = ref<any[]>([])
+
 onMounted(async () => {
   // 确保用户信息
   if (!authStore.user && authStore.token) {
@@ -252,6 +277,25 @@ onMounted(async () => {
     todaySchedule.value = (await getMyAssignments()).slice(0, 6)
   } catch { /* ignore */ }
   loadingSchedule.value = false
+
+  // 加载我的待办底稿（draft 或被退回的）
+  try {
+    const assignments = await getMyAssignments()
+    const wpList: any[] = []
+    for (const proj of assignments.slice(0, 5)) {
+      try {
+        const data = await httpApi.get(`/api/projects/${proj.project_id}/working-papers`, {
+          params: { assigned_to_me: true, status: 'draft,rejected' },
+          validateStatus: (s: number) => s < 600,
+        })
+        const items = Array.isArray(data) ? data : data?.items || []
+        for (const wp of items.slice(0, 3)) {
+          wpList.push({ ...wp, project_id: proj.project_id })
+        }
+      } catch { /* ignore */ }
+    }
+    myWorkpapers.value = wpList.slice(0, 6)
+  } catch { /* ignore */ }
 })
 </script>
 
@@ -261,6 +305,14 @@ onMounted(async () => {
   margin: 0 auto;
   padding: var(--gt-space-6);
 }
+
+/* ── 我的待办底稿 ── */
+.my-wp-section { margin-bottom: 20px; }
+.my-wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.my-wp-card { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer; transition: box-shadow 0.2s; }
+.my-wp-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.my-wp-code { font-size: 12px; color: #909399; font-family: monospace; }
+.my-wp-name { font-size: 13px; font-weight: 500; margin: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── 欢迎横幅 ── */
 .welcome-banner {

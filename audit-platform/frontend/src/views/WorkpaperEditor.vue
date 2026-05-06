@@ -14,6 +14,14 @@
       <div class="gt-wp-editor-toolbar-right">
         <span v-if="dirty" class="gt-dirty-indicator">● 有未保存的变更</span>
         <el-button size="small" @click="onSave" :loading="saving">💾 保存</el-button>
+        <el-button
+          v-if="wpDetail && wpDetail.status === 'draft'"
+          size="small"
+          type="primary"
+          @click="onSubmitForReview"
+          :loading="submitting"
+          :disabled="dirty"
+        >📨 提交复核</el-button>
         <el-button size="small" @click="onSyncStructure" :loading="syncLoading">🔄 同步公式</el-button>
         <el-button size="small" @click="onShowVersions">📋 版本历史</el-button>
         <el-button size="small" @click="onDownload">📥 下载</el-button>
@@ -141,6 +149,7 @@ const reviewMarkers = useWorkpaperReviewMarkers({
 const wpDetail = ref<WorkpaperDetail | null>(null)
 const loading = ref(true)
 const saving = ref(false)
+const submitting = ref(false)
 const syncLoading = ref(false)
 const dirty = ref(false)
 const univerContainer = ref<HTMLElement | null>(null)
@@ -195,8 +204,11 @@ function startAutoSave() {
     if (ok) {
       autoSaveMsg.value = '已自动保存'
       setTimeout(() => { autoSaveMsg.value = '' }, 3000)
+    } else {
+      // 自动保存失败：通知用户，保留 dirty 等待手动保存
+      autoSaveMsg.value = ''
+      ElMessage.warning({ message: '自动保存失败，请手动保存', duration: 5000 })
     }
-    // 失败静默：保留 dirty，等待下次触发（需求 44.3）
   }, 30000)
 }
 
@@ -420,6 +432,35 @@ async function onSave(): Promise<boolean> {
     return false
   } finally {
     saving.value = false
+  }
+}
+
+async function onSubmitForReview() {
+  if (!wpDetail.value) return
+  if (dirty.value) {
+    ElMessage.warning('请先保存当前修改')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      '提交后底稿将进入复核流程，复核通过前您将无法编辑。确认提交？',
+      '提交复核',
+      { confirmButtonText: '确认提交', cancelButtonText: '取消', type: 'info' },
+    )
+  } catch { return }
+
+  submitting.value = true
+  try {
+    await httpApi.put(
+      `/api/projects/${projectId.value}/working-papers/${wpId.value}/status`,
+      { status: 'pending_review' },
+    )
+    ElMessage.success('已提交复核，等待复核人审阅')
+    wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
+  } catch (err: any) {
+    ElMessage.error('提交失败: ' + (err?.response?.data?.detail || err?.message || ''))
+  } finally {
+    submitting.value = false
   }
 }
 

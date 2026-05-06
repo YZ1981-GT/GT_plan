@@ -200,12 +200,13 @@ class RoleContextService:
             items.append({"key": "mgmt-dashboard", "label": "管理看板", "icon": "DataAnalysis", "path": "/dashboard/management"})
 
         if role in ("admin", "partner", "manager"):
+            items.append({"key": "manager-dashboard", "label": "项目经理工作台", "icon": "Monitor", "path": "/dashboard/manager"})
             items.append({"key": "workhours", "label": "工时管理", "icon": "Timer", "path": "/work-hours"})
 
         if role in ("admin", "partner", "qc"):
-            # QC 看板在项目内，不在全局导航
-
-            pass
+            items.append({"key": "qc-rules", "label": "QC 规则管理", "icon": "SetUp", "path": "/qc/rules"})
+            items.append({"key": "qc-inspections", "label": "质控抽查", "icon": "Search", "path": "/qc/inspections"})
+            items.append({"key": "qc-cases", "label": "案例库", "icon": "Collection", "path": "/qc/cases"})
 
         if role in ("admin", "partner", "manager"):
             items.append({"key": "consolidation", "label": "合并项目", "icon": "Connection", "path": "/consolidation"})

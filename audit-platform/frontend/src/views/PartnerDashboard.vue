@@ -152,7 +152,10 @@
               <div class="sign-card-name">{{ p.client_name || p.name }}</div>
               <div class="sign-card-meta">{{ signCardText(p) }}</div>
             </div>
-            <el-button type="primary" size="small" round>签字前检查 →</el-button>
+            <div class="sign-card-actions">
+              <el-button size="small" plain @click.stop="goToReport(p.id)">查看报告</el-button>
+              <el-button type="primary" size="small" round>签字前检查 →</el-button>
+            </div>
           </div>
         </div>
         <el-empty v-else description="暂无待签字项目" />
@@ -219,7 +222,16 @@
             立即签字
           </el-button>
           <div v-if="!canSign && readinessData" class="gt-sign-hint">
-            <template v-if="!readinessData.ready">就绪检查未通过，无法签字</template>
+            <template v-if="!readinessData.ready">
+              <div style="color: #f56c6c; font-weight: 600; margin-bottom: 4px">就绪检查未通过，无法签字</div>
+              <div v-if="readinessData.groups?.length" style="font-size: 12px; color: #909399">
+                <template v-for="group in readinessData.groups" :key="group.id">
+                  <div v-for="finding in group.findings" :key="finding.rule_code || finding.message" style="padding: 2px 0">
+                    ❌ {{ finding.rule_code ? `[${finding.rule_code}]` : '' }} {{ finding.message }}
+                  </div>
+                </template>
+              </div>
+            </template>
             <template v-else-if="!myReadyStep">当前未轮到你签字</template>
           </div>
         </div>
@@ -388,6 +400,10 @@ function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' |
 
 function goToProject(pid: string) {
   router.push(`/projects/${pid}/progress-board`)
+}
+
+function goToReport(pid: string) {
+  router.push(`/projects/${pid}/audit-report`)
 }
 function onProjectClick(row: any) {
   goToProject(row.id)

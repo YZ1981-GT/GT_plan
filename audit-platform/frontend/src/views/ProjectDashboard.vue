@@ -64,7 +64,13 @@
             </el-table-column>
           </el-table>
           <div v-if="remindLimitTip" class="gt-pd-remind-tip">
-            <el-alert :title="remindLimitTip" type="warning" :closable="true" @close="remindLimitTip = ''" show-icon />
+            <el-alert :title="remindLimitTip" type="warning" :closable="true" @close="remindLimitTip = ''" show-icon>
+              <template #default>
+                <el-button size="small" type="danger" plain style="margin-top: 4px" @click="onEscalateToPartner">
+                  升级到合伙人
+                </el-button>
+              </template>
+            </el-alert>
           </div>
         </div>
       </el-col>
@@ -98,7 +104,7 @@ import { PieChart, BarChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, GridComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getWorkpaperProgress, getOverdueWorkpapers,
   runConsistencyCheck as apiRunConsistencyCheck, getProjectWorkHours,
@@ -173,6 +179,32 @@ async function onRemind(row: any) {
     ElMessage.error('催办失败，请重试')
   } finally {
     row._reminding = false
+  }
+}
+
+/** 催办 3 次后升级到合伙人 */
+async function onEscalateToPartner() {
+  const overdueItems = overdue.value.filter((r: any) => (remindCounts.value[r.wp_id] || 0) >= 3)
+  if (!overdueItems.length) {
+    ElMessage.info('没有需要升级的底稿')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将 ${overdueItems.length} 个逾期底稿升级通知合伙人，确认？`,
+      '升级到合伙人',
+      { confirmButtonText: '确认升级', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch { return }
+  try {
+    await http.post(`/api/projects/${projectId.value}/workpapers/escalate-to-partner`, {
+      wp_ids: overdueItems.map((r: any) => r.wp_id),
+      reason: '催办 3 次未响应',
+    }, { validateStatus: (s: number) => s < 600 })
+    ElMessage.success('已通知合伙人关注')
+    remindLimitTip.value = ''
+  } catch {
+    ElMessage.error('升级失败，请手动联系合伙人')
   }
 }
 
