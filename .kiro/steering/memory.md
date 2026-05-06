@@ -59,7 +59,7 @@ inclusion: always
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（R5 全部完成，已推送远程 8aff1c0）
+- git 分支：feature/global-component-library（R5 全部完成 87b0f38，R4 本地新文件待提交）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -101,12 +101,12 @@ inclusion: always
 - 三套就绪检查逻辑分散可能矛盾：gate_engine（submit_review/sign_off/export_package）/ partner_dashboard.sign-readiness（8 项）/ qc_dashboard.archive-readiness，需统一为 gate_engine 门面
 - SignatureRecord.signature_level 仅 String(20) 无顺序强制，三级签字无前置依赖校验
 - qc_engine.py 14 条 QC-01~14 规则 + gate_rules_phase14.py QC-19~26 全是硬编码 Python，无 qc_rule_definitions 表支持自定义
-- WorkpaperEditor.vue 工具栏仅保存/同步公式/版本/下载/PDF/上传，无 AI 侧栏、无程序要求侧栏、无右键序时账穿透、无对比上年按钮
+- WorkpaperEditor.vue 三栏布局（R4 完成）：左程序要求侧栏 + 中 Univer + 右 AI 助手侧栏；工具栏含保存/同步公式/版本/下载/PDF/上传/对比上年/AI内容；底部 SmartTipList 可点击定位；右键菜单"穿透序时账"+"从附件OCR提取"；编辑锁 acquire/heartbeat/release；附件拖拽上传；焦点时间追踪；readOnly 模式（锁冲突时禁用编辑）
 - EQCR 角色与工作台已落地（R5 Tasks 1-7）：ProjectAssignment.role='eqcr' 已启用、GateType.eqcr_approval 已注册、ReportStatus.eqcr_approved 已扩展、EqcrService + /api/eqcr/* 路由 + 前端 EqcrWorkbench/EqcrProjectView 页面 + 5 Tab 组件 + 关联方 CRUD 全部就绪
 - ThreeColumnLayout.vue 新增 #nav-eqcr slot（R5 Task 4），DefaultLayout 注入"🛡️ 独立复核"导航按钮（partner/admin 可见）
 - Communication/ClientCommunication 模型不存在（grep 零命中），ProjectProgressBoard 沟通记录前端组件存在但后端未独立建模，可能塞在 JSON 字段或散落表里
 - WorkingPaper 无 due_date 字段，wp_progress_service overdue_days 用 created_at 估算"已创建天数"，语义弱
-- ledger/penetrate 端点参数为 account_code + drill_level + date，不支持按 amount 容差匹配；按金额穿透需新增端点
+- ledger/penetrate 端点参数为 account_code + drill_level + date；R4 新增独立端点 `/ledger/penetrate-by-amount`（四策略：exact/tolerance/code+amount/summary，200 条截断）
 - assignment_service.ROLE_MAP 和 role_context_service._ROLE_PRIORITY 两个字典是角色体系单一真源，新增 role='eqcr' 已同时更新；_ROLE_PRIORITY 当前 partner(5)/eqcr(5)/qc(4)/manager(3)/auditor(2)/readonly(1)
 - GoingConcernEvaluation 模型已存在（collaboration_models.py），Round 5 EQCR 持续经营 Tab 可直接复用，不要重复建模
 - 归档包设计决策：采用"插件化章节"模式（00/01/02/.../99 顺序），各 Round 各自插入章节，Round 1 需求 6 只预留机制
@@ -114,7 +114,11 @@ inclusion: always
 - 审计意见锁定架构决策：不新增 opinion_locked_at 平行字段，改为扩展 ReportStatus 状态机 draft→review→eqcr_approved→final（R5 需求 6 + README 跨轮约束第 3 条）
 - 枚举扩展硬约定：IssueTicket.source 在 R1 一次性预留 11 个值（L2/L3/Q/review_comment/consistency/ai/reminder/client_commitment/pbc/confirmation/qc_inspection），ProjectAssignment.role 预留 eqcr，避免多轮迁移
 - 权限矩阵四点同步约定：新增 role/动作需同时更新 assignment_service.ROLE_MAP + role_context_service._ROLE_PRIORITY + 前端 ROLE_MAP + composables/usePermission.ROLE_PERMISSIONS
-- 焦点时长隐私决策：R4 需求 10 焦点追踪只写 localStorage（按周归档键），不落库不发后端，消除监控隐患
+- 焦点时长隐私决策：R4 需求 10 焦点追踪只写 localStorage（按周归档键 `focus_tracker_YYYY-MM-DD`），不落库不发后端，消除监控隐患
+- R4 编辑软锁：`workpaper_editing_locks` 表，有效锁 = `released_at IS NULL AND heartbeat_at > now - 5min`，惰性清理（acquire 时过期锁设 released_at=now），前端 heartbeat 每 2 分钟，beforeUnload 释放
+- R4 AI 脱敏：`export_mask_service.mask_context(cell_context)` 在 LLM 调用前替换金额/客户名/身份证为 `[amount_N]/[client_N]/[id_number_N]` 占位符，映射表仅当前会话有效不回填
+- R4 预填充 provenance：`parsed_data.cell_provenance` JSONB，supersede 策略（重填覆盖旧值，`_prev` 保留最多 1 次历史），source 类型 trial_balance/prior_year/formula/ledger/manual/ocr
+- R4 Alembic 迁移 2 个：`round4_editing_lock_20260506`（workpaper_editing_locks 表）+ `round4_ocr_fields_cache_20260506`（attachments.ocr_fields_cache JSONB 列）
 - 跨轮 SLA 统一按自然日计，不引入节假日日历服务，跨长假由人工 override（README 跨轮约束第 5 条）
 - ClientCommunicationService 已存在于 `pm_service.py:481`，沟通记录存 `Project.wizard_state.communications` JSONB，`commitments` 当前是字符串；R2 需求 5 无需"调研"，直接升级为结构化数组
 - ReviewInboxService.get_inbox(user_id, project_id=None) 已支持全局+单项目双模式（`pm_service.py:26`），R1 需求 1 不新增后端端点
@@ -158,6 +162,7 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
+- **Round 4 已全部完成**（Sprint 1-3 共 23 任务）：三栏编辑器（程序要求侧栏+AI侧栏）/SmartTipList可点击定位/上年对比/按金额穿透/预填充provenance/移动端只读/附件拖拽/焦点追踪时间线/编辑软锁/OCR字段提取；本地 ~70 个 untracked 新文件待 git add + commit
 - Round 1 实施进度：Tasks 1-4 已完成（数据模型迁移 73204cf + Tasks 2-4 评审闭环后端+前端合并 5c5ac56），按 tasks.md 顺序推进剩余任务
 - Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，122 个 EQCR 测试全通过；关键修复：(1) gate_engine.evaluate 加 `await db.flush()` 修复 gate_decision.id NULL 导致 trace_events 插入失败；(2) sign_service._transition_report_status 加 `await db.flush()` 让状态变更对 refresh 可见；(3) Task 23 年度独立性声明改为独立表 `annual_independence_declarations`（R1 通用表未落地前的过渡方案，migration round5_independence_20260506）；(4) Task 18 备忘录接入 python-docx + LibreOffice PDF 管线，`build_memo_docx_bytes` 纯函数生成 docx，`eqcr_memo_pdf_generator` 归档章节生成器预留；(5) Task 24 年度声明变成真实阻断（router 守卫 + 工作台 load 阻塞）；(6) Task 15 客户名归一化 `client_lookup.normalize_client_name` 兼容"XX集团"vs"XX集团有限公司"；(7) Task 22 CompetenceRating 枚举值修正为 reliable/unreliable（原先误用 A/D）；(8) Task 20 metrics 端点加 admin/partner 角色守卫；(9) EqcrProjectView 加 EQCR 审批/解锁按钮，approve 前强制检查历年对比差异原因；(10) 新增 test_eqcr_full_flow / test_eqcr_state_machine_properties / test_eqcr_component_auditor_review / test_eqcr_memo_docx / test_client_lookup 五个测试文件；(11) 归档章节 '02-EQCR备忘录.pdf' 待 R1 archive_section_registry 落地后通过 `register('02', 'eqcr_memo.pdf', eqcr_memo_pdf_generator)` 注册
 
