@@ -830,6 +830,10 @@ export const attachments = {
   search: '/api/attachments/search',
   upload: (pid: string) => `/api/projects/${pid}/attachments/upload`,
   classify: (pid: string) => `/api/projects/${pid}/attachments/classify`,
+  preview: (id: string) => `/api/attachments/${id}/preview`,
+  download: (id: string) => `/api/attachments/${id}/download`,
+  associate: (id: string) => `/api/attachments/${id}/associate`,
+  ocrStatus: (id: string) => `/api/attachments/${id}/ocr-status`,
 } as const
 
 // ─── 穿透查询 ───────────────────────────────────────────────────────────────
@@ -953,7 +957,29 @@ export const accountChart = {
   importAsync: (pid: string) => `/api/projects/${pid}/account-chart/import-async`,
   importReset: (pid: string) => `/api/projects/${pid}/account-chart/import-reset`,
   client: (pid: string) => `/api/projects/${pid}/account-chart/client`,
+  standard: (pid: string) => `/api/projects/${pid}/account-chart/standard`,
   batchUpdate: (pid: string) => `/api/projects/${pid}/account-chart/batch-update`,
+} as const
+
+// ─── 科目映射 ───────────────────────────────────────────────────────────────
+
+export const accountMapping = {
+  list: (pid: string) => `/api/projects/${pid}/mapping`,
+  create: (pid: string) => `/api/projects/${pid}/mapping`,
+  detail: (pid: string, mappingId: string) => `/api/projects/${pid}/mapping/${mappingId}`,
+  autoMatch: (pid: string) => `/api/projects/${pid}/mapping/auto-match`,
+  completionRate: (pid: string) => `/api/projects/${pid}/mapping/completion-rate`,
+} as const
+
+// ─── 报表行次映射 ───────────────────────────────────────────────────────────
+
+export const reportLineMapping = {
+  list: (pid: string) => `/api/projects/${pid}/report-line-mapping`,
+  detail: (pid: string, id: string) => `/api/projects/${pid}/report-line-mapping/${id}`,
+  confirm: (pid: string, id: string) => `/api/projects/${pid}/report-line-mapping/${id}/confirm`,
+  aiSuggest: (pid: string) => `/api/projects/${pid}/report-line-mapping/ai-suggest`,
+  batchConfirm: (pid: string) => `/api/projects/${pid}/report-line-mapping/batch-confirm`,
+  referenceCopy: (pid: string) => `/api/projects/${pid}/report-line-mapping/reference-copy`,
 } as const
 
 // ─── 列映射 ─────────────────────────────────────────────────────────────────
@@ -1140,6 +1166,15 @@ export const governance = {
   },
 } as const
 
+// ─── 独立性声明（项目级） ───────────────────────────────────────────────────
+
+export const independenceDeclarations = {
+  questions: '/api/independence/questions',
+  list: (pid: string) => `/api/projects/${pid}/independence-declarations`,
+  detail: (pid: string, declId: string) => `/api/projects/${pid}/independence-declarations/${declId}`,
+  submit: (pid: string, declId: string) => `/api/projects/${pid}/independence-declarations/${declId}/submit`,
+} as const
+
 // ─── EQCR 独立复核（Round 5） ───────────────────────────────────────────────
 
 export const eqcr = {
@@ -1224,7 +1259,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  accountChart, columnMappings, dataLifecycle,
+  accountChart, accountMapping, reportLineMapping, columnMappings, dataLifecycle, independenceDeclarations,
   admin, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
   jobs, governance, eqcr, signatures, rotation,

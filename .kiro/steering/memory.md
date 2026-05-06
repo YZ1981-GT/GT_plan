@@ -103,6 +103,8 @@ inclusion: always
 - Vue 文件硬编码迁移进度：322→~173（已消除 149 处 / 46%），最新 commit fb8a3b9；Top 6 大文件全部完成：LedgerPenetration(23)/KnowledgeBase(16)/ConsolNoteTab(16)/AccountImportStep(15)/FormulaManagerDialog(12)/WorkpaperWorkbench(12)；剩余 ~65 文件多为 1-8 处中小文件
 - apiPaths.ts 新增路径对象（本轮）：knowledgeLibrary(11方法)/noteTemplates/accountChart/columnMappings/dataLifecycle/consolNoteSections(8方法)/reportConfig扩展/reportMapping/reports.export；ledger 从 3 方法扩展到 17 方法；workpapers 新增 batchPrefill/generateFromCodes/wpMappingTsj
 - CI 新增 vue-tsc --noEmit 步骤到 frontend-build job（.github/workflows/ci.yml）
+- CI 新增 'API hardcode guard' 卡点（基线 173，grep 统计 Vue 文件 /api/ 硬编码，超基线则 fail）；本地自查脚本 scripts/check-api-hardcode.sh；策略"触碰即修+基线只减不增"
+- Vue 硬编码迁移决策：剩余 65 文件 / 173 处不再批量修，采用触碰即修策略自然收敛；下一步优先级转向 UAT 验收 + 性能压测
 - docs/API_CHANGELOG.md 记录 R4-R6 端点变更；docs/templates/NEW_API_ENDPOINT.md 三件套模板
 - archive 对象已重构：`archive`→`orchestrate`，新增 `job(pid,jobId)` 和 `retry(pid,jobId)`
 - AnnualIndependenceDeclaration 模型已扩展：新增 project_id(nullable)/status/attachments/signed_at/signature_record_id/reviewed_by_qc_id/reviewed_at 字段（R1 需求 10 合并）

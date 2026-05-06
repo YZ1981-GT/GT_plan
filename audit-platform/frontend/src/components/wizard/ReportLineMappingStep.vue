@@ -166,6 +166,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { reportLineMapping as P_rlm } from '@/services/apiPaths'
 
 const props = defineProps<{
   projectId: string
@@ -276,7 +277,7 @@ async function loadMappings() {
       params.report_type = filterReportType.value
     }
     const data = await api.get(
-      `/api/projects/${props.projectId}/report-line-mapping`,
+      P_rlm.list(props.projectId),
       { params },
     )
     mappings.value = data
@@ -292,7 +293,7 @@ async function handleAiSuggest() {
   aiSuggesting.value = true
   try {
     const data = await api.post(
-      `/api/projects/${props.projectId}/report-line-mapping/ai-suggest`,
+      P_rlm.aiSuggest(props.projectId),
     )
     const suggestions = data
     ElMessage.success(`AI匹配完成，生成 ${suggestions.length} 条建议`)
@@ -307,7 +308,7 @@ async function handleAiSuggest() {
 async function handleConfirm(row: MappingRow) {
   try {
     await api.put(
-      `/api/projects/${props.projectId}/report-line-mapping/${row.id}/confirm`,
+      P_rlm.confirm(props.projectId, row.id),
     )
     row.is_confirmed = true
     ElMessage.success('已确认')
@@ -341,7 +342,7 @@ async function handleSaveEdit() {
   editSaving.value = true
   try {
     await api.put(
-      `/api/projects/${props.projectId}/report-line-mapping/${editForm.value.id}`,
+      P_rlm.detail(props.projectId, editForm.value.id),
       {
         report_type: editForm.value.report_type,
         report_line_code: reportLineCode,
@@ -378,7 +379,7 @@ async function handleDelete(row: MappingRow) {
 
   deletingId.value = row.id
   try {
-    await api.delete(`/api/projects/${props.projectId}/report-line-mapping/${row.id}`)
+    await api.delete(P_rlm.detail(props.projectId, row.id))
     ElMessage.success(row.is_confirmed ? '映射已删除' : '建议已拒绝')
     await loadMappings()
   } catch {
@@ -393,7 +394,7 @@ async function handleBatchConfirm() {
   batchConfirming.value = true
   try {
     const data = await api.post(
-      `/api/projects/${props.projectId}/report-line-mapping/batch-confirm`,
+      P_rlm.batchConfirm(props.projectId),
       { mapping_ids: unconfirmedIds.value },
     )
     const result = data
@@ -414,7 +415,7 @@ async function handleReferenceCopy() {
   referenceCopying.value = true
   try {
     const data = await api.post(
-      `/api/projects/${props.projectId}/report-line-mapping/reference-copy`,
+      P_rlm.referenceCopy(props.projectId),
       { source_company_code: sourceCompanyCode.value },
     )
     const result = data

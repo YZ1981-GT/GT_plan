@@ -120,6 +120,7 @@ import { Search, Upload, Document } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
 import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
+import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -148,7 +149,7 @@ async function searchWorkpapers(query: string) {
   if (!query || query.length < 1) { wpSearchResults.value = []; return }
   wpSearchLoading.value = true
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/wp-index`)
+    const data = await api.get(P_wp.wpIndex(projectId.value))
     const items = Array.isArray(data) ? data : data ?? []
     // 按编号或名称模糊过滤
     const q = query.toLowerCase()
@@ -165,7 +166,7 @@ async function loadAttachments() {
   try {
     const params: any = {}
     if (filterType.value) params.file_type = filterType.value
-    const data = await api.get(`/api/projects/${projectId.value}/attachments`, { params })
+    const data = await api.get(P_att.list(projectId.value), { params })
     attachments.value = data ?? []
   } catch { attachments.value = [] }
   finally { loading.value = false }
@@ -175,7 +176,7 @@ async function onSearch() {
   if (!searchQuery.value) { loadAttachments(); return }
   loading.value = true
   try {
-    const data = await api.get('/api/attachments/search', {
+    const data = await api.get(P_att.search, {
       params: { project_id: projectId.value, q: searchQuery.value },
     })
     attachments.value = data ?? []
@@ -185,7 +186,7 @@ async function onSearch() {
 
 function preview(row: any) {
   // 使用统一预览代理端点
-  previewUrl.value = `/api/attachments/${row.id}/preview`
+  previewUrl.value = P_att.preview(row.id)
   previewName.value = row.file_name
   previewType.value = row.file_type
   previewVisible.value = true
@@ -193,7 +194,7 @@ function preview(row: any) {
 
 async function download(row: any) {
   try {
-    await downloadFile(`/api/attachments/${row.id}/download`)
+    await downloadFile(P_att.download(row.id))
   } catch {
     ElMessage.error('下载失败')
   }
@@ -209,7 +210,7 @@ function associateDialog(row: any) {
 async function submitAssociate() {
   if (!associateWpId.value) { ElMessage.warning('请选择底稿'); return }
   try {
-    await api.post(`/api/attachments/${associateAttachmentId.value}/associate`, {
+    await api.post(P_att.associate(associateAttachmentId.value), {
       wp_id: associateWpId.value,
       association_type: associateType.value,
       notes: associateNotes.value || undefined,
@@ -233,7 +234,7 @@ async function uploadAttachment(options: any) {
   formData.append('file', options.file)
   try {
     const response = await api.post(
-      `/api/projects/${projectId.value}/attachments/upload`,
+      P_att.upload(projectId.value),
       formData,
     )
     options.onSuccess?.(response.data)
@@ -251,7 +252,7 @@ function onUploadSuccess() {
 
 async function retryOCR(row: any) {
   try {
-    await api.put(`/api/attachments/${row.id}/ocr-status`, { status: 'pending' })
+    await api.put(P_att.ocrStatus(row.id), { status: 'pending' })
     ElMessage.success('已重新提交 OCR 识别')
     await loadAttachments()
   } catch { ElMessage.error('重试失败') }

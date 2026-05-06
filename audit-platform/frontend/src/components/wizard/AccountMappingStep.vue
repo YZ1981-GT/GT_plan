@@ -161,6 +161,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Right, Connection } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { accountMapping as P_am, accountChart as P_ac } from '@/services/apiPaths'
 import { useWizardStore } from '@/stores/wizard'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 
@@ -306,7 +307,7 @@ async function handleAutoMatch() {
   autoMatching.value = true
   try {
     const data = await api.post(
-      `/api/projects/${wizardStore.projectId}/mapping/auto-match`,
+      P_am.autoMatch(wizardStore.projectId),
       mappingYear.value != null ? { year: mappingYear.value } : undefined,
     )
     const result = data
@@ -339,14 +340,14 @@ async function handleMappingChange(row: TableRow, stdCode: string) {
     if (row.mapping_id) {
       // Update existing
       const data = await api.put(
-        `/api/projects/${wizardStore.projectId}/mapping/${row.mapping_id}`,
+        P_am.detail(wizardStore.projectId, row.mapping_id),
         { standard_account_code: stdCode, year: yearPayload },
       )
       record = data
     } else {
       // Create new
       const data = await api.post(
-        `/api/projects/${wizardStore.projectId}/mapping`,
+        P_am.list(wizardStore.projectId),
         {
           original_account_code: row.account_code,
           original_account_name: row.account_name,
@@ -374,7 +375,7 @@ async function handleMappingChange(row: TableRow, stdCode: string) {
 async function fetchMappings(): Promise<MappingRecord[]> {
   if (!wizardStore.projectId) return []
   const data = await api.get(
-    `/api/projects/${wizardStore.projectId}/mapping`,
+    P_am.list(wizardStore.projectId),
   )
   return data
 }
@@ -383,7 +384,7 @@ async function loadClientAccounts() {
   if (!wizardStore.projectId) return
   try {
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/account-chart/client`,
+      P_ac.client(wizardStore.projectId),
     )
     const tree = data
     const flat: AccountItem[] = []
@@ -413,7 +414,7 @@ async function loadStandardAccounts() {
   if (!wizardStore.projectId) return
   try {
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/account-chart/standard`,
+      P_ac.standard(wizardStore.projectId),
     )
     standardAccounts.value = data
   } catch {
@@ -425,7 +426,7 @@ async function loadCompletionRate() {
   if (!wizardStore.projectId) return
   try {
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/mapping/completion-rate`,
+      P_am.completionRate(wizardStore.projectId),
     )
     const rate = data
     mappedCount.value = rate.mapped_count

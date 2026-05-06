@@ -110,6 +110,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { independenceDeclarations as P_id } from '@/services/apiPaths'
 import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
 
@@ -182,8 +183,8 @@ async function loadData() {
   loading.value = true
   try {
     const [qRes, dRes] = await Promise.allSettled([
-      api.get<{ questions: Question[] }>('/api/independence/questions'),
-      api.get<{ declarations: any[] }>(`/api/projects/${projectId.value}/independence-declarations`, {
+      api.get<{ questions: Question[] }>(P_id.questions),
+      api.get<{ declarations: any[] }>(P_id.list(projectId.value), {
         params: { year: currentYear },
       }),
     ])
@@ -243,19 +244,19 @@ async function saveDraft() {
     if (declaration.value) {
       // PATCH 更新
       const { data } = await http.patch(
-        `/api/projects/${projectId.value}/independence-declarations/${declaration.value.id}`,
+        P_id.detail(projectId.value, declaration.value.id),
         { answers: payload },
       )
       declaration.value = data
     } else {
       // 先创建再更新
       const created = await api.post<any>(
-        `/api/projects/${projectId.value}/independence-declarations`,
+        P_id.list(projectId.value),
         { declarant_id: authStore.userId, declaration_year: currentYear },
       )
       declaration.value = created
       const { data } = await http.patch(
-        `/api/projects/${projectId.value}/independence-declarations/${created.id}`,
+        P_id.detail(projectId.value, created.id),
         { answers: payload },
       )
       declaration.value = data
@@ -286,19 +287,19 @@ async function handleSubmit() {
     const payload = buildAnswersPayload()
     if (!declaration.value) {
       const created = await api.post<any>(
-        `/api/projects/${projectId.value}/independence-declarations`,
+        P_id.list(projectId.value),
         { declarant_id: authStore.userId, declaration_year: currentYear },
       )
       declaration.value = created
     }
     await http.patch(
-      `/api/projects/${projectId.value}/independence-declarations/${declaration.value.id}`,
+      P_id.detail(projectId.value, declaration.value.id),
       { answers: payload },
     )
 
     // 提交
     const result = await api.post<any>(
-      `/api/projects/${projectId.value}/independence-declarations/${declaration.value.id}/submit`,
+      P_id.submit(projectId.value, declaration.value.id),
     )
     declaration.value = result
     submitted.value = true
