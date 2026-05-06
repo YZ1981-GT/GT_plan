@@ -400,8 +400,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** OCR 状态标签类型 */
-function ocrStatusTagType(status: string | null): string {
-  const map: Record<string, string> = {
+function ocrStatusTagType(status: string | null): 'success' | 'warning' | 'info' | 'primary' | 'danger' | undefined {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     completed: 'success',
     processing: 'warning',
     pending: 'info',

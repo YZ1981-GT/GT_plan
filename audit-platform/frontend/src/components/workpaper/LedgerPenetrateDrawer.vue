@@ -333,11 +333,11 @@ function strategyLabel(strategy: string): string {
   return map[strategy] || strategy
 }
 
-function strategyTagType(strategy: string): string {
-  const map: Record<string, string> = {
+function strategyTagType(strategy: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' | undefined {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger' | undefined> = {
     exact: 'success',
     tolerance: 'warning',
-    'code+amount': '',
+    'code+amount': undefined,
     summary: 'info',
   }
   return map[strategy] || 'info'

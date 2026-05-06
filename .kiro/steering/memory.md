@@ -52,14 +52,15 @@ inclusion: always
 - Paperless-ngx 端口 8010（admin/admin）
 - 测试用户：admin/admin123（role=admin）
 
-## 当前系统状态（2026-05-05 实测核对）
+## 当前系统状态（2026-05-07 实测核对）
 
 - vue-tsc 0 错误（2026-05-06 全部修复：el-tag type 联合类型标注 + dictStore.type() 返回类型收窄 + 模板 `:type` 绑定加 `|| undefined`），Vite 构建通过
-- 后端 127 个路由文件，181 个服务文件（含子目录 import_engine/、wp_scripts/），39 个模型文件，11 个 core 模块，9 个 middleware，~152 张表
+- 后端 **151** 个路由文件，**226** 个服务文件（含子目录 import_engine/、wp_scripts/ 等），**51** 个模型文件，11 个 core 模块，9 个 middleware，~152 张表（此前 memory 记录 127/181/39 已过时）
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
-- 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
+- 前端 **93** 个 Vue 页面（views/），**186** 个组件（components/ 含所有子目录），16 个 composables，9 个 stores，19 个 services，19 个 utils（此前 memory 记录 80/20 已过时，components 统计之前只数 common/ 子目录）
+- pytest collection 2741 tests / 7 errors（2026-05-07 实测）：7 个测试模块因 3 个符号漂移 ImportError：`wrap_ai_output` 不存在（真实名 `wrap_ai_content`，影响 test_ai_content_structured.py + test_ai_content_confirm_flow.py）、`build_ai_contribution_statement` 不存在于 pdf_export_engine（真实位置 ai_contribution_watermark.generate_short_statement，影响 test_ai_contribution_statement.py）、`IndependenceDeclaration` 不存在（真实名 `AnnualIndependenceDeclaration`，影响 test_independence_service.py + test_my_pending_independence.py + test_handover_e2e.py + test_handover_service.py）
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（R4 修复 + R6 spec 已推送，最新 commit 2a0358f）
+- git 分支：feature/global-component-library（R6 实施 + 复盘修复已推送，最新 commit 4194e88）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：

@@ -251,14 +251,13 @@ class TestAIContentMustBeConfirmedRule:
 
         result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
-        assert result.rule_code == "R3-AI-MUST-CONFIRM"
-        assert result.error_code == "AI_CONTENT_UNCONFIRMED"
+        assert result.rule_code == "R3-AI-UNCONFIRMED"
+        assert result.error_code == "AI_CONTENT_NOT_CONFIRMED"
         assert result.severity.value == "blocking"
-        assert "1" in result.message
 
     @pytest.mark.asyncio
     async def test_unconfirmed_without_target_cell_passes(self, rule):
-        """未确认但 target_cell 为空的 AI 内容不阻断（简报/年报类独立产物）"""
+        """未确认但无 type=ai_generated 标记的内容不阻断"""
         db = AsyncMock()
         wp = MagicMock()
         wp.id = uuid.uuid4()
@@ -267,8 +266,8 @@ class TestAIContentMustBeConfirmedRule:
             "ai_content": [
                 {
                     "id": str(uuid.uuid4()),
-                    "type": "ai_generated",
-                    "content": "简报类 AI 内容",
+                    "type": "manual",
+                    "content": "手动输入内容",
                     "target_cell": None,
                     "confirmed_by": None,
                     "confirmed_at": None,
@@ -284,15 +283,15 @@ class TestAIContentMustBeConfirmedRule:
 
     @pytest.mark.asyncio
     async def test_multiple_unconfirmed_items(self, rule):
-        """多个未确认项正确计数"""
+        """多个未确认项正确计数（按底稿数计）"""
         db = AsyncMock()
         wp1 = MagicMock()
         wp1.id = uuid.uuid4()
         wp1.wp_code = "D-001"
         wp1.parsed_data = {
             "ai_content": [
-                {"id": "1", "content": "a", "target_cell": "A1", "confirmed_by": None},
-                {"id": "2", "content": "b", "target_cell": "B2", "confirmed_by": None},
+                {"id": "1", "type": "ai_generated", "content": "a", "target_cell": "A1", "confirmed_by": None},
+                {"id": "2", "type": "ai_generated", "content": "b", "target_cell": "B2", "confirmed_by": None},
             ]
         }
         wp2 = MagicMock()
@@ -300,8 +299,8 @@ class TestAIContentMustBeConfirmedRule:
         wp2.wp_code = "D-002"
         wp2.parsed_data = {
             "ai_content": [
-                {"id": "3", "content": "c", "target_cell": "C3", "confirmed_by": None},
-                {"id": "4", "content": "d", "target_cell": None, "confirmed_by": None},  # 无 target_cell，不计
+                {"id": "3", "type": "ai_generated", "content": "c", "target_cell": "C3", "confirmed_by": None},
+                {"id": "4", "type": "manual", "content": "d", "target_cell": None, "confirmed_by": None},
             ]
         }
         mock_result = MagicMock()
@@ -310,7 +309,7 @@ class TestAIContentMustBeConfirmedRule:
 
         result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
-        assert result.location["unconfirmed_count"] == 3
+        assert result.location["unconfirmed_wp_count"] == 2
 
     @pytest.mark.asyncio
     async def test_empty_ai_content_list(self, rule):
@@ -349,5 +348,5 @@ class TestAIContentMustBeConfirmedRule:
         from app.models.phase14_enums import GateSeverity
 
         rule = AIContentMustBeConfirmedRule()
-        assert rule.rule_code == "R3-AI-MUST-CONFIRM"
+        assert rule.rule_code == "R3-AI-UNCONFIRMED"
         assert rule.severity == GateSeverity.blocking

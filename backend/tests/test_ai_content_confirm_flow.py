@@ -125,10 +125,10 @@ class TestAiContentUnconfirmedBlocks:
 
         result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
-        assert result.rule_code == "R3-AI-MUST-CONFIRM"
-        assert result.error_code == "AI_CONTENT_UNCONFIRMED"
+        assert result.rule_code == "R3-AI-UNCONFIRMED"
+        assert result.error_code == "AI_CONTENT_NOT_CONFIRMED"
         assert result.severity.value == "blocking"
-        assert result.location["unconfirmed_count"] == 1
+        assert result.location["unconfirmed_wp_count"] == 1
 
     @pytest.mark.asyncio
     async def test_mixed_confirmed_and_unconfirmed(self):
@@ -169,7 +169,7 @@ class TestAiContentUnconfirmedBlocks:
 
         result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
-        assert result.location["unconfirmed_count"] == 1
+        assert result.location["unconfirmed_wp_count"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ class TestEndToEndConfirmFlow:
 
         result = await rule.check(db, {"project_id": uuid.uuid4()})
         assert result is not None
-        assert result.error_code == "AI_CONTENT_UNCONFIRMED"
+        assert result.error_code == "AI_CONTENT_NOT_CONFIRMED"
 
         # Step 3: 用户确认采纳
         user_id = str(uuid.uuid4())

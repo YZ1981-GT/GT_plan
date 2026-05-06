@@ -117,13 +117,13 @@ const trendData = ref<TrendItem[]>([])
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function ratingTagType(rating: string): 'success' | '' | 'warning' | 'danger' {
+function ratingTagType(rating: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' | undefined {
   switch (rating) {
     case 'A': return 'success'
-    case 'B': return ''
+    case 'B': return undefined
     case 'C': return 'warning'
     case 'D': return 'danger'
-    default: return ''
+    default: return undefined
   }
 }
 

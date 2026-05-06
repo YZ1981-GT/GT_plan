@@ -14,6 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.gate_engine import GateRule, GateRuleHit, gate_engine, rule_registry
 from app.models.phase14_enums import GateType, GateSeverity
 
+# Re-export for backward compatibility — tests import from here
+from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 

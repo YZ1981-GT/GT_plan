@@ -50,6 +50,59 @@ def wrap_ai_content(
     }
 
 
+def wrap_ai_output(
+    content: str,
+    *,
+    confidence: float = 0.0,
+    source_model: str | None = None,
+    target_cell: str | None = None,
+    target_field: str | None = None,
+    source_prompt_version: str | None = None,
+) -> dict:
+    """将 AI 输出包装为统一结构化格式（R3 Sprint 4 Task 21 完整版）。
+
+    与 wrap_ai_content 的区别：本函数面向前端确认流程，
+    包含 id/generated_at/confirm_action/revised_content 等字段，
+    供 AIContentMustBeConfirmedRule 门禁规则检查。
+
+    Args:
+        content: AI 生成的文本内容
+        confidence: 模型置信度 [0.0, 1.0]
+        source_model: 模型标识，默认从 settings 读取
+        target_cell: 目标单元格引用（如 "E5"）
+        target_field: 目标字段名（如 "conclusion"）
+        source_prompt_version: 提示词版本号
+
+    Returns:
+        统一结构化 dict，含确认状态字段
+    """
+    import uuid as _uuid
+    from datetime import timezone as _tz
+
+    if source_model is None:
+        try:
+            from app.core.config import settings
+            source_model = getattr(settings, "DEFAULT_CHAT_MODEL", "Qwen3.5-27B")
+        except Exception:
+            source_model = "Qwen3.5-27B"
+
+    return {
+        "id": str(_uuid.uuid4()),
+        "type": "ai_generated",
+        "source_model": source_model,
+        "source_prompt_version": source_prompt_version,
+        "generated_at": datetime.now(_tz.utc).isoformat(),
+        "confidence": confidence,
+        "content": content,
+        "target_cell": target_cell,
+        "target_field": target_field,
+        "confirmed_by": None,
+        "confirmed_at": None,
+        "confirm_action": None,
+        "revised_content": None,
+    }
+
+
 class WpAIService:
     """AI 辅助底稿编制"""
 
