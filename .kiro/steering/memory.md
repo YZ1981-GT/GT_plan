@@ -59,7 +59,7 @@ inclusion: always
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 80 个 Vue 页面（views/），20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（R5 全部完成，已推送远程 8aff1c0）
+- git 分支：feature/global-component-library 已合并到 master（R1-R5+R6 spec，commit 87b0f38 合并为 18dbed8），master 已同步远程；合并带入 591 个文件变更（EQCR独立复核/归档向导/工时审批/合并报表重构/R6 spec等）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
