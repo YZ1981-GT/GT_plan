@@ -105,6 +105,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useLazyEdit } from '@/composables/useLazyEdit'
 import { fmtAmount } from '@/utils/formatters'
+import * as P from '@/services/apiPaths'
 
 const props = defineProps<{
   projectId: string
@@ -175,7 +176,7 @@ async function loadConsolTb(forceRefresh = false) {
   try {
     // 从 report_config 加载行结构
     const standard = `${props.templateType}_consolidated`
-    const data = await api.get('/api/report-config', {
+    const data = await api.get(P.reportConfig.list, {
       params: { report_type: consolTbType.value, applicable_standard: standard, project_id: props.projectId },
       validateStatus: (s: number) => s < 600,
     })

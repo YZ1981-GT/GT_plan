@@ -283,7 +283,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac } from '@/services/apiPaths'
+import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac, gtCoding as P_gtc } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 
@@ -305,7 +305,7 @@ watch(() => props.project?.id, async (newId) => {
   if (!newId) { wpTree.value = []; trialBalanceRows.value = []; return }
   // 加载底稿索引树（致同编码体系，静默失败）
   try {
-    const raw = await api.get('/api/gt-coding/tree', { validateStatus: (s: number) => s < 600 })
+    const raw = await api.get(P_gtc.list, { validateStatus: (s: number) => s < 600 })
     const tree = raw?.data ?? raw ?? []
     wpTree.value = Array.isArray(tree) ? tree.map((group: any) => ({
       label: group.label,

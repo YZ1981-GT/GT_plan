@@ -325,7 +325,7 @@ import { MagicStick, EditPen, Paperclip, WarningFilled } from '@element-plus/ico
 import { getAllWpMappings, getWpPrefillData, getWpRecommendations, type WpAccountMapping, type WpPrefillData, type WpRecommendation } from '@/services/workpaperApi'
 import { getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
-import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai } from '@/services/apiPaths'
+import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai, staff as P_staff } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
@@ -750,7 +750,7 @@ onMounted(async () => {
   await refreshAll()
   // 加载人员列表
   try {
-    const data = await api.get('/api/staff')
+    const data = await api.get(P_staff.list)
     staffList.value = Array.isArray(data) ? data : (data?.items || [])
   } catch { /* 静默 */ }
 })

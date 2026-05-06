@@ -72,6 +72,7 @@ import { Plus, Search, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import ProjectTreeNode from './ProjectTreeNode.vue'
+import * as P from '@/services/apiPaths'
 
 interface ProjectItem {
   id: string
@@ -204,7 +205,7 @@ async function confirmBatchDelete() {
 async function loadProjects() {
   loading.value = true
   try {
-    const data = await api.get('/api/projects')
+    const data = await api.get(P.projects.list)
     projects.value = data ?? []
     // 自动恢复上次选中的项目（用最新数据，修复从向导跳回后旧数据残留）
     const lastId = selectedId.value || localStorage.getItem('gt-last-project-id')

@@ -112,6 +112,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
 import { eventBus } from '@/utils/eventBus'
+import * as P from '@/services/apiPaths'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -245,7 +246,7 @@ async function syncFromProject() {
         let rootName = '集团合并'
         let rootCode = 'root'
         try {
-          const { data } = await import('@/utils/http').then(m => m.default.get(`/api/projects/${projectId.value}`, { validateStatus: (s: number) => s < 600 }))
+          const { data } = await import('@/utils/http').then(m => m.default.get(P.projects.detail(projectId.value), { validateStatus: (s: number) => s < 600 }))
           const p = data
           rootName = p?.client_name || p?.name || rootName
         } catch { /* ignore */ }

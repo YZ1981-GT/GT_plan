@@ -95,6 +95,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 interface CellInfo {
   cell: string
@@ -251,7 +252,7 @@ async function pickSource(fn: string) {
         _ref: `TB('${r.standard_account_code || r.account_code || ''}','期末余额')`,
       }))
     } else if (fn === 'ROW' || fn === 'SUM_ROW' || fn === 'REPORT') {
-      const data = await api.get('/api/report-config', {
+      const data = await api.get(P.reportConfig.list, {
         params: { report_type: 'balance_sheet', project_id: props.projectId },
         validateStatus: (s: number) => s < 600,
       })

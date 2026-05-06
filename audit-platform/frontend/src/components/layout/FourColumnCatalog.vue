@@ -131,6 +131,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { DataLine, Notebook, Document, TrendCharts, FolderOpened, Connection } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 const props = defineProps<{
   project: any
@@ -264,7 +265,7 @@ watch(() => props.project?.id, async (pid) => {
 
   // 加载试算表分类（静默失败）
   try {
-    const data = await api.get(`/api/projects/${pid}/trial-balance`, {
+    const data = await api.get(P.trialBalance.get(pid), {
       params: { year: currentYear.value },
       validateStatus: (s: number) => s < 600,
     })
@@ -288,7 +289,7 @@ watch(() => props.project?.id, async (pid) => {
 
   // 加载底稿列表（按审计循环分组）
   try {
-    const data = await api.get(`/api/projects/${pid}/working-papers`, {
+    const data = await api.get(P.workpapers.list(pid), {
       validateStatus: (s: number) => s < 600,
     })
     const wps = Array.isArray(data) ? (data) : []
@@ -314,7 +315,7 @@ watch(() => props.project?.id, async (pid) => {
 watch(() => props.project?.id, async (pid) => {
   if (!pid) { relatedProjects.value = []; return }
   try {
-    const data = await api.get('/api/projects', { validateStatus: (s: number) => s < 500 })
+    const data = await api.get(P.projects.list, { validateStatus: (s: number) => s < 500 })
     const all = Array.isArray(data) ? data : (data?.items || [])
     // 显示用户能看到的所有项目（后端已按权限过滤）
     relatedProjects.value = all

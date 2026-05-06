@@ -350,6 +350,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { ADJUSTMENT_STATUS } from '@/utils/statusMaps'
+import * as P from '@/services/apiPaths'
 
 const route = useRoute()
 const router = useRouter()
@@ -905,7 +906,7 @@ async function loadTbSummary() {
     } else {
       // 新接口无数据（报表行次未配置），降级：从报表配置+科目明细构建
       const standard = `${selectedTemplateType.value}_standalone`
-      const reportData = await api.get('/api/report-config', {
+      const reportData = await api.get(P.reportConfig.list, {
         params: { report_type: tbSummaryType.value, applicable_standard: standard, project_id: projectId.value },
         validateStatus: (s: number) => s < 600,
       })

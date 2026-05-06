@@ -78,6 +78,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmBatch } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 const router = useRouter()
 
@@ -116,7 +117,7 @@ function rowClassName({ row }: { row: any }) {
 async function loadConfig() {
   loading.value = true
   try {
-    const data = await api.get('/api/report-config', {
+    const data = await api.get(P.reportConfig.list, {
       params: {
         report_type: selectedReportType.value,
         applicable_standard: selectedStandard.value,
@@ -199,7 +200,7 @@ async function onSaveAll() {
     for (const row of rows.value) {
       if (row._isNew) {
         // 新增行 — POST 创建
-        const created = await api.post('/api/report-config', {
+        const created = await api.post(P.reportConfig.list, {
           report_type: selectedReportType.value,
           applicable_standard: selectedStandard.value,
           row_number: row.row_number,

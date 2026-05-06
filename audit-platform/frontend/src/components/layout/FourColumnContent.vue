@@ -58,6 +58,7 @@ import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import DetailProjectPanel from './DetailProjectPanel.vue'
 import { fmtAmount } from '@/utils/formatters'
+import * as P from '@/services/apiPaths'
 
 const props = defineProps<{
   project: any | null
@@ -108,7 +109,7 @@ watch(() => props.catalogItem, async (item) => {
 
   if (item.type === 'trial_balance') {
     try {
-      const data = await api.get(`/api/projects/${pid}/trial-balance`, {
+      const data = await api.get(P.trialBalance.get(pid), {
         params: { year: selectedYear.value },
         validateStatus: (s: number) => s < 600,
       })
