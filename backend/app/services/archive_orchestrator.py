@@ -74,6 +74,7 @@ class ArchiveOrchestrator:
         for section_name, step_func in steps:
             try:
                 await step_func(project_id, gate_eval_id)
+                # DEPRECATED: UI only, routing uses section_progress (see Batch 2-6)
                 job.last_succeeded_section = section_name
                 # R1 Bug Fix 5: 断点续传改用 section_progress 记录每步状态
                 if job.section_progress is None:
@@ -140,6 +141,7 @@ class ArchiveOrchestrator:
         for section_name, step_func in steps[start_from:]:
             try:
                 await step_func(job.project_id, job.gate_eval_id)
+                # DEPRECATED: UI only, routing uses section_progress (see Batch 2-6)
                 job.last_succeeded_section = section_name
                 # R1 Bug Fix 5: 断点续传改用 section_progress 记录每步状态
                 if job.section_progress is None:
@@ -519,7 +521,13 @@ class ArchiveOrchestrator:
 
     @staticmethod
     def _job_to_dict(job: ArchiveJob) -> dict[str, Any]:
-        """将 ArchiveJob ORM 对象转为字典。"""
+        """将 ArchiveJob ORM 对象转为字典。
+
+        Batch 3-4 说明：`section_progress` is the authoritative routing source;
+        `last_succeeded_section` is kept for UI compatibility only (see Batch 2-6).
+        前端 UI 应优先读 section_progress 计算进度百分比，last_succeeded_section
+        仅作为失败时"最后成功章节"的文案展示。
+        """
         return {
             "id": str(job.id),
             "project_id": str(job.project_id),

@@ -270,9 +270,21 @@ const router = createRouter({
           component: () => import('@/views/WorkHoursPage.vue'),
         },
         {
+          path: 'work-hours/approve',
+          name: 'WorkHoursApproval',
+          component: () => import('@/views/WorkHoursApproval.vue'),
+          meta: { permission: 'approve_workhours' },
+        },
+        {
           path: 'dashboard/management',
           name: 'ManagementDashboard',
           component: () => import('@/views/ManagementDashboard.vue'),
+        },
+        {
+          path: 'dashboard/manager',
+          name: 'ManagerDashboard',
+          component: () => import('@/views/ManagerDashboard.vue'),
+          meta: { permission: 'view_dashboard_manager' },
         },
         {
           path: 'dashboard/partner',

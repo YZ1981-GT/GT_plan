@@ -713,6 +713,12 @@ class IndependenceDeclarationCompleteRule(GateRule):
     # 视为"已完成"的声明状态
     COMPLETED_STATUSES = ("submitted", "pending_conflict_review", "approved")
     # R1 Bug Fix 4: R1 上线日期（此日期之前创建的项目视为 legacy）
+    #
+    # Batch 3-14 下线时机说明：
+    # 此常量在 R6+ 老项目全部升级完毕后，应配合环境变量
+    # `INDEPENDENCE_LEGACY_GRACE_ENABLED=False`（见 Batch 3-7）关闭宽容期。
+    # 此常量本身可保留作"历史纪念"供追溯，也可在确认再无 legacy 项目后
+    # 连同 _is_legacy_project / _all_core_roles_declared 一并删除。
     LEGACY_CUTOFF_DATE = datetime(2026, 5, 5, tzinfo=timezone.utc)
 
     async def check(self, db: AsyncSession, context: dict) -> Optional[GateRuleHit]:
@@ -818,14 +824,25 @@ class IndependenceDeclarationCompleteRule(GateRule):
 
         Batch 2-9: cutoff 从 settings.INDEPENDENCE_LEGACY_CUTOFF_DATE 读取，
         空字符串表示"无 legacy 宽容期"，所有项目严格检查。
-        解析失败时回退到类常量 LEGACY_CUTOFF_DATE。
+        解析失败 → None（Batch 3-1：统一关闭宽容期 + WARNING 日志）。
+
+        Batch 3-7: GRACE_ENABLED=False 直接返回 False，用于 R6+ 老项目
+        全部升级完毕后全局关闭宽容期（无需改 CUTOFF_DATE 字符串）。
         """
         if created_at is None:
             return False
 
+        # Batch 3-7: 全局关闭开关
+        try:
+            from app.core.config import settings
+            if getattr(settings, "INDEPENDENCE_LEGACY_GRACE_ENABLED", True) is False:
+                return False
+        except Exception:
+            pass
+
         cutoff = cls._resolve_legacy_cutoff()
         if cutoff is None:
-            # 配置为空字符串 → 无宽容期
+            # 配置为空字符串或非法 → 无宽容期
             return False
 
         # 统一成 tz-aware UTC 再比较，避免 naive/aware 混比异常
@@ -837,7 +854,15 @@ class IndependenceDeclarationCompleteRule(GateRule):
     def _resolve_legacy_cutoff(cls) -> Optional[datetime]:
         """从 settings 读取 INDEPENDENCE_LEGACY_CUTOFF_DATE，解析为 tz-aware datetime。
 
-        返回 None 表示"无宽容期"（配置为空字符串）。
+        语义（Batch 3-1 统一）：
+        - 空字符串 → None（关闭宽容期，所有项目严格检查）
+        - 无效配置（如 "abc"）→ None（关闭宽容期）+ 记 WARNING 日志
+        - 有效日期字符串（YYYY-MM-DD）→ 对应的 tz-aware datetime
+
+        改动原因：
+        以前解析失败会静默回退到硬编码 LEGACY_CUTOFF_DATE，导致运维配错反而
+        激活宽容期——与"空串关闭"语义矛盾。现在统一为：任何非合法值都视为
+        关闭宽容期，只是空串静默、非法值记 WARNING 便于排查。
         """
         try:
             from app.core.config import settings
@@ -846,20 +871,18 @@ class IndependenceDeclarationCompleteRule(GateRule):
             raw = ""
 
         if not raw:
-            # 空字符串 = 关闭宽容期
-            # 但调用 _is_legacy_project 时，我们仍保留类常量兜底的语义：
-            # 如果调用方显式设置空串，表示关闭；未设置时默认类常量值。
-            # 由于 config 默认值是 "2026-05-05"，空串就是运维主动关闭。
+            # 空字符串 = 关闭宽容期（静默）
             return None
         try:
             return datetime.strptime(raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         except Exception:
             logger.warning(
                 "[R1-INDEPENDENCE] invalid INDEPENDENCE_LEGACY_CUTOFF_DATE=%r, "
-                "falling back to class default",
+                "grace period DISABLED (treating all projects as strict). "
+                "If this was unintended, fix the config to 'YYYY-MM-DD' or empty string.",
                 raw,
             )
-            return cls.LEGACY_CUTOFF_DATE
+            return None
 
     async def _load_project_meta(
         self, db: AsyncSession, project_id

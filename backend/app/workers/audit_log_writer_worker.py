@@ -16,10 +16,14 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
+import socket
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger("audit_log_writer")
 
@@ -236,50 +240,56 @@ async def _write_batch(entries: list[dict]) -> int:
 
 
 async def _send_admin_notification(
-    title: str, content: str, metadata: dict | None = None
+    db: AsyncSession,
+    title: str,
+    content: str,
+    metadata: dict | None = None,
 ) -> bool:
     """向所有管理员发送审计日志失败告警。
 
     Batch 2-12: _handle_write_failure 除 logger.critical 外，实际调用
     NotificationService.send_notification_to_admins 发送持久化通知。
     返回 True 表示至少发送了一条通知。兜底仍保持 logger.critical。
+
+    Batch 3-8: 函数签名改为接收 session 参数，避免每次失败开新 session，
+    短时高并发失败耗尽连接池。调用方负责 commit/rollback。
+
+    Batch 3-2: notification_type 改为独立的 AUDIT_LOG_WRITE_FAILED（原误用
+    GATE_ALERT 导致跳转到 gate-readiness 页找不到对应项目）。
     """
     try:
         from sqlalchemy import select
-        from app.core.database import async_session
         from app.models.base import UserRole
         from app.models.core import User
         from app.services.notification_service import NotificationService
-        from app.services.notification_types import GATE_ALERT
+        from app.services.notification_types import AUDIT_LOG_WRITE_FAILED
 
-        async with async_session() as db:
-            stmt = select(User.id).where(
-                User.role == UserRole.admin,
-                User.is_active == True,  # noqa: E712
-                User.is_deleted == False,  # noqa: E712
+        stmt = select(User.id).where(
+            User.role == UserRole.admin,
+            User.is_active == True,  # noqa: E712
+            User.is_deleted == False,  # noqa: E712
+        )
+        admin_ids = [row[0] for row in (await db.execute(stmt)).all()]
+        if not admin_ids:
+            logger.warning(
+                "[audit_log_writer] no admin users found for AUDIT_LOG_WRITE_FAILED notification"
             )
-            admin_ids = [row[0] for row in (await db.execute(stmt)).all()]
-            if not admin_ids:
-                logger.warning(
-                    "[audit_log_writer] no admin users found for AUDIT_LOG_WRITE_FAILED notification"
-                )
-                return False
+            return False
 
-            svc = NotificationService(db)
-            sent = await svc.send_notification_to_many(
-                user_ids=admin_ids,
-                notification_type=GATE_ALERT,
-                title=title,
-                content=content,
-                metadata=metadata,
-            )
-            await db.commit()
-            logger.info(
-                "[audit_log_writer] AUDIT_LOG_WRITE_FAILED admin notifications sent: recipients=%d sent=%d",
-                len(admin_ids),
-                sent,
-            )
-            return sent > 0
+        svc = NotificationService(db)
+        sent = await svc.send_notification_to_many(
+            user_ids=admin_ids,
+            notification_type=AUDIT_LOG_WRITE_FAILED,
+            title=title,
+            content=content,
+            metadata=metadata,
+        )
+        logger.info(
+            "[audit_log_writer] AUDIT_LOG_WRITE_FAILED admin notifications sent: recipients=%d sent=%d",
+            len(admin_ids),
+            sent,
+        )
+        return sent > 0
     except Exception as exc:
         logger.warning(
             "[audit_log_writer] send admin notification failed (falling back to log only): %s",
@@ -300,18 +310,35 @@ async def _handle_write_failure(entries: list[dict], retry_count: int = 0):
             "ALERT [AUDIT_LOG_WRITE_FAILED]: %d audit log entries could not be persisted",
             len(entries),
         )
+        # Batch 3-8: 调用方开 session，复用到 _send_admin_notification，避免开两个 session
         try:
-            await _send_admin_notification(
-                title="审计日志写入失败告警",
-                content=(
-                    f"审计日志 writer 连续 {MAX_RETRIES} 次写入失败，"
-                    f"{len(entries)} 条日志条目可能丢失，请立即检查 Redis 队列与数据库连接。"
-                ),
-                metadata={"lost_count": len(entries), "alert_type": "AUDIT_LOG_WRITE_FAILED"},
-            )
+            from app.core.database import async_session
+
+            async with async_session() as db:
+                try:
+                    await _send_admin_notification(
+                        db,
+                        title="审计日志写入失败告警",
+                        content=(
+                            f"审计日志 writer 连续 {MAX_RETRIES} 次写入失败，"
+                            f"{len(entries)} 条日志条目可能丢失，请立即检查 Redis 队列与数据库连接。"
+                        ),
+                        metadata={
+                            "retry_count": MAX_RETRIES,
+                            "lost_count": len(entries),
+                            "alert_type": "AUDIT_LOG_WRITE_FAILED",
+                        },
+                    )
+                    await db.commit()
+                except Exception as exc:
+                    await db.rollback()
+                    logger.warning(
+                        "[audit_log_writer] _send_admin_notification raised: %s", exc
+                    )
         except Exception as exc:
             logger.warning(
-                "[audit_log_writer] _send_admin_notification raised: %s", exc
+                "[audit_log_writer] open session for admin notification failed: %s",
+                exc,
             )
         return
 
@@ -384,12 +411,14 @@ async def run(stop_event: asyncio.Event) -> None:
     - stop_event.set() 后退出循环
     - 异常不影响主应用，记录 warning 后继续下一周期
     """
-    # Batch 2-13: 每次启动打印单实例约束警告，方便运维排查
-    logger.warning(
-        "[audit_log_writer] starting worker — 如果看到两个此 worker 实例同时打印此行，"
-        "请立即停止一个（单实例约束，见 backend/app/workers/README.md）"
+    # Batch 3-5: 启动日志从 warning 降级为 info，附上 worker_id（host-pid），
+    # 便于运维在日志聚合中看到同一 id 重复出现时立即识别出双实例 bug。
+    worker_id = f"{socket.gethostname()}-{os.getpid()}"
+    logger.info(
+        "[audit_log_writer] worker started id=%s "
+        "（单实例约束：同一 id 重复出现请检查部署，见 backend/app/workers/README.md）",
+        worker_id,
     )
-    logger.info("[audit_log_writer] worker started")
 
     while not stop_event.is_set():
         try:

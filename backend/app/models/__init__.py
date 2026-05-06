@@ -90,6 +90,7 @@ from app.models.attachment_models import Attachment, AttachmentWorkingPaper
 from app.models.ai_models import AIModelConfig, AIModelType, AIProvider, DocumentType, DocumentScan, DocumentExtracted, DocumentMatch, RecognitionStatus, MatchResult
 from app.models.archive_models import ArchiveJob
 from app.models.audit_log_models import AuditLogEntry
+from app.models.handover_models import HandoverRecord, HandoverReasonCode, HandoverScope
 from app.models.independence_models import IndependenceDeclaration
 from app.models.rotation_models import PartnerRotationOverride
 
@@ -187,6 +188,10 @@ __all__ = [
     "ArchiveJob",
     # --- audit log models ---
     "AuditLogEntry",
+    # --- handover models ---
+    "HandoverRecord",
+    "HandoverReasonCode",
+    "HandoverScope",
     # --- independence models ---
     "IndependenceDeclaration",
     # --- rotation models ---

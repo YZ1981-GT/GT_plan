@@ -122,12 +122,13 @@ async def _replay_startup_events() -> None:
 def _start_workers(stop_event):
     """启动所有后台 Worker，返回 task 列表。"""
     import asyncio
-    from app.workers import sla_worker, import_recover_worker, outbox_replay_worker, audit_log_writer_worker
+    from app.workers import sla_worker, import_recover_worker, outbox_replay_worker, audit_log_writer_worker, budget_alert_worker
     return [
         asyncio.create_task(sla_worker.run(stop_event)),
         asyncio.create_task(import_recover_worker.run(stop_event)),
         asyncio.create_task(outbox_replay_worker.run(stop_event)),
         asyncio.create_task(audit_log_writer_worker.run(stop_event)),
+        asyncio.create_task(budget_alert_worker.run(stop_event)),
     ]
 
 

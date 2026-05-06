@@ -715,3 +715,224 @@ class TestConcurrentWriteHashChain:
         # 所有 hash 唯一
         hashes = [r.entry_hash for r in scoped]
         assert len(set(hashes)) == 6
+
+
+# ---------------------------------------------------------------------------
+# Batch 3-9: _send_admin_notification 测试（适配 Batch 3-8 新签名 db 参数）
+# ---------------------------------------------------------------------------
+
+
+class TestSendAdminNotification:
+    """Batch 3-9: `_send_admin_notification(db, title, content, metadata)`。
+
+    关键验证点：
+    1. 只向活跃 admin 角色用户发送（排除非 admin / soft-deleted / inactive）
+    2. 无 admin 用户时返回 False + caplog warning
+    3. NotificationService 抛异常时返回 False + caplog warning
+    4. `_handle_write_failure` MAX_RETRIES 后触发 _send_admin_notification 一次
+    5. 通知 metadata 含 retry_count 和 lost_count（Batch 3-2 content 模板需要）
+    """
+
+    @pytest.mark.asyncio
+    async def test_sends_to_all_admin_users(self, db_session):
+        """创建 2 admin + 1 auditor + 1 deleted admin，只发给 2 个活跃 admin。"""
+        from app.models.base import UserRole
+        from app.models.core import User
+        from app.services.notification_types import AUDIT_LOG_WRITE_FAILED
+        from app.workers.audit_log_writer_worker import _send_admin_notification
+
+        admin1 = User(
+            id=uuid.uuid4(),
+            username="admin_a",
+            email="a@test.com",
+            hashed_password="x",
+            role=UserRole.admin,
+            is_active=True,
+        )
+        admin2 = User(
+            id=uuid.uuid4(),
+            username="admin_b",
+            email="b@test.com",
+            hashed_password="x",
+            role=UserRole.admin,
+            is_active=True,
+        )
+        auditor = User(
+            id=uuid.uuid4(),
+            username="auditor1",
+            email="aud@test.com",
+            hashed_password="x",
+            role=UserRole.auditor,
+            is_active=True,
+        )
+        deleted_admin = User(
+            id=uuid.uuid4(),
+            username="admin_deleted",
+            email="del@test.com",
+            hashed_password="x",
+            role=UserRole.admin,
+            is_active=True,
+        )
+        deleted_admin.is_deleted = True
+        db_session.add_all([admin1, admin2, auditor, deleted_admin])
+        await db_session.commit()
+
+        # Mock send_notification_to_many 验证调用参数 + 返回 sent=2
+        sent_args = {}
+
+        async def fake_send(**kwargs):
+            sent_args.update(kwargs)
+            return len(kwargs.get("user_ids", []))
+
+        with patch(
+            "app.services.notification_service.NotificationService.send_notification_to_many",
+            side_effect=fake_send,
+        ):
+            result = await _send_admin_notification(
+                db_session,
+                title="审计日志告警",
+                content="内容",
+                metadata={"retry_count": 3, "lost_count": 10},
+            )
+
+        assert result is True
+        # 只发给 2 个活跃 admin
+        assert len(sent_args["user_ids"]) == 2
+        sent_ids = set(sent_args["user_ids"])
+        assert admin1.id in sent_ids
+        assert admin2.id in sent_ids
+        assert auditor.id not in sent_ids
+        assert deleted_admin.id not in sent_ids
+        # notification_type 是 AUDIT_LOG_WRITE_FAILED（Batch 3-2）而不是 GATE_ALERT
+        assert sent_args["notification_type"] == AUDIT_LOG_WRITE_FAILED
+        # metadata 含 retry_count + lost_count
+        assert sent_args["metadata"]["retry_count"] == 3
+        assert sent_args["metadata"]["lost_count"] == 10
+
+    @pytest.mark.asyncio
+    async def test_no_admin_users_returns_false(self, db_session, caplog):
+        """无 admin 用户 → 返回 False + caplog 含 'no admin users' warning。"""
+        import logging as _log
+        from app.models.base import UserRole
+        from app.models.core import User
+        from app.workers.audit_log_writer_worker import _send_admin_notification
+
+        # 只有非 admin
+        auditor = User(
+            id=uuid.uuid4(),
+            username="auditor_only",
+            email="aud@test.com",
+            hashed_password="x",
+            role=UserRole.auditor,
+            is_active=True,
+        )
+        db_session.add(auditor)
+        await db_session.commit()
+
+        with caplog.at_level(_log.WARNING, logger="audit_log_writer"):
+            result = await _send_admin_notification(
+                db_session,
+                title="告警",
+                content="内容",
+                metadata=None,
+            )
+
+        assert result is False
+        has_warning = any(
+            "no admin users" in rec.getMessage() for rec in caplog.records
+        )
+        assert has_warning, (
+            f"expected 'no admin users' warning, got: {[r.getMessage() for r in caplog.records]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_notification_service_failure_returns_false(
+        self, db_session, caplog
+    ):
+        """NotificationService.send_notification_to_many 抛异常 → 返回 False + warning。"""
+        import logging as _log
+        from app.models.base import UserRole
+        from app.models.core import User
+        from app.workers.audit_log_writer_worker import _send_admin_notification
+
+        admin = User(
+            id=uuid.uuid4(),
+            username="admin_err",
+            email="err@test.com",
+            hashed_password="x",
+            role=UserRole.admin,
+            is_active=True,
+        )
+        db_session.add(admin)
+        await db_session.commit()
+
+        async def boom(**kwargs):
+            raise RuntimeError("redis down")
+
+        with patch(
+            "app.services.notification_service.NotificationService.send_notification_to_many",
+            side_effect=boom,
+        ):
+            with caplog.at_level(_log.WARNING, logger="audit_log_writer"):
+                result = await _send_admin_notification(
+                    db_session,
+                    title="告警",
+                    content="内容",
+                    metadata={"retry_count": 3, "lost_count": 1},
+                )
+
+        assert result is False
+        has_failure_warning = any(
+            "send admin notification failed" in rec.getMessage()
+            for rec in caplog.records
+        )
+        assert has_failure_warning, (
+            f"expected send-failed warning, got: {[r.getMessage() for r in caplog.records]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_handle_write_failure_triggers_admin_notification(self, db_session):
+        """_handle_write_failure 达到 MAX_RETRIES 后触发 _send_admin_notification 一次。"""
+        from app.workers.audit_log_writer_worker import (
+            MAX_RETRIES,
+            _handle_write_failure,
+        )
+
+        test_session_factory = async_sessionmaker(
+            test_engine, class_=AsyncSession, expire_on_commit=False
+        )
+
+        # Mock _send_admin_notification 验证被调用
+        send_calls = []
+
+        async def fake_send(db, title, content, metadata=None):
+            send_calls.append({
+                "title": title,
+                "content": content,
+                "metadata": metadata,
+            })
+            return True
+
+        with patch(
+            "app.workers.audit_log_writer_worker._send_admin_notification",
+            side_effect=fake_send,
+        ):
+            with patch(
+                "app.core.database.async_session", test_session_factory
+            ):
+                # retry_count=MAX_RETRIES → 触发告警路径
+                await _handle_write_failure(
+                    entries=[{"action_type": "t", "object_type": "x"}] * 5,
+                    retry_count=MAX_RETRIES,
+                )
+
+        assert len(send_calls) == 1, (
+            f"expected _send_admin_notification called exactly once, got {len(send_calls)}"
+        )
+        call = send_calls[0]
+        assert "审计日志" in call["title"]
+        # content 模板须含 retry_count + lost_count 数字
+        assert str(MAX_RETRIES) in call["content"]
+        assert "5" in call["content"]
+        assert call["metadata"]["retry_count"] == MAX_RETRIES
+        assert call["metadata"]["lost_count"] == 5

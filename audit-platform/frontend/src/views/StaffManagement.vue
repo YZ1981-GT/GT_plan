@@ -30,10 +30,11 @@
         </template>
       </el-table-column>
       <el-table-column prop="phone" label="联系电话" width="130" />
-      <el-table-column label="操作" width="150" align="center">
+      <el-table-column label="操作" width="220" align="center">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="editStaff(row)">编辑</el-button>
           <el-button link type="primary" size="small" @click="viewResume(row)">简历</el-button>
+          <el-button link type="warning" size="small" @click="openHandover(row)">交接</el-button>
           <el-button v-if="row.source === 'custom'" link type="danger" size="small" @click="onDeleteStaff(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -90,14 +91,105 @@
       import-type="staff"
       @imported="onStaffImported"
     />
+
+    <!-- 交接弹窗 -->
+    <el-dialog
+      v-model="showHandoverDialog"
+      title="人员工作交接"
+      width="560px"
+      append-to-body
+      :close-on-click-modal="false"
+      @close="resetHandoverForm"
+    >
+      <el-form :model="handoverForm" label-width="100px">
+        <el-form-item label="交接人">
+          <span style="font-weight: 600">{{ handoverTarget?.name }}（{{ handoverTarget?.title || '—' }}）</span>
+        </el-form-item>
+        <el-form-item label="目标人" required>
+          <el-select
+            v-model="handoverForm.target_staff_id"
+            filterable
+            placeholder="请选择接收人"
+            style="width: 100%"
+            @change="onTargetChange"
+          >
+            <el-option
+              v-for="s in handoverCandidates"
+              :key="s.id"
+              :label="`${s.name}（${s.title || '—'}）`"
+              :value="s.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="原因" required>
+          <el-select v-model="handoverForm.reason_code" placeholder="请选择原因" style="width: 100%">
+            <el-option label="离职" value="resignation" />
+            <el-option label="长期休假" value="long_leave" />
+            <el-option label="岗位轮换" value="rotation" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="补充说明">
+          <el-input
+            v-model="handoverForm.reason_detail"
+            type="textarea"
+            :rows="2"
+            placeholder="可选，补充交接原因"
+          />
+        </el-form-item>
+        <el-form-item label="生效日期" required>
+          <el-date-picker
+            v-model="handoverForm.effective_date"
+            type="date"
+            placeholder="选择生效日期"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+
+      <!-- 预览区 -->
+      <div v-if="handoverPreview" class="gt-handover-preview">
+        <el-divider content-position="left">交接预览</el-divider>
+        <el-descriptions :column="3" border size="small">
+          <el-descriptions-item label="底稿">{{ handoverPreview.workpapers }} 张</el-descriptions-item>
+          <el-descriptions-item label="工单">{{ handoverPreview.issues }} 张</el-descriptions-item>
+          <el-descriptions-item label="项目委派">{{ handoverPreview.assignments }} 个</el-descriptions-item>
+        </el-descriptions>
+        <el-alert
+          v-if="handoverForm.reason_code === 'resignation'"
+          type="warning"
+          :closable="false"
+          style="margin-top: 12px"
+          description="离职交接将同时标记该人员未完成的独立性声明为已交接替代。"
+        />
+      </div>
+      <div v-if="handoverPreviewLoading" style="text-align: center; padding: 16px">
+        <el-icon class="is-loading"><Loading /></el-icon> 加载预览中...
+      </div>
+
+      <template #footer>
+        <el-button @click="showHandoverDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!canSubmitHandover"
+          :loading="handoverSubmitting"
+          @click="executeHandover"
+        >
+          确认交接
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import { listStaff, createStaff, updateStaff, getStaffResume, deleteStaff, type StaffMember } from '@/services/staffApi'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import http from '@/utils/http'
 
 const titles = ['合伙人', '总监', '高级经理', '经理', '高级审计员', '审计员', '实习生']
 
@@ -184,6 +276,119 @@ function onStaffImported() {
   loadStaff()
 }
 
+// ── 交接功能 ──
+
+const showHandoverDialog = ref(false)
+const handoverTarget = ref<StaffMember | null>(null)
+const handoverCandidates = ref<StaffMember[]>([])
+const handoverPreview = ref<{ workpapers: number; issues: number; assignments: number } | null>(null)
+const handoverPreviewLoading = ref(false)
+const handoverSubmitting = ref(false)
+
+const handoverForm = ref({
+  target_staff_id: '',
+  reason_code: '',
+  reason_detail: '',
+  effective_date: '',
+})
+
+const canSubmitHandover = computed(() => {
+  return (
+    handoverForm.value.target_staff_id &&
+    handoverForm.value.reason_code &&
+    handoverForm.value.effective_date &&
+    handoverPreview.value !== null &&
+    !handoverSubmitting.value
+  )
+})
+
+function resetHandoverForm() {
+  handoverTarget.value = null
+  handoverPreview.value = null
+  handoverPreviewLoading.value = false
+  handoverSubmitting.value = false
+  handoverForm.value = { target_staff_id: '', reason_code: '', reason_detail: '', effective_date: '' }
+}
+
+async function openHandover(row: StaffMember) {
+  handoverTarget.value = row
+  showHandoverDialog.value = true
+
+  // 加载候选人列表（排除当前交接人）
+  try {
+    const res = await listStaff({ limit: 500 })
+    handoverCandidates.value = res.items.filter(s => s.id !== row.id)
+  } catch {
+    handoverCandidates.value = []
+  }
+
+  // 加载预览
+  await loadHandoverPreview(row.id)
+}
+
+async function loadHandoverPreview(staffId: string) {
+  handoverPreviewLoading.value = true
+  handoverPreview.value = null
+  try {
+    const { data } = await http.get(`/api/staff/${staffId}/handover/preview`, {
+      params: { scope: 'all' },
+    })
+    handoverPreview.value = data as { workpapers: number; issues: number; assignments: number }
+  } catch {
+    handoverPreview.value = null
+    ElMessage.warning('获取交接预览失败')
+  } finally {
+    handoverPreviewLoading.value = false
+  }
+}
+
+function onTargetChange() {
+  // 目标人变更时无需重新加载预览（预览只与交接人相关）
+}
+
+async function executeHandover() {
+  if (!handoverTarget.value) return
+  const totalItems = (handoverPreview.value?.workpapers || 0) +
+    (handoverPreview.value?.issues || 0) +
+    (handoverPreview.value?.assignments || 0)
+
+  if (totalItems === 0) {
+    ElMessage.info('该人员名下无需交接的工作项')
+    showHandoverDialog.value = false
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确认将 ${handoverPreview.value?.workpapers} 张底稿、${handoverPreview.value?.issues} 张工单、${handoverPreview.value?.assignments} 个项目委派交接给目标人？`,
+      '交接确认',
+      { type: 'warning' },
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  handoverSubmitting.value = true
+  try {
+    await http.post(`/api/staff/${handoverTarget.value.id}/handover`, {
+      scope: 'all',
+      target_staff_id: handoverForm.value.target_staff_id,
+      reason_code: handoverForm.value.reason_code,
+      reason_detail: handoverForm.value.reason_detail || undefined,
+      effective_date: handoverForm.value.effective_date,
+    })
+    ElMessage.success(
+      `交接完成：${handoverPreview.value?.workpapers} 张底稿、${handoverPreview.value?.issues} 张工单、${handoverPreview.value?.assignments} 个项目委派已转交，新负责人已收到通知`,
+    )
+    showHandoverDialog.value = false
+    await loadStaff()
+  } catch {
+    // http 拦截器已处理错误提示
+  } finally {
+    handoverSubmitting.value = false
+  }
+}
+
 onMounted(loadStaff)
 </script>
 
@@ -192,4 +397,5 @@ onMounted(loadStaff)
 .gt-staff-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-4); flex-wrap: wrap; gap: var(--gt-space-2); }
 .gt-staff-header .gt-page-title { font-size: 14px; }
 .gt-staff-actions { display: flex; gap: var(--gt-space-2); align-items: center; }
+.gt-handover-preview { margin-top: 16px; }
 </style>

@@ -23,21 +23,32 @@
     </el-alert>
 
     <!-- 独立性待声明提醒卡 -->
-    <el-card v-if="pendingIndependenceProjects.length" class="independence-reminder-card" shadow="hover" style="margin-bottom: 16px">
+    <el-card v-if="pendingIndependenceProjects.projects.length" class="independence-reminder-card" shadow="hover" style="margin-bottom: 16px">
       <template #header>
         <div style="display: flex; align-items: center; gap: 8px">
           <span style="font-size: 16px">📋</span>
           <span style="font-weight: 600">独立性待声明</span>
-          <el-badge :value="pendingIndependenceProjects.length" type="warning" />
+          <el-badge :value="pendingIndependenceProjects.total" type="warning" />
         </div>
       </template>
       <div class="independence-reminder-list">
-        <div v-for="p in pendingIndependenceProjects" :key="p.id" class="independence-reminder-item">
+        <div v-for="p in pendingIndependenceProjects.projects" :key="p.id" class="independence-reminder-item">
           <span class="independence-reminder-name">{{ p.client_name || p.name }}</span>
           <el-button size="small" type="warning" plain @click="goToIndependence(p.id)">
             去声明 →
           </el-button>
         </div>
+      </div>
+      <!-- Batch 3-10: has_more=true 时提供"加载更多"按钮 -->
+      <div v-if="pendingIndependenceProjects.hasMore" class="independence-reminder-footer">
+        <el-button
+          link
+          type="primary"
+          :loading="pendingIndependenceLoadingMore"
+          @click="loadMorePendingIndependence"
+        >
+          加载更多（还有 {{ Math.max(pendingIndependenceProjects.total - pendingIndependenceProjects.projects.length, 0) }} 个）
+        </el-button>
       </div>
     </el-card>
 
@@ -331,8 +342,19 @@ const teamStats = computed(() => {
   ]
 })
 
-// 独立性待声明项目（从 overview 中筛选未归档的项目作为提醒）
-const pendingIndependenceProjects = ref<any[]>([])
+// 独立性待声明项目（Batch 3-3: 改为结构化对象，区分 total/hasMore/projects）
+interface PendingIndependenceProject {
+  id: string
+  name?: string
+  client_name?: string | null
+  status?: string | null
+}
+const pendingIndependenceProjects = ref<{
+  projects: PendingIndependenceProject[]
+  total: number
+  hasMore: boolean
+}>({ projects: [], total: 0, hasMore: false })
+const pendingIndependenceLoadingMore = ref(false)
 
 function goToIndependence(pid: string) {
   router.push(`/projects/${pid}/independence`)
@@ -516,16 +538,42 @@ async function loadAll() {
  *
  * Batch 2-5: 失败不再静默降级，给用户提示。
  * Batch 2-10: 显式传 limit=50 避免后端默认值变更破坏前端假设。
+ * Batch 3-3: 同时记录 total/has_more，badge 显示真实总数而不是截断后的条数。
  */
 async function loadPendingIndependence() {
   try {
-    const res = await api.get<{ projects: any[]; total: number; has_more?: boolean }>(
+    const res = await api.get<{ projects: PendingIndependenceProject[]; total: number; has_more?: boolean }>(
       '/api/my/pending-independence?limit=50',
     )
-    pendingIndependenceProjects.value = res.projects || []
+    pendingIndependenceProjects.value = {
+      projects: res.projects || [],
+      total: res.total || 0,
+      hasMore: res.has_more || false,
+    }
   } catch {
     ElMessage.warning('独立性待声明检查失败，请刷新')
-    pendingIndependenceProjects.value = []
+    pendingIndependenceProjects.value = { projects: [], total: 0, hasMore: false }
+  }
+}
+
+/**
+ * Batch 3-10: has_more=true 时"加载更多"按钮的回调，用更大的 limit 拉全量。
+ */
+async function loadMorePendingIndependence() {
+  pendingIndependenceLoadingMore.value = true
+  try {
+    const res = await api.get<{ projects: PendingIndependenceProject[]; total: number; has_more?: boolean }>(
+      '/api/my/pending-independence?limit=200',
+    )
+    pendingIndependenceProjects.value = {
+      projects: res.projects || [],
+      total: res.total || 0,
+      hasMore: res.has_more || false,
+    }
+  } catch {
+    ElMessage.warning('加载更多失败，请稍后重试')
+  } finally {
+    pendingIndependenceLoadingMore.value = false
   }
 }
 
@@ -647,6 +695,12 @@ onMounted(loadAll)
 .independence-reminder-name {
   font-size: 14px;
   color: var(--gt-color-text, #303133);
+}
+.independence-reminder-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--el-border-color-lighter, #ebeef5);
+  text-align: center;
 }
 
 /* 轮换预警卡片 */

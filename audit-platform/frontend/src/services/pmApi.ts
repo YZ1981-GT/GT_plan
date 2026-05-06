@@ -95,6 +95,16 @@ export interface CrossRefCheckResult {
   medium_count: number
 }
 
+export interface CommitmentEntry {
+  id?: string
+  content: string
+  due_date: string | null
+  status?: 'pending' | 'done' | 'overdue'
+  related_pbc_id?: string | null
+  issue_ticket_id?: string | null
+  completed_at?: string | null
+}
+
 export interface CommunicationRecord {
   id: string
   created_at: string
@@ -103,7 +113,7 @@ export interface CommunicationRecord {
   contact_person: string
   topic: string
   content: string
-  commitments: string
+  commitments: CommitmentEntry[] | string
   related_wp_codes: string[]
   related_accounts: string[]
 }

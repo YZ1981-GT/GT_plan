@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import ForeignKey, Index, Numeric, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -88,6 +89,16 @@ class Project(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     # Round 1 需求 11：归档保留期
     archived_at: Mapped[datetime | None] = mapped_column(nullable=True)
     retention_until: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    # Round 2 需求 9：项目预算
+    budget_hours: Mapped[int | None] = mapped_column(nullable=True)
+    contract_amount: Mapped[Decimal | None] = mapped_column(
+        Numeric(20, 2), nullable=True
+    )
+    budgeted_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    budgeted_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     __table_args__ = (
         Index(
@@ -183,6 +194,7 @@ class Notification(Base):
     related_object_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     related_object_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     is_read: Mapped[bool] = mapped_column(default=False)
+    read_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (

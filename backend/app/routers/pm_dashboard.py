@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -38,7 +38,7 @@ class CommunicationCreate(BaseModel):
     contact_person: str = ""
     topic: str = ""
     content: str = ""
-    commitments: str = ""
+    commitments: Union[list[dict], str] = []
     related_wp_codes: list[str] = []
     related_accounts: list[str] = []
 
@@ -187,3 +187,21 @@ async def delete_communication(
     if not ok:
         raise HTTPException(404, "记录不存在")
     return {"message": "删除成功"}
+
+
+@router.patch("/api/projects/{project_id}/communications/{comm_id}/commitments/{commitment_id}")
+async def complete_commitment(
+    project_id: UUID,
+    comm_id: str,
+    commitment_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """标记客户承诺完成：关闭关联 ticket + 时间线追加'✅ 已完成'"""
+    svc = ClientCommunicationService(db)
+    try:
+        result = await svc.complete_commitment(project_id, comm_id, commitment_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    await db.commit()
+    return result

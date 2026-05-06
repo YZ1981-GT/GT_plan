@@ -567,6 +567,81 @@ async def update_status(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ---------------------------------------------------------------------------
+# 重新分配通知辅助函数
+# ---------------------------------------------------------------------------
+
+
+async def _send_reassignment_notifications(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_id: UUID,
+    old_assignee_id: UUID,
+    new_assignee_id: UUID,
+) -> None:
+    """重新分配底稿后，通知原编制人和新编制人。
+
+    - 原编制人收到"底稿 {wp_code} 已被重新分配"
+    - 新编制人收到"项目「{project_name}」的底稿 {wp_code} 已转交给您"
+    """
+    import logging
+    from app.services.notification_service import NotificationService
+    from app.services.notification_types import ASSIGNMENT_CREATED, WORKPAPER_REMINDER
+    from app.models.core import Project
+
+    logger = logging.getLogger(__name__)
+    notif_svc = NotificationService(db)
+
+    # 获取底稿编号（wp_code）
+    wp_row = (await db.execute(
+        sa.select(WorkingPaper.wp_index_id).where(WorkingPaper.id == wp_id)
+    )).scalar_one_or_none()
+
+    wp_code = "未知底稿"
+    if wp_row:
+        idx_row = (await db.execute(
+            sa.select(WpIndex.wp_code).where(WpIndex.id == wp_row)
+        )).scalar_one_or_none()
+        if idx_row:
+            wp_code = idx_row
+
+    # 获取项目名称
+    project_name = (await db.execute(
+        sa.select(Project.name).where(Project.id == project_id)
+    )).scalar_one_or_none() or "未知项目"
+
+    # 通知原编制人："底稿 {wp_code} 已被重新分配"
+    await notif_svc.send_notification(
+        user_id=old_assignee_id,
+        notification_type=WORKPAPER_REMINDER,
+        title="底稿已被重新分配",
+        content=f"底稿 {wp_code} 已被重新分配给其他人员",
+        metadata={
+            "object_type": "working_paper",
+            "object_id": str(wp_id),
+            "project_id": str(project_id),
+        },
+    )
+
+    # 通知新编制人："项目「{project_name}」的底稿 {wp_code} 已转交给您"
+    await notif_svc.send_notification(
+        user_id=new_assignee_id,
+        notification_type=ASSIGNMENT_CREATED,
+        title="底稿已转交给您",
+        content=f"项目「{project_name}」的底稿 {wp_code} 已转交给您，请及时处理",
+        metadata={
+            "object_type": "working_paper",
+            "object_id": str(wp_id),
+            "project_id": str(project_id),
+        },
+    )
+
+    logger.info(
+        "[REASSIGN] wp=%s old=%s new=%s project=%s",
+        wp_id, old_assignee_id, new_assignee_id, project_id,
+    )
+
+
 @router.put("/working-papers/{wp_id}/assign")
 async def assign_workpaper(
     project_id: UUID,
@@ -575,8 +650,26 @@ async def assign_workpaper(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("review")),
 ):
-    """分配编制人/复核人（需 review 权限）"""
+    """分配编制人/复核人（需 review 权限）
+
+    重新分配时发送通知：
+    - 原编制人收到"底稿已被重新分配"
+    - 新编制人收到"项目 X 底稿 Y 已转交给您"
+    """
     svc = WorkingPaperService()
+
+    # ── 记录原编制人（用于重新分配通知） ──
+    old_assigned_to: UUID | None = None
+    if data.assigned_to is not None:
+        wp_row = (await db.execute(
+            sa.select(WorkingPaper.assigned_to).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )).scalar_one_or_none()
+        old_assigned_to = wp_row  # 可能为 None（首次分配）
+
     try:
         result = await svc.assign_workpaper(
             db=db, wp_id=wp_id, project_id=project_id,
@@ -584,9 +677,29 @@ async def assign_workpaper(
             reviewer=data.reviewer,
         )
         await db.commit()
-        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # ── 重新分配通知（仅当 assigned_to 变更且原编制人存在时） ──
+    if (
+        data.assigned_to is not None
+        and old_assigned_to is not None
+        and old_assigned_to != data.assigned_to
+    ):
+        try:
+            await _send_reassignment_notifications(
+                db=db,
+                project_id=project_id,
+                wp_id=wp_id,
+                old_assignee_id=old_assigned_to,
+                new_assignee_id=data.assigned_to,
+            )
+            await db.commit()
+        except Exception:
+            # 通知发送失败不阻断主流程
+            pass
+
+    return result
 
 
 @router.post("/working-papers/{wp_id}/submit-review")

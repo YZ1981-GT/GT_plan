@@ -376,6 +376,26 @@ class WorkingPaperService:
 
         await db.flush()
 
+        # Batch 1 Fix 7.1: 底稿通过复核时自动关闭 source='reminder' 的 IssueTicket
+        if wp.status == WpFileStatus.review_passed:
+            try:
+                from app.models.phase15_models import IssueTicket
+                close_stmt = (
+                    sa.update(IssueTicket)
+                    .where(
+                        IssueTicket.wp_id == wp_id,
+                        IssueTicket.source == "reminder",
+                        IssueTicket.status.in_(["open", "in_fix"]),
+                    )
+                    .values(status="closed")
+                )
+                await db.execute(close_stmt)
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "[WP] auto-close reminder tickets failed for wp=%s: %s", wp_id, exc
+                )
+
         # R1 需求 2：退回时同步创建 ReviewRecord + 关联 IssueTicket
         # （失败不阻断本方法，见 WpReviewService.add_comment 守卫逻辑）。
         if "rejected" in new_review_status and rejected_by_id is not None:

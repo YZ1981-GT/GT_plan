@@ -233,13 +233,13 @@
 
 ## Round 2 补充任务候选（Round 1 复盘遗留）
 
-- [ ] Round2-Task-A：补测试盲点（见 backend/tests/README.md "测试盲点清单"）
+- [ ] Round2-Task-A：补测试盲点（见 backend/tests/README.md "测试盲点清单"） **[P1, 3-5d]**
   - 并发/竞态 3 项 + Worker 故障恢复 3 项 + PBT 扩展 5 项
-- [ ] Round2-Task-B：legacy 日期配置化（LEGACY_CUTOFF_DATE → system_settings.independence_legacy_cutoff）
-- [ ] Round2-Task-C：/api/my/pending-independence 加 limit query 参数（默认 50）
-- [ ] Round2-Task-D：AuditLogWriterWorker 启动时 WARNING log 单实例约束
-- [ ] Round2-Task-E：section_progress 加 GIN 索引（PG 迁移脚本）
-- [ ] Round2-Task-F：weasyprint 降级路径补测试（test_archive_pdf_generators.py）
+- [x] ~~Round2-Task-B：legacy 日期配置化（LEGACY_CUTOFF_DATE → system_settings.independence_legacy_cutoff）~~（Batch 2-9 已完成）
+- [x] ~~Round2-Task-C：/api/my/pending-independence 加 limit query 参数（默认 50）~~（Batch 2-10 已完成）
+- [x] ~~Round2-Task-D：AuditLogWriterWorker 启动时 WARNING log 单实例约束~~（Batch 3-5 已完成，降级为 info + worker_id）
+- [ ] Round2-Task-E：section_progress 加 GIN 索引（PG 迁移脚本） **[P2, 1d]**
+- [x] ~~Round2-Task-F：weasyprint 降级路径补测试（test_archive_pdf_generators.py）~~（Batch 2-11 已完成）
 
 ## 已知妥协（Round 2+ 补丁）
 

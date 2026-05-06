@@ -29,6 +29,9 @@ inclusion: always
 - 系统打磨采用 PDCA 迭代模式：提建议→成 spec 三件套→实施→复盘→下一轮新需求，直到可改进项穷尽
 - 打磨迭代具体化为"5 角色轮转"：合伙人/项目经理/质控/审计助理/EQCR 独立复核，每轮只站单一角色视角找断层，规则见 `.kiro/specs/refinement-round1-review-closure/README.md`
 - 每轮 requirements.md 起草后必须做"代码锚定交叉核验"（grep 所有假设的字段/表/端点/枚举），发现硬错立刻回补到文档，避免错误带到 design 阶段
+- 任务执行后必须自行 grep 核查实际落地，不信子代理报告；发现未落地/部分落地需补全
+- 复盘迭代模式：修完→测试覆盖→提交推送→grep 核查→再复盘，找到新建议回到修复，零新建议才真正收尾
+- 批量修复时不要每小步都停下来问 hook/确认，一气呵成完成整批再统一更新记忆
 
 ## Spec 工作流规范（production-readiness 复盘沉淀）
 
@@ -47,12 +50,12 @@ inclusion: always
 - Paperless-ngx 端口 8010（admin/admin）
 - 测试用户：admin/admin123（role=admin）
 
-## 当前系统状态（2026-05-05）
+## 当前系统状态（2026-05-06）
 
 - vue-tsc 90 个预存错误（非本 spec 引入，el-tag 类型联合/checkbox 值扩宽/tree filter-method 签名），Vite 构建通过
-- 后端 121 个路由文件（新增 pbc.py、confirmations.py），172 个服务文件，42 个模型文件，~152 张表
-- 后端新增 `backend/app/workers/` 模块：sla_worker、import_recover_worker、outbox_replay_worker（每个导出 `async def run(stop_event)`）
-- 前端 75+ 页面，20 个 common 组件，16 个 composables，9 个 stores，19 个 services，19 个 utils
+- 后端 ~126 个路由文件（R2 新增 manager_dashboard/batch_assign_enhanced/workpaper_remind/batch_brief/workhour_approve/cost_overview），~178 个服务文件，43 个模型文件，~155 张表（新增 handover_records/system_settings）
+- 后端新增 `backend/app/workers/` 模块：sla_worker、import_recover_worker、outbox_replay_worker、budget_alert_worker（每个导出 `async def run(stop_event)`）
+- 前端 ~78 页面（R2 新增 ManagerDashboard/WorkHoursApproval），22 个 common 组件（R2 新增 BatchAssignDialog/StaffSelectDialog/CommunicationCommitmentsEditor/CrossProjectBriefExporter），16 个 composables，9 个 stores，19 个 services，19 个 utils
 - git 分支：feature/global-component-library（已推送至 02e3731，待合并 master）
 - 最新提交 02e3731：Round 1 复盘 14 项修复（bug fix + 改进 + 文档）
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
@@ -88,7 +91,9 @@ inclusion: always
 - commonApi.getMyStaffId 直接返回 `string | null`；staffApi.getMyStaffId 返回对象，两者不同
 - router_registry.py 路由前缀规范：路由器内部只声明业务路径（如 /gate），注册时统一加 prefix="/api"；例外：dashboard.py 内部带 /api/dashboard 注册时不加、/wopi 不加、/api/version 直接在 main.py
 - 预存 backend 测试失败（与本 spec 无关，不要误判为回归）：test_adjustments.py 23 个测试因 SQLite 不支持 pg_advisory_xact_lock 失败；test_misstatements.py 2 个测试因 UnadjustedMisstatement 缺 soft_delete mixin；test_e2e_chain* 同样 pg_advisory_xact_lock 问题
-- NotificationCenter.vue 组件+store+API 完整，但 DefaultLayout.vue 顶部未挂铃铛入口，通知实际不可见（Round 2 重点修复）
+- 时间戳处理：DB 存 naive TIMESTAMP（SQLite + PG 默认 TIMESTAMP WITHOUT TIME ZONE），service 比较时用 `datetime.now(timezone.utc).replace(tzinfo=None)` 而非 `datetime.utcnow()`（3.12 已废弃）；避免 `datetime.now(tz=None)` 反模式混用
+- NotificationCenter.vue 组件+store+API 完整，DefaultLayout.vue 顶部已挂铃铛入口（Round 2 Task 1 完成），通知可见
+- ThreeColumnLayout.vue 已有 #nav-notifications slot（Round 2 新增），DefaultLayout 通过 `<template #nav-notifications>` 注入 NotificationCenter
 - ReviewWorkstation.vue 存在三栏+AI 预审+快捷键，但 router/index.ts 未注册，是死代码；实际入口 ReviewInbox.vue 无 AI 预审（Round 1 需合并）
 - backend/app/routers/pbc.py 和 confirmations.py 是占位空壳（各 15 行返回 []），不是真实功能，前端无对应页面
 - 归档端点三重并存语义不同：wp_storage.archive_project（锁底稿）/ private_storage.archive_project（锁+推云+清本地）/ data_lifecycle.archive_project（软删除可恢复），前端只有一个按钮入口
@@ -97,7 +102,7 @@ inclusion: always
 - qc_engine.py 14 条 QC-01~14 规则 + gate_rules_phase14.py QC-19~26 全是硬编码 Python，无 qc_rule_definitions 表支持自定义
 - WorkpaperEditor.vue 工具栏仅保存/同步公式/版本/下载/PDF/上传，无 AI 侧栏、无程序要求侧栏、无右键序时账穿透、无对比上年按钮
 - 系统无 EQCR（独立复核合伙人）专属角色与工作台，ProjectAssignment.role 缺 eqcr 枚举，gate_engine 缺 eqcr_approval 阶段
-- Communication/ClientCommunication 模型不存在（grep 零命中），ProjectProgressBoard 沟通记录前端组件存在但后端未独立建模，可能塞在 JSON 字段或散落表里
+- Communication/ClientCommunication 独立模型不存在，沟通记录存 Project.wizard_state.communications JSONB（R2 已确认并升级 commitments 为结构化数组）
 - WorkingPaper 无 due_date 字段，wp_progress_service overdue_days 用 created_at 估算"已创建天数"，语义弱
 - ledger/penetrate 端点参数为 account_code + drill_level + date，不支持按 amount 容差匹配；按金额穿透需新增端点
 - assignment_service.ROLE_MAP 和 role_context_service._ROLE_PRIORITY 两个字典是角色体系单一真源，新增 role='eqcr' 必须同时更新；_ROLE_PRIORITY 当前 partner(5)/qc(4)/manager(3)/auditor(2)/readonly(1)
@@ -109,7 +114,18 @@ inclusion: always
 - 权限矩阵四点同步约定：新增 role/动作需同时更新 assignment_service.ROLE_MAP + role_context_service._ROLE_PRIORITY + 前端 ROLE_MAP + composables/usePermission.ROLE_PERMISSIONS
 - 焦点时长隐私决策：R4 需求 10 焦点追踪只写 localStorage（按周归档键），不落库不发后端，消除监控隐患
 - 跨轮 SLA 统一按自然日计，不引入节假日日历服务，跨长假由人工 override（README 跨轮约束第 5 条）
-- ClientCommunicationService 已存在于 `pm_service.py:481`，沟通记录存 `Project.wizard_state.communications` JSONB，`commitments` 当前是字符串；R2 需求 5 无需"调研"，直接升级为结构化数组
+- ClientCommunicationService 已存在于 `pm_service.py:481`，沟通记录存 `Project.wizard_state.communications` JSONB，`commitments` 已升级为结构化数组（R2 Task 12 完成），每条 commitment 创建 IssueTicket(source='client_commitment')
+- Project 模型已有 budget_hours/contract_amount/budgeted_by/budgeted_at 字段（R2 Task 20）
+- HandoverRecord 模型已存在（handover_models.py），POST /api/staff/{id}/handover 端点可用（R2 Task 23）
+- system_settings 表存 hourly_rates JSON 配置（partner:3000/manager:1500/senior:900/auditor:500/intern:200）
+- cost_overview_service.compute 纯函数：按 approved 工时分 role 乘 rate 得成本，burn_rate = 近 14 天/14
+- budget_alert_worker 每日扫描，幂等键 budget_alert:{project_id}:{threshold}:{YYYYMMDD}
+- notification_types.py R2 新增：WORKPAPER_REMINDER/WORKHOUR_APPROVED/WORKHOUR_REJECTED/ASSIGNMENT_CREATED/COMMITMENT_DUE/BUDGET_ALERT_80/BUDGET_OVERRUN/HANDOVER_RECEIVED
+- BatchAssignStrategy 纯函数三策略（manual/round_robin/by_level），audit_cycle 映射：D/F→初级(1)，K/N→复杂(3)
+- 工时审批幂等：Redis `idempotency:workhour_approve:{key}` TTL 5 分钟；SOD 守卫通过 StaffMember.user_id→staff_id 比对
+- 催办限流：Redis `remind:{wp_id}:{YYYYMMDD}` 7 天内最多 3 次，超限 429
+- 批量简报缓存：WordExportTask(doc_type='batch_brief', template_type=cache_key_sha256)，7 天复用
+- manager 前端权限新增：view_dashboard_manager/approve_workhours/send_reminder/batch_brief
 - ReviewInboxService.get_inbox(user_id, project_id=None) 已支持全局+单项目双模式（`pm_service.py:26`），R1 需求 1 不新增后端端点
 - 复核批注并存两套：ReviewRecord（单行绑定 wp_id+cell_reference）与 review_conversations（跨对象多轮）；R1 需求 2 选定 ReviewRecord 为工单转换真源，conversations 只用于后续讨论
 - AuditEvidence 模型不存在（grep 零命中），附件与底稿关联统一用 attachment_service + workpaper_attachment_link
@@ -169,15 +185,100 @@ inclusion: always
 - 生产环境部署准备（Docker 镜像打包 LibreOffice、PG 环境变量、数据库初始化）
 - 打磨路线图已由"4 轮主题"改为"5 角色轮转"：Round 1 合伙人 / Round 2 PM / Round 3 质控 / Round 4 助理 / Round 5 EQCR，5 轮三件套（requirements+design+tasks）全部起草并完成一致性校对
 - 实施顺序：R1 → R2 → R3+R4（并行，相互独立）→ R5，依据 README v2.2 "跨轮依赖矩阵"
-- Round 1 已全部完成（Sprint 1-3 共 26 任务 + 3 验收，157 测试全绿）+ 14 项复盘修复（Batch 1）已推送（02e3731）；Round 1 关闭
-- **复盘 Batch 1 遗留问题（14 项 Batch 2 修复中）**：Fix 5 section_progress 零测试、Fix 6 非上市 7 年零测试、Fix 4 legacy 宽容期零测试、useApiError 孤儿未被任何页面消费、/api/my/pending-independence 无测试且前端静默降级、_get_next_section_index 新老双路径并存 tech debt、ADR-003 无索引、legacy 日期硬编码、batch 端点无 limit、weasyprint 降级未测、审计日志告警只是 logger.critical 非 NotificationService
-- 复盘纪律约束：子代理报告"Fix X 已在位"时必须 grep 验证 + 核查测试覆盖，不信子代理报告（本轮发现 Fix 5/6 代码加了但零测试，Fix 8 创建了文件零消费者）
+- **Round 2 已全部完成**（Sprint 1-3 共 24 任务）：通知铃铛/PM 看板/增强委派/催办/承诺升级/简报/工时审批/权限收口/预算成本/人员交接；Round 2 关闭
+- Round 1 已全部完成（Sprint 1-3 共 26 任务 + 3 验收，157 测试全绿）+ Batch 1 14 项（02e3731）+ Batch 2 14 项（01881a7）+ Batch 3 14 项（待推送）；Round 1 关闭
+- Batch 3 完成：立刻修 5 项（3-1/3-2/3-3/3-4/3-5）+ 尽快修 4 项（3-6/3-7/3-8/3-9）+ 文档 3 项（3-10/3-11/3-12）+ 配套 2 项（3-13/3-14 合并入其他）
+- Batch 3 新建 `.kiro/specs/refinement-round1-review-closure/RETROSPECTIVE.md` 汇总 Round 1 原 26 任务 + 42 项 patch 的全貌 + 5 条复盘纪律沉淀
+- Batch 3 关键决策：`AUDIT_LOG_WRITE_FAILED` 独立 notification 类型（跳转 `/audit-logs/verify-chain`）、`_send_admin_notification(db, ...)` 复用 session、worker 启动 `logger.info` + `worker_id={host}-{pid}`、`INDEPENDENCE_LEGACY_GRACE_ENABLED` 全局开关、`_resolve_legacy_cutoff` 解析失败统一返回 None+WARNING（不再回退硬编码）、前端 `pendingIndependenceProjects={projects,total,hasMore}` 结构化 + 加载更多按钮
+- Batch 2 补 17 个新测试（section_progress/非上市 7 年/legacy 宽容/pending_independence/weasyprint 降级），前端 useApiError 已被 3 个页面实际消费
+- Batch 2 技术债清理：`_get_next_section_index` 签名只接 `section_progress`，`last_succeeded_section` 字段仍写但不参与路由判断
+- Batch 2 新增 config：`INDEPENDENCE_LEGACY_CUTOFF_DATE`（空串=关闭宽容期），`/api/my/pending-independence` 新增 `limit: int = Query(50, ge=1, le=500)` + `has_more` 字段
+- Batch 2 新增 `backend/docs/adr/README.md`（ADR 索引表），`tasks.md` 追加 Round2-Task-A~F 6 条任务候选
 - Round 1 复盘新增：`composables/useApiError.ts`、`docs/adr/003-review-issue-transaction-strategy.md`、`tests/README.md`（测试盲点）、`workers/README.md`（单实例约束）
 - PDF 生成优先 weasyprint（可选 `pip install weasyprint`），不可用降级 LibreOffice（Fix 9）
 - `GET /api/my/pending-independence` 批量端点替代前端 N+1（Fix 7）
 - `useApiError.ts`：`parseApiError(err)→{code,message,detail}` + `showApiError(err)` 统一前端错误处理（Fix 8）
 - ArchiveOrchestrator `_get_next_section_index` 同时检查 `section_progress` dict（Fix 5）
 - `RotationCheckService.check_rotation` 新增 `is_listed_company` 参数，上市 5 年/非上市 7 年（Fix 6）
+
+### Round 1 Batch 4 待修（复盘锁定的 14 项，按优先级）
+
+**P0 合规必修（3 项）**：
+- `IndependenceDeclarationCompleteRule._all_core_roles_declared` 查询异常 return True 静默放行 → 改 raise/降级为 warning 并 `logger.error`
+- `IndependenceService._check_conflict_answers` 对任何 yes/true 打 `pending_conflict_review` 误判 → `independence_questions.json` 加 `is_conflict_signal: true` 字段，只对标注的问题触发
+- `ArchiveOrchestrator._set_project_retention` 重试覆盖 `archived_at` 导致保留期重新计时 → `if project.archived_at is None:` 再写
+
+**P1 性能（3 项）**：
+- `audit_log_entries` 加 JSONB 复合索引 `(payload->>'project_id', ts DESC)` 供 `_get_prev_hash` 查询
+- `issue_tickets` 加复合索引 `(source, source_ref_id)` 供 Task 4/6 反向同步查询
+- `archive_jobs.section_progress` GIN 索引（Round2-Task-E 已登记）
+
+**P1 可观测性（4 项）**：
+- `_write_batch` advisory lock 失败静默 fallback to lock-free → 加 env `AUDIT_LOG_REQUIRE_ADVISORY_LOCK=True` 默认，失败 raise 让 worker 重启
+- `_html_to_pdf_weasyprint` ImportError 完全静默 → 模块级 flag 首次 ImportError 记 warning 一次
+- PDF 水印"待归档完成后填入"语义矛盾 → 改为"本 PDF 的 SHA-256: <自哈希>"或去掉 hash 部分归入 manifest.json
+- `audit_logger_enhanced.query_logs` 改名 `_query_recent_cache` 私有化或加 @deprecated_for_audit 装饰器
+
+**P2 架构（2 项）**：
+- `sign_service._maybe_transition_report_status` 对象类型硬编码 `audit_report` → 抽 `_STATE_MACHINE_HOOKS: dict[str, Callable]` 注册表，R3/R5 rotation_override 复用
+- `rotation_check_service` 按 client_name 精确匹配，客户改名/并购后年数重置漏洞 → Round 3+ 引入 `client_alias_history` 表按 client_id 聚合
+
+**P2 工程（2 项）**：
+- Worker 单实例约束仅靠 README + worker_id 肉眼巡检 → 启动 Redis `SETNX audit_log_writer:lock <worker_id> EX 30`，已有则 exit(1)
+- `sign_document` 未强制绑定 `gate_eval_id.project_id` → 签字时强制 `validate_gate_eval(project_id=report.project_id)`，不匹配返回 403 `GATE_PROJECT_MISMATCH`
+
+### Round 2 复盘锁定 37 项待修（分 8 类，按优先级）
+
+**P0 合规/安全（6 项）必修**：
+- [x] `assignment_service.py:143` message_type 硬编码 `"ASSIGNMENT_CREATED"` 大写违反跨轮约束 1 → 改用 `notification_types.ASSIGNMENT_CREATED` 常量，删除 `manager_dashboard_service.get_assignment_status` 的双写兼容（Batch 1 P0.1 完成，21 测试通过）
+- [x] `POST /api/staff/{id}/handover` 只要 `get_current_user` → 加 `require_role(["admin","partner","manager"])`，manager 限 by_project 范围内自己的项目（Batch 1 P0.2 完成，preview 端点同样收紧）
+- `POST /api/workpapers/batch-assign-enhanced` 缺 project_access 校验 → 所有 wp_ids 必属同一项目且当前用户对该项目有 `edit` 权限
+- `POST /api/workhours/batch-approve` 只限 role 不限项目 → 校验 hour_ids 对应 project_id 都在当前用户的 manager/signing_partner 项目列表
+- Sprint 2 验收要求的 `test_pm_workflow_e2e.py`（委派→催办→重新分配→承诺→审批→简报）未写
+- Sprint 3 验收要求的 `test_handover_e2e.py`（建 staff→分底稿→离职交接→验证数据迁移+留痕）未写
+
+**P1 数据正确性（6 项）**：
+- `manager_dashboard_service._get_manager_project_ids` 每请求调 2 次（router 权限守卫 + service 内部）→ 权限判断返回 project_ids，service 接可选入参
+- `manager_dashboard_service` 用 `datetime.now(tz=None)` 与 UTC aware created_at 比较在 PG 生产会抛 TypeError → 统一 `datetime.now(timezone.utc)`
+- `workpaper_remind_service._increment_remind_count` INCR + 单独循环 SUM 非原子 → Redis pipeline 或 Lua 脚本，或改单 key `remind_count:{wp_id}` TTL 7d
+- `workpaper_remind_service` Redis INCR 在 db.commit() 之前 → 移到 commit 后，失败不计入
+- `handover_service.execute` 只 flush 不 commit，依赖 router 隐式 commit → service 末尾显式 `await db.commit()` + try/except rollback
+- `ManagerDashboard.vue` 前端 N+1：每个项目独发 `/cost-overview` 请求 → 批量端点或并入 `/manager/overview` 响应
+
+**P1 性能（3 项）**：
+- `manager_dashboard.get_overview` 顺序跑三个聚合 → `asyncio.gather` 并发
+- `_aggregate_projects` 底稿状态查 + overdue 查两次 SQL → 合并成一次 CASE WHEN
+- `WordExportTask.template_type` 存 cache_key_sha256 无索引 → 加 `idx_word_export_task_template_type`
+
+**P1 可观测性（4 项）**：
+- `budget_alert_worker.run` 开头缺 `logger.info("started") + worker_id` 纪律
+- Notification metadata 字段名散落各 service 无单一真源 → 加 `META_SCHEMA: Record<type, required_fields[]>` 校验
+- `batch_brief` AI 失败回退无响应字段 → 加 `ai_fallback_reason: str | null` 给前端展示
+- Round 2 `RETROSPECTIVE.md` 未建（R1 有对齐格式参考）
+
+**P2 UX（6 项）**：
+- `ProjectDashboard.vue` 催办 `remindCounts` 只存内存，刷新丢失 → 从后端 list/preview 端点同步
+- `BatchAssignDialog.vue` by_level 前端自实现策略与后端 `CYCLE_COMPLEXITY_MAP` 会漂移 → 前端只提交，后端返预览
+- `CommunicationCommitmentsEditor` 不支持编辑已存在承诺（id/ticket_id 会被覆盖）
+- `ManagerDashboard.vue` elapsedTimer 常驻 setInterval 浪费 CPU → 超 1 小时停 timer 或 requestIdleCallback
+- `BatchAssignDialog` 候选人未排序 → 按 role(manager→senior→auditor) + 姓名排序
+- `WorkHoursApproval.vue` 加载打 3 次 `/api/workhours` → 后端加 `/api/workhours/summary?week` 一次返回
+
+**P2 架构/一致性（8 项）**：
+- `batch_brief._generate_ai_summary` prompt 无 token 上限 → 按模型能力截断 combined_text
+- `cost_overview_service._TITLE_TO_RATE_KEY` 依赖 `StaffMember.title` 自由文本 → `StaffMember` 加 `role_level` 枚举
+- `batch_brief` 用 `WordExportTask.template_type` 存 cache_key 是字段复用 → 加专用 `cache_key` 字段或 metadata JSONB
+- `IssueTicket.source='reminder'` 无自动关闭机制 → workpaper review_passed 事件时自动关或设 `auto_close_at`
+- `IndependenceDeclaration.status='superseded_by_handover'` 值未在枚举声明 → 回补 R1 枚举
+- `batch_assign_enhanced` 不走 WpEventService → 每条发 `WP_ASSIGNED` 事件或显式 audit_logger 记录
+- `manager_dashboard._compute_risk_level` 查询时算不落库 → 未来"高风险项目趋势"需持久化
+- `handover_service` audit_log `details` 里的 from/to_staff_id 未索引 → 合并到 R1 Batch 4 的 `audit_log_entries` JSONB 索引
+
+**P2 测试覆盖（4 项）**：
+- `batch_assign_enhanced` 路由层端点 + DB 变更 + 通知发送闭环未测
+- `cost_overview` 端点层无集成测试（只有 service 层）
+- 催办/重新分配/承诺的跨角色权限矩阵未测
+- `budget_alert_worker._check_all_projects` 主循环未测（幂等键/阈值触发）
 
 ### 中期功能完善
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）

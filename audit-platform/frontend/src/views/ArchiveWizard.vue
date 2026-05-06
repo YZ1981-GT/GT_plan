@@ -268,6 +268,16 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const progressPercent = computed(() => {
   if (!jobData.value) return 0
+  // Batch 3-4: 优先读 section_progress（权威执行状态），与 archive_orchestrator
+  // 路由判断口径一致。sections 是 UI 章节列表，仅作为降级。
+  const sp = jobData.value.section_progress
+  if (sp && Object.keys(sp).length) {
+    const total = Object.keys(sp).length
+    const done = Object.values(sp).filter(
+      (v: any) => v && v.status === 'succeeded',
+    ).length
+    return total > 0 ? Math.round((done / total) * 100) : 0
+  }
   const sections = jobData.value.sections
   if (!sections || sections.length === 0) {
     // 无章节信息时按状态估算

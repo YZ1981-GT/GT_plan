@@ -122,11 +122,21 @@ def register_all_routers(app: FastAPI) -> None:
     # Excel↔HTML互转
     from app.routers.excel_html import router as exhtml_router
 
+    # 增强批量委派
+    from app.routers.batch_assign_enhanced import router as bae_router
+
+    # 底稿催办（Round 2 需求 4）
+    from app.routers.workpaper_remind import router as wp_remind_router
+
+    # 成本看板（Round 2 需求 9）
+    from app.routers.cost_overview import router as cost_overview_router
+
     for r in [formula_router, wpt_router, wp_router, qc_router, wpr_router,
               wpm_router, wpp_router, wpai_router, wps_router, wpd_router,
               wpc_router, samp_router, sampe_router, wsum_router, pr_router,
               rconv_router, ann_router, wpexpl_router, bgjob_router, wpdr_router,
-              dfc_router, exhtml_router]:
+              dfc_router, exhtml_router, bae_router, wp_remind_router,
+              cost_overview_router]:
         app.include_router(r, tags=["底稿管理"])
 
     # 底稿三式联动
@@ -177,18 +187,21 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.staff import router as staff_router
     from app.routers.assignments import router as assign_router
     from app.routers.workhours import router as wh_router
+    from app.routers.workhour_approve import router as wh_approve_router
     from app.routers.dashboard import router as dash_router
     from app.routers.pm_dashboard import router as pmd_router
     from app.routers.qc_dashboard import router as qcd_router
     from app.routers.partner_dashboard import router as pd_router
+    from app.routers.manager_dashboard import router as mgr_dash_router
     from app.routers.role_context import router as rc2_router
     from app.routers.procedures import router as proc_router
     from app.routers.subsequent_events import router as se_router
     from app.routers.forum import router as forum_router
+    from app.routers.batch_brief import router as bb_router
 
-    for r in [staff_router, assign_router, wh_router, dash_router,
-              pmd_router, qcd_router, pd_router, rc2_router, proc_router,
-              se_router, forum_router]:
+    for r in [staff_router, assign_router, wh_router, wh_approve_router, dash_router,
+              pmd_router, qcd_router, pd_router, mgr_dash_router, rc2_router, proc_router,
+              se_router, forum_router, bb_router]:
         app.include_router(r, tags=["团队与看板"])
 
     # 角色AI辅助

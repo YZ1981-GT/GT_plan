@@ -479,10 +479,36 @@ class CrossRefCheckService:
 # ---------------------------------------------------------------------------
 
 class ClientCommunicationService:
-    """客户沟通记录 — 存储在 project 的 wizard_state.communications JSONB 中"""
+    """客户沟通记录 — 存储在 project 的 wizard_state.communications JSONB 中
+
+    R2 需求 5 升级：commitments 从 string 升级为结构化数组。
+    读时兼容旧 string 格式（自动包装），写时强制数组。
+    每条 commitment 创建 IssueTicket(source='client_commitment')，回写 issue_ticket_id。
+    """
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    def _normalize_commitments(commitments) -> list[dict]:
+        """读时兼容：若 commitments 为 string 则自动包装为结构化数组"""
+        if commitments is None:
+            return []
+        if isinstance(commitments, str):
+            if not commitments.strip():
+                return []
+            return [{
+                "id": str(uuid.uuid4()),
+                "content": commitments,
+                "due_date": None,
+                "status": "pending",
+                "related_pbc_id": None,
+                "issue_ticket_id": None,
+                "completed_at": None,
+            }]
+        if isinstance(commitments, list):
+            return commitments
+        return []
 
     async def list_communications(self, project_id: uuid.UUID) -> list[dict]:
         proj = (await self.db.execute(
@@ -491,7 +517,11 @@ class ClientCommunicationService:
         if not proj:
             return []
         ws = proj.wizard_state or {}
-        return ws.get("communications", [])
+        comms = ws.get("communications", [])
+        # 读时兼容：对每条记录的 commitments 做规范化
+        for comm in comms:
+            comm["commitments"] = self._normalize_commitments(comm.get("commitments"))
+        return comms
 
     async def add_communication(
         self,
@@ -508,6 +538,15 @@ class ClientCommunicationService:
         ws = dict(proj.wizard_state or {})
         comms = list(ws.get("communications", []))
 
+        # 写时强制数组：处理 commitments
+        raw_commitments = data.get("commitments", [])
+        commitments = self._normalize_commitments(raw_commitments)
+
+        # 为每条 commitment 创建 IssueTicket
+        commitments = await self._create_tickets_for_commitments(
+            project_id, user_id, commitments
+        )
+
         record = {
             "id": str(uuid.uuid4()),
             "created_at": datetime.utcnow().isoformat(),
@@ -516,7 +555,7 @@ class ClientCommunicationService:
             "contact_person": data.get("contact_person", ""),
             "topic": data.get("topic", ""),
             "content": data.get("content", ""),
-            "commitments": data.get("commitments", ""),
+            "commitments": commitments,
             "related_wp_codes": data.get("related_wp_codes", []),
             "related_accounts": data.get("related_accounts", []),
         }
@@ -528,16 +567,159 @@ class ClientCommunicationService:
         )
         return record
 
+    async def complete_commitment(
+        self,
+        project_id: uuid.UUID,
+        comm_id: str,
+        commitment_id: str,
+        user_id: uuid.UUID,
+    ) -> dict:
+        """标记承诺完成：关闭关联 ticket + 时间线追加'✅ 已完成'"""
+        from app.models.phase15_models import IssueTicket
+
+        proj = (await self.db.execute(
+            select(Project).where(Project.id == project_id)
+        )).scalar_one_or_none()
+        if not proj:
+            raise ValueError("项目不存在")
+
+        ws = dict(proj.wizard_state or {})
+        comms = list(ws.get("communications", []))
+
+        # 找到目标沟通记录和承诺
+        target_comm = None
+        target_commitment = None
+        for comm in comms:
+            if comm.get("id") == comm_id:
+                target_comm = comm
+                # 规范化 commitments
+                comm["commitments"] = self._normalize_commitments(comm.get("commitments"))
+                for c in comm["commitments"]:
+                    if c.get("id") == commitment_id:
+                        target_commitment = c
+                        break
+                break
+
+        if not target_comm:
+            raise ValueError("沟通记录不存在")
+        if not target_commitment:
+            raise ValueError("承诺条目不存在")
+        if target_commitment.get("status") == "done":
+            raise ValueError("承诺已完成")
+
+        # 标记承诺完成
+        target_commitment["status"] = "done"
+        target_commitment["completed_at"] = datetime.utcnow().isoformat()
+
+        # 关闭关联的 IssueTicket
+        ticket_id = target_commitment.get("issue_ticket_id")
+        if ticket_id:
+            ticket = (await self.db.execute(
+                select(IssueTicket).where(IssueTicket.id == uuid.UUID(ticket_id))
+            )).scalar_one_or_none()
+            if ticket and ticket.status != "closed":
+                ticket.status = "closed"
+                ticket.closed_at = datetime.utcnow()
+
+        # 时间线追加"✅ 已完成"（在沟通记录 content 末尾追加）
+        content = target_commitment.get("content", "")
+        timeline_entry = f"\n✅ {content} 已完成"
+        target_comm["content"] = (target_comm.get("content", "") or "") + timeline_entry
+
+        ws["communications"] = comms
+        await self.db.execute(
+            sa_update(Project).where(Project.id == project_id).values(wizard_state=ws)
+        )
+
+        return target_commitment
+
     async def delete_communication(self, project_id: uuid.UUID, comm_id: str) -> bool:
+        """删除沟通记录，级联关闭关联的 client_commitment IssueTicket"""
+        from app.models.phase15_models import IssueTicket
+
         proj = (await self.db.execute(
             select(Project).where(Project.id == project_id)
         )).scalar_one_or_none()
         if not proj:
             return False
+
         ws = dict(proj.wizard_state or {})
-        comms = [c for c in ws.get("communications", []) if c.get("id") != comm_id]
+        comms_before = ws.get("communications", [])
+
+        # 找到要删除的记录，关闭其关联 tickets
+        for comm in comms_before:
+            if comm.get("id") == comm_id:
+                commitments = self._normalize_commitments(comm.get("commitments"))
+                for c in commitments:
+                    ticket_id = c.get("issue_ticket_id")
+                    if ticket_id:
+                        ticket = (await self.db.execute(
+                            select(IssueTicket).where(
+                                IssueTicket.id == uuid.UUID(ticket_id)
+                            )
+                        )).scalar_one_or_none()
+                        if ticket and ticket.status != "closed":
+                            ticket.status = "closed"
+                            ticket.closed_at = datetime.utcnow()
+                break
+
+        comms = [c for c in comms_before if c.get("id") != comm_id]
         ws["communications"] = comms
         await self.db.execute(
             sa_update(Project).where(Project.id == project_id).values(wizard_state=ws)
         )
         return True
+
+    async def _create_tickets_for_commitments(
+        self,
+        project_id: uuid.UUID,
+        user_id: uuid.UUID,
+        commitments: list[dict],
+    ) -> list[dict]:
+        """为每条 commitment 创建 IssueTicket(source='client_commitment')，回写 issue_ticket_id"""
+        from app.models.phase15_models import IssueTicket
+        from app.services.trace_event_service import generate_trace_id
+
+        for commitment in commitments:
+            # 跳过已有 ticket 的承诺（幂等）
+            if commitment.get("issue_ticket_id"):
+                continue
+            # 跳过空内容
+            if not commitment.get("content", "").strip():
+                continue
+
+            # 确保有 id
+            if not commitment.get("id"):
+                commitment["id"] = str(uuid.uuid4())
+
+            # 解析 due_date
+            due_at = None
+            if commitment.get("due_date"):
+                try:
+                    due_at = datetime.fromisoformat(commitment["due_date"])
+                except (ValueError, TypeError):
+                    pass
+
+            trace_id = generate_trace_id()
+            ticket = IssueTicket(
+                project_id=project_id,
+                source="client_commitment",
+                severity="minor",
+                category="evidence_missing",
+                title=f"客户承诺：{commitment['content'][:100]}",
+                owner_id=user_id,
+                due_at=due_at,
+                status="open",
+                trace_id=trace_id,
+            )
+            self.db.add(ticket)
+            await self.db.flush()
+
+            # 回写 issue_ticket_id
+            commitment["issue_ticket_id"] = str(ticket.id)
+
+            # 确保 status 字段存在
+            if not commitment.get("status"):
+                commitment["status"] = "pending"
+
+        return commitments

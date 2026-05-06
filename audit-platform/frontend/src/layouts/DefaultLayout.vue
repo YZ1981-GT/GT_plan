@@ -18,6 +18,10 @@
       </router-link>
     </template>
 
+    <template #nav-notifications>
+      <NotificationCenter />
+    </template>
+
     <template #middle>
       <!-- 合并模块：独立树形导航 -->
       <ConsolMiddleNav v-if="isConsolRoute" />
@@ -77,12 +81,15 @@ import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
+import { useCollaborationStore } from '@/stores/collaboration'
 import { getProject } from '@/services/auditPlatformApi'
 import { getGlobalReviewInbox } from '@/services/pmApi'
+import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
 
 const route = useRoute()
 const roleStore = useRoleContextStore()
 const projectStore = useProjectStore()
+const collaborationStore = useCollaborationStore()
 const selectedProject = ref<any>(null)
 const activeModule = ref('projects')
 const fourCol = ref(false)
@@ -114,6 +121,9 @@ onMounted(async () => {
   }
   loadPendingReviewCount()
   badgeTimer = setInterval(loadPendingReviewCount, 5 * 60 * 1000)
+  // 启动时拉取通知（collaboration store）+ 订阅 SSE 通知事件
+  collaborationStore.fetchNotifications()
+  collaborationStore.subscribeSSENotifications()
 })
 
 onBeforeUnmount(() => {
@@ -151,7 +161,7 @@ const catalogTitle = computed(() => {
 const FULLWIDTH_PATHS = [
   '/', '/projects/new', '/recycle-bin', '/forum', '/private-storage',
   '/knowledge', '/consolidation', '/attachments',
-  '/archive', '/work-hours',
+  '/archive', '/work-hours', '/work-hours/approve',
 ]
 const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/']
 

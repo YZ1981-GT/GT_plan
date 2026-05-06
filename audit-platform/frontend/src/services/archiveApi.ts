@@ -45,6 +45,13 @@ export interface ArchiveJob {
   finished_at: string | null
   current_section?: string | null
   sections?: ArchiveJobSection[]
+  /**
+   * Batch 3-4: 断点续传与进度计算的权威来源。
+   * 每个 key 对应后端步骤名（gate/wp_storage/push_to_cloud/purge_local 等），
+   * value.status 为 "succeeded"/"running"/"failed" 等。
+   * 前端 progressPercent 应优先读本字段，而非 last_succeeded_section。
+   */
+  section_progress?: Record<string, { status: string; finished_at?: string }>
 }
 
 // ── API 函数 ──────────────────────────────────────────────────────────────

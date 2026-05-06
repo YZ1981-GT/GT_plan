@@ -136,11 +136,14 @@
         <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
         <slot name="nav-review-inbox" />
 
-        <el-tooltip content="通知" placement="bottom">
-          <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
-            <el-icon :size="18"><Bell /></el-icon>
-          </el-badge>
-        </el-tooltip>
+        <!-- 通知铃铛入口 -->
+        <slot name="nav-notifications">
+          <el-tooltip content="通知" placement="bottom">
+            <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
+              <el-icon :size="18"><Bell /></el-icon>
+            </el-badge>
+          </el-tooltip>
+        </slot>
         <el-dropdown trigger="click">
           <div class="gt-user-info">
             <el-avatar :size="30" class="gt-avatar">
@@ -166,7 +169,7 @@
       <aside class="gt-sidebar" :style="{ width: sidebarCollapsed ? '56px' : sidebarWidth + 'px' }" role="navigation">
         <nav class="gt-nav">
           <div
-            v-for="item in navItems"
+            v-for="item in visibleNavItems"
             :key="item.key"
             class="gt-nav-item"
             :class="{ 'gt-nav-item--active': activeNav === item.key }"
@@ -323,14 +326,25 @@ const navItems = [
   { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
   { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production' },
   { key: 'team', label: '人员', icon: User, path: '/settings/staff', maturity: 'production' },
+  { key: 'workhours-approve', label: '工时审批', icon: Timer, path: '/work-hours/approve', maturity: 'production', roles: ['manager', 'admin'] },
   { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production' },
   { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
+  { key: 'manager-dashboard', label: 'PM工作台', icon: Odometer, path: '/dashboard/manager', maturity: 'production', roles: ['manager', 'admin'] },
   { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot' },
   // PBC/函证入口已移除（Round 1 需求 7 方案 A），Round 2 补全 MVP 后恢复
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production' },
   { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
   { key: 'users', label: '用户', icon: UserFilled, path: '/settings/users', maturity: 'production' },
 ]
+
+// 根据角色过滤导航项
+const visibleNavItems = computed(() => {
+  const role = authStore.user?.role ?? ''
+  return navItems.filter(item => {
+    if (!item.roles) return true
+    return role === 'admin' || item.roles.includes(role)
+  })
+})
 
 const activeNav = computed(() => {
   const p = route.path

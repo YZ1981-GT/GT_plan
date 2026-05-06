@@ -451,3 +451,123 @@ class TestIndependenceLegacyGracePeriod:
         assert result.rule_code == "R1-INDEPENDENCE"
         assert result.error_code == "INDEPENDENCE_DECLARATION_INCOMPLETE"
         assert result.severity.value == "blocking" if hasattr(result.severity, "value") else str(result.severity) == "blocking"
+
+
+# ---------------------------------------------------------------------------
+# Batch 3-1: _resolve_legacy_cutoff 三种分支测试
+# ---------------------------------------------------------------------------
+
+
+class TestResolveLegacyCutoff:
+    """Batch 3-1: settings.INDEPENDENCE_LEGACY_CUTOFF_DATE 解析分支。
+
+    修复前：解析失败时静默回退到硬编码的 LEGACY_CUTOFF_DATE（2026-05-05），
+    与"空串=关闭宽容期"语义矛盾。修复后统一：
+    - 空字符串 → None（关闭，静默）
+    - 非法值 → None（关闭）+ WARNING 日志
+    - 合法 YYYY-MM-DD → tz-aware datetime
+    """
+
+    def test_resolve_legacy_cutoff_empty_returns_none(self, monkeypatch):
+        """settings 为空字符串 → 返回 None（关闭宽容期）。"""
+        from app.core.config import settings
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        monkeypatch.setattr(settings, "INDEPENDENCE_LEGACY_CUTOFF_DATE", "", raising=False)
+        result = IndependenceDeclarationCompleteRule._resolve_legacy_cutoff()
+        assert result is None
+
+    def test_resolve_legacy_cutoff_invalid_returns_none_with_warning(
+        self, monkeypatch, caplog
+    ):
+        """settings 为非法字符串（如 "abc"）→ 返回 None + WARNING 日志。"""
+        import logging as _log
+        from app.core.config import settings
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        monkeypatch.setattr(
+            settings, "INDEPENDENCE_LEGACY_CUTOFF_DATE", "abc", raising=False
+        )
+
+        with caplog.at_level(_log.WARNING, logger="app.services.gate_rules_phase14"):
+            result = IndependenceDeclarationCompleteRule._resolve_legacy_cutoff()
+
+        assert result is None
+        # WARNING 日志含 "invalid INDEPENDENCE_LEGACY_CUTOFF_DATE"
+        has_warning = any(
+            "invalid INDEPENDENCE_LEGACY_CUTOFF_DATE" in rec.getMessage()
+            for rec in caplog.records
+        )
+        assert has_warning, (
+            f"expected invalid-config warning, got: {[r.getMessage() for r in caplog.records]}"
+        )
+
+    def test_resolve_legacy_cutoff_valid_returns_datetime(self, monkeypatch):
+        """settings 为合法日期字符串 → 返回 tz-aware datetime。"""
+        from app.core.config import settings
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        monkeypatch.setattr(
+            settings, "INDEPENDENCE_LEGACY_CUTOFF_DATE", "2026-01-01", raising=False
+        )
+        result = IndependenceDeclarationCompleteRule._resolve_legacy_cutoff()
+
+        assert result is not None
+        assert result.year == 2026
+        assert result.month == 1
+        assert result.day == 1
+        # tz-aware
+        assert result.tzinfo is not None
+
+
+# ---------------------------------------------------------------------------
+# Batch 3-7: INDEPENDENCE_LEGACY_GRACE_ENABLED 开关测试
+# ---------------------------------------------------------------------------
+
+
+class TestIndependenceLegacyGraceEnabledSwitch:
+    """Batch 3-7: 全局宽容期开关验证。
+
+    - True（默认）：早于 CUTOFF_DATE 的项目仍走 legacy 宽容路径
+    - False：即使早于 CUTOFF_DATE 也严格检查（R6+ 老项目升级完毕后可关闭）
+    """
+
+    def test_grace_enabled_false_disables_legacy_path(self, monkeypatch):
+        """GRACE_ENABLED=False → _is_legacy_project 直接返回 False。"""
+        from app.core.config import settings
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        # created_at 早于 CUTOFF_DATE（2026-05-05）
+        old_created_at = datetime(2025, 12, 1, tzinfo=timezone.utc)
+
+        monkeypatch.setattr(
+            settings, "INDEPENDENCE_LEGACY_GRACE_ENABLED", False, raising=False
+        )
+        # CUTOFF_DATE 保持默认或配置为合法日期
+        monkeypatch.setattr(
+            settings, "INDEPENDENCE_LEGACY_CUTOFF_DATE", "2026-05-05", raising=False
+        )
+
+        result = IndependenceDeclarationCompleteRule._is_legacy_project(old_created_at)
+        assert result is False, (
+            "GRACE_ENABLED=False 时应强制严格检查，不走 legacy 宽容路径"
+        )
+
+    def test_grace_enabled_true_default_uses_cutoff(self, monkeypatch):
+        """GRACE_ENABLED=True（默认）+ 早于 CUTOFF_DATE → 返回 True（legacy）。"""
+        from app.core.config import settings
+        from app.services.gate_rules_phase14 import IndependenceDeclarationCompleteRule
+
+        old_created_at = datetime(2025, 12, 1, tzinfo=timezone.utc)
+
+        monkeypatch.setattr(
+            settings, "INDEPENDENCE_LEGACY_GRACE_ENABLED", True, raising=False
+        )
+        monkeypatch.setattr(
+            settings, "INDEPENDENCE_LEGACY_CUTOFF_DATE", "2026-05-05", raising=False
+        )
+
+        result = IndependenceDeclarationCompleteRule._is_legacy_project(old_created_at)
+        assert result is True, (
+            "GRACE_ENABLED=True 默认时，早于 CUTOFF_DATE 的项目应识别为 legacy"
+        )

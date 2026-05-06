@@ -103,6 +103,7 @@ class WordExportTask(Base):
     __table_args__ = (
         Index("idx_word_export_task_project", "project_id", "doc_type"),
         Index("idx_word_export_task_status", "project_id", "status"),
+        Index("idx_word_export_task_template_type", "template_type"),
     )
 
 

@@ -114,6 +114,9 @@ class Settings(BaseSettings):
     # R1 上线日期：早于此日期创建的项目进入独立性声明 legacy 宽容期
     # 空字符串表示"无 legacy 宽容期"，所有项目都严格检查
     INDEPENDENCE_LEGACY_CUTOFF_DATE: str = "2026-05-05"
+    # Batch 3-7: 全局宽容期总开关；R6+ 老项目升级完毕后可关闭此开关彻底下线宽容期
+    # False = 关闭，即使项目早于 CUTOFF_DATE 也严格检查（不走 legacy 路径）
+    INDEPENDENCE_LEGACY_GRACE_ENABLED: bool = True
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

@@ -59,7 +59,7 @@ class IndependenceDeclaration(Base, TimestampMixin):
         String(30),
         server_default=text("'draft'"),
         nullable=False,
-    )  # 'draft' | 'submitted' | 'pending_conflict_review' | 'approved'
+    )  # 'draft' | 'submitted' | 'pending_conflict_review' | 'approved' | 'superseded_by_handover'
 
     __table_args__ = (
         Index(

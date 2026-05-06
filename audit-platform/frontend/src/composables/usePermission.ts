@@ -21,6 +21,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'adjustment:review',
     'report:view', 'report:edit', 'report:export',
     'workpaper:view', 'workpaper:edit',
+    'view_dashboard_manager',
+    'approve_workhours',
+    'send_reminder',
+    'batch_brief',
   ],
   auditor: [
     'project:view',
