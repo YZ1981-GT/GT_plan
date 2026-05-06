@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -84,7 +84,7 @@ class FetchRule:
         self.transform = data.get("transform", Transform.DIRECT)
         self.description = data.get("description", "")
         self.created_by = data.get("created_by")
-        self.created_at = data.get("created_at", datetime.utcnow().isoformat())
+        self.created_at = data.get("created_at", datetime.now(timezone.utc).isoformat())
         # 来源标记（preset=预设公式/custom=用户自定义）
         self.origin = data.get("origin", "custom")
 
@@ -138,7 +138,7 @@ class TraceRecord:
         self.source_location = source_location
         self.value = value
         self.rule_id = rule_id
-        self.fetched_at = datetime.utcnow().isoformat()
+        self.fetched_at = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> dict:
         return {

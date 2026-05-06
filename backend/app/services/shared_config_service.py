@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -172,7 +172,7 @@ class SharedConfigService:
 
         # 更新引用统计
         tpl.reference_count = (tpl.reference_count or 0) + 1
-        tpl.last_referenced_at = datetime.utcnow()
+        tpl.last_referenced_at = datetime.now(timezone.utc)
         await self.db.flush()
 
         return {
@@ -200,7 +200,7 @@ class SharedConfigService:
         if tpl.owner_type == 'personal' and tpl.owner_user_id != user_id:
             raise ValueError("无权删除他人的模板")
         tpl.is_deleted = True
-        tpl.deleted_at = datetime.utcnow()
+        tpl.deleted_at = datetime.now(timezone.utc)
         await self.db.flush()
         return True
 

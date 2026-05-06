@@ -430,7 +430,7 @@ class KnowledgeIndexService:
             "chunk_count": total_chunks,
             "status": "indexed",
             "source_type": source_type_str,
-            "indexed_at": datetime.datetime.utcnow().isoformat(),
+            "indexed_at": datetime.datetime.now(timezone.utc).isoformat(),
         }
 
     async def search(
@@ -498,7 +498,7 @@ class KnowledgeIndexService:
             "document_id": str(new_source_id),
             "updated_chunk_count": total_chunks,
             "status": "updated",
-            "updated_at": datetime.datetime.utcnow().isoformat(),
+            "updated_at": datetime.datetime.now(timezone.utc).isoformat(),
         }
 
     async def get_index_status(self, project_id: UUID) -> dict[str, Any]:

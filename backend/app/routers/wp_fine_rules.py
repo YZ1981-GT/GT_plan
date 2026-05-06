@@ -1,3 +1,4 @@
+from datetime import timezone
 """底稿精细化规则 API
 
 GET  /api/wp-fine-rules                              — 列出所有精细化规则（支持 cycle/quality 过滤）
@@ -122,7 +123,7 @@ async def fine_extract(
         pd = wp.parsed_data or {}
         pd["fine_checks"] = data.get("checks", [])
         pd["fine_summary"] = data.get("summary", {})
-        pd["fine_extracted_at"] = __import__("datetime").datetime.utcnow().isoformat()
+        pd["fine_extracted_at"] = __import__("datetime").datetime.now(timezone.utc).isoformat()
         wp.parsed_data = pd
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(wp, "parsed_data")

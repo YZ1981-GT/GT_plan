@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -301,7 +301,7 @@ class OCRService:
             "total": len(file_paths),
             "processed": 0,
             "failed": 0,
-            "started_at": datetime.utcnow().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat(),
             "completed_at": None,
             "errors": [],
             "results": [],
@@ -399,7 +399,7 @@ def _batch_recognize_sync(task_id: str, project_id: str, file_paths: list[str], 
                 _task_status[task_id] = status
 
             status["status"] = "completed"
-            status["completed_at"] = datetime.utcnow().isoformat()
+            status["completed_at"] = datetime.now(timezone.utc).isoformat()
             _task_status[task_id] = status
 
     asyncio.run(_run())

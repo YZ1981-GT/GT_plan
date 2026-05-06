@@ -1,0 +1,14 @@
+PLACEHOLDER: QC Annual Report Template
+
+This is a placeholder file for the QC annual report Word template.
+In production, this would be a proper .docx template with placeholders:
+
+Sections:
+- Cover page: {{firm_name}}, {{year}}, {{report_date}}
+- Chapter 1: Project Scale & Distribution
+- Chapter 2: Rating Distribution (ABCD pie chart)
+- Chapter 3: Top 10 Issues
+- Chapter 4: Reviewer Performance
+- Chapter 5: Improvement Suggestions (LLM-generated)
+- Appendix A: Rule Change History
+- Appendix B: Inspection Statistics

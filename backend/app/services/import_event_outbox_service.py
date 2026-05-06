@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -57,7 +57,7 @@ class ImportEventOutboxService:
                 extra=event_extra,
             ))
             item.status = OutboxStatus.published
-            item.published_at = datetime.utcnow()
+            item.published_at = datetime.now(timezone.utc)
             item.last_error = None
             await db.flush()
             return True
@@ -164,7 +164,7 @@ class ImportEventOutboxService:
                     extra=event_extra,
                 ))
                 item.status = OutboxStatus.published
-                item.published_at = datetime.utcnow()
+                item.published_at = datetime.now(timezone.utc)
                 item.last_error = None
                 report["published_count"] += 1
             except Exception as exc:

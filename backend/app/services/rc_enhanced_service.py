@@ -9,7 +9,7 @@ import uuid
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -143,7 +143,7 @@ class RCEnhancedService:
         ], ensure_ascii=False)
 
         file_hash = hashlib.sha256(export_content.encode()).hexdigest()
-        export_id = f"exp_rc_{datetime.utcnow().strftime('%Y%m%d')}_{uuid.uuid4().hex[:8]}"
+        export_id = f"exp_rc_{datetime.now(timezone.utc).strftime('%Y%m%d')}_{uuid.uuid4().hex[:8]}"
         trace_id = generate_trace_id()
 
         # 写入 review_conversation_exports

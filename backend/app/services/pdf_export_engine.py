@@ -196,7 +196,7 @@ class PDFExportEngine:
         if task is None:
             raise ValueError(f"导出任务不存在: {task_id}")
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         task.status = ExportTaskStatus.processing
         task.started_at = now
         task.progress_percentage = 10
@@ -219,7 +219,7 @@ class PDFExportEngine:
 
             task.progress_percentage = 100
             task.status = ExportTaskStatus.completed
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             task.file_path = str(rendered)
             task.file_size = rendered.stat().st_size if rendered.exists() else 0
             await self.db.flush()
@@ -229,7 +229,7 @@ class PDFExportEngine:
             logger.exception("Export task %s failed: %s", task_id, e)
             task.status = ExportTaskStatus.failed
             task.error_message = str(e)
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             await self.db.flush()
             return task
 

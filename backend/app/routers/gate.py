@@ -156,8 +156,8 @@ async def update_gate_rule_config(
     if req.description:
         config.description = req.description
     config.updated_by = current_user.id
-    from datetime import datetime
-    config.updated_at = datetime.utcnow()
+    from datetime import datetime, timezone
+    config.updated_at = datetime.now(timezone.utc)
     await db.flush()
     await db.commit()
     return {"status": "updated", "rule_code": rule_code}

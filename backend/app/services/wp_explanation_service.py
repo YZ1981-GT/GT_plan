@@ -149,7 +149,7 @@ class WpExplanationService:
         if gen:
             gen.status = "confirmed"
             gen.confirmed_by = user_id
-            gen.confirmed_at = datetime.utcnow()
+            gen.confirmed_at = datetime.now(timezone.utc)
 
         # 1. 写回底稿工作簿
         write_ok = await self._write_back_to_workbook(wp, final_text)
@@ -165,12 +165,12 @@ class WpExplanationService:
         pd["ai_content"] = pd.get("ai_content", {})
         pd["ai_content"]["latest_generation_id"] = str(generation_id)
         pd["ai_content"]["latest_status"] = "confirmed"
-        pd["ai_content"]["last_confirmed_at"] = datetime.utcnow().isoformat()
+        pd["ai_content"]["last_confirmed_at"] = datetime.now(timezone.utc).isoformat()
         wp.parsed_data = pd
 
         # 3. 更新状态
         wp.explanation_status = "synced"
-        wp.last_parsed_sync_at = datetime.utcnow()
+        wp.last_parsed_sync_at = datetime.now(timezone.utc)
         await self.db.flush()
 
         logger.info("confirm_draft: wp=%s gen=%s synced", wp_id, generation_id)

@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -115,7 +115,7 @@ def excel_to_structure(file_path: str, max_rows: int = 5000, max_cols: int = 50)
         "metadata": {
             "source": "excel_upload",
             "source_file": Path(file_path).name,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "version": 1,
             "sheet_count": len(sheets),
         },
@@ -335,7 +335,7 @@ def update_structure_from_edits(structure: dict, edits: list[dict], sheet_index:
             _set_formula(sheet, edit)
 
     structure["metadata"]["version"] = structure["metadata"].get("version", 0) + 1
-    structure["metadata"]["last_edited_at"] = datetime.utcnow().isoformat()
+    structure["metadata"]["last_edited_at"] = datetime.now(timezone.utc).isoformat()
 
     return structure
 
@@ -704,7 +704,7 @@ def sync_structure_from_excel(excel_path: str, structure_path: str) -> dict:
     old_version = old_structure.get("metadata", {}).get("version", 0)
     new_structure["metadata"]["version"] = old_version + 1
     new_structure["metadata"]["synced_from"] = "editor"
-    new_structure["metadata"]["synced_at"] = datetime.utcnow().isoformat()
+    new_structure["metadata"]["synced_at"] = datetime.now(timezone.utc).isoformat()
 
     # 保存
     sp.write_text(json.dumps(new_structure, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1192,7 +1192,7 @@ def rollback_to_version(storage_dir: str, stem: str, target_version: int) -> dic
     # 更新版本号（回滚也算一次新版本）
     data["metadata"]["version"] = data["metadata"].get("version", 0)
     data["metadata"]["rolled_back_from"] = target_version
-    data["metadata"]["rolled_back_at"] = datetime.utcnow().isoformat()
+    data["metadata"]["rolled_back_at"] = datetime.now(timezone.utc).isoformat()
 
     return data
 

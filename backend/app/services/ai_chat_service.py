@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Optional
 from uuid import UUID, uuid4
 
@@ -49,7 +49,7 @@ class AIChatService:
         session = AIChatSession(
             project_id=project_id,
             session_type=session_type,
-            title=title or f"会话_{datetime.utcnow().strftime('%Y%m%d%H%M')}",
+            title=title or f"会话_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}",
             user_id=user_id,
             total_messages=0,
             total_tokens=0,

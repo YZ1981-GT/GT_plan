@@ -131,7 +131,7 @@ class ConsolReportService:
 
         results: dict[str, list[dict]] = {}
         global_row_cache: dict[str, Decimal] = {}
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # 处理顺序（支持跨报表 ROW() 引用）
         type_order = [

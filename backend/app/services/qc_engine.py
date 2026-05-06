@@ -732,7 +732,7 @@ class QCEngine:
                 logger.exception("QC rule %s failed", rule.rule_id)
 
         passed = blocking_count == 0
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Store result
         qc_result = WpQcResult(

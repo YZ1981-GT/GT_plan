@@ -7,7 +7,7 @@ import uuid
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Callable, Awaitable
 
 from fastapi import HTTPException
@@ -152,7 +152,7 @@ class TaskEventBus:
             else:
                 event.status = TaskEventStatus.failed
                 delay = RETRY_BASE_SECONDS * (RETRY_MULTIPLIER ** event.retry_count)
-                event.next_retry_at = datetime.utcnow() + timedelta(seconds=delay)
+                event.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
                 logger.warning(
                     f"[EVENT_BUS] retry scheduled: event_id={event_id} "
                     f"retry={event.retry_count}/{event.max_retries} "
@@ -215,7 +215,7 @@ class TaskEventBus:
         stmt = (
             select(TaskEvent)
             .where(TaskEvent.status == TaskEventStatus.failed)
-            .where(TaskEvent.next_retry_at <= datetime.utcnow())
+            .where(TaskEvent.next_retry_at <= datetime.now(timezone.utc))
             .order_by(TaskEvent.next_retry_at.asc())
             .limit(50)
         )

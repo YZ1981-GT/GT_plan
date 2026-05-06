@@ -8,7 +8,7 @@
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -151,7 +151,7 @@ class DataLifecycleService:
 
         if retention_until is not None:
             # 统一为 naive UTC 比较（兼容 SQLite 测试和 PG 生产）
-            now_utc = datetime.utcnow()
+            now_utc = datetime.now(timezone.utc)
             retention_naive = (
                 retention_until.replace(tzinfo=None)
                 if retention_until.tzinfo is not None

@@ -14,7 +14,7 @@ API:
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -88,7 +88,7 @@ async def get_mappings(project_id: str, db: AsyncSession = Depends(get_db)):
 @router.put("/{project_id}", response_model=MappingResponse)
 async def save_mapping(project_id: str, body: MappingSave, db: AsyncSession = Depends(get_db)):
     await ensure_table(db)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     new_id = str(uuid.uuid4())
     try:
         await db.execute(text("""
@@ -116,7 +116,7 @@ async def delete_mapping(project_id: str, mapping_id: str, db: AsyncSession = De
 async def auto_generate_mappings(project_id: str, body: dict, db: AsyncSession = Depends(get_db)):
     """自动生成映射：从试算表科目名和附注模板行名进行模糊匹配"""
     await ensure_table(db)
-    year = body.get("year", datetime.utcnow().year - 1)
+    year = body.get("year", datetime.now(timezone.utc).year - 1)
     standard = body.get("standard", "soe")
 
     # 1. 获取试算表所有科目名
@@ -163,7 +163,7 @@ async def auto_generate_mappings(project_id: str, body: dict, db: AsyncSession =
                             INSERT INTO account_note_mapping (id, project_id, account_name, section_id, row_name, col_index, mapping_type, created_at)
                             VALUES (:id, :pid, :an, :sid, :rn, 1, :mt, :now)
                             ON CONFLICT (project_id, account_name, section_id, row_name) DO NOTHING
-                        """), {"id": str(uuid.uuid4()), "pid": project_id, "an": acc_name, "sid": sec["section_id"], "rn": row_name, "mt": mtype, "now": datetime.utcnow()})
+                        """), {"id": str(uuid.uuid4()), "pid": project_id, "an": acc_name, "sid": sec["section_id"], "rn": row_name, "mt": mtype, "now": datetime.now(timezone.utc)})
                         generated += 1
                     except Exception:
                         pass

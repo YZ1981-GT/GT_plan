@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -51,7 +51,7 @@ class ContinuousAuditService:
         # 推算当年年度
         ws = prior.wizard_state or {}
         basic_info = ws.get("steps", {}).get("basic_info", {}).get("data", {})
-        prior_year = basic_info.get("audit_year", datetime.utcnow().year)
+        prior_year = basic_info.get("audit_year", datetime.now(timezone.utc).year)
         new_year = prior_year + 1
         inherited_template_type = basic_info.get("template_type") or prior.template_type
         inherited_report_scope = basic_info.get("report_scope") or prior.report_scope

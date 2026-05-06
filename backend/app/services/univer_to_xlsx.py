@@ -1,3 +1,4 @@
+from datetime import timezone
 """将 Univer IWorkbookData 格式回写为 xlsx 文件
 
 接收前端 Univer 编辑器的 snapshot 数据，转换为 openpyxl Workbook 并保存。
@@ -227,6 +228,6 @@ def univer_snapshot_to_structure(snapshot: dict[str, Any]) -> dict[str, Any]:
         "sheet_names": sheet_names,
         "metadata": {
             "editor": "univer",
-            "saved_at": __import__("datetime").datetime.utcnow().isoformat(),
+            "saved_at": __import__("datetime").datetime.now(timezone.utc).isoformat(),
         },
     }

@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -92,7 +92,7 @@ class ImportJobService:
         """Persist heartbeat/progress for a running job without changing status."""
         values: dict = {
             "progress_pct": max(0, min(progress_pct, 100)),
-            "heartbeat_at": datetime.utcnow(),
+            "heartbeat_at": datetime.now(timezone.utc),
         }
         if progress_message is not None:
             values["progress_message"] = progress_message
@@ -140,7 +140,7 @@ class ImportJobService:
             job.result_summary = result_summary
 
         # 时间戳
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if new_status == JobStatus.running and not job.started_at:
             job.started_at = now
         if new_status in (JobStatus.completed, JobStatus.failed, JobStatus.canceled, JobStatus.timed_out):
@@ -159,7 +159,7 @@ class ImportJobService:
         extra compare-and-set makes recovery/worker races harmless: only one
         runner can move the job from queued to running.
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         result = await db.execute(
             sa.update(ImportJob)
             .where(
@@ -199,7 +199,7 @@ class ImportJobService:
         """更新心跳时间（worker 定期调用）"""
         await db.execute(
             sa.update(ImportJob).where(ImportJob.id == job_id).values(
-                heartbeat_at=datetime.utcnow()
+                heartbeat_at=datetime.now(timezone.utc)
             )
         )
 
@@ -209,7 +209,7 @@ class ImportJobService:
 
         由定时任务调用，将超时作业标记为 timed_out。
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         running_statuses = [JobStatus.queued, JobStatus.running, JobStatus.validating,
                            JobStatus.writing, JobStatus.activating]
 
@@ -277,7 +277,7 @@ class ImportJobService:
             raise ValueError(f"当前状态 {job.status.value} 不可取消")
 
         job.status = JobStatus.canceled
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(timezone.utc)
         return job
 
     @staticmethod

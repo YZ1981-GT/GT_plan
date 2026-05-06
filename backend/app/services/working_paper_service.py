@@ -208,7 +208,7 @@ class WorkingPaperService:
 
         # No conflict — increment version
         wp.file_version += 1
-        wp.updated_at = datetime.utcnow()
+        wp.updated_at = datetime.now(timezone.utc)
         await db.flush()
 
         return {
@@ -272,7 +272,7 @@ class WorkingPaperService:
             )
 
         wp.status = new_enum
-        wp.updated_at = datetime.utcnow()
+        wp.updated_at = datetime.now(timezone.utc)
         await db.flush()
 
         # 同步更新 wp_index 状态
@@ -356,7 +356,7 @@ class WorkingPaperService:
             )
 
         wp.review_status = new_enum
-        wp.updated_at = datetime.utcnow()
+        wp.updated_at = datetime.now(timezone.utc)
 
         # 退回时强制填写退回原因并记录退回信息
         if "rejected" in new_review_status:
@@ -364,7 +364,7 @@ class WorkingPaperService:
                 raise ValueError("退回时必须填写退回原因")
             wp.rejection_reason = reason
             wp.rejected_by = rejected_by_id
-            wp.rejected_at = datetime.utcnow()
+            wp.rejected_at = datetime.now(timezone.utc)
 
         # 复核状态变化联动编制状态
         if new_review_status == "pending_level1":
@@ -451,7 +451,7 @@ class WorkingPaperService:
             wp.assigned_to = assigned_to
         if reviewer is not None:
             wp.reviewer = reviewer
-        wp.updated_at = datetime.utcnow()
+        wp.updated_at = datetime.now(timezone.utc)
         await db.flush()
 
         # Also update wp_index

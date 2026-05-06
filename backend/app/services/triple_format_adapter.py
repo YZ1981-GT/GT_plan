@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -194,7 +194,7 @@ class DisclosureNoteAdapter:
                 "note_section": note_section,
                 "project_id": str(project_id),
                 "year": year,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "version": 1,
             },
         }
@@ -329,7 +329,7 @@ class FinancialReportAdapter:
                 "project_id": str(project_id),
                 "year": year,
                 "row_count": len(rows),
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "version": 1,
             },
         }
@@ -387,7 +387,7 @@ class AdjustmentSummaryAdapter:
                 "project_id": str(project_id),
                 "year": year,
                 "entry_count": len(rows_data),
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "version": 1,
             },
         }
@@ -443,7 +443,7 @@ class TrialBalanceAdapter:
                 "project_id": str(project_id),
                 "year": year,
                 "row_count": len(rows),
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "version": 1,
             },
         }
@@ -501,7 +501,7 @@ class ConsolWorksheetAdapter:
                 "project_id": str(project_id),
                 "year": year,
                 "row_count": len(rows),
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "version": 1,
             },
         }

@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -41,7 +41,7 @@ class ProcessRecordService:
                 "project_id": str(project_id),
                 "file_version": file_version,
                 "edited_by": str(user_id),
-                "edited_at": datetime.utcnow().isoformat(),
+                "edited_at": datetime.now(timezone.utc).isoformat(),
                 "change_summary": change_summary or "底稿已更新",
             },
         )
@@ -216,7 +216,7 @@ class AIContentTagService:
 
         content.confirmation_status = AIConfirmationStatus(status)
         content.confirmed_by = user_id
-        content.confirmed_at = datetime.utcnow()
+        content.confirmed_at = datetime.now(timezone.utc)
         await db.flush()
 
         return {

@@ -20,7 +20,7 @@ R1 需求 2（refinement-round1-review-closure）扩展：工单状态变更时
 """
 import uuid
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -81,7 +81,7 @@ class IssueTicketService:
         source = IssueSource.L2  # 默认
 
         hours = SLA_HOURS.get(sla_level, 72)
-        due_at = datetime.utcnow() + timedelta(hours=hours)
+        due_at = datetime.now(timezone.utc) + timedelta(hours=hours)
         trace_id = generate_trace_id()
 
         ticket = IssueTicket(
@@ -142,7 +142,7 @@ class IssueTicketService:
         if evidence_refs:
             ticket.evidence_refs = evidence_refs
         if status in (IssueStatus.closed, IssueStatus.rejected):
-            ticket.closed_at = datetime.utcnow()
+            ticket.closed_at = datetime.now(timezone.utc)
         await db.flush()
 
         # R1 需求 2：反向同步到关联 ReviewRecord + WorkingPaper.review_status
@@ -245,7 +245,7 @@ class IssueTicketService:
         stmt = (
             select(IssueTicket)
             .where(IssueTicket.status.in_([IssueStatus.open, IssueStatus.in_fix]))
-            .where(IssueTicket.due_at < datetime.utcnow())
+            .where(IssueTicket.due_at < datetime.now(timezone.utc))
         )
         result = await db.execute(stmt)
         tickets = result.scalars().all()
@@ -362,7 +362,7 @@ class IssueTicketService:
             )
             return
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if new_status == IssueStatus.pending_recheck:
             existing_reply = (review.reply_text or "").strip()

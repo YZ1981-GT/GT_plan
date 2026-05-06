@@ -34,12 +34,14 @@
       <el-table-column prop="disagreement_count" label="异议数" width="80" align="center" />
       <el-table-column label="异议率" width="120" align="center">
         <template #default="{ row }">
-          <el-tag
-            :type="rateTagType(row.disagreement_rate)"
-            size="small"
-          >
-            {{ row.disagreement_rate }}%
-          </el-tag>
+          <el-tooltip content="健康的 EQCR 应产生建设性异议，过低（0%）可能表示复核流于形式" placement="top">
+            <el-tag
+              :type="rateTagType(row.disagreement_rate)"
+              size="small"
+            >
+              {{ row.disagreement_rate }}%
+            </el-tag>
+          </el-tooltip>
           <span v-if="row.disagreement_rate > 20" style="margin-left: 4px; font-size: 11px; color: #67c23a">独立性强</span>
           <span v-else-if="row.disagreement_rate === 0" style="margin-left: 4px; font-size: 11px; color: #e6a23c">需审查</span>
         </template>
