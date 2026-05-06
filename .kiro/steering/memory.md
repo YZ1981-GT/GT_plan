@@ -98,8 +98,9 @@ inclusion: always
 - NotificationCenter.vue 已挂载到 DefaultLayout.vue 顶部导航（R6 Task 7），通知铃铛可见；导航顺序：复核收件箱→🔔通知→🛡️独立复核→📊EQCR指标
 - ReviewWorkstation.vue 已确认删除（R6 Task 8 验证 fileSearch 零命中）
 - backend/app/routers/pbc.py 和 confirmations.py 返回 `{"status": "developing", "items": [], "note": "..."}`，maturity 标记为 developing（R6 Task 8）
-- apiPaths.ts 当前 **244** 个 API 端点（2026-05-07），dead-link-check.js 验证零死链；新增 qcRules/qcInspections/qcCases/qcAnnualReports/qcAuditLogCompliance/qcArchiveReadiness 6 个路径对象
-- 前端 service 硬编码路径迁移 **全部完成**（2026-05-07）：9 个文件共 257 处硬编码→0，全部使用 apiPaths 常量。最新 commit 6723fd9
+- apiPaths.ts 当前 **260+** 个 API 端点（2026-05-07），新增 reportConfig/reportMapping/consolNoteSections + eqcr 扩展（memo/independence/componentAuditors/priorYear/metrics）+ admin 扩展（importEventHealth/importEventReplay）+ reports.export
+- 前端 service 硬编码路径迁移 **全部完成**（2026-05-07）：9 个文件共 257 处硬编码→0，全部使用 apiPaths 常量
+- Vue 文件硬编码迁移进度：322→251（已消除 71 处 / 16 个文件），最新 commit 95c159c；已完成模块：QC 全部/EQCR 全部/报表+合并/性能监控/管理看板；剩余 70 文件中最大 5 个：LedgerPenetration(23)/KnowledgeBase(16)/AccountImportStep(15)/WorkpaperWorkbench(12)/FormulaManagerDialog(12)
 - CI 新增 vue-tsc --noEmit 步骤到 frontend-build job（.github/workflows/ci.yml）
 - docs/API_CHANGELOG.md 记录 R4-R6 端点变更；docs/templates/NEW_API_ENDPOINT.md 三件套模板
 - archive 对象已重构：`archive`→`orchestrate`，新增 `job(pid,jobId)` 和 `retry(pid,jobId)`

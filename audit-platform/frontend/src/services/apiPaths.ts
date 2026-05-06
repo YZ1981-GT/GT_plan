@@ -91,6 +91,10 @@ export const reports = {
 export const reportConfig = {
   list: '/api/report-config',
   drillDown: '/api/report-config/drill-down',
+  detail: (id: string) => `/api/report-config/${id}`,
+  create: '/api/report-config',
+  executeFormulasBatch: '/api/report-config/execute-formulas-batch',
+  batchUpdate: '/api/report-config/batch-update',
 } as const
 
 // ─── 报表映射 ───────────────────────────────────────────────────────────────
@@ -98,6 +102,13 @@ export const reportConfig = {
 export const reportMapping = {
   preset: (pid: string) => `/api/projects/${pid}/report-mapping/preset`,
   save: (pid: string) => `/api/projects/${pid}/report-mapping`,
+} as const
+
+// ─── 附注模板 ───────────────────────────────────────────────────────────────
+
+export const noteTemplates = {
+  list: (templateType: string) => `/api/note-templates/${templateType}`,
+  presetFormulas: (templateType: string) => `/api/note-templates/preset-formulas/${templateType}`,
 } as const
 
 // ─── 合并附注 ───────────────────────────────────────────────────────────────
@@ -467,6 +478,22 @@ export const knowledge = {
   doc: (cat: string, docId: string) => `/api/knowledge/${cat}/${docId}`,
   search: '/api/knowledge/search',
   libraries: '/api/knowledge/libraries',
+} as const
+
+// ─── 知识库文件管理 ─────────────────────────────────────────────────────────
+
+export const knowledgeLibrary = {
+  tree: '/api/knowledge-library/tree',
+  search: '/api/knowledge-library/search',
+  folders: '/api/knowledge-library/folders',
+  folderDocuments: (folderId: string) => `/api/knowledge-library/folders/${folderId}/documents`,
+  folderUpload: (folderId: string) => `/api/knowledge-library/folders/${folderId}/upload`,
+  folderRename: (folderId: string) => `/api/knowledge-library/folders/${folderId}/rename`,
+  folderDelete: (folderId: string) => `/api/knowledge-library/folders/${folderId}`,
+  documentDetail: (docId: string) => `/api/knowledge-library/documents/${docId}`,
+  documentDownload: (docId: string) => `/api/knowledge-library/documents/${docId}/download`,
+  documentPreview: (docId: string) => `/api/knowledge-library/documents/${docId}/preview`,
+  documentMove: (docId: string) => `/api/knowledge-library/documents/${docId}/move`,
 } as const
 
 // ─── 看板 ───────────────────────────────────────────────────────────────────
@@ -902,6 +929,31 @@ export const excelHtml = {
   cellInfo: (pid: string, fileStem: string) => `/api/projects/${pid}/excel-html/cell-info/${fileStem}`,
 } as const
 
+// ─── 账套导入 ───────────────────────────────────────────────────────────────
+
+export const accountChart = {
+  preview: (pid: string) => `/api/projects/${pid}/account-chart/preview`,
+  importAsync: (pid: string) => `/api/projects/${pid}/account-chart/import-async`,
+  importReset: (pid: string) => `/api/projects/${pid}/account-chart/import-reset`,
+  client: (pid: string) => `/api/projects/${pid}/account-chart/client`,
+  batchUpdate: (pid: string) => `/api/projects/${pid}/account-chart/batch-update`,
+} as const
+
+// ─── 列映射 ─────────────────────────────────────────────────────────────────
+
+export const columnMappings = {
+  list: (pid: string) => `/api/projects/${pid}/column-mappings`,
+  save: (pid: string) => `/api/projects/${pid}/column-mappings`,
+  referenceProjects: (pid: string) => `/api/projects/${pid}/column-mappings/reference-projects`,
+  referenceCopy: (pid: string) => `/api/projects/${pid}/column-mappings/reference-copy`,
+} as const
+
+// ─── 数据生命周期 ───────────────────────────────────────────────────────────
+
+export const dataLifecycle = {
+  importQueue: (pid: string) => `/api/data-lifecycle/import-queue/${pid}`,
+} as const
+
 // ─── 导入智能增强 ───────────────────────────────────────────────────────────
 
 export const importIntelligence = {
@@ -1142,12 +1194,12 @@ export const rotation = {
 
 export const API = {
   projects, trialBalance, adjustments, materiality, misstatements,
-  reports, reportConfig, reportMapping, consolNoteSections,
+  reports, reportConfig, reportMapping, noteTemplates, consolNoteSections,
   cfsWorksheet, disclosureNotes, auditReport, exportTask,
   workpaperSummary, events, consolidation, consolWorksheetData,
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
   wpDependencies, templates, formula, sampling, staff, users, auth,
-  notifications, system, recycleBin, knowledge, dashboard, annotations,
+  notifications, system, recycleBin, knowledge, knowledgeLibrary, dashboard, annotations,
   procedures, reviews, sync, auditLogs, projectMgmt, archive,
   subsequentEvents, pbc, confirmations, goingConcern, riskAssessments,
   auditPrograms, findings, managementLetter, reviewConversations,
@@ -1155,6 +1207,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
+  accountChart, columnMappings, dataLifecycle,
   admin, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
   jobs, governance, eqcr, signatures, rotation,

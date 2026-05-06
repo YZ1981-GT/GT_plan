@@ -379,6 +379,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { accountChart as P_ac, columnMappings as P_cm, dataLifecycle as P_dl, importIntelligence as P_ii, ledger as P_ledger } from '@/services/apiPaths'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import { useWizardStore as useProjectWizardStore } from '@/stores/wizard'
 import { buildImportFormData, shouldReuseImportUploadToken } from '@/utils/importFormData'
@@ -945,7 +946,7 @@ async function handlePreview() {
     clearSheetMappingCache()
     const formData = buildImportPreviewFormData(selectedFiles.value)
     const previewUrl = buildImportPreviewUrl({
-      basePath: `/api/projects/${wizardStore.projectId}/account-chart/preview`,
+      basePath: P_ac.preview(wizardStore.projectId),
     })
     const data = await api.post(
       previewUrl,
@@ -1098,7 +1099,7 @@ async function _resetImportLock(
     const params: Record<string, any> = {}
     if (jobId) params.job_id = jobId
     if (!jobId && force) params.force = true
-    const data = await api.post(`/api/projects/${wizardStore.projectId}/account-chart/import-reset`, null, { params })
+    const data = await api.post(P_ac.importReset(wizardStore.projectId), null, { params })
     return { ok: true, message: data?.message || '重置成功' }
   } catch (err: any) {
     const detail = err?.response?.data?.detail
@@ -1120,7 +1121,7 @@ async function _resetImportLock(
 onMounted(async () => {
   if (!wizardStore.projectId) return
   try {
-    const data = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+    const data = await api.get(P_dl.importQueue(wizardStore.projectId))
     const status = data
     const activeStatuses = new Set(['pending', 'queued', 'running', 'validating', 'writing', 'activating', 'processing'])
     const currentStatus = String(status?.status || '')
@@ -1228,7 +1229,7 @@ async function saveCurrentSheetMapping() {
   }
   if (Object.keys(cleanMapping).length === 0) return
   try {
-    await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+    await api.post(P_cm.list(wizardStore.projectId), {
       file_type: sheet.file_type_guess,
       sheet_name: getMappingSheetKey(sheet),
       mapping: cleanMapping,
@@ -1249,7 +1250,7 @@ async function smartEnhanceMapping() {
 
   try {
     const { data } = await api.post(
-      `/api/projects/${wizardStore.projectId}/import-intelligence/enhance-mapping`,
+      P_ii.enhanceMapping(wizardStore.projectId),
       { headers: sheet.headers, existing_mapping: existingMapping }
     )
     const result = data
@@ -1305,7 +1306,7 @@ async function saveMapping(silent = false) {
     if (Object.keys(cleanMapping).length === 0) continue
 
     try {
-      await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+      await api.post(P_cm.list(wizardStore.projectId), {
         file_type: sheet.file_type_guess,
         sheet_name: getMappingSheetKey(sheet),
         mapping: cleanMapping,
@@ -1326,7 +1327,7 @@ async function saveMapping(silent = false) {
     }
     if (Object.keys(cleanMapping).length === 0) return
     try {
-      await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+      await api.post(P_cm.list(wizardStore.projectId), {
         file_type: sheet.file_type_guess,
         sheet_name: getMappingSheetKey(sheet),
         mapping: cleanMapping,
@@ -1351,7 +1352,7 @@ async function loadSavedMapping(fileType: string, headers: string[], sheet?: She
   if (wizardStore.projectId) {
     try {
       const data = await api.get(
-        `/api/projects/${wizardStore.projectId}/column-mappings`,
+        P_cm.list(wizardStore.projectId),
         { params: { file_type: fileType } }
       )
       const mappings = data ?? {}
@@ -1451,7 +1452,7 @@ async function handleImport() {
     let importJobId: string | null = null
 
     const importUrl = buildImportJobUrl({
-      basePath: `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
+      basePath: P_ac.importAsync(wizardStore.projectId),
       uploadToken: uploadToken.value,
       year: previewYear.value,
     })
@@ -1468,7 +1469,7 @@ async function handleImport() {
       maxPolls: 400,
       timeoutMessage: '导入任务仍在后台运行，请稍后刷新页面查看结果',
       onWait: () => new Promise<void>(resolve => setTimeout(resolve, 2000)),
-      fetchStatus: () => fetchImportQueueStatus(() => api.get(`/api/projects/${wizardStore.projectId}/ledger-import/jobs/${importJobId}`)),
+      fetchStatus: () => fetchImportQueueStatus(() => api.get(P_ledger.import.jobDetail(wizardStore.projectId!, importJobId!))),
       onStatus: (status) => {
         if (status && typeof status === 'object') {
           const pct = status.progress ?? 0
@@ -1551,7 +1552,7 @@ async function handleImport() {
       try {
         let queuedJobId: string | null = null
         try {
-          const queueStatus = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+          const queueStatus = await api.get(P_dl.importQueue(wizardStore.projectId))
           queuedJobId = queueStatus?.job_id ? String(queueStatus.job_id) : null
         } catch {
           queuedJobId = null
@@ -1592,7 +1593,7 @@ async function loadClientTree() {
   if (!wizardStore.projectId) return
   try {
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/account-chart/client`,
+      P_ac.client(wizardStore.projectId),
     )
     clientTree.value = data
     // 默认激活第一个大类
@@ -1654,7 +1655,7 @@ async function saveEdits() {
       ...vals,
     }))
     await api.put(
-      `/api/projects/${wizardStore.projectId}/account-chart/batch-update`,
+      P_ac.batchUpdate(wizardStore.projectId),
       { updates },
     )
     ElMessage.success(`已保存 ${updates.length} 条修改`)
@@ -1678,7 +1679,7 @@ watch(showRefMappingDialog, async (visible) => {
   loadingRefProjects.value = true
   try {
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/column-mappings/reference-projects`,
+      P_cm.referenceProjects(wizardStore.projectId),
       { validateStatus: (s: number) => s < 600 }
     )
     refProjects.value = Array.isArray(data) ? data : []
@@ -1693,7 +1694,7 @@ async function applyRefMapping() {
   if (!selectedRefProject.value || !wizardStore.projectId) return
   try {
     await api.post(
-      `/api/projects/${wizardStore.projectId}/column-mappings/reference-copy`,
+      P_cm.referenceCopy(wizardStore.projectId),
       { source_project_id: selectedRefProject.value.id }
     )
     ElMessage.success(`已从「${selectedRefProject.value.name}」复制映射关系`)
