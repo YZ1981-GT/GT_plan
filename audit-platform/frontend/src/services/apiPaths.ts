@@ -73,6 +73,7 @@ export const misstatements = {
   fromAje: (pid: string, groupId: string) => `/api/projects/${pid}/misstatements/from-aje/${groupId}`,
   detail: (pid: string, id: string) => `/api/projects/${pid}/misstatements/${id}`,
   summary: (pid: string) => `/api/projects/${pid}/misstatements/summary`,
+  recheckThreshold: (pid: string) => `/api/projects/${pid}/misstatements/recheck-threshold`,
 } as const
 
 // ─── 财务报表 ───────────────────────────────────────────────────────────────
@@ -1230,6 +1231,7 @@ export const eqcr = {
   memoGenerate: (pid: string) => `/api/eqcr/projects/${pid}/memo`,
   memoSave: (pid: string) => `/api/eqcr/projects/${pid}/memo`,
   memoFinalize: (pid: string) => `/api/eqcr/projects/${pid}/memo/finalize`,
+  memoExport: (pid: string, format = 'docx') => `/api/eqcr/projects/${pid}/memo/export?format=${format}`,
   // 任务 13：工时/审批/解锁
   timeSummary: (pid: string) => `/api/eqcr/projects/${pid}/time-summary`,
   approve: (pid: string) => `/api/eqcr/projects/${pid}/approve`,

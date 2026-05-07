@@ -99,7 +99,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
@@ -271,7 +272,7 @@ function addCustomRow() {
 async function batchDeleteCustom() {
   if (!selectedCustomRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除 ${selectedCustomRows.value.length} 条自定义分录？`, '删除确认', { type: 'warning' })
+    await confirmBatch('删除', selectedCustomRows.value.length)
     const del = new Set(selectedCustomRows.value)
     const remaining = customEntries.filter(r => !del.has(r))
     customEntries.length = 0; customEntries.push(...remaining)

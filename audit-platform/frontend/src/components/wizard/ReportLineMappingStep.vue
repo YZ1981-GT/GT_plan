@@ -164,7 +164,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { reportLineMapping as P_rlm } from '@/services/apiPaths'
 
@@ -365,11 +366,7 @@ async function handleSaveEdit() {
 async function handleDelete(row: MappingRow) {
   if (!props.projectId) return
   try {
-    await ElMessageBox.confirm(
-      `确定要${row.is_confirmed ? '删除' : '拒绝'}该映射吗？`,
-      '提示',
-      { type: 'warning' },
-    )
+    await confirmDelete('该映射')
   } catch (err) {
     if (err === 'cancel' || err === 'close') {
       return

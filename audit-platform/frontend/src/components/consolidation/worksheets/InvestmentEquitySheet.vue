@@ -137,7 +137,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
@@ -176,7 +177,7 @@ function addRow() { rows.value.push(mkEmpty()) }
 async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 条？`, '删除确认', { type: 'warning' })
+    await confirmBatch('删除', selectedRows.value.length)
     const del = new Set(selectedRows.value); rows.value = rows.value.filter(r => !del.has(r)); selectedRows.value = []
   } catch {}
 }

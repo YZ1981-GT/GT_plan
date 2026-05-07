@@ -193,6 +193,30 @@ http.interceptors.response.use(
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)
 
+    // R8-S1-05：超时专门处理
+    if (error.code === 'ECONNABORTED') {
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'warning',
+        title: '请求超时',
+        message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
+        duration: 6000,
+      })
+      return Promise.reject(error)
+    }
+
+    // R8-S1-05：断网专门处理
+    if (!error.response && !navigator.onLine) {
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'warning',
+        title: '网络已断开',
+        message: '当前离线，部分操作可能无法完成。恢复网络后请重试。',
+        duration: 8000,
+      })
+      return Promise.reject(error)
+    }
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number }
     const authStore = useAuthStore()
     const status = error.response?.status
@@ -291,7 +315,14 @@ http.interceptors.response.use(
 
     const displayMsg = requestId ? `${msg}（ID: ${requestId}）` : msg
     if (status && status >= 500) {
-      ElMessage.error(displayMsg)
+      // R8-S1-05：5xx 最终失败用持续性通知卡片（重试已耗尽）
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'error',
+        title: '服务器错误',
+        message: displayMsg,
+        duration: 8000,
+      })
     } else if (status === 403) {
       ElMessage.error(displayMsg)
     } else {

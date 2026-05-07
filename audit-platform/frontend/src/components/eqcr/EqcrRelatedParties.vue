@@ -64,7 +64,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import {
   eqcrApi,
   type EqcrDomainPayload,
@@ -165,11 +166,7 @@ async function submitRegistry(form: { name: string; relation_type: string; is_co
 
 async function confirmDeleteRegistry(row: EqcrRelatedPartyRegistry) {
   try {
-    await ElMessageBox.confirm(
-      `确定删除关联方「${row.name}」？相关交易记录不会自动删除。`,
-      '确认删除',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-    )
+    await confirmDelete('关联方「' + row.name + '」')
   } catch {
     return
   }
@@ -220,11 +217,7 @@ async function submitTxn(form: {
 async function confirmDeleteTxn(row: EqcrRelatedPartyTransaction) {
   const partyName = registryNameMap.value[row.related_party_id] ?? '（已删除）'
   try {
-    await ElMessageBox.confirm(
-      `确定删除「${partyName}」的交易记录？`,
-      '确认删除',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-    )
+    await confirmDelete('「' + partyName + '」的交易记录')
   } catch {
     return
   }

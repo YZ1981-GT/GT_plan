@@ -78,3 +78,9 @@ ts_errors.txt
 GT_word/
 �ϲ�ģ���йر���.xlsx
 backend/data/exports/
+
+# 品牌源文件（不入库，避免仓库膨胀）
+GT_logo/
+
+# 运行时 xlsx 临时文件
+2025人员情况.xlsx

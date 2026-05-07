@@ -155,7 +155,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDuplicateAction, confirmDangerous } from '@/utils/confirm'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj } from '@/services/apiPaths'
@@ -197,23 +198,9 @@ async function startImport() {
     if (dup.has_duplicates) {
       // 弹窗让用户选择
       try {
-        await ElMessageBox.confirm(
-          `${dup.message}。\n\n选择"覆盖"将删除旧数据后重新导入，选择"跳过"将只导入新增记录。`,
-          '检测到重复数据',
-          {
-            confirmButtonText: '覆盖旧数据',
-            cancelButtonText: '跳过重复',
-            distinguishCancelAndClose: true,
-            type: 'warning',
-          }
-        )
-        // 用户点了"覆盖旧数据"
-        await doImport('overwrite')
-      } catch (action) {
-        if (action === 'cancel') {
-          // 用户点了"跳过重复"
-          await doImport('skip')
-        }
+        const action = await confirmDuplicateAction(dup.message + '。\n\n选择"覆盖"将删除旧数据后重新导入，选择"跳过"将只导入新增记录。')
+        await doImport(action)
+      } catch {
         // 用户点了关闭（X），不导入
         return
       }
@@ -291,9 +278,7 @@ async function loadBatches() {
 
 async function handleRollback(batchId: string) {
   try {
-    await ElMessageBox.confirm('确定要回滚此批次导入吗？所有导入的记录将被删除。', '确认回滚', {
-      type: 'warning',
-    })
+    await confirmDangerous('确定要回滚此批次导入吗？所有导入的记录将被删除。', '确认回滚')
     await api.post(`${P_proj.detail(props.projectId)}/import/${batchId}/rollback`)
     ElMessage.success('回滚成功')
     await loadBatches()

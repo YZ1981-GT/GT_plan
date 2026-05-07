@@ -162,7 +162,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO } from '@/composables/useExcelIO'
@@ -225,7 +226,7 @@ function addDirectRow() {
 async function batchDeleteDirect() {
   if (!selectedDirectRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除 ${selectedDirectRows.value.length} 行？删除后可点击"还原"恢复。`, '删除确认', { type: 'warning' })
+    await confirmBatch('删除', selectedDirectRows.value.length)
     const del = new Set(selectedDirectRows.value)
     directRows.value = directRows.value.filter(r => !del.has(r))
     selectedDirectRows.value = []
@@ -234,7 +235,7 @@ async function batchDeleteDirect() {
 
 async function restoreDirectDefaults() {
   try {
-    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
+    await confirmDangerous('确定恢复默认行结构？当前数据将被重置。', '还原确认')
     // 重建默认行
     const SIM_STRUCTURE = [
       { s: '1.基础信息', d: '', sec: true }, { s: '持股比例', d: '', sec: true },

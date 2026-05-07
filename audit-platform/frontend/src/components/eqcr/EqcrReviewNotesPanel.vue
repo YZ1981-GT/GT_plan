@@ -151,7 +151,8 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmShare } from '@/utils/confirm'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
   eqcrApi,
@@ -255,11 +256,7 @@ async function handleSubmit() {
 
 async function handleDelete(note: EqcrReviewNote) {
   try {
-    await ElMessageBox.confirm(
-      `确定删除笔记"${note.title}"？删除后不可恢复。`,
-      '确认删除',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-    )
+    await confirmDelete('笔记"' + note.title + '"')
   } catch {
     return // 用户取消
   }
@@ -277,11 +274,7 @@ async function handleDelete(note: EqcrReviewNote) {
 
 async function handleShare(note: EqcrReviewNote) {
   try {
-    await ElMessageBox.confirm(
-      `确定将笔记"${note.title}"分享给项目组？分享后项目组成员可见，且会同步到项目沟通记录。`,
-      '分享给项目组',
-      { type: 'info', confirmButtonText: '确认分享', cancelButtonText: '取消' },
-    )
+    await confirmShare('笔记"' + note.title + '"', '项目组')
   } catch {
     return // 用户取消
   }

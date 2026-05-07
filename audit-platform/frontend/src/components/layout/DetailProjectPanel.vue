@@ -281,7 +281,8 @@ import { useRouter } from 'vue-router'
 import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck,
 } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac, gtCoding as P_gtc } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
@@ -372,11 +373,7 @@ async function goToLedgerImport() {
 async function handleResetImport() {
   if (!props.project) return
   try {
-    await ElMessageBox.confirm(
-      '将清除当前项目卡住的导入任务，释放导入锁，并刷新页面。\n已入库的数据不受影响。',
-      '确认重置',
-      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmForceReset('将清除当前项目卡住的导入任务，释放导入锁，并刷新页面。\n已入库的数据不受影响。')
     await api.post(P_ac.importReset(props.project.id), null, {
       params: { force: true },
     })
@@ -402,11 +399,7 @@ function editProject() {
 async function onCreateNextYear() {
   if (!props.project) return
   try {
-    await ElMessageBox.confirm(
-      `确定要基于「${props.project.name}」创建下年项目吗？将继承科目映射、团队委派、试算表审定数等配置。`,
-      '创建下年项目',
-      { confirmButtonText: '确定创建', cancelButtonText: '取消', type: 'info' },
-    )
+    await confirmDangerous('确定要基于「' + props.project.name + '」创建下年项目吗？将继承科目映射、团队委派、试算表审定数等配置。', '创建下年项目')
     const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`)
     const result = data
     ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)

@@ -10,9 +10,14 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   partner: [
     'project:view', 'project:edit', 'project:create', 'project:delete',
     'adjustment:view', 'adjustment:edit', 'adjustment:create', 'adjustment:delete',
-    'adjustment:review',
-    'report:view', 'report:edit', 'report:export',
+    'adjustment:review', 'adjustment:convert_to_misstatement',
+    'report:view', 'report:edit', 'report:export', 'report:export_final',
     'workpaper:view', 'workpaper:edit', 'workpaper:export',
+    'workpaper:submit_review', 'workpaper:review_approve', 'workpaper:review_reject',
+    'workpaper:escalate',
+    'sign:execute',
+    'archive:execute',
+    'assignment:batch',
     'template:delete',
     'staff:delete',
     'user:view',
@@ -20,9 +25,12 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   manager: [
     'project:view', 'project:edit', 'project:create',
     'adjustment:view', 'adjustment:edit', 'adjustment:create', 'adjustment:delete',
-    'adjustment:review',
+    'adjustment:review', 'adjustment:convert_to_misstatement',
     'report:view', 'report:edit', 'report:export',
     'workpaper:view', 'workpaper:edit', 'workpaper:export',
+    'workpaper:submit_review', 'workpaper:review_approve', 'workpaper:review_reject',
+    'workpaper:escalate',
+    'assignment:batch',
     'template:delete',
     'staff:delete',
     'view_dashboard_manager',
@@ -33,8 +41,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   auditor: [
     'project:view',
     'adjustment:view', 'adjustment:edit', 'adjustment:create',
+    'adjustment:convert_to_misstatement',
     'report:view',
     'workpaper:view', 'workpaper:edit',
+    'workpaper:submit_review',
+    'independence:edit',
   ],
   // R5 任务 2：EQCR 独立复核合伙人
   // 只读项目/底稿 + EQCR 专属动作（查看工作台、录意见、影子计算、审批）
@@ -48,6 +59,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'record_opinion',
     'shadow_compute',
     'approve_eqcr',
+    'eqcr:approve',
+    'independence:edit',
+  ],
+  qc: [
+    'project:view',
+    'workpaper:view',
+    'report:view',
+    'adjustment:view',
+    'qc:publish_report',
+    'independence:edit',
   ],
 }
 

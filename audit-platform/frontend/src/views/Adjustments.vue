@@ -116,12 +116,12 @@
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openEditDialog(row)"
-            :disabled="row.review_status === 'approved' || row.review_status === 'pending_review'">
+            :disabled="row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW">
             编辑
           </el-button>
           <el-button size="small" type="danger" @click="onDelete(row)"
             v-permission="'adjustment:delete'"
-            :disabled="row.review_status === 'approved' || row.review_status === 'pending_review'">
+            :disabled="row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW">
             删除
           </el-button>
         </template>
@@ -129,7 +129,8 @@
       <el-table-column label="转错报" width="110" fixed="right">
         <template #default="{ row }">
           <el-button
-            v-if="row.review_status === 'rejected' && normalizeAdjustmentType(row.adjustment_type) === 'aje'"
+            v-if="row.review_status === ADJUSTMENT_STATUS.REJECTED && normalizeAdjustmentType(row.adjustment_type) === ADJUSTMENT_TYPE.AJE"
+            v-permission="'adjustment:convert_to_misstatement'"
             size="small"
             type="warning"
             :loading="convertingGroupId === row.entry_group_id"
@@ -280,8 +281,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { confirmDelete, confirmConvert } from '@/utils/confirm'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmConvert, confirmDangerous } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
@@ -303,6 +304,7 @@ import { usePasteImport } from '@/composables/usePasteImport'
 import { parseApiError } from '@/composables/useApiError'
 import { handleApiError } from '@/utils/errorHandler'
 import * as P from '@/services/apiPaths'
+import { ADJUSTMENT_STATUS, ADJUSTMENT_TYPE } from '@/constants/statusEnum'
 
 const route = useRoute()
 const router = useRouter()
@@ -616,11 +618,7 @@ async function onConvertToMisstatement(row: any) {
     const res = await convertAjeToMisstatement(projectId.value, row.entry_group_id)
     ElMessage.success(`已转为错报（净额 ${res.net_amount}）`)
     try {
-      await ElMessageBox.confirm(
-        '是否立即查看《未更正错报汇总表》？',
-        '转换成功',
-        { confirmButtonText: '立即查看', cancelButtonText: '稍后', type: 'success' },
-      )
+      await confirmDangerous('是否立即查看《未更正错报汇总表》？', '转换成功')
       router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
     } catch {
       /* 用户选择稍后，不跳转 */
@@ -630,11 +628,7 @@ async function onConvertToMisstatement(row: any) {
     const parsed = parseApiError(err)
     if (parsed.code === 'ALREADY_CONVERTED') {
       try {
-        await ElMessageBox.confirm(
-          '该分录已转为未更正错报，是否跳转查看？',
-          '已转换',
-          { confirmButtonText: '跳转查看', cancelButtonText: '关闭', type: 'info' },
-        )
+        await confirmDangerous('该分录已转为未更正错报，是否跳转查看？', '已转换')
         router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
       } catch {
         /* 用户选择关闭 */
@@ -648,7 +642,7 @@ async function onConvertToMisstatement(row: any) {
 }
 
 async function batchReview(status: string) {
-  const eligible = selectedRows.value.filter(r => r.review_status === 'pending_review')
+  const eligible = selectedRows.value.filter(r => r.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW)
   const skipped = selectedRows.value.length - eligible.length
   if (skipped > 0) {
     ElMessage.warning(`已跳过 ${skipped} 条非待复核状态的分录`)

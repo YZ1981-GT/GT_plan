@@ -132,3 +132,121 @@ export async function confirmEscalate(targetRole: string): Promise<void> {
     { confirmButtonText: '确认升级', cancelButtonText: '取消', type: 'warning' },
   )
 }
+
+// ══ R8-S1-02 新增语义化确认函数 ══════════════════════════════════
+
+/**
+ * 签字确认弹窗（必须输入客户名全称）
+ * @param clientName 客户名（用户必须输入匹配才能确认）
+ * @param reportType 报告类型描述
+ */
+export async function confirmSignature(clientName: string, reportType: string): Promise<boolean> {
+  const { value } = await ElMessageBox.prompt(
+    `您即将签字「${escapeHtml(clientName)}」的${escapeHtml(reportType)}。\n\n签字一旦完成将：\n1. 不可撤销（只能通过撤回流程）\n2. 锁定底稿、报表、附注编辑\n\n请输入客户名全称确认：`,
+    '签字确认',
+    {
+      confirmButtonText: '确认签字',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger',
+      inputPattern: new RegExp(`^${clientName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+      inputErrorMessage: `请输入正确的客户名：${clientName}`,
+    },
+  )
+  return value === clientName
+}
+
+/**
+ * 强制重置确认弹窗（导入锁、卡住任务等）
+ * @param context 重置上下文描述
+ */
+export async function confirmForceReset(context: string): Promise<void> {
+  await ElMessageBox.confirm(
+    `${escapeHtml(context)}\n\n确定要强制重置吗？已入库的数据不受影响。`,
+    '确认重置',
+    {
+      confirmButtonText: '强制重置',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger',
+    },
+  )
+}
+
+/**
+ * 回滚版本确认弹窗
+ * @param version 目标版本号
+ */
+export async function confirmRollback(version: number): Promise<void> {
+  await ElMessageBox.confirm(
+    `确定回滚到版本 ${version}？当前未保存的编辑将丢失。`,
+    '确认回滚',
+    {
+      confirmButtonText: '确认回滚',
+      cancelButtonText: '取消',
+      type: 'warning',
+    },
+  )
+}
+
+/**
+ * 分享给项目组确认弹窗
+ * @param target 被分享内容描述
+ * @param audience 目标受众描述
+ */
+export async function confirmShare(target: string, audience: string): Promise<void> {
+  await ElMessageBox.confirm(
+    `确定将「${escapeHtml(target)}」分享给${escapeHtml(audience)}？分享后对方可见。`,
+    '分享确认',
+    {
+      confirmButtonText: '确认分享',
+      cancelButtonText: '取消',
+      type: 'info',
+    },
+  )
+}
+
+/**
+ * 重复数据/已存在操作确认弹窗
+ * @param message 描述信息
+ * @returns 'overwrite' 覆盖 / 'skip' 跳过（用户取消时 reject）
+ */
+export async function confirmDuplicateAction(message: string): Promise<'overwrite' | 'skip'> {
+  try {
+    await ElMessageBox.confirm(
+      `${escapeHtml(message)}\n\n选择"覆盖"将删除旧数据后重新处理，选择"跳过"将保留现有数据。`,
+      '检测到重复',
+      {
+        confirmButtonText: '覆盖',
+        cancelButtonText: '跳过',
+        type: 'warning',
+        distinguishCancelAndClose: true,
+      },
+    )
+    return 'overwrite'
+  } catch (action) {
+    if (action === 'cancel') return 'skip'
+    throw action // close（点 X）时 reject
+  }
+}
+
+/**
+ * 强制通过确认弹窗（复核有未解决意见时）
+ * @param reason 强制通过的原因提示
+ * @returns { confirmed: true, note: 用户输入的备注 }（取消时 reject）
+ */
+export async function confirmForcePass(reason: string): Promise<{ confirmed: boolean; note: string }> {
+  const { value } = await ElMessageBox.prompt(
+    `${escapeHtml(reason)}\n\n确定要强制通过吗？请填写原因：`,
+    '强制通过确认',
+    {
+      confirmButtonText: '强制通过',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger',
+      inputPlaceholder: '请输入强制通过的原因...',
+      inputValidator: (v: string) => (v && v.trim().length >= 2) || '原因至少 2 个字符',
+    },
+  )
+  return { confirmed: true, note: value }
+}

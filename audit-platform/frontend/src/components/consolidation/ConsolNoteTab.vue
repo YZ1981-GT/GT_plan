@@ -846,12 +846,8 @@ async function confirmAndExecuteAggregate() {
   }
 
   try {
-    const { ElMessageBox } = await import('element-plus')
-    await ElMessageBox.confirm(confirmMsg, '确认执行汇总', {
-      type: 'info',
-      confirmButtonText: '确认汇总',
-      cancelButtonText: '返回修改',
-    })
+    const { confirmDangerous } = await import('@/utils/confirm')
+    await confirmDangerous(confirmMsg, '确认执行汇总')
     await executeAggregate()
   } catch { /* cancelled */ }
 }

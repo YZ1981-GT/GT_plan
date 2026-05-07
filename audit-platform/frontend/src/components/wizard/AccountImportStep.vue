@@ -376,6 +376,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirmForceReset } from '@/utils/confirm'
 import { UploadFilled, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -1046,11 +1047,7 @@ const resetting = ref(false)
 /** 用户手动点击"重置导入"按钮 */
 async function handleForceReset() {
   try {
-    await ElMessageBox.confirm(
-      '将清除当前导入状态，释放导入锁，恢复到初始上传界面。\n\n已入库的数据不受影响，下次导入会覆盖。',
-      '确认重置',
-      { confirmButtonText: '确认重置', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmForceReset('将清除当前导入状态，释放导入锁，恢复到初始上传界面。\n\n已入库的数据不受影响，下次导入会覆盖。')
   } catch {
     return // 用户取消
   }
@@ -1557,11 +1554,7 @@ async function handleImport() {
         } catch {
           queuedJobId = null
         }
-        await ElMessageBox.confirm(
-          `${errMsg}\n\n如果上一次导入已中断或卡住，可以强制重置后重新导入。`,
-          '导入冲突',
-          { confirmButtonText: '强制重置', cancelButtonText: '稍后再试', type: 'warning' },
-        )
+        await confirmForceReset(errMsg + '\n\n如果上一次导入已中断或卡住，可以强制重置后重新导入。')
         // 用户选择强制重置
         const resetRes = await _resetImportLock(queuedJobId, !queuedJobId)
         if (!resetRes.ok) {

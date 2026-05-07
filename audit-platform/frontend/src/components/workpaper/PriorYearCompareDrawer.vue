@@ -91,7 +91,8 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDangerous } from '@/utils/confirm'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 
@@ -190,14 +191,9 @@ async function onCopyConclusion() {
   if (!priorYearData.value?.conclusion) return
 
   try {
-    await ElMessageBox.confirm(
+    await confirmDangerous(
       `确定将上年结论复制到当前底稿？\n\n上年结论：\n"${priorYearData.value.conclusion.slice(0, 200)}${priorYearData.value.conclusion.length > 200 ? '...' : ''}"`,
       '复制上年结论',
-      {
-        confirmButtonText: '确定复制',
-        cancelButtonText: '取消',
-        type: 'info',
-      },
     )
   } catch {
     // 用户取消

@@ -110,6 +110,19 @@ export interface MaterialityChangedPayload {
   year?: number
 }
 
+/** 年度切换（R8-S1-04：全局年度上下文） */
+export interface YearChangedPayload {
+  projectId: string
+  year: number
+}
+
+/** 底稿单元格定位（R8-S2-02：自检失败项 → Univer 定位） */
+export interface WorkpaperLocateCellPayload {
+  wpId: string
+  sheetName?: string
+  cellRef: string
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -138,9 +151,13 @@ export type Events = {
   // 底稿生命周期
   'workpaper:parsed': WorkpaperParsedPayload
   'workpaper:saved': WorkpaperSavedPayload
+  'workpaper:locate-cell': WorkpaperLocateCellPayload
 
   // 重要性水平
   'materiality:changed': MaterialityChangedPayload
+
+  // 年度切换（R8-S1-04）
+  'year:changed': YearChangedPayload
 
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void

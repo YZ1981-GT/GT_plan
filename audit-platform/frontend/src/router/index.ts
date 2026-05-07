@@ -286,6 +286,13 @@ const router = createRouter({
           name: 'PartnerDashboard',
           component: () => import('@/views/PartnerDashboard.vue'),
         },
+        // R8-S2-06：合伙人签字决策面板
+        {
+          path: 'partner/sign-decision/:projectId/:year',
+          name: 'PartnerSignDecision',
+          component: () => import('@/views/PartnerSignDecision.vue'),
+          meta: { roles: ['partner', 'admin'] },
+        },
         {
           path: 'projects/:projectId/consistency',
           name: 'ConsistencyDashboard',
@@ -462,6 +469,10 @@ const router = createRouter({
           meta: { roles: ['qc', 'admin', 'partner'] },
         },
         {
+          path: 'qc',
+          redirect: '/qc/inspections',
+        },
+        {
           path: 'qc/inspections',
           name: 'QcInspectionWorkbench',
           component: () => import('@/views/qc/QcInspectionWorkbench.vue'),
@@ -489,7 +500,7 @@ const router = createRouter({
         {
           path: 'confirmation',
           name: 'ConfirmationHub',
-          component: () => import('@/views/DevelopingPage.vue'),
+          component: () => import('@/views/ConfirmationHub.vue'),
           meta: { developing: true },
         },
       ],

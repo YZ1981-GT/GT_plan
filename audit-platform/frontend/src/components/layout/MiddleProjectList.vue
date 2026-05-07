@@ -69,7 +69,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Delete } from '@element-plus/icons-vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmBatch } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import ProjectTreeNode from './ProjectTreeNode.vue'
 import * as P from '@/services/apiPaths'
@@ -174,11 +175,7 @@ function editProject(project: any) {
 
 async function confirmDeleteOne(project: any) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除项目「${project.name || project.client_name || '未命名'}」吗？此操作不可恢复。`,
-      '删除确认',
-      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
-    )
+    await confirmDelete(project.name || project.client_name || '未命名')
     await api.delete(`/api/projects/${project.id}`)
     ElMessage.success('项目已删除')
     projects.value = projects.value.filter(p => p.id !== project.id)
@@ -189,11 +186,7 @@ async function confirmDeleteOne(project: any) {
 
 async function confirmBatchDelete() {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除选中的 ${checkedIds.value.length} 个项目吗？此操作不可恢复。`,
-      '批量删除确认',
-      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
-    )
+    await confirmBatch('删除', checkedIds.value.length)
     await api.post('/api/projects/batch-delete', { project_ids: checkedIds.value })
     ElMessage.success(`已删除 ${checkedIds.value.length} 个项目`)
     projects.value = projects.value.filter(p => !checkedIds.value.includes(p.id))
