@@ -151,10 +151,13 @@ class WpAIService:
             )
 
             prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请用一句话分析变动原因。"
+            # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 35）
+            from app.services.export_mask_service import export_mask_service
+            masked_prompt, _mapping = export_mask_service.mask_text(prompt)
             try:
                 ai_text = await chat_completion([
                     {"role": "system", "content": "你是审计分析师，请简洁分析科目余额变动原因。如有上年分析参照请对比。"},
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": masked_prompt},
                 ], context_documents=context_docs if context_docs else None)
                 source_model = "qwen3.5-27b"
             except Exception:

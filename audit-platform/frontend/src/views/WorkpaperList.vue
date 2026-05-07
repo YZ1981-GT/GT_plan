@@ -511,7 +511,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmForcePass } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
 import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
@@ -1372,16 +1373,9 @@ async function onReviewPass() {
   // 强制检查：所有批注必须已解决
   if (unresolvedCount.value > 0) {
     try {
-      await ElMessageBox.confirm(
-        `当前有 ${unresolvedCount.value} 条未解决的复核意见，建议先处理后再通过复核。确定强制通过吗？`,
-        '复核确认',
-        {
-          type: 'warning',
-          confirmButtonText: '强制通过',
-          cancelButtonText: '返回处理',
-          confirmButtonClass: 'el-button--danger',
-        }
-      )
+      const result = await confirmForcePass('当前有 ' + unresolvedCount.value + ' 条未解决的复核意见，建议先处理后再通过复核。确定强制通过吗？')
+      // result.note 可用于记录强制通过原因（如需要）
+      void result
     } catch {
       return  // 用户选择返回处理
     }

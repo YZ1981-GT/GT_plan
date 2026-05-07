@@ -107,7 +107,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDangerous } from '@/utils/confirm'
 import type { UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { independenceDeclarations as P_id } from '@/services/apiPaths'
@@ -272,11 +273,7 @@ async function saveDraft() {
 // 提交声明
 async function handleSubmit() {
   try {
-    await ElMessageBox.confirm(
-      '提交后将触发签字留痕，确认提交独立性声明？',
-      '确认提交',
-      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmDangerous('提交后将触发签字留痕，确认提交独立性声明？', '确认提交')
   } catch {
     return
   }

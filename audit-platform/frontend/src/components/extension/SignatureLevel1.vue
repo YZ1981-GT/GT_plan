@@ -10,7 +10,7 @@
     </el-form>
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" @click="onSign" :loading="signing">确认签名</el-button>
+      <el-button type="primary" @click="onSign" :loading="signing" v-permission="'sign:execute'">确认签名</el-button>
     </template>
   </el-dialog>
 </template>

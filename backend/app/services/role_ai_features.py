@@ -282,13 +282,27 @@ async def _llm_polish_report(raw_data: dict) -> str:
     """LLM 润色周报"""
     try:
         from app.services.llm_client import chat_completion
+        from app.services.export_mask_service import export_mask_service
+
+        # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 38）
+        masked_data, _mapping = export_mask_service.mask_context(
+            {
+                "project_name": raw_data["project_name"],
+                "completed_this_week": raw_data["completed_this_week"],
+                "new_adjustments": raw_data["new_adjustments"],
+                "done_workpapers": raw_data["done_workpapers"],
+                "total_workpapers": raw_data["total_workpapers"],
+                "completion_rate": raw_data["completion_rate"],
+                "stale_workpapers": raw_data["stale_workpapers"],
+            }
+        )
         prompt = f"""请根据以下审计项目周报数据，生成一段简洁专业的周报摘要（3-5句话）：
 
-项目：{raw_data['project_name']}
-本周完成底稿：{raw_data['completed_this_week']} 个
-新增调整分录：{raw_data['new_adjustments']} 笔
-总体进度：{raw_data['done_workpapers']}/{raw_data['total_workpapers']}（{raw_data['completion_rate']}%）
-超期底稿：{raw_data['stale_workpapers']} 个
+项目：{masked_data['project_name']}
+本周完成底稿：{masked_data['completed_this_week']} 个
+新增调整分录：{masked_data['new_adjustments']} 笔
+总体进度：{masked_data['done_workpapers']}/{masked_data['total_workpapers']}（{masked_data['completion_rate']}%）
+超期底稿：{masked_data['stale_workpapers']} 个
 
 要求：专业简洁，突出进展和风险，给出下周建议。"""
 
@@ -303,16 +317,30 @@ async def _llm_generate_summary(summary_data: dict) -> str:
     """LLM 生成项目摘要"""
     try:
         from app.services.llm_client import chat_completion
+        from app.services.export_mask_service import export_mask_service
+
         metrics = summary_data["metrics"]
         risks = summary_data.get("risks", [])
+
+        # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 38）
+        masked_ctx, _mapping = export_mask_service.mask_context(
+            {
+                "project_name": summary_data["project_name"],
+                "workpaper_progress": metrics["workpaper_progress"],
+                "adjustments": metrics["adjustments"],
+                "misstatements": metrics["misstatements"],
+                "stale_workpapers": metrics["stale_workpapers"],
+                "risks_text": "; ".join(risks) if risks else "暂无重大风险",
+            }
+        )
         prompt = f"""请根据以下审计项目数据，生成一段合伙人可在5分钟内阅读的项目状态摘要（5-8句话）：
 
-项目：{summary_data['project_name']}
-底稿进度：{metrics['workpaper_progress']}
-调整分录：{metrics['adjustments']} 笔
-未更正错报：{metrics['misstatements']} 项
-超期底稿：{metrics['stale_workpapers']} 个
-风险点：{'; '.join(risks) if risks else '暂无重大风险'}
+项目：{masked_ctx['project_name']}
+底稿进度：{masked_ctx['workpaper_progress']}
+调整分录：{masked_ctx['adjustments']} 笔
+未更正错报：{masked_ctx['misstatements']} 项
+超期底稿：{masked_ctx['stale_workpapers']} 个
+风险点：{masked_ctx['risks_text']}
 
 要求：开头一句话总结项目状态（正常/需关注/有风险），然后分点说明关键信息和建议。"""
 
