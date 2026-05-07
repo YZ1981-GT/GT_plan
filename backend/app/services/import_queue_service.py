@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """导入队列服务 — 并发控制 + 进度跟踪
 
 多用户同时导入时：
@@ -38,7 +38,7 @@ class ImportQueueService:
 
     @staticmethod
     def _cleanup_stale_memory_locks():
-        cutoff = datetime.now(timezone.utc) - _STALE_IMPORT_TIMEOUT
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None).replace(tzinfo=None) - _STALE_IMPORT_TIMEOUT
         stale_projects: list[str] = []
         for pid, info in _import_locks.items():
             started = info.get("started")
@@ -55,7 +55,7 @@ class ImportQueueService:
 
     @staticmethod
     async def _expire_stale_jobs(db: AsyncSession):
-        cutoff = datetime.now(timezone.utc) - _STALE_IMPORT_TIMEOUT
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None).replace(tzinfo=None) - _STALE_IMPORT_TIMEOUT
         result = await db.execute(
             select(ImportBatch).where(
                 ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
@@ -68,7 +68,7 @@ class ImportQueueService:
         if not stale_batches:
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         for batch in stale_batches:
             summary = dict(batch.validation_summary or {})
             summary.update({
@@ -199,7 +199,7 @@ class ImportQueueService:
             summary["error"] = message
 
         batch.status = status
-        batch.completed_at = datetime.now(timezone.utc)
+        batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         batch.validation_summary = summary
         if year is not None and year > 0:
             batch.year = year
@@ -274,7 +274,7 @@ class ImportQueueService:
             if active >= _MAX_CONCURRENT_IMPORTS:
                 return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试", None
 
-            started_at = datetime.now(timezone.utc)
+            started_at = datetime.now(timezone.utc).replace(tzinfo=None)
             batch = ImportBatch(
                 project_id=project_id,
                 year=year,
@@ -362,7 +362,7 @@ class ImportQueueService:
                         summary = dict(batch.validation_summary or {})
                         summary.update({"job": True, "progress": -1, "message": "导入被手动重置", "error": "导入被手动重置"})
                         batch.status = ImportStatus.failed
-                        batch.completed_at = datetime.now(timezone.utc)
+                        batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                         batch.validation_summary = summary
                 except Exception:
                     logger.warning("force_release(job_id) 更新 batch 失败: %s", batch_id_raw)
@@ -389,7 +389,7 @@ class ImportQueueService:
         stale_batches = result.scalars().all()
         for batch in stale_batches:
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.now(timezone.utc)
+            batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
             if batch.validation_summary and isinstance(batch.validation_summary, dict):
                 batch.validation_summary["error"] = "导入被中断，已自动清理"
             else:
@@ -478,7 +478,7 @@ class ImportQueueService:
                     if result is not None:
                         summary["result"] = result
                     batch.status = ImportStatus.failed
-                    batch.completed_at = datetime.now(timezone.utc)
+                    batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     batch.validation_summary = summary
                     if year is not None and year > 0:
                         batch.year = year

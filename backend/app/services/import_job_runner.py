@@ -81,7 +81,7 @@ class ImportJobRunner:
             if timed_out_jobs:
                 await db.commit()
 
-            stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=20)
+            stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=20)
             running_states = (
                 JobStatus.running,
                 JobStatus.validating,
@@ -105,7 +105,7 @@ class ImportJobRunner:
             for stale in stale_jobs:
                 stale.status = JobStatus.timed_out
                 stale.error_message = "导入作业心跳丢失，已标记超时"
-                stale.completed_at = datetime.now(timezone.utc)
+                stale.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 timed_out_jobs.append(stale)
             if stale_jobs:
                 await db.commit()

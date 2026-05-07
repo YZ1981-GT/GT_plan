@@ -50,7 +50,10 @@ class LedgerImportUploadService:
             created = datetime.fromisoformat(created_at)
         except ValueError:
             return True
-        return created < datetime.now(timezone.utc) - cls.TTL
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        if created.tzinfo is not None:
+            created = created.replace(tzinfo=None)
+        return created < now_naive - cls.TTL
 
     @classmethod
     def cleanup_expired_bundles(cls, project_id: UUID) -> None:
