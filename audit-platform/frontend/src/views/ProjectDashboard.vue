@@ -50,6 +50,7 @@
                   :disabled="isRemindDisabled(row)"
                   :loading="row._reminding"
                   @click="onRemind(row)"
+                  v-permission="'workpaper:escalate'"
                 >
                   催办
                 </el-button>

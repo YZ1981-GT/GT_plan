@@ -41,7 +41,8 @@
           </el-form>
 
           <el-button type="primary" @click="onExport" :loading="exportLoading"
-            :disabled="selectedDocs.length === 0" style="width: 100%; margin-top: 12px">
+            :disabled="selectedDocs.length === 0" style="width: 100%; margin-top: 12px"
+            v-permission="'report:export'">
             开始导出
           </el-button>
 

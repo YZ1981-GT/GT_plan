@@ -35,7 +35,7 @@
         <div class="gt-msg-header">
           <span>{{ selectedConv?.title }}</span>
           <div>
-            <el-button size="small" @click="onExport">导出</el-button>
+            <el-button size="small" @click="onExport" v-permission="'report:export'">导出</el-button>
             <el-button size="small" type="danger" @click="onClose"
               v-if="selectedConv?.status === 'open'">结束对话</el-button>
           </div>

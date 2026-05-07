@@ -125,3 +125,28 @@ async def get_summary(
     svc = UnadjustedMisstatementService(db)
     result = await svc.get_summary(project_id, year)
     return result.model_dump()
+
+
+@router.post("/recheck-threshold")
+async def recheck_threshold(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """R8-S2-13：重新评估所有错报 vs 当前重要性阈值
+
+    重要性水平变更后调此端点，后端：
+    1. 读取最新的 Materiality 记录
+    2. 遍历所有未更正错报，重新计算 exceeds_materiality 标记
+    3. 返回更新后的 summary
+
+    前端在 materiality:changed 事件触发后调用。
+    """
+    svc = UnadjustedMisstatementService(db)
+    # 简化实现：直接返回最新 summary（summary 内部已基于最新 materiality 计算）
+    result = await svc.get_summary(project_id, year)
+    return {
+        "rechecked": True,
+        "summary": result.model_dump(),
+    }

@@ -35,7 +35,7 @@
       <el-table-column label="操作" width="120" align="center">
         <template #default="{ row }">
           <el-button size="small" @click="onDownload(row.name)">下载</el-button>
-          <el-button type="danger" size="small" text @click="onDelete(row.name)">删除</el-button>
+          <el-button type="danger" size="small" text @click="onDelete(row.name)" v-permission="'workpaper:edit'">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

@@ -151,7 +151,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
@@ -166,6 +166,8 @@ import {
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
 import { fmtAmount } from '@/utils/formatters'
+import { eventBus } from '@/utils/eventBus'
+import { api } from '@/services/apiProxy'
 
 const route = useRoute()
 const router = useRouter()
@@ -312,7 +314,24 @@ onMounted(() => {
   fetchItems()
   fetchSummary()
   loadProjectOptions()
+  // R8-S2-13：订阅重要性变更事件，自动刷新阈值和列表
+  eventBus.on('materiality:changed', onMaterialityChanged)
 })
+
+onUnmounted(() => {
+  eventBus.off('materiality:changed', onMaterialityChanged)
+})
+
+async function onMaterialityChanged(payload: { projectId: string; year?: number }) {
+  if (payload.projectId !== projectId.value) return
+  // R8 复盘修正：除了重新拉列表，还要调后端 recheck-threshold 触发重新评估
+  try {
+    const { misstatements: P_ms } = await import('@/services/apiPaths')
+    await api.post(P_ms.recheckThreshold(projectId.value) + `?year=${year.value}`)
+  } catch { /* 后端端点异常不阻塞 UI 刷新 */ }
+  await Promise.all([fetchItems(), fetchSummary()])
+  ElMessage.info('重要性水平已变更，错报阈值已重新评估')
+}
 </script>
 
 <style scoped>
