@@ -17,49 +17,15 @@
         </el-breadcrumb>
       </div>
       <div class="gt-topbar-right">
-        <!-- 顶部快捷入口（全局工具） -->
-        <el-tooltip content="知识库" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/knowledge')">
-            <el-icon :size="18"><Reading /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="私人库" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/private-storage')">
-            <el-icon :size="18"><Suitcase /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="AI 模型" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/settings/ai-models')">
-            <el-icon :size="18"><Cpu /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="排版模板" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/settings/report-format')">
-            <el-icon :size="18"><Document /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="吐槽求助" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/forum')">
-            <el-icon :size="18"><ChatDotSquare /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="公式管理" placement="bottom">
-          <div class="gt-topbar-btn" @click="showFormulaManager = true">
-            <span style="font-size:16px;font-weight:700;font-style:italic;line-height:18px">ƒx</span>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="自定义查询" placement="bottom">
-          <div class="gt-topbar-btn" @click="showCustomQuery = true">
-            <span style="font-size:15px;line-height:18px">🔍</span>
-          </div>
-        </el-tooltip>
+        <!-- 通知铃铛 -->
+        <slot name="nav-notifications" />
 
-        <!-- 显示设置（金额单位 / 字号） -->
+        <!-- 显示设置 Aa -->
         <el-popover placement="bottom" :width="240" trigger="click">
           <template #reference>
-            <el-tooltip content="显示设置（单位/字号）" placement="bottom">
+            <el-tooltip content="显示设置" placement="bottom">
               <div class="gt-topbar-btn">
-                <span style="font-size:15px;line-height:18px">Aa</span>
+                <span class="gt-topbar-text-icon">Aa</span>
               </div>
             </el-tooltip>
           </template>
@@ -130,14 +96,10 @@
           </div>
         </el-tooltip>
 
-        <!-- 同步状态指示器 -->
-        <SyncStatusIndicator />
+        <div class="gt-topbar-divider" />
 
         <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
         <slot name="nav-review-inbox" />
-
-        <!-- 通知中心入口 -->
-        <slot name="nav-notifications" />
 
         <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
         <slot name="nav-eqcr" />
@@ -185,6 +147,51 @@
           </div>
         </nav>
         <div class="gt-sidebar-bottom">
+          <!-- 工具簇（从顶栏迁移过来，避免顶栏过载） -->
+          <div class="gt-sidebar-tools-title" v-if="!sidebarCollapsed">工具</div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': route.path.startsWith('/knowledge') }" @click="router.push('/knowledge')" title="知识库">
+            <el-icon :size="18"><Reading /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">知识库</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/private-storage' }" @click="router.push('/private-storage')" title="私人库">
+            <el-icon :size="18"><Suitcase /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">私人库</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/ai-models' }" @click="router.push('/settings/ai-models')" title="AI 模型">
+            <el-icon :size="18"><Cpu /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">AI 模型</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/report-format' }" @click="router.push('/settings/report-format')" title="排版模板">
+            <el-icon :size="18"><Document /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">排版模板</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/forum' }" @click="router.push('/forum')" title="吐槽求助">
+            <el-icon :size="18"><ChatDotSquare /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">吐槽求助</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" @click="showFormulaManager = true" title="公式管理">
+            <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700">ƒx</span>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" @click="showCustomQuery = true" title="自定义查询">
+            <span class="gt-tool-text-icon">🔍</span>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">自定义查询</span>
+            </transition>
+          </div>
+
           <div class="gt-nav-item" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠">
             <el-icon :size="18"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
             <transition name="gt-fade">
@@ -306,7 +313,6 @@ import {
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
-import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue'
 import { eventBus } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { createSSE, type SSEConnection } from '@/utils/sse'
@@ -333,10 +339,10 @@ const FALLBACK_NAV = [
   { key: 'team', label: '人员档案', icon: User, path: '/settings/staff', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'eqcr'] },
   { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot', roles: ['admin', 'partner', 'manager'] },
+  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
   { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: null },
   { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
-  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot', roles: ['admin', 'partner', 'manager', 'auditor'] },
+  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
   { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
 ]
 
@@ -363,7 +369,7 @@ const activeNav = computed(() => {
   const p = route.path
   if (p === '/') return 'dashboard'
   // 顶部栏路由不高亮左侧导航
-  const topBarPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum', '/recycle-bin', '/settings']
+  const topBarPaths = ['/recycle-bin', '/settings']
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
   // 合并项目详情页（/projects/:id/consolidation）高亮"合并"而非"项目"
   if (p.match(/^\/projects\/[^/]+\/consolidation/)) return 'consolidation'
@@ -377,6 +383,13 @@ const activeNav = computed(() => {
 const currentModule = computed(() => {
   const item = navItems.value.find(n => n.key === activeNav.value)
   return item?.label || ''
+})
+
+// 工具区 active 判断
+const activeToolPath = computed(() => {
+  const p = route.path
+  const toolPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum']
+  return toolPaths.find(tp => p.startsWith(tp)) || ''
 })
 
 const emit = defineEmits<{
@@ -698,7 +711,8 @@ onUnmounted(() => {
 .gt-topbar-center :deep(.el-breadcrumb__inner),
 .gt-topbar-center :deep(.el-breadcrumb__separator) { color: rgba(255, 255, 255, 0.7); }
 .gt-topbar-center :deep(.el-breadcrumb__inner.is-link) { color: #fff; }
-.gt-topbar-right { display: flex; align-items: center; gap: var(--gt-space-3); }
+.gt-topbar-right { display: flex; align-items: center; gap: 4px; }
+.gt-topbar-right > * { display: inline-flex; align-items: center; }
 
 .gt-logo {
   display: flex;
@@ -710,9 +724,9 @@ onUnmounted(() => {
   transition: background var(--gt-transition-fast);
 }
 .gt-logo:hover { background: rgba(255, 255, 255, 0.1); }
-.gt-logo-img { height: 28px; width: auto; }
+.gt-logo-img { height: 40px; width: auto; }
 .gt-logo-text {
-  font-size: var(--gt-font-size-lg);
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
@@ -720,24 +734,35 @@ onUnmounted(() => {
 
 .gt-topbar-btn {
   cursor: pointer;
-  padding: 6px;
-  border-radius: var(--gt-radius-sm);
-  color: rgba(255, 255, 255, 0.8);
-  transition: all var(--gt-transition-fast);
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  transition: background 0.15s ease;
 }
-.gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+.gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.gt-topbar-text-icon {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
 
 /* 顶栏内所有 el-button text / el-badge 适配深紫背景 */
 .gt-topbar-right :deep(.el-button--text) { color: rgba(255, 255, 255, 0.85); }
 .gt-topbar-right :deep(.el-button--text:hover) { color: #fff; background: rgba(255, 255, 255, 0.1); }
-.gt-topbar-right :deep(.el-icon) { color: inherit; }
+.gt-topbar-right :deep(.el-icon) { color: rgba(255, 255, 255, 0.9); }
+.gt-topbar-right :deep(.el-icon svg) { fill: currentColor; }
 .gt-topbar-right :deep(.el-dropdown) { color: #fff; }
 
 .gt-topbar-divider {
   width: 1px;
   height: 20px;
   background: rgba(255, 255, 255, 0.2);
-  margin: 0 2px;
+  margin: 0 8px;
 }
 
 .gt-import-indicator {
@@ -841,6 +866,31 @@ onUnmounted(() => {
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);
   padding: var(--gt-space-1);
+}
+
+/* 工具簇（侧栏底部） */
+.gt-sidebar-tools-title {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary, #909399);
+  padding: 8px 14px 4px;
+  letter-spacing: 0.5px;
+}
+.gt-nav-item--tool {
+  font-size: 13px;
+  color: var(--gt-color-text-secondary, #606266);
+}
+.gt-nav-item--tool:hover {
+  background: rgba(75, 45, 119, 0.05);
+  color: var(--gt-color-primary);
+}
+.gt-tool-text-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* 折叠态 */

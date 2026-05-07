@@ -9,12 +9,14 @@
       <router-link
         v-if="isReviewRole"
         to="/review-inbox"
-        class="gt-nav-review-inbox"
+        class="gt-topbar-action-link"
         style="text-decoration: none;"
       >
-        <el-badge :value="pendingReviewCount" :hidden="pendingReviewCount === 0" type="danger">
-          <el-button size="small" text>📋 复核收件箱</el-button>
-        </el-badge>
+        <el-tooltip content="待复核底稿收件箱" placement="bottom">
+          <el-badge :value="pendingReviewCount" :hidden="pendingReviewCount === 0" type="danger">
+            <span class="gt-topbar-action-btn">📋 复核收件箱</span>
+          </el-badge>
+        </el-tooltip>
       </router-link>
     </template>
 
@@ -26,19 +28,22 @@
       <router-link
         v-if="isEqcrEligible"
         to="/eqcr/workbench"
-        class="gt-nav-eqcr"
+        class="gt-topbar-action-link"
         style="text-decoration: none;"
       >
-        <el-button size="small" text>🛡️ 独立复核</el-button>
+        <el-tooltip content="EQCR 独立复核工作台" placement="bottom">
+          <span class="gt-topbar-action-btn">🛡️ 独立复核</span>
+        </el-tooltip>
       </router-link>
       <router-link
         v-if="isEqcrEligible"
         to="/eqcr/metrics"
-        class="gt-nav-eqcr-metrics"
-        style="text-decoration: none; margin-left: 4px;"
-        title="EQCR 指标仪表盘（admin/partner 可见）"
+        class="gt-topbar-action-link"
+        style="text-decoration: none; margin-left: 2px;"
       >
-        <el-button size="small" text>📊 EQCR 指标</el-button>
+        <el-tooltip content="EQCR 指标仪表盘" placement="bottom">
+          <span class="gt-topbar-action-btn">📊 EQCR 指标</span>
+        </el-tooltip>
       </router-link>
     </template>
 
@@ -276,5 +281,26 @@ function onCatalogSelect(item: any) {
   height: 100%;
   overflow-y: auto;
   padding: var(--gt-space-4);
+}
+
+/* 顶栏操作按钮（白色文字，深紫背景上清晰可见） */
+.gt-topbar-action-link {
+  display: inline-flex;
+  align-items: center;
+}
+.gt-topbar-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.gt-topbar-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 </style>

@@ -22,6 +22,12 @@
                   {{ statusLabel(project.status) }}
                 </el-tag>
               </el-descriptions-item>
+              <el-descriptions-item label="报表准则">
+                <el-tag :type="project.template_type === 'soe' ? 'warning' : 'primary'" size="small">
+                  {{ project.template_type === 'soe' ? '国企版' : project.template_type === 'listed' ? '上市版' : '未设置' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="企业代码">{{ project.company_code || project.client_code || '-' }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(project.created_at) }}</el-descriptions-item>
             </el-descriptions>
 
@@ -56,7 +62,17 @@
               <span class="gt-workflow-arrow">→</span>
               <span class="gt-workflow-step">⑤ 附注</span>
             </div>
+            <div class="gt-quick-tip">
+              💡 提示：首次使用请按建议流程操作。先导入账套数据，完成科目映射后系统自动生成试算表，再依次编制底稿、生成报表和附注。
+            </div>
             <div class="gt-quick-grid">
+              <!-- 第一行：核心流程（按建议流程顺序） -->
+              <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
+                <div class="gt-quick-btn" @click="goToLedgerImport()">
+                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
+                  <span>账套导入</span>
+                </div>
+              </el-tooltip>
               <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
                 <div class="gt-quick-btn" @click="goTo('trial-balance')">
                   <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
@@ -87,20 +103,17 @@
                   <span>附注</span>
                 </div>
               </el-tooltip>
+              <!-- 第二行：辅助功能 -->
               <el-tooltip content="设置整体重要性水平、实际执行重要性和明显微小错报" placement="top">
                 <div class="gt-quick-btn" @click="goTo('materiality')">
                   <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
                   <span>重要性</span>
                 </div>
               </el-tooltip>
-              <div class="gt-quick-btn" @click="goTo('audit-checks')">
-                <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
-                <span>审计检查</span>
-              </div>
-              <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
-                <div class="gt-quick-btn" @click="goToLedgerImport()">
-                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
-                  <span>账套导入</span>
+              <el-tooltip content="执行审计检查清单" placement="top">
+                <div class="gt-quick-btn" @click="goTo('audit-checks')">
+                  <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
+                  <span>审计检查</span>
                 </div>
               </el-tooltip>
               <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
@@ -109,18 +122,24 @@
                   <span>查账</span>
                 </div>
               </el-tooltip>
-              <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport" title="清除卡住的导入任务，释放导入锁">
-                <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
-                <span>重置</span>
-              </div>
-              <div class="gt-quick-btn" @click="onCreateNextYear" title="一键创建当年项目（继承上年配置）">
-                <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
-                <span>创建下年</span>
-              </div>
-              <div class="gt-quick-btn" @click="showTeamAssign = true" title="为项目分配团队成员">
-                <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
-                <span>人员委派</span>
-              </div>
+              <el-tooltip content="清除卡住的导入任务，释放导入锁" placement="top">
+                <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport">
+                  <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
+                  <span>重置</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="一键创建当年项目（继承上年配置）" placement="top">
+                <div class="gt-quick-btn" @click="onCreateNextYear">
+                  <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
+                  <span>创建下年</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="为项目分配团队成员" placement="top">
+                <div class="gt-quick-btn" @click="showTeamAssign = true">
+                  <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
+                  <span>人员委派</span>
+                </div>
+              </el-tooltip>
               <div
                 v-if="project.report_scope === 'consolidated'"
                 class="gt-quick-btn"
@@ -484,6 +503,11 @@ function formatSize(bytes: number) {
 .gt-workflow-hint-label { font-weight: 600; color: #6b5b8a; margin-right: 2px; }
 .gt-workflow-step { background: #fff; padding: 1px 6px; border-radius: 4px; border: 1px solid #e8e4f0; white-space: nowrap; }
 .gt-workflow-arrow { color: #c4b8d9; font-size: 10px; }
+.gt-quick-tip {
+  font-size: 11px; color: #909399; line-height: 1.5;
+  padding: 6px 10px; margin-bottom: 10px;
+  background: #fafafa; border-radius: 6px; border-left: 3px solid #4b2d77;
+}
 .gt-quick-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: var(--gt-space-3); border-radius: var(--gt-radius-sm);

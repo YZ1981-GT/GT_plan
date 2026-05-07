@@ -4,8 +4,8 @@
     title="年度独立性声明"
     width="700px"
     :close-on-click-modal="false"
-    :close-on-press-escape="false"
-    :show-close="false"
+    :close-on-press-escape="true"
+    :show-close="true"
     append-to-body
   >
     <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px">

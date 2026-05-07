@@ -91,3 +91,9 @@ GT_logo/
 
 # Commit 消息临时文件
 COMMIT_MSG_TMP.txt
+
+# 开发日志
+backend_dev.log
+frontend_dev.log
+backend_log.txt
+start-dev-log.bat

@@ -371,3 +371,8 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(qc_rat_router, tags=["qc-ratings"])
     app.include_router(qc_case_router, tags=["qc-cases"])
     app.include_router(qc_ar_router, tags=["qc-annual-reports"])
+
+    # ═══ 23. 通知中心 ═══
+    # notifications 路由内部已声明 prefix="/api/notifications"，注册时不加额外前缀。
+    from app.routers.notifications import router as notifications_router
+    app.include_router(notifications_router, tags=["notifications"])

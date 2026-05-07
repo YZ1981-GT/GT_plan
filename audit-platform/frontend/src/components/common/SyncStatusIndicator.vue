@@ -1,6 +1,5 @@
 <template>
   <div class="gt-sync-indicator">
-    <!-- 状态图标按钮 -->
     <el-tooltip :content="tooltipText" placement="bottom">
       <div
         class="gt-topbar-btn gt-sync-btn"
@@ -9,7 +8,7 @@
       >
         <el-icon v-if="status === 'syncing'" :size="18" class="is-loading"><Loading /></el-icon>
         <el-icon v-else-if="status === 'failed'" :size="18"><WarningFilled /></el-icon>
-        <el-icon v-else :size="18"><CircleCheckFilled /></el-icon>
+        <el-icon v-else :size="18"><Refresh /></el-icon>
         <el-badge
           v-if="failedEvents.length > 0"
           :value="failedEvents.length"
@@ -81,7 +80,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Loading, WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
+import { Loading, WarningFilled, CircleCheckFilled, Check, Refresh } from '@element-plus/icons-vue'
 import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 
 // ── 状态 ──
@@ -204,21 +203,22 @@ eventBus.on('sse:sync-failed', onSyncFailed)
 
 .gt-sync-btn {
   position: relative;
-  transition: all 0.2s;
+  margin: 0;
+  vertical-align: middle;
 }
 .gt-sync-btn--synced {
-  color: var(--gt-color-text-tertiary, #909399);
+  color: rgba(255, 255, 255, 0.85);
 }
 .gt-sync-btn--syncing {
-  color: var(--gt-color-primary, #4b2d77);
-  background: var(--gt-color-primary-bg, #f3eef8);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
 }
 .gt-sync-btn--failed {
-  color: #f56c6c;
-  background: #fef0f0;
+  color: #ff6b6b;
+  background: rgba(255, 100, 100, 0.15);
 }
 .gt-sync-btn--failed:hover {
-  background: #fde2e2;
+  background: rgba(255, 100, 100, 0.25);
 }
 
 .gt-sync-badge {

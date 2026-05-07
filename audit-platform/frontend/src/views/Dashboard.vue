@@ -268,7 +268,7 @@ onMounted(async () => {
     stats.inProgress = list.filter((p: any) => ['execution', 'planning'].includes(p.status)).length
     stats.pendingReview = list.filter((p: any) => p.status === 'completion').length
     stats.completed = list.filter((p: any) => p.status === 'archived').length
-    recentProjects.value = list.slice(0, 5)
+    recentProjects.value = list.slice(0, 3)
   } catch { /* ignore */ }
   loadingProjects.value = false
 
@@ -394,6 +394,8 @@ onMounted(async () => {
 .project-link:hover { text-decoration: underline; }
 
 .gt-compact-table :deep(.el-table__row td) { padding: 8px 0; }
+.gt-compact-table :deep(.el-table__body .cell) { font-size: 13px !important; }
+.gt-compact-table :deep(.el-table__header .cell) { font-size: 13px !important; }
 
 /* ── 今日日程 ── */
 .schedule-card { min-height: 240px; }

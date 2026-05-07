@@ -3,7 +3,7 @@
     <!-- 左侧品牌区 -->
     <div class="gt-login-brand">
       <div class="brand-content gt-fade-in">
-        <img src="/gt-logo.png" alt="Grant Thornton 致同" class="brand-logo" />
+        <img src="/gt-logo-white.png" alt="Grant Thornton 致同" class="brand-logo" />
         <h1 class="brand-title">致同审计作业平台</h1>
         <p class="brand-desc">面向会计师事务所的审计全流程作业系统</p>
       </div>

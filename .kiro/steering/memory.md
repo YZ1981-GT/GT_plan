@@ -69,7 +69,7 @@ inclusion: always
 - **页面标题**：致同审计作业平台（index.html title 已更新）
 - pytest collection **2830 tests / 0 errors**（2026-05-07 修复后）：之前 7 个 collection error 已通过添加 `wrap_ai_output` 函数、`IndependenceDeclaration` 别名、`build_ai_contribution_statement` 等 4 函数到 pdf_export_engine、`AIContentMustBeConfirmedRule` re-export 到 gate_rules_phase14 全部解决
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/round7-global-polish（HEAD = 2e72884，R7 Sprint 1-3 全部完成，已拉取到本地，工作区干净）
+- git 分支：feature/round8-deep-closure（HEAD = a1b936e，R8 Sprint 1+2 全部完成 + 清理，已推送到 origin）；上游 feature/round7-global-polish（2e72884）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -98,7 +98,7 @@ inclusion: always
 - **单元格编辑不入 operationHistory**：operationHistory 当前只接 `删除` 动作（Adjustments/RecycleBin），单元格误改无 Ctrl+Z 可恢复
 - **NotificationCenter 只 30s 轮询 + SSE**，无分类 Tab、无免打扰时段
 - **AiAssistantSidebar 与 SmartTipList 职责重叠**：WorkpaperEditor 右栏 AI 提示在两处渲染（AiAssistantSidebar + WorkpaperEditor 内联 smartTip 面板 90-94 行）
-- **顶栏工具簇 14 图标过载**（知识库/私人库/AI模型/排版模板/吐槽/公式/自定义查询/Aa/视图切换/回收站/系统设置/SyncStatus/复核/通知/EQCR+头像），版面位置规约建议折叠为"⚙️ 工具箱"下拉，保留 6-7 图标
+- **顶栏工具簇已瘦身**（2026-05-07，14→4 常驻图标）：顶栏只保留 🔔通知 · Aa显示设置 | 视图切换·回收站·设置 | 复核收件箱·独立复核·EQCR 指标 | 用户菜单；SyncStatusIndicator 已从顶栏移除（正常态无交互价值）；移至左侧栏底部"工具"区的 7 个：知识库/私人库/AI 模型/排版模板/吐槽求助/公式管理/自定义查询；`.gt-topbar-btn` 统一 34×34px 圆角 8px，gap 4px，分隔线 margin 8px
 - **版面组件唯一位置原则**：GtPageHeader/GtInfoBar/GtToolbar/GtStatusTag/GtAmountCell/CellContextMenu/TableSearchBar/SelectionBar/SyncStatusIndicator/NotificationCenter 等 21 个全局组件必须有唯一归属位置，禁止各视图自写重复；详见 docs/GLOBAL_REFINEMENT_PROPOSAL_v1.md §11.6
 - **角色差异化布局已规约**：auditor/manager/qc/partner/eqcr/admin 各自顶栏角色动作簇、左栏导航项数、Detail 默认落地页，实现方式 = §2.2 动态导航 + §1.1 登录角色跳转
 - Univer 公式引擎：@univerjs/preset-sheets-formula **不存在于 npm**，公式引擎内置在 preset-sheets-core（UniverSheetsFormulaPlugin + UniverSheetsFormulaUIPlugin 自动注册），只需 UniverSheetsCorePreset 未传 workerURL（否则 notExecuteFormula=true 禁用计算）
@@ -241,8 +241,8 @@ inclusion: always
   - **Sprint 2 Week 3 已完成（Task 55-82 / 82，Task 52/53/82 保留）**：新建 `scripts/find-missing-v-permission.mjs`（盘点危险操作按钮未加 v-permission，glob@13 作为 devDependency）+ 8 个漏加 v-permission 按钮补齐（ProjectDashboard 催办/PrivateStorage 删除/EqcrMemoEditor 定稿/PDFExportPanel 导出/ReviewConversations 导出/SignatureLevel1-2 签字，从 8 → 1 剩 AiContentConfirmDialog 非危险）+ ROLE_PERMISSIONS 补齐 16 权限码（含 sign:execute/archive:execute/report:export_final/workpaper:submit_review|review_approve|review_reject|escalate/assignment:batch/qc:publish_report/eqcr:approve/independence:edit）+ 新建 `qc` 角色权限组 + 新建 `constants/statusEnum.ts`（18 套状态常量 + TS 类型导出）+ WorkpaperEditor/AuditReportEditor/Adjustments 替换硬编码状态字符串为常量引用 + 新建 `utils/formRules.ts`（12 套 el-form 规则 + makeRules 组合工具）+ 新建 `backend/app/routers/note_related_workpapers.py`（附注行→底稿端点，router_registry §22）+ DisclosureEditor 右键菜单"查看相关底稿" + Misstatements 订阅 materiality:changed 事件 + GateReadinessPanel 组件内自动订阅 materiality:changed（触发父级 onRefresh） + 后端 misstatements.py 新增 POST /recheck-threshold 端点 + apiPaths 新增 misstatements.recheckThreshold
   - **R8 总完成（Sprint 1+2）**：121/124 task（97.6%，Task 52/53 跳过+Task 82 UAT 待真人）；vue-tsc 0 错误；pytest 2848 tests / 0 errors；ElMessageBox.confirm 全量清零（基线 5 合格）；新建 11 文件（后端 3 + 前端 7 + 脚本 1） + 修改 ~50 文件 + 新增 13 AI masking 测试
   - **R8 复盘发现 9 处字段凭印象错误（P0 已修复）**：risk_summary_service 违反"代码锚定"铁律——(1) ReviewRecord 无 project_id/content/wp_id，真实字段 working_paper_id/comment_text（需 join WorkingPaper 反查 project_id）；(2) UnadjustedMisstatement.net_amount→misstatement_amount，description→misstatement_description；(3) Adjustment 无 converted_to_misstatement_id，反向查 UnadjustedMisstatement.source_adjustment_id；(4) total_debit/credit 在 AdjustmentEntry 不在 Adjustment 头表；(5) GoingConcernConclusion 枚举值 no_material_uncertainty；(6) risk_summary_service 所有聚合加 year 参数；修复代码见 commit + 新建 test_risk_summary_service.py 8 smoke test 全部通过（User.hashed_password / WorkingPaper 必填 source_type 也在测试中踩雷并修正）
-  - **R8 git 提交策略**：从 feature/round7-global-polish 切出 **feature/round8-deep-closure** 新分支；分组提交 5 个 commit（S1 / S2-W1 / S2-W2+P0 / S2-W3 / UI+spec+docs）；**用 COMMIT_MSG_TMP.txt 文件承载多行 commit message**（避免 PowerShell 对 `-m "Task 3 (括号)"` 括号内空格的参数误解析，用完即删）；.gitignore 新增 GT_logo/（AI 源文件）和 2025人员情况.xlsx
-  - **git status 发现大量审计模板 xlsx/docx 变更**（致同通用审计程序及底稿模板 目录下 ~$ 锁文件 + B30/C5/D4/E/I/L/S34 等底稿模板的 D/M 状态）—— 这些是业务资产不应进代码仓库，需要考虑加入 .gitignore 白名单或迁移到专用资产库
+  - **R8 git 提交策略**：从 feature/round7-global-polish 切出 **feature/round8-deep-closure** 新分支；分组提交 7+2 个 commit（S1 / S2-W1 / S2-W2+P0 / S2-W3 / UI+spec+docs / AI脱敏漏网+v-permission / Office锁文件清理 / 移除临时文件 / .gitignore追加）；**用 COMMIT_MSG_TMP.txt 文件承载多行 commit message**（避免 PowerShell 对 `-m "Task 3 (括号)"` 括号内空格的参数误解析，用完即删）；.gitignore 新增 GT_logo/ + 2025人员情况.xlsx + `~$*` + `~WRL*` + COMMIT_MSG_TMP.txt；**已推送到 origin/feature/round8-deep-closure（a1b936e）**
+  - **审计模板 Office 临时文件已清理**：129 个 ~$ 和 ~WRL 锁文件从 git 历史中删除，.gitignore 已追加 `~$*` 和 `~WRL*` 模式防止再次入库；B30 集团审计新准则英文版模板（ISA 600 revised 系列 20+ 文件）也一并从跟踪中移除
   - **Sprint 2 架构决策**：不拆 7 个 SideTab wrapper（Task 1-6 跳过，WorkpaperSidePanel 直接用 AiAssistantSidebar/AttachmentDropZone/ProgramRequirementsSidebar/DependencyGraph 已足够）；自检 Tab 复用 fine-checks/summary 批量端点（不新建 wp_id 专用端点）；stale 横幅共享 CSS class（3 视图继承）；**PartnerSignDecision 中栏 HTML 降级**（不依赖不存在的 /preview-pdf 端点，直接渲染 audit-report.paragraphs 8 节）；**ManagerDashboard 复用 overview 端点**（不新建 manager_matrix，alerts 前端派生）；**QcHub 复用 R7-S3 的 QcInspectionWorkbench 6 Tab**（不重复新建，只加 /qc → /qc/inspections 重定向）；**Task 52-53 跳过**（ProjectDashboard 非 Tab 布局，QCDashboard 降级为 Tab 重构成本过高）；**recheck-threshold 复用 get_summary**（summary 服务内部已基于最新 materiality 计算，无需重写逻辑）；**GateReadinessPanel 内部自动订阅 materiality:changed**（不让每个使用方各自订阅，利用已有 onRefresh prop 回调）
   - **ShadowCompareRow verdict 映射约定**：前端 pass/flag → 后端 EqcrOpinion.agree/disagree，复用 eqcrApi.createOpinion 端点（避免新建专用 verdict 表）
   - **IssueTicket.severity 实际枚举**（本次 grep 核对）：blocker/major/minor/suggestion（不是 memory 之前记录的 high）；risk_summary 取 blocker+major 为高严重度
@@ -259,6 +259,8 @@ inclusion: always
 - **3 个后端端点确认不存在需新建**：GET /api/qc/rotation/due-this-month（Sprint 3 Task 18）、GET /api/reports/{pid}/{year}/{type}/{row_code}/related-workpapers（Task 46）、GET /api/eqcr/projects/{pid}/memo/export?format=docx（Task 23）
 - **后端编辑锁实际路径**：`/api/workpapers/{wp_id}/editing-lock`（POST acquire / PATCH heartbeat / DELETE release / POST force / GET active），不是设计文档假设的 `/api/editing-locks/acquire`；useEditingLock.ts 已适配实际路径
 - **后端 stale-summary 端点已新建**：`backend/app/routers/stale_summary.py`，用 `WorkingPaper.prefill_stale` 字段 + join WpIndex 取 wp_code/wp_name，注册在 router_registry.py §18
+- **通知端点已新建**：`backend/app/routers/notifications.py`（GET list / GET unread-count / POST read / POST read-all / DELETE），注册在 router_registry.py §23；修复登录后 Dashboard 两个 "Not Found" toast
+- **start-dev-log.bat 已创建**：带日志输出的启动脚本（后端→backend_dev.log，前端→frontend_dev.log），便于排查运行时错误
 - 合并 feature/global-component-library 到 master（用户手动操作）
 - 0.3 公式计算浏览器手动验证（启动前端输入 `=SUM(A1:A3)` 看结果）
 - 用真实审计项目进行用户验收测试（UAT）
@@ -293,6 +295,7 @@ inclusion: always
 - Round 5 实施进度：**全部完成 + 复盘 P0-P2 修复**，122 个 EQCR 测试全通过；R5 关闭
 
 ### 中期功能完善
+- **项目三码体系（待 spec）**：本企业名称+代码、上级企业名称+代码、最终控制方名称+代码 6 字段必填（所有项目，非仅合并），通过 parent_company_code→company_code 构建项目树；可见性基于 ProjectAssignment 派单裁剪（助理看子公司，经理看项目组，合伙人看全部）；需新建 spec 规划
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）
 - working_paper_service 状态机 draft→edit_complete 是否符合业务流程（需确认）[P3]
 - 合并模块需找真实项目做业务测试（技术完成度 85%，业务完成度 60%）[P1]
