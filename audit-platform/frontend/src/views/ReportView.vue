@@ -62,6 +62,17 @@
         </template>
       </GtPageHeader>
 
+      <!-- R8-S2-03：Stale 状态横幅（上游数据变更提示） -->
+      <div v-if="stale.isStale.value" class="gt-stale-banner">
+        <span class="gt-stale-icon">⚠️</span>
+        <span class="gt-stale-text">
+          上游数据已变更，当前报表可能基于旧试算表（{{ stale.staleCount.value }} 张底稿待重算）
+        </span>
+        <el-button size="small" type="primary" :loading="stale.loading.value" @click="onStaleRecalc">
+          🔄 点击重算
+        </el-button>
+      </div>
+
       <!-- Tab 切换 -->
       <el-tabs v-model="activeTab" @tab-change="onTabChange">
         <el-tab-pane label="资产负债表" name="balance_sheet" />
@@ -668,6 +679,15 @@ const router = useRouter()
 const projectStore = useProjectStore()
 
 const projectId = computed(() => projectStore.projectId)
+
+// R8-S2-03：Stale 状态追踪（上游数据变更提示）
+import { useStaleStatus } from '@/composables/useStaleStatus'
+const stale = useStaleStatus(projectId)
+async function onStaleRecalc() {
+  await stale.recalc()
+  // 重算后重新拉取报表数据
+  await fetchReport()
+}
 
 function goBack() {
   router.push(`/projects`)

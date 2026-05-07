@@ -538,3 +538,34 @@ a, button, .el-button, .el-tag, .el-tree-node__content,
 .gt-edit-mode-ribbon .gt-edit-mode-icon {
   font-size: 14px;
 }
+
+
+/* ══ R8-S2-03：Stale 状态横幅（跨视图统一样式） ══ */
+.gt-stale-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--gt-space-3);
+  padding: var(--gt-space-3) var(--gt-space-4);
+  margin: var(--gt-space-2) 0;
+  background: linear-gradient(90deg, var(--gt-color-wheat-light), var(--gt-color-bg-elevated));
+  border-left: 4px solid var(--gt-color-wheat);
+  border-radius: var(--gt-radius-sm);
+  font-size: var(--gt-font-size-sm);
+  animation: gt-stale-pulse 2s ease-in-out infinite;
+}
+
+.gt-stale-banner .gt-stale-icon {
+  font-size: var(--gt-font-size-lg);
+  flex-shrink: 0;
+}
+
+.gt-stale-banner .gt-stale-text {
+  flex: 1;
+  color: var(--gt-color-text);
+  line-height: 1.5;
+}
+
+@keyframes gt-stale-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 194, 61, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 194, 61, 0.15); }
+}

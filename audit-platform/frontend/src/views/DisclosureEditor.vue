@@ -52,6 +52,17 @@
       </template>
     </GtPageHeader>
 
+    <!-- R8-S2-03：Stale 状态横幅 -->
+    <div v-if="stale.isStale.value" class="gt-stale-banner">
+      <span class="gt-stale-icon">⚠️</span>
+      <span class="gt-stale-text">
+        上游数据已变更（{{ stale.staleCount.value }} 张底稿待重算），附注数据可能过时
+      </span>
+      <el-button size="small" type="primary" :loading="stale.loading.value" @click="onStaleRecalc">
+        🔄 点击重算
+      </el-button>
+    </div>
+
     <!-- 编辑锁提示 -->
     <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
       {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
@@ -368,7 +379,7 @@
     />
   </div>
 
-  <!-- 右键菜单（统一组件） -->
+  <!-- 右键菜单（统一组件 + 查看相关底稿） -->
   <CellContextMenu
     :visible="deCtx.contextMenu.visible"
     :x="deCtx.contextMenu.x"
@@ -380,7 +391,12 @@
     @formula="onDeCtxFormula"
     @sum="onDeCtxSum"
     @compare="onDeCtxCompare"
-  />
+  >
+    <!-- R8-S2-12：查看相关底稿 -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxRelatedWp">
+      <span class="gt-ucell-ctx-icon">📝</span> 查看相关底稿
+    </div>
+  </CellContextMenu>
 
   <!-- 知识库文档选择弹窗 [R3.7] -->
   <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
@@ -388,7 +404,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
@@ -397,6 +413,7 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { confirmLeave } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
@@ -437,6 +454,14 @@ const year = computed(() => {
   const qy = Number(route.query.year)
   return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
 })
+
+// R8-S2-03：Stale 状态追踪
+import { useStaleStatus } from '@/composables/useStaleStatus'
+const stale = useStaleStatus(projectId)
+async function onStaleRecalc() {
+  await stale.recalc()
+  await fetchTree()
+}
 
 const editLock = useEditingLock({
   resourceId: computed(() => 'disclosure_' + (route.params.projectId as string || '')),
@@ -1372,13 +1397,34 @@ onMounted(async () => {
   if (noteList.value.length === 0) {
     await onGenerate()
   }
+  // R8-S2-14：关闭浏览器/刷新前警告
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 onUnmounted(() => {
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
+  window.removeEventListener('beforeunload', onBeforeUnload)
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
 })
+
+// R8-S2-14：未保存拦截
+onBeforeRouteLeave(async (_to, _from, next) => {
+  if (!editDirty.value && !autoSave.isDirty.value) { next(); return }
+  try {
+    await confirmLeave('附注')
+    next()
+  } catch {
+    next(false)
+  }
+})
+
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (editDirty.value || autoSave.isDirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
 const { isFullscreen: deFullscreen, toggleFullscreen: toggleDeFullscreen } = useFullscreen()
@@ -1481,6 +1527,48 @@ function onDeCtxCompare() {
   const vals = deCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
   ElMessage.info(`差异：${fmtAmount(diff)}`)
+}
+
+/**
+ * R8-S2-12：查看附注行关联的底稿
+ * 单底稿直接跳转，多底稿弹列表让用户选择
+ */
+async function onDeCtxRelatedWp() {
+  deCtx.closeContextMenu()
+  const note = currentNote.value
+  if (!note?.note_section) {
+    ElMessage.warning('请先选择附注章节')
+    return
+  }
+  // 用当前选中单元格所在行作为 row_code（简化：用行 index 或项目名）
+  const sel = deCtx.selectedCells.value[0]
+  if (!sel) return
+  const rowCode = `row_${sel.row}`
+  try {
+    const data: any = await api.get(
+      `/api/notes/${projectId.value}/${year.value}/${encodeURIComponent(note.note_section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    const wps = data?.workpapers || []
+    if (!wps.length) {
+      ElMessage.info('该附注行暂无关联底稿')
+      return
+    }
+    if (wps.length === 1) {
+      // 单底稿直接跳转
+      const wp = wps[0]
+      router.push({
+        name: 'WorkpaperEditor',
+        params: { projectId: projectId.value, wpId: wp.id },
+      })
+      return
+    }
+    // 多底稿：提示用户选择（简化弹 list）
+    const list = wps.map((w: any) => `${w.wp_code} ${w.wp_name}`).join('\n')
+    ElMessage.info(`该行关联 ${wps.length} 张底稿：\n${list}`)
+  } catch (e: any) {
+    handleApiError(e, '查看相关底稿')
+  }
 }
 </script>
 

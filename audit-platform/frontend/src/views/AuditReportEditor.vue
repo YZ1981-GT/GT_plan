@@ -20,6 +20,17 @@
       </template>
     </GtPageHeader>
 
+    <!-- R8-S2-03：Stale 状态横幅 -->
+    <div v-if="stale.isStale.value" class="gt-stale-banner">
+      <span class="gt-stale-icon">⚠️</span>
+      <span class="gt-stale-text">
+        上游数据已变更（{{ stale.staleCount.value }} 张底稿待重算），报告引用数据可能过时
+      </span>
+      <el-button size="small" type="primary" :loading="stale.loading.value" @click="onStaleRecalc">
+        🔄 点击重算
+      </el-button>
+    </div>
+
     <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
     <!-- 编辑锁提示 -->
@@ -69,10 +80,10 @@
         <div class="gt-ar-panel gt-ar-editor-panel">
           <div class="gt-ar-editor-header">
             <h4>{{ activeSection }}</h4>
-            <el-tag v-if="report.status === 'draft'" size="small" type="info">可编辑</el-tag>
-            <el-tag v-else-if="report.status === 'review'" size="small" type="warning">⚠ 审阅中</el-tag>
-            <el-tag v-else-if="report.status === 'eqcr_approved'" size="small" type="danger">🔒 EQCR 已锁定</el-tag>
-            <el-tag v-else-if="report.status === 'final'" size="small" type="success">🔒 已定稿</el-tag>
+            <el-tag v-if="report.status === REPORT_STATUS.DRAFT" size="small" type="info">可编辑</el-tag>
+            <el-tag v-else-if="report.status === REPORT_STATUS.REVIEW" size="small" type="warning">⚠ 审阅中</el-tag>
+            <el-tag v-else-if="report.status === REPORT_STATUS.EQCR_APPROVED" size="small" type="danger">🔒 EQCR 已锁定</el-tag>
+            <el-tag v-else-if="report.status === REPORT_STATUS.FINAL" size="small" type="success">🔒 已定稿</el-tag>
           </div>
           <div class="gt-ar-edit-hint" v-if="!isLocked">
             直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
@@ -160,8 +171,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   generateAuditReport, getAuditReport, updateAuditReportParagraph,
@@ -179,6 +190,7 @@ import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import { useEditingLock } from '@/composables/useEditingLock'
+import { REPORT_STATUS } from '@/constants/statusEnum'
 
 const route = useRoute()
 const router = useRouter()
@@ -186,6 +198,14 @@ const dictStore = useDictStore()
 const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+
+// R8-S2-03：Stale 状态追踪
+import { useStaleStatus } from '@/composables/useStaleStatus'
+const stale = useStaleStatus(projectId)
+async function onStaleRecalc() {
+  await stale.recalc()
+  await fetchReport()
+}
 
 const editLock = useEditingLock({
   resourceId: computed(() => 'report_' + (route.params.projectId as string || '')),
@@ -359,7 +379,31 @@ onMounted(async () => {
       misstatementWarning.value = true
     }
   } catch { /* 静默失败，不影响主流程 */ }
+  // R8-S2-14：关闭浏览器/刷新前警告
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+})
+
+// R8-S2-14：未保存拦截
+onBeforeRouteLeave(async (_to, _from, next) => {
+  if (!isDirty.value) { next(); return }
+  try {
+    await confirmLeave('审计报告')
+    next()
+  } catch {
+    next(false)
+  }
+})
+
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (isDirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 
 // ── 共享模板 ──
 function getReportConfigData(): Record<string, any> {

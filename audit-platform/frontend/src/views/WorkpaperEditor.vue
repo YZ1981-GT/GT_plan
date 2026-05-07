@@ -19,8 +19,21 @@
       <div class="gt-wp-editor-toolbar-right">
         <span v-if="dirty" class="gt-dirty-indicator">● 有未保存的变更</span>
         <el-button size="small" @click="onSave" :loading="saving">💾 保存</el-button>
+        <el-tooltip
+          v-if="wpDetail && wpDetail.status === WP_STATUS.DRAFT && fineCheckFailCount > 0"
+          placement="bottom"
+          :content="`当前有 ${fineCheckFailCount} 项自检未通过，建议处理后再提交`"
+        >
+          <el-button
+            size="small"
+            type="warning"
+            @click="onSubmitForReview"
+            :loading="submitting"
+            :disabled="dirty"
+          >⚠️ 提交复核（{{ fineCheckFailCount }} 项待处理）</el-button>
+        </el-tooltip>
         <el-button
-          v-if="wpDetail && wpDetail.status === 'draft'"
+          v-else-if="wpDetail && wpDetail.status === WP_STATUS.DRAFT"
           size="small"
           type="primary"
           @click="onSubmitForReview"
@@ -32,7 +45,9 @@
         <el-button size="small" @click="onDownload">📥 下载</el-button>
         <el-button size="small" @click="onExportPdf" :loading="exportingPdf" v-permission="'workpaper:export'">📄 导出 PDF</el-button>
         <el-button size="small" @click="onUpload">📤 上传</el-button>
-        <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
+        <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
+          <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
+        </el-badge>
       </div>
     </div>
 
@@ -113,6 +128,7 @@
         :project-id="projectId"
         :wp-id="wpId"
         :wp-code="wpDetail?.wp_code"
+        @finecheck-update="fineCheckFailCount = $event"
       />
     </el-drawer>
   </div>
@@ -122,8 +138,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onBeforeRouteLeave } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { confirmSubmitReview, confirmLeave } from '@/utils/confirm'
+import { ElMessage } from 'element-plus'
+import { confirmSubmitReview, confirmLeave, confirmVersionConflict } from '@/utils/confirm'
 import { Loading } from '@element-plus/icons-vue'
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets'
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
@@ -144,6 +160,7 @@ import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
 import { handleApiError } from '@/utils/errorHandler'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
+import { WP_STATUS } from '@/constants/statusEnum'
 
 const DIRTY_COMMAND_PATTERNS = [
   'set-range-values', 'set-cell',
@@ -203,6 +220,8 @@ const submitting = ref(false)
 const syncLoading = ref(false)
 const dirty = ref(false)
 const showSidePanel = ref(false)
+// R8-S2-02：自检未通过项数（由 WorkpaperSidePanel @finecheck-update 同步）
+const fineCheckFailCount = ref(0)
 const univerContainer = ref<HTMLElement | null>(null)
 
 // 任务 8.18.1：用户名映射（UUID → 显示名）
@@ -406,16 +425,7 @@ async function onSave(): Promise<boolean> {
     if (data?.detail?.error_code === 'VERSION_CONFLICT' || data?.error_code === 'VERSION_CONFLICT') {
       const detail = data.detail || data
       try {
-        await ElMessageBox.confirm(
-          `底稿已被他人修改（服务器版本 v${detail.server_version}，您的版本 v${detail.expected_version}）。刷新放弃本地修改？或强制覆盖？`,
-          '版本冲突',
-          {
-            confirmButtonText: '刷新放弃',
-            cancelButtonText: '强制覆盖',
-            type: 'warning',
-            distinguishCancelAndClose: true,
-          },
-        )
+        await confirmVersionConflict(detail.server_version, detail.expected_version)
         // 刷新放弃：重新加载最新数据
         await initUniver()
         return false
@@ -589,15 +599,71 @@ onBeforeRouteLeave(async (_to, _from, next) => {
   }
 })
 
-onMounted(initUniver)
+onMounted(() => {
+  initUniver()
+  // R8-S2-02：订阅 workpaper:locate-cell 事件，定位到 Univer 单元格
+  eventBus.on('workpaper:locate-cell', onLocateCell)
+  // R8-S2-14：关闭浏览器/刷新前警告
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
 
 onUnmounted(() => {
+  eventBus.off('workpaper:locate-cell', onLocateCell)
+  window.removeEventListener('beforeunload', onBeforeUnload)
   if (univerInstance) {
     try { univerInstance.dispose() } catch { /* ignore */ }
     univerInstance = null
     univerAPI = null
   }
 })
+
+/** R8-S2-14：浏览器关闭/刷新前警告（仅在 dirty 时阻止） */
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (dirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
+/**
+ * R8-S2-02：响应 workpaper:locate-cell 事件，通过 Univer API 定位到指定单元格
+ * - 事件来源：WorkpaperSidePanel 自检 Tab 的"定位"按钮
+ * - 仅处理属于当前底稿的事件（wpId 匹配）
+ */
+function onLocateCell(payload: { wpId: string; sheetName?: string; cellRef: string }) {
+  if (!univerAPI || payload.wpId !== wpId.value) return
+  try {
+    const workbook = univerAPI.getActiveWorkbook()
+    if (!workbook) return
+    // 如果指定 sheetName，先切到对应 sheet
+    if (payload.sheetName) {
+      const sheet = workbook.getSheetByName?.(payload.sheetName)
+      if (sheet) workbook.setActiveSheet?.(sheet)
+    }
+    // cellRef 支持 "B5" 或 "Sheet1!B5" 两种格式
+    const cellRef = payload.cellRef.includes('!') ? payload.cellRef.split('!')[1] : payload.cellRef
+    const activeSheet = workbook.getActiveSheet?.()
+    if (!activeSheet) return
+    // 解析 A1 格式为 row/col
+    const m = cellRef.match(/^([A-Z]+)(\d+)$/i)
+    if (!m) return
+    const colStr = m[1].toUpperCase()
+    const row = parseInt(m[2], 10) - 1
+    let col = 0
+    for (const ch of colStr) col = col * 26 + (ch.charCodeAt(0) - 64)
+    col -= 1
+    const range = activeSheet.getRange?.(row, col)
+    if (range) {
+      activeSheet.setActiveRange?.(range)
+      // 滚动到目标单元格
+      try { range.activate?.() } catch { /* ignore */ }
+    }
+    // 切回编辑区焦点
+    showSidePanel.value = false
+  } catch {
+    /* Univer API 不稳定时静默忽略 */
+  }
+}
 </script>
 
 <style scoped>
