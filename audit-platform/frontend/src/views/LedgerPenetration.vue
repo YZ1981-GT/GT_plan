@@ -460,6 +460,20 @@
     :close-on-press-escape="!previewing && !importing"
     :show-close="!previewing && !importing"
   >
+    <!-- 进度条放在 dialog 顶部（header 下方，不被 v-loading 遮罩覆盖） -->
+    <template #header>
+      <span style="font-size: 16px; font-weight: 600">账套导入</span>
+      <el-progress
+        v-if="previewing || importing"
+        :percentage="Math.round(importProgressPct)"
+        :stroke-width="8"
+        :show-text="true"
+        :format="(pct: number) => pct < 100 ? `${pct}%` : '完成'"
+        :status="importProgressPct >= 100 ? 'success' : ''"
+        color="#4b2d77"
+        style="margin-top: 8px"
+      />
+    </template>
     <div v-loading="previewing || importing"
          :element-loading-text="previewing ? '正在解析文件，请稍候...' : importing ? '正在导入数据，请稍候...' : ''"
          element-loading-background="rgba(255,255,255,0.85)">
@@ -827,6 +841,7 @@ const importedResult = ref<LedgerImportResultPayload | null>(null)
 const uploadToken = ref('')
 const previewing = ref(false)
 const importing = ref(false)
+const importProgressPct = ref(0)
 const uploadRef = ref()
 
 const DATA_TYPE_LABELS: Record<string, string> = {
@@ -993,6 +1008,13 @@ function onImportFileChange(file: any) {
 async function doPreview() {
   if (!importFiles.value.length) return
   previewing.value = true
+  importProgressPct.value = 0
+  const progressTimer = setInterval(() => {
+    if (importProgressPct.value < 90) {
+      importProgressPct.value += Math.random() * 12 + 3
+      if (importProgressPct.value > 90) importProgressPct.value = 90
+    }
+  }, 400)
   try {
     const formData = buildImportPreviewFormData(importFiles.value)
     const url = buildImportPreviewUrl({
@@ -1001,6 +1023,7 @@ async function doPreview() {
       previewRows: 50,
     })
     const data = await smartPreviewLedgerImport(projectId.value, url, formData)
+    importProgressPct.value = 100
     const previewSuccess = resolveImportPreviewSuccess({
       result: data,
       nextStage: 'preview' as const,
@@ -1021,11 +1044,12 @@ async function doPreview() {
       },
     })
   } catch (e: any) {
-    // 带 HTTP 响应的错误已由 http 拦截器统一提示（含 500），避免再弹出第二条英文 axios 文案
     if (!e?.response) {
       ElMessage.error(e?.message || '解析失败')
     }
   } finally {
+    clearInterval(progressTimer)
+    importProgressPct.value = 0
     previewing.value = false
   }
 }
@@ -2425,3 +2449,15 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 </style>
+
+/* 导入进度条 — Teleport 到 body，fixed 定位在屏幕顶部 */
+:global(.gt-import-progress-overlay) {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  padding: 8px 20%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
