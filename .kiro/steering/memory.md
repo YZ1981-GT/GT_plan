@@ -44,7 +44,7 @@ inclusion: always
 ## 环境配置
 
 - Python 3.12（.venv），Docker 28.3.3，Ollama 0.11.10
-- 前端依赖共 22 生产 + 7 开发：关键新增 mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0、unplugin-vue-components@32.0.0、@univerjs/presets@0.21.1、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）、@univerjs/sheets-formula@0.21.1、opentype.js@1.3.5、xlsx@0.18.5
+- 前端依赖共 22 生产 + 8 开发：关键新增 mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0、unplugin-vue-components@32.0.0、@univerjs/presets@0.21.1、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）、@univerjs/sheets-formula@0.21.1、opentype.js@1.3.5、xlsx@0.18.5；R8-S2 新增 dev 依赖 glob@13（scripts/find-missing-v-permission.mjs 使用）
 - 后端新增测试依赖 hypothesis@6.152.4 + ruff@0.11.12（R6 Task 2 写入 requirements.txt）
 - PG ~160 张表（152 基线 + R5 新增 6 张 + R6 新增 qc_rule_definitions + review_records.conversation_id 列），Redis 6379，后端 9980，前端 3030
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
@@ -57,10 +57,19 @@ inclusion: always
 - vue-tsc 0 错误（2026-05-06 全部修复：el-tag type 联合类型标注 + dictStore.type() 返回类型收窄 + 模板 `:type` 绑定加 `|| undefined`），Vite 构建通过
 - 后端 **151** 个路由文件，**226** 个服务文件（含子目录 import_engine/、wp_scripts/ 等），**51** 个模型文件，11 个 core 模块，9 个 middleware，~152 张表（此前 memory 记录 127/181/39 已过时）
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
-- 前端 **93** 个 Vue 页面（views/），**186** 个组件（components/ 含所有子目录），16 个 composables，9 个 stores，19 个 services，19 个 utils（此前 memory 记录 80/20 已过时，components 统计之前只数 common/ 子目录）
+- 前端 **86** 个 Vue 页面（views/ 含子目录 ai/eqcr/qc/independence/extension），**194** 个组件（components/ 含所有子目录），16 个 composables，9 个 stores，19 个 services，19 个 utils
+- GtPageHeader 接入率 **12/86**（14%）：TrialBalance/ReportView/DisclosureEditor/ConsolidationIndex/EqcrMetrics/KnowledgeBase/Misstatements/Projects/Materiality/AuditReportEditor/Adjustments/WorkpaperList
+- GtEditableTable 接入率 **0/86**
+- v-permission 接入 **5** 个 .vue 文件
+- useEditingLock 接入 **3** 个编辑器（WorkpaperEditor/DisclosureEditor/AuditReportEditor）
+- ElMessageBox.confirm 直接用法 **0 处**（R8-S1 Day 2-3 全量清零，30+ 处全部替换为 utils/confirm.ts 语义化函数）
+- Vue 层 /api/ 硬编码剩余 **~17 处**
+- **顶栏已改为致同品牌深紫背景**（#4b2d77），logo 用反白版 gt-logo-white.png，文字/图标/按钮全白色；侧栏底色 #f8f7fc（微紫调）
+- **Logo 文件**：public/gt-logo-white.png（反白，顶栏用）、public/gt-logo.png（标准彩色，登录页+favicon）、public/gt.png（旧版保留兼容）
+- **页面标题**：致同审计作业平台（index.html title 已更新）
 - pytest collection **2830 tests / 0 errors**（2026-05-07 修复后）：之前 7 个 collection error 已通过添加 `wrap_ai_output` 函数、`IndependenceDeclaration` 别名、`build_ai_contribution_statement` 等 4 函数到 pdf_export_engine、`AIContentMustBeConfirmedRule` re-export 到 gate_rules_phase14 全部解决
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（最新 commit 0926b2c，五角色体验修复）
+- git 分支：feature/round7-global-polish（HEAD = 2e72884，R7 Sprint 1-3 全部完成，已拉取到本地，工作区干净）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -73,8 +82,8 @@ inclusion: always
 
 ## 关键技术事实（查阅/排查专用）
 
-- **前端视图/组件实测规模（2026-05-07）**：views/ 根目录 73 个 `.vue`；GtPageHeader 接入率 6/73（8%）；GtEditableTable 接入率 0/73；utils/statusMaps.ts 共 9 套 StatusMap（WP_STATUS / WP_REVIEW_STATUS / ADJUSTMENT_STATUS / REPORT_STATUS / TEMPLATE_STATUS / PROJECT_STATUS / ISSUE_STATUS / PDF_TASK_STATUS + 1）；components/ai/ 19 个文件（部分死代码）
-- **导航动态化未落地**：`ThreeColumnLayout.vue` 第 324-335 行 `navItems` 仍是硬编码 10 项，后端 `role_context_service.get_nav_items` + `stores/roleContext.ts` 的 `navItems` 字段已就绪但前端没接入；这是角色感知的正确修复点
+- **前端视图/组件实测规模（2026-05-07）**：views/ 含子目录共 86 个 `.vue`（根目录 68 + ai/eqcr/qc/independence/extension）；GtPageHeader 接入率 12/86（14%）；GtEditableTable 接入率 0/86；statusMaps.ts 已删除；components/ai/ 清理后剩余约 14 个文件
+- **导航动态化已落地**：`ThreeColumnLayout.vue:360` navItems 已 computed + buildNavForRole 按角色过滤；FALLBACK_NAV 10 项含 roles 字段；后端 get_nav_items 仍可覆盖但前端已不依赖
 - **ReviewInbox.vue 是死代码**：router 三条路由（ReviewInbox/ReviewInboxGlobal/review-inbox）全部指向 `ReviewWorkbench.vue`，`ReviewInbox.vue` 文件仍在但无引用，可安全删除
 - **PartnerDashboard.vue 两处硬编码**：第 561、582 行 `/api/my/pending-independence?limit=...` 未走 apiPaths；QCDashboard.vue:325 `/api/qc/reviewer-metrics` 同样硬编码；需补 `apiPaths.ts` 的 `my.pendingIndependence` / `qc.reviewerMetrics` 并封装 service
 - **EQCR 指标入口权限窄**：`DefaultLayout.vue` 第 132 行 `isEqcrEligible` 只认 partner/admin，`router/index.ts:465` meta.roles 同样窄，建议加 `role === 'eqcr'` 让 EQCR 自己看指标
@@ -221,6 +230,21 @@ inclusion: always
 ## 活跃待办
 
 ### 最高优先级
+- **GLOBAL_REFINEMENT_PROPOSAL_v2.md 已生成**（docs/）：v1 落地核查 + 5 角色深挖 + 21 横切主题 + 联动穿透闭环图 + P0-P3 路线图 41 项
+- **Round 8 spec 三件套已创建**（`.kiro/specs/refinement-round8-deep-closure/`）：Sprint 1（P0，42 task，1 周）+ Sprint 2（P1，82 task，3 周）
+  - Sprint 1：/confirmation 路由修复 + confirm.ts 补齐 30+ 处替换 + Adjustments 转错报按钮 + projectYear store + http 5xx 容灾 + AI mask_context 审计
+  - Sprint 2：WorkpaperSidePanel 7 Tab + useStaleStatus 跨视图 + ShadowCompareRow + EQCR 备忘录版本/Word 导出 + PartnerSignDecision 签字面板 + risk-summary 端点 + ManagerDashboard 4 Tab + QcHub + v-permission 15+ 处 + statusEnum.ts + formRules.ts + 附注穿透 + 重要性联动
+  - **三件套一致性分析结论**：覆盖率 100%（v2 P0+P1 20 项全覆盖），2 个中等问题需实施前修补：(1) sprint2-design.md 缺 D11（R8-S2-14 未保存提醒）；(2) PartnerSignDecision PDF 预览依赖 `/api/reports/{pid}/preview-pdf` 端点需确认是否已存在
+  - **Sprint 1 已完成（42/42 task，Task 3 浏览器手动验证除外）**：ConfirmationHub.vue 新建 + router 注册 + feedback.ts 新建 + http.ts 超时/断网/5xx 容灾 + confirm.ts 新增 6 函数 + **ElMessageBox.confirm 全量清零**（views 0 + components 0，远超 CI 基线 5）+ **projectStore.changeYear 增加 eventBus year:changed emit**（决策：不新建 projectYear.ts，复用现有 store）+ **AI 脱敏全路径审计**（note_ai 3 端点 + wp_ai_service analytical_review + role_ai_features _llm_polish_report / _llm_generate_summary 全部集成 mask_context）+ 新建 backend/tests/test_ai_masking.py 13 测试
+  - **Sprint 2 Week 1 已完成（Task 1-23 / 82）**：新建 `composables/useStaleStatus.ts` + WorkpaperSidePanel 9 Tab（新增"自检"Tab，内联实现避免过度拆分）+ `workpaper:locate-cell` eventBus 事件 + WorkpaperEditor Univer 单元格定位 API + ReportView/DisclosureEditor/AuditReportEditor 三视图 stale 横幅 + .gt-stale-banner 统一样式 + 3 编辑器 onBeforeRouteLeave + beforeunload 未保存拦截
+  - **Sprint 2 Week 2 已完成（Task 24-54 / 82）**：新建 `backend/app/services/risk_summary_service.py`（聚合 6 数据源：高严重度工单+未解决复核意见+重大错报+被拒未转AJE+持续经营+AI flags/budget/sla 预留）+ `backend/app/routers/risk_summary.py`（router_registry §21 注册）+ `views/PartnerSignDecision.vue`（三栏：GateReadinessPanel / 报告 HTML 预览 / 风险摘要 + 底栏签字操作）+ EqcrMemoEditor onExportWord（blob 下载）+ EqcrProjectView onShadowVerdict 持久化（pass/flag → agree/disagree 映射到 EqcrOpinion）+ ManagerDashboard 异常告警区块（前端 computed 派生，4 维：高风险/工时超支/逾期底稿/逾期承诺）+ PartnerDashboard 决策面板跳转按钮
+  - **Sprint 2 Week 3 已完成（Task 55-82 / 82，Task 52/53/82 保留）**：新建 `scripts/find-missing-v-permission.mjs`（盘点危险操作按钮未加 v-permission，glob@13 作为 devDependency）+ 8 个漏加 v-permission 按钮补齐（ProjectDashboard 催办/PrivateStorage 删除/EqcrMemoEditor 定稿/PDFExportPanel 导出/ReviewConversations 导出/SignatureLevel1-2 签字，从 8 → 1 剩 AiContentConfirmDialog 非危险）+ ROLE_PERMISSIONS 补齐 16 权限码（含 sign:execute/archive:execute/report:export_final/workpaper:submit_review|review_approve|review_reject|escalate/assignment:batch/qc:publish_report/eqcr:approve/independence:edit）+ 新建 `qc` 角色权限组 + 新建 `constants/statusEnum.ts`（18 套状态常量 + TS 类型导出）+ WorkpaperEditor/AuditReportEditor/Adjustments 替换硬编码状态字符串为常量引用 + 新建 `utils/formRules.ts`（12 套 el-form 规则 + makeRules 组合工具）+ 新建 `backend/app/routers/note_related_workpapers.py`（附注行→底稿端点，router_registry §22）+ DisclosureEditor 右键菜单"查看相关底稿" + Misstatements 订阅 materiality:changed 事件 + GateReadinessPanel 组件内自动订阅 materiality:changed（触发父级 onRefresh） + 后端 misstatements.py 新增 POST /recheck-threshold 端点 + apiPaths 新增 misstatements.recheckThreshold
+  - **R8 总完成（Sprint 1+2）**：121/124 task（97.6%，Task 52/53 跳过+Task 82 UAT 待真人）；vue-tsc 0 错误；pytest 2848 tests / 0 errors；ElMessageBox.confirm 全量清零（基线 5 合格）；新建 11 文件（后端 3 + 前端 7 + 脚本 1） + 修改 ~50 文件 + 新增 13 AI masking 测试
+  - **R8 复盘发现 9 处字段凭印象错误（P0 必修）**：risk_summary_service 违反"代码锚定"铁律——(1) ReviewRecord 无 project_id/content/wp_id，真实字段 working_paper_id/comment_text（需 join WorkingPaper 反查 project_id）；(2) UnadjustedMisstatement.net_amount→misstatement_amount，description→misstatement_description；(3) Adjustment 无 converted_to_misstatement_id，反向应查 UnadjustedMisstatement.source_adjustment_id；(4) total_debit/total_credit 不在 Adjustment 头表而在 AdjustmentEntry 明细行；(5) GoingConcernConclusion 枚举值是 no_material_uncertainty 而非 going_concern_appropriate；(6) risk_summary_service 未按 year 过滤；已标记待修
+  - **Sprint 2 架构决策**：不拆 7 个 SideTab wrapper（Task 1-6 跳过，WorkpaperSidePanel 直接用 AiAssistantSidebar/AttachmentDropZone/ProgramRequirementsSidebar/DependencyGraph 已足够）；自检 Tab 复用 fine-checks/summary 批量端点（不新建 wp_id 专用端点）；stale 横幅共享 CSS class（3 视图继承）；**PartnerSignDecision 中栏 HTML 降级**（不依赖不存在的 /preview-pdf 端点，直接渲染 audit-report.paragraphs 8 节）；**ManagerDashboard 复用 overview 端点**（不新建 manager_matrix，alerts 前端派生）；**QcHub 复用 R7-S3 的 QcInspectionWorkbench 6 Tab**（不重复新建，只加 /qc → /qc/inspections 重定向）；**Task 52-53 跳过**（ProjectDashboard 非 Tab 布局，QCDashboard 降级为 Tab 重构成本过高）；**recheck-threshold 复用 get_summary**（summary 服务内部已基于最新 materiality 计算，无需重写逻辑）；**GateReadinessPanel 内部自动订阅 materiality:changed**（不让每个使用方各自订阅，利用已有 onRefresh prop 回调）
+  - **ShadowCompareRow verdict 映射约定**：前端 pass/flag → 后端 EqcrOpinion.agree/disagree，复用 eqcrApi.createOpinion 端点（避免新建专用 verdict 表）
+  - **IssueTicket.severity 实际枚举**（本次 grep 核对）：blocker/major/minor/suggestion（不是 memory 之前记录的 high）；risk_summary 取 blocker+major 为高严重度
+- **UI 品牌风格已对齐致同内网**：顶栏深紫 #4b2d77 + 反白 logo + 白色文字图标；侧栏 #f8f7fc 微紫调；favicon 改致同 logo；页面标题"致同审计作业平台"
 - 全局打磨建议 v1 已补完到 ~1800 行（docs/GLOBAL_REFINEMENT_PROPOSAL_v1.md）：5 角色穿刺 + 32 横切主题 + P0-P3 共 35 项路线图 + 第 11 章"版面位置规约"
 - **Round 7 Sprint 1（P0）已完成**：18/18 task 全部执行，vue-tsc 0 错误；删除 12 文件（ReviewInbox + 5 Mobile + 5 AI 死代码 + 1 重复组件）、修改 6 文件（apiPaths/PartnerDashboard/QCDashboard/DefaultLayout/router/auth）、新建 2 文件（GtEmpty.vue + confirm.ts 5 函数）；UAT 待手动验证（角色跳转+函证路由+EQCR 指标）
 - **Round 7 Sprint 2（P1）已完成**：42/42 task 全部执行，vue-tsc 0 错误；新建 5 文件（useEditingLock/useWorkpaperAutoSave/errorHandler/ShortcutHelpDialog/stale_summary.py）、修改 20+ 文件（导航动态化/13 处 ElMessageBox 替换/4 视图 useEditMode/3 视图编辑锁/2 视图自动保存/工时 Tab 合并删除 WorkHoursApproval/Stale 三态/5 视图 errorHandler/CI lint）、后端新增 stale-summary 端点；右键菜单 5 视图已在之前 Round 实现无需重做

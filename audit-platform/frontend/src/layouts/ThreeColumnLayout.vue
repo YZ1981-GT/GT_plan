@@ -4,7 +4,7 @@
     <header class="gt-topbar">
       <div class="gt-topbar-left">
         <div class="gt-logo" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠/展开导航">
-          <img src="/gt.png" alt="致同" class="gt-logo-img" />
+          <img src="/gt-logo-white.png" alt="Grant Thornton 致同" class="gt-logo-img" />
           <transition name="gt-fade">
             <span v-if="!sidebarCollapsed" class="gt-logo-text">审计平台</span>
           </transition>
@@ -680,21 +680,24 @@ onUnmounted(() => {
   background: var(--gt-color-bg);
 }
 
-/* ── 顶部导航栏 ── */
+/* ── 顶部导航栏（致同品牌深紫） ── */
 .gt-topbar {
   height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--gt-space-4);
-  background: var(--gt-color-bg-white);
-  border-bottom: 1px solid var(--gt-color-border-light);
+  background: var(--gt-color-primary);
+  border-bottom: none;
   flex-shrink: 0;
   z-index: 100;
 }
 
 .gt-topbar-left { display: flex; align-items: center; }
 .gt-topbar-center { flex: 1; padding: 0 var(--gt-space-4); }
+.gt-topbar-center :deep(.el-breadcrumb__inner),
+.gt-topbar-center :deep(.el-breadcrumb__separator) { color: rgba(255, 255, 255, 0.7); }
+.gt-topbar-center :deep(.el-breadcrumb__inner.is-link) { color: #fff; }
 .gt-topbar-right { display: flex; align-items: center; gap: var(--gt-space-3); }
 
 .gt-logo {
@@ -706,12 +709,12 @@ onUnmounted(() => {
   border-radius: var(--gt-radius-sm);
   transition: background var(--gt-transition-fast);
 }
-.gt-logo:hover { background: var(--gt-color-primary-bg); }
+.gt-logo:hover { background: rgba(255, 255, 255, 0.1); }
 .gt-logo-img { height: 28px; width: auto; }
 .gt-logo-text {
   font-size: var(--gt-font-size-lg);
   font-weight: 700;
-  color: var(--gt-color-primary);
+  color: #fff;
   white-space: nowrap;
 }
 
@@ -719,15 +722,21 @@ onUnmounted(() => {
   cursor: pointer;
   padding: 6px;
   border-radius: var(--gt-radius-sm);
-  color: var(--gt-color-text-secondary);
+  color: rgba(255, 255, 255, 0.8);
   transition: all var(--gt-transition-fast);
 }
-.gt-topbar-btn:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
+.gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.15); color: #fff; }
+
+/* 顶栏内所有 el-button text / el-badge 适配深紫背景 */
+.gt-topbar-right :deep(.el-button--text) { color: rgba(255, 255, 255, 0.85); }
+.gt-topbar-right :deep(.el-button--text:hover) { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.gt-topbar-right :deep(.el-icon) { color: inherit; }
+.gt-topbar-right :deep(.el-dropdown) { color: #fff; }
 
 .gt-topbar-divider {
   width: 1px;
   height: 20px;
-  background: var(--gt-color-border-light);
+  background: rgba(255, 255, 255, 0.2);
   margin: 0 2px;
 }
 
@@ -758,17 +767,18 @@ onUnmounted(() => {
   border-radius: var(--gt-radius-sm);
   transition: background var(--gt-transition-fast);
 }
-.gt-user-info:hover { background: var(--gt-color-primary-bg); }
+.gt-user-info:hover { background: rgba(255, 255, 255, 0.15); }
 .gt-avatar {
-  background: linear-gradient(135deg, var(--gt-color-primary) 0%, var(--gt-color-primary-light) 100%);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
   font-weight: 600;
   font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 .gt-username {
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
-  color: var(--gt-color-text);
+  color: #fff;
 }
 
 /* ── 三栏主体 ── */
@@ -779,11 +789,11 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* ── 左侧栏 ── */
+/* ── 左侧栏（致同风格：浅灰底 + 紫色激活） ── */
 .gt-sidebar {
   display: flex;
   flex-direction: column;
-  background: #f5f7fa;
+  background: #f8f7fc;
   border-right: 1px solid var(--gt-color-border-light);
   transition: width var(--gt-transition-base);
   overflow: hidden;
