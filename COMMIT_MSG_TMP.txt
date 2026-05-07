@@ -1,0 +1,9 @@
+fix(R8): AI 脱敏漏网补齐 + v-permission + confirm.ts 替换遗留
+
+- note_ai.py 4 个端点接入 export_mask_service 脱敏
+- role_ai_features.py 2 个 LLM 函数接入脱敏
+- wp_ai_service.py analytical_review 接入脱敏
+- SignatureLevel1/2.vue 补 v-permission="sign:execute"
+- WorkpaperList.vue ElMessageBox→confirmForcePass
+- IndependenceDeclarationForm.vue ElMessageBox→confirmDangerous
+- Login.vue logo 路径 gt.png→gt-logo.png
