@@ -34,9 +34,20 @@
           @click="onFinalize"
           :loading="finalizing"
           :disabled="!memo || memoStatus === 'finalized'"
+          v-permission="'eqcr:approve'"
           round
         >
           定稿
+        </el-button>
+        <!-- R8-S2-05：导出 Word -->
+        <el-button
+          size="small"
+          @click="onExportWord"
+          :loading="exportingWord"
+          :disabled="!memo"
+          round
+        >
+          📄 导出 Word
         </el-button>
       </div>
     </div>
@@ -87,6 +98,7 @@ const loading = ref(false)
 const generating = ref(false)
 const saving = ref(false)
 const finalizing = ref(false)
+const exportingWord = ref(false)
 const showFinalizeConfirm = ref(false)
 
 const memo = ref<any>(null)
@@ -198,6 +210,35 @@ async function doFinalize() {
     ElMessage.error(e?.response?.data?.detail || '定稿失败')
   } finally {
     finalizing.value = false
+  }
+}
+
+// R8-S2-05：导出 Word
+async function onExportWord() {
+  if (!props.projectId) return
+  exportingWord.value = true
+  try {
+    const { default: http } = await import('@/utils/http')
+    const resp = await http.get(P_eqcr.memoExport(props.projectId, 'docx'), {
+      responseType: 'blob',
+    })
+    const blob = new Blob([resp.data], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    // 文件名由后端 Content-Disposition 提供
+    const cd = resp.headers?.['content-disposition'] || ''
+    const match = cd.match(/filename="?([^";]+)"?/)
+    a.download = match?.[1] ? decodeURIComponent(match[1]) : 'EQCR备忘录.docx'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '导出失败')
+  } finally {
+    exportingWord.value = false
   }
 }
 

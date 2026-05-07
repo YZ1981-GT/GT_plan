@@ -220,6 +220,8 @@ import EqcrMemoEditor from '@/components/eqcr/EqcrMemoEditor.vue'
 import EqcrComponentAuditors from '@/components/eqcr/EqcrComponentAuditors.vue'
 import ShadowCompareRow from '@/components/eqcr/ShadowCompareRow.vue'
 import type { ShadowCompareItem } from '@/components/eqcr/ShadowCompareRow.vue'
+import { feedback } from '@/utils/feedback'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -247,9 +249,23 @@ const shadowData = ref<Record<string, ShadowCompareItem[]>>({
   opinion_type: [],
 })
 
-function onShadowVerdict(row: ShadowCompareItem, action: 'pass' | 'flag') {
+async function onShadowVerdict(row: ShadowCompareItem, action: 'pass' | 'flag') {
+  const prev = row.verdict
   row.verdict = action
-  // TODO: 持久化到后端 EqcrVerdict 表
+  // R8-S2-04：持久化到后端 EqcrOpinion（pass→agree, flag→disagree）
+  try {
+    const { eqcrApi } = await import('@/services/eqcrService')
+    await eqcrApi.createOpinion({
+      project_id: projectId.value,
+      domain: activeTab.value as any,
+      verdict: action === 'pass' ? 'agree' : 'disagree',
+      comment: `[ShadowCompareRow] ${row.dimension}：项目组值 ${row.teamValue}，影子值 ${row.shadowValue}，差异 ${row.diff}`,
+    })
+    feedback.success(`已${action === 'pass' ? '通过' : '标记'}：${row.dimension}`)
+  } catch (e: any) {
+    row.verdict = prev  // 回滚 UI 状态
+    handleApiError(e, '保存判断')
+  }
 }
 
 const isConsolidated = computed<boolean>(

@@ -350,6 +350,16 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.report_related_workpapers import router as rrw_router
     app.include_router(rrw_router, tags=["report-workpapers"])
 
+    # ═══ 21. Round 8：风险摘要（签字决策面板用） ═══
+    # risk_summary 路由内部已声明 prefix="/api/projects/{project_id}"，注册时不加额外前缀。
+    from app.routers.risk_summary import router as risk_summary_router
+    app.include_router(risk_summary_router, tags=["risk-summary"])
+
+    # ═══ 22. Round 8：附注行关联底稿（附注→底稿穿透） ═══
+    # note_related_workpapers 路由内部已声明 prefix="/api/notes"，注册时不加额外前缀。
+    from app.routers.note_related_workpapers import router as note_rw_router
+    app.include_router(note_rw_router, tags=["note-workpapers"])
+
     # ═══ 17. Round 3：QC 抽查 + 评级 + 案例库 + 年报 ═══
     # 以下 4 个路由内部已声明完整 prefix，注册时不加额外前缀。
     from app.routers.qc_inspections import router as qc_insp_router

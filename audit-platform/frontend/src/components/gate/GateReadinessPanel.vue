@@ -146,6 +146,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import {
   Refresh,
   WarningFilled,
@@ -277,11 +278,28 @@ function stopTick() {
 
 onMounted(() => {
   startTick()
+  // R8-S2-13：订阅重要性变更事件，自动触发 onRefresh 重新评估
+  eventBus.on('materiality:changed', onMaterialityChanged)
 })
 
 onBeforeUnmount(() => {
   stopTick()
+  eventBus.off('materiality:changed', onMaterialityChanged)
 })
+
+/** R8-S2-13：重要性变更 → 触发 readiness 重新获取（需父组件提供 onRefresh） */
+async function onMaterialityChanged(payload: { projectId: string; year?: number }) {
+  if (props.projectId && payload.projectId !== props.projectId) return
+  if (!props.onRefresh) return
+  try {
+    const r = props.onRefresh()
+    if (r && typeof (r as any).then === 'function') {
+      await (r as Promise<void>)
+    }
+  } catch {
+    /* 静默 */
+  }
+}
 
 // 新一轮 data（不同 gate_eval_id）到来时重置自动刷新标记
 watch(

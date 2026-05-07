@@ -232,6 +232,32 @@
       <el-empty v-else-if="!assignmentStatusLoading" :image-size="50" description="近 7 天无委派记录" />
     </section>
 
+    <!-- 区块 R8-S2-08：异常告警（从 overview 派生） -->
+    <section class="gt-section" v-if="alertItems.length">
+      <h3 class="gt-section-title">
+        🚨 异常告警
+        <el-tag size="small" type="danger" style="margin-left: 8px">{{ alertItems.length }}</el-tag>
+      </h3>
+      <div class="gt-alerts-list">
+        <div
+          v-for="(alert, idx) in alertItems"
+          :key="idx"
+          class="gt-alert-item"
+          :class="`gt-alert-${alert.level}`"
+          @click="goToProject(alert.project_id)"
+        >
+          <span class="gt-alert-icon">{{ alert.icon }}</span>
+          <div class="gt-alert-content">
+            <div class="gt-alert-title">{{ alert.project_name }}</div>
+            <div class="gt-alert-desc">{{ alert.desc }}</div>
+          </div>
+          <el-tag :type="alertTagType(alert.level)" size="small">
+            {{ alertLevelLabel(alert.level) }}
+          </el-tag>
+        </div>
+      </div>
+    </section>
+
     <!-- 区块三：本周关键动作 -->
     <section class="gt-section">
       <h3 class="gt-section-title">本周关键动作</h3>
@@ -648,6 +674,87 @@ function riskLabel(level: string): string {
   return '未评估'
 }
 
+// R8-S2-08：异常告警 — 从 overview + commitments 派生
+interface AlertItem {
+  project_id: string
+  project_name: string
+  icon: string
+  desc: string
+  level: 'critical' | 'warning' | 'info'
+}
+const alertItems = computed<AlertItem[]>(() => {
+  if (!overview.value) return []
+  const items: AlertItem[] = []
+  for (const proj of overview.value.projects) {
+    // 1. 高风险项目
+    if (proj.risk_level === 'high') {
+      items.push({
+        project_id: proj.project_id,
+        project_name: proj.project_name,
+        icon: '🔴',
+        desc: `高风险项目：完成率 ${proj.completion_rate}%，逾期底稿 ${proj.overdue_count} 张`,
+        level: 'critical',
+      })
+    }
+    // 2. 预算超支（使用 80% 以上为警告）
+    if ((proj as any).budget_hours && (proj as any).actual_hours) {
+      const pct = ((proj as any).actual_hours / (proj as any).budget_hours) * 100
+      if (pct > 120) {
+        items.push({
+          project_id: proj.project_id,
+          project_name: proj.project_name,
+          icon: '💰',
+          desc: `工时严重超支：已用 ${(proj as any).actual_hours}h / 预算 ${(proj as any).budget_hours}h（${pct.toFixed(0)}%）`,
+          level: 'critical',
+        })
+      } else if (pct > 90) {
+        items.push({
+          project_id: proj.project_id,
+          project_name: proj.project_name,
+          icon: '⚠️',
+          desc: `工时接近超支：已用 ${(proj as any).actual_hours}h / 预算 ${(proj as any).budget_hours}h（${pct.toFixed(0)}%）`,
+          level: 'warning',
+        })
+      }
+    }
+    // 3. 逾期底稿超过 5 张
+    if (proj.overdue_count > 5) {
+      items.push({
+        project_id: proj.project_id,
+        project_name: proj.project_name,
+        icon: '⏰',
+        desc: `${proj.overdue_count} 张底稿逾期，需加快进度`,
+        level: 'warning',
+      })
+    }
+  }
+  // 4. 逾期客户承诺
+  for (const c of overdueCommitments.value) {
+    items.push({
+      project_id: c.project_id,
+      project_name: c.project_name,
+      icon: '📋',
+      desc: `客户承诺逾期：${c.content}`,
+      level: 'warning',
+    })
+  }
+  // 按 level 排序：critical 在前
+  const levelOrder = { critical: 0, warning: 1, info: 2 }
+  items.sort((a, b) => levelOrder[a.level] - levelOrder[b.level])
+  return items
+})
+
+function alertTagType(level: string): 'danger' | 'warning' | 'info' {
+  if (level === 'critical') return 'danger'
+  if (level === 'warning') return 'warning'
+  return 'info'
+}
+function alertLevelLabel(level: string): string {
+  if (level === 'critical') return '严重'
+  if (level === 'warning') return '警告'
+  return '提示'
+}
+
 function progressColor(rate: number): string {
   if (rate >= 80) return '#67c23a'
   if (rate >= 50) return '#e6a23c'
@@ -933,6 +1040,57 @@ onBeforeUnmount(() => {
   flex: 1;
   font-size: 13px;
   color: var(--gt-color-text);
+}
+
+/* R8-S2-08：异常告警 */
+.gt-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gt-alert-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--gt-radius-sm);
+  border: 1px solid var(--gt-color-border-light);
+  background: var(--gt-color-bg-white);
+  cursor: pointer;
+  transition: all var(--gt-transition-fast);
+}
+.gt-alert-item:hover {
+  box-shadow: var(--gt-shadow-sm);
+  transform: translateX(2px);
+}
+.gt-alert-critical {
+  border-left: 4px solid var(--gt-color-coral);
+  background: var(--gt-color-coral-light);
+}
+.gt-alert-warning {
+  border-left: 4px solid var(--gt-color-wheat);
+  background: var(--gt-color-wheat-light);
+}
+.gt-alert-info {
+  border-left: 4px solid var(--gt-color-teal);
+}
+.gt-alert-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.gt-alert-content {
+  flex: 1;
+  min-width: 0;
+}
+.gt-alert-title {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-text);
+}
+.gt-alert-desc {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+  margin-top: 2px;
 }
 
 /* 团队负载 */

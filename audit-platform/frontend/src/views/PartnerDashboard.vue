@@ -154,6 +154,7 @@
             </div>
             <div class="sign-card-actions">
               <el-button size="small" plain @click.stop="goToReport(p.id)">查看报告</el-button>
+              <el-button size="small" plain @click.stop="goToSignDecision(p.id, (p as any).audit_year || (p as any).year)">决策面板 →</el-button>
               <el-button type="primary" size="small" round>签字前检查 →</el-button>
             </div>
           </div>
@@ -405,6 +406,12 @@ function goToProject(pid: string) {
 
 function goToReport(pid: string) {
   router.push(`/projects/${pid}/audit-report`)
+}
+
+// R8-S2-06：跳转签字决策面板
+function goToSignDecision(pid: string, year?: number) {
+  const y = year || new Date().getFullYear() - 1
+  router.push(`/partner/sign-decision/${pid}/${y}`)
 }
 function onProjectClick(row: any) {
   goToProject(row.id)
