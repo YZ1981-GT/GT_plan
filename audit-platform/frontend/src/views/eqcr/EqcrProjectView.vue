@@ -134,9 +134,11 @@
     <el-tabs v-model="activeTab" class="eqcr-tabs">
       <el-tab-pane label="重要性" name="materiality">
         <EqcrMateriality v-if="activeTab === 'materiality'" :project-id="projectId" />
+        <ShadowCompareRow v-if="activeTab === 'materiality' && shadowData.materiality.length" :rows="shadowData.materiality" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="会计估计" name="estimate">
         <EqcrEstimates v-if="activeTab === 'estimate'" :project-id="projectId" />
+        <ShadowCompareRow v-if="activeTab === 'estimate' && shadowData.estimate.length" :rows="shadowData.estimate" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="关联方" name="related_party">
         <EqcrRelatedParties
@@ -144,18 +146,21 @@
           :project-id="projectId"
           :can-write="canWriteRelatedParties"
         />
+        <ShadowCompareRow v-if="activeTab === 'related_party' && shadowData.related_party.length" :rows="shadowData.related_party" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="持续经营" name="going_concern">
         <EqcrGoingConcern
           v-if="activeTab === 'going_concern'"
           :project-id="projectId"
         />
+        <ShadowCompareRow v-if="activeTab === 'going_concern' && shadowData.going_concern.length" :rows="shadowData.going_concern" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="审计意见" name="opinion_type">
         <EqcrOpinionType
           v-if="activeTab === 'opinion_type'"
           :project-id="projectId"
         />
+        <ShadowCompareRow v-if="activeTab === 'opinion_type' && shadowData.opinion_type.length" :rows="shadowData.opinion_type" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="影子计算" name="shadow_compute">
         <EqcrShadowCompute
@@ -213,6 +218,8 @@ import EqcrReviewNotesPanel from '@/components/eqcr/EqcrReviewNotesPanel.vue'
 import EqcrPriorYearCompare from '@/components/eqcr/EqcrPriorYearCompare.vue'
 import EqcrMemoEditor from '@/components/eqcr/EqcrMemoEditor.vue'
 import EqcrComponentAuditors from '@/components/eqcr/EqcrComponentAuditors.vue'
+import ShadowCompareRow from '@/components/eqcr/ShadowCompareRow.vue'
+import type { ShadowCompareItem } from '@/components/eqcr/ShadowCompareRow.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -230,6 +237,21 @@ const project = computed(() => overview.value?.project ?? null)
 const reportStatus = computed<ReportStatusValue | null>(
   () => overview.value?.report_status ?? null,
 )
+
+// R7-S3-04：影子对比数据（5 判断 Tab 各自的对比行）
+const shadowData = ref<Record<string, ShadowCompareItem[]>>({
+  materiality: [],
+  estimate: [],
+  related_party: [],
+  going_concern: [],
+  opinion_type: [],
+})
+
+function onShadowVerdict(row: ShadowCompareItem, action: 'pass' | 'flag') {
+  row.verdict = action
+  // TODO: 持久化到后端 EqcrVerdict 表
+}
+
 const isConsolidated = computed<boolean>(
   () => project.value?.report_scope === 'consolidated',
 )

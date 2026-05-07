@@ -60,7 +60,7 @@ inclusion: always
 - 前端 **93** 个 Vue 页面（views/），**186** 个组件（components/ 含所有子目录），16 个 composables，9 个 stores，19 个 services，19 个 utils（此前 memory 记录 80/20 已过时，components 统计之前只数 common/ 子目录）
 - pytest collection **2830 tests / 0 errors**（2026-05-07 修复后）：之前 7 个 collection error 已通过添加 `wrap_ai_output` 函数、`IndependenceDeclaration` 别名、`build_ai_contribution_statement` 等 4 函数到 pdf_export_engine、`AIContentMustBeConfirmedRule` re-export 到 gate_rules_phase14 全部解决
 - 后端测试：98+ 个根目录测试 + 4 个 e2e + 4 个 integration + R5 新增 test_eqcr_full_flow/test_eqcr_state_machine_properties/test_eqcr_component_auditor_review
-- git 分支：feature/global-component-library（最新 commit 26f67a0，前后端联动质量提升）
+- git 分支：feature/global-component-library（最新 commit 0926b2c，五角色体验修复）
 - 本分支相对 master 新增前端依赖（后端 requirements.txt 无变化）：生产 7 个（@univerjs/presets、@univerjs/preset-sheets-core、@univerjs/sheets-formula、mitt、nprogress、opentype.js、xlsx）+ 开发 3 个（@types/nprogress、unplugin-auto-import、unplugin-vue-components）；已在 audit-platform/frontend 执行 npm install 安装完成
 - .gitignore 已排除 backend/ 下 wp_storage 运行时 UUID 目录（glob `backend/[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*/`）
 - **production-readiness spec 全部完成**（4 Sprint / 46 需求）：
@@ -73,6 +73,25 @@ inclusion: always
 
 ## 关键技术事实（查阅/排查专用）
 
+- **前端视图/组件实测规模（2026-05-07）**：views/ 根目录 73 个 `.vue`；GtPageHeader 接入率 6/73（8%）；GtEditableTable 接入率 0/73；utils/statusMaps.ts 共 9 套 StatusMap（WP_STATUS / WP_REVIEW_STATUS / ADJUSTMENT_STATUS / REPORT_STATUS / TEMPLATE_STATUS / PROJECT_STATUS / ISSUE_STATUS / PDF_TASK_STATUS + 1）；components/ai/ 19 个文件（部分死代码）
+- **导航动态化未落地**：`ThreeColumnLayout.vue` 第 324-335 行 `navItems` 仍是硬编码 10 项，后端 `role_context_service.get_nav_items` + `stores/roleContext.ts` 的 `navItems` 字段已就绪但前端没接入；这是角色感知的正确修复点
+- **ReviewInbox.vue 是死代码**：router 三条路由（ReviewInbox/ReviewInboxGlobal/review-inbox）全部指向 `ReviewWorkbench.vue`，`ReviewInbox.vue` 文件仍在但无引用，可安全删除
+- **PartnerDashboard.vue 两处硬编码**：第 561、582 行 `/api/my/pending-independence?limit=...` 未走 apiPaths；QCDashboard.vue:325 `/api/qc/reviewer-metrics` 同样硬编码；需补 `apiPaths.ts` 的 `my.pendingIndependence` / `qc.reviewerMetrics` 并封装 service
+- **EQCR 指标入口权限窄**：`DefaultLayout.vue` 第 132 行 `isEqcrEligible` 只认 partner/admin，`router/index.ts:465` meta.roles 同样窄，建议加 `role === 'eqcr'` 让 EQCR 自己看指标
+- **AI 组件重复 + 死代码**：`components/workpaper/AiContentConfirmDialog.vue` 与 `components/ai/AiContentConfirmDialog.vue` 同名共存；`ai/ContractAnalysis / ContractAnalysisPanel / EvidenceChainPanel / EvidenceChainView` 四组件 grep 零引用
+- **/confirmation 侧栏指向不存在的路由**：`ThreeColumnLayout.vue:330` 侧栏"函证"指 `/confirmation`，但 router 中无此路径定义，点击走 NotFound 而非 DevelopingPage；已 maturity=developing 但守卫没触发
+- **Mobile 系列 5 视图全是 stub**（MobilePenetration/MobileReview/MobileReport/MobileProjectList/MobileWorkpaperEditor），Round 7+ 前可考虑整体删除以减负
+- **useCellSelection 接入只 4/73**（TrialBalance/ReportView/DisclosureEditor/ConsolidationIndex），其他表格无 Excel 级选中；行选/列选/Ctrl+A/粘贴入库/单元格撤销全部缺失
+- **编辑锁前端只 1 处**：仅 `components/formula/StructureEditor.vue` acquireLock/releaseLock + lockRefreshTimer；WorkpaperEditor/DisclosureEditor/AuditReportEditor 裸奔，两人并发编辑会互覆盖（后端 workpaper_editing_locks 表已就绪）
+- **后端联动链路已完整但前端不可见**：event_handlers.py 已订阅 ADJUSTMENT_*→TB→REPORTS→AUDIT_REPORT / WORKPAPER_SAVED→consistency / LEDGER_ACTIVATED→mark_stale；前端 workpaper.is_stale 只判 consistent/inconsistent 没展示 stale
+- **穿透端点共 5 套**（reports/drilldown/{row_code}、drilldown/ledger/{code}、ledger/penetrate、consol_worksheet/drill/*、penetrate-by-amount），前端入口散；usePenetrate 应封装统一
+- **快捷键已注册 13 个但无 UI**：shortcutManager 全局单例已在 shortcuts.ts 定义 shortcut:save/undo/redo/search/goto/export/submit/escape/refresh/help 等，但 `?` 或 F1 帮助面板未实现
+- **单元格编辑不入 operationHistory**：operationHistory 当前只接 `删除` 动作（Adjustments/RecycleBin），单元格误改无 Ctrl+Z 可恢复
+- **NotificationCenter 只 30s 轮询 + SSE**，无分类 Tab、无免打扰时段
+- **AiAssistantSidebar 与 SmartTipList 职责重叠**：WorkpaperEditor 右栏 AI 提示在两处渲染（AiAssistantSidebar + WorkpaperEditor 内联 smartTip 面板 90-94 行）
+- **顶栏工具簇 14 图标过载**（知识库/私人库/AI模型/排版模板/吐槽/公式/自定义查询/Aa/视图切换/回收站/系统设置/SyncStatus/复核/通知/EQCR+头像），版面位置规约建议折叠为"⚙️ 工具箱"下拉，保留 6-7 图标
+- **版面组件唯一位置原则**：GtPageHeader/GtInfoBar/GtToolbar/GtStatusTag/GtAmountCell/CellContextMenu/TableSearchBar/SelectionBar/SyncStatusIndicator/NotificationCenter 等 21 个全局组件必须有唯一归属位置，禁止各视图自写重复；详见 docs/GLOBAL_REFINEMENT_PROPOSAL_v1.md §11.6
+- **角色差异化布局已规约**：auditor/manager/qc/partner/eqcr/admin 各自顶栏角色动作簇、左栏导航项数、Detail 默认落地页，实现方式 = §2.2 动态导航 + §1.1 登录角色跳转
 - Univer 公式引擎：@univerjs/preset-sheets-formula **不存在于 npm**，公式引擎内置在 preset-sheets-core（UniverSheetsFormulaPlugin + UniverSheetsFormulaUIPlugin 自动注册），只需 UniverSheetsCorePreset 未传 workerURL（否则 notExecuteFormula=true 禁用计算）
 - ThreeColumnLayout.vue 无 #header/#nav-icons slot（顶部导航硬编码）；新入口需先添加自定义 slot（已加 #nav-review-inbox），再在 DefaultLayout 通过 `<template #nav-review-inbox>` 注入
 - eventBus 新增事件：`workpaper:saved`（WorkpaperSavedPayload: projectId/wpId/year?）、`materiality:changed`（MaterialityChangedPayload: projectId/year?）
@@ -100,7 +119,7 @@ inclusion: always
 - backend/app/routers/pbc.py 和 confirmations.py 返回 `{"status": "developing", "items": [], "note": "..."}`，maturity 标记为 developing（R6 Task 8）
 - apiPaths.ts 当前 **260+** 个 API 端点（2026-05-07），新增 reportConfig/reportMapping/consolNoteSections + eqcr 扩展（memo/independence/componentAuditors/priorYear/metrics）+ admin 扩展（importEventHealth/importEventReplay）+ reports.export
 - 前端 service 硬编码路径迁移 **全部完成**（2026-05-07）：9 个文件共 257 处硬编码→0，全部使用 apiPaths 常量
-- Vue 文件硬编码迁移进度：322→115（已消除 207 处 / 64%），最新 commit 137e113；CI 基线已更新到 115；剩余 58 文件为零散专用端点（disclosure-notes 8/workhours 7/projects子路径 31 等），触碰即修
+- Vue 文件硬编码迁移进度：322→~90（已消除 ~232 处 / 72%），最新 commit 535f7dd；CI 基线 115（实际已低于基线）；剩余 ~50 文件为零散专用端点（disclosure-notes/workhours/metabase/audit-types/custom-query 等），不再批量修，触碰即修
 - apiPaths.ts 新增路径对象（本轮）：knowledgeLibrary(11方法)/noteTemplates/accountChart(含standard)/accountMapping/reportLineMapping/columnMappings/dataLifecycle/consolNoteSections(8方法)/reportConfig扩展(detail/create/executeFormulasBatch/batchUpdate)/reportMapping/reports.export/independenceDeclarations；ledger 从 3 方法扩展到 17 方法；workpapers 新增 batchPrefill/generateFromCodes/wpMappingTsj/versions/univerData/univerSave/exportPdf；attachments 新增 preview/download/associate/ocrStatus
 - CI 新增 vue-tsc --noEmit 步骤到 frontend-build job（.github/workflows/ci.yml）
 - CI 新增 'API hardcode guard' 卡点（基线 173，grep 统计 Vue 文件 /api/ 硬编码，超基线则 fail）；本地自查脚本 scripts/check-api-hardcode.sh；策略"触碰即修+基线只减不增"
@@ -193,10 +212,27 @@ inclusion: always
 - python-docx 已装可用（phase13 note_word_exporter.py 同款），Word 生成遵循 `build_*_docx_bytes(...)→bytes` 纯函数模式便于单测；PDF 转换走 LibreOffice headless `soffice --headless --convert-to pdf`（memory 之前关于 LibreOffice 路径检测记录正确）
 - 客户名归一化 `app/services/client_lookup.normalize_client_name` + `client_names_match`：去空白、全角→半角、去"有限公司/股份/集团/Co.,Ltd/Inc." 后缀，归一后精确相等。R3 正式落地后迁入 R3 模块
 - 前端路由 beforeEach 新增 `meta.requiresAnnualDeclaration` 守卫：访问 EQCR 相关路由前调 `/api/eqcr/independence/annual/check`，未声明则强制跳 EqcrWorkbench 弹对话框；同时支持 `meta.roles` 角色粗筛
+- role_context_service.get_nav_items 已修复：QC 角色新增 3 个全局导航（规则管理/质控抽查/案例库）；manager 角色新增"项目经理工作台"入口
+- workhour_list.py 新建端点：GET /api/workhours（审批人视角聚合列表）+ GET /api/workhours/summary（本周统计，消除 N+1）
+- WorkpaperEditor.vue 新增"提交复核"按钮（draft→pending_review）+ 自动保存失败 toast 提示
+- workpaper_remind.py 新增 POST /escalate-to-partner 端点（催办 3 次后升级通知签字合伙人）
+- 前后端路径修复：WorkpaperWorkbench AI 聊天 /api/chat/stream→/api/workpapers/{wpId}/ai/chat；附件上传 /api/attachments/upload→/api/projects/{pid}/attachments/upload；AiAssistantSidebar /chat→/ai/chat
 
 ## 活跃待办
 
 ### 最高优先级
+- 全局打磨建议 v1 已补完到 ~1800 行（docs/GLOBAL_REFINEMENT_PROPOSAL_v1.md）：5 角色穿刺 + 32 横切主题 + P0-P3 共 35 项路线图 + 第 11 章"版面位置规约"
+- **Round 7 Sprint 1（P0）已完成**：18/18 task 全部执行，vue-tsc 0 错误；删除 12 文件（ReviewInbox + 5 Mobile + 5 AI 死代码 + 1 重复组件）、修改 6 文件（apiPaths/PartnerDashboard/QCDashboard/DefaultLayout/router/auth）、新建 2 文件（GtEmpty.vue + confirm.ts 5 函数）；UAT 待手动验证（角色跳转+函证路由+EQCR 指标）
+- **Round 7 Sprint 2（P1）已完成**：42/42 task 全部执行，vue-tsc 0 错误；新建 5 文件（useEditingLock/useWorkpaperAutoSave/errorHandler/ShortcutHelpDialog/stale_summary.py）、修改 20+ 文件（导航动态化/13 处 ElMessageBox 替换/4 视图 useEditMode/3 视图编辑锁/2 视图自动保存/工时 Tab 合并删除 WorkHoursApproval/Stale 三态/5 视图 errorHandler/CI lint）、后端新增 stale-summary 端点；右键菜单 5 视图已在之前 Round 实现无需重做
+- **R7 S1+S2 复盘修正已落地（8 项质量改进）**：(1) 角色跳转从 auth.ts 移到 Login.vue（职责单一）；(2) navItems 加 roles 字段按角色过滤+隐藏（auditor 看不到"账号权限"，qc 看不到"工时"等）；(3) WorkpaperEditor 两套自动保存合并为 useWorkpaperAutoSave 60s 单一方案；(4) AuditReportEditor/DisclosureEditor 编辑锁改 autoAcquire:false + watch isEditing 联动 acquire/release；(5) 编辑锁 watch isMine→exitEdit 强制只读；(6) autoSaveMsg/dirty 颜色改 CSS 变量；(7) 导航标签"人员"→"人员档案"/"用户"→"账号权限"；(8) useEditingLock 加 resourceType:'workpaper'|'other' 参数，非底稿资源降级为前端检测避免错误路径 404
+- **Round 7 技术债清单（3 项剩余，触碰即修）**：(1) related-workpapers 端点需精确映射（report_config→account→wp_mapping）；(2) resourceType:'other' 降级需后端通用 editing_locks 表支持 resource_type 字段；(3) 4 编辑器未接入 WorkpaperSidePanel
+- **已修复技术债**：#1 crossCheckResults 真实数据填充（切换 Tab 时并行加载 BS+IS 按 row_code 计算）；#4 WorkpaperEditor 硬编码颜色→CSS 变量；#5 WorkHoursPage 472→185 行（WorkHourApprovalTab 子组件）；#7 Misstatements 接入 usePasteImport（粘贴→逐行创建错报）
+- **Round 8 方向建议**：P0 跨表核对真实数据+编辑锁通用化；P1 http.ts 全局 5xx 默认处理+GtPageHeader CI 指标+WorkpaperWorkbench 右栏替换；P2 related-workpapers 精确映射+vitest 基建；P3 暗色模式+Ctrl+K 全局搜索
+- **流程改进沉淀**：Sprint task 数 ≤30（Sprint 3 的 58 太多）；"触碰即修"设 30 天 SLA；每 Sprint 开始前 30 分钟 grep 核对端点/字段假设；关键改动不委托子代理手动做
+- **statusMaps.ts 已删除（R7-S3-02 里程碑）**：GtStatusTag 现在唯一数据源是 dictStore（后端 /api/system/dicts），不再有前端硬编码回退；所有 views 中 statusMap prop 用法已清零；后端 9 套字典完整覆盖
+- **3 个后端端点确认不存在需新建**：GET /api/qc/rotation/due-this-month（Sprint 3 Task 18）、GET /api/reports/{pid}/{year}/{type}/{row_code}/related-workpapers（Task 46）、GET /api/eqcr/projects/{pid}/memo/export?format=docx（Task 23）
+- **后端编辑锁实际路径**：`/api/workpapers/{wp_id}/editing-lock`（POST acquire / PATCH heartbeat / DELETE release / POST force / GET active），不是设计文档假设的 `/api/editing-locks/acquire`；useEditingLock.ts 已适配实际路径
+- **后端 stale-summary 端点已新建**：`backend/app/routers/stale_summary.py`，用 `WorkingPaper.prefill_stale` 字段 + join WpIndex 取 wp_code/wp_name，注册在 router_registry.py §18
 - 合并 feature/global-component-library 到 master（用户手动操作）
 - 0.3 公式计算浏览器手动验证（启动前端输入 `=SUM(A1:A3)` 看结果）
 - 用真实审计项目进行用户验收测试（UAT）

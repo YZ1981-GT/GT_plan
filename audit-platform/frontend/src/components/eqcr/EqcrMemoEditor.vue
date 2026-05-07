@@ -4,6 +4,24 @@
       <h4>EQCR 独立复核备忘录</h4>
       <div class="eqcr-memo-editor__actions">
         <el-tag v-if="memoStatus" :type="statusTagType" size="small">{{ statusLabel }}</el-tag>
+        <!-- R7-S3-04 Task 22：版本历史下拉 -->
+        <el-select
+          v-if="historyVersions.length > 0"
+          v-model="viewingVersion"
+          size="small"
+          style="width: 140px"
+          placeholder="当前版本"
+          clearable
+          @change="onVersionChange"
+        >
+          <el-option :value="0" label="当前版本" />
+          <el-option
+            v-for="h in historyVersions"
+            :key="h.version"
+            :value="h.version"
+            :label="`v${h.version} (${h.saved_at?.slice(0, 10) || '?'})`"
+          />
+        </el-select>
         <el-button size="small" @click="onGenerate" :loading="generating" round>
           {{ memo ? '重新生成' : '生成备忘录' }}
         </el-button>
@@ -74,6 +92,24 @@ const showFinalizeConfirm = ref(false)
 const memo = ref<any>(null)
 const sectionOrder = ref<string[]>([])
 const editableSections = reactive<Record<string, string>>({})
+
+// R7-S3-04 Task 22：版本历史
+const historyVersions = ref<Array<{ version: number; saved_at: string; sections_snapshot: Record<string, string> }>>([])
+const viewingVersion = ref<number>(0)
+
+function onVersionChange(ver: number) {
+  if (ver === 0 || !ver) {
+    // 回到当前版本
+    if (memo.value?.sections) {
+      Object.assign(editableSections, memo.value.sections)
+    }
+    return
+  }
+  const hist = historyVersions.value.find(h => h.version === ver)
+  if (hist?.sections_snapshot) {
+    Object.assign(editableSections, hist.sections_snapshot)
+  }
+}
 const memoStatus = ref<string>('')
 
 const statusLabel = computed(() => {
@@ -100,6 +136,9 @@ async function loadMemo() {
     }
     // 使用默认章节顺序
     sectionOrder.value = Object.keys(sections)
+    // R7-S3-04：加载版本历史
+    historyVersions.value = data.history || []
+    viewingVersion.value = 0
   } catch (e: any) {
     if (e?.response?.status === 404) {
       memo.value = null

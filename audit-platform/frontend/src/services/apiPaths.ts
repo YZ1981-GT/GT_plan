@@ -1070,6 +1070,14 @@ export const admin = {
   importEventReplay: '/api/admin/import-event-replay',
 } as const
 
+// ─── 我的（个人聚合） ────────────────────────────────────────────────────────
+
+export const my = {
+  pendingIndependence: '/api/my/pending-independence',
+  reminders: '/api/my/reminders',
+  unreadAnnotations: '/api/my/unread-annotations/count',
+} as const
+
 // ─── 合伙人 ─────────────────────────────────────────────────────────────────
 
 export const partner = {
@@ -1085,6 +1093,7 @@ export const qcDashboard = {
   staffProgress: (pid: string) => `/api/projects/${pid}/qc-dashboard/staff-progress`,
   openIssues: (pid: string) => `/api/projects/${pid}/qc-dashboard/open-issues`,
   archiveReadiness: (pid: string) => `/api/projects/${pid}/qc-dashboard/archive-readiness`,
+  reviewerMetrics: '/api/qc/reviewer-metrics',
 } as const
 
 // ─── 质控规则管理 ───────────────────────────────────────────────────────────
@@ -1275,7 +1284,7 @@ export const API = {
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
   accountChart, accountMapping, reportLineMapping, columnMappings, dataLifecycle, independenceDeclarations,
-  admin, partner, qcDashboard, qcRules, qcInspections, qcCases,
+  admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
   jobs, governance, eqcr, signatures, rotation,
 } as const

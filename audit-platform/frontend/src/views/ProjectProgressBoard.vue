@@ -187,7 +187,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import {
   getProgressBoard, getProgressBrief, checkCrossRefs,
   listCommunications, addCommunication, deleteCommunication,
@@ -351,7 +352,7 @@ async function handleAddComm() {
 }
 
 async function handleDeleteComm(commId: string) {
-  await ElMessageBox.confirm('确认删除此沟通记录？', '确认')
+  await confirmDelete('此沟通记录')
   try {
     await deleteCommunication(projectId.value, commId)
     ElMessage.success('已删除')

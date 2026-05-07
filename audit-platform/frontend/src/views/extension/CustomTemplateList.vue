@@ -48,7 +48,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import {
   listCustomTemplates, validateCustomTemplate as validateTpl,
   publishCustomTemplate, deleteCustomTemplate,
@@ -85,7 +86,7 @@ async function validateTemplate(row: any) {
 
 async function publishTemplate(row: any) {
   try {
-    await ElMessageBox.confirm('确认发布此模板？发布后其他用户可在模板市场中使用。', '发布确认')
+    await confirmDangerous('确认发布此模板？发布后其他用户可在模板市场中使用。', '发布确认')
     await publishCustomTemplate(row.id)
     ElMessage.success('发布成功')
     loadTemplates()
@@ -94,7 +95,7 @@ async function publishTemplate(row: any) {
 
 async function deleteTemplate(row: any) {
   try {
-    await ElMessageBox.confirm('确认删除此模板？', '删除确认', { type: 'warning' })
+    await confirmDelete('此模板')
     await deleteCustomTemplate(row.id)
     ElMessage.success('已删除')
     loadTemplates()

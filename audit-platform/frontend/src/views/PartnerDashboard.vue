@@ -304,6 +304,7 @@ import {
   type RotationCheckResult, type RotationOverrideResult,
 } from '@/services/rotationApi'
 import { api } from '@/services/apiProxy'
+import { my as P_my } from '@/services/apiPaths'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
 import SignatureWorkflowLine from '@/components/signature/SignatureWorkflowLine.vue'
@@ -559,7 +560,7 @@ async function loadAll() {
 async function loadPendingIndependence() {
   try {
     const res = await api.get<{ projects: PendingIndependenceProject[]; total: number; has_more?: boolean }>(
-      '/api/my/pending-independence?limit=50',
+      P_my.pendingIndependence, { params: { limit: 50 } },
     )
     pendingIndependenceProjects.value = {
       projects: res.projects || [],
@@ -579,7 +580,7 @@ async function loadMorePendingIndependence() {
   pendingIndependenceLoadingMore.value = true
   try {
     const res = await api.get<{ projects: PendingIndependenceProject[]; total: number; has_more?: boolean }>(
-      '/api/my/pending-independence?limit=200',
+      P_my.pendingIndependence, { params: { limit: 200 } },
     )
     pendingIndependenceProjects.value = {
       projects: res.projects || [],

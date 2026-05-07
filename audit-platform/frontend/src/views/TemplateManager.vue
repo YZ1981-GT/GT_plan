@@ -3,6 +3,8 @@
     <div class="gt-tpl-header">
       <h2 class="gt-page-title">模板管理</h2>
       <div style="display: flex; gap: 8px; align-items: center;">
+        <el-button v-if="!isEditing" size="small" @click="enterEdit">✏️ 编辑</el-button>
+        <el-button v-else size="small" type="warning" @click="() => exitEdit()">退出编辑</el-button>
         <SharedTemplatePicker
           config-type="workpaper_template"
           :project-id="projectId"
@@ -12,6 +14,8 @@
         <el-button type="primary" @click="showUploadDialog = true">上传模板</el-button>
       </div>
     </div>
+
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
     <el-tabs v-model="activeTab">
       <!-- 模板列表 -->
@@ -32,7 +36,7 @@
             <template #default="{ row }">
               <el-button size="small" @click="onNewVersion(row)">新版本</el-button>
               <el-button size="small" @click="onViewTemplate(row)">查看</el-button>
-              <el-button size="small" type="danger" @click="onDeleteTemplate(row)">删除</el-button>
+              <el-button size="small" type="danger" @click="onDeleteTemplate(row)" v-permission="'template:delete'">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -94,7 +98,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmLeave } from '@/utils/confirm'
+import { useEditMode } from '@/composables/useEditMode'
 import {
   listTemplates, uploadTemplate, createTemplateVersion, deleteTemplate,
   listTemplateSets,
@@ -104,6 +110,7 @@ import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 const activeTab = ref('templates')
 const tplLoading = ref(false)
@@ -172,7 +179,7 @@ function onViewTemplate(row: TemplateItem) {
 }
 
 async function onDeleteTemplate(row: TemplateItem) {
-  await ElMessageBox.confirm(`确定删除模板 ${row.template_code}？`, '确认')
+  await confirmDelete(`模板 ${row.template_code}`)
   try {
     await deleteTemplate(row.id)
     ElMessage.success('模板已删除')

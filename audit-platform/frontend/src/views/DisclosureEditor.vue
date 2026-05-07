@@ -52,6 +52,11 @@
       </template>
     </GtPageHeader>
 
+    <!-- 编辑锁提示 -->
+    <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
+      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
+    </el-alert>
+
     <div class="gt-de-body">
       <!-- 左侧：目录树 -->
       <div class="gt-de-sidebar">
@@ -419,6 +424,9 @@ import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge
 import { useAutoSave } from '@/composables/useAutoSave'
 import { withLoading } from '@/composables/useLoading'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
+import { useEditingLock } from '@/composables/useEditingLock'
+import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -429,6 +437,26 @@ const year = computed(() => {
   const qy = Number(route.query.year)
   return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
 })
+
+const editLock = useEditingLock({
+  resourceId: computed(() => 'disclosure_' + (route.params.projectId as string || '')),
+  resourceType: 'other',  // 附注无后端锁端点，降级为前端检测
+  autoAcquire: false,
+})
+
+// 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
+watch(() => editMode.value, async (editing) => {
+  if (editing) await editLock.acquire()
+  else editLock.release()
+})
+watch(() => editLock.isMine.value, (mine) => {
+  if (!mine && editMode.value) exitEdit()
+})
+
+// R7-S2-05：后端定时自动保存（2 分钟间隔）
+const autoSave = useWorkpaperAutoSave(async () => {
+  await onSave()
+}, 120_000)
 
 // 单位切换 — 使用 projectStore
 const selectedProjectId = ref('')
@@ -551,7 +579,7 @@ const editor = useEditor({
     Placeholder.configure({ placeholder: '请输入附注文字内容...' }),
   ],
   content: '',
-  onUpdate: ({ editor: e }) => { textContent.value = e.getHTML(); if (editMode.value) markEditDirty() },
+  onUpdate: ({ editor: e }) => { textContent.value = e.getHTML(); if (editMode.value) { markEditDirty(); autoSave.markDirty() } },
 })
 
 onBeforeUnmount(() => { editor.value?.destroy() })
@@ -1007,6 +1035,7 @@ function _getPriorYearValue(_row: any, rowIndex: number): any {
 
 function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number | undefined) {
   markEditDirty()
+  autoSave.markDirty()
   if (!currentNote.value?.table_data?.rows) return
   const rows = currentNote.value.table_data.rows
   const totalRowIndex = rows.findIndex((r: any) => r.is_total)
@@ -1057,7 +1086,7 @@ async function onRefreshFromWP() {
     await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     ElMessage.success('已从底稿刷新数据')
     if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-  } catch { ElMessage.error('刷新失败') }
+  } catch (e) { handleApiError(e, '刷新附注') }
   finally { refreshLoading.value = false }
 }
 
@@ -1082,9 +1111,9 @@ async function onManualRefresh() {
     await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     if (currentNote.value) await fetchDetail(currentNote.value.note_section)
     ElMessage.success('手动刷新成功')
-  } catch {
+  } catch (e) {
     syncError.value = true
-    ElMessage.error('刷新失败，请稍后重试')
+    handleApiError(e, '刷新附注')
   }
 }
 
@@ -1179,7 +1208,7 @@ async function onExportWord() {
     URL.revokeObjectURL(url)
     ElMessage.success('附注 Word 导出成功')
   } catch (e: any) {
-    ElMessage.error('导出失败：' + (e?.message || '请稍后重试'))
+    handleApiError(e, '导出附注 Word')
   } finally { exportLoading.value = false }
 }
 
@@ -1315,6 +1344,7 @@ async function onSave() {
     ElMessage.success('保存成功')
     editMode.value = false
     clearEditDirty()
+    autoSave.clearDirty()
     clearAutoSaveDraft()
     currentNote.value!.status = 'confirmed'
     justSaved.value = true

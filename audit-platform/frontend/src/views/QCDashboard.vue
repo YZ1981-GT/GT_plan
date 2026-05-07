@@ -321,7 +321,9 @@ async function loadReviewerMetrics() {
   if (reviewerMetrics.value.length) return
   reviewerLoading.value = true
   try {
-    const data = await import('@/services/apiProxy').then(m => m.api.get<any>('/api/qc/reviewer-metrics'))
+    const { api } = await import('@/services/apiProxy')
+    const { qcDashboard: P_qc } = await import('@/services/apiPaths')
+    const data = await api.get<any>(P_qc.reviewerMetrics)
     reviewerMetrics.value = data?.items || []
   } catch { /* ignore */ }
   finally { reviewerLoading.value = false }

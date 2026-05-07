@@ -269,12 +269,7 @@ const router = createRouter({
           name: 'WorkHours',
           component: () => import('@/views/WorkHoursPage.vue'),
         },
-        {
-          path: 'work-hours/approve',
-          name: 'WorkHoursApproval',
-          component: () => import('@/views/WorkHoursApproval.vue'),
-          meta: { permission: 'approve_workhours' },
-        },
+
         {
           path: 'dashboard/management',
           name: 'ManagementDashboard',
@@ -420,21 +415,7 @@ const router = createRouter({
           component: () => import('@/views/PerformanceMonitor.vue'),
           meta: { permission: 'admin' },
         },
-        // ── Mobile Routes ──
-        {
-          path: 'projects/:projectId/mobile-penetration',
-          name: 'MobilePenetration',
-          component: () => import('@/views/MobilePenetration.vue'),
-          meta: { developing: true },
-          props: (route: any) => ({ projectId: route.params.projectId }),
-        },
-        {
-          path: 'projects/:projectId/mobile-review',
-          name: 'MobileReviewView',
-          component: () => import('@/views/MobileReviewView.vue'),
-          meta: { developing: true },
-          props: (route: any) => ({ projectId: route.params.projectId }),
-        },
+        // ── Mobile Routes removed (R7-S1-05) ──
         // ── Round 5：EQCR 独立复核工作台 ──
         // 访问控制说明：
         //   页面本身只有 requireAuth（走父路由 meta），不设 meta.permission；
@@ -465,7 +446,7 @@ const router = createRouter({
           path: 'eqcr/metrics',
           name: 'EqcrMetrics',
           component: () => import('@/views/eqcr/EqcrMetrics.vue'),
-          meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner'] },
+          meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner', 'eqcr'] },
         },
         // ── Round 6：QC 规则定义只读列表 ──
         {
@@ -503,6 +484,13 @@ const router = createRouter({
           name: 'QcAnnualReports',
           component: () => import('@/views/qc/QcAnnualReports.vue'),
           meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        // ── R7-S1-06：函证占位路由 ──
+        {
+          path: 'confirmation',
+          name: 'ConfirmationHub',
+          component: () => import('@/views/DevelopingPage.vue'),
+          meta: { developing: true },
         },
       ],
     },

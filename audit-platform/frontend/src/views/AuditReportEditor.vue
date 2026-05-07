@@ -2,7 +2,7 @@
   <div class="gt-audit-report gt-fade-in">
     <GtPageHeader title="审计报告" @back="router.push('/projects')">
       <template #actions>
-        <GtToolbar @formula="() => {}">
+        <GtToolbar @formula="() => {}" :show-edit-toggle="true" :is-editing="isEditing" @edit-toggle="isEditing ? exitEdit() : enterEdit()">
           <template #left>
             <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
             <SharedTemplatePicker
@@ -19,6 +19,13 @@
         </GtToolbar>
       </template>
     </GtPageHeader>
+
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
+
+    <!-- 编辑锁提示 -->
+    <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
+      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
+    </el-alert>
 
     <!-- 错报超限警告横幅（需求 20.2） -->
     <el-alert
@@ -166,15 +173,34 @@ import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useDictStore } from '@/stores/dict'
 import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
+import { useEditMode } from '@/composables/useEditMode'
+import { confirmLeave } from '@/utils/confirm'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
+import { useEditingLock } from '@/composables/useEditingLock'
 
 const route = useRoute()
 const router = useRouter()
 const dictStore = useDictStore()
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+
+const editLock = useEditingLock({
+  resourceId: computed(() => 'report_' + (route.params.projectId as string || '')),
+  resourceType: 'other',  // 审计报告无后端锁端点，降级为前端检测
+  autoAcquire: false,
+})
+
+// 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
+watch(() => isEditing.value, async (editing) => {
+  if (editing) await editLock.acquire()
+  else editLock.release()
+})
+watch(() => editLock.isMine.value, (mine) => {
+  if (!mine && isEditing.value) exitEdit()
+})
 
 const loading = ref(false)
 const genLoading = ref(false)

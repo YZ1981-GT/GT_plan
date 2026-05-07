@@ -87,7 +87,7 @@
         点击上方"新增"按钮创建调整分录。调整分录将自动更新试算表审定数和报表数据。
       </div>
     </el-alert>
-    <el-table :data="entries" v-loading="loading" border stripe style="width: 100%"
+    <el-table ref="adjTableRef" :data="entries" v-loading="loading" border stripe style="width: 100%"
       @selection-change="onSelectionChange">
       <el-table-column type="selection" width="40" />
       <el-table-column prop="adjustment_no" label="编号" width="120" />
@@ -110,7 +110,7 @@
       </el-table-column>
       <el-table-column prop="review_status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag size="small" :type="(dictStore.type('adjustment_status', row.review_status)) || undefined">{{ dictStore.label('adjustment_status', row.review_status) }}</el-tag>
+          <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
@@ -166,7 +166,7 @@
 
       <!-- 逐条原因模式 -->
       <template v-else>
-        <div style="font-size: 12px; color: #909399; margin-bottom: 8px">
+        <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 8px">
           为每条分录填写独立驳回原因（留空时使用统一原因）
         </div>
         <el-input
@@ -181,7 +181,7 @@
           :key="row.entry_group_id"
           style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px"
         >
-          <span style="min-width: 120px; font-size: 13px; color: #303133; flex-shrink: 0">
+          <span style="min-width: 120px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text); flex-shrink: 0">
             {{ row.adjustment_no || row.entry_group_id?.slice(0, 8) }}
           </span>
           <el-input
@@ -225,7 +225,7 @@
                 <el-option v-for="opt in accountOptions" :key="opt.code"
                   :label="`${opt.code} ${opt.name}`" :value="opt.code">
                   <span>{{ opt.code }} {{ opt.name }}</span>
-                  <span v-if="opt.report_line" style="float:right;color:#999;font-size:11px;margin-left:8px">
+                  <span v-if="opt.report_line" style="float: right; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); margin-left: 8px">
                     → {{ opt.report_line }}
                   </span>
                 </el-option>
@@ -281,7 +281,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { confirmDelete } from '@/utils/confirm'
+import { confirmDelete, confirmConvert } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
@@ -297,10 +297,11 @@ import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
-import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
 import { operationHistory } from '@/utils/operationHistory'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { usePasteImport } from '@/composables/usePasteImport'
 import { parseApiError } from '@/composables/useApiError'
+import { handleApiError } from '@/utils/errorHandler'
 import * as P from '@/services/apiPaths'
 
 const route = useRoute()
@@ -337,6 +338,35 @@ const activeTab = ref('all')
 const entries = ref<any[]>([])
 const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
+
+// R7-S3-08 Task 41：粘贴入库
+const adjTableRef = ref<HTMLElement | null>(null)
+usePasteImport({
+  containerRef: adjTableRef,
+  columns: [
+    { key: 'standard_account_code', label: '科目编码' },
+    { key: 'account_name', label: '科目名称' },
+    { key: 'debit_amount', label: '借方' },
+    { key: 'credit_amount', label: '贷方' },
+  ],
+  onInsert: async (rows) => {
+    // 粘贴的行作为新分录的 line_items 创建
+    const lineItems = rows.map(r => ({
+      standard_account_code: r.standard_account_code || '',
+      account_name: r.account_name || '',
+      debit_amount: parseFloat(r.debit_amount) || 0,
+      credit_amount: parseFloat(r.credit_amount) || 0,
+    }))
+    await createAdjustment(projectId.value, {
+      adjustment_type: 'aje',
+      year: year.value,
+      description: `粘贴导入 ${lineItems.length} 行`,
+      line_items: lineItems,
+    })
+    await fetchEntries()
+    await fetchSummary()
+  },
+})
 const showRejectDialog = ref(false)
 const rejectReason = ref('')
 const rejectMode = ref<'unified' | 'individual'>('unified')
@@ -535,7 +565,7 @@ async function onBatchCommit() {
     fetchEntries()
     fetchSummary()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '批量提交失败')
+    handleApiError(e, '批量提交')
   } finally {
     batchCommitting.value = false
   }
@@ -576,11 +606,7 @@ async function onConvertToMisstatement(row: any) {
     return
   }
   try {
-    await ElMessageBox.confirm(
-      `将该分录（${row.adjustment_no || row.entry_group_id?.slice(0, 8)}）转为未更正错报？转换后该条目将出现在《未更正错报汇总表》中。`,
-      '确认转错报',
-      { confirmButtonText: '确认转换', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmConvert('该分录', '未更正错报')
   } catch {
     return
   }

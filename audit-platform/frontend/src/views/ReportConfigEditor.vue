@@ -6,6 +6,8 @@
         <p>{{ standardLabel }} · {{ reportTypeLabel }} · {{ rows.length }} 行</p>
       </div>
       <div class="gt-rce-banner-actions">
+        <el-button v-if="!isEditing" size="small" @click="enterEdit">✏️ 编辑</el-button>
+        <el-button v-else size="small" type="warning" @click="() => exitEdit()">退出编辑</el-button>
         <el-select v-model="selectedStandard" size="small" style="width: 160px" @change="loadConfig">
           <el-option label="国企版合并" value="soe_consolidated" />
           <el-option label="国企版单体" value="soe_standalone" />
@@ -27,6 +29,8 @@
         <el-button size="small" @click="router.back()">返回</el-button>
       </div>
     </div>
+
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
     <el-table :data="rows" v-loading="loading" border size="small" style="width: 100%"
       row-key="row_code" :row-class-name="rowClassName"
@@ -76,11 +80,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { confirmBatch } from '@/utils/confirm'
+import { confirmBatch, confirmLeave } from '@/utils/confirm'
+import { useEditMode } from '@/composables/useEditMode'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 
 const router = useRouter()
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 const selectedStandard = ref('soe_consolidated')
 const selectedReportType = ref('balance_sheet')

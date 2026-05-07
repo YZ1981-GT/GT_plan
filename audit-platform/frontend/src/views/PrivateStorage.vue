@@ -50,7 +50,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import { useAuthStore } from '@/stores/auth'
 import {
   listPrivateFiles, getPrivateQuota, uploadPrivateFile,
@@ -143,7 +144,7 @@ async function onDelete(name: string) {
   const uid = getUserId()
   if (!uid) return
 
-  await ElMessageBox.confirm(`确定删除「${name}」？`, '删除确认', { type: 'warning' })
+  await confirmDelete(`「${name}」`)
   try {
     await deletePrivateFile(uid, name)
     ElMessage.success('已删除')

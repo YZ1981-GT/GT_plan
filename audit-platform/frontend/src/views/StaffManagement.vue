@@ -35,7 +35,7 @@
           <el-button link type="primary" size="small" @click="editStaff(row)">编辑</el-button>
           <el-button link type="primary" size="small" @click="viewResume(row)">简历</el-button>
           <el-button link type="warning" size="small" @click="openHandover(row)">交接</el-button>
-          <el-button v-if="row.source === 'custom'" link type="danger" size="small" @click="onDeleteStaff(row)">删除</el-button>
+          <el-button v-if="row.source === 'custom'" link type="danger" size="small" @click="onDeleteStaff(row)" v-permission="'staff:delete'">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -185,7 +185,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { Loading } from '@element-plus/icons-vue'
 import { listStaff, createStaff, updateStaff, getStaffResume, deleteStaff, type StaffMember } from '@/services/staffApi'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
@@ -263,7 +264,7 @@ async function saveStaff() {
 }
 
 async function onDeleteStaff(row: StaffMember) {
-  await ElMessageBox.confirm(`确定删除「${row.name}」？此操作仅对自定义人员有效。`, '删除确认', { type: 'warning' })
+  await confirmDelete(`「${row.name}」`)
   try {
     await deleteStaff(row.id)
     ElMessage.success('已删除')
@@ -359,10 +360,9 @@ async function executeHandover() {
   }
 
   try {
-    await ElMessageBox.confirm(
+    await confirmDangerous(
       `确认将 ${handoverPreview.value?.workpapers} 张底稿、${handoverPreview.value?.issues} 张工单、${handoverPreview.value?.assignments} 个项目委派交接给目标人？`,
       '交接确认',
-      { type: 'warning' },
     )
   } catch {
     return // 用户取消

@@ -1,15 +1,29 @@
 <template>
   <div class="gt-projects gt-fade-in">
-    <!-- 页头 -->
-    <div class="projects-header">
-      <h1 class="gt-page-title">
-        <el-icon :size="26"><FolderOpened /></el-icon>
-        项目列表
-      </h1>
-      <el-button type="primary" size="large" @click="goToCreateProject">
-        <el-icon><Plus /></el-icon>
-        新建项目
-      </el-button>
+    <!-- 页头 [R7-S3-01] -->
+    <GtPageHeader title="项目列表" :show-back="false">
+      <template #actions>
+        <el-button type="primary" size="small" @click="goToCreateProject">
+          <el-icon><Plus /></el-icon> 新建项目
+        </el-button>
+      </template>
+    </GtPageHeader>
+
+    <!-- 筛选栏 [R7-S3-06 Task 33] -->
+    <div class="gt-projects-filter-bar">
+      <el-radio-group v-model="viewMode" size="small" style="margin-right: 12px">
+        <el-radio-button value="list">列表</el-radio-button>
+        <el-radio-button value="client">按客户</el-radio-button>
+      </el-radio-group>
+      <el-select v-model="filterStatus" placeholder="状态" clearable size="small" style="width: 120px">
+        <el-option label="活跃" value="active" />
+        <el-option label="已归档" value="archived" />
+        <el-option label="全部" value="" />
+      </el-select>
+      <el-select v-model="filterTag" placeholder="标签" clearable size="small" style="width: 120px; margin-left: 8px">
+        <el-option v-for="t in availableTags" :key="t" :label="t" :value="t" />
+      </el-select>
+      <el-input v-model="searchText" placeholder="搜索项目/客户..." clearable size="small" style="width: 200px; margin-left: 8px" />
     </div>
 
     <!-- 表格卡片 -->
@@ -88,10 +102,18 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listProjects } from '@/services/commonApi'
 import { FolderOpened, Plus, Right, Upload } from '@element-plus/icons-vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 
 const router = useRouter()
 const loading = ref(false)
 const projects = ref<any[]>([])
+
+// R7-S3-06 Task 33：筛选状态
+const viewMode = ref<'list' | 'client'>('list')
+const filterStatus = ref('')
+const filterTag = ref('')
+const searchText = ref('')
+const availableTags = ref(['年审', '季审', '上市准备', '内审', '专项', '税审', '国企', '上市公司'])
 
 onMounted(() => loadProjectList())
 

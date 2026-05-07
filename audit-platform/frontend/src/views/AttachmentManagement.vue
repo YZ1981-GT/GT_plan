@@ -118,6 +118,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Upload, Document } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
+import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue'
 import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
@@ -185,6 +186,7 @@ async function onSearch() {
 }
 
 function preview(row: any) {
+  // TODO: replace AttachmentPreview dialog with AttachmentPreviewDrawer for unified drawer-based preview
   // 使用统一预览代理端点
   previewUrl.value = P_att.preview(row.id)
   previewName.value = row.file_name

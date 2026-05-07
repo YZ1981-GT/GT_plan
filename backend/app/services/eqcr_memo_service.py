@@ -258,7 +258,10 @@ class EqcrMemoService:
         project_id: UUID,
         sections: dict[str, str],
     ) -> dict:
-        """保存编辑后的备忘录内容到 Project.wizard_state.eqcr_memo。"""
+        """保存编辑后的备忘录内容到 Project.wizard_state.eqcr_memo。
+        
+        R7-S3-04 Task 21：保存前将旧 sections 压入 history 数组（最多 5 版）。
+        """
         proj = (
             await self.db.execute(
                 sa.select(Project).where(
@@ -272,9 +275,24 @@ class EqcrMemoService:
 
         wizard = dict(proj.wizard_state) if proj.wizard_state else {}
         existing = wizard.get("eqcr_memo") or {}
+        
+        # R7-S3-04：版本历史 — 保存前将旧 sections 压入 history
+        old_sections = existing.get("sections")
+        history: list = existing.get("history") or []
+        if old_sections:
+            history.append({
+                "version": len(history) + 1,
+                "saved_at": existing.get("updated_at", datetime.now(timezone.utc).isoformat()),
+                "sections_snapshot": old_sections,
+            })
+            # 最多保留 5 版
+            if len(history) > 5:
+                history = history[-5:]
+        
         wizard["eqcr_memo"] = {
             **existing,
             "sections": sections,
+            "history": history,
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "status": "draft",
         }
@@ -284,6 +302,7 @@ class EqcrMemoService:
         return {
             "status": "saved",
             "updated_at": wizard["eqcr_memo"]["updated_at"],
+            "history_count": len(history),
         }
 
     async def finalize_memo(

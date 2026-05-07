@@ -75,6 +75,13 @@
       />
       <!-- 具体子页面：右侧全宽显示路由内容 -->
       <div v-else class="gt-detail-content">
+        <!-- R7-S3-10：联动状态横条 -->
+        <LinkageStatusBar
+          v-if="staleCount > 0"
+          :stale-count="staleCount"
+          @recalc="onRecalcStale"
+          @detail="$router.push(`/projects/${route.params.projectId}/workpapers?filter=stale`)"
+        />
         <ErrorBoundary>
           <router-view v-slot="{ Component }">
             <Transition name="gt-page" mode="out-in">
@@ -97,6 +104,7 @@ import DetailProjectPanel from '@/components/layout/DetailProjectPanel.vue'
 import FourColumnCatalog from '@/components/layout/FourColumnCatalog.vue'
 import FourColumnContent from '@/components/layout/FourColumnContent.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import LinkageStatusBar from '@/components/common/LinkageStatusBar.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
 import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
@@ -118,6 +126,27 @@ const selectedCatalogItem = ref<any>(null)
 const pendingReviewCount = ref(0)
 let badgeTimer: ReturnType<typeof setInterval> | null = null
 
+// R7-S3-10：联动状态横条
+const staleCount = ref(0)
+
+async function loadStaleCount() {
+  const pid = route.params.projectId as string
+  if (!pid) { staleCount.value = 0; return }
+  try {
+    const data = await import('@/services/apiProxy').then(m => m.api.get(`/api/projects/${pid}/stale-summary`))
+    staleCount.value = (data as any)?.stale_count || 0
+  } catch { staleCount.value = 0 }
+}
+
+async function onRecalcStale() {
+  const pid = route.params.projectId as string
+  if (!pid) return
+  try {
+    await import('@/services/apiProxy').then(m => m.api.post(`/api/projects/${pid}/trial-balance/recalc`))
+    staleCount.value = 0
+  } catch { /* ignore */ }
+}
+
 // 是否有复核权限（reviewer/partner/admin）
 const isReviewRole = computed(() => {
   const role = roleStore.effectiveRole
@@ -130,7 +159,7 @@ const isReviewRole = computed(() => {
 //   非 EQCR 用户进入工作台会看到空态，不影响合伙人/管理员的巡视能力。
 const isEqcrEligible = computed(() => {
   const role = roleStore.effectiveRole
-  return role === 'partner' || role === 'admin' || roleStore.isPartner
+  return ['partner', 'admin', 'eqcr'].includes(role) || roleStore.isPartner
 })
 
 async function loadPendingReviewCount() {
@@ -158,8 +187,10 @@ onBeforeUnmount(() => {
 watch(() => route.params.projectId, async (pid) => {
   if (pid && typeof pid === 'string') {
     await roleStore.loadProjectRole(pid)
+    loadStaleCount()
   } else {
     roleStore.currentProjectRole = null
+    staleCount.value = 0
   }
 }, { immediate: true })
 

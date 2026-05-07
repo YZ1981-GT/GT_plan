@@ -104,7 +104,8 @@ import { PieChart, BarChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, GridComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmEscalate } from '@/utils/confirm'
 import {
   getWorkpaperProgress, getOverdueWorkpapers,
   runConsistencyCheck as apiRunConsistencyCheck, getProjectWorkHours,
@@ -190,11 +191,7 @@ async function onEscalateToPartner() {
     return
   }
   try {
-    await ElMessageBox.confirm(
-      `将 ${overdueItems.length} 个逾期底稿升级通知合伙人，确认？`,
-      '升级到合伙人',
-      { confirmButtonText: '确认升级', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmEscalate('合伙人')
   } catch { return }
   try {
     await http.post(`/api/projects/${projectId.value}/workpapers/escalate-to-partner`, {

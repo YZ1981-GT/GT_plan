@@ -67,7 +67,18 @@ async function handleLogin() {
   try {
     await authStore.login(form.username, form.password)
     ElMessage.success('登录成功')
-    router.push((route.query.redirect as string) || '/')
+    // R7-S1-04: 优先 redirect query，否则按角色跳转到对应首页
+    const ROLE_HOME: Record<string, string> = {
+      auditor: '/my/dashboard',
+      manager: '/dashboard/manager',
+      partner: '/dashboard/partner',
+      qc: '/qc/inspections',
+      eqcr: '/eqcr/workbench',
+      admin: '/',
+    }
+    const redirect = route.query.redirect as string | undefined
+    const target = redirect || ROLE_HOME[authStore.user?.role ?? ''] || '/'
+    router.replace(target)
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.message ?? '登录失败')
   } finally { loading.value = false }

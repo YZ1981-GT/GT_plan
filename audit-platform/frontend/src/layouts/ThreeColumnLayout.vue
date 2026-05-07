@@ -283,6 +283,9 @@
       :project-id="currentProjectId"
       :year="currentYear"
     />
+
+    <!-- 全局快捷键帮助面板 [R7-S2-12] -->
+    <ShortcutHelpDialog v-model="showShortcutHelp" />
   </div>
 </template>
 
@@ -291,6 +294,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useRoleContextStore } from '@/stores/roleContext'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
@@ -301,6 +305,7 @@ import {
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
+import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue'
 import { eventBus } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
@@ -319,19 +324,40 @@ const props = defineProps<{
   catalogTitle?: string
 }>()
 
-// ── 导航项 ──
-const navItems = [
-  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
-  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production' },
-  { key: 'team', label: '人员', icon: User, path: '/settings/staff', maturity: 'production' },
-  { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production' },
-  { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
-  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot' },
-  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing' },
-  { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production' },
-  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
-  { key: 'users', label: '用户', icon: UserFilled, path: '/settings/users', maturity: 'production' },
+// ── 导航项（R7-S2-01：角色感知动态化） ──
+const roleStore = useRoleContextStore()
+
+const FALLBACK_NAV = [
+  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production', roles: null },
+  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production', roles: null },
+  { key: 'team', label: '人员档案', icon: User, path: '/settings/staff', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'eqcr'] },
+  { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot', roles: ['admin', 'partner', 'manager'] },
+  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: null },
+  { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot', roles: ['admin', 'partner', 'manager', 'auditor'] },
+  { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
 ]
+
+/**
+ * 按角色过滤 + 覆盖路径
+ * - roles=null 表示所有角色可见
+ * - 按角色覆盖"看板"默认路径
+ */
+function buildNavForRole(nav: typeof FALLBACK_NAV, role: string) {
+  return nav
+    .filter(item => !item.roles || item.roles.includes(role))
+    .map(item => {
+      if (item.key === 'mgmt-dashboard') {
+        if (role === 'manager') return { ...item, path: '/dashboard/manager' }
+        if (role === 'partner') return { ...item, path: '/dashboard/partner' }
+      }
+      return item
+    })
+}
+
+const navItems = computed(() => buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor'))
 
 const activeNav = computed(() => {
   const p = route.path
@@ -341,7 +367,7 @@ const activeNav = computed(() => {
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
   // 合并项目详情页（/projects/:id/consolidation）高亮"合并"而非"项目"
   if (p.match(/^\/projects\/[^/]+\/consolidation/)) return 'consolidation'
-  for (const item of navItems) {
+  for (const item of navItems.value) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }
   if (p.startsWith('/projects')) return 'projects'
@@ -349,7 +375,7 @@ const activeNav = computed(() => {
 })
 
 const currentModule = computed(() => {
-  const item = navItems.find(n => n.key === activeNav.value)
+  const item = navItems.value.find(n => n.key === activeNav.value)
   return item?.label || ''
 })
 
@@ -358,7 +384,7 @@ const emit = defineEmits<{
   (e: 'view-change', mode: 'three' | 'four'): void
 }>()
 
-function onNavClick(item: typeof navItems[0]) {
+function onNavClick(item: (typeof FALLBACK_NAV)[0]) {
   emit('nav-change', item.key)
   router.push(item.path)
 }
@@ -375,6 +401,7 @@ const fourColumnMode = ref(false)
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
 const showCustomQuery = ref(false)
+const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
@@ -622,6 +649,7 @@ onMounted(() => {
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
   eventBus.on('four-col-switch', onSwitchFourCol)
   eventBus.on('shortcut:undo', onShortcutUndo)
+  eventBus.on('shortcut:help', () => { showShortcutHelp.value = true })
   // 移动端手势
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })

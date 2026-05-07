@@ -1,5 +1,10 @@
 <template>
   <div class="gt-wp-editor gt-fade-in">
+    <!-- 编辑锁提示 -->
+    <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
+      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
+    </el-alert>
+
     <!-- 顶部工具栏 -->
     <div class="gt-wp-editor-toolbar">
       <div class="gt-wp-editor-toolbar-left">
@@ -25,8 +30,9 @@
         <el-button size="small" @click="onSyncStructure" :loading="syncLoading">🔄 同步公式</el-button>
         <el-button size="small" @click="onShowVersions">📋 版本历史</el-button>
         <el-button size="small" @click="onDownload">📥 下载</el-button>
-        <el-button size="small" @click="onExportPdf" :loading="exportingPdf">📄 导出 PDF</el-button>
+        <el-button size="small" @click="onExportPdf" :loading="exportingPdf" v-permission="'workpaper:export'">📄 导出 PDF</el-button>
         <el-button size="small" @click="onUpload">📤 上传</el-button>
+        <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
       </div>
     </div>
 
@@ -47,7 +53,7 @@
             placement="top"
           >
             <div style="font-weight: 600">v{{ v.version ?? v.file_version ?? '—' }}</div>
-            <div v-if="v.note || v.description" style="font-size: 12px; color: #666; margin-top: 4px">
+            <div v-if="v.note || v.description" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); margin-top: 4px">
               {{ v.note || v.description }}
             </div>
             <div v-if="v.created_by_name || v.created_by" style="font-size: 12px; color: #999; margin-top: 2px">
@@ -73,8 +79,8 @@
       <span>复核人: {{ resolveUserName(wpDetail.reviewer) }}</span>
       <span>版本: v{{ wpDetail.file_version || 1 }}</span>
       <span v-if="wpDetail.updated_at">最后修改: {{ wpDetail.updated_at.slice(0, 19) }}</span>
-      <span v-if="autoSaveMsg" style="color: #67c23a">✓ {{ autoSaveMsg }}</span>
-      <span v-if="dirty" style="color: #e6a23c">● 未保存</span>
+      <span v-if="autoSaveMsg" style="color: var(--gt-color-success)">✓ {{ autoSaveMsg }}</span>
+      <span v-if="dirty" style="color: var(--gt-color-wheat)">● 未保存</span>
       <span v-if="smartTip" class="gt-wp-smart-tip" @click="showSmartTipDetail = !showSmartTipDetail">
         💡 {{ smartTip.summary }}
       </span>
@@ -87,12 +93,28 @@
         <el-button size="small" text @click="showSmartTipDetail = false">收起</el-button>
       </div>
       <div v-if="smartTip.warnings?.length" style="margin-bottom:6px">
-        <div v-for="(w, i) in smartTip.warnings" :key="i" style="font-size:12px;color:#e6a23c;padding:2px 0">⚠️ {{ w }}</div>
+        <div v-for="(w, i) in smartTip.warnings" :key="i" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-wheat); padding: 2px 0">⚠️ {{ w }}</div>
       </div>
       <div v-if="smartTip.tips?.length">
-        <div v-for="(t, i) in smartTip.tips" :key="i" style="font-size:12px;color:#666;padding:1px 0">• {{ t }}</div>
+        <div v-for="(t, i) in smartTip.tips" :key="i" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); padding: 1px 0">• {{ t }}</div>
       </div>
     </div>
+
+    <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式） -->
+    <el-drawer
+      v-model="showSidePanel"
+      direction="rtl"
+      size="400px"
+      :with-header="false"
+      :modal="false"
+      append-to-body
+    >
+      <WorkpaperSidePanel
+        :project-id="projectId"
+        :wp-id="wpId"
+        :wp-code="wpDetail?.wp_code"
+      />
+    </el-drawer>
   </div>
 </template>
 
@@ -101,6 +123,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirmSubmitReview, confirmLeave } from '@/utils/confirm'
 import { Loading } from '@element-plus/icons-vue'
 import { createUniver, LocaleType, mergeLocales } from '@univerjs/presets'
 import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
@@ -117,6 +140,10 @@ import { api as httpApi } from '@/services/apiProxy'
 import { workpapers as P_wp } from '@/services/apiPaths'
 import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
+import { useEditingLock } from '@/composables/useEditingLock'
+import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
+import { handleApiError } from '@/utils/errorHandler'
+import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 
 const DIRTY_COMMAND_PATTERNS = [
   'set-range-values', 'set-cell',
@@ -131,6 +158,29 @@ const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+
+const editLock = useEditingLock({
+  resourceId: computed(() => wpId.value || ''),
+  // WorkpaperEditor 天然编辑模式，mount 时即 acquire
+})
+
+// R7-S2-05：统一自动保存（60s 间隔，合并原 30s UI 反馈 + 120s 后端保存）
+const autoSave = useWorkpaperAutoSave(async () => {
+  const ok = await onSave()
+  if (!ok) {
+    ElMessage.warning({ message: '自动保存失败，请手动保存', duration: 5000 })
+  }
+}, 60_000)
+
+// UI 反馈：绑定 autoSave 状态
+const autoSaveMsg = computed(() => {
+  if (autoSave.saving.value) return '保存中...'
+  if (autoSave.lastSavedAt.value) {
+    const sec = Math.round((Date.now() - autoSave.lastSavedAt.value.getTime()) / 1000)
+    if (sec < 5) return '已自动保存'
+  }
+  return ''
+})
 
 // R1 需求 2：底稿复核红点（任务 5）
 const reviewMarkers = useWorkpaperReviewMarkers({
@@ -152,6 +202,7 @@ const saving = ref(false)
 const submitting = ref(false)
 const syncLoading = ref(false)
 const dirty = ref(false)
+const showSidePanel = ref(false)
 const univerContainer = ref<HTMLElement | null>(null)
 
 // 任务 8.18.1：用户名映射（UUID → 显示名）
@@ -192,34 +243,7 @@ async function onShowVersions() {
   }
 }
 
-// 任务 8.20.1：自动保存（dirty=true 且距上次编辑 30s 后静默触发 onSave）
-const autoSaveMsg = ref('')
-let autoSaveTimer: ReturnType<typeof setInterval> | null = null
-
-function startAutoSave() {
-  stopAutoSave()
-  autoSaveTimer = setInterval(async () => {
-    if (!dirty.value || saving.value) return
-    const ok = await onSave()
-    if (ok) {
-      autoSaveMsg.value = '已自动保存'
-      setTimeout(() => { autoSaveMsg.value = '' }, 3000)
-    } else {
-      // 自动保存失败：通知用户，保留 dirty 等待手动保存
-      autoSaveMsg.value = ''
-      ElMessage.warning({ message: '自动保存失败，请手动保存', duration: 5000 })
-    }
-  }, 30000)
-}
-
-function stopAutoSave() {
-  if (autoSaveTimer) {
-    clearInterval(autoSaveTimer)
-    autoSaveTimer = null
-  }
-}
-
-watch(loading, (v) => { if (!v) startAutoSave() })
+// （旧 30s 自动保存已合并到 useWorkpaperAutoSave 60s 统一方案）
 
 let univerInstance: any = null
 let univerAPI: any = null
@@ -317,6 +341,7 @@ async function initUniver() {
   univerAPI.onCommandExecuted((command: any) => {
     if (DIRTY_COMMAND_PATTERNS.some(p => command.id?.includes(p))) {
       dirty.value = true
+      autoSave.markDirty()
     }
   })
 
@@ -402,6 +427,7 @@ async function onSave(): Promise<boolean> {
             { snapshot },
           )
           dirty.value = false
+          autoSave.clearDirty()
           ElMessage.success(retryData?.message || '已强制覆盖保存')
           eventBus.emit('workpaper:saved', {
             projectId: projectId.value,
@@ -416,6 +442,7 @@ async function onSave(): Promise<boolean> {
 
     const result = data
     dirty.value = false
+    autoSave.clearDirty()
     ElMessage.success(result?.message || '保存成功')
 
     // 发布底稿保存事件，触发附注自动同步
@@ -428,7 +455,7 @@ async function onSave(): Promise<boolean> {
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
     return true
   } catch (err: any) {
-    ElMessage.error('保存失败: ' + (err?.response?.data?.detail || err?.message || ''))
+    handleApiError(err, '保存底稿')
     return false
   } finally {
     saving.value = false
@@ -442,11 +469,7 @@ async function onSubmitForReview() {
     return
   }
   try {
-    await ElMessageBox.confirm(
-      '提交后底稿将进入复核流程，复核通过前您将无法编辑。确认提交？',
-      '提交复核',
-      { confirmButtonText: '确认提交', cancelButtonText: '取消', type: 'info' },
-    )
+    await confirmSubmitReview(wpDetail.value?.wp_code || '', wpDetail.value?.wp_name || '')
   } catch { return }
 
   submitting.value = true
@@ -458,7 +481,7 @@ async function onSubmitForReview() {
     ElMessage.success('已提交复核，等待复核人审阅')
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
   } catch (err: any) {
-    ElMessage.error('提交失败: ' + (err?.response?.data?.detail || err?.message || ''))
+    handleApiError(err, '提交复核')
   } finally {
     submitting.value = false
   }
@@ -521,7 +544,7 @@ async function onExportPdf() {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
   } catch (err: any) {
-    ElMessage.error('PDF 导出失败: ' + (err?.message || ''))
+    handleApiError(err, 'PDF 导出')
   } finally {
     exportingPdf.value = false
   }
@@ -559,11 +582,7 @@ async function loadSmartTips() {
 onBeforeRouteLeave(async (_to, _from, next) => {
   if (!dirty.value) { next(); return }
   try {
-    await ElMessageBox.confirm(
-      '当前底稿有未保存的变更，离开将丢失这些变更。',
-      '确认离开',
-      { confirmButtonText: '放弃变更', cancelButtonText: '继续编辑', type: 'warning' }
-    )
+    await confirmLeave('底稿')
     next()
   } catch {
     next(false)
@@ -573,7 +592,6 @@ onBeforeRouteLeave(async (_to, _from, next) => {
 onMounted(initUniver)
 
 onUnmounted(() => {
-  stopAutoSave()
   if (univerInstance) {
     try { univerInstance.dispose() } catch { /* ignore */ }
     univerInstance = null
@@ -617,8 +635,8 @@ onUnmounted(() => {
   z-index: 20; max-height: 300px; overflow-y: auto;
 }
 .gt-dirty-indicator {
-  color: #e6a23c;
-  font-size: 12px;
+  color: var(--gt-color-wheat);
+  font-size: var(--gt-font-size-xs);
   font-weight: 500;
 }
 </style>

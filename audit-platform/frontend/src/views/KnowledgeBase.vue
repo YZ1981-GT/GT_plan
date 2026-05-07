@@ -16,25 +16,25 @@
       </div>
     </transition>
 
-    <!-- 页面横幅 -->
-    <div class="gt-kb-banner">
-      <div class="gt-kb-banner-text">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 12px" @click="goHome">← 返回</el-button>
-        <div>
-          <h2 style="margin: 0">知识库</h2>
-          <p style="margin: 2px 0 0; opacity: 0.85">{{ folderTree.length }} 个分类 · {{ totalDocs }} 个文档</p>
-        </div>
-      </div>
-      <div class="gt-kb-banner-actions">
-        <el-input v-model="searchKeyword" placeholder="搜索文档..." size="small" clearable style="width: 180px"
-          @keyup.enter="onSearch" />
-        <el-button size="small" @click="onSearch" :loading="searchLoading" round>搜索</el-button>
-        <el-button size="small" @click="onCreateFolder" round>新建文件夹</el-button>
-        <el-button size="small" @click="onUploadDocs" round>上传文档</el-button>
-        <el-button size="small" @click="onUploadFolder" round>上传文件夹</el-button>
-        <el-button size="small" @click="loadTree" :loading="treeLoading" round>刷新</el-button>
-      </div>
-    </div>
+    <!-- 页面横幅 [R7-S3-01] -->
+    <GtPageHeader title="知识库" @back="goHome">
+      <template #actions>
+        <GtToolbar>
+          <template #left>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ folderTree.length }} 个分类 · {{ totalDocs }} 个文档</span>
+          </template>
+          <template #right>
+            <el-input v-model="searchKeyword" placeholder="搜索文档..." size="small" clearable style="width: 180px"
+              @keyup.enter="onSearch" />
+            <el-button size="small" @click="onSearch" :loading="searchLoading">搜索</el-button>
+            <el-button size="small" @click="onCreateFolder">新建文件夹</el-button>
+            <el-button size="small" @click="onUploadDocs">上传文档</el-button>
+            <el-button size="small" @click="onUploadFolder">上传文件夹</el-button>
+            <el-button size="small" @click="loadTree" :loading="treeLoading">刷新</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <!-- 主体：左树 + 右文档列表 -->
     <el-row :gutter="12" class="gt-kb-body">
@@ -254,6 +254,8 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete, confirmBatch, confirmDangerous } from '@/utils/confirm'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import { Upload, FolderOpened } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { knowledgeLibrary as P_kl } from '@/services/apiPaths'

@@ -168,7 +168,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import {
   generateCFSWorksheet, getCFSWorksheet, getCFSReconciliation,
   createCFSAdjustment, updateCFSAdjustment, deleteCFSAdjustment as apiDeleteAdj,
@@ -274,7 +275,7 @@ function editAdj(row: any) {
 }
 
 async function deleteAdj(row: any) {
-  await ElMessageBox.confirm('确定删除该调整分录？', '确认')
+  await confirmDelete('该调整分录')
   await apiDeleteAdj(row.id)
   ElMessage.success('删除成功')
   await fetchAll()

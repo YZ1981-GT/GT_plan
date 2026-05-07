@@ -184,9 +184,7 @@
                   <span class="gt-wpb-attach-name">{{ att.file_name }}</span>
                   <span class="gt-wpb-attach-meta">
                     {{ att.attachment_type || '通用' }}  {{ formatSize(att.file_size) }}
-                    <span v-if="att.ocr_status === 'success'" class="gt-wpb-ocr-badge gt-wpb-ocr--ok">OCR✓</span>
-                    <span v-else-if="att.ocr_status === 'processing'" class="gt-wpb-ocr-badge gt-wpb-ocr--ing">OCR中</span>
-                    <span v-else-if="att.ocr_status === 'failed'" class="gt-wpb-ocr-badge gt-wpb-ocr--fail">OCR✗</span>
+                    <OcrStatusBadge v-if="att.ocr_status" :status="getOcrStatus(att)" />
                   </span>
                 </div>
                 <el-button size="small" text type="primary" @click="onPreviewAttachment(att.id)">预览</el-button>
@@ -327,6 +325,7 @@ import { getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
 import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai, staff as P_staff } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
+import OcrStatusBadge from '@/components/common/OcrStatusBadge.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -520,6 +519,13 @@ function formatSize(bytes?: number): string {
   if (bytes < 1024) return `${bytes}B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`
+}
+
+function getOcrStatus(att: any): 'ok' | 'processing' | 'failed' | 'pending' {
+  if (att.ocr_status === 'completed' || att.ocr_status === 'success' || att.ocr_status === 'ok') return 'ok'
+  if (att.ocr_status === 'processing') return 'processing'
+  if (att.ocr_status === 'failed') return 'failed'
+  return 'pending'
 }
 
 // ── 数据加载 ──
@@ -732,6 +738,7 @@ async function onAttachFileSelect(file: any) {
 }
 
 function onPreviewAttachment(id: string) {
+  // TODO: replace window.open with AttachmentPreviewDrawer
   window.open(`${P_att.search}/${id}/preview`, '_blank')
 }
 
@@ -876,10 +883,6 @@ onMounted(async () => {
 .gt-wpb-attach-info { flex: 1; display: flex; flex-direction: column; }
 .gt-wpb-attach-name { font-size: 13px; font-weight: 500; }
 .gt-wpb-attach-meta { font-size: 11px; color: var(--gt-color-text-tertiary); display: flex; align-items: center; gap: 6px; }
-.gt-wpb-ocr-badge { font-size: 10px; padding: 1px 4px; border-radius: 3px; font-weight: 600; }
-.gt-wpb-ocr--ok { background: var(--gt-color-success-light); color: var(--gt-color-success); }
-.gt-wpb-ocr--ing { background: var(--gt-color-wheat-light); color: #b88a00; }
-.gt-wpb-ocr--fail { background: var(--gt-color-coral-light); color: var(--gt-color-coral); }
 .gt-wpb-attach-empty { text-align: center; padding: var(--gt-space-4); color: var(--gt-color-text-tertiary); font-size: 13px; }
 .gt-wpb-attach-actions { display: flex; gap: var(--gt-space-2); }
 /* 操作按钮 */

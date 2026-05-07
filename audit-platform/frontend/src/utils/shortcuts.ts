@@ -117,6 +117,10 @@ export function registerDefaultShortcuts(_router: any) {
     eventBus.emit('shortcut:help')
   }, '显示快捷键帮助面板', '全局')
 
+  shortcutManager.register('F1', () => {
+    eventBus.emit('shortcut:help')
+  }, '显示快捷键帮助面板', '全局')
+
   shortcutManager.register('Ctrl+TAB', () => {
     eventBus.emit('shortcut:tab-focus')
   }, '切换栏目焦点', '三栏/四栏布局')

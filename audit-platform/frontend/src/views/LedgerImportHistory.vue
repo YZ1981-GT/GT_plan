@@ -113,7 +113,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDangerous } from '@/utils/confirm'
 import {
   cancelImportJob,
   getActiveLedgerDataset,
@@ -189,9 +190,7 @@ async function loadAll() {
 }
 
 async function rollback(row: LedgerDataset) {
-  await ElMessageBox.confirm('确认回滚到上一 active 数据集？该操作会切换当前可见账表数据。', '回滚确认', {
-    type: 'warning',
-  })
+  await confirmDangerous('确认回滚到上一 active 数据集？该操作会切换当前可见账表数据。', '回滚确认')
   await rollbackLedgerDataset(projectId.value, row.id, selectedYear.value, '用户从导入历史页面发起回滚')
   ElMessage.success('回滚成功')
   await loadAll()

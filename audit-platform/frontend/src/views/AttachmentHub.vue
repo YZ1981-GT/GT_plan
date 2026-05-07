@@ -34,6 +34,9 @@
 import { ref, onMounted } from 'vue'
 import { Paperclip } from '@element-plus/icons-vue'
 import { listProjects } from '@/services/commonApi'
+import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue'
+
+// TODO: replace window.open with AttachmentPreviewDrawer when per-file preview is added to this hub view
 
 const loading = ref(false)
 const projects = ref<any[]>([])

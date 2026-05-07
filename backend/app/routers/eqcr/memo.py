@@ -104,3 +104,42 @@ async def finalize_eqcr_memo(
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/projects/{project_id}/memo/export")
+async def export_eqcr_memo(
+    project_id: UUID,
+    format: str = "docx",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """导出 EQCR 备忘录为 Word 文档 [R7-S3-04 Task 23]。
+
+    参数：
+        format: 'docx'（默认）
+    返回：
+        Word 文件字节流（application/vnd.openxmlformats-officedocument.wordprocessingml.document）
+    """
+    from fastapi.responses import Response
+    from app.services.eqcr_memo_service import EqcrMemoService
+
+    svc = EqcrMemoService(db)
+    try:
+        memo_data = await svc.generate_memo(project_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    sections = memo_data.get("sections") or {}
+    if not sections:
+        raise HTTPException(status_code=404, detail="备忘录尚未生成")
+
+    # 生成 Word 文档
+    from app.services.eqcr_memo_service import build_memo_docx_bytes
+    docx_bytes = build_memo_docx_bytes(sections, project_name=memo_data.get("project_name", ""))
+
+    filename = f"EQCR备忘录_{memo_data.get('project_name', project_id)}.docx"
+    return Response(
+        content=docx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

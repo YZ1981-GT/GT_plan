@@ -122,6 +122,7 @@
       :row-class-name="rowClassName"
       :cell-class-name="tbCellClassName"
       @cell-click="onTbCellClick"
+      @cell-dblclick="onTbCellDblClick"
       @cell-contextmenu="onTbCellContextMenu"
     >
       <el-table-column prop="standard_account_code" label="科目编码" width="130">
@@ -186,6 +187,9 @@
         <template #default="{ row }">
           <el-tooltip v-if="row.wp_consistency?.status === 'consistent'" content="底稿审定数一致" placement="top">
             <span style="color: #28a745; cursor: pointer" @dblclick="openWorkpaper(row)">✅</span>
+          </el-tooltip>
+          <el-tooltip v-else-if="row.wp_consistency?.status === 'stale'" content="上游数据已变更，点击重算">
+            <span style="color: var(--gt-color-teal, #009688); cursor: pointer" @click="onRecalcWp(row)">🔄</span>
           </el-tooltip>
           <el-tooltip v-else-if="row.wp_consistency?.status === 'inconsistent'" :content="`差异 ${row.wp_consistency.diff_amount}`" placement="top">
             <span style="color: #FF5149; cursor: pointer" @dblclick="openWorkpaper(row)">⚠️</span>
@@ -272,7 +276,7 @@
         </el-table-column>
         <el-table-column prop="review_status" label="状态" width="100">
           <template #default="{ row }">
-            <GtStatusTag :status-map="ADJUSTMENT_STATUS" status-map-name="ADJUSTMENT_STATUS" :value="row.review_status" />
+            <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
           </template>
         </el-table-column>
       </el-table>
@@ -349,7 +353,8 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
-import { ADJUSTMENT_STATUS } from '@/utils/statusMaps'
+import { handleApiError } from '@/utils/errorHandler'
+import { usePenetrate } from '@/composables/usePenetrate'
 import * as P from '@/services/apiPaths'
 
 const route = useRoute()
@@ -604,6 +609,13 @@ function openWorkpaper(row: TrialBalanceRow) {
   }
 }
 
+async function onRecalcWp(row: any) {
+  try {
+    await api.post(`/api/projects/${projectId.value}/working-papers/${row.wp_consistency?.wp_id}/recalc`)
+    ElMessage.success('重算已触发')
+  } catch (e) { handleApiError(e, '重算底稿') }
+}
+
 function onUnadjustedClick(_row: TrialBalanceRow) {
   router.push({
     name: 'Drilldown',
@@ -738,6 +750,7 @@ function copyTbTable() {
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const tbCtx = useCellSelection()
+const penetrate = usePenetrate()
 const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
 const tbSumLazyEdit = useLazyEdit()
 
@@ -784,6 +797,14 @@ function onKeydown(e: KeyboardEvent) {
     e.stopPropagation()
     tbSearch.toggle()
   }
+  // R7-S3-08：Ctrl+A 全选表格
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    const target = e.target as HTMLElement
+    if (target?.closest('.el-table')) {
+      e.preventDefault()
+      tbCtx.selectAll(groupedRows.value.length, 6)
+    }
+  }
 }
 
 function tbCellClassName({ rowIndex, columnIndex }: any) {
@@ -805,6 +826,14 @@ function onTbCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   tbCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   tbCtx.contextMenu.rowData = row
   tbCtx.contextMenu.itemName = row.account_name || ''
+}
+
+// R7-S3-09 Task 44：双击金额穿透到序时账
+function onTbCellDblClick(row: any, column: any) {
+  const amountCols = ['未审数', 'RJE调整', 'AJE调整', '审定数']
+  if (amountCols.includes(column.label) && row.standard_account_code) {
+    penetrate.toLedger(row.standard_account_code)
+  }
 }
 
 function onTbCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
@@ -972,7 +1001,7 @@ async function saveTbSummary() {
       { validateStatus: (s: number) => s < 600 }
     )
     ElMessage.success('试算平衡表已保存')
-  } catch { ElMessage.error('保存失败') }
+  } catch (e) { handleApiError(e, '保存试算平衡表') }
 }
 
 async function exportTbSummary() {

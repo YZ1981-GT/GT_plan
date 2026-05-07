@@ -166,6 +166,20 @@
           </el-table>
         </div>
       </el-tab-pane>
+
+      <!-- R7-S3-03：扩展 4 Tab 形成 QC Hub -->
+      <el-tab-pane label="规则库" name="rules" lazy>
+        <QcRuleListEmbed />
+      </el-tab-pane>
+      <el-tab-pane label="案例库" name="cases" lazy>
+        <QcCaseLibraryEmbed />
+      </el-tab-pane>
+      <el-tab-pane label="年报" name="annual" lazy>
+        <QcAnnualReportsEmbed />
+      </el-tab-pane>
+      <el-tab-pane label="客户趋势" name="trend" lazy>
+        <QcClientTrendEmbed />
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 录入结论对话框 -->
@@ -229,6 +243,10 @@ import { getInspections, getInspectionDetail, submitVerdict as apiSubmitVerdict,
 import { getAuditLogFindings, runAuditLogCompliance, updateFindingStatus } from '@/services/qcAuditLogComplianceApi'
 import http from '@/utils/http'
 import { qcInspections as P_insp } from '@/services/apiPaths'
+import QcRuleListEmbed from '@/components/qc/QcRuleListEmbed.vue'
+import QcCaseLibraryEmbed from '@/components/qc/QcCaseLibraryEmbed.vue'
+import QcAnnualReportsEmbed from '@/components/qc/QcAnnualReportsEmbed.vue'
+import QcClientTrendEmbed from '@/components/qc/QcClientTrendEmbed.vue'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

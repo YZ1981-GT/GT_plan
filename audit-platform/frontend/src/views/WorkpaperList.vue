@@ -1,43 +1,50 @@
 ﻿<template>
   <div class="gt-wp-list gt-fade-in">
-    <!-- 顶部筛选栏 -->
-    <div class="gt-wp-filter-bar">
-      <el-button text size="small" style="margin-right: 6px" @click="$router.push('/projects')">← 返回</el-button>
-      <h2 class="gt-page-title">底稿管理</h2>
-      <div v-if="treeData.length > 0" class="gt-wp-view-toggle">
-        <el-radio-group v-model="viewMode" size="small">
-          <el-radio-button value="list">列表</el-radio-button>
-          <el-radio-button value="kanban">看板</el-radio-button>
-        </el-radio-group>
-      </div>
-      <div v-if="treeData.length > 0" class="gt-wp-filters">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索底稿..."
-          clearable
-          size="default"
-          style="width: 200px"
-          @input="onSearchDebounce"
-        />
-        <el-select v-model="filterCycle" placeholder="审计循环" clearable size="default" style="width: 160px">
-          <el-option v-for="c in cycleOptions" :key="c.value" :label="c.label" :value="c.value" />
-        </el-select>
-        <el-select v-model="filterStatus" placeholder="状态" clearable size="default" style="width: 130px">
-          <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-        <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 130px">
-          <el-option label="全部" value="" />
-          <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
-        </el-select>
-        <el-button @click="fetchData" :loading="loading">刷新</el-button>
-        <el-button @click="showWpImport = true">📥 Excel导入</el-button>
-        <el-button type="primary" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
-          批量下载 ({{ selectedWpIds.length }})
-        </el-button>
-        <el-button type="warning" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
-          批量委派 ({{ selectedWpIds.length }})
-        </el-button>
-      </div>
+    <!-- 页面横幅 [R7-S3-01] -->
+    <GtPageHeader title="底稿管理" @back="$router.push('/projects')">
+      <template #actions>
+        <GtToolbar :show-import="true" import-label="Excel导入" @import="showWpImport = true">
+          <template #left>
+            <div v-if="treeData.length > 0" class="gt-wp-view-toggle">
+              <el-radio-group v-model="viewMode" size="small">
+                <el-radio-button value="list">列表</el-radio-button>
+                <el-radio-button value="kanban">看板</el-radio-button>
+              </el-radio-group>
+            </div>
+          </template>
+          <template #right>
+            <el-button @click="fetchData" :loading="loading" size="small">刷新</el-button>
+            <el-button type="primary" size="small" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
+              批量下载 ({{ selectedWpIds.length }})
+            </el-button>
+            <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
+              批量委派 ({{ selectedWpIds.length }})
+            </el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
+
+    <!-- 筛选栏（独立行，内容多不塞进 GtToolbar） -->
+    <div v-if="treeData.length > 0" class="gt-wp-filter-bar">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="搜索底稿..."
+        clearable
+        size="default"
+        style="width: 200px"
+        @input="onSearchDebounce"
+      />
+      <el-select v-model="filterCycle" placeholder="审计循环" clearable size="default" style="width: 160px">
+        <el-option v-for="c in cycleOptions" :key="c.value" :label="c.label" :value="c.value" />
+      </el-select>
+      <el-select v-model="filterStatus" placeholder="状态" clearable size="default" style="width: 130px">
+        <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+      <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 130px">
+        <el-option label="全部" value="" />
+        <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
+      </el-select>
     </div>
 
     <!-- 进度指示器（任务 7.2） -->
@@ -74,14 +81,14 @@
       <div class="gt-wp-intro-half gt-wp-intro-half--guide">
         <h3 class="gt-wp-guide-title">审计程序与底稿体系</h3>
         <div class="gt-wp-guide-flow">
-          <span class="gt-wp-flow-tag" style="background:#7c5cbf">B 风险评估</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-primary)">B 风险评估</span>
           <span class="gt-wp-flow-arrow">→</span>
-          <span class="gt-wp-flow-tag" style="background:#6a4fa0">C 控制测试</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-primary-dark)">C 控制测试</span>
           <span class="gt-wp-flow-arrow">→</span>
-          <span class="gt-wp-flow-tag" style="background:#e6553a">D-N 实质性程序</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-coral)">D-N 实质性程序</span>
           <span class="gt-wp-flow-arrow">→</span>
-          <span class="gt-wp-flow-tag" style="background:#1a8a5c">A 完成阶段</span>
-          <span class="gt-wp-flow-tag" style="background:#7f8c8d;margin-left:4px">S 特定项目</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-success)">A 完成阶段</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-text-tertiary); margin-left: 4px">S 特定项目</span>
         </div>
         <div class="gt-wp-guide-list">
           <div
@@ -101,7 +108,7 @@
     <!-- 加载中 -->
     <div v-else-if="loading" class="gt-wp-empty-full">
       <el-icon class="is-loading" style="font-size: 28px; color: var(--gt-color-primary)"><Loading /></el-icon>
-      <div style="margin-top: 12px; font-size: 14px; color: #999">加载中...</div>
+      <div style="margin-top: 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary)">加载中...</div>
     </div>
 
     <!-- 有数据时：左右分栏 -->
@@ -122,7 +129,7 @@
           <template #default="{ data }">
             <div class="gt-wp-tree-node">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
-              <GtStatusTag v-if="data.status" :status-map="WP_STATUS" status-map-name="WP_STATUS" :value="data.status" class="gt-wp-tree-node-tag" />
+              <GtStatusTag v-if="data.status" dict-key="wp_status" :value="data.status" class="gt-wp-tree-node-tag" />
             </div>
           </template>
         </el-tree>
@@ -138,10 +145,10 @@
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
               <el-descriptions-item label="审计循环">{{ selectedWp.audit_cycle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="编制状态">
-                <el-tag size="small" :type="(dictStore.type('wp_status', selectedWp.status)) || undefined">{{ dictStore.label('wp_status', selectedWp.status) }}</el-tag>
+                <GtStatusTag dict-key="wp_status" :value="selectedWp.status" />
               </el-descriptions-item>
               <el-descriptions-item label="复核状态">
-                <el-tag size="small" :type="(dictStore.type('wp_review_status', selectedWp.review_status)) || undefined">{{ dictStore.label('wp_review_status', selectedWp.review_status) }}</el-tag>
+                <GtStatusTag dict-key="wp_review_status" :value="selectedWp.review_status" />
               </el-descriptions-item>
               <el-descriptions-item label="编制人">{{ resolveUserName(selectedWp.assigned_to) }}</el-descriptions-item>
               <el-descriptions-item label="复核人">{{ resolveUserName(selectedWp.reviewer) }}</el-descriptions-item>
@@ -513,7 +520,8 @@ import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
-import { WP_STATUS, WP_REVIEW_STATUS } from '@/utils/statusMaps'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import { useDictStore } from '@/stores/dict'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,

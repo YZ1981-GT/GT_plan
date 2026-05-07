@@ -515,3 +515,26 @@ a, button, .el-button, .el-tag, .el-tree-node__content,
   background: rgba(75, 45, 119, 0.15);
   color: var(--gt-color-primary-dark);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   编辑模式横条 [R7-S2-03]
+   ═══════════════════════════════════════════════════════════════ */
+
+.gt-edit-mode-ribbon {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(90deg, #fff8e6 0%, #fff3cd 100%);
+  border-bottom: 1px solid #ffc107;
+  font-size: 12px;
+  color: #856404;
+  font-weight: 500;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.gt-edit-mode-ribbon .gt-edit-mode-icon {
+  font-size: 14px;
+}

@@ -90,7 +90,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import { Refresh, Plus } from '@element-plus/icons-vue'
 import ModelTable from '@/components/ai/ModelTable.vue'
 import type { AIModel, AIModelCreate, AIHealthStatus } from '@/services/aiModelApi'
@@ -168,9 +169,7 @@ function onEdit(model: AIModel) {
 }
 
 async function onDelete(model: AIModel) {
-  await ElMessageBox.confirm(`确定删除模型「${model.model_name}」？`, '确认删除', {
-    type: 'warning',
-  })
+  await confirmDelete(`模型「${model.model_name}」`)
   try {
     await deleteAIModel(model.id)
     ElMessage.success('已删除')

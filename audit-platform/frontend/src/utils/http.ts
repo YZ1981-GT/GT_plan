@@ -12,6 +12,11 @@ import { useAuthStore } from '@/stores/auth'
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
 
+// ── Trace ID 存储（R7-S2-11）──────────────────────────────
+let _lastTraceId = ''
+/** 获取最近一次请求的 trace id（X-Request-ID 响应头） */
+export function getLastTraceId(): string { return _lastTraceId }
+
 const http = axios.create({
   baseURL: '/',
   timeout: 30000,
@@ -132,6 +137,8 @@ let refreshQueue: Array<{
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     removePending(response.config as InternalAxiosRequestConfig)
+    // R7-S2-11: 存储 trace id
+    _lastTraceId = response.headers?.['x-request-id'] || ''
     // NProgress：所有请求完成后结束进度条
     activeRequests = Math.max(0, activeRequests - 1)
     if (activeRequests === 0) NProgress.done()
@@ -161,6 +168,8 @@ http.interceptors.response.use(
   },
   async (error: AxiosError) => {
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
+    // R7-S2-11: 存储 trace id（错误响应）
+    _lastTraceId = (error.response?.headers as any)?.['x-request-id'] || ''
     // NProgress：错误时也递减计数
     activeRequests = Math.max(0, activeRequests - 1)
     if (activeRequests === 0) NProgress.done()

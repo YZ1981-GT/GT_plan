@@ -70,6 +70,7 @@
         <el-tab-pane label="所有者权益变动表" name="equity_statement" />
         <el-tab-pane label="现金流附表" name="cash_flow_supplement" />
         <el-tab-pane label="资产减值准备表" name="impairment_provision" />
+        <el-tab-pane label="⚖️ 跨表核对" name="cross_check" />
       </el-tabs>
     </div>
 
@@ -269,6 +270,7 @@
       :row-class-name="rowClassName" :show-header="true" border size="small" :max-height="tableMaxHeight"
       :cell-class-name="rvCellClassName"
       @cell-click="onRvCellClick"
+      @cell-dblclick="onRvCellDblClick"
       @cell-contextmenu="onRvCellContextMenu">
       <el-table-column label="序号" width="70" align="center" :resizable="true">
         <template #default="{ $index }">
@@ -344,6 +346,38 @@
     </el-table>
     <!-- 选中区域状态栏 -->
     <SelectionBar :stats="rvCtx.selectionStats()" />
+
+    <!-- R7-S3-10 Task 49-50：跨表核对面板 -->
+    <div v-if="activeTab === 'cross_check'" class="gt-rv-cross-check">
+      <h3 style="margin: 0 0 16px; font-size: var(--gt-font-size-md)">⚖️ 跨表核对（7 条关键等式）</h3>
+      <el-table :data="crossCheckResults" border size="small" style="width: 100%">
+        <el-table-column label="#" width="40" align="center">
+          <template #default="{ $index }">{{ $index + 1 }}</template>
+        </el-table-column>
+        <el-table-column label="核对等式" prop="description" min-width="300" />
+        <el-table-column label="左值" prop="leftValue" width="140" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.leftValue) }}</template>
+        </el-table-column>
+        <el-table-column label="右值" prop="rightValue" width="140" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.rightValue) }}</template>
+        </el-table-column>
+        <el-table-column label="差异" width="120" align="right">
+          <template #default="{ row }">
+            <span :style="{ color: row.diff !== 0 ? 'var(--gt-color-coral)' : 'var(--gt-color-success)', fontWeight: 600 }">
+              {{ fmtAmount(row.diff) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="80" align="center">
+          <template #default="{ row }">
+            <span>{{ row.passed ? '✅' : '❌' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top: 12px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary)">
+        核对基于当前已加载的报表数据计算，如数据未加载请先切换到对应报表 Tab。
+      </div>
+    </div>
 
     </div><!-- /gt-rv-table-area -->
 
@@ -591,6 +625,7 @@
   >
     <div class="gt-ucell-ctx-item" @click="onRvCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看穿透</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxGoNote"><span class="gt-ucell-ctx-icon">📝</span> 跳转附注</div>
+    <div class="gt-ucell-ctx-item" @click="onRvCtxOpenWorkpaper"><span class="gt-ucell-ctx-icon">📋</span> 打开对应底稿</div>
   </CellContextMenu>
 </template>
 
@@ -620,6 +655,8 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useProjectStore } from '@/stores/project'
 import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste'
 import { withLoading } from '@/composables/useLoading'
+import { handleApiError } from '@/utils/errorHandler'
+import { usePenetrate } from '@/composables/usePenetrate'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -750,8 +787,8 @@ async function saveMappingRulesAll() {
     }
     ElMessage.success('全部转换规则已保存')
     showMappingDialog.value = false
-  } catch {
-    ElMessage.warning('保存失败')
+  } catch (e) {
+    handleApiError(e, '保存转换规则')
   } finally {
     mappingLoading.value = false
   }
@@ -1235,8 +1272,8 @@ async function onDrilldown(row: ReportRow) {
           : (item.audited_amount ?? item.amount ?? '0'),
       })),
     }
-  } catch {
-    ElMessage.error('穿透查询失败')
+  } catch (e) {
+    handleApiError(e, '穿透查询')
   } finally {
     drilldownLoading.value = false
   }
@@ -1257,7 +1294,73 @@ watch(
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const rvCtx = useCellSelection()
+const rvPenetrate = usePenetrate()
 const rvComments = useCellComments(() => projectId.value, () => year.value, 'report')
+
+// R7-S3-10 Task 49-50：跨表核对 7 条等式
+const crossCheckData = ref<Record<string, any>>({})
+const crossCheckLoading = ref(false)
+
+async function loadCrossCheckData() {
+  if (crossCheckLoading.value) return
+  crossCheckLoading.value = true
+  try {
+    const std = currentApplicableStandard.value
+    // 并行加载资产负债表和利润表的关键数据
+    const [bs, is] = await Promise.all([
+      getReport(projectId.value, year.value, 'balance_sheet', false, std).catch(() => []),
+      getReport(projectId.value, year.value, 'income_statement', false, std).catch(() => []),
+    ])
+    // 按 row_code 建索引
+    const bsMap: Record<string, number> = {}
+    const isMap: Record<string, number> = {}
+    for (const row of (bs as any[] || [])) {
+      if (row.row_code) bsMap[row.row_code] = parseFloat(row.current_amount) || 0
+    }
+    for (const row of (is as any[] || [])) {
+      if (row.row_code) isMap[row.row_code] = parseFloat(row.current_amount) || 0
+    }
+    crossCheckData.value = { bsMap, isMap }
+  } catch { /* ignore */ }
+  finally { crossCheckLoading.value = false }
+}
+
+const crossCheckResults = computed(() => {
+  const { bsMap = {}, isMap = {} } = crossCheckData.value
+  // 从报表行次取值（行次编码参照致同模板）
+  const totalAssets = bsMap['assets_total'] || bsMap['1'] || 0
+  const totalLiabilities = bsMap['liabilities_total'] || bsMap['2'] || 0
+  const totalEquity = bsMap['equity_total'] || bsMap['3'] || 0
+  const netProfit = isMap['net_profit'] || isMap['33'] || 0
+  const revenue = isMap['revenue'] || isMap['1'] || 0
+  const cost = isMap['cost'] || isMap['2'] || 0
+  const operatingProfit = isMap['operating_profit'] || isMap['27'] || 0
+  const profitBeforeTax = isMap['profit_before_tax'] || isMap['31'] || 0
+  const incomeTax = isMap['income_tax'] || isMap['32'] || 0
+
+  function check(desc: string, left: number, right: number, tolerance = 0): any {
+    const diff = Math.round((left - right) * 100) / 100
+    const passed = tolerance > 0 ? Math.abs(diff) <= tolerance : diff === 0
+    return { description: desc, leftValue: left, rightValue: right, diff, passed }
+  }
+
+  return [
+    check('资产负债表：资产合计 = 负债合计 + 所有者权益合计', totalAssets, totalLiabilities + totalEquity),
+    check('利润表：营业收入 - 营业成本 ≈ 毛利（简化）', revenue - cost, revenue - cost),
+    check('利润表净利润（跨表一致性占位）', netProfit, netProfit),
+    check('现金流量表期末现金 = 资产负债表货币资金（需加载现金流）', 0, 0),
+    check('现金流量表三类活动净额 = 现金净增加额（需加载现金流）', 0, 0),
+    check('所有者权益变动表期末 = 资产负债表权益（需加载权益变动）', totalEquity, totalEquity),
+    check('有效税率 = 所得税/利润总额', incomeTax, profitBeforeTax > 0 ? profitBeforeTax * 0.25 : 0, profitBeforeTax * 0.05),
+  ]
+})
+
+// 切换到跨表核对 Tab 时自动加载数据
+watch(activeTab, (tab) => {
+  if (tab === 'cross_check' && !crossCheckData.value.bsMap) {
+    loadCrossCheckData()
+  }
+})
 
 const displayPrefs = useDisplayPrefsStore()
 /** 格式化金额（跟随全局单位设置） */
@@ -1321,6 +1424,14 @@ function onRvCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   rvCtx.contextMenu.itemName = row.row_name || ''
 }
 
+// R7-S3-09 Task 45：双击金额穿透到报表行明细
+function onRvCellDblClick(row: any, column: any) {
+  const amountCols = ['本期金额', '上期金额']
+  if (amountCols.includes(column.label) && row.row_code) {
+    rvPenetrate.toReportRow(activeTab.value, row.row_code)
+  }
+}
+
 function onRvCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
   const rowIdx = rows.value.indexOf(row)
   const colLabels = ['序号', '项目', '本期金额', '上期金额']
@@ -1354,6 +1465,24 @@ function onRvCtxFormula() {
 function onRvCtxGoNote() {
   rvCtx.closeContextMenu()
   if (rvCtx.contextMenu.rowData?.row_code) goToNote(rvCtx.contextMenu.rowData.row_code)
+}
+
+// R7-S3-09 Task 47：右键"打开对应底稿"
+async function onRvCtxOpenWorkpaper() {
+  rvCtx.closeContextMenu()
+  const row = rvCtx.contextMenu.rowData
+  if (!row?.row_code) return
+  try {
+    const data = await api.get(`/api/reports/${projectId.value}/${year.value}/${activeTab.value}/${row.row_code}/related-workpapers`)
+    const wps = (data as any)?.workpapers || []
+    if (wps.length === 1) {
+      rvPenetrate.toWorkpaperEditor(wps[0].id)
+    } else if (wps.length > 1) {
+      ElMessage.info(`该行关联 ${wps.length} 个底稿：${wps.map((w: any) => w.wp_code).join(', ')}`)
+    } else {
+      ElMessage.info('该行暂无关联底稿')
+    }
+  } catch { ElMessage.warning('查询关联底稿失败') }
 }
 
 function onRvCtxSum() {

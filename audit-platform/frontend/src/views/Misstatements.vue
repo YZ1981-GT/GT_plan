@@ -1,34 +1,24 @@
 <template>
   <div class="gt-misstatements gt-fade-in">
-    <!-- 页面横幅 -->
-    <div class="gt-ms-banner">
-      <div class="gt-ms-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-ms-title">未更正错报汇总</h2>
-        <div class="gt-ms-info-bar">
-          <div class="gt-ms-info-item">
-            <span class="gt-ms-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-ms-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-ms-info-sep" />
-          <div class="gt-ms-info-item">
-            <span class="gt-ms-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-ms-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-ms-info-sep" />
-          <div class="gt-ms-info-item">
-            <span class="gt-ms-info-badge">累计错报 vs 重要性水平</span>
-          </div>
-        </div>
-      </div>
-      <div class="gt-ms-banner-row2">
-        <el-button size="small" @click="openCreateDialog">+ 新增错报</el-button>
-      </div>
-    </div>
+    <!-- 页面横幅 [R7-S3-01] -->
+    <GtPageHeader title="未更正错报汇总" @back="router.push('/projects')">
+      <GtInfoBar
+        :show-unit="true"
+        :show-year="true"
+        :unit-value="selectedProjectId"
+        :year-value="selectedYear"
+        :badges="[{ value: '累计错报 vs 重要性水平' }]"
+        @unit-change="onProjectChange"
+        @year-change="onYearChange"
+      />
+      <template #actions>
+        <GtToolbar>
+          <template #left>
+            <el-button size="small" type="primary" @click="openCreateDialog">+ 新增错报</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <!-- 重要性水平对比卡片 -->
     <div class="gt-ms-materiality-cards" v-if="summary">
@@ -91,7 +81,7 @@
         点击"新增"手动录入，或在调整分录页面驳回 AJE 时自动生成。累计金额超过重要性水平时系统会预警。
       </div>
     </el-alert>
-    <el-table :data="items" v-loading="loading" border stripe style="width: 100%">
+    <el-table ref="msTableRef" :data="items" v-loading="loading" border stripe style="width: 100%">
       <el-table-column prop="misstatement_description" label="错报描述" min-width="200" show-overflow-tooltip />
       <el-table-column label="类型" width="100">
         <template #default="{ row }">
@@ -163,7 +153,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
+import { usePasteImport } from '@/composables/usePasteImport'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import {
   listMisstatements, createMisstatement, updateMisstatement,
   deleteMisstatement, getMisstatementSummary,
@@ -185,6 +180,32 @@ const loading = ref(false)
 const submitLoading = ref(false)
 const items = ref<MisstatementItem[]>([])
 const summary = ref<MisstatementSummaryData | null>(null)
+
+// R7 技术债 5：粘贴入库
+const msTableRef = ref<HTMLElement | null>(null)
+usePasteImport({
+  containerRef: msTableRef,
+  columns: [
+    { key: 'misstatement_description', label: '错报描述' },
+    { key: 'misstatement_type', label: '类型' },
+    { key: 'affected_account_code', label: '科目编码' },
+    { key: 'misstatement_amount', label: '金额' },
+  ],
+  onInsert: async (rows) => {
+    for (const r of rows) {
+      await createMisstatement(projectId.value, {
+        misstatement_type: r.misstatement_type || 'factual',
+        misstatement_description: r.misstatement_description || '',
+        affected_account_code: r.affected_account_code || '',
+        affected_account_name: '',
+        misstatement_amount: String(parseFloat(r.misstatement_amount) || 0),
+        year: year.value,
+      })
+    }
+    fetchItems()
+    fetchSummary()
+  },
+})
 
 const formVisible = ref(false)
 const isEditing = ref(false)
@@ -279,7 +300,7 @@ async function onSubmit() {
 }
 
 async function onDelete(row: MisstatementItem) {
-  await ElMessageBox.confirm('确定删除该错报记录？', '确认')
+  await confirmDelete('该错报记录')
   await deleteMisstatement(projectId.value, row.id)
   ElMessage.success('删除成功')
   fetchItems()
