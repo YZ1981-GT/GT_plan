@@ -300,3 +300,74 @@
 | 新旧引擎并存复杂度 | 低 | 中 | feature flag + 灰度发布，项目级 override 可快速回退单项目 |
 | 适配器打分冲突 | 低 | 低 | design §26 已列为已知问题；tie-breaker 规则（文件名权重 > 列名权重）在 Sprint 1 Task 14 中落实 |
 | AI 兜底成本/延迟 | 低 | 低 | 封顶置信度 60 + 每日每项目 20 次上限 + 脱敏；可选功能默认关闭 |
+
+
+---
+
+## Sprint 6：账表导入全链路深度修复（第 7 周 / 20 tasks / 对齐 2026-05-08 复盘）
+
+> **驱动**：9 家真实样本验证发现 v2 引擎在"识别 → 转换 → 写入 → 事务 → 运维"五层都有真实 bug 或架构债。Sprint 6 聚焦 P0-P1 项目，目标 Worker 端到端真实入库跑通并回归稳定。
+
+### 架构清洁（死代码+边界模糊）
+
+- [ ] **Task S6-1** 删除 `aux_derivation.py` 死代码（职责已在 converter 完成，`_execute_v2` 未调用）；同步更新 `ledger_import/__init__.py` 不再导出 — 0.5h
+- [ ] **Task S6-2** `_clear_project_year_tables` 迁移到 `writer.py` 新增 `clear_project_year(db, project_id, year)` 函数；`_execute_v2` 改调新函数 — 1h
+- [ ] **Task S6-3** `_execute_v2` 全量迁移到 `ledger_import/orchestrator.py` 新增 `execute_job(job_id, ...)` 入口；`import_job_runner._execute_v2` 薄包装只保留分支跳转 — 3h
+
+### 运维可观测性 + 容灾
+
+- [ ] **Task S6-4** `_execute_v2` 最外层 try/except 兜底：即使 import/DB 初始化失败也要写 `error_message` + `result_summary['phase']='bootstrap'` 到 job 表；释放 ImportQueueService.lock — 1h
+- [ ] **Task S6-5** 各 Phase 入口加 `logger.info("ImportJob {} phase={} ...")` 结构化日志，便于失败时通过日志快速定位卡在哪一步 — 0.5h
+
+### 转换层修复
+
+- [ ] **Task S6-6** `prepare_rows_with_raw_extra` 多列映射到同一 std_field 时，被丢弃的列值进入 `raw_extra["_discarded_mappings"][std_field] = [{header, value}]`，不再静默丢失 — 1.5h
+- [ ] **Task S6-7** 空值策略统一：`_insert_aux_balance` / `_insert_aux_ledger` 中 `aux_code`/`aux_name` 空串改为 NULL；converter 返回 `None` 而非 `""`；更新模型字段 default/nullable 校验；补 test — 1.5h
+- [ ] **Task S6-8** 辅助维度类型重名：`tb_aux_balance` / `tb_aux_ledger` 新增 `aux_dimensions_raw` 已有列的穿透查询支持按 `(account_code, aux_type, aux_code)` 三元组定位，避免"税率"在客户/项目下混淆；补端点 `GET /api/projects/{pid}/ledger/aux-ledger/by-triplet` — 2h
+
+### 识别层修复
+
+- [ ] **Task S6-9** 和平物流余额表识别：`identifier.identify` L1 命中且 `score ≥ 85` 时锁定 table_type，L2 只用于列映射不投票；加到 `ledger_recognition_rules.json.matching_config.l1_lock_threshold` — 2h
+- [ ] **Task S6-10** 真实样本 `和平物流25加工账-药品批发.xlsx` 补 smoke test，断言余额表识别为 balance — 0.5h
+
+### 解析层修复
+
+- [ ] **Task S6-11** `iter_excel_rows` 和 `iter_excel_rows_from_path` 合并底层：提取 `_iter_excel_from_workbook(wb, ...)` 共用函数，两个入口各自 load_workbook 后调用同一逻辑 — 1.5h
+- [ ] **Task S6-12** xlsx 合并单元格 forward-fill 可选策略：`iter_excel_rows_from_path(..., forward_fill_cols=[0, 1])` 支持指定列向下填充；辅助明细账 account_code 场景专用 — 2h
+
+### 写入层事务边界
+
+- [ ] **Task S6-13** `_execute_v2` 走 staged 模式：创建 `LedgerDataset(status='staging')` → 4 张表 insert 时 `dataset_id=staging_id` → 全部成功后 `activate_dataset()` 原子切换 → 失败时 `DatasetService.mark_failed_for_job` — 3h
+- [ ] **Task S6-14** `rebuild_aux_balance_summary` 加 dataset_id 过滤（只汇总本次 staging，不污染历史激活数据） — 1h
+
+### Incremental 追加
+
+- [ ] **Task S6-15** `ledger_data_service.apply_incremental(project_id, year, new_file_periods)` 真正的"按期间追加"：只删 overlap 期间，插入 new 期间；走 staged 模式 — 3h
+- [ ] **Task S6-16** `routers/ledger_data.py` 新增 `POST /incremental/apply` 端点 + 前端 `LedgerDataManager.vue` 增量追加 Tab 打通 — 1.5h
+
+### 端到端验证
+
+- [ ] **Task S6-17** `backend/tests/ledger_import/test_execute_v2_e2e.py` 集成测试：直接调 `ImportJobRunner.run_job()` 路径，mock upload_bundle 为 YG36 真实文件副本，断言 PG 四张表行数均 > 0 + tb_aux_ledger.aux_type 有"金融机构"/"客户"/"税率" — 3h
+- [ ] **Task S6-18** CI 加 v2 smoke step：pytest 只跑 test_execute_v2_e2e，fail 则整个 pipeline red — 0.5h
+
+### 测试补齐
+
+- [ ] **Task S6-19** `test_prepare_rows_discarded.py` 覆盖 Task S6-6 的丢弃列保留逻辑 — 1h
+- [ ] **Task S6-20** `test_aux_triplet_penetration.py` 覆盖 Task S6-8 的三元组查询 — 1h
+
+**Sprint 6 小计**：约 30h（核心 2 周）
+
+---
+
+## Sprint 7：UX + 运维可观测（后续规划，本轮不做）
+
+- [ ] `ledger_data_service.delete` 改软删除 + 回收站
+- [ ] `LedgerDataManager.vue` 挂载到项目设置页/数据管理页
+- [ ] 前端识别失败时允许手动改 table_type
+- [ ] raw_extra GIN 索引支持查询
+- [ ] 进度条改走 `import_jobs` 表轮询（替换内存态 ImportQueueService）
+- [ ] L2/L3 容差按金额量级动态
+- [ ] force_activate 审批链落地
+- [ ] 识别准确率 metric 仪表盘（Metabase）
+- [ ] 大文件性能基准 CI 门禁（内存 < 2GB / 耗时 < 10min）
+- [ ] adapter 机制取舍（删或改纯别名包）

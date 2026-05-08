@@ -170,15 +170,47 @@ def prepare_rows_with_raw_extra(
     transformed: list[dict[str, Any]] = []
     warnings: list[LedgerImportError] = []
 
+    # 识别多对一映射：哪些 std_field 有多个原始列来源
+    std_field_sources: dict[str, list[str]] = {}
+    for orig_header, std_field in column_mapping.items():
+        std_field_sources.setdefault(std_field, []).append(orig_header)
+    multi_source_fields = {
+        sf: srcs for sf, srcs in std_field_sources.items() if len(srcs) > 1
+    }
+
     for raw_row in raw_rows:
         std_row: dict[str, Any] = {}
+        discarded_mappings: dict[str, list[dict]] = {}
 
-        # Map known columns to standard fields
+        # Map known columns to standard fields.
+        # 多个原始列可能映射到同一个 standard_field（如"核算维度"和"主表项目"都→aux_dimensions），
+        # 策略：首个非空值保留到 std_row[std_field]；其余非空值收集到 raw_extra["_discarded_mappings"]
+        # 避免被静默丢失（design §9.4 + Sprint 6 Task S6-6）
         for orig_header, std_field in column_mapping.items():
-            std_row[std_field] = raw_row.get(orig_header)
+            val = raw_row.get(orig_header)
+            val_str = str(val).strip() if val is not None else ""
+            existing = std_row.get(std_field)
+            existing_str = str(existing).strip() if existing is not None else ""
+
+            if not existing_str:
+                # 第一个非空 → 保留
+                std_row[std_field] = val
+            elif val_str and std_field in multi_source_fields:
+                # 已有非空值，此列又有值 → 收集为 discarded
+                discarded_mappings.setdefault(std_field, []).append({
+                    "header": orig_header,
+                    "value": val,
+                })
 
         # Build raw_extra from unmapped columns
         extra, warning = build_raw_extra(raw_row, mapped_headers, original_headers)
+
+        # 合并丢弃的多对一映射值到 raw_extra["_discarded_mappings"]
+        if discarded_mappings:
+            if extra is None:
+                extra = {}
+            extra["_discarded_mappings"] = discarded_mappings
+
         if extra is not None:
             std_row["raw_extra"] = extra
         else:
@@ -233,5 +265,40 @@ __all__ = [
     "build_raw_extra",
     "prepare_rows_with_raw_extra",
     "activate_dataset",
+    "clear_project_year",
     "RAW_EXTRA_MAX_BYTES",
 ]
+
+
+async def clear_project_year(project_id: UUID, year: int, db) -> None:
+    """Soft-delete 四表 + 标记旧 ImportBatch 为 rolled_back（S6-2 从 smart_import_engine 迁出）。
+
+    确保每个 project-year 只保留一份有效数据集，避免新旧导入混存。
+    """
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import (
+        ImportBatch, ImportStatus,
+        TbAuxBalance, TbAuxLedger, TbBalance, TbLedger,
+    )
+
+    for model in (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger):
+        tbl = model.__table__
+        await db.execute(
+            sa.update(tbl)
+            .where(
+                tbl.c.project_id == project_id,
+                tbl.c.year == year,
+                tbl.c.is_deleted == sa.false(),
+            )
+            .values(is_deleted=True)
+        )
+    await db.execute(
+        sa.update(ImportBatch)
+        .where(
+            ImportBatch.project_id == project_id,
+            ImportBatch.year == year,
+            ImportBatch.status == ImportStatus.completed,
+        )
+        .values(status=ImportStatus.rolled_back)
+    )
+    await db.flush()

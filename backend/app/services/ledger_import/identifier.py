@@ -871,8 +871,20 @@ def identify(sheet: SheetDetection) -> SheetDetection:
     total_weight = sum(weights.values())
     conflict = False
 
+    # S6-9: L1 强信号锁定机制——sheet 名命中且置信度 ≥ l1_lock_threshold 时，
+    # 锁定 table_type 为 L1 的判断，不让 L2/L3 否决（典型场景：和平物流的
+    # "余额表" sheet 被非标准列结构让 L2 误投 ledger）
+    l1_lock_threshold = MATCHING_CONFIG.get("l1_lock_threshold", 85)
+    l1_locked = (
+        l1_type != "unknown"
+        and l1_score >= l1_lock_threshold
+    )
+
     if votes:
-        final_type: TableType = max(votes, key=lambda k: votes[k])
+        if l1_locked:
+            final_type = l1_type  # type: ignore[assignment]
+        else:
+            final_type: TableType = max(votes, key=lambda k: votes[k])
         # 计算最终置信度：
         # 使用实际贡献权重归一化，确保单级别强信号也能给出合理分数
         contributing_weight = 0.0
@@ -886,7 +898,10 @@ def identify(sheet: SheetDetection) -> SheetDetection:
 
         # 归一化方式：按贡献权重归一化，但不超过 95
         # 这样 L1 alone (90 * 0.2 / 0.2) = 90, L2 alone (95 * 0.5 / 0.5) = 95
-        if contributing_weight > 0:
+        if l1_locked:
+            # L1 锁定：置信度直接用 L1 score（封顶 95）
+            final_conf = int(min(l1_score, 95))
+        elif contributing_weight > 0:
             final_conf = int(min(votes[final_type] * 100 / contributing_weight, 95))
         else:
             final_conf = 0
@@ -936,10 +951,12 @@ def identify(sheet: SheetDetection) -> SheetDetection:
             **{k: v for k, v in l3_evidence.items() if k != "confidence"},
         },
         "final_choice": {
-            "source": "weighted_aggregation",
+            "source": "l1_locked" if l1_locked else "weighted_aggregation",
             "table_type": final_type,
             "confidence": final_conf,
             "conflict": conflict,
+            "l1_locked": l1_locked,
+            "l1_lock_threshold": l1_lock_threshold,
             "votes": {str(k): round(v, 4) for k, v in votes.items()},
             "vote_details": vote_details,
             "weights": weights,

@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from backend.app.services.ledger_import.detection_types import SheetDetection, TableType
+from .detection_types import SheetDetection, TableType
 
 __all__ = [
     "MergedGroup",

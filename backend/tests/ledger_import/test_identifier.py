@@ -245,17 +245,19 @@ class TestAggregation:
         assert result.table_type_confidence >= 80
 
     def test_aggregation_l1_l2_disagree(self):
-        """L1 says balance, L2 says ledger → L2 wins, conflict=True in evidence."""
+        """L1 says balance (strong, score≥85), L2 says ledger → L1 locks the decision (S6-9)."""
         # Sheet name suggests balance, but headers are clearly ledger
         headers = ["日期", "凭证号", "摘要", "科目编码", "借方金额", "贷方金额"]
         sheet = _make_sheet(
-            sheet_name="余额表",  # L1 → balance
+            sheet_name="余额表",  # L1 → balance (strong)
             headers=headers,      # L2 → ledger
         )
         result = identify(sheet)
 
-        # L2 should win
-        assert result.table_type == "ledger"
-        # Evidence should record conflict
+        # L1 locked because score ≥ l1_lock_threshold (default 85)
+        assert result.table_type == "balance"
+        # Evidence should record conflict + l1_locked
         evidence = result.detection_evidence
         assert evidence["final_choice"]["conflict"] is True
+        assert evidence["final_choice"]["l1_locked"] is True
+        assert evidence["final_choice"]["source"] == "l1_locked"

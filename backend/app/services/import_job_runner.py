@@ -474,23 +474,31 @@ class ImportJobRunner:
                     db, job_id, JobStatus.failed,
                     progress_pct=0,
                     error_message=f"v2 模块导入失败: {str(imp_exc)[:500]}",
+                    result_summary={
+                        "engine": "v2", "phase": "bootstrap_import",
+                        "error": str(imp_exc)[:500],
+                    },
                 )
                 await db.commit()
             ImportQueueService.release_lock(project_id)
             return
 
-        logger.info("ImportJob %s: v2 engine starting", job_id)
+        logger.info("ImportJob %s: v2 engine starting (project=%s year=%s)",
+                    job_id, project_id, year)
 
         try:
             # ── Phase 1: Load files ──
+            logger.info("ImportJob %s phase=load_files", job_id)
             await cls._persist_progress(job_id, 5, "加载上传文件")
             file_sources = await cls._load_file_sources(
                 project_id=project_id, upload_token=upload_token
             )
             if not file_sources:
                 raise ValueError("无可导入的文件")
+            logger.info("ImportJob %s loaded %d file(s)", job_id, len(file_sources))
 
             # ── Phase 2: Detect + Identify ──
+            logger.info("ImportJob %s phase=detect_identify", job_id)
             await cls._persist_progress(job_id, 10, "识别文件结构")
             async with async_session() as db:
                 await ImportJobService.transition(
@@ -512,6 +520,7 @@ class ImportJobRunner:
                 detections[str(filepath)] = fd
 
             # ── Phase 3: Parse → Convert → Validate → Write (streaming) ──
+            logger.info("ImportJob %s phase=parse_write_streaming", job_id)
             await cls._persist_progress(job_id, 20, "解析并写入数据")
             async with async_session() as db:
                 await ImportJobService.transition(
@@ -529,9 +538,9 @@ class ImportJobRunner:
 
             # Clear old data ONCE before streaming inserts start
             from app.services.smart_import_engine import (
-                _clear_project_year_tables,
                 rebuild_aux_balance_summary,
             )
+            from app.services.ledger_import.writer import clear_project_year
             from app.models.audit_platform_models import (
                 TbBalance, TbLedger, TbAuxBalance, TbAuxLedger,
             )
@@ -539,7 +548,7 @@ class ImportJobRunner:
 
             import_year = year or 2025
             async with async_session() as clear_db:
-                await _clear_project_year_tables(project_id, import_year, clear_db)
+                await clear_project_year(project_id, import_year, clear_db)
                 await clear_db.commit()
 
             # Bulk insert params: 14 columns × 1000 rows = 14000 params (< PG 65535 limit)
@@ -657,8 +666,8 @@ class ImportJobRunner:
                                 "voucher_type": r.get("voucher_type"),
                                 "accounting_period": r.get("accounting_period"),
                                 "aux_type": r.get("aux_type"),
-                                "aux_code": r.get("aux_code") or "",
-                                "aux_name": r.get("aux_name") or "",
+                                "aux_code": r.get("aux_code"),
+                                "aux_name": r.get("aux_name"),
                                 "aux_dimensions_raw": r.get("aux_dimensions_raw"),
                                 "debit_amount": r.get("debit_amount"),
                                 "credit_amount": r.get("credit_amount"),
@@ -806,6 +815,7 @@ class ImportJobRunner:
             )
 
             # ── Phase 4: Activation gate (basic — only blocking findings) ──
+            logger.info("ImportJob %s phase=activation_gate", job_id)
             await cls._persist_progress(job_id, 87, "评估激活条件")
             force = bool(options.get("force_activate"))
             gate = evaluate_activation(all_findings, force=force)
@@ -819,12 +829,14 @@ class ImportJobRunner:
                 )
 
             # ── Phase 5: Rebuild aux summary ──
+            logger.info("ImportJob %s phase=rebuild_aux_summary", job_id)
             await cls._persist_progress(job_id, 92, "重建辅助汇总")
             async with async_session() as summary_db:
                 await rebuild_aux_balance_summary(project_id, import_year, summary_db)
                 await summary_db.commit()
 
             # ── Phase 6: Complete ──
+            logger.info("ImportJob %s phase=complete", job_id)
             await cls._persist_progress(job_id, 98, "收尾")
             async with async_session() as db:
                 await ImportJobService.transition(

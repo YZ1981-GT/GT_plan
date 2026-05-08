@@ -221,8 +221,8 @@ def convert_balance_rows(
                     aux_balance_rows.append({
                         **base_row,
                         "aux_type": dim["aux_type"],
-                        "aux_code": dim.get("aux_code") or "",
-                        "aux_name": dim.get("aux_name") or "",
+                        "aux_code": dim.get("aux_code") or None,
+                        "aux_name": dim.get("aux_name") or None,
                         "aux_dimensions_raw": aux_dim_str,  # 溯源原始维度字符串
                     })
                 # 辅助维度行同时也写主表（对齐旧引擎：一条带辅助维度的余额行 = 主表 1 + 辅助表 N）
@@ -314,8 +314,8 @@ def convert_ledger_rows(
                 aux_ledger_rows.append({
                     **base_fields,
                     "aux_type": dim["aux_type"],
-                    "aux_code": dim.get("aux_code") or "",
-                    "aux_name": dim.get("aux_name") or "",
+                    "aux_code": dim.get("aux_code") or None,
+                    "aux_name": dim.get("aux_name") or None,
                     "aux_dimensions_raw": aux_dim_str,
                     "raw_extra": row.get("raw_extra"),
                 })
