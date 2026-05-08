@@ -201,7 +201,7 @@ class EliminationEntry(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
         Enum(ReviewStatusEnum), server_default="draft", nullable=False
     )
     reviewer_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class InternalTrade(Base, SoftDeleteMixin, TimestampMixin):
@@ -331,7 +331,7 @@ class ComponentInstruction(Base, SoftDeleteMixin, TimestampMixin, AuditMixin):
     status: Mapped[InstructionStatus] = mapped_column(
         Enum(InstructionStatus), server_default="draft", nullable=False
     )
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ComponentResult(Base, SoftDeleteMixin, TimestampMixin):

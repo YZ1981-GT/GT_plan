@@ -273,6 +273,7 @@ class TbBalance(Base):
     currency_code: Mapped[str] = mapped_column(
         String(3), server_default=text("'CNY'"), nullable=False
     )
+    raw_extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )
@@ -342,6 +343,7 @@ class TbLedger(Base):
     currency_code: Mapped[str] = mapped_column(
         String(3), server_default=text("'CNY'"), nullable=False
     )
+    raw_extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )
@@ -412,6 +414,7 @@ class TbAuxBalance(Base):
     currency_code: Mapped[str] = mapped_column(
         String(3), server_default=text("'CNY'"), nullable=False
     )
+    raw_extra: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     import_batch_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("import_batches.id"), nullable=True
     )

@@ -48,7 +48,7 @@ class ProjectQualityRating(Base, TimestampMixin):
         JSONB, nullable=True
     )  # 各维度得分明细 {qc_pass_rate: 85, review_depth: 72, ...}
     computed_at: Mapped[datetime] = mapped_column(
-        sa.DateTime, server_default=sa.func.now(), nullable=False
+        sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
     computed_by_rule_version: Mapped[int] = mapped_column(
         sa.Integer, server_default=text("1"), nullable=False

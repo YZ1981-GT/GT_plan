@@ -1,0 +1,267 @@
+"""账表数据管理服务 — 查询 / 删除 / 增量追加。
+
+职责：
+- summarize_ledger_data: 按 project+year+table 聚合行数 + 期间分布
+- delete_ledger_data: 按维度删除已导入数据（year/table/period_range）
+- detect_new_periods: 增量追加前检测期间差异（file vs existing）
+- incremental_append: 增量追加序时账（避免覆盖已有月份）
+
+设计原则：
+- 纯 service 层，不依赖 FastAPI
+- 余额表（tb_balance/tb_aux_balance）按 year 全量管理
+- 序时账（tb_ledger/tb_aux_ledger）按 year + accounting_period 管理
+- 所有操作生成 audit log（方便回溯）
+"""
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Any, Optional
+from uuid import UUID
+
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
+
+# 支持的账表（四表）
+LEDGER_TABLES: list[str] = [
+    "tb_balance",
+    "tb_ledger",
+    "tb_aux_balance",
+    "tb_aux_ledger",
+]
+
+# 按年度全量管理（不含 period 概念）
+BALANCE_TABLES: frozenset[str] = frozenset({"tb_balance", "tb_aux_balance"})
+
+# 按 period 分期管理
+LEDGER_TABLES_PERIODIC: frozenset[str] = frozenset({"tb_ledger", "tb_aux_ledger"})
+
+
+async def summarize_ledger_data(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: Optional[int] = None,
+) -> dict[str, Any]:
+    """查询项目已导入数据的概览（按年度/期间分布）。
+
+    Args:
+        db: 异步会话
+        project_id: 项目 UUID
+        year: 可选，只查某一年（None 则查所有年度）
+
+    Returns:
+        {
+            "project_id": str,
+            "tables": {
+                "tb_balance": {"total": 1822, "years": {2025: 1822}},
+                "tb_ledger": {
+                    "total": 22716,
+                    "years": {
+                        2025: {
+                            "total": 22716,
+                            "periods": {1: 2000, 2: 1800, ...},
+                            "voucher_date_min": "2025-01-01",
+                            "voucher_date_max": "2025-12-31",
+                        }
+                    }
+                },
+                ...
+            }
+        }
+    """
+    result: dict[str, Any] = {"project_id": str(project_id), "tables": {}}
+
+    for table in LEDGER_TABLES:
+        table_data: dict[str, Any] = {"total": 0, "years": {}}
+
+        # 年度聚合
+        year_filter = "AND year = :year" if year is not None else ""
+        count_sql = f"""
+            SELECT year, COUNT(*) AS cnt
+            FROM {table}
+            WHERE project_id = :pid {year_filter}
+            GROUP BY year
+            ORDER BY year
+        """
+        params: dict[str, Any] = {"pid": str(project_id)}
+        if year is not None:
+            params["year"] = year
+
+        try:
+            rows = await db.execute(sa.text(count_sql), params)
+        except Exception as exc:
+            logger.warning("summarize %s failed: %s", table, exc)
+            result["tables"][table] = {"total": 0, "years": {}, "error": str(exc)}
+            continue
+
+        for row in rows.all():
+            y, cnt = int(row[0]), int(row[1])
+            table_data["total"] += cnt
+            table_data["years"][y] = {"total": cnt}
+
+        # 序时账补充 period + 日期范围
+        if table in LEDGER_TABLES_PERIODIC and table_data["total"] > 0:
+            for y_str in list(table_data["years"].keys()):
+                period_sql = f"""
+                    SELECT
+                        EXTRACT(MONTH FROM voucher_date)::int AS period,
+                        COUNT(*) AS cnt
+                    FROM {table}
+                    WHERE project_id = :pid AND year = :year
+                    GROUP BY period
+                    ORDER BY period
+                """
+                try:
+                    prows = await db.execute(
+                        sa.text(period_sql),
+                        {"pid": str(project_id), "year": y_str},
+                    )
+                    periods: dict[int, int] = {}
+                    for prow in prows.all():
+                        if prow[0] is not None:
+                            periods[int(prow[0])] = int(prow[1])
+                    table_data["years"][y_str]["periods"] = periods
+
+                    # 日期范围
+                    range_sql = f"""
+                        SELECT MIN(voucher_date), MAX(voucher_date)
+                        FROM {table}
+                        WHERE project_id = :pid AND year = :year
+                    """
+                    rrow = await db.execute(
+                        sa.text(range_sql),
+                        {"pid": str(project_id), "year": y_str},
+                    )
+                    rdata = rrow.first()
+                    if rdata and rdata[0]:
+                        table_data["years"][y_str]["voucher_date_min"] = rdata[0].isoformat()
+                        table_data["years"][y_str]["voucher_date_max"] = rdata[1].isoformat()
+                except Exception as exc:
+                    logger.warning("period summary %s failed: %s", table, exc)
+
+        result["tables"][table] = table_data
+
+    return result
+
+
+async def delete_ledger_data(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: int,
+    tables: Optional[list[str]] = None,
+    periods: Optional[list[int]] = None,
+) -> dict[str, int]:
+    """删除账表数据（按年度 + 可选期间/表）。
+
+    Args:
+        project_id: 项目 UUID
+        year: 必填，删除目标年度
+        tables: 可选，指定要删除的表（默认全部 4 张）
+        periods: 可选，指定要删除的月份（仅对 ledger/aux_ledger 生效；
+                 若指定则只删这些月份，未指定则删整个年度）
+
+    Returns:
+        {"tb_balance": 1822, "tb_ledger": 5000, ...} 各表删除行数
+
+    注意：
+    - 余额表（tb_balance/tb_aux_balance）不支持 period 过滤，periods 参数对它们无效
+    - 返回的行数可用于生成审计日志
+    """
+    if not tables:
+        tables = LEDGER_TABLES
+    else:
+        invalid = set(tables) - set(LEDGER_TABLES)
+        if invalid:
+            raise ValueError(f"不支持的表: {invalid}")
+
+    deleted: dict[str, int] = {}
+
+    for table in tables:
+        use_period_filter = (
+            periods is not None
+            and len(periods) > 0
+            and table in LEDGER_TABLES_PERIODIC
+        )
+
+        if use_period_filter:
+            sql = f"""
+                DELETE FROM {table}
+                WHERE project_id = :pid AND year = :year
+                  AND EXTRACT(MONTH FROM voucher_date)::int = ANY(:periods)
+            """
+            params = {
+                "pid": str(project_id),
+                "year": year,
+                "periods": periods,
+            }
+        else:
+            sql = f"DELETE FROM {table} WHERE project_id = :pid AND year = :year"
+            params = {"pid": str(project_id), "year": year}
+
+        try:
+            result = await db.execute(sa.text(sql), params)
+            deleted[table] = result.rowcount or 0
+            logger.info(
+                "deleted %d rows from %s (project=%s year=%d periods=%s)",
+                deleted[table], table, project_id, year, periods,
+            )
+        except Exception as exc:
+            logger.exception("delete %s failed", table)
+            deleted[table] = -1  # sentinel for error
+            raise
+
+    await db.commit()
+    return deleted
+
+
+async def detect_existing_periods(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: int,
+) -> set[int]:
+    """查询项目某年度序时账已存在的月份集合（基于 voucher_date）。"""
+    sql = """
+        SELECT DISTINCT EXTRACT(MONTH FROM voucher_date)::int AS period
+        FROM tb_ledger
+        WHERE project_id = :pid AND year = :year AND voucher_date IS NOT NULL
+    """
+    rows = await db.execute(
+        sa.text(sql), {"pid": str(project_id), "year": year}
+    )
+    return {int(r[0]) for r in rows.all() if r[0] is not None}
+
+
+def compute_incremental_diff(
+    existing_periods: set[int],
+    file_periods: set[int],
+) -> dict[str, list[int]]:
+    """计算增量导入的期间差异。
+
+    Returns:
+        {
+            "new": [12],           # 新增月份（文件有但库里没有）
+            "overlap": [11],       # 重叠月份（文件有且库里也有，需 force 或跳过）
+            "only_existing": [10], # 库里有但文件没有（不影响，不返回操作建议）
+        }
+    """
+    return {
+        "new": sorted(file_periods - existing_periods),
+        "overlap": sorted(file_periods & existing_periods),
+        "only_existing": sorted(existing_periods - file_periods),
+    }
+
+
+__all__ = [
+    "LEDGER_TABLES",
+    "BALANCE_TABLES",
+    "LEDGER_TABLES_PERIODIC",
+    "summarize_ledger_data",
+    "delete_ledger_data",
+    "detect_existing_periods",
+    "compute_incremental_diff",
+]

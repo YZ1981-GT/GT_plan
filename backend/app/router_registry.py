@@ -376,3 +376,15 @@ def register_all_routers(app: FastAPI) -> None:
     # notifications 路由内部已声明 prefix="/api/notifications"，注册时不加额外前缀。
     from app.routers.notifications import router as notifications_router
     app.include_router(notifications_router, tags=["notifications"])
+
+    # ═══ 24. 账表导入 v2（ledger-import-unification） ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.ledger_import_v2 import router as ledger_import_v2_router
+    from app.routers.ledger_raw_extra import router as ledger_raw_extra_router
+    app.include_router(ledger_import_v2_router, tags=["ledger-import-v2"])
+    app.include_router(ledger_raw_extra_router, tags=["ledger-import-v2"])
+
+    # ═══ 25. 账表数据管理（查询/删除/增量追加） ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.ledger_data import router as ledger_data_router
+    app.include_router(ledger_data_router, tags=["ledger-data"])

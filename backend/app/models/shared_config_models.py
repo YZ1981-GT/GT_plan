@@ -70,7 +70,7 @@ class SharedConfigTemplate(Base, TimestampMixin, SoftDeleteMixin):
 
     # 引用统计
     reference_count = Column(Integer, default=0, comment="被引用次数")
-    last_referenced_at = Column(DateTime, comment="最后被引用时间")
+    last_referenced_at = Column(DateTime(timezone=True), comment="最后被引用时间")
 
     __table_args__ = (
         UniqueConstraint("config_type", "owner_type", "owner_user_id", "owner_project_id", "name",
@@ -86,6 +86,6 @@ class ConfigReference(Base, TimestampMixin):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False, index=True)
     template_id = Column(UUID(as_uuid=True), ForeignKey("shared_config_templates.id"), nullable=False)
     config_type = Column(String(50), nullable=False, comment="配置类型")
-    applied_at = Column(DateTime, default=datetime.utcnow, comment="引用时间")
+    applied_at = Column(DateTime(timezone=True), default=datetime.utcnow, comment="引用时间")
     applied_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), comment="操作人")
     is_customized = Column(Boolean, default=False, comment="引用后是否做了本地修改")

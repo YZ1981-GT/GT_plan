@@ -22,6 +22,7 @@ _DEFAULT_FLAGS: dict[str, bool] = {
     "forum": True,                 # 吐槽专栏
     "check_in": True,              # 打卡签到
     "advanced_collaboration": False,  # 高级协同（实验功能）
+    "ledger_import_v2": True,          # 新账表导入引擎（v2 已验证，默认启用）；支持项目级 override via set_project_flag
 }
 
 # 项目级覆盖（project_id → {flag: value}）
@@ -71,6 +72,7 @@ def get_feature_maturity() -> dict[str, str]:
         "forum": "production",
         "check_in": "production",
         "advanced_collaboration": "experimental",
+        "ledger_import_v2": "production",
         # 正式可用
         "project_management": "production",
         "trial_balance": "production",

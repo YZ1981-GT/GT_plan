@@ -49,8 +49,8 @@ class QcInspection(Base, SoftDeleteMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(
         String(20), server_default=text("'created'"), nullable=False
     )  # 'created' | 'in_progress' | 'completed' | 'cancelled'
-    started_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
     report_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Relationships
@@ -94,7 +94,7 @@ class QcInspectionItem(Base, TimestampMixin):
     qc_verdict: Mapped[str | None] = mapped_column(
         String(20), nullable=True
     )  # 'pass' | 'fail' | 'conditional_pass'
-    completed_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
 
     # Relationships
     inspection: Mapped["QcInspection"] = relationship(

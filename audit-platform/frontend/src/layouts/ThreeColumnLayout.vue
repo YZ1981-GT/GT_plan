@@ -830,6 +830,7 @@ onUnmounted(() => {
   padding: var(--gt-space-2) var(--gt-space-1);
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0; /* 允许 flex 子项收缩以触发滚动 */
 }
 
 .gt-nav-item {
@@ -866,6 +867,9 @@ onUnmounted(() => {
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);
   padding: var(--gt-space-1);
+  flex-shrink: 0; /* 工具区不被压缩，主导航区滚动 */
+  max-height: 45vh; /* 窗口极小时工具区也不能占满，留空间给主导航 */
+  overflow-y: auto;
 }
 
 /* 工具簇（侧栏底部） */

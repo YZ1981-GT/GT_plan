@@ -37,6 +37,9 @@
           <el-icon style="margin-right: 2px"><Upload /></el-icon> 导入数据
         </el-button>
         <el-button size="small" plain @click="goToImportHistory">导入历史</el-button>
+        <el-button size="small" plain @click="dataManagerVisible = true">
+          <el-icon style="margin-right: 2px"><Setting /></el-icon> 数据管理
+        </el-button>
         <el-button size="small" @click="runValidation" :loading="validating" type="warning" plain>
           <el-icon style="margin-right: 2px"><Warning /></el-icon> 数据校验
         </el-button>
@@ -649,17 +652,27 @@
       <el-button @click="validateDialogVisible = false">关闭</el-button>
     </template>
   </el-dialog>
+
+  <!-- ── 账表数据管理弹窗 ── -->
+  <LedgerDataManager
+    v-if="projectId"
+    v-model="dataManagerVisible"
+    :project-id="projectId"
+    @data-changed="onDataChanged"
+    @request-incremental-upload="onIncrementalUpload"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, Warning } from '@element-plus/icons-vue'
+import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
 import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
+import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
 import { buildImportFormData } from '@/utils/importFormData'
 import { applyImportPreviewSuccess, buildImportPreviewFormData, buildImportPreviewUrl, resolveImportPreviewSuccess } from '@/utils/importPreview'
 import { buildImportJobUrl, fetchImportQueueStatus } from '@/utils/importJobRequest'
@@ -808,6 +821,30 @@ async function runValidation() {
   }
 }
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
+
+// 账表数据管理弹窗
+const dataManagerVisible = ref(false)
+
+function onDataChanged() {
+  // 数据被删除/追加后刷新页面数据
+  loadBalance()
+  loadAuxBalance()
+}
+
+function onIncrementalUpload(year: number) {
+  // 用户在数据管理弹窗选了增量追加
+  dataManagerVisible.value = false
+  importDialogVisible.value = true
+  importStep.value = 'upload'
+  importFiles.value = []
+  importYear.value = year
+  ElNotification({
+    title: '增量追加模式',
+    message: `请上传 ${year} 年的序时账文件，系统将自动检测并只追加新月份`,
+    type: 'info',
+    duration: 5000,
+  })
+}
 const importFiles = ref<File[]>([])
 const importYear = ref<number | undefined>(undefined)
 const previewResult = ref<any>(null)

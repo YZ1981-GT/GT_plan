@@ -101,7 +101,7 @@ class EqcrReviewNote(Base, SoftDeleteMixin, TimestampMixin):
     shared_to_team: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
-    shared_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
+    shared_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
     )
@@ -183,7 +183,7 @@ class EqcrDisagreementResolution(Base, TimestampMixin):
     participants: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolution_verdict: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    resolved_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index(

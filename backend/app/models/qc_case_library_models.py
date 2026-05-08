@@ -56,7 +56,7 @@ class QcCaseLibrary(Base, SoftDeleteMixin, TimestampMixin):
         PG_UUID(as_uuid=True), nullable=False
     )
     published_at: Mapped[datetime] = mapped_column(
-        sa.DateTime, server_default=sa.func.now(), nullable=False
+        sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
     )
     review_count: Mapped[int] = mapped_column(
         sa.Integer, server_default=text("0"), nullable=False

@@ -878,6 +878,20 @@ export const ledger = {
     jobCancel: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/cancel`,
     activationRecords: (pid: string) => `/api/projects/${pid}/ledger-import/activation-records`,
     artifacts: (pid: string) => `/api/projects/${pid}/ledger-import/artifacts`,
+    // v2 endpoints (新账表导入引擎)
+    v2Detect: (pid: string) => `/api/projects/${pid}/ledger-import/detect`,
+    v2Submit: (pid: string) => `/api/projects/${pid}/ledger-import/submit`,
+    v2Stream: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/stream`,
+    v2Diagnostics: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/diagnostics`,
+    v2Cancel: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/cancel`,
+    v2Retry: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/retry`,
+    rawExtraFields: (pid: string) => `/api/projects/${pid}/ledger/raw-extra-fields`,
+  },
+  // v2 账表数据管理（查询/删除/增量追加）
+  data: {
+    summary: (pid: string) => `/api/projects/${pid}/ledger-data/summary`,
+    delete: (pid: string) => `/api/projects/${pid}/ledger-data`,
+    incrementalDetect: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/detect`,
   },
 } as const
 

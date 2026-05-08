@@ -161,7 +161,7 @@ class ImportJob(Base):
     )
     year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     status: Mapped[JobStatus] = mapped_column(
-        sa.Enum(JobStatus, name="job_status", create_type=False),
+        sa.Enum(JobStatus, name="job_status_enum", create_type=False),
         server_default=text("'pending'"),
         nullable=False,
     )

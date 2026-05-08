@@ -1,5 +1,23 @@
 # -*- coding: utf-8 -*-
-"""通用智能四表导入引擎
+"""通用智能四表导入引擎（DEPRECATED — 逐步迁移到 ledger_import/ v2 模块）。
+
+.. deprecated::
+    本文件为 v1 引擎（3000+ 行单文件），已被 v2 模块化引擎替代。
+    v2 位于 ``app/services/ledger_import/``，提供：
+    - 三级并行识别（detector → identifier → adapter）
+    - 声明式 JSON 配置（热加载）
+    - 分层校验（key/recommended/extra）
+    - 大文件流式探测（600MB+ CSV < 10ms）
+    - raw_extra JSONB 保留未映射列
+
+    迁移路径：
+    - detect/identify → ``ledger_import.orchestrator.ImportOrchestrator.detect_from_paths``
+    - convert_balance_rows → ``ledger_import.converter.convert_balance_rows``
+    - convert_ledger_rows → ``ledger_import.converter.convert_ledger_rows``
+    - smart_import_streaming → 通过 feature_flag ``ledger_import_v2`` 切换
+
+    当前仍被 import_job_runner.py / ledger_import_application_service.py 调用，
+    待 v2 全链路验证通过后逐步切换。
 
 支持不同企业导出的各种格式：
 1. 单行/双行合并表头自动检测与合并

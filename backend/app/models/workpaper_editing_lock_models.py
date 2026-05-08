@@ -41,13 +41,13 @@ class WorkpaperEditingLock(Base, TimestampMixin):
         nullable=False,
     )
     acquired_at: Mapped[datetime] = mapped_column(
-        sa.DateTime, nullable=False, server_default=sa.func.now()
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
     heartbeat_at: Mapped[datetime] = mapped_column(
-        sa.DateTime, nullable=False, server_default=sa.func.now()
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
     released_at: Mapped[datetime | None] = mapped_column(
-        sa.DateTime, nullable=True
+        sa.DateTime(timezone=True), nullable=True
     )
 
     __table_args__ = (

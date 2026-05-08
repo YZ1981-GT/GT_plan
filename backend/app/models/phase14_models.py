@@ -41,7 +41,7 @@ class TraceEvent(Base):
     content_hash = Column(String(64), nullable=True, comment="对象内容 SHA-256（取证用）")
     version_no = Column(Integer, nullable=True)
     trace_id = Column(String(64), nullable=False, comment="格式: trc_{yyyyMMddHHmmss}_{uuid[:12]}")
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         Index("idx_trace_events_project", "project_id", "event_type", created_at.desc()),
@@ -66,7 +66,7 @@ class GateDecision(Base):
     hit_rules = Column(JSONB, nullable=False, comment="[{rule_code, error_code, severity, message, location, suggested_action}]")
     actor_id = Column(UUID(as_uuid=True), nullable=False)
     trace_id = Column(String(64), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         Index("idx_gate_decisions_project_gate", "project_id", "gate_type", created_at.desc()),
@@ -91,8 +91,8 @@ class GateRuleConfig(Base):
     tenant_id = Column(UUID(as_uuid=True), nullable=True, comment="租户ID，platform 级为 NULL")
     description = Column(String(200), nullable=True)
     updated_by = Column(UUID(as_uuid=True), nullable=True)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         Index("idx_gate_rule_configs_rule", "rule_code", "config_level"),

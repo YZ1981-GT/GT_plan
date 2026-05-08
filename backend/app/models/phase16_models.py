@@ -24,7 +24,7 @@ class VersionLineStamp(Base):
     version_no = Column(Integer, nullable=False)
     source_snapshot_id = Column(String(64), nullable=True)
     trace_id = Column(String(64), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         Index("idx_version_line_project_object", "project_id", "object_type", "object_id", version_no.desc()),
@@ -41,7 +41,7 @@ class EvidenceHashCheck(Base):
     sha256 = Column(String(64), nullable=False)
     signature_digest = Column(String(128), nullable=True)
     check_status = Column(String(16), nullable=False, comment="passed/failed")
-    checked_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    checked_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         Index("idx_evidence_hash_export", "export_id", checked_at.desc()),
@@ -64,8 +64,8 @@ class OfflineConflict(Base):
     reason_code = Column(String(64), nullable=True)
     qc_replay_job_id = Column(UUID(as_uuid=True), nullable=True)
     trace_id = Column(String(64), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("idx_offline_conflicts_project_status", "project_id", "status", created_at.desc()),
