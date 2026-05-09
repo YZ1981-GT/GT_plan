@@ -385,7 +385,7 @@ async def retry_job(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/jobs/latest")
+@router.get("/active-job")
 async def get_latest_job(
     project_id: UUID,
     db: AsyncSession = Depends(get_db),
