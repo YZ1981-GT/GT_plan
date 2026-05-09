@@ -71,6 +71,7 @@ class ErrorCode(str, Enum):
     AUX_ACCOUNT_MISMATCH = "AUX_ACCOUNT_MISMATCH"
     EXTRA_TRUNCATED = "EXTRA_TRUNCATED"
     CURRENCY_MIX = "CURRENCY_MIX"
+    ROW_SKIPPED_KEY_EMPTY = "ROW_SKIPPED_KEY_EMPTY"  # 企业级宽容策略：脏行跳过
 
     # ------- info（severity=warning + INFO_CODES 标记，前端不弹窗）-------
     RAW_EXTRA_COLUMNS_PRESERVED = "RAW_EXTRA_COLUMNS_PRESERVED"
@@ -116,6 +117,7 @@ DEFAULT_SEVERITY: dict[ErrorCode, ErrorSeverity] = {
     ErrorCode.AUX_ACCOUNT_MISMATCH: "warning",
     ErrorCode.EXTRA_TRUNCATED: "warning",
     ErrorCode.CURRENCY_MIX: "warning",
+    ErrorCode.ROW_SKIPPED_KEY_EMPTY: "warning",
     # info（severity=warning，通过 INFO_CODES 与真 warning 区分）
     ErrorCode.RAW_EXTRA_COLUMNS_PRESERVED: "warning",
     ErrorCode.AI_FALLBACK_USED: "warning",
@@ -170,6 +172,7 @@ DEFAULT_COLUMN_TIER: dict[ErrorCode, Optional[ColumnTier]] = {
     ErrorCode.AUX_ACCOUNT_MISMATCH: None,
     ErrorCode.EXTRA_TRUNCATED: "extra",
     ErrorCode.CURRENCY_MIX: None,
+    ErrorCode.ROW_SKIPPED_KEY_EMPTY: "key",
     # info
     ErrorCode.RAW_EXTRA_COLUMNS_PRESERVED: "extra",
     ErrorCode.AI_FALLBACK_USED: None,

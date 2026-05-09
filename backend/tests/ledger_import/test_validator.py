@@ -24,29 +24,43 @@ from backend.app.services.ledger_import.validator import (
 
 
 class TestL1KeyColumnEmpty:
-    """L1: 关键列空值 → blocking。"""
+    """L1: 关键列空值 → 脏数据行跳过 + warning（企业级宽容策略）。"""
 
-    def test_empty_account_code_blocking(self):
-        """account_code 为空 → blocking finding。"""
+    def test_empty_account_code_row_skipped_warning(self):
+        """account_code 为空（其他 key 有值）→ ROW_SKIPPED_KEY_EMPTY warning。"""
         rows = [{"account_code": "", "debit_amount": "100", "credit_amount": "50"}]
         findings, cleaned = validate_l1(
             rows, "balance",
             column_mapping={"科目编码": "account_code"},
         )
 
-        blocking = [f for f in findings if f.blocking]
-        assert len(blocking) >= 1
-        assert blocking[0].code == "EMPTY_VALUE_KEY"
-        assert "account_code" in blocking[0].message
+        # 脏数据行整行跳过，不写入 cleaned_rows
+        assert len(cleaned) == 0
+        warnings = [f for f in findings if f.code == "ROW_SKIPPED_KEY_EMPTY"]
+        assert len(warnings) == 1
+        assert not warnings[0].blocking
+        assert "account_code" in warnings[0].message
 
-    def test_none_voucher_date_blocking(self):
-        """voucher_date 为 None → blocking。"""
+    def test_none_voucher_date_row_skipped_warning(self):
+        """voucher_date 为 None → ROW_SKIPPED_KEY_EMPTY warning。"""
         rows = [{"voucher_date": None, "voucher_no": "记-001", "account_code": "1001",
                  "debit_amount": "100", "credit_amount": "0"}]
         findings, cleaned = validate_l1(rows, "ledger", column_mapping={})
 
-        blocking = [f for f in findings if f.code == "EMPTY_VALUE_KEY"]
-        assert len(blocking) >= 1
+        assert len(cleaned) == 0
+        warnings = [f for f in findings if f.code == "ROW_SKIPPED_KEY_EMPTY"]
+        assert len(warnings) == 1
+        assert not warnings[0].blocking
+
+    def test_all_key_empty_row_silently_skipped(self):
+        """整行所有 key col 都空 → 静默跳过，不记 finding。"""
+        rows = [{"voucher_date": None, "voucher_no": None, "account_code": None,
+                 "debit_amount": None, "credit_amount": None}]
+        findings, cleaned = validate_l1(rows, "ledger", column_mapping={})
+
+        assert len(cleaned) == 0
+        # 整行空白不记 finding
+        assert len([f for f in findings if f.code == "ROW_SKIPPED_KEY_EMPTY"]) == 0
 
 
 class TestL1KeyColumnAmountInvalid:

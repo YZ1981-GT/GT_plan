@@ -156,21 +156,24 @@ def validate_l1(
     file_name: str = "",
     sheet_name: str = "",
 ) -> tuple[list[ValidationFinding], list[dict]]:
-    """L1 validation: per-row, per-column checks.
+    """L1 validation: per-row, per-column checks (企业级宽容策略).
 
-    Returns (findings, cleaned_rows) where cleaned_rows has:
-    - Key column violations → finding is blocking, row NOT cleaned (caller must handle)
-    - Recommended column violations → value set to None in cleaned row, finding is warning
-    - Extra columns → not validated at all
+    Returns (findings, cleaned_rows) — cleaned_rows 只包含"可入库"的行。
 
-    Checks:
-    - AMOUNT fields (debit_amount, credit_amount, opening_balance, closing_balance, etc.):
-      Must be numeric. Key column → blocking; recommended → warning + NULL.
-    - DATE fields (voucher_date):
-      Must be parseable as date. Key column → blocking; recommended → warning + NULL.
-    - EMPTY check:
-      Key columns must not be empty/None. → blocking.
-      Recommended columns: no check (empty is acceptable).
+    ## 整行级别（新增，企业级通用规则）
+    - 整行所有 key col（除 exclusive_pair 外）都空 → 静默跳过（空白行/尾部行）
+    - 部分 key col 空、其他有值 → 记 `ROW_SKIPPED_KEY_EMPTY` warning，跳过该行
+      （脏数据容忍：不阻止整批激活，仅记录被跳过行数）
+    - exclusive_pair（借贷互斥 / 余额零值）内字段允许全空（原有语义）
+
+    ## 字段级别
+    - AMOUNT 字段（debit_amount / opening_balance / 等）：值非空但不可解析为数值
+        - key tier：blocking `AMOUNT_NOT_NUMERIC_KEY`
+        - recommended tier：warning + 值置 None
+    - DATE 字段（voucher_date）：值非空但不可解析为日期
+        - key tier：blocking `DATE_INVALID_KEY`
+        - recommended tier：warning + 值置 None
+    - extra 字段：不做任何校验（原样进 raw_extra）
     """
     key_cols = KEY_COLUMNS.get(table_type, set())
     rec_cols = RECOMMENDED_COLUMNS.get(table_type, set())
@@ -208,7 +211,43 @@ def validate_l1(
     findings: list[ValidationFinding] = []
     cleaned_rows: list[dict] = []
 
+    # S7 企业级规则：key column 空值处理策略
+    # 1. 整行所有字段（key + recommended + extra）都空 → 纯空白行，静默跳过
+    # 2. 整行有值但非 exclusive_pair 的 key col 有空 → 脏数据行 warning + 跳过
+    # 3. AMOUNT / DATE 类型错误 → warning + 该字段置 None（原有逻辑）
+    non_exclusive_key_cols = key_cols - exclusive_pair
+
     for row_idx, row in enumerate(rows):
+        # ── 预检 1：整行是否所有字段都空（纯空白行/尾部行）──
+        row_all_empty = all(_is_empty(v) for v in row.values())
+        if row_all_empty:
+            continue  # 静默跳过
+
+        # ── 预检 2：非 exclusive 的 key col 是否有空（脏数据行）──
+        row_empty_key_names = [
+            fn for fn in non_exclusive_key_cols if _is_empty(row.get(fn))
+        ]
+        if row_empty_key_names:
+            findings.append(
+                ValidationFinding(
+                    level="L1",
+                    severity="warning",
+                    code="ROW_SKIPPED_KEY_EMPTY",
+                    message=(
+                        f"第 {row_idx} 行因关键列空值被跳过："
+                        f"{', '.join(row_empty_key_names)}"
+                    ),
+                    location={
+                        "file": file_name,
+                        "sheet": sheet_name,
+                        "row": row_idx,
+                        "column": ",".join(row_empty_key_names),
+                    },
+                    blocking=False,
+                )
+            )
+            continue  # 整行跳过，不写入
+
         cleaned_row = dict(row)  # shallow copy
 
         for field_name, value in row.items():
@@ -228,23 +267,11 @@ def validate_l1(
                 "column": field_name,
             }
 
-            # --- EMPTY check (key columns only) ---
+            # --- EMPTY check (已由预检 1/2 处理，此处 defensive) ---
             if tier == "key" and _is_empty(value):
-                # S7 修复：exclusive_pair 内的字段不做 EMPTY blocking
-                # （序时账借贷互斥、余额表零余额行是合法场景）
-                if field_name in exclusive_pair:
-                    continue
-                findings.append(
-                    ValidationFinding(
-                        level="L1",
-                        severity="blocking",
-                        code="EMPTY_VALUE_KEY",
-                        message=f"关键列 '{field_name}' 值为空（第 {row_idx} 行）",
-                        location=location,
-                        blocking=True,
-                    )
-                )
-                continue  # skip further checks for this field
+                # 预检已处理：空白行跳过、脏数据行跳过+warning
+                # 走到这里只可能是 exclusive_pair 成员（允许全空），直接放行
+                continue
 
             # --- AMOUNT check ---
             if field_name in _AMOUNT_FIELDS:
