@@ -40,6 +40,32 @@ jobs:
             --ignore=backend/tests/e2e \
             -x --tb=short
 
+  ledger-import-smoke:
+    # S6-18: v2 账表导入引擎端到端 smoke
+    # 防止"单测通过但真实数据跑不通"的回归（Sprint 6 复盘教训）
+    # 不依赖 PG，SQLite 内存库 + 真实样本（若仓库含 数据/ 目录则跑完整 E2E，否则 skip）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true  # 若真实样本用 LFS 存储
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run ledger_import full suite
+        run: |
+          python -m pytest backend/tests/ledger_import/ \
+            --tb=short -v
+      - name: Run real-sample smoke (skip if 数据/ absent)
+        run: |
+          python -m pytest \
+            backend/tests/ledger_import/test_real_samples_smoke.py \
+            backend/tests/ledger_import/test_execute_v2_e2e.py \
+            -v --tb=short -s
+
   backend-lint:
     runs-on: ubuntu-latest
     steps:
