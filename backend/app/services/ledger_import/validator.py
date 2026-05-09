@@ -448,7 +448,7 @@ async def validate_l3(
     1. BALANCE_LEDGER_MISMATCH: For each account_code,
        tb_balance.closing_balance != tb_balance.opening_balance
            + sum(tb_ledger.debit) - sum(tb_ledger.credit)
-       Tolerance: abs(diff) > 1.0 → blocking
+       Tolerance: dynamic — base 1.0 + magnitude × 0.001%, cap 100 → blocking
     2. AUX_ACCOUNT_MISMATCH: account_codes in tb_aux_balance/tb_aux_ledger
        that don't exist in tb_balance/tb_ledger → warning (not blocking)
     """
@@ -488,7 +488,11 @@ async def validate_l3(
         sum_credit = float(row.sum_credit)
         expected_closing = opening + sum_debit - sum_credit
         diff = abs(closing - expected_closing)
-        if diff > 1.0:
+        # S7: 动态容差——按金额量级调整（小金额 1 元，大金额按比例）
+        # 基础容差 1 元 + 金额量级的 0.001%（万分之一），上限 100 元
+        magnitude = max(abs(opening), abs(closing), abs(sum_debit), abs(sum_credit), 1.0)
+        tolerance = min(1.0 + magnitude * 0.00001, 100.0)
+        if diff > tolerance:
             mismatch_accounts.append(row.account_code)
 
     if mismatch_accounts:
@@ -499,7 +503,7 @@ async def validate_l3(
                 severity="blocking",
                 code="BALANCE_LEDGER_MISMATCH",
                 message=(
-                    f"余额表期末余额与序时账累计不一致（容差 1 元），"
+                    f"余额表期末余额与序时账累计不一致（动态容差），"
                     f"涉及 {len(mismatch_accounts)} 个科目：{', '.join(sample)}"
                     + ("..." if len(mismatch_accounts) > 10 else "")
                 ),

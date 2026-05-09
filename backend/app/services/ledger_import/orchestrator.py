@@ -150,18 +150,12 @@ class ImportOrchestrator:
                 identified_sheets.append(identified)
             fd.sheets = identified_sheets
 
-        # Step 3: Match best adapter
+        # Step 3: Adapter hint (S7: 不再自动 detect_best，adapter 仅作别名包)
         adapter_id: str | None = None
-        for fd in file_detections:
-            if adapter_hint:
-                adapter = adapter_registry.get(adapter_hint)
-                if adapter:
-                    adapter_id = adapter.id
-                    break
-            best_adapter, score = adapter_registry.detect_best(fd)
-            if score > 0.1:
-                adapter_id = best_adapter.id
-                break
+        if adapter_hint:
+            adapter = adapter_registry.get(adapter_hint)
+            if adapter:
+                adapter_id = adapter.id
 
         # Step 4: Year detection
         if year_override is not None:

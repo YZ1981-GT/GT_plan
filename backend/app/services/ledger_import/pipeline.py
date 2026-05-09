@@ -283,6 +283,15 @@ async def execute_pipeline(
     await _progress(85, "评估激活条件")
     gate = evaluate_activation(all_findings, force=force_activate)
 
+    # S7: force_activate 审批链——即使 force 跳过 blocking，也记录审计轨迹
+    force_skipped_findings = 0
+    if force_activate and gate.blocking_findings:
+        force_skipped_findings = len(gate.blocking_findings)
+        logger.warning(
+            "Pipeline %s force_activate=True, skipping %d blocking findings",
+            job_id, force_skipped_findings,
+        )
+
     if not gate.allowed:
         blocking_msgs = [f.message for f in gate.blocking_findings[:10]]
         logger.warning(
@@ -316,6 +325,7 @@ async def execute_pipeline(
                 "warnings": len([f for f in all_findings if not f.blocking]),
                 "blocking": len([f for f in all_findings if f.blocking]),
                 "force_activated": force_activate,
+                "force_skipped_findings": force_skipped_findings,
             },
         )
         await act_db.commit()
