@@ -68,7 +68,7 @@ def build_raw_extra(
         )
 
     if len(serialized.encode("utf-8")) <= RAW_EXTRA_MAX_BYTES:
-        return extra, None
+        return _sanitize_raw_extra(extra), None
 
     # Truncate: keep columns in order until we hit the limit
     truncated: dict[str, Any] = {}
@@ -100,7 +100,7 @@ def build_raw_extra(
             ),
         )
 
-    return truncated if truncated else None, warning
+    return _sanitize_raw_extra(truncated) if truncated else None, warning
 
 
 async def write_chunk(
@@ -315,6 +315,44 @@ async def clear_project_year(project_id: UUID, year: int, db) -> None:
 DEFAULT_INSERT_CHUNK_SIZE = 1000
 
 
+def _sanitize_raw_extra(extra: dict) -> dict:
+    """将 raw_extra 字典中的非 JSON 原生类型转为可序列化值。
+
+    PG JSONB 列要求值可被 json.dumps 序列化。真实数据的 raw_extra 可能含：
+    - datetime / date 对象（如"到期日"列）
+    - Decimal（如未映射的金额列）
+    - 其他非标准类型
+
+    策略：递归遍历，datetime→isoformat，Decimal→float，其余→str。
+    """
+    from datetime import date as _date, datetime as _dt
+    from decimal import Decimal as _Decimal
+
+    sanitized: dict = {}
+    for k, v in extra.items():
+        if v is None:
+            sanitized[k] = None
+        elif isinstance(v, _dt):
+            sanitized[k] = v.isoformat()
+        elif isinstance(v, _date):
+            sanitized[k] = v.isoformat()
+        elif isinstance(v, _Decimal):
+            sanitized[k] = float(v)
+        elif isinstance(v, (str, int, float, bool)):
+            sanitized[k] = v
+        elif isinstance(v, dict):
+            sanitized[k] = _sanitize_raw_extra(v)
+        elif isinstance(v, list):
+            sanitized[k] = [
+                _sanitize_raw_extra(item) if isinstance(item, dict)
+                else (item.isoformat() if isinstance(item, (_dt, _date)) else str(item))
+                for item in v
+            ]
+        else:
+            sanitized[k] = str(v)
+    return sanitized
+
+
 async def bulk_insert_staged(
     db_session_factory,
     table_model,
@@ -378,6 +416,9 @@ async def bulk_insert_staged(
                 # currency_code 默认 CNY
                 if "currency_code" in valid_cols and not rec.get("currency_code"):
                     rec["currency_code"] = "CNY"
+                # raw_extra JSONB 安全序列化：datetime/date/Decimal 等非 JSON 原生类型转 str
+                if "raw_extra" in rec and rec["raw_extra"] is not None:
+                    rec["raw_extra"] = _sanitize_raw_extra(rec["raw_extra"])
                 records.append(rec)
 
             if records:
