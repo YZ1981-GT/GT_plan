@@ -138,6 +138,45 @@
                 </span>
               </div>
             </el-form-item>
+
+            <!-- 预检结果展示 -->
+            <el-form-item v-if="incrementalDiff" label="检测结果">
+              <div style="font-size: 13px; line-height: 1.8">
+                <div>
+                  <span style="color: #67c23a; font-weight: 600">新增月份：</span>
+                  <el-tag
+                    v-for="p in incrementalDiff.diff.new"
+                    :key="`new-${p}`"
+                    size="small"
+                    type="success"
+                    style="margin: 2px"
+                  >
+                    {{ p }}月
+                  </el-tag>
+                  <span v-if="incrementalDiff.diff.new.length === 0" style="color: #999">无</span>
+                </div>
+                <div>
+                  <span style="color: #e6a23c; font-weight: 600">重叠月份：</span>
+                  <el-tag
+                    v-for="p in incrementalDiff.diff.overlap"
+                    :key="`ov-${p}`"
+                    size="small"
+                    type="warning"
+                    style="margin: 2px"
+                  >
+                    {{ p }}月
+                  </el-tag>
+                  <span v-if="incrementalDiff.diff.overlap.length === 0" style="color: #999">无</span>
+                </div>
+                <div v-if="incrementalDiff.diff.overlap.length > 0" style="margin-top: 8px">
+                  <el-radio-group v-model="overlapStrategy">
+                    <el-radio value="skip">跳过重叠月份（只追加新月份）</el-radio>
+                    <el-radio value="overwrite">覆盖重叠月份（删除旧数据）</el-radio>
+                  </el-radio-group>
+                </div>
+              </div>
+            </el-form-item>
+
             <el-alert
               type="success"
               :closable="false"
@@ -148,19 +187,40 @@
               <template #default>
                 <ol style="margin: 8px 0 0 16px; padding: 0">
                   <li>选择年度（上方）</li>
-                  <li>点击下方"上传文件"选择 12 月序时账</li>
-                  <li>系统自动检测新增月份 vs 重叠月份</li>
-                  <li>确认后只追加新月份，重叠月份需二次确认</li>
+                  <li>点击"检测"输入/扫描文件将要导入的月份</li>
+                  <li>确认重叠策略（跳过/覆盖）</li>
+                  <li>执行清理旧数据后上传文件继续导入</li>
                 </ol>
               </template>
             </el-alert>
-            <el-button
-              type="primary"
-              :disabled="!incrementalForm.year"
-              @click="onOpenIncrementalUpload"
-            >
-              上传文件 (增量追加)
-            </el-button>
+            <div style="display: flex; gap: 8px">
+              <el-input
+                v-model="filePeriodsInput"
+                placeholder="文件包含的月份，逗号分隔如: 11,12"
+                style="width: 260px"
+              />
+              <el-button
+                :disabled="!incrementalForm.year || !filePeriodsInput"
+                @click="onDetectIncremental"
+              >
+                检测差异
+              </el-button>
+              <el-button
+                v-if="incrementalDiff && (incrementalDiff.diff.overlap.length > 0 || incrementalDiff.diff.new.length > 0)"
+                type="warning"
+                :disabled="!incrementalForm.year"
+                @click="onApplyIncremental"
+              >
+                执行清理
+              </el-button>
+              <el-button
+                type="primary"
+                :disabled="!incrementalForm.year"
+                @click="onOpenIncrementalUpload"
+              >
+                上传文件
+              </el-button>
+            </div>
           </el-form>
         </el-tab-pane>
       </el-tabs>
@@ -205,6 +265,9 @@ const deleteForm = ref<{ year: number | null; tables: string[]; periods: number[
 })
 
 const incrementalForm = ref<{ year: number | null }>({ year: null })
+const filePeriodsInput = ref('')
+const incrementalDiff = ref<any>(null)
+const overlapStrategy = ref<'skip' | 'overwrite'>('skip')
 
 const tableLabels: Record<string, string> = {
   tb_balance: '科目余额表',
@@ -310,6 +373,86 @@ async function onDelete() {
 function onOpenIncrementalUpload() {
   if (!incrementalForm.value.year) return
   emit('request-incremental-upload', incrementalForm.value.year)
+}
+
+function _parseFilePeriods(): number[] {
+  return filePeriodsInput.value
+    .split(/[,，]/)
+    .map((s) => Number(s.trim()))
+    .filter((n) => n >= 1 && n <= 12)
+}
+
+async function onDetectIncremental() {
+  if (!incrementalForm.value.year) return
+  const file_periods = _parseFilePeriods()
+  if (file_periods.length === 0) {
+    ElMessage.warning('请输入有效的月份，如 11,12')
+    return
+  }
+  loading.value = true
+  try {
+    incrementalDiff.value = await api.post(
+      ledger.import.data.incrementalDetect(props.projectId),
+      { year: incrementalForm.value.year, file_periods },
+    )
+    // 默认策略：有 overlap 则提示用户选择，否则 skip
+    if (incrementalDiff.value.diff.overlap.length === 0) {
+      overlapStrategy.value = 'skip'
+    }
+  } catch (exc: any) {
+    ElMessage.error('检测失败: ' + (exc.message || exc))
+  } finally {
+    loading.value = false
+  }
+}
+
+async function onApplyIncremental() {
+  if (!incrementalForm.value.year || !incrementalDiff.value) return
+  const file_periods = _parseFilePeriods()
+  const strategy = overlapStrategy.value
+
+  if (strategy === 'overwrite') {
+    const ovMonths = incrementalDiff.value.diff.overlap.join(', ')
+    try {
+      await ElMessageBox.confirm(
+        `即将覆盖 ${incrementalForm.value.year} 年 ${ovMonths} 月数据，此操作不可恢复，是否继续？`,
+        '覆盖确认',
+        { confirmButtonText: '确认覆盖', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+  }
+
+  loading.value = true
+  try {
+    const result: any = await api.post(
+      ledger.import.data.incrementalApply(props.projectId),
+      {
+        year: incrementalForm.value.year,
+        file_periods,
+        overlap_strategy: strategy,
+        confirmed: strategy === 'overwrite',
+      },
+    )
+    if (result.executed) {
+      const rows = result.action?.rows_deleted
+      const total = rows
+        ? Object.values(rows).reduce((a: number, b: any) => a + (Number(b) || 0), 0)
+        : 0
+      ElMessage.success(`已清理 ${total} 行旧数据，请上传文件继续`)
+    } else {
+      ElMessage.info('跳过策略下无需清理，可直接上传新月份文件')
+    }
+    emit('data-changed')
+    await refreshSummary()
+    // 清空检测结果，鼓励用户上传新文件
+    incrementalDiff.value = null
+  } catch (exc: any) {
+    ElMessage.error('清理失败: ' + (exc.message || exc))
+  } finally {
+    loading.value = false
+  }
 }
 
 function onClose() {

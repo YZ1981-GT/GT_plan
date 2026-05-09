@@ -863,6 +863,7 @@ export const ledger = {
   auxBalanceSummary: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-summary`,
   auxBalancePaged: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-paged`,
   auxEntries: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-entries/${code}`,
+  auxByTriplet: (pid: string) => `/api/projects/${pid}/ledger/aux/by-triplet`,
   auxSummary: (pid: string) => `/api/projects/${pid}/ledger/aux-summary`,
   exportBalance: (pid: string) => `/api/projects/${pid}/ledger/export-balance`,
   exportAuxBalance: (pid: string) => `/api/projects/${pid}/ledger/export-aux-balance`,
@@ -892,6 +893,7 @@ export const ledger = {
     summary: (pid: string) => `/api/projects/${pid}/ledger-data/summary`,
     delete: (pid: string) => `/api/projects/${pid}/ledger-data`,
     incrementalDetect: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/detect`,
+    incrementalApply: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/apply`,
   },
 } as const
 

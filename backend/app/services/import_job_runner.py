@@ -536,20 +536,36 @@ class ImportJobRunner:
                     sheet_key = f"{m.get('file_name', '')}!{m.get('sheet_name', '')}"
                     confirmed[sheet_key] = m.get("mappings", {})
 
-            # Clear old data ONCE before streaming inserts start
+            # S6-13: Staged 模式——先创建 staged dataset，所有 insert 带 dataset_id + is_deleted=true
+            # 激活 gate 通过后调 activate_dataset 原子切换；失败时 mark_failed 清理
             from app.services.smart_import_engine import (
                 rebuild_aux_balance_summary,
             )
-            from app.services.ledger_import.writer import clear_project_year
+            from app.services.ledger_import.writer import activate_dataset
+            from app.services.dataset_service import DatasetService
             from app.models.audit_platform_models import (
                 TbBalance, TbLedger, TbAuxBalance, TbAuxLedger,
             )
             from sqlalchemy import insert
 
             import_year = year or 2025
-            async with async_session() as clear_db:
-                await clear_project_year(project_id, import_year, clear_db)
-                await clear_db.commit()
+
+            # 创建 staged dataset
+            staging_dataset_id: UUID
+            async with async_session() as stage_db:
+                staged = await DatasetService.create_staged(
+                    stage_db,
+                    project_id=project_id,
+                    year=import_year,
+                    source_type="ledger_import_v2",
+                    job_id=job_id,
+                    created_by=created_by,
+                )
+                staging_dataset_id = staged.id
+                await stage_db.commit()
+            logger.info(
+                "ImportJob %s created staged dataset %s", job_id, staging_dataset_id,
+            )
 
             # Bulk insert params: 14 columns × 1000 rows = 14000 params (< PG 65535 limit)
             INSERT_CHUNK_SIZE = 1000
@@ -579,6 +595,8 @@ class ImportJobRunner:
                                 "level": r.get("level", 1),
                                 "currency_code": r.get("currency_code", "CNY"),
                                 "raw_extra": r.get("raw_extra"),
+                                "dataset_id": staging_dataset_id,
+                                "is_deleted": True,  # staged，activate 后切换
                             }
                             for r in batch
                         ])
@@ -612,6 +630,8 @@ class ImportJobRunner:
                                 "closing_credit": r.get("closing_credit"),
                                 "currency_code": r.get("currency_code", "CNY"),
                                 "raw_extra": r.get("raw_extra"),
+                                "dataset_id": staging_dataset_id,
+                                "is_deleted": True,
                             }
                             for r in batch
                         ])
@@ -641,6 +661,8 @@ class ImportJobRunner:
                                 "preparer": r.get("preparer"),
                                 "currency_code": r.get("currency_code", "CNY"),
                                 "raw_extra": r.get("raw_extra"),
+                                "dataset_id": staging_dataset_id,
+                                "is_deleted": True,
                             }
                             for r in batch
                         ])
@@ -675,6 +697,8 @@ class ImportJobRunner:
                                 "preparer": r.get("preparer"),
                                 "currency_code": r.get("currency_code", "CNY"),
                                 "raw_extra": r.get("raw_extra"),
+                                "dataset_id": staging_dataset_id,
+                                "is_deleted": True,
                             }
                             for r in batch
                         ])
@@ -733,11 +757,19 @@ class ImportJobRunner:
                     )
 
                     # Stream parse rows
+                    # S6-12: account_code / account_name 列启用 forward-fill，
+                    # 应对合并单元格场景（银行存款占 N 行只在第 1 行显示）
+                    ff_cols = []
+                    for idx, cm in enumerate(sheet.column_mappings):
+                        if cm.standard_field in ("account_code", "account_name"):
+                            ff_cols.append(cm.column_index)
+
                     if ext in (".xlsx", ".xlsm"):
                         row_iter = iter_excel_rows_from_path(
                             str(filepath),
                             sheet.sheet_name,
                             data_start_row=sheet.data_start_row,
+                            forward_fill_cols=ff_cols or None,
                         )
                     elif ext in (".csv", ".tsv"):
                         encoding = fd.encoding or "utf-8"
@@ -814,25 +846,63 @@ class ImportJobRunner:
                 total_ledger_written, total_aux_ledger_written,
             )
 
-            # ── Phase 4: Activation gate (basic — only blocking findings) ──
+            # ── Phase 4: Activation gate + 原子激活（S6-13） ──
             logger.info("ImportJob %s phase=activation_gate", job_id)
-            await cls._persist_progress(job_id, 87, "评估激活条件")
+            await cls._persist_progress(job_id, 85, "评估激活条件")
             force = bool(options.get("force_activate"))
             gate = evaluate_activation(all_findings, force=force)
 
             if not gate.allowed:
-                blocking_msgs = [f.message for f in gate.blocking_findings[:5]]
-                # 注意：数据已写入，这里只是警告用户
+                # Blocking findings → 不激活，dataset 保持 staged（后续可查诊断）
+                # 返回 failed + result_summary 含 blocking_findings 详情
+                blocking_msgs = [f.message for f in gate.blocking_findings[:10]]
                 logger.warning(
-                    "ImportJob %s has %d blocking findings but data already written",
-                    job_id, len(gate.blocking_findings),
+                    "ImportJob %s blocking findings (%d)，dataset %s 保持 staged 不激活",
+                    job_id, len(gate.blocking_findings), staging_dataset_id,
+                )
+                # 清理 staged 数据（回滚）
+                async with async_session() as mf_db:
+                    await DatasetService.mark_failed(
+                        mf_db, staging_dataset_id, cleanup_rows=True,
+                    )
+                    await mf_db.commit()
+                # 上抛异常，进入外层 except 流程标记 failed
+                raise RuntimeError(
+                    f"校验失败（{len(gate.blocking_findings)} 条阻塞错误），"
+                    f"数据未激活：{'; '.join(blocking_msgs[:3])}"
                 )
 
-            # ── Phase 5: Rebuild aux summary ──
+            # 激活 gate 通过，原子切换 staged → active
+            logger.info("ImportJob %s phase=activate_dataset %s",
+                        job_id, staging_dataset_id)
+            await cls._persist_progress(job_id, 90, "激活数据集")
+            async with async_session() as act_db:
+                await activate_dataset(
+                    act_db,
+                    dataset_id=staging_dataset_id,
+                    activated_by=created_by,
+                    record_summary={
+                        "balance_rows": total_balance_written,
+                        "aux_balance_rows": total_aux_balance_written,
+                        "ledger_rows": total_ledger_written,
+                        "aux_ledger_rows": total_aux_ledger_written,
+                    },
+                    validation_summary={
+                        "warnings": len([f for f in all_findings if not f.blocking]),
+                        "blocking": len([f for f in all_findings if f.blocking]),
+                        "force_activated": force,
+                    },
+                )
+                await act_db.commit()
+
+            # ── Phase 5: Rebuild aux summary（只汇总本 dataset） ──
             logger.info("ImportJob %s phase=rebuild_aux_summary", job_id)
-            await cls._persist_progress(job_id, 92, "重建辅助汇总")
+            await cls._persist_progress(job_id, 93, "重建辅助汇总")
             async with async_session() as summary_db:
-                await rebuild_aux_balance_summary(project_id, import_year, summary_db)
+                await rebuild_aux_balance_summary(
+                    project_id, import_year, summary_db,
+                    dataset_id=staging_dataset_id,
+                )
                 await summary_db.commit()
 
             # ── Phase 6: Complete ──
@@ -845,6 +915,7 @@ class ImportJobRunner:
                     progress_message="v2 导入完成",
                     result_summary={
                         "engine": "v2",
+                        "dataset_id": str(staging_dataset_id),
                         "balance_rows": total_balance_written,
                         "aux_balance_rows": total_aux_balance_written,
                         "ledger_rows": total_ledger_written,
@@ -878,6 +949,23 @@ class ImportJobRunner:
             logger.exception("ImportJob v2 执行失败: %s", job_id)
             # 多层兜底：即使 DB 操作失败也要尽量标记 job 为 failed + 释放锁
             error_msg = str(exc)[:1000] if exc else "未知错误"
+
+            # S6-13: 清理 staged dataset（防止孤儿数据）
+            try:
+                from app.services.dataset_service import DatasetService as _DS
+                async with async_session() as cleanup_db:
+                    cleaned = await _DS.mark_failed_for_job(cleanup_db, job_id)
+                    await cleanup_db.commit()
+                    if cleaned > 0:
+                        logger.info(
+                            "ImportJob %s cleaned up %d staged dataset(s)",
+                            job_id, cleaned,
+                        )
+            except Exception:
+                logger.exception(
+                    "ImportJob %s staged cleanup failed", job_id,
+                )
+
             for attempt in range(3):
                 try:
                     async with async_session() as db:

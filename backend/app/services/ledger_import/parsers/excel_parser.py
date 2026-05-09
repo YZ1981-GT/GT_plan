@@ -49,8 +49,12 @@ def _iter_from_workbook(
     *,
     data_start_row: int,
     chunk_size: int,
+    forward_fill_cols: list[int] | None = None,
 ) -> Generator[list[list[Any]], None, None]:
-    """已打开的 workbook → 流式 yield chunk。"""
+    """已打开的 workbook → 流式 yield chunk。
+
+    forward_fill_cols：合并单元格向下填充（None → 上一行非空值）。
+    """
     if sheet_name not in wb.sheetnames:
         raise RuntimeError(
             f"Sheet '{sheet_name}' not found. Available: {wb.sheetnames}"
@@ -61,8 +65,26 @@ def _iter_from_workbook(
     min_row = data_start_row + 1
     chunk: list[list[Any]] = []
 
+    # forward-fill 上一行记忆值（跨 chunk 保持）
+    prev_values: dict[int, Any] = {}
+    ff_cols = set(forward_fill_cols or [])
+
     for row_tuple in ws.iter_rows(min_row=min_row, values_only=True):
-        chunk.append(list(row_tuple))
+        row_list = list(row_tuple)
+        # 执行 forward-fill
+        if ff_cols:
+            for col_idx in ff_cols:
+                if col_idx < len(row_list):
+                    val = row_list[col_idx]
+                    if val is None or (isinstance(val, str) and not val.strip()):
+                        # 空值 → 用上一行值填
+                        if col_idx in prev_values:
+                            row_list[col_idx] = prev_values[col_idx]
+                    else:
+                        # 非空值 → 更新记忆
+                        prev_values[col_idx] = val
+
+        chunk.append(row_list)
         if len(chunk) >= chunk_size:
             yield chunk
             chunk = []
@@ -77,6 +99,8 @@ def _iter_with_fallback(
     sheet_name: str,
     data_start_row: int,
     chunk_size: int,
+    *,
+    forward_fill_cols: list[int] | None = None,
 ) -> Generator[list[list[Any]], None, None]:
     """尝试 read_only=True 流式；0 行时回退 read_only=False。"""
     yielded = 0
@@ -86,6 +110,7 @@ def _iter_with_fallback(
                 wb, sheet_name,
                 data_start_row=data_start_row,
                 chunk_size=chunk_size,
+                forward_fill_cols=forward_fill_cols,
             ):
                 yielded += len(chunk)
                 yield chunk
@@ -115,6 +140,7 @@ def _iter_with_fallback(
                 wb, sheet_name,
                 data_start_row=data_start_row,
                 chunk_size=chunk_size,
+                forward_fill_cols=forward_fill_cols,
             )
     except RuntimeError:
         raise
@@ -131,11 +157,20 @@ def iter_excel_rows(
     *,
     data_start_row: int = 1,
     chunk_size: int = CHUNK_SIZE,
+    forward_fill_cols: list[int] | None = None,
 ) -> Generator[list[list[Any]], None, None]:
-    """Yield chunks from xlsx bytes. read_only + 自动回退。"""
+    """Yield chunks from xlsx bytes. read_only + 自动回退。
+
+    Parameters
+    ----------
+    forward_fill_cols : list[int] | None
+        0-based 列索引，这些列的 None 值会被上一行的非空值填充。
+        典型场景：科目编码列（银行存款 4 行只在第 1 行显示）。默认 None = 不填充。
+    """
     source = io.BytesIO(content)
     yield from _iter_with_fallback(
         source, "bytes", sheet_name, data_start_row, chunk_size,
+        forward_fill_cols=forward_fill_cols,
     )
 
 
@@ -145,8 +180,13 @@ def iter_excel_rows_from_path(
     *,
     data_start_row: int = 1,
     chunk_size: int = CHUNK_SIZE,
+    forward_fill_cols: list[int] | None = None,
 ) -> Generator[list[list[Any]], None, None]:
-    """Yield chunks from xlsx path. 不全量读入内存（read_only）+ 自动回退。"""
+    """Yield chunks from xlsx path. 不全量读入内存（read_only）+ 自动回退。
+
+    forward_fill_cols：S6-12 合并单元格向下填充（如合并的科目编码列）。
+    """
     yield from _iter_with_fallback(
         path, f"path={path}", sheet_name, data_start_row, chunk_size,
+        forward_fill_cols=forward_fill_cols,
     )

@@ -23,6 +23,7 @@ from app.deps import get_current_user
 from app.models.core import User
 from app.services.ledger_data_service import (
     LEDGER_TABLES,
+    apply_incremental,
     compute_incremental_diff,
     delete_ledger_data,
     detect_existing_periods,
@@ -146,6 +147,64 @@ async def detect_incremental(
         "can_append_safely": len(diff["overlap"]) == 0,
         "requires_confirm": len(diff["overlap"]) > 0,
     }
+
+
+class IncrementalApplyRequest(BaseModel):
+    """增量追加执行（S6-15）。"""
+    year: int
+    file_periods: list[int] = Field(..., description="文件中的月份列表")
+    overlap_strategy: str = Field(
+        "skip",
+        description="重叠月份策略：skip=跳过/overwrite=覆盖",
+    )
+    confirmed: bool = Field(False, description="二次确认（overwrite 策略必填）")
+
+
+@router.post("/incremental/apply")
+async def apply_incremental_endpoint(
+    project_id: UUID,
+    request: IncrementalApplyRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """S6-15: 增量追加执行——按策略清理将被覆盖的期间。
+
+    清理完成后，前端继续走正常的 `/ledger-import/submit` 触发新导入；
+    或者本端点不变，由前端分两步调用（先 detect，再本端点清理旧月）。
+
+    overlap_strategy:
+      - skip: 跳过重叠月份（不删除）
+      - overwrite: 删除重叠月份（必须 confirmed=True）
+    """
+    # 权限校验
+    if current_user.role not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="仅项目经理及以上可执行增量追加")
+
+    if request.overlap_strategy == "overwrite" and not request.confirmed:
+        raise HTTPException(
+            status_code=400,
+            detail="overwrite 策略必须显式确认（confirmed=true）",
+        )
+
+    try:
+        result = await apply_incremental(
+            db,
+            project_id=project_id,
+            year=request.year,
+            file_periods=request.file_periods,
+            overlap_strategy=request.overlap_strategy,
+        )
+        logger.info(
+            "incremental apply by user=%s project=%s year=%d strategy=%s executed=%s",
+            current_user.id, project_id, request.year,
+            request.overlap_strategy, result.get("executed"),
+        )
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.exception("apply_incremental failed")
+        raise HTTPException(status_code=500, detail=f"增量追加失败: {exc}")
 
 
 __all__ = ["router"]

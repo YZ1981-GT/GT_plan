@@ -441,6 +441,12 @@ class TbAuxBalance(Base):
             "idx_tb_aux_balance_import_batch",
             "import_batch_id",
         ),
+        # S6-8: 三元组精确查询专用索引
+        Index(
+            "idx_tb_aux_balance_triplet",
+            "project_id", "year", "account_code", "aux_type", "aux_code",
+            postgresql_where=text("is_deleted = false"),
+        ),
     )
 
 
@@ -512,6 +518,12 @@ class TbAuxLedger(Base):
         Index(
             "idx_tb_aux_ledger_import_batch",
             "import_batch_id",
+        ),
+        # S6-8: 三元组精确查询专用索引（按 account_code + aux_type + aux_code 定位）
+        Index(
+            "idx_tb_aux_ledger_triplet",
+            "project_id", "year", "account_code", "aux_type", "aux_code",
+            postgresql_where=text("is_deleted = false"),
         ),
     )
 

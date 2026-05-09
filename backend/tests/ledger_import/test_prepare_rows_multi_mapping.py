@@ -60,3 +60,64 @@ def test_single_column_no_discarded():
     assert result[0]["raw_extra"] == {"无关列": "val"}
     # 无丢弃映射
     assert "_discarded_mappings" not in result[0]["raw_extra"]
+
+
+# S6-19: 边界场景补充
+
+
+def test_three_columns_mixed_empty():
+    """3 列同映射，第 2 列空，第 3 列非空 → 第 1 非空保留，第 3 进 discarded。"""
+    col_mapping = {
+        "账簿类型": "voucher_type",
+        "凭证类型": "voucher_type",
+        "来源类型": "voucher_type",
+    }
+    headers = ["账簿类型", "凭证类型", "来源类型"]
+    rows = [
+        {"账簿类型": "主账簿", "凭证类型": "", "来源类型": "自动转账"},
+    ]
+    result, _ = prepare_rows_with_raw_extra(rows, col_mapping, headers)
+    assert result[0]["voucher_type"] == "主账簿"
+    discarded = result[0]["raw_extra"]["_discarded_mappings"]["voucher_type"]
+    # 空"凭证类型"不进 discarded，只有非空"来源类型"进
+    assert len(discarded) == 1
+    assert discarded[0]["header"] == "来源类型"
+    assert discarded[0]["value"] == "自动转账"
+
+
+def test_multi_mapping_with_raw_extra_merge():
+    """多列映射 + 未映射列同时存在，两者合并到 raw_extra。"""
+    col_mapping = {
+        "核算维度": "aux_dimensions",
+        "主表项目": "aux_dimensions",
+    }
+    headers = ["核算维度", "主表项目", "备注", "操作员"]
+    rows = [
+        {
+            "核算维度": "客户:001 A客户",
+            "主表项目": "项目:P01 研发",  # 被丢弃
+            "备注": "测试",               # 进 raw_extra
+            "操作员": "张三",             # 进 raw_extra
+        },
+    ]
+    result, _ = prepare_rows_with_raw_extra(rows, col_mapping, headers)
+    assert result[0]["aux_dimensions"] == "客户:001 A客户"
+    extra = result[0]["raw_extra"]
+    assert extra["备注"] == "测试"
+    assert extra["操作员"] == "张三"
+    # 丢弃项也在
+    assert extra["_discarded_mappings"]["aux_dimensions"][0]["value"] == "项目:P01 研发"
+
+
+def test_all_empty_no_discarded_key():
+    """所有列都空时，raw_extra 不会出现 _discarded_mappings 空字典。"""
+    col_mapping = {
+        "核算维度": "aux_dimensions",
+        "主表项目": "aux_dimensions",
+    }
+    headers = ["核算维度", "主表项目"]
+    rows = [{"核算维度": None, "主表项目": ""}]
+    result, _ = prepare_rows_with_raw_extra(rows, col_mapping, headers)
+    # 没有任何非空值 → std_row 的 aux_dimensions 也保持 None/""
+    # raw_extra 应为 None（无未映射列、无丢弃列）
+    assert result[0]["raw_extra"] is None

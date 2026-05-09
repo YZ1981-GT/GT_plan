@@ -331,6 +331,30 @@ async def get_aux_ledger_entries(
     )
 
 
+@router.get("/aux/by-triplet")
+async def get_aux_by_triplet(
+    project_id: UUID,
+    year: int = Query(...),
+    account_code: str = Query(..., description="科目编码"),
+    aux_type: str = Query(..., description="辅助维度类型，如 客户/成本中心/金融机构"),
+    aux_code: str | None = Query(None, description="辅助编码（缺省则返回该维度类型下所有）"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """S6-8 三元组精确穿透（account_code + aux_type + aux_code）。
+
+    同时返回辅助余额 + 辅助明细账，解决"税率"等维度类型跨科目重名问题。
+    前端点击科目下的某条"客户:041108,重庆医药..."时调用此端点。
+    """
+    svc = _svc(db, None)
+    return await svc.get_aux_by_triplet(
+        project_id, year, account_code, aux_type, aux_code,
+        page=page, page_size=page_size,
+    )
+
+
 @router.delete("/cache")
 async def clear_cache(
     project_id: UUID,

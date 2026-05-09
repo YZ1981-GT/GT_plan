@@ -100,11 +100,22 @@ def test_json_format_preserves_key_count(d: dict):
 ))
 @settings(max_examples=100)
 def test_multi_dimension_split(parts: list[str]):
-    """用逗号分隔的多段，返回列表长度 ≤ 段数（空段被跳过）。"""
+    """用逗号分隔的多段，返回列表长度 ≤ 段数 + 1（整体不可解析时 fallback 1 条）。
+
+    注意：S6-6 后 `_smart_comma_split` 只在"逗号后紧跟 `类型:`"时才切分，
+    因此随机 parts 大概率不会被切，整体变成 1 条 unparseable。
+    """
     raw = ",".join(parts)
+    if not raw.strip():
+        # 纯空白输入 → 返回空列表（满足不变式）
+        result = parse_aux_dimension(raw)
+        assert result == []
+        return
+
     result = parse_aux_dimension(raw)
     non_empty_parts = [p for p in parts if p.strip()]
-    assert len(result) <= len(non_empty_parts)
+    # 上界：每段一条（强切分场景）或整体一条（弱切分场景）
+    assert len(result) <= max(len(non_empty_parts), 1)
 
 
 # ---------------------------------------------------------------------------

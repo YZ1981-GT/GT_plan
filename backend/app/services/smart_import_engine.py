@@ -3081,13 +3081,28 @@ async def smart_import_streaming(
     }
 
 
-async def rebuild_aux_balance_summary(project_id: UUID, year: int, db) -> int:
+async def rebuild_aux_balance_summary(
+    project_id: UUID,
+    year: int,
+    db,
+    *,
+    dataset_id: UUID | None = None,
+) -> int:
     """重建辅助余额汇总表（按维度类型+科目+辅助编码分组）。
 
     通用规则：任何企业导入后都自动调用。
     汇总结果存入 tb_aux_balance_summary，前端直接查汇总表渲染树形视图。
+
+    S6-14: 新增可选 dataset_id 参数——只汇总指定 dataset 的辅助余额行，
+    避免 staging+active 并存时互相污染。dataset_id=None 时退化为原行为
+    （汇总 project+year 下所有 is_deleted=false 的行）。
     """
     import sqlalchemy as sa
+
+    dataset_filter_sql = "AND dataset_id = :did" if dataset_id else ""
+    params: dict = {"pid": str(project_id), "yr": year}
+    if dataset_id:
+        params["did"] = str(dataset_id)
 
     # 1. 清除旧汇总
     await db.execute(sa.text(
@@ -3095,7 +3110,7 @@ async def rebuild_aux_balance_summary(project_id: UUID, year: int, db) -> int:
     ), {"pid": str(project_id), "yr": year})
 
     # 2. 用 SQL 聚合直接插入（比 Python 遍历快几十倍）
-    await db.execute(sa.text("""
+    await db.execute(sa.text(f"""
         INSERT INTO tb_aux_balance_summary
             (project_id, year, dim_type, account_code, account_name, aux_code, aux_name,
              record_count, opening_balance, debit_amount, credit_amount, closing_balance)
@@ -3110,8 +3125,9 @@ async def rebuild_aux_balance_summary(project_id: UUID, year: int, db) -> int:
             SUM(COALESCE(closing_balance, 0))
         FROM tb_aux_balance
         WHERE project_id = :pid AND year = :yr AND is_deleted = false
+          {dataset_filter_sql}
         GROUP BY project_id, year, aux_type, account_code, aux_code
-    """), {"pid": str(project_id), "yr": year})
+    """), params)  # noqa: S608
 
     # 3. 查汇总行数
     r = await db.execute(sa.text(
