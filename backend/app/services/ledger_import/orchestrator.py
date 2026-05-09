@@ -421,7 +421,6 @@ async def execute_pipeline(
         ValueError: 文件空 / 参数错误
     """
     import os
-    from sqlalchemy import insert
     from app.core.database import async_session
     from app.models.audit_platform_models import (
         TbAuxBalance, TbAuxLedger, TbBalance, TbLedger,
@@ -484,143 +483,38 @@ async def execute_pipeline(
         await stage_db.commit()
     logger.info("Pipeline %s created staged dataset %s", job_id, staging_dataset_id)
 
-    # Insert chunk size (PG 65535 param limit / 25 cols ≈ 1000 safe)
-    INSERT_CHUNK_SIZE = 1000
+    # S7-2: 用 bulk_insert_staged 通用函数替代 4 个重复的 _insert_* 闭包
+    # 自省字段：按 table_model.__table__.columns 过滤 row 字典，
+    # 自动注入 id/project_id/year/dataset_id/is_deleted 公共字段
+    from app.services.ledger_import.writer import bulk_insert_staged
 
     async def _insert_balance(rows: list[dict]) -> None:
-        if not rows:
-            return
-        async with async_session() as db:
-            for i in range(0, len(rows), INSERT_CHUNK_SIZE):
-                batch = rows[i:i + INSERT_CHUNK_SIZE]
-                stmt = insert(TbBalance).values([
-                    {
-                        "id": uuid.uuid4(),
-                        "project_id": project_id,
-                        "year": import_year,
-                        "account_code": r["account_code"],
-                        "account_name": r.get("account_name", ""),
-                        "company_code": r.get("company_code") or "default",
-                        "opening_balance": r.get("opening_balance"),
-                        "opening_debit": r.get("opening_debit"),
-                        "opening_credit": r.get("opening_credit"),
-                        "debit_amount": r.get("debit_amount"),
-                        "credit_amount": r.get("credit_amount"),
-                        "closing_balance": r.get("closing_balance"),
-                        "closing_debit": r.get("closing_debit"),
-                        "closing_credit": r.get("closing_credit"),
-                        "level": r.get("level", 1),
-                        "currency_code": r.get("currency_code", "CNY"),
-                        "raw_extra": r.get("raw_extra"),
-                        "dataset_id": staging_dataset_id,
-                        "is_deleted": True,
-                    }
-                    for r in batch
-                ])
-                await db.execute(stmt)
-            await db.commit()
+        await bulk_insert_staged(
+            async_session, TbBalance, rows,
+            project_id=project_id, year=import_year,
+            dataset_id=staging_dataset_id, is_deleted=True,
+        )
 
     async def _insert_aux_balance(rows: list[dict]) -> None:
-        if not rows:
-            return
-        async with async_session() as db:
-            for i in range(0, len(rows), INSERT_CHUNK_SIZE):
-                batch = rows[i:i + INSERT_CHUNK_SIZE]
-                stmt = insert(TbAuxBalance).values([
-                    {
-                        "id": uuid.uuid4(),
-                        "project_id": project_id,
-                        "year": import_year,
-                        "account_code": r["account_code"],
-                        "account_name": r.get("account_name", ""),
-                        "company_code": r.get("company_code") or "default",
-                        "aux_type": r.get("aux_type"),
-                        "aux_code": r.get("aux_code"),
-                        "aux_name": r.get("aux_name"),
-                        "opening_balance": r.get("opening_balance"),
-                        "opening_debit": r.get("opening_debit"),
-                        "opening_credit": r.get("opening_credit"),
-                        "debit_amount": r.get("debit_amount"),
-                        "credit_amount": r.get("credit_amount"),
-                        "closing_balance": r.get("closing_balance"),
-                        "closing_debit": r.get("closing_debit"),
-                        "closing_credit": r.get("closing_credit"),
-                        "currency_code": r.get("currency_code", "CNY"),
-                        "raw_extra": r.get("raw_extra"),
-                        "dataset_id": staging_dataset_id,
-                        "is_deleted": True,
-                    }
-                    for r in batch
-                ])
-                await db.execute(stmt)
-            await db.commit()
+        await bulk_insert_staged(
+            async_session, TbAuxBalance, rows,
+            project_id=project_id, year=import_year,
+            dataset_id=staging_dataset_id, is_deleted=True,
+        )
 
     async def _insert_ledger(rows: list[dict]) -> None:
-        if not rows:
-            return
-        async with async_session() as db:
-            for i in range(0, len(rows), INSERT_CHUNK_SIZE):
-                batch = rows[i:i + INSERT_CHUNK_SIZE]
-                stmt = insert(TbLedger).values([
-                    {
-                        "id": uuid.uuid4(),
-                        "project_id": project_id,
-                        "year": import_year,
-                        "account_code": r["account_code"],
-                        "account_name": r.get("account_name", ""),
-                        "company_code": r.get("company_code") or "default",
-                        "voucher_date": r.get("voucher_date"),
-                        "voucher_no": r.get("voucher_no", ""),
-                        "voucher_type": r.get("voucher_type"),
-                        "debit_amount": r.get("debit_amount"),
-                        "credit_amount": r.get("credit_amount"),
-                        "summary": r.get("summary"),
-                        "preparer": r.get("preparer"),
-                        "currency_code": r.get("currency_code", "CNY"),
-                        "raw_extra": r.get("raw_extra"),
-                        "dataset_id": staging_dataset_id,
-                        "is_deleted": True,
-                    }
-                    for r in batch
-                ])
-                await db.execute(stmt)
-            await db.commit()
+        await bulk_insert_staged(
+            async_session, TbLedger, rows,
+            project_id=project_id, year=import_year,
+            dataset_id=staging_dataset_id, is_deleted=True,
+        )
 
     async def _insert_aux_ledger(rows: list[dict]) -> None:
-        if not rows:
-            return
-        async with async_session() as db:
-            for i in range(0, len(rows), INSERT_CHUNK_SIZE):
-                batch = rows[i:i + INSERT_CHUNK_SIZE]
-                stmt = insert(TbAuxLedger).values([
-                    {
-                        "id": uuid.uuid4(),
-                        "project_id": project_id,
-                        "year": import_year,
-                        "account_code": r["account_code"],
-                        "account_name": r.get("account_name", ""),
-                        "company_code": r.get("company_code") or "default",
-                        "voucher_date": r.get("voucher_date"),
-                        "voucher_no": r.get("voucher_no", ""),
-                        "voucher_type": r.get("voucher_type"),
-                        "accounting_period": r.get("accounting_period"),
-                        "aux_type": r.get("aux_type"),
-                        "aux_code": r.get("aux_code"),
-                        "aux_name": r.get("aux_name"),
-                        "aux_dimensions_raw": r.get("aux_dimensions_raw"),
-                        "debit_amount": r.get("debit_amount"),
-                        "credit_amount": r.get("credit_amount"),
-                        "summary": r.get("summary"),
-                        "preparer": r.get("preparer"),
-                        "currency_code": r.get("currency_code", "CNY"),
-                        "raw_extra": r.get("raw_extra"),
-                        "dataset_id": staging_dataset_id,
-                        "is_deleted": True,
-                    }
-                    for r in batch
-                ])
-                await db.execute(stmt)
-            await db.commit()
+        await bulk_insert_staged(
+            async_session, TbAuxLedger, rows,
+            project_id=project_id, year=import_year,
+            dataset_id=staging_dataset_id, is_deleted=True,
+        )
 
     # ── Parse → Convert → Validate → Write (streaming) ──
     logger.info("Pipeline %s phase=parse_write_streaming", job_id)

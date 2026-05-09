@@ -150,7 +150,7 @@ def convert_balance_rows(
         if not account_code:
             continue
 
-        account_name = str(row.get("account_name", "")).strip()
+        account_name = str(row.get("account_name", "")).strip() or None
         company_code = str(row.get("company_code", "")).strip() or default_company
 
         # ── 期初 ──
@@ -290,7 +290,7 @@ def convert_ledger_rows(
 
         base_fields = {
             "account_code": account_code,
-            "account_name": str(row.get("account_name", "")).strip(),
+            "account_name": str(row.get("account_name", "")).strip() or None,
             "voucher_date": voucher_date,
             "voucher_no": voucher_no,
             "voucher_type": str(row.get("voucher_type", "")).strip() or None,

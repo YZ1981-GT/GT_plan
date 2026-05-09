@@ -266,6 +266,8 @@ __all__ = [
     "prepare_rows_with_raw_extra",
     "activate_dataset",
     "clear_project_year",
+    "bulk_insert_staged",
+    "DEFAULT_INSERT_CHUNK_SIZE",
     "RAW_EXTRA_MAX_BYTES",
 ]
 
@@ -302,3 +304,85 @@ async def clear_project_year(project_id: UUID, year: int, db) -> None:
         .values(status=ImportStatus.rolled_back)
     )
     await db.flush()
+
+
+
+# ---------------------------------------------------------------------------
+# S7-2: bulk_insert_staged — 通用 4 表流式插入（替代 4 个重复闭包）
+# ---------------------------------------------------------------------------
+
+# PG 参数上限 65535，保守按 25 列/行估算，chunk_size=1000 约 25000 参数
+DEFAULT_INSERT_CHUNK_SIZE = 1000
+
+
+async def bulk_insert_staged(
+    db_session_factory,
+    table_model,
+    rows: list[dict[str, Any]],
+    *,
+    project_id: UUID,
+    year: int,
+    dataset_id: UUID,
+    chunk_size: int = DEFAULT_INSERT_CHUNK_SIZE,
+    is_deleted: bool = True,
+    default_company_code: str = "default",
+) -> int:
+    """通用 staged 模式批量 insert（S7-2）。
+
+    自动根据 table_model.__table__.columns 从每行字典里取存在的字段，
+    不存在的字段跳过；同时注入公共字段（id/project_id/year/dataset_id/is_deleted）。
+
+    Args:
+        db_session_factory: `async_session` from core.database（调用方传入避免循环 import）
+        table_model: SQLAlchemy ORM 模型类（TbBalance / TbLedger / TbAuxBalance / TbAuxLedger）
+        rows: 已转换的数据行列表（converter 产出）
+        project_id: 项目 UUID
+        year: 会计年度
+        dataset_id: staging dataset UUID
+        chunk_size: 批大小（默认 1000）
+        is_deleted: 是否写 staged（True = 隐藏，等 activate 切换；False = 直接可见）
+        default_company_code: company_code 缺省值（NOT NULL 字段）
+
+    Returns:
+        实际插入行数
+    """
+    import uuid as _uuid
+    from sqlalchemy import insert
+
+    if not rows:
+        return 0
+
+    # 从模型拿合法字段名（SQLAlchemy 列对象）
+    valid_cols = {c.name for c in table_model.__table__.columns}
+    inserted = 0
+
+    async with db_session_factory() as db:
+        for i in range(0, len(rows), chunk_size):
+            batch = rows[i:i + chunk_size]
+            records = []
+            for r in batch:
+                # 按模型列自省过滤，只取存在的字段
+                rec: dict[str, Any] = {}
+                for k, v in r.items():
+                    if k in valid_cols:
+                        rec[k] = v
+                # 注入/覆盖公共字段
+                rec["id"] = _uuid.uuid4()
+                rec["project_id"] = project_id
+                rec["year"] = year
+                rec["dataset_id"] = dataset_id
+                rec["is_deleted"] = is_deleted
+                # company_code NOT NULL 兜底
+                if "company_code" in valid_cols and not rec.get("company_code"):
+                    rec["company_code"] = default_company_code
+                # currency_code 默认 CNY
+                if "currency_code" in valid_cols and not rec.get("currency_code"):
+                    rec["currency_code"] = "CNY"
+                records.append(rec)
+
+            if records:
+                await db.execute(insert(table_model).values(records))
+                inserted += len(records)
+        await db.commit()
+
+    return inserted
