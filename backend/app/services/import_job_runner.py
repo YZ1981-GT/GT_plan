@@ -462,11 +462,11 @@ class ImportJobRunner:
         - staged dataset 失败兜底清理
 
         核心数据管线（detect/parse/convert/validate/write/activate）由
-        `ledger_import.orchestrator.execute_pipeline` 执行（S6-3 架构清洁）。
+        `ledger_import.pipeline.execute_pipeline` 执行（S6-3/S7-6 架构清洁）。
         """
         # Bootstrap import（任何错误都兜底）
         try:
-            from app.services.ledger_import.orchestrator import (
+            from app.services.ledger_import.pipeline import (
                 PipelineResult, execute_pipeline,
             )
         except Exception as imp_exc:

@@ -1,14 +1,14 @@
 """Round 7: clients 主数据 + project_tags [R7-S3-06 Task 30]
 
 Revision ID: round7_clients_20260508
-Revises: round7_section_progress_gin
+Revises: round7_section_progress_gin_20260507
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = 'round7_clients_20260508'
-down_revision = 'round7_section_progress_gin'
+down_revision = 'round7_section_progress_gin_20260507'
 branch_labels = None
 depends_on = None
 
