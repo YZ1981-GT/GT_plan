@@ -14,7 +14,7 @@
         style="margin-bottom: 16px"
       >
         <template #title>
-          查看已导入数据、按年度/月份删除、或增量追加 12 月序时账等
+          查看已导入数据、按年度/月份删除、或增量追加 12 月序时账�?
         </template>
       </el-alert>
 
@@ -30,7 +30,7 @@
             >
               <el-table-column prop="table" label="表名" width="140" />
               <el-table-column prop="year" label="年度" width="80" />
-              <el-table-column prop="total" label="总行数" width="100" align="right" />
+              <el-table-column prop="total" label="总行�? width="100" align="right" />
               <el-table-column label="月份分布">
                 <template #default="{ row }">
                   <div v-if="row.periods">
@@ -40,10 +40,10 @@
                       size="small"
                       style="margin: 2px"
                     >
-                      {{ period }}月: {{ cnt }}
+                      {{ period }}�? {{ cnt }}
                     </el-tag>
                   </div>
-                  <span v-else style="color: #999">—</span>
+                  <span v-else style="color: #999">�?/span>
                 </template>
               </el-table-column>
               <el-table-column label="日期范围" width="200">
@@ -55,7 +55,7 @@
               </el-table-column>
             </el-table>
             <div v-if="summaryRows.length === 0" style="text-align: center; padding: 40px; color: #999">
-              暂无已导入数据
+              暂无已导入数�?
             </div>
           </div>
         </el-tab-pane>
@@ -73,23 +73,23 @@
                 />
               </el-select>
             </el-form-item>
-            <el-form-item label="目标表">
+            <el-form-item label="目标�?>
               <el-checkbox-group v-model="deleteForm.tables">
-                <el-checkbox value="tb_balance">科目余额表</el-checkbox>
-                <el-checkbox value="tb_aux_balance">辅助余额表</el-checkbox>
-                <el-checkbox value="tb_ledger">序时账</el-checkbox>
-                <el-checkbox value="tb_aux_ledger">辅助序时账</el-checkbox>
+                <el-checkbox value="tb_balance">科目余额�?/el-checkbox>
+                <el-checkbox value="tb_aux_balance">辅助余额�?/el-checkbox>
+                <el-checkbox value="tb_ledger">序时�?/el-checkbox>
+                <el-checkbox value="tb_aux_ledger">辅助序时�?/el-checkbox>
               </el-checkbox-group>
               <div style="font-size: 12px; color: #999; margin-top: 4px">
-                不选 = 删除全部四张表
+                不�?= 删除全部四张�?
               </div>
             </el-form-item>
             <el-form-item label="月份（可选）">
               <el-checkbox-group v-model="deleteForm.periods">
-                <el-checkbox v-for="m in 12" :key="m" :value="m">{{ m }}月</el-checkbox>
+                <el-checkbox v-for="m in 12" :key="m" :value="m">{{ m }}�?/el-checkbox>
               </el-checkbox-group>
               <div style="font-size: 12px; color: #999; margin-top: 4px">
-                仅对序时账/辅助序时账生效；不选 = 删整个年度
+                仅对序时�?辅助序时账生效；不�?= 删整个年�?
               </div>
             </el-form-item>
             <el-alert
@@ -109,7 +109,7 @@
           </el-form>
         </el-tab-pane>
 
-        <!-- Tab 3: 增量追加（12月） -->
+        <!-- Tab 3: 增量追加�?2月） -->
         <el-tab-pane label="增量追加" name="incremental">
           <el-form label-width="100px" size="default">
             <el-form-item label="年度" required>
@@ -131,19 +131,19 @@
                   type="success"
                   style="margin: 2px"
                 >
-                  {{ p }}月
+                  {{ p }}�?
                 </el-tag>
                 <span v-if="getExistingPeriods(incrementalForm.year).length === 0" style="color: #999">
-                  暂无序时账数据
+                  暂无序时账数�?
                 </span>
               </div>
             </el-form-item>
 
             <!-- 预检结果展示 -->
-            <el-form-item v-if="incrementalDiff" label="检测结果">
+            <el-form-item v-if="incrementalDiff" label="检测结�?>
               <div style="font-size: 13px; line-height: 1.8">
                 <div>
-                  <span style="color: #67c23a; font-weight: 600">新增月份：</span>
+                  <span style="color: #67c23a; font-weight: 600">新增月份�?/span>
                   <el-tag
                     v-for="p in incrementalDiff.diff.new"
                     :key="`new-${p}`"
@@ -151,12 +151,12 @@
                     type="success"
                     style="margin: 2px"
                   >
-                    {{ p }}月
+                    {{ p }}�?
                   </el-tag>
-                  <span v-if="incrementalDiff.diff.new.length === 0" style="color: #999">无</span>
+                  <span v-if="incrementalDiff.diff.new.length === 0" style="color: #999">�?/span>
                 </div>
                 <div>
-                  <span style="color: #e6a23c; font-weight: 600">重叠月份：</span>
+                  <span style="color: #e6a23c; font-weight: 600">重叠月份�?/span>
                   <el-tag
                     v-for="p in incrementalDiff.diff.overlap"
                     :key="`ov-${p}`"
@@ -164,14 +164,14 @@
                     type="warning"
                     style="margin: 2px"
                   >
-                    {{ p }}月
+                    {{ p }}�?
                   </el-tag>
-                  <span v-if="incrementalDiff.diff.overlap.length === 0" style="color: #999">无</span>
+                  <span v-if="incrementalDiff.diff.overlap.length === 0" style="color: #999">�?/span>
                 </div>
                 <div v-if="incrementalDiff.diff.overlap.length > 0" style="margin-top: 8px">
                   <el-radio-group v-model="overlapStrategy">
                     <el-radio value="skip">跳过重叠月份（只追加新月份）</el-radio>
-                    <el-radio value="overwrite">覆盖重叠月份（删除旧数据）</el-radio>
+                    <el-radio value="overwrite">覆盖重叠月份（删除旧数据�?/el-radio>
                   </el-radio-group>
                 </div>
               </div>
@@ -187,8 +187,8 @@
               <template #default>
                 <ol style="margin: 8px 0 0 16px; padding: 0">
                   <li>选择年度（上方）</li>
-                  <li>点击"检测"输入/扫描文件将要导入的月份</li>
-                  <li>确认重叠策略（跳过/覆盖）</li>
+                  <li>点击"检�?输入/扫描文件将要导入的月�?/li>
+                  <li>确认重叠策略（跳�?覆盖�?/li>
                   <li>执行清理旧数据后上传文件继续导入</li>
                 </ol>
               </template>
@@ -196,14 +196,14 @@
             <div style="display: flex; gap: 8px">
               <el-input
                 v-model="filePeriodsInput"
-                placeholder="文件包含的月份，逗号分隔如: 11,12"
+                placeholder="文件包含的月份，逗号分隔�? 11,12"
                 style="width: 260px"
               />
               <el-button
                 :disabled="!incrementalForm.year || !filePeriodsInput"
                 @click="onDetectIncremental"
               >
-                检测差异
+                检测差�?
               </el-button>
               <el-button
                 v-if="incrementalDiff && (incrementalDiff.diff.overlap.length > 0 || incrementalDiff.diff.new.length > 0)"
@@ -270,10 +270,10 @@ const incrementalDiff = ref<any>(null)
 const overlapStrategy = ref<'skip' | 'overwrite'>('skip')
 
 const tableLabels: Record<string, string> = {
-  tb_balance: '科目余额表',
-  tb_aux_balance: '辅助余额表',
-  tb_ledger: '序时账',
-  tb_aux_ledger: '辅助序时账',
+  tb_balance: '科目余额�?,
+  tb_aux_balance: '辅助余额�?,
+  tb_ledger: '序时�?,
+  tb_aux_ledger: '辅助序时�?,
 }
 
 const availableYears = computed<number[]>(() => {
@@ -316,7 +316,7 @@ function getExistingPeriods(year: number): number[] {
 async function refreshSummary() {
   loading.value = true
   try {
-    summary.value = await api.get(ledger.import.data.summary(props.projectId))
+    summary.value = await api.get(ledger.data.summary(props.projectId))
   } catch (exc: any) {
     ElMessage.error('查询失败: ' + (exc.message || exc))
   } finally {
@@ -328,15 +328,15 @@ async function onDelete() {
   if (!deleteForm.value.year) return
 
   const tablesLabel = deleteForm.value.tables.length > 0
-    ? deleteForm.value.tables.map((t) => tableLabels[t] || t).join('、')
-    : '全部四张表'
+    ? deleteForm.value.tables.map((t) => tableLabels[t] || t).join('�?)
+    : '全部四张�?
   const periodsLabel = deleteForm.value.periods.length > 0
     ? `${deleteForm.value.periods.sort((a, b) => a - b).join(',')} 月`
     : '整年'
 
   try {
     await ElMessageBox.confirm(
-      `即将删除 ${deleteForm.value.year} 年 ${periodsLabel} 的 ${tablesLabel} 数据，此操作不可恢复，是否继续？`,
+      `即将删除 ${deleteForm.value.year} �?${periodsLabel} �?${tablesLabel} 数据，此操作不可恢复，是否继续？`,
       '删除确认',
       {
         confirmButtonText: '确认删除',
@@ -350,7 +350,7 @@ async function onDelete() {
 
   loading.value = true
   try {
-    const result: any = await api.delete(ledger.import.data.delete(props.projectId), {
+    const result: any = await api.delete(ledger.data.delete(props.projectId), {
       data: {
         year: deleteForm.value.year,
         tables: deleteForm.value.tables.length > 0 ? deleteForm.value.tables : null,
@@ -358,7 +358,7 @@ async function onDelete() {
         confirmed: true,
       },
     })
-    ElMessage.success(`已删除 ${result.total_deleted} 行数据`)
+    ElMessage.success(`已删�?${result.total_deleted} 行数据`)
     emit('data-changed')
     await refreshSummary()
     // Reset form
@@ -392,15 +392,15 @@ async function onDetectIncremental() {
   loading.value = true
   try {
     incrementalDiff.value = await api.post(
-      ledger.import.data.incrementalDetect(props.projectId),
+      ledger.data.incrementalDetect(props.projectId),
       { year: incrementalForm.value.year, file_periods },
     )
-    // 默认策略：有 overlap 则提示用户选择，否则 skip
+    // 默认策略：有 overlap 则提示用户选择，否�?skip
     if (incrementalDiff.value.diff.overlap.length === 0) {
       overlapStrategy.value = 'skip'
     }
   } catch (exc: any) {
-    ElMessage.error('检测失败: ' + (exc.message || exc))
+    ElMessage.error('检测失�? ' + (exc.message || exc))
   } finally {
     loading.value = false
   }
@@ -415,7 +415,7 @@ async function onApplyIncremental() {
     const ovMonths = incrementalDiff.value.diff.overlap.join(', ')
     try {
       await ElMessageBox.confirm(
-        `即将覆盖 ${incrementalForm.value.year} 年 ${ovMonths} 月数据，此操作不可恢复，是否继续？`,
+        `即将覆盖 ${incrementalForm.value.year} �?${ovMonths} 月数据，此操作不可恢复，是否继续？`,
         '覆盖确认',
         { confirmButtonText: '确认覆盖', cancelButtonText: '取消', type: 'warning' },
       )
@@ -427,7 +427,7 @@ async function onApplyIncremental() {
   loading.value = true
   try {
     const result: any = await api.post(
-      ledger.import.data.incrementalApply(props.projectId),
+      ledger.data.incrementalApply(props.projectId),
       {
         year: incrementalForm.value.year,
         file_periods,
@@ -440,13 +440,13 @@ async function onApplyIncremental() {
       const total = rows
         ? Object.values(rows).reduce((a: number, b: any) => a + (Number(b) || 0), 0)
         : 0
-      ElMessage.success(`已清理 ${total} 行旧数据，请上传文件继续`)
+      ElMessage.success(`已清�?${total} 行旧数据，请上传文件继续`)
     } else {
-      ElMessage.info('跳过策略下无需清理，可直接上传新月份文件')
+      ElMessage.info('跳过策略下无需清理，可直接上传新月份文�?)
     }
     emit('data-changed')
     await refreshSummary()
-    // 清空检测结果，鼓励用户上传新文件
+    // 清空检测结果，鼓励用户上传新文�?
     incrementalDiff.value = null
   } catch (exc: any) {
     ElMessage.error('清理失败: ' + (exc.message || exc))
