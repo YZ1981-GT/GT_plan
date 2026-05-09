@@ -180,11 +180,28 @@ def validate_l1(
     # The column_mapping tells us which original headers map to which standard fields
     # Rows dict keys are standard_field names
 
+    # S7 修复：某些"关键列对"互为替代（借贷分列模式），只要其中一个非空即可
+    # 序时账：debit_amount / credit_amount（借贷不可能同时有值）
+    # 余额表：opening_debit / opening_credit、closing_debit / closing_credit
+    _EXCLUSIVE_KEY_PAIRS: dict[str, set[str]] = {
+        "ledger": {"debit_amount", "credit_amount"},
+        "aux_ledger": {"debit_amount", "credit_amount"},
+    }
+    exclusive_pair = _EXCLUSIVE_KEY_PAIRS.get(table_type, set())
+
     findings: list[ValidationFinding] = []
     cleaned_rows: list[dict] = []
 
     for row_idx, row in enumerate(rows):
         cleaned_row = dict(row)  # shallow copy
+
+        # 预计算：若是 exclusive_pair 模式，至少一个非空就通过
+        exclusive_pair_ok = False
+        if exclusive_pair:
+            for f in exclusive_pair:
+                if not _is_empty(row.get(f)):
+                    exclusive_pair_ok = True
+                    break
 
         for field_name, value in row.items():
             # Determine tier
@@ -205,6 +222,9 @@ def validate_l1(
 
             # --- EMPTY check (key columns only) ---
             if tier == "key" and _is_empty(value):
+                # S7 修复：属于 exclusive_pair 的字段，另一个非空时跳过空值 blocking
+                if field_name in exclusive_pair and exclusive_pair_ok:
+                    continue
                 findings.append(
                     ValidationFinding(
                         level="L1",
