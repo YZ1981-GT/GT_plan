@@ -66,6 +66,19 @@ class SubmitRequest(BaseModel):
     confirmed_mappings: list[dict]
     force_activate: bool = False
     adapter_id: Optional[str] = None
+    # S7-9: 增量追加模式
+    incremental: bool = Field(
+        False,
+        description="S7-9 增量追加模式：true 时 submit 前按 overlap_strategy 清理旧数据",
+    )
+    overlap_strategy: str = Field(
+        "skip",
+        description="增量追加重叠月份策略（skip=跳过 / overwrite=覆盖），仅 incremental=true 时生效",
+    )
+    file_periods: Optional[list[int]] = Field(
+        None,
+        description="文件包含的月份列表（incremental+overwrite 时必填，用于精确清理）",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -131,8 +144,26 @@ async def submit_import(
 ):
     """Accept confirmed mappings, create ImportJob, return job info.
 
-    The worker will pick up the queued job and execute the import pipeline.
+    S7-9: 支持 incremental 模式——submit 前自动按 overlap_strategy 清理旧数据，
+    用户无需先调 /incremental/apply 再上传（一步到位）。
     """
+    # S7-9: 增量追加模式——submit 前清理旧月份
+    if body.incremental and body.overlap_strategy == "overwrite":
+        if not body.file_periods:
+            raise HTTPException(
+                status_code=400,
+                detail="incremental+overwrite 模式必须提供 file_periods",
+            )
+        from app.services.ledger_data_service import apply_incremental
+        await apply_incremental(
+            db,
+            project_id=project_id,
+            year=body.year,
+            file_periods=body.file_periods,
+            overlap_strategy="overwrite",
+        )
+        # apply_incremental 内部已 commit
+
     from app.services.ledger_import.orchestrator import ImportOrchestrator
 
     result = await ImportOrchestrator.submit(

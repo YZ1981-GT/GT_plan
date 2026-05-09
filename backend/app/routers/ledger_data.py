@@ -27,6 +27,8 @@ from app.services.ledger_data_service import (
     compute_incremental_diff,
     delete_ledger_data,
     detect_existing_periods,
+    list_trash,
+    restore_ledger_data,
     summarize_ledger_data,
 )
 
@@ -50,6 +52,17 @@ class DeleteLedgerRequest(BaseModel):
         False,
         description="二次确认（防止误操作）",
     )
+    hard_delete: bool = Field(
+        False,
+        description="硬删除（S7-10 默认软删，进回收站可恢复；硬删不可恢复）",
+    )
+
+
+class RestoreLedgerRequest(BaseModel):
+    """S7-10 恢复请求。"""
+    year: int
+    tables: Optional[list[str]] = None
+    periods: Optional[list[int]] = None
 
 
 class IncrementalDetectRequest(BaseModel):
@@ -101,11 +114,13 @@ async def delete_ledger(
             year=request.year,
             tables=request.tables,
             periods=request.periods,
+            hard_delete=request.hard_delete,
         )
         total = sum(v for v in deleted.values() if v >= 0)
+        mode = "hard" if request.hard_delete else "soft"
         logger.info(
-            "ledger delete by user=%s project=%s year=%d periods=%s total=%d",
-            current_user.id, project_id, request.year, request.periods, total,
+            "ledger %s-delete by user=%s project=%s year=%d periods=%s total=%d",
+            mode, current_user.id, project_id, request.year, request.periods, total,
         )
         return {
             "success": True,
@@ -113,12 +128,67 @@ async def delete_ledger(
             "total_deleted": total,
             "year": request.year,
             "periods": request.periods,
+            "mode": mode,
+            "recoverable": not request.hard_delete,
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.exception("delete ledger data failed")
         raise HTTPException(status_code=500, detail=f"删除失败: {exc}")
+
+
+@router.get("/trash")
+async def get_trash(
+    project_id: UUID,
+    year: Optional[int] = Query(None, description="只查某一年（None 则全部）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """S7-10: 列出回收站中已软删除的数据。"""
+    try:
+        return await list_trash(db, project_id=project_id, year=year)
+    except Exception as exc:
+        logger.exception("list_trash failed")
+        raise HTTPException(status_code=500, detail=f"查询回收站失败: {exc}")
+
+
+@router.post("/restore")
+async def restore_ledger(
+    project_id: UUID,
+    request: RestoreLedgerRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """S7-10: 从回收站恢复数据（is_deleted=true → false）。"""
+    if current_user.role not in ("admin", "partner", "manager"):
+        raise HTTPException(status_code=403, detail="仅项目经理及以上可恢复账表数据")
+
+    try:
+        restored = await restore_ledger_data(
+            db,
+            project_id=project_id,
+            year=request.year,
+            tables=request.tables,
+            periods=request.periods,
+        )
+        total = sum(v for v in restored.values() if v >= 0)
+        logger.info(
+            "ledger restore by user=%s project=%s year=%d periods=%s total=%d",
+            current_user.id, project_id, request.year, request.periods, total,
+        )
+        return {
+            "success": True,
+            "restored": restored,
+            "total_restored": total,
+            "year": request.year,
+            "periods": request.periods,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.exception("restore ledger failed")
+        raise HTTPException(status_code=500, detail=f"恢复失败: {exc}")
 
 
 @router.post("/incremental/detect")

@@ -894,6 +894,8 @@ export const ledger = {
     delete: (pid: string) => `/api/projects/${pid}/ledger-data`,
     incrementalDetect: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/detect`,
     incrementalApply: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/apply`,
+    trash: (pid: string) => `/api/projects/${pid}/ledger-data/trash`,
+    restore: (pid: string) => `/api/projects/${pid}/ledger-data/restore`,
   },
 } as const
 

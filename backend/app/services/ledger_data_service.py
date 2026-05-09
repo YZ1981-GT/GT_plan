@@ -154,8 +154,12 @@ async def delete_ledger_data(
     year: int,
     tables: Optional[list[str]] = None,
     periods: Optional[list[int]] = None,
+    hard_delete: bool = False,
 ) -> dict[str, int]:
     """删除账表数据（按年度 + 可选期间/表）。
+
+    S7-10: 默认软删除（is_deleted=true 标记），支持恢复；
+    `hard_delete=True` 才真正 DELETE（不可恢复）。
 
     Args:
         project_id: 项目 UUID
@@ -163,12 +167,14 @@ async def delete_ledger_data(
         tables: 可选，指定要删除的表（默认全部 4 张）
         periods: 可选，指定要删除的月份（仅对 ledger/aux_ledger 生效；
                  若指定则只删这些月份，未指定则删整个年度）
+        hard_delete: 是否硬删（默认 False 即软删，进回收站可恢复）
 
     Returns:
-        {"tb_balance": 1822, "tb_ledger": 5000, ...} 各表删除行数
+        {"tb_balance": 1822, "tb_ledger": 5000, ...} 各表影响行数
 
     注意：
     - 余额表（tb_balance/tb_aux_balance）不支持 period 过滤，periods 参数对它们无效
+    - 软删除用 UPDATE is_deleted=true，保留可恢复能力
     - 返回的行数可用于生成审计日志
     """
     if not tables:
@@ -187,35 +193,167 @@ async def delete_ledger_data(
             and table in LEDGER_TABLES_PERIODIC
         )
 
+        if hard_delete:
+            verb = "DELETE FROM"
+            set_clause = ""
+        else:
+            verb = "UPDATE"
+            set_clause = "SET is_deleted = true"
+
         if use_period_filter:
-            sql = f"""
-                DELETE FROM {table}
-                WHERE project_id = :pid AND year = :year
-                  AND EXTRACT(MONTH FROM voucher_date)::int = ANY(:periods)
-            """
+            if hard_delete:
+                sql = f"""
+                    DELETE FROM {table}
+                    WHERE project_id = :pid AND year = :year
+                      AND EXTRACT(MONTH FROM voucher_date)::int = ANY(:periods)
+                """
+            else:
+                sql = f"""
+                    UPDATE {table} {set_clause}
+                    WHERE project_id = :pid AND year = :year
+                      AND EXTRACT(MONTH FROM voucher_date)::int = ANY(:periods)
+                      AND is_deleted = false
+                """
             params = {
                 "pid": str(project_id),
                 "year": year,
                 "periods": periods,
             }
         else:
-            sql = f"DELETE FROM {table} WHERE project_id = :pid AND year = :year"
+            if hard_delete:
+                sql = f"DELETE FROM {table} WHERE project_id = :pid AND year = :year"
+            else:
+                sql = (
+                    f"UPDATE {table} {set_clause} "
+                    f"WHERE project_id = :pid AND year = :year AND is_deleted = false"
+                )
             params = {"pid": str(project_id), "year": year}
 
         try:
             result = await db.execute(sa.text(sql), params)
             deleted[table] = result.rowcount or 0
             logger.info(
-                "deleted %d rows from %s (project=%s year=%d periods=%s)",
+                "%s %d rows from %s (project=%s year=%d periods=%s)",
+                "hard-deleted" if hard_delete else "soft-deleted",
                 deleted[table], table, project_id, year, periods,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("delete %s failed", table)
             deleted[table] = -1  # sentinel for error
             raise
 
     await db.commit()
     return deleted
+
+
+async def restore_ledger_data(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: int,
+    tables: Optional[list[str]] = None,
+    periods: Optional[list[int]] = None,
+) -> dict[str, int]:
+    """S7-10: 从回收站恢复软删除的数据（is_deleted=false）。
+
+    参数语义同 delete_ledger_data（只不过反向操作）。
+    硬删除的数据无法恢复，此函数只对软删有效。
+    """
+    if not tables:
+        tables = LEDGER_TABLES
+    else:
+        invalid = set(tables) - set(LEDGER_TABLES)
+        if invalid:
+            raise ValueError(f"不支持的表: {invalid}")
+
+    restored: dict[str, int] = {}
+
+    for table in tables:
+        use_period_filter = (
+            periods is not None
+            and len(periods) > 0
+            and table in LEDGER_TABLES_PERIODIC
+        )
+
+        if use_period_filter:
+            sql = f"""
+                UPDATE {table} SET is_deleted = false
+                WHERE project_id = :pid AND year = :year
+                  AND EXTRACT(MONTH FROM voucher_date)::int = ANY(:periods)
+                  AND is_deleted = true
+            """
+            params = {"pid": str(project_id), "year": year, "periods": periods}
+        else:
+            sql = (
+                f"UPDATE {table} SET is_deleted = false "
+                f"WHERE project_id = :pid AND year = :year AND is_deleted = true"
+            )
+            params = {"pid": str(project_id), "year": year}
+
+        try:
+            result = await db.execute(sa.text(sql), params)
+            restored[table] = result.rowcount or 0
+            logger.info(
+                "restored %d rows in %s (project=%s year=%d periods=%s)",
+                restored[table], table, project_id, year, periods,
+            )
+        except Exception:
+            logger.exception("restore %s failed", table)
+            restored[table] = -1
+            raise
+
+    await db.commit()
+    return restored
+
+
+async def list_trash(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: Optional[int] = None,
+) -> dict[str, Any]:
+    """S7-10: 列出回收站中的数据（is_deleted=true）。
+
+    Returns:
+        {
+            "tb_balance": {"total": 1822, "years": {2024: 1822}},
+            "tb_ledger": {"total": 10000, "years": {...}},
+            ...
+        }
+    """
+    result: dict[str, Any] = {}
+
+    year_filter = "AND year = :year" if year is not None else ""
+
+    for table in LEDGER_TABLES:
+        count_sql = f"""
+            SELECT year, COUNT(*) AS cnt
+            FROM {table}
+            WHERE project_id = :pid AND is_deleted = true {year_filter}
+            GROUP BY year
+            ORDER BY year DESC
+        """
+        params: dict[str, Any] = {"pid": str(project_id)}
+        if year is not None:
+            params["year"] = year
+
+        try:
+            rows = (await db.execute(sa.text(count_sql), params)).all()
+        except Exception as exc:
+            logger.warning("list_trash %s failed: %s", table, exc)
+            result[table] = {"total": 0, "years": {}, "error": str(exc)}
+            continue
+
+        total = 0
+        years: dict[int, int] = {}
+        for row in rows:
+            y, cnt = int(row[0]), int(row[1])
+            years[y] = cnt
+            total += cnt
+
+        result[table] = {"total": total, "years": years}
+
+    return result
 
 
 async def detect_existing_periods(
@@ -262,6 +400,8 @@ __all__ = [
     "LEDGER_TABLES_PERIODIC",
     "summarize_ledger_data",
     "delete_ledger_data",
+    "restore_ledger_data",
+    "list_trash",
     "detect_existing_periods",
     "compute_incremental_diff",
     "apply_incremental",
