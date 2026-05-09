@@ -378,3 +378,80 @@ async def retry_job(
         "status": resume_result["status"],
         "retry_count": resume_result["retry_count"],
     }
+
+
+# ---------------------------------------------------------------------------
+# GET /jobs/latest (S7 — 进度条轮询改走 import_jobs 表)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/jobs/latest")
+async def get_latest_job(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """S7: 获取项目最新的导入作业状态（替代 ImportQueueService 内存态轮询）。
+
+    前端 ThreeColumnLayout 每 10s 轮询此端点显示进度条。
+    后端重启后仍能看到正在运行/最近完成的 job。
+
+    Returns:
+        - 有活跃 job: {status, progress, message, job_id, year}
+        - 无活跃 job: {status: "idle"}
+    """
+    # 优先找 running/writing/validating/activating 的活跃 job
+    active_statuses = (
+        JobStatus.running, JobStatus.validating,
+        JobStatus.writing, JobStatus.activating,
+        JobStatus.queued, JobStatus.pending,
+    )
+    stmt = (
+        select(ImportJob)
+        .where(
+            ImportJob.project_id == project_id,
+            ImportJob.status.in_(active_statuses),
+        )
+        .order_by(ImportJob.created_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    job = result.scalar_one_or_none()
+
+    if job:
+        return {
+            "status": "processing",
+            "progress": job.progress_pct or 0,
+            "message": job.progress_message or "导入中...",
+            "job_id": str(job.id),
+            "year": job.year,
+        }
+
+    # 没有活跃 job，查最近 5 分钟内完成/失败的（给前端 toast 用）
+    from datetime import datetime, timedelta, timezone
+    recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+    stmt_recent = (
+        select(ImportJob)
+        .where(
+            ImportJob.project_id == project_id,
+            ImportJob.status.in_((JobStatus.completed, JobStatus.failed)),
+            ImportJob.completed_at > recent_cutoff,
+        )
+        .order_by(ImportJob.completed_at.desc())
+        .limit(1)
+    )
+    result_recent = await db.execute(stmt_recent)
+    recent_job = result_recent.scalar_one_or_none()
+
+    if recent_job:
+        return {
+            "status": recent_job.status.value,
+            "progress": 100 if recent_job.status == JobStatus.completed else 0,
+            "message": recent_job.progress_message or (
+                "导入完成" if recent_job.status == JobStatus.completed else "导入失败"
+            ),
+            "job_id": str(recent_job.id),
+            "year": recent_job.year,
+        }
+
+    return {"status": "idle"}

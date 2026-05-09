@@ -540,7 +540,9 @@ async function pollImportQueue() {
     return
   }
   try {
-    const statusData = await api.get(`/api/data-lifecycle/import-queue/${projectId}`, {
+    // S7: 改轮询 import_jobs 表（持久化），不再依赖 ImportQueueService 内存态
+    // 后端重启后仍能看到正在运行的 job
+    const statusData = await api.get(`/api/projects/${projectId}/ledger-import/jobs/latest`, {
       validateStatus: (s: number) => s < 600,
     })
     const status = statusData
