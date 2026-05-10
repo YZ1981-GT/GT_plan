@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.services.ledger_import.writer import (
+from app.services.ledger_import.writer import (
     RAW_EXTRA_MAX_BYTES,
     build_raw_extra,
     prepare_rows_with_raw_extra,

@@ -1011,10 +1011,12 @@ def _detect_xlsx_from_path(
     *,
     file_size: int,
 ) -> FileDetection:
-    """从文件路径探测 xlsx，openpyxl 直接打开文件（不读入内存）。
+    """从文件路径探测 xlsx。
 
-    openpyxl read_only=True 模式下，只解析 shared_strings + 前 20 行的 XML，
-    内存占用与文件大小无关（~10-50MB 级别，取决于 shared_strings 表大小）。
+    用 openpyxl read_only=True 真流式读前 20 行 XML，内存占用与 sheet 数据量无关
+    （~10-50MB 级别，取决于 shared_strings 表大小）。
+    历史：曾试 calamine 加速 detect，实测 calamine 必须全量解码 sheet（YG2101 序时账
+    650k 行 17.81s），不适合 "只读前 20 行" 场景，已移除。
     """
     fd = FileDetection(file_name=filename, file_size_bytes=file_size, file_type="xlsx")
 

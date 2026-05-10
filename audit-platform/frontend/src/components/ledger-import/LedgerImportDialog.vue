@@ -48,6 +48,7 @@
       @complete="onImportComplete"
       @failed="onImportFailed"
       @canceled="onImportCanceled"
+      @background="onMoveToBackground"
     />
   </el-dialog>
 
@@ -59,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import UploadStep from './UploadStep.vue'
 import DetectionPreview from './DetectionPreview.vue'
 import ColumnMappingEditor from './ColumnMappingEditor.vue'
@@ -157,10 +158,20 @@ const confirmedSheets = ref<SheetDetection[]>([])
 const jobId = ref('')
 const importErrors = ref<ImportError[]>([])
 const errorDialogVisible = ref(false)
+/** 标记当前是"转后台"关闭而非用户主动取消；close 时不重置状态 */
+const isBackgroundMode = ref(false)
 
 const dialogVisible = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val),
+})
+
+// 打开时若已有正在跑的 jobId → 直接跳 step 3 看进度
+watch(dialogVisible, (v) => {
+  if (v && jobId.value && currentStep.value !== 3) {
+    // 有残留 jobId 说明之前转后台，直接恢复进度视图
+    currentStep.value = 3
+  }
 })
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
@@ -221,7 +232,20 @@ function onImportCanceled() {
   currentStep.value = 0
 }
 
+function onMoveToBackground() {
+  // worker 后端继续跑，关闭 dialog 但保留 jobId
+  // 下次打开 dialog（如顶栏跳转）时 onShow 会检查并恢复 step 3
+  isBackgroundMode.value = true
+  dialogVisible.value = false
+}
+
 function onClose() {
+  // 背景模式：保留 jobId，下次打开直接跳 step 3 看进度
+  if (isBackgroundMode.value) {
+    isBackgroundMode.value = false
+    return
+  }
+  // 正常关闭：清空状态
   currentStep.value = 0
   detectionResult.value = null
   confirmedSheets.value = []

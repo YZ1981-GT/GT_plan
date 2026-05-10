@@ -11,16 +11,16 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.services.ledger_import.adapters import AdapterRegistry
-from backend.app.services.ledger_import.adapters.base import BaseAdapter
-from backend.app.services.ledger_import.adapters.generic import GenericAdapter
-from backend.app.services.ledger_import.adapters.kingdee import KingdeeAdapter
-from backend.app.services.ledger_import.adapters.yonyou import YonyouAdapter
-from backend.app.services.ledger_import.adapters.sap import SapAdapter
-from backend.app.services.ledger_import.adapters.oracle import OracleAdapter
-from backend.app.services.ledger_import.adapters.inspur import InspurAdapter
-from backend.app.services.ledger_import.adapters.newgrand import NewgrandAdapter
-from backend.app.services.ledger_import.detection_types import FileDetection, SheetDetection
+from app.services.ledger_import.adapters import AdapterRegistry
+from app.services.ledger_import.adapters.base import BaseAdapter
+from app.services.ledger_import.adapters.generic import GenericAdapter
+from app.services.ledger_import.adapters.kingdee import KingdeeAdapter
+from app.services.ledger_import.adapters.yonyou import YonyouAdapter
+from app.services.ledger_import.adapters.sap import SapAdapter
+from app.services.ledger_import.adapters.oracle import OracleAdapter
+from app.services.ledger_import.adapters.inspur import InspurAdapter
+from app.services.ledger_import.adapters.newgrand import NewgrandAdapter
+from app.services.ledger_import.detection_types import FileDetection, SheetDetection
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ class TestAdapterRegistry:
 
     def test_all_adapters_registered(self):
         """全局 registry 应包含所有 7 个适配器。"""
-        from backend.app.services.ledger_import.adapters import registry
+        from app.services.ledger_import.adapters import registry
 
         all_adapters = registry.all()
         ids = {a.id for a in all_adapters}

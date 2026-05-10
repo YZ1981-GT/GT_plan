@@ -129,6 +129,47 @@ def _resolve_direction(direction_raw, amount: Optional[Decimal]) -> Optional[Dec
 # ---------------------------------------------------------------------------
 
 
+def _aggregate_aux_to_summary(
+    aux_base_rows: list[dict],
+    account_code: str,
+    company_code: str,
+) -> dict:
+    """将多条带辅助维度的余额行聚合成一条虚拟主表汇总行。
+
+    用于 Excel 里只有明细行没有汇总行的场景（如 1122 应收账款 只导出 2 家客户明细）。
+    所有金额字段求和，raw_extra 追加 _aggregated_from_aux 标记以便后续溯源。
+    """
+    def _sum(field: str) -> Optional[Decimal]:
+        vals = [r.get(field) for r in aux_base_rows if r.get(field) is not None]
+        if not vals:
+            return None
+        total = Decimal(0)
+        for v in vals:
+            total += v
+        return total
+
+    first = aux_base_rows[0]
+    raw_extra_base = dict(first.get("raw_extra") or {})
+    raw_extra_base["_aggregated_from_aux"] = True
+    raw_extra_base["_aux_row_count"] = len(aux_base_rows)
+
+    return {
+        "account_code": account_code,
+        "account_name": first.get("account_name"),
+        "company_code": company_code,
+        "opening_balance": _sum("opening_balance"),
+        "opening_debit": _sum("opening_debit"),
+        "opening_credit": _sum("opening_credit"),
+        "debit_amount": _sum("debit_amount"),
+        "credit_amount": _sum("credit_amount"),
+        "closing_balance": _sum("closing_balance"),
+        "closing_debit": _sum("closing_debit"),
+        "closing_credit": _sum("closing_credit"),
+        "currency_code": first.get("currency_code") or "CNY",
+        "raw_extra": raw_extra_base,
+    }
+
+
 def convert_balance_rows(
     rows: list[dict],
     *,
@@ -141,9 +182,17 @@ def convert_balance_rows(
     - 净额+方向模式（opening_balance + direction）→ 按方向调符号
 
     含辅助维度的行自动拆分到 aux_balance_rows。
+
+    主表去重规则（按 (company_code, account_code) 分组，每组产出 1 条主表行）：
+    - 有汇总行（无 aux 的原始行）→ 主表用汇总行，丢弃带 aux 行对主表的重复写入
+    - 仅有明细行（N 条带 aux）→ 主表聚合生成虚拟汇总行，raw_extra._aggregated_from_aux=true
+    避免同一 account_code 在 tb_balance 里重复 N+1 次导致下游 SUM 翻倍。
     """
-    balance_rows: list[dict] = []
     aux_balance_rows: list[dict] = []
+    # 分组索引：(company_code, account_code) → {summary: dict|None, aux_base_rows: list[dict]}
+    # aux_base_rows 记录"带 aux 原始行的 base_row"（不含 aux_type/aux_code 等维度字段），
+    # 仅在该组无 summary 时用于聚合生成虚拟汇总行。
+    groups: dict[tuple[str, str], dict] = {}
 
     for row in rows:
         account_code = str(row.get("account_code", "")).strip()
@@ -225,17 +274,34 @@ def convert_balance_rows(
                         "aux_name": dim.get("aux_name") or None,
                         "aux_dimensions_raw": aux_dim_str,  # 溯源原始维度字符串
                     })
-                # 辅助维度行同时也写主表（对齐旧引擎：一条带辅助维度的余额行 = 主表 1 + 辅助表 N）
-                balance_rows.append({
-                    **base_row,
-                    "level": infer_level(account_code),
-                })
+                # 记录该组的带 aux base row，用于在无汇总行时聚合成虚拟汇总
+                key = (company_code, account_code)
+                g = groups.setdefault(key, {"summary": None, "aux_base_rows": []})
+                g["aux_base_rows"].append(base_row)
                 continue
 
-        balance_rows.append({
-            **base_row,
-            "level": infer_level(account_code),
-        })
+        # 无辅助维度 → 作为该组的汇总行（若重复出现则用第一条）
+        key = (company_code, account_code)
+        g = groups.setdefault(key, {"summary": None, "aux_base_rows": []})
+        if g["summary"] is None:
+            g["summary"] = {
+                **base_row,
+                "level": infer_level(account_code),
+            }
+
+    # ── 按组装配主表 ──
+    balance_rows: list[dict] = []
+    for (company_code, account_code), g in groups.items():
+        if g["summary"] is not None:
+            # 场景 A：有汇总行 → 用汇总行，丢弃 aux_base_rows 对主表的重复写入
+            balance_rows.append(g["summary"])
+        elif g["aux_base_rows"]:
+            # 场景 B：只有明细 → 聚合生成虚拟汇总行
+            aggregated = _aggregate_aux_to_summary(
+                g["aux_base_rows"], account_code, company_code,
+            )
+            aggregated["level"] = infer_level(account_code)
+            balance_rows.append(aggregated)
 
     return balance_rows, aux_balance_rows
 

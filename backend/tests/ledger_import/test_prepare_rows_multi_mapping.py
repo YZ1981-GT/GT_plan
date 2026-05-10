@@ -7,7 +7,7 @@
 - 修复前：后者 None 覆盖前者有效值 → aux_dimensions=None → aux_ledger=0
 - 修复后：第一个非空值保留 → aux_dimensions 正确保留
 """
-from backend.app.services.ledger_import.writer import prepare_rows_with_raw_extra
+from app.services.ledger_import.writer import prepare_rows_with_raw_extra
 
 
 def test_multi_column_same_field_keeps_non_empty():

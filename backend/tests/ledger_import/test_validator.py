@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.services.ledger_import.validator import (
+from app.services.ledger_import.validator import (
     ValidationFinding,
     evaluate_activation,
     validate_l1,

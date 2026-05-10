@@ -80,7 +80,20 @@ def test_minimal_sample_balance_conversion(minimal_sample_path: Path):
     _, cleaned = validate_l1(std_rows, "balance", column_mapping=col_mapping)
     bal, aux_bal = convert_balance_rows(cleaned)
 
-    assert len(bal) >= 3, f"预期主表 ≥ 3 行（库存现金+本年利润+部分无维度科目）, 实际 {len(bal)}"
+    # 去重后主表按 (company, account_code) 分组：1001/1002/1122/2202/4103 = 5 组
+    assert len(bal) == 5, f"预期主表精确 5 行（去重后每 account_code 1 条）, 实际 {len(bal)}"
+    # account_code 不应重复
+    codes = [r["account_code"] for r in bal]
+    assert len(codes) == len(set(codes)), f"主表 account_code 重复: {codes}"
+    # 1002 用原汇总行值（48000），不是聚合（48000）——此处恰好相等但标记不同
+    b1002 = next(r for r in bal if r["account_code"] == "1002")
+    assert not (b1002.get("raw_extra") or {}).get("_aggregated_from_aux"), \
+        "1002 有汇总行，主表应用汇总行不应标记聚合"
+    # 1122 仅有明细，应是聚合行
+    b1122 = next(r for r in bal if r["account_code"] == "1122")
+    assert (b1122.get("raw_extra") or {}).get("_aggregated_from_aux") is True, \
+        "1122 无汇总行仅明细，主表应是聚合虚拟汇总"
+
     assert len(aux_bal) >= 4, f"预期辅助余额 ≥ 4 行（2 银行 + 2 客户 + 1 供应商）, 实际 {len(aux_bal)}"
 
     # 辅助维度类型必须含金融机构/客户/供应商

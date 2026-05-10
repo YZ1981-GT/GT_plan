@@ -865,6 +865,7 @@ export const ledger = {
   auxEntries: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-entries/${code}`,
   auxByTriplet: (pid: string) => `/api/projects/${pid}/ledger/aux/by-triplet`,
   auxSummary: (pid: string) => `/api/projects/${pid}/ledger/aux-summary`,
+  balanceTree: (pid: string) => `/api/projects/${pid}/ledger/balance-tree`,
   exportBalance: (pid: string) => `/api/projects/${pid}/ledger/export-balance`,
   exportAuxBalance: (pid: string) => `/api/projects/${pid}/ledger/export-aux-balance`,
   exportLedger: (pid: string, code: string) => `/api/projects/${pid}/ledger/export-ledger/${encodeURIComponent(code)}`,

@@ -522,6 +522,124 @@ export async function getLedgerEntries(projectId: string, code: string, year: nu
   return data
 }
 
+// ── 科目余额树形（Layer 2 / Sprint 8） ──
+// 主表 + 辅助余额嵌套，el-table :tree-props 直接渲染
+// v2（2026-05-10）：支持三层嵌套（父科目 → 维度组节点 → 具体明细），
+// mismatch 按单一 aux_type 校验
+
+export interface LedgerBalanceAuxChild {
+  aux_type: string
+  aux_code: string | null
+  aux_name: string | null
+  aux_dimensions_raw: string | null
+  opening_balance: number | null
+  opening_debit: number | null
+  opening_credit: number | null
+  debit_amount: number | null
+  credit_amount: number | null
+  closing_balance: number | null
+  closing_debit: number | null
+  closing_credit: number | null
+  currency_code: string | null
+}
+
+/** 维度组节点：代表某个 aux_type 在该科目下的聚合 */
+export interface LedgerBalanceDimensionGroup {
+  _is_dimension_group: true
+  aux_type: string
+  account_code: string
+  account_name: string | null
+  opening_balance: number
+  debit_amount: number
+  credit_amount: number
+  closing_balance: number
+  record_count: number
+  has_children: boolean
+  children: LedgerBalanceAuxChild[]
+}
+
+export interface LedgerBalanceTreeNode {
+  account_code: string
+  account_name: string | null
+  level: number | null
+  company_code: string
+  opening_balance: number | null
+  opening_debit: number | null
+  opening_credit: number | null
+  debit_amount: number | null
+  credit_amount: number | null
+  closing_balance: number | null
+  closing_debit: number | null
+  closing_credit: number | null
+  currency_code: string | null
+  aggregated_from_aux: boolean
+  aux_row_count: number
+  aux_types: string[]
+  aux_rows_total: number
+  has_children: boolean
+  children: LedgerBalanceDimensionGroup[]
+}
+
+export interface LedgerBalanceTreeMismatch {
+  company_code: string
+  account_code: string
+  aux_type: string
+  parent_closing: number
+  dim_sum: number
+  record_count: number
+  diff: number
+}
+
+export interface LedgerBalanceTreeResponse {
+  year: number
+  company_code: string | null
+  tree: LedgerBalanceTreeNode[]
+  pagination: {
+    page: number
+    page_size: number
+    total: number
+    total_pages: number
+  }
+  summary: {
+    account_count: number
+    aggregated_count: number
+    with_children_count: number
+    aux_total_rows: number
+    mismatches: LedgerBalanceTreeMismatch[]
+  }
+}
+
+export interface LedgerBalanceTreeParams {
+  year: number
+  companyCode?: string
+  page?: number
+  pageSize?: number
+  keyword?: string
+  onlyWithChildren?: boolean
+  onlyWithActivity?: boolean
+}
+
+export async function getLedgerBalanceTree(
+  projectId: string,
+  params: number | LedgerBalanceTreeParams,
+  companyCode?: string,
+): Promise<LedgerBalanceTreeResponse> {
+  // 兼容旧调用 getLedgerBalanceTree(pid, year, companyCode)
+  const p: LedgerBalanceTreeParams =
+    typeof params === 'number' ? { year: params, companyCode } : params
+
+  const query: Record<string, any> = { year: p.year }
+  if (p.companyCode) query.company_code = p.companyCode
+  if (p.page !== undefined) query.page = p.page
+  if (p.pageSize !== undefined) query.page_size = Math.min(p.pageSize, 200)
+  if (p.keyword) query.keyword = p.keyword
+  if (p.onlyWithChildren) query.only_with_children = true
+  if (p.onlyWithActivity) query.only_with_activity = true
+
+  const { data } = await http.get(P_ledger.balanceTree(projectId), { params: query })
+  return data as LedgerBalanceTreeResponse
+}
+
 // ── 集团架构（合并页面） ──
 
 export async function listChildProjects(parentProjectId: string): Promise<any[]> {

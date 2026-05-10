@@ -89,10 +89,28 @@
           </div>
         </el-tooltip>
         <!-- 后台导入任务指示 -->
-        <el-tooltip v-if="bgImportStatus" :content="bgImportStatus.message" placement="bottom">
-          <div class="gt-topbar-btn gt-import-indicator" @click="navigateToImport">
-            <el-icon :size="18" class="is-loading"><Loading /></el-icon>
-            <span class="gt-import-label">导入中</span>
+        <el-tooltip
+          v-if="bgImportStatus"
+          :content="bgImportStatus.tooltip"
+          placement="bottom"
+          effect="dark"
+        >
+          <div
+            class="gt-topbar-btn gt-import-indicator"
+            :class="`gt-phase-${bgImportStatus.phase}`"
+            @click="navigateToImport"
+          >
+            <el-progress
+              type="circle"
+              :percentage="bgImportStatus.progress"
+              :width="22"
+              :stroke-width="3"
+              :show-text="false"
+              :color="phaseColor"
+              :status="bgImportStatus.progress >= 100 ? 'success' : undefined"
+              class="gt-import-progress-ring"
+            />
+            <span class="gt-import-label">{{ bgImportLabel }}</span>
           </div>
         </el-tooltip>
 
@@ -530,57 +548,180 @@ function onTouchEnd(e: TouchEvent) {
 }
 
 // ── 后台导入任务全局轮询 ──
-const bgImportStatus = ref<{ projectId: string; message: string; progress: number } | null>(null)
+// 状态模型（不直接用 route.params.projectId 作为 "追踪中 project"——
+// 用户转后台后切到其他项目，原项目导入仍应被追踪直到结束）
+interface BgImportStatus {
+  projectId: string
+  phase: string          // 来自 job.current_phase：bootstrap/parsing/validating/writing/activating/completed
+  progress: number       // 0-100
+  message: string        // 当前阶段人类可读消息
+  tooltip: string        // 鼠标悬停完整信息
+}
+const bgImportStatus = ref<BgImportStatus | null>(null)
 let importPollTimer: ReturnType<typeof setInterval> | null = null
+/** 当前被追踪的 projectId（独立于路由，支持跨项目保留导入指示） */
+const trackedProjectId = ref<string | null>(null)
+/** 连续轮询错误计数——连续 3 次错误自动释放追踪 */
+let pollErrorCount = 0
+const MAX_POLL_ERRORS = 3
+
+const PHASE_LABEL: Record<string, string> = {
+  bootstrap: '启动',
+  parsing: '解析',
+  validating: '校验',
+  writing: '写入',
+  activating: '激活',
+  completed: '完成',
+  failed: '失败',
+  canceled: '已取消',
+  pending: '排队',
+  queued: '排队',
+}
+
+const bgImportLabel = computed(() => {
+  if (!bgImportStatus.value) return ''
+  return `${bgImportStatus.value.progress}%`
+})
+
+// P3-3.2: 按阶段着色（解析蓝 / 校验橙 / 写入紫 / 激活绿）
+// 注：completed 状态下 bgImportStatus 会被清空，指示器消失，
+// 所以这里不需要包含 completed 颜色
+const PHASE_COLORS: Record<string, string> = {
+  bootstrap: '#909399',
+  queued: '#909399',
+  pending: '#909399',
+  parsing: '#409eff',
+  validating: '#e6a23c',
+  writing: '#a855f7',
+  activating: '#67c23a',
+}
+
+const phaseColor = computed(() => {
+  if (!bgImportStatus.value) return '#409eff'
+  return PHASE_COLORS[bgImportStatus.value.phase] || '#409eff'
+})
 
 async function pollImportQueue() {
-  const projectId = route.params.projectId as string
-  if (!projectId) {
+  // 优先追踪 trackedProjectId；若无则回退到当前路由项目
+  const trackId = trackedProjectId.value || (route.params.projectId as string)
+  if (!trackId) {
     bgImportStatus.value = null
     return
   }
   try {
-    // S7: 改轮询 import_jobs 表（持久化），不再依赖 ImportQueueService 内存态
-    // 后端重启后仍能看到正在运行的 job
-    const statusData = await api.get(`/api/projects/${projectId}/ledger-import/active-job`, {
-      validateStatus: (s: number) => s < 600,
-    })
+    const statusData: any = await api.get(
+      `/api/projects/${trackId}/ledger-import/active-job`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    pollErrorCount = 0  // 成功响应重置错误计数
     const status = statusData
     if (status && status.status === 'processing') {
+      const phase = status.phase || status.current_phase || 'writing'
+      const pct = status.progress ?? 0
+      const phaseLabel = PHASE_LABEL[phase] || phase
+      const msg = status.message || `${phaseLabel}中`
+      // P3-5.5: 展示剩余耗时估算
+      const eta = status.estimated_remaining_seconds as number | null | undefined
+      const etaText = typeof eta === 'number' && eta > 0
+        ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
+        : ''
+      const tooltipLines = [
+        `导入进行中 · ${phaseLabel} · ${pct}%`,
+        msg,
+      ]
+      if (etaText) tooltipLines.push(`预计剩余 ${etaText}`)
+      tooltipLines.push('点击跳转查看详情')
       bgImportStatus.value = {
-        projectId,
-        message: `[${status.progress ?? 0}%] ${status.message || '后台导入中...'}`,
-        progress: status.progress ?? 0,
+        projectId: trackId,
+        phase,
+        progress: pct,
+        message: msg,
+        tooltip: tooltipLines.join('\n'),
+      }
+      // 第一次发现正在处理的 job → 记录为追踪对象
+      if (!trackedProjectId.value) {
+        trackedProjectId.value = trackId
       }
     } else if (bgImportStatus.value) {
       const prev = bgImportStatus.value
       bgImportStatus.value = null
-      if (prev.progress >= 0 && status?.status !== 'failed') {
-        ElMessage.success(status?.message || '后台导入已完成')
+      trackedProjectId.value = null
+      // P3: toast 带 year 和 project 片段，便于用户识别是哪个任务完成
+      const yr = status?.year ? `${status.year} 年度` : ''
+      const finishedLabel = yr ? `（${yr}）` : ''
+      // P2-1.2: 显式处理 canceled 状态
+      if (status?.status === 'canceled' || status?.status === 'timed_out') {
+        ElMessage.warning({
+          message: `${status?.message || '导入已取消'}${finishedLabel}`,
+          duration: 4000,
+        })
       } else if (status?.status === 'failed') {
-        ElMessage.error(status?.message || '后台导入失败')
+        ElMessage.error({
+          message: `${status?.message || '后台导入失败'}${finishedLabel}，点击顶栏可查看历史`,
+          duration: 6000,
+        })
+      } else {
+        ElMessage.success({
+          message: `${status?.message || '后台导入已完成'}${finishedLabel}`,
+          duration: 4000,
+        })
       }
+    } else if (status?.status === 'idle' && trackedProjectId.value === trackId) {
+      // 追踪中的项目已无 job（外部取消或其他原因），释放追踪
+      trackedProjectId.value = null
     }
   } catch {
-    // ignore
+    // P2-1.2: 连续 3 次错误自动释放追踪，避免后端不可达时永久卡死
+    pollErrorCount++
+    if (pollErrorCount >= MAX_POLL_ERRORS) {
+      bgImportStatus.value = null
+      trackedProjectId.value = null
+      pollErrorCount = 0
+    }
   }
 }
 
 function navigateToImport() {
-  const pid = bgImportStatus.value?.projectId || route.params.projectId
-  if (pid) {
+  const pid = bgImportStatus.value?.projectId || trackedProjectId.value || route.params.projectId
+  if (!pid) return
+  // 已在目标页 → 避免 router.push 的"navigation duplicated"警告，用 replace + query
+  const currentPid = route.params.projectId as string
+  if (currentPid === pid) {
+    router.replace({
+      path: `/projects/${pid}/ledger`,
+      query: { ...route.query, import: '1' },
+    })
+  } else {
     router.push({ path: `/projects/${pid}/ledger`, query: { import: '1' } })
   }
 }
 
 watch(() => route.params.projectId, (newId) => {
+  // 路由项目变化时：不清 bgImportStatus（跨项目保留追踪）；
+  // 首次进入路由时主动触发一次轮询
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  bgImportStatus.value = null
-  if (newId) {
+  if (newId && !trackedProjectId.value) {
+    // 当前没在追踪其他项目 → 轮询新项目
     pollImportQueue()
-    importPollTimer = setInterval(pollImportQueue, 10000)
+  } else if (trackedProjectId.value) {
+    // 继续追踪旧项目，不切换
+    pollImportQueue()
   }
+  importPollTimer = setInterval(pollImportQueue, 5000)  // 5s 轮询比 10s 更实时
 }, { immediate: true })
+
+// 页面隐藏时暂停轮询（标签页切走或浏览器后台）节省请求
+function onVisibilityChange() {
+  if (document.hidden) {
+    if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
+  } else {
+    if (!importPollTimer && (trackedProjectId.value || route.params.projectId)) {
+      pollImportQueue()
+      importPollTimer = setInterval(pollImportQueue, 5000)
+    }
+  }
+}
+document.addEventListener('visibilitychange', onVisibilityChange)
 
 async function handleLogout() {
   await authStore.logout()
@@ -673,6 +814,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   eventBus.off('open-formula-manager', onOpenFormulaEvent)
   eventBus.off('four-col-switch', onSwitchFourCol)
   eventBus.off('shortcut:undo', onShortcutUndo)
@@ -772,16 +914,24 @@ onUnmounted(() => {
   background: var(--gt-color-primary-bg);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 6px;
+  padding: 4px 10px;
   border-radius: var(--gt-radius-sm);
+  min-width: 62px;
+  justify-content: center;
 }
 .gt-import-indicator:hover {
   background: var(--gt-color-primary-lighter);
+  transform: scale(1.02);
+}
+.gt-import-progress-ring {
+  flex: 0 0 22px;
 }
 .gt-import-label {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 

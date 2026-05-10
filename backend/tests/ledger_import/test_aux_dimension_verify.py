@@ -1,6 +1,6 @@
 """Verification script for aux_dimension.py Tasks 24-26."""
 
-from backend.app.services.ledger_import.aux_dimension import (
+from app.services.ledger_import.aux_dimension import (
     parse_aux_dimension,
     detect_aux_columns,
     PATTERNS,

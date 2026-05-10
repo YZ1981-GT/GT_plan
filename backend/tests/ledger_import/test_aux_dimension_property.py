@@ -18,7 +18,7 @@ import pytest
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
 
-from backend.app.services.ledger_import.aux_dimension import (
+from app.services.ledger_import.aux_dimension import (
     detect_aux_columns,
     parse_aux_dimension,
 )

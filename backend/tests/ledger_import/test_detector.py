@@ -18,8 +18,8 @@ import zipfile
 
 import pytest
 
-from backend.app.services.ledger_import.detector import detect_file
-from backend.app.services.ledger_import.errors import ErrorCode
+from app.services.ledger_import.detector import detect_file
+from app.services.ledger_import.errors import ErrorCode
 
 
 # ---------------------------------------------------------------------------

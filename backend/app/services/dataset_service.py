@@ -64,7 +64,13 @@ class DatasetService:
         dataset_id: UUID,
         is_deleted: bool,
     ) -> None:
-        """Toggle physical row visibility for a dataset during activate/rollback."""
+        """Toggle physical row visibility for a dataset during activate/rollback.
+
+        B3 实测记录（2026-05-10）：YG2101 级 200 万行 UPDATE 串行 127s；
+        曾试 asyncio.gather + 独立 session 并行 4 张表，无效（126s）——PG WAL 写入
+        串行是瓶颈，不是 Python 侧。真正加速走 partial index on (dataset_id)
+        WHERE is_deleted=true，让 UPDATE 的 WHERE 子句走索引。
+        """
         for model in (TbBalance, TbLedger, TbAuxBalance, TbAuxLedger):
             tbl = model.__table__
             await db.execute(

@@ -26,6 +26,16 @@ from app.services.smart_import_engine import SmartImportError, smart_import_stre
 logger = logging.getLogger(__name__)
 
 
+# E1 / Batch 3 M4: 错误映射已拆分到独立模块 `import_error_formatter`。
+# 此处 re-export 保持向后兼容（测试和其他模块的旧 import 路径不受影响）。
+from app.services.import_error_formatter import (  # noqa: F401, E402
+    _ErrorRule,
+    _ERROR_RULES,
+    _humanize_import_error,
+    register_error_rule,
+)
+
+
 class ImportJobCanceled(RuntimeError):
     """Raised when a running import job is canceled cooperatively."""
 
@@ -395,7 +405,8 @@ class ImportJobRunner:
             diagnostics = exc.diagnostics if isinstance(exc, SmartImportError) else None
             failure_errors = exc.errors if isinstance(exc, SmartImportError) else None
             failure_year = exc.year if isinstance(exc, SmartImportError) else year
-            failure_message = "导入已取消" if is_canceled else str(exc)
+            # P1-5.1: 失败原因可读化
+            failure_message = "导入已取消" if is_canceled else _humanize_import_error(exc)
             if payload_style == "account_chart":
                 failure_payload = LedgerImportApplicationService.build_account_chart_failure_payload(
                     failure_message,
@@ -600,7 +611,12 @@ class ImportJobRunner:
         except Exception as exc:
             logger.exception("ImportJob v2 执行失败: %s", job_id)
             # 多层兜底：即使 DB 操作失败也要尽量标记 job 为 failed + 释放锁
-            error_msg = str(exc)[:1000] if exc else "未知错误"
+            # P1-5.1: 先区分用户取消，再走异常可读化映射
+            is_canceled = isinstance(exc, ImportJobCanceled)
+            if is_canceled:
+                error_msg = "导入已取消"
+            else:
+                error_msg = _humanize_import_error(exc) if exc else "未知错误"
 
             # S6-13: 清理 staged dataset（防止孤儿数据）
             try:
@@ -621,11 +637,19 @@ class ImportJobRunner:
             for attempt in range(3):
                 try:
                     async with async_session() as db:
+                        # P1: canceled 时不标 failed
+                        target_status = (
+                            JobStatus.canceled if is_canceled else JobStatus.failed
+                        )
                         await ImportJobService.transition(
-                            db, job_id, JobStatus.failed,
+                            db, job_id, target_status,
                             progress_pct=0,
                             error_message=error_msg,
-                            result_summary={"engine": "v2", "error": str(exc)[:500]},
+                            result_summary={
+                                "engine": "v2",
+                                "error": str(exc)[:500] if not is_canceled else None,
+                                "canceled": is_canceled,
+                            },
                         )
                         await db.commit()
                     break

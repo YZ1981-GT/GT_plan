@@ -184,6 +184,7 @@ declare module 'vue' {
     KnowledgeBasePanel: typeof import('./components/ai/KnowledgeBasePanel.vue')['default']
     KnowledgePickerDialog: typeof import('./components/common/KnowledgePickerDialog.vue')['default']
     LanguageSwitcher: typeof import('./components/extension/LanguageSwitcher.vue')['default']
+    LedgerBalanceTreeView: typeof import('./components/ledger-import/LedgerBalanceTreeView.vue')['default']
     LedgerDataManager: typeof import('./components/ledger-import/LedgerDataManager.vue')['default']
     LedgerImportDialog: typeof import('./components/ledger-import/LedgerImportDialog.vue')['default']
     LedgerPenetrateDrawer: typeof import('./components/workpaper/LedgerPenetrateDrawer.vue')['default']

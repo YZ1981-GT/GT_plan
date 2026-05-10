@@ -433,3 +433,75 @@ inclusion: always
 - **跨轮复盘方法沉淀**：pytest --collect-only 先查 collection error；按 file glob 分组跑避免超时；grep `db.add(...).id` 找 flush 缺失；grep `datetime.utcnow()` 找 tz 混用；readCode 所有被标 [x] 的 Sprint 核心表/字段；脆性根因多是"模型已建但测试 conftest 未注册"或"字段假设未 grep 核对"
 - 跨轮复盘后测试总数：EQCR 122 + Phase13/14 93 + phase property 101 = 316 个已验证通过（只包含核心受影响文件，未跑全量）
 - test_audit_report.py 剩余 12 个失败是 401 Unauthorized（test client 未配置 auth override，代码本身逻辑正确）；test_wopi_working_paper_qc_review.py QC 规则失败是测试假设"所有 stub 规则返回空"已过时（规则已实装），属测试设计漂移不是代码 bug
+
+## 用户偏好（B3 轮新增）
+
+- **死代码立即删除**：不留 DEPRECATED/保留作 fallback 等注释，否则每次复盘都会重复提议（2026-05-10 明确要求）
+
+## B3 大账套加速（2026-05-10）
+
+- **[✅ calamine parser 已落地]**：`backend/app/services/ledger_import/parsers/excel_parser_calamine.py`（~150 行，签名与 openpyxl 版一致），feature flag `ledger_import_use_calamine` 默认 True；实测 3.2-3.4× 加速（YG4001 0.47→0.14s / YG36 1.98→0.63s / YG2101 76.68→22.48s）
+- **[✅ 死代码清理]** 删除 `detector._detect_xlsx_from_path_calamine`（~3000 字符）+ `parsers/excel_parser_calamine.detect_sheets_from_path_calamine`（~1700 字符）；detector 永远走 openpyxl read_only（真 SAX）
+- **[✅ pipeline 按 sheet 行数切 engine]**：`_CALAMINE_PARSE_MAX_ROWS=500_000` 阈值，< 500k 用 calamine，≥ 500k 用 openpyxl（避免 calamine 大 sheet 全量 decode 问题）
+- **[✅ pipeline perf 打点已落地]**：每 phase `_mark` 标记 + parse_write_streaming 内部 7 项累计耗时（parse/dict/prepare/validate/convert/insert/progress/cancel）
+- **[✅ scripts/b3_diag_yg2101.py]**（保留）：本进程直接 execute_pipeline 跑 YG2101 拿 perf 日志的诊断脚本；绕过 HTTP 层；踩坑 = projects NOT NULL 列多用 SELECT LIMIT 1 复用 / import_jobs.year NOT NULL / ledger_datasets.job_id FK → 必须先 INSERT ImportJob
+- **[❌ 实测无效已回滚] 并行 UPDATE**：4 张 Tb* 表改为 asyncio.gather + 独立 session，YG2101 实测 127s→126s 无加速（PG WAL 串行写入是真瓶颈不是 Python/网络）；已恢复 for loop 串行版，函数 docstring 记录此教训
+- **[⏸️ 待做] P1 partial index**：`CREATE INDEX CONCURRENTLY ... on Tb*(dataset_id) WHERE is_deleted=true`；让 activate UPDATE 走索引；预期 activate 127s→40-60s
+- **[⏸️ 待做] P2 bulk_copy_staged Python 开销优化**：跳过空 raw_extra / COPY binary format / 传 dict 给 asyncpg 自动编码
+- **[⏸️ 待 Sprint] P3 架构重构**：业务查询 30+ 处改走 `v_ledger_active` 视图，activate 只改 metadata；工时 3-5 天；彻底消除 UPDATE 风暴
+
+## YG2101 真实性能数据（128MB / 200 万行，2026-05-10 实测）
+
+- **总耗时 399-482s**（取决于系统负载，calamine 解析 ~20s + parse_write_streaming 270-360s + activate 127s + rebuild 0.7s）
+- **parse_write_streaming 内部拆解**：parse 87.6s / dict 化 2.5s / prepare_rows 13.6s / validate_l1 4.7s / convert 9.2s / **insert 151.8s（30 次 COPY）** / progress+cancel 0.0s
+- **activate 127s 根因** = `DatasetService._set_dataset_visibility` UPDATE 4 张 Tb* 表（200 万行 is_deleted=false）；PG UPDATE 本质 = 删旧 tuple + 写新 tuple（MVCC）
+- **关键架构事实**：业务查询 **全部** 通过 `Tb*.is_deleted=false` 判断可见性，**没有一个**业务查询过滤 `dataset_id`；意味着 activate 必须物理 UPDATE（除非大规模改业务查询走视图层）
+- **insert 151.8s 拆解**：aux_ledger 每 100k 行 COPY ~19s（吞吐 ~5200 rows/s），包含 `_sanitize_raw_extra` + `json.dumps` + tuple 构造公共字段的 Python 开销约 30-40s
+- **parse 87s 来源**：calamine `get_sheet_by_name` 必须全量 decode sheet XML（Rust 侧），无法避免
+
+## B3 方案对比沉淀（2026-05-10 基于实测推演）
+
+- **[否决] Partial index WHERE is_deleted=false**：预期加速 insert（staged 不进索引），但同时让 activate 变慢（UPDATE 时 200 万行要建索引），净收益 ≈ 0，否决
+- **[待评估] 方案 B 业务查询加 dataset_id 过滤**：改 30+ 查询，新建 `active_dataset_id(pid, yr)` PG 函数作 helper；彻底消除 UPDATE 风暴；**5 天工时独立 Sprint**
+- **[待评估] 方案 C Tb* 表 partition by dataset_id**：activate 变成 ALTER TABLE ATTACH/DETACH（瞬间）；涉及 schema migration + ORM 适配；**2-3 周工时**
+- **[待评估] 方案 D DROP → UPDATE → REBUILD 索引**：200 万行 UPDATE 可能从 127s → 40-60s；缺点 = rebuild 期间业务查询不可用（生产不行）
+- **[✅ 推荐立刻做] 方案 E PG 配置调优**（10 分钟，零代码）：`wal_compression=on` / `synchronous_commit=off` / `wal_buffers=64MB` / `checkpoint_timeout=30min` / `max_wal_size=8GB`；预期总省 ~50s（399s→350s）；`synchronous_commit=off` 断电可能丢秒级但审计二次导入可接受
+- **[✅ 推荐] 方案 F insert Python 开销优化**：`_sanitize_raw_extra` 对 None/空 dict 快速返回 + bulk_copy_staged tuple 构造合并；预期 insert 再省 20-30s
+- **[✅ 推荐核心洞察] 异步 activate**：用户完全不需要等 127s UPDATE 完成，pipeline 写完 insert 就返回 "completed"，activate 后台 worker 异步跑；**用户感知从 400s → 250-280s**（大半时间都省在"不等 activate"）
+- **组合建议**：E + F + 异步 activate（0.5 天工时），把 YG2101 用户感知压到 4-5 分钟；再不够再做 C partition
+
+## 关键技术洞察（B3 沉淀，未来大数据优化可复用）
+
+- **PG UPDATE 真瓶颈是 WAL 串行写入**，不是 Python/网络/asyncpg —— 所有基于"并发客户端"的加速方案（多 connection 并行 / 协程 gather）对大批 UPDATE 都无效
+- **PG UPDATE 本质 = 删旧 tuple + 写新 tuple + 所有索引的维护**，200 万行 UPDATE ≈ 做 200 万次 INSERT + 200 万次 DELETE + N 倍索引操作
+- **"用户感知耗时"≠"后台完成耗时"**：长流程的 metadata 切换（activate/rebuild_summary）都可以后台异步做，用户体验只关心数据写完这一刻
+
+## B3 架构方案深度沉淀（2026-05-10）
+
+- **[否决] 方案 C partition by dataset_id**：PG LIST PARTITION 要求每个 dataset 预建 partition（UUID 动态值会炸），HASH PARTITION 只做静态分片无法按 dataset 切换；**不能用于 activate 切换场景**
+- **[否决] 方案 G trigger 自动维护 is_deleted**：trigger 内仍做 200 万行 UPDATE，瓶颈没动只是换位置
+- **[推荐 B' 视图方案] 根本方案 activate 从 127s 降到 0.01s**：
+  - 4 张 Tb* 表 + 4 个 view（`v_tb_balance` / `v_tb_ledger` / `v_tb_aux_balance` / `v_tb_aux_ledger`）
+  - view 定义 = `SELECT * FROM tb_x WHERE EXISTS (SELECT 1 FROM ledger_datasets d WHERE d.id=tb_x.dataset_id AND d.status='active')`
+  - 业务查询 30+ 处 `Tb*` → `v_Tb*`（grep 替换）
+  - `DatasetService.activate` 只 UPDATE `ledger_datasets.status='active'` 一行
+  - `_set_dataset_visibility` 可变 no-op 或保留兼容
+  - is_deleted 字段保留作软删除语义（回收站等）
+  - **工时 3-4 天，收益 activate 127s→0.01s，YG2101 总耗时 399s→270s**
+  - 风险：30+ 业务查询改漏；有些 service 走 raw SQL 可能漏掉；view 复杂 JOIN 性能需测
+- **组合推荐路线**：先 E+F+异步 activate（0.5 天，399s→250s 用户感知）验证接受度 → 再评估是否上 B'（4 天）彻底解决
+- **核心洞察**：所有跨 session 并发客户端加速（multi-connection / asyncio.gather）对 PG UPDATE 都无效（WAL 串行写）；UPDATE 真正要消灭只有两条路：(1) 数据不动改 metadata 切换（视图/partition）(2) 业务不需要 UPDATE（staged 模式下行直接 is_deleted=false + view 层 JOIN 过滤）
+
+## B3 架构重构调研成果（2026-05-10，开干前盘点）
+
+- **[发现] `backend/app/services/dataset_query.py` 已提供 `get_active_filter(db, table, pid, year)` 过渡抽象**，文档明确写了四步迁移计划：加 dataset_id 列 → 写入填 → 查询迁移 → 去掉 is_deleted；当前阶段业务查询可选用它（有 dataset_id 优先，否则降级 is_deleted）
+- **[业务查询直接用 `TbX.is_deleted == False` 统计]**：约 40 处直接查询散落在 15+ 个 service + 2 个 router，绝大多数**没有**走 `get_active_filter`；B' 视图方案的改造面就是这 40 处
+- **[否决 B''] computed column 方案**：PG 计算列不能引用其他表（不能 JOIN ledger_datasets），is_deleted 只能是静态列
+- **[否决 B'''] 写入 is_deleted=false 靠 dataset_id 区分**：如果所有行都 is_deleted=false，staged 数据对业务查询立即可见（40 处没过滤 dataset_id），会暴露未激活数据
+- **[重新推荐] 务实路径 E+F+异步 activate（0.5 天）+ 观察**：0.5 天做 PG 调优 + Python 侧优化 + activate 放后台，用户感知 400s → 250s 即可；若仍不满意再上 3-4 天 B' 视图方案
+- **raw SQL 访问点**：`metabase_service.py` / `data_lifecycle_service.py` / `smart_import_engine.py` / `import_intelligence.py` / `consistency_replay_engine.py` / `ledger_import/validator.py` 都有 raw SQL `FROM tb_*`，B' 方案需要一并替换为 `v_tb_*`
+
+## 待用户决策
+
+- **选 1：先做 E+F+异步 activate（1.5 小时）**，见效快；不够再上 B'
+- **选 2：直接开 B' 分支做视图方案（3-4 天）**，彻底消除 activate 127s + rollback 127s

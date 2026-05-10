@@ -222,16 +222,30 @@ async def retry_import_job(
 async def cancel_import_job(
     project_id: UUID,
     job_id: UUID,
+    expected_version: int | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """取消导入作业"""
+    """取消导入作业。
+
+    P1-Q1: 可选 `expected_version` 参数做乐观锁——前端传入期望版本号，
+    与 DB 当前 version 不一致时返回 409（说明另一个请求已修改 job 状态）。
+    不传则保持向后兼容，但可能并发 cancel 冲突。
+    """
     try:
         existing = await ImportJobService.get_job(db, job_id)
         if not existing or existing.project_id != project_id:
             raise HTTPException(status_code=404, detail="作业不存在")
+        # P1-Q1: 乐观锁守卫
+        if expected_version is not None and existing.version != expected_version:
+            raise HTTPException(
+                status_code=409,
+                detail=f"作业已被修改（期望版本 {expected_version}，当前版本 {existing.version}），请刷新后重试",
+            )
         existing_status = existing.status
         job = await ImportJobService.cancel(db, job_id)
+        # P1-Q1: 每次状态变更自增 version
+        job.version = (existing.version or 0) + 1
         await db.commit()
         ImportJobRunner.request_cancel(job.id)
         if existing_status in (JobStatus.pending, JobStatus.queued):
@@ -245,6 +259,17 @@ async def cancel_import_job(
                     message="导入已取消",
                     year=job.year,
                 )
-        return {"message": "作业已取消", "job_id": str(job.id)}
+        # P2-4.2: 同步清理对应的 ImportArtifact，避免重复提交累加存储
+        try:
+            from app.services.import_artifact_service import ImportArtifactService
+            if job.artifact_id:
+                await ImportArtifactService.mark_consumed(db, job.artifact_id)
+                await db.commit()
+        except Exception:
+            import logging
+            logging.getLogger(__name__).debug(
+                "cancel: artifact cleanup failed for %s", job_id, exc_info=True,
+            )
+        return {"message": "作业已取消", "job_id": str(job.id), "status": "canceled"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

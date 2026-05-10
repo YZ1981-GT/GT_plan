@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.services.ledger_import.detection_types import (
+from app.services.ledger_import.detection_types import (
     SheetDetection,
 )
-from backend.app.services.ledger_import.identifier import identify
+from app.services.ledger_import.identifier import identify
 
 
 # ---------------------------------------------------------------------------

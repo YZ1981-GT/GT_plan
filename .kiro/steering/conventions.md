@@ -97,3 +97,148 @@ inclusion: manual
 - 导航按角色裁剪（审计员 6 项，管理层多看看板/委派，admin 额外看用户管理）
 - 空壳页面（<50 行）标记 developing 灰色不可点击
 - 功能收敛：停止加新功能，核心 6-8 个页面做到极致
+
+
+## 后端踩坑与规范（2026-05-10 补充）
+
+### uvicorn --reload 路由树不可变限制
+
+给已注册 router 追加新 `@router.get(...)` 端点后，`--reload` 只能重新 import 代码，无法重建 FastAPI app 的路由树，新端点访问返回 404。修复必须整进程重启（Ctrl+C + 重跑 start-dev.bat）。反之对现有端点函数体的改动 --reload 可以正常热加载。
+
+### uvicorn --reload 僵尸端口
+
+reloader 进程崩溃/中断后，LISTEN 在 9980 的子进程 PID 在 `Get-Process` / `tasklist` 都查不到但 `Get-NetTCPConnection` 仍显示 LISTEN。无法通过 Stop-Process 杀掉，必须在 start-dev.bat 的 cmd 窗口 Ctrl+C 或整窗口关闭重开。
+
+### 重复 activate 导致数据叠加
+
+同一 `project_id + year` 多次导入**不会覆盖**，而是每次创建新 dataset 并 activate，旧 dataset 只标 `superseded` 但数据行仍 `is_deleted=false`。结果 tb_balance COUNT = 单次导入行数 × N。验证数据正确性前必须先清理所有历史 dataset（DELETE ledger_datasets 级联）。
+
+### 清理项目账表数据的 SQL 外键顺序
+
+```sql
+-- 1. 先取消活跃 jobs（job_status_enum 值单 L: canceled，非 cancelled）
+UPDATE import_jobs SET status = 'canceled'
+  WHERE project_id = :pid
+    AND status IN ('queued','running','validating','writing','activating','pending');
+
+-- 2. 四表数据（无外键约束直接删）
+DELETE FROM tb_balance      WHERE project_id = :pid AND year = :yr;
+DELETE FROM tb_aux_balance  WHERE project_id = :pid AND year = :yr;
+DELETE FROM tb_ledger       WHERE project_id = :pid AND year = :yr;
+DELETE FROM tb_aux_ledger   WHERE project_id = :pid AND year = :yr;
+
+-- 3. activation_records → ledger_datasets（外键顺序）
+DELETE FROM activation_records
+  WHERE dataset_id IN (SELECT id FROM ledger_datasets WHERE project_id = :pid AND year = :yr);
+DELETE FROM ledger_datasets WHERE project_id = :pid AND year = :yr;
+```
+
+### 测试 fake user role 必须是 `.value` 对象
+
+`backend/app/deps.py:161` 的 `require_project_access` 用 `current_user.role.value == "admin"` 做权限判断，测试里 `override_get_current_user` 的 fake user **不能**直接写 `role = "admin"` 字符串，会报 `'str' object has no attribute 'value'`。
+
+正确模式：
+```python
+class _FakeUser:
+    id = FAKE_USER_ID
+    class _Role:
+        value = "admin"
+    role = _Role()
+```
+
+## 前端踩坑与规范（2026-05-10 补充）
+
+### el-table 树形（多层嵌套）最佳实践
+
+三层渲染（父 > 分组 > 明细）关键点：
+- `row-key` 用独立 `_rowKey` 字段，分段式：`acc:${company}:${code}` / `acc:...:grp:${type}` / `acc:...:grp:...:aux:${aux_code}`
+- `:tree-props="{ children: 'children', hasChildren: 'has_children' }"` 后端必须同时返回 `children` 数组和 `has_children` 布尔
+- 每个节点用 `_nodeType` 字段区分类型（`'account' | 'group' | 'aux'`）
+- 展开全部需要**递归**：`toggleRowExpansion(row, true)` + 遍历 children 再调自己，否则只展开第一层
+- 多层过滤：parent 命中保留整组，任一 group.aux_type 或 child.aux_code/name 命中也要保留父节点
+- 行样式：通过 row-class-name 返回 `_nodeType` 对应 CSS class
+
+### PowerShell 批量修改中文文件铁律
+
+**禁止**用 PowerShell 的 `Get-Content -Raw | -replace | Set-Content` 对含中文的文件做批量修改——默认用 UTF-16 解码 UTF-8 3 字节中文会截断成 2 字节（第 3 字节被吞），产生 `\xef\xbf\xbd` replacement char。
+
+正确做法：**必须用 Python `open(path, 'rb')` 字节级读写**，`content.replace(b'old', b'new')`；或用 IDE 的 strReplace 工具。
+
+
+## UX 异步流程五铁律（2026-05-10 Sprint 8 UX 精修 v2 沉淀）
+
+### 1. 异常状态检测 ≠ 强制跳转
+
+用户点击入口打开对话框时若检测到后端异常状态（如已有进行中的作业），**不要自动切换视图打断用户**。正确做法：弹 `ElMessageBox` 三选一给用户选择权：
+- 查看进度 / 继续原操作
+- 取消旧作业并新建
+- 稍后（什么都不做）
+
+### 2. 顶栏跳转 vs 用户主动开——两个入口要区分
+
+同一个对话框可能从两个路径打开，处理逻辑不同：
+- **顶栏跳转回来**：用户目的明确是"看进度"→ 静默恢复，不弹框
+- **主动点入口**：用户想开新流程 → 需弹框提示已有作业
+
+实现：入口函数加 `{ autoRecoverActiveJob?: boolean }` 参数，分别走 `recoverActiveImportJobSilent` / `checkActiveJobBeforeUpload`。
+
+### 3. dialog 关闭流程统一
+
+处于"进行中"状态时（如 importing step）**不应禁用 × 和 Esc**——用户找不到关闭入口会很焦虑。
+正确做法：
+- 放开 `show-close` / `close-on-press-escape`
+- 加 `:before-close` 钩子识别状态，importing 时关闭 = "放后台继续"（走相同 toast + 保留 jobId 逻辑）
+
+### 4. 异步弹窗时序
+
+dialog 关闭动画（~300ms）期间**不要立即弹另一个 MessageBox**，两个 dialog DOM 叠加视觉不佳。
+使用 `setTimeout(() => ElMessageBox.confirm(...), 300)` 延迟等动画完成。
+
+### 5. canceled ≠ failed（后端异常处理）
+
+Worker 层 `except Exception as exc` 捕获到 `ImportJobCanceled`（继承自 RuntimeError）也算异常。必须：
+```python
+is_canceled = isinstance(exc, ImportJobCanceled)
+if is_canceled:
+    error_msg = "导入已取消"
+    target_status = JobStatus.canceled
+else:
+    error_msg = _humanize_import_error(exc)
+    target_status = JobStatus.failed
+```
+transition 到对应状态；不能一刀切 failed。
+
+这五条适用于所有"长流程 + 可后台继续"的 UX（导入/导出/PDF 生成/批量操作等）。
+
+
+## 修复必须实测验收（2026-05-10 用户规约）
+
+用户明确要求：**修复后必须亲自测试验收，不能改错了或改了没效果**。
+
+### 适用场景强制要求
+
+| 修改类型 | 最低验收要求 |
+|---------|------------|
+| 错误映射 / 类型判断函数（如 `_humanize_import_error`）| 新增/更新 unit test 覆盖所有分支，必须实际跑 `pytest` |
+| 新建 HTTP 端点 / 修改现有端点 | 实际 curl 或跑对应 test_client 测试，不能只看代码 |
+| 引用外部模型字段（ORM / TypedDict / API schema）| grep 确认字段名+类型，不能凭印象；尽量加 fixture 构造测试 |
+| 多个 router 挂载同一 URL 路径 | grep 同路径所有实现，确认哪个先注册拦截；必要时删死代码 |
+| 新增 TypeScript 类型断言或 cast | 跑 vue-tsc 验证；类型塌陷（如交叉类型变 never）必须用 any 断言 + 注释说明 |
+| 任何 async 流程的 try/except/finally 分支 | 构造真实异常跑一次，验证错误路径被正确捕获 |
+
+### 本轮实战踩过的 5 个静态 review 漏洞
+
+1. `msg.lower().contains('ForeignKeyViolation')` 对 asyncpg 异常失效——类名不在 msg 里
+2. 凭印象写 `job.upload_token` 实际字段不存在
+3. 两个 router 挂同 URL，先注册的拦截导致后者变死代码
+4. `ImportArtifact(manifest={})` 字段名错，实际是 `file_manifest`
+5. Element Plus MessageBoxData 交叉类型 TS 塌陷为 `never`
+
+### 推荐工作流
+
+```
+1. 修改代码 → 2. grep 相关字段/类名 → 3. getDiagnostics 看 TS/Python 编译
+4. 构造 1-2 个关键场景手动测（python -c / curl）→ 5. 加对应 unit/integration 测试
+6. 跑全量回归（pytest + vue-tsc） → 7. 真实数据 smoke（e2e_yg4001_smoke.py 或相当）
+```
+第 4-7 步任一步失败都算修复未完成。

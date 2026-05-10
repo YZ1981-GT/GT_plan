@@ -86,6 +86,7 @@ async def execute_pipeline(
         ValueError: 文件空 / 参数错误
     """
     import os
+    import time as _time
     from app.core.database import async_session
     from app.models.audit_platform_models import (
         TbAuxBalance, TbAuxLedger, TbBalance, TbLedger,
@@ -98,11 +99,42 @@ async def execute_pipeline(
     from .identifier import identify
     from .parsers.csv_parser import iter_csv_rows_from_path
     from .parsers.excel_parser import iter_excel_rows_from_path
+    from .parsers.excel_parser_calamine import iter_excel_rows_from_path_calamine
     from .validator import evaluate_activation, validate_l1
-    from .writer import activate_dataset, bulk_insert_staged, prepare_rows_with_raw_extra
+    from .writer import activate_dataset, bulk_write_staged, prepare_rows_with_raw_extra
 
     if not file_sources:
         raise ValueError("无可导入的文件")
+
+    # B3 + 反思（2026-05-10）：按 "sheet 行数" 而非 "文件字节" 切 engine
+    # - calamine 在 get_sheet_by_name 时就要全量解码 sheet XML（Rust 侧）
+    # - YG2101 序时账 650k 行 calamine 解码 22s vs openpyxl read_only 30s+
+    # - YG4001/YG36 几千~几万行 calamine 解码 <1s vs openpyxl 0.5-2s
+    # 真实断点在 ~ 300-500k 行：此之下 calamine 快 3-5×，之上 calamine 不劣但内存高
+    # 按"sheet 估算行数 < 500k 用 calamine，≥ 500k 用 openpyxl"比字节阈值更精确
+    from app.services.feature_flags import is_enabled
+
+    _CALAMINE_PARSE_MAX_ROWS = 500_000
+    use_calamine_global = is_enabled("ledger_import_use_calamine", project_id)
+
+    def _choose_excel_iter(sheet_row_estimate: int):
+        """按 sheet 行数动态选 parser engine。"""
+        if not use_calamine_global:
+            return iter_excel_rows_from_path
+        if sheet_row_estimate and sheet_row_estimate >= _CALAMINE_PARSE_MAX_ROWS:
+            logger.info(
+                "Pipeline %s sheet has %d rows ≥ %d, using openpyxl",
+                job_id, sheet_row_estimate, _CALAMINE_PARSE_MAX_ROWS,
+            )
+            return iter_excel_rows_from_path
+        return iter_excel_rows_from_path_calamine
+
+    logger.info(
+        "Pipeline %s xlsx engine strategy: %s (calamine flag=%s, row threshold=%d)",
+        job_id,
+        "per-sheet dynamic" if use_calamine_global else "openpyxl (flag off)",
+        use_calamine_global, _CALAMINE_PARSE_MAX_ROWS,
+    )
 
     async def _progress(pct: int, msg: str) -> None:
         if progress_cb is not None:
@@ -111,6 +143,18 @@ async def execute_pipeline(
     async def _check_cancel() -> None:
         if cancel_check is not None and await cancel_check():
             raise RuntimeError("导入已被用户取消")
+
+    # B3 深度诊断：打点记录各 phase 耗时
+    _perf: dict[str, float] = {}
+    _perf_t0 = _time.time()
+
+    def _mark(phase: str) -> None:
+        """phase 开始前调用，记录"上一个 phase"的累计耗时。"""
+        now = _time.time()
+        _perf[phase] = now
+        logger.info("[perf] %s phase=%s cumulative=%.2fs", job_id, phase, now - _perf_t0)
+
+    _mark("start")
 
     # ── Detect + Identify ──
     logger.info("Pipeline %s phase=detect_identify", job_id)
@@ -122,6 +166,7 @@ async def execute_pipeline(
             idx = fd.sheets.index(sheet)
             fd.sheets[idx] = identify(sheet)
         detections[str(filepath)] = fd
+    _mark("detect_identify_done")
 
     # Resolve confirmed mappings
     confirmed = {}
@@ -146,10 +191,11 @@ async def execute_pipeline(
         staging_dataset_id = staged.id
         await stage_db.commit()
     logger.info("Pipeline %s created staged dataset %s", job_id, staging_dataset_id)
+    _mark("create_staged_done")
 
-    # S7-2: bulk_insert_staged 按模型自省字段，注入公共列
+    # S7-2 + B2: bulk_write_staged 智能派发（小批 INSERT / 大批 COPY，COPY 失败自动降级）
     async def _insert(table_model, rows: list[dict]) -> None:
-        await bulk_insert_staged(
+        await bulk_write_staged(
             async_session, table_model, rows,
             project_id=project_id, year=import_year,
             dataset_id=staging_dataset_id, is_deleted=True,
@@ -158,6 +204,18 @@ async def execute_pipeline(
     # ── Parse → Convert → Validate → Write (streaming) ──
     logger.info("Pipeline %s phase=parse_write_streaming", job_id)
     await _progress(20, "解析并写入数据")
+
+    # B3 诊断：累计每类操作耗时
+    _t_parse = 0.0
+    _t_dict = 0.0
+    _t_prepare = 0.0
+    _t_validate = 0.0
+    _t_convert = 0.0
+    _t_insert = 0.0
+    _t_progress = 0.0
+    _t_cancel_check = 0.0
+    _n_inserts = 0
+    _n_progress_calls = 0
 
     all_findings: list[Any] = []
     total_rows_parsed = 0
@@ -214,7 +272,8 @@ async def execute_pipeline(
             ]
 
             if ext in (".xlsx", ".xlsm"):
-                row_iter = iter_excel_rows_from_path(
+                _excel_iter = _choose_excel_iter(sheet.row_count_estimate)
+                row_iter = _excel_iter(
                     str(filepath), sheet.sheet_name,
                     data_start_row=sheet.data_start_row,
                     forward_fill_cols=ff_cols or None,
@@ -229,8 +288,22 @@ async def execute_pipeline(
                 continue
 
             chunk_count = 0
-            for chunk in row_iter:
+            balance_cleaned_accumulated: list[dict] = []
+            is_balance_sheet = sheet.table_type in ("balance", "aux_balance")
+
+            # B3 诊断：把 for 循环展开成 while 以便测纯解析耗时
+            _parse_iter = iter(row_iter)
+            while True:
+                _t = _time.time()
+                try:
+                    chunk = next(_parse_iter)
+                except StopIteration:
+                    _t_parse += _time.time() - _t
+                    break
+                _t_parse += _time.time() - _t
+
                 chunk_count += 1
+                _t = _time.time()
                 dict_rows = []
                 for raw_row in chunk:
                     row_dict = {}
@@ -240,37 +313,66 @@ async def execute_pipeline(
                         else:
                             row_dict[f"col_{i}"] = val
                     dict_rows.append(row_dict)
+                _t_dict += _time.time() - _t
 
+                _t = _time.time()
                 std_rows, extra_warnings = prepare_rows_with_raw_extra(
                     dict_rows, col_mapping, headers
                 )
+                _t_prepare += _time.time() - _t
                 all_findings.extend(extra_warnings)
 
+                _t = _time.time()
                 findings, cleaned = validate_l1(
                     std_rows, sheet.table_type, column_mapping=col_mapping,
                     file_name=filename, sheet_name=sheet.sheet_name,
                 )
+                _t_validate += _time.time() - _t
                 all_findings.extend(findings)
 
-                if sheet.table_type in ("balance", "aux_balance"):
-                    bal, aux_bal = convert_balance_rows(cleaned)
-                    await _insert(TbBalance, bal)
-                    await _insert(TbAuxBalance, aux_bal)
-                    total_balance_written += len(bal)
-                    total_aux_balance_written += len(aux_bal)
+                if is_balance_sheet:
+                    balance_cleaned_accumulated.extend(cleaned)
                 elif sheet.table_type in ("ledger", "aux_ledger"):
+                    _t = _time.time()
                     ledger, aux_ledger, _stats = convert_ledger_rows(cleaned)
+                    _t_convert += _time.time() - _t
+                    _t = _time.time()
                     await _insert(TbLedger, ledger)
                     await _insert(TbAuxLedger, aux_ledger)
+                    _t_insert += _time.time() - _t
+                    _n_inserts += 2
                     total_ledger_written += len(ledger)
                     total_aux_ledger_written += len(aux_ledger)
 
                 total_rows_parsed += len(chunk)
                 pct = min(20 + int(65 * total_rows_parsed / total_est_rows), 85)
+                _t = _time.time()
                 await _progress(pct, f"已处理 {total_rows_parsed:,}/{total_est_rows:,} 行")
+                _t_progress += _time.time() - _t
+                _n_progress_calls += 1
 
                 if chunk_count % 5 == 0:
+                    _t = _time.time()
                     await _check_cancel()
+                    _t_cancel_check += _time.time() - _t
+
+            # Balance sheet 累积完毕，统一 convert + 写入
+            if is_balance_sheet and balance_cleaned_accumulated:
+                _t = _time.time()
+                bal, aux_bal = convert_balance_rows(balance_cleaned_accumulated)
+                _t_convert += _time.time() - _t
+                logger.info(
+                    "Pipeline %s balance sheet %s: cleaned=%d dedup→balance=%d aux=%d",
+                    job_id, sheet.sheet_name,
+                    len(balance_cleaned_accumulated), len(bal), len(aux_bal),
+                )
+                _t = _time.time()
+                await _insert(TbBalance, bal)
+                await _insert(TbAuxBalance, aux_bal)
+                _t_insert += _time.time() - _t
+                _n_inserts += 2
+                total_balance_written += len(bal)
+                total_aux_balance_written += len(aux_bal)
 
     logger.info(
         "Pipeline %s streaming done: %d+%d balance, %d+%d ledger",
@@ -278,10 +380,21 @@ async def execute_pipeline(
         total_ledger_written, total_aux_ledger_written,
     )
 
+    # B3 诊断：parse_write_streaming 内部各步累计耗时
+    _mark("parse_write_streaming_done")
+    logger.info(
+        "[perf] %s parse_write_streaming breakdown: parse=%.1fs dict=%.1fs prepare=%.1fs "
+        "validate=%.1fs convert=%.1fs insert=%.1fs progress=%.1fs (%d calls) "
+        "cancel=%.1fs | inserts=%d",
+        job_id, _t_parse, _t_dict, _t_prepare, _t_validate, _t_convert,
+        _t_insert, _t_progress, _n_progress_calls, _t_cancel_check, _n_inserts,
+    )
+
     # ── Activation gate ──
     logger.info("Pipeline %s phase=activation_gate", job_id)
     await _progress(85, "评估激活条件")
     gate = evaluate_activation(all_findings, force=force_activate)
+    _mark("activation_gate_done")
 
     # S7: force_activate 审批链——即使 force 跳过 blocking，也记录审计轨迹
     force_skipped_findings = 0
@@ -329,6 +442,7 @@ async def execute_pipeline(
             },
         )
         await act_db.commit()
+    _mark("activate_dataset_done")
 
     # ── Rebuild aux summary ──
     logger.info("Pipeline %s phase=rebuild_aux_summary", job_id)
@@ -339,6 +453,16 @@ async def execute_pipeline(
             dataset_id=staging_dataset_id,
         )
         await summary_db.commit()
+    _mark("rebuild_aux_summary_done")
+
+    # B3 诊断：总耗时拆解日志
+    phases = list(_perf.items())
+    lines = []
+    for idx, (name, t) in enumerate(phases):
+        delta = t - phases[idx - 1][1] if idx > 0 else 0
+        lines.append(f"{name} +{delta:.1f}s")
+    logger.info("[perf] %s phases: %s | total=%.1fs",
+                job_id, " → ".join(lines[1:]), _time.time() - _perf_t0)
 
     return PipelineResult(
         success=True,

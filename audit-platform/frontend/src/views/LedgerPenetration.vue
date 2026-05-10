@@ -459,9 +459,10 @@
     width="720px"
     append-to-body
     destroy-on-close
-    :close-on-click-modal="!previewing && !importing"
-    :close-on-press-escape="!previewing && !importing"
-    :show-close="!previewing && !importing"
+    :close-on-click-modal="!previewing"
+    :close-on-press-escape="!previewing"
+    :show-close="!previewing"
+    :before-close="onDialogBeforeClose"
   >
     <!-- 进度条放在 dialog 顶部（header 下方，不被 v-loading 遮罩覆盖） -->
     <template #header>
@@ -501,6 +502,43 @@
         <el-input-number v-model="importYear" :min="2000" :max="2099" size="small" style="width: 120px" />
         <span style="font-size: 12px; color: #999; margin-left: 8px">不填则自动从文件内容提取</span>
       </div>
+
+      <!-- P2-1.3 + P2: 耗时预估 + 关注事项 -->
+      <el-alert
+        v-if="importFiles.length > 0"
+        :type="importIsLargeFile ? 'warning' : 'info'"
+        :closable="false"
+        show-icon
+        style="margin-top: 12px"
+      >
+        <template #title>
+          <b>预计耗时 {{ importEstimateText }}</b>
+          <span v-if="importIsLargeFile"> · 建议上传后使用"关闭（后台继续）"</span>
+        </template>
+        <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+          <div>• 总大小 <b>{{ formatFileSize(importTotalBytes) }}</b>，共 {{ importFiles.length }} 个文件</div>
+          <div>• 耗时 = 上传 + 识别 + 入库（按网速 20Mbps 估算，实际可能有波动）</div>
+          <div>• 损益类科目期末结转后 opening/closing 为空属正常；辅助维度按单一类型聚合应等于主表</div>
+          <div v-if="importIsLargeFile">• 大文件（&gt;50MB）识别阶段较慢，前端若无响应 3-5 秒属正常</div>
+          <div>• 请确保：同一项目年度无进行中的导入作业，否则 submit 会被阻塞</div>
+        </div>
+      </el-alert>
+
+      <!-- FAQ 折叠面板 -->
+      <el-collapse style="margin-top: 12px">
+        <el-collapse-item title="常见问题" name="faq">
+          <div style="font-size: 12px; line-height: 1.8; color: #606266">
+            <p><b>Q：为什么损益类科目 opening_balance 为空？</b><br/>
+            A：会计准则规定损益类期末结转到本年利润，opening/closing 天然为 NULL，只有 debit/credit 有值。余额树形"有金额"过滤器已按此差异化处理。</p>
+            <p><b>Q：辅助维度为什么同一笔金额出现在多行？</b><br/>
+            A：一行多维度（如客户+项目+成本中心）在 tb_aux_balance 冗余存 N 条，每条记原行金额。按单一 aux_type 分组求和应 = 主表（这是正确的立体坐标存储）。</p>
+            <p><b>Q：点"关闭（后台继续）"后如何看进度？</b><br/>
+            A：顶栏"导入中"进度环会持续更新，鼠标悬停看阶段 + 剩余耗时；点击该图标跳回此 dialog。</p>
+            <p><b>Q：导入失败怎么办？</b><br/>
+            A：错误提示会区分"数据关联错误 / 字段格式错误 / 必填为空"等类型。点"导入历史"查看详细 diagnostics。</p>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
     </div>
 
     <!-- 步骤2：预览确认 -->
@@ -514,6 +552,32 @@
         :description="`仅解析前 ${previewResult?.preview_rows || 50} 行用于确认列映射，实际数据量以后台导入结果为准。`"
         show-icon
       />
+
+      <!-- P0-U1: 列映射完成率警告 -->
+      <el-alert
+        v-if="mappingCoverage.hasLow"
+        :type="mappingCoverage.isWarning ? 'warning' : 'info'"
+        :closable="false"
+        style="margin-bottom: 12px"
+        show-icon
+      >
+        <template #title>
+          <b>列映射完成率：{{ mappingCoverage.mapped }}/{{ mappingCoverage.total }} ({{ mappingCoverage.rate }}%)</b>
+          <span v-if="mappingCoverage.isWarning"> · 建议检查下方未识别列</span>
+        </template>
+        <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+          <div v-for="(info, idx) in mappingCoverage.sheets" :key="idx">
+            • {{ info.sheet }} ({{ info.data_type }}): {{ info.mapped }}/{{ info.total }} ({{ info.rate }}%)
+            <span v-if="info.unmapped.length > 0" style="color: #909399">
+              未识别 {{ info.unmapped.length }} 列：{{ info.unmapped.slice(0, 5).join('、') }}{{ info.unmapped.length > 5 ? '…' : '' }}
+            </span>
+          </div>
+          <div style="color: #909399; margin-top: 4px">
+            未识别列将不被写入四表，如有需要请在下方"列映射调整"中手动设置。
+          </div>
+        </div>
+      </el-alert>
+
       <el-descriptions :column="2" size="small" border style="margin-bottom: 12px">
         <el-descriptions-item label="识别年度">{{ previewResult?.year }}</el-descriptions-item>
         <el-descriptions-item label="余额表">{{ previewResult?.summary?.balance || 0 }} 行</el-descriptions-item>
@@ -605,6 +669,28 @@
         container-style="text-align: center; padding: 30px 0"
         validation-panel-style="margin-top: 16px; text-align: left"
       />
+
+      <!-- P3-U3: 导入成功后的下一步引导卡片 -->
+      <div class="gt-completion-guide">
+        <div class="guide-title">下一步操作建议</div>
+        <div class="guide-cards">
+          <div class="guide-card" @click="onGuideViewTree">
+            <div class="guide-card-icon">📊</div>
+            <div class="guide-card-title">查看余额树形</div>
+            <div class="guide-card-desc">按维度核对科目余额是否符合原表</div>
+          </div>
+          <div class="guide-card" @click="onGuideValidate">
+            <div class="guide-card-icon">✓</div>
+            <div class="guide-card-title">运行数据一致性校验</div>
+            <div class="guide-card-desc">检查四表之间的借贷平衡与辅助关系</div>
+          </div>
+          <div class="guide-card" @click="onGuideHistory">
+            <div class="guide-card-icon">📜</div>
+            <div class="guide-card-title">查看导入历史</div>
+            <div class="guide-card-desc">查看完整的 diagnostics 和处理记录</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     </div><!-- v-loading wrapper -->
@@ -618,7 +704,7 @@
       <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" @click="doImport">
         确认导入
       </el-button>
-      <el-button v-if="importStep === 'importing'" @click="importDialogVisible = false">关闭（后台继续）</el-button>
+      <el-button v-if="importStep === 'importing'" @click="onMoveToBackground">关闭（后台继续）</el-button>
       <el-button v-if="importStep === 'done'" type="primary" @click="onImportDone">完成</el-button>
     </template>
   </el-dialog>
@@ -667,7 +753,7 @@
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
-import { ElMessage, ElNotification } from 'element-plus'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
@@ -799,6 +885,79 @@ function goToImportHistory() {
 
 // ── 智能导入 ──
 const importDialogVisible = ref(false)
+
+// P2-1.3: 耗时预估 computed
+const importTotalBytes = computed(() =>
+  importFiles.value.reduce((sum, f) => sum + (f.size || 0), 0)
+)
+const importTotalMB = computed(() => importTotalBytes.value / (1024 * 1024))
+const importIsLargeFile = computed(() => importTotalMB.value > 50)
+const importEstimateSeconds = computed(() => {
+  const mb = importTotalMB.value
+  const uploadSec = Math.round(mb / 2.5)  // 20Mbps = 2.5 MB/s
+  let processSec: number
+  if (mb < 1) processSec = 10
+  else if (mb < 5) processSec = Math.round(mb * 11)
+  else if (mb < 20) processSec = Math.round(mb * 12)
+  else if (mb < 100) processSec = Math.round(mb * 14)
+  else processSec = Math.round(mb * 16)
+  return uploadSec + processSec
+})
+const importEstimateText = computed(() => {
+  const s = importEstimateSeconds.value
+  if (s < 60) return `约 ${s} 秒`
+  if (s < 600) return `约 ${Math.round(s / 60)} 分钟`
+  return `约 ${Math.round(s / 60)} 分钟（强烈建议后台继续）`
+})
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// P0-U1: 列映射完成率汇总（preview 后用于警告低质量映射）
+interface SheetMappingInfo {
+  sheet: string
+  data_type: string
+  mapped: number
+  total: number
+  rate: number
+  unmapped: string[]
+}
+const mappingCoverage = computed(() => {
+  const sheets: SheetMappingInfo[] = []
+  let totalMapped = 0
+  let totalHeaders = 0
+  for (const d of (previewResult.value?.diagnostics || [])) {
+    const headers: string[] = d.headers || d.raw_headers || []
+    const mapping = d.column_mapping || {}
+    const mapped = Object.keys(mapping).length
+    const total = headers.length
+    const unmapped = headers.filter((h: string) => !mapping[h])
+    sheets.push({
+      sheet: `${d.file || ''} / ${d.sheet || ''}`,
+      data_type: d.data_type || '未知',
+      mapped,
+      total,
+      rate: total > 0 ? Math.round(mapped * 100 / total) : 0,
+      unmapped,
+    })
+    totalMapped += mapped
+    totalHeaders += total
+  }
+  const rate = totalHeaders > 0 ? Math.round(totalMapped * 100 / totalHeaders) : 0
+  // 任一 sheet 低于 70% 或整体低于 70% → 触发警告
+  const hasLow = sheets.some((s) => s.rate < 70) || rate < 70
+  return {
+    sheets,
+    mapped: totalMapped,
+    total: totalHeaders,
+    rate,
+    hasLow,
+    isWarning: hasLow,
+  }
+})
 
 // ── 数据校验 ──
 const validateDialogVisible = ref(false)
@@ -1013,7 +1172,7 @@ function stopImportStatusPolling() {
   _importStatusPollCount = 0
 }
 
-function openImportDialog() {
+function openImportDialog(options: { autoRecoverActiveJob?: boolean } = {}) {
   importDialogVisible.value = true
   importStep.value = 'upload'
   importFiles.value = []
@@ -1026,10 +1185,112 @@ function openImportDialog() {
   bgImportPolling.value = false
   bgImportMessage.value = ''
   uploadRef.value?.clearFiles?.()
+  // P1-2.1: 检查活跃 job
+  // - 顶栏跳转回来（autoRecoverActiveJob=true）：直接静默跳 importing step
+  // - 用户主动开新导入（默认）：弹对话框让用户选择处理方式
+  if (options.autoRecoverActiveJob) {
+    void recoverActiveImportJobSilent()
+  } else {
+    void checkActiveJobBeforeUpload()
+  }
+}
+
+/**
+ * 静默恢复进度（顶栏跳转场景）：
+ * - 有活跃 job：跳 importing step 显示进度
+ * - 最近 5 分钟内 failed：提示错误
+ * - 其他：保持 upload step
+ */
+async function recoverActiveImportJobSilent() {
+  if (!projectId.value) return
+  try {
+    const resp: any = await api.get(
+      `/api/projects/${projectId.value}/ledger-import/active-job`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (resp?.status === 'processing' && resp.job_id) {
+      importStep.value = 'importing'
+      bgImportPolling.value = true
+      bgImportMessage.value = `[${resp.progress ?? 0}%] ${resp.message || '后台导入中...'}（从后台恢复）`
+      startImportStatusPolling(resp.job_id)
+    } else if (resp?.status === 'failed' && resp.job_id) {
+      ElMessage.error({
+        message: `最近一次导入失败：${resp.message || '未知错误'}`,
+        duration: 6000,
+      })
+    }
+    // completed/canceled 不提示（顶栏 pollImportQueue 已经弹过 toast）
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * 上传前检测是否已有活跃 job。
+ * 修复 P0：弹确认框让用户选，而非强制跳进度视图——
+ * - 查看进度：跳 importing step 追踪旧 job
+ * - 取消旧作业：先 cancel 再留在 upload step 让用户重新提交
+ * - 稍后：仅提示，保持 upload step，用户自行等待
+ */
+async function checkActiveJobBeforeUpload() {
+  if (!projectId.value) return
+  try {
+    const resp: any = await api.get(
+      `/api/projects/${projectId.value}/ledger-import/active-job`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (resp?.status !== 'processing' || !resp.job_id) return
+
+    const pct = resp.progress ?? 0
+    const phase = resp.phase || 'writing'
+    const activeJobId = resp.job_id
+
+    try {
+      const result: any = await ElMessageBox({
+        title: '检测到导入作业进行中',
+        message: `当前项目已有导入作业进行中（${phase} ${pct}%）。请选择如何处理：`,
+        showCancelButton: true,
+        showConfirmButton: true,
+        distinguishCancelAndClose: true,
+        confirmButtonText: '查看进度',
+        cancelButtonText: '取消旧作业并新建',
+        type: 'warning',
+      })
+      // Element Plus MessageBoxData 类型是 `{value, action} & Action` 交叉类型，
+      // TS 塌陷为 never，需 any 断言；resolve 时 result 可能是 'confirm' 字符串
+      // 或 {action:'confirm', value}，兼容处理
+      const action = typeof result === 'string' ? result : result?.action
+      if (action === 'confirm') {
+        // 查看进度
+        importStep.value = 'importing'
+        bgImportPolling.value = true
+        bgImportMessage.value = `[${pct}%] ${resp.message || '后台导入中...'}`
+        startImportStatusPolling(activeJobId)
+      }
+    } catch (err: any) {
+      // reject 时 err 通常是 'cancel' | 'close' 字符串（Element Plus 默认行为）
+      const action = typeof err === 'string' ? err : err?.action
+      if (action === 'cancel') {
+        // 用户选"取消旧作业"
+        try {
+          await api.post(
+            `/api/projects/${projectId.value}/ledger-import/jobs/${activeJobId}/cancel`,
+          )
+          ElMessage.success('旧作业已取消，可开始新导入')
+        } catch (e: any) {
+          ElMessage.error(e?.message || '取消旧作业失败')
+        }
+      }
+      // action === 'close'：稍后 → 什么都不做
+    }
+  } catch {
+    // 网络异常不影响 dialog 正常打开
+  }
 }
 
 function openImportDialogFromRoute() {
-  openImportDialog()
+  // 顶栏跳回时静默恢复进度，不弹"请选择"对话框打扰用户
+  openImportDialog({ autoRecoverActiveJob: true })
   const nextQuery = { ...route.query }
   delete nextQuery.import
   router.replace({ path: route.path, query: nextQuery })
@@ -1183,10 +1444,89 @@ async function doImport() {
     ElMessage.error(errMsg)
     stopImportStatusPolling()
     importStep.value = 'preview'
+    // P1-U4: 失败后主动询问下一步（不强推，关闭即视为"留在预览"自行决定）
+    _showFailureActionPrompt(errMsg)
   } finally {
     importing.value = false
     bgImportPolling.value = false
   }
+}
+
+/** flag：避免 before-close 钩子和 onMoveToBackground 重复弹 toast */
+const _closingAsBackground = ref(false)
+/** 组件销毁时清理未触发的弹框计时器 */
+let _completionPromptTimer: number | null = null
+
+/**
+ * P1-U4: 失败后提示用户下一步操作。
+ * 不阻断用户在 preview 继续手动调映射后"确认导入"重试，也提供"导入历史"入口查看完整 diagnostics。
+ */
+function _showFailureActionPrompt(errMsg: string) {
+  ElMessageBox({
+    title: '导入失败',
+    message: `${errMsg.slice(0, 300)}\n\n可选操作：\n• 返回预览调整列映射后重新导入\n• 查看导入历史查看完整诊断`,
+    showCancelButton: true,
+    showConfirmButton: true,
+    distinguishCancelAndClose: true,
+    confirmButtonText: '返回预览重试',
+    cancelButtonText: '查看导入历史',
+    type: 'error',
+  }).catch((err: any) => {
+    const action = typeof err === 'string' ? err : err?.action
+    if (action === 'cancel') {
+      goToImportHistory()
+    }
+    // close: 什么都不做
+  })
+}
+
+function onMoveToBackground() {
+  // worker 后端继续跑，关闭 dialog；顶栏进度环持续追踪
+  // 设 flag 避免 before-close 钩子重复弹 toast
+  _closingAsBackground.value = true
+  importDialogVisible.value = false
+  ElMessage.success({
+    message: '已转入后台，顶栏"导入中"进度环可追踪进度',
+    duration: 4000,
+  })
+}
+
+// P3-U3: 导入成功引导卡片的 3 个入口
+function onGuideViewTree() {
+  importDialogVisible.value = false
+  _auxBalanceLoadedKey.value = ''
+  loadAvailableYears()
+  loadBalance()
+  dataManagerVisible.value = true  // 打开余额树形 Tab
+}
+function onGuideValidate() {
+  importDialogVisible.value = false
+  validateDialogVisible.value = true
+  runValidation()
+}
+function onGuideHistory() {
+  importDialogVisible.value = false
+  goToImportHistory()
+}
+
+/**
+ * dialog 关闭前钩子：importing 态下关闭视同"放后台继续"，弹 toast 引导。
+ * 若由 onMoveToBackground 主动触发则跳过 toast（那边已经弹过）。
+ */
+function onDialogBeforeClose(done: () => void) {
+  if (_closingAsBackground.value) {
+    _closingAsBackground.value = false
+    done()
+    return
+  }
+  if (importStep.value === 'importing' && !importing.value) {
+    // × / Esc 关闭 importing dialog → 视同放后台
+    ElMessage.success({
+      message: '已转入后台，顶栏"导入中"进度环可追踪进度',
+      duration: 4000,
+    })
+  }
+  done()
 }
 
 function onImportDone() {
@@ -1199,6 +1539,26 @@ function onImportDone() {
   if (balanceTab.value === 'aux') {
     loadAllAuxBalance()
   }
+  // P2-5.2: 询问是否立即查看树形视图验证数据
+  // 延迟 350ms（元素 dialog 关闭动画 ~300ms）再弹确认框，避免两层 dialog 叠加
+  _completionPromptTimer = window.setTimeout(() => {
+    _completionPromptTimer = null
+    if (!importDialogVisible.value && projectId.value) {
+      ElMessageBox.confirm(
+        '账套导入完成。是否立即打开"账表数据管理 · 余额树形"验证数据正确性？',
+        '导入完成',
+        {
+          confirmButtonText: '打开树形视图',
+          cancelButtonText: '稍后',
+          type: 'success',
+        },
+      ).then(() => {
+        dataManagerVisible.value = true
+      }).catch(() => {
+        // 用户选稍后，什么都不做
+      })
+    }
+  }, 350)
 }
 
 // 路由变化时重新加载（不在初始化时触发，由 onMounted 处理）
@@ -2342,6 +2702,11 @@ onUnmounted(() => {
 onBeforeUnmount(() => {
   // 需求 22.1：组件卸载时清理导入状态轮询定时器
   stopImportStatusPolling()
+  // 清理完成提示延时器（防止销毁后回调误触发）
+  if (_completionPromptTimer !== null) {
+    clearTimeout(_completionPromptTimer)
+    _completionPromptTimer = null
+  }
 })
 </script>
 
@@ -2484,6 +2849,53 @@ onBeforeUnmount(() => {
   border-color: var(--gt-color-primary);
   color: var(--gt-color-primary);
   font-weight: 600;
+}
+
+/* P3-U3: 导入成功引导卡片 */
+.gt-completion-guide {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed #e0dde5;
+}
+.gt-completion-guide .guide-title {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.gt-completion-guide .guide-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.gt-completion-guide .guide-card {
+  padding: 14px 12px;
+  border: 1px solid #e0dde5;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  background: #fff;
+}
+.gt-completion-guide .guide-card:hover {
+  border-color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg, #f8f5ff);
+  transform: translateY(-2px);
+}
+.gt-completion-guide .guide-card-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+.gt-completion-guide .guide-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+.gt-completion-guide .guide-card-desc {
+  font-size: 11px;
+  color: #909399;
+  line-height: 1.5;
 }
 </style>
 

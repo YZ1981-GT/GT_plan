@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     title="账表数据管理"
-    width="720px"
+    width="1100px"
     :close-on-click-modal="false"
     :before-close="onClose"
   >
@@ -19,6 +19,29 @@
       </el-alert>
 
       <el-tabs v-model="activeTab">
+        <!-- Tab 0: 余额树形（Layer 2 / Sprint 8） -->
+        <el-tab-pane label="余额树形" name="balance_tree">
+          <div v-if="activeTab === 'balance_tree'">
+            <el-form inline size="small" style="margin-bottom: 8px">
+              <el-form-item label="年度">
+                <el-input-number
+                  v-model="treeYear"
+                  :min="2000"
+                  :max="2100"
+                  :step="1"
+                  :controls="false"
+                  style="width: 100px"
+                />
+              </el-form-item>
+            </el-form>
+            <LedgerBalanceTreeView
+              v-if="treeYear"
+              :project-id="projectId"
+              :year="treeYear"
+            />
+          </div>
+        </el-tab-pane>
+
         <!-- Tab 1: 数据概览 -->
         <el-tab-pane label="数据概览" name="summary">
           <div v-if="summary">
@@ -238,6 +261,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger } from '@/services/apiPaths'
+import LedgerBalanceTreeView from './LedgerBalanceTreeView.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -257,6 +281,9 @@ watch(visible, (v) => emit('update:modelValue', v))
 const loading = ref(false)
 const activeTab = ref('summary')
 const summary = ref<any>(null)
+
+// 树形视图的独立 year 选择（默认从 summary 拿一个可用年度）
+const treeYear = ref<number>(new Date().getFullYear())
 
 const deleteForm = ref<{ year: number | null; tables: string[]; periods: number[] }>({
   year: null,
@@ -317,6 +344,11 @@ async function refreshSummary() {
   loading.value = true
   try {
     summary.value = await api.get(ledger.data.summary(props.projectId))
+    // 自动选中一个有数据的年度给余额树形 Tab 用
+    const years = Object.keys(summary.value?.tables?.tb_balance?.years || {})
+      .map(Number)
+      .sort((a, b) => b - a)
+    if (years.length > 0) treeYear.value = years[0]
   } catch (exc: any) {
     ElMessage.error('查询失败: ' + (exc.message || exc))
   } finally {

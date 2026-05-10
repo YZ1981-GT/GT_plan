@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from backend.app.services.ledger_import.converter import convert_ledger_rows
+from app.services.ledger_import.converter import convert_ledger_rows
 
 
 def _make_row(**extra) -> dict:

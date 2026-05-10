@@ -332,42 +332,10 @@ async def get_job_diagnostics(
 # ---------------------------------------------------------------------------
 # POST /jobs/{job_id}/cancel (Task 46)
 # ---------------------------------------------------------------------------
-
-
-@router.post("/jobs/{job_id}/cancel")
-async def cancel_job(
-    project_id: UUID,
-    job_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
-):
-    """Cancel a running/queued job.
-
-    Sets status to 'canceled'. The worker will detect this and clean up
-    any staged data.
-    """
-    stmt = select(ImportJob).where(
-        ImportJob.id == job_id,
-        ImportJob.project_id == project_id,
-    )
-    result = await db.execute(stmt)
-    job = result.scalar_one_or_none()
-
-    if job is None:
-        raise HTTPException(status_code=404, detail="作业不存在")
-
-    if job.status not in CANCELABLE_STATUSES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"作业当前状态 '{job.status.value}' 不可取消",
-        )
-
-    job.status = JobStatus.canceled
-    job.progress_message = "用户取消"
-    await db.flush()
-    await db.commit()
-
-    return {"job_id": str(job.id), "status": "canceled"}
+# 注：cancel 端点由 `ledger_datasets.cancel_import_job` 提供。本模块无定义——
+# 两个 router 注册到同一 prefix，ledger_datasets 先注册会拦截本模块的路由。
+# 历史上 v2 也曾定义此端点（现已删除，见 Sprint 8 UX v3 复盘 M2）。
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -440,6 +408,9 @@ async def get_latest_job(
         JobStatus.writing, JobStatus.activating,
         JobStatus.queued, JobStatus.pending,
     )
+    # 函数内用到的 datetime 工具（顶部 import 可能不够，本函数需要 timedelta）
+    from datetime import datetime, timedelta, timezone
+
     stmt = (
         select(ImportJob)
         .where(
@@ -453,16 +424,27 @@ async def get_latest_job(
     job = result.scalar_one_or_none()
 
     if job:
+        # P3-5.5: 剩余耗时估算（基于已用时间和进度线性外推）
+        estimated_remaining = None
+        if job.started_at and job.progress_pct and 5 <= job.progress_pct < 100:
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            started = job.started_at if job.started_at.tzinfo is None else (
+                job.started_at.replace(tzinfo=None)
+            )
+            elapsed_sec = max(1, int((now - started).total_seconds()))
+            total_est_sec = elapsed_sec * 100 / job.progress_pct
+            estimated_remaining = max(0, int(total_est_sec - elapsed_sec))
         return {
             "status": "processing",
+            "phase": job.current_phase or "writing",
             "progress": job.progress_pct or 0,
             "message": job.progress_message or "导入中...",
             "job_id": str(job.id),
             "year": job.year,
+            "estimated_remaining_seconds": estimated_remaining,
         }
 
     # 没有活跃 job，查最近 5 分钟内完成/失败的（给前端 toast 用）
-    from datetime import datetime, timedelta, timezone
     recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
     stmt_recent = (
         select(ImportJob)
@@ -480,6 +462,9 @@ async def get_latest_job(
     if recent_job:
         return {
             "status": recent_job.status.value,
+            "phase": recent_job.current_phase or (
+                "completed" if recent_job.status == JobStatus.completed else "failed"
+            ),
             "progress": 100 if recent_job.status == JobStatus.completed else 0,
             "message": recent_job.progress_message or (
                 "导入完成" if recent_job.status == JobStatus.completed else "导入失败"

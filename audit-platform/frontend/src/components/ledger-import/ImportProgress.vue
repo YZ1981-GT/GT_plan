@@ -43,6 +43,15 @@
     <div class="step-actions">
       <el-button
         v-if="!isFinished"
+        aria-label="放到后台继续"
+        type="primary"
+        plain
+        @click="onMoveToBackground"
+      >
+        放到后台继续
+      </el-button>
+      <el-button
+        v-if="!isFinished"
         type="danger"
         plain
         aria-label="取消导入"
@@ -59,6 +68,25 @@
         完成
       </el-button>
     </div>
+
+    <!-- 关注事项提示（仅进行中） -->
+    <el-alert
+      v-if="!isFinished"
+      type="info"
+      :closable="false"
+      show-icon
+      style="margin-top: 16px"
+    >
+      <template #title>
+        <span class="tips-title">关注事项</span>
+      </template>
+      <ul class="tips-list">
+        <li>数据正在后台写入，关闭或切走页面不会中断导入；顶栏"导入中"指示器可追踪进度</li>
+        <li>大文件（&gt;50MB）耗时较长，建议点"放到后台继续"先处理别的工作</li>
+        <li>导入完成前请勿重复提交同一年度的相同文件，否则旧 dataset 会被 superseded 但数据可能累加</li>
+        <li>取消导入会清理 staged 数据但不影响已激活的历史数据集</li>
+      </ul>
+    </el-alert>
   </div>
 </template>
 
@@ -78,6 +106,7 @@ const emit = defineEmits<{
   complete: []
   failed: []
   canceled: []
+  background: []  // 放后台继续（不取消 worker，仅关闭对话框）
 }>()
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -114,8 +143,20 @@ const phases = ref<PhaseInfo[]>([
   { key: 'uploading', label: '上传', percent: 100, completed: true },
   { key: 'parsing', label: '解析', percent: 0, completed: false },
   { key: 'validating', label: '校验', percent: 0, completed: false },
+  { key: 'writing', label: '写入', percent: 0, completed: false },
   { key: 'activating', label: '激活', percent: 0, completed: false },
 ])
+
+// 后端 phase 名到前端 key 的映射（bootstrap/queued 归入 parsing 前的占位）
+const PHASE_MAP: Record<string, string> = {
+  bootstrap: 'parsing',
+  queued: 'parsing',
+  pending: 'parsing',
+  parsing: 'parsing',
+  validating: 'validating',
+  writing: 'writing',
+  activating: 'activating',
+}
 
 // ─── Computed ───────────────────────────────────────────────────────────────
 
@@ -149,7 +190,9 @@ function connectSSE() {
 }
 
 function handleSSEMessage(data: SSEMessage) {
-  currentPhase.value = data.phase
+  // 映射后端 phase 到前端 phase key（bootstrap/queued/pending 都归入 parsing）
+  const mapped = PHASE_MAP[data.phase] || data.phase
+  currentPhase.value = mapped
 
   if (data.file) {
     currentFile.value = data.file + (data.sheet ? ` / ${data.sheet}` : '')
@@ -160,7 +203,7 @@ function handleSSEMessage(data: SSEMessage) {
   }
 
   // 更新各阶段进度
-  const phaseIdx = phases.value.findIndex(p => p.key === data.phase)
+  const phaseIdx = phases.value.findIndex(p => p.key === mapped)
   if (phaseIdx >= 0 && data.percent !== undefined) {
     phases.value[phaseIdx].percent = data.percent
     // 标记之前的阶段为完成
@@ -170,9 +213,9 @@ function handleSSEMessage(data: SSEMessage) {
     }
   }
 
-  // 计算总进度（4 段各占 25%）
+  // 计算总进度（各阶段均分 100%）
   const total = phases.value.reduce((sum, p) => sum + p.percent, 0)
-  totalPercent.value = Math.round(total / 4)
+  totalPercent.value = Math.round(total / phases.value.length)
 
   // 完成
   if (data.phase === 'completed') {
@@ -220,6 +263,16 @@ async function onCancel() {
   }
 }
 
+function onMoveToBackground() {
+  // 关闭 SSE 不取消 worker，让后端继续跑
+  closeSSE()
+  ElMessage.success({
+    message: '已转入后台，顶栏"导入中"指示器可追踪进度',
+    duration: 3000,
+  })
+  emit('background')
+}
+
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 onMounted(() => {
@@ -238,7 +291,7 @@ onUnmounted(() => {
 
 .phase-segments {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -284,5 +337,23 @@ onUnmounted(() => {
 .step-actions {
   margin-top: 24px;
   text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.tips-title {
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+.tips-list {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
+}
+.tips-list li {
+  list-style: disc;
 }
 </style>

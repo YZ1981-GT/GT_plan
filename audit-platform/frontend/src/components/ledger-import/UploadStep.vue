@@ -34,6 +34,26 @@
       </div>
     </div>
 
+    <!-- 耗时预估 + 关注事项（文件选中后显示） -->
+    <el-alert
+      v-if="selectedFiles.length > 0"
+      :type="alertLevel"
+      :closable="false"
+      show-icon
+      style="margin-top: 12px"
+    >
+      <template #title>
+        <b>预计耗时 {{ estimateText }}</b>
+        <span v-if="isLargeFile"> · 建议使用"放到后台继续"</span>
+      </template>
+      <div class="tips-list">
+        <div>• 总大小 <b>{{ formatSize(totalBytes) }}</b>，共 {{ selectedFiles.length }} 个文件</div>
+        <div>• 识别 + 入库顺序执行；损益类科目期末结转后 opening/closing 为空属正常</div>
+        <div v-if="isLargeFile">• 大文件（&gt;50MB）识别阶段较慢，首屏有 3-5 秒白屏属正常</div>
+        <div>• 上传前请确保：同一项目年度无进行中的导入作业，否则会被阻塞</div>
+      </div>
+    </el-alert>
+
     <!-- 上传进度 -->
     <el-progress
       v-if="uploading"
@@ -58,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { UploadFilled, Document, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { UploadFile, UploadInstance } from 'element-plus'
@@ -82,6 +102,36 @@ const selectedFiles = ref<File[]>([])
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const detecting = ref(false)
+
+// 耗时预估（基于 YG4001-30 0.81MB → ~11 秒 / YG36 3.5MB → ~40 秒 / YG2101 128MB → ~20 分钟 的真实样本统计）
+// P2-1.3: 公式 = 上传时间 + 后端处理时间
+// - 上传假设：有效带宽 20 Mbps（2.5 MB/s），大致覆盖办公网 / 家庭宽带
+// - 后端处理：文件 MB × 系数（非线性，大文件更慢）
+const UPLOAD_MB_PER_SECOND = 2.5
+const totalBytes = computed(() => selectedFiles.value.reduce((sum, f) => sum + f.size, 0))
+const totalMB = computed(() => totalBytes.value / (1024 * 1024))
+const isLargeFile = computed(() => totalMB.value > 50)
+
+const estimateSeconds = computed(() => {
+  const mb = totalMB.value
+  const uploadSec = Math.round(mb / UPLOAD_MB_PER_SECOND)  // 上传耗时
+  let processSec: number
+  if (mb < 1) processSec = 10
+  else if (mb < 5) processSec = Math.round(mb * 11)
+  else if (mb < 20) processSec = Math.round(mb * 12)
+  else if (mb < 100) processSec = Math.round(mb * 14)
+  else processSec = Math.round(mb * 16)
+  return uploadSec + processSec
+})
+
+const estimateText = computed(() => {
+  const s = estimateSeconds.value
+  if (s < 60) return `约 ${s} 秒`
+  if (s < 600) return `约 ${Math.round(s / 60)} 分钟`
+  return `约 ${Math.round(s / 60)} 分钟（建议放后台继续）`
+})
+
+const alertLevel = computed<'info' | 'warning'>(() => isLargeFile.value ? 'warning' : 'info')
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
 
@@ -117,18 +167,11 @@ async function startDetect() {
   try {
     const { api } = await import('@/services/apiProxy')
 
-    // 分 chunk 上传（5MB 每片），对于小文件直接整体上传
-    const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
+    // 注：当前实现整体上传，不做客户端分片
+    // TODO: 真正分片需后端加 chunked upload 端点，>500MB 文件浏览器内存会承压
     const formData = new FormData()
-
     for (const file of selectedFiles.value) {
-      if (file.size <= CHUNK_SIZE) {
-        // 小文件直接添加
-        formData.append('files', file, file.name)
-      } else {
-        // 大文件分片：这里简化为整体上传（真正分片需要后端支持分片接口）
-        formData.append('files', file, file.name)
-      }
+      formData.append('files', file, file.name)
     }
 
     uploadProgress.value = 50
@@ -196,5 +239,12 @@ async function startDetect() {
 .step-actions {
   margin-top: 24px;
   text-align: right;
+}
+
+.tips-list {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
 }
 </style>

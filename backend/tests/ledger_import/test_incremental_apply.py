@@ -1,7 +1,7 @@
 """S6-15: apply_incremental 增量追加测试。"""
 from __future__ import annotations
 
-from backend.app.services.ledger_data_service import compute_incremental_diff
+from app.services.ledger_data_service import compute_incremental_diff
 
 
 def test_diff_only_new_periods():

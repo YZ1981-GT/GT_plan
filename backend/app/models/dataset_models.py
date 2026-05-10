@@ -198,6 +198,12 @@ class ImportJob(Base):
         sa.Integer, server_default=text("600"), nullable=False
     )  # 默认 10 分钟超时
 
+    # P1-Q1: 乐观锁版本号（防并发 cancel/retry 竞态）
+    # 每次 status/progress 更新时 +1，端点调用时传入预期版本号做 WHERE 守卫
+    version: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+
     # 操作者与时间
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True

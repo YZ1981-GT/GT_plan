@@ -118,6 +118,10 @@ class Settings(BaseSettings):
     # False = 关闭，即使项目早于 CUTOFF_DATE 也严格检查（不走 legacy 路径）
     INDEPENDENCE_LEGACY_GRACE_ENABLED: bool = True
 
+    # Q5: 运行环境标识（dev / staging / production）
+    # production 模式下强制校验关键安全配置（JWT_SECRET_KEY 等），校验失败启动报错
+    APP_ENV: str = "dev"
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
     @property
@@ -134,10 +138,17 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# 启动时警告弱 JWT 密钥
+# 启动时校验关键安全配置
 import logging as _logging
 _logger = _logging.getLogger("audit_platform.config")
 if not settings.is_jwt_key_secure:
+    # Q5: production 模式下强制失败，防止弱密钥上线
+    if settings.APP_ENV.lower() in ("prod", "production"):
+        raise RuntimeError(
+            "APP_ENV=production 但 JWT_SECRET_KEY 使用弱密钥/<16 字符。"
+            "生产环境必须设置强随机密钥（建议 `openssl rand -hex 32`）。"
+            "如需跳过此检查（仅用于应急），可临时设置 APP_ENV=staging。"
+        )
     _logger.warning(
         "⚠️  JWT_SECRET_KEY 使用了默认弱密钥，生产环境请设置强随机密钥（至少16字符）"
     )
