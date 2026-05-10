@@ -223,7 +223,11 @@ class ImportJobService:
 
         timed_out_jobs = []
         for job in jobs:
-            elapsed = (now - job.heartbeat_at).total_seconds()
+            hb = job.heartbeat_at
+            # PG TIMESTAMP WITH TIME ZONE 返回 aware datetime，本地 now 是 naive；对齐为 naive UTC 后比较
+            if hb is not None and hb.tzinfo is not None:
+                hb = hb.astimezone(timezone.utc).replace(tzinfo=None)
+            elapsed = (now - hb).total_seconds() if hb is not None else 0
             if elapsed > job.timeout_seconds:
                 valid_next = _VALID_TRANSITIONS.get(job.status, set())
                 if JobStatus.timed_out in valid_next:

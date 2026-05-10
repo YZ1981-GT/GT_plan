@@ -92,12 +92,22 @@ class ImportJobRunner:
                 sa.select(ImportJob).where(
                     ImportJob.status.in_(running_states),
                     sa.or_(
+                        # 情况 1：有 started_at 但心跳丢失 > 20 分钟
                         sa.and_(
                             ImportJob.heartbeat_at.is_(None),
                             ImportJob.started_at.isnot(None),
                             ImportJob.started_at < stale_cutoff,
                         ),
+                        # 情况 2：心跳已有但 > 20 分钟未更新
                         ImportJob.heartbeat_at < stale_cutoff,
+                        # 情况 3（新增）：从未真正启动的僵尸 job
+                        # （status=running 但 started_at/heartbeat_at 都为 NULL 且创建 > 20 分钟）
+                        # 这种情况通常是进程崩溃或数据库迁移遗留，会永久锁定项目
+                        sa.and_(
+                            ImportJob.heartbeat_at.is_(None),
+                            ImportJob.started_at.is_(None),
+                            ImportJob.created_at < stale_cutoff,
+                        ),
                     ),
                 )
             )
@@ -538,8 +548,17 @@ class ImportJobRunner:
                 cancel_check=_cancel_check,
             )
 
-            # ── Phase 5: Complete ──
+            # ── Phase 5: writing → activating → completed（对齐状态机）──
             logger.info("ImportJob %s phase=complete", job_id)
+            await cls._persist_progress(job_id, 96, "切换激活态")
+            async with async_session() as db:
+                # 必须经过 activating 状态（状态机要求 writing→activating→completed）
+                await ImportJobService.transition(
+                    db, job_id, JobStatus.activating,
+                    progress_pct=96,
+                    progress_message="激活数据集",
+                )
+                await db.commit()
             await cls._persist_progress(job_id, 98, "收尾")
             async with async_session() as db:
                 await ImportJobService.transition(

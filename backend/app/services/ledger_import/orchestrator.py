@@ -254,21 +254,30 @@ class ImportOrchestrator:
             ImportJob,
             JobStatus,
         )
+        from sqlalchemy import select as _sa_select
 
-        # Create ImportArtifact (file reference, not raw bytes)
-        artifact = ImportArtifact(
-            id=uuid.uuid4(),
-            project_id=project_id,
-            upload_token=upload_token,
-            status=ArtifactStatus.active,
-            storage_uri=storage_uri,
-            total_size_bytes=total_size_bytes,
-            file_manifest=file_manifest,
-            file_count=len(file_manifest),
-            created_by=created_by,
+        # 查是否已存在 artifact（detect 阶段通过 create_bundle 创建）
+        existing_stmt = _sa_select(ImportArtifact).where(
+            ImportArtifact.upload_token == upload_token
         )
-        db.add(artifact)
-        await db.flush()
+        existing_res = await db.execute(existing_stmt)
+        artifact = existing_res.scalar_one_or_none()
+
+        if artifact is None:
+            # 未找到（老链路回退），创建新 artifact
+            artifact = ImportArtifact(
+                id=uuid.uuid4(),
+                project_id=project_id,
+                upload_token=upload_token,
+                status=ArtifactStatus.active,
+                storage_uri=storage_uri,
+                total_size_bytes=total_size_bytes,
+                file_manifest=file_manifest,
+                file_count=len(file_manifest),
+                created_by=created_by,
+            )
+            db.add(artifact)
+            await db.flush()
 
         # Create ImportJob
         job = ImportJob(

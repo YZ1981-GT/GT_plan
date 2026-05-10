@@ -95,9 +95,16 @@ async def detect_files(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """Multipart file upload → run detection pipeline → return LedgerDetectionResult.
+    """Multipart file upload → 持久化到 bundle → 识别 → 返回 LedgerDetectionResult.
 
-    Limits: max 20 files, total 500 MB.
+    持久化策略（S7+ 企业级链路）：
+    - 文件通过 `LedgerImportUploadService.create_bundle` 保存到共享存储
+      （本地或 S3），同时建 ImportArtifact 记录；后续 /submit 阶段 worker 用
+      upload_token 恢复文件、走完整 pipeline。
+    - 识别阶段走 `detect_from_paths`，大文件不全量读入内存。
+    - upload_token 以 bundle manifest 为准（覆盖 orchestrator 随机生成的 token）。
+
+    Limits: max 20 files, total 500 MB（沿用 MAX_FILES/MAX_TOTAL_SIZE_BYTES）。
     """
     if len(files) > MAX_FILES:
         raise HTTPException(
@@ -105,27 +112,42 @@ async def detect_files(
             detail=f"最多上传 {MAX_FILES} 个文件，当前 {len(files)} 个",
         )
 
-    # Read all file bytes and check total size
-    file_data: list[tuple[str, bytes]] = []
-    total_size = 0
-    for f in files:
-        content = await f.read()
-        total_size += len(content)
-        if total_size > MAX_TOTAL_SIZE_BYTES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"文件总大小超过 {MAX_TOTAL_SIZE_BYTES // (1024 * 1024)} MB 限制",
-            )
-        file_data.append((f.filename or "unknown", content))
-
-    # Run detection (pure computation, no DB writes)
+    # Step 1: 持久化文件到 bundle + 写 ImportArtifact（复用老链路）
     from app.services.ledger_import.orchestrator import ImportOrchestrator
+    from app.services.ledger_import_upload_service import LedgerImportUploadService
 
-    result = ImportOrchestrator.detect(
-        file_data,
+    try:
+        manifest = await LedgerImportUploadService.create_bundle(
+            project_id, str(current_user.id), files,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("detect bundle 持久化失败")
+        raise HTTPException(status_code=500, detail=f"文件保存失败: {exc}") from exc
+
+    upload_token = manifest["upload_token"]
+    file_entries = LedgerImportUploadService.get_bundle_files(project_id, upload_token)
+
+    # Step 2: 识别（从 bundle 文件路径读，不全量加载内存）
+    file_paths = [str(path) for _name, path in file_entries]
+    result = ImportOrchestrator.detect_from_paths(
+        file_paths,
         year_override=year_override,
         adapter_hint=adapter_hint,
     )
+    # orchestrator.detect_from_paths 内部生成的 token 覆盖为 bundle token
+    # （保证 /submit 走 bundle 路径能找到文件）
+    result.upload_token = upload_token
+
+    # 用原始 filename 覆盖（bundle 存储时可能做了 safe_filename 前缀处理）
+    name_by_path = {str(path): name for name, path in file_entries}
+    for fd in result.files:
+        # FileDetection.file_name 应是用户原始名
+        for orig_name in name_by_path.values():
+            if fd.file_name.endswith(orig_name) or orig_name.endswith(fd.file_name):
+                fd.file_name = orig_name
+                break
 
     return result.model_dump(mode="json")
 
@@ -179,6 +201,18 @@ async def submit_import(
         adapter_id=body.adapter_id,
     )
     await db.commit()
+
+    # 立即 enqueue 触发 worker，不等 recover_jobs 30s 轮询
+    try:
+        from app.services.import_job_runner import ImportJobRunner
+        from uuid import UUID as _UUID
+        jid = result["job_id"]
+        if not isinstance(jid, _UUID):
+            jid = _UUID(str(jid))
+        ImportJobRunner.enqueue(jid)
+    except Exception:
+        # enqueue 失败不阻断 submit 返回，recover_jobs 会兜底
+        logger.exception("ImportJob enqueue 失败，等待 recover 兜底")
 
     return {"job_id": str(result["job_id"]), "status": result["status"]}
 
