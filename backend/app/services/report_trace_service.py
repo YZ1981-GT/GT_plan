@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TbLedger, TrialBalance
+from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ class ReportTraceService:
 
     async def trace_section(
         self, db: AsyncSession, project_id: UUID, section_number: str,
+        year: int | None = None,
     ) -> dict[str, Any]:
         """溯源查询：附注科目 → 底稿 → 试算表 → 序时账"""
         trace = {
@@ -80,9 +82,18 @@ class ReportTraceService:
 
         # 4. 查大额序时账
         try:
+            if year:
+                ledger_conditions = [
+                    await get_active_filter(db, TbLedger.__table__, project_id, year),
+                ]
+            else:
+                ledger_conditions = [
+                    TbLedger.project_id == project_id,
+                    TbLedger.is_deleted == sa.false(),
+                ]
             ledger_result = await db.execute(
                 sa.select(TbLedger)
-                .where(TbLedger.project_id == project_id, TbLedger.is_deleted == sa.false())
+                .where(*ledger_conditions)
                 .order_by(TbLedger.debit_amount.desc().nullslast())
                 .limit(10)
             )

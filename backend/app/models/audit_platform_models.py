@@ -252,6 +252,10 @@ class TbBalance(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # F41 / Sprint 7.5: 多租户预留列（暂恒为 'default'；get_active_filter 未启用租户校验）
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), server_default=text("'default'"), nullable=False
+    )
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
     )
@@ -299,12 +303,12 @@ class TbBalance(Base):
             "idx_tb_balance_import_batch",
             "import_batch_id",
         ),
+        # F41 / Sprint 7.5: tenant 维度复合索引（未来多租户查询命中）
+        Index(
+            "idx_tb_balance_tenant_project_year",
+            "tenant_id", "project_id", "year",
+        ),
     )
-
-
-# ---------------------------------------------------------------------------
-# TbLedger 模型
-# ---------------------------------------------------------------------------
 
 
 class TbLedger(Base):
@@ -314,6 +318,10 @@ class TbLedger(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    # F41 / Sprint 7.5: 多租户预留列
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), server_default=text("'default'"), nullable=False
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
@@ -373,6 +381,11 @@ class TbLedger(Base):
             "idx_tb_ledger_import_batch",
             "import_batch_id",
         ),
+        # F41 / Sprint 7.5: tenant 维度复合索引
+        Index(
+            "idx_tb_ledger_tenant_project_year",
+            "tenant_id", "project_id", "year",
+        ),
     )
 
 
@@ -388,6 +401,10 @@ class TbAuxBalance(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    # F41 / Sprint 7.5: 多租户预留列
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), server_default=text("'default'"), nullable=False
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
@@ -447,6 +464,11 @@ class TbAuxBalance(Base):
             "project_id", "year", "account_code", "aux_type", "aux_code",
             postgresql_where=text("is_deleted = false"),
         ),
+        # F41 / Sprint 7.5: tenant 维度复合索引
+        Index(
+            "idx_tb_aux_balance_tenant_project_year",
+            "tenant_id", "project_id", "year",
+        ),
     )
 
 
@@ -462,6 +484,10 @@ class TbAuxLedger(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    # F41 / Sprint 7.5: 多租户预留列
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), server_default=text("'default'"), nullable=False
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
@@ -525,6 +551,11 @@ class TbAuxLedger(Base):
             "idx_tb_aux_ledger_triplet",
             "project_id", "year", "account_code", "aux_type", "aux_code",
             postgresql_where=text("is_deleted = false"),
+        ),
+        # F41 / Sprint 7.5: tenant 维度复合索引
+        Index(
+            "idx_tb_aux_ledger_tenant_project_year",
+            "tenant_id", "project_id", "year",
         ),
     )
 
@@ -864,6 +895,15 @@ class UnadjustedMisstatement(Base):
     )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
+    )
+    # F50 / Sprint 8.16: 下游快照绑定（创建时绑定当前 active dataset）
+    bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("ledger_datasets.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    dataset_bound_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())

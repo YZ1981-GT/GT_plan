@@ -81,10 +81,26 @@ class WpChatService:
         year: int | None = None,
     ) -> dict[str, Any]:
         """台账分析底稿生成 — LLM 分析序时账大额/异常/关联方交易"""
+        from app.services.dataset_query import get_active_filter
+
         # 查询序时账数据
-        conditions = [TbLedger.project_id == project_id, TbLedger.is_deleted == sa.false()]
         if year:
-            conditions.append(TbLedger.year == year)
+            conditions = [await get_active_filter(db, TbLedger.__table__, project_id, year)]
+        else:
+            # year=None：查所有年度的 active data
+            from app.models.dataset_models import LedgerDataset, DatasetStatus
+            active_ds_subq = (
+                sa.select(LedgerDataset.id)
+                .where(
+                    LedgerDataset.project_id == project_id,
+                    LedgerDataset.status == DatasetStatus.active,
+                )
+            )
+            conditions = [
+                TbLedger.project_id == project_id,
+                TbLedger.dataset_id.in_(active_ds_subq),
+                TbLedger.is_deleted == sa.false(),
+            ]
         if account_codes:
             conditions.append(TbLedger.account_code.in_(account_codes))
 

@@ -5,7 +5,7 @@ os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
@@ -126,13 +126,19 @@ async def _replay_startup_events() -> None:
 def _start_workers(stop_event):
     """启动所有后台 Worker，返回 task 列表。"""
     import asyncio
-    from app.workers import sla_worker, import_recover_worker, outbox_replay_worker, audit_log_writer_worker, budget_alert_worker
+    from app.workers import (
+        sla_worker, import_recover_worker, outbox_replay_worker,
+        audit_log_writer_worker, budget_alert_worker, dataset_purge_worker,
+        staged_orphan_cleaner,
+    )
     return [
         asyncio.create_task(sla_worker.run(stop_event)),
         asyncio.create_task(import_recover_worker.run(stop_event)),
         asyncio.create_task(outbox_replay_worker.run(stop_event)),
         asyncio.create_task(audit_log_writer_worker.run(stop_event)),
         asyncio.create_task(budget_alert_worker.run(stop_event)),
+        asyncio.create_task(dataset_purge_worker.run(stop_event)),
+        asyncio.create_task(staged_orphan_cleaner.run(stop_event)),
     ]
 
 
@@ -147,6 +153,20 @@ app = FastAPI(
 @app.get("/api/version")
 async def api_version():
     return {"version": "1.0.0", "api_prefix": "/api"}
+
+
+@app.get("/metrics", tags=["observability"])
+async def metrics_endpoint():
+    """Prometheus /metrics 端点（F16 / Sprint 4.10）。
+
+    prometheus_client 未安装时返回占位文本；安装后返回完整指标。
+    暴露 ledger_import_{duration_seconds,jobs_total} + ledger_dataset_count
+    + event_outbox_dlq_depth + ledger_import_health_status 共 5 项。
+    """
+    from app.services.ledger_import.metrics import render_metrics
+
+    body, content_type = render_metrics()
+    return Response(content=body, media_type=content_type)
 
 
 # --- 异常处理器 ---

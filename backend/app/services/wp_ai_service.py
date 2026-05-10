@@ -191,13 +191,13 @@ class WpAIService:
         """函证对象提取：从辅助余额表提取"""
         from app.models.audit_platform_models import TbAuxBalance
 
+        from app.services.dataset_query import get_active_filter
+
         q = (
             sa.select(TbAuxBalance)
             .where(
-                TbAuxBalance.project_id == project_id,
+                await get_active_filter(self.db, TbAuxBalance.__table__, project_id, year),
                 TbAuxBalance.account_code.like(f"{account_code}%"),
-                TbAuxBalance.year == year,
-                TbAuxBalance.is_deleted == False,  # noqa
             )
             .order_by(TbAuxBalance.closing_balance.desc())
             .limit(50)

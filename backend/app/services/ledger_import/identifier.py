@@ -259,13 +259,26 @@ def _levenshtein_leq(a: str, b: str, max_d: int = 2) -> bool:
 # ---------------------------------------------------------------------------
 
 
+_GENERIC_SHEET_NAMES: frozenset[str] = frozenset({
+    "sheet1", "sheet2", "sheet3",
+    "列表数据", "数据", "data",
+    "工作表1", "工作表2", "sheet",
+})
+
+
 def _detect_by_sheet_name(sheet_name: str) -> tuple[TableType, int, dict]:
-    """Level 1：按 sheet 名正则识别。返回 (table_type, score_0_100, evidence)。"""
+    """Level 1：按 sheet 名正则识别。返回 (table_type, score_0_100, evidence)。
+
+    通用 sheet 名（sheet1/列表数据/data 等）返回 ``(unknown, 0, evidence)``，
+    evidence 中附 ``is_generic_name=True`` 便于决策透明化（F8 表类型鲁棒性）。
+    """
     patterns_tried: dict[TableType, list[str]] = {
         tt: list(patterns) for tt, patterns in SHEET_NAME_PATTERNS.items()
     }
 
     name = (sheet_name or "").strip()
+    is_generic = name.lower() in _GENERIC_SHEET_NAMES
+
     for tt, patterns in SHEET_NAME_PATTERNS.items():
         for pat in patterns:
             if re.search(pat, name):
@@ -278,6 +291,7 @@ def _detect_by_sheet_name(sheet_name: str) -> tuple[TableType, int, dict]:
                         "matched_pattern": pat,
                         "matched_table": tt,
                         "confidence": conf,
+                        "is_generic_name": False,
                     },
                 )
 
@@ -289,6 +303,7 @@ def _detect_by_sheet_name(sheet_name: str) -> tuple[TableType, int, dict]:
             "matched_pattern": None,
             "matched_table": "unknown",
             "confidence": 0,
+            "is_generic_name": is_generic,
         },
     )
 
@@ -540,15 +555,48 @@ def _get_alternatives(table_type: TableType, key_col: str) -> list[str]:
 def _detect_by_headers(
     header_cells: list[str],
     data_rows: list[list[str]] | None = None,
+    compound_headers: dict[int, list[str]] | None = None,
 ) -> tuple[TableType, int, list[ColumnMatch], dict]:
     """Level 2：按列名 + KEY_COLUMNS 识别表类型，集成内容验证器。
 
     返回 ``(table_type, confidence_0_100, column_matches, evidence)``。
+
+    F7: ``compound_headers`` ``{col_index: [子字段, ...]}`` 为组合表头时（如
+    ``[凭证号码]#[日期]`` 拆出 ``["凭证号码", "日期"]``），
+    对每个子字段独立查别名，取最高置信度的匹配。
     """
+    compound = compound_headers or {}
     # Step 1: 映射每列
     header_mappings: list[tuple[str, Optional[str], int, str]] = []
+
+    # F7: 先做一轮常规匹配收集已命中的 standard_field，再用子字段补充空列
+    # 这样避免组合表头的子字段映射覆盖已有列的映射（如 和平物流 [凭证号码]#[日期]
+    # 不应抢走 [日期] 独立列的 voucher_date 映射）
+    first_pass: list[tuple[str, Optional[str], int, str]] = []
     for header in header_cells or []:
         std, conf, source = _match_header(header)
+        first_pass.append((header, std, conf, source))
+
+    already_mapped: set[str] = {std for (_h, std, _c, _s) in first_pass if std}
+
+    for idx, (header, std, conf, source) in enumerate(first_pass):
+        # F7: 只对"未映射"的组合表头列使用子字段匹配（避免抢占已映射列）
+        subs = compound.get(idx, [])
+        if len(subs) > 1 and std is None:
+            best: tuple[Optional[str], int, str] = (None, 0, source)
+            for sub in subs:
+                sub_std, sub_conf, sub_source = _match_header(sub)
+                # 只选尚未被其他列占用的 standard_field
+                if (
+                    sub_std
+                    and sub_std not in already_mapped
+                    and sub_conf > best[1]
+                ):
+                    best = (sub_std, sub_conf, sub_source)
+            if best[0]:
+                std, conf, source = best
+                already_mapped.add(best[0])
+
         header_mappings.append((header, std, conf, source))
 
     matched_std_fields: set[str] = {
@@ -839,10 +887,34 @@ def identify(sheet: SheetDetection) -> SheetDetection:
             l1_score = max(fn_score - 10, 65)
             l1_evidence = {**fn_evidence, "source": "file_name", "file_name": fname_stem}
 
+    # F6: 如果 L1 仍弱（<60）或 unknown，使用 detector 提取的 filename_hint 补强
+    # filename_hint 结构（detector._extract_filename_hints 产出）：
+    #   {table_type, table_confidence, matched_keyword, year, month, file_stem}
+    filename_hint_raw = sheet.detection_evidence.get("filename_hint") or {}
+    if (
+        l1_score < 60
+        and filename_hint_raw.get("table_type")
+    ):
+        hint_type = filename_hint_raw["table_type"]
+        hint_conf = filename_hint_raw.get("table_confidence", 65)
+        # 只在 L1 仍为 unknown 或置信度更低时覆盖
+        if l1_type == "unknown" or hint_conf > l1_score:
+            l1_type = hint_type
+            l1_score = hint_conf
+            l1_evidence = {
+                **l1_evidence,
+                "source": "filename_hint",
+                "matched_keyword": filename_hint_raw.get("matched_keyword"),
+                "file_stem": filename_hint_raw.get("file_stem"),
+            }
+
     # ---- Level 2: 表头特征 + 内容验证器
     header_cells = _resolve_header_cells(sheet)
     data_rows = sheet.preview_rows[sheet.data_start_row:] if sheet.preview_rows else []
-    l2_type, l2_score, column_matches, l2_evidence = _detect_by_headers(header_cells, data_rows)
+    compound_headers = sheet.detection_evidence.get("compound_headers") or {}
+    l2_type, l2_score, column_matches, l2_evidence = _detect_by_headers(
+        header_cells, data_rows, compound_headers=compound_headers
+    )
 
     # ---- Level 3: 内容特征（始终执行，不再条件触发）
     l3_type, l3_score, l3_evidence = _detect_by_content(
@@ -874,10 +946,21 @@ def identify(sheet: SheetDetection) -> SheetDetection:
     # S6-9: L1 强信号锁定机制——sheet 名命中且置信度 ≥ l1_lock_threshold 时，
     # 锁定 table_type 为 L1 的判断，不让 L2/L3 否决（典型场景：和平物流的
     # "余额表" sheet 被非标准列结构让 L2 误投 ledger）
+    #
+    # F8 例外：L1 = balance 但 L2 明确指向 aux_balance（含 aux_type 列），
+    # 或 L1 = ledger 但 L2 明确指向 aux_ledger——应让更具体的 L2 结果胜出，
+    # 因为 aux_* 是 balance/ledger 的更具体变体（"科目余额表（有核算维度）"
+    # 名字上匹配 balance 模式，但实为 aux_balance）。
     l1_lock_threshold = MATCHING_CONFIG.get("l1_lock_threshold", 85)
+    _aux_variant_pairs = {
+        ("balance", "aux_balance"),
+        ("ledger", "aux_ledger"),
+    }
+    l2_specializes_l1 = (l1_type, l2_type) in _aux_variant_pairs and l2_score >= 60
     l1_locked = (
         l1_type != "unknown"
         and l1_score >= l1_lock_threshold
+        and not l2_specializes_l1
     )
 
     if votes:
@@ -968,6 +1051,16 @@ def identify(sheet: SheetDetection) -> SheetDetection:
         if k not in detection_evidence:
             detection_evidence[k] = v
 
+    # F9: 生成 skip_reason（表类型 unknown 时说明原因）
+    warnings_list = list(sheet.warnings or [])
+    if final_type == "unknown":
+        skip_reason = _derive_skip_reason(sheet, header_cells, data_rows, l1_evidence)
+        detection_evidence["skip_reason"] = skip_reason
+        if skip_reason.get("code"):
+            warning_tag = f"SKIPPED_UNKNOWN:{skip_reason['code']}"
+            if warning_tag not in warnings_list:
+                warnings_list.append(warning_tag)
+
     return sheet.model_copy(
         update={
             "table_type": final_type,
@@ -975,8 +1068,55 @@ def identify(sheet: SheetDetection) -> SheetDetection:
             "confidence_level": confidence_level,
             "column_mappings": column_matches,
             "detection_evidence": detection_evidence,
+            "warnings": warnings_list,
         }
     )
+
+
+def _derive_skip_reason(
+    sheet: SheetDetection,
+    header_cells: list[str],
+    data_rows: list[list[str]],
+    l1_evidence: dict,
+) -> dict:
+    """F9: 为 unknown table_type 生成人类可读的跳过原因。
+
+    返回 ``{code, message_cn}``，code 集中在：
+    - ``ROWS_TOO_FEW``: 行数太少（<5 行数据）
+    - ``HEADER_UNRECOGNIZABLE``: 表头无法识别（关键列 0 命中）
+    - ``CONTENT_MISMATCH``: 列内容不符合任一表类型特征
+    """
+    row_est = sheet.row_count_estimate or 0
+    non_empty_headers = [h for h in header_cells if h and str(h).strip()]
+
+    # 1) 行数太少
+    if row_est < 5 or len(data_rows) < 2:
+        return {
+            "code": "ROWS_TOO_FEW",
+            "message_cn": (
+                f"行数太少（约 {row_est} 行），无法作为账表导入；"
+                "可能是元信息 sheet 或空 sheet"
+            ),
+        }
+
+    # 2) 表头无法识别
+    if len(non_empty_headers) < 3:
+        return {
+            "code": "HEADER_UNRECOGNIZABLE",
+            "message_cn": (
+                f"表头无法识别（仅 {len(non_empty_headers)} 个非空表头单元格）；"
+                "请检查是否有合并单元格或标题行干扰"
+            ),
+        }
+
+    # 3) 列内容不符合任一表类型特征
+    return {
+        "code": "CONTENT_MISMATCH",
+        "message_cn": (
+            "列内容不符合余额表 / 序时账 / 辅助表的任一特征；"
+            "请确认 sheet 类型或联系管理员配置识别规则"
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------

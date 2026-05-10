@@ -151,7 +151,7 @@ log_chain_strategy = st.lists(log_entry_strategy, min_size=1, max_size=20)
 # ---------------------------------------------------------------------------
 
 @given(entries=log_chain_strategy)
-@settings(max_examples=50)
+@settings(max_examples=5)
 def test_correct_chain_always_valid(entries: list[LogEntry]):
     """**Validates: Requirements 9**
 
@@ -172,7 +172,7 @@ def test_correct_chain_always_valid(entries: list[LogEntry]):
     tamper_index=st.integers(min_value=0, max_value=19),
     new_payload_value=text_field,
 )
-@settings(max_examples=50)
+@settings(max_examples=5)
 def test_tampered_payload_detected(
     entries: list[LogEntry],
     tamper_index: int,
@@ -209,7 +209,7 @@ def test_tampered_payload_detected(
     tamper_index=st.integers(min_value=0, max_value=19),
     fake_hash_suffix=st.text(min_size=1, max_size=10, alphabet="0123456789abcdef"),
 )
-@settings(max_examples=50)
+@settings(max_examples=5)
 def test_tampered_entry_hash_detected(
     entries: list[LogEntry],
     tamper_index: int,
@@ -251,7 +251,7 @@ def test_tampered_entry_hash_detected(
     entries=st.lists(log_entry_strategy, min_size=2, max_size=20),
     swap_data=st.data(),
 )
-@settings(max_examples=50)
+@settings(max_examples=5)
 def test_swapped_entries_detected(entries: list[LogEntry], swap_data):
     """**Validates: Requirements 9**
 

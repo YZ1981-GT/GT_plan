@@ -187,8 +187,15 @@ class ColumnMatch(BaseModel):
         "content_pattern",
         "manual",
         "ai_fallback",
+        "history_reuse",
     ]
     sample_values: list[str] = Field(default_factory=list)
+
+    # F52 / Sprint 8.35: 历史复用标记
+    # 由 orchestrator._apply_history_reuse 在 detect 阶段命中 30 天内的
+    # ImportColumnMappingHistory 时设为 True，前端据此显示 "🕒 上次映射" badge。
+    auto_applied_from_history: bool = False
+    history_mapping_id: Optional[str] = None
 
     @property
     def is_key_column(self) -> bool:

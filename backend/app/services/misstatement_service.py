@@ -65,6 +65,16 @@ class UnadjustedMisstatementService:
             auditor_evaluation=data.auditor_evaluation,
             created_by=created_by,
         )
+        # F50 / Sprint 8.19: 错报创建时绑定当前 active dataset
+        try:
+            from app.services.dataset_query import bind_to_active_dataset
+            await bind_to_active_dataset(self.db, row, project_id, data.year)
+        except Exception as _bind_err:
+            import logging
+            logging.getLogger(__name__).warning(
+                "misstatement dataset binding failed: project=%s year=%s err=%s",
+                project_id, data.year, _bind_err,
+            )
         self.db.add(row)
         await self.db.flush()
         return self._to_response(row)
@@ -124,6 +134,16 @@ class UnadjustedMisstatementService:
             misstatement_type=MisstatementType.factual,
             created_by=created_by,
         )
+        # F50 / Sprint 8.19: AJE 转错报也绑定当前 active dataset
+        try:
+            from app.services.dataset_query import bind_to_active_dataset
+            await bind_to_active_dataset(self.db, row, project_id, year)
+        except Exception as _bind_err:
+            import logging
+            logging.getLogger(__name__).warning(
+                "misstatement(from AJE) dataset binding failed: project=%s year=%s err=%s",
+                project_id, year, _bind_err,
+            )
         self.db.add(row)
         await self.db.flush()
         return self._to_response(row)
@@ -356,6 +376,18 @@ class UnadjustedMisstatementService:
                 prior_year_id=prior.id,
                 created_by=created_by,
             )
+            # F50 / Sprint 8.19: 结转错报绑定目标年度的 active dataset
+            try:
+                from app.services.dataset_query import bind_to_active_dataset
+                await bind_to_active_dataset(
+                    self.db, new_row, project_id, target_year
+                )
+            except Exception as _bind_err:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "misstatement(carry_forward) binding failed: project=%s year=%s err=%s",
+                    project_id, target_year, _bind_err,
+                )
             self.db.add(new_row)
             count += 1
 

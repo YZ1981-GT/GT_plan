@@ -28,6 +28,7 @@ import csv
 import io
 import logging
 import os
+import re
 import zipfile
 from datetime import date, datetime, time
 from typing import Any, Optional
@@ -49,6 +50,178 @@ _XLSX_EXTS = {".xlsx", ".xlsm"}
 _CSV_EXTS = {".csv", ".tsv"}
 _XLS_EXTS = {".xls"}
 _ZIP_EXTS = {".zip"}
+
+
+# ---------------------------------------------------------------------------
+# 文件名元信息提取（F6 / Sprint 10 Task 10.12-10.14）
+# ---------------------------------------------------------------------------
+
+# 表类型关键字（匹配文件名基名，不区分大小写）
+_FILENAME_TABLE_KEYWORDS: dict[str, list[str]] = {
+    "balance": ["科目余额", "余额表", "试算", "试算平衡", "总账", "trial balance", "tb"],
+    "ledger": ["序时账", "序时", "凭证明细", "凭证", "总账明细", "明细账", "general ledger", "journal", "gl"],
+    "aux_balance": ["辅助余额", "核算项目余额", "辅助核算余额"],
+    "aux_ledger": ["辅助明细", "核算项目明细", "辅助序时"],
+}
+
+# 期间信息（年月）提取模式
+# 优先级顺序（关键：更具体的先匹配）：
+# 1. 25年10月 / 2025年10月（年月都带中文后缀）
+# 2. 24.10 / 2024.10 / 2024-10 / 2024/10（点/斜杠/短横分隔）
+# 3. 202410（6 位连续）
+#
+# 为保证 4 位年份不被吃掉为 "2 位+2 位"，采用多条正则按顺序匹配。
+_FILENAME_YEAR_MONTH_PATTERNS = [
+    # (年)年(月)月：明确的中文分隔
+    re.compile(r"(?P<year>20\d{2}|\d{2})年(?P<month>0?[1-9]|1[0-2])月"),
+    # 2 位年 + 月格式（如 24.10 / 24-10 / 24_10 / 24/10）- year 严格 2 位
+    re.compile(r"(?:^|[^0-9])(?P<year>\d{2})[./\-_](?P<month>0?[1-9]|1[0-2])(?:[^0-9]|$)"),
+    # 4 位年 + 月格式（如 2024.10 / 2024-10 / 2024_10 / 2024/10）
+    re.compile(r"(?P<year>20\d{2})[./\-_](?P<month>0?[1-9]|1[0-2])(?:[^0-9]|$)"),
+    # 仅年年月（不带分隔符）：202410
+    re.compile(r"(?:^|[^0-9])(?P<year>20\d{2})(?P<month>0?[1-9]|1[0-2])(?:[^0-9]|$)"),
+]
+# 仅年份
+_FILENAME_YEAR_ONLY_RE = re.compile(r"(?:^|[^0-9])(?P<year>20\d{2}|19\d{2})(?:[^0-9]|$)")
+
+
+def _extract_filename_hints(filename: str) -> dict:
+    """从文件名提取表类型 / 年月信息（F6 文件名元信息利用）。
+
+    Args:
+        filename: 含路径或不含路径的文件名（含扩展名）。
+
+    Returns:
+        dict 含以下可选键：
+        - ``table_type``: ``"balance"``/``"ledger"``/``"aux_balance"``/``"aux_ledger"``（不含 unknown）
+        - ``table_confidence``: 65 或 70（仅命中时返回）
+        - ``matched_keyword``: 触发命中的关键字
+        - ``year``: int（4 位年份）
+        - ``month``: int（1-12）
+        - ``file_stem``: 无扩展名的文件名基名
+
+    如果未能提取任何信息，返回空 dict。
+    """
+    hints: dict = {}
+    if not filename:
+        return hints
+
+    # 去路径 + 扩展名，统一小写做关键字匹配
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    hints["file_stem"] = stem
+    stem_lower = stem.lower()
+
+    # 1) 表类型匹配：优先匹配更长/更具体的关键字
+    best_match: Optional[tuple[str, str, int]] = None  # (table_type, keyword, length)
+    for tt, keywords in _FILENAME_TABLE_KEYWORDS.items():
+        for kw in keywords:
+            if kw.lower() in stem_lower:
+                # 更长的 keyword 更具体
+                if best_match is None or len(kw) > best_match[2]:
+                    best_match = (tt, kw, len(kw))
+
+    if best_match is not None:
+        tt, kw, _ = best_match
+        hints["table_type"] = tt
+        hints["matched_keyword"] = kw
+        # 较长关键字（>=4 char）给 75，较短给 65
+        hints["table_confidence"] = 75 if len(kw) >= 4 else 65
+
+    # 2) 期间信息提取：按优先级尝试多条正则
+    for pat in _FILENAME_YEAR_MONTH_PATTERNS:
+        ym_match = pat.search(stem)
+        if ym_match:
+            year_raw = ym_match.group("year")
+            month_raw = ym_match.group("month")
+            # 2 位年份 → 20xx
+            if len(year_raw) == 2:
+                year = 2000 + int(year_raw)
+            else:
+                year = int(year_raw)
+            month = int(month_raw)
+            if 1 <= month <= 12 and 2000 <= year <= 2100:
+                hints["year"] = year
+                hints["month"] = month
+                break
+    else:
+        # 兜底只查年份
+        y_only = _FILENAME_YEAR_ONLY_RE.search(stem)
+        if y_only:
+            year = int(y_only.group("year"))
+            if 2000 <= year <= 2100:
+                hints["year"] = year
+
+    return hints
+
+
+# ---------------------------------------------------------------------------
+# 表头规范化（F7 方括号 + 组合表头，Sprint 10 Task 10.16-10.18）
+# ---------------------------------------------------------------------------
+
+# 方括号剥壳：[XX] → XX；全角【XX】→ XX
+_BRACKET_STRIP_RE = re.compile(r"[\[【](.+?)[\]】]")
+
+# 组合分隔符：# / | / @ 等
+_COMPOUND_SEP_RE = re.compile(r"\s*[#|@]\s*")
+
+
+def _normalize_header(cell: str) -> tuple[str, list[str]]:
+    """规范化单个表头单元格（F7）。
+
+    处理：
+    1. 剥离方括号：``[凭证号码]`` → ``凭证号码``
+    2. 组合表头拆分：``凭证号码#日期`` / ``[凭证号码]#[日期]`` → 主名 + 子字段列表
+
+    返回 ``(primary, sub_fields)``：
+    - ``primary``：主标识（拆分后的第一个字段，始终非空）
+    - ``sub_fields``：拆出的子字段（含 primary 自身，空时为 [primary]）
+
+    示例：
+      - ``"[凭证号码]"`` → ``("凭证号码", ["凭证号码"])``
+      - ``"[凭证号码]#[日期]"`` → ``("凭证号码#日期", ["凭证号码", "日期"])``
+      - ``"凭证号码#日期"`` → ``("凭证号码#日期", ["凭证号码", "日期"])``
+      - ``"科目编码"`` → ``("科目编码", ["科目编码"])``
+    """
+    if cell is None:
+        return "", []
+    s = str(cell).strip()
+    if not s:
+        return "", []
+
+    # 1) 剥方括号：反复替换直到没有方括号对（但保留未配对的）
+    def _strip_once(m: re.Match) -> str:
+        return m.group(1)
+
+    s_stripped = _BRACKET_STRIP_RE.sub(_strip_once, s)
+
+    # 2) 检测组合分隔符
+    if _COMPOUND_SEP_RE.search(s_stripped):
+        sub_fields = [p.strip() for p in _COMPOUND_SEP_RE.split(s_stripped) if p.strip()]
+        if sub_fields:
+            # primary 用 # 连接所有子字段（作为唯一 header 标识）
+            primary = "#".join(sub_fields)
+            return primary, sub_fields
+
+    # 3) 无组合：单字段
+    return s_stripped, [s_stripped]
+
+
+def _normalize_header_row(cells: list[str]) -> tuple[list[str], dict[int, list[str]]]:
+    """对整行表头做规范化。
+
+    Returns:
+        ``(normalized_cells, compound_headers)``
+        - ``normalized_cells``: 与输入等长，每个 cell 都已剥方括号 + 主标识
+        - ``compound_headers``: ``{col_index: [子字段, ...]}``，仅含拆出多个子字段的列
+    """
+    normalized: list[str] = []
+    compound: dict[int, list[str]] = {}
+    for idx, cell in enumerate(cells):
+        primary, subs = _normalize_header(cell)
+        normalized.append(primary)
+        if len(subs) > 1:
+            compound[idx] = subs
+    return normalized, compound
 
 
 def detect_file_from_path(path: str, filename: Optional[str] = None) -> FileDetection:
@@ -304,9 +477,19 @@ def _detect_xlsx_sheet(
     data_start_row, merged_headers = _detect_header_row(preview_rows)
     # header_row_index 是"表头所在行"的 0-based 索引（合并表头时取下行）
     header_row_index = max(data_start_row - 1, 0)
+
+    # F7: 规范化表头（剥方括号 + 拆组合表头）
+    normalized_headers, compound_headers = _normalize_header_row(merged_headers)
+
+    # F6: 提取文件名元信息作为识别降级信号
+    filename_hint = _extract_filename_hints(filename)
+
     detection_evidence: dict = {
-        "header_cells": merged_headers,
+        "header_cells": normalized_headers,
+        "header_cells_raw": merged_headers,
         "merged_header": _is_merged_header(preview_rows, data_start_row, merged_headers),
+        "compound_headers": compound_headers,
+        "filename_hint": filename_hint,
     }
 
     return SheetDetection(
@@ -383,9 +566,19 @@ def _detect_csv(
     data_start_row, merged_headers = _detect_header_row(preview_rows)
     header_row_index = max(data_start_row - 1, 0)
     row_count_estimate = len(preview_rows)
+
+    # F7: 规范化表头（剥方括号 + 拆组合表头）
+    normalized_headers, compound_headers = _normalize_header_row(merged_headers)
+
+    # F6: 提取文件名元信息作为识别降级信号
+    filename_hint = _extract_filename_hints(filename)
+
     detection_evidence: dict = {
-        "header_cells": merged_headers,
+        "header_cells": normalized_headers,
+        "header_cells_raw": merged_headers,
         "merged_header": _is_merged_header(preview_rows, data_start_row, merged_headers),
+        "compound_headers": compound_headers,
+        "filename_hint": filename_hint,
     }
 
     fd.sheets.append(
@@ -900,7 +1093,13 @@ def _is_merged_header(
     return False
 
 
-__all__ = ["detect_file", "detect_file_from_path"]
+__all__ = [
+    "detect_file",
+    "detect_file_from_path",
+    "_extract_filename_hints",
+    "_normalize_header",
+    "_normalize_header_row",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -978,9 +1177,18 @@ def _detect_csv_from_path(
     else:
         row_count_estimate = 0
 
+    # F7: 规范化表头（剥方括号 + 拆组合表头）
+    normalized_headers, compound_headers = _normalize_header_row(merged_headers)
+
+    # F6: 提取文件名元信息作为识别降级信号
+    filename_hint = _extract_filename_hints(filename)
+
     detection_evidence: dict = {
-        "header_cells": merged_headers,
+        "header_cells": normalized_headers,
+        "header_cells_raw": merged_headers,
         "merged_header": _is_merged_header(preview_rows, data_start_row, merged_headers),
+        "compound_headers": compound_headers,
+        "filename_hint": filename_hint,
     }
 
     fd.sheets.append(

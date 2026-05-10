@@ -720,6 +720,16 @@ class ConsolDisclosureService:
                     status=NoteStatus.draft,
                     sort_order=100 + idx,
                 )
+                # F50 / Sprint 8.19: 附注创建时绑定当前 active dataset
+                try:
+                    from app.services.dataset_query import bind_to_active_dataset_sync
+                    bind_to_active_dataset_sync(self.db, note, project_id, year)
+                except Exception as _bind_err:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "consol disclosure_note dataset binding failed: section=%s err=%s",
+                        section.section_code, _bind_err,
+                    )
                 self.db.add(note)
                 saved_notes.append(note)
 

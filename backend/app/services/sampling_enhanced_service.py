@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TbLedger, TbAuxLedger
+from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +41,10 @@ class CutoffTestService:
         stmt = (
             sa.select(TbLedger)
             .where(
-                TbLedger.project_id == project_id,
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
                 TbLedger.account_code.in_(account_codes),
                 TbLedger.voucher_date >= start_date,
                 TbLedger.voucher_date <= end_date,
-                TbLedger.is_deleted == sa.false(),
                 sa.or_(
                     TbLedger.debit_amount > amount_threshold,
                     TbLedger.credit_amount > amount_threshold,
@@ -98,13 +98,17 @@ class AgingAnalysisService:
         base = date.fromisoformat(base_date)
 
         # 查询辅助明细账
-        conditions = [
-            TbAuxLedger.project_id == project_id,
-            TbAuxLedger.account_code == account_code,
-            TbAuxLedger.is_deleted == sa.false(),
-        ]
         if year:
-            conditions.append(TbAuxLedger.year == year)
+            conditions = [
+                await get_active_filter(db, TbAuxLedger.__table__, project_id, year),
+                TbAuxLedger.account_code == account_code,
+            ]
+        else:
+            conditions = [
+                TbAuxLedger.project_id == project_id,
+                TbAuxLedger.account_code == account_code,
+                TbAuxLedger.is_deleted == sa.false(),
+            ]
 
         stmt = (
             sa.select(TbAuxLedger)
@@ -246,10 +250,8 @@ class MonthlyDetailService:
                 sa.func.count().label("entry_count"),
             )
             .where(
-                TbLedger.project_id == project_id,
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
                 TbLedger.account_code == account_code,
-                TbLedger.year == year,
-                TbLedger.is_deleted == sa.false(),
             )
             .group_by(TbLedger.accounting_period)
             .order_by(TbLedger.accounting_period)

@@ -404,6 +404,16 @@ async def generate_from_codes(
         )
         db.add(wp)
 
+        # F50 / Sprint 8.17: 底稿快照绑定 —— 绑定当前 active dataset
+        try:
+            from app.services.dataset_query import bind_to_active_dataset
+            await bind_to_active_dataset(db, wp, project_id, data.year)
+        except Exception as _bind_err:
+            import logging
+            logging.getLogger(__name__).warning(
+                "dataset binding failed for wp %s: %s", code, _bind_err
+            )
+
         # 填充底稿表头（编制单位/审计期间/索引号/交叉索引等）
         try:
             from app.services.wp_header_service import fill_workpaper_header
@@ -494,6 +504,16 @@ async def create_custom_workpaper(
     )
     db.add(wp)
     await db.flush()
+
+    # F50 / Sprint 8.17: 自定义底稿同样绑定当前 active dataset
+    try:
+        from app.services.dataset_query import bind_to_active_dataset
+        await bind_to_active_dataset(db, wp, project_id, data.year)
+    except Exception as _bind_err:
+        import logging
+        logging.getLogger(__name__).warning(
+            "dataset binding failed for custom wp %s: %s", data.wp_code, _bind_err
+        )
 
     # 自定义底稿强制写入标准表头（is_custom=True）
     try:

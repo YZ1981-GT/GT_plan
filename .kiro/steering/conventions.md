@@ -242,3 +242,74 @@ transition 到对应状态；不能一刀切 failed。
 6. 跑全量回归（pytest + vue-tsc） → 7. 真实数据 smoke（e2e_yg4001_smoke.py 或相当）
 ```
 第 4-7 步任一步失败都算修复未完成。
+
+
+## 账表四表查询规约（B' 视图重构，2026-05-10）
+
+**参考**：ADR-002、`backend/app/services/dataset_query.py`
+
+### 强制规则
+1. **Tb* 四表查询必须走 `get_active_filter`**（TbBalance/TbLedger/TbAuxBalance/TbAuxLedger）
+2. **禁止直接写 `TbX.is_deleted == False`**（或 `sa.false()`）—— CI `backend-lint` job 卡点防回归
+3. **raw SQL 禁止 `WHERE is_deleted = false`**，改为 `EXISTS (SELECT 1 FROM ledger_datasets d WHERE d.id = tb_x.dataset_id AND d.status = 'active')`
+
+### 标准用法
+```python
+from app.services.dataset_query import get_active_filter
+
+# 方法 A：where 条件列表
+result = await db.execute(
+    sa.select(TbLedger).where(
+        await get_active_filter(db, TbLedger.__table__, project_id, year),
+        TbLedger.account_code == code,  # 业务过滤
+    )
+)
+
+# 方法 B：year 已知且复用多次 → 先查 active_id 再用同步版本
+active_id = await DatasetService.get_active_dataset_id(db, project_id, year)
+filter_expr = get_filter_with_dataset_id(TbLedger.__table__, project_id, year, active_id)
+# 多次复用 filter_expr 避免 N+1
+```
+
+### year=None 场景（Template B）
+```python
+from app.models.dataset_models import LedgerDataset, DatasetStatus
+
+active_ds_subq = (
+    sa.select(LedgerDataset.id).where(
+        LedgerDataset.project_id == project_id,
+        LedgerDataset.status == DatasetStatus.active,
+    )
+)
+conditions = [
+    TbLedger.project_id == project_id,
+    TbLedger.dataset_id.in_(active_ds_subq),
+    TbLedger.is_deleted == sa.false(),  # 兜底保险
+]
+```
+
+### 允许清单（year=None 兜底，CI baseline=6）
+- `wp_chat_service.py:generate_ledger_analysis`
+- `sampling_enhanced_service.py:analyze_aging`
+- `report_trace_service.py:trace_section`
+- `ocr_service_v2.py:match_with_ledger`
+- `routers/report_trace.py:aux_summary`（2 处，aux_balance + balance）
+
+### 写入规约
+- pipeline 新写入统一 `is_deleted=False`（staged 隔离靠 `dataset.status=staged`）
+- 回收站 / archive / restore 仍用 `is_deleted=true`（软删语义保留，独立于 B' 可见性）
+
+### raw SQL 迁移模板
+```sql
+-- 改前
+SELECT ... FROM tb_ledger
+WHERE project_id = :pid AND year = :yr AND is_deleted = false
+
+-- 改后
+SELECT ... FROM tb_ledger l
+WHERE l.project_id = :pid AND l.year = :yr
+  AND EXISTS (
+    SELECT 1 FROM ledger_datasets d
+    WHERE d.id = l.dataset_id AND d.status = 'active'
+  )
+```

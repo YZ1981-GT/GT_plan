@@ -318,6 +318,17 @@ class WorkingPaper(Base):
         ForeignKey("users.id"), nullable=True
     )
 
+    # F50 / Sprint 8.16: 下游快照绑定（合规关键）
+    # 底稿首次生成时绑定当时的 active dataset_id，rollback 时保护数据不可篡改。
+    bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("ledger_datasets.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    dataset_bound_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     __table_args__ = (
         Index(
             "uq_working_paper_project_index",

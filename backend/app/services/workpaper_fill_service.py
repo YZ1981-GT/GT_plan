@@ -39,6 +39,7 @@ from app.models.audit_platform_models import (
 )
 from app.models.report_models import DisclosureNote, FinancialReport
 from app.services.ai_service import AIService
+from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
@@ -585,11 +586,9 @@ class WorkpaperFillService:
         result = await self.db.execute(
             select(TbLedger)
             .where(
-                TbLedger.project_id == project_id,
-                TbLedger.year == year,
+                await get_active_filter(self.db, TbLedger.__table__, project_id, year),
                 TbLedger.account_code == account_code,
                 TbLedger.company_code == company_code,
-                TbLedger.is_deleted == False,  # noqa: E712
                 (
                     (TbLedger.debit_amount >= threshold)
                     | (TbLedger.credit_amount >= threshold)
@@ -632,11 +631,9 @@ class WorkpaperFillService:
         result = await self.db.execute(
             select(TbAuxBalance)
             .where(
-                TbAuxBalance.project_id == project_id,
-                TbAuxBalance.year == year,
+                await get_active_filter(self.db, TbAuxBalance.__table__, project_id, year),
                 TbAuxBalance.account_code == account_code,
                 TbAuxBalance.company_code == company_code,
-                TbAuxBalance.is_deleted == False,  # noqa: E712
             )
             .order_by(desc(func.abs(func.coalesce(TbAuxBalance.closing_balance, 0))))
             .limit(limit)
@@ -1028,10 +1025,8 @@ class WorkpaperFillService:
         for row in tb_rows:
             aux_result = await self.db.execute(
                 select(TbAuxBalance).where(
-                    TbAuxBalance.project_id == project_id,
-                    TbAuxBalance.year == year,
+                    await get_active_filter(self.db, TbAuxBalance.__table__, project_id, year),
                     TbAuxBalance.account_code == row.standard_account_code,
-                    TbAuxBalance.is_deleted == False,  # noqa: E712,
                     func.abs(func.coalesce(TbAuxBalance.closing_balance, 0)) > 0,
                 ).order_by(desc(func.abs(TbAuxBalance.closing_balance))).limit(10)
             )

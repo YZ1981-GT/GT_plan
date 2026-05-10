@@ -611,6 +611,16 @@ class DisclosureEngine:
                     status=NoteStatus.draft,
                     sort_order=sort_order,
                 )
+                # F50 / Sprint 8.19: 附注创建时绑定当前 active dataset
+                try:
+                    from app.services.dataset_query import bind_to_active_dataset
+                    await bind_to_active_dataset(self.db, note, project_id, year)
+                except Exception as _bind_err:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "disclosure_note dataset binding failed: section=%s err=%s",
+                        note_section, _bind_err,
+                    )
                 self.db.add(note)
 
             results.append({

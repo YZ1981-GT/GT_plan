@@ -3099,7 +3099,7 @@ async def rebuild_aux_balance_summary(
     """
     import sqlalchemy as sa
 
-    dataset_filter_sql = "AND dataset_id = :did" if dataset_id else ""
+    dataset_filter_sql = "AND ab.dataset_id = :did" if dataset_id else ""
     params: dict = {"pid": str(project_id), "yr": year}
     if dataset_id:
         params["did"] = str(dataset_id)
@@ -3115,18 +3115,22 @@ async def rebuild_aux_balance_summary(
             (project_id, year, dim_type, account_code, account_name, aux_code, aux_name,
              record_count, opening_balance, debit_amount, credit_amount, closing_balance)
         SELECT
-            project_id, year, aux_type, account_code,
-            MAX(account_name),
-            aux_code, MAX(aux_name),
+            ab.project_id, ab.year, ab.aux_type, ab.account_code,
+            MAX(ab.account_name),
+            ab.aux_code, MAX(ab.aux_name),
             COUNT(*),
-            SUM(COALESCE(opening_balance, 0)),
-            SUM(COALESCE(debit_amount, 0)),
-            SUM(COALESCE(credit_amount, 0)),
-            SUM(COALESCE(closing_balance, 0))
-        FROM tb_aux_balance
-        WHERE project_id = :pid AND year = :yr AND is_deleted = false
+            SUM(COALESCE(ab.opening_balance, 0)),
+            SUM(COALESCE(ab.debit_amount, 0)),
+            SUM(COALESCE(ab.credit_amount, 0)),
+            SUM(COALESCE(ab.closing_balance, 0))
+        FROM tb_aux_balance ab
+        WHERE ab.project_id = :pid AND ab.year = :yr
+          AND EXISTS (
+            SELECT 1 FROM ledger_datasets d
+            WHERE d.id = ab.dataset_id AND d.status = 'active'
+          )
           {dataset_filter_sql}
-        GROUP BY project_id, year, aux_type, account_code, aux_code
+        GROUP BY ab.project_id, ab.year, ab.aux_type, ab.account_code, ab.aux_code
     """), params)  # noqa: S608
 
     # 3. 查汇总行数

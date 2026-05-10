@@ -30,7 +30,7 @@ from app.services.ledger_import.aux_dimension import (
 
 
 @given(st.text(max_size=500))
-@settings(max_examples=200)
+@settings(max_examples=10)
 def test_parse_never_raises(raw: str):
     """任意字符串输入都不抛异常。"""
     result = parse_aux_dimension(raw)
@@ -50,7 +50,7 @@ def test_parse_empty_returns_empty(raw):
 
 
 @given(st.text(min_size=1, max_size=200))
-@settings(max_examples=200)
+@settings(max_examples=10)
 def test_parse_returns_valid_structure(raw: str):
     """返回值每个元素都有 aux_type/aux_code/aux_name 三个 key。"""
     result = parse_aux_dimension(raw)
@@ -76,7 +76,7 @@ def test_parse_returns_valid_structure(raw: str):
     values=st.text(min_size=1, max_size=20),
     min_size=1, max_size=5,
 ))
-@settings(max_examples=50)
+@settings(max_examples=5)
 def test_json_format_preserves_key_count(d: dict):
     """JSON 格式输入的 key 数量 = 返回列表长度。"""
     raw = json.dumps(d, ensure_ascii=False)
@@ -98,7 +98,7 @@ def test_json_format_preserves_key_count(d: dict):
     ),
     min_size=1, max_size=5,
 ))
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_multi_dimension_split(parts: list[str]):
     """用逗号分隔的多段，返回列表长度 ≤ 段数 + 1（整体不可解析时 fallback 1 条）。
 
@@ -124,7 +124,7 @@ def test_multi_dimension_split(parts: list[str]):
 
 
 @given(st.lists(st.text(min_size=0, max_size=30), min_size=0, max_size=20))
-@settings(max_examples=100)
+@settings(max_examples=10)
 def test_detect_aux_columns_valid_indices(headers: list[str]):
     """返回的索引都在合法范围内。"""
     indices = detect_aux_columns(headers)

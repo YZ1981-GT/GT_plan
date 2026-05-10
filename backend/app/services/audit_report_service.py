@@ -425,6 +425,9 @@ class AuditReportService:
     ) -> AuditReport | None:
         """更新审计报告状态，finalize 时执行 KAM 校验。
 
+        F50 / Sprint 8.18: 转 final 时锁定 bound_dataset_id（合规关键）。
+        一旦 AuditReport 绑定了 dataset，该 dataset 就受 rollback 保护。
+
         Validates: Requirements 6.7
         """
         result = await self.db.execute(
@@ -442,6 +445,20 @@ class AuditReportService:
             validation_error = self._validate_finalize(report)
             if validation_error:
                 raise ValueError(validation_error)
+
+            # F50 / Sprint 8.18: final 锁定快照绑定
+            # 已经绑定过（eqcr 阶段或重复调用）则不再覆盖，保证首次锁定不可变
+            if report.bound_dataset_id is None:
+                try:
+                    from app.services.dataset_query import bind_to_active_dataset
+                    await bind_to_active_dataset(
+                        self.db, report, report.project_id, report.year
+                    )
+                except Exception as _bind_err:
+                    logger.warning(
+                        "audit_report dataset binding failed: report=%s err=%s",
+                        report_id, _bind_err,
+                    )
 
         report.status = status
         await self.db.flush()

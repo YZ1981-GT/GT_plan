@@ -84,6 +84,49 @@ jobs:
         run: python -m ruff check backend/
       - name: Check signature_level usage
         run: python scripts/check_signature_level_usage.py
+      - name: B' view refactor guard (Tb*.is_deleted ORM usage)
+        run: |
+          # B' 视图重构后，业务查询必须走 get_active_filter，不能直接写
+          # TbX.is_deleted == False (禁止 ORM 层硬编码 is_deleted 过滤)
+          # 允许清单：get_active_filter 内部实现、年度 fallback 兜底分支
+          # 基线：2026-05-10 Sprint 1 完成，剩余 6 处是 year=None Template B 兜底
+          BASELINE=6
+          COUNT=$(grep -rEn "Tb(Balance|Ledger|AuxBalance|AuxLedger)\.is_deleted\s*==" backend/app/ \
+            --include="*.py" | wc -l)
+          echo "Direct TbX.is_deleted== ORM usage: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::TbX.is_deleted ORM usage increased from $BASELINE to $COUNT."
+            echo "::error::Use app.services.dataset_query.get_active_filter instead."
+            grep -rEn "Tb(Balance|Ledger|AuxBalance|AuxLedger)\.is_deleted\s*==" backend/app/ --include="*.py"
+            exit 1
+          fi
+      - name: F40 upload_security guard (detect entry must call validate_upload_safety)
+        run: |
+          # F40：所有对外接收上传文件的入口必须调用 validate_upload_safety
+          # 防止有人绕过上传校验直接 create artifact / write
+          # 当前必须命中的入口：
+          #   - backend/app/routers/ledger_import_v2.py (POST /detect)
+          #   - backend/app/services/ledger_import_application_service.py (resolve_file_sources)
+          set -e
+          for FILE in backend/app/routers/ledger_import_v2.py backend/app/services/ledger_import_application_service.py; do
+            HITS=$(grep -c "validate_upload_safety" "$FILE" || true)
+            if [ "$HITS" -lt 1 ]; then
+              echo "::error file=$FILE::validate_upload_safety missing (F40 upload security guard)"
+              exit 1
+            fi
+            echo "  $FILE: validate_upload_safety hits = $HITS"
+          done
+      - name: F48 validation rules catalog consistency
+        run: |
+          # F48：VALIDATION_RULES_CATALOG 必须与 errors.py 的 ErrorCode 双向一致
+          # 专用测试在 backend/tests/ledger_import/test_validation_rules_catalog.py
+          # 已在 ledger-import-smoke job 中跑；这里再独立跑一次作为卡点
+          python -m pytest backend/tests/ledger_import/test_validation_rules_catalog.py -v --tb=short
+      - name: F48 error hints coverage (all ErrorCode must have hint)
+        run: |
+          # F32 / F48 延续：test_all_error_codes_have_hints.py 确保 ErrorCode enum
+          # 每个值都在 error_hints.py 有 ErrorHint 注册
+          python -m pytest backend/tests/ledger_import/test_error_hints.py -v --tb=short
 
   seed-validate:
     runs-on: ubuntu-latest

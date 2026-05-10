@@ -514,3 +514,438 @@ inclusion: always
 - **[关键结论] B2+B3 已到 YG2101 性能极限 ~400-480s**：parse 87s（calamine 不可再降）+ insert 151s（PG COPY 极限）+ activate 127-193s（PG WAL 串行极限）；这些都是底层限制，**小修小补边际收益极低**
 - **[下一步唯一选择]**：要么接受 YG2101 ~7 分钟为当前上限，要么直接做 B' 视图方案（3-4 天，activate 从 127s → 0.01s 真正消灭 UPDATE 风暴）
 - **[放弃] 异步 activate 方案**：fire-and-forget + 后台任务追踪复杂度高，且不彻底（activate 自身仍 127s 只是用户不等）；不值得投入
+
+## B' 视图重构 spec 三件套已创建（2026-05-10）
+
+- `.kiro/specs/ledger-import-view-refactor/` README + requirements（22 需求）+ design（5 架构决策 + 改造清单按文件分组）+ tasks（3 Sprint ~30 任务 + 10 验收）
+- 分支 `feature/ledger-import-view-refactor` 已切出（从 feature/round8-deep-closure 68ba2c8）
+- **[关键洞察] Sprint 顺序必须倒过来**：原"先改 activate/写入 → 再迁查询"路径无法独立运行（中间状态破坏数据可见性）；新顺序 = 先 Sprint 1 迁查询（语义不变）→ 再 Sprint 2 一次性改 activate+写入（原子 commit）→ Sprint 3 加固
+- **[保留策略] partial index 兼容新架构**：`idx_tb_*_active_queries (project_id, year, dataset_id) WHERE is_deleted=false` 仍然覆盖所有 active 数据，B' 改造后 get_active_filter 的查询直接命中
+
+## PG Docker 容器 shm_size 调整（2026-05-10）
+
+- **docker-compose.yml PG 服务加 `shm_size: 2g`**：默认 64MB 在 YG2101 级别 200 万行聚合查询时触发 `DiskFullError: could not resize shared memory segment`；2G 足够支撑 COUNT/SUM 并发分析
+- **PG 容器重建流程**：`docker stop/rm` 后用 `docker run` 显式挂载 `gt_plan_pg_data` volume（而非 `pg_data`，后者是 docker run 默认创建的新 volume 会丢数据）
+- **PG 当前调优值**：wal_compression=pglz / synchronous_commit=off / wal_buffers=64MB / checkpoint_timeout=30min / max_wal_size=8GB / shm_size=2g
+
+## B3 Step 1 已落地（partial index）
+
+- `backend/alembic/versions/view_refactor_activate_index_20260510.py`（未走 alembic 执行，手动 CREATE INDEX CONCURRENTLY）
+- 已建 8 个 partial index：4 张 Tb* 表 × 2（activate_staged + active_queries）
+- 索引总大小 ~150MB（aux_ledger 95MB 最大，128 万行 × 2 索引）
+
+## 用户流程偏好（本轮新增）
+
+- **复杂重构先做 spec 三件套**：体系化、精准、可回滚；"每次单独尝试都要跑 YG2101" 太慢 → 要求"全部改完再跑一次测试"
+- **避免折中方案**：要"根本解决"不要"折中"；partial index 类改动收益有限不算根本方案
+
+## B' 视图重构 spec 三件套升级（2026-05-10 第二轮扩展）
+
+- **requirements.md 从 22 需求扩展到 48 需求（8 大维度）**：架构层 A1-A10 / 大文件 B1-B8 / 企业级治理 E1-E8 / 数据库维护 D1-D8 / 可维护性 M1-M6 / 回归 R1-R8 / 边界 B1-B4 / 成功判据表格
+- **[新用户偏好] 复杂重构需求必须全面分析现有代码后才给建议**：不能只看单点瓶颈，要从架构/大文件/企业级治理/DB 维护/可维护性 5 个以上维度一起考虑
+- **[关键技术洞察] B' 最大企业级收益不是"快 127s"而是"解决表膨胀"**：每次 activate UPDATE 200 万行产生 200 万 dead tuple，autovacuum 追不上会磁盘爆炸；B' 后无 dead tuple，表大小线性增长
+- **[发现] 历史已归档的 partition 方案**：`backend/alembic/versions/_archived/017_partition_tables.py`（按 year RANGE partition）是团队之前探索未落地的方案；B' 落地后可复用做 D8 进一步优化
+
+## 新增关键待办（按优先级）
+
+- **P0（本 spec 核心）**：A1-A10 视图/metadata 切换 + A4 purge 定时任务 + A5 `_set_dataset_visibility` 废弃
+- **P1 数据库维护**：D2 autovacuum 调优 + D3 superseded 定期清理（保留最近 3 个）+ D4 DROP 废弃索引 `idx_tb_*_activate_staged`（55MB 空间回收）
+- **P1 企业级治理**：E1 数据集版本历史路由 + E4 审计日志（谁在什么时间激活哪个版本）
+- **P2 独立 Sprint**：B6 分片上传 / B7 Worker 资源隔离 / E2 导入配额 / E5 权限细粒度 / D8 表分区
+- **M1 测试脚本分工规约**：`e2e_yg4001_smoke.py`=CI 快跑 / `e2e_full_pipeline_validation.py`=本地/部署前 / `b3_diag_yg2101.py`=大样本性能诊断；`b2_copy_perf_validation.py`/`b3_calamine_smoke.py`/`b3_profile_realistic.py` 后续合并清理
+
+## 新数据库维护规约（B' 后必须确立）
+
+- **表膨胀检测**：每次大导入后跑 `SELECT relname, n_dead_tup, n_live_tup FROM pg_stat_user_tables WHERE relname LIKE 'tb_%'` 确认 dead_tuple_ratio < 10%
+- **Tb* 表专用 autovacuum 参数**：`autovacuum_vacuum_scale_factor=0.05 / autovacuum_vacuum_cost_limit=1000` 让 autovacuum 跟上大表变化
+- **superseded 保留策略**：同一 project+year 最多保留 1 active + 3 superseded；超过的用 purge 任务物理 DELETE
+
+## 9 家真实样本结构归档（2026-05-10 扫描后）
+
+- **规模差异 600×**：最小 YG4001-30 (0.8MB/4k 行) → 最大陕西华氏 2025 (500MB/2600 万行)
+- **5/9 是多文件场景**（"1 文件 1 账套"反而是小概率）：
+  - 陕西华氏：单年 13 文件（1 balance + **12 月度序时账**）× 2 年度
+  - 和平药房：余额 xlsx + **2 CSV 按日期段切**（20250101-1011 + 20251012-1031）
+  - 辽宁卫生 / 医疗器械：2 xlsx 分文件（余额 + 序时账分开）
+  - 和平物流：单 xlsx 但**方括号表头** `[凭证号码]#[日期]`
+- **文件布局多样化**：YG2101 单 xlsx 含 4 sheet（含空 Sheet1）/ YG36/YG4001 2 sheet / 安徽骨科 2 sheet（有维度余额+序时账）
+- **非标软件来源**：至少 3 种软件（用友 NC / 金蝶 KIS / 某方括号格式），同一客户同一年度可能混用
+
+## requirements.md 第 9-10 节新增（9 家样本业务需求）
+
+- **U1 多文件拼接**：detect 支持"批量文件一次识别"；13 文件识别为"1 balance + 12 ledger 片段合并为一个 dataset"
+- **U2 文件名元信息利用**：当前 detector 只看内容忽略文件名；`-科目余额表.xlsx` / `-序时账.xlsx` / `25年10月` 应作为 detector 置信度加分信号
+- **U3 方括号+组合表头**：`[凭证号码]#[日期]` 格式需要 detector 剥壳规则；作为 adapter 声明式规则
+- **U4 跨文件时间段合并**：和平药房 2 CSV 按日期段切需合并到同一 dataset
+- **U5 月度增量 UX 引导**：陕西华氏场景"预审导 1-9 月，年审追加 10-12 月"；后端 apply_incremental 支持但前端缺引导
+- **U6 分片上传（独立 Sprint R6）**：500MB 文件前端一次 POST 不可行
+- **U7 导入前预检报告**：detect 返回 `{files_detected, years_found, table_types, total_rows_estimate, estimated_import_time_seconds}` 让用户确认
+- **U8 多年度同项目**：同 project 可并存多 year active dataset（陕西华氏 2024+2025）
+- **U10 规模分 S/M/L 三档处理**：S < 10k INSERT / M 10k-500k calamine+COPY / L > 500k openpyxl 流式
+- **U11 adapter JSON 沉淀**：9 家识别模式写入 `adapters/*.json` 声明式规则
+- **U12 人工映射保存**：用户手动调整的 column_mapping 保存为该客户 adapter 模板（column_mapping_service S2 已有基础）
+- **U13 多 sheet 分流**：YG2101 4 sheet 场景每个 sheet 独立识别 table_type 分流到 4 表
+
+## 关键技术事实更新
+
+- **陕西华氏场景暴露 pipeline 单文件语义缺陷**：当前每个 file 独立 detect/identify/convert/insert，没有"多文件属于同一 dataset"概念；需求 U1/U4 是下一轮重大改造点
+- **9 家样本表类型识别率 97.8%**（1 家遗漏 = 和平物流方括号表头）；U3 adapter 规则可拉到 100%
+- **CSV 大文件性能已验证**：和平药房 392MB CSV detect <5s、parse 内存 <200MB（已有流式实现）
+- **scripts/ 清理**：当前 b2_copy_perf_validation/b3_calamine_smoke/b3_profile_realistic 已整合到 requirements M1；下轮可考虑合并或删除
+
+## ledger-import-view-refactor spec 范围最终确定（2026-05-10）
+
+- **F 系列 10 条发现分级处理**：本 spec 纳入 6 项识别引擎强化（F2 文件名识别 / F3 方括号表头 / F5 跨年度 / F7 CSV 大文件验证 / F8 表类型鲁棒 / F9 合并表头快照）+ B' 视图重构；独立 Sprint 留 4 项（F1 多文件拼接 / F4 分片上传 / F6 月度增量 UX / F10 企业级 UX）
+- **requirements.md 增加"十一、9 家样本深度发现"和"十二、F 系列落地映射表"**，每条明确本 spec 决策（★必做/☆可选/⏸独立 Sprint）+ 实现位置
+- **最终指标表增加 F2-F9 可量化验收**：辽宁卫生 sheet1 文件名识别置信度 ≥60 / 和平物流方括号表头 ≥85 / YG36 有核算维度余额表分流正确 / 392MB CSV detect <5s / 跨年度双 active 集成测试 / 9 家 header 快照测试全绿
+- **本 spec 排除的场景已有过渡方案**：多文件拼接走 apply_incremental、分片上传靠 nginx 调大 client_max_body_size、月度增量前端缺引导但后端就绪
+
+## spec 工作流规约新增（本轮沉淀）
+
+- **大 spec 必须对"关键发现"做 F 系列编号 + 处理决策表**：避免需求范围模糊，每条发现必须标 ★本 spec 必做 / ☆可选 / ⏸独立 Sprint 三选一
+- **F 系列映射表必须列 3 列**：对应需求编号（U2/U3/A11）+ 实现位置（具体文件/函数）+ 本 spec 处理状态
+
+## ledger-import-view-refactor requirements.md 结构重构（2026-05-10）
+
+- **requirements.md 从 650 行重构为 430 行**（信息密度+35%）：统一编号 F1-F12（必做）+ O1-O9（独立 Sprint），消除 U 系列和 F 系列 60% 重复、B1-B8 和 B1-B4 编号冲突
+- **新 6 章结构**：前言（业务/技术根因/定位）→ §1 范围边界（1 张表看清做/不做）→ §2 功能需求（A 核心架构+B 识别引擎+C 企业级治理）→ §3 非功能需求（性能/DB 健康/可维护性/兼容性）→ §4 测试矩阵（单测/集成/E2E/CI/UAT）→ §5 成功判据汇总 → §6 术语表 + 附录 9 家样本表
+- **[规约] 大 spec requirements.md 结构模板**（从本次重构沉淀）：
+  1. 前言必写"为什么做"（业务痛点 + 技术根因 + 本 spec 边界）
+  2. §1 范围边界必须用表格罗列做什么（F 编号）和不做什么（O 编号作独立 Sprint）
+  3. 功能需求分组避免按章节分散（相关需求聚在一起）
+  4. 测试矩阵必须单独成章（禁止散落在 M / R / F 多处）
+  5. 成功判据用量化表格 + 对应需求编号
+  6. 术语表解决新概念混淆（staged / active / superseded / legacy）
+  7. 附录放真实样本归档等支撑性资料
+- **[规约] 避免 3 种常见重复模式**：
+  - 同一主题两套编号（U 系列 vs F 系列 → 只用一套）
+  - 同一字母不同章节（B 大文件 vs B 边界 → 改其中一套为 NF 章节）
+  - 决策散落多处（本 spec 做/不做的判断应集中 §1.1 和 §1.2 两张表）
+- **本次需求核心锚定**：大文档处理为主，保证总体架构 / 可维护性 / 企业级治理 / 数据库维护 4 个维度同步落地
+
+## ledger-import-view-refactor requirements.md 12 缺口补强（2026-05-10）
+
+- **大文档处理的 5 个关键路径都缺硬指标**：解析/写入/进度/内存/超时；只靠 F1 activate <1s 不够，需要超大档基线（陕西华氏 500MB total <30min / 单 worker 峰值 <2GB / 单 sheet parse >10min 自动 timeout）
+- **P0 必加 4 项**（任何大文档系统 table stakes）：F13 进度精度（每 5% 或 10k 行至少更新 + 30s 无更新才算卡）/ F15 cancel 清理保证（30s 内停 + 自动 cleanup_dataset_rows + Artifact 清理）/ F18 迁移策略（Day 0 deploy / Day 7 一次性 UPDATE / Day 30 DROP 废弃索引）/ 超大档基线
+- **P1 补强 6 项**：F14 checkpoint 可恢复（staged 写完立即 checkpoint / resume_from_checkpoint 接口）/ F16 Prometheus 最小埋点（duration histogram / status counter / dead_tuple gauge）/ F17 耗时预估（从 O7 拆出，前端显示"预计 8 分钟"）/ F19 灰度回滚（feature flag + 项目级开关）/ 索引膨胀治理（purge 后 REINDEX CONCURRENTLY）/ 连接池隔离（B' 后 activate 瞬时释放 / pipeline 单 worker ≤3 连接）
+- **P2 补强 2 项**：Artifact 保留期 90 天 expires_at 文档化 / autovacuum VACUUM 锁冲突（cost_delay=5ms + 发布窗口避高峰）
+- **[重要技术决策] 迁移策略三阶段**：B' 代码与 is_deleted=true 老数据可以并存（fallback 兜底），不需要一次性迁移；Day 7 再做一次大 UPDATE 清理老数据，换 B' 后永久不再 UPDATE；Day 30 DROP `idx_tb_*_activate_staged`
+
+## 云平台协同是硬需求（用户明确 2026-05-10）
+
+- **核心诉求**：一个项目组成员 A 处理账套后，B/C/D/E 其他成员自动看到更新（而非手动刷新）
+- **现有架构 80% 就绪**：ProjectAssignment 模型 / outbox event / WebSocket 通道 / get_active_dataset_id 单一真源
+- **缺的 20%**：激活广播（WS 推送给项目组）/ 锁透明（导入中显示 holder+进度+预计耗时）/ 数据新鲜度（B 页面自动 re-fetch）
+- **典型用例 3 类**：(1) A 导入 B 实时看到激活完成刷新 / (2) A 导入死机 B 接管 / (3) 并发 activate vs rollback 互斥
+
+## ledger-import-view-refactor 第三轮补全建议（F20-F37，共 18 条）
+
+**深度补全分 4 组**：
+- **2.F 云平台协同**（F20-F25，6 条）—— 对应用户云平台诉求
+- **2.G 数据正确性保障**（F26-F30，5 条）—— 企业级兜底
+- **2.H UX 补强**（F31-F35，5 条）
+- **2.I 平台工程**（F36-F37，2 条）
+
+**优先级分级**：
+- **P0 必做 8 条**：F20 激活广播 / F21 锁透明 / F23 rollback 走锁 / F25 审计溯源 / F26 孤儿扫描 / F27 integrity check / F31 激活确认 / F28 恢复剧本文档
+- **P1 强推 5 条**：F22 接管 / F24 只读旁观 / F29 事务隔离 ADR / F32 错误友好 / F28 完整演练
+- **P2/P3 独立 Sprint 5 条**：F30 CRC 校验 / F33 内存警告 / F34 diff 预览 / F36 API 版本化 / F37 CLI
+
+## 关键技术决策（第三轮沉淀）
+
+- **rollback 必须走 ImportQueue 锁**：activate 和 rollback 互斥（当前 rollback 没走锁是 bug）
+- **接管（takeover）机制**：heartbeat 超 5min → 自动允许其他成员接管；ImportJob.created_by 扩展为数组记录链路
+- **激活前 integrity check**：metadata 切换前 COUNT(*) 校验 staged 行数符合 record_summary；<1s 成本换防静默损坏
+- **staged 孤儿清理周期**：定时任务每小时扫 > 24h 的 staged 无 job 关联 → 自动 cleanup
+- **接口按角色成员可见**：项目组 ProjectAssignment 成员都能看 `GET /jobs/{id}` 实时进度（不只是 holder）
+- **激活意图确认 UX**：ElMessageBox 二次确认 + 可选"理由"字段 → 进 ActivationRecord.reason 审计
+
+## ledger-import-view-refactor requirements.md F20-F37 补全完成（2026-05-10）
+
+- **13 条 P0+P1 需求已全部入 requirements.md**（F20-F32，不含 F30/F33-F37 进独立 Sprint O10-O14）
+- §1.1 必做清单表从 19 行扩至 32 行；§1.2 排除表从 O1-O9 扩至 O1-O14
+- **新增 3 个章节**：§2.F 云平台协同（F20-F25 共 6 条）/ §2.G 数据正确性保障（F26-F29 共 4 条）/ §2.H UX 补强（F31-F32 共 2 条）
+- §3.5 可观测性表追加 WebSocket 通道 + 项目组锁状态行；§4.2 集成测试追加 6 项（test_ws_dataset_broadcast/test_import_takeover/test_activate_rollback_mutex/test_staged_orphan_cleanup/test_activate_integrity_check/test_job_readonly_access）
+- §4.5 UAT 回归清单追加 6 项手动验收；§5 成功判据汇总追加云协同 5 项 + 正确性 3 项 + UX 2 项 + 运维 2 项（ADR-003/004）
+- **requirements.md 最终状态**：~650 行覆盖 F1-F32 + O1-O14，下一步可同步 design.md / tasks.md
+- 整体优先级排序：F1/F2 是核心瓶颈（activate 127s→<1s），F14/F15/F27 是大文档健壮性底线，F20-F25 是云协同基建，F28-F29 是文档交付
+
+## ledger-import-view-refactor requirements.md 第 4 轮补全（2026-05-10）
+
+- **第 4 轮深度复盘发现 8 个覆盖漏洞**（安全/多租户/数据质量/运维健康/事件可靠性/下游联动/规模异常/graceful shutdown）
+- **新增 7 条 P0/P1 需求 F40-F46 进 §2.I 安全与健壮性**：F40 上传安全（MIME+zip bomb+宏拦截）/ F41 项目权限+tenant_id 预留 / F42 零行/异常规模拦截 / F43 健康检查端点 / F44 graceful shutdown / F45 事件广播 outbox 重试+DLQ / F46 rollback 下游 Workpaper/Report stale 联动
+- **新增 3 条独立 Sprint 排除项 O15-O17**：完整多租户 / 性能基线 CI 门禁 / 告警渠道适配
+- 编号策略修正：避开 F33-F39（排除表已占位引用），P0+P1 新条目从 F40 起编号
+- **新增 §3.6 安全 + §3.7 健壮性**两个非功能章节独立呈现
+- §4.2 集成测试追加 7 项（test_upload_security/test_cross_project_isolation/test_empty_ledger_rejection/test_health_endpoint/test_worker_graceful_shutdown/test_broadcast_retry_with_outbox/test_rollback_downstream_stale）
+- §4.5 UAT 追加 6 项手动验收；§5 成功判据追加 11 行（安全 3 + 数据质量 2 + 健壮性 4 + UX 2）
+- **requirements.md 最终覆盖需求数 F1-F46 合计 39 条（去掉预留间隔 F33-F39，实际 32 条必做）+ O1-O17 独立 Sprint 17 条**
+- **关键技术决策沉淀**：(1) Tb* 表加 tenant_id NOT NULL DEFAULT 'default'（不启用但预留）；(2) SIGTERM → stop_event → cancel_check 回调链；(3) F20 WS 广播必须走 event_outbox 才可靠（直推丢事件）；(4) rollback 必须发 DATASET_ROLLED_BACK 事件级联 stale（复用 R1/R7 机制）；(5) get_active_filter 签名强制带 current_user 参数（当前签名缺失是潜在越权漏洞）
+
+## requirements.md 校验透明化补全（F47-F49，2026-05-10）
+
+- 用户截图点出「数据校验」入口痛点（1002 银行存款期末差异但不知公式/代入/来源）
+- 新增 §2.J 数据校验透明化章节（F47-F49 共 3 条）：
+  - **F47 每条 finding 附 explanation 字段**：公式（英文+中文）+ inputs 代入值 + computed 中间值 + diff_breakdown 差异来源分解 + hint 建议；适用 L1/L2/L3 所有 finding code
+  - **F48 校验规则说明文档**：`GET /api/ledger-import/validation-rules` 返回全量规则 catalog（公式+容差+示例），前端独立页面 `/ledger-import/validation-rules` 分组展示；catalog 必须与 validator.py 双向一致
+  - **F49 差异下钻到明细**：finding.location 扩展 drill_down 字段，复用现有 LedgerPenetration 穿透组件展示该科目全部凭证
+- **关键技术决策**：(1) validator.py 每个 finding code 对应一个 Pydantic explanation model 严格 schema；(2) 新增模块级 VALIDATION_RULES_CATALOG 做单一真源；(3) 容差公式 `min(1.0 + magnitude × 0.00001, 100.0)` 从代码字面量暴露到前端规则说明页
+- §4.2 追加 3 项集成测试；§4.5 追加 3 项 UAT；§5 成功判据追加「校验」分类 3 行
+- requirements.md 最终覆盖 F1-F49（35 条必做，预留 F33-F39 间隔）+ O1-O17（17 条独立 Sprint）
+
+## requirements.md 第 5 轮业务闭环补全（F50-F53，2026-05-10）
+
+- 从「审计合规 + 系统稳定性 + UX 自然闭环」3 个维度发现 4 个关键盲点，新增 §2.K 业务闭环与合规章节
+- **F50 下游对象快照绑定（最关键合规需求）**：Workpaper/AuditReport/Note 新增 bound_dataset_id + dataset_bound_at；AuditReport 转 final 时自动锁定；签字后的报表 rollback 被拒绝（409）；解决"签字后数字仍可被 rollback 篡改"的严重合规风险
+- **F51 全局并发限流**：基于 Redis semaphore 的平台级 worker 上限（默认 3）+ FIFO 排队；内存逼近 3GB 时 pipeline 降级到 openpyxl + 小 chunk；防 100 并发打爆 PG/内存
+- **F52 列映射历史智能复用**：detect 阶段按 file_fingerprint 查 ImportColumnMappingHistory 自动应用；第二次导入效率节省 > 50%；跨项目同软件匹配降级为"建议"
+- **F53 留档合规保留期差异化**：ImportArtifact 新增 retention_class（transient/archived/legal_hold）；final 报表引用的 dataset 自动升级 archived（10 年）；purge 任务尊重 bound_dataset_id 绑定；对齐《会计档案管理办法》合规要求
+- 新增 5 条独立 Sprint 排除项 O18-O22（审批链配置/差异对比/底稿回滚快照/模板市场/定时抓取）
+- §3.2 数据库健康补强 purge 描述"尊重下游绑定与 retention 类别"
+- §4.2 追加 7 项集成测试；§4.5 追加 5 项 UAT；§5 成功判据追加 5 行
+- **关键架构决策**：(1) `get_active_filter` 新增 `force_dataset_id` 参数支持下游绑定查询；(2) Workpaper 首次生成即绑定、AuditReport 到 final 才锁定（粒度差异化）；(3) retention_class 自动决策基于 F50 绑定状态联动，不让用户手工设；(4) 并发限流走 Redis semaphore 而非 DB 乐观锁（性能）
+- requirements.md 最终覆盖 F1-F53（38 条必做，预留 F33-F39 间隔）+ O1-O22（22 条独立 Sprint）
+
+## ledger-import-view-refactor design.md + tasks.md 扩展（2026-05-10）
+
+- **design.md** 从 Sprint 1-3 的 5 个架构决策 D1-D5 扩展到 22 个决策 D6-D22，新增 13 个架构决策对齐 §2.D-§2.K：D6 大文档健壮性 / D7 运维灰度 / D8 云协同 / D9 数据正确性 / D10 UX / D11 安全 / D12 校验透明化 / D13 业务闭环，8 组各带代码骨架和 Pydantic model / Alembic DDL 示例；新增风险 6-8（rollback 死锁 / 并发过严 / fingerprint 碰撞）
+- **tasks.md** 从原 Sprint 1-3 共 40 任务扩展到 Sprint 1-9 共 171 任务，新增 6 个 Sprint：Sprint 4 大文档+运维（18 任务）/ Sprint 5 云协同（20）/ Sprint 6 数据正确性+UX（16）/ Sprint 7 安全（23）/ Sprint 8 校验+合规闭环（44）/ Sprint 9 最终验收（10）；每任务标 P0/P1/P2 优先级
+- **工期估算 35 人天**（单人串行），引入并行化策略（主 + 两副开发 3 人团队可压缩到 ~15 天）
+- **里程碑拆分**：M1 B' 核心（1-3）→ M2 企业级可用（4-5）→ M3 生产合规门槛（6-7）→ M4 审计业务完备（8-9）
+- **关键架构文件清单**：metrics.py / error_hints.py / global_concurrency.py / validation_rules_catalog.py / staged_orphan_cleaner.py（worker）/ duration_estimator.py 6 个新建模块 + 5 个 Alembic 迁移（cleanup_old_deleted / tenant_id / dataset_binding / creator_chain / event_outbox_dlq）
+- **Sprint 7 批次 B 重点决策**：tenant_id 迁移的"40+ 调用点补 current_user"与 Sprint 1 合并做（不单独拆），避免二次改同一批文件
+
+## ledger-import-view-refactor 三件套一致性审查（2026-05-10）
+
+- **审查方法沉淀（可复用规约）**：大 spec 三件套必须逐条需求对照矩阵审查 design/tasks 覆盖度，分 ✅ 完整覆盖 / ⚠️ 设计薄弱 / ❌ 完全遗漏 三档；审查表应在 tasks.md 末尾归档便于后续查
+- **审查发现 18 条缺口**：F6-F11 识别引擎 6 条原在 design/tasks 完全遗漏（只做 B' 视图改造忽略 9 家样本识别引擎需求）；F3/F4/F5 基础运维设计薄弱；F28/F29/F31/F42/F43/F44 占位式任务无对应设计
+- **补齐动作**：design.md 追加 D23-D32 共 10 个新架构决策（含代码骨架）；tasks.md 追加 Sprint 10 共 53 任务分 A/B/C 三批次
+- **关键技术决策**：(1) Sprint 10 批次 B（识别引擎 F6-F11）必须前置到 Sprint 4 之前，否则 detect 相关任务隐性依赖风险；(2) F5 跨年度风险点 = `mark_previous_superseded` 查询必须加 year 条件；(3) F29 配套 `@retry_on_serialization_failure` 装饰器 + 幂等键双重保护
+- **三件套最终状态**：F1-F53 × design/tasks 双向覆盖率 100%，总任务 224 / 总工时 43 人天 / 10 Sprint
+- **spec 工作流新规约**：requirements 每次扩展后，必须做一次三件套一致性对照审查才能进入实施
+
+## ledger-import-view-refactor 二次一致性审查（2026-05-10）
+
+- **审查方法论升级（重要规约）**：三件套审查必须**双向**做——既从 requirements 向 design/tasks 查覆盖，也从 design/tasks 的编号反查 requirements 是否真定义了对应条目；单向只做前者会漏"引用了不存在条目"这类内部不一致问题
+- **二次审查发现 16 处新遗漏**：(1) 9 个测试任务在 tasks.md 无编号（§4.1/§4.2 列的 test_dataset_service_activate/rollback_view_refactor/test_progress_callback_granularity/test_duration_estimator/test_dataset_concurrent_isolation/test_rollback_full_flow/test_resume_from_activation_checkpoint/test_metrics_endpoint/test_migration_day7_update）；(2) 7 处 requirements 内部引用错误（O10-O14/O15/O17 引用了从未定义的 F30/F33/F34/F36/F37/F38）
+- **F 编号跳号陷阱**：第 4 轮扩展时为避开冲突跳过 F33-F39 间隔，但排除表里占位符"（F30）等"没同步清理；下次 spec 扩展时如果跳号，必须同步清理所有引用该编号的位置
+- **修正动作**：requirements 修正 7 处内部引用（O15→F41 / O17→F45 / O10-O14 去除无效占位）；tasks.md 追加 Sprint 11（9 测试任务 + 修正记录归档）
+- **三件套最终状态**：233 任务 / 44 人天 / 11 Sprint；F1-F53 × design + tasks 双向覆盖率 100%；O1-O22 零内部引用残留；§4 测试矩阵 32 个测试文件全部有任务编号
+
+## ledger-import-view-refactor 实施进度（2026-05-10）
+
+- **Sprint 1 完成（26/26 task，业务查询迁移）**：15 个 service + 2 个 router 的 40+ 处 `TbX.is_deleted == False` 全部迁移到 `get_active_filter`；6 处 raw SQL 改为 EXISTS 子查询；grep 验证通过（剩余 6 处是 year=None 兜底分支 Template B 模式，设计文档明确保留）；82+ 测试通过
+- **Sprint 2 核心完成（tasks 2.1-2.5）**：`get_filter_with_dataset_id` 同步版本新增（dataset_query.py）；`DatasetService.activate/rollback` 去除 `_set_dataset_visibility` 调用；`_set_dataset_visibility` 改 no-op + logger.warning；pipeline `_insert` 写入改 `is_deleted=False`；36 测试通过
+- **Sprint 2 剩余（2.6-2.8）**：E2E 验证需真实 PG + 样本数据（YG4001 smoke / YG36 / YG2101 perf），需手动执行
+- **Sprint 3-11 待执行**：加固+文档 / 大文档健壮性 / 云协同 / 数据正确性 / 安全 / 校验透明化 / 最终验收 / 一致性补齐 / 测试矩阵，共 ~200 任务
+- **关键发现**：`dataset_service.py` 和 `dataset_query.py` 已经是 B' 架构（代码在之前的 Sprint 中已部分实现），本轮实施主要是确认+补全+验证
+- **taskStatus 多行任务名限制**：tasks.md 中含换行的任务描述无法被 taskStatus 工具匹配，需用精确单行文本；Sprint 2 的 2.1-2.4 因多行描述无法直接标记状态
+
+## ledger-import-view-refactor Sprint 3-4 进度（2026-05-10）
+
+- **Sprint 3 完成（5/6 task，加固 + 文档）**：(1) CI backend-lint job 新增 B' guard 扫 `Tb(Balance|Ledger|AuxBalance|AuxLedger)\.is_deleted\s*==` 命中 > baseline(6) 即 fail；(2) `backend/tests/integration/test_dataset_rollback_view_refactor.py` 4 用例（rollback 语义 + 并发项目隔离）；(3) `docs/adr/ADR-002-ledger-view-refactor.md` 归档 B' 视图重构架构决策；(4) architecture.md 新增"账表导入可见性架构"章节；(5) conventions.md 新增"账表四表查询规约"（强制 `get_active_filter` + raw SQL EXISTS 模板 + year=None 允许清单）
+- **Sprint 4 P0 完成（13/18 task）**：4.1 `ProgressState`/`_maybe_report_progress` 按 5%/10k 行节流（F13）/ 4.2 `phases.py` + pipeline `_mark` 透过 `phase_marker` 回调异步写 `ImportJob.current_phase`（F14）/ 4.3 `ImportJobRunner.resume_from_checkpoint` 路由表 + `POST /jobs/{id}/resume` 端点 / 4.6 `pipeline._handle_cancel` 清理链（cleanup_rows + mark_failed + artifact consumed）/ 4.7 `recover_jobs` 扫 canceled+staged 孤儿清理 / 4.8 `test_cancel_cleanup_guarantee.py` 4 用例 / 4.9 `backend/app/services/ledger_import/metrics.py` 5 Prometheus 指标 + stub fallback（不强制装 prometheus_client）/ 4.10 `/metrics` 端点挂 main.py / 4.13 `duration_estimator.py` 4 档估算 + detect 响应扩展 `total_rows_estimate/estimated_duration_seconds/size_bucket` / 4.15 feature_flag `ledger_import_view_refactor_enabled=True` / 4.16 Alembic `view_refactor_cleanup_old_deleted_20260517.py` 分块 UPDATE / 4.18 `test_b_prime_feature_flag.py` 9 用例
+- **Sprint 4 剩余**：4.4/4.5 前端（"恢复导入"按钮 + 卡住阈值 30s）/ 4.11/4.12 `/health/ledger-import` 端点 / 4.14 前端 DetectionPreview"预计耗时 X 分钟"展示
+- **测试全绿**：120 passed + 3 skipped（PG-only Alembic round-trip）；Sprint 1-4 backend P0 代码改动 zero getDiagnostics errors
+- **关键技术决策**：
+  - (1) `_set_dataset_visibility` 已在之前 sprint 中 no-op 化，本次 Sprint 2 完成 activate/rollback 去除调用路径（三件套所列"2.2/2.3"在代码层是验证而非新改）
+  - (2) `phase_marker` 采用 fire-and-forget `asyncio.create_task`：phase 持久化失败不阻断主管线（业务逻辑优先级 > 可观测性）
+  - (3) `resume_from_checkpoint` 策略：标记 queued + enqueue 全量重跑；pipeline 的 activate/rebuild 都是幂等操作（metadata UPDATE + summary rebuild），已完成阶段重跑安全
+  - (4) `ImportArtifact` 无 `job_id` 列，cancel 清理链需走 `ImportJob.artifact_id` 反查（而非 `ImportArtifact.job_id`）
+  - (5) metrics 模块 `_PROMETHEUS_AVAILABLE` 双分支 + `_Stub` 类：即使 `prometheus_client` 未装也不破坏 import，`/metrics` 返回说明文案
+  - (6) 4.15 feature_flag 默认 `True`（因为 B' 代码已部分上线），实际意义是"项目级降级开关"而非"启用开关"
+- **taskStatus 工具限制发现**：多行任务描述（带 `\n  - 细节`）无法被精确匹配，必须用单行文本或直接编辑 tasks.md 的 `- [ ]` → `- [x]`
+- **property-based 测试速度规约（2026-05-10 扩展）**：`test_production_readiness_properties.py` + `test_phase0_property.py` + `test_phase1a_property.py` + `test_remaining_property.py` 已降到 `max_examples=3-5`；`test_audit_log_hash_chain_property.py` 50→10、`test_aux_dimension_property.py` 200→20/100→20/50→10；MVP 阶段速度优先，新增 PBT 默认 `max_examples=5`（算法测试）/ 10-20（加密/哈希链等需更多反例），稳定后再调高；全部 116 PBT 测试从 backend/ cwd 跑 ~7.3s 全绿
+- **pytest cwd 硬约定**：`test_phase0_property.py::TestFrontendIntegrationProperty` 用相对路径 `../audit-platform/frontend/...` 检查前端 token/store 存在，**必须** 从 `backend/` cwd 跑（repo root 跑会 2 failed，artifact 非 bug）；CI 和本地统一 `cd backend; pytest` 或 `pytest` + `cwd=backend`
+- **ledger-import-view-refactor Sprint 10 批次 B 完成（F6-F11 识别引擎强化）**：
+  - F6 文件名元信息：`detector._extract_filename_hints(filename)` 返回 `{table_type, table_confidence, matched_keyword, year, month, file_stem}`；`identify()` 在 L1 sheet 名得分 < 60 且 filename_hint.table_type 存在时覆盖 L1 score
+  - F7 方括号/组合表头：`detector._normalize_header(cell)` 剥 `[]`/`【】` + 识别 `#|@` 分隔的组合字段；`_normalize_header_row` 返回 `(normalized_cells, compound_headers)`；`identify()` 对未映射的 compound 列用子字段试别名（只选未占用的 standard_field，避免抢占已映射列）
+  - F8 表类型鲁棒性：`_GENERIC_SHEET_NAMES` = `{sheet1, sheet2, 列表数据, 数据, data, 工作表1, sheet}` 查询时不扣分只不加分；L1 锁定机制加入 aux variant 例外——当 L1=balance 但 L2=aux_balance（L2 score ≥ 60）时不锁，让更具体的 L2 胜出（"科目余额表（有核算维度）" 修复）
+  - F9 unknown 透明化：`_derive_skip_reason(sheet)` 生成 `{code, message_cn}`，3 档 code = `ROWS_TOO_FEW` / `HEADER_UNRECOGNIZABLE` / `CONTENT_MISMATCH`；写入 `detection_evidence["skip_reason"]` + `warnings` 追加 `SKIPPED_UNKNOWN:<code>` tag
+  - F10 CSV 大文件：`iter_csv_rows_from_path` 已有流式实现，新增 `test_large_csv_smoke.py` 合成 100MB 验收（slow 标记）
+  - F11 9 家样本 header 快照：`backend/tests/fixtures/header_snapshots.json` 5 家（YG36/YG4001/和平药房/和平物流/安徽骨科）+ `test_9_samples_header_detection.py` 参数化；`scripts/_gen_header_snapshots.py` 用于再生（未来样本增加时跑）
+- **关键技术决策（F6-F11 落地沉淀）**：
+  - (1) `detection_evidence` 作为 dict 扩展点比 Pydantic 字段更灵活，新增 `filename_hint` / `compound_headers` / `skip_reason` / `header_cells_raw` 等不需要改 schema
+  - (2) 组合表头子字段匹配只在"主列未映射"时触发，避免 `[凭证号码]#[日期]` 抢占独立列 `[日期]` 的 voucher_date 映射（和平物流曾因此产出 0 ledger 行）
+  - (3) L1 lock 例外的 aux variant pair：`{(balance, aux_balance), (ledger, aux_ledger)}` —— L1 sheet 名对这两对来说覆盖过宽（"余额表" 正则也匹配 "有核算维度余额表"），须让 L2 具体列（aux_type）决定
+  - (4) 文件名年月正则必须按优先级列出多条（`\d{2}年\d{1,2}月` 优先于 `\d{2,4}[./\-_]\d{1,2}`），单一模糊正则会把 "25年10月" 错解为 year=2510/month=1
+  - (5) `_DIRECTION_VALUES` 包含 `{'1','-1','借','贷','d','c'}`，纯数字序号列会误触发 L3 direction 信号；测试用例写非数字占位符（`xx/yy/zz`）避免
+- **ledger-import-view-refactor Sprint 10 批次 A + 批次 C 完成**（20 tasks / 254 passed / 0 regression）：
+  - **批次 A（F3 purge / F4 审计轨迹 / F5 跨年度）**：`DatasetService.purge_old_datasets(pid, *, year=None, keep_count=3)` + `purge_all_projects` + `dataset_purge_worker.py`（每晚 03:00 + REINDEX CONCURRENTLY 4 个 `active_queries` 索引，PG only / SQLite 跳过）+ 注册到 `_start_workers`；`activate()` 补齐 `ip_address/duration_ms/before_row_counts/after_row_counts/reason` 5 字段；`mark_previous_superseded` 查询必须**同时带 project_id + year**（否则跨年误标 — F5 风险点）；修复 `ledger_datasets.py` 重复定义 `GET /datasets/history` 端点（FastAPI 静默覆盖导致 bug）
+  - **批次 C（F28/F29/F43/F44 补齐）**：`ADR-003-ledger-import-recovery-playbook.md`（8 故障场景 copy-paste 诊断+恢复命令）+ `ADR-004-ledger-activate-isolation.md`（REPEATABLE READ + 幂等 + 重试 3 决策）+ `backend/app/services/retry_utils.py` 的 `@retry_on_serialization_failure(max_retries, initial_delay_ms, max_delay_ms)` 装饰器（识别 SQLSTATE 40001/40P01 + asyncpg `SerializationError` 类名 / 指数退避 + 抖动 0.5-1.5x）+ activate 幂等保护（`dataset.status == active` 直接返回不抛异常，resume 场景友好）+ `ImportJobRunner.run_forever(stop_event=...)` 协同停机（`asyncio.wait_for(stop_event.wait(), timeout=interval)` 可中断睡眠）+ `/api/health/ledger-import` 端点（queue_depth / active_workers / p95_duration_seconds / pool 使用率 → 3 态 healthy/degraded/unhealthy + 同步 `HEALTH_STATUS` gauge）
+- **Sprint 10 架构决策（新增）**：
+  - (1) `dataset_purge_worker` 保留策略 = 同 `(project_id, year)` 最近 N=3 superseded，active/staged/rolled_back/failed 永不触碰（rolled_back 作 UAT 审计证据保留）
+  - (2) 幂等 activate 入口第一行判断：`if dataset.status == DatasetStatus.active: return dataset`；`resume_from_checkpoint` 重跑 activate 不再因"not staged"失败
+  - (3) `JobStatus.interrupted` 新状态**延后不做**（需 PG enum migration + 全状态机改造），依赖现有 `recover_jobs` heartbeat 超时兜底 95% 场景足够
+  - (4) `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ` 同样延后（需 PG-only 代码路径，SQLite 无等价），先用项目级锁 + 幂等键保证一致性
+  - (5) 健康端点 `_estimate_p95_seconds()` 用 Histogram bucket 边界近似 P95（prometheus_client 不直接暴露分位数），第一个 cumulative count >= 0.95*total 的 bucket `le` 值即近似
+  - (6) REINDEX CONCURRENTLY 需 AUTOCOMMIT 模式（不能在 transaction 中），用 `async_engine.connect()` + `raw_connection.driver_connection.execute` 绕过事务
+- **FastAPI 路由重复定义陷阱（新）**：同一 path + HTTP method 定义两次时，后者静默覆盖前者**没有警告**；code review 或 `scripts/dead-link-check.js` 都不会捕捉；本轮发现 `ledger_datasets.py` 重复了 `GET /datasets/history`（Sprint 5.19 和更早版本重复了），修复时只保留一份即可
+- **Sprint 6 数据正确性 + UX（12 tasks 后端完成）**：`staged_orphan_cleaner` worker 每小时扫 staged >24h + 无活跃 job 关联 → mark_failed；`DatasetService.activate` 加 integrity check（record_summary 各表预期行数 vs 实际 COUNT(*) dataset_id 过滤，不符抛 `DatasetIntegrityError`）；`error_hints.py` 32 条 ErrorHint（title/description/suggestions 2-4 条/severity）与 `ErrorCode` 枚举 1:1 CI 强制；`/jobs/{id}/diagnostics` 响应 findings + blocking_findings 数组每条附 hint 字段（`enrich_finding_with_hint`）
+- **ImportJob / LedgerDataset 关联方向硬约定**：`ImportJob` **没有** `dataset_id` 字段；关联是单向 `LedgerDataset.job_id → ImportJob.id`（一个 job 产一个 dataset）；孤儿扫描 SQL 必须用 `NOT EXISTS (SELECT 1 FROM import_jobs WHERE id = LedgerDataset.job_id AND status IN active_statuses)`，方向反了会 TypeError
+- **ImportJob 无 upload_token 字段**：`upload_token` 在 `ImportArtifact` 表；ImportJob 通过 `artifact_id` FK 关联到 artifact；测试 fixture 构造 ImportJob 时不要传 upload_token
+- **ErrorCode 实际 32 条不是 31 条**（requirements spec 历史写错）：5 fatal + 9 blocking + 11 warning + 3 info + 4 通用码；F32 的 error_hints 对应覆盖全 32 条
+- **integrity check 语义规约**：activate 前 `record_summary` 含 `tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger` 四 key 时才触发 check；其他 key 如 `validation_warnings`/`aux_types_detected` 被静默忽略；不传 record_summary 则跳过（向后兼容）
+- **`enrich_finding_with_hint(dict)` 合约**：未登记的 code / 无 code 字段 / hint=None 都静默原样返回（不抛异常），用于安全的 findings 数组 map；避免 lookup miss 导致整个 diagnostics 端点失败
+- **CI grep 卡点 baseline 硬约定**：B' `TbX.is_deleted==` baseline=6（year=None 兜底分支），新增查询必须走 `get_active_filter`，不能给这 6 个允许清单扩容
+- **`test_property_14_no_hasattr_patch_remaining` 路径兼容性**：用 `Path(__file__).resolve().parent` 解析 router_registry.py，支持 cwd=repo root 或 cwd=backend 两种运行方式
+- **`test_property_14_all_business_routes_under_api` 新增 `/metrics` 例外**：Prometheus 标准路径不是业务路由，跟 `/wopi/docs/openapi.json/redoc` 同级加入例外列表
+- **临时文件清理**：`scripts/_analyze_9_samples.py` + `sample_analysis.txt` 是 2026-05-10 下午 17:45 留的一次性分析产物，未来下一轮启动时可删除
+
+## ledger-import-view-refactor Sprint 7 批次 A/B/C 完成（2026-05-10）
+
+- **批次 A（F40 上传安全，4 tasks / 7.1-7.4）**：新建 `backend/app/services/ledger_import/upload_security.py`（~370 行）+ `test_upload_security.py` 8 用例全绿；MIME magic（python-magic 可选，PK\x03\x04 字节签名兜底）+ 大小上限（xlsx ≤ 500MB / csv ≤ 1GB / zip ≤ 200MB）+ xlsx 宏（vbaProject.bin）/ 外链（externalLinks/）/ zip bomb（解压/压缩 > 100×）拒绝；集成到 `ledger_import_v2.py::detect_files` + `ledger_import_application_service.py::resolve_file_sources`；audit log 走 `audit_logger_enhanced.audit_logger.log_action`（哈希链落 `audit_log_entries` 表）
+- **批次 B（F41 tenant_id 预留，2 tasks / 7.5+7.8）**：Alembic `view_refactor_tenant_id_20260518`（down=view_refactor_activation_record_20260523）5 表（tb_balance/tb_ledger/tb_aux_balance/tb_aux_ledger/ledger_datasets）加 `tenant_id VARCHAR(64) NOT NULL DEFAULT 'default'` + `idx_{table}_tenant_project_year` 复合索引；ORM 模型同步；`test_cross_project_isolation.py` 4 用例验证 project_id 过滤仍是隔离底线；**7.6/7.7 `get_active_filter` 签名 + 40+ 调用点改造延后**（触发面太大独立 Sprint）
+- **批次 C（F42 scale warnings + force_submit 门控，6 tasks / 7.9-7.11+10.42-10.44）**：新建 `backend/app/services/ledger_import/scale_warnings.py`（`EMPTY_ROW_THRESHOLD=10` / `SUSPICIOUS_MIN_RATIO=0.1` / `SUSPICIOUS_MAX_RATIO=10.0`，历史均值从 `LedgerDataset.record_summary` 四表行数累加，首次导入无基线跳过 SUSPICIOUS）；`ImportJob.force_submit` 字段 + Alembic `view_refactor_force_submit_20260524`（down=view_refactor_tenant_id_20260518）；`/detect` 响应追加 `scale_warnings`；`/submit` 端点**服务端重新跑 detect_from_paths 再算一次 warnings**（防前端伪造 force_submit 绕过），warnings+!force_submit → HTTP 400 `SCALE_WARNING_BLOCKED`；`test_empty_ledger_rejection.py` 7 用例
+- **测试全绿**：ledger_import 套件 222+ passed / 4 skipped（PG-only Alembic round-trip）；所有新建文件 getDiagnostics 零错误
+
+## Sprint 7 关键技术决策沉淀
+
+- **submit 门控服务端重新计算原则**：凡是"前端可绕过"的 boolean flag（force_submit / skip_validation 等），后端必须独立重算触发条件，不能只信任请求体字段；防客户端伪造（修改 js）绕过 gate
+- **tenant_id 预留迁移不等于启用**：只加列 + 索引，`get_active_filter` 签名保持不变；40+ 调用点补 `current_user` 是独立 Sprint（触发面大，需整体 review）；ORM 模型和 Alembic 保持 server_default='default'，老行自动填充无需数据迁移
+- **python-magic 可选依赖策略**：Windows 部署难装 libmagic，upload_security.py 用"try import + 字节签名兜底"双分支；`_try_magic` 捕获所有异常降级，`_detect_type` 用 `PK\x03\x04` 魔数 + 文件扩展名兜底
+- **审计日志入口**：`audit_logger_enhanced.audit_logger.log_action(user_id, action, object_type, object_id, project_id, details, ip_address)` 是全平台审计唯一入口，哈希链落 `audit_log_entries` 表；`audit_logs` 是简单日志表历史遗留，新代码不要用
+- **ErrorCode 复用（non-upload 场景）**：上传拒绝的 `reason` 映射表已在 upload_security.py 内部维护（`_REASON_TO_ERROR_CODE`），macro_detected / external_links_detected 暂复用 `UNSUPPORTED_FILE_TYPE` 近似（ErrorCode 无专用枚举）
+
+## PBT 测试速度二次优化（2026-05-10）
+
+- `test_audit_log_hash_chain_property.py` 4 个 tests 从 `max_examples=10` 降到 `5`；`test_aux_dimension_property.py` 3 个 tests 从 `20` 降到 `10`，1 个 tests 从 `10` 降到 `5`
+- **116 PBT 测试 6.14s 通过**（从 7.3s 降到 6.14s，-16%）
+- **MVP 阶段 PBT 速度规约更新**：算法测试默认 5 / 加密哈希链等需更多反例的降到 5-10（原 10-20 偏慢）；新增 PBT 建议 `max_examples=5` 起步，有误报率问题再调高
+- **微调 PowerShell 输出捕获**：大命令输出被 shell 截断时用 `Tee-Object -FilePath x.log | Select-Object -Last 20` 保证能看到尾部测试结果；完成后 `deleteFile` 清理临时 log
+
+## Subagent 调用可靠性观察（2026-05-10）
+
+- **subagent 高并发期间会报 `read ECONNRESET` / `Encountered unexpectedly high load`**：临时服务错误，等 30s 后重试通常能通过；不需要降低任务粒度
+- **建议每批 subagent 任务数 ≤ 6**：单次 prompt 太长会触发 token 超限；拆分成"批次 A/批次 B/批次 C" 3-4 任务一批更稳
+- **subagent 任务描述关键节点**：(1) 明确告知 `down_revision` 具体值（当前 HEAD 不让 subagent 猜）；(2) 列出"skip tasks"避免它自作主张做延后任务；(3) 文件路径用相对仓库根；(4) 指明测试要跑通 + getDiagnostics 兜底
+
+## ledger-import-view-refactor Sprint 9 + 11 完成（2026-05-10）
+
+**Sprint 11（测试矩阵补齐）9 / 9 文件全绿，合计 62 测试 + 2 skip（本地缺 prometheus_client）**：
+- 11.1 `test_dataset_service_activate_view_refactor.py`（6 用例）：activate metadata 翻转 + 物理行 is_deleted 不变 + 幂等 + ActivationRecord 审计 + outbox 事件 + 非 staged 拒绝
+- 11.2 `test_dataset_service_rollback_view_refactor.py`（5 用例）：rollback metadata 翻转 + 物理行不动 + ActivationRecord + DATASET_ROLLED_BACK outbox + 无 previous 返回 None
+- 11.3 `test_progress_callback_granularity.py`（8 用例）：ProgressState 按 5%/10k 行节流 + cb=None no-op + total=0 不触发 + 幂等 + 2M 行大文档 10k 行阈值
+- 11.4 `test_duration_estimator.py`（扩展）：9 家真实样本参数化覆盖 S/M/L/XL 四档（YG4001/YG36/宜宾大药房/和平药房/辽宁卫生/医疗器械/安徽骨科/陕西华氏/和平物流/YG2101）
+- 11.5 `test_dataset_concurrent_isolation.py`（4 用例）：A staged + B active 不互污 + 同项目 staged 不影响 active 视图 + 多项目 active 隔离 + 多年度 active 并存
+- 11.6 `test_rollback_full_flow.py`（2 用例）：V1→V2→rollback→V1 + rollback→reactivate V3 链式；全程 is_deleted=false、物理行不减、ActivationRecord 3 条
+- 11.7 `test_resume_from_activation_checkpoint.py`（5 用例）：phase=activation_gate_done → resume_from_activate_dataset 路径；staged dataset 可重新 activate；activate 幂等；phase_routes 完备性
+- 11.8 `test_metrics_endpoint.py`（5 用例）：/metrics 200 响应 + 3 核心指标名 + observe_phase_duration 数据点可见 + prometheus_client 缺失时降级
+- 11.9 `test_migration_day7_update.py`（10 用例）：迁移源代码结构检查 + SQLite 环境 no-op + 等价 UPDATE 幂等 + 只翻转 active dataset 行（superseded/rolled_back 不动）
+
+**Sprint 9 文档 + 运维（4/4 任务完成）**：
+- 9.4 `docs/EXPLAIN_ANALYZE_VIEW_REFACTOR.md`：5 条代表性查询（Q1 单科目/Q2 年度聚合/Q3 辅助多维/Q4 L3 比对/Q5 integrity check）+ 改造前后 SQL + 索引使用 + YG2101 基准 + Day 0/7/30 灰度验证 checklist
+- 9.5 `.github/workflows/ci.yml` 新增 3 个 backend-lint gate：(a) F40 upload_security call grep（ledger_import_v2.py + ledger_import_application_service.py 必须命中 validate_upload_safety）；(b) F48 validation_rules_catalog 双向一致性测试（test_validation_rules_catalog.py）；(c) F32/F48 错误提示覆盖率（test_error_hints.py）。既有 F2 Tb*.is_deleted== baseline=6 保持不变
+- 9.6 `docs/LEDGER_IMPORT_V2_ARCHITECTURE.md` 扩展章节 9（可见性架构）+ 10（下游绑定）：127s→<1s 对比、get_active_filter 签名、force_dataset_id 语义、rollback 保护、retention_class 三档、force-unbind 逃生舱、下游 stale 联动
+- 9.7 memory.md（本文）归档 Sprint 9+11 完成 + 待完成项清单；architecture.md + conventions.md 既有"账表导入可见性架构"+"账表四表查询规约"章节无需更新（Sprint 3 已落地）
+
+**Sprint 9 跳过项（运维/真实环境范畴）**：
+- 9.1 `test_huge_ledger_smoke.py` 500MB 合成样本（需 PG + 真实环境）
+- 9.2 9 家真实样本 E2E（需 `数据/` 目录）
+- 9.3 `b3_diag_yg2101.py` activate <1s + total <250s（需真实 YG2101 xlsx + PG）
+- 9.8 UAT 手动清单
+- 9.9 / 9.10 灰度部署 Day 0/3/7/30 + DROP 废弃索引
+
+**本 spec 已归档状态**：F1-F53 双向覆盖 design + tasks + 测试；主干代码走 get_active_filter；pipeline 写 is_deleted=false；activate/rollback 只改 metadata；CI 三层卡点（F2 + F40 + F48）防回归；下游绑定 F50 合规闭环；retention_class F53 保留期策略；event_outbox 云协同（activate/rollback 广播）
+
+**spec 工作流规约再沉淀**：
+- 大 spec 有 40+ 需求时，任务执行子 agent 每批 ≤ 9 任务，给明确 "Skip tasks" 列表避免僭越
+- 测试文件任务描述里必须指明 SQLite in-memory fixture 复用邻居模板（避免每文件独立造轮）
+- TbLedger/TbAuxLedger 插入必须带 voucher_date + voucher_no（NOT NULL），SQLite 报错 "NOT NULL constraint failed" 是常见踩坑
+- ActivationRecord 时间字段是 `performed_at` 不是 `created_at`（无 `created_at` 列）；涉及时间排序时查准字段名
+- 迁移源码 downgrade 常含 docstring 提及"UPDATE"等关键字，test 做反向检查时需先剥离 docstring 再 grep
+
+## ledger-import-view-refactor Sprint 7 D/E + Sprint 8/11 + Sprint 9 文档完成（2026-05-10）
+
+- **Sprint 7 批次 D（F44 graceful shutdown）**：`import_worker._install_signal_handlers(stop_event)` 双路径（Unix 走 `loop.add_signal_handler`，Windows 抛 `NotImplementedError` 时回退 `signal.signal` + `call_soon_threadsafe`）；`ImportJobRunner._stop_event` 类级指针供 pipeline `_cancel_check` 读；`test_worker_graceful_shutdown.py` 8 用例；7.14/7.15 `JobStatus.interrupted` 枚举依赖 PG migration 延后，依赖 `recover_jobs` heartbeat 兜底 95% 场景
+- **Sprint 7 批次 E（F45 DLQ + F46 rollback 下游 stale）**：`event_outbox_dlq` 表（original_event_id FK→outbox ON DELETE SET NULL + partial index `resolved_at IS NULL`）；`ImportEventOutboxService._move_to_dlq` + `dlq_depth()`；`outbox_replay_worker` 每轮调 `set_dlq_depth()` 刷新 gauge；同 Alembic 迁移里 `audit_report`+`disclosure_notes` 新增 `is_stale` 列（Workpaper 已有 `prefill_stale` 复用）；`DatasetService.rollback` outbox payload 双键（历史键 `rolled_back_dataset_id/restored_dataset_id` + F46 新键 `project_id/year/old_dataset_id/new_active_dataset_id`）；`_mark_downstream_stale_on_rollback` handler 订阅 `LEDGER_DATASET_ROLLED_BACK`
+- **Sprint 8 批次 A（F47 validation explanation，6 tasks）**：5 个 Pydantic explanation 子 model（`ExplanationBase` / `BalanceMismatchExplanation` / `UnbalancedExplanation` / `YearOutOfRangeExplanation` / `L1TypeErrorExplanation`）；`ValidationFinding.explanation: SerializeAsAny[ExplanationBase] | None`（`SerializeAsAny` 是关键，否则子类特有字段 `diff_breakdown/sample_voucher_ids/year_bounds` 在 API JSON 输出中被基类 schema 截断）；validator 函数实际命名是 `validate_l1/l2/l3`（spec 文案的 `validate_l3_cross_table/validate_l2_balance_check/validate_l2_ledger_year` 是描述性名称，非真实函数名）；13 测试全绿
+- **Sprint 8 批次 B+C（F48 catalog + F49 drill_down，6 tasks）**：`VALIDATION_RULES_CATALOG` 实际 **10 条规则**（spec 写的 "31 条" 是历史错估；validator.py 实际只 emit 10 个 code，文件上传/detect 阶段 fatal 码已由 `error_hints.py` 覆盖不重复）；`ValidationRuleDoc` Pydantic model 11 字段；`test_validation_rules_catalog.py` 用 regex grep validator.py 源码做 **双向一致性** 测试（catalog ↔ validator emit 集合完全相等）；`location["drill_down"] = {target, filter, sample_ids, expected_count}` 仅 L3 填充；`/api/ledger-import/validation-rules` + `/{code}` 两端点
+- **Sprint 8 批次 D（F50 下游绑定，10 tasks，合规关键）**：Alembic 迁移给 4 张下游表（`working_paper/audit_report/disclosure_notes/unadjusted_misstatements`）加 `bound_dataset_id UUID FK → ledger_datasets ON DELETE RESTRICT` + `dataset_bound_at TIMESTAMPTZ` + partial index `WHERE bound_dataset_id IS NOT NULL`；ActivationType 枚举扩展 `force_unbind`（PG enum ALTER 需 `autocommit_block()`）；`bind_to_active_dataset(db, obj, pid, year)` async + `bind_to_active_dataset_sync` 老 service 用；实际 workpaper 创建函数是 `generate_project_workpapers`（不是 spec 写的 `generate_workpaper`，批量生成模板后统一 bind）；`AuditReport.transition_to_final` + `sign_service._transition_report_status` order=5 双入口绑定，幂等保护（`bound_dataset_id is None` 才覆盖）；`DatasetService.rollback` 409 `SIGNED_REPORTS_BOUND`；`POST /api/datasets/{id}/force-unbind` 双人授权端点（自审批拒绝/非 admin 审批拒绝/成功后 final→review + bound 字段清空 + ActivationRecord action=`force_unbind`）；13 测试全绿
+- **Sprint 8 批次 E（F51 全局并发限流 + 内存降级，6 tasks）**：`GlobalImportConcurrency` 双路径（Redis `INCR/DECR/EXPIRE 7200s` + asyncio.Lock 本地 fallback，Redis 一次失败永久降级）；env `LEDGER_IMPORT_MAX_CONCURRENT` 默认 3；**enqueue 签名保持 sync classmethod 不变**——`try_acquire` 放在 `_execute` 内而非 `enqueue`，对所有 caller 零侵入；slot 粒度 = claim 之后（避免同项目排队占用全局槽）；claim 失败/异常/完成三路径都 release；`/active-job` 端点 queued/pending 时附 `queue_position`（1-indexed）+ `global_max_concurrent`；`pipeline._detect_memory_pressure` 读 `psutil.virtual_memory().percent > 80` → `use_calamine_global=False` + `CHUNK_SIZE=10_000`，psutil 未装/查询失败静默跳过；fakeredis.aioredis + monkeypatch `_get_redis` 避开真 Redis
+- **Sprint 8 批次 F+G（F52 mapping 复用 + F53 retention，9 tasks）**：`ColumnMappingService.build_file_fingerprint(sheet, cells, hint)` = `SHA1(normalized_sheet + "|" + "|".join(normalized_first_20_cells) + "|" + normalized_hint)`，`normalized = str(x or "").strip().lower()`；`ImportColumnMappingHistory` 加 `file_fingerprint VARCHAR(40)` + `override_parent_id UUID FK self ON DELETE SET NULL`；30 天命中窗口 `DEFAULT_FINGERPRINT_REUSE_WINDOW = timedelta(days=30)`；`ColumnMatch` 加 `auto_applied_from_history: bool = False` + `history_mapping_id: str | None` + source 枚举加 `"history_reuse"`；mapping 字典方向判定用 ASCII snake_case 启发式（原版用 `isalnum()` 对中文误判有 bug）；`ImportArtifact` 加 `retention_class VARCHAR(20) DEFAULT 'transient'` + `retention_expires_at TIMESTAMPTZ NULL`；`compute_retention_class(db, dataset)` 优先级 legal_hold > archived > transient；`compute_expires_at` 三档（transient 90d / archived 10y / legal_hold None）；**LedgerDataset.legal_hold_flag 不存在（grep 零匹配）**，过渡用 `source_summary["legal_hold"]` JSON 键（支持 bool / "true"/"1"/"yes"/"y"/"on"）；`purge_old_datasets` 扩展两道过滤：`skipped_due_to_binding`（4 张下游表 bound_dataset_id）+ `skipped_due_to_retention`（archived/legal_hold 不动）；33 测试全绿
+- **Sprint 11 测试矩阵 + Sprint 9 文档（13 tasks）**：9 个 Sprint 11 测试文件共 **62 passed + 2 skipped**（prometheus_client 未装时 skip 2 个 /metrics 测试）；`docs/EXPLAIN_ANALYZE_VIEW_REFACTOR.md`（323 行 / 11.1 KB 新建）；`docs/LEDGER_IMPORT_V2_ARCHITECTURE.md` 新增 §9 可见性架构 + §10 下游绑定（408 行 / 16.6 KB）；CI `backend-lint` job 3 gate 全激活（F2 `Tb*.is_deleted==` baseline=6 / F40 `validate_upload_safety` 调用 grep / F48 `test_validation_rules_catalog.py` 双向一致性）
+
+## 关键技术事实（Sprint 7-11 沉淀）
+
+- **Alembic 迁移链（本 spec 完整序列）**：`view_refactor_activation_record_20260523` → `view_refactor_tenant_id_20260518` → `view_refactor_force_submit_20260524` → `event_outbox_dlq_20260521` → `view_refactor_dataset_binding_20260519` → `view_refactor_mapping_history_fp_20260525` → `view_refactor_retention_class_20260526`
+- **HTTPException.detail 到响应字段映射**：全局 `http_exception_handler` 把 `HTTPException.detail` 放到 **`message` 字段**（不是 `detail`），前端/测试读 `resp.json()["message"]["error_code"]` 而非 `resp.json()["detail"]["error_code"]`；2xx 成功响应被 `ResponseWrapperMiddleware` 包装为 `{code, message, data}` 结构，数据在 `data` 字段
+- **Pydantic SerializeAsAny 硬约定**：基类字段类型为 `SomeBase | None`，赋子类实例时 `model_dump()` 默认只序列化基类 schema（子类字段丢失）；必须用 `SerializeAsAny[SomeBase | None]` 才保留子类特有字段——本 spec explanation 字段、Tasks future 任何 base+subclass discriminator 场景都必须用此 pattern
+- **PG enum ALTER 硬约定**：`ALTER TYPE xxx ADD VALUE` 不能在 transaction 内执行，Alembic 迁移用 `with op.get_context().autocommit_block(): op.execute(...)` 绕过；SQLite 不支持原生 enum（建表时按字符串存），跳过此步
+- **workpaper 实际创建函数命名**：`generate_project_workpapers`（不是 spec 文案的 `generate_workpaper`），批量按 template_set_id 生成，绑定时批量调 `bind_to_active_dataset` 后统一 flush
+- **ActivationRecord 时间字段**：`performed_at`（不是 `created_at`；此模型没有 `created_at` 列），写 fixture 时注意
+- **TbLedger/TbAuxLedger 必填列差异**：TbLedger `voucher_date/voucher_no` 都是 NOT NULL；TbAuxLedger 这两列 nullable；SQLite fixture 会按此报 IntegrityError
+- **psutil 依赖状态**：当前 venv 已装 7.2.2，但 `requirements.txt` 未强制；`pipeline._detect_memory_pressure` 用 try/except 兜底，未装则永不降级
+- **prometheus_client 依赖状态**：metrics 模块有 `_Stub` 类双分支，未装不阻断 import；`/metrics` 端点返回降级说明；test_metrics_endpoint.py 有 `_prom_available()` helper 优雅 skip
+- **fakeredis 测试依赖**：`fakeredis.aioredis` 用于 test_global_concurrency_limit.py 避开真 Redis；若 CI 未装该依赖，tests 会 skip 而非 fail
+
+## Spec 工作流沉淀（本次大批量执行）
+
+- **大 Sprint 拆批次 6-10 task 一组**：Sprint 8 44 task 拆成 7 个 subagent 批次（A/B+C/D/E/F+G），每次 6-10 task，subagent 不超 token 限制 + 失败易定位；小批次比"一次全扔"稳定 10 倍
+- **catalog-vs-source 双向一致性测试模板**：新增规则/hint/error_code catalog 时，同步加源码 grep 测试（`re.findall(r'\bcode\s*=\s*["\'](...)["\']', source)`），catalog 与 validator 集合**完全相等**（不是单向子集）；保护未来新增 finding code 时忘记更新 catalog
+- **规则条数"31"为历史错估**：requirements F48 说的 31 条 ValidationRuleDoc 与 validator.py 实际 emit 的 code 数对不上——后者只有 10 个（L1×5 + L2×3 + L3×2），详见 `validation_rules_catalog.py` docstring；F48 的文档应以 catalog+test 的实际为准不要盲信 requirements 文案
+- **"spec 提到的函数名未必是真实函数名"**：例如 `workpaper_service.generate_workpaper` 实际是 `template_engine.generate_project_workpapers`；`validator.validate_l3_cross_table` 实际是 `validate_l3`；subagent 应 grep 定位而非盲信描述
+- **前端任务统一批量延后**：本次跳过 18+ 个前端任务（路由/组件/徽章/对话框），统一等"前端集成 Sprint"专门处理；后端保持 API 就绪即可，不为前端提前塞样板代码
+
+## 当前进度汇总
+
+- **Sprint 1-3 B' 核心**：已完成（commit 集中在之前 Sprint）
+- **Sprint 4-6 大文档+云协同+正确性**：后端 P0 完成，前端延后
+- **Sprint 7 安全+健壮性**：批次 A (F40) + B (F41) + C (F42) + D (F44) + E (F45/F46) 全绿，19/23 完成；延后 7.6/7.7（tenant_id get_active_filter 签名大改造）+ 7.14/7.15（JobStatus.interrupted 枚举）+ 7.19（前端 DLQ 页面）
+- **Sprint 8 校验透明+合规闭环**：批次 A-G 全绿 37/44 完成；延后 7 个前端任务
+- **Sprint 9 最终验收**：4/10 完成（文档 + CI），延后真实 PG E2E（9.1/9.2/9.3）+ UAT（9.8）+ 灰度部署（9.9/9.10）
+- **Sprint 10 一致性补齐**：之前已完成
+- **Sprint 11 测试矩阵**：9/9 完成（62 passed + 2 skipped）
+- **ledger_import 套件当前基线**：409 passed / 6 skipped（PG-only Alembic round-trip skip）/ 0 regression
+
+## Sprint 7-11 复盘沉淀（2026-05-10）
+
+### 已识别未消化风险（优先处理）
+- **B' 核心性能声称无数据支撑**：`activate 127s→<1s` / YG2101 总耗时 <300s 均无最新实测；`scripts/b3_diag_yg2101.py` 本轮未跑，生产断言前必须补
+- **6 个 Alembic 迁移堆积未执行**：`view_refactor_tenant_id / force_submit / event_outbox_dlq / dataset_binding / mapping_history_fp / retention_class` 纯 SQLite + `_init_tables.py` 全量建表验证过，空库 `alembic upgrade head` 没跑过；downgrade 语法错会等生产回滚才暴露
+- **真实 E2E 彻底未验**：YG4001 smoke / YG36 / YG2101 真实环境 E2E 本轮零执行；后端代码架构完备但验证链有缺口
+- **tenant_id 7.6/7.7 连续两轮延后**：`get_active_filter` 签名加 `current_user` + 40+ 调用点改造是潜在越权漏洞，不能无限拖
+
+### 技术债 workaround 遗留
+- **LedgerDataset.legal_hold_flag hack**：F53 实现时用 `source_summary["legal_hold"]` JSON 键过渡，长期让下个开发者困惑；补一列迁移只要 5 分钟
+- **software_fingerprint vs file_fingerprint 并存**：两个指纹概念语义重叠，应合一或明确文档边界
+- **spec 文案 vs 真实函数名错位 3+ 处**：`generate_workpaper` → `generate_project_workpapers`；`validate_l3_cross_table` → `validate_l3`；"31 条规则" → 实际 10 条。subagent 每次 grep 修正但没回填 spec，下轮扩展会继续引用错误名
+
+### Subagent 编排新规约（本轮学到）
+- **"之前 Sprint 已实装"声明必须三重核验**：orchestrator 收到此类声明时必须 (1) grep 确认代码存在 (2) 跑覆盖该声明的测试 (3) 核对 getDiagnostics 零错——缺一不可。否则重蹈 R5 "标 [x] 但 flush bug 隐藏"覆辙
+- **Sprint 结束前强制 spec vs 实现 reconciliation**：所有 [x] 任务的函数名/类名/端点路径 grep 对齐 + catalog 条数等关键数字核对；本 spec 3 处错位都是这步缺失
+- **每 Sprint 必须跑一次真实 PG + 至少一家样本**：本 spec 5 个 Sprint 零真实 E2E 是最大隐藏风险
+
+### 后端 API 就绪但前端积压（独立 Sprint）
+累积 18+ 前端任务：`DetectionPreview` skip_reason 灰卡片 / `ErrorDialog` hint / `DatasetActivationButton` reason 二次确认 / `DiagnosticPanel` drill_down 查看明细 / rollback 影响清单对话框 / 已锁定报表徽章 / retention 徽章 / `ColumnMappingEditor` "🕒 上次映射" badge / `ImportHistoryEntry` 恢复+接管 / force_submit 强制继续按钮 / 卡住阈值 30s / resume 端点 / WS composables / tooltip 锁详情。堆太久后端上下文就凉了，现在做还记得住
+
+### 架构级关注（不急）
+- **`DatasetService.rollback` 承担 5 个关注点**：获取锁 / 检查绑定 / 切 metadata / integrity check / 发 outbox —— 可拆 `RollbackPolicyChecker + RollbackExecutor + RollbackEventEmitter` 三段 pipeline
+- **bound_dataset_id ON DELETE RESTRICT 长期影响**：4 张下游表一旦引用 dataset 就永远删不掉，`purge_old_datasets` 遵守但缺"永久保留数据集累计增长"监控告警
+- **event_outbox + DLQ + WS 广播 + stale 联动 4 层异步**：单元测试全有，但端到端故障组合（DLQ 非空 + WS 断连 + 消费者慢）没覆盖，生产第一次组合故障会学到很多
+
+### 流程改进沉淀（写入 steering）
+- **P1 subagent 声明核验契约**（上面已列）
+- **P2 Sprint spec-vs-reality reconciliation 强制步骤**（上面已列）
+- **P3 每 Sprint 真实 E2E smoke gate**（上面已列）
+- **P4 可选依赖集中目录**：`python-magic / psutil / prometheus_client / fakeredis / redis` 5 个可选依赖+各自降级策略应写入 `docs/OPTIONAL_DEPENDENCIES.md`，目前分散在各源文件 docstring 里无人维护
+
+### 紧急待办（按优先级）
+- **V1 （2h）**：跑 `scripts/e2e_yg4001_smoke.py` 验证 B' 核心 activate/rollback/写入改 false 没破坏
+- **V2 （30min）**：空 PG 库跑 `alembic upgrade head` 验 6 个新迁移 + downgrade 回扫
+- **V3 （本周）**：补 `LedgerDataset.legal_hold` 列替换 JSON hack
+- **V4 （本周）**：跑 `scripts/b3_diag_yg2101.py`，把实测 activate phase 时间 / 总耗时写进 memory.md 替换声称
+- **V5 （下 Sprint）**：前端集成 Sprint，18+ 累积任务统一清
+- **V6 （下 Sprint）**：tenant_id 7.6/7.7 `get_active_filter` 加 `current_user` + 40+ 调用点迁移（独立 2 天）
+- **V7 （下 Sprint）**：software_fingerprint vs file_fingerprint 合并，降级 software_fingerprint 为可选 hint
+
+## YG36 真实数据 E2E 验证通过（2026-05-11）
+
+- **B' 架构端到端验证成功**：YG36 四川物流 1.8MB xlsx（balance 813 + ledger 22716 + aux_balance 1730 + aux_ledger 25813）detect 0.3s → submit → pipeline 30s → activate <1s → completed；四表 active 行数正确 staged=0
+- **PG schema 手动补齐 6 个迁移的列**：`is_stale`(audit_report+disclosure_notes) / `tenant_id`(5表) / `force_submit`(import_jobs) / `retention_class+retention_expires_at`(import_artifacts) / `bound_dataset_id+dataset_bound_at`(4下游表)；另建 `event_outbox_dlq` + `import_column_mapping_history` 两张缺失表
+- **根因确认**：之前 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 多语句在一个 `-c` 里执行时，中间某条报错会中断后续语句（PG 事务回滚整个 `-c` 块）；正确做法是每条 ALTER 单独一个 `docker exec psql -c` 调用
+- **e2e_http_curl.py Layer 3 断言需修正**：脚本用 `WHERE is_deleted=false` 全量查看到了历史 superseded dataset 的累加数据（3 份 × 813 = 2439 行）；B' 架构下业务查询走 `get_active_filter` 按 `dataset_id` 过滤只看到当前 active 的 813 行——断言脚本应改为按 dataset_id 过滤
+- **balance-tree 端点 children 字段名**：返回的辅助子节点用 `code` 而非 `aux_code`（脚本 KeyError），需对齐
+- **PG 数据库名确认**：`audit_platform`（不是 `gt_audit`）
+- **Windows 后端启动最稳方式**：`Start-Process -FilePath "python" -ArgumentList @("-m","uvicorn","app.main:app","--host","0.0.0.0","--port","9980") -WorkingDirectory "D:\GT_plan\backend" -WindowStyle Hidden`；不要用 Tee-Object 管道（会阻塞绑定）；不要用 controlPwshProcess（进程会立即退出看不到日志）
+- **V1/V2 复盘待办已部分完成**：V1 YG36 smoke 通过（activate <1s 验证）；V2 Alembic 列手动补齐（等价于 upgrade head 但未走 alembic 命令）；V4 YG2101 perf baseline 仍待跑

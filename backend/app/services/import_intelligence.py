@@ -22,6 +22,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.services.dataset_query import get_active_filter
 
 _logger = logging.getLogger(__name__)
 
@@ -238,9 +239,7 @@ async def deep_quality_check(
     # DQ-01: 科目编码格式
     result = await db.execute(
         sa.select(TbBalance.account_code).where(
-            TbBalance.project_id == project_id,
-            TbBalance.year == year,
-            TbBalance.is_deleted == sa.false(),
+            await get_active_filter(db, TbBalance.__table__, project_id, year),
         ).distinct()
     )
     codes = [r[0] for r in result.all()]
@@ -256,9 +255,7 @@ async def deep_quality_check(
     # DQ-02: 金额异常（单笔超1亿）
     result = await db.execute(
         sa.select(sa.func.count()).select_from(TbLedger).where(
-            TbLedger.project_id == project_id,
-            TbLedger.year == year,
-            TbLedger.is_deleted == sa.false(),
+            await get_active_filter(db, TbLedger.__table__, project_id, year),
             sa.or_(
                 TbLedger.debit_amount > 100000000,
                 TbLedger.credit_amount > 100000000,
@@ -280,9 +277,7 @@ async def deep_quality_check(
             sa.func.extract('month', TbLedger.voucher_date).label('month'),
             sa.func.count().label('cnt'),
         ).where(
-            TbLedger.project_id == project_id,
-            TbLedger.year == year,
-            TbLedger.is_deleted == sa.false(),
+            await get_active_filter(db, TbLedger.__table__, project_id, year),
             TbLedger.voucher_date.isnot(None),
         ).group_by(sa.text('1'))
     )
@@ -299,13 +294,17 @@ async def deep_quality_check(
     # DQ-04: 借贷平衡（按凭证号汇总）
     result = await db.execute(
         sa.text("""
-            SELECT voucher_no,
-                   ABS(SUM(COALESCE(debit_amount,0)) - SUM(COALESCE(credit_amount,0))) as diff
-            FROM tb_ledger
-            WHERE project_id = :pid AND year = :yr AND is_deleted = false
-              AND voucher_no IS NOT NULL
-            GROUP BY voucher_no
-            HAVING ABS(SUM(COALESCE(debit_amount,0)) - SUM(COALESCE(credit_amount,0))) > 0.01
+            SELECT l.voucher_no,
+                   ABS(SUM(COALESCE(l.debit_amount,0)) - SUM(COALESCE(l.credit_amount,0))) as diff
+            FROM tb_ledger l
+            WHERE l.project_id = :pid AND l.year = :yr
+              AND EXISTS (
+                SELECT 1 FROM ledger_datasets d
+                WHERE d.id = l.dataset_id AND d.status = 'active'
+              )
+              AND l.voucher_no IS NOT NULL
+            GROUP BY l.voucher_no
+            HAVING ABS(SUM(COALESCE(l.debit_amount,0)) - SUM(COALESCE(l.credit_amount,0))) > 0.01
             LIMIT 10
         """).bindparams(pid=project_id, yr=year)
     )
@@ -327,12 +326,20 @@ async def deep_quality_check(
                    ABS(COALESCE(b.debit_amount,0) - COALESCE(l.ledger_debit,0)) as diff
             FROM tb_balance b
             LEFT JOIN (
-                SELECT account_code, SUM(COALESCE(debit_amount,0)) as ledger_debit
-                FROM tb_ledger
-                WHERE project_id = :pid AND year = :yr AND is_deleted = false
-                GROUP BY account_code
+                SELECT l2.account_code, SUM(COALESCE(l2.debit_amount,0)) as ledger_debit
+                FROM tb_ledger l2
+                WHERE l2.project_id = :pid AND l2.year = :yr
+                  AND EXISTS (
+                    SELECT 1 FROM ledger_datasets d
+                    WHERE d.id = l2.dataset_id AND d.status = 'active'
+                  )
+                GROUP BY l2.account_code
             ) l ON b.account_code = l.account_code
-            WHERE b.project_id = :pid AND b.year = :yr AND b.is_deleted = false
+            WHERE b.project_id = :pid AND b.year = :yr
+              AND EXISTS (
+                SELECT 1 FROM ledger_datasets d
+                WHERE d.id = b.dataset_id AND d.status = 'active'
+              )
             HAVING ABS(COALESCE(b.debit_amount,0) - COALESCE(l.ledger_debit,0)) > 1
             ORDER BY diff DESC
             LIMIT 5
@@ -392,12 +399,12 @@ async def prepare_incremental_import(
         # 统计现有数据量
         ledger_count = (await db.execute(
             sa.select(sa.func.count()).select_from(TbLedger).where(
-                TbLedger.project_id == project_id, TbLedger.year == year, TbLedger.is_deleted == sa.false()
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
             )
         )).scalar() or 0
         balance_count = (await db.execute(
             sa.select(sa.func.count()).select_from(TbBalance).where(
-                TbBalance.project_id == project_id, TbBalance.year == year, TbBalance.is_deleted == sa.false()
+                await get_active_filter(db, TbBalance.__table__, project_id, year),
             )
         )).scalar() or 0
 
@@ -417,9 +424,7 @@ async def prepare_incremental_import(
         month = int(period)
         existing = (await db.execute(
             sa.select(sa.func.count()).select_from(TbLedger).where(
-                TbLedger.project_id == project_id,
-                TbLedger.year == year,
-                TbLedger.is_deleted == sa.false(),
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
                 sa.func.extract('month', TbLedger.voucher_date) == month,
             )
         )).scalar() or 0
@@ -464,26 +469,26 @@ async def generate_import_overview(
     # 关键指标
     balance_count = (await db.execute(
         sa.select(sa.func.count()).select_from(TbBalance).where(
-            TbBalance.project_id == project_id, TbBalance.year == year, TbBalance.is_deleted == sa.false()
+            await get_active_filter(db, TbBalance.__table__, project_id, year),
         )
     )).scalar() or 0
 
     ledger_count = (await db.execute(
         sa.select(sa.func.count()).select_from(TbLedger).where(
-            TbLedger.project_id == project_id, TbLedger.year == year, TbLedger.is_deleted == sa.false()
+            await get_active_filter(db, TbLedger.__table__, project_id, year),
         )
     )).scalar() or 0
 
     aux_count = (await db.execute(
         sa.select(sa.func.count()).select_from(TbAuxBalance).where(
-            TbAuxBalance.project_id == project_id, TbAuxBalance.year == year, TbAuxBalance.is_deleted == sa.false()
+            await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
         )
     )).scalar() or 0
 
     # 总金额
     total_debit = (await db.execute(
         sa.select(sa.func.coalesce(sa.func.sum(TbLedger.debit_amount), 0)).where(
-            TbLedger.project_id == project_id, TbLedger.year == year, TbLedger.is_deleted == sa.false()
+            await get_active_filter(db, TbLedger.__table__, project_id, year),
         )
     )).scalar() or 0
 
@@ -499,16 +504,20 @@ async def generate_import_overview(
         sa.text("""
             SELECT
                 CASE
-                    WHEN account_code LIKE '1%' THEN '资产'
-                    WHEN account_code LIKE '2%' THEN '负债'
-                    WHEN account_code LIKE '3%' OR account_code LIKE '4%' THEN '权益'
-                    WHEN account_code LIKE '5%' OR account_code LIKE '60%' THEN '收入'
-                    WHEN account_code LIKE '6%' THEN '费用'
+                    WHEN b.account_code LIKE '1%' THEN '资产'
+                    WHEN b.account_code LIKE '2%' THEN '负债'
+                    WHEN b.account_code LIKE '3%' OR b.account_code LIKE '4%' THEN '权益'
+                    WHEN b.account_code LIKE '5%' OR b.account_code LIKE '60%' THEN '收入'
+                    WHEN b.account_code LIKE '6%' THEN '费用'
                     ELSE '其他'
                 END as category,
                 COUNT(*) as cnt
-            FROM tb_balance
-            WHERE project_id = :pid AND year = :yr AND is_deleted = false
+            FROM tb_balance b
+            WHERE b.project_id = :pid AND b.year = :yr
+              AND EXISTS (
+                SELECT 1 FROM ledger_datasets d
+                WHERE d.id = b.dataset_id AND d.status = 'active'
+              )
             GROUP BY 1
             ORDER BY 1
         """).bindparams(pid=project_id, yr=year)
@@ -518,10 +527,14 @@ async def generate_import_overview(
     # 按月份分布
     result = await db.execute(
         sa.text("""
-            SELECT EXTRACT(MONTH FROM voucher_date)::int as month, COUNT(*) as cnt
-            FROM tb_ledger
-            WHERE project_id = :pid AND year = :yr AND is_deleted = false
-              AND voucher_date IS NOT NULL
+            SELECT EXTRACT(MONTH FROM l.voucher_date)::int as month, COUNT(*) as cnt
+            FROM tb_ledger l
+            WHERE l.project_id = :pid AND l.year = :yr
+              AND EXISTS (
+                SELECT 1 FROM ledger_datasets d
+                WHERE d.id = l.dataset_id AND d.status = 'active'
+              )
+              AND l.voucher_date IS NOT NULL
             GROUP BY 1
             ORDER BY 1
         """).bindparams(pid=project_id, yr=year)

@@ -129,7 +129,10 @@ class ConsistencyReplayEngine:
                     AND t.year = tb.year
                     AND t.standard_account_code = tb.account_code
                 WHERE tb.project_id = :pid
-                    AND tb.is_deleted = false
+                    AND EXISTS (
+                      SELECT 1 FROM ledger_datasets d
+                      WHERE d.id = tb.dataset_id AND d.status = 'active'
+                    )
                 GROUP BY tb.account_code, t.unadjusted_amount
                 HAVING ABS(COALESCE(SUM(tb.closing_balance), 0) - COALESCE(t.unadjusted_amount, 0)) > 0.01
                 LIMIT 20

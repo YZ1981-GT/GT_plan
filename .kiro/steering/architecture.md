@@ -323,3 +323,39 @@ where.append(sa.or_(loss_gain_active, other_active))
 **首次实现**：`/balance-tree` 端点 `only_with_activity` 参数。未来所有"余额状态/活跃度"判定（试算表筛选、报表生成预筛、账表健康度指标等）都应遵循此差异化规则。
 
 **真实数据验证**（YG36）：全部 813 → 有活动 208；其中 6xxx 损益类 356 个 → 97 个有活动（opening/closing 全 NULL 但 debit/credit 有值被正确包含）。
+
+
+## 账表导入可见性架构（B' 视图重构，2026-05-10）
+
+**参考**：ADR-002 (`docs/adr/ADR-002-ledger-view-refactor.md`)、spec `.kiro/specs/ledger-import-view-refactor/`
+
+### 核心原则
+可见性状态从**行级 `is_deleted` 字段**升级到**`ledger_datasets.status` 元数据**。物理行 `is_deleted` 恒为 `false`（除回收站/归档场景），可见性完全由 `ledger_datasets.status = 'active'` 控制。
+
+### 查询层
+- **单一入口**：`app.services.dataset_query.get_active_filter(db, table, project_id, year)`
+- **返回**：`project_id + year + dataset_id(active) + is_deleted=false（兜底）` 组合条件
+- **优化版本**：`get_filter_with_dataset_id(table, pid, year, dataset_id)` 同步版，caller 先查一次 active_id 后批量复用（避免 N+1）
+- **year=None 兜底**：`LedgerDataset` 子查询 + `dataset_id.in_(active_ids)` + `is_deleted=false` 双保险（Template B 模式）
+
+### 写入层
+- pipeline `_insert` 写入直接 `is_deleted=False`
+- staged 隔离靠 `dataset.status = 'staged'`（不依赖 is_deleted）
+- 回收站 / archive / restore 仍用 `is_deleted=true`（软删语义保留）
+
+### activate/rollback 路径
+- 只 UPDATE `ledger_datasets` 2 行元数据（superseded ↔ active）
+- 不再 UPDATE Tb* 物理行（旧逻辑 127s → 新逻辑 <1s）
+- `DatasetService._set_dataset_visibility` 改为 no-op + `logger.warning`（保留签名兼容）
+
+### 禁止模式
+- 业务查询禁用 `TbX.is_deleted == False`（Tb* = TbBalance/TbLedger/TbAuxBalance/TbAuxLedger）
+- CI 卡点：`backend-lint` job 扫 `Tb(Balance|Ledger|AuxBalance|AuxLedger)\.is_deleted\s*==` 命中 > baseline(6) 即 fail
+- 6 处允许清单均为 year=None 兜底分支（wp_chat_service/sampling_enhanced_service/report_trace_service/ocr_service_v2/routers/report_trace×2）
+
+### 集成测试锚定
+`backend/tests/integration/test_dataset_rollback_view_refactor.py` 4 用例覆盖：
+- rollback 切换 metadata 不 UPDATE 物理行
+- 首版无 previous 返回 None 不改状态
+- 跨项目 A staged + B active 互不污染（按 project_id 隔离）
+- 两项目同时 active 查询严格隔离

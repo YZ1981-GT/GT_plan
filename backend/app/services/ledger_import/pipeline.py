@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 from uuid import UUID
 
@@ -26,8 +27,59 @@ __all__ = [
     "PipelineResult",
     "ProgressCallback",
     "CancelChecker",
+    "PhaseMarker",
+    "ProgressState",
     "execute_pipeline",
+    "_handle_cancel",
+    "_detect_memory_pressure",
 ]
+
+
+# ---------------------------------------------------------------------------
+# F51 / Sprint 8.31: 内存降级探测
+# ---------------------------------------------------------------------------
+
+
+_MEMORY_PRESSURE_THRESHOLD_PERCENT = 80.0
+
+
+def _detect_memory_pressure(job_id: UUID | None = None) -> bool:
+    """读 psutil.virtual_memory().percent，> 80% 返回 True 触发降级。
+
+    psutil 是可选依赖（未写入 requirements.txt）。未安装或查询失败时
+    返回 False（保持默认 calamine + 50k chunk），不影响主流程。
+
+    Args:
+        job_id: 仅用于日志 trace
+
+    Returns:
+        True：系统内存压力大，需降级到 openpyxl + 10k chunk
+        False：内存充足或无法检测，走默认路径
+    """
+    try:
+        import psutil  # noqa: WPS433
+    except ImportError:
+        return False
+    try:
+        percent = float(psutil.virtual_memory().percent)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(
+            "Pipeline %s psutil.virtual_memory() failed: %s (skip downgrade)",
+            job_id, exc,
+        )
+        return False
+    if percent > _MEMORY_PRESSURE_THRESHOLD_PERCENT:
+        logger.warning(
+            "memory_pressure_downgrade: job=%s system memory %.1f%% > %.1f%% "
+            "→ downgrading to openpyxl + smaller chunks",
+            job_id, percent, _MEMORY_PRESSURE_THRESHOLD_PERCENT,
+        )
+        return True
+    logger.debug(
+        "Pipeline %s memory check: %.1f%% (below %.1f%% threshold, no downgrade)",
+        job_id, percent, _MEMORY_PRESSURE_THRESHOLD_PERCENT,
+    )
+    return False
 
 
 @dataclass
@@ -51,6 +103,120 @@ class PipelineResult:
 # Callback types
 ProgressCallback = Callable[[int, str], Awaitable[None]]  # (pct, message)
 CancelChecker = Callable[[], Awaitable[bool]]  # returns True if canceled
+# F14 / Sprint 4.2: phase checkpoint 回调 — 每个关键 phase 完成后异步写入
+# ImportJob.current_phase，用于崩溃后 resume_from_checkpoint 路由。
+PhaseMarker = Callable[[str], Awaitable[None]]  # (phase) → None
+
+
+# ---------------------------------------------------------------------------
+# F13: 进度上报节流（Sprint 4.1）
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ProgressState:
+    """进度上报状态 — 支持按百分比或行数阈值触发（F13）。
+
+    _maybe_report_progress 按 5% 或 10k 行（先达到者）触发回调；
+    大文档导入避免"每 chunk 都发进度"造成前端/数据库压力，也避免
+    "长时间无更新"让前端误判卡死。
+    """
+
+    total_rows_est: int
+    rows_processed: int = 0
+    last_pct_reported: int = -1
+    last_rows_reported: int = 0
+    last_report_at: datetime | None = None
+
+
+async def _maybe_report_progress(
+    state: ProgressState,
+    cb: "ProgressCallback | None",
+    message_builder: Callable[[int], str],
+) -> None:
+    """按 5% 或 10k 行触发 progress_cb。
+
+    - cb is None → 直接返回
+    - total_rows_est <= 0 → 无法计算百分比，直接返回
+    - 百分比 delta ≥ 5 OR 行数 delta ≥ 10_000 → 触发
+    - 更新 state.last_* 三个字段记录上次上报信息
+    """
+    if cb is None or state.total_rows_est <= 0:
+        return
+    pct = min(int(state.rows_processed * 100 / state.total_rows_est), 100)
+    rows_delta = state.rows_processed - state.last_rows_reported
+    pct_delta = pct - state.last_pct_reported
+    if pct_delta >= 5 or rows_delta >= 10_000:
+        await cb(pct, message_builder(pct))
+        state.last_pct_reported = pct
+        state.last_rows_reported = state.rows_processed
+        state.last_report_at = datetime.now(timezone.utc)
+
+
+# ---------------------------------------------------------------------------
+# F15: cancel 清理链（Sprint 4.6）
+# ---------------------------------------------------------------------------
+
+
+async def _handle_cancel(
+    *,
+    dataset_id: UUID | None,
+    job_id: UUID,
+) -> None:
+    """Cancel 时的完整清理链（F15）。
+
+    步骤（best-effort，任一失败不阻断其他）：
+    1. cleanup staged Tb* rows via DatasetService.cleanup_dataset_rows
+    2. DatasetService.mark_failed（不再重复清理行，避免双删）
+    3. 标记 job 关联的 ImportArtifact 为 consumed
+       （防止后续重试读到旧 upload bundle）
+
+    任何步骤异常都 logger.exception 记录、但不上抛 — 本函数语义是"尽力清理"。
+    """
+    # 延迟 import 避免循环依赖
+    from app.core.database import async_session
+    from app.services.dataset_service import DatasetService
+    from app.services.import_artifact_service import ImportArtifactService
+    from app.models.dataset_models import ImportArtifact, ImportJob
+    import sqlalchemy as sa
+
+    # Step 1 + 2: staged 行 + dataset 标 failed（都放同一事务，失败回滚）
+    if dataset_id is not None:
+        try:
+            async with async_session() as db:
+                await DatasetService.cleanup_dataset_rows(db, dataset_id)
+                # cleanup_rows=False 因为上一步已经删了
+                await DatasetService.mark_failed(db, dataset_id, cleanup_rows=False)
+                await db.commit()
+            logger.info(
+                "Pipeline %s cancel cleanup: dataset %s cleaned + marked failed",
+                job_id, dataset_id,
+            )
+        except Exception:
+            logger.exception(
+                "Pipeline %s cleanup_dataset_rows/mark_failed failed (dataset=%s)",
+                job_id, dataset_id,
+            )
+
+    # Step 3: 标记 job 关联的 artifact 为 consumed（防止 retry 读旧 bundle）
+    try:
+        async with async_session() as db:
+            # ImportJob.artifact_id → ImportArtifact
+            result = await db.execute(
+                sa.select(ImportJob.artifact_id).where(ImportJob.id == job_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is not None:
+                await ImportArtifactService.mark_consumed(db, row)
+                await db.commit()
+                logger.info(
+                    "Pipeline %s cancel cleanup: artifact %s marked consumed",
+                    job_id, row,
+                )
+    except Exception:
+        logger.exception(
+            "Pipeline %s artifact mark_consumed failed (job=%s)", job_id, job_id,
+        )
 
 
 async def execute_pipeline(
@@ -64,6 +230,7 @@ async def execute_pipeline(
     force_activate: bool = False,
     progress_cb: ProgressCallback | None = None,
     cancel_check: CancelChecker | None = None,
+    phase_marker: PhaseMarker | None = None,
 ) -> PipelineResult:
     """v2 引擎纯数据管线（detect → parse → convert → validate → write → activate）。
 
@@ -77,6 +244,9 @@ async def execute_pipeline(
         force_activate: 跳过 L2/L3 校验强制激活
         progress_cb: 进度回调 async (pct, message)
         cancel_check: 取消检查 async () → True 则抛 RuntimeError("导入已被用户取消")
+        phase_marker: F14 checkpoint 回调 async (phase) → None；每个关键 phase
+            完成后调用，用于持久化 ``ImportJob.current_phase``。回调内部异常
+            被 pipeline 吞掉（持久化失败不应阻断主流程）。
 
     Returns:
         PipelineResult
@@ -117,6 +287,21 @@ async def execute_pipeline(
     _CALAMINE_PARSE_MAX_ROWS = 500_000
     use_calamine_global = is_enabled("ledger_import_use_calamine", project_id)
 
+    # F51 / Sprint 8.31: 内存降级
+    # 启动时读 psutil.virtual_memory().percent > 80% → 强制走 openpyxl 流式
+    # + 降低 chunk_size 到 10k（默认 50k），减少内存峰值。
+    # psutil 是可选依赖，未装或查询失败时静默跳过（不阻断主流程）。
+    memory_downgrade = _detect_memory_pressure(job_id)
+    if memory_downgrade:
+        use_calamine_global = False
+        current_chunk_size = 10_000
+        logger.warning(
+            "memory_pressure_downgrade: job=%s forcing openpyxl + chunk_size=%d",
+            job_id, current_chunk_size,
+        )
+    else:
+        current_chunk_size = 50_000
+
     def _choose_excel_iter(sheet_row_estimate: int):
         """按 sheet 行数动态选 parser engine。"""
         if not use_calamine_global:
@@ -130,29 +315,67 @@ async def execute_pipeline(
         return iter_excel_rows_from_path_calamine
 
     logger.info(
-        "Pipeline %s xlsx engine strategy: %s (calamine flag=%s, row threshold=%d)",
+        "Pipeline %s xlsx engine strategy: %s (calamine flag=%s, row threshold=%d, "
+        "chunk_size=%d, mem_downgrade=%s)",
         job_id,
         "per-sheet dynamic" if use_calamine_global else "openpyxl (flag off)",
         use_calamine_global, _CALAMINE_PARSE_MAX_ROWS,
+        current_chunk_size, memory_downgrade,
     )
 
     async def _progress(pct: int, msg: str) -> None:
         if progress_cb is not None:
             await progress_cb(pct, msg)
 
+    # F15: staging_dataset_id 先占位，cancel 清理链会用到
+    staging_dataset_id: UUID | None = None
+
     async def _check_cancel() -> None:
+        """检查 cancel 信号；若触发则先做 _handle_cancel 清理链（F15），再抛异常。"""
         if cancel_check is not None and await cancel_check():
+            # F15（Sprint 4.6）：cancel 清理链 — dataset/artifact 清理幂等
+            try:
+                await _handle_cancel(dataset_id=staging_dataset_id, job_id=job_id)
+            except Exception:
+                logger.exception(
+                    "Pipeline %s _handle_cancel raised (ignored; cleanup is best-effort)",
+                    job_id,
+                )
             raise RuntimeError("导入已被用户取消")
 
     # B3 深度诊断：打点记录各 phase 耗时
     _perf: dict[str, float] = {}
     _perf_t0 = _time.time()
+    _last_phase: list[tuple[str, float]] = [("", _perf_t0)]  # mutable for closure
 
     def _mark(phase: str) -> None:
-        """phase 开始前调用，记录"上一个 phase"的累计耗时。"""
+        """phase 开始前调用，记录"上一个 phase"的累计耗时 + F16 histogram。
+
+        F14 / Sprint 4.2：phase 名同步 fire-and-forget 写入 ImportJob.current_phase，
+        用于崩溃后 resume_from_checkpoint 路由。回调异常不阻断主流程。
+        """
         now = _time.time()
         _perf[phase] = now
         logger.info("[perf] %s phase=%s cumulative=%.2fs", job_id, phase, now - _perf_t0)
+        # F16 (Sprint 4.9)：上一个 phase 的耗时进 histogram
+        prev_phase, prev_t = _last_phase[0]
+        if prev_phase:
+            try:
+                from app.services.ledger_import.metrics import observe_phase_duration
+                observe_phase_duration(prev_phase, now - prev_t)
+            except Exception:  # metrics 问题不能阻断业务
+                pass
+        _last_phase[0] = (phase, now)
+        # F14 / Sprint 4.2：checkpoint 持久化（fire-and-forget）
+        if phase_marker is not None:
+            try:
+                import asyncio as _asyncio
+                _asyncio.create_task(phase_marker(phase))
+            except Exception:  # 回调调度失败不阻断业务
+                logger.debug(
+                    "Pipeline %s phase_marker schedule failed for phase=%s",
+                    job_id, phase, exc_info=True,
+                )
 
     _mark("start")
 
@@ -198,7 +421,7 @@ async def execute_pipeline(
         await bulk_write_staged(
             async_session, table_model, rows,
             project_id=project_id, year=import_year,
-            dataset_id=staging_dataset_id, is_deleted=True,
+            dataset_id=staging_dataset_id, is_deleted=False,
         )
 
     # ── Parse → Convert → Validate → Write (streaming) ──
@@ -230,6 +453,16 @@ async def execute_pipeline(
         for s in fd.sheets
         if s.table_type != "unknown"
     ) or 1
+
+    # F13（Sprint 4.1）：进度上报节流 — 按 5% 或 10k 行触发
+    progress_state = ProgressState(total_rows_est=total_est_rows)
+
+    def _build_progress_msg(pct: int) -> str:
+        # 20~85 区间留给 parse_write_streaming 阶段；细节带实际行数
+        real_pct = min(20 + int(65 * pct / 100), 85)
+        return (
+            f"已处理 {progress_state.rows_processed:,}/{progress_state.total_rows_est:,} 行"
+        )
 
     for filename, filepath in file_sources:
         fd = detections[str(filepath)]
@@ -276,6 +509,7 @@ async def execute_pipeline(
                 row_iter = _excel_iter(
                     str(filepath), sheet.sheet_name,
                     data_start_row=sheet.data_start_row,
+                    chunk_size=current_chunk_size,
                     forward_fill_cols=ff_cols or None,
                 )
             elif ext in (".csv", ".tsv"):
@@ -283,6 +517,7 @@ async def execute_pipeline(
                 row_iter = iter_csv_rows_from_path(
                     str(filepath), encoding=encoding,
                     data_start_row=sheet.data_start_row,
+                    chunk_size=current_chunk_size,
                 )
             else:
                 continue
@@ -345,9 +580,20 @@ async def execute_pipeline(
                     total_aux_ledger_written += len(aux_ledger)
 
                 total_rows_parsed += len(chunk)
-                pct = min(20 + int(65 * total_rows_parsed / total_est_rows), 85)
+                progress_state.rows_processed = total_rows_parsed
+                # F13: 按 5% / 10k 行节流 — 取代"每 chunk 硬推送"
                 _t = _time.time()
-                await _progress(pct, f"已处理 {total_rows_parsed:,}/{total_est_rows:,} 行")
+
+                async def _emit_progress(pct: int, msg: str) -> None:
+                    # 把 0-100% 映射到 parse_write_streaming 阶段的 20-85%
+                    real_pct = min(20 + int(65 * pct / 100), 85)
+                    await _progress(real_pct, msg)
+
+                await _maybe_report_progress(
+                    progress_state,
+                    _emit_progress,
+                    _build_progress_msg,
+                )
                 _t_progress += _time.time() - _t
                 _n_progress_calls += 1
 

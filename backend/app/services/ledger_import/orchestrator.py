@@ -299,8 +299,6 @@ class ImportOrchestrator:
 
         return {"job_id": job.id, "status": "queued"}
 
-    # ---- Phase 3: Resume (断点续传) ----
-
     @staticmethod
     async def resume(
         db: AsyncSession,
@@ -352,6 +350,169 @@ class ImportOrchestrator:
             "status": "queued",
             "retry_count": job.retry_count,
         }
+
+    # ---- F52 / Sprint 8.35: Detect 阶段历史映射复用 ----
+
+    @staticmethod
+    async def apply_history_reuse(
+        db: AsyncSession,
+        detection: LedgerDetectionResult,
+        *,
+        project_id: UUID,
+        software_hint: str | None = None,
+        window_days: int = 30,
+    ) -> LedgerDetectionResult:
+        """F52：对 detect 结果按文件指纹查历史映射，命中则自动应用。
+
+        语义：
+        - 每个 ``SheetDetection`` 计算 ``file_fingerprint``（sheet_name +
+          header_cells[:20] + software_hint）
+        - 命中 ``ImportColumnMappingHistory`` 30 天内的记录时：
+            - 按 header 名称匹配历史 mapping 的 standard_field
+            - 对应 ``ColumnMatch`` 若 standard_field 原为 None 或不同，则覆盖为历史值
+            - 标记 ``auto_applied_from_history=True`` + ``history_mapping_id=<uuid>``
+            - ``source`` 标记为 ``"history_reuse"``，``confidence`` 至少 ``90``
+        - 未命中或历史记录超出窗口时原样返回（不修改 detection）。
+
+        Args:
+            db: 异步 session
+            detection: ``ImportOrchestrator.detect`` / ``detect_from_paths`` 的返回值
+            project_id: 当前项目
+            software_hint: 可选软件提示（与 build_file_fingerprint 的 hint 保持一致）
+            window_days: 历史复用窗口（默认 30 天）
+
+        Returns:
+            已应用历史 mapping 的新 ``LedgerDetectionResult`` 副本。
+        """
+        from datetime import timedelta
+
+        from .column_mapping_service import ColumnMappingService
+        from .detection_types import ColumnMatch, classify_column_tier
+
+        window = timedelta(days=window_days)
+
+        # 逐文件逐 sheet 处理
+        new_files: list[FileDetection] = []
+        for fd in detection.files:
+            new_sheets: list[SheetDetection] = []
+            for sheet in fd.sheets:
+                # 提取 header_cells：优先从 detection_evidence；再退到 preview
+                header_cells_raw: list = (
+                    sheet.detection_evidence.get("header_cells")
+                    if isinstance(sheet.detection_evidence, dict)
+                    else None
+                ) or []
+                if not header_cells_raw and sheet.preview_rows and 0 <= sheet.header_row_index < len(sheet.preview_rows):
+                    header_cells_raw = list(sheet.preview_rows[sheet.header_row_index])
+
+                if not header_cells_raw:
+                    new_sheets.append(sheet)
+                    continue
+
+                fp = ColumnMappingService.build_file_fingerprint(
+                    sheet.sheet_name, header_cells_raw, software_hint=software_hint
+                )
+                record = await ColumnMappingService.find_by_file_fingerprint(
+                    db,
+                    project_id=project_id,
+                    file_fingerprint=fp,
+                    window=window,
+                )
+                if record is None or not isinstance(record.column_mapping, dict):
+                    new_sheets.append(sheet)
+                    continue
+
+                # 历史 mapping：支持两种格式
+                #   1) {standard_field: header_name}  — 正向（legacy save_mapping）
+                #   2) {header_name: standard_field}  — 反向（部分历史调用方）
+                mapping = record.column_mapping
+                # 归一化为 header_name(lower) → standard_field
+                # 方向判定：standard_field 是纯 ASCII snake_case；header 常含中文/空格
+                def _looks_like_std_field(s: str) -> bool:
+                    if not s:
+                        return False
+                    return all(
+                        (ch.isascii() and (ch.isalnum() or ch == "_"))
+                        for ch in s.strip().lower()
+                    )
+
+                header_to_field: dict[str, str] = {}
+                for k, v in mapping.items():
+                    if not isinstance(k, str) or not isinstance(v, str):
+                        continue
+                    key_looks_like_std = _looks_like_std_field(k)
+                    val_looks_like_std = _looks_like_std_field(v)
+                    if key_looks_like_std and not val_looks_like_std:
+                        # 正向：standard_field → header
+                        header_to_field[v.strip().lower()] = k
+                    elif val_looks_like_std and not key_looks_like_std:
+                        # 反向：header → standard_field
+                        header_to_field[k.strip().lower()] = v
+                    else:
+                        # 歧义兜底：key 当 header
+                        header_to_field[k.strip().lower()] = v
+
+                applied = False
+                new_cols: list[ColumnMatch] = []
+                history_mapping_id = str(record.id)
+                for col in sheet.column_mappings:
+                    header_key = (col.column_header or "").strip().lower()
+                    std_field = header_to_field.get(header_key)
+                    if not std_field:
+                        new_cols.append(col)
+                        continue
+                    # 如果历史 mapping 提议的 standard_field 与当前相同则仅标记 flag
+                    if col.standard_field == std_field:
+                        new_cols.append(
+                            col.model_copy(
+                                update={
+                                    "auto_applied_from_history": True,
+                                    "history_mapping_id": history_mapping_id,
+                                }
+                            )
+                        )
+                        applied = True
+                        continue
+                    # 覆盖为历史值
+                    new_tier = classify_column_tier(std_field, sheet.table_type)
+                    new_cols.append(
+                        col.model_copy(
+                            update={
+                                "standard_field": std_field,
+                                "column_tier": new_tier,
+                                "confidence": max(col.confidence, 90),
+                                "source": "history_reuse",
+                                "auto_applied_from_history": True,
+                                "history_mapping_id": history_mapping_id,
+                            }
+                        )
+                    )
+                    applied = True
+
+                if applied:
+                    # 写 detection_evidence 便于前端调试 + 追溯
+                    new_evidence = dict(sheet.detection_evidence or {})
+                    new_evidence["history_reuse"] = {
+                        "hit": True,
+                        "file_fingerprint": fp,
+                        "mapping_id": history_mapping_id,
+                        "software_hint": software_hint,
+                        "window_days": window_days,
+                    }
+                    new_sheets.append(
+                        sheet.model_copy(
+                            update={
+                                "column_mappings": new_cols,
+                                "detection_evidence": new_evidence,
+                            }
+                        )
+                    )
+                else:
+                    new_sheets.append(sheet)
+
+            new_files.append(fd.model_copy(update={"sheets": new_sheets}))
+
+        return detection.model_copy(update={"files": new_files})
 
 
 # S7-6: execute_pipeline / PipelineResult 已迁到 pipeline.py

@@ -66,6 +66,13 @@ class SubmitRequest(BaseModel):
     confirmed_mappings: list[dict]
     force_activate: bool = False
     adapter_id: Optional[str] = None
+    # F42 / Sprint 7.10 + 10.43：用户明确覆盖规模警告后重发的标记
+    # detect 返回 scale_warnings 非空时，submit 必须传 force_submit=True，
+    # 否则端点返回 400 SCALE_WARNING_BLOCKED。
+    force_submit: bool = Field(
+        False,
+        description="规模警告强制继续（detect 返回 scale_warnings 时必填 true）",
+    )
     # S7-9: 增量追加模式
     incremental: bool = Field(
         False,
@@ -112,6 +119,27 @@ async def detect_files(
             detail=f"最多上传 {MAX_FILES} 个文件，当前 {len(files)} 个",
         )
 
+    # Step 0: 上传安全校验（F40 / Sprint 7 批次 A）——MIME/magic/大小/zip bomb/宏
+    from app.services.ledger_import.upload_security import validate_upload_safety
+
+    client_ip = None
+    try:
+        # 尝试从 FastAPI Request 获取 client ip（需依赖注入 Request 才完美，
+        # 此处用轻量方式：从 files 上下文拿不到，先传 None，后续补依赖注入）
+        pass
+    except Exception:  # pragma: no cover
+        pass
+
+    for _upload in files:
+        if _upload is None:
+            continue
+        await validate_upload_safety(
+            _upload,
+            user_id=current_user.id,
+            project_id=project_id,
+            ip_address=client_ip,
+        )
+
     # Step 1: 持久化文件到 bundle + 写 ImportArtifact（复用老链路）
     from app.services.ledger_import.orchestrator import ImportOrchestrator
     from app.services.ledger_import_upload_service import LedgerImportUploadService
@@ -149,7 +177,34 @@ async def detect_files(
                 fd.file_name = orig_name
                 break
 
-    return result.model_dump(mode="json")
+    # F17 / Sprint 4.13：附上总行数估算 + 预计耗时 + 规模档位，
+    # 供前端 DetectionPreview 展示"预计 X 分钟"。
+    from app.services.ledger_import.duration_estimator import (
+        estimate_duration_bucket,
+        estimate_duration_seconds,
+    )
+
+    total_rows_estimate = sum(
+        s.row_count_estimate
+        for fd in result.files
+        for s in fd.sheets
+        if s.table_type != "unknown"
+    )
+
+    response = result.model_dump(mode="json")
+    response["total_rows_estimate"] = total_rows_estimate
+    response["estimated_duration_seconds"] = estimate_duration_seconds(total_rows_estimate)
+    response["size_bucket"] = estimate_duration_bucket(total_rows_estimate)
+
+    # F42 / design D30 / Sprint 7.9 + 10.42：规模异常警告（零行 / 异常规模）
+    # 前端收到 warnings 后必须引导用户点"强制继续"才能调 /submit 时传
+    # force_submit=True；否则 submit 会被 SCALE_WARNING_BLOCKED 拦截。
+    from app.services.ledger_import.scale_warnings import check_scale_warnings
+
+    response["scale_warnings"] = await check_scale_warnings(
+        response, project_id, db
+    )
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +223,55 @@ async def submit_import(
 
     S7-9: 支持 incremental 模式——submit 前自动按 overlap_strategy 清理旧数据，
     用户无需先调 /incremental/apply 再上传（一步到位）。
+
+    F42 / design D30：detect 阶段产生 ``scale_warnings`` 时必须在前端点"强制
+    继续"后以 ``force_submit=True`` 重发；否则此端点返回 400 + 错误码
+    ``SCALE_WARNING_BLOCKED`` 并附带 warnings 数组，供前端再次展示。
     """
+    # F42 门控：从 bundle 再次计算 scale_warnings（不依赖前端传递，防止客户端
+    # 伪造 force_submit 绕过）。重跑 detect_from_paths 只读表头/行数，不
+    # 做完整 parse，< 2s。
+    from app.services.ledger_import.duration_estimator import (
+        estimate_duration_seconds,
+    )
+    from app.services.ledger_import.orchestrator import ImportOrchestrator
+    from app.services.ledger_import.scale_warnings import check_scale_warnings
+    from app.services.ledger_import_upload_service import LedgerImportUploadService
+
+    try:
+        file_entries = LedgerImportUploadService.get_bundle_files(
+            project_id, body.upload_token
+        )
+    except Exception:  # pragma: no cover - 上传产物不存在/过期在别处拦截
+        file_entries = []
+
+    if file_entries:
+        detection = ImportOrchestrator.detect_from_paths(
+            [str(path) for _name, path in file_entries]
+        )
+        total_rows_estimate = sum(
+            s.row_count_estimate
+            for fd in detection.files
+            for s in fd.sheets
+            if s.table_type != "unknown"
+        )
+        scale_warnings = await check_scale_warnings(
+            {"total_rows_estimate": total_rows_estimate}, project_id, db
+        )
+        if scale_warnings and not body.force_submit:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "SCALE_WARNING_BLOCKED",
+                    "message": "检测到规模异常，需用户确认后强制继续",
+                    "warnings": scale_warnings,
+                    "total_rows_estimate": total_rows_estimate,
+                    "estimated_duration_seconds": estimate_duration_seconds(
+                        total_rows_estimate
+                    ),
+                },
+            )
+
     # S7-9: 增量追加模式——submit 前清理旧月份
     if body.incremental and body.overlap_strategy == "overwrite":
         if not body.file_periods:
@@ -186,8 +289,6 @@ async def submit_import(
         )
         # apply_incremental 内部已 commit
 
-    from app.services.ledger_import.orchestrator import ImportOrchestrator
-
     result = await ImportOrchestrator.submit(
         db,
         upload_token=body.upload_token,
@@ -200,6 +301,18 @@ async def submit_import(
         created_by=current_user.id,
         adapter_id=body.adapter_id,
     )
+
+    # F42 / Sprint 7.10：把 force_submit 持久化到 ImportJob（审计轨迹）
+    if body.force_submit:
+        job_id = result["job_id"]
+        if not isinstance(job_id, UUID):
+            job_id = UUID(str(job_id))
+        await db.execute(
+            ImportJob.__table__.update()
+            .where(ImportJob.id == job_id)
+            .values(force_submit=True)
+        )
+
     await db.commit()
 
     # 立即 enqueue 触发 worker，不等 recover_jobs 30s 轮询
@@ -311,13 +424,30 @@ async def get_job_diagnostics(
     # dedicated columns (per design §9.3)
     options = job.options or {}
 
+    # F32 / Sprint 6.12: enrich findings with human-readable hints
+    from app.services.ledger_import.error_hints import enrich_finding_with_hint
+
+    result_summary = dict(job.result_summary) if job.result_summary else {}
+    findings = result_summary.get("findings")
+    if isinstance(findings, list):
+        result_summary["findings"] = [
+            enrich_finding_with_hint(f) if isinstance(f, dict) else f
+            for f in findings
+        ]
+    blocking = result_summary.get("blocking_findings")
+    if isinstance(blocking, list):
+        result_summary["blocking_findings"] = [
+            enrich_finding_with_hint(f) if isinstance(f, dict) else f
+            for f in blocking
+        ]
+
     return {
         "job_id": str(job.id),
         "status": job.status.value,
         "current_phase": job.current_phase,
         "progress_pct": job.progress_pct,
         "error_message": job.error_message,
-        "result_summary": job.result_summary,
+        "result_summary": result_summary,
         "detection_result": options.get("detection_result"),
         "adapter_used": options.get("adapter_id"),
         "options": options,
@@ -383,6 +513,39 @@ async def retry_job(
 
 
 # ---------------------------------------------------------------------------
+# POST /jobs/{job_id}/resume (F14 / Sprint 4.3 — checkpoint 恢复)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/jobs/{job_id}/resume")
+async def resume_from_checkpoint(
+    project_id: UUID,
+    job_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """从最后一个 checkpoint 恢复失败/超时的导入作业（F14）。
+
+    - 查 job.current_phase → 按路由表决定从哪个阶段继续
+    - activate_dataset / rebuild_aux_summary 都是幂等操作，全量重跑安全
+    - staged dataset 已清理时降级为 full_restart_required
+    """
+    # Verify job belongs to this project
+    stmt = select(ImportJob).where(
+        ImportJob.id == job_id,
+        ImportJob.project_id == project_id,
+    )
+    result = await db.execute(stmt)
+    job = result.scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail="作业不存在")
+
+    from app.services.import_job_runner import ImportJobRunner
+
+    return await ImportJobRunner.resume_from_checkpoint(job_id)
+
+
+# ---------------------------------------------------------------------------
 # GET /jobs/latest (S7 — 进度条轮询改走 import_jobs 表)
 # ---------------------------------------------------------------------------
 
@@ -398,19 +561,23 @@ async def get_latest_job(
     前端 ThreeColumnLayout 每 10s 轮询此端点显示进度条。
     后端重启后仍能看到正在运行/最近完成的 job。
 
+    F21 / Sprint 5.7 扩展：当有活跃锁时额外返回 `lock_info` 对象，
+    包含 holder_name / action / progress / 预估剩余等信息供前端 tooltip 展示。
+
     Returns:
-        - 有活跃 job: {status, progress, message, job_id, year}
+        - 有活跃 job: {status, progress, message, job_id, year, lock_info?}
         - 无活跃 job: {status: "idle"}
     """
+    from datetime import datetime, timedelta, timezone
+
+    from app.services.import_queue_service import ImportQueueService
+
     # 优先找 running/writing/validating/activating 的活跃 job
     active_statuses = (
         JobStatus.running, JobStatus.validating,
         JobStatus.writing, JobStatus.activating,
         JobStatus.queued, JobStatus.pending,
     )
-    # 函数内用到的 datetime 工具（顶部 import 可能不够，本函数需要 timedelta）
-    from datetime import datetime, timedelta, timezone
-
     stmt = (
         select(ImportJob)
         .where(
@@ -434,7 +601,7 @@ async def get_latest_job(
             elapsed_sec = max(1, int((now - started).total_seconds()))
             total_est_sec = elapsed_sec * 100 / job.progress_pct
             estimated_remaining = max(0, int(total_est_sec - elapsed_sec))
-        return {
+        response = {
             "status": "processing",
             "phase": job.current_phase or "writing",
             "progress": job.progress_pct or 0,
@@ -443,6 +610,25 @@ async def get_latest_job(
             "year": job.year,
             "estimated_remaining_seconds": estimated_remaining,
         }
+        # F51 / Sprint 8.30: queued 作业展示全局队列位置
+        # 1-indexed：1 = 下一个将被执行；N = 前面还有 N-1 个排队
+        if job.status in (JobStatus.queued, JobStatus.pending):
+            from app.services.ledger_import.global_concurrency import (
+                GLOBAL_CONCURRENCY,
+            )
+            try:
+                position = await GLOBAL_CONCURRENCY.queue_position(db, job.id)
+                if position > 0:
+                    response["queue_position"] = position
+                    response["global_max_concurrent"] = GLOBAL_CONCURRENCY.max_concurrent
+            except Exception:  # noqa: BLE001
+                # queue_position 查询失败不应阻断整个端点
+                pass
+        # F21: 合并锁透明信息
+        lock_info = await ImportQueueService.get_lock_info(project_id, db)
+        if lock_info:
+            response["lock_info"] = lock_info
+        return response
 
     # 没有活跃 job，查最近 5 分钟内完成/失败的（给前端 toast 用）
     recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
@@ -460,7 +646,7 @@ async def get_latest_job(
     recent_job = result_recent.scalar_one_or_none()
 
     if recent_job:
-        return {
+        response = {
             "status": recent_job.status.value,
             "phase": recent_job.current_phase or (
                 "completed" if recent_job.status == JobStatus.completed else "failed"
@@ -471,6 +657,24 @@ async def get_latest_job(
             ),
             "job_id": str(recent_job.id),
             "year": recent_job.year,
+        }
+        # F21: 若有未释放的 action_lock（例如进行中 rollback），也带出
+        lock_info = await ImportQueueService.get_lock_info(project_id, db)
+        if lock_info:
+            response["lock_info"] = lock_info
+        return response
+
+    # 无活跃 job 也无最近 job，但可能有 rollback 在跑
+    lock_info = await ImportQueueService.get_lock_info(project_id, db)
+    if lock_info:
+        return {
+            "status": "processing",
+            "phase": lock_info.get("current_phase") or "processing",
+            "progress": lock_info.get("progress_pct") or 0,
+            "message": lock_info.get("progress_message") or f"{lock_info.get('action', '操作')}进行中",
+            "job_id": lock_info.get("job_id"),
+            "year": None,
+            "lock_info": lock_info,
         }
 
     return {"status": "idle"}

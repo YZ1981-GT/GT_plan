@@ -39,6 +39,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
+from app.services.dataset_query import get_active_filter
 
 _logger = logging.getLogger(__name__)
 
@@ -386,10 +387,8 @@ class CustomFetchService:
         field = source.get("field", "closing_balance")
 
         query = sa.select(TbAuxBalance).where(
-            TbAuxBalance.project_id == self.project_id,
-            TbAuxBalance.year == self.year,
+            await get_active_filter(self.db, TbAuxBalance.__table__, self.project_id, self.year),
             TbAuxBalance.account_code == account_code,
-            TbAuxBalance.is_deleted == sa.false(),
         )
         if aux_code:
             query = query.where(TbAuxBalance.aux_code == aux_code)

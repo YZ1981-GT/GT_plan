@@ -64,10 +64,12 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.data_lifecycle import router as data_lifecycle_router
     from app.routers.continuous_audit import router as continuous_audit_router
     from app.routers.ledger_datasets import router as ledger_datasets_router
+    from app.routers.dataset_force_unbind import router as dataset_force_unbind_router
 
     for r in [project_wizard_router, account_chart_router, mapping_router,
               rlm_router, data_import_router, data_lifecycle_router,
-              continuous_audit_router, ledger_datasets_router]:
+              continuous_audit_router, ledger_datasets_router,
+              dataset_force_unbind_router]:
         app.include_router(r, tags=["项目与数据"])
 
     # 导入智能增强
@@ -388,3 +390,13 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
     from app.routers.ledger_data import router as ledger_data_router
     app.include_router(ledger_data_router, tags=["ledger-data"])
+
+    # ═══ 26. Sprint 10 F43: 账表导入子系统健康检查 ═══
+    # 路由内部已声明 prefix="/api/health"，注册时不加额外前缀。
+    from app.routers.ledger_import_health import router as ledger_health_router
+    app.include_router(ledger_health_router, tags=["health"])
+
+    # ═══ 27. Sprint 8 F48: 校验规则说明文档 ═══
+    # 路由内部已声明 prefix="/api/ledger-import/validation-rules"，注册时不加额外前缀。
+    from app.routers.validation_rules import router as validation_rules_router
+    app.include_router(validation_rules_router, tags=["ledger-import-validation-rules"])

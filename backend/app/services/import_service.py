@@ -324,16 +324,36 @@ async def queue_unmapped(project_id: UUID, db: AsyncSession) -> list[str]:
     Validates: Requirements 4.22
     """
     from app.models.audit_platform_models import AccountMapping
+    from app.models.dataset_models import DatasetStatus, LedgerDataset
+    from app.services.dataset_query import get_active_filter
+
+    # 查找最新 active 年度
+    year_result = await db.execute(
+        select(LedgerDataset.year).where(
+            LedgerDataset.project_id == project_id,
+            LedgerDataset.status == DatasetStatus.active,
+        ).order_by(LedgerDataset.year.desc()).limit(1)
+    )
+    active_year = year_result.scalar_one_or_none()
 
     # Get all account codes from tb_balance
-    balance_result = await db.execute(
-        select(TbBalance.account_code)
-        .where(
-            TbBalance.project_id == project_id,
-            TbBalance.is_deleted == False,  # noqa: E712
+    if active_year is not None:
+        balance_result = await db.execute(
+            select(TbBalance.account_code)
+            .where(
+                await get_active_filter(db, TbBalance.__table__, project_id, active_year),
+            )
+            .distinct()
         )
-        .distinct()
-    )
+    else:
+        # 无 active 数据集时降级为 project_id 过滤
+        balance_result = await db.execute(
+            select(TbBalance.account_code)
+            .where(
+                TbBalance.project_id == project_id,
+            )
+            .distinct()
+        )
     balance_codes = {row[0] for row in balance_result.all()}
 
     # Get all mapped codes
@@ -415,11 +435,10 @@ async def _load_balance_data(
     project_id: UUID, year: int, db: AsyncSession
 ) -> list[dict]:
     """Load existing balance data for cross-table validation."""
+    from app.services.dataset_query import get_active_filter
     result = await db.execute(
         select(TbBalance).where(
-            TbBalance.project_id == project_id,
-            TbBalance.year == year,
-            TbBalance.is_deleted == False,  # noqa: E712
+            await get_active_filter(db, TbBalance.__table__, project_id, year),
         )
     )
     rows = result.scalars().all()

@@ -149,6 +149,13 @@ class ImportJobService:
         # 心跳
         job.heartbeat_at = now
 
+        # F16 (Sprint 4.9)：job 状态转换埋点
+        try:
+            from app.services.ledger_import.metrics import inc_job_status
+            inc_job_status(new_status.value)
+        except Exception:  # metrics 问题不能阻断业务
+            pass
+
         return job
 
     @staticmethod

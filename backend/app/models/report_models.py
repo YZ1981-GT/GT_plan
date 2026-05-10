@@ -293,6 +293,19 @@ class DisclosureNote(Base):
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # F46 / Sprint 7.22: 账套 rollback 后由 event_handlers 标 True，提示刷新
+    is_stale: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    # F50 / Sprint 8.16: 下游快照绑定（创建时绑定当前 active dataset）
+    bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("ledger_datasets.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    dataset_bound_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_by: Mapped[uuid.UUID | None] = mapped_column(
@@ -346,6 +359,20 @@ class AuditReport(Base):
     )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
+    )
+    # F46 / Sprint 7.22: 账套 rollback 后由 event_handlers 标 True，提示刷新
+    is_stale: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    # F50 / Sprint 8.16: 下游快照绑定
+    # AuditReport 绑定时机特殊：不是创建时，而是 status 转 final 时锁定（签字级合规）
+    bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("ledger_datasets.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    dataset_bound_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())

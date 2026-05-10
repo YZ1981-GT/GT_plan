@@ -141,6 +141,19 @@ class SignService:
             # 归档签字完成：eqcr_approved → final
             if current_status == ReportStatus.eqcr_approved.value:
                 report.status = ReportStatus.final
+                # F50 / Sprint 8.18: final 锁定快照绑定
+                if report.bound_dataset_id is None:
+                    try:
+                        from app.services.dataset_query import bind_to_active_dataset
+                        await bind_to_active_dataset(
+                            db, report, report.project_id, report.year
+                        )
+                    except Exception as _bind_err:
+                        logger.warning(
+                            "SignService: order=5 final 绑定 dataset 失败 "
+                            "report=%s err=%s",
+                            report_id, _bind_err,
+                        )
                 await db.flush()  # 确保状态变更写入 DB，供后续 refresh 读到
                 logger.info(
                     "SignService: order=5 archive sign complete, "

@@ -16,10 +16,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
 from .detection_types import (
     KEY_COLUMNS,
@@ -28,19 +28,116 @@ from .detection_types import (
 )
 
 # ---------------------------------------------------------------------------
+# Finding explanation 子结构（F47）
+# ---------------------------------------------------------------------------
+
+
+class ExplanationBase(BaseModel):
+    """校验发现的可解释元数据基类（F47 / design §D12.1）。
+
+    所有字段都是人类/机器混合语义：
+
+    - ``formula``     ：英文公式字符串（如 ``"closing = opening + sum(debit) - sum(credit)"``）
+    - ``formula_cn``  ：中文公式（展示给审计助理看）
+    - ``inputs``      ：代入值字典，键是公式中各个变量名
+    - ``computed``    ：公式求出的中间值（expected / actual / diff / tolerance 等）
+    - ``hint``        ：中文建议（如 "检查是否有凭证漏过账"）
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    formula: str
+    formula_cn: str
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    computed: dict[str, Any] = Field(default_factory=dict)
+    hint: str = ""
+
+
+class BalanceMismatchExplanation(ExplanationBase):
+    """L3 ``BALANCE_LEDGER_MISMATCH`` 专属解释。
+
+    额外字段：
+
+    - ``diff_breakdown`` ：差异来源分解（opening / sum_debit / sum_credit
+      / closing 四条权重），每条 ``{source, value, weight}``
+    - ``tolerance_formula`` ：容差计算公式字符串
+    """
+
+    diff_breakdown: list[dict[str, Any]] = Field(default_factory=list)
+    tolerance_formula: str = "min(1.0 + magnitude * 0.00001, 100.0)"
+
+
+class UnbalancedExplanation(ExplanationBase):
+    """L2 ``BALANCE_UNBALANCED`` 专属解释。
+
+    额外字段 ``sample_voucher_ids`` 保留导致借贷差异最大的前 10 条凭证号。
+    """
+
+    sample_voucher_ids: list[str] = Field(default_factory=list)
+
+
+class YearOutOfRangeExplanation(ExplanationBase):
+    """L2 ``L2_LEDGER_YEAR_OUT_OF_RANGE`` 专属解释。
+
+    额外字段：
+
+    - ``year_bounds`` ：(year_start, year_end) 日期串元组
+    - ``out_of_range_samples`` ：越界凭证样本（前 10 条，``{voucher_no, voucher_date}``）
+    """
+
+    year_bounds: tuple[str, str]
+    out_of_range_samples: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class L1TypeErrorExplanation(ExplanationBase):
+    """L1 类型错误（AMOUNT / DATE）专属解释。
+
+    额外字段：
+
+    - ``field_name``    ：出错的标准字段名
+    - ``actual_value``  ：原始字符串（可能被截断到 128 char）
+    - ``expected_type`` ：期望类型（``numeric`` / ``date``）
+    """
+
+    field_name: str
+    actual_value: str
+    expected_type: Literal["numeric", "date"]
+
+
+# ---------------------------------------------------------------------------
 # 数据结构
 # ---------------------------------------------------------------------------
 
 
 class ValidationFinding(BaseModel):
-    """单条校验发现。"""
+    """单条校验发现（F47：附可选 explanation；F49：location.drill_down）。
+
+    ``location`` 为 dict（保持向后兼容），常见 key：
+
+    - ``file`` / ``sheet`` / ``row`` / ``column`` ：定位信息
+    - ``drill_down`` ：F49 差异下钻 payload（可选），结构如::
+
+        {
+            "target": "tb_ledger" | "tb_aux_ledger" | "tb_aux_balance",
+            "filter": {"dataset_id": "<uuid>", "account_code": "1001", ...},
+            "sample_ids": ["<uuid1>", "<uuid2>", "<uuid3>"],
+            "expected_count": 458,
+        }
+
+      前端 ``DiagnosticPanel.vue`` 用 ``target`` + ``filter`` 打开
+      ``LedgerPenetration.vue`` 穿透抽屉，``sample_ids`` 用于高亮首屏行。
+      仅 L3 findings 当前填充此字段，L1/L2 可按需扩展。
+    """
 
     level: Literal["L1", "L2", "L3"]
     severity: Literal["fatal", "blocking", "warning"]
     code: str
     message: str
-    location: dict  # { file, sheet, row, column }
+    location: dict  # { file, sheet, row, column, drill_down? }
     blocking: bool  # True when this finding blocks activation (unless force)
+    # SerializeAsAny 确保子类特有字段（diff_breakdown / sample_voucher_ids 等）
+    # 在 model_dump() / API JSON 输出中保留而不被基类截断
+    explanation: Optional[SerializeAsAny[ExplanationBase]] = None
 
 
 class ActivationGate(BaseModel):
@@ -276,6 +373,17 @@ def validate_l1(
             # --- AMOUNT check ---
             if field_name in _AMOUNT_FIELDS:
                 if not _is_empty(value) and _try_parse_numeric(value) is None:
+                    actual_value_str = str(value)[:128]
+                    amount_explanation = L1TypeErrorExplanation(
+                        formula=f"parse_numeric({field_name}) -> float",
+                        formula_cn=f"将关键列 {field_name} 的字符串解析为数值（允许千分位逗号）",
+                        inputs={"raw_value": actual_value_str},
+                        computed={"parse_result": None},
+                        hint="检查该值是否为合法数字（如 1234.56 或 1,234.56）；若为空建议填 0",
+                        field_name=field_name,
+                        actual_value=actual_value_str,
+                        expected_type="numeric",
+                    )
                     if tier == "key":
                         findings.append(
                             ValidationFinding(
@@ -288,6 +396,7 @@ def validate_l1(
                                 ),
                                 location=location,
                                 blocking=True,
+                                explanation=amount_explanation,
                             )
                         )
                     else:
@@ -303,6 +412,7 @@ def validate_l1(
                                 ),
                                 location=location,
                                 blocking=False,
+                                explanation=amount_explanation,
                             )
                         )
                         cleaned_row[field_name] = None
@@ -310,6 +420,20 @@ def validate_l1(
             # --- DATE check ---
             elif field_name in _DATE_FIELDS:
                 if not _is_empty(value) and _try_parse_date(value) is None:
+                    actual_value_str = str(value)[:128]
+                    date_explanation = L1TypeErrorExplanation(
+                        formula=f"parse_date({field_name}) -> datetime",
+                        formula_cn=(
+                            f"将关键列 {field_name} 的字符串解析为日期"
+                            f"（支持 YYYY-MM-DD / YYYY/MM/DD / YYYYMMDD / Excel 序列号）"
+                        ),
+                        inputs={"raw_value": actual_value_str},
+                        computed={"parse_result": None},
+                        hint="检查该值是否为合法日期（推荐 YYYY-MM-DD 格式）；Excel 序列号会自动换算",
+                        field_name=field_name,
+                        actual_value=actual_value_str,
+                        expected_type="date",
+                    )
                     if tier == "key":
                         findings.append(
                             ValidationFinding(
@@ -322,6 +446,7 @@ def validate_l1(
                                 ),
                                 location=location,
                                 blocking=True,
+                                explanation=date_explanation,
                             )
                         )
                     else:
@@ -337,6 +462,7 @@ def validate_l1(
                                 ),
                                 location=location,
                                 blocking=False,
+                                explanation=date_explanation,
                             )
                         )
                         cleaned_row[field_name] = None
@@ -388,6 +514,43 @@ async def validate_l2(
         total_debit = float(row.total_debit)
         total_credit = float(row.total_credit)
         if abs(total_debit - total_credit) > 0.01:
+            # 取借贷差异贡献最大的前 10 条凭证号（按 |debit - credit| 降序）
+            sample_result = await db.execute(
+                text("""
+                    SELECT voucher_no,
+                           COALESCE(SUM(debit_amount), 0) AS vd,
+                           COALESCE(SUM(credit_amount), 0) AS vc
+                    FROM tb_ledger
+                    WHERE dataset_id = :dataset_id
+                      AND voucher_no IS NOT NULL
+                    GROUP BY voucher_no
+                    ORDER BY ABS(COALESCE(SUM(debit_amount), 0)
+                                 - COALESCE(SUM(credit_amount), 0)) DESC
+                    LIMIT 10
+                """),
+                {"dataset_id": str(dataset_id)},
+            )
+            sample_voucher_ids = [r.voucher_no for r in sample_result.fetchall()]
+
+            diff_value = round(total_debit - total_credit, 4)
+            explanation = UnbalancedExplanation(
+                formula="sum(debit_amount) == sum(credit_amount)",
+                formula_cn="借方发生额合计 应 等于 贷方发生额合计",
+                inputs={
+                    "sum_debit": round(total_debit, 2),
+                    "sum_credit": round(total_credit, 2),
+                },
+                computed={
+                    "diff": diff_value,
+                    "abs_diff": abs(diff_value),
+                    "tolerance": 0.01,
+                },
+                hint=(
+                    "检查是否有凭证只录入了一侧（漏过账）或金额错录；"
+                    "`sample_voucher_ids` 是按单凭证借贷差额降序的前 10 条候选，可优先排查"
+                ),
+                sample_voucher_ids=sample_voucher_ids,
+            )
             findings.append(
                 ValidationFinding(
                     level="L2",
@@ -400,6 +563,7 @@ async def validate_l2(
                     ),
                     location={"file": "", "sheet": "", "row": -1, "column": ""},
                     blocking=True,
+                    explanation=explanation,
                 )
             )
 
@@ -422,6 +586,55 @@ async def validate_l2(
     )
     row = result.fetchone()
     if row is not None and row.cnt > 0:
+        # 抽取越界样本（前 10 条，含 voucher_no + voucher_date）
+        sample_result = await db.execute(
+            text("""
+                SELECT voucher_no, voucher_date
+                FROM tb_ledger
+                WHERE dataset_id = :dataset_id
+                  AND (
+                      voucher_date < :year_start
+                      OR voucher_date > :year_end
+                  )
+                ORDER BY voucher_date
+                LIMIT 10
+            """),
+            {
+                "dataset_id": str(dataset_id),
+                "year_start": f"{year}-01-01",
+                "year_end": f"{year}-12-31",
+            },
+        )
+        out_of_range_samples: list[dict[str, Any]] = []
+        for r in sample_result.fetchall():
+            vd = r.voucher_date
+            out_of_range_samples.append(
+                {
+                    "voucher_no": r.voucher_no,
+                    "voucher_date": vd.isoformat() if hasattr(vd, "isoformat") else str(vd),
+                }
+            )
+
+        year_start = f"{year}-01-01"
+        year_end = f"{year}-12-31"
+        explanation = YearOutOfRangeExplanation(
+            formula="year_start <= voucher_date <= year_end",
+            formula_cn="凭证日期 应 在年度区间 [year_start, year_end] 内",
+            inputs={
+                "year": year,
+                "year_start": year_start,
+                "year_end": year_end,
+            },
+            computed={
+                "out_of_range_count": int(row.cnt),
+            },
+            hint=(
+                "检查越界凭证是否应归属其他年度（如跨年调整）；"
+                "L2_LEDGER_YEAR_OUT_OF_RANGE 不可被 force 跳过，必须修复源数据"
+            ),
+            year_bounds=(year_start, year_end),
+            out_of_range_samples=out_of_range_samples,
+        )
         findings.append(
             ValidationFinding(
                 level="L2",
@@ -433,6 +646,7 @@ async def validate_l2(
                 ),
                 location={"file": "", "sheet": "", "row": -1, "column": "voucher_date"},
                 blocking=True,
+                explanation=explanation,
             )
         )
 
@@ -537,6 +751,8 @@ async def validate_l3(
     )
     rows = result.fetchall()
     mismatch_accounts: list[str] = []
+    # 保留第一条差异最大的科目用于 explanation
+    sample_mismatch: Optional[dict[str, Any]] = None
     for row in rows:
         opening = float(row.opening_balance) if row.opening_balance is not None else 0.0
         closing = float(row.closing_balance) if row.closing_balance is not None else 0.0
@@ -550,9 +766,116 @@ async def validate_l3(
         tolerance = min(1.0 + magnitude * 0.00001, 100.0)
         if diff > tolerance:
             mismatch_accounts.append(row.account_code)
+            if sample_mismatch is None or diff > sample_mismatch["diff"]:
+                sample_mismatch = {
+                    "account_code": row.account_code,
+                    "opening_balance": round(opening, 2),
+                    "sum_debit": round(sum_debit, 2),
+                    "sum_credit": round(sum_credit, 2),
+                    "expected_closing": round(expected_closing, 2),
+                    "actual_closing": round(closing, 2),
+                    "diff": round(diff, 4),
+                    "tolerance": round(tolerance, 4),
+                    "magnitude": round(magnitude, 2),
+                }
 
     if mismatch_accounts:
         sample = mismatch_accounts[:10]
+        explanation: Optional[BalanceMismatchExplanation] = None
+        # F49 / Sprint 8.13: 构造 drill_down 让前端直达穿透抽屉
+        drill_down: Optional[dict[str, Any]] = None
+        if sample_mismatch is not None:
+            mismatch_code = sample_mismatch["account_code"]
+            # 取差异最大科目的前 3 条 tb_ledger.id 作为 sample_ids
+            sid_result = await db.execute(
+                text("""
+                    SELECT id FROM tb_ledger
+                    WHERE dataset_id = :dataset_id
+                      AND account_code = :account_code
+                    ORDER BY voucher_date, voucher_no
+                    LIMIT 3
+                """),
+                {
+                    "dataset_id": str(dataset_id),
+                    "account_code": mismatch_code,
+                },
+            )
+            sample_ids = [str(r.id) for r in sid_result.fetchall()]
+            # 取该科目总行数作为 expected_count
+            cnt_result = await db.execute(
+                text("""
+                    SELECT COUNT(*) AS cnt FROM tb_ledger
+                    WHERE dataset_id = :dataset_id
+                      AND account_code = :account_code
+                """),
+                {
+                    "dataset_id": str(dataset_id),
+                    "account_code": mismatch_code,
+                },
+            )
+            cnt_row = cnt_result.fetchone()
+            expected_count = int(cnt_row.cnt) if cnt_row is not None else 0
+            drill_down = {
+                "target": "tb_ledger",
+                "filter": {
+                    "dataset_id": str(dataset_id),
+                    "account_code": mismatch_code,
+                },
+                "sample_ids": sample_ids,
+                "expected_count": expected_count,
+            }
+            # diff_breakdown：把期末余额拆成 4 个来源（符号表示权重）
+            diff_breakdown = [
+                {
+                    "source": "opening_balance",
+                    "value": sample_mismatch["opening_balance"],
+                    "weight": "+",
+                },
+                {
+                    "source": "sum_debit",
+                    "value": sample_mismatch["sum_debit"],
+                    "weight": "+",
+                },
+                {
+                    "source": "sum_credit",
+                    "value": sample_mismatch["sum_credit"],
+                    "weight": "-",
+                },
+                {
+                    "source": "actual_closing_balance",
+                    "value": sample_mismatch["actual_closing"],
+                    "weight": "=",
+                },
+            ]
+            explanation = BalanceMismatchExplanation(
+                formula=(
+                    "closing_balance = opening_balance + sum(debit_amount)"
+                    " - sum(credit_amount)"
+                ),
+                formula_cn=(
+                    "期末余额 = 期初余额 + 借方累计 - 贷方累计"
+                    "（按科目逐行核对，容差动态）"
+                ),
+                inputs={
+                    "account_code": sample_mismatch["account_code"],
+                    "opening_balance": sample_mismatch["opening_balance"],
+                    "sum_debit": sample_mismatch["sum_debit"],
+                    "sum_credit": sample_mismatch["sum_credit"],
+                    "actual_closing_balance": sample_mismatch["actual_closing"],
+                },
+                computed={
+                    "expected_closing": sample_mismatch["expected_closing"],
+                    "diff": sample_mismatch["diff"],
+                    "tolerance": sample_mismatch["tolerance"],
+                    "magnitude": sample_mismatch["magnitude"],
+                },
+                hint=(
+                    "检查该科目是否有凭证漏过账、期初余额导入错误、或存在跨期调整未入账；"
+                    "样本科目为差额最大的 1 个，完整科目列表见 message"
+                ),
+                diff_breakdown=diff_breakdown,
+                tolerance_formula="min(1.0 + magnitude * 0.00001, 100.0)",
+            )
         findings.append(
             ValidationFinding(
                 level="L3",
@@ -568,8 +891,11 @@ async def validate_l3(
                     "sheet": "",
                     "row": -1,
                     "column": "closing_balance",
+                    # F49 / Sprint 8.12+8.13: 直达穿透抽屉所需 payload
+                    "drill_down": drill_down,
                 },
                 blocking=True,
+                explanation=explanation,
             )
         )
 
@@ -607,6 +933,52 @@ async def validate_l3(
     all_aux_missing = set(aux_balance_missing + aux_ledger_missing)
     if all_aux_missing:
         sample = sorted(all_aux_missing)[:10]
+        # F49 / Sprint 8.13: 为辅助科目不一致也填 drill_down
+        # 优先选 aux_ledger 作 target（凭证级数据更有穿透价值），
+        # 若该 missing 仅在 aux_balance，则退回 aux_balance
+        missing_code = sample[0]
+        target_table = (
+            "tb_aux_ledger"
+            if missing_code in aux_ledger_missing
+            else "tb_aux_balance"
+        )
+        aux_sid_result = await db.execute(
+            text(f"""
+                SELECT id FROM {target_table}
+                WHERE dataset_id = :dataset_id
+                  AND account_code = :account_code
+                LIMIT 3
+            """),
+            {
+                "dataset_id": str(dataset_id),
+                "account_code": missing_code,
+            },
+        )
+        aux_sample_ids = [str(r.id) for r in aux_sid_result.fetchall()]
+        aux_cnt_result = await db.execute(
+            text(f"""
+                SELECT COUNT(*) AS cnt FROM {target_table}
+                WHERE dataset_id = :dataset_id
+                  AND account_code = :account_code
+            """),
+            {
+                "dataset_id": str(dataset_id),
+                "account_code": missing_code,
+            },
+        )
+        aux_cnt_row = aux_cnt_result.fetchone()
+        aux_expected_count = (
+            int(aux_cnt_row.cnt) if aux_cnt_row is not None else 0
+        )
+        aux_drill_down = {
+            "target": target_table,
+            "filter": {
+                "dataset_id": str(dataset_id),
+                "account_code": missing_code,
+            },
+            "sample_ids": aux_sample_ids,
+            "expected_count": aux_expected_count,
+        }
         findings.append(
             ValidationFinding(
                 level="L3",
@@ -622,6 +994,7 @@ async def validate_l3(
                     "sheet": "",
                     "row": -1,
                     "column": "account_code",
+                    "drill_down": aux_drill_down,
                 },
                 blocking=False,
             )
@@ -702,6 +1075,11 @@ def evaluate_activation(
 __all__ = [
     "ValidationFinding",
     "ActivationGate",
+    "ExplanationBase",
+    "BalanceMismatchExplanation",
+    "UnbalancedExplanation",
+    "YearOutOfRangeExplanation",
+    "L1TypeErrorExplanation",
     "validate_l1",
     "validate_l2",
     "validate_l3",

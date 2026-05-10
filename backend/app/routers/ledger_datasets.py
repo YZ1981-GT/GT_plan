@@ -10,7 +10,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -20,7 +20,7 @@ from app.models.dataset_models import JobStatus
 from app.services.dataset_service import DatasetService
 from app.services.import_job_service import ImportJobService
 from app.services.import_job_runner import ImportJobRunner
-from app.services.import_queue_service import ImportQueueService
+from app.services.import_queue_service import ImportLockError, ImportQueueService
 from app.services.import_artifact_service import ImportArtifactService
 
 router = APIRouter(prefix="/api/projects/{project_id}/ledger-import", tags=["数据集版本"])
@@ -65,21 +65,116 @@ async def get_active_dataset(
     return {"active_dataset_id": str(dataset_id)}
 
 
+@router.get("/datasets/history")
+async def get_datasets_history(
+    project_id: UUID,
+    year: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """F25 / Sprint 5.19: 账套导入历史时间轴。
+
+    返回 `[{dataset, activation_records: [...]}]`，按 dataset.created_at DESC
+    排序。每个 dataset 附带其相关的 activate/rollback 审计记录（含 ip/duration/
+    before/after row counts）。
+
+    Query 参数：
+    - year（可选）：只返回该年度；不传则返回全部年度的完整时间轴
+    """
+    import sqlalchemy as sa
+
+    from app.models.dataset_models import ActivationRecord, LedgerDataset
+
+    dataset_filters = [LedgerDataset.project_id == project_id]
+    if year is not None:
+        dataset_filters.append(LedgerDataset.year == year)
+    datasets = (
+        await db.execute(
+            sa.select(LedgerDataset)
+            .where(*dataset_filters)
+            .order_by(LedgerDataset.created_at.desc())
+        )
+    ).scalars().all()
+
+    record_filters = [ActivationRecord.project_id == project_id]
+    if year is not None:
+        record_filters.append(ActivationRecord.year == year)
+    records = (
+        await db.execute(
+            sa.select(ActivationRecord)
+            .where(*record_filters)
+            .order_by(ActivationRecord.performed_at.desc())
+        )
+    ).scalars().all()
+
+    records_by_dataset: dict = {}
+    for r in records:
+        records_by_dataset.setdefault(r.dataset_id, []).append(
+            {
+                "id": str(r.id),
+                "action": r.action.value,
+                "previous_dataset_id": str(r.previous_dataset_id) if r.previous_dataset_id else None,
+                "performed_by": str(r.performed_by) if r.performed_by else None,
+                "performed_at": r.performed_at.isoformat() if r.performed_at else None,
+                "reason": r.reason,
+                "ip_address": r.ip_address,
+                "duration_ms": r.duration_ms,
+                "before_row_counts": r.before_row_counts,
+                "after_row_counts": r.after_row_counts,
+            }
+        )
+
+    return [
+        {
+            "dataset_id": str(d.id),
+            "year": d.year,
+            "status": d.status.value,
+            "source_type": d.source_type,
+            "source_summary": d.source_summary,
+            "record_summary": d.record_summary,
+            "created_at": d.created_at.isoformat() if d.created_at else None,
+            "activated_at": d.activated_at.isoformat() if d.activated_at else None,
+            "activated_by": str(d.activated_by) if d.activated_by else None,
+            "created_by": str(d.created_by) if d.created_by else None,
+            "previous_dataset_id": str(d.previous_dataset_id) if d.previous_dataset_id else None,
+            "activation_records": records_by_dataset.get(d.id, []),
+        }
+        for d in datasets
+    ]
+
+
 @router.post("/datasets/{dataset_id}/rollback")
 async def rollback_dataset(
     project_id: UUID,
     dataset_id: UUID,
+    request: Request,
     year: int = 2025,
     reason: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    """回滚到上一版本数据集"""
-    result = await DatasetService.rollback(
-        db, project_id, year,
-        performed_by=current_user.id,
-        reason=reason,
-    )
+    """回滚到上一版本数据集。
+
+    F23: activate 与 rollback 共享同一项目锁；锁被占用时返回 409。
+    F25: 写入 ActivationRecord.reason / ip_address / duration_ms / before_/after_row_counts。
+    """
+    # F25: 从请求里拿客户端 IP（X-Forwarded-For 优先，兼容反向代理）
+    ip_address: str | None = None
+    if request is not None:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            ip_address = xff.split(",")[0].strip()
+        elif request.client is not None:
+            ip_address = request.client.host
+    try:
+        result = await DatasetService.rollback(
+            db, project_id, year,
+            performed_by=current_user.id,
+            reason=reason,
+            ip_address=ip_address,
+        )
+    except ImportLockError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     if not result:
         raise HTTPException(status_code=400, detail="无法回滚：没有上一版本或当前无 active 数据集")
     await db.commit()

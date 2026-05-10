@@ -372,6 +372,66 @@ def register_event_handlers() -> None:
 
     logger.info("Phase 9 workpaper event handlers registered")
 
+    # ------------------------------------------------------------------
+    # F46 / Sprint 7.22: 账套 rollback → 标下游 Workpaper/AuditReport/DisclosureNote is_stale
+    # ------------------------------------------------------------------
+    async def _mark_downstream_stale_on_rollback(payload: EventPayload) -> None:
+        """rollback 后同时把底稿/审计报告/附注标记为过期。
+
+        Workpaper 已由 `_mark_workpapers_stale_all` 覆盖（走 prefill_stale），
+        本 handler 补齐 AuditReport.is_stale 和 DisclosureNote.is_stale。
+        """
+        import sqlalchemy as _sa
+        from app.models.report_models import AuditReport, DisclosureNote
+
+        project_id = payload.project_id
+        year = payload.year
+        if project_id is None or year is None:
+            return
+
+        async with async_session_factory() as session:
+            try:
+                await session.execute(
+                    _sa.update(AuditReport)
+                    .where(
+                        AuditReport.project_id == project_id,
+                        AuditReport.year == year,
+                        AuditReport.is_deleted == False,  # noqa: E712
+                    )
+                    .values(is_stale=True)
+                )
+                await session.execute(
+                    _sa.update(DisclosureNote)
+                    .where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == False,  # noqa: E712
+                    )
+                    .values(is_stale=True)
+                )
+                await session.commit()
+                logger.info(
+                    "[F46-rollback-stale] AuditReport/DisclosureNote marked stale "
+                    "for project=%s year=%s",
+                    project_id,
+                    year,
+                )
+            except Exception:  # pragma: no cover - 失败不阻断事件链
+                await session.rollback()
+                logger.warning(
+                    "[F46-rollback-stale] failed to mark downstream stale for "
+                    "project=%s year=%s",
+                    project_id,
+                    year,
+                    exc_info=True,
+                )
+
+    event_bus.subscribe(
+        EventType.LEDGER_DATASET_ROLLED_BACK,
+        _mark_downstream_stale_on_rollback,
+    )
+    logger.info("F46 rollback downstream stale handler registered")
+
     # ── 地址坐标注册表缓存失效 ──
     from app.services.address_registry import address_registry
 

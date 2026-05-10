@@ -45,6 +45,7 @@ from app.models import (
     MatchResult,
     RecognitionStatus,
 )
+from app.models.dataset_models import LedgerDataset, DatasetStatus
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -521,8 +522,17 @@ async def match_with_ledger(
         return None
 
     # 2. 查询匹配账目（金额近似+日期相近+对方单位关键词）
+    # B' 架构：用 dataset_id 过滤 active 数据（无 year 参数时查所有年度）
+    active_ds_subq = (
+        select(LedgerDataset.id)
+        .where(
+            LedgerDataset.project_id == project_id,
+            LedgerDataset.status == DatasetStatus.active,
+        )
+    )
     query = select(TbLedger).where(
         TbLedger.project_id == project_id,
+        TbLedger.dataset_id.in_(active_ds_subq),
         TbLedger.is_deleted == False,  # noqa: E712
     )
 

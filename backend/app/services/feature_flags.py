@@ -24,6 +24,7 @@ _DEFAULT_FLAGS: dict[str, bool] = {
     "advanced_collaboration": False,  # 高级协同（实验功能）
     "ledger_import_v2": True,          # 新账表导入引擎（v2 已验证，默认启用）；支持项目级 override via set_project_flag
     "ledger_import_use_calamine": True,  # B3: 用 Rust calamine 替代 openpyxl 解析 xlsx（YG36 E2E 验证通过，3× 加速；出问题 set_project_flag(pid, False) 单项目回退）
+    "ledger_import_view_refactor_enabled": True,  # B' 视图重构（F19 / Sprint 4.15）：activate 不再 UPDATE 物理行，查询走 get_active_filter；出问题 set_project_flag(pid, False) 单项目降级老逻辑
 }
 
 # 项目级覆盖（project_id → {flag: value}）
@@ -75,6 +76,7 @@ def get_feature_maturity() -> dict[str, str]:
         "advanced_collaboration": "experimental",
         "ledger_import_v2": "production",
         "ledger_import_use_calamine": "pilot",
+        "ledger_import_view_refactor_enabled": "pilot",
         # 正式可用
         "project_management": "production",
         "trial_balance": "production",

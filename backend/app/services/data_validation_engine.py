@@ -319,10 +319,14 @@ class DataValidationEngine:
             from sqlalchemy import text
             # 检查异常大金额（超过 10 亿）
             stmt = text("""
-                SELECT account_code, account_name, closing_balance
-                FROM tb_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                    AND ABS(closing_balance) > 1000000000
+                SELECT b.account_code, b.account_name, b.closing_balance
+                FROM tb_balance b
+                WHERE b.project_id = :pid AND b.year = :year
+                    AND EXISTS (
+                      SELECT 1 FROM ledger_datasets d
+                      WHERE d.id = b.dataset_id AND d.status = 'active'
+                    )
+                    AND ABS(b.closing_balance) > 1000000000
                 LIMIT 10
             """)
             result = await self.db.execute(stmt, {"pid": str(project_id), "year": year})

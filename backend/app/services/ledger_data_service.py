@@ -364,9 +364,13 @@ async def detect_existing_periods(
 ) -> set[int]:
     """查询项目某年度序时账已存在的月份集合（基于 voucher_date）。"""
     sql = """
-        SELECT DISTINCT EXTRACT(MONTH FROM voucher_date)::int AS period
-        FROM tb_ledger
-        WHERE project_id = :pid AND year = :year AND voucher_date IS NOT NULL
+        SELECT DISTINCT EXTRACT(MONTH FROM l.voucher_date)::int AS period
+        FROM tb_ledger l
+        WHERE l.project_id = :pid AND l.year = :year AND l.voucher_date IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM ledger_datasets d
+            WHERE d.id = l.dataset_id AND d.status = 'active'
+          )
     """
     rows = await db.execute(
         sa.text(sql), {"pid": str(project_id), "year": year}
