@@ -505,3 +505,12 @@ inclusion: always
 
 - **选 1：先做 E+F+异步 activate（1.5 小时）**，见效快；不够再上 B'
 - **选 2：直接开 B' 分支做视图方案（3-4 天）**，彻底消除 activate 127s + rollback 127s
+
+## B3 E+F 实测结论（2026-05-10）
+
+- **[E PG 配置已是最优]**：查询 `wal_compression=pglz / synchronous_commit=off / wal_buffers=64MB / checkpoint_timeout=30min / max_wal_size=8GB`，此前有人已调过；**E 方案不需重做**
+- **[F Python 优化实测收益 <1s]**：`_json_default` 合并 `_sanitize_raw_extra + json.dumps`；微基准 130 万次 4.61s → 3.76s（省 0.85s）；YG2101 生产实测被 PG 波动噪声淹没（activate 127s→193s 的波动 >> F 收益）；**F 改动保留但收益可忽略**
+- **[activate 真实波动 127-193s]**：同一代码同一数据，连续两次跑 YG2101 activate 耗时差 66s；系统负载 / autovacuum / 磁盘缓存等随机因素影响极大；**activate 耗时单次测量不可靠，需多次平均**
+- **[关键结论] B2+B3 已到 YG2101 性能极限 ~400-480s**：parse 87s（calamine 不可再降）+ insert 151s（PG COPY 极限）+ activate 127-193s（PG WAL 串行极限）；这些都是底层限制，**小修小补边际收益极低**
+- **[下一步唯一选择]**：要么接受 YG2101 ~7 分钟为当前上限，要么直接做 B' 视图方案（3-4 天，activate 从 127s → 0.01s 真正消灭 UPDATE 风暴）
+- **[放弃] 异步 activate 方案**：fire-and-forget + 后台任务追踪复杂度高，且不彻底（activate 自身仍 127s 只是用户不等）；不值得投入
