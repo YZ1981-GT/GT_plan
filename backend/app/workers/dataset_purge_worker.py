@@ -135,3 +135,36 @@ async def _reindex_active_queries_indexes() -> None:
                     )
     except Exception as e:  # noqa: BLE001
         logger.warning("[DATASET_PURGE] reindex step skipped: %s", e)
+
+    # P1-6: purge 后 VACUUM 回收 dead tuple 空间（仅 PG）
+    await _vacuum_tb_tables()
+
+
+_VACUUM_TABLES = ("tb_balance", "tb_ledger", "tb_aux_balance", "tb_aux_ledger")
+
+
+async def _vacuum_tb_tables() -> None:
+    """对 4 张 Tb* 表执行 VACUUM (VERBOSE) 回收 dead tuple 空间。
+
+    仅在 PostgreSQL 下执行；SQLite 不支持 VACUUM 单表，跳过。
+    VACUUM 不能在事务内执行，需要 AUTOCOMMIT 模式。
+    """
+    import sqlalchemy as sa
+
+    from app.core.database import async_engine
+
+    if "postgresql" not in str(async_engine.url):
+        return
+
+    try:
+        async with async_engine.connect() as raw_conn:
+            # VACUUM 不能在事务内执行，需要 autocommit
+            await raw_conn.execution_options(isolation_level="AUTOCOMMIT")
+            for tbl in _VACUUM_TABLES:
+                try:
+                    await raw_conn.execute(sa.text(f"VACUUM (VERBOSE) {tbl}"))
+                    logger.info("[Purge] VACUUM %s completed", tbl)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("[Purge] VACUUM %s failed (non-critical): %s", tbl, exc)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[Purge] VACUUM failed (non-critical): %s", exc)

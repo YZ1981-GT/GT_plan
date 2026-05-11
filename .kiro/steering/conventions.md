@@ -313,3 +313,13 @@ WHERE l.project_id = :pid AND l.year = :yr
     WHERE d.id = l.dataset_id AND d.status = 'active'
   )
 ```
+
+
+## Spec 目标设定规约（2026-05-11 沉淀）
+
+- 性能目标必须基于实测基线设定，不能凭直觉
+- 设定前先跑一次真实样本拿基线数据（如 YG2101 128MB → pipeline ~660s）
+- 目标分两层：架构收益目标（如 activate <1s）+ 端到端目标（如 total <Xs）
+- 端到端目标受 IO/网络/PG 物理限制，不能无限压缩
+- 目标超标时区分"架构问题"和"物理限制"：前者必须修，后者记录为已知限制
+- 示例：YG2101 activate 从 127s→<1s 是架构收益；total 660s 是 PG COPY 物理限制（~5000 rows/s）

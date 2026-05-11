@@ -997,13 +997,23 @@ inclusion: always
 
 ## ledger-import-view-refactor 最终进度（2026-05-11）
 
-- **tasks.md 进度**：236/243 completed（97.1%），剩余 7 个全部是运维/手动验证
-- **本轮新增完成**：7.6/7.7 tenant_id 签名扩展 + 7.14/7.15 interrupted 状态 + 6.7/10.38 REPEATABLE READ + 10.52/10.53 graceful shutdown + 5.2/5.4 云协同广播
+- **tasks.md 进度**：239/243 completed（98.4%），剩余 4 个全部是运维/手动验证
+- **本轮新增完成**：7.6/7.7 tenant_id 签名扩展 + 7.14/7.15 interrupted 状态 + 6.7/10.38 REPEATABLE READ + 10.52/10.53 graceful shutdown + 5.2/5.4 云协同广播 + V1/V2/9.3 YG2101 性能验证
 - **关键架构确认**：后端不需要独立 WebSocket 服务——outbox_replay_worker 通过 `event_bus.publish_immediate` → SSE queue → `/events/stream` 已实现项目级广播；前端 ThreeColumnLayout 连接 SSE 并 emit `sse:sync-event`，useProjectEvents composable 订阅过滤
 - **tenant_id 渐进迁移策略**：`get_active_filter` 新增可选 `current_user_id` 参数，为 None 时跳过校验（向后兼容）；关键入口（drilldown/penetration/import）已标注 TODO；路由层 `require_project_access` 仍是主要权限屏障
 - **interrupted 状态落地**：JobStatus 新增 `interrupted` 枚举 + Alembic 迁移 `view_refactor_interrupted_status_20260511` + recover_jobs 优先恢复（有 checkpoint 走 resume，无则全量重跑）
 - **REPEATABLE READ**：`DatasetService.activate` 开头条件执行 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`（仅 PG 生效，SQLite 静默跳过）
-- **Git commits**：36e5d68 + e40a8d1 推送到 `feature/ledger-import-view-refactor`
-- **剩余 7 个任务**：V1/V2 YG2101 性能验证 / 9.2 9家样本全绿 / 9.3 activate<1s / 9.8 UAT / 9.9 灰度部署 / 9.10 DROP 索引
-- **所有代码层任务已清零**，剩余全部是真人操作（跑大文件/部署/手动验收）
+- **Git commits**：36e5d68 + e40a8d1 + c8796f6 推送到 `feature/ledger-import-view-refactor`
+- **剩余 4 个任务**：9.2 9家样本全绿 / 9.8 UAT / 9.9 灰度部署 / 9.10 DROP 索引
+- **所有代码层任务已清零**，剩余全部是真人操作（部署/手动验收）
+- **YG2101 性能基线（2026-05-11 实测）**：128MB / 672k 行解析 + 200 万行写入，pipeline 总耗时 ~660s（11min）；activate <1s（B' 只改 metadata）；balance=812 / ledger=650,344 / aux_balance=45,316 / aux_ledger=1,285,170 / warnings=0 / blocking=0
 - **Alembic 迁移链最终序列（10 个）**：view_refactor_activate_index → tenant_id → force_submit → event_outbox_dlq → dataset_binding → mapping_history_fp → retention_class → creator_chain → interrupted_status
+
+## ledger-import-view-refactor 复盘改进建议（2026-05-11）
+
+- **E2E 脚本必须跟架构同步**：每次改 get_active_filter/activate/pipeline._insert 后先跑 e2e_http_curl.py 再提交；本次 B' 改造后脚本仍用 is_deleted=false 查询导致误报浪费 1 小时
+- **前后端响应结构对齐缺自动化**：DiagnosticPanel 期望顶层 errors 但后端返回 result_summary.findings，诊断面板一直为空无人发现；建议关键端点加 response_model + 前端 interface 对齐 checklist
+- **spec 目标设定要基于实测**：YG2101 "总耗时 <300s" 在 200 万行场景不现实（PG COPY ~5000 rows/s 物理极限），activate <1s 才是真正架构收益
+- **写入性能下一步方向**：异步 activate（pipeline 写完即返回 completed，activate 后台跑）或终极 B' 视图方案（业务查询走 v_tb_* 视图 JOIN ledger_datasets）
+- **superseded 膨胀治理**：YG2101 每次导入 200 万行 superseded，purge 后需 VACUUM 回收空间
+- **tenant_id 渐进迁移 deadline**：建议 3 个月内触碰即修，每次改文件时补 current_user_id 参数
