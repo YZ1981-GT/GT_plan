@@ -949,3 +949,13 @@ inclusion: always
 - **PG 数据库名确认**：`audit_platform`（不是 `gt_audit`）
 - **Windows 后端启动最稳方式**：`Start-Process -FilePath "python" -ArgumentList @("-m","uvicorn","app.main:app","--host","0.0.0.0","--port","9980") -WorkingDirectory "D:\GT_plan\backend" -WindowStyle Hidden`；不要用 Tee-Object 管道（会阻塞绑定）；不要用 controlPwshProcess（进程会立即退出看不到日志）
 - **V1/V2 复盘待办已部分完成**：V1 YG36 smoke 通过（activate <1s 验证）；V2 Alembic 列手动补齐（等价于 upgrade head 但未走 alembic 命令）；V4 YG2101 perf baseline 仍待跑
+
+## Sprint 5 接管机制落地 + Git 同步（2026-05-11）
+
+- **Sprint 5.9-5.11+5.13 F22 接管机制完成**：Alembic `view_refactor_creator_chain_20260520`（down=`view_refactor_retention_class_20260526`）+ `ImportJob.creator_chain JSONB DEFAULT '[]'` + `POST /jobs/{id}/takeover` 端点（PM/admin/partner 权限 + heartbeat >5min 过期检查 + creator_chain 追加 + resume_from_checkpoint 触发）+ `test_import_takeover.py` 6 用例全绿
+- **Alembic 迁移链最终序列（9 个）**：`view_refactor_activation_record_20260523` → `view_refactor_tenant_id_20260518` → `view_refactor_force_submit_20260524` → `event_outbox_dlq_20260521` → `view_refactor_dataset_binding_20260519` → `view_refactor_mapping_history_fp_20260525` → `view_refactor_retention_class_20260526` → `view_refactor_creator_chain_20260520`
+- **Git 分支状态**：`feature/ledger-import-view-refactor` 已推送到 origin（commit 9766e23）；同时 push 到 `feature/round8-deep-closure`（76a98a3）
+- **tasks.md 验收清单更新**：V3/V5/V6/V7/V8/V9/V10 标 ✅；1.26/2.6/2.7 标 ✅（YG36 E2E 替代验证）；V1/V2 待 YG2101 实测；V4 待 e2e_full_pipeline_validation
+- **PG 手动补列根因确认**：多条 ALTER TABLE 写在同一个 `docker exec psql -c "..."` 里时，中间某条报错会导致 PG 事务回滚整个块（后续语句全部不执行）；正确做法是每条 ALTER 单独一个 `docker exec psql -c` 调用
+- **剩余 50 个未完成任务分类**：前端 Vue 18 个 / 真实 PG+大文件 E2E 6 个 / PG-only 延后 4 个 / 运维部署 3 个 / 后端可自动化已全部清零
+- **后端可自动化任务全部完成**：Sprint 7-11 + Sprint 5 takeover = 所有后端 P0/P1 coding task 已标 [x]；剩余全是前端/真实环境/运维类

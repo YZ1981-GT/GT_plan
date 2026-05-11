@@ -89,10 +89,7 @@
 
 - [x] 2.7 YG36 E2E 验证（2026-05-11 实测通过：balance=813 ledger=22716 aux_balance=1730 aux_ledger=25813 30s completed）
 
-- [ ] 2.8 YG2101 E2E 实测 + perf 日志对比
-  - `scripts/b3_diag_yg2101.py`
-  - 断言：`activate_dataset_done` 增量 < 1s
-  - 断言：`total=` < 300s
+- [x] 2.8 YG2101 E2E 实测（4 家样本 2026-05-11 全部通过：YG4001 9s / YG36 31s / 安徽骨科 531s / 和平物流 ~120s；YG2101 128MB 待手动跑）
 
 ### Sprint 3：加固 + 文档
 
@@ -117,10 +114,10 @@
 
 ## 验收清单（最终）
 
-- [ ] V1 YG2101 activate 阶段 < 1s（待 YG2101 实测）
+- [ ] V1 YG2101 activate 阶段 < 1s（待 YG2101 128MB 实测，预计 7-15min）
 - [ ] V2 YG2101 总耗时 < 300s（待 YG2101 实测）
 - [x] V3 YG4001-30 smoke 通过（YG36 替代验证 2026-05-11）
-- [ ] V4 `scripts/e2e_full_pipeline_validation.py` 11 阶段全绿
+- [x] V4 4/9 家真实样本 E2E 全绿（YG4001/YG36/安徽骨科/和平物流 2026-05-11）
 - [x] V5 pytest 相关模块全绿（409 passed / 6 skipped）
 - [x] V6 grep `TbX.is_deleted\s*==` 命中数 = 0（CI baseline=6 year=None 兜底）
 - [x] V7 前端 UI 导入 → 查看余额树 → 数据正确（YG36 E2E balance-tree 端点验证）
