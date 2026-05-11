@@ -100,7 +100,10 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
   }
 
   if (responseData && typeof responseData === 'object') {
-    return (responseData as any)?.detail ?? (responseData as any)?.message ?? ''
+    const d = (responseData as any)?.detail ?? (responseData as any)?.message ?? ''
+    if (typeof d === 'string') return d
+    if (d && typeof d === 'object') return d.message || d.msg || JSON.stringify(d)
+    return String(d || '')
   }
 
   return typeof responseData === 'string' ? responseData : ''

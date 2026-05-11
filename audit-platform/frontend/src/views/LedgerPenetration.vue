@@ -9,8 +9,7 @@
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
       <div class="gt-ledger-title">
-        <span class="gt-ledger-company">{{ currentProject?.client_name || currentProject?.name || '—' }}</span>
-        <el-tag size="small" type="info" style="margin-left: 8px">{{ currentProject?.name || '' }}</el-tag>
+        <el-tag size="large" type="warning" effect="dark" style="font-size: 18px; padding: 8px 20px; font-weight: 600">{{ currentProject?.name || currentProject?.client_name || '—' }}</el-tag>
       </div>
       <div class="gt-ledger-switches">
         <el-select
@@ -122,8 +121,16 @@
 
       <!-- 空状态 -->
       <div v-if="balanceTab === 'account' && !loading && balanceData.length === 0" class="gt-empty-state">
-        <p style="font-size: 15px; color: #999">暂无科目余额数据</p>
-        <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
+        <template v-if="isImportActive">
+          <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
+          <p style="font-size: 15px; color: #4b2d77; font-weight: 500">数据处理中...</p>
+          <p style="font-size: 13px; color: #909399">后台正在导入账套数据，完成后此处将自动显示。可在顶栏查看进度。</p>
+          <el-button size="small" style="margin-top: 12px" @click="refresh">刷新查看</el-button>
+        </template>
+        <template v-else>
+          <p style="font-size: 15px; color: #999">暂无科目余额数据</p>
+          <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
+        </template>
       </div>
 
       <!-- 余额表 -->
@@ -229,9 +236,17 @@
         </div>
 
         <!-- 空状态 -->
-        <div v-if="!loading && auxSummaryData.length === 0 && auxPagedRows.length === 0" class="gt-empty-state">
-          <p style="font-size: 15px; color: #999">暂无辅助余额数据</p>
-          <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
+        <div v-if="!loading && auxSummaryData.length === 0 && auxPagedRows.length === 0 && treeAuxBalance.length === 0" class="gt-empty-state">
+          <template v-if="isImportActive">
+            <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
+            <p style="font-size: 15px; color: #4b2d77; font-weight: 500">数据处理中...</p>
+            <p style="font-size: 13px; color: #909399">后台正在导入账套数据，完成后此处将自动显示。</p>
+            <el-button size="small" style="margin-top: 12px" @click="loadAllAuxBalance">刷新查看</el-button>
+          </template>
+          <template v-else>
+            <p style="font-size: 15px; color: #999">暂无辅助余额数据</p>
+            <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
+          </template>
         </div>
 
         <el-table
@@ -254,6 +269,17 @@
           @selection-change="onSelectionChange"
           :row-style="auxRowStyle"
         >
+          <template #empty>
+            <div v-if="isImportActive" style="padding: 40px 0; text-align: center">
+              <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
+              <p style="font-size: 15px; color: #4b2d77; font-weight: 500; margin: 0">数据处理中...</p>
+              <p style="font-size: 13px; color: #909399; margin: 8px 0 12px">后台正在导入账套数据，完成后此处将自动显示。</p>
+              <el-button size="small" @click="loadAllAuxBalance">刷新查看</el-button>
+            </div>
+            <div v-else style="padding: 40px 0; text-align: center; color: #999">
+              暂无数据
+            </div>
+          </template>
           <el-table-column type="selection" width="40" align="center" />
           <el-table-column prop="account_code" label="科目编号" width="130" sortable>
             <template #default="{ row }"><span class="gt-amt">{{ row.account_code }}</span></template>
@@ -795,33 +821,45 @@
   </el-dialog>
 
   <!-- 数据校验弹窗 -->
-  <el-dialog v-model="validateDialogVisible" title="数据一致性校验" width="700px" append-to-body>
+  <el-dialog v-model="validateDialogVisible" title="数据一致性校验" width="650px" append-to-body>
     <div v-loading="validating" element-loading-text="正在校验...">
       <div v-if="validateResult">
-        <el-descriptions :column="3" border size="small" style="margin-bottom: 12px">
-          <el-descriptions-item label="余额表科目">{{ validateResult.summary?.balance_count || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="辅助核算科目">{{ validateResult.summary?.aux_account_count || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="序时账科目">{{ validateResult.summary?.ledger_account_count || 0 }}</el-descriptions-item>
-        </el-descriptions>
-
-        <div v-for="(f, idx) in validateResult.findings" :key="idx"
-          style="margin-bottom: 6px; font-size: 13px; display: flex; align-items: flex-start; gap: 6px">
-          <el-tag :type="f.level === 'error' ? 'danger' : f.level === 'warning' ? 'warning' : 'success'" size="small" style="flex-shrink: 0">
-            {{ f.category }}
-          </el-tag>
-          <span :style="{ color: f.level === 'error' ? '#f56c6c' : f.level === 'warning' ? '#e6a23c' : '#67c23a' }">
-            {{ f.message }}
-          </span>
+        <!-- 概览卡片 -->
+        <div style="display: flex; gap: 12px; margin-bottom: 16px">
+          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
+            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.balance_count || 0 }}</div>
+            <div style="font-size: 12px; color: #909399">余额表科目</div>
+          </div>
+          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
+            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.aux_account_count || 0 }}</div>
+            <div style="font-size: 12px; color: #909399">辅助核算科目</div>
+          </div>
+          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
+            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.ledger_account_count || 0 }}</div>
+            <div style="font-size: 12px; color: #909399">序时账科目</div>
+          </div>
         </div>
 
-        <div v-if="!validateResult.findings?.length" style="color: #999; text-align: center; padding: 20px">
-          暂无校验结果
+        <!-- 校验结果 -->
+        <div v-for="(f, idx) in validateResult.findings" :key="idx"
+          style="margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px"
+          :style="{
+            background: f.level === 'error' ? '#fef0f0' : f.level === 'warning' ? '#fdf6ec' : '#f0f9eb',
+            border: `1px solid ${f.level === 'error' ? '#fbc4c4' : f.level === 'warning' ? '#f5dab1' : '#c2e7b0'}`,
+          }"
+        >
+          <span style="font-size: 16px; flex-shrink: 0">{{ f.level === 'error' ? '❌' : f.level === 'warning' ? '⚠️' : '✅' }}</span>
+          <span style="font-weight: 500; min-width: 120px; flex-shrink: 0; color: #606266">{{ f.category }}</span>
+          <span style="color: #303133">{{ f.message }}</span>
+        </div>
+
+        <!-- 全部通过 -->
+        <div v-if="validateResult.summary?.errors === 0 && validateResult.summary?.warnings === 0"
+          style="text-align: center; padding: 20px; color: #67c23a; font-size: 15px; font-weight: 500">
+          🎉 数据一致性校验全部通过
         </div>
       </div>
     </div>
-    <template #footer>
-      <el-button @click="validateDialogVisible = false">关闭</el-button>
-    </template>
   </el-dialog>
 
   <!-- ── 账表数据管理弹窗 ── -->
@@ -1275,6 +1313,9 @@ function initColumnMapping() {
 // ── 后台导入轮询状态 ──
 const bgImportPolling = ref(false)
 const bgImportMessage = ref('')
+
+// 是否有正在进行的导入（用于空状态提示）
+const isImportActive = ref(false)
 
 // ── 导入状态后台轮询（需求 22.1、22.2） ──
 let _importStatusTimer: ReturnType<typeof setInterval> | null = null
@@ -2182,12 +2223,30 @@ async function loadBalance() {
       params: { year: year.value },
     })
     balanceData.value = data ?? []
-    // debug log removed for production
+    // 数据为空时检测是否有正在进行的导入
+    if (balanceData.value.length === 0) {
+      checkImportActive()
+    } else {
+      isImportActive.value = false
+    }
   } catch (e) {
     console.error('[Ledger] loadBalance failed:', e)
     balanceData.value = []
+    checkImportActive()
   }
   finally { loading.value = false }
+}
+
+/** 检测是否有正在进行的导入任务 */
+async function checkImportActive() {
+  try {
+    const resp: any = await api.get(
+      `/api/projects/${projectId.value}/ledger-import/active-job`,
+    )
+    isImportActive.value = resp?.status === 'processing' || resp?.status === 'queued'
+  } catch {
+    isImportActive.value = false
+  }
 }
 
 async function loadLedger() {
@@ -2660,7 +2719,13 @@ async function loadAllAuxBalance() {
     console.error('loadAllAuxBalance error:', e)
     auxSummaryData.value = []; auxPagedRows.value = []
   }
-  finally { loading.value = false }
+  finally {
+    loading.value = false
+    // 数据为空时检测是否有正在进行的导入
+    if (auxSummaryData.value.length === 0 && auxPagedRows.value.length === 0) {
+      checkImportActive()
+    }
+  }
 }
 
 /** 加载指定维度的汇总数据（树形视图和仅小计模式用） */
@@ -2713,6 +2778,9 @@ async function loadAuxBalancePage() {
     const result = data
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0
+    if (auxPagedRows.value.length === 0 && auxSummaryData.value.length === 0) {
+      checkImportActive()
+    }
   } catch { auxPagedRows.value = [] }
 }
 

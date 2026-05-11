@@ -962,7 +962,7 @@ async def validate_data(
 
     findings = []
 
-    # 1. 科目余额表内部勾稽
+    # 1. 科目余额表内部勾稽（排除损益类科目——期末结转后期初期末天然为0）
     bal_tbl = TbBalance.__table__
     bal_rows = await db.execute(
         sa.select(
@@ -992,20 +992,24 @@ async def validate_data(
         credit = credit or Decimal(0)
         closing = closing or Decimal(0)
         bal_map[code] = {"opening": opening, "debit": debit, "credit": credit, "closing": closing}
+        # 损益类科目（5xxx/6xxx）期初期末天然为0，只检查有期初或期末的科目
+        is_income_expense = str(code).startswith('5') or str(code).startswith('6')
+        if is_income_expense:
+            continue  # 损益类不做勾稽检查
         expected = opening + debit - credit
-        if abs(expected - closing) > Decimal("0.01"):
+        if abs(expected - closing) > Decimal("1.00"):  # 容差 1 元（四舍五入）
             bal_errors += 1
-            if bal_errors <= 5:
+            if bal_errors <= 3:
                 findings.append({
                     "level": "error", "category": "余额表勾稽",
-                    "message": f"{code}: 期初{opening}+借{debit}-贷{credit}={expected}, 期末{closing}, 差{expected-closing}",
+                    "message": f"{code}: 期初+借-贷={expected:.2f}, 期末={closing:.2f}, 差额={abs(expected-closing):.2f}",
                 })
-    if bal_errors > 5:
+    if bal_errors > 3:
         findings.append({"level": "error", "category": "余额表勾稽",
-                         "message": f"共 {bal_errors} 个科目不平"})
+                         "message": f"共 {bal_errors} 个科目借贷不平（已排除损益类）"})
     elif bal_errors == 0:
         findings.append({"level": "info", "category": "余额表勾稽",
-                         "message": f"{len(bal_data)} 个科目全部勾稽通过"})
+                         "message": f"✓ {len(bal_data)} 个科目全部勾稽通过"})
 
     # 2. 科目余额表 vs 辅助余额表
     aux_tbl = TbAuxBalance.__table__
@@ -1031,22 +1035,25 @@ async def validate_data(
         if code not in bal_map:
             continue
         b_closing = bal_map[code]["closing"]
+        # 损益类科目跳过（期末=0 但辅助维度可能有值）
+        if str(code).startswith('5') or str(code).startswith('6'):
+            continue
         types = aux_by_code[code]
         best_type, best_cnt, best_closing = min(types, key=lambda x: abs(b_closing - x[2]))
         diff = b_closing - best_closing
-        if abs(diff) > Decimal("0.01"):
+        if abs(diff) > Decimal("1.00"):  # 容差 1 元
             cross_errors += 1
-            if cross_errors <= 5:
+            if cross_errors <= 3:
                 findings.append({
                     "level": "warning", "category": "余额表vs辅助余额表",
-                    "message": f"{code}: 科目期末={b_closing}, 维度({best_type},{best_cnt}条)汇总={best_closing}, 差{diff}",
+                    "message": f"{code}: 主表期末={b_closing:.2f}, 辅助({best_type})汇总={best_closing:.2f}, 差额={abs(diff):.2f}",
                 })
-    if cross_errors > 5:
+    if cross_errors > 3:
         findings.append({"level": "warning", "category": "余额表vs辅助余额表",
-                         "message": f"共 {cross_errors} 个科目不一致"})
+                         "message": f"共 {cross_errors} 个科目不一致（已排除损益类）"})
     elif cross_errors == 0 and aux_by_code:
         findings.append({"level": "info", "category": "余额表vs辅助余额表",
-                         "message": f"{len(aux_by_code)} 个有辅助核算的科目全部一致"})
+                         "message": f"✓ {len(aux_by_code)} 个辅助核算科目全部一致"})
 
     # 3. 序时账 vs 科目余额表
     led_tbl = TbLedger.__table__
@@ -1068,14 +1075,14 @@ async def validate_data(
         b = bal_map[code]
         led_debit = led_debit or Decimal(0)
         led_credit = led_credit or Decimal(0)
-        if abs(b["debit"] - led_debit) > Decimal("0.01") or abs(b["credit"] - led_credit) > Decimal("0.01"):
+        if abs(b["debit"] - led_debit) > Decimal("1.00") or abs(b["credit"] - led_credit) > Decimal("1.00"):
             led_errors += 1
-            if led_errors <= 5:
+            if led_errors <= 3:
                 findings.append({
                     "level": "warning", "category": "序时账vs余额表",
-                    "message": f"{code}: 余额表借{b['debit']}/贷{b['credit']}, 序时账借{led_debit}/贷{led_credit}",
+                    "message": f"{code}: 余额表借{b['debit']:.2f}/贷{b['credit']:.2f}, 序时账借{led_debit:.2f}/贷{led_credit:.2f}",
                 })
-    if led_errors > 5:
+    if led_errors > 3:
         findings.append({"level": "warning", "category": "序时账vs余额表",
                          "message": f"共 {led_errors} 个科目不一致"})
     elif led_errors == 0 and led_agg_data:

@@ -94,7 +94,7 @@ class ImportJobRunner:
             if timed_out_jobs:
                 await db.commit()
 
-            stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=20)
+            stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=120)
             running_states = (
                 JobStatus.running,
                 JobStatus.validating,

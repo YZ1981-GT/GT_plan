@@ -72,16 +72,25 @@ async def summarize_ledger_data(
         datasets = []
 
     # 汇总各年度各表行数
+    # record_summary key 映射: balance_rows→tb_balance, ledger_rows→tb_ledger 等
+    _KEY_MAP = {
+        "tb_balance": "balance_rows",
+        "tb_ledger": "ledger_rows",
+        "tb_aux_balance": "aux_balance_rows",
+        "tb_aux_ledger": "aux_ledger_rows",
+    }
     for table in LEDGER_TABLES:
         table_data: dict[str, Any] = {"total": 0, "years": {}}
         for ds_row in datasets:
             y = int(ds_row[0])
             summary = ds_row[1] or {}
-            # record_summary 格式: {"tb_balance": N, "tb_ledger": N, ...}
-            cnt = summary.get(table, 0) if isinstance(summary, dict) else 0
-            if cnt > 0:
-                table_data["total"] += cnt
-                table_data["years"][y] = {"total": cnt}
+            if not isinstance(summary, dict):
+                continue
+            # 尝试两种 key 格式（新格式 balance_rows / 旧格式 tb_balance）
+            cnt = summary.get(_KEY_MAP.get(table, table), 0) or summary.get(table, 0)
+            if cnt and int(cnt) > 0:
+                table_data["total"] += int(cnt)
+                table_data["years"][y] = {"total": int(cnt)}
         result["tables"][table] = table_data
 
     # 序时账补充 period 分布（只查 active 数据，用索引）
