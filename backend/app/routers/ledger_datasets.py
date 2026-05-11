@@ -216,7 +216,19 @@ async def list_import_jobs(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询导入作业历史"""
+    from app.models.core import User as UserModel
     jobs = await ImportJobService.list_jobs(db, project_id, year)
+    # 批量查询用户名
+    user_ids = {j.created_by for j in jobs if j.created_by}
+    user_map: dict = {}
+    if user_ids:
+        import sqlalchemy as sa
+        result = await db.execute(
+            sa.select(UserModel.id, UserModel.username)
+            .where(UserModel.id.in_(user_ids))
+        )
+        for row in result.fetchall():
+            user_map[str(row[0])] = row[1] or str(row[0])[:8]
     return [
         {
             "id": str(j.id),
@@ -226,6 +238,7 @@ async def list_import_jobs(
             "progress_message": j.progress_message,
             "error_message": j.error_message,
             "retry_count": j.retry_count,
+            "created_by_name": user_map.get(str(j.created_by), '—') if j.created_by else '—',
             "created_at": j.created_at.isoformat() if j.created_at else None,
             "started_at": j.started_at.isoformat() if j.started_at else None,
             "completed_at": j.completed_at.isoformat() if j.completed_at else None,

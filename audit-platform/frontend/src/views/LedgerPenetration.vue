@@ -1,5 +1,11 @@
 <template>
-  <div class="gt-penetration">
+  <div class="gt-penetration" :class="{ 'gt-penetration--fullscreen': isFullscreen }" ref="penetrationRef">
+    <!-- 全屏模式下的退出提示 -->
+    <div v-if="isFullscreen" class="gt-fullscreen-topbar">
+      <span>{{ currentProject?.client_name || '—' }} · 账簿查询</span>
+      <div style="flex:1" />
+      <el-button size="small" @click="toggleFullscreen">退出全屏</el-button>
+    </div>
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
       <div class="gt-ledger-title">
@@ -107,7 +113,11 @@
         <el-tag type="info" size="small">账簿查询</el-tag>
         <el-tag size="small">{{ filteredFlatCount }} / {{ balanceData.length }}</el-tag>
         <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
-        <el-button size="small" type="success" plain @click="exportBalanceExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="exportBalanceExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">
+          {{ isFullscreen ? '退出全屏' : '全屏' }}
+        </el-button>
       </div>
 
       <!-- 空状态 -->
@@ -130,27 +140,30 @@
         style="width: 100%"
         highlight-current-row
         @row-dblclick="drillToLedger"
+        @row-contextmenu="onRowContextMenu"
+        @selection-change="onSelectionChange"
         :row-style="balanceRowStyle"
         :indent="24"
       >
+        <el-table-column type="selection" width="40" align="center" />
         <el-table-column prop="account_code" label="科目编号" width="200" sortable>
           <template #default="{ row }">
-            <span class="gt-link" @click.stop="drillToLedger(row)">{{ row.account_code }}</span>
+            <span class="gt-link gt-amt" @click.stop="drillToLedger(row)">{{ row.account_code }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="opening_balance" label="期初余额" width="150" align="right" sortable>
-          <template #default="{ row }">{{ fmtAmt(row.opening_balance) }}</template>
+        <el-table-column prop="opening_balance" label="期初余额" width="170" align="right" sortable>
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.opening_balance) }}</span></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方发生额" width="150" align="right" sortable>
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方发生额" width="170" align="right" sortable>
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方发生额" width="150" align="right" sortable>
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方发生额" width="170" align="right" sortable>
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末余额" width="150" align="right" sortable>
+        <el-table-column prop="closing_balance" label="期末余额" width="170" align="right" sortable>
           <template #default="{ row }">
-            <span class="gt-link" @click.stop="drillToLedger(row)">{{ fmtAmt(row.closing_balance) }}</span>
+            <span class="gt-link gt-amt" @click.stop="drillToLedger(row)">{{ fmtAmt(row.closing_balance) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -172,7 +185,9 @@
             </el-button>
             <div class="gt-filter-spacer" />
             <el-button size="small" @click="loadAllAuxBalance" :loading="loading">刷新</el-button>
-            <el-button size="small" type="success" plain @click="exportAuxBalanceExcel">导出Excel</el-button>
+            <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+            <el-button size="small" plain @click="exportAuxBalanceExcel">导出Excel</el-button>
+            <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
             <el-button size="small" text @click="auxToolbarCollapsed = !auxToolbarCollapsed" style="padding: 4px 6px; min-width: auto">
               {{ auxToolbarCollapsed ? '展开筛选 ▼' : '收起筛选 ▲' }}
             </el-button>
@@ -235,9 +250,14 @@
           style="width: 100%"
           highlight-current-row
           @row-dblclick="drillToAuxLedgerFromBalance"
+          @row-contextmenu="onRowContextMenu"
+          @selection-change="onSelectionChange"
           :row-style="auxRowStyle"
         >
-          <el-table-column prop="account_code" label="科目编号" width="130" sortable />
+          <el-table-column type="selection" width="40" align="center" />
+          <el-table-column prop="account_code" label="科目编号" width="130" sortable>
+            <template #default="{ row }"><span class="gt-amt">{{ row.account_code }}</span></template>
+          </el-table-column>
           <el-table-column prop="account_name" label="科目名称" width="150" show-overflow-tooltip />
           <el-table-column v-if="!auxTreeMode" prop="aux_type" label="辅助类型" width="90" />
           <el-table-column prop="aux_code" label="辅助编码" width="100" show-overflow-tooltip>
@@ -261,35 +281,37 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="opening_balance" label="期初余额" width="130" align="right" sortable>
+          <el-table-column prop="opening_balance" label="期初余额" width="160" align="right" sortable>
             <template #default="{ row }">
-              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.opening_balance) }}</span>
+              <span class="gt-amt" :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.opening_balance) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="debit_amount" label="借方发生额" width="130" align="right" sortable>
+          <el-table-column prop="debit_amount" label="借方发生额" width="160" align="right" sortable>
             <template #default="{ row }">
-              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.debit_amount) }}</span>
+              <span class="gt-amt" :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.debit_amount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="credit_amount" label="贷方发生额" width="130" align="right" sortable>
+          <el-table-column prop="credit_amount" label="贷方发生额" width="160" align="right" sortable>
             <template #default="{ row }">
-              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.credit_amount) }}</span>
+              <span class="gt-amt" :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.credit_amount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="closing_balance" label="期末余额" width="130" align="right" sortable>
+          <el-table-column prop="closing_balance" label="期末余额" width="160" align="right" sortable>
             <template #default="{ row }">
-              <span v-if="!row._isGroup" class="gt-link" @click.stop="drillToAuxLedgerFromBalance(row)">{{ fmtAmt(row.closing_balance) }}</span>
-              <span v-else style="font-weight: 600">{{ fmtAmt(row.closing_balance) }}</span>
+              <span v-if="!row._isGroup" class="gt-link gt-amt" @click.stop="drillToAuxLedgerFromBalance(row)">{{ fmtAmt(row.closing_balance) }}</span>
+              <span v-else class="gt-amt" style="font-weight: 600">{{ fmtAmt(row.closing_balance) }}</span>
             </template>
           </el-table-column>
         </el-table>
         <div class="gt-pagination" v-if="!auxTreeMode && auxFlatTotal > auxPageSize">
           <el-pagination
             v-model:current-page="auxPage"
-            :page-size="auxPageSize"
+            v-model:page-size="auxPageSize"
+            :page-sizes="auxPageSizeOptions"
             :total="auxFlatTotal"
-            layout="prev, pager, next, total"
+            layout="sizes, total, prev, pager, next, jumper"
             size="small"
+            @size-change="onAuxPageSizeChange"
             @current-change="loadAuxBalancePage"
           />
         </div>
@@ -313,7 +335,9 @@
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} 序时账</el-tag>
         <el-button size="small" @click="loadLedger" :loading="loading">刷新</el-button>
-        <el-button size="small" type="success" plain @click="exportLedgerExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="exportLedgerExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
         :data="ledgerDisplay"
@@ -323,33 +347,45 @@
         style="width: 100%"
         highlight-current-row
         @row-dblclick="drillToVoucher"
+        @row-contextmenu="onRowContextMenu"
+        @selection-change="onSelectionChange"
         :row-class-name="ledgerRowClass"
       >
-        <el-table-column prop="voucher_date" label="日期" width="100" />
+        <el-table-column type="selection" width="40" align="center" />
+        <el-table-column prop="voucher_date" label="日期" width="110">
+          <template #default="{ row }"><span class="gt-amt">{{ row.voucher_date }}</span></template>
+        </el-table-column>
         <el-table-column prop="voucher_no" label="凭证号" width="90">
           <template #default="{ row }">
-            <span v-if="row._type === 'normal'" class="gt-link" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
+            <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="debit_amount" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="140" align="right">
+        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
+        </el-table-column>
+        <el-table-column prop="balance" label="余额" width="170" align="right">
           <template #default="{ row }">
-            <span :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
+            <span class="gt-amt" :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="counterpart_account" label="对方科目" width="120" show-overflow-tooltip />
       </el-table>
-      <div class="gt-pagination" v-if="ledgerHasMore || ledgerTotal > ledgerPageSize">
-        <el-button v-if="ledgerHasMore" @click="loadMoreLedger" :loading="ledgerLoadingMore" size="small" type="primary" plain>
-          加载更多
-        </el-button>
-        <el-tag size="small" type="info" style="margin-left: 8px">已加载 {{ ledgerItems.length }} / {{ ledgerTotal }} 条</el-tag>
+      <div class="gt-pagination" v-if="ledgerTotal > ledgerPageSize">
+        <el-pagination
+          v-model:current-page="ledgerPage"
+          v-model:page-size="ledgerPageSize"
+          :page-sizes="ledgerPageSizeOptions"
+          :total="ledgerTotal"
+          layout="sizes, total, prev, pager, next, jumper"
+          size="small"
+          @size-change="onLedgerPageSizeChange"
+          @current-change="onLedgerPageChange"
+        />
       </div>
     </template>
 
@@ -358,17 +394,33 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">凭证 {{ currentVoucher }}</el-tag>
+        <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
-      <el-table :data="voucherItems" border stripe size="small" :max-height="tableHeight" style="width: 100%">
-        <el-table-column prop="account_code" label="科目编号" width="120" />
+      <el-table
+        :data="voucherItems"
+        border
+        stripe
+        size="small"
+        :max-height="tableHeight"
+        style="width: 100%"
+        @selection-change="onSelectionChange"
+        @row-contextmenu="onRowContextMenu"
+      >
+        <el-table-column type="selection" width="40" align="center" />
+        <el-table-column prop="account_code" label="科目编号" width="120">
+          <template #default="{ row }"><span class="gt-amt">{{ row.account_code }}</span></template>
+        </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="debit_amount" label="借方" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
+        </el-table-column>
       </el-table>
     </template>
 
@@ -377,8 +429,11 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} 辅助余额</el-tag>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
-      <el-table :data="auxBalanceItems" border stripe size="small" :max-height="tableHeight" style="width: 100%" @row-dblclick="drillToAuxLedger">
+      <el-table :data="auxBalanceItems" border stripe size="small" :max-height="tableHeight" style="width: 100%" @row-dblclick="drillToAuxLedger" @row-contextmenu="onRowContextMenu" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="40" align="center" />
         <el-table-column prop="aux_type" label="辅助类型" width="100" />
         <el-table-column prop="aux_code" label="编号" width="120" />
         <el-table-column prop="aux_name" label="名称" min-width="200" show-overflow-tooltip>
@@ -386,17 +441,17 @@
             <span class="gt-link">{{ row.aux_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="opening_balance" label="期初" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.opening_balance) }}</template>
+        <el-table-column prop="opening_balance" label="期初" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.opening_balance) }}</span></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.closing_balance) }}</template>
+        <el-table-column prop="closing_balance" label="期末" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.closing_balance) }}</span></template>
         </el-table-column>
       </el-table>
     </template>
@@ -407,6 +462,8 @@
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} / {{ currentAuxCode }} 辅助明细</el-tag>
         <el-button size="small" @click="loadAuxLedger" :loading="loading">刷新</el-button>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
         :data="auxLedgerDisplay"
@@ -416,25 +473,32 @@
         style="width: 100%"
         highlight-current-row
         @row-dblclick="drillToVoucher"
+        @row-contextmenu="onRowContextMenu"
+        @selection-change="onSelectionChange"
         :row-class-name="ledgerRowClass"
       >
-        <el-table-column prop="voucher_date" label="日期" width="100" />
+        <el-table-column type="selection" width="40" align="center" />
+        <el-table-column prop="voucher_date" label="日期" width="110">
+          <template #default="{ row }"><span class="gt-amt">{{ row.voucher_date }}</span></template>
+        </el-table-column>
         <el-table-column prop="voucher_no" label="凭证号" width="90">
           <template #default="{ row }">
-            <span v-if="row._type === 'normal'" class="gt-link" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
+            <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="aux_name" label="辅助名称" width="150" show-overflow-tooltip />
-        <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="debit_amount" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="140" align="right">
+        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
+        </el-table-column>
+        <el-table-column prop="balance" label="余额" width="170" align="right">
           <template #default="{ row }">
-            <span :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
+            <span class="gt-amt" :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -451,6 +515,27 @@
     </template>
 
   </div>
+
+  <!-- ── 右键上下文菜单 ── -->
+  <Teleport to="body">
+    <div
+      v-if="contextMenu.visible"
+      class="gt-context-menu"
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+      @click="contextMenu.visible = false"
+    >
+      <div class="gt-context-menu__item" @click="onContextAction('drill')">
+        穿透到明细
+      </div>
+      <div class="gt-context-menu__item" @click="onContextAction('copy')">
+        复制选中行
+      </div>
+      <div class="gt-context-menu__item gt-context-menu__divider" />
+      <div class="gt-context-menu__item" @click="onContextAction('voucher')">
+        抽凭到底稿（开发中）
+      </div>
+    </div>
+  </Teleport>
 
   <!-- ── 智能导入弹窗 ── -->
   <el-dialog
@@ -747,6 +832,59 @@
     @data-changed="onDataChanged"
     @request-incremental-upload="onIncrementalUpload"
   />
+
+  <!-- ── 导入历史弹窗 ── -->
+  <el-dialog v-model="importHistoryVisible" title="导入历史" width="900px" append-to-body destroy-on-close>
+    <div v-loading="importHistoryLoading">
+      <el-tabs>
+        <el-tab-pane label="导入作业">
+          <el-empty v-if="importHistoryJobs.length === 0" description="暂无导入记录" />
+          <el-table v-else :data="importHistoryJobs" border size="small" style="width: 100%">
+            <el-table-column prop="status" label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'completed' ? 'success' : row.status === 'failed' ? 'danger' : row.status === 'running' ? 'warning' : 'info'" size="small">{{ row.status }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="progress_pct" label="进度" width="140">
+              <template #default="{ row }">
+                <el-progress :percentage="Math.max(0, Math.min(row.progress_pct || 0, 100))" :stroke-width="14" />
+              </template>
+            </el-table-column>
+            <el-table-column prop="progress_message" label="阶段" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="created_by_name" label="导入人" width="90" />
+            <el-table-column prop="created_at" label="时间" width="140">
+              <template #default="{ row }"><span class="gt-amt">{{ row.created_at ? new Date(row.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' }}</span></template>
+            </el-table-column>
+            <el-table-column prop="error_message" label="错误" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span v-if="row.error_message" style="color: #f56c6c">{{ row.error_message }}</span>
+                <span v-else style="color: #999">—</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane label="数据集版本">
+          <el-empty v-if="importHistoryDatasets.length === 0" description="暂无数据集" />
+          <el-table v-else :data="importHistoryDatasets" border size="small" style="width: 100%">
+            <el-table-column prop="status" label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'active' ? 'success' : row.status === 'failed' ? 'danger' : 'info'" size="small">{{ row.status }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="id" label="ID" width="100" show-overflow-tooltip>
+              <template #default="{ row }"><span class="gt-amt">{{ row.id?.slice(0, 8) }}</span></template>
+            </el-table-column>
+            <el-table-column prop="record_summary" label="数据量" min-width="260">
+              <template #default="{ row }">{{ formatRecordSummary(row.record_summary) }}</template>
+            </el-table-column>
+            <el-table-column prop="activated_at" label="激活时间" width="140">
+              <template #default="{ row }"><span class="gt-amt">{{ row.activated_at ? new Date(row.activated_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' }}</span></template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
@@ -877,10 +1015,8 @@ function goToImport() {
 }
 
 function goToImportHistory() {
-  router.push({
-    path: `/projects/${projectId.value}/ledger/import-history`,
-    query: { year: String(selectedYear.value) },
-  })
+  importHistoryVisible.value = true
+  loadImportHistory()
 }
 
 // ── 智能导入 ──
@@ -983,6 +1119,36 @@ const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
 
 // 账表数据管理弹窗
 const dataManagerVisible = ref(false)
+
+// 导入历史弹窗
+const importHistoryVisible = ref(false)
+const importHistoryLoading = ref(false)
+const importHistoryJobs = ref<any[]>([])
+const importHistoryDatasets = ref<any[]>([])
+
+async function loadImportHistory() {
+  importHistoryLoading.value = true
+  try {
+    const [jobsData, datasetsData] = await Promise.allSettled([
+      api.get(P_ledger.import.jobs(projectId.value), { params: { year: year.value } }),
+      api.get(P_ledger.import.datasets(projectId.value), { params: { year: year.value } }),
+    ])
+    importHistoryJobs.value = jobsData.status === 'fulfilled' ? (jobsData.value ?? []) : []
+    importHistoryDatasets.value = datasetsData.status === 'fulfilled' ? (datasetsData.value ?? []) : []
+  } finally {
+    importHistoryLoading.value = false
+  }
+}
+
+function formatRecordSummary(summary: Record<string, unknown> | null | undefined) {
+  if (!summary) return '—'
+  const parts: string[] = []
+  if (summary.tb_balance) parts.push(`余额 ${summary.tb_balance}`)
+  if (summary.tb_aux_balance) parts.push(`辅助余额 ${summary.tb_aux_balance}`)
+  if (summary.tb_ledger) parts.push(`序时账 ${summary.tb_ledger}`)
+  if (summary.tb_aux_ledger) parts.push(`辅助明细 ${summary.tb_aux_ledger}`)
+  return parts.length > 0 ? parts.join(' / ') : '—'
+}
 
 function onDataChanged() {
   // 数据被删除/追加后刷新页面数据
@@ -1585,6 +1751,68 @@ watch(() => route.query.import, (val) => {
 const loading = ref(false)
 const tableHeight = ref(Math.max(400, window.innerHeight - 240))
 
+// ── 全屏模式 ──
+const isFullscreen = ref(false)
+const penetrationRef = ref<HTMLElement | null>(null)
+
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
+  // 全屏时表格高度占满
+  if (isFullscreen.value) {
+    tableHeight.value = window.innerHeight - 140
+  } else {
+    tableHeight.value = Math.max(400, window.innerHeight - 240)
+  }
+}
+
+// ── 行选择 ──
+const selectedRows = ref<any[]>([])
+
+function onSelectionChange(rows: any[]) {
+  selectedRows.value = rows
+}
+
+// ── 右键菜单 ──
+const contextMenu = ref({ visible: false, x: 0, y: 0, row: null as any })
+
+function onRowContextMenu(row: any, _col: any, event: MouseEvent) {
+  event.preventDefault()
+  contextMenu.value = { visible: true, x: event.clientX, y: event.clientY, row }
+  // 点击其他地方关闭
+  const close = () => { contextMenu.value.visible = false; document.removeEventListener('click', close) }
+  setTimeout(() => document.addEventListener('click', close), 0)
+}
+
+function onContextAction(action: string) {
+  const row = contextMenu.value.row
+  if (!row) return
+  if (action === 'drill') {
+    if (currentLevel.value === 'balance') drillToLedger(row)
+    else if (currentLevel.value === 'ledger') drillToVoucher(row)
+  } else if (action === 'copy') {
+    copySelectedRows(row)
+  } else if (action === 'voucher') {
+    // TODO: 抽凭联动到底稿（后续实现）
+  }
+}
+
+/** 复制选中行到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
+function copySelectedRows(fallbackRow?: any) {
+  const rows = selectedRows.value.length > 0 ? selectedRows.value : (fallbackRow ? [fallbackRow] : [])
+  if (rows.length === 0) return
+  // 提取可见字段（排除内部字段）
+  const excludeKeys = new Set(['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra'])
+  const keys = Object.keys(rows[0]).filter(k => !excludeKeys.has(k) && !k.startsWith('_'))
+  const lines = rows.map(r => keys.map(k => {
+    const v = r[k]
+    return v == null ? '' : String(v)
+  }).join('\t'))
+  const text = lines.join('\n')
+  navigator.clipboard?.writeText(text).then(() => {
+    ElMessage.success(`已复制 ${rows.length} 行`)
+  })
+}
+
 // ── 导航状态 ──
 type Level = 'balance' | 'ledger' | 'voucher' | 'aux_balance' | 'aux_ledger'
 const currentLevel = ref<Level>('balance')
@@ -1601,7 +1829,8 @@ const balanceTab = ref<'account' | 'aux'>('account')
 const auxSearchKeyword = ref('')
 const auxFilter = ref('all')
 const auxPage = ref(1)
-const auxPageSize = 100
+const auxPageSize = ref(100)
+const auxPageSizeOptions = [50, 100, 200, 500]
 const dateRange = ref<string[] | null>(null)
 
 interface Crumb { label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string }
@@ -1612,12 +1841,8 @@ const balanceData = ref<any[]>([])
 const ledgerItems = ref<any[]>([])
 const ledgerTotal = ref(0)
 const ledgerPage = ref(1)
-const ledgerPageSize = 200
-
-// ── 游标分页状态 ──
-const ledgerCursor = ref<string | null>(null)
-const ledgerHasMore = ref(false)
-const ledgerLoadingMore = ref(false)
+const ledgerPageSize = ref(100)
+const ledgerPageSizeOptions = [50, 100, 200, 500]
 
 /** 序时账增强显示：期初行 + 每笔余额 + 月小计行 */
 const ledgerDisplay = computed(() => {
@@ -1811,11 +2036,16 @@ const filteredBalance = computed(() => {
   } else if (f === 'both') {
     rows = rows.filter(r => num(r.opening_balance) !== 0 && num(r.closing_balance) !== 0)
   } else if (f === 'all_nonzero') {
-    rows = rows.filter(r =>
-      num(r.opening_balance) !== 0 &&
-      (num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0) &&
-      num(r.closing_balance) !== 0
-    )
+    // 损益类科目期末结转后 opening/closing 天然为 0，只判断有变动
+    rows = rows.filter(r => {
+      const hasMovement = num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0
+      const code = String(r.account_code || '')
+      const isIncomeExpense = code.startsWith('5') || code.startsWith('6')
+      if (isIncomeExpense) {
+        return hasMovement
+      }
+      return num(r.opening_balance) !== 0 && hasMovement && num(r.closing_balance) !== 0
+    })
   } else if (f === 'changed') {
     rows = rows.filter(r => num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0)
   } else if (f === 'debit') {
@@ -1963,7 +2193,7 @@ async function loadBalance() {
 async function loadLedger() {
   loading.value = true
   try {
-    const params: any = { year: year.value, limit: ledgerPageSize }
+    const params: any = { year: year.value, page: ledgerPage.value, page_size: ledgerPageSize.value }
     if (dateRange.value?.length === 2) {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
@@ -1978,31 +2208,19 @@ async function loadLedger() {
     currentAccountOpening.value = num(obResult?.opening_balance)
     ledgerItems.value = result.items ?? result ?? []
     ledgerTotal.value = result.total ?? ledgerItems.value.length
-    ledgerCursor.value = result.next_cursor ?? null
-    ledgerHasMore.value = result.has_more ?? false
-  } catch { ledgerItems.value = []; ledgerHasMore.value = false }
+  } catch { ledgerItems.value = [] }
   finally { loading.value = false }
 }
 
-async function loadMoreLedger() {
-  if (!ledgerHasMore.value || !ledgerCursor.value || ledgerLoadingMore.value) return
-  ledgerLoadingMore.value = true
-  try {
-    const params: any = { year: year.value, limit: ledgerPageSize, cursor: ledgerCursor.value }
-    if (dateRange.value?.length === 2) {
-      params.date_from = dateRange.value[0]
-      params.date_to = dateRange.value[1]
-    }
-    const data = await api.get(
-      P_ledger.entries(projectId.value, currentAccount.value), { params }
-    )
-    const result = data
-    const newItems = result.items ?? result ?? []
-    ledgerItems.value = [...ledgerItems.value, ...newItems]
-    ledgerCursor.value = result.next_cursor ?? null
-    ledgerHasMore.value = result.has_more ?? false
-  } catch { ledgerHasMore.value = false }
-  finally { ledgerLoadingMore.value = false }
+function onLedgerPageChange(page: number) {
+  ledgerPage.value = page
+  loadLedger()
+}
+
+function onLedgerPageSizeChange(size: number) {
+  ledgerPageSize.value = size
+  ledgerPage.value = 1
+  loadLedger()
 }
 
 async function loadVoucher() {
@@ -2096,7 +2314,7 @@ const auxDisplayCount = computed(() => {
     const dim = auxDimTypesFromServer.value.find((d: any) => d.type === dt)
     return dim ? dim.total_records : 0
   }
-  return auxPagedTotal.value
+  return auxFlatTotal.value
 })
 
 /** 预计算：按维度类型+科目编号的分组汇总（优先用后端汇总数据） */
@@ -2134,12 +2352,22 @@ const treeAuxBalance = computed(() => {
   const groups = _auxGroupCache.value.get(dimType)
   if (!groups) return []
 
+  // 搜索关键词
+  const kw = auxSearchKeyword.value.trim().toLowerCase()
+
   // 全部展开模式：用汇总数据构建完整二级树
   const buildChildren = auxAllExpanded.value
   const summaryByCode = buildChildren ? _buildSummaryByCode(dimType) : null
 
   const tree: any[] = []
   for (const [code, g] of groups) {
+    // 搜索过滤：科目编号或名称匹配
+    if (kw) {
+      const codeMatch = code.toLowerCase().includes(kw)
+      const nameMatch = (g.name || '').toLowerCase().includes(kw)
+      if (!codeMatch && !nameMatch) continue
+    }
+
     const node: any = {
       _tree_key: code,
       _isGroup: true,
@@ -2267,6 +2495,7 @@ function onAuxSearchInput() {
     if (!auxTreeMode.value && !auxSummaryOnly.value) {
       loadAuxBalancePage()
     }
+    // 仅小计模式和树形模式下搜索靠前端过滤（computed 自动响应 auxSearchKeyword 变化）
   }, 400)
 }
 
@@ -2334,11 +2563,21 @@ async function toggleAuxExpand(row: any) {
 
 const auxFlatTotal = computed(() => {
   if (auxSummaryOnly.value) {
+    let rows = auxSummaryData.value
     const dimType = auxSelectedDimType.value
     if (dimType && dimType !== '全部') {
-      return auxSummaryData.value.filter(r => r.dim_type === dimType).length
+      rows = rows.filter(r => r.dim_type === dimType)
     }
-    return auxSummaryData.value.length
+    const kw = auxSearchKeyword.value.trim().toLowerCase()
+    if (kw) {
+      rows = rows.filter(r =>
+        (r.account_code || '').toLowerCase().includes(kw) ||
+        (r.account_name || '').toLowerCase().includes(kw) ||
+        (r.aux_code || '').toLowerCase().includes(kw) ||
+        (r.aux_name || '').toLowerCase().includes(kw)
+      )
+    }
+    return rows.length
   }
   return auxPagedTotal.value
 })
@@ -2354,8 +2593,18 @@ const auxFlatDisplayRows = computed(() => {
     if (dimType && dimType !== '全部') {
       rows = rows.filter(r => r.dim_type === dimType)
     }
-    const start = (auxPage.value - 1) * auxPageSize
-    const page = rows.slice(start, start + auxPageSize)
+    // 前端搜索过滤
+    const kw = auxSearchKeyword.value.trim().toLowerCase()
+    if (kw) {
+      rows = rows.filter(r =>
+        (r.account_code || '').toLowerCase().includes(kw) ||
+        (r.account_name || '').toLowerCase().includes(kw) ||
+        (r.aux_code || '').toLowerCase().includes(kw) ||
+        (r.aux_name || '').toLowerCase().includes(kw)
+      )
+    }
+    const start = (auxPage.value - 1) * auxPageSize.value
+    const page = rows.slice(start, start + auxPageSize.value)
 
     // 构建显示行（含展开的明细）
     const display: any[] = []
@@ -2450,7 +2699,7 @@ const auxPagedTotal = ref(0)
 
 async function loadAuxBalancePage() {
   try {
-    const params: any = { year: year.value, page: auxPage.value, page_size: auxPageSize }
+    const params: any = { year: year.value, page: auxPage.value, page_size: auxPageSize.value }
     if (auxSelectedDimType.value && auxSelectedDimType.value !== '全部') {
       params.dim_type = auxSelectedDimType.value
     }
@@ -2465,6 +2714,12 @@ async function loadAuxBalancePage() {
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0
   } catch { auxPagedRows.value = [] }
+}
+
+function onAuxPageSizeChange(size: number) {
+  auxPageSize.value = size
+  auxPage.value = 1
+  loadAuxBalancePage()
 }
 
 // 缓存标记：project_id + year 组合，避免重复加载
@@ -2678,6 +2933,11 @@ function refresh() {
 
 // ── 键盘快捷键：Enter 返回上一级 ──
 function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isFullscreen.value) {
+    isFullscreen.value = false
+    tableHeight.value = Math.max(400, window.innerHeight - 240)
+    return
+  }
   if (e.key === 'Enter' && currentLevel.value !== 'balance') {
     e.preventDefault()
     // 返回上一级
@@ -2712,6 +2972,61 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .gt-penetration { padding: var(--gt-space-4); height: 100%; display: flex; flex-direction: column; }
+
+/* 全屏模式 */
+.gt-penetration--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #fff;
+  padding: var(--gt-space-4);
+  overflow-y: auto;
+}
+.gt-fullscreen-topbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--gt-color-primary-dark, #4b2d77);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--gt-radius-md);
+  margin-bottom: var(--gt-space-3);
+}
+
+/* 右键菜单 */
+.gt-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  min-width: 160px;
+}
+.gt-context-menu__item {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #303133;
+  transition: background 0.15s;
+}
+.gt-context-menu__item:hover {
+  background: var(--gt-color-primary-bg, #f0ecf7);
+  color: var(--gt-color-primary);
+}
+.gt-context-menu__divider {
+  height: 1px;
+  background: #e4e7ed;
+  margin: 4px 0;
+  padding: 0;
+  cursor: default;
+}
+.gt-context-menu__divider:hover {
+  background: #e4e7ed;
+  color: #303133;
+}
 
 .gt-ledger-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -2761,6 +3076,20 @@ onBeforeUnmount(() => {
 
 .gt-link { color: var(--gt-color-primary); cursor: pointer; }
 .gt-link:hover { text-decoration: underline; }
+
+.gt-amt {
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表格单元格字号统一 13px */
+:deep(.el-table .el-table__cell) {
+  font-size: 13px;
+}
+:deep(.el-table .el-table__header-wrapper th) {
+  font-size: 13px;
+}
 
 .gt-pagination { margin-top: var(--gt-space-3); display: flex; justify-content: flex-end; }
 

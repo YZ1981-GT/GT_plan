@@ -173,14 +173,14 @@ const router = createRouter({
           component: () => import('@/views/OfflineConflictWorkbench.vue'),
         },
         {
-          path: 'projects/:projectId/ledger',
-          name: 'LedgerPenetration',
-          component: () => import('@/views/LedgerPenetration.vue'),
-        },
-        {
           path: 'projects/:projectId/ledger/import-history',
           name: 'LedgerImportHistory',
           component: () => import('@/views/LedgerImportHistory.vue'),
+        },
+        {
+          path: 'projects/:projectId/ledger',
+          name: 'LedgerPenetration',
+          component: () => import('@/views/LedgerPenetration.vue'),
         },
         {
           path: 'projects/:projectId/attachments',

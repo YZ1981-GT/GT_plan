@@ -45,104 +45,69 @@ async def summarize_ledger_data(
     project_id: UUID,
     year: Optional[int] = None,
 ) -> dict[str, Any]:
-    """查询项目已导入数据的概览（按年度/期间分布）。
+    """查询项目已导入数据的概览。
 
-    Args:
-        db: 异步会话
-        project_id: 项目 UUID
-        year: 可选，只查某一年（None 则查所有年度）
-
-    Returns:
-        {
-            "project_id": str,
-            "tables": {
-                "tb_balance": {"total": 1822, "years": {2025: 1822}},
-                "tb_ledger": {
-                    "total": 22716,
-                    "years": {
-                        2025: {
-                            "total": 22716,
-                            "periods": {1: 2000, 2: 1800, ...},
-                            "voucher_date_min": "2025-01-01",
-                            "voucher_date_max": "2025-12-31",
-                        }
-                    }
-                },
-                ...
-            }
-        }
+    优先从 ledger_datasets.record_summary 读取预计算行数（O(1)），
+    避免对千万级大表做实时 COUNT。
     """
     result: dict[str, Any] = {"project_id": str(project_id), "tables": {}}
 
+    # 从 active dataset 的 record_summary 获取行数（瞬时查询）
+    year_filter = "AND year = :year" if year is not None else ""
+    ds_sql = f"""
+        SELECT year, record_summary
+        FROM ledger_datasets
+        WHERE project_id = :pid AND status = 'active' {year_filter}
+        ORDER BY year
+    """
+    params: dict[str, Any] = {"pid": str(project_id)}
+    if year is not None:
+        params["year"] = year
+
+    try:
+        ds_rows = await db.execute(sa.text(ds_sql), params)
+        datasets = ds_rows.fetchall()
+    except Exception as exc:
+        logger.warning("summarize from datasets failed: %s", exc)
+        datasets = []
+
+    # 汇总各年度各表行数
     for table in LEDGER_TABLES:
         table_data: dict[str, Any] = {"total": 0, "years": {}}
+        for ds_row in datasets:
+            y = int(ds_row[0])
+            summary = ds_row[1] or {}
+            # record_summary 格式: {"tb_balance": N, "tb_ledger": N, ...}
+            cnt = summary.get(table, 0) if isinstance(summary, dict) else 0
+            if cnt > 0:
+                table_data["total"] += cnt
+                table_data["years"][y] = {"total": cnt}
+        result["tables"][table] = table_data
 
-        # 年度聚合
-        year_filter = "AND year = :year" if year is not None else ""
-        count_sql = f"""
-            SELECT year, COUNT(*) AS cnt
-            FROM {table}
-            WHERE project_id = :pid {year_filter}
-            GROUP BY year
-            ORDER BY year
-        """
-        params: dict[str, Any] = {"pid": str(project_id)}
-        if year is not None:
-            params["year"] = year
-
-        try:
-            rows = await db.execute(sa.text(count_sql), params)
-        except Exception as exc:
-            logger.warning("summarize %s failed: %s", table, exc)
-            result["tables"][table] = {"total": 0, "years": {}, "error": str(exc)}
+    # 序时账补充 period 分布（只查 active 数据，用索引）
+    for table in LEDGER_TABLES_PERIODIC:
+        table_info = result["tables"].get(table, {})
+        if table_info.get("total", 0) == 0:
             continue
-
-        for row in rows.all():
-            y, cnt = int(row[0]), int(row[1])
-            table_data["total"] += cnt
-            table_data["years"][y] = {"total": cnt}
-
-        # 序时账补充 period + 日期范围
-        if table in LEDGER_TABLES_PERIODIC and table_data["total"] > 0:
-            for y_str in list(table_data["years"].keys()):
+        for y in list(table_info.get("years", {}).keys()):
+            try:
                 period_sql = f"""
                     SELECT
                         EXTRACT(MONTH FROM voucher_date)::int AS period,
                         COUNT(*) AS cnt
                     FROM {table}
-                    WHERE project_id = :pid AND year = :year
+                    WHERE project_id = :pid AND year = :yr AND is_deleted = false
                     GROUP BY period
                     ORDER BY period
                 """
-                try:
-                    prows = await db.execute(
-                        sa.text(period_sql),
-                        {"pid": str(project_id), "year": y_str},
-                    )
-                    periods: dict[int, int] = {}
-                    for prow in prows.all():
-                        if prow[0] is not None:
-                            periods[int(prow[0])] = int(prow[1])
-                    table_data["years"][y_str]["periods"] = periods
-
-                    # 日期范围
-                    range_sql = f"""
-                        SELECT MIN(voucher_date), MAX(voucher_date)
-                        FROM {table}
-                        WHERE project_id = :pid AND year = :year
-                    """
-                    rrow = await db.execute(
-                        sa.text(range_sql),
-                        {"pid": str(project_id), "year": y_str},
-                    )
-                    rdata = rrow.first()
-                    if rdata and rdata[0]:
-                        table_data["years"][y_str]["voucher_date_min"] = rdata[0].isoformat()
-                        table_data["years"][y_str]["voucher_date_max"] = rdata[1].isoformat()
-                except Exception as exc:
-                    logger.warning("period summary %s failed: %s", table, exc)
-
-        result["tables"][table] = table_data
+                prows = await db.execute(sa.text(period_sql), {"pid": str(project_id), "yr": y})
+                periods: dict[int, int] = {}
+                for prow in prows.all():
+                    if prow[0] is not None:
+                        periods[int(prow[0])] = int(prow[1])
+                table_info["years"][y]["periods"] = periods
+            except Exception:
+                pass  # period 查询失败不阻断
 
     return result
 

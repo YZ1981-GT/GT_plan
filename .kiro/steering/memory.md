@@ -24,6 +24,9 @@ inclusion: always
 - 记忆拆分：memory.md 只放精简状态+待办，技术决策→architecture.md，规范→conventions.md，修复记录→dev-history.md
 - 目标并发规模 6000 人
 - 表格列宽要足够大，不折行不省略号截断
+- 表格数字列（金额、科目编号等）统一使用 Arial Narrow 字体 + `white-space: nowrap` + `font-variant-numeric: tabular-nums`，通过 `.gt-amt` class 实现
+- 表格分页用标准分页组件（左侧 page size 选择器 + 右侧页码导航含 jumper），不用"加载更多"模式
+- 四表联查需支持全屏模式 + 行选择（checkbox）+ 右键菜单，右键菜单预留"抽凭到底稿"入口（后续与底稿抽凭模块衔接）
 - 表格编辑需支持查看/编辑模式切换
 - 复制按钮命名：工具栏"复制整表" vs 右键"复制选中区域"
 - 系统打磨采用 PDCA 迭代模式：提建议→成 spec 三件套→实施→复盘→下一轮新需求，直到可改进项穷尽
@@ -48,6 +51,7 @@ inclusion: always
 - 前端依赖共 22 生产 + 8 开发：关键新增 mitt@3.0.1、nprogress@0.2.0、unplugin-auto-import@21.0.0、unplugin-vue-components@32.0.0、@univerjs/presets@0.21.1、@univerjs/preset-sheets-core@0.21.1（公式引擎内置）、@univerjs/sheets-formula@0.21.1、opentype.js@1.3.5、xlsx@0.18.5；R8-S2 新增 dev 依赖 glob@13（scripts/find-missing-v-permission.mjs 使用）
 - 后端新增测试依赖 hypothesis@6.152.4 + ruff@0.11.12（R6 Task 2 写入 requirements.txt）
 - PG ~160 张表（152 基线 + R5 新增 6 张 + R6 新增 qc_rule_definitions + review_records.conversation_id 列），Redis 6379，后端 9980，前端 3030
+- 前端 HTTP 全局超时 120s（http.ts），detect 端点单独 300s（大文件多文件场景）
 - vLLM Qwen3.5-27B-NVFP4 端口 8100（enable_thinking: false）
 - ONLYOFFICE 端口 8080（已替换为 Univer，WOPI 保留兼容）
 - Paperless-ngx 端口 8010（admin/admin）
@@ -401,6 +405,7 @@ inclusion: always
   - **复盘方法论沉淀**：(1) 测试金字塔头重倾向——121 unit + 2 E2E，真实 bug 多在层间集成（ORM vs Alembic、Worker vs Pipeline、FE vs BE），下轮先补 integration 而非 unit；(2) "先跑通再说"会累积架构债，每 Sprint 留 20% 时间还债；(3) commit message 的"声称已修"需人工复核——"真实样本 E2E 通过"实际只测了 YG36 1 家不是 9 家，"Staged 原子激活"没并发验证是否真原子；(4) 前后端联动的 UX 流程测试缺失（后端端点通 + 前端按钮在 ≠ 用户真能走通），需引入 playwright
   - **辅助维度列处理修复（2026-05-08）**：(1) 新增 `aux_dimensions` 字段（混合维度列，含多维度字符串），别名 `["核算维度", "辅助核算", "核算项目", "辅助维度", "多维度"]`；(2) `aux_type` 别名精简为 `["辅助类型", "辅助核算类型"]`（不含"核算类型"避免与 aux_dimensions 冲突）；(3) RECOMMENDED_COLUMNS 的 balance/ledger 加入 aux_dimensions；(4) converter `aux_balance_rows` 分流时跳过 aux_type=None 的条目（否则 NOT NULL 报错）。实测：四川物流 tb_balance=814 + tb_aux_balance=1919 正确入库
   - **前端导入进度条现状**：`ThreeColumnLayout.vue` 顶栏已有"导入中"按钮 + `bgImportStatus` 轮询 `/api/data-lifecycle/import-queue/{projectId}`；问题：`ImportQueueService` 是内存态（重启后丢失），前端看不到后台任务；架构级改进需让 import_queue 状态写 DB 或前端改轮询 import_jobs 表
+  - **导入历史改为内嵌 dialog**：`LedgerImportHistory.vue` 独立页面因 Vite 动态 import 缓存问题无法稳定加载，改为 LedgerPenetration 内 el-dialog 弹窗模式（`importHistoryVisible`），避免路由跳转
   - **账表数据管理功能已实现（2026-05-08）**：后端 `ledger_data_service.py` + `routers/ledger_data.py`（router_registry §25）3 个端点：(1) `GET /api/projects/{pid}/ledger-data/summary` 查询年度/月份分布；(2) `DELETE /api/projects/{pid}/ledger-data` 按 year+tables+periods 删除；(3) `POST /api/projects/{pid}/ledger-data/incremental/detect` 增量追加预检（diff: new/overlap/only_existing）；前端 `LedgerDataManager.vue` 组件含 3 Tab（概览/删除/增量追加），apiPaths 新增 `ledger.import.data.*`；余额表按 year 全量，序时账按 year+accounting_period 可追加
   - **`LedgerDataManager` 待挂载**：组件已建但未挂载到具体入口页面（如 LedgerPenetration.vue），需添加"数据管理"按钮打开
   - **迁移剩余步骤（P1-P2）**：P1 迁移 `_clear_project_year_tables` 到 writer.py + application_service 替换 `smart_parse_files`（2.5h）→ P2 观察稳定后删除旧引擎文件
@@ -526,7 +531,11 @@ inclusion: always
 
 - **docker-compose.yml PG 服务加 `shm_size: 2g`**：默认 64MB 在 YG2101 级别 200 万行聚合查询时触发 `DiskFullError: could not resize shared memory segment`；2G 足够支撑 COUNT/SUM 并发分析
 - **PG 容器重建流程**：`docker stop/rm` 后用 `docker run` 显式挂载 `gt_plan_pg_data` volume（而非 `pg_data`，后者是 docker run 默认创建的新 volume 会丢数据）
-- **PG 当前调优值**：wal_compression=pglz / synchronous_commit=off / wal_buffers=64MB / checkpoint_timeout=30min / max_wal_size=8GB / shm_size=2g
+- **PG 当前调优值**：shared_buffers=1GB / work_mem=64MB / effective_cache_size=6GB / max_connections=200 / random_page_cost=1.1 / effective_io_concurrency=200 / wal_compression=pglz / synchronous_commit=off / wal_buffers=64MB / checkpoint_timeout=30min / max_wal_size=8GB / shm_size=2g
+- **四表实际数据量（2026-05-11）**：tb_aux_ledger 1570万行 / tb_ledger 741万行 / tb_aux_balance 70万行 / tb_balance 11万行（总计 2300 万行）
+- **查询性能优化索引（2026-05-11）**：`idx_tb_ledger_proj_year_acct_date (project_id, year, account_code, voucher_date, id) WHERE is_deleted=false` + aux_ledger 同款；序时账穿透查询从 Filter 降为纯 Index Scan（17ms）
+- **Redis 缓存热查询**：`/balance` 和 `/aux-balance-summary` 端点加 5 分钟 Redis 缓存（key 格式 `ledger:*:{pid}:{year}:*`），导入完成后自动 SCAN+DELETE 失效
+- **.env 连接池**：`DB_POOL_SIZE=30` / `DB_MAX_OVERFLOW=100`（最大并发 130 连接）
 
 ## B3 Step 1 已落地（partial index）
 
@@ -1056,3 +1065,12 @@ inclusion: always
 
 - **导入进度 ETA 估算修复**：`estimated_remaining_seconds` 上限 3600s（超过不显示），进度 <10% 时不估算（早期线性外推误差极大，如 21% 时算出 1806 分钟）；根因是 `started_at` 包含 detect+排队时间而非纯写入时间
 - **顶栏导入指示器点击跳转修正**：从 `/projects/${pid}/ledger`（账表查询页，导入中无数据）改为 `/projects/${pid}/ledger/import-history`（导入历史页，能看到 job 进度）
+
+- **DetailProjectPanel "快捷操作"标题已删除**：保留建议流程+按钮网格，去掉多余 h4 标签（用户反馈冗余）
+- **项目状态提示已加**：planning 显示"请先导入账套数据，完成后状态将自动推进"；created 显示"新建项目，请开始配置"
+- **ETA 前端也加了 3600s 上限**：`ThreeColumnLayout.vue` 中 `eta <= 3600` 才显示，防止后端未重启时仍展示不合理数字
+
+## 用户反馈的 UI 问题（2026-05-11）
+
+- **查账页面金额列折行**：LedgerPenetration.vue 的期初金额/借方发生额/贷方发生额/期末金额列宽不够（当前 width=150/130），大金额（如 210,301,834.96）折行显示；需要加宽或用 `white-space: nowrap` + `min-width`
+- **和平药房 3 文件上传 500 错误**：前端上传 3 个文件（1 xlsx + 2 CSV 共 432MB）时服务端报错（ID: a5789793-cda）；可能是文件大小超限（MAX_TOTAL_SIZE_BYTES=500MB 但单文件 CSV 上限 1GB 应该够）或 CSV 编码探测/upload_security 校验问题；需查后端日志定位

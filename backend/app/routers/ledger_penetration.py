@@ -64,11 +64,27 @@ async def get_balance(
     year: int = Query(...),
     account_code: str | None = None,
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """科目余额汇总"""
+    """科目余额汇总（Redis 缓存 5 分钟）"""
+    import json
+    cache_key = f"ledger:balance:{project_id}:{year}:{account_code or 'all'}"
+    if redis:
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
     svc = _svc(db, None)
-    return await svc.get_balance_summary(project_id, year, account_code)
+    result = await svc.get_balance_summary(project_id, year, account_code)
+    if redis:
+        try:
+            await redis.set(cache_key, json.dumps(result, default=str), ex=300)
+        except Exception:
+            pass
+    return result
 
 
 @router.get("/opening-balance/{account_code}")
@@ -136,14 +152,25 @@ async def get_aux_balance_summary(
     year: int = Query(...),
     dim_type: Optional[str] = Query(None, description="维度类型"),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """辅助余额汇总（预计算，按维度+科目+辅助编码分组）。
+    """辅助余额汇总（预计算，按维度+科目+辅助编码分组，Redis 缓存 5 分钟）。
 
     前端树形视图用这个接口，不再加载12万行原始数据。
     返回：维度类型列表 + 汇总行数据
     """
+    import json
     import sqlalchemy as sa
+
+    cache_key = f"ledger:aux_summary:{project_id}:{year}:{dim_type or 'all'}"
+    if redis:
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
 
     # 维度类型列表（含各类型的记录数）
     r = await db.execute(sa.text("""
@@ -184,7 +211,14 @@ async def get_aux_balance_summary(
         for row in r.fetchall()
     ]
 
-    return {"dim_types": dim_types, "rows": rows, "total": len(rows)}
+    result = {"dim_types": dim_types, "rows": rows, "total": len(rows)}
+    if redis:
+        try:
+            import json
+            await redis.set(cache_key, json.dumps(result, default=str), ex=300)
+        except Exception:
+            pass
+    return result
 
 
 @router.get("/aux-balance-paged")

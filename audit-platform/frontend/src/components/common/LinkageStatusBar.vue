@@ -11,9 +11,9 @@
   <transition name="el-fade-in">
     <div v-if="!dismissed && staleCount > 0" class="gt-linkage-bar">
       <span class="gt-linkage-bar__icon">⚠️</span>
-      <span class="gt-linkage-bar__text">当前项目有 <strong>{{ staleCount }}</strong> 处数据过期</span>
-      <el-button size="small" type="primary" text @click="$emit('recalc')">一键重算</el-button>
-      <el-button size="small" text @click="$emit('detail')">查看详情</el-button>
+      <span class="gt-linkage-bar__text" title="账套数据更新后，依赖该数据的试算表、报表或附注尚未同步更新">当前项目有 <strong>{{ staleCount }}</strong> 处数据过期</span>
+      <el-button size="small" type="primary" text @click="$emit('recalc')" title="重新计算所有过期的试算表、报表和附注数据，使其与最新账套保持一致">一键重算</el-button>
+      <el-button size="small" text @click="$emit('detail')" title="查看哪些底稿、报表或附注的数据已过期，需要更新">查看详情</el-button>
       <el-button size="small" text class="gt-linkage-bar__close" @click="dismissed = true">×</el-button>
     </div>
   </transition>

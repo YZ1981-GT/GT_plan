@@ -19,7 +19,7 @@ export function getLastTraceId(): string { return _lastTraceId }
 
 const http = axios.create({
   baseURL: '/',
-  timeout: 30000,
+  timeout: 120000,
 })
 
 // ── 请求去重：相同 GET 请求在飞行中不重复发送 ──────────────

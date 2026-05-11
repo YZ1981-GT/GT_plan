@@ -19,29 +19,6 @@
       </el-alert>
 
       <el-tabs v-model="activeTab">
-        <!-- Tab 0: 余额树形（Layer 2 / Sprint 8） -->
-        <el-tab-pane label="余额树形" name="balance_tree">
-          <div v-if="activeTab === 'balance_tree'">
-            <el-form inline size="small" style="margin-bottom: 8px">
-              <el-form-item label="年度">
-                <el-input-number
-                  v-model="treeYear"
-                  :min="2000"
-                  :max="2100"
-                  :step="1"
-                  :controls="false"
-                  style="width: 100px"
-                />
-              </el-form-item>
-            </el-form>
-            <LedgerBalanceTreeView
-              v-if="treeYear"
-              :project-id="projectId"
-              :year="treeYear"
-            />
-          </div>
-        </el-tab-pane>
-
         <!-- Tab 1: 数据概览 -->
         <el-tab-pane label="数据概览" name="summary">
           <div v-if="summary">
@@ -201,28 +178,30 @@
             </el-form-item>
 
             <el-alert
-              type="success"
+              type="info"
               :closable="false"
               show-icon
-              title="操作步骤"
               style="margin-bottom: 16px"
             >
+              <template #title>操作步骤</template>
               <template #default>
-                <ol style="margin: 8px 0 0 16px; padding: 0">
+                <ol style="margin: 4px 0 0 16px; padding: 0; font-size: 13px; line-height: 1.8">
                   <li>选择年度（上方）</li>
-                  <li>点击"检测"输入/扫描文件将要导入的月份</li>
+                  <li>点击"检测"输入文件将要导入的月份</li>
                   <li>确认重叠策略（跳过/覆盖）</li>
                   <li>执行清理旧数据后上传文件继续导入</li>
                 </ol>
               </template>
             </el-alert>
-            <div style="display: flex; gap: 8px">
+            <div style="display: flex; gap: 8px; align-items: center; padding: 12px; background: #f8f7fc; border-radius: 8px; border: 1px solid #e8e4f0">
               <el-input
                 v-model="filePeriodsInput"
                 placeholder="文件包含的月份，逗号分隔如: 11,12"
-                style="width: 260px"
+                style="width: 280px"
+                size="small"
               />
               <el-button
+                size="small"
                 :disabled="!incrementalForm.year || !filePeriodsInput"
                 @click="onDetectIncremental"
               >
@@ -230,6 +209,7 @@
               </el-button>
               <el-button
                 v-if="incrementalDiff && (incrementalDiff.diff.overlap.length > 0 || incrementalDiff.diff.new.length > 0)"
+                size="small"
                 type="warning"
                 :disabled="!incrementalForm.year"
                 @click="onApplyIncremental"
@@ -237,6 +217,7 @@
                 执行清理
               </el-button>
               <el-button
+                size="small"
                 type="primary"
                 :disabled="!incrementalForm.year"
                 @click="onOpenIncrementalUpload"
@@ -248,11 +229,6 @@
         </el-tab-pane>
       </el-tabs>
     </div>
-
-    <template #footer>
-      <el-button @click="onClose">关闭</el-button>
-      <el-button @click="refreshSummary">刷新数据</el-button>
-    </template>
   </el-dialog>
 </template>
 
@@ -261,7 +237,6 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger } from '@/services/apiPaths'
-import LedgerBalanceTreeView from './LedgerBalanceTreeView.vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -282,9 +257,6 @@ const loading = ref(false)
 const activeTab = ref('summary')
 const summary = ref<any>(null)
 
-// 树形视图的独立 year 选择（默认从 summary 拿一个可用年度）
-const treeYear = ref<number>(new Date().getFullYear())
-
 const deleteForm = ref<{ year: number | null; tables: string[]; periods: number[] }>({
   year: null,
   tables: [],
@@ -304,13 +276,20 @@ const tableLabels: Record<string, string> = {
 }
 
 const availableYears = computed<number[]>(() => {
-  if (!summary.value?.tables) return [new Date().getFullYear()]
+  const currentYear = new Date().getFullYear()
+  if (!summary.value?.tables) {
+    // summary 未加载时提供近 3 年选项
+    return [currentYear, currentYear - 1, currentYear - 2]
+  }
   const years = new Set<number>()
   for (const t of Object.values(summary.value.tables) as any[]) {
     if (t.years) Object.keys(t.years).forEach((y) => years.add(Number(y)))
   }
+  // 确保当前年度和前一年始终可选（即使没有数据也能选择导入）
+  years.add(currentYear)
+  years.add(currentYear - 1)
   const arr = Array.from(years).sort((a, b) => b - a)
-  return arr.length ? arr : [new Date().getFullYear()]
+  return arr
 })
 
 const summaryRows = computed(() => {
@@ -344,11 +323,9 @@ async function refreshSummary() {
   loading.value = true
   try {
     summary.value = await api.get(ledger.data.summary(props.projectId))
-    // 自动选中一个有数据的年度给余额树形 Tab 用
     const years = Object.keys(summary.value?.tables?.tb_balance?.years || {})
       .map(Number)
       .sort((a, b) => b - a)
-    if (years.length > 0) treeYear.value = years[0]
   } catch (exc: any) {
     ElMessage.error('查询失败: ' + (exc.message || exc))
   } finally {

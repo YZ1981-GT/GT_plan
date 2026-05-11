@@ -753,6 +753,20 @@ class ImportJobRunner:
                 result.ledger_rows, result.aux_ledger_rows,
             )
 
+            # 导入完成后清除 Redis 缓存（余额表 + 辅助余额汇总）
+            try:
+                from app.core.redis import redis_client as _redis
+                if _redis:
+                    pattern = f"ledger:*:{project_id}:{year}:*"
+                    keys = []
+                    async for key in _redis.scan_iter(match=pattern):
+                        keys.append(key)
+                    if keys:
+                        await _redis.delete(*keys)
+                        logger.info("ImportJob %s 清除 %d 个缓存键", job_id, len(keys))
+            except Exception:
+                pass  # 缓存清除失败不影响主流程
+
         except Exception as exc:
             logger.exception("ImportJob v2 执行失败: %s", job_id)
             # 多层兜底：即使 DB 操作失败也要尽量标记 job 为 failed + 释放锁

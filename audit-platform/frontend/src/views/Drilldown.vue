@@ -64,7 +64,9 @@
         border
         style="width: 100%"
       >
-        <el-table-column prop="account_code" label="科目编码" width="140" />
+        <el-table-column prop="account_code" label="科目编码" width="140">
+          <template #default="{ row }"><span class="gt-amt">{{ row.account_code }}</span></template>
+        </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="180">
           <template #default="{ row }">
             <span
@@ -76,17 +78,17 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="opening_balance" label="期初余额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.opening_balance) }}</template>
+        <el-table-column prop="opening_balance" label="期初余额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.opening_balance) }}</span></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方发生额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方发生额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方发生额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方发生额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.credit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末余额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.closing_balance) }}</template>
+        <el-table-column prop="closing_balance" label="期末余额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.closing_balance) }}</span></template>
         </el-table-column>
       </el-table>
 
@@ -157,11 +159,11 @@
         <el-table-column prop="voucher_date" label="凭证日期" width="110" />
         <el-table-column prop="voucher_no" label="凭证号" width="100" />
         <el-table-column prop="account_name" label="科目名称" width="160" />
-        <el-table-column prop="debit_amount" label="借方金额" width="130" align="right">
-          <template #default="{ row }">{{ fmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方金额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方金额" width="130" align="right">
-          <template #default="{ row }">{{ fmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方金额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.credit_amount) }}</span></template>
         </el-table-column>
         <el-table-column prop="counterpart_account" label="对方科目" width="120" />
         <el-table-column prop="summary" label="摘要" min-width="200" />
@@ -197,17 +199,17 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="opening_balance" label="期初余额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.opening_balance) }}</template>
+        <el-table-column prop="opening_balance" label="期初余额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.opening_balance) }}</span></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方发生额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方发生额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方发生额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方发生额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.credit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末余额" width="140" align="right">
-          <template #default="{ row }">{{ fmt(row.closing_balance) }}</template>
+        <el-table-column prop="closing_balance" label="期末余额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.closing_balance) }}</span></template>
         </el-table-column>
       </el-table>
     </div>
@@ -224,11 +226,11 @@
         <el-table-column prop="voucher_date" label="凭证日期" width="110" />
         <el-table-column prop="voucher_no" label="凭证号" width="100" />
         <el-table-column prop="aux_name" label="辅助名称" width="160" />
-        <el-table-column prop="debit_amount" label="借方金额" width="130" align="right">
-          <template #default="{ row }">{{ fmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方金额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.debit_amount) }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方金额" width="130" align="right">
-          <template #default="{ row }">{{ fmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方金额" width="160" align="right">
+          <template #default="{ row }"><span class="gt-amt">{{ fmt(row.credit_amount) }}</span></template>
         </el-table-column>
         <el-table-column prop="summary" label="摘要" min-width="200" />
         <el-table-column prop="preparer" label="制单人" width="80" />
@@ -375,5 +377,10 @@ function onAuxLedgerPageChange(page: number) {
 .gt-drilldown-account-link:hover {
   background: var(--gt-color-primary-bg);
   color: var(--gt-color-primary-light);
+}
+.gt-amt {
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 </style>

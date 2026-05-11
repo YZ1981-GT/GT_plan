@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     LEDGER_UPLOAD_STORAGE_ROOT: str = "./storage/ledger_uploads"
     LEDGER_UPLOAD_TTL_HOURS: int = 24
     LEDGER_UPLOAD_MAX_FILE_COUNT: int = 20
-    LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB: int = 200
+    LEDGER_UPLOAD_MAX_TOTAL_SIZE_MB: int = 1024  # 账表导入总大小上限（MB），支持大 CSV 场景（如和平药房 432MB）
     LEDGER_ARTIFACT_STORAGE_BACKEND: str = "local"  # local, s3
     LEDGER_ARTIFACT_S3_ENDPOINT_URL: str = ""
     LEDGER_ARTIFACT_S3_REGION: str = "us-east-1"

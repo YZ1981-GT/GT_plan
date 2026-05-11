@@ -1,80 +1,78 @@
 <template>
-  <div class="ledger-import-history">
-    <div class="page-header">
-      <div>
-        <h2>账表导入历史</h2>
-        <p>查看导入作业、数据集版本、激活记录，并支持回滚到上一有效版本。</p>
+  <div class="gt-import-history">
+    <!-- 页头 -->
+    <div class="gt-ih-header">
+      <div class="gt-ih-header__left">
+        <el-button text size="small" @click="goBack">← 返回账簿查询</el-button>
+        <h3>导入历史</h3>
       </div>
-      <div class="actions">
-        <el-input-number v-model="selectedYear" :min="2000" :max="2100" size="small" />
-        <el-button :loading="loading" @click="loadAll">刷新</el-button>
+      <div class="gt-ih-header__right">
+        <el-select v-model="selectedYear" size="small" style="width: 100px" @change="loadAll">
+          <el-option v-for="y in yearOptions" :key="y" :value="y" :label="`${y}年`" />
+        </el-select>
+        <el-button size="small" @click="loadAll" :loading="loading">刷新</el-button>
       </div>
     </div>
 
-    <el-alert
-      v-if="activeDatasetId"
-      type="success"
-      :closable="false"
-      show-icon
-      :title="`当前 active dataset：${activeDatasetId}`"
-      style="margin-bottom: 16px"
-    />
-    <el-alert
-      v-else
-      type="warning"
-      :closable="false"
-      show-icon
-      title="当前年度尚无 active dataset"
-      style="margin-bottom: 16px"
-    />
+    <!-- 当前状态卡片 -->
+    <div class="gt-ih-status-cards">
+      <div class="gt-ih-card">
+        <div class="gt-ih-card__label">当前活跃数据集</div>
+        <div class="gt-ih-card__value" :class="{ 'gt-ih-card__value--ok': activeDatasetId }">
+          {{ activeDatasetId ? '已激活' : '无' }}
+        </div>
+      </div>
+      <div class="gt-ih-card">
+        <div class="gt-ih-card__label">导入作业</div>
+        <div class="gt-ih-card__value">{{ jobs.length }} 个</div>
+      </div>
+      <div class="gt-ih-card">
+        <div class="gt-ih-card__label">数据集版本</div>
+        <div class="gt-ih-card__value">{{ datasets.length }} 个</div>
+      </div>
+      <div class="gt-ih-card" v-if="latestJob">
+        <div class="gt-ih-card__label">最近导入</div>
+        <div class="gt-ih-card__value gt-ih-card__value--small">
+          <el-tag :type="jobTagType(latestJob.status) || undefined" size="small">{{ latestJob.status }}</el-tag>
+          <span v-if="latestJob.progress_pct != null" style="margin-left: 4px">{{ latestJob.progress_pct }}%</span>
+        </div>
+      </div>
+    </div>
 
-    <el-tabs>
-      <el-tab-pane label="数据集版本">
-        <el-table :data="datasets" v-loading="loading" border>
-          <el-table-column prop="status" label="状态" width="120">
-            <template #default="{ row }">
-              <el-tag :type="(datasetTagType(row.status)) || undefined">{{ row.status }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="id" label="Dataset ID" min-width="260" show-overflow-tooltip />
-          <el-table-column prop="record_summary" label="记录摘要" min-width="220">
-            <template #default="{ row }">{{ formatJson(row.record_summary) }}</template>
-          </el-table-column>
-          <el-table-column prop="validation_summary" label="校验摘要" min-width="220">
-            <template #default="{ row }">{{ formatJson(row.validation_summary) }}</template>
-          </el-table-column>
-          <el-table-column prop="activated_at" label="激活时间" width="190" />
-          <el-table-column label="操作" width="120" fixed="right">
-            <template #default="{ row }">
-              <el-button
-                v-if="row.status === 'active' && row.previous_dataset_id"
-                size="small"
-                type="warning"
-                @click="rollback(row)"
-              >
-                回滚
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
+    <!-- 错误提示 -->
+    <el-alert v-if="loadError" type="error" :closable="true" style="margin-bottom: 12px" show-icon>
+      <template #title>加载失败</template>
+      {{ loadError }}
+    </el-alert>
 
-      <el-tab-pane label="导入作业">
-        <el-table :data="jobs" v-loading="loading" border>
-          <el-table-column prop="status" label="状态" width="120">
+    <!-- Tab 内容 -->
+    <el-tabs v-model="activeTab">
+      <!-- 导入作业 -->
+      <el-tab-pane label="导入作业" name="jobs">
+        <el-empty v-if="!loading && jobs.length === 0" description="暂无导入作业记录" />
+        <el-table v-else :data="jobs" v-loading="loading" border size="small" style="width: 100%">
+          <el-table-column prop="status" label="状态" width="110">
             <template #default="{ row }">
-              <el-tag :type="(jobTagType(row.status)) || undefined">{{ row.status }}</el-tag>
+              <el-tag :type="jobTagType(row.status) || undefined" size="small">{{ row.status }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="id" label="Job ID" min-width="260" show-overflow-tooltip />
-          <el-table-column prop="progress_pct" label="进度" width="180">
+          <el-table-column prop="progress_pct" label="进度" width="160">
             <template #default="{ row }">
-              <el-progress :percentage="Math.max(0, Math.min(row.progress_pct || 0, 100))" />
+              <el-progress :percentage="Math.max(0, Math.min(row.progress_pct || 0, 100))" :stroke-width="14" />
             </template>
           </el-table-column>
-          <el-table-column prop="progress_message" label="阶段信息" min-width="220" show-overflow-tooltip />
-          <el-table-column prop="error_message" label="错误" min-width="220" show-overflow-tooltip />
-          <el-table-column label="操作" width="160" fixed="right">
+          <el-table-column prop="progress_message" label="阶段" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="created_by_name" label="导入人" width="100" />
+          <el-table-column prop="created_at" label="创建时间" width="170">
+            <template #default="{ row }"><span class="gt-amt">{{ fmtTime(row.created_at) }}</span></template>
+          </el-table-column>
+          <el-table-column prop="error_message" label="错误信息" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="row.error_message" style="color: #f56c6c">{{ row.error_message }}</span>
+              <span v-else style="color: #999">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
               <el-button v-if="['failed', 'timed_out'].includes(row.status)" size="small" @click="retry(row)">重试</el-button>
               <el-button v-if="['pending', 'queued', 'running', 'validating', 'writing', 'activating'].includes(row.status)" size="small" type="danger" @click="cancel(row)">取消</el-button>
@@ -83,36 +81,54 @@
         </el-table>
       </el-tab-pane>
 
-      <el-tab-pane label="激活记录">
-        <el-table :data="records" v-loading="loading" border>
-          <el-table-column prop="action" label="动作" width="120" />
-          <el-table-column prop="dataset_id" label="Dataset ID" min-width="260" show-overflow-tooltip />
-          <el-table-column prop="previous_dataset_id" label="Previous" min-width="260" show-overflow-tooltip />
-          <el-table-column prop="performed_at" label="时间" width="190" />
-          <el-table-column prop="reason" label="原因" min-width="220" show-overflow-tooltip />
-        </el-table>
-      </el-tab-pane>
-
-      <el-tab-pane label="上传产物">
-        <el-table :data="artifacts" v-loading="loading" border>
-          <el-table-column prop="status" label="状态" width="120" />
-          <el-table-column prop="upload_token" label="Upload Token" min-width="260" show-overflow-tooltip />
-          <el-table-column prop="file_count" label="文件数" width="100" />
-          <el-table-column prop="storage_uri" label="存储位置" min-width="220" show-overflow-tooltip />
-          <el-table-column prop="total_size_bytes" label="大小" width="140">
-            <template #default="{ row }">{{ formatBytes(row.total_size_bytes) }}</template>
+      <!-- 数据集版本 -->
+      <el-tab-pane label="数据集版本" name="datasets">
+        <el-empty v-if="!loading && datasets.length === 0" description="暂无数据集版本" />
+        <el-table v-else :data="datasets" v-loading="loading" border size="small" style="width: 100%">
+          <el-table-column prop="status" label="状态" width="110">
+            <template #default="{ row }">
+              <el-tag :type="datasetTagType(row.status) || undefined" size="small">{{ row.status }}</el-tag>
+            </template>
           </el-table-column>
-          <el-table-column prop="checksum" label="Checksum" min-width="260" show-overflow-tooltip />
-          <el-table-column prop="expires_at" label="过期时间" width="190" />
+          <el-table-column prop="id" label="ID" width="120" show-overflow-tooltip>
+            <template #default="{ row }"><span class="gt-amt">{{ row.id?.slice(0, 8) }}...</span></template>
+          </el-table-column>
+          <el-table-column prop="record_summary" label="数据量" min-width="240">
+            <template #default="{ row }">{{ formatRecordSummary(row.record_summary) }}</template>
+          </el-table-column>
+          <el-table-column prop="activated_at" label="激活时间" width="170">
+            <template #default="{ row }"><span class="gt-amt">{{ fmtTime(row.activated_at) }}</span></template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="row.status === 'active' && row.previous_dataset_id"
+                size="small" type="warning" @click="rollback(row)"
+              >回滚</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </el-tab-pane>
 
-      <!-- 10.9: 导入历史时间轴 -->
-      <el-tab-pane label="时间轴">
-        <ImportTimeline
-          :project-id="projectId"
-          :initial-year="selectedYear"
-        />
+      <!-- 激活记录 -->
+      <el-tab-pane label="激活记录" name="records">
+        <el-empty v-if="!loading && records.length === 0" description="暂无激活/回滚记录" />
+        <el-table v-else :data="records" v-loading="loading" border size="small" style="width: 100%">
+          <el-table-column prop="action" label="动作" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.action === 'activate' ? 'success' : row.action === 'rollback' ? 'warning' : 'info'" size="small">
+                {{ row.action === 'activate' ? '激活' : row.action === 'rollback' ? '回滚' : row.action }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="dataset_id" label="数据集" width="120" show-overflow-tooltip>
+            <template #default="{ row }"><span class="gt-amt">{{ row.dataset_id?.slice(0, 8) }}...</span></template>
+          </el-table-column>
+          <el-table-column prop="performed_at" label="时间" width="170">
+            <template #default="{ row }"><span class="gt-amt">{{ fmtTime(row.performed_at) }}</span></template>
+          </el-table-column>
+          <el-table-column prop="reason" label="原因" min-width="240" show-overflow-tooltip />
+        </el-table>
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -120,57 +136,64 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
 import {
   cancelImportJob,
   getActiveLedgerDataset,
   listActivationRecords,
-  listImportArtifacts,
   listImportJobs,
   listLedgerDatasets,
   retryImportJob,
   rollbackLedgerDataset,
   type ImportJob,
   type LedgerDataset,
-  type ImportArtifact,
 } from '@/services/ledgerImportApi'
-import ImportTimeline from '@/components/ledger-import/ImportTimeline.vue'
 
 const route = useRoute()
+const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
-const selectedYear = ref(Number(route.query.year) || new Date().getFullYear() - 1)
+const selectedYear = ref(Number(route.query.year) || new Date().getFullYear())
+const yearOptions = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i)
 const loading = ref(false)
+const loadError = ref('')
+const activeTab = ref('jobs')
 const activeDatasetId = ref<string | null>(null)
 const datasets = ref<LedgerDataset[]>([])
 const jobs = ref<ImportJob[]>([])
 const records = ref<any[]>([])
-const artifacts = ref<ImportArtifact[]>([])
 
-function formatJson(value: unknown) {
-  if (!value) return '-'
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
-  }
+const latestJob = computed(() => jobs.value[0] || null)
+
+function goBack() {
+  router.push({ path: `/projects/${projectId.value}/ledger`, query: { year: String(selectedYear.value) } })
 }
 
-function formatBytes(value: number) {
-  if (!value) return '0 B'
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
-  return `${(value / 1024 / 1024).toFixed(1)} MB`
+function fmtTime(v: string | null | undefined) {
+  if (!v) return '—'
+  try { return new Date(v).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }
+  catch { return v }
 }
 
-function datasetTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+function formatRecordSummary(summary: Record<string, unknown> | null | undefined) {
+  if (!summary) return '—'
+  const parts: string[] = []
+  if (summary.tb_balance) parts.push(`余额 ${summary.tb_balance}`)
+  if (summary.tb_aux_balance) parts.push(`辅助余额 ${summary.tb_aux_balance}`)
+  if (summary.tb_ledger) parts.push(`序时账 ${summary.tb_ledger}`)
+  if (summary.tb_aux_ledger) parts.push(`辅助明细 ${summary.tb_aux_ledger}`)
+  return parts.length > 0 ? parts.join(' / ') : JSON.stringify(summary).slice(0, 60)
+}
+
+function datasetTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
   if (status === 'active') return 'success'
   if (status === 'failed' || status === 'rolled_back') return 'danger'
   if (status === 'staged') return 'warning'
   return 'info'
 }
 
-function jobTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+function jobTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
   if (status === 'completed') return 'success'
   if (status === 'failed' || status === 'timed_out' || status === 'canceled') return 'danger'
   if (status === 'running' || status === 'writing' || status === 'activating') return 'warning'
@@ -180,61 +203,47 @@ function jobTagType(status: string): '' | 'success' | 'warning' | 'info' | 'dang
 async function loadAll() {
   if (!projectId.value) return
   loading.value = true
+  loadError.value = ''
   try {
-    const [active, datasetList, jobList, recordList, artifactList] = await Promise.all([
+    const results = await Promise.allSettled([
       getActiveLedgerDataset(projectId.value, selectedYear.value),
       listLedgerDatasets(projectId.value, selectedYear.value),
       listImportJobs(projectId.value, selectedYear.value),
       listActivationRecords(projectId.value, selectedYear.value),
-      listImportArtifacts(projectId.value),
     ])
-    activeDatasetId.value = active.active_dataset_id
-    datasets.value = datasetList
-    jobs.value = jobList
-    records.value = recordList
-    artifacts.value = artifactList
+    // 逐个处理，单个失败不影响其他
+    if (results[0].status === 'fulfilled') {
+      activeDatasetId.value = (results[0].value as any)?.active_dataset_id ?? null
+    }
+    if (results[1].status === 'fulfilled') {
+      datasets.value = (results[1].value as LedgerDataset[]) ?? []
+    }
+    if (results[2].status === 'fulfilled') {
+      jobs.value = (results[2].value as ImportJob[]) ?? []
+    }
+    if (results[3].status === 'fulfilled') {
+      records.value = (results[3].value as any[]) ?? []
+    }
+    // 收集错误
+    const errors = results.filter(r => r.status === 'rejected').map(r => (r as PromiseRejectedResult).reason?.message || '未知错误')
+    if (errors.length > 0) {
+      loadError.value = errors.join('; ')
+    }
   } finally {
     loading.value = false
   }
 }
 
 async function rollback(row: LedgerDataset) {
-  // 8.23: 展示影响对象清单
-  let impactMessage = '确认回滚到上一 active 数据集？该操作会切换当前可见账表数据。'
+  await confirmDangerous('确认回滚到上一版本？回滚后依赖该数据的底稿/报表将标记为"数据过期"。', '回滚确认')
   try {
-    // Try to get active dataset info to show bound objects
-    const { api } = await import('@/services/apiProxy')
-    const { ledger: ledgerPaths } = await import('@/services/apiPaths')
-    const activeInfo: any = await api.get(ledgerPaths.import.datasetsActive(projectId.value), { params: { year: selectedYear.value } })
-    if (activeInfo?.bound_reports_count || activeInfo?.bound_workpapers_count) {
-      const parts: string[] = []
-      if (activeInfo.bound_reports_count) parts.push(`${activeInfo.bound_reports_count} 份报表`)
-      if (activeInfo.bound_workpapers_count) parts.push(`${activeInfo.bound_workpapers_count} 个底稿`)
-      impactMessage = `以下对象将受影响：${parts.join(' / ')}\n\n回滚后这些对象将标记为"数据过期"(stale)，需要重新核对。`
-    }
-  } catch {
-    // If we can't get impact info, proceed with basic confirmation
-  }
-
-  await confirmDangerous(impactMessage, '回滚确认')
-
-  try {
-    await rollbackLedgerDataset(projectId.value, row.id, selectedYear.value, '用户从导入历史页面发起回滚')
+    await rollbackLedgerDataset(projectId.value, row.id, selectedYear.value, '用户从导入历史发起回滚')
     ElMessage.success('回滚成功')
     await loadAll()
   } catch (err: any) {
-    // 8.23: Handle 409 SIGNED_REPORTS_BOUND — show the reports list from error detail
-    const detail = err?.detail || err?.response?.data?.detail || err?.response?.data?.message
-    if (detail?.error_code === 'SIGNED_REPORTS_BOUND' || err?.response?.status === 409) {
-      const reports = detail?.bound_reports || detail?.reports || []
-      const reportList = reports.length > 0
-        ? reports.map((r: any) => `• ${r.title || r.id}`).join('\n')
-        : '（已签字报表）'
-      ElMessageBox.alert(
-        `无法回滚：以下已签字报表绑定了当前数据集，回滚将导致数据不一致。\n\n${reportList}\n\n如需强制回滚，请联系管理员使用"强制解绑"功能。`,
-        '回滚被拒绝',
-        { type: 'error', confirmButtonText: '知道了' },
-      )
+    const detail = err?.detail || err?.response?.data?.message
+    if (err?.response?.status === 409) {
+      ElMessageBox.alert('无法回滚：已有签字报表绑定了当前数据集。如需强制回滚请联系管理员。', '回滚被拒绝', { type: 'error' })
     } else {
       ElMessage.error('回滚失败: ' + (detail?.message || err?.message || '未知错误'))
     }
@@ -258,30 +267,73 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.ledger-import-history {
+.gt-import-history {
   padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
 }
 
-.page-header {
+.gt-ih-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: var(--gt-space-4);
 }
-
-.page-header h2 {
-  margin: 0 0 6px;
-}
-
-.page-header p {
-  margin: 0;
-  color: #666;
-}
-
-.actions {
+.gt-ih-header__left {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 12px;
+}
+.gt-ih-header__left h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gt-color-primary-dark, #4b2d77);
+}
+.gt-ih-header__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gt-ih-status-cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: var(--gt-space-4);
+}
+.gt-ih-card {
+  flex: 1;
+  padding: 12px 16px;
+  background: #f8f7fc;
+  border: 1px solid #e8e4f0;
+  border-radius: 8px;
+}
+.gt-ih-card__label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+.gt-ih-card__value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+.gt-ih-card__value--ok {
+  color: #67c23a;
+}
+.gt-ih-card__value--small {
+  font-size: 13px;
+}
+
+.gt-amt {
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+:deep(.el-table .el-table__cell) {
+  font-size: 13px;
 }
 </style>
