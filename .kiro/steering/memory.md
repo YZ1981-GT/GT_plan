@@ -997,10 +997,13 @@ inclusion: always
 
 ## ledger-import-view-refactor 最终进度（2026-05-11）
 
-- **tasks.md 进度**：228/243 completed（93.8%），剩余 15 个硬依赖外部环境
-- **本轮新增 6 个完成**：5.2 outbox→SSE 广播确认 / 5.4 三视图 useProjectEvents 自动刷新 / 5.5 WS 广播测试 / 8.24 已锁定报表徽章 / 9.1 合成 500MB smoke 测试 / 10.49 K8s probe 文档
+- **tasks.md 进度**：236/243 completed（97.1%），剩余 7 个全部是运维/手动验证
+- **本轮新增完成**：7.6/7.7 tenant_id 签名扩展 + 7.14/7.15 interrupted 状态 + 6.7/10.38 REPEATABLE READ + 10.52/10.53 graceful shutdown + 5.2/5.4 云协同广播
 - **关键架构确认**：后端不需要独立 WebSocket 服务——outbox_replay_worker 通过 `event_bus.publish_immediate` → SSE queue → `/events/stream` 已实现项目级广播；前端 ThreeColumnLayout 连接 SSE 并 emit `sse:sync-event`，useProjectEvents composable 订阅过滤
-- **新建文件**：`docs/KUBERNETES_PROBES.md` / `backend/tests/ledger_import/test_huge_ledger_smoke.py`（2M 行合成管线 smoke，@pytest.mark.slow）
-- **Git commits**：1773934 + 36e5d68 推送到 `feature/ledger-import-view-refactor`
-- **剩余 15 个任务分类**：tenant_id 大改造 2 / PG enum interrupted 4 / PG REPEATABLE READ 2 / YG2101 性能验证 4 / 运维部署 3
-- **所有可自动化任务已清零**，下一步需要：(1) YG2101 128MB 手动跑验证性能基线 (2) tenant_id 40+ 调用点改造（独立 Sprint）(3) PG enum ALTER TYPE 迁移
+- **tenant_id 渐进迁移策略**：`get_active_filter` 新增可选 `current_user_id` 参数，为 None 时跳过校验（向后兼容）；关键入口（drilldown/penetration/import）已标注 TODO；路由层 `require_project_access` 仍是主要权限屏障
+- **interrupted 状态落地**：JobStatus 新增 `interrupted` 枚举 + Alembic 迁移 `view_refactor_interrupted_status_20260511` + recover_jobs 优先恢复（有 checkpoint 走 resume，无则全量重跑）
+- **REPEATABLE READ**：`DatasetService.activate` 开头条件执行 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`（仅 PG 生效，SQLite 静默跳过）
+- **Git commits**：36e5d68 + e40a8d1 推送到 `feature/ledger-import-view-refactor`
+- **剩余 7 个任务**：V1/V2 YG2101 性能验证 / 9.2 9家样本全绿 / 9.3 activate<1s / 9.8 UAT / 9.9 灰度部署 / 9.10 DROP 索引
+- **所有代码层任务已清零**，剩余全部是真人操作（跑大文件/部署/手动验收）
+- **Alembic 迁移链最终序列（10 个）**：view_refactor_activate_index → tenant_id → force_submit → event_outbox_dlq → dataset_binding → mapping_history_fp → retention_class → creator_chain → interrupted_status
