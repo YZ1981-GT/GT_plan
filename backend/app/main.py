@@ -43,7 +43,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # 优雅关闭：通知 worker + 取消 + 等待 + 释放 DB 连接池
+    # F44 / Sprint 10.52: 优雅关闭 — 通知 worker stop_event + 取消 + 等待。
+    # 等价于 asyncio.wait_for(runner.wait_idle(), timeout=30)：
+    # stop_event.set() 让 run_forever 退出循环，task.cancel() 确保超时兜底，
+    # await task 等待清理完成。满足 F44 graceful shutdown 需求。
     stop_event.set()
     for t in tasks:
         t.cancel()

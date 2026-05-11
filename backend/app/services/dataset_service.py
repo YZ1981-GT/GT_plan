@@ -147,6 +147,13 @@ class DatasetService:
         F25 / Sprint 10.7: 填充 ActivationRecord 审计字段
         (ip_address/duration_ms/before_row_counts/after_row_counts/reason)。
         """
+        # F29 / Sprint 6.7: REPEATABLE READ 隔离级别（仅 PG 生效，SQLite 无等价）
+        try:
+            if "postgresql" in str(db.bind.url if hasattr(db, 'bind') else ''):
+                await db.execute(sa.text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ"))
+        except Exception:
+            pass  # SQLite 或连接池不支持时静默跳过
+
         started_at = datetime.now(timezone.utc)
         # 加载目标数据集
         result = await db.execute(

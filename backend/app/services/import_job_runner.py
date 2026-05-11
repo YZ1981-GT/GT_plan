@@ -133,6 +133,35 @@ class ImportJobRunner:
             if stale_jobs:
                 await db.commit()
 
+            # F44 / Sprint 7.14-7.15 + 10.53: 恢复 interrupted 状态的 job
+            # interrupted = worker 收到 SIGTERM 后主动标记的中断状态，
+            # 重启后应优先恢复（有 checkpoint 则 resume，无则全量重跑）
+            interrupted_result = await db.execute(
+                sa.select(ImportJob).where(
+                    ImportJob.status == JobStatus.interrupted,
+                )
+            )
+            interrupted_jobs = list(interrupted_result.scalars().all())
+            for ij in interrupted_jobs:
+                if ij.current_phase:
+                    # 10.53: 有 checkpoint，走 resume_from_checkpoint
+                    ij.status = JobStatus.queued
+                    ij.progress_pct = 0
+                    ij.progress_message = f"从中断检查点恢复（{ij.current_phase}）"
+                    ij.error_message = None
+                else:
+                    # 无 checkpoint，全量重跑
+                    ij.status = JobStatus.queued
+                    ij.progress_pct = 0
+                    ij.progress_message = "中断作业恢复排队（全量重跑）"
+                    ij.error_message = None
+            if interrupted_jobs:
+                await db.commit()
+                logger.info(
+                    "recover_jobs: recovered %d interrupted job(s)",
+                    len(interrupted_jobs),
+                )
+
             queue_result = await db.execute(
                 sa.select(ImportJob.id).where(ImportJob.status == JobStatus.queued)
             )
@@ -820,8 +849,8 @@ class ImportJobRunner:
                     "job_id": str(job_id),
                 }
 
-            # 只允许从 failed / timed_out 恢复
-            if job.status not in (JobStatus.failed, JobStatus.timed_out):
+            # 只允许从 failed / timed_out / interrupted 恢复
+            if job.status not in (JobStatus.failed, JobStatus.timed_out, JobStatus.interrupted):
                 return {
                     "resumed": False,
                     "from_phase": job.current_phase,

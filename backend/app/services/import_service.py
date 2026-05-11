@@ -341,7 +341,7 @@ async def queue_unmapped(project_id: UUID, db: AsyncSession) -> list[str]:
         balance_result = await db.execute(
             select(TbBalance.account_code)
             .where(
-                await get_active_filter(db, TbBalance.__table__, project_id, active_year),
+                await get_active_filter(db, TbBalance.__table__, project_id, active_year, current_user_id=None),  # F41: 内部服务调用，显式 opt-out
             )
             .distinct()
         )
@@ -438,7 +438,7 @@ async def _load_balance_data(
     from app.services.dataset_query import get_active_filter
     result = await db.execute(
         select(TbBalance).where(
-            await get_active_filter(db, TbBalance.__table__, project_id, year),
+            await get_active_filter(db, TbBalance.__table__, project_id, year, current_user_id=None),  # F41: 内部校验调用，显式 opt-out
         )
     )
     rows = result.scalars().all()

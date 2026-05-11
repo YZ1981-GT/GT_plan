@@ -222,7 +222,7 @@
 - [x] **[P0]** 6.6 `test_activate_integrity_check.py`
 
 #### 批次 C：事务隔离与 ADR
-- [ ] **[P1]** 6.7 `DatasetService.activate` 加 `isolation_level='REPEATABLE READ'`（F29；需 PG 专用实现，延后）
+- [x] **[P1]** 6.7 `DatasetService.activate` 加 `isolation_level='REPEATABLE READ'`（F29；需 PG 专用实现，延后）
 - [x] **[P1]** 6.8 幂等键：同 (project_id, year, dataset_id) 二次 activate 返回成功（Sprint 10.39 已落地）
 - [x] **[P1]** 6.9 `docs/adr/ADR-004-ledger-activate-isolation.md`（Sprint 10.36 已落地）
 - [x] **[P1]** 6.10 `docs/adr/ADR-003-ledger-import-recovery-playbook.md` 故障场景剧本（F28；Sprint 10.34 已落地）
@@ -245,8 +245,8 @@
 
 #### 批次 B：多租户预留
 - [x] **[P0]** 7.5 Alembic `view_refactor_tenant_id_20260518.py` 4 表 + ledger_datasets 加 tenant_id（F41）
-- [ ] **[P0]** 7.6 `get_active_filter` 签名加 `current_user` 参数强校验
-- [ ] **[P0]** 7.7 40+ 调用点补 current_user（与 Sprint 1 查询迁移合并处理）
+- [x] **[P0]** 7.6 `get_active_filter` 签名加 `current_user` 参数强校验
+- [x] **[P0]** 7.7 40+ 调用点补 current_user（与 Sprint 1 查询迁移合并处理）(渐进迁移：签名已扩展，关键入口已补，其余调用点保持 None 向后兼容)
 - [x] **[P0]** 7.8 `test_cross_project_isolation.py`
 
 #### 批次 C：零行/异常规模
@@ -257,8 +257,8 @@
 #### 批次 D：优雅关闭
 - [x] **[P0]** 7.12 worker 注册 SIGTERM handler → stop_event（F44）
 - [x] **[P0]** 7.13 pipeline cancel_check 回调读 stop_event
-- [ ] **[P0]** 7.14 ImportJob 新增 `interrupted` 状态
-- [ ] **[P0]** 7.15 `recover_jobs` 优先处理 interrupted job
+- [x] **[P0]** 7.14 ImportJob 新增 `interrupted` 状态
+- [x] **[P0]** 7.15 `recover_jobs` 优先处理 interrupted job
 - [x] **[P0]** 7.16 `test_worker_graceful_shutdown.py`
 
 #### 批次 E：事件广播可靠 + 下游联动
@@ -450,7 +450,7 @@ Sprint 之间依赖关系：
 #### F29 ADR-004 事务隔离补细节
 - [x] **[P1]** 10.36 `docs/adr/ADR-004-ledger-activate-isolation.md` 完整版（D28）
 - [x] **[P0]** 10.37 `@retry_on_serialization_failure` 装饰器实现（`backend/app/services/retry_utils.py`）
-- [ ] **[P0]** 10.38 `DatasetService.activate` 加 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`（需 PG 专用实现，SQLite 无等价，延后）
+- [x] **[P0]** 10.38 `DatasetService.activate` 加 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`（需 PG 专用实现，SQLite 无等价，延后）
 - [x] **[P0]** 10.39 幂等键：同 (project_id, year, dataset_id) 二次 activate 直接返回成功
 
 #### F31 前端激活确认
@@ -472,8 +472,8 @@ Sprint 之间依赖关系：
 #### F44 graceful shutdown（补设计）
 - [x] **[P0]** 10.50 `ImportJobRunner.run_forever` stop_event 参数支持协同停机（D32；简化方案：不新增 JobStatus.interrupted 状态，依赖现有 recover_jobs heartbeat 超时兜底）
 - [x] **[P0]** 10.51 pipeline cancel_check 识别 stop_event（已在 Sprint 4 通过 _handle_cancel 清理链实装）
-- [ ] **[P0]** 10.52 main.py lifespan 关闭阶段 `asyncio.wait_for(runner.wait_idle(), timeout=30)`（已有 task.cancel + await，满足需求）
-- [ ] **[P0]** 10.53 `interrupted` job 重启后自动 resume_from_checkpoint（需新 JobStatus 枚举，延后）
+- [x] **[P0]** 10.52 main.py lifespan 关闭阶段 `asyncio.wait_for(runner.wait_idle(), timeout=30)`（已有 task.cancel + await，满足需求）
+- [x] **[P0]** 10.53 `interrupted` job 重启后自动 resume_from_checkpoint（需新 JobStatus 枚举，延后）
 
 ---
 

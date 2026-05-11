@@ -51,6 +51,7 @@ class JobStatus(str, enum.Enum):
     failed = "failed"
     canceled = "canceled"
     timed_out = "timed_out"
+    interrupted = "interrupted"
 
 
 class ArtifactStatus(str, enum.Enum):
