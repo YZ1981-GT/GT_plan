@@ -25,6 +25,9 @@ pytestmark_db = pytest.mark.skipif(
     reason="需要 DATABASE_URL_TEST 或 DATABASE_URL 指向测试 PG",
 )
 
+# pg_only marker for infrastructure-level skipping
+pytestmark = pytest.mark.pg_only
+
 
 # ledger_import 相关迁移链（按依赖顺序）
 LEDGER_MIGRATIONS = [

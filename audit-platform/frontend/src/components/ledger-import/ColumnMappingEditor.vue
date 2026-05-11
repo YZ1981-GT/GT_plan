@@ -386,8 +386,7 @@ async function importMappingFromProject() {
     const pid = getCurrentProjectId()
     await ledgerImportV2Api.copyMappingFromProject(pid, selectedReferenceProject.value)
     showImportMappingDialog.value = false
-    // Re-init mappings after import (would need to re-detect in real flow)
-    ElMessage.success('映射导入成功，请检查映射结果')
+    ElMessage.success('映射模板已保存，下次导入相同格式文件时将自动应用')
   } catch {
     ElMessage.error('导入映射失败')
   } finally {

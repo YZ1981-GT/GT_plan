@@ -40,6 +40,35 @@ jobs:
             --ignore=backend/tests/e2e \
             -x --tb=short
 
+  backend-tests-pg:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_audit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+        working-directory: .
+      - name: Run PG-only tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
+        run: python -m pytest tests/ -m pg_only -v --tb=short
+        working-directory: backend
+
   ledger-import-smoke:
     # S6-18: v2 账表导入引擎端到端 smoke
     # 防止"单测通过但真实数据跑不通"的回归（Sprint 6 复盘教训）

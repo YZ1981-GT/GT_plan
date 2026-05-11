@@ -170,6 +170,7 @@
 #### 批次 D：预估 + 上线
 - [x] **[P1]** 4.13 `duration_estimator.py` + detect 响应扩展（F17）
 - [x] **[P1]** 4.14 前端 `DetectionPreview.vue` 展示"预计耗时 X 分钟"
+
 - [x] **[P0]** 4.15 `feature_flags.py` 新增 `ledger_import_view_refactor_enabled` + 项目级 override（F19）
 - [x] **[P0]** 4.16 Alembic `view_refactor_cleanup_old_deleted_20260517.py` 分块 UPDATE（F18 Day 7）
 - [x] **[P0]** 4.17 `docs/adr/ADR-002-ledger-view-refactor.md` 三阶段迁移剧本归档

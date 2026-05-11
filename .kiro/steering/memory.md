@@ -1017,3 +1017,20 @@ inclusion: always
 - **写入性能下一步方向**：异步 activate（pipeline 写完即返回 completed，activate 后台跑）或终极 B' 视图方案（业务查询走 v_tb_* 视图 JOIN ledger_datasets）
 - **superseded 膨胀治理**：YG2101 每次导入 200 万行 superseded，purge 后需 VACUUM 回收空间
 - **tenant_id 渐进迁移 deadline**：建议 3 个月内触碰即修，每次改文件时补 current_user_id 参数
+
+## 复盘改进 9 条全部落地（2026-05-11，commit 00beda8）
+
+- **新建永久脚本 2 个**：`scripts/e2e_9_companies_batch.py`（九家样本批量验证，--all 含慢样本）+ `scripts/validate_spec_references.py`（spec 引用核对，grep 验证函数名/端点是否真实存在）
+- **新建文档 4 个**：`docs/FRONTEND_BACKEND_ALIGNMENT_CHECKLIST.md`（5 端点前后端对齐清单）+ `docs/TENANT_ID_MIGRATION_PLAN.md`（deadline 2026-08-11）+ `docs/adr/ADR-005-async-activate.md`（异步 activate 提案，当前不急）+ `audit-platform/frontend/e2e/ledger-import-smoke.spec.ts`（playwright 骨架 4 case，待安装后实装）
+- **新建 hook**：`.kiro/hooks/e2e-reminder.json`（编辑 5 个核心文件时提醒跑 E2E）
+- **purge worker 扩展**：`_vacuum_tb_tables()` 在 REINDEX 后对 4 张 Tb* 表执行 VACUUM（仅 PG，AUTOCOMMIT 模式）
+- **conventions.md 新增**："Spec 目标设定规约"章节（基于实测基线 / 两层目标 / 区分架构问题与物理限制）
+
+## 二次复盘发现（2026-05-11，系统级隐患）
+
+- **PG 数据膨胀**：tb_balance 5964 行但 active 只 813（7× 膨胀），superseded 行 is_deleted=false 仍在；purge worker 因 activation_records FK 约束无法删 metadata；需手动清理一次 + 修复 FK cascade
+- **useLedgerImport.ts composable 未被使用**：LedgerImportDialog 用组件内部 ref 管理状态，composable 是死代码；决策：删除或迁移
+- **ColumnMappingEditor "从其他项目导入映射"是半成品**：API 调用成功但没重新初始化映射，用户看到"成功"但映射没变；需实装或删除按钮
+- **SSE + 5s 轮询重复**：ThreeColumnLayout 同时维护 SSE 连接和 active-job 轮询，功能重叠；长期应让 SSE 推送 IMPORT_PROGRESS 事件替代轮询
+- **SQLite 测试覆盖盲区**：423 测试全是 SQLite，PG 特有行为（enum/VACUUM/isolation）无法验证；建议 CI 加 PG 容器 job 跑 @pytest.mark.pg_only 子集
+- **优先级排序**：数据膨胀清理 > 半成品功能 > PG CI > SSE 去重 > composable 清理

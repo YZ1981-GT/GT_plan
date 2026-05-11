@@ -64,6 +64,16 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
 
+def pytest_collection_modifyitems(config, items):
+    """Skip pg_only tests when DATABASE_URL is not PostgreSQL."""
+    db_url = os.getenv("DATABASE_URL", "sqlite")
+    if "postgresql" not in db_url:
+        skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
+        for item in items:
+            if "pg_only" in item.keywords:
+                item.add_marker(skip_pg)
+
+
 # ---------------------------------------------------------------------------
 # Task 4: 模型注册完整性测试
 # ---------------------------------------------------------------------------
