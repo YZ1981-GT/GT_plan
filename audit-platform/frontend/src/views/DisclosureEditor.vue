@@ -444,6 +444,7 @@ import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
 import { handleApiError } from '@/utils/errorHandler'
+import { useProjectEvents } from '@/composables/useProjectEvents'
 
 const route = useRoute()
 const router = useRouter()
@@ -454,6 +455,11 @@ const year = computed(() => {
   const qy = Number(route.query.year)
   return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
 })
+
+// ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
+const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
+onDatasetActivated(() => fetchTree())
+onDatasetRolledBack(() => fetchTree())
 
 // R8-S2-03：Stale 状态追踪
 import { useStaleStatus } from '@/composables/useStaleStatus'

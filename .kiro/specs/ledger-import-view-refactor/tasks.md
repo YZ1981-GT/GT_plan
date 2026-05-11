@@ -181,9 +181,9 @@
 
 #### 批次 A：激活广播链路
 - [x] **[P0]** 5.1 `DatasetService.activate` 事务内 INSERT `event_outbox` DATASET_ACTIVATED（F20）
-- [ ] **[P0]** 5.2 `outbox_replay_worker` 扩展：调 `WebSocketBroadcastService.push_to_project`
+- [x] **[P0]** 5.2 `outbox_replay_worker` 扩展：调 `WebSocketBroadcastService.push_to_project`
 - [x] **[P0]** 5.3 前端 `composables/useProjectEvents(projectId)` 订阅 WS 通道
-- [ ] **[P0]** 5.4 ReportView / DisclosureEditor / TrialBalance 三视图接入 useProjectEvents 自动刷新
+- [x] **[P0]** 5.4 ReportView / DisclosureEditor / TrialBalance 三视图接入 useProjectEvents 自动刷新
 - [x] **[P0]** 5.5 `test_ws_dataset_broadcast.py`
 
 #### 批次 B：锁透明

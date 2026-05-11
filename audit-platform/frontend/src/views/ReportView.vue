@@ -668,6 +668,7 @@ import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste
 import { withLoading } from '@/composables/useLoading'
 import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
+import { useProjectEvents } from '@/composables/useProjectEvents'
 import {
   generateReports, getReport, getReportDrilldown, getReportConsistencyCheck, recalcTrialBalance,
   getReportExcelUrl,
@@ -679,6 +680,11 @@ const router = useRouter()
 const projectStore = useProjectStore()
 
 const projectId = computed(() => projectStore.projectId)
+
+// ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
+const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
+onDatasetActivated(() => fetchReport())
+onDatasetRolledBack(() => fetchReport())
 
 // R8-S2-03：Stale 状态追踪（上游数据变更提示）
 import { useStaleStatus } from '@/composables/useStaleStatus'

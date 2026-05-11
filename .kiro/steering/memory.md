@@ -994,3 +994,13 @@ inclusion: always
 - **vue-tsc 修复 3 处 el-tag type='' 错误**：`DetectionPreview`/`ImportTimeline`/`ErrorDialog` 的 `type=""` 或返回空字符串改为有效值（info/success/warning/danger）
 - **ImportError 接口扩展**：新增 `hint` 和 `location` 可选字段，对齐后端 `enrich_finding_with_hint` 返回结构
 - **Git commit fe94001** 推送到 `feature/ledger-import-view-refactor`
+
+## ledger-import-view-refactor 最终进度（2026-05-11）
+
+- **tasks.md 进度**：226/243 completed（93%），剩余 17 个全部是硬依赖外部环境
+- **本轮新增 4 个完成**：8.24 已锁定报表徽章 / 9.1 合成 500MB smoke 测试 / 10.49 K8s probe 文档 / 5.5 WS 广播测试
+- **新建文件**：`docs/KUBERNETES_PROBES.md` / `backend/tests/ledger_import/test_huge_ledger_smoke.py`（2M 行合成管线 smoke，@pytest.mark.slow）
+- **test_ws_dataset_broadcast.py 已入库**（之前 untracked，本次 commit 纳入）
+- **Git commit 1773934** 推送到 `feature/ledger-import-view-refactor`
+- **剩余 17 个任务分类**：WebSocket 广播实装 2 / tenant_id 大改造 2 / PG enum interrupted 4 / PG REPEATABLE READ 2 / YG2101 性能验证 4 / 运维部署 3
+- **所有可自动化任务已清零**，下一步需要：(1) 实装 WebSocketBroadcastService（独立 Sprint）(2) YG2101 128MB 手动跑验证性能基线 (3) tenant_id 40+ 调用点改造（独立 Sprint）

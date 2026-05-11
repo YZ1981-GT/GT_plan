@@ -355,6 +355,7 @@ import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
+import { useProjectEvents } from '@/composables/useProjectEvents'
 import * as P from '@/services/apiPaths'
 
 const route = useRoute()
@@ -366,6 +367,11 @@ const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
 const selectedYear = ref(projectStore.year)
 const yearOptions = computed(() => projectStore.yearOptions)
+
+// ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
+const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
+onDatasetActivated(() => fetchData())
+onDatasetRolledBack(() => fetchData())
 
 function onProjectChange(pid: string) {
   router.push({
