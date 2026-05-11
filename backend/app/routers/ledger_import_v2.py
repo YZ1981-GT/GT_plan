@@ -513,6 +513,108 @@ async def retry_job(
 
 
 # ---------------------------------------------------------------------------
+# POST /jobs/{job_id}/takeover (F22 / Sprint 5.10 — 接管机制)
+# ---------------------------------------------------------------------------
+
+
+class TakeoverRequest(BaseModel):
+    """POST /jobs/{job_id}/takeover request body."""
+
+    reason: str = Field(
+        ...,
+        description="接管原因（如 'A 网络掉线'）",
+        min_length=1,
+        max_length=500,
+    )
+
+
+@router.post("/jobs/{job_id}/takeover")
+async def takeover_job(
+    project_id: UUID,
+    job_id: UUID,
+    body: TakeoverRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """F22 / Sprint 5.10-5.11: 接管导入作业。
+
+    前置条件：
+    - 当前用户角色为 PM / admin / partner
+    - job 的 heartbeat 已过期（heartbeat_at 为 NULL 或 > 5 分钟前）
+
+    动作：
+    - 更新 creator_chain 追加接管记录
+    - 触发 resume_from_checkpoint 从最后检查点恢复
+    """
+    from datetime import timezone
+
+    # 权限检查：仅 PM / admin / partner 可接管
+    allowed_roles = {"pm", "admin", "partner"}
+    if current_user.role.value not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="仅 PM / admin / partner 可接管导入作业",
+        )
+
+    # 查找 job
+    stmt = select(ImportJob).where(
+        ImportJob.id == job_id,
+        ImportJob.project_id == project_id,
+    )
+    result = await db.execute(stmt)
+    job = result.scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail="作业不存在")
+
+    # 检查 heartbeat 是否过期（NULL 或 > 5 分钟前）
+    from datetime import datetime, timedelta
+
+    now = datetime.now(timezone.utc)
+    heartbeat_expired = False
+    if job.heartbeat_at is None:
+        heartbeat_expired = True
+    else:
+        hb = job.heartbeat_at
+        if hb.tzinfo is None:
+            hb = hb.replace(tzinfo=timezone.utc)
+        if hb < now - timedelta(minutes=5):
+            heartbeat_expired = True
+
+    if not heartbeat_expired:
+        raise HTTPException(
+            status_code=403,
+            detail="作业仍在活跃中（heartbeat 未过期），无法接管",
+        )
+
+    # 更新 creator_chain
+    chain = list(job.creator_chain or [])
+    chain.append({
+        "user_id": str(current_user.id),
+        "action": "takeover",
+        "at": now.isoformat(),
+        "reason": body.reason,
+    })
+    job.creator_chain = chain
+    job.created_by = current_user.id
+    await db.flush()
+    await db.commit()
+
+    # 触发 resume_from_checkpoint（F14 机制）
+    from app.services.import_job_runner import ImportJobRunner
+
+    resume_result = await ImportJobRunner.resume_from_checkpoint(job_id)
+
+    return {
+        "job_id": str(job_id),
+        "status": job.status.value if hasattr(job.status, "value") else str(job.status),
+        "takeover_by": str(current_user.id),
+        "resumed_from_phase": resume_result.get("from_phase"),
+        "resume_action": resume_result.get("action"),
+        "message": resume_result.get("message", "接管成功"),
+    }
+
+
+# ---------------------------------------------------------------------------
 # POST /jobs/{job_id}/resume (F14 / Sprint 4.3 — checkpoint 恢复)
 # ---------------------------------------------------------------------------
 

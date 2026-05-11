@@ -226,6 +226,11 @@ class ImportJob(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+    # F22 / Sprint 5.9: 接管链路记录
+    # 格式: [{"user_id": "A", "action": "create", "at": "..."}, ...]
+    creator_chain: Mapped[list | None] = mapped_column(
+        JSONB, server_default=text("'[]'"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
