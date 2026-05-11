@@ -1034,3 +1034,13 @@ inclusion: always
 - **SSE + 5s 轮询重复**：ThreeColumnLayout 同时维护 SSE 连接和 active-job 轮询，功能重叠；长期应让 SSE 推送 IMPORT_PROGRESS 事件替代轮询
 - **SQLite 测试覆盖盲区**：423 测试全是 SQLite，PG 特有行为（enum/VACUUM/isolation）无法验证；建议 CI 加 PG 容器 job 跑 @pytest.mark.pg_only 子集
 - **优先级排序**：数据膨胀清理 > 半成品功能 > PG CI > SSE 去重 > composable 清理
+
+## 二次复盘 6 项即时修复完成（2026-05-11，commit 007939e）
+
+- **PG 数据膨胀已清理**：删除 8 条旧 activation_records + 8 条旧 superseded metadata，当前 active=1 superseded=3（符合 keep_count=3）
+- **useLedgerImport.ts 已删除**（-140 行死代码）；LedgerImportDialog 用组件内部 ref 管理状态足够
+- **ColumnMappingEditor 消息已修正**：从"映射导入成功"改为"映射模板已保存，下次导入相同格式文件时将自动应用"（准确描述 file_fingerprint 复用机制）
+- **CI 新增 `backend-tests-pg` job**：postgres:16 容器 + `pytest -m pg_only`（Alembic round-trip / enum / isolation 测试）
+- **ADR-006 SSE vs 轮询决策**：保持双通道各司其职（SSE 推业务事件，轮询查精确进度），长期 SSE 稳定后可替代轮询
+- **e2e_9_companies_batch.py 首次跑通 4/6 家**：YG36(68s)/YG4001(9s)/安徽骨科(537s)/和平物流(96s) 成功；辽宁卫生 79MB 超时（15min 不够，需 --all 模式的 20min 超时）
+- **pytest.ini 新增 `pg_only` marker 注册**（消除 PytestUnknownMarkWarning）
