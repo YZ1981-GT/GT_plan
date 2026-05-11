@@ -66,6 +66,12 @@
             <el-tag size="small">{{ opinionLabel(report.opinion_type) }}</el-tag>
             <el-tag size="small" type="info">{{ report.company_type === 'listed' ? '上市公司' : '非上市' }}</el-tag>
             <el-tag size="small" :type="(statusTagType(report.status)) || undefined">{{ statusLabel(report.status) }}</el-tag>
+            <el-tag
+              v-if="isLocked && report.bound_dataset_id"
+              size="small"
+              type="info"
+              effect="plain"
+            >🔒 数据版本：已锁定</el-tag>
           </div>
           <el-menu :default-active="activeSection" @select="onSectionSelect" class="gt-ar-section-menu">
             <el-menu-item v-for="s in sectionNames" :key="s" :index="s">

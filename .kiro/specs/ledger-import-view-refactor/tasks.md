@@ -184,7 +184,7 @@
 - [ ] **[P0]** 5.2 `outbox_replay_worker` 扩展：调 `WebSocketBroadcastService.push_to_project`
 - [x] **[P0]** 5.3 前端 `composables/useProjectEvents(projectId)` 订阅 WS 通道
 - [ ] **[P0]** 5.4 ReportView / DisclosureEditor / TrialBalance 三视图接入 useProjectEvents 自动刷新
-- [ ] **[P0]** 5.5 `test_ws_dataset_broadcast.py`
+- [x] **[P0]** 5.5 `test_ws_dataset_broadcast.py`
 
 #### 批次 B：锁透明
 - [x] **[P0]** 5.6 `ImportQueueService.get_lock_info()` 返回 LockInfo 结构（F21）
@@ -304,7 +304,7 @@
 - [x] **[P0]** 8.21 下游 service 查询优先用 bound_dataset_id（未绑定才走 active）
 - [x] **[P0]** 8.22 `DatasetService.rollback` 前检查 final 报表绑定 → 拒绝（409）
 - [x] **[P0]** 8.23 前端 rollback 对话框展示影响对象清单（LedgerImportHistory.vue rollback 对话框含 bound 对象列表 + 409 SIGNED_REPORTS_BOUND 报表清单）
-- [ ] **[P0]** 8.24 已锁定报表显示"数据版本：VN（已锁定）"徽章
+- [x] **[P0]** 8.24 已锁定报表显示"数据版本：VN（已锁定）"徽章
 - [x] **[P0]** 8.25 `test_workpaper_dataset_binding.py`
 - [x] **[P0]** 8.26 `test_signed_report_rollback_protection.py`
 - [x] **[P1]** 8.27 admin 双人授权的 `POST /datasets/{id}/force-unbind` 接口（风险 6 缓解）
@@ -334,7 +334,7 @@
 
 ### Sprint 9：最终验收与文档
 
-- [ ] **[P0]** 9.1 `test_huge_ledger_smoke.py` 500MB 合成样本 < 30min + 内存 < 2GB
+- [x] **[P0]** 9.1 `test_huge_ledger_smoke.py` 500MB 合成样本 < 30min + 内存 < 2GB
 - [ ] **[P0]** 9.2 9 家真实样本参数化 E2E 全绿（F6/F7/F8/F11）
 - [ ] **[P0]** 9.3 `b3_diag_yg2101.py` activate <1s + total <250s
 - [x] **[P0]** 9.4 EXPLAIN ANALYZE 关键查询改造前后 <1.2×
@@ -467,7 +467,7 @@ Sprint 之间依赖关系：
 - [x] **[P1]** 10.46 `backend/app/routers/ledger_import_health.py` `/api/health/ledger-import` 实现（D31）
 - [x] **[P1]** 10.47 status 3 态决策（healthy/degraded/unhealthy）
 - [x] **[P1]** 10.48 HEALTH_STATUS gauge 同步
-- [ ] **[P2]** 10.49 Kubernetes liveness/readiness probe 配置文档化
+- [x] **[P2]** 10.49 Kubernetes liveness/readiness probe 配置文档化
 
 #### F44 graceful shutdown（补设计）
 - [x] **[P0]** 10.50 `ImportJobRunner.run_forever` stop_event 参数支持协同停机（D32；简化方案：不新增 JobStatus.interrupted 状态，依赖现有 recover_jobs heartbeat 超时兜底）
