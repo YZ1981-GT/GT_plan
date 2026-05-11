@@ -11,6 +11,23 @@
     </el-tabs>
 
     <div v-if="currentSheet" class="mapping-content">
+      <!-- 8.36: 应用全部历史映射按钮 -->
+      <div v-if="hasHistoryMappings" class="history-apply-bar">
+        <el-alert type="info" :closable="false" show-icon>
+          <template #title>
+            <span>检测到历史映射记录，部分列已自动应用</span>
+            <el-button
+              type="primary"
+              size="small"
+              style="margin-left: 12px"
+              @click="applyAllHistoryMappings"
+            >
+              应用全部历史映射
+            </el-button>
+          </template>
+        </el-alert>
+      </div>
+
       <!-- 🔴 关键列（key）— 必须填写 -->
       <div class="mapping-section section-key">
         <div class="section-header">
@@ -47,6 +64,9 @@
             </el-select>
             <el-tag v-if="mapping.confidence > 0" size="small" type="info">
               {{ mapping.confidence }}%
+            </el-tag>
+            <el-tag v-if="mapping.autoAppliedFromHistory" size="small" type="warning" effect="plain" class="history-badge">
+              🕒 上次映射
             </el-tag>
           </div>
         </div>
@@ -88,6 +108,9 @@
               </el-select>
               <el-tag v-if="mapping.confidence > 0" size="small" type="info">
                 {{ mapping.confidence }}%
+              </el-tag>
+              <el-tag v-if="mapping.autoAppliedFromHistory" size="small" type="warning" effect="plain" class="history-badge">
+                🕒 上次映射
               </el-tag>
             </div>
           </div>
@@ -182,6 +205,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Right } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { SheetDetection, LedgerDetectionResult, ConfirmedMapping } from './LedgerImportDialog.vue'
@@ -191,6 +215,7 @@ import type { SheetDetection, LedgerDetectionResult, ConfirmedMapping } from './
 const props = defineProps<{
   sheets: SheetDetection[]
   detectionResult: LedgerDetectionResult | null
+  projectId?: string
 }>()
 
 const emit = defineEmits<{
@@ -206,6 +231,8 @@ interface MappingRow {
   column_tier: 'key' | 'recommended' | 'extra'
   confidence: number
   mappedField: string | null
+  autoAppliedFromHistory: boolean
+  historyMappingId: string | null
 }
 
 interface StandardField {
@@ -223,6 +250,13 @@ const selectedReferenceProject = ref('')
 const referenceProjects = ref<Array<{ id: string; name: string }>>([])
 const loadingProjects = ref(false)
 const importingMapping = ref(false)
+
+/** 获取当前项目 ID（优先 prop，回退路由参数） */
+function getCurrentProjectId(): string {
+  if (props.projectId) return props.projectId
+  const route = useRoute()
+  return (route.params.projectId as string) || ''
+}
 
 // ─── Standard Fields ────────────────────────────────────────────────────────
 
@@ -280,7 +314,24 @@ const allKeyColumnsMapped = computed(() =>
   keyMappings.value.every(m => !!m.mappedField)
 )
 
+// 8.36: Check if any mappings were auto-applied from history
+const hasHistoryMappings = computed(() =>
+  currentMappings.value.some(m => m.autoAppliedFromHistory)
+)
+
 // ─── Methods ────────────────────────────────────────────────────────────────
+
+// 8.36: Apply all history mappings (accept all auto-applied suggestions)
+function applyAllHistoryMappings() {
+  const mappings = currentMappings.value
+  for (const m of mappings) {
+    if (m.autoAppliedFromHistory && m.mappedField) {
+      // Already applied — just confirm by keeping the value
+      // This is a no-op since they're already set, but signals user intent
+    }
+  }
+  ElMessage.success('已应用全部历史映射')
+}
 
 function isFieldUsed(fieldValue: string, excludeColIdx: number): boolean {
   return currentMappings.value.some(
@@ -297,6 +348,8 @@ function initMappings() {
       column_tier: col.column_tier,
       confidence: col.confidence,
       mappedField: col.standard_field,
+      autoAppliedFromHistory: !!(col as any).auto_applied_from_history,
+      historyMappingId: (col as any).history_mapping_id || null,
     }))
     map.set(idx, rows)
   })
@@ -328,10 +381,10 @@ async function importMappingFromProject() {
   importingMapping.value = true
   try {
     const { ledgerImportV2Api } = await import('@/services/ledgerImportV2Api')
-    await ledgerImportV2Api.copyMappingFromProject(
-      props.detectionResult?.upload_token ? '' : '',
-      selectedReferenceProject.value
-    )
+    // 从 detectionResult 中获取当前项目 ID（通过 upload_token 关联的项目）
+    // 实际项目 ID 需要从父组件传入
+    const pid = getCurrentProjectId()
+    await ledgerImportV2Api.copyMappingFromProject(pid, selectedReferenceProject.value)
     showImportMappingDialog.value = false
     // Re-init mappings after import (would need to re-detect in real flow)
     ElMessage.success('映射导入成功，请检查映射结果')
@@ -353,7 +406,8 @@ watch(showImportMappingDialog, async (visible) => {
     loadingProjects.value = true
     try {
       const { ledgerImportV2Api } = await import('@/services/ledgerImportV2Api')
-      const res = await ledgerImportV2Api.getReferenceProjects('') as Array<{ id: string; name: string }>
+      const pid = getCurrentProjectId()
+      const res = await ledgerImportV2Api.getReferenceProjects(pid) as Array<{ id: string; name: string }>
       referenceProjects.value = res || []
     } catch { /* ignore */ }
     finally { loadingProjects.value = false }
@@ -443,5 +497,13 @@ watch(showImportMappingDialog, async (visible) => {
 .actions-right {
   display: flex;
   gap: 8px;
+}
+
+.history-badge {
+  font-size: 11px;
+}
+
+.history-apply-bar {
+  margin-bottom: 16px;
 }
 </style>

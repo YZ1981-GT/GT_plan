@@ -503,6 +503,19 @@ const router = createRouter({
           component: () => import('@/views/ConfirmationHub.vue'),
           meta: { developing: true },
         },
+        // ── 账表导入校验规则说明页 (8.9) ──
+        {
+          path: 'ledger-import/validation-rules',
+          name: 'ValidationRules',
+          component: () => import('@/views/ValidationRules.vue'),
+        },
+        // ── 管理员：事件死信队列 (7.19) ──
+        {
+          path: 'admin/event-dlq',
+          name: 'EventDLQ',
+          component: () => import('@/views/admin/EventDLQ.vue'),
+          meta: { permission: 'admin' },
+        },
       ],
     },
     {

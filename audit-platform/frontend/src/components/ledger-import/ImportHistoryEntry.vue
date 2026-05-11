@@ -6,6 +6,15 @@
       <el-tag v-if="entry.adapter_used" size="small">
         适配器: {{ entry.adapter_used }}
       </el-tag>
+      <!-- 8.42: retention 徽章 -->
+      <el-tag
+        v-if="entry.retention_class"
+        :type="retentionTagType"
+        size="small"
+        effect="plain"
+      >
+        {{ retentionLabel }}
+      </el-tag>
     </div>
 
     <div class="entry-body">
@@ -22,6 +31,30 @@
 
     <!-- 诊断入口 -->
     <div class="entry-actions">
+      <!-- 5.12: 接管导入按钮（heartbeat 超 5min 才显示） -->
+      <el-button
+        v-if="canTakeover"
+        link
+        type="danger"
+        size="small"
+        aria-label="接管导入"
+        :loading="takeoverLoading"
+        @click="onTakeover"
+      >
+        接管导入
+      </el-button>
+      <!-- 4.4: 恢复导入按钮 -->
+      <el-button
+        v-if="canResume"
+        link
+        type="warning"
+        size="small"
+        aria-label="恢复导入"
+        :loading="resumeLoading"
+        @click="onResume"
+      >
+        恢复导入
+      </el-button>
       <el-button
         v-if="entry.job_id"
         link
@@ -47,6 +80,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue'
+import { ElMessage } from 'element-plus'
+import { ledgerImportV2Api } from '@/services/ledgerImportV2Api'
+
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
 interface HistoryEntry {
@@ -58,16 +95,102 @@ interface HistoryEntry {
   detection_evidence: Record<string, unknown> | null
   file_count?: number
   total_rows?: number
+  retention_class?: 'transient' | 'archived' | 'legal_hold' | null
+  project_id?: string
+  heartbeat_at?: string | null
+  lock_info?: { holder_id?: string; holder_name?: string } | null
 }
 
-defineProps<{
+const props = defineProps<{
   entry: HistoryEntry
+  projectId?: string
 }>()
 
 const emit = defineEmits<{
   'show-diagnostics': [jobId: string]
   'show-evidence': [evidence: Record<string, unknown>]
+  'resumed': [jobId: string]
+  'taken-over': [jobId: string]
 }>()
+
+// ─── Resume (4.4) ───────────────────────────────────────────────────────────
+
+const resumeLoading = ref(false)
+
+/** Show resume button only for failed/timed_out jobs */
+const canResume = computed(() => {
+  return props.entry.job_id && ['failed', 'timed_out'].includes(props.entry.status)
+})
+
+async function onResume() {
+  const pid = props.projectId || props.entry.project_id
+  if (!pid || !props.entry.job_id) return
+  resumeLoading.value = true
+  try {
+    await ledgerImportV2Api.resume(pid, props.entry.job_id)
+    ElMessage.success('已恢复导入任务')
+    emit('resumed', props.entry.job_id)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '恢复导入失败')
+  } finally {
+    resumeLoading.value = false
+  }
+}
+
+// ─── Takeover (5.12) ────────────────────────────────────────────────────────
+
+const takeoverLoading = ref(false)
+
+/** Show takeover button when job is running but heartbeat is stale (>5min) */
+const canTakeover = computed(() => {
+  if (!props.entry.job_id) return false
+  if (props.entry.status !== 'running') return false
+  if (!props.entry.heartbeat_at) return false
+  // Check if heartbeat is older than 5 minutes
+  const heartbeat = new Date(props.entry.heartbeat_at).getTime()
+  const fiveMinAgo = Date.now() - 5 * 60 * 1000
+  return heartbeat < fiveMinAgo
+})
+
+async function onTakeover() {
+  const pid = props.projectId || props.entry.project_id
+  if (!pid || !props.entry.job_id) return
+
+  const { ElMessageBox } = await import('element-plus')
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      '请输入接管原因（如：原操作人离线）',
+      '接管导入',
+      { confirmButtonText: '确认接管', cancelButtonText: '取消', inputPlaceholder: '接管原因' }
+    )
+    takeoverLoading.value = true
+    await ledgerImportV2Api.takeover(pid, props.entry.job_id)
+    ElMessage.success('已接管导入任务')
+    emit('taken-over', props.entry.job_id)
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.message !== 'cancel') {
+      ElMessage.error(e?.message || '接管失败')
+    }
+  } finally {
+    takeoverLoading.value = false
+  }
+}
+
+// ─── Retention badge (8.42) ─────────────────────────────────────────────────
+
+const RETENTION_MAP: Record<string, { label: string; type: '' | 'info' | 'danger' }> = {
+  transient: { label: '临时(90天)', type: 'info' },
+  archived: { label: '归档(10年)', type: '' },
+  legal_hold: { label: '法定保留', type: 'danger' },
+}
+
+const retentionTagType = computed(() => {
+  return RETENTION_MAP[props.entry.retention_class || '']?.type || 'info'
+})
+
+const retentionLabel = computed(() => {
+  return RETENTION_MAP[props.entry.retention_class || '']?.label || props.entry.retention_class
+})
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -84,6 +207,7 @@ function getStatusLabel(status: string): string {
     running: '⟳ 进行中',
     queued: '⏳ 排队中',
     canceled: '⊘ 已取消',
+    timed_out: '⏱ 超时',
   }
   return map[status] || status
 }

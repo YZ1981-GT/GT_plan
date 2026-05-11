@@ -959,3 +959,34 @@ inclusion: always
 - **PG 手动补列根因确认**：多条 ALTER TABLE 写在同一个 `docker exec psql -c "..."` 里时，中间某条报错会导致 PG 事务回滚整个块（后续语句全部不执行）；正确做法是每条 ALTER 单独一个 `docker exec psql -c` 调用
 - **剩余 50 个未完成任务分类**：前端 Vue 18 个 / 真实 PG+大文件 E2E 6 个 / PG-only 延后 4 个 / 运维部署 3 个 / 后端可自动化已全部清零
 - **后端可自动化任务全部完成**：Sprint 7-11 + Sprint 5 takeover = 所有后端 P0/P1 coding task 已标 [x]；剩余全是前端/真实环境/运维类
+
+## 4/9 家真实样本 E2E 批量验证通过（2026-05-11）
+
+- **YG4001 宜宾大药房**：0.8MB / 9s / balance=812 ledger=4409 aux_balance=304 aux_ledger=5628
+- **YG36 四川物流**：3.5MB / 31s / balance=813 ledger=22716 aux_balance=1730 aux_ledger=25813
+- **安徽骨科**：58.2MB / 531s（8.8min）/ balance=812 ledger=348802 aux_balance=43153 aux_ledger=619000
+- **和平物流**：13.7MB / ~120s / balance=275 ledger=118259 aux_balance=3616 aux_ledger=0（方括号表头 L1 锁定修复后识别正确）
+- **吞吐量参考**：安徽骨科 35 万行序时账 + 62 万辅助明细 = 约 1900 rows/s（含 aux 维度解析 + PG COPY）
+- **剩余 5 家未测**：辽宁卫生/医疗器械（2 xlsx 分文件需批量上传）、陕西华氏（13 文件×2 年度）、和平药房（392MB CSV）、YG2101（128MB 单文件预计 7-15min）——多文件场景需前端批量上传或脚本逐文件 detect
+- **Git 状态**：commit d842d39 推送到 `feature/ledger-import-view-refactor`
+
+## 前端 21 个任务全部完成 + 4/9 真实样本 E2E 通过（2026-05-11）
+
+- **前端 Batch 1（9 tasks）**：ImportHistoryEntry resume 按钮 + retention 徽章 / ThreeColumnLayout 卡住阈值 30s / DetectionPreview 预计耗时+规模档位+灰色 unknown 卡片+skip_reason badge+强制继续按钮 / ImportButton tooltip 锁详情 / DatasetActivationButton ElMessageBox.prompt 二次确认+reason 传递 / LedgerImportDialog forceSubmitFlag 透传
+- **前端 Batch 2（6 tasks）**：`useProjectEvents` composable（eventBus 订阅 sse:sync-event 按 projectId 过滤，暴露 onDatasetActivated/onDatasetRolledBack typed handlers）/ ImportHistoryEntry 接管按钮（heartbeat >5min 显示）/ ErrorDialog hint 展示（title/description/suggestions 卡片）/ ValidationRules.vue 新页面（L1/L2/L3 分组 el-collapse+el-table）/ DiagnosticPanel drill_down 抽屉 / EventDLQ.vue admin 页面
+- **前端 Batch 3（4 tasks）**：ErrorDialog+DiagnosticPanel error code 可点击跳转规则详情页（window.open 新标签）/ LedgerImportHistory rollback 对话框展示影响对象清单+409 SIGNED_REPORTS_BOUND 报表列表 / ColumnMappingEditor "🕒 上次映射" badge + "应用全部历史映射" 按钮 / ImportTimeline.vue 新组件（el-timeline+el-card，按年度查 datasets/history 端点）
+- **新建前端文件 5 个**：`useProjectEvents.ts` / `ValidationRules.vue` / `EventDLQ.vue` / `ImportButton.vue` / `ImportTimeline.vue`
+- **修改前端文件 10+ 个**：ImportHistoryEntry / DetectionPreview / LedgerImportDialog / ThreeColumnLayout / ErrorDialog / DiagnosticPanel / ColumnMappingEditor / DatasetActivationButton / LedgerImportHistory / router/index.ts / apiPaths.ts / ledgerImportV2Api.ts
+- **新增路由 2 条**：`/ledger-import/validation-rules` + `/admin/event-dlq`（meta: permission admin）
+- **getDiagnostics 全部 0 错误**
+- **真实样本 E2E 4/9 通过**：YG4001 9s / YG36 31s / 安徽骨科 531s / 和平物流 ~120s；剩余 5 家需多文件上传或 >10min 超时
+- **tasks.md 进度**：201→222 completed / 42→21 remaining（完成率 91.4%）
+- **Git**：commit d842d39 → 后续 commit 含前端 3 批次 + 真实样本验证
+
+## 前后端联动审查修复（2026-05-11）
+
+- **DiagnosticPanel 响应结构修复**：后端 `/diagnostics` 返回 `result_summary.findings + blocking_findings`，前端原来期望顶层 `errors` 数组导致诊断面板永远为空；修复为 `fetchDiagnostics` 内做数据归一化
+- **ColumnMappingEditor project_id 修复**：`copyMappingFromProject` 和 `getReferenceProjects` 原传空字符串，改为新增 `projectId` prop + `getCurrentProjectId()` 辅助函数从 LedgerImportDialog 传入
+- **SubmitBody 接口补齐**：`ledgerImportV2Api.ts` 的 `SubmitBody` 补齐 `force_submit/incremental/overlap_strategy/file_periods` 4 字段
+- **column-mappings 端点位置确认**：在 `backend/app/routers/account_chart.py`（prefix `/api/projects`），不在 ledger_import_v2.py
+- **前后端联动审查方法论**：context-gatherer 误报率高（本次 8 个 issue 中 5 个是误报），关键路径必须手动 grep 验证；真正的 bug 多在"响应结构不匹配"和"参数传递遗漏"两类

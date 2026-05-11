@@ -13,6 +13,10 @@ export interface SubmitBody {
   confirmed_mappings: unknown[]
   force_activate?: boolean
   adapter_id?: string
+  force_submit?: boolean
+  incremental?: boolean
+  overlap_strategy?: 'skip' | 'overwrite'
+  file_periods?: number[] | null
 }
 
 export interface DiagnosticsResult {
@@ -53,6 +57,14 @@ export const ledgerImportV2Api = {
   /** 重试失败作业 */
   retry: (pid: string, jobId: string) =>
     api.post(`${BASE(pid)}/jobs/${jobId}/retry`),
+
+  /** 恢复导入（从 checkpoint 恢复） */
+  resume: (pid: string, jobId: string) =>
+    api.post(`${BASE(pid)}/jobs/${jobId}/resume`),
+
+  /** 接管导入（heartbeat 超时后其他成员接管） */
+  takeover: (pid: string, jobId: string) =>
+    api.post(`${BASE(pid)}/jobs/${jobId}/takeover`),
 
   /** 获取诊断详情 */
   diagnostics: (pid: string, jobId: string) =>

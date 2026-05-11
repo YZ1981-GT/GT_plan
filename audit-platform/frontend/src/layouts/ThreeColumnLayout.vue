@@ -561,9 +561,9 @@ const bgImportStatus = ref<BgImportStatus | null>(null)
 let importPollTimer: ReturnType<typeof setInterval> | null = null
 /** 当前被追踪的 projectId（独立于路由，支持跨项目保留导入指示） */
 const trackedProjectId = ref<string | null>(null)
-/** 连续轮询错误计数——连续 3 次错误自动释放追踪 */
+/** 连续轮询错误计数——连续 6 次错误自动释放追踪（30s = 6 × 5s 轮询间隔） */
 let pollErrorCount = 0
-const MAX_POLL_ERRORS = 3
+const MAX_POLL_ERRORS = 6
 
 const PHASE_LABEL: Record<string, string> = {
   bootstrap: '启动',

@@ -152,26 +152,37 @@ def main():
     async def db_check():
         nonlocal assertions_passed
         async with async_session() as db:
+            # B' 架构：获取 active dataset_id，所有查询按 dataset_id 过滤
+            active_ds_row = (await db.execute(sa.text("""
+                SELECT id FROM ledger_datasets
+                WHERE project_id = :pid AND year = :yr AND status = 'active'
+                ORDER BY activated_at DESC NULLS LAST LIMIT 1
+            """), {"pid": PROJECT_ID, "yr": year})).first()
+            active_ds_id = str(active_ds_row.id) if active_ds_row else None
+            ds_filter = "AND dataset_id = :ds_id" if active_ds_id else ""
+            params = {"pid": PROJECT_ID, "yr": year, "ds_id": active_ds_id}
+            print(f"  active dataset_id: {active_ds_id}")
+
             for tbl in ("tb_balance", "tb_aux_balance", "tb_ledger", "tb_aux_ledger"):
                 row = (await db.execute(sa.text(f"""
                     SELECT COUNT(*) FILTER (WHERE is_deleted=false) AS active,
                            COUNT(*) FILTER (WHERE is_deleted=true) AS staged
                     FROM {tbl}
-                    WHERE project_id = :pid AND year = :yr
-                """), {"pid": PROJECT_ID, "yr": year})).first()
+                    WHERE project_id = :pid AND year = :yr {ds_filter}
+                """), params)).first()
                 print(f"  {tbl}: active={row.active} staged={row.staged}")
 
             # ── Layer 3 去重断言 ──
             print(f"\n  [Layer 3 断言] tb_balance 主表去重正确性")
 
             # (a) tb_balance 无 account_code 重复
-            dup = (await db.execute(sa.text("""
+            dup = (await db.execute(sa.text(f"""
                 SELECT account_code, company_code, COUNT(*) AS cnt
                 FROM tb_balance
-                WHERE project_id = :pid AND year = :yr AND is_deleted = false
+                WHERE project_id = :pid AND year = :yr AND is_deleted = false {ds_filter}
                 GROUP BY account_code, company_code
                 HAVING COUNT(*) > 1
-            """), {"pid": PROJECT_ID, "yr": year})).fetchall()
+            """), params)).fetchall()
             if dup:
                 print(f"    ❌ tb_balance 主表存在 {len(dup)} 个重复 account_code:")
                 for r in dup[:5]:
@@ -181,14 +192,14 @@ def main():
                 print(f"    ✅ tb_balance 所有 account_code 唯一（按 company+code 分组）")
 
             # (b) 1002 银行存款 closing 不翻倍（有则 ≈ 辅助和）
-            bank = (await db.execute(sa.text("""
+            bank = (await db.execute(sa.text(f"""
                 SELECT company_code, account_code, account_name, closing_balance,
                        (raw_extra ->> '_aggregated_from_aux')::bool AS agg,
                        (raw_extra ->> '_aux_row_count')::int AS aux_cnt
                 FROM tb_balance
-                WHERE project_id = :pid AND year = :yr AND is_deleted = false
+                WHERE project_id = :pid AND year = :yr AND is_deleted = false {ds_filter}
                   AND account_code = '1002'
-            """), {"pid": PROJECT_ID, "yr": year})).fetchall()
+            """), params)).fetchall()
             if not bank:
                 print(f"    ⚠️  未找到 1002 银行存款（YG36 可能使用其他科目编码）")
             else:
@@ -196,33 +207,33 @@ def main():
                     print(f"    1002/{r.company_code}: {r.account_name or ''} "
                           f"closing={r.closing_balance} aggregated={r.agg} aux_cnt={r.aux_cnt}")
 
-                # 辅助和 = 主表值
-                aux_sum = (await db.execute(sa.text("""
-                    SELECT company_code, SUM(closing_balance) AS s,
+                # 辅助和 = 主表值（按 aux_type 分组，多维度场景每个维度类型合计=主表）
+                aux_sum = (await db.execute(sa.text(f"""
+                    SELECT company_code, aux_type, SUM(closing_balance) AS s,
                            COUNT(*) AS cnt
                     FROM tb_aux_balance
-                    WHERE project_id = :pid AND year = :yr AND is_deleted = false
+                    WHERE project_id = :pid AND year = :yr AND is_deleted = false {ds_filter}
                       AND account_code = '1002'
-                    GROUP BY company_code
-                """), {"pid": PROJECT_ID, "yr": year})).fetchall()
+                    GROUP BY company_code, aux_type
+                """), params)).fetchall()
                 for aux in aux_sum:
                     parent = next((b for b in bank if b.company_code == aux.company_code), None)
                     if parent is None:
                         continue
                     diff = abs(float(aux.s or 0) - float(parent.closing_balance or 0))
                     tag = "✅" if diff < 1.0 else "❌"
-                    print(f"    {tag} 1002/{aux.company_code} 辅助和={aux.s} "
+                    print(f"    {tag} 1002/{aux.company_code}/{aux.aux_type} 辅助和={aux.s} "
                           f"(n={aux.cnt}) 主表={parent.closing_balance} 差={diff:.2f}")
                     if diff >= 1.0:
                         assertions_passed = False
 
             # (c) 聚合行统计
-            agg_count = (await db.execute(sa.text("""
+            agg_count = (await db.execute(sa.text(f"""
                 SELECT COUNT(*) AS c
                 FROM tb_balance
-                WHERE project_id = :pid AND year = :yr AND is_deleted = false
+                WHERE project_id = :pid AND year = :yr AND is_deleted = false {ds_filter}
                   AND (raw_extra ->> '_aggregated_from_aux')::bool = true
-            """), {"pid": PROJECT_ID, "yr": year})).scalar()
+            """), params)).scalar()
             print(f"    ℹ️  聚合生成的主表行: {agg_count}（Excel 中无汇总行仅有明细的科目）")
 
     asyncio.run(db_check())
@@ -258,8 +269,12 @@ def main():
                   f"closing={node['closing_balance']} has_children={node['has_children']}")
             if node["has_children"]:
                 for c in node["children"][:5]:
-                    print(f"    └─ {c['aux_type']}:{c['aux_code']} {c['aux_name']} "
-                          f"closing={c['closing_balance']}")
+                    # 后端返回 code/name 而非 aux_code/aux_name
+                    code = c.get('aux_code') or c.get('code') or '?'
+                    name = c.get('aux_name') or c.get('name') or '?'
+                    aux_type = c.get('aux_type') or c.get('type') or '?'
+                    print(f"    └─ {aux_type}:{code} {name} "
+                          f"closing={c.get('closing_balance')}")
 
     print(f"\n=== 总结 ===")
     if assertions_passed:

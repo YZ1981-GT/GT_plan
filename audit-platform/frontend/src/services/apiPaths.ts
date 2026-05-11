@@ -887,6 +887,11 @@ export const ledger = {
     v2Diagnostics: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/diagnostics`,
     v2Cancel: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/cancel`,
     v2Retry: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/retry`,
+    v2Resume: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/resume`,
+    v2Takeover: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/takeover`,
+    activeJob: (pid: string) => `/api/projects/${pid}/ledger-import/active-job`,
+    datasetsHistory: (pid: string) => `/api/projects/${pid}/ledger-import/datasets/history`,
+    datasetForceUnbind: (pid: string, dsId: string) => `/api/projects/${pid}/ledger-import/datasets/${dsId}/force-unbind`,
     rawExtraFields: (pid: string) => `/api/projects/${pid}/ledger/raw-extra-fields`,
   },
   // v2 账表数据管理（查询/删除/增量追加）

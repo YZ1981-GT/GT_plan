@@ -153,8 +153,8 @@
 - [x] **[P0]** 4.1 `pipeline.py` 实现 `ProgressState` + `_maybe_report_progress` 按 5% / 10k 行触发（F13）
 - [x] **[P0]** 4.2 `ImportJob.current_phase` 枚举扩展 + `_mark(phase)` 同步写入（F14）
 - [x] **[P0]** 4.3 `ImportJobRunner.resume_from_checkpoint(job_id)` 路由表实现（F14）
-- [ ] **[P1]** 4.4 前端"恢复导入"按钮（ImportHistoryEntry.vue）调用 resume 端点
-- [ ] **[P1]** 4.5 `ThreeColumnLayout.vue` 卡住阈值 10s → 30s
+- [x] **[P1]** 4.4 前端"恢复导入"按钮（ImportHistoryEntry.vue）调用 resume 端点
+- [x] **[P1]** 4.5 `ThreeColumnLayout.vue` 卡住阈值 10s → 30s
 
 #### 批次 B：cancel 清理
 - [x] **[P0]** 4.6 `pipeline._handle_cancel` 清理链实现（F15）
@@ -169,7 +169,7 @@
 
 #### 批次 D：预估 + 上线
 - [x] **[P1]** 4.13 `duration_estimator.py` + detect 响应扩展（F17）
-- [ ] **[P1]** 4.14 前端 `DetectionPreview.vue` 展示"预计耗时 X 分钟"
+- [x] **[P1]** 4.14 前端 `DetectionPreview.vue` 展示"预计耗时 X 分钟"
 - [x] **[P0]** 4.15 `feature_flags.py` 新增 `ledger_import_view_refactor_enabled` + 项目级 override（F19）
 - [x] **[P0]** 4.16 Alembic `view_refactor_cleanup_old_deleted_20260517.py` 分块 UPDATE（F18 Day 7）
 - [x] **[P0]** 4.17 `docs/adr/ADR-002-ledger-view-refactor.md` 三阶段迁移剧本归档
@@ -182,20 +182,20 @@
 #### 批次 A：激活广播链路
 - [x] **[P0]** 5.1 `DatasetService.activate` 事务内 INSERT `event_outbox` DATASET_ACTIVATED（F20）
 - [ ] **[P0]** 5.2 `outbox_replay_worker` 扩展：调 `WebSocketBroadcastService.push_to_project`
-- [ ] **[P0]** 5.3 前端 `composables/useProjectEvents(projectId)` 订阅 WS 通道
+- [x] **[P0]** 5.3 前端 `composables/useProjectEvents(projectId)` 订阅 WS 通道
 - [ ] **[P0]** 5.4 ReportView / DisclosureEditor / TrialBalance 三视图接入 useProjectEvents 自动刷新
 - [ ] **[P0]** 5.5 `test_ws_dataset_broadcast.py`
 
 #### 批次 B：锁透明
 - [x] **[P0]** 5.6 `ImportQueueService.get_lock_info()` 返回 LockInfo 结构（F21）
 - [x] **[P0]** 5.7 `GET /active-job` 扩展返回 holder + progress + 预估剩余
-- [ ] **[P0]** 5.8 前端 `ImportButton.vue` tooltip 展示锁详情
+- [x] **[P0]** 5.8 前端 `ImportButton.vue` tooltip 展示锁详情
 
 #### 批次 C：接管机制
 - [x] **[P1]** 5.9 Alembic `view_refactor_creator_chain_20260520.py` 加 `creator_chain JSONB`（F22）
 - [x] **[P1]** 5.10 `POST /jobs/{id}/takeover` 端点 + PM/admin 权限
 - [x] **[P1]** 5.11 takeover 后触发 `resume_from_checkpoint`
-- [ ] **[P1]** 5.12 前端"接管导入"按钮（heartbeat 超 5min 才显示）
+- [x] **[P1]** 5.12 前端"接管导入"按钮（heartbeat 超 5min 才显示）
 - [x] **[P1]** 5.13 `test_import_takeover.py`
 
 #### 批次 D：互斥与旁观
@@ -230,10 +230,10 @@
 #### 批次 D：UX 补强
 - [x] **[P0]** 6.11 `error_hints.py` 32 条错误码映射 + Pydantic ErrorHint model（F32）
 - [x] **[P0]** 6.12 `/diagnostics` 响应 findings 数组 enriched hint 字段
-- [ ] **[P0]** 6.13 前端 `ErrorDialog.vue` 展示 title/description/suggestions（前端任务延后）
+- [x] **[P0]** 6.13 前端 `ErrorDialog.vue` 展示 title/description/suggestions（前端任务延后）
 - [x] **[P0]** 6.14 `test_all_error_codes_have_hints.py` CI 一致性检查（`test_error_hints.py`）
-- [ ] **[P1]** 6.15 前端 `DatasetActivationButton.vue` ElMessageBox 二次确认 + reason 字段（F31，前端任务延后）
-- [ ] **[P1]** 6.16 reason 写入 ActivationRecord.reason（后端已支持 `activate(*, reason=...)`；前端延后）
+- [x] **[P1]** 6.15 前端 `DatasetActivationButton.vue` ElMessageBox 二次确认 + reason 字段（F31，前端任务延后）
+- [x] **[P1]** 6.16 reason 写入 ActivationRecord.reason（后端已支持 `activate(*, reason=...)`；前端延后）
 
 ### Sprint 7：安全与健壮性（F40-F46）
 
@@ -264,7 +264,7 @@
 #### 批次 E：事件广播可靠 + 下游联动
 - [x] **[P0]** 7.17 Alembic `event_outbox_dlq_20260521.py` DLQ 表（F45）
 - [x] **[P0]** 7.18 `outbox_replay_worker` 失败 3 次移入 DLQ + 告警
-- [ ] **[P1]** 7.19 `/admin/event-dlq` 页面 + 手动重投
+- [x] **[P1]** 7.19 `/admin/event-dlq` 页面 + 手动重投
 - [x] **[P0]** 7.20 `test_broadcast_retry_with_outbox.py`
 - [x] **[P0]** 7.21 `DatasetService.rollback` 发 DATASET_ROLLED_BACK event（F46）
 - [x] **[P0]** 7.22 `event_handlers.py` 订阅 → 标 Workpaper/AuditReport/DisclosureNote is_stale
@@ -285,14 +285,14 @@
 #### 批次 B：规则说明文档
 - [x] **[P0]** 8.7 `validation_rules_catalog.py` 31 条 ValidationRuleDoc（F48）
 - [x] **[P0]** 8.8 `GET /api/ledger-import/validation-rules` 端点
-- [ ] **[P0]** 8.9 前端页面 `/ledger-import/validation-rules`（路由 + 组件）
+- [x] **[P0]** 8.9 前端页面 `/ledger-import/validation-rules`（路由 + 组件）
 - [x] **[P0]** 8.10 `test_validation_rules_catalog.py` catalog 与 validator.py 双向一致性
-- [ ] **[P1]** 8.11 finding.code 前端点击直达对应规则详情页
+- [x] **[P1]** 8.11 finding.code 前端点击直达对应规则详情页（ErrorDialog+DiagnosticPanel code 可点击跳转 ValidationRules 页面）
 
 #### 批次 C：差异下钻
 - [x] **[P0]** 8.12 `ValidationFinding.location.drill_down` 字段（F49）
 - [x] **[P0]** 8.13 L3 finding 生成时填充 drill_down（target + filter + sample_ids）
-- [ ] **[P0]** 8.14 前端 `DiagnosticPanel.vue` "查看明细"按钮打开 `LedgerPenetration.vue` 抽屉
+- [x] **[P0]** 8.14 前端 `DiagnosticPanel.vue` "查看明细"按钮打开 `LedgerPenetration.vue` 抽屉
 - [x] **[P0]** 8.15 `test_finding_drill_down.py`
 
 #### 批次 D：下游快照绑定（合规关键）
@@ -303,7 +303,7 @@
 - [x] **[P0]** 8.20 `get_active_filter` 签名加 `force_dataset_id` 参数
 - [x] **[P0]** 8.21 下游 service 查询优先用 bound_dataset_id（未绑定才走 active）
 - [x] **[P0]** 8.22 `DatasetService.rollback` 前检查 final 报表绑定 → 拒绝（409）
-- [ ] **[P0]** 8.23 前端 rollback 对话框展示影响对象清单
+- [x] **[P0]** 8.23 前端 rollback 对话框展示影响对象清单（LedgerImportHistory.vue rollback 对话框含 bound 对象列表 + 409 SIGNED_REPORTS_BOUND 报表清单）
 - [ ] **[P0]** 8.24 已锁定报表显示"数据版本：VN（已锁定）"徽章
 - [x] **[P0]** 8.25 `test_workpaper_dataset_binding.py`
 - [x] **[P0]** 8.26 `test_signed_report_rollback_protection.py`
@@ -320,7 +320,7 @@
 #### 批次 F：列映射历史复用
 - [x] **[P1]** 8.34 `ImportColumnMappingHistory` 扩展 file_fingerprint + override_parent_id（F52）
 - [x] **[P1]** 8.35 detect 阶段查询历史 mapping 自动应用 + 填充 auto_applied_from_history 标记
-- [ ] **[P1]** 8.36 前端 ColumnMappingEditor 显示"🕒 上次映射"badge + "应用全部"按钮
+- [x] **[P1]** 8.36 前端 ColumnMappingEditor 显示"🕒 上次映射"badge + "应用全部历史映射"按钮
 - [x] **[P1]** 8.37 `test_column_mapping_history_reuse.py`
 
 #### 批次 G：留档合规保留期
@@ -328,7 +328,7 @@
 - [x] **[P0]** 8.39 `compute_retention_class(dataset)` 自动决策（legal_hold > archived > transient）
 - [x] **[P0]** 8.40 activate 时同步计算并写入 artifact
 - [x] **[P0]** 8.41 `purge_old_datasets` 扩展：排除 bound_dataset 引用 + 按 retention_class 过滤
-- [ ] **[P0]** 8.42 前端"导入历史"页面展示 retention 徽章
+- [x] **[P0]** 8.42 前端"导入历史"页面展示 retention 徽章
 - [x] **[P0]** 8.43 `test_retention_class_assignment.py`
 - [x] **[P0]** 8.44 `test_purge_respects_bindings.py`
 
@@ -399,7 +399,7 @@ Sprint 之间依赖关系：
 - [x] **[P0]** 10.6 Alembic `view_refactor_activation_record_20260523.py` ActivationRecord 加 ip/duration_ms/before_row_counts/after_row_counts/reason/action 字段（Sprint 5.18 已落地）
 - [x] **[P0]** 10.7 `DatasetService.activate/rollback` 填充扩展字段
 - [x] **[P0]** 10.8 `GET /api/projects/{pid}/ledger-import/datasets/history` 端点（去重后只保留一份）
-- [ ] **[P1]** 10.9 前端"账套导入历史时间轴"组件（UI 独立，可延后）
+- [x] **[P1]** 10.9 前端"账套导入历史时间轴"组件（ImportTimeline.vue 已创建，el-timeline + datasets/history 端点）
 
 #### F5 跨年度同项目支持
 - [x] **[P0]** 10.10 `mark_previous_superseded` 查询加 year 条件（D25 风险点）
@@ -429,7 +429,7 @@ Sprint 之间依赖关系：
 #### F9 多 sheet unknown 透明化
 - [x] **[P0]** 10.25 `SheetDetection.skip_reason` 字段 + `SheetWarning` 结构（D26.4）
 - [x] **[P0]** 10.26 detect 阶段生成中文原因（行数太少 / 表头无法识别 / 列内容不符合）
-- [ ] **[P0]** 10.27 前端 `DetectionPreview.vue` 灰色卡片 + skip_reason badge
+- [x] **[P0]** 10.27 前端 `DetectionPreview.vue` 灰色卡片 + skip_reason badge
 - [x] **[P0]** 10.28 `test_unknown_sheet_reason.py` YG2101 Sheet1 场景
 
 #### F10 CSV 大文件保障
@@ -454,14 +454,14 @@ Sprint 之间依赖关系：
 - [x] **[P0]** 10.39 幂等键：同 (project_id, year, dataset_id) 二次 activate 直接返回成功
 
 #### F31 前端激活确认
-- [ ] **[P0]** 10.40 `DatasetActivationButton.vue` ElMessageBox.prompt 实现（D29，前端任务延后）
-- [ ] **[P0]** 10.41 reason 字段传递到 API + 写入 ActivationRecord.reason（前端任务延后；后端 activate(*, reason=) 已支持）
+- [x] **[P0]** 10.40 `DatasetActivationButton.vue` ElMessageBox.prompt 实现（D29，前端任务延后）
+- [x] **[P0]** 10.41 reason 字段传递到 API + 写入 ActivationRecord.reason（前端任务延后；后端 activate(*, reason=) 已支持）
 
 #### F42 零行/异常规模拦截（补设计）
 - [x] **[P1]** 10.42 `check_scale_warnings()` 函数实现（D30，基于历史均值 ±5σ 改为 ±10×）
 - [x] **[P1]** 10.43 `ImportJob.force_submit` 字段
 - [x] **[P1]** 10.44 detect 响应 warnings 数组 + submit 端点 force_submit 门控
-- [ ] **[P1]** 10.45 前端检测结果页"强制继续"按钮
+- [x] **[P1]** 10.45 前端检测结果页"强制继续"按钮
 
 #### F43 健康端点（补设计）
 - [x] **[P1]** 10.46 `backend/app/routers/ledger_import_health.py` `/api/health/ledger-import` 实现（D31）

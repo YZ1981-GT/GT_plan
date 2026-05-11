@@ -41,10 +41,25 @@
       <el-collapse-item title="错误详情" name="errors">
         <div v-if="diagnostics?.errors?.length" class="error-list-compact">
           <div v-for="(err, idx) in diagnostics.errors" :key="idx" class="error-compact">
-            <el-tag :type="err.severity === 'fatal' ? 'danger' : err.severity === 'blocking' ? 'warning' : 'info'" size="small">
+            <el-tag
+              :type="err.severity === 'fatal' ? 'danger' : err.severity === 'blocking' ? 'warning' : 'info'"
+              size="small"
+              class="code-link"
+              @click="goToRule(err.code)"
+            >
               {{ err.code }}
             </el-tag>
             <span>{{ err.message }}</span>
+            <!-- 8.14: 查看明细按钮（drill_down） -->
+            <el-button
+              v-if="err.location?.drill_down"
+              link
+              type="primary"
+              size="small"
+              @click="onDrillDown(err)"
+            >
+              查看明细 ({{ err.location.drill_down.expected_count || '?' }}行)
+            </el-button>
           </div>
         </div>
         <el-empty v-else description="无错误" :image-size="60" />
@@ -72,12 +87,46 @@
       <el-icon class="is-loading"><Loading /></el-icon>
       <span>加载诊断数据...</span>
     </div>
+
+    <!-- 8.14: LedgerPenetration 抽屉（通过 iframe 或路由跳转） -->
+    <el-drawer
+      v-model="drillDrawerVisible"
+      title="明细穿透"
+      size="80%"
+      direction="rtl"
+      destroy-on-close
+    >
+      <div class="drill-down-content">
+        <p class="drill-info">
+          正在查看科目明细凭证，筛选条件：
+        </p>
+        <el-descriptions :column="2" border size="small" v-if="drillDownFilter">
+          <el-descriptions-item
+            v-for="(val, key) in drillDownFilter"
+            :key="String(key)"
+            :label="String(key)"
+          >
+            {{ val }}
+          </el-descriptions-item>
+        </el-descriptions>
+        <el-button
+          type="primary"
+          style="margin-top: 16px"
+          @click="openPenetrationPage"
+        >
+          在新页面打开穿透视图
+        </el-button>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { CircleCheck, CircleClose, Loading } from '@element-plus/icons-vue'
+
+const router = useRouter()
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -88,14 +137,39 @@ const props = defineProps<{
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+interface DrillDown {
+  target?: string
+  filter?: Record<string, any>
+  sample_ids?: string[]
+  expected_count?: number
+}
+
+interface DiagnosticError {
+  code: string
+  severity: string
+  message: string
+  location?: {
+    drill_down?: DrillDown
+    [key: string]: any
+  }
+}
+
 interface DiagnosticData {
   detection_evidence: Record<string, unknown> | null
   adapter_used: string | null
   adapter_score: number | null
   engine_version: string | null
   duration_ms: number | null
-  errors: Array<{ code: string; severity: string; message: string }>
+  errors: DiagnosticError[]
   progress_history: Array<{ phase: string; timestamp: string; message?: string }>
+  // 后端实际返回的字段
+  result_summary?: {
+    findings?: DiagnosticError[]
+    blocking_findings?: DiagnosticError[]
+    [key: string]: any
+  } | null
+  current_phase?: string | null
+  status?: string
 }
 
 // ─── State ──────────────────────────────────────────────────────────────────
@@ -103,6 +177,33 @@ interface DiagnosticData {
 const expandedPanels = ref<string[]>(['evidence'])
 const diagnostics = ref<DiagnosticData | null>(null)
 const loading = ref(false)
+
+// ─── Drill Down (8.14) ──────────────────────────────────────────────────────
+
+const drillDrawerVisible = ref(false)
+const drillDownFilter = ref<Record<string, any> | null>(null)
+
+function onDrillDown(err: DiagnosticError) {
+  if (!err.location?.drill_down?.filter) return
+  drillDownFilter.value = err.location.drill_down.filter
+  drillDrawerVisible.value = true
+}
+
+function goToRule(code: string) {
+  const route = router.resolve({ path: '/ledger-import/validation-rules', hash: `#${code}` })
+  window.open(route.href, '_blank')
+}
+
+function openPenetrationPage() {
+  const query: Record<string, string> = {}
+  if (drillDownFilter.value) {
+    Object.entries(drillDownFilter.value).forEach(([k, v]) => {
+      if (v != null) query[k] = String(v)
+    })
+  }
+  router.push({ path: `/projects/${props.projectId}/ledger`, query })
+  drillDrawerVisible.value = false
+}
 
 // ─── Methods ────────────────────────────────────────────────────────────────
 
@@ -132,8 +233,25 @@ async function fetchDiagnostics() {
     const { api } = await import('@/services/apiProxy')
     const res = await api.get(
       `/api/projects/${props.projectId}/ledger-import/jobs/${props.jobId}/diagnostics`
-    )
-    diagnostics.value = res as DiagnosticData
+    ) as any
+    // 后端返回 result_summary.findings / blocking_findings，前端统一到 errors 数组
+    const summary = res?.result_summary || {}
+    const findings: DiagnosticError[] = [
+      ...(summary.blocking_findings || []),
+      ...(summary.findings || []),
+    ]
+    diagnostics.value = {
+      detection_evidence: res?.detection_result?.detection_evidence || res?.options?.detection_evidence || null,
+      adapter_used: res?.adapter_used || null,
+      adapter_score: res?.options?.adapter_score || null,
+      engine_version: res?.options?.engine_version || 'v2',
+      duration_ms: summary.duration_ms || null,
+      errors: findings,
+      progress_history: summary.progress_history || [],
+      result_summary: summary,
+      current_phase: res?.current_phase,
+      status: res?.status,
+    }
   } catch (err) {
     console.error('获取诊断数据失败', err)
   } finally {
@@ -200,6 +318,16 @@ onMounted(() => {
   font-size: 13px;
 }
 
+.error-compact .code-link {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.error-compact .code-link:hover {
+  opacity: 0.7;
+  text-decoration: underline;
+}
+
 .history-phase {
   font-weight: 500;
 }
@@ -218,5 +346,15 @@ onMounted(() => {
   gap: 8px;
   background: rgba(255, 255, 255, 0.8);
   font-size: 14px;
+}
+
+.drill-down-content {
+  padding: 16px;
+}
+
+.drill-info {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 </style>

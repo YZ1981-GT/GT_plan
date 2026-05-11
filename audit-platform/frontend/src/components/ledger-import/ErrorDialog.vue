@@ -47,7 +47,14 @@
           >
             {{ getSeverityLabel(error.severity) }}
           </el-tag>
-          <span class="error-code">{{ error.code }}</span>
+          <el-link
+            class="error-code"
+            type="primary"
+            :underline="false"
+            @click="goToRule(error.code)"
+          >
+            {{ error.code }}
+          </el-link>
         </div>
 
         <div class="error-message">{{ error.message }}</div>
@@ -64,6 +71,23 @@
           <el-icon><InfoFilled /></el-icon>
           <span>{{ error.suggestion }}</span>
         </div>
+
+        <!-- 6.13: 展示 hint 字段（title/description/suggestions from error_hints.py） -->
+        <div v-if="error.hint" class="error-hint-block">
+          <div v-if="error.hint.title" class="hint-title">
+            <el-icon><InfoFilled /></el-icon>
+            <strong>{{ error.hint.title }}</strong>
+          </div>
+          <div v-if="error.hint.description" class="hint-description">
+            {{ error.hint.description }}
+          </div>
+          <div v-if="error.hint.suggestions?.length" class="hint-suggestions">
+            <span class="hint-suggestions-label">建议操作：</span>
+            <ul>
+              <li v-for="(s, sIdx) in error.hint.suggestions" :key="sIdx">{{ s }}</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       <el-empty v-if="currentErrors.length === 0" description="无错误" />
@@ -77,8 +101,11 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Location, InfoFilled } from '@element-plus/icons-vue'
 import type { ImportError } from './LedgerImportDialog.vue'
+
+const router = useRouter()
 
 // ─── Props & Emits ──────────────────────────────────────────────────────────
 
@@ -141,6 +168,11 @@ function getSeverityLabel(severity: string): string {
     default: return severity
   }
 }
+
+function goToRule(code: string) {
+  const route = router.resolve({ path: '/ledger-import/validation-rules', hash: `#${code}` })
+  window.open(route.href, '_blank')
+}
 </script>
 
 <style scoped>
@@ -181,7 +213,11 @@ function getSeverityLabel(severity: string): string {
 .error-code {
   font-family: monospace;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  cursor: pointer;
+}
+
+.error-code:hover {
+  text-decoration: underline;
 }
 
 .error-message {
@@ -206,5 +242,49 @@ function getSeverityLabel(severity: string): string {
   font-size: 12px;
   color: var(--el-color-primary);
   margin-top: 4px;
+}
+
+.error-hint-block {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.hint-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--el-text-color-primary);
+}
+
+.hint-description {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  line-height: 1.5;
+  margin-bottom: 6px;
+}
+
+.hint-suggestions {
+  font-size: 12px;
+}
+
+.hint-suggestions-label {
+  color: var(--el-text-color-secondary);
+  font-weight: 500;
+}
+
+.hint-suggestions ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  list-style: disc;
+}
+
+.hint-suggestions li {
+  color: var(--el-color-primary);
+  line-height: 1.6;
 }
 </style>

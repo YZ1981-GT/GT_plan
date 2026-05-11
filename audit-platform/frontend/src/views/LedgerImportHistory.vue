@@ -106,6 +106,14 @@
           <el-table-column prop="expires_at" label="过期时间" width="190" />
         </el-table>
       </el-tab-pane>
+
+      <!-- 10.9: 导入历史时间轴 -->
+      <el-tab-pane label="时间轴">
+        <ImportTimeline
+          :project-id="projectId"
+          :initial-year="selectedYear"
+        />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -113,7 +121,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
 import {
   cancelImportJob,
@@ -128,6 +136,7 @@ import {
   type LedgerDataset,
   type ImportArtifact,
 } from '@/services/ledgerImportApi'
+import ImportTimeline from '@/components/ledger-import/ImportTimeline.vue'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -190,10 +199,46 @@ async function loadAll() {
 }
 
 async function rollback(row: LedgerDataset) {
-  await confirmDangerous('确认回滚到上一 active 数据集？该操作会切换当前可见账表数据。', '回滚确认')
-  await rollbackLedgerDataset(projectId.value, row.id, selectedYear.value, '用户从导入历史页面发起回滚')
-  ElMessage.success('回滚成功')
-  await loadAll()
+  // 8.23: 展示影响对象清单
+  let impactMessage = '确认回滚到上一 active 数据集？该操作会切换当前可见账表数据。'
+  try {
+    // Try to get active dataset info to show bound objects
+    const { api } = await import('@/services/apiProxy')
+    const { ledger: ledgerPaths } = await import('@/services/apiPaths')
+    const activeInfo: any = await api.get(ledgerPaths.import.datasetsActive(projectId.value), { params: { year: selectedYear.value } })
+    if (activeInfo?.bound_reports_count || activeInfo?.bound_workpapers_count) {
+      const parts: string[] = []
+      if (activeInfo.bound_reports_count) parts.push(`${activeInfo.bound_reports_count} 份报表`)
+      if (activeInfo.bound_workpapers_count) parts.push(`${activeInfo.bound_workpapers_count} 个底稿`)
+      impactMessage = `以下对象将受影响：${parts.join(' / ')}\n\n回滚后这些对象将标记为"数据过期"(stale)，需要重新核对。`
+    }
+  } catch {
+    // If we can't get impact info, proceed with basic confirmation
+  }
+
+  await confirmDangerous(impactMessage, '回滚确认')
+
+  try {
+    await rollbackLedgerDataset(projectId.value, row.id, selectedYear.value, '用户从导入历史页面发起回滚')
+    ElMessage.success('回滚成功')
+    await loadAll()
+  } catch (err: any) {
+    // 8.23: Handle 409 SIGNED_REPORTS_BOUND — show the reports list from error detail
+    const detail = err?.detail || err?.response?.data?.detail || err?.response?.data?.message
+    if (detail?.error_code === 'SIGNED_REPORTS_BOUND' || err?.response?.status === 409) {
+      const reports = detail?.bound_reports || detail?.reports || []
+      const reportList = reports.length > 0
+        ? reports.map((r: any) => `• ${r.title || r.id}`).join('\n')
+        : '（已签字报表）'
+      ElMessageBox.alert(
+        `无法回滚：以下已签字报表绑定了当前数据集，回滚将导致数据不一致。\n\n${reportList}\n\n如需强制回滚，请联系管理员使用"强制解绑"功能。`,
+        '回滚被拒绝',
+        { type: 'error', confirmButtonText: '知道了' },
+      )
+    } else {
+      ElMessage.error('回滚失败: ' + (detail?.message || err?.message || '未知错误'))
+    }
+  }
 }
 
 async function retry(row: ImportJob) {

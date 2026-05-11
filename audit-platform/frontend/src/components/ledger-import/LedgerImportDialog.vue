@@ -36,6 +36,7 @@
       v-if="currentStep === 2"
       :sheets="confirmedSheets"
       :detection-result="detectionResult"
+      :project-id="projectId"
       @confirm="onMappingConfirm"
       @back="currentStep = 1"
     />
@@ -80,6 +81,12 @@ export interface LedgerDetectionResult {
   can_derive: Record<string, boolean>
   errors: ImportError[]
   requires_manual_confirm: boolean
+  // F17: duration estimation from detect response
+  estimated_duration_seconds?: number | null
+  total_rows_estimate?: number | null
+  size_bucket?: 'S' | 'M' | 'L' | 'XL' | null
+  // F42: scale warnings
+  scale_warnings?: Array<{ code: string; message: string }>
 }
 
 export interface FileDetection {
@@ -128,6 +135,21 @@ export interface ImportError {
   row?: number | null
   column?: string | null
   suggestion?: string | null
+  hint?: {
+    title?: string
+    description?: string
+    suggestions?: string[]
+    severity?: string
+  } | null
+  location?: {
+    drill_down?: {
+      target?: string
+      filter?: Record<string, any>
+      sample_ids?: string[]
+      expected_count?: number
+    }
+    [key: string]: any
+  } | null
 }
 
 export interface ConfirmedMapping {
@@ -155,6 +177,7 @@ const emit = defineEmits<{
 const currentStep = ref(0)
 const detectionResult = ref<LedgerDetectionResult | null>(null)
 const confirmedSheets = ref<SheetDetection[]>([])
+const forceSubmitFlag = ref(false)
 const jobId = ref('')
 const importErrors = ref<ImportError[]>([])
 const errorDialogVisible = ref(false)
@@ -188,8 +211,9 @@ function onDetectComplete(result: LedgerDetectionResult) {
   currentStep.value = 1
 }
 
-function onDetectionConfirm(sheets: SheetDetection[]) {
+function onDetectionConfirm(sheets: SheetDetection[], forceSubmit?: boolean) {
   confirmedSheets.value = sheets
+  forceSubmitFlag.value = forceSubmit || false
   currentStep.value = 2
 }
 
@@ -209,6 +233,7 @@ async function submitImportJob(mappings: ConfirmedMapping[]) {
         year: detectionResult.value.detected_year,
         confirmed_mappings: mappings,
         force_activate: false,
+        force_submit: forceSubmitFlag.value,
       }
     )
     jobId.value = (res as { job_id: string }).job_id
@@ -249,6 +274,7 @@ function onClose() {
   currentStep.value = 0
   detectionResult.value = null
   confirmedSheets.value = []
+  forceSubmitFlag.value = false
   jobId.value = ''
   importErrors.value = []
 }
