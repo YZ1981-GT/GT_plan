@@ -990,3 +990,7 @@ inclusion: always
 - **SubmitBody 接口补齐**：`ledgerImportV2Api.ts` 的 `SubmitBody` 补齐 `force_submit/incremental/overlap_strategy/file_periods` 4 字段
 - **column-mappings 端点位置确认**：在 `backend/app/routers/account_chart.py`（prefix `/api/projects`），不在 ledger_import_v2.py
 - **前后端联动审查方法论**：context-gatherer 误报率高（本次 8 个 issue 中 5 个是误报），关键路径必须手动 grep 验证；真正的 bug 多在"响应结构不匹配"和"参数传递遗漏"两类
+- **E2E 脚本 B' 架构适配完成**：`e2e_http_curl.py` 所有 SQL 查询加 `dataset_id` 过滤 + 多维度辅助按 `aux_type` 分组断言；YG36 全部 Layer 3 断言通过
+- **vue-tsc 修复 3 处 el-tag type='' 错误**：`DetectionPreview`/`ImportTimeline`/`ErrorDialog` 的 `type=""` 或返回空字符串改为有效值（info/success/warning/danger）
+- **ImportError 接口扩展**：新增 `hint` 和 `location` 可选字段，对齐后端 `enrich_finding_with_hint` 返回结构
+- **Git commit fe94001** 推送到 `feature/ledger-import-view-refactor`
