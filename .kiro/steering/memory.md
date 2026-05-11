@@ -1053,3 +1053,6 @@ inclusion: always
 - **ImportBatch 僵尸锁根因**：`e2e_9_companies_batch.py` 辽宁卫生超时退出后 ImportBatch 留在 processing 状态，阻塞该项目所有后续导入（409）；修复 = UPDATE status='failed'；预防 = 脚本超时退出时应主动调 release_lock 或标记 failed
 - **排查 409 时注意多项目**：顶栏红色横幅显示的 project_id 可能不是当前查的项目（本次是 `4da6cd8c` 而非 `f4b778ad`），排查时应查 ALL projects 的 processing batch
 - **`_expire_stale_jobs` 超时 20 分钟**：ImportBatch 的自动清理需要 20 分钟才触发，前端在此之前就会显示 409；大文件测试脚本应设更长超时或主动清理
+
+- **导入进度 ETA 估算修复**：`estimated_remaining_seconds` 上限 3600s（超过不显示），进度 <10% 时不估算（早期线性外推误差极大，如 21% 时算出 1806 分钟）；根因是 `started_at` 包含 detect+排队时间而非纯写入时间
+- **顶栏导入指示器点击跳转修正**：从 `/projects/${pid}/ledger`（账表查询页，导入中无数据）改为 `/projects/${pid}/ledger/import-history`（导入历史页，能看到 job 进度）

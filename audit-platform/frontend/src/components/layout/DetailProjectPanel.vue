@@ -21,6 +21,12 @@
                 <el-tag :type="(statusTagType(project.status)) || undefined" size="small">
                   {{ statusLabel(project.status) }}
                 </el-tag>
+                <span v-if="project.status === 'planning'" class="gt-status-hint">
+                  — 请先导入账套数据，完成后状态将自动推进
+                </span>
+                <span v-else-if="project.status === 'created'" class="gt-status-hint">
+                  — 新建项目，请开始配置
+                </span>
               </el-descriptions-item>
               <el-descriptions-item label="报表准则">
                 <el-tag :type="project.template_type === 'soe' ? 'warning' : 'primary'" size="small">
@@ -49,7 +55,6 @@
 
           <!-- 快捷入口 -->
           <div class="gt-detail-section">
-            <h4 class="gt-section-label">快捷操作</h4>
             <div class="gt-workflow-hint">
               <span class="gt-workflow-hint-label">建议流程：</span>
               <span class="gt-workflow-step">① 导入</span>
@@ -490,6 +495,12 @@ function formatSize(bytes: number) {
 .gt-section-label {
   font-size: var(--gt-font-size-sm); font-weight: 600;
   color: var(--gt-color-text-secondary); margin-bottom: var(--gt-space-2);
+}
+
+.gt-status-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-left: 4px;
 }
 
 .gt-quick-grid {

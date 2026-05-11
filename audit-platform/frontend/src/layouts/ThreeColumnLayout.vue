@@ -620,9 +620,9 @@ async function pollImportQueue() {
       const pct = status.progress ?? 0
       const phaseLabel = PHASE_LABEL[phase] || phase
       const msg = status.message || `${phaseLabel}中`
-      // P3-5.5: 展示剩余耗时估算
+      // P3-5.5: 展示剩余耗时估算（上限 1 小时，超过不显示）
       const eta = status.estimated_remaining_seconds as number | null | undefined
-      const etaText = typeof eta === 'number' && eta > 0
+      const etaText = typeof eta === 'number' && eta > 0 && eta <= 3600
         ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
         : ''
       const tooltipLines = [
