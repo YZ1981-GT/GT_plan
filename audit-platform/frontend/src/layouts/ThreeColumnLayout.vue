@@ -684,15 +684,14 @@ async function pollImportQueue() {
 function navigateToImport() {
   const pid = bgImportStatus.value?.projectId || trackedProjectId.value || route.params.projectId
   if (!pid) return
-  // 已在目标页 → 避免 router.push 的"navigation duplicated"警告，用 replace + query
-  const currentPid = route.params.projectId as string
-  if (currentPid === pid) {
-    router.replace({
-      path: `/projects/${pid}/ledger`,
-      query: { ...route.query, import: '1' },
-    })
+  // 跳转到导入历史页面（能看到当前 job 进度），而非账表查询页面
+  const targetPath = `/projects/${pid}/ledger/import-history`
+  const currentPath = route.path
+  if (currentPath === targetPath) {
+    // 已在目标页，强制刷新
+    router.replace({ path: targetPath, query: { ...route.query, t: String(Date.now()) } })
   } else {
-    router.push({ path: `/projects/${pid}/ledger`, query: { import: '1' } })
+    router.push({ path: targetPath })
   }
 }
 

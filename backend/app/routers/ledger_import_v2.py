@@ -695,7 +695,7 @@ async def get_latest_job(
     if job:
         # P3-5.5: 剩余耗时估算（基于已用时间和进度线性外推）
         estimated_remaining = None
-        if job.started_at and job.progress_pct and 5 <= job.progress_pct < 100:
+        if job.started_at and job.progress_pct and 10 <= job.progress_pct < 100:
             now = datetime.now(timezone.utc).replace(tzinfo=None)
             started = job.started_at if job.started_at.tzinfo is None else (
                 job.started_at.replace(tzinfo=None)
@@ -703,6 +703,9 @@ async def get_latest_job(
             elapsed_sec = max(1, int((now - started).total_seconds()))
             total_est_sec = elapsed_sec * 100 / job.progress_pct
             estimated_remaining = max(0, int(total_est_sec - elapsed_sec))
+            # 上限 3600s（1 小时）：超过说明估算不可靠，不展示
+            if estimated_remaining > 3600:
+                estimated_remaining = None
         response = {
             "status": "processing",
             "phase": job.current_phase or "writing",

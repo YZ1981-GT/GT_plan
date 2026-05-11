@@ -1044,3 +1044,12 @@ inclusion: always
 - **ADR-006 SSE vs 轮询决策**：保持双通道各司其职（SSE 推业务事件，轮询查精确进度），长期 SSE 稳定后可替代轮询
 - **e2e_9_companies_batch.py 首次跑通 4/6 家**：YG36(68s)/YG4001(9s)/安徽骨科(537s)/和平物流(96s) 成功；辽宁卫生 79MB 超时（15min 不够，需 --all 模式的 20min 超时）
 - **pytest.ini 新增 `pg_only` marker 注册**（消除 PytestUnknownMarkWarning）
+
+## PG schema 缺列修复（2026-05-11）
+
+- **import_jobs.creator_chain 列缺失导致全站 500**：Sprint 5.9 Alembic 迁移 `view_refactor_creator_chain_20260520` 未执行到 PG，所有查询 ImportJob 的端点（active-job/diagnostics/submit）都 500，前端误显示为 409 冲突；修复 = `ALTER TABLE import_jobs ADD COLUMN IF NOT EXISTS creator_chain JSONB DEFAULT '[]'`
+- **PG 手动补列教训再沉淀**：每次新增 Alembic 迁移后必须在 PG 执行（或至少 `_init_tables.py` 重建），否则 ORM 模型与 PG schema 不一致会导致隐蔽 500；当前 10 个 view_refactor 迁移中 creator_chain 是最后遗漏的一个
+
+- **ImportBatch 僵尸锁根因**：`e2e_9_companies_batch.py` 辽宁卫生超时退出后 ImportBatch 留在 processing 状态，阻塞该项目所有后续导入（409）；修复 = UPDATE status='failed'；预防 = 脚本超时退出时应主动调 release_lock 或标记 failed
+- **排查 409 时注意多项目**：顶栏红色横幅显示的 project_id 可能不是当前查的项目（本次是 `4da6cd8c` 而非 `f4b778ad`），排查时应查 ALL projects 的 processing batch
+- **`_expire_stale_jobs` 超时 20 分钟**：ImportBatch 的自动清理需要 20 分钟才触发，前端在此之前就会显示 409；大文件测试脚本应设更长超时或主动清理
