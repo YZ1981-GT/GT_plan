@@ -68,33 +68,35 @@ async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
     import sqlalchemy as sa
 
     pid = str(project_id)
-    cascade_sqls = [
-        "DELETE FROM activation_records WHERE dataset_id IN (SELECT id FROM ledger_datasets WHERE project_id = :pid)",
-        "DELETE FROM import_column_mapping_history WHERE project_id = :pid",
-        "DELETE FROM tb_aux_ledger WHERE project_id = :pid",
-        "DELETE FROM tb_aux_balance WHERE project_id = :pid",
-        "DELETE FROM tb_ledger WHERE project_id = :pid",
-        "DELETE FROM tb_balance WHERE project_id = :pid",
-        "DELETE FROM ledger_datasets WHERE project_id = :pid",
-        "DELETE FROM import_jobs WHERE project_id = :pid",
-        "DELETE FROM review_records WHERE working_paper_id IN (SELECT id FROM working_papers WHERE project_id = :pid)",
-        "DELETE FROM working_papers WHERE project_id = :pid",
-        "DELETE FROM project_assignments WHERE project_id = :pid",
-        "DELETE FROM adjustments WHERE project_id = :pid",
-        "DELETE FROM unadjusted_misstatements WHERE project_id = :pid",
-        "DELETE FROM trial_balance_entries WHERE project_id = :pid",
-        "DELETE FROM financial_reports WHERE project_id = :pid",
-        "DELETE FROM disclosure_notes WHERE project_id = :pid",
-        "DELETE FROM audit_reports WHERE project_id = :pid",
-        "DELETE FROM attachments WHERE project_id = :pid",
-        "DELETE FROM projects WHERE id = :pid",
+    # 子表级联删除（失败可跳过——表可能不存在或无数据）
+    child_sqls = [
+        "DELETE FROM activation_records WHERE dataset_id IN (SELECT id FROM ledger_datasets WHERE project_id = :pid::uuid)",
+        "DELETE FROM import_column_mapping_history WHERE project_id = :pid::uuid",
+        "DELETE FROM tb_aux_ledger WHERE project_id = :pid::uuid",
+        "DELETE FROM tb_aux_balance WHERE project_id = :pid::uuid",
+        "DELETE FROM tb_ledger WHERE project_id = :pid::uuid",
+        "DELETE FROM tb_balance WHERE project_id = :pid::uuid",
+        "DELETE FROM ledger_datasets WHERE project_id = :pid::uuid",
+        "DELETE FROM import_jobs WHERE project_id = :pid::uuid",
+        "DELETE FROM review_records WHERE working_paper_id IN (SELECT id FROM working_papers WHERE project_id = :pid::uuid)",
+        "DELETE FROM working_papers WHERE project_id = :pid::uuid",
+        "DELETE FROM project_assignments WHERE project_id = :pid::uuid",
+        "DELETE FROM adjustments WHERE project_id = :pid::uuid",
+        "DELETE FROM unadjusted_misstatements WHERE project_id = :pid::uuid",
+        "DELETE FROM trial_balance_entries WHERE project_id = :pid::uuid",
+        "DELETE FROM financial_reports WHERE project_id = :pid::uuid",
+        "DELETE FROM disclosure_notes WHERE project_id = :pid::uuid",
+        "DELETE FROM audit_reports WHERE project_id = :pid::uuid",
+        "DELETE FROM attachments WHERE project_id = :pid::uuid",
     ]
-    for sql in cascade_sqls:
+    for sql in child_sqls:
         try:
             await db.execute(sa.text(sql), {"pid": pid})
         except Exception:
-            # 表不存在或无数据时跳过
             pass
+
+    # 最后删项目本身（不能跳过，失败要报错）
+    await db.execute(sa.text("DELETE FROM projects WHERE id = :pid::uuid"), {"pid": pid})
 
 
 @router.get("")
