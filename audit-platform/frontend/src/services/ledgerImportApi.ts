@@ -66,7 +66,7 @@ export async function listLedgerDatasets(projectId: string, year: number): Promi
   return data ?? []
 }
 
-export async function getActiveLedgerDataset(projectId: string, year: number): Promise<{ active_dataset_id: string | null }> {
+export async function getActiveLedgerDataset(projectId: string, year: number): Promise<{ active_dataset_id: string | null; source_summary?: Record<string, any> }> {
   const data = await api.get(`${base(projectId)}/datasets/active`, { params: { year } })
   return data ?? { active_dataset_id: null }
 }

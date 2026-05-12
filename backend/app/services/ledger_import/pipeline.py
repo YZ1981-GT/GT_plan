@@ -402,6 +402,18 @@ async def execute_pipeline(
 
     # ── Create staged dataset ──
     logger.info("Pipeline %s phase=create_staged", job_id)
+
+    # 从 detection_evidence 提取金额单位（取第一个非 None 的）
+    _amount_unit: str | None = None
+    for _fd in detections.values():
+        for _sheet in _fd.sheets:
+            _au = (_sheet.detection_evidence or {}).get("amount_unit")
+            if _au:
+                _amount_unit = _au
+                break
+        if _amount_unit:
+            break
+
     async with async_session() as stage_db:
         staged = await DatasetService.create_staged(
             stage_db,
@@ -410,6 +422,7 @@ async def execute_pipeline(
             source_type="ledger_import_v2",
             job_id=job_id,
             created_by=created_by,
+            source_summary={"amount_unit": _amount_unit} if _amount_unit else None,
         )
         staging_dataset_id = staged.id
         await stage_db.commit()

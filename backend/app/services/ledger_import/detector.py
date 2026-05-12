@@ -490,6 +490,7 @@ def _detect_xlsx_sheet(
         "merged_header": _is_merged_header(preview_rows, data_start_row, merged_headers),
         "compound_headers": compound_headers,
         "filename_hint": filename_hint,
+        "amount_unit": _extract_amount_unit(preview_rows, data_start_row),
     }
 
     return SheetDetection(
@@ -579,6 +580,7 @@ def _detect_csv(
         "merged_header": _is_merged_header(preview_rows, data_start_row, merged_headers),
         "compound_headers": compound_headers,
         "filename_hint": filename_hint,
+        "amount_unit": _extract_amount_unit(preview_rows, data_start_row),
     }
 
     fd.sheets.append(
@@ -1019,6 +1021,40 @@ def _looks_like_banner(non_empty_cells: list[str]) -> bool:
     return any(kw in joined for kw in banner_keywords)
 
 
+def _extract_amount_unit(preview_rows: list[list[str]], data_start_row: int) -> str | None:
+    """从 data_start_row 之前的横幅行中提取金额单位。
+
+    常见模式：
+    - "金额单位：万元"
+    - "单位：万元"
+    - "金额单位:元"
+    - "单位（万元）"
+    - 单元格值直接是 "万元" / "元" / "千元"
+
+    返回 "万元" / "元" / "千元" / None（未识别）
+    """
+    import re
+
+    unit_pattern = re.compile(
+        r'(?:金额)?单位[：:\s]*([万千百]?元)|'
+        r'(?:金额)?单位[（(]([万千百]?元)[)）]|'
+        r'^([万千百]元)$'
+    )
+
+    for i in range(min(data_start_row, len(preview_rows))):
+        row = preview_rows[i]
+        for cell in row:
+            if not cell:
+                continue
+            cell_str = str(cell).strip()
+            m = unit_pattern.search(cell_str)
+            if m:
+                unit = m.group(1) or m.group(2) or m.group(3)
+                if unit:
+                    return unit
+    return None
+
+
 def _looks_like_banner_v2(non_empty_values: list[str], unique_count: int) -> bool:
     """v2.1 通用横幅判定：unique_count <= 2 时进一步确认是否为横幅。
 
@@ -1189,6 +1225,7 @@ def _detect_csv_from_path(
         "merged_header": _is_merged_header(preview_rows, data_start_row, merged_headers),
         "compound_headers": compound_headers,
         "filename_hint": filename_hint,
+        "amount_unit": _extract_amount_unit(preview_rows, data_start_row),
     }
 
     fd.sheets.append(

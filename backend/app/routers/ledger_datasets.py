@@ -62,7 +62,17 @@ async def get_active_dataset(
     dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
     if not dataset_id:
         return {"active_dataset_id": None, "message": "当前无有效数据集"}
-    return {"active_dataset_id": str(dataset_id)}
+    # 返回 source_summary 供前端读取金额单位等元信息
+    from sqlalchemy import select
+    from app.models.dataset_models import LedgerDataset
+    result = await db.execute(
+        select(LedgerDataset.source_summary).where(LedgerDataset.id == dataset_id)
+    )
+    source_summary = result.scalar_one_or_none()
+    return {
+        "active_dataset_id": str(dataset_id),
+        "source_summary": source_summary or {},
+    }
 
 
 @router.get("/datasets/history")

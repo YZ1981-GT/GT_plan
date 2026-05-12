@@ -110,6 +110,7 @@
         </el-button>
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">账簿查询</el-tag>
+        <el-tag v-if="amountUnit" type="warning" size="small">单位：{{ amountUnit }}</el-tag>
         <el-tag size="small">{{ filteredFlatCount }} / {{ balanceData.length }}</el-tag>
         <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
@@ -180,6 +181,7 @@
         <!-- 控制区域（可折叠） -->
         <div class="gt-aux-toolbar">
           <div class="gt-aux-toolbar-header">
+            <el-tag v-if="amountUnit" type="warning" size="small">单位：{{ amountUnit }}</el-tag>
             <el-tag size="small">{{ auxDisplayCount }} / {{ auxTotalRecords }}</el-tag>
             <el-button size="small" :type="auxTreeMode ? 'primary' : ''" @click="toggleAuxTreeMode">
               {{ auxTreeMode ? '扁平视图' : '树形视图' }}
@@ -958,6 +960,9 @@ const year = computed(() => {
   if (q && q > 2000) return q
   return new Date().getFullYear() - 1
 })
+
+// 金额单位（从 active dataset 的 source_summary.amount_unit 读取）
+const amountUnit = ref<string>('')
 
 // ── 账套/年度切换 ──
 interface ProjectInfo { id: string; name: string; client_name?: string; wizard_state?: any }
@@ -2245,6 +2250,8 @@ async function loadBalance() {
       checkImportActive()
     } else {
       isImportActive.value = false
+      // 加载金额单位（从 active dataset 的 source_summary 读取）
+      loadAmountUnit()
     }
   } catch (e) {
     console.error('[Ledger] loadBalance failed:', e)
@@ -2252,6 +2259,16 @@ async function loadBalance() {
     checkImportActive()
   }
   finally { loading.value = false }
+}
+
+/** 从 active dataset 读取金额单位 */
+async function loadAmountUnit() {
+  try {
+    const ds = await getActiveLedgerDataset(projectId.value, year.value)
+    amountUnit.value = ds?.source_summary?.amount_unit || ''
+  } catch {
+    amountUnit.value = ''
+  }
 }
 
 /** 检测是否有正在进行的导入任务 */
