@@ -94,20 +94,23 @@
     <!-- 步骤引导（空数据时显示） -->
     <div v-if="showSetupGuide" class="gt-setup-guide">
       <el-steps :active="setupCurrentStep" finish-status="success" align-center>
-        <el-step title="数据导入" description="上传账套 Excel/CSV" :status="setupStepStatus[0]" />
-        <el-step title="科目映射" description="确认科目分类映射" :status="setupStepStatus[1]" />
-        <el-step title="重新计算" description="触发试算表重算" :status="setupStepStatus[2]" />
+        <el-step title="数据导入" description="上传科目余额表+序时账" :status="setupStepStatus[0]" />
+        <el-step title="科目映射" description="从余额表一级科目自动匹配" :status="setupStepStatus[1]" />
+        <el-step title="生成试算表" description="汇总计算审定数" :status="setupStepStatus[2]" />
       </el-steps>
       <div style="margin-top: 16px; text-align: center">
         <el-button v-if="setupCurrentStep === 0" type="primary" @click="tbImportVisible = true">
           一键导入数据
         </el-button>
-        <el-button v-else-if="setupCurrentStep === 1" type="primary" @click="router.push(`/projects/${projectId}/ledger?tab=mapping`)">
-          前往科目映射
+        <el-button v-else-if="setupCurrentStep === 1" type="primary" @click="onAutoMapping" :loading="autoMappingLoading">
+          自动匹配科目分类
         </el-button>
         <el-button v-else-if="setupCurrentStep === 2" type="primary" @click="onRecalc">
-          立即重新计算
+          生成试算表
         </el-button>
+        <div v-if="setupCurrentStep === 1" style="margin-top: 8px; font-size: 12px; color: #909399">
+          系统将从已导入的余额表中读取一级科目，按编码规则自动匹配到标准分类（1xxx=资产、2xxx=负债...）
+        </div>
       </div>
     </div>
 
@@ -586,7 +589,23 @@ const showSetupGuide = computed(() => rows.value.length === 0)
 const tbImportVisible = ref(false)
 function onImportDone() {
   tbImportVisible.value = false
-  fetchData()  // 导入完成后刷新试算表
+  advanceSetupStep()  // 导入完成后自动推进到步骤 2
+  fetchData()
+}
+
+// 自动科目映射（从已导入的余额表一级科目按编码规则匹配）
+const autoMappingLoading = ref(false)
+async function onAutoMapping() {
+  autoMappingLoading.value = true
+  try {
+    await api.post(P.accountMapping.autoMatch(projectId.value), { year: selectedYear.value })
+    ElMessage.success('科目映射完成，系统已按编码规则自动匹配')
+    advanceSetupStep()  // 推进到步骤 3
+  } catch (e: any) {
+    handleApiError(e, '自动科目映射')
+  } finally {
+    autoMappingLoading.value = false
+  }
 }
 
 function advanceSetupStep() {
