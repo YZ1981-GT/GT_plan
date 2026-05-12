@@ -298,7 +298,6 @@ onMounted(async () => {
   margin-top: 4px;
   display: block;
 }
-}
 
 .gt-rb-header {
   display: flex;
