@@ -111,7 +111,6 @@ import {
   getRecycleBinStats, listRecycleBinItems,
   restoreRecycleBinItem, permanentDeleteItem, emptyRecycleBin,
 } from '@/services/commonApi'
-import { operationHistory } from '@/utils/operationHistory'
 import { handleApiError } from '@/utils/errorHandler'
 
 const loading = ref(false)
@@ -171,16 +170,16 @@ async function confirmDelete(row: any) {
       `永久删除「${row.name}」？此操作不可恢复。`,
       '永久删除',
     )
-    await operationHistory.execute({
-      description: `永久删除「${row.name}」`,
-      execute: async () => {
-        await permanentDeleteItem(`${row.type}/${row.id}`)
-        await loadItems()
-        await loadStats()
-      },
-      undo: async () => { throw new Error('不可撤销') },
-    })
-  } catch { /* cancelled */ }
+  } catch { return }
+
+  try {
+    await permanentDeleteItem(`${row.type}/${row.id}`)
+    ElMessage.success(`已永久删除「${row.name}」`)
+    await loadItems()
+    await loadStats()
+  } catch (e: any) {
+    handleApiError(e, '永久删除')
+  }
 }
 
 async function confirmEmptyAll() {
@@ -189,16 +188,19 @@ async function confirmEmptyAll() {
       `清空全部 ${stats.total} 条记录？此操作不可恢复。`,
       '清空回收站',
     )
-    await operationHistory.execute({
-      description: `清空回收站（${stats.total} 条）`,
-      execute: async () => {
-        await emptyRecycleBin()
-        await loadItems()
-        await loadStats()
-      },
-      undo: async () => { throw new Error('不可撤销') },
-    })
-  } catch { /* cancelled */ }
+  } catch { return }  // 用户取消
+
+  loading.value = true
+  try {
+    await emptyRecycleBin()
+    ElMessage.success('回收站已清空')
+    await loadItems()
+    await loadStats()
+  } catch (e: any) {
+    handleApiError(e, '清空回收站')
+  } finally {
+    loading.value = false
+  }
 }
 
 function formatTime(t: string | undefined) {
