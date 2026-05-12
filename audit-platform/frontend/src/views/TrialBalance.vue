@@ -114,13 +114,45 @@
       </div>
     </div>
 
-    <!-- 账套导入弹窗（内嵌，不跳转） -->
-    <LedgerImportDialog
-      v-model="tbImportVisible"
-      :project-id="projectId"
-      :year="selectedYear"
-      @imported="onImportDone"
-    />
+    <!-- 数据源选择弹窗（智能判断：有数据→确认使用，无数据→引导导入） -->
+    <el-dialog v-model="tbImportVisible" title="选择数据源" width="520" append-to-body destroy-on-close>
+      <div v-loading="checkingData">
+        <!-- 已有数据：显示概要，确认使用 -->
+        <div v-if="existingDataSummary">
+          <el-alert type="success" :closable="false" show-icon style="margin-bottom: 16px">
+            <template #title>当前项目已有账套数据</template>
+          </el-alert>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="年度">{{ existingDataSummary.year }}</el-descriptions-item>
+            <el-descriptions-item label="科目数">{{ existingDataSummary.balance_count }} 个</el-descriptions-item>
+            <el-descriptions-item label="序时账">{{ existingDataSummary.ledger_count?.toLocaleString() || 0 }} 条</el-descriptions-item>
+            <el-descriptions-item label="数据单位">{{ existingDataSummary.amount_unit || '元' }}</el-descriptions-item>
+          </el-descriptions>
+          <div style="margin-top: 16px; text-align: center">
+            <el-button type="primary" @click="onUseExistingData">
+              使用此数据生成试算表
+            </el-button>
+          </div>
+          <div style="margin-top: 12px; text-align: center">
+            <el-button text size="small" @click="goToLedgerImport">
+              重新导入（覆盖现有数据）→
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 无数据：引导去导入 -->
+        <div v-else-if="!checkingData">
+          <el-empty description="当前项目暂无账套数据" :image-size="80">
+            <div style="font-size: 13px; color: #909399; margin-bottom: 12px">
+              请先在「查账」页面导入科目余额表和序时账
+            </div>
+            <el-button type="primary" @click="goToLedgerImport">
+              前往导入账套数据
+            </el-button>
+          </el-empty>
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 搜索栏（Ctrl+F 触发，表格上方） -->
     <TableSearchBar
@@ -386,7 +418,6 @@ import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { usePasteImport } from '@/composables/usePasteImport'
-import LedgerImportDialog from '@/components/ledger-import/LedgerImportDialog.vue'
 import * as P from '@/services/apiPaths'
 
 const route = useRoute()
@@ -585,11 +616,53 @@ const setupStepStatus = computed(() =>
 
 const showSetupGuide = computed(() => rows.value.length === 0)
 
-// 试算表内嵌导入弹窗
+// 试算表数据源选择弹窗
 const tbImportVisible = ref(false)
+const checkingData = ref(false)
+const existingDataSummary = ref<{
+  year: number
+  balance_count: number
+  ledger_count: number
+  amount_unit: string
+} | null>(null)
+
+// 打开弹窗时检查是否已有数据
+watch(tbImportVisible, async (visible) => {
+  if (!visible) return
+  checkingData.value = true
+  existingDataSummary.value = null
+  try {
+    // 从余额表查询是否有数据
+    const balance = await api.get(P.ledger.balance(projectId.value), { params: { year: selectedYear.value } })
+    const balanceRows = balance ?? []
+    if (balanceRows.length > 0) {
+      // 有数据，获取数据集信息
+      const { getActiveLedgerDataset } = await import('@/services/ledgerImportApi')
+      const ds = await getActiveLedgerDataset(projectId.value, selectedYear.value)
+      existingDataSummary.value = {
+        year: selectedYear.value,
+        balance_count: balanceRows.length,
+        ledger_count: ds?.source_summary?.tb_ledger || 0,
+        amount_unit: ds?.source_summary?.amount_unit || '元',
+      }
+    }
+  } catch { /* ignore */ }
+  finally { checkingData.value = false }
+})
+
+function onUseExistingData() {
+  tbImportVisible.value = false
+  advanceSetupStep()  // 跳到步骤 2（科目映射）
+}
+
+function goToLedgerImport() {
+  tbImportVisible.value = false
+  router.push({ path: `/projects/${projectId.value}/ledger`, query: { import: '1' } })
+}
+
 function onImportDone() {
   tbImportVisible.value = false
-  advanceSetupStep()  // 导入完成后自动推进到步骤 2
+  advanceSetupStep()
   fetchData()
 }
 
