@@ -510,6 +510,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import * as P from '@/services/apiPaths'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmForcePass } from '@/utils/confirm'
@@ -539,6 +540,7 @@ import {
   assignWorkpaper,
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -860,8 +862,8 @@ async function onConfirmAssign() {
     showAssignDialog.value = false
     // 刷新看板数据
     kanbanRef.value?.refresh()
-  } catch {
-    ElMessage.error('分配失败，请重试')
+  } catch (e: any) {
+    handleApiError(e, '分配')
   } finally {
     assignLoading.value = false
   }
@@ -1000,7 +1002,7 @@ async function loadTsjReviewPrompts() {
     if (!accountName) { tsjReviewData.value = null; return }
 
     const { data } = await import('@/utils/http').then(m =>
-      m.default.get(`/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(accountName)}`, {
+      m.default.get(P.workpapers.wpMappingTsj(projectId.value, accountName), {
         validateStatus: (s: number) => s < 600,
       })
     )
@@ -1068,8 +1070,8 @@ async function onDownload() {
   if (!selectedWp.value) return
   try {
     await downloadWorkpaper(projectId.value, selectedWp.value.id)
-  } catch {
-    ElMessage.error('下载失败')
+  } catch (e: any) {
+    handleApiError(e, '下载')
   }
 }
 
@@ -1136,7 +1138,7 @@ async function doUploadStep1(forceOverwrite: boolean) {
       uploadConflict.value = err.response.data?.detail || err.response.data
       ElMessage.warning('版本冲突，请选择操作')
     } else {
-      ElMessage.error('上传失败')
+      handleApiError(err, '上传')
     }
   } finally {
     uploadLoading.value = false
@@ -1160,8 +1162,8 @@ async function doConfirmParsed() {
     eventBus.emit('workpaper:parsed', { projectId: projectId.value, wpId: pendingWpId.value })
     ElMessage.success(`底稿已上传（v${pendingNewVersion.value}），识别数据已写入`)
     pendingWpId.value = ''
-  } catch {
-    ElMessage.error('写入识别数据失败，请重试')
+  } catch (e: any) {
+    handleApiError(e, '写入识别数据')
   } finally {
     parseLoading.value = false
   }
@@ -1178,8 +1180,8 @@ async function onBatchDownload() {
   try {
     await downloadWorkpaperPack(projectId.value, selectedWpIds.value, true)
     ElMessage.success(`已下载 ${selectedWpIds.value.length} 个底稿`)
-  } catch {
-    ElMessage.error('批量下载失败')
+  } catch (e: any) {
+    handleApiError(e, '批量下载')
   } finally {
     downloadLoading.value = false
   }
@@ -1197,8 +1199,8 @@ async function onQCCheck() {
   try {
     qcResult.value = await runQCCheck(projectId.value, selectedWp.value.id)
     ElMessage.success('自检完成')
-  } catch {
-    ElMessage.error('自检失败')
+  } catch (e: any) {
+    handleApiError(e, '自检')
   } finally {
     qcLoading.value = false
   }
@@ -1264,7 +1266,7 @@ async function onSubmitReview() {
     } else {
       gateState.value = 'error'
       gateTraceId.value = detail?.trace_id || ''
-      ElMessage.error(detail?.message || detail || '提交失败')
+      handleApiError(err, '提交')
     }
   } finally {
     submitLoading.value = false
@@ -1312,7 +1314,7 @@ async function submitAnnotation() {
     showAddAnnotation.value = false
     newAnnotation.value = { content: '', priority: 'medium' }
     await loadAnnotations()
-  } catch { ElMessage.error('提交失败') }
+  } catch (e: any) { handleApiError(e, '提交') }
 }
 
 async function resolveAnnotation(id: string) {
@@ -1321,7 +1323,7 @@ async function resolveAnnotation(id: string) {
     ElMessage.success('已标记为解决')
     await loadAnnotations()
     await loadUnconfirmedAi()
-  } catch { ElMessage.error('操作失败') }
+  } catch (e: any) { handleApiError(e, '操作') }
 }
 
 // 回复批注
@@ -1342,7 +1344,7 @@ async function _submitReply() {
     ElMessage.success('回复已提交')
     showReplyDialog.value = false
     await loadAnnotations()
-  } catch { ElMessage.error('回复失败') }
+  } catch (e: any) { handleApiError(e, '回复') }
 }
 
 function onRejectClick() {
@@ -1364,7 +1366,7 @@ async function onConfirmReject() {
     await fetchData()
     await selectWorkpaperById(rejectingWpId.value)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '退回失败')
+    handleApiError(err, '退回')
   }
 }
 
@@ -1389,7 +1391,7 @@ async function onReviewPass() {
     await fetchData()
     await selectWorkpaperById(selectedWp.value.id)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '操作失败')
+    handleApiError(err, '操作')
   }
 }
 

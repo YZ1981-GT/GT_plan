@@ -1,8 +1,7 @@
 <template>
   <div class="gt-tpl-manager gt-fade-in">
-    <div class="gt-tpl-header">
-      <h2 class="gt-page-title">模板管理</h2>
-      <div style="display: flex; gap: 8px; align-items: center;">
+    <GtPageHeader title="模板管理" :show-back="false">
+      <template #actions>
         <el-button v-if="!isEditing" size="small" @click="enterEdit">✏️ 编辑</el-button>
         <el-button v-else size="small" type="warning" @click="() => exitEdit()">退出编辑</el-button>
         <SharedTemplatePicker
@@ -12,8 +11,8 @@
           @applied="onTemplateConfigApplied"
         />
         <el-button type="primary" @click="showUploadDialog = true">上传模板</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
@@ -107,6 +106,7 @@ import {
   type TemplateItem, type TemplateSetItem,
 } from '@/services/workpaperApi'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
@@ -171,7 +171,7 @@ async function onNewVersion(row: TemplateItem) {
     await createTemplateVersion(row.template_code, 'minor')
     ElMessage.success('新版本已创建')
     fetchTemplates()
-  } catch { ElMessage.error('创建版本失败') }
+  } catch (e: any) { handleApiError(e, '创建版本') }
 }
 
 function onViewTemplate(row: TemplateItem) {
@@ -184,7 +184,7 @@ async function onDeleteTemplate(row: TemplateItem) {
     await deleteTemplate(row.id)
     ElMessage.success('模板已删除')
     fetchTemplates()
-  } catch { ElMessage.error('删除失败，可能存在引用') }
+  } catch (e: any) { handleApiError(e, '删除') }
 }
 
 function onEditSet(row: TemplateSetItem) {

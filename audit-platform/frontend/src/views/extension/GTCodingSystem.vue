@@ -1,9 +1,10 @@
 <template>
   <div class="gt-coding-page">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">致同底稿编码体系</h2>
-      <el-button size="small" @click="loadCoding" :loading="loading">刷新</el-button>
-    </div>
+    <GtPageHeader title="致同编码体系" :show-back="false">
+      <template #actions>
+        <el-button size="small" @click="loadCoding" :loading="loading">刷新</el-button>
+      </template>
+    </GtPageHeader>
 
     <div class="gt-coding-layout">
       <!-- 左侧编码树 -->

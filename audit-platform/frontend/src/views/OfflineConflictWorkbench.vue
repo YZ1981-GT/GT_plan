@@ -1,5 +1,6 @@
 <template>
   <div class="conflict-workbench">
+    <GtPageHeader title="离线冲突处理" :show-back="false" />
     <div class="conflict-layout">
       <!-- 左栏：冲突列表 -->
       <div class="conflict-left">
@@ -71,6 +72,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listConflicts, resolveConflict } from '@/services/governanceApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -87,7 +89,7 @@ async function loadData() {
   try {
     const result = await listConflicts({ project_id: projectId, page_size: 200 })
     conflicts.value = result.items || []
-  } catch { ElMessage.error('加载冲突列表失败') }
+  } catch (e: any) { handleApiError(e, '加载冲突列表') }
 }
 
 async function handleResolve() {
@@ -100,7 +102,7 @@ async function handleResolve() {
   try {
     let merged = undefined
     if (resolution.value === 'manual_merge') {
-      try { merged = JSON.parse(mergedValueStr.value) } catch { ElMessage.error('合并值 JSON 格式错误'); resolving.value = false; return }
+      try { merged = JSON.parse(mergedValueStr.value) } catch (e: any) { handleApiError(e, '合并值 JSON 格'); resolving.value = false; return }
     }
     const result = await resolveConflict({
       conflict_id: selected.value.id,
@@ -114,7 +116,7 @@ async function handleResolve() {
     ElMessage.success('冲突已处置')
     await loadData()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail?.message || '处置失败')
+    handleApiError(e, '处置')
     qcReplayStatus.value = ''
   } finally { resolving.value = false }
 }

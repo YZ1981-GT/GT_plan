@@ -1,21 +1,14 @@
 <template>
   <div class="qc-inspection-workbench">
-    <!-- 顶部横幅 -->
-    <div class="gt-page-banner gt-page-banner--teal">
-      <div class="gt-banner-content">
-        <h2>🔍 质控抽查工作台</h2>
-        <span class="gt-banner-sub">
-          共 {{ batches.length }} 个抽查批次
-        </span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="质控抽查" :show-back="false">
+      <template #actions>
         <el-button size="small" type="primary" @click="showNewInspection = true">新建抽查</el-button>
         <el-button size="small" type="success" @click="generateReport" :loading="generatingReport" :disabled="!selectedBatch">
           📄 生成质控报告
         </el-button>
         <el-button size="small" @click="loadBatches" :loading="loadingBatches">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- Tab 切换 -->
     <el-tabs v-model="activeTab" class="workbench-tabs">
@@ -247,6 +240,8 @@ import QcRuleListEmbed from '@/components/qc/QcRuleListEmbed.vue'
 import QcCaseLibraryEmbed from '@/components/qc/QcCaseLibraryEmbed.vue'
 import QcAnnualReportsEmbed from '@/components/qc/QcAnnualReportsEmbed.vue'
 import QcClientTrendEmbed from '@/components/qc/QcClientTrendEmbed.vue'
+import { handleApiError } from '@/utils/errorHandler'
+import { QC_INSPECTION_VERDICT } from '@/constants/statusEnum'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -443,7 +438,7 @@ function openVerdictDialog(item: InspectionItem) {
     item_id: item.id,
     wp_code: item.wp_code,
     wp_name: item.wp_name,
-    verdict: item.verdict === 'pending' ? 'pass' : item.verdict,
+    verdict: item.verdict === QC_INSPECTION_VERDICT.PENDING ? 'pass' : item.verdict,
     findings: '',
   }
   verdictDialogVisible.value = true
@@ -465,8 +460,8 @@ async function submitVerdict() {
     verdictDialogVisible.value = false
     // Reload items
     await onBatchSelect(selectedBatch.value)
-  } catch {
-    ElMessage.error('录入失败')
+  } catch (e: any) {
+    handleApiError(e, '录入')
   } finally {
     submittingVerdict.value = false
   }
@@ -484,8 +479,8 @@ async function createInspection() {
     showNewInspection.value = false
     newForm.value = { project_name: '', strategy: 'random', reviewer: '' }
     await loadBatches()
-  } catch {
-    ElMessage.error('创建失败')
+  } catch (e: any) {
+    handleApiError(e, '创建')
   } finally {
     creating.value = false
   }
@@ -519,8 +514,8 @@ async function runAuditLogScan() {
     ElMessage.success(result.message || '扫描完成')
     // 刷新列表
     await loadAuditLogFindings()
-  } catch {
-    ElMessage.error('扫描执行失败')
+  } catch (e: any) {
+    handleApiError(e, '扫描执行')
   } finally {
     scanLoading.value = false
   }
@@ -531,8 +526,8 @@ async function markAsReviewed(finding: AuditLogFinding) {
     await updateFindingStatus(finding.id, 'reviewed')
     finding.review_status = 'reviewed'
     ElMessage.success('已标记为已处理')
-  } catch {
-    ElMessage.error('标记失败')
+  } catch (e: any) {
+    handleApiError(e, '标记')
   }
 }
 
@@ -551,8 +546,8 @@ async function generateReport() {
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
     ElMessage.success('质控报告已生成')
-  } catch {
-    ElMessage.error('报告生成失败，请确认抽查已完成')
+  } catch (e: any) {
+    handleApiError(e, '报告生成')
   } finally {
     generatingReport.value = false
   }

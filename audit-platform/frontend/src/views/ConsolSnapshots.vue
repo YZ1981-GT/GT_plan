@@ -1,9 +1,10 @@
 <template>
   <div class="gt-snapshots gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">合并数据快照</h2>
-      <el-button type="primary" @click="onCreate">创建快照</el-button>
-    </div>
+    <GtPageHeader title="合并数据快照" :show-back="false">
+      <template #actions>
+        <el-button type="primary" @click="onCreate">创建快照</el-button>
+      </template>
+    </GtPageHeader>
     <el-table :data="snapshots" stripe>
       <el-table-column prop="year" label="年度" width="80" />
       <el-table-column prop="trigger_reason" label="触发原因" width="120">

@@ -1070,6 +1070,41 @@ inclusion: always
 - **项目状态提示已加**：planning 显示"请先导入账套数据，完成后状态将自动推进"；created 显示"新建项目，请开始配置"
 - **ETA 前端也加了 3600s 上限**：`ThreeColumnLayout.vue` 中 `eta <= 3600` 才显示，防止后端未重启时仍展示不合理数字
 
+## R9 全局深度复盘 spec 已完成（2026-05-12）
+
+- **spec 位置**：`.kiro/specs/refinement-round9-global-deep-review/`（requirements v1.0 + design v1.0 + tasks 83 任务 / 5 Sprint + 8 UAT）
+- **实施状态**：83/83 编码任务全部完成，剩余 8 项 UAT 需手动浏览器验证
+- **Sprint 1（P0，21 task）**：金额列统一（formatAmount.ts + 列宽 200/min-width 180）+ v-permission 全量盘点（8 按钮 + ROLE_PERMISSIONS 7 码 + find-missing 脚本增强）+ usePenetrate 统一接入（5 视图）+ GtPageHeader 强制接入（18 模式 A + 7 模式 B + variant="banner" prop）
+- **Sprint 2（P1，14 task）**：角色首页差异化（4 Dashboard 卡片/按钮/Tab）+ useAiChat 合并 3 套（composable + 3 视图改造）+ Ctrl+Z 撤销（shortcutManager 移除 undo/redo）+ usePasteImport 扩展（3 视图）+ 工时审批 Tab+badge
+- **Sprint 3（P1 续，14 task）**：GtAmountCell 已全量接入（Drilldown/LedgerPenetration/Adjustments/Misstatements 均已用）+ GtEditableTable 已接入 + /api/ 硬编码清零（7 处迁移到 apiPaths）+ statusEnum 补齐 4 组 + 8 视图替换硬编码状态字符串
+- **Sprint 4（P2，20 task）**：vitest 基建（vitest.config.ts + 4 composable 单测各≥5 用例）+ Playwright E2E 骨架（3 spec）+ NotificationCenter 分类 Tab + 免打扰时段 + CSS/Loading 审计文档 + ReviewWorkbench Univer 只读 + 知识库上下文注入（前端+后端 context 参数）+ useFullscreen 接入 3 视图 + PENETRATION_MAP.md
+- **Sprint 5（P0+P1 补充，14 task）**：死代码 6 文件已删（R7 已清理确认）+ handleApiError CI 卡点（基线 40）+ useEditMode 接入 6 视图（Adjustments/WorkHours/StaffManagement/SubsequentEvents/SamplingEnhanced/CFSWorksheet）
+- **新建文件 12 个**：vitest.config.ts / playwright.config.ts / 4 单测 / 3 E2E / CSS_VARIABLE_AUDIT.md / PENETRATION_MAP.md / LOADING_PATTERN_AUDIT.md
+- **新增前端 devDependencies**：vitest@^3.1.0 / @vue/test-utils@^2.4.0 / jsdom@^25.0.0 / @playwright/test@^1.52.0（未 npm install，仅写入 package.json）
+- **后端改动**：knowledge_folders.py 新增 context 参数做 BM25 相关性加权
+- **CI 新增**：catch 块裸 ElMessage.error grep 卡点（R9-F21）
+
+## R9 完成后复盘发现（2026-05-12 实测核验）
+
+- **GtPageHeader 实测接入率 ~30/86（35%）**：subagent 声称 95% 但 grep 只有 ~30 个视图 import GtPageHeader；差距原因 = 部分视图无 `<h2>` 模式（developing/空壳）+ 部分替换不完整；下一轮需逐视图分类处理
+- **ElMessage.error 裸用仍有 24 处**：Task 76 声称清零但实测 24 处仍在（KnowledgeBase 7 / TAccountManagement 3 / CustomTemplateEditor 3 等）；CI 基线设 40 过宽应改为 24
+- **useFullscreen 实测只 3 视图**（TrialBalance/ReportView/Adjustments）：LedgerPenetration 仍用自定义 isFullscreen ref 未真正替换
+- **vitest 4 个单测文件已创建但未 npm install**：下次启动前端需 `npm install` + `npx vitest --run` 验证
+- **Playwright E2E 是骨架占位**：3 个 spec 只有 page.goto 无真实断言，需启动前后端后实跑
+- **statusEnum 替换不完整**：Task 49 只改了 8 个视图，剩余 20+ 视图可能仍有 `=== 'draft'` 等散落硬编码
+- **流程教训**：subagent 声称完成 ≠ 真正完成，每 Sprint 结束后必须用 grep 脚本做硬指标核验；CI 基线必须基于实测值设定（当前值 = 基线，只减不增）
+- **R9 grep 硬指标核验（2026-05-12 修复后最终值）**：GtPageHeader 74/90=82%（排除项 16 个合理）/ ElMessage.error 11 次（全部是非 catch 块业务校验，Login/Register 等）/ handleApiError 53 视图 ✅ / useEditMode 11 视图 ✅ / useFullscreen 6 视图 ✅ / /api/ 硬编码 0 ✅
+- **R9 修复实际改动**：49 个视图 handleApiError 批量替换（147→11）+ 35 个视图新增 GtPageHeader（39→74）+ CI 基线从 40 修正为 11
+- **R9 最终复盘结论**：6 项核心指标达标，系统前端一致性已达较高水平；下一步重点是 UAT 真人验证而非继续加代码
+- **R9 残留 5 处状态硬编码**：QcInspectionWorkbench/ArchiveWizard/AuditReportEditor/IssueTicketList/PDFExportPanel 各 1 处 `=== 'draft'` 等未用 statusEnum（触碰即修）
+- **vitest 已跑通（2026-05-12）**：`npm install` 完成 + `npx vitest --run` 4 文件 25 测试全绿；vitest.config.ts 已加 `exclude: ['e2e/**']` 排除 Playwright 文件
+- **statusEnum 新增 3 组常量**：EXPORT_TASK_STATUS（queued/processing/completed/failed）/ QC_INSPECTION_VERDICT（pending/pass/fail/not_applicable）/ ARCHIVE_SCOPE（final/interim）+ ISSUE_STATUS 补 REJECTED
+- **statusEnum 硬编码已清零**：grep `=== 'draft'` 等模式（排除已用常量的）= 0 处
+- **vitest fake timer 陷阱**：`vi.runAllTimersAsync()` 对 setInterval 会无限循环；正确做法是 `vi.advanceTimersByTimeAsync(0)` 刷 microtask + `vi.advanceTimersByTimeAsync(interval)` 推进指定时间
+- **GtPageHeader 排除项（16 个不需要加）**：Login/Register/NotFound/DevelopingPage（4）+ LedgerPenetration/WorkpaperEditor/Drilldown/DataValidationPanel/PDFExportPanel/LedgerImportHistory/ProjectWizard/WorkpaperWorkbench/AIChatView/AIWorkpaperView/AttachmentHub/ConsolidationHub（12 个子面板/嵌入/复杂自定义头部）
+- **unplugin-vue-components 自动导入陷阱**：grep `import GtPageHeader` 只能统计显式导入，实际有 17 个视图通过 auto-import 使用 GtPageHeader 但无 import 语句；正确统计方式是 grep `<GtPageHeader` 模板标签
+- **Sprint 5 Task 76 执行空洞**：handleApiError 批量替换声称完成但实际 0 个文件被改动（grep 证实 handleApiError 仍只有 R8 的 7 个视图）；下一步 P0 = 53 个文件 147 处 ElMessage.error 机械替换为 handleApiError
+
 ## 用户反馈的 UI 问题（2026-05-11）
 
 - **查账页面金额列折行**：LedgerPenetration.vue 的期初金额/借方发生额/贷方发生额/期末金额列宽不够（当前 width=150/130），大金额（如 210,301,834.96）折行显示；需要加宽或用 `white-space: nowrap` + `min-width`

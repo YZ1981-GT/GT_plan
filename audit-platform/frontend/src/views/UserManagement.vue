@@ -1,8 +1,11 @@
 <template>
   <div class="gt-users gt-fade-in">
     <div class="gt-users-header">
-      <h2 class="gt-page-title">用户管理</h2>
-      <el-button type="primary" @click="showCreate = true" v-permission="'admin'">新增用户</el-button>
+      <GtPageHeader title="用户管理" :show-back="false">
+        <template #actions>
+          <el-button type="primary" @click="showCreate = true" v-permission="'admin'">新增用户</el-button>
+        </template>
+      </GtPageHeader>
     </div>
     <el-table :data="users" border stripe v-loading="loading">
       <el-table-column prop="username" label="用户名" width="150" />

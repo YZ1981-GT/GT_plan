@@ -10,14 +10,12 @@
 -->
 <template>
   <div class="gt-archive-wizard">
-    <div class="gt-archive-wizard-header">
-      <h2>项目归档向导</h2>
-      <el-steps :active="currentStep" finish-status="success" align-center>
-        <el-step title="就绪检查" description="确认归档条件" />
-        <el-step title="归档选项" description="选择归档方式" />
-        <el-step title="确认执行" description="开始归档" />
-      </el-steps>
-    </div>
+    <GtPageHeader title="归档向导" :show-back="false" />
+    <el-steps :active="currentStep" finish-status="success" align-center style="margin-bottom: 24px">
+      <el-step title="就绪检查" description="确认归档条件" />
+      <el-step title="归档选项" description="选择归档方式" />
+      <el-step title="确认执行" description="开始归档" />
+    </el-steps>
 
     <div class="gt-archive-wizard-body">
       <!-- ═══ 步骤 1：就绪检查 ═══ -->
@@ -80,7 +78,7 @@
         </div>
         <el-descriptions :column="1" border class="gt-archive-confirm-desc">
           <el-descriptions-item label="归档范围">
-            {{ archiveOptions.scope === 'final' ? '最终归档' : '期中归档' }}
+            {{ archiveOptions.scope === ARCHIVE_SCOPE.FINAL ? '最终归档' : '期中归档' }}
           </el-descriptions-item>
           <el-descriptions-item label="推送到云端">
             {{ archiveOptions.push_to_cloud ? '是' : '否' }}
@@ -100,6 +98,7 @@
           <el-button
             type="danger"
             :loading="startingArchive"
+            v-permission="'archive:execute'"
             @click="handleStartArchive"
           >
             开始归档
@@ -221,6 +220,8 @@ import {
 } from '@/services/archiveApi'
 import type { ArchiveJob } from '@/services/archiveApi'
 import { showApiError } from '@/composables/useApiError'
+import { handleApiError } from '@/utils/errorHandler'
+import { ARCHIVE_SCOPE } from '@/constants/statusEnum'
 
 const route = useRoute()
 const router = useRouter()
@@ -246,7 +247,7 @@ async function fetchReadiness() {
     const data = await getArchiveReadiness(projectId.value)
     readinessData.value = data
   } catch (err: any) {
-    ElMessage.error(err?.message || '获取归档就绪检查失败')
+    handleApiError(err, '获取归档就绪检查')
   } finally {
     readinessLoading.value = false
   }
@@ -322,7 +323,7 @@ async function handleRetry() {
     jobData.value = resp
     startPolling(resp.id)
   } catch (err: any) {
-    ElMessage.error(err?.message || '重试失败')
+    handleApiError(err, '重试')
   } finally {
     retrying.value = false
   }

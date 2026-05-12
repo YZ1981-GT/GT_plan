@@ -158,9 +158,9 @@ import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { useWorkpaperReviewMarkers, type ReviewMarkerTicket } from '@/composables/useWorkpaperReviewMarkers'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
-import { handleApiError } from '@/utils/errorHandler'
 import WorkpaperSidePanel from '@/components/workpaper/WorkpaperSidePanel.vue'
 import { WP_STATUS } from '@/constants/statusEnum'
+import { handleApiError } from '@/utils/errorHandler'
 
 const DIRTY_COMMAND_PATTERNS = [
   'set-range-values', 'set-cell',
@@ -254,9 +254,9 @@ async function onShowVersions() {
       validateStatus: (s: number) => s < 600,
     })
     versionList.value = Array.isArray(data) ? data : (data?.versions || data?.items || [])
-  } catch {
+  } catch (e: any) {
     versionList.value = []
-    ElMessage.error('加载版本历史失败')
+    handleApiError(e, '加载版本历史')
   } finally {
     versionLoading.value = false
   }
@@ -301,8 +301,8 @@ async function initUniver() {
   // 1. 加载底稿详情
   try {
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
-  } catch {
-    ElMessage.error('底稿不存在')
+  } catch (e: any) {
+    handleApiError(e, '底稿不存在')
     goBack()
     return
   }
@@ -485,7 +485,7 @@ async function onSubmitForReview() {
   submitting.value = true
   try {
     await httpApi.put(
-      `/api/projects/${projectId.value}/working-papers/${wpId.value}/status`,
+      P.workpapers.status(projectId.value, wpId.value),
       { status: 'pending_review' },
     )
     ElMessage.success('已提交复核，等待复核人审阅')
@@ -509,8 +509,8 @@ async function onSyncStructure() {
     await rebuildWorkpaperStructure(projectId.value, wpId.value)
     wpDetail.value = await getWorkpaper(projectId.value, wpId.value)
     ElMessage.success('公式坐标已同步')
-  } catch {
-    ElMessage.error('同步失败')
+  } catch (e: any) {
+    handleApiError(e, '同步')
   } finally {
     syncLoading.value = false
   }
@@ -519,8 +519,8 @@ async function onSyncStructure() {
 async function onDownload() {
   try {
     await downloadWorkpaper(projectId.value, wpId.value)
-  } catch {
-    ElMessage.error('下载失败')
+  } catch (e: any) {
+    handleApiError(e, '下载')
   }
 }
 
@@ -605,6 +605,10 @@ onMounted(() => {
   eventBus.on('workpaper:locate-cell', onLocateCell)
   // R8-S2-14：关闭浏览器/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)
+
+  // [R9 F9 Task 30] 确认 Univer Ctrl+Z/Y 不被 shortcutManager 拦截
+  // shortcutManager 已在 R9 Task 31 中移除 Ctrl+Z 和 Ctrl+Shift+Z 的注册
+  // Univer 内置 UndoCommand/RedoCommand 原生处理撤销/重做，无需额外绑定
 })
 
 onUnmounted(() => {

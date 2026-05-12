@@ -251,7 +251,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete, confirmBatch, confirmDangerous } from '@/utils/confirm'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -260,8 +260,17 @@ import { Upload, FolderOpened } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 import { downloadFile } from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
+const route = useRoute()
+
+/** 当前底稿上下文（wp_code + account_name），用于搜索相关性加权 */
+const currentWpContext = computed(() => {
+  const wpCode = route.query.wp_code as string || ''
+  const accountName = route.query.account_name as string || ''
+  return [wpCode, accountName].filter(Boolean).join(' ')
+})
 
 function goHome() {
   router.push('/projects')
@@ -353,7 +362,7 @@ async function doCreateFolder() {
     ElMessage.success('文件夹创建成功')
     showCreateFolder.value = false
     await loadTree()
-  } catch { ElMessage.error('创建失败') }
+  } catch (e: any) { handleApiError(e, '创建') }
 }
 
 function onUploadDocs() {
@@ -616,7 +625,7 @@ async function doRename() {
     showRename.value = false
     await loadTree()
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
-  } catch { ElMessage.error('重命名失败') }
+  } catch (e: any) { handleApiError(e, '重命名') }
   finally { renameLoading.value = false }
 }
 
@@ -634,7 +643,7 @@ async function onDeleteFolder(folder: any) {
       documents.value = []
     }
     await loadTree()
-  } catch { ElMessage.error('删除失败') }
+  } catch (e: any) { handleApiError(e, '删除') }
 }
 
 // ── 删除文档 ──
@@ -645,7 +654,7 @@ async function onDeleteDoc(doc: any) {
     ElMessage.success('已删除')
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
     await loadTree()
-  } catch { ElMessage.error('删除失败') }
+  } catch (e: any) { handleApiError(e, '删除') }
 }
 
 function formatSize(bytes: number): string {
@@ -660,11 +669,16 @@ async function onSearch() {
   if (!searchKeyword.value.trim()) return
   searchLoading.value = true
   try {
-    const data = await api.get(P_kl.search, { params: { q: searchKeyword.value } })
+    const params: Record<string, string> = { q: searchKeyword.value }
+    // 注入当前底稿上下文做相关性加权
+    if (currentWpContext.value) {
+      params.context = currentWpContext.value
+    }
+    const data = await api.get(P_kl.search, { params })
     const results = Array.isArray(data) ? data : (data || [])
     documents.value = results
     selectedFolder.value = { name: `搜索结果: "${searchKeyword.value}" (${results.length} 条)` }
-  } catch { ElMessage.error('搜索失败') }
+  } catch (e: any) { handleApiError(e, '搜索') }
   finally { searchLoading.value = false }
 }
 
@@ -743,8 +757,8 @@ async function onPreviewDoc(doc: any) {
       const response = await api.get(P_kl.documentDownload(doc.id), { responseType: 'blob' })
       const blob = new Blob([response], { type: mimeType })
       previewUrl.value = URL.createObjectURL(blob)
-    } catch {
-      ElMessage.error('预览加载失败')
+    } catch (e: any) {
+      handleApiError(e, '预览加载')
     }
   } else if (isTextFile(doc)) {
     // 文本文件加载内容
@@ -762,7 +776,7 @@ async function onPreviewDoc(doc: any) {
 async function onDownloadDoc(doc: any) {
   try {
     await downloadFile(P_kl.documentDownload(doc.id), { fileName: doc.name })
-  } catch { ElMessage.error('下载失败') }
+  } catch (e: any) { handleApiError(e, '下载') }
 }
 
 // 移动文档
@@ -782,7 +796,7 @@ async function _onMoveDoc(doc: any) {
     ElMessage.success(`已移动到「${target.name}」`)
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
     await loadTree()
-  } catch { ElMessage.error('移动失败') }
+  } catch (e: any) { handleApiError(e, '移动') }
 }
 
 // 文件夹右键重命名
@@ -796,7 +810,7 @@ async function _onFolderContextMenu(folder: any, event: MouseEvent) {
     await api.put(P_kl.folderRename(folder.id), { name: value })
     ElMessage.success('重命名成功')
     await loadTree()
-  } catch { ElMessage.error('重命名失败') }
+  } catch (e: any) { handleApiError(e, '重命名') }
 }
 
 onMounted(async () => {

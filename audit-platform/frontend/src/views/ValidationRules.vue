@@ -1,9 +1,7 @@
 <template>
   <div class="validation-rules-page">
-    <div class="page-header">
-      <h2>数据校验规则说明</h2>
-      <p class="page-desc">以下规则用于账表导入后的数据质量校验，分为 L1（基础格式）、L2（逻辑一致性）、L3（跨表核对）三个层级。</p>
-    </div>
+    <GtPageHeader title="校验规则" :show-back="false" />
+    <p class="page-desc">以下规则用于账表导入后的数据质量校验，分为 L1（基础格式）、L2（逻辑一致性）、L3（跨表核对）三个层级。</p>
 
     <el-skeleton :loading="loading" :rows="8" animated>
       <template #default>
@@ -58,6 +56,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -95,7 +94,7 @@ function getRulesByLevel(level: string): ValidationRule[] {
 async function fetchRules() {
   loading.value = true
   try {
-    const res = await api.get<ValidationRule[]>('/api/ledger-import/validation-rules')
+    const res = await api.get<ValidationRule[]>(P.ledgerImportValidationRules.list)
     rules.value = Array.isArray(res) ? res : []
   } catch (e) {
     console.error('获取校验规则失败', e)

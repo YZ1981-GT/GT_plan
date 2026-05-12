@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-misstatements gt-fade-in">
+  <div class="gt-misstatements gt-fade-in" :class="{ 'gt-fullscreen': isFullscreen }">
     <!-- 页面横幅 [R7-S3-01] -->
     <GtPageHeader title="未更正错报汇总" @back="router.push('/projects')">
       <GtInfoBar
@@ -15,6 +15,7 @@
         <GtToolbar>
           <template #left>
             <el-button size="small" type="primary" @click="openCreateDialog">+ 新增错报</el-button>
+            <el-button size="small" plain @click="toggleFullscreen">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
           </template>
         </GtToolbar>
       </template>
@@ -93,7 +94,9 @@
       <el-table-column prop="affected_account_code" label="科目编码" width="120" />
       <el-table-column prop="affected_account_name" label="科目名称" width="140" show-overflow-tooltip />
       <el-table-column label="金额" width="130" align="right">
-        <template #default="{ row }">{{ fmtAmt(row.misstatement_amount) }}</template>
+        <template #default="{ row }">
+          <GtAmountCell :value="row.misstatement_amount" :clickable="true" @click="penetrate.toLedger(row.affected_account_code)" />
+        </template>
       </el-table-column>
       <el-table-column label="结转" width="70" align="center">
         <template #default="{ row }">
@@ -156,6 +159,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { confirmDelete } from '@/utils/confirm'
 import { usePasteImport } from '@/composables/usePasteImport'
+import { usePenetrate } from '@/composables/usePenetrate'
+import { useFullscreen } from '@/composables/useFullscreen'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
@@ -168,9 +173,12 @@ import { useProjectSelector } from '@/composables/useProjectSelector'
 import { fmtAmount } from '@/utils/formatters'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 const route = useRoute()
 const router = useRouter()
+const penetrate = usePenetrate()
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
 
 const {

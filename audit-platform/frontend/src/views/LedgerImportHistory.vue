@@ -150,6 +150,8 @@ import {
   type ImportJob,
   type LedgerDataset,
 } from '@/services/ledgerImportApi'
+import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -194,9 +196,9 @@ function datasetTagType(status: string): '' | 'success' | 'warning' | 'info' | '
 }
 
 function jobTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  if (status === 'completed') return 'success'
-  if (status === 'failed' || status === 'timed_out' || status === 'canceled') return 'danger'
-  if (status === 'running' || status === 'writing' || status === 'activating') return 'warning'
+  if (status === IMPORT_JOB_STATUS.COMPLETED) return 'success'
+  if (status === IMPORT_JOB_STATUS.FAILED || status === IMPORT_JOB_STATUS.TIMED_OUT || status === IMPORT_JOB_STATUS.CANCELED) return 'danger'
+  if (status === IMPORT_JOB_STATUS.RUNNING || status === 'writing' || status === 'activating') return 'warning'
   return 'info'
 }
 
@@ -245,7 +247,7 @@ async function rollback(row: LedgerDataset) {
     if (err?.response?.status === 409) {
       ElMessageBox.alert('无法回滚：已有签字报表绑定了当前数据集。如需强制回滚请联系管理员。', '回滚被拒绝', { type: 'error' })
     } else {
-      ElMessage.error('回滚失败: ' + (detail?.message || err?.message || '未知错误'))
+      handleApiError(err, '回滚数据集')
     }
   }
 }

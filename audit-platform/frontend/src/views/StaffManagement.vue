@@ -1,18 +1,19 @@
 <template>
   <div class="gt-staff-page gt-fade-in">
     <div class="gt-staff-header">
-      <h2 class="gt-page-title">人员库管理</h2>
-      <div class="gt-staff-actions">
-        <el-input v-model="searchQuery" placeholder="搜索姓名/工号" clearable style="width: 220px"
-          @input="debouncedSearch" />
-        <el-select v-model="filterDept" placeholder="部门" clearable style="width: 150px" @change="loadStaff">
-          <el-option label="审计一部" value="审计一部" />
-          <el-option label="审计二部" value="审计二部" />
-          <el-option label="审计三部" value="审计三部" />
-        </el-select>
-        <el-button type="primary" @click="showCreateDialog = true">新增人员</el-button>
-        <el-button @click="showStaffImport = true">Excel导入</el-button>
-      </div>
+      <GtPageHeader title="人员库管理" :show-back="false">
+        <template #actions>
+          <el-input v-model="searchQuery" placeholder="搜索姓名/工号" clearable style="width: 220px"
+            @input="debouncedSearch" />
+          <el-select v-model="filterDept" placeholder="部门" clearable style="width: 150px" @change="loadStaff">
+            <el-option label="审计一部" value="审计一部" />
+            <el-option label="审计二部" value="审计二部" />
+            <el-option label="审计三部" value="审计三部" />
+          </el-select>
+          <el-button type="primary" @click="showCreateDialog = true">新增人员</el-button>
+          <el-button @click="showStaffImport = true">Excel导入</el-button>
+        </template>
+      </GtPageHeader>
     </div>
 
     <el-table :data="staffList" v-loading="loading" border stripe style="width: 100%">
@@ -184,13 +185,16 @@
 </template>
 
 <script setup lang="ts">
+import * as P from '@/services/apiPaths'
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDelete, confirmDangerous } from '@/utils/confirm'
+import { useEditMode } from '@/composables/useEditMode'
 import { Loading } from '@element-plus/icons-vue'
 import { listStaff, createStaff, updateStaff, getStaffResume, deleteStaff, type StaffMember } from '@/services/staffApi'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import http from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 const titles = ['合伙人', '总监', '高级经理', '经理', '高级审计员', '审计员', '实习生']
 
@@ -205,6 +209,7 @@ const showCreateDialog = ref(false)
 const showStaffImport = ref(false)
 const showResumeDialog = ref(false)
 const editingStaff = ref<StaffMember | null>(null)
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const saving = ref(false)
 const resumeData = ref<any>(null)
 
@@ -242,7 +247,7 @@ async function viewResume(row: StaffMember) {
   try {
     resumeData.value = await getStaffResume(row.id)
     showResumeDialog.value = true
-  } catch { ElMessage.error('获取简历失败') }
+  } catch (e: any) { handleApiError(e, '获取简历') }
 }
 
 async function saveStaff() {
@@ -269,7 +274,7 @@ async function onDeleteStaff(row: StaffMember) {
     await deleteStaff(row.id)
     ElMessage.success('已删除')
     await loadStaff()
-  } catch { ElMessage.error('删除失败') }
+  } catch (e: any) { handleApiError(e, '删除') }
 }
 
 function onStaffImported() {
@@ -331,7 +336,7 @@ async function loadHandoverPreview(staffId: string) {
   handoverPreviewLoading.value = true
   handoverPreview.value = null
   try {
-    const { data } = await http.get(`/api/staff/${staffId}/handover/preview`, {
+    const { data } = await http.get(P.staff.handoverPreview(staffId), {
       params: { scope: 'all' },
     })
     handoverPreview.value = data as { workpapers: number; issues: number; assignments: number }
@@ -370,7 +375,7 @@ async function executeHandover() {
 
   handoverSubmitting.value = true
   try {
-    await http.post(`/api/staff/${handoverTarget.value.id}/handover`, {
+    await http.post(P.staff.handover(handoverTarget.value.id), {
       scope: 'all',
       target_staff_id: handoverForm.value.target_staff_id,
       reason_code: handoverForm.value.reason_code,

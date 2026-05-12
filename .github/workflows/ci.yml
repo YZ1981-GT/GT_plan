@@ -216,6 +216,18 @@ jobs:
             exit 1
           fi
         working-directory: audit-platform/frontend
+      - name: Catch block bare ElMessage.error guard (R9-F21)
+        run: |
+          # catch 块内禁止裸 ElMessage.error，必须使用 handleApiError
+          # 基线：11（Login/Register + 非 catch 块业务校验，只减不增）
+          BASELINE=11
+          COUNT=$(grep -r --include="*.vue" -c "ElMessage\.error" src/views | awk -F: '{s+=$2}END{print s}')
+          echo "Bare ElMessage.error in views: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Bare ElMessage.error usage increased from $BASELINE to $COUNT. Use handleApiError() instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
       - name: Inline hex color guard (R7-S3-01)
         run: |
           # 禁止 Vue template 中 style="" 内硬编码十六进制颜色

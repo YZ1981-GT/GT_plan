@@ -1,16 +1,11 @@
 <template>
   <div class="qc-annual-reports">
-    <!-- 顶部横幅 -->
-    <div class="gt-page-banner gt-page-banner--teal">
-      <div class="gt-banner-content">
-        <h2>📊 年度质量报告</h2>
-        <span class="gt-banner-sub">共 {{ reports.length }} 份报告</span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="质控年报" :show-back="false">
+      <template #actions>
         <el-button size="small" type="primary" @click="showGenerateDialog = true">生成年报</el-button>
         <el-button size="small" @click="loadReports" :loading="loading">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 报告表格 -->
     <el-table
@@ -85,6 +80,7 @@ import { ElMessage } from 'element-plus'
 import { listAnnualReports, generateAnnualReport, downloadAnnualReport } from '@/services/qcAnnualReportApi'
 import http from '@/utils/http'
 import { qcAnnualReports as P_ar } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -171,8 +167,8 @@ async function generateReport() {
     ElMessage.success('年报生成任务已提交')
     showGenerateDialog.value = false
     await loadReports()
-  } catch {
-    ElMessage.error('提交失败')
+  } catch (e: any) {
+    handleApiError(e, '提交')
   } finally {
     generating.value = false
   }
@@ -193,8 +189,8 @@ async function downloadReport(row: ReportItem) {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
-  } catch {
-    ElMessage.error('下载失败')
+  } catch (e: any) {
+    handleApiError(e, '下载')
   } finally {
     row._downloading = false
   }

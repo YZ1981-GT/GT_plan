@@ -159,18 +159,18 @@
           </template>
         </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="opening_balance" label="期初余额" width="170" align="right" sortable>
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.opening_balance) }}</span></template>
+        <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable>
+          <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方发生额" width="170" align="right" sortable>
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
+        <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable>
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方发生额" width="170" align="right" sortable>
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
+        <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable>
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末余额" width="170" align="right" sortable>
+        <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable>
           <template #default="{ row }">
-            <span class="gt-link gt-amt" @click.stop="drillToLedger(row)">{{ fmtAmt(row.closing_balance) }}</span>
+            <GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -307,25 +307,25 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="opening_balance" label="期初余额" width="160" align="right" sortable>
+          <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span class="gt-amt" :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.opening_balance) }}</span>
+              <GtAmountCell :value="row.opening_balance" />
             </template>
           </el-table-column>
-          <el-table-column prop="debit_amount" label="借方发生额" width="160" align="right" sortable>
+          <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span class="gt-amt" :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.debit_amount) }}</span>
+              <GtAmountCell :value="row.debit_amount" />
             </template>
           </el-table-column>
-          <el-table-column prop="credit_amount" label="贷方发生额" width="160" align="right" sortable>
+          <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span class="gt-amt" :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.credit_amount) }}</span>
+              <GtAmountCell :value="row.credit_amount" />
             </template>
           </el-table-column>
-          <el-table-column prop="closing_balance" label="期末余额" width="160" align="right" sortable>
+          <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span v-if="!row._isGroup" class="gt-link gt-amt" @click.stop="drillToAuxLedgerFromBalance(row)">{{ fmtAmt(row.closing_balance) }}</span>
-              <span v-else class="gt-amt" style="font-weight: 600">{{ fmtAmt(row.closing_balance) }}</span>
+              <GtAmountCell v-if="!row._isGroup" :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" />
+              <GtAmountCell v-else :value="row.closing_balance" />
             </template>
           </el-table-column>
         </el-table>
@@ -389,15 +389,15 @@
         <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="170" align="right">
+        <el-table-column prop="balance" label="余额" width="200" min-width="180" align="right">
           <template #default="{ row }">
-            <span class="gt-amt" :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
+            <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
       </el-table>
@@ -438,11 +438,11 @@
           <template #default="{ row }"><span class="gt-amt">{{ row.account_code }}</span></template>
         </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
         <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
@@ -467,17 +467,17 @@
             <span class="gt-link">{{ row.aux_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="opening_balance" label="期初" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.opening_balance) }}</span></template>
+        <el-table-column prop="opening_balance" label="期初" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.closing_balance) }}</span></template>
+        <el-table-column prop="closing_balance" label="期末" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.closing_balance" /></template>
         </el-table-column>
       </el-table>
     </template>
@@ -516,15 +516,15 @@
         <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.debit_amount) }}</span></template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="160" align="right">
-          <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.credit_amount) }}</span></template>
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="170" align="right">
+        <el-table-column prop="balance" label="余额" width="200" min-width="180" align="right">
           <template #default="{ row }">
-            <span class="gt-amt" :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
+            <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
       </el-table>
@@ -880,7 +880,7 @@
           <el-table v-else :data="importHistoryJobs" border size="small" style="width: 100%">
             <el-table-column prop="status" label="状态" width="110">
               <template #default="{ row }">
-                <el-tag :type="row.status === 'completed' ? 'success' : row.status === 'failed' ? 'danger' : row.status === 'running' ? 'warning' : 'info'" size="small">{{ row.status }}</el-tag>
+                <el-tag :type="row.status === IMPORT_JOB_STATUS.COMPLETED ? 'success' : row.status === IMPORT_JOB_STATUS.FAILED ? 'danger' : row.status === IMPORT_JOB_STATUS.RUNNING ? 'warning' : 'info'" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="progress_pct" label="进度" width="140">
@@ -933,6 +933,7 @@ import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
+import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
 import { buildImportFormData } from '@/utils/importFormData'
@@ -943,9 +944,14 @@ import { resolveImportCompletionToast, resolveImportFailureMessage, shouldFinish
 import { runImportPollingFlow } from '@/utils/useImportPollingFlow'
 import { useImportValidation } from '@/utils/useImportValidation'
 import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
+import { usePenetrate } from '@/composables/usePenetrate'
+import { useFullscreen } from '@/composables/useFullscreen'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
+const penetrate = usePenetrate()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => {
   const q = Number(route.query.year)
@@ -1147,8 +1153,8 @@ async function runValidation() {
       `${P_ledger.validate(projectId.value)}?year=${selectedYear.value}`
     )
     validateResult.value = data
-  } catch {
-    ElMessage.error('校验失败')
+  } catch (e: any) {
+    handleApiError(e, '校验')
   } finally {
     validating.value = false
   }
@@ -1341,7 +1347,7 @@ function startImportStatusPolling(jobId: string) {
       // 实际后端路由：GET /api/projects/{project_id}/ledger-import/jobs/{job_id}
       const status = await getImportJob(projectId.value, jobId)
       const jobStatus = status?.status
-      if (jobStatus === 'completed') {
+      if (jobStatus === IMPORT_JOB_STATUS.COMPLETED) {
         stopImportStatusPolling()
         ElNotification({
           title: '导入完成',
@@ -1412,7 +1418,7 @@ async function recoverActiveImportJobSilent() {
   if (!projectId.value) return
   try {
     const resp: any = await api.get(
-      `/api/projects/${projectId.value}/ledger-import/active-job`,
+      P.ledger.import.activeJob(projectId.value),
       { validateStatus: (s: number) => s < 600 },
     )
     if (resp?.status === 'processing' && resp.job_id) {
@@ -1443,7 +1449,7 @@ async function checkActiveJobBeforeUpload() {
   if (!projectId.value) return
   try {
     const resp: any = await api.get(
-      `/api/projects/${projectId.value}/ledger-import/active-job`,
+      P.ledger.import.activeJob(projectId.value),
       { validateStatus: (s: number) => s < 600 },
     )
     if (resp?.status !== 'processing' || !resp.job_id) return
@@ -1481,11 +1487,11 @@ async function checkActiveJobBeforeUpload() {
         // 用户选"取消旧作业"
         try {
           await api.post(
-            `/api/projects/${projectId.value}/ledger-import/jobs/${activeJobId}/cancel`,
+            P.ledger.import.jobCancel(projectId.value, activeJobId),
           )
           ElMessage.success('旧作业已取消，可开始新导入')
         } catch (e: any) {
-          ElMessage.error(e?.message || '取消旧作业失败')
+          handleApiError(e, '取消旧作业')
         }
       }
       // action === 'close'：稍后 → 什么都不做
@@ -1550,7 +1556,7 @@ async function doPreview() {
     })
   } catch (e: any) {
     if (!e?.response) {
-      ElMessage.error(e?.message || '解析失败')
+      handleApiError(e, '解析')
     }
   } finally {
     clearInterval(progressTimer)
@@ -1648,7 +1654,7 @@ async function doImport() {
       errValidation,
       e?.response?.data?.detail || e?.message || '导入失败',
     )
-    ElMessage.error(errMsg)
+    handleApiError(e, '操作')
     stopImportStatusPolling()
     importStep.value = 'preview'
     // P1-U4: 失败后主动询问下一步（不强推，关闭即视为"留在预览"自行决定）
@@ -1793,18 +1799,17 @@ const loading = ref(false)
 const tableHeight = ref(Math.max(400, window.innerHeight - 240))
 
 // ── 全屏模式 ──
-const isFullscreen = ref(false)
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const penetrationRef = ref<HTMLElement | null>(null)
 
-function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
-  // 全屏时表格高度占满
-  if (isFullscreen.value) {
+// 全屏切换时调整表格高度
+watch(isFullscreen, (val) => {
+  if (val) {
     tableHeight.value = window.innerHeight - 140
   } else {
     tableHeight.value = Math.max(400, window.innerHeight - 240)
   }
-}
+})
 
 // ── 行选择 ──
 const selectedRows = ref<any[]>([])
@@ -2241,7 +2246,7 @@ async function loadBalance() {
 async function checkImportActive() {
   try {
     const resp: any = await api.get(
-      `/api/projects/${projectId.value}/ledger-import/active-job`,
+      P.ledger.import.activeJob(projectId.value),
     )
     isImportActive.value = resp?.status === 'processing' || resp?.status === 'queued'
   } catch {
@@ -2827,7 +2832,7 @@ async function exportAuxBalanceExcel() {
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error(e?.message || '导出失败')
+    handleApiError(e, '导出')
   }
 }
 
@@ -2849,7 +2854,7 @@ async function exportBalanceExcel() {
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error(e?.message || '导出失败')
+    handleApiError(e, '导出')
   }
 }
 
@@ -2877,7 +2882,7 @@ async function exportLedgerExcel() {
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error(e?.message || '导出失败')
+    handleApiError(e, '导出')
   }
 }
 
@@ -2918,11 +2923,11 @@ async function loadAuxLedger() {
 // ── 穿透导航 ──
 function drillToLedger(row: any) {
   const code = row.account_code
-  // 判断是否有子科目（非末级）：在 balanceData 中查找是否有以该编码为前缀的其他科目
+  // 内部穿透：从余额表下钻到序时账（不跳转路由，切换内部 level）
+  // 外部穿透统一使用 penetrate.toLedger(code)
   const hasChildren = balanceData.value.some(r =>
     r.account_code !== code && (r.account_code.startsWith(code + '.') || (r.account_code.startsWith(code) && r.account_code.length > code.length && !code.includes('.')))
   )
-  // 非末级科目用前缀查询（查所有子科目的明细账）
   currentAccount.value = hasChildren ? code + '*' : code
   currentAccountOpening.value = num(row.opening_balance)
   currentLevel.value = 'ledger'
@@ -3001,11 +3006,6 @@ function refresh() {
 
 // ── 键盘快捷键：Enter 返回上一级 ──
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && isFullscreen.value) {
-    isFullscreen.value = false
-    tableHeight.value = Math.max(400, window.innerHeight - 240)
-    return
-  }
   if (e.key === 'Enter' && currentLevel.value !== 'balance') {
     e.preventDefault()
     // 返回上一级

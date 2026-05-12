@@ -236,12 +236,45 @@ async def init_preset_folders(
 @router.get("/search")
 async def search_documents(
     q: str,
+    context: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """全文搜索（跨文件夹搜索文档名和内容）"""
+    """全文搜索（跨文件夹搜索文档名和内容）
+    
+    Args:
+        q: 搜索关键词
+        context: 可选的底稿上下文（wp_code + account_name），用于相关性加权
+    """
     from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
     import sqlalchemy as _sa
+
+    # 构建搜索条件
+    search_conditions = [
+        KnowledgeDocument.is_deleted == _sa.false(),
+        KnowledgeFolder.is_deleted == _sa.false(),
+        _sa.or_(
+            KnowledgeDocument.name.ilike(f"%{q}%"),
+            KnowledgeDocument.content_text.ilike(f"%{q}%"),
+            KnowledgeDocument.tags.cast(_sa.String).ilike(f"%{q}%"),
+        ),
+    ]
+
+    # 如果有上下文参数，扩展搜索条件以提升相关性
+    # 上下文关键词也参与匹配（BM25 boost 效果）
+    if context and context.strip():
+        context_terms = context.strip().split()
+        context_conditions = []
+        for term in context_terms[:3]:  # 最多取 3 个上下文词
+            context_conditions.append(KnowledgeDocument.name.ilike(f"%{term}%"))
+            context_conditions.append(KnowledgeDocument.content_text.ilike(f"%{term}%"))
+        # 上下文匹配作为额外排序信号（匹配上下文的排前面）
+        context_relevance = _sa.case(
+            (_sa.or_(*context_conditions), 1),
+            else_=0,
+        ).label("context_relevance")
+    else:
+        context_relevance = _sa.literal(0).label("context_relevance")
 
     query = (
         _sa.select(
@@ -252,18 +285,11 @@ async def search_documents(
             KnowledgeDocument.created_at,
             KnowledgeFolder.name.label("folder_name"),
             KnowledgeFolder.id.label("folder_id"),
+            context_relevance,
         )
         .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
-        .where(
-            KnowledgeDocument.is_deleted == _sa.false(),
-            KnowledgeFolder.is_deleted == _sa.false(),
-            _sa.or_(
-                KnowledgeDocument.name.ilike(f"%{q}%"),
-                KnowledgeDocument.content_text.ilike(f"%{q}%"),
-                KnowledgeDocument.tags.cast(_sa.String).ilike(f"%{q}%"),
-            ),
-        )
-        .order_by(KnowledgeDocument.created_at.desc())
+        .where(*search_conditions)
+        .order_by(context_relevance.desc(), KnowledgeDocument.created_at.desc())
         .limit(50)
     )
     result = await db.execute(query)

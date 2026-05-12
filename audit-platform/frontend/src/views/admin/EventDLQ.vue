@@ -1,12 +1,13 @@
 <template>
   <div class="event-dlq-page">
-    <div class="page-header">
-      <h2>事件死信队列 (DLQ)</h2>
-      <p class="page-desc">显示广播失败超过重试次数的事件，可手动重投。</p>
-      <el-button type="primary" size="small" :loading="loading" @click="fetchDLQ">
-        刷新
-      </el-button>
-    </div>
+    <GtPageHeader title="事件死信队列" :show-back="false">
+      <template #actions>
+        <el-button type="primary" size="small" :loading="loading" @click="fetchDLQ">
+          刷新
+        </el-button>
+      </template>
+    </GtPageHeader>
+    <p class="page-desc">显示广播失败超过重试次数的事件，可手动重投。</p>
 
     <el-table
       v-loading="loading"
@@ -71,6 +72,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { admin } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -122,7 +124,7 @@ async function onReinject(entry: DLQEntry) {
     // Refresh list
     await fetchDLQ()
   } catch (e: any) {
-    ElMessage.error(e?.message || '重投失败')
+    handleApiError(e, '重投事件')
   } finally {
     reinjectingId.value = null
   }

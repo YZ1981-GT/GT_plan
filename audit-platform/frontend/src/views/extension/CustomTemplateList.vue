@@ -1,8 +1,7 @@
 <template>
   <div class="gt-template-list">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">自定义模板管理</h2>
-      <div class="gt-header-actions">
+    <GtPageHeader title="自定义模板" :show-back="false">
+      <template #actions>
         <el-select v-model="filterCategory" placeholder="分类筛选" clearable size="small" style="width: 140px" @change="loadTemplates">
           <el-option label="行业专用" value="industry" />
           <el-option label="客户专用" value="client" />
@@ -11,8 +10,8 @@
         <el-button type="primary" size="small" @click="$router.push('/extension/custom-templates/new')">
           <el-icon><Plus /></el-icon> 新建模板
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <el-table :data="templates" v-loading="loading" stripe size="small" style="width: 100%">
       <el-table-column prop="template_name" label="模板名称" min-width="200" show-overflow-tooltip />
@@ -54,6 +53,7 @@ import {
   listCustomTemplates, validateCustomTemplate as validateTpl,
   publishCustomTemplate, deleteCustomTemplate,
 } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 const loading = ref(false)
@@ -80,7 +80,7 @@ async function validateTemplate(row: any) {
     const result = await validateTpl(row.id)
     if (result.valid) ElMessage.success('模板验证通过')
     else ElMessage.warning(`验证发现 ${result.issues?.length || 0} 个问题`)
-  } catch { ElMessage.error('验证失败') }
+  } catch (e: any) { handleApiError(e, '验证') }
   finally { row._validating = false }
 }
 

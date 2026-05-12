@@ -113,6 +113,7 @@ import {
   createExportTask, getExportTaskStatus, getExportDownloadUrl, getExportHistory,
   type ExportTaskData,
 } from '@/services/auditPlatformApi'
+import { EXPORT_TASK_STATUS } from '@/constants/statusEnum'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -138,8 +139,8 @@ function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger
 }
 
 function progressStatus(s: string) {
-  if (s === 'completed') return 'success'
-  if (s === 'failed') return 'exception'
+  if (s === EXPORT_TASK_STATUS.COMPLETED) return 'success'
+  if (s === EXPORT_TASK_STATUS.FAILED) return 'exception'
   return undefined
 }
 

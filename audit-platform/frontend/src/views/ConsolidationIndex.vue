@@ -474,6 +474,7 @@ import type { ConsolTreeSelectPayload, ConsolCatalogSelectPayload, ConsolRefresh
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -1050,7 +1051,7 @@ async function applyConsolConversion() {
     // 通知其他组件
     eventBus.emit('standard-change', { standard: newType as 'soe' | 'listed' })
   } catch (e: any) {
-    ElMessage.error('转换失败：' + (e?.message || '未知错误'))
+    handleApiError(e, '切换合并映射')
   } finally { consolMappingLoading.value = false }
 }
 

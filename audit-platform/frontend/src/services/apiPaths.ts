@@ -28,8 +28,10 @@ export const projects = {
   communications: {
     list: (id: string) => `/api/projects/${id}/communications`,
     detail: (id: string, commId: string) => `/api/projects/${id}/communications/${commId}`,
+    commitmentUpdate: (id: string, commId: string, commitId: string) => `/api/projects/${id}/communications/${commId}/commitments/${commitId}`,
   },
   findingsSummary: (id: string) => `/api/projects/${id}/findings-summary`,
+  riskSummary: (id: string) => `/api/projects/${id}/risk-summary`,
   costOverview: (id: string) => `/api/projects/${id}/cost-overview`,
 } as const
 
@@ -39,6 +41,8 @@ export const trialBalance = {
   get: (pid: string) => `/api/projects/${pid}/trial-balance`,
   recalc: (pid: string) => `/api/projects/${pid}/trial-balance/recalc`,
   consistencyCheck: (pid: string) => `/api/projects/${pid}/trial-balance/consistency-check`,
+  export: (pid: string) => `/api/projects/${pid}/trial-balance/export`,
+  summaryWithAdjustments: (pid: string) => `/api/projects/${pid}/trial-balance/summary-with-adjustments`,
 } as const
 
 // ─── 调整分录 ───────────────────────────────────────────────────────────────
@@ -83,6 +87,8 @@ export const reports = {
   get: (pid: string, year: number, type: string) => `/api/reports/${pid}/${year}/${type}`,
   drilldown: (pid: string, year: number, type: string, rowCode: string) =>
     `/api/reports/${pid}/${year}/${type}/drilldown/${rowCode}`,
+  relatedWorkpapers: (pid: string, year: number, type: string, rowCode: string) =>
+    `/api/reports/${pid}/${year}/${type}/${rowCode}/related-workpapers`,
   consistencyCheck: (pid: string, year: number) => `/api/reports/${pid}/${year}/consistency-check`,
   exportExcel: (pid: string, year: number, type: string) => `/api/reports/${pid}/${year}/${type}/export-excel`,
   export: (pid: string, year: number) => `/api/reports/${pid}/${year}/export`,
@@ -151,6 +157,10 @@ export const disclosureNotes = {
   validate: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validate`,
   validationResults: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validation-results`,
   refreshFromWorkpapers: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/refresh-from-workpapers`,
+  clearFormulas: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/clear-formulas`,
+  exportWord: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/export-word`,
+  priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,
+  relatedWorkpapers: (pid: string, year: number, section: string, rowCode: string) => `/api/notes/${pid}/${year}/${encodeURIComponent(section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
   ai: {
     generatePolicy: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-policy`,
     generateAnalysis: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-analysis`,
@@ -310,6 +320,9 @@ export const workpapers = {
   univerData: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-data`,
   univerSave: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-save`,
   exportPdf: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/export-pdf`,
+  recalc: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/recalc`,
+  remind: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/remind`,
+  escalateToPartner: (pid: string) => `/api/projects/${pid}/workpapers/escalate-to-partner`,
 } as const
 
 // ─── 底稿复核批注 ───────────────────────────────────────────────────────────
@@ -421,6 +434,8 @@ export const staff = {
   workHours: (id: string) => `/api/staff/${id}/work-hours`,
   checkIn: (id: string) => `/api/staff/${id}/check-in`,
   checkIns: (id: string) => `/api/staff/${id}/check-ins`,
+  handoverPreview: (id: string) => `/api/staff/${id}/handover/preview`,
+  handover: (id: string) => `/api/staff/${id}/handover`,
 } as const
 
 // ─── 用户 ───────────────────────────────────────────────────────────────────
@@ -1080,6 +1095,34 @@ export const regulatory = {
   cicpaReport: '/api/regulatory/cicpa-report',
 } as const
 
+// ─── 数据校验 ───────────────────────────────────────────────────────────────
+
+export const dataValidation = {
+  run: (pid: string) => `/api/projects/${pid}/data-validation`,
+  fix: (pid: string) => `/api/projects/${pid}/data-validation/fix`,
+  export: (pid: string) => `/api/projects/${pid}/data-validation/export`,
+} as const
+
+// ─── 精细化检查 ─────────────────────────────────────────────────────────────
+
+export const fineChecks = {
+  summary: (pid: string) => `/api/projects/${pid}/fine-checks/summary`,
+} as const
+
+// ─── 项目工单 ───────────────────────────────────────────────────────────────
+
+export const projectIssues = {
+  list: (pid: string) => `/api/projects/${pid}/issues`,
+  detail: (pid: string, issueId: string) => `/api/projects/${pid}/issues/${issueId}`,
+} as const
+
+// ─── 账表导入校验规则 ───────────────────────────────────────────────────────
+
+export const ledgerImportValidationRules = {
+  list: '/api/ledger-import/validation-rules',
+  detail: (code: string) => `/api/ledger-import/validation-rules/${code}`,
+} as const
+
 // ─── 其他 ───────────────────────────────────────────────────────────────────
 
 export const aiPlugins = { list: '/api/ai-plugins' } as const
@@ -1116,9 +1159,11 @@ export const partner = {
 export const qcDashboard = {
   overview: (pid: string) => `/api/projects/${pid}/qc-dashboard/overview`,
   staffProgress: (pid: string) => `/api/projects/${pid}/qc-dashboard/staff-progress`,
+  projectRating: (pid: string, year: number) => `/api/qc/projects/${pid}/rating/${year}`,
   openIssues: (pid: string) => `/api/projects/${pid}/qc-dashboard/open-issues`,
   archiveReadiness: (pid: string) => `/api/projects/${pid}/qc-dashboard/archive-readiness`,
   reviewerMetrics: '/api/qc/reviewer-metrics',
+  clientQualityTrend: (clientName: string) => `/api/qc/clients/${encodeURIComponent(clientName)}/quality-trend`,
 } as const
 
 // ─── 质控规则管理 ───────────────────────────────────────────────────────────
@@ -1309,6 +1354,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
+  dataValidation, fineChecks, projectIssues, ledgerImportValidationRules,
   accountChart, accountMapping, reportLineMapping, columnMappings, dataLifecycle, independenceDeclarations,
   admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,

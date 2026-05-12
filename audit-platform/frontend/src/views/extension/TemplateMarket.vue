@@ -1,10 +1,11 @@
 <template>
   <div class="gt-template-market">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">模板市场</h2>
-      <el-input v-model="searchQuery" placeholder="搜索模板..." size="small" clearable
-        :prefix-icon="Search" style="width: 240px" @keyup.enter="loadTemplates" />
-    </div>
+    <GtPageHeader title="模板市场" :show-back="false">
+      <template #actions>
+        <el-input v-model="searchQuery" placeholder="搜索模板..." size="small" clearable
+          :prefix-icon="Search" style="width: 240px" @keyup.enter="loadTemplates" />
+      </template>
+    </GtPageHeader>
 
     <div class="gt-market-grid" v-loading="loading">
       <el-card
@@ -41,6 +42,7 @@ import { ref, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { listCustomTemplates, copyCustomTemplate } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const loading = ref(false)
 const templates = ref<any[]>([])
@@ -61,7 +63,7 @@ async function copyToMine(t: any) {
   try {
     await copyCustomTemplate(t.id)
     ElMessage.success('已复制到我的模板')
-  } catch { ElMessage.error('复制失败') }
+  } catch (e: any) { handleApiError(e, '复制') }
   finally { t._copying = false }
 }
 

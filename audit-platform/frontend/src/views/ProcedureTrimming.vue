@@ -1,11 +1,12 @@
 <template>
   <div class="gt-procedure gt-fade-in">
     <div class="gt-proc-header">
-      <h2 class="gt-page-title">审计程序裁剪</h2>
-      <div class="gt-proc-actions">
-        <el-button size="small" @click="showRefDialog = true">参照其他单位</el-button>
-        <el-button size="small" @click="saveTrim" :loading="saving">保存裁剪</el-button>
-      </div>
+      <GtPageHeader title="审计程序裁剪" :show-back="false">
+        <template #actions>
+          <el-button size="small" @click="showRefDialog = true">参照其他单位</el-button>
+          <el-button size="small" @click="saveTrim" :loading="saving">保存裁剪</el-button>
+        </template>
+      </GtPageHeader>
     </div>
 
     <!-- 程序执行进度可视化 -->
@@ -101,6 +102,7 @@ import {
   getProcedures, updateProcedureTrim, initProcedures,
   addCustomProcedure, applyProcedureScheme, listProjects,
 } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -174,7 +176,7 @@ async function applyRef() {
     ElMessage.success('已应用参照方案')
     showRefDialog.value = false
     await loadProcedures()
-  } catch { ElMessage.error('应用失败') }
+  } catch (e: any) { handleApiError(e, '应用') }
 }
 
 onMounted(async () => {

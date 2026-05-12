@@ -144,6 +144,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import * as P from '@/services/apiPaths'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
@@ -151,6 +152,7 @@ import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 import { getSignReadinessV2, signDocument } from '@/services/signatureApi'
 import { api } from '@/services/apiProxy'
+import { REPORT_STATUS } from '@/constants/statusEnum'
 import { confirmSignature } from '@/utils/confirm'
 import { feedback } from '@/utils/feedback'
 import { handleApiError } from '@/utils/errorHandler'
@@ -209,16 +211,16 @@ const reportStatusLabel = computed(() => {
 })
 
 const reportStatusTagType = computed<'primary' | 'info' | 'warning' | 'success' | 'danger' | undefined>(() => {
-  if (reportStatus.value === 'final') return 'success'
-  if (reportStatus.value === 'eqcr_approved') return 'success'
-  if (reportStatus.value === 'review') return 'warning'
+  if (reportStatus.value === REPORT_STATUS.FINAL) return 'success'
+  if (reportStatus.value === REPORT_STATUS.EQCR_APPROVED) return 'success'
+  if (reportStatus.value === REPORT_STATUS.REVIEW) return 'warning'
   return 'info'
 })
 
 // ── 加载 ──
 async function loadProject() {
   try {
-    const data: any = await api.get(`/api/projects/${projectId.value}`)
+    const data: any = await api.get(P.projects.detail(projectId.value))
     clientName.value = data?.client_name || data?.name || ''
   } catch { /* ignore */ }
 }
@@ -237,7 +239,7 @@ async function loadReadiness() {
 async function loadReport() {
   reportLoading.value = true
   try {
-    const data: any = await api.get(`/api/audit-report/${projectId.value}/${year.value}`)
+    const data: any = await api.get(P.auditReport.get(projectId.value, year.value))
     reportStatus.value = data?.status || 'draft'
     // 拼 HTML 预览（降级方案：不使用 PDF 预览端点，直接渲染 paragraphs）
     const paragraphs = data?.paragraphs || {}
@@ -265,7 +267,7 @@ async function loadReport() {
 async function loadRiskSummary() {
   riskLoading.value = true
   try {
-    const data = await api.get<RiskSummaryData>(`/api/projects/${projectId.value}/risk-summary`)
+    const data = await api.get<RiskSummaryData>(P.projects.riskSummary(projectId.value))
     riskSummary.value = data
   } catch (e) {
     handleApiError(e, '加载风险摘要')
@@ -298,7 +300,7 @@ async function onSign() {
   signing.value = true
   try {
     // 找报告 ID
-    const reportData: any = await api.get(`/api/audit-report/${projectId.value}/${year.value}`)
+    const reportData: any = await api.get(P.auditReport.get(projectId.value, year.value))
     if (!reportData?.id) {
       ElMessage.error('未找到报告，请先生成')
       return

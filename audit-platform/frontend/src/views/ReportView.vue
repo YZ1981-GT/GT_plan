@@ -645,7 +645,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm } from '@/services/apiPaths'
+import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, reports as P_reports } from '@/services/apiPaths'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
@@ -1499,7 +1499,7 @@ async function onRvCtxOpenWorkpaper() {
   const row = rvCtx.contextMenu.rowData
   if (!row?.row_code) return
   try {
-    const data = await api.get(`/api/reports/${projectId.value}/${year.value}/${activeTab.value}/${row.row_code}/related-workpapers`)
+    const data = await api.get(P_reports.relatedWorkpapers(projectId.value, year.value, activeTab.value, row.row_code))
     const wps = (data as any)?.workpapers || []
     if (wps.length === 1) {
       rvPenetrate.toWorkpaperEditor(wps[0].id)

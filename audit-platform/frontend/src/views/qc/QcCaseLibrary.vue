@@ -1,15 +1,10 @@
 <template>
   <div class="qc-case-library">
-    <!-- 顶部横幅 -->
-    <div class="gt-page-banner gt-page-banner--teal">
-      <div class="gt-banner-content">
-        <h2>📚 质控案例库</h2>
-        <span class="gt-banner-sub">共 {{ total }} 个案例</span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="质控案例库" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="loadCases" :loading="loading">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 筛选栏 -->
     <div class="filter-bar">
@@ -144,8 +139,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { getCases, getCaseDetail } from '@/services/qcCaseApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -271,8 +266,8 @@ async function onRowClick(row: CaseItem) {
   try {
     const data = await getCaseDetail(row.id)
     detailData.value = data as any
-  } catch {
-    ElMessage.error('加载案例详情失败')
+  } catch (e: any) {
+    handleApiError(e, '加载案例详情')
     detailData.value = { ...row, description: '', lessons_learned: '', related_standards: [] }
   } finally {
     loadingDetail.value = false

@@ -197,6 +197,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { REPORT_STATUS } from '@/constants/statusEnum'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -271,7 +272,7 @@ const sectionNames = computed(() => {
 
 const isLocked = computed(() => {
   const s = report.value?.status
-  return s === 'eqcr_approved' || s === 'final'
+  return s === REPORT_STATUS.EQCR_APPROVED || s === REPORT_STATUS.FINAL
 })
 
 watch(activeSection, (s) => {
@@ -348,8 +349,8 @@ async function onExportWord() {
     a.click()
     URL.revokeObjectURL(url)
     ElMessage.success('Word 导出成功')
-  } catch {
-    ElMessage.error('Word 导出失败')
+  } catch (e: any) {
+    handleApiError(e, 'Word 导出')
   } finally {
     exportingWord.value = false
   }

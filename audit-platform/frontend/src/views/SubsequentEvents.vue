@@ -1,8 +1,11 @@
 <template>
   <div class="gt-events gt-fade-in">
     <div class="gt-events-header">
-      <h2 class="gt-page-title">后续事项</h2>
-      <el-button type="primary" @click="showCreate = true">新增事项</el-button>
+      <GtPageHeader title="后续事项" :show-back="false">
+        <template #actions>
+          <el-button type="primary" @click="showCreate = true">新增事项</el-button>
+        </template>
+      </GtPageHeader>
     </div>
     <el-table :data="events" border stripe v-loading="loading">
       <el-table-column prop="event_type" label="类型" width="120">
@@ -47,8 +50,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listSubsequentEvents, createSubsequentEvent } from '@/services/commonApi'
+import { useEditMode } from '@/composables/useEditMode'
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const events = ref<any[]>([])
 const loading = ref(false)
 const showCreate = ref(false)

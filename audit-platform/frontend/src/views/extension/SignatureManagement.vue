@@ -1,8 +1,6 @@
 <template>
   <div class="gt-sig-mgmt">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">电子签名管理</h2>
-    </div>
+    <GtPageHeader title="签字管理" :show-back="false" />
 
     <!-- 对象选择 -->
     <el-card shadow="never" class="gt-sig-selector">

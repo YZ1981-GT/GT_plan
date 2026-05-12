@@ -356,6 +356,7 @@ import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
+import { usePasteImport } from '@/composables/usePasteImport'
 import * as P from '@/services/apiPaths'
 
 const route = useRoute()
@@ -602,7 +603,7 @@ function onTbImported() {
 
 function onExport() {
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-    downloadFileAsBlob(`/api/projects/${projectId.value}/trial-balance/export?year=${year.value}`, `试算表_${year.value}.xlsx`)
+    downloadFileAsBlob(`${P.trialBalance.export(projectId.value)}?year=${year.value}`, `试算表_${year.value}.xlsx`)
   })
 }
 
@@ -617,7 +618,7 @@ function openWorkpaper(row: TrialBalanceRow) {
 
 async function onRecalcWp(row: any) {
   try {
-    await api.post(`/api/projects/${projectId.value}/working-papers/${row.wp_consistency?.wp_id}/recalc`)
+    await api.post(P.workpapers.recalc(projectId.value, row.wp_consistency?.wp_id))
     ElMessage.success('重算已触发')
   } catch (e) { handleApiError(e, '重算底稿') }
 }
@@ -762,6 +763,34 @@ const tbSumLazyEdit = useLazyEdit()
 
 // ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
 const tbTableRef = ref<any>(null)
+
+// [R9 F10 Task 32] usePasteImport 接入：粘贴 AJE 到调整列
+usePasteImport({
+  containerRef: tbTableRef,
+  columns: [
+    { key: 'account_code', label: '科目编码' },
+    { key: 'debit', label: '借方调整' },
+    { key: 'credit', label: '贷方调整' },
+  ],
+  onInsert: async (rows) => {
+    // 将粘贴的 AJE 数据写入调整列（通过 API 批量创建调整分录）
+    for (const r of rows) {
+      if (!r.account_code) continue
+      try {
+        await api.post(P.adjustments.create(projectId.value), {
+          account_code: r.account_code,
+          debit_amount: parseFloat(r.debit) || 0,
+          credit_amount: parseFloat(r.credit) || 0,
+          year: selectedYear.value,
+          summary: '粘贴导入',
+        })
+      } catch { /* 静默跳过单行失败 */ }
+    }
+    ElMessage.success(`已粘贴 ${rows.length} 行 AJE 数据`)
+    // 刷新试算表
+    fetchData()
+  },
+})
 
 tbCtx.setupTableDrag(tbTableRef, (rowIdx: number, colIdx: number) => {
   const row = groupedRows.value[rowIdx]
@@ -915,7 +944,7 @@ async function loadTbSummary() {
   try {
     // 调用新接口：从 adjustments 表自动汇总 AJE/RJE
     const result = await api.get(
-      `/api/projects/${projectId.value}/trial-balance/summary-with-adjustments`,
+      P.trialBalance.summaryWithAdjustments(projectId.value),
       {
         params: { year: year.value, report_type: tbSummaryType.value },
         validateStatus: (s: number) => s < 600,
@@ -1002,7 +1031,7 @@ async function saveTbSummary() {
       rcl_dr: r.rcl_dr, rcl_cr: r.rcl_cr,
     }))
     await api.put(
-      `/api/consol-worksheet-data/${projectId.value}/${selectedYear.value}/tb_summary_${tbSummaryType.value}`,
+      P.consolWorksheetData.get(projectId.value, selectedYear.value, `tb_summary_${tbSummaryType.value}`),
       { sheet_key: `tb_summary_${tbSummaryType.value}`, data: { rows: saveRows } },
       { validateStatus: (s: number) => s < 600 }
     )

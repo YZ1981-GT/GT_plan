@@ -61,10 +61,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 const loading = ref(false)
@@ -87,8 +87,8 @@ async function fetchMetrics() {
   try {
     const data = await api.get(`${P_eqcr.metrics}?year=${selectedYear.value}`)
     metrics.value = data.metrics || []
-  } catch {
-    ElMessage.error('获取 EQCR 指标失败')
+  } catch (e: any) {
+    handleApiError(e, '获取 EQCR 指标')
   } finally {
     loading.value = false
   }

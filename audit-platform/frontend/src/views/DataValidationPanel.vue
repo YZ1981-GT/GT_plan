@@ -29,6 +29,8 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import ValidationList from '../components/common/ValidationList.vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -47,12 +49,12 @@ const completenessFindings = computed(() =>
 async function runValidation() {
   loading.value = true
   try {
-    const res = await api.post(`/api/projects/${props.projectId}/data-validation`)
+    const res = await api.post(P.dataValidation.run(props.projectId))
     findings.value = res.findings || []
     summary.value = { total: res.total, ...res.by_severity }
     ElMessage.success(`校验完成，发现 ${res.total} 项问题`)
   } catch (e: any) {
-    ElMessage.error('校验失败: ' + (e.message || '未知错误'))
+    handleApiError(e, '执行校验')
   } finally {
     loading.value = false
   }
@@ -60,17 +62,17 @@ async function runValidation() {
 
 async function handleFix(findingIds: string[]) {
   try {
-    await api.post(`/api/projects/${props.projectId}/data-validation/fix`, findingIds)
+    await api.post(P.dataValidation.fix(props.projectId), findingIds)
     ElMessage.success('修复完成')
     await runValidation()
   } catch (e: any) {
-    ElMessage.error('修复失败')
+    handleApiError(e, '修复')
   }
 }
 
 async function exportFindings() {
   const { downloadFileAsBlob } = await import('@/services/commonApi')
-  await downloadFileAsBlob(`/api/projects/${props.projectId}/data-validation/export?format=csv`, '数据校验结果.csv')
+  await downloadFileAsBlob(`${P.dataValidation.export(props.projectId)}?format=csv`, '数据校验结果.csv')
 }
 </script>
 

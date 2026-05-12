@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="performance-monitor">
-    <h3>性能监控</h3>
+    <GtPageHeader title="性能监控" :show-back="false" />
     <el-row :gutter="16">
       <el-col :span="8">
         <el-card shadow="hover">
@@ -218,6 +218,7 @@ import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { admin as P_admin } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const stats = ref<any>({})
 const slowQueries = ref<any[]>([])
@@ -405,8 +406,8 @@ async function replayImportEvents() {
       `重放完成（${renderScopeLabel(data.scope)}）：发布 ${data.published_count || 0}，失败 ${data.failed_count || 0}`,
     )
     await loadImportEventHealth()
-  } catch {
-    ElMessage.error('导入事件重放失败')
+  } catch (e: any) {
+    handleApiError(e, '导入事件重放')
   } finally {
     eventReplayLoading.value = false
   }

@@ -1,8 +1,11 @@
 <template>
   <div class="gt-proj-dash gt-fade-in">
     <div class="gt-pd-header">
-      <h2 class="gt-page-title">项目看板</h2>
-      <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
+      <GtPageHeader title="项目看板" :show-back="false">
+        <template #actions>
+          <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
+        </template>
+      </GtPageHeader>
     </div>
     <el-row :gutter="16">
       <el-col :span="8">
@@ -99,6 +102,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import * as P from '@/services/apiPaths'
 import { useRoute } from 'vue-router'
 import { use } from 'echarts/core'
 import { PieChart, BarChart } from 'echarts/charts'
@@ -113,6 +117,7 @@ import {
 } from '@/services/commonApi'
 import http from '@/utils/http'
 import StaffSelectDialog from '@/components/assignment/StaffSelectDialog.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 use([PieChart, BarChart, TitleComponent, TooltipComponent, GridComponent, CanvasRenderer])
 
@@ -153,7 +158,7 @@ async function onRemind(row: any) {
   row._reminding = true
   try {
     const { data, status } = await http.post(
-      `/api/projects/${projectId.value}/workpapers/${row.wp_id}/remind`,
+      P.workpapers.remind(projectId.value, row.wp_id),
       {},
       { validateStatus: (s: number) => s < 600 },
     )
@@ -178,7 +183,7 @@ async function onRemind(row: any) {
       }
     }
   } catch (err: any) {
-    ElMessage.error('催办失败，请重试')
+    handleApiError(err, '催办')
   } finally {
     row._reminding = false
   }
@@ -195,14 +200,14 @@ async function onEscalateToPartner() {
     await confirmEscalate('合伙人')
   } catch { return }
   try {
-    await http.post(`/api/projects/${projectId.value}/workpapers/escalate-to-partner`, {
+    await http.post(P.workpapers.escalateToPartner(projectId.value), {
       wp_ids: overdueItems.map((r: any) => r.wp_id),
       reason: '催办 3 次未响应',
     }, { validateStatus: (s: number) => s < 600 })
     ElMessage.success('已通知合伙人关注')
     remindLimitTip.value = ''
-  } catch {
-    ElMessage.error('升级失败，请手动联系合伙人')
+  } catch (e: any) {
+    handleApiError(e, '升级')
   }
 }
 
@@ -226,7 +231,7 @@ async function onReassignConfirm(staff: { user_id: string; staff_name: string })
 
   try {
     await http.put(
-      `/api/projects/${projectId.value}/working-papers/${wpId}/assign`,
+      P.workpapers.assign(projectId.value, wpId),
       { assigned_to: staff.user_id },
     )
     ElMessage.success(`已重新分配给 ${staff.staff_name}`)
@@ -235,7 +240,7 @@ async function onReassignConfirm(staff: { user_id: string; staff_name: string })
   } catch (err: any) {
     const detail = err?.response?.data?.detail
     const msg = typeof detail === 'string' ? detail : '重新分配失败，请重试'
-    ElMessage.error(msg)
+    handleApiError(err, '操作')
   }
 }
 

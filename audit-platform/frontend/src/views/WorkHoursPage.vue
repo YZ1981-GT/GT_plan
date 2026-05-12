@@ -1,7 +1,7 @@
 <template>
   <div class="gt-workhours-page gt-fade-in">
     <div class="gt-wh-header">
-      <h2 class="gt-page-title">工时管理</h2>
+      <GtPageHeader title="工时管理" :show-back="false" />
     </div>
 
     <el-tabs v-model="activeTab">
@@ -16,7 +16,7 @@
         </div>
 
         <!-- 工时列表 -->
-        <el-table :data="hours" v-loading="loading" border stripe style="width: 100%">
+        <el-table ref="whTableRef" :data="hours" v-loading="loading" border stripe style="width: 100%">
           <el-table-column prop="work_date" label="日期" width="120" sortable />
           <el-table-column prop="project_name" label="项目" min-width="200" />
           <el-table-column prop="hours" label="小时" width="80" align="right" />
@@ -63,9 +63,19 @@
         </el-dialog>
       </el-tab-pane>
 
-      <!-- ═══ Tab 2: 待审批（抽取为子组件 R7 技术债 5） ═══ -->
-      <el-tab-pane v-if="can('approve_workhours')" label="待审批" name="approve">
-        <WorkHourApprovalTab />
+      <!-- ═══ Tab 2: 待审批（抽取为子组件 R7 技术债 5）+ 顶栏 badge [R9 F15 Task 35] ═══ -->
+      <el-tab-pane v-if="can('approve_workhours')" name="approve">
+        <template #label>
+          待审批
+          <el-badge
+            v-if="pendingApprovalCount > 0"
+            :value="pendingApprovalCount"
+            :max="99"
+            type="danger"
+            style="margin-left: 4px"
+          />
+        </template>
+        <WorkHourApprovalTab @count-change="onApprovalCountChange" />
       </el-tab-pane>
 
       <!-- ═══ Tab 3: 统计 ═══ -->
@@ -83,11 +93,20 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listWorkHours, createWorkHour, updateWorkHour, getAISuggestions, getMyAssignments, getMyStaffId, type WorkHourRecord } from '@/services/staffApi'
 import { usePermission } from '@/composables/usePermission'
+import { usePasteImport } from '@/composables/usePasteImport'
+import { useEditMode } from '@/composables/useEditMode'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import WorkHourApprovalTab from '@/components/workhour/WorkHourApprovalTab.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const { can } = usePermission()
 const activeTab = ref('mine')
+
+// [R9 F15 Task 35] 待审批数量 badge
+const pendingApprovalCount = ref(0)
+function onApprovalCountChange(count: number) {
+  pendingApprovalCount.value = count
+}
 
 // ══════════════════════════════════════════════
 // Tab 1: 我的填报
@@ -95,12 +114,41 @@ const activeTab = ref('mine')
 const hours = ref<WorkHourRecord[]>([])
 const loading = ref(false)
 const dateRange = ref<[string, string] | null>(null)
+
+// [R9 F10 Task 34] usePasteImport 接入：粘贴批量工时
+const whTableRef = ref<HTMLElement | null>(null)
+usePasteImport({
+  containerRef: whTableRef,
+  columns: [
+    { key: 'date', label: '日期' },
+    { key: 'project', label: '项目' },
+    { key: 'hours', label: '小时数' },
+    { key: 'description', label: '工作内容' },
+  ],
+  onInsert: async (rows) => {
+    if (!currentStaffId.value) return
+    for (const r of rows) {
+      // 尝试匹配项目名称到 project_id
+      const matchedProject = myProjects.value.find(
+        (p: any) => p.project_name === r.project || p.project_id === r.project
+      )
+      await createWorkHour(currentStaffId.value, {
+        work_date: r.date || new Date().toISOString().slice(0, 10),
+        project_id: matchedProject?.project_id || r.project || '',
+        hours: parseFloat(r.hours) || 8,
+        description: r.description || '',
+      })
+    }
+    await loadHours()
+  },
+})
 const showCreateDialog = ref(false)
 const submitting = ref(false)
 const warnings = ref<{ message: string }[]>([])
 const myProjects = ref<any[]>([])
 const currentStaffId = ref('')
 const editingHourId = ref<string | null>(null)
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 const form = ref({ work_date: '', project_id: '', hours: 8, description: '' })
 
@@ -157,7 +205,7 @@ async function showAISuggest() {
       showCreateDialog.value = true
       ElMessage.info('已加载 AI 建议，请确认后保存')
     } else { ElMessage.info('暂无建议') }
-  } catch { ElMessage.error('AI 预填失败') }
+  } catch (e: any) { handleApiError(e, 'AI 预填') }
 }
 
 // ══════════════════════════════════════════════
@@ -179,6 +227,16 @@ onMounted(async () => {
     myProjects.value = await getMyAssignments()
   } catch { /* ignore */ }
   if (currentStaffId.value) await loadHours()
+
+  // [R9 F15 Task 35] 加载待审批数量
+  if (can('approve_workhours')) {
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const { workHours: P_wh } = await import('@/services/apiPaths')
+      const summary = await api.get(P_wh.summary) as any
+      pendingApprovalCount.value = summary?.pending_count || 0
+    } catch { /* 静默 */ }
+  }
 })
 </script>
 

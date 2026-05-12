@@ -1,16 +1,15 @@
 <template>
   <div class="gt-review-conv gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">复核对话</h2>
-      <div class="gt-header-actions">
+    <GtPageHeader title="复核对话" :show-back="false">
+      <template #actions>
         <el-radio-group v-model="statusFilter" size="default" @change="fetchConversations">
           <el-radio-button label="">全部</el-radio-button>
           <el-radio-button label="open">进行中</el-radio-button>
           <el-radio-button label="closed">已关闭</el-radio-button>
         </el-radio-group>
         <el-button type="primary" @click="showCreateDialog = true">发起对话</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <div class="gt-conv-layout">
       <!-- 左侧对话列表 -->
@@ -86,6 +85,7 @@ import {
   listConversations, getMessages, sendMessage, closeConversation,
   exportConversation, createConversation, type ConversationItem,
 } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
@@ -127,7 +127,7 @@ async function onClose() {
     await closeConversation(selectedId.value)
     ElMessage.success('对话已关闭')
     await fetchConversations()
-  } catch (e: any) { ElMessage.error(e?.response?.data?.detail || '关闭失败') }
+  } catch (e: any) { handleApiError(e, '关闭') }
 }
 
 async function onExport() {

@@ -1,16 +1,24 @@
 <template>
   <div class="partner-dashboard">
-    <div class="gt-page-banner gt-page-banner--dark">
-      <div class="gt-banner-content">
-        <h2>🏛️ 合伙人看板</h2>
-        <span class="gt-banner-sub" v-if="overview">
+    <GtPageHeader title="合伙人看板" variant="banner" icon="🏛️" :show-back="false">
+      <template #subtitle>
+        <span v-if="overview">
           {{ overview.total_projects }} 个项目 · {{ overview.risk_alert_count }} 个风险预警 · {{ overview.pending_sign_count }} 个待签字
         </span>
-      </div>
-      <div class="gt-banner-actions">
+      </template>
+      <template #actions>
+        <!-- 待签字项目一键跳转 [R9 F7-Partner Task 24] -->
+        <el-button
+          v-if="overview && overview.pending_sign_count > 0"
+          size="small"
+          type="warning"
+          @click="goToPartnerSignDecision"
+        >
+          ✍️ 待签字项目 ({{ overview.pending_sign_count }})
+        </el-button>
         <el-button size="small" @click="loadAll" :loading="loading">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 风险预警横幅 -->
     <el-alert v-if="overview && overview.risk_alert_count > 0" type="warning" :closable="false" style="margin-bottom: 16px">
@@ -291,6 +299,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import {
   getPartnerOverview, getTeamEfficiency,
@@ -306,10 +315,12 @@ import {
 } from '@/services/rotationApi'
 import { api } from '@/services/apiProxy'
 import { my as P_my } from '@/services/apiPaths'
+import { PROJECT_STATUS } from '@/constants/statusEnum'
 import type { GateReadinessData } from '@/components/gate/GateReadinessPanel.vue'
 import GateReadinessPanel from '@/components/gate/GateReadinessPanel.vue'
 import SignatureWorkflowLine from '@/components/signature/SignatureWorkflowLine.vue'
 import { parseApiError } from '@/composables/useApiError'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -394,14 +405,25 @@ function statusLabel(s: string) {
   return m[s] || s
 }
 function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  if (s === 'archived') return 'success'
-  if (s === 'execution') return ''
-  if (s === 'reporting' || s === 'completion') return 'warning'
+  if (s === PROJECT_STATUS.ARCHIVED) return 'success'
+  if (s === PROJECT_STATUS.EXECUTION) return ''
+  if (s === PROJECT_STATUS.REPORTING || s === PROJECT_STATUS.COMPLETION) return 'warning'
   return 'info'
 }
 
 function goToProject(pid: string) {
   router.push(`/projects/${pid}/progress-board`)
+}
+
+// [R9 F7-Partner Task 24] 一键跳转待签字项目
+function goToPartnerSignDecision() {
+  // 如果只有一个待签字项目，直接跳到该项目的签字决策页
+  if (overview.value?.pending_sign?.length === 1) {
+    router.push(`/projects/${overview.value.pending_sign[0].id}/sign-decision`)
+  } else {
+    // 多个待签字项目，跳到待签字 Tab
+    activeTab.value = 'sign'
+  }
 }
 
 function goToReport(pid: string) {
@@ -471,8 +493,8 @@ async function refreshReadiness() {
   readinessLoading.value = true
   try {
     readinessData.value = await getSignReadinessV2(currentSignProjectId.value)
-  } catch {
-    ElMessage.error('刷新失败')
+  } catch (e: any) {
+    handleApiError(e, '刷新')
   } finally {
     readinessLoading.value = false
   }
@@ -519,12 +541,12 @@ async function handleSign() {
     // R1 Bug Fix 8: 使用 parseApiError 统一解析错误
     const parsed = parseApiError(err)
     if (parsed.code === 'PREREQUISITE_NOT_MET') {
-      ElMessage.error('前置签字未完成')
+      handleApiError(err, '前置签字未完成')
     } else if (parsed.code === 'GATE_STALE') {
       ElMessage.warning('检查已过期，请刷新')
       refreshReadiness()
     } else {
-      ElMessage.error(parsed.message || '签字失败')
+      handleApiError(err, '签字')
     }
   } finally {
     signing.value = false
@@ -533,7 +555,7 @@ async function handleSign() {
 
 async function loadAll() {
   loading.value = true
-  try { overview.value = await getPartnerOverview() } catch { ElMessage.error('加载失败') }
+  try { overview.value = await getPartnerOverview() } catch (e: any) { handleApiError(e, '加载') }
   finally { loading.value = false }
   teamLoading.value = true
   try { teamData.value = await getTeamEfficiency() } catch {}
@@ -663,7 +685,7 @@ async function submitOverride() {
     ElMessage.success('Override 申请已提交，待合规合伙人 + 首席风控合伙人双签')
   } catch (err: any) {
     const msg = err?.response?.data?.detail?.message || err?.response?.data?.detail || 'Override 申请失败'
-    ElMessage.error(typeof msg === 'string' ? msg : 'Override 申请失败')
+    handleApiError(err, 'Override 申请')
   } finally {
     overrideSubmitting.value = false
   }

@@ -1,7 +1,7 @@
 <template>
   <div class="gt-collab gt-fade-in">
     <div class="gt-collab-header">
-      <h2 class="gt-page-title">协作管理</h2>
+      <GtPageHeader title="协作管理" :show-back="false" />
     </div>
 
     <el-tabs v-model="activeTab">

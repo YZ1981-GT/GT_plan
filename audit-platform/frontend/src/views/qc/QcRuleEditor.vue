@@ -1,15 +1,10 @@
 <template>
   <div class="qc-rule-editor">
-    <!-- 顶部横幅 -->
-    <div class="gt-page-banner gt-page-banner--teal">
-      <div class="gt-banner-content">
-        <h2>✏️ 规则编辑</h2>
-        <span class="gt-banner-sub">{{ form.rule_code }} — {{ form.title || '加载中...' }}</span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="规则编辑" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="goBack">← 返回列表</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 编辑表单 -->
     <el-form
@@ -139,6 +134,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getQcRule, updateQcRule, dryRunQcRule } from '@/services/qcRuleApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -241,8 +237,8 @@ async function loadRule() {
     for (let i = 1; i <= (data.version || 1); i++) {
       versionHistory.value.push({ version: i, note: i === data.version ? '当前版本' : '历史更新' })
     }
-  } catch {
-    ElMessage.error('加载规则失败')
+  } catch (e: any) {
+    handleApiError(e, '加载规则')
   } finally {
     loading.value = false
   }
@@ -262,8 +258,8 @@ async function saveRule() {
     })
     ElMessage.success('保存成功')
     await loadRule()
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e: any) {
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }
@@ -276,8 +272,8 @@ async function dryRun() {
     dryRunResult.value = result as any
     dryRunDialogVisible.value = true
     hasRunDryRun.value = true
-  } catch {
-    ElMessage.error('试运行失败')
+  } catch (e: any) {
+    handleApiError(e, '试运行')
   } finally {
     dryRunning.value = false
   }

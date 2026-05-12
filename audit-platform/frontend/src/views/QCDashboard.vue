@@ -1,23 +1,36 @@
 <template>
   <div class="qc-dashboard">
     <!-- 顶部横幅 -->
-    <div class="gt-page-banner gt-page-banner--teal">
-      <div class="gt-banner-content">
-        <h2>🔍 质控看板</h2>
-        <span class="gt-banner-sub" v-if="overview">
+    <GtPageHeader title="质控看板" variant="banner" icon="🔍" :show-back="false">
+      <template #subtitle>
+        <span v-if="overview">
           QC 通过率 {{ overview.qc_pass_rate }}% · {{ overview.qc_passed }}/{{ overview.qc_checked }} 通过
         </span>
-      </div>
-      <div class="gt-banner-actions">
+      </template>
+      <template #actions>
         <el-button size="small" @click="loadAll" :loading="loading">刷新</el-button>
         <el-button size="small" @click="activeTab = 'archive'">📦 归档检查</el-button>
-      </div>
-    </div>
+        <el-button size="small" type="primary" v-permission="'qc:initiate'" @click="onInitiateInspection">🔍 发起抽查</el-button>
+      </template>
+    </GtPageHeader>
 
     <el-tabs v-model="activeTab">
       <!-- Tab 1: QC 总览 -->
       <el-tab-pane label="质量总览" name="overview">
         <div v-if="overview" class="gt-stat-cards">
+          <!-- 本年抽查覆盖率卡片 [R9 F7-QC Task 23] -->
+          <div class="gt-stat-card gt-stat-card--coverage">
+            <div class="gt-stat-num">{{ inspectionCoverageRate }}%</div>
+            <div class="gt-stat-label">本年抽查覆盖率</div>
+            <el-progress
+              :percentage="inspectionCoverageRate"
+              :stroke-width="6"
+              :show-text="false"
+              :color="inspectionCoverageRate >= 80 ? '#67c23a' : inspectionCoverageRate >= 50 ? '#e6a23c' : '#f56c6c'"
+              style="margin-top: 6px; width: 100%"
+            />
+            <div class="gt-stat-sub">{{ overview.qc_checked }}/{{ overview.total }} 项目</div>
+          </div>
           <div class="gt-stat-card gt-stat-card--success">
             <div class="gt-stat-num">{{ overview.qc_passed }}</div>
             <div class="gt-stat-label">QC 通过</div>
@@ -200,14 +213,17 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { useRoute, useRouter } from 'vue-router'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import {
   getQCOverview, getStaffProgress, getOpenIssues, getArchiveReadiness, runArchiveReadinessCheck,
   type QCOverview, type StaffProgressItem, type OpenIssue, type ArchiveReadiness,
 } from '@/services/qcDashboardApi'
+import * as P from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
+const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 
 const activeTab = ref('overview')
@@ -215,6 +231,12 @@ const loading = ref(false)
 
 // Overview
 const overview = ref<QCOverview | null>(null)
+
+// 本年抽查覆盖率 [R9 F7-QC Task 23]
+const inspectionCoverageRate = computed(() => {
+  if (!overview.value || !overview.value.total || overview.value.total === 0) return 0
+  return Math.round((overview.value.qc_checked / overview.value.total) * 100)
+})
 
 // Staff progress
 const staffProgress = ref<StaffProgressItem[]>([])
@@ -256,7 +278,7 @@ function reviewTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger
 
 async function loadOverview() {
   loading.value = true
-  try { overview.value = await getQCOverview(projectId.value) } catch { ElMessage.error('加载QC总览失败') }
+  try { overview.value = await getQCOverview(projectId.value) } catch (e: any) { handleApiError(e, '加载QC总览') }
   finally { loading.value = false }
 }
 
@@ -282,7 +304,7 @@ async function loadIssues() {
 async function loadArchive() {
   archiveLoading.value = true
   try { archiveResult.value = await runArchiveReadinessCheck(projectId.value) }
-  catch { ElMessage.error('归档检查失败') }
+  catch (e: any) { handleApiError(e, '归档检查') }
   finally { archiveLoading.value = false }
 }
 
@@ -311,7 +333,7 @@ async function loadRating() {
   ratingLoading.value = true
   try {
     const year = new Date().getFullYear()
-    const data = await import('@/services/apiProxy').then(m => m.api.get(`/api/qc/projects/${projectId.value}/rating/${year}`))
+    const data = await import('@/services/apiProxy').then(m => m.api.get(P.qcDashboard.projectRating(projectId.value, year)))
     ratingData.value = data
   } catch { /* 无评级数据 */ }
   finally { ratingLoading.value = false }
@@ -327,6 +349,11 @@ async function loadReviewerMetrics() {
     reviewerMetrics.value = data?.items || []
   } catch { /* ignore */ }
   finally { reviewerLoading.value = false }
+}
+
+function onInitiateInspection() {
+  // 跳转到质控抽查工作台
+  router.push(`/qc/inspections?project=${projectId.value}`)
 }
 
 async function loadAll() {
@@ -355,4 +382,17 @@ onMounted(loadAll)
 .rating-badge--d { background: #f56c6c; }
 .rating-badge--n { background: #c0c4cc; }
 .rating-details { font-size: 14px; color: #606266; line-height: 2; }
+
+/* 本年抽查覆盖率卡片 [R9 F7-QC Task 23] */
+.gt-stat-card--coverage {
+  border-left: 4px solid #409eff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.gt-stat-sub {
+  font-size: 11px;
+  color: #909399;
+  margin-top: 4px;
+}
 </style>

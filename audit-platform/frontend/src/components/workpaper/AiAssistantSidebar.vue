@@ -62,10 +62,10 @@
           </div>
         </div>
         <!-- 流式输出 -->
-        <div v-if="streamingMessage" class="chat-message assistant streaming">
+        <div v-if="streamingText" class="chat-message assistant streaming">
           <div class="message-role">🤖</div>
           <div class="message-content">
-            <div class="markdown-content" v-html="renderMarkdown(streamingMessage)"></div>
+            <div class="markdown-content" v-html="renderMarkdown(streamingText)"></div>
           </div>
         </div>
       </div>
@@ -102,7 +102,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { useAuthStore } from '@/stores/auth'
+import { useAiChat } from '@/composables/useAiChat'
 
 // ─── Props ───
 const props = defineProps<{
@@ -137,17 +137,35 @@ const MAX_WIDTH = 600
 const isCollapsed = ref(false)
 const sidebarWidth = ref(DEFAULT_WIDTH)
 const inputText = ref('')
-const sending = ref(false)
-const streamingMessage = ref('')
 const chatHistoryRef = ref<HTMLElement | null>(null)
 
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  text: string
-}
+// ─── useAiChat composable [R9 F8 Task 27] ───
+const chatEndpoint = computed(() => `/api/workpapers/${props.wpId}/ai/chat`)
+const chatContext = computed(() => {
+  const ctx: Record<string, any> = {
+    wp_id: props.wpId,
+    project_id: props.projectId,
+  }
+  if (procedureCode.value) {
+    ctx.procedure_code = procedureCode.value
+  }
+  if (props.selectedCell) {
+    ctx.cell_context = {
+      cell_ref: props.selectedCell.cell_ref,
+      value: props.selectedCell.value,
+      formula: props.selectedCell.formula,
+      row: props.selectedCell.row,
+      column: props.selectedCell.column,
+    }
+  }
+  return ctx
+})
 
-const messages = ref<ChatMessage[]>([])
+const { messages, loading: sending, streamingText, send, clear } = useAiChat({
+  endpoint: chatEndpoint,
+  context: chatContext,
+  streaming: true,
+})
 
 // ─── Quick Prompts ───
 const quickPrompts = [
@@ -192,7 +210,6 @@ function startResize(e: MouseEvent) {
 
 function onResize(e: MouseEvent) {
   if (!resizing) return
-  // 右侧栏：鼠标向左移动 = 宽度增加
   const diff = startX - e.clientX
   const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + diff))
   sidebarWidth.value = newWidth
@@ -212,117 +229,18 @@ function toggleCollapse() {
   isCollapsed.value = !isCollapsed.value
 }
 
-// ─── Chat Logic ───
-function buildCellContext() {
-  if (!props.selectedCell) return undefined
-  return {
-    cell_ref: props.selectedCell.cell_ref,
-    value: props.selectedCell.value,
-    formula: props.selectedCell.formula,
-    row: props.selectedCell.row,
-    column: props.selectedCell.column,
-  }
-}
-
+// ─── Chat Logic (delegated to useAiChat) ───
 async function sendMessage() {
   const text = inputText.value.trim()
   if (!text || sending.value) return
-
   inputText.value = ''
-  sending.value = true
-
-  // 添加用户消息
-  const userMsg: ChatMessage = {
-    id: Date.now().toString(),
-    role: 'user',
-    text,
-  }
-  messages.value.push(userMsg)
-  scrollToBottom()
-
-  // 准备请求体
-  const body: Record<string, any> = {
-    message: text,
-    wp_id: props.wpId,
-    project_id: props.projectId,
-  }
-  if (procedureCode.value) {
-    body.procedure_code = procedureCode.value
-  }
-  const cellCtx = buildCellContext()
-  if (cellCtx) {
-    body.cell_context = cellCtx
-  }
-
-  streamingMessage.value = ''
-
-  try {
-    const response = await fetch(`/api/workpapers/${props.wpId}/ai/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getToken()}`,
-      },
-      body: JSON.stringify(body),
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    // 尝试流式读取
-    const contentType = response.headers.get('content-type') || ''
-    if (contentType.includes('text/event-stream') || contentType.includes('text/plain')) {
-      const reader = response.body?.getReader()
-      if (reader) {
-        const decoder = new TextDecoder()
-        let fullText = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          fullText += decoder.decode(value, { stream: true })
-          streamingMessage.value = fullText
-          scrollToBottom()
-        }
-        addAssistantMessage(fullText)
-      }
-    } else {
-      // JSON 响应
-      const result = await response.json()
-      const answer = result.answer || result.message || result.text || JSON.stringify(result)
-      addAssistantMessage(answer)
-    }
-  } catch (e: any) {
-    console.error('[AiAssistantSidebar] chat error:', e)
-    addAssistantMessage('AI 服务暂不可用，请稍后重试。')
-  } finally {
-    sending.value = false
-    streamingMessage.value = ''
-  }
-}
-
-function addAssistantMessage(text: string) {
-  const aiMsg: ChatMessage = {
-    id: (Date.now() + 1).toString(),
-    role: 'assistant',
-    text,
-  }
-  messages.value.push(aiMsg)
+  await send(text)
   scrollToBottom()
 }
 
 function sendQuickPrompt(text: string) {
   inputText.value = text
   sendMessage()
-}
-
-function getToken(): string {
-  try {
-    const authStore = useAuthStore()
-    return authStore.token || ''
-  } catch {
-    return ''
-  }
 }
 
 // ─── Insert to Conclusion ───
@@ -360,7 +278,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  // 清理可能残留的 resize 事件
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
 })

@@ -1,5 +1,6 @@
 <template>
   <div class="issue-ticket-list">
+    <GtPageHeader title="问题工单" :show-back="false" />
     <div class="issue-toolbar">
       <el-select v-model="filters.status" placeholder="状态" clearable size="small" style="width:120px">
         <el-option label="待处理" value="open" />
@@ -53,6 +54,20 @@
       <el-table-column prop="created_at" label="创建时间" width="160">
         <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
       </el-table-column>
+      <el-table-column label="操作" width="80" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.status !== 'closed' && row.status !== 'rejected'"
+            v-permission="'ticket:close'"
+            type="danger"
+            size="small"
+            text
+            @click.stop="onCloseTicket(row)"
+          >
+            关闭
+          </el-button>
+        </template>
+      </el-table-column>
     </el-table>
 
     <el-pagination
@@ -72,6 +87,10 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listIssues, type IssueTicket } from '@/services/governanceApi'
+import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
+import { ISSUE_STATUS, ISSUE_SEVERITY, ISSUE_SOURCE } from '@/constants/statusEnum'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -97,11 +116,21 @@ async function loadData() {
     issues.value = result.items || []
     total.value = result.total || 0
   } catch (e: any) {
-    ElMessage.error('加载问题单失败')
+    handleApiError(e, '加载问题单')
   }
 }
 
 function handlePageChange(p: number) { page.value = p; loadData() }
+
+async function onCloseTicket(row: IssueTicket) {
+  try {
+    await api.patch(P.projectIssues.detail(projectId, row.id), { status: 'closed' })
+    ElMessage.success('工单已关闭')
+    await loadData()
+  } catch (e: any) {
+    handleApiError(e, '关闭')
+  }
+}
 
 function handleRowClick(row: IssueTicket) {
   // R1 需求 2 验收 6：点击行跳转到底稿对应 cell
@@ -110,7 +139,7 @@ function handleRowClick(row: IssueTicket) {
   // 比手工同步 cell_ref 更准确，也不需要后端改 schema。
   if (row.wp_id) {
     const query: Record<string, string> = {}
-    if (row.source === 'review_comment' && row.source_ref_id) {
+    if (row.source === ISSUE_SOURCE.REVIEW_COMMENT && row.source_ref_id) {
       query.review_id = row.source_ref_id
     }
     router.push({
@@ -122,9 +151,9 @@ function handleRowClick(row: IssueTicket) {
 }
 
 function sourceTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  if (s === 'Q') return 'danger'
-  if (s === 'L3') return 'warning'
-  if (s === 'review_comment') return 'info'
+  if (s === ISSUE_SOURCE.Q) return 'danger'
+  if (s === ISSUE_SOURCE.L3) return 'warning'
+  if (s === ISSUE_SOURCE.REVIEW_COMMENT) return 'info'
   return ''
 }
 function sourceLabel(s: string): string {
@@ -144,8 +173,8 @@ function sourceLabel(s: string): string {
   return m[s] || s
 }
 function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  if (s === 'blocker') return 'danger'
-  if (s === 'major') return 'warning'
+  if (s === ISSUE_SEVERITY.BLOCKER) return 'danger'
+  if (s === ISSUE_SEVERITY.MAJOR) return 'warning'
   return 'info'
 }
 function severityLabel(s: string) {
@@ -153,9 +182,9 @@ function severityLabel(s: string) {
   return m[s] || s
 }
 function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
-  if (s === 'closed') return 'success'
-  if (s === 'rejected') return 'danger'
-  if (s === 'open') return 'warning'
+  if (s === ISSUE_STATUS.CLOSED) return 'success'
+  if (s === ISSUE_STATUS.REJECTED) return 'danger'
+  if (s === ISSUE_STATUS.OPEN) return 'warning'
   return 'info'
 }
 function statusLabel(s: string) {

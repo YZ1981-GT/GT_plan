@@ -1,9 +1,10 @@
 <template>
   <div class="gt-format-mgr gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">报告排版模板</h2>
-      <el-button type="primary" @click="showCreate = true">新建模板</el-button>
-    </div>
+    <GtPageHeader title="报告排版模板" :show-back="false">
+      <template #actions>
+        <el-button type="primary" @click="showCreate = true">新建模板</el-button>
+      </template>
+    </GtPageHeader>
     <el-table :data="templates" stripe>
       <el-table-column prop="template_name" label="模板名称" />
       <el-table-column prop="template_type" label="类型" width="120" />

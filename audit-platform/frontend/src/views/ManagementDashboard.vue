@@ -1,16 +1,14 @@
 ﻿<template>
   <div class="gt-dashboard gt-fade-in">
     <!-- 顶部横幅 -->
-    <div class="gt-mgmt-banner">
-      <div class="gt-mgmt-banner-text">
-        <h2 class="gt-mgmt-title">管理看板</h2>
-        <p class="gt-mgmt-subtitle">实时掌握项目进度、人员负荷与风险预警</p>
-      </div>
-      <div class="gt-mgmt-banner-actions">
+    <GtPageHeader title="管理看板" variant="banner" icon="📈" :show-back="false">
+      <template #subtitle>
+        实时掌握项目进度、人员负荷与风险预警
+      </template>
+      <template #actions>
         <el-button size="default" @click="refreshAll" :loading="loading" :icon="Refresh" round>刷新数据</el-button>
-      </div>
-      <div class="gt-mgmt-banner-deco"></div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- ── KPI 指标卡片 ── -->
     <div class="kpi-grid">
@@ -221,6 +219,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import {
   getDashboardOverview, getDashboardProjectProgress, getDashboardStaffWorkload,
   getDashboardRiskAlerts, getDashboardGroupProgress, getDashboardHoursHeatmap,

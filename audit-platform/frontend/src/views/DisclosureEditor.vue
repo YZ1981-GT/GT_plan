@@ -396,6 +396,10 @@
     <div class="gt-ucell-ctx-item" @click="onDeCtxRelatedWp">
       <span class="gt-ucell-ctx-icon">📝</span> 查看相关底稿
     </div>
+    <!-- R9-F5：穿透到序时账 -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger">
+      <span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账
+    </div>
   </CellContextMenu>
 
   <!-- 知识库文档选择弹窗 [R3.7] -->
@@ -404,8 +408,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
+import * as P from '@/services/apiPaths'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
+import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -443,8 +449,8 @@ import { withLoading } from '@/composables/useLoading'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
-import { handleApiError } from '@/utils/errorHandler'
 import { useProjectEvents } from '@/composables/useProjectEvents'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -693,7 +699,7 @@ async function onAiContinueWrite() {
       ElMessage.success('续写完成')
     }
   } catch (e: any) {
-    ElMessage.error('续写失败: ' + (e.message || '未知错误'))
+    handleApiError(e, 'AI续写')
   } finally {
     aiLoading.value = false
   }
@@ -726,7 +732,7 @@ async function onAiRewriteConfirm() {
       ElMessage.success('改写完成')
     }
   } catch (e: any) {
-    ElMessage.error('改写失败: ' + (e.message || '未知错误'))
+    handleApiError(e, 'AI改写')
   } finally {
     aiLoading.value = false
     aiRewriteDialogVisible.value = false
@@ -746,7 +752,7 @@ async function onAiGeneratePolicy() {
       ElMessage.success(`会计政策已生成（参照${res.reference_count}篇文档）`)
     }
   } catch (e: any) {
-    ElMessage.error('生成失败: ' + (e.message || '未知错误'))
+    handleApiError(e, '生成会计政策')
   } finally {
     aiLoading.value = false
   }
@@ -764,7 +770,7 @@ async function onAiGenerateAnalysis() {
       ElMessage.success('变动分析已生成')
     }
   } catch (e: any) {
-    ElMessage.error('生成失败: ' + (e.message || '未知错误'))
+    handleApiError(e, '生成变动分析')
   } finally {
     aiLoading.value = false
   }
@@ -1189,7 +1195,7 @@ async function onClearAllFormulas() {
   try {
     const { default: http } = await import('@/utils/http')
     await http.post(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/${currentNote.value.note_section}/clear-formulas`
+      P.disclosureNotes.clearFormulas(projectId.value, year.value, currentNote.value.note_section)
     )
     ElMessage.success('公式已清除，所有单元格切换为手动编辑模式')
     await fetchDetail(currentNote.value.note_section)
@@ -1215,8 +1221,8 @@ async function onRestoreAutoMode() {
     await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     ElMessage.success('已恢复自动提数模式')
     await fetchDetail(currentNote.value.note_section)
-  } catch {
-    ElMessage.error('恢复失败')
+  } catch (e: any) {
+    handleApiError(e, '恢复')
   }
 }
 
@@ -1225,7 +1231,7 @@ async function onExportWord() {
   try {
     const { default: http } = await import('@/utils/http')
     const resp = await http.post(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/export-word`,
+      P.disclosureNotes.exportWord(projectId.value, year.value),
       {},
       { responseType: 'blob' }
     )
@@ -1300,7 +1306,7 @@ async function fetchDetail(noteSection: string) {
   // 并行加载上年数据
   try {
     priorYearNote.value = await api.get(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/${noteSection}/prior-year`
+      P.disclosureNotes.priorYear(projectId.value, year.value, noteSection)
     )
   } catch { priorYearNote.value = null }
 }
@@ -1450,6 +1456,7 @@ function copyNoteTable() {
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const deCtx = useCellSelection()
+const penetrate = usePenetrate()
 const deTableRef = ref<any>(null)
 deCtx.setupTableDrag(deTableRef, (rowIdx: number, colIdx: number) => {
   const tableRows = activeTableData.value?.rows || []
@@ -1552,7 +1559,7 @@ async function onDeCtxRelatedWp() {
   const rowCode = `row_${sel.row}`
   try {
     const data: any = await api.get(
-      `/api/notes/${projectId.value}/${year.value}/${encodeURIComponent(note.note_section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
+      P.disclosureNotes.relatedWorkpapers(projectId.value, year.value, note.note_section, rowCode),
       { validateStatus: (s: number) => s < 600 },
     )
     const wps = data?.workpapers || []
@@ -1574,6 +1581,31 @@ async function onDeCtxRelatedWp() {
     ElMessage.info(`该行关联 ${wps.length} 张底稿：\n${list}`)
   } catch (e: any) {
     handleApiError(e, '查看相关底稿')
+  }
+}
+
+/**
+ * R9-F5：穿透到序时账
+ * 从附注单元格穿透到对应科目的序时账
+ */
+function onDeCtxPenetrateToLedger() {
+  deCtx.closeContextMenu()
+  const note = currentNote.value
+  if (!note?.note_section) {
+    ElMessage.warning('请先选择附注章节')
+    return
+  }
+  // 尝试从选中行获取科目编码（第一列通常是科目名/编码）
+  const sel = deCtx.selectedCells.value[0]
+  if (!sel) return
+  const tableRows = activeTableData.value?.rows || []
+  const row = tableRows[sel.row]
+  // 优先取 account_code 字段，否则取第一列值作为科目标识
+  const accountCode = row?.account_code || row?.values?.[0] || row?.cells?.[0] || ''
+  if (accountCode) {
+    penetrate.toLedger(String(accountCode))
+  } else {
+    ElMessage.warning('无法识别当前行的科目编码')
   }
 }
 </script>

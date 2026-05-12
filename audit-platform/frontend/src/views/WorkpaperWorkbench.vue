@@ -290,12 +290,9 @@
               <span>{{ tip }}</span>
             </div>
           </div>
-          <el-input v-model="aiQuestion" type="textarea" :rows="2" placeholder="输入问题，例如：该科目审计风险点是什么？" style="margin-top: 12px" />
-          <el-button type="primary" size="small" style="margin-top: 8px" :disabled="!aiQuestion.trim()" @click="onAskAI" :loading="aiAsking" round>
-            <el-icon style="margin-right: 4px"><MagicStick /></el-icon>提问
-          </el-button>
-          <div v-if="aiAnswer" class="gt-wpb-ai-answer gt-fade-in">
-            <p>{{ aiAnswer }}</p>
+          <!-- [R9 F8 Task 29] AI 对话已移至 WorkpaperSidePanel AI Tab，此处仅保留入口提示 -->
+          <div class="gt-wpb-ai-hint" style="margin-top: 12px; padding: 12px; background: #f9f7fb; border-radius: 8px; text-align: center; color: #666; font-size: 13px;">
+            💡 AI 助手已整合到底稿编辑器侧面板，请在编辑器中使用 AI Tab 获取智能辅助
           </div>
           <!-- 审计程序检查清单 -->
           <div class="gt-wpb-checklist" v-if="auditChecklist.length">
@@ -326,6 +323,7 @@ import { api } from '@/services/apiProxy'
 import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai, staff as P_staff } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import OcrStatusBadge from '@/components/common/OcrStatusBadge.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -643,34 +641,13 @@ async function onGenerateRecommended() {
     recommendations.value = []
     await refreshAll()
   } catch (e: any) {
-    ElMessage.error(e?.message || '生成失败')
+    handleApiError(e, '生成')
   }
   generatingWps.value = false
 }
 
-async function onAskAI() {
-  if (!aiQuestion.value.trim() || !selectedMapping.value) return
-  aiAsking.value = true
-  aiAnswer.value = ''
-  try {
-    // 获取底稿 ID（如果已生成）
-    const wpStatus = wpStatusMap.value[selectedMapping.value.wp_code]
-    const wpId = (wpStatus as any)?.id
-    if (!wpId) {
-      aiAnswer.value = '请先生成底稿后再使用 AI 助手'
-      aiAsking.value = false
-      return
-    }
-    const data = await api.post(`/api/workpapers/${wpId}/ai/chat`, {
-      message: aiQuestion.value,
-      context: `当前底稿：${selectedMapping.value.wp_code} ${selectedMapping.value.wp_name}，科目：${selectedMapping.value.account_name}`,
-    })
-    aiAnswer.value = typeof data === 'string' ? data : (data?.content || data?.message || '暂无回复')
-  } catch {
-    aiAnswer.value = 'AI 服务暂时不可用，请稍后再试'
-  }
-  aiAsking.value = false
-}
+// [R9 F8 Task 29] AI 对话已移至 WorkpaperSidePanel AI Tab
+// onAskAI 函数已移除，AI 功能通过 WorkpaperEditor 的 AiAssistantSidebar 提供
 
 function onOpenWorkpaper() {
   if (!selectedMapping.value) return
@@ -729,11 +706,11 @@ async function onAttachFileSelect(file: any) {
   formData.append('wp_code', selectedMapping.value.wp_code)
   formData.append('attachment_type', 'workpaper')
   try {
-    await api.post(`/api/projects/${projectId.value}/attachments/upload`, formData)
+    await api.post(P_att.upload(projectId.value), formData)
     ElMessage.success('附件上传成功')
     loadAttachments(selectedMapping.value.wp_code)
   } catch (e: any) {
-    ElMessage.error(e?.message || '上传失败')
+    handleApiError(e, '上传')
   }
 }
 
@@ -755,7 +732,7 @@ async function onConfirmAssign() {
     showAssignDialog.value = false
     await refreshAll()
   } catch (e: any) {
-    ElMessage.error(e?.message || '委派失败')
+    handleApiError(e, '委派')
   }
   assignLoading.value = false
 }

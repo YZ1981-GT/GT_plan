@@ -1,73 +1,11 @@
 <template>
   <div v-loading="loading" class="eqcr-project-view">
     <!-- 顶部 banner -->
-    <div class="gt-page-banner gt-page-banner--dark">
-      <div class="gt-banner-content">
-        <div class="eqcr-banner__title-row">
-          <el-button
-            size="small"
-            class="eqcr-banner__back"
-            @click="goBack"
-          >
-            ← 返回工作台
-          </el-button>
-          <h2 class="eqcr-banner__title">
-            🛡️ {{ project?.name || 'EQCR 项目复核' }}
-          </h2>
-        </div>
-        <div v-if="project" class="eqcr-banner__meta">
-          <span>客户：{{ project.client_name || '—' }}</span>
-          <span>审计期间：
-            {{ project.audit_period_start || '?' }}
-            ~
-            {{ project.audit_period_end || '?' }}
-          </span>
-          <span>签字日：{{ project.signing_date || '未设定' }}</span>
-          <el-tag
-            v-if="daysToSigning !== null"
-            size="small"
-            effect="dark"
-            :type="daysTagType(daysToSigning)"
-          >
-            {{ daysLabel(daysToSigning) }}
-          </el-tag>
-        </div>
-      </div>
-      <div class="gt-banner-actions">
-        <el-tag
-          v-if="reportStatus"
-          :type="reportStatusType(reportStatus)"
-          effect="dark"
-        >
-          {{ reportStatusLabel(reportStatus) }}
-        </el-tag>
-        <el-button
-          v-if="canApprove"
-          size="small"
-          type="primary"
-          :loading="approving"
-          @click="onApproveClick"
-        >
-          EQCR 审批
-        </el-button>
-        <el-button
-          v-if="canUnlock"
-          size="small"
-          type="warning"
-          :loading="unlocking"
-          @click="onUnlockClick"
-        >
-          解锁意见
-        </el-button>
-        <el-button
-          size="small"
-          :loading="loading"
-          @click="loadOverview"
-        >
-          刷新
-        </el-button>
-      </div>
-    </div>
+    <GtPageHeader title="独立复核" :show-back="false">
+      <template #actions>
+        <el-button size="small" @click="goBack">← 返回工作台</el-button>
+      </template>
+    </GtPageHeader>
 
     <!-- 非 EQCR 访问提示 -->
     <el-alert
@@ -193,6 +131,53 @@
           :project-id="projectId"
         />
       </el-tab-pane>
+      <!-- 关键发现摘要 Tab [R9 F7-EQCR Task 25] -->
+      <el-tab-pane label="关键发现摘要" name="key_findings_summary">
+        <div v-if="activeTab === 'key_findings_summary'" class="eqcr-key-findings-summary">
+          <el-alert type="info" :closable="false" show-icon style="margin-bottom: 16px">
+            <template #title>本页聚合各 Tab 核心结论，便于一页纸快速浏览</template>
+          </el-alert>
+          <div class="eqcr-findings-grid">
+            <el-card v-if="overview" shadow="hover" class="eqcr-finding-card">
+              <template #header><span>📊 重要性</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview.opinion_summary?.materiality || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>📐 会计估计</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.estimate || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>🔗 关联方</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.related_party || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>🏢 持续经营</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.going_concern || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>📝 审计意见</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.opinion_type || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>🛡️ EQCR 总结</span></template>
+              <div class="eqcr-finding-content">
+                总意见数 {{ overview?.opinion_summary?.total || 0 }}，
+                工时 {{ timeSummary?.total_hours ?? '—' }}h
+              </div>
+            </el-card>
+          </div>
+        </div>
+      </el-tab-pane>
       <!-- 预留 Tab：组成部分审计师 → Task 22 实装，本任务不渲染 -->
     </el-tabs>
   </div>
@@ -208,6 +193,7 @@ import {
   type ReportStatusValue,
 } from '@/services/eqcrService'
 import { eqcr as P_eqcr } from '@/services/apiPaths'
+import { REPORT_STATUS } from '@/constants/statusEnum'
 import EqcrMateriality from '@/components/eqcr/EqcrMateriality.vue'
 import EqcrEstimates from '@/components/eqcr/EqcrEstimates.vue'
 import EqcrRelatedParties from '@/components/eqcr/EqcrRelatedParties.vue'
@@ -313,11 +299,11 @@ async function loadOverview() {
     } catch { timeSummary.value = null }
   } catch (err: any) {
     if (err?.response?.status === 404) {
-      ElMessage.error('项目不存在')
+      handleApiError(err, '项目不存在')
       router.replace({ name: 'EqcrWorkbench' })
       return
     }
-    ElMessage.error(err?.response?.data?.detail || '加载项目总览失败')
+    handleApiError(err, '加载项目总览')
     overview.value = null
   } finally {
     loading.value = false
@@ -336,7 +322,7 @@ const unlocking = ref(false)
 
 const canApprove = computed<boolean>(() => {
   if (!overview.value?.my_role_confirmed) return false
-  return reportStatus.value === 'review'
+  return reportStatus.value === REPORT_STATUS.REVIEW
 })
 
 const canUnlock = computed<boolean>(() => {
@@ -388,9 +374,9 @@ async function onApproveClick() {
     if (detail?.error_code === 'EQCR_GATE_BLOCKED') {
       const rules = detail.blocking_rules || []
       const msg = rules.map((r: any) => `[${r.rule_code}] ${r.message}`).join('\n')
-      ElMessage.error(`EQCR 门禁阻断：\n${msg}`)
+      handleApiError(e, '操作')
     } else {
-      ElMessage.error(typeof detail === 'string' ? detail : '审批失败')
+      handleApiError(e, '审批')
     }
   } finally {
     approving.value = false
@@ -420,7 +406,7 @@ async function onUnlockClick() {
     ElMessage.success('EQCR 意见已解锁')
     await loadOverview()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '解锁失败')
+    handleApiError(e, '解锁')
   } finally {
     unlocking.value = false
   }
@@ -533,5 +519,23 @@ function reportStatusType(
 
 .eqcr-tabs {
   margin-top: 16px;
+}
+
+/* 关键发现摘要 [R9 F7-EQCR Task 25] */
+.eqcr-key-findings-summary {
+  padding: 8px 0;
+}
+.eqcr-findings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.eqcr-finding-card {
+  min-height: 100px;
+}
+.eqcr-finding-content {
+  font-size: 14px;
+  color: var(--gt-color-text-secondary);
+  line-height: 1.6;
 }
 </style>

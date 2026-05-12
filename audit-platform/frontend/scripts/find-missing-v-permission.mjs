@@ -24,6 +24,15 @@ const DANGER_PATTERNS = [
   /@click[^>]*=['"][^'"]*on(Export|Publish|Finalize)\b/i,
   /@click[^>]*=['"][^'"]*on(Convert|Revoke|Rollback)\b/i,
   /@click[^>]*=['"][^'"]*on(ForcePass|BatchAssign)\b/i,
+  // R9 新增：直接函数名模式（不带 on 前缀）
+  /@click[^>]*=['"]delete\b/i,
+  /@click[^>]*=['"]archive\b/i,
+  /@click[^>]*=['"]sign\b/i,
+  /@click[^>]*=['"]export\b/i,
+  // R9 新增：含 handleXxx 模式
+  /@click[^>]*=['"][^'"]*handle(Delete|Archive|Sign|Export)\b/i,
+  // R9 新增：含 doXxx 模式
+  /@click[^>]*=['"][^'"]*do(Delete|Archive|Sign|Export)\b/i,
 ]
 
 const files = globSync('{views,components}/**/*.vue', { cwd: ROOT, absolute: true })

@@ -1,5 +1,6 @@
 <template>
   <div class="gt-wp-summary">
+    <GtPageHeader title="底稿汇总" :show-back="false" />
     <!-- 左侧选择面板 -->
     <aside class="gt-wp-summary__left">
       <!-- 科目选择 -->
@@ -95,6 +96,7 @@ import { ElMessage } from 'element-plus'
 import { getChildCompanies, generateWorkpaperSummary, exportWorkpaperSummary } from '@/services/auditPlatformApi'
 import { fmtAmount } from '@/utils/formatters'
 import { useProjectStore } from '@/stores/project'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -246,7 +248,7 @@ async function doGenerate() {
       ElMessage.info('未查询到匹配数据')
     }
   } catch (e: any) {
-    ElMessage.error(e?.message || '生成汇总失败')
+    handleApiError(e, '生成汇总')
   } finally {
     loading.value = false
   }
@@ -272,8 +274,8 @@ async function doExport() {
     a.click()
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
-  } catch {
-    ElMessage.error('导出失败')
+  } catch (e: any) {
+    handleApiError(e, '导出')
   }
 }
 

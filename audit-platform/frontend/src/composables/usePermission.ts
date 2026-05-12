@@ -21,6 +21,12 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'template:delete',
     'staff:delete',
     'user:view',
+    'recycle:restore', 'recycle:purge',
+    'sampling:execute',
+    'report_config:edit',
+    'ticket:close',
+    'adjustment:create',
+    'qc:initiate',
   ],
   manager: [
     'project:view', 'project:edit', 'project:create',
@@ -37,6 +43,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'approve_workhours',
     'send_reminder',
     'batch_brief',
+    'recycle:restore', 'recycle:purge',
+    'sampling:execute',
+    'report_config:edit',
+    'ticket:close',
+    'adjustment:create',
   ],
   auditor: [
     'project:view',
@@ -68,6 +79,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'report:view',
     'adjustment:view',
     'qc:publish_report',
+    'qc:initiate',
+    'sampling:execute',
     'independence:edit',
   ],
 }

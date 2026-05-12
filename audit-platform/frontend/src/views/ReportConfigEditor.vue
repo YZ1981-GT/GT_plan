@@ -1,11 +1,7 @@
 <template>
   <div class="gt-report-config-editor gt-fade-in">
-    <div class="gt-rce-banner">
-      <div class="gt-rce-banner-text">
-        <h2>报表结构编辑</h2>
-        <p>{{ standardLabel }} · {{ reportTypeLabel }} · {{ rows.length }} 行</p>
-      </div>
-      <div class="gt-rce-banner-actions">
+    <GtPageHeader title="报表配置" :show-back="false">
+      <template #actions>
         <el-button v-if="!isEditing" size="small" @click="enterEdit">✏️ 编辑</el-button>
         <el-button v-else size="small" type="warning" @click="() => exitEdit()">退出编辑</el-button>
         <el-select v-model="selectedStandard" size="small" style="width: 160px" @change="loadConfig">
@@ -22,13 +18,13 @@
           <el-option label="现金流附表" value="cash_flow_supplement" />
           <el-option label="资产减值准备表" value="impairment_provision" />
         </el-select>
-        <el-button size="small" type="primary" @click="onSaveAll" :loading="saving">保存修改</el-button>
+        <el-button size="small" type="primary" v-permission="'report_config:edit'" @click="onSaveAll" :loading="saving">保存修改</el-button>
         <el-button size="small" @click="onInsertAbove">↑ 在上方插入</el-button>
         <el-button size="small" @click="onAddRow">末尾新增</el-button>
         <el-button size="small" @click="onDeleteSelected" :disabled="selectedRows.length === 0" style="color: #fff; opacity: 0.8;">删除选中 ({{ selectedRows.length }})</el-button>
         <el-button size="small" @click="router.back()">返回</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
@@ -84,6 +80,7 @@ import { confirmBatch, confirmLeave } from '@/utils/confirm'
 import { useEditMode } from '@/composables/useEditMode'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
@@ -235,7 +232,7 @@ async function onSaveAll() {
     ElMessage.success(`已保存 ${savedCount} 行`)
     rows.value.forEach(r => { r._editing = false })
   } catch (e: any) {
-    ElMessage.error('保存失败: ' + (e?.message || ''))
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }

@@ -1,20 +1,9 @@
 <template>
   <div class="gt-dashboard gt-fade-in">
     <!-- ── 欢迎横幅 ── -->
-    <div class="welcome-banner">
-      <div class="welcome-text">
-        <h1 class="welcome-title">{{ greeting }}，{{ displayName }}</h1>
-        <p class="welcome-date">{{ todayStr }}</p>
-        <p class="welcome-motto">{{ motto }}</p>
-      </div>
-      <div class="welcome-deco">
-        <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="60" cy="60" r="50" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
-          <circle cx="60" cy="60" r="35" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-          <circle cx="60" cy="60" r="20" fill="rgba(255,255,255,0.08)"/>
-        </svg>
-      </div>
-    </div>
+    <GtPageHeader title="工作台" variant="banner" icon="🏠" :show-back="false">
+      <template #subtitle>{{ todayStr }}</template>
+    </GtPageHeader>
 
     <!-- ── 统计卡片 ── -->
     <div class="stat-grid gt-stagger">
@@ -53,8 +42,8 @@
         >
           <div class="my-wp-code">{{ wp.wp_code }}</div>
           <div class="my-wp-name">{{ wp.wp_name }}</div>
-          <el-tag :type="wp.status === 'draft' ? 'info' : 'warning'" size="small">
-            {{ wp.status === 'draft' ? '编制中' : '待修改' }}
+          <el-tag :type="wp.status === WP_STATUS.DRAFT ? 'info' : 'warning'" size="small">
+            {{ wp.status === WP_STATUS.DRAFT ? '编制中' : '待修改' }}
           </el-tag>
         </div>
       </div>
@@ -129,6 +118,7 @@ import { useAuthStore } from '@/stores/auth'
 import { listProjects, getMyAssignments } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
 import { dashboard as P_dash } from '@/services/apiPaths'
+import { WP_STATUS, PROJECT_STATUS } from '@/constants/statusEnum'
 import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
@@ -267,7 +257,7 @@ onMounted(async () => {
     stats.total = list.length
     stats.inProgress = list.filter((p: any) => ['execution', 'planning'].includes(p.status)).length
     stats.pendingReview = list.filter((p: any) => p.status === 'completion').length
-    stats.completed = list.filter((p: any) => p.status === 'archived').length
+    stats.completed = list.filter((p: any) => p.status === PROJECT_STATUS.ARCHIVED).length
     recentProjects.value = list.slice(0, 3)
   } catch { /* ignore */ }
   loadingProjects.value = false
@@ -284,7 +274,7 @@ onMounted(async () => {
     const wpList: any[] = []
     for (const proj of assignments.slice(0, 5)) {
       try {
-        const data = await httpApi.get(`/api/projects/${proj.project_id}/working-papers`, {
+        const data = await httpApi.get(P.workpapers.list(proj.project_id), {
           params: { assigned_to_me: true, status: 'draft,rejected' },
           validateStatus: (s: number) => s < 600,
         })

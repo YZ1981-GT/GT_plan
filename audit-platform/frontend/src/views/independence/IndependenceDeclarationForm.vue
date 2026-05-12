@@ -1,19 +1,15 @@
 <template>
   <div class="independence-form">
-    <div class="gt-page-banner">
-      <div class="gt-banner-content">
-        <h2>📋 独立性声明</h2>
-        <span class="gt-banner-sub">{{ currentYear }} 年度 · 项目 {{ projectId }}</span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="独立性声明" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="saveDraft" :loading="saving" :disabled="submitted">
           保存草稿
         </el-button>
         <el-button size="small" type="primary" @click="handleSubmit" :loading="submitting" :disabled="submitted">
           提交声明
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 已提交成功状态 -->
     <el-result v-if="submitted" icon="success" title="独立性声明已提交" sub-title="声明已签字留痕，可在归档包中查看">
@@ -114,6 +110,7 @@ import { api } from '@/services/apiProxy'
 import { independenceDeclarations as P_id } from '@/services/apiPaths'
 import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -213,8 +210,8 @@ async function loadData() {
         submitted.value = true
       }
     }
-  } catch {
-    ElMessage.error('加载独立性声明数据失败')
+  } catch (e: any) {
+    handleApiError(e, '加载独立性声明数据')
   } finally {
     loading.value = false
   }
@@ -263,8 +260,8 @@ async function saveDraft() {
       declaration.value = data
     }
     ElMessage.success('草稿已保存')
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e: any) {
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }
@@ -303,7 +300,7 @@ async function handleSubmit() {
     ElMessage.success('独立性声明已提交')
   } catch (err: any) {
     const msg = err?.response?.data?.detail || err?.message || '提交失败'
-    ElMessage.error(typeof msg === 'string' ? msg : '提交失败')
+    handleApiError(err, '提交')
   } finally {
     submitting.value = false
   }

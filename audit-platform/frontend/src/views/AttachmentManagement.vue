@@ -1,24 +1,25 @@
 ﻿<template>
   <div class="gt-attachment-page">
     <div class="gt-att-header">
-      <h2 class="gt-page-title">附件管理</h2>
-      <div class="gt-att-actions">
-        <el-input v-model="searchQuery" placeholder="搜索附件..." size="small" clearable
-          :prefix-icon="Search" style="width: 200px" @keyup.enter="onSearch" />
-        <el-select v-model="filterType" placeholder="文件类型" size="small" clearable style="width: 120px" @change="loadAttachments">
-          <el-option label="PDF" value="pdf" />
-          <el-option label="Word" value="word" />
-          <el-option label="Excel" value="excel" />
-          <el-option label="图片" value="image" />
-        </el-select>
-        <el-upload
-          :show-file-list="false"
-          :before-upload="beforeUpload"
-          :http-request="uploadAttachment"
-        >
-          <el-button type="primary" size="small"><el-icon><Upload /></el-icon> 上传附件</el-button>
-        </el-upload>
-      </div>
+      <GtPageHeader title="附件管理" :show-back="false">
+        <template #actions>
+          <el-input v-model="searchQuery" placeholder="搜索附件..." size="small" clearable
+            :prefix-icon="Search" style="width: 200px" @keyup.enter="onSearch" />
+          <el-select v-model="filterType" placeholder="文件类型" size="small" clearable style="width: 120px" @change="loadAttachments">
+            <el-option label="PDF" value="pdf" />
+            <el-option label="Word" value="word" />
+            <el-option label="Excel" value="excel" />
+            <el-option label="图片" value="image" />
+          </el-select>
+          <el-upload
+            :show-file-list="false"
+            :before-upload="beforeUpload"
+            :http-request="uploadAttachment"
+          >
+            <el-button type="primary" size="small"><el-icon><Upload /></el-icon> 上传附件</el-button>
+          </el-upload>
+        </template>
+      </GtPageHeader>
     </div>
 
     <!-- 附件列表 -->
@@ -122,6 +123,7 @@ import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer
 import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -197,8 +199,8 @@ function preview(row: any) {
 async function download(row: any) {
   try {
     await downloadFile(P_att.download(row.id))
-  } catch {
-    ElMessage.error('下载失败')
+  } catch (e: any) {
+    handleApiError(e, '下载')
   }
 }
 
@@ -219,7 +221,7 @@ async function submitAssociate() {
     })
     ElMessage.success('关联成功')
     associateVisible.value = false
-  } catch { ElMessage.error('关联失败') }
+  } catch (e: any) { handleApiError(e, '关联') }
 }
 
 function beforeUpload(file: File) {
@@ -243,7 +245,7 @@ async function uploadAttachment(options: any) {
     onUploadSuccess()
   } catch (error) {
     options.onError?.(error)
-    ElMessage.error('上传失败')
+    handleApiError(error, '上传')
   }
 }
 
@@ -257,7 +259,7 @@ async function retryOCR(row: any) {
     await api.put(P_att.ocrStatus(row.id), { status: 'pending' })
     ElMessage.success('已重新提交 OCR 识别')
     await loadAttachments()
-  } catch { ElMessage.error('重试失败') }
+  } catch (e: any) { handleApiError(e, '重试') }
 }
 
 function formatSize(bytes: number): string {

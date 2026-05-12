@@ -1,17 +1,10 @@
 <template>
   <div class="qc-rule-list">
-    <!-- 顶部横幅 -->
-    <div class="gt-page-banner gt-page-banner--teal">
-      <div class="gt-banner-content">
-        <h2>📋 QC 规则定义</h2>
-        <span class="gt-banner-sub">
-          共 {{ rules.length }} 条规则，已启用 {{ enabledCount }} 条
-        </span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="质控规则" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="loadRules" :loading="loading">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 规则表格 -->
     <el-table

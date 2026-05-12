@@ -1,20 +1,6 @@
 <template>
   <div class="gt-private-storage">
-    <div class="gt-ps-header">
-      <h2>私人库</h2>
-      <div class="gt-ps-quota">
-        <el-progress
-          :percentage="quotaPct"
-          :color="quota.warning ? '#F56C6C' : 'var(--gt-color-primary, #4b2d77)'"
-          :stroke-width="8"
-          style="width: 200px"
-        />
-        <span class="gt-ps-quota-text">
-          {{ formatSize(quota.used) }} / {{ formatSize(quota.limit) }}
-        </span>
-        <el-tag v-if="quota.warning" type="danger" size="small">容量不足</el-tag>
-      </div>
-    </div>
+    <GtPageHeader title="私人文件库" :show-back="false" />
 
     <div class="gt-ps-actions">
       <el-upload :auto-upload="false" :show-file-list="false" @change="onFileSelect">
@@ -57,6 +43,7 @@ import {
   listPrivateFiles, getPrivateQuota, uploadPrivateFile,
   downloadPrivateFile, deletePrivateFile,
 } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const authStore = useAuthStore()
 const loading = ref(false)
@@ -120,7 +107,7 @@ async function onFileSelect(file: any) {
     ElMessage.success('上传成功')
     await fetchFiles()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '上传失败')
+    handleApiError(err, '上传')
   }
 }
 
@@ -135,8 +122,8 @@ async function onDownload(name: string) {
     a.download = name
     a.click()
     URL.revokeObjectURL(url)
-  } catch {
-    ElMessage.error('下载失败')
+  } catch (e: any) {
+    handleApiError(e, '下载')
   }
 }
 
@@ -149,8 +136,8 @@ async function onDelete(name: string) {
     await deletePrivateFile(uid, name)
     ElMessage.success('已删除')
     await fetchFiles()
-  } catch {
-    ElMessage.error('删除失败')
+  } catch (e: any) {
+    handleApiError(e, '删除')
   }
 }
 

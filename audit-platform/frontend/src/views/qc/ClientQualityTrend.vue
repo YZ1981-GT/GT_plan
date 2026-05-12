@@ -1,21 +1,16 @@
 <template>
   <div class="client-quality-trend">
-    <!-- 顶部横幅 -->
-    <div class="gt-page-banner gt-page-banner--teal">
-      <div class="gt-banner-content">
-        <h2>📈 客户质量趋势</h2>
-        <span class="gt-banner-sub">客户：{{ clientName }}</span>
-      </div>
-      <div class="gt-banner-actions">
-        <span style="margin-right: 8px; font-size: 13px; color: #fff;">年数：</span>
+    <GtPageHeader title="客户质量趋势" :show-back="false">
+      <template #actions>
+        <span style="margin-right: 8px; font-size: 13px;">年数：</span>
         <el-select v-model="years" size="small" style="width: 80px;" @change="loadTrend">
           <el-option v-for="y in 10" :key="y" :label="`${y}`" :value="y" />
         </el-select>
         <el-button size="small" @click="loadTrend" :loading="loading" style="margin-left: 8px;">
           刷新
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 趋势表格 -->
     <el-table
@@ -92,10 +87,11 @@
 </template>
 
 <script setup lang="ts">
+import * as P from '@/services/apiPaths'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { handleApiError } from '@/utils/errorHandler'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -177,7 +173,7 @@ async function loadTrend() {
   loading.value = true
   try {
     const data = await api.get<any>(
-      `/api/qc/clients/${encodeURIComponent(clientName.value)}/quality-trend?years=${years.value}`
+      `${P.qcDashboard.clientQualityTrend(clientName.value)}?years=${years.value}`
     )
     if (Array.isArray(data)) {
       trendData.value = data
@@ -186,9 +182,9 @@ async function loadTrend() {
     } else {
       trendData.value = []
     }
-  } catch {
+  } catch (e: any) {
     trendData.value = []
-    ElMessage.error('加载质量趋势失败')
+    handleApiError(e, '加载质量趋势')
   } finally {
     loading.value = false
   }

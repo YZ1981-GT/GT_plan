@@ -66,6 +66,7 @@ export const ISSUE_STATUS = {
   IN_PROGRESS: 'in_progress',
   RESOLVED: 'resolved',
   CLOSED: 'closed',
+  REJECTED: 'rejected',
 } as const
 
 /** 问题单严重度（IssueTicket.severity） */
@@ -108,6 +109,28 @@ export const PDF_TASK_STATUS = {
   FAILED: 'failed',
 } as const
 
+/** 导出任务状态（ExportTask.status） */
+export const EXPORT_TASK_STATUS = {
+  QUEUED: 'queued',
+  PROCESSING: 'processing',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+} as const
+
+/** QC 抽查结论（InspectionItem.verdict） */
+export const QC_INSPECTION_VERDICT = {
+  PENDING: 'pending',
+  PASS: 'pass',
+  FAIL: 'fail',
+  NOT_APPLICABLE: 'not_applicable',
+} as const
+
+/** 归档范围（ArchiveOptions.scope） */
+export const ARCHIVE_SCOPE = {
+  FINAL: 'final',
+  INTERIM: 'interim',
+} as const
+
 /** 归档作业状态（ArchiveJob.status） */
 export const ARCHIVE_JOB_STATUS = {
   PENDING: 'pending',
@@ -135,6 +158,46 @@ export const IMPORT_JOB_STATUS = {
   CANCELED: 'canceled',
 } as const
 
+/** 批注状态（Annotation.status） */
+export const ANNOTATION_STATUS = {
+  PENDING: 'pending',
+  REPLIED: 'replied',
+  RESOLVED: 'resolved',
+} as const
+
+/** 独立性声明状态（IndependenceDeclaration.status） */
+export const INDEPENDENCE_STATUS = {
+  DRAFT: 'draft',
+  SUBMITTED: 'submitted',
+  APPROVED: 'approved',
+  PENDING_CONFLICT_REVIEW: 'pending_conflict_review',
+} as const
+
+/** 问题单来源（IssueTicket.source） */
+export const ISSUE_SOURCE = {
+  REVIEW_COMMENT: 'review_comment',
+  CONSISTENCY: 'consistency',
+  AI: 'ai',
+  REMINDER: 'reminder',
+  CLIENT_COMMITMENT: 'client_commitment',
+  PBC: 'pbc',
+  CONFIRMATION: 'confirmation',
+  QC_INSPECTION: 'qc_inspection',
+  Q: 'Q',
+  L2: 'L2',
+  L3: 'L3',
+} as const
+
+/** 审计程序执行状态（Procedure.execution_status） */
+export const PROCEDURE_EXECUTION_STATUS = {
+  PENDING: 'pending',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  REVIEWED: 'reviewed',
+  NOT_APPLICABLE: 'not_applicable',
+  SKIP: 'skip',
+} as const
+
 /** 已完成状态合集（跨多业务通用） */
 export const COMPLETED_STATUSES: readonly string[] = [
   WP_STATUS.REVIEW_PASSED,
@@ -151,3 +214,7 @@ export type AdjustmentStatus = typeof ADJUSTMENT_STATUS[keyof typeof ADJUSTMENT_
 export type ProjectStatus = typeof PROJECT_STATUS[keyof typeof PROJECT_STATUS]
 export type IssueStatus = typeof ISSUE_STATUS[keyof typeof ISSUE_STATUS]
 export type IssueSeverity = typeof ISSUE_SEVERITY[keyof typeof ISSUE_SEVERITY]
+export type AnnotationStatus = typeof ANNOTATION_STATUS[keyof typeof ANNOTATION_STATUS]
+export type IndependenceStatus = typeof INDEPENDENCE_STATUS[keyof typeof INDEPENDENCE_STATUS]
+export type IssueSource = typeof ISSUE_SOURCE[keyof typeof ISSUE_SOURCE]
+export type ProcedureExecutionStatus = typeof PROCEDURE_EXECUTION_STATUS[keyof typeof PROCEDURE_EXECUTION_STATUS]

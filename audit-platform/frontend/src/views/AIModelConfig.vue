@@ -1,17 +1,15 @@
 <template>
   <div class="ai-model-config">
-    <!-- 顶部状态栏 -->
-    <div class="ai-header">
-      <h3 class="ai-title">AI 模型配置</h3>
-      <div class="ai-header-actions">
+    <GtPageHeader title="AI 模型配置" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="refreshHealth" :loading="healthLoading">
           <el-icon><Refresh /></el-icon>检测状态
         </el-button>
         <el-button size="small" type="primary" @click="showCreateDialog = true">
           <el-icon><Plus /></el-icon>新增模型
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 健康状态卡片 -->
     <div class="ai-health-cards" v-if="health">
