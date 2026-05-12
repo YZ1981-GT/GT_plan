@@ -120,7 +120,7 @@
                 <el-option label="逻辑审核" value="logic_check" />
                 <el-option label="合理性" value="reasonability" />
               </el-select>
-              <el-tag v-else :type="categoryTagType(row.formula_category)" size="small">
+              <el-tag v-else :type="(categoryTagType(row.formula_category)) || undefined" size="small">
                 {{ categoryLabel(row.formula_category) }}
               </el-tag>
             </template>
@@ -264,7 +264,7 @@
             </el-table-column>
             <el-table-column label="分类" width="90" align="center">
               <template #default="{ row }">
-                <el-tag :type="categoryTagType(row.formula_category)" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
+                <el-tag :type="(categoryTagType(row.formula_category)) || undefined" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
@@ -294,7 +294,7 @@
         </el-table-column>
         <el-table-column label="分类" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="categoryTagType(row.formula_category)" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
+            <el-tag :type="(categoryTagType(row.formula_category)) || undefined" size="small">{{ categoryLabel(row.formula_category) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="formula_description" label="说明" min-width="140" show-overflow-tooltip />
@@ -335,6 +335,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { reportConfig as P_rc, noteTemplates as P_nt } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
@@ -383,7 +384,7 @@ const noteTreeLoaded = ref(false)
 async function loadNoteTree() {
   if (noteTreeLoaded.value) return
   try {
-    const data = await api.get(`/api/note-templates/${fmTemplateType.value}`, {
+    const data = await api.get(P_nt.list(fmTemplateType.value), {
       validateStatus: (s: number) => s < 600,
     })
     const sections = data ?? []
@@ -624,7 +625,7 @@ async function loadRowsForNode(nodeKey: string) {
     loadingData.value = true
     try {
       const standard = `${fmTemplateType.value}_standalone`
-      const data = await api.get('/api/report-config', {
+      const data = await api.get(P_rc.list, {
         params: { report_type: reportType, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
@@ -1031,7 +1032,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
       if (selectedNodeKey.value.startsWith('report_')) {
         const reportType = selectedNodeKey.value.replace('report_', '')
         try {
-          const saved = await api.post('/api/report-config', {
+          const saved = await api.post(P_rc.list, {
             report_type: reportType,
             applicable_standard: `${fmTemplateType.value}_standalone`,
             row_number: row.row_number,
@@ -1056,7 +1057,7 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
   // 已有行——更新到后端
   if (row.id) {
     try {
-      await api.put(`/api/report-config/${row.id}`, {
+      await api.put(P_rc.detail(row.id), {
         formula: data.formula || null,
         formula_category: data.category,
         formula_description: data.description,
@@ -1073,7 +1074,7 @@ async function saveEdit(row: any) {
   // 兼容行内编辑（保留）
   if (!row.id) return
   try {
-    await api.put(`/api/report-config/${row.id}`, {
+    await api.put(P_rc.detail(row.id), {
       formula: editFormula.value || null,
       formula_category: editCategory.value,
       formula_description: editDescription.value,
@@ -1089,7 +1090,7 @@ async function saveEdit(row: any) {
   }
 }
 
-function categoryTagType(cat: string | null) {
+function categoryTagType(cat: string | null): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (cat === 'auto_calc') return 'primary'
   if (cat === 'logic_check') return 'warning'
   if (cat === 'reasonability') return 'info'
@@ -1123,7 +1124,7 @@ async function onApplyFormulas() {
       formula: r.formula,
     }))
 
-    const data = await api.post('/api/report-config/execute-formulas-batch', {
+    const data = await api.post(P_rc.executeFormulasBatch, {
       project_id: props.projectId,
       year: props.year,
       formulas,
@@ -1155,7 +1156,7 @@ async function onApplyFormulas() {
           row_code: code,
           current_period_amount: val,
         }))
-        await api.post('/api/report-config/batch-update', {
+        await api.post(P_rc.batchUpdate, {
           project_id: props.projectId,
           report_type: reportType,
           applicable_standard: `soe_standalone`,
@@ -1190,7 +1191,7 @@ async function onImportPresetFormulas() {
     const reportType = selectedNodeKey.value.replace('report_', '')
     try {
       const standard = `${fmTemplateType.value}_standalone`
-      const data = await api.get('/api/report-config', {
+      const data = await api.get(P_rc.list, {
         params: { report_type: reportType, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
@@ -1206,7 +1207,7 @@ async function onImportPresetFormulas() {
   // 附注类 / 表间审核：从附注校验预设公式加载
   if (selectedNodeKey.value.startsWith('note_') || selectedNodeKey.value.startsWith('cross_')) {
     try {
-      const data = await api.get(`/api/note-templates/preset-formulas/${fmTemplateType.value}`, {
+      const data = await api.get(P_nt.presetFormulas(fmTemplateType.value), {
         validateStatus: (s: number) => s < 600,
       })
       const presets = data ?? []
@@ -1293,7 +1294,7 @@ async function onSaveAllFormulas() {
       if (row._isNew && row.formula) {
         // 新增
         const reportType = selectedNodeKey.value.replace('report_', '')
-        await api.post('/api/report-config', {
+        await api.post(P_rc.list, {
           report_type: reportType,
           applicable_standard: `${fmTemplateType.value}_standalone`,
           row_number: row.row_number || 0,
@@ -1307,7 +1308,7 @@ async function onSaveAllFormulas() {
         saved++
       } else if (row.id) {
         // 更新
-        await api.put(`/api/report-config/${row.id}`, {
+        await api.put(P_rc.detail(row.id), {
           formula: row.formula,
           formula_category: row.formula_category,
           formula_description: row.formula_description,
@@ -1410,7 +1411,7 @@ watch(showFormulaDashboard, async (v) => {
   for (const rt of types) {
     if (allRowsMap.value[rt]?.length) continue
     try {
-      const data = await api.get('/api/report-config', {
+      const data = await api.get(P_rc.list, {
         params: { report_type: rt, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })

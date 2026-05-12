@@ -1,43 +1,50 @@
 ﻿<template>
   <div class="gt-wp-list gt-fade-in">
-    <!-- 顶部筛选栏 -->
-    <div class="gt-wp-filter-bar">
-      <el-button text size="small" style="margin-right: 6px" @click="$router.push('/projects')">← 返回</el-button>
-      <h2 class="gt-page-title">底稿管理</h2>
-      <div v-if="treeData.length > 0" class="gt-wp-view-toggle">
-        <el-radio-group v-model="viewMode" size="small">
-          <el-radio-button value="list">列表</el-radio-button>
-          <el-radio-button value="kanban">看板</el-radio-button>
-        </el-radio-group>
-      </div>
-      <div v-if="treeData.length > 0" class="gt-wp-filters">
-        <el-input
-          v-model="searchKeyword"
-          placeholder="搜索底稿..."
-          clearable
-          size="default"
-          style="width: 200px"
-          @input="onSearchDebounce"
-        />
-        <el-select v-model="filterCycle" placeholder="审计循环" clearable size="default" style="width: 160px">
-          <el-option v-for="c in cycleOptions" :key="c.value" :label="c.label" :value="c.value" />
-        </el-select>
-        <el-select v-model="filterStatus" placeholder="状态" clearable size="default" style="width: 130px">
-          <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-        <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 130px">
-          <el-option label="全部" value="" />
-          <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
-        </el-select>
-        <el-button @click="fetchData" :loading="loading">刷新</el-button>
-        <el-button @click="showWpImport = true">📥 Excel导入</el-button>
-        <el-button type="primary" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
-          批量下载 ({{ selectedWpIds.length }})
-        </el-button>
-        <el-button type="warning" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
-          批量委派 ({{ selectedWpIds.length }})
-        </el-button>
-      </div>
+    <!-- 页面横幅 [R7-S3-01] -->
+    <GtPageHeader title="底稿管理" @back="$router.push('/projects')">
+      <template #actions>
+        <GtToolbar :show-import="true" import-label="Excel导入" @import="showWpImport = true">
+          <template #left>
+            <div v-if="treeData.length > 0" class="gt-wp-view-toggle">
+              <el-radio-group v-model="viewMode" size="small">
+                <el-radio-button value="list">列表</el-radio-button>
+                <el-radio-button value="kanban">看板</el-radio-button>
+              </el-radio-group>
+            </div>
+          </template>
+          <template #right>
+            <el-button @click="fetchData" :loading="loading" size="small">刷新</el-button>
+            <el-button type="primary" size="small" :disabled="selectedWpIds.length === 0" @click="onBatchDownload" :loading="downloadLoading">
+              批量下载 ({{ selectedWpIds.length }})
+            </el-button>
+            <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
+              批量委派 ({{ selectedWpIds.length }})
+            </el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
+
+    <!-- 筛选栏（独立行，内容多不塞进 GtToolbar） -->
+    <div v-if="treeData.length > 0" class="gt-wp-filter-bar">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="搜索底稿..."
+        clearable
+        size="default"
+        style="width: 200px"
+        @input="onSearchDebounce"
+      />
+      <el-select v-model="filterCycle" placeholder="审计循环" clearable size="default" style="width: 160px">
+        <el-option v-for="c in cycleOptions" :key="c.value" :label="c.label" :value="c.value" />
+      </el-select>
+      <el-select v-model="filterStatus" placeholder="状态" clearable size="default" style="width: 130px">
+        <el-option v-for="s in statusOptions" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+      <el-select v-model="filterAssignee" placeholder="编制人" clearable size="default" style="width: 130px">
+        <el-option label="全部" value="" />
+        <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
+      </el-select>
     </div>
 
     <!-- 进度指示器（任务 7.2） -->
@@ -74,14 +81,14 @@
       <div class="gt-wp-intro-half gt-wp-intro-half--guide">
         <h3 class="gt-wp-guide-title">审计程序与底稿体系</h3>
         <div class="gt-wp-guide-flow">
-          <span class="gt-wp-flow-tag" style="background:#7c5cbf">B 风险评估</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-primary)">B 风险评估</span>
           <span class="gt-wp-flow-arrow">→</span>
-          <span class="gt-wp-flow-tag" style="background:#6a4fa0">C 控制测试</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-primary-dark)">C 控制测试</span>
           <span class="gt-wp-flow-arrow">→</span>
-          <span class="gt-wp-flow-tag" style="background:#e6553a">D-N 实质性程序</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-coral)">D-N 实质性程序</span>
           <span class="gt-wp-flow-arrow">→</span>
-          <span class="gt-wp-flow-tag" style="background:#1a8a5c">A 完成阶段</span>
-          <span class="gt-wp-flow-tag" style="background:#7f8c8d;margin-left:4px">S 特定项目</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-success)">A 完成阶段</span>
+          <span class="gt-wp-flow-tag" style="background: var(--gt-color-text-tertiary); margin-left: 4px">S 特定项目</span>
         </div>
         <div class="gt-wp-guide-list">
           <div
@@ -101,7 +108,7 @@
     <!-- 加载中 -->
     <div v-else-if="loading" class="gt-wp-empty-full">
       <el-icon class="is-loading" style="font-size: 28px; color: var(--gt-color-primary)"><Loading /></el-icon>
-      <div style="margin-top: 12px; font-size: 14px; color: #999">加载中...</div>
+      <div style="margin-top: 12px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text-tertiary)">加载中...</div>
     </div>
 
     <!-- 有数据时：左右分栏 -->
@@ -122,7 +129,7 @@
           <template #default="{ data }">
             <div class="gt-wp-tree-node">
               <span class="gt-wp-tree-node-label">{{ data.label }}</span>
-              <GtStatusTag v-if="data.status" :status-map="WP_STATUS" status-map-name="WP_STATUS" :value="data.status" class="gt-wp-tree-node-tag" />
+              <GtStatusTag v-if="data.status" dict-key="wp_status" :value="data.status" class="gt-wp-tree-node-tag" />
             </div>
           </template>
         </el-tree>
@@ -138,10 +145,10 @@
               <el-descriptions-item label="底稿名称">{{ selectedWp.wp_name }}</el-descriptions-item>
               <el-descriptions-item label="审计循环">{{ selectedWp.audit_cycle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="编制状态">
-                <el-tag size="small" :type="dictStore.type('wp_status', selectedWp.status)">{{ dictStore.label('wp_status', selectedWp.status) }}</el-tag>
+                <GtStatusTag dict-key="wp_status" :value="selectedWp.status" />
               </el-descriptions-item>
               <el-descriptions-item label="复核状态">
-                <el-tag size="small" :type="dictStore.type('wp_review_status', selectedWp.review_status)">{{ dictStore.label('wp_review_status', selectedWp.review_status) }}</el-tag>
+                <GtStatusTag dict-key="wp_review_status" :value="selectedWp.review_status" />
               </el-descriptions-item>
               <el-descriptions-item label="编制人">{{ resolveUserName(selectedWp.assigned_to) }}</el-descriptions-item>
               <el-descriptions-item label="复核人">{{ resolveUserName(selectedWp.reviewer) }}</el-descriptions-item>
@@ -503,8 +510,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import * as P from '@/services/apiPaths'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmForcePass } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
 import { Download, Monitor, Upload, Loading } from '@element-plus/icons-vue'
 import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
@@ -513,7 +522,8 @@ import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
-import { WP_STATUS, WP_REVIEW_STATUS } from '@/utils/statusMaps'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import { useDictStore } from '@/stores/dict'
 import {
   listWorkpaperAnnotations, createAnnotation, updateAnnotation,
@@ -530,6 +540,7 @@ import {
   assignWorkpaper,
   type WorkpaperDetail, type WpIndexItem, type QCResult,
 } from '@/services/workpaperApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -851,8 +862,8 @@ async function onConfirmAssign() {
     showAssignDialog.value = false
     // 刷新看板数据
     kanbanRef.value?.refresh()
-  } catch {
-    ElMessage.error('分配失败，请重试')
+  } catch (e: any) {
+    handleApiError(e, '分配')
   } finally {
     assignLoading.value = false
   }
@@ -991,7 +1002,7 @@ async function loadTsjReviewPrompts() {
     if (!accountName) { tsjReviewData.value = null; return }
 
     const { data } = await import('@/utils/http').then(m =>
-      m.default.get(`/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(accountName)}`, {
+      m.default.get(P.workpapers.wpMappingTsj(projectId.value, accountName), {
         validateStatus: (s: number) => s < 600,
       })
     )
@@ -1059,8 +1070,8 @@ async function onDownload() {
   if (!selectedWp.value) return
   try {
     await downloadWorkpaper(projectId.value, selectedWp.value.id)
-  } catch {
-    ElMessage.error('下载失败')
+  } catch (e: any) {
+    handleApiError(e, '下载')
   }
 }
 
@@ -1127,7 +1138,7 @@ async function doUploadStep1(forceOverwrite: boolean) {
       uploadConflict.value = err.response.data?.detail || err.response.data
       ElMessage.warning('版本冲突，请选择操作')
     } else {
-      ElMessage.error('上传失败')
+      handleApiError(err, '上传')
     }
   } finally {
     uploadLoading.value = false
@@ -1151,8 +1162,8 @@ async function doConfirmParsed() {
     eventBus.emit('workpaper:parsed', { projectId: projectId.value, wpId: pendingWpId.value })
     ElMessage.success(`底稿已上传（v${pendingNewVersion.value}），识别数据已写入`)
     pendingWpId.value = ''
-  } catch {
-    ElMessage.error('写入识别数据失败，请重试')
+  } catch (e: any) {
+    handleApiError(e, '写入识别数据')
   } finally {
     parseLoading.value = false
   }
@@ -1169,8 +1180,8 @@ async function onBatchDownload() {
   try {
     await downloadWorkpaperPack(projectId.value, selectedWpIds.value, true)
     ElMessage.success(`已下载 ${selectedWpIds.value.length} 个底稿`)
-  } catch {
-    ElMessage.error('批量下载失败')
+  } catch (e: any) {
+    handleApiError(e, '批量下载')
   } finally {
     downloadLoading.value = false
   }
@@ -1188,8 +1199,8 @@ async function onQCCheck() {
   try {
     qcResult.value = await runQCCheck(projectId.value, selectedWp.value.id)
     ElMessage.success('自检完成')
-  } catch {
-    ElMessage.error('自检失败')
+  } catch (e: any) {
+    handleApiError(e, '自检')
   } finally {
     qcLoading.value = false
   }
@@ -1255,7 +1266,7 @@ async function onSubmitReview() {
     } else {
       gateState.value = 'error'
       gateTraceId.value = detail?.trace_id || ''
-      ElMessage.error(detail?.message || detail || '提交失败')
+      handleApiError(err, '提交')
     }
   } finally {
     submitLoading.value = false
@@ -1303,7 +1314,7 @@ async function submitAnnotation() {
     showAddAnnotation.value = false
     newAnnotation.value = { content: '', priority: 'medium' }
     await loadAnnotations()
-  } catch { ElMessage.error('提交失败') }
+  } catch (e: any) { handleApiError(e, '提交') }
 }
 
 async function resolveAnnotation(id: string) {
@@ -1312,7 +1323,7 @@ async function resolveAnnotation(id: string) {
     ElMessage.success('已标记为解决')
     await loadAnnotations()
     await loadUnconfirmedAi()
-  } catch { ElMessage.error('操作失败') }
+  } catch (e: any) { handleApiError(e, '操作') }
 }
 
 // 回复批注
@@ -1333,7 +1344,7 @@ async function _submitReply() {
     ElMessage.success('回复已提交')
     showReplyDialog.value = false
     await loadAnnotations()
-  } catch { ElMessage.error('回复失败') }
+  } catch (e: any) { handleApiError(e, '回复') }
 }
 
 function onRejectClick() {
@@ -1355,7 +1366,7 @@ async function onConfirmReject() {
     await fetchData()
     await selectWorkpaperById(rejectingWpId.value)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '退回失败')
+    handleApiError(err, '退回')
   }
 }
 
@@ -1364,16 +1375,9 @@ async function onReviewPass() {
   // 强制检查：所有批注必须已解决
   if (unresolvedCount.value > 0) {
     try {
-      await ElMessageBox.confirm(
-        `当前有 ${unresolvedCount.value} 条未解决的复核意见，建议先处理后再通过复核。确定强制通过吗？`,
-        '复核确认',
-        {
-          type: 'warning',
-          confirmButtonText: '强制通过',
-          cancelButtonText: '返回处理',
-          confirmButtonClass: 'el-button--danger',
-        }
-      )
+      const result = await confirmForcePass('当前有 ' + unresolvedCount.value + ' 条未解决的复核意见，建议先处理后再通过复核。确定强制通过吗？')
+      // result.note 可用于记录强制通过原因（如需要）
+      void result
     } catch {
       return  // 用户选择返回处理
     }
@@ -1387,7 +1391,7 @@ async function onReviewPass() {
     await fetchData()
     await selectWorkpaperById(selectedWp.value.id)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '操作失败')
+    handleApiError(err, '操作')
   }
 }
 

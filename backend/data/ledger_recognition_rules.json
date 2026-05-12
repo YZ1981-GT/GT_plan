@@ -1,0 +1,358 @@
+{
+  "version": "2.1",
+  "table_signatures": {
+    "balance": {
+      "sheet_name_patterns": [
+        "(?i)(科目余额|余额表|试算平衡|总账|general\\s*ledger)",
+        "^TB\\s*[0-9]{4}"
+      ],
+      "key_columns": {
+        "account_code": {
+          "aliases": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code"],
+          "required": true,
+          "content_validator": "code"
+        },
+        "opening_balance": {
+          "aliases": ["年初余额", "期初余额"],
+          "required": false,
+          "alternatives": ["opening_debit+opening_credit"],
+          "content_validator": "numeric"
+        },
+        "closing_balance": {
+          "aliases": ["期末余额"],
+          "required": true,
+          "alternatives": ["closing_debit+closing_credit"],
+          "content_validator": "numeric"
+        },
+        "debit_amount": {
+          "aliases": ["借方金额", "本期借方", "借方发生额", "借方本期", "借方本期发生额", "本期借方发生额", "借方", "Debit", "DR"],
+          "required": true,
+          "content_validator": "numeric"
+        },
+        "credit_amount": {
+          "aliases": ["贷方金额", "本期贷方", "贷方发生额", "贷方本期", "贷方本期发生额", "本期贷方发生额", "贷方", "Credit", "CR"],
+          "required": true,
+          "content_validator": "numeric"
+        }
+      },
+      "recommended_columns": {
+        "account_name": {
+          "aliases": ["科目名称", "科目全名", "账户名称", "Account Name"],
+          "content_validator": "text"
+        },
+        "level": {
+          "aliases": ["级次", "科目级别", "Level"]
+        },
+        "company_code": {
+          "aliases": ["公司代码", "公司编码", "组织编码", "Company Code"]
+        },
+        "currency_code": {
+          "aliases": ["币种", "币别", "Currency"]
+        },
+        "accounting_period": {
+          "aliases": ["会计期间", "期间", "Period"]
+        },
+        "opening_debit": {
+          "aliases": ["年初借方", "期初借方", "期初借方余额"],
+          "content_validator": "numeric"
+        },
+        "opening_credit": {
+          "aliases": ["年初贷方", "期初贷方", "期初贷方余额"],
+          "content_validator": "numeric"
+        },
+        "closing_debit": {
+          "aliases": ["期末借方", "期末借方余额"],
+          "content_validator": "numeric"
+        },
+        "closing_credit": {
+          "aliases": ["期末贷方", "期末贷方余额"],
+          "content_validator": "numeric"
+        }
+      },
+      "content_signals": {
+        "numeric_columns_min": 4,
+        "has_date_column": false,
+        "has_direction_column": false
+      },
+      "negative_signals": ["voucher_date", "voucher_no"]
+    },
+    "ledger": {
+      "sheet_name_patterns": [
+        "(?i)(凭证|序时|日记账|明细账|detail\\s*ledger|journal)",
+        "^(1|2|3|4|5|6|7|8|9|10|11|12)月(凭证)?$"
+      ],
+      "key_columns": {
+        "voucher_date": {
+          "aliases": ["日期", "记账日期", "凭证日期", "制单日期", "业务日期"],
+          "required": true,
+          "content_validator": "date"
+        },
+        "voucher_no": {
+          "aliases": ["凭证号", "凭证字号", "凭证编号"],
+          "required": true
+        },
+        "account_code": {
+          "aliases": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code"],
+          "required": true,
+          "content_validator": "code"
+        },
+        "debit_amount": {
+          "aliases": ["借方金额", "借方", "借方发生额", "Debit", "DR"],
+          "required": true,
+          "content_validator": "numeric"
+        },
+        "credit_amount": {
+          "aliases": ["贷方金额", "贷方", "贷方发生额", "Credit", "CR"],
+          "required": true,
+          "content_validator": "numeric"
+        }
+      },
+      "recommended_columns": {
+        "summary": {
+          "aliases": ["摘要", "凭证摘要", "摘要说明", "Description"],
+          "content_validator": "text"
+        },
+        "preparer": {
+          "aliases": ["制单人", "制单", "经办人"],
+          "content_validator": "text"
+        },
+        "currency_code": {
+          "aliases": ["币种", "币别", "Currency"]
+        },
+        "voucher_type": {
+          "aliases": ["凭证类型", "凭证字", "字"]
+        },
+        "entry_seq": {
+          "aliases": ["分录号", "序号", "Line", "Line No", "Line Number"]
+        },
+        "company_code": {
+          "aliases": ["公司代码", "公司编码", "核算组织", "Company Code"]
+        },
+        "accounting_period": {
+          "aliases": ["会计期间", "期间", "Period"]
+        },
+        "account_name": {
+          "aliases": ["科目名称", "科目全名", "账户名称", "Account Name"],
+          "content_validator": "text"
+        }
+      },
+      "content_signals": {
+        "has_date_column": true,
+        "has_direction_column": true,
+        "numeric_columns_min": 2
+      },
+      "negative_signals": ["opening_balance", "closing_balance"]
+    },
+    "aux_balance": {
+      "sheet_name_patterns": [
+        "(?i)(辅助余额|核算项目余额|辅助核算.*余额)"
+      ],
+      "key_columns": {
+        "account_code": {
+          "aliases": ["科目编码", "科目代码", "账户编码"],
+          "required": true,
+          "content_validator": "code"
+        },
+        "opening_balance": {
+          "aliases": ["年初余额", "期初余额"],
+          "required": false,
+          "content_validator": "numeric"
+        },
+        "closing_balance": {
+          "aliases": ["期末余额"],
+          "required": true,
+          "content_validator": "numeric"
+        },
+        "debit_amount": {
+          "aliases": ["借方金额", "本期借方", "借方发生额", "借方"],
+          "required": true,
+          "content_validator": "numeric"
+        },
+        "credit_amount": {
+          "aliases": ["贷方金额", "本期贷方", "贷方发生额", "贷方"],
+          "required": true,
+          "content_validator": "numeric"
+        },
+        "aux_type": {
+          "aliases": ["辅助类型", "核算类型", "辅助核算类型"],
+          "required": true
+        },
+        "aux_code": {
+          "aliases": ["辅助编码", "核算项目编码", "辅助项目编码"],
+          "required": true
+        }
+      },
+      "recommended_columns": {
+        "aux_name": {
+          "aliases": ["辅助名称", "核算项目名称", "辅助项目名称"],
+          "content_validator": "text"
+        },
+        "account_name": {
+          "aliases": ["科目名称", "科目全名", "账户名称"],
+          "content_validator": "text"
+        },
+        "level": {
+          "aliases": ["级次", "科目级别"]
+        },
+        "currency_code": {
+          "aliases": ["币种", "币别"]
+        }
+      },
+      "content_signals": {
+        "numeric_columns_min": 4,
+        "has_date_column": false,
+        "has_direction_column": false
+      },
+      "negative_signals": ["voucher_date", "voucher_no"]
+    },
+    "aux_ledger": {
+      "sheet_name_patterns": [
+        "(?i)(辅助明细|核算项目.*明细|多维.*明细)"
+      ],
+      "key_columns": {
+        "voucher_date": {
+          "aliases": ["日期", "记账日期", "凭证日期", "制单日期"],
+          "required": true,
+          "content_validator": "date"
+        },
+        "voucher_no": {
+          "aliases": ["凭证号", "凭证字号", "凭证编号"],
+          "required": true
+        },
+        "account_code": {
+          "aliases": ["科目编码", "科目代码", "账户编码"],
+          "required": true,
+          "content_validator": "code"
+        },
+        "debit_amount": {
+          "aliases": ["借方金额", "借方", "借方发生额"],
+          "required": true,
+          "content_validator": "numeric"
+        },
+        "credit_amount": {
+          "aliases": ["贷方金额", "贷方", "贷方发生额"],
+          "required": true,
+          "content_validator": "numeric"
+        },
+        "aux_type": {
+          "aliases": ["辅助类型", "核算类型", "辅助核算类型"],
+          "required": true
+        },
+        "aux_code": {
+          "aliases": ["辅助编码", "核算项目编码", "辅助项目编码"],
+          "required": true
+        }
+      },
+      "recommended_columns": {
+        "aux_name": {
+          "aliases": ["辅助名称", "核算项目名称", "辅助项目名称"],
+          "content_validator": "text"
+        },
+        "summary": {
+          "aliases": ["摘要", "凭证摘要", "摘要说明"],
+          "content_validator": "text"
+        },
+        "preparer": {
+          "aliases": ["制单人", "制单", "经办人"]
+        },
+        "currency_code": {
+          "aliases": ["币种", "币别"]
+        },
+        "voucher_type": {
+          "aliases": ["凭证类型", "凭证字"]
+        },
+        "entry_seq": {
+          "aliases": ["分录号", "序号"]
+        },
+        "account_name": {
+          "aliases": ["科目名称", "科目全名", "账户名称"],
+          "content_validator": "text"
+        }
+      },
+      "content_signals": {
+        "has_date_column": true,
+        "has_direction_column": true,
+        "numeric_columns_min": 2
+      },
+      "negative_signals": ["opening_balance", "closing_balance"]
+    },
+    "account_chart": {
+      "sheet_name_patterns": [
+        "(?i)(科目表|账户表|chart\\s*of\\s*accounts)"
+      ],
+      "key_columns": {
+        "account_code": {
+          "aliases": ["科目编码", "科目代码", "账户编码", "科目编号"],
+          "required": true,
+          "content_validator": "code"
+        },
+        "account_name": {
+          "aliases": ["科目名称", "科目全名", "账户名称"],
+          "required": true,
+          "content_validator": "text"
+        }
+      },
+      "recommended_columns": {
+        "level": {
+          "aliases": ["级次", "科目级别", "Level"]
+        },
+        "category": {
+          "aliases": ["类别", "科目类别"]
+        },
+        "direction": {
+          "aliases": ["方向", "余额方向", "科目方向"]
+        }
+      },
+      "content_signals": {
+        "numeric_columns_min": 0,
+        "has_date_column": false,
+        "has_direction_column": true
+      },
+      "negative_signals": []
+    }
+  },
+  "matching_config": {
+    "exact_match_confidence": 95,
+    "fuzzy_match_confidence": 70,
+    "min_fuzzy_length": 3,
+    "levenshtein_max_distance": 2,
+    "min_levenshtein_length": 4,
+    "weights": {
+      "sheet_name": 0.2,
+      "header": 0.5,
+      "content": 0.3
+    },
+    "thresholds": {
+      "high_confidence": 80,
+      "medium_confidence": 60,
+      "low_confidence": 30
+    }
+  },
+  "column_aliases": {
+    "account_code": ["科目编码", "科目代码", "账户编码", "科目编号", "Account Code"],
+    "account_name": ["科目名称", "科目全名", "账户名称", "Account Name"],
+    "opening_balance": ["年初余额", "期初余额"],
+    "opening_debit": ["年初借方", "期初借方", "期初借方余额"],
+    "opening_credit": ["年初贷方", "期初贷方", "期初贷方余额"],
+    "debit_amount": ["借方金额", "本期借方", "借方发生额", "借方本期", "借方本期发生额", "本期借方发生额", "借方", "Debit", "DR"],
+    "credit_amount": ["贷方金额", "本期贷方", "贷方发生额", "贷方本期", "贷方本期发生额", "本期贷方发生额", "贷方", "Credit", "CR"],
+    "closing_balance": ["期末余额"],
+    "closing_debit": ["期末借方", "期末借方余额"],
+    "closing_credit": ["期末贷方", "期末贷方余额"],
+    "voucher_date": ["日期", "记账日期", "凭证日期", "制单日期", "业务日期"],
+    "voucher_no": ["凭证号", "凭证字号", "凭证编号"],
+    "voucher_type": ["凭证类型", "凭证字", "字"],
+    "summary": ["摘要", "凭证摘要", "摘要说明", "Description"],
+    "preparer": ["制单人", "制单", "经办人"],
+    "currency_code": ["币种", "币别", "Currency"],
+    "entry_seq": ["分录号", "序号", "Line", "Line No", "Line Number"],
+    "level": ["级次", "科目级别", "Level"],
+    "aux_type": ["辅助类型", "核算类型", "辅助核算类型"],
+    "aux_code": ["辅助编码", "核算项目编码", "辅助项目编码"],
+    "aux_name": ["辅助名称", "核算项目名称", "辅助项目名称"],
+    "category": ["类别", "科目类别"],
+    "direction": ["方向", "余额方向", "科目方向"],
+    "company_code": ["公司代码", "公司编码", "组织编码", "核算组织", "Company Code"],
+    "accounting_period": ["会计期间", "期间", "Period"]
+  }
+}

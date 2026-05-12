@@ -1,8 +1,7 @@
 <template>
   <div class="gt-settings">
-    <div class="gt-settings-header">
-      <h2>系统设置</h2>
-      <div class="gt-settings-actions">
+    <GtPageHeader title="系统设置" :show-back="false">
+      <template #actions>
         <el-switch
           v-model="expertMode"
           active-text="专家模式"
@@ -16,8 +15,8 @@
         <el-button size="small" type="primary" @click="loadSettings" :loading="loading">
           <el-icon><Refresh /></el-icon> 刷新
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 服务健康状态 -->
     <div v-if="healthResults" class="gt-health-bar">
@@ -149,6 +148,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Monitor, Refresh, Edit, Loading, InfoFilled } from '@element-plus/icons-vue'
 import { getSystemSettings, updateSystemSetting, getSystemHealth } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -466,7 +466,7 @@ async function saveEdit(key: string) {
       ElMessage.error(Object.values(res.rejected)[0] as string)
     }
   } catch (e: any) {
-    ElMessage.error(e.message || '更新失败')
+    handleApiError(e, '更新')
   } finally {
     saving.value = false
   }
@@ -480,7 +480,7 @@ async function loadSettings() {
     editableKeys.value = res.editable_keys || []
     jwtSecure.value = res.jwt_secure !== false
   } catch (e: any) {
-    ElMessage.error('加载配置失败: ' + (e.message || ''))
+    handleApiError(e, '加载配置')
   } finally {
     loading.value = false
   }
@@ -491,8 +491,8 @@ async function checkHealth() {
   try {
     const res = await getSystemHealth()
     healthResults.value = res.services || {}
-  } catch {
-    ElMessage.error('服务检测失败')
+  } catch (e: any) {
+    handleApiError(e, '服务检测')
   } finally {
     healthLoading.value = false
   }

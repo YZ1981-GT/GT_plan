@@ -1,17 +1,22 @@
 <template>
   <div class="gt-aux-summary gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">辅助余额表汇总匹配</h2>
-      <el-input-number v-model="year" :min="2020" :max="2030" @change="fetch" style="width: 120px" />
-    </div>
+    <GtPageHeader title="辅助余额表汇总匹配" :show-back="false">
+      <template #actions>
+        <el-input-number v-model="year" :min="2020" :max="2030" @change="fetch" style="width: 120px" />
+      </template>
+    </GtPageHeader>
     <el-table :data="items" stripe :row-class-name="rowClass">
       <el-table-column prop="account_code" label="科目编码" width="120" />
       <el-table-column prop="account_name" label="科目名称" />
       <el-table-column prop="tb_balance" label="科目余额" width="140" align="right">
-        <template #default="{ row }">{{ fmtAmount(row.tb_balance) }}</template>
+        <template #default="{ row }">
+          <span class="gt-link gt-amt" @click="penetrate.toLedger(row.account_code)">{{ fmtAmount(row.tb_balance) }}</span>
+        </template>
       </el-table-column>
       <el-table-column prop="aux_summary" label="辅助汇总" width="140" align="right">
-        <template #default="{ row }">{{ fmtAmount(row.aux_summary) }}</template>
+        <template #default="{ row }">
+          <span class="gt-link gt-amt" @click="penetrate.toLedger(row.account_code)">{{ fmtAmount(row.aux_summary) }}</span>
+        </template>
       </el-table-column>
       <el-table-column prop="diff" label="差异" width="120" align="right">
         <template #default="{ row }">
@@ -34,7 +39,10 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { auxSummary } from '@/services/commonApi'
 import { fmtAmount } from '@/utils/formatters'
+import { usePenetrate } from '@/composables/usePenetrate'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 const route = useRoute()
+const penetrate = usePenetrate()
 const projectId = ref(route.params.projectId as string || '')
 const year = ref(2025)
 const items = ref<any[]>([])
@@ -44,7 +52,6 @@ onMounted(fetch)
 </script>
 <style scoped>
 .gt-aux-summary { padding: var(--gt-space-4); }
-.gt-page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--gt-space-3); }
 .gt-summary-stats { margin-top: var(--gt-space-2); font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
 :deep(.gt-row-mismatch) { background-color: #fff1f0 !important; }
 </style>

@@ -4,7 +4,7 @@ Validates: Requirements 4.3, 4.4, 4.5, 4.6, 4.21, 4.22, 4.23
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import BinaryIO
 from uuid import UUID
@@ -87,7 +87,7 @@ async def start_import(
         file_name=file.filename,
         data_type=data_type,
         status=ImportStatus.processing,
-        started_at=datetime.utcnow(),
+        started_at=datetime.now(timezone.utc),
     )
     db.add(batch)
     await db.flush()
@@ -101,7 +101,7 @@ async def start_import(
         if not parsed_data:
             batch.status = ImportStatus.failed
             batch.validation_summary = {"error": "文件中未解析到有效数据"}
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc)
             await db.commit()
             raise HTTPException(status_code=400, detail="文件中未解析到有效数据")
 
@@ -130,7 +130,7 @@ async def start_import(
 
         if not validation_result.passed:
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc)
             await db.commit()
             # Return the batch with failure info rather than raising
             return batch
@@ -147,7 +147,7 @@ async def start_import(
                     "existing_count": existing_count,
                     "duplicate_action_required": True,
                 }
-                batch.completed_at = datetime.utcnow()
+                batch.completed_at = datetime.now(timezone.utc)
                 await db.commit()
                 return batch
             elif on_duplicate == "overwrite":
@@ -182,7 +182,7 @@ async def start_import(
         # 7. Update batch status
         batch.record_count = record_count
         batch.status = ImportStatus.completed
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
         await db.commit()
 
         # 8. Publish data imported event
@@ -204,7 +204,7 @@ async def start_import(
         logger.exception("Import failed: %s", e)
         batch.status = ImportStatus.failed
         batch.validation_summary = {"error": str(e)}
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
         await db.commit()
         raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
 
@@ -231,7 +231,7 @@ async def get_import_progress(
 
     elapsed = 0.0
     if batch.started_at:
-        end = batch.completed_at or datetime.utcnow()
+        end = batch.completed_at or datetime.now(timezone.utc)
         elapsed = (end - batch.started_at).total_seconds()
 
     # Extract warnings from validation summary
@@ -324,16 +324,36 @@ async def queue_unmapped(project_id: UUID, db: AsyncSession) -> list[str]:
     Validates: Requirements 4.22
     """
     from app.models.audit_platform_models import AccountMapping
+    from app.models.dataset_models import DatasetStatus, LedgerDataset
+    from app.services.dataset_query import get_active_filter
+
+    # 查找最新 active 年度
+    year_result = await db.execute(
+        select(LedgerDataset.year).where(
+            LedgerDataset.project_id == project_id,
+            LedgerDataset.status == DatasetStatus.active,
+        ).order_by(LedgerDataset.year.desc()).limit(1)
+    )
+    active_year = year_result.scalar_one_or_none()
 
     # Get all account codes from tb_balance
-    balance_result = await db.execute(
-        select(TbBalance.account_code)
-        .where(
-            TbBalance.project_id == project_id,
-            TbBalance.is_deleted == False,  # noqa: E712
+    if active_year is not None:
+        balance_result = await db.execute(
+            select(TbBalance.account_code)
+            .where(
+                await get_active_filter(db, TbBalance.__table__, project_id, active_year, current_user_id=None),  # F41: 内部服务调用，显式 opt-out
+            )
+            .distinct()
         )
-        .distinct()
-    )
+    else:
+        # 无 active 数据集时降级为 project_id 过滤
+        balance_result = await db.execute(
+            select(TbBalance.account_code)
+            .where(
+                TbBalance.project_id == project_id,
+            )
+            .distinct()
+        )
     balance_codes = {row[0] for row in balance_result.all()}
 
     # Get all mapped codes
@@ -380,7 +400,7 @@ async def rollback_import(batch_id: UUID, db: AsyncSession) -> ImportBatch:
 
     batch.status = ImportStatus.rolled_back
     batch.record_count = 0
-    batch.completed_at = datetime.utcnow()
+    batch.completed_at = datetime.now(timezone.utc)
     await db.commit()
 
     # Publish import rolled back event
@@ -415,11 +435,10 @@ async def _load_balance_data(
     project_id: UUID, year: int, db: AsyncSession
 ) -> list[dict]:
     """Load existing balance data for cross-table validation."""
+    from app.services.dataset_query import get_active_filter
     result = await db.execute(
         select(TbBalance).where(
-            TbBalance.project_id == project_id,
-            TbBalance.year == year,
-            TbBalance.is_deleted == False,  # noqa: E712
+            await get_active_filter(db, TbBalance.__table__, project_id, year, current_user_id=None),  # F41: 内部校验调用，显式 opt-out
         )
     )
     rows = result.scalars().all()
@@ -652,7 +671,7 @@ async def start_import_streaming(
         file_name=file_name or "streaming_import",
         data_type=data_type,
         status=ImportStatus.processing,
-        started_at=datetime.utcnow(),
+        started_at=datetime.now(timezone.utc),
     )
     if batch_id:
         batch.id = batch_id
@@ -672,7 +691,7 @@ async def start_import_streaming(
                     "existing_count": existing_count,
                     "duplicate_action_required": True,
                 }
-                batch.completed_at = datetime.utcnow()
+                batch.completed_at = datetime.now(timezone.utc)
                 await db.commit()
                 return batch
             if on_duplicate == "overwrite":
@@ -714,7 +733,7 @@ async def start_import_streaming(
 
         batch.record_count = total_rows
         batch.status = ImportStatus.completed
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
         await db.commit()
 
         # 发布导入完成事件
@@ -738,7 +757,7 @@ async def start_import_streaming(
             pass
         batch.status = ImportStatus.failed
         batch.validation_summary = {"error": str(e)}
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
         db.add(batch)
         await db.commit()
         raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")

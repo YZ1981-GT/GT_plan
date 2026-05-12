@@ -1,34 +1,25 @@
 <template>
-  <div class="gt-misstatements gt-fade-in">
-    <!-- 页面横幅 -->
-    <div class="gt-ms-banner">
-      <div class="gt-ms-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-ms-title">未更正错报汇总</h2>
-        <div class="gt-ms-info-bar">
-          <div class="gt-ms-info-item">
-            <span class="gt-ms-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-ms-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-ms-info-sep" />
-          <div class="gt-ms-info-item">
-            <span class="gt-ms-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-ms-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-ms-info-sep" />
-          <div class="gt-ms-info-item">
-            <span class="gt-ms-info-badge">累计错报 vs 重要性水平</span>
-          </div>
-        </div>
-      </div>
-      <div class="gt-ms-banner-row2">
-        <el-button size="small" @click="openCreateDialog">+ 新增错报</el-button>
-      </div>
-    </div>
+  <div class="gt-misstatements gt-fade-in" :class="{ 'gt-fullscreen': isFullscreen }">
+    <!-- 页面横幅 [R7-S3-01] -->
+    <GtPageHeader title="未更正错报汇总" @back="router.push('/projects')">
+      <GtInfoBar
+        :show-unit="true"
+        :show-year="true"
+        :unit-value="selectedProjectId"
+        :year-value="selectedYear"
+        :badges="[{ value: '累计错报 vs 重要性水平' }]"
+        @unit-change="onProjectChange"
+        @year-change="onYearChange"
+      />
+      <template #actions>
+        <GtToolbar>
+          <template #left>
+            <el-button size="small" type="primary" @click="openCreateDialog">+ 新增错报</el-button>
+            <el-button size="small" plain @click="toggleFullscreen">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <!-- 重要性水平对比卡片 -->
     <div class="gt-ms-materiality-cards" v-if="summary">
@@ -69,7 +60,7 @@
       <el-table :data="summary.by_type" border size="small" style="margin-bottom: 16px">
         <el-table-column label="错报类型" width="150">
           <template #default="{ row }">
-            <el-tag :type="typeTagType(row.misstatement_type)" size="small">
+            <el-tag :type="(typeTagType(row.misstatement_type)) || undefined" size="small">
               {{ typeLabel(row.misstatement_type) }}
             </el-tag>
           </template>
@@ -91,11 +82,11 @@
         点击"新增"手动录入，或在调整分录页面驳回 AJE 时自动生成。累计金额超过重要性水平时系统会预警。
       </div>
     </el-alert>
-    <el-table :data="items" v-loading="loading" border stripe style="width: 100%">
+    <el-table ref="msTableRef" :data="items" v-loading="loading" border stripe style="width: 100%">
       <el-table-column prop="misstatement_description" label="错报描述" min-width="200" show-overflow-tooltip />
       <el-table-column label="类型" width="100">
         <template #default="{ row }">
-          <el-tag :type="typeTagType(row.misstatement_type)" size="small">
+          <el-tag :type="(typeTagType(row.misstatement_type)) || undefined" size="small">
             {{ typeLabel(row.misstatement_type) }}
           </el-tag>
         </template>
@@ -103,7 +94,9 @@
       <el-table-column prop="affected_account_code" label="科目编码" width="120" />
       <el-table-column prop="affected_account_name" label="科目名称" width="140" show-overflow-tooltip />
       <el-table-column label="金额" width="130" align="right">
-        <template #default="{ row }">{{ fmtAmt(row.misstatement_amount) }}</template>
+        <template #default="{ row }">
+          <GtAmountCell :value="row.misstatement_amount" :clickable="true" @click="penetrate.toLedger(row.affected_account_code)" />
+        </template>
       </el-table-column>
       <el-table-column label="结转" width="70" align="center">
         <template #default="{ row }">
@@ -161,9 +154,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
+import { usePasteImport } from '@/composables/usePasteImport'
+import { usePenetrate } from '@/composables/usePenetrate'
+import { useFullscreen } from '@/composables/useFullscreen'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import {
   listMisstatements, createMisstatement, updateMisstatement,
   deleteMisstatement, getMisstatementSummary,
@@ -171,9 +171,14 @@ import {
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
 import { fmtAmount } from '@/utils/formatters'
+import { eventBus } from '@/utils/eventBus'
+import { api } from '@/services/apiProxy'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
 
 const route = useRoute()
 const router = useRouter()
+const penetrate = usePenetrate()
+const { isFullscreen, toggleFullscreen } = useFullscreen()
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
 
 const {
@@ -185,6 +190,32 @@ const loading = ref(false)
 const submitLoading = ref(false)
 const items = ref<MisstatementItem[]>([])
 const summary = ref<MisstatementSummaryData | null>(null)
+
+// R7 技术债 5：粘贴入库
+const msTableRef = ref<HTMLElement | null>(null)
+usePasteImport({
+  containerRef: msTableRef,
+  columns: [
+    { key: 'misstatement_description', label: '错报描述' },
+    { key: 'misstatement_type', label: '类型' },
+    { key: 'affected_account_code', label: '科目编码' },
+    { key: 'misstatement_amount', label: '金额' },
+  ],
+  onInsert: async (rows) => {
+    for (const r of rows) {
+      await createMisstatement(projectId.value, {
+        misstatement_type: r.misstatement_type || 'factual',
+        misstatement_description: r.misstatement_description || '',
+        affected_account_code: r.affected_account_code || '',
+        affected_account_name: '',
+        misstatement_amount: String(parseFloat(r.misstatement_amount) || 0),
+        year: year.value,
+      })
+    }
+    fetchItems()
+    fetchSummary()
+  },
+})
 
 const formVisible = ref(false)
 const isEditing = ref(false)
@@ -206,8 +237,8 @@ function typeLabel(t: string) {
   return m[t] || t
 }
 
-function typeTagType(t: string) {
-  const m: Record<string, string> = { factual: 'danger', judgmental: 'warning', projected: 'info' }
+function typeTagType(t: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { factual: 'danger', judgmental: 'warning', projected: 'info' }
   return m[t] || 'info'
 }
 
@@ -279,7 +310,7 @@ async function onSubmit() {
 }
 
 async function onDelete(row: MisstatementItem) {
-  await ElMessageBox.confirm('确定删除该错报记录？', '确认')
+  await confirmDelete('该错报记录')
   await deleteMisstatement(projectId.value, row.id)
   ElMessage.success('删除成功')
   fetchItems()
@@ -291,7 +322,24 @@ onMounted(() => {
   fetchItems()
   fetchSummary()
   loadProjectOptions()
+  // R8-S2-13：订阅重要性变更事件，自动刷新阈值和列表
+  eventBus.on('materiality:changed', onMaterialityChanged)
 })
+
+onUnmounted(() => {
+  eventBus.off('materiality:changed', onMaterialityChanged)
+})
+
+async function onMaterialityChanged(payload: { projectId: string; year?: number }) {
+  if (payload.projectId !== projectId.value) return
+  // R8 复盘修正：除了重新拉列表，还要调后端 recheck-threshold 触发重新评估
+  try {
+    const { misstatements: P_ms } = await import('@/services/apiPaths')
+    await api.post(P_ms.recheckThreshold(projectId.value) + `?year=${year.value}`)
+  } catch { /* 后端端点异常不阻塞 UI 刷新 */ }
+  await Promise.all([fetchItems(), fetchSummary()])
+  ElMessage.info('重要性水平已变更，错报阈值已重新评估')
+}
 </script>
 
 <style scoped>

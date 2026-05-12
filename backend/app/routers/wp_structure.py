@@ -90,8 +90,8 @@ async def save_structure(
 
     # 版本递增
     wp.file_version = (wp.file_version or 0) + 1
-    from datetime import datetime
-    wp.updated_at = datetime.utcnow()
+    from datetime import datetime, timezone
+    wp.updated_at = datetime.now(timezone.utc)
     await db.flush()
     await db.commit()
 

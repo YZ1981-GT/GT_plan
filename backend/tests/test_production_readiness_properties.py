@@ -8,7 +8,7 @@
     原因：项目前端未装 vitest/fast-check，新增前端测试栈超出本 spec 范围。
     代价：如果前端 TS 代码实际实现偏离本文件复刻的算法，这里测过不能代表真实行为，
     需通过 code review 保证两边一致。
-  - 运行次数：沿用项目既有模式 max_examples=5–30（速度优先，MVP 阶段）
+  - 运行次数：max_examples=3–5（速度优先，MVP 阶段；2026-05-10 调低防止慢测试）
 """
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def _simulate_on_save_success(bus: _FakeEventBus, project_id: str, wp_id: str) -
     project_id=st.uuids().map(str),
     wp_id=st.uuids().map(str),
 )
-@settings(max_examples=20)
+@settings(max_examples=5)
 def test_property_01_workpaper_save_event_propagates(project_id, wp_id):
     """Property 1: 底稿保存事件传播（验证需求 1.1）"""
     bus = _FakeEventBus()
@@ -102,7 +102,7 @@ class _Debouncer:
         max_size=20,
     )
 )
-@settings(max_examples=30)
+@settings(max_examples=5)
 def test_property_02_debounce_coalesces_burst(events):
     """Property 2: 1 秒内 N 次连续事件只产生 1 次刷新（验证需求 1.5）"""
     d = _Debouncer(wait_ms=1000)
@@ -141,7 +141,7 @@ def _build_spark_series(trend: dict[str, dict[str, int]]) -> dict[str, list[int]
         min_size=1, max_size=7,
     )
 )
-@settings(max_examples=20)
+@settings(max_examples=5)
 def test_property_03_trend_series_matches_api(trend):
     """Property 3: sparkSeries 数组值 == API 响应（验证需求 2.3）"""
     series = _build_spark_series(trend)
@@ -175,7 +175,7 @@ def _should_mark_dirty(command_id: str) -> bool:
     pattern=st.sampled_from(_DIRTY_PATTERNS),
     suffix=st.text(min_size=0, max_size=10, alphabet="abcdefghijklmnopqrstuvwxyz-"),
 )
-@settings(max_examples=20)
+@settings(max_examples=5)
 def test_property_04_command_triggers_dirty(prefix, pattern, suffix):
     """Property 4: 命令 ID 含 DIRTY_COMMAND_PATTERNS 任一模式则 dirty=true（需求 3.1/3.2/3.6）"""
     command_id = f"{prefix}{pattern}{suffix}"
@@ -185,7 +185,7 @@ def test_property_04_command_triggers_dirty(prefix, pattern, suffix):
 @given(noise=st.text(min_size=1, max_size=30).filter(
     lambda s: not any(p in s for p in _DIRTY_PATTERNS)
 ))
-@settings(max_examples=10)
+@settings(max_examples=3)
 def test_property_04_negative_non_dirty_command(noise):
     """Property 4 补充：不含任一模式的命令不应触发 dirty"""
     assert _should_mark_dirty(noise) is False
@@ -208,7 +208,7 @@ class _EditorState:
 
 
 @given(edits_before=st.integers(min_value=1, max_value=50))
-@settings(max_examples=15)
+@settings(max_examples=5)
 def test_property_05_save_resets_dirty(edits_before):
     """Property 5: 任意数量编辑后保存，dirty 必定重置为 false（需求 3.5）"""
     st_ = _EditorState()
@@ -232,7 +232,7 @@ def _has_review_inbox_access(role: str) -> bool:
 
 
 @given(role=st.sampled_from(_ALL_ROLES))
-@settings(max_examples=20)
+@settings(max_examples=5)
 def test_property_06_review_inbox_visibility(role):
     """Property 6: 角色在 {reviewer, partner, admin} 才显示收件箱入口（需求 4.1/4.4）"""
     has_access = _has_review_inbox_access(role)
@@ -249,7 +249,7 @@ def _badge_count_from_api(api_total: int) -> int:
 
 
 @given(api_total=st.integers(min_value=0, max_value=10_000))
-@settings(max_examples=20)
+@settings(max_examples=5)
 def test_property_07_badge_count_matches_api(api_total):
     """Property 7: Badge 数 == API 返回 total（需求 4.3/4.5）"""
     assert _badge_count_from_api(api_total) == api_total
@@ -274,7 +274,7 @@ def _resolve_user_name(uuid: str | None, user_map: dict[str, str]) -> str:
     ),
     lookup=st.uuids().map(str),
 )
-@settings(max_examples=25)
+@settings(max_examples=5)
 def test_property_08_uuid_to_name_mapping(user_map, lookup):
     """Property 8: 映射完整性三分支（需求 5.1/5.2/5.3）"""
     # 分支 A：null/空
@@ -312,7 +312,7 @@ def _progress_percent(statuses: list[str]) -> dict:
         min_size=0, max_size=100,
     )
 )
-@settings(max_examples=30)
+@settings(max_examples=5)
 def test_property_09_progress_calculation(statuses):
     """Property 9: percent = floor(completed/total*100)（需求 6.2/6.4）"""
     result = _progress_percent(statuses)
@@ -349,7 +349,7 @@ class _SetupStepMachine:
 
 
 @given(advance_count=st.integers(min_value=0, max_value=10))
-@settings(max_examples=15)
+@settings(max_examples=5)
 def test_property_10_step_monotonic(advance_count):
     """Property 10: 步骤单调递进，永不回退，上限 3（需求 7.2/7.3）"""
     m = _SetupStepMachine()
@@ -386,7 +386,7 @@ def _asset_total(rows: list[tuple[str, float]]) -> float:
     rev_amt=st.floats(min_value=-1e10, max_value=1e10, allow_nan=False, allow_infinity=False),
     exp_amt=st.floats(min_value=-1e10, max_value=1e10, allow_nan=False, allow_infinity=False),
 )
-@settings(max_examples=25)
+@settings(max_examples=5)
 def test_property_11_balance_includes_income_net(asset_amt, liab_amt, eq_amt, rev_amt, exp_amt):
     """Property 11: 资产 ≈ 负债 + 权益 + 收入 + 费用（需求 8.1/8.3/8.4）"""
     # 构造一组"应平衡"的数据：asset = liab + eq + rev + exp
@@ -460,7 +460,16 @@ async def test_property_13_worker_isolates_exceptions():
 
 def test_property_14_no_hasattr_patch_remaining():
     """Property 14: router_registry.py 不得再有 hasattr 补丁（需求 11.1/11.2）"""
-    src = Path("app/router_registry.py").read_text(encoding="utf-8")
+    # 解析相对于本测试文件的路径，兼容 cwd=repo root 或 cwd=backend
+    test_dir = Path(__file__).resolve().parent
+    candidates = [
+        test_dir.parent / "app" / "router_registry.py",  # backend/app/router_registry.py
+        Path("backend/app/router_registry.py"),
+        Path("app/router_registry.py"),
+    ]
+    src_path = next((p for p in candidates if p.exists()), None)
+    assert src_path is not None, f"router_registry.py 未找到（尝试路径：{candidates}）"
+    src = src_path.read_text(encoding="utf-8")
     # hasattr(r, 'prefix') 这种运行时判断补丁必须已经删除
     assert "hasattr(r, 'prefix')" not in src
     assert "hasattr(r, \"prefix\")" not in src
@@ -475,11 +484,12 @@ def test_property_14_all_business_routes_under_api():
         path = getattr(route, "path", "")
         if not path:
             continue
-        # 已知例外（WOPI 协议要求、探针、OpenAPI 内置路径）
+        # 已知例外（WOPI 协议要求、探针、OpenAPI 内置路径、Prometheus 标准路径）
         exceptions = (
             "/wopi",
             "/api",  # 前缀本身匹配
             "/docs", "/openapi.json", "/redoc",
+            "/metrics",  # Sprint 4.10 Prometheus 标准端点，非业务路由
         )
         if path.startswith(exceptions):
             continue

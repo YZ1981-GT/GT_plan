@@ -6,7 +6,7 @@ Phase 8 Task 7: 数据校验增强
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -30,7 +30,7 @@ class ValidationFinding:
         self.message = message
         self.details = details or {}
         self.fix_suggestion = fix_suggestion
-        self.created_at = datetime.utcnow().isoformat()
+        self.created_at = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -319,10 +319,14 @@ class DataValidationEngine:
             from sqlalchemy import text
             # 检查异常大金额（超过 10 亿）
             stmt = text("""
-                SELECT account_code, account_name, closing_balance
-                FROM tb_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                    AND ABS(closing_balance) > 1000000000
+                SELECT b.account_code, b.account_name, b.closing_balance
+                FROM tb_balance b
+                WHERE b.project_id = :pid AND b.year = :year
+                    AND EXISTS (
+                      SELECT 1 FROM ledger_datasets d
+                      WHERE d.id = b.dataset_id AND d.status = 'active'
+                    )
+                    AND ABS(b.closing_balance) > 1000000000
                 LIMIT 10
             """)
             result = await self.db.execute(stmt, {"pid": str(project_id), "year": year})

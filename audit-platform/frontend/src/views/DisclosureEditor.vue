@@ -52,6 +52,22 @@
       </template>
     </GtPageHeader>
 
+    <!-- R8-S2-03：Stale 状态横幅 -->
+    <div v-if="stale.isStale.value" class="gt-stale-banner">
+      <span class="gt-stale-icon">⚠️</span>
+      <span class="gt-stale-text">
+        上游数据已变更（{{ stale.staleCount.value }} 张底稿待重算），附注数据可能过时
+      </span>
+      <el-button size="small" type="primary" :loading="stale.loading.value" @click="onStaleRecalc">
+        🔄 点击重算
+      </el-button>
+    </div>
+
+    <!-- 编辑锁提示 -->
+    <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
+      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
+    </el-alert>
+
     <div class="gt-de-body">
       <!-- 左侧：目录树 -->
       <div class="gt-de-sidebar">
@@ -274,7 +290,7 @@
         <div v-for="(f, fi) in validationFindings" :key="fi" class="gt-de-finding-item"
           :class="'gt-de-severity-' + f.severity">
           <div class="gt-de-finding-header">
-            <el-tag :type="severityTagType(f.severity)" size="small">{{ f.severity }}</el-tag>
+            <el-tag :type="(severityTagType(f.severity)) || undefined" size="small">{{ f.severity }}</el-tag>
             <span class="gt-de-finding-type">{{ f.check_type }}</span>
           </div>
           <div class="gt-de-finding-section">{{ f.note_section }} {{ f.table_name }}</div>
@@ -363,7 +379,7 @@
     />
   </div>
 
-  <!-- 右键菜单（统一组件） -->
+  <!-- 右键菜单（统一组件 + 查看相关底稿） -->
   <CellContextMenu
     :visible="deCtx.contextMenu.visible"
     :x="deCtx.contextMenu.x"
@@ -375,7 +391,16 @@
     @formula="onDeCtxFormula"
     @sum="onDeCtxSum"
     @compare="onDeCtxCompare"
-  />
+  >
+    <!-- R8-S2-12：查看相关底稿 -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxRelatedWp">
+      <span class="gt-ucell-ctx-icon">📝</span> 查看相关底稿
+    </div>
+    <!-- R9-F5：穿透到序时账 -->
+    <div class="gt-ucell-ctx-item" @click="onDeCtxPenetrateToLedger">
+      <span class="gt-ucell-ctx-icon">📊</span> 穿透到序时账
+    </div>
+  </CellContextMenu>
 
   <!-- 知识库文档选择弹窗 [R3.7] -->
   <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
@@ -383,8 +408,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import * as P from '@/services/apiPaths'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useCellSelection } from '@/composables/useCellSelection'
+import { usePenetrate } from '@/composables/usePenetrate'
 import { useEditMode } from '@/composables/useEditMode'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -392,6 +419,7 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
+import { confirmLeave } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
@@ -419,6 +447,10 @@ import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge
 import { useAutoSave } from '@/composables/useAutoSave'
 import { withLoading } from '@/composables/useLoading'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
+import { useEditingLock } from '@/composables/useEditingLock'
+import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
+import { useProjectEvents } from '@/composables/useProjectEvents'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -429,6 +461,39 @@ const year = computed(() => {
   const qy = Number(route.query.year)
   return (Number.isFinite(qy) && qy > 2000) ? qy : projectStore.year
 })
+
+// ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
+const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
+onDatasetActivated(() => fetchTree())
+onDatasetRolledBack(() => fetchTree())
+
+// R8-S2-03：Stale 状态追踪
+import { useStaleStatus } from '@/composables/useStaleStatus'
+const stale = useStaleStatus(projectId)
+async function onStaleRecalc() {
+  await stale.recalc()
+  await fetchTree()
+}
+
+const editLock = useEditingLock({
+  resourceId: computed(() => 'disclosure_' + (route.params.projectId as string || '')),
+  resourceType: 'other',  // 附注无后端锁端点，降级为前端检测
+  autoAcquire: false,
+})
+
+// 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
+watch(() => editMode.value, async (editing) => {
+  if (editing) await editLock.acquire()
+  else editLock.release()
+})
+watch(() => editLock.isMine.value, (mine) => {
+  if (!mine && editMode.value) exitEdit()
+})
+
+// R7-S2-05：后端定时自动保存（2 分钟间隔）
+const autoSave = useWorkpaperAutoSave(async () => {
+  await onSave()
+}, 120_000)
 
 // 单位切换 — 使用 projectStore
 const selectedProjectId = ref('')
@@ -551,7 +616,7 @@ const editor = useEditor({
     Placeholder.configure({ placeholder: '请输入附注文字内容...' }),
   ],
   content: '',
-  onUpdate: ({ editor: e }) => { textContent.value = e.getHTML(); if (editMode.value) markEditDirty() },
+  onUpdate: ({ editor: e }) => { textContent.value = e.getHTML(); if (editMode.value) { markEditDirty(); autoSave.markDirty() } },
 })
 
 onBeforeUnmount(() => { editor.value?.destroy() })
@@ -634,7 +699,7 @@ async function onAiContinueWrite() {
       ElMessage.success('续写完成')
     }
   } catch (e: any) {
-    ElMessage.error('续写失败: ' + (e.message || '未知错误'))
+    handleApiError(e, 'AI续写')
   } finally {
     aiLoading.value = false
   }
@@ -667,7 +732,7 @@ async function onAiRewriteConfirm() {
       ElMessage.success('改写完成')
     }
   } catch (e: any) {
-    ElMessage.error('改写失败: ' + (e.message || '未知错误'))
+    handleApiError(e, 'AI改写')
   } finally {
     aiLoading.value = false
     aiRewriteDialogVisible.value = false
@@ -687,7 +752,7 @@ async function onAiGeneratePolicy() {
       ElMessage.success(`会计政策已生成（参照${res.reference_count}篇文档）`)
     }
   } catch (e: any) {
-    ElMessage.error('生成失败: ' + (e.message || '未知错误'))
+    handleApiError(e, '生成会计政策')
   } finally {
     aiLoading.value = false
   }
@@ -705,7 +770,7 @@ async function onAiGenerateAnalysis() {
       ElMessage.success('变动分析已生成')
     }
   } catch (e: any) {
-    ElMessage.error('生成失败: ' + (e.message || '未知错误'))
+    handleApiError(e, '生成变动分析')
   } finally {
     aiLoading.value = false
   }
@@ -1005,8 +1070,9 @@ function _getPriorYearValue(_row: any, rowIndex: number): any {
   return values[0] ?? null
 }
 
-function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number) {
+function onCellValueChange(rowIndex: number, colIndex: number, _newValue: number | undefined) {
   markEditDirty()
+  autoSave.markDirty()
   if (!currentNote.value?.table_data?.rows) return
   const rows = currentNote.value.table_data.rows
   const totalRowIndex = rows.findIndex((r: any) => r.is_total)
@@ -1057,7 +1123,7 @@ async function onRefreshFromWP() {
     await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     ElMessage.success('已从底稿刷新数据')
     if (currentNote.value) await fetchDetail(currentNote.value.note_section)
-  } catch { ElMessage.error('刷新失败') }
+  } catch (e) { handleApiError(e, '刷新附注') }
   finally { refreshLoading.value = false }
 }
 
@@ -1082,9 +1148,9 @@ async function onManualRefresh() {
     await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     if (currentNote.value) await fetchDetail(currentNote.value.note_section)
     ElMessage.success('手动刷新成功')
-  } catch {
+  } catch (e) {
     syncError.value = true
-    ElMessage.error('刷新失败，请稍后重试')
+    handleApiError(e, '刷新附注')
   }
 }
 
@@ -1129,7 +1195,7 @@ async function onClearAllFormulas() {
   try {
     const { default: http } = await import('@/utils/http')
     await http.post(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/${currentNote.value.note_section}/clear-formulas`
+      P.disclosureNotes.clearFormulas(projectId.value, year.value, currentNote.value.note_section)
     )
     ElMessage.success('公式已清除，所有单元格切换为手动编辑模式')
     await fetchDetail(currentNote.value.note_section)
@@ -1155,8 +1221,8 @@ async function onRestoreAutoMode() {
     await refreshDisclosureFromWorkpapers(projectId.value, year.value)
     ElMessage.success('已恢复自动提数模式')
     await fetchDetail(currentNote.value.note_section)
-  } catch {
-    ElMessage.error('恢复失败')
+  } catch (e: any) {
+    handleApiError(e, '恢复')
   }
 }
 
@@ -1165,7 +1231,7 @@ async function onExportWord() {
   try {
     const { default: http } = await import('@/utils/http')
     const resp = await http.post(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/export-word`,
+      P.disclosureNotes.exportWord(projectId.value, year.value),
       {},
       { responseType: 'blob' }
     )
@@ -1179,12 +1245,12 @@ async function onExportWord() {
     URL.revokeObjectURL(url)
     ElMessage.success('附注 Word 导出成功')
   } catch (e: any) {
-    ElMessage.error('导出失败：' + (e?.message || '请稍后重试'))
+    handleApiError(e, '导出附注 Word')
   } finally { exportLoading.value = false }
 }
 
-function severityTagType(s: string) {
-  const m: Record<string, string> = { error: 'danger', warning: 'warning', info: 'info' }
+function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { error: 'danger', warning: 'warning', info: 'info' }
   return m[s] || 'info'
 }
 
@@ -1240,7 +1306,7 @@ async function fetchDetail(noteSection: string) {
   // 并行加载上年数据
   try {
     priorYearNote.value = await api.get(
-      `/api/disclosure-notes/${projectId.value}/${year.value}/${noteSection}/prior-year`
+      P.disclosureNotes.priorYear(projectId.value, year.value, noteSection)
     )
   } catch { priorYearNote.value = null }
 }
@@ -1315,6 +1381,7 @@ async function onSave() {
     ElMessage.success('保存成功')
     editMode.value = false
     clearEditDirty()
+    autoSave.clearDirty()
     clearAutoSaveDraft()
     currentNote.value!.status = 'confirmed'
     justSaved.value = true
@@ -1342,13 +1409,34 @@ onMounted(async () => {
   if (noteList.value.length === 0) {
     await onGenerate()
   }
+  // R8-S2-14：关闭浏览器/刷新前警告
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 onUnmounted(() => {
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
+  window.removeEventListener('beforeunload', onBeforeUnload)
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
 })
+
+// R8-S2-14：未保存拦截
+onBeforeRouteLeave(async (_to, _from, next) => {
+  if (!editDirty.value && !autoSave.isDirty.value) { next(); return }
+  try {
+    await confirmLeave('附注')
+    next()
+  } catch {
+    next(false)
+  }
+})
+
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (editDirty.value || autoSave.isDirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
 const { isFullscreen: deFullscreen, toggleFullscreen: toggleDeFullscreen } = useFullscreen()
@@ -1368,6 +1456,7 @@ function copyNoteTable() {
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const deCtx = useCellSelection()
+const penetrate = usePenetrate()
 const deTableRef = ref<any>(null)
 deCtx.setupTableDrag(deTableRef, (rowIdx: number, colIdx: number) => {
   const tableRows = activeTableData.value?.rows || []
@@ -1451,6 +1540,73 @@ function onDeCtxCompare() {
   const vals = deCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
   ElMessage.info(`差异：${fmtAmount(diff)}`)
+}
+
+/**
+ * R8-S2-12：查看附注行关联的底稿
+ * 单底稿直接跳转，多底稿弹列表让用户选择
+ */
+async function onDeCtxRelatedWp() {
+  deCtx.closeContextMenu()
+  const note = currentNote.value
+  if (!note?.note_section) {
+    ElMessage.warning('请先选择附注章节')
+    return
+  }
+  // 用当前选中单元格所在行作为 row_code（简化：用行 index 或项目名）
+  const sel = deCtx.selectedCells.value[0]
+  if (!sel) return
+  const rowCode = `row_${sel.row}`
+  try {
+    const data: any = await api.get(
+      P.disclosureNotes.relatedWorkpapers(projectId.value, year.value, note.note_section, rowCode),
+      { validateStatus: (s: number) => s < 600 },
+    )
+    const wps = data?.workpapers || []
+    if (!wps.length) {
+      ElMessage.info('该附注行暂无关联底稿')
+      return
+    }
+    if (wps.length === 1) {
+      // 单底稿直接跳转
+      const wp = wps[0]
+      router.push({
+        name: 'WorkpaperEditor',
+        params: { projectId: projectId.value, wpId: wp.id },
+      })
+      return
+    }
+    // 多底稿：提示用户选择（简化弹 list）
+    const list = wps.map((w: any) => `${w.wp_code} ${w.wp_name}`).join('\n')
+    ElMessage.info(`该行关联 ${wps.length} 张底稿：\n${list}`)
+  } catch (e: any) {
+    handleApiError(e, '查看相关底稿')
+  }
+}
+
+/**
+ * R9-F5：穿透到序时账
+ * 从附注单元格穿透到对应科目的序时账
+ */
+function onDeCtxPenetrateToLedger() {
+  deCtx.closeContextMenu()
+  const note = currentNote.value
+  if (!note?.note_section) {
+    ElMessage.warning('请先选择附注章节')
+    return
+  }
+  // 尝试从选中行获取科目编码（第一列通常是科目名/编码）
+  const sel = deCtx.selectedCells.value[0]
+  if (!sel) return
+  const tableRows = activeTableData.value?.rows || []
+  const row = tableRows[sel.row]
+  // 优先取 account_code 字段，否则取第一列值作为科目标识
+  const accountCode = row?.account_code || row?.values?.[0] || row?.cells?.[0] || ''
+  if (accountCode) {
+    penetrate.toLedger(String(accountCode))
+  } else {
+    ElMessage.warning('无法识别当前行的科目编码')
+  }
 }
 </script>
 

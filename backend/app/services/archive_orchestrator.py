@@ -53,7 +53,22 @@ class ArchiveOrchestrator:
         gate_eval_id: uuid.UUID | None = None,
         initiated_by: uuid.UUID | None = None,
     ) -> ArchiveJob:
-        """创建归档作业并串行执行各步骤。"""
+        """创建归档作业并串行执行各步骤。
+
+        幂等逻辑（R6 Task 16）：同一 project_id 24h 内有
+        status in ('succeeded','running') 的 ArchiveJob 则直接返回，不重复打包。
+        """
+        # ── R6 幂等检查：24h 内已有 succeeded/running 的作业则直接返回 ──
+        existing_job = await self._find_recent_job(project_id)
+        if existing_job is not None:
+            logger.info(
+                "[ARCHIVE_ORCHESTRATOR] idempotent hit: project=%s existing_job=%s status=%s",
+                project_id,
+                existing_job.id,
+                existing_job.status,
+            )
+            return existing_job
+
         job = ArchiveJob(
             id=uuid.uuid4(),
             project_id=project_id,
@@ -395,6 +410,29 @@ class ArchiveOrchestrator:
                 job.id,
                 exc,
             )
+
+    # ── 幂等查询（R6 Task 16）──────────────────────────────────
+
+    async def _find_recent_job(self, project_id: uuid.UUID) -> ArchiveJob | None:
+        """查找同一 project_id 24h 内 status in ('succeeded','running') 的作业。
+
+        返回最近一条匹配的 ArchiveJob，若无则返回 None。
+        """
+        from datetime import timedelta
+
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        stmt = (
+            select(ArchiveJob)
+            .where(
+                ArchiveJob.project_id == project_id,
+                ArchiveJob.status.in_(["succeeded", "running"]),
+                ArchiveJob.created_at >= cutoff,
+            )
+            .order_by(ArchiveJob.created_at.desc())
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
     # ── 内部步骤实现 ──────────────────────────────────────────
 

@@ -144,8 +144,8 @@ async def save_note_data(
     """保存用户编辑的附注数据"""
     await _ensure_table(db)
     import uuid
-    from datetime import datetime
-    now = datetime.utcnow()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
     data_json = json.dumps(body.get("data", {}), ensure_ascii=False)
     try:
         await db.execute(

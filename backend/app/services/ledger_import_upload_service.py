@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -50,7 +50,10 @@ class LedgerImportUploadService:
             created = datetime.fromisoformat(created_at)
         except ValueError:
             return True
-        return created < datetime.utcnow() - cls.TTL
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        if created.tzinfo is not None:
+            created = created.replace(tzinfo=None)
+        return created < now_naive - cls.TTL
 
     @classmethod
     def cleanup_expired_bundles(cls, project_id: UUID) -> None:
@@ -132,7 +135,7 @@ class LedgerImportUploadService:
                 "upload_token": upload_token,
                 "project_id": str(project_id),
                 "created_by": user_id,
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "total_size": total_size,
                 "files": manifest_files,
             }
@@ -167,7 +170,7 @@ class LedgerImportUploadService:
                         bundle_dir=bundle_dir,
                         manifest_files=artifact_files,
                         total_size_bytes=total_size,
-                        expires_at=datetime.utcnow() + timedelta(hours=settings.LEDGER_UPLOAD_TTL_HOURS),
+                        expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.LEDGER_UPLOAD_TTL_HOURS),
                         created_by=_uuid.UUID(user_id) if user_id else None,
                     )
                     await art_db.commit()

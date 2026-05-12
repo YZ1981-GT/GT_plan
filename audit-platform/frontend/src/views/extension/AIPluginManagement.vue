@@ -1,9 +1,10 @@
 <template>
   <div class="gt-plugin-mgmt">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">AI插件管理</h2>
-      <el-button size="small" @click="loadPlugins" :loading="loading">刷新</el-button>
-    </div>
+    <GtPageHeader title="AI 插件管理" :show-back="false">
+      <template #actions>
+        <el-button size="small" @click="loadPlugins" :loading="loading">刷新</el-button>
+      </template>
+    </GtPageHeader>
 
     <PluginList :plugins="plugins" :loading="loading" :is-stub="isStubPlugin" @config="openConfig" @toggled="loadPlugins" @execute="executePlugin" />
 

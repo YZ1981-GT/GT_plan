@@ -1,6 +1,6 @@
 <template>
   <div class="gt-personal gt-fade-in">
-    <h2 class="gt-page-title">我的工作台</h2>
+    <GtPageHeader title="我的工作台" :show-back="false" />
     <el-row :gutter="16">
       <el-col :span="8">
         <div class="gt-p-card">

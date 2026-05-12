@@ -38,6 +38,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { regulatory as P_reg } from '@/services/apiPaths'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -75,7 +76,7 @@ async function onSubmit() {
   if (!valid) return
   submitting.value = true
   try {
-    await api.post('/api/regulatory/archival-standard', form.value)
+    await api.post(P_reg.archivalStandard, form.value)
     ElMessage.success('归档备案提交成功')
     emit('submitted')
     visible.value = false

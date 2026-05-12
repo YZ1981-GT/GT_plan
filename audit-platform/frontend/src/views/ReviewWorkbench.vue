@@ -1,20 +1,13 @@
 <template>
   <div class="review-workbench">
-    <!-- 顶部横幅 + 模式切换 -->
-    <div class="gt-page-banner">
-      <div class="gt-banner-content">
-        <h2>📋 复核工作台</h2>
-        <span class="gt-banner-sub">
-          {{ isGlobal ? '跨项目' : projectName }} · 共 {{ total }} 个底稿待复核
-        </span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="复核工作台" :show-back="false">
+      <template #actions>
         <el-radio-group v-model="viewMode" size="small">
           <el-radio-button value="workbench">三栏视图</el-radio-button>
           <el-radio-button value="batch">批量模式</el-radio-button>
         </el-radio-group>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 筛选条 -->
     <div class="filter-bar">
@@ -188,7 +181,7 @@
         </div>
       </div>
 
-      <!-- 中栏：只读预览 -->
+      <!-- 中栏：只读预览（Univer 只读实例） -->
       <div class="preview-panel">
         <template v-if="selectedItem">
           <div class="panel-header">
@@ -228,12 +221,17 @@
               </el-tag>
             </div>
           </div>
+          <!-- Univer 只读底稿预览 -->
+          <div class="univer-readonly-container" v-if="wpSnapshot">
+            <div ref="univerContainerRef" class="univer-sheet-host" />
+          </div>
           <el-alert
+            v-else
             type="info"
             :closable="false"
             show-icon
-            title="只读预览"
-            description="点击右上角「打开完整编辑器」查看底稿完整内容，或在右栏直接做出复核判断。"
+            title="底稿预览"
+            description="正在加载底稿数据..."
           />
         </template>
         <el-empty v-else description="请从左侧选择底稿" />
@@ -345,6 +343,7 @@ import {
   type ReviewInboxItem,
 } from '@/services/pmApi'
 import { reviewContent, updateReviewStatus, type ReviewIssue } from '@/services/workpaperApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -373,6 +372,11 @@ const aiLoading = ref(false)
 const reviewComment = ref('')
 const actioning = ref(false)
 const pendingAction = ref<'approve' | 'reject' | null>(null)
+
+// Univer 只读预览
+const wpSnapshot = ref<any>(null)
+const univerContainerRef = ref<HTMLElement | null>(null)
+const reviewMarkers = ref<any[]>([])
 
 // 筛选条件
 const filterProjectId = ref('')
@@ -487,7 +491,7 @@ async function loadData() {
       }
     }
   } catch (e: any) {
-    ElMessage.error('加载失败: ' + (e.message || '未知错误'))
+    handleApiError(e, '加载复核数据')
   } finally {
     loading.value = false
   }
@@ -499,12 +503,17 @@ async function selectItem(item: ReviewInboxItem) {
   selectedWpId.value = item.id
   reviewComment.value = ''
   aiIssues.value = []
+  wpSnapshot.value = null
   aiLoading.value = true
   try {
     const res = await reviewContent(item.project_id, item.id)
     aiIssues.value = res.issues || []
+    // Load workpaper snapshot for Univer readonly preview
+    wpSnapshot.value = res.univer_data || res.snapshot || { sheets: {} }
+    reviewMarkers.value = res.review_markers || []
   } catch {
     aiIssues.value = []
+    wpSnapshot.value = null
   } finally {
     aiLoading.value = false
   }
@@ -556,7 +565,7 @@ async function approveCurrent() {
     total.value = Math.max(0, total.value - 1)
     pickNextAfterRemoval(item.id)
   } catch (e: any) {
-    ElMessage.error(e.message || '操作失败')
+    handleApiError(e, '操作')
   } finally {
     actioning.value = false
     pendingAction.value = null
@@ -578,7 +587,7 @@ async function rejectCurrent() {
     reviewComment.value = ''
     pickNextAfterRemoval(item.id)
   } catch (e: any) {
-    ElMessage.error(e.message || '操作失败')
+    handleApiError(e, '操作')
   } finally {
     actioning.value = false
     pendingAction.value = null
@@ -641,7 +650,7 @@ async function doBatchReview(
     )
     await loadData()
   } catch (e: any) {
-    ElMessage.error('操作失败: ' + (e.message || ''))
+    handleApiError(e, '操作')
   }
 }
 
@@ -833,6 +842,19 @@ onUnmounted(() => {
   padding: 12px;
   background: var(--el-fill-color-lighter);
   border-radius: 8px;
+}
+
+.univer-readonly-container {
+  flex: 1;
+  min-height: 300px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.univer-sheet-host {
+  width: 100%;
+  height: 400px;
 }
 .meta-row {
   display: flex;

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -127,7 +127,7 @@ class WorkpaperRemindService:
             owner_id=operator_id,
             status=IssueStatus.open,
             trace_id=trace_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(ticket)
         await db.flush()

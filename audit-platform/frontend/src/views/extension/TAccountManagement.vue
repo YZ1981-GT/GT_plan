@@ -1,14 +1,13 @@
 <template>
   <div class="gt-t-mgmt">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">T型账户管理</h2>
-      <div class="gt-header-actions">
+    <GtPageHeader title="T型账户" :show-back="false">
+      <template #actions>
         <el-button type="primary" size="small" @click="showCreate = true">
           <el-icon><Plus /></el-icon> 新建T型账户
         </el-button>
         <el-button size="small" @click="loadAccounts" :loading="loading">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- T型账户列表 -->
     <el-table :data="accounts" v-loading="loading" stripe size="small" style="width: 100%"
@@ -86,6 +85,7 @@ import {
   addTAccountEntry, calculateTAccount,
 } from '@/services/commonApi'
 import { fmtAmount } from '@/utils/formatters'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
@@ -136,14 +136,14 @@ async function addEntry(entry: any) {
     ElMessage.success('分录已添加')
     const detail = await getTAccount(projectId.value, currentAccount.value.id)
     currentEntries.value = detail.entries ?? []
-  } catch { ElMessage.error('添加失败') }
+  } catch (e: any) { handleApiError(e, '添加') }
 }
 
 async function calculate(row: any) {
   try {
     calcResult.value = await calculateTAccount(projectId.value, row.id)
     ElMessage.success('计算完成')
-  } catch { ElMessage.error('计算失败') }
+  } catch (e: any) { handleApiError(e, '计算') }
 }
 
 async function createAccount() {
@@ -154,7 +154,7 @@ async function createAccount() {
     ElMessage.success('T型账户已创建')
     showCreate.value = false
     loadAccounts()
-  } catch { ElMessage.error('创建失败') }
+  } catch (e: any) { handleApiError(e, '创建') }
   finally { creating.value = false }
 }
 

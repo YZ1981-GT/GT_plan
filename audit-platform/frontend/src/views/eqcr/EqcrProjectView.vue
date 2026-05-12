@@ -1,73 +1,11 @@
 <template>
   <div v-loading="loading" class="eqcr-project-view">
     <!-- 顶部 banner -->
-    <div class="gt-page-banner gt-page-banner--dark">
-      <div class="gt-banner-content">
-        <div class="eqcr-banner__title-row">
-          <el-button
-            size="small"
-            class="eqcr-banner__back"
-            @click="goBack"
-          >
-            ← 返回工作台
-          </el-button>
-          <h2 class="eqcr-banner__title">
-            🛡️ {{ project?.name || 'EQCR 项目复核' }}
-          </h2>
-        </div>
-        <div v-if="project" class="eqcr-banner__meta">
-          <span>客户：{{ project.client_name || '—' }}</span>
-          <span>审计期间：
-            {{ project.audit_period_start || '?' }}
-            ~
-            {{ project.audit_period_end || '?' }}
-          </span>
-          <span>签字日：{{ project.signing_date || '未设定' }}</span>
-          <el-tag
-            v-if="daysToSigning !== null"
-            size="small"
-            effect="dark"
-            :type="daysTagType(daysToSigning)"
-          >
-            {{ daysLabel(daysToSigning) }}
-          </el-tag>
-        </div>
-      </div>
-      <div class="gt-banner-actions">
-        <el-tag
-          v-if="reportStatus"
-          :type="reportStatusType(reportStatus)"
-          effect="dark"
-        >
-          {{ reportStatusLabel(reportStatus) }}
-        </el-tag>
-        <el-button
-          v-if="canApprove"
-          size="small"
-          type="primary"
-          :loading="approving"
-          @click="onApproveClick"
-        >
-          EQCR 审批
-        </el-button>
-        <el-button
-          v-if="canUnlock"
-          size="small"
-          type="warning"
-          :loading="unlocking"
-          @click="onUnlockClick"
-        >
-          解锁意见
-        </el-button>
-        <el-button
-          size="small"
-          :loading="loading"
-          @click="loadOverview"
-        >
-          刷新
-        </el-button>
-      </div>
-    </div>
+    <GtPageHeader title="独立复核" :show-back="false">
+      <template #actions>
+        <el-button size="small" @click="goBack">← 返回工作台</el-button>
+      </template>
+    </GtPageHeader>
 
     <!-- 非 EQCR 访问提示 -->
     <el-alert
@@ -82,7 +20,15 @@
 
     <!-- 关键指标摘要 -->
     <el-row v-if="overview" :gutter="12" class="eqcr-summary-row">
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
+        <el-card shadow="hover" class="eqcr-summary-card">
+          <div class="eqcr-summary-card__label">本项目 EQCR 工时</div>
+          <div class="eqcr-summary-card__value">
+            {{ timeSummary?.total_hours ?? '—' }}<span class="eqcr-summary-card__unit">h</span>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card shadow="hover" class="eqcr-summary-card">
           <div class="eqcr-summary-card__label">已录 EQCR 意见</div>
           <div class="eqcr-summary-card__value">
@@ -90,7 +36,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card shadow="hover" class="eqcr-summary-card">
           <div class="eqcr-summary-card__label">独立笔记</div>
           <div class="eqcr-summary-card__value">
@@ -98,7 +44,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card shadow="hover" class="eqcr-summary-card">
           <div class="eqcr-summary-card__label">影子计算</div>
           <div class="eqcr-summary-card__value">
@@ -106,7 +52,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :xs="12" :sm="8" :md="6">
+      <el-col :xs="12" :sm="8" :md="6" :lg="4">
         <el-card
           shadow="hover"
           class="eqcr-summary-card"
@@ -126,9 +72,11 @@
     <el-tabs v-model="activeTab" class="eqcr-tabs">
       <el-tab-pane label="重要性" name="materiality">
         <EqcrMateriality v-if="activeTab === 'materiality'" :project-id="projectId" />
+        <ShadowCompareRow v-if="activeTab === 'materiality' && shadowData.materiality.length" :rows="shadowData.materiality" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="会计估计" name="estimate">
         <EqcrEstimates v-if="activeTab === 'estimate'" :project-id="projectId" />
+        <ShadowCompareRow v-if="activeTab === 'estimate' && shadowData.estimate.length" :rows="shadowData.estimate" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="关联方" name="related_party">
         <EqcrRelatedParties
@@ -136,18 +84,21 @@
           :project-id="projectId"
           :can-write="canWriteRelatedParties"
         />
+        <ShadowCompareRow v-if="activeTab === 'related_party' && shadowData.related_party.length" :rows="shadowData.related_party" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="持续经营" name="going_concern">
         <EqcrGoingConcern
           v-if="activeTab === 'going_concern'"
           :project-id="projectId"
         />
+        <ShadowCompareRow v-if="activeTab === 'going_concern' && shadowData.going_concern.length" :rows="shadowData.going_concern" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="审计意见" name="opinion_type">
         <EqcrOpinionType
           v-if="activeTab === 'opinion_type'"
           :project-id="projectId"
         />
+        <ShadowCompareRow v-if="activeTab === 'opinion_type' && shadowData.opinion_type.length" :rows="shadowData.opinion_type" @verdict="onShadowVerdict" />
       </el-tab-pane>
       <el-tab-pane label="影子计算" name="shadow_compute">
         <EqcrShadowCompute
@@ -180,6 +131,53 @@
           :project-id="projectId"
         />
       </el-tab-pane>
+      <!-- 关键发现摘要 Tab [R9 F7-EQCR Task 25] -->
+      <el-tab-pane label="关键发现摘要" name="key_findings_summary">
+        <div v-if="activeTab === 'key_findings_summary'" class="eqcr-key-findings-summary">
+          <el-alert type="info" :closable="false" show-icon style="margin-bottom: 16px">
+            <template #title>本页聚合各 Tab 核心结论，便于一页纸快速浏览</template>
+          </el-alert>
+          <div class="eqcr-findings-grid">
+            <el-card v-if="overview" shadow="hover" class="eqcr-finding-card">
+              <template #header><span>📊 重要性</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview.opinion_summary?.materiality || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>📐 会计估计</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.estimate || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>🔗 关联方</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.related_party || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>🏢 持续经营</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.going_concern || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>📝 审计意见</span></template>
+              <div class="eqcr-finding-content">
+                已录入 {{ overview?.opinion_summary?.opinion_type || 0 }} 条意见
+              </div>
+            </el-card>
+            <el-card shadow="hover" class="eqcr-finding-card">
+              <template #header><span>🛡️ EQCR 总结</span></template>
+              <div class="eqcr-finding-content">
+                总意见数 {{ overview?.opinion_summary?.total || 0 }}，
+                工时 {{ timeSummary?.total_hours ?? '—' }}h
+              </div>
+            </el-card>
+          </div>
+        </div>
+      </el-tab-pane>
       <!-- 预留 Tab：组成部分审计师 → Task 22 实装，本任务不渲染 -->
     </el-tabs>
   </div>
@@ -194,6 +192,8 @@ import {
   type EqcrProjectOverview,
   type ReportStatusValue,
 } from '@/services/eqcrService'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
+import { REPORT_STATUS } from '@/constants/statusEnum'
 import EqcrMateriality from '@/components/eqcr/EqcrMateriality.vue'
 import EqcrEstimates from '@/components/eqcr/EqcrEstimates.vue'
 import EqcrRelatedParties from '@/components/eqcr/EqcrRelatedParties.vue'
@@ -204,6 +204,10 @@ import EqcrReviewNotesPanel from '@/components/eqcr/EqcrReviewNotesPanel.vue'
 import EqcrPriorYearCompare from '@/components/eqcr/EqcrPriorYearCompare.vue'
 import EqcrMemoEditor from '@/components/eqcr/EqcrMemoEditor.vue'
 import EqcrComponentAuditors from '@/components/eqcr/EqcrComponentAuditors.vue'
+import ShadowCompareRow from '@/components/eqcr/ShadowCompareRow.vue'
+import type { ShadowCompareItem } from '@/components/eqcr/ShadowCompareRow.vue'
+import { feedback } from '@/utils/feedback'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -212,6 +216,7 @@ const projectId = computed(() => String(route.params.projectId ?? ''))
 
 const loading = ref(false)
 const overview = ref<EqcrProjectOverview | null>(null)
+const timeSummary = ref<{ total_hours: number; record_count: number } | null>(null)
 const activeTab = ref<
   'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute' | 'review_notes' | 'prior_year' | 'memo' | 'component_auditor'
 >('materiality')
@@ -220,6 +225,35 @@ const project = computed(() => overview.value?.project ?? null)
 const reportStatus = computed<ReportStatusValue | null>(
   () => overview.value?.report_status ?? null,
 )
+
+// R7-S3-04：影子对比数据（5 判断 Tab 各自的对比行）
+const shadowData = ref<Record<string, ShadowCompareItem[]>>({
+  materiality: [],
+  estimate: [],
+  related_party: [],
+  going_concern: [],
+  opinion_type: [],
+})
+
+async function onShadowVerdict(row: ShadowCompareItem, action: 'pass' | 'flag') {
+  const prev = row.verdict
+  row.verdict = action
+  // R8-S2-04：持久化到后端 EqcrOpinion（pass→agree, flag→disagree）
+  try {
+    const { eqcrApi } = await import('@/services/eqcrService')
+    await eqcrApi.createOpinion({
+      project_id: projectId.value,
+      domain: activeTab.value as any,
+      verdict: action === 'pass' ? 'agree' : 'disagree',
+      comment: `[ShadowCompareRow] ${row.dimension}：项目组值 ${row.teamValue}，影子值 ${row.shadowValue}，差异 ${row.diff}`,
+    })
+    feedback.success(`已${action === 'pass' ? '通过' : '标记'}：${row.dimension}`)
+  } catch (e: any) {
+    row.verdict = prev  // 回滚 UI 状态
+    handleApiError(e, '保存判断')
+  }
+}
+
 const isConsolidated = computed<boolean>(
   () => project.value?.report_scope === 'consolidated',
 )
@@ -258,13 +292,18 @@ async function loadOverview() {
   loading.value = true
   try {
     overview.value = await eqcrApi.getProjectOverview(projectId.value)
+    // Fetch time summary in parallel
+    try {
+      const api = (await import('@/services/apiProxy')).default
+      timeSummary.value = await api.get(P_eqcr.timeSummary(projectId.value))
+    } catch { timeSummary.value = null }
   } catch (err: any) {
     if (err?.response?.status === 404) {
-      ElMessage.error('项目不存在')
+      handleApiError(err, '项目不存在')
       router.replace({ name: 'EqcrWorkbench' })
       return
     }
-    ElMessage.error(err?.response?.data?.detail || '加载项目总览失败')
+    handleApiError(err, '加载项目总览')
     overview.value = null
   } finally {
     loading.value = false
@@ -283,7 +322,7 @@ const unlocking = ref(false)
 
 const canApprove = computed<boolean>(() => {
   if (!overview.value?.my_role_confirmed) return false
-  return reportStatus.value === 'review'
+  return reportStatus.value === REPORT_STATUS.REVIEW
 })
 
 const canUnlock = computed<boolean>(() => {
@@ -322,7 +361,7 @@ async function onApproveClick() {
   try {
     const diffReasons = priorYearRef.value?.getDiffReasons?.() ?? {}
     const api = (await import('@/services/apiProxy')).default
-    await api.post(`/api/eqcr/projects/${projectId.value}/approve`, {
+    await api.post(P_eqcr.approve(projectId.value), {
       verdict: 'approve',
       comment,
       // 差异原因附加到审批记录（后端 extra_payload 可扩展）
@@ -335,9 +374,9 @@ async function onApproveClick() {
     if (detail?.error_code === 'EQCR_GATE_BLOCKED') {
       const rules = detail.blocking_rules || []
       const msg = rules.map((r: any) => `[${r.rule_code}] ${r.message}`).join('\n')
-      ElMessage.error(`EQCR 门禁阻断：\n${msg}`)
+      handleApiError(e, '操作')
     } else {
-      ElMessage.error(typeof detail === 'string' ? detail : '审批失败')
+      handleApiError(e, '审批')
     }
   } finally {
     approving.value = false
@@ -361,13 +400,13 @@ async function onUnlockClick() {
   unlocking.value = true
   try {
     const api = (await import('@/services/apiProxy')).default
-    await api.post(`/api/eqcr/projects/${projectId.value}/unlock-opinion`, {
+    await api.post(P_eqcr.unlockOpinion(projectId.value), {
       reason,
     })
     ElMessage.success('EQCR 意见已解锁')
     await loadOverview()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '解锁失败')
+    handleApiError(e, '解锁')
   } finally {
     unlocking.value = false
   }
@@ -465,6 +504,12 @@ function reportStatusType(
   font-weight: 600;
   color: var(--gt-color-text, #303133);
 }
+.eqcr-summary-card__unit {
+  font-size: var(--gt-font-size-sm, 13px);
+  font-weight: 400;
+  color: var(--gt-color-text-tertiary, #909399);
+  margin-left: 2px;
+}
 .eqcr-summary-card--danger {
   border-left: 4px solid var(--el-color-danger, #f56c6c);
 }
@@ -474,5 +519,23 @@ function reportStatusType(
 
 .eqcr-tabs {
   margin-top: 16px;
+}
+
+/* 关键发现摘要 [R9 F7-EQCR Task 25] */
+.eqcr-key-findings-summary {
+  padding: 8px 0;
+}
+.eqcr-findings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.eqcr-finding-card {
+  min-height: 100px;
+}
+.eqcr-finding-content {
+  font-size: 14px;
+  color: var(--gt-color-text-secondary);
+  line-height: 1.6;
 }
 </style>

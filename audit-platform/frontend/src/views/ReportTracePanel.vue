@@ -1,12 +1,11 @@
 <template>
   <div class="gt-trace gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">报告复核溯源</h2>
-      <div class="gt-header-actions">
+    <GtPageHeader title="报告复核溯源" :show-back="false">
+      <template #actions>
         <el-input v-model="sectionNumber" placeholder="附注章节号（如 五、9）" style="width: 200px" />
         <el-button type="primary" @click="onTrace">溯源查询</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
     <div v-if="traceData" class="gt-trace-result">
       <el-card header="附注数据" shadow="never" v-if="traceData.note_data">
         <pre class="gt-trace-json">{{ JSON.stringify(traceData.note_data, null, 2) }}</pre>

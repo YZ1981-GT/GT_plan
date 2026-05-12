@@ -1,0 +1,23 @@
+{
+  "id": "yonyou",
+  "display_name": "用友 U8/NC/T+",
+  "priority": 80,
+  "match_patterns": {
+    "filename_regex": [
+      "(?i)(用友|UFIDA|U8|NC\\d|T\\+)"
+    ],
+    "signature_columns": {
+      "balance": ["科目编码", "科目名称", "方向", "年初余额"],
+      "ledger": ["凭证日期", "凭证号", "摘要", "科目"]
+    }
+  },
+  "column_aliases": {
+    "balance": {
+      "account_code": ["科目编码", "科目代码"],
+      "opening_balance": ["年初余额", "期初余额"]
+    },
+    "ledger": {
+      "voucher_date": ["凭证日期", "制单日期"]
+    }
+  }
+}

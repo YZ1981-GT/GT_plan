@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -10,8 +11,15 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_schemas import EventPayload, EventType
-from app.models.dataset_models import ImportEventOutbox, OutboxStatus
+from app.models.dataset_models import (
+    EventOutboxDLQ,
+    ImportEventOutbox,
+    OutboxStatus,
+)
 from app.services.event_bus import event_bus
+
+
+logger = logging.getLogger(__name__)
 
 
 class ImportEventOutboxService:
@@ -57,7 +65,7 @@ class ImportEventOutboxService:
                 extra=event_extra,
             ))
             item.status = OutboxStatus.published
-            item.published_at = datetime.utcnow()
+            item.published_at = datetime.now(timezone.utc)
             item.last_error = None
             await db.flush()
             return True
@@ -112,6 +120,7 @@ class ImportEventOutboxService:
             "skipped_exhausted_count": 0,
             "exhausted_total_count": 0,
             "exhausted_skipped_in_this_run": 0,
+            "moved_to_dlq_count": 0,
             "max_attempts": max_attempts if (max_attempts is not None and max_attempts > 0) else None,
         }
         if max_attempts is not None and max_attempts > 0:
@@ -164,7 +173,7 @@ class ImportEventOutboxService:
                     extra=event_extra,
                 ))
                 item.status = OutboxStatus.published
-                item.published_at = datetime.utcnow()
+                item.published_at = datetime.now(timezone.utc)
                 item.last_error = None
                 report["published_count"] += 1
             except Exception as exc:
@@ -172,6 +181,16 @@ class ImportEventOutboxService:
                 item.last_error = str(exc)[:1000]
                 report["failed_count"] += 1
                 report["last_error"] = str(exc)
+                # F45 / Sprint 7.18: 重试 N 次仍失败 → 移入 DLQ
+                if (
+                    max_attempts is not None
+                    and max_attempts > 0
+                    and int(item.attempt_count or 0) >= max_attempts
+                ):
+                    await ImportEventOutboxService._move_to_dlq(db, item, reason=str(exc))
+                    report["moved_to_dlq_count"] = (
+                        report.get("moved_to_dlq_count", 0) + 1
+                    )
         await db.flush()
         return report
 
@@ -230,3 +249,58 @@ class ImportEventOutboxService:
                 for item in recent_failed
             ],
         }
+
+    # ------------------------------------------------------------------
+    # F45 / Sprint 7.18: DLQ (dead letter queue) 相关操作
+    # ------------------------------------------------------------------
+    @staticmethod
+    async def _move_to_dlq(
+        db: AsyncSession,
+        item: ImportEventOutbox,
+        *,
+        reason: str,
+    ) -> EventOutboxDLQ:
+        """把 outbox 行 snapshot 进 DLQ。
+
+        原 outbox 行保留（status=failed + attempt_count），不删除，作为审计痕迹。
+        DLQ 行独立保存 payload/attempt_count/failure_reason，方便手动重投。
+
+        调用方负责 flush / commit。
+        """
+        dlq = EventOutboxDLQ(
+            original_event_id=item.id,
+            event_type=item.event_type,
+            project_id=item.project_id,
+            year=item.year,
+            payload=item.payload,
+            failure_reason=(reason or "")[:2000] if reason else None,
+            attempt_count=int(item.attempt_count or 0),
+        )
+        db.add(dlq)
+        try:
+            await db.flush()
+        except Exception:  # pragma: no cover - flush 失败极少见
+            logger.exception(
+                "[EventOutboxDLQ] flush failed for outbox_id=%s", item.id
+            )
+            raise
+        logger.warning(
+            "[EventOutboxDLQ] moved event to DLQ: "
+            "event_type=%s project_id=%s year=%s attempt_count=%s reason=%s",
+            item.event_type,
+            item.project_id,
+            item.year,
+            item.attempt_count,
+            (reason or "")[:200],
+        )
+        return dlq
+
+    @staticmethod
+    async def dlq_depth(db: AsyncSession) -> int:
+        """查询未处理（resolved_at IS NULL）的 DLQ 深度，供 /metrics 消费。"""
+        result = await db.execute(
+            sa.select(sa.func.count())
+            .select_from(EventOutboxDLQ)
+            .where(EventOutboxDLQ.resolved_at.is_(None))
+        )
+        return int(result.scalar_one() or 0)

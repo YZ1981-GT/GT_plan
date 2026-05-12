@@ -7,7 +7,7 @@ import uuid
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -150,7 +150,7 @@ class GateEngine:
 
         # 幂等检查
         cache_key = f"{project_id}:{gate_type}:{trace_id}"
-        now = datetime.utcnow().timestamp()
+        now = datetime.now(timezone.utc).timestamp()
         if cache_key in self._cache:
             cached_result, cached_at = self._cache[cache_key]
             if now - cached_at < self._cache_ttl:

@@ -89,6 +89,7 @@ async def generate_analysis(
     """变动分析自动生成（接入 vLLM + RAG 参照上年附注）"""
     from app.services.llm_client import chat_completion
     from app.services.reference_doc_service import ReferenceDocService
+    from app.services.export_mask_service import export_mask_service
 
     context_docs = await ReferenceDocService.load_context(
         db, project_id, data.year,
@@ -96,7 +97,11 @@ async def generate_analysis(
         section_hint=data.section_number,
     )
 
-    prompt = f"附注章节「{data.section_number}」，本期数据：{data.current_data}，上期数据：{data.prior_data}。请用一段话分析变动原因。"
+    # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 36）
+    masked_current, _m1 = export_mask_service.mask_context(data.current_data)
+    masked_prior, _m2 = export_mask_service.mask_context(data.prior_data)
+
+    prompt = f"附注章节「{data.section_number}」，本期数据：{masked_current}，上期数据：{masked_prior}。请用一段话分析变动原因。"
     try:
         text = await chat_completion([
             {"role": "system", "content": "你是审计分析师，请分析附注数据变动原因，语言简洁专业。如有上年参照请对比分析。"},
@@ -156,6 +161,7 @@ async def ai_complete(
     """智能续写（接入 vLLM + RAG 参照上年附注风格）"""
     from app.services.llm_client import chat_completion
     from app.services.reference_doc_service import ReferenceDocService
+    from app.services.export_mask_service import export_mask_service
 
     context_docs = await ReferenceDocService.load_context(
         db, project_id, 2025,
@@ -163,10 +169,13 @@ async def ai_complete(
         section_hint=section_number,
     )
 
+    # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 36）
+    masked_text, _mapping = export_mask_service.mask_text(current_text)
+
     try:
         text = await chat_completion([
             {"role": "system", "content": "你是审计附注编写助手。请续写以下文本，保持专业风格。参考上年附注的表述风格。只输出续写部分。"},
-            {"role": "user", "content": f"请续写：{current_text}"},
+            {"role": "user", "content": f"请续写：{masked_text}"},
         ], max_tokens=200, context_documents=context_docs if context_docs else None)
         return {"suggestions": [current_text + text], "reference_count": len(context_docs)}
     except Exception:
@@ -183,6 +192,7 @@ async def ai_complete(
     """智能续写（POST body，接入 vLLM + RAG）"""
     from app.services.llm_client import chat_completion
     from app.services.reference_doc_service import ReferenceDocService
+    from app.services.export_mask_service import export_mask_service
 
     context_docs = await ReferenceDocService.load_context(
         db, project_id, data.year,
@@ -190,10 +200,13 @@ async def ai_complete(
         section_hint=data.section_number,
     )
 
+    # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 36）
+    masked_text, _mapping = export_mask_service.mask_text(data.text)
+
     try:
         text = await chat_completion([
             {"role": "system", "content": "你是审计附注编写助手。请续写以下文本，保持专业风格，语言简洁。参考上年附注的表述风格。只输出续写部分，不要重复已有内容。"},
-            {"role": "user", "content": f"请续写以下内容：\n\n{data.text}"},
+            {"role": "user", "content": f"请续写以下内容：\n\n{masked_text}"},
         ], max_tokens=500, context_documents=context_docs if context_docs else None)
         return {"result": data.text + text, "appended": text, "reference_count": len(context_docs)}
     except Exception:
@@ -210,6 +223,7 @@ async def ai_rewrite(
     """改写选中文本（接入 vLLM + RAG）"""
     from app.services.llm_client import chat_completion
     from app.services.reference_doc_service import ReferenceDocService
+    from app.services.export_mask_service import export_mask_service
 
     context_docs = await ReferenceDocService.load_context(
         db, project_id, data.year,
@@ -217,10 +231,13 @@ async def ai_rewrite(
         section_hint=data.section_number,
     )
 
+    # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 36）
+    masked_text, _mapping = export_mask_service.mask_text(data.text)
+
     try:
         text = await chat_completion([
             {"role": "system", "content": "你是审计附注编写专家。请按照用户指令改写文本，保持专业审计语言风格，符合中国企业会计准则表述规范。只输出改写后的文本，不要解释。"},
-            {"role": "user", "content": f"指令：{data.instruction}\n\n原文：\n{data.text}"},
+            {"role": "user", "content": f"指令：{data.instruction}\n\n原文：\n{masked_text}"},
         ], max_tokens=1000, context_documents=context_docs if context_docs else None)
         return {"original": data.text, "rewritten": text, "reference_count": len(context_docs)}
     except Exception:

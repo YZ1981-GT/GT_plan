@@ -122,6 +122,7 @@
       :row-class-name="rowClassName"
       :cell-class-name="tbCellClassName"
       @cell-click="onTbCellClick"
+      @cell-dblclick="onTbCellDblClick"
       @cell-contextmenu="onTbCellContextMenu"
     >
       <el-table-column prop="standard_account_code" label="科目编码" width="130">
@@ -186,6 +187,9 @@
         <template #default="{ row }">
           <el-tooltip v-if="row.wp_consistency?.status === 'consistent'" content="底稿审定数一致" placement="top">
             <span style="color: #28a745; cursor: pointer" @dblclick="openWorkpaper(row)">✅</span>
+          </el-tooltip>
+          <el-tooltip v-else-if="row.wp_consistency?.status === 'stale'" content="上游数据已变更，点击重算">
+            <span style="color: var(--gt-color-teal, #009688); cursor: pointer" @click="onRecalcWp(row)">🔄</span>
           </el-tooltip>
           <el-tooltip v-else-if="row.wp_consistency?.status === 'inconsistent'" :content="`差异 ${row.wp_consistency.diff_amount}`" placement="top">
             <span style="color: #FF5149; cursor: pointer" @dblclick="openWorkpaper(row)">⚠️</span>
@@ -272,7 +276,7 @@
         </el-table-column>
         <el-table-column prop="review_status" label="状态" width="100">
           <template #default="{ row }">
-            <GtStatusTag :status-map="ADJUSTMENT_STATUS" status-map-name="ADJUSTMENT_STATUS" :value="row.review_status" />
+            <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
           </template>
         </el-table-column>
       </el-table>
@@ -349,7 +353,11 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
-import { ADJUSTMENT_STATUS } from '@/utils/statusMaps'
+import { handleApiError } from '@/utils/errorHandler'
+import { usePenetrate } from '@/composables/usePenetrate'
+import { useProjectEvents } from '@/composables/useProjectEvents'
+import { usePasteImport } from '@/composables/usePasteImport'
+import * as P from '@/services/apiPaths'
 
 const route = useRoute()
 const router = useRouter()
@@ -360,6 +368,11 @@ const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
 const selectedYear = ref(projectStore.year)
 const yearOptions = computed(() => projectStore.yearOptions)
+
+// ─── 云协同：账套激活/回滚后自动刷新 ─────────────────────────────────────────
+const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
+onDatasetActivated(() => fetchData())
+onDatasetRolledBack(() => fetchData())
 
 function onProjectChange(pid: string) {
   router.push({
@@ -590,7 +603,7 @@ function onTbImported() {
 
 function onExport() {
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
-    downloadFileAsBlob(`/api/projects/${projectId.value}/trial-balance/export?year=${year.value}`, `试算表_${year.value}.xlsx`)
+    downloadFileAsBlob(`${P.trialBalance.export(projectId.value)}?year=${year.value}`, `试算表_${year.value}.xlsx`)
   })
 }
 
@@ -601,6 +614,13 @@ function openWorkpaper(row: TrialBalanceRow) {
   } else {
     ElMessage.info('该科目未关联底稿')
   }
+}
+
+async function onRecalcWp(row: any) {
+  try {
+    await api.post(P.workpapers.recalc(projectId.value, row.wp_consistency?.wp_id))
+    ElMessage.success('重算已触发')
+  } catch (e) { handleApiError(e, '重算底稿') }
 }
 
 function onUnadjustedClick(_row: TrialBalanceRow) {
@@ -737,11 +757,40 @@ function copyTbTable() {
 
 // ─── 单元格选中与右键菜单（统一 composable） ─────────────────────────────────
 const tbCtx = useCellSelection()
+const penetrate = usePenetrate()
 const tbComments = useCellComments(() => projectId.value, () => year.value, 'trial_balance')
 const tbSumLazyEdit = useLazyEdit()
 
 // ─── 拖拽框选（鼠标左键按住拖动选中连续区域） ──────────────────────────────
 const tbTableRef = ref<any>(null)
+
+// [R9 F10 Task 32] usePasteImport 接入：粘贴 AJE 到调整列
+usePasteImport({
+  containerRef: tbTableRef,
+  columns: [
+    { key: 'account_code', label: '科目编码' },
+    { key: 'debit', label: '借方调整' },
+    { key: 'credit', label: '贷方调整' },
+  ],
+  onInsert: async (rows) => {
+    // 将粘贴的 AJE 数据写入调整列（通过 API 批量创建调整分录）
+    for (const r of rows) {
+      if (!r.account_code) continue
+      try {
+        await api.post(P.adjustments.create(projectId.value), {
+          account_code: r.account_code,
+          debit_amount: parseFloat(r.debit) || 0,
+          credit_amount: parseFloat(r.credit) || 0,
+          year: selectedYear.value,
+          summary: '粘贴导入',
+        })
+      } catch { /* 静默跳过单行失败 */ }
+    }
+    ElMessage.success(`已粘贴 ${rows.length} 行 AJE 数据`)
+    // 刷新试算表
+    fetchData()
+  },
+})
 
 tbCtx.setupTableDrag(tbTableRef, (rowIdx: number, colIdx: number) => {
   const row = groupedRows.value[rowIdx]
@@ -783,6 +832,14 @@ function onKeydown(e: KeyboardEvent) {
     e.stopPropagation()
     tbSearch.toggle()
   }
+  // R7-S3-08：Ctrl+A 全选表格
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    const target = e.target as HTMLElement
+    if (target?.closest('.el-table')) {
+      e.preventDefault()
+      tbCtx.selectAll(groupedRows.value.length, 6)
+    }
+  }
 }
 
 function tbCellClassName({ rowIndex, columnIndex }: any) {
@@ -804,6 +861,14 @@ function onTbCellClick(row: any, column: any, _cell: HTMLElement, event: MouseEv
   tbCtx.selectCell(rowIdx, colIdx, value, event.ctrlKey || event.metaKey, event.shiftKey)
   tbCtx.contextMenu.rowData = row
   tbCtx.contextMenu.itemName = row.account_name || ''
+}
+
+// R7-S3-09 Task 44：双击金额穿透到序时账
+function onTbCellDblClick(row: any, column: any) {
+  const amountCols = ['未审数', 'RJE调整', 'AJE调整', '审定数']
+  if (amountCols.includes(column.label) && row.standard_account_code) {
+    penetrate.toLedger(row.standard_account_code)
+  }
 }
 
 function onTbCellContextMenu(row: any, column: any, _cell: HTMLElement, event: MouseEvent) {
@@ -879,7 +944,7 @@ async function loadTbSummary() {
   try {
     // 调用新接口：从 adjustments 表自动汇总 AJE/RJE
     const result = await api.get(
-      `/api/projects/${projectId.value}/trial-balance/summary-with-adjustments`,
+      P.trialBalance.summaryWithAdjustments(projectId.value),
       {
         params: { year: year.value, report_type: tbSummaryType.value },
         validateStatus: (s: number) => s < 600,
@@ -905,7 +970,7 @@ async function loadTbSummary() {
     } else {
       // 新接口无数据（报表行次未配置），降级：从报表配置+科目明细构建
       const standard = `${selectedTemplateType.value}_standalone`
-      const reportData = await api.get('/api/report-config', {
+      const reportData = await api.get(P.reportConfig.list, {
         params: { report_type: tbSummaryType.value, applicable_standard: standard, project_id: projectId.value },
         validateStatus: (s: number) => s < 600,
       })
@@ -966,12 +1031,12 @@ async function saveTbSummary() {
       rcl_dr: r.rcl_dr, rcl_cr: r.rcl_cr,
     }))
     await api.put(
-      `/api/consol-worksheet-data/${projectId.value}/${selectedYear.value}/tb_summary_${tbSummaryType.value}`,
+      P.consolWorksheetData.get(projectId.value, selectedYear.value, `tb_summary_${tbSummaryType.value}`),
       { sheet_key: `tb_summary_${tbSummaryType.value}`, data: { rows: saveRows } },
       { validateStatus: (s: number) => s < 600 }
     )
     ElMessage.success('试算平衡表已保存')
-  } catch { ElMessage.error('保存失败') }
+  } catch (e) { handleApiError(e, '保存试算平衡表') }
 }
 
 async function exportTbSummary() {

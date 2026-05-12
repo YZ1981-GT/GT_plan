@@ -1,8 +1,7 @@
 <template>
   <div class="gt-annotations gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">复核批注</h2>
-      <div class="gt-header-actions">
+    <GtPageHeader title="复核批注" :show-back="false">
+      <template #actions>
         <el-select v-model="filters.status" placeholder="状态" clearable size="default" @change="fetch">
           <el-option label="待处理" value="pending" />
           <el-option label="已回复" value="replied" />
@@ -14,8 +13,8 @@
           <el-option label="低" value="low" />
         </el-select>
         <el-button type="primary" @click="showCreate = true">添加批注</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
     <el-table :data="annotations" stripe>
       <el-table-column prop="cell_ref" label="单元格" width="120" />
       <el-table-column prop="content" label="内容" show-overflow-tooltip />
@@ -28,7 +27,7 @@
       </el-table-column>
       <el-table-column prop="status" label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'pending' ? 'warning' : row.status === 'replied' ? '' : 'success'" size="small">
+          <el-tag :type="(row.status === 'pending' ? 'warning' : row.status === 'replied' ? '' : 'success') || undefined" size="small">
             {{ row.status === 'pending' ? '待处理' : row.status === 'replied' ? '已回复' : '已解决' }}
           </el-tag>
         </template>

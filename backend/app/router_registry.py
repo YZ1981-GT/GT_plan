@@ -1,17 +1,42 @@
 """路由注册表 — 按业务域分组
 
 将 main.py 中 90+ 个平铺的 include_router 收口到此模块，
-按 7 个业务域分组注册，便于维护和查找。
+按 8 个业务域分组注册，便于维护和查找。
 
 路由前缀规范（IMPORTANT）：
   - 标准做法：路由器内部 prefix 只声明业务路径（如 prefix="/gate"），
     本文件在 include_router 时统一添加 prefix="/api"
   - 最终路径 = /api + 路由器内部路径 + 端点路径
 
-已知例外（不要修改）：
-  - dashboard.py：内部 prefix="/api/dashboard"，注册时不加额外前缀
-  - /wopi 路由：不加 /api 前缀（WOPI 协议要求）
-  - /api/version：直接定义在 main.py（版本探针）
+已知例外（ADR — Architecture Decision Record）：
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ 例外 1: dashboard.py                                                    │
+  │   内部 prefix="/api/dashboard"，注册时不加额外前缀                       │
+  │   原因：历史遗留，dashboard 路由在 Phase 0 直接定义了完整路径，           │
+  │         修改会破坏前端已部署的 API 调用。                                 │
+  │   影响：仅此一个路由文件，不影响其他模块。                               │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ 例外 2: /wopi 路由                                                      │
+  │   注册时 prefix="/wopi"，不加 /api 前缀                                  │
+  │   原因：WOPI 协议规范要求固定路径格式 /wopi/files/{file_id}，            │
+  │         Office Online Server 硬编码此路径，不可更改。                     │
+  │   影响：仅 WOPI 集成，与业务 API 完全隔离。                              │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ 例外 3: /api/version                                                    │
+  │   直接定义在 main.py（版本探针），不经过 router_registry                  │
+  │   原因：极简端点（3 行），无需独立路由文件。                              │
+  │   影响：无。                                                             │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ 例外 4: §13-§17 的 R3/R4/R5/R6 路由                                     │
+  │   这些路由器内部已含完整 /api 前缀，注册时不加额外前缀                   │
+  │   原因：后期 Round 开发时为避免与早期路由冲突，采用自包含前缀模式。       │
+  │   影响：新增 Round 路由应遵循此模式（内部含 /api，注册不加前缀）。        │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+变更日志：
+  - 2026-05-07: 添加 ADR 注释，文档化所有例外情况
+  - 2026-05-06: R6 新增 §15 qc_rules_router
+  - 2026-05-05: R5 新增 §14 eqcr_router
 """
 from fastapi import APIRouter, FastAPI
 
@@ -39,10 +64,12 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.data_lifecycle import router as data_lifecycle_router
     from app.routers.continuous_audit import router as continuous_audit_router
     from app.routers.ledger_datasets import router as ledger_datasets_router
+    from app.routers.dataset_force_unbind import router as dataset_force_unbind_router
 
     for r in [project_wizard_router, account_chart_router, mapping_router,
               rlm_router, data_import_router, data_lifecycle_router,
-              continuous_audit_router, ledger_datasets_router]:
+              continuous_audit_router, ledger_datasets_router,
+              dataset_force_unbind_router]:
         app.include_router(r, tags=["项目与数据"])
 
     # 导入智能增强
@@ -129,6 +156,10 @@ def register_all_routers(app: FastAPI) -> None:
               dfc_router, exhtml_router]:
         app.include_router(r, tags=["底稿管理"])
 
+    # 底稿 AI 内容确认
+    from app.routers.wp_ai_confirm import router as wp_ai_confirm_router
+    app.include_router(wp_ai_confirm_router, tags=["底稿管理"])
+
     # 底稿三式联动
     from app.routers.wp_structure import router as wpstruct_router
     app.include_router(wpstruct_router, tags=["底稿管理"])
@@ -177,6 +208,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.staff import router as staff_router
     from app.routers.assignments import router as assign_router
     from app.routers.workhours import router as wh_router
+    from app.routers.workhour_list import router as wh_list_router
     from app.routers.dashboard import router as dash_router
     from app.routers.pm_dashboard import router as pmd_router
     from app.routers.qc_dashboard import router as qcd_router
@@ -186,7 +218,7 @@ def register_all_routers(app: FastAPI) -> None:
     from app.routers.subsequent_events import router as se_router
     from app.routers.forum import router as forum_router
 
-    for r in [staff_router, assign_router, wh_router, dash_router,
+    for r in [staff_router, assign_router, wh_router, wh_list_router, dash_router,
               pmd_router, qcd_router, pd_router, rc2_router, proc_router,
               se_router, forum_router]:
         app.include_router(r, tags=["团队与看板"])
@@ -280,7 +312,91 @@ def register_all_routers(app: FastAPI) -> None:
     app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
     app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
 
-    # ═══ 13. Round 5：EQCR 工作台 ═══
-    # EQCR 路由器内部已声明 prefix="/api/eqcr"，注册时不加额外前缀。
+    # ═══ 13. Round 4：审计助理增强 ═══
+    # R4 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.workpaper_requirements import router as wpreq_router
+    from app.routers.workpaper_prior_year import router as wppy_router
+    from app.routers.workpaper_html_preview import router as wphp_router
+    from app.routers.editing_lock import router as editlock_router
+    from app.routers.ocr_fields import router as ocrf_router
+    from app.routers.penetrate_by_amount import router as pba_router
+
+    for r in [wpreq_router, wppy_router, wphp_router, editlock_router, ocrf_router, pba_router]:
+        app.include_router(r, tags=["审计助理(R4)"])
+
+    # ═══ 14. Round 5：EQCR 工作台 ═══
+    # EQCR 路由包内部已声明 prefix="/api/eqcr"，注册时不加额外前缀。
     from app.routers.eqcr import router as eqcr_router
     app.include_router(eqcr_router, tags=["eqcr"])
+
+    # ═══ 15. Round 6：QC 规则定义管理 ═══
+    # qc_rules 路由内部已声明 prefix="/api/qc/rules"，注册时不加额外前缀。
+    from app.routers.qc_rules import router as qc_rules_router
+    app.include_router(qc_rules_router, tags=["qc-rules"])
+
+    # ═══ 16. Round 3：QC 审计日志合规抽查 ═══
+    # qc_audit_log_compliance 路由内部已声明 prefix="/api/qc/audit-log-compliance"
+    from app.routers.qc_audit_log_compliance import router as qc_alc_router
+    app.include_router(qc_alc_router, tags=["qc-audit-log-compliance"])
+
+    # ═══ 18. Round 7：Stale 底稿汇总 ═══
+    # stale_summary 路由内部已声明 prefix="/api/projects/{project_id}"，注册时不加额外前缀。
+    from app.routers.stale_summary import router as stale_summary_router
+    app.include_router(stale_summary_router, tags=["stale"])
+
+    # ═══ 19. Round 7：QC 本月应抽查 ═══
+    from app.routers.qc_rotation_due import router as qc_rotation_due_router
+    app.include_router(qc_rotation_due_router, tags=["qc-rotation"])
+
+    # ═══ 20. Round 7：报表行关联底稿 ═══
+    from app.routers.report_related_workpapers import router as rrw_router
+    app.include_router(rrw_router, tags=["report-workpapers"])
+
+    # ═══ 21. Round 8：风险摘要（签字决策面板用） ═══
+    # risk_summary 路由内部已声明 prefix="/api/projects/{project_id}"，注册时不加额外前缀。
+    from app.routers.risk_summary import router as risk_summary_router
+    app.include_router(risk_summary_router, tags=["risk-summary"])
+
+    # ═══ 22. Round 8：附注行关联底稿（附注→底稿穿透） ═══
+    # note_related_workpapers 路由内部已声明 prefix="/api/notes"，注册时不加额外前缀。
+    from app.routers.note_related_workpapers import router as note_rw_router
+    app.include_router(note_rw_router, tags=["note-workpapers"])
+
+    # ═══ 17. Round 3：QC 抽查 + 评级 + 案例库 + 年报 ═══
+    # 以下 4 个路由内部已声明完整 prefix，注册时不加额外前缀。
+    from app.routers.qc_inspections import router as qc_insp_router
+    from app.routers.qc_ratings import router as qc_rat_router
+    from app.routers.qc_cases import router as qc_case_router
+    from app.routers.qc_annual_reports import router as qc_ar_router
+
+    app.include_router(qc_insp_router, tags=["qc-inspections"])
+    app.include_router(qc_rat_router, tags=["qc-ratings"])
+    app.include_router(qc_case_router, tags=["qc-cases"])
+    app.include_router(qc_ar_router, tags=["qc-annual-reports"])
+
+    # ═══ 23. 通知中心 ═══
+    # notifications 路由内部已声明 prefix="/api/notifications"，注册时不加额外前缀。
+    from app.routers.notifications import router as notifications_router
+    app.include_router(notifications_router, tags=["notifications"])
+
+    # ═══ 24. 账表导入 v2（ledger-import-unification） ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.ledger_import_v2 import router as ledger_import_v2_router
+    from app.routers.ledger_raw_extra import router as ledger_raw_extra_router
+    app.include_router(ledger_import_v2_router, tags=["ledger-import-v2"])
+    app.include_router(ledger_raw_extra_router, tags=["ledger-import-v2"])
+
+    # ═══ 25. 账表数据管理（查询/删除/增量追加） ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.ledger_data import router as ledger_data_router
+    app.include_router(ledger_data_router, tags=["ledger-data"])
+
+    # ═══ 26. Sprint 10 F43: 账表导入子系统健康检查 ═══
+    # 路由内部已声明 prefix="/api/health"，注册时不加额外前缀。
+    from app.routers.ledger_import_health import router as ledger_health_router
+    app.include_router(ledger_health_router, tags=["health"])
+
+    # ═══ 27. Sprint 8 F48: 校验规则说明文档 ═══
+    # 路由内部已声明 prefix="/api/ledger-import/validation-rules"，注册时不加额外前缀。
+    from app.routers.validation_rules import router as validation_rules_router
+    app.include_router(validation_rules_router, tags=["ledger-import-validation-rules"])

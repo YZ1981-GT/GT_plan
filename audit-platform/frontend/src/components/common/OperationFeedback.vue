@@ -1,6 +1,6 @@
 <template>
   <div class="operation-feedback">
-    <el-progress v-if="showProgress" :percentage="progress" :status="progressStatus" :stroke-width="4" />
+    <el-progress v-if="showProgress" :percentage="progress" :status="(progressStatus as '' | 'success' | 'warning' | 'exception')" :stroke-width="4" />
   </div>
 </template>
 

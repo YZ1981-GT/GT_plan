@@ -125,4 +125,161 @@ class ExportMaskService:
         return False
 
 
+    # -----------------------------------------------------------------------
+    # Round 4 需求 2: AI 脱敏 — mask_context / mask_text / _is_sensitive_amount
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _get_amount_re():
+        """金额正则：匹配 ¥1,234,567.89 / 1234567.89 / 500万元 / 1,500,000.00 等"""
+        import re
+        return re.compile(
+            r'[¥￥$]\s*[\d,]+(?:\.\d{1,2})?'  # ¥1,234,567.89
+            r'|[\d,]{4,}(?:\.\d{1,2})?\s*(?:万元|亿元|元)'  # 500万元 / 1234元
+            r'|\d+(?:\.\d+)?\s*[万亿](?:元)?'  # 500万 / 3.5亿
+            r'|[\d,]{6,}(?:\.\d{1,2})?',  # 1,500,000.00 (6+ digits with commas)
+            re.UNICODE,
+        )
+
+    @staticmethod
+    def _get_name_re():
+        """客户名/人名正则：匹配公司名和带上下文的人名"""
+        import re
+        return re.compile(
+            r'[\u4e00-\u9fff]{2,}(?:公司|集团|有限|股份|企业|银行|证券|科技)'  # 公司名
+            r'|(?:联系人|客户|经办人|负责人|法人|代表)[：:]\s*([\u4e00-\u9fff]{2,4})'  # 带标记的人名
+            r'|(?:，|,)\s*(?:客户|联系人)[：:]\s*([\u4e00-\u9fff]{2,4})',  # 逗号后的人名
+            re.UNICODE,
+        )
+
+    @staticmethod
+    def _get_id_re():
+        """身份证号正则"""
+        import re
+        return re.compile(r'\d{17}[\dXx]|\d{15}')
+
+    def _is_sensitive_amount(self, value) -> bool:
+        """判断值是否为敏感金额（>= 100000）"""
+        import re
+        if isinstance(value, (int, float)):
+            return abs(value) >= 100000
+        if isinstance(value, str):
+            # 提取数字部分
+            cleaned = re.sub(r'[¥￥$,\s]', '', value)
+            cleaned = cleaned.replace('元', '')
+            multiplier = 1
+            if '万' in cleaned:
+                cleaned = cleaned.replace('万', '')
+                multiplier = 10000
+            elif '亿' in cleaned:
+                cleaned = cleaned.replace('亿', '')
+                multiplier = 100000000
+            try:
+                num = float(cleaned) * multiplier
+                return abs(num) >= 100000
+            except (ValueError, TypeError):
+                return False
+        return False
+
+    def mask_context(self, ctx: dict | None) -> tuple[dict | None, dict]:
+        """对 AI 上下文中的敏感字段进行脱敏
+
+        Args:
+            ctx: 单元格上下文字典 {cell_ref, value, formula, ...}
+
+        Returns:
+            (masked_ctx, mapping) — 脱敏后的上下文和映射表
+        """
+        if ctx is None:
+            return None, {}
+        if not ctx:
+            return {}, {}
+
+        import copy
+        import re
+
+        masked = copy.deepcopy(ctx)
+        mapping: dict[str, str] = {}
+        counter = {"amount": 0, "client": 0, "id_number": 0}
+
+        amount_re = self._get_amount_re()
+        name_re = self._get_name_re()
+        id_re = self._get_id_re()
+
+        def _mask_value(key: str, val):
+            """对单个值进行脱敏"""
+            if val is None:
+                return val
+
+            # 数值型金额
+            if isinstance(val, (int, float)):
+                if self._is_sensitive_amount(val):
+                    counter["amount"] += 1
+                    placeholder = f"[amount_{counter['amount']}]"
+                    mapping[placeholder] = str(val)
+                    return placeholder
+                return val
+
+            if not isinstance(val, str):
+                return val
+
+            result = val
+
+            # 身份证号脱敏（优先，避免被金额正则误匹配）
+            for m in id_re.finditer(result):
+                counter["id_number"] += 1
+                placeholder = f"[id_number_{counter['id_number']}]"
+                mapping[placeholder] = m.group()
+                result = result.replace(m.group(), placeholder, 1)
+
+            # 客户名/人名脱敏
+            for m in name_re.finditer(result):
+                # 提取实际要替换的文本
+                matched_text = m.group()
+                # 如果有捕获组（人名），替换人名部分
+                name_part = m.group(1) or m.group(2) if m.lastindex else None
+                if name_part:
+                    counter["client"] += 1
+                    placeholder = f"[client_{counter['client']}]"
+                    mapping[placeholder] = name_part
+                    result = result.replace(name_part, placeholder, 1)
+                else:
+                    # 公司名整体替换
+                    counter["client"] += 1
+                    placeholder = f"[client_{counter['client']}]"
+                    mapping[placeholder] = matched_text
+                    result = result.replace(matched_text, placeholder, 1)
+
+            # 金额脱敏
+            for m in amount_re.finditer(result):
+                if self._is_sensitive_amount(m.group()):
+                    counter["amount"] += 1
+                    placeholder = f"[amount_{counter['amount']}]"
+                    mapping[placeholder] = m.group()
+                    result = result.replace(m.group(), placeholder, 1)
+
+            return result
+
+        for key in list(masked.keys()):
+            masked[key] = _mask_value(key, masked[key])
+
+        return masked, mapping
+
+    def mask_text(self, text: str) -> tuple[str, dict]:
+        """对纯文本进行脱敏（用于 HTML 预览等场景）
+
+        Args:
+            text: 待脱敏文本
+
+        Returns:
+            (masked_text, mapping)
+        """
+        if not text:
+            return text, {}
+
+        ctx = {"_text": text}
+        masked, mapping = self.mask_context(ctx)
+        return masked["_text"], mapping
+
+
 export_mask_service = ExportMaskService()

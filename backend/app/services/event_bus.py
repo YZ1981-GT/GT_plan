@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 from typing import Any, Callable, Coroutine
 
@@ -195,7 +195,7 @@ class EventBus:
             恢复并重新分发的事件数量
         """
         report = {
-            "checked_at": datetime.utcnow().isoformat(),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
             "redis_available": False,
             "read_count": 0,
             "success_count": 0,

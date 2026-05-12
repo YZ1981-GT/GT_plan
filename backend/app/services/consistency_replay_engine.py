@@ -7,7 +7,7 @@ import uuid
 import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select, func, text
@@ -60,7 +60,7 @@ class ConsistencyReplayEngine:
     ) -> ConsistencyReplayResult:
         """按快照复算五层一致性"""
         if snapshot_id is None:
-            snapshot_id = f"snap_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            snapshot_id = f"snap_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
 
         trace_id = generate_trace_id()
         layers = []
@@ -129,7 +129,10 @@ class ConsistencyReplayEngine:
                     AND t.year = tb.year
                     AND t.standard_account_code = tb.account_code
                 WHERE tb.project_id = :pid
-                    AND tb.is_deleted = false
+                    AND EXISTS (
+                      SELECT 1 FROM ledger_datasets d
+                      WHERE d.id = tb.dataset_id AND d.status = 'active'
+                    )
                 GROUP BY tb.account_code, t.unadjusted_amount
                 HAVING ABS(COALESCE(SUM(tb.closing_balance), 0) - COALESCE(t.unadjusted_amount, 0)) > 0.01
                 LIMIT 20
@@ -246,7 +249,7 @@ class ConsistencyReplayEngine:
         result = await self.replay_consistency(db, project_id, year)
         return {
             "project_id": str(project_id),
-            "replay_at": datetime.utcnow().isoformat(),
+            "replay_at": datetime.now(timezone.utc).isoformat(),
             "snapshot_id": result.snapshot_id,
             "overall_status": result.overall_status,
             "blocking_count": result.blocking_count,

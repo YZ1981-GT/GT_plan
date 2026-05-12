@@ -70,7 +70,7 @@
 
     <!-- 状态标签 -->
     <div class="formula-meta" v-if="hasFormula || isMerged || hasFetchRule">
-      <el-tag v-if="hasFormula" size="small" :type="formulaTypeColor" effect="plain" title="公式类型">{{ formulaTypeLabel || '公式' }}</el-tag>
+      <el-tag v-if="hasFormula" size="small" :type="(formulaTypeColor) || undefined" effect="plain" title="公式类型">{{ formulaTypeLabel || '公式' }}</el-tag>
       <el-tag v-if="isMerged" size="small" type="warning" effect="plain">合并{{ mergeRange }}</el-tag>
       <el-tag v-if="hasFetchRule" size="small" type="info" effect="plain">🔗取数</el-tag>
     </div>
@@ -95,6 +95,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 interface CellInfo {
   cell: string
@@ -149,7 +150,7 @@ const formulaTypeLabel = computed(() => {
   return map[formulaType.value] || formulaType.value
 })
 
-const formulaTypeColor = computed(() => {
+const formulaTypeColor = computed((): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' => {
   if (formulaType.value === 'cross_table') return 'warning'
   if (formulaType.value === 'vertical_sum') return ''
   return 'info'
@@ -251,7 +252,7 @@ async function pickSource(fn: string) {
         _ref: `TB('${r.standard_account_code || r.account_code || ''}','期末余额')`,
       }))
     } else if (fn === 'ROW' || fn === 'SUM_ROW' || fn === 'REPORT') {
-      const data = await api.get('/api/report-config', {
+      const data = await api.get(P.reportConfig.list, {
         params: { report_type: 'balance_sheet', project_id: props.projectId },
         validateStatus: (s: number) => s < 600,
       })

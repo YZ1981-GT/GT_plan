@@ -22,6 +22,7 @@ import { ref, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { getProject, getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 
 const currentYear = new Date().getFullYear()
 
@@ -84,9 +85,16 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
-  // ─── 切换年度 ───
+  // ─── 切换年度（R8-S1-04：切换时 emit eventBus 通知订阅视图） ───
   function changeYear(y: number) {
+    const prev = year.value
     year.value = y
+    if (prev !== y && projectId.value) {
+      eventBus.emit('year:changed', {
+        projectId: projectId.value,
+        year: y,
+      })
+    }
   }
 
   // ─── 切换准则 ───

@@ -46,7 +46,7 @@
       <el-table-column prop="procedure_name" label="程序名称" min-width="200" />
       <el-table-column label="类型" width="130">
         <template #default="{ row }">
-          <el-tag :type="typeTagType(row.procedure_type)" size="small">
+          <el-tag :type="(typeTagType(row.procedure_type)) || undefined" size="small">
             {{ typeLabel(row.procedure_type) }}
           </el-tag>
         </template>
@@ -257,8 +257,8 @@ function typeLabel(type: string): string {
   return labels[type] || type
 }
 
-function typeTagType(type: string): string {
-  const types: Record<string, string> = {
+function typeTagType(type: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const types: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     risk_assessment: 'info',
     control_test: 'warning',
     substantive: '',

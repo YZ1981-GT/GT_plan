@@ -37,3 +37,9 @@ async def run(stop_event: asyncio.Event) -> None:
             break
         except Exception as e:
             logger.warning("[ImportRecover] loop error: %s", e)
+            # 修复：异常后也要等 INTERVAL_SECONDS 再重试，否则死循环刷日志
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=INTERVAL_SECONDS)
+                break
+            except asyncio.TimeoutError:
+                pass

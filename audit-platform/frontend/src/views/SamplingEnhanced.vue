@@ -1,8 +1,6 @@
 <template>
   <div class="gt-sampling-enhanced gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">抽样程序增强</h2>
-    </div>
+    <GtPageHeader title="审计抽样" :show-back="false" />
     <el-tabs v-model="activeTab">
       <!-- 截止性测试 -->
       <el-tab-pane label="截止性测试" name="cutoff">
@@ -12,7 +10,7 @@
           <el-form-item label="期末前天数"><el-input-number v-model="cutoffForm.days_before" :min="1" :max="30" /></el-form-item>
           <el-form-item label="期末后天数"><el-input-number v-model="cutoffForm.days_after" :min="1" :max="30" /></el-form-item>
           <el-form-item label="金额阈值"><el-input-number v-model="cutoffForm.threshold" :min="0" :step="1000" /></el-form-item>
-          <el-form-item><el-button type="primary" @click="runCutoff" :loading="loading">执行</el-button></el-form-item>
+          <el-form-item><el-button type="primary" v-permission="'sampling:execute'" @click="runCutoff" :loading="loading">执行</el-button></el-form-item>
         </el-form>
         <el-table v-if="cutoffResult" :data="cutoffResult.entries" stripe size="small" style="margin-top: 16px">
           <el-table-column prop="voucher_date" label="日期" width="100" />
@@ -73,9 +71,11 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { cutoffTest, agingAnalysis, monthlyDetail } from '@/services/commonApi'
+import { useEditMode } from '@/composables/useEditMode'
 import { useProjectStore } from '@/stores/project'
 const route = useRoute()
 const projectId = ref(route.params.projectId as string || '')
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const projectStore = useProjectStore()
 const activeTab = ref('cutoff')
 const loading = ref(false)

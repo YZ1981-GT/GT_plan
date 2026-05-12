@@ -1,0 +1,10 @@
+[
+  {"tag": "年审", "description": "年度审计项目"},
+  {"tag": "季审", "description": "季度审计项目"},
+  {"tag": "上市准备", "description": "IPO 相关审计"},
+  {"tag": "内审", "description": "内部审计项目"},
+  {"tag": "专项", "description": "专项审计（如清算/合并）"},
+  {"tag": "税审", "description": "税务审计项目"},
+  {"tag": "国企", "description": "国有企业审计"},
+  {"tag": "上市公司", "description": "已上市公司审计"}
+]

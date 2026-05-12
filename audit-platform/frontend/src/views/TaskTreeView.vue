@@ -1,5 +1,6 @@
 <template>
   <div class="task-tree-view">
+    <GtPageHeader title="任务树" :show-back="false" />
     <!-- 顶部筛选栏 -->
     <div class="tree-toolbar">
       <el-select v-model="filters.root_level" placeholder="节点层级" clearable size="small" style="width:120px">
@@ -46,7 +47,7 @@
         <el-descriptions :column="1" border size="small">
           <el-descriptions-item label="层级">{{ selectedNode.node_level }}</el-descriptions-item>
           <el-descriptions-item label="状态">
-            <el-tag :type="statusTagType(selectedNode.status)" size="small">{{ selectedNode.status }}</el-tag>
+            <el-tag :type="(statusTagType(selectedNode.status)) || undefined" size="small">{{ selectedNode.status }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="负责人">{{ selectedNode.assignee_id || '未分配' }}</el-descriptions-item>
           <el-descriptions-item label="截止时间">{{ selectedNode.due_at || '无' }}</el-descriptions-item>
@@ -79,6 +80,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listTaskTree, getTreeStats, transitNodeStatus, type TaskNode } from '@/services/governanceApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = route.params.projectId as string
@@ -117,7 +119,7 @@ async function loadData() {
       children: [],
     }))
   } catch (e: any) {
-    ElMessage.error(e.message || '加载任务树失败')
+    handleApiError(e, '加载任务树')
   }
 }
 
@@ -125,7 +127,7 @@ function handleNodeClick(data: TreeItem) {
   selectedNode.value = data
 }
 
-function statusTagType(status: string) {
+function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   if (status === 'blocked') return 'danger'
   if (status === 'done') return 'success'
   if (status === 'in_progress') return 'primary'
@@ -139,7 +141,7 @@ async function transitTo(nextStatus: string) {
     ElMessage.success(`状态已更新为 ${nextStatus}`)
     selectedNode.value.status = nextStatus
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail?.message || '状态更新失败')
+    handleApiError(e, '状态更新')
   }
 }
 
@@ -155,7 +157,7 @@ async function loadStats() {
     }))
     showStats.value = true
   } catch (e: any) {
-    ElMessage.error('加载统计失败')
+    handleApiError(e, '加载统计')
   }
 }
 

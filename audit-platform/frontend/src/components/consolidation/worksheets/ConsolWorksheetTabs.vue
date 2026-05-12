@@ -29,7 +29,7 @@
                 <span class="cw-nav-item-label">{{ sheet.label }}</span>
                 <span class="cw-nav-item-desc">{{ sheet.desc }}</span>
               </div>
-              <el-tag v-if="sheet.tag" :type="sheet.tagType" size="small" effect="plain" style="flex-shrink:0">{{ sheet.tag }}</el-tag>
+              <el-tag v-if="sheet.tag" :type="(sheet.tagType) || undefined" size="small" effect="plain" style="flex-shrink:0">{{ sheet.tag }}</el-tag>
             </div>
           </template>
         </template>

@@ -114,6 +114,96 @@ _RENDERERS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# AI 贡献声明水印工具（R3 Sprint 4 Task 23）
+# ---------------------------------------------------------------------------
+
+def build_ai_contribution_statement(reviewer: str = "审计师") -> str:
+    """生成 AI 贡献声明文本。
+
+    Args:
+        reviewer: 审阅人名称，默认"审计师"
+
+    Returns:
+        格式化的声明文本
+    """
+    return f"本文档含 AI 辅助生成内容，已由 {reviewer} 审阅并定稿"
+
+
+def get_ai_statement_css() -> str:
+    """生成 AI 贡献声明的 CSS 样式块。"""
+    return """\
+.ai-contribution-statement {
+    position: fixed;
+    bottom: 10px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9pt;
+    color: #666;
+    padding: 4px 0;
+    border-top: 1px solid #ddd;
+}
+"""
+
+
+def get_ai_statement_html(reviewer: str = "审计师") -> str:
+    """生成 AI 贡献声明的 HTML 片段。
+
+    Args:
+        reviewer: 审阅人名称
+
+    Returns:
+        包含声明文本的 HTML div
+    """
+    text = build_ai_contribution_statement(reviewer)
+    return f'<div class="ai-contribution-statement">{text}</div>'
+
+
+def render_with_ai_statement(html_content: str, reviewer: str = "审计师") -> str:
+    """将 AI 贡献声明注入到已有 HTML 文档中。
+
+    注入逻辑：
+    1. CSS 注入到 </style> 前（若有），否则创建 <style> 注入到 </head> 前
+       若无 </head>，则在 HTML 片段中使用 inline style
+    2. HTML 片段注入到 </body> 前；若无 </body> 则追加到末尾
+
+    Args:
+        html_content: 原始 HTML 文档字符串
+        reviewer: 审阅人名称
+
+    Returns:
+        注入声明后的 HTML 文档
+    """
+    css = get_ai_statement_css()
+    statement_text = build_ai_contribution_statement(reviewer)
+
+    # 注入 CSS
+    if "</style>" in html_content:
+        html_content = html_content.replace("</style>", css + "</style>", 1)
+        html_snippet = f'<div class="ai-contribution-statement">{statement_text}</div>'
+    elif "</head>" in html_content:
+        html_content = html_content.replace(
+            "</head>", f"<style>{css}</style></head>", 1
+        )
+        html_snippet = f'<div class="ai-contribution-statement">{statement_text}</div>'
+    else:
+        # 无 head/style 标签，使用 inline style
+        html_snippet = (
+            f'<div class="ai-contribution-statement" '
+            f'style="position:fixed;bottom:10px;text-align:center;'
+            f'font-size:9pt;color:#666;">{statement_text}</div>'
+        )
+
+    # 注入 HTML 片段到 </body> 前；若无 </body> 则追加到末尾
+    if "</body>" in html_content:
+        html_content = html_content.replace("</body>", html_snippet + "</body>", 1)
+    else:
+        html_content = html_content + html_snippet + "\n"
+
+    return html_content
+
+
 class PDFExportEngine:
     """PDF导出引擎
 
@@ -196,7 +286,7 @@ class PDFExportEngine:
         if task is None:
             raise ValueError(f"导出任务不存在: {task_id}")
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         task.status = ExportTaskStatus.processing
         task.started_at = now
         task.progress_percentage = 10
@@ -219,7 +309,7 @@ class PDFExportEngine:
 
             task.progress_percentage = 100
             task.status = ExportTaskStatus.completed
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             task.file_path = str(rendered)
             task.file_size = rendered.stat().st_size if rendered.exists() else 0
             await self.db.flush()
@@ -229,7 +319,7 @@ class PDFExportEngine:
             logger.exception("Export task %s failed: %s", task_id, e)
             task.status = ExportTaskStatus.failed
             task.error_message = str(e)
-            task.completed_at = datetime.utcnow()
+            task.completed_at = datetime.now(timezone.utc)
             await self.db.flush()
             return task
 

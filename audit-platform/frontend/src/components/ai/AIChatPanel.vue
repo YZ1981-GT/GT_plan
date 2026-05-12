@@ -55,10 +55,10 @@
           </div>
         </div>
         <!-- 流式输出中的消息 -->
-        <div v-if="streamingMessage" class="chat-message assistant streaming">
+        <div v-if="streamingText" class="chat-message assistant streaming">
           <div class="message-role">🤖</div>
           <div class="message-content">
-            <div class="markdown-content" v-html="renderMarkdown(streamingMessage)"></div>
+            <div class="markdown-content" v-html="renderMarkdown(streamingText)"></div>
           </div>
         </div>
       </div>
@@ -88,6 +88,7 @@
 import { ref, reactive, computed, nextTick, watch } from 'vue'
 import { useProjectStore } from '@/stores/project'
 import CommandConfirmCard from './CommandConfirmCard.vue'
+import { useAiChat } from '@/composables/useAiChat'
 
 const props = defineProps({
   projectId: { type: String, default: null }
@@ -96,10 +97,7 @@ const props = defineProps({
 const projectStore = useProjectStore()
 const isCollapsed = ref(false)
 const inputText = ref('')
-const sending = ref(false)
-const streamingMessage = ref('')
 const chatHistoryRef = ref(null)
-const messages = ref([])
 
 const projectContext = computed(() => {
   const project = projectStore.currentProject
@@ -110,103 +108,30 @@ const projectContext = computed(() => {
   }
 })
 
-// SSE 流式对话
+// [R9 F8 Task 28] 使用 useAiChat composable 替代内联 fetch 逻辑
+const chatContext = computed(() => ({
+  project_id: props.projectId,
+  conversation_id: conversationId.value,
+}))
+
+const { messages, loading: sending, streamingText, send, clear } = useAiChat({
+  endpoint: '/api/ai/chat',
+  context: chatContext,
+  streaming: true,
+})
+
+const conversationId = ref(null)
+
+// SSE 流式对话（委托给 useAiChat）
 async function sendMessage() {
   if (!inputText.value.trim() || sending.value) return
   const text = inputText.value.trim()
   inputText.value = ''
-  sending.value = true
-
-  // 添加用户消息
-  const userMsg = {
-    id: Date.now().toString(),
-    role: 'user',
-    text,
-    sources: [],
-    commandCard: null,
-    showFileUpload: false
-  }
-  messages.value.push(userMsg)
-
-  // 添加空的 AI 消息占位
-  const aiMsgId = (Date.now() + 1).toString()
-  const aiMsg = {
-    id: aiMsgId,
-    role: 'assistant',
-    text: '',
-    sources: [],
-    commandCard: null
-  }
-  messages.value.push(aiMsg)
-
-  streamingMessage.value = ''
+  await send(text)
   scrollToBottom()
-
-  try {
-    const response = await fetch('/api/ai/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        project_id: props.projectId,
-        message: text,
-        conversation_id: conversationId.value
-      })
-    })
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let fullText = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = decoder.decode(value)
-      fullText += chunk
-      streamingMessage.value = fullText
-      scrollToBottom()
-    }
-
-    // 更新消息内容
-    const msgIdx = messages.value.findIndex(m => m.id === aiMsgId)
-    if (msgIdx >= 0) {
-      messages.value[msgIdx].text = fullText
-    }
-    streamingMessage.value = ''
-  } catch (e) {
-    console.error('AI chat error:', e)
-    const msgIdx = messages.value.findIndex(m => m.id === aiMsgId)
-    if (msgIdx >= 0) {
-      messages.value[msgIdx].text = 'AI服务暂不可用，请稍后重试。'
-    }
-  } finally {
-    sending.value = false
-  }
 }
 
-const conversationId = ref(null)
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (chatHistoryRef.value) {
-      chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight
-    }
-  })
-}
-
-function renderMarkdown(text) {
-  // 简单 markdown 渲染（依赖前端库更好的实现）
-  if (!text) return ''
-  return text
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\n/g, '<br>')
-}
-
+// 保留文件分析功能（独立于 useAiChat）
 function handleDrop(e) {
   const files = Array.from(e.dataTransfer.files)
   if (files.length > 0) {
@@ -240,15 +165,12 @@ async function processFiles(files) {
         body: formData
       })
       const result = await res.json()
-      // 文件分析结果添加到对话
-      const analysisMsg = {
+      // 文件分析结果添加到对话（直接 push 到 messages）
+      messages.value.push({
         id: Date.now().toString(),
         role: 'assistant',
         text: `📄 **${file.name}** 分析结果：\n\n${result.analysis || result.message || '分析完成'}`,
-        sources: [],
-        commandCard: null
-      }
-      messages.value.push(analysisMsg)
+      })
       scrollToBottom()
     } catch (e) {
       console.error('File analysis error:', e)
@@ -257,14 +179,12 @@ async function processFiles(files) {
 }
 
 function navigateToSource(src) {
-  // 跳转到源数据
   if (src.url) {
     window.open(src.url, '_blank')
   }
 }
 
 async function handleCommandConfirm(command) {
-  // 执行已确认的操作
   try {
     const res = await fetch('/api/ai/chat/execute-command', {
       method: 'POST',
@@ -272,15 +192,11 @@ async function handleCommandConfirm(command) {
       body: JSON.stringify({ command_id: command.id, confirmed: true })
     })
     const result = await res.json()
-    // 添加执行结果消息
-    const resultMsg = {
+    messages.value.push({
       id: Date.now().toString(),
       role: 'assistant',
       text: `✅ ${command.label} 执行完成\n\n${result.message || ''}`,
-      sources: [],
-      commandCard: null
-    }
-    messages.value.push(resultMsg)
+    })
     scrollToBottom()
   } catch (e) {
     console.error('Command execution error:', e)
@@ -288,42 +204,34 @@ async function handleCommandConfirm(command) {
 }
 
 function handleCommandCancel(command) {
-  const resultMsg = {
+  messages.value.push({
     id: Date.now().toString(),
     role: 'assistant',
     text: `❌ 已取消操作：${command.label}`,
-    sources: [],
-    commandCard: null
-  }
-  messages.value.push(resultMsg)
+  })
   scrollToBottom()
 }
 
-// 加载对话历史
-async function loadHistory() {
-  if (!props.projectId) return
-  try {
-    const res = await fetch(`/api/projects/${props.projectId}/chat/history`)
-    if (res.ok) {
-      const history = await res.json()
-      messages.value = history.map(h => ({
-        id: h.id,
-        role: h.role,
-        text: h.message_text,
-        sources: h.referenced_sources || [],
-        commandCard: null
-      }))
+function scrollToBottom() {
+  nextTick(() => {
+    if (chatHistoryRef.value) {
+      chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight
     }
-  } catch (e) {
-    console.error('Load history error:', e)
-  }
+  })
 }
 
-watch(() => props.projectId, (val) => {
-  if (val) {
-    loadHistory()
-  }
-}, { immediate: true })
+function renderMarkdown(text) {
+  if (!text) return ''
+  return text
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\n/g, '<br>')
+}
 </script>
 
 <style scoped>

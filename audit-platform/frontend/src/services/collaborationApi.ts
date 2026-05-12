@@ -1,239 +1,244 @@
-
 /**
  * 协作与质控 API 服务层
  */
 import http from '@/utils/http'
+import {
+  auth, notifications, projects, users, reviews, sync, auditLogs,
+  projectMgmt, archive, subsequentEvents, pbc, confirmations,
+  goingConcern, riskAssessments, auditPrograms, findings,
+  managementLetter,
+} from './apiPaths'
 
 // Auth
 export const authApi = {
   login: (username: string, password: string) =>
-    http.post('/api/auth/login', { username, password }),
+    http.post(auth.login, { username, password }),
   refresh: (refresh_token: string) =>
-    http.post('/api/auth/refresh', { refresh_token }),
-  logout: () => http.post('/api/auth/logout'),
-  me: () => http.get('/api/auth/me'),
+    http.post(auth.refresh, { refresh_token }),
+  logout: () => http.post(auth.logout),
+  me: () => http.get(auth.me),
 }
 
 // Notifications
 export const notificationApi = {
   list: (params?: { unread_only?: boolean; skip?: number; limit?: number }) =>
-    http.get('/api/notifications', { params }),
-  unreadCount: () => http.get('/api/notifications/unread-count'),
-  markRead: (id: string) => http.post(`/api/notifications/${id}/read`),
-  markAllRead: () => http.post('/api/notifications/read-all'),
-  delete: (id: string) => http.delete(`/api/notifications/${id}`),
+    http.get(notifications.list, { params }),
+  unreadCount: () => http.get(notifications.unreadCount),
+  markRead: (id: string) => http.post(notifications.read(id)),
+  markAllRead: () => http.post(notifications.readAll),
+  delete: (id: string) => http.delete(notifications.delete(id)),
 }
 
 // Projects & Users
 export const projectApi = {
-  list: () => http.get('/api/projects'),
-  get: (id: string) => http.get(`/api/projects/${id}`),
-  create: (data: any) => http.post('/api/projects', data),
-  update: (id: string, data: any) => http.put(`/api/projects/${id}`, data),
-  delete: (id: string) => http.delete(`/api/projects/${id}`),
+  list: () => http.get(projects.list),
+  get: (id: string) => http.get(projects.detail(id)),
+  create: (data: any) => http.post(projects.list, data),
+  update: (id: string, data: any) => http.put(projects.detail(id), data),
+  delete: (id: string) => http.delete(projects.detail(id)),
 }
 
 export const userApi = {
-  list: (params?: any) => http.get('/api/users', { params }),
-  get: (id: string) => http.get(`/api/users/${id}`),
+  list: (params?: any) => http.get(users.list, { params }),
+  get: (id: string) => http.get(users.detail(id)),
   invite: (projectId: string, data: any) =>
-    http.post(`/api/projects/${projectId}/users`, data),
+    http.post(projects.assignments(projectId), data),
   remove: (projectId: string, userId: string) =>
-    http.delete(`/api/projects/${projectId}/users/${userId}`),
+    http.delete(`${projects.assignments(projectId)}/${userId}`),
   updateRole: (projectId: string, userId: string, data: any) =>
-    http.patch(`/api/projects/${projectId}/users/${userId}`, data),
+    http.patch(`${projects.assignments(projectId)}/${userId}`, data),
 }
 
 // Reviews
 export const reviewApi = {
   create: (data: { workpaper_id: string; project_id: string; review_level: number }) =>
-    http.post('/api/reviews', data),
+    http.post(reviews.create, data),
   list: (workpaperId: string) =>
-    http.get(`/api/reviews/workpaper/${workpaperId}`),
+    http.get(reviews.workpaper(workpaperId)),
   pending: (params?: any) =>
-    http.get('/api/reviews/pending', { params }),
+    http.get(reviews.pending, { params }),
   start: (reviewId: string) =>
-    http.post(`/api/reviews/${reviewId}/start`),
+    http.post(reviews.start(reviewId)),
   approve: (reviewId: string, data?: { comments?: string; reply_text?: string }) =>
-    http.post(`/api/reviews/${reviewId}/approve`, data),
+    http.post(reviews.approve(reviewId), data),
   reject: (reviewId: string, data: { comments: string }) =>
-    http.post(`/api/reviews/${reviewId}/reject`, data),
+    http.post(reviews.reject(reviewId), data),
 }
 
 // Sync
 export const syncApi = {
   status: (projectId: string) =>
-    http.get(`/api/sync/status/${projectId}`),
+    http.get(sync.status(projectId)),
   lock: (projectId: string) =>
-    http.post(`/api/sync/lock/${projectId}`),
+    http.post(sync.lock(projectId)),
   unlock: (projectId: string) =>
-    http.post(`/api/sync/unlock/${projectId}`),
+    http.post(sync.unlock(projectId)),
   sync: (projectId: string, syncType?: string) =>
-    http.post(`/api/sync/sync/${projectId}`, null, { params: { sync_type: syncType } }),
+    http.post(sync.sync(projectId), null, { params: { sync_type: syncType } }),
   detectConflict: (projectId: string, localData: any, serverData: any) =>
-    http.post(`/api/sync-conflicts/${projectId}/detect`, { local_data: localData, server_data: serverData }),
+    http.post(sync.conflicts.detect(projectId), { local_data: localData, server_data: serverData }),
   resolveConflict: (projectId: string, data: any) =>
-    http.post(`/api/sync-conflicts/${projectId}/resolve`, data),
+    http.post(sync.conflicts.resolve(projectId), data),
   conflictHistory: (projectId: string) =>
-    http.get(`/api/sync-conflicts/${projectId}/history`),
+    http.get(sync.conflicts.history(projectId)),
 }
 
 // Audit logs
 export const auditLogApi = {
   list: (params?: any) =>
-    http.get('/api/audit-logs', { params }),
+    http.get(auditLogs.list, { params }),
 }
 
 // Project management
 export const projectMgmtApi = {
   createMilestone: (projectId: string, data: any) =>
-    http.post(`/api/projects/${projectId}/timeline`, data),
+    http.post(projectMgmt.timeline(projectId), data),
   getTimeline: (projectId: string) =>
-    http.get(`/api/projects/${projectId}/timeline`),
+    http.get(projectMgmt.timeline(projectId)),
   completeMilestone: (projectId: string, timelineId: string) =>
-    http.post(`/api/projects/${projectId}/timeline/${timelineId}/complete`),
+    http.post(projectMgmt.timelineComplete(projectId, timelineId)),
   logWorkHours: (projectId: string, data: any) =>
-    http.post(`/api/projects/${projectId}/work-hours`, data),
+    http.post(projectMgmt.workHours(projectId), data),
   getWorkHours: (projectId: string, params?: any) =>
-    http.get(`/api/projects/${projectId}/work-hours`, { params }),
+    http.get(projectMgmt.workHours(projectId), { params }),
   setBudget: (projectId: string, data: any) =>
-    http.post(`/api/projects/${projectId}/budget-hours`, data),
+    http.post(projectMgmt.budgetHours(projectId), data),
   getBudget: (projectId: string) =>
-    http.get(`/api/projects/${projectId}/budget-hours`),
+    http.get(projectMgmt.budgetHours(projectId)),
 }
 
 // Archive
 export const archiveApi = {
   initChecklist: (projectId: string) =>
-    http.post(`/api/archive/${projectId}/checklist/init`),
+    http.post(archive.checklist.init(projectId)),
   getChecklist: (projectId: string) =>
-    http.get(`/api/archive/${projectId}/checklist`),
+    http.get(archive.checklist.get(projectId)),
   completeItem: (projectId: string, itemId: string, notes?: string) =>
-    http.post(`/api/archive/${projectId}/checklist/${itemId}/complete`, null, { params: { notes } }),
+    http.post(archive.checklist.complete(projectId, itemId), null, { params: { notes } }),
   archive: (projectId: string) =>
-    http.post(`/api/archive/${projectId}/archive`),
+    http.post(archive.orchestrate(projectId)),
   exportPdf: (projectId: string, data?: { password?: string }) =>
-    http.post(`/api/archive/${projectId}/export-pdf`, data),
+    http.post(archive.exportPdf(projectId), data),
   requestModification: (projectId: string, data: any) =>
-    http.post(`/api/archive/${projectId}/modifications`, data),
+    http.post(archive.modifications.request(projectId), data),
   approveModification: (projectId: string, modId: string, comments?: string) =>
-    http.post(`/api/archive/${projectId}/modifications/${modId}/approve`, null, { params: { comments } }),
+    http.post(archive.modifications.approve(projectId, modId), null, { params: { comments } }),
   rejectModification: (projectId: string, modId: string, comments?: string) =>
-    http.post(`/api/archive/${projectId}/modifications/${modId}/reject`, null, { params: { comments } }),
+    http.post(archive.modifications.reject(projectId, modId), null, { params: { comments } }),
 }
 
 // Subsequent Events
 export const subsequentEventApi = {
   createEvent: (projectId: string, data: any) =>
-    http.post(`/api/subsequent-events/${projectId}/events`, data),
+    http.post(subsequentEvents.events(projectId), data),
   getEvents: (projectId: string) =>
-    http.get(`/api/subsequent-events/${projectId}/events`),
+    http.get(subsequentEvents.events(projectId)),
   initChecklist: (projectId: string) =>
-    http.post(`/api/subsequent-events/${projectId}/checklist/init`),
+    http.post(subsequentEvents.checklist.init(projectId)),
   getChecklist: (projectId: string) =>
-    http.get(`/api/subsequent-events/${projectId}/checklist`),
+    http.get(subsequentEvents.checklist.get(projectId)),
   completeChecklistItem: (projectId: string, itemId: string, notes?: string) =>
-    http.post(`/api/subsequent-events/${projectId}/checklist/${itemId}/complete`, null, { params: { notes } }),
+    http.post(subsequentEvents.checklist.complete(projectId, itemId), null, { params: { notes } }),
 }
 
 // PBC
 export const pbcApi = {
   createItem: (projectId: string, data: any) =>
-    http.post(`/api/pbc/${projectId}/items`, data),
+    http.post(pbc.items(projectId), data),
   getItems: (projectId: string) =>
-    http.get(`/api/pbc/${projectId}/items`),
+    http.get(pbc.items(projectId)),
   updateStatus: (projectId: string, itemId: string, data: any) =>
-    http.patch(`/api/pbc/${projectId}/items/${itemId}/status`, null, { params: data }),
+    http.patch(pbc.itemStatus(projectId, itemId), null, { params: data }),
   pendingReminders: (projectId: string) =>
-    http.get(`/api/pbc/${projectId}/pending-reminders`),
+    http.get(pbc.pendingReminders(projectId)),
 }
 
 // Confirmations
 export const confirmationApi = {
   create: (projectId: string, data: any) =>
-    http.post(`/api/confirmations/${projectId}/confirmations`, data),
+    http.post(confirmations.list(projectId), data),
   list: (projectId: string) =>
-    http.get(`/api/confirmations/${projectId}/confirmations`),
+    http.get(confirmations.list(projectId)),
   generateLetter: (projectId: string, confId: string, data: any) =>
-    http.post(`/api/confirmations/${projectId}/confirmations/${confId}/letter`, data),
+    http.post(confirmations.letter(projectId, confId), data),
   recordResult: (projectId: string, confId: string, data: any) =>
-    http.post(`/api/confirmations/${projectId}/confirmations/${confId}/result`, data),
+    http.post(confirmations.result(projectId, confId), data),
   createSummary: (projectId: string, data: any) =>
-    http.post(`/api/confirmations/${projectId}/summary`, data),
+    http.post(confirmations.summary(projectId), data),
 }
 
 // Going Concern
 export const goingConcernApi = {
   init: (projectId: string) =>
-    http.post(`/api/going-concern/${projectId}/init`),
+    http.post(goingConcern.init(projectId)),
   createEvaluation: (projectId: string, data?: any) =>
-    http.post(`/api/going-concern/${projectId}/evaluation`, data),
+    http.post(goingConcern.evaluation(projectId), data),
   getEvaluation: (projectId: string) =>
-    http.get(`/api/going-concern/${projectId}/evaluation`),
+    http.get(goingConcern.evaluation(projectId)),
   updateEvaluation: (projectId: string, gcId: string, data: any) =>
-    http.patch(`/api/going-concern/${projectId}/evaluation/${gcId}`, data),
+    http.patch(goingConcern.evaluationDetail(projectId, gcId), data),
   getIndicators: (projectId: string, gcId: string) =>
-    http.get(`/api/going-concern/${projectId}/evaluation/${gcId}/indicators`),
+    http.get(goingConcern.indicators(projectId, gcId)),
   updateIndicator: (projectId: string, gcId: string, indId: string, data: any) =>
-    http.patch(`/api/going-concern/${projectId}/evaluation/${gcId}/indicators/${indId}`, data),
+    http.patch(goingConcern.indicatorDetail(projectId, gcId, indId), data),
 }
 
 // Risk Assessment
 export const riskApi = {
   list: (projectId: string) =>
-    http.get(`/api/risk-assessments/projects/${projectId}/risk-assessments`),
+    http.get(riskAssessments.list(projectId)),
   create: (projectId: string, data: any) =>
-    http.post(`/api/risk-assessments/projects/${projectId}/risk-assessments`, data),
+    http.post(riskAssessments.list(projectId), data),
   updateResponse: (projectId: string, assessmentId: string, data: any) =>
-    http.put(`/api/risk-assessments/projects/${projectId}/risk-assessments/${assessmentId}/response`, data),
+    http.put(riskAssessments.response(projectId, assessmentId), data),
   verifyCoverage: (projectId: string, assessmentId: string) =>
-    http.post(`/api/risk-assessments/projects/${projectId}/risk-assessments/${assessmentId}/verify-coverage`),
+    http.post(riskAssessments.verifyCoverage(projectId, assessmentId)),
   getRiskMatrix: (projectId: string) =>
-    http.get(`/api/risk-assessments/projects/${projectId}/risk-matrix`),
+    http.get(riskAssessments.riskMatrix(projectId)),
   getOverallRisk: (projectId: string) =>
-    http.get(`/api/risk-assessments/projects/${projectId}/overall-risk`),
+    http.get(riskAssessments.overallRisk(projectId)),
 }
 
 // Audit Program
 export const auditProgramApi = {
   list: (projectId: string) =>
-    http.get(`/api/audit-programs/projects/${projectId}/audit-programs`),
+    http.get(auditPrograms.list(projectId)),
   create: (projectId: string, data: any) =>
-    http.post(`/api/audit-programs/projects/${projectId}/audit-programs`, data),
+    http.post(auditPrograms.list(projectId), data),
   listProcedures: (projectId: string) =>
-    http.get(`/api/audit-programs/projects/${projectId}/procedures`),
+    http.get(auditPrograms.procedures(projectId)),
   createProcedure: (projectId: string, programId: string, data: any) =>
-    http.post(`/api/audit-programs/projects/${projectId}/procedures`, data, { params: { program_id: programId } }),
+    http.post(auditPrograms.procedures(projectId), data, { params: { program_id: programId } }),
   updateProcedureStatus: (projectId: string, procedureId: string, data: any) =>
-    http.put(`/api/audit-programs/programs/${projectId}/procedures/${procedureId}`, data),
+    http.put(auditPrograms.procedureStatus(projectId, procedureId), data),
   linkWorkpaper: (projectId: string, procedureId: string, data: any) =>
-    http.post(`/api/audit-programs/programs/${projectId}/procedures/${procedureId}/link-workpaper`, data),
+    http.post(auditPrograms.linkWorkpaper(projectId, procedureId), data),
   getCoverageReport: (programId: string) =>
-    http.get(`/api/audit-programs/programs/${programId}/coverage-report`),
+    http.get(auditPrograms.coverageReport(programId)),
 }
 
 // Audit Finding
 export const findingApi = {
   list: (projectId: string) =>
-    http.get(`/api/findings/projects/${projectId}/findings`),
+    http.get(findings.list(projectId)),
   create: (projectId: string, data: any) =>
-    http.post(`/api/findings/projects/${projectId}/findings`, data),
+    http.post(findings.list(projectId), data),
   update: (findingId: string, data: any) =>
-    http.put(`/api/findings/${findingId}`, data),
+    http.put(findings.detail(findingId), data),
   linkToAdjustment: (findingId: string, adjustmentId: string) =>
-    http.post(`/api/findings/${findingId}/link-adjustment`, { adjustment_id: adjustmentId }),
+    http.post(findings.linkAdjustment(findingId), { adjustment_id: adjustmentId }),
 }
 
 // Management Letter
 export const managementLetterApi = {
   list: (projectId: string) =>
-    http.get(`/api/management-letter/projects/${projectId}/management-letter-items`),
+    http.get(managementLetter.list(projectId)),
   create: (projectId: string, data: any) =>
-    http.post(`/api/management-letter/projects/${projectId}/management-letter-items`, data),
+    http.post(managementLetter.list(projectId), data),
   updateFollowUp: (itemId: string, data: any) =>
-    http.put(`/api/management-letter/items/${itemId}/follow-up`, data),
+    http.put(managementLetter.followUp(itemId), data),
   carryForward: (projectId: string, data: { source_project_id: string }) =>
-    http.post(`/api/management-letter/projects/${projectId}/carry-forward`, data),
+    http.post(managementLetter.carryForward(projectId), data),
   get: (itemId: string) =>
-    http.get(`/api/management-letter/items/${itemId}`),
+    http.get(managementLetter.detail(itemId)),
 }

@@ -50,6 +50,9 @@ class LedgerPenetrationService:
         self.db = db
         self.redis = redis
         self._cache = cache_manager  # CacheManager instance (preferred)
+        # TODO F41: 渐进迁移——未来 __init__ 应接收 current_user_id 参数，
+        # 传递给 get_active_filter 做项目权限校验。当前所有调用保持
+        # current_user_id=None（由路由层 require_project_access 保障权限）。
 
     # ------------------------------------------------------------------
     # 核心穿透查询（无缓存版）
@@ -246,6 +249,127 @@ class LedgerPenetrationService:
         items = [dict(r._mapping) for r in result.fetchall()]
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+    # ------------------------------------------------------------------
+    # S6-8: 三元组穿透（account_code + aux_type + aux_code 精确定位）
+    # ------------------------------------------------------------------
+
+    async def get_aux_by_triplet(
+        self,
+        project_id: UUID,
+        year: int,
+        account_code: str,
+        aux_type: str,
+        aux_code: str | None = None,
+        *,
+        page: int = 1,
+        page_size: int = 100,
+    ) -> dict:
+        """三元组精确穿透：同时返回辅助余额 + 辅助明细账。
+
+        解决"税率"等维度类型跨科目重名场景：用户点科目 6001.14.02 下的
+        "客户:041108,重庆医药..." 时，能用 (6001.14.02, 客户, 041108)
+        精确定位，不受"税率"等重名维度干扰。
+
+        Returns:
+            {
+                "account": {account_code, account_name},
+                "aux": {aux_type, aux_code, aux_name},
+                "balance": {opening_balance, debit_amount, credit_amount, closing_balance},
+                "ledger": {items: [...], total, page, page_size}
+            }
+        """
+        bal_tbl = TbAuxBalance.__table__
+        led_tbl = TbAuxLedger.__table__
+
+        bal_filter = await get_active_filter(self.db, bal_tbl, project_id, year)
+        led_filter = await get_active_filter(self.db, led_tbl, project_id, year)
+
+        # 1. 辅助余额（唯一行）
+        bal_stmt = (
+            sa.select(
+                bal_tbl.c.account_code, bal_tbl.c.account_name,
+                bal_tbl.c.aux_type, bal_tbl.c.aux_code, bal_tbl.c.aux_name,
+                bal_tbl.c.opening_balance, bal_tbl.c.debit_amount,
+                bal_tbl.c.credit_amount, bal_tbl.c.closing_balance,
+            )
+            .where(
+                bal_filter,
+                bal_tbl.c.account_code == account_code,
+                bal_tbl.c.aux_type == aux_type,
+            )
+        )
+        if aux_code is not None:
+            bal_stmt = bal_stmt.where(bal_tbl.c.aux_code == aux_code)
+        bal_result = await self.db.execute(bal_stmt)
+        bal_rows = [dict(r._mapping) for r in bal_result.fetchall()]
+
+        # 2. 辅助明细账分页
+        led_base = (
+            sa.select(
+                led_tbl.c.id, led_tbl.c.voucher_date, led_tbl.c.voucher_no,
+                led_tbl.c.account_code, led_tbl.c.account_name,
+                led_tbl.c.aux_type, led_tbl.c.aux_code, led_tbl.c.aux_name,
+                led_tbl.c.debit_amount, led_tbl.c.credit_amount,
+                led_tbl.c.summary, led_tbl.c.aux_dimensions_raw,
+            )
+            .where(
+                led_filter,
+                led_tbl.c.account_code == account_code,
+                led_tbl.c.aux_type == aux_type,
+            )
+        )
+        if aux_code is not None:
+            led_base = led_base.where(led_tbl.c.aux_code == aux_code)
+
+        count_stmt = sa.select(sa.func.count()).select_from(led_base.subquery())
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        offset = (page - 1) * page_size
+        data_stmt = (
+            led_base.order_by(led_tbl.c.voucher_date, led_tbl.c.voucher_no)
+            .offset(offset).limit(page_size)
+        )
+        led_result = await self.db.execute(data_stmt)
+        led_items = [dict(r._mapping) for r in led_result.fetchall()]
+
+        # 聚合返回结构
+        account_info = (
+            {"account_code": bal_rows[0]["account_code"],
+             "account_name": bal_rows[0]["account_name"]}
+            if bal_rows else
+            {"account_code": account_code, "account_name": None}
+        )
+        aux_info = {"aux_type": aux_type, "aux_code": aux_code, "aux_name": None}
+        balance_data = {}
+        if bal_rows:
+            # 多条余额行（不同 aux_code）求和
+            from decimal import Decimal
+
+            def _sum(field: str) -> Decimal:
+                return sum((Decimal(str(r[field] or 0)) for r in bal_rows), Decimal(0))
+
+            balance_data = {
+                "opening_balance": _sum("opening_balance"),
+                "debit_amount": _sum("debit_amount"),
+                "credit_amount": _sum("credit_amount"),
+                "closing_balance": _sum("closing_balance"),
+                "aux_code_count": len({r["aux_code"] for r in bal_rows}),
+            }
+            if len(bal_rows) == 1:
+                aux_info["aux_name"] = bal_rows[0]["aux_name"]
+
+        return {
+            "account": account_info,
+            "aux": aux_info,
+            "balance": balance_data,
+            "ledger": {
+                "items": led_items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+            },
+        }
 
     # ------------------------------------------------------------------
     # 游标分页（keyset pagination）

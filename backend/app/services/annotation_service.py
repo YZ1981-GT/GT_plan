@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -93,7 +93,7 @@ class AnnotationService:
             ann.status = status
         if content:
             ann.content = content
-        ann.updated_at = datetime.utcnow()
+        ann.updated_at = datetime.now(timezone.utc)
         await db.flush()
         return self._to_dict(ann)
 

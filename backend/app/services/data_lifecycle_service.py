@@ -8,7 +8,7 @@
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -37,7 +37,11 @@ class DataLifecycleService:
         # 各表统计
         for tbl in _TABLE_NAMES:
             r = await self.db.execute(sa.text(
-                f"SELECT COUNT(*) FROM {tbl} WHERE is_deleted = false"
+                f"SELECT COUNT(*) FROM {tbl} t"
+                f" WHERE EXISTS ("
+                f"   SELECT 1 FROM ledger_datasets d"
+                f"   WHERE d.id = t.dataset_id AND d.status = 'active'"
+                f" )"
             ))
             rows = r.scalar() or 0
             r2 = await self.db.execute(sa.text(
@@ -58,13 +62,21 @@ class DataLifecycleService:
             SELECT t.project_id, p.name, p.client_name,
                    SUM(t.cnt) as total_rows
             FROM (
-                SELECT project_id, COUNT(*) as cnt FROM tb_balance WHERE is_deleted = false GROUP BY project_id
+                SELECT b.project_id, COUNT(*) as cnt FROM tb_balance b
+                WHERE EXISTS (SELECT 1 FROM ledger_datasets d WHERE d.id = b.dataset_id AND d.status = 'active')
+                GROUP BY b.project_id
                 UNION ALL
-                SELECT project_id, COUNT(*) FROM tb_aux_balance WHERE is_deleted = false GROUP BY project_id
+                SELECT ab.project_id, COUNT(*) FROM tb_aux_balance ab
+                WHERE EXISTS (SELECT 1 FROM ledger_datasets d WHERE d.id = ab.dataset_id AND d.status = 'active')
+                GROUP BY ab.project_id
                 UNION ALL
-                SELECT project_id, COUNT(*) FROM tb_ledger WHERE is_deleted = false GROUP BY project_id
+                SELECT l.project_id, COUNT(*) FROM tb_ledger l
+                WHERE EXISTS (SELECT 1 FROM ledger_datasets d WHERE d.id = l.dataset_id AND d.status = 'active')
+                GROUP BY l.project_id
                 UNION ALL
-                SELECT project_id, COUNT(*) FROM tb_aux_ledger WHERE is_deleted = false GROUP BY project_id
+                SELECT al.project_id, COUNT(*) FROM tb_aux_ledger al
+                WHERE EXISTS (SELECT 1 FROM ledger_datasets d WHERE d.id = al.dataset_id AND d.status = 'active')
+                GROUP BY al.project_id
             ) t
             LEFT JOIN projects p ON p.id = t.project_id
             GROUP BY t.project_id, p.name, p.client_name
@@ -86,8 +98,13 @@ class DataLifecycleService:
 
         for tbl in _TABLE_NAMES:
             r = await self.db.execute(sa.text(
-                f"SELECT year, COUNT(*) FROM {tbl} "
-                f"WHERE project_id = :pid AND is_deleted = false GROUP BY year ORDER BY year"
+                f"SELECT year, COUNT(*) FROM {tbl} t "
+                f"WHERE t.project_id = :pid"
+                f" AND EXISTS ("
+                f"   SELECT 1 FROM ledger_datasets d"
+                f"   WHERE d.id = t.dataset_id AND d.status = 'active'"
+                f" )"
+                f" GROUP BY year ORDER BY year"
             ), {"pid": str(project_id)})
             by_year = {row[0]: row[1] for row in r.fetchall()}
             stats["tables"][tbl] = by_year
@@ -151,7 +168,7 @@ class DataLifecycleService:
 
         if retention_until is not None:
             # 统一为 naive UTC 比较（兼容 SQLite 测试和 PG 生产）
-            now_utc = datetime.utcnow()
+            now_utc = datetime.now(timezone.utc)
             retention_naive = (
                 retention_until.replace(tzinfo=None)
                 if retention_until.tzinfo is not None

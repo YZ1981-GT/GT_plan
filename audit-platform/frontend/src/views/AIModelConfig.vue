@@ -1,17 +1,15 @@
 <template>
   <div class="ai-model-config">
-    <!-- 顶部状态栏 -->
-    <div class="ai-header">
-      <h3 class="ai-title">AI 模型配置</h3>
-      <div class="ai-header-actions">
+    <GtPageHeader title="AI 模型配置" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="refreshHealth" :loading="healthLoading">
           <el-icon><Refresh /></el-icon>检测状态
         </el-button>
         <el-button size="small" type="primary" @click="showCreateDialog = true">
           <el-icon><Plus /></el-icon>新增模型
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 健康状态卡片 -->
     <div class="ai-health-cards" v-if="health">
@@ -90,7 +88,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import { Refresh, Plus } from '@element-plus/icons-vue'
 import ModelTable from '@/components/ai/ModelTable.vue'
 import type { AIModel, AIModelCreate, AIHealthStatus } from '@/services/aiModelApi'
@@ -168,9 +167,7 @@ function onEdit(model: AIModel) {
 }
 
 async function onDelete(model: AIModel) {
-  await ElMessageBox.confirm(`确定删除模型「${model.model_name}」？`, '确认删除', {
-    type: 'warning',
-  })
+  await confirmDelete(`模型「${model.model_name}」`)
   try {
     await deleteAIModel(model.id)
     ElMessage.success('已删除')

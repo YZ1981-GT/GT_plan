@@ -59,12 +59,25 @@ async def run(stop_event: asyncio.Event) -> None:
                         batch_size=cleanup_batch_size,
                     )
                     last_cleanup_monotonic = _time.monotonic()
+                # F45 / Sprint 7.18: 刷新 DLQ 深度到 Prometheus gauge
+                try:
+                    from app.services.ledger_import.metrics import set_dlq_depth
+                    dlq_depth = await ImportEventOutboxService.dlq_depth(db)
+                    set_dlq_depth(dlq_depth)
+                except Exception:  # pragma: no cover - metrics 失败不阻断主循环
+                    logger.debug("[OutboxReplay] failed to update DLQ gauge", exc_info=True)
                 await db.commit()
 
             if report.get("failed_count"):
                 logger.warning(
                     "[OutboxReplay] failed_count=%s report=%s",
                     report.get("failed_count"), report,
+                )
+            if report.get("moved_to_dlq_count", 0) > 0:
+                logger.warning(
+                    "[OutboxReplay] moved_to_dlq_count=%s (events exhausted retries, "
+                    "investigate DLQ table event_outbox_dlq)",
+                    report.get("moved_to_dlq_count"),
                 )
             if report.get("exhausted_total_count", 0):
                 logger.warning(

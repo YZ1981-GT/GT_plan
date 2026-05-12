@@ -52,7 +52,7 @@
           <el-table-column prop="created_at" label="评价时间" width="160" />
           <el-table-column prop="conclusion_type" label="结论类型" width="180">
             <template #default="{ row }">
-              <el-tag :type="conclusionTagType(row.conclusion_type)">
+              <el-tag :type="(conclusionTagType(row.conclusion_type)) || undefined">
                 {{ conclusionLabel(row.conclusion_type) }}
               </el-tag>
             </template>
@@ -156,8 +156,8 @@ const conclusionLabel = (t: string) => {
   return map[t] || t
 }
 
-const conclusionTagType = (t: string) => {
-  const map: Record<string, string> = {
+const conclusionTagType = (t: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' => {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     NO_ISSUES: 'success',
     MITIGATING_FACTORS: 'warning',
     GOING_CONCERN_UNCERTAINTY: 'danger',

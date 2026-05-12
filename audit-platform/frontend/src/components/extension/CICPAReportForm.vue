@@ -40,6 +40,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { regulatory as P_reg } from '@/services/apiPaths'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -78,7 +79,7 @@ async function onSubmit() {
   if (!valid) return
   submitting.value = true
   try {
-    await api.post('/api/regulatory/cicpa-report', form.value)
+    await api.post(P_reg.cicpaReport, form.value)
     ElMessage.success('备案提交成功')
     emit('submitted')
     visible.value = false

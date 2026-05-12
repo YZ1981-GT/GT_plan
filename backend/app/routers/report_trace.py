@@ -5,7 +5,7 @@ Phase 10 Task 7/9/10/13/14/16/17/19/20/21 — 合并为一个路由模块减少�
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -19,6 +19,7 @@ from app.models.core import User
 from app.services.report_trace_service import ReportTraceService
 from app.services.consol_enhanced_service import ConsolLockService, IndependentModuleService
 from app.services.annotation_service import AnnotationService
+from app.services.dataset_query import get_active_filter
 
 router = APIRouter(tags=["phase10-misc"])
 
@@ -28,11 +29,12 @@ router = APIRouter(tags=["phase10-misc"])
 @router.get("/api/report-review/{project_id}/trace/{section_number}")
 async def trace_section(
     project_id: UUID, section_number: str,
+    year: int | None = None,
     db: AsyncSession = Depends(get_db),
 current_user: User = Depends(get_current_user),
 ):
     svc = ReportTraceService()
-    return await svc.trace_section(db, project_id, section_number)
+    return await svc.trace_section(db, project_id, section_number, year=year)
 
 
 @router.get("/api/projects/{project_id}/findings-summary")
@@ -98,7 +100,7 @@ async def check_in(staff_id: UUID, req: CheckInRequest, db: AsyncSession = Depen
     from app.models.phase10_models import CheckIn
     ci = CheckIn(
         staff_id=staff_id,
-        check_time=datetime.utcnow(),
+        check_time=datetime.now(timezone.utc),
         latitude=req.latitude,
         longitude=req.longitude,
         location_name=req.location_name,
@@ -138,9 +140,10 @@ async def aux_summary(project_id: UUID, year: int | None = None, db: AsyncSessio
     from app.models.audit_platform_models import TbAuxBalance, TbBalance
 
     # 辅助余额按科目汇总
-    aux_conditions = [TbAuxBalance.project_id == project_id, TbAuxBalance.is_deleted == sa.false()]
     if year:
-        aux_conditions.append(TbAuxBalance.year == year)
+        aux_conditions = [await get_active_filter(db, TbAuxBalance.__table__, project_id, year)]
+    else:
+        aux_conditions = [TbAuxBalance.project_id == project_id, TbAuxBalance.is_deleted == sa.false()]
     aux_stmt = (
         sa.select(
             TbAuxBalance.account_code,
@@ -153,9 +156,10 @@ async def aux_summary(project_id: UUID, year: int | None = None, db: AsyncSessio
     aux_map = {r.account_code: float(r.aux_total or 0) for r in aux_result.fetchall()}
 
     # 科目余额
-    bal_conditions = [TbBalance.project_id == project_id, TbBalance.is_deleted == sa.false()]
     if year:
-        bal_conditions.append(TbBalance.year == year)
+        bal_conditions = [await get_active_filter(db, TbBalance.__table__, project_id, year)]
+    else:
+        bal_conditions = [TbBalance.project_id == project_id, TbBalance.is_deleted == sa.false()]
     bal_stmt = (
         sa.select(TbBalance.account_code, TbBalance.account_name, TbBalance.closing_balance)
         .where(*bal_conditions)
@@ -221,7 +225,7 @@ current_user: User = Depends(get_current_user),
     from app.models.phase10_models import ConsolSnapshot
     snap = ConsolSnapshot(
         project_id=project_id, year=year,
-        snapshot_data={"created_at": datetime.utcnow().isoformat()},
+        snapshot_data={"created_at": datetime.now(timezone.utc).isoformat()},
         trigger_reason=reason,
     )
     db.add(snap)
@@ -321,7 +325,7 @@ async def annual_diff_report(project_id: UUID, db: AsyncSession = Depends(get_db
         return {
             "project_id": str(project_id),
             "report": "年度差异分析报告",
-            "generated_at": str(datetime.utcnow()) if 'datetime' in dir() else None,
+            "generated_at": str(datetime.now(timezone.utc)) if 'datetime' in dir() else None,
             "significant_changes": significant,
             "total_accounts": len(significant),
         }

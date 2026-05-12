@@ -74,7 +74,7 @@
 
       <!-- File type detection -->
       <div v-if="activeSheet" class="file-type-bar">
-        <el-tag :type="fileTypeTagType" size="large">
+        <el-tag :type="(fileTypeTagType) || undefined" size="large">
           检测到：{{ fileTypeLabel }}
         </el-tag>
         <span class="row-count">
@@ -237,7 +237,7 @@
               <el-icon v-else-if="d.missing_cols.length" style="color: #f56c6c"><CircleClose /></el-icon>
               <el-icon v-else style="color: #909399"><InfoFilled /></el-icon>
               <span>{{ d.sheet_name }}</span>
-              <el-tag :type="sheetTagType(d.guessed_type)" size="small">{{ typeLabel(d.guessed_type) }}</el-tag>
+              <el-tag :type="(sheetTagType(d.guessed_type)) || undefined" size="small">{{ typeLabel(d.guessed_type) }}</el-tag>
               <span style="color: #999">{{ d.row_count }} 行</span>
               <span v-if="d.missing_cols.length" style="color: #f56c6c; font-size: 12px">
                 缺少必需列：{{ d.missing_cols.map(colLabel).join('、') }}
@@ -320,7 +320,7 @@
         >
           <template #label>
             <span>
-              <el-tag :type="categoryTagType(cat)" size="small" style="margin-right: 4px">{{ categoryLabel(cat) }}</el-tag>
+              <el-tag :type="(categoryTagType(cat)) || undefined" size="small" style="margin-right: 4px">{{ categoryLabel(cat) }}</el-tag>
               {{ countNodes(nodes) }}
             </span>
           </template>
@@ -358,7 +358,7 @@
                   <span class="node-name" :class="{ 'node-name--edited': editedCodes.has(data.account_code) }">
                     {{ data.account_name }}
                   </span>
-                  <el-tag size="small" :type="data.direction === 'debit' ? '' : 'warning'">
+                  <el-tag size="small" :type="(data.direction === 'debit' ? '' : 'warning') || undefined">
                     {{ data.direction === 'debit' ? '借' : '贷' }}
                   </el-tag>
                   <span class="node-level">L{{ data.level }}</span>
@@ -376,9 +376,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { confirmForceReset } from '@/utils/confirm'
 import { UploadFilled, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import type { UploadFile, UploadInstance } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { accountChart as P_ac, columnMappings as P_cm, dataLifecycle as P_dl, importIntelligence as P_ii, ledger as P_ledger } from '@/services/apiPaths'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
 import { useWizardStore as useProjectWizardStore } from '@/stores/wizard'
 import { buildImportFormData, shouldReuseImportUploadToken } from '@/utils/importFormData'
@@ -584,7 +586,9 @@ const FILE_TYPE_LABELS: Record<string, string> = {
   unknown: '未识别类型',
 }
 
-const FILE_TYPE_TAG: Record<string, string> = {
+type _TagType = '' | 'success' | 'warning' | 'info' | 'primary' | 'danger'
+
+const FILE_TYPE_TAG: Record<string, _TagType> = {
   account_chart: 'success',
   ledger: 'primary',
   balance: 'warning',
@@ -597,13 +601,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   revenue: '收入类', expense: '费用类',
 }
 
-const CATEGORY_TAG_TYPES: Record<string, string> = {
+const CATEGORY_TAG_TYPES: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
   asset: '', liability: 'warning', equity: 'success',
   revenue: 'primary', expense: 'danger',
 }
 
 const fileTypeLabel = ref('')
-const fileTypeTagType = ref('')
+const fileTypeTagType = ref<_TagType>('')
 
 // Computed: current active sheet data
 const activeSheet = computed(() => previewSheets.value[activeSheetIdx.value] || null)
@@ -665,7 +669,7 @@ async function onSheetChange(idx: number) {
 }
 
 function categoryLabel(cat: string): string { return CATEGORY_LABELS[cat] || cat }
-function categoryTagType(cat: string): string { return CATEGORY_TAG_TYPES[cat] || '' }
+function categoryTagType(cat: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined { return CATEGORY_TAG_TYPES[cat] || undefined }
 
 function dataTypeLabel(dt: string): string {
   const m: Record<string, string> = {
@@ -695,9 +699,9 @@ function isSheetOk(d: SheetDiagnostic): boolean {
   return d.guessed_type !== 'unknown' && d.guessed_type !== 'empty' && d.missing_cols.length === 0 && d.row_count > 0
 }
 
-function sheetTagType(t: string): '' | 'success' | 'warning' | 'info' | 'danger' {
+function sheetTagType(t: string): 'success' | 'warning' | 'info' | 'danger' | undefined {
   if (t === 'balance' || t === 'ledger' || t === 'aux_balance' || t === 'aux_ledger') return 'success'
-  if (t === 'account_chart') return ''
+  if (t === 'account_chart') return undefined
   if (t === 'empty') return 'info'
   return 'warning'
 }
@@ -943,7 +947,7 @@ async function handlePreview() {
     clearSheetMappingCache()
     const formData = buildImportPreviewFormData(selectedFiles.value)
     const previewUrl = buildImportPreviewUrl({
-      basePath: `/api/projects/${wizardStore.projectId}/account-chart/preview`,
+      basePath: P_ac.preview(wizardStore.projectId),
     })
     const data = await api.post(
       previewUrl,
@@ -1043,11 +1047,7 @@ const resetting = ref(false)
 /** 用户手动点击"重置导入"按钮 */
 async function handleForceReset() {
   try {
-    await ElMessageBox.confirm(
-      '将清除当前导入状态，释放导入锁，恢复到初始上传界面。\n\n已入库的数据不受影响，下次导入会覆盖。',
-      '确认重置',
-      { confirmButtonText: '确认重置', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmForceReset('将清除当前导入状态，释放导入锁，恢复到初始上传界面。\n\n已入库的数据不受影响，下次导入会覆盖。')
   } catch {
     return // 用户取消
   }
@@ -1096,7 +1096,7 @@ async function _resetImportLock(
     const params: Record<string, any> = {}
     if (jobId) params.job_id = jobId
     if (!jobId && force) params.force = true
-    const data = await api.post(`/api/projects/${wizardStore.projectId}/account-chart/import-reset`, null, { params })
+    const data = await api.post(P_ac.importReset(wizardStore.projectId), null, { params })
     return { ok: true, message: data?.message || '重置成功' }
   } catch (err: any) {
     const detail = err?.response?.data?.detail
@@ -1118,7 +1118,7 @@ async function _resetImportLock(
 onMounted(async () => {
   if (!wizardStore.projectId) return
   try {
-    const data = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+    const data = await api.get(P_dl.importQueue(wizardStore.projectId))
     const status = data
     const activeStatuses = new Set(['pending', 'queued', 'running', 'validating', 'writing', 'activating', 'processing'])
     const currentStatus = String(status?.status || '')
@@ -1226,7 +1226,7 @@ async function saveCurrentSheetMapping() {
   }
   if (Object.keys(cleanMapping).length === 0) return
   try {
-    await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+    await api.post(P_cm.list(wizardStore.projectId), {
       file_type: sheet.file_type_guess,
       sheet_name: getMappingSheetKey(sheet),
       mapping: cleanMapping,
@@ -1247,7 +1247,7 @@ async function smartEnhanceMapping() {
 
   try {
     const { data } = await api.post(
-      `/api/projects/${wizardStore.projectId}/import-intelligence/enhance-mapping`,
+      P_ii.enhanceMapping(wizardStore.projectId),
       { headers: sheet.headers, existing_mapping: existingMapping }
     )
     const result = data
@@ -1303,7 +1303,7 @@ async function saveMapping(silent = false) {
     if (Object.keys(cleanMapping).length === 0) continue
 
     try {
-      await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+      await api.post(P_cm.list(wizardStore.projectId), {
         file_type: sheet.file_type_guess,
         sheet_name: getMappingSheetKey(sheet),
         mapping: cleanMapping,
@@ -1324,7 +1324,7 @@ async function saveMapping(silent = false) {
     }
     if (Object.keys(cleanMapping).length === 0) return
     try {
-      await api.post(`/api/projects/${wizardStore.projectId}/column-mappings`, {
+      await api.post(P_cm.list(wizardStore.projectId), {
         file_type: sheet.file_type_guess,
         sheet_name: getMappingSheetKey(sheet),
         mapping: cleanMapping,
@@ -1349,7 +1349,7 @@ async function loadSavedMapping(fileType: string, headers: string[], sheet?: She
   if (wizardStore.projectId) {
     try {
       const data = await api.get(
-        `/api/projects/${wizardStore.projectId}/column-mappings`,
+        P_cm.list(wizardStore.projectId),
         { params: { file_type: fileType } }
       )
       const mappings = data ?? {}
@@ -1449,7 +1449,7 @@ async function handleImport() {
     let importJobId: string | null = null
 
     const importUrl = buildImportJobUrl({
-      basePath: `/api/projects/${wizardStore.projectId}/account-chart/import-async`,
+      basePath: P_ac.importAsync(wizardStore.projectId),
       uploadToken: uploadToken.value,
       year: previewYear.value,
     })
@@ -1466,7 +1466,7 @@ async function handleImport() {
       maxPolls: 400,
       timeoutMessage: '导入任务仍在后台运行，请稍后刷新页面查看结果',
       onWait: () => new Promise<void>(resolve => setTimeout(resolve, 2000)),
-      fetchStatus: () => fetchImportQueueStatus(() => api.get(`/api/projects/${wizardStore.projectId}/ledger-import/jobs/${importJobId}`)),
+      fetchStatus: () => fetchImportQueueStatus(() => api.get(P_ledger.import.jobDetail(wizardStore.projectId!, importJobId!))),
       onStatus: (status) => {
         if (status && typeof status === 'object') {
           const pct = status.progress ?? 0
@@ -1549,16 +1549,12 @@ async function handleImport() {
       try {
         let queuedJobId: string | null = null
         try {
-          const queueStatus = await api.get(`/api/data-lifecycle/import-queue/${wizardStore.projectId}`)
+          const queueStatus = await api.get(P_dl.importQueue(wizardStore.projectId))
           queuedJobId = queueStatus?.job_id ? String(queueStatus.job_id) : null
         } catch {
           queuedJobId = null
         }
-        await ElMessageBox.confirm(
-          `${errMsg}\n\n如果上一次导入已中断或卡住，可以强制重置后重新导入。`,
-          '导入冲突',
-          { confirmButtonText: '强制重置', cancelButtonText: '稍后再试', type: 'warning' },
-        )
+        await confirmForceReset(errMsg + '\n\n如果上一次导入已中断或卡住，可以强制重置后重新导入。')
         // 用户选择强制重置
         const resetRes = await _resetImportLock(queuedJobId, !queuedJobId)
         if (!resetRes.ok) {
@@ -1590,7 +1586,7 @@ async function loadClientTree() {
   if (!wizardStore.projectId) return
   try {
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/account-chart/client`,
+      P_ac.client(wizardStore.projectId),
     )
     clientTree.value = data
     // 默认激活第一个大类
@@ -1652,7 +1648,7 @@ async function saveEdits() {
       ...vals,
     }))
     await api.put(
-      `/api/projects/${wizardStore.projectId}/account-chart/batch-update`,
+      P_ac.batchUpdate(wizardStore.projectId),
       { updates },
     )
     ElMessage.success(`已保存 ${updates.length} 条修改`)
@@ -1676,7 +1672,7 @@ watch(showRefMappingDialog, async (visible) => {
   loadingRefProjects.value = true
   try {
     const data = await api.get(
-      `/api/projects/${wizardStore.projectId}/column-mappings/reference-projects`,
+      P_cm.referenceProjects(wizardStore.projectId),
       { validateStatus: (s: number) => s < 600 }
     )
     refProjects.value = Array.isArray(data) ? data : []
@@ -1691,7 +1687,7 @@ async function applyRefMapping() {
   if (!selectedRefProject.value || !wizardStore.projectId) return
   try {
     await api.post(
-      `/api/projects/${wizardStore.projectId}/column-mappings/reference-copy`,
+      P_cm.referenceCopy(wizardStore.projectId),
       { source_project_id: selectedRefProject.value.id }
     )
     ElMessage.success(`已从「${selectedRefProject.value.name}」复制映射关系`)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -25,7 +25,7 @@ class ConsolLockService:
         await db.execute(sa.text(
             "UPDATE projects SET consol_lock = true, consol_lock_by = :by, "
             "consol_lock_at = :at WHERE id = :pid"
-        ), {"by": str(locked_by), "at": datetime.utcnow(), "pid": str(project_id)})
+        ), {"by": str(locked_by), "at": datetime.now(timezone.utc), "pid": str(project_id)})
         await db.flush()
         return {"locked": True, "project_id": str(project_id)}
 
@@ -150,7 +150,7 @@ class IndependentModuleService:
         if module not in valid_modules:
             raise ValueError(f"不支持的模块: {module}")
         project = Project(
-            name=f"临时项目-{module}-{datetime.utcnow().strftime('%Y%m%d%H%M')}",
+            name=f"临时项目-{module}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}",
             client_name="临时",
             manager_id=user_id,
         )

@@ -66,7 +66,7 @@ class CategoryDef:
     label: str
 
 
-# sign_off: 8 项（与 legacy SignReadinessService.check_sign_readiness 保持 id/label 对齐）
+# sign_off: 11 项（与 legacy SignReadinessService.check_sign_readiness 保持 id/label 对齐）
 SIGN_OFF_CATEGORIES: tuple[CategoryDef, ...] = (
     CategoryDef("l2_review", "所有底稿二级复核通过"),
     CategoryDef("qc_all_pass", "QC 自检全部通过"),
@@ -76,6 +76,9 @@ SIGN_OFF_CATEGORIES: tuple[CategoryDef, ...] = (
     CategoryDef("report_generated", "审计报告已生成"),
     CategoryDef("kam_confirmed", "关键审计事项已确认"),
     CategoryDef("independence", "独立性确认"),
+    CategoryDef("subsequent_events", "期后事项审阅已完成"),
+    CategoryDef("going_concern", "持续经营评价已完成"),
+    CategoryDef("mgmt_representation", "管理层声明书已获取"),
 )
 
 # export_package: 12 项（与 legacy ArchiveReadinessService.check_readiness 对齐）
@@ -135,6 +138,13 @@ _SIGN_OFF_RULE_CATEGORY: dict[str, str] = {
     "R1-EVENT-CASCADE": "misc",
     # R1 需求 10：独立性声明完整性
     "R1-INDEPENDENCE": "independence",
+    # R6 需求 2：KAM + 独立性确认 GateRule
+    "R6-KAM": "kam_confirmed",
+    "R6-INDEPENDENCE": "independence",
+    # R7 P2：期后事项 / 持续经营 / 管理层声明 GateRule
+    "R7-SUBSEQUENT": "subsequent_events",
+    "R7-GOING-CONCERN": "going_concern",
+    "R7-MGMT-REP": "mgmt_representation",
 }
 
 _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
@@ -152,6 +162,13 @@ _EXPORT_PACKAGE_RULE_CATEGORY: dict[str, str] = {
     "R1-EVENT-CASCADE": "misc",
     # R1 需求 10：独立性声明完整性
     "R1-INDEPENDENCE": "independence",
+    # R6 需求 2：KAM + 独立性确认 GateRule
+    "R6-KAM": "kam_confirmed",
+    "R6-INDEPENDENCE": "independence",
+    # R7 P2：期后事项 / 持续经营 / 管理层声明 GateRule
+    "R7-SUBSEQUENT": "subsequent_events",
+    "R7-GOING-CONCERN": "going_concern",
+    "R7-MGMT-REP": "mgmt_representation",
 }
 
 

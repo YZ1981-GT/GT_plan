@@ -1,8 +1,7 @@
 <template>
   <div class="gt-template-list">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">自定义模板管理</h2>
-      <div class="gt-header-actions">
+    <GtPageHeader title="自定义模板" :show-back="false">
+      <template #actions>
         <el-select v-model="filterCategory" placeholder="分类筛选" clearable size="small" style="width: 140px" @change="loadTemplates">
           <el-option label="行业专用" value="industry" />
           <el-option label="客户专用" value="client" />
@@ -11,14 +10,14 @@
         <el-button type="primary" size="small" @click="$router.push('/extension/custom-templates/new')">
           <el-icon><Plus /></el-icon> 新建模板
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <el-table :data="templates" v-loading="loading" stripe size="small" style="width: 100%">
       <el-table-column prop="template_name" label="模板名称" min-width="200" show-overflow-tooltip />
       <el-table-column prop="category" label="分类" width="100" align="center">
         <template #default="{ row }">
-          <el-tag size="small" :type="categoryTag(row.category)">{{ categoryLabel(row.category) }}</el-tag>
+          <el-tag size="small" :type="(categoryTag(row.category)) || undefined">{{ categoryLabel(row.category) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="version" label="版本" width="80" align="center" />
@@ -48,11 +47,13 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import {
   listCustomTemplates, validateCustomTemplate as validateTpl,
   publishCustomTemplate, deleteCustomTemplate,
 } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 const loading = ref(false)
@@ -79,13 +80,13 @@ async function validateTemplate(row: any) {
     const result = await validateTpl(row.id)
     if (result.valid) ElMessage.success('模板验证通过')
     else ElMessage.warning(`验证发现 ${result.issues?.length || 0} 个问题`)
-  } catch { ElMessage.error('验证失败') }
+  } catch (e: any) { handleApiError(e, '验证') }
   finally { row._validating = false }
 }
 
 async function publishTemplate(row: any) {
   try {
-    await ElMessageBox.confirm('确认发布此模板？发布后其他用户可在模板市场中使用。', '发布确认')
+    await confirmDangerous('确认发布此模板？发布后其他用户可在模板市场中使用。', '发布确认')
     await publishCustomTemplate(row.id)
     ElMessage.success('发布成功')
     loadTemplates()
@@ -94,15 +95,15 @@ async function publishTemplate(row: any) {
 
 async function deleteTemplate(row: any) {
   try {
-    await ElMessageBox.confirm('确认删除此模板？', '删除确认', { type: 'warning' })
+    await confirmDelete('此模板')
     await deleteCustomTemplate(row.id)
     ElMessage.success('已删除')
     loadTemplates()
   } catch { /* cancelled */ }
 }
 
-function categoryTag(c: string) {
-  const m: Record<string, string> = { industry: '', client: 'success', personal: 'warning' }
+function categoryTag(c: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const m: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = { industry: undefined, client: 'success', personal: 'warning' }
   return m[c] || 'info'
 }
 function categoryLabel(c: string) {

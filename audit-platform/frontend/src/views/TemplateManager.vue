@@ -1,8 +1,9 @@
 <template>
   <div class="gt-tpl-manager gt-fade-in">
-    <div class="gt-tpl-header">
-      <h2 class="gt-page-title">模板管理</h2>
-      <div style="display: flex; gap: 8px; align-items: center;">
+    <GtPageHeader title="模板管理" :show-back="false">
+      <template #actions>
+        <el-button v-if="!isEditing" size="small" @click="enterEdit">✏️ 编辑</el-button>
+        <el-button v-else size="small" type="warning" @click="() => exitEdit()">退出编辑</el-button>
         <SharedTemplatePicker
           config-type="workpaper_template"
           :project-id="projectId"
@@ -10,8 +11,10 @@
           @applied="onTemplateConfigApplied"
         />
         <el-button type="primary" @click="showUploadDialog = true">上传模板</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
+
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
     <el-tabs v-model="activeTab">
       <!-- 模板列表 -->
@@ -25,14 +28,14 @@
           </el-table-column>
           <el-table-column prop="status" label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="tplStatusType(row.status)" size="small">{{ tplStatusLabel(row.status) }}</el-tag>
+              <el-tag :type="(tplStatusType(row.status)) || undefined" size="small">{{ tplStatusLabel(row.status) }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <el-button size="small" @click="onNewVersion(row)">新版本</el-button>
               <el-button size="small" @click="onViewTemplate(row)">查看</el-button>
-              <el-button size="small" type="danger" @click="onDeleteTemplate(row)">删除</el-button>
+              <el-button size="small" type="danger" @click="onDeleteTemplate(row)" v-permission="'template:delete'">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -94,16 +97,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmLeave } from '@/utils/confirm'
+import { useEditMode } from '@/composables/useEditMode'
 import {
   listTemplates, uploadTemplate, createTemplateVersion, deleteTemplate,
   listTemplateSets,
   type TemplateItem, type TemplateSetItem,
 } from '@/services/workpaperApi'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = computed(() => (route.params.projectId as string) || '')
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 const activeTab = ref('templates')
 const tplLoading = ref(false)
@@ -121,8 +128,8 @@ const uploadForm = ref({
   description: '',
 })
 
-function tplStatusType(s: string) {
-  const m: Record<string, string> = { draft: 'info', published: 'success', deprecated: 'danger' }
+function tplStatusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { draft: 'info', published: 'success', deprecated: 'danger' }
   return m[s] || 'info'
 }
 
@@ -164,7 +171,7 @@ async function onNewVersion(row: TemplateItem) {
     await createTemplateVersion(row.template_code, 'minor')
     ElMessage.success('新版本已创建')
     fetchTemplates()
-  } catch { ElMessage.error('创建版本失败') }
+  } catch (e: any) { handleApiError(e, '创建版本') }
 }
 
 function onViewTemplate(row: TemplateItem) {
@@ -172,12 +179,12 @@ function onViewTemplate(row: TemplateItem) {
 }
 
 async function onDeleteTemplate(row: TemplateItem) {
-  await ElMessageBox.confirm(`确定删除模板 ${row.template_code}？`, '确认')
+  await confirmDelete(`模板 ${row.template_code}`)
   try {
     await deleteTemplate(row.id)
     ElMessage.success('模板已删除')
     fetchTemplates()
-  } catch { ElMessage.error('删除失败，可能存在引用') }
+  } catch (e: any) { handleApiError(e, '删除') }
 }
 
 function onEditSet(row: TemplateSetItem) {

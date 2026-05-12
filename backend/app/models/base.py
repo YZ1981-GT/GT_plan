@@ -4,7 +4,7 @@ import enum
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, func
+from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -85,20 +85,24 @@ class SoftDeleteMixin:
     """
 
     is_deleted: Mapped[bool] = mapped_column(default=False)
-    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     def soft_delete(self) -> None:
         """标记为软删除，自动设置 deleted_at 时间戳。"""
         self.is_deleted = True
-        self.deleted_at = datetime.utcnow()
+        self.deleted_at = datetime.now(timezone.utc)
 
 
 class TimestampMixin:
-    """时间戳 Mixin — 自动记录创建和更新时间"""
+    """时间戳 Mixin — 自动记录创建和更新时间（全部使用 aware datetime / timestamptz）"""
 
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 
@@ -111,3 +115,19 @@ class AuditMixin:
     updated_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+
+
+# ---------------------------------------------------------------------------
+# 全局类型映射：所有 datetime 列默认使用 timezone-aware TIMESTAMPTZ
+# ---------------------------------------------------------------------------
+# 历史问题：SQLAlchemy 2.0 默认 Mapped[datetime] → TIMESTAMP WITHOUT TIME ZONE，
+# 和代码中 datetime.now(timezone.utc) 不兼容，asyncpg 报"can't subtract offset-naive
+# and offset-aware datetimes"。
+#
+# 通过注册 type_annotation_map 将 Python datetime 统一映射为 timestamptz，
+# 所有 Mapped[datetime] / Mapped[datetime | None] 无需显式传 DateTime(timezone=True) 即可 aware。
+from sqlalchemy import DateTime as _DateTime  # noqa: E402
+
+Base.registry.update_type_annotation_map(
+    {datetime: _DateTime(timezone=True)}
+)

@@ -184,9 +184,7 @@
                   <span class="gt-wpb-attach-name">{{ att.file_name }}</span>
                   <span class="gt-wpb-attach-meta">
                     {{ att.attachment_type || '通用' }}  {{ formatSize(att.file_size) }}
-                    <span v-if="att.ocr_status === 'success'" class="gt-wpb-ocr-badge gt-wpb-ocr--ok">OCR✓</span>
-                    <span v-else-if="att.ocr_status === 'processing'" class="gt-wpb-ocr-badge gt-wpb-ocr--ing">OCR中</span>
-                    <span v-else-if="att.ocr_status === 'failed'" class="gt-wpb-ocr-badge gt-wpb-ocr--fail">OCR✗</span>
+                    <OcrStatusBadge v-if="att.ocr_status" :status="getOcrStatus(att)" />
                   </span>
                 </div>
                 <el-button size="small" text type="primary" @click="onPreviewAttachment(att.id)">预览</el-button>
@@ -292,12 +290,9 @@
               <span>{{ tip }}</span>
             </div>
           </div>
-          <el-input v-model="aiQuestion" type="textarea" :rows="2" placeholder="输入问题，例如：该科目审计风险点是什么？" style="margin-top: 12px" />
-          <el-button type="primary" size="small" style="margin-top: 8px" :disabled="!aiQuestion.trim()" @click="onAskAI" :loading="aiAsking" round>
-            <el-icon style="margin-right: 4px"><MagicStick /></el-icon>提问
-          </el-button>
-          <div v-if="aiAnswer" class="gt-wpb-ai-answer gt-fade-in">
-            <p>{{ aiAnswer }}</p>
+          <!-- [R9 F8 Task 29] AI 对话已移至 WorkpaperSidePanel AI Tab，此处仅保留入口提示 -->
+          <div class="gt-wpb-ai-hint" style="margin-top: 12px; padding: 12px; background: #f9f7fb; border-radius: 8px; text-align: center; color: #666; font-size: 13px;">
+            💡 AI 助手已整合到底稿编辑器侧面板，请在编辑器中使用 AI Tab 获取智能辅助
           </div>
           <!-- 审计程序检查清单 -->
           <div class="gt-wpb-checklist" v-if="auditChecklist.length">
@@ -325,7 +320,10 @@ import { MagicStick, EditPen, Paperclip, WarningFilled } from '@element-plus/ico
 import { getAllWpMappings, getWpPrefillData, getWpRecommendations, type WpAccountMapping, type WpPrefillData, type WpRecommendation } from '@/services/workpaperApi'
 import { getProjectAuditYear } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { workpapers as P_wp, attachments as P_att, wpAI as P_wpai, staff as P_staff } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
+import OcrStatusBadge from '@/components/common/OcrStatusBadge.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -423,7 +421,7 @@ watch(selectedMapping, async (m) => {
   tsjData.value = null
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/wp-mapping/tsj/${encodeURIComponent(m.account_name)}`,
+      P_wp.wpMappingTsj(projectId.value, m.account_name),
       { validateStatus: () => true }
     )
     const result = data
@@ -481,7 +479,7 @@ const treeData = computed<TreeNode[]>(() => {
   return Object.values(groups).sort((a, b) => a.label.localeCompare(b.label))
 })
 
-function filterNode(value: string, data: TreeNode) {
+function filterNode(value: string, data: any, node: any) {
   if (!value) return true
   const v = value.toLowerCase()
   return (data.label || '').toLowerCase().includes(v)
@@ -521,6 +519,13 @@ function formatSize(bytes?: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`
 }
 
+function getOcrStatus(att: any): 'ok' | 'processing' | 'failed' | 'pending' {
+  if (att.ocr_status === 'completed' || att.ocr_status === 'success' || att.ocr_status === 'ok') return 'ok'
+  if (att.ocr_status === 'processing') return 'processing'
+  if (att.ocr_status === 'failed') return 'failed'
+  return 'pending'
+}
+
 // ── 数据加载 ──
 async function refreshAll() {
   loading.value = true
@@ -532,7 +537,7 @@ async function refreshAll() {
   }
   // 加载底稿状态（非关键，静默）
   try {
-    const wps = await api.get(`/api/projects/${projectId.value}/working-papers`, { validateStatus: (s: number) => s < 500 })
+    const wps = await api.get(P_wp.list(projectId.value), { validateStatus: (s: number) => s < 500 })
     const list = Array.isArray(wps) ? wps : (wps?.items || [])
     const map: Record<string, any> = {}
     for (const w of list) {
@@ -559,7 +564,7 @@ async function loadPrefillData(m: WpAccountMapping) {
 
 async function loadAttachments(wpCode: string) {
   try {
-    const data = await api.get(`/api/attachments`, {
+    const data = await api.get(P_att.search, {
       params: { wp_code: wpCode, project_id: projectId.value },
       validateStatus: (s: number) => s < 500,
     })
@@ -582,7 +587,7 @@ async function loadAiAnalysis(m: WpAccountMapping) {
   aiLoading.value = true
   aiAnalysis.value = null
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/wp-ai/analytical-review`, {
+    const data = await api.get(P_wpai.generateExplanation(projectId.value, ''), {
       params: { account_name: m.account_name, year: year.value },
       validateStatus: (s: number) => s < 500,
     })
@@ -609,7 +614,7 @@ async function loadPriorYear(m: WpAccountMapping) {
 async function onBatchPrefill() {
   prefillLoading.value = true
   try {
-    await api.post(`/api/projects/${projectId.value}/working-papers/batch-prefill`)
+    await api.post(P_wp.batchPrefill(projectId.value))
     ElMessage.success('批量预填充已提交')
   } catch (e: any) {
     ElMessage.warning(e?.message || '预填充失败')
@@ -631,31 +636,18 @@ async function onGenerateRecommended() {
   generatingWps.value = true
   try {
     const codes = recommendations.value.map(r => r.wp_code)
-    await api.post(`/api/projects/${projectId.value}/working-papers/generate-from-codes`, { wp_codes: codes, year: year.value })
+    await api.post(P_wp.generateFromCodes(projectId.value), { wp_codes: codes, year: year.value })
     ElMessage.success('底稿生成完成')
     recommendations.value = []
     await refreshAll()
   } catch (e: any) {
-    ElMessage.error(e?.message || '生成失败')
+    handleApiError(e, '生成')
   }
   generatingWps.value = false
 }
 
-async function onAskAI() {
-  if (!aiQuestion.value.trim() || !selectedMapping.value) return
-  aiAsking.value = true
-  aiAnswer.value = ''
-  try {
-    const data = await api.post(`/api/chat/stream`, {
-      message: aiQuestion.value,
-      context: `当前底稿：${selectedMapping.value.wp_code} ${selectedMapping.value.wp_name}，科目：${selectedMapping.value.account_name}`,
-    })
-    aiAnswer.value = typeof data === 'string' ? data : (data?.content || data?.message || '暂无回复')
-  } catch {
-    aiAnswer.value = 'AI 服务暂时不可用，请稍后再试'
-  }
-  aiAsking.value = false
-}
+// [R9 F8 Task 29] AI 对话已移至 WorkpaperSidePanel AI Tab
+// onAskAI 函数已移除，AI 功能通过 WorkpaperEditor 的 AiAssistantSidebar 提供
 
 function onOpenWorkpaper() {
   if (!selectedMapping.value) return
@@ -672,7 +664,7 @@ function onOpenWorkpaper() {
 
 async function generateSingleWorkpaper(wpCode: string) {
   try {
-    await api.post(`/api/projects/${projectId.value}/working-papers/generate-from-codes`, {
+    await api.post(P_wp.generateFromCodes(projectId.value), {
       wp_codes: [wpCode],
       year: year.value,
     })
@@ -712,18 +704,19 @@ async function onAttachFileSelect(file: any) {
   const formData = new FormData()
   formData.append('file', file.raw)
   formData.append('wp_code', selectedMapping.value.wp_code)
-  formData.append('project_id', projectId.value)
+  formData.append('attachment_type', 'workpaper')
   try {
-    await api.post('/api/attachments/upload', formData)
+    await api.post(P_att.upload(projectId.value), formData)
     ElMessage.success('附件上传成功')
     loadAttachments(selectedMapping.value.wp_code)
   } catch (e: any) {
-    ElMessage.error(e?.message || '上传失败')
+    handleApiError(e, '上传')
   }
 }
 
 function onPreviewAttachment(id: string) {
-  window.open(`/api/attachments/${id}/preview`, '_blank')
+  // TODO: replace window.open with AttachmentPreviewDrawer
+  window.open(`${P_att.search}/${id}/preview`, '_blank')
 }
 
 function onManageAttachments() {
@@ -734,12 +727,12 @@ async function onConfirmAssign() {
   if (!selectedMapping.value) return
   assignLoading.value = true
   try {
-    await api.put(`/api/projects/${projectId.value}/working-papers/${selectedMapping.value.wp_code}/assign`, assignForm)
+    await api.put(`${P_wp.list(projectId.value)}/${selectedMapping.value.wp_code}/assign`, assignForm)
     ElMessage.success('委派成功')
     showAssignDialog.value = false
     await refreshAll()
   } catch (e: any) {
-    ElMessage.error(e?.message || '委派失败')
+    handleApiError(e, '委派')
   }
   assignLoading.value = false
 }
@@ -749,7 +742,7 @@ onMounted(async () => {
   await refreshAll()
   // 加载人员列表
   try {
-    const data = await api.get('/api/staff')
+    const data = await api.get(P_staff.list)
     staffList.value = Array.isArray(data) ? data : (data?.items || [])
   } catch { /* 静默 */ }
 })
@@ -867,10 +860,6 @@ onMounted(async () => {
 .gt-wpb-attach-info { flex: 1; display: flex; flex-direction: column; }
 .gt-wpb-attach-name { font-size: 13px; font-weight: 500; }
 .gt-wpb-attach-meta { font-size: 11px; color: var(--gt-color-text-tertiary); display: flex; align-items: center; gap: 6px; }
-.gt-wpb-ocr-badge { font-size: 10px; padding: 1px 4px; border-radius: 3px; font-weight: 600; }
-.gt-wpb-ocr--ok { background: var(--gt-color-success-light); color: var(--gt-color-success); }
-.gt-wpb-ocr--ing { background: var(--gt-color-wheat-light); color: #b88a00; }
-.gt-wpb-ocr--fail { background: var(--gt-color-coral-light); color: var(--gt-color-coral); }
 .gt-wpb-attach-empty { text-align: center; padding: var(--gt-space-4); color: var(--gt-color-text-tertiary); font-size: 13px; }
 .gt-wpb-attach-actions { display: flex; gap: var(--gt-space-2); }
 /* 操作按钮 */

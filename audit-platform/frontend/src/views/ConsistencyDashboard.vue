@@ -1,8 +1,11 @@
 <template>
   <div class="gt-consistency gt-fade-in">
     <div class="gt-cons-header">
-      <h2 class="gt-page-title">全链路一致性校验</h2>
-      <el-button type="primary" @click="runCheck" :loading="loading">运行校验</el-button>
+      <GtPageHeader title="全链路一致性校验" :show-back="false">
+        <template #actions>
+          <el-button type="primary" @click="runCheck" :loading="loading">运行校验</el-button>
+        </template>
+      </GtPageHeader>
     </div>
 
     <!-- 整体状态 -->

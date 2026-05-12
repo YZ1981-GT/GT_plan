@@ -655,7 +655,7 @@ async def _auto_import_data_sheets(
         CHUNK_SIZE,
     )
     from app.models.audit_platform_models import ImportBatch, ImportStatus
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     parser = GenericParser()
     result: dict[str, int] = {}
@@ -679,7 +679,7 @@ async def _auto_import_data_sheets(
                 file_name=f"auto_{data_type}",
                 data_type=data_type,
                 status=ImportStatus.processing,
-                started_at=datetime.utcnow(),
+                started_at=datetime.now(timezone.utc),
             )
             db.add(batch)
             await db.flush()
@@ -699,7 +699,7 @@ async def _auto_import_data_sheets(
 
             batch.record_count = record_count
             batch.status = ImportStatus.completed
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc)
             await db.commit()
 
             await _backfill_account_names(project_id, batch.id, data_type, db)

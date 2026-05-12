@@ -86,13 +86,22 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Loading } from '@element-plus/icons-vue'
 import { useKnowledge, knowledgePickerOptions, _resolvePickerSelection, _rejectPickerSelection } from '@/composables/useKnowledge'
 import type { KnowledgeDoc } from '@/composables/useKnowledge'
 
 const visible = defineModel<boolean>('visible', { default: false })
+const route = useRoute()
 
 const { search: doSearch } = useKnowledge()
+
+/** 当前底稿上下文（wp_code + account_name），注入搜索请求 */
+const currentContext = computed(() => {
+  const wpCode = route.query.wp_code as string || ''
+  const accountName = route.query.account_name as string || ''
+  return [wpCode, accountName].filter(Boolean).join(' ')
+})
 
 const keyword = ref('')
 const searching = ref(false)
@@ -123,7 +132,7 @@ async function onSearch() {
   selectedDocs.value = []
   try {
     const category = knowledgePickerOptions.value?.category
-    docList.value = await doSearch(keyword.value, category)
+    docList.value = await doSearch(keyword.value, category, currentContext.value)
   } finally {
     searching.value = false
   }

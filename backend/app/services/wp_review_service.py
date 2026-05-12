@@ -202,8 +202,8 @@ class WpReviewService:
         record.status = ReviewCommentStatus.replied
         record.reply_text = reply_text
         record.replier_id = replier_id
-        record.replied_at = datetime.utcnow()
-        record.updated_at = datetime.utcnow()
+        record.replied_at = datetime.now(timezone.utc)
+        record.updated_at = datetime.now(timezone.utc)
         await db.flush()
         return self._to_dict(record)
 
@@ -229,8 +229,8 @@ class WpReviewService:
 
         record.status = ReviewCommentStatus.resolved
         record.resolved_by = resolved_by
-        record.resolved_at = datetime.utcnow()
-        record.updated_at = datetime.utcnow()
+        record.resolved_at = datetime.now(timezone.utc)
+        record.updated_at = datetime.now(timezone.utc)
         await db.flush()
         return self._to_dict(record)
 
@@ -266,9 +266,28 @@ async def _build_and_persist_issue_ticket(
 ) -> IssueTicket:
     """按 R1 需求 2 的字段契约创建 IssueTicket 并 flush 到 DB。
 
+    R6 需求 3 AC5：去重校验 — 若已存在 IssueTicket(source='review_comment',
+    source_ref_id=record.id) 则直接返回已有工单，不重复创建。
+
     抛出的任何异常由调用方决定是否吞掉（主流程吞掉 + 发补偿事件，补偿
     handler 按幂等跳过即可）。
     """
+    # R6: 去重校验
+    import sqlalchemy as sa
+    existing_stmt = sa.select(IssueTicket).where(
+        IssueTicket.source == IssueSource.review_comment.value,
+        IssueTicket.source_ref_id == review_record.id,
+    )
+    existing_result = await db.execute(existing_stmt)
+    existing_ticket = existing_result.scalar_one_or_none()
+    if existing_ticket is not None:
+        logger.info(
+            "[WP_REVIEW] IssueTicket already exists for ReviewRecord=%s ticket=%s (dedup)",
+            review_record.id,
+            existing_ticket.id,
+        )
+        return existing_ticket
+
     wp = await db.get(WorkingPaper, review_record.working_paper_id)
     if wp is None:
         raise ValueError(f"WorkingPaper {review_record.working_paper_id} not found")
@@ -294,7 +313,7 @@ async def _build_and_persist_issue_ticket(
         title=title[:200],
         description=review_record.comment_text,
         owner_id=owner_id,
-        due_at=datetime.utcnow() + timedelta(hours=_REVIEW_COMMENT_SLA_HOURS),
+        due_at=datetime.now(timezone.utc) + timedelta(hours=_REVIEW_COMMENT_SLA_HOURS),
         status=IssueStatus.open.value,
         trace_id=trace_id,
         evidence_refs=[],
@@ -318,4 +337,4 @@ def _generate_trace_id() -> str:
     except Exception:  # noqa: BLE001
         import uuid as _uuid
 
-        return f"trc_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{_uuid.uuid4().hex[:12]}"
+        return f"trc_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{_uuid.uuid4().hex[:12]}"

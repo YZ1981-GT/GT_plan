@@ -115,12 +115,12 @@ export const useDictStore = defineStore('dict', () => {
   }
 
   // ─── 获取 el-tag type ───
-  function type(dictKey: string, value: string | undefined | null): string {
+  function type(dictKey: string, value: string | undefined | null): 'success' | 'warning' | 'info' | 'danger' | 'primary' {
     if (!value) return 'info'
     const entries = data.value[dictKey]
     if (!entries) return 'info'
     const entry = entries.find((e) => e.value === value)
-    return entry?.color ?? 'info'
+    return (entry?.color as 'success' | 'warning' | 'info' | 'danger' | 'primary') ?? 'info'
   }
 
   // ─── 获取某个字典的全部选项 ───

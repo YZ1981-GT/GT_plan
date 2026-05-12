@@ -1,36 +1,12 @@
 <template>
   <div class="gt-cfs-worksheet gt-fade-in">
-    <!-- 页面横幅 -->
-    <div class="gt-cfs-banner">
-      <div class="gt-cfs-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-cfs-title">现金流量表工作底稿</h2>
-        <div class="gt-cfs-info-bar">
-          <div class="gt-cfs-info-item">
-            <span class="gt-cfs-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-cfs-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-cfs-info-sep" />
-          <div class="gt-cfs-info-item">
-            <span class="gt-cfs-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-cfs-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-cfs-info-sep" />
-          <div class="gt-cfs-info-item">
-            <span class="gt-cfs-info-badge">工作底稿法编制</span>
-          </div>
-        </div>
-      </div>
-      <div class="gt-cfs-banner-row2">
+    <GtPageHeader title="现金流量表" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="onGenerate" :loading="genLoading">生成底稿</el-button>
         <el-button size="small" @click="onAutoGenerate" :loading="autoLoading">自动调整项</el-button>
         <el-button size="small" @click="showAdjForm = true">新建调整</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 平衡状态 -->
     <el-alert v-if="reconciliation" :type="reconciliation.balanced ? 'success' : 'warning'"
@@ -82,7 +58,7 @@
       </el-table-column>
       <el-table-column label="类别" width="100">
         <template #default="{ row }">
-          <el-tag size="small" :type="categoryTagType(row.cash_flow_category)">
+          <el-tag size="small" :type="(categoryTagType(row.cash_flow_category)) || undefined">
             {{ categoryLabel(row.cash_flow_category) }}
           </el-tag>
         </template>
@@ -168,7 +144,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import {
   generateCFSWorksheet, getCFSWorksheet, getCFSReconciliation,
   createCFSAdjustment, updateCFSAdjustment, deleteCFSAdjustment as apiDeleteAdj,
@@ -176,6 +153,7 @@ import {
   type CFSWorksheetRow, type CFSReconciliation, type CFSIndirectMethod,
 } from '@/services/auditPlatformApi'
 import { useProjectSelector } from '@/composables/useProjectSelector'
+import { useEditMode } from '@/composables/useEditMode'
 import { fmtAmount } from '@/utils/formatters'
 
 const route = useRoute()
@@ -202,6 +180,7 @@ const verifyResult = ref<any>(null)
 // Adjustment form
 const showAdjForm = ref(false)
 const editingAdj = ref<any>(null)
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const adjForm = ref({
   description: '', debit_account: '', credit_account: '',
   amount: 0, cash_flow_category: 'operating', cash_flow_line_item: '',
@@ -214,8 +193,8 @@ function categoryLabel(c: string) {
   return m[c] || c
 }
 
-function categoryTagType(c: string) {
-  const m: Record<string, string> = { operating: '', investing: 'success', financing: 'warning', supplementary: 'info' }
+function categoryTagType(c: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { operating: '', investing: 'success', financing: 'warning', supplementary: 'info' }
   return m[c] || 'info'
 }
 
@@ -274,7 +253,7 @@ function editAdj(row: any) {
 }
 
 async function deleteAdj(row: any) {
-  await ElMessageBox.confirm('确定删除该调整分录？', '确认')
+  await confirmDelete('该调整分录')
   await apiDeleteAdj(row.id)
   ElMessage.success('删除成功')
   await fetchAll()

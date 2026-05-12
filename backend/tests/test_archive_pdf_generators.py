@@ -120,13 +120,13 @@ class TestBuildWatermark:
         assert "审计平台" in wm
 
     def test_contains_hash_placeholder(self):
-        """水印包含 SHA-256 占位符。"""
+        """水印包含 SHA-256 占位符（manifest_hash 引用）。"""
         wm = _build_watermark()
-        assert "待归档完成后填入" in wm
+        assert "见 manifest_hash" in wm
 
     def test_custom_hash(self):
         """可传入自定义 hash 值。"""
-        wm = _build_watermark(hash_placeholder="deadbeef1234")
+        wm = _build_watermark(hash_value="deadbeef1234")
         assert "deadbeef1234" in wm
 
 

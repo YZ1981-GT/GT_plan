@@ -12,9 +12,14 @@ import { useAuthStore } from '@/stores/auth'
 // ── NProgress 活跃请求计数器 ──────────────────────────────
 let activeRequests = 0
 
+// ── Trace ID 存储（R7-S2-11）──────────────────────────────
+let _lastTraceId = ''
+/** 获取最近一次请求的 trace id（X-Request-ID 响应头） */
+export function getLastTraceId(): string { return _lastTraceId }
+
 const http = axios.create({
   baseURL: '/',
-  timeout: 30000,
+  timeout: 120000,
 })
 
 // ── 请求去重：相同 GET 请求在飞行中不重复发送 ──────────────
@@ -95,7 +100,10 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
   }
 
   if (responseData && typeof responseData === 'object') {
-    return (responseData as any)?.detail ?? (responseData as any)?.message ?? ''
+    const d = (responseData as any)?.detail ?? (responseData as any)?.message ?? ''
+    if (typeof d === 'string') return d
+    if (d && typeof d === 'object') return d.message || d.msg || JSON.stringify(d)
+    return String(d || '')
   }
 
   return typeof responseData === 'string' ? responseData : ''
@@ -132,6 +140,8 @@ let refreshQueue: Array<{
 http.interceptors.response.use(
   (response: AxiosResponse) => {
     removePending(response.config as InternalAxiosRequestConfig)
+    // R7-S2-11: 存储 trace id
+    _lastTraceId = response.headers?.['x-request-id'] || ''
     // NProgress：所有请求完成后结束进度条
     activeRequests = Math.max(0, activeRequests - 1)
     if (activeRequests === 0) NProgress.done()
@@ -161,6 +171,8 @@ http.interceptors.response.use(
   },
   async (error: AxiosError) => {
     if (error.config) removePending(error.config as InternalAxiosRequestConfig)
+    // R7-S2-11: 存储 trace id（错误响应）
+    _lastTraceId = (error.response?.headers as any)?.['x-request-id'] || ''
     // NProgress：错误时也递减计数
     activeRequests = Math.max(0, activeRequests - 1)
     if (activeRequests === 0) NProgress.done()
@@ -183,6 +195,30 @@ http.interceptors.response.use(
 
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)
+
+    // R8-S1-05：超时专门处理
+    if (error.code === 'ECONNABORTED') {
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'warning',
+        title: '请求超时',
+        message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
+        duration: 6000,
+      })
+      return Promise.reject(error)
+    }
+
+    // R8-S1-05：断网专门处理
+    if (!error.response && !navigator.onLine) {
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'warning',
+        title: '网络已断开',
+        message: '当前离线，部分操作可能无法完成。恢复网络后请重试。',
+        duration: 8000,
+      })
+      return Promise.reject(error)
+    }
 
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number }
     const authStore = useAuthStore()
@@ -282,7 +318,14 @@ http.interceptors.response.use(
 
     const displayMsg = requestId ? `${msg}（ID: ${requestId}）` : msg
     if (status && status >= 500) {
-      ElMessage.error(displayMsg)
+      // R8-S1-05：5xx 最终失败用持续性通知卡片（重试已耗尽）
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'error',
+        title: '服务器错误',
+        message: displayMsg,
+        duration: 8000,
+      })
     } else if (status === 403) {
       ElMessage.error(displayMsg)
     } else {

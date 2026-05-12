@@ -16,25 +16,25 @@
       </div>
     </transition>
 
-    <!-- 页面横幅 -->
-    <div class="gt-kb-banner">
-      <div class="gt-kb-banner-text">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 12px" @click="goHome">← 返回</el-button>
-        <div>
-          <h2 style="margin: 0">知识库</h2>
-          <p style="margin: 2px 0 0; opacity: 0.85">{{ folderTree.length }} 个分类 · {{ totalDocs }} 个文档</p>
-        </div>
-      </div>
-      <div class="gt-kb-banner-actions">
-        <el-input v-model="searchKeyword" placeholder="搜索文档..." size="small" clearable style="width: 180px"
-          @keyup.enter="onSearch" />
-        <el-button size="small" @click="onSearch" :loading="searchLoading" round>搜索</el-button>
-        <el-button size="small" @click="onCreateFolder" round>新建文件夹</el-button>
-        <el-button size="small" @click="onUploadDocs" round>上传文档</el-button>
-        <el-button size="small" @click="onUploadFolder" round>上传文件夹</el-button>
-        <el-button size="small" @click="loadTree" :loading="treeLoading" round>刷新</el-button>
-      </div>
-    </div>
+    <!-- 页面横幅 [R7-S3-01] -->
+    <GtPageHeader title="知识库" @back="goHome">
+      <template #actions>
+        <GtToolbar>
+          <template #left>
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary)">{{ folderTree.length }} 个分类 · {{ totalDocs }} 个文档</span>
+          </template>
+          <template #right>
+            <el-input v-model="searchKeyword" placeholder="搜索文档..." size="small" clearable style="width: 180px"
+              @keyup.enter="onSearch" />
+            <el-button size="small" @click="onSearch" :loading="searchLoading">搜索</el-button>
+            <el-button size="small" @click="onCreateFolder">新建文件夹</el-button>
+            <el-button size="small" @click="onUploadDocs">上传文档</el-button>
+            <el-button size="small" @click="onUploadFolder">上传文件夹</el-button>
+            <el-button size="small" @click="loadTree" :loading="treeLoading">刷新</el-button>
+          </template>
+        </GtToolbar>
+      </template>
+    </GtPageHeader>
 
     <!-- 主体：左树 + 右文档列表 -->
     <el-row :gutter="12" class="gt-kb-body">
@@ -251,14 +251,26 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmDelete, confirmBatch, confirmDangerous } from '@/utils/confirm'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import { Upload, FolderOpened } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 import { downloadFile } from '@/utils/http'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
+const route = useRoute()
+
+/** 当前底稿上下文（wp_code + account_name），用于搜索相关性加权 */
+const currentWpContext = computed(() => {
+  const wpCode = route.query.wp_code as string || ''
+  const accountName = route.query.account_name as string || ''
+  return [wpCode, accountName].filter(Boolean).join(' ')
+})
 
 function goHome() {
   router.push('/projects')
@@ -311,7 +323,7 @@ const flatFolders = computed(() => {
 async function loadTree() {
   treeLoading.value = true
   try {
-    const data = await api.get('/api/knowledge-library/tree')
+    const data = await api.get(P_kl.tree)
     folderTree.value = Array.isArray(data) ? data : (data || [])
   } catch {
     folderTree.value = []
@@ -324,7 +336,7 @@ async function onFolderClick(node: any) {
   selectedFolder.value = node
   docLoading.value = true
   try {
-    const data = await api.get(`/api/knowledge-library/folders/${node.id}/documents`)
+    const data = await api.get(P_kl.folderDocuments(node.id))
     documents.value = Array.isArray(data) ? data : (data || [])
   } catch {
     documents.value = []
@@ -342,7 +354,7 @@ function onCreateFolder() {
 
 async function doCreateFolder() {
   try {
-    await api.post('/api/knowledge-library/folders', {
+    await api.post(P_kl.folders, {
       name: newFolderName.value,
       parent_id: newFolderParent.value,
       access_level: newFolderAccess.value,
@@ -350,7 +362,7 @@ async function doCreateFolder() {
     ElMessage.success('文件夹创建成功')
     showCreateFolder.value = false
     await loadTree()
-  } catch { ElMessage.error('创建失败') }
+  } catch (e: any) { handleApiError(e, '创建') }
 }
 
 function onUploadDocs() {
@@ -497,7 +509,7 @@ async function startBackgroundUpload(files: File[], targetFolder: any) {
 
   async function createFolderRaw(name: string, parentId: string): Promise<string | null> {
     try {
-      const resp = await fetch('/api/knowledge-library/folders', {
+      const resp = await fetch(P_kl.folders, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({ name, parent_id: parentId, access_level: targetFolder.access_level || 'public' }),
@@ -516,7 +528,7 @@ async function startBackgroundUpload(files: File[], targetFolder: any) {
       formData.append('files', file, cleanName)
 
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', `/api/knowledge-library/folders/${folderId}/upload`)
+      xhr.open('POST', P_kl.folderUpload(folderId))
       const token = localStorage.getItem('token')
       if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
@@ -601,11 +613,11 @@ async function doRename() {
   renameLoading.value = true
   try {
     if (renameType.value === 'folder') {
-      await api.put(`/api/knowledge-library/folders/${renameTargetId.value}/rename`, {
+      await api.put(P_kl.folderRename(renameTargetId.value), {
         name: renameNewName.value.trim(),
       })
     } else {
-      await api.put(`/api/knowledge-library/documents/${renameTargetId.value}`, {
+      await api.put(P_kl.documentDetail(renameTargetId.value), {
         name: renameNewName.value.trim(),
       })
     }
@@ -613,7 +625,7 @@ async function doRename() {
     showRename.value = false
     await loadTree()
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
-  } catch { ElMessage.error('重命名失败') }
+  } catch (e: any) { handleApiError(e, '重命名') }
   finally { renameLoading.value = false }
 }
 
@@ -624,25 +636,25 @@ async function onDeleteFolder(folder: any) {
     '删除确认',
   )
   try {
-    await api.delete(`/api/knowledge-library/folders/${folder.id}`)
+    await api.delete(P_kl.folderDelete(folder.id))
     ElMessage.success('文件夹已删除')
     if (selectedFolder.value?.id === folder.id) {
       selectedFolder.value = null
       documents.value = []
     }
     await loadTree()
-  } catch { ElMessage.error('删除失败') }
+  } catch (e: any) { handleApiError(e, '删除') }
 }
 
 // ── 删除文档 ──
 async function onDeleteDoc(doc: any) {
   await confirmDelete(`文档「${doc.name}」`)
   try {
-    await api.delete(`/api/knowledge-library/documents/${doc.id}`)
+    await api.delete(P_kl.documentDetail(doc.id))
     ElMessage.success('已删除')
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
     await loadTree()
-  } catch { ElMessage.error('删除失败') }
+  } catch (e: any) { handleApiError(e, '删除') }
 }
 
 function formatSize(bytes: number): string {
@@ -657,11 +669,16 @@ async function onSearch() {
   if (!searchKeyword.value.trim()) return
   searchLoading.value = true
   try {
-    const data = await api.get('/api/knowledge-library/search', { params: { q: searchKeyword.value } })
+    const params: Record<string, string> = { q: searchKeyword.value }
+    // 注入当前底稿上下文做相关性加权
+    if (currentWpContext.value) {
+      params.context = currentWpContext.value
+    }
+    const data = await api.get(P_kl.search, { params })
     const results = Array.isArray(data) ? data : (data || [])
     documents.value = results
     selectedFolder.value = { name: `搜索结果: "${searchKeyword.value}" (${results.length} 条)` }
-  } catch { ElMessage.error('搜索失败') }
+  } catch (e: any) { handleApiError(e, '搜索') }
   finally { searchLoading.value = false }
 }
 
@@ -677,7 +694,7 @@ async function onBatchDelete() {
   let deleted = 0
   for (const id of selectedDocIds.value) {
     try {
-      await api.delete(`/api/knowledge-library/documents/${id}`)
+      await api.delete(P_kl.documentDetail(id))
       deleted++
     } catch { /* 单个失败不阻断 */ }
   }
@@ -737,16 +754,16 @@ async function onPreviewDoc(doc: any) {
     // 图片和 PDF 通过携带认证头的请求获取 blob，再生成 object URL
     try {
       const mimeType = isPdfFile(doc) ? 'application/pdf' : `image/${(doc.name || '').split('.').pop()?.toLowerCase() || 'jpeg'}`
-      const response = await api.get(`/api/knowledge-library/documents/${doc.id}/download`, { responseType: 'blob' })
+      const response = await api.get(P_kl.documentDownload(doc.id), { responseType: 'blob' })
       const blob = new Blob([response], { type: mimeType })
       previewUrl.value = URL.createObjectURL(blob)
-    } catch {
-      ElMessage.error('预览加载失败')
+    } catch (e: any) {
+      handleApiError(e, '预览加载')
     }
   } else if (isTextFile(doc)) {
     // 文本文件加载内容
     try {
-      const data = await api.get(`/api/knowledge-library/documents/${doc.id}/preview`)
+      const data = await api.get(P_kl.documentPreview(doc.id))
       const result = data
       previewText.value = result?.content || '（空文件）'
     } catch {
@@ -758,8 +775,8 @@ async function onPreviewDoc(doc: any) {
 
 async function onDownloadDoc(doc: any) {
   try {
-    await downloadFile(`/api/knowledge-library/documents/${doc.id}/download`, { fileName: doc.name })
-  } catch { ElMessage.error('下载失败') }
+    await downloadFile(P_kl.documentDownload(doc.id), { fileName: doc.name })
+  } catch (e: any) { handleApiError(e, '下载') }
 }
 
 // 移动文档
@@ -775,11 +792,11 @@ async function _onMoveDoc(doc: any) {
     return
   }
   try {
-    await api.put(`/api/knowledge-library/documents/${doc.id}/move`, { target_folder_id: target.id })
+    await api.put(P_kl.documentMove(doc.id), { target_folder_id: target.id })
     ElMessage.success(`已移动到「${target.name}」`)
     if (selectedFolder.value) await onFolderClick(selectedFolder.value)
     await loadTree()
-  } catch { ElMessage.error('移动失败') }
+  } catch (e: any) { handleApiError(e, '移动') }
 }
 
 // 文件夹右键重命名
@@ -790,10 +807,10 @@ async function _onFolderContextMenu(folder: any, event: MouseEvent) {
   })
   if (!value || value === folder.name) return
   try {
-    await api.put(`/api/knowledge-library/folders/${folder.id}/rename`, { name: value })
+    await api.put(P_kl.folderRename(folder.id), { name: value })
     ElMessage.success('重命名成功')
     await loadTree()
-  } catch { ElMessage.error('重命名失败') }
+  } catch (e: any) { handleApiError(e, '重命名') }
 }
 
 onMounted(async () => {

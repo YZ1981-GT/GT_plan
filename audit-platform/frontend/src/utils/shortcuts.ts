@@ -82,13 +82,9 @@ export function registerDefaultShortcuts(_router: any) {
     eventBus.emit('shortcut:save')
   }, '保存当前编辑内容', '底稿编辑/附注编辑/报告编辑')
 
-  shortcutManager.register('Ctrl+Z', () => {
-    eventBus.emit('shortcut:undo')
-  }, '撤销上一步操作', '全局')
-
-  shortcutManager.register('Ctrl+Shift+Z', () => {
-    eventBus.emit('shortcut:redo')
-  }, '重做', '全局')
+  // [R9 F9 Task 31] Ctrl+Z/Y 不再由 shortcutManager 注册
+  // Univer 编辑器内置 undo/redo 命令系统，原生处理 Ctrl+Z/Ctrl+Shift+Z
+  // 如果 shortcutManager 拦截这些快捷键，会阻止 Univer 的撤销/重做功能
 
   // 注意：不注册 Ctrl+F，避免阻止浏览器原生搜索。
   // 各模块（TrialBalance/DisclosureEditor）自行监听 keydown 实现表内搜索。
@@ -114,6 +110,10 @@ export function registerDefaultShortcuts(_router: any) {
   }, '刷新当前数据', '全局')
 
   shortcutManager.register('Ctrl+/', () => {
+    eventBus.emit('shortcut:help')
+  }, '显示快捷键帮助面板', '全局')
+
+  shortcutManager.register('F1', () => {
     eventBus.emit('shortcut:help')
   }, '显示快捷键帮助面板', '全局')
 

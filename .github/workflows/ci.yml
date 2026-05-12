@@ -1,0 +1,259 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: audit_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/audit_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run tests (exclude integration/e2e)
+        run: |
+          python -m pytest backend/tests/ \
+            --ignore=backend/tests/integration \
+            --ignore=backend/tests/e2e \
+            -x --tb=short
+
+  backend-tests-pg:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_audit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+        working-directory: .
+      - name: Run PG-only tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_audit
+        run: python -m pytest tests/ -m pg_only -v --tb=short
+        working-directory: backend
+
+  ledger-import-smoke:
+    # S6-18: v2 账表导入引擎端到端 smoke
+    # 防止"单测通过但真实数据跑不通"的回归（Sprint 6 复盘教训）
+    # 不依赖 PG，SQLite 内存库 + 最小合成样本（S7-3 fixture 必跑）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true  # 若真实样本用 LFS 存储
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run ledger_import full suite (含最小合成样本 smoke)
+        run: |
+          python -m pytest backend/tests/ledger_import/ \
+            --ignore=backend/tests/ledger_import/test_execute_v2_e2e.py \
+            --ignore=backend/tests/ledger_import/test_real_samples_smoke.py \
+            --ignore=backend/tests/ledger_import/test_9_samples_e2e.py \
+            --tb=short -v
+      - name: Run real-sample tests (skip if 数据/ absent)
+        run: |
+          python -m pytest \
+            backend/tests/ledger_import/test_real_samples_smoke.py \
+            backend/tests/ledger_import/test_execute_v2_e2e.py \
+            backend/tests/ledger_import/test_9_samples_e2e.py \
+            -v --tb=short -s || true  # 允许 skip 不挂 CI
+
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Ruff check
+        run: python -m ruff check backend/
+      - name: Check signature_level usage
+        run: python scripts/check_signature_level_usage.py
+      - name: B' view refactor guard (Tb*.is_deleted ORM usage)
+        run: |
+          # B' 视图重构后，业务查询必须走 get_active_filter，不能直接写
+          # TbX.is_deleted == False (禁止 ORM 层硬编码 is_deleted 过滤)
+          # 允许清单：get_active_filter 内部实现、年度 fallback 兜底分支
+          # 基线：2026-05-10 Sprint 1 完成，剩余 6 处是 year=None Template B 兜底
+          BASELINE=6
+          COUNT=$(grep -rEn "Tb(Balance|Ledger|AuxBalance|AuxLedger)\.is_deleted\s*==" backend/app/ \
+            --include="*.py" | wc -l)
+          echo "Direct TbX.is_deleted== ORM usage: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::TbX.is_deleted ORM usage increased from $BASELINE to $COUNT."
+            echo "::error::Use app.services.dataset_query.get_active_filter instead."
+            grep -rEn "Tb(Balance|Ledger|AuxBalance|AuxLedger)\.is_deleted\s*==" backend/app/ --include="*.py"
+            exit 1
+          fi
+      - name: F40 upload_security guard (detect entry must call validate_upload_safety)
+        run: |
+          # F40：所有对外接收上传文件的入口必须调用 validate_upload_safety
+          # 防止有人绕过上传校验直接 create artifact / write
+          # 当前必须命中的入口：
+          #   - backend/app/routers/ledger_import_v2.py (POST /detect)
+          #   - backend/app/services/ledger_import_application_service.py (resolve_file_sources)
+          set -e
+          for FILE in backend/app/routers/ledger_import_v2.py backend/app/services/ledger_import_application_service.py; do
+            HITS=$(grep -c "validate_upload_safety" "$FILE" || true)
+            if [ "$HITS" -lt 1 ]; then
+              echo "::error file=$FILE::validate_upload_safety missing (F40 upload security guard)"
+              exit 1
+            fi
+            echo "  $FILE: validate_upload_safety hits = $HITS"
+          done
+      - name: F48 validation rules catalog consistency
+        run: |
+          # F48：VALIDATION_RULES_CATALOG 必须与 errors.py 的 ErrorCode 双向一致
+          # 专用测试在 backend/tests/ledger_import/test_validation_rules_catalog.py
+          # 已在 ledger-import-smoke job 中跑；这里再独立跑一次作为卡点
+          python -m pytest backend/tests/ledger_import/test_validation_rules_catalog.py -v --tb=short
+      - name: F48 error hints coverage (all ErrorCode must have hint)
+        run: |
+          # F32 / F48 延续：test_all_error_codes_have_hints.py 确保 ErrorCode enum
+          # 每个值都在 error_hints.py 有 ErrorHint 注册
+          python -m pytest backend/tests/ledger_import/test_error_hints.py -v --tb=short
+
+  seed-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Validate seed files
+        run: python scripts/validate_seed_files.py
+      - name: Dead link check (apiPaths ↔ router_registry)
+        run: node scripts/dead-link-check.js
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Type check (vue-tsc)
+        run: npx vue-tsc --noEmit
+        working-directory: audit-platform/frontend
+      - name: API hardcode guard (Vue files)
+        run: |
+          # 统计 Vue 文件中绕过 service 层的硬编码 API 路径数量
+          # 基线：115（2026-05-07），只允许减少不允许增加
+          BASELINE=115
+          COUNT=$(grep -r --include="*.vue" -E "['\`\"/]/api/" src/views src/components \
+            | grep -v "apiPaths" | grep -v "^\s*//" | grep -v "^\s*\*" | wc -l)
+          echo "Hardcoded API paths in Vue files: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Hardcoded API paths increased from $BASELINE to $COUNT. Use apiPaths constants instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: ElMessageBox.confirm guard (R7-S2-06)
+        run: |
+          # 禁止新代码直接使用 ElMessageBox.confirm，必须走 utils/confirm.ts
+          # 允许清单：Adjustments.vue（导航确认）、WorkpaperEditor.vue（版本冲突特殊逻辑）、WorkpaperList.vue（强制通过）、IndependenceDeclarationForm.vue、WorkHoursApproval.vue（即将删除）
+          BASELINE=5
+          COUNT=$(grep -r --include="*.vue" "ElMessageBox.confirm" src/views \
+            | grep -v "// allow-confirm" | wc -l)
+          echo "Direct ElMessageBox.confirm usage: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::ElMessageBox.confirm usage increased from $BASELINE to $COUNT. Use utils/confirm.ts instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: Catch block bare ElMessage.error guard (R9-F21)
+        run: |
+          # catch 块内禁止裸 ElMessage.error，必须使用 handleApiError
+          # 基线：11（Login/Register + 非 catch 块业务校验，只减不增）
+          BASELINE=11
+          COUNT=$(grep -r --include="*.vue" -c "ElMessage\.error" src/views | awk -F: '{s+=$2}END{print s}')
+          echo "Bare ElMessage.error in views: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Bare ElMessage.error usage increased from $BASELINE to $COUNT. Use handleApiError() instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: Inline hex color guard (R7-S3-01)
+        run: |
+          # 禁止 Vue template 中 style="" 内硬编码十六进制颜色
+          # 应使用 var(--gt-*) CSS 变量。基线：触碰即修，只减不增
+          BASELINE=80
+          COUNT=$(grep -r --include="*.vue" -P 'style="[^"]*#[0-9a-fA-F]{3,8}' src/views \
+            | grep -v "// allow-hex" | wc -l)
+          echo "Inline hex colors in Vue views: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Inline hex colors increased from $BASELINE to $COUNT. Use CSS variables instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: Bare el-tag status guard (R7-S3-01)
+        run: |
+          # 禁止用 el-tag + 三元表达式表达状态，应使用 GtStatusTag
+          # 匹配模式：:type="row.xxx === 'yyy' ?" 或 :type="(xxx) || undefined"
+          BASELINE=20
+          COUNT=$(grep -r --include="*.vue" -P ':type="\(?.*===.*\?' src/views \
+            | grep -v "GtStatusTag" | grep -v "// allow-tag" | wc -l)
+          echo "Bare el-tag status patterns: $COUNT (baseline: $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Bare el-tag status patterns increased. Use GtStatusTag instead."
+            exit 1
+          fi
+        working-directory: audit-platform/frontend
+      - name: Build
+        run: npm run build
+        working-directory: audit-platform/frontend

@@ -306,7 +306,7 @@ class WOPIHostService:
         # 5. 更新数据库
         old_version = wp.file_version
         wp.file_version += 1
-        wp.updated_at = datetime.utcnow()
+        wp.updated_at = datetime.now(timezone.utc)
         wp.prefill_stale = True
         await db.flush()
 
@@ -418,7 +418,7 @@ class WOPIHostService:
                                     pd = _wp_obj.parsed_data or {}
                                     pd["fine_checks"] = data.get("checks", [])
                                     pd["fine_summary"] = data.get("summary", {})
-                                    pd["fine_extracted_at"] = datetime.utcnow().isoformat()
+                                    pd["fine_extracted_at"] = datetime.now(timezone.utc).isoformat()
                                     _wp_obj.parsed_data = pd
                                     flag_modified(_wp_obj, "parsed_data")
                                     await fine_db.commit()
@@ -576,7 +576,7 @@ class WOPIHostService:
 
         Validates: Requirements 3.2
         """
-        expire = datetime.utcnow() + timedelta(minutes=expires_minutes)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
         payload = {
             "sub": str(user_id),
             "project_id": str(project_id),

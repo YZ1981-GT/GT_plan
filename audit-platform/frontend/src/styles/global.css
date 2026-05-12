@@ -714,6 +714,20 @@ body {
    条件格式（金额单元格）
    配合 displayPrefs.amountClass() 使用
    ═══════════════════════════════════════════════════════════════ */
+
+/* 金额通用字体：Arial Narrow 数字紧凑易读，辅以等宽兜底
+   只应用于显式加 .gt-amount class 的元素，避免误伤非金额右对齐列（级次/行数等）
+   需在 el-table-column 的 cell template 里显式用 <span class="gt-amount"> 包裹金额
+   formatters.fmtAmount 已输出纯文本，由使用方决定是否加 class */
+.gt-amount,
+.gt-amount--negative,
+.gt-amount--highlight {
+  font-family: "Arial Narrow", "Helvetica Neue Narrow", "Roboto Condensed",
+               "PingFang SC Narrow", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;  /* 等宽数字，对齐更整齐 */
+  letter-spacing: 0;
+}
+
 .gt-amount--negative {
   color: #d94840 !important;
 }

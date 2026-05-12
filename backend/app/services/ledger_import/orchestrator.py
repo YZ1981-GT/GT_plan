@@ -1,0 +1,525 @@
+"""ImportOrchestrator — 账表导入编排器（唯一入口）。
+
+职责（见 design.md §1 / §7 / Sprint 3 Task 39-41）：
+
+1. ``detect(files)``        : 组合 Detector → Identifier → AdapterRegistry，
+                              返回 ``LedgerDetectionResult`` 供前端预检弹窗使用。
+2. ``submit(upload_token, confirmed_mappings)`` : 用户确认后落 ``ImportJob``，
+                              交 worker 走 parser → validator → writer → staged→active 切换。
+3. ``resume(job_id)``       : 断点续传 — 复用 ``import_artifacts`` 表，失败作业可 retry。
+
+设计原则：
+- detect() 是纯计算（不写 DB），返回 LedgerDetectionResult 供前端预检
+- submit() 创建 ImportJob + ImportArtifact，交 worker 异步执行
+- resume() 从 import_artifacts 恢复失败作业
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .adapters import registry as adapter_registry
+from .detection_types import (
+    FileDetection,
+    LedgerDetectionResult,
+    SheetDetection,
+    TableType,
+)
+from .detector import detect_file, detect_file_from_path
+from .identifier import identify
+from .merge_strategy import merge_sheets
+from .year_detector import detect_year
+
+logger = logging.getLogger(__name__)
+
+__all__ = ["ImportOrchestrator", "execute_pipeline", "PipelineResult"]
+
+
+class ImportOrchestrator:
+    """账表导入编排器 — detect / submit / resume 三阶段。
+
+    设计原则：
+    - detect() 是纯计算（不写 DB），返回 LedgerDetectionResult 供前端预检
+    - submit() 创建 ImportJob + ImportArtifact，交 worker 异步执行
+    - resume() 从 import_artifacts 恢复失败作业
+    """
+
+    # ---- Phase 1: Detect (read-only, no DB writes) ----
+
+    @staticmethod
+    def detect(
+        files: list[tuple[str, bytes]],
+        *,
+        year_override: int | None = None,
+        adapter_hint: str | None = None,
+    ) -> LedgerDetectionResult:
+        """Detect file types, identify sheets, match adapters.
+
+        Args:
+            files: List of (filename, content_bytes) tuples.
+            year_override: User-specified year (skips auto-detection).
+            adapter_hint: User-specified adapter id (e.g. "yonyou").
+
+        Returns:
+            LedgerDetectionResult with all detection info for frontend preview.
+        """
+        upload_token = str(uuid.uuid4())
+        file_detections: list[FileDetection] = []
+        all_errors: list[Any] = []
+
+        # Step 1: Detect each file
+        for filename, content in files:
+            fd = detect_file(content, filename)
+            file_detections.append(fd)
+            all_errors.extend(fd.errors)
+
+        # Steps 2-7: Shared logic
+        return ImportOrchestrator._finalize_detection(
+            file_detections,
+            upload_token=upload_token,
+            all_errors=all_errors,
+            year_override=year_override,
+            adapter_hint=adapter_hint,
+        )
+
+    # ---- Phase 2: Submit (creates ImportJob, stores artifacts) ----
+
+    @staticmethod
+    def detect_from_paths(
+        file_paths: list[str],
+        *,
+        year_override: int | None = None,
+        adapter_hint: str | None = None,
+    ) -> LedgerDetectionResult:
+        """Detect from file paths — 支持 600MB+ 大文件，不全量读入内存。
+
+        与 detect() 逻辑完全相同，区别仅在于输入是文件路径而非 bytes。
+        CSV 只读前 64KB，xlsx 用 openpyxl 流式读取。
+
+        Args:
+            file_paths: List of file absolute/relative paths.
+            year_override: User-specified year.
+            adapter_hint: User-specified adapter id.
+
+        Returns:
+            LedgerDetectionResult (same as detect()).
+        """
+        import os
+
+        upload_token = str(uuid.uuid4())
+        file_detections: list[FileDetection] = []
+        all_errors: list[Any] = []
+
+        # Step 1: Detect each file from path
+        for path in file_paths:
+            filename = os.path.basename(path)
+            fd = detect_file_from_path(path, filename)
+            file_detections.append(fd)
+            all_errors.extend(fd.errors)
+
+        # Step 2-7: Same as detect()
+        return ImportOrchestrator._finalize_detection(
+            file_detections,
+            upload_token=upload_token,
+            all_errors=all_errors,
+            year_override=year_override,
+            adapter_hint=adapter_hint,
+        )
+
+    @staticmethod
+    def _finalize_detection(
+        file_detections: list[FileDetection],
+        *,
+        upload_token: str,
+        all_errors: list[Any],
+        year_override: int | None = None,
+        adapter_hint: str | None = None,
+    ) -> LedgerDetectionResult:
+        """Shared logic for detect() and detect_from_paths() — Steps 2-7."""
+
+        # Step 2: Identify each sheet
+        for fd in file_detections:
+            identified_sheets: list[SheetDetection] = []
+            for sheet in fd.sheets:
+                identified = identify(sheet)
+                identified_sheets.append(identified)
+            fd.sheets = identified_sheets
+
+        # Step 3: Adapter hint (S7: 不再自动 detect_best，adapter 仅作别名包)
+        adapter_id: str | None = None
+        if adapter_hint:
+            adapter = adapter_registry.get(adapter_hint)
+            if adapter:
+                adapter_id = adapter.id
+
+        # Step 4: Year detection
+        if year_override is not None:
+            detected_year: int | None = year_override
+            year_confidence = 100
+            year_evidence: dict = {"override": True, "chosen_priority": "user_override"}
+        else:
+            detected_year, year_confidence, year_evidence = detect_year(
+                file_detections
+            )
+
+        # Step 5: Merge strategy
+        all_sheets = [s for fd in file_detections for s in fd.sheets]
+        merged_groups = merge_sheets(all_sheets, strategy="auto")
+        merged_tables: dict[TableType, list[tuple[str, str]]] = {}
+        for group in merged_groups:
+            if len(group.sheets) > 1:
+                merged_tables[group.table_type] = group.sheets
+
+        # Step 6: Check missing tables
+        detected_types: set[TableType] = {
+            s.table_type
+            for fd in file_detections
+            for s in fd.sheets
+            if s.table_type != "unknown"
+        }
+        required_types: set[TableType] = {"balance", "ledger"}
+        missing_tables: list[TableType] = [
+            t for t in required_types if t not in detected_types
+        ]
+
+        can_derive: dict[TableType, bool] = {}
+        if "aux_balance" not in detected_types and "balance" in detected_types:
+            can_derive["aux_balance"] = True
+        if "aux_ledger" not in detected_types and "ledger" in detected_types:
+            can_derive["aux_ledger"] = True
+
+        # Step 7: Determine if manual confirm needed
+        requires_manual = any(
+            s.confidence_level in ("low", "manual_required")
+            for fd in file_detections
+            for s in fd.sheets
+        )
+
+        return LedgerDetectionResult(
+            upload_token=upload_token,
+            files=file_detections,
+            detected_year=detected_year,
+            year_confidence=year_confidence,
+            year_evidence=year_evidence,
+            merged_tables=merged_tables,
+            missing_tables=missing_tables,
+            can_derive=can_derive,
+            errors=all_errors,
+            requires_manual_confirm=requires_manual,
+        )
+
+    @staticmethod
+    async def submit(
+        db: AsyncSession,
+        *,
+        upload_token: str,
+        project_id: UUID,
+        year: int,
+        confirmed_mappings: list[dict],
+        file_manifest: list[dict],
+        storage_uri: str,
+        total_size_bytes: int = 0,
+        force_activate: bool = False,
+        created_by: UUID | None = None,
+        adapter_id: str | None = None,
+    ) -> dict:
+        """Create ImportJob + ImportArtifact, return job info.
+
+        Args:
+            db: Database session.
+            upload_token: Token from detect phase.
+            project_id: Target project.
+            year: Confirmed accounting year.
+            confirmed_mappings: User-confirmed column mappings per sheet.
+            file_manifest: List of file info dicts
+                [{"file_name": "...", "size_bytes": N, "mime_type": "..."}].
+            storage_uri: URI where uploaded files are stored
+                (e.g. "local:///tmp/uploads/{upload_token}").
+            total_size_bytes: Total size of all uploaded files.
+            force_activate: Skip L2/L3 validation.
+            created_by: User UUID.
+            adapter_id: Matched adapter id.
+
+        Returns:
+            {"job_id": UUID, "status": "queued"}
+        """
+        from app.models.dataset_models import (
+            ArtifactStatus,
+            ImportArtifact,
+            ImportJob,
+            JobStatus,
+        )
+        from sqlalchemy import select as _sa_select
+
+        # 查是否已存在 artifact（detect 阶段通过 create_bundle 创建）
+        existing_stmt = _sa_select(ImportArtifact).where(
+            ImportArtifact.upload_token == upload_token
+        )
+        existing_res = await db.execute(existing_stmt)
+        artifact = existing_res.scalar_one_or_none()
+
+        if artifact is None:
+            # 未找到（老链路回退），创建新 artifact
+            artifact = ImportArtifact(
+                id=uuid.uuid4(),
+                project_id=project_id,
+                upload_token=upload_token,
+                status=ArtifactStatus.active,
+                storage_uri=storage_uri,
+                total_size_bytes=total_size_bytes,
+                file_manifest=file_manifest,
+                file_count=len(file_manifest),
+                created_by=created_by,
+            )
+            db.add(artifact)
+            await db.flush()
+
+        # Create ImportJob
+        job = ImportJob(
+            id=uuid.uuid4(),
+            project_id=project_id,
+            year=year,
+            status=JobStatus.queued,
+            artifact_id=artifact.id,
+            custom_mapping={"confirmed_mappings": confirmed_mappings},
+            options={
+                "upload_token": upload_token,
+                "adapter_id": adapter_id,
+                "force_activate": force_activate,
+            },
+            created_by=created_by,
+        )
+        db.add(job)
+        await db.flush()
+
+        return {"job_id": job.id, "status": "queued"}
+
+    @staticmethod
+    async def resume(
+        db: AsyncSession,
+        *,
+        job_id: UUID,
+    ) -> dict:
+        """Resume a failed job by resetting status to queued.
+
+        Reuses existing ImportArtifact (files already uploaded).
+        Increments retry_count. Fails if max_retries exceeded.
+
+        Returns:
+            {"job_id": UUID, "status": "queued", "retry_count": N}
+
+        Raises:
+            ValueError: If job not found, not in failed status, or max retries exceeded.
+        """
+        from sqlalchemy import select
+
+        from app.models.dataset_models import ImportJob, JobStatus
+
+        stmt = select(ImportJob).where(ImportJob.id == job_id)
+        result = await db.execute(stmt)
+        job = result.scalar_one_or_none()
+
+        if job is None:
+            raise ValueError(f"ImportJob {job_id} not found")
+
+        if job.status not in (JobStatus.failed,):
+            raise ValueError(
+                f"Cannot resume job in status '{job.status.value}'; "
+                "only 'failed' jobs can be resumed"
+            )
+
+        if job.retry_count >= job.max_retries:
+            raise ValueError(
+                f"Job {job_id} has exceeded max retries ({job.max_retries})"
+            )
+
+        job.status = JobStatus.queued
+        job.retry_count = job.retry_count + 1
+        job.error_message = None
+        job.progress_pct = 0
+        job.current_phase = None
+        await db.flush()
+
+        return {
+            "job_id": job.id,
+            "status": "queued",
+            "retry_count": job.retry_count,
+        }
+
+    # ---- F52 / Sprint 8.35: Detect 阶段历史映射复用 ----
+
+    @staticmethod
+    async def apply_history_reuse(
+        db: AsyncSession,
+        detection: LedgerDetectionResult,
+        *,
+        project_id: UUID,
+        software_hint: str | None = None,
+        window_days: int = 30,
+    ) -> LedgerDetectionResult:
+        """F52：对 detect 结果按文件指纹查历史映射，命中则自动应用。
+
+        语义：
+        - 每个 ``SheetDetection`` 计算 ``file_fingerprint``（sheet_name +
+          header_cells[:20] + software_hint）
+        - 命中 ``ImportColumnMappingHistory`` 30 天内的记录时：
+            - 按 header 名称匹配历史 mapping 的 standard_field
+            - 对应 ``ColumnMatch`` 若 standard_field 原为 None 或不同，则覆盖为历史值
+            - 标记 ``auto_applied_from_history=True`` + ``history_mapping_id=<uuid>``
+            - ``source`` 标记为 ``"history_reuse"``，``confidence`` 至少 ``90``
+        - 未命中或历史记录超出窗口时原样返回（不修改 detection）。
+
+        Args:
+            db: 异步 session
+            detection: ``ImportOrchestrator.detect`` / ``detect_from_paths`` 的返回值
+            project_id: 当前项目
+            software_hint: 可选软件提示（与 build_file_fingerprint 的 hint 保持一致）
+            window_days: 历史复用窗口（默认 30 天）
+
+        Returns:
+            已应用历史 mapping 的新 ``LedgerDetectionResult`` 副本。
+        """
+        from datetime import timedelta
+
+        from .column_mapping_service import ColumnMappingService
+        from .detection_types import ColumnMatch, classify_column_tier
+
+        window = timedelta(days=window_days)
+
+        # 逐文件逐 sheet 处理
+        new_files: list[FileDetection] = []
+        for fd in detection.files:
+            new_sheets: list[SheetDetection] = []
+            for sheet in fd.sheets:
+                # 提取 header_cells：优先从 detection_evidence；再退到 preview
+                header_cells_raw: list = (
+                    sheet.detection_evidence.get("header_cells")
+                    if isinstance(sheet.detection_evidence, dict)
+                    else None
+                ) or []
+                if not header_cells_raw and sheet.preview_rows and 0 <= sheet.header_row_index < len(sheet.preview_rows):
+                    header_cells_raw = list(sheet.preview_rows[sheet.header_row_index])
+
+                if not header_cells_raw:
+                    new_sheets.append(sheet)
+                    continue
+
+                fp = ColumnMappingService.build_file_fingerprint(
+                    sheet.sheet_name, header_cells_raw, software_hint=software_hint
+                )
+                record = await ColumnMappingService.find_by_file_fingerprint(
+                    db,
+                    project_id=project_id,
+                    file_fingerprint=fp,
+                    window=window,
+                )
+                if record is None or not isinstance(record.column_mapping, dict):
+                    new_sheets.append(sheet)
+                    continue
+
+                # 历史 mapping：支持两种格式
+                #   1) {standard_field: header_name}  — 正向（legacy save_mapping）
+                #   2) {header_name: standard_field}  — 反向（部分历史调用方）
+                mapping = record.column_mapping
+                # 归一化为 header_name(lower) → standard_field
+                # 方向判定：standard_field 是纯 ASCII snake_case；header 常含中文/空格
+                def _looks_like_std_field(s: str) -> bool:
+                    if not s:
+                        return False
+                    return all(
+                        (ch.isascii() and (ch.isalnum() or ch == "_"))
+                        for ch in s.strip().lower()
+                    )
+
+                header_to_field: dict[str, str] = {}
+                for k, v in mapping.items():
+                    if not isinstance(k, str) or not isinstance(v, str):
+                        continue
+                    key_looks_like_std = _looks_like_std_field(k)
+                    val_looks_like_std = _looks_like_std_field(v)
+                    if key_looks_like_std and not val_looks_like_std:
+                        # 正向：standard_field → header
+                        header_to_field[v.strip().lower()] = k
+                    elif val_looks_like_std and not key_looks_like_std:
+                        # 反向：header → standard_field
+                        header_to_field[k.strip().lower()] = v
+                    else:
+                        # 歧义兜底：key 当 header
+                        header_to_field[k.strip().lower()] = v
+
+                applied = False
+                new_cols: list[ColumnMatch] = []
+                history_mapping_id = str(record.id)
+                for col in sheet.column_mappings:
+                    header_key = (col.column_header or "").strip().lower()
+                    std_field = header_to_field.get(header_key)
+                    if not std_field:
+                        new_cols.append(col)
+                        continue
+                    # 如果历史 mapping 提议的 standard_field 与当前相同则仅标记 flag
+                    if col.standard_field == std_field:
+                        new_cols.append(
+                            col.model_copy(
+                                update={
+                                    "auto_applied_from_history": True,
+                                    "history_mapping_id": history_mapping_id,
+                                }
+                            )
+                        )
+                        applied = True
+                        continue
+                    # 覆盖为历史值
+                    new_tier = classify_column_tier(std_field, sheet.table_type)
+                    new_cols.append(
+                        col.model_copy(
+                            update={
+                                "standard_field": std_field,
+                                "column_tier": new_tier,
+                                "confidence": max(col.confidence, 90),
+                                "source": "history_reuse",
+                                "auto_applied_from_history": True,
+                                "history_mapping_id": history_mapping_id,
+                            }
+                        )
+                    )
+                    applied = True
+
+                if applied:
+                    # 写 detection_evidence 便于前端调试 + 追溯
+                    new_evidence = dict(sheet.detection_evidence or {})
+                    new_evidence["history_reuse"] = {
+                        "hit": True,
+                        "file_fingerprint": fp,
+                        "mapping_id": history_mapping_id,
+                        "software_hint": software_hint,
+                        "window_days": window_days,
+                    }
+                    new_sheets.append(
+                        sheet.model_copy(
+                            update={
+                                "column_mappings": new_cols,
+                                "detection_evidence": new_evidence,
+                            }
+                        )
+                    )
+                else:
+                    new_sheets.append(sheet)
+
+            new_files.append(fd.model_copy(update={"sheets": new_sheets}))
+
+        return detection.model_copy(update={"files": new_files})
+
+
+# S7-6: execute_pipeline / PipelineResult 已迁到 pipeline.py
+# 以下为向后兼容 re-export（调用方可继续 from .orchestrator import ...）
+from .pipeline import (  # noqa: E402, F401
+    PipelineResult,
+    ProgressCallback,
+    CancelChecker,
+    execute_pipeline,
+)

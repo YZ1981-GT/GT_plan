@@ -141,7 +141,7 @@ class TemplateLibraryService:
         selected_by: UUID | None = None,
     ) -> ProjectTemplateSelection:
         """为项目选择模板（从事务所默认或集团定制中选）"""
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         # 加载模板信息
         tmpl = await self.db.execute(
@@ -169,7 +169,7 @@ class TemplateLibraryService:
             project_id=project_id,
             template_id=template_id,
             template_type=template.template_type,
-            pulled_at=datetime.utcnow(),
+            pulled_at=datetime.now(timezone.utc),
             selected_by=selected_by,
         )
         self.db.add(selection)

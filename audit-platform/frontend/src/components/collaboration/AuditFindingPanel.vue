@@ -13,7 +13,7 @@
       <el-table-column prop="finding_description" label="描述" min-width="200" show-overflow-tooltip />
       <el-table-column prop="severity" label="严重程度" width="100">
         <template #default="{ row }">
-          <el-tag :type="severityTag(row.severity)" size="small">
+          <el-tag :type="(severityTag(row.severity)) || undefined" size="small">
             {{ severityLabel(row.severity) }}
           </el-tag>
         </template>
@@ -27,7 +27,7 @@
       <el-table-column prop="management_response" label="管理层回复" min-width="150" show-overflow-tooltip />
       <el-table-column prop="final_disposition" label="最终处理" width="110">
         <template #default="{ row }">
-          <el-tag :type="dispositionTag(row.final_treatment)" size="small">
+          <el-tag :type="(dispositionTag(row.final_treatment)) || undefined" size="small">
             {{ dispositionLabel(row.final_treatment) }}
           </el-tag>
         </template>
@@ -172,8 +172,8 @@ const highSeverityCount = computed(() => findings.value.filter(f => f.severity =
 const totalImpact = computed(() => findings.value.reduce((sum, f) => sum + (f.finding_amount || 0), 0))
 const adjustedCount = computed(() => findings.value.filter(f => f.final_treatment === 'adjusted').length)
 
-function severityTag(severity: string): string {
-  const map: Record<string, string> = {
+function severityTag(severity: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     high: 'danger',
     medium: 'warning',
     low: 'success',
@@ -190,8 +190,8 @@ function severityLabel(severity: string): string {
   return map[severity] || severity
 }
 
-function dispositionTag(treatment: string | null): string {
-  const map: Record<string, string> = {
+function dispositionTag(treatment: string | null): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     adjusted: 'success',
     unadjusted: 'danger',
     disclosed: 'warning',

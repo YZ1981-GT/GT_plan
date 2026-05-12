@@ -94,6 +94,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -160,7 +161,7 @@ const tableData = computed(() => {
 async function fetchComparison() {
   loading.value = true
   try {
-    data.value = await api.get(`/api/eqcr/projects/${props.projectId}/prior-year-comparison`)
+    data.value = await api.get(P_eqcr.priorYearComparison(props.projectId))
   } catch {
     ElMessage.error('获取历年对比数据失败')
   } finally {
@@ -175,7 +176,7 @@ async function onLinkPriorYear() {
   }
   linkLoading.value = true
   try {
-    const result = await api.post(`/api/eqcr/projects/${props.projectId}/link-prior-year`, {
+    const result = await api.post(P_eqcr.linkPriorYear(props.projectId), {
       prior_project_id: linkProjectId.value.trim(),
     })
     if (result?.linked) {

@@ -52,21 +52,21 @@
       </el-table-column>
       <el-table-column prop="inherent_risk" label="固有风险" width="100">
         <template #default="{ row }">
-          <el-tag :type="riskType(row.inherent_risk)" size="small">
+          <el-tag :type="(riskType(row.inherent_risk)) || undefined" size="small">
             {{ row.inherent_risk === 'high' ? '高' : row.inherent_risk === 'medium' ? '中' : '低' }}
           </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="control_risk" label="控制风险" width="100">
         <template #default="{ row }">
-          <el-tag :type="riskType(row.control_risk)" size="small">
+          <el-tag :type="(riskType(row.control_risk)) || undefined" size="small">
             {{ row.control_risk === 'high' ? '高' : row.control_risk === 'medium' ? '中' : '低' }}
           </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="combined_risk" label="组合风险" width="100">
         <template #default="{ row }">
-          <el-tag :type="riskType(row.combined_risk)" size="small" class="combined-risk">
+          <el-tag :type="(riskType(row.combined_risk)) || undefined" size="small" class="combined-risk">
             {{ row.combined_risk === 'high' ? '高' : row.combined_risk === 'medium' ? '中' : '低' }}
           </el-tag>
         </template>
@@ -197,8 +197,8 @@ function getCellCount(ir: string, cr: string): number {
   ).length
 }
 
-function riskType(level: string): string {
-  const map: Record<string, string> = {
+function riskType(level: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     high: 'danger',
     medium: 'warning',
     low: 'success',

@@ -33,6 +33,9 @@ class DrilldownService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        # TODO F41: 渐进迁移——未来 __init__ 应接收 current_user_id 参数，
+        # 传递给 get_active_filter 做项目权限校验。当前所有调用保持
+        # current_user_id=None（由路由层 require_project_access 保障权限）。
 
     async def get_balance_list(
         self, project_id: UUID, year: int, filters: BalanceFilter

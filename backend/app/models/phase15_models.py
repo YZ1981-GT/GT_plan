@@ -27,10 +27,10 @@ class TaskTreeNode(Base):
     ref_id = Column(UUID(as_uuid=True), nullable=False, comment="关联业务对象ID")
     status = Column(String(16), nullable=False, default="pending", comment="pending/in_progress/blocked/done")
     assignee_id = Column(UUID(as_uuid=True), nullable=True)
-    due_at = Column(DateTime, nullable=True)
+    due_at = Column(DateTime(timezone=True), nullable=True)
     meta = Column(JSONB, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
         Index("idx_task_tree_project_level", "project_id", "node_level", "status"),
@@ -51,10 +51,10 @@ class TaskEvent(Base):
     status = Column(String(16), nullable=False, default="queued", comment="queued/replaying/succeeded/failed/dead_letter")
     retry_count = Column(Integer, nullable=False, default=0)
     max_retries = Column(Integer, nullable=False, default=3)
-    next_retry_at = Column(DateTime, nullable=True)
+    next_retry_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
     trace_id = Column(String(64), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
         Index("idx_task_events_project_status", "project_id", "status", created_at.desc()),
@@ -95,7 +95,7 @@ class IssueTicket(Base):
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
     owner_id = Column(UUID(as_uuid=True), nullable=False)
-    due_at = Column(DateTime, nullable=True)
+    due_at = Column(DateTime(timezone=True), nullable=True)
     entity_id = Column(UUID(as_uuid=True), nullable=True)
     account_code = Column(String(20), nullable=True)
     status = Column(String(20), nullable=False, default="open", comment="open/in_fix/pending_recheck/closed/rejected")
@@ -103,9 +103,9 @@ class IssueTicket(Base):
     evidence_refs = Column(JSONB, default=list)
     reason_code = Column(String(64), nullable=True)
     trace_id = Column(String(64), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
-    closed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    closed_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         Index("idx_issue_tickets_project_status", "project_id", "status", created_at.desc()),

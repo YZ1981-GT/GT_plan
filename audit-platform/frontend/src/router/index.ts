@@ -173,14 +173,14 @@ const router = createRouter({
           component: () => import('@/views/OfflineConflictWorkbench.vue'),
         },
         {
-          path: 'projects/:projectId/ledger',
-          name: 'LedgerPenetration',
-          component: () => import('@/views/LedgerPenetration.vue'),
-        },
-        {
           path: 'projects/:projectId/ledger/import-history',
           name: 'LedgerImportHistory',
           component: () => import('@/views/LedgerImportHistory.vue'),
+        },
+        {
+          path: 'projects/:projectId/ledger',
+          name: 'LedgerPenetration',
+          component: () => import('@/views/LedgerPenetration.vue'),
         },
         {
           path: 'projects/:projectId/attachments',
@@ -269,12 +269,7 @@ const router = createRouter({
           name: 'WorkHours',
           component: () => import('@/views/WorkHoursPage.vue'),
         },
-        {
-          path: 'work-hours/approve',
-          name: 'WorkHoursApproval',
-          component: () => import('@/views/WorkHoursApproval.vue'),
-          meta: { permission: 'approve_workhours' },
-        },
+
         {
           path: 'dashboard/management',
           name: 'ManagementDashboard',
@@ -290,6 +285,13 @@ const router = createRouter({
           path: 'dashboard/partner',
           name: 'PartnerDashboard',
           component: () => import('@/views/PartnerDashboard.vue'),
+        },
+        // R8-S2-06：合伙人签字决策面板
+        {
+          path: 'partner/sign-decision/:projectId/:year',
+          name: 'PartnerSignDecision',
+          component: () => import('@/views/PartnerSignDecision.vue'),
+          meta: { roles: ['partner', 'admin'] },
         },
         {
           path: 'projects/:projectId/consistency',
@@ -420,21 +422,7 @@ const router = createRouter({
           component: () => import('@/views/PerformanceMonitor.vue'),
           meta: { permission: 'admin' },
         },
-        // ── Mobile Routes ──
-        {
-          path: 'projects/:projectId/mobile-penetration',
-          name: 'MobilePenetration',
-          component: () => import('@/views/MobilePenetration.vue'),
-          meta: { developing: true },
-          props: (route: any) => ({ projectId: route.params.projectId }),
-        },
-        {
-          path: 'projects/:projectId/mobile-review',
-          name: 'MobileReviewView',
-          component: () => import('@/views/MobileReviewView.vue'),
-          meta: { developing: true },
-          props: (route: any) => ({ projectId: route.params.projectId }),
-        },
+        // ── Mobile Routes removed (R7-S1-05) ──
         // ── Round 5：EQCR 独立复核工作台 ──
         // 访问控制说明：
         //   页面本身只有 requireAuth（走父路由 meta），不设 meta.permission；
@@ -465,7 +453,68 @@ const router = createRouter({
           path: 'eqcr/metrics',
           name: 'EqcrMetrics',
           component: () => import('@/views/eqcr/EqcrMetrics.vue'),
-          meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner'] },
+          meta: { requiresAnnualDeclaration: true, roles: ['admin', 'partner', 'eqcr'] },
+        },
+        // ── Round 6：QC 规则定义只读列表 ──
+        {
+          path: 'qc/rules',
+          name: 'QcRuleList',
+          component: () => import('@/views/qc/QcRuleList.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/rules/:ruleId/edit',
+          name: 'QcRuleEditor',
+          component: () => import('@/views/qc/QcRuleEditor.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc',
+          redirect: '/qc/inspections',
+        },
+        {
+          path: 'qc/inspections',
+          name: 'QcInspectionWorkbench',
+          component: () => import('@/views/qc/QcInspectionWorkbench.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/clients/:clientName/trend',
+          name: 'ClientQualityTrend',
+          component: () => import('@/views/qc/ClientQualityTrend.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/cases',
+          name: 'QcCaseLibrary',
+          component: () => import('@/views/qc/QcCaseLibrary.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        {
+          path: 'qc/annual-reports',
+          name: 'QcAnnualReports',
+          component: () => import('@/views/qc/QcAnnualReports.vue'),
+          meta: { roles: ['qc', 'admin', 'partner'] },
+        },
+        // ── R7-S1-06：函证占位路由 ──
+        {
+          path: 'confirmation',
+          name: 'ConfirmationHub',
+          component: () => import('@/views/ConfirmationHub.vue'),
+          meta: { developing: true },
+        },
+        // ── 账表导入校验规则说明页 (8.9) ──
+        {
+          path: 'ledger-import/validation-rules',
+          name: 'ValidationRules',
+          component: () => import('@/views/ValidationRules.vue'),
+        },
+        // ── 管理员：事件死信队列 (7.19) ──
+        {
+          path: 'admin/event-dlq',
+          name: 'EventDLQ',
+          component: () => import('@/views/admin/EventDLQ.vue'),
+          meta: { permission: 'admin' },
         },
       ],
     },

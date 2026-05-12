@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """导入队列服务 — 并发控制 + 进度跟踪
 
 多用户同时导入时：
@@ -9,7 +9,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from uuid import UUID
 
@@ -33,12 +33,25 @@ IMPORT_JOB_DATA_TYPE = "__smart_import_job__"
 _acquire_mutex = asyncio.Lock()
 
 
+class ImportLockError(RuntimeError):
+    """无法获取项目导入锁（F23）。
+
+    场景：activate 和 rollback 互斥；rollback 请求时检测到同项目已有
+    activate/import/rollback 在进行，抛出此异常让路由层转 409。
+    """
+
+    def __init__(self, message: str, *, project_id: UUID | str | None = None, action: str | None = None):
+        super().__init__(message)
+        self.project_id = str(project_id) if project_id else None
+        self.action = action
+
+
 class ImportQueueService:
     """导入队列管理"""
 
     @staticmethod
     def _cleanup_stale_memory_locks():
-        cutoff = datetime.utcnow() - _STALE_IMPORT_TIMEOUT
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None).replace(tzinfo=None) - _STALE_IMPORT_TIMEOUT
         stale_projects: list[str] = []
         for pid, info in _import_locks.items():
             started = info.get("started")
@@ -55,7 +68,7 @@ class ImportQueueService:
 
     @staticmethod
     async def _expire_stale_jobs(db: AsyncSession):
-        cutoff = datetime.utcnow() - _STALE_IMPORT_TIMEOUT
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None).replace(tzinfo=None) - _STALE_IMPORT_TIMEOUT
         result = await db.execute(
             select(ImportBatch).where(
                 ImportBatch.data_type == IMPORT_JOB_DATA_TYPE,
@@ -68,7 +81,7 @@ class ImportQueueService:
         if not stale_batches:
             return
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         for batch in stale_batches:
             summary = dict(batch.validation_summary or {})
             summary.update({
@@ -199,7 +212,7 @@ class ImportQueueService:
             summary["error"] = message
 
         batch.status = status
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         batch.validation_summary = summary
         if year is not None and year > 0:
             batch.year = year
@@ -274,7 +287,7 @@ class ImportQueueService:
             if active >= _MAX_CONCURRENT_IMPORTS:
                 return False, f"系统繁忙，当前有 {active} 个导入任务在执行，请稍后重试", None
 
-            started_at = datetime.utcnow()
+            started_at = datetime.now(timezone.utc).replace(tzinfo=None)
             batch = ImportBatch(
                 project_id=project_id,
                 year=year,
@@ -314,6 +327,157 @@ class ImportQueueService:
     def release_lock(project_id: UUID):
         """释放导入锁。"""
         _import_locks.pop(str(project_id), None)
+
+    # -----------------------------------------------------------------------
+    # F23 / Sprint 5.14: activate / rollback 轻量级项目锁
+    # -----------------------------------------------------------------------
+    # 与 `acquire_lock`（创建 ImportBatch 的完整导入锁）不同，本组 API 只写
+    # `_import_locks` 内存态，专用于 DatasetService.activate / rollback 的
+    # 短时互斥（典型耗时 < 1 秒，B' 架构后）。两者共享同一 `_import_locks`
+    # 字典，所以：
+    #   - 有 import 在跑 → try_acquire_action_lock 失败（rollback 拒绝）
+    #   - 有 rollback 在跑 → acquire_lock 能检测到 _import_locks 但
+    #     数据库层无 ImportBatch，此处不做硬阻断（设计文档 D8.4 只要求
+    #     rollback 自身互斥，不要求 rollback 在跑时 import 也拒绝）
+
+    @staticmethod
+    def try_acquire_action_lock(
+        project_id: UUID,
+        *,
+        action: str,
+        user_id: str | None = None,
+    ) -> bool:
+        """尝试获取 activate / rollback 的轻量级项目锁。
+
+        Returns:
+            True  — 成功获取，调用方必须在 finally 中调用 release_action_lock
+            False — 已被占用，调用方应抛 ImportLockError
+        """
+        pid = str(project_id)
+        if pid in _import_locks:
+            return False
+        _import_locks[pid] = {
+            "action": action,
+            "user": user_id,
+            "started": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            "batch_id": None,  # 非完整导入，无 ImportBatch
+            "status": "processing",
+            "progress": 0,
+            "message": f"{action} 进行中",
+        }
+        return True
+
+    @staticmethod
+    def release_action_lock(project_id: UUID) -> None:
+        """释放 activate / rollback 的轻量级项目锁。"""
+        _import_locks.pop(str(project_id), None)
+
+    # -----------------------------------------------------------------------
+    # F21 / Sprint 5.6: 锁透明 —— 查询当前项目的锁详情
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    async def get_lock_info(
+        project_id: UUID, db: AsyncSession
+    ) -> dict | None:
+        """F21: 返回当前项目的导入锁详情（holder / 进度 / 预估剩余）。
+
+        优先查 ImportJob（完整导入场景），降级查 `_import_locks`
+        内存态（rollback/activate 等短操作）。无锁返回 None。
+
+        返回结构对应前端 LockInfo（has_lock / action / holder_* /
+        current_phase / progress_pct / rows_processed /
+        estimated_remaining_seconds / acquired_at / progress_message）。
+        """
+        from app.models.core import User  # 延迟 import 避免循环依赖
+
+        pid = str(project_id)
+        state = _import_locks.get(pid)
+
+        # 1) 先找活跃 ImportJob（导入场景 holder 最权威）
+        active_statuses = (
+            JobStatus.pending,
+            JobStatus.queued,
+            JobStatus.running,
+            JobStatus.validating,
+            JobStatus.writing,
+            JobStatus.activating,
+        )
+        result = await db.execute(
+            select(ImportJob)
+            .where(
+                ImportJob.project_id == project_id,
+                ImportJob.status.in_(active_statuses),
+            )
+            .order_by(ImportJob.created_at.desc())
+            .limit(1)
+        )
+        job = result.scalar_one_or_none()
+
+        if job:
+            holder_name = await _resolve_holder_name(db, job.created_by)
+
+            # 预估剩余耗时（基于已用时间线性外推）
+            estimated_remaining = None
+            if job.started_at and job.progress_pct and 5 <= job.progress_pct < 100:
+                started = (
+                    job.started_at.replace(tzinfo=None)
+                    if job.started_at.tzinfo
+                    else job.started_at
+                )
+                now = datetime.now(timezone.utc).replace(tzinfo=None)
+                elapsed_sec = max(1, int((now - started).total_seconds()))
+                total_est = elapsed_sec * 100 / job.progress_pct
+                estimated_remaining = max(0, int(total_est - elapsed_sec))
+
+            rows_processed = 0
+            if job.result_summary and isinstance(job.result_summary, dict):
+                rows_processed = int(job.result_summary.get("total_parsed", 0) or 0)
+
+            return {
+                "has_lock": True,
+                "action": "import",
+                "holder_user_id": str(job.created_by) if job.created_by else None,
+                "holder_name": holder_name,
+                "job_id": str(job.id),
+                "current_phase": job.current_phase or "writing",
+                "current_phase_cn": _phase_cn(job.current_phase),
+                "progress_pct": job.progress_pct or 0,
+                "rows_processed": rows_processed,
+                "estimated_remaining_seconds": estimated_remaining,
+                "acquired_at": (
+                    job.started_at.isoformat() if job.started_at else None
+                ),
+                "progress_message": job.progress_message,
+            }
+
+        # 2) 没有活跃 ImportJob → 查内存态 action_lock（rollback/activate 短操作）
+        if state:
+            user_id_str = state.get("user")
+            holder_name = None
+            if user_id_str:
+                try:
+                    holder_uuid = UUID(str(user_id_str))
+                    holder_name = await _resolve_holder_name(db, holder_uuid)
+                except (ValueError, TypeError):
+                    pass
+
+            return {
+                "has_lock": True,
+                "action": state.get("action", "import"),
+                "holder_user_id": user_id_str,
+                "holder_name": holder_name,
+                "job_id": None,
+                "current_phase": state.get("status", "processing"),
+                "current_phase_cn": _phase_cn(state.get("status")),
+                "progress_pct": state.get("progress", 0),
+                "rows_processed": 0,
+                "estimated_remaining_seconds": None,
+                "acquired_at": state.get("started"),
+                "progress_message": state.get("message"),
+            }
+
+        return None
 
     @staticmethod
     async def force_release(
@@ -362,7 +526,7 @@ class ImportQueueService:
                         summary = dict(batch.validation_summary or {})
                         summary.update({"job": True, "progress": -1, "message": "导入被手动重置", "error": "导入被手动重置"})
                         batch.status = ImportStatus.failed
-                        batch.completed_at = datetime.utcnow()
+                        batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                         batch.validation_summary = summary
                 except Exception:
                     logger.warning("force_release(job_id) 更新 batch 失败: %s", batch_id_raw)
@@ -389,7 +553,7 @@ class ImportQueueService:
         stale_batches = result.scalars().all()
         for batch in stale_batches:
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
             if batch.validation_summary and isinstance(batch.validation_summary, dict):
                 batch.validation_summary["error"] = "导入被中断，已自动清理"
             else:
@@ -478,7 +642,7 @@ class ImportQueueService:
                     if result is not None:
                         summary["result"] = result
                     batch.status = ImportStatus.failed
-                    batch.completed_at = datetime.utcnow()
+                    batch.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     batch.validation_summary = summary
                     if year is not None and year > 0:
                         batch.year = year
@@ -564,3 +728,50 @@ class ImportQueueService:
                     **ImportQueueService._build_batch_payload(batch),
                 }
         return list(active_map.values())
+
+
+# ---------------------------------------------------------------------------
+# F21 / Sprint 5.6: 模块级辅助函数
+# ---------------------------------------------------------------------------
+
+_PHASE_CN_MAPPING = {
+    "pending": "排队中",
+    "queued": "排队中",
+    "running": "运行中",
+    "validating": "校验中",
+    "writing": "写入中",
+    "activating": "激活中",
+    "activate_dataset_done": "激活完成",
+    "rebuild_aux_summary_done": "收尾中",
+    "rollback": "回滚中",
+    "activate": "激活中",
+    "import": "导入中",
+    "processing": "处理中",
+    "completed": "已完成",
+    "failed": "已失败",
+    "canceled": "已取消",
+}
+
+
+def _phase_cn(phase: str | None) -> str:
+    """阶段英文名 → 中文展示（F21 锁透明 tooltip 用）。"""
+    if not phase:
+        return ""
+    return _PHASE_CN_MAPPING.get(phase, phase)
+
+
+async def _resolve_holder_name(
+    db: AsyncSession, user_id: UUID | None
+) -> str | None:
+    """根据 user_id 查询用户名；用户不存在或查询失败时返回 None。"""
+    if not user_id:
+        return None
+    try:
+        from app.models.core import User  # 延迟 import
+        result = await db.execute(select(User.username).where(User.id == user_id))
+        row = result.first()
+        if row:
+            return row[0]
+    except Exception:
+        logger.debug("get_lock_info: 解析 holder_name 失败", exc_info=True)
+    return None

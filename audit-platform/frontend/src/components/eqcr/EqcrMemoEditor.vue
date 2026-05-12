@@ -4,6 +4,24 @@
       <h4>EQCR 独立复核备忘录</h4>
       <div class="eqcr-memo-editor__actions">
         <el-tag v-if="memoStatus" :type="statusTagType" size="small">{{ statusLabel }}</el-tag>
+        <!-- R7-S3-04 Task 22：版本历史下拉 -->
+        <el-select
+          v-if="historyVersions.length > 0"
+          v-model="viewingVersion"
+          size="small"
+          style="width: 140px"
+          placeholder="当前版本"
+          clearable
+          @change="onVersionChange"
+        >
+          <el-option :value="0" label="当前版本" />
+          <el-option
+            v-for="h in historyVersions"
+            :key="h.version"
+            :value="h.version"
+            :label="`v${h.version} (${h.saved_at?.slice(0, 10) || '?'})`"
+          />
+        </el-select>
         <el-button size="small" @click="onGenerate" :loading="generating" round>
           {{ memo ? '重新生成' : '生成备忘录' }}
         </el-button>
@@ -16,14 +34,25 @@
           @click="onFinalize"
           :loading="finalizing"
           :disabled="!memo || memoStatus === 'finalized'"
+          v-permission="'eqcr:approve'"
           round
         >
           定稿
         </el-button>
+        <!-- R8-S2-05：导出 Word -->
+        <el-button
+          size="small"
+          @click="onExportWord"
+          :loading="exportingWord"
+          :disabled="!memo"
+          round
+        >
+          📄 导出 Word
+        </el-button>
       </div>
     </div>
 
-    <el-empty v-if="!memo && !loading" description="备忘录尚未生成，请点击"生成备忘录"">
+    <el-empty v-if="!memo && !loading" description="备忘录尚未生成，请点击「生成备忘录」">
     </el-empty>
 
     <div v-if="loading" v-loading="true" style="min-height: 200px"></div>
@@ -61,6 +90,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 
 const props = defineProps<{ projectId: string }>()
 
@@ -68,11 +98,30 @@ const loading = ref(false)
 const generating = ref(false)
 const saving = ref(false)
 const finalizing = ref(false)
+const exportingWord = ref(false)
 const showFinalizeConfirm = ref(false)
 
 const memo = ref<any>(null)
 const sectionOrder = ref<string[]>([])
 const editableSections = reactive<Record<string, string>>({})
+
+// R7-S3-04 Task 22：版本历史
+const historyVersions = ref<Array<{ version: number; saved_at: string; sections_snapshot: Record<string, string> }>>([])
+const viewingVersion = ref<number>(0)
+
+function onVersionChange(ver: number) {
+  if (ver === 0 || !ver) {
+    // 回到当前版本
+    if (memo.value?.sections) {
+      Object.assign(editableSections, memo.value.sections)
+    }
+    return
+  }
+  const hist = historyVersions.value.find(h => h.version === ver)
+  if (hist?.sections_snapshot) {
+    Object.assign(editableSections, hist.sections_snapshot)
+  }
+}
 const memoStatus = ref<string>('')
 
 const statusLabel = computed(() => {
@@ -89,7 +138,7 @@ const statusTagType = computed(() => {
 async function loadMemo() {
   loading.value = true
   try {
-    const data = await api.get(`/api/eqcr/projects/${props.projectId}/memo/preview`)
+    const data = await api.get(P_eqcr.memoPreview(props.projectId))
     memo.value = data
     memoStatus.value = data.status || 'draft'
     // 填充可编辑内容
@@ -99,6 +148,9 @@ async function loadMemo() {
     }
     // 使用默认章节顺序
     sectionOrder.value = Object.keys(sections)
+    // R7-S3-04：加载版本历史
+    historyVersions.value = data.history || []
+    viewingVersion.value = 0
   } catch (e: any) {
     if (e?.response?.status === 404) {
       memo.value = null
@@ -113,7 +165,7 @@ async function loadMemo() {
 async function onGenerate() {
   generating.value = true
   try {
-    const data = await api.post(`/api/eqcr/projects/${props.projectId}/memo`)
+    const data = await api.post(P_eqcr.memoGenerate(props.projectId))
     memo.value = data
     memoStatus.value = data.status || 'draft'
     sectionOrder.value = data.section_order || Object.keys(data.sections || {})
@@ -132,7 +184,7 @@ async function onGenerate() {
 async function onSave() {
   saving.value = true
   try {
-    await api.put(`/api/eqcr/projects/${props.projectId}/memo`, {
+    await api.put(P_eqcr.memoSave(props.projectId), {
       sections: { ...editableSections },
     })
     ElMessage.success('备忘录已保存')
@@ -150,7 +202,7 @@ function onFinalize() {
 async function doFinalize() {
   finalizing.value = true
   try {
-    await api.post(`/api/eqcr/projects/${props.projectId}/memo/finalize`)
+    await api.post(P_eqcr.memoFinalize(props.projectId))
     memoStatus.value = 'finalized'
     showFinalizeConfirm.value = false
     ElMessage.success('备忘录已定稿，PDF 将在归档时自动生成')
@@ -158,6 +210,35 @@ async function doFinalize() {
     ElMessage.error(e?.response?.data?.detail || '定稿失败')
   } finally {
     finalizing.value = false
+  }
+}
+
+// R8-S2-05：导出 Word
+async function onExportWord() {
+  if (!props.projectId) return
+  exportingWord.value = true
+  try {
+    const { default: http } = await import('@/utils/http')
+    const resp = await http.get(P_eqcr.memoExport(props.projectId, 'docx'), {
+      responseType: 'blob',
+    })
+    const blob = new Blob([resp.data], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    // 文件名由后端 Content-Disposition 提供
+    const cd = resp.headers?.['content-disposition'] || ''
+    const match = cd.match(/filename="?([^";]+)"?/)
+    a.download = match?.[1] ? decodeURIComponent(match[1]) : 'EQCR备忘录.docx'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '导出失败')
+  } finally {
+    exportingWord.value = false
   }
 }
 

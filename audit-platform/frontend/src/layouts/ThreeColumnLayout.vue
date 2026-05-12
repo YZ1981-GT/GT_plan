@@ -4,7 +4,7 @@
     <header class="gt-topbar">
       <div class="gt-topbar-left">
         <div class="gt-logo" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠/展开导航">
-          <img src="/gt.png" alt="致同" class="gt-logo-img" />
+          <img src="/gt-logo-white.png" alt="Grant Thornton 致同" class="gt-logo-img" />
           <transition name="gt-fade">
             <span v-if="!sidebarCollapsed" class="gt-logo-text">审计平台</span>
           </transition>
@@ -17,49 +17,15 @@
         </el-breadcrumb>
       </div>
       <div class="gt-topbar-right">
-        <!-- 顶部快捷入口（全局工具） -->
-        <el-tooltip content="知识库" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/knowledge')">
-            <el-icon :size="18"><Reading /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="私人库" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/private-storage')">
-            <el-icon :size="18"><Suitcase /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="AI 模型" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/settings/ai-models')">
-            <el-icon :size="18"><Cpu /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="排版模板" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/settings/report-format')">
-            <el-icon :size="18"><Document /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="吐槽求助" placement="bottom">
-          <div class="gt-topbar-btn" @click="router.push('/forum')">
-            <el-icon :size="18"><ChatDotSquare /></el-icon>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="公式管理" placement="bottom">
-          <div class="gt-topbar-btn" @click="showFormulaManager = true">
-            <span style="font-size:16px;font-weight:700;font-style:italic;line-height:18px">ƒx</span>
-          </div>
-        </el-tooltip>
-        <el-tooltip content="自定义查询" placement="bottom">
-          <div class="gt-topbar-btn" @click="showCustomQuery = true">
-            <span style="font-size:15px;line-height:18px">🔍</span>
-          </div>
-        </el-tooltip>
+        <!-- 通知铃铛 -->
+        <slot name="nav-notifications" />
 
-        <!-- 显示设置（金额单位 / 字号） -->
+        <!-- 显示设置 Aa -->
         <el-popover placement="bottom" :width="240" trigger="click">
           <template #reference>
-            <el-tooltip content="显示设置（单位/字号）" placement="bottom">
+            <el-tooltip content="显示设置" placement="bottom">
               <div class="gt-topbar-btn">
-                <span style="font-size:15px;line-height:18px">Aa</span>
+                <span class="gt-topbar-text-icon">Aa</span>
               </div>
             </el-tooltip>
           </template>
@@ -123,27 +89,38 @@
           </div>
         </el-tooltip>
         <!-- 后台导入任务指示 -->
-        <el-tooltip v-if="bgImportStatus" :content="bgImportStatus.message" placement="bottom">
-          <div class="gt-topbar-btn gt-import-indicator" @click="navigateToImport">
-            <el-icon :size="18" class="is-loading"><Loading /></el-icon>
-            <span class="gt-import-label">导入中</span>
+        <el-tooltip
+          v-if="bgImportStatus"
+          :content="bgImportStatus.tooltip"
+          placement="bottom"
+          effect="dark"
+        >
+          <div
+            class="gt-topbar-btn gt-import-indicator"
+            :class="`gt-phase-${bgImportStatus.phase}`"
+            @click="navigateToImport"
+          >
+            <el-progress
+              type="circle"
+              :percentage="bgImportStatus.progress"
+              :width="22"
+              :stroke-width="3"
+              :show-text="false"
+              :color="phaseColor"
+              :status="bgImportStatus.progress >= 100 ? 'success' : undefined"
+              class="gt-import-progress-ring"
+            />
+            <span class="gt-import-label">{{ bgImportLabel }}</span>
           </div>
         </el-tooltip>
 
-        <!-- 同步状态指示器 -->
-        <SyncStatusIndicator />
+        <div class="gt-topbar-divider" />
 
         <!-- 复核收件箱入口（reviewer/partner/admin 可见） -->
         <slot name="nav-review-inbox" />
 
         <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
         <slot name="nav-eqcr" />
-
-        <el-tooltip content="通知" placement="bottom">
-          <el-badge :value="0" :hidden="true" class="gt-topbar-btn">
-            <el-icon :size="18"><Bell /></el-icon>
-          </el-badge>
-        </el-tooltip>
         <el-dropdown trigger="click">
           <div class="gt-user-info">
             <el-avatar :size="30" class="gt-avatar">
@@ -182,11 +159,57 @@
                 {{ item.label }}
                 <span v-if="item.maturity === 'pilot'" class="gt-maturity-badge gt-maturity-pilot">试点</span>
                 <span v-else-if="item.maturity === 'experimental'" class="gt-maturity-badge gt-maturity-exp">实验</span>
+                <span v-else-if="item.maturity === 'developing'" class="gt-maturity-badge gt-maturity-dev">开发中</span>
               </span>
             </transition>
           </div>
         </nav>
         <div class="gt-sidebar-bottom">
+          <!-- 工具簇（从顶栏迁移过来，避免顶栏过载） -->
+          <div class="gt-sidebar-tools-title" v-if="!sidebarCollapsed">工具</div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': route.path.startsWith('/knowledge') }" @click="router.push('/knowledge')" title="知识库">
+            <el-icon :size="18"><Reading /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">知识库</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/private-storage' }" @click="router.push('/private-storage')" title="私人库">
+            <el-icon :size="18"><Suitcase /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">私人库</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/ai-models' }" @click="router.push('/settings/ai-models')" title="AI 模型">
+            <el-icon :size="18"><Cpu /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">AI 模型</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/settings/report-format' }" @click="router.push('/settings/report-format')" title="排版模板">
+            <el-icon :size="18"><Document /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">排版模板</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" :class="{ 'gt-nav-item--active': activeToolPath === '/forum' }" @click="router.push('/forum')" title="吐槽求助">
+            <el-icon :size="18"><ChatDotSquare /></el-icon>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">吐槽求助</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" @click="showFormulaManager = true" title="公式管理">
+            <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700">ƒx</span>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
+            </transition>
+          </div>
+          <div class="gt-nav-item gt-nav-item--tool" @click="showCustomQuery = true" title="自定义查询">
+            <span class="gt-tool-text-icon">🔍</span>
+            <transition name="gt-fade">
+              <span v-if="!sidebarCollapsed" class="gt-nav-label">自定义查询</span>
+            </transition>
+          </div>
+
           <div class="gt-nav-item" @click="sidebarCollapsed = !sidebarCollapsed" title="折叠">
             <el-icon :size="18"><DArrowLeft v-if="!sidebarCollapsed" /><DArrowRight v-else /></el-icon>
             <transition name="gt-fade">
@@ -285,6 +308,9 @@
       :project-id="currentProjectId"
       :year="currentYear"
     />
+
+    <!-- 全局快捷键帮助面板 [R7-S2-12] -->
+    <ShortcutHelpDialog v-model="showShortcutHelp" />
   </div>
 </template>
 
@@ -293,17 +319,18 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useRoleContextStore } from '@/stores/roleContext'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
-  Stamp, Box, Setting, Bell, ArrowDown, SwitchButton,
+  Stamp, Box, Setting, ArrowDown, SwitchButton,
   DArrowLeft, DArrowRight, Cpu, DeleteFilled, Grid, Menu, Paperclip,
   DataAnalysis, UserFilled, ChatDotSquare, Suitcase, Document, Loading,
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
-import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue'
+import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { createSSE, type SSEConnection } from '@/utils/sse'
@@ -321,29 +348,50 @@ const props = defineProps<{
   catalogTitle?: string
 }>()
 
-// ── 导航项 ──
-const navItems = [
-  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production' },
-  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production' },
-  { key: 'team', label: '人员', icon: User, path: '/settings/staff', maturity: 'production' },
-  { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production' },
-  { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production' },
-  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'pilot' },
-  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'pilot' },
-  { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production' },
-  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'pilot' },
-  { key: 'users', label: '用户', icon: UserFilled, path: '/settings/users', maturity: 'production' },
+// ── 导航项（R7-S2-01：角色感知动态化） ──
+const roleStore = useRoleContextStore()
+
+const FALLBACK_NAV = [
+  { key: 'dashboard', label: '仪表盘', icon: Odometer, path: '/', maturity: 'production', roles: null },
+  { key: 'projects', label: '项目', icon: FolderOpened, path: '/projects', maturity: 'production', roles: null },
+  { key: 'team', label: '人员档案', icon: User, path: '/settings/staff', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'workhours', label: '工时', icon: Timer, path: '/work-hours', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor', 'eqcr'] },
+  { key: 'mgmt-dashboard', label: '看板', icon: DataAnalysis, path: '/dashboard/management', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'consolidation', label: '合并', icon: Connection, path: '/consolidation', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'confirmation', label: '函证', icon: Stamp, path: '/confirmation', maturity: 'developing', roles: null },
+  { key: 'archive', label: '归档', icon: Box, path: '/archive', maturity: 'production', roles: ['admin', 'partner', 'manager'] },
+  { key: 'attachments', label: '附件', icon: Paperclip, path: '/attachments', maturity: 'production', roles: ['admin', 'partner', 'manager', 'auditor'] },
+  { key: 'users', label: '账号权限', icon: UserFilled, path: '/settings/users', maturity: 'production', roles: ['admin'] },
 ]
+
+/**
+ * 按角色过滤 + 覆盖路径
+ * - roles=null 表示所有角色可见
+ * - 按角色覆盖"看板"默认路径
+ */
+function buildNavForRole(nav: typeof FALLBACK_NAV, role: string) {
+  return nav
+    .filter(item => !item.roles || item.roles.includes(role))
+    .map(item => {
+      if (item.key === 'mgmt-dashboard') {
+        if (role === 'manager') return { ...item, path: '/dashboard/manager' }
+        if (role === 'partner') return { ...item, path: '/dashboard/partner' }
+      }
+      return item
+    })
+}
+
+const navItems = computed(() => buildNavForRole(FALLBACK_NAV, roleStore.effectiveRole || 'auditor'))
 
 const activeNav = computed(() => {
   const p = route.path
   if (p === '/') return 'dashboard'
   // 顶部栏路由不高亮左侧导航
-  const topBarPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum', '/recycle-bin', '/settings']
+  const topBarPaths = ['/recycle-bin', '/settings']
   if (topBarPaths.some(tp => p === tp || (tp !== '/settings' && p.startsWith(tp)))) return ''
   // 合并项目详情页（/projects/:id/consolidation）高亮"合并"而非"项目"
   if (p.match(/^\/projects\/[^/]+\/consolidation/)) return 'consolidation'
-  for (const item of navItems) {
+  for (const item of navItems.value) {
     if (item.path !== '/' && p.startsWith(item.path)) return item.key
   }
   if (p.startsWith('/projects')) return 'projects'
@@ -351,8 +399,15 @@ const activeNav = computed(() => {
 })
 
 const currentModule = computed(() => {
-  const item = navItems.find(n => n.key === activeNav.value)
+  const item = navItems.value.find(n => n.key === activeNav.value)
   return item?.label || ''
+})
+
+// 工具区 active 判断
+const activeToolPath = computed(() => {
+  const p = route.path
+  const toolPaths = ['/knowledge', '/private-storage', '/settings/ai-models', '/settings/report-format', '/forum']
+  return toolPaths.find(tp => p.startsWith(tp)) || ''
 })
 
 const emit = defineEmits<{
@@ -360,7 +415,7 @@ const emit = defineEmits<{
   (e: 'view-change', mode: 'three' | 'four'): void
 }>()
 
-function onNavClick(item: typeof navItems[0]) {
+function onNavClick(item: (typeof FALLBACK_NAV)[0]) {
   emit('nav-change', item.key)
   router.push(item.path)
 }
@@ -377,6 +432,7 @@ const fourColumnMode = ref(false)
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
 const showCustomQuery = ref(false)
+const showShortcutHelp = ref(false)
 const currentProjectId = computed(() => (route.params.projectId as string) || '')
 const currentYear = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
 
@@ -492,55 +548,179 @@ function onTouchEnd(e: TouchEvent) {
 }
 
 // ── 后台导入任务全局轮询 ──
-const bgImportStatus = ref<{ projectId: string; message: string; progress: number } | null>(null)
+// 状态模型（不直接用 route.params.projectId 作为 "追踪中 project"——
+// 用户转后台后切到其他项目，原项目导入仍应被追踪直到结束）
+interface BgImportStatus {
+  projectId: string
+  phase: string          // 来自 job.current_phase：bootstrap/parsing/validating/writing/activating/completed
+  progress: number       // 0-100
+  message: string        // 当前阶段人类可读消息
+  tooltip: string        // 鼠标悬停完整信息
+}
+const bgImportStatus = ref<BgImportStatus | null>(null)
 let importPollTimer: ReturnType<typeof setInterval> | null = null
+/** 当前被追踪的 projectId（独立于路由，支持跨项目保留导入指示） */
+const trackedProjectId = ref<string | null>(null)
+/** 连续轮询错误计数——连续 6 次错误自动释放追踪（30s = 6 × 5s 轮询间隔） */
+let pollErrorCount = 0
+const MAX_POLL_ERRORS = 6
+
+const PHASE_LABEL: Record<string, string> = {
+  bootstrap: '启动',
+  parsing: '解析',
+  validating: '校验',
+  writing: '写入',
+  activating: '激活',
+  completed: '完成',
+  failed: '失败',
+  canceled: '已取消',
+  pending: '排队',
+  queued: '排队',
+}
+
+const bgImportLabel = computed(() => {
+  if (!bgImportStatus.value) return ''
+  return `${bgImportStatus.value.progress}%`
+})
+
+// P3-3.2: 按阶段着色（解析蓝 / 校验橙 / 写入紫 / 激活绿）
+// 注：completed 状态下 bgImportStatus 会被清空，指示器消失，
+// 所以这里不需要包含 completed 颜色
+const PHASE_COLORS: Record<string, string> = {
+  bootstrap: '#909399',
+  queued: '#909399',
+  pending: '#909399',
+  parsing: '#409eff',
+  validating: '#e6a23c',
+  writing: '#a855f7',
+  activating: '#67c23a',
+}
+
+const phaseColor = computed(() => {
+  if (!bgImportStatus.value) return '#409eff'
+  return PHASE_COLORS[bgImportStatus.value.phase] || '#409eff'
+})
 
 async function pollImportQueue() {
-  const projectId = route.params.projectId as string
-  if (!projectId) {
+  // 优先追踪 trackedProjectId；若无则回退到当前路由项目
+  const trackId = trackedProjectId.value || (route.params.projectId as string)
+  if (!trackId) {
     bgImportStatus.value = null
     return
   }
   try {
-    const statusData = await api.get(`/api/data-lifecycle/import-queue/${projectId}`, {
-      validateStatus: (s: number) => s < 600,
-    })
+    const statusData: any = await api.get(
+      `/api/projects/${trackId}/ledger-import/active-job`,
+      { validateStatus: (s: number) => s < 600 },
+    )
+    pollErrorCount = 0  // 成功响应重置错误计数
     const status = statusData
     if (status && status.status === 'processing') {
+      const phase = status.phase || status.current_phase || 'writing'
+      const pct = status.progress ?? 0
+      const phaseLabel = PHASE_LABEL[phase] || phase
+      const msg = status.message || `${phaseLabel}中`
+      // P3-5.5: 展示剩余耗时估算（上限 1 小时，超过不显示）
+      const eta = status.estimated_remaining_seconds as number | null | undefined
+      const etaText = typeof eta === 'number' && eta > 0 && eta <= 3600
+        ? (eta < 60 ? `约 ${eta} 秒` : `约 ${Math.round(eta / 60)} 分钟`)
+        : ''
+      const tooltipLines = [
+        `导入进行中 · ${phaseLabel} · ${pct}%`,
+        msg,
+      ]
+      if (etaText) tooltipLines.push(`预计剩余 ${etaText}`)
+      tooltipLines.push('点击跳转查看详情')
       bgImportStatus.value = {
-        projectId,
-        message: `[${status.progress ?? 0}%] ${status.message || '后台导入中...'}`,
-        progress: status.progress ?? 0,
+        projectId: trackId,
+        phase,
+        progress: pct,
+        message: msg,
+        tooltip: tooltipLines.join('\n'),
+      }
+      // 第一次发现正在处理的 job → 记录为追踪对象
+      if (!trackedProjectId.value) {
+        trackedProjectId.value = trackId
       }
     } else if (bgImportStatus.value) {
       const prev = bgImportStatus.value
       bgImportStatus.value = null
-      if (prev.progress >= 0 && status?.status !== 'failed') {
-        ElMessage.success(status?.message || '后台导入已完成')
+      trackedProjectId.value = null
+      // P3: toast 带 year 和 project 片段，便于用户识别是哪个任务完成
+      const yr = status?.year ? `${status.year} 年度` : ''
+      const finishedLabel = yr ? `（${yr}）` : ''
+      // P2-1.2: 显式处理 canceled 状态
+      if (status?.status === 'canceled' || status?.status === 'timed_out') {
+        ElMessage.warning({
+          message: `${status?.message || '导入已取消'}${finishedLabel}`,
+          duration: 4000,
+        })
       } else if (status?.status === 'failed') {
-        ElMessage.error(status?.message || '后台导入失败')
+        ElMessage.error({
+          message: `${status?.message || '后台导入失败'}${finishedLabel}，点击顶栏可查看历史`,
+          duration: 6000,
+        })
+      } else {
+        ElMessage.success({
+          message: `${status?.message || '后台导入已完成'}${finishedLabel}`,
+          duration: 4000,
+        })
       }
+    } else if (status?.status === 'idle' && trackedProjectId.value === trackId) {
+      // 追踪中的项目已无 job（外部取消或其他原因），释放追踪
+      trackedProjectId.value = null
     }
   } catch {
-    // ignore
+    // P2-1.2: 连续 3 次错误自动释放追踪，避免后端不可达时永久卡死
+    pollErrorCount++
+    if (pollErrorCount >= MAX_POLL_ERRORS) {
+      bgImportStatus.value = null
+      trackedProjectId.value = null
+      pollErrorCount = 0
+    }
   }
 }
 
 function navigateToImport() {
-  const pid = bgImportStatus.value?.projectId || route.params.projectId
-  if (pid) {
-    router.push({ path: `/projects/${pid}/ledger`, query: { import: '1' } })
+  const pid = bgImportStatus.value?.projectId || trackedProjectId.value || route.params.projectId
+  if (!pid) return
+  // 跳转到导入历史页面（能看到当前 job 进度），而非账表查询页面
+  const targetPath = `/projects/${pid}/ledger/import-history`
+  const currentPath = route.path
+  if (currentPath === targetPath) {
+    // 已在目标页，强制刷新
+    router.replace({ path: targetPath, query: { ...route.query, t: String(Date.now()) } })
+  } else {
+    router.push({ path: targetPath })
   }
 }
 
 watch(() => route.params.projectId, (newId) => {
+  // 路由项目变化时：不清 bgImportStatus（跨项目保留追踪）；
+  // 首次进入路由时主动触发一次轮询
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  bgImportStatus.value = null
-  if (newId) {
+  if (newId && !trackedProjectId.value) {
+    // 当前没在追踪其他项目 → 轮询新项目
     pollImportQueue()
-    importPollTimer = setInterval(pollImportQueue, 10000)
+  } else if (trackedProjectId.value) {
+    // 继续追踪旧项目，不切换
+    pollImportQueue()
   }
+  importPollTimer = setInterval(pollImportQueue, 5000)  // 5s 轮询比 10s 更实时
 }, { immediate: true })
+
+// 页面隐藏时暂停轮询（标签页切走或浏览器后台）节省请求
+function onVisibilityChange() {
+  if (document.hidden) {
+    if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
+  } else {
+    if (!importPollTimer && (trackedProjectId.value || route.params.projectId)) {
+      pollImportQueue()
+      importPollTimer = setInterval(pollImportQueue, 5000)
+    }
+  }
+}
+document.addEventListener('visibilitychange', onVisibilityChange)
 
 async function handleLogout() {
   await authStore.logout()
@@ -624,6 +804,7 @@ onMounted(() => {
   eventBus.on('open-formula-manager', onOpenFormulaEvent)
   eventBus.on('four-col-switch', onSwitchFourCol)
   eventBus.on('shortcut:undo', onShortcutUndo)
+  eventBus.on('shortcut:help', () => { showShortcutHelp.value = true })
   // 移动端手势
   document.addEventListener('touchstart', onTouchStart, { passive: true })
   document.addEventListener('touchend', onTouchEnd, { passive: true })
@@ -632,6 +813,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('touchstart', onTouchStart)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   eventBus.off('open-formula-manager', onOpenFormulaEvent)
   eventBus.off('four-col-switch', onSwitchFourCol)
   eventBus.off('shortcut:undo', onShortcutUndo)
@@ -654,22 +836,26 @@ onUnmounted(() => {
   background: var(--gt-color-bg);
 }
 
-/* ── 顶部导航栏 ── */
+/* ── 顶部导航栏（致同品牌深紫） ── */
 .gt-topbar {
   height: 52px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--gt-space-4);
-  background: var(--gt-color-bg-white);
-  border-bottom: 1px solid var(--gt-color-border-light);
+  background: var(--gt-color-primary);
+  border-bottom: none;
   flex-shrink: 0;
   z-index: 100;
 }
 
 .gt-topbar-left { display: flex; align-items: center; }
 .gt-topbar-center { flex: 1; padding: 0 var(--gt-space-4); }
-.gt-topbar-right { display: flex; align-items: center; gap: var(--gt-space-3); }
+.gt-topbar-center :deep(.el-breadcrumb__inner),
+.gt-topbar-center :deep(.el-breadcrumb__separator) { color: rgba(255, 255, 255, 0.7); }
+.gt-topbar-center :deep(.el-breadcrumb__inner.is-link) { color: #fff; }
+.gt-topbar-right { display: flex; align-items: center; gap: 4px; }
+.gt-topbar-right > * { display: inline-flex; align-items: center; }
 
 .gt-logo {
   display: flex;
@@ -680,29 +866,46 @@ onUnmounted(() => {
   border-radius: var(--gt-radius-sm);
   transition: background var(--gt-transition-fast);
 }
-.gt-logo:hover { background: var(--gt-color-primary-bg); }
-.gt-logo-img { height: 28px; width: auto; }
+.gt-logo:hover { background: rgba(255, 255, 255, 0.1); }
+.gt-logo-img { height: 40px; width: auto; }
 .gt-logo-text {
-  font-size: var(--gt-font-size-lg);
+  font-size: 14px;
   font-weight: 700;
-  color: var(--gt-color-primary);
+  color: #fff;
   white-space: nowrap;
 }
 
 .gt-topbar-btn {
   cursor: pointer;
-  padding: 6px;
-  border-radius: var(--gt-radius-sm);
-  color: var(--gt-color-text-secondary);
-  transition: all var(--gt-transition-fast);
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  transition: background 0.15s ease;
 }
-.gt-topbar-btn:hover { background: var(--gt-color-primary-bg); color: var(--gt-color-primary); }
+.gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.gt-topbar-text-icon {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* 顶栏内所有 el-button text / el-badge 适配深紫背景 */
+.gt-topbar-right :deep(.el-button--text) { color: rgba(255, 255, 255, 0.85); }
+.gt-topbar-right :deep(.el-button--text:hover) { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.gt-topbar-right :deep(.el-icon) { color: rgba(255, 255, 255, 0.9); }
+.gt-topbar-right :deep(.el-icon svg) { fill: currentColor; }
+.gt-topbar-right :deep(.el-dropdown) { color: #fff; }
 
 .gt-topbar-divider {
   width: 1px;
   height: 20px;
-  background: var(--gt-color-border-light);
-  margin: 0 2px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 8px;
 }
 
 .gt-import-indicator {
@@ -710,16 +913,24 @@ onUnmounted(() => {
   background: var(--gt-color-primary-bg);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 6px;
+  padding: 4px 10px;
   border-radius: var(--gt-radius-sm);
+  min-width: 62px;
+  justify-content: center;
 }
 .gt-import-indicator:hover {
   background: var(--gt-color-primary-lighter);
+  transform: scale(1.02);
+}
+.gt-import-progress-ring {
+  flex: 0 0 22px;
 }
 .gt-import-label {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -732,17 +943,18 @@ onUnmounted(() => {
   border-radius: var(--gt-radius-sm);
   transition: background var(--gt-transition-fast);
 }
-.gt-user-info:hover { background: var(--gt-color-primary-bg); }
+.gt-user-info:hover { background: rgba(255, 255, 255, 0.15); }
 .gt-avatar {
-  background: linear-gradient(135deg, var(--gt-color-primary) 0%, var(--gt-color-primary-light) 100%);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
   font-weight: 600;
   font-size: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 .gt-username {
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
-  color: var(--gt-color-text);
+  color: #fff;
 }
 
 /* ── 三栏主体 ── */
@@ -753,11 +965,11 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* ── 左侧栏 ── */
+/* ── 左侧栏（致同风格：浅灰底 + 紫色激活） ── */
 .gt-sidebar {
   display: flex;
   flex-direction: column;
-  background: #f5f7fa;
+  background: #f8f7fc;
   border-right: 1px solid var(--gt-color-border-light);
   transition: width var(--gt-transition-base);
   overflow: hidden;
@@ -769,6 +981,7 @@ onUnmounted(() => {
   padding: var(--gt-space-2) var(--gt-space-1);
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0; /* 允许 flex 子项收缩以触发滚动 */
 }
 
 .gt-nav-item {
@@ -800,10 +1013,39 @@ onUnmounted(() => {
 }
 .gt-maturity-pilot { background: #fef0e6; color: #e6a23c; }
 .gt-maturity-exp { background: #fde2e2; color: #f56c6c; }
+.gt-maturity-dev { background: #e8eaed; color: #909399; }
 
 .gt-sidebar-bottom {
   border-top: 1px solid var(--gt-color-border-light);
   padding: var(--gt-space-1);
+  flex-shrink: 0; /* 工具区不被压缩，主导航区滚动 */
+  max-height: 45vh; /* 窗口极小时工具区也不能占满，留空间给主导航 */
+  overflow-y: auto;
+}
+
+/* 工具簇（侧栏底部） */
+.gt-sidebar-tools-title {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary, #909399);
+  padding: 8px 14px 4px;
+  letter-spacing: 0.5px;
+}
+.gt-nav-item--tool {
+  font-size: 13px;
+  color: var(--gt-color-text-secondary, #606266);
+}
+.gt-nav-item--tool:hover {
+  background: rgba(75, 45, 119, 0.05);
+  color: var(--gt-color-primary);
+}
+.gt-tool-text-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  line-height: 1;
 }
 
 /* 折叠态 */

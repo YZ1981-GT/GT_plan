@@ -55,9 +55,10 @@ _DICTS: dict[str, list[dict[str, str]]] = {
     ],
     # 报告状态
     "report_status": [
-        {"value": "draft",  "label": "草稿",   "color": "info"},
-        {"value": "review", "label": "复核中", "color": "warning"},
-        {"value": "final",  "label": "已定稿", "color": "success"},
+        {"value": "draft",          "label": "草稿",       "color": "info"},
+        {"value": "review",         "label": "复核中",     "color": "warning"},
+        {"value": "eqcr_approved",  "label": "EQCR已锁",  "color": ""},
+        {"value": "final",          "label": "已定稿",     "color": "success"},
     ],
     # 模板状态
     "template_status": [
@@ -88,6 +89,14 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "processing", "label": "处理中", "color": "warning"},
         {"value": "completed",  "label": "已完成", "color": "success"},
         {"value": "failed",     "label": "失败",   "color": "danger"},
+    ],
+    # 工时状态 [R7-S2-06]
+    "workhour_status": [
+        {"value": "draft",     "label": "草稿",   "color": "info"},
+        {"value": "tracking",  "label": "计时中", "color": "warning"},
+        {"value": "confirmed", "label": "已确认", "color": ""},
+        {"value": "approved",  "label": "已审批", "color": "success"},
+        {"value": "rejected",  "label": "已退回", "color": "danger"},
     ],
 }
 

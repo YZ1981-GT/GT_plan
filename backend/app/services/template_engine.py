@@ -648,6 +648,15 @@ class TemplateEngine:
             except Exception as _mf_err:
                 logger.debug("multi-file generation for %s: %s", code, _mf_err)
 
+        # F50 / Sprint 8.17: 底稿快照绑定 — 所有新建底稿都绑定当前 active dataset
+        # 没有 active dataset（账套未导入）时，字段保持 None；允许先建底稿后导账套
+        try:
+            from app.services.dataset_query import bind_to_active_dataset
+            for wp in workpapers:
+                await bind_to_active_dataset(db, wp, project_id, year)
+        except Exception as _bind_err:
+            logger.warning("dataset binding failed for project=%s: %s", project_id, _bind_err)
+
         await db.flush()
         logger.info("generate_project_workpapers: project=%s codes=%d files=%d", project_id, len(template_codes), len(workpapers))
         return workpapers

@@ -14,7 +14,7 @@
     </GtPageHeader>
 -->
 <template>
-  <div class="gt-page-header">
+  <div class="gt-page-header" :class="{ 'gt-page-header--banner': variant === 'banner' }">
     <div class="gt-page-header__row1">
       <el-button
         v-if="showBack"
@@ -22,6 +22,7 @@
         class="gt-page-header__back"
         @click="onBack"
       >← 返回</el-button>
+      <span v-if="icon && variant === 'banner'" class="gt-page-header__icon">{{ icon }}</span>
       <h2 class="gt-page-header__title">{{ title }}</h2>
       <!-- 默认插槽：放 GtInfoBar -->
       <slot />
@@ -33,6 +34,10 @@
           <span v-else class="gt-sync-dot gt-sync-dot--ok">✓ 已更新</span>
         </el-tooltip>
       </div>
+    </div>
+    <!-- subtitle 插槽（banner 模式下显示副标题） -->
+    <div v-if="variant === 'banner'" class="gt-page-header__subtitle">
+      <slot name="subtitle" />
     </div>
     <!-- actions 插槽：放 GtToolbar -->
     <slot name="actions" />
@@ -53,10 +58,16 @@ const props = withDefaults(defineProps<{
   showSyncStatus?: boolean
   /** 返回按钮模式：'route' 触发 back 事件（父组件处理），'history' 调用 router.back() */
   backMode?: 'route' | 'history'
+  /** 显示变体：'default' 标准标题栏，'banner' 大型 Dashboard 横幅 */
+  variant?: 'default' | 'banner'
+  /** 图标（emoji 或图标名，仅 banner 模式显示） */
+  icon?: string
 }>(), {
   showBack: true,
   showSyncStatus: false,
   backMode: 'route',
+  variant: 'default',
+  icon: '',
 })
 
 const emit = defineEmits<{
@@ -223,5 +234,26 @@ onUnmounted(() => {
 @keyframes gt-sync-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* ── Banner 变体 ── */
+.gt-page-header--banner {
+  padding: 24px 32px;
+}
+
+.gt-page-header--banner .gt-page-header__title {
+  font-size: 22px;
+}
+
+.gt-page-header__icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.gt-page-header__subtitle {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-top: -4px;
+  padding-left: 0;
 }
 </style>

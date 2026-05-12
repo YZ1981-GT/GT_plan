@@ -1,24 +1,37 @@
 <template>
   <div class="gt-manager-dashboard gt-fade-in">
     <!-- 页面头部 -->
-    <div class="gt-page-banner">
-      <div class="gt-banner-content">
-        <h2>📊 项目经理工作台</h2>
-        <span class="gt-banner-sub">
-          <template v-if="overview">
-            {{ overview.projects.length }} 个项目 · {{ crossTodoTotal }} 项待办
-          </template>
+    <GtPageHeader title="项目经理工作台" variant="banner" icon="📊" :show-back="false">
+      <template #subtitle>
+        <span v-if="overview">
+          {{ overview.projects.length }} 个项目 · {{ crossTodoTotal }} 项待办
         </span>
-      </div>
-      <div class="gt-banner-actions">
+      </template>
+      <template #actions>
         <span class="gt-last-update" v-if="lastUpdateTime">
           上次更新 {{ elapsedText }} 前
         </span>
         <el-button size="small" :loading="loading" @click="loadOverview">
           刷新
         </el-button>
+      </template>
+    </GtPageHeader>
+
+    <!-- 区块零：待审批工时聚合卡片 [R9 F7-PM Task 22] -->
+    <section class="gt-section" v-if="pendingWorkHoursSummary">
+      <div class="gt-pending-workhours-card" @click="goToWorkHoursApprove()">
+        <div class="gt-pwh-icon">⏱️</div>
+        <div class="gt-pwh-info">
+          <div class="gt-pwh-count">{{ pendingWorkHoursSummary.pending_count }}</div>
+          <div class="gt-pwh-label">待审批工时</div>
+        </div>
+        <div class="gt-pwh-detail" v-if="pendingWorkHoursSummary.total_hours">
+          <span class="gt-pwh-hours">{{ pendingWorkHoursSummary.total_hours }}h</span>
+          <span class="gt-pwh-sub">涉及 {{ pendingWorkHoursSummary.staff_count || 0 }} 人</span>
+        </div>
+        <el-button size="small" type="primary" plain class="gt-pwh-action">去审批 →</el-button>
       </div>
-    </div>
+    </section>
 
     <!-- 区块一：项目总览（卡片网格） -->
     <section class="gt-section">
@@ -111,7 +124,7 @@
               </div>
             </el-col>
             <el-col :span="8">
-              <div class="gt-todo-card" @click="goToUnassigned()">
+              <div class="gt-todo-card" v-permission="'assignment:batch'" @click="goToUnassigned()">
                 <div class="gt-todo-icon">📝</div>
                 <div class="gt-todo-info">
                   <span class="gt-todo-count">{{ overview.cross_todos.pending_assign }}</span>
@@ -232,6 +245,32 @@
       <el-empty v-else-if="!assignmentStatusLoading" :image-size="50" description="近 7 天无委派记录" />
     </section>
 
+    <!-- 区块 R8-S2-08：异常告警（从 overview 派生） -->
+    <section class="gt-section" v-if="alertItems.length">
+      <h3 class="gt-section-title">
+        🚨 异常告警
+        <el-tag size="small" type="danger" style="margin-left: 8px">{{ alertItems.length }}</el-tag>
+      </h3>
+      <div class="gt-alerts-list">
+        <div
+          v-for="(alert, idx) in alertItems"
+          :key="idx"
+          class="gt-alert-item"
+          :class="`gt-alert-${alert.level}`"
+          @click="goToProject(alert.project_id)"
+        >
+          <span class="gt-alert-icon">{{ alert.icon }}</span>
+          <div class="gt-alert-content">
+            <div class="gt-alert-title">{{ alert.project_name }}</div>
+            <div class="gt-alert-desc">{{ alert.desc }}</div>
+          </div>
+          <el-tag :type="alertTagType(alert.level)" size="small">
+            {{ alertLevelLabel(alert.level) }}
+          </el-tag>
+        </div>
+      </div>
+    </section>
+
     <!-- 区块三：本周关键动作 -->
     <section class="gt-section">
       <h3 class="gt-section-title">本周关键动作</h3>
@@ -281,13 +320,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import { api } from '@/services/apiProxy'
+import { dashboard as P_dash, workHours as P_wh } from '@/services/apiPaths'
 import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
 import { listCommunications } from '@/services/pmApi'
 import type { CommitmentEntry, CommunicationRecord } from '@/services/pmApi'
 import CrossProjectBriefExporter from '@/components/pm/CrossProjectBriefExporter.vue'
 import type { BriefProject } from '@/components/pm/CrossProjectBriefExporter.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 
@@ -346,6 +388,23 @@ const elapsedText = ref('')
 // 近期委派状态
 const assignmentStatusList = ref<AssignmentStatusItem[]>([])
 const assignmentStatusLoading = ref(false)
+
+// 待审批工时聚合 [R9 F7-PM Task 22]
+interface PendingWorkHoursSummary {
+  pending_count: number
+  total_hours: number
+  staff_count: number
+}
+const pendingWorkHoursSummary = ref<PendingWorkHoursSummary | null>(null)
+
+async function loadPendingWorkHoursSummary() {
+  try {
+    const data = await api.get(P_wh.summary)
+    pendingWorkHoursSummary.value = data as PendingWorkHoursSummary
+  } catch {
+    // 静默失败，不影响主看板
+  }
+}
 
 // 客户承诺 Tab
 const crossTodoTab = ref('overview')
@@ -476,14 +535,14 @@ function onUserActivity() {
 async function loadOverview() {
   loading.value = true
   try {
-    const data = await api.get('/api/dashboard/manager/overview')
+    const data = await api.get(P_dash.manager.overview)
     overview.value = data as ManagerOverview
     lastUpdateTime.value = new Date()
     updateElapsed()
     // Batch 1 Fix 1.7: budget_hours/actual_hours 已包含在 overview 响应中，无需 N+1
   } catch (err: any) {
     const msg = err?.detail?.message || err?.message || '加载失败'
-    ElMessage.error(`加载经理看板失败：${msg}`)
+    handleApiError(err, '操作')
   } finally {
     loading.value = false
   }
@@ -493,11 +552,11 @@ async function loadOverview() {
 async function loadAssignmentStatus() {
   assignmentStatusLoading.value = true
   try {
-    const data = await api.get('/api/dashboard/manager/assignment-status?days=7')
+    const data = await api.get(P_dash.manager.assignmentStatus, { params: { days: 7 } })
     assignmentStatusList.value = (data as AssignmentStatusItem[]) || []
   } catch (err: any) {
     const msg = err?.detail?.message || err?.message || '加载失败'
-    ElMessage.error(`加载委派状态失败：${msg}`)
+    handleApiError(err, '操作')
   } finally {
     assignmentStatusLoading.value = false
   }
@@ -556,7 +615,7 @@ async function loadCommitments() {
     allCommitments.value = items
   } catch (err: any) {
     const msg = err?.detail?.message || err?.message || '加载失败'
-    ElMessage.error(`加载客户承诺失败：${msg}`)
+    handleApiError(err, '操作')
   } finally {
     commitmentsLoading.value = false
   }
@@ -580,7 +639,7 @@ async function completeCommitment(row: CommitmentDisplayItem) {
   row._completing = true
   try {
     await http.patch(
-      `/api/projects/${row.project_id}/communications/${row.comm_id}/commitments/${row.commitment_id}`,
+      P.projects.communications.commitmentUpdate(row.project_id, row.comm_id, row.commitment_id),
       { status: 'done' }
     )
     ElMessage.success(`承诺"${row.content}"已标记完成`)
@@ -589,7 +648,7 @@ async function completeCommitment(row: CommitmentDisplayItem) {
     allCommitments.value = allCommitments.value.filter(c => c !== row)
   } catch (err: any) {
     const msg = err?.response?.data?.detail?.message || err?.message || '操作失败'
-    ElMessage.error(`标记完成失败：${msg}`)
+    handleApiError(err, '操作')
   } finally {
     row._completing = false
   }
@@ -647,6 +706,87 @@ function riskLabel(level: string): string {
   return '未评估'
 }
 
+// R8-S2-08：异常告警 — 从 overview + commitments 派生
+interface AlertItem {
+  project_id: string
+  project_name: string
+  icon: string
+  desc: string
+  level: 'critical' | 'warning' | 'info'
+}
+const alertItems = computed<AlertItem[]>(() => {
+  if (!overview.value) return []
+  const items: AlertItem[] = []
+  for (const proj of overview.value.projects) {
+    // 1. 高风险项目
+    if (proj.risk_level === 'high') {
+      items.push({
+        project_id: proj.project_id,
+        project_name: proj.project_name,
+        icon: '🔴',
+        desc: `高风险项目：完成率 ${proj.completion_rate}%，逾期底稿 ${proj.overdue_count} 张`,
+        level: 'critical',
+      })
+    }
+    // 2. 预算超支（使用 80% 以上为警告）
+    if ((proj as any).budget_hours && (proj as any).actual_hours) {
+      const pct = ((proj as any).actual_hours / (proj as any).budget_hours) * 100
+      if (pct > 120) {
+        items.push({
+          project_id: proj.project_id,
+          project_name: proj.project_name,
+          icon: '💰',
+          desc: `工时严重超支：已用 ${(proj as any).actual_hours}h / 预算 ${(proj as any).budget_hours}h（${pct.toFixed(0)}%）`,
+          level: 'critical',
+        })
+      } else if (pct > 90) {
+        items.push({
+          project_id: proj.project_id,
+          project_name: proj.project_name,
+          icon: '⚠️',
+          desc: `工时接近超支：已用 ${(proj as any).actual_hours}h / 预算 ${(proj as any).budget_hours}h（${pct.toFixed(0)}%）`,
+          level: 'warning',
+        })
+      }
+    }
+    // 3. 逾期底稿超过 5 张
+    if (proj.overdue_count > 5) {
+      items.push({
+        project_id: proj.project_id,
+        project_name: proj.project_name,
+        icon: '⏰',
+        desc: `${proj.overdue_count} 张底稿逾期，需加快进度`,
+        level: 'warning',
+      })
+    }
+  }
+  // 4. 逾期客户承诺
+  for (const c of overdueCommitments.value) {
+    items.push({
+      project_id: c.project_id,
+      project_name: c.project_name,
+      icon: '📋',
+      desc: `客户承诺逾期：${c.content}`,
+      level: 'warning',
+    })
+  }
+  // 按 level 排序：critical 在前
+  const levelOrder = { critical: 0, warning: 1, info: 2 }
+  items.sort((a, b) => levelOrder[a.level] - levelOrder[b.level])
+  return items
+})
+
+function alertTagType(level: string): 'danger' | 'warning' | 'info' {
+  if (level === 'critical') return 'danger'
+  if (level === 'warning') return 'warning'
+  return 'info'
+}
+function alertLevelLabel(level: string): string {
+  if (level === 'critical') return '严重'
+  if (level === 'warning') return '警告'
+  return '提示'
+}
+
 function progressColor(rate: number): string {
   if (rate >= 80) return '#67c23a'
   if (rate >= 50) return '#e6a23c'
@@ -675,6 +815,7 @@ function actionTagType(priority: string): 'danger' | 'warning' | 'info' {
 onMounted(() => {
   loadOverview()
   loadAssignmentStatus()
+  loadPendingWorkHoursSummary()
   elapsedTimer = setInterval(updateElapsed, 1000)
   // 监听用户交互以重启 timer
   document.addEventListener('click', onUserActivity)
@@ -934,6 +1075,57 @@ onBeforeUnmount(() => {
   color: var(--gt-color-text);
 }
 
+/* R8-S2-08：异常告警 */
+.gt-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gt-alert-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--gt-radius-sm);
+  border: 1px solid var(--gt-color-border-light);
+  background: var(--gt-color-bg-white);
+  cursor: pointer;
+  transition: all var(--gt-transition-fast);
+}
+.gt-alert-item:hover {
+  box-shadow: var(--gt-shadow-sm);
+  transform: translateX(2px);
+}
+.gt-alert-critical {
+  border-left: 4px solid var(--gt-color-coral);
+  background: var(--gt-color-coral-light);
+}
+.gt-alert-warning {
+  border-left: 4px solid var(--gt-color-wheat);
+  background: var(--gt-color-wheat-light);
+}
+.gt-alert-info {
+  border-left: 4px solid var(--gt-color-teal);
+}
+.gt-alert-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.gt-alert-content {
+  flex: 1;
+  min-width: 0;
+}
+.gt-alert-title {
+  font-size: var(--gt-font-size-sm);
+  font-weight: 600;
+  color: var(--gt-color-text);
+}
+.gt-alert-desc {
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
+  margin-top: 2px;
+}
+
 /* 团队负载 */
 .gt-hours-warning {
   color: var(--el-color-danger, #f56c6c);
@@ -981,4 +1173,29 @@ onBeforeUnmount(() => {
   color: var(--gt-color-text-tertiary);
   font-size: 13px;
 }
+
+/* 待审批工时聚合卡片 [R9 F7-PM Task 22] */
+.gt-pending-workhours-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+  border: 1px solid #fde68a;
+  border-radius: var(--gt-radius-md);
+  cursor: pointer;
+  transition: all var(--gt-transition-fast);
+}
+.gt-pending-workhours-card:hover {
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.15);
+  transform: translateY(-1px);
+}
+.gt-pwh-icon { font-size: 32px; }
+.gt-pwh-info { display: flex; flex-direction: column; }
+.gt-pwh-count { font-size: 28px; font-weight: 700; color: #d97706; }
+.gt-pwh-label { font-size: 13px; color: #92400e; }
+.gt-pwh-detail { display: flex; flex-direction: column; margin-left: auto; text-align: right; }
+.gt-pwh-hours { font-size: 16px; font-weight: 600; color: #b45309; }
+.gt-pwh-sub { font-size: 12px; color: #92400e; }
+.gt-pwh-action { margin-left: 16px; }
 </style>

@@ -41,7 +41,8 @@
           </el-form>
 
           <el-button type="primary" @click="onExport" :loading="exportLoading"
-            :disabled="selectedDocs.length === 0" style="width: 100%; margin-top: 12px">
+            :disabled="selectedDocs.length === 0" style="width: 100%; margin-top: 12px"
+            v-permission="'report:export'">
             开始导出
           </el-button>
 
@@ -82,7 +83,7 @@
             </el-table-column>
             <el-table-column label="状态" width="90">
               <template #default="{ row }">
-                <el-tag :type="statusTagType(row.status)" size="small">{{ taskStatusLabel(row.status) }}</el-tag>
+                <el-tag :type="(statusTagType(row.status)) || undefined" size="small">{{ taskStatusLabel(row.status) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="大小" width="100">
@@ -112,6 +113,7 @@ import {
   createExportTask, getExportTaskStatus, getExportDownloadUrl, getExportHistory,
   type ExportTaskData,
 } from '@/services/auditPlatformApi'
+import { EXPORT_TASK_STATUS } from '@/constants/statusEnum'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -131,14 +133,14 @@ function taskStatusLabel(s: string) {
   return m[s] || s
 }
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = { queued: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { queued: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
   return m[s] || 'info'
 }
 
 function progressStatus(s: string) {
-  if (s === 'completed') return 'success'
-  if (s === 'failed') return 'exception'
+  if (s === EXPORT_TASK_STATUS.COMPLETED) return 'success'
+  if (s === EXPORT_TASK_STATUS.FAILED) return 'exception'
   return undefined
 }
 

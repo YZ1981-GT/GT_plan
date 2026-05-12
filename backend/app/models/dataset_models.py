@@ -51,6 +51,7 @@ class JobStatus(str, enum.Enum):
     failed = "failed"
     canceled = "canceled"
     timed_out = "timed_out"
+    interrupted = "interrupted"
 
 
 class ArtifactStatus(str, enum.Enum):
@@ -64,6 +65,7 @@ class ActivationType(str, enum.Enum):
     """激活动作类型"""
     activate = "activate"
     rollback = "rollback"
+    force_unbind = "force_unbind"
 
 
 class OutboxStatus(str, enum.Enum):
@@ -89,6 +91,10 @@ class LedgerDataset(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    # F41 / Sprint 7.5: 多租户预留列（暂恒为 'default'）
+    tenant_id: Mapped[str] = mapped_column(
+        String(64), server_default=text("'default'"), nullable=False
     )
     project_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("projects.id"), nullable=False
@@ -136,6 +142,11 @@ class LedgerDataset(Base):
     __table_args__ = (
         Index("idx_ledger_datasets_project_year", "project_id", "year"),
         Index("idx_ledger_datasets_active", "project_id", "year", "status"),
+        # F41 / Sprint 7.5: tenant 维度复合索引
+        Index(
+            "idx_ledger_datasets_tenant_project_year",
+            "tenant_id", "project_id", "year",
+        ),
     )
 
 
@@ -161,7 +172,7 @@ class ImportJob(Base):
     )
     year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     status: Mapped[JobStatus] = mapped_column(
-        sa.Enum(JobStatus, name="job_status", create_type=False),
+        sa.Enum(JobStatus, name="job_status_enum", create_type=False),
         server_default=text("'pending'"),
         nullable=False,
     )
@@ -198,9 +209,28 @@ class ImportJob(Base):
         sa.Integer, server_default=text("600"), nullable=False
     )  # 默认 10 分钟超时
 
+    # P1-Q1: 乐观锁版本号（防并发 cancel/retry 竞态）
+    # 每次 status/progress 更新时 +1，端点调用时传入预期版本号做 WHERE 守卫
+    version: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+
+    # F42 / Sprint 7.10: 规模异常强制继续标记
+    # detect 阶段若返回 EMPTY_LEDGER_WARNING / SUSPICIOUS_DATASET_SIZE，submit
+    # 时必须传 ``force_submit=True`` 才能绕过门控；该值持久化到 ImportJob 以保留
+    # "用户明确覆盖了规模警告"的审计轨迹（见 design D30 / requirements F42）。
+    force_submit: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False
+    )
+
     # 操作者与时间
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
+    )
+    # F22 / Sprint 5.9: 接管链路记录
+    # 格式: [{"user_id": "A", "action": "create", "at": "..."}, ...]
+    creator_chain: Mapped[list | None] = mapped_column(
+        JSONB, server_default=text("'[]'"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -258,6 +288,18 @@ class ImportArtifact(Base):
     )
     expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
+    # F53 / Sprint 8.38: 留档合规保留期分类
+    # - transient（默认）：90 天过期，purge 任务物理删
+    # - archived       ：10 年过期，元数据永久保留
+    # - legal_hold     ：法定保留，永不删除
+    # 由 DatasetService.activate → compute_retention_class 联动决策（F53 / Sprint 8.40）。
+    retention_class: Mapped[str] = mapped_column(
+        String(20), server_default=text("'transient'"), nullable=False
+    )
+    retention_expires_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     # 操作者与时间
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
@@ -267,6 +309,11 @@ class ImportArtifact(Base):
     __table_args__ = (
         Index("idx_import_artifacts_project", "project_id"),
         Index("idx_import_artifacts_token", "upload_token", unique=True),
+        # F53 / Sprint 8.41: purge 任务按 retention_class + retention_expires_at 扫描
+        Index(
+            "idx_import_artifacts_retention",
+            "retention_class", "retention_expires_at",
+        ),
     )
 
 
@@ -308,6 +355,15 @@ class ActivationRecord(Base):
     performed_at: Mapped[datetime] = mapped_column(server_default=func.now())
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # F25 / Sprint 5.18: 审计溯源扩展字段
+    # 用于"谁在什么时间、从哪里、花了多久激活哪个版本"的完整轨迹
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    # 记录激活/回滚前后的四表行数，防静默数据损失
+    # 形如 {"tb_balance": 827, "tb_ledger": 1147414, "tb_aux_balance": 127618, "tb_aux_ledger": 2732674}
+    before_row_counts: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    after_row_counts: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     __table_args__ = (
         Index("idx_activation_records_project_year", "project_id", "year"),
     )
@@ -346,6 +402,59 @@ class ImportEventOutbox(Base):
     __table_args__ = (
         Index("idx_import_event_outbox_status", "status", "created_at"),
         Index("idx_import_event_outbox_project_year", "project_id", "year"),
+    )
+
+
+class EventOutboxDLQ(Base):
+    """事件广播死信队列（F45）。
+
+    ``import_event_outbox`` 的事件重试 N 次仍失败后（N = ``LEDGER_IMPORT_OUTBOX_MAX_RETRY_ATTEMPTS``），
+    Worker 会把事件 snapshot 进本表作为"死信"保留，原 outbox 行保留 status=failed 作审计。
+
+    - ``original_event_id``：指向原 outbox 行（FK nullable，原行被清理后自动 SET NULL）
+    - ``payload``：事件载荷 snapshot，独立存储便于手动重投
+    - ``failure_reason``：最后一次失败的异常信息
+    - ``attempt_count``：进入 DLQ 时的累计尝试次数
+    - ``resolved_at / resolved_by``：人工处理回执（``null`` = 未处理）
+    """
+
+    __tablename__ = "event_outbox_dlq"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    original_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("import_event_outbox.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempt_count: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    moved_to_dlq_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    resolved_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_event_outbox_dlq_project_year",
+            "project_id", "year", "moved_to_dlq_at",
+        ),
+        # 未处理的 DLQ 行（运维优先查的场景）
+        Index(
+            "idx_event_outbox_dlq_unresolved",
+            "moved_to_dlq_at",
+            postgresql_where=text("resolved_at IS NULL"),
+        ),
     )
 
 

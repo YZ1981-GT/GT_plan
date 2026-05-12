@@ -1,5 +1,23 @@
 # -*- coding: utf-8 -*-
-"""通用智能四表导入引擎
+"""通用智能四表导入引擎（DEPRECATED — 逐步迁移到 ledger_import/ v2 模块）。
+
+.. deprecated::
+    本文件为 v1 引擎（3000+ 行单文件），已被 v2 模块化引擎替代。
+    v2 位于 ``app/services/ledger_import/``，提供：
+    - 三级并行识别（detector → identifier → adapter）
+    - 声明式 JSON 配置（热加载）
+    - 分层校验（key/recommended/extra）
+    - 大文件流式探测（600MB+ CSV < 10ms）
+    - raw_extra JSONB 保留未映射列
+
+    迁移路径：
+    - detect/identify → ``ledger_import.orchestrator.ImportOrchestrator.detect_from_paths``
+    - convert_balance_rows → ``ledger_import.converter.convert_balance_rows``
+    - convert_ledger_rows → ``ledger_import.converter.convert_ledger_rows``
+    - smart_import_streaming → 通过 feature_flag ``ledger_import_v2`` 切换
+
+    当前仍被 import_job_runner.py / ledger_import_application_service.py 调用，
+    待 v2 全链路验证通过后逐步切换。
 
 支持不同企业导出的各种格式：
 1. 单行/双行合并表头自动检测与合并
@@ -14,7 +32,7 @@ import io
 import logging
 import re
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterator, Optional
@@ -2024,7 +2042,7 @@ async def write_four_tables(
         batch = ImportBatch(
             project_id=project_id, year=year, source_type="smart_import",
             file_name=f"smart_{data_type}", data_type=data_type,
-            status=ImportStatus.processing, started_at=datetime.utcnow(),
+            status=ImportStatus.processing, started_at=datetime.now(timezone.utc),
         )
         db.add(batch)
         await db.flush()
@@ -2056,7 +2074,7 @@ async def write_four_tables(
             batch.record_count = record_count
 
         batch.status = ImportStatus.completed
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
         result[data_type] = record_count
 
     # ── 序时账 + 辅助明细账（流式拆分，不在内存中保留全部辅助明细行） ──
@@ -2065,14 +2083,14 @@ async def write_four_tables(
         led_batch = ImportBatch(
             project_id=project_id, year=year, source_type="smart_import",
             file_name="smart_tb_ledger", data_type="tb_ledger",
-            status=ImportStatus.processing, started_at=datetime.utcnow(),
+            status=ImportStatus.processing, started_at=datetime.now(timezone.utc),
         )
         db.add(led_batch)
         # 辅助明细账批次
         aux_batch = ImportBatch(
             project_id=project_id, year=year, source_type="smart_import",
             file_name="smart_tb_aux_ledger", data_type="tb_aux_ledger",
-            status=ImportStatus.processing, started_at=datetime.utcnow(),
+            status=ImportStatus.processing, started_at=datetime.now(timezone.utc),
         )
         db.add(aux_batch)
         await db.flush()
@@ -2148,10 +2166,10 @@ async def write_four_tables(
 
         led_batch.record_count = led_count
         led_batch.status = ImportStatus.completed
-        led_batch.completed_at = datetime.utcnow()
+        led_batch.completed_at = datetime.now(timezone.utc)
         aux_batch.record_count = aux_count
         aux_batch.status = ImportStatus.completed
-        aux_batch.completed_at = datetime.utcnow()
+        aux_batch.completed_at = datetime.now(timezone.utc)
         result["tb_ledger"] = led_count
         result["tb_aux_ledger"] = aux_count
 
@@ -2576,7 +2594,7 @@ async def smart_import_streaming(
             file_name=f"multi_{dt_key}",
             data_type=dt_key,
             status=ImportStatus.processing,
-            started_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
         )
         db.add(batch)
         batches[dt_key] = batch
@@ -2898,7 +2916,7 @@ async def smart_import_streaming(
         for dt_key, batch in batches.items():
             batch.record_count = counts[dt_key]
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc)
         # Phase 17: 标记数据集失败
         if _dataset_id:
             try:
@@ -2919,7 +2937,7 @@ async def smart_import_streaming(
         for dt_key, batch in batches.items():
             batch.record_count = counts[dt_key]
             batch.status = ImportStatus.failed
-            batch.completed_at = datetime.utcnow()
+            batch.completed_at = datetime.now(timezone.utc)
         # Phase 17: 标记数据集失败
         if _dataset_id:
             try:
@@ -2982,7 +3000,7 @@ async def smart_import_streaming(
     for dt_key, batch in batches.items():
         batch.record_count = counts[dt_key]
         batch.status = ImportStatus.completed
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
 
     # Phase 17: 激活数据集版本
     _activated_dataset = None
@@ -3063,13 +3081,28 @@ async def smart_import_streaming(
     }
 
 
-async def rebuild_aux_balance_summary(project_id: UUID, year: int, db) -> int:
+async def rebuild_aux_balance_summary(
+    project_id: UUID,
+    year: int,
+    db,
+    *,
+    dataset_id: UUID | None = None,
+) -> int:
     """重建辅助余额汇总表（按维度类型+科目+辅助编码分组）。
 
     通用规则：任何企业导入后都自动调用。
     汇总结果存入 tb_aux_balance_summary，前端直接查汇总表渲染树形视图。
+
+    S6-14: 新增可选 dataset_id 参数——只汇总指定 dataset 的辅助余额行，
+    避免 staging+active 并存时互相污染。dataset_id=None 时退化为原行为
+    （汇总 project+year 下所有 is_deleted=false 的行）。
     """
     import sqlalchemy as sa
+
+    dataset_filter_sql = "AND ab.dataset_id = :did" if dataset_id else ""
+    params: dict = {"pid": str(project_id), "yr": year}
+    if dataset_id:
+        params["did"] = str(dataset_id)
 
     # 1. 清除旧汇总
     await db.execute(sa.text(
@@ -3077,23 +3110,28 @@ async def rebuild_aux_balance_summary(project_id: UUID, year: int, db) -> int:
     ), {"pid": str(project_id), "yr": year})
 
     # 2. 用 SQL 聚合直接插入（比 Python 遍历快几十倍）
-    await db.execute(sa.text("""
+    await db.execute(sa.text(f"""
         INSERT INTO tb_aux_balance_summary
             (project_id, year, dim_type, account_code, account_name, aux_code, aux_name,
              record_count, opening_balance, debit_amount, credit_amount, closing_balance)
         SELECT
-            project_id, year, aux_type, account_code,
-            MAX(account_name),
-            aux_code, MAX(aux_name),
+            ab.project_id, ab.year, ab.aux_type, ab.account_code,
+            MAX(ab.account_name),
+            ab.aux_code, MAX(ab.aux_name),
             COUNT(*),
-            SUM(COALESCE(opening_balance, 0)),
-            SUM(COALESCE(debit_amount, 0)),
-            SUM(COALESCE(credit_amount, 0)),
-            SUM(COALESCE(closing_balance, 0))
-        FROM tb_aux_balance
-        WHERE project_id = :pid AND year = :yr AND is_deleted = false
-        GROUP BY project_id, year, aux_type, account_code, aux_code
-    """), {"pid": str(project_id), "yr": year})
+            SUM(COALESCE(ab.opening_balance, 0)),
+            SUM(COALESCE(ab.debit_amount, 0)),
+            SUM(COALESCE(ab.credit_amount, 0)),
+            SUM(COALESCE(ab.closing_balance, 0))
+        FROM tb_aux_balance ab
+        WHERE ab.project_id = :pid AND ab.year = :yr
+          AND EXISTS (
+            SELECT 1 FROM ledger_datasets d
+            WHERE d.id = ab.dataset_id AND d.status = 'active'
+          )
+          {dataset_filter_sql}
+        GROUP BY ab.project_id, ab.year, ab.aux_type, ab.account_code, ab.aux_code
+    """), params)  # noqa: S608
 
     # 3. 查汇总行数
     r = await db.execute(sa.text(

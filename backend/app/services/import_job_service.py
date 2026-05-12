@@ -1,4 +1,4 @@
-"""导入作业服务 — Durable Job 状态机
+﻿"""导入作业服务 — Durable Job 状态机
 
 将导入任务从 asyncio.create_task 升级为持久化作业：
 - 作业状态持久化到数据库
@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -92,7 +92,7 @@ class ImportJobService:
         """Persist heartbeat/progress for a running job without changing status."""
         values: dict = {
             "progress_pct": max(0, min(progress_pct, 100)),
-            "heartbeat_at": datetime.utcnow(),
+            "heartbeat_at": datetime.now(timezone.utc).replace(tzinfo=None),
         }
         if progress_message is not None:
             values["progress_message"] = progress_message
@@ -140,7 +140,7 @@ class ImportJobService:
             job.result_summary = result_summary
 
         # 时间戳
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if new_status == JobStatus.running and not job.started_at:
             job.started_at = now
         if new_status in (JobStatus.completed, JobStatus.failed, JobStatus.canceled, JobStatus.timed_out):
@@ -148,6 +148,13 @@ class ImportJobService:
 
         # 心跳
         job.heartbeat_at = now
+
+        # F16 (Sprint 4.9)：job 状态转换埋点
+        try:
+            from app.services.ledger_import.metrics import inc_job_status
+            inc_job_status(new_status.value)
+        except Exception:  # metrics 问题不能阻断业务
+            pass
 
         return job
 
@@ -159,7 +166,7 @@ class ImportJobService:
         extra compare-and-set makes recovery/worker races harmless: only one
         runner can move the job from queued to running.
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         result = await db.execute(
             sa.update(ImportJob)
             .where(
@@ -199,7 +206,7 @@ class ImportJobService:
         """更新心跳时间（worker 定期调用）"""
         await db.execute(
             sa.update(ImportJob).where(ImportJob.id == job_id).values(
-                heartbeat_at=datetime.utcnow()
+                heartbeat_at=datetime.now(timezone.utc).replace(tzinfo=None)
             )
         )
 
@@ -209,7 +216,7 @@ class ImportJobService:
 
         由定时任务调用，将超时作业标记为 timed_out。
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         running_statuses = [JobStatus.queued, JobStatus.running, JobStatus.validating,
                            JobStatus.writing, JobStatus.activating]
 
@@ -223,7 +230,11 @@ class ImportJobService:
 
         timed_out_jobs = []
         for job in jobs:
-            elapsed = (now - job.heartbeat_at).total_seconds()
+            hb = job.heartbeat_at
+            # PG TIMESTAMP WITH TIME ZONE 返回 aware datetime，本地 now 是 naive；对齐为 naive UTC 后比较
+            if hb is not None and hb.tzinfo is not None:
+                hb = hb.astimezone(timezone.utc).replace(tzinfo=None)
+            elapsed = (now - hb).total_seconds() if hb is not None else 0
             if elapsed > job.timeout_seconds:
                 valid_next = _VALID_TRANSITIONS.get(job.status, set())
                 if JobStatus.timed_out in valid_next:
@@ -277,7 +288,7 @@ class ImportJobService:
             raise ValueError(f"当前状态 {job.status.value} 不可取消")
 
         job.status = JobStatus.canceled
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         return job
 
     @staticmethod

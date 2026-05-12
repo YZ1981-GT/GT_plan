@@ -1,0 +1,62 @@
+[
+  {
+    "rule_code": "AL-01",
+    "severity": "blocking",
+    "scope": "audit_log",
+    "category": "异常操作",
+    "title": "非工作时间批量删除",
+    "description": "凌晨0-6点批量删除底稿操作",
+    "expression_type": "python",
+    "expression": "app.services.qc_rule_executor.AuditLogBulkDeleteRule",
+    "enabled": true,
+    "version": 1
+  },
+  {
+    "rule_code": "AL-02",
+    "severity": "warning",
+    "scope": "audit_log",
+    "category": "权限异常",
+    "title": "越权访问尝试",
+    "description": "用户尝试访问无权限资源超过5次/小时",
+    "expression_type": "python",
+    "expression": "app.services.qc_rule_executor.AuditLogUnauthorizedAccessRule",
+    "enabled": true,
+    "version": 1
+  },
+  {
+    "rule_code": "AL-03",
+    "severity": "warning",
+    "scope": "audit_log",
+    "category": "数据异常",
+    "title": "大批量数据导出",
+    "description": "单次导出超过1000条记录",
+    "expression_type": "python",
+    "expression": "app.services.qc_rule_executor.AuditLogBulkExportRule",
+    "enabled": true,
+    "version": 1
+  },
+  {
+    "rule_code": "AL-04",
+    "severity": "info",
+    "scope": "audit_log",
+    "category": "操作审计",
+    "title": "敏感字段修改",
+    "description": "修改重要性水平/审计意见类型等敏感字段",
+    "expression_type": "python",
+    "expression": "app.services.qc_rule_executor.AuditLogSensitiveFieldRule",
+    "enabled": true,
+    "version": 1
+  },
+  {
+    "rule_code": "AL-05",
+    "severity": "warning",
+    "scope": "audit_log",
+    "category": "异常操作",
+    "title": "短时间内反复修改同一对象",
+    "description": "5分钟内对同一对象修改超过10次",
+    "expression_type": "python",
+    "expression": "app.services.qc_rule_executor.AuditLogRapidModificationRule",
+    "enabled": true,
+    "version": 1
+  }
+]

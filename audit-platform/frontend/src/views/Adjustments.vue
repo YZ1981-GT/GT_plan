@@ -1,5 +1,5 @@
 <template>
-  <div class="gt-adjustments gt-fade-in">
+  <div class="gt-adjustments gt-fade-in" :class="{ 'gt-fullscreen': isFullscreen }">
     <!-- 页面横幅 -->
     <GtPageHeader title="调整分录" @back="router.push('/projects')">
       <GtInfoBar
@@ -19,8 +19,9 @@
           @export="onExportSummary"
           @import="showImportDialog = true"
         >
+          <el-button size="small" plain @click="toggleFullscreen">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
           <template #left>
-            <el-button size="small" type="primary" @click="openCreateDialog">+ 新建分录</el-button>
+            <el-button size="small" type="primary" v-permission="'adjustment:create'" @click="openCreateDialog">+ 新建分录</el-button>
             <div class="gt-adj-batch-toggle">
               <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
               <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
@@ -87,60 +88,64 @@
         点击上方"新增"按钮创建调整分录。调整分录将自动更新试算表审定数和报表数据。
       </div>
     </el-alert>
-    <el-table :data="entries" v-loading="loading" border stripe style="width: 100%"
-      @selection-change="onSelectionChange">
-      <el-table-column type="selection" width="40" />
-      <el-table-column prop="adjustment_no" label="编号" width="120" />
-      <el-table-column prop="adjustment_type" label="类型" width="70">
-        <template #default="{ row }">
-          <el-tag :type="normalizeAdjustmentType(row.adjustment_type) === 'aje' ? 'danger' : 'warning'" size="small">
-            {{ formatAdjustmentType(row.adjustment_type) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="description" label="摘要" min-width="200" show-overflow-tooltip />
-      <el-table-column label="借方合计" width="130" align="right">
-        <template #default="{ row }">{{ fmtAmt(row.total_debit) }}</template>
-      </el-table-column>
-      <el-table-column label="贷方合计" width="130" align="right">
-        <template #default="{ row }">{{ fmtAmt(row.total_credit) }}</template>
-      </el-table-column>
-      <el-table-column prop="created_at" label="日期" width="110">
-        <template #default="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
-      </el-table-column>
-      <el-table-column prop="review_status" label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag size="small" :type="dictStore.type('adjustment_status', row.review_status)">{{ dictStore.label('adjustment_status', row.review_status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" @click="openEditDialog(row)"
-            :disabled="row.review_status === 'approved' || row.review_status === 'pending_review'">
-            编辑
-          </el-button>
-          <el-button size="small" type="danger" @click="onDelete(row)"
-            v-permission="'adjustment:delete'"
-            :disabled="row.review_status === 'approved' || row.review_status === 'pending_review'">
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-      <el-table-column label="转错报" width="110" fixed="right">
-        <template #default="{ row }">
-          <el-button
-            v-if="row.review_status === 'rejected' && normalizeAdjustmentType(row.adjustment_type) === 'aje'"
-            size="small"
-            type="warning"
-            :loading="convertingGroupId === row.entry_group_id"
-            @click="onConvertToMisstatement(row)"
-          >
-            转错报
-          </el-button>
-          <span v-else class="gt-adj-col-placeholder">—</span>
-        </template>
-      </el-table-column>
-    </el-table>
+    <GtEditableTable
+      ref="adjTableRef"
+      :model-value="entries"
+      :columns="adjColumns"
+      :editable="false"
+      :show-selection="true"
+      :show-toolbar="true"
+      :show-footer="true"
+      :show-selection-bar="true"
+      v-loading="loading"
+      @selection-change="onSelectionChange"
+    >
+      <template #col-adjustment_type="{ row }">
+        <el-tag :type="normalizeAdjustmentType(row.adjustment_type) === 'aje' ? 'danger' : 'warning'" size="small">
+          {{ formatAdjustmentType(row.adjustment_type) }}
+        </el-tag>
+      </template>
+      <template #col-total_debit="{ row }">
+        <GtAmountCell :value="row.total_debit" :clickable="true" @click="penetrate.toLedger(row.line_items?.[0]?.standard_account_code || '')" />
+      </template>
+      <template #col-total_credit="{ row }">
+        <GtAmountCell :value="row.total_credit" :clickable="true" @click="penetrate.toLedger(row.line_items?.[0]?.standard_account_code || '')" />
+      </template>
+      <template #col-created_at="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
+      <template #col-review_status="{ row }">
+        <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
+      </template>
+      <template #extra-columns>
+        <el-table-column label="操作" width="180" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="openEditDialog(row)"
+              :disabled="row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW">
+              编辑
+            </el-button>
+            <el-button size="small" type="danger" @click="onDelete(row)"
+              v-permission="'adjustment:delete'"
+              :disabled="row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="转错报" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.review_status === ADJUSTMENT_STATUS.REJECTED && normalizeAdjustmentType(row.adjustment_type) === ADJUSTMENT_TYPE.AJE"
+              v-permission="'adjustment:convert_to_misstatement'"
+              size="small"
+              type="warning"
+              :loading="convertingGroupId === row.entry_group_id"
+              @click="onConvertToMisstatement(row)"
+            >
+              转错报
+            </el-button>
+            <span v-else class="gt-adj-col-placeholder">—</span>
+          </template>
+        </el-table-column>
+      </template>
+    </GtEditableTable>
 
     <!-- 批量复核操作 -->
     <div class="gt-adj-batch-actions" v-if="selectedRows.length > 0">
@@ -166,7 +171,7 @@
 
       <!-- 逐条原因模式 -->
       <template v-else>
-        <div style="font-size: 12px; color: #909399; margin-bottom: 8px">
+        <div style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-bottom: 8px">
           为每条分录填写独立驳回原因（留空时使用统一原因）
         </div>
         <el-input
@@ -181,7 +186,7 @@
           :key="row.entry_group_id"
           style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px"
         >
-          <span style="min-width: 120px; font-size: 13px; color: #303133; flex-shrink: 0">
+          <span style="min-width: 120px; font-size: var(--gt-font-size-sm); color: var(--gt-color-text); flex-shrink: 0">
             {{ row.adjustment_no || row.entry_group_id?.slice(0, 8) }}
           </span>
           <el-input
@@ -225,7 +230,7 @@
                 <el-option v-for="opt in accountOptions" :key="opt.code"
                   :label="`${opt.code} ${opt.name}`" :value="opt.code">
                   <span>{{ opt.code }} {{ opt.name }}</span>
-                  <span v-if="opt.report_line" style="float:right;color:#999;font-size:11px;margin-left:8px">
+                  <span v-if="opt.report_line" style="float: right; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); margin-left: 8px">
                     → {{ opt.report_line }}
                   </span>
                 </el-option>
@@ -280,8 +285,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { confirmDelete } from '@/utils/confirm'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmConvert, confirmDangerous } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
@@ -297,13 +302,36 @@ import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
-import { ADJUSTMENT_STATUS, getStatusLabel } from '@/utils/statusMaps'
 import { operationHistory } from '@/utils/operationHistory'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { usePasteImport } from '@/composables/usePasteImport'
 import { parseApiError } from '@/composables/useApiError'
+import { usePenetrate } from '@/composables/usePenetrate'
+import { useFullscreen } from '@/composables/useFullscreen'
+import { useEditMode } from '@/composables/useEditMode'
+import { handleApiError } from '@/utils/errorHandler'
+import * as P from '@/services/apiPaths'
+import { ADJUSTMENT_STATUS, ADJUSTMENT_TYPE } from '@/constants/statusEnum'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtEditableTable from '@/components/common/GtEditableTable.vue'
+import type { GtColumn } from '@/components/common/GtEditableTable.vue'
 
 const route = useRoute()
 const router = useRouter()
+const penetrate = usePenetrate()
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
+
+/** GtEditableTable 列配置 */
+const adjColumns: GtColumn[] = [
+  { prop: 'adjustment_no', label: '编号', width: 120 },
+  { prop: 'adjustment_type', label: '类型', width: 70 },
+  { prop: 'description', label: '摘要', minWidth: 200 },
+  { prop: 'total_debit', label: '借方合计', width: 130, align: 'right' },
+  { prop: 'total_credit', label: '贷方合计', width: 130, align: 'right' },
+  { prop: 'created_at', label: '日期', width: 110 },
+  { prop: 'review_status', label: '状态', width: 100 },
+]
 const dictStore = useDictStore()
 const projectStore = useProjectStore()
 
@@ -336,6 +364,37 @@ const activeTab = ref('all')
 const entries = ref<any[]>([])
 const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
+
+// R7-S3-08 Task 41 + R9 F10 Task 33：粘贴多行分录
+const adjTableRef = ref<HTMLElement | null>(null)
+usePasteImport({
+  containerRef: adjTableRef,
+  columns: [
+    { key: 'standard_account_code', label: '科目编码' },
+    { key: 'account_name', label: '科目名称' },
+    { key: 'debit_amount', label: '借方' },
+    { key: 'credit_amount', label: '贷方' },
+    { key: 'summary', label: '摘要' },
+  ],
+  onInsert: async (rows) => {
+    // 粘贴的行作为新分录的 line_items 创建
+    const lineItems = rows.map(r => ({
+      standard_account_code: r.standard_account_code || '',
+      account_name: r.account_name || '',
+      debit_amount: parseFloat(r.debit_amount) || 0,
+      credit_amount: parseFloat(r.credit_amount) || 0,
+    }))
+    const summary = rows[0]?.summary || `粘贴导入 ${lineItems.length} 行`
+    await createAdjustment(projectId.value, {
+      adjustment_type: 'aje',
+      year: year.value,
+      description: summary,
+      line_items: lineItems,
+    })
+    await fetchEntries()
+    await fetchSummary()
+  },
+})
 const showRejectDialog = ref(false)
 const rejectReason = ref('')
 const rejectMode = ref<'unified' | 'individual'>('unified')
@@ -534,7 +593,7 @@ async function onBatchCommit() {
     fetchEntries()
     fetchSummary()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '批量提交失败')
+    handleApiError(e, '批量提交')
   } finally {
     batchCommitting.value = false
   }
@@ -575,11 +634,7 @@ async function onConvertToMisstatement(row: any) {
     return
   }
   try {
-    await ElMessageBox.confirm(
-      `将该分录（${row.adjustment_no || row.entry_group_id?.slice(0, 8)}）转为未更正错报？转换后该条目将出现在《未更正错报汇总表》中。`,
-      '确认转错报',
-      { confirmButtonText: '确认转换', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmConvert('该分录', '未更正错报')
   } catch {
     return
   }
@@ -589,11 +644,7 @@ async function onConvertToMisstatement(row: any) {
     const res = await convertAjeToMisstatement(projectId.value, row.entry_group_id)
     ElMessage.success(`已转为错报（净额 ${res.net_amount}）`)
     try {
-      await ElMessageBox.confirm(
-        '是否立即查看《未更正错报汇总表》？',
-        '转换成功',
-        { confirmButtonText: '立即查看', cancelButtonText: '稍后', type: 'success' },
-      )
+      await confirmDangerous('是否立即查看《未更正错报汇总表》？', '转换成功')
       router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
     } catch {
       /* 用户选择稍后，不跳转 */
@@ -603,11 +654,7 @@ async function onConvertToMisstatement(row: any) {
     const parsed = parseApiError(err)
     if (parsed.code === 'ALREADY_CONVERTED') {
       try {
-        await ElMessageBox.confirm(
-          '该分录已转为未更正错报，是否跳转查看？',
-          '已转换',
-          { confirmButtonText: '跳转查看', cancelButtonText: '关闭', type: 'info' },
-        )
+        await confirmDangerous('该分录已转为未更正错报，是否跳转查看？', '已转换')
         router.push({ name: 'Misstatements', params: { projectId: projectId.value } })
       } catch {
         /* 用户选择关闭 */
@@ -621,7 +668,7 @@ async function onConvertToMisstatement(row: any) {
 }
 
 async function batchReview(status: string) {
-  const eligible = selectedRows.value.filter(r => r.review_status === 'pending_review')
+  const eligible = selectedRows.value.filter(r => r.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW)
   const skipped = selectedRows.value.length - eligible.length
   if (skipped > 0) {
     ElMessage.warning(`已跳过 ${skipped} 条非待复核状态的分录`)
@@ -673,7 +720,7 @@ function onImported() {
 function onExportSummary() {
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     downloadFileAsBlob(
-      `/api/projects/${projectId.value}/adjustments/export-summary?year=${year.value}&format=excel`,
+      `${P.adjustments.exportSummary(projectId.value)}?year=${year.value}&format=excel`,
       `审计调整汇总_${year.value}.xlsx`
     )
   })

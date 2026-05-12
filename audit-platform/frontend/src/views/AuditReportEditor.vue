@@ -2,7 +2,7 @@
   <div class="gt-audit-report gt-fade-in">
     <GtPageHeader title="审计报告" @back="router.push('/projects')">
       <template #actions>
-        <GtToolbar @formula="() => {}">
+        <GtToolbar @formula="() => {}" :show-edit-toggle="true" :is-editing="isEditing" @edit-toggle="isEditing ? exitEdit() : enterEdit()">
           <template #left>
             <el-button size="small" @click="showGenerateDialog = true" round>生成报告</el-button>
             <SharedTemplatePicker
@@ -19,6 +19,24 @@
         </GtToolbar>
       </template>
     </GtPageHeader>
+
+    <!-- R8-S2-03：Stale 状态横幅 -->
+    <div v-if="stale.isStale.value" class="gt-stale-banner">
+      <span class="gt-stale-icon">⚠️</span>
+      <span class="gt-stale-text">
+        上游数据已变更（{{ stale.staleCount.value }} 张底稿待重算），报告引用数据可能过时
+      </span>
+      <el-button size="small" type="primary" :loading="stale.loading.value" @click="onStaleRecalc">
+        🔄 点击重算
+      </el-button>
+    </div>
+
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
+
+    <!-- 编辑锁提示 -->
+    <el-alert v-if="editLock.locked.value && !editLock.isMine.value" type="warning" :closable="false" style="margin-bottom: 8px">
+      {{ editLock.lockedBy.value || '其他用户' }} 正在编辑，当前为只读模式
+    </el-alert>
 
     <!-- 错报超限警告横幅（需求 20.2） -->
     <el-alert
@@ -47,7 +65,13 @@
           <div class="gt-ar-nav-info">
             <el-tag size="small">{{ opinionLabel(report.opinion_type) }}</el-tag>
             <el-tag size="small" type="info">{{ report.company_type === 'listed' ? '上市公司' : '非上市' }}</el-tag>
-            <el-tag size="small" :type="statusTagType(report.status)">{{ statusLabel(report.status) }}</el-tag>
+            <el-tag size="small" :type="(statusTagType(report.status)) || undefined">{{ statusLabel(report.status) }}</el-tag>
+            <el-tag
+              v-if="isLocked && report.bound_dataset_id"
+              size="small"
+              type="info"
+              effect="plain"
+            >🔒 数据版本：已锁定</el-tag>
           </div>
           <el-menu :default-active="activeSection" @select="onSectionSelect" class="gt-ar-section-menu">
             <el-menu-item v-for="s in sectionNames" :key="s" :index="s">
@@ -62,10 +86,10 @@
         <div class="gt-ar-panel gt-ar-editor-panel">
           <div class="gt-ar-editor-header">
             <h4>{{ activeSection }}</h4>
-            <el-tag v-if="report.status === 'draft'" size="small" type="info">可编辑</el-tag>
-            <el-tag v-else-if="report.status === 'review'" size="small" type="warning">⚠ 审阅中</el-tag>
-            <el-tag v-else-if="report.status === 'eqcr_approved'" size="small" type="danger">🔒 EQCR 已锁定</el-tag>
-            <el-tag v-else-if="report.status === 'final'" size="small" type="success">🔒 已定稿</el-tag>
+            <el-tag v-if="report.status === REPORT_STATUS.DRAFT" size="small" type="info">可编辑</el-tag>
+            <el-tag v-else-if="report.status === REPORT_STATUS.REVIEW" size="small" type="warning">⚠ 审阅中</el-tag>
+            <el-tag v-else-if="report.status === REPORT_STATUS.EQCR_APPROVED" size="small" type="danger">🔒 EQCR 已锁定</el-tag>
+            <el-tag v-else-if="report.status === REPORT_STATUS.FINAL" size="small" type="success">🔒 已定稿</el-tag>
           </div>
           <div class="gt-ar-edit-hint" v-if="!isLocked">
             直接编辑下方文本，修改单位名称、简称、关键审计事项等内容后点击保存
@@ -153,8 +177,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   generateAuditReport, getAuditReport, updateAuditReportParagraph,
@@ -166,15 +190,44 @@ import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useDictStore } from '@/stores/dict'
 import { useKnowledge, knowledgePickerVisible } from '@/composables/useKnowledge'
+import { useEditMode } from '@/composables/useEditMode'
+import { confirmLeave } from '@/utils/confirm'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
+import { useEditingLock } from '@/composables/useEditingLock'
+import { REPORT_STATUS } from '@/constants/statusEnum'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
 const dictStore = useDictStore()
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+
+// R8-S2-03：Stale 状态追踪
+import { useStaleStatus } from '@/composables/useStaleStatus'
+const stale = useStaleStatus(projectId)
+async function onStaleRecalc() {
+  await stale.recalc()
+  await fetchReport()
+}
+
+const editLock = useEditingLock({
+  resourceId: computed(() => 'report_' + (route.params.projectId as string || '')),
+  resourceType: 'other',  // 审计报告无后端锁端点，降级为前端检测
+  autoAcquire: false,
+})
+
+// 编辑锁联动：进入编辑时 acquire，退出时 release；他人持锁时强制退出
+watch(() => isEditing.value, async (editing) => {
+  if (editing) await editLock.acquire()
+  else editLock.release()
+})
+watch(() => editLock.isMine.value, (mine) => {
+  if (!mine && isEditing.value) exitEdit()
+})
 
 const loading = ref(false)
 const genLoading = ref(false)
@@ -219,7 +272,7 @@ const sectionNames = computed(() => {
 
 const isLocked = computed(() => {
   const s = report.value?.status
-  return s === 'eqcr_approved' || s === 'final'
+  return s === REPORT_STATUS.EQCR_APPROVED || s === REPORT_STATUS.FINAL
 })
 
 watch(activeSection, (s) => {
@@ -239,8 +292,8 @@ function statusLabel(s: string) {
   return dictStore.label('report_status', s)
 }
 
-function statusTagType(s: string) {
-  return dictStore.type('report_status', s)
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  return dictStore.type('report_status', s) as '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'
 }
 
 function onSectionSelect(s: string) { activeSection.value = s }
@@ -296,8 +349,8 @@ async function onExportWord() {
     a.click()
     URL.revokeObjectURL(url)
     ElMessage.success('Word 导出成功')
-  } catch {
-    ElMessage.error('Word 导出失败')
+  } catch (e: any) {
+    handleApiError(e, 'Word 导出')
   } finally {
     exportingWord.value = false
   }
@@ -333,7 +386,31 @@ onMounted(async () => {
       misstatementWarning.value = true
     }
   } catch { /* 静默失败，不影响主流程 */ }
+  // R8-S2-14：关闭浏览器/刷新前警告
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+})
+
+// R8-S2-14：未保存拦截
+onBeforeRouteLeave(async (_to, _from, next) => {
+  if (!isDirty.value) { next(); return }
+  try {
+    await confirmLeave('审计报告')
+    next()
+  } catch {
+    next(false)
+  }
+})
+
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (isDirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 
 // ── 共享模板 ──
 function getReportConfigData(): Record<string, any> {

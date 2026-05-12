@@ -1,20 +1,7 @@
 <template>
   <div class="eqcr-workbench">
-    <!-- 页头 -->
-    <div class="gt-page-banner gt-page-banner--dark">
-      <div class="gt-banner-content">
-        <h2>🛡️ EQCR 独立复核工作台</h2>
-        <span class="gt-banner-sub" v-if="!loading">
-          共 {{ cards.length }} 个项目
-          <template v-if="summary.upcoming > 0">
-            · {{ summary.upcoming }} 个临近签字
-          </template>
-          <template v-if="summary.disagree > 0">
-            · {{ summary.disagree }} 个有异议
-          </template>
-        </span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="EQCR 工作台" :show-back="false">
+      <template #actions>
         <el-radio-group
           v-model="progressFilter"
           size="small"
@@ -27,8 +14,8 @@
           <el-radio-button value="disagree">有异议</el-radio-button>
         </el-radio-group>
         <el-button size="small" :loading="loading" @click="load">刷新</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 空态 -->
     <el-empty
@@ -145,7 +132,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import {
   eqcrApi,
   type EqcrProgress,
@@ -154,6 +140,8 @@ import {
 } from '@/services/eqcrService'
 import EqcrAnnualDeclarationDialog from '@/components/eqcr/EqcrAnnualDeclarationDialog.vue'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 
@@ -168,7 +156,7 @@ const declarationOk = ref(false)
 
 async function checkAnnualDeclaration(): Promise<boolean> {
   try {
-    const data = await api.get('/api/eqcr/independence/annual/check')
+    const data = await api.get(P_eqcr.independence.check)
     declarationOk.value = !!data?.has_declaration
     if (!declarationOk.value) {
       showDeclarationDialog.value = true
@@ -201,7 +189,7 @@ async function load() {
   try {
     cards.value = await eqcrApi.listMyProjects()
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.detail || '加载 EQCR 项目失败')
+    handleApiError(err, '加载 EQCR 项目')
     cards.value = []
   } finally {
     loading.value = false

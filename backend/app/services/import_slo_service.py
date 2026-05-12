@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +48,7 @@ class ImportSLOService:
         project_id=None,
         year: int | None = None,
     ) -> dict:
-        since = datetime.utcnow() - timedelta(hours=max(1, hours))
+        since = datetime.now(timezone.utc) - timedelta(hours=max(1, hours))
         filters = [ImportJob.created_at >= since]
         if project_id is not None:
             filters.append(ImportJob.project_id == project_id)
@@ -146,7 +146,7 @@ class ImportSLOService:
     @classmethod
     async def get_runner_health(cls, db: AsyncSession) -> dict:
         """Report whether queued import jobs have an execution path."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         thresholds = cls._thresholds()
         queue_warn_seconds = thresholds["queue_delay_p95_warn_seconds"]
         stale_cutoff = now - timedelta(minutes=20)

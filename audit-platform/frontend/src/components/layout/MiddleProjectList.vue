@@ -69,9 +69,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Search, Delete } from '@element-plus/icons-vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete, confirmBatch } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import ProjectTreeNode from './ProjectTreeNode.vue'
+import * as P from '@/services/apiPaths'
 
 interface ProjectItem {
   id: string
@@ -149,7 +151,7 @@ const allVisibleIds = computed(() => getAllIds(filteredTree.value))
 const isAllChecked = computed(() => allVisibleIds.value.length > 0 && checkedIds.value.length === allVisibleIds.value.length)
 const isIndeterminate = computed(() => checkedIds.value.length > 0 && checkedIds.value.length < allVisibleIds.value.length)
 
-function toggleSelectAll(val: boolean) {
+function toggleSelectAll(val: string | number | boolean) {
   checkedIds.value = val ? [...allVisibleIds.value] : []
 }
 
@@ -173,11 +175,7 @@ function editProject(project: any) {
 
 async function confirmDeleteOne(project: any) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除项目「${project.name || project.client_name || '未命名'}」吗？此操作不可恢复。`,
-      '删除确认',
-      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
-    )
+    await confirmDelete(project.name || project.client_name || '未命名')
     await api.delete(`/api/projects/${project.id}`)
     ElMessage.success('项目已删除')
     projects.value = projects.value.filter(p => p.id !== project.id)
@@ -188,11 +186,7 @@ async function confirmDeleteOne(project: any) {
 
 async function confirmBatchDelete() {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除选中的 ${checkedIds.value.length} 个项目吗？此操作不可恢复。`,
-      '批量删除确认',
-      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' }
-    )
+    await confirmBatch('删除', checkedIds.value.length)
     await api.post('/api/projects/batch-delete', { project_ids: checkedIds.value })
     ElMessage.success(`已删除 ${checkedIds.value.length} 个项目`)
     projects.value = projects.value.filter(p => !checkedIds.value.includes(p.id))
@@ -204,7 +198,7 @@ async function confirmBatchDelete() {
 async function loadProjects() {
   loading.value = true
   try {
-    const data = await api.get('/api/projects')
+    const data = await api.get(P.projects.list)
     projects.value = data ?? []
     // 自动恢复上次选中的项目（用最新数据，修复从向导跳回后旧数据残留）
     const lastId = selectedId.value || localStorage.getItem('gt-last-project-id')

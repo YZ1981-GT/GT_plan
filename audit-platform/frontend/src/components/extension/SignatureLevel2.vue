@@ -20,7 +20,7 @@
     </div>
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" @click="onSign" :loading="signing" :disabled="!hasDrawn">确认签名</el-button>
+      <el-button type="primary" @click="onSign" :loading="signing" :disabled="!hasDrawn" v-permission="'sign:execute'">确认签名</el-button>
     </template>
   </el-dialog>
 </template>
@@ -29,6 +29,7 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { signatures as P_sig } from '@/services/apiPaths'
 
 const props = defineProps<{
   modelValue: boolean
@@ -120,7 +121,7 @@ async function onSign() {
   const signatureData = canvasRef.value.toDataURL('image/png')
   signing.value = true
   try {
-    const data = await api.post('/api/signatures/sign', {
+    const data = await api.post(P_sig.sign, {
       object_type: props.objectType,
       object_id: props.objectId,
       signature_level: 'level2',

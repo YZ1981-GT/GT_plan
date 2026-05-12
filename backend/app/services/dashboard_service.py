@@ -6,7 +6,7 @@ Phase 9 Task 1.10: 看板聚合 API
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -202,7 +202,7 @@ class DashboardService:
         """风险预警"""
         alerts = []
         # 超期项目（简化：status != archived 且创建超过 180 天）
-        cutoff = datetime.utcnow() - timedelta(days=180)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=180)
         overdue_q = sa.select(sa.func.count()).select_from(Project).where(
             Project.is_deleted == False,  # noqa
             Project.status.notin_(["archived", "created"]),
@@ -262,7 +262,7 @@ class DashboardService:
 
     async def _get_overdue_projects(self) -> int:
         """逾期项目数：创建超 180 天仍处于 planning/execution 状态且未归档"""
-        cutoff = datetime.utcnow() - timedelta(days=180)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=180)
         result = await self.db.execute(
             sa.select(sa.func.count()).select_from(Project).where(
                 Project.status.in_([ProjectStatus.execution, ProjectStatus.planning]),

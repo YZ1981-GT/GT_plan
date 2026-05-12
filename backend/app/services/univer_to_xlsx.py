@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timezone
 from pathlib import Path
 from typing import Any
 
@@ -227,6 +228,6 @@ def univer_snapshot_to_structure(snapshot: dict[str, Any]) -> dict[str, Any]:
         "sheet_names": sheet_names,
         "metadata": {
             "editor": "univer",
-            "saved_at": __import__("datetime").datetime.utcnow().isoformat(),
+            "saved_at": __import__("datetime").datetime.now(timezone.utc).isoformat(),
         },
     }

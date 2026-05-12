@@ -115,7 +115,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO } from '@/composables/useExcelIO'
@@ -273,7 +274,7 @@ function addRow() {
 async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 行？删除后可点击"还原"恢复。`, '删除确认', { type: 'warning' })
+    await confirmBatch('删除', selectedRows.value.length)
     const del = new Set(selectedRows.value)
     tableData.value = tableData.value.filter(r => !del.has(r))
     selectedRows.value = []
@@ -282,7 +283,7 @@ async function batchDelete() {
 
 async function restoreDefaults() {
   try {
-    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
+    await confirmDangerous('确定恢复默认行结构？当前数据将被重置。', '还原确认')
     const mk = (item: string, o: Partial<CapitalReserveRow> = {}): CapitalReserveRow =>
       ({ item, total: null, elimAdj: null, parentVal: null, values: [], ...o })
     tableData.value = [mk('期初金额',{bold:true}),mk('当期变动',{isComputed:true}),mk('+权益法模拟',{fromElim:true}),

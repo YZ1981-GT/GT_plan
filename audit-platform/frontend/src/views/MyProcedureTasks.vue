@@ -1,13 +1,12 @@
 <template>
   <div class="gt-my-proc gt-fade-in">
-    <div class="gt-page-banner">
-      <div class="gt-banner-content">
-        <h2>📋 我的审计程序</h2>
-        <span class="gt-banner-sub" v-if="tasks.length">
+    <GtPageHeader title="我的审计程序" variant="banner" icon="📋" :show-back="false">
+      <template #subtitle>
+        <span v-if="tasks.length">
           {{ completedCount }}/{{ tasks.length }} 已完成 · {{ inProgressCount }} 进行中
         </span>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <el-empty v-if="!tasks.length && !loading" description="暂无被委派的审计程序，请联系项目经理分配" />
 
@@ -49,7 +48,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import { getMyStaffId, getMyProcedureTasks, updateProcedureTrim } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 const loading = ref(false)
@@ -90,8 +91,8 @@ async function updateStatus(row: any) {
       { id: row.id, status: row.status || 'execute', skip_reason: row.skip_reason },
     ])
     ElMessage.success('状态已更新')
-  } catch {
-    ElMessage.error('更新失败')
+  } catch (e: any) {
+    handleApiError(e, '更新')
   }
 }
 
@@ -102,7 +103,7 @@ async function loadMyTasks() {
     if (!staffId) return
     tasks.value = await getMyProcedureTasks(staffId)
   } catch (e: any) {
-    ElMessage.error('加载失败')
+    handleApiError(e, '加载')
   } finally {
     loading.value = false
   }

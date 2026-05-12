@@ -75,6 +75,23 @@ class LedgerImportApplicationService:
             raise HTTPException(status_code=400, detail="未提供文件")
 
         cls.ensure_supported_uploads(uploads)
+
+        # F40 / Sprint 7 批次 A：上传安全校验（MIME + magic + 大小 + zip bomb + 宏）
+        from app.services.ledger_import.upload_security import validate_upload_safety
+
+        _uid = None
+        try:
+            _uid = UUID(user_id) if isinstance(user_id, str) else user_id
+        except Exception:
+            _uid = None
+
+        for upload in uploads:
+            await validate_upload_safety(
+                upload,
+                user_id=_uid,
+                project_id=project_id,
+            )
+
         manifest = await LedgerImportUploadService.create_bundle(project_id, user_id, uploads)
         resolved_token = manifest["upload_token"]
         return resolved_token, LedgerImportUploadService.get_bundle_files(project_id, resolved_token)

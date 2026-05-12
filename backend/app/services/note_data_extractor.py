@@ -29,6 +29,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance, TbAuxBalance
+from app.services.dataset_query import get_active_filter
 
 _logger = logging.getLogger(__name__)
 
@@ -263,10 +264,8 @@ async def generate_dynamic_rows(
     # 从辅助余额表获取明细
     result = await db.execute(
         sa.select(TbAuxBalance).where(
-            TbAuxBalance.project_id == project_id,
-            TbAuxBalance.year == year,
+            await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
             TbAuxBalance.account_code.in_(account_codes),
-            TbAuxBalance.is_deleted == sa.false(),
         ).order_by(TbAuxBalance.aux_code)
     )
     aux_rows = result.scalars().all()
@@ -491,10 +490,8 @@ async def _calc_derived_field(
         from app.models.audit_platform_models import TbLedger
         result = await db.execute(
             sa.select(sa.func.coalesce(sa.func.sum(TbLedger.debit_amount), 0)).where(
-                TbLedger.project_id == project_id,
-                TbLedger.year == year,
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
                 TbLedger.account_code == account_code,
-                TbLedger.is_deleted == sa.false(),
             )
         )
         val = result.scalar()
@@ -505,10 +502,8 @@ async def _calc_derived_field(
         from app.models.audit_platform_models import TbLedger
         result = await db.execute(
             sa.select(sa.func.coalesce(sa.func.sum(TbLedger.credit_amount), 0)).where(
-                TbLedger.project_id == project_id,
-                TbLedger.year == year,
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
                 TbLedger.account_code == account_code,
-                TbLedger.is_deleted == sa.false(),
             )
         )
         val = result.scalar()
@@ -519,10 +514,8 @@ async def _calc_derived_field(
         from app.models.audit_platform_models import TbLedger
         result = await db.execute(
             sa.select(sa.func.coalesce(sa.func.sum(TbLedger.credit_amount), 0)).where(
-                TbLedger.project_id == project_id,
-                TbLedger.year == year,
+                await get_active_filter(db, TbLedger.__table__, project_id, year),
                 TbLedger.account_code == account_code,
-                TbLedger.is_deleted == sa.false(),
             )
         )
         val = result.scalar()
@@ -552,10 +545,8 @@ async def _fetch_dynamic_column(
     """浮动行列取数：从辅助余额表按维度获取"""
     result = await db.execute(
         sa.select(TbAuxBalance).where(
-            TbAuxBalance.project_id == project_id,
-            TbAuxBalance.year == year,
+            await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
             TbAuxBalance.account_code.in_(account_codes),
-            TbAuxBalance.is_deleted == sa.false(),
         ).order_by(TbAuxBalance.aux_name)
     )
     aux_rows = result.scalars().all()
@@ -582,10 +573,8 @@ async def _fetch_mixed_row(
     """变动表行取数：按资产分类（辅助维度）获取一行多列数据"""
     result = await db.execute(
         sa.select(TbAuxBalance).where(
-            TbAuxBalance.project_id == project_id,
-            TbAuxBalance.year == year,
+            await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
             TbAuxBalance.account_code.in_(account_codes),
-            TbAuxBalance.is_deleted == sa.false(),
         ).order_by(TbAuxBalance.aux_name)
     )
     aux_rows = result.scalars().all()

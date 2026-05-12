@@ -1,24 +1,25 @@
 <template>
   <div class="gt-recycle-bin">
     <div class="gt-recycle-header">
-      <h2>回收站</h2>
-      <div class="gt-recycle-actions">
-        <el-tag v-if="stats.is_over_limit" type="danger" size="large" effect="dark">
-          已超出上限（{{ stats.total }}/{{ stats.limit }}），请清理
-        </el-tag>
-        <el-tag v-else type="info" size="large">
-          {{ stats.total }} 条已删除记录
-        </el-tag>
-        <el-button
-          type="danger"
-          plain
-          size="small"
-          :disabled="stats.total === 0"
-          @click="confirmEmptyAll"
-        >
-          <el-icon><Delete /></el-icon> 清空回收站
-        </el-button>
-      </div>
+      <GtPageHeader title="回收站" :show-back="false">
+        <template #actions>
+          <el-tag v-if="stats.is_over_limit" type="danger" size="large" effect="dark">
+            已超出上限（{{ stats.total }}/{{ stats.limit }}），请清理
+          </el-tag>
+          <el-tag v-else type="info" size="large">
+            {{ stats.total }} 条已删除记录
+          </el-tag>
+          <el-button
+            type="danger"
+            plain
+            size="small"
+            :disabled="stats.total === 0"
+            @click="confirmEmptyAll"
+          >
+            <el-icon><Delete /></el-icon> 清空回收站
+          </el-button>
+        </template>
+      </GtPageHeader>
     </div>
 
     <!-- 类型筛选 -->
@@ -46,10 +47,10 @@
       </el-table-column>
       <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
-          <el-button type="primary" size="small" text @click="restoreItem(row)">
+          <el-button type="primary" size="small" text v-permission="'recycle:restore'" @click="restoreItem(row)">
             恢复
           </el-button>
-          <el-button type="danger" size="small" text @click="confirmDelete(row)">
+          <el-button type="danger" size="small" text v-permission="'recycle:purge'" @click="confirmDelete(row)">
             永久删除
           </el-button>
         </template>
@@ -79,6 +80,7 @@ import {
   restoreRecycleBinItem, permanentDeleteItem, emptyRecycleBin,
 } from '@/services/commonApi'
 import { operationHistory } from '@/utils/operationHistory'
+import { handleApiError } from '@/utils/errorHandler'
 
 const loading = ref(false)
 const items = ref<any[]>([])
@@ -122,7 +124,7 @@ async function restoreItem(row: any) {
     await loadItems()
     await loadStats()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '恢复失败')
+    handleApiError(e, '恢复')
   }
 }
 

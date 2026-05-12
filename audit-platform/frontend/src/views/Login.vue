@@ -3,7 +3,7 @@
     <!-- 左侧品牌区 -->
     <div class="gt-login-brand">
       <div class="brand-content gt-fade-in">
-        <img src="/gt.png" alt="致同" class="brand-logo" />
+        <img src="/gt-logo-white.png" alt="Grant Thornton 致同" class="brand-logo" />
         <h1 class="brand-title">致同审计作业平台</h1>
         <p class="brand-desc">面向会计师事务所的审计全流程作业系统</p>
       </div>
@@ -67,7 +67,18 @@ async function handleLogin() {
   try {
     await authStore.login(form.username, form.password)
     ElMessage.success('登录成功')
-    router.push((route.query.redirect as string) || '/')
+    // R7-S1-04: 优先 redirect query，否则按角色跳转到对应首页
+    const ROLE_HOME: Record<string, string> = {
+      auditor: '/my/dashboard',
+      manager: '/dashboard/manager',
+      partner: '/dashboard/partner',
+      qc: '/qc/inspections',
+      eqcr: '/eqcr/workbench',
+      admin: '/',
+    }
+    const redirect = route.query.redirect as string | undefined
+    const target = redirect || ROLE_HOME[authStore.user?.role ?? ''] || '/'
+    router.replace(target)
   } catch (err: any) {
     ElMessage.error(err?.response?.data?.message ?? '登录失败')
   } finally { loading.value = false }

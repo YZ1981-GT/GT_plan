@@ -165,14 +165,15 @@ class TestR1DefaultRegistration:
     """R1 默认注册验证。"""
 
     def test_r1_sections_registered(self):
-        """register_r1_sections 注册 00/01/99 三个章节。"""
+        """register_r1_sections 注册 00/01/04/99 四个章节。"""
         register_r1_sections()
         sections = list_all()
         prefixes = [s.order_prefix for s in sections]
         assert "00" in prefixes
         assert "01" in prefixes
+        assert "04" in prefixes
         assert "99" in prefixes
-        assert len(sections) == 3
+        assert len(sections) == 4
 
     def test_r1_filenames(self):
         """R1 章节文件名正确。"""

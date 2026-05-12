@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -39,6 +39,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
+from app.services.dataset_query import get_active_filter
 
 _logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class FetchRule:
         self.transform = data.get("transform", Transform.DIRECT)
         self.description = data.get("description", "")
         self.created_by = data.get("created_by")
-        self.created_at = data.get("created_at", datetime.utcnow().isoformat())
+        self.created_at = data.get("created_at", datetime.now(timezone.utc).isoformat())
         # 来源标记（preset=预设公式/custom=用户自定义）
         self.origin = data.get("origin", "custom")
 
@@ -138,7 +139,7 @@ class TraceRecord:
         self.source_location = source_location
         self.value = value
         self.rule_id = rule_id
-        self.fetched_at = datetime.utcnow().isoformat()
+        self.fetched_at = datetime.now(timezone.utc).isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -386,10 +387,8 @@ class CustomFetchService:
         field = source.get("field", "closing_balance")
 
         query = sa.select(TbAuxBalance).where(
-            TbAuxBalance.project_id == self.project_id,
-            TbAuxBalance.year == self.year,
+            await get_active_filter(self.db, TbAuxBalance.__table__, self.project_id, self.year),
             TbAuxBalance.account_code == account_code,
-            TbAuxBalance.is_deleted == sa.false(),
         )
         if aux_code:
             query = query.where(TbAuxBalance.aux_code == aux_code)

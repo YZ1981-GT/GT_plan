@@ -64,7 +64,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
@@ -98,7 +99,7 @@ function addRow() {
 }
 async function batchDeleteRows() {
   if (!selectedRows.value.length) return
-  try { await ElMessageBox.confirm(`确定删除 ${selectedRows.value.length} 行？`, '删除确认', { type: 'warning' })
+  try { await confirmBatch('删除', selectedRows.value.length)
     const del = new Set(selectedRows.value); const remaining = manualRows.filter(r => !del.has(r)); manualRows.length = 0; manualRows.push(...remaining); selectedRows.value = []
   } catch {}
 }

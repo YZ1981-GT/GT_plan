@@ -1,19 +1,15 @@
 <template>
   <div class="independence-form">
-    <div class="gt-page-banner">
-      <div class="gt-banner-content">
-        <h2>📋 独立性声明</h2>
-        <span class="gt-banner-sub">{{ currentYear }} 年度 · 项目 {{ projectId }}</span>
-      </div>
-      <div class="gt-banner-actions">
+    <GtPageHeader title="独立性声明" :show-back="false">
+      <template #actions>
         <el-button size="small" @click="saveDraft" :loading="saving" :disabled="submitted">
           保存草稿
         </el-button>
         <el-button size="small" type="primary" @click="handleSubmit" :loading="submitting" :disabled="submitted">
           提交声明
         </el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 已提交成功状态 -->
     <el-result v-if="submitted" icon="success" title="独立性声明已提交" sub-title="声明已签字留痕，可在归档包中查看">
@@ -107,11 +103,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDangerous } from '@/utils/confirm'
 import type { UploadUserFile } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { independenceDeclarations as P_id } from '@/services/apiPaths'
 import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -182,8 +181,8 @@ async function loadData() {
   loading.value = true
   try {
     const [qRes, dRes] = await Promise.allSettled([
-      api.get<{ questions: Question[] }>('/api/independence/questions'),
-      api.get<{ declarations: any[] }>(`/api/projects/${projectId.value}/independence-declarations`, {
+      api.get<{ questions: Question[] }>(P_id.questions),
+      api.get<{ declarations: any[] }>(P_id.list(projectId.value), {
         params: { year: currentYear },
       }),
     ])
@@ -211,8 +210,8 @@ async function loadData() {
         submitted.value = true
       }
     }
-  } catch {
-    ElMessage.error('加载独立性声明数据失败')
+  } catch (e: any) {
+    handleApiError(e, '加载独立性声明数据')
   } finally {
     loading.value = false
   }
@@ -243,26 +242,26 @@ async function saveDraft() {
     if (declaration.value) {
       // PATCH 更新
       const { data } = await http.patch(
-        `/api/projects/${projectId.value}/independence-declarations/${declaration.value.id}`,
+        P_id.detail(projectId.value, declaration.value.id),
         { answers: payload },
       )
       declaration.value = data
     } else {
       // 先创建再更新
       const created = await api.post<any>(
-        `/api/projects/${projectId.value}/independence-declarations`,
+        P_id.list(projectId.value),
         { declarant_id: authStore.userId, declaration_year: currentYear },
       )
       declaration.value = created
       const { data } = await http.patch(
-        `/api/projects/${projectId.value}/independence-declarations/${created.id}`,
+        P_id.detail(projectId.value, created.id),
         { answers: payload },
       )
       declaration.value = data
     }
     ElMessage.success('草稿已保存')
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e: any) {
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }
@@ -271,11 +270,7 @@ async function saveDraft() {
 // 提交声明
 async function handleSubmit() {
   try {
-    await ElMessageBox.confirm(
-      '提交后将触发签字留痕，确认提交独立性声明？',
-      '确认提交',
-      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
-    )
+    await confirmDangerous('提交后将触发签字留痕，确认提交独立性声明？', '确认提交')
   } catch {
     return
   }
@@ -286,26 +281,26 @@ async function handleSubmit() {
     const payload = buildAnswersPayload()
     if (!declaration.value) {
       const created = await api.post<any>(
-        `/api/projects/${projectId.value}/independence-declarations`,
+        P_id.list(projectId.value),
         { declarant_id: authStore.userId, declaration_year: currentYear },
       )
       declaration.value = created
     }
     await http.patch(
-      `/api/projects/${projectId.value}/independence-declarations/${declaration.value.id}`,
+      P_id.detail(projectId.value, declaration.value.id),
       { answers: payload },
     )
 
     // 提交
     const result = await api.post<any>(
-      `/api/projects/${projectId.value}/independence-declarations/${declaration.value.id}/submit`,
+      P_id.submit(projectId.value, declaration.value.id),
     )
     declaration.value = result
     submitted.value = true
     ElMessage.success('独立性声明已提交')
   } catch (err: any) {
     const msg = err?.response?.data?.detail || err?.message || '提交失败'
-    ElMessage.error(typeof msg === 'string' ? msg : '提交失败')
+    handleApiError(err, '提交')
   } finally {
     submitting.value = false
   }

@@ -14,7 +14,7 @@
       </el-table-column>
       <el-table-column prop="check_status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="statusColor(row.check_status)" size="small">{{ statusLabel(row.check_status) }}</el-tag>
+          <el-tag :type="(statusColor(row.check_status)) || undefined" size="small">{{ statusLabel(row.check_status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="checked_by_username" label="检查人" width="100" />
@@ -69,6 +69,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useAuthStore } from '@/stores/auth'
+import { projects as P_proj } from '@/services/apiPaths'
 
 const props = defineProps<{ projectId: string }>()
 const authStore = useAuthStore()
@@ -106,15 +107,15 @@ const statusLabel = (s: string) => ({
   pending: '待检查', pass: '通过', fail: '未通过', na: '不适用',
 }[s] || s)
 
-const statusColor = (s: string) => ({
+const statusColor = (s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' => ({
   pending: 'info', pass: 'success', fail: 'danger', na: 'warning',
-}[s] || 'info')
+} as Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'>)[s] || 'info'
 
 const loadItems = async () => {
   if (!props.projectId) return
   loading.value = true
   try {
-    const data = await api.get(`/api/projects/${props.projectId}/se-checklist`)
+    const data = await api.get(`${P_proj.detail(props.projectId)}/se-checklist`)
     items.value = Array.isArray(data) ? data : []
   } catch {
     items.value = []
@@ -141,10 +142,10 @@ const handleSave = async () => {
     if (!valid) return
     try {
       if (isEditing.value) {
-        await api.put(`/api/projects/${props.projectId}/se-checklist/${form.value.id}`, form.value)
+        await api.put(`${P_proj.detail(props.projectId)}/se-checklist/${form.value.id}`, form.value)
         ElMessage.success('已更新')
       } else {
-        await api.post(`/api/projects/${props.projectId}/se-checklist`, form.value)
+        await api.post(`${P_proj.detail(props.projectId)}/se-checklist`, form.value)
         ElMessage.success('已添加')
       }
       dialogVisible.value = false
@@ -157,7 +158,7 @@ const handleSave = async () => {
 
 const handleDelete = async (row: any) => {
   try {
-    await api.delete(`/api/projects/${props.projectId}/se-checklist/${row.id}`)
+    await api.delete(`${P_proj.detail(props.projectId)}/se-checklist/${row.id}`)
     ElMessage.success('已删除')
     loadItems()
   } catch {

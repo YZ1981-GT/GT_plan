@@ -1,8 +1,11 @@
 <template>
   <div class="gt-proj-dash gt-fade-in">
     <div class="gt-pd-header">
-      <h2 class="gt-page-title">项目看板</h2>
-      <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
+      <GtPageHeader title="项目看板" :show-back="false">
+        <template #actions>
+          <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
+        </template>
+      </GtPageHeader>
     </div>
     <el-row :gutter="16">
       <el-col :span="8">
@@ -50,6 +53,7 @@
                   :disabled="isRemindDisabled(row)"
                   :loading="row._reminding"
                   @click="onRemind(row)"
+                  v-permission="'workpaper:escalate'"
                 >
                   催办
                 </el-button>
@@ -64,7 +68,13 @@
             </el-table-column>
           </el-table>
           <div v-if="remindLimitTip" class="gt-pd-remind-tip">
-            <el-alert :title="remindLimitTip" type="warning" :closable="true" @close="remindLimitTip = ''" show-icon />
+            <el-alert :title="remindLimitTip" type="warning" :closable="true" @close="remindLimitTip = ''" show-icon>
+              <template #default>
+                <el-button size="small" type="danger" plain style="margin-top: 4px" @click="onEscalateToPartner">
+                  升级到合伙人
+                </el-button>
+              </template>
+            </el-alert>
           </div>
         </div>
       </el-col>
@@ -92,6 +102,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import * as P from '@/services/apiPaths'
 import { useRoute } from 'vue-router'
 import { use } from 'echarts/core'
 import { PieChart, BarChart } from 'echarts/charts'
@@ -99,12 +110,14 @@ import { TitleComponent, TooltipComponent, GridComponent } from 'echarts/compone
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { ElMessage } from 'element-plus'
+import { confirmEscalate } from '@/utils/confirm'
 import {
   getWorkpaperProgress, getOverdueWorkpapers,
   runConsistencyCheck as apiRunConsistencyCheck, getProjectWorkHours,
 } from '@/services/commonApi'
 import http from '@/utils/http'
 import StaffSelectDialog from '@/components/assignment/StaffSelectDialog.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 use([PieChart, BarChart, TitleComponent, TooltipComponent, GridComponent, CanvasRenderer])
 
@@ -145,7 +158,7 @@ async function onRemind(row: any) {
   row._reminding = true
   try {
     const { data, status } = await http.post(
-      `/api/projects/${projectId.value}/workpapers/${row.wp_id}/remind`,
+      P.workpapers.remind(projectId.value, row.wp_id),
       {},
       { validateStatus: (s: number) => s < 600 },
     )
@@ -170,9 +183,31 @@ async function onRemind(row: any) {
       }
     }
   } catch (err: any) {
-    ElMessage.error('催办失败，请重试')
+    handleApiError(err, '催办')
   } finally {
     row._reminding = false
+  }
+}
+
+/** 催办 3 次后升级到合伙人 */
+async function onEscalateToPartner() {
+  const overdueItems = overdue.value.filter((r: any) => (remindCounts.value[r.wp_id] || 0) >= 3)
+  if (!overdueItems.length) {
+    ElMessage.info('没有需要升级的底稿')
+    return
+  }
+  try {
+    await confirmEscalate('合伙人')
+  } catch { return }
+  try {
+    await http.post(P.workpapers.escalateToPartner(projectId.value), {
+      wp_ids: overdueItems.map((r: any) => r.wp_id),
+      reason: '催办 3 次未响应',
+    }, { validateStatus: (s: number) => s < 600 })
+    ElMessage.success('已通知合伙人关注')
+    remindLimitTip.value = ''
+  } catch (e: any) {
+    handleApiError(e, '升级')
   }
 }
 
@@ -196,7 +231,7 @@ async function onReassignConfirm(staff: { user_id: string; staff_name: string })
 
   try {
     await http.put(
-      `/api/projects/${projectId.value}/working-papers/${wpId}/assign`,
+      P.workpapers.assign(projectId.value, wpId),
       { assigned_to: staff.user_id },
     )
     ElMessage.success(`已重新分配给 ${staff.staff_name}`)
@@ -205,7 +240,7 @@ async function onReassignConfirm(staff: { user_id: string; staff_name: string })
   } catch (err: any) {
     const detail = err?.response?.data?.detail
     const msg = typeof detail === 'string' ? detail : '重新分配失败，请重试'
-    ElMessage.error(msg)
+    handleApiError(err, '操作')
   }
 }
 

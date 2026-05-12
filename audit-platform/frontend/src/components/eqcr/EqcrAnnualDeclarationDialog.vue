@@ -4,8 +4,8 @@
     title="年度独立性声明"
     width="700px"
     :close-on-click-modal="false"
-    :close-on-press-escape="false"
-    :show-close="false"
+    :close-on-press-escape="true"
+    :show-close="true"
     append-to-body
   >
     <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px">
@@ -50,6 +50,7 @@
 import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -84,7 +85,7 @@ const groupedQuestions = computed(() => {
 async function loadQuestions() {
   loadingQuestions.value = true
   try {
-    const data = await api.get('/api/eqcr/independence/annual/questions')
+    const data = await api.get(P_eqcr.independence.questions)
     questions.value = data.questions || []
   } catch {
     ElMessage.error('加载声明问题失败')
@@ -96,7 +97,7 @@ async function loadQuestions() {
 async function onSubmit() {
   submitting.value = true
   try {
-    await api.post('/api/eqcr/independence/annual/submit', {
+    await api.post(P_eqcr.independence.submit, {
       year: currentYear,
       answers: { ...answers },
     })

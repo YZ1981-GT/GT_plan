@@ -19,6 +19,8 @@ export interface ReviewInboxItem {
   assigned_to: string | null
   submitted_at: string | null
   file_version: number
+  conversation_id: string | null
+  conversation_message_count: number
 }
 
 export interface ReviewInboxResult {

@@ -321,7 +321,8 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { WarningFilled } from '@element-plus/icons-vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { fmtAmount, fmtPercent } from '@/utils/formatters'
 import { useExcelIO } from '@/composables/useExcelIO'
@@ -431,11 +432,7 @@ function onSelectionChange(selection: SubsidiaryInfoRow[]) {
 async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
-    await ElMessageBox.confirm(
-      `确定删除选中的 ${selectedRows.value.length} 条记录？`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-    )
+    await confirmBatch('删除', selectedRows.value.length)
     const toDelete = new Set(selectedRows.value)
     rows.value = rows.value.filter(r => !toDelete.has(r))
     selectedRows.value = []

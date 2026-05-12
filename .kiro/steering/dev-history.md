@@ -279,3 +279,127 @@ inclusion: manual
 - 通知落地（notification_types.py）
 
 **分支状态：** HEAD=5c5ac56 已推送 origin/feature/global-component-library，待合并 master
+
+
+## 2026-05-10：账表导入主表去重 Sprint 8（Layer 1-3）
+
+### 背景
+
+YG36 重庆医药集团四川物流真实样本导入后发现 `tb_balance` 同 account_code 重复 140 次。1002 银行存款在主表有 3 条（4048.93 / 3948.93 / 100），下游所有 `SUM(closing_balance)` 聚合翻倍。
+
+### 根因分析（分层）
+
+1. **Layer 1 根因**：`converter.convert_balance_rows` L213-234 硬编码"含辅助维度的行同时也写主表"，真实 Excel 中"汇总行(无aux) + N 明细行(有aux)"结构被写进主表 N+1 次
+2. **Layer 1 二次发现**：修复后仍有跨 chunk 重复泄漏——`_execute_v2` 流式分块调用 converter，"按 (company, account_code) 分组去重"只能在单 chunk 范围生效
+3. **Layer 2 原设计缺陷**：`/balance-tree` 端点用"所有 aux 行求和"判 mismatch，对 YG36 多维度冗余存储模型误报 12 条
+4. **复盘关键转折**：Layer 3 验证时扩大分析范围，通过查询 `tb_aux_balance` 原始 raw 值，发现"翻倍"实为正确冗余存储，不是数据 bug，是校验算法 bug
+
+### 修复内容
+
+**Layer 1**：`converter.py convert_balance_rows` 重写
+- 按 `(company_code, account_code)` 分组
+- 有汇总行 → 主表仅用汇总行
+- 仅明细 → 聚合生成虚拟汇总行（`raw_extra._aggregated_from_aux=True` + `_aux_row_count=N`）
+- 新增 `_aggregate_aux_to_summary` 辅助函数
+- 专测 `test_converter_balance_dedup.py` 6 用例
+
+**Layer 1 二次修复**：`pipeline.py _execute_v2` 跨 chunk 累积
+- balance/aux_balance sheet 累积 cleaned 到内存后 sheet 结束统一 convert
+- ledger sheet 保持流式
+- sheet 结束日志：`cleaned=N dedup→balance=M aux=K`
+
+**Layer 2**：`/balance-tree` 端点重写为两层嵌套
+- 父科目 → aux_type 分组节点 → 具体 aux_code 明细行
+- mismatch 算法改为按单一 aux_type 组求和 vs 主表
+- 节点新增 `aux_types[]` / `aux_rows_total` / `record_count`
+- 前端 `LedgerBalanceTreeView.vue` 三层 el-table 树形渲染
+
+**Layer 3**：YG36 真实样本 E2E 回归
+- `scripts/e2e_http_curl.py` 扩展 Layer 3 断言
+- 验证结果：tb_balance 1823→813、重复 140→0、1002 3条→1条、closing 4048.93 正确、mismatch 12→0
+
+### 关键数据对比
+
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| tb_balance 行数 | 1823 | **813** |
+| account_code 重复数 | 140 | **0** |
+| 1002 主表条数 | 3 | **1** |
+| balance-tree mismatch 数 | 12（误报） | **0** |
+| 1002 前端展示 | 平铺 4 条 aux | **2 维度组 × 2 明细** |
+
+### 测试增量
+
+- 后端 converter 专测 6 用例
+- 后端 balance-tree 端点 6 用例（含"多维度同金额不报 mismatch"专测）
+- 前端 vue-tsc 0 错误
+- 整套 ledger_import 152 passed / 3 skipped（含 9 家真实样本 E2E）
+- test_ledger_penetration 27 passed
+
+### 复盘教训
+
+1. **扩大分析范围再下结论**：第一反应认为"冗余存储是 bug"要改 parse_aux_dimension，扩大查询真实 raw 数据后发现是校验算法 bug。未来遇到"看起来翻倍"的问题先按不同维度 GROUP BY 验证，而非直接改数据层
+2. **流式 + 聚合天然矛盾**：聚合必须在 sheet/文件边界做，不能随意按 chunk 调用带分组语义的 converter
+3. **单元测试过 ≠ 生产数据对**：converter 单测 6 个全过但生产数据仍错，因为单测都在单 chunk 范围；真实 bug 只有真实数据才能暴露
+4. **`--reload` 不能捕获新 router 端点**：路由树启动时绑定，追加 `@router.get` 后必须整进程重启
+5. **PG 重复 activate 数据叠加**：同一 project+year 多次导入不覆盖而是累加 activated dataset，验证前必须清理
+
+
+## 2026-05-10：Sprint 8 P0-P3 收尾（Layer 1-3 复盘改进）
+
+在 Layer 1-3 完成后执行了完整复盘+收尾：
+
+### P0：主表字段丢失验证（排除假警报）
+验证 1002 实测所有金额字段完整（opening_balance=307072.27 / debit_amount=2.1亿 / closing_balance=4048.93）。`_discarded_mappings` 是"多列映射同 standard_field 时保留最优值 + 副本进 raw_extra"的正常机制。tb_balance 813 行只 22% 有 debit_amount 是 YG36 大量零余额明细科目的业务事实。
+
+### P1：Memory 三文件分流
+- `architecture.md` 新增 3 章：辅助维度冗余存储模型 / balance-tree 两层嵌套 / 流式分块矛盾+sheet 边界累积
+- `conventions.md` 新增 2 章：后端踩坑（uvicorn reload 路由树不可变/清理 SQL 外键顺序/fake user role .value/重复 activate）+ 前端踩坑（el-table 三层树形/PowerShell 中文批处理禁忌）
+- `dev-history.md` 新增"2026-05-10：账表导入主表去重 Sprint 8"章节
+- memory.md 精简 462→447 行
+
+### P2a：converter 多维度单测
+`test_converter_balance_dedup.py` 新增 2 用例（6→8 通过）：
+- `test_multi_dimension_redundant_storage`：一行双维度 → 主表 1 条 + aux 4 条；按 aux_type GROUP BY 求和 = 主表；反例验证平铺求和 = 父 × 2
+- `test_multi_dimension_with_summary_row_dedup`：有汇总行 + 多维度明细，主表用汇总行不标聚合，aux 仍 4 条
+
+### P2b：balance 累积内存保护
+`pipeline.py` 在 balance sheet 累积达 50000/100000 行时打 warning 日志，合并账套超大余额表时可预警（不阻断）。
+
+### P3a：/balance-tree 分页
+后端新增 `page` / `page_size`（le=200 硬上限）/ `keyword` / `only_with_children` 查询参数；响应新增 `pagination` 字段。前端 `el-pagination` + pageSizes [20, 50, 100, 200]；keyword + only_with_children 走服务端过滤，aggregated/mismatch 仍本地；`getLedgerBalanceTree` 支持新 `LedgerBalanceTreeParams` 对象参数（向后兼容旧 3 参调用）。新增 5 个端点测试（6→11 通过）。
+
+### P3b：ADR 文档
+`docs/adr/ADR-001-auxiliary-dimension-redundant-storage.md` 完整记录：背景（YG36 真实例）+ 决策（按维度冗余存 N 条）+ 关键性质（GROUP BY aux_type = 主表）+ 实施要点（入库/校验/受影响代码路径）+ 备选方案否决理由（只存主维度 / 坐标点表）+ 真实数据验证结果。
+
+### P3c：组件文档
+`LedgerBalanceTreeView.vue` 顶部注释块说明 `_nodeType: 'account'|'group'|'aux'` 三态 + 三层嵌套设计 + props/expose。
+
+### P3d：UX 增强
+- el-table `show-summary` + `getSummary` 方法智能识别列名求和（仅累加父科目行避免维度组重复计入）
+- "导出当前页"按钮动态 import xlsx，三层展开导出（科目 / 维度组 / 明细）含标签列，文件名 `余额树形_{年}_第{页}页.xlsx`
+
+### P3e：脚本升级
+`scripts/e2e_http_curl.py` 从"用完即删"改为正式 regression 脚本。约定：Worker / orchestrator / converter / pipeline 改动后必须先跑此脚本再 commit。
+
+### 最终测试结果
+- 前端 vue-tsc：0 错误
+- 后端 ledger 相关：176 passed / 3 skipped（含 11 个端点测试 + 8 个 converter 单测 + 152 其他 ledger_import + 9 家真实样本 E2E 跳过）
+
+
+### P3f：损益类过滤联动修复（2026-05-10 补丁）
+
+**用户报告**："有金额"筛选器损益类未联动
+
+**根因**：会计准则——损益类科目（5/6 开头）期末结转本年利润后 opening/closing 天然 NULL，但 debit/credit 当期有发生额。如果一刀切要求四字段都有值，损益类 356 个全部被误排除。
+
+**修复**：balance-tree 端点新增 `only_with_activity` 参数，按 account_code 首位分类：1-4 开头任一字段非零 / 5-6 开头只看 debit/credit。前端 filterMode 加"有金额"按钮带 tooltip 说明。
+
+**实现细节**：
+- 用 OR 拼两个场景而非 CASE，让查询优化器走索引
+- 用 `sa.func.substr(account_code, 1, 1)` 而非 `left`（SQLite 不支持 left）
+- 新增端点测试 `test_only_with_activity_loss_gain_coverage`
+
+**真实数据验证**：YG36 全部 813 → 有活动 **208**；其中 6xxx 损益类 356 个 → **97 个** 有活动（opening/closing 全 NULL 但 debit/credit 有值被正确包含，如 6001 营业收入 debit=3773 万）。
+
+**测试**：端点 11→12 通过。

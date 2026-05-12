@@ -114,50 +114,65 @@ class MetabaseService:
                 "id": "total_ledger",
                 "name": "总账查询",
                 "sql": """
-SELECT account_code, account_name,
-       SUM(debit_amount) as debit_total,
-       SUM(credit_amount) as credit_total
-FROM tb_ledger
-WHERE project_id = {{project_id}} AND year = {{year}}
-  AND is_deleted = false
-GROUP BY account_code, account_name
-ORDER BY account_code;
+SELECT l.account_code, l.account_name,
+       SUM(l.debit_amount) as debit_total,
+       SUM(l.credit_amount) as credit_total
+FROM tb_ledger l
+WHERE l.project_id = {{project_id}} AND l.year = {{year}}
+  AND EXISTS (
+    SELECT 1 FROM ledger_datasets d
+    WHERE d.id = l.dataset_id AND d.status = 'active'
+  )
+GROUP BY l.account_code, l.account_name
+ORDER BY l.account_code;
 """,
             },
             {
                 "id": "detail_ledger",
                 "name": "明细账查询",
                 "sql": """
-SELECT voucher_date, voucher_no, account_code, account_name,
-       debit_amount, credit_amount, summary
-FROM tb_ledger
-WHERE project_id = {{project_id}} AND year = {{year}}
-  AND account_code = {{account_code}} AND is_deleted = false
-ORDER BY voucher_date, voucher_no;
+SELECT l.voucher_date, l.voucher_no, l.account_code, l.account_name,
+       l.debit_amount, l.credit_amount, l.summary
+FROM tb_ledger l
+WHERE l.project_id = {{project_id}} AND l.year = {{year}}
+  AND l.account_code = {{account_code}}
+  AND EXISTS (
+    SELECT 1 FROM ledger_datasets d
+    WHERE d.id = l.dataset_id AND d.status = 'active'
+  )
+ORDER BY l.voucher_date, l.voucher_no;
 """,
             },
             {
                 "id": "voucher_query",
                 "name": "凭证查询",
                 "sql": """
-SELECT voucher_no, voucher_date, account_code, account_name,
-       debit_amount, credit_amount, summary
-FROM tb_ledger
-WHERE project_id = {{project_id}} AND year = {{year}}
-  AND voucher_no = {{voucher_no}} AND is_deleted = false
-ORDER BY account_code;
+SELECT l.voucher_no, l.voucher_date, l.account_code, l.account_name,
+       l.debit_amount, l.credit_amount, l.summary
+FROM tb_ledger l
+WHERE l.project_id = {{project_id}} AND l.year = {{year}}
+  AND l.voucher_no = {{voucher_no}}
+  AND EXISTS (
+    SELECT 1 FROM ledger_datasets d
+    WHERE d.id = l.dataset_id AND d.status = 'active'
+  )
+ORDER BY l.account_code;
 """,
             },
             {
                 "id": "aux_query",
                 "name": "辅助账查询",
                 "sql": """
-SELECT aux_type, aux_code, aux_name,
-       opening_balance, debit_amount, credit_amount, closing_balance
-FROM tb_aux_balance
-WHERE project_id = {{project_id}} AND year = {{year}}
-  AND account_code = {{account_code}} AND is_deleted = false
-ORDER BY aux_type, aux_code;
+SELECT ab.aux_type, ab.aux_code, ab.aux_name,
+       ab.opening_balance, ab.debit_amount, ab.credit_amount, ab.closing_balance
+FROM tb_aux_balance ab
+WHERE ab.project_id = {{project_id}} AND ab.year = {{year}}
+  AND ab.account_code = {{account_code}}
+  AND EXISTS (
+    SELECT 1 FROM ledger_datasets d
+    WHERE d.id = ab.dataset_id AND d.status = 'active'
+  )
+ORDER BY ab.aux_type, ab.aux_code;
 """,
             },
         ]

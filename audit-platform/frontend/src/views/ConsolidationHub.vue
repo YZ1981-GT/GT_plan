@@ -56,7 +56,7 @@
               <div class="ch-card-avatar">
                 <span>{{ (p.client_name || p.name || '?').charAt(0) }}</span>
               </div>
-              <el-tag :type="statusType(p.status)" size="small" effect="light" round>
+              <el-tag :type="(statusType(p.status)) || undefined" size="small" effect="light" round>
                 {{ statusLabel(p.status) }}
               </el-tag>
             </div>
@@ -113,8 +113,8 @@ const gridDensityClass = computed(() => {
   return 'ch-grid--dense'                  // 16+：密集列表式
 })
 
-function statusType(s: string) {
-  return ({ created: 'info', planning: '', execution: 'warning', completion: 'success', archived: 'info' } as Record<string, string>)[s] || 'info'
+function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  return ({ created: 'info', planning: '', execution: 'warning', completion: 'success', archived: 'info' } as Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'>)[s] || 'info'
 }
 function statusLabel(s: string) {
   return ({ created: '已创建', planning: '计划中', execution: '执行中', completion: '已完成', archived: '已归档' } as Record<string, string>)[s] || s
@@ -181,13 +181,13 @@ onMounted(async () => {
 }
 /* 1-2个项目：大卡片，最多2列 */
 .ch-grid--sparse {
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;
 }
-.ch-grid--sparse .ch-card-body { padding: 24px; }
-.ch-grid--sparse .ch-card-name { font-size: 19px; }
-.ch-grid--sparse .ch-card-avatar { width: 48px; height: 48px; font-size: 22px; border-radius: 12px; }
-.ch-grid--sparse .ch-card-info-item { font-size: 14px; }
-.ch-grid--sparse .ch-card-enter { font-size: 14px; }
+.ch-grid--sparse .ch-card-body { padding: 20px; }
+.ch-grid--sparse .ch-card-name { font-size: 16px; }
+.ch-grid--sparse .ch-card-avatar { width: 42px; height: 42px; font-size: 18px; border-radius: 10px; }
+.ch-grid--sparse .ch-card-info-item { font-size: 13px; }
+.ch-grid--sparse .ch-card-enter { font-size: 13px; }
 
 /* 3-6个项目：标准 */
 .ch-grid--normal {
@@ -253,7 +253,7 @@ onMounted(async () => {
 }
 
 .ch-card-name {
-  margin: 0 0 12px; font-size: 17px; font-weight: 600; color: #1a1a2e;
+  margin: 0 0 10px; font-size: 15px; font-weight: 600; color: #1a1a2e;
   line-height: 1.4;
 }
 

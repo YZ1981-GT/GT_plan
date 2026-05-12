@@ -1,10 +1,15 @@
 <template>
-  <div class="gt-penetration">
+  <div class="gt-penetration" :class="{ 'gt-penetration--fullscreen': isFullscreen }" ref="penetrationRef">
+    <!-- 全屏模式下的退出提示 -->
+    <div v-if="isFullscreen" class="gt-fullscreen-topbar">
+      <span>{{ currentProject?.client_name || '—' }} · 账簿查询</span>
+      <div style="flex:1" />
+      <el-button size="small" @click="toggleFullscreen">退出全屏</el-button>
+    </div>
     <!-- 账套信息栏 -->
     <div class="gt-ledger-header">
       <div class="gt-ledger-title">
-        <span class="gt-ledger-company">{{ currentProject?.client_name || currentProject?.name || '—' }}</span>
-        <el-tag size="small" type="info" style="margin-left: 8px">{{ currentProject?.name || '' }}</el-tag>
+        <el-tag size="large" type="warning" effect="dark" style="font-size: 18px; padding: 8px 20px; font-weight: 600">{{ currentProject?.name || currentProject?.client_name || '—' }}</el-tag>
       </div>
       <div class="gt-ledger-switches">
         <el-select
@@ -37,6 +42,9 @@
           <el-icon style="margin-right: 2px"><Upload /></el-icon> 导入数据
         </el-button>
         <el-button size="small" plain @click="goToImportHistory">导入历史</el-button>
+        <el-button size="small" plain @click="dataManagerVisible = true">
+          <el-icon style="margin-right: 2px"><Setting /></el-icon> 数据管理
+        </el-button>
         <el-button size="small" @click="runValidation" :loading="validating" type="warning" plain>
           <el-icon style="margin-right: 2px"><Warning /></el-icon> 数据校验
         </el-button>
@@ -104,13 +112,25 @@
         <el-tag type="info" size="small">账簿查询</el-tag>
         <el-tag size="small">{{ filteredFlatCount }} / {{ balanceData.length }}</el-tag>
         <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
-        <el-button size="small" type="success" plain @click="exportBalanceExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="exportBalanceExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">
+          {{ isFullscreen ? '退出全屏' : '全屏' }}
+        </el-button>
       </div>
 
       <!-- 空状态 -->
       <div v-if="balanceTab === 'account' && !loading && balanceData.length === 0" class="gt-empty-state">
-        <p style="font-size: 15px; color: #999">暂无科目余额数据</p>
-        <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
+        <template v-if="isImportActive">
+          <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
+          <p style="font-size: 15px; color: #4b2d77; font-weight: 500">数据处理中...</p>
+          <p style="font-size: 13px; color: #909399">后台正在导入账套数据，完成后此处将自动显示。可在顶栏查看进度。</p>
+          <el-button size="small" style="margin-top: 12px" @click="refresh">刷新查看</el-button>
+        </template>
+        <template v-else>
+          <p style="font-size: 15px; color: #999">暂无科目余额数据</p>
+          <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」上传包含余额表的 Excel/CSV 文件</p>
+        </template>
       </div>
 
       <!-- 余额表 -->
@@ -127,27 +147,30 @@
         style="width: 100%"
         highlight-current-row
         @row-dblclick="drillToLedger"
+        @row-contextmenu="onRowContextMenu"
+        @selection-change="onSelectionChange"
         :row-style="balanceRowStyle"
         :indent="24"
       >
+        <el-table-column type="selection" width="40" align="center" />
         <el-table-column prop="account_code" label="科目编号" width="200" sortable>
           <template #default="{ row }">
-            <span class="gt-link" @click.stop="drillToLedger(row)">{{ row.account_code }}</span>
+            <span class="gt-link gt-amt" @click.stop="drillToLedger(row)">{{ row.account_code }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="opening_balance" label="期初余额" width="150" align="right" sortable>
-          <template #default="{ row }">{{ fmtAmt(row.opening_balance) }}</template>
+        <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable>
+          <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方发生额" width="150" align="right" sortable>
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable>
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方发生额" width="150" align="right" sortable>
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable>
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末余额" width="150" align="right" sortable>
+        <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable>
           <template #default="{ row }">
-            <span class="gt-link" @click.stop="drillToLedger(row)">{{ fmtAmt(row.closing_balance) }}</span>
+            <GtAmountCell :value="row.closing_balance" :clickable="true" @click="drillToLedger(row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -169,7 +192,9 @@
             </el-button>
             <div class="gt-filter-spacer" />
             <el-button size="small" @click="loadAllAuxBalance" :loading="loading">刷新</el-button>
-            <el-button size="small" type="success" plain @click="exportAuxBalanceExcel">导出Excel</el-button>
+            <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+            <el-button size="small" plain @click="exportAuxBalanceExcel">导出Excel</el-button>
+            <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
             <el-button size="small" text @click="auxToolbarCollapsed = !auxToolbarCollapsed" style="padding: 4px 6px; min-width: auto">
               {{ auxToolbarCollapsed ? '展开筛选 ▼' : '收起筛选 ▲' }}
             </el-button>
@@ -211,9 +236,17 @@
         </div>
 
         <!-- 空状态 -->
-        <div v-if="!loading && auxSummaryData.length === 0 && auxPagedRows.length === 0" class="gt-empty-state">
-          <p style="font-size: 15px; color: #999">暂无辅助余额数据</p>
-          <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
+        <div v-if="!loading && auxSummaryData.length === 0 && auxPagedRows.length === 0 && treeAuxBalance.length === 0" class="gt-empty-state">
+          <template v-if="isImportActive">
+            <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
+            <p style="font-size: 15px; color: #4b2d77; font-weight: 500">数据处理中...</p>
+            <p style="font-size: 13px; color: #909399">后台正在导入账套数据，完成后此处将自动显示。</p>
+            <el-button size="small" style="margin-top: 12px" @click="loadAllAuxBalance">刷新查看</el-button>
+          </template>
+          <template v-else>
+            <p style="font-size: 15px; color: #999">暂无辅助余额数据</p>
+            <p style="font-size: 13px; color: #bbb">请点击右上角「导入数据」重新上传包含辅助账的 Excel/CSV 文件</p>
+          </template>
         </div>
 
         <el-table
@@ -232,9 +265,25 @@
           style="width: 100%"
           highlight-current-row
           @row-dblclick="drillToAuxLedgerFromBalance"
+          @row-contextmenu="onRowContextMenu"
+          @selection-change="onSelectionChange"
           :row-style="auxRowStyle"
         >
-          <el-table-column prop="account_code" label="科目编号" width="130" sortable />
+          <template #empty>
+            <div v-if="isImportActive" style="padding: 40px 0; text-align: center">
+              <div style="font-size: 32px; margin-bottom: 12px">⏳</div>
+              <p style="font-size: 15px; color: #4b2d77; font-weight: 500; margin: 0">数据处理中...</p>
+              <p style="font-size: 13px; color: #909399; margin: 8px 0 12px">后台正在导入账套数据，完成后此处将自动显示。</p>
+              <el-button size="small" @click="loadAllAuxBalance">刷新查看</el-button>
+            </div>
+            <div v-else style="padding: 40px 0; text-align: center; color: #999">
+              暂无数据
+            </div>
+          </template>
+          <el-table-column type="selection" width="40" align="center" />
+          <el-table-column prop="account_code" label="科目编号" width="130" sortable>
+            <template #default="{ row }"><span class="gt-amt">{{ row.account_code }}</span></template>
+          </el-table-column>
           <el-table-column prop="account_name" label="科目名称" width="150" show-overflow-tooltip />
           <el-table-column v-if="!auxTreeMode" prop="aux_type" label="辅助类型" width="90" />
           <el-table-column prop="aux_code" label="辅助编码" width="100" show-overflow-tooltip>
@@ -258,35 +307,37 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="opening_balance" label="期初余额" width="130" align="right" sortable>
+          <el-table-column prop="opening_balance" label="期初余额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.opening_balance) }}</span>
+              <GtAmountCell :value="row.opening_balance" />
             </template>
           </el-table-column>
-          <el-table-column prop="debit_amount" label="借方发生额" width="130" align="right" sortable>
+          <el-table-column prop="debit_amount" label="借方发生额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.debit_amount) }}</span>
+              <GtAmountCell :value="row.debit_amount" />
             </template>
           </el-table-column>
-          <el-table-column prop="credit_amount" label="贷方发生额" width="130" align="right" sortable>
+          <el-table-column prop="credit_amount" label="贷方发生额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span :style="{ fontWeight: row._isGroup ? '600' : 'normal' }">{{ fmtAmt(row.credit_amount) }}</span>
+              <GtAmountCell :value="row.credit_amount" />
             </template>
           </el-table-column>
-          <el-table-column prop="closing_balance" label="期末余额" width="130" align="right" sortable>
+          <el-table-column prop="closing_balance" label="期末余额" width="200" min-width="180" align="right" sortable>
             <template #default="{ row }">
-              <span v-if="!row._isGroup" class="gt-link" @click.stop="drillToAuxLedgerFromBalance(row)">{{ fmtAmt(row.closing_balance) }}</span>
-              <span v-else style="font-weight: 600">{{ fmtAmt(row.closing_balance) }}</span>
+              <GtAmountCell v-if="!row._isGroup" :value="row.closing_balance" :clickable="true" @click="drillToAuxLedgerFromBalance(row)" />
+              <GtAmountCell v-else :value="row.closing_balance" />
             </template>
           </el-table-column>
         </el-table>
         <div class="gt-pagination" v-if="!auxTreeMode && auxFlatTotal > auxPageSize">
           <el-pagination
             v-model:current-page="auxPage"
-            :page-size="auxPageSize"
+            v-model:page-size="auxPageSize"
+            :page-sizes="auxPageSizeOptions"
             :total="auxFlatTotal"
-            layout="prev, pager, next, total"
+            layout="sizes, total, prev, pager, next, jumper"
             size="small"
+            @size-change="onAuxPageSizeChange"
             @current-change="loadAuxBalancePage"
           />
         </div>
@@ -310,7 +361,9 @@
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} 序时账</el-tag>
         <el-button size="small" @click="loadLedger" :loading="loading">刷新</el-button>
-        <el-button size="small" type="success" plain @click="exportLedgerExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="exportLedgerExcel">导出Excel</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
         :data="ledgerDisplay"
@@ -320,33 +373,45 @@
         style="width: 100%"
         highlight-current-row
         @row-dblclick="drillToVoucher"
+        @row-contextmenu="onRowContextMenu"
+        @selection-change="onSelectionChange"
         :row-class-name="ledgerRowClass"
       >
-        <el-table-column prop="voucher_date" label="日期" width="100" />
+        <el-table-column type="selection" width="40" align="center" />
+        <el-table-column prop="voucher_date" label="日期" width="110">
+          <template #default="{ row }"><span class="gt-amt">{{ row.voucher_date }}</span></template>
+        </el-table-column>
         <el-table-column prop="voucher_no" label="凭证号" width="90">
           <template #default="{ row }">
-            <span v-if="row._type === 'normal'" class="gt-link" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
+            <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="debit_amount" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="140" align="right">
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
+        </el-table-column>
+        <el-table-column prop="balance" label="余额" width="200" min-width="180" align="right">
           <template #default="{ row }">
-            <span :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
+            <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
-        <el-table-column prop="counterpart_account" label="对方科目" width="120" show-overflow-tooltip />
       </el-table>
-      <div class="gt-pagination" v-if="ledgerHasMore || ledgerTotal > ledgerPageSize">
-        <el-button v-if="ledgerHasMore" @click="loadMoreLedger" :loading="ledgerLoadingMore" size="small" type="primary" plain>
-          加载更多
-        </el-button>
-        <el-tag size="small" type="info" style="margin-left: 8px">已加载 {{ ledgerItems.length }} / {{ ledgerTotal }} 条</el-tag>
+      <div class="gt-pagination" v-if="ledgerTotal > ledgerPageSize">
+        <el-pagination
+          v-model:current-page="ledgerPage"
+          v-model:page-size="ledgerPageSize"
+          :page-sizes="ledgerPageSizeOptions"
+          :total="ledgerTotal"
+          layout="sizes, total, prev, pager, next, jumper"
+          size="small"
+          @size-change="onLedgerPageSizeChange"
+          @current-change="onLedgerPageChange"
+        />
       </div>
     </template>
 
@@ -355,17 +420,33 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">凭证 {{ currentVoucher }}</el-tag>
+        <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
-      <el-table :data="voucherItems" border stripe size="small" :max-height="tableHeight" style="width: 100%">
-        <el-table-column prop="account_code" label="科目编号" width="120" />
+      <el-table
+        :data="voucherItems"
+        border
+        stripe
+        size="small"
+        :max-height="tableHeight"
+        style="width: 100%"
+        @selection-change="onSelectionChange"
+        @row-contextmenu="onRowContextMenu"
+      >
+        <el-table-column type="selection" width="40" align="center" />
+        <el-table-column prop="account_code" label="科目编号" width="120">
+          <template #default="{ row }"><span class="gt-amt">{{ row.account_code }}</span></template>
+        </el-table-column>
         <el-table-column prop="account_name" label="科目名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="debit_amount" label="借方" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="140" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
+        </el-table-column>
       </el-table>
     </template>
 
@@ -374,8 +455,11 @@
       <div class="gt-filter-row">
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} 辅助余额</el-tag>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
-      <el-table :data="auxBalanceItems" border stripe size="small" :max-height="tableHeight" style="width: 100%" @row-dblclick="drillToAuxLedger">
+      <el-table :data="auxBalanceItems" border stripe size="small" :max-height="tableHeight" style="width: 100%" @row-dblclick="drillToAuxLedger" @row-contextmenu="onRowContextMenu" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="40" align="center" />
         <el-table-column prop="aux_type" label="辅助类型" width="100" />
         <el-table-column prop="aux_code" label="编号" width="120" />
         <el-table-column prop="aux_name" label="名称" min-width="200" show-overflow-tooltip>
@@ -383,17 +467,17 @@
             <span class="gt-link">{{ row.aux_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="opening_balance" label="期初" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.opening_balance) }}</template>
+        <el-table-column prop="opening_balance" label="期初" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.opening_balance" /></template>
         </el-table-column>
-        <el-table-column prop="debit_amount" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="closing_balance" label="期末" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.closing_balance) }}</template>
+        <el-table-column prop="closing_balance" label="期末" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.closing_balance" /></template>
         </el-table-column>
       </el-table>
     </template>
@@ -404,6 +488,8 @@
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">{{ currentAccount }} / {{ currentAuxCode }} 辅助明细</el-tag>
         <el-button size="small" @click="loadAuxLedger" :loading="loading">刷新</el-button>
+        <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
         :data="auxLedgerDisplay"
@@ -413,25 +499,32 @@
         style="width: 100%"
         highlight-current-row
         @row-dblclick="drillToVoucher"
+        @row-contextmenu="onRowContextMenu"
+        @selection-change="onSelectionChange"
         :row-class-name="ledgerRowClass"
       >
-        <el-table-column prop="voucher_date" label="日期" width="100" />
+        <el-table-column type="selection" width="40" align="center" />
+        <el-table-column prop="voucher_date" label="日期" width="110">
+          <template #default="{ row }"><span class="gt-amt">{{ row.voucher_date }}</span></template>
+        </el-table-column>
         <el-table-column prop="voucher_no" label="凭证号" width="90">
           <template #default="{ row }">
-            <span v-if="row._type === 'normal'" class="gt-link" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
+            <span v-if="row._type === 'normal'" class="gt-link gt-amt" @click.stop="drillToVoucher(row)">{{ row.voucher_no }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="aux_name" label="辅助名称" width="150" show-overflow-tooltip />
-        <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="debit_amount" label="借方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.debit_amount) }}</template>
+        <el-table-column prop="summary" label="摘要" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
         </el-table-column>
-        <el-table-column prop="credit_amount" label="贷方" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmt(row.credit_amount) }}</template>
+        <el-table-column prop="debit_amount" label="借方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.debit_amount" /></template>
         </el-table-column>
-        <el-table-column prop="balance" label="余额" width="140" align="right">
+        <el-table-column prop="credit_amount" label="贷方" width="200" min-width="180" align="right">
+          <template #default="{ row }"><GtAmountCell :value="row.credit_amount" /></template>
+        </el-table-column>
+        <el-table-column prop="balance" label="余额" width="200" min-width="180" align="right">
           <template #default="{ row }">
-            <span :style="{ fontWeight: row._type !== 'normal' ? '600' : 'normal' }">{{ fmtAmt(row.balance) }}</span>
+            <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
       </el-table>
@@ -449,6 +542,27 @@
 
   </div>
 
+  <!-- ── 右键上下文菜单 ── -->
+  <Teleport to="body">
+    <div
+      v-if="contextMenu.visible"
+      class="gt-context-menu"
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+      @click="contextMenu.visible = false"
+    >
+      <div class="gt-context-menu__item" @click="onContextAction('drill')">
+        穿透到明细
+      </div>
+      <div class="gt-context-menu__item" @click="onContextAction('copy')">
+        复制选中行
+      </div>
+      <div class="gt-context-menu__item gt-context-menu__divider" />
+      <div class="gt-context-menu__item" @click="onContextAction('voucher')">
+        抽凭到底稿（开发中）
+      </div>
+    </div>
+  </Teleport>
+
   <!-- ── 智能导入弹窗 ── -->
   <el-dialog
     v-model="importDialogVisible"
@@ -456,10 +570,25 @@
     width="720px"
     append-to-body
     destroy-on-close
-    :close-on-click-modal="!previewing && !importing"
-    :close-on-press-escape="!previewing && !importing"
-    :show-close="!previewing && !importing"
+    :close-on-click-modal="!previewing"
+    :close-on-press-escape="!previewing"
+    :show-close="!previewing"
+    :before-close="onDialogBeforeClose"
   >
+    <!-- 进度条放在 dialog 顶部（header 下方，不被 v-loading 遮罩覆盖） -->
+    <template #header>
+      <span style="font-size: 16px; font-weight: 600">账套导入</span>
+      <el-progress
+        v-if="previewing || importing"
+        :percentage="Math.round(importProgressPct)"
+        :stroke-width="8"
+        :show-text="true"
+        :format="(pct: number) => pct < 100 ? `${pct}%` : '完成'"
+        :status="importProgressPct >= 100 ? 'success' : ''"
+        color="#4b2d77"
+        style="margin-top: 8px"
+      />
+    </template>
     <div v-loading="previewing || importing"
          :element-loading-text="previewing ? '正在解析文件，请稍候...' : importing ? '正在导入数据，请稍候...' : ''"
          element-loading-background="rgba(255,255,255,0.85)">
@@ -484,6 +613,43 @@
         <el-input-number v-model="importYear" :min="2000" :max="2099" size="small" style="width: 120px" />
         <span style="font-size: 12px; color: #999; margin-left: 8px">不填则自动从文件内容提取</span>
       </div>
+
+      <!-- P2-1.3 + P2: 耗时预估 + 关注事项 -->
+      <el-alert
+        v-if="importFiles.length > 0"
+        :type="importIsLargeFile ? 'warning' : 'info'"
+        :closable="false"
+        show-icon
+        style="margin-top: 12px"
+      >
+        <template #title>
+          <b>预计耗时 {{ importEstimateText }}</b>
+          <span v-if="importIsLargeFile"> · 建议上传后使用"关闭（后台继续）"</span>
+        </template>
+        <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+          <div>• 总大小 <b>{{ formatFileSize(importTotalBytes) }}</b>，共 {{ importFiles.length }} 个文件</div>
+          <div>• 耗时 = 上传 + 识别 + 入库（按网速 20Mbps 估算，实际可能有波动）</div>
+          <div>• 损益类科目期末结转后 opening/closing 为空属正常；辅助维度按单一类型聚合应等于主表</div>
+          <div v-if="importIsLargeFile">• 大文件（&gt;50MB）识别阶段较慢，前端若无响应 3-5 秒属正常</div>
+          <div>• 请确保：同一项目年度无进行中的导入作业，否则 submit 会被阻塞</div>
+        </div>
+      </el-alert>
+
+      <!-- FAQ 折叠面板 -->
+      <el-collapse style="margin-top: 12px">
+        <el-collapse-item title="常见问题" name="faq">
+          <div style="font-size: 12px; line-height: 1.8; color: #606266">
+            <p><b>Q：为什么损益类科目 opening_balance 为空？</b><br/>
+            A：会计准则规定损益类期末结转到本年利润，opening/closing 天然为 NULL，只有 debit/credit 有值。余额树形"有金额"过滤器已按此差异化处理。</p>
+            <p><b>Q：辅助维度为什么同一笔金额出现在多行？</b><br/>
+            A：一行多维度（如客户+项目+成本中心）在 tb_aux_balance 冗余存 N 条，每条记原行金额。按单一 aux_type 分组求和应 = 主表（这是正确的立体坐标存储）。</p>
+            <p><b>Q：点"关闭（后台继续）"后如何看进度？</b><br/>
+            A：顶栏"导入中"进度环会持续更新，鼠标悬停看阶段 + 剩余耗时；点击该图标跳回此 dialog。</p>
+            <p><b>Q：导入失败怎么办？</b><br/>
+            A：错误提示会区分"数据关联错误 / 字段格式错误 / 必填为空"等类型。点"导入历史"查看详细 diagnostics。</p>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
     </div>
 
     <!-- 步骤2：预览确认 -->
@@ -497,6 +663,32 @@
         :description="`仅解析前 ${previewResult?.preview_rows || 50} 行用于确认列映射，实际数据量以后台导入结果为准。`"
         show-icon
       />
+
+      <!-- P0-U1: 列映射完成率警告 -->
+      <el-alert
+        v-if="mappingCoverage.hasLow"
+        :type="mappingCoverage.isWarning ? 'warning' : 'info'"
+        :closable="false"
+        style="margin-bottom: 12px"
+        show-icon
+      >
+        <template #title>
+          <b>列映射完成率：{{ mappingCoverage.mapped }}/{{ mappingCoverage.total }} ({{ mappingCoverage.rate }}%)</b>
+          <span v-if="mappingCoverage.isWarning"> · 建议检查下方未识别列</span>
+        </template>
+        <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+          <div v-for="(info, idx) in mappingCoverage.sheets" :key="idx">
+            • {{ info.sheet }} ({{ info.data_type }}): {{ info.mapped }}/{{ info.total }} ({{ info.rate }}%)
+            <span v-if="info.unmapped.length > 0" style="color: #909399">
+              未识别 {{ info.unmapped.length }} 列：{{ info.unmapped.slice(0, 5).join('、') }}{{ info.unmapped.length > 5 ? '…' : '' }}
+            </span>
+          </div>
+          <div style="color: #909399; margin-top: 4px">
+            未识别列将不被写入四表，如有需要请在下方"列映射调整"中手动设置。
+          </div>
+        </div>
+      </el-alert>
+
       <el-descriptions :column="2" size="small" border style="margin-bottom: 12px">
         <el-descriptions-item label="识别年度">{{ previewResult?.year }}</el-descriptions-item>
         <el-descriptions-item label="余额表">{{ previewResult?.summary?.balance || 0 }} 行</el-descriptions-item>
@@ -588,6 +780,28 @@
         container-style="text-align: center; padding: 30px 0"
         validation-panel-style="margin-top: 16px; text-align: left"
       />
+
+      <!-- P3-U3: 导入成功后的下一步引导卡片 -->
+      <div class="gt-completion-guide">
+        <div class="guide-title">下一步操作建议</div>
+        <div class="guide-cards">
+          <div class="guide-card" @click="onGuideViewTree">
+            <div class="guide-card-icon">📊</div>
+            <div class="guide-card-title">查看余额树形</div>
+            <div class="guide-card-desc">按维度核对科目余额是否符合原表</div>
+          </div>
+          <div class="guide-card" @click="onGuideValidate">
+            <div class="guide-card-icon">✓</div>
+            <div class="guide-card-title">运行数据一致性校验</div>
+            <div class="guide-card-desc">检查四表之间的借贷平衡与辅助关系</div>
+          </div>
+          <div class="guide-card" @click="onGuideHistory">
+            <div class="guide-card-icon">📜</div>
+            <div class="guide-card-title">查看导入历史</div>
+            <div class="guide-card-desc">查看完整的 diagnostics 和处理记录</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     </div><!-- v-loading wrapper -->
@@ -601,50 +815,127 @@
       <el-button v-if="importStep === 'preview'" type="primary" :loading="importing" @click="doImport">
         确认导入
       </el-button>
-      <el-button v-if="importStep === 'importing'" @click="importDialogVisible = false">关闭（后台继续）</el-button>
+      <el-button v-if="importStep === 'importing'" @click="onMoveToBackground">关闭（后台继续）</el-button>
       <el-button v-if="importStep === 'done'" type="primary" @click="onImportDone">完成</el-button>
     </template>
   </el-dialog>
 
   <!-- 数据校验弹窗 -->
-  <el-dialog v-model="validateDialogVisible" title="数据一致性校验" width="700px" append-to-body>
+  <el-dialog v-model="validateDialogVisible" title="数据一致性校验" width="650px" append-to-body>
     <div v-loading="validating" element-loading-text="正在校验...">
       <div v-if="validateResult">
-        <el-descriptions :column="3" border size="small" style="margin-bottom: 12px">
-          <el-descriptions-item label="余额表科目">{{ validateResult.summary?.balance_count || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="辅助核算科目">{{ validateResult.summary?.aux_account_count || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="序时账科目">{{ validateResult.summary?.ledger_account_count || 0 }}</el-descriptions-item>
-        </el-descriptions>
-
-        <div v-for="(f, idx) in validateResult.findings" :key="idx"
-          style="margin-bottom: 6px; font-size: 13px; display: flex; align-items: flex-start; gap: 6px">
-          <el-tag :type="f.level === 'error' ? 'danger' : f.level === 'warning' ? 'warning' : 'success'" size="small" style="flex-shrink: 0">
-            {{ f.category }}
-          </el-tag>
-          <span :style="{ color: f.level === 'error' ? '#f56c6c' : f.level === 'warning' ? '#e6a23c' : '#67c23a' }">
-            {{ f.message }}
-          </span>
+        <!-- 概览卡片 -->
+        <div style="display: flex; gap: 12px; margin-bottom: 16px">
+          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
+            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.balance_count || 0 }}</div>
+            <div style="font-size: 12px; color: #909399">余额表科目</div>
+          </div>
+          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
+            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.aux_account_count || 0 }}</div>
+            <div style="font-size: 12px; color: #909399">辅助核算科目</div>
+          </div>
+          <div style="flex: 1; padding: 12px; background: #f8f7fc; border-radius: 8px; text-align: center">
+            <div style="font-size: 20px; font-weight: 600; color: #4b2d77">{{ validateResult.summary?.ledger_account_count || 0 }}</div>
+            <div style="font-size: 12px; color: #909399">序时账科目</div>
+          </div>
         </div>
 
-        <div v-if="!validateResult.findings?.length" style="color: #999; text-align: center; padding: 20px">
-          暂无校验结果
+        <!-- 校验结果 -->
+        <div v-for="(f, idx) in validateResult.findings" :key="idx"
+          style="margin-bottom: 8px; padding: 8px 12px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px"
+          :style="{
+            background: f.level === 'error' ? '#fef0f0' : f.level === 'warning' ? '#fdf6ec' : '#f0f9eb',
+            border: `1px solid ${f.level === 'error' ? '#fbc4c4' : f.level === 'warning' ? '#f5dab1' : '#c2e7b0'}`,
+          }"
+        >
+          <span style="font-size: 16px; flex-shrink: 0">{{ f.level === 'error' ? '❌' : f.level === 'warning' ? '⚠️' : '✅' }}</span>
+          <span style="font-weight: 500; min-width: 120px; flex-shrink: 0; color: #606266">{{ f.category }}</span>
+          <span style="color: #303133">{{ f.message }}</span>
+        </div>
+
+        <!-- 全部通过 -->
+        <div v-if="validateResult.summary?.errors === 0 && validateResult.summary?.warnings === 0"
+          style="text-align: center; padding: 20px; color: #67c23a; font-size: 15px; font-weight: 500">
+          🎉 数据一致性校验全部通过
         </div>
       </div>
     </div>
-    <template #footer>
-      <el-button @click="validateDialogVisible = false">关闭</el-button>
-    </template>
+  </el-dialog>
+
+  <!-- ── 账表数据管理弹窗 ── -->
+  <LedgerDataManager
+    v-if="projectId"
+    v-model="dataManagerVisible"
+    :project-id="projectId"
+    @data-changed="onDataChanged"
+    @request-incremental-upload="onIncrementalUpload"
+  />
+
+  <!-- ── 导入历史弹窗 ── -->
+  <el-dialog v-model="importHistoryVisible" title="导入历史" width="900px" append-to-body destroy-on-close>
+    <div v-loading="importHistoryLoading">
+      <el-tabs>
+        <el-tab-pane label="导入作业">
+          <el-empty v-if="importHistoryJobs.length === 0" description="暂无导入记录" />
+          <el-table v-else :data="importHistoryJobs" border size="small" style="width: 100%">
+            <el-table-column prop="status" label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag :type="row.status === IMPORT_JOB_STATUS.COMPLETED ? 'success' : row.status === IMPORT_JOB_STATUS.FAILED ? 'danger' : row.status === IMPORT_JOB_STATUS.RUNNING ? 'warning' : 'info'" size="small">{{ row.status }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="progress_pct" label="进度" width="140">
+              <template #default="{ row }">
+                <el-progress :percentage="Math.max(0, Math.min(row.progress_pct || 0, 100))" :stroke-width="14" />
+              </template>
+            </el-table-column>
+            <el-table-column prop="progress_message" label="阶段" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="created_by_name" label="导入人" width="90" />
+            <el-table-column prop="created_at" label="时间" width="140">
+              <template #default="{ row }"><span class="gt-amt">{{ row.created_at ? new Date(row.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' }}</span></template>
+            </el-table-column>
+            <el-table-column prop="error_message" label="错误" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span v-if="row.error_message" style="color: #f56c6c">{{ row.error_message }}</span>
+                <span v-else style="color: #999">—</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane label="数据集版本">
+          <el-empty v-if="importHistoryDatasets.length === 0" description="暂无数据集" />
+          <el-table v-else :data="importHistoryDatasets" border size="small" style="width: 100%">
+            <el-table-column prop="status" label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'active' ? 'success' : row.status === 'failed' ? 'danger' : 'info'" size="small">{{ row.status }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="id" label="ID" width="100" show-overflow-tooltip>
+              <template #default="{ row }"><span class="gt-amt">{{ row.id?.slice(0, 8) }}</span></template>
+            </el-table-column>
+            <el-table-column prop="record_summary" label="数据量" min-width="260">
+              <template #default="{ row }">{{ formatRecordSummary(row.record_summary) }}</template>
+            </el-table-column>
+            <el-table-column prop="activated_at" label="激活时间" width="140">
+              <template #default="{ row }"><span class="gt-amt">{{ row.activated_at ? new Date(row.activated_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' }}</span></template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Upload, Loading, Warning } from '@element-plus/icons-vue'
-import { ElMessage, ElNotification } from 'element-plus'
+import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { ledger as P_ledger, projects as P_proj, materiality as P_mat } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
+import { IMPORT_JOB_STATUS } from '@/constants/statusEnum'
 import ImportCompletionSummary from '@/components/ImportCompletionSummary.vue'
+import LedgerDataManager from '@/components/ledger-import/LedgerDataManager.vue'
 import { buildImportFormData } from '@/utils/importFormData'
 import { applyImportPreviewSuccess, buildImportPreviewFormData, buildImportPreviewUrl, resolveImportPreviewSuccess } from '@/utils/importPreview'
 import { buildImportJobUrl, fetchImportQueueStatus } from '@/utils/importJobRequest'
@@ -653,9 +944,14 @@ import { resolveImportCompletionToast, resolveImportFailureMessage, shouldFinish
 import { runImportPollingFlow } from '@/utils/useImportPollingFlow'
 import { useImportValidation } from '@/utils/useImportValidation'
 import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
+import { usePenetrate } from '@/composables/usePenetrate'
+import { useFullscreen } from '@/composables/useFullscreen'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
+const penetrate = usePenetrate()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => {
   const q = Number(route.query.year)
@@ -683,7 +979,7 @@ const availableYears = ref<number[]>([])
 async function loadAvailableYears() {
   if (!projectId.value) return
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/ledger/years`)
+    const data = await api.get(P_ledger.years(projectId.value))
     const result = data
     availableYears.value = result?.years ?? []
   } catch {
@@ -693,7 +989,7 @@ async function loadAvailableYears() {
 
 async function loadProjectList() {
   try {
-    const data = await api.get('/api/projects')
+    const data = await api.get(P_proj.list)
     const list = data ?? []
     projectList.value = Array.isArray(list) ? list : []
   } catch {
@@ -704,7 +1000,7 @@ async function loadProjectList() {
 async function loadCurrentProject() {
   if (!projectId.value) return
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/wizard`)
+    const data = await api.get(P_proj.wizard(projectId.value))
     const ws = data
     const basicInfo = ws?.steps?.basic_info?.data || {}
     currentProject.value = {
@@ -731,7 +1027,7 @@ async function loadProjectMaterialityAndPeriod() {
   if (!projectId.value) return
   try {
     // 获取项目基本信息（含 audit_period_end）
-    const proj = await api.get(`/api/projects/${projectId.value}`)
+    const proj = await api.get(P_proj.detail(projectId.value))
     if (proj?.audit_period_end) {
       auditPeriodEnd.value = proj.audit_period_end
     }
@@ -739,7 +1035,7 @@ async function loadProjectMaterialityAndPeriod() {
   try {
     // 获取重要性水平（含 performance_materiality）
     const mat = await api.get(
-      `/api/projects/${projectId.value}/materiality?year=${selectedYear.value}`
+      `${P_mat.get(projectId.value)}?year=${selectedYear.value}`
     )
     if (mat?.performance_materiality) {
       performanceMateriality.value = Number(mat.performance_materiality) || 0
@@ -763,14 +1059,85 @@ function goToImport() {
 }
 
 function goToImportHistory() {
-  router.push({
-    path: `/projects/${projectId.value}/ledger/import-history`,
-    query: { year: String(selectedYear.value) },
-  })
+  importHistoryVisible.value = true
+  loadImportHistory()
 }
 
 // ── 智能导入 ──
 const importDialogVisible = ref(false)
+
+// P2-1.3: 耗时预估 computed
+const importTotalBytes = computed(() =>
+  importFiles.value.reduce((sum, f) => sum + (f.size || 0), 0)
+)
+const importTotalMB = computed(() => importTotalBytes.value / (1024 * 1024))
+const importIsLargeFile = computed(() => importTotalMB.value > 50)
+const importEstimateSeconds = computed(() => {
+  const mb = importTotalMB.value
+  const uploadSec = Math.round(mb / 2.5)  // 20Mbps = 2.5 MB/s
+  let processSec: number
+  if (mb < 1) processSec = 10
+  else if (mb < 5) processSec = Math.round(mb * 11)
+  else if (mb < 20) processSec = Math.round(mb * 12)
+  else if (mb < 100) processSec = Math.round(mb * 14)
+  else processSec = Math.round(mb * 16)
+  return uploadSec + processSec
+})
+const importEstimateText = computed(() => {
+  const s = importEstimateSeconds.value
+  if (s < 60) return `约 ${s} 秒`
+  if (s < 600) return `约 ${Math.round(s / 60)} 分钟`
+  return `约 ${Math.round(s / 60)} 分钟（强烈建议后台继续）`
+})
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// P0-U1: 列映射完成率汇总（preview 后用于警告低质量映射）
+interface SheetMappingInfo {
+  sheet: string
+  data_type: string
+  mapped: number
+  total: number
+  rate: number
+  unmapped: string[]
+}
+const mappingCoverage = computed(() => {
+  const sheets: SheetMappingInfo[] = []
+  let totalMapped = 0
+  let totalHeaders = 0
+  for (const d of (previewResult.value?.diagnostics || [])) {
+    const headers: string[] = d.headers || d.raw_headers || []
+    const mapping = d.column_mapping || {}
+    const mapped = Object.keys(mapping).length
+    const total = headers.length
+    const unmapped = headers.filter((h: string) => !mapping[h])
+    sheets.push({
+      sheet: `${d.file || ''} / ${d.sheet || ''}`,
+      data_type: d.data_type || '未知',
+      mapped,
+      total,
+      rate: total > 0 ? Math.round(mapped * 100 / total) : 0,
+      unmapped,
+    })
+    totalMapped += mapped
+    totalHeaders += total
+  }
+  const rate = totalHeaders > 0 ? Math.round(totalMapped * 100 / totalHeaders) : 0
+  // 任一 sheet 低于 70% 或整体低于 70% → 触发警告
+  const hasLow = sheets.some((s) => s.rate < 70) || rate < 70
+  return {
+    sheets,
+    mapped: totalMapped,
+    total: totalHeaders,
+    rate,
+    hasLow,
+    isWarning: hasLow,
+  }
+})
 
 // ── 数据校验 ──
 const validateDialogVisible = ref(false)
@@ -783,16 +1150,70 @@ async function runValidation() {
   validateResult.value = null
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/validate?year=${selectedYear.value}`
+      `${P_ledger.validate(projectId.value)}?year=${selectedYear.value}`
     )
     validateResult.value = data
-  } catch {
-    ElMessage.error('校验失败')
+  } catch (e: any) {
+    handleApiError(e, '校验')
   } finally {
     validating.value = false
   }
 }
 const importStep = ref<'upload' | 'preview' | 'importing' | 'done'>('upload')
+
+// 账表数据管理弹窗
+const dataManagerVisible = ref(false)
+
+// 导入历史弹窗
+const importHistoryVisible = ref(false)
+const importHistoryLoading = ref(false)
+const importHistoryJobs = ref<any[]>([])
+const importHistoryDatasets = ref<any[]>([])
+
+async function loadImportHistory() {
+  importHistoryLoading.value = true
+  try {
+    const [jobsData, datasetsData] = await Promise.allSettled([
+      api.get(P_ledger.import.jobs(projectId.value), { params: { year: year.value } }),
+      api.get(P_ledger.import.datasets(projectId.value), { params: { year: year.value } }),
+    ])
+    importHistoryJobs.value = jobsData.status === 'fulfilled' ? (jobsData.value ?? []) : []
+    importHistoryDatasets.value = datasetsData.status === 'fulfilled' ? (datasetsData.value ?? []) : []
+  } finally {
+    importHistoryLoading.value = false
+  }
+}
+
+function formatRecordSummary(summary: Record<string, unknown> | null | undefined) {
+  if (!summary) return '—'
+  const parts: string[] = []
+  if (summary.tb_balance) parts.push(`余额 ${summary.tb_balance}`)
+  if (summary.tb_aux_balance) parts.push(`辅助余额 ${summary.tb_aux_balance}`)
+  if (summary.tb_ledger) parts.push(`序时账 ${summary.tb_ledger}`)
+  if (summary.tb_aux_ledger) parts.push(`辅助明细 ${summary.tb_aux_ledger}`)
+  return parts.length > 0 ? parts.join(' / ') : '—'
+}
+
+function onDataChanged() {
+  // 数据被删除/追加后刷新页面数据
+  loadBalance()
+  loadAuxBalance()
+}
+
+function onIncrementalUpload(year: number) {
+  // 用户在数据管理弹窗选了增量追加
+  dataManagerVisible.value = false
+  importDialogVisible.value = true
+  importStep.value = 'upload'
+  importFiles.value = []
+  importYear.value = year
+  ElNotification({
+    title: '增量追加模式',
+    message: `请上传 ${year} 年的序时账文件，系统将自动检测并只追加新月份`,
+    type: 'info',
+    duration: 5000,
+  })
+}
 const importFiles = ref<File[]>([])
 const importYear = ref<number | undefined>(undefined)
 const previewResult = ref<any>(null)
@@ -826,6 +1247,7 @@ const importedResult = ref<LedgerImportResultPayload | null>(null)
 const uploadToken = ref('')
 const previewing = ref(false)
 const importing = ref(false)
+const importProgressPct = ref(0)
 const uploadRef = ref()
 
 const DATA_TYPE_LABELS: Record<string, string> = {
@@ -898,6 +1320,9 @@ function initColumnMapping() {
 const bgImportPolling = ref(false)
 const bgImportMessage = ref('')
 
+// 是否有正在进行的导入（用于空状态提示）
+const isImportActive = ref(false)
+
 // ── 导入状态后台轮询（需求 22.1、22.2） ──
 let _importStatusTimer: ReturnType<typeof setInterval> | null = null
 let _importStatusPollCount = 0
@@ -922,7 +1347,7 @@ function startImportStatusPolling(jobId: string) {
       // 实际后端路由：GET /api/projects/{project_id}/ledger-import/jobs/{job_id}
       const status = await getImportJob(projectId.value, jobId)
       const jobStatus = status?.status
-      if (jobStatus === 'completed') {
+      if (jobStatus === IMPORT_JOB_STATUS.COMPLETED) {
         stopImportStatusPolling()
         ElNotification({
           title: '导入完成',
@@ -960,7 +1385,7 @@ function stopImportStatusPolling() {
   _importStatusPollCount = 0
 }
 
-function openImportDialog() {
+function openImportDialog(options: { autoRecoverActiveJob?: boolean } = {}) {
   importDialogVisible.value = true
   importStep.value = 'upload'
   importFiles.value = []
@@ -973,10 +1398,112 @@ function openImportDialog() {
   bgImportPolling.value = false
   bgImportMessage.value = ''
   uploadRef.value?.clearFiles?.()
+  // P1-2.1: 检查活跃 job
+  // - 顶栏跳转回来（autoRecoverActiveJob=true）：直接静默跳 importing step
+  // - 用户主动开新导入（默认）：弹对话框让用户选择处理方式
+  if (options.autoRecoverActiveJob) {
+    void recoverActiveImportJobSilent()
+  } else {
+    void checkActiveJobBeforeUpload()
+  }
+}
+
+/**
+ * 静默恢复进度（顶栏跳转场景）：
+ * - 有活跃 job：跳 importing step 显示进度
+ * - 最近 5 分钟内 failed：提示错误
+ * - 其他：保持 upload step
+ */
+async function recoverActiveImportJobSilent() {
+  if (!projectId.value) return
+  try {
+    const resp: any = await api.get(
+      P.ledger.import.activeJob(projectId.value),
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (resp?.status === 'processing' && resp.job_id) {
+      importStep.value = 'importing'
+      bgImportPolling.value = true
+      bgImportMessage.value = `[${resp.progress ?? 0}%] ${resp.message || '后台导入中...'}（从后台恢复）`
+      startImportStatusPolling(resp.job_id)
+    } else if (resp?.status === 'failed' && resp.job_id) {
+      ElMessage.error({
+        message: `最近一次导入失败：${resp.message || '未知错误'}`,
+        duration: 6000,
+      })
+    }
+    // completed/canceled 不提示（顶栏 pollImportQueue 已经弹过 toast）
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * 上传前检测是否已有活跃 job。
+ * 修复 P0：弹确认框让用户选，而非强制跳进度视图——
+ * - 查看进度：跳 importing step 追踪旧 job
+ * - 取消旧作业：先 cancel 再留在 upload step 让用户重新提交
+ * - 稍后：仅提示，保持 upload step，用户自行等待
+ */
+async function checkActiveJobBeforeUpload() {
+  if (!projectId.value) return
+  try {
+    const resp: any = await api.get(
+      P.ledger.import.activeJob(projectId.value),
+      { validateStatus: (s: number) => s < 600 },
+    )
+    if (resp?.status !== 'processing' || !resp.job_id) return
+
+    const pct = resp.progress ?? 0
+    const phase = resp.phase || 'writing'
+    const activeJobId = resp.job_id
+
+    try {
+      const result: any = await ElMessageBox({
+        title: '检测到导入作业进行中',
+        message: `当前项目已有导入作业进行中（${phase} ${pct}%）。请选择如何处理：`,
+        showCancelButton: true,
+        showConfirmButton: true,
+        distinguishCancelAndClose: true,
+        confirmButtonText: '查看进度',
+        cancelButtonText: '取消旧作业并新建',
+        type: 'warning',
+      })
+      // Element Plus MessageBoxData 类型是 `{value, action} & Action` 交叉类型，
+      // TS 塌陷为 never，需 any 断言；resolve 时 result 可能是 'confirm' 字符串
+      // 或 {action:'confirm', value}，兼容处理
+      const action = typeof result === 'string' ? result : result?.action
+      if (action === 'confirm') {
+        // 查看进度
+        importStep.value = 'importing'
+        bgImportPolling.value = true
+        bgImportMessage.value = `[${pct}%] ${resp.message || '后台导入中...'}`
+        startImportStatusPolling(activeJobId)
+      }
+    } catch (err: any) {
+      // reject 时 err 通常是 'cancel' | 'close' 字符串（Element Plus 默认行为）
+      const action = typeof err === 'string' ? err : err?.action
+      if (action === 'cancel') {
+        // 用户选"取消旧作业"
+        try {
+          await api.post(
+            P.ledger.import.jobCancel(projectId.value, activeJobId),
+          )
+          ElMessage.success('旧作业已取消，可开始新导入')
+        } catch (e: any) {
+          handleApiError(e, '取消旧作业')
+        }
+      }
+      // action === 'close'：稍后 → 什么都不做
+    }
+  } catch {
+    // 网络异常不影响 dialog 正常打开
+  }
 }
 
 function openImportDialogFromRoute() {
-  openImportDialog()
+  // 顶栏跳回时静默恢复进度，不弹"请选择"对话框打扰用户
+  openImportDialog({ autoRecoverActiveJob: true })
   const nextQuery = { ...route.query }
   delete nextQuery.import
   router.replace({ path: route.path, query: nextQuery })
@@ -992,14 +1519,22 @@ function onImportFileChange(file: any) {
 async function doPreview() {
   if (!importFiles.value.length) return
   previewing.value = true
+  importProgressPct.value = 0
+  const progressTimer = setInterval(() => {
+    if (importProgressPct.value < 90) {
+      importProgressPct.value += Math.random() * 12 + 3
+      if (importProgressPct.value > 90) importProgressPct.value = 90
+    }
+  }, 400)
   try {
     const formData = buildImportPreviewFormData(importFiles.value)
     const url = buildImportPreviewUrl({
-      basePath: `/api/projects/${projectId.value}/ledger/smart-preview`,
+      basePath: P_ledger.smartPreview(projectId.value),
       year: importYear.value,
       previewRows: 50,
     })
     const data = await smartPreviewLedgerImport(projectId.value, url, formData)
+    importProgressPct.value = 100
     const previewSuccess = resolveImportPreviewSuccess({
       result: data,
       nextStage: 'preview' as const,
@@ -1020,11 +1555,12 @@ async function doPreview() {
       },
     })
   } catch (e: any) {
-    // 带 HTTP 响应的错误已由 http 拦截器统一提示（含 500），避免再弹出第二条英文 axios 文案
     if (!e?.response) {
-      ElMessage.error(e?.message || '解析失败')
+      handleApiError(e, '解析')
     }
   } finally {
+    clearInterval(progressTimer)
+    importProgressPct.value = 0
     previewing.value = false
   }
 }
@@ -1047,7 +1583,7 @@ async function doImport() {
       mappingPayload: mappingParam,
     })
     const url = buildImportJobUrl({
-      basePath: `/api/projects/${projectId.value}/ledger/smart-import`,
+      basePath: P_ledger.smartImport(projectId.value),
       year: yr,
       uploadToken: uploadToken.value,
     })
@@ -1118,13 +1654,92 @@ async function doImport() {
       errValidation,
       e?.response?.data?.detail || e?.message || '导入失败',
     )
-    ElMessage.error(errMsg)
+    handleApiError(e, '操作')
     stopImportStatusPolling()
     importStep.value = 'preview'
+    // P1-U4: 失败后主动询问下一步（不强推，关闭即视为"留在预览"自行决定）
+    _showFailureActionPrompt(errMsg)
   } finally {
     importing.value = false
     bgImportPolling.value = false
   }
+}
+
+/** flag：避免 before-close 钩子和 onMoveToBackground 重复弹 toast */
+const _closingAsBackground = ref(false)
+/** 组件销毁时清理未触发的弹框计时器 */
+let _completionPromptTimer: number | null = null
+
+/**
+ * P1-U4: 失败后提示用户下一步操作。
+ * 不阻断用户在 preview 继续手动调映射后"确认导入"重试，也提供"导入历史"入口查看完整 diagnostics。
+ */
+function _showFailureActionPrompt(errMsg: string) {
+  ElMessageBox({
+    title: '导入失败',
+    message: `${errMsg.slice(0, 300)}\n\n可选操作：\n• 返回预览调整列映射后重新导入\n• 查看导入历史查看完整诊断`,
+    showCancelButton: true,
+    showConfirmButton: true,
+    distinguishCancelAndClose: true,
+    confirmButtonText: '返回预览重试',
+    cancelButtonText: '查看导入历史',
+    type: 'error',
+  }).catch((err: any) => {
+    const action = typeof err === 'string' ? err : err?.action
+    if (action === 'cancel') {
+      goToImportHistory()
+    }
+    // close: 什么都不做
+  })
+}
+
+function onMoveToBackground() {
+  // worker 后端继续跑，关闭 dialog；顶栏进度环持续追踪
+  // 设 flag 避免 before-close 钩子重复弹 toast
+  _closingAsBackground.value = true
+  importDialogVisible.value = false
+  ElMessage.success({
+    message: '已转入后台，顶栏"导入中"进度环可追踪进度',
+    duration: 4000,
+  })
+}
+
+// P3-U3: 导入成功引导卡片的 3 个入口
+function onGuideViewTree() {
+  importDialogVisible.value = false
+  _auxBalanceLoadedKey.value = ''
+  loadAvailableYears()
+  loadBalance()
+  dataManagerVisible.value = true  // 打开余额树形 Tab
+}
+function onGuideValidate() {
+  importDialogVisible.value = false
+  validateDialogVisible.value = true
+  runValidation()
+}
+function onGuideHistory() {
+  importDialogVisible.value = false
+  goToImportHistory()
+}
+
+/**
+ * dialog 关闭前钩子：importing 态下关闭视同"放后台继续"，弹 toast 引导。
+ * 若由 onMoveToBackground 主动触发则跳过 toast（那边已经弹过）。
+ */
+function onDialogBeforeClose(done: () => void) {
+  if (_closingAsBackground.value) {
+    _closingAsBackground.value = false
+    done()
+    return
+  }
+  if (importStep.value === 'importing' && !importing.value) {
+    // × / Esc 关闭 importing dialog → 视同放后台
+    ElMessage.success({
+      message: '已转入后台，顶栏"导入中"进度环可追踪进度',
+      duration: 4000,
+    })
+  }
+  done()
 }
 
 function onImportDone() {
@@ -1137,6 +1752,26 @@ function onImportDone() {
   if (balanceTab.value === 'aux') {
     loadAllAuxBalance()
   }
+  // P2-5.2: 询问是否立即查看树形视图验证数据
+  // 延迟 350ms（元素 dialog 关闭动画 ~300ms）再弹确认框，避免两层 dialog 叠加
+  _completionPromptTimer = window.setTimeout(() => {
+    _completionPromptTimer = null
+    if (!importDialogVisible.value && projectId.value) {
+      ElMessageBox.confirm(
+        '账套导入完成。是否立即打开"账表数据管理 · 余额树形"验证数据正确性？',
+        '导入完成',
+        {
+          confirmButtonText: '打开树形视图',
+          cancelButtonText: '稍后',
+          type: 'success',
+        },
+      ).then(() => {
+        dataManagerVisible.value = true
+      }).catch(() => {
+        // 用户选稍后，什么都不做
+      })
+    }
+  }, 350)
 }
 
 // 路由变化时重新加载（不在初始化时触发，由 onMounted 处理）
@@ -1163,6 +1798,67 @@ watch(() => route.query.import, (val) => {
 const loading = ref(false)
 const tableHeight = ref(Math.max(400, window.innerHeight - 240))
 
+// ── 全屏模式 ──
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+const penetrationRef = ref<HTMLElement | null>(null)
+
+// 全屏切换时调整表格高度
+watch(isFullscreen, (val) => {
+  if (val) {
+    tableHeight.value = window.innerHeight - 140
+  } else {
+    tableHeight.value = Math.max(400, window.innerHeight - 240)
+  }
+})
+
+// ── 行选择 ──
+const selectedRows = ref<any[]>([])
+
+function onSelectionChange(rows: any[]) {
+  selectedRows.value = rows
+}
+
+// ── 右键菜单 ──
+const contextMenu = ref({ visible: false, x: 0, y: 0, row: null as any })
+
+function onRowContextMenu(row: any, _col: any, event: MouseEvent) {
+  event.preventDefault()
+  contextMenu.value = { visible: true, x: event.clientX, y: event.clientY, row }
+  // 点击其他地方关闭
+  const close = () => { contextMenu.value.visible = false; document.removeEventListener('click', close) }
+  setTimeout(() => document.addEventListener('click', close), 0)
+}
+
+function onContextAction(action: string) {
+  const row = contextMenu.value.row
+  if (!row) return
+  if (action === 'drill') {
+    if (currentLevel.value === 'balance') drillToLedger(row)
+    else if (currentLevel.value === 'ledger') drillToVoucher(row)
+  } else if (action === 'copy') {
+    copySelectedRows(row)
+  } else if (action === 'voucher') {
+    // TODO: 抽凭联动到底稿（后续实现）
+  }
+}
+
+/** 复制选中行到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
+function copySelectedRows(fallbackRow?: any) {
+  const rows = selectedRows.value.length > 0 ? selectedRows.value : (fallbackRow ? [fallbackRow] : [])
+  if (rows.length === 0) return
+  // 提取可见字段（排除内部字段）
+  const excludeKeys = new Set(['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra'])
+  const keys = Object.keys(rows[0]).filter(k => !excludeKeys.has(k) && !k.startsWith('_'))
+  const lines = rows.map(r => keys.map(k => {
+    const v = r[k]
+    return v == null ? '' : String(v)
+  }).join('\t'))
+  const text = lines.join('\n')
+  navigator.clipboard?.writeText(text).then(() => {
+    ElMessage.success(`已复制 ${rows.length} 行`)
+  })
+}
+
 // ── 导航状态 ──
 type Level = 'balance' | 'ledger' | 'voucher' | 'aux_balance' | 'aux_ledger'
 const currentLevel = ref<Level>('balance')
@@ -1179,7 +1875,8 @@ const balanceTab = ref<'account' | 'aux'>('account')
 const auxSearchKeyword = ref('')
 const auxFilter = ref('all')
 const auxPage = ref(1)
-const auxPageSize = 100
+const auxPageSize = ref(100)
+const auxPageSizeOptions = [50, 100, 200, 500]
 const dateRange = ref<string[] | null>(null)
 
 interface Crumb { label: string; level: Level; account?: string; voucher?: string; auxType?: string; auxCode?: string }
@@ -1190,12 +1887,8 @@ const balanceData = ref<any[]>([])
 const ledgerItems = ref<any[]>([])
 const ledgerTotal = ref(0)
 const ledgerPage = ref(1)
-const ledgerPageSize = 200
-
-// ── 游标分页状态 ──
-const ledgerCursor = ref<string | null>(null)
-const ledgerHasMore = ref(false)
-const ledgerLoadingMore = ref(false)
+const ledgerPageSize = ref(100)
+const ledgerPageSizeOptions = [50, 100, 200, 500]
 
 /** 序时账增强显示：期初行 + 每笔余额 + 月小计行 */
 const ledgerDisplay = computed(() => {
@@ -1389,11 +2082,16 @@ const filteredBalance = computed(() => {
   } else if (f === 'both') {
     rows = rows.filter(r => num(r.opening_balance) !== 0 && num(r.closing_balance) !== 0)
   } else if (f === 'all_nonzero') {
-    rows = rows.filter(r =>
-      num(r.opening_balance) !== 0 &&
-      (num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0) &&
-      num(r.closing_balance) !== 0
-    )
+    // 损益类科目期末结转后 opening/closing 天然为 0，只判断有变动
+    rows = rows.filter(r => {
+      const hasMovement = num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0
+      const code = String(r.account_code || '')
+      const isIncomeExpense = code.startsWith('5') || code.startsWith('6')
+      if (isIncomeExpense) {
+        return hasMovement
+      }
+      return num(r.opening_balance) !== 0 && hasMovement && num(r.closing_balance) !== 0
+    })
   } else if (f === 'changed') {
     rows = rows.filter(r => num(r.debit_amount) !== 0 || num(r.credit_amount) !== 0)
   } else if (f === 'debit') {
@@ -1526,68 +2224,74 @@ async function loadBalance() {
   }
   loading.value = true
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/ledger/balance`, {
+    const data = await api.get(P_ledger.balance(projectId.value), {
       params: { year: year.value },
     })
     balanceData.value = data ?? []
-    // debug log removed for production
+    // 数据为空时检测是否有正在进行的导入
+    if (balanceData.value.length === 0) {
+      checkImportActive()
+    } else {
+      isImportActive.value = false
+    }
   } catch (e) {
     console.error('[Ledger] loadBalance failed:', e)
     balanceData.value = []
+    checkImportActive()
   }
   finally { loading.value = false }
+}
+
+/** 检测是否有正在进行的导入任务 */
+async function checkImportActive() {
+  try {
+    const resp: any = await api.get(
+      P.ledger.import.activeJob(projectId.value),
+    )
+    isImportActive.value = resp?.status === 'processing' || resp?.status === 'queued'
+  } catch {
+    isImportActive.value = false
+  }
 }
 
 async function loadLedger() {
   loading.value = true
   try {
-    const params: any = { year: year.value, limit: ledgerPageSize }
+    const params: any = { year: year.value, page: ledgerPage.value, page_size: ledgerPageSize.value }
     if (dateRange.value?.length === 2) {
       params.date_from = dateRange.value[0]
       params.date_to = dateRange.value[1]
     }
     // 首次加载时从后端获取期初余额（确保 running_balance 准确）
     const [data, obData] = await Promise.all([
-      api.get(`/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }),
-      api.get(`/api/projects/${projectId.value}/ledger/opening-balance/${encodeURIComponent(currentAccount.value)}`, { params: { year: year.value } }),
+      api.get(P_ledger.entries(projectId.value, currentAccount.value), { params }),
+      api.get(P_ledger.openingBalance(projectId.value, currentAccount.value), { params: { year: year.value } }),
     ])
     const result = data
     const obResult = obData
     currentAccountOpening.value = num(obResult?.opening_balance)
     ledgerItems.value = result.items ?? result ?? []
     ledgerTotal.value = result.total ?? ledgerItems.value.length
-    ledgerCursor.value = result.next_cursor ?? null
-    ledgerHasMore.value = result.has_more ?? false
-  } catch { ledgerItems.value = []; ledgerHasMore.value = false }
+  } catch { ledgerItems.value = [] }
   finally { loading.value = false }
 }
 
-async function loadMoreLedger() {
-  if (!ledgerHasMore.value || !ledgerCursor.value || ledgerLoadingMore.value) return
-  ledgerLoadingMore.value = true
-  try {
-    const params: any = { year: year.value, limit: ledgerPageSize, cursor: ledgerCursor.value }
-    if (dateRange.value?.length === 2) {
-      params.date_from = dateRange.value[0]
-      params.date_to = dateRange.value[1]
-    }
-    const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/entries/${encodeURIComponent(currentAccount.value)}`, { params }
-    )
-    const result = data
-    const newItems = result.items ?? result ?? []
-    ledgerItems.value = [...ledgerItems.value, ...newItems]
-    ledgerCursor.value = result.next_cursor ?? null
-    ledgerHasMore.value = result.has_more ?? false
-  } catch { ledgerHasMore.value = false }
-  finally { ledgerLoadingMore.value = false }
+function onLedgerPageChange(page: number) {
+  ledgerPage.value = page
+  loadLedger()
+}
+
+function onLedgerPageSizeChange(size: number) {
+  ledgerPageSize.value = size
+  ledgerPage.value = 1
+  loadLedger()
 }
 
 async function loadVoucher() {
   loading.value = true
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/voucher/${encodeURIComponent(currentVoucher.value)}`,
+      P_ledger.voucher(projectId.value, currentVoucher.value),
       { params: { year: year.value } }
     )
     voucherItems.value = data ?? []
@@ -1599,7 +2303,7 @@ async function loadAuxBalance() {
   loading.value = true
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance/${currentAccount.value}`,
+      P_ledger.auxBalance(projectId.value, currentAccount.value),
       { params: { year: year.value } }
     )
     auxBalanceItems.value = data ?? []
@@ -1674,7 +2378,7 @@ const auxDisplayCount = computed(() => {
     const dim = auxDimTypesFromServer.value.find((d: any) => d.type === dt)
     return dim ? dim.total_records : 0
   }
-  return auxPagedTotal.value
+  return auxFlatTotal.value
 })
 
 /** 预计算：按维度类型+科目编号的分组汇总（优先用后端汇总数据） */
@@ -1712,12 +2416,22 @@ const treeAuxBalance = computed(() => {
   const groups = _auxGroupCache.value.get(dimType)
   if (!groups) return []
 
+  // 搜索关键词
+  const kw = auxSearchKeyword.value.trim().toLowerCase()
+
   // 全部展开模式：用汇总数据构建完整二级树
   const buildChildren = auxAllExpanded.value
   const summaryByCode = buildChildren ? _buildSummaryByCode(dimType) : null
 
   const tree: any[] = []
   for (const [code, g] of groups) {
+    // 搜索过滤：科目编号或名称匹配
+    if (kw) {
+      const codeMatch = code.toLowerCase().includes(kw)
+      const nameMatch = (g.name || '').toLowerCase().includes(kw)
+      if (!codeMatch && !nameMatch) continue
+    }
+
     const node: any = {
       _tree_key: code,
       _isGroup: true,
@@ -1802,7 +2516,7 @@ function loadAuxTreeChildren(row: any, _treeNode: any, resolve: (data: any[]) =>
     // 第二级展开辅助编码：从后端按需查询明细
     const code = row._parentCode
     const auxCode = row._auxKey
-    api.get(`/api/projects/${projectId.value}/ledger/aux-balance-detail`, {
+    api.get(P_ledger.auxBalanceDetail(projectId.value), {
       params: { year: year.value, account_code: code, dim_type: dimType, aux_code: auxCode }
     }).then((data: any) => {
       const items = (data ?? []).map((item: any, idx: number) => ({
@@ -1845,6 +2559,7 @@ function onAuxSearchInput() {
     if (!auxTreeMode.value && !auxSummaryOnly.value) {
       loadAuxBalancePage()
     }
+    // 仅小计模式和树形模式下搜索靠前端过滤（computed 自动响应 auxSearchKeyword 变化）
   }, 400)
 }
 
@@ -1899,7 +2614,7 @@ async function toggleAuxExpand(row: any) {
     if (!_auxExpandedDetails.value.has(key)) {
       try {
         const data = await api.get(
-          `/api/projects/${projectId.value}/ledger/aux-balance-detail`,
+          P_ledger.auxBalanceDetail(projectId.value),
           { params: { year: year.value, account_code: row.account_code, dim_type: auxSelectedDimType.value, aux_code: row.aux_code } }
         )
         _auxExpandedDetails.value.set(key, (data ?? []).map((r: any) => ({ ...r, _isDetail: true })))
@@ -1912,11 +2627,21 @@ async function toggleAuxExpand(row: any) {
 
 const auxFlatTotal = computed(() => {
   if (auxSummaryOnly.value) {
+    let rows = auxSummaryData.value
     const dimType = auxSelectedDimType.value
     if (dimType && dimType !== '全部') {
-      return auxSummaryData.value.filter(r => r.dim_type === dimType).length
+      rows = rows.filter(r => r.dim_type === dimType)
     }
-    return auxSummaryData.value.length
+    const kw = auxSearchKeyword.value.trim().toLowerCase()
+    if (kw) {
+      rows = rows.filter(r =>
+        (r.account_code || '').toLowerCase().includes(kw) ||
+        (r.account_name || '').toLowerCase().includes(kw) ||
+        (r.aux_code || '').toLowerCase().includes(kw) ||
+        (r.aux_name || '').toLowerCase().includes(kw)
+      )
+    }
+    return rows.length
   }
   return auxPagedTotal.value
 })
@@ -1932,8 +2657,18 @@ const auxFlatDisplayRows = computed(() => {
     if (dimType && dimType !== '全部') {
       rows = rows.filter(r => r.dim_type === dimType)
     }
-    const start = (auxPage.value - 1) * auxPageSize
-    const page = rows.slice(start, start + auxPageSize)
+    // 前端搜索过滤
+    const kw = auxSearchKeyword.value.trim().toLowerCase()
+    if (kw) {
+      rows = rows.filter(r =>
+        (r.account_code || '').toLowerCase().includes(kw) ||
+        (r.account_name || '').toLowerCase().includes(kw) ||
+        (r.aux_code || '').toLowerCase().includes(kw) ||
+        (r.aux_name || '').toLowerCase().includes(kw)
+      )
+    }
+    const start = (auxPage.value - 1) * auxPageSize.value
+    const page = rows.slice(start, start + auxPageSize.value)
 
     // 构建显示行（含展开的明细）
     const display: any[] = []
@@ -1969,7 +2704,7 @@ async function loadAllAuxBalance() {
   try {
     // 只加载维度类型列表（轻量，不加载全部汇总行）
     const summaryData = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
+      P_ledger.auxBalanceSummary(projectId.value),
       { params: { year: year.value, dim_type: '__types_only__' } }
     )
     const summary = summaryData
@@ -1989,7 +2724,13 @@ async function loadAllAuxBalance() {
     console.error('loadAllAuxBalance error:', e)
     auxSummaryData.value = []; auxPagedRows.value = []
   }
-  finally { loading.value = false }
+  finally {
+    loading.value = false
+    // 数据为空时检测是否有正在进行的导入
+    if (auxSummaryData.value.length === 0 && auxPagedRows.value.length === 0) {
+      checkImportActive()
+    }
+  }
 }
 
 /** 加载指定维度的汇总数据（树形视图和仅小计模式用） */
@@ -2005,7 +2746,7 @@ async function loadAuxSummaryForDim() {
   try {
     loading.value = true
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance-summary`,
+      P_ledger.auxBalanceSummary(projectId.value),
       { params }
     )
     const result = data
@@ -2028,7 +2769,7 @@ const auxPagedTotal = ref(0)
 
 async function loadAuxBalancePage() {
   try {
-    const params: any = { year: year.value, page: auxPage.value, page_size: auxPageSize }
+    const params: any = { year: year.value, page: auxPage.value, page_size: auxPageSize.value }
     if (auxSelectedDimType.value && auxSelectedDimType.value !== '全部') {
       params.dim_type = auxSelectedDimType.value
     }
@@ -2036,13 +2777,22 @@ async function loadAuxBalancePage() {
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-balance-paged`,
+      P_ledger.auxBalancePaged(projectId.value),
       { params }
     )
     const result = data
     auxPagedRows.value = result.rows || []
     auxPagedTotal.value = result.total || 0
+    if (auxPagedRows.value.length === 0 && auxSummaryData.value.length === 0) {
+      checkImportActive()
+    }
   } catch { auxPagedRows.value = [] }
+}
+
+function onAuxPageSizeChange(size: number) {
+  auxPageSize.value = size
+  auxPage.value = 1
+  loadAuxBalancePage()
 }
 
 // 缓存标记：project_id + year 组合，避免重复加载
@@ -2067,7 +2817,7 @@ async function exportAuxBalanceExcel() {
     if (auxFilter.value && auxFilter.value !== 'all') params.filter = auxFilter.value
 
     const blobResult = await api.get(
-      `/api/projects/${projectId.value}/ledger/export-aux-balance`,
+      P_ledger.exportAuxBalance(projectId.value),
       { params, responseType: 'blob' }
     )
     // apiProxy 直接返回 data，对 blob 响应即为 Blob 本身
@@ -2082,7 +2832,7 @@ async function exportAuxBalanceExcel() {
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error(e?.message || '导出失败')
+    handleApiError(e, '导出')
   }
 }
 
@@ -2090,7 +2840,7 @@ async function exportAuxBalanceExcel() {
 async function exportBalanceExcel() {
   try {
     const blobResult = await api.get(
-      `/api/projects/${projectId.value}/ledger/export-balance`,
+      P_ledger.exportBalance(projectId.value),
       { params: { year: year.value }, responseType: 'blob' }
     )
     const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
@@ -2104,7 +2854,7 @@ async function exportBalanceExcel() {
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error(e?.message || '导出失败')
+    handleApiError(e, '导出')
   }
 }
 
@@ -2117,7 +2867,7 @@ async function exportLedgerExcel() {
       params.date_to = dateRange.value[1]
     }
     const blobResult = await api.get(
-      `/api/projects/${projectId.value}/ledger/export-ledger/${encodeURIComponent(currentAccount.value)}`,
+      P_ledger.exportLedger(projectId.value, currentAccount.value),
       { params, responseType: 'blob' }
     )
     const blobData = blobResult instanceof Blob ? blobResult : new Blob([blobResult])
@@ -2132,7 +2882,7 @@ async function exportLedgerExcel() {
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
   } catch (e: any) {
-    ElMessage.error(e?.message || '导出失败')
+    handleApiError(e, '导出')
   }
 }
 
@@ -2160,7 +2910,7 @@ async function loadAuxLedger() {
   loading.value = true
   try {
     const data = await api.get(
-      `/api/projects/${projectId.value}/ledger/aux-entries/${currentAccount.value}`,
+      P_ledger.auxEntries(projectId.value, currentAccount.value),
       { params: { year: year.value, aux_type: currentAuxType.value, aux_code: currentAuxCode.value, page: auxLedgerPage.value, page_size: 100 } }
     )
     const result = data
@@ -2173,11 +2923,11 @@ async function loadAuxLedger() {
 // ── 穿透导航 ──
 function drillToLedger(row: any) {
   const code = row.account_code
-  // 判断是否有子科目（非末级）：在 balanceData 中查找是否有以该编码为前缀的其他科目
+  // 内部穿透：从余额表下钻到序时账（不跳转路由，切换内部 level）
+  // 外部穿透统一使用 penetrate.toLedger(code)
   const hasChildren = balanceData.value.some(r =>
     r.account_code !== code && (r.account_code.startsWith(code + '.') || (r.account_code.startsWith(code) && r.account_code.length > code.length && !code.includes('.')))
   )
-  // 非末级科目用前缀查询（查所有子科目的明细账）
   currentAccount.value = hasChildren ? code + '*' : code
   currentAccountOpening.value = num(row.opening_balance)
   currentLevel.value = 'ledger'
@@ -2280,11 +3030,71 @@ onUnmounted(() => {
 onBeforeUnmount(() => {
   // 需求 22.1：组件卸载时清理导入状态轮询定时器
   stopImportStatusPolling()
+  // 清理完成提示延时器（防止销毁后回调误触发）
+  if (_completionPromptTimer !== null) {
+    clearTimeout(_completionPromptTimer)
+    _completionPromptTimer = null
+  }
 })
 </script>
 
 <style scoped>
 .gt-penetration { padding: var(--gt-space-4); height: 100%; display: flex; flex-direction: column; }
+
+/* 全屏模式 */
+.gt-penetration--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #fff;
+  padding: var(--gt-space-4);
+  overflow-y: auto;
+}
+.gt-fullscreen-topbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--gt-color-primary-dark, #4b2d77);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--gt-radius-md);
+  margin-bottom: var(--gt-space-3);
+}
+
+/* 右键菜单 */
+.gt-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  min-width: 160px;
+}
+.gt-context-menu__item {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #303133;
+  transition: background 0.15s;
+}
+.gt-context-menu__item:hover {
+  background: var(--gt-color-primary-bg, #f0ecf7);
+  color: var(--gt-color-primary);
+}
+.gt-context-menu__divider {
+  height: 1px;
+  background: #e4e7ed;
+  margin: 4px 0;
+  padding: 0;
+  cursor: default;
+}
+.gt-context-menu__divider:hover {
+  background: #e4e7ed;
+  color: #303133;
+}
 
 .gt-ledger-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -2334,6 +3144,20 @@ onBeforeUnmount(() => {
 
 .gt-link { color: var(--gt-color-primary); cursor: pointer; }
 .gt-link:hover { text-decoration: underline; }
+
+.gt-amt {
+  font-family: 'Arial Narrow', Arial, sans-serif;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表格单元格字号统一 13px */
+:deep(.el-table .el-table__cell) {
+  font-size: 13px;
+}
+:deep(.el-table .el-table__header-wrapper th) {
+  font-size: 13px;
+}
 
 .gt-pagination { margin-top: var(--gt-space-3); display: flex; justify-content: flex-end; }
 
@@ -2423,4 +3247,63 @@ onBeforeUnmount(() => {
   color: var(--gt-color-primary);
   font-weight: 600;
 }
+
+/* P3-U3: 导入成功引导卡片 */
+.gt-completion-guide {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed #e0dde5;
+}
+.gt-completion-guide .guide-title {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.gt-completion-guide .guide-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.gt-completion-guide .guide-card {
+  padding: 14px 12px;
+  border: 1px solid #e0dde5;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  background: #fff;
+}
+.gt-completion-guide .guide-card:hover {
+  border-color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg, #f8f5ff);
+  transform: translateY(-2px);
+}
+.gt-completion-guide .guide-card-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+.gt-completion-guide .guide-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 4px;
+}
+.gt-completion-guide .guide-card-desc {
+  font-size: 11px;
+  color: #909399;
+  line-height: 1.5;
+}
 </style>
+
+/* 导入进度条 — Teleport 到 body，fixed 定位在屏幕顶部 */
+:global(.gt-import-progress-overlay) {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  padding: 8px 20%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}

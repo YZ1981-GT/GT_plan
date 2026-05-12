@@ -1,20 +1,9 @@
 <template>
   <div class="gt-dashboard gt-fade-in">
     <!-- ── 欢迎横幅 ── -->
-    <div class="welcome-banner">
-      <div class="welcome-text">
-        <h1 class="welcome-title">{{ greeting }}，{{ displayName }}</h1>
-        <p class="welcome-date">{{ todayStr }}</p>
-        <p class="welcome-motto">{{ motto }}</p>
-      </div>
-      <div class="welcome-deco">
-        <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="60" cy="60" r="50" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
-          <circle cx="60" cy="60" r="35" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>
-          <circle cx="60" cy="60" r="20" fill="rgba(255,255,255,0.08)"/>
-        </svg>
-      </div>
-    </div>
+    <GtPageHeader title="工作台" variant="banner" icon="🏠" :show-back="false">
+      <template #subtitle>{{ todayStr }}</template>
+    </GtPageHeader>
 
     <!-- ── 统计卡片 ── -->
     <div class="stat-grid gt-stagger">
@@ -38,6 +27,28 @@
       </div>
     </div>
 
+    <!-- ── 我的待办底稿（快速入口） ── -->
+    <div v-if="myWorkpapers.length > 0" class="my-wp-section gt-stagger">
+      <div class="section-header" style="margin-bottom: 8px">
+        <h2 class="section-title">📋 我的待办底稿</h2>
+        <el-tag size="small" type="warning">{{ myWorkpapers.length }} 项</el-tag>
+      </div>
+      <div class="my-wp-grid">
+        <div
+          v-for="wp in myWorkpapers.slice(0, 6)"
+          :key="wp.id"
+          class="my-wp-card"
+          @click="$router.push(`/projects/${wp.project_id}/workpapers/${wp.id}/edit`)"
+        >
+          <div class="my-wp-code">{{ wp.wp_code }}</div>
+          <div class="my-wp-name">{{ wp.wp_name }}</div>
+          <el-tag :type="wp.status === WP_STATUS.DRAFT ? 'info' : 'warning'" size="small">
+            {{ wp.status === WP_STATUS.DRAFT ? '编制中' : '待修改' }}
+          </el-tag>
+        </div>
+      </div>
+    </div>
+
     <!-- ── 中间区域：最近项目 + 今日日程 ── -->
     <el-row :gutter="16" class="mid-row">
       <el-col :span="14">
@@ -56,7 +67,7 @@
             <el-table-column prop="client_name" label="客户" min-width="120" />
             <el-table-column prop="status" label="状态" width="100" align="center">
               <template #default="{ row }">
-                <el-tag :type="statusType(row.status)" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
+                <el-tag :type="(statusType(row.status)) || undefined" size="small" effect="light" round>{{ statusLabel(row.status) }}</el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -106,6 +117,8 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { listProjects, getMyAssignments } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
+import { dashboard as P_dash } from '@/services/apiPaths'
+import { WP_STATUS, PROJECT_STATUS } from '@/constants/statusEnum'
 import GTChart from '@/components/GTChart.vue'
 import {
   FolderOpened, Loading, Warning, CircleCheck,
@@ -162,7 +175,7 @@ const trendLoadError = ref(false)
 async function loadTrendData() {
   trendLoadError.value = false
   try {
-    const res = await httpApi.get('/api/dashboard/stats/trend', {
+    const res = await httpApi.get(P_dash.statsTrend, {
       params: { days: 7 }
     })
     trendData.value = res.trend || {}
@@ -226,6 +239,9 @@ const timelineColors = ['#4b2d77', '#0094B3', '#FF5149', '#F5A623', '#28a745']
 function timelineColor(i: number) { return timelineColors[i % timelineColors.length] }
 
 // ── 数据加载 ──
+// ── 我的待办底稿 ──
+const myWorkpapers = ref<any[]>([])
+
 onMounted(async () => {
   // 确保用户信息
   if (!authStore.user && authStore.token) {
@@ -241,8 +257,8 @@ onMounted(async () => {
     stats.total = list.length
     stats.inProgress = list.filter((p: any) => ['execution', 'planning'].includes(p.status)).length
     stats.pendingReview = list.filter((p: any) => p.status === 'completion').length
-    stats.completed = list.filter((p: any) => p.status === 'archived').length
-    recentProjects.value = list.slice(0, 5)
+    stats.completed = list.filter((p: any) => p.status === PROJECT_STATUS.ARCHIVED).length
+    recentProjects.value = list.slice(0, 3)
   } catch { /* ignore */ }
   loadingProjects.value = false
 
@@ -251,6 +267,25 @@ onMounted(async () => {
     todaySchedule.value = (await getMyAssignments()).slice(0, 6)
   } catch { /* ignore */ }
   loadingSchedule.value = false
+
+  // 加载我的待办底稿（draft 或被退回的）
+  try {
+    const assignments = await getMyAssignments()
+    const wpList: any[] = []
+    for (const proj of assignments.slice(0, 5)) {
+      try {
+        const data = await httpApi.get(P.workpapers.list(proj.project_id), {
+          params: { assigned_to_me: true, status: 'draft,rejected' },
+          validateStatus: (s: number) => s < 600,
+        })
+        const items = Array.isArray(data) ? data : data?.items || []
+        for (const wp of items.slice(0, 3)) {
+          wpList.push({ ...wp, project_id: proj.project_id })
+        }
+      } catch { /* ignore */ }
+    }
+    myWorkpapers.value = wpList.slice(0, 6)
+  } catch { /* ignore */ }
 })
 </script>
 
@@ -260,6 +295,14 @@ onMounted(async () => {
   margin: 0 auto;
   padding: var(--gt-space-6);
 }
+
+/* ── 我的待办底稿 ── */
+.my-wp-section { margin-bottom: 20px; }
+.my-wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.my-wp-card { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); cursor: pointer; transition: box-shadow 0.2s; }
+.my-wp-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.my-wp-code { font-size: 12px; color: #909399; font-family: monospace; }
+.my-wp-name { font-size: 13px; font-weight: 500; margin: 4px 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── 欢迎横幅 ── */
 .welcome-banner {
@@ -341,6 +384,8 @@ onMounted(async () => {
 .project-link:hover { text-decoration: underline; }
 
 .gt-compact-table :deep(.el-table__row td) { padding: 8px 0; }
+.gt-compact-table :deep(.el-table__body .cell) { font-size: 13px !important; }
+.gt-compact-table :deep(.el-table__header .cell) { font-size: 13px !important; }
 
 /* ── 今日日程 ── */
 .schedule-card { min-height: 240px; }

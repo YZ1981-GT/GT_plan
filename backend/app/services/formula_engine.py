@@ -24,6 +24,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TbAuxBalance, TrialBalance
+from app.services.dataset_query import get_active_filter
 
 logger = logging.getLogger(__name__)
 
@@ -232,12 +233,10 @@ class AUXExecutor:
 
         result = await db.execute(
             sa.select(TbAuxBalance).where(
-                TbAuxBalance.project_id == project_id,
-                TbAuxBalance.year == year,
+                await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
                 TbAuxBalance.account_code == account_code,
                 TbAuxBalance.aux_type == aux_type,
                 TbAuxBalance.aux_name == aux_name,
-                TbAuxBalance.is_deleted == sa.false(),
             )
         )
         row = result.scalar_one_or_none()

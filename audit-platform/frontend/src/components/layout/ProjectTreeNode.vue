@@ -22,7 +22,7 @@
         :model-value="checkedIds.includes(node.id)"
         size="small"
         class="gt-node-check"
-        @change="(val: boolean) => $emit('toggle-check', node.id, val)"
+        @change="(val: string | number | boolean) => $emit('toggle-check', node.id, !!val)"
         @click.stop
       />
 
@@ -38,7 +38,7 @@
         <div class="gt-node-meta">
           <span>{{ node.client_name || '-' }}</span>
           <span class="gt-node-meta-right">
-            <el-tag v-if="node.status !== 'created'" :type="statusTagType(node.status)" size="small" round>
+            <el-tag v-if="node.status !== 'created'" :type="(statusTagType(node.status)) || undefined" size="small" round>
               {{ statusLabel(node.status) }}
             </el-tag>
             <el-button
@@ -108,8 +108,8 @@ defineEmits<{
 const expanded = ref(true)
 const hasChildren = computed(() => (props.node.children?.length ?? 0) > 0)
 
-function statusTagType(s: string) {
-  const m: Record<string, string> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
   return m[s] || 'info'
 }
 

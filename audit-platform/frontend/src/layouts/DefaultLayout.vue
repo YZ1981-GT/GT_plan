@@ -9,32 +9,41 @@
       <router-link
         v-if="isReviewRole"
         to="/review-inbox"
-        class="gt-nav-review-inbox"
+        class="gt-topbar-action-link"
         style="text-decoration: none;"
       >
-        <el-badge :value="pendingReviewCount" :hidden="pendingReviewCount === 0" type="danger">
-          <el-button size="small" text>📋 复核收件箱</el-button>
-        </el-badge>
+        <el-tooltip content="待复核底稿收件箱" placement="bottom">
+          <el-badge :value="pendingReviewCount" :hidden="pendingReviewCount === 0" type="danger">
+            <span class="gt-topbar-action-btn">📋 复核收件箱</span>
+          </el-badge>
+        </el-tooltip>
       </router-link>
+    </template>
+
+    <template #nav-notifications>
+      <NotificationCenter />
     </template>
 
     <template #nav-eqcr>
       <router-link
         v-if="isEqcrEligible"
         to="/eqcr/workbench"
-        class="gt-nav-eqcr"
+        class="gt-topbar-action-link"
         style="text-decoration: none;"
       >
-        <el-button size="small" text>🛡️ 独立复核</el-button>
+        <el-tooltip content="EQCR 独立复核工作台" placement="bottom">
+          <span class="gt-topbar-action-btn">🛡️ 独立复核</span>
+        </el-tooltip>
       </router-link>
       <router-link
         v-if="isEqcrEligible"
         to="/eqcr/metrics"
-        class="gt-nav-eqcr-metrics"
-        style="text-decoration: none; margin-left: 4px;"
-        title="EQCR 指标仪表盘（admin/partner 可见）"
+        class="gt-topbar-action-link"
+        style="text-decoration: none; margin-left: 2px;"
       >
-        <el-button size="small" text>📊 EQCR 指标</el-button>
+        <el-tooltip content="EQCR 指标仪表盘" placement="bottom">
+          <span class="gt-topbar-action-btn">📊 EQCR 指标</span>
+        </el-tooltip>
       </router-link>
     </template>
 
@@ -71,6 +80,13 @@
       />
       <!-- 具体子页面：右侧全宽显示路由内容 -->
       <div v-else class="gt-detail-content">
+        <!-- R7-S3-10：联动状态横条 -->
+        <LinkageStatusBar
+          v-if="staleCount > 0"
+          :stale-count="staleCount"
+          @recalc="onRecalcStale"
+          @detail="$router.push(`/projects/${route.params.projectId}/workpapers?filter=stale`)"
+        />
         <ErrorBoundary>
           <router-view v-slot="{ Component }">
             <Transition name="gt-page" mode="out-in">
@@ -93,8 +109,10 @@ import DetailProjectPanel from '@/components/layout/DetailProjectPanel.vue'
 import FourColumnCatalog from '@/components/layout/FourColumnCatalog.vue'
 import FourColumnContent from '@/components/layout/FourColumnContent.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import LinkageStatusBar from '@/components/common/LinkageStatusBar.vue'
 import ConsolMiddleNav from '@/components/consolidation/ConsolMiddleNav.vue'
 import ConsolCatalog from '@/components/consolidation/ConsolCatalog.vue'
+import NotificationCenter from '@/components/collaboration/NotificationCenter.vue'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useProjectStore } from '@/stores/project'
 import { getProject } from '@/services/auditPlatformApi'
@@ -113,6 +131,27 @@ const selectedCatalogItem = ref<any>(null)
 const pendingReviewCount = ref(0)
 let badgeTimer: ReturnType<typeof setInterval> | null = null
 
+// R7-S3-10：联动状态横条
+const staleCount = ref(0)
+
+async function loadStaleCount() {
+  const pid = route.params.projectId as string
+  if (!pid) { staleCount.value = 0; return }
+  try {
+    const data = await import('@/services/apiProxy').then(m => m.api.get(`/api/projects/${pid}/stale-summary`))
+    staleCount.value = (data as any)?.stale_count || 0
+  } catch { staleCount.value = 0 }
+}
+
+async function onRecalcStale() {
+  const pid = route.params.projectId as string
+  if (!pid) return
+  try {
+    await import('@/services/apiProxy').then(m => m.api.post(`/api/projects/${pid}/trial-balance/recalc`))
+    staleCount.value = 0
+  } catch { /* ignore */ }
+}
+
 // 是否有复核权限（reviewer/partner/admin）
 const isReviewRole = computed(() => {
   const role = roleStore.effectiveRole
@@ -125,7 +164,7 @@ const isReviewRole = computed(() => {
 //   非 EQCR 用户进入工作台会看到空态，不影响合伙人/管理员的巡视能力。
 const isEqcrEligible = computed(() => {
   const role = roleStore.effectiveRole
-  return role === 'partner' || role === 'admin' || roleStore.isPartner
+  return ['partner', 'admin', 'eqcr'].includes(role) || roleStore.isPartner
 })
 
 async function loadPendingReviewCount() {
@@ -153,8 +192,10 @@ onBeforeUnmount(() => {
 watch(() => route.params.projectId, async (pid) => {
   if (pid && typeof pid === 'string') {
     await roleStore.loadProjectRole(pid)
+    loadStaleCount()
   } else {
     roleStore.currentProjectRole = null
+    staleCount.value = 0
   }
 }, { immediate: true })
 
@@ -240,5 +281,26 @@ function onCatalogSelect(item: any) {
   height: 100%;
   overflow-y: auto;
   padding: var(--gt-space-4);
+}
+
+/* 顶栏操作按钮（白色文字，深紫背景上清晰可见） */
+.gt-topbar-action-link {
+  display: inline-flex;
+  align-items: center;
+}
+.gt-topbar-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.gt-topbar-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 </style>

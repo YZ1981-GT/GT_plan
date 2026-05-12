@@ -1,14 +1,13 @@
 <template>
   <div class="progress-board">
     <!-- 顶部横幅 -->
-    <div class="gt-page-banner">
-      <div class="gt-banner-content">
-        <h2>📊 项目进度看板</h2>
-        <span class="gt-banner-sub" v-if="totalStats">
+    <GtPageHeader title="项目进度看板" variant="banner" icon="📊" :show-back="false">
+      <template #subtitle>
+        <span v-if="totalStats">
           完成率 {{ passedRate }}% · {{ totalStats.passed }}/{{ totalStats.total }} 已通过
         </span>
-      </div>
-      <div class="gt-banner-actions">
+      </template>
+      <template #actions>
         <el-radio-group v-model="viewMode" size="small">
           <el-radio-button value="board">看板</el-radio-button>
           <el-radio-button value="table">表格</el-radio-button>
@@ -18,8 +17,8 @@
         <el-button size="small" @click="handleExportBrief(true)" :loading="exportingBrief">✨ AI简报</el-button>
         <el-button size="small" @click="handleExportAdj">📊 导出调整汇总</el-button>
         <el-button size="small" @click="handleCrossRefCheck" :loading="checkingRefs">🔗 交叉引用检查</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <!-- 统计卡片 -->
     <div class="stat-cards" v-if="totalStats">
@@ -62,7 +61,7 @@
         <el-table-column label="审计循环" prop="audit_cycle" width="100" />
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="bucketTagType(row.bucket)" size="small">{{ bucketLabel(row.bucket) }}</el-tag>
+            <el-tag :type="(bucketTagType(row.bucket)) || undefined" size="small">{{ bucketLabel(row.bucket) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="80">
@@ -187,7 +186,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import { confirmDelete } from '@/utils/confirm'
 import {
   getProgressBoard, getProgressBrief, checkCrossRefs,
   listCommunications, addCommunication, deleteCommunication,
@@ -197,6 +198,7 @@ import {
 } from '@/services/pmApi'
 import CommunicationCommitmentsEditor from '@/components/pm/CommunicationCommitmentsEditor.vue'
 import type { CommitmentItem } from '@/components/pm/CommunicationCommitmentsEditor.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -238,8 +240,8 @@ function bucketLabel(b: string) {
   const m: Record<string, string> = { not_started: '未开始', in_progress: '编制中', pending_review: '待复核', passed: '已通过' }
   return m[b] || b
 }
-function bucketTagType(b: string) {
-  const m: Record<string, string> = { not_started: 'info', in_progress: '', pending_review: 'warning', passed: 'success' }
+function bucketTagType(b: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { not_started: 'info', in_progress: '', pending_review: 'warning', passed: 'success' }
   return m[b] || ''
 }
 
@@ -262,7 +264,7 @@ async function handleExportBrief(polish = false) {
     briefData.value = await getProgressBrief(projectId.value, polish)
     viewMode.value = 'brief'
   } catch (e: any) {
-    ElMessage.error('生成简报失败')
+    handleApiError(e, '生成简报')
   } finally {
     exportingBrief.value = false
   }
@@ -287,8 +289,8 @@ async function handleExportAdj() {
   try {
     await exportAdjustmentSummary(projectId.value, year)
     ElMessage.success('导出成功')
-  } catch {
-    ElMessage.error('导出失败')
+  } catch (e: any) {
+    handleApiError(e, '导出')
   }
 }
 
@@ -302,8 +304,8 @@ async function handleCrossRefCheck() {
   try {
     crossRefResult.value = await checkCrossRefs(projectId.value)
     showCrossRefDialog.value = true
-  } catch {
-    ElMessage.error('检查失败')
+  } catch (e: any) {
+    handleApiError(e, '检查')
   } finally {
     checkingRefs.value = false
   }
@@ -345,19 +347,19 @@ async function handleAddComm() {
     showCommDialog.value = false
     Object.assign(commForm, { contact_person: '', topic: '', content: '', commitments: [], related_wp_codes_str: '' })
     await loadComms()
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e: any) {
+    handleApiError(e, '保存')
   }
 }
 
 async function handleDeleteComm(commId: string) {
-  await ElMessageBox.confirm('确认删除此沟通记录？', '确认')
+  await confirmDelete('此沟通记录')
   try {
     await deleteCommunication(projectId.value, commId)
     ElMessage.success('已删除')
     await loadComms()
-  } catch {
-    ElMessage.error('删除失败')
+  } catch (e: any) {
+    handleApiError(e, '删除')
   }
 }
 
@@ -366,7 +368,7 @@ async function loadData() {
   try {
     boardData.value = await getProgressBoard(projectId.value)
   } catch (e: any) {
-    ElMessage.error('加载失败')
+    handleApiError(e, '加载')
   } finally {
     loading.value = false
   }

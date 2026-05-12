@@ -71,7 +71,7 @@
       </template>
 
       <div class="progress-info">
-        <el-tag :type="statusTagType(currentProgress.status)" size="large">
+        <el-tag :type="(statusTagType(currentProgress.status)) || undefined" size="large">
           {{ statusLabel(currentProgress.status) }}
         </el-tag>
         <span style="margin-left: 12px">
@@ -125,7 +125,7 @@
         <el-table-column prop="record_count" label="记录数" width="80" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="small">
+            <el-tag :type="(statusTagType(row.status)) || undefined" size="small">
               {{ statusLabel(row.status) }}
             </el-tag>
           </template>
@@ -155,9 +155,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDuplicateAction, confirmDangerous } from '@/utils/confirm'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj } from '@/services/apiPaths'
 
 const props = defineProps<{
   projectId: string
@@ -189,30 +191,16 @@ async function startImport() {
   // 1. 先检查是否有重复数据
   try {
     const dup = await api.get(
-      `/api/projects/${props.projectId}/import/check-duplicates`,
+      `${P_proj.detail(props.projectId)}/import/check-duplicates`,
       { params: { data_type: form.dataType, year: form.year } }
     )
 
     if (dup.has_duplicates) {
       // 弹窗让用户选择
       try {
-        await ElMessageBox.confirm(
-          `${dup.message}。\n\n选择"覆盖"将删除旧数据后重新导入，选择"跳过"将只导入新增记录。`,
-          '检测到重复数据',
-          {
-            confirmButtonText: '覆盖旧数据',
-            cancelButtonText: '跳过重复',
-            distinguishCancelAndClose: true,
-            type: 'warning',
-          }
-        )
-        // 用户点了"覆盖旧数据"
-        await doImport('overwrite')
-      } catch (action) {
-        if (action === 'cancel') {
-          // 用户点了"跳过重复"
-          await doImport('skip')
-        }
+        const action = await confirmDuplicateAction(dup.message + '。\n\n选择"覆盖"将删除旧数据后重新导入，选择"跳过"将只导入新增记录。')
+        await doImport(action)
+      } catch {
         // 用户点了关闭（X），不导入
         return
       }
@@ -241,7 +229,7 @@ async function doImport(onDuplicate: string) {
     formData.append('on_duplicate', onDuplicate)
 
     const batch = await api.post(
-      `/api/projects/${props.projectId}/import`,
+      `${P_proj.detail(props.projectId)}/import`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
@@ -271,7 +259,7 @@ async function doImport(onDuplicate: string) {
 async function loadProgress(batchId: string) {
   try {
     currentProgress.value = await api.get(
-      `/api/projects/${props.projectId}/import/${batchId}/progress`
+      `${P_proj.detail(props.projectId)}/import/${batchId}/progress`
     )
   } catch {
     // ignore
@@ -281,7 +269,7 @@ async function loadProgress(batchId: string) {
 async function loadBatches() {
   try {
     batches.value = await api.get(
-      `/api/projects/${props.projectId}/import/batches`
+      `${P_proj.detail(props.projectId)}/import/batches`
     ) || []
   } catch {
     batches.value = []
@@ -290,10 +278,8 @@ async function loadBatches() {
 
 async function handleRollback(batchId: string) {
   try {
-    await ElMessageBox.confirm('确定要回滚此批次导入吗？所有导入的记录将被删除。', '确认回滚', {
-      type: 'warning',
-    })
-    await api.post(`/api/projects/${props.projectId}/import/${batchId}/rollback`)
+    await confirmDangerous('确定要回滚此批次导入吗？所有导入的记录将被删除。', '确认回滚')
+    await api.post(`${P_proj.detail(props.projectId)}/import/${batchId}/rollback`)
     ElMessage.success('回滚成功')
     await loadBatches()
   } catch {
@@ -301,8 +287,8 @@ async function handleRollback(batchId: string) {
   }
 }
 
-function statusTagType(status: string) {
-  const map: Record<string, string> = {
+function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
     pending: 'info',
     processing: 'warning',
     completed: 'success',

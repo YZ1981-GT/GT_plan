@@ -433,6 +433,7 @@
 import { ref, computed, watch } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 interface FormulaItem {
   expression: string
@@ -671,7 +672,7 @@ async function openSourceBrowserForReport(reportType: string, label: string) {
   }
   try {
     const standard = props.applicableStandard || 'soe_consolidated'
-    const resp = await api.get('/api/report-config', {
+    const resp = await api.get(P.reportConfig.list, {
       params: { report_type: reportType, applicable_standard: standard },
       validateStatus: (s: number) => s < 600,
     })
@@ -885,7 +886,7 @@ async function loadTargetRows() {
   targetPickerLoading.value = true
   try {
     const standard = props.applicableStandard || 'soe_consolidated'
-    const resp = await api.get('/api/report-config', {
+    const resp = await api.get(P.reportConfig.list, {
       params: { report_type: 'balance_sheet', applicable_standard: standard },
       validateStatus: (s: number) => s < 600,
     })

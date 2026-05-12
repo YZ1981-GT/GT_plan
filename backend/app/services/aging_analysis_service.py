@@ -19,6 +19,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.dataset_query import get_active_filter
+
 logger = logging.getLogger(__name__)
 
 _DATA_DIR = Path(__file__).parent.parent.parent / "data" / "wp_fine_rules"
@@ -140,10 +142,8 @@ async def calculate_aging_provision(
                 TbAuxBalance.aux_name,
                 sa.func.sum(TbAuxBalance.closing_balance).label("balance"),
             ).where(
-                TbAuxBalance.project_id == project_id,
-                TbAuxBalance.year == year,
+                await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
                 TbAuxBalance.account_code.startswith(account_code[:4]),
-                TbAuxBalance.is_deleted == sa.false(),
             ).group_by(TbAuxBalance.aux_name)
         )
         aging_data = {row[0]: float(row[1] or 0) for row in result.all()}
@@ -278,10 +278,8 @@ async def calculate_inventory_aging(
                 TbAuxBalance.aux_name,
                 sa.func.sum(TbAuxBalance.closing_balance).label("balance"),
             ).where(
-                TbAuxBalance.project_id == project_id,
-                TbAuxBalance.year == year,
+                await get_active_filter(db, TbAuxBalance.__table__, project_id, year),
                 TbAuxBalance.account_code.startswith("140"),
-                TbAuxBalance.is_deleted == sa.false(),
             ).group_by(TbAuxBalance.aux_name)
         )
         aging_data = {row[0]: float(row[1] or 0) for row in result.all()}

@@ -1,7 +1,7 @@
 <template>
   <div class="gt-collab gt-fade-in">
     <div class="gt-collab-header">
-      <h2 class="gt-page-title">协作管理</h2>
+      <GtPageHeader title="协作管理" :show-back="false" />
     </div>
 
     <el-tabs v-model="activeTab">
@@ -62,6 +62,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
+import { pbc as P_pbc, confirmations as P_conf } from '@/services/apiPaths'
 
 const route = useRoute()
 const activeTab = ref('timeline')
@@ -81,7 +82,7 @@ onMounted(async () => {
 
   // 加载 PBC 清单
   try {
-    const res = await api.get(`/api/projects/${projectId}/pbc`)
+    const res = await api.get(P_pbc.items(projectId))
     pbcList.value = Array.isArray(res) ? res : (res?.data ?? [])
   } catch {
     pbcList.value = []
@@ -89,7 +90,7 @@ onMounted(async () => {
 
   // 加载函证列表
   try {
-    const res = await api.get(`/api/projects/${projectId}/confirmations`)
+    const res = await api.get(P_conf.list(projectId))
     confirmations.value = Array.isArray(res) ? res : (res?.data ?? [])
   } catch {
     confirmations.value = []

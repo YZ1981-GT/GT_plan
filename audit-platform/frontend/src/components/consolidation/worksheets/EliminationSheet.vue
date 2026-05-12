@@ -38,7 +38,7 @@
       <el-table-column type="index" label="序号" width="50" fixed align="center" class-name="ws-col-index" />
       <el-table-column prop="source" label="来源" width="90" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.source" :type="sourceTagType(row.source)" size="small" effect="plain">{{ row.source }}</el-tag>
+          <el-tag v-if="row.source" :type="(sourceTagType(row.source)) || undefined" size="small" effect="plain">{{ row.source }}</el-tag>
           <el-tag v-else type="info" size="small" effect="light">自定义</el-tag>
         </template>
       </el-table-column>
@@ -58,7 +58,7 @@
             <el-tree-select v-model="row.subject" :data="subjectTree" size="small" style="width:100%"
               placeholder="选择科目" filterable check-strictly :render-after-expand="false"
               popper-class="ws-subject-popper"
-              :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }" />
+              :props="{ label: 'label', children: 'children', disabled: 'disabled' }" />
           </div>
           <span v-else>{{ row.subject }}</span>
         </template>
@@ -99,7 +99,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
@@ -271,7 +272,7 @@ function addCustomRow() {
 async function batchDeleteCustom() {
   if (!selectedCustomRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除 ${selectedCustomRows.value.length} 条自定义分录？`, '删除确认', { type: 'warning' })
+    await confirmBatch('删除', selectedCustomRows.value.length)
     const del = new Set(selectedCustomRows.value)
     const remaining = customEntries.filter(r => !del.has(r))
     customEntries.length = 0; customEntries.push(...remaining)
@@ -336,8 +337,8 @@ async function onFileSelected(e: Event) {
 }
 
 
-function sourceTagType(source: string) {
-  const map: Record<string, string> = { '权益抵消': '', '损益抵消': 'warning', '交叉持股': 'info', '内部往来': 'success', '内部交易': 'success', '内部现金流': 'success' }
+function sourceTagType(source: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { '权益抵消': '', '损益抵消': 'warning', '交叉持股': 'info', '内部往来': 'success', '内部交易': 'success', '内部现金流': 'success' }
   return map[source] || 'info'
 }
 

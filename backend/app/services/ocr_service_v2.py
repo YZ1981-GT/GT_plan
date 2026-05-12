@@ -19,7 +19,7 @@ import os
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -45,6 +45,7 @@ from app.models import (
     MatchResult,
     RecognitionStatus,
 )
+from app.models.dataset_models import LedgerDataset, DatasetStatus
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -301,7 +302,7 @@ class OCRService:
             "total": len(file_paths),
             "processed": 0,
             "failed": 0,
-            "started_at": datetime.utcnow().isoformat(),
+            "started_at": datetime.now(timezone.utc).isoformat(),
             "completed_at": None,
             "errors": [],
             "results": [],
@@ -399,7 +400,7 @@ def _batch_recognize_sync(task_id: str, project_id: str, file_paths: list[str], 
                 _task_status[task_id] = status
 
             status["status"] = "completed"
-            status["completed_at"] = datetime.utcnow().isoformat()
+            status["completed_at"] = datetime.now(timezone.utc).isoformat()
             _task_status[task_id] = status
 
     asyncio.run(_run())
@@ -521,8 +522,17 @@ async def match_with_ledger(
         return None
 
     # 2. 查询匹配账目（金额近似+日期相近+对方单位关键词）
+    # B' 架构：用 dataset_id 过滤 active 数据（无 year 参数时查所有年度）
+    active_ds_subq = (
+        select(LedgerDataset.id)
+        .where(
+            LedgerDataset.project_id == project_id,
+            LedgerDataset.status == DatasetStatus.active,
+        )
+    )
     query = select(TbLedger).where(
         TbLedger.project_id == project_id,
+        TbLedger.dataset_id.in_(active_ds_subq),
         TbLedger.is_deleted == False,  # noqa: E712
     )
 

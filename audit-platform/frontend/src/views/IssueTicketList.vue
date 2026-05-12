@@ -1,5 +1,6 @@
 <template>
   <div class="issue-ticket-list">
+    <GtPageHeader title="问题工单" :show-back="false" />
     <div class="issue-toolbar">
       <el-select v-model="filters.status" placeholder="状态" clearable size="small" style="width:120px">
         <el-option label="待处理" value="open" />
@@ -23,21 +24,26 @@
       <el-button size="small" @click="loadData">刷新</el-button>
     </div>
 
-    <el-table :data="issues" border size="small" stripe @row-click="handleRowClick">
-      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+    <el-table :data="issues" border size="small" stripe @row-click="handleRowClick" :row-class-name="rowClassName">
+      <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.source === 'Q'" class="q-icon">🛡️</span>
+          {{ row.title }}
+        </template>
+      </el-table-column>
       <el-table-column prop="source" label="来源" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="sourceTagType(row.source)" size="small">{{ sourceLabel(row.source) }}</el-tag>
+          <el-tag :type="(sourceTagType(row.source)) || undefined" size="small">{{ sourceLabel(row.source) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="severity" label="严重度" width="80" align="center">
         <template #default="{ row }">
-          <el-tag :type="severityTagType(row.severity)" size="small">{{ severityLabel(row.severity) }}</el-tag>
+          <el-tag :type="(severityTagType(row.severity)) || undefined" size="small">{{ severityLabel(row.severity) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="status" label="状态" width="90" align="center">
         <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+          <el-tag :type="(statusTagType(row.status)) || undefined" size="small">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="SLA 倒计时" width="120" align="center">
@@ -47,6 +53,20 @@
       </el-table-column>
       <el-table-column prop="created_at" label="创建时间" width="160">
         <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="80" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.status !== 'closed' && row.status !== 'rejected'"
+            v-permission="'ticket:close'"
+            type="danger"
+            size="small"
+            text
+            @click.stop="onCloseTicket(row)"
+          >
+            关闭
+          </el-button>
+        </template>
       </el-table-column>
     </el-table>
 
@@ -67,6 +87,10 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listIssues, type IssueTicket } from '@/services/governanceApi'
+import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
+import { ISSUE_STATUS, ISSUE_SEVERITY, ISSUE_SOURCE } from '@/constants/statusEnum'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -92,11 +116,21 @@ async function loadData() {
     issues.value = result.items || []
     total.value = result.total || 0
   } catch (e: any) {
-    ElMessage.error('加载问题单失败')
+    handleApiError(e, '加载问题单')
   }
 }
 
 function handlePageChange(p: number) { page.value = p; loadData() }
+
+async function onCloseTicket(row: IssueTicket) {
+  try {
+    await api.patch(P.projectIssues.detail(projectId, row.id), { status: 'closed' })
+    ElMessage.success('工单已关闭')
+    await loadData()
+  } catch (e: any) {
+    handleApiError(e, '关闭')
+  }
+}
 
 function handleRowClick(row: IssueTicket) {
   // R1 需求 2 验收 6：点击行跳转到底稿对应 cell
@@ -105,7 +139,7 @@ function handleRowClick(row: IssueTicket) {
   // 比手工同步 cell_ref 更准确，也不需要后端改 schema。
   if (row.wp_id) {
     const query: Record<string, string> = {}
-    if (row.source === 'review_comment' && row.source_ref_id) {
+    if (row.source === ISSUE_SOURCE.REVIEW_COMMENT && row.source_ref_id) {
       query.review_id = row.source_ref_id
     }
     router.push({
@@ -116,10 +150,10 @@ function handleRowClick(row: IssueTicket) {
   }
 }
 
-function sourceTagType(s: string) {
-  if (s === 'Q') return 'danger'
-  if (s === 'L3') return 'warning'
-  if (s === 'review_comment') return 'info'
+function sourceTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  if (s === ISSUE_SOURCE.Q) return 'danger'
+  if (s === ISSUE_SOURCE.L3) return 'warning'
+  if (s === ISSUE_SOURCE.REVIEW_COMMENT) return 'info'
   return ''
 }
 function sourceLabel(s: string): string {
@@ -138,19 +172,19 @@ function sourceLabel(s: string): string {
   }
   return m[s] || s
 }
-function severityTagType(s: string) {
-  if (s === 'blocker') return 'danger'
-  if (s === 'major') return 'warning'
+function severityTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  if (s === ISSUE_SEVERITY.BLOCKER) return 'danger'
+  if (s === ISSUE_SEVERITY.MAJOR) return 'warning'
   return 'info'
 }
 function severityLabel(s: string) {
   const m: Record<string, string> = { blocker: '阻断', major: '重大', minor: '一般', suggestion: '建议' }
   return m[s] || s
 }
-function statusTagType(s: string) {
-  if (s === 'closed') return 'success'
-  if (s === 'rejected') return 'danger'
-  if (s === 'open') return 'warning'
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  if (s === ISSUE_STATUS.CLOSED) return 'success'
+  if (s === ISSUE_STATUS.REJECTED) return 'danger'
+  if (s === ISSUE_STATUS.OPEN) return 'warning'
   return 'info'
 }
 function statusLabel(s: string) {
@@ -179,6 +213,11 @@ function formatTime(t: string | undefined) {
   return new Date(t).toLocaleString('zh-CN')
 }
 
+function rowClassName({ row }: { row: any }): string {
+  if (row.source === 'Q') return 'q-source-row'
+  return ''
+}
+
 onMounted(() => {
   loadData()
   // SLA 倒计时每分钟刷新
@@ -193,4 +232,13 @@ onUnmounted(() => { if (slaTimer) clearInterval(slaTimer) })
 .sla-expired { color: var(--el-color-danger); font-weight: 600; }
 .sla-urgent { color: var(--el-color-danger); }
 .sla-warning { color: var(--el-color-warning); }
+.q-icon { margin-right: 4px; }
+
+/* Q 整改单红左边框 */
+:deep(.q-source-row) {
+  border-left: 3px solid #f56c6c !important;
+}
+:deep(.q-source-row td:first-child) {
+  border-left: 3px solid #f56c6c;
+}
 </style>

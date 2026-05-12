@@ -305,7 +305,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmRollback } from '@/utils/confirm'
 import FormulaBar from './FormulaBar.vue'
 import CellSelector from './CellSelector.vue'
 import {
@@ -347,8 +348,8 @@ const saving = ref(false)
 const sheetNames = ref<string[]>([])
 const activeSheetIndex = ref('0')
 
-async function onSheetChange(idx: string) {
-  activeSheetIndex.value = idx
+async function onSheetChange(idx: string | number) {
+  activeSheetIndex.value = String(idx)
   await loadContent()
 }
 
@@ -677,7 +678,7 @@ async function diffVersion(version: number) {
 }
 
 async function rollbackVersion(version: number) {
-  await ElMessageBox.confirm(`确定回滚到版本 ${version}？当前未保存的编辑将丢失。`, '确认回滚')
+  await confirmRollback(version)
   try {
     await rollbackFileVersion(props.projectId, props.fileStem!, version)
     ElMessage.success(`已回滚到版本 ${version}`)

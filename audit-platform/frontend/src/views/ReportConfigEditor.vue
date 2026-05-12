@@ -1,11 +1,9 @@
 <template>
   <div class="gt-report-config-editor gt-fade-in">
-    <div class="gt-rce-banner">
-      <div class="gt-rce-banner-text">
-        <h2>报表结构编辑</h2>
-        <p>{{ standardLabel }} · {{ reportTypeLabel }} · {{ rows.length }} 行</p>
-      </div>
-      <div class="gt-rce-banner-actions">
+    <GtPageHeader title="报表配置" :show-back="false">
+      <template #actions>
+        <el-button v-if="!isEditing" size="small" @click="enterEdit">✏️ 编辑</el-button>
+        <el-button v-else size="small" type="warning" @click="() => exitEdit()">退出编辑</el-button>
         <el-select v-model="selectedStandard" size="small" style="width: 160px" @change="loadConfig">
           <el-option label="国企版合并" value="soe_consolidated" />
           <el-option label="国企版单体" value="soe_standalone" />
@@ -20,13 +18,15 @@
           <el-option label="现金流附表" value="cash_flow_supplement" />
           <el-option label="资产减值准备表" value="impairment_provision" />
         </el-select>
-        <el-button size="small" type="primary" @click="onSaveAll" :loading="saving">保存修改</el-button>
+        <el-button size="small" type="primary" v-permission="'report_config:edit'" @click="onSaveAll" :loading="saving">保存修改</el-button>
         <el-button size="small" @click="onInsertAbove">↑ 在上方插入</el-button>
         <el-button size="small" @click="onAddRow">末尾新增</el-button>
         <el-button size="small" @click="onDeleteSelected" :disabled="selectedRows.length === 0" style="color: #fff; opacity: 0.8;">删除选中 ({{ selectedRows.length }})</el-button>
         <el-button size="small" @click="router.back()">返回</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
+
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
     <el-table :data="rows" v-loading="loading" border size="small" style="width: 100%"
       row-key="row_code" :row-class-name="rowClassName"
@@ -76,10 +76,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { confirmBatch } from '@/utils/confirm'
+import { confirmBatch, confirmLeave } from '@/utils/confirm'
+import { useEditMode } from '@/composables/useEditMode'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 const selectedStandard = ref('soe_consolidated')
 const selectedReportType = ref('balance_sheet')
@@ -116,7 +120,7 @@ function rowClassName({ row }: { row: any }) {
 async function loadConfig() {
   loading.value = true
   try {
-    const data = await api.get('/api/report-config', {
+    const data = await api.get(P.reportConfig.list, {
       params: {
         report_type: selectedReportType.value,
         applicable_standard: selectedStandard.value,
@@ -181,7 +185,7 @@ async function onDeleteSelected() {
   for (const row of selectedRows.value) {
     if (row.id && !row._isNew) {
       try {
-        await api.delete(`/api/report-config/${row.id}`)
+        await api.delete(P.reportConfig.detail(row.id))
       } catch { /* ignore */ }
     }
     const idx = rows.value.indexOf(row)
@@ -199,7 +203,7 @@ async function onSaveAll() {
     for (const row of rows.value) {
       if (row._isNew) {
         // 新增行 — POST 创建
-        const created = await api.post('/api/report-config', {
+        const created = await api.post(P.reportConfig.list, {
           report_type: selectedReportType.value,
           applicable_standard: selectedStandard.value,
           row_number: row.row_number,
@@ -216,7 +220,7 @@ async function onSaveAll() {
         }
         savedCount++
       } else if (row.id) {
-        await api.put(`/api/report-config/${row.id}`, {
+        await api.put(P.reportConfig.detail(row.id), {
           row_name: row.row_name,
           formula: row.formula,
           indent_level: row.indent_level,
@@ -228,7 +232,7 @@ async function onSaveAll() {
     ElMessage.success(`已保存 ${savedCount} 行`)
     rows.value.forEach(r => { r._editing = false })
   } catch (e: any) {
-    ElMessage.error('保存失败: ' + (e?.message || ''))
+    handleApiError(e, '保存')
   } finally {
     saving.value = false
   }

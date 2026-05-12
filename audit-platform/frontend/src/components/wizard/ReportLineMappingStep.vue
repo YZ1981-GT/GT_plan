@@ -45,7 +45,7 @@
       <el-table-column prop="standard_account_code" label="标准科目编码" width="150" />
       <el-table-column label="报表类型" width="130">
         <template #default="{ row }">
-          <el-tag :type="reportTypeTag(row.report_type)" size="small">
+          <el-tag :type="(reportTypeTag(row.report_type)) || undefined" size="small">
             {{ reportTypeLabel(row.report_type) }}
           </el-tag>
         </template>
@@ -62,7 +62,7 @@
       </el-table-column>
       <el-table-column label="映射类型" width="120">
         <template #default="{ row }">
-          <el-tag :type="mappingTypeTag(row.mapping_type)" size="small">
+          <el-tag :type="(mappingTypeTag(row.mapping_type)) || undefined" size="small">
             {{ mappingTypeLabel(row.mapping_type) }}
           </el-tag>
         </template>
@@ -164,8 +164,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmDelete } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
+import { reportLineMapping as P_rlm } from '@/services/apiPaths'
 
 const props = defineProps<{
   projectId: string
@@ -239,9 +241,9 @@ function reportTypeLabel(type: string): string {
   return labels[type] || type
 }
 
-function reportTypeTag(type: string): string {
-  const tags: Record<string, string> = {
-    balance_sheet: '',
+function reportTypeTag(type: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const tags: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = {
+    balance_sheet: undefined,
     income_statement: 'success',
     cash_flow: 'warning',
   }
@@ -257,10 +259,10 @@ function mappingTypeLabel(type: string): string {
   return labels[type] || type
 }
 
-function mappingTypeTag(type: string): string {
-  const tags: Record<string, string> = {
+function mappingTypeTag(type: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const tags: Record<string, 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined> = {
     ai_suggested: 'info',
-    manual: '',
+    manual: undefined,
     reference_copied: 'warning',
   }
   return tags[type] || 'info'
@@ -276,7 +278,7 @@ async function loadMappings() {
       params.report_type = filterReportType.value
     }
     const data = await api.get(
-      `/api/projects/${props.projectId}/report-line-mapping`,
+      P_rlm.list(props.projectId),
       { params },
     )
     mappings.value = data
@@ -292,7 +294,7 @@ async function handleAiSuggest() {
   aiSuggesting.value = true
   try {
     const data = await api.post(
-      `/api/projects/${props.projectId}/report-line-mapping/ai-suggest`,
+      P_rlm.aiSuggest(props.projectId),
     )
     const suggestions = data
     ElMessage.success(`AI匹配完成，生成 ${suggestions.length} 条建议`)
@@ -307,7 +309,7 @@ async function handleAiSuggest() {
 async function handleConfirm(row: MappingRow) {
   try {
     await api.put(
-      `/api/projects/${props.projectId}/report-line-mapping/${row.id}/confirm`,
+      P_rlm.confirm(props.projectId, row.id),
     )
     row.is_confirmed = true
     ElMessage.success('已确认')
@@ -341,7 +343,7 @@ async function handleSaveEdit() {
   editSaving.value = true
   try {
     await api.put(
-      `/api/projects/${props.projectId}/report-line-mapping/${editForm.value.id}`,
+      P_rlm.detail(props.projectId, editForm.value.id),
       {
         report_type: editForm.value.report_type,
         report_line_code: reportLineCode,
@@ -364,11 +366,7 @@ async function handleSaveEdit() {
 async function handleDelete(row: MappingRow) {
   if (!props.projectId) return
   try {
-    await ElMessageBox.confirm(
-      `确定要${row.is_confirmed ? '删除' : '拒绝'}该映射吗？`,
-      '提示',
-      { type: 'warning' },
-    )
+    await confirmDelete('该映射')
   } catch (err) {
     if (err === 'cancel' || err === 'close') {
       return
@@ -378,7 +376,7 @@ async function handleDelete(row: MappingRow) {
 
   deletingId.value = row.id
   try {
-    await api.delete(`/api/projects/${props.projectId}/report-line-mapping/${row.id}`)
+    await api.delete(P_rlm.detail(props.projectId, row.id))
     ElMessage.success(row.is_confirmed ? '映射已删除' : '建议已拒绝')
     await loadMappings()
   } catch {
@@ -393,7 +391,7 @@ async function handleBatchConfirm() {
   batchConfirming.value = true
   try {
     const data = await api.post(
-      `/api/projects/${props.projectId}/report-line-mapping/batch-confirm`,
+      P_rlm.batchConfirm(props.projectId),
       { mapping_ids: unconfirmedIds.value },
     )
     const result = data
@@ -414,7 +412,7 @@ async function handleReferenceCopy() {
   referenceCopying.value = true
   try {
     const data = await api.post(
-      `/api/projects/${props.projectId}/report-line-mapping/reference-copy`,
+      P_rlm.referenceCopy(props.projectId),
       { source_company_code: sourceCompanyCode.value },
     )
     const result = data

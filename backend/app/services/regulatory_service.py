@@ -41,7 +41,7 @@ MAX_RETRY_ATTEMPTS = 3
 
 
 def _now() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
 
 
 class RegulatoryService:

@@ -64,11 +64,27 @@ async def get_balance(
     year: int = Query(...),
     account_code: str | None = None,
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """科目余额汇总"""
+    """科目余额汇总（Redis 缓存 5 分钟）"""
+    import json
+    cache_key = f"ledger:balance:{project_id}:{year}:{account_code or 'all'}"
+    if redis:
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
     svc = _svc(db, None)
-    return await svc.get_balance_summary(project_id, year, account_code)
+    result = await svc.get_balance_summary(project_id, year, account_code)
+    if redis:
+        try:
+            await redis.set(cache_key, json.dumps(result, default=str), ex=300)
+        except Exception:
+            pass
+    return result
 
 
 @router.get("/opening-balance/{account_code}")
@@ -136,14 +152,25 @@ async def get_aux_balance_summary(
     year: int = Query(...),
     dim_type: Optional[str] = Query(None, description="维度类型"),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """辅助余额汇总（预计算，按维度+科目+辅助编码分组）。
+    """辅助余额汇总（预计算，按维度+科目+辅助编码分组，Redis 缓存 5 分钟）。
 
     前端树形视图用这个接口，不再加载12万行原始数据。
     返回：维度类型列表 + 汇总行数据
     """
+    import json
     import sqlalchemy as sa
+
+    cache_key = f"ledger:aux_summary:{project_id}:{year}:{dim_type or 'all'}"
+    if redis:
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
 
     # 维度类型列表（含各类型的记录数）
     r = await db.execute(sa.text("""
@@ -184,7 +211,14 @@ async def get_aux_balance_summary(
         for row in r.fetchall()
     ]
 
-    return {"dim_types": dim_types, "rows": rows, "total": len(rows)}
+    result = {"dim_types": dim_types, "rows": rows, "total": len(rows)}
+    if redis:
+        try:
+            import json
+            await redis.set(cache_key, json.dumps(result, default=str), ex=300)
+        except Exception:
+            pass
+    return result
 
 
 @router.get("/aux-balance-paged")
@@ -328,6 +362,30 @@ async def get_aux_ledger_entries(
         )
     return await svc.get_aux_ledger_entries(
         project_id, year, account_code, aux_type, aux_code, page, page_size,
+    )
+
+
+@router.get("/aux/by-triplet")
+async def get_aux_by_triplet(
+    project_id: UUID,
+    year: int = Query(...),
+    account_code: str = Query(..., description="科目编码"),
+    aux_type: str = Query(..., description="辅助维度类型，如 客户/成本中心/金融机构"),
+    aux_code: str | None = Query(None, description="辅助编码（缺省则返回该维度类型下所有）"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """S6-8 三元组精确穿透（account_code + aux_type + aux_code）。
+
+    同时返回辅助余额 + 辅助明细账，解决"税率"等维度类型跨科目重名问题。
+    前端点击科目下的某条"客户:041108,重庆医药..."时调用此端点。
+    """
+    svc = _svc(db, None)
+    return await svc.get_aux_by_triplet(
+        project_id, year, account_code, aux_type, aux_code,
+        page=page, page_size=page_size,
     )
 
 
@@ -904,7 +962,7 @@ async def validate_data(
 
     findings = []
 
-    # 1. 科目余额表内部勾稽
+    # 1. 科目余额表内部勾稽（排除损益类科目——期末结转后期初期末天然为0）
     bal_tbl = TbBalance.__table__
     bal_rows = await db.execute(
         sa.select(
@@ -934,20 +992,24 @@ async def validate_data(
         credit = credit or Decimal(0)
         closing = closing or Decimal(0)
         bal_map[code] = {"opening": opening, "debit": debit, "credit": credit, "closing": closing}
+        # 损益类科目（5xxx/6xxx）期初期末天然为0，只检查有期初或期末的科目
+        is_income_expense = str(code).startswith('5') or str(code).startswith('6')
+        if is_income_expense:
+            continue  # 损益类不做勾稽检查
         expected = opening + debit - credit
-        if abs(expected - closing) > Decimal("0.01"):
+        if abs(expected - closing) > Decimal("1.00"):  # 容差 1 元（四舍五入）
             bal_errors += 1
-            if bal_errors <= 5:
+            if bal_errors <= 3:
                 findings.append({
                     "level": "error", "category": "余额表勾稽",
-                    "message": f"{code}: 期初{opening}+借{debit}-贷{credit}={expected}, 期末{closing}, 差{expected-closing}",
+                    "message": f"{code}: 期初+借-贷={expected:.2f}, 期末={closing:.2f}, 差额={abs(expected-closing):.2f}",
                 })
-    if bal_errors > 5:
+    if bal_errors > 3:
         findings.append({"level": "error", "category": "余额表勾稽",
-                         "message": f"共 {bal_errors} 个科目不平"})
+                         "message": f"共 {bal_errors} 个科目借贷不平（已排除损益类）"})
     elif bal_errors == 0:
         findings.append({"level": "info", "category": "余额表勾稽",
-                         "message": f"{len(bal_data)} 个科目全部勾稽通过"})
+                         "message": f"✓ {len(bal_data)} 个科目全部勾稽通过"})
 
     # 2. 科目余额表 vs 辅助余额表
     aux_tbl = TbAuxBalance.__table__
@@ -973,22 +1035,25 @@ async def validate_data(
         if code not in bal_map:
             continue
         b_closing = bal_map[code]["closing"]
+        # 损益类科目跳过（期末=0 但辅助维度可能有值）
+        if str(code).startswith('5') or str(code).startswith('6'):
+            continue
         types = aux_by_code[code]
         best_type, best_cnt, best_closing = min(types, key=lambda x: abs(b_closing - x[2]))
         diff = b_closing - best_closing
-        if abs(diff) > Decimal("0.01"):
+        if abs(diff) > Decimal("1.00"):  # 容差 1 元
             cross_errors += 1
-            if cross_errors <= 5:
+            if cross_errors <= 3:
                 findings.append({
                     "level": "warning", "category": "余额表vs辅助余额表",
-                    "message": f"{code}: 科目期末={b_closing}, 维度({best_type},{best_cnt}条)汇总={best_closing}, 差{diff}",
+                    "message": f"{code}: 主表期末={b_closing:.2f}, 辅助({best_type})汇总={best_closing:.2f}, 差额={abs(diff):.2f}",
                 })
-    if cross_errors > 5:
+    if cross_errors > 3:
         findings.append({"level": "warning", "category": "余额表vs辅助余额表",
-                         "message": f"共 {cross_errors} 个科目不一致"})
+                         "message": f"共 {cross_errors} 个科目不一致（已排除损益类）"})
     elif cross_errors == 0 and aux_by_code:
         findings.append({"level": "info", "category": "余额表vs辅助余额表",
-                         "message": f"{len(aux_by_code)} 个有辅助核算的科目全部一致"})
+                         "message": f"✓ {len(aux_by_code)} 个辅助核算科目全部一致"})
 
     # 3. 序时账 vs 科目余额表
     led_tbl = TbLedger.__table__
@@ -1010,14 +1075,14 @@ async def validate_data(
         b = bal_map[code]
         led_debit = led_debit or Decimal(0)
         led_credit = led_credit or Decimal(0)
-        if abs(b["debit"] - led_debit) > Decimal("0.01") or abs(b["credit"] - led_credit) > Decimal("0.01"):
+        if abs(b["debit"] - led_debit) > Decimal("1.00") or abs(b["credit"] - led_credit) > Decimal("1.00"):
             led_errors += 1
-            if led_errors <= 5:
+            if led_errors <= 3:
                 findings.append({
                     "level": "warning", "category": "序时账vs余额表",
-                    "message": f"{code}: 余额表借{b['debit']}/贷{b['credit']}, 序时账借{led_debit}/贷{led_credit}",
+                    "message": f"{code}: 余额表借{b['debit']:.2f}/贷{b['credit']:.2f}, 序时账借{led_debit:.2f}/贷{led_credit:.2f}",
                 })
-    if led_errors > 5:
+    if led_errors > 3:
         findings.append({"level": "warning", "category": "序时账vs余额表",
                          "message": f"共 {led_errors} 个科目不一致"})
     elif led_errors == 0 and led_agg_data:
@@ -1033,5 +1098,319 @@ async def validate_data(
             "ledger_account_count": len(led_agg_data),
             "errors": sum(1 for f in findings if f["level"] == "error"),
             "warnings": sum(1 for f in findings if f["level"] == "warning"),
+        },
+    }
+
+
+@router.get("/balance-tree")
+async def get_balance_tree(
+    project_id: UUID,
+    year: int = Query(...),
+    company_code: str | None = Query(None, description="可选公司代码，默认合并全部"),
+    page: int = Query(1, ge=1, description="页码（1-based）"),
+    page_size: int = Query(
+        100, ge=1, le=200,
+        description="每页科目数，用户自定义，最多 200",
+    ),
+    keyword: str | None = Query(
+        None,
+        description="按 account_code / account_name 模糊过滤（大小写不敏感）",
+    ),
+    only_with_children: bool = Query(
+        False, description="仅返回含辅助维度的科目（前端维度过滤）",
+    ),
+    only_with_activity: bool = Query(
+        False,
+        description=(
+            "仅返回有金额活动的科目：对资产/负债/权益类要求 opening/closing/debit/credit "
+            "任一非零；对损益类（5/6 开头）只要求 debit/credit 任一非零"
+            "（损益类期末结转后 opening/closing 天然为 NULL，不应参与判定）"
+        ),
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """科目余额树形视图（Layer 2 v2 / Sprint 8 P3 分页）。
+
+    返回主表 + 辅助余额嵌套结构，前端 el-table :tree-props 直接渲染：
+
+        [
+          {account_code, account_name, level, opening_balance, ...,
+           aggregated_from_aux: bool, aux_row_count: int,
+           children: [
+             {aux_type, aux_code, aux_name, aux_dimensions_raw,
+              opening_balance, closing_balance, ...},
+             ...
+           ]},
+          ...
+        ]
+
+    children 按 (aux_type, aux_code) 排序；父节点是 tb_balance 行，
+    子节点来自 tb_aux_balance 同 account_code 聚合。
+    """
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import TbBalance, TbAuxBalance
+
+    bal_tbl = TbBalance.__table__
+    aux_tbl = TbAuxBalance.__table__
+
+    bal_where = [await get_active_filter(db, bal_tbl, project_id, year)]
+    aux_where = [await get_active_filter(db, aux_tbl, project_id, year)]
+    if company_code:
+        bal_where.append(bal_tbl.c.company_code == company_code)
+        aux_where.append(aux_tbl.c.company_code == company_code)
+
+    # keyword 模糊过滤（作用于主表 account_code / account_name）
+    if keyword:
+        kw = f"%{keyword.strip()}%"
+        bal_where.append(
+            sa.or_(
+                bal_tbl.c.account_code.ilike(kw),
+                bal_tbl.c.account_name.ilike(kw),
+            )
+        )
+
+    # only_with_children=True 时，先取有辅助的 account_code 集合，加到 where 过滤主表
+    if only_with_children:
+        codes_stmt = sa.select(aux_tbl.c.account_code).where(*aux_where).distinct()
+        codes_result = await db.execute(codes_stmt)
+        codes_with_aux = [r[0] for r in codes_result.fetchall()]
+        if codes_with_aux:
+            bal_where.append(bal_tbl.c.account_code.in_(codes_with_aux))
+        else:
+            # 没有任何含辅助的科目 → 返回空页
+            return {
+                "year": year,
+                "company_code": company_code,
+                "tree": [],
+                "pagination": {
+                    "page": page, "page_size": page_size,
+                    "total": 0, "total_pages": 0,
+                },
+                "summary": {
+                    "account_count": 0,
+                    "aggregated_count": 0,
+                    "with_children_count": 0,
+                    "aux_total_rows": 0,
+                    "mismatches": [],
+                },
+            }
+
+    # only_with_activity：按科目类型差异化判断
+    # - 资产/负债/权益类（1/2/3/4 开头）：opening/closing/debit/credit 任一非零
+    # - 损益类（5/6 开头）：debit/credit 任一非零（opening/closing 天然 NULL 不参与判定）
+    # 实现：用 OR 拼两种场景而非 CASE，让查询优化器能走索引
+    # 用 substr 而非 left（SQLite 测试兼容，PG 也支持）
+    if only_with_activity:
+        def _nonzero(col):
+            return sa.and_(col.is_not(None), col != 0)
+
+        first_char = sa.func.substr(bal_tbl.c.account_code, 1, 1)
+        # 场景 1：损益类（5/6）只看 debit/credit
+        loss_gain_active = sa.and_(
+            first_char.in_(("5", "6")),
+            sa.or_(
+                _nonzero(bal_tbl.c.debit_amount),
+                _nonzero(bal_tbl.c.credit_amount),
+            ),
+        )
+        # 场景 2：非损益类 + 任一金额字段非零
+        other_active = sa.and_(
+            sa.not_(first_char.in_(("5", "6"))),
+            sa.or_(
+                _nonzero(bal_tbl.c.debit_amount),
+                _nonzero(bal_tbl.c.credit_amount),
+                _nonzero(bal_tbl.c.opening_balance),
+                _nonzero(bal_tbl.c.closing_balance),
+            ),
+        )
+        bal_where.append(sa.or_(loss_gain_active, other_active))
+
+    # 分页前先查总数
+    total_stmt = sa.select(sa.func.count()).select_from(bal_tbl).where(*bal_where)
+    total = (await db.execute(total_stmt)).scalar() or 0
+    total_pages = (total + page_size - 1) // page_size if page_size else 1
+
+    # 主表（带分页）
+    offset = (page - 1) * page_size
+    bal_stmt = (
+        sa.select(
+            bal_tbl.c.account_code, bal_tbl.c.account_name, bal_tbl.c.level,
+            bal_tbl.c.company_code,
+            bal_tbl.c.opening_balance, bal_tbl.c.opening_debit, bal_tbl.c.opening_credit,
+            bal_tbl.c.debit_amount, bal_tbl.c.credit_amount,
+            bal_tbl.c.closing_balance, bal_tbl.c.closing_debit, bal_tbl.c.closing_credit,
+            bal_tbl.c.currency_code, bal_tbl.c.raw_extra,
+        )
+        .where(*bal_where)
+        .order_by(bal_tbl.c.account_code)
+        .limit(page_size)
+        .offset(offset)
+    )
+    bal_result = await db.execute(bal_stmt)
+    bal_rows_list = bal_result.fetchall()
+    # 本页主表的 account_code 集合（用于收窄 aux 查询，避免拉全量）
+    page_account_codes = [r[0] for r in bal_rows_list]
+    if page_account_codes:
+        aux_where.append(aux_tbl.c.account_code.in_(page_account_codes))
+    else:
+        # 本页无主表数据 → 返回空
+        return {
+            "year": year,
+            "company_code": company_code,
+            "tree": [],
+            "pagination": {
+                "page": page, "page_size": page_size,
+                "total": total, "total_pages": total_pages,
+            },
+            "summary": {
+                "account_count": 0,
+                "aggregated_count": 0,
+                "with_children_count": 0,
+                "aux_total_rows": 0,
+                "mismatches": [],
+            },
+        }
+
+    # 辅助余额（按 (company_code, account_code) 分组到父节点，多公司合并场景下正确隔离）
+    aux_stmt = sa.select(
+        aux_tbl.c.company_code,
+        aux_tbl.c.account_code, aux_tbl.c.aux_type, aux_tbl.c.aux_code,
+        aux_tbl.c.aux_name, aux_tbl.c.aux_dimensions_raw,
+        aux_tbl.c.opening_balance, aux_tbl.c.opening_debit, aux_tbl.c.opening_credit,
+        aux_tbl.c.debit_amount, aux_tbl.c.credit_amount,
+        aux_tbl.c.closing_balance, aux_tbl.c.closing_debit, aux_tbl.c.closing_credit,
+        aux_tbl.c.currency_code,
+    ).where(*aux_where).order_by(
+        aux_tbl.c.company_code,
+        aux_tbl.c.account_code, aux_tbl.c.aux_type, aux_tbl.c.aux_code,
+    )
+    aux_result = await db.execute(aux_stmt)
+
+    # aux rows 按 (company_code, account_code, aux_type) 三层聚合
+    # 真实账务场景：一行多维度在 tb_aux_balance 里会冗余存 N 条（N=维度个数），
+    # 按"单一维度类型"聚合才等于主表金额（任一维度完备覆盖全部金额）。
+    # 多公司合并场景下，相同 account_code 在不同 company_code 下独立，不能合并。
+    from collections import defaultdict
+    aux_by_comp_code_type: dict[
+        tuple[str, str], dict[str, list[dict]]
+    ] = defaultdict(lambda: defaultdict(list))
+    for r in aux_result.fetchall():
+        aux_by_comp_code_type[(r[0], r[1])][r[2] or ""].append({
+            "aux_type": r[2],
+            "aux_code": r[3],
+            "aux_name": r[4],
+            "aux_dimensions_raw": r[5],
+            "opening_balance": float(r[6]) if r[6] is not None else None,
+            "opening_debit": float(r[7]) if r[7] is not None else None,
+            "opening_credit": float(r[8]) if r[8] is not None else None,
+            "debit_amount": float(r[9]) if r[9] is not None else None,
+            "credit_amount": float(r[10]) if r[10] is not None else None,
+            "closing_balance": float(r[11]) if r[11] is not None else None,
+            "closing_debit": float(r[12]) if r[12] is not None else None,
+            "closing_credit": float(r[13]) if r[13] is not None else None,
+            "currency_code": r[14],
+        })
+
+    def _build_dimension_nodes(
+        company_code: str, account_code: str, account_name: str | None,
+    ) -> tuple[list[dict], int, dict[str, float]]:
+        """构造 aux_type 分组节点 + 返回每个维度类型的 closing 求和。"""
+        dim_nodes: list[dict] = []
+        total_aux_rows = 0
+        type_sums: dict[str, float] = {}
+        for aux_type, rows in aux_by_comp_code_type.get((company_code, account_code), {}).items():
+            total_aux_rows += len(rows)
+            dim_sum = sum((r["closing_balance"] or 0) for r in rows)
+            type_sums[aux_type] = dim_sum
+            dim_nodes.append({
+                "_is_dimension_group": True,
+                "aux_type": aux_type,
+                "account_code": account_code,
+                "account_name": account_name,
+                "closing_balance": dim_sum,
+                "opening_balance": sum(
+                    (r["opening_balance"] or 0) for r in rows
+                ),
+                "debit_amount": sum(
+                    (r["debit_amount"] or 0) for r in rows
+                ),
+                "credit_amount": sum(
+                    (r["credit_amount"] or 0) for r in rows
+                ),
+                "record_count": len(rows),
+                "has_children": True,
+                "children": rows,
+            })
+        return dim_nodes, total_aux_rows, type_sums
+
+    tree: list[dict] = []
+    for r in bal_rows_list:
+        raw_extra = r[13] or {}
+        aggregated = bool(raw_extra.get("_aggregated_from_aux"))
+        aux_row_count = int(raw_extra.get("_aux_row_count") or 0)
+        # 传 (company_code=r[3], account_code=r[0], account_name=r[1])，
+        # 多公司合并场景下 aux 分组隔离
+        dim_nodes, total_aux_rows, _type_sums = _build_dimension_nodes(r[3], r[0], r[1])
+        tree.append({
+            "account_code": r[0],
+            "account_name": r[1],
+            "level": r[2],
+            "company_code": r[3],
+            "opening_balance": float(r[4]) if r[4] is not None else None,
+            "opening_debit": float(r[5]) if r[5] is not None else None,
+            "opening_credit": float(r[6]) if r[6] is not None else None,
+            "debit_amount": float(r[7]) if r[7] is not None else None,
+            "credit_amount": float(r[8]) if r[8] is not None else None,
+            "closing_balance": float(r[9]) if r[9] is not None else None,
+            "closing_debit": float(r[10]) if r[10] is not None else None,
+            "closing_credit": float(r[11]) if r[11] is not None else None,
+            "currency_code": r[12],
+            "aggregated_from_aux": aggregated,
+            "aux_row_count": aux_row_count,
+            "aux_types": list(_type_sums.keys()),
+            "aux_rows_total": total_aux_rows,
+            "has_children": len(dim_nodes) > 0,
+            "children": dim_nodes,
+        })
+
+    # 辅助一致性检查：任一维度类型求和 ≠ 主表即视为 mismatch
+    # （按单一 aux_type 聚合应等于主表，这是正确的辅助核算语义）
+    # 多公司合并场景下带 company_code 标识，避免用户看两家同 account_code 时混淆
+    mismatches: list[dict] = []
+    for node in tree:
+        if not node["children"]:
+            continue
+        parent_val = node["closing_balance"] or 0
+        for dim_node in node["children"]:
+            dim_sum = dim_node["closing_balance"] or 0
+            diff = abs(dim_sum - parent_val)
+            if diff > 1.0:
+                mismatches.append({
+                    "company_code": node["company_code"],
+                    "account_code": node["account_code"],
+                    "aux_type": dim_node["aux_type"],
+                    "parent_closing": parent_val,
+                    "dim_sum": dim_sum,
+                    "record_count": dim_node["record_count"],
+                    "diff": diff,
+                })
+
+    return {
+        "year": year,
+        "company_code": company_code,
+        "tree": tree,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
+        },
+        "summary": {
+            "account_count": len(tree),
+            "aggregated_count": sum(1 for n in tree if n["aggregated_from_aux"]),
+            "with_children_count": sum(1 for n in tree if n["has_children"]),
+            "aux_total_rows": sum(n["aux_rows_total"] for n in tree),
+            "mismatches": mismatches,
         },
     }

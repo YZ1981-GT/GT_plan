@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="performance-monitor">
-    <h3>性能监控</h3>
+    <GtPageHeader title="性能监控" :show-back="false" />
     <el-row :gutter="16">
       <el-col :span="8">
         <el-card shadow="hover">
@@ -217,6 +217,8 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
+import { admin as P_admin } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const stats = ref<any>({})
 const slowQueries = ref<any[]>([])
@@ -250,8 +252,8 @@ let _syncingScopeFromRoute = false
 
 async function loadStats() {
   try {
-    stats.value = await api.get('/api/admin/performance-stats')
-    const sqRes = await api.get('/api/admin/slow-queries')
+    stats.value = await api.get(P_admin.performanceStats)
+    const sqRes = await api.get(P_admin.slowQueries)
     slowQueries.value = (sqRes as any).queries || []
   } catch { /* ignore */ }
 }
@@ -259,7 +261,7 @@ async function loadStats() {
 async function loadTrends() {
   trendLoading.value = true
   try {
-    const res = await api.get('/api/admin/performance-metrics', {
+    const res = await api.get(P_admin.performanceMetrics, {
       params: { hours: 24 },
     })
     const metrics = res.data ?? res ?? []
@@ -274,7 +276,7 @@ async function loadTrends() {
 
 async function loadBottlenecks() {
   try {
-    const res = await api.get('/api/admin/performance-stats')
+    const res = await api.get(P_admin.performanceStats)
     const data = res.data ?? res ?? {}
 
     const items: any[] = []
@@ -360,7 +362,7 @@ function renderScopeLabel(scope?: { project_id?: string | null; year?: number | 
 async function loadImportEventHealth() {
   eventHealthLoading.value = true
   try {
-    const res = await api.get('/api/admin/import-event-health', {
+    const res = await api.get(P_admin.importEventHealth, {
       params: buildScopeParams(),
     })
     const data = res?.data ?? res ?? {}
@@ -396,7 +398,7 @@ async function loadImportEventHealth() {
 async function replayImportEvents() {
   eventReplayLoading.value = true
   try {
-    const res = await api.post('/api/admin/import-event-replay', null, {
+    const res = await api.post(P_admin.importEventReplay, null, {
       params: { limit: 100, ...buildScopeParams() },
     })
     const data = res?.data ?? res ?? {}
@@ -404,8 +406,8 @@ async function replayImportEvents() {
       `重放完成（${renderScopeLabel(data.scope)}）：发布 ${data.published_count || 0}，失败 ${data.failed_count || 0}`,
     )
     await loadImportEventHealth()
-  } catch {
-    ElMessage.error('导入事件重放失败')
+  } catch (e: any) {
+    handleApiError(e, '导入事件重放')
   } finally {
     eventReplayLoading.value = false
   }

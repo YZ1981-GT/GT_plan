@@ -1,12 +1,11 @@
 <template>
   <div class="gt-ack-dashboard gt-fade-in">
     <!-- 横幅 -->
-    <div class="gt-page-banner gt-page-banner--purple">
-      <div class="gt-page-banner__content">
-        <h2 class="gt-page-banner__title">审计检查仪表盘</h2>
-        <p class="gt-page-banner__desc">项目级审计检查汇总 · 按循环分组 · 通过率一览</p>
-      </div>
-    </div>
+    <GtPageHeader title="审计检查仪表盘" variant="banner" icon="✅" :show-back="false">
+      <template #subtitle>
+        项目级审计检查汇总 · 按循环分组 · 通过率一览
+      </template>
+    </GtPageHeader>
 
     <!-- 汇总卡片 -->
     <div class="gt-ack-summary">
@@ -84,8 +83,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import DependencyGraph from '@/components/workpaper/DependencyGraph.vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -137,7 +138,7 @@ async function loadDashboard() {
       wp_id: string; wp_code: string; wp_name: string;
       audit_cycle: string | null; checks: CheckItem[]; summary: Record<string, unknown>
     }> = await api.get(
-      `/api/projects/${projectId.value}/fine-checks/summary`,
+      P.fineChecks.summary(projectId.value),
       { validateStatus: (s: number) => s < 600 },
     )
 

@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 import sqlalchemy as sa
 from sqlalchemy import func
@@ -170,7 +170,7 @@ async def change_review_status(
 
     if reviewer_id:
         entry.reviewer_id = reviewer_id
-    entry.reviewed_at = datetime.utcnow()
+    entry.reviewed_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(entry)

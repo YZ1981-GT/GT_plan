@@ -25,7 +25,7 @@
       >
         <div class="column-header" :style="{borderTopColor: columnColors[col.key]}">
           <span class="column-title">{{ col.label }}</span>
-          <el-badge :value="kanbanData[col.key]?.length || 0" :type="col.badgeType" />
+          <el-badge :value="kanbanData[col.key]?.length || 0" :type="(col.badgeType) || undefined" />
         </div>
 
         <div class="column-body">

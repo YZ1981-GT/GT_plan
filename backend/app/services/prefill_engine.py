@@ -393,14 +393,14 @@ async def parse_workpaper_real(
 
     # 写入 parsed_data（dry_run=True 时跳过写入，仅返回预览）
     from datetime import datetime, timezone
-    parsed["extracted_at"] = datetime.utcnow().isoformat()
+    parsed["extracted_at"] = datetime.now(timezone.utc).isoformat()
     if not dry_run:
         wp_write = (await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
         )).scalar_one_or_none()
         if wp_write:
             wp_write.parsed_data = parsed
-            wp_write.last_parsed_at = datetime.utcnow()
+            wp_write.last_parsed_at = datetime.now(timezone.utc)
             await db.flush()
 
     _logger.info(
@@ -531,3 +531,100 @@ class ParseService:
 
     async def detect_conflicts(self, db: AsyncSession, project_id: UUID, wp_id: UUID, uploaded_version: int) -> dict:
         return await detect_conflicts(db, project_id, wp_id, uploaded_version)
+
+
+# ---------------------------------------------------------------------------
+# Round 4 需求 7: 预填充 provenance 回写
+# ---------------------------------------------------------------------------
+
+PREFILL_SERVICE_VERSION = "prefill_v1.2"
+
+# 公式类型 → provenance source 映射
+_FORMULA_TYPE_TO_SOURCE: dict[str, str] = {
+    "TB": "trial_balance",
+    "SUM_TB": "trial_balance",
+    "AUX": "ledger",
+    "PREV": "prior_year",
+    "WP": "formula",
+}
+
+
+def _build_source_ref(
+    formula_type: str,
+    raw_args: str,
+    params: dict[str, str],
+) -> str | None:
+    """根据公式类型和参数构建 source_ref 字符串
+
+    Returns:
+        source_ref 字符串，或 None（参数不足/未知类型时）
+    """
+    ft = formula_type.upper()
+
+    if ft in ("TB", "SUM_TB"):
+        account = params.get("account_code") or params.get("account_range", "")
+        column = params.get("column_name", "")
+        if not account:
+            return None
+        return f"{account}:{column}"
+
+    elif ft == "AUX":
+        account = params.get("account_code", "")
+        dimension = params.get("aux_dimension", "")
+        value = params.get("dimension_value", "")
+        column = params.get("column_name", "")
+        if not account:
+            return None
+        return f"{account}:{dimension}:{value}:{column}"
+
+    elif ft == "PREV":
+        inner_type = params.get("formula_type", "")
+        account = params.get("account_code", "")
+        if not inner_type:
+            return None
+        return f"{inner_type}:{account}"
+
+    elif ft == "WP":
+        wp_code = params.get("wp_code", "")
+        cell_ref = params.get("cell_ref", "")
+        if not wp_code:
+            return None
+        return f"{wp_code}!{cell_ref}"
+
+    return None
+
+
+def _write_cell_provenance(wp, provenance: dict[str, dict]) -> None:
+    """将 provenance 数据写入 wp.parsed_data.cell_provenance
+
+    Supersede 策略：
+    - 重填时覆盖旧值
+    - 保留最多 1 次历史（_prev 字段）
+    - 相同 filled_at 时不创建 _prev（幂等重入）
+    """
+    if wp.parsed_data is None:
+        wp.parsed_data = {}
+
+    if "cell_provenance" not in wp.parsed_data:
+        wp.parsed_data["cell_provenance"] = {}
+
+    cp = wp.parsed_data["cell_provenance"]
+
+    for cell_ref, new_entry in provenance.items():
+        existing = cp.get(cell_ref)
+
+        if existing is None:
+            # 首次写入
+            cp[cell_ref] = new_entry
+        else:
+            # Supersede: 检查是否幂等重入（相同 filled_at）
+            if existing.get("filled_at") == new_entry.get("filled_at"):
+                # 幂等，不创建 _prev
+                cp[cell_ref] = new_entry
+            else:
+                # 保留上一次为 _prev（丢弃更早的历史）
+                prev_snapshot = {
+                    k: v for k, v in existing.items() if k != "_prev"
+                }
+                new_entry["_prev"] = prev_snapshot
+                cp[cell_ref] = new_entry

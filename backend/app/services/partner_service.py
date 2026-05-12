@@ -97,7 +97,7 @@ class PartnerOverviewService:
 
             # 项目创建超过120天还没完成
             if proj.created_at:
-                age = (datetime.utcnow() - proj.created_at.replace(tzinfo=timezone.utc)).days
+                age = (datetime.now(timezone.utc) - proj.created_at.replace(tzinfo=timezone.utc)).days
                 if age > 120 and proj.status not in ("archived", "reporting"):
                     risk_level = "medium" if risk_level == "low" else risk_level
                     risk_reasons.append(f"项目已进行 {age} 天")
@@ -408,30 +408,8 @@ class SignReadinessService:
                 }
             )
 
-        # KAM + independence — wizard_state
-        ws = (proj.wizard_state or {}) if proj is not None else {}
-        if not ws.get("kam_confirmed", False):
-            extra.setdefault("kam_confirmed", []).append(
-                {
-                    "rule_code": "READINESS-KAM",
-                    "error_code": "KAM_NOT_CONFIRMED",
-                    "severity": "blocking",
-                    "message": "关键审计事项尚未确认",
-                    "location": {"project_id": str(project_id)},
-                    "action_hint": "请在项目向导确认关键审计事项",
-                }
-            )
-        if not ws.get("independence_confirmed", False):
-            extra.setdefault("independence", []).append(
-                {
-                    "rule_code": "READINESS-INDEP",
-                    "error_code": "INDEPENDENCE_NOT_CONFIRMED",
-                    "severity": "blocking",
-                    "message": "独立性确认未完成",
-                    "location": {"project_id": str(project_id)},
-                    "action_hint": "请完成独立性声明（R1 v1.5 将升级为结构化声明）",
-                }
-            )
+        # KAM + independence — 已由 R6 GateRule 覆盖（R6-KAM / R6-INDEPENDENCE）
+        # 不再在 extra_findings 中重复检查
 
         return extra
 

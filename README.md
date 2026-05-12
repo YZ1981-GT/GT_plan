@@ -334,3 +334,45 @@ Recommended upload strategy for very large datasets:
 ## 联系方式
 
 如有问题或建议，请联系项目维护者。
+
+## CI / pre-commit
+
+### 本地 pre-commit 安装
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+安装后每次 `git commit` 会自动运行以下检查：
+
+| Hook | 作用 | 触发文件 |
+|------|------|----------|
+| `check-json` | JSON 语法校验 | `backend/data/*.json` |
+| `json-template-lint` | Seed 文件 schema 校验 | `backend/data/*.json` |
+
+手动运行全部 hook（不提交）：
+
+```bash
+pre-commit run --all-files
+```
+
+### CI 流水线
+
+推送到 `master` 或发起 PR 时，GitHub Actions 自动运行 4 个并发 job：
+
+| Job | 内容 |
+|-----|------|
+| `backend-tests` | pytest（排除 integration/e2e） |
+| `backend-lint` | ruff check + signature_level 用法检查 |
+| `seed-validate` | validate_seed_files.py schema 校验 |
+| `frontend-build` | npm ci + npm run build |
+
+### CI 失败排查
+
+| 失败 Job | 常见原因 | 排查步骤 |
+|----------|----------|----------|
+| `backend-tests` | 新代码引入测试失败 | 本地 `python -m pytest backend/tests/ --ignore=backend/tests/integration --ignore=backend/tests/e2e -x --tb=short` |
+| `backend-lint` | ruff 规则违反或 `signature_level ==` 直接比较 | 本地 `python -m ruff check backend/` 修复；确认不直接比较 `signature_level` 字段 |
+| `seed-validate` | seed JSON 格式错误或字段缺失 | 本地 `python scripts/validate_seed_files.py` 查看具体报错 |
+| `frontend-build` | TypeScript 类型错误或依赖缺失 | 本地 `cd audit-platform/frontend && npm ci && npm run build` |

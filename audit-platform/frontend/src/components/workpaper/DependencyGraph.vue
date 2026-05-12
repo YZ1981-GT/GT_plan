@@ -48,7 +48,7 @@
           <span class="gt-dep-node-label">{{ cycleName }}实质性程序</span>
         </div>
         <div v-if="impactLabel" class="gt-dep-impact">
-          <el-tag :type="impactType" size="small">{{ impactLabel }}</el-tag>
+          <el-tag :type="(impactType) || undefined" size="small">{{ impactLabel }}</el-tag>
           <span class="gt-dep-impact-text">{{ impactSuggestion }}</span>
         </div>
       </div>
@@ -61,6 +61,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/services/apiProxy'
+import * as P from '@/services/apiPaths'
 
 const props = defineProps<{
   projectId: string
@@ -108,7 +109,7 @@ async function loadGraph() {
 async function loadNodeStatuses() {
   // 简化：从底稿列表获取B/C类底稿状态
   try {
-    const data = await api.get(`/api/projects/${props.projectId}/working-papers`, {
+    const data = await api.get(P.workpapers.list(props.projectId), {
       params: { audit_cycle: selectedCycle.value },
       validateStatus: (s: number) => s < 600,
     })

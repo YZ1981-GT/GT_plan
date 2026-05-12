@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +18,7 @@ class ImportEventConsumptionService:
         retention_days: int = 180,
         batch_size: int = 5000,
     ) -> dict[str, int]:
-        cutoff = datetime.utcnow() - timedelta(days=max(1, retention_days))
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=max(1, retention_days))
         ids = list(
             (
                 await db.execute(

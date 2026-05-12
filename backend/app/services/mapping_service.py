@@ -61,15 +61,16 @@ async def _resolve_event_year(
     db: AsyncSession,
     year: int | None = None,
 ) -> int | None:
-    """优先使用显式 year，缺失时再从 tb_balance 推断。"""
+    """优先使用显式 year，缺失时再从 ledger_datasets 推断最新 active 年度。"""
     if year is not None:
         return year
 
+    from app.models.dataset_models import DatasetStatus, LedgerDataset
     year_result = await db.execute(
-        select(TbBalance.year).where(
-            TbBalance.project_id == project_id,
-            TbBalance.is_deleted == False,  # noqa: E712
-        ).distinct().order_by(TbBalance.year.desc()).limit(1)
+        select(LedgerDataset.year).where(
+            LedgerDataset.project_id == project_id,
+            LedgerDataset.status == DatasetStatus.active,
+        ).order_by(LedgerDataset.year.desc()).limit(1)
     )
     return year_result.scalar_one_or_none()
 
@@ -639,7 +640,22 @@ async def _get_unmapped_with_balance(
     if year is not None:
         balance_filters.append(await get_active_filter(db, TbBalance.__table__, project_id, year))
     else:
-        balance_filters.append(TbBalance.is_deleted == False)  # noqa: E712
+        # year 未知时，查询所有 active 数据集对应的行
+        from app.models.dataset_models import DatasetStatus, LedgerDataset
+        ds_result = await db.execute(
+            select(LedgerDataset.year).where(
+                LedgerDataset.project_id == project_id,
+                LedgerDataset.status == DatasetStatus.active,
+            )
+        )
+        active_years = [row[0] for row in ds_result.all()]
+        if active_years:
+            # 使用最新 active 年度的过滤条件
+            latest_year = max(active_years)
+            balance_filters.append(await get_active_filter(db, TbBalance.__table__, project_id, latest_year))
+        else:
+            # 无 active 数据集时降级为 project_id 过滤
+            balance_filters.append(TbBalance.project_id == project_id)
     balance_result = await db.execute(
         select(
             TbBalance.account_code,

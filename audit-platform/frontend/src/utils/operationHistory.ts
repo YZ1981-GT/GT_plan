@@ -18,6 +18,21 @@ export interface Operation {
   undo: () => Promise<void> | void
 }
 
+/**
+ * 单元格编辑操作（Sprint 3 GtEditableTable 集成时使用）
+ * operationHistory.execute() 已兼容此类型（满足 Operation 接口即可）
+ */
+export interface CellEditOp {
+  type: 'cell_edit'
+  description: string
+  rowIdx: number
+  colKey: string
+  oldValue: any
+  newValue: any
+  execute: () => Promise<void>
+  undo: () => Promise<void>
+}
+
 interface HistoryEntry {
   operation: Operation
   executedAt: number

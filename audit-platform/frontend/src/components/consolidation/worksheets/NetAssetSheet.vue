@@ -103,7 +103,8 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmBatch, confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO } from '@/composables/useExcelIO'
@@ -155,7 +156,7 @@ let _deletedBackup: NetAssetRow[] = []
 async function batchDelete() {
   if (!selectedRows.value.length) return
   try {
-    await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 行？删除后可点击"还原"恢复默认行。`, '删除确认', { type: 'warning' })
+    await confirmBatch('删除', selectedRows.value.length)
     _deletedBackup = [...tableData.value] // 备份当前状态
     const del = new Set(selectedRows.value)
     tableData.value = tableData.value.filter(r => !del.has(r))
@@ -166,7 +167,7 @@ async function batchDelete() {
 
 async function restoreDefaults() {
   try {
-    await ElMessageBox.confirm('确定恢复默认行结构？当前数据将被重置。', '还原确认', { type: 'warning' })
+    await confirmDangerous('确定恢复默认行结构？当前数据将被重置。', '还原确认')
     emit('restore-defaults')
     ElMessage.success('已恢复默认行结构')
   } catch {}

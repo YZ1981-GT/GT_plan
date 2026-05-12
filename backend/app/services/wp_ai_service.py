@@ -1,18 +1,106 @@
 """AI 辅助底稿编制服务
 
 Phase 9 Task 9.8: 分析性复核 + 函证对象提取 + 审定表核对
+R3 Sprint 4 Task 21: AI 内容统一结构化
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+def wrap_ai_content(
+    value: str | dict,
+    source_model: str,
+    confidence: float,
+    confirmed_by: UUID | None = None,
+    confirmed_at: datetime | None = None,
+) -> dict:
+    """将 AI 输出包装为统一结构化格式。
+
+    R3 Sprint 4 Task 21: 所有 AI 输出必须包装为此结构，
+    以便门禁规则 AIContentMustBeConfirmedRule 检查确认状态。
+
+    Args:
+        value: AI 生成的原始内容（文本或结构化数据）
+        source_model: 生成该内容的模型标识（如 'qwen3.5-27b'）
+        confidence: 模型置信度 [0.0, 1.0]
+        confirmed_by: 确认人 UUID（未确认时为 None）
+        confirmed_at: 确认时间（未确认时为 None）
+
+    Returns:
+        统一结构化 dict
+    """
+    return {
+        "type": "ai_generated",
+        "source_model": source_model,
+        "confidence": confidence,
+        "confirmed_by": str(confirmed_by) if confirmed_by else None,
+        "confirmed_at": confirmed_at.isoformat() if confirmed_at else None,
+        "value": value,
+    }
+
+
+def wrap_ai_output(
+    content: str,
+    *,
+    confidence: float = 0.0,
+    source_model: str | None = None,
+    target_cell: str | None = None,
+    target_field: str | None = None,
+    source_prompt_version: str | None = None,
+) -> dict:
+    """将 AI 输出包装为统一结构化格式（R3 Sprint 4 Task 21 完整版）。
+
+    与 wrap_ai_content 的区别：本函数面向前端确认流程，
+    包含 id/generated_at/confirm_action/revised_content 等字段，
+    供 AIContentMustBeConfirmedRule 门禁规则检查。
+
+    Args:
+        content: AI 生成的文本内容
+        confidence: 模型置信度 [0.0, 1.0]
+        source_model: 模型标识，默认从 settings 读取
+        target_cell: 目标单元格引用（如 "E5"）
+        target_field: 目标字段名（如 "conclusion"）
+        source_prompt_version: 提示词版本号
+
+    Returns:
+        统一结构化 dict，含确认状态字段
+    """
+    import uuid as _uuid
+    from datetime import timezone as _tz
+
+    if source_model is None:
+        try:
+            from app.core.config import settings
+            source_model = getattr(settings, "DEFAULT_CHAT_MODEL", "Qwen3.5-27B")
+        except Exception:
+            source_model = "Qwen3.5-27B"
+
+    return {
+        "id": str(_uuid.uuid4()),
+        "type": "ai_generated",
+        "source_model": source_model,
+        "source_prompt_version": source_prompt_version,
+        "generated_at": datetime.now(_tz.utc).isoformat(),
+        "confidence": confidence,
+        "content": content,
+        "target_cell": target_cell,
+        "target_field": target_field,
+        "confirmed_by": None,
+        "confirmed_at": None,
+        "confirm_action": None,
+        "revised_content": None,
+    }
 
 
 class WpAIService:
@@ -63,13 +151,25 @@ class WpAIService:
             )
 
             prompt = f"科目 {account_code}，本期余额 {current:,.2f}，上期余额 {prior:,.2f}，变动额 {change:,.2f}，变动率 {rate}%。请用一句话分析变动原因。"
+            # AI 脱敏前置过滤（R4 需求 2 / R8-S1 Task 35）
+            from app.services.export_mask_service import export_mask_service
+            masked_prompt, _mapping = export_mask_service.mask_text(prompt)
             try:
                 ai_text = await chat_completion([
                     {"role": "system", "content": "你是审计分析师，请简洁分析科目余额变动原因。如有上年分析参照请对比。"},
-                    {"role": "user", "content": prompt},
+                    {"role": "user", "content": masked_prompt},
                 ], context_documents=context_docs if context_docs else None)
+                source_model = "qwen3.5-27b"
             except Exception:
                 ai_text = f"该科目余额变动 {change:,.2f}，变动率 {rate}%。"
+                source_model = "fallback"
+
+            # R3 Sprint 4: AI 输出统一结构化
+            ai_analysis_wrapped = wrap_ai_content(
+                value=ai_text,
+                source_model=source_model,
+                confidence=0.8 if source_model != "fallback" else 0.0,
+            )
 
             update_task(task_id, TaskStatus.success)
             return {
@@ -79,7 +179,7 @@ class WpAIService:
                 "change_amount": change,
                 "change_rate": rate,
                 "is_significant": is_significant,
-                "ai_analysis": ai_text,
+                "ai_analysis": ai_analysis_wrapped,
                 "recommended_procedures": [],
                 "task_id": task_id,
             }
@@ -91,13 +191,13 @@ class WpAIService:
         """函证对象提取：从辅助余额表提取"""
         from app.models.audit_platform_models import TbAuxBalance
 
+        from app.services.dataset_query import get_active_filter
+
         q = (
             sa.select(TbAuxBalance)
             .where(
-                TbAuxBalance.project_id == project_id,
+                await get_active_filter(self.db, TbAuxBalance.__table__, project_id, year),
                 TbAuxBalance.account_code.like(f"{account_code}%"),
-                TbAuxBalance.year == year,
-                TbAuxBalance.is_deleted == False,  # noqa
             )
             .order_by(TbAuxBalance.closing_balance.desc())
             .limit(50)

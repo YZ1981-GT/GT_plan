@@ -1,9 +1,10 @@
 <template>
   <div class="gt-template-editor">
-    <div class="gt-page-header">
-      <el-button size="small" @click="$router.back()"><el-icon><ArrowLeft /></el-icon> 返回</el-button>
-      <h2 class="gt-page-title">{{ isNew ? '新建模板' : '编辑模板' }}</h2>
-    </div>
+    <GtPageHeader title="自定义模板编辑" :show-back="false">
+      <template #actions>
+        <el-button size="small" @click="$router.back()"><el-icon><ArrowLeft /></el-icon> 返回</el-button>
+      </template>
+    </GtPageHeader>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="max-width: 700px">
       <el-form-item label="模板名称" prop="template_name">
@@ -47,6 +48,7 @@ import {
   getCustomTemplate, createCustomTemplate, updateCustomTemplate,
   validateCustomTemplate,
 } from '@/services/commonApi'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const router = useRouter()
@@ -80,7 +82,7 @@ async function loadTemplate() {
     form.value.category = t.category
     form.value.version = t.version
     form.value.description = t.description || ''
-  } catch { ElMessage.error('加载模板失败') }
+  } catch (e: any) { handleApiError(e, '加载模板') }
 }
 
 async function onSave() {
@@ -103,7 +105,7 @@ async function onSave() {
       ElMessage.success('模板更新成功')
     }
     router.push('/extension/custom-templates')
-  } catch { ElMessage.error('保存失败') }
+  } catch (e: any) { handleApiError(e, '保存') }
   finally { saving.value = false }
 }
 
@@ -111,7 +113,7 @@ async function onValidate() {
   validating.value = true
   try {
     validationResult.value = await validateCustomTemplate(templateId.value)
-  } catch { ElMessage.error('验证请求失败') }
+  } catch (e: any) { handleApiError(e, '验证请求') }
   finally { validating.value = false }
 }
 

@@ -34,12 +34,14 @@
       <el-table-column prop="disagreement_count" label="异议数" width="80" align="center" />
       <el-table-column label="异议率" width="120" align="center">
         <template #default="{ row }">
-          <el-tag
-            :type="rateTagType(row.disagreement_rate)"
-            size="small"
-          >
-            {{ row.disagreement_rate }}%
-          </el-tag>
+          <el-tooltip content="健康的 EQCR 应产生建设性异议，过低（0%）可能表示复核流于形式" placement="top">
+            <el-tag
+              :type="rateTagType(row.disagreement_rate)"
+              size="small"
+            >
+              {{ row.disagreement_rate }}%
+            </el-tag>
+          </el-tooltip>
           <span v-if="row.disagreement_rate > 20" style="margin-left: 4px; font-size: 11px; color: #67c23a">独立性强</span>
           <span v-else-if="row.disagreement_rate === 0" style="margin-left: 4px; font-size: 11px; color: #e6a23c">需审查</span>
         </template>
@@ -59,9 +61,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import api from '@/services/apiProxy'
+import { eqcr as P_eqcr } from '@/services/apiPaths'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const router = useRouter()
 const loading = ref(false)
@@ -82,10 +85,10 @@ function rateTagType(rate: number): ElTagType {
 async function fetchMetrics() {
   loading.value = true
   try {
-    const data = await api.get(`/api/eqcr/metrics?year=${selectedYear.value}`)
+    const data = await api.get(`${P_eqcr.metrics}?year=${selectedYear.value}`)
     metrics.value = data.metrics || []
-  } catch {
-    ElMessage.error('获取 EQCR 指标失败')
+  } catch (e: any) {
+    handleApiError(e, '获取 EQCR 指标')
   } finally {
     loading.value = false
   }

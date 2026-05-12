@@ -8,7 +8,7 @@ from __future__ import annotations
 import io
 import logging
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -161,7 +161,7 @@ class WpUploadService:
 
         # 更新数据库
         wp.file_version += 1
-        wp.updated_at = datetime.utcnow()
+        wp.updated_at = datetime.now(timezone.utc)
         wp.prefill_stale = True  # 标记需要重新解析
         await db.flush()
 

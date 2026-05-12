@@ -1,9 +1,10 @@
 <template>
   <div class="gt-forum gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">吐槽与求助</h2>
-      <el-button type="primary" @click="showCreate = true">发帖</el-button>
-    </div>
+    <GtPageHeader title="吐槽与求助" :show-back="false">
+      <template #actions>
+        <el-button type="primary" @click="showCreate = true">发帖</el-button>
+      </template>
+    </GtPageHeader>
 
     <el-radio-group v-model="category" @change="fetchPosts" style="margin-bottom: var(--gt-space-3)">
       <el-radio-button label="">全部</el-radio-button>
@@ -82,6 +83,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { listPosts, createPost, getComments, createComment, likePost, type ForumPostItem } from '@/services/commonApi'
 import { EditPen, Hide, Promotion } from '@element-plus/icons-vue'
+import { handleApiError } from '@/utils/errorHandler'
 
 const category = ref('')
 const posts = ref<ForumPostItem[]>([])
@@ -101,7 +103,7 @@ async function fetchPosts() {
     posts.value = await listPosts(category.value || undefined)
   } catch (e: any) {
     posts.value = []
-    ElMessage.error('加载帖子失败: ' + (e?.message || ''))
+    handleApiError(e, '加载帖子')
   } finally {
     loading.value = false
   }

@@ -1,9 +1,10 @@
 <template>
   <div class="gt-checkins gt-fade-in">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">打卡签到</h2>
-      <el-button type="primary" @click="onCheckIn">打卡</el-button>
-    </div>
+    <GtPageHeader title="打卡签到" :show-back="false">
+      <template #actions>
+        <el-button type="primary" @click="onCheckIn">打卡</el-button>
+      </template>
+    </GtPageHeader>
     <el-table :data="checkIns" stripe>
       <el-table-column prop="check_time" label="打卡时间">
         <template #default="{ row }">{{ row.check_time?.slice(0, 19) }}</template>

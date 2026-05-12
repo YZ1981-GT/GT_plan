@@ -72,12 +72,12 @@ class BackgroundJobService:
                 if executor_fn:
                     await executor_fn(item.wp_id)
                 item.status = "succeeded"
-                item.finished_at = datetime.utcnow()
+                item.finished_at = datetime.now(timezone.utc)
                 job.progress_done += 1
             except Exception as e:
                 item.status = "failed"
                 item.error_message = str(e)[:500]
-                item.finished_at = datetime.utcnow()
+                item.finished_at = datetime.now(timezone.utc)
                 job.failed_count += 1
                 logger.warning("job %s item %s failed: %s", job_id, item.wp_id, e)
             await self.db.flush()
@@ -85,7 +85,7 @@ class BackgroundJobService:
         job.status = "succeeded" if job.failed_count == 0 else (
             "failed" if job.progress_done == 0 else "partial_failed"
         )
-        job.updated_at = datetime.utcnow()
+        job.updated_at = datetime.now(timezone.utc)
         await self.db.flush()
 
     async def retry_job(self, job_id: UUID, executor_fn=None) -> dict:

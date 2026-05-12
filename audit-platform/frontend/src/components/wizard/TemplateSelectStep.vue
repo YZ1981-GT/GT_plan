@@ -19,7 +19,7 @@
         <el-table-column prop="template_name" label="模板名称" min-width="200" />
         <el-table-column prop="template_type" label="类型" width="120">
           <template #default="{ row }">
-            <el-tag size="small" :type="typeTagColor(row.template_type)">
+            <el-tag size="small" :type="(typeTagColor(row.template_type)) || undefined">
               {{ typeLabel(row.template_type) }}
             </el-tag>
           </template>
@@ -70,7 +70,7 @@
         <el-table-column prop="audit_cycle" label="循环" width="60" />
         <el-table-column prop="level_label" label="来源" width="120">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.level === 'firm_default' ? '' : 'warning'" effect="plain">
+            <el-tag size="small" :type="(row.level === 'firm_default' ? '' : 'warning') || undefined" effect="plain">
               {{ row.level_label }}
             </el-tag>
           </template>

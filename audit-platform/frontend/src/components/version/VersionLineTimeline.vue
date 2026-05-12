@@ -47,8 +47,8 @@ function objectTypeIcon(t: string) {
   const m: Record<string, string> = { report: '📊', note: '📝', workpaper: '📋', procedure: '📌' }
   return m[t] || '📄'
 }
-function objectTypeColor(t: string) {
-  const m: Record<string, string> = { report: 'primary', note: 'success', workpaper: 'warning', procedure: 'danger' }
+function objectTypeColor(t: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { report: 'primary', note: 'success', workpaper: 'warning', procedure: 'danger' }
   return m[t] || ''
 }
 function formatTime(t: string) {

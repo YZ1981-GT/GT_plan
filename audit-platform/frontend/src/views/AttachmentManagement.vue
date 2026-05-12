@@ -1,24 +1,25 @@
 ﻿<template>
   <div class="gt-attachment-page">
     <div class="gt-att-header">
-      <h2 class="gt-page-title">附件管理</h2>
-      <div class="gt-att-actions">
-        <el-input v-model="searchQuery" placeholder="搜索附件..." size="small" clearable
-          :prefix-icon="Search" style="width: 200px" @keyup.enter="onSearch" />
-        <el-select v-model="filterType" placeholder="文件类型" size="small" clearable style="width: 120px" @change="loadAttachments">
-          <el-option label="PDF" value="pdf" />
-          <el-option label="Word" value="word" />
-          <el-option label="Excel" value="excel" />
-          <el-option label="图片" value="image" />
-        </el-select>
-        <el-upload
-          :show-file-list="false"
-          :before-upload="beforeUpload"
-          :http-request="uploadAttachment"
-        >
-          <el-button type="primary" size="small"><el-icon><Upload /></el-icon> 上传附件</el-button>
-        </el-upload>
-      </div>
+      <GtPageHeader title="附件管理" :show-back="false">
+        <template #actions>
+          <el-input v-model="searchQuery" placeholder="搜索附件..." size="small" clearable
+            :prefix-icon="Search" style="width: 200px" @keyup.enter="onSearch" />
+          <el-select v-model="filterType" placeholder="文件类型" size="small" clearable style="width: 120px" @change="loadAttachments">
+            <el-option label="PDF" value="pdf" />
+            <el-option label="Word" value="word" />
+            <el-option label="Excel" value="excel" />
+            <el-option label="图片" value="image" />
+          </el-select>
+          <el-upload
+            :show-file-list="false"
+            :before-upload="beforeUpload"
+            :http-request="uploadAttachment"
+          >
+            <el-button type="primary" size="small"><el-icon><Upload /></el-icon> 上传附件</el-button>
+          </el-upload>
+        </template>
+      </GtPageHeader>
     </div>
 
     <!-- 附件列表 -->
@@ -33,7 +34,7 @@
       </el-table-column>
       <el-table-column prop="file_type" label="类型" width="80" align="center">
         <template #default="{ row }">
-          <el-tag size="small" :type="typeTagType(row.file_type)">{{ row.file_type }}</el-tag>
+          <el-tag size="small" :type="(typeTagType(row.file_type)) || undefined">{{ row.file_type }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="大小" width="100" align="right">
@@ -41,7 +42,7 @@
       </el-table-column>
       <el-table-column prop="ocr_status" label="OCR" width="120" align="center">
         <template #default="{ row }">
-          <el-tag size="small" :type="ocrTagType(row.ocr_status)">{{ ocrLabel(row.ocr_status) }}</el-tag>
+          <el-tag size="small" :type="(ocrTagType(row.ocr_status)) || undefined">{{ ocrLabel(row.ocr_status) }}</el-tag>
           <el-button v-if="row.ocr_status === 'failed'" link type="warning" size="small" @click="retryOCR(row)" style="margin-left:4px">重试</el-button>
         </template>
       </el-table-column>
@@ -118,8 +119,11 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Upload, Document } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
+import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue'
 import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
+import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
@@ -148,7 +152,7 @@ async function searchWorkpapers(query: string) {
   if (!query || query.length < 1) { wpSearchResults.value = []; return }
   wpSearchLoading.value = true
   try {
-    const data = await api.get(`/api/projects/${projectId.value}/wp-index`)
+    const data = await api.get(P_wp.wpIndex(projectId.value))
     const items = Array.isArray(data) ? data : data ?? []
     // 按编号或名称模糊过滤
     const q = query.toLowerCase()
@@ -165,7 +169,7 @@ async function loadAttachments() {
   try {
     const params: any = {}
     if (filterType.value) params.file_type = filterType.value
-    const data = await api.get(`/api/projects/${projectId.value}/attachments`, { params })
+    const data = await api.get(P_att.list(projectId.value), { params })
     attachments.value = data ?? []
   } catch { attachments.value = [] }
   finally { loading.value = false }
@@ -175,7 +179,7 @@ async function onSearch() {
   if (!searchQuery.value) { loadAttachments(); return }
   loading.value = true
   try {
-    const data = await api.get('/api/attachments/search', {
+    const data = await api.get(P_att.search, {
       params: { project_id: projectId.value, q: searchQuery.value },
     })
     attachments.value = data ?? []
@@ -184,8 +188,9 @@ async function onSearch() {
 }
 
 function preview(row: any) {
+  // TODO: replace AttachmentPreview dialog with AttachmentPreviewDrawer for unified drawer-based preview
   // 使用统一预览代理端点
-  previewUrl.value = `/api/attachments/${row.id}/preview`
+  previewUrl.value = P_att.preview(row.id)
   previewName.value = row.file_name
   previewType.value = row.file_type
   previewVisible.value = true
@@ -193,9 +198,9 @@ function preview(row: any) {
 
 async function download(row: any) {
   try {
-    await downloadFile(`/api/attachments/${row.id}/download`)
-  } catch {
-    ElMessage.error('下载失败')
+    await downloadFile(P_att.download(row.id))
+  } catch (e: any) {
+    handleApiError(e, '下载')
   }
 }
 
@@ -209,14 +214,14 @@ function associateDialog(row: any) {
 async function submitAssociate() {
   if (!associateWpId.value) { ElMessage.warning('请选择底稿'); return }
   try {
-    await api.post(`/api/attachments/${associateAttachmentId.value}/associate`, {
+    await api.post(P_att.associate(associateAttachmentId.value), {
       wp_id: associateWpId.value,
       association_type: associateType.value,
       notes: associateNotes.value || undefined,
     })
     ElMessage.success('关联成功')
     associateVisible.value = false
-  } catch { ElMessage.error('关联失败') }
+  } catch (e: any) { handleApiError(e, '关联') }
 }
 
 function beforeUpload(file: File) {
@@ -233,14 +238,14 @@ async function uploadAttachment(options: any) {
   formData.append('file', options.file)
   try {
     const response = await api.post(
-      `/api/projects/${projectId.value}/attachments/upload`,
+      P_att.upload(projectId.value),
       formData,
     )
     options.onSuccess?.(response.data)
     onUploadSuccess()
   } catch (error) {
     options.onError?.(error)
-    ElMessage.error('上传失败')
+    handleApiError(error, '上传')
   }
 }
 
@@ -251,10 +256,10 @@ function onUploadSuccess() {
 
 async function retryOCR(row: any) {
   try {
-    await api.put(`/api/attachments/${row.id}/ocr-status`, { status: 'pending' })
+    await api.put(P_att.ocrStatus(row.id), { status: 'pending' })
     ElMessage.success('已重新提交 OCR 识别')
     await loadAttachments()
-  } catch { ElMessage.error('重试失败') }
+  } catch (e: any) { handleApiError(e, '重试') }
 }
 
 function formatSize(bytes: number): string {
@@ -269,13 +274,13 @@ function formatDate(d: string): string {
   return new Date(d).toLocaleDateString('zh-CN')
 }
 
-function typeTagType(t: string): string {
-  const m: Record<string, string> = { pdf: 'danger', docx: '', xlsx: 'success', image: 'warning' }
+function typeTagType(t: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { pdf: 'danger', docx: '', xlsx: 'success', image: 'warning' }
   return m[t] || 'info'
 }
 
-function ocrTagType(s: string): string {
-  const m: Record<string, string> = { pending: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
+function ocrTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { pending: 'info', processing: 'warning', completed: 'success', failed: 'danger' }
   return m[s] || 'info'
 }
 

@@ -12,7 +12,7 @@
       <template #default="{ row }">
         <el-switch
           :model-value="row.is_enabled"
-          @change="(v: boolean) => togglePlugin(row, v)"
+          @change="(v: string | number | boolean) => togglePlugin(row, !!v)"
           :loading="row._toggling"
           active-text="启用"
           inactive-text="禁用"
@@ -35,6 +35,7 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { aiPlugins as P_aip } from '@/services/apiPaths'
 
 defineProps<{
   plugins: any[]
@@ -52,7 +53,7 @@ async function togglePlugin(plugin: any, enabled: boolean) {
   plugin._toggling = true
   try {
     const action = enabled ? 'enable' : 'disable'
-    await api.post(`/api/ai-plugins/${plugin.id}/${action}`)
+    await api.post(`${P_aip.list}/${plugin.id}/${action}`)
     plugin.is_enabled = enabled
     ElMessage.success(`插件已${enabled ? '启用' : '禁用'}`)
     emit('toggled')

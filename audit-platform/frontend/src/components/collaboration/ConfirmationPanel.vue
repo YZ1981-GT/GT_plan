@@ -23,7 +23,7 @@
       </el-table-column>
       <el-table-column label="状态" width="120">
         <template #default="{ row }">
-          <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+          <el-tag :type="(statusType(row.status)) || undefined">{{ statusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="due_date" label="截止日期" width="120" />
@@ -70,7 +70,7 @@
         <p><strong>函证名称：</strong>{{ currentRow.confirmation_name }}</p>
         <p><strong>交易对手：</strong>{{ currentRow.counterparty }}</p>
         <p><strong>类型：</strong>{{ typeLabel(currentRow.type) }}</p>
-        <p><strong>状态：</strong><el-tag :type="statusType(currentRow.status)">{{ statusLabel(currentRow.status) }}</el-tag></p>
+        <p><strong>状态：</strong><el-tag :type="(statusType(currentRow.status)) || undefined">{{ statusLabel(currentRow.status) }}</el-tag></p>
         <el-divider />
         <h4>审核意见</h4>
         <el-input v-model="reviewComments" type="textarea" :rows="4" placeholder="填写审核意见" />
@@ -110,7 +110,7 @@ const typeMap: Record<string, string> = {
   LAWYER: '律师',
 }
 
-const statusMap: Record<string, { label: string; type: string }> = {
+const statusMap: Record<string, { label: string; type: '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' }> = {
   PENDING: { label: '待发送', type: 'info' },
   SENT: { label: '已发送', type: 'warning' },
   RECEIVED: { label: '已回函', type: 'success' },
@@ -130,7 +130,7 @@ function statusLabel(s: string) {
   return statusMap[s]?.label || s
 }
 
-function statusType(s: string) {
+function statusType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
   return statusMap[s]?.type || 'info'
 }
 

@@ -399,6 +399,58 @@ export function useCellSelection() {
     _releaseDocListeners()
   })
 
+  // ── R7-S3-08：行选/列选/全选 ──
+
+  /**
+   * 选中整行（点击行号时调用）
+   * @param rowIdx 行索引
+   * @param totalCols 总列数
+   */
+  function selectRow(rowIdx: number, totalCols: number) {
+    const cells: SelectedCell[] = []
+    for (let c = 0; c < totalCols; c++) {
+      const val = _getCellValue ? _getCellValue(rowIdx, c) : null
+      cells.push({ row: rowIdx, col: c, value: val })
+    }
+    selectedCells.value = cells
+    anchorRow = rowIdx
+    anchorCol = 0
+  }
+
+  /**
+   * 选中整列（点击列头时调用）
+   * @param colIdx 列索引
+   * @param totalRows 总行数
+   */
+  function selectColumn(colIdx: number, totalRows: number) {
+    const cells: SelectedCell[] = []
+    for (let r = 0; r < totalRows; r++) {
+      const val = _getCellValue ? _getCellValue(r, colIdx) : null
+      cells.push({ row: r, col: colIdx, value: val })
+    }
+    selectedCells.value = cells
+    anchorRow = 0
+    anchorCol = colIdx
+  }
+
+  /**
+   * 全选（Ctrl+A，表格 focus 时）
+   * @param totalRows 总行数
+   * @param totalCols 总列数
+   */
+  function selectAll(totalRows: number, totalCols: number) {
+    const cells: SelectedCell[] = []
+    for (let r = 0; r < totalRows; r++) {
+      for (let c = 0; c < totalCols; c++) {
+        const val = _getCellValue ? _getCellValue(r, c) : null
+        cells.push({ row: r, col: c, value: val })
+      }
+    }
+    selectedCells.value = cells
+    anchorRow = 0
+    anchorCol = 0
+  }
+
   return {
     selectedCells,
     contextMenu,
@@ -406,6 +458,9 @@ export function useCellSelection() {
     isCellSelected,
     selectCell,
     selectRange,
+    selectRow,
+    selectColumn,
+    selectAll,
     startDrag,
     updateDrag,
     endDrag,

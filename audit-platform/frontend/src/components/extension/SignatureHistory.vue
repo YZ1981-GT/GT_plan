@@ -11,7 +11,7 @@
         <el-card shadow="never" class="gt-sig-card">
           <div class="gt-sig-info">
             <span class="gt-sig-signer">{{ r.signer_name || r.signer_id }}</span>
-            <el-tag size="small" :type="levelType(r.signature_level)">{{ levelLabel(r.signature_level) }}</el-tag>
+            <el-tag size="small" :type="(levelType(r.signature_level)) || undefined">{{ levelLabel(r.signature_level) }}</el-tag>
           </div>
           <div class="gt-sig-meta">
             <span v-if="r.ip_address">IP: {{ r.ip_address }}</span>
@@ -27,6 +27,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { api } from '@/services/apiProxy'
+import { signatures as P_sig } from '@/services/apiPaths'
 
 const props = defineProps<{
   objectType: string
@@ -38,13 +39,13 @@ const records = ref<any[]>([])
 async function loadRecords() {
   if (!props.objectType || !props.objectId) return
   try {
-    const data = await api.get(`/api/signatures/${props.objectType}/${props.objectId}`)
+    const data = await api.get(P_sig.list(props.objectType, props.objectId))
     records.value = data ?? []
   } catch { records.value = [] }
 }
 
-function levelType(l: string) {
-  const m: Record<string, string> = { level1: 'primary', level2: 'success', level3: 'warning' }
+function levelType(l: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { level1: 'primary', level2: 'success', level3: 'warning' }
   return m[l] || 'info'
 }
 function levelLabel(l: string) {

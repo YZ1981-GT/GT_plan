@@ -28,8 +28,11 @@ export const projects = {
   communications: {
     list: (id: string) => `/api/projects/${id}/communications`,
     detail: (id: string, commId: string) => `/api/projects/${id}/communications/${commId}`,
+    commitmentUpdate: (id: string, commId: string, commitId: string) => `/api/projects/${id}/communications/${commId}/commitments/${commitId}`,
   },
   findingsSummary: (id: string) => `/api/projects/${id}/findings-summary`,
+  riskSummary: (id: string) => `/api/projects/${id}/risk-summary`,
+  costOverview: (id: string) => `/api/projects/${id}/cost-overview`,
 } as const
 
 // ─── 试算表 ─────────────────────────────────────────────────────────────────
@@ -38,6 +41,8 @@ export const trialBalance = {
   get: (pid: string) => `/api/projects/${pid}/trial-balance`,
   recalc: (pid: string) => `/api/projects/${pid}/trial-balance/recalc`,
   consistencyCheck: (pid: string) => `/api/projects/${pid}/trial-balance/consistency-check`,
+  export: (pid: string) => `/api/projects/${pid}/trial-balance/export`,
+  summaryWithAdjustments: (pid: string) => `/api/projects/${pid}/trial-balance/summary-with-adjustments`,
 } as const
 
 // ─── 调整分录 ───────────────────────────────────────────────────────────────
@@ -51,6 +56,7 @@ export const adjustments = {
   summary: (pid: string) => `/api/projects/${pid}/adjustments/summary`,
   accountDropdown: (pid: string) => `/api/projects/${pid}/adjustments/account-dropdown`,
   exportSummary: (pid: string) => `/api/projects/${pid}/adjustments/export-summary`,
+  convertToMisstatement: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/convert-to-misstatement`,
 } as const
 
 // ─── 重要性 ─────────────────────────────────────────────────────────────────
@@ -71,6 +77,7 @@ export const misstatements = {
   fromAje: (pid: string, groupId: string) => `/api/projects/${pid}/misstatements/from-aje/${groupId}`,
   detail: (pid: string, id: string) => `/api/projects/${pid}/misstatements/${id}`,
   summary: (pid: string) => `/api/projects/${pid}/misstatements/summary`,
+  recheckThreshold: (pid: string) => `/api/projects/${pid}/misstatements/recheck-threshold`,
 } as const
 
 // ─── 财务报表 ───────────────────────────────────────────────────────────────
@@ -80,8 +87,49 @@ export const reports = {
   get: (pid: string, year: number, type: string) => `/api/reports/${pid}/${year}/${type}`,
   drilldown: (pid: string, year: number, type: string, rowCode: string) =>
     `/api/reports/${pid}/${year}/${type}/drilldown/${rowCode}`,
+  relatedWorkpapers: (pid: string, year: number, type: string, rowCode: string) =>
+    `/api/reports/${pid}/${year}/${type}/${rowCode}/related-workpapers`,
   consistencyCheck: (pid: string, year: number) => `/api/reports/${pid}/${year}/consistency-check`,
   exportExcel: (pid: string, year: number, type: string) => `/api/reports/${pid}/${year}/${type}/export-excel`,
+  export: (pid: string, year: number) => `/api/reports/${pid}/${year}/export`,
+} as const
+
+// ─── 报表配置 ───────────────────────────────────────────────────────────────
+
+export const reportConfig = {
+  list: '/api/report-config',
+  drillDown: '/api/report-config/drill-down',
+  detail: (id: string) => `/api/report-config/${id}`,
+  create: '/api/report-config',
+  executeFormulasBatch: '/api/report-config/execute-formulas-batch',
+  batchUpdate: '/api/report-config/batch-update',
+} as const
+
+// ─── 报表映射 ───────────────────────────────────────────────────────────────
+
+export const reportMapping = {
+  preset: (pid: string) => `/api/projects/${pid}/report-mapping/preset`,
+  save: (pid: string) => `/api/projects/${pid}/report-mapping`,
+} as const
+
+// ─── 附注模板 ───────────────────────────────────────────────────────────────
+
+export const noteTemplates = {
+  list: (templateType: string) => `/api/note-templates/${templateType}`,
+  presetFormulas: (templateType: string) => `/api/note-templates/preset-formulas/${templateType}`,
+} as const
+
+// ─── 合并附注 ───────────────────────────────────────────────────────────────
+
+export const consolNoteSections = {
+  list: (templateType: string) => `/api/consol-note-sections/${templateType}`,
+  detail: (templateType: string, sectionId: string) => `/api/consol-note-sections/${templateType}/${sectionId}`,
+  aggregate: (pid: string, year: number) => `/api/consol-note-sections/aggregate/${pid}/${year}`,
+  refresh: (pid: string, year: number, sectionId: string) => `/api/consol-note-sections/refresh/${pid}/${year}/${sectionId}`,
+  data: (pid: string, year: number, sectionId: string) => `/api/consol-note-sections/data/${pid}/${year}/${sectionId}`,
+  applyFormulas: (pid: string, year: number) => `/api/consol-note-sections/apply-formulas/${pid}/${year}`,
+  auditAll: (pid: string, year: number) => `/api/consol-note-sections/audit-all/${pid}/${year}`,
+  audit: (pid: string, year: number, sectionId: string) => `/api/consol-note-sections/audit/${pid}/${year}/${sectionId}`,
 } as const
 
 // ─── 现金流量表工作底稿 ─────────────────────────────────────────────────────
@@ -109,6 +157,10 @@ export const disclosureNotes = {
   validate: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validate`,
   validationResults: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validation-results`,
   refreshFromWorkpapers: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/refresh-from-workpapers`,
+  clearFormulas: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/clear-formulas`,
+  exportWord: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/export-word`,
+  priorYear: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${section}/prior-year`,
+  relatedWorkpapers: (pid: string, year: number, section: string, rowCode: string) => `/api/notes/${pid}/${year}/${encodeURIComponent(section)}/row/${encodeURIComponent(rowCode)}/related-workpapers`,
   ai: {
     generatePolicy: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-policy`,
     generateAnalysis: (pid: string) => `/api/disclosure-notes/${pid}/ai/generate-analysis`,
@@ -261,6 +313,16 @@ export const workpapers = {
   wpIndex: (pid: string) => `/api/projects/${pid}/wp-index`,
   wpCrossRefs: (pid: string) => `/api/projects/${pid}/wp-cross-refs`,
   qcSummary: (pid: string) => `/api/projects/${pid}/qc-summary`,
+  batchPrefill: (pid: string) => `/api/projects/${pid}/working-papers/batch-prefill`,
+  generateFromCodes: (pid: string) => `/api/projects/${pid}/working-papers/generate-from-codes`,
+  wpMappingTsj: (pid: string, accountName: string) => `/api/projects/${pid}/wp-mapping/tsj/${encodeURIComponent(accountName)}`,
+  versions: (wpId: string) => `/api/workpapers/${wpId}/versions`,
+  univerData: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-data`,
+  univerSave: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/univer-save`,
+  exportPdf: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/export-pdf`,
+  recalc: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/recalc`,
+  remind: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/remind`,
+  escalateToPartner: (pid: string) => `/api/projects/${pid}/workpapers/escalate-to-partner`,
 } as const
 
 // ─── 底稿复核批注 ───────────────────────────────────────────────────────────
@@ -372,6 +434,8 @@ export const staff = {
   workHours: (id: string) => `/api/staff/${id}/work-hours`,
   checkIn: (id: string) => `/api/staff/${id}/check-in`,
   checkIns: (id: string) => `/api/staff/${id}/check-ins`,
+  handoverPreview: (id: string) => `/api/staff/${id}/handover/preview`,
+  handover: (id: string) => `/api/staff/${id}/handover`,
 } as const
 
 // ─── 用户 ───────────────────────────────────────────────────────────────────
@@ -440,6 +504,22 @@ export const knowledge = {
   libraries: '/api/knowledge/libraries',
 } as const
 
+// ─── 知识库文件管理 ─────────────────────────────────────────────────────────
+
+export const knowledgeLibrary = {
+  tree: '/api/knowledge-library/tree',
+  search: '/api/knowledge-library/search',
+  folders: '/api/knowledge-library/folders',
+  folderDocuments: (folderId: string) => `/api/knowledge-library/folders/${folderId}/documents`,
+  folderUpload: (folderId: string) => `/api/knowledge-library/folders/${folderId}/upload`,
+  folderRename: (folderId: string) => `/api/knowledge-library/folders/${folderId}/rename`,
+  folderDelete: (folderId: string) => `/api/knowledge-library/folders/${folderId}`,
+  documentDetail: (docId: string) => `/api/knowledge-library/documents/${docId}`,
+  documentDownload: (docId: string) => `/api/knowledge-library/documents/${docId}/download`,
+  documentPreview: (docId: string) => `/api/knowledge-library/documents/${docId}/preview`,
+  documentMove: (docId: string) => `/api/knowledge-library/documents/${docId}/move`,
+} as const
+
 // ─── 看板 ───────────────────────────────────────────────────────────────────
 
 export const dashboard = {
@@ -452,6 +532,11 @@ export const dashboard = {
   projectStaffHours: '/api/dashboard/project-staff-hours',
   staffDetail: '/api/dashboard/staff-detail',
   availableStaff: '/api/dashboard/available-staff',
+  statsTrend: '/api/dashboard/stats/trend',
+  manager: {
+    overview: '/api/dashboard/manager/overview',
+    assignmentStatus: '/api/dashboard/manager/assignment-status',
+  },
 } as const
 
 // ─── 批注 ───────────────────────────────────────────────────────────────────
@@ -524,16 +609,18 @@ export const projectMgmt = {
 
 export const archive = {
   checklist: {
-    init: (pid: string) => `/api/archive/${pid}/checklist/init`,
-    get: (pid: string) => `/api/archive/${pid}/checklist`,
-    complete: (pid: string, itemId: string) => `/api/archive/${pid}/checklist/${itemId}/complete`,
+    init: (pid: string) => `/api/projects/${pid}/archive/checklist/init`,
+    get: (pid: string) => `/api/projects/${pid}/archive/checklist`,
+    complete: (pid: string, itemId: string) => `/api/projects/${pid}/archive/checklist/${itemId}/complete`,
   },
-  archive: (pid: string) => `/api/archive/${pid}/archive`,
-  exportPdf: (pid: string) => `/api/archive/${pid}/export-pdf`,
+  orchestrate: (pid: string) => `/api/projects/${pid}/archive/orchestrate`,
+  job: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}`,
+  retry: (pid: string, jobId: string) => `/api/projects/${pid}/archive/jobs/${jobId}/retry`,
+  exportPdf: (pid: string) => `/api/projects/${pid}/archive/export-pdf`,
   modifications: {
-    request: (pid: string) => `/api/archive/${pid}/modifications`,
-    approve: (pid: string, modId: string) => `/api/archive/${pid}/modifications/${modId}/approve`,
-    reject: (pid: string, modId: string) => `/api/archive/${pid}/modifications/${modId}/reject`,
+    request: (pid: string) => `/api/projects/${pid}/archive/modifications`,
+    approve: (pid: string, modId: string) => `/api/projects/${pid}/archive/modifications/${modId}/approve`,
+    reject: (pid: string, modId: string) => `/api/projects/${pid}/archive/modifications/${modId}/reject`,
   },
 } as const
 
@@ -550,6 +637,10 @@ export const subsequentEvents = {
 
 // ─── PBC ────────────────────────────────────────────────────────────────────
 
+/**
+ * @deprecated R7+ 计划 — 后端当前为 stub 实现（返回 status: "developing"）。
+ * 前端暂无对应页面，待 R7 正式开发时补充真实实现。
+ */
 export const pbc = {
   items: (pid: string) => `/api/pbc/${pid}/items`,
   itemStatus: (pid: string, itemId: string) => `/api/pbc/${pid}/items/${itemId}/status`,
@@ -558,6 +649,10 @@ export const pbc = {
 
 // ─── 函证 ───────────────────────────────────────────────────────────────────
 
+/**
+ * @deprecated R7+ 计划 — 后端当前为 stub 实现（返回 status: "developing"）。
+ * 前端暂无对应页面，待 R7 正式开发时补充真实实现。
+ */
 export const confirmations = {
   list: (pid: string) => `/api/confirmations/${pid}/confirmations`,
   detail: (pid: string, confId: string) => `/api/confirmations/${pid}/confirmations/${confId}`,
@@ -761,6 +856,10 @@ export const attachments = {
   search: '/api/attachments/search',
   upload: (pid: string) => `/api/projects/${pid}/attachments/upload`,
   classify: (pid: string) => `/api/projects/${pid}/attachments/classify`,
+  preview: (id: string) => `/api/attachments/${id}/preview`,
+  download: (id: string) => `/api/attachments/${id}/download`,
+  associate: (id: string) => `/api/attachments/${id}/associate`,
+  ocrStatus: (id: string) => `/api/attachments/${id}/ocr-status`,
 } as const
 
 // ─── 穿透查询 ───────────────────────────────────────────────────────────────
@@ -768,7 +867,23 @@ export const attachments = {
 export const ledger = {
   balance: (pid: string) => `/api/projects/${pid}/ledger/balance`,
   entries: (pid: string, code: string) => `/api/projects/${pid}/ledger/entries/${encodeURIComponent(code)}`,
+  openingBalance: (pid: string, code: string) => `/api/projects/${pid}/ledger/opening-balance/${encodeURIComponent(code)}`,
+  voucher: (pid: string, voucherNo: string) => `/api/projects/${pid}/ledger/voucher/${encodeURIComponent(voucherNo)}`,
+  years: (pid: string) => `/api/projects/${pid}/ledger/years`,
+  validate: (pid: string) => `/api/projects/${pid}/ledger/validate`,
+  smartPreview: (pid: string) => `/api/projects/${pid}/ledger/smart-preview`,
+  smartImport: (pid: string) => `/api/projects/${pid}/ledger/smart-import`,
+  auxBalance: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-balance/${code}`,
+  auxBalanceDetail: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-detail`,
+  auxBalanceSummary: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-summary`,
+  auxBalancePaged: (pid: string) => `/api/projects/${pid}/ledger/aux-balance-paged`,
+  auxEntries: (pid: string, code: string) => `/api/projects/${pid}/ledger/aux-entries/${code}`,
+  auxByTriplet: (pid: string) => `/api/projects/${pid}/ledger/aux/by-triplet`,
   auxSummary: (pid: string) => `/api/projects/${pid}/ledger/aux-summary`,
+  balanceTree: (pid: string) => `/api/projects/${pid}/ledger/balance-tree`,
+  exportBalance: (pid: string) => `/api/projects/${pid}/ledger/export-balance`,
+  exportAuxBalance: (pid: string) => `/api/projects/${pid}/ledger/export-aux-balance`,
+  exportLedger: (pid: string, code: string) => `/api/projects/${pid}/ledger/export-ledger/${encodeURIComponent(code)}`,
   import: {
     base: (pid: string) => `/api/projects/${pid}/ledger-import`,
     datasets: (pid: string) => `/api/projects/${pid}/ledger-import/datasets`,
@@ -780,6 +895,28 @@ export const ledger = {
     jobCancel: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/cancel`,
     activationRecords: (pid: string) => `/api/projects/${pid}/ledger-import/activation-records`,
     artifacts: (pid: string) => `/api/projects/${pid}/ledger-import/artifacts`,
+    // v2 endpoints (新账表导入引擎)
+    v2Detect: (pid: string) => `/api/projects/${pid}/ledger-import/detect`,
+    v2Submit: (pid: string) => `/api/projects/${pid}/ledger-import/submit`,
+    v2Stream: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/stream`,
+    v2Diagnostics: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/diagnostics`,
+    v2Cancel: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/cancel`,
+    v2Retry: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/retry`,
+    v2Resume: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/resume`,
+    v2Takeover: (pid: string, jobId: string) => `/api/projects/${pid}/ledger-import/jobs/${jobId}/takeover`,
+    activeJob: (pid: string) => `/api/projects/${pid}/ledger-import/active-job`,
+    datasetsHistory: (pid: string) => `/api/projects/${pid}/ledger-import/datasets/history`,
+    datasetForceUnbind: (pid: string, dsId: string) => `/api/projects/${pid}/ledger-import/datasets/${dsId}/force-unbind`,
+    rawExtraFields: (pid: string) => `/api/projects/${pid}/ledger/raw-extra-fields`,
+  },
+  // v2 账表数据管理（查询/删除/增量追加）
+  data: {
+    summary: (pid: string) => `/api/projects/${pid}/ledger-data/summary`,
+    delete: (pid: string) => `/api/projects/${pid}/ledger-data`,
+    incrementalDetect: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/detect`,
+    incrementalApply: (pid: string) => `/api/projects/${pid}/ledger-data/incremental/apply`,
+    trash: (pid: string) => `/api/projects/${pid}/ledger-data/trash`,
+    restore: (pid: string) => `/api/projects/${pid}/ledger-data/restore`,
   },
 } as const
 
@@ -863,6 +1000,53 @@ export const excelHtml = {
   cellInfo: (pid: string, fileStem: string) => `/api/projects/${pid}/excel-html/cell-info/${fileStem}`,
 } as const
 
+// ─── 账套导入 ───────────────────────────────────────────────────────────────
+
+export const accountChart = {
+  preview: (pid: string) => `/api/projects/${pid}/account-chart/preview`,
+  importAsync: (pid: string) => `/api/projects/${pid}/account-chart/import-async`,
+  importReset: (pid: string) => `/api/projects/${pid}/account-chart/import-reset`,
+  client: (pid: string) => `/api/projects/${pid}/account-chart/client`,
+  standard: (pid: string) => `/api/projects/${pid}/account-chart/standard`,
+  batchUpdate: (pid: string) => `/api/projects/${pid}/account-chart/batch-update`,
+} as const
+
+// ─── 科目映射 ───────────────────────────────────────────────────────────────
+
+export const accountMapping = {
+  list: (pid: string) => `/api/projects/${pid}/mapping`,
+  create: (pid: string) => `/api/projects/${pid}/mapping`,
+  detail: (pid: string, mappingId: string) => `/api/projects/${pid}/mapping/${mappingId}`,
+  autoMatch: (pid: string) => `/api/projects/${pid}/mapping/auto-match`,
+  completionRate: (pid: string) => `/api/projects/${pid}/mapping/completion-rate`,
+} as const
+
+// ─── 报表行次映射 ───────────────────────────────────────────────────────────
+
+export const reportLineMapping = {
+  list: (pid: string) => `/api/projects/${pid}/report-line-mapping`,
+  detail: (pid: string, id: string) => `/api/projects/${pid}/report-line-mapping/${id}`,
+  confirm: (pid: string, id: string) => `/api/projects/${pid}/report-line-mapping/${id}/confirm`,
+  aiSuggest: (pid: string) => `/api/projects/${pid}/report-line-mapping/ai-suggest`,
+  batchConfirm: (pid: string) => `/api/projects/${pid}/report-line-mapping/batch-confirm`,
+  referenceCopy: (pid: string) => `/api/projects/${pid}/report-line-mapping/reference-copy`,
+} as const
+
+// ─── 列映射 ─────────────────────────────────────────────────────────────────
+
+export const columnMappings = {
+  list: (pid: string) => `/api/projects/${pid}/column-mappings`,
+  save: (pid: string) => `/api/projects/${pid}/column-mappings`,
+  referenceProjects: (pid: string) => `/api/projects/${pid}/column-mappings/reference-projects`,
+  referenceCopy: (pid: string) => `/api/projects/${pid}/column-mappings/reference-copy`,
+} as const
+
+// ─── 数据生命周期 ───────────────────────────────────────────────────────────
+
+export const dataLifecycle = {
+  importQueue: (pid: string) => `/api/data-lifecycle/import-queue/${pid}`,
+} as const
+
 // ─── 导入智能增强 ───────────────────────────────────────────────────────────
 
 export const importIntelligence = {
@@ -886,6 +1070,9 @@ export const addressRegistry = {
 // ─── 工时 ───────────────────────────────────────────────────────────────────
 
 export const workHours = {
+  list: '/api/workhours',
+  summary: '/api/workhours/summary',
+  batchApprove: '/api/workhours/batch-approve',
   detail: (hourId: string) => `/api/work-hours/${hourId}`,
   aiSuggest: '/api/work-hours/ai-suggest',
   editTimeSuggest: '/api/work-hours/edit-time-suggest',
@@ -904,6 +1091,36 @@ export const aging = {
 export const regulatory = {
   filings: '/api/regulatory/filings',
   retry: (id: string) => `/api/regulatory/filings/${id}/retry`,
+  archivalStandard: '/api/regulatory/archival-standard',
+  cicpaReport: '/api/regulatory/cicpa-report',
+} as const
+
+// ─── 数据校验 ───────────────────────────────────────────────────────────────
+
+export const dataValidation = {
+  run: (pid: string) => `/api/projects/${pid}/data-validation`,
+  fix: (pid: string) => `/api/projects/${pid}/data-validation/fix`,
+  export: (pid: string) => `/api/projects/${pid}/data-validation/export`,
+} as const
+
+// ─── 精细化检查 ─────────────────────────────────────────────────────────────
+
+export const fineChecks = {
+  summary: (pid: string) => `/api/projects/${pid}/fine-checks/summary`,
+} as const
+
+// ─── 项目工单 ───────────────────────────────────────────────────────────────
+
+export const projectIssues = {
+  list: (pid: string) => `/api/projects/${pid}/issues`,
+  detail: (pid: string, issueId: string) => `/api/projects/${pid}/issues/${issueId}`,
+} as const
+
+// ─── 账表导入校验规则 ───────────────────────────────────────────────────────
+
+export const ledgerImportValidationRules = {
+  list: '/api/ledger-import/validation-rules',
+  detail: (code: string) => `/api/ledger-import/validation-rules/${code}`,
 } as const
 
 // ─── 其他 ───────────────────────────────────────────────────────────────────
@@ -917,6 +1134,16 @@ export const admin = {
   performanceStats: '/api/admin/performance-stats',
   slowQueries: '/api/admin/slow-queries',
   performanceMetrics: '/api/admin/performance-metrics',
+  importEventHealth: '/api/admin/import-event-health',
+  importEventReplay: '/api/admin/import-event-replay',
+} as const
+
+// ─── 我的（个人聚合） ────────────────────────────────────────────────────────
+
+export const my = {
+  pendingIndependence: '/api/my/pending-independence',
+  reminders: '/api/my/reminders',
+  unreadAnnotations: '/api/my/unread-annotations/count',
 } as const
 
 // ─── 合伙人 ─────────────────────────────────────────────────────────────────
@@ -932,8 +1159,60 @@ export const partner = {
 export const qcDashboard = {
   overview: (pid: string) => `/api/projects/${pid}/qc-dashboard/overview`,
   staffProgress: (pid: string) => `/api/projects/${pid}/qc-dashboard/staff-progress`,
+  projectRating: (pid: string, year: number) => `/api/qc/projects/${pid}/rating/${year}`,
   openIssues: (pid: string) => `/api/projects/${pid}/qc-dashboard/open-issues`,
   archiveReadiness: (pid: string) => `/api/projects/${pid}/qc-dashboard/archive-readiness`,
+  reviewerMetrics: '/api/qc/reviewer-metrics',
+  clientQualityTrend: (clientName: string) => `/api/qc/clients/${encodeURIComponent(clientName)}/quality-trend`,
+} as const
+
+// ─── 质控规则管理 ───────────────────────────────────────────────────────────
+
+export const qcRules = {
+  list: '/api/qc/rules',
+  detail: (ruleId: string) => `/api/qc/rules/${ruleId}`,
+  dryRun: (ruleId: string) => `/api/qc/rules/${ruleId}/dry-run`,
+  versions: (ruleId: string) => `/api/qc/rules/${ruleId}/versions`,
+} as const
+
+// ─── 质控抽查 ───────────────────────────────────────────────────────────────
+
+export const qcInspections = {
+  list: '/api/qc/inspections',
+  detail: (id: string) => `/api/qc/inspections/${id}`,
+  verdict: (inspId: string, itemId: string) => `/api/qc/inspections/${inspId}/items/${itemId}/verdict`,
+  report: (inspId: string) => `/api/qc/inspections/${inspId}/report`,
+  publishAsCase: (inspId: string, itemId: string) => `/api/qc/inspections/${inspId}/items/${itemId}/publish-as-case`,
+} as const
+
+// ─── 质控案例库 ─────────────────────────────────────────────────────────────
+
+export const qcCases = {
+  list: '/api/qc/cases',
+  detail: (caseId: string) => `/api/qc/cases/${caseId}`,
+} as const
+
+// ─── 质控年报 ───────────────────────────────────────────────────────────────
+
+export const qcAnnualReports = {
+  list: '/api/qc/annual-reports',
+  generate: '/api/qc/annual-reports',
+  download: (reportId: string) => `/api/qc/annual-reports/${reportId}/download`,
+} as const
+
+// ─── 质控日志合规 ───────────────────────────────────────────────────────────
+
+export const qcAuditLogCompliance = {
+  findings: '/api/qc/audit-log-compliance/findings',
+  run: '/api/qc/audit-log-compliance/run',
+  findingStatus: (findingId: string) => `/api/qc/audit-log-compliance/findings/${findingId}/status`,
+  summary: '/api/qc/audit-log-compliance/summary',
+} as const
+
+// ─── 归档就绪 ───────────────────────────────────────────────────────────────
+
+export const qcArchiveReadiness = {
+  check: '/api/qc/archive-readiness',
 } as const
 
 // ─── 底稿 Job ───────────────────────────────────────────────────────────────
@@ -981,6 +1260,15 @@ export const governance = {
   },
 } as const
 
+// ─── 独立性声明（项目级） ───────────────────────────────────────────────────
+
+export const independenceDeclarations = {
+  questions: '/api/independence/questions',
+  list: (pid: string) => `/api/projects/${pid}/independence-declarations`,
+  detail: (pid: string, declId: string) => `/api/projects/${pid}/independence-declarations/${declId}`,
+  submit: (pid: string, declId: string) => `/api/projects/${pid}/independence-declarations/${declId}/submit`,
+} as const
+
 // ─── EQCR 独立复核（Round 5） ───────────────────────────────────────────────
 
 export const eqcr = {
@@ -1007,17 +1295,58 @@ export const eqcr = {
   notes: (pid: string) => `/api/eqcr/projects/${pid}/notes`,
   noteDetail: (pid: string, noteId: string) => `/api/eqcr/projects/${pid}/notes/${noteId}`,
   noteShare: (noteId: string) => `/api/eqcr/notes/${noteId}/share-to-team`,
+  // 任务 12：备忘录
+  memoPreview: (pid: string) => `/api/eqcr/projects/${pid}/memo/preview`,
+  memoGenerate: (pid: string) => `/api/eqcr/projects/${pid}/memo`,
+  memoSave: (pid: string) => `/api/eqcr/projects/${pid}/memo`,
+  memoFinalize: (pid: string) => `/api/eqcr/projects/${pid}/memo/finalize`,
+  memoExport: (pid: string, format = 'docx') => `/api/eqcr/projects/${pid}/memo/export?format=${format}`,
+  // 任务 13：工时/审批/解锁
+  timeSummary: (pid: string) => `/api/eqcr/projects/${pid}/time-summary`,
+  approve: (pid: string) => `/api/eqcr/projects/${pid}/approve`,
+  unlockOpinion: (pid: string) => `/api/eqcr/projects/${pid}/unlock-opinion`,
+  // 独立性声明
+  independence: {
+    check: '/api/eqcr/independence/annual/check',
+    questions: '/api/eqcr/independence/annual/questions',
+    submit: '/api/eqcr/independence/annual/submit',
+  },
+  // 组件审计师
+  componentAuditors: (pid: string) => `/api/eqcr/projects/${pid}/component-auditors`,
+  // 历年对比
+  priorYearComparison: (pid: string) => `/api/eqcr/projects/${pid}/prior-year-comparison`,
+  linkPriorYear: (pid: string) => `/api/eqcr/projects/${pid}/link-prior-year`,
+  // 指标
+  metrics: '/api/eqcr/metrics',
+} as const
+
+// ─── 签字流水线（Round 1 需求 4） ────────────────────────────────────────────
+
+export const signatures = {
+  sign: '/api/signatures/sign',
+  workflow: (pid: string) => `/api/projects/${pid}/signature-workflow`,
+  list: (objectType: string, objectId: string) => `/api/signatures/${objectType}/${objectId}`,
+  verify: (sigId: string) => `/api/signatures/${sigId}/verify`,
+  revoke: (sigId: string) => `/api/signatures/${sigId}/revoke`,
+} as const
+
+// ─── 合伙人轮换检查（Round 1 需求 11） ──────────────────────────────────────
+
+export const rotation = {
+  check: '/api/rotation/check',
+  overrides: '/api/rotation/overrides',
 } as const
 
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
 
 export const API = {
   projects, trialBalance, adjustments, materiality, misstatements,
-  reports, cfsWorksheet, disclosureNotes, auditReport, exportTask,
+  reports, reportConfig, reportMapping, noteTemplates, consolNoteSections,
+  cfsWorksheet, disclosureNotes, auditReport, exportTask,
   workpaperSummary, events, consolidation, consolWorksheetData,
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
   wpDependencies, templates, formula, sampling, staff, users, auth,
-  notifications, system, recycleBin, knowledge, dashboard, annotations,
+  notifications, system, recycleBin, knowledge, knowledgeLibrary, dashboard, annotations,
   procedures, reviews, sync, auditLogs, projectMgmt, archive,
   subsequentEvents, pbc, confirmations, goingConcern, riskAssessments,
   auditPrograms, findings, managementLetter, reviewConversations,
@@ -1025,7 +1354,11 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
-  admin, partner, qcDashboard, jobs, governance, eqcr,
+  dataValidation, fineChecks, projectIssues, ledgerImportValidationRules,
+  accountChart, accountMapping, reportLineMapping, columnMappings, dataLifecycle, independenceDeclarations,
+  admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
+  qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
+  jobs, governance, eqcr, signatures, rotation,
 } as const
 
 export default API

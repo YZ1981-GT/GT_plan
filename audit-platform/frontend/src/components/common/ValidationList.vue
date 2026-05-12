@@ -23,7 +23,7 @@
 defineProps<{ findings: any[] }>()
 defineEmits<{ fix: [ids: string[]] }>()
 
-function severityType(s: string) {
-  return s === 'high' ? 'danger' : s === 'medium' ? 'warning' : s === 'low' ? 'info' : ''
+function severityType(s: string): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  return s === 'high' ? 'danger' : s === 'medium' ? 'warning' : s === 'low' ? 'info' : undefined
 }
 </script>

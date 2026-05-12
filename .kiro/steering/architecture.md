@@ -211,3 +211,151 @@ inclusion: manual
 - 统一原则：结构来自模板，数据从底稿动态提取，校验基于结构不依赖行名
 - 取数优先级：底稿 fine_summary 明细行 > 底稿 audited_amount > 试算表 > 模板预设行
 - 缓存链路：extract_with_fine_rule → parsed_data.fine_summary → _wp_fine_cache → _build_table_data
+
+
+## 辅助维度冗余存储模型（2026-05-10 定型）
+
+**核心设计**：`tb_aux_balance` / `tb_aux_ledger` 采用"按维度冗余存储"模式，非"按坐标点单条存储"。
+
+**举例**（真实 YG36）：
+```
+原始行：金融机构:YG0001,工商银行;银行账户:3100035219100042014  closing=3948.93
+       金融机构:YG0018,邮储;银行账户:951004010002007700         closing=100.00
+
+入库成 4 条 tb_aux_balance：
+  type=金融机构  code=YG0001  name=工行           closing=3948.93
+  type=金融机构  code=YG0018  name=邮储           closing=100.00
+  type=银行账户  code=NULL    name=3100...42014   closing=3948.93   ← 同金额冗余
+  type=银行账户  code=NULL    name=951...07700    closing=100.00    ← 同金额冗余
+```
+
+**校验铁律**：对 tb_aux_balance 做一致性校验时，**必须按 aux_type GROUP BY 求和后再和 tb_balance 比对**。
+- 正确：`金融机构 sum = 3948.93+100 = 4048.93 = tb_balance.closing` ✓
+- 正确：`银行账户 sum = 3948.93+100 = 4048.93 = tb_balance.closing` ✓
+- **禁止**：所有 aux 行求和 `8097.86 = 父×2` → 会产生误报 mismatch
+
+**受此模式影响的代码路径**（未来新增聚合逻辑必须遵守）：
+- `/api/projects/{pid}/ledger/balance-tree` 端点 mismatches 算法（Layer 2 v2）
+- `validate_four_tables` 校验函数（smart_import_engine.py:1210）
+- `consistency_check_service._check_tb_vs_balance`
+- `consistency_replay_engine`
+- `import_intelligence` DQ-05
+- 未来的合并工作底稿校验
+
+## balance-tree 端点两层嵌套结构（2026-05-10）
+
+`GET /api/projects/{pid}/ledger/balance-tree?year=&company_code=` 返回三层树形：
+
+```
+父科目节点 (account_code)
+├── 维度组节点 (aux_type)  ← 第 2 层聚合求和
+│   ├── 具体 aux 明细 1   ← 第 3 层 tb_aux_balance 原始行
+│   └── 具体 aux 明细 2
+└── 另一个维度组节点
+    ├── 明细 1（与上组同金额冗余）
+    └── 明细 2
+```
+
+**节点字段**：
+- 父：`aux_types: []`（该科目涉及的维度类型列表）、`aux_rows_total: N`（所有明细总数）
+- 维度组：`_is_dimension_group: true`、`aux_type`、`closing_balance`（组内求和）、`record_count`
+- 明细：tb_aux_balance 原始字段
+
+**mismatch 判定**：每个维度组 sum ≠ 主表 closing 才算 mismatch，返回 `{account_code, aux_type, parent_closing, dim_sum, record_count, diff}`。
+
+**前端对应渲染**：`LedgerBalanceTreeView.vue` el-table tree-props 三层渲染，用 `_nodeType: 'account'|'group'|'aux'` 区分，`_rowKey` 三段式（`acc:...` / `acc:...:grp:...` / `acc:...:grp:...:aux:...`）。
+
+## 流式分块 + 分组聚合矛盾（2026-05-10）
+
+**问题**：pipeline.py `_execute_v2` 对所有 sheet 流式分块解析，converter 的"按 (company, account_code) 分组去重"只能在 chunk 范围内生效。YG36 真实数据 1823 行 balance sheet 分 2 chunk，导致 account_code 跨 chunk 重复（1002 被拆 3 条主表行）。
+
+**决策**：按表特性差异化策略，非一刀切。
+- **balance / aux_balance**：sheet 全量累积 cleaned 到内存，sheet 结束时统一 `convert_balance_rows` + `_insert`，跨 chunk 去重生效；真实数据 <5k 行内存安全
+- **ledger / aux_ledger**：保持流式（百万级行数内存不可控），序时账本身不存在"同 account_code 重复"语义问题
+- 未来若 balance 超 50000 行需要内存阈值 warning
+
+**代码位置**：`backend/app/services/ledger_import/pipeline.py _execute_v2` 内的 `balance_cleaned_accumulated` 列表 + sheet 结束处的统一 insert。
+
+
+## /balance-tree 分页查询参数（2026-05-10 Sprint 8 P3）
+
+端点支持服务端分页 + 过滤：
+
+| 参数 | 类型 | 约束 | 默认 | 说明 |
+|------|------|------|------|------|
+| `year` | int | required | — | 年度 |
+| `company_code` | str | optional | None | 公司代码（合并账套用） |
+| `page` | int | ≥1 | 1 | 页码（1-based） |
+| `page_size` | int | 1-200 | 100 | 每页科目数，**硬上限 200** |
+| `keyword` | str | optional | None | account_code/account_name 模糊过滤（ilike） |
+| `only_with_children` | bool | optional | false | 仅返回含辅助维度的科目 |
+
+**响应新增 `pagination` 字段**：`{page, page_size, total, total_pages}`
+
+**设计要点**：
+- `only_with_children=true` 时先查 aux_balance 的 account_code 集合再过滤主表（避免 LEFT JOIN 膨胀）
+- aux 查询通过 `account_code IN (本页主表)` 收窄，避免全量 aux 拉回
+- 前端 keyword/only_with_children 走服务端过滤，aggregated/mismatch 走本地过滤（服务端无需知道 mismatch 细节）
+
+**ADR**：见 `docs/adr/ADR-001-auxiliary-dimension-redundant-storage.md`
+
+
+## 损益类 vs 资产负债类科目过滤差异（2026-05-10 Sprint 8 P3f）
+
+**会计准则事实**：损益类科目（5/6 开头）期末结转到本年利润，`opening_balance` 和 `closing_balance` 天然为 NULL；资产负债权益类（1/2/3/4 开头）则保留期初期末余额。
+
+**影响所有涉及"是否有金额活动"判定的代码**：不能一刀切要求四字段都有值，必须按科目类型差异化：
+
+- **1/2/3/4 开头**：`opening_balance OR closing_balance OR debit_amount OR credit_amount` 任一非零
+- **5/6 开头**：`debit_amount OR credit_amount` 任一非零（opening/closing 不参与）
+
+**实现模式**（SQLAlchemy，SQLite/PG 双兼容）：
+
+```python
+first_char = sa.func.substr(bal_tbl.c.account_code, 1, 1)
+loss_gain_active = sa.and_(first_char.in_(("5", "6")), ...debit/credit 任一非零)
+other_active = sa.and_(sa.not_(first_char.in_(("5", "6"))), ...四字段任一非零)
+where.append(sa.or_(loss_gain_active, other_active))
+```
+
+用 OR 拼场景（非 CASE）便于查询优化器走索引；用 `substr` 而非 `left`（SQLite 不支持 `left`）。
+
+**首次实现**：`/balance-tree` 端点 `only_with_activity` 参数。未来所有"余额状态/活跃度"判定（试算表筛选、报表生成预筛、账表健康度指标等）都应遵循此差异化规则。
+
+**真实数据验证**（YG36）：全部 813 → 有活动 208；其中 6xxx 损益类 356 个 → 97 个有活动（opening/closing 全 NULL 但 debit/credit 有值被正确包含）。
+
+
+## 账表导入可见性架构（B' 视图重构，2026-05-10）
+
+**参考**：ADR-002 (`docs/adr/ADR-002-ledger-view-refactor.md`)、spec `.kiro/specs/ledger-import-view-refactor/`
+
+### 核心原则
+可见性状态从**行级 `is_deleted` 字段**升级到**`ledger_datasets.status` 元数据**。物理行 `is_deleted` 恒为 `false`（除回收站/归档场景），可见性完全由 `ledger_datasets.status = 'active'` 控制。
+
+### 查询层
+- **单一入口**：`app.services.dataset_query.get_active_filter(db, table, project_id, year)`
+- **返回**：`project_id + year + dataset_id(active) + is_deleted=false（兜底）` 组合条件
+- **优化版本**：`get_filter_with_dataset_id(table, pid, year, dataset_id)` 同步版，caller 先查一次 active_id 后批量复用（避免 N+1）
+- **year=None 兜底**：`LedgerDataset` 子查询 + `dataset_id.in_(active_ids)` + `is_deleted=false` 双保险（Template B 模式）
+
+### 写入层
+- pipeline `_insert` 写入直接 `is_deleted=False`
+- staged 隔离靠 `dataset.status = 'staged'`（不依赖 is_deleted）
+- 回收站 / archive / restore 仍用 `is_deleted=true`（软删语义保留）
+
+### activate/rollback 路径
+- 只 UPDATE `ledger_datasets` 2 行元数据（superseded ↔ active）
+- 不再 UPDATE Tb* 物理行（旧逻辑 127s → 新逻辑 <1s）
+- `DatasetService._set_dataset_visibility` 改为 no-op + `logger.warning`（保留签名兼容）
+
+### 禁止模式
+- 业务查询禁用 `TbX.is_deleted == False`（Tb* = TbBalance/TbLedger/TbAuxBalance/TbAuxLedger）
+- CI 卡点：`backend-lint` job 扫 `Tb(Balance|Ledger|AuxBalance|AuxLedger)\.is_deleted\s*==` 命中 > baseline(6) 即 fail
+- 6 处允许清单均为 year=None 兜底分支（wp_chat_service/sampling_enhanced_service/report_trace_service/ocr_service_v2/routers/report_trace×2）
+
+### 集成测试锚定
+`backend/tests/integration/test_dataset_rollback_view_refactor.py` 4 用例覆盖：
+- rollback 切换 metadata 不 UPDATE 物理行
+- 首版无 previous 返回 None 不改状态
+- 跨项目 A staged + B active 互不污染（按 project_id 隔离）
+- 两项目同时 active 查询严格隔离

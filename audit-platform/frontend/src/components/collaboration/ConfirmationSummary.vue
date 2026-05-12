@@ -107,7 +107,7 @@ const statusLabelMap: Record<string, string> = {
   EXCEPTION: '异常',
 }
 
-const statusTypeMap: Record<string, string> = {
+const statusTypeMap: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
   PENDING: 'info',
   SENT: 'warning',
   RECEIVED: 'success',

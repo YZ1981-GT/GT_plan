@@ -1,8 +1,7 @@
 <template>
   <div class="gt-filing-page">
-    <div class="gt-page-header">
-      <h2 class="gt-page-title">监管备案</h2>
-      <div class="gt-header-actions">
+    <GtPageHeader title="监管备案" :show-back="false">
+      <template #actions>
         <el-select v-model="filterType" placeholder="备案类型" clearable size="small" style="width: 160px" @change="loadFilings">
           <el-option label="中注协报告备案" value="cicpa_report" />
           <el-option label="电子底稿归档" value="archival_standard" />
@@ -15,8 +14,8 @@
         </el-select>
         <el-button type="primary" size="small" @click="showCICPA = true">新建中注协备案</el-button>
         <el-button size="small" @click="showArchival = true">新建归档备案</el-button>
-      </div>
-    </div>
+      </template>
+    </GtPageHeader>
 
     <el-table :data="filings" v-loading="loading" stripe size="small" style="width: 100%">
       <el-table-column prop="project_name" label="项目" min-width="180" show-overflow-tooltip />
@@ -59,6 +58,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import FilingStatus from '@/components/extension/FilingStatus.vue'
 import FilingError from '@/components/extension/FilingError.vue'
 import CICPAReportForm from '@/components/extension/CICPAReportForm.vue'
@@ -99,7 +99,7 @@ async function retryFilingFn(row: any) {
     await retryFilingApi(row.id)
     ElMessage.success('重试请求已提交')
     loadFilings()
-  } catch { ElMessage.error('重试失败') }
+  } catch (e: any) { handleApiError(e, '重试备案') }
 }
 
 function fmtTime(d: string) { return d ? new Date(d).toLocaleString('zh-CN') : '-' }

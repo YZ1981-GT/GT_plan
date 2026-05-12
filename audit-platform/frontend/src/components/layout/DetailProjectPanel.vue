@@ -18,10 +18,22 @@
                 <el-tag size="small">{{ typeLabel(project.project_type) }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="当前状态">
-                <el-tag :type="statusTagType(project.status)" size="small">
+                <el-tag :type="(statusTagType(project.status)) || undefined" size="small">
                   {{ statusLabel(project.status) }}
                 </el-tag>
+                <span v-if="project.status === 'planning'" class="gt-status-hint">
+                  — 请先导入账套数据，完成后状态将自动推进
+                </span>
+                <span v-else-if="project.status === 'created'" class="gt-status-hint">
+                  — 新建项目，请开始配置
+                </span>
               </el-descriptions-item>
+              <el-descriptions-item label="报表准则">
+                <el-tag :type="project.template_type === 'soe' ? 'warning' : 'primary'" size="small">
+                  {{ project.template_type === 'soe' ? '国企版' : project.template_type === 'listed' ? '上市版' : '未设置' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="企业代码">{{ project.company_code || project.client_code || '-' }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(project.created_at) }}</el-descriptions-item>
             </el-descriptions>
 
@@ -43,7 +55,6 @@
 
           <!-- 快捷入口 -->
           <div class="gt-detail-section">
-            <h4 class="gt-section-label">快捷操作</h4>
             <div class="gt-workflow-hint">
               <span class="gt-workflow-hint-label">建议流程：</span>
               <span class="gt-workflow-step">① 导入</span>
@@ -56,7 +67,17 @@
               <span class="gt-workflow-arrow">→</span>
               <span class="gt-workflow-step">⑤ 附注</span>
             </div>
+            <div class="gt-quick-tip">
+              💡 提示：首次使用请按建议流程操作。先导入账套数据，完成科目映射后系统自动生成试算表，再依次编制底稿、生成报表和附注。
+            </div>
             <div class="gt-quick-grid">
+              <!-- 第一行：核心流程（按建议流程顺序） -->
+              <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
+                <div class="gt-quick-btn" @click="goToLedgerImport()">
+                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
+                  <span>账套导入</span>
+                </div>
+              </el-tooltip>
               <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
                 <div class="gt-quick-btn" @click="goTo('trial-balance')">
                   <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
@@ -87,20 +108,17 @@
                   <span>附注</span>
                 </div>
               </el-tooltip>
+              <!-- 第二行：辅助功能 -->
               <el-tooltip content="设置整体重要性水平、实际执行重要性和明显微小错报" placement="top">
                 <div class="gt-quick-btn" @click="goTo('materiality')">
                   <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
                   <span>重要性</span>
                 </div>
               </el-tooltip>
-              <div class="gt-quick-btn" @click="goTo('audit-checks')">
-                <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
-                <span>审计检查</span>
-              </div>
-              <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
-                <div class="gt-quick-btn" @click="goToLedgerImport()">
-                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
-                  <span>账套导入</span>
+              <el-tooltip content="执行审计检查清单" placement="top">
+                <div class="gt-quick-btn" @click="goTo('audit-checks')">
+                  <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
+                  <span>审计检查</span>
                 </div>
               </el-tooltip>
               <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
@@ -109,18 +127,24 @@
                   <span>查账</span>
                 </div>
               </el-tooltip>
-              <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport" title="清除卡住的导入任务，释放导入锁">
-                <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
-                <span>重置</span>
-              </div>
-              <div class="gt-quick-btn" @click="onCreateNextYear" title="一键创建当年项目（继承上年配置）">
-                <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
-                <span>创建下年</span>
-              </div>
-              <div class="gt-quick-btn" @click="showTeamAssign = true" title="为项目分配团队成员">
-                <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
-                <span>人员委派</span>
-              </div>
+              <el-tooltip content="清除卡住的导入任务，释放导入锁" placement="top">
+                <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport">
+                  <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
+                  <span>重置</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="一键创建当年项目（继承上年配置）" placement="top">
+                <div class="gt-quick-btn" @click="onCreateNextYear">
+                  <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
+                  <span>创建下年</span>
+                </div>
+              </el-tooltip>
+              <el-tooltip content="为项目分配团队成员" placement="top">
+                <div class="gt-quick-btn" @click="showTeamAssign = true">
+                  <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
+                  <span>人员委派</span>
+                </div>
+              </el-tooltip>
               <div
                 v-if="project.report_scope === 'consolidated'"
                 class="gt-quick-btn"
@@ -281,8 +305,10 @@ import { useRouter } from 'vue-router'
 import {
   DataLine, Edit, Document, TrendCharts, Notebook, Aim, Coin, PieChart, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck,
 } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
+import { projects as P_proj, trialBalance as P_tb, attachments as P_att, accountChart as P_ac, gtCoding as P_gtc } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 
@@ -304,7 +330,7 @@ watch(() => props.project?.id, async (newId) => {
   if (!newId) { wpTree.value = []; trialBalanceRows.value = []; return }
   // 加载底稿索引树（致同编码体系，静默失败）
   try {
-    const raw = await api.get('/api/gt-coding/tree', { validateStatus: (s: number) => s < 600 })
+    const raw = await api.get(P_gtc.list, { validateStatus: (s: number) => s < 600 })
     const tree = raw?.data ?? raw ?? []
     wpTree.value = Array.isArray(tree) ? tree.map((group: any) => ({
       label: group.label,
@@ -316,7 +342,7 @@ watch(() => props.project?.id, async (newId) => {
   } catch { wpTree.value = [] }
   // 加载试算表预览（前20行，静默失败）
   try {
-    const raw = await api.get(`/api/projects/${newId}/trial-balance`, {
+    const raw = await api.get(P_tb.get(newId), {
       params: { year: projectYear.value },
       validateStatus: (s: number) => s < 600,
     })
@@ -325,7 +351,7 @@ watch(() => props.project?.id, async (newId) => {
   } catch { trialBalanceRows.value = [] }
   // 加载附件列表（前10条，静默失败）
   try {
-    const raw = await api.get(`/api/projects/${newId}/attachments`, {
+    const raw = await api.get(P_att.list(newId), {
       params: { page_size: 10 },
       validateStatus: (s: number) => s < 600,
     })
@@ -371,12 +397,8 @@ async function goToLedgerImport() {
 async function handleResetImport() {
   if (!props.project) return
   try {
-    await ElMessageBox.confirm(
-      '将清除当前项目卡住的导入任务，释放导入锁，并刷新页面。\n已入库的数据不受影响。',
-      '确认重置',
-      { confirmButtonText: '确认', cancelButtonText: '取消', type: 'warning' },
-    )
-    await api.post(`/api/projects/${props.project.id}/account-chart/import-reset`, null, {
+    await confirmForceReset('将清除当前项目卡住的导入任务，释放导入锁，并刷新页面。\n已入库的数据不受影响。')
+    await api.post(P_ac.importReset(props.project.id), null, {
       params: { force: true },
     })
     window.location.reload()
@@ -401,12 +423,8 @@ function editProject() {
 async function onCreateNextYear() {
   if (!props.project) return
   try {
-    await ElMessageBox.confirm(
-      `确定要基于「${props.project.name}」创建下年项目吗？将继承科目映射、团队委派、试算表审定数等配置。`,
-      '创建下年项目',
-      { confirmButtonText: '确定创建', cancelButtonText: '取消', type: 'info' },
-    )
-    const data = await api.post(`/api/projects/${props.project.id}/create-next-year`)
+    await confirmDangerous('确定要基于「' + props.project.name + '」创建下年项目吗？将继承科目映射、团队委派、试算表审定数等配置。', '创建下年项目')
+    const data = await api.post(`${P_proj.detail(props.project.id)}/create-next-year`)
     const result = data
     ElMessage.success(`已创建下年项目，新项目ID: ${result.new_project_id?.slice(0, 8)}...`)
     router.push(`/projects/new?projectId=${result.new_project_id}`)
@@ -423,8 +441,8 @@ function typeLabel(t: string) {
   const m: Record<string, string> = { annual: '年度审计', special: '专项审计', ipo: 'IPO审计', internal_control: '内控审计' }
   return m[t] || t || '-'
 }
-function statusTagType(s: string) {
-  const m: Record<string, string> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
+function statusTagType(s: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
+  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger' | 'primary'> = { created: 'info', planning: 'warning', execution: '', completion: 'success', archived: 'info' }
   return m[s] || 'info'
 }
 function statusLabel(s: string) {
@@ -479,6 +497,12 @@ function formatSize(bytes: number) {
   color: var(--gt-color-text-secondary); margin-bottom: var(--gt-space-2);
 }
 
+.gt-status-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-left: 4px;
+}
+
 .gt-quick-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gt-space-2);
 }
@@ -490,6 +514,11 @@ function formatSize(bytes: number) {
 .gt-workflow-hint-label { font-weight: 600; color: #6b5b8a; margin-right: 2px; }
 .gt-workflow-step { background: #fff; padding: 1px 6px; border-radius: 4px; border: 1px solid #e8e4f0; white-space: nowrap; }
 .gt-workflow-arrow { color: #c4b8d9; font-size: 10px; }
+.gt-quick-tip {
+  font-size: 11px; color: #909399; line-height: 1.5;
+  padding: 6px 10px; margin-bottom: 10px;
+  background: #fafafa; border-radius: 6px; border-left: 3px solid #4b2d77;
+}
 .gt-quick-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: var(--gt-space-3); border-radius: var(--gt-radius-sm);

@@ -92,11 +92,20 @@ services:
 
   # ----------------------------------------------------------
 
-  # FastAPI Backend锛堟湰鍦版瀯寤猴級
-
+  # FastAPI Backend（已停用）
+  #
+  # 本地开发统一用 start-dev.bat 在宿主机 9980 端口运行后端，
+  # Docker 里不再启动该服务，避免重复进程 / 端口冲突 / worker 死循环吃 CPU。
+  #
+  # 如果未来需要在容器里跑后端（例如生产部署），用 profile 手动拉起：
+  #   docker compose --profile docker-backend up -d backend
+  #
   # ----------------------------------------------------------
 
   backend:
+
+    profiles:
+      - docker-backend
 
     build:
 

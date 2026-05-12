@@ -1,31 +1,23 @@
 <template>
   <div class="gt-materiality gt-fade-in">
-    <!-- 页面横幅 -->
-    <div class="gt-mat-banner">
-      <div class="gt-mat-banner-row1">
-        <el-button text style="color: #fff; font-size: 13px; padding: 0; margin-right: 8px" @click="router.push('/projects')">← 返回</el-button>
-        <h2 class="gt-mat-title">重要性水平</h2>
-        <div class="gt-mat-info-bar">
-          <div class="gt-mat-info-item">
-            <span class="gt-mat-info-label">单位</span>
-            <el-select v-model="selectedProjectId" size="small" class="gt-mat-unit-select" filterable @change="onProjectChange">
-              <el-option v-for="p in projectOptions" :key="p.id" :label="p.name" :value="p.id" />
-            </el-select>
-          </div>
-          <div class="gt-mat-info-sep" />
-          <div class="gt-mat-info-item">
-            <span class="gt-mat-info-label">年度</span>
-            <el-select v-model="selectedYear" size="small" class="gt-mat-year-select" @change="onYearChange">
-              <el-option v-for="y in yearOptions" :key="y" :label="y + '年'" :value="y" />
-            </el-select>
-          </div>
-          <div class="gt-mat-info-sep" />
-          <div class="gt-mat-info-item">
-            <span class="gt-mat-info-badge">三级重要性计算与手动覆盖</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- 页面横幅 [R7-S3-01] -->
+    <GtPageHeader title="重要性水平" @back="router.push('/projects')">
+      <GtInfoBar
+        :show-unit="true"
+        :show-year="true"
+        :unit-value="selectedProjectId"
+        :year-value="selectedYear"
+        :badges="[{ value: '三级重要性计算与手动覆盖' }]"
+        @unit-change="onProjectChange"
+        @year-change="onYearChange"
+      />
+      <template #actions>
+        <GtToolbar :show-edit-toggle="true" :is-editing="isEditing" @edit-toggle="isEditing ? exitEdit() : enterEdit()" />
+      </template>
+    </GtPageHeader>
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
+
+    <div v-if="isEditing" class="gt-edit-mode-ribbon"><span class="gt-edit-mode-icon">✏️</span> 编辑中 · 请记得保存</div>
 
     <div class="gt-mat-layout">
       <!-- 左侧：配置表单 -->
@@ -137,6 +129,11 @@
 import { ref, onMounted, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useEditMode } from '@/composables/useEditMode'
+import { confirmLeave } from '@/utils/confirm'
+import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import GtInfoBar from '@/components/common/GtInfoBar.vue'
+import GtToolbar from '@/components/common/GtToolbar.vue'
 import {
   getMateriality, calculateMateriality, overrideMateriality,
   getMaterialityHistory, getMaterialityBenchmark,
@@ -149,6 +146,7 @@ import { eventBus, type MaterialityChangedPayload } from '@/utils/eventBus'
 const route = useRoute()
 const router = useRouter()
 const year = computed(() => Number(route.query.year) || new Date().getFullYear())
+const { isEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
 const {
   projectId, selectedProjectId, projectOptions, selectedYear, yearOptions,
