@@ -71,7 +71,7 @@
           <span class="gt-amt">{{ formatTime(row.deleted_at) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="自动清理" width="90" align="center">
+      <el-table-column label="剩余" width="70" align="center">
         <template #default="{ row }">
           <span :class="retentionClass(row.deleted_at)">{{ retentionDays(row.deleted_at) }}</span>
         </template>
