@@ -1107,6 +1107,7 @@ inclusion: always
 - **fix: vue-tsc 0 错误（7880f6f）**：R9 subagent 批量替换 handleApiError 时引入 5 处 `P.xxx` 引用错误（应为 P_ledger/P_wp/P_proj）+ EqcrProjectView/AuditReportEditor/KnowledgePickerDialog 类型修复；AMOUNT_DIVISOR_KEY 从 .vue export 移到独立 `constants/amountDivisor.ts`
 - **fix: 清空回收站 500（36b2023）**：`DELETE FROM projects WHERE is_deleted=true` 触发 FK 约束（子表 ledger_datasets/import_jobs 等仍引用）；修复 = 按 FK 深度顺序 raw SQL 级联删除（activation_records→四表→ledger_datasets→import_jobs→working_papers→project_assignments→adjustments→projects），每步 try/except 跳过不存在的表
 - **fix: 清空回收站点击无反应（0066288）**：`operationHistory.execute()` 内部异常被外层 `catch { /* cancelled */ }` 静默吞掉；修复 = 去掉 operationHistory 包装，confirmDangerous 和 API 调用分开 try/catch，失败走 handleApiError 显示错误
+- **回收站级联删除仍有问题（0964edf 后仍报错）**：加了 `::uuid` 类型转换 + 项目本身删除不再 pass，但仍然 500；根因可能是还有未覆盖的 FK 子表（如 import_batches/sampling_configs/issue_tickets 等）；需要查后端日志确认具体哪个 FK 约束报错
 - **feat: 科目余额表自动补齐父级汇总行（3c8f69d）**：Excel 原始数据常只有末级科目（如 1012.13），缺少上级汇总行（1012）；后端 `get_balance_summary` 查询后自动递归补齐缺失父级（金额=子级求和），支持点号分隔和纯数字两种编码格式；合成行标记 `_is_synthetic: true`
 - **四表金额单位问题（2026-05-12 发现）**：真实样本（四川物流等）Excel 原始数据以"万元"为单位编制，系统原样存储不做单位转换，导致前端显示数字看起来"太小"；需要在导入时从表头提取单位信息（"单位：万元"）或让用户手动选择，前端余额表顶部标注单位
 - **四表金额单位功能已实现（88b2a79）**：detector 从 Excel 表头自动提取 amount_unit 存入 dataset.source_summary；前端余额表/辅助余额表工具栏显示橙色"单位：万元"tag；旧数据集需重新导入或手动 UPDATE PG 补 source_summary.amount_unit

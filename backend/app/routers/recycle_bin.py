@@ -64,38 +64,52 @@ def _get_recyclable_tables() -> dict:
 
 
 async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
-    """按 FK 依赖顺序级联删除单个项目的所有子表数据，最后删项目本身。"""
+    """级联删除单个项目及其所有子表数据。
+
+    方案：动态查询所有引用 projects 表的 FK，多轮逐表删除直到无 FK 冲突。
+    """
     import sqlalchemy as sa
 
     pid = str(project_id)
-    # 子表级联删除（失败可跳过——表可能不存在或无数据）
-    child_sqls = [
-        "DELETE FROM activation_records WHERE dataset_id IN (SELECT id FROM ledger_datasets WHERE project_id = :pid::uuid)",
-        "DELETE FROM import_column_mapping_history WHERE project_id = :pid::uuid",
-        "DELETE FROM tb_aux_ledger WHERE project_id = :pid::uuid",
-        "DELETE FROM tb_aux_balance WHERE project_id = :pid::uuid",
-        "DELETE FROM tb_ledger WHERE project_id = :pid::uuid",
-        "DELETE FROM tb_balance WHERE project_id = :pid::uuid",
-        "DELETE FROM ledger_datasets WHERE project_id = :pid::uuid",
-        "DELETE FROM import_jobs WHERE project_id = :pid::uuid",
-        "DELETE FROM review_records WHERE working_paper_id IN (SELECT id FROM working_papers WHERE project_id = :pid::uuid)",
-        "DELETE FROM working_papers WHERE project_id = :pid::uuid",
-        "DELETE FROM project_assignments WHERE project_id = :pid::uuid",
-        "DELETE FROM adjustments WHERE project_id = :pid::uuid",
-        "DELETE FROM unadjusted_misstatements WHERE project_id = :pid::uuid",
-        "DELETE FROM trial_balance_entries WHERE project_id = :pid::uuid",
-        "DELETE FROM financial_reports WHERE project_id = :pid::uuid",
-        "DELETE FROM disclosure_notes WHERE project_id = :pid::uuid",
-        "DELETE FROM audit_reports WHERE project_id = :pid::uuid",
-        "DELETE FROM attachments WHERE project_id = :pid::uuid",
-    ]
-    for sql in child_sqls:
-        try:
-            await db.execute(sa.text(sql), {"pid": pid})
-        except Exception:
-            pass
 
-    # 最后删项目本身（不能跳过，失败要报错）
+    # 1. 查出所有引用 projects.id 的子表
+    fk_query = sa.text("""
+        SELECT DISTINCT tc.table_name, kcu.column_name
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+        JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+          AND ccu.table_name = 'projects'
+          AND tc.table_name != 'projects'
+    """)
+    result = await db.execute(fk_query)
+    child_tables = [(row[0], row[1]) for row in result.fetchall()]
+
+    # 2. 多轮删除（最多 5 轮，处理子表间的 FK 依赖）
+    for _round in range(5):
+        failed = []
+        for table_name, column_name in child_tables:
+            try:
+                await db.execute(
+                    sa.text(f'DELETE FROM "{table_name}" WHERE "{column_name}" = :pid::uuid'),
+                    {"pid": pid},
+                )
+            except Exception:
+                failed.append((table_name, column_name))
+        if not failed:
+            break
+        child_tables = failed  # 下一轮只重试失败的
+
+    # 3. 处理 projects 自引用（parent_project_id）
+    try:
+        await db.execute(
+            sa.text("UPDATE projects SET parent_project_id = NULL WHERE parent_project_id = :pid::uuid"),
+            {"pid": pid},
+        )
+    except Exception:
+        pass
+
+    # 4. 最后删项目本身
     await db.execute(sa.text("DELETE FROM projects WHERE id = :pid::uuid"), {"pid": pid})
 
 
