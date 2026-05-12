@@ -315,14 +315,10 @@ async def empty_recycle_bin(
                 await _cascade_delete_project(db, pid)
             except Exception:
                 pass
-        deleted_count += len(deleted_pids)        deleted_count += len(deleted_pids)
+        deleted_count += len(deleted_pids)
 
     await db.commit()
     return {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
-    resp: dict = {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
-    if errors:
-        resp["warnings"] = errors
-        resp["message"] += f"（{len(errors)} 个类型因关联数据无法清空）"
     return resp
 
 
