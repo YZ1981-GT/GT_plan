@@ -110,7 +110,11 @@
         </el-button>
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">账簿查询</el-tag>
-        <el-tag v-if="amountUnit" type="warning" size="small">单位：{{ amountUnit }}</el-tag>
+        <el-select v-model="displayUnit" size="small" style="width: 100px" title="显示单位切换">
+          <el-option label="元" value="yuan" />
+          <el-option label="万元" value="wan" />
+          <el-option label="千元" value="qian" />
+        </el-select>
         <el-tag size="small">{{ filteredFlatCount }} / {{ balanceData.length }}</el-tag>
         <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
@@ -181,7 +185,11 @@
         <!-- 控制区域（可折叠） -->
         <div class="gt-aux-toolbar">
           <div class="gt-aux-toolbar-header">
-            <el-tag v-if="amountUnit" type="warning" size="small">单位：{{ amountUnit }}</el-tag>
+            <el-select v-model="displayUnit" size="small" style="width: 100px" title="显示单位切换">
+              <el-option label="元" value="yuan" />
+              <el-option label="万元" value="wan" />
+              <el-option label="千元" value="qian" />
+            </el-select>
             <el-tag size="small">{{ auxDisplayCount }} / {{ auxTotalRecords }}</el-tag>
             <el-button size="small" :type="auxTreeMode ? 'primary' : ''" @click="toggleAuxTreeMode">
               {{ auxTreeMode ? '扁平视图' : '树形视图' }}
@@ -928,7 +936,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Search, Upload, Loading, Warning, Setting } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
@@ -948,7 +956,7 @@ import { useImportValidation } from '@/utils/useImportValidation'
 import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
-import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtAmountCell, { AMOUNT_DIVISOR_KEY } from '@/components/common/GtAmountCell.vue'
 import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
@@ -963,6 +971,16 @@ const year = computed(() => {
 
 // 金额单位（从 active dataset 的 source_summary.amount_unit 读取）
 const amountUnit = ref<string>('')
+// 显示单位切换（纯前端换算，不改数据库）
+const displayUnit = ref<'yuan' | 'wan' | 'qian'>('yuan')
+const displayDivisor = computed(() => {
+  if (displayUnit.value === 'wan') return 10000
+  if (displayUnit.value === 'qian') return 1000
+  return 1
+})
+
+// 通过 provide 让所有子组件 GtAmountCell 自动获取除数
+provide(AMOUNT_DIVISOR_KEY, () => displayDivisor.value)
 
 // ── 账套/年度切换 ──
 interface ProjectInfo { id: string; name: string; client_name?: string; wizard_state?: any }
@@ -2265,7 +2283,12 @@ async function loadBalance() {
 async function loadAmountUnit() {
   try {
     const ds = await getActiveLedgerDataset(projectId.value, year.value)
-    amountUnit.value = ds?.source_summary?.amount_unit || ''
+    const unit = ds?.source_summary?.amount_unit || ''
+    amountUnit.value = unit
+    // 根据检测到的单位设置默认显示模式
+    if (unit === '万元') displayUnit.value = 'wan'
+    else if (unit === '千元') displayUnit.value = 'qian'
+    else displayUnit.value = 'yuan'
   } catch {
     amountUnit.value = ''
   }

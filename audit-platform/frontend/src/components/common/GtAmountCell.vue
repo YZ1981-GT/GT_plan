@@ -10,21 +10,25 @@
     <span
       class="gt-amount-cell"
       :class="[
-        displayPrefs.amountClass(value, priorValue),
+        displayPrefs.amountClass(scaledValue, priorValue),
         { 'gt-amount-cell--clickable': clickable },
       ]"
       style="white-space: nowrap"
       @click="handleClick"
     >
-      {{ displayPrefs.fmt(value) }}
+      {{ displayPrefs.fmt(scaledValue) }}
     </span>
   </CommentTooltip>
 </template>
 
 <script setup lang="ts">
+import { computed, inject } from 'vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import type { CellComment } from '@/composables/useCellComments'
+
+/** 金额除数注入 key（由父组件 provide，默认 1 不换算） */
+export const AMOUNT_DIVISOR_KEY = Symbol('amountDivisor')
 
 const props = withDefaults(
   defineProps<{
@@ -49,6 +53,19 @@ const emit = defineEmits<{
 }>()
 
 const displayPrefs = useDisplayPrefsStore()
+
+/** 注入的除数（父组件 provide AMOUNT_DIVISOR_KEY） */
+const injectedDivisor = inject(AMOUNT_DIVISOR_KEY, 1) as number | (() => number)
+const divisor = computed(() => typeof injectedDivisor === 'function' ? injectedDivisor() : injectedDivisor)
+
+/** 按除数换算后的值（用于显示） */
+const scaledValue = computed(() => {
+  const d = divisor.value
+  if (d === 1 || !props.value) return props.value
+  const num = typeof props.value === 'string' ? parseFloat(props.value) : props.value
+  if (isNaN(num as number)) return props.value
+  return (num as number) / d
+})
 
 function handleClick() {
   if (props.clickable) {
