@@ -223,16 +223,26 @@ async def empty_recycle_bin(
     target_tables = {item_type: tables[item_type]} if item_type and item_type in tables else tables
 
     deleted_count = 0
+    errors = []
     for tbl_key, (model, label, _) in target_tables.items():
         if not hasattr(model, "is_deleted"):
             continue
-        result = await db.execute(
-            delete(model).where(model.is_deleted == True)  # noqa: E712
-        )
-        deleted_count += result.rowcount
+        try:
+            result = await db.execute(
+                delete(model).where(model.is_deleted == True)  # noqa: E712
+            )
+            deleted_count += result.rowcount
+        except Exception as exc:
+            # FK 约束等错误时跳过该表，继续处理其他表
+            await db.rollback()
+            errors.append(f"{label}: {str(exc)[:100]}")
 
     await db.commit()
-    return {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
+    resp: dict = {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
+    if errors:
+        resp["warnings"] = errors
+        resp["message"] += f"（{len(errors)} 个类型因关联数据无法清空）"
+    return resp
 
 
 @router.get("/stats")

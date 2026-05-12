@@ -1108,8 +1108,8 @@ inclusion: always
 - **四表金额单位问题（2026-05-12 发现）**：真实样本（四川物流等）Excel 原始数据以"万元"为单位编制，系统原样存储不做单位转换，导致前端显示数字看起来"太小"；需要在导入时从表头提取单位信息（"单位：万元"）或让用户手动选择，前端余额表顶部标注单位
 - **四表金额单位功能已实现（88b2a79）**：detector 从 Excel 表头自动提取 amount_unit 存入 dataset.source_summary；前端余额表/辅助余额表工具栏显示橙色"单位：万元"tag；旧数据集需重新导入或手动 UPDATE PG 补 source_summary.amount_unit
 - **待做：金额单位前端切换器**：当前只显示从 Excel 提取的单位标签，不支持用户手动切换"元/万元"显示模式（即不做数值除以 10000 的换算显示）；用户要求加一个切换按钮
-- **金额单位切换器已实现（ca0981b）**：provide/inject 模式，GtAmountCell 通过 `inject(AMOUNT_DIVISOR_KEY)` 获取除数自动换算；四表联动天然生效（同一 LedgerPenetration 组件 provide scope）；默认"原值显示"不自动换算，橙色 tag 标注数据原始单位（来自 Excel 表头）；选项为"原值显示/÷万显示/÷千显示"
-- **金额显示异常排查（2026-05-12）**：PG 数据正确（148151.74 元），前端显示 14.82（÷10000）；数据库无除法逻辑；疑似浏览器缓存旧 JS bundle（之前有 `displayUnit='wan'` 自动设置逻辑后改为始终 'yuan'）；建议用户 Ctrl+Shift+R 硬刷新验证
+- **金额单位切换器最终方案（1c979f4）**：删除 provide/inject AMOUNT_DIVISOR_KEY 机制（双重除法 bug 根因），统一用 displayPrefs store 的 `amountUnit` + `fmt()` 做单位换算；选择器标签改为直观的"元/万元/千元"；displayPrefs store 默认 `amountUnit: 'wan'`（localStorage 持久化）
+- **金额显示异常根因确认**：`displayPrefs` store 默认 amountUnit='wan'，`GtAmountCell` 的 `displayPrefs.fmt()` 内部调 `fmtAmountUnit(v, 'wan')` 已经除以 10000；R9 又加了 provide/inject 第二层除法 = 双重除以 10000；数据库数据始终正确（元为单位原样存储）
 - **金额单位联动需求（2026-05-12）**：四表（余额表/辅助余额表/序时账/辅助明细账）单位切换必须联动——用户在任一表切换万元则四表同步；当前只有余额表和辅助余额表有切换器，序时账和辅助明细账缺失；provide 已覆盖所有子组件但序时账/辅助明细的 GtAmountCell 也在同一 provide scope 内应该已生效，需验证
 - **GtPageHeader 排除项（16 个不需要加）**：Login/Register/NotFound/DevelopingPage（4）+ LedgerPenetration/WorkpaperEditor/Drilldown/DataValidationPanel/PDFExportPanel/LedgerImportHistory/ProjectWizard/WorkpaperWorkbench/AIChatView/AIWorkpaperView/AttachmentHub/ConsolidationHub（12 个子面板/嵌入/复杂自定义头部）
 - **unplugin-vue-components 自动导入陷阱**：grep `import GtPageHeader` 只能统计显式导入，实际有 17 个视图通过 auto-import 使用 GtPageHeader 但无 import 语句；正确统计方式是 grep `<GtPageHeader` 模板标签
