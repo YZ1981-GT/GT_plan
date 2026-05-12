@@ -218,26 +218,96 @@ async def empty_recycle_bin(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> dict:
-    """清空回收站（永久删除所有已软删除的记录）"""
+    """清空回收站（永久删除所有已软删除的记录）
+
+    对于项目类型，需要按 FK 依赖顺序级联删除子表数据。
+    """
+    import sqlalchemy as sa
+
     tables = _get_recyclable_tables()
-    target_tables = {item_type: tables[item_type]} if item_type and item_type in tables else tables
+
+    # 如果指定了非 project 类型，直接删
+    if item_type and item_type != "project" and item_type in tables:
+        model = tables[item_type][0]
+        if hasattr(model, "is_deleted"):
+            result = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712
+            await db.commit()
+            return {"message": f"已永久删除 {result.rowcount} 条记录", "deleted_count": result.rowcount}
+        return {"message": "该类型不支持软删除", "deleted_count": 0}
+
+    # 获取待删除的项目 ID 列表
+    deleted_project_ids_q = select(Project.id).where(Project.is_deleted == True)  # noqa: E712
+    result = await db.execute(deleted_project_ids_q)
+    deleted_pids = [row[0] for row in result.fetchall()]
 
     deleted_count = 0
-    errors = []
-    for tbl_key, (model, label, _) in target_tables.items():
+
+    # 1. 先删非 project 类型的软删除记录（这些通常没有复杂 FK）
+    for tbl_key, (model, label, _) in tables.items():
+        if tbl_key == "project":
+            continue
         if not hasattr(model, "is_deleted"):
             continue
         try:
-            result = await db.execute(
-                delete(model).where(model.is_deleted == True)  # noqa: E712
-            )
-            deleted_count += result.rowcount
-        except Exception as exc:
-            # FK 约束等错误时跳过该表，继续处理其他表
+            r = await db.execute(delete(model).where(model.is_deleted == True))  # noqa: E712
+            deleted_count += r.rowcount
+        except Exception:
             await db.rollback()
-            errors.append(f"{label}: {str(exc)[:100]}")
+
+    # 2. 级联删除已删除项目的子表数据（按 FK 深度从深到浅）
+    if deleted_pids:
+        # 用 raw SQL 按正确顺序级联删除，避免 ORM 关系图问题
+        cascade_sqls = [
+            # 最深层：activation_records → ledger_datasets
+            "DELETE FROM activation_records WHERE dataset_id IN (SELECT id FROM ledger_datasets WHERE project_id = ANY(:pids))",
+            # import_column_mapping_history（如果存在）
+            "DELETE FROM import_column_mapping_history WHERE project_id = ANY(:pids)",
+            # tb 四表
+            "DELETE FROM tb_aux_ledger WHERE project_id = ANY(:pids)",
+            "DELETE FROM tb_aux_balance WHERE project_id = ANY(:pids)",
+            "DELETE FROM tb_ledger WHERE project_id = ANY(:pids)",
+            "DELETE FROM tb_balance WHERE project_id = ANY(:pids)",
+            # ledger_datasets（引用 import_jobs）
+            "DELETE FROM ledger_datasets WHERE project_id = ANY(:pids)",
+            # import_jobs
+            "DELETE FROM import_jobs WHERE project_id = ANY(:pids)",
+            # 底稿相关
+            "DELETE FROM review_records WHERE working_paper_id IN (SELECT id FROM working_papers WHERE project_id = ANY(:pids))",
+            "DELETE FROM working_papers WHERE project_id = ANY(:pids)",
+            # 项目分配
+            "DELETE FROM project_assignments WHERE project_id = ANY(:pids)",
+            # 调整分录
+            "DELETE FROM adjustments WHERE project_id = ANY(:pids)",
+            "DELETE FROM adjustment_entries WHERE adjustment_id NOT IN (SELECT id FROM adjustments)",
+            # 错报
+            "DELETE FROM unadjusted_misstatements WHERE project_id = ANY(:pids)",
+            # 试算表
+            "DELETE FROM trial_balance_entries WHERE project_id = ANY(:pids)",
+            # 报表
+            "DELETE FROM financial_reports WHERE project_id = ANY(:pids)",
+            # 附注
+            "DELETE FROM disclosure_notes WHERE project_id = ANY(:pids)",
+            # 审计报告
+            "DELETE FROM audit_reports WHERE project_id = ANY(:pids)",
+            # 附件
+            "DELETE FROM attachments WHERE project_id = ANY(:pids)",
+            # 最后删项目本身
+            "DELETE FROM projects WHERE id = ANY(:pids)",
+        ]
+
+        pids_list = [str(pid) for pid in deleted_pids]
+        for sql in cascade_sqls:
+            try:
+                await db.execute(sa.text(sql), {"pids": pids_list})
+            except Exception:
+                # 表不存在或其他错误时跳过
+                await db.rollback()
+                continue
+
+        deleted_count += len(deleted_pids)
 
     await db.commit()
+    return {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
     resp: dict = {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
     if errors:
         resp["warnings"] = errors
