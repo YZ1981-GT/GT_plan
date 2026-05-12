@@ -69,7 +69,7 @@
       </template>
       <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
         请先完成以下步骤：① 导入账套数据（科目余额表）→ ② 完成科目映射 → ③ 点击"全量重算"生成试算表。
-        <el-button type="primary" text size="small" @click="router.push({ path: `/projects/${projectId}/ledger`, query: { import: '1' } })">前往导入 →</el-button>
+        <el-button type="primary" text size="small" @click="tbImportVisible = true">一键导入 →</el-button>
       </div>
     </el-alert>
 
@@ -81,8 +81,8 @@
         <el-step title="重新计算" description="触发试算表重算" :status="setupStepStatus[2]" />
       </el-steps>
       <div style="margin-top: 16px; text-align: center">
-        <el-button v-if="setupCurrentStep === 0" type="primary" @click="router.push(`/projects/${projectId}/ledger`)">
-          前往导入数据
+        <el-button v-if="setupCurrentStep === 0" type="primary" @click="tbImportVisible = true">
+          一键导入数据
         </el-button>
         <el-button v-else-if="setupCurrentStep === 1" type="primary" @click="router.push(`/projects/${projectId}/ledger?tab=mapping`)">
           前往科目映射
@@ -92,6 +92,14 @@
         </el-button>
       </div>
     </div>
+
+    <!-- 账套导入弹窗（内嵌，不跳转） -->
+    <LedgerImportDialog
+      v-model="tbImportVisible"
+      :project-id="projectId"
+      :year="selectedYear"
+      @imported="onImportDone"
+    />
 
     <!-- 搜索栏（Ctrl+F 触发，表格上方） -->
     <TableSearchBar
@@ -357,6 +365,7 @@ import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { usePasteImport } from '@/composables/usePasteImport'
+import LedgerImportDialog from '@/components/ledger-import/LedgerImportDialog.vue'
 import * as P from '@/services/apiPaths'
 
 const route = useRoute()
@@ -554,6 +563,13 @@ const setupStepStatus = computed(() =>
 )
 
 const showSetupGuide = computed(() => rows.value.length === 0)
+
+// 试算表内嵌导入弹窗
+const tbImportVisible = ref(false)
+function onImportDone() {
+  tbImportVisible.value = false
+  fetchData()  // 导入完成后刷新试算表
+}
 
 function advanceSetupStep() {
   if (setupCurrentStep.value < 3) {
