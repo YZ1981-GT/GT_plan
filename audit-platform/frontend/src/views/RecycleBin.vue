@@ -1,6 +1,18 @@
 <template>
   <div class="gt-recycle-bin">
-    <!-- 轻量标题栏（不用 GtPageHeader 的紫色横幅） -->
+    <!-- 顶部删除进度条 -->
+    <div v-if="emptying" class="gt-rb-progress-bar">
+      <el-progress
+        :percentage="emptyProgress"
+        :stroke-width="4"
+        :show-text="false"
+        color="#f56c6c"
+        style="width: 100%"
+      />
+      <span class="gt-rb-progress-text">正在清空回收站... {{ emptyProgressText }}</span>
+    </div>
+
+    <!-- 轻量标题栏 -->
     <div class="gt-rb-header">
       <div class="gt-rb-title">
         <el-icon :size="20" style="color: #909399"><Delete /></el-icon>
@@ -13,6 +25,7 @@
           type="danger"
           plain
           size="small"
+          :loading="emptying"
           v-permission="'recycle:purge'"
           @click="confirmEmptyAll"
         >
@@ -103,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
@@ -114,6 +127,14 @@ import {
 import { handleApiError } from '@/utils/errorHandler'
 
 const loading = ref(false)
+const emptying = ref(false)
+const emptyProgress = ref(0)
+const emptyProgressText = computed(() => {
+  if (emptyProgress.value >= 100) return '完成'
+  if (emptyProgress.value > 70) return '清理关联数据...'
+  if (emptyProgress.value > 30) return '删除项目数据...'
+  return '准备中...'
+})
 const items = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -190,16 +211,27 @@ async function confirmEmptyAll() {
     )
   } catch { return }  // 用户取消
 
-  loading.value = true
+  emptying.value = true
+  emptyProgress.value = 0
+  // 模拟进度（后端无流式进度，用定时器模拟）
+  const progressTimer = setInterval(() => {
+    if (emptyProgress.value < 90) {
+      emptyProgress.value += Math.random() * 15 + 5
+      if (emptyProgress.value > 90) emptyProgress.value = 90
+    }
+  }, 500)
+
   try {
     await emptyRecycleBin()
+    emptyProgress.value = 100
     ElMessage.success('回收站已清空')
     await loadItems()
     await loadStats()
   } catch (e: any) {
     handleApiError(e, '清空回收站')
   } finally {
-    loading.value = false
+    clearInterval(progressTimer)
+    setTimeout(() => { emptying.value = false; emptyProgress.value = 0 }, 600)
   }
 }
 
@@ -247,6 +279,25 @@ onMounted(async () => {
 <style scoped>
 .gt-recycle-bin {
   padding: 20px 24px;
+  position: relative;
+}
+
+.gt-rb-progress-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  padding: 8px 0 4px;
+  margin: -20px -24px 12px;
+  padding: 8px 24px 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.gt-rb-progress-text {
+  font-size: 12px;
+  color: #f56c6c;
+  margin-top: 4px;
+  display: block;
+}
 }
 
 .gt-rb-header {
