@@ -652,7 +652,8 @@ watch(tbImportVisible, async (visible) => {
 
 function onUseExistingData() {
   tbImportVisible.value = false
-  advanceSetupStep()  // 跳到步骤 2（科目映射）
+  // 有数据时直接执行映射+重算一条龙
+  onAutoMapping()
 }
 
 function goToLedgerImport() {
@@ -672,8 +673,10 @@ async function onAutoMapping() {
   autoMappingLoading.value = true
   try {
     await api.post(P.accountMapping.autoMatch(projectId.value), { year: selectedYear.value })
-    ElMessage.success('科目映射完成，系统已按编码规则自动匹配')
+    ElMessage.success('科目映射完成，正在生成试算表...')
     advanceSetupStep()  // 推进到步骤 3
+    // 映射完成后自动触发重算（不让用户再手动点第三步）
+    await onRecalc()
   } catch (e: any) {
     handleApiError(e, '自动科目映射')
   } finally {
