@@ -43,6 +43,46 @@ class DecimalEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+def _get_parent_code(code: str) -> str | None:
+    """获取科目的父编码。
+
+    点号分隔：1002.001 → 1002
+    纯数字：4位为一级无父，6位→前4位，8位→前6位
+    """
+    if not code:
+        return None
+    if "." in code:
+        last_dot = code.rfind(".")
+        return code[:last_dot] if last_dot > 0 else None
+    if len(code) > 6:
+        return code[:6]
+    if len(code) > 4:
+        return code[:4]
+    return None
+
+
+def _is_child_of(child_code: str, parent_code: str) -> bool:
+    """判断 child_code 是否是 parent_code 的直接或间接子级"""
+    if not child_code or not parent_code:
+        return False
+    if child_code == parent_code:
+        return False
+    if "." in parent_code or "." in child_code:
+        return child_code.startswith(parent_code + ".")
+    return child_code.startswith(parent_code) and len(child_code) > len(parent_code)
+
+
+def _get_level(code: str) -> int:
+    """推断科目级次"""
+    if "." in code:
+        return len(code.split("."))
+    if len(code) <= 4:
+        return 1
+    if len(code) <= 6:
+        return 2
+    return 3
+
+
 class LedgerPenetrationService:
     """穿透查询服务"""
 
@@ -62,7 +102,7 @@ class LedgerPenetrationService:
         self, project_id: UUID, year: int,
         account_code: str | None = None,
     ) -> list[dict]:
-        """第一层：科目余额汇总"""
+        """第一层：科目余额汇总（自动补齐缺失的父级汇总行）"""
         tbl = TbBalance.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
         stmt = (
@@ -82,7 +122,88 @@ class LedgerPenetrationService:
             stmt = stmt.where(tbl.c.account_code == account_code)
 
         result = await self.db.execute(stmt)
-        return [dict(r._mapping) for r in result.fetchall()]
+        rows = [dict(r._mapping) for r in result.fetchall()]
+
+        # 自动补齐缺失的父级汇总行
+        return self._fill_parent_levels(rows)
+
+    @staticmethod
+    def _fill_parent_levels(rows: list[dict]) -> list[dict]:
+        """补齐缺失的父级科目汇总行。
+
+        规则：
+        - 点号分隔：1002.001 的父级是 1002
+        - 纯数字：4位为一级，6位为二级（前4位是父），8位为三级（前6位是父）
+        - 父级行的金额 = 所有直接子级金额之和
+        """
+        if not rows:
+            return rows
+
+        existing_codes = {r["account_code"] for r in rows}
+        code_to_row: dict[str, dict] = {r["account_code"]: r for r in rows}
+
+        # 收集所有需要补齐的父级编码
+        parents_needed: dict[str, set] = {}  # parent_code → set of child_codes
+
+        for row in rows:
+            code = row["account_code"]
+            parent = _get_parent_code(code)
+            while parent and parent not in existing_codes:
+                if parent not in parents_needed:
+                    parents_needed[parent] = set()
+                parents_needed[parent].add(code)
+                existing_codes.add(parent)  # 避免重复处理
+                code = parent
+                parent = _get_parent_code(code)
+
+        if not parents_needed:
+            return rows
+
+        # 为每个缺失的父级生成汇总行
+        from decimal import Decimal
+
+        def _sum_children(parent_code: str) -> dict:
+            """递归汇总所有以 parent_code 为前缀的子级金额"""
+            opening = Decimal(0)
+            debit = Decimal(0)
+            credit = Decimal(0)
+            closing = Decimal(0)
+
+            for r in rows:
+                child_code = r["account_code"]
+                if _is_child_of(child_code, parent_code):
+                    opening += Decimal(str(r.get("opening_balance") or 0))
+                    debit += Decimal(str(r.get("debit_amount") or 0))
+                    credit += Decimal(str(r.get("credit_amount") or 0))
+                    closing += Decimal(str(r.get("closing_balance") or 0))
+
+            # 推断科目名称：取第一个子级名称的公共前缀部分
+            child_names = [
+                r.get("account_name", "")
+                for r in rows
+                if _is_child_of(r["account_code"], parent_code)
+            ]
+            name = child_names[0].split("_")[0] if child_names else parent_code
+
+            level = _get_level(parent_code)
+            return {
+                "account_code": parent_code,
+                "account_name": name,
+                "level": level,
+                "opening_balance": float(opening) if opening else None,
+                "debit_amount": float(debit) if debit else None,
+                "credit_amount": float(credit) if credit else None,
+                "closing_balance": float(closing) if closing else None,
+                "_is_synthetic": True,  # 标记为合成行
+            }
+
+        for parent_code in parents_needed:
+            code_to_row[parent_code] = _sum_children(parent_code)
+
+        # 合并并按科目编码排序
+        all_rows = list(code_to_row.values())
+        all_rows.sort(key=lambda r: r["account_code"])
+        return all_rows
 
     async def get_account_opening_balance(
         self, project_id: UUID, year: int, account_code: str,
