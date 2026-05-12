@@ -66,51 +66,57 @@ def _get_recyclable_tables() -> dict:
 async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
     """级联删除单个项目及其所有关联数据。
 
-    使用 session_replication_role = replica 临时禁用 FK 触发器，
-    直接删除所有引用该项目的子表数据，最后删项目本身。
+    使用独立的 raw connection + session_replication_role=replica 禁用 FK，
+    绕过 SQLAlchemy session 的事务管理避免 rollback 污染。
     """
-    import sqlalchemy as sa
+    from app.core.database import async_engine
 
     pid = str(project_id)
 
-    # 临时禁用 FK 检查（当前 session 内有效）
-    await db.execute(sa.text("SET session_replication_role = 'replica'"))
+    async with async_engine.connect() as conn:
+        # 获取底层 asyncpg connection 设置 autocommit-like 行为
+        raw = await conn.get_raw_connection()
+        pg_conn = raw.driver_connection  # asyncpg connection
 
-    try:
-        # 查出所有引用 projects.id 的子表
-        fk_query = sa.text("""
-            SELECT DISTINCT tc.table_name, kcu.column_name
-            FROM information_schema.table_constraints tc
-            JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-            JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
-            WHERE tc.constraint_type = 'FOREIGN KEY'
-              AND ccu.table_name = 'projects'
-              AND tc.table_name != 'projects'
-        """)
-        result = await db.execute(fk_query)
-        child_tables = [(row[0], row[1]) for row in result.fetchall()]
+        # 禁用 FK 检查
+        await pg_conn.execute("SET session_replication_role = 'replica'")
 
-        # 逐表删除
-        for table_name, column_name in child_tables:
+        try:
+            # 查出所有引用 projects.id 的子表
+            rows = await pg_conn.fetch("""
+                SELECT DISTINCT tc.table_name, kcu.column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND ccu.table_name = 'projects'
+                  AND tc.table_name != 'projects'
+            """)
+
+            # 逐表删除
+            for row in rows:
+                table_name = row["table_name"]
+                column_name = row["column_name"]
+                try:
+                    await pg_conn.execute(
+                        f'DELETE FROM "{table_name}" WHERE "{column_name}" = $1::uuid', pid
+                    )
+                except Exception:
+                    pass
+
+            # 处理自引用
             try:
-                await db.execute(
-                    sa.text(f'DELETE FROM "{table_name}" WHERE "{column_name}" = :pid::uuid'),
-                    {"pid": pid},
+                await pg_conn.execute(
+                    "UPDATE projects SET parent_project_id = NULL WHERE parent_project_id = $1::uuid", pid
                 )
             except Exception:
                 pass
 
-        # 处理自引用
-        await db.execute(
-            sa.text("UPDATE projects SET parent_project_id = NULL WHERE parent_project_id = :pid::uuid"),
-            {"pid": pid},
-        )
-
-        # 删项目本身
-        await db.execute(sa.text("DELETE FROM projects WHERE id = :pid::uuid"), {"pid": pid})
-    finally:
-        # 恢复 FK 检查
-        await db.execute(sa.text("SET session_replication_role = 'origin'"))
+            # 删项目本身
+            await pg_conn.execute("DELETE FROM projects WHERE id = $1::uuid", pid)
+        finally:
+            # 恢复 FK 检查
+            await pg_conn.execute("SET session_replication_role = 'origin'")
 
 
 @router.get("")
