@@ -73,11 +73,20 @@ export function usePasteImport(options: PasteImportOptions) {
     e.preventDefault()
   }
 
+  function _getEl(): HTMLElement | null {
+    const v = options.containerRef.value
+    if (!v) return null
+    // 支持 Vue 组件 ref（取 $el）和原生 DOM ref
+    if (v instanceof HTMLElement) return v
+    if (v.$el instanceof HTMLElement) return v.$el
+    return null
+  }
+
   onMounted(() => {
-    options.containerRef.value?.addEventListener('paste', onPaste as any)
+    _getEl()?.addEventListener('paste', onPaste as any)
   })
 
   onUnmounted(() => {
-    options.containerRef.value?.removeEventListener('paste', onPaste as any)
+    _getEl()?.removeEventListener('paste', onPaste as any)
   })
 }
