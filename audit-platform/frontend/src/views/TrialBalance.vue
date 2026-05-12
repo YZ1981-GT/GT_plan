@@ -42,8 +42,26 @@
 
     <!-- 视图切换：科目明细 / 试算平衡表 -->
     <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
-      <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'detail' }" @click="tbViewMode = 'detail'">科目明细</span>
-      <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'summary' }" @click="tbViewMode = 'summary'; loadTbSummary()">试算平衡表</span>
+      <el-tooltip placement="bottom" :show-after="500">
+        <template #content>
+          <div style="max-width: 280px; line-height: 1.6">
+            <b>科目明细</b><br>
+            按科目编码逐行展示期初、AJE调整、RJE重分类、审定数。<br>
+            <span style="color: #e6a23c">适用：逐科目核对数据、录入调整分录</span>
+          </div>
+        </template>
+        <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'detail' }" @click="tbViewMode = 'detail'">科目明细</span>
+      </el-tooltip>
+      <el-tooltip placement="bottom" :show-after="500">
+        <template #content>
+          <div style="max-width: 280px; line-height: 1.6">
+            <b>试算平衡表</b><br>
+            按报表行次（资产负债表/利润表）汇总展示，对应审计报告附表格式。<br>
+            <span style="color: #e6a23c">适用：出具报表前核对借贷平衡、查看审定后报表数</span>
+          </div>
+        </template>
+        <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'summary' }" @click="tbViewMode = 'summary'; loadTbSummary()">试算平衡表</span>
+      </el-tooltip>
     </div>
 
     <!-- 一致性校验结果 -->
