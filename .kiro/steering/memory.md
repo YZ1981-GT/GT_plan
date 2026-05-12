@@ -1102,6 +1102,7 @@ inclusion: always
 - **statusEnum 硬编码已清零**：grep `=== 'draft'` 等模式（排除已用常量的）= 0 处
 - **vitest fake timer 陷阱**：`vi.runAllTimersAsync()` 对 setInterval 会无限循环；正确做法是 `vi.advanceTimersByTimeAsync(0)` 刷 microtask + `vi.advanceTimersByTimeAsync(interval)` 推进指定时间
 - **R9 git 提交**：commit a68eb18 推送到 origin/feature/ledger-import-view-refactor（112 文件 +5163/-1171）
+- **git 分支整理（2026-05-12）**：R7-R9 + ledger-import-v2 合并到 master（d8ce7c9）；删除 7 个过时分支（round7/round8/global-component-library/cell-selection/pinia-event-store/univer-import/cursor-setup）；仓库现只有 master + feature/ledger-import-view-refactor 两个分支
 - **GtPageHeader 排除项（16 个不需要加）**：Login/Register/NotFound/DevelopingPage（4）+ LedgerPenetration/WorkpaperEditor/Drilldown/DataValidationPanel/PDFExportPanel/LedgerImportHistory/ProjectWizard/WorkpaperWorkbench/AIChatView/AIWorkpaperView/AttachmentHub/ConsolidationHub（12 个子面板/嵌入/复杂自定义头部）
 - **unplugin-vue-components 自动导入陷阱**：grep `import GtPageHeader` 只能统计显式导入，实际有 17 个视图通过 auto-import 使用 GtPageHeader 但无 import 语句；正确统计方式是 grep `<GtPageHeader` 模板标签
 - **Sprint 5 Task 76 执行空洞**：handleApiError 批量替换声称完成但实际 0 个文件被改动（grep 证实 handleApiError 仍只有 R8 的 7 个视图）；下一步 P0 = 53 个文件 147 处 ElMessage.error 机械替换为 handleApiError

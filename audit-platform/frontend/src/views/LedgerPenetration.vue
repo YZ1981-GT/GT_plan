@@ -1568,6 +1568,7 @@ async function doPreview() {
 async function doImport() {
   if ((!importFiles.value.length && !uploadToken.value) || !projectId.value) return
   importing.value = true
+  _importPollingAborted = false
   importStep.value = 'importing'
   bgImportPolling.value = true
 
@@ -1601,7 +1602,11 @@ async function doImport() {
       maxPolls: 400,
       timeoutMessage: '导入任务仍在后台运行，请稍后刷新页面查看结果',
       onWait: () => new Promise<void>(resolve => setTimeout(resolve, 3000)),
-      fetchStatus: () => fetchImportQueueStatus(() => getImportJob(projectId.value, importJobId)),
+      fetchStatus: () => {
+        // 用户已点"关闭（后台继续）"，中断前台轮询
+        if (_importPollingAborted) throw new Error('__ABORTED__')
+        return fetchImportQueueStatus(() => getImportJob(projectId.value, importJobId))
+      },
       onStatus: (status) => {
         if (status && typeof status === 'object') {
           const pct = status.progress ?? 0
@@ -1612,6 +1617,7 @@ async function doImport() {
       shouldFinish: (status) => shouldFinishImportPolling(status),
       hasFailed: (status) => hasImportFailed(status),
       getFailureMessage: (status) => status?.message || '导入失败',
+      shouldIgnoreError: (error) => (error as Error)?.message === '__ABORTED__',
       onSuccessStatus: (status) => {
         const payload = status?.result
         const resolvedImportedResult = (payload?.imported && !payload?.validation)
@@ -1667,6 +1673,8 @@ async function doImport() {
 
 /** flag：避免 before-close 钩子和 onMoveToBackground 重复弹 toast */
 const _closingAsBackground = ref(false)
+/** flag：用户点"关闭（后台继续）"后中断前台轮询循环 */
+let _importPollingAborted = false
 /** 组件销毁时清理未触发的弹框计时器 */
 let _completionPromptTimer: number | null = null
 
@@ -1697,6 +1705,8 @@ function onMoveToBackground() {
   // worker 后端继续跑，关闭 dialog；顶栏进度环持续追踪
   // 设 flag 避免 before-close 钩子重复弹 toast
   _closingAsBackground.value = true
+  // 中断前台 runImportPollingFlow 循环，避免后续 canceled/failed 弹错误弹窗
+  _importPollingAborted = true
   importDialogVisible.value = false
   ElMessage.success({
     message: '已转入后台，顶栏"导入中"进度环可追踪进度',
@@ -1733,6 +1743,8 @@ function onDialogBeforeClose(done: () => void) {
     return
   }
   if (importStep.value === 'importing' && !importing.value) {
+    // × / Esc 关闭 importing dialog → 视同放后台，中断前台轮询
+    _importPollingAborted = true
     // × / Esc 关闭 importing dialog → 视同放后台
     ElMessage.success({
       message: '已转入后台，顶栏"导入中"进度环可追踪进度',
