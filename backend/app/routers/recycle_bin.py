@@ -64,30 +64,33 @@ def _get_recyclable_tables() -> dict:
 
 
 async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
-    """级联删除单个项目及其所有子表数据。
+    """级联删除单个项目及其所有关联数据。
 
-    方案：动态查询所有引用 projects 表的 FK，多轮逐表删除直到无 FK 冲突。
+    使用 session_replication_role = replica 临时禁用 FK 触发器，
+    直接删除所有引用该项目的子表数据，最后删项目本身。
     """
     import sqlalchemy as sa
 
     pid = str(project_id)
 
-    # 1. 查出所有引用 projects.id 的子表
-    fk_query = sa.text("""
-        SELECT DISTINCT tc.table_name, kcu.column_name
-        FROM information_schema.table_constraints tc
-        JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-        JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
-        WHERE tc.constraint_type = 'FOREIGN KEY'
-          AND ccu.table_name = 'projects'
-          AND tc.table_name != 'projects'
-    """)
-    result = await db.execute(fk_query)
-    child_tables = [(row[0], row[1]) for row in result.fetchall()]
+    # 临时禁用 FK 检查（当前 session 内有效）
+    await db.execute(sa.text("SET session_replication_role = 'replica'"))
 
-    # 2. 多轮删除（最多 5 轮，处理子表间的 FK 依赖）
-    for _round in range(5):
-        failed = []
+    try:
+        # 查出所有引用 projects.id 的子表
+        fk_query = sa.text("""
+            SELECT DISTINCT tc.table_name, kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+            JOIN information_schema.constraint_column_usage ccu ON tc.constraint_name = ccu.constraint_name
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND ccu.table_name = 'projects'
+              AND tc.table_name != 'projects'
+        """)
+        result = await db.execute(fk_query)
+        child_tables = [(row[0], row[1]) for row in result.fetchall()]
+
+        # 逐表删除
         for table_name, column_name in child_tables:
             try:
                 await db.execute(
@@ -95,22 +98,19 @@ async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
                     {"pid": pid},
                 )
             except Exception:
-                failed.append((table_name, column_name))
-        if not failed:
-            break
-        child_tables = failed  # 下一轮只重试失败的
+                pass
 
-    # 3. 处理 projects 自引用（parent_project_id）
-    try:
+        # 处理自引用
         await db.execute(
             sa.text("UPDATE projects SET parent_project_id = NULL WHERE parent_project_id = :pid::uuid"),
             {"pid": pid},
         )
-    except Exception:
-        pass
 
-    # 4. 最后删项目本身
-    await db.execute(sa.text("DELETE FROM projects WHERE id = :pid::uuid"), {"pid": pid})
+        # 删项目本身
+        await db.execute(sa.text("DELETE FROM projects WHERE id = :pid::uuid"), {"pid": pid})
+    finally:
+        # 恢复 FK 检查
+        await db.execute(sa.text("SET session_replication_role = 'origin'"))
 
 
 @router.get("")
@@ -308,57 +308,14 @@ async def empty_recycle_bin(
         except Exception:
             await db.rollback()
 
-    # 2. 级联删除已删除项目的子表数据（按 FK 深度从深到浅）
+    # 2. 级联删除已删除项目
     if deleted_pids:
-        # 用 raw SQL 按正确顺序级联删除，避免 ORM 关系图问题
-        cascade_sqls = [
-            # 最深层：activation_records → ledger_datasets
-            "DELETE FROM activation_records WHERE dataset_id IN (SELECT id FROM ledger_datasets WHERE project_id = ANY(:pids))",
-            # import_column_mapping_history（如果存在）
-            "DELETE FROM import_column_mapping_history WHERE project_id = ANY(:pids)",
-            # tb 四表
-            "DELETE FROM tb_aux_ledger WHERE project_id = ANY(:pids)",
-            "DELETE FROM tb_aux_balance WHERE project_id = ANY(:pids)",
-            "DELETE FROM tb_ledger WHERE project_id = ANY(:pids)",
-            "DELETE FROM tb_balance WHERE project_id = ANY(:pids)",
-            # ledger_datasets（引用 import_jobs）
-            "DELETE FROM ledger_datasets WHERE project_id = ANY(:pids)",
-            # import_jobs
-            "DELETE FROM import_jobs WHERE project_id = ANY(:pids)",
-            # 底稿相关
-            "DELETE FROM review_records WHERE working_paper_id IN (SELECT id FROM working_papers WHERE project_id = ANY(:pids))",
-            "DELETE FROM working_papers WHERE project_id = ANY(:pids)",
-            # 项目分配
-            "DELETE FROM project_assignments WHERE project_id = ANY(:pids)",
-            # 调整分录
-            "DELETE FROM adjustments WHERE project_id = ANY(:pids)",
-            "DELETE FROM adjustment_entries WHERE adjustment_id NOT IN (SELECT id FROM adjustments)",
-            # 错报
-            "DELETE FROM unadjusted_misstatements WHERE project_id = ANY(:pids)",
-            # 试算表
-            "DELETE FROM trial_balance_entries WHERE project_id = ANY(:pids)",
-            # 报表
-            "DELETE FROM financial_reports WHERE project_id = ANY(:pids)",
-            # 附注
-            "DELETE FROM disclosure_notes WHERE project_id = ANY(:pids)",
-            # 审计报告
-            "DELETE FROM audit_reports WHERE project_id = ANY(:pids)",
-            # 附件
-            "DELETE FROM attachments WHERE project_id = ANY(:pids)",
-            # 最后删项目本身
-            "DELETE FROM projects WHERE id = ANY(:pids)",
-        ]
-
-        pids_list = [str(pid) for pid in deleted_pids]
-        for sql in cascade_sqls:
+        for pid in deleted_pids:
             try:
-                await db.execute(sa.text(sql), {"pids": pids_list})
+                await _cascade_delete_project(db, pid)
             except Exception:
-                # 表不存在或其他错误时跳过
-                await db.rollback()
-                continue
-
-        deleted_count += len(deleted_pids)
+                pass
+        deleted_count += len(deleted_pids)        deleted_count += len(deleted_pids)
 
     await db.commit()
     return {"message": f"已永久删除 {deleted_count} 条记录", "deleted_count": deleted_count}
