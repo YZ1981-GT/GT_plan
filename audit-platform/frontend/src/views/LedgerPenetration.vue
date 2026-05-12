@@ -110,11 +110,12 @@
         </el-button>
         <div class="gt-filter-spacer" />
         <el-tag type="info" size="small">账簿查询</el-tag>
-        <el-select v-model="displayUnit" size="small" style="width: 100px" title="显示单位切换">
-          <el-option label="元" value="yuan" />
-          <el-option label="万元" value="wan" />
-          <el-option label="千元" value="qian" />
+        <el-select v-model="displayUnit" size="small" style="width: 120px" title="金额显示单位（换算查看）">
+          <el-option label="原值显示" value="yuan" />
+          <el-option label="÷万 显示" value="wan" />
+          <el-option label="÷千 显示" value="qian" />
         </el-select>
+        <el-tag v-if="amountUnit" type="warning" size="small" title="数据原始单位（来自Excel表头）">{{ amountUnit }}</el-tag>
         <el-tag size="small">{{ filteredFlatCount }} / {{ balanceData.length }}</el-tag>
         <el-button size="small" @click="refresh" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
@@ -185,10 +186,10 @@
         <!-- 控制区域（可折叠） -->
         <div class="gt-aux-toolbar">
           <div class="gt-aux-toolbar-header">
-            <el-select v-model="displayUnit" size="small" style="width: 100px" title="显示单位切换">
-              <el-option label="元" value="yuan" />
-              <el-option label="万元" value="wan" />
-              <el-option label="千元" value="qian" />
+            <el-select v-model="displayUnit" size="small" style="width: 120px" title="金额显示单位（换算查看）">
+              <el-option label="原值显示" value="yuan" />
+              <el-option label="÷万 显示" value="wan" />
+              <el-option label="÷千 显示" value="qian" />
             </el-select>
             <el-tag size="small">{{ auxDisplayCount }} / {{ auxTotalRecords }}</el-tag>
             <el-button size="small" :type="auxTreeMode ? 'primary' : ''" @click="toggleAuxTreeMode">
@@ -2285,10 +2286,9 @@ async function loadAmountUnit() {
     const ds = await getActiveLedgerDataset(projectId.value, year.value)
     const unit = ds?.source_summary?.amount_unit || ''
     amountUnit.value = unit
-    // 根据检测到的单位设置默认显示模式
-    if (unit === '万元') displayUnit.value = 'wan'
-    else if (unit === '千元') displayUnit.value = 'qian'
-    else displayUnit.value = 'yuan'
+    // 默认始终"原样显示"（不换算），单位标签只是告知用户数据本身的单位
+    // 用户可手动切换到其他单位做换算查看
+    displayUnit.value = 'yuan'
   } catch {
     amountUnit.value = ''
   }
