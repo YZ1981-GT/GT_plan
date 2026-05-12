@@ -506,7 +506,7 @@ async function selectItem(item: ReviewInboxItem) {
   wpSnapshot.value = null
   aiLoading.value = true
   try {
-    const res = await reviewContent(item.project_id, item.id)
+    const res: any = await reviewContent(item.project_id, item.id)
     aiIssues.value = res.issues || []
     // Load workpaper snapshot for Univer readonly preview
     wpSnapshot.value = res.univer_data || res.snapshot || { sheets: {} }

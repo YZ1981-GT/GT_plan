@@ -67,7 +67,7 @@
             <el-tag size="small" type="info">{{ report.company_type === 'listed' ? '上市公司' : '非上市' }}</el-tag>
             <el-tag size="small" :type="(statusTagType(report.status)) || undefined">{{ statusLabel(report.status) }}</el-tag>
             <el-tag
-              v-if="isLocked && report.bound_dataset_id"
+              v-if="isLocked && (report as any).bound_dataset_id"
               size="small"
               type="info"
               effect="plain"

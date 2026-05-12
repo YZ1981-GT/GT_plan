@@ -117,7 +117,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { listProjects, getMyAssignments } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
-import { dashboard as P_dash } from '@/services/apiPaths'
+import { dashboard as P_dash, workpapers as P_wp } from '@/services/apiPaths'
 import { WP_STATUS, PROJECT_STATUS } from '@/constants/statusEnum'
 import GTChart from '@/components/GTChart.vue'
 import {
@@ -274,7 +274,7 @@ onMounted(async () => {
     const wpList: any[] = []
     for (const proj of assignments.slice(0, 5)) {
       try {
-        const data = await httpApi.get(P.workpapers.list(proj.project_id), {
+        const data = await httpApi.get(P_wp.list(proj.project_id), {
           params: { assigned_to_me: true, status: 'draft,rejected' },
           validateStatus: (s: number) => s < 600,
         })

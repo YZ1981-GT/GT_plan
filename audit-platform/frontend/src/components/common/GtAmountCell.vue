@@ -26,9 +26,7 @@ import { computed, inject } from 'vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import type { CellComment } from '@/composables/useCellComments'
-
-/** 金额除数注入 key（由父组件 provide，默认 1 不换算） */
-export const AMOUNT_DIVISOR_KEY = Symbol('amountDivisor')
+import { AMOUNT_DIVISOR_KEY } from '@/constants/amountDivisor'
 
 const props = withDefaults(
   defineProps<{

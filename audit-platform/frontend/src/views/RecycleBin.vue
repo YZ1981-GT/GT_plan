@@ -223,9 +223,9 @@ function retentionClass(deletedAt: string | undefined): string {
   return ''
 }
 
-function typeTagColor(type: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const m: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = {
-    project: '', workpaper: 'success', attachment: 'info', adjustment: 'warning',
+function typeTagColor(type: string): 'success' | 'warning' | 'info' | 'danger' {
+  const m: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
+    project: 'info', workpaper: 'success', attachment: 'info', adjustment: 'warning',
   }
   return m[type] || 'info'
 }

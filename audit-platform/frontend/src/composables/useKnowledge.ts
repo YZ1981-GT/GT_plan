@@ -94,12 +94,13 @@ export function useKnowledge() {
    * @param query 搜索关键词
    * @param category 可选分类过滤
    */
-  async function search(query: string, category?: string): Promise<KnowledgeDoc[]> {
+  async function search(query: string, category?: string, context?: string): Promise<KnowledgeDoc[]> {
     if (!query.trim()) return []
     searching.value = true
     try {
       const params: Record<string, string> = { q: query }
       if (category) params.category = category
+      if (context) params.context = context
       const data = await api.get<any>(P_kb.search, { params })
       const results: KnowledgeDoc[] = Array.isArray(data) ? data : data?.results || []
       searchResults.value = results

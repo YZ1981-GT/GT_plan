@@ -141,31 +141,31 @@
             <el-card v-if="overview" shadow="hover" class="eqcr-finding-card">
               <template #header><span>📊 重要性</span></template>
               <div class="eqcr-finding-content">
-                已录入 {{ overview.opinion_summary?.materiality || 0 }} 条意见
+                已录入 {{ (overview.opinion_summary as any)?.materiality || 0 }} 条意见
               </div>
             </el-card>
             <el-card shadow="hover" class="eqcr-finding-card">
               <template #header><span>📐 会计估计</span></template>
               <div class="eqcr-finding-content">
-                已录入 {{ overview?.opinion_summary?.estimate || 0 }} 条意见
+                已录入 {{ (overview?.opinion_summary as any)?.estimate || 0 }} 条意见
               </div>
             </el-card>
             <el-card shadow="hover" class="eqcr-finding-card">
               <template #header><span>🔗 关联方</span></template>
               <div class="eqcr-finding-content">
-                已录入 {{ overview?.opinion_summary?.related_party || 0 }} 条意见
+                已录入 {{ (overview?.opinion_summary as any)?.related_party || 0 }} 条意见
               </div>
             </el-card>
             <el-card shadow="hover" class="eqcr-finding-card">
               <template #header><span>🏢 持续经营</span></template>
               <div class="eqcr-finding-content">
-                已录入 {{ overview?.opinion_summary?.going_concern || 0 }} 条意见
+                已录入 {{ (overview?.opinion_summary as any)?.going_concern || 0 }} 条意见
               </div>
             </el-card>
             <el-card shadow="hover" class="eqcr-finding-card">
               <template #header><span>📝 审计意见</span></template>
               <div class="eqcr-finding-content">
-                已录入 {{ overview?.opinion_summary?.opinion_type || 0 }} 条意见
+                已录入 {{ (overview?.opinion_summary as any)?.opinion_type || 0 }} 条意见
               </div>
             </el-card>
             <el-card shadow="hover" class="eqcr-finding-card">
@@ -218,7 +218,7 @@ const loading = ref(false)
 const overview = ref<EqcrProjectOverview | null>(null)
 const timeSummary = ref<{ total_hours: number; record_count: number } | null>(null)
 const activeTab = ref<
-  'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute' | 'review_notes' | 'prior_year' | 'memo' | 'component_auditor'
+  'materiality' | 'estimate' | 'related_party' | 'going_concern' | 'opinion_type' | 'shadow_compute' | 'review_notes' | 'prior_year' | 'memo' | 'component_auditor' | 'key_findings_summary'
 >('materiality')
 
 const project = computed(() => overview.value?.project ?? null)

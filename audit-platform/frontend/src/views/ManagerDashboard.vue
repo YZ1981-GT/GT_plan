@@ -322,7 +322,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import { api } from '@/services/apiProxy'
-import { dashboard as P_dash, workHours as P_wh } from '@/services/apiPaths'
+import { dashboard as P_dash, workHours as P_wh, projects as P_proj } from '@/services/apiPaths'
 import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
 import { listCommunications } from '@/services/pmApi'
@@ -639,7 +639,7 @@ async function completeCommitment(row: CommitmentDisplayItem) {
   row._completing = true
   try {
     await http.patch(
-      P.projects.communications.commitmentUpdate(row.project_id, row.comm_id, row.commitment_id),
+      P_proj.communications.commitmentUpdate(row.project_id, row.comm_id, row.commitment_id),
       { status: 'done' }
     )
     ElMessage.success(`承诺"${row.content}"已标记完成`)

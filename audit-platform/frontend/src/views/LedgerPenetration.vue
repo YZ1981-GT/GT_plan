@@ -957,7 +957,8 @@ import { useImportValidation } from '@/utils/useImportValidation'
 import { getActiveLedgerDataset, getImportJob, smartPreviewLedgerImport, submitSmartLedgerImport } from '@/services/ledgerImportApi'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useFullscreen } from '@/composables/useFullscreen'
-import GtAmountCell, { AMOUNT_DIVISOR_KEY } from '@/components/common/GtAmountCell.vue'
+import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import { AMOUNT_DIVISOR_KEY } from '@/constants/amountDivisor'
 import { handleApiError } from '@/utils/errorHandler'
 
 const route = useRoute()
@@ -1442,7 +1443,7 @@ async function recoverActiveImportJobSilent() {
   if (!projectId.value) return
   try {
     const resp: any = await api.get(
-      P.ledger.import.activeJob(projectId.value),
+      P_ledger.import.activeJob(projectId.value),
       { validateStatus: (s: number) => s < 600 },
     )
     if (resp?.status === 'processing' && resp.job_id) {
@@ -1473,7 +1474,7 @@ async function checkActiveJobBeforeUpload() {
   if (!projectId.value) return
   try {
     const resp: any = await api.get(
-      P.ledger.import.activeJob(projectId.value),
+      P_ledger.import.activeJob(projectId.value),
       { validateStatus: (s: number) => s < 600 },
     )
     if (resp?.status !== 'processing' || !resp.job_id) return
@@ -1511,7 +1512,7 @@ async function checkActiveJobBeforeUpload() {
         // 用户选"取消旧作业"
         try {
           await api.post(
-            P.ledger.import.jobCancel(projectId.value, activeJobId),
+            P_ledger.import.jobCancel(projectId.value, activeJobId),
           )
           ElMessage.success('旧作业已取消，可开始新导入')
         } catch (e: any) {
@@ -2298,7 +2299,7 @@ async function loadAmountUnit() {
 async function checkImportActive() {
   try {
     const resp: any = await api.get(
-      P.ledger.import.activeJob(projectId.value),
+      P_ledger.import.activeJob(projectId.value),
     )
     isImportActive.value = resp?.status === 'processing' || resp?.status === 'queued'
   } catch {

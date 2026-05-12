@@ -485,7 +485,7 @@ async function onSubmitForReview() {
   submitting.value = true
   try {
     await httpApi.put(
-      P.workpapers.status(projectId.value, wpId.value),
+      P_wp.status(projectId.value, wpId.value),
       { status: 'pending_review' },
     )
     ElMessage.success('已提交复核，等待复核人审阅')
