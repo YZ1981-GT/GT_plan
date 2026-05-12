@@ -63,6 +63,40 @@ def _get_recyclable_tables() -> dict:
     return _RECYCLABLE_TABLES
 
 
+async def _cascade_delete_project(db: AsyncSession, project_id: UUID) -> None:
+    """按 FK 依赖顺序级联删除单个项目的所有子表数据，最后删项目本身。"""
+    import sqlalchemy as sa
+
+    pid = str(project_id)
+    cascade_sqls = [
+        "DELETE FROM activation_records WHERE dataset_id IN (SELECT id FROM ledger_datasets WHERE project_id = :pid)",
+        "DELETE FROM import_column_mapping_history WHERE project_id = :pid",
+        "DELETE FROM tb_aux_ledger WHERE project_id = :pid",
+        "DELETE FROM tb_aux_balance WHERE project_id = :pid",
+        "DELETE FROM tb_ledger WHERE project_id = :pid",
+        "DELETE FROM tb_balance WHERE project_id = :pid",
+        "DELETE FROM ledger_datasets WHERE project_id = :pid",
+        "DELETE FROM import_jobs WHERE project_id = :pid",
+        "DELETE FROM review_records WHERE working_paper_id IN (SELECT id FROM working_papers WHERE project_id = :pid)",
+        "DELETE FROM working_papers WHERE project_id = :pid",
+        "DELETE FROM project_assignments WHERE project_id = :pid",
+        "DELETE FROM adjustments WHERE project_id = :pid",
+        "DELETE FROM unadjusted_misstatements WHERE project_id = :pid",
+        "DELETE FROM trial_balance_entries WHERE project_id = :pid",
+        "DELETE FROM financial_reports WHERE project_id = :pid",
+        "DELETE FROM disclosure_notes WHERE project_id = :pid",
+        "DELETE FROM audit_reports WHERE project_id = :pid",
+        "DELETE FROM attachments WHERE project_id = :pid",
+        "DELETE FROM projects WHERE id = :pid",
+    ]
+    for sql in cascade_sqls:
+        try:
+            await db.execute(sa.text(sql), {"pid": pid})
+        except Exception:
+            # 表不存在或无数据时跳过
+            pass
+
+
 @router.get("")
 async def list_recycle_bin(
     item_type: str | None = Query(None, description="筛选类型：project/adjustment/working_paper/attachment 等"),
@@ -188,9 +222,13 @@ async def permanently_delete(
     if not row:
         raise HTTPException(status_code=404, detail="记录不存在或未被删除")
 
-    await db.delete(row)
-    await db.commit()
+    # 项目类型需要级联删除子表
+    if item_type == "project":
+        await _cascade_delete_project(db, item_id)
+    else:
+        await db.delete(row)
 
+    await db.commit()
     return {"message": f"{label}已永久删除", "id": str(item_id)}
 
 
