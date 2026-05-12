@@ -58,11 +58,8 @@ const divisor = computed(() => typeof injectedDivisor === 'function' ? injectedD
 
 /** 按除数换算后的值（用于显示） */
 const scaledValue = computed(() => {
-  const d = divisor.value
-  if (d === 1 || !props.value) return props.value
-  const num = typeof props.value === 'string' ? parseFloat(props.value) : props.value
-  if (isNaN(num as number)) return props.value
-  return (num as number) / d
+  // 不再做额外除法——displayPrefs.fmt() 已经内置单位换算
+  return props.value
 })
 
 function handleClick() {
