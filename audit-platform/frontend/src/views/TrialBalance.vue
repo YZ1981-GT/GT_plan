@@ -10,6 +10,7 @@
         :badges="[
           { value: rows.length + ' 个科目' },
           { label: '单位', value: displayPrefs.unitSuffix },
+          ...(lastRecalcAt ? [{ label: '数据', value: isStale ? '⚠ 待重算' : `✓ ${freshnessText}` }] : []),
         ]"
         @unit-change="onProjectChange"
         @year-change="onYearChange"
@@ -21,11 +22,12 @@
           :is-fullscreen="tbFullscreen"
           :show-export="true"
           :show-import="true"
+          import-label="Excel导入"
           :show-formula="true"
           @copy="copyTbTable"
           @fullscreen="toggleTbFullscreen()"
           @export="onExport"
-          @import="showTbImport = true"
+          @import="onToolbarImport"
           @formula="showFormulaManager = true"
         >
           <template #left>
@@ -68,27 +70,50 @@
     <el-alert
       v-if="consistencyResult"
       :type="consistencyResult.consistent ? 'success' : 'warning'"
-      :title="consistencyResult.consistent ? '数据一致' : `发现 ${consistencyResult.issues.length} 项不一致`"
+      :title="consistencyResult.consistent ? '一致性校验通过：试算表与四表数据一致' : `发现 ${consistencyResult.issues.length} 项不一致`"
       :closable="true"
       show-icon
       style="margin-bottom: 12px"
-    />
+    >
+      <div v-if="!consistencyResult.consistent && consistencyResult.issues.length > 0" style="font-size: 12px; line-height: 1.8; margin-top: 4px">
+        <div v-for="(issue, idx) in consistencyResult.issues.slice(0, 5)" :key="idx" style="padding: 2px 0">
+          · {{ (issue as any).message || (issue as any).description || JSON.stringify(issue) }}
+        </div>
+        <div v-if="consistencyResult.issues.length > 5" style="color: #909399; margin-top: 4px">
+          还有 {{ consistencyResult.issues.length - 5 }} 项未显示
+        </div>
+      </div>
+    </el-alert>
 
-    <!-- 空数据引导提示 -->
+    <!-- 数据新鲜度提示（有未重算的调整分录时） -->
     <el-alert
-      v-if="!loading && rows.length === 0"
-      type="info"
+      v-if="isStale && rows.length > 0"
+      type="warning"
+      :closable="false"
       show-icon
+      style="margin-bottom: 12px"
+    >
+      <template #title>
+        <span>检测到新调整分录，试算表数据可能已过时</span>
+        <el-button type="warning" size="small" plain style="margin-left: 12px" @click="onRecalc" :loading="recalcLoading">
+          立即重算 →
+        </el-button>
+      </template>
+      <div style="font-size: 12px; color: #909399; margin-top: 4px">
+        上次重算：{{ freshnessText }} · 最新调整分录：{{ latestAdjustmentAt ? new Date(latestAdjustmentAt).toLocaleString('zh-CN') : '—' }}
+      </div>
+    </el-alert>
+
+    <!-- 空数据引导：只在 setup-guide 前简要说明（不重复步骤） -->
+    <el-alert
+      v-if="!loading && rows.length === 0 && !dataState.hasBalance"
+      type="info"
       :closable="false"
       style="margin-bottom: 12px"
     >
       <template #title>
-        <span>试算表暂无数据</span>
+        <span>试算表暂无数据 — 请按下方步骤操作</span>
       </template>
-      <div style="font-size: 12px; line-height: 1.8; margin-top: 4px">
-        请先完成以下步骤：① 导入账套数据（科目余额表）→ ② 完成科目映射 → ③ 点击"全量重算"生成试算表。
-        <el-button type="primary" text size="small" @click="tbImportVisible = true">一键导入 →</el-button>
-      </div>
     </el-alert>
 
     <!-- 步骤引导（空数据时显示） -->
@@ -384,7 +409,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Link } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
@@ -586,6 +611,41 @@ const liabEquityTotal = computed(() => {
 // 差额（资产 - 负债权益），用于 tooltip 显示
 const balanceDiff = computed(() => assetTotal.value - liabEquityTotal.value)
 
+// ── 数据新鲜度 ──
+const lastRecalcAt = computed(() => {
+  const times = rows.value.map(r => r.updated_at).filter(Boolean) as string[]
+  if (!times.length) return null
+  return times.sort().reverse()[0]  // 最大的 updated_at
+})
+const latestAdjustmentAt = ref<string | null>(null)
+const isStale = computed(() => {
+  if (!lastRecalcAt.value || !latestAdjustmentAt.value) return false
+  return new Date(latestAdjustmentAt.value) > new Date(lastRecalcAt.value)
+})
+const freshnessText = computed(() => {
+  if (!lastRecalcAt.value) return ''
+  const d = new Date(lastRecalcAt.value)
+  const diff = Date.now() - d.getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return '刚刚'
+  if (mins < 60) return `${mins}分钟前`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}小时前`
+  return d.toLocaleDateString('zh-CN')
+})
+
+async function loadLatestAdjustmentTime() {
+  try {
+    const adjs = await listAdjustments(projectId.value, year.value)
+    if (adjs && adjs.length > 0) {
+      const times = adjs.map((a: any) => a.updated_at).filter(Boolean).sort().reverse()
+      latestAdjustmentAt.value = times[0] || null
+    } else {
+      latestAdjustmentAt.value = null
+    }
+  } catch { latestAdjustmentAt.value = null }
+}
+
 const isBalanced = computed(() => {
   // 正确逻辑：资产类合计 = 负债类合计 + 权益类合计，允许 1 元浮点误差
   if (!rows.value.length) return true
@@ -597,14 +657,19 @@ function num(v: string | null | undefined): number {
 }
 
 // ─── 步骤引导（空数据时显示） ─────────────────────────────────────────────────
-const setupCurrentStep = computed({
-  get: () => {
-    const saved = localStorage.getItem(`setup_step_${projectId.value}`)
-    return saved ? parseInt(saved) : 0
-  },
-  set: (val: number) => {
-    localStorage.setItem(`setup_step_${projectId.value}`, String(val))
-  }
+// ─── 步骤引导（根据实际数据状态自动检测）─────────────────────────────────────
+// 数据状态（不用 localStorage，避免与真实数据状态不一致）
+const dataState = ref<{
+  hasBalance: boolean
+  mappingRate: number  // 0-100
+  hasTb: boolean
+}>({ hasBalance: false, mappingRate: 0, hasTb: false })
+
+const setupCurrentStep = computed(() => {
+  if (!dataState.value.hasBalance) return 0  // 需要导入
+  if (dataState.value.mappingRate < 80) return 1  // 需要映射
+  if (!dataState.value.hasTb) return 2  // 需要生成试算表
+  return 3  // 全部完成
 })
 
 const setupStepStatus = computed(() =>
@@ -613,6 +678,21 @@ const setupStepStatus = computed(() =>
     i === setupCurrentStep.value ? 'process' : 'wait'
   ) as ('wait' | 'process' | 'finish')[]
 )
+
+/** 检测当前数据状态（用于自动推进步骤） */
+async function detectDataState() {
+  try {
+    const [balance, mapping] = await Promise.allSettled([
+      api.get(P.ledger.balance(projectId.value), { params: { year: selectedYear.value } }),
+      api.get(P.accountMapping.completionRate(projectId.value), { params: { year: selectedYear.value } }),
+    ])
+    dataState.value = {
+      hasBalance: balance.status === 'fulfilled' && (balance.value?.length ?? 0) > 0,
+      mappingRate: mapping.status === 'fulfilled' ? (mapping.value?.rate ?? mapping.value?.completion_rate ?? 0) : 0,
+      hasTb: rows.value.length > 0,
+    }
+  } catch { /* ignore */ }
+}
 
 const showSetupGuide = computed(() => rows.value.length === 0)
 
@@ -663,8 +743,29 @@ function goToLedgerImport() {
 
 function onImportDone() {
   tbImportVisible.value = false
-  advanceSetupStep()
+  detectDataState()
   fetchData()
+}
+
+/** 工具栏"Excel导入"按钮：弹框让用户选择导入类型 */
+async function onToolbarImport() {
+  try {
+    const action = await ElMessageBox({
+      title: 'Excel 导入',
+      message: '请选择要导入的数据类型：',
+      showCancelButton: true,
+      distinguishCancelAndClose: true,
+      confirmButtonText: '账套数据（四表）',
+      cancelButtonText: '试算表数据',
+    })
+    if (action === 'confirm') {
+      tbImportVisible.value = true  // 走账套导入流程
+    }
+  } catch (err: any) {
+    if (err === 'cancel') {
+      showTbImport.value = true  // 走试算表直接导入
+    }
+  }
 }
 
 // 自动科目映射（从已导入的余额表一级科目按编码规则匹配）
@@ -674,19 +775,13 @@ async function onAutoMapping() {
   try {
     await api.post(P.accountMapping.autoMatch(projectId.value), { year: selectedYear.value })
     ElMessage.success('科目映射完成，正在生成试算表...')
-    advanceSetupStep()  // 推进到步骤 3
+    await detectDataState()  // 刷新数据状态推进步骤
     // 映射完成后自动触发重算（不让用户再手动点第三步）
     await onRecalc()
   } catch (e: any) {
     handleApiError(e, '自动科目映射')
   } finally {
     autoMappingLoading.value = false
-  }
-}
-
-function advanceSetupStep() {
-  if (setupCurrentStep.value < 3) {
-    setupCurrentStep.value = setupCurrentStep.value + 1
   }
 }
 
@@ -719,6 +814,7 @@ const onRecalc = withLoading(recalcLoading, async () => {
   await recalcTrialBalance(projectId.value, year.value)
   ElMessage.success('重算完成')
   await fetchData()
+  await loadLatestAdjustmentTime()
 })
 
 const onConsistencyCheck = withLoading(checkLoading, async () => {
@@ -785,6 +881,8 @@ watch(
     selectedProjectId.value = projectId.value
     selectedYear.value = year.value
     await fetchData()
+    await detectDataState()  // 自动检测步骤状态
+    await loadLatestAdjustmentTime()  // 加载最新调整时间用于新鲜度检测
     if (!projectStore.projectOptions.length) projectStore.loadProjectOptions()
     // 加载底稿-科目映射
     try {

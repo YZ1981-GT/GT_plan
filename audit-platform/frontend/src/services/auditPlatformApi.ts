@@ -46,6 +46,7 @@ export interface TrialBalanceRow {
   opening_balance: string | null
   exceeds_materiality: boolean
   below_trivial: boolean
+  updated_at?: string | null
 }
 
 export async function getTrialBalance(projectId: string, year: number): Promise<TrialBalanceRow[]> {

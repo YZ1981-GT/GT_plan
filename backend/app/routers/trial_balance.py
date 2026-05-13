@@ -61,6 +61,7 @@ async def get_trial_balance(
             "opening_balance": str(r.opening_balance) if r.opening_balance is not None else None,
             "exceeds_materiality": abs(audited) >= overall_mat if overall_mat else False,
             "below_trivial": abs(audited) < trivial_thr if trivial_thr else False,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
         }
         result.append(item)
 
