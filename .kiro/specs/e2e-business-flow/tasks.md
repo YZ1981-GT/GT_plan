@@ -10,10 +10,10 @@
 - [ ] 1. F1/D1: start-dev.bat 的 uvicorn 命令加 `--reload-exclude "__pycache__"` 避免 recalc 时 worker 被杀
 - [ ] 2. F2: TrialBalance.vue onRecalc 完成后确认 fetchData() 被调用（已有，验证生效）
 - [ ] 3. F14: 确认 standard_account_chart.json 的 166 个标准科目已加载到 account_chart 表（source=standard）；如未加载则新建 seed 端点
-- [ ] 4. F3/D2: report_engine.py generate_all_reports 开头加前置检查（trial_balance 有数据 + report_config 有配置）
-- [ ] 5. F15: 验证 report_config seed 中的 formula 字段（TB 函数语法）能被 ReportEngine 正确解析
-- [ ] 6. F3: 检查 report_line_mapping 表是否有数据；无则从 soe_listed_mapping_preset.json 自动加载
-- [ ] 7. F4: 用真实项目（陕西华氏）调用 POST /api/reports/generate 验证四张报表生成成功
+- [ ] 4. F3/D2: 新建 scripts/fill_report_formulas.py — 从 multi_standard_report_formats.json 读取 CAS 公式，按 row_name 匹配 report_config 行并填充 formula 字段
+- [ ] 5. F15: 执行 fill_report_formulas.py 填充国企版（soe_consolidated/standalone）的 formula
+- [ ] 6. F15: 执行 fill_report_formulas.py 填充上市版（listed_consolidated/standalone）的 formula
+- [ ] 7. F4: 用真实项目（陕西华氏）调用 POST /api/reports/generate 验证四张报表生成成功（金额非 0）
 - [ ] 8. F4: 前端 ReportView.vue 加载报表数据验证（切换四张报表都有行数据）
 - [ ] 9. F9: 用真实项目调用 POST /api/disclosure-notes/generate 验证附注生成成功
 - [ ] 10. F10: 前端 DisclosureEditor.vue 加载附注目录树验证

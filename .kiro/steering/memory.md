@@ -1120,6 +1120,7 @@ inclusion: always
 - **试算表待做清单**：~~P1 映射质量面板~~ ✅ / ~~P1 增量重算可视化~~ ✅ / ~~P2 多子公司切换~~ ✅ / ~~P3 试算表冻结机制~~ ✅（全部完成 33c01bb）
 - **缺失：独立的科目映射编辑器页面**：当前无 `/projects/:id/account-mapping` 路由，只有 wizard 步骤组件 `AccountMappingStep.vue`；"查看映射详情"按钮暂改为 toast 提示
 - **待做：业务流程端到端联调 spec**：需要系统性跑通 导入→映射→试算表→报表→底稿→附注 完整链路；检查报表模板/底稿模板/附注模板 seed 数据是否加载；参考本地审计报告模板（国企版/上市版/合并/单体）和附注模板 md 文档
+- **e2e-business-flow spec 已创建（eadeaa8）**：`.kiro/specs/e2e-business-flow/` 三件套，3 Sprint / 24 task / 7 UAT；核心策略 = 不新建后端逻辑（API 全存在），重点确保数据就绪+前端正确调用+前置检查自动加载 seed
 - **Seed 数据已全部加载到 PG（2026-05-13）**：报表配置 22 套/1191 行 + 模板集 6 个 + 底稿模板库 363 个 + 标准科目 166 个 + 附注模板 SOE+Listed + 审计报告模板 + 致同编码 48 + AI 模型/插件；加载命令见 memory 中"PG 重建后待办"
 - **recalc 500 根因确认**：直接 Python 调用 `full_recalc` 成功（812 科目 3 步全通过），HTTP 层 500 是 uvicorn `--reload` 模式下 auto-match 写入大量文件触发 worker 重启导致；生产环境无此问题；开发环境建议不用 `--reload` 或加 `--reload-exclude`
 - **auto-match 完整流程验证通过**：陕西华氏项目 saved=812 / unmatched=0 / rate=100%；标准科目从客户科目一级编码自动生成后前缀匹配率 100%

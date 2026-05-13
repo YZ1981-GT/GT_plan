@@ -56,7 +56,8 @@
 | F12 | 流程引导 | 每个环节完成后显示"下一步"按钮引导用户进入下一环节 | P1 |
 | F13 | 科目映射 | 独立的科目映射查看/编辑页面（当前缺失导致空白） | P1 |
 | F14 | 标准科目 | 确保 standard_account_chart seed 加载到 account_chart 表 | P0 |
-| F15 | 报表配置 | 确保 report_config seed 的 formula 字段能被 ReportEngine 正确解析执行 | P0 |
+| F15 | 报表配置 | report_config 的 formula 字段全部为 NULL，需要从 wp_account_mapping 生成 TB() 公式 | P0 |
+| F16 | 报表配置 | 国企版/上市版报表切换：项目可选择 soe 或 listed 标准，报表自动使用对应行次结构 | P1 |
 
 ### §1.2 排除项
 
@@ -86,7 +87,7 @@
 | F3 | report_line_mapping 自动就绪 | 生成报表前检查映射，缺失则从 soe_listed_mapping_preset.json 自动加载 |
 | F4 | 四张报表正确展示 | ReportView 切换资产负债表/利润表/现金流量表/权益变动表，每张有数据行 |
 | F5 | 穿透查询 | 点击报表行次金额，能看到对应的试算表科目明细 |
-| F15 | 公式执行 | report_config 中的 TB('1001','audited') 类公式能正确从试算表取值 |
+| F15 | 公式生成 | 从 wp_account_mapping.json 的 report_row→account_codes 映射，为 report_config 每行生成 TB() 公式 |
 
 ### §2.C 底稿环节（F6-F8）
 

@@ -26,28 +26,42 @@
 
 ---
 
-## D2 报表生成前置检查（F3, F14, F15）
+## D2 报表生成前置检查 + 公式填充（F3, F14, F15）
 
 ### 现状
 
-`ReportEngine.generate_all_reports()` 需要：
-1. `trial_balance` 表有数据（recalc 后产出）
-2. `report_config` 表有对应 `applicable_standard` 的行次配置（seed 已加载）
-3. `report_line_mapping` 表有行次→科目映射（**可能缺失**）
+- `ReportEngine.generate_all_reports()` 从 `report_config` 读取 formula 字段执行公式
+- **report_config 表中 1191 行的 formula 字段全部为 NULL**（seed 加载时未填充公式）
+- `multi_standard_report_formats.json` 中有完整的 TB()/ROW()/SUM_TB() 公式（CAS 标准）
+- `report_excel_formulas.json` 中有 Excel 行间计算公式（小计/合计行）
+- `soe_listed_mapping_preset.json` 中有国企版→上市版行次名称映射
 
 ### 设计决策
 
-在 `generate_all_reports()` 开头加前置检查：
-1. 检查 trial_balance 是否有数据 → 无则提示"请先重算试算表"
-2. 检查 report_config 是否有对应标准的配置 → 无则自动从 seed 加载
-3. 检查 report_line_mapping 是否有数据 → 无则从 `soe_listed_mapping_preset.json` 自动加载
+**核心任务**：为 report_config 表的每一行填充 formula 字段。数据来源：
+1. `multi_standard_report_formats.json` 的 CAS.BS/IS/CFS 公式（按 row_code 匹配）
+2. `wp_account_mapping.json` 的 report_row → account_codes 映射（补充未覆盖的行）
+3. `report_excel_formulas.json` 的行间计算公式（ROW() 合计行）
+
+**国企版/上市版处理**：
+- 国企版（soe_consolidated/soe_standalone）：行次多（129 行），含△/▲特殊行业行
+- 上市版（listed_consolidated/listed_standalone）：行次少（88 行），标准 A 股格式
+- 两版共享同一套标准科目编码，公式逻辑相同，只是行次结构不同
+- `soe_listed_mapping_preset.json` 提供行次名称对照关系
+
+**实现方案**：新建 `scripts/fill_report_formulas.py` 脚本：
+1. 读取 `multi_standard_report_formats.json` 的 CAS 公式
+2. 按 row_name 模糊匹配 report_config 中的行
+3. 匹配成功的写入 formula 字段
+4. 未匹配的合计行从 `report_excel_formulas.json` 提取 ROW() 公式
+5. 支持 `--standard soe|listed` 参数分别处理两版
 
 ### 改动文件
 
 | 文件 | 改动 |
 |------|------|
-| backend/app/services/report_engine.py | generate_all_reports 加前置检查 |
-| backend/app/services/report_line_mapping_service.py | 新增 auto_load_from_preset() |
+| scripts/fill_report_formulas.py | 新建（一次性脚本，填充后可删） |
+| backend/app/routers/report_config.py | seed 端点增加 formula 填充逻辑 |
 
 ---
 
