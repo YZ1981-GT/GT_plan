@@ -903,7 +903,7 @@ const mappingResult = ref<{ matched: number; needConfirm: number; total: number;
 
 function goToMappingEditor() {
   mappingResultVisible.value = false
-  router.push(`/projects/${projectId.value}/ledger?tab=mapping`)
+  ElMessage.info('科目映射已自动完成，如需手动调整请在「查账」页面的「数据管理」中操作')
 }
 
 async function onAutoMapping() {
