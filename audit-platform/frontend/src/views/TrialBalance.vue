@@ -409,6 +409,9 @@
         <div style="font-size: 12px; color: #909399; margin-top: 4px">
           共 {{ mappingResult.total }} 个客户科目，完成率 {{ mappingResult.rate }}%
         </div>
+        <el-alert v-if="mappingResult.needConfirm > 0" type="info" :closable="false" show-icon style="margin-top: 8px">
+          <template #title>{{ mappingResult.needConfirm }} 个科目未能自动匹配，建议手动确认</template>
+        </el-alert>
       </div>
       <template #footer>
         <el-button @click="mappingResultVisible = false">关闭</el-button>
@@ -914,8 +917,12 @@ async function onAutoMapping() {
       total: result?.total_client ?? 0,
       rate: ((result?.completion_rate ?? 0) * 100).toFixed(0),
     }
-    mappingResultVisible.value = true
-    ElMessage.success('科目映射完成，正在生成试算表...')
+    if (mappingResult.value.total === 0) {
+      ElMessage.warning('未找到客户科目数据，请确认已导入科目余额表')
+    } else {
+      mappingResultVisible.value = true
+      ElMessage.success('科目映射完成，正在生成试算表...')
+    }
     await detectDataState()  // 刷新数据状态推进步骤
     // 映射完成后自动触发重算（不让用户再手动点第三步）
     await onRecalc()
