@@ -725,6 +725,7 @@ class DisclosureEngine:
         notes = result.scalars().all()
         return [
             {
+                "id": str(n.id),
                 "note_section": n.note_section,
                 "section_title": n.section_title,
                 "account_name": n.account_name,
