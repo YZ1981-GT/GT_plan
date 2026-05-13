@@ -183,6 +183,96 @@ async def auto_suggest(
 # ---------------------------------------------------------------------------
 
 
+async def _generate_client_accounts_from_balance(
+    project_id: UUID,
+    db: AsyncSession,
+    year: int | None = None,
+) -> int:
+    """从 tb_balance 自动生成客户科目到 account_chart。
+
+    当 account_chart 为空时调用，从已导入的余额表中提取唯一科目编码+名称，
+    按编码规则推断 category（1xxx=资产/2xxx=负债/3xxx=权益/5xxx=收入/6xxx=费用）。
+    """
+    import uuid as _uuid
+    from app.models.audit_platform_models import AccountCategory
+
+    # 获取 active dataset 的余额表科目
+    tbl = TbBalance.__table__
+    active_filter = await get_active_filter(db, tbl, project_id, year or 2025)
+
+    result = await db.execute(
+        select(
+            tbl.c.account_code,
+            tbl.c.account_name,
+        )
+        .where(active_filter)
+        .distinct()
+        .order_by(tbl.c.account_code)
+    )
+    balance_accounts = result.fetchall()
+
+    if not balance_accounts:
+        return 0
+
+    # 获取 active dataset_id
+    dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year or 2025)
+
+    # 按编码首位推断 category
+    def _infer_category(code: str) -> str:
+        if not code:
+            return AccountCategory.asset.value
+        first = code[0]
+        if first == '1':
+            return AccountCategory.asset.value
+        elif first == '2':
+            return AccountCategory.liability.value
+        elif first == '3':
+            return AccountCategory.equity.value
+        elif first in ('5', '4'):
+            return AccountCategory.revenue.value
+        elif first == '6':
+            return AccountCategory.expense.value
+        return AccountCategory.asset.value
+
+    count = 0
+    for row in balance_accounts:
+        code = row.account_code
+        name = row.account_name or code
+        cat = _infer_category(code)
+
+        # 检查是否已存在
+        existing = await db.execute(
+            select(AccountChart.id).where(
+                AccountChart.project_id == project_id,
+                AccountChart.account_code == code,
+                AccountChart.source == AccountSource.client,
+                AccountChart.is_deleted == False,  # noqa: E712
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        db.add(AccountChart(
+            id=_uuid.uuid4(),
+            project_id=project_id,
+            account_code=code,
+            account_name=name,
+            source=AccountSource.client,
+            category=cat,
+            dataset_id=dataset_id,
+        ))
+        count += 1
+
+    if count > 0:
+        await db.flush()
+        logger.info(
+            "Generated %d client accounts from tb_balance for project %s",
+            count, project_id,
+        )
+
+    return count
+
+
 async def auto_match(
     project_id: UUID,
     db: AsyncSession,
@@ -190,10 +280,14 @@ async def auto_match(
 ) -> AutoMatchResult:
     """Auto-match and directly save all mappings.
 
-    Runs auto_suggest, then saves all suggestions as mappings.
-    Already-mapped accounts are skipped (not overwritten).
-    Returns the full result with details for user review.
+    如果 account_chart 中没有客户科目，自动从 tb_balance 生成。
+    然后运行 auto_suggest + 保存映射。
     """
+    # 先检查是否有客户科目，没有则从 tb_balance 自动生成
+    total_client = await _count_client_accounts(project_id, db, year=year)
+    if total_client == 0:
+        await _generate_client_accounts_from_balance(project_id, db, year=year)
+
     suggestions = await auto_suggest(project_id, db, year=year)
 
     # Get existing mappings to skip
