@@ -1,0 +1,5 @@
+{
+  "version": "1.0",
+  "name": "e2e-business-flow",
+  "description": "业务流程端到端联调：导入→映射→试算表→报表→底稿→附注完整链路跑通"
+}
