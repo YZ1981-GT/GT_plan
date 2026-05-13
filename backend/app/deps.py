@@ -265,8 +265,8 @@ async def check_consol_lock(
     except HTTPException:
         raise
     except Exception:
-        # Column may not exist in test DB or early migrations — skip check
-        pass
+        # Column may not exist — rollback the failed transaction to recover
+        await db.rollback()
 
 
 # ---------------------------------------------------------------------------

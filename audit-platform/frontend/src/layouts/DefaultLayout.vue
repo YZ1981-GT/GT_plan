@@ -87,13 +87,13 @@
           @recalc="onRecalcStale"
           @detail="$router.push(`/projects/${route.params.projectId}/workpapers?filter=stale`)"
         />
-        <ErrorBoundary>
-          <router-view v-slot="{ Component }">
+        <router-view v-slot="{ Component, route: viewRoute }">
+          <ErrorBoundary :key="viewRoute.fullPath">
             <Transition name="gt-page" mode="out-in">
-              <component :is="Component" />
+              <component :is="Component" :key="viewRoute.fullPath" />
             </Transition>
-          </router-view>
-        </ErrorBoundary>
+          </ErrorBoundary>
+        </router-view>
       </div>
     </template>
   </ThreeColumnLayout>

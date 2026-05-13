@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 # 资产负债表行次
 _BALANCE_SHEET_LINES: dict[str, tuple[str, str, int, str | None]] = {
     # code_prefix: (line_code, line_name, level, parent_line_code)
+    # ── 资产类 ──
     "1001": ("BS001", "货币资金", 1, None),
     "1002": ("BS001", "货币资金", 1, None),
     "1012": ("BS001", "货币资金", 1, None),
@@ -52,32 +53,60 @@ _BALANCE_SHEET_LINES: dict[str, tuple[str, str, int, str | None]] = {
     "1408": ("BS009", "存货", 1, None),
     "1411": ("BS009", "存货", 1, None),
     "1501": ("BS010", "持有待售资产", 1, None),
+    "1511": ("BS010", "持有待售资产", 1, None),
     "1601": ("BS011", "长期股权投资", 1, None),
+    "1611": ("BS011", "长期股权投资", 1, None),
     "1701": ("BS012", "固定资产", 1, None),
     "1702": ("BS012", "固定资产", 1, None),
+    "1703": ("BS012", "固定资产", 1, None),
+    "1711": ("BS015", "在建工程", 1, None),
     "1801": ("BS013", "无形资产", 1, None),
+    "1811": ("BS016", "开发支出", 1, None),
     "1901": ("BS014", "长期待摊费用", 1, None),
+    "1811": ("BS016", "开发支出", 1, None),
+    "1901": ("BS014", "长期待摊费用", 1, None),
+    "1911": ("BS017", "商誉", 1, None),
+    "1521": ("BS018", "投资性房地产", 1, None),
+    "1531": ("BS019", "可供出售金融资产", 1, None),
+    "1532": ("BS020", "其他权益工具投资", 1, None),
+    "1541": ("BS021", "持有至到期投资", 1, None),
+    "1711": ("BS015", "在建工程", 1, None),
+    # ── 负债类 ──
     "2001": ("BS101", "短期借款", 1, None),
     "2201": ("BS102", "应付票据", 1, None),
     "2202": ("BS103", "应付账款", 1, None),
     "2203": ("BS104", "预收款项", 1, None),
+    "2205": ("BS104", "预收款项", 1, None),
     "2211": ("BS105", "应付职工薪酬", 1, None),
     "2221": ("BS106", "应交税费", 1, None),
+    "2231": ("BS111", "应付利息", 1, None),
+    "2232": ("BS112", "应付股利", 1, None),
     "2241": ("BS107", "其他应付款", 1, None),
+    "2401": ("BS113", "递延收益", 1, None),
     "2501": ("BS108", "长期借款", 1, None),
     "2502": ("BS109", "应付债券", 1, None),
+    "2701": ("BS114", "长期应付职工薪酬", 1, None),
     "2711": ("BS110", "长期应付款", 1, None),
+    "2801": ("BS115", "预计负债", 1, None),
+    "2901": ("BS116", "递延所得税负债", 1, None),
+    # ── 权益类 ──
     "3001": ("BS201", "实收资本", 1, None),
     "3002": ("BS202", "资本公积", 1, None),
+    "3003": ("BS205", "其他综合收益", 1, None),
+    "3005": ("BS205", "其他综合收益", 1, None),
     "3101": ("BS203", "盈余公积", 1, None),
+    "3102": ("BS203", "盈余公积", 1, None),
     "3103": ("BS203", "盈余公积", 1, None),
     "3104": ("BS204", "未分配利润", 1, None),
+    "3201": ("BS206", "库存股", 1, None),
+    "3301": ("BS207", "专项储备", 1, None),
 }
 
 # 利润表行次
 _INCOME_STATEMENT_LINES: dict[str, tuple[str, str, int, str | None]] = {
     "5001": ("IS001", "营业收入", 1, None),
     "5051": ("IS001", "营业收入", 1, None),
+    "5101": ("IS001", "营业收入", 1, None),
     "5401": ("IS002", "营业成本", 1, None),
     "5402": ("IS002", "营业成本", 1, None),
     "5403": ("IS003", "税金及附加", 1, None),
@@ -95,6 +124,80 @@ _INCOME_STATEMENT_LINES: dict[str, tuple[str, str, int, str | None]] = {
     "6401": ("IS015", "营业外支出", 1, None),
     "6801": ("IS016", "所得税费用", 1, None),
 }
+
+
+# ---------------------------------------------------------------------------
+# 科目名称 → 报表行次 关键词映射（编码匹配不上时的兜底）
+# ---------------------------------------------------------------------------
+
+_NAME_TO_BALANCE_SHEET: list[tuple[list[str], str, str]] = [
+    # (关键词列表, line_code, line_name) — 科目名称包含任一关键词即命中
+    # ── 资产类 ──
+    (["银行存款", "库存现金", "现金", "货币资金", "其他货币"], "BS001", "货币资金"),
+    (["交易性金融资产"], "BS002", "交易性金融资产"),
+    (["应收票据"], "BS003", "应收票据"),
+    (["应收账款"], "BS004", "应收账款"),
+    (["预付款项", "预付账款", "预付"], "BS005", "预付款项"),
+    (["应收利息"], "BS006", "应收利息"),
+    (["应收股利"], "BS007", "应收股利"),
+    (["其他应收款", "其他应收"], "BS008", "其他应收款"),
+    (["存货", "原材料", "库存商品", "在产品", "发出商品", "周转材料", "委托加工", "低值易耗"], "BS009", "存货"),
+    (["持有待售"], "BS010", "持有待售资产"),
+    (["长期股权投资"], "BS011", "长期股权投资"),
+    (["固定资产", "累计折旧"], "BS012", "固定资产"),
+    (["无形资产", "累计摊销"], "BS013", "无形资产"),
+    (["长期待摊费用", "长期待摊"], "BS014", "长期待摊费用"),
+    (["在建工程"], "BS015", "在建工程"),
+    (["开发支出"], "BS016", "开发支出"),
+    (["商誉"], "BS017", "商誉"),
+    (["投资性房地产"], "BS018", "投资性房地产"),
+    (["可供出售金融"], "BS019", "可供出售金融资产"),
+    (["其他权益工具投资"], "BS020", "其他权益工具投资"),
+    (["递延所得税资产"], "BS022", "递延所得税资产"),
+    # ── 负债类 ──
+    (["短期借款"], "BS101", "短期借款"),
+    (["应付票据"], "BS102", "应付票据"),
+    (["应付账款"], "BS103", "应付账款"),
+    (["预收款项", "预收账款", "合同负债"], "BS104", "预收款项"),
+    (["应付职工薪酬", "应付工资", "应付福利"], "BS105", "应付职工薪酬"),
+    (["应交税费", "应交税金"], "BS106", "应交税费"),
+    (["其他应付款", "其他应付"], "BS107", "其他应付款"),
+    (["长期借款"], "BS108", "长期借款"),
+    (["应付债券"], "BS109", "应付债券"),
+    (["长期应付款"], "BS110", "长期应付款"),
+    (["应付利息"], "BS111", "应付利息"),
+    (["应付股利"], "BS112", "应付股利"),
+    (["递延收益"], "BS113", "递延收益"),
+    (["预计负债"], "BS115", "预计负债"),
+    (["递延所得税负债"], "BS116", "递延所得税负债"),
+    # ── 权益类 ──
+    (["实收资本", "股本"], "BS201", "实收资本"),
+    (["资本公积"], "BS202", "资本公积"),
+    (["盈余公积"], "BS203", "盈余公积"),
+    (["未分配利润", "利润分配"], "BS204", "未分配利润"),
+    (["其他综合收益"], "BS205", "其他综合收益"),
+    (["库存股"], "BS206", "库存股"),
+    (["专项储备"], "BS207", "专项储备"),
+]
+
+_NAME_TO_INCOME_STATEMENT: list[tuple[list[str], str, str]] = [
+    (["营业收入", "主营业务收入", "其他业务收入"], "IS001", "营业收入"),
+    (["营业成本", "主营业务成本", "其他业务成本"], "IS002", "营业成本"),
+    (["税金及附加", "营业税金"], "IS003", "税金及附加"),
+    (["销售费用"], "IS004", "销售费用"),
+    (["管理费用"], "IS005", "管理费用"),
+    (["研发费用"], "IS006", "研发费用"),
+    (["财务费用"], "IS007", "财务费用"),
+    (["资产减值损失"], "IS008", "资产减值损失"),
+    (["信用减值损失"], "IS009", "信用减值损失"),
+    (["资产处置收益", "资产处置"], "IS010", "资产处置收益"),
+    (["其他收益"], "IS011", "其他收益"),
+    (["投资收益"], "IS012", "投资收益"),
+    (["公允价值变动"], "IS013", "公允价值变动收益"),
+    (["营业外收入"], "IS014", "营业外收入"),
+    (["营业外支出"], "IS015", "营业外支出"),
+    (["所得税费用", "所得税"], "IS016", "所得税费用"),
+]
 
 
 def _determine_report_type_from_code(account_code: str) -> ReportType | None:
@@ -117,27 +220,47 @@ def _determine_report_type_from_code(account_code: str) -> ReportType | None:
 
 
 def _lookup_report_line(
-    account_code: str, report_type: ReportType
+    account_code: str, report_type: ReportType, account_name: str = ""
 ) -> tuple[str, str, int, str | None, float] | None:
-    """查找科目编码对应的报表行次。返回 (line_code, line_name, level, parent, confidence)。"""
+    """查找科目编码对应的报表行次。返回 (line_code, line_name, level, parent, confidence)。
+
+    双保险策略：
+    1. 优先按编码前缀精确匹配（confidence=1.0）
+    2. 编码前缀模糊匹配（confidence=0.8）
+    3. 按科目名称关键词兜底匹配（confidence=0.7）
+    """
     mapping_dict = (
         _BALANCE_SHEET_LINES
         if report_type == ReportType.balance_sheet
         else _INCOME_STATEMENT_LINES
     )
 
-    # 精确匹配（4位编码）
+    # 策略 1：精确匹配（4位编码）
     prefix4 = account_code[:4] if len(account_code) >= 4 else account_code
     if prefix4 in mapping_dict:
         lc, ln, lv, pc = mapping_dict[prefix4]
         return lc, ln, lv, pc, 1.0
 
-    # 前缀匹配（逐步缩短）
+    # 策略 2：前缀匹配（逐步缩短）
     for length in (3, 2, 1):
         prefix = account_code[:length]
         for code, (lc, ln, lv, pc) in mapping_dict.items():
             if code.startswith(prefix):
                 return lc, ln, lv, pc, 0.8
+
+    # 策略 3：按科目名称关键词兜底
+    if account_name:
+        name_rules = (
+            _NAME_TO_BALANCE_SHEET
+            if report_type == ReportType.balance_sheet
+            else _NAME_TO_INCOME_STATEMENT
+        )
+        # 去除名称中的下划线分隔符（如"银行存款_工商银行"→"银行存款工商银行"）
+        clean_name = account_name.replace("_", "").replace(" ", "")
+        for keywords, lc, ln in name_rules:
+            for kw in keywords:
+                if kw in clean_name:
+                    return lc, ln, 1, None, 0.7
 
     return None
 
@@ -151,11 +274,11 @@ async def ai_suggest_mappings(
     project_id: UUID,
     db: AsyncSession,
 ) -> list[dict]:
-    """规则匹配占位（后续接入LLM）：根据标准科目编码前缀生成报表行次映射建议。
+    """规则匹配占位（后续接入LLM）：根据标准科目编码前缀 + 科目名称双保险生成报表行次映射建议。
 
     Validates: Requirements 3.10
     """
-    # 获取项目已映射的标准科目（通过 account_mapping）
+    # 获取项目已映射的标准科目（通过 account_mapping），同时获取科目名称
     mapped_result = await db.execute(
         select(AccountMapping.standard_account_code).where(
             AccountMapping.project_id == project_id,
@@ -163,6 +286,19 @@ async def ai_suggest_mappings(
         ).distinct()
     )
     mapped_std_codes = [row[0] for row in mapped_result.all()]
+
+    # 构建科目编码→名称映射（从 AccountChart 获取）
+    code_name_map: dict[str, str] = {}
+    if mapped_std_codes:
+        name_result = await db.execute(
+            select(AccountChart.account_code, AccountChart.account_name).where(
+                AccountChart.project_id == project_id,
+                AccountChart.account_code.in_(mapped_std_codes),
+                AccountChart.is_deleted == False,  # noqa: E712
+            )
+        )
+        for row in name_result.all():
+            code_name_map[row[0]] = row[1] or ""
 
     if not mapped_std_codes:
         # 回退：直接使用标准科目表
@@ -175,6 +311,21 @@ async def ai_suggest_mappings(
         )
         std_accounts = std_result.all()
         mapped_std_codes = [row[0] for row in std_accounts]
+        for row in std_accounts:
+            code_name_map[row[0]] = row[1] or ""
+
+    # 如果 AccountChart 没有名称，尝试从 TrialBalance 获取
+    if not code_name_map:
+        from app.models.audit_platform_models import TrialBalance
+        tb_result = await db.execute(
+            select(TrialBalance.standard_account_code, TrialBalance.account_name).where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.is_deleted == False,  # noqa: E712
+            ).distinct()
+        )
+        for row in tb_result.all():
+            if row[0] and row[1]:
+                code_name_map[row[0]] = row[1]
 
     suggestions: list[dict] = []
     seen_keys: set[str] = set()
@@ -184,7 +335,9 @@ async def ai_suggest_mappings(
         if rt is None:
             continue
 
-        result = _lookup_report_line(std_code, rt)
+        # 双保险：编码 + 名称
+        account_name = code_name_map.get(std_code, "")
+        result = _lookup_report_line(std_code, rt, account_name)
         if result is None:
             continue
 

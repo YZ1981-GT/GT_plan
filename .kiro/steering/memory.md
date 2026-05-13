@@ -25,6 +25,7 @@ inclusion: always
 - 目标并发规模 6000 人
 - 表格列宽要足够大，不折行不省略号截断
 - 表格数字列（金额、科目编号等）统一使用 Arial Narrow 字体 + `white-space: nowrap` + `font-variant-numeric: tabular-nums`，通过 `.gt-amt` class 实现
+- **el-table 字号控制必须用动态 class + !important**：`:style="{ fontSize }"` 不生效（内部 DOM 层级太深被 Element Plus 默认样式覆盖）；正确方案 = `:class="gt-tb-font-${size}"` + scoped `:deep(.gt-tb-font-sm) th .cell, td .cell { font-size: 12px !important }`
 - 表格分页用标准分页组件（左侧 page size 选择器 + 右侧页码导航含 jumper），不用"加载更多"模式
 - 四表联查需支持全屏模式 + 行选择（checkbox）+ 右键菜单，右键菜单预留"抽凭到底稿"入口（后续与底稿抽凭模块衔接）
 - 表格编辑需支持查看/编辑模式切换
@@ -87,9 +88,15 @@ inclusion: always
 
 ## 关键技术事实（查阅/排查专用）
 
+- **试算平衡表只显示 is_confirmed=True 的 ReportLineMapping**：`get_summary_with_adjustments` 查询条件含 `is_confirmed == True`；"一键预设"（ai_suggest_mappings）生成的映射默认 `is_confirmed=False`，必须确认后才会出现在试算平衡表；前端"一键预设"按钮已改为生成后自动批量确认
+- **ReportLineMapping 不存科目名称**：只有 `standard_account_code` + `report_line_code/name`；科目名称需从 TrialBalance rows（`standard_account_code` + `account_name`）获取，不能从 mapping 表取
+- **报表行次映射双保险策略**：`_lookup_report_line(code, type, name)` 三级匹配——(1) 编码前缀精确匹配 conf=1.0；(2) 编码前缀模糊匹配 conf=0.8；(3) 科目名称关键词兜底 conf=0.7；`_NAME_TO_BALANCE_SHEET`（40+ 条）和 `_NAME_TO_INCOME_STATEMENT`（16 条）覆盖资产/负债/权益/损益全部常见科目名称
+- **`POST /report-line-mapping/manual` 端点**：手动创建单条映射（mapping_type=manual, is_confirmed=True），用于未映射科目的用户手动指定
 - **AccountMapping 表无 year 列**：只有 project_id/original_account_code/standard_account_code/mapping_type/is_deleted/created_by/created_at/updated_at；查询时不能带 year 过滤
-- **TrialBalance 表无 direction 列**：借贷方向通过 `account_category` 推断（asset/expense=借方，liability/equity/revenue=贷方）
+- **TrialBalance 方向判断最终方案**：不硬编码科目编码/名称，默认从余额正负推断（正=借，负=贷）；支持用户手动点击切换方向（`directionOverrides` ref）；方向决定小计加减逻辑
+- **科目明细金额展示规则（最终版）**：所有普通行一律取绝对值展示 + 方向列标"借/贷"；小计按方向加减计算——资产类中贷方科目减去绝对值，负债/权益类中借方科目减去绝对值；小计直接展示计算结果；数据库存储不变
 - **working_paper 表名是单数**：`working_paper`（不是 working_papers），ORM 类 WorkingPaper.__tablename__ = "working_paper"
+- **`check_consol_lock` 必须 rollback**：查询不存在的 `projects.consol_lock` 列会让 asyncpg 事务进入 aborted 状态，后续所有 SQL 报 `InFailedSQLTransactionError`；except 分支必须 `await db.rollback()` 恢复事务（仅 `pass` 不够）
 - **Docker 日常只起 3 个基础服务**：audit-postgres(5432) + audit-redis(6380:6379) + audit-metabase(3000)；backend 容器已从默认 compose 移除（或挂到 profile），本地开发 **唯一** 用 start-dev.bat 跑在宿主机 9980；Docker 里再起后端 = 重复进程 + 重复 worker 循环吃 CPU
 - **docker-compose.yml backend 服务 profiles: [docker-backend]**：默认 `docker compose up` 不拉起；需要时 `docker compose --profile docker-backend up -d backend`
 - **PG job_status_enum 类型值（2026-05-07 补齐后 12 个）**：pending/running/completed/failed/timed_out/cancelled/retrying（历史遗留）+ queued/validating/writing/activating/canceled（R8 补齐）；Python JobStatus 实际只用 10 个，cancelled(双L)/retrying 是历史数据兼容保留
@@ -109,13 +116,15 @@ inclusion: always
 - **ReviewInbox.vue 是死代码**：router 三条路由（ReviewInbox/ReviewInboxGlobal/review-inbox）全部指向 `ReviewWorkbench.vue`，`ReviewInbox.vue` 文件仍在但无引用，可安全删除
 - **PartnerDashboard.vue 两处硬编码**：第 561、582 行 `/api/my/pending-independence?limit=...` 未走 apiPaths；QCDashboard.vue:325 `/api/qc/reviewer-metrics` 同样硬编码；需补 `apiPaths.ts` 的 `my.pendingIndependence` / `qc.reviewerMetrics` 并封装 service
 - **EQCR 指标入口权限窄**：`DefaultLayout.vue` 第 132 行 `isEqcrEligible` 只认 partner/admin，`router/index.ts:465` meta.roles 同样窄，建议加 `role === 'eqcr'` 让 EQCR 自己看指标
+- **DefaultLayout router-view 加 `:key="viewRoute.fullPath"`**：解决路由跳转后新页面空白的问题；ErrorBoundary 也需要带 key（否则 hasError 状态不重置，跳转后继续隐藏内容）；最终结构 = `<router-view v-slot> → <ErrorBoundary :key> → <Transition> → <component :key>`
 - **AI 组件重复 + 死代码**：`components/workpaper/AiContentConfirmDialog.vue` 与 `components/ai/AiContentConfirmDialog.vue` 同名共存；`ai/ContractAnalysis / ContractAnalysisPanel / EvidenceChainPanel / EvidenceChainView` 四组件 grep 零引用
 - **/confirmation 侧栏指向不存在的路由**：`ThreeColumnLayout.vue:330` 侧栏"函证"指 `/confirmation`，但 router 中无此路径定义，点击走 NotFound 而非 DevelopingPage；已 maturity=developing 但守卫没触发
 - **Mobile 系列 5 视图全是 stub**（MobilePenetration/MobileReview/MobileReport/MobileProjectList/MobileWorkpaperEditor），Round 7+ 前可考虑整体删除以减负
 - **useCellSelection 接入只 4/73**（TrialBalance/ReportView/DisclosureEditor/ConsolidationIndex），其他表格无 Excel 级选中；行选/列选/Ctrl+A/粘贴入库/单元格撤销全部缺失
 - **编辑锁前端只 1 处**：仅 `components/formula/StructureEditor.vue` acquireLock/releaseLock + lockRefreshTimer；WorkpaperEditor/DisclosureEditor/AuditReportEditor 裸奔，两人并发编辑会互覆盖（后端 workpaper_editing_locks 表已就绪）
 - **后端联动链路已完整但前端不可见**：event_handlers.py 已订阅 ADJUSTMENT_*→TB→REPORTS→AUDIT_REPORT / WORKPAPER_SAVED→consistency / LEDGER_ACTIVATED→mark_stale；前端 workpaper.is_stale 只判 consistent/inconsistent 没展示 stale
-- **穿透端点共 5 套**（reports/drilldown/{row_code}、drilldown/ledger/{code}、ledger/penetrate、consol_worksheet/drill/*、penetrate-by-amount），前端入口散；usePenetrate 应封装统一
+- **穿透端点共 5+1 套**（reports/drilldown/{row_code}、drilldown/ledger/{code}、ledger/penetrate、consol_worksheet/drill/*、penetrate-by-amount、**trial-balance/trace**），前端入口散；usePenetrate 应封装统一
+- **`GET /trial-balance/trace` 数据溯源端点**：查询标准科目对应的所有客户科目及 tb_balance 原始数据（account_mapping JOIN tb_balance），返回 sources 数组含 account_code/account_name/closing_balance/debit_amount/credit_amount
 - **快捷键已注册 13 个但无 UI**：shortcutManager 全局单例已在 shortcuts.ts 定义 shortcut:save/undo/redo/search/goto/export/submit/escape/refresh/help 等，但 `?` 或 F1 帮助面板未实现
 - **单元格编辑不入 operationHistory**：operationHistory 当前只接 `删除` 动作（Adjustments/RecycleBin），单元格误改无 Ctrl+Z 可恢复
 - **NotificationCenter 只 30s 轮询 + SSE**，无分类 Tab、无免打扰时段
@@ -127,6 +136,9 @@ inclusion: always
 - ThreeColumnLayout.vue 无 #header/#nav-icons slot（顶部导航硬编码）；新入口需先添加自定义 slot（已加 #nav-review-inbox），再在 DefaultLayout 通过 `<template #nav-review-inbox>` 注入
 - eventBus 新增事件：`workpaper:saved`（WorkpaperSavedPayload: projectId/wpId/year?）、`materiality:changed`（MaterialityChangedPayload: projectId/year?）
 - 后端 AccountCategory 枚举实际值：asset/liability/equity/revenue/expense（无 income/cost）；前端借贷平衡 liabEquityTotal 过滤时需兼容 `['revenue','income','cost','expense']`
+- **mapping_service.py `_infer_category` 4xxx 已修正为 equity**：此前错误地把 4xxx 归为 revenue（与 5xxx 合并），导致 4001 实收资本/4101 盈余公积/4103 本年利润/4104 利润分配被归到"收入"类；修复后需重新 auto-match 才能生效
+- **前端试算表分组双保险策略**：`groupedRows` 分类优先用后端 `account_category`，仅当编码首位+名称关键词双重匹配时才覆盖（如 4xxx+名称含"资本/公积/利润"→equity）；不强制按编码首位归类
+- **试算表增加"负债和权益合计"行**：在权益小计后自动插入，方便与资产小计校对（资产 = 负债 + 权益）
 - 后端错报模型：`UnadjustedMisstatement`（表名 unadjusted_misstatements），不是 Misstatement
 - GateRule 注册模式：继承 GateRule + `rule_registry.register_all([GateType.submit_review, GateType.sign_off], Rule())`；错报超限规则必须注册到 submit_review（仅 sign_off 不够）
 - 账套导入状态端点：`GET /api/projects/{project_id}/ledger-import/jobs/{job_id}`（通过 getImportJob service）；作业状态枚举 completed/failed/timed_out/canceled（轮询四个都要判断）
@@ -1172,6 +1184,10 @@ inclusion: always
 - **spec 工作流教训**：验证脚本的断言字段名必须从后端代码中提取（grep 确认），不能凭印象写；design.md 假设必须先 grep 核验再写结论
 
 - **recalc 依赖链路确认**：`tb_balance → account_mapping(auto-match) → trial_balance(recalc) → financial_report(generate)`；recalc_unadjusted 通过 JOIN account_mapping 汇总 tb_balance.closing_balance 到标准科目；account_mapping 为空时 recalc 静默返回 0 行不报错
+- **试算表科目名称取数**：一次性加载 tb_balance 全部 account_code→account_name，对标准科目编码精确匹配或前缀匹配明细行，**统一取下划线前第一段**作为一级科目名称（如"其他货币资金_集采监管账户"→"其他货币资金"）；很多企业余额表没有一级汇总行只有明细行，不能依赖精确匹配
+- **损益类科目（5xxx/6xxx）取单边发生额**：不能用 `debit - credit`（结转后两者相等=0）；正确做法：收入类取 `credit_amount` 存为负数（贷方语义），费用类取 `debit_amount` 存为正数（借方语义）；收入类编码：5001/5051/5101/6001/6051/6101/6111/6115/6117/6301；其余 6xxx/5xxx 为费用类
+- **试算表损益区域展示为"净利润"**：不分"收入小计"/"费用小计"，合并为一行"净利润 = 收入 - 成本费用"；正数=盈利，负数=亏损（红字）；去掉了无意义的"合计"行（资产/负债/权益/损益口径不同不能加总）
+- **借贷平衡校验只比较"资产小计 = 负债和权益合计"**：不含损益类（损益取发生额与余额口径不同）；`getActualCat` 提取为模块级函数供 groupedRows/assetTotal/liabEquityTotal 共用
 - **宜宾大药房 trial_balance=0 根因确认**：该项目从未执行 auto-match（account_mapping 为空），导致 recalc 无法汇总；修复路径 = 先 auto-match → 再 recalc
 - **e2e-business-flow spec v2.0 待补强 6 个维度**：(1) 依赖链路透明化+前置条件矩阵 (2) 错误场景覆盖（静默返回空 vs 明确报错） (3) 多项目通用性验证（每个项目分别断言） (4) 前端报表表样细节（标题行加粗/金额右对齐千分位/缩进可视化/合计行分隔线） (5) 公式覆盖率 26.5% 合理性论证（标题行/特殊行业行/CFS 手工填列） (6) 数据质量检查扩展为套件（借贷平衡/科目完整性/报表平衡/利润表勾稽）
 - **报表表样企业级要求**：标题行加粗背景色、数据行正常、合计行加粗+上边框、金额右对齐+千分位+负数红色、indent_level→padding-left、空报表友好提示、不同行类型不同样式

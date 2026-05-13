@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
     <Transition name="gt-ucell-ctx-fade">
-      <div v-if="visible" class="gt-ucell-context-menu"
-        :style="{ left: x + 'px', top: y + 'px' }" @contextmenu.prevent>
+      <div v-if="visible" ref="menuRef" class="gt-ucell-context-menu"
+        :style="menuStyle" @contextmenu.prevent>
         <div class="gt-ucell-ctx-header">
           <span>{{ itemName }}</span>
           <span v-if="value != null" style="color:#4b2d77;font-weight:600">{{ formattedValue }}</span>
@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
 
 const props = defineProps<{
@@ -49,6 +49,37 @@ defineEmits<{
   (e: 'sum'): void
   (e: 'compare'): void
 }>()
+
+const menuRef = ref<HTMLElement | null>(null)
+const adjustedY = ref(0)
+const adjustedX = ref(0)
+
+// 菜单显示后动态调整位置，防止超出视口
+watch(() => props.visible, async (v) => {
+  if (v) {
+    adjustedX.value = props.x
+    adjustedY.value = props.y
+    await nextTick()
+    const el = menuRef.value
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const viewH = window.innerHeight
+    const viewW = window.innerWidth
+    // 超出底部：向上弹出
+    if (rect.bottom > viewH - 10) {
+      adjustedY.value = Math.max(10, props.y - rect.height)
+    }
+    // 超出右侧：向左弹出
+    if (rect.right > viewW - 10) {
+      adjustedX.value = Math.max(10, props.x - rect.width)
+    }
+  }
+})
+
+const menuStyle = computed(() => ({
+  left: adjustedX.value + 'px',
+  top: adjustedY.value + 'px',
+}))
 
 const formattedValue = computed(() => {
   const v = props.value

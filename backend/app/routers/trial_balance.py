@@ -95,6 +95,68 @@ async def recalc_trial_balance(
     return {"message": "重算完成"}
 
 
+@router.get("/trace")
+async def trace_to_balance(
+    project_id: UUID,
+    year: int = Query(...),
+    standard_account_code: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """数据溯源：查询标准科目对应的所有客户科目及其余额表原始数据。
+
+    返回该标准科目由哪些客户科目汇总而来，每个客户科目的期末余额/借方发生额/贷方发生额。
+    """
+    import sqlalchemy as sa
+    from app.models.audit_platform_models import AccountMapping, TbBalance
+    from app.services.dataset_query import get_active_filter
+
+    mp = AccountMapping.__table__
+    bal = TbBalance.__table__
+    balance_filter = await get_active_filter(db, bal, project_id, year)
+
+    # 查询映射到该标准科目的所有客户科目
+    q = (
+        sa.select(
+            bal.c.account_code,
+            bal.c.account_name,
+            sa.func.coalesce(bal.c.closing_balance, 0).label("closing_balance"),
+            sa.func.coalesce(bal.c.debit_amount, 0).label("debit_amount"),
+            sa.func.coalesce(bal.c.credit_amount, 0).label("credit_amount"),
+            sa.func.coalesce(bal.c.opening_balance, 0).label("opening_balance"),
+        )
+        .select_from(
+            bal.join(
+                mp,
+                sa.and_(
+                    mp.c.project_id == bal.c.project_id,
+                    mp.c.original_account_code == bal.c.account_code,
+                    mp.c.is_deleted == sa.false(),
+                ),
+            )
+        )
+        .where(
+            balance_filter,
+            mp.c.standard_account_code == standard_account_code,
+        )
+        .order_by(bal.c.account_code)
+    )
+
+    result = await db.execute(q)
+    sources = [
+        {
+            "account_code": r.account_code,
+            "account_name": r.account_name,
+            "closing_balance": float(r.closing_balance),
+            "debit_amount": float(r.debit_amount),
+            "credit_amount": float(r.credit_amount),
+            "opening_balance": float(r.opening_balance),
+        }
+        for r in result.fetchall()
+    ]
+    return {"sources": sources}
+
+
 @router.get("/summary-with-adjustments")
 async def get_summary_with_adjustments(
     project_id: UUID,

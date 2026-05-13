@@ -121,6 +121,68 @@ async def delete_mapping(
 
 
 @router.post(
+    "/{project_id}/report-line-mapping/manual",
+    response_model=dict,
+)
+async def create_manual_mapping(
+    project_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """手动创建单条报表行次映射（用户从下拉选择报表项目）。"""
+    from app.models.audit_platform_models import (
+        ReportLineMapping,
+        ReportLineMappingType,
+        ReportType,
+    )
+
+    std_code = body.get("standard_account_code", "").strip()
+    report_type_str = body.get("report_type", "balance_sheet")
+    line_code = body.get("report_line_code", "").strip()
+    line_name = body.get("report_line_name", "").strip()
+
+    if not std_code or not line_code:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="科目编码和报表行次编码不能为空")
+
+    # 解析 report_type
+    try:
+        rt = ReportType(report_type_str)
+    except ValueError:
+        rt = ReportType.balance_sheet
+
+    # 检查是否已存在
+    from sqlalchemy import select
+    existing = await db.execute(
+        select(ReportLineMapping).where(
+            ReportLineMapping.project_id == project_id,
+            ReportLineMapping.standard_account_code == std_code,
+            ReportLineMapping.report_type == rt,
+            ReportLineMapping.is_deleted == False,  # noqa: E712
+        )
+    )
+    if existing.scalar_one_or_none():
+        return {"created": False, "message": "该科目已有映射"}
+
+    mapping = ReportLineMapping(
+        project_id=project_id,
+        standard_account_code=std_code,
+        report_type=rt,
+        report_line_code=line_code,
+        report_line_name=line_name,
+        report_line_level=1,
+        parent_line_code=None,
+        mapping_type=ReportLineMappingType.manual,
+        is_confirmed=True,  # 手动映射直接确认
+    )
+    db.add(mapping)
+    await db.flush()
+    await db.commit()
+    return {"created": True, "id": str(mapping.id)}
+
+
+@router.post(
     "/{project_id}/report-line-mapping/reference-copy",
     response_model=ReferenceCopyResult,
 )

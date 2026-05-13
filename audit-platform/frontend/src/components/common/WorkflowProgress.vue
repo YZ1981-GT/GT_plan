@@ -1,13 +1,22 @@
 <template>
   <div class="workflow-progress" v-if="loaded">
-    <el-steps :active="currentStep" finish-status="success" simple class="workflow-progress__steps">
-      <el-step title="导入" />
-      <el-step title="映射" />
-      <el-step title="试算表" />
-      <el-step title="报表" />
-      <el-step title="底稿" />
-      <el-step title="附注" />
-    </el-steps>
+    <div class="workflow-progress__steps">
+      <template v-for="(step, idx) in steps" :key="step.key">
+        <span
+          class="wf-step"
+          :class="{
+            'wf-step--done': idx < currentStep,
+            'wf-step--active': idx === currentStep,
+            'wf-step--future': idx > currentStep,
+          }"
+          @click="onStepClick(step)"
+        >
+          <span class="wf-step__icon">{{ idx < currentStep ? '✓' : (idx + 1) }}</span>
+          <span class="wf-step__label">{{ step.label }}</span>
+        </span>
+        <span v-if="idx < steps.length - 1" class="wf-step__connector" :class="{ 'wf-connector--done': idx < currentStep }"></span>
+      </template>
+    </div>
     <el-button
       v-if="nextAction"
       type="primary"
@@ -53,7 +62,18 @@ const loaded = ref(false)
 const currentStep = ref(0)
 const nextAction = ref<NextAction | null>(null)
 
+// 步骤定义：每步对应一个路由或动作
+const steps = [
+  { key: 'import', label: '导入', route: (pid: string) => `/projects/${pid}/trial-balance`, action: 'import' },
+  { key: 'mapping', label: '映射', route: (pid: string) => `/projects/${pid}/trial-balance`, action: 'mapping' },
+  { key: 'trial_balance', label: '试算表', route: (pid: string) => `/projects/${pid}/trial-balance` },
+  { key: 'reports', label: '报表', route: (pid: string) => `/projects/${pid}/reports` },
+  { key: 'workpapers', label: '底稿', route: (pid: string) => `/projects/${pid}/workpapers` },
+  { key: 'notes', label: '附注', route: (pid: string) => `/projects/${pid}/disclosure-notes` },
+]
+
 async function fetchStatus() {
+  if (!props.projectId) return
   try {
     const yr = props.year || 2025
     const res = await api.get(`/api/projects/${props.projectId}/workflow-status?year=${yr}`) as WorkflowStatusResponse
@@ -62,8 +82,21 @@ async function fetchStatus() {
     loaded.value = true
   } catch {
     // 静默失败，不阻断页面
-    loaded.value = false
+    loaded.value = true
+    currentStep.value = 2 // 默认在试算表步骤
   }
+}
+
+const emit = defineEmits<{ (e: 'step-action', action: string): void }>()
+
+function onStepClick(step: typeof steps[number]) {
+  if (!props.projectId) return
+  // 特殊动作：不跳转，通知父组件
+  if ((step as any).action) {
+    emit('step-action', (step as any).action)
+    return
+  }
+  router.push(step.route(props.projectId))
 }
 
 function onNext() {
@@ -81,18 +114,77 @@ watch(() => [props.projectId, props.year], fetchStatus)
 .workflow-progress {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
-  background: #f8f7fc;
+  gap: 12px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #f8f7fc 0%, #f0edf5 100%);
+  border: 1px solid #e8e0f0;
   border-radius: 8px;
   margin-bottom: 12px;
 }
 
 .workflow-progress__steps {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
 }
 
 .workflow-progress__next-btn {
   flex-shrink: 0;
 }
+
+.wf-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 16px;
+  transition: all 0.2s;
+  font-size: 13px;
+  user-select: none;
+  white-space: nowrap;
+}
+.wf-step:hover { background: rgba(75, 45, 119, 0.08); }
+
+.wf-step__icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.wf-step--done .wf-step__icon { background: #e8f5e9; color: #4caf50; }
+.wf-step--done .wf-step__label { color: #4caf50; font-weight: 500; }
+.wf-step--done:hover .wf-step__icon { background: #c8e6c9; }
+
+.wf-step--active .wf-step__icon { background: #4b2d77; color: #fff; box-shadow: 0 2px 6px rgba(75,45,119,0.3); }
+.wf-step--active .wf-step__label { color: #4b2d77; font-weight: 600; }
+.wf-step--active { background: rgba(75, 45, 119, 0.06); }
+
+.wf-step--future .wf-step__icon { background: #f0edf5; color: #b0a4c0; border: 1px solid #e0dce8; }
+.wf-step--future .wf-step__label { color: #b0a4c0; }
+.wf-step--future:hover .wf-step__icon { background: #e8e0f0; color: #8b7ba8; }
+.wf-step--future:hover .wf-step__label { color: #8b7ba8; }
+
+.wf-step__label {
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
+.wf-step__connector {
+  width: 24px;
+  height: 1px;
+  background: #d9d2e8;
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+.wf-step--done + .wf-step__connector,
+.wf-connector--done { background: #4caf50; }
 </style>

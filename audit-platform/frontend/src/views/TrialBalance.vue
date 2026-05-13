@@ -1,77 +1,85 @@
 <template>
   <div class="gt-trial-balance gt-fade-in" :class="{ 'gt-fullscreen': tbFullscreen }">
-    <!-- 页面横幅 -->
-    <GtPageHeader title="试算表" :show-sync-status="true" @back="router.push('/projects')">
-      <GtInfoBar
-        :show-unit="true"
-        :show-year="true"
-        :unit-value="selectedProjectId"
-        :year-value="selectedYear"
-        :badges="[
-          { value: rows.length + ' 个科目' },
-          { label: '单位', value: displayPrefs.unitSuffix },
-          ...(lastRecalcAt ? [{ label: '数据', value: isStale ? '⚠ 待重算' : `✓ ${freshnessText}` }] : []),
-          ...(isFrozen ? [{ label: '🔒', value: '已锁定' }] : []),
-        ]"
-        @unit-change="onProjectChange"
-        @year-change="onYearChange"
-      >
-        <el-select
-          v-if="hasMultipleCompanies"
-          v-model="companyCode"
-          size="small"
-          style="width: 160px; margin-left: 8px"
-          placeholder="选择子公司"
-          @change="onCompanyChange"
+    <!-- 顶部区域（可折叠） -->
+    <div v-show="!headerCollapsed">
+      <!-- 页面横幅 -->
+      <GtPageHeader title="试算表" :show-sync-status="true" @back="router.push('/projects')">
+        <GtInfoBar
+          :show-unit="true"
+          :show-year="true"
+          :unit-value="selectedProjectId"
+          :year-value="selectedYear"
+          :badges="[
+            { value: rows.length + ' 个科目' },
+            { label: '单位', value: displayPrefs.unitSuffix },
+            ...(lastRecalcAt ? [{ label: '数据', value: isStale ? '⚠ 待重算' : `✓ ${freshnessText}` }] : []),
+            ...(isFrozen ? [{ label: '🔒', value: '已锁定' }] : []),
+          ]"
+          @unit-change="onProjectChange"
+          @year-change="onYearChange"
         >
-          <el-option
-            v-for="c in companyList"
-            :key="c.code"
-            :label="c.name"
-            :value="c.code"
-          />
-        </el-select>
-      </GtInfoBar>
-      <template #actions>
-        <GtToolbar
-          :show-copy="true"
-          :show-fullscreen="true"
-          :is-fullscreen="tbFullscreen"
-          :show-export="true"
-          :show-import="true"
-          import-label="Excel导入"
-          :show-formula="true"
-          @copy="copyTbTable"
-          @fullscreen="toggleTbFullscreen()"
-          @export="onExport"
-          @import="onToolbarImport"
-          @formula="showFormulaManager = true"
-        >
-          <template #left>
-            <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
-              <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
-            </el-tooltip>
-            <el-tooltip content="执行数据质量检查（借贷平衡/余额一致性/映射完整性）" placement="bottom">
-              <el-button size="small" @click="showDataQualityDialog = true">🔍 数据质量检查</el-button>
-            </el-tooltip>
-            <el-tooltip :content="isFrozen ? '试算表已锁定，解锁后才能重算' : '从四表数据重新计算未审数、调整数、审定数（需先导入数据）'" placement="bottom">
-              <el-button size="small" @click="onRecalc" :loading="recalcLoading" :disabled="isFrozen">🔄 全量重算</el-button>
-            </el-tooltip>
-            <el-tooltip :content="isFrozen ? '点击解锁试算表' : '锁定试算表，防止自动重算'" placement="bottom">
-              <el-button size="small" @click="toggleFreeze" :type="isFrozen ? 'danger' : 'default'">
-                {{ isFrozen ? '🔒' : '🔓' }}
-              </el-button>
-            </el-tooltip>
-          </template>
-        </GtToolbar>
-      </template>
-    </GtPageHeader>
+          <el-select
+            v-if="hasMultipleCompanies"
+            v-model="companyCode"
+            size="small"
+            style="width: 160px; margin-left: 8px"
+            placeholder="选择子公司"
+            @change="onCompanyChange"
+          >
+            <el-option
+              v-for="c in companyList"
+              :key="c.code"
+              :label="c.name"
+              :value="c.code"
+            />
+          </el-select>
+        </GtInfoBar>
+        <template #actions>
+          <GtToolbar
+            :show-copy="true"
+            :show-fullscreen="true"
+            :is-fullscreen="tbFullscreen"
+            :show-export="true"
+            :show-import="true"
+            import-label="Excel导入"
+            :show-formula="true"
+            @copy="copyTbTable"
+            @fullscreen="toggleTbFullscreen()"
+            @export="onExport"
+            @import="onToolbarImport"
+            @formula="showFormulaManager = true"
+          >
+            <template #left>
+              <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
+                <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
+              </el-tooltip>
+              <el-tooltip content="执行数据质量检查（借贷平衡/余额一致性/映射完整性）" placement="bottom">
+                <el-button size="small" @click="showDataQualityDialog = true">🔍 数据质量检查</el-button>
+              </el-tooltip>
+              <el-tooltip :content="isFrozen ? '试算表已锁定，解锁后才能重算' : '从四表数据重新计算未审数、调整数、审定数（需先导入数据）'" placement="bottom">
+                <el-button size="small" @click="onRecalc" :loading="recalcLoading" :disabled="isFrozen">🔄 全量重算</el-button>
+              </el-tooltip>
+              <el-tooltip :content="isFrozen ? '点击解锁试算表' : '锁定试算表，防止自动重算'" placement="bottom">
+                <el-button size="small" @click="toggleFreeze" :type="isFrozen ? 'danger' : 'default'">
+                  {{ isFrozen ? '🔒' : '🔓' }}
+                </el-button>
+              </el-tooltip>
+            </template>
+          </GtToolbar>
+        </template>
+      </GtPageHeader>
 
-    <!-- 工作流进度条 -->
-    <WorkflowProgress :project-id="projectId" :year="selectedYear" />
+      <!-- 工作流进度条 -->
+      <WorkflowProgress :project-id="projectId" :year="selectedYear" @step-action="onWorkflowAction" />
+    </div>
 
-    <!-- 视图切换：科目明细 / 试算平衡表 -->
-    <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
+    <!-- 折叠/展开按钮 -->
+    <div class="gt-header-toggle" @click="headerCollapsed = !headerCollapsed">
+      <span>{{ headerCollapsed ? '▼ 展开工具栏' : '▲ 收起工具栏' }}</span>
+    </div>
+
+    <!-- 视图切换：科目明细 / 试算平衡表 / 映射规则 -->
+    <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5;align-items:center">
       <el-tooltip placement="bottom" :show-after="500">
         <template #content>
           <div style="max-width: 280px; line-height: 1.6">
@@ -92,7 +100,15 @@
         </template>
         <span class="gt-tb-view-tag" :class="{ 'gt-tb-view-tag--active': tbViewMode === 'summary' }" @click="tbViewMode = 'summary'; loadTbSummary()">试算平衡表</span>
       </el-tooltip>
+      <el-tooltip content="查看/编辑科目明细与试算平衡表的对应关系（映射规则）" placement="bottom">
+        <el-button size="small" class="gt-mapping-rule-btn" @click="showMappingDialog = true">
+          🔗 映射规则
+        </el-button>
+      </el-tooltip>
     </div>
+
+    <!-- 映射规则弹窗 -->
+    <ReportLineMappingDialog v-model="showMappingDialog" :project-id="projectId" :account-rows="rows" />
 
     <!-- 一致性校验结果 -->
     <el-alert
@@ -236,15 +252,16 @@
       v-loading="loading"
       border
       stripe
+      :max-height="tableMaxHeight"
       style="width: 100%"
-      :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
+      :class="`gt-tb-font-${displayPrefs.fontSize}`"
       :row-class-name="rowClassName"
       :cell-class-name="tbCellClassName"
       @cell-click="onTbCellClick"
       @cell-dblclick="onTbCellDblClick"
       @cell-contextmenu="onTbCellContextMenu"
     >
-      <el-table-column prop="standard_account_code" label="科目编码" width="130">
+      <el-table-column prop="standard_account_code" label="科目编码" width="130" class-name="gt-amt-col">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && getLinkedWp(row.standard_account_code)"
             class="clickable" @click="onOpenWorkpaper(row.standard_account_code)"
@@ -256,53 +273,66 @@
         </template>
       </el-table-column>
       <el-table-column prop="account_name" label="科目名称" min-width="180" />
-      <el-table-column label="未审数" width="150" align="right">
+      <el-table-column label="方向" width="80" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
+        <template #default="{ row }">
+          <span
+            v-if="!row._isSubtotal && !row._isTotal"
+            :class="getDirectionClass(row)"
+            class="gt-dir-toggle"
+            @click="toggleDirection(row)"
+            :title="'点击切换借贷方向'"
+          >
+            {{ getDirection(row) }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="未审数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
           <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 2)">
           <span v-if="!row._isSubtotal && !row._isTotal"
-            class="clickable" @click="onUnadjustedClick(row)"
+            class="clickable gt-amt" @click="onUnadjustedClick(row)"
             :class="displayPrefs.amountClass(row.unadjusted_amount)">
-            {{ fmt(row.unadjusted_amount) }}
+            {{ fmtDir(row, 'unadjusted_amount') }}
           </span>
-          <span v-else class="subtotal-val" :class="displayPrefs.amountClass(row.unadjusted_amount)">{{ fmt(row.unadjusted_amount) }}</span>
+          <span v-else class="subtotal-val gt-amt" :class="displayPrefs.amountClass(row.unadjusted_amount)">{{ fmtDir(row, 'unadjusted_amount') }}</span>
           </CommentTooltip>
         </template>
       </el-table-column>
-      <el-table-column label="RJE调整" width="140" align="right">
+      <el-table-column label="RJE调整" width="150" align="right" class-name="gt-amt-col">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && row.rje_adjustment !== '0'"
-            class="clickable" @click="onAdjClick(row, 'rje')">
+            class="clickable gt-amt" @click="onAdjClick(row, 'rje')">
             {{ fmt(row.rje_adjustment) }}
           </span>
-          <span v-else :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
+          <span v-else class="gt-amt" :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
             {{ fmt(row.rje_adjustment) }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="AJE调整" width="140" align="right">
+      <el-table-column label="AJE调整" width="150" align="right" class-name="gt-amt-col">
         <template #default="{ row }">
           <span v-if="!row._isSubtotal && !row._isTotal && row.aje_adjustment !== '0'"
-            class="clickable" @click="onAdjClick(row, 'aje')">
+            class="clickable gt-amt" @click="onAdjClick(row, 'aje')">
             {{ fmt(row.aje_adjustment) }}
           </span>
-          <span v-else :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
+          <span v-else class="gt-amt" :class="{ 'subtotal-val': row._isSubtotal || row._isTotal }">
             {{ fmt(row.aje_adjustment) }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="审定数" width="150" align="right">
+      <el-table-column label="审定数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
           <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 5)">
-          <span :class="['subtotal-val', displayPrefs.amountClass(row.audited_amount)]" v-if="row._isSubtotal || row._isTotal">
-            {{ fmt(row.audited_amount) }}
+          <span :class="['subtotal-val', 'gt-amt', displayPrefs.amountClass(row.audited_amount)]" v-if="row._isSubtotal || row._isTotal">
+            {{ fmtDir(row, 'audited_amount') }}
           </span>
-          <span v-else :class="displayPrefs.amountClass(row.audited_amount)">
-            {{ fmt(row.audited_amount) }}
+          <span v-else :class="['gt-amt', displayPrefs.amountClass(row.audited_amount)]">
+            {{ fmtDir(row, 'audited_amount') }}
           </span>
           </CommentTooltip>
         </template>
       </el-table-column>
-      <el-table-column label="底稿状态" width="100" align="center">
+      <el-table-column label="底稿状态" width="120" align="center" :header-cell-style="{ whiteSpace: 'nowrap' }">
         <template #default="{ row }">
           <el-tooltip v-if="row.wp_consistency?.status === 'consistent'" content="底稿审定数一致" placement="top">
             <span style="color: #28a745; cursor: pointer" @dblclick="openWorkpaper(row)">✅</span>
@@ -373,7 +403,7 @@
     <!-- 借贷平衡指示器 -->
     <div class="gt-tb-balance-indicator" v-if="!loading">
       <el-tooltip
-        :content="isBalanced ? '资产 = 负债 + 权益 + 损益净额' : `差额：${fmt(Math.abs(balanceDiff))} 元`"
+        :content="isBalanced ? '资产小计 = 负债和权益合计' : `差额：${fmt(Math.abs(balanceDiff))} 元（资产 - 负债权益）`"
         placement="top"
       >
         <span :class="isBalanced ? 'gt-tb-balanced' : 'gt-tb-unbalanced'">
@@ -458,11 +488,11 @@
     @compare="onTbCtxCompare"
   >
     <div class="gt-ucell-ctx-item" @click="onTbCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看明细</div>
+    <div class="gt-ucell-ctx-item" @click="onTbCtxTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数据溯源</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看相关分录</div>
   </CellContextMenu>
 
-  <!-- 数据质量检查对话框 -->
   <DataQualityDialog
     v-model="showDataQualityDialog"
     :project-id="projectId"
@@ -505,6 +535,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import DataQualityDialog from '@/components/DataQualityDialog.vue'
+import ReportLineMappingDialog from '@/components/trial-balance/ReportLineMappingDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
@@ -516,7 +547,7 @@ const route = useRoute()
 const router = useRouter()
 const projectStore = useProjectStore()
 
-const projectId = computed(() => projectStore.projectId)
+const projectId = computed(() => projectStore.projectId || (route.params.projectId as string) || '')
 const selectedProjectId = ref(projectStore.projectId)
 const projectOptions = computed(() => projectStore.projectOptions)
 const selectedYear = ref(projectStore.year)
@@ -546,6 +577,63 @@ function onYearChange(y: number) {
 const displayPrefs = useDisplayPrefsStore()
 /** 格式化金额（跟随全局单位设置） */
 const fmt = (v: any) => displayPrefs.fmt(v)
+
+/**
+ * 方向感知格式化：
+ * - 负债/权益/收入类科目：原始负数取绝对值展示为正数（方向列标"贷"）
+ * - 资产类中的备抵科目：保持负数展示（红字），方向列标"贷"，表示是资产减项
+ *   这样资产小计 = 各行数字直接相加即可验证
+ * - 小计行：直接展示（资产小计已是净额正数，负债小计原始负数取绝对值）
+ */
+function fmtDir(row: any, field: string) {
+  const val = Number(row[field] || 0)
+  if (val === 0) return fmt(0)
+  // 小计行/合计行：直接展示（已经按方向计算好了）
+  // 净利润行：正数=盈利，负数=亏损，直接展示不取绝对值
+  if (row._isSubtotal || row._isTotal) return fmt(val)
+  // 普通行：取绝对值展示
+  return fmt(Math.abs(val))
+}
+
+// ─── 科目余额方向判断 ───────────────────────────────────────────────────────
+// 用户手动覆盖的方向存储（科目编码 → '借'|'贷'）
+const directionOverrides = ref<Record<string, '借' | '贷'>>({})
+
+// 判断科目余额方向：优先用户手动设置 > 数据推断
+function getDirection(row: any): string {
+  if (!row.standard_account_code && !row.account_category) return ''
+  const code = row.standard_account_code || ''
+  const cat = row.account_category || ''
+
+  // 小计行/合计行：根据 account_category 判断
+  if (!code && cat) {
+    if (['liability', 'equity', 'revenue'].includes(cat)) return '贷'
+    return '借'
+  }
+
+  // 优先使用用户手动设置的方向
+  if (code && directionOverrides.value[code]) {
+    return directionOverrides.value[code]
+  }
+
+  // 默认推断：根据余额正负判断（正数=借方余额，负数=贷方余额）
+  const val = Number(row.unadjusted_amount || 0)
+  if (val < 0) return '贷'
+  return '借'
+}
+
+function getDirectionClass(row: any): string {
+  const dir = getDirection(row)
+  return dir === '贷' ? 'gt-dir-credit' : 'gt-dir-debit'
+}
+
+// 用户点击方向列切换借贷
+function toggleDirection(row: any) {
+  const code = row.standard_account_code
+  if (!code) return
+  const current = getDirection(row)
+  directionOverrides.value[code] = current === '借' ? '贷' : '借'
+}
 
 // ─── Task 3: Multi-Company Switcher ─────────────────────────────────────────
 const companyCode = ref('001')
@@ -616,6 +704,8 @@ const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().g
 const loading = ref(false)
 const showTbImport = ref(false)
 const showDataQualityDialog = ref(false)
+const showMappingDialog = ref(false)
+const headerCollapsed = ref(false)
 const recalcLoading = ref(false)
 const checkLoading = ref(false)
 const showFormulaManager = ref(false)
@@ -640,18 +730,21 @@ function getLinkedWp(accountCode: string): WpAccountMapping | undefined {
 
 function onOpenWorkpaper(accountCode: string) {
   const mapping = getLinkedWp(accountCode)
-  if (!mapping) return
+  if (!mapping) {
+    ElMessage.info('该科目未关联底稿')
+    return
+  }
   // 直接跳转到底稿编辑器
   const wp = wpList.value.find(w => w.wp_code === mapping.wp_code)
   if (wp) {
     router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId: wp.id } })
   } else {
-    // 底稿未生成时，跳到列表页并高亮
-    router.push({ path: `/projects/${projectId.value}/workpapers`, query: { highlight: mapping.wp_code } })
+    ElMessage.info(`底稿 ${mapping.wp_code}（${mapping.wp_name}）尚未生成，请先点击"生成底稿"`)
   }
 }
 
-const CATEGORY_ORDER = ['asset', 'liability', 'equity', 'revenue', 'cost', 'expense']
+const CATEGORY_ORDER = ['asset', 'liability', 'equity']
+const INCOME_EXPENSE_CATS = ['revenue', 'cost', 'expense']
 const CATEGORY_LABELS: Record<string, string> = {
   asset: '资产', liability: '负债', equity: '权益',
   revenue: '收入', cost: '成本', expense: '费用',
@@ -663,12 +756,37 @@ interface DisplayRow extends TrialBalanceRow {
   _highlight?: boolean
 }
 
+// 辅助函数：判断科目实际分类（双保险，编码+名称）
+function getActualCat(r: any): string {
+  const code = r.standard_account_code || ''
+  const first = code.charAt(0)
+  const name = (r.account_name || '').replace(/_/g, '')
+  const dbCat = r.account_category || 'asset'
+  let actualCat = dbCat
+
+  if ((first === '3' || first === '4') && (
+    name.includes('资本') || name.includes('公积') || name.includes('利润') ||
+    name.includes('股本') || name.includes('权益') || name.includes('储备') ||
+    name.includes('库存股') || name.includes('盈余')
+  )) {
+    actualCat = 'equity'
+  } else if (first === '2' && (
+    name.includes('借款') || name.includes('应付') || name.includes('预收') ||
+    name.includes('负债') || name.includes('应交') || name.includes('递延')
+  )) {
+    actualCat = 'liability'
+  }
+  return actualCat
+}
+
 const groupedRows = computed<DisplayRow[]>(() => {
   const result: DisplayRow[] = []
-  const totals = { unadjusted: 0, rje: 0, aje: 0, audited: 0 }
+  // 用于"负债和权益合计"
+  const liabEquitySub = { unadjusted: 0, rje: 0, aje: 0, audited: 0 }
 
+  // ── 第一部分：资产 / 负债 / 权益 ──
   for (const cat of CATEGORY_ORDER) {
-    const catRows = rows.value.filter(r => r.account_category === cat)
+    const catRows = rows.value.filter(r => getActualCat(r) === cat)
     if (!catRows.length) continue
 
     const sub = { unadjusted: 0, rje: 0, aje: 0, audited: 0 }
@@ -677,9 +795,19 @@ const groupedRows = computed<DisplayRow[]>(() => {
       const rj = num(r.rje_adjustment)
       const aj = num(r.aje_adjustment)
       const au = num(r.audited_amount)
-      sub.unadjusted += u; sub.rje += rj; sub.aje += aj; sub.audited += au
+
+      const dir = getDirection(r)
+      const catIsDebit = cat === 'asset'
+      const sign = (catIsDebit && dir === '贷') || (!catIsDebit && dir === '借') ? -1 : 1
+
+      sub.unadjusted += Math.abs(u) * sign
+      sub.rje += rj
+      sub.aje += aj
+      sub.audited += Math.abs(au) * sign
+
       result.push({ ...r, _highlight: r.exceeds_materiality })
     }
+
     // 小计行
     result.push({
       standard_account_code: '',
@@ -695,47 +823,98 @@ const groupedRows = computed<DisplayRow[]>(() => {
       _isSubtotal: true,
     } as DisplayRow)
 
-    totals.unadjusted += sub.unadjusted
-    totals.rje += sub.rje
-    totals.aje += sub.aje
-    totals.audited += sub.audited
+    // 累加负债+权益合计
+    if (cat === 'liability' || cat === 'equity') {
+      liabEquitySub.unadjusted += sub.unadjusted
+      liabEquitySub.rje += sub.rje
+      liabEquitySub.aje += sub.aje
+      liabEquitySub.audited += sub.audited
+    }
+
+    // 在权益小计后插入"负债和权益合计"
+    if (cat === 'equity') {
+      result.push({
+        standard_account_code: '',
+        account_name: '负债和权益合计',
+        account_category: 'equity',
+        unadjusted_amount: String(liabEquitySub.unadjusted),
+        rje_adjustment: String(liabEquitySub.rje),
+        aje_adjustment: String(liabEquitySub.aje),
+        audited_amount: String(liabEquitySub.audited),
+        opening_balance: null,
+        exceeds_materiality: false,
+        below_trivial: false,
+        _isTotal: true,
+      } as DisplayRow)
+    }
   }
-  // 合计行
-  result.push({
-    standard_account_code: '',
-    account_name: '合计',
-    account_category: null,
-    unadjusted_amount: String(totals.unadjusted),
-    rje_adjustment: String(totals.rje),
-    aje_adjustment: String(totals.aje),
-    audited_amount: String(totals.audited),
-    opening_balance: null,
-    exceeds_materiality: false,
-    below_trivial: false,
-    _isTotal: true,
-  } as DisplayRow)
+
+  // ── 第二部分：损益类（收入 - 成本 - 费用 = 净利润） ──
+  const incomeExpenseRows = rows.value.filter(r => INCOME_EXPENSE_CATS.includes(getActualCat(r)))
+  if (incomeExpenseRows.length) {
+    const netProfit = { unadjusted: 0, rje: 0, aje: 0, audited: 0 }
+
+    for (const r of incomeExpenseRows) {
+      const u = num(r.unadjusted_amount)
+      const rj = num(r.rje_adjustment)
+      const aj = num(r.aje_adjustment)
+      const au = num(r.audited_amount)
+
+      // 收入类（贷方）：取绝对值加正数；费用/成本类（借方）：取绝对值减
+      const dir = getDirection(r)
+      const sign = dir === '贷' ? 1 : -1
+
+      netProfit.unadjusted += Math.abs(u) * sign
+      netProfit.rje += rj
+      netProfit.aje += aj
+      netProfit.audited += Math.abs(au) * sign
+
+      result.push({ ...r, _highlight: r.exceeds_materiality })
+    }
+
+    // 净利润行（正数=盈利，负数=亏损）
+    result.push({
+      standard_account_code: '',
+      account_name: '净利润',
+      account_category: 'revenue',
+      unadjusted_amount: String(netProfit.unadjusted),
+      rje_adjustment: String(netProfit.rje),
+      aje_adjustment: String(netProfit.aje),
+      audited_amount: String(netProfit.audited),
+      opening_balance: null,
+      exceeds_materiality: false,
+      below_trivial: false,
+      _isSubtotal: true,
+    } as DisplayRow)
+  }
 
   return result
 })
 
-// 资产类合计
-const assetTotal = computed(() =>
-  rows.value
-    .filter(r => r.account_category === 'asset')
-    .reduce((s, r) => s + num(r.audited_amount), 0)
-)
-// 负债+权益+损益净额合计（用于借贷平衡校验）
-const liabEquityTotal = computed(() => {
-  const liabEquity = rows.value
-    .filter(r => ['liability', 'equity'].includes(r.account_category || ''))
-    .reduce((s, r) => s + num(r.audited_amount), 0)
-  // 损益净额：后端枚举实际使用 'revenue'/'expense'，兼容 'income'/'cost' 旧值
-  const incomeNet = rows.value
-    .filter(r => ['revenue', 'income', 'cost', 'expense'].includes(r.account_category || ''))
-    .reduce((s, r) => s + num(r.audited_amount), 0)
-  return liabEquity + incomeNet
+// 资产类合计（用展示逻辑：按方向加减）
+const assetTotal = computed(() => {
+  const assetRows = rows.value.filter(r => getActualCat(r) === 'asset')
+  let total = 0
+  for (const r of assetRows) {
+    const val = Math.abs(num(r.audited_amount))
+    const dir = getDirection(r)
+    total += dir === '贷' ? -val : val
+  }
+  return total
 })
-// 差额（资产 - 负债权益），用于 tooltip 显示
+// 负债+权益合计（用展示逻辑：按方向加减）
+const liabEquityTotal = computed(() => {
+  const leRows = rows.value.filter(r => ['liability', 'equity'].includes(getActualCat(r)))
+  let total = 0
+  for (const r of leRows) {
+    const val = Math.abs(num(r.audited_amount))
+    const dir = getDirection(r)
+    // 负债/权益类：贷方加正数，借方减
+    total += dir === '借' ? -val : val
+  }
+  return total
+})
+// 差额（资产 - 负债和权益），用于平衡校验
 const balanceDiff = computed(() => assetTotal.value - liabEquityTotal.value)
 
 // ── 数据新鲜度 ──
@@ -889,6 +1068,15 @@ function onImportDone() {
   fetchData()
 }
 
+/** 工作流步骤动作（映射步骤点击时打开映射弹窗，导入步骤打开导入弹窗） */
+function onWorkflowAction(action: string) {
+  if (action === 'mapping') {
+    showMappingDialog.value = true
+  } else if (action === 'import') {
+    onToolbarImport()
+  }
+}
+
 /** 工具栏"Excel导入"按钮：弹框让用户选择导入类型 */
 async function onToolbarImport() {
   try {
@@ -1015,11 +1203,12 @@ async function onRecalcWp(row: any) {
   } catch (e) { handleApiError(e, '重算底稿') }
 }
 
-function onUnadjustedClick(_row: TrialBalanceRow) {
+function onUnadjustedClick(row: TrialBalanceRow) {
+  // 点击未审数：跳转到余额表定位到对应科目（数据溯源）
+  if (!row.standard_account_code) return
   router.push({
-    name: 'Drilldown',
-    params: { projectId: projectId.value },
-    query: { year: String(year.value) },
+    path: `/projects/${projectId.value}/ledger`,
+    query: { year: String(year.value), account: row.standard_account_code },
   })
 }
 
@@ -1131,6 +1320,13 @@ function recalcTbSummaryAudited() {
 
 watch(tbSummaryRows, recalcTbSummaryAudited, { deep: true })
 const { isFullscreen: tbFullscreen, toggleFullscreen: toggleTbFullscreen } = useFullscreen()
+
+// 表格最大高度（视口高度 - 顶部区域，实现表头固定）
+const tableMaxHeight = computed(() => {
+  if (tbFullscreen.value) return 'calc(100vh - 60px)'
+  if (headerCollapsed.value) return 'calc(100vh - 160px)'
+  return 'calc(100vh - 320px)'
+})
 
 function copyTbTable() {
   const data = tbViewMode.value === 'summary' ? tbSummaryRows.value : groupedRows.value
@@ -1289,12 +1485,184 @@ function onTbCtxCopy() {
 
 function onTbCtxDrillDown() {
   tbCtx.closeContextMenu()
-  if (tbCtx.contextMenu.rowData) onUnadjustedClick(tbCtx.contextMenu.rowData)
+  const row = tbCtx.contextMenu.rowData
+  if (!row) return
+
+  // 净利润行：展示计算明细（每个损益科目的加减过程）
+  if (row._isSubtotal && row.account_name === '净利润') {
+    _showNetProfitDetail()
+    return
+  }
+
+  // 小计行：展示该类别下所有科目的汇总明细
+  if (row._isSubtotal || row._isTotal) {
+    _showSubtotalDetail(row)
+    return
+  }
+
+  // 普通科目行：跳转到余额表溯源
+  onUnadjustedClick(row)
+}
+
+function _showNetProfitDetail() {
+  const incomeExpenseRows = rows.value.filter(r => INCOME_EXPENSE_CATS.includes(getActualCat(r)))
+  if (!incomeExpenseRows.length) {
+    ElMessage.info('暂无损益类科目数据')
+    return
+  }
+
+  let detail = '【净利润计算明细】\n\n'
+  let totalRevenue = 0
+  let totalExpense = 0
+
+  // 收入类
+  detail += '━━ 收入类（+）━━\n'
+  for (const r of incomeExpenseRows) {
+    const dir = getDirection(r)
+    if (dir !== '贷') continue
+    const val = Math.abs(Number(r.unadjusted_amount || 0))
+    if (val === 0) continue
+    totalRevenue += val
+    detail += `  + ${r.standard_account_code} ${r.account_name}：${val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+  }
+  detail += `  收入合计：${totalRevenue.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n\n`
+
+  // 费用/成本类
+  detail += '━━ 费用/成本类（-）━━\n'
+  for (const r of incomeExpenseRows) {
+    const dir = getDirection(r)
+    if (dir !== '借') continue
+    const val = Math.abs(Number(r.unadjusted_amount || 0))
+    if (val === 0) continue
+    totalExpense += val
+    detail += `  - ${r.standard_account_code} ${r.account_name}：${val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+  }
+  detail += `  费用合计：${totalExpense.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n\n`
+
+  // 净利润
+  const netProfit = totalRevenue - totalExpense
+  detail += '━━━━━━━━━━━━━━━━\n'
+  detail += `净利润 = 收入 - 费用 = ${netProfit.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+  detail += netProfit >= 0 ? '（盈利）' : '（亏损）'
+
+  ElMessageBox.alert(detail, '净利润计算明细', {
+    confirmButtonText: '确定',
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+  })
+}
+
+function _showSubtotalDetail(row: any) {
+  const cat = row.account_category || ''
+  const name = row.account_name || ''
+
+  // "负债和权益合计"特殊处理：包含负债+权益两个类别
+  let catRows: any[]
+  let catLabel: string
+  if (name.includes('负债和权益合计')) {
+    catRows = rows.value.filter(r => ['liability', 'equity'].includes(getActualCat(r)))
+    catLabel = '负债和权益'
+  } else {
+    catRows = rows.value.filter(r => getActualCat(r) === cat)
+    catLabel = ({ asset: '资产', liability: '负债', equity: '权益' } as any)[cat] || cat
+  }
+
+  if (!catRows.length) {
+    ElMessage.info('暂无明细数据')
+    return
+  }
+
+  let detail = `【${name} 计算明细】\n\n`
+  const catIsDebit = cat === 'asset'
+
+  for (const r of catRows) {
+    const val = Math.abs(Number(r.unadjusted_amount || 0))
+    if (val === 0) continue
+    const dir = getDirection(r)
+    // 负债/权益类：贷方加，借方减
+    const sign = (catIsDebit && dir === '贷') || (!catIsDebit && dir === '借') ? '-' : '+'
+    detail += `  ${sign} ${r.standard_account_code} ${r.account_name}：${val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}（${dir}）\n`
+  }
+  detail += `\n━━━━━━━━━━━━━━━━\n`
+  detail += `${name} = ${Math.abs(Number(row.unadjusted_amount || 0)).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
+
+  ElMessageBox.alert(detail, `${catLabel}类汇总明细`, {
+    confirmButtonText: '确定',
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
+  })
+}
+
+// ─── 数据溯源：跳转到余额表并定位到对应科目 ───
+async function onTbCtxTrace() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  if (!row?.standard_account_code) {
+    ElMessage.info('请在科目行上右键')
+    return
+  }
+  // 跳转到查账页面，带上科目编码参数，查账页面会自动定位
+  router.push({
+    path: `/projects/${projectId.value}/ledger`,
+    query: { year: String(year.value), account: row.standard_account_code },
+  })
 }
 
 function onTbCtxFormula() {
   tbCtx.closeContextMenu()
-  showFormulaManager.value = true
+  const row = tbCtx.contextMenu.rowData
+  if (!row) {
+    ElMessage.info('请选择一个单元格')
+    return
+  }
+
+  const code = row.standard_account_code || ''
+  const name = row.account_name || code || '—'
+  const dir = getDirection(row)
+  const val = Number(row.unadjusted_amount || 0)
+
+  let formulaDesc = ''
+
+  if (row._isSubtotal || row._isTotal) {
+    // 小计/合计行：展示汇总公式
+    formulaDesc += `【${name}】\n\n`
+    if (name.includes('净利润')) {
+      formulaDesc += `= Σ 收入类科目（贷方）- Σ 费用/成本类科目（借方）\n`
+      formulaDesc += `\n收入类取绝对值相加，费用类取绝对值相减`
+    } else if (name.includes('负债和权益合计')) {
+      formulaDesc += `= 负债 小计 + 权益 小计\n`
+      formulaDesc += `\n用于与"资产 小计"校对（应相等）`
+    } else {
+      const cat = row.account_category || ''
+      const catLabel = { asset: '资产', liability: '负债', equity: '权益' }[cat] || cat
+      formulaDesc += `= Σ ${catLabel}类各科目（按方向加减）\n\n`
+      formulaDesc += `规则：同方向科目取绝对值相加，反方向科目取绝对值相减\n`
+      formulaDesc += `（如资产类中贷方科目为减项）`
+    }
+  } else {
+    // 普通科目行
+    formulaDesc += `科目：${code} ${name}\n`
+    formulaDesc += `方向：${dir}\n`
+    formulaDesc += `未审数：${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+    formulaDesc += `\n取数公式：\n`
+
+    const first = code.charAt(0)
+    if (first === '5' || first === '6') {
+      const isRevenue = ['5001', '5051', '5101'].includes(code) ||
+        (first === '6' && ['6001', '6051', '6101', '6111', '6115', '6117', '6301'].includes(code.slice(0, 4)))
+      if (isRevenue) {
+        formulaDesc += `= SUM(tb_balance.credit_amount)\n  [收入类：取贷方发生额]`
+      } else {
+        formulaDesc += `= SUM(tb_balance.debit_amount)\n  [费用类：取借方发生额]`
+      }
+    } else {
+      formulaDesc += `= SUM(tb_balance.closing_balance)\n  [资产/负债/权益：取期末余额]`
+    }
+    formulaDesc += `\n\n审定数 = 未审数 + RJE调整 + AJE调整`
+  }
+
+  ElMessageBox.alert(formulaDesc, `公式详情`, {
+    confirmButtonText: '确定',
+    customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '13px' },
+  })
 }
 
 function onTbCtxOpenWp() {
@@ -1455,6 +1823,60 @@ async function exportTbSummary() {
 <style scoped>
   .gt-trial-balance { padding: var(--gt-space-5); }
 
+  /* 折叠/展开按钮 */
+  .gt-header-toggle {
+    text-align: center;
+    padding: 2px 0;
+    cursor: pointer;
+    font-size: 11px;
+    color: #909399;
+    border-bottom: 1px solid #f0edf5;
+    margin-bottom: 6px;
+    user-select: none;
+    transition: color 0.15s;
+  }
+  .gt-header-toggle:hover { color: #4b2d77; }
+
+  /* ── 金额列统一字体（Arial Narrow + tabular-nums + 不折行） ── */
+  .gt-amt {
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  :deep(.gt-amt-col) {
+    font-family: 'Arial Narrow', Arial, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── 表格字号由 displayPrefs 控制（Aa 按钮），通过 class 切换 ── */
+  :deep(.gt-tb-font-xs),
+  :deep(.gt-tb-font-xs) th .cell,
+  :deep(.gt-tb-font-xs) td .cell,
+  :deep(.gt-tb-font-xs) .el-table__body { font-size: 11px !important; }
+
+  :deep(.gt-tb-font-sm),
+  :deep(.gt-tb-font-sm) th .cell,
+  :deep(.gt-tb-font-sm) td .cell,
+  :deep(.gt-tb-font-sm) .el-table__body { font-size: 12px !important; }
+
+  :deep(.gt-tb-font-md),
+  :deep(.gt-tb-font-md) th .cell,
+  :deep(.gt-tb-font-md) td .cell,
+  :deep(.gt-tb-font-md) .el-table__body { font-size: 13px !important; }
+
+  :deep(.gt-tb-font-lg),
+  :deep(.gt-tb-font-lg) th .cell,
+  :deep(.gt-tb-font-lg) td .cell,
+  :deep(.gt-tb-font-lg) .el-table__body { font-size: 14px !important; }
+
+  :deep(.el-table th .cell) {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  :deep(.el-table td .cell) {
+    line-height: 1.4;
+  }
+
   /* ── GtPageHeader 已替换横幅样式 ── */
 
   .clickable {
@@ -1463,6 +1885,12 @@ async function exportTbSummary() {
   }
   .clickable:hover { color: var(--gt-color-primary-light); text-decoration: underline; }
   .subtotal-val { font-weight: 700; }
+
+  /* 方向列样式 */
+  .gt-dir-debit { color: #303133; font-size: 11px; }
+  .gt-dir-credit { color: #e6a23c; font-size: 11px; font-weight: 600; }
+  .gt-dir-toggle { cursor: pointer; user-select: none; padding: 2px 6px; border-radius: 3px; }
+  .gt-dir-toggle:hover { background: #f0edf5; }
 
   .gt-tb-balance-indicator {
     margin-top: var(--gt-space-4); text-align: right;
@@ -1509,6 +1937,17 @@ async function exportTbSummary() {
 }
 .gt-tb-view-tag:hover { color: #4b2d77; }
 .gt-tb-view-tag--active { color: #4b2d77; font-weight: 600; border-bottom-color: #4b2d77; }
+
+.gt-mapping-rule-btn {
+  margin-left: 16px;
+  border-color: #d9d2e8;
+  color: #4b2d77;
+  font-size: 12px;
+}
+.gt-mapping-rule-btn:hover {
+  border-color: #4b2d77;
+  background: #f8f5fd;
+}
 
 /* 试算平衡表 */
 .gt-tb-summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }

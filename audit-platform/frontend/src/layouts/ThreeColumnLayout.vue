@@ -21,13 +21,11 @@
         <slot name="nav-notifications" />
 
         <!-- 显示设置 Aa -->
-        <el-popover placement="bottom" :width="240" trigger="click">
+        <el-popover placement="bottom" :width="240" trigger="click" :teleported="true">
           <template #reference>
-            <el-tooltip content="显示设置" placement="bottom">
-              <div class="gt-topbar-btn">
-                <span class="gt-topbar-text-icon">Aa</span>
-              </div>
-            </el-tooltip>
+            <div class="gt-topbar-btn" title="显示设置">
+              <span class="gt-topbar-text-icon">Aa</span>
+            </div>
           </template>
           <div class="gt-display-prefs-panel">
             <div class="gt-dp-row">

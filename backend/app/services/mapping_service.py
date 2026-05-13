@@ -228,7 +228,9 @@ async def _generate_client_accounts_from_balance(
             return AccountCategory.liability.value
         elif first == '3':
             return AccountCategory.equity.value
-        elif first in ('5', '4'):
+        elif first == '4':
+            return AccountCategory.equity.value
+        elif first == '5':
             return AccountCategory.revenue.value
         elif first == '6':
             return AccountCategory.expense.value

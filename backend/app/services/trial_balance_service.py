@@ -83,7 +83,61 @@ class TrialBalanceService:
         result = await self.db.execute(agg_q)
         agg_rows = {r.standard_account_code: r for r in result.fetchall()}
 
-        # 2. 获取标准科目信息（名称、类别）
+        # 1b. 损益类科目额外汇总本期发生额（debit_amount - credit_amount）
+        # 损益类期末余额通常为 0（已结转），审计需要看本期发生额
+        period_agg_q = (
+            sa.select(
+                mp.c.standard_account_code,
+                sa.func.coalesce(sa.func.sum(bal.c.debit_amount), 0).label("total_debit"),
+                sa.func.coalesce(sa.func.sum(bal.c.credit_amount), 0).label("total_credit"),
+            )
+            .select_from(
+                bal.join(
+                    mp,
+                    sa.and_(
+                        mp.c.project_id == bal.c.project_id,
+                        mp.c.original_account_code == bal.c.account_code,
+                        mp.c.is_deleted == sa.false(),
+                    ),
+                )
+            )
+            .where(balance_filter)
+            .group_by(mp.c.standard_account_code)
+        )
+        if account_codes:
+            period_agg_q = period_agg_q.where(mp.c.standard_account_code.in_(account_codes))
+
+        period_result = await self.db.execute(period_agg_q)
+        period_rows = {r.standard_account_code: r for r in period_result.fetchall()}
+
+        # 2. 获取一级科目名称
+        # 注意：此时 existing_rows 还未加载，用 agg_rows.keys() 即可（有余额的科目一定在里面）
+        level1_names: dict[str, str] = {}
+        if agg_rows:
+            # 从 tb_balance 取所有相关行的名称（含明细行）
+            name_q = (
+                sa.select(bal.c.account_code, bal.c.account_name)
+                .where(balance_filter)
+                .distinct()
+            )
+            name_result = await self.db.execute(name_q)
+            all_names: dict[str, str] = {}
+            for r in name_result.fetchall():
+                if r.account_code and r.account_name:
+                    all_names[r.account_code] = r.account_name
+
+            # 对每个标准科目编码，优先精确匹配，否则从明细行取下划线前的部分
+            for code in agg_rows.keys():
+                if code in all_names:
+                    raw_name = all_names[code]
+                    level1_names[code] = raw_name.split('_')[0] if '_' in raw_name else raw_name
+                else:
+                    for _ac_code, _ac_name in all_names.items():
+                        if _ac_code.startswith(code + '.') or (_ac_code.startswith(code) and len(_ac_code) > len(code)):
+                            level1_names[code] = _ac_name.split('_')[0] if '_' in _ac_name else _ac_name
+                            break
+
+        # 2b. 兜底：从 AccountChart 标准科目表取名称（余额表没有的情况）
         std_q = (
             sa.select(ac.c.account_code, ac.c.account_name, ac.c.category)
             .where(
@@ -96,7 +150,13 @@ class TrialBalanceService:
             std_q = std_q.where(ac.c.account_code.in_(account_codes))
 
         std_result = await self.db.execute(std_q)
-        std_map = {r.account_code: r for r in std_result.fetchall()}
+        std_map: dict[str, any] = {}
+        for r in std_result.fetchall():
+            existing = std_map.get(r.account_code)
+            if existing is None:
+                std_map[r.account_code] = r
+            elif len(r.account_name or '') < len(existing.account_name or ''):
+                std_map[r.account_code] = r
 
         # 3. 获取已有试算表行（批量加载）
         tb_q = sa.select(TrialBalance).where(
@@ -122,8 +182,34 @@ class TrialBalanceService:
             std = std_map.get(code)
             closing = Decimal(str(agg.total_closing)) if agg else Decimal("0")
             opening = Decimal(str(agg.total_opening)) if agg else Decimal("0")
-            name = std.account_name if std else None
+            # 优先用 tb_balance level=1 的一级科目名称（最准确）
+            name = level1_names.get(code) or (std.account_name if std else None)
             cat = std.category if std else AccountCategory.asset.value
+
+            # 损益类科目（5xxx/6xxx）：取单边发生额（不做借-贷，因为结转后两边相等）
+            # 收入类：取 credit_amount（贷方发生额），存为负数保持"贷方=负"语义
+            # 费用/成本类：取 debit_amount（借方发生额），存为正数保持"借方=正"语义
+            is_income_expense = code and code[0] in ('5', '6')
+            if is_income_expense:
+                period = period_rows.get(code)
+                if period:
+                    total_dr = Decimal(str(period.total_debit))
+                    total_cr = Decimal(str(period.total_credit))
+                    # 判断是收入类还是费用类：
+                    # 收入类编码：5001/5051/5101/6001/6051/6101/6111/6117/6301
+                    # 费用类编码：5401+/6401+/6403+/6601+/6602+/6603+/6701+/6702+/6711+/6801+
+                    is_revenue = code in ('5001', '5051', '5101') or (
+                        code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301')
+                    )
+                    if is_revenue:
+                        # 收入类：取贷方发生额，存为负数（贷方语义）
+                        closing = -total_cr
+                    else:
+                        # 费用/成本类：取借方发生额，存为正数（借方语义）
+                        closing = total_dr
+                else:
+                    closing = Decimal("0")
+                opening = Decimal("0")  # 损益类无期初余额
 
             row = existing_rows.get(code)
             if row:

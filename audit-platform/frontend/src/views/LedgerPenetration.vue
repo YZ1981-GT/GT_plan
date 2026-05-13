@@ -2060,6 +2060,51 @@ const auxLedgerDisplay = computed(() => {
 const balanceTableRef = ref<any>(null)
 const allExpanded = ref(false)
 
+// 数据溯源：滚动到指定科目并高亮
+function _scrollToAccount(accountCode: string) {
+  let retries = 0
+  const maxRetries = 10
+
+  function tryScroll() {
+    retries++
+    const tableEl = balanceTableRef.value
+    if (!tableEl || !filteredBalance.value.length) {
+      if (retries < maxRetries) setTimeout(tryScroll, 300)
+      return
+    }
+
+    // 在余额数据中找到匹配的行（精确匹配或前缀匹配）
+    const rows = filteredBalance.value
+    let targetIdx = rows.findIndex((r: any) => r.account_code === accountCode)
+    if (targetIdx < 0) {
+      targetIdx = rows.findIndex((r: any) => r.account_code?.startsWith(accountCode))
+    }
+    if (targetIdx < 0) {
+      if (retries < maxRetries) setTimeout(tryScroll, 300)
+      return
+    }
+
+    // 高亮该行
+    tableEl.setCurrentRow(rows[targetIdx])
+
+    // 滚动到该行
+    setTimeout(() => {
+      const tbody = tableEl.$el?.querySelector('.el-table__body-wrapper')
+      const rowEls = tbody?.querySelectorAll('tr.el-table__row')
+      const rowEl = rowEls?.[targetIdx]
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // 闪烁高亮
+        rowEl.style.transition = 'background 0.3s'
+        rowEl.style.background = '#fff3cd'
+        setTimeout(() => { rowEl.style.background = '' }, 4000)
+      }
+    }, 100)
+  }
+
+  setTimeout(tryScroll, 500)
+}
+
 function toggleExpandAll() {
   allExpanded.value = !allExpanded.value
   // el-table tree 不支持动态切换 default-expand-all，需要手动操作
@@ -3055,13 +3100,25 @@ function refresh() {
   else if (currentLevel.value === 'aux_ledger') loadAuxLedger()
 }
 
-// ── 键盘快捷键：Enter 返回上一级 ──
+// ── 键盘快捷键：Enter 返回上一级 / Backspace 返回上一页 ──
 function onKeyDown(e: KeyboardEvent) {
+  // 如果焦点在输入框内，不拦截
+  const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+  if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return
+
   if (e.key === 'Enter' && currentLevel.value !== 'balance') {
     e.preventDefault()
-    // 返回上一级
     const idx = breadcrumbs.value.length - 2
     if (idx >= 0) navigateTo(idx)
+  }
+  // Backspace：返回上一页（浏览器后退）
+  if (e.key === 'Backspace') {
+    e.preventDefault()
+    router.back()
+  }
+  // Escape：同样返回上一页
+  if (e.key === 'Escape') {
+    router.back()
   }
 }
 onMounted(async () => {
@@ -3073,6 +3130,10 @@ onMounted(async () => {
   _initialized = true
   if (route.query.import === '1') {
     openImportDialogFromRoute()
+  }
+  // 数据溯源：从试算表跳转过来时自动定位到指定科目
+  if (route.query.account) {
+    _scrollToAccount(route.query.account as string)
   }
 })
 onUnmounted(() => {
