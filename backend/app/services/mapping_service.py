@@ -234,6 +234,23 @@ async def _generate_client_accounts_from_balance(
             return AccountCategory.expense.value
         return AccountCategory.asset.value
 
+    # 按 category 推断借贷方向
+    from app.models.audit_platform_models import AccountDirection
+    def _infer_direction(cat: str) -> AccountDirection:
+        # 资产/费用类 = 借方；负债/权益/收入类 = 贷方
+        if cat in (AccountCategory.asset.value, AccountCategory.expense.value):
+            return AccountDirection.debit
+        return AccountDirection.credit
+
+    def _infer_level(code: str) -> int:
+        if '.' in code:
+            return len(code.split('.'))
+        if len(code) <= 4:
+            return 1
+        if len(code) <= 6:
+            return 2
+        return 3
+
     count = 0
     for row in balance_accounts:
         code = row.account_code
@@ -259,6 +276,8 @@ async def _generate_client_accounts_from_balance(
             account_name=name,
             source=AccountSource.client,
             category=cat,
+            direction=_infer_direction(cat),
+            level=_infer_level(code),
             dataset_id=dataset_id,
         ))
         count += 1
