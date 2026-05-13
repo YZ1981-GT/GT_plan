@@ -49,8 +49,10 @@ export interface TrialBalanceRow {
   updated_at?: string | null
 }
 
-export async function getTrialBalance(projectId: string, year: number): Promise<TrialBalanceRow[]> {
-  const { data } = await http.get(P_tb.get(projectId), { params: { year } })
+export async function getTrialBalance(projectId: string, year: number, companyCode?: string): Promise<TrialBalanceRow[]> {
+  const params: Record<string, any> = { year }
+  if (companyCode) params.company_code = companyCode
+  const { data } = await http.get(P_tb.get(projectId), { params })
   return data
 }
 

@@ -11,10 +11,27 @@
           { value: rows.length + ' 个科目' },
           { label: '单位', value: displayPrefs.unitSuffix },
           ...(lastRecalcAt ? [{ label: '数据', value: isStale ? '⚠ 待重算' : `✓ ${freshnessText}` }] : []),
+          ...(isFrozen ? [{ label: '🔒', value: '已锁定' }] : []),
         ]"
         @unit-change="onProjectChange"
         @year-change="onYearChange"
-      />
+      >
+        <el-select
+          v-if="hasMultipleCompanies"
+          v-model="companyCode"
+          size="small"
+          style="width: 160px; margin-left: 8px"
+          placeholder="选择子公司"
+          @change="onCompanyChange"
+        >
+          <el-option
+            v-for="c in companyList"
+            :key="c.code"
+            :label="c.name"
+            :value="c.code"
+          />
+        </el-select>
+      </GtInfoBar>
       <template #actions>
         <GtToolbar
           :show-copy="true"
@@ -34,8 +51,13 @@
             <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
               <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
             </el-tooltip>
-            <el-tooltip content="从四表数据重新计算未审数、调整数、审定数（需先导入数据）" placement="bottom">
-              <el-button size="small" @click="onRecalc" :loading="recalcLoading">🔄 全量重算</el-button>
+            <el-tooltip :content="isFrozen ? '试算表已锁定，解锁后才能重算' : '从四表数据重新计算未审数、调整数、审定数（需先导入数据）'" placement="bottom">
+              <el-button size="small" @click="onRecalc" :loading="recalcLoading" :disabled="isFrozen">🔄 全量重算</el-button>
+            </el-tooltip>
+            <el-tooltip :content="isFrozen ? '点击解锁试算表' : '锁定试算表，防止自动重算'" placement="bottom">
+              <el-button size="small" @click="toggleFreeze" :type="isFrozen ? 'danger' : 'default'">
+                {{ isFrozen ? '🔒' : '🔓' }}
+              </el-button>
             </el-tooltip>
           </template>
         </GtToolbar>
@@ -88,14 +110,15 @@
     <!-- 数据新鲜度提示（有未重算的调整分录时） -->
     <el-alert
       v-if="isStale && rows.length > 0"
-      type="warning"
+      :type="isFrozen ? 'info' : 'warning'"
       :closable="false"
       show-icon
       style="margin-bottom: 12px"
     >
       <template #title>
-        <span>检测到新调整分录，试算表数据可能已过时</span>
-        <el-button type="warning" size="small" plain style="margin-left: 12px" @click="onRecalc" :loading="recalcLoading">
+        <span v-if="isFrozen">🔒 已锁定，不会自动重算</span>
+        <span v-else>检测到新调整分录，试算表数据可能已过时</span>
+        <el-button v-if="!isFrozen" type="warning" size="small" plain style="margin-left: 12px" @click="onRecalc" :loading="recalcLoading">
           立即重算 →
         </el-button>
       </template>
@@ -196,6 +219,10 @@
     />
 
     <!-- 试算表主表（科目明细视图） -->
+    <div v-if="tbViewMode === 'detail' && staleAccountCodes.size > 0" style="margin-bottom: 6px; font-size: 12px; color: #909399; display: flex; align-items: center; gap: 6px">
+      <span style="display: inline-block; width: 14px; height: 14px; background: #fef9e7; border-left: 3px solid #f0c040; border-radius: 2px"></span>
+      <span>黄底行 = 有新调整分录待重算</span>
+    </div>
     <el-table
       ref="tbTableRef"
       v-if="tbViewMode === 'detail'"
@@ -368,6 +395,27 @@
       </el-table>
     </el-dialog>
 
+    <!-- 映射质量面板（Task 1） -->
+    <el-dialog v-model="mappingResultVisible" title="科目映射结果" width="460" append-to-body destroy-on-close>
+      <div style="display: flex; flex-direction: column; gap: 16px; padding: 8px 0">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <el-badge :value="mappingResult.matched" type="success" />
+          <span style="font-size: 14px">匹配成功</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px">
+          <el-badge :value="mappingResult.needConfirm" type="warning" />
+          <span style="font-size: 14px">需手动确认</span>
+        </div>
+        <div style="font-size: 12px; color: #909399; margin-top: 4px">
+          共 {{ mappingResult.total }} 个客户科目，完成率 {{ mappingResult.rate }}%
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="mappingResultVisible = false">关闭</el-button>
+        <el-button type="primary" @click="goToMappingEditor">查看映射详情</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 公式管理弹窗 -->
     <FormulaManagerDialog
       v-model="showFormulaManager"
@@ -443,6 +491,7 @@ import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { usePasteImport } from '@/composables/usePasteImport'
+import { usePermission } from '@/composables/usePermission'
 import * as P from '@/services/apiPaths'
 
 const route = useRoute()
@@ -479,6 +528,65 @@ function onYearChange(y: number) {
 const displayPrefs = useDisplayPrefsStore()
 /** 格式化金额（跟随全局单位设置） */
 const fmt = (v: any) => displayPrefs.fmt(v)
+
+// ─── Task 3: Multi-Company Switcher ─────────────────────────────────────────
+const companyCode = ref('001')
+const companyList = ref<{ code: string; name: string }[]>([])
+const hasMultipleCompanies = computed(() => companyList.value.length > 1)
+
+async function loadCompanyList() {
+  try {
+    const result = await api.get(`/api/projects/${projectId.value}/child-companies`)
+    if (Array.isArray(result) && result.length > 0) {
+      companyList.value = result.map((c: any) => ({
+        code: c.company_code || c.code || '001',
+        name: c.company_name || c.name || c.company_code || '默认',
+      }))
+    } else {
+      companyList.value = []
+    }
+  } catch {
+    companyList.value = []
+  }
+}
+
+function onCompanyChange(code: string) {
+  companyCode.value = code
+  fetchData()
+}
+
+// ─── Task 4: Trial Balance Freeze Mechanism ─────────────────────────────────
+const { can } = usePermission()
+const isFrozen = ref(false)
+const canToggleFreeze = computed(() => can('admin') || can('project:edit'))
+
+function getFreezeKey() {
+  return `tb_frozen_${projectId.value}_${year.value}`
+}
+
+function loadFreezeState() {
+  try {
+    isFrozen.value = localStorage.getItem(getFreezeKey()) === '1'
+  } catch {
+    isFrozen.value = false
+  }
+}
+
+function toggleFreeze() {
+  if (!canToggleFreeze.value) {
+    ElMessage.warning('仅管理员/合伙人/项目经理可操作锁定')
+    return
+  }
+  isFrozen.value = !isFrozen.value
+  try {
+    if (isFrozen.value) {
+      localStorage.setItem(getFreezeKey(), '1')
+    } else {
+      localStorage.removeItem(getFreezeKey())
+    }
+  } catch { /* ignore */ }
+  ElMessage.success(isFrozen.value ? '试算表已锁定' : '试算表已解锁')
+}
 
 const routeYear = computed(() => {
   const value = Number(route.query.year)
@@ -652,6 +760,21 @@ const isBalanced = computed(() => {
   return Math.abs(balanceDiff.value) < 1
 })
 
+// Task 2: Identify stale rows (updated_at older than latest adjustment)
+const staleAccountCodes = computed<Set<string>>(() => {
+  if (!latestAdjustmentAt.value) return new Set()
+  const latestAdj = new Date(latestAdjustmentAt.value).getTime()
+  const codes = new Set<string>()
+  for (const row of rows.value) {
+    if (row.updated_at && row.standard_account_code) {
+      if (new Date(row.updated_at).getTime() < latestAdj) {
+        codes.add(row.standard_account_code)
+      }
+    }
+  }
+  return codes
+})
+
 function num(v: string | null | undefined): number {
   return v != null ? parseFloat(v) || 0 : 0
 }
@@ -770,10 +893,28 @@ async function onToolbarImport() {
 
 // 自动科目映射（从已导入的余额表一级科目按编码规则匹配）
 const autoMappingLoading = ref(false)
+const mappingResultVisible = ref(false)
+const mappingResult = ref<{ matched: number; needConfirm: number; total: number; rate: string }>({
+  matched: 0, needConfirm: 0, total: 0, rate: '0',
+})
+
+function goToMappingEditor() {
+  mappingResultVisible.value = false
+  router.push(`/projects/${projectId.value}/ledger?tab=mapping`)
+}
+
 async function onAutoMapping() {
   autoMappingLoading.value = true
   try {
-    await api.post(P.accountMapping.autoMatch(projectId.value), { year: selectedYear.value })
+    const result = await api.post(P.accountMapping.autoMatch(projectId.value), { year: selectedYear.value })
+    // Capture mapping quality result
+    mappingResult.value = {
+      matched: result?.saved_count ?? 0,
+      needConfirm: result?.unmatched_count ?? 0,
+      total: result?.total_client ?? 0,
+      rate: ((result?.completion_rate ?? 0) * 100).toFixed(0),
+    }
+    mappingResultVisible.value = true
     ElMessage.success('科目映射完成，正在生成试算表...')
     await detectDataState()  // 刷新数据状态推进步骤
     // 映射完成后自动触发重算（不让用户再手动点第三步）
@@ -789,6 +930,8 @@ function rowClassName({ row }: { row: DisplayRow }) {
   if (row._isTotal) return 'total-row'
   if (row._isSubtotal) return 'subtotal-row'
   if (row._highlight) return 'highlight-row'
+  // Task 2: stale rows (updated_at older than latest adjustment)
+  if (row.standard_account_code && staleAccountCodes.value.has(row.standard_account_code)) return 'stale-row'
   return ''
 }
 
@@ -807,7 +950,7 @@ async function ensureProjectYear() {
 }
 
 const fetchData = withLoading(loading, async () => {
-  rows.value = await getTrialBalance(projectId.value, year.value)
+  rows.value = await getTrialBalance(projectId.value, year.value, hasMultipleCompanies.value ? companyCode.value : undefined)
 })
 
 const onRecalc = withLoading(recalcLoading, async () => {
@@ -883,6 +1026,8 @@ watch(
     await fetchData()
     await detectDataState()  // 自动检测步骤状态
     await loadLatestAdjustmentTime()  // 加载最新调整时间用于新鲜度检测
+    await loadCompanyList()  // Task 3: 加载子公司列表
+    loadFreezeState()  // Task 4: 加载冻结状态
     if (!projectStore.projectOptions.length) projectStore.loadProjectOptions()
     // 加载底稿-科目映射
     try {
@@ -1324,6 +1469,10 @@ async function exportTbSummary() {
   :deep(.total-row td) { border-bottom: 2px solid var(--gt-color-primary-lighter) !important; }
   :deep(.highlight-row) {
     background: linear-gradient(90deg, #fffbf0, var(--gt-color-wheat-light)) !important;
+  }
+  :deep(.stale-row) {
+    background: #fef9e7 !important;
+    border-left: 3px solid #f0c040;
   }
 
   :deep(.el-tabs__item.is-active) { font-weight: 600; }

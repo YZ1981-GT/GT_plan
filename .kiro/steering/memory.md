@@ -1111,6 +1111,9 @@ inclusion: always
 - **feat: 科目余额表自动补齐父级汇总行（3c8f69d）**：Excel 原始数据常只有末级科目（如 1012.13），缺少上级汇总行（1012）；后端 `get_balance_summary` 查询后自动递归补齐缺失父级（金额=子级求和），支持点号分隔和纯数字两种编码格式；合成行标记 `_is_synthetic: true`
 - **fix: usePasteImport 兼容 Vue 组件 ref（9b6b981）**：R9 Task 32 给 TrialBalance 传了 el-table 组件 ref 作为 containerRef，但 composable 直接调 `.addEventListener()` 导致崩溃；修复 = `_getEl()` 辅助函数自动判断 HTMLElement vs Vue 组件实例（取 `.$el`）
 - **用户偏好：试算表步骤引导不应跳转上传**：科目映射步骤应直接从已入库的 tb_balance 一级科目按编码规则自动匹配（1xxx=资产/2xxx=负债/3xxx=权益/5xxx=收入/6xxx=费用），不需要用户再上传文件；已改为"自动匹配科目分类"按钮调 `/mapping/auto-match` API
+- **试算表 P0 优化已落地（59e58da）**：步骤自动推进（基于数据真相不用 localStorage）+ 新鲜度指示器（badge + stale 告警横幅）+ 一致性校验详情展开 + 导入入口合并（弹框选"账套数据"或"试算表数据"）+ 空状态简化
+- **技术决策：步骤引导类功能永远从数据层推导状态，不用 localStorage**：`detectDataState()` 并发查 tb_balance 行数 + mapping/completion-rate + rows.length 实时计算当前步骤
+- **试算表待做清单**：P1 映射质量面板（成功/需确认数量+进入编辑器）/ P1 增量重算可视化（stale 行标黄底）/ P2 多子公司切换（company_code 动态）/ P3 试算表冻结机制（报告期末锁定）
 - **四表金额单位问题（2026-05-12 发现）**：真实样本（四川物流等）Excel 原始数据以"万元"为单位编制，系统原样存储不做单位转换，导致前端显示数字看起来"太小"；需要在导入时从表头提取单位信息（"单位：万元"）或让用户手动选择，前端余额表顶部标注单位
 - **四表金额单位功能已实现（88b2a79）**：detector 从 Excel 表头自动提取 amount_unit 存入 dataset.source_summary；前端余额表/辅助余额表工具栏显示橙色"单位：万元"tag；旧数据集需重新导入或手动 UPDATE PG 补 source_summary.amount_unit
 - **待做：金额单位前端切换器**：当前只显示从 Excel 提取的单位标签，不支持用户手动切换"元/万元"显示模式（即不做数值除以 10000 的换算显示）；用户要求加一个切换按钮
