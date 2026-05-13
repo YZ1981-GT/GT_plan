@@ -1121,6 +1121,14 @@ inclusion: always
 - **缺失：独立的科目映射编辑器页面**：当前无 `/projects/:id/account-mapping` 路由，只有 wizard 步骤组件 `AccountMappingStep.vue`；"查看映射详情"按钮暂改为 toast 提示
 - **待做：业务流程端到端联调 spec**：需要系统性跑通 导入→映射→试算表→报表→底稿→附注 完整链路；检查报表模板/底稿模板/附注模板 seed 数据是否加载；参考本地审计报告模板（国企版/上市版/合并/单体）和附注模板 md 文档
 - **e2e-business-flow spec 已创建（eadeaa8）**：`.kiro/specs/e2e-business-flow/` 三件套，3 Sprint / 24 task / 7 UAT；核心策略 = 不新建后端逻辑（API 全存在），重点确保数据就绪+前端正确调用+前置检查自动加载 seed
+- **report_config formula 全 NULL 是报表生成全 0 的根因**：seed 加载只写了行次结构没填公式；公式数据源在 `multi_standard_report_formats.json`（CAS 标准 TB()/ROW()/SUM_TB() 格式）；Sprint 1 核心任务 = 写 fill_report_formulas.py 脚本填充 formula 字段
+- **report_config 公式覆盖率分析**：CAS 公式仅 49 行（BS 15 + IS 13 + CFS 15 + EQ 6），report_config 国企版 303 行/上市版 214 行；名称匹配率 45%（58/129）；57 行是特殊行业科目（金融/保险）对普通企业为 0 不影响；正确策略 = CAS 公式覆盖核心行 + wp_mapping 补充 + 合计行用 ROW() + 剩余保持 NULL（返回 0）
+- **报表生成合理预期**：资产负债表/利润表核心 ~30 行有数据即为成功；现金流量表首次生成大部分为 0（需从序时账分析，非余额表可推算）；权益变动表只有期末余额行有数据；特殊行业行（△/▲）为 0 是正常的
+- **ReportEngine 公式语法**：`TB('1002','期末余额')` 带引号+列名（不是 `TB(1002)`）；`SUM_TB('1401~1499','期末余额')` 范围求和；`ROW('BS-009')` 引用其他行；列名支持：期末余额/审定数/年初余额/期初余额/未审数/RJE调整/AJE调整
+- **6 种报表公式逻辑各不同**：BS/IS 直接从试算表取数；CFS 大部分无法从余额表推算（需序时账分析或间接法）；EQ 是多列矩阵（行=项目，列=变动类型）；CFS 附表是间接法调整表（从净利润调整到经营活动现金流）；减值准备表是期初/增加/减少/期末结构
+- **用户要求：所有报表类型都要处理好**（BS/IS/CFS/EQ/CFS附表/减值准备），不能只做资产负债表和利润表
+- **fill_report_formulas.py 脚本已创建但有编码问题需重写**：正确语法已确认，需在新对话中重新创建并执行
+- **国企版/上市版报表差异**：soe 129 行（含△/▲特殊行业行）/ listed 88 行；两版共享标准科目编码，公式逻辑相同只是行次结构不同；`soe_listed_mapping_preset.json` 提供行次名称对照
 - **Seed 数据已全部加载到 PG（2026-05-13）**：报表配置 22 套/1191 行 + 模板集 6 个 + 底稿模板库 363 个 + 标准科目 166 个 + 附注模板 SOE+Listed + 审计报告模板 + 致同编码 48 + AI 模型/插件；加载命令见 memory 中"PG 重建后待办"
 - **recalc 500 根因确认**：直接 Python 调用 `full_recalc` 成功（812 科目 3 步全通过），HTTP 层 500 是 uvicorn `--reload` 模式下 auto-match 写入大量文件触发 worker 重启导致；生产环境无此问题；开发环境建议不用 `--reload` 或加 `--reload-exclude`
 - **auto-match 完整流程验证通过**：陕西华氏项目 saved=812 / unmatched=0 / rate=100%；标准科目从客户科目一级编码自动生成后前缀匹配率 100%
