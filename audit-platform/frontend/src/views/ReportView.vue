@@ -62,6 +62,21 @@
         </template>
       </GtPageHeader>
 
+      <!-- 工作流进度条 -->
+      <WorkflowProgress :project-id="selectedProjectId" :year="selectedYear" />
+
+      <!-- F29: 报表平衡检查结果 -->
+      <el-alert
+        v-if="balanceCheckResult"
+        :title="balanceCheckResult.status === 'passed' ? '✅ 报表平衡检查通过' : balanceCheckResult.status === 'warning' ? '⚠️ 报表平衡检查有差异' : '❌ 报表平衡检查失败'"
+        :type="balanceCheckResult.status === 'passed' ? 'success' : balanceCheckResult.status === 'warning' ? 'warning' : 'error'"
+        :description="balanceCheckResult.message"
+        show-icon
+        :closable="true"
+        style="margin-bottom: 8px"
+        @close="balanceCheckResult = null"
+      />
+
       <!-- R8-S2-03：Stale 状态横幅（上游数据变更提示） -->
       <div v-if="stale.isStale.value" class="gt-stale-banner">
         <span class="gt-stale-icon">⚠️</span>
@@ -290,8 +305,8 @@
       </el-table-column>
       <el-table-column label="项目" min-width="300" :resizable="true" fixed>
         <template #default="{ row }">
-          <span :class="{ 'gt-rv-category': !row.current_period_amount && !row.is_total_row && (row.indent_level || 0) === 0 }"
-                :style="{ paddingLeft: (row.indent_level || 0) * 18 + 'px', fontWeight: row.is_total_row ? 700 : 400, fontSize: '13px' }">
+          <span :class="['report-row-name', `report-indent-${Math.min(row.indent_level || 0, 2)}`]"
+                :style="{ paddingLeft: (row.indent_level || 0) * 24 + 8 + 'px', fontWeight: row.is_total_row || getRowType(row) === 'header' ? 700 : 400, fontSize: '13px' }">
             {{ row.row_name }}
             <el-button v-if="getNoteSection(row.row_code)" size="small" text type="primary"
               style="font-size:10px;padding:0 2px;margin-left:4px" title="查看附注"
@@ -299,22 +314,40 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="本期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.current_period_amount) || 0) - (Number(b.current_period_amount) || 0)">
+      <el-table-column label="本期金额" min-width="160" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.current_period_amount) || 0) - (Number(b.current_period_amount) || 0)">
         <template #default="{ row, $index }">
-          <GtAmountCell
-            :value="row.current_period_amount"
-            :prior-value="row.prior_period_amount"
-            :clickable="true"
-            :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
-            @click="onDrilldown(row)"
-          />
+          <template v-if="getRowType(row) === 'header'">
+            <span class="report-amount">&nbsp;</span>
+          </template>
+          <template v-else-if="getRowType(row) === 'manual'">
+            <span class="report-amount" style="color: #bbb;">—</span>
+          </template>
+          <template v-else>
+            <GtAmountCell
+              :value="row.current_period_amount"
+              :prior-value="row.prior_period_amount"
+              :clickable="true"
+              :comment="rvComments.getComment(`report_${activeTab}`, $index, 2)"
+              @click="onDrilldown(row)"
+            />
+          </template>
         </template>
       </el-table-column>
-      <el-table-column label="上期金额" min-width="140" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.prior_period_amount) || 0) - (Number(b.prior_period_amount) || 0)">
+      <el-table-column label="上期金额" min-width="160" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.prior_period_amount) || 0) - (Number(b.prior_period_amount) || 0)">
         <template #default="{ row, $index }">
-          <CommentTooltip :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)">
-            <span class="gt-rv-amount-cell-readonly" :class="displayPrefs.amountClass(row.prior_period_amount)">{{ fmt(row.prior_period_amount) }}</span>
-          </CommentTooltip>
+          <template v-if="getRowType(row) === 'header'">
+            <span class="report-amount">&nbsp;</span>
+          </template>
+          <template v-else-if="getRowType(row) === 'manual'">
+            <span class="report-amount" style="color: #bbb;">—</span>
+          </template>
+          <template v-else>
+            <CommentTooltip :comment="rvComments.getComment(`report_${activeTab}`, $index, 3)">
+              <span class="report-amount" :class="{ 'report-amount--negative': parseFloat(row.prior_period_amount || '0') < 0 }">
+                {{ formatReportAmount(row.prior_period_amount).text }}
+              </span>
+            </CommentTooltip>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -357,6 +390,12 @@
     </el-table>
     <!-- 选中区域状态栏 -->
     <SelectionBar :stats="rvCtx.selectionStats()" />
+
+    <!-- F28: 报表数据覆盖率摘要 -->
+    <div v-if="coverageSummary && activeTab !== 'cross_check'" class="gt-rv-coverage-summary">
+      <span class="gt-rv-coverage-icon">📊</span>
+      <span class="gt-rv-coverage-text">{{ coverageSummary.text }}</span>
+    </div>
 
     <!-- R7-S3-10 Task 49-50：跨表核对面板 -->
     <div v-if="activeTab === 'cross_check'" class="gt-rv-cross-check">
@@ -643,7 +682,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, reports as P_reports } from '@/services/apiPaths'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
@@ -656,6 +695,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
+import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useCellComments } from '@/composables/useCellComments'
@@ -860,6 +900,21 @@ const syncLoading = ref(false)
 const activeTab = ref('balance_sheet')
 const reportMode = ref('audited')
 
+// F29/D10: 报表平衡检查结果
+const balanceCheckResult = ref<{ status: string; message: string } | null>(null)
+
+async function runBalanceCheck() {
+  try {
+    const res = await api.get(`/api/projects/${projectId.value}/data-quality/check?checks=report_balance&year=${year.value}`)
+    const rb = res?.results?.report_balance
+    if (rb) {
+      balanceCheckResult.value = { status: rb.status, message: rb.message || '' }
+    }
+  } catch {
+    // 静默失败，不阻断
+  }
+}
+
 // 动态计算表格最大高度（窗口高度 - 顶部固定区域）
 const tableMaxHeight = ref(500)
 function updateTableHeight() {
@@ -967,9 +1022,19 @@ function goToNote(rowCode: string) {
   }
 }
 
+// ─── F27/D9: 行类型判定逻辑（6 种行类型） ─────────────────────────────────────
+function getRowType(row: ReportRow): string {
+  if (row.row_name && (row.row_name.includes('：') || row.row_name.includes(':'))) return 'header'
+  if (row.is_total_row) return 'total'
+  if (row.row_name && (row.row_name.startsWith('△') || row.row_name.startsWith('▲'))) return 'special'
+  if (!row.formula_used && row.current_period_amount === '0') return 'manual'
+  if (parseFloat(row.current_period_amount || '0') === 0 && !row.current_period_amount?.includes('.')) return 'zero'
+  return 'data'
+}
+
 function rowClassName({ row }: { row: ReportRow }) {
-  if (row.is_total_row) return 'total-row'
-  return ''
+  const type = getRowType(row)
+  return `report-row--${type}`
 }
 
 async function ensureProjectYear() {
@@ -1071,9 +1136,9 @@ async function loadTemplateRows() {
 }
 
 function compareRowClassName({ row }: { row: any }) {
-  if (row.is_total_row) return 'total-row'
-  if (row.adjustment && row.adjustment !== 0) return 'diff-row'
-  return ''
+  const type = getRowType(row)
+  if (row.adjustment && row.adjustment !== 0) return `report-row--${type} diff-row`
+  return `report-row--${type}`
 }
 
 function onTabChange() { fetchReport() }
@@ -1083,6 +1148,38 @@ const _onSyncUnadjusted = withLoading(syncLoading, async () => {
   await fetchReport()
   ElMessage.success('未审数已按四表账套科目重新同步')
 })
+
+// F26: 前置条件错误处理——显示错误信息 + "去完成"跳转按钮
+const PREREQUISITE_ROUTE_MAP: Record<string, string> = {
+  recalc: 'trial-balance',
+  auto_match: 'mapping',
+  generate_reports: 'reports',
+  select_template: 'settings',
+}
+
+async function handlePrerequisiteError(message: string, action: string | null) {
+  const routeKey = action ? PREREQUISITE_ROUTE_MAP[action] : null
+  if (routeKey) {
+    try {
+      await ElMessageBox.confirm(
+        message,
+        '前置条件未满足',
+        {
+          confirmButtonText: '去完成',
+          cancelButtonText: '取消',
+          type: 'warning',
+        },
+      )
+      // Navigate to the prerequisite page
+      const targetPath = `/projects/${projectId.value}/${routeKey}`
+      router.push(targetPath)
+    } catch {
+      // User cancelled
+    }
+  } else {
+    ElMessage.warning(message || '前置条件未满足')
+  }
+}
 
 async function onGenerate() {
   const { showGuide } = await import('@/composables/useWorkflowGuide')
@@ -1103,9 +1200,27 @@ async function onGenerate() {
   )
   if (!ok) return
   await withLoading(genLoading, async () => {
-    await generateReports(projectId.value, year.value)
-    ElMessage.success('报表生成完成')
-    await fetchReport()
+    try {
+      const result = await generateReports(projectId.value, year.value)
+      const summary = result?.summary
+      if (summary && summary.total_rows > 0) {
+        ElMessage.success(`报表生成完成：${summary.total_rows} 行，${summary.non_zero_rows} 行有数据`)
+      } else {
+        ElMessage.success('报表生成完成')
+      }
+      await fetchReport()
+      // F29/D10: 报表生成后自动执行报表平衡检查
+      await runBalanceCheck()
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.response?.data?.message
+      if (err?.response?.status === 400 && detail) {
+        const msg = typeof detail === 'object' ? detail.message : detail
+        const action = typeof detail === 'object' ? detail.prerequisite_action : null
+        await handlePrerequisiteError(msg, action)
+      } else {
+        handleApiError(err, '报表生成')
+      }
+    }
   })()
 }
 
@@ -1392,6 +1507,57 @@ const displayPrefs = useDisplayPrefsStore()
 /** 格式化金额（跟随全局单位设置） */
 const fmt = (v: any) => displayPrefs.fmt(v)
 
+/**
+ * F27: 金额格式化——千分位 + 负数红色括号
+ * 返回 { text, isNegative } 用于模板渲染
+ */
+function formatReportAmount(value: any): { text: string; isNegative: boolean } {
+  if (value === null || value === undefined || value === '') return { text: '', isNegative: false }
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value)
+  if (isNaN(num)) return { text: String(value), isNegative: false }
+  if (num === 0) return { text: '0.00', isNegative: false }
+  const isNeg = num < 0
+  const abs = Math.abs(num)
+  // 千分位格式化
+  const parts = abs.toFixed(2).split('.')
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const formatted = parts.join('.')
+  // 负数用括号表示
+  const text = isNeg ? `(${formatted})` : formatted
+  return { text, isNegative: isNeg }
+}
+
+/**
+ * F28: 计算报表数据覆盖率摘要
+ */
+const coverageSummary = computed(() => {
+  if (!rows.value || rows.value.length === 0) return null
+  const total = rows.value.length
+  let withData = 0
+  let headerRows = 0
+  let manualRows = 0
+
+  for (const row of rows.value) {
+    const type = getRowType(row)
+    if (type === 'header') {
+      headerRows++
+    } else if (type === 'manual') {
+      manualRows++
+    } else {
+      const amt = parseFloat(row.current_period_amount || '0')
+      if (amt !== 0) withData++
+    }
+  }
+
+  return {
+    total,
+    withData,
+    headerRows,
+    manualRows,
+    text: `${total} 行，${withData} 行有数据，${headerRows} 行标题行，${manualRows} 行待填列`
+  }
+})
+
 // ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
 const rvSearch = useTableSearch(rows, ['row_name', 'row_code'])
 
@@ -1676,15 +1842,6 @@ function copyReportTable() {
   font-weight: 600;
 }
 
-/* 合计行 */
-:deep(.total-row) {
-  background: #f3eff8 !important;
-  font-weight: 700;
-}
-:deep(.total-row td) {
-  border-top: 1.5px solid #d8d0e8 !important;
-}
-
 /* 对比视图差异行 */
 :deep(.diff-row) { background: #fffbf5 !important; }
 
@@ -1958,6 +2115,76 @@ function copyReportTable() {
 @keyframes gt-trace-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(230, 81, 0, 0.1); }
   50% { box-shadow: 0 0 8px 2px rgba(230, 81, 0, 0.15); }
+}
+
+/* ── F27/D9: 报表行类型样式（6 种） ── */
+:deep(.report-row--header) {
+  font-weight: 700 !important;
+  background: #f5f7fa !important;
+}
+:deep(.report-row--header td) {
+  font-weight: 700;
+  color: #333;
+}
+:deep(.report-row--data) {
+  /* 正常数据行 */
+}
+:deep(.report-row--total) {
+  font-weight: 700 !important;
+  background: #f3eff8 !important;
+}
+:deep(.report-row--total td) {
+  border-top: 1.5px solid #dcdfe6 !important;
+  font-weight: 700;
+}
+:deep(.report-row--zero) {
+  opacity: 0.5;
+}
+:deep(.report-row--special) {
+  font-style: italic;
+  opacity: 0.4;
+}
+:deep(.report-row--manual) {
+  /* 待手工填列 — 正常显示，金额列显示"—" */
+}
+
+/* ── F27: 金额列统一样式 ── */
+.report-amount {
+  text-align: right;
+  font-family: 'Arial Narrow', Arial, monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 13px;
+  display: inline-block;
+  min-width: 80px;
+}
+.report-amount--negative {
+  color: #f56c6c;
+}
+
+/* ── F27: 缩进可视化 ── */
+.report-indent-0 { padding-left: 8px; }
+.report-indent-1 { padding-left: 32px; }
+.report-indent-2 { padding-left: 56px; }
+
+/* ── F28: 覆盖率摘要 ── */
+.gt-rv-coverage-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin-top: 8px;
+  background: #f8f9fa;
+  border: 1px solid #ebeef5;
+  border-radius: var(--gt-radius-md, 6px);
+  font-size: 12px;
+  color: #606266;
+}
+.gt-rv-coverage-icon {
+  font-size: 14px;
+}
+.gt-rv-coverage-text {
+  font-variant-numeric: tabular-nums;
 }
 
 

@@ -45,6 +45,12 @@ async def generate_notes(
     current_user: User = Depends(get_current_user),
 ):
     """生成附注初稿"""
+    from app.services.prerequisite_checker import PrerequisiteChecker
+
+    check = await PrerequisiteChecker().check(db, data.project_id, data.year, "generate_notes")
+    if not check["ok"]:
+        raise HTTPException(status_code=400, detail=check)
+
     engine = DisclosureEngine(db)
     try:
         results = await engine.generate_notes(

@@ -25,6 +25,9 @@
       </template>
     </GtPageHeader>
 
+    <!-- 工作流进度条 -->
+    <WorkflowProgress :project-id="projectId" :year="Number(route.query.year) || 2025" />
+
     <!-- 筛选栏（独立行，内容多不塞进 GtToolbar） -->
     <div v-if="treeData.length > 0" class="gt-wp-filter-bar">
       <el-input
@@ -520,6 +523,7 @@ import GateBlockPanel from '@/components/gate/GateBlockPanel.vue'
 import SoDConflictDialog from '@/components/gate/SoDConflictDialog.vue'
 import WorkpaperKanban from '@/components/workpaper/WorkpaperKanban.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'

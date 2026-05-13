@@ -52,6 +52,9 @@
       </template>
     </GtPageHeader>
 
+    <!-- 工作流进度条 -->
+    <WorkflowProgress :project-id="selectedProjectId" :year="selectedYear" />
+
     <!-- R8-S2-03：Stale 状态横幅 -->
     <div v-if="stale.isStale.value" class="gt-stale-banner">
       <span class="gt-stale-icon">⚠️</span>
@@ -420,6 +423,7 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import { useCellComments } from '@/composables/useCellComments'
 import { confirmLeave } from '@/utils/confirm'
+import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'

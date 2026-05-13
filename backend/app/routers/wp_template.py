@@ -265,6 +265,12 @@ async def generate_project_workpapers(
     current_user: User = Depends(get_current_user),
 ):
     """从模板集生成项目底稿"""
+    from app.services.prerequisite_checker import PrerequisiteChecker
+
+    check = await PrerequisiteChecker().check(db, project_id, data.year, "generate_workpapers")
+    if not check["ok"]:
+        raise HTTPException(status_code=400, detail=check)
+
     engine = TemplateEngine()
     try:
         workpapers = await engine.generate_project_workpapers(

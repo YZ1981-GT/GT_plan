@@ -400,3 +400,13 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/ledger-import/validation-rules"，注册时不加额外前缀。
     from app.routers.validation_rules import router as validation_rules_router
     app.include_router(validation_rules_router, tags=["ledger-import-validation-rules"])
+
+    # ═══ 28. E2E 业务流程：数据质量检查 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/data-quality"，注册时不加额外前缀。
+    from app.routers.data_quality import router as data_quality_router
+    app.include_router(data_quality_router, tags=["data-quality"])
+
+    # ═══ 29. E2E 业务流程：工作流进度 ═══
+    # 路由内部已声明 prefix="/api/projects/{project_id}/workflow-status"，注册时不加额外前缀。
+    from app.routers.workflow_status import router as workflow_status_router
+    app.include_router(workflow_status_router, tags=["workflow"])

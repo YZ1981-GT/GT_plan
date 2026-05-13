@@ -59,12 +59,15 @@
 
           <div class="gt-form-section-title" style="margin-top: 20px">模板与报表</div>
 
-          <el-form-item label="附注模板" prop="template_type">
-            <el-radio-group v-model="form.template_type">
-              <el-radio-button value="soe">国企版</el-radio-button>
-              <el-radio-button value="listed">上市版</el-radio-button>
-              <el-radio-button value="custom">自定义</el-radio-button>
-            </el-radio-group>
+          <el-form-item label="报表标准" prop="template_type">
+            <el-select v-model="form.template_type" placeholder="请选择报表标准" style="width: 200px">
+              <el-option label="国有企业" value="soe" />
+              <el-option label="上市公司" value="listed" />
+              <el-option label="自定义" value="custom" />
+            </el-select>
+            <span style="margin-left: 8px; font-size: 12px; color: #909399">
+              决定报表行次和附注模板
+            </span>
           </el-form-item>
 
           <el-form-item v-if="form.template_type === 'custom'" label="自定义模板" prop="custom_template_id">

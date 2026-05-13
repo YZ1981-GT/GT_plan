@@ -87,6 +87,9 @@ inclusion: always
 
 ## 关键技术事实（查阅/排查专用）
 
+- **AccountMapping 表无 year 列**：只有 project_id/original_account_code/standard_account_code/mapping_type/is_deleted/created_by/created_at/updated_at；查询时不能带 year 过滤
+- **TrialBalance 表无 direction 列**：借贷方向通过 `account_category` 推断（asset/expense=借方，liability/equity/revenue=贷方）
+- **working_paper 表名是单数**：`working_paper`（不是 working_papers），ORM 类 WorkingPaper.__tablename__ = "working_paper"
 - **Docker 日常只起 3 个基础服务**：audit-postgres(5432) + audit-redis(6380:6379) + audit-metabase(3000)；backend 容器已从默认 compose 移除（或挂到 profile），本地开发 **唯一** 用 start-dev.bat 跑在宿主机 9980；Docker 里再起后端 = 重复进程 + 重复 worker 循环吃 CPU
 - **docker-compose.yml backend 服务 profiles: [docker-backend]**：默认 `docker compose up` 不拉起；需要时 `docker compose --profile docker-backend up -d backend`
 - **PG job_status_enum 类型值（2026-05-07 补齐后 12 个）**：pending/running/completed/failed/timed_out/cancelled/retrying（历史遗留）+ queued/validating/writing/activating/canceled（R8 补齐）；Python JobStatus 实际只用 10 个，cancelled(双L)/retrying 是历史数据兼容保留
@@ -1118,8 +1121,8 @@ inclusion: always
 - **试算表 P0 优化已落地（59e58da）**：步骤自动推进（基于数据真相不用 localStorage）+ 新鲜度指示器（badge + stale 告警横幅）+ 一致性校验详情展开 + 导入入口合并（弹框选"账套数据"或"试算表数据"）+ 空状态简化
 - **技术决策：步骤引导类功能永远从数据层推导状态，不用 localStorage**：`detectDataState()` 并发查 tb_balance 行数 + mapping/completion-rate + rows.length 实时计算当前步骤
 - **试算表待做清单**：~~P1 映射质量面板~~ ✅ / ~~P1 增量重算可视化~~ ✅ / ~~P2 多子公司切换~~ ✅ / ~~P3 试算表冻结机制~~ ✅（全部完成 33c01bb）
-- **缺失：独立的科目映射编辑器页面**：当前无 `/projects/:id/account-mapping` 路由，只有 wizard 步骤组件 `AccountMappingStep.vue`；"查看映射详情"按钮暂改为 toast 提示
-- **待做：业务流程端到端联调 spec**：需要系统性跑通 导入→映射→试算表→报表→底稿→附注 完整链路；检查报表模板/底稿模板/附注模板 seed 数据是否加载；参考本地审计报告模板（国企版/上市版/合并/单体）和附注模板 md 文档
+- **~~缺失：独立的科目映射编辑器页面~~** ✅ 已创建 `AccountMappingPage.vue` + 路由 `/projects/:id/mapping`（映射列表+完成率+手动调整+自动匹配）
+- **待做：业务流程端到端联调 spec**：~~需要系统性跑通 导入→映射→试算表→报表→底稿→附注 完整链路~~ ✅ 已完成（50/50 task，8 UAT 待手动验证）
 - **e2e-business-flow spec 已创建（eadeaa8）**：`.kiro/specs/e2e-business-flow/` 三件套，3 Sprint / 24 task / 7 UAT；核心策略 = 不新建后端逻辑（API 全存在），重点确保数据就绪+前端正确调用+前置检查自动加载 seed
 - **report_config formula 全 NULL 是报表生成全 0 的根因**：seed 加载只写了行次结构没填公式；公式数据源在 `multi_standard_report_formats.json`（CAS 标准 TB()/ROW()/SUM_TB() 格式）；Sprint 1 核心任务 = 写 fill_report_formulas.py 脚本填充 formula 字段
 - **report_config 公式覆盖率分析**：CAS 公式仅 49 行（BS 15 + IS 13 + CFS 15 + EQ 6），report_config 国企版 303 行/上市版 214 行；名称匹配率 45%（58/129）；57 行是特殊行业科目（金融/保险）对普通企业为 0 不影响；正确策略 = CAS 公式覆盖核心行 + wp_mapping 补充 + 合计行用 ROW() + 剩余保持 NULL（返回 0）
@@ -1147,3 +1150,44 @@ inclusion: always
 
 - **查账页面金额列折行**：LedgerPenetration.vue 的期初金额/借方发生额/贷方发生额/期末金额列宽不够（当前 width=150/130），大金额（如 210,301,834.96）折行显示；需要加宽或用 `white-space: nowrap` + `min-width`
 - **和平药房 3 文件上传 500 错误**：前端上传 3 个文件（1 xlsx + 2 CSV 共 432MB）时服务端报错（ID: a5789793-cda）；可能是文件大小超限（MAX_TOTAL_SIZE_BYTES=500MB 但单文件 CSV 上限 1GB 应该够）或 CSV 编码探测/upload_security 校验问题；需查后端日志定位
+
+
+## e2e-business-flow spec v2.0 复盘（2026-05-13）
+
+- **报表全零根因确认**：generate_all_reports 默认 applicable_standard="enterprise"，但 report_config 表中只有 soe_consolidated/soe_standalone/listed_consolidated/listed_standalone 四种标准，导致 _load_report_configs 返回空列表→所有报表 0 行→返回空结构体被前端解读为"全零"
+- **修复方案**：项目表增加 report_standard 字段（默认 soe_standalone），generate_all_reports 从项目配置读取；或直接改默认值为 soe_standalone
+- **公式填充已完成**：316/1191 行已有公式（BS 55/129=43%, IS 16/78=21%），覆盖所有核心科目行；标题行/特殊行业行/CFS 明细行无公式是正常的
+- **fill_report_formulas.py 已创建并执行**：按 row_name 匹配（非 row_code），特殊公式表 > CAS 标准 > 合计行自动生成三级优先
+- **wp_account_mapping row_code 与 report_config_seed row_code 不一致**：前者用 CAS 简化编号（BS-002=货币资金），后者用国企版完整编号（BS-002=货币资金 但 BS-004=△拆出资金 vs wp 的 BS-004=应收票据）；匹配必须走 row_name 不能走 row_code
+- **financial_report 表名是单数**：`financial_report`（不是 financial_reports）
+- **宜宾大药房 trial_balance=0 但 tb_balance=812**：recalc 从未执行，需手动触发
+- **spec v2.0 升级要点**：增加数据质量校验（F7-F8）、E2E 验证脚本（F25）、公式 seed 端点化（F5）、错误详情返回（F23）、前端反馈（F24）、零值灰显（F11）
+- **用户要求**：企业级通用处理、不硬编码、人机联动、强真实数据验证、前端美观友好、可扩展；陕西华氏明细账不完整是已知情况，系统应能检测并报告差异而非崩溃
+
+- **报表全零根因修正（重大发现）**：测试脚本 `_test_report_generation.py` 检查字段名错误（用 `r.get("amount")` 但实际返回字段是 `"current_period_amount"` str 类型），报表引擎可能已正常工作；HTTP 端点 `/api/reports/generate` 已有 `_resolve_applicable_standard` 自动从 `Project.template_type + report_scope` 组合为 `"soe_standalone"`，无需前端传参
+- **4 个项目 template_type/report_scope 已配置**：全部为 `soe` + `standalone`，resolve 返回 `"soe_standalone"` 正确
+- **宜宾大药房 recalc 前置条件**：需先确认 account_mapping 存在（auto-match 是否执行过），不存在则先 auto-match 再 recalc
+- **tb_ledger pg_stat n_live_tup=0 但可能是 autovacuum 未更新**：数据质量校验前需先 COUNT 确认 tb_ledger 实际有数据
+- **spec 工作流教训**：验证脚本的断言字段名必须从后端代码中提取（grep 确认），不能凭印象写；design.md 假设必须先 grep 核验再写结论
+
+- **recalc 依赖链路确认**：`tb_balance → account_mapping(auto-match) → trial_balance(recalc) → financial_report(generate)`；recalc_unadjusted 通过 JOIN account_mapping 汇总 tb_balance.closing_balance 到标准科目；account_mapping 为空时 recalc 静默返回 0 行不报错
+- **宜宾大药房 trial_balance=0 根因确认**：该项目从未执行 auto-match（account_mapping 为空），导致 recalc 无法汇总；修复路径 = 先 auto-match → 再 recalc
+- **e2e-business-flow spec v2.0 待补强 6 个维度**：(1) 依赖链路透明化+前置条件矩阵 (2) 错误场景覆盖（静默返回空 vs 明确报错） (3) 多项目通用性验证（每个项目分别断言） (4) 前端报表表样细节（标题行加粗/金额右对齐千分位/缩进可视化/合计行分隔线） (5) 公式覆盖率 26.5% 合理性论证（标题行/特殊行业行/CFS 手工填列） (6) 数据质量检查扩展为套件（借贷平衡/科目完整性/报表平衡/利润表勾稽）
+- **报表表样企业级要求**：标题行加粗背景色、数据行正常、合计行加粗+上边框、金额右对齐+千分位+负数红色、indent_level→padding-left、空报表友好提示、不同行类型不同样式
+
+- **e2e-business-flow spec v2.0 最终版已写入**：F1-F29 / D1-D10 / 50 task + 8 UAT / 4 Sprint ~7 天；新增 F26 前置条件校验器 + F27 报表表样 6 种行类型 + F28 覆盖率摘要 + F29 数据质量检查套件（5 种检查）
+- **PrerequisiteChecker 设计模式**：通用前置条件校验器，每个生成端点第一行调用，不满足返回 HTTP 400 + `{ok, message, prerequisite_action}` 结构；前端 catch 400 显示 message + "去完成"跳转按钮
+- **报表行类型判定逻辑**：getRowType(row) 返回 header/data/total/zero/special/manual 6 种，基于 row_name 含"："、is_total_row、△/▲前缀、formula_used 是否存在、金额是否为 0 判定
+- **e2e-business-flow spec v2.0 实施完成（2026-05-13）**：50/50 编码任务全部完成，剩余 8 项 UAT 需手动浏览器验证
+  - Sprint 1：报表全零确认为测试脚本误报（字段名 current_period_amount），4 项目 BS 非零行均 ≥10（陕西华氏 27/和平药房 29/辽宁卫生 26/宜宾大药房 13）；宜宾大药房 auto-match+recalc 成功（0→100 行）；PrerequisiteChecker 集成 4 端点；ReportFormulaService 封装+seed 自动调用+fill-formulas 端点
+  - Sprint 2：ReportView 6 Tab 确认 + getRowType 6 种行类型 + CSS 样式 + 金额千分位负数红色括号 + indent_level×24px + 覆盖率摘要 + 穿透查询 + generate summary 返回 + toast 摘要 + 前置条件 400 跳转 + DataQualityService 5 种检查 + data_quality 端点 + DataQualityDialog.vue + TrialBalance 按钮
+  - Sprint 3：template_sets seed 确认 + 底稿生成 92 个 + wp_mapping 86 条 + 附注生成 173 节 + AccountMappingPage.vue 新建 + /projects/:id/mapping 路由 + 报表标准下拉框
+  - Sprint 4：workflow-status 端点（6 步进度推导）+ WorkflowProgress.vue 组件 + 4 视图接入 + 报表平衡自动检查 + e2e 脚本 Layer 1-4 完整
+  - **新建后端文件**：prerequisite_checker.py / report_formula_service.py / data_quality_service.py / data_quality.py / workflow_status.py + 对应测试
+  - **新建前端文件**：DataQualityDialog.vue / AccountMappingPage.vue / WorkflowProgress.vue
+  - **router_registry 新增**：§28 data_quality / §29 workflow_status
+  - **4 个项目 UUID 确认**：陕西华氏 005a6f2d-cecd-4e30-bcbd-9fb01236c194 / 和平药房 5942c12e-65fb-4187-ace3-79d45a90cb53 / 辽宁卫生 37814426-a29e-4fc2-9313-a59d229bf7b0 / 宜宾大药房 14fb8c10-9462-45f6-8f56-d023f5b6df13
+  - **复盘发现 3 个 P0/P1 问题（全部已修复 2026-05-13）**：(1) e2e 脚本 emoji 在 Windows GBK 终端崩溃→加 io.TextIOWrapper UTF-8；(2) workflow_status.py 查 `account_mapping` 带 `AND year = :yr` 但该表无 year 列→去掉；(3) `working_papers` 表名错误→改为 `working_paper`（单数）；(4) data_quality_service `_check_debit_credit_balance` 查 `direction` 列不存在→改用 `account_category IN ('asset','expense')` 判断借贷方向
+  - **`scripts/init_4_projects.py` 已创建**：DB 重建后一键恢复 4 项目数据（auto-match→recalc→generate_reports），4/4 成功
+  - **e2e 脚本健壮性已增强**：每个项目独立 session（防事务级联失败）+ try/except + rollback
+  - **e2e 最终验证全绿**：4 项目 × 4 层 = 16 项检查全部 PASS（陕西华氏 tb=100/BS=27/底稿92/附注173，和平药房 tb=53/BS=29/附注173，辽宁卫生 tb=47/BS=26/附注173，宜宾大药房 tb=100/BS=13/附注173）

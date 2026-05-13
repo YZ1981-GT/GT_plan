@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -78,6 +78,12 @@ async def recalc_trial_balance(
     current_user: User = Depends(require_project_access("edit")),
 ):
     """手动触发全量重算（合并锁定期间禁止，需编辑权限）"""
+    from app.services.prerequisite_checker import PrerequisiteChecker
+
+    check = await PrerequisiteChecker().check(db, project_id, year, "recalc")
+    if not check["ok"]:
+        raise HTTPException(status_code=400, detail=check)
+
     svc = TrialBalanceService(db)
     await svc.full_recalc(project_id, year, company_code)
     await db.commit()

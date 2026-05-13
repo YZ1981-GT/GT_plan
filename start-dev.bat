@@ -35,20 +35,20 @@ if not exist "%FRONTEND_DIR%\node_modules" (
 )
 
 if exist "%ROOT_DIR%\.venv\Scripts\python.exe" (
-  set "BACKEND_START_CMD="%ROOT_DIR%\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app"
+  set "BACKEND_START_CMD="%ROOT_DIR%\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis""
 ) else if exist "%BACKEND_DIR%\.venv\Scripts\python.exe" (
-  set "BACKEND_START_CMD="%BACKEND_DIR%\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app"
+  set "BACKEND_START_CMD="%BACKEND_DIR%\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis""
 ) else (
   where py >nul 2>nul
   if not errorlevel 1 (
-    set "BACKEND_START_CMD=py -3 -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app"
+    set "BACKEND_START_CMD=py -3 -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis""
   ) else (
     where python >nul 2>nul
     if errorlevel 1 (
       echo [ERROR] 未检测到 Python，请先安装 Python 或创建 backend\.venv。
       exit /b 1
     )
-    set "BACKEND_START_CMD=python -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app"
+    set "BACKEND_START_CMD=python -m uvicorn app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis""
   )
 )
 

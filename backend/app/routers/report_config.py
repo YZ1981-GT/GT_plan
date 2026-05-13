@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.models.core import User
 from app.models.report_models import FinancialReportType, ReportConfig
 from app.models.report_schemas import ReportConfigCloneRequest, ReportConfigRow
@@ -150,11 +150,53 @@ async def load_seed_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """加载种子数据"""
+    """加载种子数据，完成后自动填充公式（确保新部署自动就绪）"""
+    from app.services.report_formula_service import report_formula_service
+
     svc = ReportConfigService(db)
     count = await svc.load_seed_data()
     await db.commit()
-    return {"message": f"成功加载 {count} 行种子数据", "count": count}
+
+    # 自动填充公式（幂等，已有公式的行跳过）
+    formula_stats = await report_formula_service.fill_all_formulas(db, standard="all")
+    await db.commit()
+
+    return {
+        "message": f"成功加载 {count} 行种子数据，填充 {formula_stats['updated']} 行公式",
+        "count": count,
+        "formula_stats": formula_stats,
+    }
+
+
+@router.post("/fill-formulas")
+async def fill_formulas(
+    body: dict | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"])),
+):
+    """填充报表公式（幂等，admin 权限）。
+
+    请求体（可选）:
+      standard: "all" | "soe" | "listed"（默认 "all"）
+
+    返回:
+      {total, updated, skipped, coverage_pct}
+    """
+    from app.services.report_formula_service import report_formula_service
+
+    standard = "all"
+    if body and isinstance(body, dict):
+        standard = body.get("standard", "all")
+
+    stats = await report_formula_service.fill_all_formulas(db, standard=standard)
+    await db.commit()
+
+    return {
+        "total": stats["total"],
+        "updated": stats["updated"],
+        "skipped": stats["skipped"],
+        "coverage": f"{stats['coverage_pct']}%",
+    }
 
 
 @router.post("/batch-update")

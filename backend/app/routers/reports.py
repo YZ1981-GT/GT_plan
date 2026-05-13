@@ -51,6 +51,12 @@ async def generate_reports(
     current_user: User = Depends(get_current_user),
 ):
     """生成/重新生成四张报表"""
+    from app.services.prerequisite_checker import PrerequisiteChecker
+
+    check = await PrerequisiteChecker().check(db, data.project_id, data.year, "generate_reports")
+    if not check["ok"]:
+        raise HTTPException(status_code=400, detail=check)
+
     # 从项目配置动态确定报表标准（国企/上市 × 合并/单体）
     applicable_standard = await _resolve_applicable_standard(db, data.project_id)
 
@@ -64,10 +70,29 @@ async def generate_reports(
             year=data.year,
             extra={"report_types": list(results.keys())},
         ))
+
+        # F23: 计算 summary 统计
+        total_rows = sum(len(v) for v in results.values())
+        non_zero_rows = 0
+        for rows in results.values():
+            for row in rows:
+                amt = row.get("current_period_amount") if isinstance(row, dict) else None
+                if amt is not None:
+                    try:
+                        if float(str(amt)) != 0:
+                            non_zero_rows += 1
+                    except (ValueError, TypeError):
+                        pass
+
         return {
             "message": "报表生成成功",
             "report_types": list(results.keys()),
             "row_counts": {k: len(v) for k, v in results.items()},
+            "summary": {
+                "total_rows": total_rows,
+                "non_zero_rows": non_zero_rows,
+                "failed_rows": 0,
+            },
         }
     except Exception as e:
         await db.rollback()

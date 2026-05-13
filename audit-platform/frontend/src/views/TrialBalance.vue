@@ -51,6 +51,9 @@
             <el-tooltip content="检查试算表与四表数据的一致性" placement="bottom">
               <el-button size="small" @click="onConsistencyCheck" :loading="checkLoading">✅ 一致性校验</el-button>
             </el-tooltip>
+            <el-tooltip content="执行数据质量检查（借贷平衡/余额一致性/映射完整性）" placement="bottom">
+              <el-button size="small" @click="showDataQualityDialog = true">🔍 数据质量检查</el-button>
+            </el-tooltip>
             <el-tooltip :content="isFrozen ? '试算表已锁定，解锁后才能重算' : '从四表数据重新计算未审数、调整数、审定数（需先导入数据）'" placement="bottom">
               <el-button size="small" @click="onRecalc" :loading="recalcLoading" :disabled="isFrozen">🔄 全量重算</el-button>
             </el-tooltip>
@@ -63,6 +66,9 @@
         </GtToolbar>
       </template>
     </GtPageHeader>
+
+    <!-- 工作流进度条 -->
+    <WorkflowProgress :project-id="projectId" :year="selectedYear" />
 
     <!-- 视图切换：科目明细 / 试算平衡表 -->
     <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
@@ -455,6 +461,13 @@
     <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看相关分录</div>
   </CellContextMenu>
+
+  <!-- 数据质量检查对话框 -->
+  <DataQualityDialog
+    v-model="showDataQualityDialog"
+    :project-id="projectId"
+    :year="year"
+  />
 </template>
 
 <script setup lang="ts">
@@ -475,6 +488,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus, type WorkpaperParsedPayload, type MaterialityChangedPayload } from '@/utils/eventBus'
 import {
@@ -490,6 +504,7 @@ import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import DataQualityDialog from '@/components/DataQualityDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
@@ -600,6 +615,7 @@ const year = computed(() => routeYear.value ?? projectYear.value ?? new Date().g
 
 const loading = ref(false)
 const showTbImport = ref(false)
+const showDataQualityDialog = ref(false)
 const recalcLoading = ref(false)
 const checkLoading = ref(false)
 const showFormulaManager = ref(false)

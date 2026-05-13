@@ -173,6 +173,11 @@ const router = createRouter({
           component: () => import('@/views/OfflineConflictWorkbench.vue'),
         },
         {
+          path: 'projects/:projectId/mapping',
+          name: 'AccountMapping',
+          component: () => import('@/views/AccountMappingPage.vue'),
+        },
+        {
           path: 'projects/:projectId/ledger/import-history',
           name: 'LedgerImportHistory',
           component: () => import('@/views/LedgerImportHistory.vue'),
