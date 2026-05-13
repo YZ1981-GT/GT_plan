@@ -472,7 +472,7 @@ async function checkSign(pid: string) {
     if (readiness.status === 'fulfilled') {
       readinessData.value = readiness.value
     } else {
-      ElMessage.error('就绪检查加载失败')
+      handleApiError(readiness.reason, '加载就绪检查')
     }
 
     if (workflow.status === 'fulfilled') {

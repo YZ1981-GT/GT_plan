@@ -49,6 +49,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { checkExportIntegrity } from '@/services/governanceApi'
 
 const props = defineProps<{ exportId: string }>()
@@ -60,7 +61,7 @@ async function loadData() {
   loading.value = true
   try {
     result.value = await checkExportIntegrity(props.exportId)
-  } catch { ElMessage.error('完整性校验失败') }
+  } catch (e) { handleApiError(e, '完整性校验失败') }
   finally { loading.value = false }
 }
 </script>

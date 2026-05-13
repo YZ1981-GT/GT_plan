@@ -320,7 +320,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useRoleContextStore } from '@/stores/roleContext'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElNotification } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
   Odometer, FolderOpened, User, Reading, Timer, Connection,
@@ -656,8 +656,10 @@ async function pollImportQueue() {
           duration: 4000,
         })
       } else if (status?.status === 'failed') {
-        ElMessage.error({
+        ElNotification({
+          title: '导入失败',
           message: `${status?.message || '后台导入失败'}${finishedLabel}，点击顶栏可查看历史`,
+          type: 'error',
           duration: 6000,
         })
       } else {

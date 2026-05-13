@@ -1448,8 +1448,10 @@ async function recoverActiveImportJobSilent() {
       bgImportMessage.value = `[${resp.progress ?? 0}%] ${resp.message || '后台导入中...'}（从后台恢复）`
       startImportStatusPolling(resp.job_id)
     } else if (resp?.status === 'failed' && resp.job_id) {
-      ElMessage.error({
+      ElNotification({
+        title: '导入失败',
         message: `最近一次导入失败：${resp.message || '未知错误'}`,
+        type: 'error',
         duration: 6000,
       })
     }

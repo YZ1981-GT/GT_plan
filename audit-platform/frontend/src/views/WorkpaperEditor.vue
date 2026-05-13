@@ -542,7 +542,7 @@ async function onExportPdf() {
       const txt = await blob.text()
       let msg = 'PDF 导出失败'
       try { msg = JSON.parse(txt)?.detail || msg } catch { /* ignore */ }
-      ElMessage.error(msg)
+      handleApiError({ response: { status: 500, data: { detail: msg } } }, 'PDF 导出')
       return
     }
     const url = URL.createObjectURL(blob)

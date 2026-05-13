@@ -34,6 +34,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { archiveApi } from '@/services/collaborationApi'
 
 const checklistItems = ref<any[]>([])
@@ -56,7 +57,7 @@ async function initChecklist() {
     const { data } = await archiveApi.getChecklist(projectId)
     checklistItems.value = data
   } catch (e) {
-    ElMessage.error('初始化失败')
+    handleApiError(e, '初始化归档清单')
   }
 }
 
@@ -66,7 +67,7 @@ async function completeItem(row: any) {
     ElMessage.success('已标记完成')
     row.is_completed = true
   } catch (e) {
-    ElMessage.error('操作失败')
+    handleApiError(e, '标记完成')
   }
 }
 </script>

@@ -376,6 +376,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { confirmForceReset } from '@/utils/confirm'
 import { UploadFilled, InfoFilled, RefreshRight } from '@element-plus/icons-vue'
 import type { UploadFile, UploadInstance } from 'element-plus'
@@ -1021,8 +1022,7 @@ async function handlePreview() {
       },
     })
   } catch (err: any) {
-    const errMsg = err?.response?.data?.detail || err?.message || '文件预览失败'
-    ElMessage.error(errMsg)
+    handleApiError(err, '文件预览')
   } finally {
     previewing.value = false
   }
@@ -1059,7 +1059,7 @@ async function handleForceReset() {
       if (resetRes.code === 'IMPORT_RESET_JOB_ID_REQUIRED') {
         ElMessage.warning('重置失败：请先定位具体导入作业再重置，或确认执行项目级强制重置。')
       } else {
-        ElMessage.error(resetRes.message || '重置失败，请刷新页面')
+        ElMessage.warning(resetRes.message || '重置失败，请刷新页面')
       }
       return
     }
@@ -1561,7 +1561,7 @@ async function handleImport() {
           if (resetRes.code === 'IMPORT_RESET_JOB_ID_REQUIRED') {
             ElMessage.warning('重置失败：未定位到作业ID，系统已拒绝项目级重置。请到导入历史选择具体作业后重试。')
           } else {
-            ElMessage.error(resetRes.message || '重置失败，请稍后重试')
+            ElMessage.warning(resetRes.message || '重置失败，请稍后重试')
           }
         } else {
           ElMessage.success(
@@ -1574,7 +1574,7 @@ async function handleImport() {
         // 用户选择稍后再试
       }
     } else {
-      ElMessage.error(errMsg)
+      handleApiError({ response: { status: 400, data: { detail: errMsg } } }, '导入')
     }
   } finally {
     importing.value = false
@@ -1655,7 +1655,7 @@ async function saveEdits() {
     Object.keys(pendingEdits).forEach(k => delete pendingEdits[k])
     editedCodes.clear()
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '保存失败')
+    handleApiError(e, '保存映射')
   } finally {
     saving.value = false
   }
@@ -1702,7 +1702,7 @@ async function applyRefMapping() {
       }
     }
   } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '复制映射失败')
+    handleApiError(e, '复制映射')
   }
 }
 

@@ -50,6 +50,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { userApi } from '@/services/collaborationApi'
 
 const teamMembers = ref<any[]>([])
@@ -71,7 +72,7 @@ async function invite() {
     ElMessage.success('邀请已发送')
     showInvite.value = false
   } catch (e) {
-    ElMessage.error('邀请失败')
+    handleApiError(e, '邀请')
   }
 }
 

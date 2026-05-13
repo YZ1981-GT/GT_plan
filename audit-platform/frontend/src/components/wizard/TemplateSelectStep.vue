@@ -96,6 +96,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Search, Check, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import {
   getAvailableTemplates,
   getProjectTemplates,
@@ -181,7 +182,7 @@ async function batchSelect() {
     batchSelection.value = []
     await loadSelected()
   } catch (e: any) {
-    ElMessage.error(e?.message || '选择失败')
+    handleApiError(e, '选择失败')
   } finally {
     selecting.value = false
   }

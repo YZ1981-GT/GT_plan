@@ -66,6 +66,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { archiveApi } from '@/services/collaborationApi'
 
 const projectId = 'current-project-id'
@@ -151,8 +152,8 @@ async function submitRequest() {
     form.value.approval_status = 'UNDER_REVIEW'
     form.value.submitted_at = new Date().toLocaleString('zh-CN')
     ElMessage.success('修改申请已提交')
-  } catch {
-    ElMessage.error('提交失败')
+  } catch (e) {
+    handleApiError(e, '提交修改申请')
   }
 }
 </script>

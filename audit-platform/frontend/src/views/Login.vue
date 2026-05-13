@@ -80,7 +80,7 @@ async function handleLogin() {
     const target = redirect || ROLE_HOME[authStore.user?.role ?? ''] || '/'
     router.replace(target)
   } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message ?? '登录失败')
+    ElMessage.warning(err?.response?.data?.message ?? '登录失败，请检查用户名和密码')
   } finally { loading.value = false }
 }
 </script>

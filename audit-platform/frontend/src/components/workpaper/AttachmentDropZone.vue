@@ -35,6 +35,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { Loading } from '@element-plus/icons-vue'
 import { uploadAttachment } from '@/services/commonApi'
 import { api as httpApi } from '@/services/apiProxy'
@@ -159,7 +160,7 @@ async function processFile(file: File) {
     })
   } catch (err: any) {
     const msg = err?.response?.data?.detail || err?.message || '上传失败'
-    ElMessage.error(`附件上传失败: ${msg}`)
+    handleApiError(err, '附件上传失败')
     emit('upload-error', msg)
   } finally {
     uploading.value = false

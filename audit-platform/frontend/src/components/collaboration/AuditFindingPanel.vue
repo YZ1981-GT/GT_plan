@@ -134,6 +134,7 @@
 import { ref, computed } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { findingApi } from '@/services/collaborationApi'
 
 interface Finding {

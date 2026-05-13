@@ -193,6 +193,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { fmtAmount } from '@/utils/formatters'
 import {
   listSamplingConfigs,
@@ -284,7 +285,7 @@ async function previewSampleSize() {
     })
     calculatedSize.value = res.calculated_size
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '计算失败')
+    handleApiError(e, '计算样本量')
   }
 }
 
@@ -301,7 +302,7 @@ async function saveConfig() {
     await loadConfigs()
     ElMessage.success('保存成功')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '保存失败')
+    handleApiError(e, '保存抽样配置')
   }
 }
 
@@ -317,7 +318,7 @@ async function saveRecord() {
     await loadRecords()
     ElMessage.success('保存成功')
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '保存失败')
+    handleApiError(e, '保存抽样记录')
   }
 }
 
@@ -328,7 +329,7 @@ async function musEvaluate(row: any) {
     musResult.value = await musSamplingEvaluate(props.projectId, row.id, details)
     await loadRecords()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || 'MUS评价失败')
+    handleApiError(e, 'MUS评价')
   }
 }
 

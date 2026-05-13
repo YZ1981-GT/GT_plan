@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { fmtAmount } from '@/utils/formatters'
 
@@ -159,7 +160,7 @@ async function executeQuery() {
     resultColumns.value = result?.columns || (resultRows.value.length ? Object.keys(resultRows.value[0]) : [])
     if (!resultRows.value.length) ElMessage.info('查询无结果')
   } catch (err: any) {
-    ElMessage.error('查询失败: ' + (err?.message || ''))
+    handleApiError(err, '查询失败')
   } finally { loading.value = false }
 }
 

@@ -170,9 +170,7 @@ async function onRemind(row: any) {
       remindCounts.value[row.wp_id] = 3
       ElMessage.warning(msg || '已连续催办 3 次，请考虑重新分配')
     } else if (status >= 400) {
-      const detail = data?.detail
-      const msg = typeof detail === 'string' ? detail : '催办失败，请重试'
-      ElMessage.error(msg)
+      handleApiError({ response: { status, data } }, '催办')
     } else {
       // 成功
       if (data?.remind_count !== undefined) {

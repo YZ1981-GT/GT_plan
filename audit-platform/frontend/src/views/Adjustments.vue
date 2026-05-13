@@ -660,7 +660,7 @@ async function onConvertToMisstatement(row: any) {
         /* 用户选择关闭 */
       }
     } else {
-      ElMessage.error(parsed.message || '转换失败')
+      handleApiError({ response: { status: 400, data: { detail: parsed.message || '转换失败' } } }, '转换错报')
     }
   } finally {
     convertingGroupId.value = ''

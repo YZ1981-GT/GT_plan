@@ -78,6 +78,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import FormulaRefPicker from './FormulaRefPicker.vue'
 
@@ -165,7 +166,7 @@ async function onApply() {
     ElMessage.success(`公式已应用：执行 ${result?.executed || 0} 个，更新 ${result?.updated || 0} 个单元格`)
     emit('applied')
   } catch (e: any) {
-    ElMessage.error('应用失败: ' + (e?.response?.data?.detail || e?.message || ''))
+    handleApiError(e, '应用失败')
   } finally {
     applying.value = false
   }

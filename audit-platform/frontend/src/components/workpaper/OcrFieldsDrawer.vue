@@ -140,6 +140,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 
@@ -258,9 +259,9 @@ async function loadAttachments() {
       file_type: item.file_type || item.content_type || '未知',
       ocr_status: item.ocr_status || null,
     }))
-  } catch {
+  } catch (e) {
     attachments.value = []
-    ElMessage.error('加载附件列表失败')
+    handleApiError(e, '加载附件列表失败')
   } finally {
     loadingAttachments.value = false
   }

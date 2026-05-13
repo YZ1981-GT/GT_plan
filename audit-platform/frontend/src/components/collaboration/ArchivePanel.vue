@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { archiveApi } from '@/services/collaborationApi'
 
 const projectId = 'current-project-id'
@@ -113,12 +114,9 @@ async function markComplete(row: any) {
     row.is_completed = true
     row.completed_at = new Date().toLocaleString('zh-CN')
     ElMessage.success('已标记完成')
-  } catch {
-    ElMessage.error('操作失败')
+  } catch (e) {
+    handleApiError(e, '标记完成')
   }
-}
-
-async function executeArchive() {
   if (!allComplete.value) {
     ElMessage.warning('请先完成所有检查项')
     return
@@ -127,8 +125,8 @@ async function executeArchive() {
     await archiveApi.archive(projectId)
     archiveStatus.value = 'ARCHIVED'
     ElMessage.success('归档执行成功')
-  } catch {
-    ElMessage.error('归档执行失败')
+  } catch (e) {
+    handleApiError(e, '归档执行')
   }
 }
 
@@ -143,8 +141,8 @@ async function handleExportPdf() {
     ElMessage.success('PDF导出任务已提交')
     pdfPassword.value = ''
     confirmPassword.value = ''
-  } catch {
-    ElMessage.error('导出失败')
+  } catch (e) {
+    handleApiError(e, '导出PDF')
   }
 }
 </script>

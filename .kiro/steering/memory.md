@@ -1105,7 +1105,8 @@ inclusion: always
 - **statusEnum 硬编码已清零**：grep `=== 'draft'` 等模式（排除已用常量的）= 0 处
 - **vitest fake timer 陷阱**：`vi.runAllTimersAsync()` 对 setInterval 会无限循环；正确做法是 `vi.advanceTimersByTimeAsync(0)` 刷 microtask + `vi.advanceTimersByTimeAsync(interval)` 推进指定时间
 - **R9 git 提交**：commit a68eb18 推送到 origin/feature/ledger-import-view-refactor（112 文件 +5163/-1171）
-- **git 分支整理（2026-05-12）**：R7-R9 + ledger-import-v2 合并到 master（d8ce7c9）；删除 7 个过时分支（round7/round8/global-component-library/cell-selection/pinia-event-store/univer-import/cursor-setup）；仓库现只有 master + feature/ledger-import-view-refactor 两个分支
+- **git 分支整理（2026-05-12）**：R7-R9 + ledger-import-v2 合并到 master（d8ce7c9）；删除 7 个过时分支（round7/round8/global-component-library/cell-selection/pinia-event-store/univer-import/cursor-setup）；仓库现有 master + feature/ledger-import-view-refactor + feature/e2e-business-flow 三个分支
+- **feature/e2e-business-flow 分支已推送（2026-05-13）**：从 feature/ledger-import-view-refactor 切出，含 e2e spec 全部 50 task 实现 + 修复
 - **fix: 导入转后台弹错误弹窗（f35471d）**：用户点"关闭（后台继续）"后 `runImportPollingFlow` 仍在前台轮询，job 变 canceled 时 throw→catch 弹 ElMessageBox；修复 = `_importPollingAborted` flag + `shouldIgnoreError` 静默退出循环
 - **fix: vue-tsc 0 错误（7880f6f）**：R9 subagent 批量替换 handleApiError 时引入 5 处 `P.xxx` 引用错误（应为 P_ledger/P_wp/P_proj）+ EqcrProjectView/AuditReportEditor/KnowledgePickerDialog 类型修复；AMOUNT_DIVISOR_KEY 从 .vue export 移到独立 `constants/amountDivisor.ts`
 - **fix: 清空回收站 500（36b2023）**：`DELETE FROM projects WHERE is_deleted=true` 触发 FK 约束（子表 ledger_datasets/import_jobs 等仍引用）；修复 = 按 FK 深度顺序 raw SQL 级联删除（activation_records→四表→ledger_datasets→import_jobs→working_papers→project_assignments→adjustments→projects），每步 try/except 跳过不存在的表
@@ -1191,3 +1192,4 @@ inclusion: always
   - **`scripts/init_4_projects.py` 已创建**：DB 重建后一键恢复 4 项目数据（auto-match→recalc→generate_reports），4/4 成功
   - **e2e 脚本健壮性已增强**：每个项目独立 session（防事务级联失败）+ try/except + rollback
   - **e2e 最终验证全绿**：4 项目 × 4 层 = 16 项检查全部 PASS（陕西华氏 tb=100/BS=27/底稿92/附注173，和平药房 tb=53/BS=29/附注173，辽宁卫生 tb=47/BS=26/附注173，宜宾大药房 tb=100/BS=13/附注173）
+  - **fix: 附注页面打不开**：`disclosure_engine.py` 的 `get_notes_tree()` 返回字典缺少 `id` 字段，前端 tree 组件 key=undefined 导致渲染失败；修复 = 添加 `"id": str(n.id)`（commit bc71f2b）

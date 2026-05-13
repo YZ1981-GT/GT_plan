@@ -116,6 +116,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { Refresh } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { updateProcedureTrim } from '@/services/commonApi'
@@ -249,7 +250,7 @@ async function markAsCompleted(proc: ProcedureItem) {
     proc.execution_status = 'completed'
     ElMessage.success(`${proc.procedure_code} 已标记为完成`)
   } catch (e: any) {
-    ElMessage.error('标记失败：' + (e?.message || '未知错误'))
+    handleApiError(e, '标记失败')
   } finally {
     proc._marking = false
   }

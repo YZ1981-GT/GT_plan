@@ -334,6 +334,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { reportConfig as P_rc, noteTemplates as P_nt } from '@/services/apiPaths'
 import { fmtAmount } from '@/utils/formatters'
@@ -1064,8 +1065,8 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
       })
       ElMessage.success('公式已保存')
       emit('saved')
-    } catch {
-      ElMessage.error('保存失败')
+    } catch (e) {
+      handleApiError(e, '保存失败')
     }
   }
 }
@@ -1085,8 +1086,8 @@ async function saveEdit(row: any) {
     editingId.value = null
     ElMessage.success('公式已保存')
     emit('saved')
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e) {
+    handleApiError(e, '保存失败')
   }
 }
 
@@ -1171,8 +1172,8 @@ async function onApplyFormulas() {
       ElMessage.success(`已执行 ${successCount} 条自动运算公式`)
     }
     emit('applied')
-  } catch (err: any) {
-    ElMessage.error('公式执行失败: ' + (err?.response?.data?.error || err?.message || '未知错误'))
+  } catch (e: any) {
+    handleApiError(e, '公式执行失败')
   } finally {
     applying.value = false
   }
@@ -1199,7 +1200,7 @@ async function onImportPresetFormulas() {
       allRowsMap.value[reportType] = rows
       const formulaCount = rows.filter((r: any) => r.formula).length
       ElMessage.success(`已导入 ${rows.length} 行，其中 ${formulaCount} 个预设公式`)
-    } catch { ElMessage.error('导入失败') }
+    } catch (e) { handleApiError(e, '导入失败') }
     finally { loadingData.value = false }
     return
   }
@@ -1213,7 +1214,7 @@ async function onImportPresetFormulas() {
       const presets = data ?? []
       notePresetFormulas.value = presets
       ElMessage.success(`已加载 ${presets.length} 条附注校验预设公式（${fmTemplateType.value === 'soe' ? '国企版' : '上市版'}）`)
-    } catch { ElMessage.error('加载附注预设公式失败') }
+    } catch (e) { handleApiError(e, '加载附注预设公式失败') }
     finally { loadingData.value = false }
     return
   }
@@ -1318,8 +1319,8 @@ async function onSaveAllFormulas() {
     }
     ElMessage.success(`已保存 ${saved} 个公式`)
     emit('saved')
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e) {
+    handleApiError(e, '保存失败')
   } finally {
     applying.value = false
   }

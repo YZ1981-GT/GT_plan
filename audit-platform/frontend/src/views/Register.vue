@@ -125,7 +125,7 @@ async function handleRegister() {
     router.push('/login')
   } catch (err: any) {
     const msg = err?.response?.data?.detail ?? '注册失败'
-    ElMessage.error(msg)
+    ElMessage.warning(msg)
   } finally {
     loading.value = false
   }

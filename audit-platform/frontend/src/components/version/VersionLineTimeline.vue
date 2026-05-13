@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { queryVersionLine } from '@/services/governanceApi'
 
 const props = defineProps<{
@@ -40,7 +41,7 @@ async function loadData() {
   try {
     const result = await queryVersionLine(props.projectId, props.objectType, props.objectId)
     stamps.value = result.items || []
-  } catch { ElMessage.error('加载版本链失败') }
+  } catch (e) { handleApiError(e, '加载版本链失败') }
 }
 
 function objectTypeIcon(t: string) {

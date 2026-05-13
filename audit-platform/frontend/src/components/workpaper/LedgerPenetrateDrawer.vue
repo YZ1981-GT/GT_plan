@@ -134,6 +134,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 
@@ -267,7 +268,7 @@ async function onExportToAttachment() {
 
     ElMessage.success('穿透结果已导出为附件并关联到当前底稿')
   } catch (err: any) {
-    ElMessage.error('导出失败: ' + (err?.message || '未知错误'))
+    handleApiError(err, '导出失败')
   } finally {
     exporting.value = false
   }

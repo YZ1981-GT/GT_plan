@@ -81,6 +81,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { Loading } from '@element-plus/icons-vue'
 import {
   listSharedTemplates, saveAsTemplate, applyTemplate, getTemplateDetail,
@@ -127,7 +128,7 @@ async function onSave() {
     ElMessage.success('模板已保存')
     showSaveDialog.value = false
   } catch (e: any) {
-    ElMessage.error('保存失败: ' + (e?.message || ''))
+    handleApiError(e, '保存失败')
   } finally {
     saving.value = false
   }
@@ -184,7 +185,7 @@ async function onApply() {
     })
     showPickDialog.value = false
   } catch (e: any) {
-    ElMessage.error('引用失败: ' + (e?.message || ''))
+    handleApiError(e, '引用失败')
   } finally {
     applying.value = false
   }

@@ -101,6 +101,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { subsequentEventApi } from '@/services/collaborationApi'
 
 const projectId = 'current-project-id'
@@ -160,7 +161,7 @@ async function createEvent() {
     dialogVisible.value = false
     await loadEvents()
   } catch (e) {
-    ElMessage.error('创建失败')
+    handleApiError(e, '创建')
   }
 }
 
@@ -170,7 +171,7 @@ async function initChecklist() {
     ElMessage.success('清单已初始化')
     await loadChecklist()
   } catch (e) {
-    ElMessage.error('初始化失败')
+    handleApiError(e, '初始化')
   }
 }
 
@@ -180,7 +181,7 @@ async function completeItem(row: any) {
     ElMessage.success('已标记完成')
     row.is_completed = true
   } catch (e) {
-    ElMessage.error('操作失败')
+    handleApiError(e, '操作')
   }
 }
 </script>

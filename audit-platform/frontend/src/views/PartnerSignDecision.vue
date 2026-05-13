@@ -302,12 +302,12 @@ async function onSign() {
     // 找报告 ID
     const reportData: any = await api.get(P.auditReport.get(projectId.value, year.value))
     if (!reportData?.id) {
-      ElMessage.error('未找到报告，请先生成')
+      ElMessage.warning('未找到报告，请先生成')
       return
     }
     const userId = authStore.user?.id
     if (!userId) {
-      ElMessage.error('用户未登录')
+      ElMessage.warning('用户未登录')
       return
     }
     await signDocument({

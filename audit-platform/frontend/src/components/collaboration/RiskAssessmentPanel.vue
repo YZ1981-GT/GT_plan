@@ -150,6 +150,7 @@
 import { ref } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { riskApi } from '@/services/collaborationApi'
 
 interface Risk {
@@ -247,8 +248,8 @@ async function addRisk() {
       response_strategy: '',
     }
     ElMessage.success('风险已添加')
-  } catch {
-    ElMessage.error('添加失败')
+  } catch (e) {
+    handleApiError(e, '添加')
   }
 }
 
@@ -256,8 +257,8 @@ async function saveResponse(risk: Risk) {
   try {
     await riskApi.updateResponse(props.projectId, risk.id, { response_strategy: risk.response_strategy })
     ElMessage.success('应对策略已保存')
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e) {
+    handleApiError(e, '保存')
   }
 }
 

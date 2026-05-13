@@ -63,6 +63,7 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { projectMgmtApi } from '@/services/collaborationApi'
 
 const emit = defineEmits<{
@@ -123,7 +124,7 @@ async function handleSubmit() {
     handleReset()
     emit('submitted')
   } catch (e: any) {
-    ElMessage.error(e?.message ?? '提交失败，请重试')
+    handleApiError(e, '提交')
   } finally {
     submitting.value = false
   }

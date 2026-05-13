@@ -96,6 +96,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
 import { workHours as P_wh } from '@/services/apiPaths'
+import { handleApiError } from '@/utils/errorHandler'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 
 interface ApprovalRecord {
@@ -140,7 +141,7 @@ async function loadData() {
     if (dateRange.value) { params.date_from = dateRange.value[0]; params.date_to = dateRange.value[1] }
     const data = await api.get(P_wh.list, { params })
     records.value = (Array.isArray(data) ? data : (data as any)?.items || []) as ApprovalRecord[]
-  } catch { ElMessage.error('加载失败') }
+  } catch (e) { handleApiError(e, '加载工时') }
   finally { loading.value = false }
 }
 
@@ -161,7 +162,7 @@ async function batchApprove() {
     ElMessage.success(`已批准 ${selectedRows.value.length} 条`)
     tableRef.value?.clearSelection()
     loadData(); loadStats()
-  } catch { ElMessage.error('批量批准失败') }
+  } catch (e) { handleApiError(e, '批量批准') }
   finally { batchLoading.value = false }
 }
 
@@ -174,7 +175,7 @@ async function batchReject() {
     showRejectDialog.value = false; rejectReason.value = ''
     tableRef.value?.clearSelection()
     loadData(); loadStats()
-  } catch { ElMessage.error('批量退回失败') }
+  } catch (e) { handleApiError(e, '批量退回') }
   finally { batchLoading.value = false }
 }
 
@@ -184,7 +185,7 @@ async function approveOne(row: ApprovalRecord) {
     await http.post(P_wh.batchApprove, { hour_ids: [row.id], action: 'approve' }, { headers: { 'Idempotency-Key': idempotencyKey() } })
     ElMessage.success(`已批准 ${row.staff_name} 的工时`)
     loadData(); loadStats()
-  } catch { ElMessage.error('批准失败') }
+  } catch (e) { handleApiError(e, '批准工时') }
   finally { batchLoading.value = false }
 }
 
@@ -201,7 +202,7 @@ async function confirmSingleReject() {
     ElMessage.success(`已退回 ${singleRejectRow.value.staff_name} 的工时`)
     showSingleRejectDialog.value = false
     loadData(); loadStats()
-  } catch { ElMessage.error('退回失败') }
+  } catch (e) { handleApiError(e, '退回工时') }
   finally { batchLoading.value = false }
 }
 

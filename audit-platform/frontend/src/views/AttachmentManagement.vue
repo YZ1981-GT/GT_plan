@@ -227,7 +227,7 @@ async function submitAssociate() {
 function beforeUpload(file: File) {
   const maxSize = 50 * 1024 * 1024 // 50MB
   if (file.size > maxSize) {
-    ElMessage.error('文件大小不能超过 50MB')
+    ElMessage.warning('文件大小不能超过 50MB')
     return false
   }
   return true

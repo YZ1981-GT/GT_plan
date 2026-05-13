@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
 import { useAuthStore } from '@/stores/auth'
 import { projects as P_proj } from '@/services/apiPaths'
@@ -150,8 +151,8 @@ const handleSave = async () => {
       }
       dialogVisible.value = false
       loadItems()
-    } catch {
-      ElMessage.error('保存失败')
+    } catch (e) {
+      handleApiError(e, '保存')
     }
   })
 }
@@ -161,8 +162,8 @@ const handleDelete = async (row: any) => {
     await api.delete(`${P_proj.detail(props.projectId)}/se-checklist/${row.id}`)
     ElMessage.success('已删除')
     loadItems()
-  } catch {
-    ElMessage.error('删除失败')
+  } catch (e) {
+    handleApiError(e, '删除')
   }
 }
 

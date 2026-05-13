@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { syncApi } from '@/services/collaborationApi'
 
 const syncStatus = ref<any>(null)
@@ -49,7 +50,7 @@ async function syncNow() {
     const { data } = await syncApi.status(projectId)
     syncStatus.value = data
   } catch (e) {
-    ElMessage.error('同步失败')
+    handleApiError(e, '同步')
   }
 }
 </script>

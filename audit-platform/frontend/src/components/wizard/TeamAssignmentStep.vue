@@ -122,6 +122,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { User } from '@element-plus/icons-vue'
 import { listStaff, createStaff, listAssignments, saveAssignments, type StaffMember, type Assignment } from '@/services/staffApi'
 import { useWizardStore } from '@/stores/wizard'
@@ -249,7 +250,7 @@ async function validate(): Promise<boolean> {
       await saveAssignments(props.projectId, members.value.map(m => ({
         staff_id: m.staff_id, role: m.role, assigned_cycles: m.assigned_cycles,
       })))
-    } catch { ElMessage.error('保存委派失败'); return false }
+    } catch (e) { handleApiError(e, '保存委派失败'); return false }
   }
   // 保存到 wizard_state
   await wizardStore.saveStep('team_assignment', {

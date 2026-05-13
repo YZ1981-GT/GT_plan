@@ -121,6 +121,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { reviewApi } from '@/services/collaborationApi'
 
 interface ReviewRecord {
@@ -230,7 +231,7 @@ async function loadReviews() {
     reviews.value = data || []
   } catch (e) {
     console.error('加载复核记录失败', e)
-    ElMessage.error('加载复核记录失败')
+    handleApiError(e, '加载复核记录')
   }
 }
 
@@ -255,7 +256,7 @@ async function submitReview() {
     await loadReviews()
   } catch (e) {
     console.error('提交复核意见失败', e)
-    ElMessage.error('提交失败')
+    handleApiError(e, '提交复核意见')
   }
 }
 
@@ -277,7 +278,7 @@ async function submitReply() {
     await loadReviews()
   } catch (e) {
     console.error('提交回复失败', e)
-    ElMessage.error('提交回复失败')
+    handleApiError(e, '提交回复')
   }
 }
 

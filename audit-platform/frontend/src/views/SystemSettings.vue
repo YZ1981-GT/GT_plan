@@ -463,7 +463,7 @@ async function saveEdit(key: string) {
       cancelEdit()
       await loadSettings()
     } else if (res.rejected && Object.keys(res.rejected).length > 0) {
-      ElMessage.error(Object.values(res.rejected)[0] as string)
+      ElMessage.warning(Object.values(res.rejected)[0] as string)
     }
   } catch (e: any) {
     handleApiError(e, '更新')

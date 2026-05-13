@@ -137,6 +137,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import http from '@/utils/http'
 import { listAssignments, type Assignment } from '@/services/staffApi'
 
@@ -360,9 +361,8 @@ async function onSubmit() {
     ElMessage.success(`已分配 ${result.updated} 张，${result.notifications_sent} 人收到通知`)
     emit('assigned', result)
     onClose()
-  } catch (err: any) {
-    const detail = err?.response?.data?.detail
-    ElMessage.error(detail || '批量委派失败，请重试')
+  } catch (e: any) {
+    handleApiError(e, '批量委派')
   } finally {
     submitting.value = false
   }

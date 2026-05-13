@@ -306,6 +306,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { confirmRollback } from '@/utils/confirm'
 import FormulaBar from './FormulaBar.vue'
 import CellSelector from './CellSelector.vue'
@@ -435,8 +436,8 @@ async function onPageChange(page: number) {
       { params: { page, page_size: pageSize.value, editable: true } }
     )
     htmlContent.value = data.html || data?.data?.html || ''
-  } catch {
-    ElMessage.error('加载分页数据失败')
+  } catch (e) {
+    handleApiError(e, '加载分页数据失败')
   }
 }
 
@@ -628,7 +629,7 @@ async function saveEdits() {
     await loadContent()
     ElMessage.success(`已保存 v${result.version}`)
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '保存失败')
+    handleApiError(e, '保存失败')
   } finally {
     saving.value = false
   }
@@ -660,7 +661,7 @@ async function runFormulas() {
       ElMessage.success(`公式执行完成：${result.executed} 个单元格已更新`)
     }
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '公式执行失败')
+    handleApiError(e, '公式执行失败')
   } finally {
     calculating.value = false
   }
@@ -684,7 +685,7 @@ async function rollbackVersion(version: number) {
     ElMessage.success(`已回滚到版本 ${version}`)
     await loadContent()
   } catch (e: any) {
-    ElMessage.error(e?.response?.data?.detail || '回滚失败')
+    handleApiError(e, '回滚失败')
   }
 }
 

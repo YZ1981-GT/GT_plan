@@ -89,6 +89,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { projectMgmtApi } from '@/services/collaborationApi'
 
 const projectId = 'current-project-id'
@@ -156,7 +157,7 @@ async function markComplete(row: any) {
     ElMessage.success('里程碑已标记完成')
     row.actual_date = new Date().toISOString().slice(0, 10)
   } catch (e: any) {
-    ElMessage.error(e?.message ?? '操作失败')
+    handleApiError(e, '操作')
   }
 }
 
@@ -177,7 +178,7 @@ async function handleAddMilestone() {
     addForm.type = 'MILESTONE'
     await fetchTimeline()
   } catch (e: any) {
-    ElMessage.error(e?.message ?? '添加失败')
+    handleApiError(e, '添加')
   } finally {
     adding.value = false
   }

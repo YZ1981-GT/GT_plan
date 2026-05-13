@@ -63,6 +63,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { handleApiError } from '@/utils/errorHandler'
 import { reviewApi } from '@/services/collaborationApi'
 
 const reviewTab = ref('pending')
@@ -103,7 +104,7 @@ async function startReview(row: any) {
     await reviewApi.start(row.id)
     ElMessage.success('复核已开始')
   } catch (e) {
-    ElMessage.error('操作失败')
+    handleApiError(e, '操作')
   }
 }
 
@@ -115,7 +116,7 @@ async function approveReview() {
     showReviewDialog.value = false
     pendingReviews.value = pendingReviews.value.filter(r => r.id !== currentReview.value.id)
   } catch (e) {
-    ElMessage.error('操作失败')
+    handleApiError(e, '操作')
   }
 }
 
@@ -132,7 +133,7 @@ async function confirmReject() {
     showReviewDialog.value = false
     pendingReviews.value = pendingReviews.value.filter(r => r.id !== currentReview.value.id)
   } catch (e) {
-    ElMessage.error('操作失败')
+    handleApiError(e, '操作')
   }
 }
 </script>
