@@ -292,6 +292,75 @@ async def _generate_client_accounts_from_balance(
     return count
 
 
+async def _generate_standard_accounts_from_client(
+    project_id: UUID,
+    db: AsyncSession,
+) -> int:
+    """从客户科目的一级编码自动生成标准科目。
+
+    逻辑：提取所有客户科目的前 4 位编码（去重），作为标准科目。
+    名称取该编码下第一个客户科目的名称。
+    """
+    import uuid as _uuid
+    from app.models.audit_platform_models import AccountCategory, AccountDirection
+
+    # 获取该项目所有客户科目
+    result = await db.execute(
+        select(AccountChart.account_code, AccountChart.account_name, AccountChart.category).where(
+            AccountChart.project_id == project_id,
+            AccountChart.source == AccountSource.client,
+            AccountChart.is_deleted == False,  # noqa: E712
+        ).order_by(AccountChart.account_code)
+    )
+    client_rows = result.fetchall()
+    if not client_rows:
+        return 0
+
+    # 提取一级编码（前 4 位）去重
+    level1_map: dict[str, tuple[str, str]] = {}  # code → (name, category)
+    for row in client_rows:
+        code = row.account_code
+        l1_code = code.split('.')[0][:4] if '.' in code else code[:4]
+        if l1_code not in level1_map:
+            level1_map[l1_code] = (row.account_name or l1_code, row.category or 'asset')
+
+    count = 0
+    for code, (name, cat) in level1_map.items():
+        # 检查是否已存在
+        existing = await db.execute(
+            select(AccountChart.id).where(
+                AccountChart.project_id == project_id,
+                AccountChart.account_code == code,
+                AccountChart.source == AccountSource.standard,
+                AccountChart.is_deleted == False,  # noqa: E712
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            continue
+
+        direction = AccountDirection.debit if cat in ('asset', 'expense') else AccountDirection.credit
+        db.add(AccountChart(
+            id=_uuid.uuid4(),
+            project_id=project_id,
+            account_code=code,
+            account_name=name,
+            source=AccountSource.standard,
+            category=cat,
+            direction=direction,
+            level=1,
+        ))
+        count += 1
+
+    if count > 0:
+        await db.flush()
+        logger.info(
+            "Generated %d standard accounts from client L1 codes for project %s",
+            count, project_id,
+        )
+
+    return count
+
+
 async def auto_match(
     project_id: UUID,
     db: AsyncSession,
@@ -300,12 +369,24 @@ async def auto_match(
     """Auto-match and directly save all mappings.
 
     如果 account_chart 中没有客户科目，自动从 tb_balance 生成。
+    如果没有标准科目，自动从客户科目的一级编码生成标准科目。
     然后运行 auto_suggest + 保存映射。
     """
     # 先检查是否有客户科目，没有则从 tb_balance 自动生成
     total_client = await _count_client_accounts(project_id, db, year=year)
     if total_client == 0:
         await _generate_client_accounts_from_balance(project_id, db, year=year)
+
+    # 检查是否有标准科目，没有则从客户科目的一级编码自动生成
+    std_count_result = await db.execute(
+        select(func.count(AccountChart.id)).where(
+            AccountChart.project_id == project_id,
+            AccountChart.source == AccountSource.standard,
+            AccountChart.is_deleted == False,  # noqa: E712
+        )
+    )
+    if std_count_result.scalar_one() == 0:
+        await _generate_standard_accounts_from_client(project_id, db)
 
     suggestions = await auto_suggest(project_id, db, year=year)
 
