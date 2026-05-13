@@ -915,7 +915,7 @@ async function onAutoMapping() {
       matched: result?.saved_count ?? 0,
       needConfirm: result?.unmatched_count ?? 0,
       total: result?.total_client ?? 0,
-      rate: ((result?.completion_rate ?? 0) * 100).toFixed(0),
+      rate: String(Math.round(result?.completion_rate ?? 0)),
     }
     if (mappingResult.value.total === 0) {
       ElMessage.warning('未找到客户科目数据，请确认已导入科目余额表')
@@ -924,7 +924,8 @@ async function onAutoMapping() {
       ElMessage.success('科目映射完成，正在生成试算表...')
     }
     await detectDataState()  // 刷新数据状态推进步骤
-    // 映射完成后自动触发重算（不让用户再手动点第三步）
+    // 映射完成后稍等一下再触发重算（避免后端事务竞争）
+    await new Promise(r => setTimeout(r, 500))
     await onRecalc()
   } catch (e: any) {
     handleApiError(e, '自动科目映射')
