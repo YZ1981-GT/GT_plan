@@ -24,10 +24,14 @@ inclusion: always
 - 记忆拆分：memory.md 只放精简状态+待办，技术决策→architecture.md，规范→conventions.md，修复记录→dev-history.md
 - 目标并发规模 6000 人
 - 表格列宽要足够大，不折行不省略号截断
+- **表格选中行必须视觉明显**：8% 透明度背景色在白底上几乎不可见，最低 14% + 左侧 3px 紫色竖线指示器；hover 也要有浅色反馈；用户反馈"丑"多数是行间距太松+选中不明显
+- **最大化数据显示区域**：工具栏按钮（刷新/导出/保存）应合并到 Tab 栏右侧而非独占一行；减少表格上方的非数据行数，让表格尽可能多显示数据行
 - 表格数字列（金额、科目编号等）统一使用 Arial Narrow 字体 + `white-space: nowrap` + `font-variant-numeric: tabular-nums`，通过 `.gt-amt` class 实现
 - **el-table 字号控制必须用动态 class + !important**：`:style="{ fontSize }"` 不生效（内部 DOM 层级太深被 Element Plus 默认样式覆盖）；正确方案 = `:class="gt-tb-font-${size}"` + scoped `:deep(.gt-tb-font-sm) th .cell, td .cell { font-size: 12px !important }`
+- **所有表格统一用 el-table**：替换所有原生 HTML table（试算平衡表/报表等）；不引入 AG Grid（包体积大+与 Univer 重叠）；底稿编辑器继续用 Univer；el-table + useCellSelection composable 满足"查看+少量编辑"需求
 - 表格分页用标准分页组件（左侧 page size 选择器 + 右侧页码导航含 jumper），不用"加载更多"模式
 - 四表联查需支持全屏模式 + 行选择（checkbox）+ 右键菜单，右键菜单预留"抽凭到底稿"入口（后续与底稿抽凭模块衔接）
+- **溯源/穿透跳转后必须支持 Backspace 返回原位**：记录来源视图+行索引+滚动位置，按 Backspace 恢复（不拦截输入框内的 Backspace）；已在 TrialBalance.vue 试算平衡表→科目明细溯源实现，其他穿透场景同理
 - 表格编辑需支持查看/编辑模式切换
 - 复制按钮命名：工具栏"复制整表" vs 右键"复制选中区域"
 - 系统打磨采用 PDCA 迭代模式：提建议→成 spec 三件套→实施→复盘→下一轮新需求，直到可改进项穷尽
@@ -45,6 +49,7 @@ inclusion: always
 - **R5 复盘教训**：标 `[x]` 前必须跑 pytest 验证；"代码文件存在"不等于"功能可用"。Task 12/13 初次标完成时其实 gate_engine/sign_service 有隐藏 flush bug，集成测试才能暴露
 - **跨文件字段/枚举假设必须 grep 核对**：User.metadata_、WorkHour.status 类型、ProjectStatus.in_progress、CompetenceRating.A 这些都是我凭印象写的错误假设，导致代码 runtime 失败
 - **测试 fixture 模板**：每个新 test 文件应复用邻居文件的 `db_session` fixture 模板（见 test_eqcr_gate_approve.py 为样板：本地 _engine + pytest_asyncio.fixture + Base.metadata.create_all）；backend/tests/conftest.py 不提供 db_session
+- **Run All Tasks 前必须预检现状**：创建 spec 前或执行前先 grep 关键标志（如 `<table`）确认哪些 task 实际需要执行；已完成的 task 直接标 [x] 跳过，避免 21 次 subagent 空跑（表格统一化 spec 教训）
 
 ## 环境配置
 
@@ -94,6 +99,11 @@ inclusion: always
 - **`POST /report-line-mapping/manual` 端点**：手动创建单条映射（mapping_type=manual, is_confirmed=True），用于未映射科目的用户手动指定
 - **AccountMapping 表无 year 列**：只有 project_id/original_account_code/standard_account_code/mapping_type/is_deleted/created_by/created_at/updated_at；查询时不能带 year 过滤
 - **TrialBalance 方向判断最终方案**：不硬编码科目编码/名称，默认从余额正负推断（正=借，负=贷）；支持用户手动点击切换方向（`directionOverrides` ref）；方向决定小计加减逻辑
+- **试算平衡表（summary 视图）贷方科目展示为正数**：`get_summary_with_adjustments` 构建 `unadj_map`/`tb_amount_map` 时，对 2xxx/3xxx/4xxx + 收入类（5001/5051/5101/6001/6051/6101/6111/6115/6117/6301）的负值取反；公式引擎 `TB('2001','期末余额')` 返回正数；科目明细视图不受影响（用 `fmtDir` 取绝对值+方向列）
+- **试算平衡表导入/导出模板已实现**：导出下拉菜单（导出数据/导出空模板）+ 导入按钮（按行次编码+名称双保险匹配覆盖未审数）；未审数编辑通过"✏️ 编辑"按钮切换模式（`tbSumEditMode` ref），编辑模式下所有报表类型未审数可点击编辑+双击不跳转，保存后自动退出编辑模式恢复双击溯源
+- **试算平衡表保存持久化**：保存到 `consol_worksheet_data` 表（sheet_key=`tb_summary_{type}`，JSONB）；加载时先取公式计算结果再调 `_mergeSavedTbSummary` 合并已保存手动数据（公式无值的行用保存值覆盖），现金流量表手动填写刷新后不丢失
+- **试算平衡表"断开公式"功能**：右键菜单"✂️ 断开公式"标记行级 `formula_detached=true`，该行未审数变为可编辑+不被公式覆盖+微黄背景+左侧橙色竖线；"🔗 恢复公式"取消标记并立即刷新；断开后自动进入编辑模式；标记随 JSONB 持久化，零后端改动
+- **试算平衡表 4 个报表类型页签**：balance_sheet / income_statement / cash_flow_statement / cash_flow_supplement（现金流量附表为新增）
 - **科目明细金额展示规则（最终版）**：所有普通行一律取绝对值展示 + 方向列标"借/贷"；小计按方向加减计算——资产类中贷方科目减去绝对值，负债/权益类中借方科目减去绝对值；小计直接展示计算结果；数据库存储不变
 - **working_paper 表名是单数**：`working_paper`（不是 working_papers），ORM 类 WorkingPaper.__tablename__ = "working_paper"
 - **`check_consol_lock` 必须 rollback**：查询不存在的 `projects.consol_lock` 列会让 asyncpg 事务进入 aborted 状态，后续所有 SQL 报 `InFailedSQLTransactionError`；except 分支必须 `await db.rollback()` 恢复事务（仅 `pass` 不够）
@@ -120,7 +130,7 @@ inclusion: always
 - **AI 组件重复 + 死代码**：`components/workpaper/AiContentConfirmDialog.vue` 与 `components/ai/AiContentConfirmDialog.vue` 同名共存；`ai/ContractAnalysis / ContractAnalysisPanel / EvidenceChainPanel / EvidenceChainView` 四组件 grep 零引用
 - **/confirmation 侧栏指向不存在的路由**：`ThreeColumnLayout.vue:330` 侧栏"函证"指 `/confirmation`，但 router 中无此路径定义，点击走 NotFound 而非 DevelopingPage；已 maturity=developing 但守卫没触发
 - **Mobile 系列 5 视图全是 stub**（MobilePenetration/MobileReview/MobileReport/MobileProjectList/MobileWorkpaperEditor），Round 7+ 前可考虑整体删除以减负
-- **useCellSelection 接入只 4/73**（TrialBalance/ReportView/DisclosureEditor/ConsolidationIndex），其他表格无 Excel 级选中；行选/列选/Ctrl+A/粘贴入库/单元格撤销全部缺失
+- **useCellSelection 接入 5 实例/4 视图**（TrialBalance 科目明细 `tbCtx` + 试算平衡表 `tbSumCtx` / ReportView / DisclosureEditor / ConsolidationIndex），其他表格无 Excel 级选中；行选/列选/Ctrl+A/粘贴入库/单元格撤销全部缺失
 - **编辑锁前端只 1 处**：仅 `components/formula/StructureEditor.vue` acquireLock/releaseLock + lockRefreshTimer；WorkpaperEditor/DisclosureEditor/AuditReportEditor 裸奔，两人并发编辑会互覆盖（后端 workpaper_editing_locks 表已就绪）
 - **后端联动链路已完整但前端不可见**：event_handlers.py 已订阅 ADJUSTMENT_*→TB→REPORTS→AUDIT_REPORT / WORKPAPER_SAVED→consistency / LEDGER_ACTIVATED→mark_stale；前端 workpaper.is_stale 只判 consistent/inconsistent 没展示 stale
 - **穿透端点共 5+1 套**（reports/drilldown/{row_code}、drilldown/ledger/{code}、ledger/penetrate、consol_worksheet/drill/*、penetrate-by-amount、**trial-balance/trace**），前端入口散；usePenetrate 应封装统一
@@ -264,6 +274,9 @@ inclusion: always
 ## 活跃待办
 
 ### 最高优先级
+- **表格统一化 spec 全部完成**（`.kiro/specs/table-unification-el-table/`）：21/21 编码任务完成，剩余 5 项 UAT 需手动浏览器验证；所有 11 处原生 HTML table 已迁移到 el-table（GtPrintPreview 按退出条件保留原生 table 用于打印）；全局样式 `gt-table.css` 已就绪（紫色表头/边框色/字号 class/表头 nowrap/.gt-amt）；grep `<table` 确认 0 处渲染用原生 table（排除剪贴板 HTML + 打印预览）
+  - **复盘发现**：spec 创建时迁移已全部完成（R7-R9 各轮逐步落地），21 个 task 实际是"验收审计"而非"实施"；下次创建 spec 前先 grep 预检现状避免空跑
+  - **后续优化（触碰即修）**：`:header-cell-style` 内联 ~40 处分布 20+ 文件，但实际用了 4 种表头色（`#f0edf5` 标准紫 / `#f8f6fb` 浅紫 / `#f4f0fa` 中紫 / `#edf3f9` 蓝灰）是视觉层级区分非冗余；gt-table.css 的 `!important` 会覆盖内联导致不能直接删；可选方案 = 提取 4 个 class（`.gt-table-header-default/light/mid/blue`）替代内联对象；max-height N 值 8 种是各页面布局适配不需统一；GtPrintPreview 保持原生 table 不动
 - **GLOBAL_REFINEMENT_PROPOSAL_v2.md 已生成**（docs/）：v1 落地核查 + 5 角色深挖 + 21 横切主题 + 联动穿透闭环图 + P0-P3 路线图 41 项
 - **Round 8 spec 三件套已创建**（`.kiro/specs/refinement-round8-deep-closure/`）：Sprint 1（P0，42 task，1 周）+ Sprint 2（P1，82 task，3 周）
   - Sprint 1：/confirmation 路由修复 + confirm.ts 补齐 30+ 处替换 + Adjustments 转错报按钮 + projectYear store + http 5xx 容灾 + AI mask_context 审计
@@ -1193,7 +1206,10 @@ inclusion: always
 - **试算平衡表行次结构来自标准库（report_config）**：所有企业共用同一套行次模板（按 applicable_standard 如 soe_standalone 过滤）；`get_summary_with_adjustments` 先加载 report_config 行次模板再用 ReportLineMapping 填充数据，没有数据的行次显示为空；report_config 无数据时 fallback 到旧逻辑（从映射表取行次）
 - **report_config 与 ReportLineMapping 编码体系不同**：report_config 用 `BS-001`（有连字符），映射表用 `BS001`（无连字符）；匹配通过 `row_name` 名称对应（精确+模糊包含），不走编码直接匹配
 - **试算平衡表公式计算已实现**：`_eval_formula` 支持 `TB()/SUM_TB()/ROW()/SUM_ROW()` + 加减运算；`report_config.formula` 是唯一真源（公式管理弹窗编辑同一字段）；合计行有公式走公式（如 `SUM_ROW('BS-002','BS-008')`），无公式 fallback 向前汇总；`row_values` dict 记录每行结果供后续行引用
+- **report_config seed 公式不完整**：合计行公式范围可能太小（如 BS-052 `SUM_ROW('BS-011','BS-013')` 实际应覆盖 BS-029~BS-051）；已加 fallback：公式结果为 0 时自动向前汇总子行
 - **借贷平衡校验只比较"资产小计 = 负债和权益合计"**：不含损益类（损益取发生额与余额口径不同）；`getActualCat` 提取为模块级函数供 groupedRows/assetTotal/liabEquityTotal 共用
+- **试算平衡表交互已实现**：右键菜单（复制/查看公式/汇总明细/数据溯源）+ 行选择高亮 + 右键菜单防超出视口；溯源逻辑 = 切换到 detail Tab + setCurrentRow + scrollIntoView；**点击未审数直接溯源已关闭**（用户要求溯源只走右键），双击行仍触发溯源
+- **公式管理中心新增"试算平衡表"节点**：左侧树含"科目明细"（显示 TB 取数公式）+"试算平衡表"（显示 report_config 行次公式）两个子节点
 - **宜宾大药房 trial_balance=0 根因确认**：该项目从未执行 auto-match（account_mapping 为空），导致 recalc 无法汇总；修复路径 = 先 auto-match → 再 recalc
 - **e2e-business-flow spec v2.0 待补强 6 个维度**：(1) 依赖链路透明化+前置条件矩阵 (2) 错误场景覆盖（静默返回空 vs 明确报错） (3) 多项目通用性验证（每个项目分别断言） (4) 前端报表表样细节（标题行加粗/金额右对齐千分位/缩进可视化/合计行分隔线） (5) 公式覆盖率 26.5% 合理性论证（标题行/特殊行业行/CFS 手工填列） (6) 数据质量检查扩展为套件（借贷平衡/科目完整性/报表平衡/利润表勾稽）
 - **报表表样企业级要求**：标题行加粗背景色、数据行正常、合计行加粗+上边框、金额右对齐+千分位+负数红色、indent_level→padding-left、空报表友好提示、不同行类型不同样式

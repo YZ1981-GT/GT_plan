@@ -328,3 +328,168 @@ def validate_formula(formula: str) -> list[str]:
         if fn not in known_funcs:
             errors.append(f"未知函数: {fn}()")
     return errors
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FormulaEngine 类（向后兼容 formula.py 路由）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class FormulaEngine:
+    """公式引擎类（兼容旧 API 路由）。
+
+    旧路由 formula.py 需要一个带 redis_client 的类实例，
+    提供 execute/list_all_functions/register_custom_function 等方法。
+    """
+
+    # 内置函数列表
+    _BUILTIN_FUNCTIONS = [
+        {"name": "TB", "description": "取科目余额", "syntax": "TB('科目编码','列名')", "category": "取数"},
+        {"name": "SUM_TB", "description": "范围科目求和", "syntax": "SUM_TB('起始~结束','列名')", "category": "取数"},
+        {"name": "ROW", "description": "引用其他行次", "syntax": "ROW('行次编码')", "category": "引用"},
+        {"name": "SUM_ROW", "description": "范围行次求和", "syntax": "SUM_ROW('起始','结束')", "category": "引用"},
+        {"name": "PREV", "description": "上年同期值", "syntax": "PREV('科目编码','列名')", "category": "取数"},
+        {"name": "REPORT", "description": "跨报表引用", "syntax": "REPORT('行次编码','期间')", "category": "引用"},
+        {"name": "AUX", "description": "辅助核算取值", "syntax": "AUX('科目','维度','列名')", "category": "取数"},
+        {"name": "ABS", "description": "绝对值", "syntax": "ABS(值)", "category": "数学"},
+        {"name": "ROUND", "description": "四舍五入", "syntax": "ROUND(值, 位数)", "category": "数学"},
+        {"name": "MAX", "description": "最大值", "syntax": "MAX(值1, 值2)", "category": "数学"},
+        {"name": "MIN", "description": "最小值", "syntax": "MIN(值1, 值2)", "category": "数学"},
+        {"name": "IF", "description": "条件判断", "syntax": "IF(条件, 真值, 假值)", "category": "逻辑"},
+    ]
+
+    def __init__(self, redis_client=None):
+        self.redis = redis_client
+        self._custom_functions: dict[str, dict] = {}
+
+    def list_all_functions(self) -> list[dict]:
+        """列出所有可用函数（内置 + 自定义）"""
+        result = list(self._BUILTIN_FUNCTIONS)
+        for name, info in self._custom_functions.items():
+            result.append({"name": name, "category": "自定义", **info})
+        return result
+
+    def list_custom_functions(self) -> list[dict]:
+        """列出自定义函数"""
+        return [{"name": k, **v} for k, v in self._custom_functions.items()]
+
+    def register_custom_function(self, name: str, description: str = "", syntax: str = "", formula: str = "", expression: str = "") -> dict:
+        """注册自定义函数"""
+        if not name or not name.strip():
+            raise ValueError("函数名不能为空")
+        # 检查是否与内置函数冲突
+        builtin_names = {f["name"] for f in self._BUILTIN_FUNCTIONS}
+        if name in builtin_names:
+            raise ValueError(f"内置函数 {name} 不可覆盖")
+        # 校验表达式
+        expr = expression or formula
+        if expr and not _validate_custom_expression(expr):
+            raise ValueError(f"表达式语法不合法: {expr}")
+        self._custom_functions[name] = {
+            "description": description,
+            "syntax": syntax,
+            "formula": expr,
+            "expression": expr,
+        }
+        return {"registered": True, "name": name}
+
+    def unregister_custom_function(self, name: str) -> bool:
+        """注销自定义函数"""
+        return self._custom_functions.pop(name, None) is not None
+
+    async def invalidate_cache(self, project_id=None, year=None, account_codes=None):
+        """清除公式缓存（Redis）"""
+        if not self.redis:
+            return
+        try:
+            # 简单实现：删除项目相关的缓存键
+            pattern = f"formula:*:{project_id}:*" if project_id else "formula:*"
+            keys = []
+            async for key in self.redis.scan_iter(match=pattern):
+                keys.append(key)
+            if keys:
+                await self.redis.delete(*keys)
+        except Exception:
+            pass  # Redis 不可用时静默
+
+    async def execute(self, db, project_id, year, formula_type: str, params: dict, **kwargs) -> dict:
+        """执行公式（兼容旧 API）"""
+        from decimal import Decimal
+        # 简单实现：构建 tb_map 并调用统一引擎
+        formula_str = params.get("formula", "")
+        if not formula_str:
+            return {"value": 0, "formula": "", "error": None}
+
+        # 从 trial_balance 加载数据
+        import sqlalchemy as sa
+        from app.models.audit_platform_models import TrialBalance
+        tb_table = TrialBalance.__table__
+        q = sa.select(tb_table.c.standard_account_code, tb_table.c.unadjusted_amount).where(
+            tb_table.c.project_id == project_id,
+            tb_table.c.year == year,
+            tb_table.c.is_deleted == sa.false(),
+        )
+        result = await db.execute(q)
+        tb_map: dict[str, Decimal] = {}
+        for r in result.fetchall():
+            if r.standard_account_code:
+                tb_map[r.standard_account_code] = tb_map.get(r.standard_account_code, Decimal("0")) + (r.unadjusted_amount or Decimal("0"))
+
+        val = execute_formula(formula_str, tb_map, {})
+        return {"value": float(val), "formula": formula_str, "error": None}
+
+    async def batch_execute(self, db, project_id, year, formulas: list[dict], **kwargs) -> list[dict]:
+        """批量执行公式"""
+        results = []
+        for f in formulas:
+            r = await self.execute(db, project_id, year, f.get("formula_type", ""), f.get("params", {}))
+            results.append(r)
+        return results
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 兼容导出（旧测试和旧模块依赖的名称）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class FormulaError(Exception):
+    """公式执行错误"""
+    pass
+
+
+# 旧测试引用的 Executor 类（占位，实际逻辑在 execute 函数中）
+class TBExecutor:
+    """TB 函数执行器（兼容占位）"""
+    pass
+
+
+class SumTBExecutor:
+    """SUM_TB 函数执行器（兼容占位）"""
+    pass
+
+
+class PREVExecutor:
+    """PREV 函数执行器（兼容占位）"""
+    pass
+
+
+def _validate_custom_expression(expression: str) -> bool:
+    """校验自定义公式表达式是否安全合法。
+
+    规则：
+    - 不能为空
+    - 不能包含 import/exec/eval/__/open 等危险关键字
+    - 必须能被 ast.parse 解析
+    """
+    if not expression or not expression.strip():
+        return False
+    dangerous = ['import ', 'exec(', 'eval(', '__', 'open(', 'os.', 'sys.', 'subprocess']
+    for d in dangerous:
+        if d in expression:
+            return False
+    # 先替换公式函数为数字占位符再验证语法
+    import re
+    cleaned = re.sub(r"[A-Z_]+\([^)]*\)", "0", expression)
+    try:
+        ast.parse(cleaned, mode="eval")
+        return True
+    except SyntaxError:
+        return False

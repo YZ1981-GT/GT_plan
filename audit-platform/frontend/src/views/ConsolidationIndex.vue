@@ -138,99 +138,84 @@
               <el-button size="small" @click="exportConsolReport">📤 导出</el-button>
             </div>
           </div>
-          <!-- 权益变动表 — 矩阵视图 -->
-          <div v-if="consolReportType === 'equity_statement' && consolReportRows.length" class="gt-consol-matrix" v-loading="consolReportLoading">
-            <div class="gt-consol-matrix-scroll">
-              <table class="gt-consol-matrix-table">
-                <thead>
-                  <tr>
-                    <th rowspan="4" class="gt-cm-th-project">项目</th>
-                    <th :colspan="consolEqCols.length">本年金额</th>
-                    <th :colspan="consolEqCols.length" class="gt-cm-th-prior">上年金额</th>
-                  </tr>
-                  <tr>
-                    <th :colspan="consolEqCols.length - 2">归属于母公司所有者权益</th>
-                    <th rowspan="3">少数股东<br/>权益</th>
-                    <th rowspan="3" class="gt-cm-th-total">所有者<br/>权益合计</th>
-                    <th :colspan="consolEqCols.length - 2">归属于母公司所有者权益</th>
-                    <th rowspan="3">少数股东<br/>权益</th>
-                    <th rowspan="3" class="gt-cm-th-total">所有者<br/>权益合计</th>
-                  </tr>
-                  <tr>
-                    <th rowspan="2">实收资本</th>
-                    <th colspan="3">其他权益工具</th>
-                    <th rowspan="2">资本公积</th>
-                    <th rowspan="2">减：库存股</th>
-                    <th rowspan="2">其他综合收益</th>
-                    <th rowspan="2">专项储备</th>
-                    <th rowspan="2">盈余公积</th>
-                    <th rowspan="2">一般风险准备</th>
-                    <th rowspan="2">未分配利润</th>
-                    <th rowspan="2" class="gt-cm-th-total">小计</th>
-                    <th rowspan="2">实收资本</th>
-                    <th colspan="3">其他权益工具</th>
-                    <th rowspan="2">资本公积</th>
-                    <th rowspan="2">减：库存股</th>
-                    <th rowspan="2">其他综合收益</th>
-                    <th rowspan="2">专项储备</th>
-                    <th rowspan="2">盈余公积</th>
-                    <th rowspan="2">一般风险准备</th>
-                    <th rowspan="2">未分配利润</th>
-                    <th rowspan="2" class="gt-cm-th-total">小计</th>
-                  </tr>
-                  <tr>
-                    <th>优先股</th><th>永续债</th><th>其他</th>
-                    <th>优先股</th><th>永续债</th><th>其他</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in consolReportRows" :key="row.row_code"
-                      :class="{ 'gt-cm-total-row': row.is_total_row, 'gt-cm-category': row.indent_level === 0 && !row.is_total_row }">
-                    <td class="gt-cm-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 14 + 'px' }">{{ row.row_name }}</td>
-                    <td v-for="col in consolEqCols" :key="'cv-' + col" class="gt-cm-td-amt">{{ fmtAmt(row['current_' + col]) }}</td>
-                    <td v-for="col in consolEqCols" :key="'pv-' + col" class="gt-cm-td-amt gt-cm-td-prior">{{ fmtAmt(row['prior_' + col]) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <!-- 权益变动表 — el-table 矩阵视图 -->
+          <div v-if="consolReportType === 'equity_statement' && consolReportRows.length" v-loading="consolReportLoading">
+            <el-table :data="consolReportRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
+              :header-cell-style="{ background: '#f4f0fa', fontSize: '12px', whiteSpace: 'nowrap' }"
+              :cell-style="{ padding: '2px 8px', fontSize: '13px' }"
+              :row-class-name="eqRowClassName"
+              :span-method="eqSpanMethod">
+              <el-table-column prop="row_name" label="项目" fixed="left" min-width="200">
+                <template #default="{ row }">
+                  <span style="white-space:nowrap" :style="{ paddingLeft: (row.indent_level || 0) * 14 + 'px' }">{{ row.row_name }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="本年金额">
+                <el-table-column v-for="col in consolEqCols" :key="'cv-' + col" :label="eqColLabel(col)" min-width="100" align="right">
+                  <template #default="{ row }">
+                    <span class="gt-amt" style="white-space:nowrap">{{ fmtAmt(row['current_' + col]) }}</span>
+                  </template>
+                </el-table-column>
+              </el-table-column>
+              <el-table-column label="上年金额">
+                <el-table-column v-for="col in consolEqCols" :key="'pv-' + col" :label="eqColLabel(col)" min-width="100" align="right">
+                  <template #default="{ row }">
+                    <span class="gt-amt" style="white-space:nowrap">{{ fmtAmt(row['prior_' + col]) }}</span>
+                  </template>
+                </el-table-column>
+              </el-table-column>
+            </el-table>
           </div>
 
-          <!-- 资产减值准备表 — 矩阵视图 -->
-          <div v-else-if="consolReportType === 'impairment_provision' && consolReportRows.length" class="gt-consol-matrix" v-loading="consolReportLoading">
-            <div class="gt-consol-matrix-scroll">
-              <table class="gt-consol-matrix-table">
-                <thead>
-                  <tr>
-                    <th rowspan="2" class="gt-cm-th-project">项目</th>
-                    <th rowspan="2">年初账面余额</th>
-                    <th colspan="4">本期增加额</th>
-                    <th colspan="5">本期减少额</th>
-                    <th rowspan="2" class="gt-cm-th-total">期末账面余额</th>
-                  </tr>
-                  <tr>
-                    <th>本期计提额</th><th>合并增加额</th><th>其他原因增加额</th><th class="gt-cm-th-total">合计</th>
-                    <th>转回额</th><th>转销额</th><th>合并减少额</th><th>其他原因减少额</th><th class="gt-cm-th-total">合计</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in consolReportRows" :key="row.row_code"
-                      :class="{ 'gt-cm-total-row': row.is_total_row }">
-                    <td class="gt-cm-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 14 + 'px' }">{{ row.row_name }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.opening_balance) }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.provision) }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.merge_add) }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.other_add) }}</td>
-                    <td class="gt-cm-td-amt" style="font-weight:600">{{ fmtAmt(row.add_total) }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.reversal) }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.writeoff) }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.merge_dec) }}</td>
-                    <td class="gt-cm-td-amt">{{ fmtAmt(row.other_dec) }}</td>
-                    <td class="gt-cm-td-amt" style="font-weight:600">{{ fmtAmt(row.dec_total) }}</td>
-                    <td class="gt-cm-td-amt" style="font-weight:700">{{ fmtAmt(row.closing_balance) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+          <!-- 资产减值准备表 — el-table 矩阵视图 -->
+          <div v-else-if="consolReportType === 'impairment_provision' && consolReportRows.length" v-loading="consolReportLoading">
+            <el-table :data="consolReportRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
+              :header-cell-style="{ background: '#f4f0fa', fontSize: '12px', whiteSpace: 'nowrap' }"
+              :cell-style="{ padding: '2px 8px', fontSize: '13px' }"
+              :row-class-name="impairRowClassName">
+              <el-table-column prop="row_name" label="项目" fixed="left" min-width="200">
+                <template #default="{ row }">
+                  <span style="white-space:nowrap" :style="{ paddingLeft: (row.indent_level || 0) * 14 + 'px' }">{{ row.row_name }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="opening_balance" label="年初账面余额" min-width="120" align="right">
+                <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.opening_balance) }}</span></template>
+              </el-table-column>
+              <el-table-column label="本期增加额">
+                <el-table-column prop="provision" label="本期计提额" min-width="110" align="right">
+                  <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.provision) }}</span></template>
+                </el-table-column>
+                <el-table-column prop="merge_add" label="合并增加额" min-width="110" align="right">
+                  <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.merge_add) }}</span></template>
+                </el-table-column>
+                <el-table-column prop="other_add" label="其他原因增加额" min-width="120" align="right">
+                  <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.other_add) }}</span></template>
+                </el-table-column>
+                <el-table-column prop="add_total" label="合计" min-width="100" align="right">
+                  <template #default="{ row }"><span class="gt-amt" style="font-weight:600">{{ fmtAmt(row.add_total) }}</span></template>
+                </el-table-column>
+              </el-table-column>
+              <el-table-column label="本期减少额">
+                <el-table-column prop="reversal" label="转回额" min-width="100" align="right">
+                  <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.reversal) }}</span></template>
+                </el-table-column>
+                <el-table-column prop="writeoff" label="转销额" min-width="100" align="right">
+                  <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.writeoff) }}</span></template>
+                </el-table-column>
+                <el-table-column prop="merge_dec" label="合并减少额" min-width="110" align="right">
+                  <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.merge_dec) }}</span></template>
+                </el-table-column>
+                <el-table-column prop="other_dec" label="其他原因减少额" min-width="120" align="right">
+                  <template #default="{ row }"><span class="gt-amt">{{ fmtAmt(row.other_dec) }}</span></template>
+                </el-table-column>
+                <el-table-column prop="dec_total" label="合计" min-width="100" align="right">
+                  <template #default="{ row }"><span class="gt-amt" style="font-weight:600">{{ fmtAmt(row.dec_total) }}</span></template>
+                </el-table-column>
+              </el-table-column>
+              <el-table-column prop="closing_balance" label="期末账面余额" min-width="120" align="right">
+                <template #default="{ row }"><span class="gt-amt" style="font-weight:700">{{ fmtAmt(row.closing_balance) }}</span></template>
+              </el-table-column>
+            </el-table>
           </div>
 
           <!-- 普通报表（资产负债表/利润表/现金流量表/现金流附表） -->
@@ -377,48 +362,25 @@
         </el-table>
       </template>
 
-      <!-- 转置视图：列变行 -->
+      <!-- 转置视图：列变行 — el-table -->
       <template v-else>
-        <div class="gt-consol-matrix" style="max-height:55vh">
-          <div class="gt-consol-matrix-scroll">
-            <table class="gt-consol-matrix-table">
-              <thead>
-                <tr>
-                  <th class="gt-cm-th-project">字段</th>
-                  <th v-for="(row, ri) in currentDrillDownRows" :key="ri">{{ row.company_name }}</th>
-                  <th class="gt-cm-th-total">合计</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="gt-cm-td-project">企业代码</td>
-                  <td v-for="(row, ri) in currentDrillDownRows" :key="'code'+ri" class="gt-cm-td-amt">{{ row.company_code }}</td>
-                  <td class="gt-cm-td-amt">—</td>
-                </tr>
-                <tr v-if="drillDownLevel === 'leaf'">
-                  <td class="gt-cm-td-project">上级单位</td>
-                  <td v-for="(row, ri) in currentDrillDownRows" :key="'parent'+ri" class="gt-cm-td-amt">{{ row.parent_name || '—' }}</td>
-                  <td class="gt-cm-td-amt">—</td>
-                </tr>
-                <tr>
-                  <td class="gt-cm-td-project" style="font-weight:600">金额</td>
-                  <td v-for="(row, ri) in currentDrillDownRows" :key="'amt'+ri" class="gt-cm-td-amt" :style="{ color: row.amount < 0 ? '#f56c6c' : '' }">{{ fmtAmt(row.amount) }}</td>
-                  <td class="gt-cm-td-amt" style="font-weight:700">{{ fmtAmt(drillDownCell.totalValue) }}</td>
-                </tr>
-                <tr>
-                  <td class="gt-cm-td-project">占比</td>
-                  <td v-for="(row, ri) in currentDrillDownRows" :key="'ratio'+ri" class="gt-cm-td-amt">{{ row.ratio }}%</td>
-                  <td class="gt-cm-td-amt" style="font-weight:600">100%</td>
-                </tr>
-                <tr v-if="drillDownLevel === 'direct'">
-                  <td class="gt-cm-td-project">数据来源</td>
-                  <td v-for="(row, ri) in currentDrillDownRows" :key="'src'+ri" class="gt-cm-td-amt">{{ row.source }}</td>
-                  <td class="gt-cm-td-amt">—</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <el-table :data="drillDownTransposedRows" border size="small" max-height="55vh" style="width:100%"
+          :header-cell-style="{ background: '#f0edf5', fontSize: '12px', whiteSpace: 'nowrap' }"
+          :cell-style="{ padding: '2px 8px', fontSize: '12px' }">
+          <el-table-column prop="field" label="字段" fixed="left" min-width="120" />
+          <el-table-column v-for="(row, ri) in currentDrillDownRows" :key="ri" :label="row.company_name" min-width="120" align="right">
+            <template #default="{ row: transRow }">
+              <span :style="{ color: transRow.field === '金额' && Number(transRow['col_' + ri]) < 0 ? '#f56c6c' : '' }">
+                {{ transRow['col_' + ri] }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="合计" min-width="120" align="right">
+            <template #default="{ row: transRow }">
+              <span :style="{ fontWeight: transRow.field === '金额' ? '700' : '600' }">{{ transRow.total }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
       </template>
 
       <el-empty v-if="!drillDownDirectRows.length && !drillDownLoading" description="请先在表格中选中一个单元格，再点击查看" />
@@ -559,6 +521,63 @@ const currentDrillDownRows = computed(() => {
 })
 const drillDownTitle = computed(() => {
   return `汇总穿透 — ${drillDownCell.itemName} / ${drillDownCell.colName}`
+})
+
+// ─── 权益变动表 el-table 辅助 ──────────────────────────────────────────────
+const EQ_COL_LABELS: Record<string, string> = {
+  paid_in_capital: '实收资本', preferred_stock: '优先股', perpetual_bond: '永续债',
+  other_equity_instruments: '其他', capital_reserve: '资本公积', treasury_stock: '减：库存股',
+  other_comprehensive_income: '其他综合收益', special_reserve: '专项储备',
+  surplus_reserve: '盈余公积', general_risk_reserve: '一般风险准备',
+  retained_earnings: '未分配利润', subtotal: '小计',
+  minority_interest: '少数股东权益', total: '所有者权益合计',
+}
+function eqColLabel(col: string): string {
+  return EQ_COL_LABELS[col] || col
+}
+function eqRowClassName({ row }: { row: any }): string {
+  if (row.is_total_row) return 'gt-cm-total-row'
+  if (row.indent_level === 0) return 'gt-cm-category'
+  return ''
+}
+function eqSpanMethod(): { rowspan: number; colspan: number } | undefined {
+  // el-table nested columns handle the multi-row header automatically
+  return undefined
+}
+function impairRowClassName({ row }: { row: any }): string {
+  if (row.is_total_row) return 'gt-cm-total-row'
+  return ''
+}
+
+// ─── 穿透转置视图 el-table 辅助 ──────────────────────────────────────────────
+const drillDownTransposedRows = computed(() => {
+  const rows: any[] = []
+  const items = currentDrillDownRows.value
+  // 企业代码行
+  const codeRow: any = { field: '企业代码', total: '—' }
+  items.forEach((r, i) => { codeRow['col_' + i] = r.company_code })
+  rows.push(codeRow)
+  // 上级单位行（仅末级明细）
+  if (drillDownLevel.value === 'leaf') {
+    const parentRow: any = { field: '上级单位', total: '—' }
+    items.forEach((r, i) => { parentRow['col_' + i] = r.parent_name || '—' })
+    rows.push(parentRow)
+  }
+  // 金额行
+  const amtRow: any = { field: '金额', total: fmtAmt(drillDownCell.totalValue) }
+  items.forEach((r, i) => { amtRow['col_' + i] = fmtAmt(r.amount) })
+  rows.push(amtRow)
+  // 占比行
+  const ratioRow: any = { field: '占比', total: '100%' }
+  items.forEach((r, i) => { ratioRow['col_' + i] = r.ratio + '%' })
+  rows.push(ratioRow)
+  // 数据来源行（仅直接下级）
+  if (drillDownLevel.value === 'direct') {
+    const srcRow: any = { field: '数据来源', total: '—' }
+    items.forEach((r, i) => { srcRow['col_' + i] = r.source })
+    rows.push(srcRow)
+  }
+  return rows
 })
 
 function openCellDrillDown() {
@@ -1375,43 +1394,11 @@ watch(activeTab, (tab) => {
   height: 34px;
 }
 
-/* ── 矩阵表格（权益变动表 & 资产减值准备表） ── */
-.gt-consol-matrix {
-  overflow: hidden; border: 1px solid #e8e4f0; border-radius: 6px;
-}
-.gt-consol-matrix-scroll {
-  overflow-x: auto; max-height: calc(100vh - 280px);
-}
-.gt-consol-matrix-table {
-  width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px;
-}
-.gt-consol-matrix-table th,
-.gt-consol-matrix-table td {
-  border: 1px solid #e8e4f0; padding: 6px 10px; white-space: nowrap; text-align: center;
-}
-.gt-consol-matrix-table thead th {
-  background: linear-gradient(180deg, #f4f0fa, #ece6f5); color: #333; font-weight: 600; position: sticky; top: 0; z-index: 2; font-size: 12px;
-}
-/* 斑马纹 */
-.gt-consol-matrix-table tbody tr:nth-child(even) td { background: #faf9fd; }
-.gt-consol-matrix-table tbody tr:hover td { background: var(--gt-color-primary-bg, #f4f0fa); }
-.gt-cm-th-project {
-  min-width: 200px; text-align: left !important; position: sticky; left: 0; z-index: 3;
-  background: linear-gradient(180deg, #f4f0fa, #ece6f5) !important;
-}
-.gt-cm-th-prior { background: #f5f3f8 !important; }
-.gt-cm-th-total { font-weight: 700 !important; background: #ebe7f2 !important; }
-.gt-cm-td-project {
-  text-align: left !important; font-size: 12px; position: sticky; left: 0; z-index: 1;
-  background: #fff; white-space: nowrap;
-}
-.gt-cm-td-amt { text-align: right !important; font-size: 13px; min-width: 90px; font-variant-numeric: tabular-nums; }
+/* ── 合并报表 el-table 行样式 ── */
+:deep(.gt-cm-total-row td) { font-weight: 700; background: #f0edf5 !important; }
+:deep(.gt-cm-category td) { font-weight: 600; color: #4b2d77; }
 .gt-tb-editable { cursor: text; border-bottom: 1px dashed var(--gt-color-border, #e5e5ea); padding: 2px 6px; border-radius: 2px; display: inline-block; min-width: 70px; text-align: right; }
 .gt-tb-editable:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
-.gt-cm-td-prior { background: #faf9fc; }
-.gt-cm-total-row td { font-weight: 700; background: #f0edf5 !important; }
-.gt-cm-category td { font-weight: 600; color: #4b2d77; }
-.gt-cm-th-total { background: #e8e0f0 !important; color: #4b2d77; font-weight: 700; }
 .gt-tb-audited { font-weight: 700; color: #4b2d77; background: rgba(75,45,119,0.06); }
 
 /* 审核结果行样式 */

@@ -93,31 +93,23 @@ const formattedValue = computed(() => {
 <style>
 /* ══ 通用单元格选中高亮（GT品牌紫色系） ══ */
 
-/* 选中单元格：淡紫色背景，无独立边框（连续区域看起来是一个整体） */
+/* 选中单元格：淡紫色背景，不显示边框 */
 .gt-ucell--selected {
   position: relative;
   background: rgba(75, 45, 119, 0.08) !important;
   z-index: 1;
+  border-color: transparent !important;
 }
 
-/* 选中区域的外边框：只在区域边缘显示（通过相邻选择器判断） */
-/* 上边框：如果上方没有选中单元格 */
-.gt-ucell--selected {
-  border-top: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
-  border-bottom: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
-  border-left: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
-  border-right: 1.5px solid var(--gt-color-primary, #4b2d77) !important;
-}
-
-/* 相邻选中单元格之间去掉内部边框 */
+/* 相邻选中单元格之间保持无边框 */
 .gt-ucell--selected + .gt-ucell--selected {
-  border-left: none !important;
+  border-color: transparent !important;
 }
 
-/* 单选时（只有一个单元格）：加强调样式 */
+/* 单选时（只有一个单元格）：稍深背景，无边框 */
 .gt-ucell--single-selected {
-  background: rgba(75, 45, 119, 0.1) !important;
-  outline: 2px solid var(--gt-color-primary, #4b2d77);
+  background: rgba(75, 45, 119, 0.12) !important;
+  border-color: transparent !important;
   outline-offset: -2px;
 }
 /* 单选右下角小方块（Excel 风格的填充柄） */

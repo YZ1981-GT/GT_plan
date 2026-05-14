@@ -523,7 +523,17 @@ class TrialBalanceService:
             )
             tb_result = await self.db.execute(tb_q)
             for r in tb_result.fetchall():
-                unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
+                amount = Decimal(str(r.unadj))
+                # 贷方方向科目取反为正数（与 tb_amount_map 保持一致）
+                code = r.standard_account_code
+                is_credit_dir = (
+                    code[0] in ('2', '3', '4')
+                    or code in ('5001', '5051', '5101')
+                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
+                )
+                if is_credit_dir and amount < 0:
+                    amount = -amount
+                unadj_map[code] = amount
 
         # 4. 从 adjustments 汇总 AJE/RJE
         aje_dr_map: dict[str, Decimal] = {}
@@ -565,6 +575,9 @@ class TrialBalanceService:
         from app.services.formula_engine import execute_formula, get_formula_account_codes, FormulaContext
 
         # 构建 trial_balance 科目→金额索引（供公式引擎用）
+        # 注意：负债/权益/收入类科目在 trial_balance 中存为负数（贷方语义），
+        # 但报表展示时应为正数。此处对贷方方向科目取绝对值（取反），
+        # 使公式引擎和前端展示统一为正数。
         all_tb_q = (
             sa.select(tb.c.standard_account_code, tb.c.unadjusted_amount)
             .where(
@@ -578,9 +591,18 @@ class TrialBalanceService:
         tb_amount_map: dict[str, Decimal] = {}
         for r in all_tb_result.fetchall():
             if r.standard_account_code:
-                tb_amount_map[r.standard_account_code] = (
-                    tb_amount_map.get(r.standard_account_code, Decimal("0"))
-                    + (r.unadjusted_amount or Decimal("0"))
+                amount = r.unadjusted_amount or Decimal("0")
+                # 贷方方向科目（2xxx负债/3xxx权益/4xxx权益/收入类）取反为正数
+                code = r.standard_account_code
+                is_credit_direction = (
+                    code[0] in ('2', '3', '4')  # 负债/权益
+                    or code in ('5001', '5051', '5101')  # 收入
+                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
+                )
+                if is_credit_direction and amount < 0:
+                    amount = -amount
+                tb_amount_map[code] = (
+                    tb_amount_map.get(code, Decimal("0")) + amount
                 )
 
         result_rows = []
@@ -618,6 +640,20 @@ class TrialBalanceService:
                         rcl_dr += rcl_dr_map.get(code, Decimal("0"))
                         rcl_cr += rcl_cr_map.get(code, Decimal("0"))
                 audited = unadj + aje_dr - aje_cr + rcl_dr - rcl_cr
+
+                # 合计行公式结果为 0 时 fallback 到向前汇总（seed 公式可能范围不完整）
+                if is_total and unadj == 0:
+                    fb_unadj = Decimal("0")
+                    fb_audited = Decimal("0")
+                    for prev_row in result_rows[::-1]:
+                        if prev_row.get("is_category") or prev_row.get("is_total"):
+                            break
+                        fb_unadj += Decimal(str(prev_row.get("unadjusted") or 0))
+                        fb_audited += Decimal(str(prev_row.get("audited") or 0))
+                    if fb_unadj != 0:
+                        unadj = fb_unadj
+                        audited = fb_audited
+
             elif is_total:
                 # 合计行无公式：向前汇总子行（fallback）
                 total_unadj = Decimal("0")
@@ -729,7 +765,16 @@ class TrialBalanceService:
             )
             tb_result = await self.db.execute(tb_q)
             for r in tb_result.fetchall():
-                unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
+                amount = Decimal(str(r.unadj))
+                code = r.standard_account_code
+                is_credit_dir = (
+                    code[0] in ('2', '3', '4')
+                    or code in ('5001', '5051', '5101')
+                    or (code.startswith('6') and code[:4] in ('6001', '6051', '6101', '6111', '6115', '6117', '6301'))
+                )
+                if is_credit_dir and amount < 0:
+                    amount = -amount
+                unadj_map[code] = amount
 
         aje_dr_map: dict[str, Decimal] = {}
         aje_cr_map: dict[str, Decimal] = {}

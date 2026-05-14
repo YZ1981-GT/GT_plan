@@ -82,41 +82,42 @@
       <div v-if="documents.length === 0" class="empty-state">
         知识库暂无文档，请添加或导入数据
       </div>
-      <div v-else class="docs-table-wrap">
-        <table class="docs-table">
-          <thead>
-            <tr>
-              <th>标题</th>
-              <th>类型</th>
-              <th>标签</th>
-              <th>分块数</th>
-              <th>创建时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="doc in documents" :key="doc.knowledge_id">
-              <td class="doc-title">{{ doc.title }}</td>
-              <td>
-                <span class="source-tag">{{ doc.source_type }}</span>
-              </td>
-              <td>
-                <span
-                  v-for="tag in doc.tags"
-                  :key="tag"
-                  class="tag-item"
-                >{{ tag }}</span>
-              </td>
-              <td>{{ doc.chunk_count }}</td>
-              <td>{{ formatDate(doc.created_at) }}</td>
-              <td>
-                <button class="btn-icon" @click="viewDoc(doc)" title="查看">👁️</button>
-                <button class="btn-icon" @click="deleteDoc(doc)" title="删除">🗑️</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <el-table
+        v-else
+        :data="documents"
+        border
+        size="small"
+        :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }"
+        row-key="knowledge_id"
+      >
+        <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="source_type" label="类型" width="100">
+          <template #default="{ row }">
+            <span class="source-tag">{{ row.source_type }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="标签" min-width="150">
+          <template #default="{ row }">
+            <span
+              v-for="tag in row.tags"
+              :key="tag"
+              class="tag-item"
+            >{{ tag }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="chunk_count" label="分块数" width="80" align="center" />
+        <el-table-column label="创建时间" width="120">
+          <template #default="{ row }">
+            {{ formatDate(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" align="center">
+          <template #default="{ row }">
+            <button class="btn-icon" @click="viewDoc(row)" title="查看">👁️</button>
+            <button class="btn-icon" @click="deleteDoc(row)" title="删除">🗑️</button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <!-- 添加文档弹窗 -->
@@ -558,19 +559,7 @@ onMounted(() => {
   border-radius: 4px;
 }
 
-.docs-table-wrap { overflow-x: auto; }
-.docs-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.docs-table th, .docs-table td {
-  border: 1px solid #eee;
-  padding: 8px 12px;
-  text-align: left;
-}
-.docs-table th { background: #f9f9f9; font-weight: 600; }
-.doc-title { font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 
 .tag-item {
   display: inline-block;

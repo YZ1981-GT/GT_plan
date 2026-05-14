@@ -47,14 +47,15 @@
         </el-table>
         <!-- 转置视图 -->
         <div v-else class="gt-cq-transposed" v-loading="loading">
-          <table class="gt-cq-trans-table" border="1">
-            <tbody>
-              <tr v-for="col in resultColumns" :key="col">
-                <th>{{ columnLabel(col) }}</th>
-                <td v-for="(row, ri) in filteredRows.slice(0, 50)" :key="ri">{{ formatCell(row[col]) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <el-table :data="transposedRows" border size="small" max-height="calc(100vh - 200px)" style="width:100%"
+            :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }">
+            <el-table-column prop="_field_label" label="字段" width="140" fixed="left" />
+            <el-table-column v-for="(_, ci) in transposedDataCols" :key="ci" :prop="'_v' + ci" :label="'#' + (ci + 1)" min-width="120" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span style="display:block; text-align:right">{{ row['_v' + ci] }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
         <div class="gt-cq-footer">
           <span style="font-size:11px;color:#999">{{ resultRows.length }} 行 × {{ resultColumns.length }} 列{{ filterText ? `（过滤后 ${filteredRows.length} 行）` : '' }}</span>
@@ -101,6 +102,17 @@ const filteredRows = computed(() => {
   if (!filterText.value) return resultRows.value
   const kw = filterText.value.toLowerCase()
   return resultRows.value.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(kw)))
+})
+
+// 转置视图数据：每个原始列变成一行，每个原始行变成一列
+const transposedDataCols = computed(() => filteredRows.value.slice(0, 50))
+const transposedRows = computed(() => {
+  const rows = transposedDataCols.value
+  return resultColumns.value.map(col => {
+    const entry: Record<string, any> = { _field_label: columnLabel(col) }
+    rows.forEach((row, ci) => { entry['_v' + ci] = formatCell(row[col]) })
+    return entry
+  })
 })
 
 const COLUMN_LABELS: Record<string, string> = {
@@ -207,7 +219,4 @@ loadIndicators()
 .gt-cq-filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .gt-cq-footer { padding: 6px 0; }
 .gt-cq-transposed { overflow: auto; flex: 1; }
-.gt-cq-trans-table { border-collapse: collapse; font-size: 12px; }
-.gt-cq-trans-table th { background: #f0edf5; padding: 4px 8px; text-align: left; white-space: nowrap; position: sticky; left: 0; z-index: 1; }
-.gt-cq-trans-table td { padding: 4px 8px; text-align: right; white-space: nowrap; border: 1px solid #e8e4f0; }
 </style>

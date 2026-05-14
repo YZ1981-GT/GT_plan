@@ -46,47 +46,83 @@
       <span class="gt-ctb-info-formula">审定数 = 汇总 + 抵消借 - 抵消贷 + 调整借 - 调整贷</span>
     </div>
 
-    <!-- 试算平衡表 -->
-    <div class="gt-consol-matrix gt-ctb-table-wrap" v-loading="consolTbLoading">
-      <div class="gt-consol-matrix-scroll">
-        <table class="gt-consol-matrix-table">
-          <thead>
-            <tr>
-              <th rowspan="2" class="gt-cm-th-project" style="min-width:70px">行次</th>
-              <th rowspan="2" class="gt-cm-th-project" style="min-width:220px">项目</th>
-              <th rowspan="2" style="min-width:110px">审定汇总</th>
-              <th colspan="2" style="background:#e8e0f0 !important;color:#4b2d77">权益抵消</th>
-              <th colspan="2" style="background:#dce6f0 !important;color:#1a3a5c">往来交易抵消</th>
-              <th colspan="2" style="background:#e6f0e6 !important;color:#1e6e1e">报表调整</th>
-              <th rowspan="2" class="gt-cm-th-total" style="min-width:120px">合并审定数</th>
-            </tr>
-            <tr>
-              <th style="background:#f0eaf8 !important;min-width:100px">借方</th><th style="background:#f0eaf8 !important;min-width:100px">贷方</th>
-              <th style="background:#eaf0f8 !important;min-width:100px">借方</th><th style="background:#eaf0f8 !important;min-width:100px">贷方</th>
-              <th style="background:#eaf8ea !important;min-width:100px">借方</th><th style="background:#eaf8ea !important;min-width:100px">贷方</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, ri) in consolTbRows" :key="ri"
-              :class="{ 'gt-cm-total-row': row.is_total, 'gt-cm-category': row.is_category }"
-              @contextmenu.prevent="$emit('cell-context-menu', $event, row, ri)">
-              <td class="gt-cm-td-amt" style="text-align:center;font-size:12px;color:#999">{{ row.row_code }}</td>
-              <td class="gt-cm-td-project" :style="{ paddingLeft: (row.indent || 0) * 16 + 'px' }">{{ row.row_name }}</td>
-              <td class="gt-cm-td-amt gt-tb-formula">
-                <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 0)" v-model="row.summary" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
-                <span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 0)">{{ fmtAmt(row.summary) }}</span>
-              </td>
-              <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 1)" v-model="row.equity_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 1)">{{ fmtAmt(row.equity_dr) }}</span></td>
-              <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 2)" v-model="row.equity_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 2)">{{ fmtAmt(row.equity_cr) }}</span></td>
-              <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 3)" v-model="row.trade_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 3)">{{ fmtAmt(row.trade_dr) }}</span></td>
-              <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 4)" v-model="row.trade_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 4)">{{ fmtAmt(row.trade_cr) }}</span></td>
-              <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 5)" v-model="row.adj_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 5)">{{ fmtAmt(row.adj_dr) }}</span></td>
-              <td class="gt-cm-td-amt"><el-input-number v-if="tbEditMode && tbLazyEdit.isEditing(ri, 6)" v-model="row.adj_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus /><span v-else :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit(ri, 6)">{{ fmtAmt(row.adj_cr) }}</span></td>
-              <td class="gt-cm-td-amt gt-tb-audited">{{ fmtAmt(row.audited) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <!-- 试算平衡表 — el-table -->
+    <div class="gt-ctb-table-wrap" v-loading="consolTbLoading">
+      <el-table :data="consolTbRows" border size="small" max-height="calc(100vh - 240px)" style="width:100%"
+        :header-cell-style="{ whiteSpace: 'nowrap', fontSize: '12px' }"
+        :cell-style="{ padding: '2px 8px', fontSize: '13px' }"
+        :row-class-name="tbRowClassName"
+        @row-contextmenu="onRowContextMenu">
+        <el-table-column prop="row_code" label="行次" width="70" align="center">
+          <template #default="{ row }">
+            <span style="font-size:12px;color:#999">{{ row.row_code }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="row_name" label="项目" fixed="left" min-width="220">
+          <template #default="{ row }">
+            <span style="white-space:nowrap" :style="{ paddingLeft: (row.indent || 0) * 16 + 'px' }">{{ row.row_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定汇总" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing($index, 0)" v-model="row.summary" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+            <span v-else class="gt-amt" :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit($index, 0)">{{ fmtAmt(row.summary) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="权益抵消">
+          <el-table-column label="借方" min-width="100" align="right" header-align="center">
+            <template #header><span style="color:#4b2d77">借方</span></template>
+            <template #default="{ row, $index }">
+              <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing($index, 1)" v-model="row.equity_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+              <span v-else class="gt-amt" :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit($index, 1)">{{ fmtAmt(row.equity_dr) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="贷方" min-width="100" align="right" header-align="center">
+            <template #header><span style="color:#4b2d77">贷方</span></template>
+            <template #default="{ row, $index }">
+              <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing($index, 2)" v-model="row.equity_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+              <span v-else class="gt-amt" :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit($index, 2)">{{ fmtAmt(row.equity_cr) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="往来交易抵消">
+          <el-table-column label="借方" min-width="100" align="right" header-align="center">
+            <template #header><span style="color:#1a3a5c">借方</span></template>
+            <template #default="{ row, $index }">
+              <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing($index, 3)" v-model="row.trade_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+              <span v-else class="gt-amt" :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit($index, 3)">{{ fmtAmt(row.trade_dr) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="贷方" min-width="100" align="right" header-align="center">
+            <template #header><span style="color:#1a3a5c">贷方</span></template>
+            <template #default="{ row, $index }">
+              <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing($index, 4)" v-model="row.trade_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+              <span v-else class="gt-amt" :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit($index, 4)">{{ fmtAmt(row.trade_cr) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="报表调整">
+          <el-table-column label="借方" min-width="100" align="right" header-align="center">
+            <template #header><span style="color:#1e6e1e">借方</span></template>
+            <template #default="{ row, $index }">
+              <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing($index, 5)" v-model="row.adj_dr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+              <span v-else class="gt-amt" :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit($index, 5)">{{ fmtAmt(row.adj_dr) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="贷方" min-width="100" align="right" header-align="center">
+            <template #header><span style="color:#1e6e1e">贷方</span></template>
+            <template #default="{ row, $index }">
+              <el-input-number v-if="tbEditMode && tbLazyEdit.isEditing($index, 6)" v-model="row.adj_cr" size="small" :controls="false" style="width:100%" @blur="tbLazyEdit.stopEdit()" autofocus />
+              <span v-else class="gt-amt" :class="{ 'gt-tb-editable': tbEditMode }" @click="tbEditMode && tbLazyEdit.startEdit($index, 6)">{{ fmtAmt(row.adj_cr) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column prop="audited" label="合并审定数" min-width="120" align="right">
+          <template #default="{ row }">
+            <span class="gt-amt gt-tb-audited">{{ fmtAmt(row.audited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
     <el-empty v-if="!consolTbRows.length && !consolTbLoading" :image-size="80">
       <template #description>
@@ -397,6 +433,18 @@ async function auditConsolTb() {
 }
 
 defineExpose({ loadConsolTb, consolTbRows, consolTbType, consolTbLoading })
+
+function tbRowClassName({ row }: { row: any }): string {
+  if (row.is_total) return 'gt-cm-total-row'
+  if (row.is_category) return 'gt-cm-category'
+  return ''
+}
+
+function onRowContextMenu(row: any, _col: any, event: MouseEvent) {
+  event.preventDefault()
+  const ri = consolTbRows.value.indexOf(row)
+  emit('cell-context-menu', event, row, ri)
+}
 </script>
 
 <style scoped>
@@ -417,7 +465,12 @@ defineExpose({ loadConsolTb, consolTbRows, consolTbType, consolTbLoading })
   border-radius: var(--gt-radius-sm, 4px); font-size: 11px; color: var(--gt-color-primary, #4b2d77);
 }
 .gt-ctb-table-wrap { flex: 1; min-height: 0; overflow: hidden; }
-.gt-ctb-table-wrap .gt-consol-matrix-scroll { max-height: 100%; height: 100%; }
 /* 工具栏在此组件中 flex-shrink: 0 */
 .gt-ctb :deep(.gt-ctb-toolbar) { flex-shrink: 0; }
+/* el-table 行样式 */
+:deep(.gt-cm-total-row td) { font-weight: 700; background: #f0edf5 !important; }
+:deep(.gt-cm-category td) { font-weight: 600; color: #4b2d77; }
+.gt-tb-editable { cursor: text; border-bottom: 1px dashed var(--gt-color-border, #e5e5ea); padding: 2px 6px; border-radius: 2px; display: inline-block; min-width: 70px; text-align: right; }
+.gt-tb-editable:hover { background: var(--gt-color-primary-bg, #f4f0fa); }
+.gt-tb-audited { font-weight: 700; color: #4b2d77; background: rgba(75,45,119,0.06); }
 </style>

@@ -140,154 +140,79 @@
       @close="rvSearch.close()"
     />
 
-    <!-- 所有者权益变动表 — 矩阵视图 -->
+    <!-- 所有者权益变动表 — el-table 矩阵视图（动态列 v-for + span-method） -->
     <div v-if="activeTab === 'equity_statement'" class="gt-rv-equity-matrix" v-loading="loading">
-      <div class="gt-rv-eq-scroll">
-        <table class="gt-rv-eq-table gt-rv-eq-auto-width">
-          <thead v-if="isConsolidated">
-            <!-- 合并报表：4行表头 -->
-            <tr class="gt-rv-eq-hr1">
-              <th rowspan="4" class="gt-rv-eq-th-project">项目</th>
-              <th :colspan="eqTotalCols" class="gt-rv-eq-th-period">本年金额</th>
-              <th :colspan="eqTotalCols" class="gt-rv-eq-th-period gt-rv-eq-th-prior">上年金额</th>
-            </tr>
-            <tr class="gt-rv-eq-hr2">
-              <th colspan="12">归属于母公司所有者权益</th>
-              <th rowspan="3">少数股东<br/>权益</th>
-              <th rowspan="3" class="gt-rv-eq-th-total">所有者<br/>权益<br/>合计</th>
-              <th colspan="12">归属于母公司所有者权益</th>
-              <th rowspan="3">少数股东<br/>权益</th>
-              <th rowspan="3" class="gt-rv-eq-th-total">所有者<br/>权益<br/>合计</th>
-            </tr>
-            <tr class="gt-rv-eq-hr3">
-              <th rowspan="2">实收资本</th>
-              <th colspan="3">其他权益工具</th>
-              <th rowspan="2">资本公积</th>
-              <th rowspan="2">减：库存股</th>
-              <th rowspan="2">其他综合收益</th>
-              <th rowspan="2">专项储备</th>
-              <th rowspan="2">盈余公积</th>
-              <th rowspan="2">一般风险准备</th>
-              <th rowspan="2">未分配利润</th>
-              <th rowspan="2" class="gt-rv-eq-th-total">小计</th>
-              <th rowspan="2">实收资本</th>
-              <th colspan="3">其他权益工具</th>
-              <th rowspan="2">资本公积</th>
-              <th rowspan="2">减：库存股</th>
-              <th rowspan="2">其他综合收益</th>
-              <th rowspan="2">专项储备</th>
-              <th rowspan="2">盈余公积</th>
-              <th rowspan="2">一般风险准备</th>
-              <th rowspan="2">未分配利润</th>
-              <th rowspan="2" class="gt-rv-eq-th-total">小计</th>
-            </tr>
-            <tr class="gt-rv-eq-hr4">
-              <th>优先股</th><th>永续债</th><th>其他</th>
-              <th class="gt-rv-eq-th-prior-col">优先股</th><th class="gt-rv-eq-th-prior-col">永续债</th><th class="gt-rv-eq-th-prior-col">其他</th>
-            </tr>
-          </thead>
-          <thead v-else>
-            <!-- 单体报表：3行表头（无归属母公司行） -->
-            <tr class="gt-rv-eq-hr1">
-              <th rowspan="3" class="gt-rv-eq-th-project">项目</th>
-              <th :colspan="eqTotalCols" class="gt-rv-eq-th-period">本年金额</th>
-              <th :colspan="eqTotalCols" class="gt-rv-eq-th-period gt-rv-eq-th-prior">上年金额</th>
-            </tr>
-            <tr class="gt-rv-eq-hr3 gt-rv-eq-hr3--standalone">
-              <th rowspan="2">实收资本</th>
-              <th colspan="3">其他权益工具</th>
-              <th rowspan="2">资本公积</th>
-              <th rowspan="2">减：库存股</th>
-              <th rowspan="2">其他综合收益</th>
-              <th rowspan="2">专项储备</th>
-              <th rowspan="2">盈余公积</th>
-              <th rowspan="2">一般风险准备</th>
-              <th rowspan="2">未分配利润</th>
-              <th rowspan="2" class="gt-rv-eq-th-total">所有者<br/>权益合计</th>
-              <th rowspan="2">实收资本</th>
-              <th colspan="3">其他权益工具</th>
-              <th rowspan="2">资本公积</th>
-              <th rowspan="2">减：库存股</th>
-              <th rowspan="2">其他综合收益</th>
-              <th rowspan="2">专项储备</th>
-              <th rowspan="2">盈余公积</th>
-              <th rowspan="2">一般风险准备</th>
-              <th rowspan="2">未分配利润</th>
-              <th rowspan="2" class="gt-rv-eq-th-total">所有者<br/>权益合计</th>
-            </tr>
-            <tr class="gt-rv-eq-hr4 gt-rv-eq-hr4--standalone">
-              <th>优先股</th><th>永续债</th><th>其他</th>
-              <th class="gt-rv-eq-th-prior-col">优先股</th><th class="gt-rv-eq-th-prior-col">永续债</th><th class="gt-rv-eq-th-prior-col">其他</th>
-            </tr>
-          </thead>
-          <tbody v-if="rows.length">
-            <tr v-for="row in rows" :key="row.row_code"
-                :class="{ 'gt-rv-eq-total-row': row.is_total_row, 'gt-rv-eq-category': row.indent_level === 0 && !row.is_total_row }">
-              <td class="gt-rv-eq-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">
-                {{ row.row_name }}
-              </td>
-              <!-- 本年各列：仅合计列显示 current_period_amount，其余列显示 0 -->
-              <td v-for="col in eqColumns" :key="'cv-' + col.key" class="gt-rv-eq-td-amount">
+      <el-table :data="rows" border size="small" :span-method="equitySpanMethod"
+        :row-class-name="eqRowClassName" style="width: 100%" max-height="600"
+        :header-cell-style="{ background: '#f8f6fb', color: '#333', whiteSpace: 'nowrap', fontSize: '12px' }">
+        <el-table-column prop="row_name" label="项目" fixed width="280" :resizable="true">
+          <template #default="{ row }">
+            <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">{{ row.row_name }}</span>
+          </template>
+        </el-table-column>
+        <!-- 本年金额 — 动态列 -->
+        <el-table-column label="本年金额">
+          <el-table-column v-for="col in eqColumns" :key="'cv-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
+            <template #default="{ row }">
+              <span class="gt-amt">
                 <template v-if="col.key === 'total'">{{ fmt(row.current_period_amount) }}</template>
                 <template v-else>{{ fmt(0) }}</template>
-              </td>
-              <!-- 上年各列：仅合计列显示 prior_period_amount，其余列显示 0 -->
-              <td v-for="col in eqColumns" :key="'pv-' + col.key" class="gt-rv-eq-td-amount gt-rv-eq-td-prior">
+              </span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <!-- 上年金额 — 动态列 -->
+        <el-table-column label="上年金额">
+          <el-table-column v-for="col in eqColumns" :key="'pv-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
+            <template #default="{ row }">
+              <span class="gt-amt" style="color: #999">
                 <template v-if="col.key === 'total'">{{ fmt(row.prior_period_amount) }}</template>
                 <template v-else>{{ fmt(0) }}</template>
-              </td>
-            </tr>
-          </tbody>
-          <tbody v-else>
-            <tr>
-              <td :colspan="1 + eqTotalCols * 2" class="gt-rv-eq-td-empty">暂无数据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              </span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+      </el-table>
       <p v-if="rows.length === 0" class="gt-rv-eq-hint">提示：权益变动表为矩阵结构，各列金额需在项目导入数据后自动填充。</p>
     </div>
 
-    <!-- 资产减值准备表 — 矩阵视图 -->
+    <!-- 资产减值准备表 — el-table 矩阵视图（嵌套列） -->
     <div v-if="activeTab === 'impairment_provision'" class="gt-rv-equity-matrix" v-loading="loading">
-      <div class="gt-rv-eq-scroll">
-        <table class="gt-rv-eq-table gt-rv-eq-auto-width">
-          <thead>
-            <tr class="gt-rv-eq-header-group">
-              <th rowspan="2" class="gt-rv-eq-th-project">项目</th>
-              <th rowspan="2" class="gt-rv-eq-th-col">年初账面余额</th>
-              <th :colspan="impIncCols.length">本期增加额</th>
-              <th :colspan="impDecCols.length">本期减少额</th>
-              <th rowspan="2" class="gt-rv-eq-th-total">期末账面余额</th>
-            </tr>
-            <tr class="gt-rv-eq-header-cols">
-              <th v-for="col in impIncCols" :key="'inc-' + col.key" class="gt-rv-eq-th-col">{{ col.label }}</th>
-              <th v-for="col in impDecCols" :key="'dec-' + col.key" class="gt-rv-eq-th-col">{{ col.label }}</th>
-            </tr>
-          </thead>
-          <tbody v-if="rows.length">
-            <tr v-for="row in rows" :key="row.row_code"
-                :class="{ 'gt-rv-eq-total-row': row.is_total_row }">
-              <td class="gt-rv-eq-td-project" :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">
-                {{ row.row_name }}
-              </td>
-              <!-- 年初账面余额：用 prior_period_amount 表示 -->
-              <td class="gt-rv-eq-td-amount">{{ fmt(row.prior_period_amount) }}</td>
-              <!-- 本期增加各列：显示 0（矩阵细列暂无独立字段） -->
-              <td v-for="col in impIncCols" :key="'iv-' + col.key" class="gt-rv-eq-td-amount">{{ fmt(0) }}</td>
-              <!-- 本期减少各列：显示 0 -->
-              <td v-for="col in impDecCols" :key="'dv-' + col.key" class="gt-rv-eq-td-amount">{{ fmt(0) }}</td>
-              <!-- 期末账面余额：用 current_period_amount 表示 -->
-              <td class="gt-rv-eq-td-amount" style="font-weight: 600;">{{ fmt(row.current_period_amount) }}</td>
-            </tr>
-          </tbody>
-          <tbody v-else>
-            <tr>
-              <td :colspan="2 + impIncCols.length + impDecCols.length + 1" class="gt-rv-eq-td-empty">暂无数据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <el-table :data="rows" border size="small"
+        :row-class-name="impRowClassName" style="width: 100%" max-height="600"
+        :header-cell-style="{ background: '#f8f6fb', color: '#333', whiteSpace: 'nowrap', fontSize: '12px' }">
+        <el-table-column prop="row_name" label="项目" fixed width="280" :resizable="true">
+          <template #default="{ row }">
+            <span :style="{ paddingLeft: (row.indent_level || 0) * 16 + 'px' }">{{ row.row_name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="年初账面余额" width="130" align="right" :resizable="true">
+          <template #default="{ row }">
+            <span class="gt-amt">{{ fmt(row.prior_period_amount) }}</span>
+          </template>
+        </el-table-column>
+        <!-- 本期增加额 — 嵌套列 -->
+        <el-table-column label="本期增加额">
+          <el-table-column v-for="col in impIncCols" :key="'inc-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
+            <template #default>
+              <span class="gt-amt">{{ fmt(0) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <!-- 本期减少额 — 嵌套列 -->
+        <el-table-column label="本期减少额">
+          <el-table-column v-for="col in impDecCols" :key="'dec-' + col.key" :label="col.label" width="110" align="right" :resizable="true">
+            <template #default>
+              <span class="gt-amt">{{ fmt(0) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="期末账面余额" width="130" align="right" :resizable="true">
+          <template #default="{ row }">
+            <span class="gt-amt" style="font-weight: 600">{{ fmt(row.current_period_amount) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <!-- 报表表格 — 普通模式（非矩阵报表） -->
@@ -998,6 +923,31 @@ const impDecCols = [
   { key: 'other_dec', label: '其他原因减少额' },
   { key: 'dec_total', label: '合计' },
 ]
+
+// 权益变动表 span-method（合并单元格：分类标题行横跨所有列）
+function equitySpanMethod({ row, columnIndex }: { row: any; column: any; rowIndex: number; columnIndex: number }) {
+  if (row.indent_level === 0 && !row.is_total_row && columnIndex === 0) {
+    // 分类标题行：项目列横跨所有列
+    return { rowspan: 1, colspan: 1 + eqColumns.value.length * 2 }
+  }
+  if (row.indent_level === 0 && !row.is_total_row && columnIndex > 0) {
+    return { rowspan: 0, colspan: 0 }
+  }
+  return { rowspan: 1, colspan: 1 }
+}
+
+// 权益变动表行样式
+function eqRowClassName({ row }: { row: any }) {
+  if (row.is_total_row) return 'gt-rv-eq-total-row'
+  if (row.indent_level === 0) return 'gt-rv-eq-category'
+  return ''
+}
+
+// 减值准备表行样式
+function impRowClassName({ row }: { row: any }) {
+  if (row.is_total_row) return 'gt-rv-eq-total-row'
+  return ''
+}
 
 // 报表行→附注跳转
 const _ROW_NOTE_MAP: Record<string, string> = {
@@ -1871,7 +1821,7 @@ function copyReportTable() {
 :deep(.el-tabs__item.is-active) { font-weight: 600; }
 :deep(.el-tabs__active-bar) { height: 3px; border-radius: 2px; }
 
-/* ── 权益变动表 & 资产减值准备表 — 矩阵表格统一样式 ── */
+/* ── 权益变动表 & 资产减值准备表 — el-table 矩阵容器 ── */
 .gt-rv-equity-matrix {
   margin-top: 0;
   flex: 1;
@@ -1879,162 +1829,17 @@ function copyReportTable() {
   display: flex;
   flex-direction: column;
 }
-.gt-rv-eq-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  border: 1px solid #e8e4f0;
-  border-radius: var(--gt-radius-md);
-  border-top: 2px solid var(--gt-color-primary);
-  position: relative;
-}
-/* 矩阵表头冻结 — 每行精确控制 */
-.gt-rv-eq-table thead th {
-  position: sticky;
-  z-index: 3;
-  background: #f8f6fb;
-}
-.gt-rv-eq-hr1 th {
-  top: 0;
-  background: #e8e0f5 !important;
-  color: #4b2d77 !important;
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 2px;
-  border-bottom: 2px solid #d0c4e4 !important;
-}
-.gt-rv-eq-hr2 th {
-  top: 30px;
-  background: #ede8f5 !important;
-  color: #5c3d8f !important;
-  font-weight: 600;
-  font-size: 12px;
-}
-.gt-rv-eq-hr3 th {
-  top: 58px;
-  background: #f3eff8 !important;
-  color: #4b2d77 !important;
-  font-weight: 600;
-  font-size: 12px;
-}
-.gt-rv-eq-hr4 th {
-  top: 86px;
-  background: #f8f6fb !important;
-  color: #6b4a9e !important;
-  font-weight: 500;
-  font-size: 12px;
-}
-/* 单体模式：少了hr2行，hr3/hr4的top值上移 */
-.gt-rv-eq-hr3--standalone th { top: 30px !important; }
-.gt-rv-eq-hr4--standalone th { top: 58px !important; }
-/* 资产减值准备表只有2行表头 */
-.gt-rv-eq-header-group th { top: 0; }
-.gt-rv-eq-header-cols th { top: 28px; }
-.gt-rv-eq-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  table-layout: auto;
-}
-.gt-rv-eq-auto-width { width: max-content; }
-.gt-rv-eq-table th,
-.gt-rv-eq-table td {
-  border: 1px solid #e8e4f0;
-  padding: 4px 8px;
-  font-size: 13px;
-  line-height: 1.5;
-  text-align: center;
-  white-space: nowrap;
-  transition: background 0.15s ease;
-}
-/* 表头 */
-.gt-rv-eq-header-group th {
-  background: #f8f6fb;
-  color: #333;
-  font-weight: 600;
-  font-size: 12px;
-}
-.gt-rv-eq-header-cols th {
-  background: #f5f2fa;
-  color: #555;
-  font-weight: 500;
-  font-size: 12px;
-}
-.gt-rv-eq-th-period {
-  font-size: 13px !important;
-  letter-spacing: 3px;
-  font-weight: 700 !important;
-}
-.gt-rv-eq-th-project {
-  min-width: 280px;
-  text-align: left !important;
-  position: sticky;
-  left: 0;
-  z-index: 5;
-  background: #f8f6fb !important;
-  border-right: 2px solid #e0d8ec !important;
-}
-.gt-rv-eq-th-total {
-  background: #ece6f5 !important;
-  font-weight: 700 !important;
-  min-width: 80px;
-  white-space: normal;
-  line-height: 1.3;
-  color: var(--gt-color-primary) !important;
-}
-.gt-rv-eq-th-prior {
-  background: #f0eef4 !important;
-}
-.gt-rv-eq-th-prior-col {
-  background: #f5f3f8 !important;
-  color: #888 !important;
-}
-.gt-rv-eq-th-col { min-width: 78px; }
-/* 数据行 */
-.gt-rv-eq-td-project {
-  text-align: left !important;
-  font-size: 13px;
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: #fff;
-  border-right: 2px solid #e0d8ec !important;
-}
-.gt-rv-eq-td-amount {
-  font-variant-numeric: tabular-nums;
-  font-family: 'Arial Narrow', Arial, sans-serif;
-  color: #666;
-}
-.gt-rv-eq-td-prior {
-  color: #999;
-}
-/* 行 hover */
-.gt-rv-eq-table tbody tr:hover td {
-  background: #faf8fd !important;
-}
-.gt-rv-eq-table tbody tr:hover .gt-rv-eq-td-project {
-  background: #f5f2fa !important;
-}
-/* 合计行 */
-.gt-rv-eq-total-row td {
+/* 合计行样式 */
+:deep(.gt-rv-eq-total-row td) {
   background: #f3eff8 !important;
   font-weight: 700;
   border-top: 2px solid #d8d0e8 !important;
-  border-bottom: 2px solid #d8d0e8 !important;
-  color: #333;
-}
-.gt-rv-eq-total-row .gt-rv-eq-td-project {
-  background: #ede8f5 !important;
 }
 /* 分类标题行 */
-.gt-rv-eq-category td {
+:deep(.gt-rv-eq-category td) {
   color: var(--gt-color-primary);
   font-weight: 600;
   background: #fcfbfe !important;
-}
-.gt-rv-eq-category .gt-rv-eq-td-project {
-  background: #faf8fd !important;
 }
 /* 提示文字 */
 .gt-rv-eq-hint {
@@ -2042,13 +1847,6 @@ function copyReportTable() {
   font-size: 11px;
   color: #bbb;
   text-align: center;
-}
-/* 空数据行 */
-.gt-rv-eq-td-empty {
-  text-align: center;
-  color: #bbb;
-  font-size: 13px;
-  padding: 24px 0 !important;
 }
 
 /* ── 审核结果弹窗 ── */

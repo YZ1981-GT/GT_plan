@@ -15,7 +15,7 @@
     </div>
 
     <!-- 上传区域 -->
-    <div class="upload-zone" @drop.prevent="handleDrop" @dragover.prevent" @click="triggerUpload">
+    <div class="upload-zone" @drop.prevent="handleDrop" @dragover.prevent @click="triggerUpload">
       <input
         ref="fileInput"
         type="file"
@@ -45,101 +45,99 @@
           {{ matching ? '匹配中...' : '🔗 与账面数据匹配' }}
         </button>
       </div>
-      <div class="results-table-wrap">
-        <table class="results-table">
-          <thead>
-            <tr>
-              <th>文件名</th>
-              <th>类型</th>
-              <th>字段名</th>
-              <th>字段值</th>
-              <th>置信度</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="doc in results" :key="doc.id">
-              <tr
-                v-for="(field, fi) in doc.fields"
-                :key="field.id"
-                :class="{ 'low-confidence': field.confidence < 0.80 }"
-              >
-                <td v-if="fi === 0" :rowspan="doc.fields.length">{{ doc.file_name }}</td>
-                <td v-if="fi === 0" :rowspan="doc.fields.length">{{ doc.document_type }}</td>
-                <td>{{ field.field_name }}</td>
-                <td>
-                  <span v-if="!field.editing">{{ field.field_value }}</span>
-                  <input
-                    v-else
-                    v-model="field.editValue"
-                    class="field-edit-input"
-                    @keydown.enter="saveField(doc, field)"
-                    @keydown.escape="field.editing = false"
-                  />
-                </td>
-                <td :class="confidenceClass(field.confidence)">
-                  {{ (field.confidence * 100).toFixed(0) }}%
-                </td>
-                <td>
-                  <span :class="['status-badge', field.human_confirmed ? 'confirmed' : 'pending']">
-                    {{ field.human_confirmed ? '✅ 已确认' : '⏳ 待确认' }}
-                  </span>
-                </td>
-                <td>
-                  <button
-                    v-if="!field.human_confirmed"
-                    class="btn-sm"
-                    @click="startEdit(field)"
-                  >✏️</button>
-                  <button
-                    v-if="field.editing"
-                    class="btn-sm btn-primary"
-                    @click="saveField(doc, field)"
-                  >💾</button>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+      <el-table
+        :data="flattenedResults"
+        :span-method="resultsSpanMethod"
+        border
+        size="small"
+        :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }"
+        :row-class-name="resultsRowClassName"
+      >
+        <el-table-column prop="file_name" label="文件名" min-width="120" />
+        <el-table-column prop="document_type" label="类型" min-width="100" />
+        <el-table-column prop="field_name" label="字段名" min-width="100" />
+        <el-table-column label="字段值" min-width="140">
+          <template #default="{ row }">
+            <span v-if="!row.editing">{{ row.field_value }}</span>
+            <input
+              v-else
+              v-model="row.editValue"
+              class="field-edit-input"
+              @keydown.enter="saveField(row._doc, row)"
+              @keydown.escape="row.editing = false"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="置信度" width="80" align="center">
+          <template #default="{ row }">
+            <span :class="confidenceClass(row.confidence)">
+              {{ (row.confidence * 100).toFixed(0) }}%
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <span :class="['status-badge', row.human_confirmed ? 'confirmed' : 'pending']">
+              {{ row.human_confirmed ? '✅ 已确认' : '⏳ 待确认' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="{ row }">
+            <button
+              v-if="!row.human_confirmed && !row.editing"
+              class="btn-sm"
+              @click="startEdit(row)"
+            >✏️</button>
+            <button
+              v-if="row.editing"
+              class="btn-sm btn-primary"
+              @click="saveField(row._doc, row)"
+            >💾</button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <!-- 匹配结果 -->
     <div v-if="matchResults.length > 0" class="match-results">
       <h4>🔗 账面匹配结果</h4>
-      <table class="results-table">
-        <thead>
-          <tr>
-            <th>单据</th>
-            <th>匹配凭证号</th>
-            <th>科目</th>
-            <th>匹配金额</th>
-            <th>差异</th>
-            <th>结果</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in matchResults" :key="m.id" :class="matchRowClass(m.match_result)">
-            <td>{{ m.file_name }}</td>
-            <td>{{ m.matched_voucher_no || '-' }}</td>
-            <td>{{ m.matched_account_code || '-' }}</td>
-            <td>{{ m.matched_amount || '-' }}</td>
-            <td>{{ m.difference_amount ? formatCurrency(m.difference_amount) : '-' }}</td>
-            <td>
-              <span :class="['status-badge', m.match_result]">
-                {{ matchResultLabel(m.match_result) }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table
+        :data="matchResults"
+        border
+        size="small"
+        :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }"
+        :row-class-name="matchRowClassName"
+      >
+        <el-table-column prop="file_name" label="单据" min-width="120" />
+        <el-table-column label="匹配凭证号" min-width="120">
+          <template #default="{ row }">{{ row.matched_voucher_no || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="科目" min-width="120">
+          <template #default="{ row }">{{ row.matched_account_code || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="匹配金额" min-width="120" align="right">
+          <template #default="{ row }">{{ row.matched_amount || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="差异" min-width="120" align="right">
+          <template #default="{ row }">
+            {{ row.difference_amount ? formatCurrency(row.difference_amount) : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="结果" width="110" align="center">
+          <template #default="{ row }">
+            <span :class="['status-badge', row.match_result]">
+              {{ matchResultLabel(row.match_result) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ocrApi } from '@/services/aiApi'
 
 const props = defineProps({ projectId: { type: String, required: true } })
@@ -163,6 +161,49 @@ const uploadProgress = ref(0)
 const results = ref([])
 const matchResults = ref([])
 const matching = ref(false)
+
+/** Flatten results into one row per field, with _doc reference and _rowSpan for merge */
+const flattenedResults = computed(() => {
+  const rows = []
+  for (const doc of results.value) {
+    for (let fi = 0; fi < doc.fields.length; fi++) {
+      const field = doc.fields[fi]
+      rows.push({
+        ...field,
+        file_name: doc.file_name,
+        document_type: doc.document_type,
+        _doc: doc,
+        _isFirstField: fi === 0,
+        _fieldCount: doc.fields.length,
+      })
+    }
+  }
+  return rows
+})
+
+/** Span method for results table: merge file_name and document_type columns */
+function resultsSpanMethod({ row, columnIndex }) {
+  // Only merge first two columns (file_name, document_type)
+  if (columnIndex === 0 || columnIndex === 1) {
+    if (row._isFirstField) {
+      return { rowspan: row._fieldCount, colspan: 1 }
+    }
+    return { rowspan: 0, colspan: 0 }
+  }
+}
+
+/** Row class for low confidence highlighting */
+function resultsRowClassName({ row }) {
+  if (row.confidence < 0.80) return 'low-confidence'
+  return ''
+}
+
+/** Row class for match results */
+function matchRowClassName({ row }) {
+  if (row.match_result === 'mismatched') return 'row-warning'
+  if (row.match_result === 'unmatched') return 'row-error'
+  return ''
+}
 
 function triggerUpload() { fileInput.value?.click() }
 
@@ -258,12 +299,6 @@ function confidenceClass(score) {
   return 'conf-high'
 }
 
-function matchRowClass(result) {
-  if (result === 'mismatched') return 'row-warning'
-  if (result === 'unmatched') return 'row-error'
-  return ''
-}
-
 function matchResultLabel(r) {
   const m = { matched: '✅ 已匹配', mismatched: '⚠️ 不匹配', unmatched: '❌ 未匹配' }
   return m[r] || r
@@ -336,20 +371,7 @@ function formatCurrency(val) {
   font-weight: 600;
 }
 
-.results-table-wrap { overflow-x: auto; }
-.results-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.results-table th, .results-table td {
-  border: 1px solid #eee;
-  padding: 6px 8px;
-  text-align: left;
-}
-.results-table th { background: #f9f9f9; font-weight: 600; }
-
-.low-confidence { background: rgba(255,0,0,0.06); }
+:deep(.low-confidence) { background: rgba(255,0,0,0.06) !important; }
 .conf-low { color: #ff4d4f; }
 .conf-medium { color: #faad14; }
 .conf-high { color: #52c41a; }
@@ -366,8 +388,8 @@ function formatCurrency(val) {
 .status-badge.mismatched { background: #fff7e6; color: #fa8c16; }
 .status-badge.unmatched { background: #fff2f0; color: #ff4d4f; }
 
-.row-warning { background: rgba(255,173,0,0.08); }
-.row-error { background: rgba(255,77,79,0.06); }
+:deep(.row-warning) { background: rgba(255,173,0,0.08) !important; }
+:deep(.row-error) { background: rgba(255,77,79,0.06) !important; }
 
 .field-edit-input {
   border: 1px solid #4b2d77;

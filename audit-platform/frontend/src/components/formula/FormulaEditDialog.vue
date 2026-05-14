@@ -380,44 +380,54 @@
       <div style="margin-bottom: 8px; font-size: 12px; color: #666;">
         💡 点击表格中的单元格，将其设为公式的写入目标位置
       </div>
-      <div class="gt-fe-target-table-wrap">
-        <table class="gt-fe-target-table" border="1">
-          <thead>
-            <tr>
-              <th style="width: 40px; background: #f5f3f8;">#</th>
-              <th style="background: #f5f3f8; padding: 6px 10px; font-size: 12px; width: 100px;">行次</th>
-              <th style="background: #f5f3f8; padding: 6px 10px; font-size: 12px;">项目名称</th>
-              <th style="background: #f5f3f8; padding: 6px 10px; font-size: 12px; width: 100px; text-align: center;">期末金额</th>
-              <th style="background: #f5f3f8; padding: 6px 10px; font-size: 12px; width: 100px; text-align: center;">期初金额</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, ri) in targetPickerRows" :key="ri">
-              <td style="color: #bbb; font-size: 10px; text-align: center; background: #faf8fd;">{{ ri + 1 }}</td>
-              <td style="font-size: 11px; color: #999; white-space: nowrap;">{{ row[0] }}</td>
-              <td style="font-size: 12px;">{{ row[1] }}</td>
-              <td
-                class="gt-fe-target-cell"
-                :class="{ 'gt-fe-target-cell-selected': targetSelectedCell === `R${ri}C2` }"
-                @click="onTargetCellClick(ri, 2, row[2])"
-                style="text-align: center; min-width: 80px;"
-              >
-                <span v-if="targetSelectedCell === `R${ri}C2`" style="color: #4b2d77;">✓ 期末</span>
-                <span v-else style="color: #ccc; font-size: 11px;">点击选择</span>
-              </td>
-              <td
-                class="gt-fe-target-cell"
-                :class="{ 'gt-fe-target-cell-selected': targetSelectedCell === `R${ri}C3` }"
-                @click="onTargetCellClick(ri, 3, row[3])"
-                style="text-align: center; min-width: 80px;"
-              >
-                <span v-if="targetSelectedCell === `R${ri}C3`" style="color: #4b2d77;">✓ 期初</span>
-                <span v-else style="color: #ccc; font-size: 11px;">点击选择</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <el-table
+        :data="targetPickerRows"
+        border
+        size="small"
+        max-height="55vh"
+        :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }"
+        style="width: 100%;"
+      >
+        <el-table-column label="#" width="50" align="center">
+          <template #default="{ $index }">
+            <span style="color: #bbb; font-size: 10px;">{{ $index + 1 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="行次" width="100">
+          <template #default="{ row }">
+            <span style="font-size: 11px; color: #999; white-space: nowrap;">{{ row[0] }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="项目名称" min-width="200">
+          <template #default="{ row }">
+            <span style="font-size: 12px;">{{ row[1] }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末金额" width="120" align="center">
+          <template #default="{ row, $index }">
+            <div
+              class="gt-fe-target-cell"
+              :class="{ 'gt-fe-target-cell-selected': targetSelectedCell === `R${$index}C2` }"
+              @click="onTargetCellClick($index, 2, row[2])"
+            >
+              <span v-if="targetSelectedCell === `R${$index}C2`" style="color: #4b2d77;">✓ 期末</span>
+              <span v-else style="color: #ccc; font-size: 11px;">点击选择</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初金额" width="120" align="center">
+          <template #default="{ row, $index }">
+            <div
+              class="gt-fe-target-cell"
+              :class="{ 'gt-fe-target-cell-selected': targetSelectedCell === `R${$index}C3` }"
+              @click="onTargetCellClick($index, 3, row[3])"
+            >
+              <span v-if="targetSelectedCell === `R${$index}C3`" style="color: #4b2d77;">✓ 期初</span>
+              <span v-else style="color: #ccc; font-size: 11px;">点击选择</span>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
       <div v-if="targetSelectedCell" style="margin-top: 8px; font-size: 12px;">
         已选中：<code style="color: #4b2d77; background: #f0ecf5; padding: 2px 8px; border-radius: 4px;">{{ targetSelectedLabel }}</code>
       </div>
@@ -1158,22 +1168,6 @@ function confirmTargetCell() {
   gap: 4px;
   padding: 4px 0;
   margin-bottom: 4px;
-}
-.gt-fe-target-table-wrap {
-  max-height: 55vh;
-  overflow: auto;
-  border: 1px solid #e8e4f0;
-  border-radius: 6px;
-}
-.gt-fe-target-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.gt-fe-target-table th,
-.gt-fe-target-table td {
-  padding: 5px 8px;
-  border: 1px solid #e8e4f0;
 }
 .gt-fe-target-cell {
   cursor: pointer;

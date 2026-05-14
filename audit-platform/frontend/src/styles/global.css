@@ -8,6 +8,7 @@
 @import './gt-print.css';
 @import './gt-page-components.css';
 @import './gt-polish.css';
+@import './gt-table.css';
 
 /* ═══════════════════════════════════════════════════════════════
    NProgress 主题覆盖 — GT 紫色
@@ -82,9 +83,9 @@ body {
   font-size: var(--gt-font-size-sm);
   letter-spacing: 0.3px;
   text-transform: none;
-  border-bottom: 2px solid var(--gt-color-primary-lighter) !important;
-  background: linear-gradient(180deg, #f8f5fd 0%, var(--gt-color-primary-bg) 100%) !important;
+  border-bottom: 2px solid #e8e4f0 !important;
   color: var(--gt-color-primary-dark) !important;
+  /* 表头背景色由 gt-table.css 统一控制（#f0edf5） */
 }
 
 .el-table td.el-table__cell {

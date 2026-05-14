@@ -1,0 +1,92 @@
+/**
+ * gt-table.css — el-table 统一样式
+ * 所有 el-table 共用：紫色表头 / 边框色 / 字号动态 class / 表头 nowrap / 金额列
+ *
+ * 使用方式：
+ *   - 紫色表头/边框色：自动应用于所有 el-table
+ *   - 字号控制：在 el-table 外层容器加 class="gt-tb-font-sm" 等
+ *   - 金额列：在金额 <span> 上加 class="gt-amt"
+ */
+
+/* ═══════════════════════════════════════════════════════════════
+   1. 统一紫色表头
+   ═══════════════════════════════════════════════════════════════ */
+.el-table thead th {
+  background: #f0edf5 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   2. 统一边框色（border 模式）
+   ═══════════════════════════════════════════════════════════════ */
+.el-table--border td,
+.el-table--border th {
+  border-color: #e8e4f0 !important;
+}
+
+.el-table--border .el-table__inner-wrapper::after,
+.el-table--border::before {
+  background-color: #e8e4f0 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. 表头 white-space: nowrap（防止表头文字折行）
+   ═══════════════════════════════════════════════════════════════ */
+.el-table thead th .cell {
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. 字号动态 class（配合 displayPrefs.fontSize 使用）
+   用法：:class="`gt-tb-font-${displayPrefs.fontSize}`"
+   ═══════════════════════════════════════════════════════════════ */
+.gt-tb-font-xs .el-table__body,
+.gt-tb-font-xs th .cell,
+.gt-tb-font-xs td .cell {
+  font-size: 11px !important;
+}
+
+.gt-tb-font-sm .el-table__body,
+.gt-tb-font-sm th .cell,
+.gt-tb-font-sm td .cell {
+  font-size: 12px !important;
+}
+
+.gt-tb-font-md .el-table__body,
+.gt-tb-font-md th .cell,
+.gt-tb-font-md td .cell {
+  font-size: 13px !important;
+}
+
+.gt-tb-font-lg .el-table__body,
+.gt-tb-font-lg th .cell,
+.gt-tb-font-lg td .cell {
+  font-size: 14px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. 金额列统一样式 .gt-amt
+   用法：<span class="gt-amt">{{ fmtAmount(row.amount) }}</span>
+   ═══════════════════════════════════════════════════════════════ */
+.gt-amt {
+  font-family: 'Arial Narrow', Arial, monospace;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   6. 选中样式（配合 useCellSelection）
+   ═══════════════════════════════════════════════════════════════ */
+.gt-ucell--selected {
+  background: rgba(75, 45, 119, 0.08) !important;
+  border-color: transparent !important;
+}
+
+.gt-ucell--single-selected {
+  background: rgba(75, 45, 119, 0.12) !important;
+  border-color: transparent !important;
+}
+
+/* 试算平衡表行选中 */
+.gt-tb-sum-selected td {
+  background: rgba(75, 45, 119, 0.08) !important;
+}

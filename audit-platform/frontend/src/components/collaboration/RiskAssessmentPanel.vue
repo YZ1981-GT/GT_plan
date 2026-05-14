@@ -11,29 +11,31 @@
     <div class="risk-heatmap">
       <h4>风险矩阵热力图</h4>
       <div class="heatmap-container">
-        <table class="heatmap-table">
-          <thead>
-            <tr>
-              <th></th>
-              <th>控制风险-高</th>
-              <th>控制风险-中</th>
-              <th>控制风险-低</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="ir in ['high', 'medium', 'low']" :key="ir">
-              <td class="row-label">固有风险-{{ ir === 'high' ? '高' : ir === 'medium' ? '中' : '低' }}</td>
-              <td
-                v-for="cr in ['high', 'medium', 'low']"
-                :key="cr"
-                class="heatmap-cell"
-                :style="{ backgroundColor: getHeatmapColor(ir, cr) }"
-              >
-                <span class="cell-count">{{ getCellCount(ir, cr) }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <el-table
+          :data="heatmapRows"
+          border
+          size="small"
+          :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }"
+          :cell-style="heatmapCellStyle"
+          class="heatmap-el-table"
+        >
+          <el-table-column prop="label" label="" width="120" />
+          <el-table-column prop="high" label="控制风险-高" width="120" align="center">
+            <template #default="{ row }">
+              <span class="cell-count">{{ row.high }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="medium" label="控制风险-中" width="120" align="center">
+            <template #default="{ row }">
+              <span class="cell-count">{{ row.medium }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="low" label="控制风险-低" width="120" align="center">
+            <template #default="{ row }">
+              <span class="cell-count">{{ row.low }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
         <div class="heatmap-legend">
           <span class="legend-item"><span class="color-box" style="background:#F56C6C"></span> 高风险</span>
           <span class="legend-item"><span class="color-box" style="background:#E6A23C"></span> 中风险</span>
@@ -147,7 +149,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import type { CSSProperties } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
@@ -196,6 +199,43 @@ function getCellCount(ir: string, cr: string): number {
   return risks.value.filter(
     r => r.inherent_risk === ir && r.control_risk === cr
   ).length
+}
+
+// Heatmap el-table data rows
+const heatmapRows = computed(() => [
+  {
+    label: '固有风险-高',
+    ir: 'high',
+    high: getCellCount('high', 'high'),
+    medium: getCellCount('high', 'medium'),
+    low: getCellCount('high', 'low'),
+  },
+  {
+    label: '固有风险-中',
+    ir: 'medium',
+    high: getCellCount('medium', 'high'),
+    medium: getCellCount('medium', 'medium'),
+    low: getCellCount('medium', 'low'),
+  },
+  {
+    label: '固有风险-低',
+    ir: 'low',
+    high: getCellCount('low', 'high'),
+    medium: getCellCount('low', 'medium'),
+    low: getCellCount('low', 'low'),
+  },
+])
+
+// Cell style for heatmap background colors
+function heatmapCellStyle({ row, column }: { row: { ir: string }, column: { property: string } }): CSSProperties {
+  const prop = column.property
+  if (prop === 'label') {
+    return { background: '#f0edf5', fontWeight: '600', fontSize: '13px' }
+  }
+  if (['high', 'medium', 'low'].includes(prop)) {
+    return { backgroundColor: getHeatmapColor(row.ir, prop), color: '#fff' }
+  }
+  return {}
 }
 
 function riskType(level: string): '' | 'success' | 'warning' | 'info' | 'danger' | 'primary' {
@@ -301,33 +341,10 @@ loadRisks()
   align-items: flex-start;
   gap: 24px;
 }
-.heatmap-table {
-  border-collapse: collapse;
+.heatmap-el-table {
+  max-width: 500px;
 }
-.heatmap-table th,
-.heatmap-table td {
-  border: 1px solid #dcdfe6;
-  padding: 8px 16px;
-  text-align: center;
-}
-.heatmap-table th {
-  background: #f5f7fa;
-  font-weight: 600;
-  font-size: 13px;
-}
-.row-label {
-  background: #f5f7fa;
-  font-weight: 600;
-  font-size: 13px;
-}
-.heatmap-cell {
-  min-width: 80px;
-  min-height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.cell-count {
+.heatmap-el-table .cell-count {
   font-weight: 700;
   font-size: 18px;
   color: #fff;

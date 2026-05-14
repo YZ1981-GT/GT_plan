@@ -475,6 +475,12 @@ const staticNoteTree = [
 
 const treeData = computed(() => [
   {
+    key: 'trial_balance', label: '试算平衡表', icon: '📑', children: [
+      { key: 'tb_detail', label: '科目明细', icon: '' },
+      { key: 'tb_summary', label: '试算平衡表', icon: '' },
+    ],
+  },
+  {
     key: 'report', label: '报表', icon: '📊', children: [
       { key: 'report_balance_sheet', label: '资产负债表', icon: '', count: countFormulas('balance_sheet') },
       { key: 'report_income_statement', label: '利润表', icon: '', count: countFormulas('income_statement') },
@@ -616,6 +622,16 @@ const formulaResults = ref<Record<string, { value: number | null; trace: any[] }
 const notePresetFormulas = ref<any[]>([])
 
 async function loadRowsForNode(nodeKey: string) {
+  // 试算平衡表节点：tb_detail 用 props.rows，tb_summary 加载 report_config
+  if (nodeKey === 'tb_detail') {
+    // 科目明细数据来自 props.rows，不需要额外加载
+    return
+  }
+  if (nodeKey === 'tb_summary') {
+    // 加载资产负债表的 report_config 作为试算平衡表行次
+    nodeKey = 'report_balance_sheet'
+  }
+
   if (nodeKey.startsWith('report_')) {
     const reportType = nodeKey.replace('report_', '')
     const cacheKey = `${fmTemplateType.value}_${reportType}`
@@ -662,7 +678,9 @@ function onTreeNodeClick(data: any) {
   if (!data.children || data.children.length === 0) {
     selectedNodeKey.value = data.key
     // 构建路径
-    if (data.key.startsWith('report_')) {
+    if (data.key.startsWith('tb_')) {
+      selectedPath.value = `试算平衡表 > ${data.label}`
+    } else if (data.key.startsWith('report_')) {
       selectedPath.value = `报表 > ${data.label}`
     } else if (data.key.startsWith('note_')) {
       selectedPath.value = `附注 > ${data._sectionTitle || data.label}`
@@ -682,6 +700,23 @@ function onTreeNodeClick(data: any) {
 
 // ── 当前显示的行 ──
 const currentRows = computed(() => {
+  // 试算平衡表节点
+  if (selectedNodeKey.value === 'tb_detail') {
+    // 科目明细：显示科目→报表行次的映射公式
+    return (props.rows || []).map((r: any) => ({
+      row_code: r.standard_account_code || '',
+      row_name: r.account_name || '',
+      formula: `TB('${r.standard_account_code}','期末余额')`,
+      formula_category: '取数',
+      formula_description: '从余额表取期末余额',
+      _computed_value: r.unadjusted_amount,
+    }))
+  }
+  if (selectedNodeKey.value === 'tb_summary') {
+    // 试算平衡表：显示 report_config 的行次公式
+    return allRowsMap.value['balance_sheet'] || []
+  }
+
   if (selectedNodeKey.value.startsWith('report_')) {
     const rt = selectedNodeKey.value.replace('report_', '')
     return allRowsMap.value[rt] || []
