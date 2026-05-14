@@ -100,15 +100,26 @@ _BALANCE_SHEET_LINES: dict[str, tuple[str, str, int, str | None]] = {
     "3104": ("BS204", "未分配利润", 1, None),
     "3201": ("BS206", "库存股", 1, None),
     "3301": ("BS207", "专项储备", 1, None),
+    # 4xxx 权益类补充
+    "4001": ("BS201", "实收资本", 1, None),
+    "4101": ("BS203", "盈余公积", 1, None),
+    "4103": ("BS204", "未分配利润", 1, None),
+    "4104": ("BS204", "未分配利润", 1, None),
+    "4201": ("BS208", "库存股", 1, None),
+    "4301": ("BS207", "专项储备", 1, None),
+    "4401": ("BS209", "其他权益工具", 1, None),
 }
 
 # 利润表行次
 _INCOME_STATEMENT_LINES: dict[str, tuple[str, str, int, str | None]] = {
-    "5001": ("IS001", "营业收入", 1, None),
-    "5051": ("IS001", "营业收入", 1, None),
-    "5101": ("IS001", "营业收入", 1, None),
-    "5401": ("IS002", "营业成本", 1, None),
-    "5402": ("IS002", "营业成本", 1, None),
+    # 5xxx 成本类（注意：5001/5002/5101/5301 是生产成本/制造费用，归入营业成本或存货）
+    "5001": ("IS002", "营业成本", 1, None),   # 基本生产成本
+    "5002": ("IS002", "营业成本", 1, None),   # 辅助生产成本
+    "5051": ("IS001", "营业收入", 1, None),   # 其他业务收入
+    "5101": ("IS002", "营业成本", 1, None),   # 制造费用
+    "5301": ("IS006", "研发费用", 1, None),   # 研发支出（费用化部分）
+    "5401": ("IS002", "营业成本", 1, None),   # 主营业务成本
+    "5402": ("IS002", "营业成本", 1, None),   # 其他业务成本
     "5403": ("IS003", "税金及附加", 1, None),
     "5601": ("IS004", "销售费用", 1, None),
     "5602": ("IS005", "管理费用", 1, None),
@@ -120,6 +131,8 @@ _INCOME_STATEMENT_LINES: dict[str, tuple[str, str, int, str | None]] = {
     "6051": ("IS011", "其他收益", 1, None),
     "6101": ("IS012", "投资收益", 1, None),
     "6111": ("IS013", "公允价值变动收益", 1, None),
+    "6115": ("IS010", "资产处置收益", 1, None),
+    "6117": ("IS011", "其他收益", 1, None),
     "6301": ("IS014", "营业外收入", 1, None),
     "6401": ("IS015", "营业外支出", 1, None),
     "6801": ("IS016", "所得税费用", 1, None),
@@ -178,6 +191,7 @@ _NAME_TO_BALANCE_SHEET: list[tuple[list[str], str, str]] = [
     (["其他综合收益"], "BS205", "其他综合收益"),
     (["库存股"], "BS206", "库存股"),
     (["专项储备"], "BS207", "专项储备"),
+    (["其他权益工具"], "BS209", "其他权益工具"),
 ]
 
 _NAME_TO_INCOME_STATEMENT: list[tuple[list[str], str, str]] = [
@@ -224,10 +238,8 @@ def _lookup_report_line(
 ) -> tuple[str, str, int, str | None, float] | None:
     """查找科目编码对应的报表行次。返回 (line_code, line_name, level, parent, confidence)。
 
-    双保险策略：
-    1. 优先按编码前缀精确匹配（confidence=1.0）
-    2. 编码前缀模糊匹配（confidence=0.8）
-    3. 按科目名称关键词兜底匹配（confidence=0.7）
+    策略：精确匹配 + 名称关键词兜底。不做前缀模糊匹配（避免乱匹配）。
+    匹配不上的返回 None，由用户手动指定。
     """
     mapping_dict = (
         _BALANCE_SHEET_LINES
@@ -241,26 +253,21 @@ def _lookup_report_line(
         lc, ln, lv, pc = mapping_dict[prefix4]
         return lc, ln, lv, pc, 1.0
 
-    # 策略 2：前缀匹配（逐步缩短）
-    for length in (3, 2, 1):
-        prefix = account_code[:length]
-        for code, (lc, ln, lv, pc) in mapping_dict.items():
-            if code.startswith(prefix):
-                return lc, ln, lv, pc, 0.8
-
-    # 策略 3：按科目名称关键词兜底
+    # 策略 2：按科目名称关键词兜底（编码匹配不上时）
     if account_name:
         name_rules = (
             _NAME_TO_BALANCE_SHEET
             if report_type == ReportType.balance_sheet
             else _NAME_TO_INCOME_STATEMENT
         )
-        # 去除名称中的下划线分隔符（如"银行存款_工商银行"→"银行存款工商银行"）
         clean_name = account_name.replace("_", "").replace(" ", "")
         for keywords, lc, ln in name_rules:
             for kw in keywords:
                 if kw in clean_name:
                     return lc, ln, 1, None, 0.7
+
+    # 匹配不上：返回 None，由用户手动指定
+    return None
 
     return None
 

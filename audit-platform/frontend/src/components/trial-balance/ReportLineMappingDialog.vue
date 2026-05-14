@@ -20,6 +20,17 @@
       <el-button size="small" :loading="confirmAllLoading" @click="onBatchConfirm" :disabled="!unconfirmedIds.length">
         ✅ 全部确认 ({{ unconfirmedIds.length }})
       </el-button>
+      <el-button size="small" @click="onExportTemplate">
+        📥 导出模板
+      </el-button>
+      <el-upload
+        :show-file-list="false"
+        accept=".xlsx,.xls,.csv"
+        :before-upload="onImportTemplate"
+        style="display: inline-block"
+      >
+        <el-button size="small">📤 导入模板</el-button>
+      </el-upload>
       <span style="flex:1" />
       <el-select v-model="filterType" size="small" placeholder="筛选" clearable style="width: 140px">
         <el-option label="全部" value="" />
@@ -291,6 +302,9 @@ function _buildDefaultReportLines() {
     { report_line_code: 'BS203', report_line_name: '盈余公积', report_type: 'balance_sheet' },
     { report_line_code: 'BS204', report_line_name: '未分配利润', report_type: 'balance_sheet' },
     { report_line_code: 'BS205', report_line_name: '其他综合收益', report_type: 'balance_sheet' },
+    { report_line_code: 'BS206', report_line_name: '库存股', report_type: 'balance_sheet' },
+    { report_line_code: 'BS207', report_line_name: '专项储备', report_type: 'balance_sheet' },
+    { report_line_code: 'BS209', report_line_name: '其他权益工具', report_type: 'balance_sheet' },
     { report_line_code: 'IS001', report_line_name: '营业收入', report_type: 'income_statement' },
     { report_line_code: 'IS002', report_line_name: '营业成本', report_type: 'income_statement' },
     { report_line_code: 'IS003', report_line_name: '税金及附加', report_type: 'income_statement' },
@@ -400,6 +414,100 @@ async function onReferenceCopy() {
     await loadMappings()
   } catch (e) { handleApiError(e, '参照复制') }
   finally { refLoading.value = false }
+}
+
+// ─── 导出映射模板（Excel，含必填标注 + 预设库 sheet） ───
+function onExportTemplate() {
+  import('xlsx').then(XLSX => {
+    const wb = XLSX.utils.book_new()
+
+    // Sheet 1：映射规则（当前数据）
+    const data = mergedRows.value.map(r => ({
+      '*科目编码（必填）': r.account_code,
+      '科目名称': r.account_name,
+      '*报表行次编码（必填）': r.report_line_code || '',
+      '*报表行次名称（必填）': r.report_line_name || '',
+      '*报表类型（必填）': r.report_type ? reportTypeLabel(r.report_type) : '',
+      '状态': r.mapped ? (r.is_confirmed ? '已确认' : '待确认') : '⚠未映射-请填写',
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    ws['!cols'] = [{ wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 16 }]
+    XLSX.utils.book_append_sheet(wb, ws, '映射规则')
+
+    // Sheet 2：预设库（所有可选的报表行次，供用户复制粘贴）
+    const presetData = reportLineOptions.value.map((l: any) => ({
+      '报表行次编码': l.report_line_code,
+      '报表行次名称': l.report_line_name,
+      '报表类型': reportTypeLabel(l.report_type),
+    }))
+    const ws2 = XLSX.utils.json_to_sheet(presetData)
+    ws2['!cols'] = [{ wch: 16 }, { wch: 24 }, { wch: 14 }]
+    XLSX.utils.book_append_sheet(wb, ws2, '可选报表行次（预设库）')
+
+    // Sheet 3：填写说明
+    const instructions = [
+      { '说明': '【填写规则】' },
+      { '说明': '1. 带 * 号的列为必填项' },
+      { '说明': '2. "科目编码"为余额表中的一级科目编码（4位）' },
+      { '说明': '3. "报表行次编码"和"报表行次名称"请从"可选报表行次"sheet中选择' },
+      { '说明': '4. "报表类型"可选值：资产负债表 / 利润表' },
+      { '说明': '5. 已有映射的行无需修改，只需补充"⚠未映射"的行' },
+      { '说明': '6. 编辑完成后保存，回到系统点击"导入模板"上传即可' },
+      { '说明': '' },
+      { '说明': '【注意事项】' },
+      { '说明': '- 导入时已存在的映射不会被覆盖' },
+      { '说明': '- 如需修改已有映射，请先在系统中删除再导入' },
+      { '说明': '- 同一科目编码只能映射到一个报表行次' },
+    ]
+    const ws3 = XLSX.utils.json_to_sheet(instructions)
+    ws3['!cols'] = [{ wch: 60 }]
+    XLSX.utils.book_append_sheet(wb, ws3, '填写说明')
+
+    XLSX.writeFile(wb, `映射规则模板_${props.projectId.slice(0, 8)}.xlsx`)
+    ElMessage.success('已导出映射模板（含预设库和填写说明）')
+  })
+}
+
+// ─── 导入映射模板（Excel） ───
+function onImportTemplate(file: File) {
+  import('xlsx').then(async XLSX => {
+    const buf = await file.arrayBuffer()
+    const wb = XLSX.read(buf)
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(ws)
+
+    if (!rows.length) {
+      ElMessage.warning('文件为空')
+      return
+    }
+
+    // 解析并批量创建映射（兼容带*号和不带*号的列名）
+    const typeMap: Record<string, string> = { '资产负债表': 'balance_sheet', '利润表': 'income_statement', '现金流量表': 'cash_flow', '权益变动表': 'equity_change' }
+    let created = 0
+    let skipped = 0
+    for (const row of rows) {
+      const code = String(row['*科目编码（必填）'] || row['科目编码'] || '').trim()
+      const lineCode = String(row['*报表行次编码（必填）'] || row['报表行次编码'] || '').trim()
+      const lineName = String(row['*报表行次名称（必填）'] || row['报表行次名称'] || '').trim()
+      const typeStr = String(row['*报表类型（必填）'] || row['报表类型'] || '').trim()
+      if (!code || !lineCode || !lineName) { skipped++; continue }
+
+      const reportType = typeMap[typeStr] || 'balance_sheet'
+      try {
+        const res: any = await api.post(`/api/projects/${props.projectId}/report-line-mapping/manual`, {
+          standard_account_code: code,
+          report_type: reportType,
+          report_line_code: lineCode,
+          report_line_name: lineName,
+        })
+        if (res?.created) created++
+        else skipped++
+      } catch { skipped++ }
+    }
+    ElMessage.success(`导入完成：新增 ${created} 条，跳过 ${skipped} 条（已存在或无效）`)
+    await loadMappings()
+  })
+  return false
 }
 
 // ─── 辅助 ───

@@ -1877,6 +1877,22 @@ async function exportTbSummary() {
     line-height: 1.4;
   }
 
+  /* ── 科目明细表样式统一（与试算平衡表风格一致） ── */
+  :deep(.el-table thead th) {
+    background: #f0edf5 !important;
+    color: #303133;
+    border-bottom: 1px solid #e8e4f0 !important;
+  }
+  :deep(.el-table--border td) {
+    border-color: #e8e4f0 !important;
+  }
+  :deep(.el-table--border th) {
+    border-color: #e8e4f0 !important;
+  }
+  :deep(.el-table__row td) {
+    padding: 4px 0;
+  }
+
   /* ── GtPageHeader 已替换横幅样式 ── */
 
   .clickable {
@@ -1952,7 +1968,9 @@ async function exportTbSummary() {
 /* 试算平衡表 */
 .gt-tb-summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gt-tb-summary-table th, .gt-tb-summary-table td { border: 1px solid #e8e4f0; padding: 4px 8px; }
-.gt-tb-summary-table thead th { background: #f0edf5; font-weight: 600; text-align: center; position: sticky; top: 0; z-index: 2; }
+.gt-tb-summary-table thead th { background: #f0edf5; font-weight: 600; text-align: center; position: sticky; z-index: 2; }
+.gt-tb-summary-table thead tr:first-child th { top: 0; }
+.gt-tb-summary-table thead tr:nth-child(2) th { top: 30px; }
 .gt-tb-sum-num { text-align: right; }
 .gt-tb-editable { cursor: text; border-bottom: 1px dashed #e5e5ea; padding: 2px 4px; border-radius: 2px; display: inline-block; min-width: 60px; text-align: right; }
 .gt-tb-editable:hover { background: #f4f0fa; }

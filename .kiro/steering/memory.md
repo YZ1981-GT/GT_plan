@@ -90,7 +90,7 @@ inclusion: always
 
 - **试算平衡表只显示 is_confirmed=True 的 ReportLineMapping**：`get_summary_with_adjustments` 查询条件含 `is_confirmed == True`；"一键预设"（ai_suggest_mappings）生成的映射默认 `is_confirmed=False`，必须确认后才会出现在试算平衡表；前端"一键预设"按钮已改为生成后自动批量确认
 - **ReportLineMapping 不存科目名称**：只有 `standard_account_code` + `report_line_code/name`；科目名称需从 TrialBalance rows（`standard_account_code` + `account_name`）获取，不能从 mapping 表取
-- **报表行次映射双保险策略**：`_lookup_report_line(code, type, name)` 三级匹配——(1) 编码前缀精确匹配 conf=1.0；(2) 编码前缀模糊匹配 conf=0.8；(3) 科目名称关键词兜底 conf=0.7；`_NAME_TO_BALANCE_SHEET`（40+ 条）和 `_NAME_TO_INCOME_STATEMENT`（16 条）覆盖资产/负债/权益/损益全部常见科目名称
+- **报表行次映射策略（已修正）**：`_lookup_report_line` 只做精确 4 位编码匹配 + 名称关键词兜底，**禁止前缀模糊匹配**（会导致 5002 匹配到 5001 等乱匹配）；匹配不上的返回 None 由用户手动指定；用户偏好：能准确判断的才对应，不能的就提示手动
 - **`POST /report-line-mapping/manual` 端点**：手动创建单条映射（mapping_type=manual, is_confirmed=True），用于未映射科目的用户手动指定
 - **AccountMapping 表无 year 列**：只有 project_id/original_account_code/standard_account_code/mapping_type/is_deleted/created_by/created_at/updated_at；查询时不能带 year 过滤
 - **TrialBalance 方向判断最终方案**：不硬编码科目编码/名称，默认从余额正负推断（正=借，负=贷）；支持用户手动点击切换方向（`directionOverrides` ref）；方向决定小计加减逻辑
@@ -1141,6 +1141,9 @@ inclusion: always
 - **report_config 公式覆盖率分析**：CAS 公式仅 49 行（BS 15 + IS 13 + CFS 15 + EQ 6），report_config 国企版 303 行/上市版 214 行；名称匹配率 45%（58/129）；57 行是特殊行业科目（金融/保险）对普通企业为 0 不影响；正确策略 = CAS 公式覆盖核心行 + wp_mapping 补充 + 合计行用 ROW() + 剩余保持 NULL（返回 0）
 - **报表生成合理预期**：资产负债表/利润表核心 ~30 行有数据即为成功；现金流量表首次生成大部分为 0（需从序时账分析，非余额表可推算）；权益变动表只有期末余额行有数据；特殊行业行（△/▲）为 0 是正常的
 - **ReportEngine 公式语法**：`TB('1002','期末余额')` 带引号+列名（不是 `TB(1002)`）；`SUM_TB('1401~1499','期末余额')` 范围求和；`ROW('BS-009')` 引用其他行；列名支持：期末余额/审定数/年初余额/期初余额/未审数/RJE调整/AJE调整
+- **统一公式引擎企业级版本已落地**：`formula_engine.py` 含 `FormulaResult`（value+errors+warnings+trace）+ `FormulaContext`（多列取数+上年数据+row_cache）+ `validate_formula` 校验 + `safe_eval_expr` AST 安全求值；16 个 pytest 测试全绿（`tests/test_formula_engine.py`）
+- **formula_engine 已修复的问题**：SUM_TB 前缀长度精确匹配（✅）/ TB 多列支持通过 FormulaContext.tb_data[code][column]（✅）/ PREV 从 prior_tb_data 取值（✅）/ FormulaResult.trace 审计轨迹（✅）/ 16 单测（✅）；剩余：ReportEngine 迁移到统一引擎
+- **公式联动全景**：report_config.formula 是唯一真源 → ReportEngine 执行 → 结果写入 financial_report → 附注通过 REPORT() 引用报表值 → 底稿用 Univer 独立公式引擎（WP 函数桥接）
 - **6 种报表公式逻辑各不同**：BS/IS 直接从试算表取数；CFS 大部分无法从余额表推算（需序时账分析或间接法）；EQ 是多列矩阵（行=项目，列=变动类型）；CFS 附表是间接法调整表（从净利润调整到经营活动现金流）；减值准备表是期初/增加/减少/期末结构
 - **用户要求：所有报表类型都要处理好**（BS/IS/CFS/EQ/CFS附表/减值准备），不能只做资产负债表和利润表
 - **fill_report_formulas.py 脚本已创建但有编码问题需重写**：正确语法已确认，需在新对话中重新创建并执行
@@ -1187,6 +1190,9 @@ inclusion: always
 - **试算表科目名称取数**：一次性加载 tb_balance 全部 account_code→account_name，对标准科目编码精确匹配或前缀匹配明细行，**统一取下划线前第一段**作为一级科目名称（如"其他货币资金_集采监管账户"→"其他货币资金"）；很多企业余额表没有一级汇总行只有明细行，不能依赖精确匹配
 - **损益类科目（5xxx/6xxx）取单边发生额**：不能用 `debit - credit`（结转后两者相等=0）；正确做法：收入类取 `credit_amount` 存为负数（贷方语义），费用类取 `debit_amount` 存为正数（借方语义）；收入类编码：5001/5051/5101/6001/6051/6101/6111/6115/6117/6301；其余 6xxx/5xxx 为费用类
 - **试算表损益区域展示为"净利润"**：不分"收入小计"/"费用小计"，合并为一行"净利润 = 收入 - 成本费用"；正数=盈利，负数=亏损（红字）；去掉了无意义的"合计"行（资产/负债/权益/损益口径不同不能加总）
+- **试算平衡表行次结构来自标准库（report_config）**：所有企业共用同一套行次模板（按 applicable_standard 如 soe_standalone 过滤）；`get_summary_with_adjustments` 先加载 report_config 行次模板再用 ReportLineMapping 填充数据，没有数据的行次显示为空；report_config 无数据时 fallback 到旧逻辑（从映射表取行次）
+- **report_config 与 ReportLineMapping 编码体系不同**：report_config 用 `BS-001`（有连字符），映射表用 `BS001`（无连字符）；匹配通过 `row_name` 名称对应（精确+模糊包含），不走编码直接匹配
+- **试算平衡表公式计算已实现**：`_eval_formula` 支持 `TB()/SUM_TB()/ROW()/SUM_ROW()` + 加减运算；`report_config.formula` 是唯一真源（公式管理弹窗编辑同一字段）；合计行有公式走公式（如 `SUM_ROW('BS-002','BS-008')`），无公式 fallback 向前汇总；`row_values` dict 记录每行结果供后续行引用
 - **借贷平衡校验只比较"资产小计 = 负债和权益合计"**：不含损益类（损益取发生额与余额口径不同）；`getActualCat` 提取为模块级函数供 groupedRows/assetTotal/liabEquityTotal 共用
 - **宜宾大药房 trial_balance=0 根因确认**：该项目从未执行 auto-match（account_mapping 为空），导致 recalc 无法汇总；修复路径 = 先 auto-match → 再 recalc
 - **e2e-business-flow spec v2.0 待补强 6 个维度**：(1) 依赖链路透明化+前置条件矩阵 (2) 错误场景覆盖（静默返回空 vs 明确报错） (3) 多项目通用性验证（每个项目分别断言） (4) 前端报表表样细节（标题行加粗/金额右对齐千分位/缩进可视化/合计行分隔线） (5) 公式覆盖率 26.5% 合理性论证（标题行/特殊行业行/CFS 手工填列） (6) 数据质量检查扩展为套件（借贷平衡/科目完整性/报表平衡/利润表勾稽）

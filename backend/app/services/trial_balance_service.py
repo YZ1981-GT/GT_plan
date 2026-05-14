@@ -416,25 +416,267 @@ class TrialBalanceService:
         company_code: str = "001",
     ) -> list[dict]:
         """
-        按报表行次汇总试算平衡表，AJE/RJE 从 adjustments 表自动计算。
+        按报表行次汇总试算平衡表。
 
-        返回结构：
-        [
-          {
-            "row_code": "BS-001",
-            "row_name": "货币资金",
-            "indent": 0,
-            "is_total": False,
-            "is_category": False,
-            "unadjusted": 5500000,
-            "aje_dr": 0,
-            "aje_cr": 150000,
-            "rcl_dr": 0,
-            "rcl_cr": 0,
-            "audited": 5350000,
-          }
-        ]
+        行次结构来自标准库（report_config），所有企业共用同一套模板。
+        数据填充根据每个企业的 ReportLineMapping 映射关系。
         """
+        from app.models.audit_platform_models import (
+            Adjustment,
+            AdjustmentType,
+            ReportLineMapping,
+        )
+        from app.models.report_models import ReportConfig
+
+        rlm = ReportLineMapping.__table__
+        adj = Adjustment.__table__
+        tb = TrialBalance.__table__
+        rc = ReportConfig.__table__
+
+        # 1. 从 report_config 加载标准行次模板（所有企业共用）
+        # 确定 applicable_standard（从项目配置推断）
+        from app.models.core import Project
+        proj_result = await self.db.execute(
+            sa.select(Project).where(Project.id == project_id)
+        )
+        proj = proj_result.scalar_one_or_none()
+        template_type = 'soe'
+        report_scope = 'standalone'
+        if proj and proj.wizard_state:
+            basic = (proj.wizard_state or {}).get('basic_info', {}).get('data', {})
+            template_type = basic.get('template_type', 'soe')
+            report_scope = basic.get('report_scope', 'standalone')
+        applicable_standard = f"{template_type}_{report_scope}"
+
+        rc_q = (
+            sa.select(rc.c.row_code, rc.c.row_name, rc.c.indent_level, rc.c.is_total_row, rc.c.formula)
+            .where(
+                rc.c.report_type == report_type,
+                rc.c.applicable_standard == applicable_standard,
+                rc.c.is_deleted == sa.false(),
+            )
+            .order_by(rc.c.row_number)
+        )
+        rc_result = await self.db.execute(rc_q)
+        rc_rows = rc_result.fetchall()
+
+        # 如果标准库没有数据，fallback 到旧逻辑（从映射表取行次）
+        if not rc_rows:
+            return await self._get_summary_from_mapping(project_id, year, report_type, company_code)
+
+        # 2. 获取该项目的映射关系（标准科目 → 报表行次名称）
+        mapping_q = (
+            sa.select(rlm.c.standard_account_code, rlm.c.report_line_code, rlm.c.report_line_name)
+            .where(
+                rlm.c.project_id == project_id,
+                rlm.c.report_type == report_type,
+                rlm.c.is_deleted == sa.false(),
+                rlm.c.is_confirmed == sa.true(),
+            )
+        )
+        mapping_result = await self.db.execute(mapping_q)
+
+        # 建立 report_config 行次名称 → row_code 的索引（用于名称匹配）
+        rc_name_to_code: dict[str, str] = {}
+        for rc_row in rc_rows:
+            name = (rc_row.row_name or '').strip().replace('：', '').replace(':', '').replace(' ', '')
+            if name:
+                rc_name_to_code[name] = rc_row.row_code
+
+        # 行次编码（report_config 的 row_code）→ 标准科目列表
+        line_accounts: dict[str, list[str]] = {}
+        all_account_codes: set[str] = set()
+        for r in mapping_result.fetchall():
+            # 通过映射表的 report_line_name 匹配 report_config 的 row_name
+            mapping_name = (r.report_line_name or '').strip().replace('：', '').replace(':', '').replace(' ', '')
+            matched_rc_code = rc_name_to_code.get(mapping_name)
+
+            if not matched_rc_code:
+                # 名称匹配不上，尝试模糊匹配（包含关系）
+                for rc_name, rc_code in rc_name_to_code.items():
+                    if mapping_name in rc_name or rc_name in mapping_name:
+                        matched_rc_code = rc_code
+                        break
+
+            if matched_rc_code:
+                if matched_rc_code not in line_accounts:
+                    line_accounts[matched_rc_code] = []
+                line_accounts[matched_rc_code].append(r.standard_account_code)
+                all_account_codes.add(r.standard_account_code)
+
+        # 3. 从 trial_balance 汇总未审数
+        unadj_map: dict[str, Decimal] = {}
+        if all_account_codes:
+            tb_q = (
+                sa.select(
+                    tb.c.standard_account_code,
+                    sa.func.coalesce(sa.func.sum(tb.c.unadjusted_amount), 0).label("unadj"),
+                )
+                .where(
+                    tb.c.project_id == project_id,
+                    tb.c.year == year,
+                    tb.c.company_code == company_code,
+                    tb.c.standard_account_code.in_(list(all_account_codes)),
+                    tb.c.is_deleted == sa.false(),
+                )
+                .group_by(tb.c.standard_account_code)
+            )
+            tb_result = await self.db.execute(tb_q)
+            for r in tb_result.fetchall():
+                unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
+
+        # 4. 从 adjustments 汇总 AJE/RJE
+        aje_dr_map: dict[str, Decimal] = {}
+        aje_cr_map: dict[str, Decimal] = {}
+        rcl_dr_map: dict[str, Decimal] = {}
+        rcl_cr_map: dict[str, Decimal] = {}
+
+        if all_account_codes:
+            adj_q = (
+                sa.select(
+                    adj.c.account_code,
+                    adj.c.adjustment_type,
+                    sa.func.coalesce(sa.func.sum(adj.c.debit_amount), 0).label("total_dr"),
+                    sa.func.coalesce(sa.func.sum(adj.c.credit_amount), 0).label("total_cr"),
+                )
+                .where(
+                    adj.c.project_id == project_id,
+                    adj.c.year == year,
+                    adj.c.account_code.in_(list(all_account_codes)),
+                    adj.c.is_deleted == sa.false(),
+                )
+                .group_by(adj.c.account_code, adj.c.adjustment_type)
+            )
+            adj_result = await self.db.execute(adj_q)
+            for r in adj_result.fetchall():
+                code = r.account_code
+                dr = Decimal(str(r.total_dr))
+                cr = Decimal(str(r.total_cr))
+                adj_type = r.adjustment_type
+                if adj_type in (AdjustmentType.aje.value, AdjustmentType.aje):
+                    aje_dr_map[code] = aje_dr_map.get(code, Decimal("0")) + dr
+                    aje_cr_map[code] = aje_cr_map.get(code, Decimal("0")) + cr
+                else:
+                    rcl_dr_map[code] = rcl_dr_map.get(code, Decimal("0")) + dr
+                    rcl_cr_map[code] = rcl_cr_map.get(code, Decimal("0")) + cr
+
+        # 5. 按标准行次模板构建结果
+        # 使用统一公式引擎执行 report_config.formula
+        from app.services.formula_engine import execute_formula, get_formula_account_codes, FormulaContext
+
+        # 构建 trial_balance 科目→金额索引（供公式引擎用）
+        all_tb_q = (
+            sa.select(tb.c.standard_account_code, tb.c.unadjusted_amount)
+            .where(
+                tb.c.project_id == project_id,
+                tb.c.year == year,
+                tb.c.company_code == company_code,
+                tb.c.is_deleted == sa.false(),
+            )
+        )
+        all_tb_result = await self.db.execute(all_tb_q)
+        tb_amount_map: dict[str, Decimal] = {}
+        for r in all_tb_result.fetchall():
+            if r.standard_account_code:
+                tb_amount_map[r.standard_account_code] = (
+                    tb_amount_map.get(r.standard_account_code, Decimal("0"))
+                    + (r.unadjusted_amount or Decimal("0"))
+                )
+
+        result_rows = []
+        row_values: dict[str, Decimal | float] = {}
+
+        for rc_row in rc_rows:
+            row_code = rc_row.row_code
+            formula = rc_row.formula
+            is_total = rc_row.is_total_row or False
+
+            if formula:
+                # 有公式：用统一公式引擎执行
+                unadj = execute_formula(formula, tb_amount_map, row_values)
+                # 公式涉及的科目的调整也要汇总
+                aje_dr = Decimal("0")
+                aje_cr = Decimal("0")
+                rcl_dr = Decimal("0")
+                rcl_cr = Decimal("0")
+                formula_codes = get_formula_account_codes(formula)
+                for code in formula_codes:
+                    if code.startswith("__range__"):
+                        # 范围编码：遍历匹配
+                        range_str = code.replace("__range__", "")
+                        parts = range_str.split("~")
+                        if len(parts) == 2:
+                            for ac in list(all_account_codes):
+                                if parts[0] <= ac <= parts[1]:
+                                    aje_dr += aje_dr_map.get(ac, Decimal("0"))
+                                    aje_cr += aje_cr_map.get(ac, Decimal("0"))
+                                    rcl_dr += rcl_dr_map.get(ac, Decimal("0"))
+                                    rcl_cr += rcl_cr_map.get(ac, Decimal("0"))
+                    else:
+                        aje_dr += aje_dr_map.get(code, Decimal("0"))
+                        aje_cr += aje_cr_map.get(code, Decimal("0"))
+                        rcl_dr += rcl_dr_map.get(code, Decimal("0"))
+                        rcl_cr += rcl_cr_map.get(code, Decimal("0"))
+                audited = unadj + aje_dr - aje_cr + rcl_dr - rcl_cr
+            elif is_total:
+                # 合计行无公式：向前汇总子行（fallback）
+                total_unadj = Decimal("0")
+                total_aje_dr = Decimal("0")
+                total_aje_cr = Decimal("0")
+                total_rcl_dr = Decimal("0")
+                total_rcl_cr = Decimal("0")
+                total_audited = Decimal("0")
+                for prev_row in result_rows[::-1]:
+                    if prev_row.get("is_category") or prev_row.get("is_total"):
+                        break
+                    total_unadj += Decimal(str(prev_row.get("unadjusted") or 0))
+                    total_aje_dr += Decimal(str(prev_row.get("aje_dr") or 0))
+                    total_aje_cr += Decimal(str(prev_row.get("aje_cr") or 0))
+                    total_rcl_dr += Decimal(str(prev_row.get("rcl_dr") or 0))
+                    total_rcl_cr += Decimal(str(prev_row.get("rcl_cr") or 0))
+                    total_audited += Decimal(str(prev_row.get("audited") or 0))
+                unadj = total_unadj
+                aje_dr = total_aje_dr
+                aje_cr = total_aje_cr
+                rcl_dr = total_rcl_dr
+                rcl_cr = total_rcl_cr
+                audited = total_audited
+            else:
+                # 无公式非合计：用映射关系填充
+                accounts = line_accounts.get(row_code, [])
+                unadj = sum(unadj_map.get(ac, Decimal("0")) for ac in accounts)
+                aje_dr = sum(aje_dr_map.get(ac, Decimal("0")) for ac in accounts)
+                aje_cr = sum(aje_cr_map.get(ac, Decimal("0")) for ac in accounts)
+                rcl_dr = sum(rcl_dr_map.get(ac, Decimal("0")) for ac in accounts)
+                rcl_cr = sum(rcl_cr_map.get(ac, Decimal("0")) for ac in accounts)
+                audited = unadj + aje_dr - aje_cr + rcl_dr - rcl_cr
+
+            row_values[row_code] = float(unadj)
+
+            result_rows.append({
+                "row_code": row_code,
+                "row_name": rc_row.row_name,
+                "indent": rc_row.indent_level or 0,
+                "is_total": is_total,
+                "is_category": ((rc_row.indent_level or 0) == 0 and not is_total),
+                "unadjusted": float(unadj) if unadj != 0 else None,
+                "aje_dr": float(aje_dr) if aje_dr != 0 else None,
+                "aje_cr": float(aje_cr) if aje_cr != 0 else None,
+                "rcl_dr": float(rcl_dr) if rcl_dr != 0 else None,
+                "rcl_cr": float(rcl_cr) if rcl_cr != 0 else None,
+                "audited": float(audited) if audited != 0 else None,
+            })
+
+        return result_rows
+
+    async def _get_summary_from_mapping(
+        self,
+        project_id: UUID,
+        year: int,
+        report_type: str = "balance_sheet",
+        company_code: str = "001",
+    ) -> list[dict]:
+        """Fallback：当 report_config 无数据时，从映射表取行次（旧逻辑）"""
         from app.models.audit_platform_models import (
             Adjustment,
             AdjustmentType,
@@ -445,7 +687,6 @@ class TrialBalanceService:
         adj = Adjustment.__table__
         tb = TrialBalance.__table__
 
-        # 1. 获取报表行次结构（按 report_type 过滤）
         report_lines_q = (
             sa.select(
                 rlm.c.report_line_code,
@@ -468,10 +709,8 @@ class TrialBalanceService:
         if not rl_rows:
             return []
 
-        # 2. 收集所有涉及的标准科目
         all_account_codes = list({r.standard_account_code for r in rl_rows if r.standard_account_code})
 
-        # 3. 从 trial_balance 汇总未审数（按标准科目）
         unadj_map: dict[str, Decimal] = {}
         if all_account_codes:
             tb_q = (
@@ -492,7 +731,6 @@ class TrialBalanceService:
             for r in tb_result.fetchall():
                 unadj_map[r.standard_account_code] = Decimal(str(r.unadj))
 
-        # 4. 从 adjustments 汇总 AJE/RJE 借贷（按标准科目）
         aje_dr_map: dict[str, Decimal] = {}
         aje_cr_map: dict[str, Decimal] = {}
         rcl_dr_map: dict[str, Decimal] = {}
@@ -527,8 +765,6 @@ class TrialBalanceService:
                     rcl_dr_map[code] = rcl_dr_map.get(code, Decimal("0")) + dr
                     rcl_cr_map[code] = rcl_cr_map.get(code, Decimal("0")) + cr
 
-        # 5. 按报表行次聚合（一个行次可能对应多个标准科目）
-        # 先建立行次→科目列表的映射
         line_accounts: dict[str, list[str]] = {}
         line_meta: dict[str, dict] = {}
         for r in rl_rows:
@@ -544,7 +780,6 @@ class TrialBalanceService:
             if r.standard_account_code:
                 line_accounts[code].append(r.standard_account_code)
 
-        # 6. 构建结果行（保持行次顺序）
         seen_codes: set[str] = set()
         ordered_codes: list[str] = []
         for r in rl_rows:
