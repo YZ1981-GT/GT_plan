@@ -101,6 +101,7 @@ from app.models.related_party_models import (
 )
 from app.models.independence_models import AnnualIndependenceDeclaration
 from app.models.qc_rule_models import QcRuleDefinition
+from app.models.enterprise_linkage_models import AdjustmentEditingLock, TbChangeHistory, EventCascadeLog  # noqa: F401
 
 __all__ = [
     # --- base ---

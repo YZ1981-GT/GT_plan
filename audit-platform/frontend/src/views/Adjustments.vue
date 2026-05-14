@@ -35,6 +35,9 @@
       </template>
     </GtPageHeader>
 
+    <!-- 在线成员 [enterprise-linkage 3.2] -->
+    <PresenceAvatars :project-id="projectId" view-name="adjustments" />
+
     <!-- 汇总面板 -->
     <div class="gt-summary-panel" v-if="summary">
       <div class="gt-summary-card">
@@ -100,6 +103,32 @@
       v-loading="loading"
       @selection-change="onSelectionChange"
     >
+      <!-- 展开行：显示行项明细 -->
+      <template #expand="{ row }">
+        <div class="gt-adj-expand-detail">
+          <table class="gt-adj-line-table">
+            <thead>
+              <tr><th>科目编码</th><th>科目名称</th><th style="text-align:center">方向</th><th style="text-align:right">金额</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(li, idx) in (row.line_items || [])" :key="idx">
+                <td>{{ li.standard_account_code }}</td>
+                <td>{{ li.account_name }}</td>
+                <td style="text-align:center">
+                  <span :class="li.debit_amount ? 'gt-adj-dir-dr' : 'gt-adj-dir-cr'">{{ li.debit_amount ? '借' : '贷' }}</span>
+                </td>
+                <td style="text-align:right" class="gt-amt">{{ fmtAmt(li.debit_amount || li.credit_amount) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="gt-adj-expand-footer">
+            <span v-if="row.description" class="gt-adj-expand-desc">📝 {{ row.description }}</span>
+            <span class="gt-adj-expand-impact" v-if="row.line_items?.length">
+              影响科目：{{ row.line_items.map((li: any) => li.account_name || li.standard_account_code).filter(Boolean).join('、') }}
+            </span>
+          </div>
+        </div>
+      </template>
       <template #col-adjustment_type="{ row }">
         <el-tag :type="normalizeAdjustmentType(row.adjustment_type) === 'aje' ? 'danger' : 'warning'" size="small">
           {{ formatAdjustmentType(row.adjustment_type) }}
@@ -153,6 +182,19 @@
       <el-button type="success" size="small" @click="batchReview('approved')">批量批准</el-button>
       <el-button type="warning" size="small" @click="showRejectDialog = true">批量驳回</el-button>
     </div>
+
+    <!-- 批量模式浮动提交栏 -->
+    <transition name="el-fade-in">
+      <div v-if="batchMode && batchPendingCount > 0" class="gt-adj-batch-float-bar">
+        <span>📦 批量模式：{{ batchPendingCount }} 笔待提交</span>
+        <span style="font-size:11px;color:#909399">提交后将一次性触发试算表重算</span>
+        <span style="flex:1" />
+        <el-button size="small" @click="batchMode = false; batchPendingCount = 0">取消全部</el-button>
+        <el-button size="small" type="success" :loading="batchCommitting" @click="onBatchCommit">
+          ✓ 提交全部 ({{ batchPendingCount }})
+        </el-button>
+      </div>
+    </transition>
 
     <!-- 驳回原因弹窗 -->
     <el-dialog append-to-body v-model="showRejectDialog" title="驳回原因" width="520px" @open="onRejectDialogOpen">
@@ -213,6 +255,22 @@
             <el-radio value="rje">RJE</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="快捷模板" v-if="!isEditing">
+          <el-select v-model="selectedTemplate" placeholder="选择常用模板快速填充" clearable size="small" style="width:100%" @change="onTemplateSelect">
+            <el-option-group label="AJE 常用">
+              <el-option value="bad_debt" label="坏账准备计提" />
+              <el-option value="depreciation" label="固定资产折旧" />
+              <el-option value="amortization" label="无形资产摊销" />
+              <el-option value="accrued_expense" label="预提费用" />
+              <el-option value="revenue_cutoff" label="收入截止调整" />
+            </el-option-group>
+            <el-option-group label="RJE 常用">
+              <el-option value="rcl_current_noncurrent" label="流动/非流动重分类" />
+              <el-option value="rcl_ar_prepay" label="应收/预付重分类" />
+              <el-option value="rcl_ap_advance" label="应付/预收重分类" />
+            </el-option-group>
+          </el-select>
+        </el-form-item>
         <el-form-item label="摘要">
           <el-input v-model="form.description" placeholder="调整说明" />
         </el-form-item>
@@ -262,6 +320,9 @@
           借方合计: {{ totalDebit.toFixed(2) }} | 贷方合计: {{ totalCredit.toFixed(2) }}
           | 差额: {{ balanceDiff.toFixed(2) }}
         </div>
+
+        <!-- 影响预判面板 [enterprise-linkage 3.8] -->
+        <ImpactPreviewPanel :preview="impactPreview" :loading="impactLoading" />
       </el-form>
       <template #footer>
         <el-button @click="formDialogVisible = false">取消</el-button>
@@ -300,6 +361,7 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { fmtAmount } from '@/utils/formatters'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import PresenceAvatars from '@/components/PresenceAvatars.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import { operationHistory } from '@/utils/operationHistory'
@@ -315,6 +377,8 @@ import { ADJUSTMENT_STATUS, ADJUSTMENT_TYPE } from '@/constants/statusEnum'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import GtEditableTable from '@/components/common/GtEditableTable.vue'
 import type { GtColumn } from '@/components/common/GtEditableTable.vue'
+import ImpactPreviewPanel from '@/components/ImpactPreviewPanel.vue'
+import { useImpactPreview } from '@/composables/useImpactPreview'
 
 const route = useRoute()
 const router = useRouter()
@@ -365,6 +429,11 @@ const entries = ref<any[]>([])
 const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
 
+// ─── Impact Preview [enterprise-linkage 3.8] ─────────────────────────────────
+const impactProjectId = computed(() => projectId)
+const impactYear = computed(() => selectedYear.value ?? 2025)
+const { preview: impactPreview, loading: impactLoading, fetchPreview } = useImpactPreview(impactProjectId, impactYear)
+
 // R7-S3-08 Task 41 + R9 F10 Task 33：粘贴多行分录
 const adjTableRef = ref<HTMLElement | null>(null)
 usePasteImport({
@@ -414,11 +483,62 @@ const convertingGroupId = ref<string>('')
 const formDialogVisible = ref(false)
 const isEditing = ref(false)
 const editingGroupId = ref('')
+const selectedTemplate = ref('')
 const form = ref({
   adjustment_type: 'aje',
   description: '',
   line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
 })
+
+// 分录模板定义
+const ADJUSTMENT_TEMPLATES: Record<string, { type: string; description: string; lines: { code: string; name: string; dr: number; cr: number }[] }> = {
+  bad_debt: { type: 'aje', description: '计提坏账准备', lines: [
+    { code: '6601', name: '资产减值损失', dr: 0, cr: 0 },
+    { code: '1231', name: '坏账准备', dr: 0, cr: 0 },
+  ]},
+  depreciation: { type: 'aje', description: '补提折旧', lines: [
+    { code: '6602', name: '管理费用-折旧', dr: 0, cr: 0 },
+    { code: '1602', name: '累计折旧', dr: 0, cr: 0 },
+  ]},
+  amortization: { type: 'aje', description: '补提摊销', lines: [
+    { code: '6602', name: '管理费用-摊销', dr: 0, cr: 0 },
+    { code: '1702', name: '累计摊销', dr: 0, cr: 0 },
+  ]},
+  accrued_expense: { type: 'aje', description: '预提费用', lines: [
+    { code: '6602', name: '管理费用', dr: 0, cr: 0 },
+    { code: '2211', name: '应付职工薪酬', dr: 0, cr: 0 },
+  ]},
+  revenue_cutoff: { type: 'aje', description: '收入截止调整', lines: [
+    { code: '5001', name: '主营业务收入', dr: 0, cr: 0 },
+    { code: '2205', name: '合同负债', dr: 0, cr: 0 },
+  ]},
+  rcl_current_noncurrent: { type: 'rje', description: '一年内到期非流动资产重分类', lines: [
+    { code: '1503', name: '一年内到期的非流动资产', dr: 0, cr: 0 },
+    { code: '1511', name: '长期股权投资', dr: 0, cr: 0 },
+  ]},
+  rcl_ar_prepay: { type: 'rje', description: '应收/预付重分类', lines: [
+    { code: '1123', name: '预付款项', dr: 0, cr: 0 },
+    { code: '1122', name: '应收账款', dr: 0, cr: 0 },
+  ]},
+  rcl_ap_advance: { type: 'rje', description: '应付/预收重分类', lines: [
+    { code: '2203', name: '预收款项', dr: 0, cr: 0 },
+    { code: '2202', name: '应付账款', dr: 0, cr: 0 },
+  ]},
+}
+
+function onTemplateSelect(key: string) {
+  if (!key) return
+  const tpl = ADJUSTMENT_TEMPLATES[key]
+  if (!tpl) return
+  form.value.adjustment_type = tpl.type
+  form.value.description = tpl.description
+  form.value.line_items = tpl.lines.map(l => ({
+    standard_account_code: l.code,
+    account_name: l.name,
+    debit_amount: l.dr,
+    credit_amount: l.cr,
+  }))
+}
 
 const totalDebit = computed(() => form.value.line_items.reduce((s, l) => s + (l.debit_amount || 0), 0))
 const totalCredit = computed(() => form.value.line_items.reduce((s, l) => s + (l.credit_amount || 0), 0))
@@ -519,6 +639,8 @@ function onAccountSelect(idx: number) {
   const code = form.value.line_items[idx].standard_account_code
   const opt = accountOptions.value.find(o => o.code === code)
   if (opt) form.value.line_items[idx].account_name = opt.name
+  // [enterprise-linkage 3.8] Fetch impact preview when account changes
+  if (code) fetchPreview(code)
 }
 
 function openCreateDialog() {
@@ -560,6 +682,7 @@ async function onSubmit() {
         line_items: form.value.line_items,
       })
       ElMessage.success('保存成功')
+      _showImpactFeedback()
     } else {
       await createAdjustment(projectId.value, {
         adjustment_type: form.value.adjustment_type,
@@ -572,6 +695,7 @@ async function onSubmit() {
         ElMessage.success(`创建成功（批量模式，待提交 ${batchPendingCount.value} 笔）`)
       } else {
         ElMessage.success('创建成功')
+        _showImpactFeedback()
       }
     }
     formDialogVisible.value = false
@@ -581,6 +705,21 @@ async function onSubmit() {
   } finally {
     submitLoading.value = false
   }
+}
+
+/** 显示分录对试算表的影响反馈 */
+function _showImpactFeedback() {
+  const accounts = form.value.line_items
+    .map(li => li.account_name || li.standard_account_code)
+    .filter(Boolean)
+  if (!accounts.length) return
+  const type = form.value.adjustment_type === 'aje' ? '审计调整' : '重分类'
+  ElMessage({
+    type: 'info',
+    message: `${type}已更新试算表：${accounts.join('、')}`,
+    duration: 4000,
+    showClose: true,
+  })
 }
 
 async function onBatchCommit() {
@@ -812,6 +951,58 @@ watch(
 
 .gt-adj-col-placeholder {
   color: var(--gt-color-text-tertiary, #909399);
+}
+
+/* 展开行明细 */
+.gt-adj-expand-detail {
+  padding: 8px 16px 8px 48px;
+  background: #faf8fd;
+}
+.gt-adj-line-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.gt-adj-line-table th {
+  background: #f0edf5;
+  padding: 4px 8px;
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid #e8e4f0;
+}
+.gt-adj-line-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.gt-adj-expand-footer {
+  display: flex;
+  gap: 16px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #909399;
+}
+.gt-adj-expand-desc { color: #606266; }
+.gt-adj-expand-impact { color: #4b2d77; font-weight: 500; }
+.gt-adj-dir-dr { color: #f56c6c; font-weight: 600; }
+.gt-adj-dir-cr { color: #409eff; font-weight: 600; }
+
+/* 批量模式浮动提交栏 */
+.gt-adj-batch-float-bar {
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #f8f6fb, #ece4f5);
+  border-top: 2px solid #4b2d77;
+  box-shadow: 0 -4px 12px rgba(75, 45, 119, 0.1);
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b2d77;
 }
 
 :deep(.el-tabs__item.is-active) { font-weight: 600; }

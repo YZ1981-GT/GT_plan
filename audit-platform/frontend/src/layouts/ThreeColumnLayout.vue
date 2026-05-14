@@ -138,6 +138,9 @@
       </div>
     </header>
 
+    <!-- 级联 degraded 状态横幅 [enterprise-linkage 4.8] -->
+    <DegradedBanner />
+
     <!-- 三栏主体 -->
     <div class="gt-body">
       <!-- 左侧栏：1级功能导航 -->
@@ -333,6 +336,7 @@ import { eventBus } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { createSSE, type SSEConnection } from '@/utils/sse'
 import { events as eventPaths } from '@/services/apiPaths'
+import DegradedBanner from '@/components/DegradedBanner.vue'
 
 const route = useRoute()
 const router = useRouter()

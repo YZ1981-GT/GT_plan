@@ -772,6 +772,16 @@ class EventType(str, enum.Enum):
     # Batch 3 Fix 3: 批量委派事件供 event_handlers 级联
     WORKPAPER_ASSIGNED = "workpaper.assigned"
 
+    # Enterprise Linkage: Presence 事件
+    PRESENCE_JOINED = "presence.joined"
+    PRESENCE_LEFT = "presence.left"
+    PRESENCE_EDITING_STARTED = "presence.editing_started"
+    PRESENCE_EDITING_STOPPED = "presence.editing_stopped"
+
+    # Enterprise Linkage: 批量提交 + 级联降级
+    ADJUSTMENT_BATCH_COMMITTED = "adjustment.batch_committed"
+    LINKAGE_CASCADE_DEGRADED = "linkage.cascade_degraded"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

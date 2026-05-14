@@ -62,9 +62,6 @@
         </template>
       </GtPageHeader>
 
-      <!-- 工作流进度条 -->
-      <WorkflowProgress :project-id="selectedProjectId" :year="selectedYear" />
-
       <!-- F29: 报表平衡检查结果 -->
       <el-alert
         v-if="balanceCheckResult"
@@ -420,7 +417,7 @@
               <span>{{ row.soe_row_name }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="编码" width="80" align="center">
+          <el-table-column label="编码" width="110" align="center">
             <template #default="{ row }">
               <span style="color: #aaa; font-size: 11px;">{{ row.soe_row_code }}</span>
             </template>
@@ -601,6 +598,7 @@
     <div class="gt-ucell-ctx-item" @click="onRvCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看穿透</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxGoNote"><span class="gt-ucell-ctx-icon">📝</span> 跳转附注</div>
     <div class="gt-ucell-ctx-item" @click="onRvCtxOpenWorkpaper"><span class="gt-ucell-ctx-icon">📋</span> 打开对应底稿</div>
+    <div class="gt-ucell-ctx-item" @click="onRvCtxViewAdjustments"><span class="gt-ucell-ctx-icon">🔗</span> 查看调整明细</div>
   </CellContextMenu>
 </template>
 
@@ -620,7 +618,6 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
-import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import { useCellComments } from '@/composables/useCellComments'
@@ -1091,7 +1088,10 @@ function compareRowClassName({ row }: { row: any }) {
   return `report-row--${type}`
 }
 
-function onTabChange() { fetchReport() }
+function onTabChange() {
+  if (activeTab.value === 'cross_check') return
+  fetchReport()
+}
 
 const _onSyncUnadjusted = withLoading(syncLoading, async () => {
   await recalcTrialBalance(projectId.value, year.value)
@@ -1625,6 +1625,20 @@ async function onRvCtxOpenWorkpaper() {
       ElMessage.info('该行暂无关联底稿')
     }
   } catch { ElMessage.warning('查询关联底稿失败') }
+}
+
+// enterprise-linkage 3.10：右键"查看调整明细" → 跳转试算表高亮对应行
+function onRvCtxViewAdjustments() {
+  rvCtx.closeContextMenu()
+  const row = rvCtx.contextMenu.rowData
+  if (!row?.row_code) {
+    ElMessage.info('请在数据行上右键')
+    return
+  }
+  router.push({
+    path: `/projects/${projectId.value}/trial-balance`,
+    query: { highlight_row: row.row_code, year: String(year.value) },
+  })
 }
 
 function onRvCtxSum() {

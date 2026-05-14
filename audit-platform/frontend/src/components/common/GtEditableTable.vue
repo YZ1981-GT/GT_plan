@@ -49,6 +49,13 @@
       :span-method="groupBy ? groupSpanMethod : undefined"
       :row-class-name="groupBy ? groupRowClassName : undefined"
     >
+      <!-- 展开行插槽 -->
+      <el-table-column v-if="$slots.expand" type="expand" width="36">
+        <template #default="{ row, $index }">
+          <slot name="expand" :row="row" :index="$index" />
+        </template>
+      </el-table-column>
+
       <!-- 多选列 -->
       <el-table-column
         v-if="showSelection && editable && editMode.isEditing.value"

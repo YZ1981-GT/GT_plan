@@ -127,6 +127,7 @@
           show-checkbox
           @check-change="onCheckChange"
           @node-click="onNodeClick"
+          @node-contextmenu="onWpNodeContextMenu"
           ref="treeRef"
         >
           <template #default="{ data }">
@@ -136,6 +137,18 @@
             </div>
           </template>
         </el-tree>
+
+        <!-- 底稿右键菜单 [enterprise-linkage 3.10] -->
+        <div
+          v-if="wpCtxVisible"
+          class="gt-tb-sum-ctx"
+          :style="{ left: wpCtxX + 'px', top: wpCtxY + 'px' }"
+          @contextmenu.prevent
+        >
+          <div class="gt-ucell-ctx-item" @click="onWpCtxTraceToTb">
+            <span class="gt-ucell-ctx-icon">🔍</span> 溯源到试算表
+          </div>
+        </div>
       </div>
 
       <!-- 右侧详情面板 -->
@@ -1060,6 +1073,40 @@ async function selectWorkpaperById(wpId: string) {
 async function onNodeClick(data: TreeNode) {
   if (!data.wpId) return
   await selectWorkpaperById(data.wpId)
+}
+
+// ─── 底稿右键菜单 [enterprise-linkage 3.10] ────────────────────────────────
+const wpCtxVisible = ref(false)
+const wpCtxX = ref(0)
+const wpCtxY = ref(0)
+let wpCtxNodeData: TreeNode | null = null
+
+function onWpNodeContextMenu(event: MouseEvent, data: TreeNode) {
+  if (!data.wpId) return // 只对叶子节点（底稿）显示菜单
+  event.preventDefault()
+  wpCtxNodeData = data
+  wpCtxX.value = event.clientX
+  wpCtxY.value = event.clientY
+  wpCtxVisible.value = true
+
+  const closeHandler = () => {
+    wpCtxVisible.value = false
+    document.removeEventListener('click', closeHandler)
+  }
+  setTimeout(() => document.addEventListener('click', closeHandler), 0)
+}
+
+function onWpCtxTraceToTb() {
+  wpCtxVisible.value = false
+  if (!wpCtxNodeData) return
+  // Extract account code from wp_code (first char is cycle letter, rest is account-related)
+  // Navigate to trial balance with highlight
+  const label = wpCtxNodeData.label || ''
+  const wpCode = label.split(' ')[0] || ''
+  router.push({
+    path: `/projects/${projectId.value}/trial-balance`,
+    query: { highlight_wp: wpCode },
+  })
 }
 
 function onOnlineEdit() {

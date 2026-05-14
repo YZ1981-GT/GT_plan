@@ -403,8 +403,9 @@ async def export_adjustment_summary(
     svc = AdjustmentService(db)
     aje_result = await svc.list_entries(project_id, year, adjustment_type=AdjustmentType.aje, page_size=500)
     rje_result = await svc.list_entries(project_id, year, adjustment_type=AdjustmentType.rje, page_size=500)
-    aje_list = aje_result if isinstance(aje_result, list) else (aje_result.items if hasattr(aje_result, 'items') else [])
-    rje_list = rje_result if isinstance(rje_result, list) else (rje_result.items if hasattr(rje_result, 'items') else [])
+    # list_entries 返回 dict {"items": [...], "total": ...}
+    aje_list = aje_result.get("items", []) if isinstance(aje_result, dict) else aje_result
+    rje_list = rje_result.get("items", []) if isinstance(rje_result, dict) else rje_result
 
     if format == "json":
         return {
@@ -446,13 +447,23 @@ async def export_adjustment_summary(
 
 
 def _adj_to_dict(adj) -> dict:
+    """将分录组（dict 或 ORM 对象）转为导出用字典。"""
+    if isinstance(adj, dict):
+        return {
+            "adjustment_no": adj.get("adjustment_no", ""),
+            "description": adj.get("description", ""),
+            "account_code": adj.get("account_code", ""),
+            "account_name": adj.get("account_name", ""),
+            "debit_amount": str(adj.get("debit_amount") or adj.get("total_debit") or 0),
+            "credit_amount": str(adj.get("credit_amount") or adj.get("total_credit") or 0),
+        }
     return {
-        "adjustment_no": adj.adjustment_no if hasattr(adj, 'adjustment_no') else str(adj.get('adjustment_no', '')),
-        "description": adj.description if hasattr(adj, 'description') else str(adj.get('description', '')),
-        "account_code": adj.account_code if hasattr(adj, 'account_code') else str(adj.get('account_code', '')),
-        "account_name": adj.account_name if hasattr(adj, 'account_name') else str(adj.get('account_name', '')),
-        "debit_amount": str(adj.debit_amount) if hasattr(adj, 'debit_amount') else str(adj.get('debit_amount', 0)),
-        "credit_amount": str(adj.credit_amount) if hasattr(adj, 'credit_amount') else str(adj.get('credit_amount', 0)),
+        "adjustment_no": getattr(adj, "adjustment_no", ""),
+        "description": getattr(adj, "description", ""),
+        "account_code": getattr(adj, "account_code", ""),
+        "account_name": getattr(adj, "account_name", ""),
+        "debit_amount": str(getattr(adj, "debit_amount", 0) or 0),
+        "credit_amount": str(getattr(adj, "credit_amount", 0) or 0),
     }
 
 
@@ -469,14 +480,39 @@ def _write_adj_sheet(ws, entries, adj_type: str):
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center")
 
-    for i, adj in enumerate(entries, 2):
-        d = _adj_to_dict(adj)
-        ws.cell(row=i, column=1, value=d["adjustment_no"])
-        ws.cell(row=i, column=2, value=d["description"])
-        ws.cell(row=i, column=3, value=d["account_code"])
-        ws.cell(row=i, column=4, value=d["account_name"])
-        ws.cell(row=i, column=5, value=float(d["debit_amount"] or 0))
-        ws.cell(row=i, column=6, value=float(d["credit_amount"] or 0))
+    row_idx = 2
+    for adj in entries:
+        if isinstance(adj, dict) and "line_items" in adj:
+            # 分录组模式：每个 line_item 一行
+            line_items = adj.get("line_items", [])
+            if not line_items:
+                # 无明细行时输出汇总行
+                ws.cell(row=row_idx, column=1, value=adj.get("adjustment_no", ""))
+                ws.cell(row=row_idx, column=2, value=adj.get("description", ""))
+                ws.cell(row=row_idx, column=3, value="")
+                ws.cell(row=row_idx, column=4, value="")
+                ws.cell(row=row_idx, column=5, value=float(adj.get("total_debit") or 0))
+                ws.cell(row=row_idx, column=6, value=float(adj.get("total_credit") or 0))
+                row_idx += 1
+            else:
+                for li in line_items:
+                    ws.cell(row=row_idx, column=1, value=adj.get("adjustment_no", ""))
+                    ws.cell(row=row_idx, column=2, value=adj.get("description", ""))
+                    ws.cell(row=row_idx, column=3, value=li.get("standard_account_code", ""))
+                    ws.cell(row=row_idx, column=4, value=li.get("account_name", ""))
+                    ws.cell(row=row_idx, column=5, value=float(li.get("debit_amount") or 0))
+                    ws.cell(row=row_idx, column=6, value=float(li.get("credit_amount") or 0))
+                    row_idx += 1
+        else:
+            # 扁平模式兼容
+            d = _adj_to_dict(adj)
+            ws.cell(row=row_idx, column=1, value=d["adjustment_no"])
+            ws.cell(row=row_idx, column=2, value=d["description"])
+            ws.cell(row=row_idx, column=3, value=d["account_code"])
+            ws.cell(row=row_idx, column=4, value=d["account_name"])
+            ws.cell(row=row_idx, column=5, value=float(d["debit_amount"] or 0))
+            ws.cell(row=row_idx, column=6, value=float(d["credit_amount"] or 0))
+            row_idx += 1
 
     # 列宽
     ws.column_dimensions["A"].width = 14

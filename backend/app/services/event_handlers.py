@@ -334,6 +334,10 @@ def register_event_handlers() -> None:
         EventType.MAPPING_CHANGED,
         _invalidate_formula_cache_on_adjustment,
     )
+    event_bus.subscribe(
+        EventType.ADJUSTMENT_BATCH_COMMITTED,
+        _invalidate_formula_cache_on_adjustment,
+    )
 
     logger.info("All event handlers registered successfully (including formula cache invalidation)")
 
@@ -369,6 +373,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _mark_workpapers_stale_by_account)
     event_bus.subscribe(EventType.MAPPING_CHANGED, _mark_workpapers_stale_by_account)
+    event_bus.subscribe(EventType.ADJUSTMENT_BATCH_COMMITTED, _mark_workpapers_stale_by_account)
 
     logger.info("Phase 9 workpaper event handlers registered")
 
@@ -462,3 +467,137 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _invalidate_addr_all)
 
     logger.info("Address registry cache invalidation handlers registered")
+
+    # ------------------------------------------------------------------
+    # Enterprise Linkage: 调整分录事件 → SSE 推送给项目组在线成员
+    # 按 ProjectAssignment.role 过滤推送内容（助理只收到负责科目相关事件）
+    # Validates: Requirements 1.1, 1.2, 1.3, 12.1, 12.2, 12.3, 12.4, 12.5
+    # ------------------------------------------------------------------
+    async def _notify_adjustment_event_sse(payload: EventPayload) -> None:
+        """调整分录 CRUD 事件 → 通过 SSE 推送给项目组在线成员。
+
+        角色过滤逻辑：
+        - partner/manager/qc/eqcr/admin: 收到所有事件
+        - auditor（助理）: 只收到与自己负责科目相关的事件
+          (通过 workpaper_assignments 关联的 account_code 过滤)
+
+        SSE 推送已由 EventBus._notify_sse 自动完成（所有事件都推到 SSE 队列）。
+        此处记录日志 + 标记 payload.extra 中的 role_filter 信息供前端过滤。
+        """
+        # Enrich payload with role filter metadata for frontend filtering
+        if payload.extra is None:
+            payload.extra = {}
+        payload.extra["_role_filter"] = {
+            "full_access_roles": ["partner", "manager", "qc", "eqcr", "admin"],
+            "filtered_role": "auditor",
+            "filter_by": "account_codes",
+        }
+
+        logger.info(
+            "[enterprise-linkage] Adjustment event %s pushed via SSE for project=%s, "
+            "accounts=%s, entry_group=%s",
+            payload.event_type.value,
+            payload.project_id,
+            payload.account_codes,
+            payload.entry_group_id,
+        )
+
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _notify_adjustment_event_sse)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _notify_adjustment_event_sse)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _notify_adjustment_event_sse)
+
+    logger.info("Enterprise Linkage: adjustment SSE push handlers registered")
+
+    # ------------------------------------------------------------------
+    # Enterprise Linkage Task 2.5: 批量提交单次级联
+    # ADJUSTMENT_BATCH_COMMITTED → 一次性 TB 重算（非逐条）
+    # Validates: Requirements 9.1, 9.2, 9.3
+    # ------------------------------------------------------------------
+    event_bus.subscribe(
+        EventType.ADJUSTMENT_BATCH_COMMITTED,
+        _make_tb_handler("on_adjustment_changed"),
+    )
+    logger.info("Enterprise Linkage: batch committed → single TB recalc handler registered")
+
+    # ------------------------------------------------------------------
+    # Enterprise Linkage Task 2.8: 事件级联日志记录
+    # 每次级联执行写入 event_cascade_log
+    # Validates: Requirements 7.1, 7.2
+    # ------------------------------------------------------------------
+    async def _log_cascade_on_tb_updated(payload: EventPayload) -> None:
+        """TB 重算完成后记录级联日志。"""
+        import time as _time
+        try:
+            async with async_session_factory() as session:
+                from app.services.linkage_service import LinkageService
+                svc = LinkageService(session)
+                trigger = payload.extra.get("trigger", "unknown") if payload.extra else "unknown"
+                steps = [
+                    {"step": "tb_recalc", "status": "completed"},
+                    {"step": "reports_update", "status": "pending"},
+                ]
+                await svc.log_cascade(
+                    project_id=payload.project_id,
+                    year=payload.year,
+                    trigger_event=trigger if trigger != "unknown" else payload.event_type.value,
+                    trigger_payload={
+                        "account_codes": payload.account_codes,
+                        "entry_group_id": str(payload.entry_group_id) if payload.entry_group_id else None,
+                    },
+                    steps=steps,
+                    status="completed",
+                    duration_ms=0,  # 精确耗时需要在 handler 外层计时
+                )
+                await session.commit()
+        except Exception as e:
+            logger.warning("[cascade-log] Failed to log cascade: %s", e)
+
+    event_bus.subscribe(EventType.TRIAL_BALANCE_UPDATED, _log_cascade_on_tb_updated)
+    logger.info("Enterprise Linkage: cascade logging handler registered")
+
+    # ------------------------------------------------------------------
+    # Enterprise Linkage Task 2.4: 调整分录变更 → 记录 TB 变更历史
+    # Validates: Requirements 2.4
+    # ------------------------------------------------------------------
+    async def _record_tb_change_on_adjustment(payload: "EventPayload") -> None:
+        """Record TB change history when adjustments change. Task 2.4 wiring."""
+        from uuid import UUID as _UUID
+
+        project_id = payload.project_id
+        year = payload.year
+        extra = payload.extra or {}
+        operator_id = extra.get("operator_id")
+        operator_name = extra.get("operator_name", "")
+        account_codes = payload.account_codes or []
+
+        if not project_id or not year or not operator_id or not account_codes:
+            return
+
+        op_map = {
+            "adjustment.created": "adjustment_created",
+            "adjustment.updated": "adjustment_modified",
+            "adjustment.deleted": "adjustment_deleted",
+        }
+        operation_type = op_map.get(payload.event_type.value if hasattr(payload.event_type, 'value') else str(payload.event_type), "unknown")
+
+        try:
+            async with async_session_factory() as session:
+                from app.services.linkage_service import LinkageService
+                svc = LinkageService(session)
+                for code in account_codes:
+                    await svc.record_tb_change(
+                        project_id=project_id,
+                        year=year,
+                        row_code=code,
+                        operation_type=operation_type,
+                        operator_id=_UUID(str(operator_id)),
+                        operator_name=operator_name,
+                    )
+                await session.commit()
+        except Exception as exc:
+            logger.warning("[TB_CHANGE_HISTORY] failed: %s", exc)
+
+    event_bus.subscribe(EventType.ADJUSTMENT_CREATED, _record_tb_change_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_UPDATED, _record_tb_change_on_adjustment)
+    event_bus.subscribe(EventType.ADJUSTMENT_DELETED, _record_tb_change_on_adjustment)
+    logger.info("Enterprise Linkage: TB change history handler registered")

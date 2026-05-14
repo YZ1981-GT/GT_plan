@@ -178,7 +178,11 @@ class AdjustmentService:
         project_id: UUID,
         year: int,
     ) -> dict:
-        """批量提交：收集所有 draft 分录涉及的科目，统一发布一次事件触发重算"""
+        """批量提交：收集所有 draft 分录涉及的科目，统一发布一次事件触发重算。
+
+        Task 2.5: 发布单条 ADJUSTMENT_BATCH_COMMITTED 事件（非逐条）
+        Task 2.6: 使用单事务，任何校验失败整批回滚
+        """
         adj = Adjustment.__table__
         q = (
             sa.select(sa.func.array_agg(sa.distinct(adj.c.account_code)))
@@ -194,8 +198,9 @@ class AdjustmentService:
         all_codes = [c for c in all_codes if c]
 
         if all_codes:
+            # Task 2.5: 发布单条 ADJUSTMENT_BATCH_COMMITTED 事件
             await self._publish_adjustment_event(
-                EventType.ADJUSTMENT_CREATED,
+                EventType.ADJUSTMENT_BATCH_COMMITTED,
                 project_id, year, all_codes,
             )
 

@@ -1337,6 +1337,31 @@ export const rotation = {
   overrides: '/api/rotation/overrides',
 } as const
 
+// ─── Presence（在线感知） ────────────────────────────────────────────────────
+
+export const presence = {
+  heartbeat: (pid: string) => `/api/projects/${pid}/presence/heartbeat`,
+  online: (pid: string) => `/api/projects/${pid}/presence/online`,
+  editing: (pid: string) => `/api/projects/${pid}/presence/editing`,
+} as const
+
+// ─── Linkage（联动指示器 + 影响预判） ────────────────────────────────────────
+
+export const linkage = {
+  tbRowAdjustments: (pid: string, rowCode: string) => `/api/projects/${pid}/linkage/tb-row/${encodeURIComponent(rowCode)}/adjustments`,
+  tbRowWorkpapers: (pid: string, rowCode: string) => `/api/projects/${pid}/linkage/tb-row/${encodeURIComponent(rowCode)}/workpapers`,
+  impactPreview: (pid: string) => `/api/projects/${pid}/linkage/impact-preview`,
+  changeHistory: (pid: string, rowCode: string) => `/api/projects/${pid}/linkage/change-history/${encodeURIComponent(rowCode)}`,
+} as const
+
+// ─── Conflict Guard（调整分录编辑锁） ───────────────────────────────────────
+
+export const conflictGuard = {
+  lock: (pid: string, entryGroupId: string) => `/api/projects/${pid}/adjustments/${entryGroupId}/lock`,
+  heartbeat: (pid: string, entryGroupId: string) => `/api/projects/${pid}/adjustments/${entryGroupId}/lock/heartbeat`,
+  unlock: (pid: string, entryGroupId: string) => `/api/projects/${pid}/adjustments/${entryGroupId}/lock`,
+} as const
+
 // ─── 聚合导出（便于 import { API } from '@/services/apiPaths'） ─────────────
 
 export const API = {
@@ -1359,6 +1384,7 @@ export const API = {
   admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,
   jobs, governance, eqcr, signatures, rotation,
+  presence, linkage, conflictGuard,
 } as const
 
 export default API

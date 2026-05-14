@@ -13,6 +13,7 @@ inclusion: always
 - 部署：本地优先、轻量方案
 - 启动：`start-dev.bat` 一键启动后端 9980 + 前端 3030
 - 打包：build_exe.py（PyInstaller），不要 .bat
+- **输出控制**：别一次输出过多，分步输出或修改；大改动拆小批次
 - 功能收敛：停止加新功能，核心 6-8 个页面做到极致，空壳标记 developing
 - 前后端联动：不能只开发后端不管前端
 - 删除必须二次确认，所有删除先进回收站
@@ -70,7 +71,7 @@ inclusion: always
 - 后端 `backend/app/workers/` 模块 4 个：sla_worker、import_recover_worker、outbox_replay_worker、import_worker（每个导出 `async def run(stop_event)`）
 - 前端 **86** 个 Vue 页面（views/ 含子目录 ai/eqcr/qc/independence/extension），**194** 个组件（components/ 含所有子目录），16 个 composables，9 个 stores，19 个 services，19 个 utils
 - GtPageHeader 接入率 **12/86**（14%）：TrialBalance/ReportView/DisclosureEditor/ConsolidationIndex/EqcrMetrics/KnowledgeBase/Misstatements/Projects/Materiality/AuditReportEditor/Adjustments/WorkpaperList
-- GtEditableTable 接入率 **0/86**
+- GtEditableTable 接入率 **1/86**（Adjustments.vue）；新增 `#expand` 插槽支持展开行明细（el-table type="expand"）
 - v-permission 接入 **5** 个 .vue 文件
 - useEditingLock 接入 **3** 个编辑器（WorkpaperEditor/DisclosureEditor/AuditReportEditor）
 - ElMessageBox.confirm 直接用法 **0 处**（R8-S1 Day 2-3 全量清零，30+ 处全部替换为 utils/confirm.ts 语义化函数）
@@ -101,9 +102,12 @@ inclusion: always
 - **TrialBalance 方向判断最终方案**：不硬编码科目编码/名称，默认从余额正负推断（正=借，负=贷）；支持用户手动点击切换方向（`directionOverrides` ref）；方向决定小计加减逻辑
 - **试算平衡表（summary 视图）贷方科目展示为正数**：`get_summary_with_adjustments` 构建 `unadj_map`/`tb_amount_map` 时，对 2xxx/3xxx/4xxx + 收入类（5001/5051/5101/6001/6051/6101/6111/6115/6117/6301）的负值取反；公式引擎 `TB('2001','期末余额')` 返回正数；科目明细视图不受影响（用 `fmtDir` 取绝对值+方向列）
 - **试算平衡表导入/导出模板已实现**：导出下拉菜单（导出数据/导出空模板）+ 导入按钮（按行次编码+名称双保险匹配覆盖未审数）；未审数编辑通过"✏️ 编辑"按钮切换模式（`tbSumEditMode` ref），编辑模式下所有报表类型未审数可点击编辑+双击不跳转，保存后自动退出编辑模式恢复双击溯源
+- **试算平衡表编辑列行为差异（有意为之）**：重分类借贷列始终可编辑（不受 tbSumEditMode 控制，审计师需随时调重分类）；未审数列需进入编辑模式或断开公式才可编辑；所有可编辑列 blur 后立即 `recalcTbSummaryAudited()` 实时更新审定数
 - **试算平衡表保存持久化**：保存到 `consol_worksheet_data` 表（sheet_key=`tb_summary_{type}`，JSONB）；加载时先取公式计算结果再调 `_mergeSavedTbSummary` 合并已保存手动数据（公式无值的行用保存值覆盖），现金流量表手动填写刷新后不丢失
 - **试算平衡表"断开公式"功能**：右键菜单"✂️ 断开公式"标记行级 `formula_detached=true`，该行未审数变为可编辑+不被公式覆盖+微黄背景+左侧橙色竖线；"🔗 恢复公式"取消标记并立即刷新；断开后自动进入编辑模式；标记随 JSONB 持久化，零后端改动
 - **试算平衡表 4 个报表类型页签**：balance_sheet / income_statement / cash_flow_statement / cash_flow_supplement（现金流量附表为新增）
+- **试算平衡表期初/期末双视图**：`tbSumPeriod` radio-group 切换 ending/opening；期初数据来源：连续审计=上年审定数自动带入（`tbSumOpeningSource='prior_year'`），首次承接=空行次手动填写（`'manual'`）；期初保存到独立 sheet key `tb_summary_opening_{type}`；期初也支持编辑/断开公式/导入导出
+- **期初试算上年数据取法**：用同一 `projectId` + `year-1` 查询（适用于同项目多年度场景）；上年数据全 0/null 视为无效走首次承接；跨项目取上年数据需未来"关联项目"机制（当前不支持）
 - **科目明细金额展示规则（最终版）**：所有普通行一律取绝对值展示 + 方向列标"借/贷"；小计按方向加减计算——资产类中贷方科目减去绝对值，负债/权益类中借方科目减去绝对值；小计直接展示计算结果；数据库存储不变
 - **working_paper 表名是单数**：`working_paper`（不是 working_papers），ORM 类 WorkingPaper.__tablename__ = "working_paper"
 - **`check_consol_lock` 必须 rollback**：查询不存在的 `projects.consol_lock` 列会让 asyncpg 事务进入 aborted 状态，后续所有 SQL 报 `InFailedSQLTransactionError`；except 分支必须 `await db.rollback()` 恢复事务（仅 `pass` 不够）
@@ -440,6 +444,16 @@ inclusion: always
   - **旧引擎外部调用方（3 处，仅回退时触发）**：import_job_runner.py（smart_import_streaming）、ledger_import_application_service.py（smart_parse_files + smart_import_streaming）、account_chart_service.py（_clear_project_year_tables）
 
 ### 中期功能完善
+- **审计调整分录企业级联动 spec 实施完成**（`.kiro/specs/enterprise-linkage/`）：5 Sprint / 41 必做任务全部完成 + 5 项复盘修复；8 项可选测试任务跳过；8 项 UAT 待手动验证
+  - Sprint 1（基础设施）：2 Alembic 迁移（3 新表 + adjustments.version）+ PresenceService(Redis ZSET) + ConflictGuardService(编辑锁+乐观锁) + Presence/ConflictGuard API + EventType 6 新枚举 + event_handlers SSE 推送 + 增量事件拉取端点
+  - Sprint 2（核心联动）：LinkageService（TB→分录/底稿关联 + 影响预判 + 变更历史 + 级联日志）+ Linkage API 4 端点 + 批量重分类导入/导出 3 端点 + 批量提交单次级联 + 批量原子性
+  - Sprint 3（前端集成）：5 composables（usePresence/useConflictGuard/useLinkageIndicator/useImpactPreview/useNavigationStack）+ 5 组件（PresenceAvatars/ConflictDialog/LinkageBadge+Popover/ImpactPreviewPanel）+ 右键菜单跨模块跳转
+  - Sprint 4（打磨监控）：useNotificationFatigue + EventCascadeMonitor + admin_event_health 端点 + useSSEDegradation + 权限过滤 + 跨年度隔离 + 一致性校验端点 + DegradedBanner
+  - 复盘修复 5 项：ORM 模型 enterprise_linkage_models.py（3 类）+ DegradedBanner 挂载 ThreeColumnLayout + ImpactPreviewPanel 挂载 Adjustments 创建对话框 + LinkageBadge 挂载 TrialBalance 联动列 + record_tb_change 事件订阅接入
+  - 新建后端文件 9 个：2 迁移 + presence_service + conflict_guard_service + linkage_service + event_cascade_monitor + presence.py + conflict_guard.py + linkage.py + reclassification.py + admin_event_health.py + enterprise_linkage_models.py
+  - 新建前端文件 12 个：7 composables + 5 components
+  - router_registry 新增 §30（Presence+ConflictGuard）§31（Linkage+Reclassification）§32（AdminEventHealth）
+  - apiPaths.ts 新增 presence/linkage/conflictGuard 3 个路径对象
 - **项目三码体系（待 spec）**：本企业名称+代码、上级企业名称+代码、最终控制方名称+代码 6 字段必填（所有项目，非仅合并），通过 parent_company_code→company_code 构建项目树；可见性基于 ProjectAssignment 派单裁剪（助理看子公司，经理看项目组，合伙人看全部）；需新建 spec 规划
 - 性能测试（真实 PG + 大数据量环境运行 load_test.py，验证 6000 并发）
 - working_paper_service 状态机 draft→edit_complete 是否符合业务流程（需确认）[P3]

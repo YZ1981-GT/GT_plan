@@ -69,6 +69,9 @@
         </template>
       </GtPageHeader>
 
+      <!-- 在线成员 [enterprise-linkage 3.2] -->
+      <PresenceAvatars :project-id="projectId" view-name="trial_balance" />
+
       <!-- 工作流进度条 -->
       <WorkflowProgress :project-id="projectId" :year="selectedYear" @step-action="onWorkflowAction" />
     </div>
@@ -338,6 +341,11 @@
           </span>
         </template>
       </el-table-column>
+      <el-table-column label="联动" width="100" align="center">
+        <template #default="{ row }">
+          <LinkageBadge v-if="row.row_code" :count="getAdjustments(row.row_code).length" type="adjustment" />
+        </template>
+      </el-table-column>
       <el-table-column label="审定数" width="160" align="right" class-name="gt-amt-col">
         <template #default="{ row, $index }">
           <CommentTooltip :comment="tbComments.getComment('trial_balance', $index, 5)">
@@ -368,6 +376,16 @@
 
     <!-- 试算平衡表视图（报表行次级别） -->
     <div v-if="tbViewMode === 'summary'">
+      <!-- 期初/期末切换 -->
+      <div style="display:flex;gap:12px;margin-bottom:8px;align-items:center">
+        <el-radio-group v-model="tbSumPeriod" size="small" @change="loadTbSummary()">
+          <el-radio-button value="ending">期末试算</el-radio-button>
+          <el-radio-button value="opening">期初试算</el-radio-button>
+        </el-radio-group>
+        <span v-if="tbSumPeriod === 'opening'" style="font-size:11px;color:#e6a23c">
+          {{ tbSumOpeningSource === 'prior_year' ? '📎 数据来源：上年审定数' : '✏️ 首次承接：手动填写' }}
+        </span>
+      </div>
       <!-- 报表类型切换 -->
       <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:2px solid #f0edf5">
         <span v-for="rt in tbSummaryTypes" :key="rt.key"
@@ -417,7 +435,7 @@
                   size="small"
                   :controls="false"
                   style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit()"
+                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
                   autofocus
                 />
                 <span v-else class="gt-tb-editable gt-amt" @click="tbSumLazyEdit.startEdit($index, 0)">
@@ -449,7 +467,7 @@
                   size="small"
                   :controls="false"
                   style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit()"
+                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
                   autofocus
                 />
                 <span v-else class="gt-tb-editable gt-amt" @click="tbSumLazyEdit.startEdit($index, 2)">{{ fmt(row.rcl_dr) }}</span>
@@ -463,7 +481,7 @@
                   size="small"
                   :controls="false"
                   style="width:100%"
-                  @blur="tbSumLazyEdit.stopEdit()"
+                  @blur="tbSumLazyEdit.stopEdit(); recalcTbSummaryAudited()"
                   autofocus
                 />
                 <span v-else class="gt-tb-editable gt-amt" @click="tbSumLazyEdit.startEdit($index, 3)">{{ fmt(row.rcl_cr) }}</span>
@@ -591,7 +609,8 @@
     <div class="gt-ucell-ctx-item" @click="onTbCtxDrillDown"><span class="gt-ucell-ctx-icon">📊</span> 查看明细</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxTrace"><span class="gt-ucell-ctx-icon">🔍</span> 数据溯源</div>
     <div class="gt-ucell-ctx-item" @click="onTbCtxOpenWp"><span class="gt-ucell-ctx-icon">📝</span> 打开底稿</div>
-    <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看相关分录</div>
+    <div class="gt-ucell-ctx-item" @click="onTbCtxViewAdj"><span class="gt-ucell-ctx-icon">📋</span> 查看调整分录</div>
+    <div class="gt-ucell-ctx-item" @click="onTbCtxViewLinkedWp"><span class="gt-ucell-ctx-icon">🔗</span> 查看关联底稿</div>
   </CellContextMenu>
 
   <DataQualityDialog
@@ -620,6 +639,7 @@ import { useTableSearch } from '@/composables/useTableSearch'
 import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
+import PresenceAvatars from '@/components/PresenceAvatars.vue'
 import { api } from '@/services/apiProxy'
 import { eventBus, type WorkpaperParsedPayload, type MaterialityChangedPayload } from '@/utils/eventBus'
 import {
@@ -643,6 +663,8 @@ import { useProjectEvents } from '@/composables/useProjectEvents'
 import { usePasteImport } from '@/composables/usePasteImport'
 import { usePermission } from '@/composables/usePermission'
 import * as P from '@/services/apiPaths'
+import LinkageBadge from '@/components/LinkageBadge.vue'
+import { useLinkageIndicator } from '@/composables/useLinkageIndicator'
 
 const route = useRoute()
 const router = useRouter()
@@ -658,6 +680,11 @@ const yearOptions = computed(() => projectStore.yearOptions)
 const { onDatasetActivated, onDatasetRolledBack } = useProjectEvents(projectId)
 onDatasetActivated(() => fetchData())
 onDatasetRolledBack(() => fetchData())
+
+// ─── 联动徽章 [enterprise-linkage 3.6] ─────────────────────────────────────────
+const linkageProjectId = computed(() => projectId)
+const linkageYear = computed(() => selectedYear.value ?? 2025)
+const { getAdjustments, getWorkpapers } = useLinkageIndicator(linkageProjectId, linkageYear)
 
 function onProjectChange(pid: string) {
   router.push({
@@ -1415,6 +1442,11 @@ const tbSumImportInput = ref<HTMLInputElement | null>(null)
 // 编辑模式开关（点击"编辑"按钮切换，编辑中可修改未审数，保存后退出编辑模式恢复双击溯源）
 const tbSumEditMode = ref(false)
 
+// 期初/期末切换
+const tbSumPeriod = ref<'ending' | 'opening'>('ending')
+// 期初数据来源：'prior_year'（连续审计，从上年带入）或 'manual'（首次承接，手动填写）
+const tbSumOpeningSource = ref<'prior_year' | 'manual'>('manual')
+
 // 未审数列是否可编辑（编辑模式开启时所有报表类型都可编辑）
 const tbSumUnadjEditable = computed(() => tbSumEditMode.value)
 
@@ -2066,6 +2098,20 @@ function onTbCtxViewAdj() {
   })
 }
 
+// enterprise-linkage 3.10：右键"查看关联底稿" → 跳转底稿列表筛选该科目
+function onTbCtxViewLinkedWp() {
+  tbCtx.closeContextMenu()
+  const row = tbCtx.contextMenu.rowData
+  if (!row?.standard_account_code) {
+    ElMessage.info('请先选中一个科目行')
+    return
+  }
+  router.push({
+    path: `/projects/${projectId.value}/workpapers`,
+    query: { account: row.standard_account_code },
+  })
+}
+
 const tbSummaryTypes = [
   { key: 'balance_sheet', label: '资产负债表' },
   { key: 'income_statement', label: '利润表' },
@@ -2076,7 +2122,12 @@ const tbSummaryTypes = [
 async function loadTbSummary() {
   tbSummaryLoading.value = true
   try {
-    // 调用新接口：从 adjustments 表自动汇总 AJE/RJE
+    if (tbSumPeriod.value === 'opening') {
+      // 期初试算：尝试从上年项目获取审定数，否则从 consol_worksheet_data 加载手动数据
+      await _loadOpeningTbSummary()
+      return
+    }
+    // 期末试算：调用新接口从 adjustments 表自动汇总 AJE/RJE
     const result = await api.get(
       P.trialBalance.summaryWithAdjustments(projectId.value),
       {
@@ -2161,12 +2212,88 @@ async function loadTbSummary() {
 }
 
 /**
+ * 加载期初试算平衡表
+ * 1. 尝试从上年项目获取审定数（连续审计）
+ * 2. 无上年数据时从 consol_worksheet_data 加载手动保存的期初数据（首次承接）
+ * 3. 都没有则加载空行次结构供手动填写
+ */
+async function _loadOpeningTbSummary() {
+  try {
+    // 先尝试从上年获取（连续审计场景）
+    const priorYear = year.value - 1
+    let priorRows: any[] = []
+    try {
+      const priorResult = await api.get(
+        P.trialBalance.summaryWithAdjustments(projectId.value),
+        { params: { year: priorYear, report_type: tbSummaryType.value }, validateStatus: (s: number) => s < 600 }
+      )
+      priorRows = priorResult?.rows ?? []
+    } catch { /* 上年无数据，静默 */ }
+
+    if (priorRows.length > 0) {
+      // 检查上年数据是否有实质内容（全 0/null 视为无效）
+      const hasSubstance = priorRows.some((r: any) => r.audited || r.unadjusted)
+      if (hasSubstance) {
+        // 连续审计：上年审定数作为本年期初
+        tbSumOpeningSource.value = 'prior_year'
+        tbSummaryRows.value = priorRows.map((r: any) => ({
+          row_code: r.row_code || '',
+          row_name: r.row_name || '',
+          indent: r.indent || 0,
+          is_total: r.is_total || false,
+          is_category: r.is_category || false,
+          unadjusted: r.audited ?? r.unadjusted ?? null,  // 上年审定数作为期初未审数
+          aje_dr: null,  // 期初的审计调整需要单独记录
+          aje_cr: null,
+          rcl_dr: null,
+          rcl_cr: null,
+          audited: r.audited ?? null,
+        }))
+      } else {
+        priorRows = []  // 全空数据视为无上年，走首次承接
+      }
+    }
+    if (priorRows.length === 0) {
+      // 首次承接：加载空行次结构
+      tbSumOpeningSource.value = 'manual'
+      const standard = `${selectedTemplateType.value}_standalone`
+      const reportData = await api.get(P.reportConfig.list, {
+        params: { report_type: tbSummaryType.value, applicable_standard: standard, project_id: projectId.value },
+        validateStatus: (s: number) => s < 600,
+      })
+      const reportRows = Array.isArray(reportData) ? reportData : []
+      tbSummaryRows.value = reportRows.map((r: any) => ({
+        row_code: r.row_code || '',
+        row_name: r.row_name || '',
+        indent: r.indent_level || 0,
+        is_total: r.is_total_row || false,
+        is_category: (r.indent_level === 0 && !r.is_total_row),
+        unadjusted: null,
+        aje_dr: null,
+        aje_cr: null,
+        rcl_dr: null,
+        rcl_cr: null,
+        audited: null,
+      }))
+    }
+
+    // 合并已保存的期初手动数据（覆盖上年带入值或填充空行）
+    await _mergeSavedTbSummary('opening')
+    recalcTbSummaryAudited()
+  } catch { tbSummaryRows.value = [] }
+  finally { tbSummaryLoading.value = false }
+}
+
+/**
  * 合并已保存的手动数据：对于公式计算结果为空（null/0）的行，
  * 用之前手动保存的值覆盖（典型场景：现金流量表无公式，全靠手动填写）
  */
-async function _mergeSavedTbSummary() {
+async function _mergeSavedTbSummary(periodOverride?: string) {
   try {
-    const sheetKey = `tb_summary_${tbSummaryType.value}`
+    const period = periodOverride || tbSumPeriod.value
+    const sheetKey = period === 'opening'
+      ? `tb_summary_opening_${tbSummaryType.value}`
+      : `tb_summary_${tbSummaryType.value}`
     const saved = await api.get(
       P.consolWorksheetData.get(projectId.value, selectedYear.value, sheetKey),
       { validateStatus: (s: number) => s < 600 }
@@ -2212,9 +2339,12 @@ async function saveTbSummary() {
       rcl_dr: r.rcl_dr, rcl_cr: r.rcl_cr,
       formula_detached: r.formula_detached || false,
     }))
+    const sheetKey = tbSumPeriod.value === 'opening'
+      ? `tb_summary_opening_${tbSummaryType.value}`
+      : `tb_summary_${tbSummaryType.value}`
     await api.put(
-      P.consolWorksheetData.get(projectId.value, selectedYear.value, `tb_summary_${tbSummaryType.value}`),
-      { sheet_key: `tb_summary_${tbSummaryType.value}`, data: { rows: saveRows } },
+      P.consolWorksheetData.get(projectId.value, selectedYear.value, sheetKey),
+      { sheet_key: sheetKey, data: { rows: saveRows } },
       { validateStatus: (s: number) => s < 600 }
     )
     ElMessage.success('试算平衡表已保存')
@@ -2332,6 +2462,7 @@ async function onTbSumImportFile(e: Event) {
   }
 
   ElMessage.success(`导入完成：${matched} 行匹配成功${skipped ? `，${skipped} 行跳过` : ''}`)
+  recalcTbSummaryAudited()
 }
 </script>
 

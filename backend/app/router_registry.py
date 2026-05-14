@@ -410,3 +410,22 @@ def register_all_routers(app: FastAPI) -> None:
     # 路由内部已声明 prefix="/api/projects/{project_id}/workflow-status"，注册时不加额外前缀。
     from app.routers.workflow_status import router as workflow_status_router
     app.include_router(workflow_status_router, tags=["workflow"])
+
+    # ═══ 30. Enterprise Linkage: Presence + Conflict Guard ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.presence import router as presence_router
+    from app.routers.conflict_guard import router as conflict_guard_router
+    app.include_router(presence_router, tags=["presence"])
+    app.include_router(conflict_guard_router, tags=["conflict-guard"])
+
+    # ═══ 31. Enterprise Linkage: 联动查询 + 批量重分类 ═══
+    # 路由内部已声明完整 prefix（含 /api），注册时不加额外前缀。
+    from app.routers.linkage import router as linkage_router
+    from app.routers.reclassification import router as reclassification_router
+    app.include_router(linkage_router, tags=["linkage"])
+    app.include_router(reclassification_router, tags=["reclassification"])
+
+    # ═══ 32. Enterprise Linkage: 管理后台事件健康 ═══
+    # 路由内部已声明 prefix="/api/admin/event-health"，注册时不加额外前缀。
+    from app.routers.admin_event_health import router as admin_event_health_router
+    app.include_router(admin_event_health_router, tags=["admin-event-health"])
